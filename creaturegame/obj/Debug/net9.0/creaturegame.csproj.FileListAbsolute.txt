@@ -1,0 +1,14 @@
+J:\creaturegame\creaturegame\creaturegame\obj\Debug\net9.0\creaturegame.GeneratedMSBuildEditorConfig.editorconfig
+J:\creaturegame\creaturegame\creaturegame\obj\Debug\net9.0\creaturegame.AssemblyInfoInputs.cache
+J:\creaturegame\creaturegame\creaturegame\obj\Debug\net9.0\creaturegame.AssemblyInfo.cs
+J:\creaturegame\creaturegame\creaturegame\obj\Debug\net9.0\creaturegame.csproj.CoreCompileInputs.cache
+J:\creaturegame\creaturegame\creaturegame\bin\Debug\net9.0\creaturegame.exe
+J:\creaturegame\creaturegame\creaturegame\bin\Debug\net9.0\creaturegame.deps.json
+J:\creaturegame\creaturegame\creaturegame\bin\Debug\net9.0\creaturegame.runtimeconfig.json
+J:\creaturegame\creaturegame\creaturegame\bin\Debug\net9.0\creaturegame.dll
+J:\creaturegame\creaturegame\creaturegame\bin\Debug\net9.0\creaturegame.pdb
+J:\creaturegame\creaturegame\creaturegame\obj\Debug\net9.0\creaturegame.dll
+J:\creaturegame\creaturegame\creaturegame\obj\Debug\net9.0\refint\creaturegame.dll
+J:\creaturegame\creaturegame\creaturegame\obj\Debug\net9.0\creaturegame.pdb
+J:\creaturegame\creaturegame\creaturegame\obj\Debug\net9.0\creaturegame.genruntimeconfig.cache
+J:\creaturegame\creaturegame\creaturegame\obj\Debug\net9.0\ref\creaturegame.dll
