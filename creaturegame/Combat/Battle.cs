@@ -48,7 +48,7 @@ public class Battle
         while (PlayerCreature.IsAlive() && EnemyCreature.IsAlive())
         {
             // TODO make attack choosable & pause for input here
-            attacker.Attack(defender, attacker.Attacks[0]);
+            attacker.Attack(defender, attacker.MoveSet[0]);
 
             Console.WriteLine(defender.IsAlive()
                 ? $"{defender.Name} now has {defender.Attributes.GetCurrentHealth()} health remaining."

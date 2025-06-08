@@ -11,7 +11,7 @@ public class Creature
     protected int Level { get; set; } = 1;
     public Attributes Attributes { get; set; } = new Attributes();
     private List<Trait> Traits { get; set; } = [];
-    public List<Attack> Attacks { get; set; } = [new Attack("Basic Attack", "just a basic attack")];
+    public List<Attack> MoveSet { get; set; } = [new Attack("Basic Attack", "just a basic attack")];
 
     protected Creature()
     {
@@ -46,7 +46,7 @@ public class Creature
     private void DisplayAttacks()
     {
         int index = 1;
-        foreach (Attack attack in Attacks)
+        foreach (Attack attack in MoveSet)
         {
             Console.WriteLine($"Attack #{index}: {attack}");
             index++;
