@@ -32,6 +32,7 @@ public class Attributes
                 Speed = 100;
                 break;
             }
+            case CreatureType.Undefined:
             default:
             {
                 PhysicalAttack = 50;
