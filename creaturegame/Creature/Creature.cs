@@ -1,6 +1,4 @@
-﻿using System.ComponentModel.Design;
-using System.Xml.Serialization;
-using creaturegame.Attacks;
+﻿using creaturegame.Attacks;
 using creaturegame.Creature.Traits;
 using creaturegame.Creature.Parts;
 
@@ -8,37 +6,29 @@ namespace creaturegame.Creature;
 
 public class Creature
 {
-    public BodyPart Parts { get; set; }
-    public string Name { get; set; }
-    public int Level { get; set; } = 1;
+    private BodyPart Parts { get; set; } = new BodyPart(new Body(), new Brain());
+    public string Name { get; set; } = string.Empty;
+    protected int Level { get; set; } = 1;
     public Attributes Attributes { get; set; } = new Attributes();
-    public List<Trait> Traits { get; set; } = [];
+    private List<Trait> Traits { get; set; } = [];
     public List<Attack> Attacks { get; set; } = [new Attack("Basic Attack", "just a basic attack")];
-    public Creature(Parts.BodyPart bodyPart, string name, Attributes attributes)
+
+    protected Creature()
     {
-        Parts = bodyPart;
-        Name = name;
-        
     }
 
     public Creature(string name)
     {
-        Parts = new BodyPart(new Body(), new Brain());
         Name = name;
         Traits = [new Trait(TraitType.Ability, "Heat", "Gives Heat"), new Trait(TraitType.Flaw, "Weak", "is weak")];
-    }
-
-    protected Creature()
-    {
-        throw new NotImplementedException();
     }
 
 
     public void DisplayInfo()
     {
         Console.WriteLine($"Name: {Name}, Level: {Level}");
-        Console.WriteLine($"Attributes: {Attributes.ToString()}");
-        Console.WriteLine($"Parts: {Parts.ToString()}");
+        Console.WriteLine($"Attributes: {Attributes}");
+        Console.WriteLine($"Parts: {Parts}");
         DisplayTraits();
         DisplayAttacks();
     }
@@ -48,7 +38,7 @@ public class Creature
         int index = 1;
         foreach (Trait trait in Traits)
         {
-            Console.WriteLine($"Trait #{index}: {trait.ToString()}");
+            Console.WriteLine($"Trait #{index}: {trait}");
             index++;
         }
     }
@@ -58,7 +48,7 @@ public class Creature
         int index = 1;
         foreach (Attack attack in Attacks)
         {
-            Console.WriteLine($"Attack #{index}: {attack.ToString()}");
+            Console.WriteLine($"Attack #{index}: {attack}");
             index++;
         }
     }

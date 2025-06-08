@@ -9,4 +9,11 @@ public class Dragon : Creature
         Attributes.SetAttributesByCreatureType(CreatureType.Dragon);
     }
     
+    public Dragon(string creatureName)
+        {
+            Name = creatureName;
+            Level = 1;
+            Attributes.SetAttributesByCreatureType(CreatureType.Dragon);
+        }
+    
 }
