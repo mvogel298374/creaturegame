@@ -1,12 +1,15 @@
 ﻿namespace creaturegame.Attacks;
 
-public class Attack(string name, string description)
+public class Attack
 {
+    public int Id { get; set; }
     public int BaseDamage { get; set; } = 10;
-    private DamageType DamageType { get; set; } = DamageType.Physical;
-    private string Name { get; set; } = name;
-    private string Description { get; set; } = description;
-    private int Accuracy { get; set; } = 100;
+    public AttackType AttackType { get; set; } = AttackType.Physical;
+    
+    public DamageType DamageType { get; set; } = DamageType.Normal;
+    public string Name { get; set; }
+    public string Description { get; set; }
+    public int Accuracy { get; set; } = 100;
     public int PowerPointsMax { get; set; } = 30;
     public int PowerPointsCurrent { get; set; } = 30;
     public double CriticalChance { get; set; } = 0.05;
@@ -14,9 +17,18 @@ public class Attack(string name, string description)
     public int Cooldown { get; set; } = 0;
     public int Weight { get; set; } = 500;
     
+    public Attack()
+    {
+    }
+    
+    public Attack(string name, string description)
+    {
+        Name = name;
+        Description = description;
+    }
 
     public override string ToString()
     {
-        return $"Name: {Name}, Damage: {BaseDamage}, DamageType: {DamageType}, Description: {Description}";
+        return $"Name: {Name}, Damage: {BaseDamage}, DamageType: {AttackType}, Description: {Description}";
     }
 }

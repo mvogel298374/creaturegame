@@ -2,7 +2,9 @@
 
 public enum DamageType
 {
-    Physical,
-    Special,
-    Undefined
+    Normal,
+    Fighting,
+    Psychic,
+    Electric,
+    Water
 }

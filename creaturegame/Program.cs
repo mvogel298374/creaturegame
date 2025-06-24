@@ -1,5 +1,6 @@
 ﻿using creaturegame.Combat;
 using creaturegame.Creature.Creatures;
+using creaturegame.DB;
 
 namespace creaturegame;
 
@@ -10,11 +11,12 @@ class Program
         var creature1 = new Creature.Creature("Tommy");
         var creature2 = new Dragon("Jimmy");
         creature1.DisplayInfo();
-
-        var newbattle = new Battle(creature1, creature2);
-        newbattle.StartFight();
+        AttackSeeder attackSeeder = new AttackSeeder();
+        attackSeeder.AddAttack();
+        //var newbattle = new Battle(creature1, creature2);
+        //newbattle.StartFight();
         
         Console.WriteLine("Press any key to exit...");
         Console.ReadKey();
     }
-} 
+}  
