@@ -26,7 +26,7 @@ public class MoveImport
 
             if (genResponse?.moves != null)
             {
-                using var context = new GameDbContext();
+                using var context = new MovesDbContext();
                 foreach (var moveResource in genResponse.moves)
                 {
                     await FetchMoveDataByUrl(moveResource.url, context);
@@ -42,11 +42,11 @@ public class MoveImport
     public static async Task FetchMoveData(int moveId)
     {
         string url = $"https://pokeapi.co/api/v2/move/{moveId}/";
-        using var context = new GameDbContext();
+        using var context = new MovesDbContext();
         await FetchMoveDataByUrl(url, context);
     }
 
-    private static async Task FetchMoveDataByUrl(string url, GameDbContext context)
+    private static async Task FetchMoveDataByUrl(string url, MovesDbContext context)
     {
         using HttpClient client = new HttpClient();
         try

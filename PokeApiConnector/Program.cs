@@ -5,10 +5,16 @@ class Program
 {
     static async Task Main(string[] args)
     {
-        using (var context = new creaturegame.DB.GameDbContext())
+        using (var moveContext = new creaturegame.DB.MovesDbContext())
         {
-            Console.WriteLine("Ensuring database is created and schema is up to date...");
-            context.EnsureDatabaseCreated();
+            Console.WriteLine("Ensuring moves database is created...");
+            moveContext.EnsureDatabaseCreated();
+        }
+
+        using (var pokemonContext = new creaturegame.DB.PokemonDbContext())
+        {
+            Console.WriteLine("Ensuring pokemon database is created...");
+            pokemonContext.EnsureDatabaseCreated();
         }
 
         Console.WriteLine("Importing Gen 1 Moves...");

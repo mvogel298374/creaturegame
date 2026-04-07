@@ -26,7 +26,7 @@ public class PokemonImport
 
             if (genResponse?.pokemon_species != null)
             {
-                using var context = new GameDbContext();
+                using var context = new PokemonDbContext();
                 // Filter to only Gen 1 pokemon (IDs 1-151) because the generation endpoint returns all species associated, 
                 // but some might be from later gens if they have a relationship? 
                 // Actually for Gen 1 it should be 1-151.
@@ -46,7 +46,7 @@ public class PokemonImport
         }
     }
 
-    private static async Task FetchPokemonDataByUrl(string url, GameDbContext context)
+    private static async Task FetchPokemonDataByUrl(string url, PokemonDbContext context)
     {
         using HttpClient client = new HttpClient();
         try

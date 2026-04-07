@@ -5,9 +5,9 @@ namespace creaturegame.DB;
 
 public class AttackService
 {
-    private readonly GameDbContext _context;
+    private readonly MovesDbContext _context;
 
-    public AttackService(GameDbContext context)
+    public AttackService(MovesDbContext context)
     {
         _context = context;
     }

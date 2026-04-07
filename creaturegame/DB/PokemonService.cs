@@ -5,9 +5,9 @@ namespace creaturegame.DB;
 
 public class PokemonService
 {
-    private readonly GameDbContext _context;
+    private readonly PokemonDbContext _context;
 
-    public PokemonService(GameDbContext context)
+    public PokemonService(PokemonDbContext context)
     {
         _context = context;
     }

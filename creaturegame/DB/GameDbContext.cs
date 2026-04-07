@@ -3,18 +3,32 @@ using Microsoft.EntityFrameworkCore;
 
 namespace creaturegame.DB;
 
-public class GameDbContext: DbContext
+public class MovesDbContext : DbContext
 {
     public DbSet<Attack> Moves { get; set; }
-    public DbSet<PokemonSpecies> Species { get; set; }
-    
+
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
-        // The connection string points to a local SQLite file (moves.db in the project folder).
-        optionsBuilder.UseSqlite("Data Source=moves.db");
+        string dbPath = DbPathHelper.GetDatabasePath("moves.db");
+        optionsBuilder.UseSqlite($"Data Source={dbPath}");
     }
 
-    // Optionally, override OnModelCreating to configure the model further.
+    public void EnsureDatabaseCreated()
+    {
+        Database.EnsureCreated();
+    }
+}
+
+public class PokemonDbContext : DbContext
+{
+    public DbSet<PokemonSpecies> Species { get; set; }
+
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        string dbPath = DbPathHelper.GetDatabasePath("pokemon.db");
+        optionsBuilder.UseSqlite($"Data Source={dbPath}");
+    }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

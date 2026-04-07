@@ -12,11 +12,14 @@ class Program
     {
         Console.WriteLine("=== Gen 1 Pokemon Battle Simulator Scaffold ===");
         
-        var context = new GameDbContext();
-        context.EnsureDatabaseCreated();
+        var moveContext = new MovesDbContext();
+        moveContext.EnsureDatabaseCreated();
         
-        var attackService = new AttackService(context);
-        var pokemonService = new PokemonService(context);
+        var pokemonContext = new PokemonDbContext();
+        pokemonContext.EnsureDatabaseCreated();
+        
+        var attackService = new AttackService(moveContext);
+        var pokemonService = new PokemonService(pokemonContext);
 
         // Fetch Species from DB
         var bulbasaurSpecies = await pokemonService.GetSpeciesByNameAsync("bulbasaur");
