@@ -19,7 +19,6 @@ public class AttackSeeder
         
         
         using var context = new GameDbContext();
-        //context.Database.EnsureCreated();
         context.Moves.Add(newattack);
         context.SaveChanges();
     }

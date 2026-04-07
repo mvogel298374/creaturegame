@@ -1,4 +1,6 @@
-﻿namespace creaturegame.Attacks;
+﻿using System.Collections;
+
+namespace creaturegame.Attacks;
 
 public class Attack
 {
@@ -11,7 +13,6 @@ public class Attack
     public string Description { get; set; }
     public int Accuracy { get; set; } = 100;
     public int PowerPointsMax { get; set; } = 30;
-    public int PowerPointsCurrent { get; set; } = 30;
     public double CriticalChance { get; set; } = 0.05;
     public double DamageVariance { get; set; } = 0.10;
     public int Cooldown { get; set; } = 0;

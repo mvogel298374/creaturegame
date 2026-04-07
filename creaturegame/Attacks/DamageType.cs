@@ -6,5 +6,18 @@ public enum DamageType
     Fighting,
     Psychic,
     Electric,
-    Water
+    Water,
+    Flying,
+    Poison,
+    Ground,
+    Rock,
+    Bug,
+    Ghost,
+    Steel,
+    Fire,
+    Grass,
+    Ice,
+    Dragon,
+    Dark,
+    Fairy
 }
