@@ -11,7 +11,17 @@ public class Creature
     protected int Level { get; set; } = 1;
     public Attributes Attributes { get; set; } = new Attributes();
     private List<Trait> Traits { get; set; } = [];
-    public List<Attack> MoveSet { get; set; } = [new Attack("Basic Attack", "just a basic attack")];
+    public List<Attack> MoveSet { get; private set; } = [];
+
+    public bool AddAttack(Attack attack)
+    {
+        if (MoveSet.Count < 4 && !MoveSet.Any(m => m.Id == attack.Id))
+        {
+            MoveSet.Add(attack);
+            return true;
+        }
+        return false;
+    }
 
     protected Creature()
     {

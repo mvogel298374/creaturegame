@@ -34,8 +34,10 @@ You can use the following commands at the start of your message to instantly set
 ## General Instructions
 *   **Default Behavior**: If no command (like `/plan` or `/dev`) is specified, use your best judgment to mix the profiles or choose the most appropriate one based on the user's input.
 *   **External Resources**:
-    *   **PokeAPI**: Use [pokeapi.co](https://pokeapi.co/) as the primary data source for Pokémon, moves, and types.
-    *   **MCP Servers**: If available in the environment, utilize Model Context Protocol (MCP) servers for enhanced project search, documentation indexing, or specialized API interactions.
+    *   **PokeAPI**: Use [pokeapi.co](https://pokeapi.co/) as the primary data source for Pokémon, moves, and types. Use REST endpoints directly:
+        *   `https://pokeapi.co/api/v2/pokemon/{name|id}` - Stats & Types.
+        *   `https://pokeapi.co/api/v2/move/{name|id}` - Move details.
+        *   `https://pokeapi.co/api/v2/type/{name|id}` - Damage relations.
 *   **Always check `DESIGN_GUIDES.md` and `DEV_STANDARDS.md` before starting a multi-step task.
 *   If a request is ambiguous, ask whether it should be handled under `/plan` or `/dev`.
 *   Maintain the `identifier.sqlite` and `moves.db` integrity at all times.
