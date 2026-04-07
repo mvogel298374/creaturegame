@@ -64,6 +64,18 @@ public class Creature
         Traits = [new Trait(TraitType.Ability, "Heat", "Gives Heat"), new Trait(TraitType.Flaw, "Weak", "is weak")];
     }
 
+    public void InitializeFromSpecies(DB.PokemonSpecies species)
+    {
+        BaseHP = species.BaseHP;
+        BaseAttack = species.BaseAttack;
+        BaseDefense = species.BaseDefense;
+        BaseSpecial = species.BaseSpecial;
+        BaseSpeed = species.BaseSpeed;
+        Type1 = species.Type1;
+        Type2 = species.Type2;
+        CalculateStats();
+    }
+
     private void GenerateRandomDVs()
     {
         DvAttack = Random.Shared.Next(16);
