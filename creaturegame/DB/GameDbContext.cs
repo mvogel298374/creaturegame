@@ -18,7 +18,7 @@ public class GameDbContext: DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-        // For example, you can add constraints, indexes, etc.
+        modelBuilder.Entity<PokemonSpecies>().ToTable("PokemonSpecies");
     }
 
     public void EnsureDatabaseCreated()
