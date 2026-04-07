@@ -33,8 +33,7 @@ public class AttackAction : IBattleAction
 
         // Accuracy check
         int accuracy = Move.Accuracy;
-        // Simplified accuracy check for now
-        if (Random.Shared.Next(1, 101) > accuracy)
+        if (accuracy < 100 && Random.Shared.Next(1, 101) > accuracy)
         {
             Console.WriteLine("The attack missed!");
             return Task.CompletedTask;
