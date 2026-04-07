@@ -1,4 +1,6 @@
-﻿using creaturegame.Combat;
+﻿using creaturegame.Attacks;
+using creaturegame.Combat;
+using creaturegame.Creature;
 using creaturegame.Creature.Creatures;
 using creaturegame.DB;
 
@@ -10,29 +12,37 @@ class Program
     {
         var context = new GameDbContext();
         var attackService = new AttackService(context);
-        var attackSeeder = new AttackSeeder(attackService);
 
-        // Ensure we have some data in the DB
-        await attackSeeder.SeedTackleAsync();
+        var creature1 = new creaturegame.Creature.Creature("Tommy")
+        {
+            BaseHP = 45,
+            BaseAttack = 49,
+            BaseDefense = 49,
+            BaseSpecial = 65,
+            BaseSpeed = 45,
+            Type1 = DamageType.Grass,
+            Type2 = DamageType.Poison,
+            Level = 50
+        };
+        creature1.CalculateStats();
 
-        var creature1 = new Creature.Creature("Tommy");
         var creature2 = new Dragon("Jimmy");
 
         // Give Tommy the default move
-        await attackSeeder.GiveDefaultMoveAsync(creature1);
+        await attackService.GiveDefaultMoveAsync(creature1);
         
         // Give Jimmy a random move
-        await attackSeeder.GiveRandomMoveAsync(creature2);
+        await attackService.GiveRandomMoveAsync(creature2);
 
         Console.WriteLine("--- Creature 1 Info ---");
         creature1.DisplayInfo();
         Console.WriteLine("\n--- Creature 2 Info ---");
         creature2.DisplayInfo();
         
-        //var newbattle = new Battle(creature1, creature2);
-        //newbattle.StartFight();
+        var battle = new Battle(creature1, creature2);
+        await battle.StartFightAsync();
         
         Console.WriteLine("\nPress any key to exit...");
         Console.ReadKey();
     }
-}  
+}

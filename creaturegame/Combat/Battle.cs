@@ -4,61 +4,66 @@ namespace creaturegame.Combat;
 
 public class Battle
 {
-    private Creature.Creature PlayerCreature { get; set; }
-    private Creature.Creature EnemyCreature { get; set; }
+    private Creature.Creature PlayerCreature { get; }
+    private Creature.Creature EnemyCreature { get; }
 
-    public Battle(Creature.Creature attacker, Creature.Creature defender)
+    public Battle(Creature.Creature player, Creature.Creature enemy)
     {
-        PlayerCreature = attacker;
-        EnemyCreature = defender;
+        PlayerCreature = player;
+        EnemyCreature = enemy;
     }
 
-    public void StartFight()
+    public async Task StartFightAsync()
     {
-        Console.WriteLine("Battle starts!");
+        Console.WriteLine($"A wild {EnemyCreature.Name} appeared!");
+        Console.WriteLine($"Go! {PlayerCreature.Name}!");
 
-        Creature.Creature attacker;
-        Creature.Creature defender;
-        
-        if (PlayerCreature.Attributes.GetSpeed() > EnemyCreature.Attributes.GetSpeed())
-        {
-            attacker = PlayerCreature;
-            defender = EnemyCreature;    
-        }
-        else if (PlayerCreature.Attributes.GetSpeed() < EnemyCreature.Attributes.GetSpeed())
-        {
-            attacker = EnemyCreature;
-            defender = PlayerCreature; 
-        }
-        else
-        {
-            var random = Random.Shared.NextInt64(1,2);
-            if (random == 1)
-            {
-                attacker = PlayerCreature;
-                defender = EnemyCreature;
-            }
-            else
-            {
-                attacker = EnemyCreature;
-                defender = PlayerCreature; 
-            }
-        }
-        
         while (PlayerCreature.IsAlive() && EnemyCreature.IsAlive())
         {
-            // TODO make attack choosable & pause for input here
-            attacker.Attack(defender, attacker.MoveSet[0]);
+            Console.WriteLine($"\n{PlayerCreature.Name}: {PlayerCreature.Attributes.HP}/{PlayerCreature.Attributes.MaxHP} HP");
+            Console.WriteLine($"{EnemyCreature.Name}: {EnemyCreature.Attributes.HP}/{EnemyCreature.Attributes.MaxHP} HP");
 
-            Console.WriteLine(defender.IsAlive()
-                ? $"{defender.Name} now has {defender.Attributes.GetCurrentHealth()} health remaining."
-                : $"{defender.Name} has fainted. {attacker.Name} wins the combat!");
+            // For now, always pick first move for simplicity in this demo
+            var playerMove = PlayerCreature.MoveSet.Count > 0 ? PlayerCreature.MoveSet[0] : null;
+            var enemyMove = EnemyCreature.MoveSet.Count > 0 ? EnemyCreature.MoveSet[0] : null;
 
-            // Swap roles for the next turn. A simple swap to alternate between creatures.
-            (attacker, defender) = (defender, attacker);
+            if (playerMove == null || enemyMove == null) break;
 
-            // (Optional) Pause between turns for readability.
-            Console.WriteLine("Press any key for the next round...");
+            var playerAction = new AttackAction(PlayerCreature, EnemyCreature, playerMove);
+            var enemyAction = new AttackAction(EnemyCreature, PlayerCreature, enemyMove);
+
+            // Turn Resolution:
+            // 1. Priority
+            // 2. Speed
+            // 3. Random tie-breaker
+            
+            var turnQueue = new List<IBattleAction> { playerAction, enemyAction };
+            
+            turnQueue = turnQueue.OrderByDescending(a => a.Priority)
+                                 .ThenByDescending(a => a.Source.Attributes.Speed)
+                                 .ThenBy(a => Random.Shared.Next())
+                                 .ToList();
+
+            foreach (var action in turnQueue)
+            {
+                if (action.Source.IsAlive() && (action as AttackAction)?.Target.IsAlive() == true)
+                {
+                    await action.ExecuteAsync();
+                }
+            }
+
+            if (!EnemyCreature.IsAlive())
+            {
+                Console.WriteLine($"{EnemyCreature.Name} fainted!");
+                break;
+            }
+            if (!PlayerCreature.IsAlive())
+            {
+                Console.WriteLine($"{PlayerCreature.Name} fainted!");
+                break;
+            }
+
+            Console.WriteLine("\nPress any key for the next round...");
             Console.ReadKey();
         }
     }

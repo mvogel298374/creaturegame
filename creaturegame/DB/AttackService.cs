@@ -63,4 +63,22 @@ public class AttackService
         int index = Random.Shared.Next(count);
         return await _context.Moves.Skip(index).FirstOrDefaultAsync();
     }
+
+    /// <summary>
+    /// Assigns a default move (tackle) to a creature if available in the database.
+    /// </summary>
+    public async Task<bool> GiveDefaultMoveAsync(Creature.Creature creature)
+    {
+        var move = await GetAttackByNameAsync("tackle");
+        return move != null && creature.AddAttack(move);
+    }
+
+    /// <summary>
+    /// Assigns a random move from the database to a creature.
+    /// </summary>
+    public async Task<bool> GiveRandomMoveAsync(Creature.Creature creature)
+    {
+        var move = await GetRandomAttackAsync();
+        return move != null && creature.AddAttack(move);
+    }
 }

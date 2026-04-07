@@ -4,17 +4,17 @@ namespace creaturegame.Creature;
 
 public class Attributes
 {
-    private int PhysicalAttack { get; set; } = 50;
-    private int SpecialAttack { get; set; } = 50;
-    private int PhysicalDefense { get; set; } = 50;
-    private int SpecialDefense { get; set; } = 50;
-    private int Health { get; set; } = 100;
-    private int Speed { get; set; } = 50;
+    public int Attack { get; set; } = 50;
+    public int Defense { get; set; } = 50;
+    public int Special { get; set; } = 50;
+    public int HP { get; set; } = 100;
+    public int MaxHP { get; set; } = 100;
+    public int Speed { get; set; } = 50;
 
 
     public override string ToString()
     {
-        return $@"ATK: {this.PhysicalAttack}, DEF: {this.PhysicalDefense}, Sp. ATK: {this.SpecialAttack}, Sp. DEF: {this.SpecialDefense}, HP: {this.Health}, SPD: {this.Speed}";
+        return $@"ATK: {this.Attack}, DEF: {this.Defense}, SPEC: {this.Special}, HP: {this.HP}/{this.MaxHP}, SPD: {this.Speed}";
     }
 
     public void SetAttributesByCreatureType(CreatureType creature)
@@ -24,22 +24,22 @@ public class Attributes
         {
             case CreatureType.Dragon:
             {
-                PhysicalAttack = 100;
-                SpecialAttack = 80;
-                PhysicalDefense = 60;
-                SpecialDefense = 60;
-                Health = 200;
+                Attack = 100;
+                Special = 80;
+                Defense = 60;
+                HP = 200;
+                MaxHP = 200;
                 Speed = 100;
                 break;
             }
             case CreatureType.Undefined:
             default:
             {
-                PhysicalAttack = 50;
-                SpecialAttack = 50;
-                PhysicalDefense = 50;
-                SpecialDefense = 50;
-                Health = 100;
+                Attack = 50;
+                Special = 50;
+                Defense = 50;
+                HP = 100;
+                MaxHP = 100;
                 Speed = 50;
                 break;
             } 
@@ -48,28 +48,26 @@ public class Attributes
     
     public void ReceiveDamage(int damage)
     {
-        this.Health -= damage;
-        if (this.Health <= 0)
-            this.Health = 0;
+        this.HP -= damage;
+        if (this.HP <= 0)
+            this.HP = 0;
     }
 
     public void ReceiveHealing(int healing)
     {
-        var currentHealth = GetCurrentHealth();
-        this.Health += healing;
-        if (this.Health >= currentHealth)
-            this.Health = currentHealth;
+        this.HP += healing;
+        if (this.HP >= this.MaxHP)
+            this.HP = this.MaxHP;
     }
 
     public int GetCurrentHealth()
     {
-        return this.Health;
+        return this.HP;
     }
 
     public int GetSpeed()
     {
         return this.Speed;
     }
-
 }
 
