@@ -34,6 +34,58 @@ public class CoreMechanicsTests
     }
 
     [Fact]
+    public void TestLevelUpStatIncrease()
+    {
+        var bulbasaur = new Creature.Creature("Tommy")
+        {
+            BaseHP = 45,
+            BaseAttack = 49,
+            BaseDefense = 49,
+            BaseSpecial = 65,
+            BaseSpeed = 45,
+            Level = 5,
+            DvAttack = 15,
+            DvDefense = 15,
+            DvSpecial = 15,
+            DvSpeed = 15,
+            DvHP = 15
+        };
+        bulbasaur.CalculateStats();
+        
+        int oldHp = bulbasaur.Attributes.HP;
+        int oldAttack = bulbasaur.Attributes.Attack;
+        int oldSpecial = bulbasaur.Attributes.Special;
+
+        bulbasaur.LevelUp();
+
+        Assert.Equal(6, bulbasaur.Level);
+        Assert.True(bulbasaur.Attributes.HP > oldHp);
+        Assert.True(bulbasaur.Attributes.Attack > oldAttack);
+        Assert.True(bulbasaur.Attributes.Special > oldSpecial);
+    }
+
+    [Fact]
+    public void TestGainExperienceLevelUp()
+    {
+        var bulbasaur = new Creature.Creature("Tommy")
+        {
+            BaseHP = 45,
+            BaseAttack = 49,
+            BaseDefense = 49,
+            BaseSpecial = 65,
+            BaseSpeed = 45,
+            Level = 1,
+            Experience = 0
+        };
+        bulbasaur.CalculateStats();
+
+        // Exp for level 2: 2^3 = 8
+        bulbasaur.GainExperience(10);
+
+        Assert.Equal(2, bulbasaur.Level);
+    }
+
+    [Fact]
     public void TestDamageCalculationFormula()
     {
         var attacker = new Creature.Creature("Attacker") { Level = 50 };

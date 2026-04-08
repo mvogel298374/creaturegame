@@ -27,6 +27,49 @@ public class Creature
     public DamageType? Type2 { get; set; }
 
     public int Experience { get; set; } = 0;
+    public const int MaxLevel = 100;
+
+    public void GainExperience(int amount)
+    {
+        Experience += amount;
+        // Simplified level up logic as per requirement:
+        // "lets not worry about WHEN a pokemon levels up"
+        // But we still need a way to level up.
+        // I will implement a basic Experience to Level mapping or just a manual LevelUp.
+        // Given the request, I'll add a manual LevelUp method and maybe a simple threshold here.
+        
+        int nextLevelExperience = CalculateExperienceForLevel(Level + 1);
+        while (Experience >= nextLevelExperience && Level < MaxLevel)
+        {
+            LevelUp();
+            nextLevelExperience = CalculateExperienceForLevel(Level + 1);
+        }
+    }
+
+    public void LevelUp()
+    {
+        if (Level < MaxLevel)
+        {
+            Level++;
+            int oldMaxHp = Attributes.MaxHP;
+            CalculateStats();
+            
+            // Heal by the amount MaxHP increased
+            int hpIncrease = Attributes.MaxHP - oldMaxHp;
+            if (hpIncrease > 0)
+            {
+                Attributes.ReceiveHealing(hpIncrease);
+            }
+            
+            Console.WriteLine($"{Name} leveled up to {Level}!");
+        }
+    }
+
+    private int CalculateExperienceForLevel(int level)
+    {
+        // Simple Medium Fast growth rate: exp = level^3
+        return (int)Math.Pow(level, 3);
+    }
     
     // Base Stats
     public int BaseHP { get; set; }
