@@ -36,7 +36,8 @@ public class PokemonImport
                     // The species URL is like https://pokeapi.co/api/v2/pokemon-species/1/
                     // We need the pokemon data which is at https://pokeapi.co/api/v2/pokemon/1/
                     string pokemonUrl = speciesResource.url.Replace("pokemon-species", "pokemon");
-                    await FetchPokemonDataByUrl(pokemonUrl, context);
+                    string speciesUrl = speciesResource.url;
+                    await FetchPokemonDataByUrl(pokemonUrl, speciesUrl, context);
                 }
             }
         }
@@ -46,26 +47,29 @@ public class PokemonImport
         }
     }
 
-    private static async Task FetchPokemonDataByUrl(string url, PokemonDbContext context)
+    private static async Task FetchPokemonDataByUrl(string url, string speciesUrl, PokemonDbContext context)
     {
         using HttpClient client = new HttpClient();
         try
         {
+            // Fetch Pokemon Data
             HttpResponseMessage response = await client.GetAsync(url);
             response.EnsureSuccessStatusCode();
-
             string json = await response.Content.ReadAsStringAsync();
-            PokeApiPokemon pokeData = JsonSerializer.Deserialize<PokeApiPokemon>(json, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            });
+            PokeApiPokemon pokeData = JsonSerializer.Deserialize<PokeApiPokemon>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
-            if (pokeData != null)
+            // Fetch Species Data for Growth Rate
+            HttpResponseMessage speciesResponse = await client.GetAsync(speciesUrl);
+            speciesResponse.EnsureSuccessStatusCode();
+            string speciesJson = await speciesResponse.Content.ReadAsStringAsync();
+            PokeApiPokemonSpecies speciesData = JsonSerializer.Deserialize<PokeApiPokemonSpecies>(speciesJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            if (pokeData != null && speciesData != null)
             {
                 // We only want Gen 1 (1-151)
                 if (pokeData.Id > 151) return;
 
-                PokemonSpecies species = MapToSpecies(pokeData);
+                PokemonSpecies species = MapToSpecies(pokeData, speciesData);
                 
                 var existing = await context.Species.AsNoTracking().FirstOrDefaultAsync(s => s.Id == species.Id);
                 if (existing == null)
@@ -88,7 +92,7 @@ public class PokemonImport
         }
     }
 
-    private static PokemonSpecies MapToSpecies(PokeApiPokemon pokeData)
+    private static PokemonSpecies MapToSpecies(PokeApiPokemon pokeData, PokeApiPokemonSpecies speciesData)
     {
         var species = new PokemonSpecies
         {
@@ -98,7 +102,8 @@ public class PokemonImport
             BaseAttack = pokeData.Stats.FirstOrDefault(s => s.Stat.Name == "attack")?.BaseStat ?? 0,
             BaseDefense = pokeData.Stats.FirstOrDefault(s => s.Stat.Name == "defense")?.BaseStat ?? 0,
             BaseSpecial = pokeData.Stats.FirstOrDefault(s => s.Stat.Name == "special-attack")?.BaseStat ?? 0, // In Gen 1 Special Attack and Defense were one "Special" stat
-            BaseSpeed = pokeData.Stats.FirstOrDefault(s => s.Stat.Name == "speed")?.BaseStat ?? 0
+            BaseSpeed = pokeData.Stats.FirstOrDefault(s => s.Stat.Name == "speed")?.BaseStat ?? 0,
+            GrowthRate = MapGrowthRate(speciesData.GrowthRate?.Name)
         };
 
         // Types
@@ -117,5 +122,17 @@ public class PokemonImport
         }
 
         return species;
+    }
+
+    private static creaturegame.Creature.GrowthRate MapGrowthRate(string? name)
+    {
+        return name switch
+        {
+            "fast" => creaturegame.Creature.GrowthRate.Fast,
+            "medium" => creaturegame.Creature.GrowthRate.MediumFast,
+            "medium-slow" => creaturegame.Creature.GrowthRate.MediumSlow,
+            "slow" => creaturegame.Creature.GrowthRate.Slow,
+            _ => creaturegame.Creature.GrowthRate.MediumFast
+        };
     }
 }
