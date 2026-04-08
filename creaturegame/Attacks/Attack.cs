@@ -18,6 +18,10 @@ public class Attack
     public int Cooldown { get; set; } = 0;
     public int Weight { get; set; } = 500;
     
+    // New Gen 1 Properties
+    public int Priority { get; set; } = 0;
+    public int? EffectChance { get; set; }
+    
     public Attack()
     {
     }

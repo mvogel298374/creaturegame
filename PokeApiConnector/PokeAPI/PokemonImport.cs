@@ -103,7 +103,10 @@ public class PokemonImport
             BaseDefense = pokeData.Stats.FirstOrDefault(s => s.Stat.Name == "defense")?.BaseStat ?? 0,
             BaseSpecial = pokeData.Stats.FirstOrDefault(s => s.Stat.Name == "special-attack")?.BaseStat ?? 0, // In Gen 1 Special Attack and Defense were one "Special" stat
             BaseSpeed = pokeData.Stats.FirstOrDefault(s => s.Stat.Name == "speed")?.BaseStat ?? 0,
-            GrowthRate = MapGrowthRate(speciesData.GrowthRate?.Name)
+            GrowthRate = MapGrowthRate(speciesData.GrowthRate?.Name),
+            CatchRate = speciesData.CaptureRate,
+            BaseExperience = pokeData.BaseExperience ?? 0,
+            PokedexEntry = speciesData.FlavorTextEntries?.FirstOrDefault(f => f.Language.Name == "en")?.FlavorText.Replace("\f", " ").Replace("\n", " ")
         };
 
         // Types

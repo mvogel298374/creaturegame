@@ -16,6 +16,15 @@ public class MovesDbContext : DbContext
     public void EnsureDatabaseCreated()
     {
         Database.EnsureCreated();
+        try
+        {
+            Database.ExecuteSqlRaw("SELECT Priority FROM Moves LIMIT 1;");
+        }
+        catch (Microsoft.Data.Sqlite.SqliteException)
+        {
+            Database.ExecuteSqlRaw("ALTER TABLE Moves ADD COLUMN Priority INTEGER NOT NULL DEFAULT 0;");
+            Database.ExecuteSqlRaw("ALTER TABLE Moves ADD COLUMN EffectChance INTEGER;");
+        }
     }
 }
 
@@ -40,7 +49,19 @@ public class PokemonDbContext : DbContext
         Database.EnsureCreated();
         try
         {
-            // Simple check to see if GrowthRate column exists
+            // Check for CatchRate as a proxy for the new columns
+            Database.ExecuteSqlRaw("SELECT CatchRate FROM PokemonSpecies LIMIT 1;");
+        }
+        catch (Microsoft.Data.Sqlite.SqliteException)
+        {
+            Database.ExecuteSqlRaw("ALTER TABLE PokemonSpecies ADD COLUMN CatchRate INTEGER NOT NULL DEFAULT 0;");
+            Database.ExecuteSqlRaw("ALTER TABLE PokemonSpecies ADD COLUMN BaseExperience INTEGER NOT NULL DEFAULT 0;");
+            Database.ExecuteSqlRaw("ALTER TABLE PokemonSpecies ADD COLUMN PokedexEntry TEXT;");
+        }
+        
+        try
+        {
+            // Simple check to see if GrowthRate column exists (added in previous step)
             Database.ExecuteSqlRaw("SELECT GrowthRate FROM PokemonSpecies LIMIT 1;");
         }
         catch (Microsoft.Data.Sqlite.SqliteException)

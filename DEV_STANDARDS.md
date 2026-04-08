@@ -20,9 +20,11 @@ Guidelines for all `/dev` actions in this project.
 *   **Nullability**: Ensure `Nullable` is enabled and handled for API responses (`int?`, `string?`).
 *   **Error Handling**: Wrap API and DB calls in `try-catch` blocks with clear console logging.
 
-## Database File Path Management
-*   The connection string is hardcoded to `J:/creaturegame/creaturegame/creaturegame/bin/Debug/net9.0/moves.db`.
-*   Ensure the SQLite file path is consistently used across all tools.
+## Database Management
+*   **Property Tracking**: When adding new properties to models (`PokemonSpecies`, `Attack`, etc.), always ensure the corresponding database schema is updated.
+*   **Data Sourcing**: Clearly document (via comments or DTO naming) where each property is drawn from (e.g., PokeAPI `pokemon-species` endpoint vs. `pokemon` endpoint).
+*   **Migrations**: Use `EnsureDatabaseCreated` and manual `ALTER TABLE` checks in `GameDbContext.cs` to handle schema updates for existing databases.
+*   **File Path**: The connection string is hardcoded. Ensure the SQLite file path is consistently used across all tools.
 
 ## Version Control
 *   **File Tracking**: All new or modified files must be tracked by version control. Ensure all relevant files are staged and committed as part of the task.

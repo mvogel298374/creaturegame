@@ -25,6 +25,12 @@ public class PokeApiMove
     [JsonPropertyName("type")]
     public NamedApiResource Type { get; set; }
 
+    [JsonPropertyName("priority")]
+    public int Priority { get; set; }
+
+    [JsonPropertyName("effect_chance")]
+    public int? EffectChance { get; set; }
+
     [JsonPropertyName("effect_entries")]
     public List<EffectEntry> EffectEntries { get; set; }
 }

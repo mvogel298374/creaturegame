@@ -15,6 +15,9 @@ public class PokeApiPokemon
 
     [JsonPropertyName("types")]
     public List<PokemonTypeSlot> Types { get; set; }
+
+    [JsonPropertyName("base_experience")]
+    public int? BaseExperience { get; set; }
 }
 
 public class PokemonStat

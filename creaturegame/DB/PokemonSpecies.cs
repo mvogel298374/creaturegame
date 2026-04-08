@@ -19,4 +19,9 @@ public class PokemonSpecies
     public DamageType Type1 { get; set; }
     public DamageType? Type2 { get; set; }
     public GrowthRate GrowthRate { get; set; } = GrowthRate.MediumFast;
+    
+    // New Gen 1 Properties
+    public int CatchRate { get; set; }
+    public int BaseExperience { get; set; }
+    public string? PokedexEntry { get; set; }
 }

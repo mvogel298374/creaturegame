@@ -95,7 +95,9 @@ public class MoveImport
             Accuracy = pokeMove.Accuracy ?? 100,
             PowerPointsMax = pokeMove.Pp ?? 30,
             Description = pokeMove.EffectEntries?
-                .FirstOrDefault(e => e.Language.Name == "en")?.ShortEffect ?? "No description available."
+                .FirstOrDefault(e => e.Language.Name == "en")?.ShortEffect ?? "No description available.",
+            Priority = pokeMove.Priority,
+            EffectChance = pokeMove.EffectChance
         };
 
         if (Enum.TryParse<DamageType>(pokeMove.Type.Name, true, out var damageType))
