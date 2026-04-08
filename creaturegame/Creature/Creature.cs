@@ -25,6 +25,7 @@ public class Creature
 
     public DamageType? Type1 { get; set; }
     public DamageType? Type2 { get; set; }
+    public GrowthRate GrowthRate { get; set; } = GrowthRate.MediumFast;
 
     public int Experience { get; set; } = 0;
     public const int MaxLevel = 100;
@@ -67,8 +68,16 @@ public class Creature
 
     private int CalculateExperienceForLevel(int level)
     {
-        // Simple Medium Fast growth rate: exp = level^3
-        return (int)Math.Pow(level, 3);
+        if (level <= 1) return 0;
+        double n = level;
+        return GrowthRate switch
+        {
+            GrowthRate.Fast => (int)(0.8 * Math.Pow(n, 3)),
+            GrowthRate.MediumFast => (int)Math.Pow(n, 3),
+            GrowthRate.MediumSlow => (int)(1.2 * Math.Pow(n, 3) - 15 * Math.Pow(n, 2) + 100 * n - 140),
+            GrowthRate.Slow => (int)(1.25 * Math.Pow(n, 3)),
+            _ => (int)Math.Pow(n, 3)
+        };
     }
     
     // Base Stats
@@ -116,6 +125,7 @@ public class Creature
         BaseSpeed = species.BaseSpeed;
         Type1 = species.Type1;
         Type2 = species.Type2;
+        GrowthRate = species.GrowthRate;
         CalculateStats();
     }
 

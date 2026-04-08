@@ -75,7 +75,8 @@ public class CoreMechanicsTests
             BaseSpecial = 65,
             BaseSpeed = 45,
             Level = 1,
-            Experience = 0
+            Experience = 0,
+            GrowthRate = GrowthRate.MediumFast
         };
         bulbasaur.CalculateStats();
 
@@ -83,6 +84,33 @@ public class CoreMechanicsTests
         bulbasaur.GainExperience(10);
 
         Assert.Equal(2, bulbasaur.Level);
+    }
+
+    [Fact]
+    public void DifferentGrowthRatesExperience()
+    {
+        var fast = new Creature.Creature("Fast") { Level = 1, GrowthRate = GrowthRate.Fast };
+        var medFast = new Creature.Creature("MedFast") { Level = 1, GrowthRate = GrowthRate.MediumFast };
+        var medSlow = new Creature.Creature("MedSlow") { Level = 1, GrowthRate = GrowthRate.MediumSlow };
+        var slow = new Creature.Creature("Slow") { Level = 1, GrowthRate = GrowthRate.Slow };
+
+        // For level 10:
+        // Fast: 0.8 * 10^3 = 800
+        // MedFast: 10^3 = 1000
+        // MedSlow: 1.2 * 10^3 - 15 * 10^2 + 100 * 10 - 140 = 1200 - 1500 + 1000 - 140 = 560
+        // Slow: 1.25 * 10^3 = 1250
+
+        // Give 900 exp to all
+        int amount = 900;
+        fast.GainExperience(amount);
+        medFast.GainExperience(amount);
+        medSlow.GainExperience(amount);
+        slow.GainExperience(amount);
+
+        Assert.True(fast.Level >= 10);
+        Assert.True(medFast.Level < 10);
+        Assert.True(medSlow.Level >= 10); // MedSlow is actually faster at low levels in Gen 1
+        Assert.True(slow.Level < 10);
     }
 
     [Fact]

@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using creaturegame.Attacks;
+using creaturegame.Creature;
 
 namespace creaturegame.DB;
 
@@ -17,4 +18,5 @@ public class PokemonSpecies
     
     public DamageType Type1 { get; set; }
     public DamageType? Type2 { get; set; }
+    public GrowthRate GrowthRate { get; set; } = GrowthRate.MediumFast;
 }
