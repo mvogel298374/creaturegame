@@ -5,12 +5,12 @@ using creaturegame.Combat;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace creaturegame.Tests;
+namespace creaturegame.Tests.Unit;
 
 public class CoreMechanicsTests
 {
     [Fact]
-    public void TestStatCalculation()
+    public void StatCalculation()
     {
         var bulbasaur = new Creature.Creature("Tommy")
         {
@@ -34,7 +34,7 @@ public class CoreMechanicsTests
     }
 
     [Fact]
-    public void TestLevelUpStatIncrease()
+    public void LevelUpStatIncrease()
     {
         var bulbasaur = new Creature.Creature("Tommy")
         {
@@ -65,7 +65,7 @@ public class CoreMechanicsTests
     }
 
     [Fact]
-    public void TestGainExperienceLevelUp()
+    public void GainExperienceLevelUp()
     {
         var bulbasaur = new Creature.Creature("Tommy")
         {
@@ -86,7 +86,7 @@ public class CoreMechanicsTests
     }
 
     [Fact]
-    public void TestDamageCalculationFormula()
+    public void DamageCalculationFormula()
     {
         var attacker = new Creature.Creature("Attacker") { Level = 50 };
         attacker.CalculateStats(); 
@@ -104,7 +104,7 @@ public class CoreMechanicsTests
     }
 
     [Fact]
-    public void TestTurnPriority()
+    public void TurnPriority()
     {
         var fastCreature = new Creature.Creature("Fast") { Level = 50 };
         fastCreature.Attributes.Speed = 100;

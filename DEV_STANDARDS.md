@@ -23,3 +23,12 @@ Guidelines for all `/dev` actions in this project.
 ## Database File Path Management
 *   The connection string is hardcoded to `J:/creaturegame/creaturegame/creaturegame/bin/Debug/net9.0/moves.db`.
 *   Ensure the SQLite file path is consistently used across all tools.
+
+## Version Control
+*   **File Tracking**: All new or modified files must be tracked by version control. Ensure all relevant files are staged and committed as part of the task.
+*   **Cleanup**: When removing files from the project, ensure they are also removed from version control.
+
+## Testing Standards
+*   **Test Naming**: Test methods should clearly and succinctly state what they test without using the word "Test" or "test" as a prefix or suffix.
+*   **Folder Structure**: Separate tests from common/setup classes by using a structured directory (e.g., `tests/creaturegame.Tests/Unit`, `tests/creaturegame.Tests/Integration`).
+*   **Namespaces**: Test namespaces should match their folder structure (e.g., `creaturegame.Tests.Unit`).
