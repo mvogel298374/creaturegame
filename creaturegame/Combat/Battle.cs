@@ -8,18 +8,16 @@ public class Battle
     private Creature.Creature PlayerCreature { get; }
     private Creature.Creature EnemyCreature { get; }
     private readonly ITypeChart _typeChart;
-    private readonly Attack _struggle;
 
     /// <summary>
     /// Creates a battle. Pass the generation-appropriate <paramref name="typeChart"/> to control type effectiveness rules.
-    /// Pass a <paramref name="struggle"/> move (loaded from DB or hardcoded fallback) used when a Pokémon has no PP left.
+    /// Struggle is handled automatically by each creature when all PP is exhausted.
     /// </summary>
-    public Battle(Creature.Creature player, Creature.Creature enemy, ITypeChart typeChart, Attack struggle)
+    public Battle(Creature.Creature player, Creature.Creature enemy, ITypeChart typeChart)
     {
         PlayerCreature = player;
         EnemyCreature = enemy;
         _typeChart = typeChart;
-        _struggle = struggle;
     }
 
     public async Task StartFightAsync()
@@ -32,14 +30,8 @@ public class Battle
             Console.WriteLine($"\n{PlayerCreature.Name}: {PlayerCreature.Attributes.HP}/{PlayerCreature.Attributes.MaxHP} HP");
             Console.WriteLine($"{EnemyCreature.Name}: {EnemyCreature.Attributes.HP}/{EnemyCreature.Attributes.MaxHP} HP");
 
-            // For now, always pick first move for simplicity in this demo
-            var playerMove = PlayerCreature.MoveSet.Count > 0 ? PlayerCreature.MoveSet[0] : null;
-            var enemyMove = EnemyCreature.MoveSet.Count > 0 ? EnemyCreature.MoveSet[0] : null;
-
-            if (playerMove == null || enemyMove == null) break;
-
-            var playerAction = new AttackAction(PlayerCreature, EnemyCreature, playerMove, _typeChart, _struggle);
-            var enemyAction = new AttackAction(EnemyCreature, PlayerCreature, enemyMove, _typeChart, _struggle);
+            var playerAction = new AttackAction(PlayerCreature, EnemyCreature, _typeChart);
+            var enemyAction = new AttackAction(EnemyCreature, PlayerCreature, _typeChart);
 
             // Turn Resolution:
             // 1. Priority

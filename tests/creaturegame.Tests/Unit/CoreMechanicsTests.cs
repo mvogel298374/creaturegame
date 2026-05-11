@@ -140,12 +140,12 @@ public class CoreMechanicsTests
         var slowCreature = new Creature.Creature("Slow") { Level = 50 };
         slowCreature.Attributes.Speed = 50;
 
-        var move = new PokemonAttack(new Attack { Name = "Tackle", Accuracy = 100 });
-        var struggle = new Attack { Name = "Struggle", BaseDamage = 50, Accuracy = 100 };
+        fastCreature.AddAttack(new Attack { Name = "Tackle", Accuracy = 100 });
+        slowCreature.AddAttack(new Attack { Name = "Tackle", Accuracy = 100 });
 
         var chart = new Gen1TypeChart();
-        var fastAction = new AttackAction(fastCreature, slowCreature, move, chart, struggle);
-        var slowAction = new AttackAction(slowCreature, fastCreature, move, chart, struggle);
+        var fastAction = new AttackAction(fastCreature, slowCreature, chart);
+        var slowAction = new AttackAction(slowCreature, fastCreature, chart);
 
         var turnQueue = new List<IBattleAction> { slowAction, fastAction };
 
@@ -167,11 +167,12 @@ public class CoreMechanicsTests
         var defender = new Creature.Creature("Defender") { Level = 10 };
         defender.CalculateStats();
 
-        var move = new PokemonAttack(new Attack { Name = "Tackle", BaseDamage = 40, Accuracy = 100, PowerPointsMax = 5 });
-        var struggle = new Attack { Name = "Struggle", BaseDamage = 50, Accuracy = 100 };
+        var baseAttack = new Attack { Name = "Tackle", BaseDamage = 40, Accuracy = 100, PowerPointsMax = 5 };
+        attacker.AddAttack(baseAttack);
+        var move = attacker.MoveSet[0];
 
         int ppBefore = move.PowerPointsCurrent;
-        var action = new AttackAction(attacker, defender, move, new Gen1TypeChart(), struggle);
+        var action = new AttackAction(attacker, defender, new Gen1TypeChart());
         action.ExecuteAsync().Wait();
 
         Assert.Equal(ppBefore - 1, move.PowerPointsCurrent);
@@ -188,11 +189,13 @@ public class CoreMechanicsTests
         defender.Attributes.Defense = 50;
         int defenderHpBefore = defender.Attributes.HP;
 
-        var move = new PokemonAttack(new Attack { Name = "Tackle", BaseDamage = 40, Accuracy = 100, PowerPointsMax = 1 });
+        var baseAttack = new Attack { Name = "Tackle", BaseDamage = 40, Accuracy = 100, PowerPointsMax = 1 };
+        attacker.AddAttack(baseAttack);
+        var move = attacker.MoveSet[0];
         move.PowerPointsCurrent = 0; // force PP exhausted
-        var struggle = new Attack { Name = "Struggle", BaseDamage = 50, Accuracy = 100, DamageType = DamageType.Normal };
+        attacker.Struggle = new Attack { Name = "Struggle", BaseDamage = 50, Accuracy = 100, DamageType = DamageType.Normal };
 
-        var action = new AttackAction(attacker, defender, move, new Gen1TypeChart(), struggle);
+        var action = new AttackAction(attacker, defender, new Gen1TypeChart());
         action.ExecuteAsync().Wait();
 
         // Defender should have taken damage (Struggle fired)

@@ -13,37 +13,32 @@ public class AttackAction : IBattleAction
 {
     public creaturegame.Creature.Creature Source { get; }
     public creaturegame.Creature.Creature Target { get; }
-    public PokemonAttack Move { get; }
     public int Priority { get; }
     private readonly ITypeChart _typeChart;
-    private readonly Attack _struggle;
 
-    public AttackAction(creaturegame.Creature.Creature source, creaturegame.Creature.Creature target, PokemonAttack move, ITypeChart typeChart, Attack struggle)
+    public AttackAction(creaturegame.Creature.Creature source, creaturegame.Creature.Creature target, ITypeChart typeChart)
     {
         Source = source;
         Target = target;
-        Move = move;
-        Priority = move.Base.Priority;
         _typeChart = typeChart;
-        _struggle = struggle;
+        Priority = source.GetAvailableMove()?.Base.Priority ?? 0;
     }
 
     public Task ExecuteAsync()
     {
         if (!Source.IsAlive()) return Task.CompletedTask;
 
-        // If this move has no PP, use Struggle instead
+        bool usingStruggle = Source.IsOutOfPP;
+        var availableMove = usingStruggle ? null : Source.GetAvailableMove();
         Attack attackToUse;
-        bool usingStruggle = false;
-        if (Move.PowerPointsCurrent <= 0)
+        if (usingStruggle)
         {
-            attackToUse = _struggle;
-            usingStruggle = true;
+            attackToUse = Source.Struggle;
         }
         else
         {
-            attackToUse = Move.Base;
-            Move.PowerPointsCurrent--;
+            attackToUse = availableMove!.Base;
+            availableMove.PowerPointsCurrent--;
         }
 
         Console.WriteLine($"{Source.Name} used {attackToUse.Name}!");

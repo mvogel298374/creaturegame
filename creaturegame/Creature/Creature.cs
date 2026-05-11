@@ -12,6 +12,12 @@ public class Creature
     public Attributes Attributes { get; set; } = new Attributes();
     private List<Trait> Traits { get; set; } = [];
     public List<PokemonAttack> MoveSet { get; private set; } = [];
+
+    // Struggle is a system-level fallback — never exposed publicly.
+    private readonly Attack _struggle = new Attack("Struggle", "An attack that also hurts the user.") { BaseDamage = 50, Accuracy = 100, DamageType = DamageType.Normal };
+    public bool IsOutOfPP => MoveSet.Count > 0 && MoveSet.All(m => m.PowerPointsCurrent <= 0);
+    internal Attack Struggle => _struggle;
+    internal PokemonAttack? GetAvailableMove() => MoveSet.FirstOrDefault(m => m.PowerPointsCurrent > 0);
     public bool AddAttack(Attack attack)
     {
         if (MoveSet.Count < 4 && !MoveSet.Any(m => m.Base.Id == attack.Id))

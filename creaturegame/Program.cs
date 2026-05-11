@@ -24,8 +24,8 @@ class Program
 
         var typeChart = new Gen1TypeChart();
 
-        // Struggle: used when a Pokémon has no PP left (Gen 1 — typeless, 50 BP, recoil)
-        var struggle = await attackService.GetAttackByNameAsync("struggle")
+        // Struggle: loaded from DB (id=165) and assigned to each creature so it fires automatically when all PP is exhausted
+        var struggleAttack = await attackService.GetAttackByIdAsync(165)
             ?? new Attack("Struggle", "An attack that also hurts the user.") { BaseDamage = 50, Accuracy = 100, AttackType = AttackType.Physical, DamageType = DamageType.Normal };
 
         // --- Bulbasaur (Grass/Poison) ---
@@ -56,6 +56,7 @@ class Program
         var quickAttack = await attackService.GetAttackByNameAsync("quick-attack")
             ?? new Attack("Quick Attack", "An extremely fast attack.") { BaseDamage = 40, Accuracy = 100, AttackType = AttackType.Physical, DamageType = DamageType.Normal, Priority = 1 };
 
+        bulbasaur.Struggle = struggleAttack;
         bulbasaur.AddAttack(razorLeaf);
         bulbasaur.AddAttack(quickAttack);
 
@@ -85,6 +86,7 @@ class Program
         var hyperBeam = await attackService.GetAttackByNameAsync("hyper-beam")
             ?? new Attack("Hyper Beam", "A powerful beam attack.") { BaseDamage = 150, Accuracy = 90, AttackType = AttackType.Special, DamageType = DamageType.Normal };
 
+        dragonite.Struggle = struggleAttack;
         dragonite.AddAttack(flamethrower);
         dragonite.AddAttack(hyperBeam);
 
@@ -106,7 +108,7 @@ class Program
         Console.WriteLine($"  Moves: {string.Join(", ", dragonite.MoveSet.Select(m => $"{m.Base.Name} [{m.Base.DamageType}, PP:{m.PowerPointsCurrent}]"))}");
 
         Console.WriteLine("\n=== Battle Start! ===");
-        var battle = new Battle(bulbasaur, dragonite, typeChart, struggle);
+        var battle = new Battle(bulbasaur, dragonite, typeChart);
         await battle.StartFightAsync();
 
         Console.WriteLine("\nPress any key to exit...");
