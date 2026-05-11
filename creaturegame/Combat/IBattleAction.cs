@@ -15,14 +15,15 @@ public class AttackAction : IBattleAction
     public creaturegame.Creature.Creature Target { get; }
     public Attack Move { get; }
     public int Priority { get; }
+    private readonly ITypeChart _typeChart;
 
-    public AttackAction(creaturegame.Creature.Creature source, creaturegame.Creature.Creature target, Attack move)
+    public AttackAction(creaturegame.Creature.Creature source, creaturegame.Creature.Creature target, Attack move, ITypeChart typeChart)
     {
         Source = source;
         Target = target;
         Move = move;
-        // In Gen 1, most moves have priority 0. Only Quick Attack (+1) etc. have different.
-        Priority = 0; 
+        Priority = move.Priority;
+        _typeChart = typeChart;
     }
 
     public Task ExecuteAsync()
@@ -39,7 +40,7 @@ public class AttackAction : IBattleAction
             return Task.CompletedTask;
         }
 
-        int damage = DamageCalculator.CalculateGen1Damage(Source, Target, Move);
+        int damage = DamageCalculator.CalculateGen1Damage(Source, Target, Move, _typeChart);
         Target.Attributes.ReceiveDamage(damage);
 
         Console.WriteLine($"{Target.Name} took {damage} damage!");

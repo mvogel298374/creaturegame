@@ -6,11 +6,16 @@ public class Battle
 {
     private Creature.Creature PlayerCreature { get; }
     private Creature.Creature EnemyCreature { get; }
+    private readonly ITypeChart _typeChart;
 
-    public Battle(Creature.Creature player, Creature.Creature enemy)
+    /// <summary>
+    /// Creates a battle. Pass the generation-appropriate <paramref name="typeChart"/> to control type effectiveness rules.
+    /// </summary>
+    public Battle(Creature.Creature player, Creature.Creature enemy, ITypeChart typeChart)
     {
         PlayerCreature = player;
         EnemyCreature = enemy;
+        _typeChart = typeChart;
     }
 
     public async Task StartFightAsync()
@@ -29,8 +34,8 @@ public class Battle
 
             if (playerMove == null || enemyMove == null) break;
 
-            var playerAction = new AttackAction(PlayerCreature, EnemyCreature, playerMove);
-            var enemyAction = new AttackAction(EnemyCreature, PlayerCreature, enemyMove);
+            var playerAction = new AttackAction(PlayerCreature, EnemyCreature, playerMove, _typeChart);
+            var enemyAction = new AttackAction(EnemyCreature, PlayerCreature, enemyMove, _typeChart);
 
             // Turn Resolution:
             // 1. Priority

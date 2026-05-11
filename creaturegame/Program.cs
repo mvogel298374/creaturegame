@@ -10,76 +10,101 @@ class Program
 {
     static async Task Main(string[] args)
     {
-        Console.WriteLine("=== Gen 1 Pokemon Battle Simulator Scaffold ===");
-        
+        Console.WriteLine("=== Gen 1 Pokemon Battle Simulator ===");
+        Console.WriteLine("Featuring: STAB, type effectiveness, priority & speed turn order\n");
+
         var moveContext = new MovesDbContext();
         moveContext.EnsureDatabaseCreated();
-        
+
         var pokemonContext = new PokemonDbContext();
         pokemonContext.EnsureDatabaseCreated();
-        
+
         var attackService = new AttackService(moveContext);
         var pokemonService = new PokemonService(pokemonContext);
 
-        // Fetch Species from DB
-        var bulbasaurSpecies = await pokemonService.GetSpeciesByNameAsync("bulbasaur");
-        var dragoniteSpecies = await pokemonService.GetSpeciesByNameAsync("dragonite");
+        var typeChart = new Gen1TypeChart();
 
-        // Define Bulbasaur (Tommy)
-        var creature1 = new creaturegame.Creature.Creature("Tommy (Bulbasaur)")
+        // --- Bulbasaur (Grass/Poison) ---
+        var bulbasaurSpecies = await pokemonService.GetSpeciesByNameAsync("bulbasaur");
+        var bulbasaur = new creaturegame.Creature.Creature("Bulbasaur")
         {
             Level = 50,
             DvAttack = 15, DvDefense = 15, DvSpecial = 15, DvSpeed = 15, DvHP = 15
         };
-        
         if (bulbasaurSpecies != null)
         {
-            Console.WriteLine($"Found {bulbasaurSpecies.Name} in DB!");
-            creature1.InitializeFromSpecies(bulbasaurSpecies);
+            bulbasaur.InitializeFromSpecies(bulbasaurSpecies);
         }
         else
         {
-            Console.WriteLine("Bulbasaur species not found in DB, using fallback.");
-            // Fallback if DB is empty
-            creature1.BaseHP = 45; creature1.BaseAttack = 49; creature1.BaseDefense = 49; 
-            creature1.BaseSpecial = 65; creature1.BaseSpeed = 45;
-            creature1.Type1 = DamageType.Grass; creature1.Type2 = DamageType.Poison;
-            creature1.CalculateStats();
+            Console.WriteLine("[WARN] Bulbasaur not found in DB — using fallback stats.");
+            bulbasaur.BaseHP = 45; bulbasaur.BaseAttack = 49; bulbasaur.BaseDefense = 49;
+            bulbasaur.BaseSpecial = 65; bulbasaur.BaseSpeed = 45;
+            bulbasaur.Type1 = DamageType.Grass; bulbasaur.Type2 = DamageType.Poison;
+            bulbasaur.CalculateStats();
         }
 
-        // Define Dragonite (Jimmy)
-        var creature2 = new Dragon("Jimmy (Dragonite)")
+        // Razor Leaf: Grass physical — STAB on Bulbasaur (1.5x), neutral vs Dragonite
+        var razorLeaf = await attackService.GetAttackByNameAsync("razor-leaf")
+            ?? new Attack("Razor Leaf", "Cuts the foe with sharp leaves.") { BaseDamage = 55, Accuracy = 95, AttackType = AttackType.Physical, DamageType = DamageType.Grass };
+
+        // Quick Attack: Normal, Priority +1 — demonstrates priority system
+        var quickAttack = await attackService.GetAttackByNameAsync("quick-attack")
+            ?? new Attack("Quick Attack", "An extremely fast attack.") { BaseDamage = 40, Accuracy = 100, AttackType = AttackType.Physical, DamageType = DamageType.Normal, Priority = 1 };
+
+        bulbasaur.AddAttack(razorLeaf);
+        bulbasaur.AddAttack(quickAttack);
+
+        // --- Dragonite (Dragon/Flying) ---
+        var dragoniteSpecies = await pokemonService.GetSpeciesByNameAsync("dragonite");
+        var dragonite = new Dragon("Dragonite")
         {
             Level = 50,
             DvAttack = 15, DvDefense = 15, DvSpecial = 15, DvSpeed = 15, DvHP = 15
         };
-
         if (dragoniteSpecies != null)
         {
-            Console.WriteLine($"Found {dragoniteSpecies.Name} in DB!");
-            creature2.InitializeFromSpecies(dragoniteSpecies);
+            dragonite.InitializeFromSpecies(dragoniteSpecies);
         }
         else
         {
-            creature2.CalculateStats(); // Uses hardcoded Dragonite stats from Dragon class
+            Console.WriteLine("[WARN] Dragonite not found in DB — using fallback stats.");
+            dragonite.CalculateStats();
         }
 
-        // Setup Moves
-        var tackle = await attackService.GetAttackByNameAsync("tackle") ?? new Attack("Tackle", "Standard physical move") { BaseDamage = 40, Accuracy = 100, AttackType = AttackType.Physical };
-        var hyperBeam = await attackService.GetAttackByNameAsync("hyper-beam") ?? new Attack("Hyper Beam", "Powerful special move") { BaseDamage = 150, Accuracy = 90, AttackType = AttackType.Special, DamageType = DamageType.Normal };
+        // Flamethrower: Fire special — SUPER EFFECTIVE vs Bulbasaur (Grass) = 2x
+        // Dragonite has no Fire STAB so no 1.5x, but 2x type effectiveness is clearly visible
+        var flamethrower = await attackService.GetAttackByNameAsync("flamethrower")
+            ?? new Attack("Flamethrower", "A powerful fire attack that may burn.") { BaseDamage = 95, Accuracy = 100, AttackType = AttackType.Special, DamageType = DamageType.Fire };
 
-        creature1.AddAttack(tackle);
-        creature2.AddAttack(hyperBeam);
+        // Hyper Beam: Normal special — high power, no type bonus, shows contrast
+        var hyperBeam = await attackService.GetAttackByNameAsync("hyper-beam")
+            ?? new Attack("Hyper Beam", "A powerful beam attack.") { BaseDamage = 150, Accuracy = 90, AttackType = AttackType.Special, DamageType = DamageType.Normal };
 
-        Console.WriteLine("\n--- Battle Contestants ---");
-        creature1.DisplayInfo();
+        dragonite.AddAttack(flamethrower);
+        dragonite.AddAttack(hyperBeam);
+
+        // --- Type effectiveness preview ---
+        Console.WriteLine("=== Type Effectiveness Preview ===");
+        double fireVsGrass = typeChart.GetMultiplier(DamageType.Fire, DamageType.Grass);
+        double grassVsDragon = typeChart.GetMultiplier(DamageType.Grass, DamageType.Dragon);
+        Console.WriteLine($"  Fire   → Grass  : {fireVsGrass}x  (Flamethrower vs Bulbasaur — SUPER EFFECTIVE)");
+        Console.WriteLine($"  Grass  → Dragon : {grassVsDragon}x  (Razor Leaf vs Dragonite — neutral)");
+        Console.WriteLine($"  Bulbasaur STAB on Razor Leaf (Grass): 1.5x");
         Console.WriteLine();
-        creature2.DisplayInfo();
-        
-        Console.WriteLine("\n--- Battle Start! ---");
-        var battle = new Battle(creature1, creature2);
+
+        // --- Contestants ---
+        Console.WriteLine("=== Battle Contestants ===");
+        bulbasaur.DisplayInfo();
+        Console.WriteLine($"  Moves: {string.Join(", ", bulbasaur.MoveSet.Select(m => $"{m.Name} [{m.DamageType}, Prio:{m.Priority}]"))}");
+        Console.WriteLine();
+        dragonite.DisplayInfo();
+        Console.WriteLine($"  Moves: {string.Join(", ", dragonite.MoveSet.Select(m => $"{m.Name} [{m.DamageType}]"))}");
+
+        Console.WriteLine("\n=== Battle Start! ===");
+        var battle = new Battle(bulbasaur, dragonite, typeChart);
         await battle.StartFightAsync();
-        
+
         Console.WriteLine("\nPress any key to exit...");
         Console.ReadKey();
     }

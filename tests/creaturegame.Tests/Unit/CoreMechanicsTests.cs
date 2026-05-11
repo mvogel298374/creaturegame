@@ -126,7 +126,7 @@ public class CoreMechanicsTests
         
         var move = new Attack { Name = "Tackle", BaseDamage = 40, AttackType = AttackType.Physical };
         
-        int damage = DamageCalculator.CalculateGen1Damage(attacker, defender, move);
+        int damage = DamageCalculator.CalculateGen1Damage(attacker, defender, move, new Gen1TypeChart());
         
         Assert.InRange(damage, 16, 19);
     }
@@ -142,8 +142,9 @@ public class CoreMechanicsTests
 
         var move = new Attack { Name = "Tackle", Accuracy = 100 };
 
-        var fastAction = new AttackAction(fastCreature, slowCreature, move);
-        var slowAction = new AttackAction(slowCreature, fastCreature, move);
+        var chart = new Gen1TypeChart();
+        var fastAction = new AttackAction(fastCreature, slowCreature, move, chart);
+        var slowAction = new AttackAction(slowCreature, fastCreature, move, chart);
 
         var turnQueue = new List<IBattleAction> { slowAction, fastAction };
 
@@ -153,5 +154,69 @@ public class CoreMechanicsTests
 
         Assert.Equal("Fast", resolvedQueue[0].Source.Name);
         Assert.Equal("Slow", resolvedQueue[1].Source.Name);
+    }
+
+    // --- Type Chart Tests ---
+
+    [Fact]
+    public void Gen1TypeChart_SuperEffective_Returns2x()
+    {
+        var chart = new Gen1TypeChart();
+        Assert.Equal(2.0, chart.GetMultiplier(DamageType.Fire, DamageType.Grass));
+        Assert.Equal(2.0, chart.GetMultiplier(DamageType.Water, DamageType.Fire));
+        Assert.Equal(2.0, chart.GetMultiplier(DamageType.Electric, DamageType.Water));
+    }
+
+    [Fact]
+    public void Gen1TypeChart_NotVeryEffective_Returns0Point5x()
+    {
+        var chart = new Gen1TypeChart();
+        Assert.Equal(0.5, chart.GetMultiplier(DamageType.Fire, DamageType.Water));
+        Assert.Equal(0.5, chart.GetMultiplier(DamageType.Normal, DamageType.Rock));
+        Assert.Equal(0.5, chart.GetMultiplier(DamageType.Grass, DamageType.Fire));
+    }
+
+    [Fact]
+    public void Gen1TypeChart_Immune_Returns0x()
+    {
+        var chart = new Gen1TypeChart();
+        Assert.Equal(0.0, chart.GetMultiplier(DamageType.Normal, DamageType.Ghost));
+        Assert.Equal(0.0, chart.GetMultiplier(DamageType.Electric, DamageType.Ground));
+        Assert.Equal(0.0, chart.GetMultiplier(DamageType.Ground, DamageType.Flying));
+    }
+
+    [Fact]
+    public void Gen1TypeChart_GhostVsPsychic_IsImmune_Gen1Bug()
+    {
+        // In Gen 1 RBY, Ghost → Psychic = 0x (famous bug; should be 2x)
+        var chart = new Gen1TypeChart();
+        Assert.Equal(0.0, chart.GetMultiplier(DamageType.Ghost, DamageType.Psychic));
+    }
+
+    [Fact]
+    public void Gen1TypeChart_PoisonVsBug_Is2x_Gen1Quirk()
+    {
+        // Changed to 0.5x in Gen 2+
+        var chart = new Gen1TypeChart();
+        Assert.Equal(2.0, chart.GetMultiplier(DamageType.Poison, DamageType.Bug));
+    }
+
+    [Fact]
+    public void Gen1TypeChart_NeutralMatchup_Returns1x()
+    {
+        var chart = new Gen1TypeChart();
+        Assert.Equal(1.0, chart.GetMultiplier(DamageType.Normal, DamageType.Normal));
+        Assert.Equal(1.0, chart.GetMultiplier(DamageType.Fire, DamageType.Normal));
+        Assert.Equal(1.0, chart.GetMultiplier(DamageType.Water, DamageType.Electric));
+    }
+
+    [Fact]
+    public void Gen1TypeChart_DualType_MultipliesCorrectly()
+    {
+        // Water move vs Grass/Poison (Bulbasaur): 0.5 * 1.0 = 0.5
+        var chart = new Gen1TypeChart();
+        double effectiveness = DamageCalculator.GetTypeEffectiveness(
+            DamageType.Water, DamageType.Grass, DamageType.Poison, chart);
+        Assert.Equal(0.5, effectiveness);
     }
 }
