@@ -1,4 +1,5 @@
 ﻿using creaturegame;
+using creaturegame.Attacks;
 
 namespace creaturegame.Combat;
 
@@ -7,15 +8,18 @@ public class Battle
     private Creature.Creature PlayerCreature { get; }
     private Creature.Creature EnemyCreature { get; }
     private readonly ITypeChart _typeChart;
+    private readonly Attack _struggle;
 
     /// <summary>
     /// Creates a battle. Pass the generation-appropriate <paramref name="typeChart"/> to control type effectiveness rules.
+    /// Pass a <paramref name="struggle"/> move (loaded from DB or hardcoded fallback) used when a Pokémon has no PP left.
     /// </summary>
-    public Battle(Creature.Creature player, Creature.Creature enemy, ITypeChart typeChart)
+    public Battle(Creature.Creature player, Creature.Creature enemy, ITypeChart typeChart, Attack struggle)
     {
         PlayerCreature = player;
         EnemyCreature = enemy;
         _typeChart = typeChart;
+        _struggle = struggle;
     }
 
     public async Task StartFightAsync()
@@ -34,8 +38,8 @@ public class Battle
 
             if (playerMove == null || enemyMove == null) break;
 
-            var playerAction = new AttackAction(PlayerCreature, EnemyCreature, playerMove, _typeChart);
-            var enemyAction = new AttackAction(EnemyCreature, PlayerCreature, enemyMove, _typeChart);
+            var playerAction = new AttackAction(PlayerCreature, EnemyCreature, playerMove, _typeChart, _struggle);
+            var enemyAction = new AttackAction(EnemyCreature, PlayerCreature, enemyMove, _typeChart, _struggle);
 
             // Turn Resolution:
             // 1. Priority

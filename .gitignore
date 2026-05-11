@@ -1,0 +1,16 @@
+﻿# Build output
+bin/
+obj/
+
+# .NET
+*.user
+*.suo
+.vs/
+.idea/
+
+# SQLite databases (runtime-generated, use PokeApiConnector to regenerate)
+*.db
+*.sqlite
+
+# Logs
+*.log

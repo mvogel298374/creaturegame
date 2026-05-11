@@ -24,6 +24,10 @@ class Program
 
         var typeChart = new Gen1TypeChart();
 
+        // Struggle: used when a Pokémon has no PP left (Gen 1 — typeless, 50 BP, recoil)
+        var struggle = await attackService.GetAttackByNameAsync("struggle")
+            ?? new Attack("Struggle", "An attack that also hurts the user.") { BaseDamage = 50, Accuracy = 100, AttackType = AttackType.Physical, DamageType = DamageType.Normal };
+
         // --- Bulbasaur (Grass/Poison) ---
         var bulbasaurSpecies = await pokemonService.GetSpeciesByNameAsync("bulbasaur");
         var bulbasaur = new creaturegame.Creature.Creature("Bulbasaur")
@@ -96,13 +100,13 @@ class Program
         // --- Contestants ---
         Console.WriteLine("=== Battle Contestants ===");
         bulbasaur.DisplayInfo();
-        Console.WriteLine($"  Moves: {string.Join(", ", bulbasaur.MoveSet.Select(m => $"{m.Name} [{m.DamageType}, Prio:{m.Priority}]"))}");
+        Console.WriteLine($"  Moves: {string.Join(", ", bulbasaur.MoveSet.Select(m => $"{m.Base.Name} [{m.Base.DamageType}, Prio:{m.Base.Priority}, PP:{m.PowerPointsCurrent}]"))}");
         Console.WriteLine();
         dragonite.DisplayInfo();
-        Console.WriteLine($"  Moves: {string.Join(", ", dragonite.MoveSet.Select(m => $"{m.Name} [{m.DamageType}]"))}");
+        Console.WriteLine($"  Moves: {string.Join(", ", dragonite.MoveSet.Select(m => $"{m.Base.Name} [{m.Base.DamageType}, PP:{m.PowerPointsCurrent}]"))}");
 
         Console.WriteLine("\n=== Battle Start! ===");
-        var battle = new Battle(bulbasaur, dragonite, typeChart);
+        var battle = new Battle(bulbasaur, dragonite, typeChart, struggle);
         await battle.StartFightAsync();
 
         Console.WriteLine("\nPress any key to exit...");

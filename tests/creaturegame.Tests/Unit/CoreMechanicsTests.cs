@@ -140,11 +140,12 @@ public class CoreMechanicsTests
         var slowCreature = new Creature.Creature("Slow") { Level = 50 };
         slowCreature.Attributes.Speed = 50;
 
-        var move = new Attack { Name = "Tackle", Accuracy = 100 };
+        var move = new PokemonAttack(new Attack { Name = "Tackle", Accuracy = 100 });
+        var struggle = new Attack { Name = "Struggle", BaseDamage = 50, Accuracy = 100 };
 
         var chart = new Gen1TypeChart();
-        var fastAction = new AttackAction(fastCreature, slowCreature, move, chart);
-        var slowAction = new AttackAction(slowCreature, fastCreature, move, chart);
+        var fastAction = new AttackAction(fastCreature, slowCreature, move, chart, struggle);
+        var slowAction = new AttackAction(slowCreature, fastCreature, move, chart, struggle);
 
         var turnQueue = new List<IBattleAction> { slowAction, fastAction };
 
@@ -154,6 +155,52 @@ public class CoreMechanicsTests
 
         Assert.Equal("Fast", resolvedQueue[0].Source.Name);
         Assert.Equal("Slow", resolvedQueue[1].Source.Name);
+    }
+
+    // --- PP Tracking Tests ---
+
+    [Fact]
+    public void PP_DecrementsOnUse()
+    {
+        var attacker = new Creature.Creature("Attacker") { Level = 10 };
+        attacker.CalculateStats();
+        var defender = new Creature.Creature("Defender") { Level = 10 };
+        defender.CalculateStats();
+
+        var move = new PokemonAttack(new Attack { Name = "Tackle", BaseDamage = 40, Accuracy = 100, PowerPointsMax = 5 });
+        var struggle = new Attack { Name = "Struggle", BaseDamage = 50, Accuracy = 100 };
+
+        int ppBefore = move.PowerPointsCurrent;
+        var action = new AttackAction(attacker, defender, move, new Gen1TypeChart(), struggle);
+        action.ExecuteAsync().Wait();
+
+        Assert.Equal(ppBefore - 1, move.PowerPointsCurrent);
+    }
+
+    [Fact]
+    public void PP_StruggleUsedWhenPPIsZero()
+    {
+        var attacker = new Creature.Creature("Attacker") { Level = 10 };
+        attacker.CalculateStats();
+        attacker.Attributes.Attack = 50;
+        var defender = new Creature.Creature("Defender") { Level = 10 };
+        defender.CalculateStats();
+        defender.Attributes.Defense = 50;
+        int defenderHpBefore = defender.Attributes.HP;
+
+        var move = new PokemonAttack(new Attack { Name = "Tackle", BaseDamage = 40, Accuracy = 100, PowerPointsMax = 1 });
+        move.PowerPointsCurrent = 0; // force PP exhausted
+        var struggle = new Attack { Name = "Struggle", BaseDamage = 50, Accuracy = 100, DamageType = DamageType.Normal };
+
+        var action = new AttackAction(attacker, defender, move, new Gen1TypeChart(), struggle);
+        action.ExecuteAsync().Wait();
+
+        // Defender should have taken damage (Struggle fired)
+        Assert.True(defender.Attributes.HP < defenderHpBefore);
+        // Attacker should have taken recoil
+        Assert.True(attacker.Attributes.HP < attacker.Attributes.MaxHP);
+        // PP should remain 0 (not decremented further)
+        Assert.Equal(0, move.PowerPointsCurrent);
     }
 
     // --- Type Chart Tests ---

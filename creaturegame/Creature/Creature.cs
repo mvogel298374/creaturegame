@@ -11,13 +11,12 @@ public class Creature
     public int Level { get; set; } = 1;
     public Attributes Attributes { get; set; } = new Attributes();
     private List<Trait> Traits { get; set; } = [];
-    public List<Attack> MoveSet { get; private set; } = [];
-
+    public List<PokemonAttack> MoveSet { get; private set; } = [];
     public bool AddAttack(Attack attack)
     {
-        if (MoveSet.Count < 4 && !MoveSet.Any(m => m.Id == attack.Id))
+        if (MoveSet.Count < 4 && !MoveSet.Any(m => m.Base.Id == attack.Id))
         {
-            MoveSet.Add(attack);
+            MoveSet.Add(new PokemonAttack(attack));
             return true;
         }
         return false;
@@ -187,9 +186,9 @@ public class Creature
     private void DisplayAttacks()
     {
         int index = 1;
-        foreach (Attack attack in MoveSet)
+        foreach (PokemonAttack attack in MoveSet)
         {
-            Console.WriteLine($"Attack #{index}: {attack}");
+            Console.WriteLine($"Attack #{index}: {attack.Base} PP:{attack.PowerPointsCurrent}/{attack.Base.PowerPointsMax}");
             index++;
         }
     }
