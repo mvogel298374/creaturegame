@@ -35,6 +35,7 @@ public class PokemonImport
                 {
                     // The species URL is like https://pokeapi.co/api/v2/pokemon-species/1/
                     // We need the pokemon data which is at https://pokeapi.co/api/v2/pokemon/1/
+                    if (speciesResource.url == null) continue;
                     string pokemonUrl = speciesResource.url.Replace("pokemon-species", "pokemon");
                     string speciesUrl = speciesResource.url;
                     await FetchPokemonDataByUrl(pokemonUrl, speciesUrl, context);
@@ -56,13 +57,13 @@ public class PokemonImport
             HttpResponseMessage response = await client.GetAsync(url);
             response.EnsureSuccessStatusCode();
             string json = await response.Content.ReadAsStringAsync();
-            PokeApiPokemon pokeData = JsonSerializer.Deserialize<PokeApiPokemon>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            PokeApiPokemon? pokeData = JsonSerializer.Deserialize<PokeApiPokemon>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
             // Fetch Species Data for Growth Rate
             HttpResponseMessage speciesResponse = await client.GetAsync(speciesUrl);
             speciesResponse.EnsureSuccessStatusCode();
             string speciesJson = await speciesResponse.Content.ReadAsStringAsync();
-            PokeApiPokemonSpecies speciesData = JsonSerializer.Deserialize<PokeApiPokemonSpecies>(speciesJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            PokeApiPokemonSpecies? speciesData = JsonSerializer.Deserialize<PokeApiPokemonSpecies>(speciesJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
             if (pokeData != null && speciesData != null)
             {
@@ -97,30 +98,30 @@ public class PokemonImport
         var species = new PokemonSpecies
         {
             Id = pokeData.Id,
-            Name = pokeData.Name,
-            BaseHP = pokeData.Stats.FirstOrDefault(s => s.Stat.Name == "hp")?.BaseStat ?? 0,
-            BaseAttack = pokeData.Stats.FirstOrDefault(s => s.Stat.Name == "attack")?.BaseStat ?? 0,
-            BaseDefense = pokeData.Stats.FirstOrDefault(s => s.Stat.Name == "defense")?.BaseStat ?? 0,
-            BaseSpecial = pokeData.Stats.FirstOrDefault(s => s.Stat.Name == "special-attack")?.BaseStat ?? 0, // In Gen 1 Special Attack and Defense were one "Special" stat
-            BaseSpeed = pokeData.Stats.FirstOrDefault(s => s.Stat.Name == "speed")?.BaseStat ?? 0,
+            Name = pokeData.Name ?? string.Empty,
+            BaseHP = pokeData.Stats?.FirstOrDefault(s => s.Stat?.Name == "hp")?.BaseStat ?? 0,
+            BaseAttack = pokeData.Stats?.FirstOrDefault(s => s.Stat?.Name == "attack")?.BaseStat ?? 0,
+            BaseDefense = pokeData.Stats?.FirstOrDefault(s => s.Stat?.Name == "defense")?.BaseStat ?? 0,
+            BaseSpecial = pokeData.Stats?.FirstOrDefault(s => s.Stat?.Name == "special-attack")?.BaseStat ?? 0, // In Gen 1 Special Attack and Defense were one "Special" stat
+            BaseSpeed = pokeData.Stats?.FirstOrDefault(s => s.Stat?.Name == "speed")?.BaseStat ?? 0,
             GrowthRate = MapGrowthRate(speciesData.GrowthRate?.Name),
             CatchRate = speciesData.CaptureRate,
             BaseExperience = pokeData.BaseExperience ?? 0,
-            PokedexEntry = speciesData.FlavorTextEntries?.FirstOrDefault(f => f.Language.Name == "en")?.FlavorText.Replace("\f", " ").Replace("\n", " ")
+            PokedexEntry = speciesData.FlavorTextEntries?.FirstOrDefault(f => f.Language?.Name == "en")?.FlavorText?.Replace("\f", " ").Replace("\n", " ")
         };
 
         // Types
-        if (pokeData.Types.Count > 0)
+        if (pokeData.Types?.Count > 0)
         {
-            if (Enum.TryParse<DamageType>(pokeData.Types[0].Type.Name, true, out var t1))
+            if (Enum.TryParse<DamageType>(pokeData.Types[0].Type?.Name, true, out var t1))
                 species.Type1 = t1;
             else
                 species.Type1 = DamageType.Normal;
         }
 
-        if (pokeData.Types.Count > 1)
+        if (pokeData.Types?.Count > 1)
         {
-            if (Enum.TryParse<DamageType>(pokeData.Types[1].Type.Name, true, out var t2))
+            if (Enum.TryParse<DamageType>(pokeData.Types[1].Type?.Name, true, out var t2))
                 species.Type2 = t2;
         }
 

@@ -9,8 +9,8 @@ public class Attack
     public AttackType AttackType { get; set; } = AttackType.Physical;
     
     public DamageType DamageType { get; set; } = DamageType.Normal;
-    public string Name { get; set; }
-    public string Description { get; set; }
+    public string? Name { get; set; }
+    public string? Description { get; set; }
     public int Accuracy { get; set; } = 100;
     public int PowerPointsMax { get; set; } = 30;
     public double CriticalChance { get; set; } = 0.05;

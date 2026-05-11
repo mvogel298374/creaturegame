@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("PokeApiConnector")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6d7c01600beb94dae3af45ebfa06c36dc0c93b30")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+79d82f76c60430d7197638087f81545e3e4009cb")]
 [assembly: System.Reflection.AssemblyProductAttribute("PokeApiConnector")]
 [assembly: System.Reflection.AssemblyTitleAttribute("PokeApiConnector")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

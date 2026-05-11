@@ -8,13 +8,13 @@ public class PokeApiPokemon
     public int Id { get; set; }
 
     [JsonPropertyName("name")]
-    public string Name { get; set; }
+    public string? Name { get; set; }
 
     [JsonPropertyName("stats")]
-    public List<PokemonStat> Stats { get; set; }
+    public List<PokemonStat>? Stats { get; set; }
 
     [JsonPropertyName("types")]
-    public List<PokemonTypeSlot> Types { get; set; }
+    public List<PokemonTypeSlot>? Types { get; set; }
 
     [JsonPropertyName("base_experience")]
     public int? BaseExperience { get; set; }
@@ -26,13 +26,13 @@ public class PokemonStat
     public int BaseStat { get; set; }
 
     [JsonPropertyName("stat")]
-    public StatResource Stat { get; set; }
+    public StatResource? Stat { get; set; }
 }
 
 public class StatResource
 {
     [JsonPropertyName("name")]
-    public string Name { get; set; }
+    public string? Name { get; set; }
 }
 
 public class PokemonTypeSlot
@@ -41,11 +41,11 @@ public class PokemonTypeSlot
     public int Slot { get; set; }
 
     [JsonPropertyName("type")]
-    public TypeResource Type { get; set; }
+    public TypeResource? Type { get; set; }
 }
 
 public class TypeResource
 {
     [JsonPropertyName("name")]
-    public string Name { get; set; }
+    public string? Name { get; set; }
 }

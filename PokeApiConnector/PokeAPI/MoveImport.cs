@@ -29,6 +29,7 @@ public class MoveImport
                 using var context = new MovesDbContext();
                 foreach (var moveResource in genResponse.moves)
                 {
+                    if (moveResource.url == null) continue;
                     await FetchMoveDataByUrl(moveResource.url, context);
                 }
             }
@@ -55,7 +56,7 @@ public class MoveImport
             response.EnsureSuccessStatusCode();
 
             string json = await response.Content.ReadAsStringAsync();
-            PokeApiMove pokeMove = JsonSerializer.Deserialize<PokeApiMove>(json, new JsonSerializerOptions
+            PokeApiMove? pokeMove = JsonSerializer.Deserialize<PokeApiMove>(json, new JsonSerializerOptions
             {
                 PropertyNameCaseInsensitive = true
             });
@@ -95,12 +96,12 @@ public class MoveImport
             Accuracy = pokeMove.Accuracy ?? 100,
             PowerPointsMax = pokeMove.Pp ?? 30,
             Description = pokeMove.EffectEntries?
-                .FirstOrDefault(e => e.Language.Name == "en")?.ShortEffect ?? "No description available.",
+                .FirstOrDefault(e => e.Language?.Name == "en")?.ShortEffect ?? "No description available.",
             Priority = pokeMove.Priority,
             EffectChance = pokeMove.EffectChance
         };
 
-        if (Enum.TryParse<DamageType>(pokeMove.Type.Name, true, out var damageType))
+        if (Enum.TryParse<DamageType>(pokeMove.Type?.Name, true, out var damageType))
         {
             attack.DamageType = damageType;
         }
@@ -109,7 +110,7 @@ public class MoveImport
             attack.DamageType = DamageType.Normal; // Default
         }
 
-        attack.AttackType = pokeMove.DamageClass?.Name.ToLower() switch
+        attack.AttackType = pokeMove.DamageClass?.Name?.ToLower() switch
         {
             "physical" => AttackType.Physical,
             "special" => AttackType.Special,

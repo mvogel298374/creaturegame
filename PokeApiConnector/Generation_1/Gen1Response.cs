@@ -6,11 +6,11 @@ namespace PokeApiConnector.Generation_1;
 public class Gen1Response
 {
     [JsonPropertyName("moves")]
-    public List<GenerationResource> moves { get; set; }
+    public List<GenerationResource>? moves { get; set; }
 
     [JsonPropertyName("pokemon_species")]
-    public List<GenerationResource> pokemon_species { get; set; }
+    public List<GenerationResource>? pokemon_species { get; set; }
 
     [JsonPropertyName("types")]
-    public List<GenerationResource> types { get; set; }
+    public List<GenerationResource>? types { get; set; }
 }

@@ -49,7 +49,7 @@ public class AttackService
     /// </summary>
     public async Task<Attack?> GetAttackByNameAsync(string name)
     {
-        return await _context.Moves.FirstOrDefaultAsync(m => m.Name.ToLower() == name.ToLower());
+        return await _context.Moves.FirstOrDefaultAsync(m => m.Name != null && m.Name.ToLower() == name.ToLower());
     }
 
     /// <summary>

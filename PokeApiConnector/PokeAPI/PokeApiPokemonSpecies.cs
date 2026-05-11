@@ -8,32 +8,32 @@ public class PokeApiPokemonSpecies
     public int Id { get; set; }
 
     [JsonPropertyName("name")]
-    public string Name { get; set; }
+    public string? Name { get; set; }
 
     [JsonPropertyName("growth_rate")]
-    public GrowthRateResource GrowthRate { get; set; }
+    public GrowthRateResource? GrowthRate { get; set; }
 
     [JsonPropertyName("capture_rate")]
     public int CaptureRate { get; set; }
 
     [JsonPropertyName("flavor_text_entries")]
-    public List<FlavorTextEntry> FlavorTextEntries { get; set; }
+    public List<FlavorTextEntry>? FlavorTextEntries { get; set; }
 }
 
 public class FlavorTextEntry
 {
     [JsonPropertyName("flavor_text")]
-    public string FlavorText { get; set; }
+    public string? FlavorText { get; set; }
 
     [JsonPropertyName("language")]
-    public NamedApiResource Language { get; set; }
+    public NamedApiResource? Language { get; set; }
 }
 
 public class GrowthRateResource
 {
     [JsonPropertyName("name")]
-    public string Name { get; set; }
+    public string? Name { get; set; }
 
     [JsonPropertyName("url")]
-    public string Url { get; set; }
+    public string? Url { get; set; }
 }
