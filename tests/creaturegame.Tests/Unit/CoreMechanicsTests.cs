@@ -141,8 +141,8 @@ public class CoreMechanicsTests
         slowCreature.AddAttack(new Attack { Name = "Tackle", Accuracy = 100 });
 
         var chart = new Gen1TypeChart();
-        var fastAction = new AttackAction(fastCreature, slowCreature, chart);
-        var slowAction = new AttackAction(slowCreature, fastCreature, chart);
+        var fastAction = new AttackAction(fastCreature, slowCreature, fastCreature.MoveSet[0], chart);
+        var slowAction = new AttackAction(slowCreature, fastCreature, slowCreature.MoveSet[0], chart);
 
         var turnQueue = new List<IBattleAction> { slowAction, fastAction };
 
@@ -169,7 +169,7 @@ public class CoreMechanicsTests
         var move = attacker.MoveSet[0];
 
         int ppBefore = move.PowerPointsCurrent;
-        var action = new AttackAction(attacker, defender, new Gen1TypeChart());
+        var action = new AttackAction(attacker, defender, move, new Gen1TypeChart());
         await action.ExecuteAsync();
 
         Assert.Equal(ppBefore - 1, move.PowerPointsCurrent);
@@ -191,7 +191,8 @@ public class CoreMechanicsTests
         var move = attacker.MoveSet[0];
         move.PowerPointsCurrent = 0; // force PP exhausted
 
-        var action = new AttackAction(attacker, defender, new Gen1TypeChart());
+        // null signals AttackAction to use Struggle — mirrors what Battle does when IsOutOfPP
+        var action = new AttackAction(attacker, defender, null, new Gen1TypeChart());
         await action.ExecuteAsync();
 
         // Defender should have taken damage (Struggle fired)

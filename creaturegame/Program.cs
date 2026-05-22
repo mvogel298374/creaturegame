@@ -108,7 +108,9 @@ class Program
         Console.WriteLine($"  Moves: {string.Join(", ", dragonite.MoveSet.Select(m => $"{m.Base.Name} [{m.Base.DamageType}, PP:{m.PowerPointsCurrent}]"))}");
 
         Console.WriteLine("\n=== Battle Start! ===");
-        var battle = new Battle(bulbasaur, dragonite, typeChart);
+        var battle = new Battle(bulbasaur, dragonite, typeChart,
+            playerInput: AutoSelectInput.Instance,
+            enemyInput:  AutoSelectInput.Instance);
         await battle.StartFightAsync();
 
         Console.WriteLine("\nPress any key to exit...");

@@ -182,17 +182,6 @@ public class Creature
         }
     }
     
-    public void Attack(Creature target, Attack attack)
-    {
-        Console.WriteLine($"{Name} attacks {target.Name} for {attack.BaseDamage} damage!");
-        target.Attributes.ReceiveDamage(attack.BaseDamage);
-    }
-
-    // Determines if the creature is still alive.
-    public bool IsAlive()
-    {
-        var health = Attributes.GetCurrentHealth();
-        return health > 0;
-    }
+    public bool IsAlive() => Attributes.HP > 0;
     
 }

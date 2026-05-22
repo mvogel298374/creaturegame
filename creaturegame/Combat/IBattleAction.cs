@@ -16,42 +16,41 @@ public class AttackAction : IBattleAction
     public int Priority { get; }
     private readonly ITypeChart _typeChart;
 
-    public AttackAction(creaturegame.Creature.Creature source, creaturegame.Creature.Creature target, ITypeChart typeChart)
+    // Null means Struggle — Battle passes null when Source.IsOutOfPP, bypassing IBattleInput.
+    private readonly PokemonAttack? _selectedMove;
+
+    /// <param name="selectedMove">
+    /// The move committed to this turn, as chosen by IBattleInput.
+    /// Pass null to force Struggle (all PP exhausted).
+    /// </param>
+    public AttackAction(creaturegame.Creature.Creature source, creaturegame.Creature.Creature target,
+                        PokemonAttack? selectedMove, ITypeChart typeChart)
     {
-        Source = source;
-        Target = target;
-        _typeChart = typeChart;
-        Priority = source.GetAvailableMove()?.Base.Priority ?? 0;
+        Source        = source;
+        Target        = target;
+        _typeChart    = typeChart;
+        _selectedMove = selectedMove;
+        Priority      = selectedMove?.Base.Priority ?? 0;
     }
 
     public Task ExecuteAsync()
     {
         if (!Source.IsAlive()) return Task.CompletedTask;
 
-        bool usingStruggle = Source.IsOutOfPP;
-        var availableMove = usingStruggle ? null : Source.GetAvailableMove();
-        Attack attackToUse;
-        if (usingStruggle)
-        {
-            attackToUse = Source.Struggle;
-        }
-        else
-        {
-            attackToUse = availableMove!.Base;
-            availableMove.PowerPointsCurrent--;
-        }
+        bool usingStruggle = _selectedMove == null;
+        Attack attackToUse = usingStruggle ? Source.Struggle : _selectedMove!.Base;
+
+        if (!usingStruggle)
+            _selectedMove!.PowerPointsCurrent--;
 
         Console.WriteLine($"{Source.Name} used {attackToUse.Name}!");
 
         // Accuracy check (Struggle always hits)
-        if (!usingStruggle)
+        if (!usingStruggle && attackToUse.Accuracy < 100
+            && Random.Shared.Next(1, 101) > attackToUse.Accuracy)
         {
-            int accuracy = attackToUse.Accuracy;
-            if (accuracy < 100 && Random.Shared.Next(1, 101) > accuracy)
-            {
-                Console.WriteLine("The attack missed!");
-                return Task.CompletedTask;
-            }
+            Console.WriteLine("The attack missed!");
+            return Task.CompletedTask;
         }
 
         int damage = DamageCalculator.CalculateGen1Damage(Source, Target, attackToUse, _typeChart);

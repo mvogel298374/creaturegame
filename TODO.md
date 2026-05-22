@@ -28,8 +28,38 @@
 - [ ] Apply Speed/Attack modifiers from status in `DamageCalculator` and turn order
 
 ## Priority 6 – Move Selection (Player Input)
-- [ ] Replace `MoveSet[0]` hardcode in `Battle.cs` with a move menu abstraction
-- [ ] `IBattleInput` interface: `ChooseMoveAsync(Creature)` → supports console, AI, future UI
+- [ ] Implement `ConsoleInput : IBattleInput` — numbered move menu, shows PP and type
+- [ ] Wire `ConsoleInput` into `Program.cs` for the player side; enemy keeps `AutoSelectInput`
+
+## Priority 9 – AI Move Selection
+Design: `IBattleInput` is already the seam. AI implementations score available moves via
+`IMoveEvaluator` and pick using a selection strategy.
+
+**Evaluator dimensions (score each available move):**
+- Expected damage — base power × type effectiveness × STAB × stat ratio
+- Type effectiveness bonus — super-effective moves strongly preferred
+- Priority move value — prefer Quick Attack / high-priority when own HP is low or opponent near KO
+- Status move value — Thunder Wave is high-value early; worthless if target already has a status
+- PP conservation — small penalty for moves with ≤ 5 PP remaining
+- Opponent HP threshold — any move finishes a near-KO target; don't waste a precision pick
+
+**Selection strategies (how scores become a choice):**
+- `RandomMoveInput` — ignores evaluators; pure random (wild Pokémon / lowest AI tier)
+- `WeightedAIInput(IMoveEvaluator)` — probabilistic, weighted by score (average trainer)
+- `GreedyAIInput(IMoveEvaluator)` — always picks highest score (Elite Four / boss tier)
+
+**Composition:**
+- `CompositeEvaluator(IEnumerable<(IMoveEvaluator evaluator, double weight)>)` — weighted sum;
+  trainer "personality" = different weights (aggressive vs. defensive vs. status-heavy)
+
+**Implementation tasks:**
+- [ ] `DamageEvaluator : IMoveEvaluator`
+- [ ] `TypeEffectivenessEvaluator : IMoveEvaluator`
+- [ ] `StatusMoveEvaluator : IMoveEvaluator`
+- [ ] `CompositeEvaluator : IMoveEvaluator`
+- [ ] `RandomMoveInput : IBattleInput`
+- [ ] `GreedyAIInput : IBattleInput`
+- [ ] `WeightedAIInput : IBattleInput`
 
 ## Priority 7 – Experience & Catch System
 - [ ] `Battle.cs` awards XP to winner on faint (Gen 1 formula)
@@ -50,8 +80,8 @@
 - [x] Add `.editorconfig` for consistent indentation (4 spaces), charset (UTF-8), and editor-side line ending preference
 - [x] Add `.gitattributes` to normalise line endings in the repo (LF in git, auto CRLF on Windows checkout)
 - [x] Add `README.md` at repo root
-- [ ] Remove `Creature.Attack()` direct-damage method — bypasses `DamageCalculator`/type chart and has a naming collision with the `Attack` class; `AttackAction` is the correct path
-- [ ] Remove redundant `Attributes.GetCurrentHealth()` and `GetSpeed()` wrapper methods — all callers already access `.HP` / `.Speed` directly
+- [x] Remove `Creature.Attack()` direct-damage method — bypasses `DamageCalculator`/type chart and has a naming collision with the `Attack` class; `AttackAction` is the correct path
+- [x] Remove redundant `Attributes.GetCurrentHealth()` call from `IsAlive()` — now reads `Attributes.HP` directly; `IsAlive()` itself retained as a meaningful predicate
 - [ ] Resolve `Creature` class/namespace name collision (`creaturegame.Creature.Creature`) — forces fully-qualified usage in `Program.cs`; consider renaming namespace to `creaturegame.Creatures`
 - [ ] Decide on `.idea/` strategy — currently fully excluded; revisit if run configs are worth sharing
 - [ ] Consolidate or clarify relationship between `AI_CONTEXT.md` / `DESIGN_GUIDES.md` / `DEV_STANDARDS.md` and `CLAUDE.md`
