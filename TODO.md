@@ -31,6 +31,15 @@
 - [ ] Implement `ConsoleInput : IBattleInput` — numbered move menu, shows PP and type
 - [ ] Wire `ConsoleInput` into `Program.cs` for the player side; enemy keeps `AutoSelectInput`
 
+## Priority 7 – Experience & Catch System
+- [ ] `Battle.cs` awards XP to winner on faint (Gen 1 formula)
+- [ ] Basic catch mechanic using `PokemonSpecies.CatchRate`
+
+## Priority 8 – Learnset System
+- [ ] `PokemonLearnset` DB table: species ID → move ID → level learned
+- [ ] Import learnsets from PokeAPI (`/pokemon/{id}/moves`)
+- [ ] `Creature.InitializeFromSpecies()` populates starting moveset by level
+
 ## Priority 9 – AI Move Selection
 Design: `IBattleInput` is already the seam. AI implementations score available moves via
 `IMoveEvaluator` and pick using a selection strategy.
@@ -61,16 +70,23 @@ Design: `IBattleInput` is already the seam. AI implementations score available m
 - [ ] `GreedyAIInput : IBattleInput`
 - [ ] `WeightedAIInput : IBattleInput`
 
-## Priority 7 – Experience & Catch System
-- [ ] `Battle.cs` awards XP to winner on faint (Gen 1 formula)
-- [ ] Basic catch mechanic using `PokemonSpecies.CatchRate`
+## Priority 10 – Web UI
+Deprecate `Program.cs` as the primary entry point and replace it with a proper web front-end.
+The battle engine is already decoupled from I/O via `IBattleInput` and `IBattleAction`,
+so this is largely an infrastructure and presentation layer addition.
 
-## Priority 8 – Learnset System
-- [ ] `PokemonLearnset` DB table: species ID → move ID → level learned
-- [ ] Import learnsets from PokeAPI (`/pokemon/{id}/moves`)
-- [ ] `Creature.InitializeFromSpecies()` populates starting moveset by level
+- [ ] Add an ASP.NET Core project to the solution as the web host
+- [ ] Expose battle state over SignalR (real-time push suits the turn-based loop naturally)
+- [ ] Implement `WebInput : IBattleInput` backed by the SignalR connection — player sends
+      their chosen move index; server resolves the turn and broadcasts the result
+- [ ] Build a minimal browser UI: creature HP bars, move menu, battle log
+- [ ] `Program.cs` console runner becomes a dev/debug tool, not the primary entry point
+
+---
 
 ## Tech Debt / Cleanup
+
+### Done
 - [x] Remove dead scaffolding: `Body`, `Brain`, `BodyPart`, `Special`, `Dragon`, `CreatureType`, `Attributes.SetAttributesByCreatureType`
 - [x] Remove unused `using System.Net.NetworkInformation` from `Attributes.cs`
 - [x] Fix `.gitignore` — add local tool config exclusions (`.claude/settings.local.json`, `.ai/`), untrack committed build artifacts and IDE files
@@ -82,6 +98,9 @@ Design: `IBattleInput` is already the seam. AI implementations score available m
 - [x] Add `README.md` at repo root
 - [x] Remove `Creature.Attack()` direct-damage method — bypasses `DamageCalculator`/type chart and has a naming collision with the `Attack` class; `AttackAction` is the correct path
 - [x] Remove redundant `Attributes.GetCurrentHealth()` call from `IsAlive()` — now reads `Attributes.HP` directly; `IsAlive()` itself retained as a meaningful predicate
+
+### Pending
 - [ ] Resolve `Creature` class/namespace name collision (`creaturegame.Creature.Creature`) — forces fully-qualified usage in `Program.cs`; consider renaming namespace to `creaturegame.Creatures`
+- [ ] Remove redundant `Attributes.GetSpeed()` wrapper — all callers access `.Speed` directly
 - [ ] Decide on `.idea/` strategy — currently fully excluded; revisit if run configs are worth sharing
 - [ ] Consolidate or clarify relationship between `AI_CONTEXT.md` / `DESIGN_GUIDES.md` / `DEV_STANDARDS.md` and `CLAUDE.md`
