@@ -1,0 +1,16 @@
+# Normalise line endings: store as LF in git, check out as CRLF on Windows.
+* text=auto eol=crlf
+
+# Force LF for shell scripts and Unix-targeted files regardless of platform.
+*.sh text eol=lf
+
+# Treat binary formats as binary — no line-ending normalisation.
+*.db binary
+*.dll binary
+*.exe binary
+*.pdb binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary

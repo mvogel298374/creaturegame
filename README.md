@@ -93,14 +93,16 @@ The following Gen 1 quirks are intentionally preserved:
 
 ## Roadmap
 
-**Battle mechanics (in priority order):**
+For the concrete, prioritised list of what's actively being worked on, see [`TODO.md`](TODO.md).
+
+**Near-term battle mechanics (in priority order):**
 1. Move Priority — read `move.Priority` field instead of hardcoding 0
 2. Status conditions — Burn, Paralysis, Poison, Sleep, Freeze with correct Gen 1 effects and end-of-turn damage
 3. Move selection — `IBattleInput` abstraction replacing the hardcoded `MoveSet[0]`
 4. XP & catch system — Gen 1 XP formula on faint; catch rate mechanic
 5. Learnset system — per-species moveset populated from PokeAPI data
 
-**Future layers:**
+**Loose future goals** *(not yet scheduled — see TODO.md for what's actually planned)*:
 - Generation switching — plug in a new `ITypeChart` + stat formula set
 - Roguelike / autobattler mode
 - Pokémon Infinite Fusion-inspired creature composition
