@@ -1,0 +1,135 @@
+using creaturegame.Attacks;
+using creaturegame.Creature;
+using creaturegame.DB;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+
+namespace creaturegame.Tests.Integration;
+
+/// <summary>
+/// Verifies that EnsureDatabaseCreated() correctly applies EF Core migrations to a
+/// fresh SQLite database, producing a schema that can round-trip all model fields —
+/// including the columns (Priority, EffectChance, CatchRate, etc.) that were
+/// previously added via raw ALTER TABLE hacks.
+/// </summary>
+public class MigrationTests : IDisposable
+{
+    private readonly string _movesDb  = Path.ChangeExtension(Path.GetTempFileName(), ".db");
+    private readonly string _pokemonDb = Path.ChangeExtension(Path.GetTempFileName(), ".db");
+
+    // --- MovesDbContext ---
+
+    [Fact]
+    public void MovesDb_EnsureDatabaseCreated_CanRoundTripAttackWithAllFields()
+    {
+        using var context = BuildMovesContext();
+        context.EnsureDatabaseCreated();
+
+        var attack = new Attack
+        {
+            Name          = "Flamethrower",
+            BaseDamage    = 95,
+            Accuracy      = 100,
+            PowerPointsMax = 15,
+            AttackType    = AttackType.Special,
+            DamageType    = DamageType.Fire,
+            Priority      = 1,
+            EffectChance  = 10,
+        };
+        context.Moves.Add(attack);
+        context.SaveChanges();
+
+        var loaded = context.Moves.AsNoTracking().Single(m => m.Name == "Flamethrower");
+        Assert.Equal(95,           loaded.BaseDamage);
+        Assert.Equal(DamageType.Fire, loaded.DamageType);
+        Assert.Equal(1,            loaded.Priority);
+        Assert.Equal(10,           loaded.EffectChance);
+    }
+
+    [Fact]
+    public void MovesDb_EnsureDatabaseCreated_IsIdempotent()
+    {
+        using var context = BuildMovesContext();
+        var ex = Record.Exception(() =>
+        {
+            context.EnsureDatabaseCreated();
+            context.EnsureDatabaseCreated();
+        });
+        Assert.Null(ex);
+    }
+
+    // --- PokemonDbContext ---
+
+    [Fact]
+    public void PokemonDb_EnsureDatabaseCreated_CanRoundTripSpeciesWithAllFields()
+    {
+        using var context = BuildPokemonContext();
+        context.EnsureDatabaseCreated();
+
+        var species = new PokemonSpecies
+        {
+            Id             = 6,
+            Name           = "charizard",
+            BaseHP         = 78,
+            BaseAttack     = 84,
+            BaseDefense    = 78,
+            BaseSpecial    = 85,
+            BaseSpeed      = 100,
+            Type1          = DamageType.Fire,
+            Type2          = DamageType.Flying,
+            GrowthRate     = GrowthRate.MediumSlow,
+            CatchRate      = 45,
+            BaseExperience = 240,
+            PokedexEntry   = "Spits fire that is hot enough to melt boulders.",
+        };
+        context.Species.Add(species);
+        context.SaveChanges();
+
+        var loaded = context.Species.AsNoTracking().Single(s => s.Name == "charizard");
+        Assert.Equal(45,                  loaded.CatchRate);
+        Assert.Equal(240,                 loaded.BaseExperience);
+        Assert.Equal(GrowthRate.MediumSlow, loaded.GrowthRate);
+        Assert.Equal("Spits fire that is hot enough to melt boulders.", loaded.PokedexEntry);
+        Assert.Equal(DamageType.Flying,   loaded.Type2);
+    }
+
+    [Fact]
+    public void PokemonDb_EnsureDatabaseCreated_IsIdempotent()
+    {
+        using var context = BuildPokemonContext();
+        var ex = Record.Exception(() =>
+        {
+            context.EnsureDatabaseCreated();
+            context.EnsureDatabaseCreated();
+        });
+        Assert.Null(ex);
+    }
+
+    // --- Helpers ---
+
+    private MovesDbContext BuildMovesContext()
+    {
+        var options = new DbContextOptionsBuilder<MovesDbContext>()
+            .UseSqlite($"Data Source={_movesDb}")
+            .Options;
+        return new MovesDbContext(options);
+    }
+
+    private PokemonDbContext BuildPokemonContext()
+    {
+        var options = new DbContextOptionsBuilder<PokemonDbContext>()
+            .UseSqlite($"Data Source={_pokemonDb}")
+            .Options;
+        return new PokemonDbContext(options);
+    }
+
+    public void Dispose()
+    {
+        // Release any pooled SQLite connections before deleting the temp files,
+        // otherwise the connection pool keeps the file handle open just long enough
+        // to cause an IOException on Windows.
+        SqliteConnection.ClearAllPools();
+        if (File.Exists(_movesDb))   File.Delete(_movesDb);
+        if (File.Exists(_pokemonDb)) File.Delete(_pokemonDb);
+    }
+}

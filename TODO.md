@@ -45,7 +45,7 @@
 - [x] Remove unused `using System.Net.NetworkInformation` from `Attributes.cs`
 - [x] Fix `.gitignore` — add local tool config exclusions (`.claude/settings.local.json`, `.ai/`), untrack committed build artifacts and IDE files
 - [x] Add `global.json` to pin .NET SDK to 9.0.200
-- [ ] Adopt EF Core migrations before schema grows further
+- [x] Adopt EF Core migrations — `InitialCreate` scaffolded for both `MovesDbContext` and `PokemonDbContext`; `EnsureDatabaseCreated()` now calls `Database.Migrate()` instead of raw `ALTER TABLE` hacks
 - [ ] Decide: repurpose `Traits` as Pokémon Abilities layer, or remove; remove hardcoded placeholder `Traits` from `Creature` constructor in the meantime
 - [ ] Add `.editorconfig` for consistent indentation (4 spaces), charset (UTF-8), and editor-side line ending preference
 - [ ] Add `.gitattributes` to normalise line endings in the repo (LF in git, auto CRLF on Windows checkout)

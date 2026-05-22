@@ -18,6 +18,13 @@ To run a single test by name:
 & "C:\Users\USER\.dotnet\dotnet.exe" test tests/creaturegame.Tests --filter "FullyQualifiedName~<MethodName>"
 ```
 
+EF Core migration commands require `DOTNET_ROOT` set so `dotnet-ef` finds the user-local SDK instead of the system runtime-only install:
+```powershell
+$env:DOTNET_ROOT = "C:\Users\USER\.dotnet"; $env:PATH = "C:\Users\USER\.dotnet;C:\Users\USER\.dotnet\tools;$env:PATH"
+& "C:\Users\USER\.dotnet\dotnet.exe" ef migrations add <MigrationName> --project creaturegame --context <ContextName> --output-dir DB/Migrations/<Moves|Pokemon>
+& "C:\Users\USER\.dotnet\dotnet.exe" ef migrations remove --project creaturegame --context <ContextName>
+```
+
 ## Architecture
 
 Three-project .NET 9 solution:
@@ -40,7 +47,7 @@ PokeApiConnector fetches Gen 1 Pokémon and moves (IDs 1–165) from `pokeapi.co
 - **`IBattleAction`** — encapsulates a single turn action; `Priority` + `ExecuteAsync()`.
 - **`IBattleInput`** (planned) — abstracts move selection (console, AI, UI).
 - All DB reads use `AsNoTracking()` before upserts. All DB operations are async.
-- Schema migrations are currently manual `ALTER TABLE` checks in `GameDbContext`; adopt EF Core migrations before schema grows further.
+- Schema uses EF Core migrations (in `creaturegame/DB/Migrations/`). `EnsureDatabaseCreated()` calls `Database.Migrate()` — run `PokeApiConnector` on a fresh setup to create and populate the databases. Add new migrations with `dotnet ef migrations add` (see migration command above).
 
 ## Agent Profiles (AI_CONTEXT.md)
 
@@ -71,7 +78,7 @@ Active priorities (in order):
 5. **XP & Catch System** — Gen 1 XP formula on faint; `CatchRate`-based catch mechanic.
 6. **Learnset System** — `PokemonLearnset` DB table; import from PokeAPI; populate moveset on init.
 
-Tech debt to clear: remove dead scaffolding (`Body`, `Brain`, `BodyPart`, `Special`, `Dragon`, `Attributes.SetAttributesByCreatureType`), unused `using` in `Attributes.cs`, decide whether `Traits` becomes the Abilities layer.
+Tech debt to clear: decide whether `Traits` becomes the Abilities layer or is removed; add `.editorconfig` / `.gitattributes`; resolve `Creature` class/namespace collision; remove `Creature.Attack()` footgun.
 
 ## Communication Style
 
