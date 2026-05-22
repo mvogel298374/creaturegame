@@ -14,3 +14,13 @@ obj/
 
 # Logs
 *.log
+
+# Claude Code local session settings (auto-generated per-session allow rules)
+.claude/settings.local.json
+
+# AI/MCP tool local config
+.ai/
+
+# NuGet
+*.nupkg
+packages/

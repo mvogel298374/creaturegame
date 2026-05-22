@@ -1,12 +1,10 @@
 ﻿using creaturegame.Attacks;
 using creaturegame.Creature.Traits;
-using creaturegame.Creature.Parts;
 
 namespace creaturegame.Creature;
 
 public class Creature
 {
-    private BodyPart Parts { get; set; } = new BodyPart(new Body(), new Brain());
     public string Name { get; set; } = string.Empty;
     public int Level { get; set; } = 1;
     public Attributes Attributes { get; set; } = new Attributes();
@@ -110,7 +108,7 @@ public class Creature
     public StatusCondition Status { get; set; } = StatusCondition.None;
     public int SleepTurns { get; set; } = 0;
 
-    protected Creature()
+    private Creature()
     {
         GenerateRandomDVs();
     }
@@ -174,7 +172,6 @@ public class Creature
     {
         Console.WriteLine($"Name: {Name}, Level: {Level}");
         Console.WriteLine($"Attributes: {Attributes}");
-        Console.WriteLine($"Parts: {Parts}");
         DisplayTraits();
         DisplayAttacks();
     }

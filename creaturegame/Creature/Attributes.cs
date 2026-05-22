@@ -1,6 +1,4 @@
-﻿using System.Net.NetworkInformation;
-
-namespace creaturegame.Creature;
+﻿namespace creaturegame.Creature;
 
 public class Attributes
 {
@@ -17,35 +15,6 @@ public class Attributes
         return $@"ATK: {this.Attack}, DEF: {this.Defense}, SPEC: {this.Special}, HP: {this.HP}/{this.MaxHP}, SPD: {this.Speed}";
     }
 
-    public void SetAttributesByCreatureType(CreatureType creature)
-    {
-        //TODO some magic here to get the creaturetype base stats out of a db etc
-        switch (creature)
-        {
-            case CreatureType.Dragon:
-            {
-                Attack = 100;
-                Special = 80;
-                Defense = 60;
-                HP = 200;
-                MaxHP = 200;
-                Speed = 100;
-                break;
-            }
-            case CreatureType.Undefined:
-            default:
-            {
-                Attack = 50;
-                Special = 50;
-                Defense = 50;
-                HP = 100;
-                MaxHP = 100;
-                Speed = 50;
-                break;
-            } 
-        }
-    }
-    
     public void ReceiveDamage(int damage)
     {
         this.HP -= damage;

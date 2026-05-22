@@ -1,7 +1,6 @@
 ﻿using creaturegame.Attacks;
 using creaturegame.Combat;
 using creaturegame.Creature;
-using creaturegame.Creature.Creatures;
 using creaturegame.DB;
 
 namespace creaturegame;
@@ -61,7 +60,7 @@ class Program
 
         // --- Dragonite (Dragon/Flying) ---
         var dragoniteSpecies = await pokemonService.GetSpeciesByNameAsync("dragonite");
-        var dragonite = new Dragon("Dragonite")
+        var dragonite = new creaturegame.Creature.Creature("Dragonite")
         {
             Level = 50,
             DvAttack = 15, DvDefense = 15, DvSpecial = 15, DvSpeed = 15, DvHP = 15
@@ -73,6 +72,9 @@ class Program
         else
         {
             Console.WriteLine("[WARN] Dragonite not found in DB — using fallback stats.");
+            dragonite.BaseHP = 91; dragonite.BaseAttack = 134; dragonite.BaseDefense = 95;
+            dragonite.BaseSpecial = 100; dragonite.BaseSpeed = 80;
+            dragonite.Type1 = DamageType.Dragon; dragonite.Type2 = DamageType.Flying;
             dragonite.CalculateStats();
         }
 
