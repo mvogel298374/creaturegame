@@ -1,9 +1,6 @@
-﻿using Xunit;
 using creaturegame.Creature;
 using creaturegame.Attacks;
 using creaturegame.Combat;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace creaturegame.Tests.Unit;
 
@@ -160,7 +157,7 @@ public class CoreMechanicsTests
     // --- PP Tracking Tests ---
 
     [Fact]
-    public void PP_DecrementsOnUse()
+    public async Task PP_DecrementsOnUse()
     {
         var attacker = new Creature.Creature("Attacker") { Level = 10 };
         attacker.CalculateStats();
@@ -173,13 +170,13 @@ public class CoreMechanicsTests
 
         int ppBefore = move.PowerPointsCurrent;
         var action = new AttackAction(attacker, defender, new Gen1TypeChart());
-        action.ExecuteAsync().Wait();
+        await action.ExecuteAsync();
 
         Assert.Equal(ppBefore - 1, move.PowerPointsCurrent);
     }
 
     [Fact]
-    public void PP_StruggleUsedWhenPPIsZero()
+    public async Task PP_StruggleUsedWhenPPIsZero()
     {
         var attacker = new Creature.Creature("Attacker") { Level = 10 };
         attacker.CalculateStats();
@@ -195,7 +192,7 @@ public class CoreMechanicsTests
         move.PowerPointsCurrent = 0; // force PP exhausted
 
         var action = new AttackAction(attacker, defender, new Gen1TypeChart());
-        action.ExecuteAsync().Wait();
+        await action.ExecuteAsync();
 
         // Defender should have taken damage (Struggle fired)
         Assert.True(defender.Attributes.HP < defenderHpBefore);

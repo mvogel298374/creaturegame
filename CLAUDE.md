@@ -4,16 +4,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-```bash
-dotnet build                          # Build all projects
-dotnet run --project creaturegame     # Run the battle simulator
-dotnet run --project PokeApiConnector # Import data from PokeAPI into SQLite DBs
-dotnet test tests/creaturegame.Tests  # Run all tests
+The system `dotnet` at `C:\Program Files\dotnet\dotnet.exe` is a runtime-only install with no SDK. Use the user-local SDK at `C:\Users\USER\.dotnet\dotnet.exe` (NET 9.0.200) for all build and test commands.
+
+```powershell
+& "C:\Users\USER\.dotnet\dotnet.exe" build                          # Build all projects
+& "C:\Users\USER\.dotnet\dotnet.exe" run --project creaturegame     # Run the battle simulator
+& "C:\Users\USER\.dotnet\dotnet.exe" run --project PokeApiConnector # Import data from PokeAPI
+& "C:\Users\USER\.dotnet\dotnet.exe" test tests/creaturegame.Tests  # Run all tests
 ```
 
 To run a single test by name:
-```bash
-dotnet test tests/creaturegame.Tests --filter "FullyQualifiedName~<MethodName>"
+```powershell
+& "C:\Users\USER\.dotnet\dotnet.exe" test tests/creaturegame.Tests --filter "FullyQualifiedName~<MethodName>"
 ```
 
 ## Architecture
@@ -70,6 +72,12 @@ Active priorities (in order):
 6. **Learnset System** — `PokemonLearnset` DB table; import from PokeAPI; populate moveset on init.
 
 Tech debt to clear: remove dead scaffolding (`Body`, `Brain`, `BodyPart`, `Special`, `Dragon`, `Attributes.SetAttributesByCreatureType`), unused `using` in `Attributes.cs`, decide whether `Traits` becomes the Abilities layer.
+
+## Communication Style
+
+Before running any command or making changes, state in plain language what you are about to do and why — which files will be affected, what the command does, and what outcome you expect. One or two sentences is enough; silence is not.
+
+PowerShell commands are auto-approved, but commands that are system-wide or far-reaching (registry edits, installing software, modifying global environment variables, deleting files outside the repo, etc.) should still be explicitly called out and confirmed with the user before running.
 
 ## Coding Conventions
 
