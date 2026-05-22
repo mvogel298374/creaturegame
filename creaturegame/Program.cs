@@ -56,7 +56,6 @@ class Program
         var quickAttack = await attackService.GetAttackByNameAsync("quick-attack")
             ?? new Attack("Quick Attack", "An extremely fast attack.") { BaseDamage = 40, Accuracy = 100, AttackType = AttackType.Physical, DamageType = DamageType.Normal, Priority = 1 };
 
-        bulbasaur.Struggle = struggleAttack;
         bulbasaur.AddAttack(razorLeaf);
         bulbasaur.AddAttack(quickAttack);
 
@@ -85,8 +84,7 @@ class Program
         // Hyper Beam: Normal special — high power, no type bonus, shows contrast
         var hyperBeam = await attackService.GetAttackByNameAsync("hyper-beam")
             ?? new Attack("Hyper Beam", "A powerful beam attack.") { BaseDamage = 150, Accuracy = 90, AttackType = AttackType.Special, DamageType = DamageType.Normal };
-
-        dragonite.Struggle = struggleAttack;
+        
         dragonite.AddAttack(flamethrower);
         dragonite.AddAttack(hyperBeam);
 

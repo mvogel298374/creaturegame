@@ -193,7 +193,6 @@ public class CoreMechanicsTests
         attacker.AddAttack(baseAttack);
         var move = attacker.MoveSet[0];
         move.PowerPointsCurrent = 0; // force PP exhausted
-        attacker.Struggle = new Attack { Name = "Struggle", BaseDamage = 50, Accuracy = 100, DamageType = DamageType.Normal };
 
         var action = new AttackAction(attacker, defender, new Gen1TypeChart());
         action.ExecuteAsync().Wait();
