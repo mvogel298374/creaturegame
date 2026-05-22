@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__ide__getDiagnostics",
+      "WebSearch",
+      "WebFetch(domain:www.jetbrains.com)",
+      "Bash(dir J:\\\\creaturegame\\\\creaturegame *)"
+    ]
+  }
+}
