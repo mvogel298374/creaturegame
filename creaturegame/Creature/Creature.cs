@@ -1,5 +1,4 @@
 ﻿using creaturegame.Attacks;
-using creaturegame.Creature.Traits;
 
 namespace creaturegame.Creature;
 
@@ -8,7 +7,6 @@ public class Creature
     public string Name { get; set; } = string.Empty;
     public int Level { get; set; } = 1;
     public Attributes Attributes { get; set; } = new Attributes();
-    private List<Trait> Traits { get; set; } = [];
     public List<PokemonAttack> MoveSet { get; private set; } = [];
 
     // Struggle is a system-level fallback — never exposed publicly.
@@ -116,7 +114,6 @@ public class Creature
     public Creature(string name) : this()
     {
         Name = name;
-        Traits = [new Trait(TraitType.Ability, "Heat", "Gives Heat"), new Trait(TraitType.Flaw, "Weak", "is weak")];
     }
 
     public void InitializeFromSpecies(DB.PokemonSpecies species)
@@ -172,18 +169,7 @@ public class Creature
     {
         Console.WriteLine($"Name: {Name}, Level: {Level}");
         Console.WriteLine($"Attributes: {Attributes}");
-        DisplayTraits();
         DisplayAttacks();
-    }
-
-    private void DisplayTraits()
-    {
-        int index = 1;
-        foreach (Trait trait in Traits)
-        {
-            Console.WriteLine($"Trait #{index}: {trait}");
-            index++;
-        }
     }
 
     private void DisplayAttacks()

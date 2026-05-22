@@ -46,10 +46,10 @@
 - [x] Fix `.gitignore` — add local tool config exclusions (`.claude/settings.local.json`, `.ai/`), untrack committed build artifacts and IDE files
 - [x] Add `global.json` to pin .NET SDK to 9.0.200
 - [x] Adopt EF Core migrations — `InitialCreate` scaffolded for both `MovesDbContext` and `PokemonDbContext`; `EnsureDatabaseCreated()` now calls `Database.Migrate()` instead of raw `ALTER TABLE` hacks
-- [ ] Decide: repurpose `Traits` as Pokémon Abilities layer, or remove; remove hardcoded placeholder `Traits` from `Creature` constructor in the meantime
+- [x] Remove hardcoded placeholder `Traits` from `Creature` constructor; `Trait.cs` / `TraitType.cs` scaffolding retained for future Abilities layer
 - [ ] Add `.editorconfig` for consistent indentation (4 spaces), charset (UTF-8), and editor-side line ending preference
 - [ ] Add `.gitattributes` to normalise line endings in the repo (LF in git, auto CRLF on Windows checkout)
-- [ ] Add `README.md` at repo root
+- [x] Add `README.md` at repo root
 - [ ] Remove `Creature.Attack()` direct-damage method — bypasses `DamageCalculator`/type chart and has a naming collision with the `Attack` class; `AttackAction` is the correct path
 - [ ] Remove redundant `Attributes.GetCurrentHealth()` and `GetSpeed()` wrapper methods — all callers already access `.HP` / `.Speed` directly
 - [ ] Resolve `Creature` class/namespace name collision (`creaturegame.Creature.Creature`) — forces fully-qualified usage in `Program.cs`; consider renaming namespace to `creaturegame.Creatures`
