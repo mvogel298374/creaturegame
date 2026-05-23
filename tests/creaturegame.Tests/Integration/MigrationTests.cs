@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using creaturegame.Attacks;
 using creaturegame.Creatures;
 using creaturegame.DB;
@@ -35,15 +36,17 @@ public class MigrationTests : IDisposable
             DamageType    = DamageType.Fire,
             Priority      = 1,
             EffectChance  = 10,
+            StatusEffect  = StatusCondition.Burn,
         };
         context.Moves.Add(attack);
         context.SaveChanges();
 
         var loaded = context.Moves.AsNoTracking().Single(m => m.Name == "Flamethrower");
-        Assert.Equal(95,           loaded.BaseDamage);
-        Assert.Equal(DamageType.Fire, loaded.DamageType);
-        Assert.Equal(1,            loaded.Priority);
-        Assert.Equal(10,           loaded.EffectChance);
+        Assert.Equal(95,                  loaded.BaseDamage);
+        Assert.Equal(DamageType.Fire,     loaded.DamageType);
+        Assert.Equal(1,                   loaded.Priority);
+        Assert.Equal(10,                  loaded.EffectChance);
+        Assert.Equal(StatusCondition.Burn, loaded.StatusEffect);
     }
 
     [Fact]
@@ -56,6 +59,33 @@ public class MigrationTests : IDisposable
             context.EnsureDatabaseCreated();
         });
         Assert.Null(ex);
+    }
+
+    [Fact]
+    public void MovesDb_Schema_HasAllExpectedColumns()
+    {
+        using var context = BuildMovesContext();
+        context.EnsureDatabaseCreated();
+
+        var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        using var conn = new SqliteConnection($"Data Source={_movesDb}");
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "PRAGMA table_info(Moves)";
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+            columns.Add(reader.GetString(1)); // column 1 = name
+
+        Assert.Contains("Id",            columns);
+        Assert.Contains("Name",          columns);
+        Assert.Contains("BaseDamage",    columns);
+        Assert.Contains("DamageType",    columns);
+        Assert.Contains("AttackType",    columns);
+        Assert.Contains("Accuracy",      columns);
+        Assert.Contains("PowerPointsMax", columns);
+        Assert.Contains("Priority",      columns);
+        Assert.Contains("EffectChance",  columns);
+        Assert.Contains("StatusEffect",  columns);
     }
 
     // --- PokemonDbContext ---
