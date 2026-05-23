@@ -14,8 +14,8 @@
 - [x] `AttackAction` decrements `PowerPointsCurrent`, checks > 0 before executing
 - [x] Handle Struggle when all PP = 0
 
-## Priority 3 – Move Priority Fix
-- [ ] `AttackAction` constructor: read `move.Priority` instead of hardcoding 0
+## Priority 3 – Move Priority Fix ✅ DONE
+- [x] `AttackAction` constructor: read `move.Priority` instead of hardcoding 0
 
 ## Priority 4 – Status Condition Application
 - [ ] Moves with status effects apply `StatusCondition` to target (Burn, Paralysis, Poison, Sleep, Freeze)
