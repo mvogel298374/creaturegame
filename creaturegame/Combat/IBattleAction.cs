@@ -1,18 +1,19 @@
 ﻿using creaturegame.Attacks;
+using creaturegame.Creatures;
 
 namespace creaturegame.Combat;
 
 public interface IBattleAction
 {
-    creaturegame.Creature.Creature Source { get; }
+    Creature Source { get; }
     int Priority { get; }
     Task ExecuteAsync();
 }
 
 public class AttackAction : IBattleAction
 {
-    public creaturegame.Creature.Creature Source { get; }
-    public creaturegame.Creature.Creature Target { get; }
+    public Creature Source { get; }
+    public Creature Target { get; }
     public int Priority { get; }
     private readonly ITypeChart _typeChart;
 
@@ -23,7 +24,7 @@ public class AttackAction : IBattleAction
     /// The move committed to this turn, as chosen by IBattleInput.
     /// Pass null to force Struggle (all PP exhausted).
     /// </param>
-    public AttackAction(creaturegame.Creature.Creature source, creaturegame.Creature.Creature target,
+    public AttackAction(Creature source, Creature target,
                         PokemonAttack? selectedMove, ITypeChart typeChart)
     {
         Source        = source;

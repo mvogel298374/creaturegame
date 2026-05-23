@@ -1,4 +1,4 @@
-﻿namespace creaturegame.Creature;
+﻿namespace creaturegame.Creatures;
 
 public class Attributes
 {

@@ -1,4 +1,4 @@
-using creaturegame.Creature;
+using creaturegame.Creatures;
 using creaturegame.Attacks;
 using creaturegame.Combat;
 
@@ -9,7 +9,7 @@ public class CoreMechanicsTests
     [Fact]
     public void StatCalculation()
     {
-        var bulbasaur = new Creature.Creature("Tommy")
+        var bulbasaur = new Creature("Tommy")
         {
             BaseHP = 45,
             BaseAttack = 49,
@@ -33,7 +33,7 @@ public class CoreMechanicsTests
     [Fact]
     public void LevelUpStatIncrease()
     {
-        var bulbasaur = new Creature.Creature("Tommy")
+        var bulbasaur = new Creature("Tommy")
         {
             BaseHP = 45,
             BaseAttack = 49,
@@ -64,7 +64,7 @@ public class CoreMechanicsTests
     [Fact]
     public void GainExperienceLevelUp()
     {
-        var bulbasaur = new Creature.Creature("Tommy")
+        var bulbasaur = new Creature("Tommy")
         {
             BaseHP = 45,
             BaseAttack = 49,
@@ -86,10 +86,10 @@ public class CoreMechanicsTests
     [Fact]
     public void DifferentGrowthRatesExperience()
     {
-        var fast = new Creature.Creature("Fast") { Level = 1, GrowthRate = GrowthRate.Fast };
-        var medFast = new Creature.Creature("MedFast") { Level = 1, GrowthRate = GrowthRate.MediumFast };
-        var medSlow = new Creature.Creature("MedSlow") { Level = 1, GrowthRate = GrowthRate.MediumSlow };
-        var slow = new Creature.Creature("Slow") { Level = 1, GrowthRate = GrowthRate.Slow };
+        var fast = new Creature("Fast") { Level = 1, GrowthRate = GrowthRate.Fast };
+        var medFast = new Creature("MedFast") { Level = 1, GrowthRate = GrowthRate.MediumFast };
+        var medSlow = new Creature("MedSlow") { Level = 1, GrowthRate = GrowthRate.MediumSlow };
+        var slow = new Creature("Slow") { Level = 1, GrowthRate = GrowthRate.Slow };
 
         // For level 10:
         // Fast: 0.8 * 10^3 = 800
@@ -113,11 +113,11 @@ public class CoreMechanicsTests
     [Fact]
     public void DamageCalculationFormula()
     {
-        var attacker = new Creature.Creature("Attacker") { Level = 50 };
+        var attacker = new Creature("Attacker") { Level = 50 };
         attacker.CalculateStats(); 
         attacker.Attributes.Attack = 100;
         
-        var defender = new Creature.Creature("Defender") { Level = 50 };
+        var defender = new Creature("Defender") { Level = 50 };
         defender.CalculateStats();
         defender.Attributes.Defense = 100;
         
@@ -131,10 +131,10 @@ public class CoreMechanicsTests
     [Fact]
     public void TurnPriority()
     {
-        var fastCreature = new Creature.Creature("Fast") { Level = 50 };
+        var fastCreature = new Creature("Fast") { Level = 50 };
         fastCreature.Attributes.Speed = 100;
         
-        var slowCreature = new Creature.Creature("Slow") { Level = 50 };
+        var slowCreature = new Creature("Slow") { Level = 50 };
         slowCreature.Attributes.Speed = 50;
 
         fastCreature.AddAttack(new Attack { Name = "Tackle", Accuracy = 100 });
@@ -159,9 +159,9 @@ public class CoreMechanicsTests
     [Fact]
     public async Task PP_DecrementsOnUse()
     {
-        var attacker = new Creature.Creature("Attacker") { Level = 10 };
+        var attacker = new Creature("Attacker") { Level = 10 };
         attacker.CalculateStats();
-        var defender = new Creature.Creature("Defender") { Level = 10 };
+        var defender = new Creature("Defender") { Level = 10 };
         defender.CalculateStats();
 
         var baseAttack = new Attack { Name = "Tackle", BaseDamage = 40, Accuracy = 100, PowerPointsMax = 5 };
@@ -178,10 +178,10 @@ public class CoreMechanicsTests
     [Fact]
     public async Task PP_StruggleUsedWhenPPIsZero()
     {
-        var attacker = new Creature.Creature("Attacker") { Level = 10 };
+        var attacker = new Creature("Attacker") { Level = 10 };
         attacker.CalculateStats();
         attacker.Attributes.Attack = 50;
-        var defender = new Creature.Creature("Defender") { Level = 10 };
+        var defender = new Creature("Defender") { Level = 10 };
         defender.CalculateStats();
         defender.Attributes.Defense = 50;
         int defenderHpBefore = defender.Attributes.HP;

@@ -1,5 +1,5 @@
 ﻿using creaturegame.Attacks;
-using creaturegame.Creature;
+using creaturegame.Creatures;
 
 namespace creaturegame.Combat;
 
@@ -10,7 +10,7 @@ public static class DamageCalculator
     /// Type effectiveness is delegated to the provided <paramref name="typeChart"/>,
     /// making this method generation-agnostic.
     /// </summary>
-    public static int CalculateGen1Damage(Creature.Creature attacker, Creature.Creature defender, Attack move, ITypeChart typeChart)
+    public static int CalculateGen1Damage(Creature attacker, Creature defender, Attack move, ITypeChart typeChart)
     {
         // Gen 1 Damage Formula:
         // Damage = ((((2 * Level / 5 + 2) * Attack * Power / Defense) / 50) + 2) * STAB * Type * Random / 255

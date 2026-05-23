@@ -1,6 +1,6 @@
 ﻿using creaturegame.Attacks;
 
-namespace creaturegame.Creature;
+namespace creaturegame.Creatures;
 
 public class Creature
 {

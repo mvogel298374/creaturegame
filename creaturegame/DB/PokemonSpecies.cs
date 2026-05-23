@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using creaturegame.Attacks;
-using creaturegame.Creature;
+using creaturegame.Creatures;
 
 namespace creaturegame.DB;
 

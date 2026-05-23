@@ -34,3 +34,14 @@ Guidelines for all `/dev` actions in this project.
 *   **Test Naming**: Test methods should clearly and succinctly state what they test without using the word "Test" or "test" as a prefix or suffix.
 *   **Folder Structure**: Separate tests from common/setup classes by using a structured directory (e.g., `tests/creaturegame.Tests/Unit`, `tests/creaturegame.Tests/Integration`).
 *   **Namespaces**: Test namespaces should match their folder structure (e.g., `creaturegame.Tests.Unit`).
+
+---
+
+## See Also
+
+| File | Role |
+|:-----|:-----|
+| `CLAUDE.md` | Session setup, architecture overview, build commands — loaded automatically each session |
+| `TODO.md` | Authoritative task list; update it when any task completes |
+| `AI_CONTEXT.md` | Agent profiles and slash-command definitions |
+| `DESIGN_GUIDES.md` | Gen 1 mechanics and design constraints (design counterpart to this file) |

@@ -1,4 +1,5 @@
 ﻿using creaturegame.Attacks;
+using creaturegame.Creatures;
 using Microsoft.EntityFrameworkCore;
 
 namespace creaturegame.DB;
@@ -67,7 +68,7 @@ public class AttackService
     /// <summary>
     /// Assigns a default move (tackle) to a creature if available in the database.
     /// </summary>
-    public async Task<bool> GiveDefaultMoveAsync(Creature.Creature creature)
+    public async Task<bool> GiveDefaultMoveAsync(Creature creature)
     {
         var move = await GetAttackByNameAsync("tackle");
         return move != null && creature.AddAttack(move);
@@ -76,7 +77,7 @@ public class AttackService
     /// <summary>
     /// Assigns a random move from the database to a creature.
     /// </summary>
-    public async Task<bool> GiveRandomMoveAsync(Creature.Creature creature)
+    public async Task<bool> GiveRandomMoveAsync(Creature creature)
     {
         var move = await GetRandomAttackAsync();
         return move != null && creature.AddAttack(move);

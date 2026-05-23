@@ -27,3 +27,14 @@ This document outlines the core Pokémon and RPG design principles used in this 
 ## Move Design Constraints
 *   Moves with "Undefined" damage class should be reviewed and assigned a type if they are status moves.
 *   Descriptions should prioritize "short effects" for in-game tooltips.
+
+---
+
+## See Also
+
+| File | Role |
+|:-----|:-----|
+| `CLAUDE.md` | Session setup, architecture overview, build commands — loaded automatically each session |
+| `TODO.md` | Authoritative task list; update it when any task completes |
+| `AI_CONTEXT.md` | Agent profiles and slash-command definitions |
+| `DEV_STANDARDS.md` | .NET/EF coding conventions (implementation counterpart to this file) |

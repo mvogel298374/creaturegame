@@ -128,15 +128,15 @@ public class PokemonImport
         return species;
     }
 
-    private static creaturegame.Creature.GrowthRate MapGrowthRate(string? name)
+    private static creaturegame.Creatures.GrowthRate MapGrowthRate(string? name)
     {
         return name switch
         {
-            "fast" => creaturegame.Creature.GrowthRate.Fast,
-            "medium" => creaturegame.Creature.GrowthRate.MediumFast,
-            "medium-slow" => creaturegame.Creature.GrowthRate.MediumSlow,
-            "slow" => creaturegame.Creature.GrowthRate.Slow,
-            _ => creaturegame.Creature.GrowthRate.MediumFast
+            "fast" => creaturegame.Creatures.GrowthRate.Fast,
+            "medium" => creaturegame.Creatures.GrowthRate.MediumFast,
+            "medium-slow" => creaturegame.Creatures.GrowthRate.MediumSlow,
+            "slow" => creaturegame.Creatures.GrowthRate.Slow,
+            _ => creaturegame.Creatures.GrowthRate.MediumFast
         };
     }
 }

@@ -1,4 +1,4 @@
-﻿namespace creaturegame.Creature.Traits;
+﻿namespace creaturegame.Creatures.Traits;
 
 public class Trait(TraitType type, string name, string description)
 {

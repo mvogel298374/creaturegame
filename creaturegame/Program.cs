@@ -1,6 +1,6 @@
 ﻿using creaturegame.Attacks;
 using creaturegame.Combat;
-using creaturegame.Creature;
+using creaturegame.Creatures;
 using creaturegame.DB;
 
 namespace creaturegame;
@@ -29,7 +29,7 @@ class Program
 
         // --- Bulbasaur (Grass/Poison) ---
         var bulbasaurSpecies = await pokemonService.GetSpeciesByNameAsync("bulbasaur");
-        var bulbasaur = new creaturegame.Creature.Creature("Bulbasaur")
+        var bulbasaur = new Creature("Bulbasaur")
         {
             Level = 50,
             DvAttack = 15, DvDefense = 15, DvSpecial = 15, DvSpeed = 15, DvHP = 15
@@ -60,7 +60,7 @@ class Program
 
         // --- Dragonite (Dragon/Flying) ---
         var dragoniteSpecies = await pokemonService.GetSpeciesByNameAsync("dragonite");
-        var dragonite = new creaturegame.Creature.Creature("Dragonite")
+        var dragonite = new Creature("Dragonite")
         {
             Level = 50,
             DvAttack = 15, DvDefense = 15, DvSpecial = 15, DvSpeed = 15, DvHP = 15

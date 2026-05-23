@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Key Files (read these at the start of every session)
+
+| File | Purpose |
+|:-----|:--------|
+| `TODO.md` | **Authoritative** task list — priorities, done items, tech debt. Always update it when finishing a task. |
+| `AI_CONTEXT.md` | Agent profiles and slash-command definitions (`/plan`, `/dev`, `/sync`, `/test`). |
+| `DESIGN_GUIDES.md` | Gen 1 mechanics, type-balancing rules, move-import mapping. Read before `/plan` work. |
+| `DEV_STANDARDS.md` | .NET/EF coding conventions and architecture rules. Read before `/dev` work. |
+
 ## Commands
 
 The system `dotnet` at `C:\Program Files\dotnet\dotnet.exe` is a runtime-only install with no SDK. Use the user-local SDK at `C:\Users\USER\.dotnet\dotnet.exe` (NET 9.0.200) for all build and test commands.
@@ -45,7 +54,7 @@ PokeApiConnector fetches Gen 1 Pokémon and moves (IDs 1–165) from `pokeapi.co
 
 - **`ITypeChart`** — strategy interface; swap implementations to change generation rules.
 - **`IBattleAction`** — encapsulates a single turn action; `Priority` + `ExecuteAsync()`.
-- **`IBattleInput`** (planned) — abstracts move selection (console, AI, UI).
+- **`IBattleInput`** — abstracts move selection (console, AI, UI); `AutoSelectInput` is the current default.
 - All DB reads use `AsNoTracking()` before upserts. All DB operations are async.
 - Schema uses EF Core migrations (in `creaturegame/DB/Migrations/`). `EnsureDatabaseCreated()` calls `Database.Migrate()` — run `PokeApiConnector` on a fresh setup to create and populate the databases. Add new migrations with `dotnet ef migrations add` (see migration command above).
 
@@ -66,19 +75,9 @@ When no command is given, use judgment to blend profiles. If a request is ambigu
 
 The target is a **true Gen 1 Pokémon battle clone** with future layers inspired by roguelikes, autobattlers, and the Pokémon Infinite Fusion mod. Preserve Gen 1 accuracy (mechanics, quirks, formulas) before extending. See `DESIGN_GUIDES.md` for type-balancing and move-import mapping rules.
 
-## Current TODO State
+## TODO State
 
-Completed: Gen 1 type chart, damage calculation, turn ordering, PP tracking (via `PokemonAttack`), stat formulas, growth rates.
-
-Active priorities (in order):
-1. **PP Tracking** — switch `Creature.MoveSet` to `List<PokemonAttack>`; Struggle fallback when all PP = 0.
-2. **Move Priority Fix** — read `move.Priority` in `AttackAction` instead of hardcoding 0.
-3. **Status Conditions** — apply Burn/Paralysis/Poison/Sleep/Freeze; end-of-turn damage in `Battle`.
-4. **Move Selection** — replace `MoveSet[0]` hardcode with `IBattleInput` abstraction.
-5. **XP & Catch System** — Gen 1 XP formula on faint; `CatchRate`-based catch mechanic.
-6. **Learnset System** — `PokemonLearnset` DB table; import from PokeAPI; populate moveset on init.
-
-Tech debt to clear: decide whether `Traits` becomes the Abilities layer or is removed; add `.editorconfig` / `.gitattributes`; resolve `Creature` class/namespace collision; remove `Creature.Attack()` footgun.
+See `TODO.md` for the full prioritised task list, completed items, and tech debt. Always update `TODO.md` when finishing a task.
 
 ## Communication Style
 

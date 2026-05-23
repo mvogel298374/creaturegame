@@ -1,4 +1,4 @@
-﻿namespace creaturegame.Creature.Traits;
+﻿namespace creaturegame.Creatures.Traits;
 
 public enum TraitType
 {

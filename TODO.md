@@ -1,5 +1,7 @@
 # Battle Sim – TODO List
 
+> **See also:** `CLAUDE.md` (session setup, architecture, commands) · `AI_CONTEXT.md` (agent profiles) · `DESIGN_GUIDES.md` (mechanics rules) · `DEV_STANDARDS.md` (coding conventions)
+
 ## Priority 1 – Type Chart ✅ DONE
 - [x] Create `ITypeChart` interface
 - [x] Implement `Gen1TypeChart` with full 17-type Gen 1 matrix (Ghost/Psychic bug, Poison super vs Bug, no Steel/Dark/Fairy)
@@ -100,7 +102,7 @@ so this is largely an infrastructure and presentation layer addition.
 - [x] Remove redundant `Attributes.GetCurrentHealth()` call from `IsAlive()` — now reads `Attributes.HP` directly; `IsAlive()` itself retained as a meaningful predicate
 
 ### Pending
-- [ ] Resolve `Creature` class/namespace name collision (`creaturegame.Creature.Creature`) — forces fully-qualified usage in `Program.cs`; consider renaming namespace to `creaturegame.Creatures`
+- [x] Resolve `Creature` class/namespace name collision — renamed namespace to `creaturegame.Creatures`; all 16 files updated, fully-qualified `Creature.Creature` references eliminated
 - [ ] Remove redundant `Attributes.GetSpeed()` wrapper — all callers access `.Speed` directly
 - [ ] Decide on `.idea/` strategy — currently fully excluded; revisit if run configs are worth sharing
 - [ ] Consolidate or clarify relationship between `AI_CONTEXT.md` / `DESIGN_GUIDES.md` / `DEV_STANDARDS.md` and `CLAUDE.md`

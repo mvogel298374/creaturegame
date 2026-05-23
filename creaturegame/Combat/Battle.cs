@@ -1,11 +1,12 @@
 using creaturegame.Attacks;
+using creaturegame.Creatures;
 
 namespace creaturegame.Combat;
 
 public class Battle
 {
-    private Creature.Creature PlayerCreature { get; }
-    private Creature.Creature EnemyCreature  { get; }
+    private Creature PlayerCreature { get; }
+    private Creature EnemyCreature  { get; }
     private readonly ITypeChart   _typeChart;
     private readonly IBattleInput _playerInput;
     private readonly IBattleInput _enemyInput;
@@ -18,7 +19,7 @@ public class Battle
     /// move selection. Use <see cref="AutoSelectInput.Instance"/> for sides that are
     /// not yet wired to a real input source.
     /// </summary>
-    public Battle(Creature.Creature player, Creature.Creature enemy, ITypeChart typeChart,
+    public Battle(Creature player, Creature enemy, ITypeChart typeChart,
                   IBattleInput playerInput, IBattleInput enemyInput)
     {
         PlayerCreature = player;

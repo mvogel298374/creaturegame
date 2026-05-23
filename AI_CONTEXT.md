@@ -41,3 +41,14 @@ You can use the following commands at the start of your message to instantly set
 *   **Always check `DESIGN_GUIDES.md` and `DEV_STANDARDS.md` before starting a multi-step task.
 *   If a request is ambiguous, ask whether it should be handled under `/plan` or `/dev`.
 *   Maintain the `identifier.sqlite` and `moves.db` integrity at all times.
+
+---
+
+## See Also
+
+| File | Role |
+|:-----|:-----|
+| `CLAUDE.md` | Session setup, architecture overview, build commands — loaded automatically each session |
+| `TODO.md` | Authoritative task list; update it when any task completes |
+| `DESIGN_GUIDES.md` | Gen 1 mechanics and design constraints (active under `/plan`) |
+| `DEV_STANDARDS.md` | .NET/EF coding conventions (active under `/dev`) |

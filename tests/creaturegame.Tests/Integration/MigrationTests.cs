@@ -1,5 +1,5 @@
 using creaturegame.Attacks;
-using creaturegame.Creature;
+using creaturegame.Creatures;
 using creaturegame.DB;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
