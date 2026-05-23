@@ -93,7 +93,8 @@ public class Battle
             }
 
             Console.WriteLine("\nPress any key for the next round...");
-            Console.ReadKey();
+            if (!Console.IsInputRedirected)
+                Console.ReadKey();
         }
     }
 }

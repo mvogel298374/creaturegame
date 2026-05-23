@@ -1,6 +1,7 @@
 using creaturegame.Creatures;
 using creaturegame.Attacks;
 using creaturegame.Combat;
+using creaturegame.DB;
 
 namespace creaturegame.Tests.Unit;
 
@@ -342,5 +343,166 @@ public class CoreMechanicsTests
         double effectiveness = DamageCalculator.GetTypeEffectiveness(
             DamageType.Water, DamageType.Grass, DamageType.Poison, chart);
         Assert.Equal(0.5, effectiveness);
+    }
+
+    // --- Accuracy / Miss Tests ---
+
+    [Fact]
+    public async Task AccuracyCheck_ZeroPercent_NeverDealtDamage()
+    {
+        var attacker = new Creature("Attacker") { Level = 10 };
+        attacker.CalculateStats();
+        var defender = new Creature("Defender") { Level = 10 };
+        defender.CalculateStats();
+        int hpBefore = defender.Attributes.HP;
+
+        var move = new Attack { Name = "LowAcc", BaseDamage = 40, Accuracy = 0, AttackType = AttackType.Physical };
+        attacker.AddAttack(move);
+
+        for (int i = 0; i < 20; i++)
+        {
+            var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart());
+            await action.ExecuteAsync();
+        }
+
+        Assert.Equal(hpBefore, defender.Attributes.HP);
+    }
+
+    [Fact]
+    public async Task AccuracyCheck_MissDoesNotApplyStatus()
+    {
+        var attacker = new Creature("Attacker") { Level = 10 };
+        attacker.CalculateStats();
+        var defender = new Creature("Defender") { Level = 10 };
+        defender.CalculateStats();
+
+        // 0% accuracy + guaranteed status chance — status must never land on a miss
+        var move = new Attack
+        {
+            Name         = "LowAcc",
+            BaseDamage   = 40,
+            Accuracy     = 0,
+            AttackType   = AttackType.Physical,
+            StatusEffect = StatusCondition.Paralysis,
+            EffectChance = 100,
+        };
+        attacker.AddAttack(move);
+
+        for (int i = 0; i < 20; i++)
+        {
+            var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart());
+            await action.ExecuteAsync();
+        }
+
+        Assert.Equal(StatusCondition.None, defender.Status);
+    }
+
+    // --- STAB Tests ---
+
+    [Fact]
+    public void STAB_Type1Match_IncreasesDamage()
+    {
+        // All variables fixed; only STAB changes between two calls.
+        // STAB worst case (1.5 × 217/255 ≈ 1.28) always exceeds non-STAB best case (1.0),
+        // so a single sample is deterministically sufficient.
+        var attacker = new Creature("Attacker") { Level = 50 };
+        attacker.CalculateStats();
+        attacker.Attributes.Attack = 100;
+        attacker.Type1 = DamageType.Fire;
+
+        var defender = new Creature("Defender") { Level = 50 };
+        defender.CalculateStats();
+        defender.Attributes.Defense = 50;
+
+        var move = new Attack { Name = "Ember", BaseDamage = 80, AttackType = AttackType.Physical, DamageType = DamageType.Fire };
+
+        int stabDamage    = DamageCalculator.CalculateGen1Damage(attacker, defender, move, new Gen1TypeChart());
+
+        attacker.Type1 = DamageType.Water; // no STAB on Fire move
+        int nonStabDamage = DamageCalculator.CalculateGen1Damage(attacker, defender, move, new Gen1TypeChart());
+
+        Assert.True(stabDamage > nonStabDamage,
+            $"STAB damage ({stabDamage}) should exceed non-STAB ({nonStabDamage})");
+    }
+
+    [Fact]
+    public void STAB_Type2Match_IncreasesDamage()
+    {
+        var attacker = new Creature("Attacker") { Level = 50 };
+        attacker.CalculateStats();
+        attacker.Attributes.Attack = 100;
+        attacker.Type1 = DamageType.Normal; // doesn't match move
+        attacker.Type2 = DamageType.Fire;   // matches move → STAB via Type2
+
+        var defender = new Creature("Defender") { Level = 50 };
+        defender.CalculateStats();
+        defender.Attributes.Defense = 50;
+
+        var move = new Attack { Name = "Ember", BaseDamage = 80, AttackType = AttackType.Physical, DamageType = DamageType.Fire };
+
+        int stabDamage    = DamageCalculator.CalculateGen1Damage(attacker, defender, move, new Gen1TypeChart());
+
+        attacker.Type2 = null; // remove Type2 STAB
+        int nonStabDamage = DamageCalculator.CalculateGen1Damage(attacker, defender, move, new Gen1TypeChart());
+
+        Assert.True(stabDamage > nonStabDamage,
+            $"Type2 STAB damage ({stabDamage}) should exceed non-STAB ({nonStabDamage})");
+    }
+
+    // --- AddAttack Constraint Tests ---
+
+    [Fact]
+    public void AddAttack_FifthMoveRejected()
+    {
+        var creature = new Creature("Test") { Level = 1 };
+        for (int i = 1; i <= 4; i++)
+            creature.AddAttack(new Attack { Id = i, Name = $"Move{i}" });
+
+        bool result = creature.AddAttack(new Attack { Id = 5, Name = "Fifth" });
+
+        Assert.False(result);
+        Assert.Equal(4, creature.MoveSet.Count);
+    }
+
+    [Fact]
+    public void AddAttack_DuplicateIdRejected()
+    {
+        var creature = new Creature("Test") { Level = 1 };
+        creature.AddAttack(new Attack { Id = 1, Name = "Tackle" });
+
+        bool result = creature.AddAttack(new Attack { Id = 1, Name = "AnotherTackle" });
+
+        Assert.False(result);
+        Assert.Single(creature.MoveSet);
+    }
+
+    // --- InitializeFromSpecies Tests ---
+
+    [Fact]
+    public void InitializeFromSpecies_SetsBaseStatsTypesAndGrowthRate()
+    {
+        var species = new PokemonSpecies
+        {
+            Id           = 6,
+            Name         = "charizard",
+            BaseHP       = 78,
+            BaseAttack   = 84,
+            BaseDefense  = 78,
+            BaseSpecial  = 85,
+            BaseSpeed    = 100,
+            Type1        = DamageType.Fire,
+            Type2        = DamageType.Flying,
+            GrowthRate   = GrowthRate.MediumSlow,
+        };
+
+        var creature = new Creature("Charizard") { Level = 50 };
+        creature.InitializeFromSpecies(species);
+
+        Assert.Equal(DamageType.Fire,       creature.Type1);
+        Assert.Equal(DamageType.Flying,     creature.Type2);
+        Assert.Equal(GrowthRate.MediumSlow, creature.GrowthRate);
+        // HP at level 50: floor(((78 + DvHP) * 2) * 50/100) + 60; DvHP ∈ [0,15] → [138, 153]
+        Assert.InRange(creature.Attributes.HP, 138, 153);
+        Assert.True(creature.Attributes.Attack > 0);
     }
 }

@@ -135,6 +135,36 @@ public class MigrationTests : IDisposable
         Assert.Null(ex);
     }
 
+    [Fact]
+    public void PokemonDb_Schema_HasAllExpectedColumns()
+    {
+        using var context = BuildPokemonContext();
+        context.EnsureDatabaseCreated();
+
+        var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        using var conn = new SqliteConnection($"Data Source={_pokemonDb}");
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "PRAGMA table_info(PokemonSpecies)";
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+            columns.Add(reader.GetString(1));
+
+        Assert.Contains("Id",             columns);
+        Assert.Contains("Name",           columns);
+        Assert.Contains("BaseHP",         columns);
+        Assert.Contains("BaseAttack",     columns);
+        Assert.Contains("BaseDefense",    columns);
+        Assert.Contains("BaseSpecial",    columns);
+        Assert.Contains("BaseSpeed",      columns);
+        Assert.Contains("Type1",          columns);
+        Assert.Contains("Type2",          columns);
+        Assert.Contains("GrowthRate",     columns);
+        Assert.Contains("CatchRate",      columns);
+        Assert.Contains("BaseExperience", columns);
+        Assert.Contains("PokedexEntry",   columns);
+    }
+
     // --- Helpers ---
 
     private MovesDbContext BuildMovesContext()
