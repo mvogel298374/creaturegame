@@ -103,7 +103,7 @@ so this is largely an infrastructure and presentation layer addition.
 
 ### Pending
 - [x] Resolve `Creature` class/namespace name collision — renamed namespace to `creaturegame.Creatures`; all 16 files updated, fully-qualified `Creature.Creature` references eliminated
-- [ ] Remove redundant `Attributes.GetSpeed()` wrapper — all callers access `.Speed` directly
+- [x] Remove redundant `Attributes.GetSpeed()` wrapper — no callers; deleted
 - [ ] Decide on `.idea/` strategy — currently fully excluded; revisit if run configs are worth sharing
 - [x] Consolidate or clarify relationship between `AI_CONTEXT.md` / `DESIGN_GUIDES.md` / `DEV_STANDARDS.md` and `CLAUDE.md` — all files now carry See Also cross-reference tables; CLAUDE.md has a Key Files section and delegates TODO state to TODO.md
 - [x] Decide on `Traits` scaffolding — removed `Trait.cs` / `TraitType.cs`; Gen 1 has no Abilities; reintroduce as a proper Abilities layer when that priority is reached

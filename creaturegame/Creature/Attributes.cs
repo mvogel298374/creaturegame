@@ -34,9 +34,5 @@ public class Attributes
         return this.HP;
     }
 
-    public int GetSpeed()
-    {
-        return this.Speed;
-    }
 }
 
