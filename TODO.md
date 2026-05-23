@@ -17,17 +17,20 @@
 ## Priority 3 – Move Priority Fix ✅ DONE
 - [x] `AttackAction` constructor: read `move.Priority` instead of hardcoding 0
 
-## Priority 4 – Status Condition Application
-- [ ] Moves with status effects apply `StatusCondition` to target (Burn, Paralysis, Poison, Sleep, Freeze)
-- [ ] Paralysis: ¼ Speed modifier, 25% chance to skip turn
-- [ ] Burn: ½ Attack modifier, 1/16 max HP end-of-turn damage
-- [ ] Poison: 1/16 max HP end-of-turn damage
-- [ ] Sleep: skip turns (1–7 turns in Gen 1), wake on random turn
-- [ ] Freeze: skip turns, thaw on Fire move hit
+## Priority 4 – Status Condition Application ✅ DONE
+- [x] Add `StatusEffect` (`StatusCondition`) property to `Attack`; add EF migration
+- [x] Add `meta.ailment` mapping to `PokeApiMove`; import `ailment.name` → `StatusEffect`, `ailment_chance` → `EffectChance` in `MoveImport`
+- [x] `AttackAction.ExecuteAsync()`: after damage, roll `EffectChance` and set `Target.Status` if target has no status and move has a `StatusEffect`
+- [x] Set `SleepTurns` (1–7, random) when applying Sleep
+- [x] Tests: status applied on hit; not applied when target already statused; secondary effect chance respected
 
 ## Priority 5 – Status Effects in Battle Loop
-- [ ] `Battle.cs` end-of-turn processing for Burn/Poison damage
-- [ ] Apply Speed/Attack modifiers from status in `DamageCalculator` and turn order
+- [ ] Pre-turn: Sleep skips action and decrements `SleepTurns`; wakes when counter hits 0
+- [ ] Pre-turn: Freeze skips action; thaws on any Fire-type move hitting the frozen target
+- [ ] Pre-turn: Paralysis — 25% chance to skip action
+- [ ] Stat modifiers: Burn halves physical Attack in `DamageCalculator`; Paralysis quarters Speed in turn ordering
+- [ ] End-of-turn: Burn deals 1/16 max HP; Poison deals 1/16 max HP
+- [ ] Pseudo-status — Confusion: `Creature.ConfusedTurns` counter; 50% chance to hurt itself each turn (40 base power, typeless); clears when counter expires (2–5 turns, Gen 1)
 
 ## Priority 6 – Move Selection (Player Input)
 - [ ] Implement `ConsoleInput : IBattleInput` — numbered move menu, shows PP and type

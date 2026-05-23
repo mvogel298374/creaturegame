@@ -203,6 +203,83 @@ public class CoreMechanicsTests
         Assert.Equal(0, move.PowerPointsCurrent);
     }
 
+    // --- Status Condition Tests ---
+
+    [Fact]
+    public async Task Status_AppliedWhenMoveHasStatusEffect()
+    {
+        var attacker = new Creature("Attacker") { Level = 10 };
+        attacker.CalculateStats();
+        var defender = new Creature("Defender") { Level = 10 };
+        defender.CalculateStats();
+
+        var thunderWave = new Attack { Name = "Thunder Wave", BaseDamage = 0, Accuracy = 100,
+            StatusEffect = StatusCondition.Paralysis, EffectChance = 100 };
+        attacker.AddAttack(thunderWave);
+
+        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart());
+        await action.ExecuteAsync();
+
+        Assert.Equal(StatusCondition.Paralysis, defender.Status);
+    }
+
+    [Fact]
+    public async Task Status_NotAppliedWhenTargetAlreadyHasStatus()
+    {
+        var attacker = new Creature("Attacker") { Level = 10 };
+        attacker.CalculateStats();
+        var defender = new Creature("Defender") { Level = 10 };
+        defender.CalculateStats();
+        defender.Status = StatusCondition.Burn;
+
+        var thunderWave = new Attack { Name = "Thunder Wave", BaseDamage = 0, Accuracy = 100,
+            StatusEffect = StatusCondition.Paralysis, EffectChance = 100 };
+        attacker.AddAttack(thunderWave);
+
+        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart());
+        await action.ExecuteAsync();
+
+        Assert.Equal(StatusCondition.Burn, defender.Status);
+    }
+
+    [Fact]
+    public async Task Status_SleepSetsSleepTurns()
+    {
+        var attacker = new Creature("Attacker") { Level = 10 };
+        attacker.CalculateStats();
+        var defender = new Creature("Defender") { Level = 10 };
+        defender.CalculateStats();
+
+        var sleepPowder = new Attack { Name = "Sleep Powder", BaseDamage = 0, Accuracy = 100,
+            StatusEffect = StatusCondition.Sleep, EffectChance = 100 };
+        attacker.AddAttack(sleepPowder);
+
+        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart());
+        await action.ExecuteAsync();
+
+        Assert.Equal(StatusCondition.Sleep, defender.Status);
+        Assert.InRange(defender.SleepTurns, 1, 7);
+    }
+
+    [Fact]
+    public async Task Status_NotAppliedWhenEffectChanceFails()
+    {
+        var attacker = new Creature("Attacker") { Level = 10 };
+        attacker.CalculateStats();
+        var defender = new Creature("Defender") { Level = 10 };
+        defender.CalculateStats();
+
+        // 0% chance — should never apply
+        var move = new Attack { Name = "Tackle", BaseDamage = 40, Accuracy = 100,
+            StatusEffect = StatusCondition.Burn, EffectChance = 0 };
+        attacker.AddAttack(move);
+
+        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart());
+        await action.ExecuteAsync();
+
+        Assert.Equal(StatusCondition.None, defender.Status);
+    }
+
     // --- Type Chart Tests ---
 
     [Fact]

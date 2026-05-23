@@ -1,6 +1,7 @@
 ﻿using System.Text.Json;
 using PokeApiConnector.Generation_1;
 using creaturegame.Attacks;
+using creaturegame.Creatures;
 using creaturegame.DB;
 using Microsoft.EntityFrameworkCore;
 
@@ -116,6 +117,19 @@ public class MoveImport
             "special" => AttackType.Special,
             _ => AttackType.Undefined
         };
+
+        attack.StatusEffect = pokeMove.Meta?.Ailment?.Name switch
+        {
+            "paralysis" => StatusCondition.Paralysis,
+            "sleep"     => StatusCondition.Sleep,
+            "burn"      => StatusCondition.Burn,
+            "poison"    => StatusCondition.Poison,
+            "freeze"    => StatusCondition.Freeze,
+            _           => StatusCondition.None
+        };
+
+        if (attack.StatusEffect != StatusCondition.None && pokeMove.Meta?.AilmentChance > 0)
+            attack.EffectChance = pokeMove.Meta.AilmentChance;
 
         return attack;
     }

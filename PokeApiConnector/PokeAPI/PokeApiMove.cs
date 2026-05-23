@@ -33,6 +33,9 @@ public class PokeApiMove
 
     [JsonPropertyName("effect_entries")]
     public List<EffectEntry>? EffectEntries { get; set; }
+
+    [JsonPropertyName("meta")]
+    public MoveMeta? Meta { get; set; }
 }
 
 public class NamedApiResource
@@ -55,3 +58,13 @@ public class EffectEntry
     [JsonPropertyName("language")]
     public NamedApiResource? Language { get; set; }
 }
+
+public class MoveMeta
+{
+    [JsonPropertyName("ailment")]
+    public NamedApiResource? Ailment { get; set; }
+
+    [JsonPropertyName("ailment_chance")]
+    public int AilmentChance { get; set; }
+}
+

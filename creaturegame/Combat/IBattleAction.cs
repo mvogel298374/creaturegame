@@ -66,6 +66,33 @@ public class AttackAction : IBattleAction
             Console.WriteLine($"{Source.Name} is hit by recoil! ({recoil} damage)");
         }
 
+        TryApplyStatus(attackToUse);
+
         return Task.CompletedTask;
+    }
+
+    private void TryApplyStatus(Attack attack)
+    {
+        if (attack.StatusEffect == StatusCondition.None) return;
+        if (Target.Status != StatusCondition.None) return;
+        if (!Target.IsAlive()) return;
+
+        int chance = attack.EffectChance ?? 100;
+        if (Random.Shared.Next(1, 101) > chance) return;
+
+        Target.Status = attack.StatusEffect;
+
+        if (attack.StatusEffect == StatusCondition.Sleep)
+            Target.SleepTurns = Random.Shared.Next(1, 8);
+
+        Console.WriteLine(attack.StatusEffect switch
+        {
+            StatusCondition.Burn      => $"{Target.Name} was burned!",
+            StatusCondition.Paralysis => $"{Target.Name} is paralyzed! It may be unable to move!",
+            StatusCondition.Poison    => $"{Target.Name} was poisoned!",
+            StatusCondition.Sleep     => $"{Target.Name} fell asleep!",
+            StatusCondition.Freeze    => $"{Target.Name} was frozen solid!",
+            _                         => $"{Target.Name} was afflicted with {attack.StatusEffect}!"
+        });
     }
 }

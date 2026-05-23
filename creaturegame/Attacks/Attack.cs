@@ -1,4 +1,4 @@
-﻿using System.Collections;
+﻿using creaturegame.Creatures;
 
 namespace creaturegame.Attacks;
 
@@ -21,6 +21,7 @@ public class Attack
     // New Gen 1 Properties
     public int Priority { get; set; } = 0;
     public int? EffectChance { get; set; }
+    public StatusCondition StatusEffect { get; set; } = StatusCondition.None;
     
     public Attack()
     {
