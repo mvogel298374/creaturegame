@@ -82,22 +82,40 @@ Split into a React shell and a Phaser canvas region.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  Enemy nameplate   [status badge]   Lv.50               │
-│  ████████████████████░░░  HP 132/160                    │
+│  Dragonite   [BRN]   Lv.50                              │
+│  ████████████████░░░░  HP 132 / 160                     │
 │                                                         │
 │              [ENEMY SPRITE]                             │
 │                            [PLAYER SPRITE]              │
 │                                                         │
-│  Player nameplate  [status badge]   Lv.50               │
-│  █████████████░░░░░░░░░░░  HP 88/120                    │
+│  Bulbasaur          Lv.50                               │
+│  █████████░░░░░░░░░░  HP 88 / 120                       │
 │─────────────────────────────────────────────────────────│
 │  Bulbasaur used Razor Leaf!                             │
 │  It's super effective!                                  │
 │─────────────────────────────────────────────────────────│
-│  [ Razor Leaf  PP 14/15 ] [ Quick Attack  PP 29/30 ]    │
-│  [   Growl     PP 39/40 ] [   Vine Whip   PP 34/35 ]    │
+│  [ FIGHT ]                          [ STATS ]           │
 └─────────────────────────────────────────────────────────┘
 ```
+
+**The bottom menu has two states:**
+
+**State 1 — Action menu** (shown at the start of each turn, while awaiting input):
+```
+│  [ FIGHT ]                          [ STATS ]           │
+```
+- FIGHT → transitions to State 2 (move selection)
+- STATS → opens the Stats Overlay (see Screen 3a)
+- Both buttons disabled while the turn is resolving / animations playing
+
+**State 2 — Move selection** (after clicking FIGHT):
+```
+│  [ Razor Leaf  PP 14/15 ] [ Quick Attack  PP 29/30 ]    │
+│  [   Growl     PP 39/40 ] [   Vine Whip   PP 34/35 ]    │
+│  [ ← Back ]                                             │
+```
+- Clicking a move sends `ChooseMove` to the server and transitions back to resolving state
+- "← Back" returns to Action menu without sending a move
 
 **Responsibility split:**
 
@@ -107,7 +125,65 @@ Split into a React shell and a Phaser canvas region.
 | HP bar drain | Phaser tween on a Graphics object | Smooth interpolation over time |
 | Name plates, level, status badge | React | Simple DOM, easy to style |
 | Battle text log | React | Scrolling text, standard HTML |
-| Move menu buttons (4 + PP) | React | Standard buttons, easy to disable/enable |
+| Action menu + move buttons | React | Standard buttons, easy to disable/enable |
+
+### 3a. Stats Overlay
+
+Triggered by the STATS button in the battle action menu. Renders as a full-panel overlay
+on top of the battle screen. Read-only — no action is taken. Closed with a CLOSE button or
+Escape, returning to the action menu.
+
+**Visual design principle:** Classic Pokémon layout sensibility (sprite left, info right;
+stat rows with labels and values) with modern affordances (horizontal stat bars, type
+badges with colour, clean typography). Generation-agnostic: any field absent from the
+current generation's model is simply omitted — no blank placeholders.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  BULBASAUR                                    No. 001   │
+│  ─────────────────────────────────────────────────────  │
+│                                                         │
+│  [SPRITE]      Type  [GRASS] [POISON]                   │
+│  96 × 96       Lv. 50        Status  [  OK  ]           │
+│                                                         │
+│                HP   █████████████████░░░  120 / 120     │
+│                EXP  ██████████░░░░░░░░░░  125k / 133k   │
+│                                                         │
+│  ── STATS ───────────────────────────────────────────   │
+│                                                         │
+│  HP          120   ████████████████░░░░░░░░░░           │
+│  Attack       69   ███████████░░░░░░░░░░░░░░░           │
+│  Defense      65   ██████████░░░░░░░░░░░░░░░░           │
+│  Special      85   █████████████░░░░░░░░░░░░░  ← Gen 1 │
+│  Speed        65   ██████████░░░░░░░░░░░░░░░░           │
+│                                                         │
+│  ── MOVES ───────────────────────────────────────────   │
+│                                                         │
+│  Razor Leaf    [GRASS]   55 Pwr   95 Acc   PP 15 / 15   │
+│  Quick Attack  [NORMAL]  40 Pwr  100 Acc   PP 30 / 30   │
+│  Growl         [NORMAL]   — Pwr  100 Acc   PP 40 / 40   │
+│  Vine Whip     [GRASS]   35 Pwr  100 Acc   PP 35 / 35   │
+│                                                         │
+│                                           [  CLOSE  ]   │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Gen-agnostic display rules:**
+
+| Field | Rule |
+|:--|:--|
+| Special (Gen 1) | Show single "Special" stat row when `SpAtk == SpDef` and model has no separate fields |
+| Sp. Atk / Sp. Def (Gen 2+) | Show as two separate rows when the model carries distinct values |
+| DVs (Gen 1, 0–15) | Show as "DV" next to stat value if present on the model |
+| IVs (Gen 2+, 0–31) | Show as "IV" next to stat value if present on the model |
+| EVs / Stat Exp | Show a secondary bar or small number if present; omit if all zero |
+| Status badge | Always shown; displays "OK" in green when `StatusCondition.None` |
+| EXP bar | Omit if `GrowthRate` is not set or experience system is not active for this run |
+| Type 2 | Omit the second badge if `Type2` is null |
+| Move power | Show "—" for status moves with `BaseDamage == 0` |
+
+**Stat bars:** Each bar is scaled relative to 255 (the Gen 1 max for any stat at level 100
+with max DVs and Stat Exp). This gives a consistent visual reference across all generations.
 
 ### 4. Result Screen
 - Pure React overlay (no Phaser scene change needed).
@@ -154,8 +230,12 @@ src/
       BattleCanvas.tsx         ← mounts Phaser, bridges React↔Phaser events
       HpBar.tsx
       NamePlate.tsx
-      MoveMenu.tsx
       BattleLog.tsx
+      ActionMenu.tsx           ← top-level menu: FIGHT | STATS (State 1)
+      MoveMenu.tsx             ← 4 move buttons + Back (State 2)
+      StatsOverlay.tsx         ← full-screen stats panel, triggered by STATS button
+      StatBar.tsx              ← single horizontal stat bar (reused for each stat row)
+      TypeBadge.tsx            ← coloured type pill (GRASS, POISON, etc.)
   phaser/
     scenes/
       BattleScene.ts           ← sprites, tweens, animations
@@ -165,6 +245,7 @@ src/
     useBattleState.ts          ← reducer for all mutable battle state
   types/
     BattleEvents.ts            ← TypeScript mirror of C# BattleEvent types
+    Snapshots.ts               ← TypeScript mirror of CreatureSnapshot / MoveSnapshot
 ```
 
 ---
@@ -202,11 +283,46 @@ public record BattleEnded(string WinnerName) : BattleEvent;
 
 // Snapshot sent at turn start so client always has authoritative state
 public record BattleStateSnapshot(
-    string PlayerName, int PlayerHp, int PlayerMaxHp, StatusCondition PlayerStatus,
-    string EnemyName,  int EnemyHp,  int EnemyMaxHp,  StatusCondition EnemyStatus,
-    IReadOnlyList<MoveSnapshot> PlayerMoves
+    CreatureSnapshot Player,
+    CreatureSnapshot Enemy
 );
-public record MoveSnapshot(string Name, int PpCurrent, int PpMax);
+
+// Full creature display data — everything the Stats Overlay needs
+public record CreatureSnapshot(
+    string  Name,
+    int     SpeciesId,          // used to derive sprite URL: /sprites/front/{id}.png
+    int     Level,
+    int     Hp,
+    int     MaxHp,
+    int     Experience,
+    int     ExperienceToNextLevel,
+    StatusCondition Status,
+    DamageType  Type1,
+    DamageType? Type2,          // null → omit second type badge
+
+    // Stats — all present for Gen 1; Gen 2+ adds SpAtk/SpDef separately
+    int StatHp,
+    int StatAttack,
+    int StatDefense,
+    int? StatSpecial,           // Gen 1 unified Special; null in Gen 2+
+    int? StatSpAtk,             // Gen 2+ only; null in Gen 1
+    int? StatSpDef,             // Gen 2+ only; null in Gen 1
+    int StatSpeed,
+
+    // Optional IV/DV display (null = omit from overlay)
+    int? DvAttack,  int? DvDefense, int? DvSpecial, int? DvSpeed,
+
+    IReadOnlyList<MoveSnapshot> Moves
+);
+
+public record MoveSnapshot(
+    string      Name,
+    DamageType  Type,
+    int         BaseDamage,     // 0 = status move → display "—"
+    int         Accuracy,
+    int         PpCurrent,
+    int         PpMax
+);
 ```
 
 ### IBattleEventEmitter
@@ -347,9 +463,18 @@ The battle loop continues running on the server exactly as today. The only chang
 
 ### Phase 6 — Battle screen shell (React, no Phaser yet)
 - `useBattleHub` hook: connect, subscribe to `TurnStarted` / `BattleEvent` / `BattleEnded`
-- `useBattleState` reducer: tracks both creatures' HP, status, player moves + PP
-- React renders HP bars (static width for now), move menu (disabled until `TurnStarted`), text log
-- Player clicks move → `connection.invoke('ChooseMove', index)` → move menu disables
+- `useBattleState` reducer: tracks both `CreatureSnapshot`s, menu state, overlay visibility
+- React renders HP bars (static width for now), text log
+- **Action menu (State 1):** FIGHT and STATS buttons; both disabled while turn is resolving
+  - FIGHT → transitions bottom panel to move selection (State 2)
+  - STATS → sets `statsOpen = true`, renders `StatsOverlay` for the player's creature
+- **Move selection (State 2):** 4 move buttons + Back button
+  - Clicking a move sends `ChooseMove` to server, transitions to resolving state
+  - Back returns to State 1 without sending a move
+- **`StatsOverlay`:** renders full creature panel from `CreatureSnapshot` in `useBattleState`
+  - Stat bars scaled to 255; gen-agnostic rules applied (Special vs SpAtk/SpDef, null type2, etc.)
+  - Type badges from `TypeBadge` component with colour per type
+  - Closes on button click or Escape, returns to action menu
 - Full turn loop working end-to-end, output is text only
 
 ### Phase 7 — Phaser canvas
