@@ -8,6 +8,32 @@ The frontend is a React + Phaser 3 single-page application hosted by a new ASP.N
 project (`creaturegame.Web`). SignalR carries real-time battle state between the server and
 the browser. The existing battle engine is unchanged — only its input/output seams are adapted.
 
+---
+
+## Data Architecture Principle
+
+**All runtime data comes from our own database and static file server. There are no live
+calls to PokeAPI or any other external service at runtime.**
+
+PokeAPI is used exactly once: by `PokeApiConnector`, a one-shot import tool that populates
+our SQLite databases and downloads sprite assets to disk. After that, PokeAPI is out of the
+picture entirely. This means:
+
+- Species data → `pokemon.db` → `GET /api/species`
+- Move data → `moves.db` → queried server-side during battle setup
+- Sprites → `wwwroot/sprites/{front|back}/{id}.png` (downloaded by importer) → served as static files
+
+This isolation is intentional. Our DB is the canonical source of truth, not PokeAPI. We
+can edit, extend, or replace any data without touching the importer, and the game continues
+to work offline.
+
+**PokeApiConnector additions required before Phase 1:**
+- Download front and back battle sprites for all imported species (IDs 1–151)
+- Save to `creaturegame.Web/wwwroot/sprites/front/{id}.png` and `.../back/{id}.png`
+- These files are committed to the repo (they are tiny — ~2 KB each, ~600 KB total)
+
+---
+
 **Tech stack:**
 
 | Layer | Choice |
@@ -45,8 +71,8 @@ Title Screen
 
 ### 2. Starter Selection
 - Pure React.
-- Grid of species cards fetched from `GET /api/species`.
-- Each card: front sprite, name, types (coloured badges), base stat total.
+- Grid of species cards fetched from `GET /api/species` (reads from our `pokemon.db`).
+- Each card: front sprite (`/sprites/front/{id}.png` — our static file), name, types (coloured badges), base stat total.
 - Click a card → confirm button lights up. Confirm → `POST /api/game/start { speciesId }`.
 - Server creates the player's `Creature`, stores it in a `GameSession`, returns session state.
 - On success, React Router navigates to `/battle`.
@@ -102,13 +128,17 @@ creaturegame.Web/
     GameSessionManager.cs      ← maps connectionId → GameSession
     GameSession.cs             ← holds Battle, SignalRInput, SignalREventEmitter
   Controllers/
-    SpeciesController.cs       ← GET /api/species
+    SpeciesController.cs       ← GET /api/species  (reads pokemon.db — our DB, not PokeAPI)
     GameController.cs          ← POST /api/game/start
   Events/
     BattleEvent.cs             ← discriminated union of all battle event types (see below)
     IBattleEventEmitter.cs     ← interface injected into Battle/AttackAction/StatusResolver
     ConsoleBattleEventEmitter  ← existing Console.WriteLine behaviour, preserves dev tool
     SignalRBattleEventEmitter  ← pushes typed events through hub to client
+  wwwroot/
+    sprites/
+      front/                   ← {id}.png — downloaded by PokeApiConnector at import time
+      back/                    ← {id}.png — downloaded by PokeApiConnector at import time
 ```
 
 ### React side — `creaturegame.Web/ClientApp`
@@ -283,9 +313,12 @@ The battle loop continues running on the server exactly as today. The only chang
 ## Implementation Phases
 
 ### Phase 1 — .NET web project & plumbing
+- Extend `PokeApiConnector` to download front/back sprites for IDs 1–151 into `wwwroot/sprites/`
+  (one-time import; after this, no external API calls are needed at runtime)
 - Add `creaturegame.Web` project (ASP.NET Core, no views, API only)
+- Configure static file serving for `wwwroot/sprites/`
 - Add SignalR, configure CORS for Vite dev server (`localhost:5173`)
-- Stub `BattleHub`, `SpeciesController`, `GameController`
+- Stub `BattleHub`, `SpeciesController` (reads `pokemon.db`), `GameController`
 - Verify hub connection from a browser console test
 
 ### Phase 2 — React app skeleton
@@ -306,8 +339,9 @@ The battle loop continues running on the server exactly as today. The only chang
 - No backend work needed
 
 ### Phase 5 — Starter selection
-- `GET /api/species` returns list of `PokemonSpecies` from DB
-- React grid of species cards (name, type badges, sprite URL)
+- `GET /api/species` returns list of `PokemonSpecies` from `pokemon.db` (our DB)
+- React constructs sprite URL as `/sprites/front/{id}.png` from the species `Id` field
+- React grid of species cards (name, type badges, locally-served sprite)
 - `POST /api/game/start { speciesId }` creates `GameSession` keyed by SignalR connectionId
 - Navigate to `/battle` on success
 
@@ -320,7 +354,8 @@ The battle loop continues running on the server exactly as today. The only chang
 
 ### Phase 7 — Phaser canvas
 - `BattleCanvas.tsx` mounts Phaser game, exposes event bridge
-- `BattleScene.ts`: `preload` loads back/front sprites; `create` positions them
+- `BattleScene.ts`: `preload` loads sprites from `/sprites/front/{id}.png` and `/sprites/back/{id}.png`
+  (our static files — no external URL); `create` positions them
 - Sprites visible, inanimate
 
 ### Phase 8 — Animations

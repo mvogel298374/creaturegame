@@ -9,15 +9,36 @@ This document outlines the core Pokémon and RPG design principles used in this 
     *   **Autobattlers**: For strategic positioning, automated execution phases, or synergistic team building.
     *   **Pokémon Infinite Fusion mod**: For advanced fusion mechanics, custom sprite/stat generation, and expanded movepools.
 
-## Pokémon Move Data Importation
-*   **Source**: [PokeAPI](https://pokeapi.co/)
-*   **Generation Focus**: Initial focus is on Generation 1 (Moves 1-165).
-*   **Data Mapping**:
+## Data Architecture: Import vs. Runtime
+
+At runtime the game reads exclusively from **our own SQLite databases and static files**.
+PokeAPI is never called by the game server or the frontend.
+
+| Layer | Data source |
+|:------|:------------|
+| Species stats, types, growth rates | `pokemon.db` (our DB) |
+| Move names, power, accuracy, PP, status effects | `moves.db` (our DB) |
+| Battle sprites (front/back PNGs) | `wwwroot/sprites/` (our static files) |
+
+`PokeApiConnector` is a **one-time import tool** that populates the DBs and downloads
+sprite assets. Once run, it is not needed again unless you want to re-import or extend the
+dataset. Keeping PokeAPI out of the runtime path means the game works offline and is not
+affected by external API changes or outages.
+
+**If you want to change or extend data** — edit the database directly, add new migration
+fields to the model, or replace/supplement the importer. Do not add runtime PokeAPI calls.
+
+## Pokémon Data Import (PokeApiConnector)
+*   **Import source**: [PokeAPI](https://pokeapi.co/) — used by `PokeApiConnector` only
+*   **Generation focus**: Generation 1 (Pokémon IDs 1–151, Move IDs 1–165)
+*   **Move data mapping**:
     *   `Power` → `BaseDamage`
     *   `Accuracy` → `Accuracy`
     *   `PP` → `PowerPointsMax`
     *   `Damage Class` → `AttackType` (Physical/Special)
-    *   `Type` → `DamageType` (Mapping to our 18-type system)
+    *   `Type` → `DamageType` (mapped to our 18-type enum)
+*   **Sprite download**: front and back battle sprites saved to `wwwroot/sprites/front/{id}.png`
+    and `wwwroot/sprites/back/{id}.png` — served as static files, never fetched at runtime
 
 ## Type Advantages & Balancing
 *   The game uses all 18 standard types (Normal, Fire, Water, etc.).
