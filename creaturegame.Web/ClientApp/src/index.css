@@ -1,3 +1,60 @@
+/* ═══════════════════════════════════════════════════════
+   DESIGN TOKENS
+   Change values here — every screen picks them up.
+   ═══════════════════════════════════════════════════════ */
+:root {
+  /* ── Palette ──────────────────────────────────────── */
+  --clr-bg:            #1a1a2e;   /* page background */
+  --clr-bg-deep:       #0d0d1a;   /* darkest bg, gradient start */
+  --clr-bg-mid:        #16213e;   /* mid-tone bg, gradient mid */
+  --clr-bg-panel:      #0f3460;   /* raised panels, dialogs */
+
+  --clr-accent:        #e94560;   /* primary CTA, logo accent */
+  --clr-accent-glow:   rgba(233, 69, 96, 0.5);
+  --clr-accent-dark:   #8b0000;   /* text-shadow behind accent */
+
+  --clr-sky:           #87ceeb;   /* secondary text, back buttons */
+  --clr-gold:          #ffd700;   /* logo, highlights */
+
+  --clr-text:          #f0f0f0;
+  --clr-text-sub:      #aaaaaa;   /* subtitles, labels */
+  --clr-text-muted:    #555555;   /* placeholder copy */
+
+  --clr-border:        rgba(255, 255, 255, 0.10);
+  --clr-grid:          rgba(255, 255, 255, 0.02);
+
+  /* ── Typography ───────────────────────────────────── */
+  --font:              'Courier New', Courier, monospace;
+
+  --fs-xs:    0.65rem;
+  --fs-sm:    0.8rem;
+  --fs-base:  1rem;
+  --fs-lg:    1.25rem;
+  --fs-xl:    1.75rem;
+  --fs-2xl:   2.5rem;
+  --fs-3xl:   4rem;
+
+  --ls-tight:   1px;
+  --ls-normal:  2px;
+  --ls-wide:    4px;
+  --ls-wider:   6px;
+
+  /* ── Spacing ──────────────────────────────────────── */
+  --sp-xs:   0.25rem;
+  --sp-sm:   0.5rem;
+  --sp-md:   1rem;
+  --sp-lg:   2rem;
+  --sp-xl:   3rem;
+
+  /* ── UI chrome ────────────────────────────────────── */
+  --border-w:   2px;
+  --radius:     0px;          /* square = classic pixel-game feel */
+  --transition: 0.15s ease;
+}
+
+/* ═══════════════════════════════════════════════════════
+   RESET
+   ═══════════════════════════════════════════════════════ */
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -9,13 +66,97 @@ html, body, #root {
 }
 
 body {
-  font-family: 'Courier New', Courier, monospace;
-  background: #1a1a2e;
-  color: #f0f0f0;
+  font-family: var(--font);
+  background: var(--clr-bg);
+  color: var(--clr-text);
   -webkit-font-smoothing: antialiased;
 }
 
 button {
   font-family: inherit;
   cursor: pointer;
+  border-radius: var(--radius);
+}
+
+/* ═══════════════════════════════════════════════════════
+   SHARED UTILITIES
+   ═══════════════════════════════════════════════════════ */
+
+/* Full-height centred column — used by every screen */
+.screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  gap: var(--sp-md);
+}
+
+/* Tiled grid overlay — add as ::before on any .screen */
+.screen-grid::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(var(--clr-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--clr-grid) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+}
+
+/* Base button */
+.btn {
+  padding: 0.75rem 2rem;
+  font-family: var(--font);
+  font-size: var(--fs-base);
+  letter-spacing: var(--ls-wide);
+  background: transparent;
+  color: var(--clr-text);
+  border: var(--border-w) solid var(--clr-accent);
+  transition: background var(--transition), color var(--transition), box-shadow var(--transition);
+}
+
+.btn:hover {
+  background: var(--clr-accent);
+  color: var(--clr-text);
+  box-shadow: 0 0 24px var(--clr-accent-glow);
+}
+
+.btn:active {
+  transform: translateY(2px);
+}
+
+/* Ghost / outline variant — used for back/secondary actions */
+.btn-ghost {
+  padding: 0.6rem 1.5rem;
+  font-family: var(--font);
+  font-size: var(--fs-sm);
+  letter-spacing: var(--ls-normal);
+  background: transparent;
+  color: var(--clr-sky);
+  border: 1px solid var(--clr-sky);
+  transition: background var(--transition), color var(--transition);
+}
+
+.btn-ghost:hover {
+  background: var(--clr-sky);
+  color: var(--clr-bg-deep);
+}
+
+.btn-ghost:active {
+  transform: translateY(2px);
+}
+
+/* Screen heading */
+.screen-title {
+  font-size: var(--fs-xl);
+  letter-spacing: var(--ls-wider);
+  color: var(--clr-text);
+}
+
+/* Muted label / placeholder copy */
+.text-muted {
+  font-size: var(--fs-sm);
+  letter-spacing: var(--ls-normal);
+  color: var(--clr-text-muted);
 }

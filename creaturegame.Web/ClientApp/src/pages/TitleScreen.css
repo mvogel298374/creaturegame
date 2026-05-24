@@ -4,19 +4,18 @@
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: linear-gradient(160deg, #0d0d1a 0%, #1a1a3e 50%, #0d1a2e 100%);
+  background: linear-gradient(160deg, var(--clr-bg-deep) 0%, var(--clr-bg-mid) 50%, var(--clr-bg) 100%);
   position: relative;
   overflow: hidden;
 }
 
-/* Subtle grid pattern */
 .title-screen::before {
   content: '';
   position: absolute;
   inset: 0;
   background-image:
-    linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    linear-gradient(var(--clr-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--clr-grid) 1px, transparent 1px);
   background-size: 40px 40px;
   pointer-events: none;
 }
@@ -25,49 +24,49 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1.5rem;
+  gap: var(--sp-lg);
   z-index: 1;
 }
 
 .title-logo {
   font-size: clamp(2.5rem, 8vw, 5rem);
   font-weight: bold;
-  letter-spacing: 6px;
-  color: #ffffff;
+  letter-spacing: var(--ls-wider);
+  color: var(--clr-text);
   text-shadow:
     0 0 20px rgba(255, 255, 255, 0.3),
     3px 3px 0 #333;
 }
 
 .title-logo-accent {
-  color: #e94560;
+  color: var(--clr-accent);
   text-shadow:
-    0 0 20px rgba(233, 69, 96, 0.6),
-    3px 3px 0 #8b0000;
+    0 0 20px var(--clr-accent-glow),
+    3px 3px 0 var(--clr-accent-dark);
 }
 
 .title-subtitle {
-  font-size: clamp(0.65rem, 2vw, 0.85rem);
+  font-size: clamp(var(--fs-xs), 2vw, var(--fs-sm));
   letter-spacing: 5px;
-  color: #87CEEB;
+  color: var(--clr-sky);
   opacity: 0.8;
 }
 
 .btn-new-game {
-  margin-top: 1rem;
+  margin-top: var(--sp-md);
   padding: 0.85rem 2.8rem;
-  font-size: clamp(0.9rem, 2.5vw, 1.1rem);
-  letter-spacing: 4px;
+  font-size: clamp(0.9rem, 2.5vw, var(--fs-lg));
+  letter-spacing: var(--ls-wide);
   background: transparent;
-  color: #ffffff;
-  border: 2px solid #e94560;
-  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+  color: var(--clr-text);
+  border: var(--border-w) solid var(--clr-accent);
+  transition: background var(--transition), color var(--transition), box-shadow var(--transition);
 }
 
 .btn-new-game:hover {
-  background: #e94560;
-  color: #ffffff;
-  box-shadow: 0 0 24px rgba(233, 69, 96, 0.5);
+  background: var(--clr-accent);
+  color: var(--clr-text);
+  box-shadow: 0 0 24px var(--clr-accent-glow);
 }
 
 .btn-new-game:active {
@@ -76,14 +75,14 @@
 
 .title-footer {
   position: absolute;
-  bottom: 2rem;
-  font-size: 0.7rem;
-  letter-spacing: 2px;
-  color: #555;
+  bottom: var(--sp-lg);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-normal);
+  color: var(--clr-text-muted);
   animation: blink 1.5s step-end infinite;
 }
 
 @keyframes blink {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
+  50%       { opacity: 0; }
 }
