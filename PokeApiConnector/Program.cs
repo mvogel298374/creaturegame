@@ -23,6 +23,9 @@ class Program
         Console.WriteLine("\nImporting Gen 1 Pokemon Species...");
         await PokemonImport.FetchPokemonByGeneration(1);
         
+        Console.WriteLine("\nDownloading battle sprites...");
+        await SpriteDownloader.DownloadAllAsync();
+
         Console.WriteLine("\nImport Complete!");
     }
 }
