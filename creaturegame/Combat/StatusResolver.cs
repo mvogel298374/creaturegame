@@ -7,7 +7,7 @@ public static class StatusResolver
     public static int EffectiveSpeed(Creature creature) =>
         creature.Status == StatusCondition.Paralysis ? creature.Attributes.Speed / 4 : creature.Attributes.Speed;
 
-    public static bool CanAct(Creature creature, IBattleRules? rules = null)
+    public static bool CanAct(Creature creature, IBattleRules? rules = null, IBattleEventEmitter? emitter = null)
     {
         var battleRules = rules ?? Gen1BattleRules.Instance;
 
@@ -18,11 +18,11 @@ public static class StatusResolver
             {
                 creature.SleepTurns = 0;
                 creature.Status = StatusCondition.None;
-                Console.WriteLine($"{creature.Name} woke up!");
+                emitter?.Emit(new StatusCleared(creature.Name, StatusCondition.Sleep));
             }
             else
             {
-                Console.WriteLine($"{creature.Name} is fast asleep!");
+                emitter?.Emit(new ActionBlocked(creature.Name, StatusCondition.Sleep));
             }
             return false;
         }
@@ -33,34 +33,33 @@ public static class StatusResolver
                 && Random.Shared.Next(100) < battleRules.FreezeRandomThawPercent)
             {
                 creature.Status = StatusCondition.None;
-                Console.WriteLine($"{creature.Name} thawed out!");
+                emitter?.Emit(new StatusCleared(creature.Name, StatusCondition.Freeze));
                 return true;
             }
-            Console.WriteLine($"{creature.Name} is frozen solid!");
+            emitter?.Emit(new ActionBlocked(creature.Name, StatusCondition.Freeze));
             return false;
         }
 
         if (creature.Status == StatusCondition.Paralysis && Random.Shared.Next(4) == 0)
         {
-            Console.WriteLine($"{creature.Name} is fully paralyzed! It can't move!");
+            emitter?.Emit(new ActionBlocked(creature.Name, StatusCondition.Paralysis));
             return false;
         }
 
         if (creature.ConfusedTurns > 0)
         {
-            Console.WriteLine($"{creature.Name} is confused!");
+            emitter?.Emit(new ConfusionMessage(creature.Name));
             creature.ConfusedTurns--;
             if (creature.ConfusedTurns == 0)
             {
-                Console.WriteLine($"{creature.Name} snapped out of confusion!");
+                emitter?.Emit(new ConfusionCleared(creature.Name));
                 return true;
             }
             if (Random.Shared.Next(2) == 0)
             {
-                Console.WriteLine("It hurt itself in its confusion!");
                 int selfDamage = DamageCalculator.CalculateConfusionDamage(creature, battleRules);
                 creature.Attributes.ReceiveDamage(selfDamage);
-                Console.WriteLine($"{creature.Name} took {selfDamage} damage!");
+                emitter?.Emit(new ConfusionDamage(creature.Name, selfDamage, creature.Attributes.HP));
                 return false;
             }
         }
@@ -68,29 +67,29 @@ public static class StatusResolver
         return true;
     }
 
-    public static void ApplyEndOfTurnDamage(Creature creature, IBattleRules? rules = null)
+    public static void ApplyEndOfTurnDamage(Creature creature, IBattleRules? rules = null, IBattleEventEmitter? emitter = null)
     {
         if (!creature.IsAlive()) return;
 
         var battleRules = rules ?? Gen1BattleRules.Instance;
         int damage = 0;
-        string message = "";
+        StatusCondition source = StatusCondition.None;
 
         if (creature.Status == StatusCondition.Burn)
         {
             damage = Math.Max(1, creature.Attributes.MaxHP / battleRules.BurnDamageDenominator);
-            message = $"{creature.Name} is hurt by its burn!";
+            source = StatusCondition.Burn;
         }
         else if (creature.Status == StatusCondition.Poison)
         {
             damage = Math.Max(1, creature.Attributes.MaxHP / battleRules.PoisonDamageDenominator);
-            message = $"{creature.Name} is hurt by poison!";
+            source = StatusCondition.Poison;
         }
 
         if (damage > 0)
         {
             creature.Attributes.ReceiveDamage(damage);
-            Console.WriteLine($"{message} ({damage} damage)");
+            emitter?.Emit(new StatusDamage(creature.Name, damage, source, creature.Attributes.HP));
         }
     }
 }

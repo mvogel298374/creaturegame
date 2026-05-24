@@ -7,21 +7,16 @@ public class Battle
 {
     private Creature PlayerCreature { get; }
     private Creature EnemyCreature  { get; }
-    private readonly ITypeChart   _typeChart;
-    private readonly IBattleRules _rules;
-    private readonly IBattleInput _playerInput;
-    private readonly IBattleInput _enemyInput;
+    private readonly ITypeChart           _typeChart;
+    private readonly IBattleRules         _rules;
+    private readonly IBattleInput         _playerInput;
+    private readonly IBattleInput         _enemyInput;
+    private readonly IBattleEventEmitter? _emitter;
     private int _turnNumber;
 
-    /// <summary>
-    /// Creates a battle.
-    /// Pass the generation-appropriate <paramref name="typeChart"/> and
-    /// <paramref name="rules"/> to control type effectiveness and battle mechanics.
-    /// Use <see cref="AutoSelectInput.Instance"/> for sides not yet wired to a real input.
-    /// </summary>
     public Battle(Creature player, Creature enemy, ITypeChart typeChart,
                   IBattleInput playerInput, IBattleInput enemyInput,
-                  IBattleRules? rules = null)
+                  IBattleRules? rules = null, IBattleEventEmitter? emitter = null)
     {
         PlayerCreature = player;
         EnemyCreature  = enemy;
@@ -29,19 +24,23 @@ public class Battle
         _rules         = rules ?? Gen1BattleRules.Instance;
         _playerInput   = playerInput;
         _enemyInput    = enemyInput;
+        _emitter       = emitter;
     }
 
     public async Task StartFightAsync()
     {
-        Console.WriteLine($"A wild {EnemyCreature.Name} appeared!");
-        Console.WriteLine($"Go! {PlayerCreature.Name}!");
+        _emitter?.Emit(new BattleStarted(PlayerCreature.Name, EnemyCreature.Name));
 
         while (PlayerCreature.IsAlive() && EnemyCreature.IsAlive())
         {
             _turnNumber++;
 
-            Console.WriteLine($"\n{PlayerCreature.Name}: {PlayerCreature.Attributes.HP}/{PlayerCreature.Attributes.MaxHP} HP");
-            Console.WriteLine($"{EnemyCreature.Name}: {EnemyCreature.Attributes.HP}/{EnemyCreature.Attributes.MaxHP} HP");
+            _emitter?.Emit(new TurnStarted(
+                _turnNumber,
+                PlayerCreature.Name, PlayerCreature.Attributes.HP, PlayerCreature.Attributes.MaxHP, PlayerCreature.Status,
+                EnemyCreature.Name,  EnemyCreature.Attributes.HP,  EnemyCreature.Attributes.MaxHP,  EnemyCreature.Status,
+                PlayerCreature.MoveSet.Select(m => new MoveInfo(m.Base.Name ?? "", m.Base.DamageType, m.PowerPointsCurrent, m.Base.PowerPointsMax)).ToList()
+            ));
 
             // Move selection — IBattleInput is bypassed when a creature is out of PP;
             // null signals AttackAction to use Struggle (system-enforced, not a player/AI choice).
@@ -67,8 +66,8 @@ public class Battle
                       TurnNumber = _turnNumber
                   });
 
-            var playerAction = new AttackAction(PlayerCreature, EnemyCreature, playerMove, _typeChart, _rules);
-            var enemyAction  = new AttackAction(EnemyCreature, PlayerCreature, enemyMove,  _typeChart, _rules);
+            var playerAction = new AttackAction(PlayerCreature, EnemyCreature, playerMove, _typeChart, _rules, _emitter);
+            var enemyAction  = new AttackAction(EnemyCreature, PlayerCreature, enemyMove,  _typeChart, _rules, _emitter);
 
             // Turn resolution: Priority → effective Speed (Paralysis quarters) → random tie-breaker
             var turnQueue = new List<IBattleAction> { playerAction, enemyAction };
@@ -83,28 +82,29 @@ public class Battle
             {
                 if (!action.Source.IsAlive()) continue;
                 if ((action as AttackAction)?.Target.IsAlive() != true) continue;
-                if (!StatusResolver.CanAct(action.Source, _rules)) continue;
+                if (!StatusResolver.CanAct(action.Source, _rules, _emitter)) continue;
                 await action.ExecuteAsync();
             }
 
             // End-of-turn: Burn and Poison deal 1/16 max HP (Gen 1–5); fraction is rules-governed
-            StatusResolver.ApplyEndOfTurnDamage(PlayerCreature, _rules);
-            StatusResolver.ApplyEndOfTurnDamage(EnemyCreature,  _rules);
+            StatusResolver.ApplyEndOfTurnDamage(PlayerCreature, _rules, _emitter);
+            StatusResolver.ApplyEndOfTurnDamage(EnemyCreature,  _rules, _emitter);
 
             if (!EnemyCreature.IsAlive())
             {
-                Console.WriteLine($"{EnemyCreature.Name} fainted!");
+                _emitter?.Emit(new CreatureFainted(EnemyCreature.Name));
                 break;
             }
             if (!PlayerCreature.IsAlive())
             {
-                Console.WriteLine($"{PlayerCreature.Name} fainted!");
+                _emitter?.Emit(new CreatureFainted(PlayerCreature.Name));
                 break;
             }
 
-            Console.WriteLine("\nPress any key for the next round...");
-            if (!Console.IsInputRedirected)
-                Console.ReadKey();
+            _emitter?.Emit(new TurnEnded());
         }
+
+        string winner = PlayerCreature.IsAlive() ? PlayerCreature.Name : EnemyCreature.Name;
+        _emitter?.Emit(new BattleEnded(winner));
     }
 }

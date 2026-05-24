@@ -15,25 +15,22 @@ public class AttackAction : IBattleAction
     public Creature Source { get; }
     public Creature Target { get; }
     public int Priority { get; }
-    private readonly ITypeChart   _typeChart;
-    private readonly IBattleRules _rules;
+    private readonly ITypeChart           _typeChart;
+    private readonly IBattleRules         _rules;
+    private readonly IBattleEventEmitter? _emitter;
 
     // Null means Struggle — Battle passes null when Source.IsOutOfPP, bypassing IBattleInput.
     private readonly PokemonAttack? _selectedMove;
 
-    /// <param name="selectedMove">
-    /// The move committed to this turn, as chosen by IBattleInput.
-    /// Pass null to force Struggle (all PP exhausted).
-    /// </param>
-    /// <param name="rules">Generation-specific battle rules. Defaults to Gen 1 if omitted.</param>
     public AttackAction(Creature source, Creature target,
                         PokemonAttack? selectedMove, ITypeChart typeChart,
-                        IBattleRules? rules = null)
+                        IBattleRules? rules = null, IBattleEventEmitter? emitter = null)
     {
         Source        = source;
         Target        = target;
         _typeChart    = typeChart;
         _rules        = rules ?? Gen1BattleRules.Instance;
+        _emitter      = emitter;
         _selectedMove = selectedMove;
         Priority      = selectedMove?.Base.Priority ?? 0;
     }
@@ -48,13 +45,13 @@ public class AttackAction : IBattleAction
         if (!usingStruggle)
             _selectedMove!.PowerPointsCurrent--;
 
-        Console.WriteLine($"{Source.Name} used {attackToUse.Name}!");
+        _emitter?.Emit(new MoveUsed(Source.Name, attackToUse.Name ?? ""));
 
         // Accuracy check (Struggle always hits)
         if (!usingStruggle && attackToUse.Accuracy < 100
             && Random.Shared.Next(1, 101) > attackToUse.Accuracy)
         {
-            Console.WriteLine("The attack missed!");
+            _emitter?.Emit(new MoveMissed(Source.Name, attackToUse.Name ?? ""));
             return Task.CompletedTask;
         }
 
@@ -62,18 +59,23 @@ public class AttackAction : IBattleAction
         if (Target.Status == StatusCondition.Freeze && _rules.CanThawFrozenTarget(attackToUse))
         {
             Target.Status = StatusCondition.None;
-            Console.WriteLine($"{Target.Name} thawed out!");
+            _emitter?.Emit(new StatusCleared(Target.Name, StatusCondition.Freeze));
         }
 
-        int damage = DamageCalculator.CalculateDamage(Source, Target, attackToUse, _typeChart, _rules);
-        Target.Attributes.ReceiveDamage(damage);
-        Console.WriteLine($"{Target.Name} took {damage} damage!");
+        int damage = 0;
+        if (attackToUse.BaseDamage > 0)
+        {
+            double effectiveness = DamageCalculator.GetTypeEffectiveness(attackToUse.DamageType, Target.Type1, Target.Type2, _typeChart);
+            damage = DamageCalculator.CalculateDamage(Source, Target, attackToUse, _typeChart, _rules);
+            Target.Attributes.ReceiveDamage(damage);
+            _emitter?.Emit(new DamageDealt(Target.Name, damage, effectiveness, Target.Attributes.HP, Target.Attributes.MaxHP));
+        }
 
         if (usingStruggle)
         {
             int recoil = _rules.CalculateStruggleRecoil(Source, damage);
             Source.Attributes.ReceiveDamage(recoil);
-            Console.WriteLine($"{Source.Name} is hit by recoil! ({recoil} damage)");
+            _emitter?.Emit(new RecoilDamage(Source.Name, recoil, Source.Attributes.HP));
         }
 
         TryApplyStatus(attackToUse);
@@ -95,14 +97,6 @@ public class AttackAction : IBattleAction
         if (attack.StatusEffect == StatusCondition.Sleep)
             Target.SleepTurns = _rules.RollSleepTurns();
 
-        Console.WriteLine(attack.StatusEffect switch
-        {
-            StatusCondition.Burn      => $"{Target.Name} was burned!",
-            StatusCondition.Paralysis => $"{Target.Name} is paralyzed! It may be unable to move!",
-            StatusCondition.Poison    => $"{Target.Name} was poisoned!",
-            StatusCondition.Sleep     => $"{Target.Name} fell asleep!",
-            StatusCondition.Freeze    => $"{Target.Name} was frozen solid!",
-            _                         => $"{Target.Name} was afflicted with {attack.StatusEffect}!"
-        });
+        _emitter?.Emit(new StatusApplied(Target.Name, attack.StatusEffect));
     }
 }

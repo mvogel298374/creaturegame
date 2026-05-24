@@ -106,7 +106,8 @@ class Program
         Console.WriteLine("\n=== Battle Start! ===");
         var battle = new Battle(bulbasaur, dragonite, typeChart,
             playerInput: AutoSelectInput.Instance,
-            enemyInput:  AutoSelectInput.Instance);
+            enemyInput:  AutoSelectInput.Instance,
+            emitter:     ConsoleBattleEventEmitter.Instance);
         await battle.StartFightAsync();
 
         Console.WriteLine("\nPress any key to exit...");
