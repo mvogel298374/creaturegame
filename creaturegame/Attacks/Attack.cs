@@ -13,12 +13,7 @@ public class Attack
     public string? Description { get; set; }
     public int Accuracy { get; set; } = 100;
     public int PowerPointsMax { get; set; } = 30;
-    public double CriticalChance { get; set; } = 0.05;
-    public double DamageVariance { get; set; } = 0.10;
-    public int Cooldown { get; set; } = 0;
-    public int Weight { get; set; } = 500;
-    
-    // New Gen 1 Properties
+    // Gen 1 Properties
     public int Priority { get; set; } = 0;
     public int? EffectChance { get; set; }
     public StatusCondition StatusEffect { get; set; } = StatusCondition.None;

@@ -49,9 +49,10 @@ public class Battle
                 ? null
                 : await _playerInput.ChooseMoveAsync(new TurnContext
                   {
-                      Attacker  = PlayerCreature,
-                      Defender  = EnemyCreature,
-                      TypeChart = _typeChart,
+                      Attacker   = PlayerCreature,
+                      Defender   = EnemyCreature,
+                      TypeChart  = _typeChart,
+                      Rules      = _rules,
                       TurnNumber = _turnNumber
                   });
 
@@ -59,9 +60,10 @@ public class Battle
                 ? null
                 : await _enemyInput.ChooseMoveAsync(new TurnContext
                   {
-                      Attacker  = EnemyCreature,
-                      Defender  = PlayerCreature,
-                      TypeChart = _typeChart,
+                      Attacker   = EnemyCreature,
+                      Defender   = PlayerCreature,
+                      TypeChart  = _typeChart,
+                      Rules      = _rules,
                       TurnNumber = _turnNumber
                   });
 

@@ -120,4 +120,28 @@ public class BattleIntegrationTests
         Assert.False(enemy.IsAlive());
         Assert.True(player.Attributes.HP < player.Attributes.MaxHP); // recoil damage landed
     }
+
+    [Fact]
+    public async Task Battle_PoisonedEnemy_FaintsByEndOfTurnDamage()
+    {
+        // Enemy has exactly 1 HP and is Poisoned — end-of-turn damage (min 1) finishes it.
+        // Both creatures use 0-damage moves so no direct attack can kill either side.
+        var player = new Creature("Player") { Level = 50 };
+        player.CalculateStats();
+        player.Attributes.Speed = 100;
+        player.AddAttack(new Attack { Name = "Splash", BaseDamage = 0, Accuracy = 100, AttackType = AttackType.Physical });
+
+        var enemy = new Creature("Enemy") { Level = 50, Status = StatusCondition.Poison };
+        enemy.CalculateStats();
+        enemy.Attributes.HP    = 1;
+        enemy.Attributes.MaxHP = 160;
+        enemy.Attributes.Speed = 1;
+        enemy.AddAttack(new Attack { Name = "Splash", BaseDamage = 0, Accuracy = 100, AttackType = AttackType.Physical });
+
+        var battle = new Battle(player, enemy, new Gen1TypeChart(), AutoSelectInput.Instance, AutoSelectInput.Instance);
+        await battle.StartFightAsync();
+
+        Assert.False(enemy.IsAlive());
+        Assert.True(player.IsAlive());
+    }
 }

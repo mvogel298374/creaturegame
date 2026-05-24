@@ -12,8 +12,9 @@ namespace creaturegame.Combat;
 /// </summary>
 public sealed class TurnContext
 {
-    public required Creature Attacker { get; init; }
-    public required Creature Defender { get; init; }
-    public required ITypeChart TypeChart       { get; init; }
-    public int TurnNumber                      { get; init; }
+    public required Creature    Attacker   { get; init; }
+    public required Creature    Defender   { get; init; }
+    public required ITypeChart  TypeChart  { get; init; }
+    public required IBattleRules Rules     { get; init; }
+    public int TurnNumber                  { get; init; }
 }

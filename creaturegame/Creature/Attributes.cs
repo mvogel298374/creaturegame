@@ -29,10 +29,5 @@ public class Attributes
             this.HP = this.MaxHP;
     }
 
-    public int GetCurrentHealth()
-    {
-        return this.HP;
-    }
-
 }
 

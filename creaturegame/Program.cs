@@ -23,10 +23,6 @@ class Program
 
         var typeChart = new Gen1TypeChart();
 
-        // Struggle: loaded from DB (id=165) and assigned to each creature so it fires automatically when all PP is exhausted
-        var struggleAttack = await attackService.GetAttackByIdAsync(165)
-            ?? new Attack("Struggle", "An attack that also hurts the user.") { BaseDamage = 50, Accuracy = 100, AttackType = AttackType.Physical, DamageType = DamageType.Normal };
-
         // --- Bulbasaur (Grass/Poison) ---
         var bulbasaurSpecies = await pokemonService.GetSpeciesByNameAsync("bulbasaur");
         var bulbasaur = new Creature("Bulbasaur")

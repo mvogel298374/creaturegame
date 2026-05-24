@@ -53,16 +53,7 @@ public class Creature
         if (Level < MaxLevel)
         {
             Level++;
-            int oldMaxHp = Attributes.MaxHP;
             CalculateStats();
-            
-            // Heal by the amount MaxHP increased
-            int hpIncrease = Attributes.MaxHP - oldMaxHp;
-            if (hpIncrease > 0)
-            {
-                Attributes.ReceiveHealing(hpIncrease);
-            }
-            
             Console.WriteLine($"{Name} leveled up to {Level}!");
         }
     }
@@ -107,6 +98,8 @@ public class Creature
     public int SleepTurns { get; set; } = 0;
     public int ConfusedTurns { get; set; } = 0;
 
+    private bool _statsInitialized;
+
     private Creature()
     {
         GenerateRandomDVs();
@@ -143,12 +136,31 @@ public class Creature
 
     public void CalculateStats()
     {
-        Attributes.HP = CalculateHP(BaseHP, DvHP, ExpHP, Level);
-        Attributes.MaxHP = Attributes.HP;
-        Attributes.Attack = CalculateOtherStat(BaseAttack, DvAttack, ExpAttack, Level);
+        int newMaxHP = CalculateHP(BaseHP, DvHP, ExpHP, Level);
+        int oldMaxHP = Attributes.MaxHP;
+
+        Attributes.MaxHP   = newMaxHP;
+        Attributes.Attack  = CalculateOtherStat(BaseAttack,  DvAttack,  ExpAttack,  Level);
         Attributes.Defense = CalculateOtherStat(BaseDefense, DvDefense, ExpDefense, Level);
         Attributes.Special = CalculateOtherStat(BaseSpecial, DvSpecial, ExpSpecial, Level);
-        Attributes.Speed = CalculateOtherStat(BaseSpeed, DvSpeed, ExpSpeed, Level);
+        Attributes.Speed   = CalculateOtherStat(BaseSpeed,   DvSpeed,   ExpSpeed,   Level);
+
+        if (!_statsInitialized)
+        {
+            // First call — set HP to full.
+            Attributes.HP    = newMaxHP;
+            _statsInitialized = true;
+        }
+        else if (newMaxHP > oldMaxHP)
+        {
+            // MaxHP grew (e.g. level-up) — heal the delta, preserving damage taken.
+            Attributes.ReceiveHealing(newMaxHP - oldMaxHP);
+        }
+        else
+        {
+            // MaxHP unchanged or shrank — clamp current HP to new ceiling.
+            Attributes.HP = Math.Min(Attributes.HP, newMaxHP);
+        }
     }
 
     private static int CalculateHP(int baseStat, int dv, int exp, int level)

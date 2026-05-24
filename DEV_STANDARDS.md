@@ -21,9 +21,9 @@ Guidelines for all `/dev` actions in this project.
 *   **Error Handling**: Wrap API and DB calls in `try-catch` blocks with clear console logging.
 
 ## Database Management
-*   **Property Tracking**: When adding new properties to models (`PokemonSpecies`, `Attack`, etc.), always ensure the corresponding database schema is updated.
+*   **Property Tracking**: When adding new properties to models (`PokemonSpecies`, `Attack`, etc.), always add an EF Core migration — see `CLAUDE.md` for the migration command. Never use raw `ALTER TABLE`.
 *   **Data Sourcing**: Clearly document (via comments or DTO naming) where each property is drawn from (e.g., PokeAPI `pokemon-species` endpoint vs. `pokemon` endpoint).
-*   **Migrations**: Use `EnsureDatabaseCreated` and manual `ALTER TABLE` checks in `GameDbContext.cs` to handle schema updates for existing databases.
+*   **Migrations**: All schema changes go through `dotnet ef migrations add <Name>`. `EnsureDatabaseCreated()` calls `Database.Migrate()` which applies all pending migrations automatically.
 *   **File Path**: The connection string is hardcoded. Ensure the SQLite file path is consistently used across all tools.
 
 ## Version Control

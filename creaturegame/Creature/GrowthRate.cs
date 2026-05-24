@@ -1,4 +1,4 @@
-﻿namespace creaturegame.Creatures;
+namespace creaturegame.Creatures;
 
 public enum GrowthRate
 {

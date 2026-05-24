@@ -14,6 +14,9 @@ namespace creaturegame.Combat;
 /// </summary>
 public class Gen1TypeChart : ITypeChart
 {
+    public static readonly Gen1TypeChart Instance = new();
+
+
     // Outer key = attacking type, inner key = defending type, value = multiplier.
     // Only non-1.0 entries are stored; missing entries default to 1.0.
     private static readonly Dictionary<DamageType, Dictionary<DamageType, double>> Chart = new()

@@ -345,6 +345,30 @@ public class CoreMechanicsTests
         Assert.Equal(0.5, effectiveness);
     }
 
+    [Fact]
+    public void Gen1TypeChart_IceVsFire_IsNeutral_Gen1Quirk()
+    {
+        // Gen 2+: Ice → Fire = 0.5x. Gen 1: 1x (quirk).
+        var chart = new Gen1TypeChart();
+        Assert.Equal(1.0, chart.GetMultiplier(DamageType.Ice, DamageType.Fire));
+    }
+
+    [Fact]
+    public void Gen1TypeChart_BugVsPoison_Is2x_Gen1Quirk()
+    {
+        // Changed to 1x in Gen 2+.
+        var chart = new Gen1TypeChart();
+        Assert.Equal(2.0, chart.GetMultiplier(DamageType.Bug, DamageType.Poison));
+    }
+
+    [Fact]
+    public void Gen1TypeChart_BugVsPsychic_Is2x_Gen1Quirk()
+    {
+        // Changed to 1x in Gen 2+.
+        var chart = new Gen1TypeChart();
+        Assert.Equal(2.0, chart.GetMultiplier(DamageType.Bug, DamageType.Psychic));
+    }
+
     // --- Accuracy / Miss Tests ---
 
     [Fact]
@@ -659,6 +683,83 @@ public class CoreMechanicsTests
 
         Assert.True(creature.ConfusedTurns < 3,
             $"ConfusedTurns should have decremented from 3 but is {creature.ConfusedTurns}");
+    }
+
+    // --- Attributes Tests ---
+
+    [Fact]
+    public void Attributes_ReceiveDamage_ReducesHP()
+    {
+        var attrs = new Attributes { HP = 100, MaxHP = 100 };
+        attrs.ReceiveDamage(30);
+        Assert.Equal(70, attrs.HP);
+    }
+
+    [Fact]
+    public void Attributes_ReceiveDamage_FloorsAtZero()
+    {
+        var attrs = new Attributes { HP = 10, MaxHP = 100 };
+        attrs.ReceiveDamage(999);
+        Assert.Equal(0, attrs.HP);
+    }
+
+    [Fact]
+    public void Attributes_ReceiveHealing_IncreasesHP()
+    {
+        var attrs = new Attributes { HP = 50, MaxHP = 100 };
+        attrs.ReceiveHealing(20);
+        Assert.Equal(70, attrs.HP);
+    }
+
+    [Fact]
+    public void Attributes_ReceiveHealing_CapsAtMaxHP()
+    {
+        var attrs = new Attributes { HP = 90, MaxHP = 100 };
+        attrs.ReceiveHealing(50);
+        Assert.Equal(100, attrs.HP);
+    }
+
+    // --- Gen1BattleRules Contract Tests ---
+
+    [Fact]
+    public void Gen1BattleRules_RollSleepTurns_IsInRange1To7()
+    {
+        var rules = Gen1BattleRules.Instance;
+        for (int i = 0; i < 200; i++)
+            Assert.InRange(rules.RollSleepTurns(), 1, 7);
+    }
+
+    [Fact]
+    public void Gen1BattleRules_RollDamageVariance_IsInRange()
+    {
+        var rules = Gen1BattleRules.Instance;
+        double min = 217.0 / 255.0;
+        for (int i = 0; i < 200; i++)
+            Assert.InRange(rules.RollDamageVariance(), min, 1.0);
+    }
+
+    [Fact]
+    public void Gen1BattleRules_StruggleRecoil_IsHalfDamage()
+    {
+        var rules = Gen1BattleRules.Instance;
+        var creature = new Creature("Test") { Level = 1 };
+        Assert.Equal(25, rules.CalculateStruggleRecoil(creature, 50));
+    }
+
+    [Fact]
+    public void Gen1BattleRules_StruggleRecoil_MinimumOne()
+    {
+        var rules = Gen1BattleRules.Instance;
+        var creature = new Creature("Test") { Level = 1 };
+        Assert.Equal(1, rules.CalculateStruggleRecoil(creature, 1));
+    }
+
+    [Fact]
+    public void Gen1BattleRules_BurnAndPoisonDenominators_Are16()
+    {
+        var rules = Gen1BattleRules.Instance;
+        Assert.Equal(16, rules.BurnDamageDenominator);
+        Assert.Equal(16, rules.PoisonDamageDenominator);
     }
 
     // --- InitializeFromSpecies Tests ---
