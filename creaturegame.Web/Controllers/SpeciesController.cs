@@ -19,16 +19,16 @@ public class SpeciesController : ControllerBase
 
         return Ok(all.Select(s => new
         {
-            s.Id,
-            s.Name,
-            Type1 = s.Type1.ToString(),
-            Type2 = s.Type2?.ToString(),
-            s.BaseHP,
-            s.BaseAttack,
-            s.BaseDefense,
-            s.BaseSpecial,
-            s.BaseSpeed,
-            BaseStatTotal = s.BaseHP + s.BaseAttack + s.BaseDefense + s.BaseSpecial + s.BaseSpeed
+            id           = s.Id,
+            name         = s.Name,
+            type1        = s.Type1.ToString(),
+            type2        = s.Type2?.ToString(),
+            baseHp       = s.BaseHP,
+            baseAttack   = s.BaseAttack,
+            baseDefense  = s.BaseDefense,
+            baseSpecial  = s.BaseSpecial,
+            baseSpeed    = s.BaseSpeed,
+            baseStatTotal = s.BaseHP + s.BaseAttack + s.BaseDefense + s.BaseSpecial + s.BaseSpeed
         }));
     }
 }
