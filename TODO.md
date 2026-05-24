@@ -120,16 +120,46 @@ Design: `IBattleInput` is already the seam. AI implementations score available m
 - [ ] `WeightedAIInput : IBattleInput`
 
 ## Priority 11 – Web UI
-Deprecate `Program.cs` as the primary entry point and replace it with a proper web front-end.
-The battle engine is already decoupled from I/O via `IBattleInput` and `IBattleAction`,
-so this is largely an infrastructure and presentation layer addition.
+Full plan in `FRONTEND_PLAN.md`. Stack: React 18 + Phaser 3 + SignalR, hosted by a new
+`creaturegame.Web` ASP.NET Core project. Flow: Title → Starter Selection → Battle.
 
-- [ ] Add an ASP.NET Core project to the solution as the web host
-- [ ] Expose battle state over SignalR (real-time push suits the turn-based loop naturally)
-- [ ] Implement `WebInput : IBattleInput` backed by the SignalR connection — player sends
-      their chosen move index; server resolves the turn and broadcasts the result
-- [ ] Build a minimal browser UI: creature HP bars, move menu, battle log
-- [ ] `Program.cs` console runner becomes a dev/debug tool, not the primary entry point
+**Phase 1 – .NET plumbing**
+- [ ] Add `creaturegame.Web` ASP.NET Core project; configure SignalR + CORS
+- [ ] Stub `BattleHub`, `SpeciesController` (GET /api/species), `GameController` (POST /api/game/start)
+- [ ] `GameSessionManager` maps SignalR connectionId → `GameSession` (Battle + SignalRInput)
+
+**Phase 2 – React skeleton**
+- [ ] Vite + React + TypeScript in `creaturegame.Web/ClientApp`
+- [ ] React Router: `/` Title · `/select` StarterSelection · `/battle` Battle
+- [ ] SignalR client connects; log received events to console
+
+**Phase 3 – Battle engine output abstraction** ← prerequisite for all visual work
+- [ ] Define `BattleEvent` record hierarchy (`MoveUsed`, `DamageDealt`, `StatusApplied`, etc.)
+- [ ] `IBattleEventEmitter` interface; inject into `Battle`, `AttackAction`, `StatusResolver`
+- [ ] Replace all `Console.WriteLine` with `_emitter.Emit(new TypedEvent(...))`
+- [ ] `ConsoleBattleEventEmitter` preserves console runner; `SignalRBattleEventEmitter` pushes to hub
+- [ ] All 63 tests still pass
+
+**Phase 4 – Title screen**
+- [ ] React component, "New Game" navigates to `/select`
+
+**Phase 5 – Starter selection**
+- [ ] Species grid fetched from API; confirm pick calls POST /api/game/start; navigate to /battle
+
+**Phase 6 – Battle screen shell (React, no Phaser yet)**
+- [ ] `useBattleHub` hook + `useBattleState` reducer (HP, status, moves)
+- [ ] HP bars, move menu (disabled until TurnStarted), text log — full loop works, text-only
+
+**Phase 7 – Phaser canvas**
+- [ ] `BattleCanvas.tsx` mounts Phaser; `BattleScene.ts` loads + positions sprites
+
+**Phase 8 – Animations**
+- [ ] MoveUsed → attacker bob tween; DamageDealt → white flash + HP drain; CreatureFainted → slide+fade
+- [ ] React re-enables move menu only after Phaser emits `turnAnimationComplete`
+
+**Phase 9 – Polish**
+- [ ] Result overlay (win/lose + Play Again); effectiveness labels; status badges
+- [ ] `Program.cs` console runner retained as dev/debug tool
 
 ---
 
