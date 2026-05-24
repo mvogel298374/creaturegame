@@ -17,6 +17,8 @@ public static class DamageCalculator
         if (move.BaseDamage == 0) return 0;
 
         int attackStat = move.AttackType == AttackType.Physical ? attacker.Attributes.Attack : attacker.Attributes.Special;
+        if (move.AttackType == AttackType.Physical && attacker.Status == StatusCondition.Burn)
+            attackStat /= 2;
         int defenseStat = move.AttackType == AttackType.Physical ? defender.Attributes.Defense : defender.Attributes.Special;
 
         double baseDamage = (((2.0 * attacker.Level / 5.0 + 2.0) * attackStat * move.BaseDamage / defenseStat) / 50.0) + 2.0;
@@ -32,6 +34,14 @@ public static class DamageCalculator
 
         int finalDamage = (int)(baseDamage * stab * typeEffectiveness * random);
         return finalDamage;
+    }
+
+    public static int CalculateConfusionDamage(Creature attacker)
+    {
+        // Gen 1 formula: physical, 40 base power, attacker hits itself with own Attack / own Defense
+        double raw = ((2.0 * attacker.Level / 5.0 + 2.0) * attacker.Attributes.Attack * 40.0 / attacker.Attributes.Defense) / 50.0 + 2.0;
+        double random = Random.Shared.Next(217, 256) / 255.0;
+        return Math.Max(1, (int)(raw * random));
     }
 
     public static double GetTypeEffectiveness(DamageType moveType, DamageType? targetType1, DamageType? targetType2, ITypeChart typeChart)

@@ -105,6 +105,7 @@ public class Creature
     // Status
     public StatusCondition Status { get; set; } = StatusCondition.None;
     public int SleepTurns { get; set; } = 0;
+    public int ConfusedTurns { get; set; } = 0;
 
     private Creature()
     {

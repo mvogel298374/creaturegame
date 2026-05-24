@@ -24,13 +24,20 @@
 - [x] Set `SleepTurns` (1–7, random) when applying Sleep
 - [x] Tests: status applied on hit; not applied when target already statused; secondary effect chance respected
 
-## Priority 5 – Status Effects in Battle Loop
-- [ ] Pre-turn: Sleep skips action and decrements `SleepTurns`; wakes when counter hits 0
-- [ ] Pre-turn: Freeze skips action; thaws on any Fire-type move hitting the frozen target
-- [ ] Pre-turn: Paralysis — 25% chance to skip action
-- [ ] Stat modifiers: Burn halves physical Attack in `DamageCalculator`; Paralysis quarters Speed in turn ordering
-- [ ] End-of-turn: Burn deals 1/16 max HP; Poison deals 1/16 max HP
-- [ ] Pseudo-status — Confusion: `Creature.ConfusedTurns` counter; 50% chance to hurt itself each turn (40 base power, typeless); clears when counter expires (2–5 turns, Gen 1)
+## Priority 5 – Status Effects in Battle Loop ✅ DONE
+- [x] Pre-turn: Sleep skips action and decrements `SleepTurns`; wakes when counter hits 0
+- [x] Pre-turn: Freeze skips action; thaws on any Fire-type move hitting the frozen target
+- [x] Pre-turn: Paralysis — 25% chance to skip action
+- [x] Stat modifiers: Burn halves physical Attack in `DamageCalculator`; Paralysis quarters Speed in turn ordering
+- [x] End-of-turn: Burn deals 1/16 max HP; Poison deals 1/16 max HP
+- [x] Pseudo-status — Confusion: `Creature.ConfusedTurns` counter; 50% chance to hurt itself each turn (40 base power, typeless); clears when counter expires (2–5 turns, Gen 1)
+
+## Move Effects Layer (generation-agnostic)
+Move effects that are properties of the move itself rather than generation rules.
+Haze is the first concrete case; others follow the same pattern.
+- [ ] `MoveEffect` enum on `Attack`; `Attack.Effect` property; EF migration
+- [ ] `AttackAction` switches on `Effect` after damage/status: `ClearAllStatus` (Haze) clears `Status`, `SleepTurns`, `ConfusedTurns` on both Pokémon
+- [ ] Future effects to add as moves require: `Flinch`, stat-stage changes (`SwordsDance`, `Growl`, etc.), `Recharge` (Hyper Beam), `Leech Seed`, `Substitute`
 
 ## Priority 6 – Move Selection (Player Input)
 - [ ] Implement `ConsoleInput : IBattleInput` — numbered move menu, shows PP and type

@@ -8,23 +8,25 @@ public class Battle
     private Creature PlayerCreature { get; }
     private Creature EnemyCreature  { get; }
     private readonly ITypeChart   _typeChart;
+    private readonly IBattleRules _rules;
     private readonly IBattleInput _playerInput;
     private readonly IBattleInput _enemyInput;
     private int _turnNumber;
 
     /// <summary>
     /// Creates a battle.
-    /// Pass the generation-appropriate <paramref name="typeChart"/> to control type
-    /// effectiveness rules, and one <see cref="IBattleInput"/> per side to control
-    /// move selection. Use <see cref="AutoSelectInput.Instance"/> for sides that are
-    /// not yet wired to a real input source.
+    /// Pass the generation-appropriate <paramref name="typeChart"/> and
+    /// <paramref name="rules"/> to control type effectiveness and battle mechanics.
+    /// Use <see cref="AutoSelectInput.Instance"/> for sides not yet wired to a real input.
     /// </summary>
     public Battle(Creature player, Creature enemy, ITypeChart typeChart,
-                  IBattleInput playerInput, IBattleInput enemyInput)
+                  IBattleInput playerInput, IBattleInput enemyInput,
+                  IBattleRules? rules = null)
     {
         PlayerCreature = player;
         EnemyCreature  = enemy;
         _typeChart     = typeChart;
+        _rules         = rules ?? Gen1BattleRules.Instance;
         _playerInput   = playerInput;
         _enemyInput    = enemyInput;
     }
@@ -63,23 +65,29 @@ public class Battle
                       TurnNumber = _turnNumber
                   });
 
-            var playerAction = new AttackAction(PlayerCreature, EnemyCreature, playerMove, _typeChart);
-            var enemyAction  = new AttackAction(EnemyCreature, PlayerCreature, enemyMove,  _typeChart);
+            var playerAction = new AttackAction(PlayerCreature, EnemyCreature, playerMove, _typeChart, _rules);
+            var enemyAction  = new AttackAction(EnemyCreature, PlayerCreature, enemyMove,  _typeChart, _rules);
 
-            // Turn resolution: Priority → Speed → random tie-breaker
+            // Turn resolution: Priority → effective Speed (Paralysis quarters) → random tie-breaker
             var turnQueue = new List<IBattleAction> { playerAction, enemyAction };
 
             turnQueue = turnQueue
                 .OrderByDescending(a => a.Priority)
-                .ThenByDescending(a => a.Source.Attributes.Speed)
+                .ThenByDescending(a => StatusResolver.EffectiveSpeed(a.Source))
                 .ThenBy(_ => Random.Shared.Next())
                 .ToList();
 
             foreach (var action in turnQueue)
             {
-                if (action.Source.IsAlive() && (action as AttackAction)?.Target.IsAlive() == true)
-                    await action.ExecuteAsync();
+                if (!action.Source.IsAlive()) continue;
+                if ((action as AttackAction)?.Target.IsAlive() != true) continue;
+                if (!StatusResolver.CanAct(action.Source, _rules)) continue;
+                await action.ExecuteAsync();
             }
+
+            // End-of-turn: Burn and Poison deal 1/16 max HP
+            StatusResolver.ApplyEndOfTurnDamage(PlayerCreature);
+            StatusResolver.ApplyEndOfTurnDamage(EnemyCreature);
 
             if (!EnemyCreature.IsAlive())
             {

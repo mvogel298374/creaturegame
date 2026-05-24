@@ -15,7 +15,8 @@ public class AttackAction : IBattleAction
     public Creature Source { get; }
     public Creature Target { get; }
     public int Priority { get; }
-    private readonly ITypeChart _typeChart;
+    private readonly ITypeChart   _typeChart;
+    private readonly IBattleRules _rules;
 
     // Null means Struggle — Battle passes null when Source.IsOutOfPP, bypassing IBattleInput.
     private readonly PokemonAttack? _selectedMove;
@@ -24,12 +25,15 @@ public class AttackAction : IBattleAction
     /// The move committed to this turn, as chosen by IBattleInput.
     /// Pass null to force Struggle (all PP exhausted).
     /// </param>
+    /// <param name="rules">Generation-specific battle rules. Defaults to Gen 1 if omitted.</param>
     public AttackAction(Creature source, Creature target,
-                        PokemonAttack? selectedMove, ITypeChart typeChart)
+                        PokemonAttack? selectedMove, ITypeChart typeChart,
+                        IBattleRules? rules = null)
     {
         Source        = source;
         Target        = target;
         _typeChart    = typeChart;
+        _rules        = rules ?? Gen1BattleRules.Instance;
         _selectedMove = selectedMove;
         Priority      = selectedMove?.Base.Priority ?? 0;
     }
@@ -52,6 +56,13 @@ public class AttackAction : IBattleAction
         {
             Console.WriteLine("The attack missed!");
             return Task.CompletedTask;
+        }
+
+        // Thaw a frozen target if the move meets the generation's thaw criteria
+        if (Target.Status == StatusCondition.Freeze && _rules.CanThawFrozenTarget(attackToUse))
+        {
+            Target.Status = StatusCondition.None;
+            Console.WriteLine($"{Target.Name} thawed out!");
         }
 
         int damage = DamageCalculator.CalculateGen1Damage(Source, Target, attackToUse, _typeChart);

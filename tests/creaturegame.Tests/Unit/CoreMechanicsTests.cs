@@ -476,6 +476,191 @@ public class CoreMechanicsTests
         Assert.Single(creature.MoveSet);
     }
 
+    // --- Status Effects in Battle Loop Tests ---
+
+    [Fact]
+    public void Sleep_SkipsActionAndDecrementsCounter()
+    {
+        var creature = new Creature("Drowzee") { Level = 50, Status = StatusCondition.Sleep, SleepTurns = 3 };
+        creature.CalculateStats();
+
+        bool canAct = StatusResolver.CanAct(creature);
+
+        Assert.False(canAct);
+        Assert.Equal(2, creature.SleepTurns);
+        Assert.Equal(StatusCondition.Sleep, creature.Status);
+    }
+
+    [Fact]
+    public void Sleep_WakesAndClearsStatusWhenCounterHitsZero()
+    {
+        var creature = new Creature("Drowzee") { Level = 50, Status = StatusCondition.Sleep, SleepTurns = 1 };
+        creature.CalculateStats();
+
+        bool canAct = StatusResolver.CanAct(creature);
+
+        Assert.False(canAct);
+        Assert.Equal(StatusCondition.None, creature.Status);
+        Assert.Equal(0, creature.SleepTurns);
+    }
+
+    [Fact]
+    public void Freeze_SkipsAction()
+    {
+        var creature = new Creature("Articuno") { Level = 50, Status = StatusCondition.Freeze };
+        creature.CalculateStats();
+
+        bool canAct = StatusResolver.CanAct(creature);
+
+        Assert.False(canAct);
+        Assert.Equal(StatusCondition.Freeze, creature.Status);
+    }
+
+    [Fact]
+    public async Task Freeze_ThawsOnFireHitWithBurnEffect()
+    {
+        // Gen 1: Fire moves that can burn (e.g. Flamethrower) thaw a frozen target.
+        var attacker = new Creature("Charizard") { Level = 50 };
+        attacker.CalculateStats();
+        attacker.AddAttack(new Attack
+        {
+            Name = "Flamethrower", BaseDamage = 95, Accuracy = 100,
+            DamageType = DamageType.Fire, AttackType = AttackType.Special,
+            StatusEffect = StatusCondition.Burn, EffectChance = 10,
+        });
+
+        var defender = new Creature("Articuno") { Level = 50, Status = StatusCondition.Freeze };
+        defender.CalculateStats();
+
+        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart());
+        await action.ExecuteAsync();
+
+        Assert.Equal(StatusCondition.None, defender.Status);
+        Assert.True(defender.Attributes.HP < defender.Attributes.MaxHP);
+    }
+
+    [Fact]
+    public async Task Freeze_FireMoveWithoutBurnEffect_DoesNotThaw()
+    {
+        // Gen 1: Fire Spin cannot inflict burn, so it does not thaw a frozen target.
+        var attacker = new Creature("Attacker") { Level = 50 };
+        attacker.CalculateStats();
+        attacker.AddAttack(new Attack
+        {
+            Name = "Fire Spin", BaseDamage = 15, Accuracy = 70,
+            DamageType = DamageType.Fire, AttackType = AttackType.Special,
+            // No StatusEffect = Burn
+        });
+
+        var defender = new Creature("Articuno") { Level = 50, Status = StatusCondition.Freeze };
+        defender.CalculateStats();
+
+        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart());
+        await action.ExecuteAsync();
+
+        Assert.Equal(StatusCondition.Freeze, defender.Status);
+    }
+
+    [Fact]
+    public void Paralysis_EffectiveSpeedIsQuartered()
+    {
+        var creature = new Creature("Pikachu") { Level = 50, Status = StatusCondition.Paralysis };
+        creature.CalculateStats();
+        creature.Attributes.Speed = 100;
+
+        int effectiveSpeed = StatusResolver.EffectiveSpeed(creature);
+
+        Assert.Equal(25, effectiveSpeed);
+    }
+
+    [Fact]
+    public void Burn_HalvesPhysicalAttackDamage()
+    {
+        // Burn damage range (31–37) is entirely below non-burn range (61–72) for these stats,
+        // so the assertion holds for all random rolls.
+        var attacker = new Creature("Attacker") { Level = 50, Status = StatusCondition.Burn };
+        attacker.CalculateStats();
+        attacker.Attributes.Attack = 100;
+
+        var defender = new Creature("Defender") { Level = 50 };
+        defender.CalculateStats();
+        defender.Attributes.Defense = 50;
+
+        var move = new Attack { Name = "Tackle", BaseDamage = 80, AttackType = AttackType.Physical };
+
+        int burnedDamage = DamageCalculator.CalculateGen1Damage(attacker, defender, move, new Gen1TypeChart());
+
+        attacker.Status = StatusCondition.None;
+        int normalDamage = DamageCalculator.CalculateGen1Damage(attacker, defender, move, new Gen1TypeChart());
+
+        Assert.True(burnedDamage < normalDamage,
+            $"Burned ({burnedDamage}) should be less than normal ({normalDamage})");
+    }
+
+    [Fact]
+    public void Burn_EndOfTurnDamageIs1Over16MaxHP()
+    {
+        var creature = new Creature("Charizard") { Level = 50, Status = StatusCondition.Burn };
+        creature.CalculateStats();
+        creature.Attributes.MaxHP = 160;
+        creature.Attributes.HP   = 160;
+
+        StatusResolver.ApplyEndOfTurnDamage(creature);
+
+        Assert.Equal(150, creature.Attributes.HP);
+    }
+
+    [Fact]
+    public void Poison_EndOfTurnDamageIs1Over16MaxHP()
+    {
+        var creature = new Creature("Bulbasaur") { Level = 50, Status = StatusCondition.Poison };
+        creature.CalculateStats();
+        creature.Attributes.MaxHP = 160;
+        creature.Attributes.HP   = 160;
+
+        StatusResolver.ApplyEndOfTurnDamage(creature);
+
+        Assert.Equal(150, creature.Attributes.HP);
+    }
+
+    [Fact]
+    public void EndOfTurnDamage_NotAppliedToFaintedCreature()
+    {
+        var creature = new Creature("Bulbasaur") { Level = 50, Status = StatusCondition.Poison };
+        creature.CalculateStats();
+        creature.Attributes.HP = 0;
+
+        StatusResolver.ApplyEndOfTurnDamage(creature);
+
+        Assert.Equal(0, creature.Attributes.HP);
+    }
+
+    [Fact]
+    public void Confusion_SnapsOutWhenCounterReachesZero()
+    {
+        var creature = new Creature("Psyduck") { Level = 50, ConfusedTurns = 1 };
+        creature.CalculateStats();
+
+        bool canAct = StatusResolver.CanAct(creature);
+
+        Assert.True(canAct);
+        Assert.Equal(0, creature.ConfusedTurns);
+    }
+
+    [Fact]
+    public void Confusion_CounterDecrementsEachTurn()
+    {
+        var creature = new Creature("Psyduck") { Level = 50, ConfusedTurns = 3 };
+        creature.CalculateStats();
+        creature.Attributes.HP    = 9999;
+        creature.Attributes.MaxHP = 9999;
+
+        StatusResolver.CanAct(creature);
+
+        Assert.True(creature.ConfusedTurns < 3,
+            $"ConfusedTurns should have decremented from 3 but is {creature.ConfusedTurns}");
+    }
+
     // --- InitializeFromSpecies Tests ---
 
     [Fact]

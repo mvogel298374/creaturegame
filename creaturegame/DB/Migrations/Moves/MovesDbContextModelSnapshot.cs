@@ -66,7 +66,7 @@ namespace creaturegame.DB.Migrations.Moves
 
                     b.HasKey("Id");
 
-                    b.ToTable("Moves");
+                    b.ToTable("Moves", (string)null);
                 });
 #pragma warning restore 612, 618
         }
