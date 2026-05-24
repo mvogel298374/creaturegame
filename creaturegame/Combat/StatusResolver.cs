@@ -58,7 +58,7 @@ public static class StatusResolver
             if (Random.Shared.Next(2) == 0)
             {
                 Console.WriteLine("It hurt itself in its confusion!");
-                int selfDamage = DamageCalculator.CalculateConfusionDamage(creature);
+                int selfDamage = DamageCalculator.CalculateConfusionDamage(creature, battleRules);
                 creature.Attributes.ReceiveDamage(selfDamage);
                 Console.WriteLine($"{creature.Name} took {selfDamage} damage!");
                 return false;
@@ -68,21 +68,22 @@ public static class StatusResolver
         return true;
     }
 
-    public static void ApplyEndOfTurnDamage(Creature creature)
+    public static void ApplyEndOfTurnDamage(Creature creature, IBattleRules? rules = null)
     {
         if (!creature.IsAlive()) return;
 
+        var battleRules = rules ?? Gen1BattleRules.Instance;
         int damage = 0;
         string message = "";
 
         if (creature.Status == StatusCondition.Burn)
         {
-            damage = Math.Max(1, creature.Attributes.MaxHP / 16);
+            damage = Math.Max(1, creature.Attributes.MaxHP / battleRules.BurnDamageDenominator);
             message = $"{creature.Name} is hurt by its burn!";
         }
         else if (creature.Status == StatusCondition.Poison)
         {
-            damage = Math.Max(1, creature.Attributes.MaxHP / 16);
+            damage = Math.Max(1, creature.Attributes.MaxHP / battleRules.PoisonDamageDenominator);
             message = $"{creature.Name} is hurt by poison!";
         }
 

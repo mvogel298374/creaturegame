@@ -65,14 +65,13 @@ public class AttackAction : IBattleAction
             Console.WriteLine($"{Target.Name} thawed out!");
         }
 
-        int damage = DamageCalculator.CalculateGen1Damage(Source, Target, attackToUse, _typeChart);
+        int damage = DamageCalculator.CalculateDamage(Source, Target, attackToUse, _typeChart, _rules);
         Target.Attributes.ReceiveDamage(damage);
         Console.WriteLine($"{Target.Name} took {damage} damage!");
 
-        // Struggle recoil: user takes 1/2 damage dealt (Gen 1 behaviour)
         if (usingStruggle)
         {
-            int recoil = Math.Max(1, damage / 2);
+            int recoil = _rules.CalculateStruggleRecoil(Source, damage);
             Source.Attributes.ReceiveDamage(recoil);
             Console.WriteLine($"{Source.Name} is hit by recoil! ({recoil} damage)");
         }
@@ -94,7 +93,7 @@ public class AttackAction : IBattleAction
         Target.Status = attack.StatusEffect;
 
         if (attack.StatusEffect == StatusCondition.Sleep)
-            Target.SleepTurns = Random.Shared.Next(1, 8);
+            Target.SleepTurns = _rules.RollSleepTurns();
 
         Console.WriteLine(attack.StatusEffect switch
         {

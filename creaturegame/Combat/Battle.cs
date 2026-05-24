@@ -85,9 +85,9 @@ public class Battle
                 await action.ExecuteAsync();
             }
 
-            // End-of-turn: Burn and Poison deal 1/16 max HP
-            StatusResolver.ApplyEndOfTurnDamage(PlayerCreature);
-            StatusResolver.ApplyEndOfTurnDamage(EnemyCreature);
+            // End-of-turn: Burn and Poison deal 1/16 max HP (Gen 1–5); fraction is rules-governed
+            StatusResolver.ApplyEndOfTurnDamage(PlayerCreature, _rules);
+            StatusResolver.ApplyEndOfTurnDamage(EnemyCreature,  _rules);
 
             if (!EnemyCreature.IsAlive())
             {

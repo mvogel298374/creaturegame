@@ -124,7 +124,7 @@ public class CoreMechanicsTests
         
         var move = new Attack { Name = "Tackle", BaseDamage = 40, AttackType = AttackType.Physical };
         
-        int damage = DamageCalculator.CalculateGen1Damage(attacker, defender, move, new Gen1TypeChart());
+        int damage = DamageCalculator.CalculateDamage(attacker, defender, move, new Gen1TypeChart());
         
         Assert.InRange(damage, 16, 19);
     }
@@ -416,10 +416,10 @@ public class CoreMechanicsTests
 
         var move = new Attack { Name = "Ember", BaseDamage = 80, AttackType = AttackType.Physical, DamageType = DamageType.Fire };
 
-        int stabDamage    = DamageCalculator.CalculateGen1Damage(attacker, defender, move, new Gen1TypeChart());
+        int stabDamage    = DamageCalculator.CalculateDamage(attacker, defender, move, new Gen1TypeChart());
 
         attacker.Type1 = DamageType.Water; // no STAB on Fire move
-        int nonStabDamage = DamageCalculator.CalculateGen1Damage(attacker, defender, move, new Gen1TypeChart());
+        int nonStabDamage = DamageCalculator.CalculateDamage(attacker, defender, move, new Gen1TypeChart());
 
         Assert.True(stabDamage > nonStabDamage,
             $"STAB damage ({stabDamage}) should exceed non-STAB ({nonStabDamage})");
@@ -440,10 +440,10 @@ public class CoreMechanicsTests
 
         var move = new Attack { Name = "Ember", BaseDamage = 80, AttackType = AttackType.Physical, DamageType = DamageType.Fire };
 
-        int stabDamage    = DamageCalculator.CalculateGen1Damage(attacker, defender, move, new Gen1TypeChart());
+        int stabDamage    = DamageCalculator.CalculateDamage(attacker, defender, move, new Gen1TypeChart());
 
         attacker.Type2 = null; // remove Type2 STAB
-        int nonStabDamage = DamageCalculator.CalculateGen1Damage(attacker, defender, move, new Gen1TypeChart());
+        int nonStabDamage = DamageCalculator.CalculateDamage(attacker, defender, move, new Gen1TypeChart());
 
         Assert.True(stabDamage > nonStabDamage,
             $"Type2 STAB damage ({stabDamage}) should exceed non-STAB ({nonStabDamage})");
@@ -588,10 +588,10 @@ public class CoreMechanicsTests
 
         var move = new Attack { Name = "Tackle", BaseDamage = 80, AttackType = AttackType.Physical };
 
-        int burnedDamage = DamageCalculator.CalculateGen1Damage(attacker, defender, move, new Gen1TypeChart());
+        int burnedDamage = DamageCalculator.CalculateDamage(attacker, defender, move, new Gen1TypeChart());
 
         attacker.Status = StatusCondition.None;
-        int normalDamage = DamageCalculator.CalculateGen1Damage(attacker, defender, move, new Gen1TypeChart());
+        int normalDamage = DamageCalculator.CalculateDamage(attacker, defender, move, new Gen1TypeChart());
 
         Assert.True(burnedDamage < normalDamage,
             $"Burned ({burnedDamage}) should be less than normal ({normalDamage})");
