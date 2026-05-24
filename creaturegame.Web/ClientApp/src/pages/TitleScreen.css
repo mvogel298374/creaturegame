@@ -1,0 +1,89 @@
+.title-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: linear-gradient(160deg, #0d0d1a 0%, #1a1a3e 50%, #0d1a2e 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle grid pattern */
+.title-screen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+}
+
+.title-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  z-index: 1;
+}
+
+.title-logo {
+  font-size: clamp(2.5rem, 8vw, 5rem);
+  font-weight: bold;
+  letter-spacing: 6px;
+  color: #ffffff;
+  text-shadow:
+    0 0 20px rgba(255, 255, 255, 0.3),
+    3px 3px 0 #333;
+}
+
+.title-logo-accent {
+  color: #e94560;
+  text-shadow:
+    0 0 20px rgba(233, 69, 96, 0.6),
+    3px 3px 0 #8b0000;
+}
+
+.title-subtitle {
+  font-size: clamp(0.65rem, 2vw, 0.85rem);
+  letter-spacing: 5px;
+  color: #87CEEB;
+  opacity: 0.8;
+}
+
+.btn-new-game {
+  margin-top: 1rem;
+  padding: 0.85rem 2.8rem;
+  font-size: clamp(0.9rem, 2.5vw, 1.1rem);
+  letter-spacing: 4px;
+  background: transparent;
+  color: #ffffff;
+  border: 2px solid #e94560;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+
+.btn-new-game:hover {
+  background: #e94560;
+  color: #ffffff;
+  box-shadow: 0 0 24px rgba(233, 69, 96, 0.5);
+}
+
+.btn-new-game:active {
+  transform: translateY(2px);
+}
+
+.title-footer {
+  position: absolute;
+  bottom: 2rem;
+  font-size: 0.7rem;
+  letter-spacing: 2px;
+  color: #555;
+  animation: blink 1.5s step-end infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}

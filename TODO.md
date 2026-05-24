@@ -133,15 +133,23 @@ Full plan in `FRONTEND_PLAN.md`. Stack: React 18 + Phaser 3 + SignalR, hosted by
 - [ ] React Router: `/` Title · `/select` StarterSelection · `/battle` Battle
 - [ ] SignalR client connects; log received events to console
 
-**Phase 3 – Battle engine output abstraction** ← prerequisite for all visual work
-- [ ] Define `BattleEvent` record hierarchy (`MoveUsed`, `DamageDealt`, `StatusApplied`, etc.)
-- [ ] `IBattleEventEmitter` interface; inject into `Battle`, `AttackAction`, `StatusResolver`
-- [ ] Replace all `Console.WriteLine` with `_emitter.Emit(new TypedEvent(...))`
-- [ ] `ConsoleBattleEventEmitter` preserves console runner; `SignalRBattleEventEmitter` pushes to hub
-- [ ] All 63 tests still pass
+**Phase 3 – Battle engine output abstraction** ✅ DONE
+- [x] Define `BattleEvent` record hierarchy (`MoveUsed`, `DamageDealt`, `StatusApplied`, etc.)
+- [x] `IBattleEventEmitter` interface; inject into `Battle`, `AttackAction`, `StatusResolver`
+- [x] Replace all `Console.WriteLine` with `_emitter.Emit(new TypedEvent(...))`
+- [x] `ConsoleBattleEventEmitter` preserves console runner
+- [x] All 63 tests still pass
 
-**Phase 4 – Title screen**
-- [ ] React component, "New Game" navigates to `/select`
+**Phase 1 – .NET plumbing** ✅ DONE
+- [x] Add `creaturegame.Web` ASP.NET Core project; configure SignalR + CORS
+- [x] Stub `BattleHub`, `SpeciesController` (GET /api/species), `GameController` (POST /api/game/start)
+
+**Phase 2 – React skeleton** ✅ DONE
+- [x] Vite + React + TypeScript in `creaturegame.Web/ClientApp`
+- [x] React Router: `/` Title · `/select` StarterSelection · `/battle` Battle
+- [x] Title screen styled and visible; placeholder screens for select and battle
+
+**Phase 4 – Title screen** ✅ DONE (part of Phase 2 above)
 
 **Phase 5 – Starter selection**
 - [ ] Species grid fetched from API; confirm pick calls POST /api/game/start; navigate to /battle

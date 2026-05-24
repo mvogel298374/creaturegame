@@ -24,3 +24,8 @@ obj/
 # NuGet
 *.nupkg
 packages/
+
+# Node / React
+node_modules/
+dist/
+.vite/
