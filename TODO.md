@@ -154,6 +154,9 @@ Full plan in `FRONTEND_PLAN.md`. Stack: React 18 + Phaser 3 + SignalR, hosted by
 **Phase 5 – Starter selection**
 - [ ] Species grid fetched from API; confirm pick calls POST /api/game/start; navigate to /battle
 
+**Phase 5.5 – SignalR battle emitter**
+- [ ] `SignalRBattleEventEmitter : IBattleEventEmitter` — wraps `IHubContext<BattleHub>`; replaces `ConsoleBattleEventEmitter` in `GameSession`. `ConsoleBattleEventEmitter` kept for unit tests and local debugging.
+
 **Phase 6 – Battle screen shell (React, no Phaser yet)**
 - [ ] `useBattleHub` hook + `useBattleState` reducer (HP, status, moves)
 - [ ] HP bars, move menu (disabled until TurnStarted), text log — full loop works, text-only
