@@ -4,16 +4,21 @@ Guidelines for all `/dev` actions in this project.
 
 ## Technical Stack
 *   **Runtime**: .NET 9.0 (C# 13.0)
-*   **Database**: SQLite (`moves.db`)
-*   **ORM**: Entity Framework Core
-*   **Namespaces**: `creaturegame.*` for core logic, `PokeApiConnector.*` for external data tools.
+*   **Backend**: ASP.NET Core (`creaturegame.Web`) — REST API, SignalR hub, static file server
+*   **Frontend**: Vite + React 18 + TypeScript under `creaturegame.Web/ClientApp/`; SignalR JS client
+*   **Database**: SQLite (`pokemon.db`, `moves.db`)
+*   **ORM**: Entity Framework Core (two contexts: `PokemonDbContext`, `MovesDbContext`)
+*   **Namespaces**: `creaturegame.*` for core logic, `creaturegame.Web.*` for the web host, `PokeApiConnector.*` for the data importer.
 
 ## Architecture
 *   **Entity Framework Core**:
-    *   Use `GameDbContext` for SQLite interaction.
-    *   Models are located in `creaturegame/Attacks`, `creaturegame/Creature`, etc.
+    *   Use `PokemonDbContext` for species data, `MovesDbContext` for move data. There is no single `GameDbContext`.
+    *   Models are located in `creaturegame/Attacks`, `creaturegame/Creature`, `creaturegame/DB`, etc.
     *   Always use `AsNoTracking()` for read-only lookups before upserts.
     *   All DB operations should handle asynchronous execution.
+*   **Generation seams** — any mechanic that varies between Pokémon generations must go behind an interface, never hardcoded:
+    *   `ITypeChart` — type effectiveness matrix.
+    *   `IBattleRules` — stat stage multipliers, accuracy scale, crit formula, sleep duration, freeze thaw, status damage denominators, and any other gen-variable rule. Add new methods here; implement in `Gen1BattleRules`. Never query a generation enum inside battle logic.
 
 ## Coding Conventions
 *   **Primary Constructors**: Use them for DTOs and simple data structures when possible (though keep models EF-compatible).

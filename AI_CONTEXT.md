@@ -40,7 +40,7 @@ You can use the following commands at the start of your message to instantly set
         *   `https://pokeapi.co/api/v2/type/{name|id}` - Damage relations.
 *   **Always check `DESIGN_GUIDES.md` and `DEV_STANDARDS.md` before starting a multi-step task.
 *   If a request is ambiguous, ask whether it should be handled under `/plan` or `/dev`.
-*   Maintain the `identifier.sqlite` and `moves.db` integrity at all times.
+*   Maintain `pokemon.db` and `moves.db` integrity at all times.
 
 ---
 
