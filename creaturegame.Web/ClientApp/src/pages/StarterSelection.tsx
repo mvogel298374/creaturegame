@@ -33,7 +33,7 @@ export function StarterSelection() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ speciesId: selected.id }),
     });
-    nav('/battle');
+    nav('/battle', { state: { species: selected } });
   };
 
   return (

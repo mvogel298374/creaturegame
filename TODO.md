@@ -151,15 +151,21 @@ Full plan in `FRONTEND_PLAN.md`. Stack: React 18 + Phaser 3 + SignalR, hosted by
 
 **Phase 4 – Title screen** ✅ DONE (part of Phase 2 above)
 
-**Phase 5 – Starter selection**
-- [ ] Species grid fetched from API; confirm pick calls POST /api/game/start; navigate to /battle
+**Phase 5 – Starter selection** ✅ DONE
+- [x] Species grid fetched from `/api/species`; type badges; front sprites from `/sprites/front/{id}.png`
+- [x] Confirm pick calls `POST /api/game/start`; navigates to `/battle`
+- [x] 151 front + back sprites downloaded by PokeApiConnector and served as static files
 
 **Phase 5.5 – SignalR battle emitter**
+- [ ] Read ASP.NET Core SignalR docs: `IHubContext<T>` push API, typed client contracts, connection lifetime — fetch before implementing.
 - [ ] `SignalRBattleEventEmitter : IBattleEventEmitter` — wraps `IHubContext<BattleHub>`; replaces `ConsoleBattleEventEmitter` in `GameSession`. `ConsoleBattleEventEmitter` kept for unit tests and local debugging.
 
 **Phase 6 – Battle screen shell (React, no Phaser yet)**
-- [ ] `useBattleHub` hook + `useBattleState` reducer (HP, status, moves)
-- [ ] HP bars, move menu (disabled until TurnStarted), text log — full loop works, text-only
+- [x] Battle field: sky/ground background, diagonal sprite layout (enemy front top-right, player back bottom-left), nameplates with HP bars; player nameplate adds XP bar
+- [x] Action panel: FIGHT (stub) + CHECK POKEMON (shows base stats + type badges); species passed via navigate state from StarterSelection
+- [ ] `useBattleHub` hook + `useBattleState` reducer (HP, status, moves) — wire SignalR; replace mock state
+- [ ] Move menu (shown when FIGHT pressed; disabled until TurnStarted event)
+- [ ] Text log for battle events
 
 **Phase 7 – Phaser canvas**
 - [ ] `BattleCanvas.tsx` mounts Phaser; `BattleScene.ts` loads + positions sprites
@@ -188,6 +194,8 @@ Full plan in `FRONTEND_PLAN.md`. Stack: React 18 + Phaser 3 + SignalR, hosted by
 - [x] Add `README.md` at repo root
 - [x] Remove `Creature.Attack()` direct-damage method — bypasses `DamageCalculator`/type chart and has a naming collision with the `Attack` class; `AttackAction` is the correct path
 - [x] Remove redundant `Attributes.GetCurrentHealth()` call from `IsAlive()` — now reads `Attributes.HP` directly; `IsAlive()` itself retained as a meaningful predicate
+
+- [x] Add `dev.ps1` launcher — starts `dotnet watch run` (port 5100) + `npm run dev` (port 5173) in separate windows from a single command
 
 ### Pending
 - [x] Resolve `Creature` class/namespace name collision — renamed namespace to `creaturegame.Creatures`; all 16 files updated, fully-qualified `Creature.Creature` references eliminated

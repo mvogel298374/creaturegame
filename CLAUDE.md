@@ -17,9 +17,13 @@ The system `dotnet` at `C:\Program Files\dotnet\dotnet.exe` is a runtime-only in
 
 ```powershell
 & "C:\Users\USER\.dotnet\dotnet.exe" build                          # Build all projects
-& "C:\Users\USER\.dotnet\dotnet.exe" run --project creaturegame     # Run the battle simulator
 & "C:\Users\USER\.dotnet\dotnet.exe" run --project PokeApiConnector # Import data from PokeAPI
 & "C:\Users\USER\.dotnet\dotnet.exe" test tests/creaturegame.Tests  # Run all tests
+```
+
+To start the full dev environment (backend + Vite frontend + browser):
+```powershell
+.\dev.ps1   # opens two windows (backend :5100, frontend :5173) then launches the browser
 ```
 
 To run a single test by name:
@@ -36,9 +40,10 @@ $env:DOTNET_ROOT = "C:\Users\USER\.dotnet"; $env:PATH = "C:\Users\USER\.dotnet;C
 
 ## Architecture
 
-Three-project .NET 9 solution:
+Four-project .NET 9 solution:
 
-- **creaturegame** — Core battle simulator (console app). Namespaced `creaturegame.*`.
+- **creaturegame** — Core battle engine **class library** (no entry point). Namespaced `creaturegame.*`. Referenced by `creaturegame.Web` and `creaturegame.Tests`.
+- **creaturegame.Web** — ASP.NET Core host: REST API, SignalR hub, static file server. Hosts a Vite + React + TypeScript frontend under `ClientApp/`. Run via `.\dev.ps1`.
 - **PokeApiConnector** — One-shot data importer that fetches from PokeAPI and writes to SQLite. Namespaced `PokeApiConnector.*`.
 - **tests/creaturegame.Tests** — xUnit unit tests. Tests live under `Unit/` and `Integration/` subdirectories; namespaces must match folder structure.
 

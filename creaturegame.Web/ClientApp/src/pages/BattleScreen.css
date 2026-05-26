@@ -1,0 +1,334 @@
+/* ── Layout ──────────────────────────────────── */
+.battle-screen {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── Battlefield ─────────────────────────────── */
+.battle-field {
+  flex: 0 0 65vh;
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(
+      to bottom,
+      #0d1a33 0%,
+      #1a2e55 52%,
+      #2a3d1a 52%,
+      #1e2e12 100%
+    );
+}
+
+/* Scanline overlay */
+.battle-field::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 3px,
+    rgba(0, 0, 0, 0.06) 3px,
+    rgba(0, 0, 0, 0.06) 4px
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Nameplates ───────────────────────────────── */
+.nameplate {
+  background: var(--clr-bg-deep);
+  border: 2px solid var(--clr-text);
+  padding: var(--sp-xs) var(--sp-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 160px;
+  max-width: 200px;
+  z-index: 1;
+}
+
+.nameplate--enemy {
+  position: absolute;
+  top: var(--sp-md);
+  left: var(--sp-md);
+}
+
+.nameplate--player {
+  position: absolute;
+  bottom: var(--sp-md);
+  right: var(--sp-md);
+}
+
+.nameplate-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-sm);
+}
+
+.nameplate-name {
+  font-size: var(--fs-sm);
+  letter-spacing: var(--ls-normal);
+  font-weight: bold;
+}
+
+.nameplate-level {
+  font-size: var(--fs-xs);
+  color: var(--clr-text-sub);
+  letter-spacing: 0;
+}
+
+/* ── HP / XP bars ────────────────────────────── */
+.hp-row,
+.xp-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.bar-label {
+  font-size: var(--fs-xs);
+  color: var(--clr-text-sub);
+  letter-spacing: 0;
+  min-width: 14px;
+}
+
+.bar-track {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  transition: width 0.4s ease;
+}
+
+.bar-fill--high { background: #44cc44; }
+.bar-fill--mid  { background: #f8c800; }
+.bar-fill--low  { background: #cc3030; }
+.bar-fill--xp   { background: var(--clr-sky); }
+
+.hp-numbers {
+  font-size: var(--fs-xs);
+  color: var(--clr-text);
+  letter-spacing: 0;
+  min-width: 52px;
+  text-align: right;
+}
+
+.hp-sep {
+  color: var(--clr-text-muted);
+  margin: 0 1px;
+}
+
+/* ── Sprites ─────────────────────────────────── */
+
+/*
+  Positions are percentages of the battlefield height so they stay
+  proportional at any viewport size. overflow:hidden on .battle-field
+  clips anything that bleeds outside at very small viewports.
+
+  Enemy anchors to the top-right: container bottom lands near the
+  horizon (~52%), so Charmander appears to stand on the far side.
+
+  Player anchors to the bottom-left: container bottom sits at ~92%,
+  deep in the ground half, back sprite faces the opponent.
+*/
+.sprite-slot--enemy {
+  position: absolute;
+  top: 4%;
+  right: var(--sp-xl);
+  z-index: 1;
+}
+
+.sprite-slot--player {
+  position: absolute;
+  bottom: -4%;
+  left: var(--sp-xl);
+  z-index: 1;
+}
+
+.battle-sprite {
+  /* Sized at ~32% of viewport height — compensates for transparent   */
+  /* padding in Gen 1 sprites; Phaser will handle exact bounds later. */
+  width: clamp(180px, 32vh, 300px);
+  height: clamp(180px, 32vh, 300px);
+  image-rendering: pixelated;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.7));
+}
+
+.battle-sprite--back {
+  width: clamp(220px, 40vh, 380px);
+  height: clamp(220px, 40vh, 380px);
+}
+
+/* ── Battle panel ────────────────────────────── */
+.battle-panel {
+  flex: 1;
+  background: var(--clr-bg-deep);
+  border-top: 3px solid rgba(255, 255, 255, 0.5);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* ── Action menu ─────────────────────────────── */
+.action-menu {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: var(--sp-md) var(--sp-lg);
+  gap: var(--sp-sm);
+}
+
+.action-prompt {
+  font-size: var(--fs-base);
+  letter-spacing: var(--ls-normal);
+  color: var(--clr-text);
+}
+
+.action-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-md);
+  flex: 1;
+}
+
+.action-btn {
+  padding: var(--sp-sm) var(--sp-md);
+  font-family: var(--font);
+  font-size: var(--fs-base);
+  letter-spacing: var(--ls-wide);
+  background: transparent;
+  color: var(--clr-text);
+  border: 2px solid var(--clr-border);
+  cursor: pointer;
+  transition:
+    background var(--transition),
+    border-color var(--transition),
+    box-shadow var(--transition);
+}
+
+.action-btn:hover {
+  border-color: rgba(233, 69, 96, 0.5);
+  background: rgba(233, 69, 96, 0.06);
+}
+
+.action-btn:active {
+  transform: translateY(1px);
+}
+
+.action-btn--fight {
+  border-color: var(--clr-accent);
+  color: var(--clr-accent);
+}
+
+.action-btn--fight:hover {
+  background: rgba(233, 69, 96, 0.12);
+  box-shadow: 0 0 20px var(--clr-accent-glow);
+}
+
+.action-back {
+  align-self: flex-start;
+  margin-top: auto;
+}
+
+/* ── Check panel ─────────────────────────────── */
+.check-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: var(--sp-sm) var(--sp-lg);
+  gap: var(--sp-sm);
+}
+
+.check-header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-md);
+  padding-bottom: var(--sp-sm);
+  border-bottom: 1px solid var(--clr-border);
+}
+
+.check-title {
+  flex: 1;
+  font-size: var(--fs-base);
+  letter-spacing: var(--ls-wide);
+  font-weight: bold;
+}
+
+.check-level {
+  font-size: var(--fs-sm);
+  color: var(--clr-text-sub);
+}
+
+.check-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-sm);
+  flex: 1;
+}
+
+.check-hp-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-md);
+}
+
+.check-hp-value {
+  font-size: var(--fs-sm);
+  letter-spacing: 0;
+  color: var(--clr-text);
+}
+
+.check-base-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.check-stat-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-sm);
+}
+
+.check-stat-label {
+  font-size: var(--fs-xs);
+  color: var(--clr-text-sub);
+  letter-spacing: 0;
+  min-width: 26px;
+}
+
+.check-stat-track {
+  flex: 1;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.check-stat-bar {
+  height: 100%;
+  background: var(--clr-sky);
+  transition: width 0.3s ease;
+}
+
+.check-stat-value {
+  font-size: var(--fs-xs);
+  color: var(--clr-text);
+  min-width: 24px;
+  text-align: right;
+  letter-spacing: 0;
+}
+
+.check-types {
+  display: flex;
+  gap: var(--sp-xs);
+  padding-top: var(--sp-xs);
+}
