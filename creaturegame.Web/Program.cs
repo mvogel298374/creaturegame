@@ -1,9 +1,14 @@
+using System.Text.Json;
+using creaturegame.Web.Battle;
 using creaturegame.Web.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
-builder.Services.AddSignalR();
+builder.Services.AddSignalR()
+    .AddJsonProtocol(opts =>
+        opts.PayloadSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase);
+builder.Services.AddSingleton<GameSessionManager>();
 builder.Services.AddCors(opts => opts.AddDefaultPolicy(policy =>
     policy.WithOrigins("http://localhost:5173")
           .AllowAnyHeader()

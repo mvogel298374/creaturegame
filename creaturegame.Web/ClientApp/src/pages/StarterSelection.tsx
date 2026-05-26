@@ -28,12 +28,13 @@ export function StarterSelection() {
 
   const confirm = async () => {
     if (!selected) return;
-    await fetch('/api/game/start', {
+    const res = await fetch('/api/game/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ speciesId: selected.id }),
     });
-    nav('/battle', { state: { species: selected } });
+    const { gameId } = await res.json() as { gameId: string };
+    nav('/battle', { state: { species: selected, gameId } });
   };
 
   return (

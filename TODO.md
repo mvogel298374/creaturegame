@@ -156,9 +156,14 @@ Full plan in `FRONTEND_PLAN.md`. Stack: React 18 + Phaser 3 + SignalR, hosted by
 - [x] Confirm pick calls `POST /api/game/start`; navigates to `/battle`
 - [x] 151 front + back sprites downloaded by PokeApiConnector and served as static files
 
-**Phase 5.5 – SignalR battle emitter**
-- [ ] Read ASP.NET Core SignalR docs: `IHubContext<T>` push API, typed client contracts, connection lifetime — fetch before implementing.
-- [ ] `SignalRBattleEventEmitter : IBattleEventEmitter` — wraps `IHubContext<BattleHub>`; replaces `ConsoleBattleEventEmitter` in `GameSession`. `ConsoleBattleEventEmitter` kept for unit tests and local debugging.
+**Phase 5.5 – SignalR battle emitter** ✅ DONE
+- [x] `IBattleClient` typed hub interface — `OnBattleEvent(string eventType, object payload)`
+- [x] `SignalRBattleEventEmitter : IBattleEventEmitter` — wraps `IHubContext<BattleHub, IBattleClient>`; maps all BattleEvent subtypes to camelCase JSON payloads; fire-and-forget push
+- [x] `GameSessionManager` singleton — `RegisterSession(player, enemy) → gameId`; `StartBattleAsync(gameId, connectionId)` wires emitter + starts battle on thread-pool
+- [x] `BattleHub` upgraded to `Hub<IBattleClient>`; `OnConnectedAsync` reads `?gameId` query param and starts battle
+- [x] `GameController.Start` builds both creatures from DB (player species + Charmander enemy, 4 random moves each), registers session, returns `{ gameId }`
+- [x] `StarterSelection` forwards `gameId` in navigate state to `/battle`
+- [x] `ConsoleBattleEventEmitter` kept unchanged — used by unit tests and local debug runner
 
 **Phase 6 – Battle screen shell (React, no Phaser yet)**
 - [x] Battle field: sky/ground background, diagonal sprite layout (enemy front top-right, player back bottom-left), nameplates with HP bars; player nameplate adds XP bar
