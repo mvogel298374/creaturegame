@@ -32,42 +32,33 @@
 - [x] End-of-turn: Burn deals 1/16 max HP; Poison deals 1/16 max HP
 - [x] Pseudo-status — Confusion: `Creature.ConfusedTurns` counter; 50% chance to hurt itself each turn (40 base power, typeless); clears when counter expires (2–5 turns, Gen 1)
 
-## Priority 6 – Critical Hits & Stat Stages
-
-These two systems must be built together: Gen 1 crits bypass all stat stage modifiers, so the
-crit path in `DamageCalculator` needs stat stages to already exist in order to correctly ignore them.
+## Priority 6 – Critical Hits & Stat Stages ✅ DONE
 
 **Stat stages:**
-- `StatStages` struct on `Creature` — Attack, Defense, Special, Speed, Accuracy, Evasion each clamped to [-6, +6]; `Clear()` resets all to 0
-- `IBattleRules.GetStatMultiplier(int stage)` → multiplier for stages -6 to +6
-  (Gen 1 & 2 use the same table for battle stats: 2/8 … 2/2 … 8/2; accuracy/evasion differ)
-- `DamageCalculator` applies Attack/Defense/Special stage multipliers via `IBattleRules`
-- `StatusResolver.EffectiveSpeed` folds in the Speed stage multiplier (stacks with Paralysis quartering)
-- `AttackAction` accuracy check applies Accuracy/Evasion stage multipliers via `IBattleRules`
-- Gen 1 accuracy quirk: all moves use a 0–255 scale internally; a roll of 255 always misses
-  (the "1/256 miss bug" — encode in `Gen1BattleRules`)
+- [x] `StatStages` struct on `Creature` — Attack, Defense, Special, Speed, Accuracy, Evasion each clamped to [-6, +6]; `Clear()` + `Raise*()` helpers
+- [x] `IBattleRules.GetStatMultiplier(int stage)` — Gen 1: 2/(2+|n|) for n≤0, (2+n)/2 for n>0 (0.25× at -6, 4× at +6)
+- [x] `IBattleRules.GetAccuracyStageMultiplier(int stage)` — Gen 1: 3/(3+|n|) for n≤0, (3+n)/3 for n>0
+- [x] `IBattleRules.GetHitThreshold` + `AccuracyRollBound` — replaces old `< 100` check in `AttackAction`; Gen 1 0–255 scale
+- [x] `DamageCalculator` applies Attack/Defense/Special stage multipliers via `IBattleRules`
+- [x] `StatusResolver.EffectiveSpeed` folds in Speed stage multiplier (stacks with Paralysis quartering)
+- [x] Gen 1 accuracy: all moves 0–255 scale; roll 255 always misses (1/256 bug encoded in `Gen1BattleRules`)
 
 **Critical hits:**
-- `Attack.IsHighCrit` bool — high-crit moves (Slash, Crabhammer, Karate Chop, Razor Leaf) use a faster formula; import flag from PokeAPI `meta.crit_rate`
-- `IBattleRules.GetCritChance(Creature attacker, Attack move)` → 0.0–1.0
-  - Gen 1 normal: `floor(attacker.BaseSpeed / 2) / 256`
-  - Gen 1 high-crit: `floor(attacker.BaseSpeed / 2) * 8 / 256`, capped at 255/256
-  - Gen 1 uses `BaseSpeed` (unmodified by stages or status), not `Attributes.Speed`
-- `IBattleRules.CritMultiplier` → 2.0 (same across generations)
-- `IBattleRules.CritIgnoresStatStages` → true in Gen 1: crits use raw Attack/Defense/Special — no stage multipliers, no Burn Attack penalty, no Light Screen / Reflect
-- `DamageCalculator` rolls crit after the accuracy check; if crit, applies multiplier and bypasses stat stage mods per `CritIgnoresStatStages`
+- [x] `Attack.IsHighCrit` bool — EF migration added; PokeApiConnector imports `meta.crit_rate > 0`
+- [x] `IBattleRules.GetCritChance` — Gen 1 normal: floor(BaseSpeed/2)/256; high-crit: min(floor(BaseSpeed/2)×8, 255)/256
+- [x] `IBattleRules.CritMultiplier` → 2.0; `CritIgnoresStatStages` → true in Gen 1
+- [x] `DamageCalculator` rolls crit; Gen 1 crit path uses raw Attributes stats — no stages, no Burn penalty
+- [x] `DamageDealt` event carries `IsCrit` flag; console prints "A critical hit!"; SignalR payload includes it
 
-**Tests:**
-- [ ] Stat stage +6 multiplies attack stat by 4× in damage formula
-- [ ] Stat stage -6 halves attack stat (2/8 = 0.25×)
-- [ ] Speed stage applied in turn ordering; stacks with Paralysis quartering
-- [ ] Accuracy stage affects hit rate; Evasion stage affects incoming hit rate
-- [ ] Gen 1 1/256 miss: 100% accurate move with neutral stages misses 1-in-256 rolls
-- [ ] High-crit move has higher crit chance than normal move at same base speed
-- [ ] Crit deals 2× damage
-- [ ] Gen 1: crit ignores attacker's negative Attack stage
-- [ ] Gen 1: crit ignores defender's positive Defense stage
-- [ ] Gen 1: Burn Attack penalty dropped on crit (crit uses raw Attack)
+**Tests (all passing — 78 total):**
+- [x] `GetStatMultiplier_Plus6_Returns4` / `Minus6_Returns0Point25` / `Zero_Returns1`
+- [x] `StatStage_Plus6_AttackDamageHigherThanBase` / `Minus6_AttackDamageLowerThanBase`
+- [x] `SpeedStage_Plus6_IncreasesEffectiveSpeed` / `StacksWithParalysisQuartering`
+- [x] `HitThreshold_100AccuracyNeutralStages_Is255` (1/256 bug verified)
+- [x] `HitThreshold_AccuracyMinus6Stage_ReducesThreshold` / `EvasionPlus6Stage_ReducesThreshold`
+- [x] `CritChance_HighCritMove_IsHigherThanNormal` / `CritMultiplier_Gen1_IsTwo`
+- [x] `Crit_IgnoresAttackersNegativeAttackStage` / `Crit_IgnoresDefendersPositiveDefenseStage`
+- [x] `Crit_Gen1_DropsBurnAttackPenalty`
 
 ## Move Effects Layer (generation-agnostic)
 Move effects that are properties of the move itself rather than generation rules.

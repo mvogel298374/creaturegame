@@ -4,8 +4,14 @@ namespace creaturegame.Combat;
 
 public static class StatusResolver
 {
-    public static int EffectiveSpeed(Creature creature) =>
-        creature.Status == StatusCondition.Paralysis ? creature.Attributes.Speed / 4 : creature.Attributes.Speed;
+    public static int EffectiveSpeed(Creature creature, IBattleRules? rules = null)
+    {
+        var r = rules ?? Gen1BattleRules.Instance;
+        double speed = creature.Attributes.Speed * r.GetStatMultiplier(creature.Stages.Speed);
+        if (creature.Status == StatusCondition.Paralysis)
+            speed /= 4;
+        return (int)speed;
+    }
 
     public static bool CanAct(Creature creature, IBattleRules? rules = null, IBattleEventEmitter? emitter = null)
     {

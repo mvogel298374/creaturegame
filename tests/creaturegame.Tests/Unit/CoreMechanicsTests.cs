@@ -791,4 +791,270 @@ public class CoreMechanicsTests
         Assert.InRange(creature.Attributes.HP, 138, 153);
         Assert.True(creature.Attributes.Attack > 0);
     }
+
+    // ── Stat Stage Multiplier Tests ──────────────────────────────────────────
+
+    [Fact]
+    public void GetStatMultiplier_Plus6_Returns4()
+    {
+        Assert.Equal(4.0, Gen1BattleRules.Instance.GetStatMultiplier(6));
+    }
+
+    [Fact]
+    public void GetStatMultiplier_Minus6_Returns0Point25()
+    {
+        Assert.Equal(0.25, Gen1BattleRules.Instance.GetStatMultiplier(-6));
+    }
+
+    [Fact]
+    public void GetStatMultiplier_Zero_Returns1()
+    {
+        Assert.Equal(1.0, Gen1BattleRules.Instance.GetStatMultiplier(0));
+    }
+
+    [Fact]
+    public void StatStage_Plus6_AttackDamageHigherThanBase()
+    {
+        var attacker = new Creature("Attacker") { Level = 50 };
+        attacker.CalculateStats();
+        attacker.Attributes.Attack = 100;
+
+        var defender = new Creature("Defender") { Level = 50 };
+        defender.CalculateStats();
+        defender.Attributes.Defense = 100;
+
+        var move = new Attack { Name = "Tackle", BaseDamage = 40, AttackType = AttackType.Physical };
+
+        // Stage 0: baseline range; Stage +6: attack multiplied 4×.
+        // +6 minimum (4 × 217/255 ≈ 3.4×) is always above stage-0 maximum (1×),
+        // so the assertion holds for all random rolls.
+        int stage0 = DamageCalculator.CalculateDamage(attacker, defender, move, new Gen1TypeChart());
+
+        var stages = attacker.Stages;
+        stages.RaiseAttack(6);
+        attacker.Stages = stages;
+        int stage6 = DamageCalculator.CalculateDamage(attacker, defender, move, new Gen1TypeChart());
+
+        Assert.True(stage6 > stage0 * 2,
+            $"Stage +6 ({stage6}) should be substantially higher than stage 0 ({stage0})");
+    }
+
+    [Fact]
+    public void StatStage_Minus6_AttackDamageLowerThanBase()
+    {
+        var attacker = new Creature("Attacker") { Level = 50 };
+        attacker.CalculateStats();
+        attacker.Attributes.Attack = 100;
+
+        var defender = new Creature("Defender") { Level = 50 };
+        defender.CalculateStats();
+        defender.Attributes.Defense = 50;
+
+        var move = new Attack { Name = "Tackle", BaseDamage = 80, AttackType = AttackType.Physical };
+
+        int stage0 = DamageCalculator.CalculateDamage(attacker, defender, move, new Gen1TypeChart());
+
+        var stages = attacker.Stages;
+        stages.RaiseAttack(-6);
+        attacker.Stages = stages;
+        int stageM6 = DamageCalculator.CalculateDamage(attacker, defender, move, new Gen1TypeChart());
+
+        // Stage-0 minimum (217/255 ≈ 0.85×) is always above stage-(-6) maximum (0.25×).
+        Assert.True(stageM6 < stage0,
+            $"Stage -6 ({stageM6}) should be lower than stage 0 ({stage0})");
+    }
+
+    // ── Speed Stage + Paralysis Tests ────────────────────────────────────────
+
+    [Fact]
+    public void SpeedStage_Plus6_IncreasesEffectiveSpeed()
+    {
+        var creature = new Creature("Pikachu") { Level = 50 };
+        creature.CalculateStats();
+        creature.Attributes.Speed = 100;
+
+        int baseSpeed = StatusResolver.EffectiveSpeed(creature, Gen1BattleRules.Instance);
+
+        var stages = creature.Stages;
+        stages.RaiseSpeed(6);
+        creature.Stages = stages;
+        int boostedSpeed = StatusResolver.EffectiveSpeed(creature, Gen1BattleRules.Instance);
+
+        Assert.Equal(400, boostedSpeed); // 100 × 4.0
+    }
+
+    [Fact]
+    public void SpeedStage_StacksWithParalysisQuartering()
+    {
+        // Paralysis quarters; Speed +6 gives 4×. Net = 1×, so effective speed ≈ base.
+        var creature = new Creature("Pikachu") { Level = 50, Status = StatusCondition.Paralysis };
+        creature.CalculateStats();
+        creature.Attributes.Speed = 100;
+
+        var stages = creature.Stages;
+        stages.RaiseSpeed(6);
+        creature.Stages = stages;
+
+        int effective = StatusResolver.EffectiveSpeed(creature, Gen1BattleRules.Instance);
+
+        Assert.Equal(100, effective); // 100 × 4.0 / 4 = 100
+    }
+
+    // ── Accuracy Stage / Hit Threshold Tests ─────────────────────────────────
+
+    [Fact]
+    public void HitThreshold_100AccuracyNeutralStages_Is255()
+    {
+        // 100% accuracy on Gen 1 0-255 scale → threshold 255 → roll 255 always misses (1/256 bug).
+        int threshold = Gen1BattleRules.Instance.GetHitThreshold(100, 0, 0);
+        Assert.Equal(255, threshold);
+    }
+
+    [Fact]
+    public void HitThreshold_AccuracyMinus6Stage_ReducesThreshold()
+    {
+        // Accuracy stage -6 → multiplier 3/9 = 0.333×; threshold reduces significantly.
+        int neutral = Gen1BattleRules.Instance.GetHitThreshold(90, 0, 0);
+        int negative = Gen1BattleRules.Instance.GetHitThreshold(90, -6, 0);
+        Assert.True(negative < neutral,
+            $"Negative acc stage threshold ({negative}) should be below neutral ({neutral})");
+    }
+
+    [Fact]
+    public void HitThreshold_EvasionPlus6Stage_ReducesThreshold()
+    {
+        // Defender evasion +6 → multiplier 9/3 = 3×; divides threshold, making miss more likely.
+        int neutral  = Gen1BattleRules.Instance.GetHitThreshold(90, 0, 0);
+        int highEvade = Gen1BattleRules.Instance.GetHitThreshold(90, 0, 6);
+        Assert.True(highEvade < neutral,
+            $"High evasion threshold ({highEvade}) should be below neutral ({neutral})");
+    }
+
+    // ── Critical Hit Tests ───────────────────────────────────────────────────
+
+    [Fact]
+    public void CritChance_HighCritMove_IsHigherThanNormal()
+    {
+        var creature = new Creature("Sandslash") { BaseSpeed = 65 };
+        var normalMove   = new Attack { Name = "Tackle",    IsHighCrit = false };
+        var highCritMove = new Attack { Name = "Slash",     IsHighCrit = true  };
+
+        double normal   = Gen1BattleRules.Instance.GetCritChance(creature, normalMove);
+        double highCrit = Gen1BattleRules.Instance.GetCritChance(creature, highCritMove);
+
+        Assert.True(highCrit > normal,
+            $"High-crit chance ({highCrit:P2}) should exceed normal ({normal:P2})");
+    }
+
+    [Fact]
+    public void CritMultiplier_Gen1_IsTwo()
+    {
+        Assert.Equal(2.0, Gen1BattleRules.Instance.CritMultiplier);
+    }
+
+    [Fact]
+    public void Crit_IgnoresAttackersNegativeAttackStage()
+    {
+        // With Gen 1 crits, a -6 Attack stage is ignored — crit uses raw Attributes.Attack.
+        var attacker = new Creature("Attacker") { Level = 50 };
+        attacker.CalculateStats();
+        attacker.Attributes.Attack = 100;
+
+        var defender = new Creature("Defender") { Level = 50 };
+        defender.CalculateStats();
+        defender.Attributes.Defense = 50;
+
+        var move = new Attack { Name = "Slash", BaseDamage = 70, AttackType = AttackType.Physical };
+
+        int normalCrit = DamageCalculator.CalculateDamage(attacker, defender, move, new Gen1TypeChart(),
+            AlwaysCritRules.Instance, out _);
+
+        var stages = attacker.Stages;
+        stages.RaiseAttack(-6);
+        attacker.Stages = stages;
+
+        int penalisedCrit = DamageCalculator.CalculateDamage(attacker, defender, move, new Gen1TypeChart(),
+            AlwaysCritRules.Instance, out _);
+
+        // Gen 1: crit bypasses the -6 stage penalty → damage is unchanged.
+        Assert.Equal(normalCrit, penalisedCrit);
+    }
+
+    [Fact]
+    public void Crit_IgnoresDefendersPositiveDefenseStage()
+    {
+        var attacker = new Creature("Attacker") { Level = 50 };
+        attacker.CalculateStats();
+        attacker.Attributes.Attack = 100;
+
+        var defender = new Creature("Defender") { Level = 50 };
+        defender.CalculateStats();
+        defender.Attributes.Defense = 50;
+
+        var move = new Attack { Name = "Slash", BaseDamage = 70, AttackType = AttackType.Physical };
+
+        int normalCrit = DamageCalculator.CalculateDamage(attacker, defender, move, new Gen1TypeChart(),
+            AlwaysCritRules.Instance, out _);
+
+        var stages = defender.Stages;
+        stages.RaiseDefense(6);
+        defender.Stages = stages;
+
+        int boostedDefCrit = DamageCalculator.CalculateDamage(attacker, defender, move, new Gen1TypeChart(),
+            AlwaysCritRules.Instance, out _);
+
+        // Gen 1: crit bypasses defender's +6 Defense boost → damage is unchanged.
+        Assert.Equal(normalCrit, boostedDefCrit);
+    }
+
+    [Fact]
+    public void Crit_Gen1_DropsBurnAttackPenalty()
+    {
+        var attacker = new Creature("Attacker") { Level = 50 };
+        attacker.CalculateStats();
+        attacker.Attributes.Attack = 100;
+
+        var defender = new Creature("Defender") { Level = 50 };
+        defender.CalculateStats();
+        defender.Attributes.Defense = 50;
+
+        var move = new Attack { Name = "Slash", BaseDamage = 70, AttackType = AttackType.Physical };
+
+        int cleanCrit = DamageCalculator.CalculateDamage(attacker, defender, move, new Gen1TypeChart(),
+            AlwaysCritRules.Instance, out _);
+
+        attacker.Status = StatusCondition.Burn;
+        int burnedCrit = DamageCalculator.CalculateDamage(attacker, defender, move, new Gen1TypeChart(),
+            AlwaysCritRules.Instance, out _);
+
+        // Gen 1: crit ignores Burn penalty → burned and clean deal the same damage.
+        Assert.Equal(cleanCrit, burnedCrit);
+    }
+
+    // ── Test helpers ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Deterministic battle rules for crit tests: always crits, no damage variance.
+    /// All other mechanics delegate to Gen1BattleRules.
+    /// </summary>
+    private sealed class AlwaysCritRules : IBattleRules
+    {
+        public static readonly AlwaysCritRules Instance = new();
+        private AlwaysCritRules() { }
+
+        public bool   CanThawFrozenTarget(Attack move)                    => Gen1BattleRules.Instance.CanThawFrozenTarget(move);
+        public int    FreezeRandomThawPercent                             => Gen1BattleRules.Instance.FreezeRandomThawPercent;
+        public double RollDamageVariance()                                => 1.0;
+        public int    RollSleepTurns()                                    => Gen1BattleRules.Instance.RollSleepTurns();
+        public int    CalculateStruggleRecoil(Creature s, int d)          => Gen1BattleRules.Instance.CalculateStruggleRecoil(s, d);
+        public int    BurnDamageDenominator                               => Gen1BattleRules.Instance.BurnDamageDenominator;
+        public int    PoisonDamageDenominator                             => Gen1BattleRules.Instance.PoisonDamageDenominator;
+        public double GetStatMultiplier(int stage)                        => Gen1BattleRules.Instance.GetStatMultiplier(stage);
+        public double GetAccuracyStageMultiplier(int stage)               => Gen1BattleRules.Instance.GetAccuracyStageMultiplier(stage);
+        public int    GetHitThreshold(int acc, int accStage, int evaStage) => Gen1BattleRules.Instance.GetHitThreshold(acc, accStage, evaStage);
+        public int    AccuracyRollBound                                   => Gen1BattleRules.Instance.AccuracyRollBound;
+        public double GetCritChance(Creature a, Attack m)                 => 1.0;
+        public double CritMultiplier                                      => Gen1BattleRules.Instance.CritMultiplier;
+        public bool   CritIgnoresStatStages                               => Gen1BattleRules.Instance.CritIgnoresStatStages;
+    }
 }

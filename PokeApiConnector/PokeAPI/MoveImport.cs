@@ -131,6 +131,8 @@ public class MoveImport
         if (attack.StatusEffect != StatusCondition.None && pokeMove.Meta?.AilmentChance > 0)
             attack.EffectChance = pokeMove.Meta.AilmentChance;
 
+        attack.IsHighCrit = pokeMove.Meta?.CritRate > 0;
+
         return attack;
     }
 }

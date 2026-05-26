@@ -66,5 +66,8 @@ public class MoveMeta
 
     [JsonPropertyName("ailment_chance")]
     public int AilmentChance { get; set; }
+
+    [JsonPropertyName("crit_rate")]
+    public int CritRate { get; set; }
 }
 

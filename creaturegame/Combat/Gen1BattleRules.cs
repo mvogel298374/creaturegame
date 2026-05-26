@@ -28,4 +28,52 @@ public sealed class Gen1BattleRules : IBattleRules
     // Gen 1–5: Burn and Poison each deal 1/16 max HP per turn.
     public int BurnDamageDenominator   => 16;
     public int PoisonDamageDenominator => 16;
+
+    // ── Stat stages ────────────────────────────────────────────────────────────
+
+    // Gen 1/2 battle-stat table: 2/(2+|n|) for n≤0, (2+n)/2 for n>0.
+    // Yields 0.25× at -6, 1.0× at 0, 4.0× at +6.
+    public double GetStatMultiplier(int stage)
+    {
+        stage = Math.Clamp(stage, -6, 6);
+        return stage <= 0 ? 2.0 / (2 - stage) : (2.0 + stage) / 2.0;
+    }
+
+    // Gen 1 accuracy/evasion table: 3/(3+|n|) for n≤0, (3+n)/3 for n>0.
+    // Yields 0.333× at -6, 1.0× at 0, 3.0× at +6.
+    public double GetAccuracyStageMultiplier(int stage)
+    {
+        stage = Math.Clamp(stage, -6, 6);
+        return stage <= 0 ? 3.0 / (3 - stage) : (3.0 + stage) / 3.0;
+    }
+
+    // Gen 1: convert accuracy % to 0-255 scale, apply stage multipliers.
+    // A roll of 255 always misses (1/256 bug) because the threshold caps at 255.
+    public int GetHitThreshold(int accuracyPercent, int attackerAccStage, int defenderEvaStage)
+    {
+        int threshold = (int)Math.Floor(accuracyPercent * 255.0 / 100.0);
+        double accMult = GetAccuracyStageMultiplier(attackerAccStage);
+        double evaMult = GetAccuracyStageMultiplier(defenderEvaStage);
+        return Math.Clamp((int)Math.Floor(threshold * accMult / evaMult), 0, 255);
+    }
+
+    // Gen 1: roll 0-255; roll >= threshold → miss. Roll 255 always misses for 100%-acc moves.
+    public int AccuracyRollBound => 256;
+
+    // ── Critical hits ──────────────────────────────────────────────────────────
+
+    // Gen 1: normal = floor(BaseSpeed/2)/256; high-crit = min(floor(BaseSpeed/2)*8, 255)/256.
+    // BaseSpeed is the raw unmodified base speed stat.
+    public double GetCritChance(Creature attacker, Attack move)
+    {
+        double numerator = Math.Floor(attacker.BaseSpeed / 2.0);
+        if (move.IsHighCrit)
+            numerator = Math.Min(numerator * 8, 255);
+        return numerator / 256.0;
+    }
+
+    public double CritMultiplier => 2.0;
+
+    // Gen 1: crits use raw computed stats, bypassing stages and the Burn Attack penalty.
+    public bool CritIgnoresStatStages => true;
 }

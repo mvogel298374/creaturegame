@@ -17,6 +17,7 @@ public class Attack
     public int Priority { get; set; } = 0;
     public int? EffectChance { get; set; }
     public StatusCondition StatusEffect { get; set; } = StatusCondition.None;
+    public bool IsHighCrit { get; set; } = false;
     
     public Attack()
     {

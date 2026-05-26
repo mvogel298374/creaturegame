@@ -23,7 +23,7 @@ public record BattleEnded(string WinnerName) : BattleEvent;
 // --- Move actions ---
 public record MoveUsed(string AttackerName, string MoveName) : BattleEvent;
 public record MoveMissed(string AttackerName, string MoveName) : BattleEvent;
-public record DamageDealt(string TargetName, int Damage, double TypeEffectiveness, int HpAfter, int HpMax) : BattleEvent;
+public record DamageDealt(string TargetName, int Damage, double TypeEffectiveness, int HpAfter, int HpMax, bool IsCrit = false) : BattleEvent;
 public record RecoilDamage(string SourceName, int Damage, int HpAfter) : BattleEvent;
 
 // --- Status conditions ---

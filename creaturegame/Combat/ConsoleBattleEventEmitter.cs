@@ -44,6 +44,7 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                     Console.WriteLine($"It doesn't affect {e.TargetName}...");
                     break;
                 }
+                if (e.IsCrit) Console.WriteLine("A critical hit!");
                 Console.WriteLine($"{e.TargetName} took {e.Damage} damage!");
                 if (e.TypeEffectiveness >= 2.0)
                     Console.WriteLine("It's super effective!");

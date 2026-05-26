@@ -49,4 +49,56 @@ public interface IBattleRules
     /// Gen 1–5: 16. Gen 6+: 8.
     /// </summary>
     int PoisonDamageDenominator { get; }
+
+    // ── Stat stages ────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns the damage-stat multiplier for a stage in [-6, +6].
+    /// Gen 1/2: stage≤0 → 2/(2+|stage|); stage>0 → (2+stage)/2.
+    /// (Ranges from 0.25× at -6 to 4.0× at +6.)
+    /// </summary>
+    double GetStatMultiplier(int stage);
+
+    /// <summary>
+    /// Returns the accuracy/evasion multiplier for a stage in [-6, +6].
+    /// Gen 1: stage≤0 → 3/(3+|stage|); stage>0 → (3+stage)/3.
+    /// (Ranges from 0.333× at -6 to 3.0× at +6.)
+    /// </summary>
+    double GetAccuracyStageMultiplier(int stage);
+
+    /// <summary>
+    /// Converts a move's accuracy % and the combatants' accuracy/evasion stages
+    /// to an internal hit threshold on the [0, AccuracyRollBound) scale.
+    /// Roll Random.Next(AccuracyRollBound) and miss if roll >= threshold.
+    /// </summary>
+    int GetHitThreshold(int accuracyPercent, int attackerAccStage, int defenderEvaStage);
+
+    /// <summary>
+    /// Exclusive upper bound for the accuracy roll.
+    /// Gen 1: 256 (roll 0–255; a roll of 255 always misses — the 1/256 bug).
+    /// Gen 2+: 101 (roll 0–100).
+    /// </summary>
+    int AccuracyRollBound { get; }
+
+    // ── Critical hits ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns the critical-hit probability (0.0–1.0) for one attack.
+    /// Gen 1 normal:   floor(attacker.BaseSpeed / 2) / 256.
+    /// Gen 1 high-crit: min(floor(attacker.BaseSpeed / 2) * 8, 255) / 256.
+    /// Gen 1 uses BaseSpeed (unmodified by stages or status).
+    /// </summary>
+    double GetCritChance(Creature attacker, Attack move);
+
+    /// <summary>
+    /// Critical hit damage multiplier. Gen 1–5: 2.0. Gen 6+: 1.5.
+    /// </summary>
+    double CritMultiplier { get; }
+
+    /// <summary>
+    /// Whether crits bypass all stat stage modifiers and the Burn Attack penalty.
+    /// True in Gen 1: crits use computed Attack/Defense/Special directly (no stages, no Burn).
+    /// False in Gen 2+.
+    /// </summary>
+    bool CritIgnoresStatStages { get; }
 }

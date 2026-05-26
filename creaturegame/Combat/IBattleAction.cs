@@ -47,12 +47,16 @@ public class AttackAction : IBattleAction
 
         _emitter?.Emit(new MoveUsed(Source.Name, attackToUse.Name ?? ""));
 
-        // Accuracy check (Struggle always hits)
-        if (!usingStruggle && attackToUse.Accuracy < 100
-            && Random.Shared.Next(1, 101) > attackToUse.Accuracy)
+        // Accuracy check — Struggle always hits; all other moves use the Gen 1 0–255 scale.
+        if (!usingStruggle)
         {
-            _emitter?.Emit(new MoveMissed(Source.Name, attackToUse.Name ?? ""));
-            return Task.CompletedTask;
+            int threshold = _rules.GetHitThreshold(
+                attackToUse.Accuracy, Source.Stages.Accuracy, Target.Stages.Evasion);
+            if (Random.Shared.Next(_rules.AccuracyRollBound) >= threshold)
+            {
+                _emitter?.Emit(new MoveMissed(Source.Name, attackToUse.Name ?? ""));
+                return Task.CompletedTask;
+            }
         }
 
         // Thaw a frozen target if the move meets the generation's thaw criteria
@@ -66,9 +70,9 @@ public class AttackAction : IBattleAction
         if (attackToUse.BaseDamage > 0)
         {
             double effectiveness = DamageCalculator.GetTypeEffectiveness(attackToUse.DamageType, Target.Type1, Target.Type2, _typeChart);
-            damage = DamageCalculator.CalculateDamage(Source, Target, attackToUse, _typeChart, _rules);
+            damage = DamageCalculator.CalculateDamage(Source, Target, attackToUse, _typeChart, _rules, out bool isCrit);
             Target.Attributes.ReceiveDamage(damage);
-            _emitter?.Emit(new DamageDealt(Target.Name, damage, effectiveness, Target.Attributes.HP, Target.Attributes.MaxHP));
+            _emitter?.Emit(new DamageDealt(Target.Name, damage, effectiveness, Target.Attributes.HP, Target.Attributes.MaxHP, isCrit));
         }
 
         if (usingStruggle)

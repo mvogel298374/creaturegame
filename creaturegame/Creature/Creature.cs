@@ -98,6 +98,9 @@ public class Creature
     public int SleepTurns { get; set; } = 0;
     public int ConfusedTurns { get; set; } = 0;
 
+    // Stat stages (reset each battle; [-6, +6] per stat)
+    public StatStages Stages { get; set; } = new StatStages();
+
     private bool _statsInitialized;
 
     private Creature()

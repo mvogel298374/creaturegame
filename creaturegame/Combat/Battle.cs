@@ -74,7 +74,7 @@ public class Battle
 
             turnQueue = turnQueue
                 .OrderByDescending(a => a.Priority)
-                .ThenByDescending(a => StatusResolver.EffectiveSpeed(a.Source))
+                .ThenByDescending(a => StatusResolver.EffectiveSpeed(a.Source, _rules))
                 .ThenBy(_ => Random.Shared.Next())
                 .ToList();
 
