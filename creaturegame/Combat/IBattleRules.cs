@@ -80,6 +80,18 @@ public interface IBattleRules
     /// </summary>
     int AccuracyRollBound { get; }
 
+    /// <summary>
+    /// Returns the number of turns a binding move traps the target.
+    /// Gen 1: 2–5 turns.
+    /// </summary>
+    int RollBindingTurns();
+
+    /// <summary>
+    /// Divisor applied to max HP for end-of-turn binding damage (e.g. 16 → 1/16 max HP).
+    /// Gen 1–5: 16.
+    /// </summary>
+    int BindingDamageDenominator { get; }
+
     // ── Critical hits ──────────────────────────────────────────────────────────
 
     /// <summary>

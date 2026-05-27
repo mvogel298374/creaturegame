@@ -39,28 +39,70 @@ public class AttackAction : IBattleAction
     {
         if (!Source.IsAlive()) return Task.CompletedTask;
 
+        // Recharge: skip this turn and clear the flag (Hyper Beam, etc.)
+        if (Source.IsRecharging)
+        {
+            Source.IsRecharging = false;
+            _emitter?.Emit(new Recharging(Source.Name));
+            return Task.CompletedTask;
+        }
+
         bool usingStruggle = _selectedMove == null;
         Attack attackToUse = usingStruggle ? Source.Struggle : _selectedMove!.Base;
 
-        if (!usingStruggle)
+        // Two-turn move: release turn is when IsTwoTurnCharging was set by the charge turn
+        bool isTwoTurn     = !usingStruggle && attackToUse.Effect == MoveEffect.TwoTurn;
+        bool isReleaseTurn = isTwoTurn && Source.IsTwoTurnCharging;
+
+        // PP decremented on charge turn only (already consumed; don't double-spend)
+        if (!usingStruggle && !isReleaseTurn)
             _selectedMove!.PowerPointsCurrent--;
+
+        // Charge phase: wind up and defer damage to the next turn
+        if (isTwoTurn && !isReleaseTurn)
+        {
+            Source.IsTwoTurnCharging = true;
+            Source.ChargingMove      = _selectedMove;
+            _emitter?.Emit(new ChargingUp(Source.Name, attackToUse.Name ?? ""));
+            return Task.CompletedTask;
+        }
+
+        // Clear two-turn state on the release turn
+        if (isReleaseTurn)
+        {
+            Source.IsTwoTurnCharging = false;
+            Source.ChargingMove      = null;
+        }
 
         _emitter?.Emit(new MoveUsed(Source.Name, attackToUse.Name ?? ""));
 
-        // Accuracy check — Struggle always hits; all other moves use the Gen 1 0–255 scale.
-        if (!usingStruggle)
+        var category = usingStruggle ? DamageCategory.Standard : attackToUse.DamageCategory;
+
+        // OHKO: fails (not just misses) when source level < target level (Gen 1 rule)
+        if (category == DamageCategory.OHKO && Source.Level < Target.Level)
+        {
+            _emitter?.Emit(new MoveMissed(Source.Name, attackToUse.Name ?? ""));
+            return Task.CompletedTask;
+        }
+
+        // Accuracy check — Struggle and NeverMisses moves always hit
+        if (!usingStruggle && !attackToUse.NeverMisses)
         {
             int threshold = _rules.GetHitThreshold(
                 attackToUse.Accuracy, Source.Stages.Accuracy, Target.Stages.Evasion);
             if (Random.Shared.Next(_rules.AccuracyRollBound) >= threshold)
             {
                 _emitter?.Emit(new MoveMissed(Source.Name, attackToUse.Name ?? ""));
+
+                // Gen 1: Self-Destruct user faints even on miss
+                if (category == DamageCategory.SelfDestruct)
+                    Source.Attributes.ReceiveDamage(Source.Attributes.HP);
+
                 return Task.CompletedTask;
             }
         }
 
-        // Thaw a frozen target if the move meets the generation's thaw criteria.
-        // A just-thawed target cannot receive a new status from the same move.
+        // Thaw a frozen target if the move meets the generation's thaw criteria
         bool justThawed = false;
         if (Target.Status == StatusCondition.Freeze && _rules.CanThawFrozenTarget(attackToUse))
         {
@@ -69,15 +111,91 @@ public class AttackAction : IBattleAction
             justThawed = true;
         }
 
-        int damage = 0;
-        if (attackToUse.BaseDamage > 0)
+        // Damage calculation by category
+        int  damage = 0;
+        bool isCrit = false;
+
+        switch (category)
         {
-            double effectiveness = DamageCalculator.GetTypeEffectiveness(attackToUse.DamageType, Target.Type1, Target.Type2, _typeChart);
-            damage = DamageCalculator.CalculateDamage(Source, Target, attackToUse, _typeChart, _rules, out bool isCrit);
-            Target.Attributes.ReceiveDamage(damage);
-            _emitter?.Emit(new DamageDealt(Target.Name, damage, effectiveness, Target.Attributes.HP, Target.Attributes.MaxHP, isCrit));
+            case DamageCategory.Standard:
+            case DamageCategory.Drain:
+            {
+                if (usingStruggle || attackToUse.BaseDamage > 0)
+                {
+                    double eff = DamageCalculator.GetTypeEffectiveness(
+                        attackToUse.DamageType, Target.Type1, Target.Type2, _typeChart);
+                    damage = DamageCalculator.CalculateDamage(
+                        Source, Target, attackToUse, _typeChart, _rules, out isCrit);
+                    Target.Attributes.ReceiveDamage(damage);
+                    _emitter?.Emit(new DamageDealt(Target.Name, damage, eff,
+                        Target.Attributes.HP, Target.Attributes.MaxHP, isCrit));
+
+                    if (category == DamageCategory.Drain && damage > 0)
+                    {
+                        int heal = Math.Max(1, damage * attackToUse.DrainPercent / 100);
+                        Source.Attributes.ReceiveHealing(heal);
+                        _emitter?.Emit(new DrainHealed(Source.Name, heal, Source.Attributes.HP));
+                    }
+                }
+                break;
+            }
+
+            case DamageCategory.Fixed:
+                damage = attackToUse.FixedDamageValue ?? 1;
+                Target.Attributes.ReceiveDamage(damage);
+                _emitter?.Emit(new DamageDealt(Target.Name, damage, 1.0,
+                    Target.Attributes.HP, Target.Attributes.MaxHP));
+                break;
+
+            case DamageCategory.LevelBased:
+                damage = DamageCalculator.CalculateLevelBasedDamage(Source);
+                Target.Attributes.ReceiveDamage(damage);
+                _emitter?.Emit(new DamageDealt(Target.Name, damage, 1.0,
+                    Target.Attributes.HP, Target.Attributes.MaxHP));
+                break;
+
+            case DamageCategory.OHKO:
+                damage = Target.Attributes.HP;
+                Target.Attributes.ReceiveDamage(damage);
+                _emitter?.Emit(new DamageDealt(Target.Name, damage, 1.0,
+                    Target.Attributes.HP, Target.Attributes.MaxHP));
+                break;
+
+            case DamageCategory.SelfDestruct:
+            {
+                // Gen 1: target's Defense (and Special) is halved before damage calculation,
+                // then restored — this makes Explosion/Self-Destruct significantly stronger.
+                int savedDefense = Target.Attributes.Defense;
+                int savedSpecial = Target.Attributes.Special;
+                Target.Attributes.Defense = Math.Max(1, Target.Attributes.Defense / 2);
+                Target.Attributes.Special = Math.Max(1, Target.Attributes.Special / 2);
+
+                double eff = DamageCalculator.GetTypeEffectiveness(
+                    attackToUse.DamageType, Target.Type1, Target.Type2, _typeChart);
+                damage = DamageCalculator.CalculateDamage(
+                    Source, Target, attackToUse, _typeChart, _rules, out isCrit);
+
+                Target.Attributes.Defense = savedDefense;
+                Target.Attributes.Special = savedSpecial;
+
+                Target.Attributes.ReceiveDamage(damage);
+                _emitter?.Emit(new DamageDealt(Target.Name, damage, eff,
+                    Target.Attributes.HP, Target.Attributes.MaxHP, isCrit));
+
+                // User faints unconditionally (already handled miss → faint above)
+                Source.Attributes.ReceiveDamage(Source.Attributes.HP);
+                break;
+            }
+
+            case DamageCategory.SuperFang:
+                damage = DamageCalculator.CalculateSuperFangDamage(Target);
+                Target.Attributes.ReceiveDamage(damage);
+                _emitter?.Emit(new DamageDealt(Target.Name, damage, 1.0,
+                    Target.Attributes.HP, Target.Attributes.MaxHP));
+                break;
         }
 
+        // Struggle recoil
         if (usingStruggle)
         {
             int recoil = _rules.CalculateStruggleRecoil(Source, damage);
@@ -85,11 +203,15 @@ public class AttackAction : IBattleAction
             _emitter?.Emit(new RecoilDamage(Source.Name, recoil, Source.Attributes.HP));
         }
 
+        // Recharge next turn (Hyper Beam): only set when the move actually dealt damage
+        if (!usingStruggle && attackToUse.Effect == MoveEffect.Recharge && damage > 0)
+            Source.IsRecharging = true;
+
         if (!justThawed)
             TryApplyStatus(attackToUse);
 
         TryApplyStatEffect(attackToUse);
-        TryApplyHaze(attackToUse);
+        TryApplyMoveEffect(attackToUse, damage);
 
         return Task.CompletedTask;
     }
@@ -124,12 +246,41 @@ public class AttackAction : IBattleAction
         _emitter?.Emit(new StatStageChanged(affected.Name, se.Stat.ToString(), se.Delta, newStage));
     }
 
-    private void TryApplyHaze(Attack attack)
+    private void TryApplyMoveEffect(Attack attack, int damage)
     {
-        if (attack.Effect != MoveEffect.Haze) return;
-        Source.ResetBattleState();
-        Target.ResetBattleState();
-        _emitter?.Emit(new HazeClearedStages());
+        switch (attack.Effect)
+        {
+            case MoveEffect.Haze:
+                Source.ResetBattleState();
+                Target.ResetBattleState();
+                _emitter?.Emit(new HazeClearedStages());
+                break;
+
+            case MoveEffect.Flinch:
+                if (Target.IsAlive())
+                {
+                    int chance = attack.EffectChance ?? 100;
+                    if (Random.Shared.Next(1, 101) <= chance)
+                        Target.IsFlinched = true;
+                }
+                break;
+
+            case MoveEffect.LeechSeed:
+                if (!Target.HasLeechSeed && Target.IsAlive())
+                {
+                    Target.HasLeechSeed = true;
+                    _emitter?.Emit(new LeechSeedApplied(Target.Name));
+                }
+                break;
+
+            case MoveEffect.Binding:
+                if (Target.BindingTurnsRemaining == 0 && damage > 0 && Target.IsAlive())
+                {
+                    Target.BindingTurnsRemaining = _rules.RollBindingTurns();
+                    _emitter?.Emit(new BindingStarted(Target.Name, attack.Name ?? ""));
+                }
+                break;
+        }
     }
 
     private static int ApplyStageChange(Creature creature, StageStat stat, int delta) => stat switch

@@ -64,6 +64,59 @@
 
 ---
 
+## Move Execution Completeness ✅ DONE
+
+**DamageCategory on Attack (new enum + columns):**
+- [x] `DamageCategory` enum: `Standard`, `Fixed`, `LevelBased`, `Drain`, `OHKO`, `SelfDestruct`, `SuperFang`
+- [x] `Attack.DamageCategory` (default `Standard`); `Attack.FixedDamageValue` (nullable int); `Attack.DrainPercent` (int, default 50); `Attack.NeverMisses` (bool); EF migration `AddDamageCategoryAndMoveFlags`
+
+**MoveEffect additions:**
+- [x] `MoveEffect.Recharge` — sets `Source.IsRecharging` after damage; `CanAct` blocks and clears next turn
+- [x] `MoveEffect.LeechSeed` — sets `Target.HasLeechSeed`; `Battle` drains 1/16 max HP end-of-turn and heals opponent
+- [x] `MoveEffect.Binding` — sets `Target.BindingTurnsRemaining` (2–5 turns); `CanAct` blocks while > 0; end-of-turn drains 1/16 and decrements
+- [x] `MoveEffect.TwoTurn` — charge turn: emit `ChargingUp`, set state; `Battle` loop auto-fires `ChargingMove` on release turn; PP only on charge turn
+- [x] `MoveEffect.Flinch` — sets `Target.IsFlinched`; `CanAct` blocks and self-clears
+
+**Persistent creature state (all cleared by ResetBattleState):**
+- [x] `IsRecharging`, `IsFlinched`, `HasLeechSeed`, `BindingTurnsRemaining`, `IsTwoTurnCharging`, `ChargingMove`
+
+**Engine — AttackAction:**
+- [x] `NeverMisses`: skip accuracy check entirely (Swift)
+- [x] `OHKO`: fail before accuracy roll if `Source.Level < Target.Level`; on hit, set target HP → 0
+- [x] `Fixed`: deal exactly `FixedDamageValue` HP; bypass formula (Dragon Rage, Sonic Boom)
+- [x] `LevelBased`: deal exactly `Source.Level` HP (Seismic Toss, Night Shade)
+- [x] `SuperFang`: deal `floor(Target.HP / 2)`, min 1
+- [x] `Drain`: standard damage then heal Source by `floor(damage × DrainPercent / 100)`; emit `DrainHealed`
+- [x] `SelfDestruct`: standard formula with target Defense/Special halved (Gen 1 quirk); Source HP → 0 after damage; user faints even on miss
+
+**New battle events (all wired to SignalR emitter + useBattleHub.ts):**
+- [x] `DrainHealed`, `LeechSeedApplied`, `LeechSeedDamage`, `LeechSeedHealed`, `Recharging`, `BindingStarted`, `BindingBlocked`, `BindingDamage`, `FlinchBlocked`, `ChargingUp`
+
+**Import (PokeApiConnector):**
+- [x] `meta.category` and `meta.drain` added to `MoveMeta` DTO
+- [x] `meta.category.name` → `DamageCategory` mapping; ID-based overrides for Fixed/LevelBased/SuperFang/SelfDestruct/NeverMisses
+- [x] MoveEffect mapping: Hyper Beam → Recharge; Leech Seed → LeechSeed; Wrap/Bind/Clamp/Fire Spin → Binding; Fly/Dig/Solar Beam/Razor Wind/Sky Attack → TwoTurn
+
+**Tests (16 new, 106 total passing):**
+- [x] `DrainMove_HealsSourceByHalfDamageDealt`
+- [x] `FixedDamage_DealsDamageIgnoringStats`
+- [x] `LevelBasedDamage_DealsAttackerLevelDamage`
+- [x] `OHKOMove_FailsIfSourceLevelLowerThanTarget`
+- [x] `OHKOMove_FaintsTargetIfLevelSufficient`
+- [x] `SelfDestruct_FaintsUser`
+- [x] `SelfDestruct_FaintsUserEvenOnMiss`
+- [x] `SuperFang_HalvesTargetCurrentHp`
+- [x] `Recharge_SourceCannotActNextTurn`
+- [x] `LeechSeed_SetsHasLeechSeedOnTarget`
+- [x] `LeechSeedDrain_DrainsTargetAndHealsSource`
+- [x] `Binding_SetsBindingTurnsOnTarget`
+- [x] `Binding_BlocksTargetViaCanAct`
+- [x] `TwoTurnMove_ChargesFirstThenDeliversDamage`
+- [x] `NeverMisses_AlwaysHitsRegardlessOfAccuracy`
+- [x] `Flinch_BlocksTargetViaCanAct_AndSelfClears`
+
+---
+
 ## Bad Poison (Toxic)
 
 Regular Poison does flat 1/16 max HP damage per turn. Toxic inflicts Bad Poison which does escalating damage: 1/16, 2/16, 3/16... per turn. Without this, the most iconic Gen 1 stall move maps to `None` on import and is silently ignored.

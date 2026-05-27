@@ -199,6 +199,49 @@ export function useBattleHub(gameId: string | null) {
           dispatch({ type: 'LOG', message: 'All stat changes were erased!' });
           break;
 
+        case 'DrainHealed':
+          dispatch({ type: 'UPDATE_HP', name: payload.sourceName as string, hp: payload.hpAfter as number });
+          dispatch({ type: 'LOG', message: `${payload.sourceName} restored ${payload.healAmount} HP!` });
+          break;
+
+        case 'LeechSeedApplied':
+          dispatch({ type: 'LOG', message: `${payload.targetName} was seeded!` });
+          break;
+
+        case 'LeechSeedDamage':
+          dispatch({ type: 'UPDATE_HP', name: payload.drainedName as string, hp: payload.hpAfter as number });
+          dispatch({ type: 'LOG', message: `${payload.drainedName}'s health was sapped by Leech Seed!` });
+          break;
+
+        case 'LeechSeedHealed':
+          dispatch({ type: 'UPDATE_HP', name: payload.healedName as string, hp: payload.hpAfter as number });
+          break;
+
+        case 'Recharging':
+          dispatch({ type: 'LOG', message: `${payload.creatureName} must recharge!` });
+          break;
+
+        case 'BindingStarted':
+          dispatch({ type: 'LOG', message: `${payload.targetName} was squeezed by ${payload.moveName}!` });
+          break;
+
+        case 'BindingBlocked':
+          dispatch({ type: 'LOG', message: `${payload.creatureName} is bound and can't move!` });
+          break;
+
+        case 'BindingDamage':
+          dispatch({ type: 'UPDATE_HP', name: payload.targetName as string, hp: payload.hpAfter as number });
+          dispatch({ type: 'LOG', message: `${payload.targetName} is hurt by the bind!` });
+          break;
+
+        case 'FlinchBlocked':
+          dispatch({ type: 'LOG', message: `${payload.creatureName} flinched and couldn't move!` });
+          break;
+
+        case 'ChargingUp':
+          dispatch({ type: 'LOG', message: `${payload.creatureName} is charging up ${payload.moveName}!` });
+          break;
+
         case 'CreatureFainted':
           dispatch({ type: 'LOG', message: `${payload.name} fainted!` });
           break;

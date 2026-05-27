@@ -41,5 +41,27 @@ public record ConfusionCleared(string CreatureName) : BattleEvent;
 public record StatStageChanged(string CreatureName, string Stat, int Delta, int NewStage) : BattleEvent;
 public record HazeClearedStages : BattleEvent;
 
+// --- Drain / healing ---
+public record DrainHealed(string SourceName, int HealAmount, int HpAfter) : BattleEvent;
+
+// --- Leech Seed ---
+public record LeechSeedApplied(string TargetName) : BattleEvent;
+public record LeechSeedDamage(string DrainedName, int Damage, int HpAfter) : BattleEvent;
+public record LeechSeedHealed(string HealedName, int Amount, int HpAfter) : BattleEvent;
+
+// --- Recharge (Hyper Beam) ---
+public record Recharging(string CreatureName) : BattleEvent;
+
+// --- Binding (Wrap, Bind, Clamp, Fire Spin) ---
+public record BindingStarted(string TargetName, string MoveName) : BattleEvent;
+public record BindingBlocked(string CreatureName) : BattleEvent;
+public record BindingDamage(string TargetName, int Damage, int HpAfter) : BattleEvent;
+
+// --- Flinch ---
+public record FlinchBlocked(string CreatureName) : BattleEvent;
+
+// --- Two-turn moves (Fly, Dig, SolarBeam…) ---
+public record ChargingUp(string CreatureName, string MoveName) : BattleEvent;
+
 // --- Creature ---
 public record CreatureFainted(string Name) : BattleEvent;

@@ -95,6 +95,14 @@ public class Creature
     // Stat stages (reset each battle; [-6, +6] per stat)
     public StatStages Stages { get; set; } = new StatStages();
 
+    // Per-battle transient state — all cleared by ResetBattleState()
+    public bool IsRecharging { get; set; } = false;
+    public bool IsFlinched   { get; set; } = false;
+    public bool HasLeechSeed { get; set; } = false;
+    public int  BindingTurnsRemaining { get; set; } = 0;
+    public bool IsTwoTurnCharging { get; set; } = false;
+    public PokemonAttack? ChargingMove { get; set; } = null;
+
     /// <summary>
     /// Clears all transient in-battle state. Called by Battle at the start of each
     /// fight so the same Creature instance can be reused across multiple battles.
@@ -105,6 +113,12 @@ public class Creature
         SleepTurns   = 0;
         ConfusedTurns = 0;
         Stages.Clear();
+        IsRecharging          = false;
+        IsFlinched            = false;
+        HasLeechSeed          = false;
+        BindingTurnsRemaining = 0;
+        IsTwoTurnCharging     = false;
+        ChargingMove          = null;
     }
 
     private bool _statsInitialized;

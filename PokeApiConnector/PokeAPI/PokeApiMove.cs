@@ -79,6 +79,9 @@ public class MoveMeta
     [JsonPropertyName("ailment")]
     public NamedApiResource? Ailment { get; set; }
 
+    [JsonPropertyName("category")]
+    public NamedApiResource? Category { get; set; }
+
     [JsonPropertyName("ailment_chance")]
     public int AilmentChance { get; set; }
 
@@ -87,5 +90,8 @@ public class MoveMeta
 
     [JsonPropertyName("flinch_chance")]
     public int FlinchChance { get; set; }
+
+    [JsonPropertyName("drain")]
+    public int Drain { get; set; }
 }
 

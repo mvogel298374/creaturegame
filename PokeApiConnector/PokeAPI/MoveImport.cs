@@ -133,6 +133,34 @@ public class MoveImport
 
         attack.IsHighCrit = pokeMove.Meta?.CritRate > 0;
 
+        // Damage category — derived from meta.category and specific move IDs
+        attack.DamageCategory = pokeMove.Meta?.Category?.Name switch
+        {
+            "damage-heal"  => DamageCategory.Drain,
+            "ohko"         => DamageCategory.OHKO,
+            _              => DamageCategory.Standard
+        };
+
+        // Moves that PokeAPI doesn't classify via meta.category — identify by ID or name
+        if (pokeMove.Id is 120 or 153)              // Self-Destruct, Explosion
+            attack.DamageCategory = DamageCategory.SelfDestruct;
+        else if (pokeMove.Id is 69 or 101)          // Seismic Toss, Night Shade
+            attack.DamageCategory = DamageCategory.LevelBased;
+        else if (pokeMove.Id == 162)                // Super Fang
+            attack.DamageCategory = DamageCategory.SuperFang;
+        else if (pokeMove.Id == 49)                 // Sonic Boom (fixed 20 damage)
+        { attack.DamageCategory = DamageCategory.Fixed; attack.FixedDamageValue = 20; }
+        else if (pokeMove.Id == 82)                 // Dragon Rage (fixed 40 damage)
+        { attack.DamageCategory = DamageCategory.Fixed; attack.FixedDamageValue = 40; }
+
+        // Drain percentage (default 50; Mega Drain / Absorb / Leech Life all drain 50%)
+        if (attack.DamageCategory == DamageCategory.Drain && pokeMove.Meta?.Drain > 0)
+            attack.DrainPercent = pokeMove.Meta.Drain;
+
+        // Never-miss moves (Swift — bypasses accuracy roll entirely)
+        if (pokeMove.Id == 129)
+            attack.NeverMisses = true;
+
         // Stat-stage effect — take the first entry (Gen 1 moves have at most one)
         var statChange = pokeMove.StatChanges?.FirstOrDefault();
         if (statChange?.Stat?.Name != null)
@@ -163,6 +191,14 @@ public class MoveImport
         // Special move effects
         if (pokeMove.Name == "haze")
             attack.Effect = MoveEffect.Haze;
+        else if (pokeMove.Name == "leech-seed")
+            attack.Effect = MoveEffect.LeechSeed;
+        else if (pokeMove.Name is "hyper-beam")
+            attack.Effect = MoveEffect.Recharge;
+        else if (pokeMove.Name is "wrap" or "bind" or "clamp" or "fire-spin")
+            attack.Effect = MoveEffect.Binding;
+        else if (pokeMove.Name is "fly" or "dig" or "solar-beam" or "razor-wind" or "sky-attack")
+            attack.Effect = MoveEffect.TwoTurn;
         else if (pokeMove.Meta?.FlinchChance > 0)
             attack.Effect = MoveEffect.Flinch;
 

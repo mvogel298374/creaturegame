@@ -29,6 +29,10 @@ public sealed class Gen1BattleRules : IBattleRules
     public int BurnDamageDenominator   => 16;
     public int PoisonDamageDenominator => 16;
 
+    // Gen 1: binding traps for 2–5 turns.
+    public int RollBindingTurns() => Random.Shared.Next(2, 6);
+    public int BindingDamageDenominator => 16;
+
     // ── Stat stages ────────────────────────────────────────────────────────────
 
     // Gen 1/2 battle-stat table: 2/(2+|n|) for n≤0, (2+n)/2 for n>0.

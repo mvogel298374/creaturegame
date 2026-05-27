@@ -43,22 +43,30 @@ public class MigrationTests : IDisposable
             StatEffectTarget  = StageTarget.Foe,
             StatEffectChance  = 10,
             Effect            = MoveEffect.None,
+            DamageCategory    = DamageCategory.Standard,
+            FixedDamageValue  = null,
+            DrainPercent      = 50,
+            NeverMisses       = false,
         };
         context.Moves.Add(attack);
         context.SaveChanges();
 
         var loaded = context.Moves.AsNoTracking().Single(m => m.Name == "Flamethrower");
-        Assert.Equal(95,                   loaded.BaseDamage);
-        Assert.Equal(DamageType.Fire,      loaded.DamageType);
-        Assert.Equal(1,                    loaded.Priority);
-        Assert.Equal(10,                   loaded.EffectChance);
-        Assert.Equal(StatusCondition.Burn, loaded.StatusEffect);
+        Assert.Equal(95,                       loaded.BaseDamage);
+        Assert.Equal(DamageType.Fire,          loaded.DamageType);
+        Assert.Equal(1,                        loaded.Priority);
+        Assert.Equal(10,                       loaded.EffectChance);
+        Assert.Equal(StatusCondition.Burn,     loaded.StatusEffect);
         Assert.False(loaded.IsHighCrit);
-        Assert.Equal(StageStat.Special,    loaded.StatEffectStat);
-        Assert.Equal(-1,                   loaded.StatEffectDelta);
-        Assert.Equal(StageTarget.Foe,      loaded.StatEffectTarget);
-        Assert.Equal(10,                   loaded.StatEffectChance);
-        Assert.Equal(MoveEffect.None,      loaded.Effect);
+        Assert.Equal(StageStat.Special,        loaded.StatEffectStat);
+        Assert.Equal(-1,                       loaded.StatEffectDelta);
+        Assert.Equal(StageTarget.Foe,          loaded.StatEffectTarget);
+        Assert.Equal(10,                       loaded.StatEffectChance);
+        Assert.Equal(MoveEffect.None,          loaded.Effect);
+        Assert.Equal(DamageCategory.Standard,  loaded.DamageCategory);
+        Assert.Null(loaded.FixedDamageValue);
+        Assert.Equal(50,                       loaded.DrainPercent);
+        Assert.False(loaded.NeverMisses);
     }
 
     [Fact]
@@ -99,11 +107,15 @@ public class MigrationTests : IDisposable
         Assert.Contains("EffectChance",  columns);
         Assert.Contains("StatusEffect",    columns);
         Assert.Contains("IsHighCrit",      columns);
-        Assert.Contains("StatEffectStat",  columns);
-        Assert.Contains("StatEffectDelta", columns);
+        Assert.Contains("StatEffectStat",    columns);
+        Assert.Contains("StatEffectDelta",  columns);
         Assert.Contains("StatEffectTarget", columns);
         Assert.Contains("StatEffectChance", columns);
-        Assert.Contains("Effect",          columns);
+        Assert.Contains("Effect",           columns);
+        Assert.Contains("DamageCategory",   columns);
+        Assert.Contains("FixedDamageValue", columns);
+        Assert.Contains("DrainPercent",     columns);
+        Assert.Contains("NeverMisses",      columns);
     }
 
     // --- PokemonDbContext ---

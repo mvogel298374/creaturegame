@@ -17,6 +17,21 @@ public static class StatusResolver
     {
         var battleRules = rules ?? Gen1BattleRules.Instance;
 
+        // Flinch: self-clearing flag set by a faster attacker this turn
+        if (creature.IsFlinched)
+        {
+            creature.IsFlinched = false;
+            emitter?.Emit(new FlinchBlocked(creature.Name));
+            return false;
+        }
+
+        // Binding: trapped by Wrap/Bind/Clamp/Fire Spin
+        if (creature.BindingTurnsRemaining > 0)
+        {
+            emitter?.Emit(new BindingBlocked(creature.Name));
+            return false;
+        }
+
         if (creature.Status == StatusCondition.Sleep)
         {
             creature.SleepTurns--;
@@ -78,6 +93,18 @@ public static class StatusResolver
         if (!creature.IsAlive()) return;
 
         var battleRules = rules ?? Gen1BattleRules.Instance;
+
+        // Binding damage — decrement counter and deal 1/16 max HP
+        if (creature.BindingTurnsRemaining > 0)
+        {
+            creature.BindingTurnsRemaining--;
+            int bindDamage = Math.Max(1, creature.Attributes.MaxHP / battleRules.BindingDamageDenominator);
+            creature.Attributes.ReceiveDamage(bindDamage);
+            emitter?.Emit(new BindingDamage(creature.Name, bindDamage, creature.Attributes.HP));
+            if (!creature.IsAlive()) return;
+        }
+
+        // Status damage
         int damage = 0;
         StatusCondition source = StatusCondition.None;
 

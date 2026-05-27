@@ -45,29 +45,33 @@ public class Battle
                 PlayerCreature.MoveSet.Select(m => new MoveInfo(m.Base.Name ?? "", m.Base.DamageType, m.PowerPointsCurrent, m.Base.PowerPointsMax)).ToList()
             ));
 
-            // Move selection — IBattleInput is bypassed when a creature is out of PP;
-            // null signals AttackAction to use Struggle (system-enforced, not a player/AI choice).
-            PokemonAttack? playerMove = PlayerCreature.IsOutOfPP
-                ? null
-                : await _playerInput.ChooseMoveAsync(new TurnContext
-                  {
-                      Attacker   = PlayerCreature,
-                      Defender   = EnemyCreature,
-                      TypeChart  = _typeChart,
-                      Rules      = _rules,
-                      TurnNumber = _turnNumber
-                  });
+            // Move selection — two-turn moves skip IBattleInput on the release turn;
+            // null signals AttackAction to use Struggle when out of PP.
+            PokemonAttack? playerMove = PlayerCreature.IsTwoTurnCharging
+                ? PlayerCreature.ChargingMove
+                : (PlayerCreature.IsOutOfPP
+                    ? null
+                    : await _playerInput.ChooseMoveAsync(new TurnContext
+                      {
+                          Attacker   = PlayerCreature,
+                          Defender   = EnemyCreature,
+                          TypeChart  = _typeChart,
+                          Rules      = _rules,
+                          TurnNumber = _turnNumber
+                      }));
 
-            PokemonAttack? enemyMove = EnemyCreature.IsOutOfPP
-                ? null
-                : await _enemyInput.ChooseMoveAsync(new TurnContext
-                  {
-                      Attacker   = EnemyCreature,
-                      Defender   = PlayerCreature,
-                      TypeChart  = _typeChart,
-                      Rules      = _rules,
-                      TurnNumber = _turnNumber
-                  });
+            PokemonAttack? enemyMove = EnemyCreature.IsTwoTurnCharging
+                ? EnemyCreature.ChargingMove
+                : (EnemyCreature.IsOutOfPP
+                    ? null
+                    : await _enemyInput.ChooseMoveAsync(new TurnContext
+                      {
+                          Attacker   = EnemyCreature,
+                          Defender   = PlayerCreature,
+                          TypeChart  = _typeChart,
+                          Rules      = _rules,
+                          TurnNumber = _turnNumber
+                      }));
 
             var playerAction = new AttackAction(PlayerCreature, EnemyCreature, playerMove, _typeChart, _rules, _emitter);
             var enemyAction  = new AttackAction(EnemyCreature, PlayerCreature, enemyMove,  _typeChart, _rules, _emitter);
@@ -89,9 +93,13 @@ public class Battle
                 await action.ExecuteAsync();
             }
 
-            // End-of-turn: Burn and Poison deal 1/16 max HP (Gen 1–5); fraction is rules-governed
+            // End-of-turn: binding, Burn, Poison
             StatusResolver.ApplyEndOfTurnDamage(PlayerCreature, _rules, _emitter);
             StatusResolver.ApplyEndOfTurnDamage(EnemyCreature,  _rules, _emitter);
+
+            // End-of-turn: Leech Seed drain (must see both creatures, so handled here not in StatusResolver)
+            ApplyLeechSeedDrain(PlayerCreature, EnemyCreature);
+            ApplyLeechSeedDrain(EnemyCreature,  PlayerCreature);
 
             if (!EnemyCreature.IsAlive())
             {
@@ -109,5 +117,20 @@ public class Battle
 
         string winner = PlayerCreature.IsAlive() ? PlayerCreature.Name : EnemyCreature.Name;
         _emitter?.Emit(new BattleEnded(winner));
+    }
+
+    private void ApplyLeechSeedDrain(Creature drained, Creature healed)
+    {
+        if (!drained.HasLeechSeed || !drained.IsAlive()) return;
+
+        int damage = Math.Max(1, drained.Attributes.MaxHP / _rules.PoisonDamageDenominator);
+        drained.Attributes.ReceiveDamage(damage);
+        _emitter?.Emit(new LeechSeedDamage(drained.Name, damage, drained.Attributes.HP));
+
+        if (healed.IsAlive())
+        {
+            healed.Attributes.ReceiveHealing(damage);
+            _emitter?.Emit(new LeechSeedHealed(healed.Name, damage, healed.Attributes.HP));
+        }
     }
 }

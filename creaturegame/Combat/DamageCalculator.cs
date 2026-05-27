@@ -73,6 +73,14 @@ public static class DamageCalculator
         return Math.Max(1, (int)(raw * r.RollDamageVariance()));
     }
 
+    /// <summary>Super Fang / Guillotine-variant: deals exactly half the target's current HP.</summary>
+    public static int CalculateSuperFangDamage(Creature defender)
+        => Math.Max(1, defender.Attributes.HP / 2);
+
+    /// <summary>Seismic Toss / Night Shade: damage equals attacker's level.</summary>
+    public static int CalculateLevelBasedDamage(Creature attacker)
+        => attacker.Level;
+
     public static double GetTypeEffectiveness(DamageType moveType, DamageType? targetType1, DamageType? targetType2, ITypeChart typeChart)
     {
         double multiplier = 1.0;

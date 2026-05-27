@@ -119,6 +119,46 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                 Console.WriteLine("A black mist swirled around all Pokémon! All stat changes were erased!");
                 break;
 
+            case DrainHealed e:
+                Console.WriteLine($"{e.SourceName} had its energy drained! ({e.HealAmount} HP restored)");
+                break;
+
+            case LeechSeedApplied e:
+                Console.WriteLine($"{e.TargetName} was seeded!");
+                break;
+
+            case LeechSeedDamage e:
+                Console.WriteLine($"{e.DrainedName}'s health was sapped by Leech Seed! ({e.Damage} damage)");
+                break;
+
+            case LeechSeedHealed e:
+                Console.WriteLine($"{e.HealedName} absorbed energy from Leech Seed! (+{e.Amount} HP)");
+                break;
+
+            case Recharging e:
+                Console.WriteLine($"{e.CreatureName} must recharge!");
+                break;
+
+            case BindingStarted e:
+                Console.WriteLine($"{e.TargetName} was squeezed by {e.MoveName}!");
+                break;
+
+            case BindingBlocked e:
+                Console.WriteLine($"{e.CreatureName} is bound and can't move!");
+                break;
+
+            case BindingDamage e:
+                Console.WriteLine($"{e.TargetName} is hurt by the bind! ({e.Damage} damage)");
+                break;
+
+            case FlinchBlocked e:
+                Console.WriteLine($"{e.CreatureName} flinched and couldn't move!");
+                break;
+
+            case ChargingUp e:
+                Console.WriteLine($"{e.CreatureName} is charging up {e.MoveName}!");
+                break;
+
             case CreatureFainted e:
                 Console.WriteLine($"{e.Name} fainted!");
                 break;

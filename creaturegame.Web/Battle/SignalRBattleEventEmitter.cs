@@ -45,6 +45,16 @@ public sealed class SignalRBattleEventEmitter(
         ConfusionCleared e => ("ConfusionCleared", new { e.CreatureName }),
         StatStageChanged e => ("StatStageChanged", new { e.CreatureName, e.Stat, e.Delta, e.NewStage }),
         HazeClearedStages  => ("HazeClearedStages", new { }),
+        DrainHealed e      => ("DrainHealed",      new { e.SourceName, e.HealAmount, e.HpAfter }),
+        LeechSeedApplied e => ("LeechSeedApplied", new { e.TargetName }),
+        LeechSeedDamage e  => ("LeechSeedDamage",  new { e.DrainedName, e.Damage, e.HpAfter }),
+        LeechSeedHealed e  => ("LeechSeedHealed",  new { e.HealedName, e.Amount, e.HpAfter }),
+        Recharging e       => ("Recharging",       new { e.CreatureName }),
+        BindingStarted e   => ("BindingStarted",   new { e.TargetName, e.MoveName }),
+        BindingBlocked e   => ("BindingBlocked",   new { e.CreatureName }),
+        BindingDamage e    => ("BindingDamage",    new { e.TargetName, e.Damage, e.HpAfter }),
+        FlinchBlocked e    => ("FlinchBlocked",    new { e.CreatureName }),
+        ChargingUp e       => ("ChargingUp",       new { e.CreatureName, e.MoveName }),
         CreatureFainted e  => ("CreatureFainted",  new { e.Name }),
         _                  => ("Unknown",          new { })
     };
