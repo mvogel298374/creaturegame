@@ -28,25 +28,27 @@ public class MigrationTests : IDisposable
 
         var attack = new Attack
         {
-            Name          = "Flamethrower",
-            BaseDamage    = 95,
-            Accuracy      = 100,
+            Name           = "Flamethrower",
+            BaseDamage     = 95,
+            Accuracy       = 100,
             PowerPointsMax = 15,
-            AttackType    = AttackType.Special,
-            DamageType    = DamageType.Fire,
-            Priority      = 1,
-            EffectChance  = 10,
-            StatusEffect  = StatusCondition.Burn,
+            AttackType     = AttackType.Special,
+            DamageType     = DamageType.Fire,
+            Priority       = 1,
+            EffectChance   = 10,
+            StatusEffect   = StatusCondition.Burn,
+            IsHighCrit     = false,
         };
         context.Moves.Add(attack);
         context.SaveChanges();
 
         var loaded = context.Moves.AsNoTracking().Single(m => m.Name == "Flamethrower");
-        Assert.Equal(95,                  loaded.BaseDamage);
-        Assert.Equal(DamageType.Fire,     loaded.DamageType);
-        Assert.Equal(1,                   loaded.Priority);
-        Assert.Equal(10,                  loaded.EffectChance);
+        Assert.Equal(95,                   loaded.BaseDamage);
+        Assert.Equal(DamageType.Fire,      loaded.DamageType);
+        Assert.Equal(1,                    loaded.Priority);
+        Assert.Equal(10,                   loaded.EffectChance);
         Assert.Equal(StatusCondition.Burn, loaded.StatusEffect);
+        Assert.False(loaded.IsHighCrit);
     }
 
     [Fact]
@@ -86,6 +88,7 @@ public class MigrationTests : IDisposable
         Assert.Contains("Priority",      columns);
         Assert.Contains("EffectChance",  columns);
         Assert.Contains("StatusEffect",  columns);
+        Assert.Contains("IsHighCrit",    columns);
     }
 
     // --- PokemonDbContext ---

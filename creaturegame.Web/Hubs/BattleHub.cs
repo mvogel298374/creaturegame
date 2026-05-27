@@ -13,9 +13,9 @@ public class BattleHub(GameSessionManager manager) : Hub<IBattleClient>
         await base.OnConnectedAsync();
     }
 
-    public async Task ChooseMove(int moveIndex)
+    public Task ChooseMove(int moveIndex)
     {
-        // Phase 6: forward to SignalRInput for this connection
-        await Task.CompletedTask;
+        manager.SetMoveChoice(Context.ConnectionId, moveIndex);
+        return Task.CompletedTask;
     }
 }

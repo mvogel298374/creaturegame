@@ -175,8 +175,40 @@
   background: var(--clr-bg-deep);
   border-top: 3px solid rgba(255, 255, 255, 0.5);
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   min-height: 0;
+}
+
+/* ── Battle log (left half) ──────────────────── */
+.battle-log {
+  flex: 1;
+  border-right: 2px solid var(--clr-border);
+  overflow-y: auto;
+  padding: var(--sp-sm) var(--sp-md);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--clr-border) transparent;
+}
+
+.log-line {
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-tight);
+  color: var(--clr-text);
+  line-height: 1.5;
+}
+
+.log-line--muted {
+  color: var(--clr-text-muted);
+}
+
+/* ── Battle controls (right half) ───────────── */
+.battle-controls {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 /* ── Action menu ─────────────────────────────── */
@@ -332,3 +364,93 @@
   gap: var(--sp-xs);
   padding-top: var(--sp-xs);
 }
+
+/* ── Move menu ───────────────────────────────── */
+.move-menu {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: var(--sp-sm) var(--sp-md);
+  gap: var(--sp-sm);
+}
+
+.move-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-sm);
+  flex: 1;
+}
+
+.move-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: var(--sp-xs) var(--sp-sm);
+  background: transparent;
+  border: 2px solid var(--clr-border);
+  color: var(--clr-text);
+  font-family: var(--font);
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition);
+  text-align: left;
+  overflow: hidden;
+}
+
+.move-btn:hover:not(:disabled) {
+  border-color: var(--clr-accent);
+  background: rgba(233, 69, 96, 0.08);
+}
+
+.move-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.move-btn--disabled,
+.move-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.move-name {
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-tight);
+  font-weight: bold;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.move-pp {
+  font-size: 0.6rem;
+  letter-spacing: 0;
+  color: var(--clr-text-sub);
+}
+
+.move-pp--low {
+  color: var(--clr-accent);
+}
+
+/* ── Action btn waiting state ────────────────── */
+.action-btn--waiting {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Status badge ────────────────────────────── */
+.status-badge {
+  display: inline-block;
+  font-size: 0.55rem;
+  font-weight: bold;
+  letter-spacing: 1px;
+  padding: 1px 5px;
+  margin-top: 2px;
+  align-self: flex-start;
+}
+
+.status-badge--sleep     { background: #9099a1; color: #fff; }
+.status-badge--poison    { background: #ab6ac8; color: #fff; }
+.status-badge--burn      { background: #ff9c54; color: #fff; }
+.status-badge--paralysis { background: #f3d23b; color: #333; }
+.status-badge--freeze    { background: #74cec0; color: #fff; }

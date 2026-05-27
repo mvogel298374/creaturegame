@@ -6,7 +6,8 @@ namespace creaturegame.Tests.Integration;
 
 /// <summary>
 /// Tests Battle.StartFightAsync() as an integrated unit: turn loop, faint detection,
-/// the mid-turn dead-target guard, and the IsOutOfPP → Struggle path.
+/// the mid-turn dead-target guard, the IsOutOfPP → Struggle path, and the
+/// player-controlled input path (mirrors SignalRInput behaviour without the web layer).
 /// </summary>
 public class BattleIntegrationTests
 {
@@ -121,6 +122,172 @@ public class BattleIntegrationTests
         Assert.True(player.Attributes.HP < player.Attributes.MaxHP); // recoil damage landed
     }
 
+    // ── Player-controlled input tests (TurnControlledInput mirrors SignalRInput) ──
+
+    [Fact]
+    public async Task Battle_WithPlayerInput_PicksSpecificMoveByIndex_ThatMoveIsExecuted()
+    {
+        // Move 0 = 0-damage Splash (does nothing); Move 1 = Slam (kills 1-HP enemy).
+        // TurnControlledInput picks index 1 → Slam must be the move used.
+        var player = new Creature("Player") { Level = 50 };
+        player.CalculateStats();
+        player.Attributes.Attack = 999;
+        player.Attributes.Speed  = 100;
+        player.AddAttack(new Attack { Id = 1, Name = "Splash", BaseDamage = 0,   Accuracy = 100, PowerPointsMax = 5, AttackType = AttackType.Physical });
+        player.AddAttack(new Attack { Id = 2, Name = "Slam",   BaseDamage = 100, Accuracy = 100, PowerPointsMax = 5, AttackType = AttackType.Physical });
+
+        var enemy = new Creature("Enemy") { Level = 50 };
+        enemy.CalculateStats();
+        enemy.Attributes.HP    = 1;
+        enemy.Attributes.MaxHP = 1;
+        enemy.Attributes.Speed = 1;
+        enemy.AddAttack(new Attack { Name = "Tackle", BaseDamage = 10, Accuracy = 100, AttackType = AttackType.Physical });
+
+        var emitter = new RecordingEmitter();
+        var input   = new TurnControlledInput(1); // pick Slam every turn
+        var battle  = new Battle(player, enemy, new Gen1TypeChart(), input, AutoSelectInput.Instance, emitter: emitter);
+        await battle.StartFightAsync();
+
+        Assert.False(enemy.IsAlive());
+        var moveUsed = emitter.Events.OfType<MoveUsed>().First(e => e.AttackerName == "Player");
+        Assert.Equal("Slam", moveUsed.MoveName);
+    }
+
+    [Fact]
+    public async Task Battle_WithPlayerInput_FallsBackToFirstAvailable_WhenChosenIndexHasNoPP()
+    {
+        // Move 0 has PP forced to 0; Move 1 = Slam (damage move).
+        // TurnControlledInput sends index 0 → no PP → fallback → Slam used.
+        var player = new Creature("Player") { Level = 50 };
+        player.CalculateStats();
+        player.Attributes.Attack = 999;
+        player.Attributes.Speed  = 100;
+        player.AddAttack(new Attack { Id = 1, Name = "Splash", BaseDamage = 0,   Accuracy = 100, PowerPointsMax = 1, AttackType = AttackType.Physical });
+        player.AddAttack(new Attack { Id = 2, Name = "Slam",   BaseDamage = 100, Accuracy = 100, PowerPointsMax = 5, AttackType = AttackType.Physical });
+        player.MoveSet[0].PowerPointsCurrent = 0; // exhaust Splash manually
+
+        var enemy = new Creature("Enemy") { Level = 50 };
+        enemy.CalculateStats();
+        enemy.Attributes.HP    = 1;
+        enemy.Attributes.MaxHP = 1;
+        enemy.Attributes.Speed = 1;
+        enemy.AddAttack(new Attack { Name = "Tackle", BaseDamage = 10, Accuracy = 100, AttackType = AttackType.Physical });
+
+        var emitter = new RecordingEmitter();
+        var input   = new TurnControlledInput(0); // asks for Splash (0 PP) → must fall back
+        var battle  = new Battle(player, enemy, new Gen1TypeChart(), input, AutoSelectInput.Instance, emitter: emitter);
+        await battle.StartFightAsync();
+
+        Assert.False(enemy.IsAlive());
+        var moveUsed = emitter.Events.OfType<MoveUsed>().First(e => e.AttackerName == "Player");
+        Assert.Equal("Slam", moveUsed.MoveName);
+    }
+
+    [Fact]
+    public async Task Battle_TurnStartedEvent_ContainsCorrectPlayerEnemyDataAndMoveList()
+    {
+        // Run 1 turn: enemy has 1 HP, dies on first hit.
+        // Verify TurnStarted carries player's real MaxHP, enemy's real MaxHP, and the move list.
+        var player = new Creature("Player") { Level = 50 };
+        player.CalculateStats();
+        player.Attributes.Attack = 999;
+        player.Attributes.Speed  = 100;
+        player.AddAttack(new Attack { Id = 1, Name = "Tackle",    BaseDamage = 40, Accuracy = 100, PowerPointsMax = 35, AttackType = AttackType.Physical });
+        player.AddAttack(new Attack { Id = 2, Name = "Vine Whip", BaseDamage = 35, Accuracy = 100, PowerPointsMax = 25, AttackType = AttackType.Physical });
+
+        var enemy = new Creature("Enemy") { Level = 50 };
+        enemy.CalculateStats();
+        enemy.Attributes.HP    = 1;
+        enemy.Attributes.MaxHP = 200;
+        enemy.Attributes.Speed = 1;
+        enemy.AddAttack(new Attack { Name = "Splash", BaseDamage = 0, Accuracy = 100, AttackType = AttackType.Physical });
+
+        var emitter = new RecordingEmitter();
+        var input   = new TurnControlledInput(0);
+        var battle  = new Battle(player, enemy, new Gen1TypeChart(), input, AutoSelectInput.Instance, emitter: emitter);
+        await battle.StartFightAsync();
+
+        var ts = emitter.Events.OfType<TurnStarted>().First();
+        Assert.Equal("Player",             ts.PlayerName);
+        Assert.Equal("Enemy",              ts.EnemyName);
+        Assert.Equal(player.Attributes.MaxHP, ts.PlayerMaxHp);
+        Assert.Equal(200,                  ts.EnemyMaxHp);
+        Assert.Equal(2,                    ts.PlayerMoves.Count);
+        Assert.Contains(ts.PlayerMoves, m => m.Name == "Tackle");
+        Assert.Contains(ts.PlayerMoves, m => m.Name == "Vine Whip");
+        Assert.All(ts.PlayerMoves, m => Assert.True(m.PpCurrent > 0));
+    }
+
+    [Fact]
+    public async Task Battle_FullSimulation_MultiTurn_BattleStartedAndEndedEventsFire()
+    {
+        // Both sides survive multiple turns — verifies the full turn loop runs correctly
+        // under player-controlled input (TurnControlledInput always picking move 0).
+        var player = new Creature("Player") { Level = 50 };
+        player.CalculateStats();
+        player.Attributes.HP     = 100;
+        player.Attributes.MaxHP  = 100;
+        player.Attributes.Attack = 20;
+        player.Attributes.Defense = 50;
+        player.Attributes.Speed  = 100;
+        player.AddAttack(new Attack { Name = "Tackle", BaseDamage = 40, Accuracy = 100, PowerPointsMax = 35, AttackType = AttackType.Physical });
+
+        var enemy = new Creature("Enemy") { Level = 50 };
+        enemy.CalculateStats();
+        enemy.Attributes.HP     = 100;
+        enemy.Attributes.MaxHP  = 100;
+        enemy.Attributes.Attack = 15;
+        enemy.Attributes.Defense = 50;
+        enemy.Attributes.Speed  = 50;
+        enemy.AddAttack(new Attack { Name = "Scratch", BaseDamage = 40, Accuracy = 100, PowerPointsMax = 35, AttackType = AttackType.Physical });
+
+        var emitter = new RecordingEmitter();
+        // 100 choices of 0 is far more than the expected ~10–15 turns needed for one side to faint
+        var input  = new TurnControlledInput(Enumerable.Repeat(0, 100).ToArray());
+        var battle = new Battle(player, enemy, new Gen1TypeChart(), input, AutoSelectInput.Instance, emitter: emitter);
+        await battle.StartFightAsync();
+
+        Assert.Contains(emitter.Events, e => e is BattleStarted);
+        Assert.True(emitter.Events.OfType<TurnStarted>().Count() >= 2, "Expected multiple turns");
+        var ended = emitter.Events.OfType<BattleEnded>().SingleOrDefault();
+        Assert.NotNull(ended);
+        Assert.True(ended.WinnerName == "Player" || ended.WinnerName == "Enemy");
+        Assert.True(!player.IsAlive() || !enemy.IsAlive(), "One side must have fainted");
+    }
+
+    [Fact]
+    public async Task Battle_FullSimulation_EventsAreOrderedCorrectly()
+    {
+        // BattleStarted → (TurnStarted → ... → TurnEnded)* → CreatureFainted → BattleEnded
+        var player = new Creature("Player") { Level = 50 };
+        player.CalculateStats();
+        player.Attributes.Attack = 999;
+        player.Attributes.Speed  = 100;
+        player.AddAttack(new Attack { Name = "Slam", BaseDamage = 100, Accuracy = 100, PowerPointsMax = 35, AttackType = AttackType.Physical });
+
+        var enemy = new Creature("Enemy") { Level = 50 };
+        enemy.CalculateStats();
+        enemy.Attributes.HP    = 1;
+        enemy.Attributes.MaxHP = 1;
+        enemy.Attributes.Speed = 1;
+        enemy.AddAttack(new Attack { Name = "Tackle", BaseDamage = 10, Accuracy = 100, AttackType = AttackType.Physical });
+
+        var emitter = new RecordingEmitter();
+        var input   = new TurnControlledInput(0);
+        var battle  = new Battle(player, enemy, new Gen1TypeChart(), input, AutoSelectInput.Instance, emitter: emitter);
+        await battle.StartFightAsync();
+
+        var events = emitter.Events;
+        Assert.IsType<BattleStarted>(events[0]);
+        Assert.IsType<TurnStarted>(events[1]);
+        Assert.IsType<BattleEnded>(events[^1]);
+        Assert.Contains(events, e => e is CreatureFainted);
+        // BattleEnded must come after CreatureFainted
+        int faintedIdx = events.ToList().FindIndex(e => e is CreatureFainted);
+        int endedIdx   = events.ToList().FindIndex(e => e is BattleEnded);
+        Assert.True(endedIdx > faintedIdx);
+    }
+
     [Fact]
     public async Task Battle_PoisonedEnemy_FaintsByEndOfTurnDamage()
     {
@@ -143,5 +310,36 @@ public class BattleIntegrationTests
 
         Assert.False(enemy.IsAlive());
         Assert.True(player.IsAlive());
+    }
+
+    // ── Test helpers ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Deterministic IBattleInput: dequeues pre-supplied move indices, defaulting to 0
+    /// when the queue is empty. Falls back to the first available move when the chosen
+    /// index has 0 PP — mirrors the SignalRInput fallback without the web layer.
+    /// </summary>
+    private sealed class TurnControlledInput(params int[] choices) : IBattleInput
+    {
+        private readonly Queue<int> _choices = new(choices);
+
+        public Task<PokemonAttack> ChooseMoveAsync(TurnContext context)
+        {
+            var moves = context.Attacker.MoveSet;
+            int index  = _choices.Count > 0 ? _choices.Dequeue() : 0;
+
+            if (index >= 0 && index < moves.Count && moves[index].PowerPointsCurrent > 0)
+                return Task.FromResult(moves[index]);
+
+            return Task.FromResult(moves.First(m => m.PowerPointsCurrent > 0));
+        }
+    }
+
+    /// <summary>Captures all emitted BattleEvents in order for assertion.</summary>
+    private sealed class RecordingEmitter : IBattleEventEmitter
+    {
+        private readonly List<BattleEvent> _events = [];
+        public IReadOnlyList<BattleEvent> Events => _events;
+        public void Emit(BattleEvent evt) => _events.Add(evt);
     }
 }

@@ -218,7 +218,7 @@ public class CoreMechanicsTests
             StatusEffect = StatusCondition.Paralysis, EffectChance = 100 };
         attacker.AddAttack(thunderWave);
 
-        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart());
+        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), AlwaysHitRules.Instance);
         await action.ExecuteAsync();
 
         Assert.Equal(StatusCondition.Paralysis, defender.Status);
@@ -255,7 +255,7 @@ public class CoreMechanicsTests
             StatusEffect = StatusCondition.Sleep, EffectChance = 100 };
         attacker.AddAttack(sleepPowder);
 
-        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart());
+        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), AlwaysHitRules.Instance);
         await action.ExecuteAsync();
 
         Assert.Equal(StatusCondition.Sleep, defender.Status);
@@ -556,7 +556,7 @@ public class CoreMechanicsTests
         var defender = new Creature("Articuno") { Level = 50, Status = StatusCondition.Freeze };
         defender.CalculateStats();
 
-        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart());
+        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), AlwaysHitRules.Instance);
         await action.ExecuteAsync();
 
         Assert.Equal(StatusCondition.None, defender.Status);
@@ -1032,6 +1032,32 @@ public class CoreMechanicsTests
     }
 
     // ── Test helpers ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Deterministic battle rules for accuracy-sensitive tests: GetHitThreshold returns 256,
+    /// which exceeds AccuracyRollBound (256), so Random.Next(256) &gt;= 256 is never true →
+    /// moves always hit. Eliminates the Gen 1 1/256 miss flakiness in unit tests.
+    /// </summary>
+    private sealed class AlwaysHitRules : IBattleRules
+    {
+        public static readonly AlwaysHitRules Instance = new();
+        private AlwaysHitRules() { }
+
+        public bool   CanThawFrozenTarget(Attack move)                     => Gen1BattleRules.Instance.CanThawFrozenTarget(move);
+        public int    FreezeRandomThawPercent                              => Gen1BattleRules.Instance.FreezeRandomThawPercent;
+        public double RollDamageVariance()                                 => Gen1BattleRules.Instance.RollDamageVariance();
+        public int    RollSleepTurns()                                     => Gen1BattleRules.Instance.RollSleepTurns();
+        public int    CalculateStruggleRecoil(Creature s, int d)           => Gen1BattleRules.Instance.CalculateStruggleRecoil(s, d);
+        public int    BurnDamageDenominator                                => Gen1BattleRules.Instance.BurnDamageDenominator;
+        public int    PoisonDamageDenominator                              => Gen1BattleRules.Instance.PoisonDamageDenominator;
+        public double GetStatMultiplier(int stage)                         => Gen1BattleRules.Instance.GetStatMultiplier(stage);
+        public double GetAccuracyStageMultiplier(int stage)                => Gen1BattleRules.Instance.GetAccuracyStageMultiplier(stage);
+        public int    GetHitThreshold(int acc, int accStage, int evaStage) => 256; // > AccuracyRollBound → always hits
+        public int    AccuracyRollBound                                    => Gen1BattleRules.Instance.AccuracyRollBound;
+        public double GetCritChance(Creature a, Attack m)                  => Gen1BattleRules.Instance.GetCritChance(a, m);
+        public double CritMultiplier                                       => Gen1BattleRules.Instance.CritMultiplier;
+        public bool   CritIgnoresStatStages                                => Gen1BattleRules.Instance.CritIgnoresStatStages;
+    }
 
     /// <summary>
     /// Deterministic battle rules for crit tests: always crits, no damage variance.

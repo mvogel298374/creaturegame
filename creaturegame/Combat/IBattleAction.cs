@@ -1,4 +1,4 @@
-﻿using creaturegame.Attacks;
+using creaturegame.Attacks;
 using creaturegame.Creatures;
 
 namespace creaturegame.Combat;
@@ -59,11 +59,14 @@ public class AttackAction : IBattleAction
             }
         }
 
-        // Thaw a frozen target if the move meets the generation's thaw criteria
+        // Thaw a frozen target if the move meets the generation's thaw criteria.
+        // A just-thawed target cannot receive a new status from the same move.
+        bool justThawed = false;
         if (Target.Status == StatusCondition.Freeze && _rules.CanThawFrozenTarget(attackToUse))
         {
             Target.Status = StatusCondition.None;
             _emitter?.Emit(new StatusCleared(Target.Name, StatusCondition.Freeze));
+            justThawed = true;
         }
 
         int damage = 0;
@@ -82,7 +85,8 @@ public class AttackAction : IBattleAction
             _emitter?.Emit(new RecoilDamage(Source.Name, recoil, Source.Attributes.HP));
         }
 
-        TryApplyStatus(attackToUse);
+        if (!justThawed)
+            TryApplyStatus(attackToUse);
 
         return Task.CompletedTask;
     }

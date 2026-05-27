@@ -10,6 +10,7 @@ namespace creaturegame.Web.Battle;
 public sealed class GameSessionManager(IHubContext<BattleHub, IBattleClient> hubContext)
 {
     private readonly ConcurrentDictionary<string, PendingSession> _pending = new();
+    private readonly ConcurrentDictionary<string, SignalRInput>   _inputs  = new();
 
     public string RegisterSession(Creature player, Creature enemy)
     {
@@ -23,15 +24,29 @@ public sealed class GameSessionManager(IHubContext<BattleHub, IBattleClient> hub
         if (!_pending.TryRemove(gameId, out var session))
             return Task.CompletedTask;
 
+        var playerInput = new SignalRInput();
+        _inputs[connectionId] = playerInput;
+
         var emitter = new SignalRBattleEventEmitter(hubContext, connectionId);
         var battle  = new BattleEngine(
             session.Player, session.Enemy,
             Gen1TypeChart.Instance,
-            AutoSelectInput.Instance, AutoSelectInput.Instance,
+            playerInput, AutoSelectInput.Instance,
             emitter: emitter);
 
-        _ = Task.Run(() => battle.StartFightAsync());
+        _ = Task.Run(async () =>
+        {
+            try   { await battle.StartFightAsync(); }
+            finally { _inputs.TryRemove(connectionId, out _); }
+        });
+
         return Task.CompletedTask;
+    }
+
+    public void SetMoveChoice(string connectionId, int moveIndex)
+    {
+        if (_inputs.TryGetValue(connectionId, out var input))
+            input.SetChoice(moveIndex);
     }
 }
 

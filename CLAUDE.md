@@ -86,6 +86,11 @@ The target is a **true Gen 1 Pokémon battle clone** with future layers inspired
 
 See `TODO.md` for the full prioritised task list, completed items, and tech debt. Always update `TODO.md` when finishing a task.
 
+## Permissions
+
+- **File edits and creation are always allowed** — make changes to existing files or create new ones without asking for confirmation first.
+- **Git commits require explicit approval** — stage changes and propose a commit message, but do not run `git commit` until the user confirms.
+
 ## Communication Style
 
 Before running any command or making changes, state in plain language what you are about to do and why — which files will be affected, what the command does, and what outcome you expect. One or two sentences is enough; silence is not.

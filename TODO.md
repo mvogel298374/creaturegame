@@ -156,12 +156,17 @@ Full plan in `FRONTEND_PLAN.md`. Stack: React 18 + Phaser 3 + SignalR, hosted by
 - [x] `StarterSelection` forwards `gameId` in navigate state to `/battle`
 - [x] `ConsoleBattleEventEmitter` kept unchanged — used by unit tests and local debug runner
 
-**Phase 6 – Battle screen shell (React, no Phaser yet)**
+**Phase 6 – Battle screen shell (React, no Phaser yet)** ✅ DONE
 - [x] Battle field: sky/ground background, diagonal sprite layout (enemy front top-right, player back bottom-left), nameplates with HP bars; player nameplate adds XP bar
 - [x] Action panel: FIGHT (stub) + CHECK POKEMON (shows base stats + type badges); species passed via navigate state from StarterSelection
-- [ ] `useBattleHub` hook + `useBattleState` reducer (HP, status, moves) — wire SignalR; replace mock state
-- [ ] Move menu (shown when FIGHT pressed; disabled until TurnStarted event)
-- [ ] Text log for battle events
+- [x] `useBattleHub` hook + `useBattleState` reducer (HP, status, moves) — wire SignalR; replace mock state
+- [x] Move menu (shown when FIGHT pressed; disabled until TurnStarted event; 2×2 grid with PP + type badge)
+- [x] Text log for battle events (scrollable left panel; live HP, status, crit, effectiveness messages)
+- [x] `SignalRInput : IBattleInput` — blocks on TCS until player sends ChooseMove; wired into `GameSessionManager` for player side; `BattleHub.ChooseMove` forwards to it
+- [x] Status badges on nameplates (PSN/BRN/PAR/SLP/FRZ)
+- [x] Integration tests: `TurnControlledInput` + `RecordingEmitter` helpers; 5 new tests covering player-input path, event ordering, full multi-turn simulation, and poison end-of-turn kill
+- [x] Bug fix: fire move hitting frozen target no longer applies its own burn effect after thaw (`justThawed` guard in `AttackAction`)
+- [x] Test hardening: `AlwaysHitRules` helper eliminates Gen 1 1/256-miss flakiness in status/freeze unit tests; `MigrationTests` verifies `IsHighCrit` column
 
 **Phase 7 – Phaser canvas**
 - [ ] `BattleCanvas.tsx` mounts Phaser; `BattleScene.ts` loads + positions sprites
