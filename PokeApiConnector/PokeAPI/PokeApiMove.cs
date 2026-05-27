@@ -34,8 +34,23 @@ public class PokeApiMove
     [JsonPropertyName("effect_entries")]
     public List<EffectEntry>? EffectEntries { get; set; }
 
+    [JsonPropertyName("target")]
+    public NamedApiResource? Target { get; set; }
+
+    [JsonPropertyName("stat_changes")]
+    public List<StatChange>? StatChanges { get; set; }
+
     [JsonPropertyName("meta")]
     public MoveMeta? Meta { get; set; }
+}
+
+public class StatChange
+{
+    [JsonPropertyName("change")]
+    public int Change { get; set; }
+
+    [JsonPropertyName("stat")]
+    public NamedApiResource? Stat { get; set; }
 }
 
 public class NamedApiResource
@@ -69,5 +84,8 @@ public class MoveMeta
 
     [JsonPropertyName("crit_rate")]
     public int CritRate { get; set; }
+
+    [JsonPropertyName("flinch_chance")]
+    public int FlinchChance { get; set; }
 }
 

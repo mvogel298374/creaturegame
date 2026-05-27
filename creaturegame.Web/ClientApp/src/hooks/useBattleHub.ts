@@ -188,6 +188,17 @@ export function useBattleHub(gameId: string | null) {
           dispatch({ type: 'LOG', message: `${payload.creatureName} snapped out of confusion!` });
           break;
 
+        case 'StatStageChanged': {
+          const dir = (payload.delta as number) > 0 ? 'rose' : 'fell';
+          const sharp = Math.abs(payload.delta as number) >= 2 ? ' sharply' : '';
+          dispatch({ type: 'LOG', message: `${payload.creatureName}'s ${payload.stat}${sharp} ${dir}!` });
+          break;
+        }
+
+        case 'HazeClearedStages':
+          dispatch({ type: 'LOG', message: 'All stat changes were erased!' });
+          break;
+
         case 'CreatureFainted':
           dispatch({ type: 'LOG', message: `${payload.name} fainted!` });
           break;

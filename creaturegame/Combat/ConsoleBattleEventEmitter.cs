@@ -109,6 +109,16 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                 });
                 break;
 
+            case StatStageChanged e:
+                string direction = e.Delta > 0 ? "rose" : "fell";
+                string amount    = Math.Abs(e.Delta) >= 2 ? " sharply" : "";
+                Console.WriteLine($"{e.CreatureName}'s {e.Stat}{amount} {direction}! (→ {e.NewStage:+0;-0;0})");
+                break;
+
+            case HazeClearedStages:
+                Console.WriteLine("A black mist swirled around all Pokémon! All stat changes were erased!");
+                break;
+
             case CreatureFainted e:
                 Console.WriteLine($"{e.Name} fainted!");
                 break;

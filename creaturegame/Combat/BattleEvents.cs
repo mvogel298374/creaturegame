@@ -37,5 +37,9 @@ public record ConfusionMessage(string CreatureName) : BattleEvent;
 public record ConfusionDamage(string CreatureName, int Damage, int HpAfter) : BattleEvent;
 public record ConfusionCleared(string CreatureName) : BattleEvent;
 
+// --- Stat stages ---
+public record StatStageChanged(string CreatureName, string Stat, int Delta, int NewStage) : BattleEvent;
+public record HazeClearedStages : BattleEvent;
+
 // --- Creature ---
 public record CreatureFainted(string Name) : BattleEvent;

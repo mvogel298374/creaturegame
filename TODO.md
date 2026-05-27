@@ -54,33 +54,13 @@
 
 ---
 
-## Move Effects (Stat-Stage Moves)
-
-The `StatStages` infrastructure is fully built. This section makes it usable via real moves (Swords Dance, Growl, Agility, Sand Attack, etc.) and via the stage-clearing move Haze.
-
-**Model:**
-- [ ] `StatEffect` record on `Attack`: `Stat` (Attack/Defense/Special/Speed/Accuracy/Evasion), `Delta` (e.g. +2, -1), `Target` (Self/Foe), `Chance` (int, 100 for pure stat moves; 10–33 for secondary effects on damaging moves)
-- [ ] `Attack.StatEffect` property (nullable); EF migration (`StatEffectStat`, `StatEffectDelta`, `StatEffectTarget`, `StatEffectChance` columns)
-- [ ] `MoveEffect` enum on `Attack` for special non-stat effects: `None`, `Haze`, `Recharge` (Hyper Beam), `Flinch` — start with `None` and `Haze` only
-- [ ] `Attack.Effect` property + EF migration column
-
-**Engine:**
-- [ ] `AttackAction`: after damage/status resolution, if `attack.StatEffect != null` roll chance and call `Stages.Raise*(delta)` on the correct target
-- [ ] `AttackAction`: if `attack.Effect == MoveEffect.Haze`, call `ResetBattleState()` on both creatures (status + stages), emit `HazeClearedStages` event
-- [ ] `StatStageChanged(string CreatureName, string Stat, int Delta, int NewStage)` battle event — emitted on every stage change
-- [ ] `StatStageChanged` handled in `ConsoleBattleEventEmitter` and `SignalRBattleEventEmitter`; `useBattleHub.ts` logs stage changes to battle log
-
-**Import (PokeApiConnector):**
-- [ ] `MoveImport.MapToAttack`: map `stat_changes[]` array from PokeAPI move response to `StatEffect` (take first entry; Gen 1 moves only have one stat change)
-- [ ] Map `meta.flinch_chance > 0` → `Attack.Effect = MoveEffect.Flinch` (Flinch currently logged only; full flinch mechanic deferred)
-- [ ] Map move name `"haze"` → `Attack.Effect = MoveEffect.Haze`
-
-**Tests:**
-- [ ] `SwordsDance_RaisesAttackStageByTwo` — stat stage applies, damage higher next turn
-- [ ] `Growl_LowersEnemyAttackStage` — foe's stage decremented
-- [ ] `StatStage_ClampedAtPlusSix` / `ClampedAtMinusSix`
-- [ ] `Haze_ClearsAllStagesOnBothCreatures`
-- [ ] Secondary stat effect: move with `StatEffectChance = 0` never applies; `100` always applies
+## Move Effects (Stat-Stage Moves) ✅ DONE
+- [x] `StageStat` / `StageTarget` / `MoveEffect` enums + `StatEffect` record (`creaturegame/Attacks/MoveEffect.cs`)
+- [x] `Attack`: four nullable stat-effect columns (`StatEffectStat`, `StatEffectDelta`, `StatEffectTarget`, `StatEffectChance`) + computed `[NotMapped] StatEffect?` property + `MoveEffect Effect` column; EF migration `AddStatEffectAndMoveEffect`
+- [x] `AttackAction`: `TryApplyStatEffect` rolls chance, calls `Stages.Raise*(delta)` on correct target, emits `StatStageChanged`; `TryApplyHaze` calls `ResetBattleState()` on both creatures, emits `HazeClearedStages`
+- [x] `StatStageChanged` + `HazeClearedStages` events handled in `ConsoleBattleEventEmitter`, `SignalRBattleEventEmitter`, and `useBattleHub.ts`
+- [x] `MoveImport`: maps `stat_changes[]` → stat-effect columns; `flinch_chance > 0` → `MoveEffect.Flinch`; name `"haze"` → `MoveEffect.Haze`; `PokeApiMove` extended with `Target`, `StatChanges`, `MoveMeta.FlinchChance`
+- [x] 7 new tests — `SwordsDance_RaisesAttackStageByTwo`, `Growl_LowersEnemyAttackStage`, `StatStage_ClampedAtPlusSix/MinusSix`, `Haze_ClearsAllStagesOnBothCreatures`, `StatEffect_ZeroChance_NeverApplies`, `StatEffect_HundredChance_AlwaysApplies`; migration round-trip test extended
 
 ---
 

@@ -28,16 +28,21 @@ public class MigrationTests : IDisposable
 
         var attack = new Attack
         {
-            Name           = "Flamethrower",
-            BaseDamage     = 95,
-            Accuracy       = 100,
-            PowerPointsMax = 15,
-            AttackType     = AttackType.Special,
-            DamageType     = DamageType.Fire,
-            Priority       = 1,
-            EffectChance   = 10,
-            StatusEffect   = StatusCondition.Burn,
-            IsHighCrit     = false,
+            Name              = "Flamethrower",
+            BaseDamage        = 95,
+            Accuracy          = 100,
+            PowerPointsMax    = 15,
+            AttackType        = AttackType.Special,
+            DamageType        = DamageType.Fire,
+            Priority          = 1,
+            EffectChance      = 10,
+            StatusEffect      = StatusCondition.Burn,
+            IsHighCrit        = false,
+            StatEffectStat    = StageStat.Special,
+            StatEffectDelta   = -1,
+            StatEffectTarget  = StageTarget.Foe,
+            StatEffectChance  = 10,
+            Effect            = MoveEffect.None,
         };
         context.Moves.Add(attack);
         context.SaveChanges();
@@ -49,6 +54,11 @@ public class MigrationTests : IDisposable
         Assert.Equal(10,                   loaded.EffectChance);
         Assert.Equal(StatusCondition.Burn, loaded.StatusEffect);
         Assert.False(loaded.IsHighCrit);
+        Assert.Equal(StageStat.Special,    loaded.StatEffectStat);
+        Assert.Equal(-1,                   loaded.StatEffectDelta);
+        Assert.Equal(StageTarget.Foe,      loaded.StatEffectTarget);
+        Assert.Equal(10,                   loaded.StatEffectChance);
+        Assert.Equal(MoveEffect.None,      loaded.Effect);
     }
 
     [Fact]
@@ -87,8 +97,13 @@ public class MigrationTests : IDisposable
         Assert.Contains("PowerPointsMax", columns);
         Assert.Contains("Priority",      columns);
         Assert.Contains("EffectChance",  columns);
-        Assert.Contains("StatusEffect",  columns);
-        Assert.Contains("IsHighCrit",    columns);
+        Assert.Contains("StatusEffect",    columns);
+        Assert.Contains("IsHighCrit",      columns);
+        Assert.Contains("StatEffectStat",  columns);
+        Assert.Contains("StatEffectDelta", columns);
+        Assert.Contains("StatEffectTarget", columns);
+        Assert.Contains("StatEffectChance", columns);
+        Assert.Contains("Effect",          columns);
     }
 
     // --- PokemonDbContext ---

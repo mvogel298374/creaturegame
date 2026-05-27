@@ -133,6 +133,39 @@ public class MoveImport
 
         attack.IsHighCrit = pokeMove.Meta?.CritRate > 0;
 
+        // Stat-stage effect — take the first entry (Gen 1 moves have at most one)
+        var statChange = pokeMove.StatChanges?.FirstOrDefault();
+        if (statChange?.Stat?.Name != null)
+        {
+            StageStat? mappedStat = statChange.Stat.Name switch
+            {
+                "attack"                                    => StageStat.Attack,
+                "defense"                                   => StageStat.Defense,
+                "special-attack" or "special-defense"
+                    or "special"                            => StageStat.Special,
+                "speed"                                     => StageStat.Speed,
+                "accuracy"                                  => StageStat.Accuracy,
+                "evasion" or "evasiveness"                  => StageStat.Evasion,
+                _                                           => null
+            };
+            if (mappedStat.HasValue)
+            {
+                attack.StatEffectStat   = mappedStat;
+                attack.StatEffectDelta  = statChange.Change;
+                attack.StatEffectTarget = pokeMove.Target?.Name == "user"
+                    ? StageTarget.Self : StageTarget.Foe;
+                // Pure stat moves always succeed; secondary effects on damaging moves use EffectChance
+                attack.StatEffectChance = attack.BaseDamage > 0
+                    ? (pokeMove.EffectChance ?? 100) : 100;
+            }
+        }
+
+        // Special move effects
+        if (pokeMove.Name == "haze")
+            attack.Effect = MoveEffect.Haze;
+        else if (pokeMove.Meta?.FlinchChance > 0)
+            attack.Effect = MoveEffect.Flinch;
+
         return attack;
     }
 }

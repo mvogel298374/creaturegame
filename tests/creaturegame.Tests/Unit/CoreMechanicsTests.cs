@@ -1031,6 +1031,149 @@ public class CoreMechanicsTests
         Assert.Equal(cleanCrit, burnedCrit);
     }
 
+    // ── Stat-Stage Move Tests ────────────────────────────────────────────────
+
+    [Fact]
+    public async Task SwordsDance_RaisesAttackStageByTwo()
+    {
+        var attacker = new Creature("Attacker") { Level = 50 };
+        attacker.CalculateStats();
+        var defender = new Creature("Defender") { Level = 50 };
+        defender.CalculateStats();
+
+        var move = new Attack
+        {
+            Id = 1, Name = "Swords Dance", BaseDamage = 0, Accuracy = 100,
+            StatEffectStat   = StageStat.Attack,
+            StatEffectDelta  = 2,
+            StatEffectTarget = StageTarget.Self,
+            StatEffectChance = 100,
+        };
+        attacker.AddAttack(move);
+
+        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), AlwaysHitRules.Instance);
+        await action.ExecuteAsync();
+
+        Assert.Equal(2, attacker.Stages.Attack);
+        Assert.Equal(0, defender.Stages.Attack);
+    }
+
+    [Fact]
+    public async Task Growl_LowersEnemyAttackStage()
+    {
+        var attacker = new Creature("Attacker") { Level = 50 };
+        attacker.CalculateStats();
+        var defender = new Creature("Defender") { Level = 50 };
+        defender.CalculateStats();
+
+        var move = new Attack
+        {
+            Id = 1, Name = "Growl", BaseDamage = 0, Accuracy = 100,
+            StatEffectStat   = StageStat.Attack,
+            StatEffectDelta  = -1,
+            StatEffectTarget = StageTarget.Foe,
+            StatEffectChance = 100,
+        };
+        attacker.AddAttack(move);
+
+        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), AlwaysHitRules.Instance);
+        await action.ExecuteAsync();
+
+        Assert.Equal(-1, defender.Stages.Attack);
+        Assert.Equal(0,  attacker.Stages.Attack);
+    }
+
+    [Fact]
+    public void StatStage_ClampedAtPlusSix()
+    {
+        var stages = new StatStages();
+        stages.RaiseAttack(6);
+        stages.RaiseAttack(2); // would be +8 without clamp
+        Assert.Equal(6, stages.Attack);
+    }
+
+    [Fact]
+    public void StatStage_ClampedAtMinusSix()
+    {
+        var stages = new StatStages();
+        stages.RaiseDefense(-6);
+        stages.RaiseDefense(-2); // would be -8 without clamp
+        Assert.Equal(-6, stages.Defense);
+    }
+
+    [Fact]
+    public async Task Haze_ClearsAllStagesOnBothCreatures()
+    {
+        var attacker = new Creature("Attacker") { Level = 50 };
+        attacker.CalculateStats();
+        attacker.Stages.RaiseAttack(3);
+
+        var defender = new Creature("Defender") { Level = 50 };
+        defender.CalculateStats();
+        defender.Stages.RaiseSpeed(-2);
+        defender.Status = StatusCondition.Burn;
+
+        var move = new Attack { Id = 1, Name = "Haze", BaseDamage = 0, Accuracy = 100, Effect = MoveEffect.Haze };
+        attacker.AddAttack(move);
+
+        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), AlwaysHitRules.Instance);
+        await action.ExecuteAsync();
+
+        Assert.Equal(0, attacker.Stages.Attack);
+        Assert.Equal(0, defender.Stages.Speed);
+    }
+
+    [Fact]
+    public async Task StatEffect_ZeroChance_NeverApplies()
+    {
+        var attacker = new Creature("Attacker") { Level = 50 };
+        attacker.CalculateStats();
+        var defender = new Creature("Defender") { Level = 50 };
+        defender.CalculateStats();
+
+        var move = new Attack
+        {
+            Id = 1, Name = "NeverLower", BaseDamage = 40, Accuracy = 100,
+            StatEffectStat   = StageStat.Defense,
+            StatEffectDelta  = -1,
+            StatEffectTarget = StageTarget.Foe,
+            StatEffectChance = 0,
+        };
+        attacker.AddAttack(move);
+
+        for (int i = 0; i < 20; i++)
+        {
+            var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), AlwaysHitRules.Instance);
+            await action.ExecuteAsync();
+        }
+
+        Assert.Equal(0, defender.Stages.Defense);
+    }
+
+    [Fact]
+    public async Task StatEffect_HundredChance_AlwaysApplies()
+    {
+        var attacker = new Creature("Attacker") { Level = 50 };
+        attacker.CalculateStats();
+        var defender = new Creature("Defender") { Level = 50 };
+        defender.CalculateStats();
+
+        var move = new Attack
+        {
+            Id = 1, Name = "AlwaysLower", BaseDamage = 0, Accuracy = 100,
+            StatEffectStat   = StageStat.Speed,
+            StatEffectDelta  = -1,
+            StatEffectTarget = StageTarget.Foe,
+            StatEffectChance = 100,
+        };
+        attacker.AddAttack(move);
+
+        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), AlwaysHitRules.Instance);
+        await action.ExecuteAsync();
+
+        Assert.Equal(-1, defender.Stages.Speed);
+    }
+
     // ── Test helpers ─────────────────────────────────────────────────────────
 
     /// <summary>

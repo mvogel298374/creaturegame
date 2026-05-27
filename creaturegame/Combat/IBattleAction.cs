@@ -88,6 +88,9 @@ public class AttackAction : IBattleAction
         if (!justThawed)
             TryApplyStatus(attackToUse);
 
+        TryApplyStatEffect(attackToUse);
+        TryApplyHaze(attackToUse);
+
         return Task.CompletedTask;
     }
 
@@ -107,4 +110,38 @@ public class AttackAction : IBattleAction
 
         _emitter?.Emit(new StatusApplied(Target.Name, attack.StatusEffect));
     }
+
+    private void TryApplyStatEffect(Attack attack)
+    {
+        var se = attack.StatEffect;
+        if (se == null) return;
+        if (!Target.IsAlive() && se.Target == StageTarget.Foe) return;
+
+        if (Random.Shared.Next(1, 101) > se.Chance) return;
+
+        Creature affected = se.Target == StageTarget.Self ? Source : Target;
+        int newStage = ApplyStageChange(affected, se.Stat, se.Delta);
+        _emitter?.Emit(new StatStageChanged(affected.Name, se.Stat.ToString(), se.Delta, newStage));
+    }
+
+    private void TryApplyHaze(Attack attack)
+    {
+        if (attack.Effect != MoveEffect.Haze) return;
+        Source.ResetBattleState();
+        Target.ResetBattleState();
+        _emitter?.Emit(new HazeClearedStages());
+    }
+
+    private static int ApplyStageChange(Creature creature, StageStat stat, int delta) => stat switch
+    {
+        StageStat.Attack   => After(() => creature.Stages.RaiseAttack(delta),   () => creature.Stages.Attack),
+        StageStat.Defense  => After(() => creature.Stages.RaiseDefense(delta),  () => creature.Stages.Defense),
+        StageStat.Special  => After(() => creature.Stages.RaiseSpecial(delta),  () => creature.Stages.Special),
+        StageStat.Speed    => After(() => creature.Stages.RaiseSpeed(delta),    () => creature.Stages.Speed),
+        StageStat.Accuracy => After(() => creature.Stages.RaiseAccuracy(delta), () => creature.Stages.Accuracy),
+        StageStat.Evasion  => After(() => creature.Stages.RaiseEvasion(delta),  () => creature.Stages.Evasion),
+        _ => 0
+    };
+
+    private static int After(Action mutate, Func<int> read) { mutate(); return read(); }
 }

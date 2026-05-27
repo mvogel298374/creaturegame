@@ -43,6 +43,8 @@ public sealed class SignalRBattleEventEmitter(
         ConfusionMessage e => ("ConfusionMessage", new { e.CreatureName }),
         ConfusionDamage e  => ("ConfusionDamage",  new { e.CreatureName, e.Damage, e.HpAfter }),
         ConfusionCleared e => ("ConfusionCleared", new { e.CreatureName }),
+        StatStageChanged e => ("StatStageChanged", new { e.CreatureName, e.Stat, e.Delta, e.NewStage }),
+        HazeClearedStages  => ("HazeClearedStages", new { }),
         CreatureFainted e  => ("CreatureFainted",  new { e.Name }),
         _                  => ("Unknown",          new { })
     };
