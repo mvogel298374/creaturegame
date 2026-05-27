@@ -29,6 +29,9 @@ public class Battle
 
     public async Task StartFightAsync()
     {
+        PlayerCreature.ResetBattleState();
+        EnemyCreature.ResetBattleState();
+
         _emitter?.Emit(new BattleStarted(PlayerCreature.Name, EnemyCreature.Name));
 
         while (PlayerCreature.IsAlive() && EnemyCreature.IsAlive())

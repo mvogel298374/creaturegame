@@ -2,16 +2,19 @@ namespace creaturegame.Creatures;
 
 /// <summary>
 /// Per-battle stat stage modifiers, each clamped to [-6, +6].
-/// Cleared at the end of battle or by moves like Haze.
+/// Cleared at the start of each battle and by moves like Haze.
+///
+/// Declared as a class so mutations via Raise* helpers are visible to callers
+/// without the copy-back ceremony required for structs assigned through properties.
 /// </summary>
-public struct StatStages
+public class StatStages
 {
-    public int Attack;
-    public int Defense;
-    public int Special;
-    public int Speed;
-    public int Accuracy;
-    public int Evasion;
+    public int Attack   { get; private set; }
+    public int Defense  { get; private set; }
+    public int Special  { get; private set; }
+    public int Speed    { get; private set; }
+    public int Accuracy { get; private set; }
+    public int Evasion  { get; private set; }
 
     public void Clear() =>
         Attack = Defense = Special = Speed = Accuracy = Evasion = 0;

@@ -6,8 +6,8 @@ namespace creaturegame.Combat;
 /// Abstracts move selection for one side of a battle.
 /// Assign one implementation per side when constructing <see cref="Battle"/>.
 ///
-/// Implementations: AutoSelectInput (current default), ConsoleInput (Priority 6),
-/// RandomMoveInput / GreedyAIInput / WeightedAIInput (Priority 9).
+/// Implementations: AutoSelectInput (current default), ConsoleInput (Priority 7),
+/// RandomMoveInput / GreedyAIInput / WeightedAIInput (Priority 10).
 ///
 /// This interface is only called when a real choice exists. Struggle is a
 /// system-enforced fallback — Battle detects IsOutOfPP and bypasses IBattleInput,

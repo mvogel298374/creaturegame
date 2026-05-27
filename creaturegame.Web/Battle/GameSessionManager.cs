@@ -12,11 +12,23 @@ public sealed class GameSessionManager(IHubContext<BattleHub, IBattleClient> hub
     private readonly ConcurrentDictionary<string, PendingSession> _pending = new();
     private readonly ConcurrentDictionary<string, SignalRInput>   _inputs  = new();
 
+    // Pending sessions that are never claimed (client never connected) are evicted after this TTL.
+    private static readonly TimeSpan PendingSessionTtl = TimeSpan.FromMinutes(2);
+
     public string RegisterSession(Creature player, Creature enemy)
     {
         var gameId = Guid.NewGuid().ToString("N");
-        _pending[gameId] = new PendingSession(player, enemy);
+        _pending[gameId] = new PendingSession(player, enemy, DateTimeOffset.UtcNow);
+        EvictExpiredPendingSessions();
         return gameId;
+    }
+
+    private void EvictExpiredPendingSessions()
+    {
+        var cutoff = DateTimeOffset.UtcNow - PendingSessionTtl;
+        foreach (var (key, session) in _pending)
+            if (session.RegisteredAt < cutoff)
+                _pending.TryRemove(key, out _);
     }
 
     public Task StartBattleAsync(string gameId, string connectionId)
@@ -50,4 +62,4 @@ public sealed class GameSessionManager(IHubContext<BattleHub, IBattleClient> hub
     }
 }
 
-sealed record PendingSession(Creature Player, Creature Enemy);
+sealed record PendingSession(Creature Player, Creature Enemy, DateTimeOffset RegisteredAt);

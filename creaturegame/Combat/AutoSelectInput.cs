@@ -7,7 +7,7 @@ namespace creaturegame.Combat;
 /// Replicates the original hardcoded behaviour until real input sources are
 /// implemented (ConsoleInput at Priority 6, AI variants at Priority 9).
 ///
-/// Use AutoSelectInput.Instance for both sides when constructing Battle.
+/// Use AutoSelectInput.Instance for both sides when constructing Battle in tests/debug.
 /// </summary>
 public sealed class AutoSelectInput : IBattleInput
 {

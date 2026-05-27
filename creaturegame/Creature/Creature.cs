@@ -34,12 +34,6 @@ public class Creature
     public void GainExperience(int amount)
     {
         Experience += amount;
-        // Simplified level up logic as per requirement:
-        // "lets not worry about WHEN a pokemon levels up"
-        // But we still need a way to level up.
-        // I will implement a basic Experience to Level mapping or just a manual LevelUp.
-        // Given the request, I'll add a manual LevelUp method and maybe a simple threshold here.
-        
         int nextLevelExperience = CalculateExperienceForLevel(Level + 1);
         while (Experience >= nextLevelExperience && Level < MaxLevel)
         {
@@ -100,6 +94,18 @@ public class Creature
 
     // Stat stages (reset each battle; [-6, +6] per stat)
     public StatStages Stages { get; set; } = new StatStages();
+
+    /// <summary>
+    /// Clears all transient in-battle state. Called by Battle at the start of each
+    /// fight so the same Creature instance can be reused across multiple battles.
+    /// </summary>
+    public void ResetBattleState()
+    {
+        Status       = StatusCondition.None;
+        SleepTurns   = 0;
+        ConfusedTurns = 0;
+        Stages.Clear();
+    }
 
     private bool _statsInitialized;
 

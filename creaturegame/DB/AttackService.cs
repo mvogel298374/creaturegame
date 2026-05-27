@@ -35,7 +35,7 @@ public class AttackService
     /// </summary>
     public async Task<Attack?> GetAttackByIdAsync(int id)
     {
-        return await _context.Moves.FindAsync(id);
+        return await _context.Moves.AsNoTracking().FirstOrDefaultAsync(m => m.Id == id);
     }
 
     /// <summary>
@@ -43,14 +43,16 @@ public class AttackService
     /// </summary>
     public async Task<List<Attack>> GetAllAttacksAsync()
     {
-        return await _context.Moves.ToListAsync();
+        return await _context.Moves.AsNoTracking().ToListAsync();
     }
+
     /// <summary>
     /// Retrieves an attack by its name (case-insensitive).
     /// </summary>
     public async Task<Attack?> GetAttackByNameAsync(string name)
     {
-        return await _context.Moves.FirstOrDefaultAsync(m => m.Name != null && m.Name.ToLower() == name.ToLower());
+        return await _context.Moves.AsNoTracking()
+            .FirstOrDefaultAsync(m => m.Name != null && m.Name.ToLower() == name.ToLower());
     }
 
     /// <summary>
@@ -62,7 +64,7 @@ public class AttackService
         if (count == 0) return null;
 
         int index = Random.Shared.Next(count);
-        return await _context.Moves.Skip(index).FirstOrDefaultAsync();
+        return await _context.Moves.AsNoTracking().Skip(index).FirstOrDefaultAsync();
     }
 
     /// <summary>
