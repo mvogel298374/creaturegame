@@ -27,6 +27,7 @@ public class Creature
     public DamageType? Type1 { get; set; }
     public DamageType? Type2 { get; set; }
     public GrowthRate GrowthRate { get; set; } = GrowthRate.MediumFast;
+    public int SpeciesBaseExperience { get; set; }
 
     public int Experience { get; set; } = 0;
     public const int MaxLevel = 100;
@@ -48,11 +49,10 @@ public class Creature
         {
             Level++;
             CalculateStats();
-            Console.WriteLine($"{Name} leveled up to {Level}!");
         }
     }
 
-    private int CalculateExperienceForLevel(int level)
+    public int CalculateExperienceForLevel(int level)
     {
         if (level <= 1) return 0;
         double n = level;
@@ -123,11 +123,13 @@ public class Creature
         ChargingMove          = null;
     }
 
+    public IStatCalculator StatCalculator { get; set; } = Gen1StatCalculator.Instance;
+
     private bool _statsInitialized;
 
     private Creature()
     {
-        GenerateRandomDVs();
+        StatCalculator.RandomiseDvs(this);
     }
 
     public Creature(string name) : this()
@@ -145,30 +147,20 @@ public class Creature
         Type1 = species.Type1;
         Type2 = species.Type2;
         GrowthRate = species.GrowthRate;
+        SpeciesBaseExperience = species.BaseExperience;
         CalculateStats();
-    }
-
-    private void GenerateRandomDVs()
-    {
-        DvAttack = Random.Shared.Next(16);
-        DvDefense = Random.Shared.Next(16);
-        DvSpecial = Random.Shared.Next(16);
-        DvSpeed = Random.Shared.Next(16);
-        // HP DV is calculated from the lowest bit of the other four DVs
-        // Bit 0 of Attack, Defense, Speed, Special (order: ATK, DEF, SPD, SPEC)
-        DvHP = ((DvAttack & 1) << 3) | ((DvDefense & 1) << 2) | ((DvSpeed & 1) << 1) | (DvSpecial & 1);
     }
 
     public void CalculateStats()
     {
-        int newMaxHP = CalculateHP(BaseHP, DvHP, ExpHP, Level);
+        int newMaxHP = StatCalculator.CalculateHP(BaseHP, DvHP, ExpHP, Level);
         int oldMaxHP = Attributes.MaxHP;
 
         Attributes.MaxHP   = newMaxHP;
-        Attributes.Attack  = CalculateOtherStat(BaseAttack,  DvAttack,  ExpAttack,  Level);
-        Attributes.Defense = CalculateOtherStat(BaseDefense, DvDefense, ExpDefense, Level);
-        Attributes.Special = CalculateOtherStat(BaseSpecial, DvSpecial, ExpSpecial, Level);
-        Attributes.Speed   = CalculateOtherStat(BaseSpeed,   DvSpeed,   ExpSpeed,   Level);
+        Attributes.Attack  = StatCalculator.CalculateOtherStat(BaseAttack,  DvAttack,  ExpAttack,  Level);
+        Attributes.Defense = StatCalculator.CalculateOtherStat(BaseDefense, DvDefense, ExpDefense, Level);
+        Attributes.Special = StatCalculator.CalculateOtherStat(BaseSpecial, DvSpecial, ExpSpecial, Level);
+        Attributes.Speed   = StatCalculator.CalculateOtherStat(BaseSpeed,   DvSpeed,   ExpSpeed,   Level);
 
         if (!_statsInitialized)
         {
@@ -187,21 +179,6 @@ public class Creature
             Attributes.HP = Math.Min(Attributes.HP, newMaxHP);
         }
     }
-
-    private static int CalculateHP(int baseStat, int dv, int exp, int level)
-    {
-        // Gen 1 HP Formula: ( ( (Base + DV) * 2 + (sqrt(Exp)/4) ) * Level ) / 100 + Level + 10
-        double expBonus = Math.Floor(Math.Sqrt(exp)) / 4;
-        return (int)Math.Floor(((baseStat + dv) * 2 + expBonus) * level / 100) + level + 10;
-    }
-
-    private static int CalculateOtherStat(int baseStat, int dv, int exp, int level)
-    {
-        // Gen 1 Other Stats Formula: ( ( (Base + DV) * 2 + (sqrt(Exp)/4) ) * Level ) / 100 + 5
-        double expBonus = Math.Floor(Math.Sqrt(exp)) / 4;
-        return (int)Math.Floor(((baseStat + dv) * 2 + expBonus) * level / 100) + 5;
-    }
-
 
     public void DisplayInfo()
     {

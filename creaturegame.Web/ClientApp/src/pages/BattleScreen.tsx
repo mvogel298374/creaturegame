@@ -18,8 +18,9 @@ export function BattleScreen() {
   const nav = useNavigate();
   const playerSpecies: Species | null = location.state?.species ?? null;
   const gameId: string | null = location.state?.gameId ?? null;
+  const startLevel: number = location.state?.level ?? 50;
 
-  const { state, chooseMove } = useBattleHub(gameId);
+  const { state, chooseMove } = useBattleHub(gameId, startLevel);
   const [controlView, setControlView] = useState<ControlView>('menu');
   const logRef = useRef<HTMLDivElement>(null);
 
@@ -71,7 +72,7 @@ export function BattleScreen() {
         <div className="nameplate nameplate--player">
           <div className="nameplate-row">
             <span className="nameplate-name">{playerName}</span>
-            <span className="nameplate-level">Lv50</span>
+            <span className="nameplate-level">Lv{state.playerLevel}</span>
           </div>
           <HpBar hp={playerHp} maxHp={playerMaxHp} showNumbers />
           <StatusBadge status={state.playerStatus} />
@@ -114,6 +115,7 @@ export function BattleScreen() {
               playerName={playerName}
               playerHp={playerHp}
               playerMaxHp={playerMaxHp}
+              playerLevel={state.playerLevel}
               playerSpecies={playerSpecies}
               onBack={() => setControlView('menu')}
             />
@@ -250,10 +252,11 @@ const STAT_ROWS: Array<{ label: string; key: keyof Species }> = [
   { label: 'SPD', key: 'baseSpeed' },
 ];
 
-function CheckPanel({ playerName, playerHp, playerMaxHp, playerSpecies, onBack }: {
+function CheckPanel({ playerName, playerHp, playerMaxHp, playerLevel, playerSpecies, onBack }: {
   playerName: string;
   playerHp: number;
   playerMaxHp: number;
+  playerLevel: number;
   playerSpecies: Species | null;
   onBack: () => void;
 }) {
@@ -262,7 +265,7 @@ function CheckPanel({ playerName, playerHp, playerMaxHp, playerSpecies, onBack }
       <div className="check-header">
         <button className="btn-ghost" onClick={onBack}>← BACK</button>
         <span className="check-title">{playerName}</span>
-        <span className="check-level">Lv50</span>
+        <span className="check-level">Lv{playerLevel}</span>
       </div>
       <div className="check-body">
         <div className="check-hp-row">

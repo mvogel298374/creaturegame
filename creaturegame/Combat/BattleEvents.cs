@@ -65,3 +65,4 @@ public record ChargingUp(string CreatureName, string MoveName) : BattleEvent;
 
 // --- Creature ---
 public record CreatureFainted(string Name) : BattleEvent;
+public record LeveledUp(string CreatureName, int NewLevel) : BattleEvent;

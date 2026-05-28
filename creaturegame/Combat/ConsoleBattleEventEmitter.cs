@@ -162,6 +162,10 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
             case CreatureFainted e:
                 Console.WriteLine($"{e.Name} fainted!");
                 break;
+
+            case LeveledUp e:
+                Console.WriteLine($"{e.CreatureName} grew to level {e.NewLevel}!");
+                break;
         }
     }
 }

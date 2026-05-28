@@ -104,6 +104,14 @@ public class Battle
             if (!EnemyCreature.IsAlive())
             {
                 _emitter?.Emit(new CreatureFainted(EnemyCreature.Name));
+                int xp = _rules.CalculateXpAwarded(EnemyCreature.SpeciesBaseExperience, EnemyCreature.Level);
+                int priorLevel = PlayerCreature.Level;
+                PlayerCreature.GainExperience(xp);
+                while (priorLevel < PlayerCreature.Level)
+                {
+                    priorLevel++;
+                    _emitter?.Emit(new LeveledUp(PlayerCreature.Name, priorLevel));
+                }
                 break;
             }
             if (!PlayerCreature.IsAlive())

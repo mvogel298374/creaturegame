@@ -8,6 +8,7 @@ export interface BattleState {
   playerHp: number;
   playerMaxHp: number;
   playerStatus: string;
+  playerLevel: number;
   enemyName: string;
   enemyHp: number;
   enemyMaxHp: number;
@@ -27,7 +28,8 @@ type Action =
   | { type: 'LOG'; message: string }
   | { type: 'UPDATE_HP'; name: string; hp: number }
   | { type: 'UPDATE_STATUS'; name: string; status: string }
-  | { type: 'CLEAR_STATUS'; name: string };
+  | { type: 'CLEAR_STATUS'; name: string }
+  | { type: 'LEVELED_UP'; newLevel: number };
 
 const initialState: BattleState = {
   phase: 'connecting',
@@ -35,6 +37,7 @@ const initialState: BattleState = {
   playerHp: 0,
   playerMaxHp: 1,
   playerStatus: 'None',
+  playerLevel: 50,
   enemyName: '',
   enemyHp: 0,
   enemyMaxHp: 1,
@@ -82,6 +85,8 @@ function reducer(state: BattleState, action: Action): BattleState {
       if (action.name === state.playerName) return { ...state, playerStatus: 'None' };
       if (action.name === state.enemyName)  return { ...state, enemyStatus: 'None' };
       return state;
+    case 'LEVELED_UP':
+      return { ...state, playerLevel: action.newLevel };
     default:
       return state;
   }
@@ -89,8 +94,8 @@ function reducer(state: BattleState, action: Action): BattleState {
 
 type Payload = Record<string, unknown>;
 
-export function useBattleHub(gameId: string | null) {
-  const [state, dispatch] = useReducer(reducer, initialState);
+export function useBattleHub(gameId: string | null, initialLevel = 50) {
+  const [state, dispatch] = useReducer(reducer, { ...initialState, playerLevel: initialLevel });
   const connRef = useRef<signalR.HubConnection | null>(null);
 
   useEffect(() => {
@@ -246,6 +251,11 @@ export function useBattleHub(gameId: string | null) {
 
         case 'CreatureFainted':
           dispatch({ type: 'LOG', message: `${payload.name} fainted!` });
+          break;
+
+        case 'LeveledUp':
+          dispatch({ type: 'LEVELED_UP', newLevel: payload.newLevel as number });
+          dispatch({ type: 'LOG', message: `${payload.creatureName} grew to level ${payload.newLevel}!` });
           break;
       }
     });

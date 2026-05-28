@@ -133,39 +133,39 @@ Regular Poison does flat 1/16 max HP damage per turn. Toxic inflicts Bad Poison 
 
 ---
 
-## Experience, Levelling & Level Picker
+## Experience, Levelling & Level Picker ✅ DONE
 
 XP is awarded when a creature faints. The `Creature.GainExperience()` method and level-up formula exist but nothing calls them yet. This section also adds the level picker so the player can start a battle with any level (5–100) instead of a hardcoded 50. The chosen level feeds directly into the Learnset section, where it becomes the `atLevel` argument for move initialisation.
 
 **Level picker (backend):**
-- [ ] `StartGameRequest` gains an optional `Level` property (`int`, default 50, clamped server-side to [5, 100])
-- [ ] `GameController.BuildCreature(species, level)` sets `Creature.Level = level`, sets `Creature.Experience` to the threshold for that level (`CalculateExperienceForLevel(level)` already exists), then calls `CalculateStats()`
-- [ ] Moveset at the chosen level is still random until the Learnset section replaces random assignment with level-filtered moves — noted in Known Gaps
+- [x] `StartGameRequest` gains an optional `Level` property (`int`, default 50, clamped server-side to [5, 100])
+- [x] `GameController.BuildCreature(species, level)` sets `Creature.Level = level`, sets `Creature.Experience` to the threshold for that level (`CalculateExperienceForLevel(level)` already exists), then calls `CalculateStats()`
+- [x] Moveset at the chosen level is still random until the Learnset section replaces random assignment with level-filtered moves — noted in Known Gaps
 
 **Level picker (UI):**
-- [ ] `StarterSelection` screen gains a level slider (range 5–100, default 50, step 1) below the species grid
-- [ ] `POST /api/game/start` payload includes `level`; `useBattleHub.ts` stores chosen level in local state for the HUD
+- [x] `StarterSelection` screen gains a level slider (range 5–100, default 50, step 1) below the species grid
+- [x] `POST /api/game/start` payload includes `level`; `useBattleHub.ts` stores chosen level in local state for the HUD; player nameplate and Check panel show dynamic level, updated live by `LeveledUp` events
 
 **Engine:**
-- [ ] `Battle.StartFightAsync`: on `CreatureFainted`, award XP to the winning side's creature — Gen 1 wild formula: `floor(EnemySpecies.BaseExperience × EnemyLevel / 7)`. Trainer modifier (×1.5) added once the Enemy Encounter System exists
-- [ ] `PokemonSpecies.BaseExperience` is already imported and stored in DB ✓
-- [ ] `Creature` needs a `SpeciesBaseExperience` property (set by `InitializeFromSpecies`) so `Battle` can compute the award without a DB call
-- [ ] `LeveledUp(string CreatureName, int NewLevel)` battle event — replaces `Console.WriteLine` in `Creature.LevelUp()`
-- [ ] `ConsoleBattleEventEmitter`, `SignalRBattleEventEmitter`, and `useBattleHub.ts` handle `LeveledUp`
-- [ ] Moves gained on level-up are handled by the Learnset section — not in scope here
+- [x] `Battle.StartFightAsync`: on `CreatureFainted`, award XP to `PlayerCreature` only — Gen 1 wild formula: `floor(EnemySpecies.BaseExperience × EnemyLevel / 7)`. Trainer modifier (×1.5) added once the Enemy Encounter System exists
+- [x] `PokemonSpecies.BaseExperience` already imported and stored in DB ✓
+- [x] `Creature.SpeciesBaseExperience` property set by `InitializeFromSpecies`; `CalculateExperienceForLevel` made public
+- [x] `LeveledUp(string CreatureName, int NewLevel)` battle event — replaces `Console.WriteLine` in `Creature.LevelUp()`
+- [x] `ConsoleBattleEventEmitter`, `SignalRBattleEventEmitter`, and `useBattleHub.ts` handle `LeveledUp`
+- [x] Moves gained on level-up are handled by the Learnset section — not in scope here
 
-**Tests:**
-- [ ] `XP_AwardedToWinnerOnEnemyFaint` — correct Gen 1 formula result
-- [ ] `XP_LevelUpTriggered_WhenThresholdReached` — GainExperience → LevelUp path
-- [ ] `LeveledUp_EventFires` — RecordingEmitter captures the event
-- [ ] `XP_NotAwardedToLoser`
-- [ ] `BuildCreature_AtLevel30_SetsCorrectStatsAndXPThreshold` — level picker integration
+**Tests (5 new, 115 total passing):**
+- [x] `XP_AwardedToWinnerOnEnemyFaint` — correct Gen 1 formula result
+- [x] `XP_LevelUpTriggered_WhenThresholdReached` — GainExperience → LevelUp path
+- [x] `LeveledUp_EventFires` — RecordingBattleEventEmitter captures the event
+- [x] `XP_NotAwardedToLoser`
+- [x] `BuildCreature_AtLevel30_SetsCorrectStatsAndXPThreshold` — level picker integration
 
 ---
 
-## Enemy Encounter System
+## Enemy Encounter System ← NEXT
 
-`GameController` hardcodes Charmander as the enemy. Before the AI section this needs to be a real system — both so battles feel varied and so the AI has opponents to fight against.
+`GameController` hardcodes Charmander (ID 4) at level 50 as the enemy. This is the immediate next section — it replaces that hardcode so battles feel varied and the enemy level tracks the player's chosen level. Required before AI Move Selection (AI needs real opponents) and before Learnset (learnsets need a species to look up).
 
 **Design:**
 - `EncounterTable` — maps a difficulty tier (or player-species base-stat total) to a list of eligible opponent species IDs and a level range
@@ -199,6 +199,9 @@ The Level Picker sets the starting level; `LevelUp()` in battle is the permanent
 - [ ] If `MoveSet.Count == 4`: emit `MoveReplacementRequired(string CreatureName, string NewMoveName, IReadOnlyList<MoveInfo> CurrentMoves)` — this is a blocking event that requires a player decision before the battle can resume. The UI must present a "learn/forget" choice; the backend waits on a new `IBattleInput`-style TCS
 - [ ] `BattleHub` + `SignalRInput` extended with `ForgetMove(int slotIndex)` / `SkipNewMove()` path
 - [ ] `MoveLearned` and `MoveReplacementRequired` handled by all emitters and `useBattleHub.ts`
+
+**XP bar tie-in:**
+The player nameplate has an XP bar that is currently hardcoded to `xp={0} xpToNext={100}` and never fills. To make it live, `TurnStarted` needs to carry the player's current `Experience` and the threshold for the next level (`CalculateExperienceForLevel(Level + 1)`). Wire these into the `TurnStarted` event payload and update `useBattleHub.ts` to dispatch them into state. Do this alongside Learnset since that's when XP-per-battle becomes meaningful enough to show.
 
 **Tests:**
 - [ ] `Learnset_InitializeFromSpecies_GivesCorrectMovesAtLevel`
@@ -238,6 +241,21 @@ Design: `IBattleInput` is the seam. AI implementations score available moves via
 - [ ] `GreedyAIInput : IBattleInput`
 - [ ] `WeightedAIInput : IBattleInput`
 - [ ] Wire `RandomMoveInput` as default enemy input in `GameSessionManager` (replaces `AutoSelectInput`)
+
+---
+
+## EV Gain (Effort Values)
+
+Currently all creatures have 0 EVs (`ExpHP`, `ExpAttack`, `ExpDefense`, `ExpSpecial`, `ExpSpeed` are initialised to 0 and never modified). Stats vary only by DVs and level. This is a missing Gen 1 mechanic but low priority until the core loop is solid.
+
+**How to implement:**
+- In `Battle.StartFightAsync`, after awarding XP to the player, also award EVs: add the fainted enemy's base stats to the player's corresponding `Exp*` fields (`ExpAttack += enemyBaseAttack`, etc.)
+- Cap each EV field at 65535 (Gen 1 has no per-stat cap below the 16-bit max)
+- Call `CalculateStats()` on the player after updating EVs so stats reflect the new bonus immediately (or defer to end-of-battle — Gen 1 applies them mid-battle, which is the authentic behaviour)
+- `PokemonSpecies` already stores all five base stats, so no DB work is needed
+- No new battle event required unless you want a UI notification ("EVs gained" toast); the stat change is silent in the original games
+
+**Prerequisite:** None — can be added any time after Experience & Levelling is complete.
 
 ---
 
@@ -336,6 +354,5 @@ The moves array is already returned in the existing `/pokemon/{id}` response. Fo
 ### Known Gaps (not bugs — design decisions for future sections)
 - `GrowthRate` enum missing `Erratic` and `Fluctuating` — importer falls back to `MediumFast`; fix in Experience & Levelling
 - `StatusCondition` missing `BadPoison` — Toxic maps to `None` on import until Bad Poison (Toxic)
-- `GameController.BuildCreature` hardcodes level 50 and picks random moves — level picker fixed by Experience & Levelling; correct learnset moves fixed by Learnset System
-- `Creature.LevelUp()` calls `Console.WriteLine` directly — fixed by Experience & Levelling (`LeveledUp` event)
+- `GameController.BuildCreature` picks random moves — correct learnset moves fixed by Learnset System
 - `PokemonService` / `AttackService` not registered in DI — `GameController` uses direct `new()`; intentional for now, revisit when scoped lifetime or multiple-context scenarios arise

@@ -173,6 +173,37 @@
   letter-spacing: 0;
 }
 
+/* ── Level Picker ──────────────────────────── */
+.level-picker {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-md);
+  padding: var(--sp-sm) var(--sp-lg);
+  border-top: 1px solid var(--clr-border);
+  flex-shrink: 0;
+}
+
+.level-picker-label {
+  font-size: var(--fs-xs);
+  color: var(--clr-text-muted);
+  letter-spacing: var(--ls-wider);
+  white-space: nowrap;
+}
+
+.level-picker-slider {
+  width: 200px;
+  flex-shrink: 0;
+  accent-color: var(--clr-accent);
+  cursor: pointer;
+}
+
+.level-picker-value {
+  font-size: var(--fs-sm);
+  font-weight: bold;
+  letter-spacing: var(--ls-tight);
+  min-width: 2rem;
+}
+
 /* ── Footer ────────────────────────────────── */
 .select-footer {
   display: flex;

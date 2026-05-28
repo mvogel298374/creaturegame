@@ -12,6 +12,7 @@ export function StarterSelection() {
   const [search, setSearch]     = useState('');
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState<string | null>(null);
+  const [levelChoice, setLevelChoice] = useState(50);
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -31,10 +32,10 @@ export function StarterSelection() {
     const res = await fetch('/api/game/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ speciesId: selected.id }),
+      body: JSON.stringify({ speciesId: selected.id, level: levelChoice }),
     });
     const { gameId } = await res.json() as { gameId: string };
-    nav('/battle', { state: { species: selected, gameId } });
+    nav('/battle', { state: { species: selected, gameId, level: levelChoice } });
   };
 
   return (
@@ -79,6 +80,20 @@ export function StarterSelection() {
           ))}
         </div>
       </main>
+
+      <div className="level-picker">
+        <span className="level-picker-label">LEVEL</span>
+        <input
+          className="level-picker-slider"
+          type="range"
+          min={5}
+          max={100}
+          step={1}
+          value={levelChoice}
+          onChange={e => setLevelChoice(Number(e.target.value))}
+        />
+        <span className="level-picker-value">{levelChoice}</span>
+      </div>
 
       <footer className={`select-footer ${selected ? 'select-footer--visible' : ''}`}>
         {selected && (

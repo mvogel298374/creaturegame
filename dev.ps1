@@ -29,5 +29,5 @@ if ($ready) {
     Write-Host "Ready — opening http://localhost:5173"
     Start-Process "http://localhost:5173"
 } else {
-    Write-Host "Frontend didn't respond in 60s. Open http://localhost:5173 manually."
+    Write-Host "Frontend did not respond in 60s. Open http://localhost:5173 manually."
 }

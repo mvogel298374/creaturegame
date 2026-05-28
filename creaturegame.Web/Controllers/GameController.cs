@@ -32,7 +32,8 @@ public class GameController(GameSessionManager sessionManager) : ControllerBase
             if (allMoves.Count == 0)
                 return StatusCode(500, new { error = "No moves in database" });
 
-            var player = BuildCreature(playerSpecies, allMoves);
+            int playerLevel = Math.Clamp(req.Level ?? 50, 5, 100);
+            var player = BuildCreature(playerSpecies, allMoves, playerLevel);
             var enemy  = BuildCreature(enemySpecies,  allMoves);
 
             var gameId = sessionManager.RegisterSession(player, enemy);
@@ -45,14 +46,15 @@ public class GameController(GameSessionManager sessionManager) : ControllerBase
         }
     }
 
-    private static Creature BuildCreature(PokemonSpecies species, List<Attack> allMoves)
+    private static Creature BuildCreature(PokemonSpecies species, List<Attack> allMoves, int level = 50)
     {
-        var creature = new Creature(species.Name.ToUpper()) { Level = 50 };
+        var creature = new Creature(species.Name.ToUpper()) { Level = level };
         creature.InitializeFromSpecies(species);
+        creature.Experience = creature.CalculateExperienceForLevel(level);
         foreach (var move in allMoves.OrderBy(_ => Random.Shared.Next()).Take(4))
             creature.AddAttack(move);
         return creature;
     }
 }
 
-public record StartGameRequest(int SpeciesId);
+public record StartGameRequest(int SpeciesId, int? Level = null);

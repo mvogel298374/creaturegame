@@ -83,4 +83,8 @@ public sealed class Gen1BattleRules : IBattleRules
 
     // Gen 1: crits use raw computed stats, bypassing stages and the Burn Attack penalty.
     public bool CritIgnoresStatStages => true;
+
+    // Gen 1 wild XP formula: floor(BaseExperience × EnemyLevel / 7).
+    public int CalculateXpAwarded(int baseExp, int enemyLevel) =>
+        (int)Math.Floor((double)baseExp * enemyLevel / 7);
 }

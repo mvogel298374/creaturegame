@@ -119,4 +119,13 @@ public interface IBattleRules
     /// False in Gen 2+.
     /// </summary>
     bool CritIgnoresStatStages { get; }
+
+    // ── Experience ─────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns XP awarded to the winner when an enemy faints.
+    /// Gen 1 wild formula: floor(BaseExperience × EnemyLevel / 7).
+    /// Gen 5+: gain / party size; trainer battles apply 1.5× modifier.
+    /// </summary>
+    int CalculateXpAwarded(int baseExp, int enemyLevel);
 }
