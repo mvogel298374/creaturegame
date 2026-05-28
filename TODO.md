@@ -117,27 +117,19 @@
 
 ---
 
-## Bad Poison (Toxic)
+## Bad Poison (Toxic) ✅ DONE
 
-Regular Poison does flat 1/16 max HP damage per turn. Toxic inflicts Bad Poison which does escalating damage: 1/16, 2/16, 3/16... per turn. Without this, the most iconic Gen 1 stall move maps to `None` on import and is silently ignored.
+Regular Poison does flat 1/16 max HP damage per turn. Toxic inflicts Bad Poison which does escalating damage: 1/16, 2/16, 3/16... per turn.
 
-**Model:**
-- [ ] Add `StatusCondition.BadPoison` to the enum
-- [ ] `Creature.ToxicCounter` (int) — starts at 1 when Bad Poison is applied, incremented each end-of-turn before damage; reset in `ResetBattleState()`
-- [ ] PokeAPI importer: map `"bad-poison"` → `StatusCondition.BadPoison`
-
-**Engine:**
-- [ ] `IBattleRules.BadPoisonDamageFraction(int toxicCounter)` — Gen 1: returns `toxicCounter / 16.0`; counter does not cap in Gen 1 (theoretically escalates forever, but ~15 turns ends any battle)
-- [ ] `StatusResolver.ApplyEndOfTurnDamage`: if `Status == BadPoison`, deal `Max(1, floor(MaxHP × rules.BadPoisonDamageFraction(ToxicCounter)))`, then `ToxicCounter++`
-- [ ] `StatusDamage` event already exists and covers this — use `Source = StatusCondition.BadPoison`
-- [ ] `StatusResolver.CanAct`: no pre-turn effect (Bad Poison only affects end-of-turn, unlike Sleep/Freeze/Paralysis)
-- [ ] `useBattleHub.ts`: add `'BADPSN'` status badge alongside existing PSN/BRN/PAR/SLP/FRZ badges
-
-**Tests:**
-- [ ] `BadPoison_FirstTurn_Deals1_16MaxHP`
-- [ ] `BadPoison_SecondTurn_Deals2_16MaxHP` — counter increments correctly
-- [ ] `BadPoison_DoesNotBlockAction` — creature can still act each turn
-- [ ] `BadPoison_ResetOnNewBattle` — ToxicCounter cleared by ResetBattleState
+- [x] `StatusCondition.BadPoison` added to enum
+- [x] `Creature.ToxicCounter` (int, default 1) — incremented each end-of-turn after damage; reset in `ResetBattleState()`
+- [x] `IBattleRules.BadPoisonDamageFraction(int toxicCounter)` — Gen 1: `toxicCounter / 16.0`; no cap
+- [x] `StatusResolver.ApplyEndOfTurnDamage`: `BadPoison` case deals `Max(1, floor(MaxHP × fraction))` then `ToxicCounter++`
+- [x] `StatusDamage` event reused with `Source = StatusCondition.BadPoison`
+- [x] `PokeApiConnector`: `"bad-poison"` → `StatusCondition.BadPoison`
+- [x] `BattleScreen.tsx`: `StatusBadge` shows `BADPSN` for `BadPoison`
+- [x] `useBattleHub.ts`: StatusDamage log renders "toxic poison" instead of "BadPoison"
+- [x] 4 new tests — all passing (110 total)
 
 ---
 
@@ -335,6 +327,11 @@ The moves array is already returned in the existing `/pokemon/{id}` response. Fo
 - [x] `AsNoTracking()` on all read-only DB service methods
 - [x] Pending-session TTL in `GameSessionManager` (2-minute eviction)
 - [x] `AlwaysHitRules` test helper — eliminates Gen 1 1/256-miss flakiness in status unit tests
+
+### Future Refactor: BattleState extraction
+`Creature` currently owns both permanent data (base stats, DVs, types, moveset) and transient battle state (status, ToxicCounter, IsRecharging, IsFlinched, HasLeechSeed, BindingTurnsRemaining, IsTwoTurnCharging, ChargingMove, StatStages). `ResetBattleState()` is the contract separating them — good enough while there is no save system.
+
+**Trigger:** When the save system (`PlayerDbContext` / `save.db`) is built, `Creature` needs to be serialized without its battle state. At that point extract transient fields into a `BattleState` class held as `Creature.Battle` and serialize only the permanent half. All `StatusResolver`, `AttackAction`, and `Battle` call sites update from `creature.X` to `creature.Battle.X`.
 
 ### Known Gaps (not bugs — design decisions for future sections)
 - `GrowthRate` enum missing `Erratic` and `Fluctuating` — importer falls back to `MediumFast`; fix in Experience & Levelling

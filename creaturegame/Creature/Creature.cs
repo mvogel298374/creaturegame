@@ -91,6 +91,7 @@ public class Creature
     public StatusCondition Status { get; set; } = StatusCondition.None;
     public int SleepTurns { get; set; } = 0;
     public int ConfusedTurns { get; set; } = 0;
+    public int ToxicCounter { get; set; } = 1;
 
     // Stat stages (reset each battle; [-6, +6] per stat)
     public StatStages Stages { get; set; } = new StatStages();
@@ -112,6 +113,7 @@ public class Creature
         Status       = StatusCondition.None;
         SleepTurns   = 0;
         ConfusedTurns = 0;
+        ToxicCounter  = 1;
         Stages.Clear();
         IsRecharging          = false;
         IsFlinched            = false;

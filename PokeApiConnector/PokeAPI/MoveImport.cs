@@ -120,12 +120,13 @@ public class MoveImport
 
         attack.StatusEffect = pokeMove.Meta?.Ailment?.Name switch
         {
-            "paralysis" => StatusCondition.Paralysis,
-            "sleep"     => StatusCondition.Sleep,
-            "burn"      => StatusCondition.Burn,
-            "poison"    => StatusCondition.Poison,
-            "freeze"    => StatusCondition.Freeze,
-            _           => StatusCondition.None
+            "paralysis"  => StatusCondition.Paralysis,
+            "sleep"      => StatusCondition.Sleep,
+            "burn"       => StatusCondition.Burn,
+            "poison"     => StatusCondition.Poison,
+            "freeze"     => StatusCondition.Freeze,
+            "bad-poison" => StatusCondition.BadPoison,
+            _            => StatusCondition.None
         };
 
         if (attack.StatusEffect != StatusCondition.None && pokeMove.Meta?.AilmentChance > 0)

@@ -50,6 +50,12 @@ public interface IBattleRules
     /// </summary>
     int PoisonDamageDenominator { get; }
 
+    /// <summary>
+    /// Returns the fraction of max HP dealt by Bad Poison (Toxic) on the given counter tick.
+    /// Gen 1: counter/16 — escalates each turn with no cap (counter starts at 1, increments after damage).
+    /// </summary>
+    double BadPoisonDamageFraction(int toxicCounter);
+
     // ── Stat stages ────────────────────────────────────────────────────────────
 
     /// <summary>

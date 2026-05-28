@@ -7,5 +7,6 @@ public enum StatusCondition
     Poison,
     Burn,
     Paralysis,
-    Freeze
+    Freeze,
+    BadPoison
 }

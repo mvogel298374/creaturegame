@@ -158,9 +158,13 @@ function XpBar({ xp, xpToNext }: { xp: number; xpToNext: number }) {
 
 function StatusBadge({ status }: { status: string }) {
   if (!status || status === 'None') return null;
+  const label =
+    status === 'Paralysis'  ? 'PAR'    :
+    status === 'BadPoison'  ? 'BADPSN' :
+    status.slice(0, 3).toUpperCase();
   return (
     <span className={`status-badge status-badge--${status.toLowerCase()}`}>
-      {status === 'Paralysis' ? 'PAR' : status.slice(0, 3).toUpperCase()}
+      {label}
     </span>
   );
 }

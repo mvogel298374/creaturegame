@@ -1551,6 +1551,65 @@ public class CoreMechanicsTests
         Assert.False(creature.IsFlinched); // flag self-clears after blocking
     }
 
+    // ── Bad Poison (Toxic) Tests ─────────────────────────────────────────────
+
+    [Fact]
+    public void BadPoison_FirstTurn_Deals1_16MaxHP()
+    {
+        var creature = new Creature("Weezing") { Level = 50, Status = StatusCondition.BadPoison };
+        creature.CalculateStats();
+        creature.Attributes.MaxHP = 160;
+        creature.Attributes.HP   = 160;
+        creature.ToxicCounter = 1;
+
+        StatusResolver.ApplyEndOfTurnDamage(creature);
+
+        // floor(160 × 1/16) = 10
+        Assert.Equal(150, creature.Attributes.HP);
+        Assert.Equal(2, creature.ToxicCounter);
+    }
+
+    [Fact]
+    public void BadPoison_SecondTurn_Deals2_16MaxHP()
+    {
+        var creature = new Creature("Weezing") { Level = 50, Status = StatusCondition.BadPoison };
+        creature.CalculateStats();
+        creature.Attributes.MaxHP = 160;
+        creature.Attributes.HP   = 160;
+        creature.ToxicCounter = 2;
+
+        StatusResolver.ApplyEndOfTurnDamage(creature);
+
+        // floor(160 × 2/16) = 20
+        Assert.Equal(140, creature.Attributes.HP);
+        Assert.Equal(3, creature.ToxicCounter);
+    }
+
+    [Fact]
+    public void BadPoison_DoesNotBlockAction()
+    {
+        var creature = new Creature("Weezing") { Level = 50, Status = StatusCondition.BadPoison };
+        creature.CalculateStats();
+
+        bool canAct = StatusResolver.CanAct(creature);
+
+        Assert.True(canAct);
+    }
+
+    [Fact]
+    public void BadPoison_ResetOnNewBattle()
+    {
+        var creature = new Creature("Weezing") { Level = 50 };
+        creature.CalculateStats();
+        creature.Status = StatusCondition.BadPoison;
+        creature.ToxicCounter = 7;
+
+        creature.ResetBattleState();
+
+        Assert.Equal(StatusCondition.None, creature.Status);
+        Assert.Equal(1, creature.ToxicCounter);
+    }
+
     // ── Test helpers ─────────────────────────────────────────────────────────
 
     /// <summary>
@@ -1570,6 +1629,7 @@ public class CoreMechanicsTests
         public int    CalculateStruggleRecoil(Creature s, int d)           => Gen1BattleRules.Instance.CalculateStruggleRecoil(s, d);
         public int    BurnDamageDenominator                                => Gen1BattleRules.Instance.BurnDamageDenominator;
         public int    PoisonDamageDenominator                              => Gen1BattleRules.Instance.PoisonDamageDenominator;
+        public double BadPoisonDamageFraction(int toxicCounter)            => Gen1BattleRules.Instance.BadPoisonDamageFraction(toxicCounter);
         public double GetStatMultiplier(int stage)                         => Gen1BattleRules.Instance.GetStatMultiplier(stage);
         public double GetAccuracyStageMultiplier(int stage)                => Gen1BattleRules.Instance.GetAccuracyStageMultiplier(stage);
         public int    GetHitThreshold(int acc, int accStage, int evaStage) => 256; // > AccuracyRollBound → always hits
@@ -1597,6 +1657,7 @@ public class CoreMechanicsTests
         public int    CalculateStruggleRecoil(Creature s, int d)          => Gen1BattleRules.Instance.CalculateStruggleRecoil(s, d);
         public int    BurnDamageDenominator                               => Gen1BattleRules.Instance.BurnDamageDenominator;
         public int    PoisonDamageDenominator                             => Gen1BattleRules.Instance.PoisonDamageDenominator;
+        public double BadPoisonDamageFraction(int toxicCounter)           => Gen1BattleRules.Instance.BadPoisonDamageFraction(toxicCounter);
         public double GetStatMultiplier(int stage)                        => Gen1BattleRules.Instance.GetStatMultiplier(stage);
         public double GetAccuracyStageMultiplier(int stage)               => Gen1BattleRules.Instance.GetAccuracyStageMultiplier(stage);
         public int    GetHitThreshold(int acc, int accStage, int evaStage) => Gen1BattleRules.Instance.GetHitThreshold(acc, accStage, evaStage);

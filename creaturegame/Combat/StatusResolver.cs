@@ -118,6 +118,12 @@ public static class StatusResolver
             damage = Math.Max(1, creature.Attributes.MaxHP / battleRules.PoisonDamageDenominator);
             source = StatusCondition.Poison;
         }
+        else if (creature.Status == StatusCondition.BadPoison)
+        {
+            damage = Math.Max(1, (int)Math.Floor(creature.Attributes.MaxHP * battleRules.BadPoisonDamageFraction(creature.ToxicCounter)));
+            source = StatusCondition.BadPoison;
+            creature.ToxicCounter++;
+        }
 
         if (damage > 0)
         {

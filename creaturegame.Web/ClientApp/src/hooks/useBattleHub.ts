@@ -161,10 +161,12 @@ export function useBattleHub(gameId: string | null) {
           dispatch({ type: 'LOG', message: `${payload.targetName} was ${(payload.status as string).toLowerCase()}ed!` });
           break;
 
-        case 'StatusDamage':
+        case 'StatusDamage': {
           dispatch({ type: 'UPDATE_HP', name: payload.targetName as string, hp: payload.hpAfter as number });
-          dispatch({ type: 'LOG', message: `${payload.targetName} is hurt by ${payload.source}!` });
+          const src = payload.source === 'BadPoison' ? 'toxic poison' : payload.source;
+          dispatch({ type: 'LOG', message: `${payload.targetName} is hurt by ${src}!` });
           break;
+        }
 
         case 'StatusCleared':
           dispatch({ type: 'CLEAR_STATUS', name: payload.creatureName as string });

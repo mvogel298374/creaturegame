@@ -29,6 +29,9 @@ public sealed class Gen1BattleRules : IBattleRules
     public int BurnDamageDenominator   => 16;
     public int PoisonDamageDenominator => 16;
 
+    // Gen 1 Bad Poison (Toxic): counter/16 of max HP; no cap — counter increments each turn.
+    public double BadPoisonDamageFraction(int toxicCounter) => toxicCounter / 16.0;
+
     // Gen 1: binding traps for 2–5 turns.
     public int RollBindingTurns() => Random.Shared.Next(2, 6);
     public int BindingDamageDenominator => 16;
