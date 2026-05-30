@@ -4,195 +4,72 @@
 
 ---
 
-## Type Chart ✅ DONE
-- [x] Create `ITypeChart` interface
-- [x] Implement `Gen1TypeChart` with full 17-type Gen 1 matrix (Ghost/Psychic bug, Poison super vs Bug, no Steel/Dark/Fairy)
-- [x] Wire into `DamageCalculator` via interface (swappable per-generation)
-- [x] `AttackAction` and `Battle` accept `ITypeChart` — one injection point to swap generation
-- [x] 7 type chart tests added and passing
+## Completed ✅
 
-## PP Tracking ✅ DONE
-- [x] Switch `Creature.MoveSet` from `List<Attack>` to `List<PokemonAttack>`
-- [x] `AttackAction` decrements `PowerPointsCurrent`, checks > 0 before executing
-- [x] Handle Struggle when all PP = 0
+<details>
+<summary>Type Chart, PP, Status, Crits, Move Effects, Damage Categories, Bad Poison, XP/Levelling, Enemy Encounters</summary>
 
-## Move Priority Fix ✅ DONE
-- [x] `AttackAction` constructor: read `move.Priority` instead of hardcoding 0
+**Type Chart** — `ITypeChart` + `Gen1TypeChart` (17-type Gen 1 matrix, Ghost/Psychic bug, Poison→Bug quirk). Wired into `DamageCalculator` and `AttackAction`.
 
-## Status Condition Application ✅ DONE
-- [x] Add `StatusEffect` (`StatusCondition`) property to `Attack`; add EF migration
-- [x] Add `meta.ailment` mapping to `PokeApiMove`; import `ailment.name` → `StatusEffect`, `ailment_chance` → `EffectChance` in `MoveImport`
-- [x] `AttackAction.ExecuteAsync()`: after damage, roll `EffectChance` and set `Target.Status` if target has no status and move has a `StatusEffect`
-- [x] Set `SleepTurns` (1–7, random) when applying Sleep
-- [x] Tests: status applied on hit; not applied when target already statused; secondary effect chance respected
+**PP Tracking** — `PokemonAttack` wrapper; decrements on use; Struggle when all PP = 0.
 
-## Status Effects in Battle Loop ✅ DONE
-- [x] Pre-turn: Sleep skips action and decrements `SleepTurns`; wakes when counter hits 0
-- [x] Pre-turn: Freeze skips action; thaws on any Fire-type move that can burn hitting the frozen target
-- [x] Pre-turn: Paralysis — 25% chance to skip action
-- [x] Stat modifiers: Burn halves physical Attack in `DamageCalculator`; Paralysis quarters Speed in turn ordering
-- [x] End-of-turn: Burn deals 1/16 max HP; Poison deals 1/16 max HP
-- [x] Pseudo-status — Confusion: `Creature.ConfusedTurns` counter; 50% chance to hurt itself each turn (40 base power, typeless); clears when counter expires (2–5 turns, Gen 1)
+**Move Priority** — `AttackAction` reads `move.Priority` (was hardcoded 0).
 
-## Critical Hits & Stat Stages ✅ DONE
+**Status Conditions** — Applied after damage; `EffectChance` roll; sleep turn counter; status blocked if target already statused.
 
-**Stat stages:**
-- [x] `StatStages` class on `Creature` — Attack, Defense, Special, Speed, Accuracy, Evasion each clamped to [-6, +6]; `Clear()` + `Raise*()` helpers; class (not struct) so mutations are visible through property
-- [x] `IBattleRules.GetStatMultiplier(int stage)` — Gen 1: 2/(2+|n|) for n≤0, (2+n)/2 for n>0 (0.25× at -6, 4× at +6)
-- [x] `IBattleRules.GetAccuracyStageMultiplier(int stage)` — Gen 1: 3/(3+|n|) for n≤0, (3+n)/3 for n>0
-- [x] `IBattleRules.GetHitThreshold` + `AccuracyRollBound` — Gen 1 0–255 scale; roll 255 always misses (1/256 bug)
-- [x] `DamageCalculator` applies Attack/Defense/Special stage multipliers via `IBattleRules`
-- [x] `StatusResolver.EffectiveSpeed` folds in Speed stage multiplier (stacks with Paralysis quartering)
-- [x] `Creature.ResetBattleState()` — clears Status, SleepTurns, ConfusedTurns, Stages; called at start of each battle
+**Status Effects in Battle Loop** — Sleep/Freeze/Paralysis pre-turn; Burn/Poison end-of-turn 1/16; Confusion; Paralysis quarters Speed in sort order.
 
-**Critical hits:**
-- [x] `Attack.IsHighCrit` bool — EF migration added; PokeApiConnector imports `meta.crit_rate > 0`
-- [x] `IBattleRules.GetCritChance` — Gen 1 normal: floor(BaseSpeed/2)/256; high-crit: min(floor(BaseSpeed/2)×8, 255)/256
-- [x] `IBattleRules.CritMultiplier` → 2.0; `CritIgnoresStatStages` → true in Gen 1
-- [x] `DamageCalculator` rolls crit; Gen 1 crit path uses raw Attributes stats — no stages, no Burn penalty
-- [x] `DamageDealt` event carries `IsCrit` flag
+**Critical Hits & Stat Stages** — Gen 1 Speed-based crit formula; high-crit moves; stat stage multipliers on `IBattleRules`; crits ignore stages and Burn.
+
+**Move Effects** — `MoveEffect` enum; stat-stage moves (Swords Dance, Growl); Haze; Flinch; Recharge; LeechSeed; Binding; TwoTurn.
+
+**Damage Categories** — Fixed (Dragon Rage), LevelBased (Seismic Toss), OHKO, SelfDestruct (halves target Defense), SuperFang, Drain.
+
+**Bad Poison (Toxic)** — `StatusCondition.BadPoison`; `ToxicCounter` escalates damage each turn; `IBattleRules.BadPoisonDamageFraction`.
+
+**Experience, Levelling & Level Picker** — Gen 1 wild XP formula; `LeveledUp` event; level slider in UI (5–100); `GainExperience → LevelUp` path.
+
+**Enemy Encounter System** — BST-matched random selection (±15%, widens to ±50%/all); enemy level = player level ±3; player's own species excluded. `EncounterSelector` in core library.
+
+</details>
 
 ---
 
-## Move Effects (Stat-Stage Moves) ✅ DONE
-- [x] `StageStat` / `StageTarget` / `MoveEffect` enums + `StatEffect` record (`creaturegame/Attacks/MoveEffect.cs`)
-- [x] `Attack`: four nullable stat-effect columns (`StatEffectStat`, `StatEffectDelta`, `StatEffectTarget`, `StatEffectChance`) + computed `[NotMapped] StatEffect?` property + `MoveEffect Effect` column; EF migration `AddStatEffectAndMoveEffect`
-- [x] `AttackAction`: `TryApplyStatEffect` rolls chance, calls `Stages.Raise*(delta)` on correct target, emits `StatStageChanged`; `TryApplyHaze` calls `ResetBattleState()` on both creatures, emits `HazeClearedStages`
-- [x] `StatStageChanged` + `HazeClearedStages` events handled in `ConsoleBattleEventEmitter`, `SignalRBattleEventEmitter`, and `useBattleHub.ts`
-- [x] `MoveImport`: maps `stat_changes[]` → stat-effect columns; `flinch_chance > 0` → `MoveEffect.Flinch`; name `"haze"` → `MoveEffect.Haze`; `PokeApiMove` extended with `Target`, `StatChanges`, `MoveMeta.FlinchChance`
-- [x] 7 new tests — `SwordsDance_RaisesAttackStageByTwo`, `Growl_LowersEnemyAttackStage`, `StatStage_ClampedAtPlusSix/MinusSix`, `Haze_ClearsAllStagesOnBothCreatures`, `StatEffect_ZeroChance_NeverApplies`, `StatEffect_HundredChance_AlwaysApplies`; migration round-trip test extended
+## ← NEXT: Generation Abstraction — Stat Selection
 
----
+The last hardcoded Gen 1 assumption in the combat core. `DamageCalculator` currently picks `Attributes.Special` symmetrically for both offence and defence on special moves — correct for Gen 1, wrong from Gen 2 onwards (SpAtk ≠ SpDef). Closing this now keeps the engine clean before Learnset and AI work begins.
 
-## Move Execution Completeness ✅ DONE
-
-**DamageCategory on Attack (new enum + columns):**
-- [x] `DamageCategory` enum: `Standard`, `Fixed`, `LevelBased`, `Drain`, `OHKO`, `SelfDestruct`, `SuperFang`
-- [x] `Attack.DamageCategory` (default `Standard`); `Attack.FixedDamageValue` (nullable int); `Attack.DrainPercent` (int, default 50); `Attack.NeverMisses` (bool); EF migration `AddDamageCategoryAndMoveFlags`
-
-**MoveEffect additions:**
-- [x] `MoveEffect.Recharge` — sets `Source.IsRecharging` after damage; `CanAct` blocks and clears next turn
-- [x] `MoveEffect.LeechSeed` — sets `Target.HasLeechSeed`; `Battle` drains 1/16 max HP end-of-turn and heals opponent
-- [x] `MoveEffect.Binding` — sets `Target.BindingTurnsRemaining` (2–5 turns); `CanAct` blocks while > 0; end-of-turn drains 1/16 and decrements
-- [x] `MoveEffect.TwoTurn` — charge turn: emit `ChargingUp`, set state; `Battle` loop auto-fires `ChargingMove` on release turn; PP only on charge turn
-- [x] `MoveEffect.Flinch` — sets `Target.IsFlinched`; `CanAct` blocks and self-clears
-
-**Persistent creature state (all cleared by ResetBattleState):**
-- [x] `IsRecharging`, `IsFlinched`, `HasLeechSeed`, `BindingTurnsRemaining`, `IsTwoTurnCharging`, `ChargingMove`
-
-**Engine — AttackAction:**
-- [x] `NeverMisses`: skip accuracy check entirely (Swift)
-- [x] `OHKO`: fail before accuracy roll if `Source.Level < Target.Level`; on hit, set target HP → 0
-- [x] `Fixed`: deal exactly `FixedDamageValue` HP; bypass formula (Dragon Rage, Sonic Boom)
-- [x] `LevelBased`: deal exactly `Source.Level` HP (Seismic Toss, Night Shade)
-- [x] `SuperFang`: deal `floor(Target.HP / 2)`, min 1
-- [x] `Drain`: standard damage then heal Source by `floor(damage × DrainPercent / 100)`; emit `DrainHealed`
-- [x] `SelfDestruct`: standard formula with target Defense/Special halved (Gen 1 quirk); Source HP → 0 after damage; user faints even on miss
-
-**New battle events (all wired to SignalR emitter + useBattleHub.ts):**
-- [x] `DrainHealed`, `LeechSeedApplied`, `LeechSeedDamage`, `LeechSeedHealed`, `Recharging`, `BindingStarted`, `BindingBlocked`, `BindingDamage`, `FlinchBlocked`, `ChargingUp`
-
-**Import (PokeApiConnector):**
-- [x] `meta.category` and `meta.drain` added to `MoveMeta` DTO
-- [x] `meta.category.name` → `DamageCategory` mapping; ID-based overrides for Fixed/LevelBased/SuperFang/SelfDestruct/NeverMisses
-- [x] MoveEffect mapping: Hyper Beam → Recharge; Leech Seed → LeechSeed; Wrap/Bind/Clamp/Fire Spin → Binding; Fly/Dig/Solar Beam/Razor Wind/Sky Attack → TwoTurn
-
-**Tests (16 new, 106 total passing):**
-- [x] `DrainMove_HealsSourceByHalfDamageDealt`
-- [x] `FixedDamage_DealsDamageIgnoringStats`
-- [x] `LevelBasedDamage_DealsAttackerLevelDamage`
-- [x] `OHKOMove_FailsIfSourceLevelLowerThanTarget`
-- [x] `OHKOMove_FaintsTargetIfLevelSufficient`
-- [x] `SelfDestruct_FaintsUser`
-- [x] `SelfDestruct_FaintsUserEvenOnMiss`
-- [x] `SuperFang_HalvesTargetCurrentHp`
-- [x] `Recharge_SourceCannotActNextTurn`
-- [x] `LeechSeed_SetsHasLeechSeedOnTarget`
-- [x] `LeechSeedDrain_DrainsTargetAndHealsSource`
-- [x] `Binding_SetsBindingTurnsOnTarget`
-- [x] `Binding_BlocksTargetViaCanAct`
-- [x] `TwoTurnMove_ChargesFirstThenDeliversDamage`
-- [x] `NeverMisses_AlwaysHitsRegardlessOfAccuracy`
-- [x] `Flinch_BlocksTargetViaCanAct_AndSelfClears`
-
----
-
-## Bad Poison (Toxic) ✅ DONE
-
-Regular Poison does flat 1/16 max HP damage per turn. Toxic inflicts Bad Poison which does escalating damage: 1/16, 2/16, 3/16... per turn.
-
-- [x] `StatusCondition.BadPoison` added to enum
-- [x] `Creature.ToxicCounter` (int, default 1) — incremented each end-of-turn after damage; reset in `ResetBattleState()`
-- [x] `IBattleRules.BadPoisonDamageFraction(int toxicCounter)` — Gen 1: `toxicCounter / 16.0`; no cap
-- [x] `StatusResolver.ApplyEndOfTurnDamage`: `BadPoison` case deals `Max(1, floor(MaxHP × fraction))` then `ToxicCounter++`
-- [x] `StatusDamage` event reused with `Source = StatusCondition.BadPoison`
-- [x] `PokeApiConnector`: `"bad-poison"` → `StatusCondition.BadPoison`
-- [x] `BattleScreen.tsx`: `StatusBadge` shows `BADPSN` for `BadPoison`
-- [x] `useBattleHub.ts`: StatusDamage log renders "toxic poison" instead of "BadPoison"
-- [x] 4 new tests — all passing (110 total)
-
----
-
-## Experience, Levelling & Level Picker ✅ DONE
-
-XP is awarded when a creature faints. The `Creature.GainExperience()` method and level-up formula exist but nothing calls them yet. This section also adds the level picker so the player can start a battle with any level (5–100) instead of a hardcoded 50. The chosen level feeds directly into the Learnset section, where it becomes the `atLevel` argument for move initialisation.
-
-**Level picker (backend):**
-- [x] `StartGameRequest` gains an optional `Level` property (`int`, default 50, clamped server-side to [5, 100])
-- [x] `GameController.BuildCreature(species, level)` sets `Creature.Level = level`, sets `Creature.Experience` to the threshold for that level (`CalculateExperienceForLevel(level)` already exists), then calls `CalculateStats()`
-- [x] Moveset at the chosen level is still random until the Learnset section replaces random assignment with level-filtered moves — noted in Known Gaps
-
-**Level picker (UI):**
-- [x] `StarterSelection` screen gains a level slider (range 5–100, default 50, step 1) below the species grid
-- [x] `POST /api/game/start` payload includes `level`; `useBattleHub.ts` stores chosen level in local state for the HUD; player nameplate and Check panel show dynamic level, updated live by `LeveledUp` events
-
-**Engine:**
-- [x] `Battle.StartFightAsync`: on `CreatureFainted`, award XP to `PlayerCreature` only — Gen 1 wild formula: `floor(EnemySpecies.BaseExperience × EnemyLevel / 7)`. Trainer modifier (×1.5) added once the Enemy Encounter System exists
-- [x] `PokemonSpecies.BaseExperience` already imported and stored in DB ✓
-- [x] `Creature.SpeciesBaseExperience` property set by `InitializeFromSpecies`; `CalculateExperienceForLevel` made public
-- [x] `LeveledUp(string CreatureName, int NewLevel)` battle event — replaces `Console.WriteLine` in `Creature.LevelUp()`
-- [x] `ConsoleBattleEventEmitter`, `SignalRBattleEventEmitter`, and `useBattleHub.ts` handle `LeveledUp`
-- [x] Moves gained on level-up are handled by the Learnset section — not in scope here
-
-**Tests (5 new, 115 total passing):**
-- [x] `XP_AwardedToWinnerOnEnemyFaint` — correct Gen 1 formula result
-- [x] `XP_LevelUpTriggered_WhenThresholdReached` — GainExperience → LevelUp path
-- [x] `LeveledUp_EventFires` — RecordingBattleEventEmitter captures the event
-- [x] `XP_NotAwardedToLoser`
-- [x] `BuildCreature_AtLevel30_SetsCorrectStatsAndXPThreshold` — level picker integration
-
----
-
-## Enemy Encounter System ✅ DONE
-
-- [x] BST-matched random selection: pool of all 151 species filtered to ±15% of player BST (widens to ±25% / ±50% / all if pool is empty)
-- [x] Enemy level = player level ± 3, clamped to [5, 100]
-- [x] Player's own species excluded from pool
-- [x] `GameController` uses `PickByBst` + `Bst` helpers; no new API endpoints
+- [ ] Add two methods to `IBattleRules`:
+  ```csharp
+  int GetOffensiveStat(Creature attacker, AttackType moveType);
+  int GetDefensiveStat(Creature defender, AttackType moveType);
+  ```
+- [ ] `Gen1BattleRules`: both return `Attributes.Special` for `Special` moves; `Attributes.Attack` / `Attributes.Defense` for `Physical` (same as today, just explicit)
+- [ ] `DamageCalculator`: replace the four inline `Attributes.Special` references with calls to the new methods; remove the duplicated crit / non-crit stat selection block
+- [ ] Tests: `DamageCalculator_UsesOffensiveStatFromRules` and `DamageCalculator_UsesDefensiveStatFromRules` — verify injected rules control which stat is read
 
 ---
 
 ## Learnset System
 
-Currently creatures receive 4 random moves from the full move pool. Learnsets ensure Pokémon only know moves they can actually learn, making battles feel authentic and making the AI evaluator meaningful.
+Currently creatures receive 4 random moves from the full move pool. Learnsets ensure Pokémon only know moves they can actually learn.
 
-**Prerequisite:** Experience, Levelling & Level Picker must be done first — the chosen level becomes the `atLevel` argument for move initialisation here. Until then, `atLevel` defaults to 50.
+**Prerequisite:** Experience, Levelling & Level Picker ✅
 
 **Data:**
-- [ ] `PokemonLearnset` model: `SpeciesId` (FK), `MoveId` (FK), `LearnLevel` (int); EF migration on `PokemonDbContext` (learnsets are Pokémon-world data — see Database Architecture section)
-- [ ] Import from PokeAPI: the moves array is already present in the existing `/pokemon/{id}` response (`PokeApiPokemon.Moves`); fold learnset parsing into `PokemonImport` rather than adding a separate importer class — filter `version_group_details` to `version_group.name == "red-blue"` and `move_learn_method.name == "level-up"`; persist each `(speciesId, moveId, learnLevel)` entry
-- [ ] `Creature.InitializeFromSpecies(species, learnset, allMoves, atLevel)` — populates `MoveSet` with up to 4 moves learned at or below `atLevel` (take the 4 highest-level ones, as Gen 1 does); this replaces the current random move assignment in `GameController.BuildCreature`
+- [ ] `PokemonLearnset` model: `SpeciesId` (FK), `MoveId` (FK), `LearnLevel` (int); EF migration on `PokemonDbContext`
+- [ ] Import from PokeAPI: filter `/pokemon/{id}` moves array to `version_group.name == "red-blue"` and `move_learn_method.name == "level-up"`; fold into `PokemonImport` (no extra API calls)
+- [ ] `Creature.InitializeFromSpecies(species, learnset, allMoves, atLevel)` — up to 4 moves at or below `atLevel` (highest-level ones); replaces random assignment in `GameController.BuildCreature`
 
-**Level-up move learning — tie-in to the Level Picker:**
-The Level Picker sets the starting level; `LevelUp()` in battle is the permanent ongoing tie-in. Every level gained during a battle checks the learnset for newly available moves at that exact level.
-- [ ] `Creature.LevelUp()` checks the learnset for moves at the new level
-- [ ] If `MoveSet.Count < 4`: add automatically; emit `MoveLearned(string CreatureName, string MoveName)` battle event
-- [ ] If `MoveSet.Count == 4`: emit `MoveReplacementRequired(string CreatureName, string NewMoveName, IReadOnlyList<MoveInfo> CurrentMoves)` — this is a blocking event that requires a player decision before the battle can resume. The UI must present a "learn/forget" choice; the backend waits on a new `IBattleInput`-style TCS
+**Level-up move learning:**
+- [ ] `Creature.LevelUp()` checks learnset for moves at the new level
+- [ ] Slot free → add automatically; emit `MoveLearned(string CreatureName, string MoveName)`
+- [ ] Slots full → emit `MoveReplacementRequired(string CreatureName, string NewMoveName, IReadOnlyList<MoveInfo> CurrentMoves)` — blocking event; backend waits on `IBattleInput`-style TCS
 - [ ] `BattleHub` + `SignalRInput` extended with `ForgetMove(int slotIndex)` / `SkipNewMove()` path
 - [ ] `MoveLearned` and `MoveReplacementRequired` handled by all emitters and `useBattleHub.ts`
 
-**XP bar tie-in:**
-The player nameplate has an XP bar that is currently hardcoded to `xp={0} xpToNext={100}` and never fills. To make it live, `TurnStarted` needs to carry the player's current `Experience` and the threshold for the next level (`CalculateExperienceForLevel(Level + 1)`). Wire these into the `TurnStarted` event payload and update `useBattleHub.ts` to dispatch them into state. Do this alongside Learnset since that's when XP-per-battle becomes meaningful enough to show.
+**XP bar:**
+- [ ] `TurnStarted` carries `PlayerExperience` and `XpToNextLevel`; `useBattleHub.ts` dispatches into state so the XP bar fills live
 
 **Tests:**
 - [ ] `Learnset_InitializeFromSpecies_GivesCorrectMovesAtLevel`
@@ -203,26 +80,25 @@ The player nameplate has an XP bar that is currently hardcoded to `xp={0} xpToNe
 
 ## AI Move Selection
 
-Design: `IBattleInput` is the seam. AI implementations score available moves via `IMoveEvaluator` and pick using a selection strategy. `IMoveEvaluator` interface already defined.
+**Prerequisite:** Learnset System (so AI evaluates moves the Pokémon can actually learn)
 
-**Evaluator dimensions (score each available move):**
+`IBattleInput` is the seam. AI scores available moves via `IMoveEvaluator` and picks using a selection strategy.
+
+**Evaluator dimensions:**
 - Expected damage — base power × type effectiveness × STAB × stat ratio
 - Type effectiveness bonus — super-effective moves strongly preferred
-- Stat-stage move value — Swords Dance is high-value at full HP with no threats; Growl is low-value when outmatched
-- Priority move value — prefer Quick Attack / high-priority when own HP is low or opponent near KO
-- Status move value — Thunder Wave is high-value early; worthless if target already has a status
+- Stat-stage move value — Swords Dance high-value at full HP; Growl low-value when outmatched
+- Priority move value — prefer Quick Attack when own HP low or opponent near KO
+- Status move value — Thunder Wave high-value early; worthless if target already statused
 - PP conservation — small penalty for moves with ≤ 5 PP remaining
-- Opponent HP threshold — any move finishes a near-KO target; don't waste a precision pick
 
-**Selection strategies (how scores become a choice):**
+**Selection strategies:**
 - `RandomMoveInput` — ignores evaluators; pure random (wild Pokémon / lowest AI tier)
 - `WeightedAIInput(IMoveEvaluator)` — probabilistic, weighted by score (average trainer)
 - `GreedyAIInput(IMoveEvaluator)` — always picks highest score (Elite Four / boss tier)
+- `CompositeEvaluator` — weighted sum of multiple evaluators; trainer "personality" via different weights
 
-**Composition:**
-- `CompositeEvaluator(IEnumerable<(IMoveEvaluator evaluator, double weight)>)` — weighted sum; trainer "personality" = different weights (aggressive vs. defensive vs. status-heavy)
-
-**Implementation tasks:**
+**Tasks:**
 - [ ] `DamageEvaluator : IMoveEvaluator`
 - [ ] `TypeEffectivenessEvaluator : IMoveEvaluator`
 - [ ] `StatStageMoveEvaluator : IMoveEvaluator`
@@ -237,65 +113,10 @@ Design: `IBattleInput` is the seam. AI implementations score available moves via
 
 ## EV Gain (Effort Values)
 
-Currently all creatures have 0 EVs (`ExpHP`, `ExpAttack`, `ExpDefense`, `ExpSpecial`, `ExpSpeed` are initialised to 0 and never modified). Stats vary only by DVs and level. This is a missing Gen 1 mechanic but low priority until the core loop is solid.
+No prerequisites. All `ExpHP/Attack/Defense/Special/Speed` fields exist on `Creature` but are never written.
 
-**How to implement:**
-- In `Battle.StartFightAsync`, after awarding XP to the player, also award EVs: add the fainted enemy's base stats to the player's corresponding `Exp*` fields (`ExpAttack += enemyBaseAttack`, etc.)
-- Cap each EV field at 65535 (Gen 1 has no per-stat cap below the 16-bit max)
-- Call `CalculateStats()` on the player after updating EVs so stats reflect the new bonus immediately (or defer to end-of-battle — Gen 1 applies them mid-battle, which is the authentic behaviour)
-- `PokemonSpecies` already stores all five base stats, so no DB work is needed
-- No new battle event required unless you want a UI notification ("EVs gained" toast); the stat change is silent in the original games
-
-**Prerequisite:** None — can be added any time after Experience & Levelling is complete.
-
----
-
-## Catch Mechanic
-
-Deferred until the Phaser animation layer and item/bag UI exist. The catch mechanic requires:
-a bag action in the move menu, an item inventory, a capture-roll formula, and an animation sequence (throw → shake × 3 → catch or escape). Implementing it before those exist produces a dead-end backend with no playable surface.
-
-**When ready:**
-- [ ] `StatusCondition` and `Battle` extended with a "fleeing" state (catching replaces an attack action)
-- [ ] Gen 1 capture formula: `floor((MaxHP × 3 - HP × 2) × CatchRate / (MaxHP × 3))` vs. a 0–255 roll
-- [ ] `PokemonSpecies.CatchRate` already imported ✓
-- [ ] `CaptureAttempted(string TargetName, bool Caught)` battle event
-- [ ] If caught: battle ends with `BattleEnded(winner: "Player", reason: "Caught")` variant
-
----
-
-## Game Loop & Progression
-
-Currently the game is a single isolated battle — win or lose, the player clicks "Play Again" and starts fresh. This section describes the full persistent loop that turns it into a game.
-
-**Prerequisites:** Catch Mechanic, BattleState extraction, `PlayerDbContext` / `save.db`.
-
-**Core loop:**
-- Player starts with one chosen Pokémon at level 5 (or a configurable starting level)
-- Win → encounter a new wild Pokémon (BST increases gradually with player's party BST)
-- Lose → game over screen with run summary; option to restart
-- Catch → Pokémon added to party (up to 6); player can switch active Pokémon between battles
-- All XP, EVs, levels, and move changes persist across battles via `save.db`
-
-**Progressive difficulty:**
-- Track a "run depth" counter (battles won); use it to widen the BST window upward over time
-- Simple first pass: `targetBst = party lead BST + (depth × 10)`, clamped to 151 pool max
-- Later: introduce trainer-style encounters at depth milestones with fixed team compositions
-
-**Evolution:**
-- Player Pokémon evolve automatically when level threshold is met (use PokeAPI evolution chain data)
-- Evolution chain data needs importing — new `PokemonEvolution` table in `pokemon.db`
-- Enemy Pokémon: evolve to correct form for their level before the battle starts (no mid-battle evolution for enemies)
-
-**Party management UI:**
-- Between-battle screen: party roster, Pokémon summary (level, HP, moves), choose lead
-- Swap active Pokémon during battle (once party system exists)
-
-**Save system (`save.db` / `PlayerDbContext`):**
-- `PlayerSave`: trainer name, active party (ordered list of `SavedCreature`), run depth, total battles won
-- `SavedCreature`: species ID, level, XP, DVs, EVs, current moves, nickname
-- Auto-save after each battle ends; single save slot for now
-- `BattleState` extraction (see Tech Debt) is required before `Creature` can be safely serialised
+- [ ] After awarding XP in `Battle.StartFightAsync`, add fainted enemy's base stats to player's corresponding `Exp*` fields; cap each at 65535 (Gen 1 has no per-stat cap); call `CalculateStats()` immediately
+- [ ] No new battle event required (Gen 1 is silent about EVs)
 
 ---
 
@@ -303,161 +124,120 @@ Currently the game is a single isolated battle — win or lose, the player click
 
 Stack: React 18 + TypeScript + SignalR. Phaser 3 for sprite/animation canvas.
 
-### Completed ✅
-- ASP.NET Core host: SignalR, CORS, static files, BattleHub, SpeciesController, GameController
-- React skeleton: Vite, React Router, Title/Select/Battle routes
-- Battle engine output abstraction: `BattleEvent` hierarchy, `IBattleEventEmitter`, `ConsoleBattleEventEmitter`
-- Title screen
-- Starter selection: species grid, type badges, sprites, POST /api/game/start
-- SignalR battle emitter: `IBattleClient`, `SignalRBattleEventEmitter`, `GameSessionManager`, `SignalRInput`
-- Battle screen shell: HP bars, move menu (2×2, PP, type badges), battle log, status badges, `useBattleHub` reducer
-
 ### Phaser Canvas
 - [ ] Add `phaser` npm dependency to `ClientApp`
 - [ ] `BattleCanvas.tsx` — mounts a Phaser `Game` instance in a `useEffect`; destroys on unmount
-- [ ] `BattleScene.ts` — Phaser Scene that loads front sprite (`/sprites/front/{id}.png`) for enemy and back sprite (`/sprites/back/{id}.png`) for player; positions them at the correct diagonal layout (enemy top-right, player bottom-left)
-- [ ] React↔Phaser bridge: a shared `PhaserBridge` event emitter (tiny `EventEmitter` or `mitt`) — React dispatches animation commands (`playMoveAnimation`, `playFaintAnimation`); Phaser emits `animationComplete` back to React
-- [ ] Current CSS sprite placeholders replaced by the Phaser canvas; React retains the HP/status overlay layer
+- [ ] `BattleScene.ts` — loads front sprite (`/sprites/front/{id}.png`) for enemy, back sprite for player; diagonal layout (enemy top-right, player bottom-left)
+- [ ] React↔Phaser bridge — shared `PhaserBridge` event emitter (`mitt`); React dispatches `playMoveAnimation` / `playFaintAnimation`; Phaser emits `animationComplete` back
+- [ ] Current CSS sprite placeholders replaced by the Phaser canvas; React retains HP/status overlay layer
 
 ### Animations
-- [ ] `MoveUsed` → attacker sprite bobs toward the opponent (lunge + return tween, ~300ms)
-- [ ] `DamageDealt` → target sprite white-flash (swap to white texture for 2 frames); HP bar drains animated over ~600ms rather than snapping
-- [ ] `CreatureFainted` → target sprite slides down and fades out (~500ms)
-- [ ] Move menu re-enabled only after `PhaserBridge` emits `animationComplete` for the full turn sequence
-- [ ] `useBattleHub` state gains `animating: boolean`; move buttons check both `phase === 'choosing'` and `!animating`
+- [ ] `MoveUsed` → attacker sprite bobs toward opponent (lunge + return, ~300ms)
+- [ ] `DamageDealt` → target white-flash (2 frames); HP bar drains animated over ~600ms
+- [ ] `CreatureFainted` → target slides down and fades (~500ms)
+- [ ] Move menu re-enabled only after `animationComplete` for the full turn sequence
+- [ ] `useBattleHub` state gains `animating: boolean`; move buttons check `phase === 'choosing' && !animating`
 
 ### Polish
-- [ ] `BattleEndedOverlay` — covers the battle screen on `BattleEnded` event; shows winner name, "Play Again" button navigates to `/select`; "Main Menu" navigates to `/`
-- [ ] Level-up notification toast (when `LeveledUp` event fires during battle)
-- [ ] Move menu STAB indicator — subtle highlight on moves whose type matches the player creature's type
-- [ ] Color-coded effectiveness in battle log (super-effective in green, not very effective in grey, no effect in red)
-- [ ] Sprite shake tween on damage received (small horizontal oscillation before HP drain)
-- [ ] `ConsoleInput : IBattleInput` — numbered move menu for terminal play; wire into `Program.cs` console runner as the player-side input (low priority for web path but completes the debug runner)
+- [ ] `BattleEndedOverlay` — covers battle screen on `BattleEnded`; shows winner, "Play Again" → `/select`, "Main Menu" → `/`
+- [ ] Level-up notification toast on `LeveledUp` event
+- [ ] Move menu STAB indicator — subtle highlight on moves matching player's type
+- [ ] Color-coded effectiveness in battle log (super-effective green, not very effective grey, no effect red)
+- [ ] Sprite shake tween on damage received
+- [ ] `ConsoleInput : IBattleInput` — numbered move menu for terminal play (low priority)
 
 ---
 
-## Database Architecture
+## Catch Mechanic
 
-**Current two-database model (keep as-is):**
-- `pokemon.db` / `PokemonDbContext` — Pokémon-world static data: species, base stats, types, growth rates, catch rates, learnsets
-- `moves.db` / `MovesDbContext` — mechanics data: moves, damage type, accuracy, PP, stat effects, status effects
+Deferred until Phaser animations exist — the mechanic needs a throw/shake/catch animation sequence to be meaningful.
 
-**Where new tables go:**
-- `PokemonLearnset` → **`pokemon.db`** (`PokemonDbContext`). It is per-species data; it belongs alongside `PokemonSpecies`.
-- Any future species-linked data (egg groups, evolution chains, held items) → `pokemon.db`
-- Any future move-linked data (move combos, Z-move mappings) → `moves.db`
-
-**When a third database is warranted:**
-Player save state — caught Pokémon, active party, items, trainer name, save slots — is the first genuinely orthogonal dataset: it's runtime-mutable data that neither `pokemon.db` nor `moves.db` should own. Defer `PlayerDbContext` / `save.db` until the save system (after the Catch Mechanic).
-
-**PokeApiConnector scaffolding for learnset import:**
-The moves array is already returned in the existing `/pokemon/{id}` response. Fold learnset parsing into `PokemonImport` rather than adding a `LearnsetImport` class — no extra API calls needed. Steps:
-- [ ] Extend `PokeApiPokemon` DTO with a `Moves` array if not already present
-- [ ] In `PokemonImport`, after persisting `PokemonSpecies`, parse `move.version_group_details` and `INSERT OR IGNORE INTO PokemonLearnset` for each valid entry
-- [ ] `PokeApiConnector` re-runnable (idempotent) — already the case via `UpsertAttack` / EF `SetValues`; apply the same pattern to learnset entries
+**When ready:**
+- [ ] Bag action in move menu; `Battle` extended with a "catching" state
+- [ ] Gen 1 capture formula: `floor((MaxHP × 3 − HP × 2) × CatchRate / (MaxHP × 3))` vs. 0–255 roll
+- [ ] `PokemonSpecies.CatchRate` already imported ✓
+- [ ] `CaptureAttempted(string TargetName, bool Caught)` battle event
+- [ ] `BattleEnded` variant: `reason: "Caught"`
 
 ---
 
-## Multi-Generation Architecture
+## Game Loop & Progression
 
-A codebase audit was done to identify what needs abstraction before multi-gen support is added. Summary: the battle-rule and stat-formula layers are already well-abstracted; the main gaps are in the data model and stat representation.
+**Prerequisites:** Catch Mechanic, BattleState extraction (Tech Debt), `PlayerDbContext` / `save.db`
 
-### What is already well-abstracted ✅
+- Player starts with one Pokémon; win → new BST-scaled encounter; lose → game over with run summary
+- Catch → Pokémon added to party (up to 6); choose lead between battles
+- Progressive difficulty: `targetBst = party lead BST + (depth × 10)`; trainer encounters at milestones
+- Evolution: player Pokémon evolve at level threshold (requires `PokemonEvolution` table in `pokemon.db`); enemy evolves to correct form for their level before battle
+- `PlayerSave` / `SavedCreature` models in `save.db`; auto-save after each battle
+- Party management UI between battles
 
-| Interface | Implementation | Covers |
-|:----------|:---------------|:-------|
-| `IBattleRules` | `Gen1BattleRules` | Crit formula, damage variance, sleep/freeze/bind rules, accuracy scale, XP formula, status damage rates, stat stage multipliers |
-| `ITypeChart` | `Gen1TypeChart` | Full type effectiveness matrix — plug in `Gen2TypeChart` etc. to get Steel/Dark/Fairy |
-| `IStatCalculator` | `Gen1StatCalculator` | HP and stat formulas, DV randomisation, Stat Exp scaling |
-| `IBattleAction` | `AttackAction` | Turn action abstraction; additional action types (UseItem, Switch) slot in cleanly |
-| `IBattleInput` | `AutoSelectInput`, `SignalRInput` | Player/AI input — already the seam for AI Move Selection |
+---
 
-### Gaps — what needs adding before Gen 2+ work starts
+## Multi-Generation: Data Model & Schema
 
-**1. Stat selection in `DamageCalculator` (small, do it first)**
+The stat-selection abstraction (← NEXT section) is the only change to do now. Everything below is deferred to the Gen 2 sprint.
 
-`DamageCalculator` currently picks `Attributes.Special` for both the attacker's offence and the defender's defence on special moves. This is correct for Gen 1 but wrong from Gen 2 onwards (SpAtk ≠ SpDef). The fix is two new methods on `IBattleRules`:
+**`Attributes` stat split:**
+- [ ] `Attributes.Special` → `Attributes.SpAtk` + `Attributes.SpDef`; keep `Special` as a computed alias for Gen 1 (`SpAtk`, since they're equal) so existing tests migrate cleanly
+- [ ] `Creature.BaseSpecial`, `DvSpecial`, `ExpSpecial` split in parallel
 
-```csharp
-int GetOffensiveStat(Creature attacker, AttackType moveType);
-int GetDefensiveStat(Creature defender, AttackType moveType);
-```
+**`PokemonSpecies` per-generation schema:**
+- [ ] Separate timeless identity (`Id`, `Name`, `CatchRate`, `BaseExperience`, `PokedexEntry`, `GrowthRate`) from generation-specific data
+- [ ] New `PokemonSpeciesGenData` table: `SpeciesId`, `Generation` (int), `Type1`, `Type2`, `BaseHP`, `BaseAttack`, `BaseDefense`, `BaseSpAtk`, `BaseSpDef`, `BaseSpeed`; Gen 3+ adds `Ability1/2/Hidden`
+- [ ] Importer stores one row per species per generation; engine queries by active generation
+- [ ] **Note:** PokeAPI has no `past_stats` equivalent — Gen 1 stat corrections (e.g. Clefable, Beedrill, Pikachu line were buffed in Gen 6) will need a corrections table or separate data source
 
-Gen 1 implementation returns `Special` for both; Gen 2+ returns `SpAtk` / `SpDef` respectively. `DamageCalculator` replaces its inline stat selection with these calls. This is a small, safe change that can be done independently of the data model work.
-
-**2. `Attributes` stat split (breaking, defer to Gen 2 sprint)**
-
-`Attributes.Special` (single stat) → `Attributes.SpAtk` + `Attributes.SpDef`. Keep `Special` as a computed alias (`SpAtk` in Gen 1 where they're equal) so existing tests don't all break at once. `Creature.BaseSpecial`, `DvSpecial`, `ExpSpecial` all need the same split.
-
-**3. `PokemonSpecies` per-generation data (DB schema change, defer to Gen 2 sprint)**
-
-`PokemonSpecies.BaseSpecial` must split into `BaseSpAtk` + `BaseSpDef`. More broadly, the current `PokemonSpecies` table conflates timeless identity data with generation-specific mechanical data. The target schema:
-
-- `PokemonSpecies` — Id, Name, CatchRate, BaseExperience, PokedexEntry, GrowthRate (never changes)
-- `PokemonSpeciesGenData` — SpeciesId, Generation (int), Type1, Type2, BaseHP, BaseAttack, BaseDefense, BaseSpAtk, BaseSpDef, BaseSpeed (Gen 2+), and BaseSpecial (Gen 1 alias)
-  - Gen 3+ adds: Ability1, Ability2, HiddenAbility
-  - Gen 6+ adds: MegaStone, MegaType1, MegaType2, etc.
-
-The importer would store one row per species per generation it has data for. The engine queries by the active generation.
-
-**Note on PokeAPI completeness:** `past_types` and `past_abilities` are available. **Base stats are not historicised** — PokeAPI only returns current stats. Several Pokémon received stat buffs in Gen 6 (XY balance patch: Clefable, Beedrill, Pikachu line, etc.). A corrections table or a separate Gen-1-specific data source is needed for accurate Gen 1 stats.
-
-**4. Generation field on `Attack` and `PokemonSpecies` (defer to multi-gen import sprint)**
-
-When Gen 2+ data is imported, both tables need a `Generation` (or `GenerationIntroduced`) column so the engine can filter the pool to the active generation. Without this, a Gen 1 battle would be able to encounter Gen 2+ moves and species.
-
-- `Attack.GenerationIntroduced` (int) — set during import from PokeAPI generation resource
-- `PokemonSpecies.GenerationIntroduced` (int) — same
-
-`EncounterSelector` and `BuildCreature` then filter by `generationIntroduced <= activeGeneration`.
-
-**5. Generation-aware service methods (defer to multi-gen import sprint)**
-
-`PokemonService` and `AttackService` have no generation parameter. Add overloads:
-
-```csharp
-Task<List<PokemonSpecies>> GetSpeciesForGenerationAsync(int maxGeneration);
-Task<List<Attack>> GetMovesForGenerationAsync(int maxGeneration);
-```
-
-These replace direct `ToListAsync()` calls in `GameController` and `EncounterSelector`.
+**Generation filtering:**
+- [ ] `Attack.GenerationIntroduced` (int) + `PokemonSpecies.GenerationIntroduced` (int) — set on import
+- [ ] `EncounterSelector.PickByBst` and `GameController.BuildCreature` filter by `GenerationIntroduced <= activeGeneration`
+- [ ] `PokemonService.GetSpeciesForGenerationAsync(int)` + `AttackService.GetMovesForGenerationAsync(int)` replace unfiltered `ToListAsync()` calls
 
 ---
 
 ## User Documentation
 
-Target: write player-facing docs once the Enemy Encounter System + AI Move Selection are both done — at that point the core game loop is fully playable and documentation won't be describing a moving target.
+Target: after AI Move Selection lands — at that point battles are fully playable and docs won't describe a moving target.
 
-**When ready:**
-- [ ] `/help` route (or modal) in the React app — "how to play" covering starter selection, battle controls, status condition icons, level picker
-- [ ] Expand `README.md` into a developer reference — architecture decisions (two-DB model, `IBattleRules` strategy pattern, how to add a new move effect, how to add a new generation)
-- [ ] `GEN_DIFFERENCES.md` (already written) — generational mechanics reference; adapt relevant sections for player-facing "what makes Gen 1 different" explainer
+- [ ] `/help` route or modal — starter selection, battle controls, status icons, level picker
+- [ ] Expand `README.md` — architecture decisions (two-DB model, `IBattleRules` pattern, how to add a move effect, how to add a generation)
+- [ ] `GEN_DIFFERENCES.md` (already written) — adapt for player-facing "what makes Gen 1 different" explainer
+
+---
+
+## Database Architecture (reference)
+
+**Current two-database model:**
+- `pokemon.db` / `PokemonDbContext` — species, base stats, types, growth rates, catch rates, learnsets, game availability
+- `moves.db` / `MovesDbContext` — moves, damage type, accuracy, PP, stat effects, status effects
+
+**Where new tables go:**
+- Pokémon-world data (learnsets, evolution chains, egg groups) → `pokemon.db`
+- Move-world data (Z-move mappings, move combos) → `moves.db`
+- Player save state (party, caught Pokémon, items) → `save.db` / `PlayerDbContext` (defer until Catch Mechanic)
+
+**Learnset import (part of Learnset System section above):**
+- [ ] Extend `PokeApiPokemon` DTO with `Moves` array
+- [ ] In `PokemonImport`, parse `version_group_details`, filter to `"red-blue"` + `"level-up"`, persist `PokemonLearnset` rows idempotently
 
 ---
 
 ## Tech Debt / Cleanup
 
-### Done
-- [x] Remove dead scaffolding: `Body`, `Brain`, `BodyPart`, `Special`, `Dragon`, `CreatureType`, `Attributes.SetAttributesByCreatureType`
-- [x] Fix `.gitignore` and `.gitattributes`; add `.editorconfig`; add `global.json` (SDK pin 9.0.200)
-- [x] Adopt EF Core migrations — `EnsureDatabaseCreated()` calls `Database.Migrate()`
-- [x] Remove `Creature.Attack()` direct-damage method
-- [x] Resolve `Creature` class/namespace collision — namespace now `creaturegame.Creatures`
-- [x] Add `README.md`; add `dev.ps1` launcher
-- [x] `StatStages` struct→class — silent mutation fix; `Creature.ResetBattleState()` called at battle start
-- [x] `AsNoTracking()` on all read-only DB service methods
-- [x] Pending-session TTL in `GameSessionManager` (2-minute eviction)
-- [x] `AlwaysHitRules` test helper — eliminates Gen 1 1/256-miss flakiness in status unit tests
+### Done ✅
+- Remove dead scaffolding (`Body`, `Brain`, `BodyPart`, `CreatureType`, etc.)
+- `.gitignore`, `.gitattributes`, `.editorconfig`, `global.json` (SDK pin)
+- EF Core migrations; `EnsureDatabaseCreated()` calls `Database.Migrate()`
+- `StatStages` struct→class (silent mutation fix)
+- `AsNoTracking()` on all read-only DB service methods
+- Pending-session TTL in `GameSessionManager` (2-min eviction)
+- `AlwaysHitRules` test helper (eliminates 1/256-miss flakiness)
 
-### Future Refactor: BattleState extraction
-`Creature` currently owns both permanent data (base stats, DVs, types, moveset) and transient battle state (status, ToxicCounter, IsRecharging, IsFlinched, HasLeechSeed, BindingTurnsRemaining, IsTwoTurnCharging, ChargingMove, StatStages). `ResetBattleState()` is the contract separating them — good enough while there is no save system.
+### Future: BattleState extraction
+**Trigger:** when save system is built. Extract transient battle fields (`Status`, `ToxicCounter`, `IsRecharging`, `IsFlinched`, `HasLeechSeed`, `BindingTurnsRemaining`, `IsTwoTurnCharging`, `ChargingMove`, `StatStages`) from `Creature` into a `BattleState` class held as `Creature.Battle`. Serialize only the permanent half for `save.db`.
 
-**Trigger:** When the save system (`PlayerDbContext` / `save.db`) is built, `Creature` needs to be serialized without its battle state. At that point extract transient fields into a `BattleState` class held as `Creature.Battle` and serialize only the permanent half. All `StatusResolver`, `AttackAction`, and `Battle` call sites update from `creature.X` to `creature.Battle.X`.
-
-### Known Gaps (not bugs — design decisions for future sections)
-- Enemy encounter pool ignores game version — all 151 species are eligible regardless of Red/Blue/Yellow availability. Filter by `PokemonGameAvailability` once a version selector exists in the UI.
-- Enemy Pokémon do not evolve during or after battle. Wire into the level-up / learnset system once that section is complete.
-- `GrowthRate` enum missing `Erratic` and `Fluctuating` — importer falls back to `MediumFast`; fix in Experience & Levelling
-- `StatusCondition` missing `BadPoison` — Toxic maps to `None` on import until Bad Poison (Toxic)
-- `GameController.BuildCreature` picks random moves — correct learnset moves fixed by Learnset System
-- `PokemonService` / `AttackService` not registered in DI — `GameController` uses direct `new()`; intentional for now, revisit when scoped lifetime or multiple-context scenarios arise
+### Known Gaps
+- Enemy encounter pool ignores game version — filter by `PokemonGameAvailability` once a version selector exists in the UI
+- Enemy Pokémon do not evolve — wire into level-up system when Game Loop is built
+- `GameController.BuildCreature` uses random moves — fixed by Learnset System
+- `PokemonService` / `AttackService` not registered in DI — using direct `new()`; revisit when scoped lifetime or multi-context scenarios arise
