@@ -98,6 +98,22 @@ public interface IBattleRules
     /// </summary>
     int BindingDamageDenominator { get; }
 
+    // ── Stat selection ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns the offensive stat value used in damage calculation for the given move type.
+    /// Gen 1: Physical → Attack; Special → Special (combined stat).
+    /// Gen 2+: Physical → Attack; Special → SpAtk.
+    /// </summary>
+    int GetOffensiveStat(Creature attacker, AttackType moveType);
+
+    /// <summary>
+    /// Returns the defensive stat value used in damage calculation for the given move type.
+    /// Gen 1: Physical → Defense; Special → Special (combined stat).
+    /// Gen 2+: Physical → Defense; Special → SpDef.
+    /// </summary>
+    int GetDefensiveStat(Creature defender, AttackType moveType);
+
     // ── Critical hits ──────────────────────────────────────────────────────────
 
     /// <summary>

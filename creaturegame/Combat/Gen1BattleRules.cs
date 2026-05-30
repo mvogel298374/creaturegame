@@ -67,6 +67,15 @@ public sealed class Gen1BattleRules : IBattleRules
     // Gen 1: roll 0-255; roll >= threshold → miss. Roll 255 always misses for 100%-acc moves.
     public int AccuracyRollBound => 256;
 
+    // ── Stat selection ─────────────────────────────────────────────────────────
+
+    // Gen 1: Physical moves use Attack/Defense; Special moves use the combined Special stat.
+    public int GetOffensiveStat(Creature attacker, AttackType moveType) =>
+        moveType == AttackType.Physical ? attacker.Attributes.Attack : attacker.Attributes.Special;
+
+    public int GetDefensiveStat(Creature defender, AttackType moveType) =>
+        moveType == AttackType.Physical ? defender.Attributes.Defense : defender.Attributes.Special;
+
     // ── Critical hits ──────────────────────────────────────────────────────────
 
     // Gen 1: normal = floor(BaseSpeed/2)/256; high-crit = min(floor(BaseSpeed/2)*8, 255)/256.

@@ -35,18 +35,13 @@
 
 ---
 
-## ← NEXT: Generation Abstraction — Stat Selection
+## Generation Abstraction — Stat Selection ✅ DONE
 
-The last hardcoded Gen 1 assumption in the combat core. `DamageCalculator` currently picks `Attributes.Special` symmetrically for both offence and defence on special moves — correct for Gen 1, wrong from Gen 2 onwards (SpAtk ≠ SpDef). Closing this now keeps the engine clean before Learnset and AI work begins.
-
-- [ ] Add two methods to `IBattleRules`:
-  ```csharp
-  int GetOffensiveStat(Creature attacker, AttackType moveType);
-  int GetDefensiveStat(Creature defender, AttackType moveType);
-  ```
-- [ ] `Gen1BattleRules`: both return `Attributes.Special` for `Special` moves; `Attributes.Attack` / `Attributes.Defense` for `Physical` (same as today, just explicit)
-- [ ] `DamageCalculator`: replace the four inline `Attributes.Special` references with calls to the new methods; remove the duplicated crit / non-crit stat selection block
-- [ ] Tests: `DamageCalculator_UsesOffensiveStatFromRules` and `DamageCalculator_UsesDefensiveStatFromRules` — verify injected rules control which stat is read
+- [x] `IBattleRules.GetOffensiveStat(Creature, AttackType)` and `GetDefensiveStat(Creature, AttackType)` added
+- [x] `Gen1BattleRules`: Physical → Attack/Defense; Special → Special (combined Gen 1 stat)
+- [x] `DamageCalculator`: duplicated crit/non-crit stat selection block collapsed; stat reads delegated to rules
+- [x] `AlwaysHitRules` and `AlwaysCritRules` test helpers updated to implement new methods
+- [x] 2 new tests — `DamageCalculator_UsesOffensiveStatFromRules`, `DamageCalculator_UsesDefensiveStatFromRules` (124 total passing)
 
 ---
 

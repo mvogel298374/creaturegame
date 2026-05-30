@@ -16,24 +16,14 @@ public static class DamageCalculator
 
         isCrit = Random.Shared.NextDouble() < rules.GetCritChance(attacker, move);
 
-        int attackStat, defenseStat;
+        // Stat selection is delegated to rules — Gen 1 uses Special for both special offence
+        // and defence; Gen 2+ will return SpAtk / SpDef respectively.
+        int attackStat  = rules.GetOffensiveStat(attacker, move.AttackType);
+        int defenseStat = rules.GetDefensiveStat(defender, move.AttackType);
 
-        if (isCrit && rules.CritIgnoresStatStages)
+        if (!isCrit || !rules.CritIgnoresStatStages)
         {
-            // Gen 1 crits use the computed stats directly — no stage multipliers, no Burn penalty.
-            attackStat  = move.AttackType == AttackType.Physical
-                ? attacker.Attributes.Attack  : attacker.Attributes.Special;
-            defenseStat = move.AttackType == AttackType.Physical
-                ? defender.Attributes.Defense : defender.Attributes.Special;
-        }
-        else
-        {
-            attackStat  = move.AttackType == AttackType.Physical
-                ? attacker.Attributes.Attack  : attacker.Attributes.Special;
-            defenseStat = move.AttackType == AttackType.Physical
-                ? defender.Attributes.Defense : defender.Attributes.Special;
-
-            // Apply stat stage multipliers
+            // Apply stat stage multipliers (skipped for crits in Gen 1).
             double atkStageMult = rules.GetStatMultiplier(
                 move.AttackType == AttackType.Physical ? attacker.Stages.Attack : attacker.Stages.Special);
             double defStageMult = rules.GetStatMultiplier(
@@ -42,7 +32,7 @@ public static class DamageCalculator
             attackStat  = (int)(attackStat  * atkStageMult);
             defenseStat = (int)(defenseStat * defStageMult);
 
-            // Burn halves physical Attack (only on non-crit path)
+            // Burn halves physical Attack (skipped on crit path in Gen 1).
             if (move.AttackType == AttackType.Physical && attacker.Status == StatusCondition.Burn)
                 attackStat /= 2;
         }

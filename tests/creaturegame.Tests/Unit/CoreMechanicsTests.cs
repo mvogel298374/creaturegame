@@ -1836,6 +1836,8 @@ public class CoreMechanicsTests
         public int    RollBindingTurns()                                   => Gen1BattleRules.Instance.RollBindingTurns();
         public int    BindingDamageDenominator                             => Gen1BattleRules.Instance.BindingDamageDenominator;
         public int    CalculateXpAwarded(int baseExp, int enemyLevel)      => Gen1BattleRules.Instance.CalculateXpAwarded(baseExp, enemyLevel);
+        public int    GetOffensiveStat(Creature a, AttackType t)           => Gen1BattleRules.Instance.GetOffensiveStat(a, t);
+        public int    GetDefensiveStat(Creature d, AttackType t)           => Gen1BattleRules.Instance.GetDefensiveStat(d, t);
     }
 
     /// <summary>
@@ -1865,6 +1867,114 @@ public class CoreMechanicsTests
         public int    RollBindingTurns()                                  => Gen1BattleRules.Instance.RollBindingTurns();
         public int    BindingDamageDenominator                            => Gen1BattleRules.Instance.BindingDamageDenominator;
         public int    CalculateXpAwarded(int baseExp, int enemyLevel)     => Gen1BattleRules.Instance.CalculateXpAwarded(baseExp, enemyLevel);
+        public int    GetOffensiveStat(Creature a, AttackType t)          => Gen1BattleRules.Instance.GetOffensiveStat(a, t);
+        public int    GetDefensiveStat(Creature d, AttackType t)          => Gen1BattleRules.Instance.GetDefensiveStat(d, t);
+    }
+
+    // ── GetOffensiveStat / GetDefensiveStat tests ─────────────────────────────
+
+    [Fact]
+    public void DamageCalculator_UsesOffensiveStatFromRules()
+    {
+        // Rules that always return Attack for offensive lookups (including special moves).
+        // If DamageCalculator hardcoded Attributes.Special for special moves,
+        // damage would be based on Special=50 not Attack=200.
+        var attacker = new Creature("Attacker") { Level = 50 };
+        attacker.CalculateStats();
+        attacker.Attributes.Attack  = 200;
+        attacker.Attributes.Special = 50;
+
+        var defender = new Creature("Defender") { Level = 50 };
+        defender.CalculateStats();
+        defender.Attributes.Special = 50;
+
+        var specialMove = new Attack
+        {
+            Id = 1, Name = "Psychic", BaseDamage = 90, Accuracy = 100,
+            DamageType = DamageType.Psychic, AttackType = AttackType.Special,
+        };
+
+        int dmgViaAttack   = DamageCalculator.CalculateDamage(attacker, defender, specialMove, new Gen1TypeChart(), new AlwaysUseAttackStatRules());
+        int dmgViaSpecial  = DamageCalculator.CalculateDamage(attacker, defender, specialMove, new Gen1TypeChart(), AlwaysHitRules.Instance);
+
+        Assert.True(dmgViaAttack > dmgViaSpecial,
+            $"Damage via Attack=200 ({dmgViaAttack}) should exceed damage via Special=50 ({dmgViaSpecial})");
+    }
+
+    [Fact]
+    public void DamageCalculator_UsesDefensiveStatFromRules()
+    {
+        // Rules that always return Defense for defensive lookups (including special moves).
+        // Standard Gen 1 rules would use Special=50 for a special move (low → high damage).
+        // Custom rules return Defense=200 (high → lower damage).
+        var attacker = new Creature("Attacker") { Level = 50 };
+        attacker.CalculateStats();
+        attacker.Attributes.Special = 100;
+
+        var defender = new Creature("Defender") { Level = 50 };
+        defender.CalculateStats();
+        defender.Attributes.Defense = 200;
+        defender.Attributes.Special = 50;
+
+        var specialMove = new Attack
+        {
+            Id = 1, Name = "Psychic", BaseDamage = 90, Accuracy = 100,
+            DamageType = DamageType.Psychic, AttackType = AttackType.Special,
+        };
+
+        int dmgVsHighDef  = DamageCalculator.CalculateDamage(attacker, defender, specialMove, new Gen1TypeChart(), new AlwaysUseDefenseStatRules());
+        int dmgVsLowDef   = DamageCalculator.CalculateDamage(attacker, defender, specialMove, new Gen1TypeChart(), AlwaysHitRules.Instance);
+
+        Assert.True(dmgVsHighDef < dmgVsLowDef,
+            $"Damage vs Defense=200 ({dmgVsHighDef}) should be less than damage vs Special=50 ({dmgVsLowDef})");
+    }
+
+    private sealed class AlwaysUseAttackStatRules : IBattleRules
+    {
+        public bool   CanThawFrozenTarget(Attack m)             => Gen1BattleRules.Instance.CanThawFrozenTarget(m);
+        public int    FreezeRandomThawPercent                   => Gen1BattleRules.Instance.FreezeRandomThawPercent;
+        public double RollDamageVariance()                      => 1.0;
+        public int    RollSleepTurns()                          => Gen1BattleRules.Instance.RollSleepTurns();
+        public int    CalculateStruggleRecoil(Creature s, int d) => Gen1BattleRules.Instance.CalculateStruggleRecoil(s, d);
+        public int    BurnDamageDenominator                     => 16;
+        public int    PoisonDamageDenominator                   => 16;
+        public double BadPoisonDamageFraction(int c)            => Gen1BattleRules.Instance.BadPoisonDamageFraction(c);
+        public double GetStatMultiplier(int stage)              => 1.0;
+        public double GetAccuracyStageMultiplier(int stage)     => Gen1BattleRules.Instance.GetAccuracyStageMultiplier(stage);
+        public int    GetHitThreshold(int acc, int a, int e)    => 256;
+        public int    AccuracyRollBound                         => 256;
+        public double GetCritChance(Creature a, Attack m)       => 0.0;
+        public double CritMultiplier                            => 2.0;
+        public bool   CritIgnoresStatStages                     => true;
+        public int    RollBindingTurns()                        => Gen1BattleRules.Instance.RollBindingTurns();
+        public int    BindingDamageDenominator                  => 16;
+        public int    CalculateXpAwarded(int b, int l)          => Gen1BattleRules.Instance.CalculateXpAwarded(b, l);
+        public int    GetOffensiveStat(Creature a, AttackType t) => a.Attributes.Attack; // always Attack
+        public int    GetDefensiveStat(Creature d, AttackType t) => Gen1BattleRules.Instance.GetDefensiveStat(d, t);
+    }
+
+    private sealed class AlwaysUseDefenseStatRules : IBattleRules
+    {
+        public bool   CanThawFrozenTarget(Attack m)             => Gen1BattleRules.Instance.CanThawFrozenTarget(m);
+        public int    FreezeRandomThawPercent                   => Gen1BattleRules.Instance.FreezeRandomThawPercent;
+        public double RollDamageVariance()                      => 1.0;
+        public int    RollSleepTurns()                          => Gen1BattleRules.Instance.RollSleepTurns();
+        public int    CalculateStruggleRecoil(Creature s, int d) => Gen1BattleRules.Instance.CalculateStruggleRecoil(s, d);
+        public int    BurnDamageDenominator                     => 16;
+        public int    PoisonDamageDenominator                   => 16;
+        public double BadPoisonDamageFraction(int c)            => Gen1BattleRules.Instance.BadPoisonDamageFraction(c);
+        public double GetStatMultiplier(int stage)              => 1.0;
+        public double GetAccuracyStageMultiplier(int stage)     => Gen1BattleRules.Instance.GetAccuracyStageMultiplier(stage);
+        public int    GetHitThreshold(int acc, int a, int e)    => 256;
+        public int    AccuracyRollBound                         => 256;
+        public double GetCritChance(Creature a, Attack m)       => 0.0;
+        public double CritMultiplier                            => 2.0;
+        public bool   CritIgnoresStatStages                     => true;
+        public int    RollBindingTurns()                        => Gen1BattleRules.Instance.RollBindingTurns();
+        public int    BindingDamageDenominator                  => 16;
+        public int    CalculateXpAwarded(int b, int l)          => Gen1BattleRules.Instance.CalculateXpAwarded(b, l);
+        public int    GetOffensiveStat(Creature a, AttackType t) => Gen1BattleRules.Instance.GetOffensiveStat(a, t);
+        public int    GetDefensiveStat(Creature d, AttackType t) => d.Attributes.Defense; // always Defense
     }
 
     // ── EncounterSelector Tests ───────────────────────────────────────────────
