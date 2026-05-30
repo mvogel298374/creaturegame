@@ -13,7 +13,7 @@ Write-Host "Dev servers starting in new windows:"
 Write-Host "  Backend : http://localhost:5100"
 Write-Host "  Frontend: http://localhost:5173"
 Write-Host ""
-Write-Host "Waiting for frontend..."
+Write-Host "Waiting for frontend to become ready..."
 
 $ready = $false
 for ($i = 0; $i -lt 60; $i++) {

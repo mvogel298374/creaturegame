@@ -23,8 +23,9 @@ The system `dotnet` at `C:\Program Files\dotnet\dotnet.exe` is a runtime-only in
 
 To start the full dev environment (backend + Vite frontend + browser):
 ```powershell
-.\dev.ps1   # opens two windows (backend :5100, frontend :5173) then launches the browser
+.\dev.ps1
 ```
+**Run this directly in a PowerShell terminal at the repo root — do NOT wrap it in `Start-Process` or call it via `-Command ".\dev.ps1"`.** It spawns two child `pwsh` windows (backend on `:5100`, frontend on `:5173`) and opens the browser once Vite is ready. If the browser does not open automatically after ~60 s, navigate to `http://localhost:5173` manually.
 
 To run a single test by name:
 ```powershell

@@ -195,6 +195,50 @@ public class MigrationTests : IDisposable
         Assert.Contains("PokedexEntry",   columns);
     }
 
+    [Fact]
+    public void PokemonDb_Schema_HasGameAvailabilityTableWithAllColumns()
+    {
+        using var context = BuildPokemonContext();
+        context.EnsureDatabaseCreated();
+
+        var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        using var conn = new SqliteConnection($"Data Source={_pokemonDb}");
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "PRAGMA table_info(PokemonGameAvailability)";
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+            columns.Add(reader.GetString(1));
+
+        Assert.Contains("Id",               columns);
+        Assert.Contains("SpeciesId",        columns);
+        Assert.Contains("GameVersion",      columns);
+        Assert.Contains("AvailabilityType", columns);
+    }
+
+    [Fact]
+    public void PokemonDb_GameAvailability_CanRoundTripRow()
+    {
+        using var context = BuildPokemonContext();
+        context.EnsureDatabaseCreated();
+
+        var species = new PokemonSpecies { Id = 25, Name = "pikachu", GrowthRate = GrowthRate.MediumFast };
+        context.Species.Add(species);
+        context.SaveChanges();
+
+        context.GameAvailability.Add(new PokemonGameAvailability
+        {
+            SpeciesId        = 25,
+            GameVersion      = "yellow",
+            AvailabilityType = "Static",
+        });
+        context.SaveChanges();
+
+        var loaded = context.GameAvailability.AsNoTracking().Single(a => a.SpeciesId == 25);
+        Assert.Equal("yellow", loaded.GameVersion);
+        Assert.Equal("Static", loaded.AvailabilityType);
+    }
+
     // --- Helpers ---
 
     private MovesDbContext BuildMovesContext()
