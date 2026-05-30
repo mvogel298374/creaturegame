@@ -332,6 +332,17 @@ The moves array is already returned in the existing `/pokemon/{id}` response. Fo
 
 ---
 
+## User Documentation
+
+Target: write player-facing docs once the Enemy Encounter System + AI Move Selection are both done — at that point the core game loop is fully playable and documentation won't be describing a moving target.
+
+**When ready:**
+- [ ] `/help` route (or modal) in the React app — "how to play" covering starter selection, battle controls, status condition icons, level picker
+- [ ] Expand `README.md` into a developer reference — architecture decisions (two-DB model, `IBattleRules` strategy pattern, how to add a new move effect, how to add a new generation)
+- [ ] `GEN_DIFFERENCES.md` (already written) — generational mechanics reference; adapt relevant sections for player-facing "what makes Gen 1 different" explainer
+
+---
+
 ## Tech Debt / Cleanup
 
 ### Done

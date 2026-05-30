@@ -71,7 +71,7 @@ public class PokemonImport
                 if (pokeData.Id > 151) return;
 
                 PokemonSpecies species = MapToSpecies(pokeData, speciesData);
-                
+
                 var existing = await context.Species.AsNoTracking().FirstOrDefaultAsync(s => s.Id == species.Id);
                 if (existing == null)
                 {
@@ -83,7 +83,7 @@ public class PokemonImport
                     context.Species.Update(species);
                     Console.WriteLine($"Updated Existing Pokemon: {species.Name} (ID: {species.Id})");
                 }
-                
+
                 await context.SaveChangesAsync();
             }
         }

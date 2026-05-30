@@ -31,6 +31,7 @@ public class PokemonDbContext : DbContext
     public PokemonDbContext(DbContextOptions<PokemonDbContext> options) : base(options) { }
 
     public DbSet<PokemonSpecies> Species { get; set; }
+    public DbSet<PokemonGameAvailability> GameAvailability { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -45,6 +46,10 @@ public class PokemonDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
         modelBuilder.Entity<PokemonSpecies>().ToTable("PokemonSpecies");
+        modelBuilder.Entity<PokemonGameAvailability>().ToTable("PokemonGameAvailability");
+        modelBuilder.Entity<PokemonGameAvailability>()
+            .HasIndex(g => new { g.SpeciesId, g.GameVersion })
+            .IsUnique();
     }
 
     public void EnsureDatabaseCreated()

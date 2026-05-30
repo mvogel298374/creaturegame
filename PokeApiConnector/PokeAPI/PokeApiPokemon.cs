@@ -18,6 +18,24 @@ public class PokeApiPokemon
 
     [JsonPropertyName("base_experience")]
     public int? BaseExperience { get; set; }
+
+    [JsonPropertyName("game_indices")]
+    public List<PokemonGameIndex>? GameIndices { get; set; }
+}
+
+public class PokemonGameIndex
+{
+    [JsonPropertyName("game_index")]
+    public int GameIndex { get; set; }
+
+    [JsonPropertyName("version")]
+    public VersionResource? Version { get; set; }
+}
+
+public class VersionResource
+{
+    [JsonPropertyName("name")]
+    public string? Name { get; set; }
 }
 
 public class PokemonStat
