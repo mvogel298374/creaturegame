@@ -21,20 +21,25 @@ public class GameController(GameSessionManager sessionManager) : ControllerBase
             if (playerSpecies == null)
                 return BadRequest(new { error = "Unknown species" });
 
-            // Fixed enemy: Charmander (id 4); fall back to first species if not found
-            var enemySpecies = await pokemonCtx.Species.AsNoTracking().FirstOrDefaultAsync(s => s.Id == 4)
-                ?? await pokemonCtx.Species.AsNoTracking().FirstOrDefaultAsync();
-            if (enemySpecies == null)
-                return StatusCode(500, new { error = "No species in database" });
-
             await using var movesCtx = new MovesDbContext();
             var allMoves = await movesCtx.Moves.AsNoTracking().ToListAsync();
             if (allMoves.Count == 0)
                 return StatusCode(500, new { error = "No moves in database" });
 
             int playerLevel = Math.Clamp(req.Level ?? 50, 5, 100);
+            int playerBst   = Bst(playerSpecies);
+
+            var allSpecies  = await pokemonCtx.Species.AsNoTracking()
+                                  .Where(s => s.Id != playerSpecies.Id)
+                                  .ToListAsync();
+            var enemySpecies = PickByBst(allSpecies, playerBst);
+            if (enemySpecies == null)
+                return StatusCode(500, new { error = "No species in database" });
+
+            int enemyLevel = Math.Clamp(playerLevel + Random.Shared.Next(-3, 4), 5, 100);
+
             var player = BuildCreature(playerSpecies, allMoves, playerLevel);
-            var enemy  = BuildCreature(enemySpecies,  allMoves);
+            var enemy  = BuildCreature(enemySpecies,  allMoves, enemyLevel);
 
             var gameId = sessionManager.RegisterSession(player, enemy);
             return Ok(new { gameId });
@@ -44,6 +49,22 @@ public class GameController(GameSessionManager sessionManager) : ControllerBase
             Console.WriteLine($"[GameController] Start failed: {ex.Message}");
             return StatusCode(500, new { error = "Failed to start game" });
         }
+    }
+
+    private static int Bst(PokemonSpecies s) =>
+        s.BaseHP + s.BaseAttack + s.BaseDefense + s.BaseSpecial + s.BaseSpeed;
+
+    private static PokemonSpecies? PickByBst(List<PokemonSpecies> pool, int playerBst)
+    {
+        foreach (var pct in new[] { 0.15, 0.25, 0.50, 1.0 })
+        {
+            int lo = (int)(playerBst * (1.0 - pct));
+            int hi = (int)(playerBst * (1.0 + pct));
+            var candidates = pool.Where(s => Bst(s) >= lo && Bst(s) <= hi).ToList();
+            if (candidates.Count > 0)
+                return candidates[Random.Shared.Next(candidates.Count)];
+        }
+        return pool.Count > 0 ? pool[Random.Shared.Next(pool.Count)] : null;
     }
 
     private static Creature BuildCreature(PokemonSpecies species, List<Attack> allMoves, int level = 50)

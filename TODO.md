@@ -163,21 +163,12 @@ XP is awarded when a creature faints. The `Creature.GainExperience()` method and
 
 ---
 
-## Enemy Encounter System ← NEXT
+## Enemy Encounter System ✅ DONE
 
-`GameController` hardcodes Charmander (ID 4) at level 50 as the enemy. This is the immediate next section — it replaces that hardcode so battles feel varied and the enemy level tracks the player's chosen level. Required before AI Move Selection (AI needs real opponents) and before Learnset (learnsets need a species to look up).
-
-**Design:**
-- `EncounterTable` — maps a difficulty tier (or player-species base-stat total) to a list of eligible opponent species IDs and a level range
-- Simplest first pass: pick a random species from the full 151 pool whose `BaseStatTotal` is within ±15% of the player's chosen species; set opponent level = player level ± 3
-- `GameController.Start` computes the opponent; no new API endpoints needed
-
-**Tasks:**
-- [ ] `EncounterTable` static class (or config-driven) — defines tier buckets by BST range; returns a random eligible `(speciesId, level)` pair given a player species
-- [ ] `GameController` uses `EncounterTable` instead of hardcoded ID 4
-- [ ] `GameController` sets both creatures to the encounter-determined level (player level comes from the Level Picker — default 50)
-- [ ] `SpeciesController` or helper: compute `BaseStatTotal` from `PokemonSpecies` for bucketing
-- [ ] Tests: encounter table returns species within expected BST range; never returns the player's own species
+- [x] BST-matched random selection: pool of all 151 species filtered to ±15% of player BST (widens to ±25% / ±50% / all if pool is empty)
+- [x] Enemy level = player level ± 3, clamped to [5, 100]
+- [x] Player's own species excluded from pool
+- [x] `GameController` uses `PickByBst` + `Bst` helpers; no new API endpoints
 
 ---
 
@@ -273,6 +264,41 @@ a bag action in the move menu, an item inventory, a capture-roll formula, and an
 
 ---
 
+## Game Loop & Progression
+
+Currently the game is a single isolated battle — win or lose, the player clicks "Play Again" and starts fresh. This section describes the full persistent loop that turns it into a game.
+
+**Prerequisites:** Catch Mechanic, BattleState extraction, `PlayerDbContext` / `save.db`.
+
+**Core loop:**
+- Player starts with one chosen Pokémon at level 5 (or a configurable starting level)
+- Win → encounter a new wild Pokémon (BST increases gradually with player's party BST)
+- Lose → game over screen with run summary; option to restart
+- Catch → Pokémon added to party (up to 6); player can switch active Pokémon between battles
+- All XP, EVs, levels, and move changes persist across battles via `save.db`
+
+**Progressive difficulty:**
+- Track a "run depth" counter (battles won); use it to widen the BST window upward over time
+- Simple first pass: `targetBst = party lead BST + (depth × 10)`, clamped to 151 pool max
+- Later: introduce trainer-style encounters at depth milestones with fixed team compositions
+
+**Evolution:**
+- Player Pokémon evolve automatically when level threshold is met (use PokeAPI evolution chain data)
+- Evolution chain data needs importing — new `PokemonEvolution` table in `pokemon.db`
+- Enemy Pokémon: evolve to correct form for their level before the battle starts (no mid-battle evolution for enemies)
+
+**Party management UI:**
+- Between-battle screen: party roster, Pokémon summary (level, HP, moves), choose lead
+- Swap active Pokémon during battle (once party system exists)
+
+**Save system (`save.db` / `PlayerDbContext`):**
+- `PlayerSave`: trainer name, active party (ordered list of `SavedCreature`), run depth, total battles won
+- `SavedCreature`: species ID, level, XP, DVs, EVs, current moves, nickname
+- Auto-save after each battle ends; single save slot for now
+- `BattleState` extraction (see Tech Debt) is required before `Creature` can be safely serialised
+
+---
+
 ## Web UI
 
 Stack: React 18 + TypeScript + SignalR. Phaser 3 for sprite/animation canvas.
@@ -363,6 +389,8 @@ Target: write player-facing docs once the Enemy Encounter System + AI Move Selec
 **Trigger:** When the save system (`PlayerDbContext` / `save.db`) is built, `Creature` needs to be serialized without its battle state. At that point extract transient fields into a `BattleState` class held as `Creature.Battle` and serialize only the permanent half. All `StatusResolver`, `AttackAction`, and `Battle` call sites update from `creature.X` to `creature.Battle.X`.
 
 ### Known Gaps (not bugs — design decisions for future sections)
+- Enemy encounter pool ignores game version — all 151 species are eligible regardless of Red/Blue/Yellow availability. Filter by `PokemonGameAvailability` once a version selector exists in the UI.
+- Enemy Pokémon do not evolve during or after battle. Wire into the level-up / learnset system once that section is complete.
 - `GrowthRate` enum missing `Erratic` and `Fluctuating` — importer falls back to `MediumFast`; fix in Experience & Levelling
 - `StatusCondition` missing `BadPoison` — Toxic maps to `None` on import until Bad Poison (Toxic)
 - `GameController.BuildCreature` picks random moves — correct learnset moves fixed by Learnset System
