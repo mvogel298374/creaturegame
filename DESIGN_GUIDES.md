@@ -42,8 +42,8 @@ fields to the model, or replace/supplement the importer. Do not add runtime Poke
 
 ## Type Advantages & Balancing
 *   The game uses all 18 standard types (Normal, Fire, Water, etc.).
-*   Future `/plan` tasks should define the effectiveness matrix (1.0x, 2.0x, 0.5x, 0.0x).
-*   Stat growth formulas must consider base stats from the PokeAPI species data.
+*   The effectiveness matrix is implemented in `Gen1TypeChart` — 17 types, Gen 1 quirks preserved (Ghost→Psychic = 0×, Poison→Bug = 2×, no Steel/Dark/Fairy).
+*   Stat growth formulas use base stats from `pokemon.db`; `Gen1StatCalculator` implements the Gen 1 formula.
 
 ## Generation Architecture Principle
 
@@ -54,7 +54,8 @@ Any mechanic that differs between Pokémon generations **must** be implemented b
 | Interface | Governs |
 |:----------|:--------|
 | `ITypeChart` | Type effectiveness matrix |
-| `IBattleRules` | Battle mechanics that vary by generation — crit formula, stat-stage multiplier table, freeze thaw conditions, accuracy quirks, etc. |
+| `IBattleRules` | Battle mechanics that vary by generation — crit formula, damage variance, stat-stage multiplier table, accuracy scale, freeze/thaw rules, status damage rates, XP formula, **stat selection** (`GetOffensiveStat` / `GetDefensiveStat`) |
+| `IStatCalculator` | Stat calculation formulas — HP and other stat formula, DV randomisation, Stat Exp scaling. Gen 3+ will swap for a 0–31 IV / 252-cap EV implementation. |
 
 **Rules for contributors:**
 - Before implementing any mechanic: check whether it is the same in all generations.

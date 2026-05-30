@@ -792,6 +792,50 @@ public class CoreMechanicsTests
         Assert.True(creature.Attributes.Attack > 0);
     }
 
+    // ── Gen1BattleRules stat selection contract ───────────────────────────────
+    // These establish the Gen 1 contract so that when Gen2BattleRules is written,
+    // parallel tests can assert it returns SpAtk/SpDef instead.
+
+    [Fact]
+    public void Gen1BattleRules_GetOffensiveStat_Physical_ReturnsAttack()
+    {
+        var c = new Creature("Test") { Level = 50 };
+        c.CalculateStats();
+        c.Attributes.Attack  = 120;
+        c.Attributes.Special = 80;
+        Assert.Equal(120, Gen1BattleRules.Instance.GetOffensiveStat(c, AttackType.Physical));
+    }
+
+    [Fact]
+    public void Gen1BattleRules_GetOffensiveStat_Special_ReturnsSpecial()
+    {
+        var c = new Creature("Test") { Level = 50 };
+        c.CalculateStats();
+        c.Attributes.Attack  = 120;
+        c.Attributes.Special = 80;
+        Assert.Equal(80, Gen1BattleRules.Instance.GetOffensiveStat(c, AttackType.Special));
+    }
+
+    [Fact]
+    public void Gen1BattleRules_GetDefensiveStat_Physical_ReturnsDefense()
+    {
+        var c = new Creature("Test") { Level = 50 };
+        c.CalculateStats();
+        c.Attributes.Defense = 110;
+        c.Attributes.Special = 70;
+        Assert.Equal(110, Gen1BattleRules.Instance.GetDefensiveStat(c, AttackType.Physical));
+    }
+
+    [Fact]
+    public void Gen1BattleRules_GetDefensiveStat_Special_ReturnsSpecial()
+    {
+        var c = new Creature("Test") { Level = 50 };
+        c.CalculateStats();
+        c.Attributes.Defense = 110;
+        c.Attributes.Special = 70;
+        Assert.Equal(70, Gen1BattleRules.Instance.GetDefensiveStat(c, AttackType.Special));
+    }
+
     // ── Stat Stage Multiplier Tests ──────────────────────────────────────────
 
     [Fact]
