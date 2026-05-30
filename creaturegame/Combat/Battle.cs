@@ -32,7 +32,7 @@ public class Battle
         PlayerCreature.ResetBattleState();
         EnemyCreature.ResetBattleState();
 
-        _emitter?.Emit(new BattleStarted(PlayerCreature.Name, EnemyCreature.Name));
+        _emitter?.Emit(new BattleStarted(PlayerCreature.Name, EnemyCreature.Name, EnemyCreature.SpeciesId, EnemyCreature.Level));
 
         while (PlayerCreature.IsAlive() && EnemyCreature.IsAlive())
         {

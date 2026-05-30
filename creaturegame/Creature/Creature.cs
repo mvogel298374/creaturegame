@@ -27,6 +27,7 @@ public class Creature
     public DamageType? Type1 { get; set; }
     public DamageType? Type2 { get; set; }
     public GrowthRate GrowthRate { get; set; } = GrowthRate.MediumFast;
+    public int SpeciesId { get; set; }
     public int SpeciesBaseExperience { get; set; }
 
     public int Experience { get; set; } = 0;
@@ -147,6 +148,7 @@ public class Creature
         Type1 = species.Type1;
         Type2 = species.Type2;
         GrowthRate = species.GrowthRate;
+        SpeciesId = species.Id;
         SpeciesBaseExperience = species.BaseExperience;
         CalculateStats();
     }

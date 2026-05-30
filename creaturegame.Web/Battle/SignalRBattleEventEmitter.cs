@@ -16,7 +16,7 @@ public sealed class SignalRBattleEventEmitter(
 
     private static (string type, object payload) MapEvent(BattleEvent evt) => evt switch
     {
-        BattleStarted e    => ("BattleStarted",   new { e.PlayerName, e.EnemyName }),
+        BattleStarted e    => ("BattleStarted",   new { e.PlayerName, e.EnemyName, e.EnemySpeciesId, e.EnemyLevel }),
         TurnStarted e      => ("TurnStarted",      new {
                                   e.TurnNumber,
                                   e.PlayerName, e.PlayerHp, e.PlayerMaxHp,

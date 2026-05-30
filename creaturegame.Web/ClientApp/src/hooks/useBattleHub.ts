@@ -13,6 +13,8 @@ export interface BattleState {
   enemyHp: number;
   enemyMaxHp: number;
   enemyStatus: string;
+  enemySpeciesId: number;
+  enemyLevel: number;
   moves: MoveInfo[];
   winner: string | null;
   log: string[];
@@ -20,7 +22,7 @@ export interface BattleState {
 }
 
 type Action =
-  | { type: 'BATTLE_STARTED'; playerName: string; enemyName: string }
+  | { type: 'BATTLE_STARTED'; playerName: string; enemyName: string; enemySpeciesId: number; enemyLevel: number }
   | { type: 'TURN_STARTED'; turnNumber: number; playerHp: number; playerMaxHp: number; playerStatus: string; enemyHp: number; enemyMaxHp: number; enemyStatus: string; moves: MoveInfo[] }
   | { type: 'TURN_ENDED' }
   | { type: 'PLAYER_CHOSE' }
@@ -42,6 +44,8 @@ const initialState: BattleState = {
   enemyHp: 0,
   enemyMaxHp: 1,
   enemyStatus: 'None',
+  enemySpeciesId: 0,
+  enemyLevel: 0,
   moves: [],
   winner: null,
   log: [],
@@ -51,7 +55,7 @@ const initialState: BattleState = {
 function reducer(state: BattleState, action: Action): BattleState {
   switch (action.type) {
     case 'BATTLE_STARTED':
-      return { ...state, phase: 'waiting', playerName: action.playerName, enemyName: action.enemyName };
+      return { ...state, phase: 'waiting', playerName: action.playerName, enemyName: action.enemyName, enemySpeciesId: action.enemySpeciesId, enemyLevel: action.enemyLevel };
     case 'TURN_STARTED':
       return {
         ...state,
@@ -109,7 +113,7 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
     conn.on('OnBattleEvent', (eventType: string, payload: Payload) => {
       switch (eventType) {
         case 'BattleStarted':
-          dispatch({ type: 'BATTLE_STARTED', playerName: payload.playerName as string, enemyName: payload.enemyName as string });
+          dispatch({ type: 'BATTLE_STARTED', playerName: payload.playerName as string, enemyName: payload.enemyName as string, enemySpeciesId: payload.enemySpeciesId as number, enemyLevel: payload.enemyLevel as number });
           dispatch({ type: 'LOG', message: `${payload.playerName} VS ${payload.enemyName}` });
           break;
 

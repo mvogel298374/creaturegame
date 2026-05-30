@@ -6,7 +6,7 @@ namespace creaturegame.Combat;
 public abstract record BattleEvent;
 
 // --- Battle lifecycle ---
-public record BattleStarted(string PlayerName, string EnemyName) : BattleEvent;
+public record BattleStarted(string PlayerName, string EnemyName, int EnemySpeciesId, int EnemyLevel) : BattleEvent;
 
 public record TurnStarted(
     int TurnNumber,

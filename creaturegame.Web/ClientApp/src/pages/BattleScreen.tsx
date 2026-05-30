@@ -41,9 +41,10 @@ export function BattleScreen() {
   const enemyMaxHp  = state.enemyMaxHp  > 1 ? state.enemyMaxHp  : estimateHp(39);
   const enemyHp     = state.enemyMaxHp  > 1 ? state.enemyHp     : enemyMaxHp;
 
-  const playerName = state.playerName || (playerSpecies?.name.toUpperCase() ?? 'PLAYER');
-  const enemyName  = state.enemyName  || 'CHARMANDER';
-  const enemyId    = 4; // fixed enemy species id
+  const playerName  = state.playerName || (playerSpecies?.name.toUpperCase() ?? 'PLAYER');
+  const enemyName   = state.enemyName  || '???';
+  const enemyId     = state.enemySpeciesId || 0;
+  const enemyLevel  = state.enemyLevel || '?';
 
   return (
     <div className="battle-screen">
@@ -51,14 +52,14 @@ export function BattleScreen() {
         <div className="nameplate nameplate--enemy">
           <div className="nameplate-row">
             <span className="nameplate-name">{enemyName}</span>
-            <span className="nameplate-level">Lv50</span>
+            <span className="nameplate-level">Lv{enemyLevel}</span>
           </div>
           <HpBar hp={enemyHp} maxHp={enemyMaxHp} />
           <StatusBadge status={state.enemyStatus} />
         </div>
 
         <div className="sprite-slot sprite-slot--enemy">
-          <img className="battle-sprite" src={`/sprites/front/${enemyId}.png`} alt={enemyName} />
+          {enemyId > 0 && <img className="battle-sprite" src={`/sprites/front/${enemyId}.png`} alt={enemyName} />}
         </div>
 
         <div className="sprite-slot sprite-slot--player">
