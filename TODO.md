@@ -358,6 +358,72 @@ The moves array is already returned in the existing `/pokemon/{id}` response. Fo
 
 ---
 
+## Multi-Generation Architecture
+
+A codebase audit was done to identify what needs abstraction before multi-gen support is added. Summary: the battle-rule and stat-formula layers are already well-abstracted; the main gaps are in the data model and stat representation.
+
+### What is already well-abstracted ✅
+
+| Interface | Implementation | Covers |
+|:----------|:---------------|:-------|
+| `IBattleRules` | `Gen1BattleRules` | Crit formula, damage variance, sleep/freeze/bind rules, accuracy scale, XP formula, status damage rates, stat stage multipliers |
+| `ITypeChart` | `Gen1TypeChart` | Full type effectiveness matrix — plug in `Gen2TypeChart` etc. to get Steel/Dark/Fairy |
+| `IStatCalculator` | `Gen1StatCalculator` | HP and stat formulas, DV randomisation, Stat Exp scaling |
+| `IBattleAction` | `AttackAction` | Turn action abstraction; additional action types (UseItem, Switch) slot in cleanly |
+| `IBattleInput` | `AutoSelectInput`, `SignalRInput` | Player/AI input — already the seam for AI Move Selection |
+
+### Gaps — what needs adding before Gen 2+ work starts
+
+**1. Stat selection in `DamageCalculator` (small, do it first)**
+
+`DamageCalculator` currently picks `Attributes.Special` for both the attacker's offence and the defender's defence on special moves. This is correct for Gen 1 but wrong from Gen 2 onwards (SpAtk ≠ SpDef). The fix is two new methods on `IBattleRules`:
+
+```csharp
+int GetOffensiveStat(Creature attacker, AttackType moveType);
+int GetDefensiveStat(Creature defender, AttackType moveType);
+```
+
+Gen 1 implementation returns `Special` for both; Gen 2+ returns `SpAtk` / `SpDef` respectively. `DamageCalculator` replaces its inline stat selection with these calls. This is a small, safe change that can be done independently of the data model work.
+
+**2. `Attributes` stat split (breaking, defer to Gen 2 sprint)**
+
+`Attributes.Special` (single stat) → `Attributes.SpAtk` + `Attributes.SpDef`. Keep `Special` as a computed alias (`SpAtk` in Gen 1 where they're equal) so existing tests don't all break at once. `Creature.BaseSpecial`, `DvSpecial`, `ExpSpecial` all need the same split.
+
+**3. `PokemonSpecies` per-generation data (DB schema change, defer to Gen 2 sprint)**
+
+`PokemonSpecies.BaseSpecial` must split into `BaseSpAtk` + `BaseSpDef`. More broadly, the current `PokemonSpecies` table conflates timeless identity data with generation-specific mechanical data. The target schema:
+
+- `PokemonSpecies` — Id, Name, CatchRate, BaseExperience, PokedexEntry, GrowthRate (never changes)
+- `PokemonSpeciesGenData` — SpeciesId, Generation (int), Type1, Type2, BaseHP, BaseAttack, BaseDefense, BaseSpAtk, BaseSpDef, BaseSpeed (Gen 2+), and BaseSpecial (Gen 1 alias)
+  - Gen 3+ adds: Ability1, Ability2, HiddenAbility
+  - Gen 6+ adds: MegaStone, MegaType1, MegaType2, etc.
+
+The importer would store one row per species per generation it has data for. The engine queries by the active generation.
+
+**Note on PokeAPI completeness:** `past_types` and `past_abilities` are available. **Base stats are not historicised** — PokeAPI only returns current stats. Several Pokémon received stat buffs in Gen 6 (XY balance patch: Clefable, Beedrill, Pikachu line, etc.). A corrections table or a separate Gen-1-specific data source is needed for accurate Gen 1 stats.
+
+**4. Generation field on `Attack` and `PokemonSpecies` (defer to multi-gen import sprint)**
+
+When Gen 2+ data is imported, both tables need a `Generation` (or `GenerationIntroduced`) column so the engine can filter the pool to the active generation. Without this, a Gen 1 battle would be able to encounter Gen 2+ moves and species.
+
+- `Attack.GenerationIntroduced` (int) — set during import from PokeAPI generation resource
+- `PokemonSpecies.GenerationIntroduced` (int) — same
+
+`EncounterSelector` and `BuildCreature` then filter by `generationIntroduced <= activeGeneration`.
+
+**5. Generation-aware service methods (defer to multi-gen import sprint)**
+
+`PokemonService` and `AttackService` have no generation parameter. Add overloads:
+
+```csharp
+Task<List<PokemonSpecies>> GetSpeciesForGenerationAsync(int maxGeneration);
+Task<List<Attack>> GetMovesForGenerationAsync(int maxGeneration);
+```
+
+These replace direct `ToListAsync()` calls in `GameController` and `EncounterSelector`.
+
+---
+
 ## User Documentation
 
 Target: write player-facing docs once the Enemy Encounter System + AI Move Selection are both done — at that point the core game loop is fully playable and documentation won't be describing a moving target.
