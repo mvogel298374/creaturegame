@@ -110,22 +110,51 @@ public class PokemonImport
             PokedexEntry = speciesData.FlavorTextEntries?.FirstOrDefault(f => f.Language?.Name == "en")?.FlavorText?.Replace("\f", " ").Replace("\n", " ")
         };
 
-        // Types
-        if (pokeData.Types?.Count > 0)
+        // Types — prefer Gen 1-era types from past_types if available.
+        // PokeAPI returns current types; past_types records what changed and when.
+        // Each past_types entry means "these types were in effect up to and including
+        // this generation". We pick the earliest entry covering Gen 1 (gen i–v).
+        var gen1TypeSlots = Gen1TypeSlots(pokeData);
+
+        if (gen1TypeSlots?.Count > 0)
         {
-            if (Enum.TryParse<DamageType>(pokeData.Types[0].Type?.Name, true, out var t1))
+            if (Enum.TryParse<DamageType>(gen1TypeSlots[0].Type?.Name, true, out var t1))
                 species.Type1 = t1;
             else
                 species.Type1 = DamageType.Normal;
         }
 
-        if (pokeData.Types?.Count > 1)
+        if (gen1TypeSlots?.Count > 1)
         {
-            if (Enum.TryParse<DamageType>(pokeData.Types[1].Type?.Name, true, out var t2))
+            if (Enum.TryParse<DamageType>(gen1TypeSlots[1].Type?.Name, true, out var t2))
                 species.Type2 = t2;
         }
 
         return species;
+    }
+
+    // Generations that predate Gen 6 (when Fairy type was added and Steel/Dark lost
+    // some interactions). An entry in past_types with one of these names means the
+    // listed types were the ones in use during Gen 1.
+    private static readonly HashSet<string> PreGen6 =
+        ["generation-i", "generation-ii", "generation-iii", "generation-iv", "generation-v"];
+
+    private static readonly Dictionary<string, int> GenOrder = new()
+    {
+        ["generation-i"] = 1, ["generation-ii"] = 2, ["generation-iii"] = 3,
+        ["generation-iv"] = 4, ["generation-v"] = 5,
+    };
+
+    private static List<PokemonTypeSlot>? Gen1TypeSlots(PokeApiPokemon pokeData)
+    {
+        // If past_types has any pre-Gen-6 entry, that is the Gen 1 type. Pick the
+        // entry with the lowest generation number (earliest historical record).
+        var historical = pokeData.PastTypes?
+            .Where(pt => pt.Generation?.Name != null && PreGen6.Contains(pt.Generation.Name))
+            .OrderBy(pt => GenOrder.GetValueOrDefault(pt.Generation!.Name!, 99))
+            .FirstOrDefault();
+
+        return historical?.Types ?? pokeData.Types;
     }
 
     private static creaturegame.Creatures.GrowthRate MapGrowthRate(string? name)

@@ -21,6 +21,25 @@ public class PokeApiPokemon
 
     [JsonPropertyName("game_indices")]
     public List<PokemonGameIndex>? GameIndices { get; set; }
+
+    // Each entry = "these types were in effect up to and including this generation"
+    [JsonPropertyName("past_types")]
+    public List<PastTypeEntry>? PastTypes { get; set; }
+}
+
+public class PastTypeEntry
+{
+    [JsonPropertyName("generation")]
+    public GenerationResource? Generation { get; set; }
+
+    [JsonPropertyName("types")]
+    public List<PokemonTypeSlot>? Types { get; set; }
+}
+
+public class GenerationResource
+{
+    [JsonPropertyName("name")]
+    public string? Name { get; set; }
 }
 
 public class PokemonGameIndex
