@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { TypeBadge } from '../components/TypeBadge';
+import { BattleCanvas } from '../battle/BattleCanvas';
 import { useBattleHub } from '../hooks/useBattleHub';
 import type { Species } from '../types/Species';
 import type { MoveInfo } from '../types/BattleEvents';
@@ -43,7 +44,6 @@ export function BattleScreen() {
 
   const playerName  = state.playerName || (playerSpecies?.name.toUpperCase() ?? 'PLAYER');
   const enemyName   = state.enemyName  || '???';
-  const enemyId     = state.enemySpeciesId || 0;
   const enemyLevel  = state.enemyLevel || '?';
 
   return (
@@ -58,17 +58,12 @@ export function BattleScreen() {
           <StatusBadge status={state.enemyStatus} />
         </div>
 
-        <div className="sprite-slot sprite-slot--enemy">
-          {enemyId > 0 && <img className="battle-sprite" src={`/sprites/front/${enemyId}.png`} alt={enemyName} />}
-        </div>
-
-        <div className="sprite-slot sprite-slot--player">
-          <img
-            className="battle-sprite battle-sprite--back"
-            src={`/sprites/back/${playerSpecies?.id ?? 1}.png`}
-            alt={playerName}
+        {state.enemySpeciesId > 0 && (
+          <BattleCanvas
+            playerSpeciesId={playerSpecies?.id ?? 1}
+            enemySpeciesId={state.enemySpeciesId}
           />
-        </div>
+        )}
 
         <div className="nameplate nameplate--player">
           <div className="nameplate-row">
@@ -77,7 +72,7 @@ export function BattleScreen() {
           </div>
           <HpBar hp={playerHp} maxHp={playerMaxHp} showNumbers />
           <StatusBadge status={state.playerStatus} />
-          <XpBar xp={0} xpToNext={100} />
+          <XpBar xp={state.playerXp} xpToNext={state.playerXpToNext} />
         </div>
       </div>
 
@@ -95,7 +90,7 @@ export function BattleScreen() {
           {controlView === 'menu' && (
             <ActionMenu
               playerName={playerName}
-              canFight={state.phase === 'choosing'}
+              canFight={state.phase === 'choosing' && !state.animating}
               battleEnded={state.phase === 'ended'}
               winner={state.winner}
               onFight={() => setControlView('fight')}
@@ -106,7 +101,7 @@ export function BattleScreen() {
           {controlView === 'fight' && (
             <MoveMenu
               moves={state.moves}
-              canChoose={state.phase === 'choosing'}
+              canChoose={state.phase === 'choosing' && !state.animating}
               onChoose={handleChooseMove}
               onBack={() => setControlView('menu')}
             />

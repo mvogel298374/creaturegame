@@ -42,7 +42,7 @@ public class GameController(GameSessionManager sessionManager) : ControllerBase
             var player = BuildCreature(playerSpecies, allMoves, playerLevel);
             var enemy  = BuildCreature(enemySpecies,  allMoves, enemyLevel);
 
-            var gameId = sessionManager.RegisterSession(player, enemy);
+            var gameId = sessionManager.RegisterSession(player, enemy, allMoves);
             return Ok(new { gameId });
         }
         catch (Exception ex)

@@ -7,15 +7,17 @@ public class Battle
 {
     private Creature PlayerCreature { get; }
     private Creature EnemyCreature  { get; }
-    private readonly ITypeChart           _typeChart;
-    private readonly IBattleRules         _rules;
-    private readonly IBattleInput         _playerInput;
-    private readonly IBattleInput         _enemyInput;
-    private readonly IBattleEventEmitter? _emitter;
+    private readonly ITypeChart              _typeChart;
+    private readonly IBattleRules            _rules;
+    private readonly IBattleInput            _playerInput;
+    private readonly IBattleInput            _enemyInput;
+    private readonly IBattleEventEmitter?    _emitter;
+    private readonly IReadOnlyList<Attack>   _movePool;
     private int _turnNumber;
 
     public Battle(Creature player, Creature enemy, ITypeChart typeChart,
                   IBattleInput playerInput, IBattleInput enemyInput,
+                  IReadOnlyList<Attack>? movePool = null,
                   IBattleRules? rules = null, IBattleEventEmitter? emitter = null)
     {
         PlayerCreature = player;
@@ -24,6 +26,7 @@ public class Battle
         _rules         = rules ?? Gen1BattleRules.Instance;
         _playerInput   = playerInput;
         _enemyInput    = enemyInput;
+        _movePool      = movePool ?? Array.Empty<Attack>();
         _emitter       = emitter;
     }
 
@@ -73,8 +76,8 @@ public class Battle
                           TurnNumber = _turnNumber
                       }));
 
-            var playerAction = new AttackAction(PlayerCreature, EnemyCreature, playerMove, _typeChart, _rules, _emitter);
-            var enemyAction  = new AttackAction(EnemyCreature, PlayerCreature, enemyMove,  _typeChart, _rules, _emitter);
+            var playerAction = new AttackAction(PlayerCreature, EnemyCreature, playerMove, _typeChart, _rules, _emitter, _movePool);
+            var enemyAction  = new AttackAction(EnemyCreature, PlayerCreature, enemyMove,  _typeChart, _rules, _emitter, _movePool);
 
             // Turn resolution: Priority → effective Speed (Paralysis quarters) → random tie-breaker
             var turnQueue = new List<IBattleAction> { playerAction, enemyAction };

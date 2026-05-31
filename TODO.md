@@ -119,19 +119,23 @@ No prerequisites. All `ExpHP/Attack/Defense/Special/Speed` fields exist on `Crea
 
 Stack: React 18 + TypeScript + SignalR. Phaser 3 for sprite/animation canvas.
 
-### Phaser Canvas
-- [ ] Add `phaser` npm dependency to `ClientApp`
-- [ ] `BattleCanvas.tsx` — mounts a Phaser `Game` instance in a `useEffect`; destroys on unmount
-- [ ] `BattleScene.ts` — loads front sprite (`/sprites/front/{id}.png`) for enemy, back sprite for player; diagonal layout (enemy top-right, player bottom-left)
-- [ ] React↔Phaser bridge — shared `PhaserBridge` event emitter (`mitt`); React dispatches `playMoveAnimation` / `playFaintAnimation`; Phaser emits `animationComplete` back
-- [ ] Current CSS sprite placeholders replaced by the Phaser canvas; React retains HP/status overlay layer
+### Phaser Canvas ✅ DONE
+- [x] `phaser` + `mitt` npm dependencies added to `ClientApp`
+- [x] `BattleCanvas.tsx` — mounts Phaser `Game` lazily (dynamic import, separate chunk); destroys on unmount
+- [x] `BattleScene.ts` — loads front/back sprites, diagonal layout (enemy top-right, player bottom-left), entry slide-in animation with Web Audio cries
+- [x] `PhaserBridge.ts` — typed mitt emitter; React dispatches `playMoveAnimation` / `playFaintAnimation`; Phaser emits `animationComplete` back
+- [x] `AudioEngine.ts` — Web Audio API synth: `playCry`, `playFaintCry`, `playHit`, `playTick`
+- [x] CSS sprite `<img>` placeholders replaced by the Phaser canvas; React retains HP/status/nameplate overlay layer (z-index 2)
 
-### Animations
-- [ ] `MoveUsed` → attacker sprite bobs toward opponent (lunge + return, ~300ms)
-- [ ] `DamageDealt` → target white-flash (2 frames); HP bar drains animated over ~600ms
-- [ ] `CreatureFainted` → target slides down and fades (~500ms)
-- [ ] Move menu re-enabled only after `animationComplete` for the full turn sequence
-- [ ] `useBattleHub` state gains `animating: boolean`; move buttons check `phase === 'choosing' && !animating`
+### Animations ✅ DONE
+- [x] Entry: sprites slide in from edges with species cries; idle bob tween starts after entry
+- [x] `MoveUsed` → attacker lunges toward opponent (~150ms in, ~200ms back); target white-flash + `playHit()`
+- [x] `DamageDealt` → `UPDATE_HP` fires immediately (CSS `transition: width 0.6s ease-out`); log message appears after 650ms
+- [x] `CreatureFainted` → sprite slides down + fades (~500ms) with `playFaintCry()`; log appears after
+- [x] `LeveledUp` → XP bar fills to 100% (CSS `transition: width 0.9s linear`) then resets; log after
+- [x] All events enqueued — log text always appears **after** the relevant animation (Gen 1 feel)
+- [x] Move menu re-enabled only after animation queue drains (`animationComplete` bridge event)
+- [x] `useBattleHub` state gains `animating: boolean`; FIGHT + move buttons check `phase === 'choosing' && !animating`
 
 ### Polish
 - [ ] `BattleEndedOverlay` — covers battle screen on `BattleEnded`; shows winner, "Play Again" → `/select`, "Main Menu" → `/`
@@ -236,3 +240,6 @@ Target: after AI Move Selection lands — at that point battles are fully playab
 - Enemy Pokémon do not evolve — wire into level-up system when Game Loop is built
 - `GameController.BuildCreature` uses random moves — fixed by Learnset System
 - `PokemonService` / `AttackService` not registered in DI — using direct `new()`; revisit when scoped lifetime or multi-context scenarios arise
+
+### Fixed ✅
+- Metronome (`MoveEffect.Metronome`): picks a random eligible Gen 1 move and executes it in full; move pool threaded from `GameController` → `GameSessionManager` → `Battle` → `AttackAction`; DB updated via re-run of importer

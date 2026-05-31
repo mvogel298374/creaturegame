@@ -1,0 +1,13 @@
+.battle-canvas-container {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  overflow: hidden;
+}
+
+/* Let Phaser's scale manager size the canvas — no !important overrides */
+.battle-canvas-container canvas {
+  display: block;
+  image-rendering: pixelated;
+}

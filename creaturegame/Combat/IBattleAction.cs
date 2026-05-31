@@ -15,16 +15,18 @@ public class AttackAction : IBattleAction
     public Creature Source { get; }
     public Creature Target { get; }
     public int Priority { get; }
-    private readonly ITypeChart           _typeChart;
-    private readonly IBattleRules         _rules;
-    private readonly IBattleEventEmitter? _emitter;
+    private readonly ITypeChart              _typeChart;
+    private readonly IBattleRules            _rules;
+    private readonly IBattleEventEmitter?    _emitter;
+    private readonly IReadOnlyList<Attack>   _movePool;
 
     // Null means Struggle — Battle passes null when Source.IsOutOfPP, bypassing IBattleInput.
     private readonly PokemonAttack? _selectedMove;
 
     public AttackAction(Creature source, Creature target,
                         PokemonAttack? selectedMove, ITypeChart typeChart,
-                        IBattleRules? rules = null, IBattleEventEmitter? emitter = null)
+                        IBattleRules? rules = null, IBattleEventEmitter? emitter = null,
+                        IReadOnlyList<Attack>? movePool = null)
     {
         Source        = source;
         Target        = target;
@@ -32,6 +34,7 @@ public class AttackAction : IBattleAction
         _rules        = rules ?? Gen1BattleRules.Instance;
         _emitter      = emitter;
         _selectedMove = selectedMove;
+        _movePool     = movePool ?? Array.Empty<Attack>();
         Priority      = selectedMove?.Base.Priority ?? 0;
     }
 
@@ -75,6 +78,26 @@ public class AttackAction : IBattleAction
         }
 
         _emitter?.Emit(new MoveUsed(Source.Name, attackToUse.Name ?? ""));
+
+        // Metronome: pick a random move (excluding Metronome and Mirror Move) and execute it in full.
+        // Gen 1: the called move's PP is not consumed (temporary wrapper, no effect on creature's moveset).
+        if (!usingStruggle && attackToUse.Effect == MoveEffect.Metronome && _movePool.Count > 0)
+        {
+            var eligible = _movePool
+                .Where(m => m.Effect != MoveEffect.Metronome
+                         && m.Name != "mirror-move"
+                         && m.Name != "struggle")
+                .ToList();
+
+            if (eligible.Count > 0)
+            {
+                var chosen = eligible[Random.Shared.Next(eligible.Count)];
+                var inner  = new AttackAction(Source, Target,
+                    new PokemonAttack(chosen), _typeChart, _rules, _emitter, _movePool);
+                return inner.ExecuteAsync();
+            }
+            return Task.CompletedTask;
+        }
 
         var category = usingStruggle ? DamageCategory.Standard : attackToUse.DamageCategory;
 

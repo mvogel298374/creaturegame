@@ -200,6 +200,8 @@ public class MoveImport
             attack.Effect = MoveEffect.Binding;
         else if (pokeMove.Name is "fly" or "dig" or "solar-beam" or "razor-wind" or "sky-attack")
             attack.Effect = MoveEffect.TwoTurn;
+        else if (pokeMove.Name == "metronome")
+            attack.Effect = MoveEffect.Metronome;
         else if (pokeMove.Meta?.FlinchChance > 0)
             attack.Effect = MoveEffect.Flinch;
 

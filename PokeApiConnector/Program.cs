@@ -29,6 +29,9 @@ class Program
         Console.WriteLine("\nDownloading battle sprites...");
         await SpriteDownloader.DownloadAllAsync();
 
+        Console.WriteLine("\nDownloading Pokémon cries (legacy 8-bit)...");
+        await CryDownloader.DownloadAllAsync();
+
         Console.WriteLine("\nImport Complete!");
     }
 }

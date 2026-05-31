@@ -12,6 +12,7 @@ export default defineConfig({
         ws: true,
       },
       '/sprites': 'http://localhost:5100',
+      '/audio':   'http://localhost:5100',
     },
   },
 });

@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using creaturegame.Attacks;
 using creaturegame.Combat;
 using creaturegame.Creatures;
 using creaturegame.Web.Hubs;
@@ -15,10 +16,10 @@ public sealed class GameSessionManager(IHubContext<BattleHub, IBattleClient> hub
     // Pending sessions that are never claimed (client never connected) are evicted after this TTL.
     private static readonly TimeSpan PendingSessionTtl = TimeSpan.FromMinutes(2);
 
-    public string RegisterSession(Creature player, Creature enemy)
+    public string RegisterSession(Creature player, Creature enemy, IReadOnlyList<Attack> allMoves)
     {
         var gameId = Guid.NewGuid().ToString("N");
-        _pending[gameId] = new PendingSession(player, enemy, DateTimeOffset.UtcNow);
+        _pending[gameId] = new PendingSession(player, enemy, allMoves, DateTimeOffset.UtcNow);
         EvictExpiredPendingSessions();
         return gameId;
     }
@@ -44,6 +45,7 @@ public sealed class GameSessionManager(IHubContext<BattleHub, IBattleClient> hub
             session.Player, session.Enemy,
             Gen1TypeChart.Instance,
             playerInput, AutoSelectInput.Instance,
+            movePool: session.AllMoves,
             emitter: emitter);
 
         _ = Task.Run(async () =>
@@ -62,4 +64,4 @@ public sealed class GameSessionManager(IHubContext<BattleHub, IBattleClient> hub
     }
 }
 
-sealed record PendingSession(Creature Player, Creature Enemy, DateTimeOffset RegisteredAt);
+sealed record PendingSession(Creature Player, Creature Enemy, IReadOnlyList<Attack> AllMoves, DateTimeOffset RegisteredAt);

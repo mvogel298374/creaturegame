@@ -1,14 +1,18 @@
 import { useEffect, useRef, useReducer, useCallback } from 'react';
 import * as signalR from '@microsoft/signalr';
 import type { MoveInfo } from '../types/BattleEvents';
+import { bridge } from '../battle/PhaserBridge';
 
 export interface BattleState {
   phase: 'connecting' | 'waiting' | 'choosing' | 'battling' | 'ended';
+  animating: boolean;
   playerName: string;
   playerHp: number;
   playerMaxHp: number;
   playerStatus: string;
   playerLevel: number;
+  playerXp: number;
+  playerXpToNext: number;
   enemyName: string;
   enemyHp: number;
   enemyMaxHp: number;
@@ -31,15 +35,22 @@ type Action =
   | { type: 'UPDATE_HP'; name: string; hp: number }
   | { type: 'UPDATE_STATUS'; name: string; status: string }
   | { type: 'CLEAR_STATUS'; name: string }
-  | { type: 'LEVELED_UP'; newLevel: number };
+  | { type: 'LEVELED_UP'; newLevel: number }
+  | { type: 'ANIMATING_START' }
+  | { type: 'ANIMATING_DONE' }
+  | { type: 'XP_FILL' }
+  | { type: 'XP_RESET' };
 
 const initialState: BattleState = {
   phase: 'connecting',
+  animating: false,
   playerName: '',
   playerHp: 0,
   playerMaxHp: 1,
   playerStatus: 'None',
   playerLevel: 50,
+  playerXp: 0,
+  playerXpToNext: 100,
   enemyName: '',
   enemyHp: 0,
   enemyMaxHp: 1,
@@ -60,6 +71,7 @@ function reducer(state: BattleState, action: Action): BattleState {
       return {
         ...state,
         phase: 'choosing',
+        animating: false,
         turnNumber: action.turnNumber,
         playerHp: action.playerHp,
         playerMaxHp: action.playerMaxHp,
@@ -70,7 +82,7 @@ function reducer(state: BattleState, action: Action): BattleState {
         moves: action.moves,
       };
     case 'PLAYER_CHOSE':
-      return { ...state, phase: 'battling' };
+      return { ...state, phase: 'battling', animating: true };
     case 'TURN_ENDED':
       return { ...state, phase: 'battling' };
     case 'BATTLE_ENDED':
@@ -91,6 +103,14 @@ function reducer(state: BattleState, action: Action): BattleState {
       return state;
     case 'LEVELED_UP':
       return { ...state, playerLevel: action.newLevel };
+    case 'ANIMATING_START':
+      return { ...state, animating: true };
+    case 'ANIMATING_DONE':
+      return { ...state, animating: false };
+    case 'XP_FILL':
+      return { ...state, playerXp: state.playerXpToNext };
+    case 'XP_RESET':
+      return { ...state, playerXp: 0 };
     default:
       return state;
   }
@@ -98,9 +118,78 @@ function reducer(state: BattleState, action: Action): BattleState {
 
 type Payload = Record<string, unknown>;
 
+const delay = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+
+function statusAppliedMsg(name: string, status: string): string {
+  switch (status) {
+    case 'Sleep':     return `${name} fell asleep!`;
+    case 'Freeze':    return `${name} was frozen solid!`;
+    case 'Paralysis': return `${name} was paralyzed!`;
+    case 'Burn':      return `${name} was burned!`;
+    case 'Poison':    return `${name} was poisoned!`;
+    case 'BadPoison': return `${name} was badly poisoned!`;
+    default:          return `${name} was affected by ${status}!`;
+  }
+}
+
+function statusClearedMsg(name: string, wasStatus: string): string {
+  switch (wasStatus) {
+    case 'Sleep':     return `${name} woke up!`;
+    case 'Freeze':    return `${name} thawed out!`;
+    case 'Paralysis': return `${name} was cured of paralysis!`;
+    case 'Burn':      return `${name} healed its burn!`;
+    case 'Poison':
+    case 'BadPoison': return `${name} was cured of poison!`;
+    default:          return `${name} recovered from ${wasStatus}!`;
+  }
+}
+
+function actionBlockedMsg(name: string, reason: string): string {
+  switch (reason) {
+    case 'Sleep':     return `${name} is fast asleep!`;
+    case 'Freeze':    return `${name} is frozen solid!`;
+    case 'Paralysis': return `${name} is fully paralyzed!`;
+    default:          return `${name} can't move! (${reason})`;
+  }
+}
+
+function waitForBridge(): Promise<void> {
+  return new Promise<void>(resolve => {
+    const handler = () => {
+      bridge.off('animationComplete', handler);
+      resolve();
+    };
+    bridge.on('animationComplete', handler);
+  });
+}
+
 export function useBattleHub(gameId: string | null, initialLevel = 50) {
   const [state, dispatch] = useReducer(reducer, { ...initialState, playerLevel: initialLevel });
   const connRef = useRef<signalR.HubConnection | null>(null);
+
+  // Stable refs to avoid stale closures inside queued async tasks
+  const playerNameRef = useRef('');
+  const enemyNameRef  = useRef('');
+
+  // Animation queue
+  const queueRef      = useRef<Array<() => Promise<void>>>([]);
+  const processingRef = useRef(false);
+
+  const drainQueue = useCallback(async () => {
+    processingRef.current = true;
+    dispatch({ type: 'ANIMATING_START' });
+    while (queueRef.current.length > 0) {
+      const task = queueRef.current.shift()!;
+      await task();
+    }
+    processingRef.current = false;
+    dispatch({ type: 'ANIMATING_DONE' });
+  }, []);
+
+  const enqueue = useCallback((task: () => Promise<void>) => {
+    queueRef.current.push(task);
+    if (!processingRef.current) drainQueue();
+  }, [drainQueue]);
 
   useEffect(() => {
     if (!gameId) return;
@@ -112,10 +201,18 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
 
     conn.on('OnBattleEvent', (eventType: string, payload: Payload) => {
       switch (eventType) {
-        case 'BattleStarted':
-          dispatch({ type: 'BATTLE_STARTED', playerName: payload.playerName as string, enemyName: payload.enemyName as string, enemySpeciesId: payload.enemySpeciesId as number, enemyLevel: payload.enemyLevel as number });
-          dispatch({ type: 'LOG', message: `${payload.playerName} VS ${payload.enemyName}` });
+
+        // ── Non-turn events: dispatch immediately ──────────────────────────
+
+        case 'BattleStarted': {
+          const pName = payload.playerName as string;
+          const eName = payload.enemyName as string;
+          playerNameRef.current = pName;
+          enemyNameRef.current  = eName;
+          dispatch({ type: 'BATTLE_STARTED', playerName: pName, enemyName: eName, enemySpeciesId: payload.enemySpeciesId as number, enemyLevel: payload.enemyLevel as number });
+          dispatch({ type: 'LOG', message: `${pName} VS ${eName}` });
           break;
+        }
 
         case 'TurnStarted':
           dispatch({
@@ -137,130 +234,289 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
 
         case 'BattleEnded':
           dispatch({ type: 'BATTLE_ENDED', winner: payload.winnerName as string });
-          dispatch({ type: 'LOG', message: `${payload.winnerName} wins!` });
+          enqueue(async () => {
+            await delay(200);
+            dispatch({ type: 'LOG', message: `${payload.winnerName} wins!` });
+          });
           break;
 
-        case 'MoveUsed':
-          dispatch({ type: 'LOG', message: `${payload.attackerName} used ${payload.moveName}!` });
-          break;
+        // ── Turn events: enqueue for sequential animated playback ──────────
 
-        case 'MoveMissed':
-          dispatch({ type: 'LOG', message: `${payload.attackerName}'s ${payload.moveName} missed!` });
+        case 'MoveUsed': {
+          const attackerName = payload.attackerName as string;
+          const moveName     = payload.moveName as string;
+          enqueue(async () => {
+            const attackerSide = attackerName === playerNameRef.current ? 'player' : 'enemy';
+            const targetSide: 'player' | 'enemy' = attackerSide === 'player' ? 'enemy' : 'player';
+            bridge.emit('playMoveAnimation', { attackerSide, targetSide });
+            await waitForBridge();
+            await delay(200);
+            dispatch({ type: 'LOG', message: `${attackerName} used ${moveName}!` });
+          });
           break;
+        }
+
+        case 'MoveMissed': {
+          const aName = payload.attackerName as string;
+          const mName = payload.moveName as string;
+          enqueue(async () => {
+            await delay(200);
+            dispatch({ type: 'LOG', message: `${aName}'s ${mName} missed!` });
+          });
+          break;
+        }
 
         case 'DamageDealt': {
-          dispatch({ type: 'UPDATE_HP', name: payload.targetName as string, hp: payload.hpAfter as number });
-          let msg = `${payload.targetName} took ${payload.damage} damage!`;
-          if (payload.isCrit) msg += ' A critical hit!';
-          const eff = payload.typeEffectiveness as number;
-          if (eff > 1)       msg += " It's super effective!";
-          else if (eff > 0 && eff < 1) msg += " It's not very effective...";
-          else if (eff === 0) msg += " It had no effect.";
-          dispatch({ type: 'LOG', message: msg });
+          const targetName = payload.targetName as string;
+          const hpAfter    = payload.hpAfter as number;
+          const isCrit     = payload.isCrit as boolean;
+          const eff        = payload.typeEffectiveness as number;
+          const damage     = payload.damage as number;
+          enqueue(async () => {
+            bridge.emit('playHitSound', { isCrit });
+            dispatch({ type: 'UPDATE_HP', name: targetName, hp: hpAfter });
+            await delay(650);
+            let msg = `${targetName} took ${damage} damage!`;
+            if (isCrit) msg += ' A critical hit!';
+            if (eff > 1)           msg += " It's super effective!";
+            else if (eff > 0 && eff < 1) msg += " It's not very effective...";
+            else if (eff === 0)    msg += " It had no effect.";
+            dispatch({ type: 'LOG', message: msg });
+            // Breathing room between the two attackers' sequences
+            await delay(800);
+          });
           break;
         }
 
-        case 'RecoilDamage':
-          dispatch({ type: 'UPDATE_HP', name: payload.sourceName as string, hp: payload.hpAfter as number });
-          dispatch({ type: 'LOG', message: `${payload.sourceName} is hit by recoil!` });
+        case 'RecoilDamage': {
+          const srcName = payload.sourceName as string;
+          const hpAfter = payload.hpAfter as number;
+          enqueue(async () => {
+            dispatch({ type: 'UPDATE_HP', name: srcName, hp: hpAfter });
+            await delay(400);
+            dispatch({ type: 'LOG', message: `${srcName} is hit by recoil!` });
+          });
           break;
+        }
 
-        case 'StatusApplied':
-          dispatch({ type: 'UPDATE_STATUS', name: payload.targetName as string, status: payload.status as string });
-          dispatch({ type: 'LOG', message: `${payload.targetName} was ${(payload.status as string).toLowerCase()}ed!` });
+        case 'CreatureFainted': {
+          const faintedName = payload.name as string;
+          enqueue(async () => {
+            const side = faintedName === playerNameRef.current ? 'player' : 'enemy';
+            bridge.emit('playFaintAnimation', { side });
+            await waitForBridge();
+            await delay(200);
+            dispatch({ type: 'LOG', message: `${faintedName} fainted!` });
+          });
           break;
+        }
+
+        case 'LeveledUp': {
+          const newLevel = payload.newLevel as number;
+          const cName    = payload.creatureName as string;
+          enqueue(async () => {
+            dispatch({ type: 'XP_FILL' });
+            await delay(900);
+            dispatch({ type: 'XP_RESET' });
+            dispatch({ type: 'LEVELED_UP', newLevel });
+            dispatch({ type: 'LOG', message: `${cName} grew to level ${newLevel}!` });
+          });
+          break;
+        }
+
+        case 'StatusApplied': {
+          const tName  = payload.targetName as string;
+          const status = payload.status as string;
+          enqueue(async () => {
+            dispatch({ type: 'UPDATE_STATUS', name: tName, status });
+            bridge.emit('playStatusSound', undefined);
+            await delay(300);
+            dispatch({ type: 'LOG', message: statusAppliedMsg(tName, status) });
+          });
+          break;
+        }
 
         case 'StatusDamage': {
-          dispatch({ type: 'UPDATE_HP', name: payload.targetName as string, hp: payload.hpAfter as number });
-          const src = payload.source === 'BadPoison' ? 'toxic poison' : payload.source;
-          dispatch({ type: 'LOG', message: `${payload.targetName} is hurt by ${src}!` });
+          const tName  = payload.targetName as string;
+          const hpAftr = payload.hpAfter as number;
+          const src    = payload.source === 'BadPoison' ? 'toxic poison' : payload.source as string;
+          enqueue(async () => {
+            dispatch({ type: 'UPDATE_HP', name: tName, hp: hpAftr });
+            await delay(400);
+            dispatch({ type: 'LOG', message: `${tName} is hurt by ${src}!` });
+          });
           break;
         }
 
-        case 'StatusCleared':
-          dispatch({ type: 'CLEAR_STATUS', name: payload.creatureName as string });
-          dispatch({ type: 'LOG', message: `${payload.creatureName} recovered from ${payload.wasStatus}!` });
+        case 'StatusCleared': {
+          const cName     = payload.creatureName as string;
+          const wasStatus = payload.wasStatus as string;
+          enqueue(async () => {
+            dispatch({ type: 'CLEAR_STATUS', name: cName });
+            await delay(120);
+            dispatch({ type: 'LOG', message: statusClearedMsg(cName, wasStatus) });
+          });
           break;
+        }
 
-        case 'ActionBlocked':
-          dispatch({ type: 'LOG', message: `${payload.creatureName} can't move! (${payload.reason})` });
+        case 'ActionBlocked': {
+          const cName  = payload.creatureName as string;
+          const reason = payload.reason as string;
+          enqueue(async () => {
+            await delay(300);
+            dispatch({ type: 'LOG', message: actionBlockedMsg(cName, reason) });
+            await delay(800);
+          });
           break;
+        }
 
-        case 'ConfusionMessage':
-          dispatch({ type: 'LOG', message: `${payload.creatureName} is confused!` });
+        case 'ConfusionMessage': {
+          const cName = payload.creatureName as string;
+          enqueue(async () => {
+            await delay(120);
+            dispatch({ type: 'LOG', message: `${cName} is confused!` });
+          });
           break;
+        }
 
-        case 'ConfusionDamage':
-          dispatch({ type: 'UPDATE_HP', name: payload.creatureName as string, hp: payload.hpAfter as number });
-          dispatch({ type: 'LOG', message: `${payload.creatureName} hurt itself in confusion!` });
+        case 'ConfusionDamage': {
+          const cName  = payload.creatureName as string;
+          const hpAftr = payload.hpAfter as number;
+          enqueue(async () => {
+            dispatch({ type: 'UPDATE_HP', name: cName, hp: hpAftr });
+            await delay(400);
+            dispatch({ type: 'LOG', message: `${cName} hurt itself in confusion!` });
+          });
           break;
+        }
 
-        case 'ConfusionCleared':
-          dispatch({ type: 'LOG', message: `${payload.creatureName} snapped out of confusion!` });
+        case 'ConfusionCleared': {
+          const cName = payload.creatureName as string;
+          enqueue(async () => {
+            await delay(120);
+            dispatch({ type: 'LOG', message: `${cName} snapped out of confusion!` });
+          });
           break;
+        }
 
         case 'StatStageChanged': {
-          const dir = (payload.delta as number) > 0 ? 'rose' : 'fell';
-          const sharp = Math.abs(payload.delta as number) >= 2 ? ' sharply' : '';
-          dispatch({ type: 'LOG', message: `${payload.creatureName}'s ${payload.stat}${sharp} ${dir}!` });
+          const cName = payload.creatureName as string;
+          const delta = payload.delta as number;
+          const stat  = payload.stat as string;
+          enqueue(async () => {
+            await delay(120);
+            const dir   = delta > 0 ? 'rose' : 'fell';
+            const sharp = Math.abs(delta) >= 2 ? ' sharply' : '';
+            dispatch({ type: 'LOG', message: `${cName}'s ${stat}${sharp} ${dir}!` });
+          });
           break;
         }
 
         case 'HazeClearedStages':
-          dispatch({ type: 'LOG', message: 'All stat changes were erased!' });
+          enqueue(async () => {
+            await delay(120);
+            dispatch({ type: 'LOG', message: 'All stat changes were erased!' });
+          });
           break;
 
-        case 'DrainHealed':
-          dispatch({ type: 'UPDATE_HP', name: payload.sourceName as string, hp: payload.hpAfter as number });
-          dispatch({ type: 'LOG', message: `${payload.sourceName} restored ${payload.healAmount} HP!` });
+        case 'DrainHealed': {
+          const srcName    = payload.sourceName as string;
+          const hpAftr     = payload.hpAfter as number;
+          const healAmount = payload.healAmount as number;
+          enqueue(async () => {
+            dispatch({ type: 'UPDATE_HP', name: srcName, hp: hpAftr });
+            await delay(300);
+            dispatch({ type: 'LOG', message: `${srcName} restored ${healAmount} HP!` });
+          });
           break;
+        }
 
-        case 'LeechSeedApplied':
-          dispatch({ type: 'LOG', message: `${payload.targetName} was seeded!` });
+        case 'LeechSeedApplied': {
+          const tName = payload.targetName as string;
+          enqueue(async () => {
+            await delay(120);
+            dispatch({ type: 'LOG', message: `${tName} was seeded!` });
+          });
           break;
+        }
 
-        case 'LeechSeedDamage':
-          dispatch({ type: 'UPDATE_HP', name: payload.drainedName as string, hp: payload.hpAfter as number });
-          dispatch({ type: 'LOG', message: `${payload.drainedName}'s health was sapped by Leech Seed!` });
+        case 'LeechSeedDamage': {
+          const dName  = payload.drainedName as string;
+          const hpAftr = payload.hpAfter as number;
+          enqueue(async () => {
+            dispatch({ type: 'UPDATE_HP', name: dName, hp: hpAftr });
+            await delay(400);
+            dispatch({ type: 'LOG', message: `${dName}'s health was sapped by Leech Seed!` });
+          });
           break;
+        }
 
-        case 'LeechSeedHealed':
-          dispatch({ type: 'UPDATE_HP', name: payload.healedName as string, hp: payload.hpAfter as number });
+        case 'LeechSeedHealed': {
+          const hName  = payload.healedName as string;
+          const hpAftr = payload.hpAfter as number;
+          enqueue(async () => {
+            dispatch({ type: 'UPDATE_HP', name: hName, hp: hpAftr });
+          });
           break;
+        }
 
-        case 'Recharging':
-          dispatch({ type: 'LOG', message: `${payload.creatureName} must recharge!` });
+        case 'Recharging': {
+          const cName = payload.creatureName as string;
+          enqueue(async () => {
+            await delay(120);
+            dispatch({ type: 'LOG', message: `${cName} must recharge!` });
+          });
           break;
+        }
 
-        case 'BindingStarted':
-          dispatch({ type: 'LOG', message: `${payload.targetName} was squeezed by ${payload.moveName}!` });
+        case 'BindingStarted': {
+          const tName = payload.targetName as string;
+          const mName = payload.moveName as string;
+          enqueue(async () => {
+            await delay(120);
+            dispatch({ type: 'LOG', message: `${tName} was squeezed by ${mName}!` });
+          });
           break;
+        }
 
-        case 'BindingBlocked':
-          dispatch({ type: 'LOG', message: `${payload.creatureName} is bound and can't move!` });
+        case 'BindingBlocked': {
+          const cName = payload.creatureName as string;
+          enqueue(async () => {
+            await delay(120);
+            dispatch({ type: 'LOG', message: `${cName} is bound and can't move!` });
+          });
           break;
+        }
 
-        case 'BindingDamage':
-          dispatch({ type: 'UPDATE_HP', name: payload.targetName as string, hp: payload.hpAfter as number });
-          dispatch({ type: 'LOG', message: `${payload.targetName} is hurt by the bind!` });
+        case 'BindingDamage': {
+          const tName  = payload.targetName as string;
+          const hpAftr = payload.hpAfter as number;
+          enqueue(async () => {
+            dispatch({ type: 'UPDATE_HP', name: tName, hp: hpAftr });
+            await delay(400);
+            dispatch({ type: 'LOG', message: `${tName} is hurt by the bind!` });
+          });
           break;
+        }
 
-        case 'FlinchBlocked':
-          dispatch({ type: 'LOG', message: `${payload.creatureName} flinched and couldn't move!` });
+        case 'FlinchBlocked': {
+          const cName = payload.creatureName as string;
+          enqueue(async () => {
+            await delay(120);
+            dispatch({ type: 'LOG', message: `${cName} flinched and couldn't move!` });
+          });
           break;
+        }
 
-        case 'ChargingUp':
-          dispatch({ type: 'LOG', message: `${payload.creatureName} is charging up ${payload.moveName}!` });
+        case 'ChargingUp': {
+          const cName = payload.creatureName as string;
+          const mName = payload.moveName as string;
+          enqueue(async () => {
+            await delay(120);
+            dispatch({ type: 'LOG', message: `${cName} is charging up ${mName}!` });
+          });
           break;
-
-        case 'CreatureFainted':
-          dispatch({ type: 'LOG', message: `${payload.name} fainted!` });
-          break;
-
-        case 'LeveledUp':
-          dispatch({ type: 'LEVELED_UP', newLevel: payload.newLevel as number });
-          dispatch({ type: 'LOG', message: `${payload.creatureName} grew to level ${payload.newLevel}!` });
-          break;
+        }
       }
     });
 
@@ -271,7 +527,7 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
       conn.stop();
       connRef.current = null;
     };
-  }, [gameId]);
+  }, [gameId, enqueue]);
 
   const chooseMove = useCallback((index: number) => {
     dispatch({ type: 'PLAYER_CHOSE' });

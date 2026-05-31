@@ -47,7 +47,7 @@
   gap: 5px;
   min-width: 160px;
   max-width: 200px;
-  z-index: 1;
+  z-index: 2;
 }
 
 .nameplate--enemy {
@@ -106,7 +106,11 @@
 
 .bar-fill {
   height: 100%;
-  transition: width 0.4s ease;
+  transition: width 0.6s ease-out;
+}
+
+.bar-fill--xp {
+  transition: width 0.9s linear;
 }
 
 .bar-fill--high { background: #44cc44; }
@@ -127,46 +131,22 @@
   margin: 0 1px;
 }
 
-/* ── Sprites ─────────────────────────────────── */
+/* ── Phaser canvas ───────────────────────────── */
 
-/*
-  Positions are percentages of the battlefield height so they stay
-  proportional at any viewport size. overflow:hidden on .battle-field
-  clips anything that bleeds outside at very small viewports.
-
-  Enemy anchors to the top-right: container bottom lands near the
-  horizon (~52%), so Charmander appears to stand on the far side.
-
-  Player anchors to the bottom-left: container bottom sits at ~92%,
-  deep in the ground half, back sprite faces the opponent.
-*/
-.sprite-slot--enemy {
+/* Fills the battle-field; pointer-events:none so HTML overlays stay clickable */
+.battle-canvas-container {
   position: absolute;
-  top: 4%;
-  right: var(--sp-xl);
+  inset: 0;
+  pointer-events: none;
   z-index: 1;
+  overflow: hidden;
 }
 
-.sprite-slot--player {
-  position: absolute;
-  bottom: -4%;
-  left: var(--sp-xl);
-  z-index: 1;
-}
-
-.battle-sprite {
-  /* Sized at ~32% of viewport height — compensates for transparent   */
-  /* padding in Gen 1 sprites; Phaser will handle exact bounds later. */
-  width: clamp(180px, 32vh, 300px);
-  height: clamp(180px, 32vh, 300px);
+.battle-canvas-container canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
   image-rendering: pixelated;
-  object-fit: contain;
-  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.7));
-}
-
-.battle-sprite--back {
-  width: clamp(220px, 40vh, 380px);
-  height: clamp(220px, 40vh, 380px);
 }
 
 /* ── Battle panel ────────────────────────────── */
