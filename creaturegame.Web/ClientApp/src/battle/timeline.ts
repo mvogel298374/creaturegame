@@ -134,8 +134,14 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
     }
 
     case 'TurnStarted':
+      // Queued, NOT immediate. The next turn's TurnStarted arrives over the network
+      // the instant the backend resolves the turn — if applied immediately it slams
+      // the HP bars to their end-of-turn values before the damage has animated. Routing
+      // it through the timeline means HP/status/moves sync only after the queued damage
+      // steps have played, so the bar drains incrementally in step with the animation.
+      // (At battle start the queue is empty, so the first TurnStarted still applies at once.)
       return {
-        now: [{
+        steps: [d({
           type: 'TURN_STARTED',
           turnNumber: payload.turnNumber as number,
           playerHp: payload.playerHp as number,
@@ -145,7 +151,7 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
           enemyMaxHp: payload.enemyMaxHp as number,
           enemyStatus: payload.enemyStatus as string,
           moves: payload.moves as MoveInfo[],
-        }],
+        })],
       };
 
     case 'TurnEnded':

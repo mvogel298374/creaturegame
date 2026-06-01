@@ -86,6 +86,14 @@ describe('expandEvent — control plane vs timeline', () => {
     expect(steps).toBeUndefined();
   });
 
+  it('TurnStarted flows through the timeline (queued), not immediately — so HP syncs after damage animates', () => {
+    const { now, steps } = expandEvent('TurnStarted',
+      { turnNumber: 2, playerHp: 100, playerMaxHp: 150, playerStatus: 'None', enemyHp: 80, enemyMaxHp: 120, enemyStatus: 'None', moves: [] }, CTX);
+    expect(now).toBeUndefined();
+    expect(steps).toHaveLength(1);
+    expect(steps![0]).toMatchObject({ kind: 'dispatch', action: { type: 'TURN_STARTED', enemyHp: 80 } });
+  });
+
   it('BattleEnded flips phase immediately but logs the winner via the timeline', () => {
     const { now, steps } = expandEvent('BattleEnded', { winnerName: 'MEWTWO' }, CTX);
     expect(now).toEqual([{ type: 'BATTLE_ENDED', winner: 'MEWTWO' }]);
