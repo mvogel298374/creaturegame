@@ -50,8 +50,23 @@ public sealed class GameSessionManager(IHubContext<BattleHub, IBattleClient> hub
 
         _ = Task.Run(async () =>
         {
-            try   { await battle.StartFightAsync(); }
-            finally { _inputs.TryRemove(connectionId, out _); }
+            try
+            {
+                await battle.StartFightAsync();
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected when the client disconnects mid-battle — see AbandonBattle.
+                Console.WriteLine($"[GameSessionManager] Battle {gameId} cancelled (client disconnected).");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[GameSessionManager] Battle {gameId} failed: {ex}");
+            }
+            finally
+            {
+                _inputs.TryRemove(connectionId, out _);
+            }
         });
 
         return Task.CompletedTask;
@@ -61,6 +76,17 @@ public sealed class GameSessionManager(IHubContext<BattleHub, IBattleClient> hub
     {
         if (_inputs.TryGetValue(connectionId, out var input))
             input.SetChoice(moveIndex);
+    }
+
+    /// <summary>
+    /// Called when a client disconnects. Cancels any battle loop blocked on that
+    /// connection's input so the fire-and-forget task completes instead of leaking
+    /// the loop, its TaskCompletionSource, and both Creature instances forever.
+    /// </summary>
+    public void AbandonBattle(string connectionId)
+    {
+        if (_inputs.TryGetValue(connectionId, out var input))
+            input.Cancel();
     }
 }
 

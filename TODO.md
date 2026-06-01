@@ -262,14 +262,54 @@ Target: after AI Move Selection lands — at that point battles are fully playab
 - Pending-session TTL in `GameSessionManager` (2-min eviction)
 - `AlwaysHitRules` test helper (eliminates 1/256-miss flakiness)
 
-### Future: BattleState extraction
-**Trigger:** when save system is built. Extract transient battle fields (`Status`, `ToxicCounter`, `IsRecharging`, `IsFlinched`, `HasLeechSeed`, `BindingTurnsRemaining`, `IsTwoTurnCharging`, `ChargingMove`, `StatStages`) from `Creature` into a `BattleState` class held as `Creature.Battle`. Serialize only the permanent half for `save.db`.
+### Architecture Review (2026-06-01) — prioritised
+
+Findings from a full read of the core engine + web layer. The conceptual architecture (generation seams, headless event-sourced engine, `IBattleInput`) is sound and stays; these are concentrated in the web/runtime layer plus one consistency gap. Ordered by severity.
+
+#### 1. Web battle lifecycle — disconnect leak + broken reconnect + swallowed errors `[runtime bug]`
+`SignalRInput.ChooseMoveAsync` (`SignalRInput.cs:14`) awaits a `TaskCompletionSource<int>` with **no cancellation path**, and `BattleHub` has no `OnDisconnectedAsync`. If the player closes the tab mid-turn, the fire-and-forget battle loop (`GameSessionManager.cs:51`, `_ = Task.Run(...)`) awaits that TCS forever — the `SignalRInput`, the two `Creature`s, and the loop task are never collected. **Every abandoned battle is a permanent leak.**
+
+Fix (minimal, no core-engine signature change — cancellation surfaces as the awaited input throwing):
+- [x] `SignalRInput`: add a `_cancelled` flag + `Cancel()` that sets it and calls `_tcs?.TrySetCanceled()`. `ChooseMoveAsync` checks the flag on entry and throws `OperationCanceledException` (covers disconnect during enemy turn/animation when `_tcs` is null and the *next* player turn would otherwise hang).
+- [x] `BattleHub.OnDisconnectedAsync` → `manager.AbandonBattle(connectionId)` → looks up the input and calls `Cancel()`.
+- [x] `GameSessionManager`: wrap the `Task.Run` body in try/catch — swallow/log `OperationCanceledException` at debug, log other exceptions at error (currently a throw in the loop is silent and the client just hangs).
+- [ ] **Reconnect (follow-up within this item):** inputs + emitter are keyed by `connectionId`, but the client uses `.withAutomaticReconnect()`. On reconnect the connectionId changes, `_pending` is already consumed, and events keep targeting the dead connection while input can't reach the live battle. Re-key the active battle by `gameId` (an `ActiveBattle { SignalRInput, CancellationTokenSource, string CurrentConnectionId }` map), have `SignalRBattleEventEmitter` resolve the *current* connectionId dynamically, and rebind on the second `OnConnectedAsync`.
+
+#### 2. Pull `BattleState` extraction forward (was: "when save system is built") `[latent bug source]`
+`Creature` conflates persistent identity (Name, DVs, Exp, base stats), transient battle state, and behaviour. `ResetBattleState()` (`Creature.cs:112`) is a hand-maintained reset list that must be updated for every new transient field — miss one and state silently leaks between battles (the `StatStages` struct→class bug was exactly this class of fault). This is *already* a bug source, not just a future-save concern.
+- [ ] Extract transient fields (`Status`, `SleepTurns`, `ConfusedTurns`, `ToxicCounter`, `Stages`, `IsRecharging`, `IsFlinched`, `HasLeechSeed`, `BindingTurnsRemaining`, `IsTwoTurnCharging`, `ChargingMove`) into a `BattleState` class held as `Creature.Battle`
+- [ ] Replace `ResetBattleState()` with `Creature.Battle = new BattleState()` (a fresh object instead of a field-by-field reset — structurally impossible to "forget a field")
+- [ ] Update `StatusResolver`, `AttackAction`, `Battle` references; keep a save-friendly permanent/transient split ready for `save.db`
+
+#### 3. RNG is the one fidelity-critical concern not behind a seam `[consistency]`
+Crit, accuracy, speed tie-break, Metronome, and move assignment call `Random.Shared` directly inside the engine. Tests route around it with `AlwaysHitRules`/`AlwaysCritRules`, but for a true Gen 1 clone heading toward roguelike runs, **seeded/replayable RNG** will matter — and it's the natural thing to inject through the same seam pattern used everywhere else.
+- [ ] Add `IRandomSource` (e.g. `Next(int maxExclusive)`, `Next(int min, int max)`) with a `SystemRandomSource` default and a `SeededRandomSource` for tests/replays
+- [ ] Thread it through `Battle`, `AttackAction`, `DamageCalculator`, `Gen1BattleRules`, `EncounterSelector` (constructor-injected, default to shared instance)
+- [ ] Makes the whole suite deterministic without the `AlwaysHit/AlwaysCrit` shims; enables seeded run replays later
+
+#### 4. Speed tie-break uses RNG as a sort key `[footgun]`
+`Battle.cs:88` — `.ThenBy(_ => Random.Shared.Next())` calls RNG inside the `OrderBy` comparator, which is an ill-defined key (LINQ may invoke the selector multiple times per element). Harmless at 2 actions; bites the moment the turn queue grows (doubles, multi-battles).
+- [ ] Resolve the tie with a single coin flip computed once (fold into #3 — use the injected `IRandomSource`)
+
+#### 5. DbContext via `new()` instead of DI `[maintainability]`
+`GameController` does `new PokemonDbContext()` / `new MovesDbContext()` (`GameController.cs:20,25`); `PokemonService`/`AttackService` aren't registered. Works only because `OnConfiguring` hardcodes the path. Note the background battle loop touches **no** DB (data is materialised up front and passed in), so the scoped-context-in-`Task.Run` hazard doesn't apply — the real costs are lost connection pooling and tests needing real SQLite files.
+- [ ] Register `AddDbContextFactory<PokemonDbContext>()` / `<MovesDbContext>()` in `Program.cs`; inject the factory into the controller/services
+- [ ] Register `PokemonService` / `AttackService` in DI and use them instead of inline `new()` + raw `ToListAsync()`
+
+#### 6. Frontend battle-log queue is structurally racy `[design]`
+The imperative `enqueue` / `waitForBridge` / hand-tuned `delay()` choreography in `useBattleHub` coordinating Phaser over the `mitt` bus is where today's two bugs lived (permanent freeze + listener leak). The recent try/catch + timeout hardening is defensive patching over an inherently timing-fragile design.
+- [ ] Model the log as a reducer over the event stream with explicit per-event states; treat `animationComplete` as an event, not an awaited side effect
+- [ ] Dovetails with the Playwright-testing item (bridge events as the test seam) — do them together
+
+#### 7. Architecture / decision-log doc `[docs — after the above]`
+The doc set is strong, but the *why* behind the two-DB split, event sourcing, and the seam invariants lives only implicitly. For a project explicitly built to extend generation-by-generation, capture these as an `ARCHITECTURE.md` (or lightweight ADR log) so the invariants survive future drift.
+- [ ] Document: two-DB rationale, event-sourced engine + emitter pattern, the three seams (`ITypeChart`/`IBattleRules`/`IStatCalculator`) and the "never branch on generation" rule, the web session/SignalR flow, and the import-vs-runtime data boundary
+- [ ] Cross-link from `CLAUDE.md` Key Files table
 
 ### Known Gaps
 - Enemy encounter pool ignores game version — filter by `PokemonGameAvailability` once a version selector exists in the UI
 - Enemy Pokémon do not evolve — wire into level-up system when Game Loop is built
 - `GameController.BuildCreature` uses random moves — fixed by Learnset System
-- `PokemonService` / `AttackService` not registered in DI — using direct `new()`; revisit when scoped lifetime or multi-context scenarios arise
 
 ### Fixed ✅
 - Battle log froze on faint (stuck on last damage line, no "fainted!"/winner): `BattleScene`'s `destroy()` was dead code (Phaser never calls it), so `bridge.on` listeners leaked across canvas remounts (HMR/StrictMode) and a stale scene's `playFaintAnimation` threw on a destroyed sprite — now removed via `SHUTDOWN`/`DESTROY` scene events (`teardown`). Hardened the queue too: `drainQueue` try/catch-continues per task with a `finally` reset, and `waitForBridge` times out after 3 s so a lost `animationComplete` can't hang the log.

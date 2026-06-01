@@ -18,4 +18,12 @@ public class BattleHub(GameSessionManager manager) : Hub<IBattleClient>
         manager.SetMoveChoice(Context.ConnectionId, moveIndex);
         return Task.CompletedTask;
     }
+
+    public override async Task OnDisconnectedAsync(Exception? exception)
+    {
+        // Unblock any battle loop waiting on this connection's input so its
+        // fire-and-forget task can complete and be collected (prevents leaks).
+        manager.AbandonBattle(Context.ConnectionId);
+        await base.OnDisconnectedAsync(exception);
+    }
 }
