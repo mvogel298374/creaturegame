@@ -6,12 +6,12 @@ namespace creaturegame.Web.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class SpeciesController : ControllerBase
+public class SpeciesController(IDbContextFactory<PokemonDbContext> pokemonFactory) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
-        await using var ctx = new PokemonDbContext();
+        await using var ctx = await pokemonFactory.CreateDbContextAsync();
         var all = await ctx.Species
             .AsNoTracking()
             .OrderBy(s => s.Id)

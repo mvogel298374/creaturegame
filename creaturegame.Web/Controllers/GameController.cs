@@ -10,19 +10,22 @@ namespace creaturegame.Web.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class GameController(GameSessionManager sessionManager) : ControllerBase
+public class GameController(
+    GameSessionManager sessionManager,
+    IDbContextFactory<PokemonDbContext> pokemonFactory,
+    IDbContextFactory<MovesDbContext> movesFactory) : ControllerBase
 {
     [HttpPost("start")]
     public async Task<IActionResult> Start([FromBody] StartGameRequest req)
     {
         try
         {
-            await using var pokemonCtx = new PokemonDbContext();
+            await using var pokemonCtx = await pokemonFactory.CreateDbContextAsync();
             var playerSpecies = await pokemonCtx.Species.AsNoTracking().FirstOrDefaultAsync(s => s.Id == req.SpeciesId);
             if (playerSpecies == null)
                 return BadRequest(new { error = "Unknown species" });
 
-            await using var movesCtx = new MovesDbContext();
+            await using var movesCtx = await movesFactory.CreateDbContextAsync();
             var allMoves = await movesCtx.Moves.AsNoTracking().ToListAsync();
             if (allMoves.Count == 0)
                 return StatusCode(500, new { error = "No moves in database" });

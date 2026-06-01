@@ -293,10 +293,11 @@ Crit, accuracy, speed tie-break, Metronome, and move assignment call `Random.Sha
 `Battle.cs` — `.ThenBy(_ => Random.Shared.Next())` called RNG inside the `OrderBy` comparator (ill-defined key; LINQ may invoke the selector multiple times per element).
 - [x] Now draws the tie-break once (`int tieBreak = _rng.Next(2)`) and uses it as a stable sort key via the injected `IRandomSource`
 
-#### 5. DbContext via `new()` instead of DI `[maintainability]`
-`GameController` does `new PokemonDbContext()` / `new MovesDbContext()` (`GameController.cs:20,25`); `PokemonService`/`AttackService` aren't registered. Works only because `OnConfiguring` hardcodes the path. Note the background battle loop touches **no** DB (data is materialised up front and passed in), so the scoped-context-in-`Task.Run` hazard doesn't apply — the real costs are lost connection pooling and tests needing real SQLite files.
-- [ ] Register `AddDbContextFactory<PokemonDbContext>()` / `<MovesDbContext>()` in `Program.cs`; inject the factory into the controller/services
-- [ ] Register `PokemonService` / `AttackService` in DI and use them instead of inline `new()` + raw `ToListAsync()`
+#### 5. DbContext via `new()` instead of DI `[maintainability]` ✅ DONE
+`GameController` / `SpeciesController` did `new PokemonDbContext()` / `new MovesDbContext()`. Worked only because `OnConfiguring` hardcodes the path. The real costs were lost connection pooling and tests needing real SQLite files. (The background battle loop touches no DB — data is materialised up front and passed in — so the scoped-context-in-`Task.Run` hazard never applied.)
+- [x] Registered `AddDbContextFactory<PokemonDbContext>()` / `<MovesDbContext>()` in `Program.cs` (SQLite via `DbPathHelper`); both controllers now inject `IDbContextFactory<T>` and use `CreateDbContextAsync()`
+- [x] Verified at runtime: `GET /api/Species` → 151 species, `POST /api/Game/start` → gameId
+- n/a `PokemonService` / `AttackService` are not used by the web host (controllers query contexts directly), so there was nothing to register there. If they're adopted later, register them then.
 
 #### 6. Frontend battle-log queue is structurally racy `[design]`
 The imperative `enqueue` / `waitForBridge` / hand-tuned `delay()` choreography in `useBattleHub` coordinating Phaser over the `mitt` bus is where today's two bugs lived (permanent freeze + listener leak). The recent try/catch + timeout hardening is defensive patching over an inherently timing-fragile design.
