@@ -163,11 +163,14 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       const moveName = payload.moveName as string;
       const attackerSide = side(attacker);
       const targetSide: Side = attackerSide === 'player' ? 'enemy' : 'player';
+      // Gen 1 cadence: announce the move FIRST, brief beat, THEN the lunge. The
+      // hit sound + incremental HP drain follow in the DamageDealt event, so the
+      // bar never moves before the "used" line. (Was animating before the text.)
       return { steps: [
+        d(log(`${attacker} used ${formatMoveName(moveName)}!`)),
+        w(400),
         emit({ type: 'playMoveAnimation', attackerSide, targetSide }),
         anim(),
-        w(200),
-        d(log(`${attacker} used ${formatMoveName(moveName)}!`)),
       ] };
     }
 

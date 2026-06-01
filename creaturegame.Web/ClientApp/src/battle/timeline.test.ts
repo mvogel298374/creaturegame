@@ -18,9 +18,10 @@ describe('expandEvent — move-name formatting', () => {
     expect(logLines(steps)).toEqual(['MEWTWO used FURY ATTACK!']);
   });
 
-  it('plays the lunge then awaits the animation before logging', () => {
+  it('announces the move first, then beats, then plays the lunge (Gen 1 order)', () => {
     const { steps } = expandEvent('MoveUsed', { attackerName: 'MEWTWO', moveName: 'tackle' }, CTX);
-    expect(kinds(steps)).toEqual(['emit', 'awaitAnim', 'wait', 'dispatch']);
+    // dispatch(LOG "used") → wait → emit(lunge) → awaitAnim — text must precede animation.
+    expect(kinds(steps)).toEqual(['dispatch', 'wait', 'emit', 'awaitAnim']);
   });
 
   it('formats the slug in "missed" lines', () => {
