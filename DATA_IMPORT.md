@@ -85,9 +85,11 @@ For each move, `GET /move/{id}` → `PokeApiMove` DTO → `MapToAttack`. Straigh
 
 The interesting Gen 1 logic lives in the categorisation:
 
-- **`AttackType`** ← PokeAPI `damage_class` (`physical`/`special`/else → `Undefined`).
-  *(Fidelity note: in Gen 1 the physical/special split was determined by the move's
-  **type**, not per move. We currently trust PokeAPI's per-move class — see §6.)*
+- **`AttackType`** — for damaging moves, **derived from the move's type** (Gen 1 rule),
+  *not* PokeAPI's `damage_class`. Gen 1 physical types are Normal/Fighting/Flying/Poison/
+  Ground/Rock/Bug/Ghost; everything else is Special. Status moves → `Undefined`. *(PokeAPI's
+  `damage_class` is the Gen 4+ per-move split — it would wrongly make Fire Punch physical
+  and Hyper Beam special; see the resolved note in §6.)*
 - **Status ailment** → `StatusEffect` (paralysis/sleep/burn/poison/freeze/bad-poison),
   with `EffectChance` taken from `meta.ailment_chance` for damaging moves.
 - **`IsHighCrit`** ← `meta.crit_rate > 0` (Slash, Razor Leaf, etc.).
@@ -194,11 +196,11 @@ next run, rather than aborting the whole import.
 
 ## 6. Known limitations / gotchas (be honest about these)
 
-- **Physical/Special split fidelity.** `AttackType` comes from PokeAPI's per-move
-  `damage_class`, but Gen 1 derived physical/special from the move's **type**. For many
-  moves these agree; a strict audit (type-based split) is a worthwhile follow-up if a
-  move's category looks off. *(Not yet tracked in `TODO.md` — flag it if you confirm a
-  discrepancy.)*
+- **Physical/Special split fidelity — RESOLVED.** Originally `AttackType` was copied from
+  PokeAPI's per-move `damage_class`, which miscategorised **18 of 110** Gen 1 damaging
+  moves (e.g. Hyper Beam, the elemental punches, Gust) and so computed their damage off the
+  wrong stat. Now derived from the move's type (§4.1); the existing `moves.db` rows were
+  corrected in place by the same deterministic rule.
 - **`new HttpClient()` per request.** Convenient but not best practice (socket pressure at
   scale). Tolerable here given the one-shot, low-volume nature; would be a shared client /
   `IHttpClientFactory` in long-running code.

@@ -111,11 +111,15 @@ public class MoveImport
             attack.DamageType = DamageType.Normal; // Default
         }
 
+        // Gen 1: a damaging move's physical/special split is decided by its TYPE, not the
+        // move. PokeAPI's damage_class is the Gen 4+ per-move split (e.g. it calls Fire
+        // Punch "physical" and Hyper Beam "special"), which is wrong for Gen 1 — so for any
+        // move that deals damage we derive the category from DamageType. Status moves
+        // (damage_class "status") stay Undefined.
         attack.AttackType = pokeMove.DamageClass?.Name?.ToLower() switch
         {
-            "physical" => AttackType.Physical,
-            "special" => AttackType.Special,
-            _ => AttackType.Undefined
+            "physical" or "special" => Gen1DamageCategory(attack.DamageType),
+            _                       => AttackType.Undefined
         };
 
         attack.StatusEffect = pokeMove.Meta?.Ailment?.Name switch
@@ -207,4 +211,16 @@ public class MoveImport
 
         return attack;
     }
+
+    // Gen 1 physical types: Normal, Fighting, Flying, Poison, Ground, Rock, Bug, Ghost.
+    // Every other (damaging) type — Fire, Water, Grass, Electric, Psychic, Ice, Dragon —
+    // is Special. (Steel/Dark/Fairy don't exist in Gen 1.)
+    private static readonly HashSet<DamageType> Gen1PhysicalTypes =
+    [
+        DamageType.Normal, DamageType.Fighting, DamageType.Flying, DamageType.Poison,
+        DamageType.Ground, DamageType.Rock, DamageType.Bug, DamageType.Ghost,
+    ];
+
+    private static AttackType Gen1DamageCategory(DamageType type) =>
+        Gen1PhysicalTypes.Contains(type) ? AttackType.Physical : AttackType.Special;
 }
