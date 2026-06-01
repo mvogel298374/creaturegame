@@ -6,10 +6,17 @@ namespace creaturegame.Web.Battle;
 
 public sealed class SignalRBattleEventEmitter(
     IHubContext<BattleHub, IBattleClient> hubContext,
-    string connectionId) : IBattleEventEmitter
+    Func<string?> currentConnectionId) : IBattleEventEmitter
 {
     public void Emit(BattleEvent evt)
     {
+        // Resolved per-emit so events follow the player across a reconnect (the
+        // connectionId changes). If currently disconnected, the event is dropped —
+        // a turn-based battle is normally blocked on player input during a gap, so
+        // little is missed, and the reconnected client resumes from the next event.
+        var connectionId = currentConnectionId();
+        if (string.IsNullOrEmpty(connectionId)) return;
+
         var (type, payload) = MapEvent(evt);
         _ = hubContext.Clients.Client(connectionId).OnBattleEvent(type, payload);
     }

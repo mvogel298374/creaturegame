@@ -7,9 +7,11 @@ public class BattleHub(GameSessionManager manager) : Hub<IBattleClient>
 {
     public override async Task OnConnectedAsync()
     {
+        // Same gameId on a later connection = a reconnect; AttachConnection handles both
+        // the first-connect (start the battle) and reconnect (rebind) cases.
         var gameId = Context.GetHttpContext()?.Request.Query["gameId"].ToString();
         if (!string.IsNullOrEmpty(gameId))
-            await manager.StartBattleAsync(gameId, Context.ConnectionId);
+            manager.AttachConnection(gameId, Context.ConnectionId);
         await base.OnConnectedAsync();
     }
 
@@ -21,9 +23,9 @@ public class BattleHub(GameSessionManager manager) : Hub<IBattleClient>
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        // Unblock any battle loop waiting on this connection's input so its
-        // fire-and-forget task can complete and be collected (prevents leaks).
-        manager.AbandonBattle(Context.ConnectionId);
+        // Start the reconnect grace window; the battle is abandoned only if the client
+        // doesn't come back in time (prevents both a leak and killing a transient drop).
+        manager.DetachConnection(Context.ConnectionId);
         await base.OnDisconnectedAsync(exception);
     }
 }
