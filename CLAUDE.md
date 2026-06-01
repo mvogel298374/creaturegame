@@ -30,7 +30,16 @@ To start the full dev environment (backend + Vite frontend + browser):
 ```
 **Run this directly in a PowerShell terminal at the repo root — do NOT wrap it in `Start-Process` or call it via `-Command ".\dev.ps1"`.** It spawns two child `pwsh` windows (backend on `:5100`, frontend on `:5173`) and opens the browser once Vite is ready. If the browser does not open automatically after ~60 s, navigate to `http://localhost:5173` manually.
 
-To run a single test by name:
+To run **all** test suites at once (one summary, CI-friendly exit code) — .NET unit (xUnit), frontend unit (Vitest), and frontend E2E (Playwright):
+```powershell
+.\test.ps1                  # all suites (E2E skipped if the dev stack isn't running)
+.\test.ps1 -Dotnet          # only .NET unit
+.\test.ps1 -Web             # only Vitest
+.\test.ps1 -E2E -StartStack # only Playwright, starting/stopping the backend itself
+```
+Playwright E2E needs the app running (`.\dev.ps1`); without `-StartStack` it's skipped with a notice when the backend isn't on `:5100`. Frontend-only test commands also work directly: `npm test` / `npm run test:e2e` in `creaturegame.Web/ClientApp`.
+
+To run a single .NET test by name:
 ```powershell
 & "C:\Users\USER\.dotnet\dotnet.exe" test tests/creaturegame.Tests --filter "FullyQualifiedName~<MethodName>"
 ```
