@@ -196,7 +196,9 @@ Deferred until Phaser animations exist — the mechanic needs a throw/shake/catc
 
 ## Game Loop & Progression
 
-**Prerequisites:** Catch Mechanic, BattleState extraction (Tech Debt), `PlayerDbContext` / `save.db`
+**Prerequisites:** Catch Mechanic, BattleState extraction (Tech Debt ✅ done), `PlayerDbContext` / `save.db`
+
+> **Sequencing:** this whole layer is intentionally **deferred until combat fidelity is fully ironed out** — the battle sim is the foundation the roguelike/lite loop builds on.
 
 - Player starts with one Pokémon; win → new BST-scaled encounter; lose → game over with run summary
 - Catch → Pokémon added to party (up to 6); choose lead between battles
@@ -204,6 +206,7 @@ Deferred until Phaser animations exist — the mechanic needs a throw/shake/catc
 - Evolution: player Pokémon evolve at level threshold (requires `PokemonEvolution` table in `pokemon.db`); enemy evolves to correct form for their level before battle
 - `PlayerSave` / `SavedCreature` models in `save.db`; auto-save after each battle
 - Party management UI between battles
+- **Cross-encounter persistence:** carry major status across encounters and revisit the current "reset *all* transient state per battle" behaviour — today HP persists between battles but status doesn't (canonical Gen 1 keeps major status out of battle). The `Creature`/`BattleState` split is the seam for this; see `STATE_MODEL.md §2`.
 
 ---
 
