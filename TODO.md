@@ -153,27 +153,30 @@ Promote the manual Puppeteer checklist (`ui_checklist.md`) into a committed, CI-
 
 **Key constraint:** Playwright/Puppeteer query the DOM only. Phaser renders to one opaque `<canvas>` — sprite slide-in, idle bob, lunge, faint fade, and audio (cries/hit/status) are **not** directly assertable. Don't attempt pixel/sprite selectors, and never assert wall-clock animation durations (the checklist's "~1.8 s silence", "~350 ms lunge", "~600 ms HP drain") in E2E — they are the #1 source of flake. Assert **event ordering** via the bridge instead; unit-test durations separately if needed.
 
+Status: **harness + core specs landed** (9 specs, run via `npm run test:e2e` or the VS Code Playwright extension — see `ClientApp/e2e/README.md`). Remaining: a few checklist sections (§6 status, §7 XP/QUIT), `data-testid`s, and CI.
+
 **Testability seams (prerequisite plumbing):**
-- [ ] Add `data-testid` attributes to React overlays — nameplates, HP/XP bars, status badge, battle log, FIGHT/move grid, PP counts, level slider, CONFIRM
-- [ ] Expose the `PhaserBridge` `mitt` emitter on `window` behind a dev/test flag so specs can await `entryComplete` / `animationComplete` and observe `playMoveAnimation` / `playHitSound` / `playFaintAnimation` / `playStatusSound`
-- [ ] Add an "instant animations" test flag — set Phaser tween time scale high (or zero delays) and collapse CSS transition durations so flows run deterministically and fast
+- [ ] `data-testid` attributes — **deferred**: specs lean on stable semantic classes already present (`.btn-new-game`, `.species-card`, `.move-btn`, `.log-line`, `.bar-fill`, `.nameplate--*`). Add testids only where a class proves brittle.
+- [x] Expose the `PhaserBridge` `mitt` emitter on `window` behind a flag (`src/testEnv.ts` → `window.__CG_E2E__`) and **record every bridge event** on `window.__cgEvents` for ordering assertions (`PhaserBridge.ts`)
+- [x] "Instant animations" flag — under E2E, `timeline` collapses step delays + shortens the animation-complete wait, and `BattleScene` runs tweens/timers at 8× (`this.tweens/time.timeScale`)
 
 **Scaffold:**
-- [ ] `npm create playwright` in `ClientApp/`; config points at the Vite dev server (`:5173`), single Chromium project to start
+- [x] `@playwright/test` + Chromium installed; `playwright.config.ts` targets the Vite dev server (`:5173`), single Chromium project, serial (battles are stateful), `webServer` reuses a running Vite; `test:e2e` / `test:e2e:ui` scripts; Vitest scoped to `src/` so the two runners don't collide; `e2e/fixtures.ts` (flag) + `e2e/helpers.ts` (page objects) + `e2e/README.md`
 - [ ] CI step (or `dev.ps1`-adjacent script) that boots backend + frontend, runs the suite headless, and tears down
 
 **Specs (mirror `ui_checklist.md` sections):**
-- [ ] §1–2 Title + Starter selection — text, NEW GAME, 151-card grid, type badges, BST, level slider range/default, CONFIRM navigation (pure DOM)
-- [ ] §3 Battle entry — nameplates + HP/XP/status overlays render; "X VS Y" log line; FIGHT/CHECK enabled; await `entryComplete` rather than sleeping
-- [ ] §4 Move menu — 2×2 grid, PP counts, 0-PP greyed/unclickable, BACK, CHECK POKEMON
-- [ ] §5 Attack sequencing — assert **order** of bridge events (`playMoveAnimation` → `playHitSound` → HP-bar update → log line) and the animating-lock disable/re-enable, not durations
-- [ ] §6 Status conditions — badge on correct nameplate; log grammar ("fell asleep!", "is fully paralyzed!", "thawed out!", etc.)
-- [ ] §7 Faint & end — `playFaintAnimation` fires; menu stays locked until `animationComplete`; XP fill + "grew to level N!"; winner line; QUIT → title
-- [ ] §8 (optional) Visual regression snapshots of the canvas **at settled states only** (post-entry, post-faint) — expect maintenance cost; many teams skip canvas snapshots
+- [x] §1–2 Title + Starter selection — title loads (`smoke`), 151-card grid, Gen 1 type badges + BST, level slider range/default, CONFIRM → battle (`starter-select.spec.ts`)
+- [x] §3 Battle entry — player/enemy nameplates, "X VS Y" log, FIGHT/CHECK enabled (`battle.spec.ts`)
+- [x] §4 Move menu — 2×2 grid + PP, BACK returns (`battle.spec.ts`). *(0-PP greyed/unclickable not yet asserted.)*
+- [x] §5 Attack sequencing — bridge ordering (`playMoveAnimation` before `playHitSound`) and the move announced before resolution; **plus the cadence regression guard** (enemy HP doesn't snap to end-of-turn HP at choose-time) in `cadence.spec.ts`
+- [ ] §6 Status conditions — badge on correct nameplate; log grammar (not yet — status is non-deterministic per battle; needs a seeded or forced-status path)
+- [x] §7 Faint & end (partial) — plays through to faint → winner, asserting order (`battle.spec.ts`). *(XP fill / level-up line / QUIT → title not yet asserted.)*
+- [ ] §8 (optional) Visual regression snapshots of the canvas at settled states — still skipped (maintenance cost).
 
 **Notes:**
-- Keep Puppeteer-MCP for agent-driven, ad-hoc verification during a session; Playwright is the durable regression layer. The two are complementary.
+- Keep Puppeteer-MCP for agent-driven, ad-hoc verification during a session; Playwright is the durable regression layer.
 - Audio is verified by asserting the bridge *fired* the sound event, never by capturing sound.
+- Deterministic §6 (status) and richer §7 (XP/level/QUIT) coverage would benefit from a **seeded battle** entry point (the `IRandomSource` seam exists in core; wiring a per-game seed through `GameController` would make these specs deterministic).
 
 ---
 
