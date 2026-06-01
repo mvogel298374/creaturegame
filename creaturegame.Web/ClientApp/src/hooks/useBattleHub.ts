@@ -2,6 +2,7 @@ import { useEffect, useRef, useReducer, useCallback } from 'react';
 import * as signalR from '@microsoft/signalr';
 import type { MoveInfo } from '../types/BattleEvents';
 import { bridge } from '../battle/PhaserBridge';
+import { formatMoveName } from '../utils/format';
 
 export interface BattleState {
   phase: 'connecting' | 'waiting' | 'choosing' | 'battling' | 'ended';
@@ -153,12 +154,34 @@ function actionBlockedMsg(name: string, reason: string): string {
   }
 }
 
-function waitForBridge(): Promise<void> {
+// Gen 1 two-turn moves each have their own charge-up line.
+function chargingMsg(name: string, slug: string): string {
+  switch (slug) {
+    case 'fly':        return `${name} flew up high!`;
+    case 'dig':        return `${name} dug a hole!`;
+    case 'solar-beam': return `${name} took in sunlight!`;
+    case 'razor-wind': return `${name} made a whirlwind!`;
+    case 'skull-bash': return `${name} lowered its head!`;
+    case 'sky-attack': return `${name} is glowing!`;
+    default:           return `${name} began charging up!`;
+  }
+}
+
+// Resolve when Phaser signals the animation is done — but never hang the battle
+// log if that signal is lost (e.g. a stale scene listener after an HMR remount).
+function waitForBridge(timeoutMs = 3000): Promise<void> {
   return new Promise<void>(resolve => {
-    const handler = () => {
+    let settled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
       bridge.off('animationComplete', handler);
       resolve();
     };
+    const handler = () => finish();
+    timer = setTimeout(finish, timeoutMs);
     bridge.on('animationComplete', handler);
   });
 }
@@ -178,12 +201,21 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
   const drainQueue = useCallback(async () => {
     processingRef.current = true;
     dispatch({ type: 'ANIMATING_START' });
-    while (queueRef.current.length > 0) {
-      const task = queueRef.current.shift()!;
-      await task();
+    try {
+      while (queueRef.current.length > 0) {
+        const task = queueRef.current.shift()!;
+        // A failing animation task must never freeze the battle log — log it
+        // and move on so faint/end events still render.
+        try {
+          await task();
+        } catch (err) {
+          console.error('[battle queue] task failed, continuing:', err);
+        }
+      }
+    } finally {
+      processingRef.current = false;
+      dispatch({ type: 'ANIMATING_DONE' });
     }
-    processingRef.current = false;
-    dispatch({ type: 'ANIMATING_DONE' });
   }, []);
 
   const enqueue = useCallback((task: () => Promise<void>) => {
@@ -251,7 +283,7 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
             bridge.emit('playMoveAnimation', { attackerSide, targetSide });
             await waitForBridge();
             await delay(200);
-            dispatch({ type: 'LOG', message: `${attackerName} used ${moveName}!` });
+            dispatch({ type: 'LOG', message: `${attackerName} used ${formatMoveName(moveName)}!` });
           });
           break;
         }
@@ -261,7 +293,7 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
           const mName = payload.moveName as string;
           enqueue(async () => {
             await delay(200);
-            dispatch({ type: 'LOG', message: `${aName}'s ${mName} missed!` });
+            dispatch({ type: 'LOG', message: `${aName}'s ${formatMoveName(mName)} missed!` });
           });
           break;
         }
@@ -273,14 +305,20 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
           const eff        = payload.typeEffectiveness as number;
           const damage     = payload.damage as number;
           enqueue(async () => {
+            // Immunity: no hit, no damage number — just the Gen 1 line.
+            if (eff === 0) {
+              await delay(650);
+              dispatch({ type: 'LOG', message: `It doesn't affect ${targetName}...` });
+              await delay(800);
+              return;
+            }
             bridge.emit('playHitSound', { isCrit });
             dispatch({ type: 'UPDATE_HP', name: targetName, hp: hpAfter });
             await delay(650);
             let msg = `${targetName} took ${damage} damage!`;
             if (isCrit) msg += ' A critical hit!';
             if (eff > 1)           msg += " It's super effective!";
-            else if (eff > 0 && eff < 1) msg += " It's not very effective...";
-            else if (eff === 0)    msg += " It had no effect.";
+            else if (eff < 1)      msg += " It's not very effective...";
             dispatch({ type: 'LOG', message: msg });
             // Breathing room between the two attackers' sequences
             await delay(800);
@@ -474,7 +512,7 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
           const mName = payload.moveName as string;
           enqueue(async () => {
             await delay(120);
-            dispatch({ type: 'LOG', message: `${tName} was squeezed by ${mName}!` });
+            dispatch({ type: 'LOG', message: `${tName} was squeezed by ${formatMoveName(mName)}!` });
           });
           break;
         }
@@ -513,7 +551,7 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
           const mName = payload.moveName as string;
           enqueue(async () => {
             await delay(120);
-            dispatch({ type: 'LOG', message: `${cName} is charging up ${mName}!` });
+            dispatch({ type: 'LOG', message: chargingMsg(cName, mName) });
           });
           break;
         }

@@ -5,6 +5,7 @@ import { BattleCanvas } from '../battle/BattleCanvas';
 import { useBattleHub } from '../hooks/useBattleHub';
 import type { Species } from '../types/Species';
 import type { MoveInfo } from '../types/BattleEvents';
+import { formatMoveName } from '../utils/format';
 import './BattleScreen.css';
 
 // Gen 1 HP estimate at level 50, no DVs/EVs — used until first TurnStarted arrives
@@ -225,7 +226,7 @@ function MoveMenu({ moves, canChoose, onChoose, onBack }: {
               disabled={disabled}
               onClick={() => onChoose(i)}
             >
-              <span className="move-name">{move.name.toUpperCase()}</span>
+              <span className="move-name">{formatMoveName(move.name)}</span>
               {!isEmpty && (
                 <span className={`move-pp ${outOfPp ? 'move-pp--low' : ''}`}>
                   {move.ppCurrent}/{move.ppMax}

@@ -147,6 +147,36 @@ Stack: React 18 + TypeScript + SignalR. Phaser 3 for sprite/animation canvas.
 
 ---
 
+## Browser-Based UI Testing (Playwright)
+
+Promote the manual Puppeteer checklist (`ui_checklist.md`) into a committed, CI-runnable E2E suite. Playwright drives the **React DOM** (≈70% of the checklist); the **Phaser canvas** is tested through the existing `mitt` bridge, not by inspecting pixels.
+
+**Key constraint:** Playwright/Puppeteer query the DOM only. Phaser renders to one opaque `<canvas>` — sprite slide-in, idle bob, lunge, faint fade, and audio (cries/hit/status) are **not** directly assertable. Don't attempt pixel/sprite selectors, and never assert wall-clock animation durations (the checklist's "~1.8 s silence", "~350 ms lunge", "~600 ms HP drain") in E2E — they are the #1 source of flake. Assert **event ordering** via the bridge instead; unit-test durations separately if needed.
+
+**Testability seams (prerequisite plumbing):**
+- [ ] Add `data-testid` attributes to React overlays — nameplates, HP/XP bars, status badge, battle log, FIGHT/move grid, PP counts, level slider, CONFIRM
+- [ ] Expose the `PhaserBridge` `mitt` emitter on `window` behind a dev/test flag so specs can await `entryComplete` / `animationComplete` and observe `playMoveAnimation` / `playHitSound` / `playFaintAnimation` / `playStatusSound`
+- [ ] Add an "instant animations" test flag — set Phaser tween time scale high (or zero delays) and collapse CSS transition durations so flows run deterministically and fast
+
+**Scaffold:**
+- [ ] `npm create playwright` in `ClientApp/`; config points at the Vite dev server (`:5173`), single Chromium project to start
+- [ ] CI step (or `dev.ps1`-adjacent script) that boots backend + frontend, runs the suite headless, and tears down
+
+**Specs (mirror `ui_checklist.md` sections):**
+- [ ] §1–2 Title + Starter selection — text, NEW GAME, 151-card grid, type badges, BST, level slider range/default, CONFIRM navigation (pure DOM)
+- [ ] §3 Battle entry — nameplates + HP/XP/status overlays render; "X VS Y" log line; FIGHT/CHECK enabled; await `entryComplete` rather than sleeping
+- [ ] §4 Move menu — 2×2 grid, PP counts, 0-PP greyed/unclickable, BACK, CHECK POKEMON
+- [ ] §5 Attack sequencing — assert **order** of bridge events (`playMoveAnimation` → `playHitSound` → HP-bar update → log line) and the animating-lock disable/re-enable, not durations
+- [ ] §6 Status conditions — badge on correct nameplate; log grammar ("fell asleep!", "is fully paralyzed!", "thawed out!", etc.)
+- [ ] §7 Faint & end — `playFaintAnimation` fires; menu stays locked until `animationComplete`; XP fill + "grew to level N!"; winner line; QUIT → title
+- [ ] §8 (optional) Visual regression snapshots of the canvas **at settled states only** (post-entry, post-faint) — expect maintenance cost; many teams skip canvas snapshots
+
+**Notes:**
+- Keep Puppeteer-MCP for agent-driven, ad-hoc verification during a session; Playwright is the durable regression layer. The two are complementary.
+- Audio is verified by asserting the bridge *fired* the sound event, never by capturing sound.
+
+---
+
 ## Catch Mechanic
 
 Deferred until Phaser animations exist — the mechanic needs a throw/shake/catch animation sequence to be meaningful.
@@ -242,4 +272,6 @@ Target: after AI Move Selection lands — at that point battles are fully playab
 - `PokemonService` / `AttackService` not registered in DI — using direct `new()`; revisit when scoped lifetime or multi-context scenarios arise
 
 ### Fixed ✅
+- Battle log froze on faint (stuck on last damage line, no "fainted!"/winner): `BattleScene`'s `destroy()` was dead code (Phaser never calls it), so `bridge.on` listeners leaked across canvas remounts (HMR/StrictMode) and a stale scene's `playFaintAnimation` threw on a destroyed sprite — now removed via `SHUTDOWN`/`DESTROY` scene events (`teardown`). Hardened the queue too: `drainQueue` try/catch-continues per task with a `finally` reset, and `waitForBridge` times out after 3 s so a lost `animationComplete` can't hang the log.
+- Battle-log text polish: move names display formatted (`fury-attack` → `FURY ATTACK`) via `utils/format.ts#formatMoveName`, applied to the log (`MoveUsed`/`MoveMissed`/`BindingStarted`) and the move-menu grid; Gen 1 per-move two-turn charge lines (`chargingMsg`: Dig "dug a hole!", Fly "flew up high!", Solar Beam "took in sunlight!", etc.) replace the generic "is charging up X!"; immunity now reads "It doesn't affect X..." with no damage number/crit and no hit sound (was "took 0 damage! It had no effect.")
 - Metronome (`MoveEffect.Metronome`): picks a random eligible Gen 1 move and executes it in full; move pool threaded from `GameController` → `GameSessionManager` → `Battle` → `AttackAction`; DB updated via re-run of importer

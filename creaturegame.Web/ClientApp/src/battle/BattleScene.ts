@@ -11,6 +11,15 @@ export class BattleScene extends Phaser.Scene {
   private enemySpeciesId = 1;
   private criesAvailable = false;
 
+  // Kept so we can remove exactly these listeners on teardown — Phaser never
+  // calls a method named destroy(), so listeners must be cleaned up via the
+  // scene's SHUTDOWN/DESTROY events or they leak across remounts (HMR, StrictMode).
+  private onMoveAnim   = (e: { attackerSide: 'player' | 'enemy'; targetSide: 'player' | 'enemy' }) =>
+    this.playMoveAnimation(e.attackerSide, e.targetSide);
+  private onFaintAnim  = (e: { side: 'player' | 'enemy' }) => this.playFaintAnimation(e.side);
+  private onHitSound    = (e: { isCrit: boolean }) => (e.isCrit ? Audio.playHitCrit() : Audio.playHit());
+  private onStatusSound = () => Audio.playStatusApplied();
+
   constructor() {
     super({ key: 'BattleScene' });
   }
@@ -53,21 +62,15 @@ export class BattleScene extends Phaser.Scene {
     this.enemySprite = this.add.image(W + 120, enemyRestY, 'enemy').setScale(enemyScale);
     this.playerSprite = this.add.image(-120, playerRestY, 'player').setScale(playerScale);
 
-    bridge.on('playMoveAnimation', ({ attackerSide, targetSide }) => {
-      this.playMoveAnimation(attackerSide, targetSide);
-    });
+    bridge.on('playMoveAnimation', this.onMoveAnim);
+    bridge.on('playFaintAnimation', this.onFaintAnim);
+    bridge.on('playHitSound', this.onHitSound);
+    bridge.on('playStatusSound', this.onStatusSound);
 
-    bridge.on('playFaintAnimation', ({ side }) => {
-      this.playFaintAnimation(side);
-    });
-
-    bridge.on('playHitSound', ({ isCrit }) => {
-      isCrit ? Audio.playHitCrit() : Audio.playHit();
-    });
-
-    bridge.on('playStatusSound', () => {
-      Audio.playStatusApplied();
-    });
+    // Remove our bridge listeners when this scene is torn down so they can't
+    // fire on a destroyed scene (which throws and freezes the battle queue).
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.teardown, this);
+    this.events.once(Phaser.Scenes.Events.DESTROY, this.teardown, this);
 
     this.playEntryAnimation(enemyRestX, playerRestX);
   }
@@ -182,10 +185,10 @@ export class BattleScene extends Phaser.Scene {
     });
   }
 
-  destroy() {
-    bridge.off('playMoveAnimation');
-    bridge.off('playFaintAnimation');
-    bridge.off('playHitSound');
-    bridge.off('playStatusSound');
+  private teardown() {
+    bridge.off('playMoveAnimation', this.onMoveAnim);
+    bridge.off('playFaintAnimation', this.onFaintAnim);
+    bridge.off('playHitSound', this.onHitSound);
+    bridge.off('playStatusSound', this.onStatusSound);
   }
 }

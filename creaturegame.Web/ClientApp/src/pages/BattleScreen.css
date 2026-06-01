@@ -167,16 +167,16 @@
   padding: var(--sp-sm) var(--sp-md);
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--sp-xs);
   scrollbar-width: thin;
   scrollbar-color: var(--clr-border) transparent;
 }
 
 .log-line {
-  font-size: var(--fs-xs);
+  font-size: var(--fs-sm);
   letter-spacing: var(--ls-tight);
   color: var(--clr-text);
-  line-height: 1.5;
+  line-height: 1.7;
 }
 
 .log-line--muted {
