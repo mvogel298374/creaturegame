@@ -12,6 +12,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | `DEV_STANDARDS.md` | .NET/EF coding conventions and architecture rules. Read before `/dev` work. |
 | `STATE_MODEL.md` | Deep-dive reference: the `Creature` permanent/transient state split (`BattleState`) — patterns + Gen 1 domain logic. Read when touching battle state. |
 | `GENERATION_SEAMS.md` | Deep-dive reference: the generation seams (`ITypeChart`, `IBattleRules`, `IStatCalculator`) — patterns + per-gen domain logic. Read before adding a gen-variable rule or a new generation. |
+| `DATA_IMPORT.md` | Deep-dive reference: the `PokeApiConnector` import pipeline — import-vs-runtime boundary, PokeAPI→model mapping, Gen 1 data decisions. Read before changing imported data. |
 
 ## Commands
 

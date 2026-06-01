@@ -41,8 +41,8 @@ fields to the model, or replace/supplement the importer. Do not add runtime Poke
     and `wwwroot/sprites/back/{id}.png` — served as static files, never fetched at runtime
 
 ## Type Advantages & Balancing
-*   The game uses all 18 standard types (Normal, Fire, Water, etc.).
-*   The effectiveness matrix is implemented in `Gen1TypeChart` — 17 types, Gen 1 quirks preserved (Ghost→Psychic = 0×, Poison→Bug = 2×, no Steel/Dark/Fairy).
+*   The `DamageType` enum defines all 18 modern types, but **Gen 1 only used 15** — Dark and Steel arrived in Gen 2 (→ 17), Fairy in Gen 6 (→ 18).
+*   The effectiveness matrix is implemented in `Gen1TypeChart` — the 15 Gen 1 types, with the Gen 1 quirks preserved (Ghost→Psychic = 0×, Poison→Bug = 2×; no Steel/Dark/Fairy matchups).
 *   Stat growth formulas use base stats from `pokemon.db`; `Gen1StatCalculator` implements the Gen 1 formula.
 
 ## Generation Architecture Principle
@@ -78,3 +78,4 @@ Any mechanic that differs between Pokémon generations **must** be implemented b
 | `AI_CONTEXT.md` | Agent profiles and slash-command definitions |
 | `DEV_STANDARDS.md` | .NET/EF coding conventions (implementation counterpart to this file) |
 | `GENERATION_SEAMS.md` | Developer deep-dive on the generation seams that implement the architecture principle above |
+| `DATA_IMPORT.md` | Developer deep-dive on the `PokeApiConnector` import pipeline and the import-vs-runtime boundary |

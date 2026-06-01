@@ -9,7 +9,7 @@
 <details>
 <summary>Type Chart, PP, Status, Crits, Move Effects, Damage Categories, Bad Poison, XP/Levelling, Enemy Encounters</summary>
 
-**Type Chart** — `ITypeChart` + `Gen1TypeChart` (17-type Gen 1 matrix, Ghost/Psychic bug, Poison→Bug quirk). Wired into `DamageCalculator` and `AttackAction`.
+**Type Chart** — `ITypeChart` + `Gen1TypeChart` (15-type Gen 1 matrix, Ghost/Psychic bug, Poison→Bug quirk). Wired into `DamageCalculator` and `AttackAction`.
 
 **PP Tracking** — `PokemonAttack` wrapper; decrements on use; Struggle when all PP = 0.
 

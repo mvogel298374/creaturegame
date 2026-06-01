@@ -52,3 +52,4 @@ Guidelines for all `/dev` actions in this project.
 | `DESIGN_GUIDES.md` | Gen 1 mechanics and design constraints (design counterpart to this file) |
 | `STATE_MODEL.md` | Deep-dive: `Creature` permanent/transient state split (`BattleState`) — patterns + Gen 1 domain logic |
 | `GENERATION_SEAMS.md` | Deep-dive: generation seams (`ITypeChart`/`IBattleRules`/`IStatCalculator`) — patterns + per-gen domain logic |
+| `DATA_IMPORT.md` | Deep-dive: the `PokeApiConnector` import pipeline — import-vs-runtime boundary, PokeAPI→model mapping, Gen 1 decisions |
