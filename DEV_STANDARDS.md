@@ -51,3 +51,4 @@ Guidelines for all `/dev` actions in this project.
 | `AI_CONTEXT.md` | Agent profiles and slash-command definitions |
 | `DESIGN_GUIDES.md` | Gen 1 mechanics and design constraints (design counterpart to this file) |
 | `STATE_MODEL.md` | Deep-dive: `Creature` permanent/transient state split (`BattleState`) — patterns + Gen 1 domain logic |
+| `GENERATION_SEAMS.md` | Deep-dive: generation seams (`ITypeChart`/`IBattleRules`/`IStatCalculator`) — patterns + per-gen domain logic |

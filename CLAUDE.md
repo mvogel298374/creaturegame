@@ -11,6 +11,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | `DESIGN_GUIDES.md` | Gen 1 mechanics, type-balancing rules, move-import mapping. Read before `/plan` work. |
 | `DEV_STANDARDS.md` | .NET/EF coding conventions and architecture rules. Read before `/dev` work. |
 | `STATE_MODEL.md` | Deep-dive reference: the `Creature` permanent/transient state split (`BattleState`) — patterns + Gen 1 domain logic. Read when touching battle state. |
+| `GENERATION_SEAMS.md` | Deep-dive reference: the generation seams (`ITypeChart`, `IBattleRules`, `IStatCalculator`) — patterns + per-gen domain logic. Read before adding a gen-variable rule or a new generation. |
 
 ## Commands
 

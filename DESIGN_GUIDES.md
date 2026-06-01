@@ -77,3 +77,4 @@ Any mechanic that differs between Pokémon generations **must** be implemented b
 | `TODO.md` | Authoritative task list; update it when any task completes |
 | `AI_CONTEXT.md` | Agent profiles and slash-command definitions |
 | `DEV_STANDARDS.md` | .NET/EF coding conventions (implementation counterpart to this file) |
+| `GENERATION_SEAMS.md` | Developer deep-dive on the generation seams that implement the architecture principle above |
