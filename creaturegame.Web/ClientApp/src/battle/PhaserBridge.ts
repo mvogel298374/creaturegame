@@ -1,4 +1,5 @@
 import mitt from 'mitt';
+import { E2E } from '../testEnv';
 
 type BridgeEvents = {
   // React → Phaser
@@ -13,3 +14,13 @@ type BridgeEvents = {
 };
 
 export const bridge = mitt<BridgeEvents>();
+
+// E2E seam: expose the bridge and record every emitted event (with a timestamp)
+// on window so Playwright can assert animation ordering — e.g. that playHitSound
+// follows playMoveAnimation — without depending on wall-clock timing. No-op in prod.
+if (E2E && typeof window !== 'undefined') {
+  const w = window as unknown as { __cgBridge?: typeof bridge; __cgEvents?: { name: string; t: number }[] };
+  w.__cgBridge = bridge;
+  w.__cgEvents = [];
+  bridge.on('*', (type) => w.__cgEvents!.push({ name: String(type), t: Math.round(performance.now()) }));
+}

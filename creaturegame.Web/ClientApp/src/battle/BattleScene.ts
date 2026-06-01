@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { bridge } from './PhaserBridge';
 import * as Audio from './AudioEngine';
+import { E2E } from '../testEnv';
 
 export class BattleScene extends Phaser.Scene {
   private playerSprite!: Phaser.GameObjects.Image;
@@ -48,6 +49,10 @@ export class BattleScene extends Phaser.Scene {
   create() {
     const W = this.scale.width;
     const H = this.scale.height;
+
+    // E2E: run all tweens and timers (entry slide, the 1.8s cry pause, lunges,
+    // faint) much faster so battles play through quickly under test.
+    if (E2E) { this.tweens.timeScale = 8; this.time.timeScale = 8; }
 
     const enemyRestX = W * 0.68;
     const enemyRestY = H * 0.30;

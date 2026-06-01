@@ -2,6 +2,7 @@ import { useCallback, useRef } from 'react';
 import type { MoveInfo } from '../types/BattleEvents';
 import { bridge } from './PhaserBridge';
 import { formatMoveName } from '../utils/format';
+import { E2E } from '../testEnv';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The battle log is driven by a stream of backend events. Each event expands —
@@ -362,11 +363,15 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
 
 // ── Driver (the only place with timers / bridge access) ─────────────────────
 
-const delay = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+// Under E2E, collapse the cadence delays so specs run fast while preserving step
+// ordering (a tiny non-zero value keeps the microtask/timer sequence intact).
+const delay = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, E2E ? Math.min(ms, 12) : ms));
 
 // Resolve when Phaser signals the animation is done — but never hang the battle
 // log if that signal is lost (e.g. a stale scene listener after an HMR remount).
-function waitForBridge(timeoutMs = 3000): Promise<void> {
+// E2E uses a short fallback: headless WebGL often never fires animationComplete,
+// so this also bounds per-move time (keeps a small gap for ordering assertions).
+function waitForBridge(timeoutMs = E2E ? 100 : 3000): Promise<void> {
   return new Promise<void>(resolve => {
     let settled = false;
     let timer: ReturnType<typeof setTimeout>;
