@@ -283,13 +283,15 @@ Fix (minimal, no core-engine signature change — cancellation surfaces as the a
 
 #### 3. RNG is the one fidelity-critical concern not behind a seam `[consistency]`
 Crit, accuracy, speed tie-break, Metronome, and move assignment call `Random.Shared` directly inside the engine. Tests route around it with `AlwaysHitRules`/`AlwaysCritRules`, but for a true Gen 1 clone heading toward roguelike runs, **seeded/replayable RNG** will matter — and it's the natural thing to inject through the same seam pattern used everywhere else.
-- [ ] Add `IRandomSource` (e.g. `Next(int maxExclusive)`, `Next(int min, int max)`) with a `SystemRandomSource` default and a `SeededRandomSource` for tests/replays
-- [ ] Thread it through `Battle`, `AttackAction`, `DamageCalculator`, `Gen1BattleRules`, `EncounterSelector` (constructor-injected, default to shared instance)
-- [ ] Makes the whole suite deterministic without the `AlwaysHit/AlwaysCrit` shims; enables seeded run replays later
+- [x] Add `IRandomSource` (`Next(int maxExclusive)`, `Next(int min, int max)`, `NextDouble()`) with a `SystemRandomSource` default and a `SeededRandomSource(seed)` for tests/replays (`Combat/IRandomSource.cs`)
+- [x] Thread it through the **battle engine** — `Battle`, `AttackAction`, `DamageCalculator`, `StatusResolver`, `Gen1BattleRules` (optional trailing ctor/method params defaulting to `SystemRandomSource.Instance`, so no existing call site broke; interface signatures unchanged so the test doubles compile as-is)
+- [x] Seeded determinism proven: `Battle_SameSeed_ProducesIdenticalEventSequence` (135 tests pass)
+- [ ] **Setup-time RNG still on `Random.Shared`** (follow-up — outside the battle loop, so battles are already reproducible given fixed creatures): `Gen1StatCalculator.RandomiseDvs`, `EncounterSelector.PickByBst`, `AttackService` random-move pick, `GameController` enemy level + random move assignment. Thread `IRandomSource` through these for full run-level replay.
+- [ ] Optional cleanup: the `AlwaysHit/AlwaysCrit` rule shims could be replaced by seeded sources now, but they still read clearly — low priority.
 
-#### 4. Speed tie-break uses RNG as a sort key `[footgun]`
-`Battle.cs:88` — `.ThenBy(_ => Random.Shared.Next())` calls RNG inside the `OrderBy` comparator, which is an ill-defined key (LINQ may invoke the selector multiple times per element). Harmless at 2 actions; bites the moment the turn queue grows (doubles, multi-battles).
-- [ ] Resolve the tie with a single coin flip computed once (fold into #3 — use the injected `IRandomSource`)
+#### 4. Speed tie-break uses RNG as a sort key `[footgun]` ✅ DONE
+`Battle.cs` — `.ThenBy(_ => Random.Shared.Next())` called RNG inside the `OrderBy` comparator (ill-defined key; LINQ may invoke the selector multiple times per element).
+- [x] Now draws the tie-break once (`int tieBreak = _rng.Next(2)`) and uses it as a stable sort key via the injected `IRandomSource`
 
 #### 5. DbContext via `new()` instead of DI `[maintainability]`
 `GameController` does `new PokemonDbContext()` / `new MovesDbContext()` (`GameController.cs:20,25`); `PokemonService`/`AttackService` aren't registered. Works only because `OnConfiguring` hardcodes the path. Note the background battle loop touches **no** DB (data is materialised up front and passed in), so the scoped-context-in-`Task.Run` hazard doesn't apply — the real costs are lost connection pooling and tests needing real SQLite files.

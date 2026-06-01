@@ -312,6 +312,52 @@ public class BattleIntegrationTests
         Assert.True(player.IsAlive());
     }
 
+    [Fact]
+    public async Task Battle_SameSeed_ProducesIdenticalEventSequence()
+    {
+        // The IRandomSource seam makes a seeded battle fully reproducible: two runs wired
+        // with the same seed must emit byte-for-byte identical event streams. If any roll
+        // still reached the global Random.Shared, the two streams would diverge and fail.
+        string first  = await RunSeededBattle(1234);
+        string second = await RunSeededBattle(1234);
+
+        Assert.Equal(first, second);
+        Assert.Contains(nameof(BattleEnded), first);
+        Assert.True(first.Split('|').Count(s => s.Contains(nameof(TurnStarted))) >= 3,
+            "Battle should run several turns so the RNG is actually exercised");
+    }
+
+    /// <summary>
+    /// Runs a complete battle on a seeded RNG and returns the ordered event stream as a
+    /// signature string. Fresh creatures each call; the same seed wired into both the rules
+    /// and the battle drives every roll (crit, accuracy, damage variance, tie-break).
+    /// </summary>
+    private static async Task<string> RunSeededBattle(int seed)
+    {
+        var rng   = new SeededRandomSource(seed);
+        var rules = new Gen1BattleRules(rng);
+
+        var player = new Creature("Player") { Level = 50 };
+        player.CalculateStats();
+        player.Attributes.MaxHP = 150; player.Attributes.HP = 150;
+        player.Attributes.Attack = 80; player.Attributes.Defense = 70; player.Attributes.Speed = 80;
+        player.AddAttack(new Attack { Name = "Body Slam", BaseDamage = 85, Accuracy = 85, PowerPointsMax = 35, AttackType = AttackType.Physical });
+
+        var enemy = new Creature("Enemy") { Level = 50 };
+        enemy.CalculateStats();
+        enemy.Attributes.MaxHP = 150; enemy.Attributes.HP = 150;
+        enemy.Attributes.Attack = 78; enemy.Attributes.Defense = 72; enemy.Attributes.Speed = 75;
+        enemy.AddAttack(new Attack { Name = "Stomp", BaseDamage = 80, Accuracy = 85, PowerPointsMax = 35, AttackType = AttackType.Physical });
+
+        var emitter = new RecordingEmitter();
+        var input   = new TurnControlledInput(Enumerable.Repeat(0, 200).ToArray());
+        var battle  = new Battle(player, enemy, new Gen1TypeChart(), input, AutoSelectInput.Instance,
+                                 rules: rules, emitter: emitter, rng: rng);
+        await battle.StartFightAsync();
+
+        return string.Join("|", emitter.Events.Select(e => e.ToString()));
+    }
+
     // ── Test helpers ─────────────────────────────────────────────────────────
 
     /// <summary>

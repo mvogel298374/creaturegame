@@ -13,12 +13,14 @@ public class Battle
     private readonly IBattleInput            _enemyInput;
     private readonly IBattleEventEmitter?    _emitter;
     private readonly IReadOnlyList<Attack>   _movePool;
+    private readonly IRandomSource           _rng;
     private int _turnNumber;
 
     public Battle(Creature player, Creature enemy, ITypeChart typeChart,
                   IBattleInput playerInput, IBattleInput enemyInput,
                   IReadOnlyList<Attack>? movePool = null,
-                  IBattleRules? rules = null, IBattleEventEmitter? emitter = null)
+                  IBattleRules? rules = null, IBattleEventEmitter? emitter = null,
+                  IRandomSource? rng = null)
     {
         PlayerCreature = player;
         EnemyCreature  = enemy;
@@ -28,6 +30,7 @@ public class Battle
         _enemyInput    = enemyInput;
         _movePool      = movePool ?? Array.Empty<Attack>();
         _emitter       = emitter;
+        _rng           = rng ?? SystemRandomSource.Instance;
     }
 
     public async Task StartFightAsync()
@@ -76,23 +79,26 @@ public class Battle
                           TurnNumber = _turnNumber
                       }));
 
-            var playerAction = new AttackAction(PlayerCreature, EnemyCreature, playerMove, _typeChart, _rules, _emitter, _movePool);
-            var enemyAction  = new AttackAction(EnemyCreature, PlayerCreature, enemyMove,  _typeChart, _rules, _emitter, _movePool);
+            var playerAction = new AttackAction(PlayerCreature, EnemyCreature, playerMove, _typeChart, _rules, _emitter, _movePool, _rng);
+            var enemyAction  = new AttackAction(EnemyCreature, PlayerCreature, enemyMove,  _typeChart, _rules, _emitter, _movePool, _rng);
 
-            // Turn resolution: Priority → effective Speed (Paralysis quarters) → random tie-breaker
+            // Turn resolution: Priority → effective Speed (Paralysis quarters) → random tie-breaker.
+            // Draw the tie-break once (a stable sort key) rather than calling RNG inside the
+            // comparator, where it would be evaluated an unspecified number of times.
+            int tieBreak = _rng.Next(2);
             var turnQueue = new List<IBattleAction> { playerAction, enemyAction };
 
             turnQueue = turnQueue
                 .OrderByDescending(a => a.Priority)
                 .ThenByDescending(a => StatusResolver.EffectiveSpeed(a.Source, _rules))
-                .ThenBy(_ => Random.Shared.Next())
+                .ThenBy(a => a == playerAction ? tieBreak : 1 - tieBreak)
                 .ToList();
 
             foreach (var action in turnQueue)
             {
                 if (!action.Source.IsAlive()) continue;
                 if ((action as AttackAction)?.Target.IsAlive() != true) continue;
-                if (!StatusResolver.CanAct(action.Source, _rules, _emitter)) continue;
+                if (!StatusResolver.CanAct(action.Source, _rules, _emitter, _rng)) continue;
                 await action.ExecuteAsync();
             }
 

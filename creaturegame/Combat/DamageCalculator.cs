@@ -10,11 +10,12 @@ public static class DamageCalculator
     /// Stat stages and generation-specific rules are delegated to <paramref name="rules"/>.
     /// </summary>
     public static int CalculateDamage(Creature attacker, Creature defender, Attack move,
-                                      ITypeChart typeChart, IBattleRules rules, out bool isCrit)
+                                      ITypeChart typeChart, IBattleRules rules, out bool isCrit,
+                                      IRandomSource? rng = null)
     {
         if (move.BaseDamage == 0) { isCrit = false; return 0; }
 
-        isCrit = Random.Shared.NextDouble() < rules.GetCritChance(attacker, move);
+        isCrit = (rng ?? SystemRandomSource.Instance).NextDouble() < rules.GetCritChance(attacker, move);
 
         // Stat selection is delegated to rules — Gen 1 uses Special for both special offence
         // and defence; Gen 2+ will return SpAtk / SpDef respectively.

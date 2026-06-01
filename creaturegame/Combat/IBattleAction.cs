@@ -19,6 +19,7 @@ public class AttackAction : IBattleAction
     private readonly IBattleRules            _rules;
     private readonly IBattleEventEmitter?    _emitter;
     private readonly IReadOnlyList<Attack>   _movePool;
+    private readonly IRandomSource           _rng;
 
     // Null means Struggle — Battle passes null when Source.IsOutOfPP, bypassing IBattleInput.
     private readonly PokemonAttack? _selectedMove;
@@ -26,7 +27,7 @@ public class AttackAction : IBattleAction
     public AttackAction(Creature source, Creature target,
                         PokemonAttack? selectedMove, ITypeChart typeChart,
                         IBattleRules? rules = null, IBattleEventEmitter? emitter = null,
-                        IReadOnlyList<Attack>? movePool = null)
+                        IReadOnlyList<Attack>? movePool = null, IRandomSource? rng = null)
     {
         Source        = source;
         Target        = target;
@@ -35,6 +36,7 @@ public class AttackAction : IBattleAction
         _emitter      = emitter;
         _selectedMove = selectedMove;
         _movePool     = movePool ?? Array.Empty<Attack>();
+        _rng          = rng ?? SystemRandomSource.Instance;
         Priority      = selectedMove?.Base.Priority ?? 0;
     }
 
@@ -91,9 +93,9 @@ public class AttackAction : IBattleAction
 
             if (eligible.Count > 0)
             {
-                var chosen = eligible[Random.Shared.Next(eligible.Count)];
+                var chosen = eligible[_rng.Next(eligible.Count)];
                 var inner  = new AttackAction(Source, Target,
-                    new PokemonAttack(chosen), _typeChart, _rules, _emitter, _movePool);
+                    new PokemonAttack(chosen), _typeChart, _rules, _emitter, _movePool, _rng);
                 return inner.ExecuteAsync();
             }
             return Task.CompletedTask;
@@ -113,7 +115,7 @@ public class AttackAction : IBattleAction
         {
             int threshold = _rules.GetHitThreshold(
                 attackToUse.Accuracy, Source.Stages.Accuracy, Target.Stages.Evasion);
-            if (Random.Shared.Next(_rules.AccuracyRollBound) >= threshold)
+            if (_rng.Next(_rules.AccuracyRollBound) >= threshold)
             {
                 _emitter?.Emit(new MoveMissed(Source.Name, attackToUse.Name ?? ""));
 
@@ -148,7 +150,7 @@ public class AttackAction : IBattleAction
                     double eff = DamageCalculator.GetTypeEffectiveness(
                         attackToUse.DamageType, Target.Type1, Target.Type2, _typeChart);
                     damage = DamageCalculator.CalculateDamage(
-                        Source, Target, attackToUse, _typeChart, _rules, out isCrit);
+                        Source, Target, attackToUse, _typeChart, _rules, out isCrit, _rng);
                     Target.Attributes.ReceiveDamage(damage);
                     _emitter?.Emit(new DamageDealt(Target.Name, damage, eff,
                         Target.Attributes.HP, Target.Attributes.MaxHP, isCrit));
@@ -196,7 +198,7 @@ public class AttackAction : IBattleAction
                 double eff = DamageCalculator.GetTypeEffectiveness(
                     attackToUse.DamageType, Target.Type1, Target.Type2, _typeChart);
                 damage = DamageCalculator.CalculateDamage(
-                    Source, Target, attackToUse, _typeChart, _rules, out isCrit);
+                    Source, Target, attackToUse, _typeChart, _rules, out isCrit, _rng);
 
                 Target.Attributes.Defense = savedDefense;
                 Target.Attributes.Special = savedSpecial;
@@ -246,7 +248,7 @@ public class AttackAction : IBattleAction
         if (!Target.IsAlive()) return;
 
         int chance = attack.EffectChance ?? 100;
-        if (Random.Shared.Next(1, 101) > chance) return;
+        if (_rng.Next(1, 101) > chance) return;
 
         Target.Status = attack.StatusEffect;
 
@@ -262,7 +264,7 @@ public class AttackAction : IBattleAction
         if (se == null) return;
         if (!Target.IsAlive() && se.Target == StageTarget.Foe) return;
 
-        if (Random.Shared.Next(1, 101) > se.Chance) return;
+        if (_rng.Next(1, 101) > se.Chance) return;
 
         Creature affected = se.Target == StageTarget.Self ? Source : Target;
         int newStage = ApplyStageChange(affected, se.Stat, se.Delta);
@@ -283,7 +285,7 @@ public class AttackAction : IBattleAction
                 if (Target.IsAlive())
                 {
                     int chance = attack.EffectChance ?? 100;
-                    if (Random.Shared.Next(1, 101) <= chance)
+                    if (_rng.Next(1, 101) <= chance)
                         Target.IsFlinched = true;
                 }
                 break;

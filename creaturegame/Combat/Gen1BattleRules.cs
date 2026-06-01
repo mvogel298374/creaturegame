@@ -5,7 +5,15 @@ namespace creaturegame.Combat;
 
 public sealed class Gen1BattleRules : IBattleRules
 {
+    /// <summary>Default singleton — uses the shared global RNG.</summary>
     public static readonly Gen1BattleRules Instance = new();
+
+    private readonly IRandomSource _rng;
+
+    /// <param name="rng">RNG source for the random rolls (sleep/binding turns, damage
+    /// variance). Defaults to the shared global source; pass a <see cref="SeededRandomSource"/>
+    /// for reproducible battles.</param>
+    public Gen1BattleRules(IRandomSource? rng = null) => _rng = rng ?? SystemRandomSource.Instance;
 
     // Gen 1: only Fire-type moves that can inflict burn thaw a frozen target.
     // Fire Spin cannot burn, so it does not thaw — even though it is Fire-type.
@@ -16,10 +24,10 @@ public sealed class Gen1BattleRules : IBattleRules
     public int FreezeRandomThawPercent => 0;
 
     // Gen 1 damage roll: uniform integer in [217, 255], divided by 255.
-    public double RollDamageVariance() => Random.Shared.Next(217, 256) / 255.0;
+    public double RollDamageVariance() => _rng.Next(217, 256) / 255.0;
 
     // Gen 1 sleep lasts 1–7 turns.
-    public int RollSleepTurns() => Random.Shared.Next(1, 8);
+    public int RollSleepTurns() => _rng.Next(1, 8);
 
     // Gen 1 Struggle recoil: half the damage dealt to the target.
     public int CalculateStruggleRecoil(Creature source, int damageDealt) =>
@@ -33,7 +41,7 @@ public sealed class Gen1BattleRules : IBattleRules
     public double BadPoisonDamageFraction(int toxicCounter) => toxicCounter / 16.0;
 
     // Gen 1: binding traps for 2–5 turns.
-    public int RollBindingTurns() => Random.Shared.Next(2, 6);
+    public int RollBindingTurns() => _rng.Next(2, 6);
     public int BindingDamageDenominator => 16;
 
     // ── Stat stages ────────────────────────────────────────────────────────────

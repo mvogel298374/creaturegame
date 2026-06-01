@@ -13,9 +13,11 @@ public static class StatusResolver
         return (int)speed;
     }
 
-    public static bool CanAct(Creature creature, IBattleRules? rules = null, IBattleEventEmitter? emitter = null)
+    public static bool CanAct(Creature creature, IBattleRules? rules = null, IBattleEventEmitter? emitter = null,
+                              IRandomSource? rng = null)
     {
         var battleRules = rules ?? Gen1BattleRules.Instance;
+        var random      = rng ?? SystemRandomSource.Instance;
 
         // Flinch: self-clearing flag set by a faster attacker this turn
         if (creature.IsFlinched)
@@ -51,7 +53,7 @@ public static class StatusResolver
         if (creature.Status == StatusCondition.Freeze)
         {
             if (battleRules.FreezeRandomThawPercent > 0
-                && Random.Shared.Next(100) < battleRules.FreezeRandomThawPercent)
+                && random.Next(100) < battleRules.FreezeRandomThawPercent)
             {
                 creature.Status = StatusCondition.None;
                 emitter?.Emit(new StatusCleared(creature.Name, StatusCondition.Freeze));
@@ -61,7 +63,7 @@ public static class StatusResolver
             return false;
         }
 
-        if (creature.Status == StatusCondition.Paralysis && Random.Shared.Next(4) == 0)
+        if (creature.Status == StatusCondition.Paralysis && random.Next(4) == 0)
         {
             emitter?.Emit(new ActionBlocked(creature.Name, StatusCondition.Paralysis));
             return false;
@@ -76,7 +78,7 @@ public static class StatusResolver
                 emitter?.Emit(new ConfusionCleared(creature.Name));
                 return true;
             }
-            if (Random.Shared.Next(2) == 0)
+            if (random.Next(2) == 0)
             {
                 int selfDamage = DamageCalculator.CalculateConfusionDamage(creature, battleRules);
                 creature.Attributes.ReceiveDamage(selfDamage);
