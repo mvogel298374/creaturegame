@@ -10,6 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | `AI_CONTEXT.md` | Agent profiles and slash-command definitions (`/plan`, `/dev`, `/sync`, `/test`). |
 | `DESIGN_GUIDES.md` | Gen 1 mechanics, type-balancing rules, move-import mapping. Read before `/plan` work. |
 | `DEV_STANDARDS.md` | .NET/EF coding conventions and architecture rules. Read before `/dev` work. |
+| `STATE_MODEL.md` | Deep-dive reference: the `Creature` permanent/transient state split (`BattleState`) — patterns + Gen 1 domain logic. Read when touching battle state. |
 
 ## Commands
 

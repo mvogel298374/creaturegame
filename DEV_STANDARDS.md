@@ -50,3 +50,4 @@ Guidelines for all `/dev` actions in this project.
 | `TODO.md` | Authoritative task list; update it when any task completes |
 | `AI_CONTEXT.md` | Agent profiles and slash-command definitions |
 | `DESIGN_GUIDES.md` | Gen 1 mechanics and design constraints (design counterpart to this file) |
+| `STATE_MODEL.md` | Deep-dive: `Creature` permanent/transient state split (`BattleState`) — patterns + Gen 1 domain logic |
