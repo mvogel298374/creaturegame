@@ -301,10 +301,12 @@ Crit, accuracy, speed tie-break, Metronome, and move assignment call `Random.Sha
 - [x] Verified at runtime: `GET /api/Species` → 151 species, `POST /api/Game/start` → gameId
 - n/a `PokemonService` / `AttackService` are not used by the web host (controllers query contexts directly), so there was nothing to register there. If they're adopted later, register them then.
 
-#### 6. Frontend battle-log queue is structurally racy `[design]`
-The imperative `enqueue` / `waitForBridge` / hand-tuned `delay()` choreography in `useBattleHub` coordinating Phaser over the `mitt` bus is where today's two bugs lived (permanent freeze + listener leak). The recent try/catch + timeout hardening is defensive patching over an inherently timing-fragile design.
-- [ ] Model the log as a reducer over the event stream with explicit per-event states; treat `animationComplete` as an event, not an awaited side effect
-- [ ] Dovetails with the Playwright-testing item (bridge events as the test seam) — do them together
+#### 6. Frontend battle-log queue is structurally racy `[design]` ✅ DONE
+The imperative `enqueue` / `waitForBridge` / hand-tuned `delay()` choreography in `useBattleHub` coordinating Phaser over the `mitt` bus is where two bugs lived (permanent freeze + listener leak).
+- [x] Split into a **pure** `expandEvent(eventType, payload, ctx) → { now, steps }` (`battle/timeline.ts`) that maps each backend event to immediate actions + an ordered list of primitive steps (`dispatch` | `emit` | `wait` | `awaitAnim`), and a small **driver** (`useBattleTimeline`) that plays steps one at a time — the only place with timers/bridge access, retaining the per-step try/catch + `awaitAnim` timeout hardening. `useBattleHub` slimmed to connection + reducer + feeding events to the timeline.
+- [x] Sequencing/timing/text is now unit-tested without a browser: `timeline.test.ts` (14 Vitest cases) pins move-name formatting, the immunity line, crit/effectiveness suffixes, two-turn charge text, stat-stage wording, and the control-plane-vs-timeline split.
+- [ ] **Playwright E2E still pending** (separate item) — `expandEvent` is now the seam: expose the bridge on `window`, add an instant-animation mode, assert event ordering not wall-clock. Unit tests already cover text/sequencing, so E2E only needs to verify wiring.
+- [ ] Live full-flow parity check (Puppeteer `ui_checklist`) recommended before considering this fully closed — behaviour was ported verbatim, but a visual pass confirms cadence.
 
 #### 7. Architecture / decision-log doc `[docs — after the above]`
 The doc set is strong, but the *why* behind the two-DB split, event sourcing, and the seam invariants lives only implicitly. For a project explicitly built to extend generation-by-generation, capture these as an `ARCHITECTURE.md` (or lightweight ADR log) so the invariants survive future drift.
