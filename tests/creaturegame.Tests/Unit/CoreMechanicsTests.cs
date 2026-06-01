@@ -2284,6 +2284,43 @@ public class CoreMechanicsTests
         }
     }
 
+    [Fact]
+    public void EncounterSelector_PickByBst_SameSeed_PicksSameSpecies()
+    {
+        // Several candidates inside the ±15% window so the pick is a real random choice.
+        var pool = new List<PokemonSpecies>
+        {
+            Species(1, 58, 58, 58, 58, 58),  // BST 290
+            Species(2, 60, 60, 60, 60, 60),  // BST 300
+            Species(3, 62, 62, 62, 62, 62),  // BST 310
+            Species(4, 64, 64, 64, 64, 64),  // BST 320
+        };
+
+        var a = EncounterSelector.PickByBst(pool, 300, new SeededRandomSource(7));
+        var b = EncounterSelector.PickByBst(pool, 300, new SeededRandomSource(7));
+
+        Assert.NotNull(a);
+        Assert.Same(a, b);   // same seed + same pool ⇒ same pick
+    }
+
+    // ── Seeded stat-calculator Tests ──────────────────────────────────────────
+
+    [Fact]
+    public void Gen1StatCalculator_SeededRandomiseDvs_IsReproducible()
+    {
+        // Same seed ⇒ identical DVs, so seeded creature creation is reproducible.
+        var c1 = new Creature("A");
+        var c2 = new Creature("B");
+        new Gen1StatCalculator(new SeededRandomSource(99)).RandomiseDvs(c1);
+        new Gen1StatCalculator(new SeededRandomSource(99)).RandomiseDvs(c2);
+
+        Assert.Equal(c1.DvAttack,  c2.DvAttack);
+        Assert.Equal(c1.DvDefense, c2.DvDefense);
+        Assert.Equal(c1.DvSpecial, c2.DvSpecial);
+        Assert.Equal(c1.DvSpeed,   c2.DvSpeed);
+        Assert.Equal(c1.DvHP,      c2.DvHP);   // HP DV is derived from the others' low bits
+    }
+
     private static PokemonSpecies Species(int id, int hp, int atk, int def, int spc, int spd) =>
         new() { Id = id, BaseHP = hp, BaseAttack = atk, BaseDefense = def, BaseSpecial = spc, BaseSpeed = spd };
 }
