@@ -103,6 +103,7 @@ See `TODO.md` for the full prioritised task list, completed items, and tech debt
 
 - **File edits and creation are always allowed** — make changes to existing files or create new ones without asking for confirmation first.
 - **Git commits require explicit approval** — stage changes and propose a commit message, but do not run `git commit` until the user confirms.
+- **Dev stack is freely managed** — start, stop, restart, or kill the dev servers (backend `:5100`, Vite `:5173`) whenever a task needs it (build lock, fresh-code reload, test run), without asking. Don't append their running status to responses as a routine heads-up; only mention it when directly relevant (e.g. a test failed because the backend was down).
 
 ## Communication Style
 
