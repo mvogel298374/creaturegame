@@ -1654,6 +1654,44 @@ public class CoreMechanicsTests
         Assert.Equal(1, creature.ToxicCounter);
     }
 
+    [Fact]
+    public void ResetBattleState_ReplacesWholeBattleState_ClearingEveryTransientField()
+    {
+        // Locks in the BattleState contract: reset swaps in a fresh instance, so every
+        // per-battle field returns to default. A new transient field added to BattleState
+        // is covered automatically — it cannot be "forgotten" by a manual reset list.
+        var creature = new Creature("Snorlax") { Level = 50 };
+        creature.CalculateStats();
+
+        var before = creature.Battle;
+        creature.Status               = StatusCondition.Sleep;
+        creature.SleepTurns           = 5;
+        creature.ConfusedTurns        = 3;
+        creature.ToxicCounter         = 7;
+        creature.Stages.RaiseAttack(4);
+        creature.IsRecharging         = true;
+        creature.IsFlinched           = true;
+        creature.HasLeechSeed         = true;
+        creature.BindingTurnsRemaining = 3;
+        creature.IsTwoTurnCharging    = true;
+        creature.ChargingMove         = new PokemonAttack(new Attack { Name = "Dig", BaseDamage = 80 });
+
+        creature.ResetBattleState();
+
+        Assert.NotSame(before, creature.Battle);
+        Assert.Equal(StatusCondition.None, creature.Status);
+        Assert.Equal(0, creature.SleepTurns);
+        Assert.Equal(0, creature.ConfusedTurns);
+        Assert.Equal(1, creature.ToxicCounter);
+        Assert.Equal(0, creature.Stages.Attack);
+        Assert.False(creature.IsRecharging);
+        Assert.False(creature.IsFlinched);
+        Assert.False(creature.HasLeechSeed);
+        Assert.Equal(0, creature.BindingTurnsRemaining);
+        Assert.False(creature.IsTwoTurnCharging);
+        Assert.Null(creature.ChargingMove);
+    }
+
     // ── XP & Levelling Tests ─────────────────────────────────────────────────
 
     [Fact]

@@ -88,41 +88,31 @@ public class Creature
     public int ExpSpecial { get; set; } = 0;
     public int ExpSpeed { get; set; } = 0;
     
-    // Status
-    public StatusCondition Status { get; set; } = StatusCondition.None;
-    public int SleepTurns { get; set; } = 0;
-    public int ConfusedTurns { get; set; } = 0;
-    public int ToxicCounter { get; set; } = 1;
+    // ── Transient per-battle state ───────────────────────────────────────────
+    // Owned by BattleState; reset by assigning a fresh instance (see ResetBattleState).
+    // The properties below delegate to it so the engine and tests keep reading e.g.
+    // creature.Status unchanged. Add NEW per-battle fields to BattleState, never here —
+    // that is what makes a forgotten reset structurally impossible.
+    public BattleState Battle { get; set; } = new();
 
-    // Stat stages (reset each battle; [-6, +6] per stat)
-    public StatStages Stages { get; set; } = new StatStages();
-
-    // Per-battle transient state — all cleared by ResetBattleState()
-    public bool IsRecharging { get; set; } = false;
-    public bool IsFlinched   { get; set; } = false;
-    public bool HasLeechSeed { get; set; } = false;
-    public int  BindingTurnsRemaining { get; set; } = 0;
-    public bool IsTwoTurnCharging { get; set; } = false;
-    public PokemonAttack? ChargingMove { get; set; } = null;
+    public StatusCondition Status     { get => Battle.Status;                set => Battle.Status = value; }
+    public int  SleepTurns            { get => Battle.SleepTurns;            set => Battle.SleepTurns = value; }
+    public int  ConfusedTurns         { get => Battle.ConfusedTurns;         set => Battle.ConfusedTurns = value; }
+    public int  ToxicCounter          { get => Battle.ToxicCounter;          set => Battle.ToxicCounter = value; }
+    public StatStages Stages          { get => Battle.Stages;               set => Battle.Stages = value; }
+    public bool IsRecharging          { get => Battle.IsRecharging;          set => Battle.IsRecharging = value; }
+    public bool IsFlinched            { get => Battle.IsFlinched;            set => Battle.IsFlinched = value; }
+    public bool HasLeechSeed          { get => Battle.HasLeechSeed;          set => Battle.HasLeechSeed = value; }
+    public int  BindingTurnsRemaining { get => Battle.BindingTurnsRemaining; set => Battle.BindingTurnsRemaining = value; }
+    public bool IsTwoTurnCharging     { get => Battle.IsTwoTurnCharging;     set => Battle.IsTwoTurnCharging = value; }
+    public PokemonAttack? ChargingMove { get => Battle.ChargingMove;         set => Battle.ChargingMove = value; }
 
     /// <summary>
-    /// Clears all transient in-battle state. Called by Battle at the start of each
-    /// fight so the same Creature instance can be reused across multiple battles.
+    /// Clears all transient in-battle state by replacing it wholesale, so a newly added
+    /// BattleState field can never be missed by a manual reset. Called by Battle at the
+    /// start of each fight so the same Creature instance can be reused across battles.
     /// </summary>
-    public void ResetBattleState()
-    {
-        Status       = StatusCondition.None;
-        SleepTurns   = 0;
-        ConfusedTurns = 0;
-        ToxicCounter  = 1;
-        Stages.Clear();
-        IsRecharging          = false;
-        IsFlinched            = false;
-        HasLeechSeed          = false;
-        BindingTurnsRemaining = 0;
-        IsTwoTurnCharging     = false;
-        ChargingMove          = null;
-    }
+    public void ResetBattleState() => Battle = new BattleState();
 
     public IStatCalculator StatCalculator { get; set; } = Gen1StatCalculator.Instance;
 
