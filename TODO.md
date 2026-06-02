@@ -27,7 +27,7 @@
 
 **Bad Poison (Toxic)** — `StatusCondition.BadPoison`; `ToxicCounter` escalates damage each turn; `IBattleRules.BadPoisonDamageFraction`.
 
-**Experience, Levelling & Level Picker** — Gen 1 wild XP formula; `LeveledUp` event; level slider in UI (5–100); `GainExperience → LevelUp` path.
+**Experience, Levelling & Level Picker** — Gen 1 wild XP formula; `LeveledUp` event; level slider in UI (5–100); `GainExperience → LevelUp` path. *(Core mechanic only — XP is awarded and the player levels up at the moment of victory, recalculating stats. The on-screen XP bar is still cosmetic and there's no level-up move learning; see "XP & Level-Up — finish the in-battle loop" below.)*
 
 **Enemy Encounter System** — BST-matched random selection (±15%, widens to ±50%/all); enemy level = player level ±3; player's own species excluded. `EncounterSelector` in core library.
 
@@ -47,29 +47,92 @@
 
 ## Learnset System
 
-Currently creatures receive 4 random moves from the full move pool. Learnsets ensure Pokémon only know moves they can actually learn.
+Creatures used to receive 4 random moves from the full move pool (a Bulbasaur could roll
+Hydro Pump). Learnsets ensure Pokémon only know moves they can actually learn at their level.
 
 **Prerequisite:** Experience, Levelling & Level Picker ✅
 
-**Data:**
-- [ ] `PokemonLearnset` model: `SpeciesId` (FK), `MoveId` (FK), `LearnLevel` (int); EF migration on `PokemonDbContext`
-- [ ] Import from PokeAPI: filter `/pokemon/{id}` moves array to `version_group.name == "red-blue"` and `move_learn_method.name == "level-up"`; fold into `PokemonImport` (no extra API calls)
-- [ ] `Creature.InitializeFromSpecies(species, learnset, allMoves, atLevel)` — up to 4 moves at or below `atLevel` (highest-level ones); replaces random assignment in `GameController.BuildCreature`
+### Initial moveset from learnsets ✅ DONE (2026-06-02)
 
-**Level-up move learning:**
+Generation separation: learnsets are **data**, not a battle rule, so no new seam. The Gen 1
+decision (filter to `red-blue` level-up moves) is isolated in the importer & commented (like
+`Gen1TypeSlots`); rows are tagged with a `Generation` column; runtime filters by a single
+`GameController.ActiveGeneration` constant — no generation branching in logic.
+
+- [x] `PokemonLearnset` model (`Id`, `SpeciesId` FK→`PokemonSpecies`, `MoveId` logical
+  cross-DB ref to `moves.db`, `LearnLevel`, `Generation`) + index `(SpeciesId, Generation,
+  LearnLevel)`; `AddPokemonLearnset` migration on `PokemonDbContext`. Lives in `pokemon.db`.
+- [x] Import: `LearnsetMapper.ExtractGen1Learnset` (pure, testable) filters the already-fetched
+  `/pokemon/{id}` moves array to `red-blue` + `level-up`, parses MoveId from the URL, keeps
+  `MoveId <= 165`, lowest level on repeats; `PokemonImport.ImportLearnset` persists idempotently
+  (clear-then-insert). Re-imported → **989 rows across all 151 species** (verified via MCP).
+- [x] `LearnsetMoveSelector.Select(strategy, …)` (core, gen-agnostic, `IRandomSource`-seamed):
+  - **`CanonicalLatest`** (player) — deterministic, the 4 highest-level moves ≤ level.
+  - **`WeightedSmart`** (enemy) — semi-random, semi-intelligent: weight = power (or flat 60 for
+    Fixed/OHKO/etc., 35 for status) × 1.5 STAB × recency nudge; **always force-picks the top
+    damaging move** (never all-status), fills the rest by weighted draw without replacement so
+    same-species/level enemies vary. Deliberate precursor to the planned `IMoveEvaluator`.
+- [x] Wired into `GameController.BuildCreature` (player = Canonical, enemy = WeightedSmart),
+  replacing the random-4 block; graceful fallback to random if a species has no learnset rows.
+- [x] Tests (18 new, 156 total): `LearnsetImportTests` (filter/range/dedup/order, ×5),
+  `LearnsetMoveSelectorTests` (canonical, level-gating, ≤4 returns-all, always-damaging, seeded
+  determinism, statistical STAB/power bias, ×7), `MigrationTests` learnset schema + round-trip (×2),
+  `LearnsetIntegrationTests` (DB round-trip → EF query → selection: canonical legality, low-level
+  gating, **generation filter isolates gens**, WeightedSmart legal + always-attack, ×4).
+- [x] E2E: committed Playwright spec `e2e/learnset.spec.ts` — Bulbasaur@50 move menu equals the
+  canonical 4 (RAZOR LEAF/GROWTH/SLEEP POWDER/SOLAR BEAM); also verified live via Puppeteer
+  (enemy Paras used SCRATCH — legal, attacking — battle resolves).
+
+### Level-up move learning — DEFERRED (blocked by "XP & Level-Up — finish the in-battle loop")
+
+Only the **player** ever levels up; the enemy never gains XP, so its moveset is fully settled
+at build time (above). This interactive path is **blocked by the XP & Level-Up section below** —
+level-up move learning has no place to surface until the player can actually see and follow a
+level-up during play. Build that first, then this.
 - [ ] `Creature.LevelUp()` checks learnset for moves at the new level
 - [ ] Slot free → add automatically; emit `MoveLearned(string CreatureName, string MoveName)`
-- [ ] Slots full → emit `MoveReplacementRequired(string CreatureName, string NewMoveName, IReadOnlyList<MoveInfo> CurrentMoves)` — blocking event; backend waits on `IBattleInput`-style TCS
+- [ ] Slots full → emit `MoveReplacementRequired(…)` — blocking event; backend waits on an
+  `IBattleInput`-style TCS (Battle must drive level-ups one at a time to interleave the prompt)
 - [ ] `BattleHub` + `SignalRInput` extended with `ForgetMove(int slotIndex)` / `SkipNewMove()` path
-- [ ] `MoveLearned` and `MoveReplacementRequired` handled by all emitters and `useBattleHub.ts`
+- [ ] `MoveLearned` / `MoveReplacementRequired` handled by all emitters + `useBattleHub.ts` (+ React modal)
+- [ ] **XP bar:** `TurnStarted` carries `PlayerExperience` / `XpToNextLevel`; `useBattleHub.ts`
+  dispatches so the bar fills live
+- [ ] Tests: `Learnset_LevelUp_AddsNewMoveWhenSlotAvailable`,
+  `Learnset_LevelUp_EmitsMoveReplacementRequired_WhenFull`
 
-**XP bar:**
-- [ ] `TurnStarted` carries `PlayerExperience` and `XpToNextLevel`; `useBattleHub.ts` dispatches into state so the XP bar fills live
+---
+
+## XP & Level-Up — finish the in-battle loop
+
+**Slated: next combat-fidelity item after the Learnset System** (small, no new data/schema).
+This is the concrete "set up XP/level-up properly" work that the Learnset level-up section is
+blocked on. It does **not** require the Game Loop — it polishes the single-battle path that
+already exists.
+
+**What works today:** XP is awarded on enemy faint (`Battle.StartFightAsync` → `CalculateXpAwarded`
+→ `GainExperience`), the player levels up (chained `LeveledUp` events, one per level), stats
+recalc and HP heals the delta. The frontend animates an XP-bar fill on `LeveledUp`.
+
+**What's missing / not "proper":**
+- [ ] **Live XP data to the client.** `TurnStarted` carries no XP, so the bar fills to a hardcoded
+  placeholder (`playerXpToNext = 100`) instead of real progress. Add `PlayerExperience`,
+  `PlayerXpThisLevel`, `XpToNextLevel` (derived from `Creature.Experience` and
+  `CalculateExperienceForLevel`) to `TurnStarted` (or a small dedicated event); `useBattleHub.ts`
+  dispatches them into `playerXp` / `playerXpToNext` so the bar reflects actual XP.
+- [ ] **XP-gain animation.** On win, animate the bar filling by the XP earned *before* the
+  level-up fill/reset, so the gain reads correctly (today it only fills on `LeveledUp`).
+- [ ] **Verify the multi-level path end to end** — a big XP award crossing several levels emits
+  N `LeveledUp` events and the bar steps through each (the backend loop already emits per level;
+  confirm the timeline plays them in order).
+- [ ] **Surface the level-up moment** clearly in the log/UI (the hook the deferred move-learning
+  prompt will attach to).
 
 **Tests:**
-- [ ] `Learnset_InitializeFromSpecies_GivesCorrectMovesAtLevel`
-- [ ] `Learnset_LevelUp_AddsNewMoveWhenSlotAvailable`
-- [ ] `Learnset_LevelUp_EmitsMoveReplacementRequired_WhenFull`
+- [ ] Backend: `TurnStarted` (or the new event) carries correct `XpToNextLevel` / current XP for a
+  known species+level (unit/integration).
+- [ ] Backend: an XP award spanning multiple levels emits the right sequence of `LeveledUp` events.
+- [ ] E2E: §7 — XP bar fills and the "grew to level N!" line appears on a win (currently unasserted;
+  see Browser-Based UI Testing §7).
 
 ---
 
@@ -323,7 +386,7 @@ The doc set is strong, but the *why* behind the two-DB split, event sourcing, an
 ### Known Gaps
 - Enemy encounter pool ignores game version — filter by `PokemonGameAvailability` once a version selector exists in the UI
 - Enemy Pokémon do not evolve — wire into level-up system when Game Loop is built
-- `GameController.BuildCreature` uses random moves — fixed by Learnset System
+- ~~`GameController.BuildCreature` uses random moves~~ — **fixed** by the Learnset System (initial moveset now learnset-driven; see Learnset System section)
 
 ### Fixed ✅
 - Attack cadence (Gen 1 feel): the lunge + target flash played **before** the "X used MOVE!" line, and the HP bar snapped to its end-of-turn value the instant a move was chosen (the next turn's `TurnStarted` was applied immediately). Fixed by announcing the move first then animating (`MoveUsed` expansion in `timeline.ts`) and routing `TurnStarted` **through the timeline** so HP/status sync only after the turn's damage animates — bars drain in step now. Verified live (Puppeteer) + locked by the `MoveUsed`/`TurnStarted` Vitest cases and `cadence.spec.ts`.

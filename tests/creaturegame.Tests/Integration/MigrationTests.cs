@@ -239,6 +239,47 @@ public class MigrationTests : IDisposable
         Assert.Equal("Static", loaded.AvailabilityType);
     }
 
+    [Fact]
+    public void PokemonDb_Schema_HasLearnsetTableWithAllColumns()
+    {
+        using var context = BuildPokemonContext();
+        context.EnsureDatabaseCreated();
+
+        var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        using var conn = new SqliteConnection($"Data Source={_pokemonDb}");
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "PRAGMA table_info(PokemonLearnset)";
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+            columns.Add(reader.GetString(1));
+
+        Assert.Contains("Id",         columns);
+        Assert.Contains("SpeciesId",  columns);
+        Assert.Contains("MoveId",     columns);
+        Assert.Contains("LearnLevel", columns);
+        Assert.Contains("Generation", columns);
+    }
+
+    [Fact]
+    public void PokemonDb_Learnset_CanRoundTripRow()
+    {
+        using var context = BuildPokemonContext();
+        context.EnsureDatabaseCreated();
+
+        var species = new PokemonSpecies { Id = 1, Name = "bulbasaur", GrowthRate = GrowthRate.MediumSlow };
+        context.Species.Add(species);
+        context.SaveChanges();
+
+        context.Learnsets.Add(new PokemonLearnset { SpeciesId = 1, MoveId = 22, LearnLevel = 13, Generation = 1 });
+        context.SaveChanges();
+
+        var loaded = context.Learnsets.AsNoTracking().Single(l => l.SpeciesId == 1);
+        Assert.Equal(22, loaded.MoveId);
+        Assert.Equal(13, loaded.LearnLevel);
+        Assert.Equal(1,  loaded.Generation);
+    }
+
     // --- Helpers ---
 
     private MovesDbContext BuildMovesContext()

@@ -25,6 +25,32 @@ public class PokeApiPokemon
     // Each entry = "these types were in effect up to and including this generation"
     [JsonPropertyName("past_types")]
     public List<PastTypeEntry>? PastTypes { get; set; }
+
+    // Every move the species can learn, across all games/methods. We filter this down
+    // to Gen 1 (red-blue) level-up entries in LearnsetMapper — no extra API call needed.
+    [JsonPropertyName("moves")]
+    public List<PokeApiMoveEntry>? Moves { get; set; }
+}
+
+public class PokeApiMoveEntry
+{
+    [JsonPropertyName("move")]
+    public NamedApiResource? Move { get; set; }
+
+    [JsonPropertyName("version_group_details")]
+    public List<MoveVersionGroupDetail>? VersionGroupDetails { get; set; }
+}
+
+public class MoveVersionGroupDetail
+{
+    [JsonPropertyName("level_learned_at")]
+    public int LevelLearnedAt { get; set; }
+
+    [JsonPropertyName("move_learn_method")]
+    public NamedApiResource? MoveLearnMethod { get; set; }
+
+    [JsonPropertyName("version_group")]
+    public NamedApiResource? VersionGroup { get; set; }
 }
 
 public class PastTypeEntry

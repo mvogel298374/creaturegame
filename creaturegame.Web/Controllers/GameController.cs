@@ -15,6 +15,10 @@ public class GameController(
     IDbContextFactory<PokemonDbContext> pokemonFactory,
     IDbContextFactory<MovesDbContext> movesFactory) : ControllerBase
 {
+    // The single generation switch. Learnset rows are tagged by generation; the runtime
+    // filters by this constant so there is one place to change when more generations land.
+    private const int ActiveGeneration = 1;
+
     [HttpPost("start")]
     public async Task<IActionResult> Start([FromBody] StartGameRequest req)
     {
@@ -42,8 +46,18 @@ public class GameController(
 
             int enemyLevel = Math.Clamp(playerLevel + Random.Shared.Next(-3, 4), 5, 100);
 
-            var player = BuildCreature(playerSpecies, allMoves, playerLevel);
-            var enemy  = BuildCreature(enemySpecies,  allMoves, enemyLevel);
+            // Learnsets for both combatants in the active generation; movesById resolves
+            // a learnset's MoveId (a logical moves.db reference) to the loaded Attack.
+            var movesById = allMoves.ToDictionary(m => m.Id);
+            var learnsets = await pokemonCtx.Learnsets.AsNoTracking()
+                .Where(l => l.Generation == ActiveGeneration
+                            && (l.SpeciesId == playerSpecies.Id || l.SpeciesId == enemySpecies.Id))
+                .ToListAsync();
+
+            // Player gets the canonical most-recent moveset; the enemy gets a semi-random,
+            // semi-intelligent set so encounters vary.
+            var player = BuildCreature(playerSpecies, learnsets, movesById, allMoves, playerLevel, MoveSelectionStrategy.CanonicalLatest);
+            var enemy  = BuildCreature(enemySpecies,  learnsets, movesById, allMoves, enemyLevel,  MoveSelectionStrategy.WeightedSmart);
 
             var gameId = sessionManager.RegisterSession(player, enemy, allMoves);
             return Ok(new { gameId });
@@ -55,12 +69,31 @@ public class GameController(
         }
     }
 
-    private static Creature BuildCreature(PokemonSpecies species, List<Attack> allMoves, int level = 50)
+    private static Creature BuildCreature(
+        PokemonSpecies species,
+        List<PokemonLearnset> learnsets,
+        IReadOnlyDictionary<int, Attack> movesById,
+        List<Attack> allMoves,
+        int level,
+        MoveSelectionStrategy strategy)
     {
         var creature = new Creature(species.Name.ToUpper()) { Level = level };
         creature.InitializeFromSpecies(species);
         creature.Experience = creature.CalculateExperienceForLevel(level);
-        foreach (var move in allMoves.OrderBy(_ => Random.Shared.Next()).Take(4))
+
+        var speciesLearnset = learnsets.Where(l => l.SpeciesId == species.Id).ToList();
+        var moves = LearnsetMoveSelector.Select(
+            strategy, speciesLearnset, movesById, level, species.Type1, species.Type2);
+
+        if (moves.Count == 0)
+        {
+            // No learnset rows (e.g. importer not re-run) — degrade gracefully rather than
+            // shipping a move-less creature. Re-run PokeApiConnector to populate learnsets.
+            Console.WriteLine($"[GameController] No learnset for {species.Name} (ID {species.Id}); falling back to random moves.");
+            moves = allMoves.OrderBy(_ => Random.Shared.Next()).Take(4).ToList();
+        }
+
+        foreach (var move in moves)
             creature.AddAttack(move);
         return creature;
     }

@@ -85,12 +85,42 @@ public class PokemonImport
                 }
 
                 await context.SaveChangesAsync();
+
+                await ImportLearnset(pokeData, context);
             }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error fetching pokemon data from {url}: {ex.Message}");
         }
+    }
+
+    // Gen 1 is the only generation we import today; the column keeps the table multi-gen ready.
+    private const int Gen1 = 1;
+
+    // Persist the species' Gen 1 level-up learnset. Idempotent: clears this species' Gen 1
+    // rows then re-inserts, so re-running the importer converges (same pattern as the
+    // game-availability seeder). The (MoveId, LearnLevel) data comes straight off the
+    // already-fetched /pokemon response — no extra API call.
+    private static async Task ImportLearnset(PokeApiPokemon pokeData, PokemonDbContext context)
+    {
+        var entries = LearnsetMapper.ExtractGen1Learnset(pokeData);
+
+        await context.Learnsets
+            .Where(l => l.SpeciesId == pokeData.Id && l.Generation == Gen1)
+            .ExecuteDeleteAsync();
+
+        if (entries.Count == 0) return;
+
+        context.Learnsets.AddRange(entries.Select(e => new PokemonLearnset
+        {
+            SpeciesId  = pokeData.Id,
+            MoveId     = e.MoveId,
+            LearnLevel = e.LearnLevel,
+            Generation = Gen1,
+        }));
+        await context.SaveChangesAsync();
+        Console.WriteLine($"  Learnset: {entries.Count} Gen 1 level-up moves for ID {pokeData.Id}");
     }
 
     private static PokemonSpecies MapToSpecies(PokeApiPokemon pokeData, PokeApiPokemonSpecies speciesData)

@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\creaturegame\creaturegame.csproj" />
+    <ProjectReference Include="..\..\PokeApiConnector\PokeApiConnector.csproj" />
   </ItemGroup>
 
 </Project>
