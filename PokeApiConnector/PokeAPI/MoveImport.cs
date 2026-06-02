@@ -206,6 +206,12 @@ public class MoveImport
             attack.Effect = MoveEffect.TwoTurn;
         else if (pokeMove.Name == "metronome")
             attack.Effect = MoveEffect.Metronome;
+        // Confusion isn't a StatusCondition (it's a separate per-battle counter), so it's
+        // modelled as a move effect. EffectChance (already set from the move) gates the
+        // secondary confusion on damaging moves (Psybeam 10%); pure confusion moves
+        // (Supersonic, Confuse Ray) have none ⇒ AttackAction treats null as always-confuse.
+        else if (pokeMove.Meta?.Ailment?.Name == "confusion")
+            attack.Effect = MoveEffect.Confuse;
         else if (pokeMove.Meta?.FlinchChance > 0)
             attack.Effect = MoveEffect.Flinch;
 

@@ -305,6 +305,22 @@ public class AttackAction : IBattleAction
                     _emitter?.Emit(new BindingStarted(Target.Name, attack.Name ?? ""));
                 }
                 break;
+
+            case MoveEffect.Confuse:
+                // Confusion is independent of major status (a creature can be both). Gen 1
+                // confusion doesn't stack — only applies if the target isn't already confused.
+                // EffectChance gates secondary confusion on damaging moves (Psybeam 10%);
+                // pure confusion moves (Supersonic, Confuse Ray) have no chance ⇒ always land.
+                if (Target.IsAlive() && Target.ConfusedTurns == 0)
+                {
+                    int chance = attack.EffectChance ?? 100;
+                    if (_rng.Next(1, 101) <= chance)
+                    {
+                        Target.ConfusedTurns = _rules.RollConfusionTurns();
+                        _emitter?.Emit(new ConfusionStarted(Target.Name));
+                    }
+                }
+                break;
         }
     }
 

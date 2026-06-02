@@ -29,6 +29,10 @@ public sealed class Gen1BattleRules : IBattleRules
     // Gen 1 sleep lasts 1–7 turns.
     public int RollSleepTurns() => _rng.Next(1, 8);
 
+    // Gen 1 confusion lasts 1–4 turns. The counter is one higher (2–5) because
+    // StatusResolver decrements it before checking for clear (see RollConfusionTurns doc).
+    public int RollConfusionTurns() => _rng.Next(2, 6);
+
     // Gen 1 Struggle recoil: half the damage dealt to the target.
     public int CalculateStruggleRecoil(Creature source, int damageDealt) =>
         Math.Max(1, damageDealt / 2);

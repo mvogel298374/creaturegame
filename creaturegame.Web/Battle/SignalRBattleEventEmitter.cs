@@ -47,6 +47,7 @@ public sealed class SignalRBattleEventEmitter(
         StatusDamage e     => ("StatusDamage",     new { e.TargetName, e.Damage, Source = e.Source.ToString(), e.HpAfter }),
         StatusCleared e    => ("StatusCleared",    new { e.CreatureName, WasStatus = e.WasStatus.ToString() }),
         ActionBlocked e    => ("ActionBlocked",    new { e.CreatureName, Reason = e.Reason.ToString() }),
+        ConfusionStarted e => ("ConfusionStarted", new { e.TargetName }),
         ConfusionMessage e => ("ConfusionMessage", new { e.CreatureName }),
         ConfusionDamage e  => ("ConfusionDamage",  new { e.CreatureName, e.Damage, e.HpAfter }),
         ConfusionCleared e => ("ConfusionCleared", new { e.CreatureName }),

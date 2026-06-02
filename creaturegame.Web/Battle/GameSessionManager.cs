@@ -69,7 +69,7 @@ public sealed class GameSessionManager(IHubContext<BattleHub, IBattleClient> hub
         var engine  = new BattleEngine(
             session.Player, session.Enemy,
             Gen1TypeChart.Instance,
-            battle.Input, AutoSelectInput.Instance,
+            battle.Input, new RandomMoveInput(),
             movePool: session.AllMoves,
             emitter: emitter);
 

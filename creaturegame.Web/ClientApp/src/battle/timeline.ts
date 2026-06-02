@@ -271,6 +271,11 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       return { steps: [w(300), d(log(actionBlockedMsg(cName, reason))), w(800)] };
     }
 
+    case 'ConfusionStarted': {
+      const tName = payload.targetName as string;
+      return { steps: [emit({ type: 'playStatusSound' }), w(300), d(log(`${tName} became confused!`))] };
+    }
+
     case 'ConfusionMessage': {
       const cName = payload.creatureName as string;
       return { steps: [w(120), d(log(`${cName} is confused!`))] };

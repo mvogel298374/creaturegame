@@ -33,6 +33,13 @@ public interface IBattleRules
     int RollSleepTurns();
 
     /// <summary>
+    /// Returns the confusion counter set when a creature becomes confused. Note this is the raw
+    /// counter, one higher than the number of self-hit turns because <see cref="StatusResolver"/>
+    /// decrements before its cleared-check. Gen 1: 2–5 (≈1–4 turns of confusion).
+    /// </summary>
+    int RollConfusionTurns();
+
+    /// <summary>
     /// Returns the recoil damage dealt to a Struggle user.
     /// Gen 1: half the damage dealt. Gen 2: half max HP. Gen 3+: quarter max HP.
     /// </summary>

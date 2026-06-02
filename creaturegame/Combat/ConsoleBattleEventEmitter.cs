@@ -56,6 +56,10 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                 Console.WriteLine($"{e.SourceName} is hit by recoil! ({e.Damage} damage)");
                 break;
 
+            case ConfusionStarted e:
+                Console.WriteLine($"{e.TargetName} became confused!");
+                break;
+
             case ConfusionMessage e:
                 Console.WriteLine($"{e.CreatureName} is confused!");
                 break;

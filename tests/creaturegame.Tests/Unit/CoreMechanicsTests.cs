@@ -2059,6 +2059,7 @@ public class CoreMechanicsTests
         public int    FreezeRandomThawPercent                              => Gen1BattleRules.Instance.FreezeRandomThawPercent;
         public double RollDamageVariance()                                 => Gen1BattleRules.Instance.RollDamageVariance();
         public int    RollSleepTurns()                                     => Gen1BattleRules.Instance.RollSleepTurns();
+        public int    RollConfusionTurns()                                 => Gen1BattleRules.Instance.RollConfusionTurns();
         public int    CalculateStruggleRecoil(Creature s, int d)           => Gen1BattleRules.Instance.CalculateStruggleRecoil(s, d);
         public int    BurnDamageDenominator                                => Gen1BattleRules.Instance.BurnDamageDenominator;
         public int    PoisonDamageDenominator                              => Gen1BattleRules.Instance.PoisonDamageDenominator;
@@ -2090,6 +2091,7 @@ public class CoreMechanicsTests
         public int    FreezeRandomThawPercent                             => Gen1BattleRules.Instance.FreezeRandomThawPercent;
         public double RollDamageVariance()                                => 1.0;
         public int    RollSleepTurns()                                    => Gen1BattleRules.Instance.RollSleepTurns();
+        public int    RollConfusionTurns()                                => Gen1BattleRules.Instance.RollConfusionTurns();
         public int    CalculateStruggleRecoil(Creature s, int d)          => Gen1BattleRules.Instance.CalculateStruggleRecoil(s, d);
         public int    BurnDamageDenominator                               => Gen1BattleRules.Instance.BurnDamageDenominator;
         public int    PoisonDamageDenominator                             => Gen1BattleRules.Instance.PoisonDamageDenominator;
@@ -2172,6 +2174,7 @@ public class CoreMechanicsTests
         public int    FreezeRandomThawPercent                   => Gen1BattleRules.Instance.FreezeRandomThawPercent;
         public double RollDamageVariance()                      => 1.0;
         public int    RollSleepTurns()                          => Gen1BattleRules.Instance.RollSleepTurns();
+        public int    RollConfusionTurns()                      => Gen1BattleRules.Instance.RollConfusionTurns();
         public int    CalculateStruggleRecoil(Creature s, int d) => Gen1BattleRules.Instance.CalculateStruggleRecoil(s, d);
         public int    BurnDamageDenominator                     => 16;
         public int    PoisonDamageDenominator                   => 16;
@@ -2196,6 +2199,7 @@ public class CoreMechanicsTests
         public int    FreezeRandomThawPercent                   => Gen1BattleRules.Instance.FreezeRandomThawPercent;
         public double RollDamageVariance()                      => 1.0;
         public int    RollSleepTurns()                          => Gen1BattleRules.Instance.RollSleepTurns();
+        public int    RollConfusionTurns()                      => Gen1BattleRules.Instance.RollConfusionTurns();
         public int    CalculateStruggleRecoil(Creature s, int d) => Gen1BattleRules.Instance.CalculateStruggleRecoil(s, d);
         public int    BurnDamageDenominator                     => 16;
         public int    PoisonDamageDenominator                   => 16;

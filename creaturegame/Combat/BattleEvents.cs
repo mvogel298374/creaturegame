@@ -33,6 +33,7 @@ public record StatusCleared(string CreatureName, StatusCondition WasStatus) : Ba
 public record ActionBlocked(string CreatureName, StatusCondition Reason) : BattleEvent;
 
 // --- Confusion (pseudo-status — separate from StatusCondition enum) ---
+public record ConfusionStarted(string TargetName) : BattleEvent;
 public record ConfusionMessage(string CreatureName) : BattleEvent;
 public record ConfusionDamage(string CreatureName, int Damage, int HpAfter) : BattleEvent;
 public record ConfusionCleared(string CreatureName) : BattleEvent;
