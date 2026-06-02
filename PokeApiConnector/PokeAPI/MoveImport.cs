@@ -206,6 +206,13 @@ public class MoveImport
             attack.Effect = MoveEffect.TwoTurn;
         else if (pokeMove.Name == "metronome")
             attack.Effect = MoveEffect.Metronome;
+        // Gen 1 multi-hit (2–5 strikes). Fixed-2 movers (twineedle/double-kick/bonemerang) have
+        // extra effects and are handled in their own coverage batches.
+        else if (pokeMove.Name is "double-slap" or "comet-punch" or "fury-attack"
+                              or "pin-missile" or "barrage" or "fury-swipes" or "spike-cannon")
+            attack.Effect = MoveEffect.MultiHit;
+        else if (pokeMove.Name == "pay-day")
+            attack.Effect = MoveEffect.PayDay;
         // Confusion isn't a StatusCondition (it's a separate per-battle counter), so it's
         // modelled as a move effect. EffectChance (already set from the move) gates the
         // secondary confusion on damaging moves (Psybeam 10%); pure confusion moves

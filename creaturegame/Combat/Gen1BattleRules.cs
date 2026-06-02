@@ -33,6 +33,28 @@ public sealed class Gen1BattleRules : IBattleRules
     // StatusResolver decrements it before checking for clear (see RollConfusionTurns doc).
     public int RollConfusionTurns() => _rng.Next(2, 6);
 
+    // Gen 1–6: a confused creature hits itself 50% of the time.
+    public int ConfusionSelfHitPercent => 50;
+
+    // Gen 1–5 Same-Type Attack Bonus.
+    public double StabMultiplier => 1.5;
+
+    // Gen 1 stores a single ailment/effect chance per move, so every secondary effect kind
+    // resolves to the same column. A later generation would branch on `effect` here.
+    public int GetSecondaryEffectChance(Attack move, SecondaryEffectKind effect) => move.EffectChance ?? 100;
+
+    // Gen 1 multi-hit distribution: 2 and 3 hits at 3/8 each, 4 and 5 hits at 1/8 each.
+    public int RollMultiHitCount() => _rng.Next(8) switch
+    {
+        0 or 1 or 2 => 2,
+        3 or 4 or 5 => 3,
+        6           => 4,
+        _           => 5,
+    };
+
+    // Gen 1: Pay Day yields money equal to twice the user's level.
+    public int PayDayCoinMultiplier => 2;
+
     // Gen 1 Struggle recoil: half the damage dealt to the target.
     public int CalculateStruggleRecoil(Creature source, int damageDealt) =>
         Math.Max(1, damageDealt / 2);

@@ -78,7 +78,7 @@ public static class StatusResolver
                 emitter?.Emit(new ConfusionCleared(creature.Name));
                 return true;
             }
-            if (random.Next(2) == 0)
+            if (random.Next(100) < battleRules.ConfusionSelfHitPercent)
             {
                 int selfDamage = DamageCalculator.CalculateConfusionDamage(creature, battleRules);
                 creature.Attributes.ReceiveDamage(selfDamage);

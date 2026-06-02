@@ -2,6 +2,7 @@ using creaturegame.Creatures;
 using creaturegame.Attacks;
 using creaturegame.Combat;
 using creaturegame.DB;
+using creaturegame.Tests.TestSupport;
 
 namespace creaturegame.Tests.Unit;
 
@@ -1788,7 +1789,7 @@ public class CoreMechanicsTests
         enemy.Attributes.Speed = 1;
         enemy.AddAttack(new Attack { Name = "Scratch", BaseDamage = 40, Accuracy = 100, AttackType = AttackType.Physical });
 
-        var recorder = new RecordingBattleEventEmitter();
+        var recorder = new RecordingEmitter();
         var battle   = new Battle(player, enemy, new Gen1TypeChart(),
                                   AutoSelectInput.Instance, AutoSelectInput.Instance,
                                   rules: AlwaysHitRules.Instance, emitter: recorder);
@@ -1894,7 +1895,7 @@ public class CoreMechanicsTests
 
         // Pool has only one eligible move (Tackle) after excluding Metronome — deterministic
         var pool     = new List<Attack> { metronome, tackle };
-        var recorder = new RecordingBattleEventEmitter();
+        var recorder = new RecordingEmitter();
 
         var action = new AttackAction(attacker, defender, attacker.MoveSet[0],
             new Gen1TypeChart(), rules: AlwaysHitRules.Instance, emitter: recorder, movePool: pool);
@@ -1946,7 +1947,7 @@ public class CoreMechanicsTests
         for (int i = 0; i < 50; i++)
         {
             defender.Attributes.HP = defender.Attributes.MaxHP;
-            var recorder = new RecordingBattleEventEmitter();
+            var recorder = new RecordingEmitter();
             var action   = new AttackAction(attacker, defender, attacker.MoveSet[0],
                 new Gen1TypeChart(), rules: AlwaysHitRules.Instance, emitter: recorder, movePool: pool);
             await action.ExecuteAsync();
@@ -1974,7 +1975,7 @@ public class CoreMechanicsTests
         for (int i = 0; i < 50; i++)
         {
             defender.Attributes.HP = defender.Attributes.MaxHP;
-            var recorder = new RecordingBattleEventEmitter();
+            var recorder = new RecordingEmitter();
             var action   = new AttackAction(attacker, defender, attacker.MoveSet[0],
                 new Gen1TypeChart(), rules: AlwaysHitRules.Instance, emitter: recorder, movePool: pool);
             await action.ExecuteAsync();
@@ -1999,7 +2000,7 @@ public class CoreMechanicsTests
 
         // Pool contains only excluded moves → eligible list is empty → no inner action
         var pool     = new List<Attack> { metronome, mirrorMove };
-        var recorder = new RecordingBattleEventEmitter();
+        var recorder = new RecordingEmitter();
 
         var action = new AttackAction(attacker, defender, attacker.MoveSet[0],
             new Gen1TypeChart(), rules: AlwaysHitRules.Instance, emitter: recorder, movePool: pool);
@@ -2023,7 +2024,7 @@ public class CoreMechanicsTests
         attacker.AddAttack(metronome);
 
         var pool     = new List<Attack> { metronome, sleepPowder };
-        var recorder = new RecordingBattleEventEmitter();
+        var recorder = new RecordingEmitter();
 
         var action = new AttackAction(attacker, defender, attacker.MoveSet[0],
             new Gen1TypeChart(), rules: AlwaysHitRules.Instance, emitter: recorder, movePool: pool);
@@ -2034,81 +2035,7 @@ public class CoreMechanicsTests
     }
 
     // ── Test helpers ─────────────────────────────────────────────────────────
-
-    /// Captures all emitted battle events for assertion in tests. Does not write to console;
-    /// pair with ConsoleBattleEventEmitter when you also want visible output.
-    /// </summary>
-    private sealed class RecordingBattleEventEmitter : IBattleEventEmitter
-    {
-        private readonly List<BattleEvent> _events = [];
-        public void Emit(BattleEvent evt) => _events.Add(evt);
-        public IEnumerable<T> Of<T>() where T : BattleEvent => _events.OfType<T>();
-    }
-
-    /// <summary>
-    /// Deterministic battle rules for accuracy-sensitive tests: GetHitThreshold returns 256,
-    /// which exceeds AccuracyRollBound (256), so Random.Next(256) &gt;= 256 is never true →
-    /// moves always hit. Eliminates the Gen 1 1/256 miss flakiness in unit tests.
-    /// </summary>
-    private sealed class AlwaysHitRules : IBattleRules
-    {
-        public static readonly AlwaysHitRules Instance = new();
-        private AlwaysHitRules() { }
-
-        public bool   CanThawFrozenTarget(Attack move)                     => Gen1BattleRules.Instance.CanThawFrozenTarget(move);
-        public int    FreezeRandomThawPercent                              => Gen1BattleRules.Instance.FreezeRandomThawPercent;
-        public double RollDamageVariance()                                 => Gen1BattleRules.Instance.RollDamageVariance();
-        public int    RollSleepTurns()                                     => Gen1BattleRules.Instance.RollSleepTurns();
-        public int    RollConfusionTurns()                                 => Gen1BattleRules.Instance.RollConfusionTurns();
-        public int    CalculateStruggleRecoil(Creature s, int d)           => Gen1BattleRules.Instance.CalculateStruggleRecoil(s, d);
-        public int    BurnDamageDenominator                                => Gen1BattleRules.Instance.BurnDamageDenominator;
-        public int    PoisonDamageDenominator                              => Gen1BattleRules.Instance.PoisonDamageDenominator;
-        public double BadPoisonDamageFraction(int toxicCounter)            => Gen1BattleRules.Instance.BadPoisonDamageFraction(toxicCounter);
-        public double GetStatMultiplier(int stage)                         => Gen1BattleRules.Instance.GetStatMultiplier(stage);
-        public double GetAccuracyStageMultiplier(int stage)                => Gen1BattleRules.Instance.GetAccuracyStageMultiplier(stage);
-        public int    GetHitThreshold(int acc, int accStage, int evaStage) => 256; // > AccuracyRollBound → always hits
-        public int    AccuracyRollBound                                    => Gen1BattleRules.Instance.AccuracyRollBound;
-        public double GetCritChance(Creature a, Attack m)                  => Gen1BattleRules.Instance.GetCritChance(a, m);
-        public double CritMultiplier                                       => Gen1BattleRules.Instance.CritMultiplier;
-        public bool   CritIgnoresStatStages                                => Gen1BattleRules.Instance.CritIgnoresStatStages;
-        public int    RollBindingTurns()                                   => Gen1BattleRules.Instance.RollBindingTurns();
-        public int    BindingDamageDenominator                             => Gen1BattleRules.Instance.BindingDamageDenominator;
-        public int    CalculateXpAwarded(int baseExp, int enemyLevel)      => Gen1BattleRules.Instance.CalculateXpAwarded(baseExp, enemyLevel);
-        public int    GetOffensiveStat(Creature a, AttackType t)           => Gen1BattleRules.Instance.GetOffensiveStat(a, t);
-        public int    GetDefensiveStat(Creature d, AttackType t)           => Gen1BattleRules.Instance.GetDefensiveStat(d, t);
-    }
-
-    /// <summary>
-    /// Deterministic battle rules for crit tests: always crits, no damage variance.
-    /// All other mechanics delegate to Gen1BattleRules.
-    /// </summary>
-    private sealed class AlwaysCritRules : IBattleRules
-    {
-        public static readonly AlwaysCritRules Instance = new();
-        private AlwaysCritRules() { }
-
-        public bool   CanThawFrozenTarget(Attack move)                    => Gen1BattleRules.Instance.CanThawFrozenTarget(move);
-        public int    FreezeRandomThawPercent                             => Gen1BattleRules.Instance.FreezeRandomThawPercent;
-        public double RollDamageVariance()                                => 1.0;
-        public int    RollSleepTurns()                                    => Gen1BattleRules.Instance.RollSleepTurns();
-        public int    RollConfusionTurns()                                => Gen1BattleRules.Instance.RollConfusionTurns();
-        public int    CalculateStruggleRecoil(Creature s, int d)          => Gen1BattleRules.Instance.CalculateStruggleRecoil(s, d);
-        public int    BurnDamageDenominator                               => Gen1BattleRules.Instance.BurnDamageDenominator;
-        public int    PoisonDamageDenominator                             => Gen1BattleRules.Instance.PoisonDamageDenominator;
-        public double BadPoisonDamageFraction(int toxicCounter)           => Gen1BattleRules.Instance.BadPoisonDamageFraction(toxicCounter);
-        public double GetStatMultiplier(int stage)                        => Gen1BattleRules.Instance.GetStatMultiplier(stage);
-        public double GetAccuracyStageMultiplier(int stage)               => Gen1BattleRules.Instance.GetAccuracyStageMultiplier(stage);
-        public int    GetHitThreshold(int acc, int accStage, int evaStage) => Gen1BattleRules.Instance.GetHitThreshold(acc, accStage, evaStage);
-        public int    AccuracyRollBound                                   => Gen1BattleRules.Instance.AccuracyRollBound;
-        public double GetCritChance(Creature a, Attack m)                 => 1.0;
-        public double CritMultiplier                                      => Gen1BattleRules.Instance.CritMultiplier;
-        public bool   CritIgnoresStatStages                               => Gen1BattleRules.Instance.CritIgnoresStatStages;
-        public int    RollBindingTurns()                                  => Gen1BattleRules.Instance.RollBindingTurns();
-        public int    BindingDamageDenominator                            => Gen1BattleRules.Instance.BindingDamageDenominator;
-        public int    CalculateXpAwarded(int baseExp, int enemyLevel)     => Gen1BattleRules.Instance.CalculateXpAwarded(baseExp, enemyLevel);
-        public int    GetOffensiveStat(Creature a, AttackType t)          => Gen1BattleRules.Instance.GetOffensiveStat(a, t);
-        public int    GetDefensiveStat(Creature d, AttackType t)          => Gen1BattleRules.Instance.GetDefensiveStat(d, t);
-    }
+    // RecordingEmitter + the always-hit/always-crit rules doubles now live in TestSupport/.
 
     // ── GetOffensiveStat / GetDefensiveStat tests ─────────────────────────────
 
@@ -2168,54 +2095,24 @@ public class CoreMechanicsTests
             $"Damage vs Defense=200 ({dmgVsHighDef}) should be less than damage vs Special=50 ({dmgVsLowDef})");
     }
 
-    private sealed class AlwaysUseAttackStatRules : IBattleRules
+    // Deterministic (no variance, always-hit, no crit, flat stat mult) so the only thing that
+    // moves the damage is the stat the rules select — which is what these tests assert.
+    private sealed class AlwaysUseAttackStatRules : DelegatingBattleRules
     {
-        public bool   CanThawFrozenTarget(Attack m)             => Gen1BattleRules.Instance.CanThawFrozenTarget(m);
-        public int    FreezeRandomThawPercent                   => Gen1BattleRules.Instance.FreezeRandomThawPercent;
-        public double RollDamageVariance()                      => 1.0;
-        public int    RollSleepTurns()                          => Gen1BattleRules.Instance.RollSleepTurns();
-        public int    RollConfusionTurns()                      => Gen1BattleRules.Instance.RollConfusionTurns();
-        public int    CalculateStruggleRecoil(Creature s, int d) => Gen1BattleRules.Instance.CalculateStruggleRecoil(s, d);
-        public int    BurnDamageDenominator                     => 16;
-        public int    PoisonDamageDenominator                   => 16;
-        public double BadPoisonDamageFraction(int c)            => Gen1BattleRules.Instance.BadPoisonDamageFraction(c);
-        public double GetStatMultiplier(int stage)              => 1.0;
-        public double GetAccuracyStageMultiplier(int stage)     => Gen1BattleRules.Instance.GetAccuracyStageMultiplier(stage);
-        public int    GetHitThreshold(int acc, int a, int e)    => 256;
-        public int    AccuracyRollBound                         => 256;
-        public double GetCritChance(Creature a, Attack m)       => 0.0;
-        public double CritMultiplier                            => 2.0;
-        public bool   CritIgnoresStatStages                     => true;
-        public int    RollBindingTurns()                        => Gen1BattleRules.Instance.RollBindingTurns();
-        public int    BindingDamageDenominator                  => 16;
-        public int    CalculateXpAwarded(int b, int l)          => Gen1BattleRules.Instance.CalculateXpAwarded(b, l);
-        public int    GetOffensiveStat(Creature a, AttackType t) => a.Attributes.Attack; // always Attack
-        public int    GetDefensiveStat(Creature d, AttackType t) => Gen1BattleRules.Instance.GetDefensiveStat(d, t);
+        public override double RollDamageVariance()                  => 1.0;
+        public override double GetStatMultiplier(int stage)          => 1.0;
+        public override int    GetHitThreshold(int a, int b, int c)  => 256;
+        public override double GetCritChance(Creature a, Attack m)   => 0.0;
+        public override int    GetOffensiveStat(Creature a, AttackType t) => a.Attributes.Attack; // always Attack
     }
 
-    private sealed class AlwaysUseDefenseStatRules : IBattleRules
+    private sealed class AlwaysUseDefenseStatRules : DelegatingBattleRules
     {
-        public bool   CanThawFrozenTarget(Attack m)             => Gen1BattleRules.Instance.CanThawFrozenTarget(m);
-        public int    FreezeRandomThawPercent                   => Gen1BattleRules.Instance.FreezeRandomThawPercent;
-        public double RollDamageVariance()                      => 1.0;
-        public int    RollSleepTurns()                          => Gen1BattleRules.Instance.RollSleepTurns();
-        public int    RollConfusionTurns()                      => Gen1BattleRules.Instance.RollConfusionTurns();
-        public int    CalculateStruggleRecoil(Creature s, int d) => Gen1BattleRules.Instance.CalculateStruggleRecoil(s, d);
-        public int    BurnDamageDenominator                     => 16;
-        public int    PoisonDamageDenominator                   => 16;
-        public double BadPoisonDamageFraction(int c)            => Gen1BattleRules.Instance.BadPoisonDamageFraction(c);
-        public double GetStatMultiplier(int stage)              => 1.0;
-        public double GetAccuracyStageMultiplier(int stage)     => Gen1BattleRules.Instance.GetAccuracyStageMultiplier(stage);
-        public int    GetHitThreshold(int acc, int a, int e)    => 256;
-        public int    AccuracyRollBound                         => 256;
-        public double GetCritChance(Creature a, Attack m)       => 0.0;
-        public double CritMultiplier                            => 2.0;
-        public bool   CritIgnoresStatStages                     => true;
-        public int    RollBindingTurns()                        => Gen1BattleRules.Instance.RollBindingTurns();
-        public int    BindingDamageDenominator                  => 16;
-        public int    CalculateXpAwarded(int b, int l)          => Gen1BattleRules.Instance.CalculateXpAwarded(b, l);
-        public int    GetOffensiveStat(Creature a, AttackType t) => Gen1BattleRules.Instance.GetOffensiveStat(a, t);
-        public int    GetDefensiveStat(Creature d, AttackType t) => d.Attributes.Defense; // always Defense
+        public override double RollDamageVariance()                  => 1.0;
+        public override double GetStatMultiplier(int stage)          => 1.0;
+        public override int    GetHitThreshold(int a, int b, int c)  => 256;
+        public override double GetCritChance(Creature a, Attack m)   => 0.0;
+        public override int    GetDefensiveStat(Creature d, AttackType t) => d.Attributes.Defense; // always Defense
     }
 
     // ── EncounterSelector Tests ───────────────────────────────────────────────

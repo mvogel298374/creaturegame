@@ -3,6 +3,15 @@ using creaturegame.Creatures;
 
 namespace creaturegame.Combat;
 
+/// <summary>
+/// The kind of secondary effect a move can roll for on hit. Generations differ in how the
+/// chance is stored: Gen 1 keeps a single per-move chance (so every kind reads the same
+/// value), while later generations can attach independent chances per effect. Call sites
+/// ask <see cref="IBattleRules.GetSecondaryEffectChance"/> by kind so they never assume the
+/// Gen 1 single-column layout.
+/// </summary>
+public enum SecondaryEffectKind { Status, Flinch, Confuse }
+
 public interface IBattleRules
 {
     /// <summary>
@@ -18,6 +27,40 @@ public interface IBattleRules
     /// Gen 2+: 20.
     /// </summary>
     int FreezeRandomThawPercent { get; }
+
+    /// <summary>
+    /// Same-Type Attack Bonus multiplier applied when a move's type matches the attacker's.
+    /// Gen 1–5: 1.5. (Later mechanics like Adaptability/Terastal layer on top of this base.)
+    /// </summary>
+    double StabMultiplier { get; }
+
+    /// <summary>
+    /// Percent chance (0–100) that a confused creature hits itself instead of acting.
+    /// Gen 1–6: 50. Gen 7+: 33.
+    /// </summary>
+    int ConfusionSelfHitPercent { get; }
+
+    /// <summary>
+    /// Number of times a multi-hit move (Double Slap, Comet Punch, Fury Attack…) strikes when it
+    /// connects. Gen 1: 2–5 hits, weighted 2 = 3/8, 3 = 3/8, 4 = 1/8, 5 = 1/8. (Gen 5+ reweights to
+    /// favour 3 more.) Drawn once per use.
+    /// </summary>
+    int RollMultiHitCount();
+
+    /// <summary>
+    /// Coins-per-level scattered by Pay Day. The money picked up after the battle is this value
+    /// times the user's level. Gen 1: 2× level. (Later generations: 5× level.)
+    /// </summary>
+    int PayDayCoinMultiplier { get; }
+
+    /// <summary>
+    /// The percent chance (0–100) a move's secondary <paramref name="effect"/> applies on hit.
+    /// Gen 1 stores one chance per move, so every <see cref="SecondaryEffectKind"/> reads the
+    /// same column; a later generation that splits chances per effect overrides this to read
+    /// the right field. Call sites stay generation-agnostic by asking here rather than reading
+    /// the move's chance column directly.
+    /// </summary>
+    int GetSecondaryEffectChance(Attack move, SecondaryEffectKind effect);
 
     /// <summary>
     /// Returns the random damage multiplier for one hit.

@@ -208,6 +208,40 @@ randomness or force outcomes — e.g. `AlwaysHitRules` / `AlwaysCritRules` deleg
 
 ## 5. Rules for contributors
 
+### 5.0 The generation-agnostic checklist (run before every feature lands)
+
+Most seam violations are not "I wrote `if (gen == 1)`" — they're **subtler leaks** that pass
+tests and only surface as rework when Gen 2 starts. Every feature that touches battle math,
+stats, or move data must clear this checklist. The three leaks below are the ones that have
+actually bitten us; treat each pattern on the left as a **review blocker**.
+
+| 🚩 Red flag in a diff | Why it's a leak | ✅ The fix |
+|:----------------------|:----------------|:----------|
+| A **magic number** that is a game rule (`* 1.5`, `< 50`, `/ 16`, `217`, `40`) inline in engine code | The value changes between generations; hardcoding it scatters Gen 1 knowledge into generation-blind code | Add a named member to `IBattleRules` (e.g. `StabMultiplier`, `ConfusionSelfHitPercent`) with a per-gen XML doc; read it at the call site |
+| Reading **`creature.Attributes.Attack` / `.Special` / `.Defense` directly** for damage/effect math | The Special split (Gen 2) means "the offensive stat" is generation-dependent | Go through `rules.GetOffensiveStat(...)` / `GetDefensiveStat(...)` |
+| Reading a **move/species DB column directly** (`attack.EffectChance`, a stat column) where the *layout* could differ by gen | Later gens may store the same concept in a different shape (e.g. per-effect chances) | Ask the rules for the value (`rules.GetSecondaryEffectChance(move, kind)`); the Gen 1 impl can be a thin pass-through that documents the generic shape |
+| A **constant that is genuinely the same in every generation** (4 move slots, the damage-formula `+2`) | — | Leave it inline; **don't** over-abstract. A seam member you'll never vary is noise. |
+
+**The litmus question for every constant and every field read you add:**
+> *"When we build Gen 2, will this value or this data layout change?"*
+> **Yes →** behind a seam. **No →** inline is correct.
+
+If "yes" but you're not building Gen 2 yet: still add the seam member, implement the Gen 1
+value, and — when the *data* layout is what differs — make the Gen 1 implementation a
+**documented stub** that shows the generic shape (see `GetSecondaryEffectChance`: Gen 1 reads
+one column for every effect kind; the `kind` parameter exists purely so a later gen can branch).
+This is cheap now and removes a future archaeology dig.
+
+**Definition of done (gen-agnostic):**
+- [ ] No new game-rule magic numbers in `DamageCalculator` / `AttackAction` / `StatusResolver` / `Battle` — they're on a seam.
+- [ ] No new direct `Attributes.Attack/Special/Defense` reads in damage/effect math — routed through `GetOffensiveStat`/`GetDefensiveStat`.
+- [ ] No new direct gen-shaped DB-column reads at a battle call site — routed through a rules accessor.
+- [ ] No `if (generation == …)` / `"gen1"` checks anywhere in the engine.
+- [ ] Every new `IBattleRules`/`ITypeChart`/`IStatCalculator` member has a per-generation XML doc.
+
+> Doing this pass **as part of the feature** (not as a later cleanup) is the whole point — the
+> debt compounds invisibly until a generation switch forces it all at once.
+
 ### Adding a new *rule* that varies by generation
 1. Ask the decision question: **"Is this the same in every generation?"** If yes, it's
    ordinary engine logic — don't put it on a seam. If no, continue.

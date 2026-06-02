@@ -43,6 +43,8 @@ public sealed class SignalRBattleEventEmitter(
         MoveMissed e       => ("MoveMissed",       new { e.AttackerName, e.MoveName }),
         DamageDealt e      => ("DamageDealt",      new { e.TargetName, e.Damage, e.TypeEffectiveness, e.HpAfter, e.HpMax, e.IsCrit }),
         RecoilDamage e     => ("RecoilDamage",     new { e.SourceName, e.Damage, e.HpAfter }),
+        MultiHitCompleted e => ("MultiHitCompleted", new { e.Hits }),
+        CoinsScattered e   => ("CoinsScattered",   new { e.SourceName, e.Amount }),
         StatusApplied e    => ("StatusApplied",    new { e.TargetName, Status = e.Status.ToString() }),
         StatusDamage e     => ("StatusDamage",     new { e.TargetName, e.Damage, Source = e.Source.ToString(), e.HpAfter }),
         StatusCleared e    => ("StatusCleared",    new { e.CreatureName, WasStatus = e.WasStatus.ToString() }),

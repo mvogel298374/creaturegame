@@ -35,7 +35,9 @@ public static class LearnsetMoveSelector
     // Flat weights so non-power moves still compete without dominating.
     private const double FixedDamageScore = 60.0;  // OHKO/Fixed/SuperFang/etc. — attractive, not infinite
     private const double StatusMoveScore  = 35.0;  // status/stat moves — present sometimes
-    private const double StabMultiplier   = 1.5;
+    // A selection-time heuristic weight only — NOT the battle STAB multiplier (that lives on
+    // IBattleRules.StabMultiplier). This just nudges the enemy toward same-type attacks.
+    private const double StabWeightBonus  = 1.5;
 
     public static IReadOnlyList<Attack> Select(
         MoveSelectionStrategy strategy,
@@ -61,6 +63,29 @@ public static class LearnsetMoveSelector
         return strategy == MoveSelectionStrategy.CanonicalLatest
             ? SelectCanonicalLatest(candidates)
             : SelectWeightedSmart(candidates, type1, type2, rng ?? SystemRandomSource.Instance);
+    }
+
+    /// <summary>
+    /// Composition-root entry point: resolves the move table from the full pool, runs
+    /// <see cref="Select"/>, and — if the species has no usable learnset entries (e.g. the
+    /// importer hasn't been run) — falls back to four random moves so a creature is never
+    /// shipped move-less. Keeps the "what moves does a creature get" policy in one place.
+    /// </summary>
+    public static IReadOnlyList<Attack> SelectWithFallback(
+        MoveSelectionStrategy strategy,
+        IReadOnlyList<PokemonLearnset> learnset,
+        IReadOnlyList<Attack> allMoves,
+        int level,
+        DamageType type1,
+        DamageType? type2,
+        IRandomSource? rng = null)
+    {
+        var source    = rng ?? SystemRandomSource.Instance;
+        var movesById = allMoves.ToDictionary(m => m.Id);
+        var moves     = Select(strategy, learnset, movesById, level, type1, type2, source);
+        if (moves.Count > 0) return moves;
+
+        return allMoves.OrderBy(_ => source.Next(int.MaxValue)).Take(MaxMoves).ToList();
     }
 
     // The 4 moves with the highest learn level (candidates are already sorted that way).
@@ -117,7 +142,7 @@ public static class LearnsetMoveSelector
                 ? Math.Max(1, move.BaseDamage)   // power-based
                 : FixedDamageScore;              // Fixed/LevelBased/OHKO/SuperFang/SelfDestruct/Drain
             if (move.DamageType == type1 || (type2.HasValue && move.DamageType == type2.Value))
-                score *= StabMultiplier;         // STAB only matters for damaging moves
+                score *= StabWeightBonus;        // same-type nudge (damaging moves only)
         }
         else
         {

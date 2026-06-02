@@ -19,6 +19,8 @@ Guidelines for all `/dev` actions in this project.
 *   **Generation seams** — any mechanic that varies between Pokémon generations must go behind an interface, never hardcoded:
     *   `ITypeChart` — type effectiveness matrix.
     *   `IBattleRules` — stat stage multipliers, accuracy scale, crit formula, sleep duration, freeze thaw, status damage denominators, and any other gen-variable rule. Add new methods here; implement in `Gen1BattleRules`. Never query a generation enum inside battle logic.
+    *   `IStatCalculator` — stat formulas (HP/other stats, DV/IV randomisation, Stat-Exp/EV scaling).
+    *   **The leaks that pass tests:** the violations that actually cost us aren't `if (gen == 1)` — they're inline game-rule magic numbers (`* 1.5`, `< 50`), direct `Attributes.Attack/Special/Defense` reads in damage math (breaks on the Gen 2 Special split), and direct gen-shaped DB-column reads at battle call sites. **Every feature touching battle math, stats, or move data must clear the generation-agnostic checklist + definition-of-done in `GENERATION_SEAMS.md §5.0` *before it lands*** — doing it as a later cleanup is exactly the trap (the debt compounds invisibly until a generation switch forces it all at once).
 
 ## Coding Conventions
 *   **Primary Constructors**: Use them for DTOs and simple data structures when possible (though keep models EF-compatible).

@@ -25,6 +25,8 @@ public record MoveUsed(string AttackerName, string MoveName) : BattleEvent;
 public record MoveMissed(string AttackerName, string MoveName) : BattleEvent;
 public record DamageDealt(string TargetName, int Damage, double TypeEffectiveness, int HpAfter, int HpMax, bool IsCrit = false) : BattleEvent;
 public record RecoilDamage(string SourceName, int Damage, int HpAfter) : BattleEvent;
+public record MultiHitCompleted(int Hits) : BattleEvent;
+public record CoinsScattered(string SourceName, int Amount) : BattleEvent;
 
 // --- Status conditions ---
 public record StatusApplied(string TargetName, StatusCondition Status) : BattleEvent;

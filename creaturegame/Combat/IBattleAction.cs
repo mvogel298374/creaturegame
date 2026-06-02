@@ -149,11 +149,27 @@ public class AttackAction : IBattleAction
                 {
                     double eff = DamageCalculator.GetTypeEffectiveness(
                         attackToUse.DamageType, Target.Type1, Target.Type2, _typeChart);
-                    damage = DamageCalculator.CalculateDamage(
-                        Source, Target, attackToUse, _typeChart, _rules, out isCrit, _rng);
-                    Target.Attributes.ReceiveDamage(damage);
-                    _emitter?.Emit(new DamageDealt(Target.Name, damage, eff,
-                        Target.Attributes.HP, Target.Attributes.MaxHP, isCrit));
+
+                    // Multi-hit (Double Slap, Comet Punch, …): accuracy was already rolled once
+                    // above; each of the 2–5 strikes rolls its own crit + variance and stops if
+                    // the target faints. Normal moves take the hits == 1 path (identical output).
+                    bool isMultiHit = !usingStruggle && attackToUse.Effect == MoveEffect.MultiHit;
+                    int  hits       = isMultiHit ? _rules.RollMultiHitCount() : 1;
+
+                    int landed = 0;
+                    for (int i = 0; i < hits && Target.IsAlive(); i++)
+                    {
+                        int hitDamage = DamageCalculator.CalculateDamage(
+                            Source, Target, attackToUse, _typeChart, _rules, out isCrit, _rng);
+                        Target.Attributes.ReceiveDamage(hitDamage);
+                        damage += hitDamage;   // accumulated total gates drain/recoil/recharge below
+                        landed++;
+                        _emitter?.Emit(new DamageDealt(Target.Name, hitDamage, eff,
+                            Target.Attributes.HP, Target.Attributes.MaxHP, isCrit));
+                    }
+
+                    if (isMultiHit)
+                        _emitter?.Emit(new MultiHitCompleted(landed));
 
                     if (category == DamageCategory.Drain && damage > 0)
                     {
@@ -247,7 +263,7 @@ public class AttackAction : IBattleAction
         if (Target.Status != StatusCondition.None) return;
         if (!Target.IsAlive()) return;
 
-        int chance = attack.EffectChance ?? 100;
+        int chance = _rules.GetSecondaryEffectChance(attack, SecondaryEffectKind.Status);
         if (_rng.Next(1, 101) > chance) return;
 
         Target.Status = attack.StatusEffect;
@@ -284,7 +300,7 @@ public class AttackAction : IBattleAction
             case MoveEffect.Flinch:
                 if (Target.IsAlive())
                 {
-                    int chance = attack.EffectChance ?? 100;
+                    int chance = _rules.GetSecondaryEffectChance(attack, SecondaryEffectKind.Flinch);
                     if (_rng.Next(1, 101) <= chance)
                         Target.IsFlinched = true;
                 }
@@ -306,6 +322,12 @@ public class AttackAction : IBattleAction
                 }
                 break;
 
+            case MoveEffect.PayDay:
+                // Deals normal damage (handled above) and scatters coins on hit; the money is
+                // collected after the battle. No economy yet — the mechanic is the event.
+                _emitter?.Emit(new CoinsScattered(Source.Name, _rules.PayDayCoinMultiplier * Source.Level));
+                break;
+
             case MoveEffect.Confuse:
                 // Confusion is independent of major status (a creature can be both). Gen 1
                 // confusion doesn't stack — only applies if the target isn't already confused.
@@ -313,7 +335,7 @@ public class AttackAction : IBattleAction
                 // pure confusion moves (Supersonic, Confuse Ray) have no chance ⇒ always land.
                 if (Target.IsAlive() && Target.ConfusedTurns == 0)
                 {
-                    int chance = attack.EffectChance ?? 100;
+                    int chance = _rules.GetSecondaryEffectChance(attack, SecondaryEffectKind.Confuse);
                     if (_rng.Next(1, 101) <= chance)
                     {
                         Target.ConfusedTurns = _rules.RollConfusionTurns();

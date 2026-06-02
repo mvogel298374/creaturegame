@@ -169,6 +169,40 @@ recalc and HP heals the delta. The frontend animates an XP-bar fill on `LeveledU
 
 ---
 
+## Gen 1 Attack Behavior Coverage (batched)
+
+Prove **every Gen 1 attack does what it sets out to do** when given to a Pokémon and used in
+battle, in **batches of 10 moves**, via parametrized "effect contract" tests (`[Theory]` +
+`[InlineData]` — a shared effect like "deals damage" is written once and run over every move
+that has it). Real move rows come from the live `moves.db` (`MovesFixture`); the
+`MoveScenario` harness gives the move to a creature and runs one `AttackAction`.
+
+### Batch 1 (moves 1–10) ✅ DONE (2026-06-03)
+pound, karate-chop, double-slap, comet-punch, mega-punch, pay-day, fire-punch, ice-punch,
+thunder-punch, scratch. **+49 test cases (228 total).**
+- Harness built once for all batches: `TestSupport/MovesFixture` (live DB loader),
+  `MoveScenario`/`TestCreatures`, shared `RecordingEmitter` (deduped the 3 copies), and the
+  deterministic rules doubles (`NeverHitRules`, `ForceSecondaryRules`, `NoVarianceNoCritHitRules`,
+  `FixedMultiHitRules`) on `DelegatingBattleRules`.
+- Contracts: damage, PP decrement, accuracy/miss, secondary status (burn/freeze/paralysis incl.
+  miss + already-statused), Gen-1 special-by-type (the punches are Special), high-crit rate,
+  STAB ~1.5×, type-effectiveness scaling, multi-hit count, Pay Day coins.
+- **Two engine features implemented** (both behind the gen seam per `GENERATION_SEAMS.md §5.0`):
+  - **Multi-hit (2–5)** — `MoveEffect.MultiHit`, `IBattleRules.RollMultiHitCount` (Gen 1 weighted
+    2/3 = 3/8, 4/5 = 1/8), per-hit crit/variance, stop-on-faint, `MultiHitCompleted` event +
+    "Hit N times!" line. Maps double-slap/comet-punch/fury-attack/pin-missile/barrage/
+    fury-swipes/spike-cannon. Verified live (Clefairy Double Slap → "Hit 2 times!").
+  - **Pay Day** — `MoveEffect.PayDay`, `IBattleRules.PayDayCoinMultiplier` (Gen 1 = 2× level),
+    `CoinsScattered` event ("Coins scattered everywhere!"). No economy yet — the mechanic is the event.
+
+### Remaining batches (cadence)
+- [ ] Batches 2–17 (moves 11–165): query the next 10 → add `InlineData` rows to the existing
+  contracts → add only genuinely new contracts/mechanics.
+- [ ] **Fixed-2 multi-hit movers deferred to their batches**: twineedle (2 hits + 20% poison),
+  double-kick, bonemerang — these need a fixed-count variant of the multi-hit mechanic.
+
+---
+
 ## EV Gain (Effort Values)
 
 No prerequisites. All `ExpHP/Attack/Defense/Special/Speed` fields exist on `Creature` but are never written.
@@ -389,6 +423,7 @@ The doc set is strong, but the *why* behind the two-DB split, event sourcing, an
 - ~~`GameController.BuildCreature` uses random moves~~ — **fixed** by the Learnset System (initial moveset now learnset-driven; see Learnset System section)
 
 ### Fixed ✅
+- Post-feature gen-seam + smell cleanup (2026-06-02): closed three seam leaks surfaced by the Learnset/confusion work — confusion self-hit chance (`ConfusionSelfHitPercent`), STAB (`StabMultiplier`), and the EffectChance read (`GetSecondaryEffectChance` + `SecondaryEffectKind`, a Gen 1 pass-through stub showing the generic shape) are now all on `IBattleRules`; `CalculateConfusionDamage` reads stats via `GetOffensiveStat`/`GetDefensiveStat`. Killed the 5× duplicated `IBattleRules` test doubles with a `TestSupport/DelegatingBattleRules` base (new members are now a one-line change). Centralised move-selection policy in `LearnsetMoveSelector.SelectWithFallback` (dropped the split `BuildCreature` signature + fallback). **Strengthened the docs so this stops recurring:** new generation-agnostic checklist + definition-of-done in `GENERATION_SEAMS.md §5.0`, cross-linked from `DEV_STANDARDS.md` and the `/dev` profile in `AI_CONTEXT.md`. 179 tests green.
 - Enemy "only ever uses one status move" (e.g. a wild Charizard that just spammed Leer): the enemy ran on `AutoSelectInput`, which always returns move **slot 0**. `WeightedSmart`/`CanonicalLatest` order a moveset ascending by learn level, so a level-1 status move (Leer, Growl) lands in slot 0 and got used every turn. *(Not a learnset/pre-evolution data gap — Charizard's own learnset has Scratch/Ember/Rage/Slash/Fire Spin ≤ L50.)* Fixed by adding `RandomMoveInput` (uniform pick among PP-available moves, `IRandomSource`-seamed) and wiring it as the enemy input in `GameSessionManager`. Covered by `ConfusionAndInputTests` (only-available-PP, variety-over-many-turns, seeded determinism) and verified live (enemy Vaporeon used Bite/varied moves). The evaluator-driven AI tiers remain future work (AI Move Selection). *Pre-evolution movesets are a separate, lower-priority fidelity item: we use a species' own learnset only, which is correct for most mons but means a fully-evolved species whose own learnset is sparse below its level could get a thin pool — revisit when evolution-chain data is imported (Game Loop / Evolution).*
 - Confusion-inflicting moves did nothing (Supersonic appeared to "miss quietly" / have no effect): confusion is a per-battle counter (`ConfusedTurns`), **not** a `StatusCondition`, and nothing ever set it — the importer dropped the `"confusion"` ailment and no move effect applied it. Fixed end-to-end: added `MoveEffect.Confuse` + `IBattleRules.RollConfusionTurns` (Gen 1: 2–5 counter ≈ 1–4 turns), an `AttackAction` `Confuse` case (independent of major status, no stacking, `EffectChance`-gated for secondary confusion), a `ConfusionStarted` event wired through the console + SignalR emitters and the frontend `timeline.ts` ("X became confused!"), and the importer now maps ailment `"confusion"` → `MoveEffect.Confuse`. Re-imported: the 5 Gen 1 confusion moves (Supersonic, Psybeam, Confusion, Confuse Ray, Dizzy Punch) now carry the effect with correct chances; Thrash/Petal Dance correctly excluded. Covered by `ConfusionAndInputTests` and verified live ("VAPOREON became confused!" → "hurt itself in confusion!").
 - Attack cadence (Gen 1 feel): the lunge + target flash played **before** the "X used MOVE!" line, and the HP bar snapped to its end-of-turn value the instant a move was chosen (the next turn's `TurnStarted` was applied immediately). Fixed by announcing the move first then animating (`MoveUsed` expansion in `timeline.ts`) and routing `TurnStarted` **through the timeline** so HP/status sync only after the turn's damage animates — bars drain in step now. Verified live (Puppeteer) + locked by the `MoveUsed`/`TurnStarted` Vitest cases and `cadence.spec.ts`.

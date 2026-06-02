@@ -44,7 +44,7 @@ public static class DamageCalculator
 
         double baseDamage = (((2.0 * attacker.Level / 5.0 + 2.0) * attackStat * move.BaseDamage / defenseStat) / 50.0) + 2.0;
 
-        double stab            = (attacker.Type1 == move.DamageType || attacker.Type2 == move.DamageType) ? 1.5 : 1.0;
+        double stab            = (attacker.Type1 == move.DamageType || attacker.Type2 == move.DamageType) ? rules.StabMultiplier : 1.0;
         double typeEffectiveness = GetTypeEffectiveness(move.DamageType, defender.Type1, defender.Type2, typeChart);
         double critMult        = isCrit ? rules.CritMultiplier : 1.0;
         double random          = rules.RollDamageVariance();
@@ -57,10 +57,18 @@ public static class DamageCalculator
                                       ITypeChart typeChart, IBattleRules? rules = null)
         => CalculateDamage(attacker, defender, move, typeChart, rules ?? Gen1BattleRules.Instance, out _);
 
+    // Confusion self-damage is a typeless physical hit at this fixed power (gen-invariant: 40).
+    private const int ConfusionBasePower = 40;
+
     public static int CalculateConfusionDamage(Creature attacker, IBattleRules? rules = null)
     {
         var r = rules ?? Gen1BattleRules.Instance;
-        double raw = ((2.0 * attacker.Level / 5.0 + 2.0) * attacker.Attributes.Attack * 40.0 / attacker.Attributes.Defense) / 50.0 + 2.0;
+        // Stat reads go through the rules seam (physical Attack vs Defense in Gen 1; a split-
+        // Special gen would still resolve Physical → Attack/Defense here) rather than touching
+        // Attributes directly.
+        int attackStat  = r.GetOffensiveStat(attacker, AttackType.Physical);
+        int defenseStat = Math.Max(1, r.GetDefensiveStat(attacker, AttackType.Physical));
+        double raw = ((2.0 * attacker.Level / 5.0 + 2.0) * attackStat * ConfusionBasePower / defenseStat) / 50.0 + 2.0;
         return Math.Max(1, (int)(raw * r.RollDamageVariance()));
     }
 

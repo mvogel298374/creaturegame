@@ -170,4 +170,43 @@ public class LearnsetMoveSelectorTests
         Assert.True(countB > countC,
             $"Expected the decent STAB move (B={countB}) to be picked more often than the weak off-type move (C={countC}).");
     }
+
+    // --- SelectWithFallback --------------------------------------------------
+
+    [Fact]
+    public void Learnset_SelectWithFallback_NoLearnset_ReturnsFourRandomFromPool()
+    {
+        var pool = new[]
+        {
+            Move(1, "A", 40, DamageType.Normal), Move(2, "B", 40, DamageType.Fire),
+            Move(3, "C",  0, DamageType.Normal), Move(4, "D", 40, DamageType.Water),
+            Move(5, "E", 40, DamageType.Grass),
+        };
+
+        var result = LearnsetMoveSelector.SelectWithFallback(
+            MoveSelectionStrategy.CanonicalLatest, Array.Empty<PokemonLearnset>(), pool,
+            level: 50, DamageType.Normal, null, new SeededRandomSource(1));
+
+        Assert.Equal(4, result.Count);
+        Assert.All(result, m => Assert.Contains(m, pool));
+    }
+
+    [Fact]
+    public void Learnset_SelectWithFallback_WithLearnset_UsesLearnsetNotFallback()
+    {
+        var pool = new[]
+        {
+            Move(1, "Tackle",   40, DamageType.Normal),
+            Move(2, "Vine Whip",45, DamageType.Grass),
+            Move(9, "Hydro Pump",110, DamageType.Water),   // in the pool but NOT learnable
+        };
+        var learnset = new[] { Entry(1, 1), Entry(2, 13) };
+
+        var result = LearnsetMoveSelector.SelectWithFallback(
+            MoveSelectionStrategy.CanonicalLatest, learnset, pool,
+            level: 50, DamageType.Grass, null, new SeededRandomSource(1));
+
+        Assert.Equal(new[] { 1, 2 }, result.Select(m => m.Id).OrderBy(x => x).ToArray());
+        Assert.DoesNotContain(result, m => m.Id == 9);   // fallback (which could include it) was not used
+    }
 }

@@ -219,6 +219,14 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       return { steps: [d({ type: 'UPDATE_HP', name: srcName, hp: hpAfter }), w(400), d(log(`${srcName} is hit by recoil!`))] };
     }
 
+    case 'MultiHitCompleted': {
+      const hits = payload.hits as number;
+      return { steps: [w(120), d(log(`Hit ${hits} time${hits === 1 ? '' : 's'}!`))] };
+    }
+
+    case 'CoinsScattered':
+      return { steps: [w(120), d(log('Coins scattered everywhere!'))] };
+
     case 'CreatureFainted': {
       const faintedName = payload.name as string;
       return { steps: [

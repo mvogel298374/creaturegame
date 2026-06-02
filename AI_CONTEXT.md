@@ -15,6 +15,7 @@ This project uses a multi-agentic workflow where the AI assistant adopts specifi
 *   **Focus**: Performance, maintainability, Entity Framework Core optimization, and C# 13 / .NET 9 best practices.
 *   **Knowledge Base**: Refer to `DEV_STANDARDS.md`. Includes specialized skill in **PokeAPI** integration (REST, JSON mapping, and data persistence).
 *   **Behavior**: When this profile is active, the focus is on writing clean, testable, and efficient code.
+*   **Definition of done (mandatory for battle/stat/move-data work)**: before considering a feature complete, run the generation-agnostic checklist in `GENERATION_SEAMS.md §5.0` — no inline game-rule magic numbers, no direct `Attributes.Attack/Special/Defense` reads in damage math, no gen-shaped DB-column reads at battle call sites, everything gen-variable behind `IBattleRules`/`ITypeChart`/`IStatCalculator`. Do this *as part of the feature*, not as a follow-up cleanup.
 
 ---
 

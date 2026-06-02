@@ -1,6 +1,7 @@
 using creaturegame.Attacks;
 using creaturegame.Creatures;
 using creaturegame.Combat;
+using creaturegame.Tests.TestSupport;
 
 namespace creaturegame.Tests.Integration;
 
@@ -379,13 +380,5 @@ public class BattleIntegrationTests
 
             return Task.FromResult(moves.First(m => m.PowerPointsCurrent > 0));
         }
-    }
-
-    /// <summary>Captures all emitted BattleEvents in order for assertion.</summary>
-    private sealed class RecordingEmitter : IBattleEventEmitter
-    {
-        private readonly List<BattleEvent> _events = [];
-        public IReadOnlyList<BattleEvent> Events => _events;
-        public void Emit(BattleEvent evt) => _events.Add(evt);
     }
 }

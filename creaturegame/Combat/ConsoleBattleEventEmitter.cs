@@ -56,6 +56,14 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                 Console.WriteLine($"{e.SourceName} is hit by recoil! ({e.Damage} damage)");
                 break;
 
+            case MultiHitCompleted e:
+                Console.WriteLine($"Hit {e.Hits} time{(e.Hits == 1 ? "" : "s")}!");
+                break;
+
+            case CoinsScattered:
+                Console.WriteLine("Coins scattered everywhere!");
+                break;
+
             case ConfusionStarted e:
                 Console.WriteLine($"{e.TargetName} became confused!");
                 break;

@@ -1,6 +1,7 @@
 using creaturegame.Attacks;
 using creaturegame.Combat;
 using creaturegame.Creatures;
+using creaturegame.Tests.TestSupport;
 
 namespace creaturegame.Tests.Unit;
 
@@ -16,8 +17,11 @@ public class ConfusionAndInputTests
 {
     private static Creature MakeCreature(string name)
     {
-        var c = new Creature(name) { Level = 50 };
-        c.CalculateStats();   // base stats default to 0 → ~60 HP at L50; enough to be alive
+        var c = new Creature(name)
+        {
+            Level = 50, BaseHP = 60, BaseAttack = 60, BaseDefense = 60, BaseSpecial = 60, BaseSpeed = 60,
+        };
+        c.CalculateStats();
         return c;
     }
 
@@ -40,7 +44,7 @@ public class ConfusionAndInputTests
 
         var emitter = new RecordingEmitter();
         var action  = new AttackAction(attacker, target, attacker.MoveSet[0], new Gen1TypeChart(),
-            AlwaysHit.Instance, emitter, rng: new SeededRandomSource(1));
+            AlwaysHitRules.Instance, emitter, rng: new SeededRandomSource(1));
         await action.ExecuteAsync();
 
         Assert.True(target.ConfusedTurns > 0, "Supersonic should have confused the target");
@@ -58,7 +62,7 @@ public class ConfusionAndInputTests
 
         var emitter = new RecordingEmitter();
         var action  = new AttackAction(attacker, target, attacker.MoveSet[0], new Gen1TypeChart(),
-            AlwaysHit.Instance, emitter, rng: new SeededRandomSource(1));
+            AlwaysHitRules.Instance, emitter, rng: new SeededRandomSource(1));
         await action.ExecuteAsync();
 
         Assert.Equal(3, target.ConfusedTurns);   // unchanged
@@ -75,7 +79,7 @@ public class ConfusionAndInputTests
 
         var emitter = new RecordingEmitter();
         var action  = new AttackAction(attacker, target, attacker.MoveSet[0], new Gen1TypeChart(),
-            AlwaysHit.Instance, emitter, rng: new SeededRandomSource(1));
+            AlwaysHitRules.Instance, emitter, rng: new SeededRandomSource(1));
         await action.ExecuteAsync();
 
         Assert.Equal(0, target.ConfusedTurns);
@@ -144,37 +148,4 @@ public class ConfusionAndInputTests
         Rules = Gen1BattleRules.Instance, TurnNumber = 1,
     };
 
-    private sealed class RecordingEmitter : IBattleEventEmitter
-    {
-        private readonly List<BattleEvent> _events = [];
-        public IReadOnlyList<BattleEvent> Events => _events;
-        public void Emit(BattleEvent evt) => _events.Add(evt);
-    }
-
-    /// <summary>Always-hit rules so the accuracy roll never interferes with the effect under test.</summary>
-    private sealed class AlwaysHit : IBattleRules
-    {
-        public static readonly AlwaysHit Instance = new();
-        public bool   CanThawFrozenTarget(Attack m)             => Gen1BattleRules.Instance.CanThawFrozenTarget(m);
-        public int    FreezeRandomThawPercent                   => Gen1BattleRules.Instance.FreezeRandomThawPercent;
-        public double RollDamageVariance()                      => 1.0;
-        public int    RollSleepTurns()                          => Gen1BattleRules.Instance.RollSleepTurns();
-        public int    RollConfusionTurns()                      => Gen1BattleRules.Instance.RollConfusionTurns();
-        public int    CalculateStruggleRecoil(Creature s, int d) => Gen1BattleRules.Instance.CalculateStruggleRecoil(s, d);
-        public int    BurnDamageDenominator                     => 16;
-        public int    PoisonDamageDenominator                   => 16;
-        public double BadPoisonDamageFraction(int c)            => Gen1BattleRules.Instance.BadPoisonDamageFraction(c);
-        public double GetStatMultiplier(int stage)              => Gen1BattleRules.Instance.GetStatMultiplier(stage);
-        public double GetAccuracyStageMultiplier(int stage)     => Gen1BattleRules.Instance.GetAccuracyStageMultiplier(stage);
-        public int    GetHitThreshold(int acc, int a, int e)    => 256;
-        public int    AccuracyRollBound                         => 256;
-        public double GetCritChance(Creature a, Attack m)       => 0.0;
-        public double CritMultiplier                            => 2.0;
-        public bool   CritIgnoresStatStages                     => true;
-        public int    RollBindingTurns()                        => Gen1BattleRules.Instance.RollBindingTurns();
-        public int    BindingDamageDenominator                  => 16;
-        public int    CalculateXpAwarded(int b, int l)          => Gen1BattleRules.Instance.CalculateXpAwarded(b, l);
-        public int    GetOffensiveStat(Creature a, AttackType t) => Gen1BattleRules.Instance.GetOffensiveStat(a, t);
-        public int    GetDefensiveStat(Creature d, AttackType t) => Gen1BattleRules.Instance.GetDefensiveStat(d, t);
-    }
 }
