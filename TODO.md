@@ -200,6 +200,10 @@ thunder-punch, scratch. **+49 test cases (228 total).**
   contracts → add only genuinely new contracts/mechanics.
 - [ ] **Fixed-2 multi-hit movers deferred to their batches**: twineedle (2 hits + 20% poison),
   double-kick, bonemerang — these need a fixed-count variant of the multi-hit mechanic.
+- [ ] **Frontend Vitest gap**: `timeline.test.ts` doesn't yet cover the events added this work —
+  `ConfusionStarted`, `MultiHitCompleted`, `CoinsScattered` (and the existing
+  `ConfusionMessage`/`Damage`/`Cleared`). Backend behaviour is fully covered; this is just the
+  log-text mapping. Fold into the next frontend coverage pass.
 
 ---
 
