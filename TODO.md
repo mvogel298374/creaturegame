@@ -195,9 +195,43 @@ thunder-punch, scratch. **+49 test cases (228 total).**
   - **Pay Day** — `MoveEffect.PayDay`, `IBattleRules.PayDayCoinMultiplier` (Gen 1 = 2× level),
     `CoinsScattered` event ("Coins scattered everywhere!"). No economy yet — the mechanic is the event.
 
+### Test layout: capability classes, not batch files
+Tests are organised by **what the move does**, not the batch it arrived in:
+`tests/.../Integration/Gen1Attacks/` — `DamageContractTests`, `StabAndTypeEffectivenessContractTests`,
+`CriticalHitContractTests`, `MultiHitContractTests`, `SecondaryStatusContractTests`,
+`PhysicalSpecialSplitContractTests`, `OneHitKoContractTests`, `TwoTurnMoveContractTests`,
+`StatStageMoveContractTests`, `BindingContractTests`, `UniqueMoveEffectContractTests`, over a shared
+`Gen1MoveContract` base. **Covering a new batch means adding `InlineData` rows to the matching
+class** and creating a new class only when a move introduces a genuinely new mechanic. (Batch 1 +
+batch 2 were merged into this structure when batch 2 landed — there are no `Batch1/Batch2` classes.)
+
+### Batch 2 (moves 11–20) ✅ DONE (2026-06-03)
+vice-grip, guillotine, razor-wind, swords-dance, cut, gust, wing-attack, whirlwind, fly, bind.
+**248 total.** All mechanics below were already implemented in the engine — this batch is
+**coverage only, no new engine code** — and each test drives the real `AttackAction` path (the only
+substitutions are RNG-gated rolls through the `IBattleRules` seam doubles).
+- Reused contracts (rows added to existing classes): damage, PP decrement, accuracy/miss, STAB
+  (added a Flying mover), type-effectiveness scaling (Flying super-effective vs Grass/Fighting),
+  physical/special-by-type (generalised to a category theory over Normal/Fighting/Flying/Fire/Ice/Electric).
+- New capability classes for first-seen mechanics:
+  - **One-hit KO** (guillotine) — deals full-HP damage & fells; **fails** (not misses) when user
+    level < target level (Gen 1 rule); misses on accuracy fail.
+  - **Two-turn charge** (razor-wind, fly) — turn 1 emits `ChargingUp` with no damage / no
+    `MoveUsed`; turn 2 lands & deals damage; PP spent once; misses on the release turn. Razor Wind's
+    high-crit verified on the release turn vs Fly. **Plus a full-`Battle` test** proving the release
+    turn is auto-driven from `ChargingMove` without re-asking input (`CountingInput.CallCount == 1`).
+  - **Self-targeting stat-stage** (swords-dance) — +2 user Attack, no damage, `StatStageChanged`
+    targets the user.
+  - **Binding** (bind) — damages + traps 2–5 turns (`BindingStarted`).
+  - **No-op status move** (whirlwind) — announced but no combat effect yet (switch/flee has no
+    home until the Game Loop); Gen 1 −6 priority pinned, so the gap is documented not silent.
+- Harness: added `MoveScenario.UseRepeated(move, turns)` — runs consecutive real `AttackAction`s on
+  one reused `PokemonAttack` wrapper (exactly what `Battle` feeds on a two-turn release), so PP +
+  two-turn state carry across turns like a real battle.
+
 ### Remaining batches (cadence)
-- [ ] Batches 2–17 (moves 11–165): query the next 10 → add `InlineData` rows to the existing
-  contracts → add only genuinely new contracts/mechanics.
+- [ ] Batches 3–17 (moves 21–165): query the next 10 → add `InlineData` rows to the matching
+  capability class → add a new capability class only for genuinely new mechanics.
 - [ ] **Fixed-2 multi-hit movers deferred to their batches**: twineedle (2 hits + 20% poison),
   double-kick, bonemerang — these need a fixed-count variant of the multi-hit mechanic.
 - [ ] **Frontend Vitest gap**: `timeline.test.ts` doesn't yet cover the events added this work —

@@ -56,6 +56,27 @@ public sealed class MoveScenario
         await action.ExecuteAsync();
         return new MoveResult(emitter, _attacker, _defender, pokeMove);
     }
+
+    /// <summary>
+    /// Runs the same move over <paramref name="turns"/> consecutive <see cref="AttackAction"/>s,
+    /// reusing one <see cref="PokemonAttack"/> wrapper so PP and multi-turn state (two-turn charge,
+    /// recharge) carry across turns exactly as they would in a real battle. Returns one
+    /// <see cref="MoveResult"/> per turn (each with its own freshly-recorded events).
+    /// </summary>
+    public async Task<IReadOnlyList<MoveResult>> UseRepeated(Attack move, int turns)
+    {
+        _attacker.AddAttack(move);
+        var pokeMove = _attacker.MoveSet[^1];
+        var results  = new List<MoveResult>(turns);
+        for (int i = 0; i < turns; i++)
+        {
+            var emitter = new RecordingEmitter();
+            var action  = new AttackAction(_attacker, _defender, pokeMove, _typeChart, _rules, emitter, rng: _rng);
+            await action.ExecuteAsync();
+            results.Add(new MoveResult(emitter, _attacker, _defender, pokeMove));
+        }
+        return results;
+    }
 }
 
 /// <summary>Outcome of one <see cref="MoveScenario.Use"/>: the recorded events plus both creatures.</summary>
