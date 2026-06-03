@@ -106,6 +106,8 @@ public class Creature
     public int  BindingTurnsRemaining { get => Battle.BindingTurnsRemaining; set => Battle.BindingTurnsRemaining = value; }
     public bool IsTwoTurnCharging     { get => Battle.IsTwoTurnCharging;     set => Battle.IsTwoTurnCharging = value; }
     public PokemonAttack? ChargingMove { get => Battle.ChargingMove;         set => Battle.ChargingMove = value; }
+    public int  RampageTurnsRemaining { get => Battle.RampageTurnsRemaining; set => Battle.RampageTurnsRemaining = value; }
+    public PokemonAttack? RampageMove  { get => Battle.RampageMove;          set => Battle.RampageMove = value; }
 
     /// <summary>
     /// Clears all transient in-battle state by replacing it wholesale, so a newly added

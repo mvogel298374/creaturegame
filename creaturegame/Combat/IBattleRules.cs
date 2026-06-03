@@ -156,6 +156,19 @@ public interface IBattleRules
     /// </summary>
     int CalculateCrashDamage(Creature user);
 
+    /// <summary>
+    /// Returns the recoil damage a recoil move (Take Down, Double-Edge, Submission) deals back to
+    /// the user, given the damage it dealt to the target.
+    /// Gen 1: 1/4 of the damage dealt (minimum 1). Gen 2+: same fraction; Gen 7+ rounds differently.
+    /// </summary>
+    int CalculateRecoilDamage(int damageDealt);
+
+    /// <summary>
+    /// Returns how many turns a rampage move (Thrash, Petal Dance) locks the user in before it
+    /// confuses itself. Gen 1: 2–3 turns. (Gen 2+: 2–3 as well; Gen 5+ reworks the confusion.)
+    /// </summary>
+    int RollRampageTurns();
+
     // ── Stat selection ─────────────────────────────────────────────────────────
 
     /// <summary>

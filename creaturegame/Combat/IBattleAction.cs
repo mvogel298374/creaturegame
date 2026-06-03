@@ -59,8 +59,13 @@ public class AttackAction : IBattleAction
         bool isTwoTurn     = !usingStruggle && attackToUse.Effect == MoveEffect.TwoTurn;
         bool isReleaseTurn = isTwoTurn && Source.IsTwoTurnCharging;
 
-        // PP decremented on charge turn only (already consumed; don't double-spend)
-        if (!usingStruggle && !isReleaseTurn)
+        // Rampage (Thrash/Petal Dance): a continuation turn is one already locked in from before.
+        bool isRampage           = !usingStruggle && attackToUse.Effect == MoveEffect.Rampage;
+        bool rampageContinuation = isRampage && Source.RampageTurnsRemaining > 0;
+
+        // PP decremented on the first turn only (two-turn release and rampage continuations were
+        // already charged for; don't double-spend).
+        if (!usingStruggle && !isReleaseTurn && !rampageContinuation)
             _selectedMove!.PowerPointsCurrent--;
 
         // Charge phase: wind up and defer damage to the next turn
@@ -80,6 +85,28 @@ public class AttackAction : IBattleAction
         }
 
         _emitter?.Emit(new MoveUsed(Source.Name, attackToUse.Name ?? ""));
+
+        // Rampage: on the first turn roll the lock duration and remember the move; every turn counts
+        // down (even a miss), and when it expires the user confuses itself. EndRampageIfDone() runs
+        // after the attack resolves — including the miss early-return below — so the lock can't hang.
+        if (isRampage && !rampageContinuation)
+        {
+            Source.RampageTurnsRemaining = _rules.RollRampageTurns();
+            Source.RampageMove           = _selectedMove;
+        }
+        if (isRampage)
+            Source.RampageTurnsRemaining--;
+
+        void EndRampageIfDone()
+        {
+            if (!isRampage || Source.RampageTurnsRemaining > 0) return;
+            Source.RampageMove = null;
+            if (Source.IsAlive() && Source.ConfusedTurns == 0)
+            {
+                Source.ConfusedTurns = _rules.RollConfusionTurns();
+                _emitter?.Emit(new ConfusionStarted(Source.Name));
+            }
+        }
 
         // Metronome: pick a random move (excluding Metronome and Mirror Move) and execute it in full.
         // Gen 1: the called move's PP is not consumed (temporary wrapper, no effect on creature's moveset).
@@ -131,6 +158,7 @@ public class AttackAction : IBattleAction
                     _emitter?.Emit(new CrashDamage(Source.Name, crash, Source.Attributes.HP));
                 }
 
+                EndRampageIfDone();   // a missed turn still counts toward the rampage lock
                 return Task.CompletedTask;
             }
         }
@@ -266,6 +294,8 @@ public class AttackAction : IBattleAction
         TryApplyStatEffect(attackToUse);
         TryApplyMoveEffect(attackToUse, damage);
 
+        EndRampageIfDone();   // confuse the user if this was the rampage's last turn
+
         return Task.CompletedTask;
     }
 
@@ -338,6 +368,16 @@ public class AttackAction : IBattleAction
                 // Deals normal damage (handled above) and scatters coins on hit; the money is
                 // collected after the battle. No economy yet — the mechanic is the event.
                 _emitter?.Emit(new CoinsScattered(Source.Name, _rules.PayDayCoinMultiplier * Source.Level));
+                break;
+
+            case MoveEffect.Recoil:
+                // Take Down / Double-Edge: the user takes back a fraction of the damage it dealt.
+                if (damage > 0 && Source.IsAlive())
+                {
+                    int recoil = _rules.CalculateRecoilDamage(damage);
+                    Source.Attributes.ReceiveDamage(recoil);
+                    _emitter?.Emit(new RecoilDamage(Source.Name, recoil, Source.Attributes.HP));
+                }
                 break;
 
             case MoveEffect.Confuse:

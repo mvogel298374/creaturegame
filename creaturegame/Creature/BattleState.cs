@@ -28,4 +28,9 @@ public sealed class BattleState
     public int BindingTurnsRemaining { get; set; }
     public bool IsTwoTurnCharging { get; set; }
     public PokemonAttack? ChargingMove { get; set; }
+
+    // Rampage (Thrash/Petal Dance): turns left locked into the move; the move auto-repeats while
+    // > 0 and the user confuses itself when it reaches 0.
+    public int RampageTurnsRemaining { get; set; }
+    public PokemonAttack? RampageMove { get; set; }
 }

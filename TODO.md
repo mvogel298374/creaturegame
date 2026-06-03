@@ -254,13 +254,37 @@ seam per `GENERATION_SEAMS.md §5.0`); everything else coverage-only over real `
 - Data: full `PokeApiConnector` re-run (authoritative path) applied the migration + new mappings;
   verified double-kick MultiHitCount=2 / jump-kick Effect=Crash via MCP.
 
+### Batch 4 (moves 31–40) ✅ DONE (2026-06-03)
+fury-attack, horn-drill, tackle, body-slam, wrap, take-down, thrash, double-edge, tail-whip,
+poison-sting. **342 .NET + 18 Vitest.** Two genuine engine features (both behind the gen seam);
+everything else coverage-only over real `AttackAction` paths.
+- Reused contracts (rows added): damage/PP/miss; OHKO parametrized (guillotine **+ horn-drill**);
+  binding parametrized (bind **+ wrap**); secondary status (body-slam Paralysis, poison-sting Poison);
+  variable multi-hit (fury-attack); foe stat-drop (tail-whip −1 Defense, with sand-attack);
+  physical/special split (Normal movers + poison-sting→Poison Physical, tail-whip→Undefined);
+  STAB/effectiveness (first **Poison** mover poison-sting; Poison→Grass 2×).
+- **Two new engine features:**
+  - **Recoil** (take-down, double-edge) — `MoveEffect.Recoil` + `IBattleRules.CalculateRecoilDamage`
+    (Gen 1 = ¼ damage dealt, min 1); `AttackAction` reuses the existing `RecoilDamage` event (already
+    wired through console/SignalR/`timeline.ts`). Recoil applies even on a KO. → `RecoilContractTests`.
+  - **Rampage** (thrash) — multi-turn lock + self-confusion, mirroring the two-turn pattern:
+    `BattleState.RampageTurnsRemaining`/`RampageMove` (+`Creature` props), `MoveEffect.Rampage`,
+    `IBattleRules.RollRampageTurns` (Gen 1 = 2–3). `Battle` force-selects the locked move (no input
+    consulted); when the lock expires the user confuses itself (reuses `ConfusedTurns` +
+    `ConfusionStarted`). Lock decrements even on a miss. → `RampageContractTests` incl. a full-`Battle`
+    test (turn 2 not consulted; player ends up confused). petal-dance reuses this in its batch.
+- Data: full `PokeApiConnector` re-run; verified take-down/double-edge→Recoil, thrash→Rampage,
+  wrap→Binding, horn-drill→OHKO, body-slam→Paralysis, poison-sting→Poison via MCP. No schema change
+  (recoil/rampage are runtime + the existing `Effect` column).
+
 ### Remaining batches (cadence)
-- [ ] Batches 4–17 (moves 31–165): query the next 10 → add `InlineData` rows to the matching
+- [ ] Batches 5–17 (moves 41–165): query the next 10 → add `InlineData` rows to the matching
   capability class → add a new capability class only for genuinely new mechanics.
 - [ ] **Fixed-2 multi-hit movers still pending**: twineedle (2 hits + 20% poison) and bonemerang —
-  the fixed-count mechanism now exists (double-kick); these just need mapping + coverage in their batches.
-- [ ] **Frontend Vitest gap (shrinking)**: `timeline.test.ts` now covers `CrashDamage`,
-  `FlinchBlocked`, `MultiHitCompleted`. Still uncovered: `ConfusionStarted`, `CoinsScattered`,
+  the fixed-count mechanism exists (double-kick); these just need mapping + coverage in their batches.
+- [ ] **Rampage reuse pending**: petal-dance just needs the importer tag (mechanism exists) + coverage.
+- [ ] **Frontend Vitest gap (shrinking)**: `timeline.test.ts` covers `CrashDamage`, `FlinchBlocked`,
+  `MultiHitCompleted`. Still uncovered: `ConfusionStarted`, `CoinsScattered`,
   `ConfusionMessage`/`Damage`/`Cleared`. Backend behaviour is fully covered; this is just the
   log-text mapping. Fold into the next frontend coverage pass.
 

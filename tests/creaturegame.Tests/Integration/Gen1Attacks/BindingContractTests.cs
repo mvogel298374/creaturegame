@@ -11,12 +11,13 @@ namespace creaturegame.Tests.Integration.Gen1Attacks;
 [Collection(MovesCollection.Name)]
 public class BindingContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 {
-    [Fact]
-    public async Task BindDealsDamageAndStartsBinding()
+    [Theory]
+    [InlineData("bind")] [InlineData("wrap")]
+    public async Task DealsDamageAndStartsBinding(string moveName)
     {
         var result = await new MoveScenario()
             .Defender(TestCreatures.Make("D", hp: 9999, defense: 80))
-            .Use(Move("bind"));
+            .Use(Move(moveName));
 
         Assert.True(result.Has<DamageDealt>());
         Assert.True(result.TotalDamage > 0);

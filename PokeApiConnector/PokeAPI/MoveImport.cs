@@ -217,6 +217,14 @@ public class MoveImport
         // Gen 1: a missed Jump Kick deals crash damage to the user. Hi Jump Kick joins in its batch.
         else if (pokeMove.Name == "jump-kick")
             attack.Effect = MoveEffect.Crash;
+        // Recoil moves — the user takes back a fraction of the damage dealt. Submission joins later.
+        else if (pokeMove.Name is "take-down" or "double-edge")
+            attack.Effect = MoveEffect.Recoil;
+        // Rampage moves — lock the user in for 2–3 turns, then self-confuse. Matched by name BEFORE
+        // the confusion-ailment branch so they map to Rampage (the confusion is a self-effect of the
+        // lock, not a targeted secondary). Petal Dance joins in its batch.
+        else if (pokeMove.Name is "thrash" or "petal-dance")
+            attack.Effect = MoveEffect.Rampage;
         else if (pokeMove.Name == "pay-day")
             attack.Effect = MoveEffect.PayDay;
         // Confusion isn't a StatusCondition (it's a separate per-battle counter), so it's

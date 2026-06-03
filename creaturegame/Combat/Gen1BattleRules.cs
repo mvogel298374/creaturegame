@@ -73,6 +73,12 @@ public sealed class Gen1BattleRules : IBattleRules
     // Gen 1: a missed Jump Kick / Hi Jump Kick deals a flat 1 HP of crash damage to the user.
     public int CalculateCrashDamage(Creature user) => 1;
 
+    // Gen 1: recoil moves deal 1/4 of the damage dealt back to the user (minimum 1).
+    public int CalculateRecoilDamage(int damageDealt) => Math.Max(1, damageDealt / 4);
+
+    // Gen 1: Thrash / Petal Dance lock the user in for 2 or 3 turns, then self-confuse.
+    public int RollRampageTurns() => _rng.Next(2, 4);
+
     // ── Stat stages ────────────────────────────────────────────────────────────
 
     // Gen 1/2 battle-stat table: 2/(2+|n|) for n≤0, (2+n)/2 for n>0.

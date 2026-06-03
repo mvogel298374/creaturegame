@@ -11,7 +11,7 @@ namespace creaturegame.Tests.Integration.Gen1Attacks;
 public class MultiHitContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 {
     [Theory]
-    [InlineData("double-slap")] [InlineData("comet-punch")]
+    [InlineData("double-slap")] [InlineData("comet-punch")] [InlineData("fury-attack")]
     public async Task MultiHitStrikesTwoToFiveTimes(string moveName)
     {
         for (int seed = 0; seed < 25; seed++)
@@ -30,7 +30,7 @@ public class MultiHitContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     }
 
     [Theory]
-    [InlineData("double-slap")] [InlineData("comet-punch")]
+    [InlineData("double-slap")] [InlineData("comet-punch")] [InlineData("fury-attack")]
     public async Task MultiHitWithFixedCountStrikesExactlyThatMany(string moveName)
     {
         var result = await new MoveScenario()

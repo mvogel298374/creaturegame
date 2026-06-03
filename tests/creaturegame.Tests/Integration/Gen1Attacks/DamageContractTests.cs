@@ -21,6 +21,9 @@ public class DamageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     [InlineData("slam")] [InlineData("vine-whip")] [InlineData("stomp")]
     [InlineData("double-kick")] [InlineData("mega-kick")] [InlineData("jump-kick")]
     [InlineData("rolling-kick")] [InlineData("headbutt")] [InlineData("horn-attack")]
+    [InlineData("fury-attack")] [InlineData("tackle")] [InlineData("body-slam")]
+    [InlineData("wrap")] [InlineData("take-down")] [InlineData("thrash")]
+    [InlineData("double-edge")] [InlineData("poison-sting")]
     public async Task DealsDamageOnHit(string moveName)
     {
         var result = await new MoveScenario()
@@ -42,6 +45,9 @@ public class DamageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     [InlineData("slam")] [InlineData("vine-whip")] [InlineData("stomp")]
     [InlineData("double-kick")] [InlineData("mega-kick")] [InlineData("jump-kick")]
     [InlineData("rolling-kick")] [InlineData("headbutt")] [InlineData("horn-attack")]
+    [InlineData("fury-attack")] [InlineData("tackle")] [InlineData("body-slam")]
+    [InlineData("wrap")] [InlineData("take-down")] [InlineData("thrash")]
+    [InlineData("double-edge")] [InlineData("poison-sting")]
     public async Task DecrementsPpByOneOnUse(string moveName)
     {
         var move = Move(moveName);
@@ -58,6 +64,7 @@ public class DamageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     [InlineData("double-slap")] [InlineData("comet-punch")] [InlineData("mega-punch")]
     [InlineData("cut")] [InlineData("bind")]
     [InlineData("slam")] [InlineData("mega-kick")] [InlineData("rolling-kick")]
+    [InlineData("fury-attack")] [InlineData("wrap")] [InlineData("take-down")]
     public async Task MissesWhenAccuracyRollFails(string moveName)
     {
         var result = await new MoveScenario()

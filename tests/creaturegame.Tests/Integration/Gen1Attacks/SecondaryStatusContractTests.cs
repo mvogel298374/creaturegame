@@ -15,6 +15,8 @@ public class SecondaryStatusContractTests(MovesFixture moves) : Gen1MoveContract
     [InlineData("fire-punch", StatusCondition.Burn)]
     [InlineData("ice-punch", StatusCondition.Freeze)]
     [InlineData("thunder-punch", StatusCondition.Paralysis)]
+    [InlineData("body-slam", StatusCondition.Paralysis)]
+    [InlineData("poison-sting", StatusCondition.Poison)]
     public async Task AppliesSecondaryStatusOnHit(string moveName, StatusCondition expected)
     {
         var result = await new MoveScenario()
@@ -28,6 +30,7 @@ public class SecondaryStatusContractTests(MovesFixture moves) : Gen1MoveContract
 
     [Theory]
     [InlineData("fire-punch")] [InlineData("ice-punch")] [InlineData("thunder-punch")]
+    [InlineData("body-slam")] [InlineData("poison-sting")]
     public async Task NoSecondaryStatusOnMiss(string moveName)
     {
         var result = await new MoveScenario()
@@ -39,6 +42,7 @@ public class SecondaryStatusContractTests(MovesFixture moves) : Gen1MoveContract
 
     [Theory]
     [InlineData("fire-punch")] [InlineData("ice-punch")] [InlineData("thunder-punch")]
+    [InlineData("body-slam")] [InlineData("poison-sting")]
     public async Task NoSecondaryStatusWhenTargetAlreadyStatused(string moveName)
     {
         var defender = TestCreatures.Make("Defender", hp: 500);

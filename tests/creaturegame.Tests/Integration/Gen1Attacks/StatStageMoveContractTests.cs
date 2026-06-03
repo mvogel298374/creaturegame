@@ -28,19 +28,22 @@ public class StatStageMoveContractTests(MovesFixture moves) : Gen1MoveContract(m
         Assert.Equal(2, change.NewStage);
     }
 
-    [Fact]
-    public async Task SandAttackLowersFoeAccuracyByOneStage()
+    // Foe-targeting stat drops: Sand Attack (−1 Accuracy) and Tail Whip (−1 Defense).
+    [Theory]
+    [InlineData("sand-attack", "Accuracy")]
+    [InlineData("tail-whip",   "Defense")]
+    public async Task LowersFoeStatByOneStage(string moveName, string stat)
     {
         var result = await new MoveScenario()
             .Defender(TestCreatures.Make("Defender", hp: 500))
-            .Use(Move("sand-attack"));
+            .Use(Move(moveName));
 
-        Assert.Equal(-1, result.Defender.Stages.Accuracy);
-        Assert.False(result.Has<DamageDealt>(), "Sand Attack is a status move — no damage");
+        Assert.False(result.Has<DamageDealt>(), "a pure stat move deals no damage");
 
         var change = result.First<StatStageChanged>();
         Assert.NotNull(change);
         Assert.Equal(result.Defender.Name, change!.CreatureName);   // affects the foe, not the user
+        Assert.Equal(stat, change.Stat);
         Assert.Equal(-1, change.Delta);
         Assert.Equal(-1, change.NewStage);
     }

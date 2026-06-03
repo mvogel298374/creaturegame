@@ -51,11 +51,14 @@ public class Battle
                 PlayerCreature.MoveSet.Select(m => new MoveInfo(m.Base.Name ?? "", m.Base.DamageType, m.PowerPointsCurrent, m.Base.PowerPointsMax)).ToList()
             ));
 
-            // Move selection — two-turn moves skip IBattleInput on the release turn;
-            // null signals AttackAction to use Struggle when out of PP.
+            // Move selection — two-turn moves skip IBattleInput on the release turn and rampage
+            // moves (Thrash) skip it while locked in; null signals AttackAction to Struggle when
+            // out of PP.
             PokemonAttack? playerMove = PlayerCreature.IsTwoTurnCharging
                 ? PlayerCreature.ChargingMove
-                : (PlayerCreature.IsOutOfPP
+                : PlayerCreature.RampageTurnsRemaining > 0
+                  ? PlayerCreature.RampageMove
+                  : (PlayerCreature.IsOutOfPP
                     ? null
                     : await _playerInput.ChooseMoveAsync(new TurnContext
                       {
@@ -68,7 +71,9 @@ public class Battle
 
             PokemonAttack? enemyMove = EnemyCreature.IsTwoTurnCharging
                 ? EnemyCreature.ChargingMove
-                : (EnemyCreature.IsOutOfPP
+                : EnemyCreature.RampageTurnsRemaining > 0
+                  ? EnemyCreature.RampageMove
+                  : (EnemyCreature.IsOutOfPP
                     ? null
                     : await _enemyInput.ChooseMoveAsync(new TurnContext
                       {
