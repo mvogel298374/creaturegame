@@ -229,14 +229,39 @@ substitutions are RNG-gated rolls through the `IBattleRules` seam doubles).
   one reused `PokemonAttack` wrapper (exactly what `Battle` feeds on a two-turn release), so PP +
   two-turn state carry across turns like a real battle.
 
+### Batch 3 (moves 21–30) ✅ DONE (2026-06-03)
+slam, vine-whip, stomp, double-kick, mega-kick, jump-kick, rolling-kick, sand-attack, headbutt,
+horn-attack. **293 .NET + 18 Vitest.** Two genuine engine features this batch (both behind the gen
+seam per `GENERATION_SEAMS.md §5.0`); everything else coverage-only over real `AttackAction` paths.
+- Reused contracts (rows added): damage/PP/miss; STAB (first **Special-type** mover, vine-whip;
+  + Fighting jump-kick); type-effectiveness (Grass→Water, Fighting→Normal); physical/special split
+  (vine-whip→Special, the Fighting kicks + Normal movers→Physical, sand-attack→Undefined).
+- New capability classes (engine already supported these — coverage only):
+  - **Flinch** (`FlinchContractTests`: stomp, rolling-kick, headbutt) — sets the flag on hit, never
+    on miss, **plus a full-`Battle` test** where a faster flincher locks the target out
+    (`FlinchBlocked`, target never emits `MoveUsed`).
+  - **Foe stat-drop** (sand-attack) — −1 foe Accuracy, folded into `StatStageMoveContractTests`
+    alongside swords-dance's self-buff.
+- **Two new engine features:**
+  - **Fixed-count multi-hit** — `int? Attack.MultiHitCount` column (+`AddMoveMultiHitCount`
+    migration); `AttackAction` uses `MultiHitCount ?? RollMultiHitCount()`. The fixed count is move
+    data; the variable 2–5 distribution stays the gen rule. double-kick mapped (Effect=MultiHit,
+    count 2). Twineedle/bonemerang reuse the mechanism in their batches.
+  - **Jump Kick crash damage** — `MoveEffect.Crash` + `IBattleRules.CalculateCrashDamage`
+    (Gen 1 = flat 1 HP) + `CrashDamage` event (console + SignalR emitters + `timeline.ts`
+    "kept going and crashed!"). Applied on the accuracy-miss branch. jump-kick mapped. *Deferred
+    edge:* Gen 1 also crashes on a Ghost immunity (Fighting→Ghost 0×) — documented, not handled.
+- Data: full `PokeApiConnector` re-run (authoritative path) applied the migration + new mappings;
+  verified double-kick MultiHitCount=2 / jump-kick Effect=Crash via MCP.
+
 ### Remaining batches (cadence)
-- [ ] Batches 3–17 (moves 21–165): query the next 10 → add `InlineData` rows to the matching
+- [ ] Batches 4–17 (moves 31–165): query the next 10 → add `InlineData` rows to the matching
   capability class → add a new capability class only for genuinely new mechanics.
-- [ ] **Fixed-2 multi-hit movers deferred to their batches**: twineedle (2 hits + 20% poison),
-  double-kick, bonemerang — these need a fixed-count variant of the multi-hit mechanic.
-- [ ] **Frontend Vitest gap**: `timeline.test.ts` doesn't yet cover the events added this work —
-  `ConfusionStarted`, `MultiHitCompleted`, `CoinsScattered` (and the existing
-  `ConfusionMessage`/`Damage`/`Cleared`). Backend behaviour is fully covered; this is just the
+- [ ] **Fixed-2 multi-hit movers still pending**: twineedle (2 hits + 20% poison) and bonemerang —
+  the fixed-count mechanism now exists (double-kick); these just need mapping + coverage in their batches.
+- [ ] **Frontend Vitest gap (shrinking)**: `timeline.test.ts` now covers `CrashDamage`,
+  `FlinchBlocked`, `MultiHitCompleted`. Still uncovered: `ConfusionStarted`, `CoinsScattered`,
+  `ConfusionMessage`/`Damage`/`Cleared`. Backend behaviour is fully covered; this is just the
   log-text mapping. Fold into the next frontend coverage pass.
 
 ---

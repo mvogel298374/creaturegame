@@ -66,6 +66,9 @@ public record FlinchBlocked(string CreatureName) : BattleEvent;
 // --- Two-turn moves (Fly, Dig, SolarBeam…) ---
 public record ChargingUp(string CreatureName, string MoveName) : BattleEvent;
 
+// --- Crash damage (Jump Kick / Hi Jump Kick miss) ---
+public record CrashDamage(string SourceName, int Damage, int HpAfter) : BattleEvent;
+
 // --- Creature ---
 public record CreatureFainted(string Name) : BattleEvent;
 public record LeveledUp(string CreatureName, int NewLevel) : BattleEvent;

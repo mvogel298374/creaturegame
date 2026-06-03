@@ -43,6 +43,28 @@ public class MultiHitContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         Assert.Equal(result.TotalDamage, result.Defender.Attributes.MaxHP - result.Defender.Attributes.HP);
     }
 
+    // Fixed-count movers (Double Kick) always strike exactly their move-data count — no RNG, no
+    // rules double needed. This proves the MultiHitCount column drives the loop independently of
+    // the variable 2–5 distribution.
+    [Theory]
+    [InlineData("double-kick", 2)]
+    public async Task FixedCountMoveStrikesExactlyItsMoveDataCount(string moveName, int expectedHits)
+    {
+        var move = Move(moveName);
+        Assert.Equal(expectedHits, move.MultiHitCount);   // the count is move data, not a roll
+
+        for (int seed = 0; seed < 10; seed++)
+        {
+            var result = await new MoveScenario()
+                .Defender(TestCreatures.Make("D", hp: 9999, defense: 250))
+                .Rng(new SeededRandomSource(seed))
+                .Use(move);
+
+            Assert.Equal(expectedHits, result.Hits.Count);
+            Assert.Equal(expectedHits, result.First<MultiHitCompleted>()!.Hits);
+        }
+    }
+
     [Fact]
     public void RollMultiHitCountStaysInTwoToFiveAndFavoursLowCounts()
     {

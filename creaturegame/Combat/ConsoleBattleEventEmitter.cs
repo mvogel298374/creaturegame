@@ -56,6 +56,10 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                 Console.WriteLine($"{e.SourceName} is hit by recoil! ({e.Damage} damage)");
                 break;
 
+            case CrashDamage e:
+                Console.WriteLine($"{e.SourceName} kept going and crashed! ({e.Damage} damage)");
+                break;
+
             case MultiHitCompleted e:
                 Console.WriteLine($"Hit {e.Hits} time{(e.Hits == 1 ? "" : "s")}!");
                 break;

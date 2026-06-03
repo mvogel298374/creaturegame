@@ -27,4 +27,21 @@ public class StatStageMoveContractTests(MovesFixture moves) : Gen1MoveContract(m
         Assert.Equal(2, change.Delta);
         Assert.Equal(2, change.NewStage);
     }
+
+    [Fact]
+    public async Task SandAttackLowersFoeAccuracyByOneStage()
+    {
+        var result = await new MoveScenario()
+            .Defender(TestCreatures.Make("Defender", hp: 500))
+            .Use(Move("sand-attack"));
+
+        Assert.Equal(-1, result.Defender.Stages.Accuracy);
+        Assert.False(result.Has<DamageDealt>(), "Sand Attack is a status move — no damage");
+
+        var change = result.First<StatStageChanged>();
+        Assert.NotNull(change);
+        Assert.Equal(result.Defender.Name, change!.CreatureName);   // affects the foe, not the user
+        Assert.Equal(-1, change.Delta);
+        Assert.Equal(-1, change.NewStage);
+    }
 }

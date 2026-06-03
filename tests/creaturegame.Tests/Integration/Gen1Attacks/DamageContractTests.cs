@@ -18,6 +18,9 @@ public class DamageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     [InlineData("scratch")]
     [InlineData("vice-grip")] [InlineData("cut")] [InlineData("gust")]
     [InlineData("wing-attack")] [InlineData("bind")]
+    [InlineData("slam")] [InlineData("vine-whip")] [InlineData("stomp")]
+    [InlineData("double-kick")] [InlineData("mega-kick")] [InlineData("jump-kick")]
+    [InlineData("rolling-kick")] [InlineData("headbutt")] [InlineData("horn-attack")]
     public async Task DealsDamageOnHit(string moveName)
     {
         var result = await new MoveScenario()
@@ -36,6 +39,9 @@ public class DamageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     [InlineData("scratch")]
     [InlineData("vice-grip")] [InlineData("cut")] [InlineData("gust")]
     [InlineData("wing-attack")] [InlineData("bind")]
+    [InlineData("slam")] [InlineData("vine-whip")] [InlineData("stomp")]
+    [InlineData("double-kick")] [InlineData("mega-kick")] [InlineData("jump-kick")]
+    [InlineData("rolling-kick")] [InlineData("headbutt")] [InlineData("horn-attack")]
     public async Task DecrementsPpByOneOnUse(string moveName)
     {
         var move = Move(moveName);
@@ -47,9 +53,11 @@ public class DamageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     }
 
     // Only the sub-100%-accuracy single-action damaging moves can actually miss.
+    // (jump-kick also misses but takes crash damage — covered by CrashDamageContractTests.)
     [Theory]
     [InlineData("double-slap")] [InlineData("comet-punch")] [InlineData("mega-punch")]
     [InlineData("cut")] [InlineData("bind")]
+    [InlineData("slam")] [InlineData("mega-kick")] [InlineData("rolling-kick")]
     public async Task MissesWhenAccuracyRollFails(string moveName)
     {
         var result = await new MoveScenario()

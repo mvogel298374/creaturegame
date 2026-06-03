@@ -25,6 +25,16 @@ public class PhysicalSpecialSplitContractTests(MovesFixture moves) : Gen1MoveCon
     [InlineData("karate-chop",   AttackType.Physical)]  // Fighting
     [InlineData("gust",          AttackType.Physical)]  // Flying
     [InlineData("wing-attack",   AttackType.Physical)]  // Flying
+    [InlineData("vine-whip",     AttackType.Special)]   // Grass (Special in Gen 1)
+    [InlineData("double-kick",   AttackType.Physical)]  // Fighting
+    [InlineData("jump-kick",     AttackType.Physical)]  // Fighting
+    [InlineData("rolling-kick",  AttackType.Physical)]  // Fighting
+    [InlineData("slam",          AttackType.Physical)]  // Normal
+    [InlineData("stomp",         AttackType.Physical)]  // Normal
+    [InlineData("headbutt",      AttackType.Physical)]  // Normal
+    [InlineData("horn-attack",   AttackType.Physical)]  // Normal
+    // Status moves keep no damage category (Undefined) regardless of type.
+    [InlineData("sand-attack",   AttackType.Undefined)]
     public void MoveHasGen1PhysicalSpecialCategory(string moveName, AttackType expected)
         => Assert.Equal(expected, Move(moveName).AttackType);
 }

@@ -206,11 +206,17 @@ public class MoveImport
             attack.Effect = MoveEffect.TwoTurn;
         else if (pokeMove.Name == "metronome")
             attack.Effect = MoveEffect.Metronome;
-        // Gen 1 multi-hit (2–5 strikes). Fixed-2 movers (twineedle/double-kick/bonemerang) have
-        // extra effects and are handled in their own coverage batches.
+        // Gen 1 multi-hit (variable 2–5 strikes) — count drawn from the gen rules at runtime.
         else if (pokeMove.Name is "double-slap" or "comet-punch" or "fury-attack"
                               or "pin-missile" or "barrage" or "fury-swipes" or "spike-cannon")
             attack.Effect = MoveEffect.MultiHit;
+        // Fixed-count multi-hit — the count is stable move data (always 2), stored on the move.
+        // Twineedle (+poison) and Bonemerang join here in their own coverage batches.
+        else if (pokeMove.Name == "double-kick")
+        { attack.Effect = MoveEffect.MultiHit; attack.MultiHitCount = 2; }
+        // Gen 1: a missed Jump Kick deals crash damage to the user. Hi Jump Kick joins in its batch.
+        else if (pokeMove.Name == "jump-kick")
+            attack.Effect = MoveEffect.Crash;
         else if (pokeMove.Name == "pay-day")
             attack.Effect = MoveEffect.PayDay;
         // Confusion isn't a StatusCondition (it's a separate per-battle counter), so it's

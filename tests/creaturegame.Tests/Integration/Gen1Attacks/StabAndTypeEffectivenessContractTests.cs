@@ -16,6 +16,8 @@ public class StabAndTypeEffectivenessContractTests(MovesFixture moves) : Gen1Mov
     [InlineData("fire-punch",  DamageType.Fire,     DamageType.Normal, DamageType.Electric)]
     [InlineData("karate-chop", DamageType.Fighting, DamageType.Normal, DamageType.Water)]
     [InlineData("wing-attack", DamageType.Flying,   DamageType.Normal, DamageType.Normal)]
+    [InlineData("vine-whip",   DamageType.Grass,    DamageType.Normal, DamageType.Normal)]   // first Special-type STAB mover
+    [InlineData("jump-kick",   DamageType.Fighting, DamageType.Normal, DamageType.Fire)]
     public async Task StabAddsAboutHalfAgainDamage(
         string moveName, DamageType stabType, DamageType neutralAttackerType, DamageType defenderType)
     {
@@ -42,6 +44,8 @@ public class StabAndTypeEffectivenessContractTests(MovesFixture moves) : Gen1Mov
     [InlineData("thunder-punch", DamageType.Water,    DamageType.Normal, 2.0)]
     [InlineData("wing-attack",   DamageType.Grass,    DamageType.Normal, 2.0)]
     [InlineData("gust",          DamageType.Fighting, DamageType.Normal, 2.0)]
+    [InlineData("vine-whip",     DamageType.Water,    DamageType.Normal, 2.0)]   // Grass → Water
+    [InlineData("jump-kick",     DamageType.Normal,   DamageType.Fire,   2.0)]   // Fighting → Normal
     public async Task TypeEffectivenessScalesDamage(
         string moveName, DamageType defenderType, DamageType neutralDefenderType, double expectedMult)
     {

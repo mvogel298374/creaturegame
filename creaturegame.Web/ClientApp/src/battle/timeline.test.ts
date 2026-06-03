@@ -101,6 +101,25 @@ describe('expandEvent — control plane vs timeline', () => {
   });
 });
 
+describe('expandEvent — crash / flinch / multi-hit', () => {
+  it('CrashDamage updates the user HP before logging the Gen 1 crash line', () => {
+    const { steps } = expandEvent('CrashDamage', { sourceName: 'HITMONLEE', damage: 1, hpAfter: 119 }, CTX);
+    expect(kinds(steps)).toEqual(['dispatch', 'wait', 'dispatch']);
+    expect(steps![0]).toMatchObject({ kind: 'dispatch', action: { type: 'UPDATE_HP', name: 'HITMONLEE', hp: 119 } });
+    expect(logLines(steps)).toEqual(['HITMONLEE kept going and crashed!']);
+  });
+
+  it('FlinchBlocked logs the flinch line', () => {
+    expect(logLines(expandEvent('FlinchBlocked', { creatureName: 'ARTICUNO' }, CTX).steps))
+      .toEqual(["ARTICUNO flinched and couldn't move!"]);
+  });
+
+  it('MultiHitCompleted pluralises the hit count', () => {
+    expect(logLines(expandEvent('MultiHitCompleted', { hits: 2 }, CTX).steps)).toEqual(['Hit 2 times!']);
+    expect(logLines(expandEvent('MultiHitCompleted', { hits: 1 }, CTX).steps)).toEqual(['Hit 1 time!']);
+  });
+});
+
 describe('expandEvent — faint side resolves against the player name', () => {
   it('player faint targets the player sprite', () => {
     const { steps } = expandEvent('CreatureFainted', { name: 'MEWTWO' }, CTX);

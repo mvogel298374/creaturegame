@@ -70,6 +70,9 @@ public sealed class Gen1BattleRules : IBattleRules
     public int RollBindingTurns() => _rng.Next(2, 6);
     public int BindingDamageDenominator => 16;
 
+    // Gen 1: a missed Jump Kick / Hi Jump Kick deals a flat 1 HP of crash damage to the user.
+    public int CalculateCrashDamage(Creature user) => 1;
+
     // ── Stat stages ────────────────────────────────────────────────────────────
 
     // Gen 1/2 battle-stat table: 2/(2+|n|) for n≤0, (2+n)/2 for n>0.

@@ -123,6 +123,14 @@ public class AttackAction : IBattleAction
                 if (category == DamageCategory.SelfDestruct)
                     Source.Attributes.ReceiveDamage(Source.Attributes.HP);
 
+                // Gen 1: Jump Kick / Hi Jump Kick deal crash damage to the user on a miss
+                if (attackToUse.Effect == MoveEffect.Crash)
+                {
+                    int crash = _rules.CalculateCrashDamage(Source);
+                    Source.Attributes.ReceiveDamage(crash);
+                    _emitter?.Emit(new CrashDamage(Source.Name, crash, Source.Attributes.HP));
+                }
+
                 return Task.CompletedTask;
             }
         }
@@ -153,8 +161,12 @@ public class AttackAction : IBattleAction
                     // Multi-hit (Double Slap, Comet Punch, …): accuracy was already rolled once
                     // above; each of the 2–5 strikes rolls its own crit + variance and stops if
                     // the target faints. Normal moves take the hits == 1 path (identical output).
+                    // Fixed-count movers (Double Kick = 2) carry the count as move data; variable
+                    // movers (Double Slap) leave it null and draw the 2–5 count from the gen rules.
                     bool isMultiHit = !usingStruggle && attackToUse.Effect == MoveEffect.MultiHit;
-                    int  hits       = isMultiHit ? _rules.RollMultiHitCount() : 1;
+                    int  hits       = isMultiHit
+                        ? (attackToUse.MultiHitCount ?? _rules.RollMultiHitCount())
+                        : 1;
 
                     int landed = 0;
                     for (int i = 0; i < hits && Target.IsAlive(); i++)

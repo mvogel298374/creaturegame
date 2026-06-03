@@ -43,6 +43,10 @@ public class Attack
     public int DrainPercent { get; set; } = 50;
     // Swift, Lock-On, etc. — bypasses accuracy check entirely
     public bool NeverMisses { get; set; } = false;
+    // Fixed-count multi-hit (Double Kick, Twineedle, Bonemerang = 2): exact number of strikes.
+    // Null + MoveEffect.MultiHit ⇒ the variable 2–5 count from IBattleRules.RollMultiHitCount().
+    // The fixed count is stable move data, so it lives here rather than in the gen rules.
+    public int? MultiHitCount { get; set; }
     
     public Attack()
     {
