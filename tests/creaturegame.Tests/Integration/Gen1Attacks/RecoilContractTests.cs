@@ -13,7 +13,7 @@ namespace creaturegame.Tests.Integration.Gen1Attacks;
 public class RecoilContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 {
     [Theory]
-    [InlineData("take-down")] [InlineData("double-edge")]
+    [InlineData("take-down")] [InlineData("double-edge")] [InlineData("submission")]
     public async Task UserTakesRecoilProportionalToDamageDealt(string moveName)
     {
         var attacker = TestCreatures.Make("A", hp: 9999, attack: 200);
@@ -33,7 +33,7 @@ public class RecoilContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     }
 
     [Theory]
-    [InlineData("take-down")] [InlineData("double-edge")]
+    [InlineData("take-down")] [InlineData("double-edge")] [InlineData("submission")]
     public async Task RecoilStillAppliesWhenTheHitKosTheTarget(string moveName)
     {
         var attacker = TestCreatures.Make("A", hp: 9999, attack: 250);

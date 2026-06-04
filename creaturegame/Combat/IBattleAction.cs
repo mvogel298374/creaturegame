@@ -203,6 +203,8 @@ public class AttackAction : IBattleAction
                         int hitDamage = DamageCalculator.CalculateDamage(
                             Source, Target, attackToUse, _typeChart, _rules, out isCrit, _rng);
                         Target.Attributes.ReceiveDamage(hitDamage);
+                        Target.LastDamageTaken = hitDamage;          // for Counter (2× the last hit)
+                        Target.LastDamageType  = attackToUse.DamageType;
                         damage += hitDamage;   // accumulated total gates drain/recoil/recharge below
                         landed++;
                         _emitter?.Emit(new DamageDealt(Target.Name, hitDamage, eff,
@@ -413,6 +415,29 @@ public class AttackAction : IBattleAction
                         Target.DisableTurnsRemaining = _rules.RollDisableTurns();
                         _emitter?.Emit(new MoveDisabled(Target.Name, locked.Base.Name ?? ""));
                     }
+                }
+                break;
+
+            case MoveEffect.Counter:
+                // Gen 1: returns double the damage the user last took from a Normal/Fighting move.
+                // The −5 priority (move data) resolves Counter after the opponent's hit, so it
+                // counters this turn's damage. Fails if no qualifying damage was taken — Gen 1 keeps
+                // the last value until overwritten, so this can fire off a previous turn (a quirk we
+                // preserve). Fixed/level-based/self damage isn't recorded, so it isn't counterable.
+                if (Target.IsAlive()
+                    && Source.LastDamageTaken > 0
+                    && Source.LastDamageType is DamageType.Normal or DamageType.Fighting)
+                {
+                    int countered = Source.LastDamageTaken * 2;
+                    Target.Attributes.ReceiveDamage(countered);
+                    Target.LastDamageTaken = countered;
+                    Target.LastDamageType  = attack.DamageType;
+                    _emitter?.Emit(new DamageDealt(Target.Name, countered, 1.0,
+                        Target.Attributes.HP, Target.Attributes.MaxHP));
+                }
+                else
+                {
+                    _emitter?.Emit(new MoveMissed(Source.Name, attack.Name ?? ""));
                 }
                 break;
 

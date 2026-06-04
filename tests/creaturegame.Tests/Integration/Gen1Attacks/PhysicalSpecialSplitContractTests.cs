@@ -43,6 +43,9 @@ public class PhysicalSpecialSplitContractTests(MovesFixture moves) : Gen1MoveCon
     [InlineData("horn-drill",    AttackType.Physical)]  // Normal
     [InlineData("poison-sting",  AttackType.Physical)]  // Poison (physical in Gen 1)
     [InlineData("acid",          AttackType.Physical)]  // Poison (physical in Gen 1)
+    [InlineData("hyper-beam",    AttackType.Physical)]  // Normal (Special in modern gens — the classic Gen 1 split case)
+    [InlineData("peck",          AttackType.Physical)]  // Flying
+    [InlineData("submission",    AttackType.Physical)]  // Fighting
     [InlineData("ember",         AttackType.Special)]   // Fire
     [InlineData("water-gun",     AttackType.Special)]   // Water
     [InlineData("ice-beam",      AttackType.Special)]   // Ice

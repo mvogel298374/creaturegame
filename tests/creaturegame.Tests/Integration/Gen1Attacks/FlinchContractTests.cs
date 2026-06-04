@@ -16,7 +16,7 @@ namespace creaturegame.Tests.Integration.Gen1Attacks;
 public class FlinchContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 {
     [Theory]
-    [InlineData("stomp")] [InlineData("rolling-kick")] [InlineData("headbutt")] [InlineData("bite")]
+    [InlineData("stomp")] [InlineData("rolling-kick")] [InlineData("headbutt")] [InlineData("bite")] [InlineData("low-kick")]
     public async Task SetsFlinchFlagOnHit(string moveName)
     {
         var result = await new MoveScenario()
@@ -29,7 +29,7 @@ public class FlinchContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     }
 
     [Theory]
-    [InlineData("stomp")] [InlineData("rolling-kick")] [InlineData("headbutt")] [InlineData("bite")]
+    [InlineData("stomp")] [InlineData("rolling-kick")] [InlineData("headbutt")] [InlineData("bite")] [InlineData("low-kick")]
     public async Task NoFlinchOnMiss(string moveName)
     {
         var result = await new MoveScenario()

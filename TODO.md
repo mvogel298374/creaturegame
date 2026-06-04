@@ -339,18 +339,45 @@ over real `AttackAction` paths (first Water & Psychic STAB movers).
   `SecondaryEffectKind.StatStage`) instead of reading the `StatEffectChance` column directly —
   matching the status/flinch/confuse secondaries. Behavior-preserving for all existing moves.
 
+### Batch 7 (moves 61–70) ✅ DONE (2026-06-04)
+bubble-beam, aurora-beam, hyper-beam, peck, drill-peck, submission, low-kick, counter, seismic-toss,
+strength. **467 .NET + 27 Vitest.** One new mechanic (Counter), two new coverage contracts (Recharge,
+LevelBased), a **full Gen 1 secondary-chance override sweep**, and submission→Recoil. No frontend
+changes (Counter reuses `DamageDealt`/`MoveMissed`).
+- Reused contracts (rows added): damage/PP/miss (all eight damaging movers; hyper-beam 90 / submission
+  80 / low-kick 90 can miss); secondary stat-drop (bubble-beam −1 Speed, aurora-beam −1 Attack, with
+  acid); recoil (submission, with take-down/double-edge); flinch (low-kick); physical/special split
+  (hyper-beam→Normal Physical — the classic split case — peck→Flying, submission→Fighting).
+- New capability classes: **`RechargeContractTests`** (hyper-beam forces a skip turn after a hit;
+  miss → no recharge; full-`Battle`), **`LevelBasedDamageContractTests`** (seismic-toss = user level,
+  ignores bulk/type), **`CounterContractTests`** (2× last Normal/Fighting damage; fails otherwise;
+  full-`Battle`).
+- **Counter** (`MoveEffect.Counter`) — `BattleState.LastDamageTaken` + `LastDamageType` (+ `Creature`
+  props), recorded on the standard damage path; `AttackAction` returns 2× when the last hit was
+  Normal/Fighting (else `MoveMissed`); −5 priority (move data) resolves it after the opponent's hit.
+  Importer maps counter→Counter. Fixed/level-based/self damage isn't recorded ⇒ not counterable (a
+  documented simplification).
+- **Full Gen 1 secondary-chance override sweep** (layer 2, per `DATA_IMPORT.md` §5.5) — PokeAPI reports
+  modern secondary chances and rarely backfills `past_values` for them, so these verified Gen 1 values
+  are set in one commented block in the importer: **acid** 33% Def, **aurora-beam** 33% Atk,
+  **bubble-beam** 33% Spe, **bite** 10% flinch (was 30), **low-kick** 30% flinch (PokeAPI: none),
+  **poison-sting** 20% poison (was 30). Audited the rest (punches/beams 10%, body-slam 30%, twineedle
+  20%, stomp/rolling-kick/headbutt 30%, psybeam 10%) — confirmed unchanged. Re-imported + verified via MCP.
+
 ### Remaining batches (cadence)
-- [ ] Batches 7–17 (moves 61–165): query the next 10 → add `InlineData` rows to the matching
-  capability class → add a new capability class only for genuinely new mechanics. **Next: batch 7 =
-  moves 61–70.**
+- [ ] Batches 8–17 (moves 71–165): query the next 10 → add `InlineData` rows to the matching
+  capability class → add a new capability class only for genuinely new mechanics. **Next: batch 8 =
+  moves 71–80.**
 - [ ] **Fixed-2 multi-hit mover still pending**: bonemerang — the fixed-count mechanism exists
   (double-kick, twineedle); just needs mapping + coverage in its batch.
 - [ ] **Rampage reuse pending**: petal-dance just needs the importer tag (mechanism exists) + coverage.
-- [x] **Gen 1 move-data fidelity** is now data-driven via the `past_values` resolver (power/accuracy/
-  pp/effect_chance/type), so later batches get Gen-1-correct values automatically. Add a manual
-  override only for the rare thing `past_values` can't express (e.g. acid's Defense target). Watch the
-  importer console for any move whose Gen 1 secondary stat/chance looks off (PokeAPI structured data
-  can lag its own flavor text).
+- [ ] **Deferred Gen 1 fidelity edges** (documented simplifications, revisit if they matter):
+  body-slam's Gen 1 *Normal-types-immune-to-its-paralysis* quirk (a type→status-immunity rule — belongs
+  on a seam); Fighting/Normal → Ghost immunity for level-based moves (seismic-toss) and Counter; Counter
+  only answers damage recorded on the standard damage path (not fixed/level-based).
+- [x] **Gen 1 move-data fidelity** is data-driven via the `past_values` resolver (power/accuracy/pp/
+  effect_chance/type); **secondary chances/targets** that `past_values` can't express are a short,
+  verified override block in the importer (see batch 7). Add to it as later batches surface more.
 
 ---
 

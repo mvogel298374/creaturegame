@@ -210,18 +210,6 @@ public class MoveImport
             }
         }
 
-        // Gen 1 secondary-effect correction not captured by past_values (which is empty for Acid):
-        // Acid lowered the target's *Defense* (PokeAPI's stat_changes says Sp. Def — the Gen 4+
-        // version) at a 33% chance (PokeAPI records 10%). Override both for Gen 1 fidelity.
-        if (pokeMove.Name == "acid")
-        {
-            attack.StatEffectStat   = StageStat.Defense;
-            attack.StatEffectDelta  = -1;
-            attack.StatEffectTarget = StageTarget.Foe;
-            attack.StatEffectChance = 33;
-            attack.EffectChance     = 33;
-        }
-
         // Special move effects
         if (pokeMove.Name == "haze")
             attack.Effect = MoveEffect.Haze;
@@ -248,9 +236,12 @@ public class MoveImport
         // Gen 1: a missed Jump Kick deals crash damage to the user. Hi Jump Kick joins in its batch.
         else if (pokeMove.Name == "jump-kick")
             attack.Effect = MoveEffect.Crash;
-        // Recoil moves — the user takes back a fraction of the damage dealt. Submission joins later.
-        else if (pokeMove.Name is "take-down" or "double-edge")
+        // Recoil moves — the user takes back a fraction of the damage dealt.
+        else if (pokeMove.Name is "take-down" or "double-edge" or "submission")
             attack.Effect = MoveEffect.Recoil;
+        // Counter returns twice the (Normal/Fighting) physical damage the user last took (priority −5).
+        else if (pokeMove.Name == "counter")
+            attack.Effect = MoveEffect.Counter;
         // Rampage moves — lock the user in for 2–3 turns, then self-confuse. Matched by name BEFORE
         // the confusion-ailment branch so they map to Rampage (the confusion is a self-effect of the
         // lock, not a targeted secondary). Petal Dance joins in its batch.
@@ -273,6 +264,37 @@ public class MoveImport
             attack.Effect = MoveEffect.Confuse;
         else if (pokeMove.Meta?.FlinchChance > 0)
             attack.Effect = MoveEffect.Flinch;
+
+        // ── Gen 1 secondary-effect corrections (layer 2: facts PokeAPI can't express) ──────────
+        // PokeAPI reports each move's MODERN secondary chance/target and almost never backfills
+        // `past_values` for them, so these are applied here from an authority (Bulbapedia). Keep the
+        // list short, verified, and commented — see DATA_IMPORT.md §4.1/§5.5. Runs last so it wins
+        // over the stat-change and effect mapping above.
+        switch (pokeMove.Name)
+        {
+            case "acid":         // Gen 1: 33% to lower Defense (modern: 10% Sp. Def; past_values empty)
+                attack.StatEffectStat   = StageStat.Defense;
+                attack.StatEffectDelta  = -1;
+                attack.StatEffectTarget = StageTarget.Foe;
+                attack.StatEffectChance = 33;
+                attack.EffectChance     = 33;
+                break;
+            case "aurora-beam":  // Gen 1: 33% to lower Attack (modern: 10%)
+            case "bubble-beam":  // Gen 1: 33% to lower Speed (modern: 10%)
+                attack.StatEffectChance = 33;
+                attack.EffectChance     = 33;
+                break;
+            case "bite":         // Gen 1: 10% flinch (modern: 30%)
+                attack.EffectChance     = 10;
+                break;
+            case "low-kick":     // Gen 1: 30% flinch (modern: weight-based power, no flinch)
+                attack.Effect           = MoveEffect.Flinch;
+                attack.EffectChance     = 30;
+                break;
+            case "poison-sting": // Gen 1: 20% poison (modern: 30%)
+                attack.EffectChance     = 20;
+                break;
+        }
 
         return attack;
     }

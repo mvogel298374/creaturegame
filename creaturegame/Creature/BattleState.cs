@@ -43,4 +43,10 @@ public sealed class BattleState
     // Mist (the move): while set, the opponent cannot lower this creature's stat stages.
     // Gen 1 lasts until the battle ends, so it lives here and clears on the per-battle reset.
     public bool HasMist { get; set; }
+
+    // Counter: the damage this creature last took from a damaging move, and that move's type.
+    // Counter returns 2× it when the type was Normal/Fighting (Gen 1). Persists until overwritten
+    // by the next hit (a Gen 1 quirk — Counter can hit off a previous turn's damage).
+    public int LastDamageTaken { get; set; }
+    public DamageType? LastDamageType { get; set; }
 }

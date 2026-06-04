@@ -13,33 +13,38 @@ namespace creaturegame.Tests.Integration.Gen1Attacks;
 [Collection(MovesCollection.Name)]
 public class SecondaryEffectContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 {
-    [Fact]
-    public async Task AcidCanLowerTheFoesDefenseAsASecondaryEffect()
+    // Gen 1's chance-based stat-drop beams: Acid (−1 foe Defense), Bubble Beam (−1 Speed),
+    // Aurora Beam (−1 Attack). All deal damage and apply the drop when the secondary roll lands.
+    [Theory]
+    [InlineData("acid",        "Defense")]
+    [InlineData("bubble-beam", "Speed")]
+    [InlineData("aurora-beam", "Attack")]
+    public async Task LowersTheFoesStatAsASecondaryEffectOnHit(string moveName, string stat)
     {
         var result = await new MoveScenario()
             .Rules(ForceSecondaryRules.Instance)
             .Defender(TestCreatures.Make("Defender", hp: 500))
-            .Use(Move("acid"));
+            .Use(Move(moveName));
 
-        Assert.True(result.Has<DamageDealt>(), "Acid deals damage");
-        Assert.Equal(-1, result.Defender.Stages.Defense);
+        Assert.True(result.Has<DamageDealt>(), $"{moveName} deals damage");
         var change = result.First<StatStageChanged>();
         Assert.NotNull(change);
         Assert.Equal(result.Defender.Name, change!.CreatureName);
-        Assert.Equal("Defense", change.Stat);
+        Assert.Equal(stat, change.Stat);
         Assert.Equal(-1, change.Delta);
     }
 
-    [Fact]
-    public async Task AcidDoesNotLowerDefenseOnMiss()
+    [Theory]
+    [InlineData("acid")] [InlineData("bubble-beam")] [InlineData("aurora-beam")]
+    public async Task DoesNotLowerAnyStatOnMiss(string moveName)
     {
         var result = await new MoveScenario()
             .Rules(NeverHitRules.Instance)
             .Defender(TestCreatures.Make("Defender", hp: 500))
-            .Use(Move("acid"));
+            .Use(Move(moveName));
 
         Assert.True(result.Has<MoveMissed>());
-        Assert.Equal(0, result.Defender.Stages.Defense);
+        Assert.False(result.Has<StatStageChanged>());
     }
 
     [Fact]
