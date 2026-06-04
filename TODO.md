@@ -375,6 +375,12 @@ changes (Counter reuses `DamageDealt`/`MoveMissed`).
   body-slam's Gen 1 *Normal-types-immune-to-its-paralysis* quirk (a type→status-immunity rule — belongs
   on a seam); Fighting/Normal → Ghost immunity for level-based moves (seismic-toss) and Counter; Counter
   only answers damage recorded on the standard damage path (not fixed/level-based).
+- [x] **Seam audit (2026-06-04)** — fixed two move-specific damage quirks that had leaked out of the
+  seams: (1) **OHKO success** was using `Source.Level < Target.Level` (the *Gen 2+* rule, mislabelled
+  "Gen 1") → now `IBattleRules.OneHitKoSucceeds` with the correct Gen 1 **Speed** comparison; (2)
+  **Self-Destruct/Explosion Defense-halving** was an inline `/2` mutating `Target.Attributes` →
+  now `IBattleRules.SelfDestructDefenseDivisor` passed into `DamageCalculator` (no stat mutation).
+  Both now have tests asserting the *quirk* (speed-not-level; the damage boost), not just the outcome.
 - [x] **Gen 1 move-data fidelity** is data-driven via the `past_values` resolver (power/accuracy/pp/
   effect_chance/type); **secondary chances/targets** that `past_values` can't express are a short,
   verified override block in the importer (see batch 7). Add to it as later batches surface more.

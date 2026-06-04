@@ -82,6 +82,16 @@ public sealed class Gen1BattleRules : IBattleRules
     // Gen 1: Disable locks a move out for 1–7 turns (the counter decrements each turn).
     public int RollDisableTurns() => _rng.Next(1, 8);
 
+    // ── Move-specific damage quirks ──────────────────────────────────────────────
+
+    // Gen 1: a one-hit KO move fails outright if the target is faster than the user. This is a
+    // Speed comparison (using the in-battle modified Speed), NOT the level check that Gen 2 added.
+    public bool OneHitKoSucceeds(Creature user, Creature target) =>
+        StatusResolver.EffectiveSpeed(user, this) >= StatusResolver.EffectiveSpeed(target, this);
+
+    // Gen 1–4: Self-Destruct / Explosion halve the target's Defense before the damage calculation.
+    public int SelfDestructDefenseDivisor => 2;
+
     // ── Stat stages ────────────────────────────────────────────────────────────
 
     // Gen 1/2 battle-stat table: 2/(2+|n|) for n≤0, (2+n)/2 for n>0.

@@ -1389,6 +1389,38 @@ public class CoreMechanicsTests
     }
 
     [Fact]
+    public async Task SelfDestruct_HalvesTargetDefenseForExtraDamage()
+    {
+        // Gen 1 quirk: Self-Destruct/Explosion halve the target's Defense before the damage calc.
+        // Verify the boost by comparing against the same move computed with full Defense (divisor 1),
+        // both under deterministic (no-variance, no-crit) rules.
+        var attacker = TestCreatures.Make("A", attack: 150);
+        var defender = TestCreatures.Make("D", hp: 99999, defense: 120);
+
+        var explosion = new Attack
+        {
+            Id = 5, Name = "Explosion", BaseDamage = 170, Accuracy = 100,
+            DamageType = DamageType.Normal, AttackType = AttackType.Physical,
+            DamageCategory = DamageCategory.SelfDestruct,
+        };
+
+        // Reference: identical inputs but full Defense (no halving).
+        int fullDefenseDamage = DamageCalculator.CalculateDamage(
+            attacker, defender, explosion, new Gen1TypeChart(),
+            NoVarianceNoCritHitRules.Instance, out _, defenseDivisor: 1);
+
+        var emitter = new RecordingEmitter();
+        var action  = new AttackAction(attacker, defender, new PokemonAttack(explosion),
+            new Gen1TypeChart(), NoVarianceNoCritHitRules.Instance, emitter);
+        await action.ExecuteAsync();
+
+        int actualDamage = emitter.Of<DamageDealt>().First().Damage;
+        // Halved Defense ⇒ strictly more damage than the full-Defense reference.
+        Assert.True(actualDamage > fullDefenseDamage,
+            $"Expected halved-Defense damage ({actualDamage}) to exceed full-Defense damage ({fullDefenseDamage}).");
+    }
+
+    [Fact]
     public async Task SuperFang_HalvesTargetCurrentHp()
     {
         var attacker = new Creature("Attacker") { Level = 50 };

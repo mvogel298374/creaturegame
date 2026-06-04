@@ -175,6 +175,23 @@ public interface IBattleRules
     /// </summary>
     int RollDisableTurns();
 
+    // ── Move-specific damage quirks ──────────────────────────────────────────────
+
+    /// <summary>
+    /// Whether a one-hit KO move (Horn Drill, Guillotine, Fissure) succeeds against
+    /// <paramref name="target"/>, independent of the normal accuracy roll.
+    /// Gen 1: fails when the target's (in-battle) Speed is greater than the user's — a Speed
+    /// comparison, NOT a level check. Gen 2+: fails when the user's level is below the target's.
+    /// </summary>
+    bool OneHitKoSucceeds(Creature user, Creature target);
+
+    /// <summary>
+    /// Divisor applied to the target's defensive stat when computing Self-Destruct / Explosion
+    /// damage — the move halves the target's Defense before the calculation, making it much
+    /// stronger. Gen 1–4: 2. Gen 5+: 1 (the mechanic was removed).
+    /// </summary>
+    int SelfDestructDefenseDivisor { get; }
+
     // ── Stat selection ─────────────────────────────────────────────────────────
 
     /// <summary>

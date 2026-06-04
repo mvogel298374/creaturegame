@@ -11,7 +11,7 @@ public static class DamageCalculator
     /// </summary>
     public static int CalculateDamage(Creature attacker, Creature defender, Attack move,
                                       ITypeChart typeChart, IBattleRules rules, out bool isCrit,
-                                      IRandomSource? rng = null)
+                                      IRandomSource? rng = null, int defenseDivisor = 1)
     {
         if (move.BaseDamage == 0) { isCrit = false; return 0; }
 
@@ -38,8 +38,10 @@ public static class DamageCalculator
                 attackStat /= 2;
         }
 
-        // Guard against zero defense (edge case with very low stats + negative stages)
-        defenseStat = Math.Max(1, defenseStat);
+        // Guard against zero defense (edge case with very low stats + negative stages).
+        // defenseDivisor carries gen-variable move quirks (Self-Destruct/Explosion halve Defense)
+        // so the divisor stays on IBattleRules instead of being hardcoded at the call site.
+        defenseStat = Math.Max(1, defenseStat / defenseDivisor);
         attackStat  = Math.Max(1, attackStat);
 
         double baseDamage = (((2.0 * attacker.Level / 5.0 + 2.0) * attackStat * move.BaseDamage / defenseStat) / 50.0) + 2.0;

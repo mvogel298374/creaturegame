@@ -131,8 +131,10 @@ public class AttackAction : IBattleAction
 
         var category = usingStruggle ? DamageCategory.Standard : attackToUse.DamageCategory;
 
-        // OHKO: fails (not just misses) when source level < target level (Gen 1 rule)
-        if (category == DamageCategory.OHKO && Source.Level < Target.Level)
+        // OHKO: fails (not just misses) per the generation's success rule — Gen 1 fails when the
+        // target out-speeds the user (the level check is a Gen 2+ rule). The condition is gen-variable
+        // so it lives on the seam, not inline here. Independent of the accuracy roll below.
+        if (category == DamageCategory.OHKO && !_rules.OneHitKoSucceeds(Source, Target))
         {
             _emitter?.Emit(new MoveMissed(Source.Name, attackToUse.Name ?? ""));
             return Task.CompletedTask;
@@ -247,20 +249,15 @@ public class AttackAction : IBattleAction
 
             case DamageCategory.SelfDestruct:
             {
-                // Gen 1: target's Defense (and Special) is halved before damage calculation,
-                // then restored — this makes Explosion/Self-Destruct significantly stronger.
-                int savedDefense = Target.Attributes.Defense;
-                int savedSpecial = Target.Attributes.Special;
-                Target.Attributes.Defense = Math.Max(1, Target.Attributes.Defense / 2);
-                Target.Attributes.Special = Math.Max(1, Target.Attributes.Special / 2);
-
+                // Gen 1: the target's Defense is halved before damage calculation, making
+                // Explosion/Self-Destruct significantly stronger. The divisor is gen-variable
+                // (dropped in Gen 5+), so it comes from the rules seam and is passed into the
+                // calculator — we no longer mutate-and-restore the creature's real stats.
                 double eff = DamageCalculator.GetTypeEffectiveness(
                     attackToUse.DamageType, Target.Type1, Target.Type2, _typeChart);
                 damage = DamageCalculator.CalculateDamage(
-                    Source, Target, attackToUse, _typeChart, _rules, out isCrit, _rng);
-
-                Target.Attributes.Defense = savedDefense;
-                Target.Attributes.Special = savedSpecial;
+                    Source, Target, attackToUse, _typeChart, _rules, out isCrit, _rng,
+                    defenseDivisor: _rules.SelfDestructDefenseDivisor);
 
                 Target.Attributes.ReceiveDamage(damage);
                 _emitter?.Emit(new DamageDealt(Target.Name, damage, eff,

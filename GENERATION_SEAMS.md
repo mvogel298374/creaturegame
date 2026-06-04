@@ -220,6 +220,7 @@ actually bitten us; treat each pattern on the left as a **review blocker**.
 | A **magic number** that is a game rule (`* 1.5`, `< 50`, `/ 16`, `217`, `40`) inline in engine code | The value changes between generations; hardcoding it scatters Gen 1 knowledge into generation-blind code | Add a named member to `IBattleRules` (e.g. `StabMultiplier`, `ConfusionSelfHitPercent`) with a per-gen XML doc; read it at the call site |
 | Reading **`creature.Attributes.Attack` / `.Special` / `.Defense` directly** for damage/effect math | The Special split (Gen 2) means "the offensive stat" is generation-dependent | Go through `rules.GetOffensiveStat(...)` / `GetDefensiveStat(...)` |
 | Reading a **move/species DB column directly** (`attack.EffectChance`, a stat column) where the *layout* could differ by gen | Later gens may store the same concept in a different shape (e.g. per-effect chances) | Ask the rules for the value (`rules.GetSecondaryEffectChance(move, kind)`); the Gen 1 impl can be a thin pass-through that documents the generic shape |
+| A **move-specific success condition or damage modifier** written inline in an `AttackAction` damage-category branch (`if (Source.Level < Target.Level)`, `Defense / 2`, a flinch/halve/double) | The *condition itself* is almost always gen-variable even when the move exists in every gen — the OHKO success rule, the Self-Destruct halving, crash damage, etc. all changed between gens. Inline, it's invisible Gen 1 knowledge and frequently just **wrong** (copied from a modern wiki) | Put the rule on `IBattleRules` (`OneHitKoSucceeds`, `SelfDestructDefenseDivisor`, …) and **never mutate `creature.Attributes` to fake a modifier** — pass it into `DamageCalculator` (e.g. `defenseDivisor`) instead |
 | A **constant that is genuinely the same in every generation** (4 move slots, the damage-formula `+2`) | — | Leave it inline; **don't** over-abstract. A seam member you'll never vary is noise. |
 
 **The litmus question for every constant and every field read you add:**
@@ -241,6 +242,30 @@ This is cheap now and removes a future archaeology dig.
 
 > Doing this pass **as part of the feature** (not as a later cleanup) is the whole point — the
 > debt compounds invisibly until a generation switch forces it all at once.
+
+### 5.0.1 Leaks we've actually shipped (so you recognise the shape)
+
+The checklist above is abstract; these are real leaks that passed review and tests, sat in the
+codebase, and were only caught in a later seam audit. **Both involve a move that exists in every
+generation — which is exactly why the gen-variable rule inside it slipped past.** When you add a
+damage-category branch, assume its success/modifier logic is one of these in disguise:
+
+- **One-hit KO success (OHKO).** The branch read `if (Source.Level < Target.Level)` and a comment
+  *claimed* it was "the Gen 1 rule." It is not — that's the **Gen 2+** rule. Gen 1 OHKO moves fail
+  when the **target out-speeds the user** (a Speed comparison). So the leak was *also a fidelity bug*:
+  inline gen-knowledge tends to be copied from a modern source and is wrong for Gen 1. Fix:
+  `IBattleRules.OneHitKoSucceeds(user, target)`.
+- **Self-Destruct / Explosion Defense-halving.** The branch did
+  `Target.Attributes.Defense = Target.Attributes.Defense / 2;` … calc … then restored it. Two leaks
+  in one: a **game-rule magic number** (`/2`, dropped in Gen 5+) *and* **mutating the creature's real
+  stats** to fake a modifier (fragile, and meaningless once Special splits). Fix:
+  `IBattleRules.SelfDestructDefenseDivisor` passed into `DamageCalculator(..., defenseDivisor:)` —
+  the calculator applies the modifier; nobody mutates `Attributes`.
+
+**The tell both share:** the test only asserted the *outcome* ("the target faints", "it deals full
+HP"), never the *quirk* ("damage is higher because Defense was halved", "it fails on Speed, not
+level"). A test that doesn't exercise the gen-variable bit will keep a leak green forever. When you
+add one of these, **write the assertion against the quirk itself.**
 
 ### Adding a new *rule* that varies by generation
 1. Ask the decision question: **"Is this the same in every generation?"** If yes, it's
