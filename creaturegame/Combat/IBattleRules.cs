@@ -169,6 +169,12 @@ public interface IBattleRules
     /// </summary>
     int RollRampageTurns();
 
+    /// <summary>
+    /// Returns how many turns Disable locks one of the target's moves out of selection.
+    /// Gen 1: 1–7 turns. (Gen 3+: a fixed 4 turns.)
+    /// </summary>
+    int RollDisableTurns();
+
     // ── Stat selection ─────────────────────────────────────────────────────────
 
     /// <summary>

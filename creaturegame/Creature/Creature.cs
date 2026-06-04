@@ -11,9 +11,7 @@ public class Creature
 
     // Struggle is a system-level fallback — never exposed publicly.
     private readonly Attack _struggle = new Attack("Struggle", "An attack that also hurts the user.") { BaseDamage = 50, Accuracy = 100, DamageType = DamageType.Normal };
-    public bool IsOutOfPP => MoveSet.Count > 0 && MoveSet.All(m => m.PowerPointsCurrent <= 0);
     internal Attack Struggle => _struggle;
-    internal PokemonAttack? GetAvailableMove() => MoveSet.FirstOrDefault(m => m.PowerPointsCurrent > 0);
     public bool AddAttack(Attack attack)
     {
         if (MoveSet.Count < 4 && !MoveSet.Any(m => m.Base.Id == attack.Id))
@@ -108,6 +106,14 @@ public class Creature
     public PokemonAttack? ChargingMove { get => Battle.ChargingMove;         set => Battle.ChargingMove = value; }
     public int  RampageTurnsRemaining { get => Battle.RampageTurnsRemaining; set => Battle.RampageTurnsRemaining = value; }
     public PokemonAttack? RampageMove  { get => Battle.RampageMove;          set => Battle.RampageMove = value; }
+    public PokemonAttack? DisabledMove { get => Battle.DisabledMove;         set => Battle.DisabledMove = value; }
+    public int  DisableTurnsRemaining { get => Battle.DisableTurnsRemaining; set => Battle.DisableTurnsRemaining = value; }
+
+    /// <summary>
+    /// True when at least one move can be chosen this turn: it has PP and isn't Disabled. When
+    /// false the creature must Struggle (out of PP, or its only PP-bearing move is disabled).
+    /// </summary>
+    public bool CanSelectAnyMove => MoveSet.Any(m => m.PowerPointsCurrent > 0 && m != DisabledMove);
 
     /// <summary>
     /// Clears all transient in-battle state by replacing it wholesale, so a newly added

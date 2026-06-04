@@ -7,7 +7,7 @@ namespace creaturegame.Tests.Integration;
 
 /// <summary>
 /// Tests Battle.StartFightAsync() as an integrated unit: turn loop, faint detection,
-/// the mid-turn dead-target guard, the IsOutOfPP → Struggle path, and the
+/// the mid-turn dead-target guard, the out-of-PP → Struggle path, and the
 /// player-controlled input path (mirrors SignalRInput behaviour without the web layer).
 /// </summary>
 public class BattleIntegrationTests
@@ -91,7 +91,7 @@ public class BattleIntegrationTests
     {
         // Player has a 0-damage move with 1 PP — does no damage so enemy survives turn 1.
         // Enemy has 1 HP and a 0-damage move so player survives too.
-        // Turn 2: Battle sees IsOutOfPP, passes null → AttackAction uses Struggle →
+        // Turn 2: Battle sees no selectable move (out of PP), passes null → AttackAction uses Struggle →
         // enemy (1 HP) faints and player takes recoil.
         var player = new Creature("Player") { Level = 50 };
         player.CalculateStats();

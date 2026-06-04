@@ -193,7 +193,7 @@ public class CoreMechanicsTests
         var move = attacker.MoveSet[0];
         move.PowerPointsCurrent = 0; // force PP exhausted
 
-        // null signals AttackAction to use Struggle — mirrors what Battle does when IsOutOfPP
+        // null signals AttackAction to use Struggle — mirrors what Battle does when out of PP
         var action = new AttackAction(attacker, defender, null, new Gen1TypeChart(), emitter: ConsoleBattleEventEmitter.Instance);
         await action.ExecuteAsync();
 

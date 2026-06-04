@@ -16,10 +16,11 @@ public sealed class AutoSelectInput : IBattleInput
 
     public Task<PokemonAttack> ChooseMoveAsync(TurnContext context)
     {
-        // Battle guarantees this is only called when IsOutOfPP == false.
-        var move = context.Attacker.GetAvailableMove()
+        // Battle guarantees this is only called when CanSelectAnyMove == true. Skip the Disabled
+        // move so the auto-selector never picks a locked-out move.
+        var move = context.Attacker.MoveSet.FirstOrDefault(m => m.PowerPointsCurrent > 0 && m != context.DisabledMove)
             ?? throw new InvalidOperationException(
-                $"{context.Attacker.Name}: ChooseMoveAsync called with no PP remaining. " +
+                $"{context.Attacker.Name}: ChooseMoveAsync called with no selectable move. " +
                 "Battle should have bypassed IBattleInput and passed null (Struggle) directly.");
 
         return Task.FromResult(move);

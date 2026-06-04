@@ -34,7 +34,8 @@ public sealed class SignalRBattleEventEmitter(
                                       m.Name,
                                       Type     = m.Type.ToString(),
                                       m.PpCurrent,
-                                      m.PpMax
+                                      m.PpMax,
+                                      m.Disabled
                                   })
                               }),
         TurnEnded          => ("TurnEnded",        new { }),
@@ -44,6 +45,8 @@ public sealed class SignalRBattleEventEmitter(
         DamageDealt e      => ("DamageDealt",      new { e.TargetName, e.Damage, e.TypeEffectiveness, e.HpAfter, e.HpMax, e.IsCrit }),
         RecoilDamage e     => ("RecoilDamage",     new { e.SourceName, e.Damage, e.HpAfter }),
         CrashDamage e      => ("CrashDamage",      new { e.SourceName, e.Damage, e.HpAfter }),
+        MoveDisabled e     => ("MoveDisabled",     new { e.TargetName, e.MoveName }),
+        MoveReEnabled e    => ("MoveReEnabled",    new { e.CreatureName, e.MoveName }),
         MultiHitCompleted e => ("MultiHitCompleted", new { e.Hits }),
         CoinsScattered e   => ("CoinsScattered",   new { e.SourceName, e.Amount }),
         StatusApplied e    => ("StatusApplied",    new { e.TargetName, Status = e.Status.ToString() }),

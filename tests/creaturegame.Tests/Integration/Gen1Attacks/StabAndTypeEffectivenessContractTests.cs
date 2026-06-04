@@ -14,7 +14,7 @@ public class StabAndTypeEffectivenessContractTests(MovesFixture moves) : Gen1Mov
     [Theory]
     [InlineData("pound",       DamageType.Normal,   DamageType.Water,  DamageType.Fire)]
     [InlineData("fire-punch",  DamageType.Fire,     DamageType.Normal, DamageType.Electric)]
-    [InlineData("karate-chop", DamageType.Fighting, DamageType.Normal, DamageType.Water)]
+    [InlineData("karate-chop", DamageType.Normal,   DamageType.Water,  DamageType.Fire)]   // Normal in Gen 1 (was Fighting)
     [InlineData("wing-attack", DamageType.Flying,   DamageType.Normal, DamageType.Normal)]
     [InlineData("vine-whip",   DamageType.Grass,    DamageType.Normal, DamageType.Normal)]   // first Special-type STAB mover
     [InlineData("jump-kick",   DamageType.Fighting, DamageType.Normal, DamageType.Fire)]
@@ -41,10 +41,9 @@ public class StabAndTypeEffectivenessContractTests(MovesFixture moves) : Gen1Mov
     [Theory]
     [InlineData("fire-punch",    DamageType.Grass,    DamageType.Normal, 2.0)]
     [InlineData("fire-punch",    DamageType.Water,    DamageType.Normal, 0.5)]
-    [InlineData("karate-chop",   DamageType.Normal,   DamageType.Water,  2.0)]
+    [InlineData("karate-chop",   DamageType.Rock,     DamageType.Normal, 0.5)]   // Normal in Gen 1 → resisted by Rock (was Fighting → Normal 2×)
     [InlineData("thunder-punch", DamageType.Water,    DamageType.Normal, 2.0)]
-    [InlineData("wing-attack",   DamageType.Grass,    DamageType.Normal, 2.0)]
-    [InlineData("gust",          DamageType.Fighting, DamageType.Normal, 2.0)]
+    [InlineData("wing-attack",   DamageType.Grass,    DamageType.Normal, 2.0)]   // Flying super-effectiveness coverage (gust was retyped to Normal in Gen 1)
     [InlineData("vine-whip",     DamageType.Water,    DamageType.Normal, 2.0)]   // Grass → Water
     [InlineData("jump-kick",     DamageType.Normal,   DamageType.Fire,   2.0)]   // Fighting → Normal
     [InlineData("poison-sting",  DamageType.Grass,    DamageType.Normal, 2.0)]   // Poison → Grass

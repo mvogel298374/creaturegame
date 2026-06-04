@@ -22,8 +22,9 @@ public class PhysicalSpecialSplitContractTests(MovesFixture moves) : Gen1MoveCon
     [InlineData("scratch",       AttackType.Physical)]  // Normal
     [InlineData("cut",           AttackType.Physical)]  // Normal
     [InlineData("vice-grip",     AttackType.Physical)]  // Normal
-    [InlineData("karate-chop",   AttackType.Physical)]  // Fighting
-    [InlineData("gust",          AttackType.Physical)]  // Flying
+    [InlineData("karate-chop",   AttackType.Physical)]  // Normal (Gen 1; retyped to Fighting in Gen 2)
+    [InlineData("gust",          AttackType.Physical)]  // Normal (Gen 1; retyped to Flying in Gen 2)
+    [InlineData("bite",          AttackType.Physical)]  // Normal (Gen 1; retyped to Dark in Gen 2 ⇒ was Special)
     [InlineData("wing-attack",   AttackType.Physical)]  // Flying
     [InlineData("vine-whip",     AttackType.Special)]   // Grass (Special in Gen 1)
     [InlineData("double-kick",   AttackType.Physical)]  // Fighting
@@ -42,7 +43,7 @@ public class PhysicalSpecialSplitContractTests(MovesFixture moves) : Gen1MoveCon
     [InlineData("horn-drill",    AttackType.Physical)]  // Normal
     [InlineData("poison-sting",  AttackType.Physical)]  // Poison (physical in Gen 1)
     // Status moves keep no damage category (Undefined) regardless of type.
-    [InlineData("sand-attack",   AttackType.Undefined)]
+    [InlineData("sand-attack",   AttackType.Undefined)]  // Normal in Gen 1 (retyped to Ground in Gen 2)
     [InlineData("tail-whip",     AttackType.Undefined)]
     public void MoveHasGen1PhysicalSpecialCategory(string moveName, AttackType expected)
         => Assert.Equal(expected, Move(moveName).AttackType);

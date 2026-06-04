@@ -15,7 +15,7 @@ public record TurnStarted(
     IReadOnlyList<MoveInfo> PlayerMoves
 ) : BattleEvent;
 
-public record MoveInfo(string Name, DamageType Type, int PpCurrent, int PpMax);
+public record MoveInfo(string Name, DamageType Type, int PpCurrent, int PpMax, bool Disabled = false);
 
 public record TurnEnded : BattleEvent;
 public record BattleEnded(string WinnerName) : BattleEvent;
@@ -68,6 +68,10 @@ public record ChargingUp(string CreatureName, string MoveName) : BattleEvent;
 
 // --- Crash damage (Jump Kick / Hi Jump Kick miss) ---
 public record CrashDamage(string SourceName, int Damage, int HpAfter) : BattleEvent;
+
+// --- Disable (the move) ---
+public record MoveDisabled(string TargetName, string MoveName) : BattleEvent;
+public record MoveReEnabled(string CreatureName, string MoveName) : BattleEvent;
 
 // --- Creature ---
 public record CreatureFainted(string Name) : BattleEvent;

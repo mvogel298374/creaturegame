@@ -28,10 +28,13 @@ public class StatStageMoveContractTests(MovesFixture moves) : Gen1MoveContract(m
         Assert.Equal(2, change.NewStage);
     }
 
-    // Foe-targeting stat drops: Sand Attack (−1 Accuracy) and Tail Whip (−1 Defense).
+    // Foe-targeting stat drops: Sand Attack (−1 Accuracy), Tail Whip / Leer (−1 Defense),
+    // Growl (−1 Attack).
     [Theory]
     [InlineData("sand-attack", "Accuracy")]
     [InlineData("tail-whip",   "Defense")]
+    [InlineData("leer",        "Defense")]
+    [InlineData("growl",       "Attack")]
     public async Task LowersFoeStatByOneStage(string moveName, string stat)
     {
         var result = await new MoveScenario()

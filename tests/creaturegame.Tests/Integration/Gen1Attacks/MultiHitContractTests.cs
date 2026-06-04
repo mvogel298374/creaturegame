@@ -12,6 +12,7 @@ public class MultiHitContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 {
     [Theory]
     [InlineData("double-slap")] [InlineData("comet-punch")] [InlineData("fury-attack")]
+    [InlineData("pin-missile")]
     public async Task MultiHitStrikesTwoToFiveTimes(string moveName)
     {
         for (int seed = 0; seed < 25; seed++)
@@ -31,6 +32,7 @@ public class MultiHitContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 
     [Theory]
     [InlineData("double-slap")] [InlineData("comet-punch")] [InlineData("fury-attack")]
+    [InlineData("pin-missile")]
     public async Task MultiHitWithFixedCountStrikesExactlyThatMany(string moveName)
     {
         var result = await new MoveScenario()
@@ -48,6 +50,7 @@ public class MultiHitContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     // the variable 2–5 distribution.
     [Theory]
     [InlineData("double-kick", 2)]
+    [InlineData("twineedle",   2)]   // strikes twice; also carries a 20% poison secondary (see SecondaryStatusContractTests)
     public async Task FixedCountMoveStrikesExactlyItsMoveDataCount(string moveName, int expectedHits)
     {
         var move = Move(moveName);

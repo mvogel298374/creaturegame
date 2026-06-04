@@ -60,6 +60,14 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                 Console.WriteLine($"{e.SourceName} kept going and crashed! ({e.Damage} damage)");
                 break;
 
+            case MoveDisabled e:
+                Console.WriteLine($"{e.TargetName}'s {e.MoveName} was disabled!");
+                break;
+
+            case MoveReEnabled e:
+                Console.WriteLine($"{e.CreatureName}'s {e.MoveName} is no longer disabled!");
+                break;
+
             case MultiHitCompleted e:
                 Console.WriteLine($"Hit {e.Hits} time{(e.Hits == 1 ? "" : "s")}!");
                 break;

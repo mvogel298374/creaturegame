@@ -120,6 +120,42 @@ describe('expandEvent — crash / flinch / multi-hit', () => {
   });
 });
 
+describe('expandEvent — Disable', () => {
+  it('MoveDisabled formats the locked move name', () => {
+    expect(logLines(expandEvent('MoveDisabled', { targetName: 'ARTICUNO', moveName: 'ice-beam' }, CTX).steps))
+      .toEqual(["ARTICUNO's ICE BEAM was disabled!"]);
+  });
+  it('MoveReEnabled announces the move is usable again', () => {
+    expect(logLines(expandEvent('MoveReEnabled', { creatureName: 'ARTICUNO', moveName: 'ice-beam' }, CTX).steps))
+      .toEqual(["ARTICUNO's ICE BEAM is no longer disabled!"]);
+  });
+});
+
+describe('expandEvent — confusion & coins', () => {
+  it('ConfusionStarted plays the status sound and logs the line', () => {
+    const { steps } = expandEvent('ConfusionStarted', { targetName: 'ARTICUNO' }, CTX);
+    expect(steps!.some(s => s.kind === 'emit')).toBe(true);   // playStatusSound
+    expect(logLines(steps)).toEqual(['ARTICUNO became confused!']);
+  });
+  it('ConfusionMessage logs the per-turn confused line', () => {
+    expect(logLines(expandEvent('ConfusionMessage', { creatureName: 'MEWTWO' }, CTX).steps))
+      .toEqual(['MEWTWO is confused!']);
+  });
+  it('ConfusionDamage updates HP before the self-hit line', () => {
+    const { steps } = expandEvent('ConfusionDamage', { creatureName: 'MEWTWO', damage: 12, hpAfter: 88 }, CTX);
+    expect(steps![0]).toMatchObject({ kind: 'dispatch', action: { type: 'UPDATE_HP', name: 'MEWTWO', hp: 88 } });
+    expect(logLines(steps)).toEqual(['MEWTWO hurt itself in confusion!']);
+  });
+  it('ConfusionCleared announces snapping out', () => {
+    expect(logLines(expandEvent('ConfusionCleared', { creatureName: 'MEWTWO' }, CTX).steps))
+      .toEqual(['MEWTWO snapped out of confusion!']);
+  });
+  it('CoinsScattered logs the Gen 1 Pay Day line', () => {
+    expect(logLines(expandEvent('CoinsScattered', { sourceName: 'MEOWTH', amount: 100 }, CTX).steps))
+      .toEqual(['Coins scattered everywhere!']);
+  });
+});
+
 describe('expandEvent — faint side resolves against the player name', () => {
   it('player faint targets the player sprite', () => {
     const { steps } = expandEvent('CreatureFainted', { name: 'MEWTWO' }, CTX);

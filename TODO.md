@@ -277,16 +277,47 @@ everything else coverage-only over real `AttackAction` paths.
   wrap→Binding, horn-drill→OHKO, body-slam→Paralysis, poison-sting→Poison via MCP. No schema change
   (recoil/rampage are runtime + the existing `Effect` column).
 
+### Batch 5 (moves 41–50) ✅ DONE (2026-06-04)
+twineedle, pin-missile, leer, bite, growl, roar, sing, supersonic, sonic-boom, disable.
+**375 .NET + 25 Vitest.** One major new engine feature (Disable) and a cross-cutting Gen 1
+**move-type correction pass**; everything else coverage-only over real `AttackAction`/`Battle` paths.
+- Reused contracts (rows added): damage/PP/miss (pin-missile, bite, twineedle); variable multi-hit
+  (pin-missile) + fixed-2 multi-hit (twineedle); foe stat-drop (leer −1 Defense, growl −1 Attack);
+  flinch (bite); secondary status (twineedle 20% Poison); no-op switch move (roar, folded with
+  whirlwind, −6 priority pinned); physical/special split (bite now Normal/Physical, +comment fixes).
+- New capability classes: **`StatusMoveContractTests`** (sing → Sleep, supersonic → Confuse; pure
+  status moves that afflict without damage, nothing on a miss) and **`FixedDamageContractTests`**
+  (sonic-boom deals exactly 20 regardless of stats/type, incl. immunities; can miss).
+- **Two genuine engine features this batch:**
+  - **Disable** (`MoveEffect.Disable`) — full mechanic: `BattleState.DisabledMove` +
+    `DisableTurnsRemaining` (+ `Creature` delegating props + `CanSelectAnyMove`),
+    `IBattleRules.RollDisableTurns` (Gen 1 = 1–7), `AttackAction` picks a random PP-bearing foe
+    move and locks it (fails if one's already disabled). Enforced at **move-selection time**:
+    `TurnContext.DisabledMove`, `RandomMoveInput`/`AutoSelectInput`/`SignalRInput` skip it, and
+    `Battle` Struggles when it's the only move; the counter ticks down in `StatusResolver` and
+    re-enables. New `MoveDisabled`/`MoveReEnabled` events wired through console + SignalR +
+    `timeline.ts` (+ Vitest). UI greys the locked move (`MoveInfo.Disabled` → move button). Covered
+    by `DisableContractTests` incl. a **full-`Battle`** lock→Struggle→re-enable test.
+  - **Twineedle** — mapped to the existing fixed-2 multi-hit mechanism (Effect=MultiHit,
+    MultiHitCount=2) + its 20% poison secondary; no new code (deferred item now closed).
+- **Gen 1 move-type correction pass** — PokeAPI returns each move's *modern* type, but four Gen 1
+  moves were retyped later: **karate-chop** (→Fighting), **gust** (→Flying), **sand-attack**
+  (→Ground), **bite** (→Dark). The importer now restores their RBY type (all Normal) right after the
+  type parse, so STAB, the type chart, and the type-derived physical/special split are Gen-1-correct
+  (bite flips Special→Physical). Affected STAB/type-effectiveness rows updated (Flying-effectiveness
+  coverage stays via wing-attack). Re-imported + verified all rows via MCP.
+- **Frontend Vitest gap closed**: `timeline.test.ts` now also covers `ConfusionStarted`,
+  `ConfusionMessage`/`Damage`/`Cleared`, `CoinsScattered`, and the new `MoveDisabled`/`MoveReEnabled`.
+
 ### Remaining batches (cadence)
-- [ ] Batches 5–17 (moves 41–165): query the next 10 → add `InlineData` rows to the matching
-  capability class → add a new capability class only for genuinely new mechanics.
-- [ ] **Fixed-2 multi-hit movers still pending**: twineedle (2 hits + 20% poison) and bonemerang —
-  the fixed-count mechanism exists (double-kick); these just need mapping + coverage in their batches.
+- [ ] Batches 6–17 (moves 51–165): query the next 10 → add `InlineData` rows to the matching
+  capability class → add a new capability class only for genuinely new mechanics. **Next: batch 6 =
+  moves 51–60.**
+- [ ] **Fixed-2 multi-hit mover still pending**: bonemerang — the fixed-count mechanism exists
+  (double-kick, twineedle); just needs mapping + coverage in its batch. *(twineedle ✅ done batch 5.)*
 - [ ] **Rampage reuse pending**: petal-dance just needs the importer tag (mechanism exists) + coverage.
-- [ ] **Frontend Vitest gap (shrinking)**: `timeline.test.ts` covers `CrashDamage`, `FlinchBlocked`,
-  `MultiHitCompleted`. Still uncovered: `ConfusionStarted`, `CoinsScattered`,
-  `ConfusionMessage`/`Damage`/`Cleared`. Backend behaviour is fully covered; this is just the
-  log-text mapping. Fold into the next frontend coverage pass.
+- [ ] **Gen 1 type corrections** are complete for the four known retyped moves (karate-chop, gust,
+  sand-attack, bite). Watch for any further retyped moves as later batches land (none expected ≤165).
 
 ---
 

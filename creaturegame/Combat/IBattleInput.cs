@@ -10,8 +10,9 @@ namespace creaturegame.Combat;
 /// RandomMoveInput / GreedyAIInput / WeightedAIInput (Priority 10).
 ///
 /// This interface is only called when a real choice exists. Struggle is a
-/// system-enforced fallback — Battle detects IsOutOfPP and bypasses IBattleInput,
-/// passing null directly to AttackAction.
+/// system-enforced fallback — when the creature has no selectable move
+/// (<see cref="Creatures.Creature.CanSelectAnyMove"/> is false: out of PP, or its only
+/// move is Disabled), Battle bypasses IBattleInput and passes null directly to AttackAction.
 /// </summary>
 public interface IBattleInput
 {

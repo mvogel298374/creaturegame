@@ -111,6 +111,19 @@ public class MoveImport
             attack.DamageType = DamageType.Normal; // Default
         }
 
+        // Gen 1 type corrections: PokeAPI returns each move's MODERN type, but several Gen 1
+        // moves were retyped in later generations. Restore their Red/Blue/Yellow types so STAB,
+        // the type chart, and the physical/special split (derived from type just below) are all
+        // Gen-1-correct. All four were Normal in Gen 1.
+        attack.DamageType = pokeMove.Name switch
+        {
+            "karate-chop" => DamageType.Normal,  // → Fighting from Gen 2
+            "gust"        => DamageType.Normal,  // → Flying from Gen 2
+            "sand-attack" => DamageType.Normal,  // → Ground from Gen 2
+            "bite"        => DamageType.Normal,  // → Dark from Gen 2
+            _             => attack.DamageType
+        };
+
         // Gen 1: a damaging move's physical/special split is decided by its TYPE, not the
         // move. PokeAPI's damage_class is the Gen 4+ per-move split (e.g. it calls Fire
         // Punch "physical" and Hyper Beam "special"), which is wrong for Gen 1 — so for any
@@ -211,8 +224,10 @@ public class MoveImport
                               or "pin-missile" or "barrage" or "fury-swipes" or "spike-cannon")
             attack.Effect = MoveEffect.MultiHit;
         // Fixed-count multi-hit — the count is stable move data (always 2), stored on the move.
-        // Twineedle (+poison) and Bonemerang join here in their own coverage batches.
-        else if (pokeMove.Name == "double-kick")
+        // Twineedle strikes twice and carries its own 20% poison secondary (set above from the
+        // ailment); the fixed count drives the strike loop while TryApplyStatus handles the poison.
+        // Bonemerang joins here in its own coverage batch.
+        else if (pokeMove.Name is "double-kick" or "twineedle")
         { attack.Effect = MoveEffect.MultiHit; attack.MultiHitCount = 2; }
         // Gen 1: a missed Jump Kick deals crash damage to the user. Hi Jump Kick joins in its batch.
         else if (pokeMove.Name == "jump-kick")
@@ -227,6 +242,10 @@ public class MoveImport
             attack.Effect = MoveEffect.Rampage;
         else if (pokeMove.Name == "pay-day")
             attack.Effect = MoveEffect.PayDay;
+        // Disable locks one of the target's moves for a few turns; the lock itself is enforced at
+        // move-selection time. Matched by name (its ailment "disable" maps to no StatusCondition).
+        else if (pokeMove.Name == "disable")
+            attack.Effect = MoveEffect.Disable;
         // Confusion isn't a StatusCondition (it's a separate per-battle counter), so it's
         // modelled as a move effect. EffectChance (already set from the move) gates the
         // secondary confusion on damaging moves (Psybeam 10%); pure confusion moves

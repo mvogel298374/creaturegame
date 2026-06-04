@@ -48,7 +48,7 @@ public class Battle
                 _turnNumber,
                 PlayerCreature.Name, PlayerCreature.Attributes.HP, PlayerCreature.Attributes.MaxHP, PlayerCreature.Status,
                 EnemyCreature.Name,  EnemyCreature.Attributes.HP,  EnemyCreature.Attributes.MaxHP,  EnemyCreature.Status,
-                PlayerCreature.MoveSet.Select(m => new MoveInfo(m.Base.Name ?? "", m.Base.DamageType, m.PowerPointsCurrent, m.Base.PowerPointsMax)).ToList()
+                PlayerCreature.MoveSet.Select(m => new MoveInfo(m.Base.Name ?? "", m.Base.DamageType, m.PowerPointsCurrent, m.Base.PowerPointsMax, m == PlayerCreature.DisabledMove)).ToList()
             ));
 
             // Move selection — two-turn moves skip IBattleInput on the release turn and rampage
@@ -58,30 +58,32 @@ public class Battle
                 ? PlayerCreature.ChargingMove
                 : PlayerCreature.RampageTurnsRemaining > 0
                   ? PlayerCreature.RampageMove
-                  : (PlayerCreature.IsOutOfPP
+                  : (!PlayerCreature.CanSelectAnyMove
                     ? null
                     : await _playerInput.ChooseMoveAsync(new TurnContext
                       {
-                          Attacker   = PlayerCreature,
-                          Defender   = EnemyCreature,
-                          TypeChart  = _typeChart,
-                          Rules      = _rules,
-                          TurnNumber = _turnNumber
+                          Attacker     = PlayerCreature,
+                          Defender     = EnemyCreature,
+                          TypeChart    = _typeChart,
+                          Rules        = _rules,
+                          TurnNumber   = _turnNumber,
+                          DisabledMove = PlayerCreature.DisabledMove
                       }));
 
             PokemonAttack? enemyMove = EnemyCreature.IsTwoTurnCharging
                 ? EnemyCreature.ChargingMove
                 : EnemyCreature.RampageTurnsRemaining > 0
                   ? EnemyCreature.RampageMove
-                  : (EnemyCreature.IsOutOfPP
+                  : (!EnemyCreature.CanSelectAnyMove
                     ? null
                     : await _enemyInput.ChooseMoveAsync(new TurnContext
                       {
-                          Attacker   = EnemyCreature,
-                          Defender   = PlayerCreature,
-                          TypeChart  = _typeChart,
-                          Rules      = _rules,
-                          TurnNumber = _turnNumber
+                          Attacker     = EnemyCreature,
+                          Defender     = PlayerCreature,
+                          TypeChart    = _typeChart,
+                          Rules        = _rules,
+                          TurnNumber   = _turnNumber,
+                          DisabledMove = EnemyCreature.DisabledMove
                       }));
 
             var playerAction = new AttackAction(PlayerCreature, EnemyCreature, playerMove, _typeChart, _rules, _emitter, _movePool, _rng);

@@ -21,7 +21,8 @@ public class AttackAction : IBattleAction
     private readonly IReadOnlyList<Attack>   _movePool;
     private readonly IRandomSource           _rng;
 
-    // Null means Struggle — Battle passes null when Source.IsOutOfPP, bypassing IBattleInput.
+    // Null means Struggle — Battle passes null when the source has no selectable move
+    // (out of PP, or its only move is Disabled), bypassing IBattleInput.
     private readonly PokemonAttack? _selectedMove;
 
     public AttackAction(Creature source, Creature target,
@@ -377,6 +378,28 @@ public class AttackAction : IBattleAction
                     int recoil = _rules.CalculateRecoilDamage(damage);
                     Source.Attributes.ReceiveDamage(recoil);
                     _emitter?.Emit(new RecoilDamage(Source.Name, recoil, Source.Attributes.HP));
+                }
+                break;
+
+            case MoveEffect.Disable:
+                // Disable locks one of the target's moves out of selection for several turns; it
+                // fails if the target already has a move disabled or has no usable move. The
+                // duration is gen-variable and lives on the seam (IBattleRules.RollDisableTurns).
+                // The *which move* picked is also gen-variable — Gen 1 & 2 choose a random PP-bearing
+                // move (below), Gen 3+ target the last-used move. We keep that choice inline and
+                // documented rather than on a single-use seam member we wouldn't vary until Gen 3.
+                // The lock is *enforced* at move-selection time (Battle/IBattleInput skip
+                // DisabledMove); the counter ticks down end-of-turn (StatusResolver) and re-enables.
+                if (Target.IsAlive() && Target.DisableTurnsRemaining == 0)
+                {
+                    var disableable = Target.MoveSet.Where(m => m.PowerPointsCurrent > 0).ToList();
+                    if (disableable.Count > 0)
+                    {
+                        var locked = disableable[_rng.Next(disableable.Count)];
+                        Target.DisabledMove          = locked;
+                        Target.DisableTurnsRemaining = _rules.RollDisableTurns();
+                        _emitter?.Emit(new MoveDisabled(Target.Name, locked.Base.Name ?? ""));
+                    }
                 }
                 break;
 

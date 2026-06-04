@@ -96,6 +96,18 @@ public static class StatusResolver
 
         var battleRules = rules ?? Gen1BattleRules.Instance;
 
+        // Disable countdown — tick down each turn and re-enable the move when the lock expires.
+        if (creature.DisableTurnsRemaining > 0)
+        {
+            creature.DisableTurnsRemaining--;
+            if (creature.DisableTurnsRemaining == 0 && creature.DisabledMove != null)
+            {
+                string reEnabled = creature.DisabledMove.Base.Name ?? "";
+                creature.DisabledMove = null;
+                emitter?.Emit(new MoveReEnabled(creature.Name, reEnabled));
+            }
+        }
+
         // Binding damage — decrement counter and deal 1/16 max HP
         if (creature.BindingTurnsRemaining > 0)
         {

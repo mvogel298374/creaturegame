@@ -3,4 +3,5 @@ export interface MoveInfo {
   type: string;
   ppCurrent: number;
   ppMax: number;
+  disabled?: boolean;
 }

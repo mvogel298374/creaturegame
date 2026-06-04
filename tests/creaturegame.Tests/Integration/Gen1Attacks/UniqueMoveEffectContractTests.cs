@@ -10,9 +10,9 @@ namespace creaturegame.Tests.Integration.Gen1Attacks;
 /// capability class.
 /// <list type="bullet">
 /// <item><b>Pay Day</b> — deals normal damage and scatters coins = multiplier × user level.</item>
-/// <item><b>Whirlwind</b> — ends wild battles / forces a switch in Gen 1. With no party/run loop
-/// yet it is a deliberate in-engine no-op; the contract pins that it is announced but harmless and
-/// keeps its Gen 1 −6 priority, so the gap is documented rather than silent.</item>
+/// <item><b>Whirlwind / Roar</b> — end wild battles / force a switch in Gen 1. With no party/run
+/// loop yet they are deliberate in-engine no-ops; the contract pins that each is announced but
+/// harmless and keeps its Gen 1 −6 priority, so the gap is documented rather than silent.</item>
 /// </list>
 /// </summary>
 [Collection(MovesCollection.Name)]
@@ -32,10 +32,12 @@ public class UniqueMoveEffectContractTests(MovesFixture moves) : Gen1MoveContrac
         Assert.True(result.Has<DamageDealt>(), "Pay Day also deals damage");
     }
 
-    [Fact]
-    public async Task WhirlwindIsAnnouncedButHasNoCombatEffect()
+    [Theory]
+    [InlineData("whirlwind")]
+    [InlineData("roar")]
+    public async Task SwitchMoveIsAnnouncedButHasNoCombatEffect(string moveName)
     {
-        var move = Move("whirlwind");
+        var move = Move(moveName);
         var result = await new MoveScenario()
             .Defender(TestCreatures.Make("D", hp: 500))
             .Use(move);
@@ -47,7 +49,9 @@ public class UniqueMoveEffectContractTests(MovesFixture moves) : Gen1MoveContrac
         Assert.Equal(move.PowerPointsMax - 1, result.Move.PowerPointsCurrent);
     }
 
-    [Fact]
-    public void WhirlwindHasGen1NegativePriority()
-        => Assert.Equal(-6, Move("whirlwind").Priority);
+    [Theory]
+    [InlineData("whirlwind")]
+    [InlineData("roar")]
+    public void SwitchMoveHasGen1NegativePriority(string moveName)
+        => Assert.Equal(-6, Move(moveName).Priority);
 }

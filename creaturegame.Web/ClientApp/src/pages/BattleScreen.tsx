@@ -218,7 +218,8 @@ function MoveMenu({ moves, canChoose, onChoose, onBack }: {
         {slots.map((move, i) => {
           const isEmpty = move.name === '---';
           const outOfPp = !isEmpty && move.ppCurrent <= 0;
-          const disabled = !canChoose || isEmpty || outOfPp;
+          const isDisabled = !isEmpty && !!move.disabled;   // locked out by Disable
+          const disabled = !canChoose || isEmpty || outOfPp || isDisabled;
           return (
             <button
               key={i}

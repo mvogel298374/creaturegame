@@ -44,6 +44,7 @@ public abstract class DelegatingBattleRules : IBattleRules
     public virtual int    CalculateCrashDamage(Creature user)                => Gen1.CalculateCrashDamage(user);
     public virtual int    CalculateRecoilDamage(int damageDealt)             => Gen1.CalculateRecoilDamage(damageDealt);
     public virtual int    RollRampageTurns()                                 => Gen1.RollRampageTurns();
+    public virtual int    RollDisableTurns()                                 => Gen1.RollDisableTurns();
     public virtual int    CalculateXpAwarded(int baseExp, int enemyLevel)    => Gen1.CalculateXpAwarded(baseExp, enemyLevel);
     public virtual int    GetOffensiveStat(Creature a, AttackType t)         => Gen1.GetOffensiveStat(a, t);
     public virtual int    GetDefensiveStat(Creature d, AttackType t)         => Gen1.GetDefensiveStat(d, t);

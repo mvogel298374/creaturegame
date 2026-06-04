@@ -21,10 +21,12 @@ public sealed class SignalRInput : IBattleInput
         _tcs = null;
 
         var moves = context.Attacker.MoveSet;
-        if (index >= 0 && index < moves.Count && moves[index].PowerPointsCurrent > 0)
+        if (index >= 0 && index < moves.Count
+            && moves[index].PowerPointsCurrent > 0 && moves[index] != context.DisabledMove)
             return moves[index];
 
-        return moves.FirstOrDefault(m => m.PowerPointsCurrent > 0)
+        // Fallback (out-of-range / a Disabled or PP-less slot slipped through): first selectable move.
+        return moves.FirstOrDefault(m => m.PowerPointsCurrent > 0 && m != context.DisabledMove)
             ?? throw new InvalidOperationException($"{context.Attacker.Name}: no moves available");
     }
 
