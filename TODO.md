@@ -472,6 +472,23 @@ The stat-selection abstraction (← NEXT section) is the only change to do now. 
 - [ ] Importer stores one row per species per generation; engine queries by active generation
 - [ ] **Note:** PokeAPI has no `past_stats` equivalent — Gen 1 stat corrections (e.g. Clefable, Beedrill, Pikachu line were buffed in Gen 6) will need a corrections table or separate data source
 
+**Move per-generation data (intention — see `DATA_IMPORT.md` §4.1/§5.5):**
+- Today the importer resolves each move's **Gen 1** values from PokeAPI `past_values` by taking the
+  *earliest* recorded entry. The mechanism already carries the full history, so going multi-gen is a
+  **generalisation, not a rewrite**: resolve a field for target generation *G* as the value of the
+  earliest `past_values` entry whose `version_group` generation is **> G** (the change happened after
+  G, so the old value still applied at G), else the current value. "Earliest = Gen 1" is just the
+  *G = 1* case.
+- [ ] When moves go per-generation, either store one `Attack` row per `(moveId, generation)` (mirror
+  the **learnset model** — a `Generation` column + an `ActiveGeneration` filter, already the template
+  in `PokemonLearnset`) **or** resolve on demand for `ActiveGeneration`. Prefer the stored-per-gen row
+  for query simplicity and parity with `PokemonSpeciesGenData`.
+- [ ] Make the **layer-2 override table per-generation** too (e.g. Acid's stat target/chance differs
+  Gen 1 vs Gen 4+). The override key becomes `(moveName, generation)`, not just `moveName`.
+- [ ] Keep mechanic/formula differences on the **seams** (`IBattleRules` et al.), never in the
+  per-gen move data — the data layer answers "what are this move's numbers in gen G," the seam answers
+  "how does the engine apply them in gen G."
+
 **Generation filtering:**
 - [ ] `Attack.GenerationIntroduced` (int) + `PokemonSpecies.GenerationIntroduced` (int) — set on import
 - [ ] `EncounterSelector.PickByBst` and `GameController.BuildCreature` filter by `GenerationIntroduced <= activeGeneration`

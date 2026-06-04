@@ -79,13 +79,37 @@ endpoint and map it.
 ## 4. The domain: what we extract and the Gen 1 decisions in the mapping
 
 ### 4.1 Moves (`MoveImport` → `Attack`)
-For each move, `GET /move/{id}` → `PokeApiMove` DTO → `MapToAttack`. Straight fields:
-`BaseDamage` (power), `Accuracy`, `PowerPointsMax` (pp), `Priority`, `EffectChance`,
-`Description` (English short-effect), `DamageType` (parsed into our enum).
+For each move, `GET /move/{id}` → `PokeApiMove` DTO → `MapToAttack`. Core stat fields
+(`BaseDamage`/power, `Accuracy`, `PowerPointsMax`/pp, `EffectChance`, and `DamageType`) are
+**resolved to their Gen 1 values** (see immediately below), *not* copied from PokeAPI's current
+data; `Priority` and `Description` (English short-effect) are taken as-is.
 
-The interesting Gen 1 logic lives in the categorisation:
+#### Gen 1 value resolution (`past_values`) — the default fidelity mechanism
+PokeAPI returns each move's **current** (latest-generation) stats, and many Gen 1 moves differ:
+special moves were stronger (Flamethrower/Ice Beam/Surf 95→90, Hydro Pump/Blizzard 120→110),
+Blizzard was 90% accurate (→70%), and several moves were a different **type** (Bite/Gust/Karate
+Chop/Sand Attack were Normal). PokeAPI records this in each move's **`past_values`** array: every
+entry holds the value a field had *before* it changed, tagged with the `version_group` where the
+change took effect — so the recorded value applied in all *earlier* generations, Gen 1 included.
 
-- **`AttackType`** — for damaging moves, **derived from the move's type** (Gen 1 rule),
+`MapToAttack` resolves the Gen 1 value of `power`, `accuracy`, `pp`, `effect_chance`, and `type`
+by taking the **earliest** `past_values` entry that specifies each field (PokeAPI lists them
+oldest-first); a field with no entry kept its current value in Gen 1 too. This is the **single,
+data-driven source** of Gen 1 move fidelity — there are deliberately **no per-move hardcoded
+stat/type corrections**. It is the move-side analogue of `past_types` for species typing (§4.2),
+and it *superseded* an earlier hardcoded type-correction switch.
+
+**The one documented exception.** `past_values` only covers `power/accuracy/pp/effect_chance/
+type`. Where a Gen 1 fact falls outside those — a secondary's *target stat*, an ailment, priority,
+or a whole-effect rewrite — add a **small, explicitly-commented override** after the mapping,
+sourced from an authority (Bulbapedia / a Gen 1 disassembly), never from PokeAPI's current data.
+Today the list is exactly one: **Acid** (Gen 1 lowers the target's *Defense* at 33%; PokeAPI's
+structured data says Sp. Def at 10% and its `past_values` is empty). Keep this list short — see
+the layered strategy and its limits in §5.5.
+
+The remaining Gen 1 logic lives in the categorisation:
+
+- **`AttackType`** — for damaging moves, **derived from the move's (Gen-1-resolved) type** (Gen 1 rule),
   *not* PokeAPI's `damage_class`. Gen 1 physical types are Normal/Fighting/Flying/Poison/
   Ground/Rock/Bug/Ghost; everything else is Special. Status moves → `Undefined`. *(PokeAPI's
   `damage_class` is the Gen 4+ per-move split — it would wrongly make Fire Punch physical
@@ -103,8 +127,10 @@ The interesting Gen 1 logic lives in the categorisation:
 - **`DrainPercent`** ← `meta.drain` for drain moves (default 50%).
 - **`NeverMisses`** — Swift (ID 129) bypasses the accuracy roll.
 - **Stat-stage effects** ← first `stat_changes` entry → `StatEffectStat/Delta/Target/
-  Chance` (Swords Dance, Growl, …). Pure status moves always land (chance 100);
-  secondary effects on damaging moves use `EffectChance`.
+  Chance` (Swords Dance, Growl, …). Pure status moves always land (chance 100); secondary
+  effects on damaging moves use the **Gen-1-resolved** `EffectChance`. (At runtime the engine
+  reads that chance through `IBattleRules.GetSecondaryEffectChance`, not the column directly —
+  see `GENERATION_SEAMS.md`.)
 - **Special `MoveEffect`** by name: Haze, Leech Seed, Hyper Beam (Recharge), binding
   moves (Wrap/Bind/Clamp/Fire Spin), two-turn moves (Fly/Dig/Solar Beam/Razor Wind/
   Sky Attack), Metronome, and flinch (from `meta.flinch_chance`).
@@ -182,10 +208,40 @@ structure you need, encode the domain knowledge directly, **comment every magic 
 with what it represents (`// 120/153 Self-Destruct/Explosion`), and keep it all in the
 importer so the runtime model stays clean. The comments are the spec.
 
-### 5.5 Historical correctness at import time (`past_types`)
-Importing the *Gen 1* typing rather than today's is a deliberate correctness step. It's a
-good example of the importer's job: not "copy the API" but "produce an accurate Gen 1
-snapshot." Strict-clone fidelity is decided here, once, rather than patched in the engine.
+### 5.5 Historical correctness at import time (`past_types` / `past_values`)
+Importing *Gen 1* values rather than today's is a deliberate correctness step: the importer's
+job is "produce an accurate Gen 1 snapshot," not "copy the API." Two parallel mechanisms do this
+from PokeAPI's own historical fields — **`past_types`** for species typing (§4.2) and
+**`past_values`** for move power/accuracy/pp/effect_chance/type (§4.1) — and both follow the same
+rule: *take the earliest historical entry; fall back to current only when no history is recorded.*
+Strict-clone fidelity is decided here, once, rather than patched in the engine.
+
+**Reach for the fidelity layers in this order — it's the intended strategy, not a suggestion:**
+
+1. **The historical-field resolver** (`past_values` / `past_types`) — automatic, covers the
+   systematic numeric/type drift, needs no per-move code. This is the default and should handle
+   the overwhelming majority of moves.
+2. **A targeted, commented override in the importer** — *only* for a Gen 1 fact the historical
+   fields **can't express** (a secondary's target stat, an ailment, priority, a mechanic). Verify
+   it against an authority (Bulbapedia / the pret/pokered disassembly) and keep the list short.
+   Acid is the sole current entry.
+3. **The runtime seams** (`IBattleRules` / `ITypeChart` / `IStatCalculator`) — for anything that
+   is a *formula or mechanic* difference rather than stored move/species **data**. Mechanic
+   differences never belong in the importer; data differences never belong in the engine.
+
+**Limits to respect (be honest — these *will* bite if ignored):**
+
+- `past_values` covers only `power/accuracy/pp/effect_chance/type`. **Stat-target changes** (Acid),
+  ailment/secondary-chance changes PokeAPI didn't record, priority, target, crit rate, and
+  **whole-effect rewrites** are invisible to it — and PokeAPI's *structured* data can lag its own
+  flavor text. When a move's Gen 1 secondary looks off, cross-check Bulbapedia; do not assume the
+  resolver caught it.
+- "Earliest entry = Gen 1" relies on PokeAPI listing `past_values` **oldest-first**. For a field
+  that changed more than once this ordering is load-bearing; if it is ever violated, sort entries
+  by their `version_group`'s generation instead of trusting array order.
+- Contract tests assert what we *coded*, so they won't flag a wrong-but-consistent data value.
+  The real safety net is the **per-move review each coverage batch** — decode the row and
+  sanity-check power/accuracy/secondary against Gen 1 before trusting it.
 
 ### 5.6 Resilience: fail a record, not the run
 Every fetch is wrapped in try/catch with `EnsureSuccessStatusCode`, and a failure on one
@@ -201,6 +257,10 @@ next run, rather than aborting the whole import.
   moves (e.g. Hyper Beam, the elemental punches, Gust) and so computed their damage off the
   wrong stat. Now derived from the move's type (§4.1); the existing `moves.db` rows were
   corrected in place by the same deterministic rule.
+- **Gen 1 move-data fidelity is resolver-based, with blind spots.** `past_values` (§4.1) auto-
+  corrects power/accuracy/pp/effect_chance/type, but it does **not** see stat-target changes,
+  ailment/secondary-chance changes PokeAPI omitted, priority, or whole-effect rewrites — those need
+  a verified override (layer 2) and won't be caught by tests. See §5.5 for the strategy + limits.
 - **`new HttpClient()` per request.** Convenient but not best practice (socket pressure at
   scale). Tolerable here given the one-shot, low-volume nature; would be a shared client /
   `IHttpClientFactory` in long-running code.
