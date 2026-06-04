@@ -19,6 +19,8 @@ public class StabAndTypeEffectivenessContractTests(MovesFixture moves) : Gen1Mov
     [InlineData("vine-whip",   DamageType.Grass,    DamageType.Normal, DamageType.Normal)]   // first Special-type STAB mover
     [InlineData("jump-kick",   DamageType.Fighting, DamageType.Normal, DamageType.Fire)]
     [InlineData("poison-sting", DamageType.Poison,  DamageType.Normal, DamageType.Normal)]
+    [InlineData("water-gun",   DamageType.Water,    DamageType.Normal, DamageType.Normal)]   // Water STAB
+    [InlineData("psybeam",     DamageType.Psychic,  DamageType.Normal, DamageType.Normal)]   // Psychic STAB
     public async Task StabAddsAboutHalfAgainDamage(
         string moveName, DamageType stabType, DamageType neutralAttackerType, DamageType defenderType)
     {
@@ -47,6 +49,9 @@ public class StabAndTypeEffectivenessContractTests(MovesFixture moves) : Gen1Mov
     [InlineData("vine-whip",     DamageType.Water,    DamageType.Normal, 2.0)]   // Grass → Water
     [InlineData("jump-kick",     DamageType.Normal,   DamageType.Fire,   2.0)]   // Fighting → Normal
     [InlineData("poison-sting",  DamageType.Grass,    DamageType.Normal, 2.0)]   // Poison → Grass
+    [InlineData("water-gun",     DamageType.Fire,     DamageType.Normal, 2.0)]   // Water → Fire
+    [InlineData("psybeam",       DamageType.Poison,   DamageType.Normal, 2.0)]   // Psychic → Poison
+    [InlineData("ice-beam",      DamageType.Dragon,   DamageType.Normal, 2.0)]   // Ice → Dragon
     public async Task TypeEffectivenessScalesDamage(
         string moveName, DamageType defenderType, DamageType neutralDefenderType, double expectedMult)
     {

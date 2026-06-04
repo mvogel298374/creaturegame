@@ -39,4 +39,8 @@ public sealed class BattleState
     // each end-of-turn and the move is re-enabled when it reaches 0.
     public PokemonAttack? DisabledMove { get; set; }
     public int DisableTurnsRemaining { get; set; }
+
+    // Mist (the move): while set, the opponent cannot lower this creature's stat stages.
+    // Gen 1 lasts until the battle ends, so it lives here and clears on the per-battle reset.
+    public bool HasMist { get; set; }
 }

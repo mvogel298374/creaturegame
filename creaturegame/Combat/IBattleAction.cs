@@ -323,9 +323,22 @@ public class AttackAction : IBattleAction
         if (se == null) return;
         if (!Target.IsAlive() && se.Target == StageTarget.Foe) return;
 
-        if (_rng.Next(1, 101) > se.Chance) return;
-
         Creature affected = se.Target == StageTarget.Self ? Source : Target;
+
+        // Gen 1 Mist: the opponent cannot lower the Mist-holder's stats. Self-inflicted drops
+        // (and any raise) are unaffected.
+        if (se.Target == StageTarget.Foe && se.Delta < 0 && affected.HasMist)
+        {
+            _emitter?.Emit(new StatDropBlocked(affected.Name));
+            return;
+        }
+
+        // Chance comes from the rules seam (Gen 1 reads the move's single chance column for every
+        // secondary kind) rather than the StatEffectChance column directly — keeps the call site
+        // generation-agnostic, like the status/flinch/confuse secondaries.
+        int chance = _rules.GetSecondaryEffectChance(attack, SecondaryEffectKind.StatStage);
+        if (_rng.Next(1, 101) > chance) return;
+
         int newStage = ApplyStageChange(affected, se.Stat, se.Delta);
         _emitter?.Emit(new StatStageChanged(affected.Name, se.Stat.ToString(), se.Delta, newStage));
     }
@@ -400,6 +413,16 @@ public class AttackAction : IBattleAction
                         Target.DisableTurnsRemaining = _rules.RollDisableTurns();
                         _emitter?.Emit(new MoveDisabled(Target.Name, locked.Base.Name ?? ""));
                     }
+                }
+                break;
+
+            case MoveEffect.Mist:
+                // Mist shrouds the user; the opponent can't lower its stats until the battle ends
+                // (enforced in TryApplyStatEffect). Self-targeting, no damage.
+                if (!Source.HasMist)
+                {
+                    Source.HasMist = true;
+                    _emitter?.Emit(new MistApplied(Source.Name));
                 }
                 break;
 

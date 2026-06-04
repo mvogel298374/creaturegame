@@ -1182,6 +1182,9 @@ public class CoreMechanicsTests
             StatEffectStat   = StageStat.Defense,
             StatEffectDelta  = -1,
             StatEffectTarget = StageTarget.Foe,
+            // Gen 1 stores one secondary chance per move; the engine reads it via
+            // IBattleRules.GetSecondaryEffectChance (← EffectChance), so a 0% secondary lives here.
+            EffectChance     = 0,
             StatEffectChance = 0,
         };
         attacker.AddAttack(move);

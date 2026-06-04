@@ -42,6 +42,11 @@ public class PhysicalSpecialSplitContractTests(MovesFixture moves) : Gen1MoveCon
     [InlineData("fury-attack",   AttackType.Physical)]  // Normal
     [InlineData("horn-drill",    AttackType.Physical)]  // Normal
     [InlineData("poison-sting",  AttackType.Physical)]  // Poison (physical in Gen 1)
+    [InlineData("acid",          AttackType.Physical)]  // Poison (physical in Gen 1)
+    [InlineData("ember",         AttackType.Special)]   // Fire
+    [InlineData("water-gun",     AttackType.Special)]   // Water
+    [InlineData("ice-beam",      AttackType.Special)]   // Ice
+    [InlineData("psybeam",       AttackType.Special)]   // Psychic
     // Status moves keep no damage category (Undefined) regardless of type.
     [InlineData("sand-attack",   AttackType.Undefined)]  // Normal in Gen 1 (retyped to Ground in Gen 2)
     [InlineData("tail-whip",     AttackType.Undefined)]

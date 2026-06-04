@@ -73,6 +73,10 @@ public record CrashDamage(string SourceName, int Damage, int HpAfter) : BattleEv
 public record MoveDisabled(string TargetName, string MoveName) : BattleEvent;
 public record MoveReEnabled(string CreatureName, string MoveName) : BattleEvent;
 
+// --- Mist (the move) ---
+public record MistApplied(string CreatureName) : BattleEvent;
+public record StatDropBlocked(string CreatureName) : BattleEvent;
+
 // --- Creature ---
 public record CreatureFainted(string Name) : BattleEvent;
 public record LeveledUp(string CreatureName, int NewLevel) : BattleEvent;

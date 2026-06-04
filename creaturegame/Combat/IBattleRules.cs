@@ -10,7 +10,7 @@ namespace creaturegame.Combat;
 /// ask <see cref="IBattleRules.GetSecondaryEffectChance"/> by kind so they never assume the
 /// Gen 1 single-column layout.
 /// </summary>
-public enum SecondaryEffectKind { Status, Flinch, Confuse }
+public enum SecondaryEffectKind { Status, Flinch, Confuse, StatStage }
 
 public interface IBattleRules
 {

@@ -387,6 +387,16 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       return { steps: [w(120), d(log(`${cName}'s ${formatMoveName(mName)} is no longer disabled!`))] };
     }
 
+    case 'MistApplied': {
+      const cName = payload.creatureName as string;
+      return { steps: [emit({ type: 'playStatusSound' }), w(300), d(log(`${cName} became shrouded in mist!`))] };
+    }
+
+    case 'StatDropBlocked': {
+      const cName = payload.creatureName as string;
+      return { steps: [w(120), d(log(`${cName} is protected by the mist!`))] };
+    }
+
     default:
       return {};
   }

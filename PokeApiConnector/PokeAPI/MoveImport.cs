@@ -89,20 +89,36 @@ public class MoveImport
 
     private static Attack MapToAttack(PokeApiMove pokeMove)
     {
+        // PokeAPI returns each move's MODERN stats; Gen 1 often differed (special moves were
+        // stronger, Blizzard was 90% accurate, and several moves were a different type — e.g.
+        // Bite/Gust/Karate Chop/Sand Attack were Normal). PokeAPI records the history in
+        // `past_values`: each entry's value was in effect in every generation *before* its
+        // version_group, so the EARLIEST recorded value is the Gen 1 one. We resolve power /
+        // accuracy / pp / effect_chance / type from it here so every downstream decision (STAB,
+        // type chart, the type-derived physical/special split, damage) is Gen-1-correct. This is
+        // the single, data-driven source for Gen 1 move data — no per-move hardcoded corrections.
+        // (A future multi-gen importer would store one row per generation; today it's Gen 1 only.)
+        var pasts = pokeMove.PastValues ?? new List<MovePastValue>();
+        int     gen1Power     = pasts.Select(p => p.Power).FirstOrDefault(v => v != null) ?? pokeMove.Power ?? 0;
+        int     gen1Accuracy  = pasts.Select(p => p.Accuracy).FirstOrDefault(v => v != null) ?? pokeMove.Accuracy ?? 100;
+        int     gen1Pp        = pasts.Select(p => p.Pp).FirstOrDefault(v => v != null) ?? pokeMove.Pp ?? 30;
+        int?    gen1EffChance = pasts.Select(p => p.EffectChance).FirstOrDefault(v => v != null) ?? pokeMove.EffectChance;
+        string? gen1TypeName  = pasts.Select(p => p.Type?.Name).FirstOrDefault(v => v != null) ?? pokeMove.Type?.Name;
+
         Attack attack = new Attack
         {
             Id = pokeMove.Id,
             Name = pokeMove.Name,
-            BaseDamage = pokeMove.Power ?? 0,
-            Accuracy = pokeMove.Accuracy ?? 100,
-            PowerPointsMax = pokeMove.Pp ?? 30,
+            BaseDamage = gen1Power,
+            Accuracy = gen1Accuracy,
+            PowerPointsMax = gen1Pp,
             Description = pokeMove.EffectEntries?
                 .FirstOrDefault(e => e.Language?.Name == "en")?.ShortEffect ?? "No description available.",
             Priority = pokeMove.Priority,
-            EffectChance = pokeMove.EffectChance
+            EffectChance = gen1EffChance
         };
 
-        if (Enum.TryParse<DamageType>(pokeMove.Type?.Name, true, out var damageType))
+        if (Enum.TryParse<DamageType>(gen1TypeName, true, out var damageType))
         {
             attack.DamageType = damageType;
         }
@@ -110,19 +126,6 @@ public class MoveImport
         {
             attack.DamageType = DamageType.Normal; // Default
         }
-
-        // Gen 1 type corrections: PokeAPI returns each move's MODERN type, but several Gen 1
-        // moves were retyped in later generations. Restore their Red/Blue/Yellow types so STAB,
-        // the type chart, and the physical/special split (derived from type just below) are all
-        // Gen-1-correct. All four were Normal in Gen 1.
-        attack.DamageType = pokeMove.Name switch
-        {
-            "karate-chop" => DamageType.Normal,  // → Fighting from Gen 2
-            "gust"        => DamageType.Normal,  // → Flying from Gen 2
-            "sand-attack" => DamageType.Normal,  // → Ground from Gen 2
-            "bite"        => DamageType.Normal,  // → Dark from Gen 2
-            _             => attack.DamageType
-        };
 
         // Gen 1: a damaging move's physical/special split is decided by its TYPE, not the
         // move. PokeAPI's damage_class is the Gen 4+ per-move split (e.g. it calls Fire
@@ -200,10 +203,23 @@ public class MoveImport
                 attack.StatEffectDelta  = statChange.Change;
                 attack.StatEffectTarget = pokeMove.Target?.Name == "user"
                     ? StageTarget.Self : StageTarget.Foe;
-                // Pure stat moves always succeed; secondary effects on damaging moves use EffectChance
+                // Pure stat moves always succeed; secondary effects on damaging moves use the
+                // (Gen-1-resolved) effect chance.
                 attack.StatEffectChance = attack.BaseDamage > 0
-                    ? (pokeMove.EffectChance ?? 100) : 100;
+                    ? (attack.EffectChance ?? 100) : 100;
             }
+        }
+
+        // Gen 1 secondary-effect correction not captured by past_values (which is empty for Acid):
+        // Acid lowered the target's *Defense* (PokeAPI's stat_changes says Sp. Def — the Gen 4+
+        // version) at a 33% chance (PokeAPI records 10%). Override both for Gen 1 fidelity.
+        if (pokeMove.Name == "acid")
+        {
+            attack.StatEffectStat   = StageStat.Defense;
+            attack.StatEffectDelta  = -1;
+            attack.StatEffectTarget = StageTarget.Foe;
+            attack.StatEffectChance = 33;
+            attack.EffectChance     = 33;
         }
 
         // Special move effects
@@ -242,6 +258,9 @@ public class MoveImport
             attack.Effect = MoveEffect.Rampage;
         else if (pokeMove.Name == "pay-day")
             attack.Effect = MoveEffect.PayDay;
+        // Mist shrouds the user so the opponent can't lower its stats (enforced in the battle engine).
+        else if (pokeMove.Name == "mist")
+            attack.Effect = MoveEffect.Mist;
         // Disable locks one of the target's moves for a few turns; the lock itself is enforced at
         // move-selection time. Matched by name (its ailment "disable" maps to no StatusCondition).
         else if (pokeMove.Name == "disable")

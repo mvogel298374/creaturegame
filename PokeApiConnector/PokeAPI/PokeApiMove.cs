@@ -42,6 +42,33 @@ public class PokeApiMove
 
     [JsonPropertyName("meta")]
     public MoveMeta? Meta { get; set; }
+
+    // Historical values for generations before the move was changed. Each entry's version_group
+    // is the group in which the value changed to its *next* value, so the recorded value was in
+    // effect in all *earlier* generations — including Gen 1. PokeAPI lists them oldest-first.
+    [JsonPropertyName("past_values")]
+    public List<MovePastValue>? PastValues { get; set; }
+}
+
+public class MovePastValue
+{
+    [JsonPropertyName("power")]
+    public int? Power { get; set; }
+
+    [JsonPropertyName("accuracy")]
+    public int? Accuracy { get; set; }
+
+    [JsonPropertyName("pp")]
+    public int? Pp { get; set; }
+
+    [JsonPropertyName("effect_chance")]
+    public int? EffectChance { get; set; }
+
+    [JsonPropertyName("type")]
+    public NamedApiResource? Type { get; set; }
+
+    [JsonPropertyName("version_group")]
+    public NamedApiResource? VersionGroup { get; set; }
 }
 
 public class StatChange

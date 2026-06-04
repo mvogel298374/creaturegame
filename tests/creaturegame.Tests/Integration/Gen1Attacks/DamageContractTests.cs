@@ -25,6 +25,9 @@ public class DamageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     [InlineData("wrap")] [InlineData("take-down")] [InlineData("thrash")]
     [InlineData("double-edge")] [InlineData("poison-sting")]
     [InlineData("pin-missile")] [InlineData("bite")] [InlineData("twineedle")]
+    [InlineData("acid")] [InlineData("ember")] [InlineData("flamethrower")] [InlineData("water-gun")]
+    [InlineData("hydro-pump")] [InlineData("surf")] [InlineData("ice-beam")] [InlineData("blizzard")]
+    [InlineData("psybeam")]
     public async Task DealsDamageOnHit(string moveName)
     {
         var result = await new MoveScenario()
@@ -50,6 +53,9 @@ public class DamageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     [InlineData("wrap")] [InlineData("take-down")] [InlineData("thrash")]
     [InlineData("double-edge")] [InlineData("poison-sting")]
     [InlineData("pin-missile")] [InlineData("bite")] [InlineData("twineedle")]
+    [InlineData("acid")] [InlineData("ember")] [InlineData("flamethrower")] [InlineData("water-gun")]
+    [InlineData("hydro-pump")] [InlineData("surf")] [InlineData("ice-beam")] [InlineData("blizzard")]
+    [InlineData("psybeam")]
     public async Task DecrementsPpByOneOnUse(string moveName)
     {
         var move = Move(moveName);
@@ -67,7 +73,7 @@ public class DamageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     [InlineData("cut")] [InlineData("bind")]
     [InlineData("slam")] [InlineData("mega-kick")] [InlineData("rolling-kick")]
     [InlineData("fury-attack")] [InlineData("wrap")] [InlineData("take-down")]
-    [InlineData("pin-missile")]
+    [InlineData("pin-missile")] [InlineData("hydro-pump")] [InlineData("blizzard")]
     public async Task MissesWhenAccuracyRollFails(string moveName)
     {
         var result = await new MoveScenario()

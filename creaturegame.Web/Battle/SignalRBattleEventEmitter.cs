@@ -47,6 +47,8 @@ public sealed class SignalRBattleEventEmitter(
         CrashDamage e      => ("CrashDamage",      new { e.SourceName, e.Damage, e.HpAfter }),
         MoveDisabled e     => ("MoveDisabled",     new { e.TargetName, e.MoveName }),
         MoveReEnabled e    => ("MoveReEnabled",    new { e.CreatureName, e.MoveName }),
+        MistApplied e      => ("MistApplied",      new { e.CreatureName }),
+        StatDropBlocked e  => ("StatDropBlocked",  new { e.CreatureName }),
         MultiHitCompleted e => ("MultiHitCompleted", new { e.Hits }),
         CoinsScattered e   => ("CoinsScattered",   new { e.SourceName, e.Amount }),
         StatusApplied e    => ("StatusApplied",    new { e.TargetName, Status = e.Status.ToString() }),

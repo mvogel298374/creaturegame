@@ -108,6 +108,7 @@ public class Creature
     public PokemonAttack? RampageMove  { get => Battle.RampageMove;          set => Battle.RampageMove = value; }
     public PokemonAttack? DisabledMove { get => Battle.DisabledMove;         set => Battle.DisabledMove = value; }
     public int  DisableTurnsRemaining { get => Battle.DisableTurnsRemaining; set => Battle.DisableTurnsRemaining = value; }
+    public bool HasMist               { get => Battle.HasMist;               set => Battle.HasMist = value; }
 
     /// <summary>
     /// True when at least one move can be chosen this turn: it has PP and isn't Disabled. When

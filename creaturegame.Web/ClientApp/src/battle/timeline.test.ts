@@ -131,6 +131,18 @@ describe('expandEvent — Disable', () => {
   });
 });
 
+describe('expandEvent — Mist', () => {
+  it('MistApplied plays the status sound and logs the line', () => {
+    const { steps } = expandEvent('MistApplied', { creatureName: 'ARTICUNO' }, CTX);
+    expect(steps!.some(s => s.kind === 'emit')).toBe(true);   // playStatusSound
+    expect(logLines(steps)).toEqual(['ARTICUNO became shrouded in mist!']);
+  });
+  it('StatDropBlocked logs the Mist protection line', () => {
+    expect(logLines(expandEvent('StatDropBlocked', { creatureName: 'ARTICUNO' }, CTX).steps))
+      .toEqual(['ARTICUNO is protected by the mist!']);
+  });
+});
+
 describe('expandEvent — confusion & coins', () => {
   it('ConfusionStarted plays the status sound and logs the line', () => {
     const { steps } = expandEvent('ConfusionStarted', { targetName: 'ARTICUNO' }, CTX);

@@ -309,15 +309,48 @@ twineedle, pin-missile, leer, bite, growl, roar, sing, supersonic, sonic-boom, d
 - **Frontend Vitest gap closed**: `timeline.test.ts` now also covers `ConfusionStarted`,
   `ConfusionMessage`/`Damage`/`Cleared`, `CoinsScattered`, and the new `MoveDisabled`/`MoveReEnabled`.
 
+### Batch 6 (moves 51–60) ✅ DONE (2026-06-04)
+acid, ember, flamethrower, mist, water-gun, hydro-pump, surf, ice-beam, blizzard, psybeam.
+**424 .NET + 27 Vitest.** First special-attack-heavy batch; introduced a **data-driven Gen 1
+move-data resolver**, the **Mist** mechanic, and a gen-seam cleanup. Everything else coverage-only
+over real `AttackAction` paths (first Water & Psychic STAB movers).
+- Reused contracts (rows added): damage/PP/miss (all nine damaging moves; hydro-pump 80 & blizzard 90
+  can miss); secondary status burn (ember, flamethrower) + freeze (ice-beam, blizzard); STAB + type-
+  effectiveness for **Water** (water-gun → Fire 2×) & **Psychic** (psybeam → Poison 2×) + Ice → Dragon;
+  physical/special split (Water/Ice/Psychic → Special, acid → Poison Physical).
+- New capability classes: **`SecondaryEffectContractTests`** (damaging moves whose secondary is a
+  stat drop (acid → −1 foe Defense) or confusion (psybeam) — distinct from the status secondaries)
+  and **`MistContractTests`**.
+- **`past_values` resolver (the big one)** — PokeAPI returns each move's *modern* stats; Gen 1 often
+  differed (special moves stronger, Blizzard 90% acc, several moves a different type). The importer
+  now reads PokeAPI's `past_values` array and applies the **earliest** recorded power/accuracy/pp/
+  effect_chance/**type** as the Gen 1 value — one data-driven source, no per-move hardcoding. This
+  **supersedes batch 5's hardcoded type switch** (karate-chop/gust/sand-attack/bite are now corrected
+  via `past_values`, hardcodes removed) and fixed special-move powers (Flamethrower/Surf/Ice Beam 95,
+  Hydro Pump/Blizzard 120), Blizzard accuracy 90, and even **double-edge → 100** (Gen 1) from batch 4.
+  One documented exception: **acid** (Gen 1 lowers **Defense** at 33%, not Sp.Def/10%) is a manual
+  override since PokeAPI's `past_values` is empty for it. Re-imported + verified all rows via MCP.
+- **Mist** (`MoveEffect.Mist`) — `BattleState.HasMist` (+ `Creature` prop); `AttackAction` sets it +
+  emits `MistApplied`; `TryApplyStatEffect` blocks foe-induced stat drops on the holder (emits
+  `StatDropBlocked`), leaving self-buffs/raises untouched. New events wired through console + SignalR
+  + `timeline.ts` (+ Vitest). → `MistContractTests`.
+- **Gen-seam cleanup (§5.0):** acid is the first chance-based stat drop on a *damaging* move, so the
+  stat-effect chance now routes through `IBattleRules.GetSecondaryEffectChance` (new
+  `SecondaryEffectKind.StatStage`) instead of reading the `StatEffectChance` column directly —
+  matching the status/flinch/confuse secondaries. Behavior-preserving for all existing moves.
+
 ### Remaining batches (cadence)
-- [ ] Batches 6–17 (moves 51–165): query the next 10 → add `InlineData` rows to the matching
-  capability class → add a new capability class only for genuinely new mechanics. **Next: batch 6 =
-  moves 51–60.**
+- [ ] Batches 7–17 (moves 61–165): query the next 10 → add `InlineData` rows to the matching
+  capability class → add a new capability class only for genuinely new mechanics. **Next: batch 7 =
+  moves 61–70.**
 - [ ] **Fixed-2 multi-hit mover still pending**: bonemerang — the fixed-count mechanism exists
-  (double-kick, twineedle); just needs mapping + coverage in its batch. *(twineedle ✅ done batch 5.)*
+  (double-kick, twineedle); just needs mapping + coverage in its batch.
 - [ ] **Rampage reuse pending**: petal-dance just needs the importer tag (mechanism exists) + coverage.
-- [ ] **Gen 1 type corrections** are complete for the four known retyped moves (karate-chop, gust,
-  sand-attack, bite). Watch for any further retyped moves as later batches land (none expected ≤165).
+- [x] **Gen 1 move-data fidelity** is now data-driven via the `past_values` resolver (power/accuracy/
+  pp/effect_chance/type), so later batches get Gen-1-correct values automatically. Add a manual
+  override only for the rare thing `past_values` can't express (e.g. acid's Defense target). Watch the
+  importer console for any move whose Gen 1 secondary stat/chance looks off (PokeAPI structured data
+  can lag its own flavor text).
 
 ---
 

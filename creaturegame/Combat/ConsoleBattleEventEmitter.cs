@@ -68,6 +68,14 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                 Console.WriteLine($"{e.CreatureName}'s {e.MoveName} is no longer disabled!");
                 break;
 
+            case MistApplied e:
+                Console.WriteLine($"{e.CreatureName} became shrouded in mist!");
+                break;
+
+            case StatDropBlocked e:
+                Console.WriteLine($"{e.CreatureName} is protected by the mist!");
+                break;
+
             case MultiHitCompleted e:
                 Console.WriteLine($"Hit {e.Hits} time{(e.Hits == 1 ? "" : "s")}!");
                 break;
