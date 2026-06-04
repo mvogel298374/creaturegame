@@ -1,3 +1,4 @@
+using creaturegame.Attacks;
 using creaturegame.Combat;
 using creaturegame.Creatures;
 using creaturegame.Tests.TestSupport;
@@ -32,6 +33,36 @@ public class StatusMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
             .Rules(NeverHitRules.Instance)
             .Defender(TestCreatures.Make("D", hp: 500))
             .Use(Move("sing"));
+
+        Assert.True(result.Has<MoveMissed>());
+        Assert.Equal(StatusCondition.None, result.Defender.Status);
+    }
+
+    // The powders: Poison Powder (Poison), Stun Spore (Paralysis), Sleep Powder (Sleep) — pure
+    // status moves that afflict a (non-immune) target without dealing damage.
+    [Theory]
+    [InlineData("poison-powder", StatusCondition.Poison)]
+    [InlineData("stun-spore",    StatusCondition.Paralysis)]
+    [InlineData("sleep-powder",  StatusCondition.Sleep)]
+    public async Task PowderInflictsItsStatusWithoutDamage(string moveName, StatusCondition expected)
+    {
+        var result = await new MoveScenario()
+            .Defender(TestCreatures.Make("D", type1: DamageType.Water, hp: 500))
+            .Use(Move(moveName));
+
+        Assert.False(result.Has<DamageDealt>(), "a powder is a status move — no damage");
+        Assert.Equal(expected, result.Defender.Status);
+        Assert.Contains(result.Events, e => e is StatusApplied);
+    }
+
+    [Theory]
+    [InlineData("poison-powder")] [InlineData("stun-spore")] [InlineData("sleep-powder")]
+    public async Task PowderAppliesNothingOnMiss(string moveName)
+    {
+        var result = await new MoveScenario()
+            .Rules(NeverHitRules.Instance)
+            .Defender(TestCreatures.Make("D", type1: DamageType.Water, hp: 500))
+            .Use(Move(moveName));
 
         Assert.True(result.Has<MoveMissed>());
         Assert.Equal(StatusCondition.None, result.Defender.Status);

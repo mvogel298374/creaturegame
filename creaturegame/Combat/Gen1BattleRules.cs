@@ -92,6 +92,24 @@ public sealed class Gen1BattleRules : IBattleRules
     // Gen 1–4: Self-Destruct / Explosion halve the target's Defense before the damage calculation.
     public int SelfDestructDefenseDivisor => 2;
 
+    // ── Type-based immunities ────────────────────────────────────────────────────
+
+    // Gen 1 status immunities by type: Poison-types can't be poisoned, Fire-types can't be burned,
+    // and a Normal-type move can't paralyze a Normal-type (the Body Slam quirk). Sleep/Freeze have
+    // no type immunity in Gen 1.
+    public bool CanReceiveStatus(Creature target, StatusCondition status, DamageType moveType) => status switch
+    {
+        StatusCondition.Poison or StatusCondition.BadPoison           => !HasType(target, DamageType.Poison),
+        StatusCondition.Burn                                          => !HasType(target, DamageType.Fire),
+        StatusCondition.Paralysis when moveType == DamageType.Normal  => !HasType(target, DamageType.Normal),
+        _                                                             => true,
+    };
+
+    // Grass-types are immune to Leech Seed (all generations).
+    public bool CanBeLeechSeeded(Creature target) => !HasType(target, DamageType.Grass);
+
+    private static bool HasType(Creature c, DamageType type) => c.Type1 == type || c.Type2 == type;
+
     // ── Stat stages ────────────────────────────────────────────────────────────
 
     // Gen 1/2 battle-stat table: 2/(2+|n|) for n≤0, (2+n)/2 for n>0.

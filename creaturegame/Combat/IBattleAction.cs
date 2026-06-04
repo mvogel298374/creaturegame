@@ -175,6 +175,19 @@ public class AttackAction : IBattleAction
             justThawed = true;
         }
 
+        // Gen 1: a target immune to the move's type (e.g. Ghost vs a Normal/Fighting move) takes no
+        // damage even from the categories that bypass the normal damage calc (fixed / level-based /
+        // OHKO / Super Fang). Standard & Drain already fold 0× into their damage; Self-Destruct still
+        // detonates the user, so both are excluded here.
+        double typeImmunity = DamageCalculator.GetTypeEffectiveness(
+            attackToUse.DamageType, Target.Type1, Target.Type2, _typeChart);
+        if (typeImmunity == 0 && category is DamageCategory.Fixed or DamageCategory.LevelBased
+                or DamageCategory.OHKO or DamageCategory.SuperFang)
+        {
+            _emitter?.Emit(new MoveHadNoEffect(Target.Name, attackToUse.Name ?? ""));
+            return Task.CompletedTask;
+        }
+
         // Damage calculation by category
         int  damage = 0;
         bool isCrit = false;
@@ -305,6 +318,16 @@ public class AttackAction : IBattleAction
         if (Target.Status != StatusCondition.None) return;
         if (!Target.IsAlive()) return;
 
+        // Gen 1 type immunity (Poison can't be poisoned, Fire can't be burned, Body Slam can't
+        // paralyze a Normal-type). For a pure status move this is "it doesn't affect …"; on a
+        // damaging move with a secondary status, the hit already landed, so just skip silently.
+        if (!_rules.CanReceiveStatus(Target, attack.StatusEffect, attack.DamageType))
+        {
+            if (attack.BaseDamage == 0)
+                _emitter?.Emit(new MoveHadNoEffect(Target.Name, attack.Name ?? ""));
+            return;
+        }
+
         int chance = _rules.GetSecondaryEffectChance(attack, SecondaryEffectKind.Status);
         if (_rng.Next(1, 101) > chance) return;
 
@@ -362,7 +385,9 @@ public class AttackAction : IBattleAction
                 break;
 
             case MoveEffect.LeechSeed:
-                if (!Target.HasLeechSeed && Target.IsAlive())
+                if (Target.IsAlive() && !_rules.CanBeLeechSeeded(Target))
+                    _emitter?.Emit(new MoveHadNoEffect(Target.Name, attack.Name ?? ""));   // Grass-types are immune
+                else if (!Target.HasLeechSeed && Target.IsAlive())
                 {
                     Target.HasLeechSeed = true;
                     _emitter?.Emit(new LeechSeedApplied(Target.Name));
@@ -421,7 +446,14 @@ public class AttackAction : IBattleAction
                 // counters this turn's damage. Fails if no qualifying damage was taken — Gen 1 keeps
                 // the last value until overwritten, so this can fire off a previous turn (a quirk we
                 // preserve). Fixed/level-based/self damage isn't recorded, so it isn't counterable.
-                if (Target.IsAlive()
+                // Counter is Fighting-type, so a Ghost target is immune (the type chart returns 0×).
+                double counterEff = DamageCalculator.GetTypeEffectiveness(
+                    attack.DamageType, Target.Type1, Target.Type2, _typeChart);
+                if (Target.IsAlive() && counterEff == 0)
+                {
+                    _emitter?.Emit(new MoveHadNoEffect(Target.Name, attack.Name ?? ""));
+                }
+                else if (Target.IsAlive()
                     && Source.LastDamageTaken > 0
                     && Source.LastDamageType is DamageType.Normal or DamageType.Fighting)
                 {

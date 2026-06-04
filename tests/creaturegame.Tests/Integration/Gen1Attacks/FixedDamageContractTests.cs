@@ -6,8 +6,10 @@ namespace creaturegame.Tests.Integration.Gen1Attacks;
 
 /// <summary>
 /// Fixed-damage moves deal an exact amount of HP, independent of the attacker/defender stats and the
-/// type matchup (including immunities). Sonic Boom always deals 20. (Dragon Rage = 40 joins in its
-/// batch.) The move still misses on a failed accuracy roll and spends a PP like any move.
+/// type-effectiveness <i>scaling</i> (no ×2 / ×0.5). Sonic Boom always deals 20 — but a target whose
+/// type is outright <b>immune</b> to the move's type (Ghost vs Normal) still takes nothing, a Gen 1
+/// rule. (Dragon Rage = 40 joins in its batch.) The move still misses on a failed accuracy roll and
+/// spends a PP like any move.
 /// </summary>
 [Collection(MovesCollection.Name)]
 public class FixedDamageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
@@ -25,19 +27,31 @@ public class FixedDamageContractTests(MovesFixture moves) : Gen1MoveContract(mov
         Assert.Equal(20, result.First<DamageDealt>()!.Damage);
     }
 
-    // Fixed damage bypasses type effectiveness entirely — even a Ghost (which Normal can't touch)
-    // takes the full 20.
+    // Fixed damage ignores effectiveness scaling — a resistant (Rock) or neutral (Water) type still
+    // takes the full 20, with no ×0.5 / ×2.
     [Theory]
     [InlineData(DamageType.Water)]
     [InlineData(DamageType.Rock)]
-    [InlineData(DamageType.Ghost)]
-    public async Task SonicBoomIgnoresTheTypeMatchup(DamageType defenderType)
+    public async Task SonicBoomIgnoresEffectivenessScaling(DamageType defenderType)
     {
         var result = await new MoveScenario()
             .Defender(TestCreatures.Make("D", type1: defenderType, hp: 500))
             .Use(Move("sonic-boom"));
 
         Assert.Equal(20, result.TotalDamage);
+    }
+
+    // …but a full type immunity still applies: Sonic Boom is Normal, so a Ghost takes nothing.
+    [Fact]
+    public async Task SonicBoomDoesNotAffectGhostTypes()
+    {
+        var result = await new MoveScenario()
+            .Defender(TestCreatures.Make("D", type1: DamageType.Ghost, hp: 500))
+            .Use(Move("sonic-boom"));
+
+        Assert.False(result.Has<DamageDealt>());
+        Assert.True(result.Has<MoveHadNoEffect>());
+        Assert.Equal(500, result.Defender.Attributes.HP);
     }
 
     [Fact]

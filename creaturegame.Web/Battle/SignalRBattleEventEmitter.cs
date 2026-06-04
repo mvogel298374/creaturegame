@@ -42,6 +42,7 @@ public sealed class SignalRBattleEventEmitter(
         BattleEnded e      => ("BattleEnded",      new { e.WinnerName }),
         MoveUsed e         => ("MoveUsed",         new { e.AttackerName, e.MoveName }),
         MoveMissed e       => ("MoveMissed",       new { e.AttackerName, e.MoveName }),
+        MoveHadNoEffect e  => ("MoveHadNoEffect",  new { e.TargetName, e.MoveName }),
         DamageDealt e      => ("DamageDealt",      new { e.TargetName, e.Damage, e.TypeEffectiveness, e.HpAfter, e.HpMax, e.IsCrit }),
         RecoilDamage e     => ("RecoilDamage",     new { e.SourceName, e.Damage, e.HpAfter }),
         CrashDamage e      => ("CrashDamage",      new { e.SourceName, e.Damage, e.HpAfter }),

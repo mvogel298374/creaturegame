@@ -1,3 +1,4 @@
+using creaturegame.Attacks;
 using creaturegame.Combat;
 using creaturegame.Creatures;
 using creaturegame.Tests.TestSupport;
@@ -15,7 +16,6 @@ public class SecondaryStatusContractTests(MovesFixture moves) : Gen1MoveContract
     [InlineData("fire-punch", StatusCondition.Burn)]
     [InlineData("ice-punch", StatusCondition.Freeze)]
     [InlineData("thunder-punch", StatusCondition.Paralysis)]
-    [InlineData("body-slam", StatusCondition.Paralysis)]
     [InlineData("poison-sting", StatusCondition.Poison)]
     [InlineData("twineedle", StatusCondition.Poison)]   // 2 hits + 20% poison
     [InlineData("ember", StatusCondition.Burn)]
@@ -35,7 +35,7 @@ public class SecondaryStatusContractTests(MovesFixture moves) : Gen1MoveContract
 
     [Theory]
     [InlineData("fire-punch")] [InlineData("ice-punch")] [InlineData("thunder-punch")]
-    [InlineData("body-slam")] [InlineData("poison-sting")] [InlineData("twineedle")]
+    [InlineData("poison-sting")] [InlineData("twineedle")]
     [InlineData("ember")] [InlineData("flamethrower")] [InlineData("ice-beam")] [InlineData("blizzard")]
     public async Task NoSecondaryStatusOnMiss(string moveName)
     {
@@ -48,7 +48,7 @@ public class SecondaryStatusContractTests(MovesFixture moves) : Gen1MoveContract
 
     [Theory]
     [InlineData("fire-punch")] [InlineData("ice-punch")] [InlineData("thunder-punch")]
-    [InlineData("body-slam")] [InlineData("poison-sting")] [InlineData("twineedle")]
+    [InlineData("poison-sting")] [InlineData("twineedle")]
     [InlineData("ember")] [InlineData("flamethrower")] [InlineData("ice-beam")] [InlineData("blizzard")]
     public async Task NoSecondaryStatusWhenTargetAlreadyStatused(string moveName)
     {
@@ -61,5 +61,19 @@ public class SecondaryStatusContractTests(MovesFixture moves) : Gen1MoveContract
             .Use(Move(moveName));
 
         Assert.Equal(StatusCondition.Poison, result.Defender.Status);   // not overwritten
+    }
+
+    // Body Slam is special-cased: in Gen 1 it can't paralyze Normal-types (see ImmunityContractTests),
+    // but it paralyzes a non-Normal target normally.
+    [Fact]
+    public async Task BodySlamParalyzesANonNormalTarget()
+    {
+        var result = await new MoveScenario()
+            .Rules(ForceSecondaryRules.Instance)
+            .Defender(TestCreatures.Make("Defender", type1: DamageType.Water, hp: 500))
+            .Use(Move("body-slam"));
+
+        Assert.Equal(StatusCondition.Paralysis, result.Defender.Status);
+        Assert.Contains(result.Events, e => e is StatusApplied);
     }
 }

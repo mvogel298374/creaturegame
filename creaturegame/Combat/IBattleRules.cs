@@ -192,6 +192,24 @@ public interface IBattleRules
     /// </summary>
     int SelfDestructDefenseDivisor { get; }
 
+    // ── Type-based immunities ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Whether <paramref name="target"/> can receive the major <paramref name="status"/> inflicted
+    /// by a move of <paramref name="moveType"/>. Generations gate status by the target's type:
+    /// Gen 1 — Poison-types can't be poisoned, Fire-types can't be burned, and (a Gen 1 quirk) a
+    /// Normal-type move can't paralyze a Normal-type target (Body Slam). Sleep and Freeze have no
+    /// type immunity in Gen 1. Later gens add immunities (Electric→paralysis, Grass→powder, etc.),
+    /// so this stays on the seam rather than being a hardcoded check in the engine.
+    /// </summary>
+    bool CanReceiveStatus(Creature target, StatusCondition status, DamageType moveType);
+
+    /// <summary>
+    /// Whether <paramref name="target"/> can be afflicted by Leech Seed.
+    /// All generations: Grass-types are immune.
+    /// </summary>
+    bool CanBeLeechSeeded(Creature target);
+
     // ── Stat selection ─────────────────────────────────────────────────────────
 
     /// <summary>

@@ -33,6 +33,17 @@ public class CriticalHitContractTests(MovesFixture moves) : Gen1MoveContract(mov
         Assert.True(razorWind >= 40, $"high-crit move should crit most of the time (got {razorWind}/60)");
     }
 
+    // Razor Leaf is a single-turn high-crit Special move (Gen 1) — same high crit rate, no charge.
+    [Fact]
+    public async Task RazorLeafCritsFarMoreOftenThanNormal()
+    {
+        int razorLeaf = await CritRuns("razor-leaf");
+        int pound     = await CritRuns("pound");
+
+        Assert.True(razorLeaf > pound, $"razor-leaf crits ({razorLeaf}) should exceed pound ({pound})");
+        Assert.True(razorLeaf >= 40, $"high-crit move should crit most of the time (got {razorLeaf}/60)");
+    }
+
     private async Task<int> CritRuns(string moveName)
     {
         int crits = 0;

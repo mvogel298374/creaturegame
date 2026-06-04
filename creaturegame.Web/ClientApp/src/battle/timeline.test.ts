@@ -28,6 +28,11 @@ describe('expandEvent — move-name formatting', () => {
     const { steps } = expandEvent('MoveMissed', { attackerName: 'ARTICUNO', moveName: 'rolling-kick' }, CTX);
     expect(logLines(steps)).toEqual(["ARTICUNO's ROLLING KICK missed!"]);
   });
+
+  it('reads the Gen 1 immunity line for a no-effect move', () => {
+    const { steps } = expandEvent('MoveHadNoEffect', { targetName: 'GENGAR', moveName: 'seismic-toss' }, CTX);
+    expect(logLines(steps)).toEqual(["It doesn't affect GENGAR..."]);
+  });
 });
 
 describe('expandEvent — DamageDealt', () => {

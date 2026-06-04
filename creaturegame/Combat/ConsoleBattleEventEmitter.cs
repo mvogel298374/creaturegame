@@ -38,6 +38,10 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                 Console.WriteLine("The attack missed!");
                 break;
 
+            case MoveHadNoEffect e:
+                Console.WriteLine($"It doesn't affect {e.TargetName}...");
+                break;
+
             case DamageDealt e:
                 if (e.TypeEffectiveness == 0.0)
                 {

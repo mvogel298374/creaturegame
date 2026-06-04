@@ -364,17 +364,39 @@ changes (Counter reuses `DamageDealt`/`MoveMissed`).
   **poison-sting** 20% poison (was 30). Audited the rest (punches/beams 10%, body-slam 30%, twineedle
   20%, stomp/rolling-kick/headbutt 30%, psybeam 10%) — confirmed unchanged. Re-imported + verified via MCP.
 
+### Batch 8 (moves 71–80) ✅ DONE (2026-06-04)
+absorb, mega-drain, leech-seed, growth, razor-leaf, solar-beam, poison-powder, stun-spore,
+sleep-powder, petal-dance. **490 .NET + 28 Vitest.** Almost entirely a coverage batch (all mechanics
+already existed), plus the **Gen 1 type-immunity seam** (the user asked to also clear the deferred
+immunity edges) and one new event.
+- New capability classes: **`DrainContractTests`** (absorb/mega-drain heal ½ damage dealt; no
+  over-heal), **`LeechSeedContractTests`** (seeds on hit; per-turn 1/16 drain + heal in full
+  `Battle`), **`ImmunityContractTests`** (all the type immunities below).
+- Reused contracts (rows added): two-turn (solar-beam), high-crit (razor-leaf), stat-stage
+  (growth = +1 **Special** self), pure-status (poison/stun/sleep powders), rampage (petal-dance —
+  already tagged in the importer).
+- **Type-immunity seam** — new `IBattleRules.CanReceiveStatus` (Poison-type can't be poisoned,
+  Fire-type can't be burned, Normal-move can't paralyze a Normal-type = the Body Slam quirk) and
+  `CanBeLeechSeeded` (Grass immune). Moves that bypass the damage calc (fixed/level-based/OHKO/Super
+  Fang) and Counter now respect 0× type immunity via `ITypeChart` (e.g. Ghost vs Sonic Boom /
+  Seismic Toss / Counter). New `MoveHadNoEffect` event ("It doesn't affect …") wired through console
+  + SignalR + `timeline.ts` (+ Vitest). This closes the previously-deferred body-slam + Ghost edges.
+- **Data fix:** Gen 1 **growth** raises Special (not Attack as modern data reports) — importer layer-2
+  override; re-imported + verified via MCP.
+- Latent fidelity bug fixed: `SonicBoomIgnoresTheTypeMatchup(Ghost)` asserted Sonic Boom hits Ghost;
+  it doesn't in Gen 1. Corrected to "ignores effectiveness *scaling*" + a Ghost-immunity test.
+
 ### Remaining batches (cadence)
-- [ ] Batches 8–17 (moves 71–165): query the next 10 → add `InlineData` rows to the matching
-  capability class → add a new capability class only for genuinely new mechanics. **Next: batch 8 =
-  moves 71–80.**
+- [ ] Batches 9–17 (moves 81–165): query the next 10 → add `InlineData` rows to the matching
+  capability class → add a new capability class only for genuinely new mechanics. **Next: batch 9 =
+  moves 81–90.**
 - [ ] **Fixed-2 multi-hit mover still pending**: bonemerang — the fixed-count mechanism exists
   (double-kick, twineedle); just needs mapping + coverage in its batch.
-- [ ] **Rampage reuse pending**: petal-dance just needs the importer tag (mechanism exists) + coverage.
-- [ ] **Deferred Gen 1 fidelity edges** (documented simplifications, revisit if they matter):
-  body-slam's Gen 1 *Normal-types-immune-to-its-paralysis* quirk (a type→status-immunity rule — belongs
-  on a seam); Fighting/Normal → Ghost immunity for level-based moves (seismic-toss) and Counter; Counter
-  only answers damage recorded on the standard damage path (not fixed/level-based).
+- [x] **Rampage reuse**: petal-dance — done in batch 8 (already tagged in importer + coverage added).
+- [x] **Gen 1 type immunities** (batch 8): Poison→poison, Fire→burn, Body Slam→Normal-paralysis,
+  Grass→Leech Seed, and Ghost (0×) for fixed/level-based/OHKO/Super Fang/Counter — all on the seam now.
+  Remaining edge: Counter still only answers damage recorded on the standard damage path (not
+  fixed/level-based) — a documented simplification.
 - [x] **Seam audit (2026-06-04)** — fixed two move-specific damage quirks that had leaked out of the
   seams: (1) **OHKO success** was using `Source.Level < Target.Level` (the *Gen 2+* rule, mislabelled
   "Gen 1") → now `IBattleRules.OneHitKoSucceeds` with the correct Gen 1 **Speed** comparison; (2)

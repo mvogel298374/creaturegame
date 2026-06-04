@@ -28,6 +28,26 @@ public class StatStageMoveContractTests(MovesFixture moves) : Gen1MoveContract(m
         Assert.Equal(2, change.NewStage);
     }
 
+    [Fact]
+    public async Task GrowthRaisesUserSpecialByOneStage()
+    {
+        // Gen 1 Growth raises the (combined) Special stat by one stage — not Attack, as modern data
+        // reports. This pins the importer's Gen 1 override.
+        var result = await new MoveScenario()
+            .Attacker(TestCreatures.Make("A"))
+            .Use(Move("growth"));
+
+        Assert.Equal(1, result.Attacker.Stages.Special);
+        Assert.False(result.Has<DamageDealt>(), "Growth is a status move — no damage");
+
+        var change = result.First<StatStageChanged>();
+        Assert.NotNull(change);
+        Assert.Equal(result.Attacker.Name, change!.CreatureName);   // affects the user
+        Assert.Equal("Special", change.Stat);
+        Assert.Equal(1, change.Delta);
+        Assert.Equal(1, change.NewStage);
+    }
+
     // Foe-targeting stat drops: Sand Attack (−1 Accuracy), Tail Whip / Leer (−1 Defense),
     // Growl (−1 Attack).
     [Theory]

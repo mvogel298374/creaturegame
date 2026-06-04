@@ -187,6 +187,12 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       return { steps: [w(200), d(log(`${aName}'s ${formatMoveName(mName)} missed!`))] };
     }
 
+    case 'MoveHadNoEffect': {
+      // Type immunity (e.g. Ghost vs a Normal/Fighting move, Poison vs poison-powder).
+      const targetName = payload.targetName as string;
+      return { steps: [w(650), d(log(`It doesn't affect ${targetName}...`)), w(800)] };
+    }
+
     case 'DamageDealt': {
       const targetName = payload.targetName as string;
       const hpAfter    = payload.hpAfter as number;

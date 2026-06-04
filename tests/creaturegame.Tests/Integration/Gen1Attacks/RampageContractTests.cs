@@ -15,14 +15,16 @@ namespace creaturegame.Tests.Integration.Gen1Attacks;
 [Collection(MovesCollection.Name)]
 public class RampageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 {
-    [Fact]
-    public async Task FirstUseLocksTheUserInAndDealsDamage()
+    [Theory]
+    [InlineData("thrash")]
+    [InlineData("petal-dance")]
+    public async Task FirstUseLocksTheUserInAndDealsDamage(string moveName)
     {
         var attacker = TestCreatures.Make("A");
         var result = await new MoveScenario()
             .Attacker(attacker)
-            .Defender(TestCreatures.Make("D", hp: 9999, defense: 200))
-            .Use(Move("thrash"));
+            .Defender(TestCreatures.Make("D", hp: 9999, defense: 200, special: 200))
+            .Use(Move(moveName));
 
         Assert.True(result.Has<DamageDealt>());
         // Lock was rolled at 2–3 and decremented for this turn ⇒ 1–2 turns still remain.

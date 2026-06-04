@@ -294,6 +294,12 @@ public class MoveImport
             case "poison-sting": // Gen 1: 20% poison (modern: 30%)
                 attack.EffectChance     = 20;
                 break;
+            case "growth":       // Gen 1: raises Special +1 (modern: +1 Attack & +1 Sp. Atk)
+                attack.StatEffectStat   = StageStat.Special;
+                attack.StatEffectDelta  = 1;
+                attack.StatEffectTarget = StageTarget.Self;
+                attack.StatEffectChance = 100;
+                break;
         }
 
         return attack;
