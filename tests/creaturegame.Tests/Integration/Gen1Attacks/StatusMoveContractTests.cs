@@ -69,6 +69,18 @@ public class StatusMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
     }
 
     [Fact]
+    public async Task ThunderWaveParalyzesTheTarget()
+    {
+        var result = await new MoveScenario()
+            .Defender(TestCreatures.Make("D", type1: DamageType.Water, hp: 500))
+            .Use(Move("thunder-wave"));
+
+        Assert.False(result.Has<DamageDealt>(), "Thunder Wave is a status move — no damage");
+        Assert.Equal(StatusCondition.Paralysis, result.Defender.Status);
+        Assert.Contains(result.Events, e => e is StatusApplied);
+    }
+
+    [Fact]
     public async Task SupersonicConfusesTheTargetWithoutDamage()
     {
         var result = await new MoveScenario()

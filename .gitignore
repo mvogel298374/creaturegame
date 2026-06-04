@@ -41,3 +41,6 @@ creaturegame.Web/ClientApp/test-results/
 creaturegame.Web/ClientApp/playwright-report/
 creaturegame.Web/ClientApp/blob-report/
 creaturegame.Web/ClientApp/.playwright/
+
+# Claude Code scheduled-task lock (runtime state, not source)
+.claude/scheduled_tasks.lock

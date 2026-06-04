@@ -386,10 +386,31 @@ immunity edges) and one new event.
 - Latent fidelity bug fixed: `SonicBoomIgnoresTheTypeMatchup(Ghost)` asserted Sonic Boom hits Ghost;
   it doesn't in Gen 1. Corrected to "ignores effectiveness *scaling*" + a Ghost-immunity test.
 
+### Batch 9 (moves 81–90) ✅ DONE (2026-06-04)
+string-shot, dragon-rage, fire-spin, thunder-shock, thunderbolt, thunder-wave, thunder, rock-throw,
+earthquake, fissure. **535 .NET + 28 Vitest.** Pure coverage batch + one small engine extension and
+two data fixes — no new mechanics, no new events (reused batch-8 `MoveHadNoEffect`).
+- Reused contracts (rows added): damage/PP/miss (rock-throw, earthquake, fire-spin); phys/special
+  split (rock-throw/earthquake Physical, dragon-rage/fire-spin/thunderbolt Special, fissure Physical,
+  string-shot/thunder-wave Undefined); fixed damage (dragon-rage = 40); binding (fire-spin); secondary
+  status (thunder-shock/thunderbolt/thunder → Paralysis); stat-stage (string-shot −1 Speed foe); pure
+  status (thunder-wave Paralysis); OHKO (fissure).
+- **Engine extension:** the batch-8 type-immunity guard now also covers **pure-status moves** — a
+  status move whose type is 0× against the target has no effect (Thunder Wave is Electric ⇒ Ground is
+  immune). Damaging 0× moves still render via `DamageDealt` (eff 0); only pure-status (BaseDamage 0,
+  Standard) moves take the new path. → `ImmunityContractTests` (Thunder Wave vs Ground; Fissure vs Flying).
+- **Data fixes (layer-2 overrides, Gen-1 facts past_values can't express):** string-shot Speed −2 → −1
+  (one stage in Gen 1–5; two since Gen 6); thunder paralysis 30% → 10% (Gen 1). Re-imported + verified via MCP.
+- **Self-audit fixes:** (1) removed a dead branch — batch-8's Counter Ghost-immunity check became
+  unreachable once the pure-status guard caught Counter (BaseDamage 0); immunity is now handled in one
+  place. (2) Added `SecondaryChanceDataContractTests` to pin the importer's layer-2 secondary-chance
+  overrides (thunder/bite/low-kick/poison-sting/acid/aurora-beam/bubble-beam, string-shot, growth) —
+  previously a re-import could silently restore modern values with every behaviour test still green.
+
 ### Remaining batches (cadence)
-- [ ] Batches 9–17 (moves 81–165): query the next 10 → add `InlineData` rows to the matching
-  capability class → add a new capability class only for genuinely new mechanics. **Next: batch 9 =
-  moves 81–90.**
+- [ ] Batches 10–17 (moves 91–165): query the next 10 → add `InlineData` rows to the matching
+  capability class → add a new capability class only for genuinely new mechanics. **Next: batch 10 =
+  moves 91–100.**
 - [ ] **Fixed-2 multi-hit mover still pending**: bonemerang — the fixed-count mechanism exists
   (double-kick, twineedle); just needs mapping + coverage in its batch.
 - [x] **Rampage reuse**: petal-dance — done in batch 8 (already tagged in importer + coverage added).

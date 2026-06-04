@@ -65,6 +65,31 @@ public class ImmunityContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     }
 
     [Fact]
+    public async Task GroundTypesAreImmuneToThunderWave()
+    {
+        // Thunder Wave is Electric; Ground is immune (0×), so even this pure-status move does nothing.
+        var result = await new MoveScenario()
+            .Defender(TestCreatures.Make("D", type1: DamageType.Ground, hp: 500))
+            .Use(Move("thunder-wave"));
+
+        Assert.Equal(StatusCondition.None, result.Defender.Status);
+        Assert.True(result.Has<MoveHadNoEffect>());
+    }
+
+    [Fact]
+    public async Task FlyingTypesAreImmuneToFissure()
+    {
+        // Fissure is Ground (an OHKO move); Flying is immune (0×).
+        var result = await new MoveScenario()
+            .Defender(TestCreatures.Make("D", type1: DamageType.Flying, hp: 500))
+            .Use(Move("fissure"));
+
+        Assert.False(result.Has<DamageDealt>());
+        Assert.Equal(500, result.Defender.Attributes.HP);
+        Assert.True(result.Has<MoveHadNoEffect>());
+    }
+
+    [Fact]
     public async Task GhostTypesAreImmuneToCounter()
     {
         // Counter is Fighting-type; a Ghost target is immune even when the user took counterable damage.

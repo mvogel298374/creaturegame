@@ -14,7 +14,7 @@ namespace creaturegame.Tests.Integration.Gen1Attacks;
 public class OneHitKoContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 {
     [Theory]
-    [InlineData("guillotine")] [InlineData("horn-drill")]
+    [InlineData("guillotine")] [InlineData("horn-drill")] [InlineData("fissure")]
     public async Task DealsFullHpDamageAndFells(string moveName)
     {
         var result = await new MoveScenario()
@@ -29,7 +29,7 @@ public class OneHitKoContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     }
 
     [Theory]
-    [InlineData("guillotine")] [InlineData("horn-drill")]
+    [InlineData("guillotine")] [InlineData("horn-drill")] [InlineData("fissure")]
     public async Task FailsWhenTargetOutspeedsUser(string moveName)
     {
         // Gen 1: the OHKO fails outright when the target is faster than the user — a Speed
@@ -45,7 +45,7 @@ public class OneHitKoContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     }
 
     [Theory]
-    [InlineData("guillotine")] [InlineData("horn-drill")]
+    [InlineData("guillotine")] [InlineData("horn-drill")] [InlineData("fissure")]
     public async Task SucceedsWhenUserOutspeedsTargetEvenAtLowerLevel(string moveName)
     {
         // The Gen 1 check is Speed only: a lower-level but faster user still lands the OHKO.
@@ -59,7 +59,7 @@ public class OneHitKoContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     }
 
     [Theory]
-    [InlineData("guillotine")] [InlineData("horn-drill")]
+    [InlineData("guillotine")] [InlineData("horn-drill")] [InlineData("fissure")]
     public async Task MissesOnAccuracyFail(string moveName)
     {
         var result = await new MoveScenario()

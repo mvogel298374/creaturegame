@@ -300,6 +300,12 @@ public class MoveImport
                 attack.StatEffectTarget = StageTarget.Self;
                 attack.StatEffectChance = 100;
                 break;
+            case "string-shot":  // Gen 1–5: lowers Speed by 1 (modern: by 2)
+                attack.StatEffectDelta  = -1;
+                break;
+            case "thunder":      // Gen 1: 10% paralysis (modern: 30%)
+                attack.EffectChance     = 10;
+                break;
         }
 
         return attack;

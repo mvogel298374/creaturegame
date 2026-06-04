@@ -54,6 +54,19 @@ public class FixedDamageContractTests(MovesFixture moves) : Gen1MoveContract(mov
         Assert.Equal(500, result.Defender.Attributes.HP);
     }
 
+    [Theory]
+    [InlineData(40)]
+    [InlineData(255)]
+    public async Task DragonRageDealsExactly40RegardlessOfDefenderBulk(int defense)
+    {
+        var result = await new MoveScenario()
+            .Defender(TestCreatures.Make("D", hp: 500, defense: defense, special: defense))
+            .Use(Move("dragon-rage"));
+
+        Assert.Equal(40, result.TotalDamage);
+        Assert.Equal(40, result.First<DamageDealt>()!.Damage);
+    }
+
     [Fact]
     public async Task SonicBoomCanMiss()
     {

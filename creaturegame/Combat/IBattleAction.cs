@@ -175,14 +175,17 @@ public class AttackAction : IBattleAction
             justThawed = true;
         }
 
-        // Gen 1: a target immune to the move's type (e.g. Ghost vs a Normal/Fighting move) takes no
-        // damage even from the categories that bypass the normal damage calc (fixed / level-based /
-        // OHKO / Super Fang). Standard & Drain already fold 0× into their damage; Self-Destruct still
-        // detonates the user, so both are excluded here.
+        // Gen 1: a target immune to the move's type takes nothing — even from moves that bypass the
+        // normal damage calc (fixed / level-based / OHKO / Super Fang) and from pure-status moves
+        // (Thunder Wave is Electric, so a Ground-type is immune). A damaging Standard/Drain move
+        // already folds 0× into its damage (DamageDealt at 0), and Self-Destruct still detonates the
+        // user — both are excluded here.
+        bool isPureStatusMove = category == DamageCategory.Standard && !usingStruggle
+                                && attackToUse.BaseDamage == 0;
         double typeImmunity = DamageCalculator.GetTypeEffectiveness(
             attackToUse.DamageType, Target.Type1, Target.Type2, _typeChart);
-        if (typeImmunity == 0 && category is DamageCategory.Fixed or DamageCategory.LevelBased
-                or DamageCategory.OHKO or DamageCategory.SuperFang)
+        if (typeImmunity == 0 && (isPureStatusMove || category is DamageCategory.Fixed
+                or DamageCategory.LevelBased or DamageCategory.OHKO or DamageCategory.SuperFang))
         {
             _emitter?.Emit(new MoveHadNoEffect(Target.Name, attackToUse.Name ?? ""));
             return Task.CompletedTask;
@@ -446,14 +449,10 @@ public class AttackAction : IBattleAction
                 // counters this turn's damage. Fails if no qualifying damage was taken — Gen 1 keeps
                 // the last value until overwritten, so this can fire off a previous turn (a quirk we
                 // preserve). Fixed/level-based/self damage isn't recorded, so it isn't counterable.
-                // Counter is Fighting-type, so a Ghost target is immune (the type chart returns 0×).
-                double counterEff = DamageCalculator.GetTypeEffectiveness(
-                    attack.DamageType, Target.Type1, Target.Type2, _typeChart);
-                if (Target.IsAlive() && counterEff == 0)
-                {
-                    _emitter?.Emit(new MoveHadNoEffect(Target.Name, attack.Name ?? ""));
-                }
-                else if (Target.IsAlive()
+                // Type immunity (Counter is Fighting ⇒ Ghost is immune) is handled by the pure-status
+                // immunity guard above — Counter has BaseDamage 0, so an immune target already
+                // short-circuited to MoveHadNoEffect and never reaches here.
+                if (Target.IsAlive()
                     && Source.LastDamageTaken > 0
                     && Source.LastDamageType is DamageType.Normal or DamageType.Fighting)
                 {

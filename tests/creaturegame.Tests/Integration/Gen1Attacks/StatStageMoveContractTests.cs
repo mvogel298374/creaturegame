@@ -51,10 +51,11 @@ public class StatStageMoveContractTests(MovesFixture moves) : Gen1MoveContract(m
     // Foe-targeting stat drops: Sand Attack (−1 Accuracy), Tail Whip / Leer (−1 Defense),
     // Growl (−1 Attack).
     [Theory]
-    [InlineData("sand-attack", "Accuracy")]
-    [InlineData("tail-whip",   "Defense")]
-    [InlineData("leer",        "Defense")]
-    [InlineData("growl",       "Attack")]
+    [InlineData("sand-attack",  "Accuracy")]
+    [InlineData("tail-whip",    "Defense")]
+    [InlineData("leer",         "Defense")]
+    [InlineData("growl",        "Attack")]
+    [InlineData("string-shot",  "Speed")]    // Gen 1: −1 Speed (modern: −2)
     public async Task LowersFoeStatByOneStage(string moveName, string stat)
     {
         var result = await new MoveScenario()

@@ -50,9 +50,17 @@ public class PhysicalSpecialSplitContractTests(MovesFixture moves) : Gen1MoveCon
     [InlineData("water-gun",     AttackType.Special)]   // Water
     [InlineData("ice-beam",      AttackType.Special)]   // Ice
     [InlineData("psybeam",       AttackType.Special)]   // Psychic
+    [InlineData("thunderbolt",   AttackType.Special)]   // Electric
+    [InlineData("dragon-rage",   AttackType.Special)]   // Dragon (fixed-damage, still Special by type)
+    [InlineData("fire-spin",     AttackType.Special)]   // Fire
+    [InlineData("rock-throw",    AttackType.Physical)]  // Rock
+    [InlineData("earthquake",    AttackType.Physical)]  // Ground
+    [InlineData("fissure",       AttackType.Physical)]  // Ground (OHKO, still Physical by type)
     // Status moves keep no damage category (Undefined) regardless of type.
     [InlineData("sand-attack",   AttackType.Undefined)]  // Normal in Gen 1 (retyped to Ground in Gen 2)
     [InlineData("tail-whip",     AttackType.Undefined)]
+    [InlineData("string-shot",   AttackType.Undefined)]  // Bug status move
+    [InlineData("thunder-wave",  AttackType.Undefined)]  // Electric status move
     public void MoveHasGen1PhysicalSpecialCategory(string moveName, AttackType expected)
         => Assert.Equal(expected, Move(moveName).AttackType);
 }
