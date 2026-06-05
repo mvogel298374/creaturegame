@@ -476,10 +476,40 @@ through all 4 emitters + `timeline.ts` (+ Vitest).
   **real bug** (Haze+Mimic permanent-MoveSet leak). New failure modes appended to the reviewer's log
   (transient-vs-reset; self-vs-foe immunity scoping).
 
+### Batch 12 (moves 111–120) ✅ DONE (2026-06-05)
+defense-curl, barrier, light-screen, haze, reflect, focus-energy, bide, metronome, mirror-move,
+self-destruct. **638 .NET + 33 Vitest.** Mechanic-heavy: **five** new mechanics (Reflect, Light Screen,
+Focus Energy, Bide, Mirror Move) + coverage for engine features already unit-tested. Three new events
+(`ScreenApplied`, `FocusEnergyApplied`, `BideStoring`) wired through all 4 emitters + `timeline.ts`.
+- Reused/coverage (rows added): self-buff stat stage (defense-curl +1 Def, barrier +2 Def); real-row
+  coverage in `UniqueMoveEffectContractTests` for haze (clears stages), metronome (calls a pooled move),
+  self-destruct (damages foe + faints user — engine already unit-tested in `CoreMechanicsTests`);
+  phys/special split rows; data pins for all five new mappings + haze + metronome.
+- New capability classes: **`ScreenContractTests`**, **`FocusEnergyContractTests`**,
+  **`BideContractTests`**, **`MirrorMoveContractTests`**.
+- **Reflect / Light Screen (`MoveEffect.Reflect`/`LightScreen`):** double the holder's Defense / Special
+  vs the matching damage via a new `DamageCalculator` `screenDefenseMultiplier` param applied in the
+  non-crit block (crits bypass screens, Gen 1). Factor on `IBattleRules.ScreenDefenseMultiplier` (Gen 1
+  = 2). `BattleState.HasReflect`/`HasLightScreen`.
+- **Focus Energy (`MoveEffect.FocusEnergy`):** the Gen 1 *bug* (quarters crit instead of ×4) lives in
+  `Gen1BattleRules.GetCritChance` reading `Creature.HasFocusEnergy`; test pins the ÷4 quirk, not a flag.
+- **Bide (`MoveEffect.Bide`):** lock-in like rampage (`BattleState.BideTurnsRemaining`/`BideDamage`
+  `Accumulated`/`BideMove`, `Battle` force-selects while committed). Storing turns emit `BideStoring`
+  and return before MoveUsed; release deals `accumulated × IBattleRules.BideDamageMultiplier` (Gen 1 =
+  2), typeless/never-miss. **Accumulation runs in every damage-category branch** (a shared
+  `AccumulateBideDamage` helper), not just Standard — a seam-review BLOCK caught the original
+  Standard-only gap; a fixed-damage test guards it. `RollBideTurns` (Gen 1 = 2–3) on the seam.
+- **Mirror Move (`MoveEffect.MirrorMove`):** records `BattleState.LastMoveUsed` after each real move
+  (skipping Metronome/Mirror themselves); re-executes the foe's last move via an inner action (like
+  Metronome); fails if the foe hasn't moved. Bide is intentionally copyable (documented).
+- Seam-review gate: BLOCK → 2 doc blockers (per-gen XML docs for the Bide seam members) + 4 advisories,
+  **all fixed** before commit; the Bide all-category accumulation gap was the substantive one. New
+  failure mode appended to the reviewer log (a damage-taken hook added to only one category branch).
+
 ### Remaining batches (cadence)
-- [ ] Batches 12–17 (moves 111–165): query the next 10 → add `InlineData` rows to the matching
-  capability class → add a new capability class only for genuinely new mechanics. **Next: batch 12 =
-  moves 111–120.**
+- [ ] Batches 13–17 (moves 121–165): query the next 10 → add `InlineData` rows to the matching
+  capability class → add a new capability class only for genuinely new mechanics. **Next: batch 13 =
+  moves 121–130.**
 - [ ] **Fixed-2 multi-hit mover still pending**: bonemerang — the fixed-count mechanism exists
   (double-kick, twineedle); just needs mapping + coverage in its batch.
 - [x] **Rampage reuse**: petal-dance — done in batch 8 (already tagged in importer + coverage added).

@@ -73,6 +73,15 @@ public class PhysicalSpecialSplitContractTests(MovesFixture moves) : Gen1MoveCon
     [InlineData("minimize",      AttackType.Undefined)]  // Normal status move
     [InlineData("confuse-ray",   AttackType.Undefined)]  // Ghost status move
     [InlineData("withdraw",      AttackType.Undefined)]  // Water status move
+    [InlineData("defense-curl",  AttackType.Undefined)]  // Normal status move
+    [InlineData("barrier",       AttackType.Undefined)]  // Psychic status move
+    [InlineData("light-screen",  AttackType.Undefined)]  // Psychic status move
+    [InlineData("haze",          AttackType.Undefined)]  // Ice status move
+    [InlineData("reflect",       AttackType.Undefined)]  // Psychic status move
+    [InlineData("focus-energy",  AttackType.Undefined)]  // Normal status move
+    [InlineData("metronome",     AttackType.Undefined)]  // Normal status move
+    [InlineData("mirror-move",   AttackType.Undefined)]  // Flying status move
+    [InlineData("self-destruct", AttackType.Physical)]  // Normal (Self-Destruct, still Physical by type)
     [InlineData("sand-attack",   AttackType.Undefined)]  // Normal in Gen 1 (retyped to Ground in Gen 2)
     [InlineData("tail-whip",     AttackType.Undefined)]
     [InlineData("string-shot",   AttackType.Undefined)]  // Bug status move

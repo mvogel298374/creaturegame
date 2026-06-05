@@ -160,6 +160,22 @@ describe('expandEvent — Heal & Mimic', () => {
   });
 });
 
+describe('expandEvent — Screens, Focus Energy & Bide', () => {
+  it('ScreenApplied plays the status sound and logs the screen name', () => {
+    const { steps } = expandEvent('ScreenApplied', { creatureName: 'MEW', screenName: 'Reflect' }, CTX);
+    expect(steps!.some(s => s.kind === 'emit')).toBe(true);   // playStatusSound
+    expect(logLines(steps)).toEqual(['MEW was protected by Reflect!']);
+  });
+  it('FocusEnergyApplied logs the pumped line', () => {
+    expect(logLines(expandEvent('FocusEnergyApplied', { creatureName: 'MEW' }, CTX).steps))
+      .toEqual(['MEW is getting pumped!']);
+  });
+  it('BideStoring logs the storing line', () => {
+    expect(logLines(expandEvent('BideStoring', { creatureName: 'MEW' }, CTX).steps))
+      .toEqual(['MEW is storing energy!']);
+  });
+});
+
 describe('expandEvent — confusion & coins', () => {
   it('ConfusionStarted plays the status sound and logs the line', () => {
     const { steps } = expandEvent('ConfusionStarted', { targetName: 'ARTICUNO' }, CTX);

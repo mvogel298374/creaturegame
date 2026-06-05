@@ -103,3 +103,9 @@ apply the litmus question from §5.0 ("when we build Gen 2, will this value/layo
   self-buff/Recover got blocked against a Ghost (0×). Self-targeting moves never consult the target's
   type; scope any target-type-immunity check to foe-directed effects (and remember Counter is
   BaseDamage 0 yet foe-directed — it must stay inside the guard).
+- **A "damage taken" hook was added to only one of the damage-category branches** (Bide accumulation
+  lived in the Standard/Drain loop but not Fixed/LevelBased/OHKO/SelfDestruct/SuperFang/Counter), so a
+  Bide user hit by Seismic Toss / Sonic Boom / Self-Destruct under-counted. Class: incomplete-coverage
+  of `AttackAction`'s multiple damage paths. Any hook that should fire "whenever the target takes
+  damage" must run in *every* category branch (or via one shared apply-damage helper), not just the
+  common Standard path — and the test must exercise a non-Standard category to prove it.

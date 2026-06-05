@@ -80,6 +80,19 @@ public class SecondaryChanceDataContractTests(MovesFixture moves) : Gen1MoveCont
     public void NightShadeIsLevelBased()
         => Assert.Equal(DamageCategory.LevelBased, Move("night-shade").DamageCategory);
 
+    // Batch-12 move-effect mappings the importer applies by name (PokeAPI can't express these Gen 1
+    // mechanics). Pin them so a re-import that drops a clause can't silently neuter the move.
+    [Theory]
+    [InlineData("reflect",      MoveEffect.Reflect)]
+    [InlineData("light-screen", MoveEffect.LightScreen)]
+    [InlineData("focus-energy", MoveEffect.FocusEnergy)]
+    [InlineData("bide",         MoveEffect.Bide)]
+    [InlineData("mirror-move",  MoveEffect.MirrorMove)]
+    [InlineData("haze",         MoveEffect.Haze)]
+    [InlineData("metronome",    MoveEffect.Metronome)]
+    public void MoveHasItsGen1Effect(string move, MoveEffect effect)
+        => Assert.Equal(effect, Move(move).Effect);
+
     // Screech lowers the foe's Defense by two stages in every gen (the others in its family are −1).
     [Fact]
     public void ScreechLowersFoeDefenseByTwo()

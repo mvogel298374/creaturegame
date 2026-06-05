@@ -98,6 +98,13 @@ public sealed class Gen1BattleRules : IBattleRules
     // Gen 1: Recover / Soft-Boiled restore half of max HP.
     public double RecoverHealFraction => 0.5;
 
+    // Gen 1–4: Reflect / Light Screen double the relevant defensive stat (crits ignore it).
+    public int ScreenDefenseMultiplier => 2;
+
+    // Gen 1: Bide commits the user for 2–3 turns, then unleashes double the damage absorbed.
+    public int RollBideTurns() => _rng.Next(2, 4);
+    public int BideDamageMultiplier => 2;
+
     // ── Type-based immunities ────────────────────────────────────────────────────
 
     // Gen 1 status immunities by type: Poison-types can't be poisoned, Fire-types can't be burned,
@@ -165,6 +172,9 @@ public sealed class Gen1BattleRules : IBattleRules
         double numerator = Math.Floor(attacker.BaseSpeed / 2.0);
         if (move.IsHighCrit)
             numerator = Math.Min(numerator * 8, 255);
+        // Gen 1 bug: Focus Energy was meant to quadruple the crit rate but instead quarters it.
+        if (attacker.HasFocusEnergy)
+            numerator = Math.Floor(numerator / 4.0);
         return numerator / 256.0;
     }
 

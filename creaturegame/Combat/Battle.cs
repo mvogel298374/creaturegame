@@ -118,8 +118,9 @@ public class Battle
 
     /// <summary>
     /// Resolves which move a combatant uses this turn. Lock-in mechanics bypass <see cref="IBattleInput"/>:
-    /// a two-turn move on its release turn, a rampage (Thrash) while locked in, and Rage once used all
-    /// auto-repeat. Otherwise the input chooses — unless no move is selectable (out of PP, or the only
+    /// a two-turn move on its release turn, a rampage (Thrash) while locked in, Bide while committed,
+    /// and Rage once used all auto-repeat. Otherwise the input chooses — unless no move is selectable
+    /// (out of PP, or the only
     /// option is Disabled), in which case <c>null</c> tells <see cref="AttackAction"/> to Struggle.
     /// The lock branches are checked before <see cref="Creature.CanSelectAnyMove"/>, so a Rage move that
     /// gets Disabled is still force-used (Gen 1's Rage/Disable interaction is nuanced — a documented
@@ -127,8 +128,9 @@ public class Battle
     /// </summary>
     private async Task<PokemonAttack?> SelectMoveAsync(Creature attacker, Creature defender, IBattleInput input)
     {
-        if (attacker.IsTwoTurnCharging)        return attacker.ChargingMove;
+        if (attacker.IsTwoTurnCharging)         return attacker.ChargingMove;
         if (attacker.RampageTurnsRemaining > 0) return attacker.RampageMove;
+        if (attacker.BideTurnsRemaining > 0)    return attacker.BideMove;
         if (attacker.IsRaging)                  return attacker.RageMove;
         if (!attacker.CanSelectAnyMove)         return null;
 

@@ -207,6 +207,27 @@ public interface IBattleRules
     /// </summary>
     double RecoverHealFraction { get; }
 
+    /// <summary>
+    /// Factor applied to the defender's defensive stat while the matching screen (Reflect → Defense,
+    /// Light Screen → Special) is up. Gen 1–4 double the stat (×2); Gen 5+ instead reduce the damage
+    /// directly (and screens become 5-turn/team-wide). Crits ignore screens (handled in the calculator).
+    /// </summary>
+    int ScreenDefenseMultiplier { get; }
+
+    /// <summary>
+    /// Number of turns a Bide commitment lasts (storing turns plus the release turn). Gen 1: 2–3
+    /// (random). Gen 2: a fixed 2 turns. Gen 3+: reworked further (variable, +1 priority semantics
+    /// change) — a later generation overrides this rather than reusing the Gen 1 random range.
+    /// </summary>
+    int RollBideTurns();
+
+    /// <summary>
+    /// Multiplier applied to the total damage a Bide user absorbed when it unleashes. Gen 1–4: 2×.
+    /// Gen 5+ reworked Bide entirely (fixed 2 turns, different accumulation), so a later generation
+    /// reimplements the mechanic rather than just swapping this number.
+    /// </summary>
+    int BideDamageMultiplier { get; }
+
     // ── Type-based immunities ────────────────────────────────────────────────────
 
     /// <summary>

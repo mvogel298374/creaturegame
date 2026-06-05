@@ -87,10 +87,12 @@ public class StatStageMoveContractTests(MovesFixture moves) : Gen1MoveContract(m
     // Self-targeting raises beyond the special cases above: Harden / Withdraw (+1 Defense),
     // Double Team (+1 Evasion), Minimize (+2 Evasion — first Evasion mover).
     [Theory]
-    [InlineData("harden",      "Defense",  1)]
-    [InlineData("withdraw",    "Defense",  1)]
-    [InlineData("double-team", "Evasion",  1)]
-    [InlineData("minimize",    "Evasion",  2)]
+    [InlineData("harden",       "Defense",  1)]
+    [InlineData("withdraw",     "Defense",  1)]
+    [InlineData("defense-curl",  "Defense",  1)]
+    [InlineData("double-team",  "Evasion",  1)]
+    [InlineData("minimize",     "Evasion",  2)]
+    [InlineData("barrier",      "Defense",  2)]
     public async Task RaisesUserStatBySpecifiedStages(string moveName, string stat, int delta)
     {
         var result = await new MoveScenario()

@@ -255,6 +255,20 @@ public class MoveImport
         // Mimic copies a random move from the target for the rest of the battle (enforced in the engine).
         else if (pokeMove.Name == "mimic")
             attack.Effect = MoveEffect.Mimic;
+        // Reflect / Light Screen double the user's Defense / Special vs the matching damage (battle rule).
+        else if (pokeMove.Name == "reflect")
+            attack.Effect = MoveEffect.Reflect;
+        else if (pokeMove.Name == "light-screen")
+            attack.Effect = MoveEffect.LightScreen;
+        // Focus Energy: Gen 1's bugged crit modifier (applied in Gen1BattleRules.GetCritChance).
+        else if (pokeMove.Name == "focus-energy")
+            attack.Effect = MoveEffect.FocusEnergy;
+        // Bide stores damage for 2–3 turns then unleashes 2× (multi-turn lock-in in the engine).
+        else if (pokeMove.Name == "bide")
+            attack.Effect = MoveEffect.Bide;
+        // Mirror Move re-executes the opponent's last move (engine reads the foe's last-used move).
+        else if (pokeMove.Name == "mirror-move")
+            attack.Effect = MoveEffect.MirrorMove;
         // Rampage moves — lock the user in for 2–3 turns, then self-confuse. Matched by name BEFORE
         // the confusion-ailment branch so they map to Rampage (the confusion is a self-effect of the
         // lock, not a targeted secondary). Petal Dance joins in its batch.

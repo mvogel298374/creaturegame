@@ -11,7 +11,8 @@ public static class DamageCalculator
     /// </summary>
     public static int CalculateDamage(Creature attacker, Creature defender, Attack move,
                                       ITypeChart typeChart, IBattleRules rules, out bool isCrit,
-                                      IRandomSource? rng = null, int defenseDivisor = 1)
+                                      IRandomSource? rng = null, int defenseDivisor = 1,
+                                      int screenDefenseMultiplier = 1)
     {
         if (move.BaseDamage == 0) { isCrit = false; return 0; }
 
@@ -32,6 +33,10 @@ public static class DamageCalculator
 
             attackStat  = (int)(attackStat  * atkStageMult);
             defenseStat = (int)(defenseStat * defStageMult);
+
+            // Reflect / Light Screen multiply the defensive stat while up. Inside the non-crit block
+            // so a crit ignores the screen (Gen 1), exactly like stat stages and Burn below.
+            defenseStat *= screenDefenseMultiplier;
 
             // Burn halves physical Attack (skipped on crit path in Gen 1).
             if (move.AttackType == AttackType.Physical && attacker.Status == StatusCondition.Burn)

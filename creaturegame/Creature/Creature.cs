@@ -113,6 +113,13 @@ public class Creature
     public PokemonAttack? RageMove    { get => Battle.RageMove;             set => Battle.RageMove = value; }
     public PokemonAttack? MimicWrapper { get => Battle.MimicWrapper;        set => Battle.MimicWrapper = value; }
     public Attack? MimicOriginalBase  { get => Battle.MimicOriginalBase;    set => Battle.MimicOriginalBase = value; }
+    public bool HasReflect            { get => Battle.HasReflect;           set => Battle.HasReflect = value; }
+    public bool HasLightScreen        { get => Battle.HasLightScreen;       set => Battle.HasLightScreen = value; }
+    public bool HasFocusEnergy        { get => Battle.HasFocusEnergy;       set => Battle.HasFocusEnergy = value; }
+    public int  BideTurnsRemaining    { get => Battle.BideTurnsRemaining;   set => Battle.BideTurnsRemaining = value; }
+    public int  BideDamageAccumulated { get => Battle.BideDamageAccumulated; set => Battle.BideDamageAccumulated = value; }
+    public PokemonAttack? BideMove    { get => Battle.BideMove;             set => Battle.BideMove = value; }
+    public Attack? LastMoveUsed       { get => Battle.LastMoveUsed;         set => Battle.LastMoveUsed = value; }
     public int  LastDamageTaken       { get => Battle.LastDamageTaken;       set => Battle.LastDamageTaken = value; }
     public DamageType? LastDamageType { get => Battle.LastDamageType;        set => Battle.LastDamageType = value; }
 

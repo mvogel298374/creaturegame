@@ -54,6 +54,15 @@ public record Healed(string CreatureName, int HealAmount, int HpAfter) : BattleE
 // --- Mimic (the move) ---
 public record MimicLearned(string CreatureName, string MoveName) : BattleEvent;
 
+// --- Reflect / Light Screen ---
+public record ScreenApplied(string CreatureName, string ScreenName) : BattleEvent;
+
+// --- Focus Energy ---
+public record FocusEnergyApplied(string CreatureName) : BattleEvent;
+
+// --- Bide ---
+public record BideStoring(string CreatureName) : BattleEvent;
+
 // --- Leech Seed ---
 public record LeechSeedApplied(string TargetName) : BattleEvent;
 public record LeechSeedDamage(string DrainedName, int Damage, int HpAfter) : BattleEvent;

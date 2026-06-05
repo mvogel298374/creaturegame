@@ -343,6 +343,22 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       return { steps: [w(120), d(log(`${cName} learned ${formatMoveName(mName)}!`))] };
     }
 
+    case 'ScreenApplied': {
+      const cName = payload.creatureName as string;
+      const sName = payload.screenName as string;
+      return { steps: [emit({ type: 'playStatusSound' }), w(300), d(log(`${cName} was protected by ${sName}!`))] };
+    }
+
+    case 'FocusEnergyApplied': {
+      const cName = payload.creatureName as string;
+      return { steps: [w(120), d(log(`${cName} is getting pumped!`))] };
+    }
+
+    case 'BideStoring': {
+      const cName = payload.creatureName as string;
+      return { steps: [w(120), d(log(`${cName} is storing energy!`))] };
+    }
+
     case 'LeechSeedApplied': {
       const tName = payload.targetName as string;
       return { steps: [w(120), d(log(`${tName} was seeded!`))] };

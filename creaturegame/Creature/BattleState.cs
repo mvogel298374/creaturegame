@@ -50,6 +50,23 @@ public sealed class BattleState
     public bool IsRaging { get; set; }
     public PokemonAttack? RageMove { get; set; }
 
+    // Reflect / Light Screen: while up, the holder's Defense / Special is doubled when taking
+    // physical / special damage (crits ignore it). Gen 1 lasts until the battle ends.
+    public bool HasReflect { get; set; }
+    public bool HasLightScreen { get; set; }
+
+    // Focus Energy: set while the user is "focused" (Gen 1 quarters its crit rate — the famous bug).
+    public bool HasFocusEnergy { get; set; }
+
+    // Bide: turns left committed (storing then releasing); the damage absorbed while committed; and
+    // the move to auto-repeat while locked in (mirrors the rampage lock pattern).
+    public int BideTurnsRemaining { get; set; }
+    public int BideDamageAccumulated { get; set; }
+    public PokemonAttack? BideMove { get; set; }
+
+    // The last move this creature actually used — Mirror Move copies the opponent's.
+    public Attack? LastMoveUsed { get; set; }
+
     // Mimic (the move): when used, the Mimic slot's Base is swapped to a copied foe move for the rest
     // of the battle. MimicWrapper is the slot whose Base was swapped and MimicOriginalBase is the move
     // to put back; Battle restores it at battle end so the swap never leaks into the permanent MoveSet.

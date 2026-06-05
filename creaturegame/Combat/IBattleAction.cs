@@ -69,9 +69,14 @@ public class AttackAction : IBattleAction
         bool isRage           = !usingStruggle && attackToUse.Effect == MoveEffect.Rage;
         bool rageContinuation = isRage && Source.IsRaging;
 
-        // PP decremented on the first turn only (two-turn release, rampage continuations, and rage
-        // continuations were already charged for; don't double-spend).
-        if (!usingStruggle && !isReleaseTurn && !rampageContinuation && !rageContinuation)
+        // Bide: commits the user for 2–3 turns (storing damage), then unleashes 2×. A continuation
+        // turn is one already committed from before (the lock auto-repeats via Battle).
+        bool isBide           = !usingStruggle && attackToUse.Effect == MoveEffect.Bide;
+        bool bideContinuation = isBide && Source.BideTurnsRemaining > 0;
+
+        // PP decremented on the first turn only (two-turn release, rampage / rage / bide continuations
+        // were already charged for; don't double-spend).
+        if (!usingStruggle && !isReleaseTurn && !rampageContinuation && !rageContinuation && !bideContinuation)
             _selectedMove!.PowerPointsCurrent--;
 
         // Charge phase: wind up and defer damage to the next turn
@@ -90,7 +95,51 @@ public class AttackAction : IBattleAction
             Source.ChargingMove      = null;
         }
 
+        // Bide: on first use commit for 2–3 turns and reset the absorbed total; every committed turn
+        // just stores (no attack) until the counter hits 0, when it falls through to unleash below.
+        if (isBide)
+        {
+            if (!bideContinuation)
+            {
+                Source.BideTurnsRemaining    = _rules.RollBideTurns();
+                Source.BideDamageAccumulated = 0;
+                Source.BideMove              = _selectedMove;
+            }
+            Source.BideTurnsRemaining--;
+            if (Source.BideTurnsRemaining > 0)
+            {
+                _emitter?.Emit(new BideStoring(Source.Name));
+                return Task.CompletedTask;
+            }
+        }
+
         _emitter?.Emit(new MoveUsed(Source.Name, attackToUse.Name ?? ""));
+
+        // Remember the move actually used so the opponent's Mirror Move can copy it. Metronome and
+        // Mirror Move themselves aren't recorded — the move they call records itself via its inner action.
+        if (!usingStruggle && attackToUse.Effect is not (MoveEffect.Metronome or MoveEffect.MirrorMove))
+            Source.LastMoveUsed = attackToUse;
+
+        // Bide release: the committed turns are done — unleash double the damage absorbed (typeless,
+        // never misses). Fails if nothing was stored. BideMove clears so Battle stops auto-repeating.
+        if (isBide)
+        {
+            int unleashed = Source.BideDamageAccumulated * _rules.BideDamageMultiplier;
+            Source.BideMove = null;
+            if (unleashed > 0 && Target.IsAlive())
+            {
+                Target.Attributes.ReceiveDamage(unleashed);
+                Target.LastDamageTaken = unleashed;
+                Target.LastDamageType  = attackToUse.DamageType;
+                _emitter?.Emit(new DamageDealt(Target.Name, unleashed, 1.0,
+                    Target.Attributes.HP, Target.Attributes.MaxHP));
+            }
+            else
+            {
+                _emitter?.Emit(new MoveMissed(Source.Name, attackToUse.Name ?? ""));
+            }
+            return Task.CompletedTask;
+        }
 
         // Rampage: on the first turn roll the lock duration and remember the move; every turn counts
         // down (even a miss), and when it expires the user confuses itself. EndRampageIfDone() runs
@@ -140,6 +189,23 @@ public class AttackAction : IBattleAction
                     new PokemonAttack(chosen), _typeChart, _rules, _emitter, _movePool, _rng);
                 return inner.ExecuteAsync();
             }
+            return Task.CompletedTask;
+        }
+
+        // Mirror Move: re-execute the opponent's last used move. Like Metronome, the copied move runs
+        // in full through its own inner action (which records it as this creature's last move). Fails
+        // if the foe hasn't used a copyable move yet. Only Mirror Move itself and Struggle are excluded
+        // — copying Bide (which starts a fresh commitment on this user) is valid Gen 1 behavior.
+        if (!usingStruggle && attackToUse.Effect == MoveEffect.MirrorMove)
+        {
+            var last = Target.LastMoveUsed;
+            if (last != null && last.Effect != MoveEffect.MirrorMove && last.Name != "struggle")
+            {
+                var inner = new AttackAction(Source, Target,
+                    new PokemonAttack(last), _typeChart, _rules, _emitter, _movePool, _rng);
+                return inner.ExecuteAsync();
+            }
+            _emitter?.Emit(new MoveMissed(Source.Name, attackToUse.Name ?? ""));
             return Task.CompletedTask;
         }
 
@@ -218,6 +284,12 @@ public class AttackAction : IBattleAction
         int  damage = 0;
         bool isCrit = false;
 
+        // Reflect (vs physical) / Light Screen (vs special) double the defender's defensive stat while
+        // up; the calculator ignores it on a crit. Computed once and passed into every damage call.
+        int screenMult = (attackToUse.AttackType == AttackType.Physical && Target.HasReflect)
+                         || (attackToUse.AttackType == AttackType.Special && Target.HasLightScreen)
+                         ? _rules.ScreenDefenseMultiplier : 1;
+
         switch (category)
         {
             case DamageCategory.Standard:
@@ -242,10 +314,12 @@ public class AttackAction : IBattleAction
                     for (int i = 0; i < hits && Target.IsAlive(); i++)
                     {
                         int hitDamage = DamageCalculator.CalculateDamage(
-                            Source, Target, attackToUse, _typeChart, _rules, out isCrit, _rng);
+                            Source, Target, attackToUse, _typeChart, _rules, out isCrit, _rng,
+                            screenDefenseMultiplier: screenMult);
                         Target.Attributes.ReceiveDamage(hitDamage);
                         Target.LastDamageTaken = hitDamage;          // for Counter (2× the last hit)
                         Target.LastDamageType  = attackToUse.DamageType;
+                        AccumulateBideDamage(hitDamage);
                         damage += hitDamage;   // accumulated total gates drain/recoil/recharge below
                         landed++;
                         _emitter?.Emit(new DamageDealt(Target.Name, hitDamage, eff,
@@ -278,6 +352,7 @@ public class AttackAction : IBattleAction
             case DamageCategory.Fixed:
                 damage = attackToUse.FixedDamageValue ?? 1;
                 Target.Attributes.ReceiveDamage(damage);
+                AccumulateBideDamage(damage);
                 _emitter?.Emit(new DamageDealt(Target.Name, damage, 1.0,
                     Target.Attributes.HP, Target.Attributes.MaxHP));
                 break;
@@ -285,6 +360,7 @@ public class AttackAction : IBattleAction
             case DamageCategory.LevelBased:
                 damage = DamageCalculator.CalculateLevelBasedDamage(Source);
                 Target.Attributes.ReceiveDamage(damage);
+                AccumulateBideDamage(damage);
                 _emitter?.Emit(new DamageDealt(Target.Name, damage, 1.0,
                     Target.Attributes.HP, Target.Attributes.MaxHP));
                 break;
@@ -292,6 +368,7 @@ public class AttackAction : IBattleAction
             case DamageCategory.OHKO:
                 damage = Target.Attributes.HP;
                 Target.Attributes.ReceiveDamage(damage);
+                AccumulateBideDamage(damage);
                 _emitter?.Emit(new DamageDealt(Target.Name, damage, 1.0,
                     Target.Attributes.HP, Target.Attributes.MaxHP));
                 break;
@@ -306,9 +383,11 @@ public class AttackAction : IBattleAction
                     attackToUse.DamageType, Target.Type1, Target.Type2, _typeChart);
                 damage = DamageCalculator.CalculateDamage(
                     Source, Target, attackToUse, _typeChart, _rules, out isCrit, _rng,
-                    defenseDivisor: _rules.SelfDestructDefenseDivisor);
+                    defenseDivisor: _rules.SelfDestructDefenseDivisor,
+                    screenDefenseMultiplier: screenMult);
 
                 Target.Attributes.ReceiveDamage(damage);
+                AccumulateBideDamage(damage);
                 _emitter?.Emit(new DamageDealt(Target.Name, damage, eff,
                     Target.Attributes.HP, Target.Attributes.MaxHP, isCrit));
 
@@ -320,6 +399,7 @@ public class AttackAction : IBattleAction
             case DamageCategory.SuperFang:
                 damage = DamageCalculator.CalculateSuperFangDamage(Target);
                 Target.Attributes.ReceiveDamage(damage);
+                AccumulateBideDamage(damage);
                 _emitter?.Emit(new DamageDealt(Target.Name, damage, 1.0,
                     Target.Attributes.HP, Target.Attributes.MaxHP));
                 break;
@@ -346,6 +426,13 @@ public class AttackAction : IBattleAction
         EndRampageIfDone();   // confuse the user if this was the rampage's last turn
 
         return Task.CompletedTask;
+    }
+
+    // Bide stores every hit the committed user takes — any damage category — to unleash 2× on release.
+    private void AccumulateBideDamage(int dmg)
+    {
+        if (Target.BideTurnsRemaining > 0)
+            Target.BideDamageAccumulated += dmg;
     }
 
     private void TryApplyStatus(Attack attack)
@@ -491,6 +578,7 @@ public class AttackAction : IBattleAction
                 {
                     int countered = Source.LastDamageTaken * 2;
                     Target.Attributes.ReceiveDamage(countered);
+                    AccumulateBideDamage(countered);
                     Target.LastDamageTaken = countered;
                     Target.LastDamageType  = attack.DamageType;
                     _emitter?.Emit(new DamageDealt(Target.Name, countered, 1.0,
@@ -509,6 +597,33 @@ public class AttackAction : IBattleAction
                 {
                     Source.HasMist = true;
                     _emitter?.Emit(new MistApplied(Source.Name));
+                }
+                break;
+
+            case MoveEffect.Reflect:
+                // Doubles the user's Defense vs physical damage until the battle ends (self-targeting).
+                if (!Source.HasReflect)
+                {
+                    Source.HasReflect = true;
+                    _emitter?.Emit(new ScreenApplied(Source.Name, "Reflect"));
+                }
+                break;
+
+            case MoveEffect.LightScreen:
+                // Doubles the user's Special vs special damage until the battle ends (self-targeting).
+                if (!Source.HasLightScreen)
+                {
+                    Source.HasLightScreen = true;
+                    _emitter?.Emit(new ScreenApplied(Source.Name, "Light Screen"));
+                }
+                break;
+
+            case MoveEffect.FocusEnergy:
+                // Self-targeting crit modifier — Gen 1's bugged ÷4 is applied in Gen1BattleRules.GetCritChance.
+                if (!Source.HasFocusEnergy)
+                {
+                    Source.HasFocusEnergy = true;
+                    _emitter?.Emit(new FocusEnergyApplied(Source.Name));
                 }
                 break;
 

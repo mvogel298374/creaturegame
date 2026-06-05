@@ -167,6 +167,18 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                 Console.WriteLine($"{e.CreatureName} learned {e.MoveName}!");
                 break;
 
+            case ScreenApplied e:
+                Console.WriteLine($"{e.CreatureName} was protected by {e.ScreenName}!");
+                break;
+
+            case FocusEnergyApplied e:
+                Console.WriteLine($"{e.CreatureName} is getting pumped!");
+                break;
+
+            case BideStoring e:
+                Console.WriteLine($"{e.CreatureName} is storing energy!");
+                break;
+
             case LeechSeedApplied e:
                 Console.WriteLine($"{e.TargetName} was seeded!");
                 break;

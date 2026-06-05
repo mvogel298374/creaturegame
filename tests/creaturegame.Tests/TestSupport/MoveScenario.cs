@@ -40,19 +40,22 @@ public sealed class MoveScenario
     private IBattleRules _rules   = AlwaysHitRules.Instance;     // default: don't fight the 1/256 miss
     private IRandomSource _rng    = new SeededRandomSource(0);
     private ITypeChart _typeChart = Gen1TypeChart.Instance;
+    private IReadOnlyList<Attack> _movePool = Array.Empty<Attack>();
 
     public MoveScenario Attacker(Creature c) { _attacker = c; return this; }
     public MoveScenario Defender(Creature c) { _defender = c; return this; }
     public MoveScenario Rules(IBattleRules r) { _rules = r; return this; }
     public MoveScenario Rng(IRandomSource r) { _rng = r; return this; }
     public MoveScenario TypeChart(ITypeChart t) { _typeChart = t; return this; }
+    /// <summary>Move pool for effects that draw from one (Metronome).</summary>
+    public MoveScenario MovePool(params Attack[] pool) { _movePool = pool; return this; }
 
     public async Task<MoveResult> Use(Attack move)
     {
         _attacker.AddAttack(move);
         var pokeMove = _attacker.MoveSet[^1];
         var emitter  = new RecordingEmitter();
-        var action   = new AttackAction(_attacker, _defender, pokeMove, _typeChart, _rules, emitter, rng: _rng);
+        var action   = new AttackAction(_attacker, _defender, pokeMove, _typeChart, _rules, emitter, _movePool, _rng);
         await action.ExecuteAsync();
         return new MoveResult(emitter, _attacker, _defender, pokeMove);
     }
