@@ -13,7 +13,7 @@ public static class DbPathHelper
         {
             string baseDir = AppContext.BaseDirectory;
             DirectoryInfo? dir = new DirectoryInfo(baseDir);
-            
+
             // Search upwards for the solution directory as a heuristic for the project root.
             while (dir != null && !File.Exists(Path.Combine(dir.FullName, "creaturegame.sln")))
             {

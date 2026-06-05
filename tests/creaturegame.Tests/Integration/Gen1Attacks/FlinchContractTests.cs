@@ -16,11 +16,16 @@ namespace creaturegame.Tests.Integration.Gen1Attacks;
 public class FlinchContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 {
     [Theory]
-    [InlineData("stomp")] [InlineData("rolling-kick")] [InlineData("headbutt")] [InlineData("bite")] [InlineData("low-kick")] [InlineData("bone-club")]
+    [InlineData("stomp")]
+    [InlineData("rolling-kick")]
+    [InlineData("headbutt")]
+    [InlineData("bite")]
+    [InlineData("low-kick")]
+    [InlineData("bone-club")]
     public async Task SetsFlinchFlagOnHit(string moveName)
     {
         var result = await new MoveScenario()
-            .Rules(ForceSecondaryRules.Instance)   // forces the secondary chance to land
+            .Rules(ForceSecondaryRules.Instance) // forces the secondary chance to land
             .Defender(TestCreatures.Make("Defender", hp: 500))
             .Use(Move(moveName));
 
@@ -29,7 +34,12 @@ public class FlinchContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     }
 
     [Theory]
-    [InlineData("stomp")] [InlineData("rolling-kick")] [InlineData("headbutt")] [InlineData("bite")] [InlineData("low-kick")] [InlineData("bone-club")]
+    [InlineData("stomp")]
+    [InlineData("rolling-kick")]
+    [InlineData("headbutt")]
+    [InlineData("bite")]
+    [InlineData("low-kick")]
+    [InlineData("bone-club")]
     public async Task NoFlinchOnMiss(string moveName)
     {
         var result = await new MoveScenario()
@@ -52,11 +62,26 @@ public class FlinchContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         player.AddAttack(Move("stomp"));
 
         var enemy = TestCreatures.Make("Enemy", hp: 300, defense: 100, speed: 1);
-        enemy.AddAttack(new Attack { Name = "Tackle", BaseDamage = 40, Accuracy = 100, AttackType = AttackType.Physical });
+        enemy.AddAttack(
+            new Attack
+            {
+                Name = "Tackle",
+                BaseDamage = 40,
+                Accuracy = 100,
+                AttackType = AttackType.Physical,
+            }
+        );
 
         var emitter = new RecordingEmitter();
-        var battle  = new Battle(player, enemy, Gen1TypeChart.Instance, AutoSelectInput.Instance,
-                                 AutoSelectInput.Instance, rules: ForceSecondaryRules.Instance, emitter: emitter);
+        var battle = new Battle(
+            player,
+            enemy,
+            Gen1TypeChart.Instance,
+            AutoSelectInput.Instance,
+            AutoSelectInput.Instance,
+            rules: ForceSecondaryRules.Instance,
+            emitter: emitter
+        );
         await battle.StartFightAsync();
 
         Assert.Contains(emitter.Events, e => e is FlinchBlocked f && f.CreatureName == "Enemy");

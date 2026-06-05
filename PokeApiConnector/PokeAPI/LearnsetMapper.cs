@@ -13,7 +13,7 @@ namespace PokeApiConnector.PokeAPI;
 public static class LearnsetMapper
 {
     private const string Gen1VersionGroup = "red-blue";
-    private const string LevelUpMethod     = "level-up";
+    private const string LevelUpMethod = "level-up";
 
     // Gen 1 has 165 moves; our moves.db is keyed by the PokeAPI move id (1–165). Guard
     // against a stray later-gen move id sneaking in via an unexpected version-group entry.
@@ -24,7 +24,9 @@ public static class LearnsetMapper
     /// If a move appears more than once, the lowest level is kept (the level it is first
     /// learned at). Result is ordered by level then move id for stable persistence.
     /// </summary>
-    public static IReadOnlyList<(int MoveId, int LearnLevel)> ExtractGen1Learnset(PokeApiPokemon pokemon)
+    public static IReadOnlyList<(int MoveId, int LearnLevel)> ExtractGen1Learnset(
+        PokeApiPokemon pokemon
+    )
     {
         // A move can have several version_group_details; keep the lowest Gen 1 level-up level.
         var lowestLevelByMove = new Dictionary<int, int>();
@@ -32,14 +34,20 @@ public static class LearnsetMapper
         foreach (var entry in pokemon.Moves ?? [])
         {
             int moveId = ParseMoveId(entry.Move?.Url);
-            if (moveId is <= 0 or > MaxGen1MoveId) continue;
+            if (moveId is <= 0 or > MaxGen1MoveId)
+                continue;
 
             foreach (var detail in entry.VersionGroupDetails ?? [])
             {
-                if (detail.VersionGroup?.Name != Gen1VersionGroup) continue;
-                if (detail.MoveLearnMethod?.Name != LevelUpMethod) continue;
+                if (detail.VersionGroup?.Name != Gen1VersionGroup)
+                    continue;
+                if (detail.MoveLearnMethod?.Name != LevelUpMethod)
+                    continue;
 
-                if (!lowestLevelByMove.TryGetValue(moveId, out var existing) || detail.LevelLearnedAt < existing)
+                if (
+                    !lowestLevelByMove.TryGetValue(moveId, out var existing)
+                    || detail.LevelLearnedAt < existing
+                )
                     lowestLevelByMove[moveId] = detail.LevelLearnedAt;
             }
         }
@@ -54,7 +62,8 @@ public static class LearnsetMapper
     // PokeAPI move URLs look like "https://pokeapi.co/api/v2/move/22/" — pull the id.
     private static int ParseMoveId(string? url)
     {
-        if (string.IsNullOrEmpty(url)) return 0;
+        if (string.IsNullOrEmpty(url))
+            return 0;
         var segments = url.TrimEnd('/').Split('/');
         return int.TryParse(segments[^1], out var id) ? id : 0;
     }

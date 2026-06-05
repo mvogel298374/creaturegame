@@ -21,12 +21,10 @@ public class MimicContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         var defender = TestCreatures.Make("D", hp: 500);
         defender.AddAttack(Move("tackle"));
 
-        var result = await new MoveScenario()
-            .Defender(defender)
-            .Use(Move("mimic"));
+        var result = await new MoveScenario().Defender(defender).Use(Move("mimic"));
 
         Assert.False(result.Has<DamageDealt>(), "Mimic deals no damage the turn it copies");
-        Assert.Equal("tackle", result.Move.Base.Name);   // the Mimic slot has become Tackle
+        Assert.Equal("tackle", result.Move.Base.Name); // the Mimic slot has become Tackle
 
         var learned = result.First<MimicLearned>();
         Assert.NotNull(learned);
@@ -43,10 +41,10 @@ public class MimicContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         defender.AddAttack(Move("tackle"));
 
         var result = await new MoveScenario().Defender(defender).Use(Move("mimic"));
-        Assert.Equal("tackle", result.Move.Base.Name);   // swapped in
+        Assert.Equal("tackle", result.Move.Base.Name); // swapped in
 
         result.Attacker.ResetBattleState();
-        Assert.Equal("mimic", result.Move.Base.Name);    // reverted by the reset, not orphaned
+        Assert.Equal("mimic", result.Move.Base.Name); // reverted by the reset, not orphaned
     }
 
     [Fact]
@@ -59,27 +57,33 @@ public class MimicContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         player.CalculateStats();
         player.Attributes.HP = player.Attributes.MaxHP = 2000;
         player.Attributes.Attack = 200;
-        player.Attributes.Speed  = 200;    // outspeed the enemy
+        player.Attributes.Speed = 200; // outspeed the enemy
         player.AddAttack(Move("mimic"));
 
         var enemy = new Creature("Enemy") { Level = 50, Type1 = DamageType.Normal };
         enemy.CalculateStats();
         enemy.Attributes.HP = enemy.Attributes.MaxHP = 40;
         enemy.Attributes.Defense = 20;
-        enemy.Attributes.Speed   = 1;
+        enemy.Attributes.Speed = 1;
         enemy.AddAttack(Move("tackle"));
 
         var emitter = new RecordingEmitter();
-        var battle  = new Battle(player, enemy, Gen1TypeChart.Instance,
-                                 AutoSelectInput.Instance, AutoSelectInput.Instance,
-                                 rules: NoVarianceNoCritHitRules.Instance, emitter: emitter);
+        var battle = new Battle(
+            player,
+            enemy,
+            Gen1TypeChart.Instance,
+            AutoSelectInput.Instance,
+            AutoSelectInput.Instance,
+            rules: NoVarianceNoCritHitRules.Instance,
+            emitter: emitter
+        );
         await battle.StartFightAsync();
 
         // It copied Tackle (the enemy's only move)...
         var learned = emitter.Of<MimicLearned>().FirstOrDefault();
         Assert.NotNull(learned);
         Assert.Equal("tackle", learned!.MoveName);
-        Assert.False(enemy.IsAlive());                       // and used the copy to win
+        Assert.False(enemy.IsAlive()); // and used the copy to win
 
         // ...and the swap reverted — the permanent move slot is Mimic again, not Tackle.
         Assert.Equal("mimic", player.MoveSet[0].Base.Name);

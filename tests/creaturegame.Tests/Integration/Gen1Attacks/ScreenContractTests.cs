@@ -27,31 +27,51 @@ public class ScreenContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     [Fact]
     public async Task ReflectReducesPhysicalDamageButLightScreenDoesNot()
     {
-        int normal      = await DamageTaken("tackle", _ => { },              NoVarianceNoCritHitRules.Instance);
-        int reflected   = await DamageTaken("tackle", d => d.HasReflect = true,     NoVarianceNoCritHitRules.Instance);
-        int lightScreen = await DamageTaken("tackle", d => d.HasLightScreen = true, NoVarianceNoCritHitRules.Instance);
+        int normal = await DamageTaken("tackle", _ => { }, NoVarianceNoCritHitRules.Instance);
+        int reflected = await DamageTaken(
+            "tackle",
+            d => d.HasReflect = true,
+            NoVarianceNoCritHitRules.Instance
+        );
+        int lightScreen = await DamageTaken(
+            "tackle",
+            d => d.HasLightScreen = true,
+            NoVarianceNoCritHitRules.Instance
+        );
 
         Assert.True(reflected < normal, "Reflect reduces physical damage");
-        Assert.Equal(normal, lightScreen);   // Light Screen is the wrong screen for a physical hit
+        Assert.Equal(normal, lightScreen); // Light Screen is the wrong screen for a physical hit
     }
 
     [Fact]
     public async Task LightScreenReducesSpecialDamageButReflectDoesNot()
     {
-        int normal      = await DamageTaken("water-gun", _ => { },              NoVarianceNoCritHitRules.Instance);
-        int lightScreen = await DamageTaken("water-gun", d => d.HasLightScreen = true, NoVarianceNoCritHitRules.Instance);
-        int reflected   = await DamageTaken("water-gun", d => d.HasReflect = true,     NoVarianceNoCritHitRules.Instance);
+        int normal = await DamageTaken("water-gun", _ => { }, NoVarianceNoCritHitRules.Instance);
+        int lightScreen = await DamageTaken(
+            "water-gun",
+            d => d.HasLightScreen = true,
+            NoVarianceNoCritHitRules.Instance
+        );
+        int reflected = await DamageTaken(
+            "water-gun",
+            d => d.HasReflect = true,
+            NoVarianceNoCritHitRules.Instance
+        );
 
         Assert.True(lightScreen < normal, "Light Screen reduces special damage");
-        Assert.Equal(normal, reflected);     // Reflect is the wrong screen for a special hit
+        Assert.Equal(normal, reflected); // Reflect is the wrong screen for a special hit
     }
 
     [Fact]
     public async Task CritsIgnoreReflect()
     {
         // On a crit the screen is bypassed (Gen 1), so damage matches the unscreened crit.
-        int critNoScreen = await DamageTaken("tackle", _ => { },          AlwaysCritRules.Instance);
-        int critReflect  = await DamageTaken("tackle", d => d.HasReflect = true, AlwaysCritRules.Instance);
+        int critNoScreen = await DamageTaken("tackle", _ => { }, AlwaysCritRules.Instance);
+        int critReflect = await DamageTaken(
+            "tackle",
+            d => d.HasReflect = true,
+            AlwaysCritRules.Instance
+        );
 
         Assert.Equal(critNoScreen, critReflect);
     }

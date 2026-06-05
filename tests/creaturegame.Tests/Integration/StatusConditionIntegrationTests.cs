@@ -31,18 +31,20 @@ public class StatusConditionIntegrationTests : IDisposable
         using (var ctx = BuildMovesContext())
         {
             ctx.EnsureDatabaseCreated();
-            ctx.Moves.Add(new Attack
-            {
-                Id            = 1,
-                Name          = "Thunder Wave",
-                BaseDamage    = 0,
-                Accuracy      = 100,
-                PowerPointsMax = 20,
-                AttackType    = AttackType.Undefined,
-                DamageType    = DamageType.Electric,
-                StatusEffect  = StatusCondition.Paralysis,
-                EffectChance  = 100,
-            });
+            ctx.Moves.Add(
+                new Attack
+                {
+                    Id = 1,
+                    Name = "Thunder Wave",
+                    BaseDamage = 0,
+                    Accuracy = 100,
+                    PowerPointsMax = 20,
+                    AttackType = AttackType.Undefined,
+                    DamageType = DamageType.Electric,
+                    StatusEffect = StatusCondition.Paralysis,
+                    EffectChance = 100,
+                }
+            );
             await ctx.SaveChangesAsync();
         }
 
@@ -82,18 +84,20 @@ public class StatusConditionIntegrationTests : IDisposable
         using (var ctx = BuildMovesContext())
         {
             ctx.EnsureDatabaseCreated();
-            ctx.Moves.Add(new Attack
-            {
-                Id            = 1,
-                Name          = "Tackle",
-                BaseDamage    = 40,
-                Accuracy      = 100,
-                PowerPointsMax = 35,
-                AttackType    = AttackType.Physical,
-                DamageType    = DamageType.Normal,
-                StatusEffect  = StatusCondition.Burn,
-                EffectChance  = 0,
-            });
+            ctx.Moves.Add(
+                new Attack
+                {
+                    Id = 1,
+                    Name = "Tackle",
+                    BaseDamage = 40,
+                    Accuracy = 100,
+                    PowerPointsMax = 35,
+                    AttackType = AttackType.Physical,
+                    DamageType = DamageType.Normal,
+                    StatusEffect = StatusCondition.Burn,
+                    EffectChance = 0,
+                }
+            );
             await ctx.SaveChangesAsync();
         }
 
@@ -124,6 +128,7 @@ public class StatusConditionIntegrationTests : IDisposable
     public void Dispose()
     {
         SqliteConnection.ClearAllPools();
-        if (File.Exists(_movesDb)) File.Delete(_movesDb);
+        if (File.Exists(_movesDb))
+            File.Delete(_movesDb);
     }
 }

@@ -30,7 +30,7 @@ public class RampageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         // Lock was rolled at 2–3 and decremented for this turn ⇒ 1–2 turns still remain.
         Assert.InRange(result.Attacker.RampageTurnsRemaining, 1, 2);
         Assert.NotNull(result.Attacker.RampageMove);
-        Assert.Equal(0, result.Attacker.ConfusedTurns);   // not confused until the lock ends
+        Assert.Equal(0, result.Attacker.ConfusedTurns); // not confused until the lock ends
     }
 
     [Fact]
@@ -42,12 +42,27 @@ public class RampageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         player.AddAttack(Move("thrash"));
 
         var enemy = TestCreatures.Make("Enemy", hp: 600, defense: 200, speed: 1);
-        enemy.AddAttack(new Attack { Name = "Splash", BaseDamage = 0, Accuracy = 100, AttackType = AttackType.Physical });
+        enemy.AddAttack(
+            new Attack
+            {
+                Name = "Splash",
+                BaseDamage = 0,
+                Accuracy = 100,
+                AttackType = AttackType.Physical,
+            }
+        );
 
         var emitter = new RecordingEmitter();
-        var input   = new RecordingInput(0);
-        var battle  = new Battle(player, enemy, Gen1TypeChart.Instance, input, AutoSelectInput.Instance,
-                                 rules: new FixedRampageRules(2), emitter: emitter);
+        var input = new RecordingInput(0);
+        var battle = new Battle(
+            player,
+            enemy,
+            Gen1TypeChart.Instance,
+            input,
+            AutoSelectInput.Instance,
+            rules: new FixedRampageRules(2),
+            emitter: emitter
+        );
         await battle.StartFightAsync();
 
         // Turn 1 is a free selection; turn 2 is the locked rampage turn and must NOT consult input.
@@ -56,7 +71,11 @@ public class RampageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 
         // The 2-turn rampage ends with the user confusing itself.
         Assert.Contains(emitter.Events, e => e is ConfusionStarted c && c.TargetName == "Player");
-        Assert.True(emitter.Events.OfType<MoveUsed>().Count(m => m.AttackerName == "Player" && m.MoveName == "thrash") >= 2);
+        Assert.True(
+            emitter
+                .Events.OfType<MoveUsed>()
+                .Count(m => m.AttackerName == "Player" && m.MoveName == "thrash") >= 2
+        );
     }
 
     /// <summary>Records which turn numbers the engine asked for a move; always picks one fixed index.</summary>
@@ -74,9 +93,12 @@ public class RampageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     /// <summary>Always-hit, no-crit/variance rules with a fixed rampage length for determinism.</summary>
     private sealed class FixedRampageRules(int turns) : DelegatingBattleRules
     {
-        public override int    RollRampageTurns()                                   => turns;
-        public override int    GetHitThreshold(int acc, int accStage, int evaStage) => 256;
-        public override double GetCritChance(Creature a, Attack m)                  => 0.0;
-        public override double RollDamageVariance()                                 => 1.0;
+        public override int RollRampageTurns() => turns;
+
+        public override int GetHitThreshold(int acc, int accStage, int evaStage) => 256;
+
+        public override double GetCritChance(Creature a, Attack m) => 0.0;
+
+        public override double RollDamageVariance() => 1.0;
     }
 }

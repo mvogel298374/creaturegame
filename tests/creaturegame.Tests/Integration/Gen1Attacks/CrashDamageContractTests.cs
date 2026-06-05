@@ -24,7 +24,7 @@ public class CrashDamageContractTests(MovesFixture moves) : Gen1MoveContract(mov
 
         Assert.True(result.Has<MoveMissed>());
         Assert.False(result.Has<DamageDealt>());
-        Assert.Equal(result.Defender.Attributes.MaxHP, result.Defender.Attributes.HP);   // target untouched
+        Assert.Equal(result.Defender.Attributes.MaxHP, result.Defender.Attributes.HP); // target untouched
 
         int expected = Gen1BattleRules.Instance.CalculateCrashDamage(result.Attacker);
         var crash = result.First<CrashDamage>();
@@ -41,10 +41,10 @@ public class CrashDamageContractTests(MovesFixture moves) : Gen1MoveContract(mov
         var result = await new MoveScenario()
             .Attacker(attacker)
             .Defender(TestCreatures.Make("D", hp: 9999, defense: 80))
-            .Use(Move("jump-kick"));   // default AlwaysHitRules ⇒ connects
+            .Use(Move("jump-kick")); // default AlwaysHitRules ⇒ connects
 
         Assert.True(result.Has<DamageDealt>());
         Assert.False(result.Has<CrashDamage>());
-        Assert.Equal(result.Attacker.Attributes.MaxHP, result.Attacker.Attributes.HP);   // user unharmed
+        Assert.Equal(result.Attacker.Attributes.MaxHP, result.Attacker.Attributes.HP); // user unharmed
     }
 }

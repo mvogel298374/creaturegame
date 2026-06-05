@@ -16,8 +16,8 @@ namespace creaturegame.Tests.Integration.Gen1Attacks;
 public class PriorityMoveContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 {
     [Fact]
-    public void QuickAttackHasGen1PositivePriority()
-        => Assert.Equal(1, Move("quick-attack").Priority);
+    public void QuickAttackHasGen1PositivePriority() =>
+        Assert.Equal(1, Move("quick-attack").Priority);
 
     [Fact]
     public async Task QuickAttackMovesBeforeAFasterFoesNormalMove()
@@ -48,20 +48,26 @@ public class PriorityMoveContractTests(MovesFixture moves) : Gen1MoveContract(mo
         player.CalculateStats();
         player.Attributes.HP = player.Attributes.MaxHP = 999;
         player.Attributes.Attack = 40;
-        player.Attributes.Speed  = 1;      // far slower than the enemy
+        player.Attributes.Speed = 1; // far slower than the enemy
         player.AddAttack(Move(playerMove));
 
         var enemy = new Creature("Enemy") { Level = 50, Type1 = DamageType.Normal };
         enemy.CalculateStats();
         enemy.Attributes.HP = enemy.Attributes.MaxHP = 999;
         enemy.Attributes.Attack = 40;
-        enemy.Attributes.Speed  = 250;     // outspeeds the player
+        enemy.Attributes.Speed = 250; // outspeeds the player
         enemy.AddAttack(Move("pound"));
 
         var emitter = new RecordingEmitter();
-        var battle  = new Battle(player, enemy, Gen1TypeChart.Instance,
-                                 AutoSelectInput.Instance, AutoSelectInput.Instance,
-                                 rules: AlwaysHitRules.Instance, emitter: emitter);
+        var battle = new Battle(
+            player,
+            enemy,
+            Gen1TypeChart.Instance,
+            AutoSelectInput.Instance,
+            AutoSelectInput.Instance,
+            rules: AlwaysHitRules.Instance,
+            emitter: emitter
+        );
         await battle.StartFightAsync();
 
         var firstUse = emitter.Of<MoveUsed>().First();

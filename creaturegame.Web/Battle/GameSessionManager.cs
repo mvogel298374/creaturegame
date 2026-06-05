@@ -10,9 +10,9 @@ namespace creaturegame.Web.Battle;
 
 public sealed class GameSessionManager(IHubContext<BattleHub, IBattleClient> hubContext)
 {
-    private readonly ConcurrentDictionary<string, PendingSession> _pending    = new();  // gameId → registered, not yet started
-    private readonly ConcurrentDictionary<string, ActiveBattle>   _active     = new();  // gameId → running battle
-    private readonly ConcurrentDictionary<string, string>         _connToGame = new();  // connectionId → gameId (routing)
+    private readonly ConcurrentDictionary<string, PendingSession> _pending = new(); // gameId → registered, not yet started
+    private readonly ConcurrentDictionary<string, ActiveBattle> _active = new(); // gameId → running battle
+    private readonly ConcurrentDictionary<string, string> _connToGame = new(); // connectionId → gameId (routing)
 
     // Pending sessions never claimed (client never connected) are evicted after this TTL.
     private static readonly TimeSpan PendingSessionTtl = TimeSpan.FromMinutes(2);
@@ -58,7 +58,7 @@ public sealed class GameSessionManager(IHubContext<BattleHub, IBattleClient> hub
 
         // First connection: claim the pending session and start the battle loop.
         if (!_pending.TryRemove(gameId, out var session))
-            return;  // unknown or already-consumed gameId
+            return; // unknown or already-consumed gameId
 
         var battle = new ActiveBattle { CurrentConnectionId = connectionId };
         _active[gameId] = battle;
@@ -66,12 +66,15 @@ public sealed class GameSessionManager(IHubContext<BattleHub, IBattleClient> hub
 
         // Emitter resolves the current connection per-event, so output follows reconnects.
         var emitter = new SignalRBattleEventEmitter(hubContext, () => battle.CurrentConnectionId);
-        var engine  = new BattleEngine(
-            session.Player, session.Enemy,
+        var engine = new BattleEngine(
+            session.Player,
+            session.Enemy,
             Gen1TypeChart.Instance,
-            battle.Input, new RandomMoveInput(),
+            battle.Input,
+            new RandomMoveInput(),
             movePool: session.AllMoves,
-            emitter: emitter);
+            emitter: emitter
+        );
 
         _ = Task.Run(async () =>
         {
@@ -82,7 +85,9 @@ public sealed class GameSessionManager(IHubContext<BattleHub, IBattleClient> hub
             catch (OperationCanceledException)
             {
                 // Expected when the reconnect grace expires — see DetachConnection.
-                Console.WriteLine($"[GameSessionManager] Battle {gameId} abandoned (client did not reconnect).");
+                Console.WriteLine(
+                    $"[GameSessionManager] Battle {gameId} abandoned (client did not reconnect)."
+                );
             }
             catch (Exception ex)
             {
@@ -100,8 +105,10 @@ public sealed class GameSessionManager(IHubContext<BattleHub, IBattleClient> hub
 
     public void SetMoveChoice(string connectionId, int moveIndex)
     {
-        if (_connToGame.TryGetValue(connectionId, out var gameId)
-            && _active.TryGetValue(gameId, out var battle))
+        if (
+            _connToGame.TryGetValue(connectionId, out var gameId)
+            && _active.TryGetValue(gameId, out var battle)
+        )
             battle.Input.SetChoice(moveIndex);
     }
 
@@ -113,15 +120,23 @@ public sealed class GameSessionManager(IHubContext<BattleHub, IBattleClient> hub
     /// </summary>
     public void DetachConnection(string connectionId)
     {
-        if (!_connToGame.TryGetValue(connectionId, out var gameId)) return;
-        if (!_active.TryGetValue(gameId, out var battle)) return;
-        if (battle.CurrentConnectionId != connectionId) return;  // stale old connection
+        if (!_connToGame.TryGetValue(connectionId, out var gameId))
+            return;
+        if (!_active.TryGetValue(gameId, out var battle))
+            return;
+        if (battle.CurrentConnectionId != connectionId)
+            return; // stale old connection
 
         battle.ScheduleAbandon(ReconnectGrace);
     }
 }
 
-sealed record PendingSession(Creature Player, Creature Enemy, IReadOnlyList<Attack> AllMoves, DateTimeOffset RegisteredAt);
+sealed record PendingSession(
+    Creature Player,
+    Creature Enemy,
+    IReadOnlyList<Attack> AllMoves,
+    DateTimeOffset RegisteredAt
+);
 
 /// <summary>A running battle plus the connection currently bound to it and its abandon timer.</summary>
 sealed class ActiveBattle
@@ -140,10 +155,15 @@ sealed class ActiveBattle
             _abandonCts?.Cancel();
             var cts = new CancellationTokenSource();
             _abandonCts = cts;
-            _ = Task.Delay(grace, cts.Token).ContinueWith(t =>
-            {
-                if (!t.IsCanceled) Input.Cancel();   // grace expired → unblock the battle loop
-            }, TaskScheduler.Default);
+            _ = Task.Delay(grace, cts.Token)
+                .ContinueWith(
+                    t =>
+                    {
+                        if (!t.IsCanceled)
+                            Input.Cancel(); // grace expired → unblock the battle loop
+                    },
+                    TaskScheduler.Default
+                );
         }
     }
 

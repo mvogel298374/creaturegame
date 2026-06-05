@@ -1,6 +1,6 @@
-using creaturegame.Creatures;
 using creaturegame.Attacks;
 using creaturegame.Combat;
+using creaturegame.Creatures;
 using creaturegame.DB;
 using creaturegame.Tests.TestSupport;
 
@@ -23,7 +23,7 @@ public class CoreMechanicsTests
             DvDefense = 15,
             DvSpecial = 15,
             DvSpeed = 15,
-            DvHP = 15
+            DvHP = 15,
         };
         bulbasaur.CalculateStats();
 
@@ -47,10 +47,10 @@ public class CoreMechanicsTests
             DvDefense = 15,
             DvSpecial = 15,
             DvSpeed = 15,
-            DvHP = 15
+            DvHP = 15,
         };
         bulbasaur.CalculateStats();
-        
+
         int oldHp = bulbasaur.Attributes.HP;
         int oldAttack = bulbasaur.Attributes.Attack;
         int oldSpecial = bulbasaur.Attributes.Special;
@@ -75,7 +75,7 @@ public class CoreMechanicsTests
             BaseSpeed = 45,
             Level = 1,
             Experience = 0,
-            GrowthRate = GrowthRate.MediumFast
+            GrowthRate = GrowthRate.MediumFast,
         };
         bulbasaur.CalculateStats();
 
@@ -116,17 +116,27 @@ public class CoreMechanicsTests
     public void DamageCalculationFormula()
     {
         var attacker = new Creature("Attacker") { Level = 50 };
-        attacker.CalculateStats(); 
+        attacker.CalculateStats();
         attacker.Attributes.Attack = 100;
-        
+
         var defender = new Creature("Defender") { Level = 50 };
         defender.CalculateStats();
         defender.Attributes.Defense = 100;
-        
-        var move = new Attack { Name = "Tackle", BaseDamage = 40, AttackType = AttackType.Physical };
-        
-        int damage = DamageCalculator.CalculateDamage(attacker, defender, move, new Gen1TypeChart());
-        
+
+        var move = new Attack
+        {
+            Name = "Tackle",
+            BaseDamage = 40,
+            AttackType = AttackType.Physical,
+        };
+
+        int damage = DamageCalculator.CalculateDamage(
+            attacker,
+            defender,
+            move,
+            new Gen1TypeChart()
+        );
+
         Assert.InRange(damage, 16, 19);
     }
 
@@ -135,7 +145,7 @@ public class CoreMechanicsTests
     {
         var fastCreature = new Creature("Fast") { Level = 50 };
         fastCreature.Attributes.Speed = 100;
-        
+
         var slowCreature = new Creature("Slow") { Level = 50 };
         slowCreature.Attributes.Speed = 50;
 
@@ -143,14 +153,25 @@ public class CoreMechanicsTests
         slowCreature.AddAttack(new Attack { Name = "Tackle", Accuracy = 100 });
 
         var chart = new Gen1TypeChart();
-        var fastAction = new AttackAction(fastCreature, slowCreature, fastCreature.MoveSet[0], chart);
-        var slowAction = new AttackAction(slowCreature, fastCreature, slowCreature.MoveSet[0], chart);
+        var fastAction = new AttackAction(
+            fastCreature,
+            slowCreature,
+            fastCreature.MoveSet[0],
+            chart
+        );
+        var slowAction = new AttackAction(
+            slowCreature,
+            fastCreature,
+            slowCreature.MoveSet[0],
+            chart
+        );
 
         var turnQueue = new List<IBattleAction> { slowAction, fastAction };
 
-        var resolvedQueue = turnQueue.OrderByDescending(a => a.Priority)
-                                     .ThenByDescending(a => a.Source.Attributes.Speed)
-                                     .ToList();
+        var resolvedQueue = turnQueue
+            .OrderByDescending(a => a.Priority)
+            .ThenByDescending(a => a.Source.Attributes.Speed)
+            .ToList();
 
         Assert.Equal("Fast", resolvedQueue[0].Source.Name);
         Assert.Equal("Slow", resolvedQueue[1].Source.Name);
@@ -166,12 +187,24 @@ public class CoreMechanicsTests
         var defender = new Creature("Defender") { Level = 10 };
         defender.CalculateStats();
 
-        var baseAttack = new Attack { Name = "Tackle", BaseDamage = 40, Accuracy = 100, PowerPointsMax = 5 };
+        var baseAttack = new Attack
+        {
+            Name = "Tackle",
+            BaseDamage = 40,
+            Accuracy = 100,
+            PowerPointsMax = 5,
+        };
         attacker.AddAttack(baseAttack);
         var move = attacker.MoveSet[0];
 
         int ppBefore = move.PowerPointsCurrent;
-        var action = new AttackAction(attacker, defender, move, new Gen1TypeChart(), emitter: ConsoleBattleEventEmitter.Instance);
+        var action = new AttackAction(
+            attacker,
+            defender,
+            move,
+            new Gen1TypeChart(),
+            emitter: ConsoleBattleEventEmitter.Instance
+        );
         await action.ExecuteAsync();
 
         Assert.Equal(ppBefore - 1, move.PowerPointsCurrent);
@@ -188,13 +221,25 @@ public class CoreMechanicsTests
         defender.Attributes.Defense = 50;
         int defenderHpBefore = defender.Attributes.HP;
 
-        var baseAttack = new Attack { Name = "Tackle", BaseDamage = 40, Accuracy = 100, PowerPointsMax = 1 };
+        var baseAttack = new Attack
+        {
+            Name = "Tackle",
+            BaseDamage = 40,
+            Accuracy = 100,
+            PowerPointsMax = 1,
+        };
         attacker.AddAttack(baseAttack);
         var move = attacker.MoveSet[0];
         move.PowerPointsCurrent = 0; // force PP exhausted
 
         // null signals AttackAction to use Struggle — mirrors what Battle does when out of PP
-        var action = new AttackAction(attacker, defender, null, new Gen1TypeChart(), emitter: ConsoleBattleEventEmitter.Instance);
+        var action = new AttackAction(
+            attacker,
+            defender,
+            null,
+            new Gen1TypeChart(),
+            emitter: ConsoleBattleEventEmitter.Instance
+        );
         await action.ExecuteAsync();
 
         // Defender should have taken damage (Struggle fired)
@@ -215,11 +260,24 @@ public class CoreMechanicsTests
         var defender = new Creature("Defender") { Level = 10 };
         defender.CalculateStats();
 
-        var thunderWave = new Attack { Name = "Thunder Wave", BaseDamage = 0, Accuracy = 100,
-            StatusEffect = StatusCondition.Paralysis, EffectChance = 100 };
+        var thunderWave = new Attack
+        {
+            Name = "Thunder Wave",
+            BaseDamage = 0,
+            Accuracy = 100,
+            StatusEffect = StatusCondition.Paralysis,
+            EffectChance = 100,
+        };
         attacker.AddAttack(thunderWave);
 
-        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), AlwaysHitRules.Instance, ConsoleBattleEventEmitter.Instance);
+        var action = new AttackAction(
+            attacker,
+            defender,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            AlwaysHitRules.Instance,
+            ConsoleBattleEventEmitter.Instance
+        );
         await action.ExecuteAsync();
 
         Assert.Equal(StatusCondition.Paralysis, defender.Status);
@@ -234,11 +292,23 @@ public class CoreMechanicsTests
         defender.CalculateStats();
         defender.Status = StatusCondition.Burn;
 
-        var thunderWave = new Attack { Name = "Thunder Wave", BaseDamage = 0, Accuracy = 100,
-            StatusEffect = StatusCondition.Paralysis, EffectChance = 100 };
+        var thunderWave = new Attack
+        {
+            Name = "Thunder Wave",
+            BaseDamage = 0,
+            Accuracy = 100,
+            StatusEffect = StatusCondition.Paralysis,
+            EffectChance = 100,
+        };
         attacker.AddAttack(thunderWave);
 
-        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), emitter: ConsoleBattleEventEmitter.Instance);
+        var action = new AttackAction(
+            attacker,
+            defender,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            emitter: ConsoleBattleEventEmitter.Instance
+        );
         await action.ExecuteAsync();
 
         Assert.Equal(StatusCondition.Burn, defender.Status);
@@ -252,11 +322,24 @@ public class CoreMechanicsTests
         var defender = new Creature("Defender") { Level = 10 };
         defender.CalculateStats();
 
-        var sleepPowder = new Attack { Name = "Sleep Powder", BaseDamage = 0, Accuracy = 100,
-            StatusEffect = StatusCondition.Sleep, EffectChance = 100 };
+        var sleepPowder = new Attack
+        {
+            Name = "Sleep Powder",
+            BaseDamage = 0,
+            Accuracy = 100,
+            StatusEffect = StatusCondition.Sleep,
+            EffectChance = 100,
+        };
         attacker.AddAttack(sleepPowder);
 
-        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), AlwaysHitRules.Instance, ConsoleBattleEventEmitter.Instance);
+        var action = new AttackAction(
+            attacker,
+            defender,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            AlwaysHitRules.Instance,
+            ConsoleBattleEventEmitter.Instance
+        );
         await action.ExecuteAsync();
 
         Assert.Equal(StatusCondition.Sleep, defender.Status);
@@ -272,11 +355,23 @@ public class CoreMechanicsTests
         defender.CalculateStats();
 
         // 0% chance — should never apply
-        var move = new Attack { Name = "Tackle", BaseDamage = 40, Accuracy = 100,
-            StatusEffect = StatusCondition.Burn, EffectChance = 0 };
+        var move = new Attack
+        {
+            Name = "Tackle",
+            BaseDamage = 40,
+            Accuracy = 100,
+            StatusEffect = StatusCondition.Burn,
+            EffectChance = 0,
+        };
         attacker.AddAttack(move);
 
-        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), emitter: ConsoleBattleEventEmitter.Instance);
+        var action = new AttackAction(
+            attacker,
+            defender,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            emitter: ConsoleBattleEventEmitter.Instance
+        );
         await action.ExecuteAsync();
 
         Assert.Equal(StatusCondition.None, defender.Status);
@@ -342,7 +437,11 @@ public class CoreMechanicsTests
         // Water move vs Grass/Poison (Bulbasaur): 0.5 * 1.0 = 0.5
         var chart = new Gen1TypeChart();
         double effectiveness = DamageCalculator.GetTypeEffectiveness(
-            DamageType.Water, DamageType.Grass, DamageType.Poison, chart);
+            DamageType.Water,
+            DamageType.Grass,
+            DamageType.Poison,
+            chart
+        );
         Assert.Equal(0.5, effectiveness);
     }
 
@@ -381,12 +480,24 @@ public class CoreMechanicsTests
         defender.CalculateStats();
         int hpBefore = defender.Attributes.HP;
 
-        var move = new Attack { Name = "LowAcc", BaseDamage = 40, Accuracy = 0, AttackType = AttackType.Physical };
+        var move = new Attack
+        {
+            Name = "LowAcc",
+            BaseDamage = 40,
+            Accuracy = 0,
+            AttackType = AttackType.Physical,
+        };
         attacker.AddAttack(move);
 
         for (int i = 0; i < 20; i++)
         {
-            var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), emitter: ConsoleBattleEventEmitter.Instance);
+            var action = new AttackAction(
+                attacker,
+                defender,
+                attacker.MoveSet[0],
+                new Gen1TypeChart(),
+                emitter: ConsoleBattleEventEmitter.Instance
+            );
             await action.ExecuteAsync();
         }
 
@@ -404,10 +515,10 @@ public class CoreMechanicsTests
         // 0% accuracy + guaranteed status chance — status must never land on a miss
         var move = new Attack
         {
-            Name         = "LowAcc",
-            BaseDamage   = 40,
-            Accuracy     = 0,
-            AttackType   = AttackType.Physical,
+            Name = "LowAcc",
+            BaseDamage = 40,
+            Accuracy = 0,
+            AttackType = AttackType.Physical,
             StatusEffect = StatusCondition.Paralysis,
             EffectChance = 100,
         };
@@ -415,7 +526,13 @@ public class CoreMechanicsTests
 
         for (int i = 0; i < 20; i++)
         {
-            var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), emitter: ConsoleBattleEventEmitter.Instance);
+            var action = new AttackAction(
+                attacker,
+                defender,
+                attacker.MoveSet[0],
+                new Gen1TypeChart(),
+                emitter: ConsoleBattleEventEmitter.Instance
+            );
             await action.ExecuteAsync();
         }
 
@@ -439,15 +556,33 @@ public class CoreMechanicsTests
         defender.CalculateStats();
         defender.Attributes.Defense = 50;
 
-        var move = new Attack { Name = "Ember", BaseDamage = 80, AttackType = AttackType.Physical, DamageType = DamageType.Fire };
+        var move = new Attack
+        {
+            Name = "Ember",
+            BaseDamage = 80,
+            AttackType = AttackType.Physical,
+            DamageType = DamageType.Fire,
+        };
 
-        int stabDamage    = DamageCalculator.CalculateDamage(attacker, defender, move, new Gen1TypeChart());
+        int stabDamage = DamageCalculator.CalculateDamage(
+            attacker,
+            defender,
+            move,
+            new Gen1TypeChart()
+        );
 
         attacker.Type1 = DamageType.Water; // no STAB on Fire move
-        int nonStabDamage = DamageCalculator.CalculateDamage(attacker, defender, move, new Gen1TypeChart());
+        int nonStabDamage = DamageCalculator.CalculateDamage(
+            attacker,
+            defender,
+            move,
+            new Gen1TypeChart()
+        );
 
-        Assert.True(stabDamage > nonStabDamage,
-            $"STAB damage ({stabDamage}) should exceed non-STAB ({nonStabDamage})");
+        Assert.True(
+            stabDamage > nonStabDamage,
+            $"STAB damage ({stabDamage}) should exceed non-STAB ({nonStabDamage})"
+        );
     }
 
     [Fact]
@@ -457,21 +592,39 @@ public class CoreMechanicsTests
         attacker.CalculateStats();
         attacker.Attributes.Attack = 100;
         attacker.Type1 = DamageType.Normal; // doesn't match move
-        attacker.Type2 = DamageType.Fire;   // matches move → STAB via Type2
+        attacker.Type2 = DamageType.Fire; // matches move → STAB via Type2
 
         var defender = new Creature("Defender") { Level = 50 };
         defender.CalculateStats();
         defender.Attributes.Defense = 50;
 
-        var move = new Attack { Name = "Ember", BaseDamage = 80, AttackType = AttackType.Physical, DamageType = DamageType.Fire };
+        var move = new Attack
+        {
+            Name = "Ember",
+            BaseDamage = 80,
+            AttackType = AttackType.Physical,
+            DamageType = DamageType.Fire,
+        };
 
-        int stabDamage    = DamageCalculator.CalculateDamage(attacker, defender, move, new Gen1TypeChart());
+        int stabDamage = DamageCalculator.CalculateDamage(
+            attacker,
+            defender,
+            move,
+            new Gen1TypeChart()
+        );
 
         attacker.Type2 = null; // remove Type2 STAB
-        int nonStabDamage = DamageCalculator.CalculateDamage(attacker, defender, move, new Gen1TypeChart());
+        int nonStabDamage = DamageCalculator.CalculateDamage(
+            attacker,
+            defender,
+            move,
+            new Gen1TypeChart()
+        );
 
-        Assert.True(stabDamage > nonStabDamage,
-            $"Type2 STAB damage ({stabDamage}) should exceed non-STAB ({nonStabDamage})");
+        Assert.True(
+            stabDamage > nonStabDamage,
+            $"Type2 STAB damage ({stabDamage}) should exceed non-STAB ({nonStabDamage})"
+        );
     }
 
     // --- AddAttack Constraint Tests ---
@@ -506,7 +659,12 @@ public class CoreMechanicsTests
     [Fact]
     public void Sleep_SkipsActionAndDecrementsCounter()
     {
-        var creature = new Creature("Drowzee") { Level = 50, Status = StatusCondition.Sleep, SleepTurns = 3 };
+        var creature = new Creature("Drowzee")
+        {
+            Level = 50,
+            Status = StatusCondition.Sleep,
+            SleepTurns = 3,
+        };
         creature.CalculateStats();
 
         bool canAct = StatusResolver.CanAct(creature);
@@ -519,7 +677,12 @@ public class CoreMechanicsTests
     [Fact]
     public void Sleep_WakesAndClearsStatusWhenCounterHitsZero()
     {
-        var creature = new Creature("Drowzee") { Level = 50, Status = StatusCondition.Sleep, SleepTurns = 1 };
+        var creature = new Creature("Drowzee")
+        {
+            Level = 50,
+            Status = StatusCondition.Sleep,
+            SleepTurns = 1,
+        };
         creature.CalculateStats();
 
         bool canAct = StatusResolver.CanAct(creature);
@@ -547,17 +710,30 @@ public class CoreMechanicsTests
         // Gen 1: Fire moves that can burn (e.g. Flamethrower) thaw a frozen target.
         var attacker = new Creature("Charizard") { Level = 50 };
         attacker.CalculateStats();
-        attacker.AddAttack(new Attack
-        {
-            Name = "Flamethrower", BaseDamage = 95, Accuracy = 100,
-            DamageType = DamageType.Fire, AttackType = AttackType.Special,
-            StatusEffect = StatusCondition.Burn, EffectChance = 10,
-        });
+        attacker.AddAttack(
+            new Attack
+            {
+                Name = "Flamethrower",
+                BaseDamage = 95,
+                Accuracy = 100,
+                DamageType = DamageType.Fire,
+                AttackType = AttackType.Special,
+                StatusEffect = StatusCondition.Burn,
+                EffectChance = 10,
+            }
+        );
 
         var defender = new Creature("Articuno") { Level = 50, Status = StatusCondition.Freeze };
         defender.CalculateStats();
 
-        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), AlwaysHitRules.Instance, ConsoleBattleEventEmitter.Instance);
+        var action = new AttackAction(
+            attacker,
+            defender,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            AlwaysHitRules.Instance,
+            ConsoleBattleEventEmitter.Instance
+        );
         await action.ExecuteAsync();
 
         Assert.Equal(StatusCondition.None, defender.Status);
@@ -570,17 +746,28 @@ public class CoreMechanicsTests
         // Gen 1: Fire Spin cannot inflict burn, so it does not thaw a frozen target.
         var attacker = new Creature("Attacker") { Level = 50 };
         attacker.CalculateStats();
-        attacker.AddAttack(new Attack
-        {
-            Name = "Fire Spin", BaseDamage = 15, Accuracy = 70,
-            DamageType = DamageType.Fire, AttackType = AttackType.Special,
-            // No StatusEffect = Burn
-        });
+        attacker.AddAttack(
+            new Attack
+            {
+                Name = "Fire Spin",
+                BaseDamage = 15,
+                Accuracy = 70,
+                DamageType = DamageType.Fire,
+                AttackType = AttackType.Special,
+                // No StatusEffect = Burn
+            }
+        );
 
         var defender = new Creature("Articuno") { Level = 50, Status = StatusCondition.Freeze };
         defender.CalculateStats();
 
-        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), emitter: ConsoleBattleEventEmitter.Instance);
+        var action = new AttackAction(
+            attacker,
+            defender,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            emitter: ConsoleBattleEventEmitter.Instance
+        );
         await action.ExecuteAsync();
 
         Assert.Equal(StatusCondition.Freeze, defender.Status);
@@ -611,15 +798,32 @@ public class CoreMechanicsTests
         defender.CalculateStats();
         defender.Attributes.Defense = 50;
 
-        var move = new Attack { Name = "Tackle", BaseDamage = 80, AttackType = AttackType.Physical };
+        var move = new Attack
+        {
+            Name = "Tackle",
+            BaseDamage = 80,
+            AttackType = AttackType.Physical,
+        };
 
-        int burnedDamage = DamageCalculator.CalculateDamage(attacker, defender, move, new Gen1TypeChart());
+        int burnedDamage = DamageCalculator.CalculateDamage(
+            attacker,
+            defender,
+            move,
+            new Gen1TypeChart()
+        );
 
         attacker.Status = StatusCondition.None;
-        int normalDamage = DamageCalculator.CalculateDamage(attacker, defender, move, new Gen1TypeChart());
+        int normalDamage = DamageCalculator.CalculateDamage(
+            attacker,
+            defender,
+            move,
+            new Gen1TypeChart()
+        );
 
-        Assert.True(burnedDamage < normalDamage,
-            $"Burned ({burnedDamage}) should be less than normal ({normalDamage})");
+        Assert.True(
+            burnedDamage < normalDamage,
+            $"Burned ({burnedDamage}) should be less than normal ({normalDamage})"
+        );
     }
 
     [Fact]
@@ -628,7 +832,7 @@ public class CoreMechanicsTests
         var creature = new Creature("Charizard") { Level = 50, Status = StatusCondition.Burn };
         creature.CalculateStats();
         creature.Attributes.MaxHP = 160;
-        creature.Attributes.HP   = 160;
+        creature.Attributes.HP = 160;
 
         StatusResolver.ApplyEndOfTurnDamage(creature);
 
@@ -641,7 +845,7 @@ public class CoreMechanicsTests
         var creature = new Creature("Bulbasaur") { Level = 50, Status = StatusCondition.Poison };
         creature.CalculateStats();
         creature.Attributes.MaxHP = 160;
-        creature.Attributes.HP   = 160;
+        creature.Attributes.HP = 160;
 
         StatusResolver.ApplyEndOfTurnDamage(creature);
 
@@ -677,13 +881,15 @@ public class CoreMechanicsTests
     {
         var creature = new Creature("Psyduck") { Level = 50, ConfusedTurns = 3 };
         creature.CalculateStats();
-        creature.Attributes.HP    = 9999;
+        creature.Attributes.HP = 9999;
         creature.Attributes.MaxHP = 9999;
 
         StatusResolver.CanAct(creature);
 
-        Assert.True(creature.ConfusedTurns < 3,
-            $"ConfusedTurns should have decremented from 3 but is {creature.ConfusedTurns}");
+        Assert.True(
+            creature.ConfusedTurns < 3,
+            $"ConfusedTurns should have decremented from 3 but is {creature.ConfusedTurns}"
+        );
     }
 
     // --- Attributes Tests ---
@@ -770,23 +976,23 @@ public class CoreMechanicsTests
     {
         var species = new PokemonSpecies
         {
-            Id           = 6,
-            Name         = "charizard",
-            BaseHP       = 78,
-            BaseAttack   = 84,
-            BaseDefense  = 78,
-            BaseSpecial  = 85,
-            BaseSpeed    = 100,
-            Type1        = DamageType.Fire,
-            Type2        = DamageType.Flying,
-            GrowthRate   = GrowthRate.MediumSlow,
+            Id = 6,
+            Name = "charizard",
+            BaseHP = 78,
+            BaseAttack = 84,
+            BaseDefense = 78,
+            BaseSpecial = 85,
+            BaseSpeed = 100,
+            Type1 = DamageType.Fire,
+            Type2 = DamageType.Flying,
+            GrowthRate = GrowthRate.MediumSlow,
         };
 
         var creature = new Creature("Charizard") { Level = 50 };
         creature.InitializeFromSpecies(species);
 
-        Assert.Equal(DamageType.Fire,       creature.Type1);
-        Assert.Equal(DamageType.Flying,     creature.Type2);
+        Assert.Equal(DamageType.Fire, creature.Type1);
+        Assert.Equal(DamageType.Flying, creature.Type2);
         Assert.Equal(GrowthRate.MediumSlow, creature.GrowthRate);
         // HP at level 50: floor(((78 + DvHP) * 2) * 50/100) + 60; DvHP ∈ [0,15] → [138, 153]
         Assert.InRange(creature.Attributes.HP, 138, 153);
@@ -802,7 +1008,7 @@ public class CoreMechanicsTests
     {
         var c = new Creature("Test") { Level = 50 };
         c.CalculateStats();
-        c.Attributes.Attack  = 120;
+        c.Attributes.Attack = 120;
         c.Attributes.Special = 80;
         Assert.Equal(120, Gen1BattleRules.Instance.GetOffensiveStat(c, AttackType.Physical));
     }
@@ -812,7 +1018,7 @@ public class CoreMechanicsTests
     {
         var c = new Creature("Test") { Level = 50 };
         c.CalculateStats();
-        c.Attributes.Attack  = 120;
+        c.Attributes.Attack = 120;
         c.Attributes.Special = 80;
         Assert.Equal(80, Gen1BattleRules.Instance.GetOffensiveStat(c, AttackType.Special));
     }
@@ -868,20 +1074,37 @@ public class CoreMechanicsTests
         defender.CalculateStats();
         defender.Attributes.Defense = 100;
 
-        var move = new Attack { Name = "Tackle", BaseDamage = 40, AttackType = AttackType.Physical };
+        var move = new Attack
+        {
+            Name = "Tackle",
+            BaseDamage = 40,
+            AttackType = AttackType.Physical,
+        };
 
         // Stage 0: baseline range; Stage +6: attack multiplied 4×.
         // +6 minimum (4 × 217/255 ≈ 3.4×) is always above stage-0 maximum (1×),
         // so the assertion holds for all random rolls.
-        int stage0 = DamageCalculator.CalculateDamage(attacker, defender, move, new Gen1TypeChart());
+        int stage0 = DamageCalculator.CalculateDamage(
+            attacker,
+            defender,
+            move,
+            new Gen1TypeChart()
+        );
 
         var stages = attacker.Stages;
         stages.RaiseAttack(6);
         attacker.Stages = stages;
-        int stage6 = DamageCalculator.CalculateDamage(attacker, defender, move, new Gen1TypeChart());
+        int stage6 = DamageCalculator.CalculateDamage(
+            attacker,
+            defender,
+            move,
+            new Gen1TypeChart()
+        );
 
-        Assert.True(stage6 > stage0 * 2,
-            $"Stage +6 ({stage6}) should be substantially higher than stage 0 ({stage0})");
+        Assert.True(
+            stage6 > stage0 * 2,
+            $"Stage +6 ({stage6}) should be substantially higher than stage 0 ({stage0})"
+        );
     }
 
     [Fact]
@@ -895,18 +1118,35 @@ public class CoreMechanicsTests
         defender.CalculateStats();
         defender.Attributes.Defense = 50;
 
-        var move = new Attack { Name = "Tackle", BaseDamage = 80, AttackType = AttackType.Physical };
+        var move = new Attack
+        {
+            Name = "Tackle",
+            BaseDamage = 80,
+            AttackType = AttackType.Physical,
+        };
 
-        int stage0 = DamageCalculator.CalculateDamage(attacker, defender, move, new Gen1TypeChart());
+        int stage0 = DamageCalculator.CalculateDamage(
+            attacker,
+            defender,
+            move,
+            new Gen1TypeChart()
+        );
 
         var stages = attacker.Stages;
         stages.RaiseAttack(-6);
         attacker.Stages = stages;
-        int stageM6 = DamageCalculator.CalculateDamage(attacker, defender, move, new Gen1TypeChart());
+        int stageM6 = DamageCalculator.CalculateDamage(
+            attacker,
+            defender,
+            move,
+            new Gen1TypeChart()
+        );
 
         // Stage-0 minimum (217/255 ≈ 0.85×) is always above stage-(-6) maximum (0.25×).
-        Assert.True(stageM6 < stage0,
-            $"Stage -6 ({stageM6}) should be lower than stage 0 ({stage0})");
+        Assert.True(
+            stageM6 < stage0,
+            $"Stage -6 ({stageM6}) should be lower than stage 0 ({stage0})"
+        );
     }
 
     // ── Speed Stage + Paralysis Tests ────────────────────────────────────────
@@ -961,18 +1201,22 @@ public class CoreMechanicsTests
         // Accuracy stage -6 → multiplier 3/9 = 0.333×; threshold reduces significantly.
         int neutral = Gen1BattleRules.Instance.GetHitThreshold(90, 0, 0);
         int negative = Gen1BattleRules.Instance.GetHitThreshold(90, -6, 0);
-        Assert.True(negative < neutral,
-            $"Negative acc stage threshold ({negative}) should be below neutral ({neutral})");
+        Assert.True(
+            negative < neutral,
+            $"Negative acc stage threshold ({negative}) should be below neutral ({neutral})"
+        );
     }
 
     [Fact]
     public void HitThreshold_EvasionPlus6Stage_ReducesThreshold()
     {
         // Defender evasion +6 → multiplier 9/3 = 3×; divides threshold, making miss more likely.
-        int neutral  = Gen1BattleRules.Instance.GetHitThreshold(90, 0, 0);
+        int neutral = Gen1BattleRules.Instance.GetHitThreshold(90, 0, 0);
         int highEvade = Gen1BattleRules.Instance.GetHitThreshold(90, 0, 6);
-        Assert.True(highEvade < neutral,
-            $"High evasion threshold ({highEvade}) should be below neutral ({neutral})");
+        Assert.True(
+            highEvade < neutral,
+            $"High evasion threshold ({highEvade}) should be below neutral ({neutral})"
+        );
     }
 
     // ── Critical Hit Tests ───────────────────────────────────────────────────
@@ -981,14 +1225,16 @@ public class CoreMechanicsTests
     public void CritChance_HighCritMove_IsHigherThanNormal()
     {
         var creature = new Creature("Sandslash") { BaseSpeed = 65 };
-        var normalMove   = new Attack { Name = "Tackle",    IsHighCrit = false };
-        var highCritMove = new Attack { Name = "Slash",     IsHighCrit = true  };
+        var normalMove = new Attack { Name = "Tackle", IsHighCrit = false };
+        var highCritMove = new Attack { Name = "Slash", IsHighCrit = true };
 
-        double normal   = Gen1BattleRules.Instance.GetCritChance(creature, normalMove);
+        double normal = Gen1BattleRules.Instance.GetCritChance(creature, normalMove);
         double highCrit = Gen1BattleRules.Instance.GetCritChance(creature, highCritMove);
 
-        Assert.True(highCrit > normal,
-            $"High-crit chance ({highCrit:P2}) should exceed normal ({normal:P2})");
+        Assert.True(
+            highCrit > normal,
+            $"High-crit chance ({highCrit:P2}) should exceed normal ({normal:P2})"
+        );
     }
 
     [Fact]
@@ -1009,17 +1255,34 @@ public class CoreMechanicsTests
         defender.CalculateStats();
         defender.Attributes.Defense = 50;
 
-        var move = new Attack { Name = "Slash", BaseDamage = 70, AttackType = AttackType.Physical };
+        var move = new Attack
+        {
+            Name = "Slash",
+            BaseDamage = 70,
+            AttackType = AttackType.Physical,
+        };
 
-        int normalCrit = DamageCalculator.CalculateDamage(attacker, defender, move, new Gen1TypeChart(),
-            AlwaysCritRules.Instance, out _);
+        int normalCrit = DamageCalculator.CalculateDamage(
+            attacker,
+            defender,
+            move,
+            new Gen1TypeChart(),
+            AlwaysCritRules.Instance,
+            out _
+        );
 
         var stages = attacker.Stages;
         stages.RaiseAttack(-6);
         attacker.Stages = stages;
 
-        int penalisedCrit = DamageCalculator.CalculateDamage(attacker, defender, move, new Gen1TypeChart(),
-            AlwaysCritRules.Instance, out _);
+        int penalisedCrit = DamageCalculator.CalculateDamage(
+            attacker,
+            defender,
+            move,
+            new Gen1TypeChart(),
+            AlwaysCritRules.Instance,
+            out _
+        );
 
         // Gen 1: crit bypasses the -6 stage penalty → damage is unchanged.
         Assert.Equal(normalCrit, penalisedCrit);
@@ -1036,17 +1299,34 @@ public class CoreMechanicsTests
         defender.CalculateStats();
         defender.Attributes.Defense = 50;
 
-        var move = new Attack { Name = "Slash", BaseDamage = 70, AttackType = AttackType.Physical };
+        var move = new Attack
+        {
+            Name = "Slash",
+            BaseDamage = 70,
+            AttackType = AttackType.Physical,
+        };
 
-        int normalCrit = DamageCalculator.CalculateDamage(attacker, defender, move, new Gen1TypeChart(),
-            AlwaysCritRules.Instance, out _);
+        int normalCrit = DamageCalculator.CalculateDamage(
+            attacker,
+            defender,
+            move,
+            new Gen1TypeChart(),
+            AlwaysCritRules.Instance,
+            out _
+        );
 
         var stages = defender.Stages;
         stages.RaiseDefense(6);
         defender.Stages = stages;
 
-        int boostedDefCrit = DamageCalculator.CalculateDamage(attacker, defender, move, new Gen1TypeChart(),
-            AlwaysCritRules.Instance, out _);
+        int boostedDefCrit = DamageCalculator.CalculateDamage(
+            attacker,
+            defender,
+            move,
+            new Gen1TypeChart(),
+            AlwaysCritRules.Instance,
+            out _
+        );
 
         // Gen 1: crit bypasses defender's +6 Defense boost → damage is unchanged.
         Assert.Equal(normalCrit, boostedDefCrit);
@@ -1063,14 +1343,31 @@ public class CoreMechanicsTests
         defender.CalculateStats();
         defender.Attributes.Defense = 50;
 
-        var move = new Attack { Name = "Slash", BaseDamage = 70, AttackType = AttackType.Physical };
+        var move = new Attack
+        {
+            Name = "Slash",
+            BaseDamage = 70,
+            AttackType = AttackType.Physical,
+        };
 
-        int cleanCrit = DamageCalculator.CalculateDamage(attacker, defender, move, new Gen1TypeChart(),
-            AlwaysCritRules.Instance, out _);
+        int cleanCrit = DamageCalculator.CalculateDamage(
+            attacker,
+            defender,
+            move,
+            new Gen1TypeChart(),
+            AlwaysCritRules.Instance,
+            out _
+        );
 
         attacker.Status = StatusCondition.Burn;
-        int burnedCrit = DamageCalculator.CalculateDamage(attacker, defender, move, new Gen1TypeChart(),
-            AlwaysCritRules.Instance, out _);
+        int burnedCrit = DamageCalculator.CalculateDamage(
+            attacker,
+            defender,
+            move,
+            new Gen1TypeChart(),
+            AlwaysCritRules.Instance,
+            out _
+        );
 
         // Gen 1: crit ignores Burn penalty → burned and clean deal the same damage.
         Assert.Equal(cleanCrit, burnedCrit);
@@ -1088,15 +1385,25 @@ public class CoreMechanicsTests
 
         var move = new Attack
         {
-            Id = 1, Name = "Swords Dance", BaseDamage = 0, Accuracy = 100,
-            StatEffectStat   = StageStat.Attack,
-            StatEffectDelta  = 2,
+            Id = 1,
+            Name = "Swords Dance",
+            BaseDamage = 0,
+            Accuracy = 100,
+            StatEffectStat = StageStat.Attack,
+            StatEffectDelta = 2,
             StatEffectTarget = StageTarget.Self,
             StatEffectChance = 100,
         };
         attacker.AddAttack(move);
 
-        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), AlwaysHitRules.Instance, ConsoleBattleEventEmitter.Instance);
+        var action = new AttackAction(
+            attacker,
+            defender,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            AlwaysHitRules.Instance,
+            ConsoleBattleEventEmitter.Instance
+        );
         await action.ExecuteAsync();
 
         Assert.Equal(2, attacker.Stages.Attack);
@@ -1113,19 +1420,29 @@ public class CoreMechanicsTests
 
         var move = new Attack
         {
-            Id = 1, Name = "Growl", BaseDamage = 0, Accuracy = 100,
-            StatEffectStat   = StageStat.Attack,
-            StatEffectDelta  = -1,
+            Id = 1,
+            Name = "Growl",
+            BaseDamage = 0,
+            Accuracy = 100,
+            StatEffectStat = StageStat.Attack,
+            StatEffectDelta = -1,
             StatEffectTarget = StageTarget.Foe,
             StatEffectChance = 100,
         };
         attacker.AddAttack(move);
 
-        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), AlwaysHitRules.Instance, ConsoleBattleEventEmitter.Instance);
+        var action = new AttackAction(
+            attacker,
+            defender,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            AlwaysHitRules.Instance,
+            ConsoleBattleEventEmitter.Instance
+        );
         await action.ExecuteAsync();
 
         Assert.Equal(-1, defender.Stages.Attack);
-        Assert.Equal(0,  attacker.Stages.Attack);
+        Assert.Equal(0, attacker.Stages.Attack);
     }
 
     [Fact]
@@ -1158,10 +1475,24 @@ public class CoreMechanicsTests
         defender.Stages.RaiseSpeed(-2);
         defender.Status = StatusCondition.Burn;
 
-        var move = new Attack { Id = 1, Name = "Haze", BaseDamage = 0, Accuracy = 100, Effect = MoveEffect.Haze };
+        var move = new Attack
+        {
+            Id = 1,
+            Name = "Haze",
+            BaseDamage = 0,
+            Accuracy = 100,
+            Effect = MoveEffect.Haze,
+        };
         attacker.AddAttack(move);
 
-        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), AlwaysHitRules.Instance, ConsoleBattleEventEmitter.Instance);
+        var action = new AttackAction(
+            attacker,
+            defender,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            AlwaysHitRules.Instance,
+            ConsoleBattleEventEmitter.Instance
+        );
         await action.ExecuteAsync();
 
         Assert.Equal(0, attacker.Stages.Attack);
@@ -1178,20 +1509,30 @@ public class CoreMechanicsTests
 
         var move = new Attack
         {
-            Id = 1, Name = "NeverLower", BaseDamage = 40, Accuracy = 100,
-            StatEffectStat   = StageStat.Defense,
-            StatEffectDelta  = -1,
+            Id = 1,
+            Name = "NeverLower",
+            BaseDamage = 40,
+            Accuracy = 100,
+            StatEffectStat = StageStat.Defense,
+            StatEffectDelta = -1,
             StatEffectTarget = StageTarget.Foe,
             // Gen 1 stores one secondary chance per move; the engine reads it via
             // IBattleRules.GetSecondaryEffectChance (← EffectChance), so a 0% secondary lives here.
-            EffectChance     = 0,
+            EffectChance = 0,
             StatEffectChance = 0,
         };
         attacker.AddAttack(move);
 
         for (int i = 0; i < 20; i++)
         {
-            var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), AlwaysHitRules.Instance, ConsoleBattleEventEmitter.Instance);
+            var action = new AttackAction(
+                attacker,
+                defender,
+                attacker.MoveSet[0],
+                new Gen1TypeChart(),
+                AlwaysHitRules.Instance,
+                ConsoleBattleEventEmitter.Instance
+            );
             await action.ExecuteAsync();
         }
 
@@ -1208,15 +1549,25 @@ public class CoreMechanicsTests
 
         var move = new Attack
         {
-            Id = 1, Name = "AlwaysLower", BaseDamage = 0, Accuracy = 100,
-            StatEffectStat   = StageStat.Speed,
-            StatEffectDelta  = -1,
+            Id = 1,
+            Name = "AlwaysLower",
+            BaseDamage = 0,
+            Accuracy = 100,
+            StatEffectStat = StageStat.Speed,
+            StatEffectDelta = -1,
             StatEffectTarget = StageTarget.Foe,
             StatEffectChance = 100,
         };
         attacker.AddAttack(move);
 
-        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), AlwaysHitRules.Instance, ConsoleBattleEventEmitter.Instance);
+        var action = new AttackAction(
+            attacker,
+            defender,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            AlwaysHitRules.Instance,
+            ConsoleBattleEventEmitter.Instance
+        );
         await action.ExecuteAsync();
 
         Assert.Equal(-1, defender.Stages.Speed);
@@ -1236,14 +1587,26 @@ public class CoreMechanicsTests
 
         var absorb = new Attack
         {
-            Id = 1, Name = "Absorb", BaseDamage = 40, Accuracy = 100,
-            DamageType = DamageType.Grass, AttackType = AttackType.Special,
-            DamageCategory = DamageCategory.Drain, DrainPercent = 50,
+            Id = 1,
+            Name = "Absorb",
+            BaseDamage = 40,
+            Accuracy = 100,
+            DamageType = DamageType.Grass,
+            AttackType = AttackType.Special,
+            DamageCategory = DamageCategory.Drain,
+            DrainPercent = 50,
         };
         attacker.AddAttack(absorb);
 
         int hpBefore = attacker.Attributes.HP;
-        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), AlwaysHitRules.Instance, ConsoleBattleEventEmitter.Instance);
+        var action = new AttackAction(
+            attacker,
+            defender,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            AlwaysHitRules.Instance,
+            ConsoleBattleEventEmitter.Instance
+        );
         await action.ExecuteAsync();
 
         Assert.True(attacker.Attributes.HP > hpBefore);
@@ -1260,13 +1623,24 @@ public class CoreMechanicsTests
 
         var dragonRage = new Attack
         {
-            Id = 2, Name = "DragonRage", BaseDamage = 1, Accuracy = 100,
-            DamageCategory = DamageCategory.Fixed, FixedDamageValue = 40,
+            Id = 2,
+            Name = "DragonRage",
+            BaseDamage = 1,
+            Accuracy = 100,
+            DamageCategory = DamageCategory.Fixed,
+            FixedDamageValue = 40,
         };
         attacker.AddAttack(dragonRage);
 
         int hpBefore = defender.Attributes.HP;
-        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), AlwaysHitRules.Instance, ConsoleBattleEventEmitter.Instance);
+        var action = new AttackAction(
+            attacker,
+            defender,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            AlwaysHitRules.Instance,
+            ConsoleBattleEventEmitter.Instance
+        );
         await action.ExecuteAsync();
 
         Assert.Equal(40, hpBefore - defender.Attributes.HP);
@@ -1283,13 +1657,23 @@ public class CoreMechanicsTests
 
         var seismicToss = new Attack
         {
-            Id = 3, Name = "SeismicToss", BaseDamage = 1, Accuracy = 100,
+            Id = 3,
+            Name = "SeismicToss",
+            BaseDamage = 1,
+            Accuracy = 100,
             DamageCategory = DamageCategory.LevelBased,
         };
         attacker.AddAttack(seismicToss);
 
         int hpBefore = defender.Attributes.HP;
-        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), AlwaysHitRules.Instance, ConsoleBattleEventEmitter.Instance);
+        var action = new AttackAction(
+            attacker,
+            defender,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            AlwaysHitRules.Instance,
+            ConsoleBattleEventEmitter.Instance
+        );
         await action.ExecuteAsync();
 
         Assert.Equal(37, hpBefore - defender.Attributes.HP);
@@ -1306,13 +1690,23 @@ public class CoreMechanicsTests
 
         var fissure = new Attack
         {
-            Id = 4, Name = "Fissure", BaseDamage = 1, Accuracy = 100,
+            Id = 4,
+            Name = "Fissure",
+            BaseDamage = 1,
+            Accuracy = 100,
             DamageCategory = DamageCategory.OHKO,
         };
         attacker.AddAttack(fissure);
 
         int hpBefore = defender.Attributes.HP;
-        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), AlwaysHitRules.Instance, ConsoleBattleEventEmitter.Instance);
+        var action = new AttackAction(
+            attacker,
+            defender,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            AlwaysHitRules.Instance,
+            ConsoleBattleEventEmitter.Instance
+        );
         await action.ExecuteAsync();
 
         Assert.Equal(hpBefore, defender.Attributes.HP);
@@ -1330,12 +1724,22 @@ public class CoreMechanicsTests
 
         var fissure = new Attack
         {
-            Id = 4, Name = "Fissure", BaseDamage = 1, Accuracy = 100,
+            Id = 4,
+            Name = "Fissure",
+            BaseDamage = 1,
+            Accuracy = 100,
             DamageCategory = DamageCategory.OHKO,
         };
         attacker.AddAttack(fissure);
 
-        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), AlwaysHitRules.Instance, ConsoleBattleEventEmitter.Instance);
+        var action = new AttackAction(
+            attacker,
+            defender,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            AlwaysHitRules.Instance,
+            ConsoleBattleEventEmitter.Instance
+        );
         await action.ExecuteAsync();
 
         Assert.False(defender.IsAlive());
@@ -1352,13 +1756,24 @@ public class CoreMechanicsTests
 
         var explosion = new Attack
         {
-            Id = 5, Name = "Explosion", BaseDamage = 250, Accuracy = 100,
-            DamageType = DamageType.Normal, AttackType = AttackType.Physical,
+            Id = 5,
+            Name = "Explosion",
+            BaseDamage = 250,
+            Accuracy = 100,
+            DamageType = DamageType.Normal,
+            AttackType = AttackType.Physical,
             DamageCategory = DamageCategory.SelfDestruct,
         };
         attacker.AddAttack(explosion);
 
-        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), AlwaysHitRules.Instance, ConsoleBattleEventEmitter.Instance);
+        var action = new AttackAction(
+            attacker,
+            defender,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            AlwaysHitRules.Instance,
+            ConsoleBattleEventEmitter.Instance
+        );
         await action.ExecuteAsync();
 
         Assert.False(attacker.IsAlive());
@@ -1376,13 +1791,24 @@ public class CoreMechanicsTests
         // Accuracy 0 → always misses under Gen1 rules (threshold = 0, any roll >= 0)
         var explosion = new Attack
         {
-            Id = 5, Name = "Explosion", BaseDamage = 250, Accuracy = 0,
-            DamageType = DamageType.Normal, AttackType = AttackType.Physical,
+            Id = 5,
+            Name = "Explosion",
+            BaseDamage = 250,
+            Accuracy = 0,
+            DamageType = DamageType.Normal,
+            AttackType = AttackType.Physical,
             DamageCategory = DamageCategory.SelfDestruct,
         };
         attacker.AddAttack(explosion);
 
-        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), Gen1BattleRules.Instance, ConsoleBattleEventEmitter.Instance);
+        var action = new AttackAction(
+            attacker,
+            defender,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            Gen1BattleRules.Instance,
+            ConsoleBattleEventEmitter.Instance
+        );
         await action.ExecuteAsync();
 
         Assert.False(attacker.IsAlive());
@@ -1399,25 +1825,43 @@ public class CoreMechanicsTests
 
         var explosion = new Attack
         {
-            Id = 5, Name = "Explosion", BaseDamage = 170, Accuracy = 100,
-            DamageType = DamageType.Normal, AttackType = AttackType.Physical,
+            Id = 5,
+            Name = "Explosion",
+            BaseDamage = 170,
+            Accuracy = 100,
+            DamageType = DamageType.Normal,
+            AttackType = AttackType.Physical,
             DamageCategory = DamageCategory.SelfDestruct,
         };
 
         // Reference: identical inputs but full Defense (no halving).
         int fullDefenseDamage = DamageCalculator.CalculateDamage(
-            attacker, defender, explosion, new Gen1TypeChart(),
-            NoVarianceNoCritHitRules.Instance, out _, defenseDivisor: 1);
+            attacker,
+            defender,
+            explosion,
+            new Gen1TypeChart(),
+            NoVarianceNoCritHitRules.Instance,
+            out _,
+            defenseDivisor: 1
+        );
 
         var emitter = new RecordingEmitter();
-        var action  = new AttackAction(attacker, defender, new PokemonAttack(explosion),
-            new Gen1TypeChart(), NoVarianceNoCritHitRules.Instance, emitter);
+        var action = new AttackAction(
+            attacker,
+            defender,
+            new PokemonAttack(explosion),
+            new Gen1TypeChart(),
+            NoVarianceNoCritHitRules.Instance,
+            emitter
+        );
         await action.ExecuteAsync();
 
         int actualDamage = emitter.Of<DamageDealt>().First().Damage;
         // Halved Defense ⇒ strictly more damage than the full-Defense reference.
-        Assert.True(actualDamage > fullDefenseDamage,
-            $"Expected halved-Defense damage ({actualDamage}) to exceed full-Defense damage ({fullDefenseDamage}).");
+        Assert.True(
+            actualDamage > fullDefenseDamage,
+            $"Expected halved-Defense damage ({actualDamage}) to exceed full-Defense damage ({fullDefenseDamage})."
+        );
     }
 
     [Fact]
@@ -1432,12 +1876,22 @@ public class CoreMechanicsTests
 
         var superFang = new Attack
         {
-            Id = 6, Name = "SuperFang", BaseDamage = 1, Accuracy = 100,
+            Id = 6,
+            Name = "SuperFang",
+            BaseDamage = 1,
+            Accuracy = 100,
             DamageCategory = DamageCategory.SuperFang,
         };
         attacker.AddAttack(superFang);
 
-        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), AlwaysHitRules.Instance, ConsoleBattleEventEmitter.Instance);
+        var action = new AttackAction(
+            attacker,
+            defender,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            AlwaysHitRules.Instance,
+            ConsoleBattleEventEmitter.Instance
+        );
         await action.ExecuteAsync();
 
         Assert.Equal(40, defender.Attributes.HP);
@@ -1454,14 +1908,25 @@ public class CoreMechanicsTests
 
         var hyperBeam = new Attack
         {
-            Id = 7, Name = "HyperBeam", BaseDamage = 150, Accuracy = 100,
-            DamageType = DamageType.Normal, AttackType = AttackType.Special,
+            Id = 7,
+            Name = "HyperBeam",
+            BaseDamage = 150,
+            Accuracy = 100,
+            DamageType = DamageType.Normal,
+            AttackType = AttackType.Special,
             Effect = MoveEffect.Recharge,
         };
         attacker.AddAttack(hyperBeam);
 
         // Turn 1: use Hyper Beam → flag set
-        var action1 = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), AlwaysHitRules.Instance, ConsoleBattleEventEmitter.Instance);
+        var action1 = new AttackAction(
+            attacker,
+            defender,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            AlwaysHitRules.Instance,
+            ConsoleBattleEventEmitter.Instance
+        );
         await action1.ExecuteAsync();
         Assert.True(attacker.IsRecharging);
 
@@ -1469,10 +1934,17 @@ public class CoreMechanicsTests
         defender.Attributes.HP = defender.Attributes.MaxHP;
         int hpBefore = defender.Attributes.HP;
 
-        var action2 = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), AlwaysHitRules.Instance, ConsoleBattleEventEmitter.Instance);
+        var action2 = new AttackAction(
+            attacker,
+            defender,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            AlwaysHitRules.Instance,
+            ConsoleBattleEventEmitter.Instance
+        );
         await action2.ExecuteAsync();
 
-        Assert.False(attacker.IsRecharging);       // flag cleared
+        Assert.False(attacker.IsRecharging); // flag cleared
         Assert.Equal(hpBefore, defender.Attributes.HP); // no damage on recharge turn
     }
 
@@ -1487,12 +1959,22 @@ public class CoreMechanicsTests
 
         var leechSeed = new Attack
         {
-            Id = 8, Name = "LeechSeed", BaseDamage = 0, Accuracy = 100,
+            Id = 8,
+            Name = "LeechSeed",
+            BaseDamage = 0,
+            Accuracy = 100,
             Effect = MoveEffect.LeechSeed,
         };
         attacker.AddAttack(leechSeed);
 
-        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), AlwaysHitRules.Instance, ConsoleBattleEventEmitter.Instance);
+        var action = new AttackAction(
+            attacker,
+            defender,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            AlwaysHitRules.Instance,
+            ConsoleBattleEventEmitter.Instance
+        );
         await action.ExecuteAsync();
 
         Assert.True(defender.HasLeechSeed);
@@ -1505,20 +1987,39 @@ public class CoreMechanicsTests
         // and heals the player.
         var player = new Creature("Player");
         player.Attributes.MaxHP = 100;
-        player.Attributes.HP    = 80;
+        player.Attributes.HP = 80;
 
         var enemy = new Creature("Enemy");
-        enemy.Attributes.MaxHP = 16;  // drain = max(1, 16/16) = 1 per turn
-        enemy.Attributes.HP    = 1;   // drain on turn 1 end kills it
+        enemy.Attributes.MaxHP = 16; // drain = max(1, 16/16) = 1 per turn
+        enemy.Attributes.HP = 1; // drain on turn 1 end kills it
 
-        var leechSeed = new Attack { Id = 8, Name = "LeechSeed", BaseDamage = 0, Accuracy = 100, Effect = MoveEffect.LeechSeed };
-        var splash    = new Attack { Id = 9, Name = "Splash",    BaseDamage = 0, Accuracy = 100 };
+        var leechSeed = new Attack
+        {
+            Id = 8,
+            Name = "LeechSeed",
+            BaseDamage = 0,
+            Accuracy = 100,
+            Effect = MoveEffect.LeechSeed,
+        };
+        var splash = new Attack
+        {
+            Id = 9,
+            Name = "Splash",
+            BaseDamage = 0,
+            Accuracy = 100,
+        };
         player.AddAttack(leechSeed);
         enemy.AddAttack(splash);
 
-        var battle = new Battle(player, enemy, new Gen1TypeChart(),
-                                AutoSelectInput.Instance, AutoSelectInput.Instance,
-                                rules: AlwaysHitRules.Instance, emitter: ConsoleBattleEventEmitter.Instance);
+        var battle = new Battle(
+            player,
+            enemy,
+            new Gen1TypeChart(),
+            AutoSelectInput.Instance,
+            AutoSelectInput.Instance,
+            rules: AlwaysHitRules.Instance,
+            emitter: ConsoleBattleEventEmitter.Instance
+        );
         await battle.StartFightAsync();
 
         Assert.False(enemy.IsAlive());
@@ -1536,13 +2037,24 @@ public class CoreMechanicsTests
 
         var wrap = new Attack
         {
-            Id = 10, Name = "Wrap", BaseDamage = 15, Accuracy = 100,
-            DamageType = DamageType.Normal, AttackType = AttackType.Physical,
+            Id = 10,
+            Name = "Wrap",
+            BaseDamage = 15,
+            Accuracy = 100,
+            DamageType = DamageType.Normal,
+            AttackType = AttackType.Physical,
             Effect = MoveEffect.Binding,
         };
         attacker.AddAttack(wrap);
 
-        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), AlwaysHitRules.Instance, ConsoleBattleEventEmitter.Instance);
+        var action = new AttackAction(
+            attacker,
+            defender,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            AlwaysHitRules.Instance,
+            ConsoleBattleEventEmitter.Instance
+        );
         await action.ExecuteAsync();
 
         Assert.True(defender.BindingTurnsRemaining > 0);
@@ -1571,8 +2083,12 @@ public class CoreMechanicsTests
 
         var fly = new Attack
         {
-            Id = 11, Name = "Fly", BaseDamage = 70, Accuracy = 100,
-            DamageType = DamageType.Flying, AttackType = AttackType.Physical,
+            Id = 11,
+            Name = "Fly",
+            BaseDamage = 70,
+            Accuracy = 100,
+            DamageType = DamageType.Flying,
+            AttackType = AttackType.Physical,
             Effect = MoveEffect.TwoTurn,
         };
         attacker.AddAttack(fly);
@@ -1580,14 +2096,28 @@ public class CoreMechanicsTests
         int hpBefore = defender.Attributes.HP;
 
         // Turn 1: charge phase — no damage, state set
-        var action1 = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), AlwaysHitRules.Instance, ConsoleBattleEventEmitter.Instance);
+        var action1 = new AttackAction(
+            attacker,
+            defender,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            AlwaysHitRules.Instance,
+            ConsoleBattleEventEmitter.Instance
+        );
         await action1.ExecuteAsync();
 
         Assert.True(attacker.IsTwoTurnCharging);
         Assert.Equal(hpBefore, defender.Attributes.HP);
 
         // Turn 2: release phase — IsTwoTurnCharging was set, damage fires
-        var action2 = new AttackAction(attacker, defender, attacker.ChargingMove!, new Gen1TypeChart(), AlwaysHitRules.Instance, ConsoleBattleEventEmitter.Instance);
+        var action2 = new AttackAction(
+            attacker,
+            defender,
+            attacker.ChargingMove!,
+            new Gen1TypeChart(),
+            AlwaysHitRules.Instance,
+            ConsoleBattleEventEmitter.Instance
+        );
         await action2.ExecuteAsync();
 
         Assert.False(attacker.IsTwoTurnCharging);
@@ -1606,14 +2136,25 @@ public class CoreMechanicsTests
         // Accuracy 0 would always miss under Gen1BattleRules; NeverMisses bypasses the check entirely
         var swift = new Attack
         {
-            Id = 12, Name = "Swift", BaseDamage = 60, Accuracy = 0,
-            DamageType = DamageType.Normal, AttackType = AttackType.Special,
+            Id = 12,
+            Name = "Swift",
+            BaseDamage = 60,
+            Accuracy = 0,
+            DamageType = DamageType.Normal,
+            AttackType = AttackType.Special,
             NeverMisses = true,
         };
         attacker.AddAttack(swift);
 
         int hpBefore = defender.Attributes.HP;
-        var action = new AttackAction(attacker, defender, attacker.MoveSet[0], new Gen1TypeChart(), Gen1BattleRules.Instance, ConsoleBattleEventEmitter.Instance);
+        var action = new AttackAction(
+            attacker,
+            defender,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            Gen1BattleRules.Instance,
+            ConsoleBattleEventEmitter.Instance
+        );
         await action.ExecuteAsync();
 
         Assert.True(defender.Attributes.HP < hpBefore);
@@ -1639,7 +2180,7 @@ public class CoreMechanicsTests
         var creature = new Creature("Weezing") { Level = 50, Status = StatusCondition.BadPoison };
         creature.CalculateStats();
         creature.Attributes.MaxHP = 160;
-        creature.Attributes.HP   = 160;
+        creature.Attributes.HP = 160;
         creature.ToxicCounter = 1;
 
         StatusResolver.ApplyEndOfTurnDamage(creature);
@@ -1655,7 +2196,7 @@ public class CoreMechanicsTests
         var creature = new Creature("Weezing") { Level = 50, Status = StatusCondition.BadPoison };
         creature.CalculateStats();
         creature.Attributes.MaxHP = 160;
-        creature.Attributes.HP   = 160;
+        creature.Attributes.HP = 160;
         creature.ToxicCounter = 2;
 
         StatusResolver.ApplyEndOfTurnDamage(creature);
@@ -1700,17 +2241,17 @@ public class CoreMechanicsTests
         creature.CalculateStats();
 
         var before = creature.Battle;
-        creature.Status               = StatusCondition.Sleep;
-        creature.SleepTurns           = 5;
-        creature.ConfusedTurns        = 3;
-        creature.ToxicCounter         = 7;
+        creature.Status = StatusCondition.Sleep;
+        creature.SleepTurns = 5;
+        creature.ConfusedTurns = 3;
+        creature.ToxicCounter = 7;
         creature.Stages.RaiseAttack(4);
-        creature.IsRecharging         = true;
-        creature.IsFlinched           = true;
-        creature.HasLeechSeed         = true;
+        creature.IsRecharging = true;
+        creature.IsFlinched = true;
+        creature.HasLeechSeed = true;
         creature.BindingTurnsRemaining = 3;
-        creature.IsTwoTurnCharging    = true;
-        creature.ChargingMove         = new PokemonAttack(new Attack { Name = "Dig", BaseDamage = 80 });
+        creature.IsTwoTurnCharging = true;
+        creature.ChargingMove = new PokemonAttack(new Attack { Name = "Dig", BaseDamage = 80 });
 
         creature.ResetBattleState();
 
@@ -1736,8 +2277,8 @@ public class CoreMechanicsTests
         // Charmander base experience = 64; at level 50, Gen 1 wild formula:
         //   floor(64 × 50 / 7) = 457 XP awarded to the winning player.
         int enemyBaseExp = 64;
-        int enemyLevel   = 50;
-        int expectedXP   = (int)Math.Floor((double)enemyBaseExp * enemyLevel / 7); // 457
+        int enemyLevel = 50;
+        int expectedXP = (int)Math.Floor((double)enemyBaseExp * enemyLevel / 7); // 457
 
         Console.WriteLine("--- XP Award: Enemy Faints ---");
         Console.WriteLine($"Enemy: Charmander Lv{enemyLevel}, BaseExp={enemyBaseExp}");
@@ -1746,21 +2287,47 @@ public class CoreMechanicsTests
         var player = new Creature("Bulbasaur") { Level = 50 };
         player.CalculateStats();
         player.Attributes.Attack = 999;
-        player.Attributes.Speed  = 100;
-        player.AddAttack(new Attack { Name = "Tackle", BaseDamage = 100, Accuracy = 100, AttackType = AttackType.Physical });
+        player.Attributes.Speed = 100;
+        player.AddAttack(
+            new Attack
+            {
+                Name = "Tackle",
+                BaseDamage = 100,
+                Accuracy = 100,
+                AttackType = AttackType.Physical,
+            }
+        );
 
-        var enemy = new Creature("Charmander") { Level = enemyLevel, SpeciesBaseExperience = enemyBaseExp };
+        var enemy = new Creature("Charmander")
+        {
+            Level = enemyLevel,
+            SpeciesBaseExperience = enemyBaseExp,
+        };
         enemy.CalculateStats();
-        enemy.Attributes.HP    = 1;
+        enemy.Attributes.HP = 1;
         enemy.Attributes.MaxHP = 1;
         enemy.Attributes.Speed = 1;
-        enemy.AddAttack(new Attack { Name = "Scratch", BaseDamage = 40, Accuracy = 100, AttackType = AttackType.Physical });
+        enemy.AddAttack(
+            new Attack
+            {
+                Name = "Scratch",
+                BaseDamage = 40,
+                Accuracy = 100,
+                AttackType = AttackType.Physical,
+            }
+        );
 
         Console.WriteLine($"Player XP before battle: {player.Experience}");
 
-        var battle = new Battle(player, enemy, new Gen1TypeChart(),
-                                AutoSelectInput.Instance, AutoSelectInput.Instance,
-                                rules: AlwaysHitRules.Instance, emitter: ConsoleBattleEventEmitter.Instance);
+        var battle = new Battle(
+            player,
+            enemy,
+            new Gen1TypeChart(),
+            AutoSelectInput.Instance,
+            AutoSelectInput.Instance,
+            rules: AlwaysHitRules.Instance,
+            emitter: ConsoleBattleEventEmitter.Instance
+        );
         await battle.StartFightAsync();
 
         Console.WriteLine($"Player XP after battle: {player.Experience} (expected {expectedXP})");
@@ -1778,10 +2345,10 @@ public class CoreMechanicsTests
 
         var creature = new Creature("Bulbasaur")
         {
-            Level      = 1,
+            Level = 1,
             Experience = 0,
             GrowthRate = GrowthRate.MediumFast,
-            BaseHP     = 45,
+            BaseHP = 45,
         };
         creature.CalculateStats();
 
@@ -1790,7 +2357,7 @@ public class CoreMechanicsTests
         Console.WriteLine($"After +10 XP: Level {creature.Level}, XP {creature.Experience}");
         Console.WriteLine("(XP accumulates; level counter steps forward past each threshold)");
 
-        Assert.Equal(2,  creature.Level);
+        Assert.Equal(2, creature.Level);
         Assert.Equal(10, creature.Experience);
     }
 
@@ -1803,31 +2370,61 @@ public class CoreMechanicsTests
         //   MediumFast Lv3 threshold = 27 → 9 < 27 → stops at Lv2
         // Exactly one LeveledUp event should be emitted for Bulbasaur at level 2.
         int enemyBaseExp = 64;
-        int enemyLevel   = 1;
-        int expectedXP   = (int)Math.Floor((double)enemyBaseExp * enemyLevel / 7); // 9
+        int enemyLevel = 1;
+        int expectedXP = (int)Math.Floor((double)enemyBaseExp * enemyLevel / 7); // 9
 
         Console.WriteLine("--- LeveledUp Event Fires ---");
-        Console.WriteLine($"Enemy: Rattata Lv{enemyLevel}, BaseExp={enemyBaseExp} → awards {expectedXP} XP");
+        Console.WriteLine(
+            $"Enemy: Rattata Lv{enemyLevel}, BaseExp={enemyBaseExp} → awards {expectedXP} XP"
+        );
         Console.WriteLine("Player starts Lv1, MediumFast — Lv2 threshold = 8 XP");
-        Console.WriteLine($"{expectedXP} XP >= 8 → player reaches Lv2; {expectedXP} XP < 27 → stops there");
+        Console.WriteLine(
+            $"{expectedXP} XP >= 8 → player reaches Lv2; {expectedXP} XP < 27 → stops there"
+        );
 
         var player = new Creature("Bulbasaur") { Level = 1, GrowthRate = GrowthRate.MediumFast };
         player.CalculateStats();
         player.Attributes.Attack = 999;
-        player.Attributes.Speed  = 100;
-        player.AddAttack(new Attack { Name = "Tackle", BaseDamage = 100, Accuracy = 100, AttackType = AttackType.Physical });
+        player.Attributes.Speed = 100;
+        player.AddAttack(
+            new Attack
+            {
+                Name = "Tackle",
+                BaseDamage = 100,
+                Accuracy = 100,
+                AttackType = AttackType.Physical,
+            }
+        );
 
-        var enemy = new Creature("Rattata") { Level = enemyLevel, SpeciesBaseExperience = enemyBaseExp };
+        var enemy = new Creature("Rattata")
+        {
+            Level = enemyLevel,
+            SpeciesBaseExperience = enemyBaseExp,
+        };
         enemy.CalculateStats();
-        enemy.Attributes.HP    = 1;
+        enemy.Attributes.HP = 1;
         enemy.Attributes.MaxHP = 1;
         enemy.Attributes.Speed = 1;
-        enemy.AddAttack(new Attack { Name = "Scratch", BaseDamage = 40, Accuracy = 100, AttackType = AttackType.Physical });
+        enemy.AddAttack(
+            new Attack
+            {
+                Name = "Scratch",
+                BaseDamage = 40,
+                Accuracy = 100,
+                AttackType = AttackType.Physical,
+            }
+        );
 
         var recorder = new RecordingEmitter();
-        var battle   = new Battle(player, enemy, new Gen1TypeChart(),
-                                  AutoSelectInput.Instance, AutoSelectInput.Instance,
-                                  rules: AlwaysHitRules.Instance, emitter: recorder);
+        var battle = new Battle(
+            player,
+            enemy,
+            new Gen1TypeChart(),
+            AutoSelectInput.Instance,
+            AutoSelectInput.Instance,
+            rules: AlwaysHitRules.Instance,
+            emitter: recorder
+        );
         await battle.StartFightAsync();
 
         var levelUps = recorder.Of<LeveledUp>().ToList();
@@ -1837,7 +2434,7 @@ public class CoreMechanicsTests
 
         Assert.Single(levelUps);
         Assert.Equal("Bulbasaur", levelUps[0].CreatureName);
-        Assert.Equal(2,                   levelUps[0].NewLevel);
+        Assert.Equal(2, levelUps[0].NewLevel);
     }
 
     [Fact]
@@ -1851,20 +2448,42 @@ public class CoreMechanicsTests
 
         var player = new Creature("Bulbasaur") { Level = 50 };
         player.CalculateStats();
-        player.Attributes.HP    = 1;
+        player.Attributes.HP = 1;
         player.Attributes.MaxHP = 1;
         player.Attributes.Speed = 1;
-        player.AddAttack(new Attack { Name = "Tackle", BaseDamage = 40, Accuracy = 100, AttackType = AttackType.Physical });
+        player.AddAttack(
+            new Attack
+            {
+                Name = "Tackle",
+                BaseDamage = 40,
+                Accuracy = 100,
+                AttackType = AttackType.Physical,
+            }
+        );
 
         var enemy = new Creature("Charmander") { Level = 50, SpeciesBaseExperience = 64 };
         enemy.CalculateStats();
         enemy.Attributes.Attack = 999;
-        enemy.Attributes.Speed  = 100;
-        enemy.AddAttack(new Attack { Name = "Flamethrower", BaseDamage = 100, Accuracy = 100, AttackType = AttackType.Special });
+        enemy.Attributes.Speed = 100;
+        enemy.AddAttack(
+            new Attack
+            {
+                Name = "Flamethrower",
+                BaseDamage = 100,
+                Accuracy = 100,
+                AttackType = AttackType.Special,
+            }
+        );
 
-        var battle = new Battle(player, enemy, new Gen1TypeChart(),
-                                AutoSelectInput.Instance, AutoSelectInput.Instance,
-                                rules: AlwaysHitRules.Instance, emitter: ConsoleBattleEventEmitter.Instance);
+        var battle = new Battle(
+            player,
+            enemy,
+            new Gen1TypeChart(),
+            AutoSelectInput.Instance,
+            AutoSelectInput.Instance,
+            rules: AlwaysHitRules.Instance,
+            emitter: ConsoleBattleEventEmitter.Instance
+        );
         await battle.StartFightAsync();
 
         Console.WriteLine($"Enemy (NPC) Experience after battle: {enemy.Experience}");
@@ -1885,29 +2504,31 @@ public class CoreMechanicsTests
 
         var species = new PokemonSpecies
         {
-            Id             = 1,
-            Name           = "bulbasaur",
-            BaseHP         = 45,
-            BaseAttack     = 49,
-            BaseDefense    = 49,
-            BaseSpecial    = 65,
-            BaseSpeed      = 45,
-            GrowthRate     = GrowthRate.MediumFast,
+            Id = 1,
+            Name = "bulbasaur",
+            BaseHP = 45,
+            BaseAttack = 49,
+            BaseDefense = 49,
+            BaseSpecial = 65,
+            BaseSpeed = 45,
+            GrowthRate = GrowthRate.MediumFast,
             BaseExperience = 64,
         };
 
-        int level   = 30;
+        int level = 30;
         var creature = new Creature("Bulbasaur") { Level = level };
         creature.InitializeFromSpecies(species);
         creature.Experience = creature.CalculateExperienceForLevel(level);
 
-        Console.WriteLine($"Level: {creature.Level}   XP: {creature.Experience}   " +
-                          $"HP: {creature.Attributes.HP}   ATK: {creature.Attributes.Attack}   " +
-                          $"BaseExp: {creature.SpeciesBaseExperience}");
+        Console.WriteLine(
+            $"Level: {creature.Level}   XP: {creature.Experience}   "
+                + $"HP: {creature.Attributes.HP}   ATK: {creature.Attributes.Attack}   "
+                + $"BaseExp: {creature.SpeciesBaseExperience}"
+        );
 
-        Assert.Equal(30,     creature.Level);
+        Assert.Equal(30, creature.Level);
         Assert.Equal(27_000, creature.Experience);
-        Assert.Equal(64,     creature.SpeciesBaseExperience);
+        Assert.Equal(64, creature.SpeciesBaseExperience);
         // HP at Lv30 for Bulbasaur: range [67, 76] — well below Lv50 range [128, 143]
         Assert.InRange(creature.Attributes.HP, 60, 100);
         // Attack at Lv30: range [29, 43] — below Lv50 min of 54
@@ -1924,22 +2545,44 @@ public class CoreMechanicsTests
         var defender = new Creature("Defender") { Level = 50 };
         defender.CalculateStats();
 
-        var metronome = new Attack { Id = 1, Name = "metronome", BaseDamage = 0, Accuracy = 100, Effect = MoveEffect.Metronome };
-        var tackle    = new Attack { Id = 2, Name = "Tackle",    BaseDamage = 40, Accuracy = 100, AttackType = AttackType.Physical, DamageType = DamageType.Normal };
+        var metronome = new Attack
+        {
+            Id = 1,
+            Name = "metronome",
+            BaseDamage = 0,
+            Accuracy = 100,
+            Effect = MoveEffect.Metronome,
+        };
+        var tackle = new Attack
+        {
+            Id = 2,
+            Name = "Tackle",
+            BaseDamage = 40,
+            Accuracy = 100,
+            AttackType = AttackType.Physical,
+            DamageType = DamageType.Normal,
+        };
         attacker.AddAttack(metronome);
 
         // Pool has only one eligible move (Tackle) after excluding Metronome — deterministic
-        var pool     = new List<Attack> { metronome, tackle };
+        var pool = new List<Attack> { metronome, tackle };
         var recorder = new RecordingEmitter();
 
-        var action = new AttackAction(attacker, defender, attacker.MoveSet[0],
-            new Gen1TypeChart(), rules: AlwaysHitRules.Instance, emitter: recorder, movePool: pool);
+        var action = new AttackAction(
+            attacker,
+            defender,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            rules: AlwaysHitRules.Instance,
+            emitter: recorder,
+            movePool: pool
+        );
         await action.ExecuteAsync();
 
         var moveUsedEvents = recorder.Of<MoveUsed>().ToList();
         Assert.Equal(2, moveUsedEvents.Count);
         Assert.Equal("metronome", moveUsedEvents[0].MoveName);
-        Assert.Equal("Tackle",    moveUsedEvents[1].MoveName);
+        Assert.Equal("Tackle", moveUsedEvents[1].MoveName);
     }
 
     [Fact]
@@ -1951,16 +2594,41 @@ public class CoreMechanicsTests
         defender.CalculateStats();
         int fullHp = defender.Attributes.HP;
 
-        var metronome = new Attack { Id = 1, Name = "metronome", BaseDamage = 0, Accuracy = 100, Effect = MoveEffect.Metronome };
-        var tackle    = new Attack { Id = 2, Name = "Tackle",    BaseDamage = 40, Accuracy = 100, AttackType = AttackType.Physical, DamageType = DamageType.Normal };
+        var metronome = new Attack
+        {
+            Id = 1,
+            Name = "metronome",
+            BaseDamage = 0,
+            Accuracy = 100,
+            Effect = MoveEffect.Metronome,
+        };
+        var tackle = new Attack
+        {
+            Id = 2,
+            Name = "Tackle",
+            BaseDamage = 40,
+            Accuracy = 100,
+            AttackType = AttackType.Physical,
+            DamageType = DamageType.Normal,
+        };
         attacker.AddAttack(metronome);
 
-        var pool   = new List<Attack> { metronome, tackle };
-        var action = new AttackAction(attacker, defender, attacker.MoveSet[0],
-            new Gen1TypeChart(), rules: AlwaysHitRules.Instance, emitter: ConsoleBattleEventEmitter.Instance, movePool: pool);
+        var pool = new List<Attack> { metronome, tackle };
+        var action = new AttackAction(
+            attacker,
+            defender,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            rules: AlwaysHitRules.Instance,
+            emitter: ConsoleBattleEventEmitter.Instance,
+            movePool: pool
+        );
         await action.ExecuteAsync();
 
-        Assert.True(defender.Attributes.HP < fullHp, "Tackle called by Metronome should deal damage");
+        Assert.True(
+            defender.Attributes.HP < fullHp,
+            "Tackle called by Metronome should deal damage"
+        );
     }
 
     [Fact]
@@ -1971,8 +2639,23 @@ public class CoreMechanicsTests
         var defender = new Creature("Defender") { Level = 50 };
         defender.CalculateStats();
 
-        var metronome = new Attack { Id = 1, Name = "metronome", BaseDamage = 0, Accuracy = 100, Effect = MoveEffect.Metronome };
-        var tackle    = new Attack { Id = 2, Name = "Tackle",    BaseDamage = 1, Accuracy = 100, AttackType = AttackType.Physical, DamageType = DamageType.Normal };
+        var metronome = new Attack
+        {
+            Id = 1,
+            Name = "metronome",
+            BaseDamage = 0,
+            Accuracy = 100,
+            Effect = MoveEffect.Metronome,
+        };
+        var tackle = new Attack
+        {
+            Id = 2,
+            Name = "Tackle",
+            BaseDamage = 1,
+            Accuracy = 100,
+            AttackType = AttackType.Physical,
+            DamageType = DamageType.Normal,
+        };
         attacker.AddAttack(metronome);
 
         var pool = new List<Attack> { metronome, tackle };
@@ -1983,8 +2666,15 @@ public class CoreMechanicsTests
         {
             defender.Attributes.HP = defender.Attributes.MaxHP;
             var recorder = new RecordingEmitter();
-            var action   = new AttackAction(attacker, defender, attacker.MoveSet[0],
-                new Gen1TypeChart(), rules: AlwaysHitRules.Instance, emitter: recorder, movePool: pool);
+            var action = new AttackAction(
+                attacker,
+                defender,
+                attacker.MoveSet[0],
+                new Gen1TypeChart(),
+                rules: AlwaysHitRules.Instance,
+                emitter: recorder,
+                movePool: pool
+            );
             await action.ExecuteAsync();
 
             var moves = recorder.Of<MoveUsed>().Select(e => e.MoveName).ToList();
@@ -2000,9 +2690,30 @@ public class CoreMechanicsTests
         var defender = new Creature("Defender") { Level = 50 };
         defender.CalculateStats();
 
-        var metronome  = new Attack { Id = 1, Name = "metronome",  BaseDamage = 0, Accuracy = 100, Effect = MoveEffect.Metronome };
-        var mirrorMove = new Attack { Id = 2, Name = "mirror-move", BaseDamage = 0, Accuracy = 100 };
-        var tackle     = new Attack { Id = 3, Name = "Tackle",      BaseDamage = 1, Accuracy = 100, AttackType = AttackType.Physical, DamageType = DamageType.Normal };
+        var metronome = new Attack
+        {
+            Id = 1,
+            Name = "metronome",
+            BaseDamage = 0,
+            Accuracy = 100,
+            Effect = MoveEffect.Metronome,
+        };
+        var mirrorMove = new Attack
+        {
+            Id = 2,
+            Name = "mirror-move",
+            BaseDamage = 0,
+            Accuracy = 100,
+        };
+        var tackle = new Attack
+        {
+            Id = 3,
+            Name = "Tackle",
+            BaseDamage = 1,
+            Accuracy = 100,
+            AttackType = AttackType.Physical,
+            DamageType = DamageType.Normal,
+        };
         attacker.AddAttack(metronome);
 
         var pool = new List<Attack> { metronome, mirrorMove, tackle };
@@ -2011,8 +2722,15 @@ public class CoreMechanicsTests
         {
             defender.Attributes.HP = defender.Attributes.MaxHP;
             var recorder = new RecordingEmitter();
-            var action   = new AttackAction(attacker, defender, attacker.MoveSet[0],
-                new Gen1TypeChart(), rules: AlwaysHitRules.Instance, emitter: recorder, movePool: pool);
+            var action = new AttackAction(
+                attacker,
+                defender,
+                attacker.MoveSet[0],
+                new Gen1TypeChart(),
+                rules: AlwaysHitRules.Instance,
+                emitter: recorder,
+                movePool: pool
+            );
             await action.ExecuteAsync();
 
             var calledMoves = recorder.Of<MoveUsed>().Skip(1).Select(e => e.MoveName).ToList();
@@ -2029,20 +2747,40 @@ public class CoreMechanicsTests
         defender.CalculateStats();
         int fullHp = defender.Attributes.HP;
 
-        var metronome  = new Attack { Id = 1, Name = "metronome",  BaseDamage = 0, Accuracy = 100, Effect = MoveEffect.Metronome };
-        var mirrorMove = new Attack { Id = 2, Name = "mirror-move", BaseDamage = 0, Accuracy = 100 };
+        var metronome = new Attack
+        {
+            Id = 1,
+            Name = "metronome",
+            BaseDamage = 0,
+            Accuracy = 100,
+            Effect = MoveEffect.Metronome,
+        };
+        var mirrorMove = new Attack
+        {
+            Id = 2,
+            Name = "mirror-move",
+            BaseDamage = 0,
+            Accuracy = 100,
+        };
         attacker.AddAttack(metronome);
 
         // Pool contains only excluded moves → eligible list is empty → no inner action
-        var pool     = new List<Attack> { metronome, mirrorMove };
+        var pool = new List<Attack> { metronome, mirrorMove };
         var recorder = new RecordingEmitter();
 
-        var action = new AttackAction(attacker, defender, attacker.MoveSet[0],
-            new Gen1TypeChart(), rules: AlwaysHitRules.Instance, emitter: recorder, movePool: pool);
+        var action = new AttackAction(
+            attacker,
+            defender,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            rules: AlwaysHitRules.Instance,
+            emitter: recorder,
+            movePool: pool
+        );
         await action.ExecuteAsync();
 
         Assert.Equal(fullHp, defender.Attributes.HP);
-        Assert.Single(recorder.Of<MoveUsed>());  // only "metronome" itself, no inner move
+        Assert.Single(recorder.Of<MoveUsed>()); // only "metronome" itself, no inner move
     }
 
     [Fact]
@@ -2053,16 +2791,37 @@ public class CoreMechanicsTests
         var defender = new Creature("Defender") { Level = 50 };
         defender.CalculateStats();
 
-        var metronome    = new Attack { Id = 1, Name = "metronome",     BaseDamage = 0, Accuracy = 100, Effect = MoveEffect.Metronome };
-        var sleepPowder  = new Attack { Id = 2, Name = "sleep-powder",  BaseDamage = 0, Accuracy = 100,
-            StatusEffect = StatusCondition.Sleep, EffectChance = 100 };
+        var metronome = new Attack
+        {
+            Id = 1,
+            Name = "metronome",
+            BaseDamage = 0,
+            Accuracy = 100,
+            Effect = MoveEffect.Metronome,
+        };
+        var sleepPowder = new Attack
+        {
+            Id = 2,
+            Name = "sleep-powder",
+            BaseDamage = 0,
+            Accuracy = 100,
+            StatusEffect = StatusCondition.Sleep,
+            EffectChance = 100,
+        };
         attacker.AddAttack(metronome);
 
-        var pool     = new List<Attack> { metronome, sleepPowder };
+        var pool = new List<Attack> { metronome, sleepPowder };
         var recorder = new RecordingEmitter();
 
-        var action = new AttackAction(attacker, defender, attacker.MoveSet[0],
-            new Gen1TypeChart(), rules: AlwaysHitRules.Instance, emitter: recorder, movePool: pool);
+        var action = new AttackAction(
+            attacker,
+            defender,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            rules: AlwaysHitRules.Instance,
+            emitter: recorder,
+            movePool: pool
+        );
         await action.ExecuteAsync();
 
         Assert.Equal(StatusCondition.Sleep, defender.Status);
@@ -2082,7 +2841,7 @@ public class CoreMechanicsTests
         // damage would be based on Special=50 not Attack=200.
         var attacker = new Creature("Attacker") { Level = 50 };
         attacker.CalculateStats();
-        attacker.Attributes.Attack  = 200;
+        attacker.Attributes.Attack = 200;
         attacker.Attributes.Special = 50;
 
         var defender = new Creature("Defender") { Level = 50 };
@@ -2091,15 +2850,33 @@ public class CoreMechanicsTests
 
         var specialMove = new Attack
         {
-            Id = 1, Name = "Psychic", BaseDamage = 90, Accuracy = 100,
-            DamageType = DamageType.Psychic, AttackType = AttackType.Special,
+            Id = 1,
+            Name = "Psychic",
+            BaseDamage = 90,
+            Accuracy = 100,
+            DamageType = DamageType.Psychic,
+            AttackType = AttackType.Special,
         };
 
-        int dmgViaAttack   = DamageCalculator.CalculateDamage(attacker, defender, specialMove, new Gen1TypeChart(), new AlwaysUseAttackStatRules());
-        int dmgViaSpecial  = DamageCalculator.CalculateDamage(attacker, defender, specialMove, new Gen1TypeChart(), AlwaysHitRules.Instance);
+        int dmgViaAttack = DamageCalculator.CalculateDamage(
+            attacker,
+            defender,
+            specialMove,
+            new Gen1TypeChart(),
+            new AlwaysUseAttackStatRules()
+        );
+        int dmgViaSpecial = DamageCalculator.CalculateDamage(
+            attacker,
+            defender,
+            specialMove,
+            new Gen1TypeChart(),
+            AlwaysHitRules.Instance
+        );
 
-        Assert.True(dmgViaAttack > dmgViaSpecial,
-            $"Damage via Attack=200 ({dmgViaAttack}) should exceed damage via Special=50 ({dmgViaSpecial})");
+        Assert.True(
+            dmgViaAttack > dmgViaSpecial,
+            $"Damage via Attack=200 ({dmgViaAttack}) should exceed damage via Special=50 ({dmgViaSpecial})"
+        );
     }
 
     [Fact]
@@ -2119,35 +2896,61 @@ public class CoreMechanicsTests
 
         var specialMove = new Attack
         {
-            Id = 1, Name = "Psychic", BaseDamage = 90, Accuracy = 100,
-            DamageType = DamageType.Psychic, AttackType = AttackType.Special,
+            Id = 1,
+            Name = "Psychic",
+            BaseDamage = 90,
+            Accuracy = 100,
+            DamageType = DamageType.Psychic,
+            AttackType = AttackType.Special,
         };
 
-        int dmgVsHighDef  = DamageCalculator.CalculateDamage(attacker, defender, specialMove, new Gen1TypeChart(), new AlwaysUseDefenseStatRules());
-        int dmgVsLowDef   = DamageCalculator.CalculateDamage(attacker, defender, specialMove, new Gen1TypeChart(), AlwaysHitRules.Instance);
+        int dmgVsHighDef = DamageCalculator.CalculateDamage(
+            attacker,
+            defender,
+            specialMove,
+            new Gen1TypeChart(),
+            new AlwaysUseDefenseStatRules()
+        );
+        int dmgVsLowDef = DamageCalculator.CalculateDamage(
+            attacker,
+            defender,
+            specialMove,
+            new Gen1TypeChart(),
+            AlwaysHitRules.Instance
+        );
 
-        Assert.True(dmgVsHighDef < dmgVsLowDef,
-            $"Damage vs Defense=200 ({dmgVsHighDef}) should be less than damage vs Special=50 ({dmgVsLowDef})");
+        Assert.True(
+            dmgVsHighDef < dmgVsLowDef,
+            $"Damage vs Defense=200 ({dmgVsHighDef}) should be less than damage vs Special=50 ({dmgVsLowDef})"
+        );
     }
 
     // Deterministic (no variance, always-hit, no crit, flat stat mult) so the only thing that
     // moves the damage is the stat the rules select — which is what these tests assert.
     private sealed class AlwaysUseAttackStatRules : DelegatingBattleRules
     {
-        public override double RollDamageVariance()                  => 1.0;
-        public override double GetStatMultiplier(int stage)          => 1.0;
-        public override int    GetHitThreshold(int a, int b, int c)  => 256;
-        public override double GetCritChance(Creature a, Attack m)   => 0.0;
-        public override int    GetOffensiveStat(Creature a, AttackType t) => a.Attributes.Attack; // always Attack
+        public override double RollDamageVariance() => 1.0;
+
+        public override double GetStatMultiplier(int stage) => 1.0;
+
+        public override int GetHitThreshold(int a, int b, int c) => 256;
+
+        public override double GetCritChance(Creature a, Attack m) => 0.0;
+
+        public override int GetOffensiveStat(Creature a, AttackType t) => a.Attributes.Attack; // always Attack
     }
 
     private sealed class AlwaysUseDefenseStatRules : DelegatingBattleRules
     {
-        public override double RollDamageVariance()                  => 1.0;
-        public override double GetStatMultiplier(int stage)          => 1.0;
-        public override int    GetHitThreshold(int a, int b, int c)  => 256;
-        public override double GetCritChance(Creature a, Attack m)   => 0.0;
-        public override int    GetDefensiveStat(Creature d, AttackType t) => d.Attributes.Defense; // always Defense
+        public override double RollDamageVariance() => 1.0;
+
+        public override double GetStatMultiplier(int stage) => 1.0;
+
+        public override int GetHitThreshold(int a, int b, int c) => 256;
+
+        public override double GetCritChance(Creature a, Attack m) => 0.0;
+
+        public override int GetDefensiveStat(Creature d, AttackType t) => d.Attributes.Defense; // always Defense
     }
 
     // ── EncounterSelector Tests ───────────────────────────────────────────────
@@ -2155,7 +2958,14 @@ public class CoreMechanicsTests
     [Fact]
     public void EncounterSelector_Bst_SumsAllFiveStats()
     {
-        var s = new PokemonSpecies { BaseHP = 45, BaseAttack = 49, BaseDefense = 49, BaseSpecial = 65, BaseSpeed = 45 };
+        var s = new PokemonSpecies
+        {
+            BaseHP = 45,
+            BaseAttack = 49,
+            BaseDefense = 49,
+            BaseSpecial = 65,
+            BaseSpeed = 45,
+        };
         Assert.Equal(253, EncounterSelector.Bst(s));
     }
 
@@ -2166,8 +2976,8 @@ public class CoreMechanicsTests
         int playerBst = 300;
         var pool = new List<PokemonSpecies>
         {
-            Species(1, 60, 60, 60, 60, 60),  // BST 300 — inside window
-            Species(2, 20, 20, 20, 20, 20),  // BST 100 — outside ±15% of 300
+            Species(1, 60, 60, 60, 60, 60), // BST 300 — inside window
+            Species(2, 20, 20, 20, 20, 20), // BST 100 — outside ±15% of 300
         };
 
         var result = EncounterSelector.PickByBst(pool, playerBst);
@@ -2184,7 +2994,7 @@ public class CoreMechanicsTests
         int playerBst = 300;
         var pool = new List<PokemonSpecies>
         {
-            Species(1, 20, 20, 20, 20, 20),   // BST 100
+            Species(1, 20, 20, 20, 20, 20), // BST 100
             Species(2, 100, 100, 100, 100, 100), // BST 500
         };
 
@@ -2226,17 +3036,17 @@ public class CoreMechanicsTests
         // Several candidates inside the ±15% window so the pick is a real random choice.
         var pool = new List<PokemonSpecies>
         {
-            Species(1, 58, 58, 58, 58, 58),  // BST 290
-            Species(2, 60, 60, 60, 60, 60),  // BST 300
-            Species(3, 62, 62, 62, 62, 62),  // BST 310
-            Species(4, 64, 64, 64, 64, 64),  // BST 320
+            Species(1, 58, 58, 58, 58, 58), // BST 290
+            Species(2, 60, 60, 60, 60, 60), // BST 300
+            Species(3, 62, 62, 62, 62, 62), // BST 310
+            Species(4, 64, 64, 64, 64, 64), // BST 320
         };
 
         var a = EncounterSelector.PickByBst(pool, 300, new SeededRandomSource(7));
         var b = EncounterSelector.PickByBst(pool, 300, new SeededRandomSource(7));
 
         Assert.NotNull(a);
-        Assert.Same(a, b);   // same seed + same pool ⇒ same pick
+        Assert.Same(a, b); // same seed + same pool ⇒ same pick
     }
 
     // ── Seeded stat-calculator Tests ──────────────────────────────────────────
@@ -2250,13 +3060,21 @@ public class CoreMechanicsTests
         new Gen1StatCalculator(new SeededRandomSource(99)).RandomiseDvs(c1);
         new Gen1StatCalculator(new SeededRandomSource(99)).RandomiseDvs(c2);
 
-        Assert.Equal(c1.DvAttack,  c2.DvAttack);
+        Assert.Equal(c1.DvAttack, c2.DvAttack);
         Assert.Equal(c1.DvDefense, c2.DvDefense);
         Assert.Equal(c1.DvSpecial, c2.DvSpecial);
-        Assert.Equal(c1.DvSpeed,   c2.DvSpeed);
-        Assert.Equal(c1.DvHP,      c2.DvHP);   // HP DV is derived from the others' low bits
+        Assert.Equal(c1.DvSpeed, c2.DvSpeed);
+        Assert.Equal(c1.DvHP, c2.DvHP); // HP DV is derived from the others' low bits
     }
 
     private static PokemonSpecies Species(int id, int hp, int atk, int def, int spc, int spd) =>
-        new() { Id = id, BaseHP = hp, BaseAttack = atk, BaseDefense = def, BaseSpecial = spc, BaseSpeed = spd };
+        new()
+        {
+            Id = id,
+            BaseHP = hp,
+            BaseAttack = atk,
+            BaseDefense = def,
+            BaseSpecial = spc,
+            BaseSpeed = spd,
+        };
 }

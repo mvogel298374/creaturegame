@@ -16,7 +16,7 @@ public class NeverMissContractTests(MovesFixture moves) : Gen1MoveContract(moves
     public async Task SwiftHitsEvenWhenTheAccuracyRollAlwaysFails()
     {
         var result = await new MoveScenario()
-            .Rules(NeverHitRules.Instance)   // every accuracy roll fails — a normal move would miss
+            .Rules(NeverHitRules.Instance) // every accuracy roll fails — a normal move would miss
             .Defender(TestCreatures.Make("Defender", hp: 500, defense: 80))
             .Use(Move("swift"));
 

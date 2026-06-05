@@ -12,6 +12,9 @@ public sealed class RecordingEmitter : IBattleEventEmitter
     private readonly List<BattleEvent> _events = [];
 
     public IReadOnlyList<BattleEvent> Events => _events;
+
     public void Emit(BattleEvent evt) => _events.Add(evt);
-    public IEnumerable<T> Of<T>() where T : BattleEvent => _events.OfType<T>();
+
+    public IEnumerable<T> Of<T>()
+        where T : BattleEvent => _events.OfType<T>();
 }

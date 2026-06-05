@@ -83,9 +83,7 @@ public class FixedDamageContractTests(MovesFixture moves) : Gen1MoveContract(mov
     public async Task SonicBoomDecrementsPpByOne()
     {
         var move = Move("sonic-boom");
-        var result = await new MoveScenario()
-            .Defender(TestCreatures.Make("D", hp: 500))
-            .Use(move);
+        var result = await new MoveScenario().Defender(TestCreatures.Make("D", hp: 500)).Use(move);
 
         Assert.Equal(move.PowerPointsMax - 1, result.Move.PowerPointsCurrent);
     }

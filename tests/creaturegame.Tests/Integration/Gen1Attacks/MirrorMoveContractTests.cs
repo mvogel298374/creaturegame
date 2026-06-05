@@ -14,11 +14,9 @@ public class MirrorMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
     public async Task MirrorMoveReExecutesTheFoesLastMove()
     {
         var defender = TestCreatures.Make("D", hp: 500);
-        defender.LastMoveUsed = Move("tackle");   // the foe's last move
+        defender.LastMoveUsed = Move("tackle"); // the foe's last move
 
-        var result = await new MoveScenario()
-            .Defender(defender)
-            .Use(Move("mirror-move"));
+        var result = await new MoveScenario().Defender(defender).Use(Move("mirror-move"));
 
         Assert.True(result.Has<DamageDealt>(), "the copied Tackle deals damage to the foe");
         Assert.Contains(result.Events, e => e is MoveUsed m && m.MoveName == "tackle");
@@ -27,11 +25,9 @@ public class MirrorMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
     [Fact]
     public async Task MirrorMoveFailsWhenTheFoeHasNotMovedYet()
     {
-        var defender = TestCreatures.Make("D", hp: 500);   // no LastMoveUsed
+        var defender = TestCreatures.Make("D", hp: 500); // no LastMoveUsed
 
-        var result = await new MoveScenario()
-            .Defender(defender)
-            .Use(Move("mirror-move"));
+        var result = await new MoveScenario().Defender(defender).Use(Move("mirror-move"));
 
         Assert.True(result.Has<MoveMissed>());
         Assert.False(result.Has<DamageDealt>());

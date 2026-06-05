@@ -36,7 +36,7 @@ public class MistContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 
         var result = await new MoveScenario().Defender(defender).Use(Move("growl"));
 
-        Assert.Equal(0, result.Defender.Stages.Attack);                 // not lowered
+        Assert.Equal(0, result.Defender.Stages.Attack); // not lowered
         Assert.False(result.Has<StatStageChanged>());
         Assert.Contains(result.Events, e => e is StatDropBlocked s && s.CreatureName == "Defender");
     }

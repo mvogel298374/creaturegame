@@ -17,7 +17,7 @@ public class SecondaryStatusContractTests(MovesFixture moves) : Gen1MoveContract
     [InlineData("ice-punch", StatusCondition.Freeze)]
     [InlineData("thunder-punch", StatusCondition.Paralysis)]
     [InlineData("poison-sting", StatusCondition.Poison)]
-    [InlineData("twineedle", StatusCondition.Poison)]   // 2 hits + 20% poison
+    [InlineData("twineedle", StatusCondition.Poison)] // 2 hits + 20% poison
     [InlineData("ember", StatusCondition.Burn)]
     [InlineData("flamethrower", StatusCondition.Burn)]
     [InlineData("ice-beam", StatusCondition.Freeze)]
@@ -40,26 +40,44 @@ public class SecondaryStatusContractTests(MovesFixture moves) : Gen1MoveContract
     }
 
     [Theory]
-    [InlineData("fire-punch")] [InlineData("ice-punch")] [InlineData("thunder-punch")]
-    [InlineData("poison-sting")] [InlineData("twineedle")]
-    [InlineData("ember")] [InlineData("flamethrower")] [InlineData("ice-beam")] [InlineData("blizzard")]
-    [InlineData("thunder-shock")] [InlineData("thunderbolt")] [InlineData("thunder")]
-    [InlineData("smog")] [InlineData("sludge")] [InlineData("fire-blast")]
+    [InlineData("fire-punch")]
+    [InlineData("ice-punch")]
+    [InlineData("thunder-punch")]
+    [InlineData("poison-sting")]
+    [InlineData("twineedle")]
+    [InlineData("ember")]
+    [InlineData("flamethrower")]
+    [InlineData("ice-beam")]
+    [InlineData("blizzard")]
+    [InlineData("thunder-shock")]
+    [InlineData("thunderbolt")]
+    [InlineData("thunder")]
+    [InlineData("smog")]
+    [InlineData("sludge")]
+    [InlineData("fire-blast")]
     public async Task NoSecondaryStatusOnMiss(string moveName)
     {
-        var result = await new MoveScenario()
-            .Rules(NeverHitRules.Instance)
-            .Use(Move(moveName));
+        var result = await new MoveScenario().Rules(NeverHitRules.Instance).Use(Move(moveName));
 
         Assert.Equal(StatusCondition.None, result.Defender.Status);
     }
 
     [Theory]
-    [InlineData("fire-punch")] [InlineData("ice-punch")] [InlineData("thunder-punch")]
-    [InlineData("poison-sting")] [InlineData("twineedle")]
-    [InlineData("ember")] [InlineData("flamethrower")] [InlineData("ice-beam")] [InlineData("blizzard")]
-    [InlineData("thunder-shock")] [InlineData("thunderbolt")] [InlineData("thunder")]
-    [InlineData("smog")] [InlineData("sludge")] [InlineData("fire-blast")]
+    [InlineData("fire-punch")]
+    [InlineData("ice-punch")]
+    [InlineData("thunder-punch")]
+    [InlineData("poison-sting")]
+    [InlineData("twineedle")]
+    [InlineData("ember")]
+    [InlineData("flamethrower")]
+    [InlineData("ice-beam")]
+    [InlineData("blizzard")]
+    [InlineData("thunder-shock")]
+    [InlineData("thunderbolt")]
+    [InlineData("thunder")]
+    [InlineData("smog")]
+    [InlineData("sludge")]
+    [InlineData("fire-blast")]
     public async Task NoSecondaryStatusWhenTargetAlreadyStatused(string moveName)
     {
         var defender = TestCreatures.Make("Defender", hp: 500);
@@ -70,7 +88,7 @@ public class SecondaryStatusContractTests(MovesFixture moves) : Gen1MoveContract
             .Defender(defender)
             .Use(Move(moveName));
 
-        Assert.Equal(StatusCondition.Poison, result.Defender.Status);   // not overwritten
+        Assert.Equal(StatusCondition.Poison, result.Defender.Status); // not overwritten
     }
 
     // Body Slam is special-cased: in Gen 1 it can't paralyze Normal-types (see ImmunityContractTests),

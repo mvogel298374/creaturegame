@@ -41,9 +41,7 @@ public class UniqueMoveEffectContractTests(MovesFixture moves) : Gen1MoveContrac
     public async Task SwitchMoveIsAnnouncedButHasNoCombatEffect(string moveName)
     {
         var move = Move(moveName);
-        var result = await new MoveScenario()
-            .Defender(TestCreatures.Make("D", hp: 500))
-            .Use(move);
+        var result = await new MoveScenario().Defender(TestCreatures.Make("D", hp: 500)).Use(move);
 
         Assert.True(result.Has<MoveUsed>());
         Assert.False(result.Has<DamageDealt>());
@@ -56,8 +54,8 @@ public class UniqueMoveEffectContractTests(MovesFixture moves) : Gen1MoveContrac
     [InlineData("whirlwind")]
     [InlineData("roar")]
     [InlineData("teleport")]
-    public void SwitchMoveHasGen1NegativePriority(string moveName)
-        => Assert.Equal(-6, Move(moveName).Priority);
+    public void SwitchMoveHasGen1NegativePriority(string moveName) =>
+        Assert.Equal(-6, Move(moveName).Priority);
 
     // Haze (real imported row) clears every stat stage on both battlers. The escalation math is unit-
     // tested in CoreMechanicsTests; this proves the imported move drives it through AttackAction.
@@ -69,7 +67,10 @@ public class UniqueMoveEffectContractTests(MovesFixture moves) : Gen1MoveContrac
         var defender = TestCreatures.Make("D", hp: 500);
         defender.Stages.RaiseDefense(2);
 
-        var result = await new MoveScenario().Attacker(attacker).Defender(defender).Use(Move("haze"));
+        var result = await new MoveScenario()
+            .Attacker(attacker)
+            .Defender(defender)
+            .Use(Move("haze"));
 
         Assert.Equal(0, result.Attacker.Stages.Attack);
         Assert.Equal(0, result.Defender.Stages.Defense);

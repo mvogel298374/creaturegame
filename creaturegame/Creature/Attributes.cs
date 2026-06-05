@@ -9,7 +9,6 @@ public class Attributes
     public int MaxHP { get; set; } = 100;
     public int Speed { get; set; } = 50;
 
-
     public override string ToString()
     {
         return $@"ATK: {this.Attack}, DEF: {this.Defense}, SPEC: {this.Special}, HP: {this.HP}/{this.MaxHP}, SPD: {this.Speed}";
@@ -28,6 +27,4 @@ public class Attributes
         if (this.HP >= this.MaxHP)
             this.HP = this.MaxHP;
     }
-
 }
-

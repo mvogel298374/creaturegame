@@ -52,7 +52,8 @@ public class AttackService
     /// </summary>
     public async Task<Attack?> GetAttackByNameAsync(string name)
     {
-        return await _context.Moves.AsNoTracking()
+        return await _context
+            .Moves.AsNoTracking()
             .FirstOrDefaultAsync(m => m.Name != null && m.Name.ToLower() == name.ToLower());
     }
 
@@ -62,7 +63,8 @@ public class AttackService
     public async Task<Attack?> GetRandomAttackAsync(IRandomSource? rng = null)
     {
         int count = await _context.Moves.CountAsync();
-        if (count == 0) return null;
+        if (count == 0)
+            return null;
 
         int index = (rng ?? SystemRandomSource.Instance).Next(count);
         return await _context.Moves.AsNoTracking().Skip(index).FirstOrDefaultAsync();

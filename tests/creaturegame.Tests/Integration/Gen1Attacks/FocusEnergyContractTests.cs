@@ -27,7 +27,7 @@ public class FocusEnergyContractTests(MovesFixture moves) : Gen1MoveContract(mov
     public void FocusEnergyQuartersTheCritChanceInGen1()
     {
         var attacker = TestCreatures.Make("A", baseSpeed: 200);
-        var move     = Move("tackle");   // not a high-crit move
+        var move = Move("tackle"); // not a high-crit move
 
         double normal = Gen1BattleRules.Instance.GetCritChance(attacker, move);
         attacker.HasFocusEnergy = true;

@@ -40,22 +40,32 @@ public class BideContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 
         var enemy = new Creature("Enemy") { Level = 50, Type1 = DamageType.Normal };
         enemy.CalculateStats();
-        enemy.Attributes.HP = enemy.Attributes.MaxHP = 1;   // any non-zero unleash fells it
+        enemy.Attributes.HP = enemy.Attributes.MaxHP = 1; // any non-zero unleash fells it
         enemy.Attributes.Attack = 60;
-        enemy.Attributes.Speed  = 1;
+        enemy.Attributes.Speed = 1;
         enemy.AddAttack(Move("tackle"));
 
         var emitter = new RecordingEmitter();
-        var input   = new CountingInput(0);
-        var battle  = new Battle(player, enemy, Gen1TypeChart.Instance, input, AutoSelectInput.Instance,
-                                 rules: new FixedBideRules(), emitter: emitter);
+        var input = new CountingInput(0);
+        var battle = new Battle(
+            player,
+            enemy,
+            Gen1TypeChart.Instance,
+            input,
+            AutoSelectInput.Instance,
+            rules: new FixedBideRules(),
+            emitter: emitter
+        );
         await battle.StartFightAsync();
 
         Assert.Contains(emitter.Events, e => e is BideStoring);
-        Assert.Equal(1, input.CallCount);   // asked only on the first turn — Bide auto-repeats while committed
+        Assert.Equal(1, input.CallCount); // asked only on the first turn — Bide auto-repeats while committed
         Assert.False(enemy.IsAlive());
 
-        int absorbed = emitter.Of<DamageDealt>().Where(d => d.TargetName == "Player").Sum(d => d.Damage);
+        int absorbed = emitter
+            .Of<DamageDealt>()
+            .Where(d => d.TargetName == "Player")
+            .Sum(d => d.Damage);
         var unleashed = emitter.Of<DamageDealt>().First(d => d.TargetName == "Enemy");
         Assert.True(absorbed > 0, "the player absorbed a hit while storing");
         Assert.Equal(absorbed * 2, unleashed.Damage);
@@ -77,17 +87,23 @@ public class BideContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         enemy.CalculateStats();
         enemy.Attributes.HP = enemy.Attributes.MaxHP = 1;
         enemy.Attributes.Attack = 60;
-        enemy.Attributes.Speed  = 1;
+        enemy.Attributes.Speed = 1;
         enemy.AddAttack(Move("tackle"));
 
         var emitter = new RecordingEmitter();
-        var battle  = new Battle(player, enemy, Gen1TypeChart.Instance,
-                                 new CountingInput(0), AutoSelectInput.Instance,
-                                 rules: new FixedBideRules(), emitter: emitter);
+        var battle = new Battle(
+            player,
+            enemy,
+            Gen1TypeChart.Instance,
+            new CountingInput(0),
+            AutoSelectInput.Instance,
+            rules: new FixedBideRules(),
+            emitter: emitter
+        );
         await battle.StartFightAsync();
 
         Assert.Contains(emitter.Events, e => e is DamageDealt d && d.TargetName == "Enemy");
-        Assert.Null(enemy.LastDamageType);   // the unleash left no counterable record
+        Assert.Null(enemy.LastDamageType); // the unleash left no counterable record
         Assert.Equal(0, enemy.LastDamageTaken);
     }
 
@@ -106,30 +122,40 @@ public class BideContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         enemy.CalculateStats();
         enemy.Attributes.HP = enemy.Attributes.MaxHP = 1;
         enemy.Attributes.Speed = 1;
-        enemy.AddAttack(Move("sonic-boom"));   // fixed 20 damage (DamageCategory.Fixed)
+        enemy.AddAttack(Move("sonic-boom")); // fixed 20 damage (DamageCategory.Fixed)
 
         var emitter = new RecordingEmitter();
-        var battle  = new Battle(player, enemy, Gen1TypeChart.Instance,
-                                 new CountingInput(0), AutoSelectInput.Instance,
-                                 rules: new FixedBideRules(), emitter: emitter);
+        var battle = new Battle(
+            player,
+            enemy,
+            Gen1TypeChart.Instance,
+            new CountingInput(0),
+            AutoSelectInput.Instance,
+            rules: new FixedBideRules(),
+            emitter: emitter
+        );
         await battle.StartFightAsync();
 
         var unleashed = emitter.Of<DamageDealt>().First(d => d.TargetName == "Enemy");
-        Assert.Equal(40, unleashed.Damage);   // 2 × the fixed 20 absorbed while storing
+        Assert.Equal(40, unleashed.Damage); // 2 × the fixed 20 absorbed while storing
     }
 
     /// <summary>Always-hit, no-crit, no-variance, and a fixed 2-turn Bide for determinism.</summary>
     private sealed class FixedBideRules : DelegatingBattleRules
     {
-        public override int    RollBideTurns()                                       => 2;
-        public override int    GetHitThreshold(int acc, int accStage, int evaStage)  => 256;
-        public override double GetCritChance(Creature a, Attack m)                   => 0.0;
-        public override double RollDamageVariance()                                  => 1.0;
+        public override int RollBideTurns() => 2;
+
+        public override int GetHitThreshold(int acc, int accStage, int evaStage) => 256;
+
+        public override double GetCritChance(Creature a, Attack m) => 0.0;
+
+        public override double RollDamageVariance() => 1.0;
     }
 
     private sealed class CountingInput(int index) : IBattleInput
     {
         public int CallCount { get; private set; }
+
         public Task<PokemonAttack> ChooseMoveAsync(TurnContext context)
         {
             CallCount++;

@@ -5,6 +5,7 @@ namespace creaturegame.Combat;
 public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
 {
     public static readonly ConsoleBattleEventEmitter Instance = new();
+
     private ConsoleBattleEventEmitter() { }
 
     public void Emit(BattleEvent evt)
@@ -48,7 +49,8 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                     Console.WriteLine($"It doesn't affect {e.TargetName}...");
                     break;
                 }
-                if (e.IsCrit) Console.WriteLine("A critical hit!");
+                if (e.IsCrit)
+                    Console.WriteLine("A critical hit!");
                 Console.WriteLine($"{e.TargetName} took {e.Damage} damage!");
                 if (e.TypeEffectiveness >= 2.0)
                     Console.WriteLine("It's super effective!");
@@ -106,61 +108,81 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                 break;
 
             case StatusApplied e:
-                Console.WriteLine(e.Status switch
-                {
-                    StatusCondition.Burn      => $"{e.TargetName} was burned!",
-                    StatusCondition.Paralysis => $"{e.TargetName} is paralyzed! It may be unable to move!",
-                    StatusCondition.Poison    => $"{e.TargetName} was poisoned!",
-                    StatusCondition.Sleep     => $"{e.TargetName} fell asleep!",
-                    StatusCondition.Freeze    => $"{e.TargetName} was frozen solid!",
-                    _                         => $"{e.TargetName} was afflicted with {e.Status}!"
-                });
+                Console.WriteLine(
+                    e.Status switch
+                    {
+                        StatusCondition.Burn => $"{e.TargetName} was burned!",
+                        StatusCondition.Paralysis =>
+                            $"{e.TargetName} is paralyzed! It may be unable to move!",
+                        StatusCondition.Poison => $"{e.TargetName} was poisoned!",
+                        StatusCondition.Sleep => $"{e.TargetName} fell asleep!",
+                        StatusCondition.Freeze => $"{e.TargetName} was frozen solid!",
+                        _ => $"{e.TargetName} was afflicted with {e.Status}!",
+                    }
+                );
                 break;
 
             case StatusDamage e:
-                Console.WriteLine(e.Source switch
-                {
-                    StatusCondition.Burn   => $"{e.TargetName} is hurt by its burn! ({e.Damage} damage)",
-                    StatusCondition.Poison => $"{e.TargetName} is hurt by poison! ({e.Damage} damage)",
-                    _                      => $"{e.TargetName} took {e.Damage} status damage!"
-                });
+                Console.WriteLine(
+                    e.Source switch
+                    {
+                        StatusCondition.Burn =>
+                            $"{e.TargetName} is hurt by its burn! ({e.Damage} damage)",
+                        StatusCondition.Poison =>
+                            $"{e.TargetName} is hurt by poison! ({e.Damage} damage)",
+                        _ => $"{e.TargetName} took {e.Damage} status damage!",
+                    }
+                );
                 break;
 
             case StatusCleared e:
-                Console.WriteLine(e.WasStatus switch
-                {
-                    StatusCondition.Sleep  => $"{e.CreatureName} woke up!",
-                    StatusCondition.Freeze => $"{e.CreatureName} thawed out!",
-                    _                      => $"{e.CreatureName} is no longer affected by {e.WasStatus}!"
-                });
+                Console.WriteLine(
+                    e.WasStatus switch
+                    {
+                        StatusCondition.Sleep => $"{e.CreatureName} woke up!",
+                        StatusCondition.Freeze => $"{e.CreatureName} thawed out!",
+                        _ => $"{e.CreatureName} is no longer affected by {e.WasStatus}!",
+                    }
+                );
                 break;
 
             case ActionBlocked e:
-                Console.WriteLine(e.Reason switch
-                {
-                    StatusCondition.Sleep     => $"{e.CreatureName} is fast asleep!",
-                    StatusCondition.Freeze    => $"{e.CreatureName} is frozen solid!",
-                    StatusCondition.Paralysis => $"{e.CreatureName} is fully paralyzed! It can't move!",
-                    _                         => $"{e.CreatureName} is immobilized by {e.Reason}!"
-                });
+                Console.WriteLine(
+                    e.Reason switch
+                    {
+                        StatusCondition.Sleep => $"{e.CreatureName} is fast asleep!",
+                        StatusCondition.Freeze => $"{e.CreatureName} is frozen solid!",
+                        StatusCondition.Paralysis =>
+                            $"{e.CreatureName} is fully paralyzed! It can't move!",
+                        _ => $"{e.CreatureName} is immobilized by {e.Reason}!",
+                    }
+                );
                 break;
 
             case StatStageChanged e:
                 string direction = e.Delta > 0 ? "rose" : "fell";
-                string amount    = Math.Abs(e.Delta) >= 2 ? " sharply" : "";
-                Console.WriteLine($"{e.CreatureName}'s {e.Stat}{amount} {direction}! (→ {e.NewStage:+0;-0;0})");
+                string amount = Math.Abs(e.Delta) >= 2 ? " sharply" : "";
+                Console.WriteLine(
+                    $"{e.CreatureName}'s {e.Stat}{amount} {direction}! (→ {e.NewStage:+0;-0;0})"
+                );
                 break;
 
             case HazeClearedStages:
-                Console.WriteLine("A black mist swirled around all Pokémon! All stat changes were erased!");
+                Console.WriteLine(
+                    "A black mist swirled around all Pokémon! All stat changes were erased!"
+                );
                 break;
 
             case DrainHealed e:
-                Console.WriteLine($"{e.SourceName} had its energy drained! ({e.HealAmount} HP restored)");
+                Console.WriteLine(
+                    $"{e.SourceName} had its energy drained! ({e.HealAmount} HP restored)"
+                );
                 break;
 
             case Healed e:
-                Console.WriteLine($"{e.CreatureName} regained health! ({e.HealAmount} HP restored)");
+                Console.WriteLine(
+                    $"{e.CreatureName} regained health! ({e.HealAmount} HP restored)"
+                );
                 break;
 
             case MimicLearned e:
@@ -184,11 +206,15 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                 break;
 
             case LeechSeedDamage e:
-                Console.WriteLine($"{e.DrainedName}'s health was sapped by Leech Seed! ({e.Damage} damage)");
+                Console.WriteLine(
+                    $"{e.DrainedName}'s health was sapped by Leech Seed! ({e.Damage} damage)"
+                );
                 break;
 
             case LeechSeedHealed e:
-                Console.WriteLine($"{e.HealedName} absorbed energy from Leech Seed! (+{e.Amount} HP)");
+                Console.WriteLine(
+                    $"{e.HealedName} absorbed energy from Leech Seed! (+{e.Amount} HP)"
+                );
                 break;
 
             case Recharging e:

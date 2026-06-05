@@ -22,7 +22,7 @@ public class CounterContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     {
         var attacker = TestCreatures.Make("A");
         attacker.LastDamageTaken = 50;
-        attacker.LastDamageType  = lastType;
+        attacker.LastDamageType = lastType;
 
         var result = await new MoveScenario()
             .Attacker(attacker)
@@ -40,7 +40,7 @@ public class CounterContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     {
         var attacker = TestCreatures.Make("A");
         attacker.LastDamageTaken = 50;
-        attacker.LastDamageType  = DamageType.Water;   // Gen 1 Counter only answers Normal/Fighting
+        attacker.LastDamageType = DamageType.Water; // Gen 1 Counter only answers Normal/Fighting
 
         var result = await new MoveScenario()
             .Attacker(attacker)
@@ -73,14 +73,27 @@ public class CounterContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         enemy.AddAttack(Move("tackle"));
 
         var emitter = new RecordingEmitter();
-        var battle = new Battle(player, enemy, Gen1TypeChart.Instance, AutoSelectInput.Instance,
-                                AutoSelectInput.Instance, rules: AlwaysHitRules.Instance, emitter: emitter);
+        var battle = new Battle(
+            player,
+            enemy,
+            Gen1TypeChart.Instance,
+            AutoSelectInput.Instance,
+            AutoSelectInput.Instance,
+            rules: AlwaysHitRules.Instance,
+            emitter: emitter
+        );
         await battle.StartFightAsync();
 
-        var tackleHits  = emitter.Events.OfType<DamageDealt>().Where(d => d.TargetName == "Player").ToList();
-        var counterHits = emitter.Events.OfType<DamageDealt>().Where(d => d.TargetName == "Enemy").ToList();
+        var tackleHits = emitter
+            .Events.OfType<DamageDealt>()
+            .Where(d => d.TargetName == "Player")
+            .ToList();
+        var counterHits = emitter
+            .Events.OfType<DamageDealt>()
+            .Where(d => d.TargetName == "Enemy")
+            .ToList();
         Assert.NotEmpty(tackleHits);
         Assert.NotEmpty(counterHits);
-        Assert.Equal(tackleHits[0].Damage * 2, counterHits[0].Damage);   // first counter = 2× first tackle
+        Assert.Equal(tackleHits[0].Damage * 2, counterHits[0].Damage); // first counter = 2× first tackle
     }
 }

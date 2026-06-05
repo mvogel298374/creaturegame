@@ -41,16 +41,18 @@ public sealed class Gen1BattleRules : IBattleRules
 
     // Gen 1 stores a single ailment/effect chance per move, so every secondary effect kind
     // resolves to the same column. A later generation would branch on `effect` here.
-    public int GetSecondaryEffectChance(Attack move, SecondaryEffectKind effect) => move.EffectChance ?? 100;
+    public int GetSecondaryEffectChance(Attack move, SecondaryEffectKind effect) =>
+        move.EffectChance ?? 100;
 
     // Gen 1 multi-hit distribution: 2 and 3 hits at 3/8 each, 4 and 5 hits at 1/8 each.
-    public int RollMultiHitCount() => _rng.Next(8) switch
-    {
-        0 or 1 or 2 => 2,
-        3 or 4 or 5 => 3,
-        6           => 4,
-        _           => 5,
-    };
+    public int RollMultiHitCount() =>
+        _rng.Next(8) switch
+        {
+            0 or 1 or 2 => 2,
+            3 or 4 or 5 => 3,
+            6 => 4,
+            _ => 5,
+        };
 
     // Gen 1: Pay Day yields money equal to twice the user's level.
     public int PayDayCoinMultiplier => 2;
@@ -60,7 +62,7 @@ public sealed class Gen1BattleRules : IBattleRules
         Math.Max(1, damageDealt / 2);
 
     // Gen 1–5: Burn and Poison each deal 1/16 max HP per turn.
-    public int BurnDamageDenominator   => 16;
+    public int BurnDamageDenominator => 16;
     public int PoisonDamageDenominator => 16;
 
     // Gen 1 Bad Poison (Toxic): counter/16 of max HP; no cap — counter increments each turn.
@@ -68,6 +70,7 @@ public sealed class Gen1BattleRules : IBattleRules
 
     // Gen 1: binding traps for 2–5 turns.
     public int RollBindingTurns() => _rng.Next(2, 6);
+
     public int BindingDamageDenominator => 16;
 
     // Gen 1: a missed Jump Kick / Hi Jump Kick deals a flat 1 HP of crash damage to the user.
@@ -103,6 +106,7 @@ public sealed class Gen1BattleRules : IBattleRules
 
     // Gen 1: Bide commits the user for 2–3 turns, then unleashes double the damage absorbed.
     public int RollBideTurns() => _rng.Next(2, 4);
+
     public int BideDamageMultiplier => 2;
 
     // ── Type-based immunities ────────────────────────────────────────────────────
@@ -110,13 +114,20 @@ public sealed class Gen1BattleRules : IBattleRules
     // Gen 1 status immunities by type: Poison-types can't be poisoned, Fire-types can't be burned,
     // and a Normal-type move can't paralyze a Normal-type (the Body Slam quirk). Sleep/Freeze have
     // no type immunity in Gen 1.
-    public bool CanReceiveStatus(Creature target, StatusCondition status, DamageType moveType) => status switch
-    {
-        StatusCondition.Poison or StatusCondition.BadPoison           => !HasType(target, DamageType.Poison),
-        StatusCondition.Burn                                          => !HasType(target, DamageType.Fire),
-        StatusCondition.Paralysis when moveType == DamageType.Normal  => !HasType(target, DamageType.Normal),
-        _                                                             => true,
-    };
+    public bool CanReceiveStatus(Creature target, StatusCondition status, DamageType moveType) =>
+        status switch
+        {
+            StatusCondition.Poison or StatusCondition.BadPoison => !HasType(
+                target,
+                DamageType.Poison
+            ),
+            StatusCondition.Burn => !HasType(target, DamageType.Fire),
+            StatusCondition.Paralysis when moveType == DamageType.Normal => !HasType(
+                target,
+                DamageType.Normal
+            ),
+            _ => true,
+        };
 
     // Grass-types are immune to Leech Seed (all generations).
     public bool CanBeLeechSeeded(Creature target) => !HasType(target, DamageType.Grass);

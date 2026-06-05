@@ -37,14 +37,14 @@ public class DisableContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         var defender = TestCreatures.Make("D", hp: 500);
         defender.AddAttack(Move("pound"));
         defender.AddAttack(Move("scratch"));
-        defender.DisabledMove          = defender.MoveSet[0];
+        defender.DisabledMove = defender.MoveSet[0];
         defender.DisableTurnsRemaining = 3;
 
         var result = await new MoveScenario().Defender(defender).Use(Move("disable"));
 
         Assert.DoesNotContain(result.Events, e => e is MoveDisabled);
-        Assert.Equal(3, result.Defender.DisableTurnsRemaining);             // unchanged
-        Assert.Same(defender.MoveSet[0], result.Defender.DisabledMove);     // same locked move
+        Assert.Equal(3, result.Defender.DisableTurnsRemaining); // unchanged
+        Assert.Same(defender.MoveSet[0], result.Defender.DisabledMove); // same locked move
     }
 
     [Fact]
@@ -64,22 +64,38 @@ public class DisableContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         enemy.AddAttack(Move("disable"));
 
         var emitter = new RecordingEmitter();
-        var battle  = new Battle(player, enemy, Gen1TypeChart.Instance,
-                                 AutoSelectInput.Instance, AutoSelectInput.Instance,
-                                 rules: new FixedDisableRules(2), emitter: emitter,
-                                 rng: new SeededRandomSource(1));
+        var battle = new Battle(
+            player,
+            enemy,
+            Gen1TypeChart.Instance,
+            AutoSelectInput.Instance,
+            AutoSelectInput.Instance,
+            rules: new FixedDisableRules(2),
+            emitter: emitter,
+            rng: new SeededRandomSource(1)
+        );
         await battle.StartFightAsync();
 
-        Assert.Contains(emitter.Events, e => e is MoveDisabled d  && d.TargetName  == "Player" && d.MoveName == "pound");
-        Assert.Contains(emitter.Events, e => e is MoveReEnabled r && r.CreatureName == "Player" && r.MoveName == "pound");
+        Assert.Contains(
+            emitter.Events,
+            e => e is MoveDisabled d && d.TargetName == "Player" && d.MoveName == "pound"
+        );
+        Assert.Contains(
+            emitter.Events,
+            e => e is MoveReEnabled r && r.CreatureName == "Player" && r.MoveName == "pound"
+        );
         // Enforcement: while Pound was locked the player had no other move, so it Struggled.
-        Assert.Contains(emitter.Events, e => e is MoveUsed m && m.AttackerName == "Player" && m.MoveName == "Struggle");
+        Assert.Contains(
+            emitter.Events,
+            e => e is MoveUsed m && m.AttackerName == "Player" && m.MoveName == "Struggle"
+        );
     }
 
     /// <summary>Always hits and locks Disable for a fixed number of turns — deterministic timeline.</summary>
     private sealed class FixedDisableRules(int turns) : DelegatingBattleRules
     {
         public override int GetHitThreshold(int acc, int accStage, int evaStage) => 256; // always hit
-        public override int RollDisableTurns()                                    => turns;
+
+        public override int RollDisableTurns() => turns;
     }
 }

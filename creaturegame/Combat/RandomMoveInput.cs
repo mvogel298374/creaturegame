@@ -21,13 +21,14 @@ public sealed class RandomMoveInput(IRandomSource? rng = null) : IBattleInput
     {
         // Battle guarantees this is only called when CanSelectAnyMove == true, so at least one
         // move has PP and isn't Disabled.
-        var available = context.Attacker.MoveSet
-            .Where(m => m.PowerPointsCurrent > 0 && m != context.DisabledMove)
+        var available = context
+            .Attacker.MoveSet.Where(m => m.PowerPointsCurrent > 0 && m != context.DisabledMove)
             .ToList();
         if (available.Count == 0)
             throw new InvalidOperationException(
-                $"{context.Attacker.Name}: ChooseMoveAsync called with no selectable move. " +
-                "Battle should have bypassed IBattleInput and passed null (Struggle) directly.");
+                $"{context.Attacker.Name}: ChooseMoveAsync called with no selectable move. "
+                    + "Battle should have bypassed IBattleInput and passed null (Struggle) directly."
+            );
 
         return Task.FromResult(available[_rng.Next(available.Count)]);
     }

@@ -16,10 +16,10 @@ public class SecondaryEffectContractTests(MovesFixture moves) : Gen1MoveContract
     // Gen 1's chance-based stat-drop beams: Acid (−1 foe Defense), Bubble Beam (−1 Speed),
     // Aurora Beam (−1 Attack). All deal damage and apply the drop when the secondary roll lands.
     [Theory]
-    [InlineData("acid",        "Defense")]
+    [InlineData("acid", "Defense")]
     [InlineData("bubble-beam", "Speed")]
     [InlineData("aurora-beam", "Attack")]
-    [InlineData("psychic",     "Special")]   // 10% to lower the foe's (combined) Special in Gen 1
+    [InlineData("psychic", "Special")] // 10% to lower the foe's (combined) Special in Gen 1
     public async Task LowersTheFoesStatAsASecondaryEffectOnHit(string moveName, string stat)
     {
         var result = await new MoveScenario()
@@ -36,7 +36,10 @@ public class SecondaryEffectContractTests(MovesFixture moves) : Gen1MoveContract
     }
 
     [Theory]
-    [InlineData("acid")] [InlineData("bubble-beam")] [InlineData("aurora-beam")] [InlineData("psychic")]
+    [InlineData("acid")]
+    [InlineData("bubble-beam")]
+    [InlineData("aurora-beam")]
+    [InlineData("psychic")]
     public async Task DoesNotLowerAnyStatOnMiss(string moveName)
     {
         var result = await new MoveScenario()

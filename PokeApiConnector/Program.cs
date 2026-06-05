@@ -1,4 +1,5 @@
 ﻿namespace PokeApiConnector;
+
 using PokeApiConnector.PokeAPI;
 
 class Program
@@ -19,10 +20,10 @@ class Program
 
         Console.WriteLine("Importing Gen 1 Moves...");
         await MoveImport.FetchMovesByGeneration(1);
-        
+
         Console.WriteLine("\nImporting Gen 1 Pokemon Species...");
         await PokemonImport.FetchPokemonByGeneration(1);
-        
+
         Console.WriteLine("\nSeeding Gen 1 game availability...");
         await GameAvailabilitySeeder.SeedGen1Async();
 

@@ -23,7 +23,10 @@ public class StatusMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
         Assert.False(result.Has<DamageDealt>(), "Sing is a status move — no damage");
         Assert.Equal(StatusCondition.Sleep, result.Defender.Status);
         Assert.True(result.Defender.SleepTurns > 0);
-        Assert.Contains(result.Events, e => e is StatusApplied s && s.Status == StatusCondition.Sleep);
+        Assert.Contains(
+            result.Events,
+            e => e is StatusApplied s && s.Status == StatusCondition.Sleep
+        );
     }
 
     [Fact]
@@ -42,9 +45,12 @@ public class StatusMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
     // status moves that afflict a (non-immune) target without dealing damage.
     [Theory]
     [InlineData("poison-powder", StatusCondition.Poison)]
-    [InlineData("stun-spore",    StatusCondition.Paralysis)]
-    [InlineData("sleep-powder",  StatusCondition.Sleep)]
-    public async Task PowderInflictsItsStatusWithoutDamage(string moveName, StatusCondition expected)
+    [InlineData("stun-spore", StatusCondition.Paralysis)]
+    [InlineData("sleep-powder", StatusCondition.Sleep)]
+    public async Task PowderInflictsItsStatusWithoutDamage(
+        string moveName,
+        StatusCondition expected
+    )
     {
         var result = await new MoveScenario()
             .Defender(TestCreatures.Make("D", type1: DamageType.Water, hp: 500))
@@ -56,7 +62,9 @@ public class StatusMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
     }
 
     [Theory]
-    [InlineData("poison-powder")] [InlineData("stun-spore")] [InlineData("sleep-powder")]
+    [InlineData("poison-powder")]
+    [InlineData("stun-spore")]
+    [InlineData("sleep-powder")]
     public async Task PowderAppliesNothingOnMiss(string moveName)
     {
         var result = await new MoveScenario()
@@ -90,7 +98,10 @@ public class StatusMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
         Assert.False(result.Has<DamageDealt>(), "Hypnosis is a status move — no damage");
         Assert.Equal(StatusCondition.Sleep, result.Defender.Status);
         Assert.True(result.Defender.SleepTurns > 0);
-        Assert.Contains(result.Events, e => e is StatusApplied s && s.Status == StatusCondition.Sleep);
+        Assert.Contains(
+            result.Events,
+            e => e is StatusApplied s && s.Status == StatusCondition.Sleep
+        );
     }
 
     // Toxic badly-poisons (BadPoison), distinct from the regular Poison its modern PokeAPI ailment
@@ -105,7 +116,10 @@ public class StatusMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
 
         Assert.False(result.Has<DamageDealt>(), "Toxic is a status move — no damage");
         Assert.Equal(StatusCondition.BadPoison, result.Defender.Status);
-        Assert.Contains(result.Events, e => e is StatusApplied s && s.Status == StatusCondition.BadPoison);
+        Assert.Contains(
+            result.Events,
+            e => e is StatusApplied s && s.Status == StatusCondition.BadPoison
+        );
     }
 
     [Fact]

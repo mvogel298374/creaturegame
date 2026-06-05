@@ -4,5 +4,5 @@ public enum AttackType
 {
     Physical,
     Special,
-    Undefined
+    Undefined,
 }

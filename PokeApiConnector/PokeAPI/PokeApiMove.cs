@@ -121,4 +121,3 @@ public class MoveMeta
     [JsonPropertyName("drain")]
     public int Drain { get; set; }
 }
-

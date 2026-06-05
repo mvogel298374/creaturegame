@@ -16,7 +16,11 @@ namespace creaturegame.Tests.Integration.Gen1Attacks;
 public class TwoTurnMoveContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 {
     [Theory]
-    [InlineData("razor-wind")] [InlineData("fly")] [InlineData("solar-beam")] [InlineData("dig")] [InlineData("skull-bash")]
+    [InlineData("razor-wind")]
+    [InlineData("fly")]
+    [InlineData("solar-beam")]
+    [InlineData("dig")]
+    [InlineData("skull-bash")]
     public async Task ChargesFirstTurnThenStrikes(string moveName)
     {
         var move = Move(moveName);
@@ -39,7 +43,11 @@ public class TwoTurnMoveContractTests(MovesFixture moves) : Gen1MoveContract(mov
     }
 
     [Theory]
-    [InlineData("razor-wind")] [InlineData("fly")] [InlineData("solar-beam")] [InlineData("dig")] [InlineData("skull-bash")]
+    [InlineData("razor-wind")]
+    [InlineData("fly")]
+    [InlineData("solar-beam")]
+    [InlineData("dig")]
+    [InlineData("skull-bash")]
     public async Task MissesOnReleaseTurn(string moveName)
     {
         var turns = await new MoveScenario()
@@ -61,26 +69,41 @@ public class TwoTurnMoveContractTests(MovesFixture moves) : Gen1MoveContract(mov
         var player = new Creature("Player") { Level = 50, Type1 = DamageType.Normal };
         player.CalculateStats();
         player.Attributes.Attack = 300;
-        player.Attributes.Speed  = 200;   // outspeed the enemy every turn
+        player.Attributes.Speed = 200; // outspeed the enemy every turn
         player.AddAttack(Move("fly"));
 
         var enemy = new Creature("Enemy") { Level = 50, Type1 = DamageType.Normal };
         enemy.CalculateStats();
-        enemy.Attributes.HP    = 1;
+        enemy.Attributes.HP = 1;
         enemy.Attributes.MaxHP = 1;
         enemy.Attributes.Speed = 1;
-        enemy.AddAttack(new Attack { Name = "Splash", BaseDamage = 0, Accuracy = 100, AttackType = AttackType.Physical });
+        enemy.AddAttack(
+            new Attack
+            {
+                Name = "Splash",
+                BaseDamage = 0,
+                Accuracy = 100,
+                AttackType = AttackType.Physical,
+            }
+        );
 
         var emitter = new RecordingEmitter();
-        var input   = new CountingInput(0);
-        var battle  = new Battle(player, enemy, Gen1TypeChart.Instance, input, AutoSelectInput.Instance,
-                                 rules: AlwaysHitRules.Instance, emitter: emitter);
+        var input = new CountingInput(0);
+        var battle = new Battle(
+            player,
+            enemy,
+            Gen1TypeChart.Instance,
+            input,
+            AutoSelectInput.Instance,
+            rules: AlwaysHitRules.Instance,
+            emitter: emitter
+        );
         await battle.StartFightAsync();
 
         Assert.Contains(emitter.Events, e => e is ChargingUp);
         Assert.Contains(emitter.Events, e => e is DamageDealt d && d.TargetName == "Enemy");
         Assert.False(enemy.IsAlive());
-        Assert.Equal(1, input.CallCount);   // asked only on the charge turn
+        Assert.Equal(1, input.CallCount); // asked only on the charge turn
     }
 
     /// <summary>Records how many times the engine asked for a move; always picks one fixed index.</summary>

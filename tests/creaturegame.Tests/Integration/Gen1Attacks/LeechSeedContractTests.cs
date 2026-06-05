@@ -48,19 +48,44 @@ public class LeechSeedContractTests(MovesFixture moves) : Gen1MoveContract(moves
         player.Attributes.HP = 1;
         player.AddAttack(Move("leech-seed"));
 
-        var enemy = TestCreatures.Make("Enemy", type1: DamageType.Water, hp: 80, defense: 200, speed: 1);
-        enemy.AddAttack(new Attack { Name = "Splash", BaseDamage = 0, Accuracy = 100, AttackType = AttackType.Physical });
+        var enemy = TestCreatures.Make(
+            "Enemy",
+            type1: DamageType.Water,
+            hp: 80,
+            defense: 200,
+            speed: 1
+        );
+        enemy.AddAttack(
+            new Attack
+            {
+                Name = "Splash",
+                BaseDamage = 0,
+                Accuracy = 100,
+                AttackType = AttackType.Physical,
+            }
+        );
 
         var emitter = new RecordingEmitter();
-        var battle  = new Battle(player, enemy, Gen1TypeChart.Instance, AutoSelectInput.Instance,
-                                 AutoSelectInput.Instance, rules: AlwaysHitRules.Instance, emitter: emitter);
+        var battle = new Battle(
+            player,
+            enemy,
+            Gen1TypeChart.Instance,
+            AutoSelectInput.Instance,
+            AutoSelectInput.Instance,
+            rules: AlwaysHitRules.Instance,
+            emitter: emitter
+        );
         await battle.StartFightAsync();
 
-        var drain = emitter.Events.OfType<LeechSeedDamage>().FirstOrDefault(d => d.DrainedName == "Enemy");
-        var heal  = emitter.Events.OfType<LeechSeedHealed>().FirstOrDefault(h => h.HealedName == "Player");
+        var drain = emitter
+            .Events.OfType<LeechSeedDamage>()
+            .FirstOrDefault(d => d.DrainedName == "Enemy");
+        var heal = emitter
+            .Events.OfType<LeechSeedHealed>()
+            .FirstOrDefault(h => h.HealedName == "Player");
         Assert.NotNull(drain);
         Assert.NotNull(heal);
-        Assert.Equal(80 / 16, drain!.Damage);   // 1/16 of the seeded creature's max HP
+        Assert.Equal(80 / 16, drain!.Damage); // 1/16 of the seeded creature's max HP
         Assert.Equal(drain.Damage, heal!.Amount);
     }
 }

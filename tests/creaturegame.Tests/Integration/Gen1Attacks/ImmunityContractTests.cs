@@ -48,7 +48,10 @@ public class ImmunityContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 
         Assert.True(result.Has<DamageDealt>());
         Assert.Equal(StatusCondition.None, result.Defender.Status);
-        Assert.False(result.Has<MoveHadNoEffect>(), "the move connected; only the secondary status was blocked");
+        Assert.False(
+            result.Has<MoveHadNoEffect>(),
+            "the move connected; only the secondary status was blocked"
+        );
     }
 
     [Fact]
@@ -126,7 +129,10 @@ public class ImmunityContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             .Use(Move("swords-dance"));
 
         Assert.Equal(2, result.Attacker.Stages.Attack);
-        Assert.False(result.Has<MoveHadNoEffect>(), "a self-targeting move isn't blocked by the foe's type");
+        Assert.False(
+            result.Has<MoveHadNoEffect>(),
+            "a self-targeting move isn't blocked by the foe's type"
+        );
     }
 
     [Fact]
@@ -135,7 +141,7 @@ public class ImmunityContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         // Counter is Fighting-type; a Ghost target is immune even when the user took counterable damage.
         var attacker = TestCreatures.Make("A");
         attacker.LastDamageTaken = 50;
-        attacker.LastDamageType  = DamageType.Fighting;
+        attacker.LastDamageType = DamageType.Fighting;
 
         var result = await new MoveScenario()
             .Attacker(attacker)

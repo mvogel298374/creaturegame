@@ -6,7 +6,9 @@ namespace creaturegame.DB;
 public class MovesDbContext : DbContext
 {
     public MovesDbContext() { }
-    public MovesDbContext(DbContextOptions<MovesDbContext> options) : base(options) { }
+
+    public MovesDbContext(DbContextOptions<MovesDbContext> options)
+        : base(options) { }
 
     public DbSet<Attack> Moves { get; set; }
 
@@ -28,7 +30,9 @@ public class MovesDbContext : DbContext
 public class PokemonDbContext : DbContext
 {
     public PokemonDbContext() { }
-    public PokemonDbContext(DbContextOptions<PokemonDbContext> options) : base(options) { }
+
+    public PokemonDbContext(DbContextOptions<PokemonDbContext> options)
+        : base(options) { }
 
     public DbSet<PokemonSpecies> Species { get; set; }
     public DbSet<PokemonGameAvailability> GameAvailability { get; set; }
@@ -48,19 +52,27 @@ public class PokemonDbContext : DbContext
         base.OnModelCreating(modelBuilder);
         modelBuilder.Entity<PokemonSpecies>().ToTable("PokemonSpecies");
         modelBuilder.Entity<PokemonGameAvailability>().ToTable("PokemonGameAvailability");
-        modelBuilder.Entity<PokemonGameAvailability>()
+        modelBuilder
+            .Entity<PokemonGameAvailability>()
             .HasIndex(g => new { g.SpeciesId, g.GameVersion })
             .IsUnique();
 
         modelBuilder.Entity<PokemonLearnset>().ToTable("PokemonLearnset");
-        modelBuilder.Entity<PokemonLearnset>()
+        modelBuilder
+            .Entity<PokemonLearnset>()
             .HasOne<PokemonSpecies>()
             .WithMany()
             .HasForeignKey(l => l.SpeciesId)
             .OnDelete(DeleteBehavior.Cascade);
         // Drives the runtime lookup: learnset for a species in the active generation, by level.
-        modelBuilder.Entity<PokemonLearnset>()
-            .HasIndex(l => new { l.SpeciesId, l.Generation, l.LearnLevel });
+        modelBuilder
+            .Entity<PokemonLearnset>()
+            .HasIndex(l => new
+            {
+                l.SpeciesId,
+                l.Generation,
+                l.LearnLevel,
+            });
     }
 
     public void EnsureDatabaseCreated()

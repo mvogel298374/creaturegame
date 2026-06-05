@@ -8,6 +8,7 @@ public class PokemonGameAvailability
     public int Id { get; set; }
     public int SpeciesId { get; set; }
     public string GameVersion { get; set; } = "";
+
     // Wild, Static, Gift, GameCorner, Trade, Event
     public string AvailabilityType { get; set; } = "Wild";
 

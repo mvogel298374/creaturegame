@@ -29,22 +29,29 @@ public sealed class MovesFixture : IDisposable
         catch (Exception ex)
         {
             throw new InvalidOperationException(
-                "Could not read moves.db. Run `dotnet run --project PokeApiConnector` to create and populate it.", ex);
+                "Could not read moves.db. Run `dotnet run --project PokeApiConnector` to create and populate it.",
+                ex
+            );
         }
 
         if (moves.Count == 0)
             throw new InvalidOperationException(
-                "moves.db is empty. Run `dotnet run --project PokeApiConnector` to populate it.");
+                "moves.db is empty. Run `dotnet run --project PokeApiConnector` to populate it."
+            );
 
-        _byName = moves.Where(m => m.Name != null).ToDictionary(m => m.Name!, StringComparer.OrdinalIgnoreCase);
-        _byId   = moves.ToDictionary(m => m.Id);
+        _byName = moves
+            .Where(m => m.Name != null)
+            .ToDictionary(m => m.Name!, StringComparer.OrdinalIgnoreCase);
+        _byId = moves.ToDictionary(m => m.Id);
     }
 
     /// <summary>Fresh <see cref="PokemonAttack"/>-ready copy of the move by its PokeAPI name (e.g. "fire-punch").</summary>
     public Attack Get(string name) =>
         _byName.TryGetValue(name, out var move)
             ? move
-            : throw new InvalidOperationException($"No move named '{name}' in moves.db (re-run PokeApiConnector?).");
+            : throw new InvalidOperationException(
+                $"No move named '{name}' in moves.db (re-run PokeApiConnector?)."
+            );
 
     public Attack Get(int id) =>
         _byId.TryGetValue(id, out var move)

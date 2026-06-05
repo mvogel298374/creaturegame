@@ -9,22 +9,26 @@ namespace creaturegame.Creatures;
 /// </summary>
 public class StatStages
 {
-    public int Attack   { get; private set; }
-    public int Defense  { get; private set; }
-    public int Special  { get; private set; }
-    public int Speed    { get; private set; }
+    public int Attack { get; private set; }
+    public int Defense { get; private set; }
+    public int Special { get; private set; }
+    public int Speed { get; private set; }
     public int Accuracy { get; private set; }
-    public int Evasion  { get; private set; }
+    public int Evasion { get; private set; }
 
-    public void Clear() =>
-        Attack = Defense = Special = Speed = Accuracy = Evasion = 0;
+    public void Clear() => Attack = Defense = Special = Speed = Accuracy = Evasion = 0;
 
     private static int Clamp(int v) => Math.Clamp(v, -6, 6);
 
-    public void RaiseAttack(int delta)   => Attack   = Clamp(Attack   + delta);
-    public void RaiseDefense(int delta)  => Defense  = Clamp(Defense  + delta);
-    public void RaiseSpecial(int delta)  => Special  = Clamp(Special  + delta);
-    public void RaiseSpeed(int delta)    => Speed    = Clamp(Speed    + delta);
+    public void RaiseAttack(int delta) => Attack = Clamp(Attack + delta);
+
+    public void RaiseDefense(int delta) => Defense = Clamp(Defense + delta);
+
+    public void RaiseSpecial(int delta) => Special = Clamp(Special + delta);
+
+    public void RaiseSpeed(int delta) => Speed = Clamp(Speed + delta);
+
     public void RaiseAccuracy(int delta) => Accuracy = Clamp(Accuracy + delta);
-    public void RaiseEvasion(int delta)  => Evasion  = Clamp(Evasion  + delta);
+
+    public void RaiseEvasion(int delta) => Evasion = Clamp(Evasion + delta);
 }

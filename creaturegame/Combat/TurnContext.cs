@@ -13,15 +13,15 @@ namespace creaturegame.Combat;
 /// </summary>
 public sealed class TurnContext
 {
-    public required Creature    Attacker   { get; init; }
-    public required Creature    Defender   { get; init; }
-    public required ITypeChart  TypeChart  { get; init; }
-    public required IBattleRules Rules     { get; init; }
-    public int TurnNumber                  { get; init; }
+    public required Creature Attacker { get; init; }
+    public required Creature Defender { get; init; }
+    public required ITypeChart TypeChart { get; init; }
+    public required IBattleRules Rules { get; init; }
+    public int TurnNumber { get; init; }
 
     /// <summary>
     /// The attacker's move currently locked out by Disable, if any. Input sources must not
     /// select it; it is excluded from the candidate moves. Null when nothing is disabled.
     /// </summary>
-    public PokemonAttack? DisabledMove     { get; init; }
+    public PokemonAttack? DisabledMove { get; init; }
 }

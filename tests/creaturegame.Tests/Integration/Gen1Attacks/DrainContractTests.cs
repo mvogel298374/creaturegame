@@ -18,7 +18,7 @@ public class DrainContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     public async Task HealsHalfTheDamageDealt(string moveName)
     {
         var attacker = TestCreatures.Make("A", special: 120);
-        attacker.Attributes.HP = 1;   // leave room to heal so the gain is visible
+        attacker.Attributes.HP = 1; // leave room to heal so the gain is visible
 
         var result = await new MoveScenario()
             .Rules(NoVarianceNoCritHitRules.Instance)
@@ -38,7 +38,7 @@ public class DrainContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     [Fact]
     public async Task DoesNotHealAboveMaxHp()
     {
-        var attacker = TestCreatures.Make("A", hp: 300, special: 120);   // already at full HP
+        var attacker = TestCreatures.Make("A", hp: 300, special: 120); // already at full HP
 
         var result = await new MoveScenario()
             .Rules(NoVarianceNoCritHitRules.Instance)
@@ -47,6 +47,6 @@ public class DrainContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             .Use(Move("mega-drain"));
 
         Assert.True(result.Has<DamageDealt>());
-        Assert.Equal(300, result.Attacker.Attributes.HP);   // capped, no overflow
+        Assert.Equal(300, result.Attacker.Attributes.HP); // capped, no overflow
     }
 }

@@ -13,11 +13,15 @@ public static class StatusResolver
         return (int)speed;
     }
 
-    public static bool CanAct(Creature creature, IBattleRules? rules = null, IBattleEventEmitter? emitter = null,
-                              IRandomSource? rng = null)
+    public static bool CanAct(
+        Creature creature,
+        IBattleRules? rules = null,
+        IBattleEventEmitter? emitter = null,
+        IRandomSource? rng = null
+    )
     {
         var battleRules = rules ?? Gen1BattleRules.Instance;
-        var random      = rng ?? SystemRandomSource.Instance;
+        var random = rng ?? SystemRandomSource.Instance;
 
         // Flinch: self-clearing flag set by a faster attacker this turn
         if (creature.IsFlinched)
@@ -52,8 +56,10 @@ public static class StatusResolver
 
         if (creature.Status == StatusCondition.Freeze)
         {
-            if (battleRules.FreezeRandomThawPercent > 0
-                && random.Next(100) < battleRules.FreezeRandomThawPercent)
+            if (
+                battleRules.FreezeRandomThawPercent > 0
+                && random.Next(100) < battleRules.FreezeRandomThawPercent
+            )
             {
                 creature.Status = StatusCondition.None;
                 emitter?.Emit(new StatusCleared(creature.Name, StatusCondition.Freeze));
@@ -82,7 +88,9 @@ public static class StatusResolver
             {
                 int selfDamage = DamageCalculator.CalculateConfusionDamage(creature, battleRules);
                 creature.Attributes.ReceiveDamage(selfDamage);
-                emitter?.Emit(new ConfusionDamage(creature.Name, selfDamage, creature.Attributes.HP));
+                emitter?.Emit(
+                    new ConfusionDamage(creature.Name, selfDamage, creature.Attributes.HP)
+                );
                 return false;
             }
         }
@@ -90,9 +98,14 @@ public static class StatusResolver
         return true;
     }
 
-    public static void ApplyEndOfTurnDamage(Creature creature, IBattleRules? rules = null, IBattleEventEmitter? emitter = null)
+    public static void ApplyEndOfTurnDamage(
+        Creature creature,
+        IBattleRules? rules = null,
+        IBattleEventEmitter? emitter = null
+    )
     {
-        if (!creature.IsAlive()) return;
+        if (!creature.IsAlive())
+            return;
 
         var battleRules = rules ?? Gen1BattleRules.Instance;
 
@@ -112,10 +125,14 @@ public static class StatusResolver
         if (creature.BindingTurnsRemaining > 0)
         {
             creature.BindingTurnsRemaining--;
-            int bindDamage = Math.Max(1, creature.Attributes.MaxHP / battleRules.BindingDamageDenominator);
+            int bindDamage = Math.Max(
+                1,
+                creature.Attributes.MaxHP / battleRules.BindingDamageDenominator
+            );
             creature.Attributes.ReceiveDamage(bindDamage);
             emitter?.Emit(new BindingDamage(creature.Name, bindDamage, creature.Attributes.HP));
-            if (!creature.IsAlive()) return;
+            if (!creature.IsAlive())
+                return;
         }
 
         // Status damage
@@ -134,7 +151,14 @@ public static class StatusResolver
         }
         else if (creature.Status == StatusCondition.BadPoison)
         {
-            damage = Math.Max(1, (int)Math.Floor(creature.Attributes.MaxHP * battleRules.BadPoisonDamageFraction(creature.ToxicCounter)));
+            damage = Math.Max(
+                1,
+                (int)
+                    Math.Floor(
+                        creature.Attributes.MaxHP
+                            * battleRules.BadPoisonDamageFraction(creature.ToxicCounter)
+                    )
+            );
             source = StatusCondition.BadPoison;
             creature.ToxicCounter++;
         }

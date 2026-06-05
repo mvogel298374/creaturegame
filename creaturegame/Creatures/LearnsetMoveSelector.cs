@@ -33,11 +33,12 @@ public static class LearnsetMoveSelector
     private const int MaxMoves = 4;
 
     // Flat weights so non-power moves still compete without dominating.
-    private const double FixedDamageScore = 60.0;  // OHKO/Fixed/SuperFang/etc. — attractive, not infinite
-    private const double StatusMoveScore  = 35.0;  // status/stat moves — present sometimes
+    private const double FixedDamageScore = 60.0; // OHKO/Fixed/SuperFang/etc. — attractive, not infinite
+    private const double StatusMoveScore = 35.0; // status/stat moves — present sometimes
+
     // A selection-time heuristic weight only — NOT the battle STAB multiplier (that lives on
     // IBattleRules.StabMultiplier). This just nudges the enemy toward same-type attacks.
-    private const double StabWeightBonus  = 1.5;
+    private const double StabWeightBonus = 1.5;
 
     public static IReadOnlyList<Attack> Select(
         MoveSelectionStrategy strategy,
@@ -46,7 +47,8 @@ public static class LearnsetMoveSelector
         int level,
         DamageType type1,
         DamageType? type2,
-        IRandomSource? rng = null)
+        IRandomSource? rng = null
+    )
     {
         // Candidate pool: learnable at/below this level, resolved to a known move, highest
         // learn level first (ties by move id) for a stable order.
@@ -78,12 +80,14 @@ public static class LearnsetMoveSelector
         int level,
         DamageType type1,
         DamageType? type2,
-        IRandomSource? rng = null)
+        IRandomSource? rng = null
+    )
     {
-        var source    = rng ?? SystemRandomSource.Instance;
+        var source = rng ?? SystemRandomSource.Instance;
         var movesById = allMoves.ToDictionary(m => m.Id);
-        var moves     = Select(strategy, learnset, movesById, level, type1, type2, source);
-        if (moves.Count > 0) return moves;
+        var moves = Select(strategy, learnset, movesById, level, type1, type2, source);
+        if (moves.Count > 0)
+            return moves;
 
         return allMoves.OrderBy(_ => source.Next(int.MaxValue)).Take(MaxMoves).ToList();
     }
@@ -93,15 +97,19 @@ public static class LearnsetMoveSelector
         candidates.Take(MaxMoves).OrderBy(c => c.LearnLevel).Select(c => c.Move).ToList();
 
     private static IReadOnlyList<Attack> SelectWeightedSmart(
-        List<Candidate> candidates, DamageType type1, DamageType? type2, IRandomSource rng)
+        List<Candidate> candidates,
+        DamageType type1,
+        DamageType? type2,
+        IRandomSource rng
+    )
     {
-        var pool   = candidates.Select(c => new Weighted(c, Weight(c, type1, type2))).ToList();
+        var pool = candidates.Select(c => new Weighted(c, Weight(c, type1, type2))).ToList();
         var chosen = new List<Candidate>(MaxMoves);
 
         // Guarantee at least one attack: take the highest-weight damaging move deterministically.
         var bestAttack = pool.Where(w => IsDamaging(w.Candidate.Move))
-                             .OrderByDescending(w => w.Weight)
-                             .FirstOrDefault();
+            .OrderByDescending(w => w.Weight)
+            .FirstOrDefault();
         if (bestAttack is not null)
         {
             chosen.Add(bestAttack.Candidate);
@@ -122,14 +130,15 @@ public static class LearnsetMoveSelector
     private static Weighted WeightedDraw(List<Weighted> pool, IRandomSource rng)
     {
         double total = pool.Sum(w => w.Weight);
-        double roll  = rng.NextDouble() * total;
-        double acc   = 0;
+        double roll = rng.NextDouble() * total;
+        double acc = 0;
         foreach (var w in pool)
         {
             acc += w.Weight;
-            if (roll < acc) return w;
+            if (roll < acc)
+                return w;
         }
-        return pool[^1];  // floating-point guard — roll == total
+        return pool[^1]; // floating-point guard — roll == total
     }
 
     private static double Weight(Candidate c, DamageType type1, DamageType? type2)
@@ -138,11 +147,12 @@ public static class LearnsetMoveSelector
         double score;
         if (IsDamaging(move))
         {
-            score = move.DamageCategory == DamageCategory.Standard
-                ? Math.Max(1, move.BaseDamage)   // power-based
-                : FixedDamageScore;              // Fixed/LevelBased/OHKO/SuperFang/SelfDestruct/Drain
+            score =
+                move.DamageCategory == DamageCategory.Standard
+                    ? Math.Max(1, move.BaseDamage) // power-based
+                    : FixedDamageScore; // Fixed/LevelBased/OHKO/SuperFang/SelfDestruct/Drain
             if (move.DamageType == type1 || (type2.HasValue && move.DamageType == type2.Value))
-                score *= StabWeightBonus;        // same-type nudge (damaging moves only)
+                score *= StabWeightBonus; // same-type nudge (damaging moves only)
         }
         else
         {
@@ -158,5 +168,6 @@ public static class LearnsetMoveSelector
         move.BaseDamage > 0 || move.DamageCategory != DamageCategory.Standard;
 
     private sealed record Candidate(Attack Move, int LearnLevel);
+
     private sealed record Weighted(Candidate Candidate, double Weight);
 }

@@ -7,7 +7,7 @@ public class GenerationResource
 {
     [JsonPropertyName("name")]
     public string? name { get; set; }
-    
+
     [JsonPropertyName("url")]
     public string? url { get; set; }
 }

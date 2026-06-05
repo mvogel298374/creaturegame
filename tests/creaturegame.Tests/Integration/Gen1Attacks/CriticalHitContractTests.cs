@@ -14,11 +14,17 @@ public class CriticalHitContractTests(MovesFixture moves) : Gen1MoveContract(mov
     [Fact]
     public async Task HighCritMoveCritsFarMoreOftenThanNormal()
     {
-        int karateChop = await CritRuns("karate-chop");   // high-crit ⇒ crits almost always
-        int pound      = await CritRuns("pound");          // normal crit rate
+        int karateChop = await CritRuns("karate-chop"); // high-crit ⇒ crits almost always
+        int pound = await CritRuns("pound"); // normal crit rate
 
-        Assert.True(karateChop > pound, $"karate-chop crits ({karateChop}) should exceed pound ({pound})");
-        Assert.True(karateChop >= 40, $"high-crit move should crit most of the time (got {karateChop}/60)");
+        Assert.True(
+            karateChop > pound,
+            $"karate-chop crits ({karateChop}) should exceed pound ({pound})"
+        );
+        Assert.True(
+            karateChop >= 40,
+            $"high-crit move should crit most of the time (got {karateChop}/60)"
+        );
     }
 
     // Razor Wind is a high-crit move that is also two-turn, so its crit only happens on the release
@@ -27,10 +33,13 @@ public class CriticalHitContractTests(MovesFixture moves) : Gen1MoveContract(mov
     public async Task RazorWindCritsFarMoreOftenThanFlyOnRelease()
     {
         int razorWind = await ReleaseCrits("razor-wind");
-        int fly       = await ReleaseCrits("fly");
+        int fly = await ReleaseCrits("fly");
 
         Assert.True(razorWind > fly, $"razor-wind crits ({razorWind}) should exceed fly ({fly})");
-        Assert.True(razorWind >= 40, $"high-crit move should crit most of the time (got {razorWind}/60)");
+        Assert.True(
+            razorWind >= 40,
+            $"high-crit move should crit most of the time (got {razorWind}/60)"
+        );
     }
 
     // Razor Leaf is a single-turn high-crit Special move (Gen 1) — same high crit rate, no charge.
@@ -38,10 +47,16 @@ public class CriticalHitContractTests(MovesFixture moves) : Gen1MoveContract(mov
     public async Task RazorLeafCritsFarMoreOftenThanNormal()
     {
         int razorLeaf = await CritRuns("razor-leaf");
-        int pound     = await CritRuns("pound");
+        int pound = await CritRuns("pound");
 
-        Assert.True(razorLeaf > pound, $"razor-leaf crits ({razorLeaf}) should exceed pound ({pound})");
-        Assert.True(razorLeaf >= 40, $"high-crit move should crit most of the time (got {razorLeaf}/60)");
+        Assert.True(
+            razorLeaf > pound,
+            $"razor-leaf crits ({razorLeaf}) should exceed pound ({pound})"
+        );
+        Assert.True(
+            razorLeaf >= 40,
+            $"high-crit move should crit most of the time (got {razorLeaf}/60)"
+        );
     }
 
     private async Task<int> CritRuns(string moveName)
@@ -54,7 +69,8 @@ public class CriticalHitContractTests(MovesFixture moves) : Gen1MoveContract(mov
                 .Defender(TestCreatures.Make("D", hp: 9999, defense: 250))
                 .Rng(new SeededRandomSource(seed))
                 .Use(Move(moveName));
-            if (result.Hits.Any(h => h.IsCrit)) crits++;
+            if (result.Hits.Any(h => h.IsCrit))
+                crits++;
         }
         return crits;
     }
@@ -69,7 +85,8 @@ public class CriticalHitContractTests(MovesFixture moves) : Gen1MoveContract(mov
                 .Defender(TestCreatures.Make("D", hp: 99999, defense: 250))
                 .Rng(new SeededRandomSource(seed))
                 .UseRepeated(Move(moveName), 2);
-            if (turns[1].Hits.Any(h => h.IsCrit)) crits++;
+            if (turns[1].Hits.Any(h => h.IsCrit))
+                crits++;
         }
         return crits;
     }

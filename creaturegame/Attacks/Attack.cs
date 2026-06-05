@@ -14,6 +14,7 @@ public class Attack
     public string? Description { get; set; }
     public int Accuracy { get; set; } = 100;
     public int PowerPointsMax { get; set; } = 30;
+
     // Gen 1 Properties
     public int Priority { get; set; } = 0;
     public int? EffectChance { get; set; }
@@ -21,37 +22,44 @@ public class Attack
     public bool IsHighCrit { get; set; } = false;
 
     // Stat-stage effect — four nullable columns; StatEffect computed from them
-    public StageStat?   StatEffectStat    { get; set; }
-    public int?         StatEffectDelta   { get; set; }
-    public StageTarget? StatEffectTarget  { get; set; }
-    public int?         StatEffectChance  { get; set; }
+    public StageStat? StatEffectStat { get; set; }
+    public int? StatEffectDelta { get; set; }
+    public StageTarget? StatEffectTarget { get; set; }
+    public int? StatEffectChance { get; set; }
 
     [NotMapped]
-    public StatEffect? StatEffect => StatEffectStat.HasValue
-        ? new StatEffect(StatEffectStat.Value, StatEffectDelta ?? 0,
-                         StatEffectTarget ?? StageTarget.Self, StatEffectChance ?? 100)
-        : null;
+    public StatEffect? StatEffect =>
+        StatEffectStat.HasValue
+            ? new StatEffect(
+                StatEffectStat.Value,
+                StatEffectDelta ?? 0,
+                StatEffectTarget ?? StageTarget.Self,
+                StatEffectChance ?? 100
+            )
+            : null;
 
     // Special non-stat move effect (Haze, Flinch, Recharge, etc.)
     public MoveEffect Effect { get; set; } = MoveEffect.None;
 
     // Damage category — controls which formula AttackAction uses
     public DamageCategory DamageCategory { get; set; } = DamageCategory.Standard;
+
     // Fixed: exact HP dealt (Dragon Rage = 40, Sonic Boom = 20)
     public int? FixedDamageValue { get; set; }
+
     // Drain: percentage of damage dealt that heals the attacker (default Gen 1 = 50)
     public int DrainPercent { get; set; } = 50;
+
     // Swift, Lock-On, etc. — bypasses accuracy check entirely
     public bool NeverMisses { get; set; } = false;
+
     // Fixed-count multi-hit (Double Kick, Twineedle, Bonemerang = 2): exact number of strikes.
     // Null + MoveEffect.MultiHit ⇒ the variable 2–5 count from IBattleRules.RollMultiHitCount().
     // The fixed count is stable move data, so it lives here rather than in the gen rules.
     public int? MultiHitCount { get; set; }
-    
-    public Attack()
-    {
-    }
-    
+
+    public Attack() { }
+
     public Attack(string name, string description)
     {
         Name = name;

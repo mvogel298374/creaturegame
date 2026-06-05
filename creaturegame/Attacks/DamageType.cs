@@ -19,5 +19,5 @@ public enum DamageType
     Ice,
     Dragon,
     Dark,
-    Fairy
+    Fairy,
 }

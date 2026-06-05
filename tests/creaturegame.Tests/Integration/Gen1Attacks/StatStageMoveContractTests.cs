@@ -23,7 +23,7 @@ public class StatStageMoveContractTests(MovesFixture moves) : Gen1MoveContract(m
 
         var change = result.First<StatStageChanged>();
         Assert.NotNull(change);
-        Assert.Equal(result.Attacker.Name, change!.CreatureName);   // affects the user, not the foe
+        Assert.Equal(result.Attacker.Name, change!.CreatureName); // affects the user, not the foe
         Assert.Equal(2, change.Delta);
         Assert.Equal(2, change.NewStage);
     }
@@ -33,16 +33,14 @@ public class StatStageMoveContractTests(MovesFixture moves) : Gen1MoveContract(m
     {
         // Gen 1 Growth raises the (combined) Special stat by one stage — not Attack, as modern data
         // reports. This pins the importer's Gen 1 override.
-        var result = await new MoveScenario()
-            .Attacker(TestCreatures.Make("A"))
-            .Use(Move("growth"));
+        var result = await new MoveScenario().Attacker(TestCreatures.Make("A")).Use(Move("growth"));
 
         Assert.Equal(1, result.Attacker.Stages.Special);
         Assert.False(result.Has<DamageDealt>(), "Growth is a status move — no damage");
 
         var change = result.First<StatStageChanged>();
         Assert.NotNull(change);
-        Assert.Equal(result.Attacker.Name, change!.CreatureName);   // affects the user
+        Assert.Equal(result.Attacker.Name, change!.CreatureName); // affects the user
         Assert.Equal("Special", change.Stat);
         Assert.Equal(1, change.Delta);
         Assert.Equal(1, change.NewStage);
@@ -60,7 +58,7 @@ public class StatStageMoveContractTests(MovesFixture moves) : Gen1MoveContract(m
 
         var change = result.First<StatStageChanged>();
         Assert.NotNull(change);
-        Assert.Equal(result.Attacker.Name, change!.CreatureName);   // affects the user
+        Assert.Equal(result.Attacker.Name, change!.CreatureName); // affects the user
         Assert.Equal("Attack", change.Stat);
         Assert.Equal(1, change.Delta);
         Assert.Equal(1, change.NewStage);
@@ -78,7 +76,7 @@ public class StatStageMoveContractTests(MovesFixture moves) : Gen1MoveContract(m
 
         var change = result.First<StatStageChanged>();
         Assert.NotNull(change);
-        Assert.Equal(result.Attacker.Name, change!.CreatureName);   // affects the user
+        Assert.Equal(result.Attacker.Name, change!.CreatureName); // affects the user
         Assert.Equal("Speed", change.Stat);
         Assert.Equal(2, change.Delta);
         Assert.Equal(2, change.NewStage);
@@ -87,23 +85,21 @@ public class StatStageMoveContractTests(MovesFixture moves) : Gen1MoveContract(m
     // Self-targeting raises beyond the special cases above: Harden / Withdraw (+1 Defense),
     // Double Team (+1 Evasion), Minimize (+2 Evasion — first Evasion mover).
     [Theory]
-    [InlineData("harden",       "Defense",  1)]
-    [InlineData("withdraw",     "Defense",  1)]
-    [InlineData("defense-curl",  "Defense",  1)]
-    [InlineData("double-team",  "Evasion",  1)]
-    [InlineData("minimize",     "Evasion",  2)]
-    [InlineData("barrier",      "Defense",  2)]
+    [InlineData("harden", "Defense", 1)]
+    [InlineData("withdraw", "Defense", 1)]
+    [InlineData("defense-curl", "Defense", 1)]
+    [InlineData("double-team", "Evasion", 1)]
+    [InlineData("minimize", "Evasion", 2)]
+    [InlineData("barrier", "Defense", 2)]
     public async Task RaisesUserStatBySpecifiedStages(string moveName, string stat, int delta)
     {
-        var result = await new MoveScenario()
-            .Attacker(TestCreatures.Make("A"))
-            .Use(Move(moveName));
+        var result = await new MoveScenario().Attacker(TestCreatures.Make("A")).Use(Move(moveName));
 
         Assert.False(result.Has<DamageDealt>(), "a stat-stage move deals no damage");
 
         var change = result.First<StatStageChanged>();
         Assert.NotNull(change);
-        Assert.Equal(result.Attacker.Name, change!.CreatureName);   // affects the user
+        Assert.Equal(result.Attacker.Name, change!.CreatureName); // affects the user
         Assert.Equal(stat, change.Stat);
         Assert.Equal(delta, change.Delta);
         Assert.Equal(delta, change.NewStage);
@@ -130,12 +126,12 @@ public class StatStageMoveContractTests(MovesFixture moves) : Gen1MoveContract(m
     // Foe-targeting stat drops: Sand Attack / Smokescreen (−1 Accuracy), Tail Whip / Leer
     // (−1 Defense), Growl (−1 Attack).
     [Theory]
-    [InlineData("sand-attack",  "Accuracy")]
-    [InlineData("smokescreen",  "Accuracy")]
-    [InlineData("tail-whip",    "Defense")]
-    [InlineData("leer",         "Defense")]
-    [InlineData("growl",        "Attack")]
-    [InlineData("string-shot",  "Speed")]    // Gen 1: −1 Speed (modern: −2)
+    [InlineData("sand-attack", "Accuracy")]
+    [InlineData("smokescreen", "Accuracy")]
+    [InlineData("tail-whip", "Defense")]
+    [InlineData("leer", "Defense")]
+    [InlineData("growl", "Attack")]
+    [InlineData("string-shot", "Speed")] // Gen 1: −1 Speed (modern: −2)
     public async Task LowersFoeStatByOneStage(string moveName, string stat)
     {
         var result = await new MoveScenario()
@@ -146,7 +142,7 @@ public class StatStageMoveContractTests(MovesFixture moves) : Gen1MoveContract(m
 
         var change = result.First<StatStageChanged>();
         Assert.NotNull(change);
-        Assert.Equal(result.Defender.Name, change!.CreatureName);   // affects the foe, not the user
+        Assert.Equal(result.Defender.Name, change!.CreatureName); // affects the foe, not the user
         Assert.Equal(stat, change.Stat);
         Assert.Equal(-1, change.Delta);
         Assert.Equal(-1, change.NewStage);

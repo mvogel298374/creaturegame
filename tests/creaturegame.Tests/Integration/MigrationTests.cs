@@ -15,7 +15,7 @@ namespace creaturegame.Tests.Integration;
 /// </summary>
 public class MigrationTests : IDisposable
 {
-    private readonly string _movesDb  = Path.ChangeExtension(Path.GetTempFileName(), ".db");
+    private readonly string _movesDb = Path.ChangeExtension(Path.GetTempFileName(), ".db");
     private readonly string _pokemonDb = Path.ChangeExtension(Path.GetTempFileName(), ".db");
 
     // --- MovesDbContext ---
@@ -28,44 +28,44 @@ public class MigrationTests : IDisposable
 
         var attack = new Attack
         {
-            Name              = "Flamethrower",
-            BaseDamage        = 95,
-            Accuracy          = 100,
-            PowerPointsMax    = 15,
-            AttackType        = AttackType.Special,
-            DamageType        = DamageType.Fire,
-            Priority          = 1,
-            EffectChance      = 10,
-            StatusEffect      = StatusCondition.Burn,
-            IsHighCrit        = false,
-            StatEffectStat    = StageStat.Special,
-            StatEffectDelta   = -1,
-            StatEffectTarget  = StageTarget.Foe,
-            StatEffectChance  = 10,
-            Effect            = MoveEffect.None,
-            DamageCategory    = DamageCategory.Standard,
-            FixedDamageValue  = null,
-            DrainPercent      = 50,
-            NeverMisses       = false,
+            Name = "Flamethrower",
+            BaseDamage = 95,
+            Accuracy = 100,
+            PowerPointsMax = 15,
+            AttackType = AttackType.Special,
+            DamageType = DamageType.Fire,
+            Priority = 1,
+            EffectChance = 10,
+            StatusEffect = StatusCondition.Burn,
+            IsHighCrit = false,
+            StatEffectStat = StageStat.Special,
+            StatEffectDelta = -1,
+            StatEffectTarget = StageTarget.Foe,
+            StatEffectChance = 10,
+            Effect = MoveEffect.None,
+            DamageCategory = DamageCategory.Standard,
+            FixedDamageValue = null,
+            DrainPercent = 50,
+            NeverMisses = false,
         };
         context.Moves.Add(attack);
         context.SaveChanges();
 
         var loaded = context.Moves.AsNoTracking().Single(m => m.Name == "Flamethrower");
-        Assert.Equal(95,                       loaded.BaseDamage);
-        Assert.Equal(DamageType.Fire,          loaded.DamageType);
-        Assert.Equal(1,                        loaded.Priority);
-        Assert.Equal(10,                       loaded.EffectChance);
-        Assert.Equal(StatusCondition.Burn,     loaded.StatusEffect);
+        Assert.Equal(95, loaded.BaseDamage);
+        Assert.Equal(DamageType.Fire, loaded.DamageType);
+        Assert.Equal(1, loaded.Priority);
+        Assert.Equal(10, loaded.EffectChance);
+        Assert.Equal(StatusCondition.Burn, loaded.StatusEffect);
         Assert.False(loaded.IsHighCrit);
-        Assert.Equal(StageStat.Special,        loaded.StatEffectStat);
-        Assert.Equal(-1,                       loaded.StatEffectDelta);
-        Assert.Equal(StageTarget.Foe,          loaded.StatEffectTarget);
-        Assert.Equal(10,                       loaded.StatEffectChance);
-        Assert.Equal(MoveEffect.None,          loaded.Effect);
-        Assert.Equal(DamageCategory.Standard,  loaded.DamageCategory);
+        Assert.Equal(StageStat.Special, loaded.StatEffectStat);
+        Assert.Equal(-1, loaded.StatEffectDelta);
+        Assert.Equal(StageTarget.Foe, loaded.StatEffectTarget);
+        Assert.Equal(10, loaded.StatEffectChance);
+        Assert.Equal(MoveEffect.None, loaded.Effect);
+        Assert.Equal(DamageCategory.Standard, loaded.DamageCategory);
         Assert.Null(loaded.FixedDamageValue);
-        Assert.Equal(50,                       loaded.DrainPercent);
+        Assert.Equal(50, loaded.DrainPercent);
         Assert.False(loaded.NeverMisses);
     }
 
@@ -96,26 +96,26 @@ public class MigrationTests : IDisposable
         while (reader.Read())
             columns.Add(reader.GetString(1)); // column 1 = name
 
-        Assert.Contains("Id",            columns);
-        Assert.Contains("Name",          columns);
-        Assert.Contains("BaseDamage",    columns);
-        Assert.Contains("DamageType",    columns);
-        Assert.Contains("AttackType",    columns);
-        Assert.Contains("Accuracy",      columns);
+        Assert.Contains("Id", columns);
+        Assert.Contains("Name", columns);
+        Assert.Contains("BaseDamage", columns);
+        Assert.Contains("DamageType", columns);
+        Assert.Contains("AttackType", columns);
+        Assert.Contains("Accuracy", columns);
         Assert.Contains("PowerPointsMax", columns);
-        Assert.Contains("Priority",      columns);
-        Assert.Contains("EffectChance",  columns);
-        Assert.Contains("StatusEffect",    columns);
-        Assert.Contains("IsHighCrit",      columns);
-        Assert.Contains("StatEffectStat",    columns);
-        Assert.Contains("StatEffectDelta",  columns);
+        Assert.Contains("Priority", columns);
+        Assert.Contains("EffectChance", columns);
+        Assert.Contains("StatusEffect", columns);
+        Assert.Contains("IsHighCrit", columns);
+        Assert.Contains("StatEffectStat", columns);
+        Assert.Contains("StatEffectDelta", columns);
         Assert.Contains("StatEffectTarget", columns);
         Assert.Contains("StatEffectChance", columns);
-        Assert.Contains("Effect",           columns);
-        Assert.Contains("DamageCategory",   columns);
+        Assert.Contains("Effect", columns);
+        Assert.Contains("DamageCategory", columns);
         Assert.Contains("FixedDamageValue", columns);
-        Assert.Contains("DrainPercent",     columns);
-        Assert.Contains("NeverMisses",      columns);
+        Assert.Contains("DrainPercent", columns);
+        Assert.Contains("NeverMisses", columns);
     }
 
     // --- PokemonDbContext ---
@@ -128,29 +128,29 @@ public class MigrationTests : IDisposable
 
         var species = new PokemonSpecies
         {
-            Id             = 6,
-            Name           = "charizard",
-            BaseHP         = 78,
-            BaseAttack     = 84,
-            BaseDefense    = 78,
-            BaseSpecial    = 85,
-            BaseSpeed      = 100,
-            Type1          = DamageType.Fire,
-            Type2          = DamageType.Flying,
-            GrowthRate     = GrowthRate.MediumSlow,
-            CatchRate      = 45,
+            Id = 6,
+            Name = "charizard",
+            BaseHP = 78,
+            BaseAttack = 84,
+            BaseDefense = 78,
+            BaseSpecial = 85,
+            BaseSpeed = 100,
+            Type1 = DamageType.Fire,
+            Type2 = DamageType.Flying,
+            GrowthRate = GrowthRate.MediumSlow,
+            CatchRate = 45,
             BaseExperience = 240,
-            PokedexEntry   = "Spits fire that is hot enough to melt boulders.",
+            PokedexEntry = "Spits fire that is hot enough to melt boulders.",
         };
         context.Species.Add(species);
         context.SaveChanges();
 
         var loaded = context.Species.AsNoTracking().Single(s => s.Name == "charizard");
-        Assert.Equal(45,                  loaded.CatchRate);
-        Assert.Equal(240,                 loaded.BaseExperience);
+        Assert.Equal(45, loaded.CatchRate);
+        Assert.Equal(240, loaded.BaseExperience);
         Assert.Equal(GrowthRate.MediumSlow, loaded.GrowthRate);
         Assert.Equal("Spits fire that is hot enough to melt boulders.", loaded.PokedexEntry);
-        Assert.Equal(DamageType.Flying,   loaded.Type2);
+        Assert.Equal(DamageType.Flying, loaded.Type2);
     }
 
     [Fact]
@@ -180,19 +180,19 @@ public class MigrationTests : IDisposable
         while (reader.Read())
             columns.Add(reader.GetString(1));
 
-        Assert.Contains("Id",             columns);
-        Assert.Contains("Name",           columns);
-        Assert.Contains("BaseHP",         columns);
-        Assert.Contains("BaseAttack",     columns);
-        Assert.Contains("BaseDefense",    columns);
-        Assert.Contains("BaseSpecial",    columns);
-        Assert.Contains("BaseSpeed",      columns);
-        Assert.Contains("Type1",          columns);
-        Assert.Contains("Type2",          columns);
-        Assert.Contains("GrowthRate",     columns);
-        Assert.Contains("CatchRate",      columns);
+        Assert.Contains("Id", columns);
+        Assert.Contains("Name", columns);
+        Assert.Contains("BaseHP", columns);
+        Assert.Contains("BaseAttack", columns);
+        Assert.Contains("BaseDefense", columns);
+        Assert.Contains("BaseSpecial", columns);
+        Assert.Contains("BaseSpeed", columns);
+        Assert.Contains("Type1", columns);
+        Assert.Contains("Type2", columns);
+        Assert.Contains("GrowthRate", columns);
+        Assert.Contains("CatchRate", columns);
         Assert.Contains("BaseExperience", columns);
-        Assert.Contains("PokedexEntry",   columns);
+        Assert.Contains("PokedexEntry", columns);
     }
 
     [Fact]
@@ -210,9 +210,9 @@ public class MigrationTests : IDisposable
         while (reader.Read())
             columns.Add(reader.GetString(1));
 
-        Assert.Contains("Id",               columns);
-        Assert.Contains("SpeciesId",        columns);
-        Assert.Contains("GameVersion",      columns);
+        Assert.Contains("Id", columns);
+        Assert.Contains("SpeciesId", columns);
+        Assert.Contains("GameVersion", columns);
         Assert.Contains("AvailabilityType", columns);
     }
 
@@ -222,16 +222,23 @@ public class MigrationTests : IDisposable
         using var context = BuildPokemonContext();
         context.EnsureDatabaseCreated();
 
-        var species = new PokemonSpecies { Id = 25, Name = "pikachu", GrowthRate = GrowthRate.MediumFast };
+        var species = new PokemonSpecies
+        {
+            Id = 25,
+            Name = "pikachu",
+            GrowthRate = GrowthRate.MediumFast,
+        };
         context.Species.Add(species);
         context.SaveChanges();
 
-        context.GameAvailability.Add(new PokemonGameAvailability
-        {
-            SpeciesId        = 25,
-            GameVersion      = "yellow",
-            AvailabilityType = "Static",
-        });
+        context.GameAvailability.Add(
+            new PokemonGameAvailability
+            {
+                SpeciesId = 25,
+                GameVersion = "yellow",
+                AvailabilityType = "Static",
+            }
+        );
         context.SaveChanges();
 
         var loaded = context.GameAvailability.AsNoTracking().Single(a => a.SpeciesId == 25);
@@ -254,9 +261,9 @@ public class MigrationTests : IDisposable
         while (reader.Read())
             columns.Add(reader.GetString(1));
 
-        Assert.Contains("Id",         columns);
-        Assert.Contains("SpeciesId",  columns);
-        Assert.Contains("MoveId",     columns);
+        Assert.Contains("Id", columns);
+        Assert.Contains("SpeciesId", columns);
+        Assert.Contains("MoveId", columns);
         Assert.Contains("LearnLevel", columns);
         Assert.Contains("Generation", columns);
     }
@@ -267,17 +274,30 @@ public class MigrationTests : IDisposable
         using var context = BuildPokemonContext();
         context.EnsureDatabaseCreated();
 
-        var species = new PokemonSpecies { Id = 1, Name = "bulbasaur", GrowthRate = GrowthRate.MediumSlow };
+        var species = new PokemonSpecies
+        {
+            Id = 1,
+            Name = "bulbasaur",
+            GrowthRate = GrowthRate.MediumSlow,
+        };
         context.Species.Add(species);
         context.SaveChanges();
 
-        context.Learnsets.Add(new PokemonLearnset { SpeciesId = 1, MoveId = 22, LearnLevel = 13, Generation = 1 });
+        context.Learnsets.Add(
+            new PokemonLearnset
+            {
+                SpeciesId = 1,
+                MoveId = 22,
+                LearnLevel = 13,
+                Generation = 1,
+            }
+        );
         context.SaveChanges();
 
         var loaded = context.Learnsets.AsNoTracking().Single(l => l.SpeciesId == 1);
         Assert.Equal(22, loaded.MoveId);
         Assert.Equal(13, loaded.LearnLevel);
-        Assert.Equal(1,  loaded.Generation);
+        Assert.Equal(1, loaded.Generation);
     }
 
     // --- Helpers ---
@@ -304,7 +324,9 @@ public class MigrationTests : IDisposable
         // otherwise the connection pool keeps the file handle open just long enough
         // to cause an IOException on Windows.
         SqliteConnection.ClearAllPools();
-        if (File.Exists(_movesDb))   File.Delete(_movesDb);
-        if (File.Exists(_pokemonDb)) File.Delete(_pokemonDb);
+        if (File.Exists(_movesDb))
+            File.Delete(_movesDb);
+        if (File.Exists(_pokemonDb))
+            File.Delete(_pokemonDb);
     }
 }

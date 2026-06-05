@@ -11,7 +11,9 @@ namespace creaturegame.Tests.Integration.Gen1Attacks;
 public class MultiHitContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 {
     [Theory]
-    [InlineData("double-slap")] [InlineData("comet-punch")] [InlineData("fury-attack")]
+    [InlineData("double-slap")]
+    [InlineData("comet-punch")]
+    [InlineData("fury-attack")]
     [InlineData("pin-missile")]
     public async Task MultiHitStrikesTwoToFiveTimes(string moveName)
     {
@@ -31,7 +33,9 @@ public class MultiHitContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     }
 
     [Theory]
-    [InlineData("double-slap")] [InlineData("comet-punch")] [InlineData("fury-attack")]
+    [InlineData("double-slap")]
+    [InlineData("comet-punch")]
+    [InlineData("fury-attack")]
     [InlineData("pin-missile")]
     public async Task MultiHitWithFixedCountStrikesExactlyThatMany(string moveName)
     {
@@ -42,7 +46,10 @@ public class MultiHitContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 
         Assert.Equal(3, result.Hits.Count);
         Assert.Equal(3, result.First<MultiHitCompleted>()!.Hits);
-        Assert.Equal(result.TotalDamage, result.Defender.Attributes.MaxHP - result.Defender.Attributes.HP);
+        Assert.Equal(
+            result.TotalDamage,
+            result.Defender.Attributes.MaxHP - result.Defender.Attributes.HP
+        );
     }
 
     // Fixed-count movers (Double Kick) always strike exactly their move-data count — no RNG, no
@@ -50,11 +57,14 @@ public class MultiHitContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     // the variable 2–5 distribution.
     [Theory]
     [InlineData("double-kick", 2)]
-    [InlineData("twineedle",   2)]   // strikes twice; also carries a 20% poison secondary (see SecondaryStatusContractTests)
-    public async Task FixedCountMoveStrikesExactlyItsMoveDataCount(string moveName, int expectedHits)
+    [InlineData("twineedle", 2)] // strikes twice; also carries a 20% poison secondary (see SecondaryStatusContractTests)
+    public async Task FixedCountMoveStrikesExactlyItsMoveDataCount(
+        string moveName,
+        int expectedHits
+    )
     {
         var move = Move(moveName);
-        Assert.Equal(expectedHits, move.MultiHitCount);   // the count is move data, not a roll
+        Assert.Equal(expectedHits, move.MultiHitCount); // the count is move data, not a roll
 
         for (int seed = 0; seed < 10; seed++)
         {
@@ -71,7 +81,13 @@ public class MultiHitContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     [Fact]
     public void RollMultiHitCountStaysInTwoToFiveAndFavoursLowCounts()
     {
-        var counts = new Dictionary<int, int> { [2] = 0, [3] = 0, [4] = 0, [5] = 0 };
+        var counts = new Dictionary<int, int>
+        {
+            [2] = 0,
+            [3] = 0,
+            [4] = 0,
+            [5] = 0,
+        };
         for (int seed = 0; seed < 2000; seed++)
         {
             int n = new Gen1BattleRules(new SeededRandomSource(seed)).RollMultiHitCount();

@@ -1,6 +1,6 @@
 using creaturegame.Attacks;
-using creaturegame.Creatures;
 using creaturegame.Combat;
+using creaturegame.Creatures;
 using creaturegame.Tests.TestSupport;
 
 namespace creaturegame.Tests.Integration;
@@ -18,17 +18,39 @@ public class BattleIntegrationTests
         var player = new Creature("Player") { Level = 50 };
         player.CalculateStats();
         player.Attributes.Attack = 999;
-        player.Attributes.Speed  = 100;
-        player.AddAttack(new Attack { Name = "Slam", BaseDamage = 100, Accuracy = 100, AttackType = AttackType.Physical });
+        player.Attributes.Speed = 100;
+        player.AddAttack(
+            new Attack
+            {
+                Name = "Slam",
+                BaseDamage = 100,
+                Accuracy = 100,
+                AttackType = AttackType.Physical,
+            }
+        );
 
         var enemy = new Creature("Enemy") { Level = 50 };
         enemy.CalculateStats();
-        enemy.Attributes.HP    = 1;
+        enemy.Attributes.HP = 1;
         enemy.Attributes.MaxHP = 1;
         enemy.Attributes.Speed = 1;
-        enemy.AddAttack(new Attack { Name = "Tackle", BaseDamage = 40, Accuracy = 100, AttackType = AttackType.Physical });
+        enemy.AddAttack(
+            new Attack
+            {
+                Name = "Tackle",
+                BaseDamage = 40,
+                Accuracy = 100,
+                AttackType = AttackType.Physical,
+            }
+        );
 
-        var battle = new Battle(player, enemy, new Gen1TypeChart(), AutoSelectInput.Instance, AutoSelectInput.Instance);
+        var battle = new Battle(
+            player,
+            enemy,
+            new Gen1TypeChart(),
+            AutoSelectInput.Instance,
+            AutoSelectInput.Instance
+        );
         await battle.StartFightAsync();
 
         Assert.False(enemy.IsAlive());
@@ -40,18 +62,40 @@ public class BattleIntegrationTests
     {
         var player = new Creature("Player") { Level = 50 };
         player.CalculateStats();
-        player.Attributes.HP    = 1;
+        player.Attributes.HP = 1;
         player.Attributes.MaxHP = 1;
         player.Attributes.Speed = 1;
-        player.AddAttack(new Attack { Name = "Tackle", BaseDamage = 40, Accuracy = 100, AttackType = AttackType.Physical });
+        player.AddAttack(
+            new Attack
+            {
+                Name = "Tackle",
+                BaseDamage = 40,
+                Accuracy = 100,
+                AttackType = AttackType.Physical,
+            }
+        );
 
         var enemy = new Creature("Enemy") { Level = 50 };
         enemy.CalculateStats();
         enemy.Attributes.Attack = 999;
-        enemy.Attributes.Speed  = 100;
-        enemy.AddAttack(new Attack { Name = "Slam", BaseDamage = 100, Accuracy = 100, AttackType = AttackType.Physical });
+        enemy.Attributes.Speed = 100;
+        enemy.AddAttack(
+            new Attack
+            {
+                Name = "Slam",
+                BaseDamage = 100,
+                Accuracy = 100,
+                AttackType = AttackType.Physical,
+            }
+        );
 
-        var battle = new Battle(player, enemy, new Gen1TypeChart(), AutoSelectInput.Instance, AutoSelectInput.Instance);
+        var battle = new Battle(
+            player,
+            enemy,
+            new Gen1TypeChart(),
+            AutoSelectInput.Instance,
+            AutoSelectInput.Instance
+        );
         await battle.StartFightAsync();
 
         Assert.False(player.IsAlive());
@@ -67,19 +111,41 @@ public class BattleIntegrationTests
         var player = new Creature("Player") { Level = 50 };
         player.CalculateStats();
         player.Attributes.Attack = 999;
-        player.Attributes.Speed  = 200;
-        player.AddAttack(new Attack { Name = "Slam", BaseDamage = 100, Accuracy = 100, AttackType = AttackType.Physical });
+        player.Attributes.Speed = 200;
+        player.AddAttack(
+            new Attack
+            {
+                Name = "Slam",
+                BaseDamage = 100,
+                Accuracy = 100,
+                AttackType = AttackType.Physical,
+            }
+        );
 
         var enemy = new Creature("Enemy") { Level = 50 };
         enemy.CalculateStats();
-        enemy.Attributes.HP     = 1;
-        enemy.Attributes.MaxHP  = 1;
+        enemy.Attributes.HP = 1;
+        enemy.Attributes.MaxHP = 1;
         enemy.Attributes.Attack = 999;
-        enemy.Attributes.Speed  = 1;
-        enemy.AddAttack(new Attack { Name = "Slam", BaseDamage = 100, Accuracy = 100, AttackType = AttackType.Physical });
+        enemy.Attributes.Speed = 1;
+        enemy.AddAttack(
+            new Attack
+            {
+                Name = "Slam",
+                BaseDamage = 100,
+                Accuracy = 100,
+                AttackType = AttackType.Physical,
+            }
+        );
 
         int playerHpBefore = player.Attributes.HP;
-        var battle = new Battle(player, enemy, new Gen1TypeChart(), AutoSelectInput.Instance, AutoSelectInput.Instance);
+        var battle = new Battle(
+            player,
+            enemy,
+            new Gen1TypeChart(),
+            AutoSelectInput.Instance,
+            AutoSelectInput.Instance
+        );
         await battle.StartFightAsync();
 
         Assert.False(enemy.IsAlive());
@@ -95,28 +161,44 @@ public class BattleIntegrationTests
         // enemy (1 HP) faints and player takes recoil.
         var player = new Creature("Player") { Level = 50 };
         player.CalculateStats();
-        player.Attributes.HP     = 500;
-        player.Attributes.MaxHP  = 500;
+        player.Attributes.HP = 500;
+        player.Attributes.MaxHP = 500;
         player.Attributes.Attack = 50;
-        player.Attributes.Speed  = 100;
-        player.AddAttack(new Attack
-        {
-            Name           = "Splash",
-            BaseDamage     = 0,
-            Accuracy       = 100,
-            AttackType     = AttackType.Physical,
-            PowerPointsMax = 1,
-        });
+        player.Attributes.Speed = 100;
+        player.AddAttack(
+            new Attack
+            {
+                Name = "Splash",
+                BaseDamage = 0,
+                Accuracy = 100,
+                AttackType = AttackType.Physical,
+                PowerPointsMax = 1,
+            }
+        );
 
         var enemy = new Creature("Enemy") { Level = 50 };
         enemy.CalculateStats();
-        enemy.Attributes.HP    = 1;
+        enemy.Attributes.HP = 1;
         enemy.Attributes.MaxHP = 1;
         enemy.Attributes.Speed = 1;
-        enemy.AddAttack(new Attack { Name = "Splash", BaseDamage = 0, Accuracy = 100, AttackType = AttackType.Physical });
+        enemy.AddAttack(
+            new Attack
+            {
+                Name = "Splash",
+                BaseDamage = 0,
+                Accuracy = 100,
+                AttackType = AttackType.Physical,
+            }
+        );
 
         // Battle skips Console.ReadKey() when Console.IsInputRedirected (test context).
-        var battle = new Battle(player, enemy, new Gen1TypeChart(), AutoSelectInput.Instance, AutoSelectInput.Instance);
+        var battle = new Battle(
+            player,
+            enemy,
+            new Gen1TypeChart(),
+            AutoSelectInput.Instance,
+            AutoSelectInput.Instance
+        );
         await battle.StartFightAsync();
 
         Assert.False(enemy.IsAlive());
@@ -133,20 +215,55 @@ public class BattleIntegrationTests
         var player = new Creature("Player") { Level = 50 };
         player.CalculateStats();
         player.Attributes.Attack = 999;
-        player.Attributes.Speed  = 100;
-        player.AddAttack(new Attack { Id = 1, Name = "Splash", BaseDamage = 0,   Accuracy = 100, PowerPointsMax = 5, AttackType = AttackType.Physical });
-        player.AddAttack(new Attack { Id = 2, Name = "Slam",   BaseDamage = 100, Accuracy = 100, PowerPointsMax = 5, AttackType = AttackType.Physical });
+        player.Attributes.Speed = 100;
+        player.AddAttack(
+            new Attack
+            {
+                Id = 1,
+                Name = "Splash",
+                BaseDamage = 0,
+                Accuracy = 100,
+                PowerPointsMax = 5,
+                AttackType = AttackType.Physical,
+            }
+        );
+        player.AddAttack(
+            new Attack
+            {
+                Id = 2,
+                Name = "Slam",
+                BaseDamage = 100,
+                Accuracy = 100,
+                PowerPointsMax = 5,
+                AttackType = AttackType.Physical,
+            }
+        );
 
         var enemy = new Creature("Enemy") { Level = 50 };
         enemy.CalculateStats();
-        enemy.Attributes.HP    = 1;
+        enemy.Attributes.HP = 1;
         enemy.Attributes.MaxHP = 1;
         enemy.Attributes.Speed = 1;
-        enemy.AddAttack(new Attack { Name = "Tackle", BaseDamage = 10, Accuracy = 100, AttackType = AttackType.Physical });
+        enemy.AddAttack(
+            new Attack
+            {
+                Name = "Tackle",
+                BaseDamage = 10,
+                Accuracy = 100,
+                AttackType = AttackType.Physical,
+            }
+        );
 
         var emitter = new RecordingEmitter();
-        var input   = new TurnControlledInput(1); // pick Slam every turn
-        var battle  = new Battle(player, enemy, new Gen1TypeChart(), input, AutoSelectInput.Instance, emitter: emitter);
+        var input = new TurnControlledInput(1); // pick Slam every turn
+        var battle = new Battle(
+            player,
+            enemy,
+            new Gen1TypeChart(),
+            input,
+            AutoSelectInput.Instance,
+            emitter: emitter
+        );
         await battle.StartFightAsync();
 
         Assert.False(enemy.IsAlive());
@@ -162,21 +279,56 @@ public class BattleIntegrationTests
         var player = new Creature("Player") { Level = 50 };
         player.CalculateStats();
         player.Attributes.Attack = 999;
-        player.Attributes.Speed  = 100;
-        player.AddAttack(new Attack { Id = 1, Name = "Splash", BaseDamage = 0,   Accuracy = 100, PowerPointsMax = 1, AttackType = AttackType.Physical });
-        player.AddAttack(new Attack { Id = 2, Name = "Slam",   BaseDamage = 100, Accuracy = 100, PowerPointsMax = 5, AttackType = AttackType.Physical });
+        player.Attributes.Speed = 100;
+        player.AddAttack(
+            new Attack
+            {
+                Id = 1,
+                Name = "Splash",
+                BaseDamage = 0,
+                Accuracy = 100,
+                PowerPointsMax = 1,
+                AttackType = AttackType.Physical,
+            }
+        );
+        player.AddAttack(
+            new Attack
+            {
+                Id = 2,
+                Name = "Slam",
+                BaseDamage = 100,
+                Accuracy = 100,
+                PowerPointsMax = 5,
+                AttackType = AttackType.Physical,
+            }
+        );
         player.MoveSet[0].PowerPointsCurrent = 0; // exhaust Splash manually
 
         var enemy = new Creature("Enemy") { Level = 50 };
         enemy.CalculateStats();
-        enemy.Attributes.HP    = 1;
+        enemy.Attributes.HP = 1;
         enemy.Attributes.MaxHP = 1;
         enemy.Attributes.Speed = 1;
-        enemy.AddAttack(new Attack { Name = "Tackle", BaseDamage = 10, Accuracy = 100, AttackType = AttackType.Physical });
+        enemy.AddAttack(
+            new Attack
+            {
+                Name = "Tackle",
+                BaseDamage = 10,
+                Accuracy = 100,
+                AttackType = AttackType.Physical,
+            }
+        );
 
         var emitter = new RecordingEmitter();
-        var input   = new TurnControlledInput(0); // asks for Splash (0 PP) → must fall back
-        var battle  = new Battle(player, enemy, new Gen1TypeChart(), input, AutoSelectInput.Instance, emitter: emitter);
+        var input = new TurnControlledInput(0); // asks for Splash (0 PP) → must fall back
+        var battle = new Battle(
+            player,
+            enemy,
+            new Gen1TypeChart(),
+            input,
+            AutoSelectInput.Instance,
+            emitter: emitter
+        );
         await battle.StartFightAsync();
 
         Assert.False(enemy.IsAlive());
@@ -192,28 +344,63 @@ public class BattleIntegrationTests
         var player = new Creature("Player") { Level = 50 };
         player.CalculateStats();
         player.Attributes.Attack = 999;
-        player.Attributes.Speed  = 100;
-        player.AddAttack(new Attack { Id = 1, Name = "Tackle",    BaseDamage = 40, Accuracy = 100, PowerPointsMax = 35, AttackType = AttackType.Physical });
-        player.AddAttack(new Attack { Id = 2, Name = "Vine Whip", BaseDamage = 35, Accuracy = 100, PowerPointsMax = 25, AttackType = AttackType.Physical });
+        player.Attributes.Speed = 100;
+        player.AddAttack(
+            new Attack
+            {
+                Id = 1,
+                Name = "Tackle",
+                BaseDamage = 40,
+                Accuracy = 100,
+                PowerPointsMax = 35,
+                AttackType = AttackType.Physical,
+            }
+        );
+        player.AddAttack(
+            new Attack
+            {
+                Id = 2,
+                Name = "Vine Whip",
+                BaseDamage = 35,
+                Accuracy = 100,
+                PowerPointsMax = 25,
+                AttackType = AttackType.Physical,
+            }
+        );
 
         var enemy = new Creature("Enemy") { Level = 50 };
         enemy.CalculateStats();
-        enemy.Attributes.HP    = 1;
+        enemy.Attributes.HP = 1;
         enemy.Attributes.MaxHP = 200;
         enemy.Attributes.Speed = 1;
-        enemy.AddAttack(new Attack { Name = "Splash", BaseDamage = 0, Accuracy = 100, AttackType = AttackType.Physical });
+        enemy.AddAttack(
+            new Attack
+            {
+                Name = "Splash",
+                BaseDamage = 0,
+                Accuracy = 100,
+                AttackType = AttackType.Physical,
+            }
+        );
 
         var emitter = new RecordingEmitter();
-        var input   = new TurnControlledInput(0);
-        var battle  = new Battle(player, enemy, new Gen1TypeChart(), input, AutoSelectInput.Instance, emitter: emitter);
+        var input = new TurnControlledInput(0);
+        var battle = new Battle(
+            player,
+            enemy,
+            new Gen1TypeChart(),
+            input,
+            AutoSelectInput.Instance,
+            emitter: emitter
+        );
         await battle.StartFightAsync();
 
         var ts = emitter.Events.OfType<TurnStarted>().First();
-        Assert.Equal("Player",             ts.PlayerName);
-        Assert.Equal("Enemy",              ts.EnemyName);
+        Assert.Equal("Player", ts.PlayerName);
+        Assert.Equal("Enemy", ts.EnemyName);
         Assert.Equal(player.Attributes.MaxHP, ts.PlayerMaxHp);
-        Assert.Equal(200,                  ts.EnemyMaxHp);
-        Assert.Equal(2,                    ts.PlayerMoves.Count);
+        Assert.Equal(200, ts.EnemyMaxHp);
+        Assert.Equal(2, ts.PlayerMoves.Count);
         Assert.Contains(ts.PlayerMoves, m => m.Name == "Tackle");
         Assert.Contains(ts.PlayerMoves, m => m.Name == "Vine Whip");
         Assert.All(ts.PlayerMoves, m => Assert.True(m.PpCurrent > 0));
@@ -226,26 +413,51 @@ public class BattleIntegrationTests
         // under player-controlled input (TurnControlledInput always picking move 0).
         var player = new Creature("Player") { Level = 50 };
         player.CalculateStats();
-        player.Attributes.HP     = 100;
-        player.Attributes.MaxHP  = 100;
+        player.Attributes.HP = 100;
+        player.Attributes.MaxHP = 100;
         player.Attributes.Attack = 20;
         player.Attributes.Defense = 50;
-        player.Attributes.Speed  = 100;
-        player.AddAttack(new Attack { Name = "Tackle", BaseDamage = 40, Accuracy = 100, PowerPointsMax = 35, AttackType = AttackType.Physical });
+        player.Attributes.Speed = 100;
+        player.AddAttack(
+            new Attack
+            {
+                Name = "Tackle",
+                BaseDamage = 40,
+                Accuracy = 100,
+                PowerPointsMax = 35,
+                AttackType = AttackType.Physical,
+            }
+        );
 
         var enemy = new Creature("Enemy") { Level = 50 };
         enemy.CalculateStats();
-        enemy.Attributes.HP     = 100;
-        enemy.Attributes.MaxHP  = 100;
+        enemy.Attributes.HP = 100;
+        enemy.Attributes.MaxHP = 100;
         enemy.Attributes.Attack = 15;
         enemy.Attributes.Defense = 50;
-        enemy.Attributes.Speed  = 50;
-        enemy.AddAttack(new Attack { Name = "Scratch", BaseDamage = 40, Accuracy = 100, PowerPointsMax = 35, AttackType = AttackType.Physical });
+        enemy.Attributes.Speed = 50;
+        enemy.AddAttack(
+            new Attack
+            {
+                Name = "Scratch",
+                BaseDamage = 40,
+                Accuracy = 100,
+                PowerPointsMax = 35,
+                AttackType = AttackType.Physical,
+            }
+        );
 
         var emitter = new RecordingEmitter();
         // 100 choices of 0 is far more than the expected ~10–15 turns needed for one side to faint
-        var input  = new TurnControlledInput(Enumerable.Repeat(0, 100).ToArray());
-        var battle = new Battle(player, enemy, new Gen1TypeChart(), input, AutoSelectInput.Instance, emitter: emitter);
+        var input = new TurnControlledInput(Enumerable.Repeat(0, 100).ToArray());
+        var battle = new Battle(
+            player,
+            enemy,
+            new Gen1TypeChart(),
+            input,
+            AutoSelectInput.Instance,
+            emitter: emitter
+        );
         await battle.StartFightAsync();
 
         Assert.Contains(emitter.Events, e => e is BattleStarted);
@@ -263,19 +475,43 @@ public class BattleIntegrationTests
         var player = new Creature("Player") { Level = 50 };
         player.CalculateStats();
         player.Attributes.Attack = 999;
-        player.Attributes.Speed  = 100;
-        player.AddAttack(new Attack { Name = "Slam", BaseDamage = 100, Accuracy = 100, PowerPointsMax = 35, AttackType = AttackType.Physical });
+        player.Attributes.Speed = 100;
+        player.AddAttack(
+            new Attack
+            {
+                Name = "Slam",
+                BaseDamage = 100,
+                Accuracy = 100,
+                PowerPointsMax = 35,
+                AttackType = AttackType.Physical,
+            }
+        );
 
         var enemy = new Creature("Enemy") { Level = 50 };
         enemy.CalculateStats();
-        enemy.Attributes.HP    = 1;
+        enemy.Attributes.HP = 1;
         enemy.Attributes.MaxHP = 1;
         enemy.Attributes.Speed = 1;
-        enemy.AddAttack(new Attack { Name = "Tackle", BaseDamage = 10, Accuracy = 100, AttackType = AttackType.Physical });
+        enemy.AddAttack(
+            new Attack
+            {
+                Name = "Tackle",
+                BaseDamage = 10,
+                Accuracy = 100,
+                AttackType = AttackType.Physical,
+            }
+        );
 
         var emitter = new RecordingEmitter();
-        var input   = new TurnControlledInput(0);
-        var battle  = new Battle(player, enemy, new Gen1TypeChart(), input, AutoSelectInput.Instance, emitter: emitter);
+        var input = new TurnControlledInput(0);
+        var battle = new Battle(
+            player,
+            enemy,
+            new Gen1TypeChart(),
+            input,
+            AutoSelectInput.Instance,
+            emitter: emitter
+        );
         await battle.StartFightAsync();
 
         var events = emitter.Events;
@@ -285,7 +521,7 @@ public class BattleIntegrationTests
         Assert.Contains(events, e => e is CreatureFainted);
         // BattleEnded must come after CreatureFainted
         int faintedIdx = events.ToList().FindIndex(e => e is CreatureFainted);
-        int endedIdx   = events.ToList().FindIndex(e => e is BattleEnded);
+        int endedIdx = events.ToList().FindIndex(e => e is BattleEnded);
         Assert.True(endedIdx > faintedIdx);
     }
 
@@ -297,16 +533,38 @@ public class BattleIntegrationTests
         var player = new Creature("Player") { Level = 50 };
         player.CalculateStats();
         player.Attributes.Speed = 100;
-        player.AddAttack(new Attack { Name = "Splash", BaseDamage = 0, Accuracy = 100, AttackType = AttackType.Physical });
+        player.AddAttack(
+            new Attack
+            {
+                Name = "Splash",
+                BaseDamage = 0,
+                Accuracy = 100,
+                AttackType = AttackType.Physical,
+            }
+        );
 
         var enemy = new Creature("Enemy") { Level = 50, Status = StatusCondition.Poison };
         enemy.CalculateStats();
-        enemy.Attributes.HP    = 1;
+        enemy.Attributes.HP = 1;
         enemy.Attributes.MaxHP = 160;
         enemy.Attributes.Speed = 1;
-        enemy.AddAttack(new Attack { Name = "Splash", BaseDamage = 0, Accuracy = 100, AttackType = AttackType.Physical });
+        enemy.AddAttack(
+            new Attack
+            {
+                Name = "Splash",
+                BaseDamage = 0,
+                Accuracy = 100,
+                AttackType = AttackType.Physical,
+            }
+        );
 
-        var battle = new Battle(player, enemy, new Gen1TypeChart(), AutoSelectInput.Instance, AutoSelectInput.Instance);
+        var battle = new Battle(
+            player,
+            enemy,
+            new Gen1TypeChart(),
+            AutoSelectInput.Instance,
+            AutoSelectInput.Instance
+        );
         await battle.StartFightAsync();
 
         Assert.False(enemy.IsAlive());
@@ -319,13 +577,15 @@ public class BattleIntegrationTests
         // The IRandomSource seam makes a seeded battle fully reproducible: two runs wired
         // with the same seed must emit byte-for-byte identical event streams. If any roll
         // still reached the global Random.Shared, the two streams would diverge and fail.
-        string first  = await RunSeededBattle(1234);
+        string first = await RunSeededBattle(1234);
         string second = await RunSeededBattle(1234);
 
         Assert.Equal(first, second);
         Assert.Contains(nameof(BattleEnded), first);
-        Assert.True(first.Split('|').Count(s => s.Contains(nameof(TurnStarted))) >= 3,
-            "Battle should run several turns so the RNG is actually exercised");
+        Assert.True(
+            first.Split('|').Count(s => s.Contains(nameof(TurnStarted))) >= 3,
+            "Battle should run several turns so the RNG is actually exercised"
+        );
     }
 
     /// <summary>
@@ -335,25 +595,57 @@ public class BattleIntegrationTests
     /// </summary>
     private static async Task<string> RunSeededBattle(int seed)
     {
-        var rng   = new SeededRandomSource(seed);
+        var rng = new SeededRandomSource(seed);
         var rules = new Gen1BattleRules(rng);
 
         var player = new Creature("Player") { Level = 50 };
         player.CalculateStats();
-        player.Attributes.MaxHP = 150; player.Attributes.HP = 150;
-        player.Attributes.Attack = 80; player.Attributes.Defense = 70; player.Attributes.Speed = 80;
-        player.AddAttack(new Attack { Name = "Body Slam", BaseDamage = 85, Accuracy = 85, PowerPointsMax = 35, AttackType = AttackType.Physical });
+        player.Attributes.MaxHP = 150;
+        player.Attributes.HP = 150;
+        player.Attributes.Attack = 80;
+        player.Attributes.Defense = 70;
+        player.Attributes.Speed = 80;
+        player.AddAttack(
+            new Attack
+            {
+                Name = "Body Slam",
+                BaseDamage = 85,
+                Accuracy = 85,
+                PowerPointsMax = 35,
+                AttackType = AttackType.Physical,
+            }
+        );
 
         var enemy = new Creature("Enemy") { Level = 50 };
         enemy.CalculateStats();
-        enemy.Attributes.MaxHP = 150; enemy.Attributes.HP = 150;
-        enemy.Attributes.Attack = 78; enemy.Attributes.Defense = 72; enemy.Attributes.Speed = 75;
-        enemy.AddAttack(new Attack { Name = "Stomp", BaseDamage = 80, Accuracy = 85, PowerPointsMax = 35, AttackType = AttackType.Physical });
+        enemy.Attributes.MaxHP = 150;
+        enemy.Attributes.HP = 150;
+        enemy.Attributes.Attack = 78;
+        enemy.Attributes.Defense = 72;
+        enemy.Attributes.Speed = 75;
+        enemy.AddAttack(
+            new Attack
+            {
+                Name = "Stomp",
+                BaseDamage = 80,
+                Accuracy = 85,
+                PowerPointsMax = 35,
+                AttackType = AttackType.Physical,
+            }
+        );
 
         var emitter = new RecordingEmitter();
-        var input   = new TurnControlledInput(Enumerable.Repeat(0, 200).ToArray());
-        var battle  = new Battle(player, enemy, new Gen1TypeChart(), input, AutoSelectInput.Instance,
-                                 rules: rules, emitter: emitter, rng: rng);
+        var input = new TurnControlledInput(Enumerable.Repeat(0, 200).ToArray());
+        var battle = new Battle(
+            player,
+            enemy,
+            new Gen1TypeChart(),
+            input,
+            AutoSelectInput.Instance,
+            rules: rules,
+            emitter: emitter,
+            rng: rng
+        );
         await battle.StartFightAsync();
 
         return string.Join("|", emitter.Events.Select(e => e.ToString()));
@@ -373,7 +665,7 @@ public class BattleIntegrationTests
         public Task<PokemonAttack> ChooseMoveAsync(TurnContext context)
         {
             var moves = context.Attacker.MoveSet;
-            int index  = _choices.Count > 0 ? _choices.Dequeue() : 0;
+            int index = _choices.Count > 0 ? _choices.Dequeue() : 0;
 
             if (index >= 0 && index < moves.Count && moves[index].PowerPointsCurrent > 0)
                 return Task.FromResult(moves[index]);

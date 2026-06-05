@@ -39,7 +39,7 @@ public class RechargeContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 
         Assert.True(turns[0].Has<MoveMissed>());
         Assert.DoesNotContain(turns[1].Events, e => e is Recharging);
-        Assert.True(turns[1].Has<MoveMissed>());   // free to attack again, not recharging
+        Assert.True(turns[1].Has<MoveMissed>()); // free to attack again, not recharging
     }
 
     [Fact]
@@ -50,11 +50,26 @@ public class RechargeContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         var player = TestCreatures.Make("Player", hp: 9999, attack: 255, speed: 200);
         player.AddAttack(Move("hyper-beam"));
         var enemy = TestCreatures.Make("Enemy", hp: 9999, defense: 100, speed: 1);
-        enemy.AddAttack(new Attack { Name = "Tackle", BaseDamage = 40, Accuracy = 100, AttackType = AttackType.Physical });
+        enemy.AddAttack(
+            new Attack
+            {
+                Name = "Tackle",
+                BaseDamage = 40,
+                Accuracy = 100,
+                AttackType = AttackType.Physical,
+            }
+        );
 
         var emitter = new RecordingEmitter();
-        var battle = new Battle(player, enemy, Gen1TypeChart.Instance, AutoSelectInput.Instance,
-                                AutoSelectInput.Instance, rules: AlwaysHitRules.Instance, emitter: emitter);
+        var battle = new Battle(
+            player,
+            enemy,
+            Gen1TypeChart.Instance,
+            AutoSelectInput.Instance,
+            AutoSelectInput.Instance,
+            rules: AlwaysHitRules.Instance,
+            emitter: emitter
+        );
         await battle.StartFightAsync();
 
         Assert.Contains(emitter.Events, e => e is Recharging r && r.CreatureName == "Player");

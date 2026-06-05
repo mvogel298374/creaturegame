@@ -14,14 +14,14 @@ public class PokemonService
 
     public async Task<PokemonSpecies?> GetSpeciesByNameAsync(string name)
     {
-        return await _context.Species.AsNoTracking()
+        return await _context
+            .Species.AsNoTracking()
             .FirstOrDefaultAsync(s => s.Name.ToLower() == name.ToLower());
     }
 
     public async Task<PokemonSpecies?> GetSpeciesByIdAsync(int id)
     {
-        return await _context.Species.AsNoTracking()
-            .FirstOrDefaultAsync(s => s.Id == id);
+        return await _context.Species.AsNoTracking().FirstOrDefaultAsync(s => s.Id == id);
     }
 
     public async Task<List<PokemonSpecies>> GetAllSpeciesAsync()

@@ -3,14 +3,15 @@ namespace PokeApiConnector;
 public static class CryDownloader
 {
     private const int FirstId = 1;
-    private const int LastId  = 151;
+    private const int LastId = 151;
 
     // Legacy = original 8-bit Game Boy cries, perfect for Gen 1
-    private const string LegacyUrlTemplate = "https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/legacy/{0}.ogg";
+    private const string LegacyUrlTemplate =
+        "https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/legacy/{0}.ogg";
 
     public static async Task DownloadAllAsync()
     {
-        string root   = FindSolutionRoot();
+        string root = FindSolutionRoot();
         string cryDir = Path.Combine(root, "creaturegame.Web", "wwwroot", "audio", "cries");
         Directory.CreateDirectory(cryDir);
 
@@ -18,7 +19,9 @@ public static class CryDownloader
         http.DefaultRequestHeaders.UserAgent.ParseAdd("CreatureGame-Importer/1.0");
         http.Timeout = TimeSpan.FromSeconds(30);
 
-        int downloaded = 0, skipped = 0, failed = 0;
+        int downloaded = 0,
+            skipped = 0,
+            failed = 0;
 
         for (int id = FirstId; id <= LastId; id++)
         {
@@ -39,11 +42,13 @@ public static class CryDownloader
             catch (Exception ex)
             {
                 failed++;
-                Console.WriteLine($"\n  [{id,3}] FAILED: {ex.Message}");
+                Console.WriteLine($"\n  [{id, 3}] FAILED: {ex.Message}");
             }
         }
 
-        Console.WriteLine($"\r  Done — {downloaded} downloaded, {skipped} already present, {failed} failed.          ");
+        Console.WriteLine(
+            $"\r  Done — {downloaded} downloaded, {skipped} already present, {failed} failed.          "
+        );
     }
 
     private static async Task DownloadFile(HttpClient http, string url, string destPath)

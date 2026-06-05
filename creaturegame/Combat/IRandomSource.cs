@@ -25,9 +25,12 @@ public sealed class SystemRandomSource : IRandomSource
 {
     public static readonly SystemRandomSource Instance = new();
 
-    public int Next(int maxExclusive)               => Random.Shared.Next(maxExclusive);
-    public int Next(int minInclusive, int maxExclusive) => Random.Shared.Next(minInclusive, maxExclusive);
-    public double NextDouble()                      => Random.Shared.NextDouble();
+    public int Next(int maxExclusive) => Random.Shared.Next(maxExclusive);
+
+    public int Next(int minInclusive, int maxExclusive) =>
+        Random.Shared.Next(minInclusive, maxExclusive);
+
+    public double NextDouble() => Random.Shared.NextDouble();
 }
 
 /// <summary>
@@ -39,7 +42,9 @@ public sealed class SeededRandomSource(int seed) : IRandomSource
 {
     private readonly Random _random = new(seed);
 
-    public int Next(int maxExclusive)               => _random.Next(maxExclusive);
+    public int Next(int maxExclusive) => _random.Next(maxExclusive);
+
     public int Next(int minInclusive, int maxExclusive) => _random.Next(minInclusive, maxExclusive);
-    public double NextDouble()                      => _random.NextDouble();
+
+    public double NextDouble() => _random.NextDouble();
 }

@@ -17,12 +17,16 @@ public sealed class SignalRInput : IBattleInput
 
         var tcs = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
         _tcs = tcs;
-        var index = await tcs.Task;   // throws OperationCanceledException if Cancel() ran
+        var index = await tcs.Task; // throws OperationCanceledException if Cancel() ran
         _tcs = null;
 
         var moves = context.Attacker.MoveSet;
-        if (index >= 0 && index < moves.Count
-            && moves[index].PowerPointsCurrent > 0 && moves[index] != context.DisabledMove)
+        if (
+            index >= 0
+            && index < moves.Count
+            && moves[index].PowerPointsCurrent > 0
+            && moves[index] != context.DisabledMove
+        )
             return moves[index];
 
         // Fallback (out-of-range / a Disabled or PP-less slot slipped through): first selectable move.

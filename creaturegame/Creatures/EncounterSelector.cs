@@ -13,7 +13,11 @@ public static class EncounterSelector
     /// ±15 % of <paramref name="playerBst"/>. Automatically widens to ±25 %, ±50 %,
     /// then the full pool if no candidates are found at a tighter window.
     /// </summary>
-    public static PokemonSpecies? PickByBst(List<PokemonSpecies> pool, int playerBst, IRandomSource? rng = null)
+    public static PokemonSpecies? PickByBst(
+        List<PokemonSpecies> pool,
+        int playerBst,
+        IRandomSource? rng = null
+    )
     {
         var r = rng ?? SystemRandomSource.Instance;
         foreach (var pct in new[] { 0.15, 0.25, 0.50, 1.0 })
