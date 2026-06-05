@@ -1,4 +1,5 @@
 using creaturegame.Attacks;
+using creaturegame.Creatures;
 using creaturegame.Tests.TestSupport;
 
 namespace creaturegame.Tests.Integration.Gen1Attacks;
@@ -45,4 +46,17 @@ public class SecondaryChanceDataContractTests(MovesFixture moves) : Gen1MoveCont
     [Fact]
     public void GrowthRaisesSpecialInGen1()
         => Assert.Equal(StageStat.Special, Move("growth").StatEffectStat);
+
+    // Toxic badly-poisons; PokeAPI reports its ailment as plain "poison", so the importer promotes
+    // it to BadPoison. Without this pin, a re-import would silently downgrade Toxic to regular Poison.
+    [Fact]
+    public void ToxicBadlyPoisonsInGen1()
+        => Assert.Equal(StatusCondition.BadPoison, Move("toxic").StatusEffect);
+
+    // Rage carries the Gen 1 Rage mechanic (lock-in + Attack-on-hit), mapped by name in the importer.
+    // PokeAPI's ailment data can't express it; without this pin a re-import that drops the name-match
+    // would silently leave Rage a plain 20-power Normal move (the behaviour test would fail obscurely).
+    [Fact]
+    public void RageHasRageMoveEffect()
+        => Assert.Equal(MoveEffect.Rage, Move("rage").Effect);
 }

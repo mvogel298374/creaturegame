@@ -48,6 +48,42 @@ public class StatStageMoveContractTests(MovesFixture moves) : Gen1MoveContract(m
         Assert.Equal(1, change.NewStage);
     }
 
+    [Fact]
+    public async Task MeditateRaisesUserAttackByOneStage()
+    {
+        var result = await new MoveScenario()
+            .Attacker(TestCreatures.Make("A"))
+            .Use(Move("meditate"));
+
+        Assert.Equal(1, result.Attacker.Stages.Attack);
+        Assert.False(result.Has<DamageDealt>(), "Meditate is a status move — no damage");
+
+        var change = result.First<StatStageChanged>();
+        Assert.NotNull(change);
+        Assert.Equal(result.Attacker.Name, change!.CreatureName);   // affects the user
+        Assert.Equal("Attack", change.Stat);
+        Assert.Equal(1, change.Delta);
+        Assert.Equal(1, change.NewStage);
+    }
+
+    [Fact]
+    public async Task AgilityRaisesUserSpeedByTwoStages()
+    {
+        var result = await new MoveScenario()
+            .Attacker(TestCreatures.Make("A"))
+            .Use(Move("agility"));
+
+        Assert.Equal(2, result.Attacker.Stages.Speed);
+        Assert.False(result.Has<DamageDealt>(), "Agility is a status move — no damage");
+
+        var change = result.First<StatStageChanged>();
+        Assert.NotNull(change);
+        Assert.Equal(result.Attacker.Name, change!.CreatureName);   // affects the user
+        Assert.Equal("Speed", change.Stat);
+        Assert.Equal(2, change.Delta);
+        Assert.Equal(2, change.NewStage);
+    }
+
     // Foe-targeting stat drops: Sand Attack (−1 Accuracy), Tail Whip / Leer (−1 Defense),
     // Growl (−1 Attack).
     [Theory]

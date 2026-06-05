@@ -242,6 +242,10 @@ public class MoveImport
         // Counter returns twice the (Normal/Fighting) physical damage the user last took (priority −5).
         else if (pokeMove.Name == "counter")
             attack.Effect = MoveEffect.Counter;
+        // Rage locks the user into the move and raises its Attack each time it is hit (enforced in
+        // the battle engine). PokeAPI's modern ailment data doesn't capture this Gen 1 mechanic.
+        else if (pokeMove.Name == "rage")
+            attack.Effect = MoveEffect.Rage;
         // Rampage moves — lock the user in for 2–3 turns, then self-confuse. Matched by name BEFORE
         // the confusion-ailment branch so they map to Rampage (the confusion is a self-effect of the
         // lock, not a targeted secondary). Petal Dance joins in its batch.
@@ -305,6 +309,10 @@ public class MoveImport
                 break;
             case "thunder":      // Gen 1: 10% paralysis (modern: 30%)
                 attack.EffectChance     = 10;
+                break;
+            case "toxic":        // Toxic badly-poisons; PokeAPI reports its ailment as plain "poison",
+                                 // so promote it to BadPoison (escalating damage via ToxicCounter).
+                attack.StatusEffect     = StatusCondition.BadPoison;
                 break;
         }
 

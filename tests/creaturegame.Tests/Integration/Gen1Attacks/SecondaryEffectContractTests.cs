@@ -19,6 +19,7 @@ public class SecondaryEffectContractTests(MovesFixture moves) : Gen1MoveContract
     [InlineData("acid",        "Defense")]
     [InlineData("bubble-beam", "Speed")]
     [InlineData("aurora-beam", "Attack")]
+    [InlineData("psychic",     "Special")]   // 10% to lower the foe's (combined) Special in Gen 1
     public async Task LowersTheFoesStatAsASecondaryEffectOnHit(string moveName, string stat)
     {
         var result = await new MoveScenario()
@@ -35,7 +36,7 @@ public class SecondaryEffectContractTests(MovesFixture moves) : Gen1MoveContract
     }
 
     [Theory]
-    [InlineData("acid")] [InlineData("bubble-beam")] [InlineData("aurora-beam")]
+    [InlineData("acid")] [InlineData("bubble-beam")] [InlineData("aurora-beam")] [InlineData("psychic")]
     public async Task DoesNotLowerAnyStatOnMiss(string moveName)
     {
         var result = await new MoveScenario()
@@ -47,26 +48,31 @@ public class SecondaryEffectContractTests(MovesFixture moves) : Gen1MoveContract
         Assert.False(result.Has<StatStageChanged>());
     }
 
-    [Fact]
-    public async Task PsybeamCanConfuseAsASecondaryEffect()
+    // Damaging moves with a chance-based confusion secondary: Psybeam and Confusion (the move).
+    [Theory]
+    [InlineData("psybeam")]
+    [InlineData("confusion")]
+    public async Task DamagingMoveCanConfuseAsASecondaryEffect(string moveName)
     {
         var result = await new MoveScenario()
             .Rules(ForceSecondaryRules.Instance)
             .Defender(TestCreatures.Make("Defender", hp: 500))
-            .Use(Move("psybeam"));
+            .Use(Move(moveName));
 
-        Assert.True(result.Has<DamageDealt>(), "Psybeam deals damage");
+        Assert.True(result.Has<DamageDealt>(), $"{moveName} deals damage");
         Assert.True(result.Defender.ConfusedTurns > 0);
         Assert.Contains(result.Events, e => e is ConfusionStarted);
     }
 
-    [Fact]
-    public async Task PsybeamDoesNotConfuseOnMiss()
+    [Theory]
+    [InlineData("psybeam")]
+    [InlineData("confusion")]
+    public async Task DamagingMoveDoesNotConfuseOnMiss(string moveName)
     {
         var result = await new MoveScenario()
             .Rules(NeverHitRules.Instance)
             .Defender(TestCreatures.Make("Defender", hp: 500))
-            .Use(Move("psybeam"));
+            .Use(Move(moveName));
 
         Assert.True(result.Has<MoveMissed>());
         Assert.Equal(0, result.Defender.ConfusedTurns);

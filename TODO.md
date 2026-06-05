@@ -407,10 +407,40 @@ two data fixes — no new mechanics, no new events (reused batch-8 `MoveHadNoEff
   overrides (thunder/bite/low-kick/poison-sting/acid/aurora-beam/bubble-beam, string-shot, growth) —
   previously a re-import could silently restore modern values with every behaviour test still green.
 
+### Batch 10 (moves 91–100) ✅ DONE (2026-06-05)
+dig, toxic, confusion, psychic, hypnosis, meditate, agility, quick-attack, rage, teleport.
+**574 .NET + 28 Vitest.** One genuine new engine mechanic (Rage) + one Gen 1 data fix (Toxic →
+BadPoison); everything else coverage-only over real `AttackAction`/`Battle` paths. No new battle
+event (Rage reuses `StatStageChanged`), so no frontend change.
+- Reused contracts (rows added): damage/PP (confusion, psychic, quick-attack, rage); two-turn (dig);
+  phys/special split (dig Physical, confusion/psychic Special, quick-attack/rage Physical, +toxic/
+  hypnosis/agility/teleport Undefined); pure status (hypnosis → Sleep, toxic → BadPoison + miss);
+  stat-stage self-buff (meditate +1 Attack, agility +2 Speed); secondary stat-drop (psychic −1 foe
+  Special); secondary confusion (confusion folded into a theory with psybeam); no-op switch/flee
+  (teleport, with whirlwind/roar, −6 priority pinned).
+- New capability classes: **`RageContractTests`** and **`PriorityMoveContractTests`** (quick-attack;
+  engine already sorts by `Priority`, so coverage-only — a slower Quick Attack user strikes before a
+  faster foe + a control test proving the harness observes order).
+- **Rage (new mechanic, behind the gen seam):** `MoveEffect.Rage`; lock-in mirrors rampage/two-turn —
+  `BattleState.IsRaging` + `RageMove` (+ `Creature` delegating props; cleared by the wholesale
+  `ResetBattleState`), `Battle` force-selects `RageMove` while raging (both selection chains). On-hit
+  raise: in the standard damage path, a raging creature that's hit gains Attack by
+  `IBattleRules.RageAttackStagesPerHit` (Gen 1 = 1) once per connecting attack — magnitude on the seam,
+  not inline. Full-`Battle` test asserts the **quirk** (Attack rises once per *hit received*, not per
+  turn: raises == hits) + lock-in (input consulted once). Documented simplifications: builds on
+  standard-path damage only (same boundary as Counter); a Disabled Rage is still force-used (Gen 1's
+  Rage/Disable interaction is nuanced — noted in `Battle`, not enforced).
+- **Data fix:** Gen 1 **toxic** badly-poisons, but PokeAPI reports its ailment as plain `poison` →
+  importer layer-2 `case "toxic"` override sets `BadPoison` (the `ToxicCounter` escalation engine
+  already existed, just unwired). Pinned in `SecondaryChanceDataContractTests` (+ a `rage → Effect`
+  pin). Re-imported via full `PokeApiConnector` run; verified toxic StatusEffect=6 / rage Effect=17 via MCP.
+- Seam-review gate: PASS-WITH-ADVISORIES (0 blockers); all 3 advisories fixed before commit (rage
+  data-pin, Rage/Disable doc comment, quirk-not-outcome assertion in the full-`Battle` Rage test).
+
 ### Remaining batches (cadence)
-- [ ] Batches 10–17 (moves 91–165): query the next 10 → add `InlineData` rows to the matching
-  capability class → add a new capability class only for genuinely new mechanics. **Next: batch 10 =
-  moves 91–100.**
+- [ ] Batches 11–17 (moves 101–165): query the next 10 → add `InlineData` rows to the matching
+  capability class → add a new capability class only for genuinely new mechanics. **Next: batch 11 =
+  moves 101–110.**
 - [ ] **Fixed-2 multi-hit mover still pending**: bonemerang — the fixed-count mechanism exists
   (double-kick, twineedle); just needs mapping + coverage in its batch.
 - [x] **Rampage reuse**: petal-dance — done in batch 8 (already tagged in importer + coverage added).

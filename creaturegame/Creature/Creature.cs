@@ -109,6 +109,8 @@ public class Creature
     public PokemonAttack? DisabledMove { get => Battle.DisabledMove;         set => Battle.DisabledMove = value; }
     public int  DisableTurnsRemaining { get => Battle.DisableTurnsRemaining; set => Battle.DisableTurnsRemaining = value; }
     public bool HasMist               { get => Battle.HasMist;               set => Battle.HasMist = value; }
+    public bool IsRaging              { get => Battle.IsRaging;              set => Battle.IsRaging = value; }
+    public PokemonAttack? RageMove    { get => Battle.RageMove;             set => Battle.RageMove = value; }
     public int  LastDamageTaken       { get => Battle.LastDamageTaken;       set => Battle.LastDamageTaken = value; }
     public DamageType? LastDamageType { get => Battle.LastDamageType;        set => Battle.LastDamageType = value; }
 

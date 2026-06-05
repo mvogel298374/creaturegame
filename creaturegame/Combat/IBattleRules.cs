@@ -192,6 +192,14 @@ public interface IBattleRules
     /// </summary>
     int SelfDestructDefenseDivisor { get; }
 
+    /// <summary>
+    /// Number of Attack stages a Rage user gains each time it is hit by a damaging move while
+    /// locked into Rage. Gen 1: 1 stage per hit (no cap beyond the normal +6). The magnitude is
+    /// gen-variable in spirit (Gen 2 reworked Rage entirely), so it lives on the seam rather than
+    /// inline in the attack resolver.
+    /// </summary>
+    int RageAttackStagesPerHit { get; }
+
     // ── Type-based immunities ────────────────────────────────────────────────────
 
     /// <summary>

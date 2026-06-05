@@ -81,6 +81,46 @@ public class StatusMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
     }
 
     [Fact]
+    public async Task HypnosisPutsTheTargetToSleepWithoutDamage()
+    {
+        var result = await new MoveScenario()
+            .Defender(TestCreatures.Make("D", hp: 500))
+            .Use(Move("hypnosis"));
+
+        Assert.False(result.Has<DamageDealt>(), "Hypnosis is a status move — no damage");
+        Assert.Equal(StatusCondition.Sleep, result.Defender.Status);
+        Assert.True(result.Defender.SleepTurns > 0);
+        Assert.Contains(result.Events, e => e is StatusApplied s && s.Status == StatusCondition.Sleep);
+    }
+
+    // Toxic badly-poisons (BadPoison), distinct from the regular Poison its modern PokeAPI ailment
+    // reports — this also exercises the importer's Gen 1 override (pinned in
+    // SecondaryChanceDataContractTests). The escalating damage itself is covered in CoreMechanicsTests.
+    [Fact]
+    public async Task ToxicBadlyPoisonsTheTarget()
+    {
+        var result = await new MoveScenario()
+            .Defender(TestCreatures.Make("D", type1: DamageType.Water, hp: 500))
+            .Use(Move("toxic"));
+
+        Assert.False(result.Has<DamageDealt>(), "Toxic is a status move — no damage");
+        Assert.Equal(StatusCondition.BadPoison, result.Defender.Status);
+        Assert.Contains(result.Events, e => e is StatusApplied s && s.Status == StatusCondition.BadPoison);
+    }
+
+    [Fact]
+    public async Task ToxicAppliesNoStatusOnMiss()
+    {
+        var result = await new MoveScenario()
+            .Rules(NeverHitRules.Instance)
+            .Defender(TestCreatures.Make("D", type1: DamageType.Water, hp: 500))
+            .Use(Move("toxic"));
+
+        Assert.True(result.Has<MoveMissed>());
+        Assert.Equal(StatusCondition.None, result.Defender.Status);
+    }
+
+    [Fact]
     public async Task SupersonicConfusesTheTargetWithoutDamage()
     {
         var result = await new MoveScenario()

@@ -56,7 +56,16 @@ public class PhysicalSpecialSplitContractTests(MovesFixture moves) : Gen1MoveCon
     [InlineData("rock-throw",    AttackType.Physical)]  // Rock
     [InlineData("earthquake",    AttackType.Physical)]  // Ground
     [InlineData("fissure",       AttackType.Physical)]  // Ground (OHKO, still Physical by type)
+    [InlineData("dig",           AttackType.Physical)]  // Ground (two-turn, still Physical by type)
+    [InlineData("confusion",     AttackType.Special)]   // Psychic
+    [InlineData("psychic",       AttackType.Special)]   // Psychic
+    [InlineData("quick-attack",  AttackType.Physical)]  // Normal (priority move, still Physical by type)
+    [InlineData("rage",          AttackType.Physical)]  // Normal
     // Status moves keep no damage category (Undefined) regardless of type.
+    [InlineData("toxic",         AttackType.Undefined)]  // Poison status move
+    [InlineData("hypnosis",      AttackType.Undefined)]  // Psychic status move
+    [InlineData("agility",       AttackType.Undefined)]  // Psychic status move
+    [InlineData("teleport",      AttackType.Undefined)]  // Psychic status move
     [InlineData("sand-attack",   AttackType.Undefined)]  // Normal in Gen 1 (retyped to Ground in Gen 2)
     [InlineData("tail-whip",     AttackType.Undefined)]
     [InlineData("string-shot",   AttackType.Undefined)]  // Bug status move

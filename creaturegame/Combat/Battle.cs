@@ -51,13 +51,17 @@ public class Battle
                 PlayerCreature.MoveSet.Select(m => new MoveInfo(m.Base.Name ?? "", m.Base.DamageType, m.PowerPointsCurrent, m.Base.PowerPointsMax, m == PlayerCreature.DisabledMove)).ToList()
             ));
 
-            // Move selection — two-turn moves skip IBattleInput on the release turn and rampage
-            // moves (Thrash) skip it while locked in; null signals AttackAction to Struggle when
-            // out of PP.
+            // Move selection — two-turn moves skip IBattleInput on the release turn, rampage
+            // moves (Thrash) skip it while locked in, and Rage skips it once used (locked into the
+            // move). null signals AttackAction to Struggle when out of PP. The lock branches are
+            // checked before CanSelectAnyMove, so a Rage move that gets Disabled is still force-used
+            // (Gen 1's Rage/Disable interaction is nuanced — a documented simplification, not enforced).
             PokemonAttack? playerMove = PlayerCreature.IsTwoTurnCharging
                 ? PlayerCreature.ChargingMove
                 : PlayerCreature.RampageTurnsRemaining > 0
                   ? PlayerCreature.RampageMove
+                  : PlayerCreature.IsRaging
+                  ? PlayerCreature.RageMove
                   : (!PlayerCreature.CanSelectAnyMove
                     ? null
                     : await _playerInput.ChooseMoveAsync(new TurnContext
@@ -74,6 +78,8 @@ public class Battle
                 ? EnemyCreature.ChargingMove
                 : EnemyCreature.RampageTurnsRemaining > 0
                   ? EnemyCreature.RampageMove
+                  : EnemyCreature.IsRaging
+                  ? EnemyCreature.RageMove
                   : (!EnemyCreature.CanSelectAnyMove
                     ? null
                     : await _enemyInput.ChooseMoveAsync(new TurnContext

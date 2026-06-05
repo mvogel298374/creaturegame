@@ -64,9 +64,14 @@ public class AttackAction : IBattleAction
         bool isRampage           = !usingStruggle && attackToUse.Effect == MoveEffect.Rampage;
         bool rampageContinuation = isRampage && Source.RampageTurnsRemaining > 0;
 
-        // PP decremented on the first turn only (two-turn release and rampage continuations were
-        // already charged for; don't double-spend).
-        if (!usingStruggle && !isReleaseTurn && !rampageContinuation)
+        // Rage: once used, the user is locked into Rage indefinitely (auto-repeated by Battle). A
+        // continuation turn is any after the first, identified by the lock already being set.
+        bool isRage           = !usingStruggle && attackToUse.Effect == MoveEffect.Rage;
+        bool rageContinuation = isRage && Source.IsRaging;
+
+        // PP decremented on the first turn only (two-turn release, rampage continuations, and rage
+        // continuations were already charged for; don't double-spend).
+        if (!usingStruggle && !isReleaseTurn && !rampageContinuation && !rageContinuation)
             _selectedMove!.PowerPointsCurrent--;
 
         // Charge phase: wind up and defer damage to the next turn
@@ -97,6 +102,15 @@ public class AttackAction : IBattleAction
         }
         if (isRampage)
             Source.RampageTurnsRemaining--;
+
+        // Rage: lock the user in on first use (even a miss locks). Battle force-selects RageMove
+        // every turn thereafter; the lock clears only on the per-battle reset. The Attack-on-hit
+        // raise happens in the standard damage path below, when this creature is the one hit.
+        if (isRage && !rageContinuation)
+        {
+            Source.IsRaging = true;
+            Source.RageMove = _selectedMove;
+        }
 
         void EndRampageIfDone()
         {
@@ -231,6 +245,16 @@ public class AttackAction : IBattleAction
 
                     if (isMultiHit)
                         _emitter?.Emit(new MultiHitCompleted(landed));
+
+                    // Rage: a raging creature that just got hit gains Attack stage(s). Triggered
+                    // off the standard damage path only (the same boundary as Counter) — once per
+                    // connecting attack, not per multi-hit strike. Reuses StatStageChanged.
+                    if (landed > 0 && Target.IsRaging && Target.IsAlive())
+                    {
+                        int newStage = ApplyStageChange(Target, StageStat.Attack, _rules.RageAttackStagesPerHit);
+                        _emitter?.Emit(new StatStageChanged(
+                            Target.Name, StageStat.Attack.ToString(), _rules.RageAttackStagesPerHit, newStage));
+                    }
 
                     if (category == DamageCategory.Drain && damage > 0)
                     {
