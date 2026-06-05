@@ -86,6 +86,17 @@ public class PhysicalSpecialSplitContractTests(MovesFixture moves) : Gen1MoveCon
     [InlineData("tail-whip",     AttackType.Undefined)]
     [InlineData("string-shot",   AttackType.Undefined)]  // Bug status move
     [InlineData("thunder-wave",  AttackType.Undefined)]  // Electric status move
+    // Batch 13
+    [InlineData("egg-bomb",      AttackType.Physical)]   // Normal
+    [InlineData("swift",         AttackType.Physical)]   // Normal (never-miss)
+    [InlineData("skull-bash",    AttackType.Physical)]   // Normal (two-turn, still Physical by type)
+    [InlineData("lick",          AttackType.Physical)]   // Ghost (physical in Gen 1)
+    [InlineData("smog",          AttackType.Physical)]   // Poison
+    [InlineData("sludge",        AttackType.Physical)]   // Poison
+    [InlineData("bone-club",     AttackType.Physical)]   // Ground
+    [InlineData("fire-blast",    AttackType.Special)]    // Fire
+    [InlineData("waterfall",     AttackType.Special)]    // Water
+    [InlineData("clamp",         AttackType.Special)]    // Water
     public void MoveHasGen1PhysicalSpecialCategory(string moveName, AttackType expected)
         => Assert.Equal(expected, Move(moveName).AttackType);
 }

@@ -16,7 +16,7 @@ namespace creaturegame.Tests.Integration.Gen1Attacks;
 public class TwoTurnMoveContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 {
     [Theory]
-    [InlineData("razor-wind")] [InlineData("fly")] [InlineData("solar-beam")] [InlineData("dig")]
+    [InlineData("razor-wind")] [InlineData("fly")] [InlineData("solar-beam")] [InlineData("dig")] [InlineData("skull-bash")]
     public async Task ChargesFirstTurnThenStrikes(string moveName)
     {
         var move = Move(moveName);
@@ -39,7 +39,7 @@ public class TwoTurnMoveContractTests(MovesFixture moves) : Gen1MoveContract(mov
     }
 
     [Theory]
-    [InlineData("razor-wind")] [InlineData("fly")] [InlineData("solar-beam")] [InlineData("dig")]
+    [InlineData("razor-wind")] [InlineData("fly")] [InlineData("solar-beam")] [InlineData("dig")] [InlineData("skull-bash")]
     public async Task MissesOnReleaseTurn(string moveName)
     {
         var turns = await new MoveScenario()

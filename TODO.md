@@ -506,10 +506,41 @@ Focus Energy, Bide, Mirror Move) + coverage for engine features already unit-tes
   **all fixed** before commit; the Bide all-category accumulation gap was the substantive one. New
   failure mode appended to the reviewer log (a damage-taken hook added to only one category branch).
 
+### Batch 13 (moves 121–130) ✅ DONE (2026-06-05)
+egg-bomb, lick, smog, sludge, bone-club, fire-blast, waterfall, clamp, swift, skull-bash.
+**690 .NET + 33 Vitest.** Pure **coverage + data-fidelity** batch — **no new engine code, no new
+events, no schema change, no new seam**. Every mechanic already existed; the only production change is
+three Gen 1 importer data fixes.
+- Reused contracts (rows added): damage/PP/miss (egg-bomb, smog, sludge, bone-club, fire-blast,
+  waterfall, clamp, swift); secondary status (smog/sludge → Poison, fire-blast → Burn); flinch
+  (bone-club); binding (clamp, with bind/wrap/fire-spin); two-turn (skull-bash, with razor-wind/fly);
+  phys/special split (10 rows — Ghost lick & Poison smog/sludge & Ground bone-club Physical; Fire/Water
+  Special).
+- New capability class: **`NeverMissContractTests`** (swift — first never-miss move covered at the
+  contract level; the `NeverMisses` short-circuit at `IBattleAction.cs:224` was already engine-honored
+  + unit-tested, so coverage-only).
+- **lick is Ghost-type → handled specially.** 0× vs Normal *and* (the famous Gen 1 bug) 0× vs Psychic.
+  A Standard 0× damaging move folds the immunity into the calc (emits `DamageDealt` at 0, **not**
+  `MoveHadNoEffect`), so lick's zero-damage cases live in `StabAndTypeEffectivenessContractTests`
+  (`GhostMovesDealNoDamageToImmuneTypesInGen1`), not `ImmunityContractTests`; its damage+paralysis
+  coverage uses a non-immune Water defender in `SecondaryStatusContractTests`.
+- **Three importer data fixes (layer-2 + name-match)** — re-imported via full `PokeApiConnector` run,
+  verified via MCP: **skull-bash → TwoTurn** (Gen 1 plain charge, no charge-turn Defense boost = Gen 2+;
+  also clears the stale `effect_chance=100`); **fire-blast** burn 30% (modern 10%); **waterfall** no
+  secondary (the 20% flinch was added in Gen 4). All three pinned in `SecondaryChanceDataContractTests`.
+- Seam-review gate: PASS-WITH-ADVISORIES (0 blockers). 2 batch-relevant advisories fixed (skull-bash
+  stale `EffectChance` cleared + pin strengthened to the whole stat-change row). 1 advisory surfaced &
+  deferred: pre-existing flaky `OHKOMove_FailsIfSourceLevelLowerThanTarget` (randomised DVs let a
+  low-level attacker occasionally out-speed) — out of batch scope; see tech debt.
+
 ### Remaining batches (cadence)
-- [ ] Batches 13–17 (moves 121–165): query the next 10 → add `InlineData` rows to the matching
-  capability class → add a new capability class only for genuinely new mechanics. **Next: batch 13 =
-  moves 121–130.**
+- [ ] Batches 14–17 (moves 131–165): query the next 10 → add `InlineData` rows to the matching
+  capability class → add a new capability class only for genuinely new mechanics. **Next: batch 14 =
+  moves 131–140.**
+- [ ] **Tech debt — flaky test:** `OHKOMove_FailsIfSourceLevelLowerThanTarget` (CoreMechanicsTests) is
+  non-deterministic: it relies on level implying speed, but randomised DVs can flip the speed order so
+  the OHKO succeeds. Rewrite to set attacker/defender Speed explicitly (Gen 1 uses the speed compare,
+  per `IBattleRules.OneHitKoSucceeds`) and drop the level dependency. (Flagged by seam-review in batch 13.)
 - [ ] **Fixed-2 multi-hit mover still pending**: bonemerang — the fixed-count mechanism exists
   (double-kick, twineedle); just needs mapping + coverage in its batch.
 - [x] **Rampage reuse**: petal-dance — done in batch 8 (already tagged in importer + coverage added).

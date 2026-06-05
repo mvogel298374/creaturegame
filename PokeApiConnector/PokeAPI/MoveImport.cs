@@ -222,7 +222,9 @@ public class MoveImport
             attack.Effect = MoveEffect.Recharge;
         else if (pokeMove.Name is "wrap" or "bind" or "clamp" or "fire-spin")
             attack.Effect = MoveEffect.Binding;
-        else if (pokeMove.Name is "fly" or "dig" or "solar-beam" or "razor-wind" or "sky-attack")
+        // Gen 1 Skull Bash is a plain charge move — it does NOT raise Defense on the charge turn
+        // (that boost was added in Gen 2), so it maps to plain TwoTurn like Razor Wind / Sky Attack.
+        else if (pokeMove.Name is "fly" or "dig" or "solar-beam" or "razor-wind" or "sky-attack" or "skull-bash")
             attack.Effect = MoveEffect.TwoTurn;
         else if (pokeMove.Name == "metronome")
             attack.Effect = MoveEffect.Metronome;
@@ -320,6 +322,18 @@ public class MoveImport
                 break;
             case "poison-sting": // Gen 1: 20% poison (modern: 30%)
                 attack.EffectChance     = 20;
+                break;
+            case "fire-blast":   // Gen 1: 30% burn (modern: 10%)
+                attack.EffectChance     = 30;
+                break;
+            case "waterfall":    // Gen 1–3: no secondary effect; the 20% flinch was added in Gen 4
+                attack.Effect           = MoveEffect.None;
+                attack.EffectChance     = null;
+                break;
+            case "skull-bash":   // Gen 1: plain two-turn charge (mapped to TwoTurn above). PokeAPI
+                                 // carries effect_chance=100 for the Gen 2+ charge-turn Defense boost,
+                                 // which doesn't exist in Gen 1 — clear the stale, inert chance.
+                attack.EffectChance     = null;
                 break;
             case "growth":       // Gen 1: raises Special +1 (modern: +1 Attack & +1 Sp. Atk)
                 attack.StatEffectStat   = StageStat.Special;

@@ -70,4 +70,23 @@ public class StabAndTypeEffectivenessContractTests(MovesFixture moves) : Gen1Mov
         double ratio = (double)await Damage(defenderType) / await Damage(neutralDefenderType);
         Assert.InRange(ratio, expectedMult * 0.8, expectedMult * 1.2);
     }
+
+    // Gen 1 0× matchups: a Standard damaging move against an immune type deals no damage (the engine
+    // folds the immunity into the calc as DamageDealt at 0 — it does NOT take the MoveHadNoEffect path
+    // that fixed/level-based/pure-status moves do). Lick is Ghost: 0× vs Normal, and — the famous Gen 1
+    // bug — 0× vs Psychic too (despite Ghost otherwise being super-effective against Psychic).
+    [Theory]
+    [InlineData(DamageType.Normal)]
+    [InlineData(DamageType.Psychic)]   // the Gen 1 Ghost-vs-Psychic immunity bug
+    public async Task GhostMovesDealNoDamageToImmuneTypesInGen1(DamageType defenderType)
+    {
+        var result = await new MoveScenario()
+            .Attacker(TestCreatures.Make("A", attack: 250, special: 250))
+            .Defender(TestCreatures.Make("D", type1: defenderType, hp: 500, defense: 40, special: 40))
+            .Rules(NoVarianceNoCritHitRules.Instance)
+            .Use(Move("lick"));
+
+        Assert.Equal(0, result.TotalDamage);
+        Assert.Equal(500, result.Defender.Attributes.HP);
+    }
 }

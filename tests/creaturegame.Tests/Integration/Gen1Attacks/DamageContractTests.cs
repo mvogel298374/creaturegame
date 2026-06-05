@@ -32,6 +32,8 @@ public class DamageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     [InlineData("drill-peck")] [InlineData("submission")] [InlineData("low-kick")] [InlineData("strength")]
     [InlineData("rock-throw")] [InlineData("earthquake")] [InlineData("fire-spin")]
     [InlineData("confusion")] [InlineData("psychic")] [InlineData("quick-attack")] [InlineData("rage")]
+    [InlineData("egg-bomb")] [InlineData("smog")] [InlineData("sludge")] [InlineData("bone-club")]
+    [InlineData("fire-blast")] [InlineData("waterfall")] [InlineData("clamp")] [InlineData("swift")]
     public async Task DealsDamageOnHit(string moveName)
     {
         var result = await new MoveScenario()
@@ -64,6 +66,8 @@ public class DamageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     [InlineData("drill-peck")] [InlineData("submission")] [InlineData("low-kick")] [InlineData("strength")]
     [InlineData("rock-throw")] [InlineData("earthquake")] [InlineData("fire-spin")]
     [InlineData("confusion")] [InlineData("psychic")] [InlineData("quick-attack")] [InlineData("rage")]
+    [InlineData("egg-bomb")] [InlineData("smog")] [InlineData("sludge")] [InlineData("bone-club")]
+    [InlineData("fire-blast")] [InlineData("waterfall")] [InlineData("clamp")] [InlineData("swift")]
     public async Task DecrementsPpByOneOnUse(string moveName)
     {
         var move = Move(moveName);
@@ -84,6 +88,8 @@ public class DamageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     [InlineData("pin-missile")] [InlineData("hydro-pump")] [InlineData("blizzard")]
     [InlineData("hyper-beam")] [InlineData("submission")] [InlineData("low-kick")]
     [InlineData("rock-throw")] [InlineData("fire-spin")]
+    [InlineData("egg-bomb")] [InlineData("smog")] [InlineData("bone-club")]
+    [InlineData("fire-blast")] [InlineData("clamp")]
     public async Task MissesWhenAccuracyRollFails(string moveName)
     {
         var result = await new MoveScenario()

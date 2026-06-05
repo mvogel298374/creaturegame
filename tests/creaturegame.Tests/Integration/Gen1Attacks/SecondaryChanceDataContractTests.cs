@@ -102,4 +102,36 @@ public class SecondaryChanceDataContractTests(MovesFixture moves) : Gen1MoveCont
         Assert.Equal(StageTarget.Foe,   move.StatEffectTarget);
         Assert.Equal(-2,                move.StatEffectDelta);
     }
+
+    // ── Batch 13 layer-2 facts ─────────────────────────────────────────────────────────────────
+    // Fire Blast burned at 30% in Gen 1 (reduced to 10% from Gen 2). PokeAPI reports the modern 10%.
+    [Fact]
+    public void FireBlastBurnChanceIsThirtyInGen1()
+        => Assert.Equal(30, Move("fire-blast").EffectChance);
+
+    // Waterfall had no secondary effect in Gen 1–3; the 20% flinch was added in Gen 4. The importer
+    // strips the modern flinch back off — pin both the cleared effect and the null chance.
+    [Fact]
+    public void WaterfallHasNoSecondaryEffectInGen1()
+    {
+        var move = Move("waterfall");
+        Assert.Equal(MoveEffect.None, move.Effect);
+        Assert.Null(move.EffectChance);
+    }
+
+    // Gen 1 Skull Bash is a plain two-turn charge move — mapped by name in the importer (PokeAPI's
+    // meta can't express the charge). It does NOT raise Defense on the charge turn (that's Gen 2+),
+    // so it carries no stat-stage effect; pin both so a re-import can't silently regress either.
+    [Fact]
+    public void SkullBashIsTwoTurnWithNoDefenseBoostInGen1()
+    {
+        var move = Move("skull-bash");
+        Assert.Equal(MoveEffect.TwoTurn, move.Effect);
+        // No Gen 1 charge-turn Defense boost (that's Gen 2+) and no stale secondary chance: guard the
+        // whole stat-change row + EffectChance so a future PokeAPI stat_changes entry can't sneak in.
+        Assert.Null(move.StatEffectStat);
+        Assert.Null(move.StatEffectDelta);
+        Assert.Null(move.StatEffectChance);
+        Assert.Null(move.EffectChance);
+    }
 }

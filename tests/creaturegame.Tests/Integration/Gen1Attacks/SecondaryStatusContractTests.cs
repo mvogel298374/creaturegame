@@ -25,6 +25,9 @@ public class SecondaryStatusContractTests(MovesFixture moves) : Gen1MoveContract
     [InlineData("thunder-shock", StatusCondition.Paralysis)]
     [InlineData("thunderbolt", StatusCondition.Paralysis)]
     [InlineData("thunder", StatusCondition.Paralysis)]
+    [InlineData("smog", StatusCondition.Poison)]
+    [InlineData("sludge", StatusCondition.Poison)]
+    [InlineData("fire-blast", StatusCondition.Burn)]
     public async Task AppliesSecondaryStatusOnHit(string moveName, StatusCondition expected)
     {
         var result = await new MoveScenario()
@@ -41,6 +44,7 @@ public class SecondaryStatusContractTests(MovesFixture moves) : Gen1MoveContract
     [InlineData("poison-sting")] [InlineData("twineedle")]
     [InlineData("ember")] [InlineData("flamethrower")] [InlineData("ice-beam")] [InlineData("blizzard")]
     [InlineData("thunder-shock")] [InlineData("thunderbolt")] [InlineData("thunder")]
+    [InlineData("smog")] [InlineData("sludge")] [InlineData("fire-blast")]
     public async Task NoSecondaryStatusOnMiss(string moveName)
     {
         var result = await new MoveScenario()
@@ -55,6 +59,7 @@ public class SecondaryStatusContractTests(MovesFixture moves) : Gen1MoveContract
     [InlineData("poison-sting")] [InlineData("twineedle")]
     [InlineData("ember")] [InlineData("flamethrower")] [InlineData("ice-beam")] [InlineData("blizzard")]
     [InlineData("thunder-shock")] [InlineData("thunderbolt")] [InlineData("thunder")]
+    [InlineData("smog")] [InlineData("sludge")] [InlineData("fire-blast")]
     public async Task NoSecondaryStatusWhenTargetAlreadyStatused(string moveName)
     {
         var defender = TestCreatures.Make("Defender", hp: 500);
@@ -80,5 +85,22 @@ public class SecondaryStatusContractTests(MovesFixture moves) : Gen1MoveContract
 
         Assert.Equal(StatusCondition.Paralysis, result.Defender.Status);
         Assert.Contains(result.Events, e => e is StatusApplied);
+    }
+
+    // Lick is Ghost-type (0× vs Normal and — the Gen 1 bug — vs Psychic; see ImmunityContractTests).
+    // Against a non-immune target it deals damage, spends a PP, and lands its 30% paralysis secondary.
+    [Fact]
+    public async Task LickDamagesAndParalyzesANonImmuneTarget()
+    {
+        var move = Move("lick");
+        var result = await new MoveScenario()
+            .Rules(ForceSecondaryRules.Instance)
+            .Defender(TestCreatures.Make("Defender", type1: DamageType.Water, hp: 500))
+            .Use(move);
+
+        Assert.True(result.Has<DamageDealt>());
+        Assert.True(result.TotalDamage > 0);
+        Assert.Equal(StatusCondition.Paralysis, result.Defender.Status);
+        Assert.Equal(move.PowerPointsMax - 1, result.Move.PowerPointsCurrent);
     }
 }

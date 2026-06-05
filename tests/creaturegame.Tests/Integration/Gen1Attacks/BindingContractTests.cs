@@ -12,7 +12,7 @@ namespace creaturegame.Tests.Integration.Gen1Attacks;
 public class BindingContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 {
     [Theory]
-    [InlineData("bind")] [InlineData("wrap")] [InlineData("fire-spin")]
+    [InlineData("bind")] [InlineData("wrap")] [InlineData("fire-spin")] [InlineData("clamp")]
     public async Task DealsDamageAndStartsBinding(string moveName)
     {
         var result = await new MoveScenario()
