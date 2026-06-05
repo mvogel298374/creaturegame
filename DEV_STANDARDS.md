@@ -26,6 +26,13 @@ Guidelines for all `/dev` actions in this project.
 *   **Primary Constructors**: Use them for DTOs and simple data structures when possible (though keep models EF-compatible).
 *   **Nullability**: Ensure `Nullable` is enabled and handled for API responses (`int?`, `string?`).
 *   **Error Handling**: Wrap API and DB calls in `try-catch` blocks with clear console logging.
+*   **Formatting**: [CSharpier](https://csharpier.com) is the source of truth for C# layout — do **not** hand-align code into columns; let the formatter own whitespace. It is a version-pinned local tool (`.config/dotnet-tools.json`); config lives in `.csharpierrc.json`, exclusions in `.csharpierignore` (EF migrations are generated, so they're skipped). Run before committing:
+    ```powershell
+    & "C:\Users\USER\.dotnet\dotnet.exe" tool restore        # once per checkout
+    & "C:\Users\USER\.dotnet\dotnet.exe" csharpier format .   # format the tree
+    & "C:\Users\USER\.dotnet\dotnet.exe" csharpier check .    # CI-style: fail if unformatted
+    ```
+    The one-shot formatting pass is recorded in `.git-blame-ignore-revs` so `git blame` skips it (`git config blame.ignoreRevsFile .git-blame-ignore-revs`).
 
 ## Database Management
 *   **Property Tracking**: When adding new properties to models (`PokemonSpecies`, `Attack`, etc.), always add an EF Core migration — see `CLAUDE.md` for the migration command. Never use raw `ALTER TABLE`.

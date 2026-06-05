@@ -1,0 +1,3 @@
+# EF Core generated migrations + model snapshot — owned by `dotnet ef`, regenerated on demand.
+# Formatting them only causes churn and conflicts with the generator's output.
+creaturegame/DB/Migrations/
