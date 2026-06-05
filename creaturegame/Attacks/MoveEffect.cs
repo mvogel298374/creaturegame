@@ -43,6 +43,7 @@ public enum MoveEffect
     FocusEnergy,
     Bide,
     MirrorMove,
+    DreamEater,
 }
 
 public enum DamageCategory

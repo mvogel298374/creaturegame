@@ -349,8 +349,9 @@ public class MoveImport
         // Fixed-count multi-hit (always 2 — MultiHitCount is set in MapToAttack).
         ["double-kick"] = MoveEffect.MultiHit,
         ["twineedle"] = MoveEffect.MultiHit,
-        // Gen 1: a missed Jump Kick deals crash damage to the user. Hi Jump Kick joins in its batch.
+        // Gen 1: a missed Jump Kick / Hi Jump Kick deals crash damage to the user.
         ["jump-kick"] = MoveEffect.Crash,
+        ["high-jump-kick"] = MoveEffect.Crash,
         // Recoil — the user takes back a fraction of the damage dealt.
         ["take-down"] = MoveEffect.Recoil,
         ["double-edge"] = MoveEffect.Recoil,
@@ -382,6 +383,9 @@ public class MoveImport
         ["mist"] = MoveEffect.Mist,
         // Disable locks one of the target's moves (enforced at move-selection time).
         ["disable"] = MoveEffect.Disable,
+        // Dream Eater drains HP but only works on a sleeping target (enforced in the engine). The 50%
+        // drain heal rides on its DamageCategory.Drain (set from meta); this flag adds the sleep gate.
+        ["dream-eater"] = MoveEffect.DreamEater,
     };
 
     // Gen 1 physical types: Normal, Fighting, Flying, Poison, Ground, Rock, Bug, Ghost.

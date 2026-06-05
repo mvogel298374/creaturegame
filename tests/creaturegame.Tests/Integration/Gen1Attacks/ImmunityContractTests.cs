@@ -27,6 +27,30 @@ public class ImmunityContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     }
 
     [Fact]
+    public async Task PoisonTypesAreImmuneToPoisonGas()
+    {
+        // Poison Gas inflicts Poison; a Poison-type can't be poisoned (CanReceiveStatus).
+        var result = await new MoveScenario()
+            .Defender(TestCreatures.Make("D", type1: DamageType.Poison, hp: 500))
+            .Use(Move("poison-gas"));
+
+        Assert.Equal(StatusCondition.None, result.Defender.Status);
+        Assert.True(result.Has<MoveHadNoEffect>());
+    }
+
+    [Fact]
+    public async Task GhostTypesAreImmuneToGlare()
+    {
+        // Glare is a Normal-type pure-status move; Normal is 0× vs Ghost, so it has no effect.
+        var result = await new MoveScenario()
+            .Defender(TestCreatures.Make("D", type1: DamageType.Ghost, hp: 500))
+            .Use(Move("glare"));
+
+        Assert.Equal(StatusCondition.None, result.Defender.Status);
+        Assert.True(result.Has<MoveHadNoEffect>());
+    }
+
+    [Fact]
     public async Task GrassTypesAreImmuneToLeechSeed()
     {
         var result = await new MoveScenario()

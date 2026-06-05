@@ -533,10 +533,32 @@ three Gen 1 importer data fixes.
   deferred: pre-existing flaky `OHKOMove_FailsIfSourceLevelLowerThanTarget` (randomised DVs let a
   low-level attacker occasionally out-speed) — out of batch scope; see tech debt.
 
+### Batch 14 (moves 131–140) ✅ DONE (2026-06-05)
+spike-cannon, constrict, amnesia, kinesis, soft-boiled, high-jump-kick, glare, dream-eater, poison-gas,
+barrage. **730 .NET + 33 Vitest.** One new engine mechanic (Dream Eater) + two importer mappings;
+everything else coverage-only. No layer-2 data overrides needed (all values Gen-1-correct via
+`past_values`). No new battle event, no schema change.
+- Reused contracts (rows added): multi-hit (spike-cannon, barrage); secondary stat-drop (constrict
+  Speed −1); self-buff stat stage (amnesia +2 combined Special); foe stat-drop (kinesis −1 Accuracy);
+  heal (soft-boiled, parametrized with recover); pure status (glare → Paralysis, poison-gas → Poison);
+  crash-on-miss (high-jump-kick, parametrized with jump-kick); damage/PP/miss; phys/special split.
+- New capability class: **`DreamEaterContractTests`**. Immunity facts added: glare vs Ghost (Normal 0×),
+  poison-gas vs Poison-type (`CanReceiveStatus`).
+- **Dream Eater (`MoveEffect.DreamEater`):** fails on a non-sleeping target (guard in `AttackAction`
+  before the damage switch → reuses `MoveMissed`, the state-precondition-failure path like Counter, not
+  the type-based `MoveHadNoEffect`). The sleep requirement is **gen-invariant**, so it's inline, not on
+  the seam (seam-review confirmed). The 50% drain heal rides on the existing `DamageCategory.Drain`.
+- **Two importer mappings** (in `Gen1MoveEffects`): high-jump-kick → Crash (reuses jump-kick's crash
+  mechanic), dream-eater → DreamEater (Drain category stays from meta). Re-imported + MCP-verified;
+  pinned in `SecondaryChanceDataContractTests`.
+- Seam-review gate: PASS-WITH-ADVISORIES (0 blockers). Advisory addressed: documented why the Dream
+  Eater fail uses `MoveMissed` over `MoveHadNoEffect`. Other advisory (the flaky OHKO test) is the
+  pre-existing tech-debt item below.
+
 ### Remaining batches (cadence)
-- [ ] Batches 14–17 (moves 131–165): query the next 10 → add `InlineData` rows to the matching
-  capability class → add a new capability class only for genuinely new mechanics. **Next: batch 14 =
-  moves 131–140.**
+- [ ] Batches 15–17 (moves 141–165): query the next 10 → add `InlineData` rows to the matching
+  capability class → add a new capability class only for genuinely new mechanics. **Next: batch 15 =
+  moves 141–150.**
 - [ ] **Tech debt — flaky test:** `OHKOMove_FailsIfSourceLevelLowerThanTarget` (CoreMechanicsTests) is
   non-deterministic: it relies on level implying speed, but randomised DVs can flip the speed order so
   the OHKO succeeds. Rewrite to set attacker/defender Speed explicitly (Gen 1 uses the speed compare,

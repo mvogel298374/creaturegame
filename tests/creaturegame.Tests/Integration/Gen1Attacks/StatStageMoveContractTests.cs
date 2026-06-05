@@ -91,6 +91,7 @@ public class StatStageMoveContractTests(MovesFixture moves) : Gen1MoveContract(m
     [InlineData("double-team", "Evasion", 1)]
     [InlineData("minimize", "Evasion", 2)]
     [InlineData("barrier", "Defense", 2)]
+    [InlineData("amnesia", "Special", 2)] // Gen 1: +2 to the combined Special stat
     public async Task RaisesUserStatBySpecifiedStages(string moveName, string stat, int delta)
     {
         var result = await new MoveScenario().Attacker(TestCreatures.Make("A")).Use(Move(moveName));
@@ -132,6 +133,7 @@ public class StatStageMoveContractTests(MovesFixture moves) : Gen1MoveContract(m
     [InlineData("leer", "Defense")]
     [InlineData("growl", "Attack")]
     [InlineData("string-shot", "Speed")] // Gen 1: −1 Speed (modern: −2)
+    [InlineData("kinesis", "Accuracy")] // −1 foe Accuracy
     public async Task LowersFoeStatByOneStage(string moveName, string stat)
     {
         var result = await new MoveScenario()

@@ -15,6 +15,8 @@ public class MultiHitContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     [InlineData("comet-punch")]
     [InlineData("fury-attack")]
     [InlineData("pin-missile")]
+    [InlineData("spike-cannon")]
+    [InlineData("barrage")]
     public async Task MultiHitStrikesTwoToFiveTimes(string moveName)
     {
         for (int seed = 0; seed < 25; seed++)
@@ -37,6 +39,8 @@ public class MultiHitContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     [InlineData("comet-punch")]
     [InlineData("fury-attack")]
     [InlineData("pin-missile")]
+    [InlineData("spike-cannon")]
+    [InlineData("barrage")]
     public async Task MultiHitWithFixedCountStrikesExactlyThatMany(string moveName)
     {
         var result = await new MoveScenario()

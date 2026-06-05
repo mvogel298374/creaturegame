@@ -131,4 +131,20 @@ public class SecondaryChanceDataContractTests(MovesFixture moves) : Gen1MoveCont
         Assert.Null(move.StatEffectChance);
         Assert.Null(move.EffectChance);
     }
+
+    // ── Batch 14 mappings ──────────────────────────────────────────────────────────────────────
+    // High Jump Kick crashes on a miss like Jump Kick (importer name-match → Crash). Dream Eater is a
+    // sleep-gated drain — its DreamEater effect is a name mapping, and its 50% drain rides on the Drain
+    // category. Pin both so a re-import that drops a clause can't silently neuter either move.
+    [Fact]
+    public void HighJumpKickCrashesOnMissInGen1() =>
+        Assert.Equal(MoveEffect.Crash, Move("high-jump-kick").Effect);
+
+    [Fact]
+    public void DreamEaterIsASleepGatedDrainInGen1()
+    {
+        var move = Move("dream-eater");
+        Assert.Equal(MoveEffect.DreamEater, move.Effect);
+        Assert.Equal(DamageCategory.Drain, move.DamageCategory);
+    }
 }

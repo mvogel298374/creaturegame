@@ -97,6 +97,17 @@ public class PhysicalSpecialSplitContractTests(MovesFixture moves) : Gen1MoveCon
     [InlineData("fire-blast", AttackType.Special)] // Fire
     [InlineData("waterfall", AttackType.Special)] // Water
     [InlineData("clamp", AttackType.Special)] // Water
+    // Batch 14
+    [InlineData("spike-cannon", AttackType.Physical)] // Normal (multi-hit)
+    [InlineData("constrict", AttackType.Physical)] // Normal
+    [InlineData("barrage", AttackType.Physical)] // Normal (multi-hit)
+    [InlineData("high-jump-kick", AttackType.Physical)] // Fighting (crash-on-miss)
+    [InlineData("dream-eater", AttackType.Special)] // Psychic (drain)
+    [InlineData("amnesia", AttackType.Undefined)] // Psychic status move
+    [InlineData("kinesis", AttackType.Undefined)] // Psychic status move
+    [InlineData("soft-boiled", AttackType.Undefined)] // Normal status (heal) move
+    [InlineData("glare", AttackType.Undefined)] // Normal status move
+    [InlineData("poison-gas", AttackType.Undefined)] // Poison status move
     public void MoveHasGen1PhysicalSpecialCategory(string moveName, AttackType expected) =>
         Assert.Equal(expected, Move(moveName).AttackType);
 }

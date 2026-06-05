@@ -134,6 +134,36 @@ public class StatusMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
         Assert.Equal(StatusCondition.None, result.Defender.Status);
     }
 
+    // Glare (Normal → Paralysis) and Poison Gas (Poison → Poison): pure status moves that afflict a
+    // non-immune target without dealing damage, and apply nothing on a miss.
+    [Theory]
+    [InlineData("glare", StatusCondition.Paralysis)]
+    [InlineData("poison-gas", StatusCondition.Poison)]
+    public async Task InflictsItsStatusWithoutDamage(string moveName, StatusCondition expected)
+    {
+        var result = await new MoveScenario()
+            .Defender(TestCreatures.Make("D", type1: DamageType.Water, hp: 500))
+            .Use(Move(moveName));
+
+        Assert.False(result.Has<DamageDealt>(), $"{moveName} is a status move — no damage");
+        Assert.Equal(expected, result.Defender.Status);
+        Assert.Contains(result.Events, e => e is StatusApplied);
+    }
+
+    [Theory]
+    [InlineData("glare")]
+    [InlineData("poison-gas")]
+    public async Task InflictsNothingOnMiss(string moveName)
+    {
+        var result = await new MoveScenario()
+            .Rules(NeverHitRules.Instance)
+            .Defender(TestCreatures.Make("D", type1: DamageType.Water, hp: 500))
+            .Use(Move(moveName));
+
+        Assert.True(result.Has<MoveMissed>());
+        Assert.Equal(StatusCondition.None, result.Defender.Status);
+    }
+
     // Pure confusion moves (no damage): Supersonic (Normal) and Confuse Ray (Ghost).
     [Theory]
     [InlineData("supersonic")]

@@ -320,6 +320,19 @@ public class AttackAction : IBattleAction
             return Task.CompletedTask;
         }
 
+        // Dream Eater only works on a sleeping target; against anything else it fails (no damage, no
+        // heal). This requirement is invariant across generations — it's a property of the move, not a
+        // gen-variable rule — so it's checked here rather than on the IBattleRules seam. The 50% drain
+        // heal rides on the normal Drain category once the target is confirmed asleep. The failure is a
+        // *state* precondition not met (target awake), like Counter having no damage to return — so it
+        // reuses MoveMissed, the established path for that, not MoveHadNoEffect (which is the type-based
+        // "doesn't affect" line for immunities).
+        if (attackToUse.Effect == MoveEffect.DreamEater && Target.Status != StatusCondition.Sleep)
+        {
+            _emitter?.Emit(new MoveMissed(Source.Name, attackToUse.Name ?? ""));
+            return Task.CompletedTask;
+        }
+
         // Damage calculation by category
         int damage = 0;
         bool isCrit = false;

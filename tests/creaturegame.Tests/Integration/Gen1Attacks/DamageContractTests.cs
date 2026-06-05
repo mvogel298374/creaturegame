@@ -79,6 +79,9 @@ public class DamageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     [InlineData("waterfall")]
     [InlineData("clamp")]
     [InlineData("swift")]
+    [InlineData("spike-cannon")]
+    [InlineData("barrage")]
+    [InlineData("constrict")]
     public async Task DealsDamageOnHit(string moveName)
     {
         var result = await new MoveScenario()
@@ -158,6 +161,9 @@ public class DamageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     [InlineData("waterfall")]
     [InlineData("clamp")]
     [InlineData("swift")]
+    [InlineData("spike-cannon")]
+    [InlineData("barrage")]
+    [InlineData("constrict")]
     public async Task DecrementsPpByOneOnUse(string moveName)
     {
         var move = Move(moveName);
@@ -195,6 +201,7 @@ public class DamageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     [InlineData("bone-club")]
     [InlineData("fire-blast")]
     [InlineData("clamp")]
+    [InlineData("barrage")]
     public async Task MissesWhenAccuracyRollFails(string moveName)
     {
         var result = await new MoveScenario().Rules(NeverHitRules.Instance).Use(Move(moveName));

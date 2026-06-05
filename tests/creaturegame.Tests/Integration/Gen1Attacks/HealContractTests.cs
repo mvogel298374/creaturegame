@@ -11,15 +11,18 @@ namespace creaturegame.Tests.Integration.Gen1Attacks;
 [Collection(MovesCollection.Name)]
 public class HealContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 {
-    [Fact]
-    public async Task RecoverRestoresHalfOfMaxHp()
+    // Recover and Soft-Boiled share the same Heal mechanic (½ max HP).
+    [Theory]
+    [InlineData("recover")]
+    [InlineData("soft-boiled")]
+    public async Task RestoresHalfOfMaxHp(string moveName)
     {
         var healer = TestCreatures.Make("Healer", hp: 200);
         healer.Attributes.HP = 50; // damaged
 
-        var result = await new MoveScenario().Attacker(healer).Use(Move("recover"));
+        var result = await new MoveScenario().Attacker(healer).Use(Move(moveName));
 
-        Assert.False(result.Has<DamageDealt>(), "Recover is a status move — no damage");
+        Assert.False(result.Has<DamageDealt>(), $"{moveName} is a status move — no damage");
         Assert.Equal(150, healer.Attributes.HP); // 50 + ½ × 200
 
         var healed = result.First<Healed>();
@@ -29,13 +32,15 @@ public class HealContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         Assert.Equal(150, healed.HpAfter);
     }
 
-    [Fact]
-    public async Task RecoverDoesNotOverhealPastMaxHp()
+    [Theory]
+    [InlineData("recover")]
+    [InlineData("soft-boiled")]
+    public async Task DoesNotOverhealPastMaxHp(string moveName)
     {
         var healer = TestCreatures.Make("Healer", hp: 200);
         healer.Attributes.HP = 180; // ½ × 200 would overshoot
 
-        var result = await new MoveScenario().Attacker(healer).Use(Move("recover"));
+        var result = await new MoveScenario().Attacker(healer).Use(Move(moveName));
 
         Assert.Equal(200, healer.Attributes.HP); // capped at max, not 280
         Assert.True(result.Has<Healed>());

@@ -12,15 +12,17 @@ namespace creaturegame.Tests.Integration.Gen1Attacks;
 [Collection(MovesCollection.Name)]
 public class CrashDamageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 {
-    [Fact]
-    public async Task UserTakesCrashDamageOnMiss()
+    [Theory]
+    [InlineData("jump-kick")]
+    [InlineData("high-jump-kick")]
+    public async Task UserTakesCrashDamageOnMiss(string moveName)
     {
         var attacker = TestCreatures.Make("A", hp: 300);
         var result = await new MoveScenario()
             .Attacker(attacker)
             .Defender(TestCreatures.Make("D", hp: 500))
             .Rules(NeverHitRules.Instance)
-            .Use(Move("jump-kick"));
+            .Use(Move(moveName));
 
         Assert.True(result.Has<MoveMissed>());
         Assert.False(result.Has<DamageDealt>());
@@ -34,14 +36,16 @@ public class CrashDamageContractTests(MovesFixture moves) : Gen1MoveContract(mov
         Assert.Equal(result.Attacker.Attributes.HP, crash.HpAfter);
     }
 
-    [Fact]
-    public async Task NoCrashDamageOnHit()
+    [Theory]
+    [InlineData("jump-kick")]
+    [InlineData("high-jump-kick")]
+    public async Task NoCrashDamageOnHit(string moveName)
     {
         var attacker = TestCreatures.Make("A", hp: 300, attack: 200);
         var result = await new MoveScenario()
             .Attacker(attacker)
             .Defender(TestCreatures.Make("D", hp: 9999, defense: 80))
-            .Use(Move("jump-kick")); // default AlwaysHitRules ⇒ connects
+            .Use(Move(moveName)); // default AlwaysHitRules ⇒ connects
 
         Assert.True(result.Has<DamageDealt>());
         Assert.False(result.Has<CrashDamage>());
