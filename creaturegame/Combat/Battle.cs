@@ -51,46 +51,8 @@ public class Battle
                 PlayerCreature.MoveSet.Select(m => new MoveInfo(m.Base.Name ?? "", m.Base.DamageType, m.PowerPointsCurrent, m.Base.PowerPointsMax, m == PlayerCreature.DisabledMove)).ToList()
             ));
 
-            // Move selection — two-turn moves skip IBattleInput on the release turn, rampage
-            // moves (Thrash) skip it while locked in, and Rage skips it once used (locked into the
-            // move). null signals AttackAction to Struggle when out of PP. The lock branches are
-            // checked before CanSelectAnyMove, so a Rage move that gets Disabled is still force-used
-            // (Gen 1's Rage/Disable interaction is nuanced — a documented simplification, not enforced).
-            PokemonAttack? playerMove = PlayerCreature.IsTwoTurnCharging
-                ? PlayerCreature.ChargingMove
-                : PlayerCreature.RampageTurnsRemaining > 0
-                  ? PlayerCreature.RampageMove
-                  : PlayerCreature.IsRaging
-                  ? PlayerCreature.RageMove
-                  : (!PlayerCreature.CanSelectAnyMove
-                    ? null
-                    : await _playerInput.ChooseMoveAsync(new TurnContext
-                      {
-                          Attacker     = PlayerCreature,
-                          Defender     = EnemyCreature,
-                          TypeChart    = _typeChart,
-                          Rules        = _rules,
-                          TurnNumber   = _turnNumber,
-                          DisabledMove = PlayerCreature.DisabledMove
-                      }));
-
-            PokemonAttack? enemyMove = EnemyCreature.IsTwoTurnCharging
-                ? EnemyCreature.ChargingMove
-                : EnemyCreature.RampageTurnsRemaining > 0
-                  ? EnemyCreature.RampageMove
-                  : EnemyCreature.IsRaging
-                  ? EnemyCreature.RageMove
-                  : (!EnemyCreature.CanSelectAnyMove
-                    ? null
-                    : await _enemyInput.ChooseMoveAsync(new TurnContext
-                      {
-                          Attacker     = EnemyCreature,
-                          Defender     = PlayerCreature,
-                          TypeChart    = _typeChart,
-                          Rules        = _rules,
-                          TurnNumber   = _turnNumber,
-                          DisabledMove = EnemyCreature.DisabledMove
-                      }));
+            PokemonAttack? playerMove = await SelectMoveAsync(PlayerCreature, EnemyCreature, _playerInput);
+            PokemonAttack? enemyMove  = await SelectMoveAsync(EnemyCreature, PlayerCreature, _enemyInput);
 
             var playerAction = new AttackAction(PlayerCreature, EnemyCreature, playerMove, _typeChart, _rules, _emitter, _movePool, _rng);
             var enemyAction  = new AttackAction(EnemyCreature, PlayerCreature, enemyMove,  _typeChart, _rules, _emitter, _movePool, _rng);
@@ -147,6 +109,33 @@ public class Battle
 
         string winner = PlayerCreature.IsAlive() ? PlayerCreature.Name : EnemyCreature.Name;
         _emitter?.Emit(new BattleEnded(winner));
+    }
+
+    /// <summary>
+    /// Resolves which move a combatant uses this turn. Lock-in mechanics bypass <see cref="IBattleInput"/>:
+    /// a two-turn move on its release turn, a rampage (Thrash) while locked in, and Rage once used all
+    /// auto-repeat. Otherwise the input chooses — unless no move is selectable (out of PP, or the only
+    /// option is Disabled), in which case <c>null</c> tells <see cref="AttackAction"/> to Struggle.
+    /// The lock branches are checked before <see cref="Creature.CanSelectAnyMove"/>, so a Rage move that
+    /// gets Disabled is still force-used (Gen 1's Rage/Disable interaction is nuanced — a documented
+    /// simplification, not enforced).
+    /// </summary>
+    private async Task<PokemonAttack?> SelectMoveAsync(Creature attacker, Creature defender, IBattleInput input)
+    {
+        if (attacker.IsTwoTurnCharging)        return attacker.ChargingMove;
+        if (attacker.RampageTurnsRemaining > 0) return attacker.RampageMove;
+        if (attacker.IsRaging)                  return attacker.RageMove;
+        if (!attacker.CanSelectAnyMove)         return null;
+
+        return await input.ChooseMoveAsync(new TurnContext
+        {
+            Attacker     = attacker,
+            Defender     = defender,
+            TypeChart    = _typeChart,
+            Rules        = _rules,
+            TurnNumber   = _turnNumber,
+            DisabledMove = attacker.DisabledMove
+        });
     }
 
     private void ApplyLeechSeedDrain(Creature drained, Creature healed)

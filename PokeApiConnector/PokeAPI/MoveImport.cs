@@ -138,6 +138,10 @@ public class MoveImport
             _                       => AttackType.Undefined
         };
 
+        // PokeAPI reports a target's *status condition* here, not the move's special mechanic — so
+        // Toxic comes through as plain "poison" (the badly-poison escalation is a move effect, not a
+        // distinct ailment). Toxic → BadPoison is restored in the layer-2 override block below; no Gen 1
+        // move emits a "bad-poison" ailment, so there's no arm for it here.
         attack.StatusEffect = pokeMove.Meta?.Ailment?.Name switch
         {
             "paralysis"  => StatusCondition.Paralysis,
@@ -145,7 +149,6 @@ public class MoveImport
             "burn"       => StatusCondition.Burn,
             "poison"     => StatusCondition.Poison,
             "freeze"     => StatusCondition.Freeze,
-            "bad-poison" => StatusCondition.BadPoison,
             _            => StatusCondition.None
         };
 
