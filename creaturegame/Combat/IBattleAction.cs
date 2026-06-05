@@ -74,9 +74,12 @@ public class AttackAction : IBattleAction
         bool isBide           = !usingStruggle && attackToUse.Effect == MoveEffect.Bide;
         bool bideContinuation = isBide && Source.BideTurnsRemaining > 0;
 
-        // PP decremented on the first turn only (two-turn release, rampage / rage / bide continuations
-        // were already charged for; don't double-spend).
-        if (!usingStruggle && !isReleaseTurn && !rampageContinuation && !rageContinuation && !bideContinuation)
+        // A turn that continues an already-charged/committed lock-in: a two-turn release, or a rampage /
+        // rage / bide continuation. PP was spent on the first turn of the lock, so these don't re-spend.
+        bool isLockedInContinuation = isReleaseTurn || rampageContinuation || rageContinuation || bideContinuation;
+
+        // PP decremented on the first turn only (don't double-spend a lock-in continuation).
+        if (!usingStruggle && !isLockedInContinuation)
             _selectedMove!.PowerPointsCurrent--;
 
         // Charge phase: wind up and defer damage to the next turn
@@ -116,12 +119,17 @@ public class AttackAction : IBattleAction
         _emitter?.Emit(new MoveUsed(Source.Name, attackToUse.Name ?? ""));
 
         // Remember the move actually used so the opponent's Mirror Move can copy it. Metronome and
-        // Mirror Move themselves aren't recorded — the move they call records itself via its inner action.
+        // Mirror Move themselves aren't recorded here — the move they *call* records itself via its
+        // inner action — so neither can ever be the foe's LastMoveUsed (that's why the Mirror Move
+        // filter below only has to exclude Struggle, not them).
         if (!usingStruggle && attackToUse.Effect is not (MoveEffect.Metronome or MoveEffect.MirrorMove))
             Source.LastMoveUsed = attackToUse;
 
-        // Bide release: the committed turns are done — unleash double the damage absorbed (typeless,
-        // never misses). Fails if nothing was stored. BideMove clears so Battle stops auto-repeating.
+        // Bide release: the committed turns are done — unleash double the damage absorbed. The damage
+        // is typeless and never misses; like the other non-standard damage categories (Fixed, OHKO, …)
+        // it is deliberately not recorded as counterable, so Counter can't reflect it (matching this
+        // engine's "Counter only answers standard-path damage" simplification). Fails if nothing was
+        // stored. BideMove clears so Battle stops auto-repeating.
         if (isBide)
         {
             int unleashed = Source.BideDamageAccumulated * _rules.BideDamageMultiplier;
@@ -129,8 +137,6 @@ public class AttackAction : IBattleAction
             if (unleashed > 0 && Target.IsAlive())
             {
                 Target.Attributes.ReceiveDamage(unleashed);
-                Target.LastDamageTaken = unleashed;
-                Target.LastDamageType  = attackToUse.DamageType;
                 _emitter?.Emit(new DamageDealt(Target.Name, unleashed, 1.0,
                     Target.Attributes.HP, Target.Attributes.MaxHP));
             }
@@ -187,14 +193,16 @@ public class AttackAction : IBattleAction
             return Task.CompletedTask;
         }
 
-        // Mirror Move: re-execute the opponent's last used move. Like Metronome, the copied move runs
-        // in full through its own inner action (which records it as this creature's last move). Fails
-        // if the foe hasn't used a copyable move yet. Only Mirror Move itself and Struggle are excluded
-        // — copying Bide (which starts a fresh commitment on this user) is valid Gen 1 behavior.
+        // Mirror Move: re-execute the opponent's last used move. Like Metronome, the copied move runs in
+        // full through its own inner action (which records it as this creature's last move). Fails if the
+        // foe hasn't used a copyable move yet. Metronome/Mirror Move are never recorded as a LastMoveUsed
+        // (see above), so only Struggle needs excluding here. Copying a lock-in move is valid Gen 1
+        // behavior: Bide starts a fresh commitment, and a two-turn move (Fly) charges then auto-releases
+        // through the normal lock-in path on this user.
         if (!usingStruggle && attackToUse.Effect == MoveEffect.MirrorMove)
         {
             var last = Target.LastMoveUsed;
-            if (last != null && last.Effect != MoveEffect.MirrorMove && last.Name != "struggle")
+            if (last != null && last.Name != "struggle")
                 return ExecuteInner(last);
             _emitter?.Emit(new MoveMissed(Source.Name, attackToUse.Name ?? ""));
             return Task.CompletedTask;

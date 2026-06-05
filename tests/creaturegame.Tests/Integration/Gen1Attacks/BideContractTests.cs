@@ -62,6 +62,36 @@ public class BideContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     }
 
     [Fact]
+    public async Task BideDamageIsTypelessAndNotCounterable()
+    {
+        // Bide's unleash is typeless and, like the other non-standard damage categories, is not
+        // recorded as counterable — so the victim has no counterable damage on record from it (the
+        // player here only ever uses Bide, so the only hit the enemy takes is the unleash).
+        var player = new Creature("Player") { Level = 50, Type1 = DamageType.Normal };
+        player.CalculateStats();
+        player.Attributes.HP = player.Attributes.MaxHP = 2000;
+        player.Attributes.Speed = 200;
+        player.AddAttack(Move("bide"));
+
+        var enemy = new Creature("Enemy") { Level = 50, Type1 = DamageType.Normal };
+        enemy.CalculateStats();
+        enemy.Attributes.HP = enemy.Attributes.MaxHP = 1;
+        enemy.Attributes.Attack = 60;
+        enemy.Attributes.Speed  = 1;
+        enemy.AddAttack(Move("tackle"));
+
+        var emitter = new RecordingEmitter();
+        var battle  = new Battle(player, enemy, Gen1TypeChart.Instance,
+                                 new CountingInput(0), AutoSelectInput.Instance,
+                                 rules: new FixedBideRules(), emitter: emitter);
+        await battle.StartFightAsync();
+
+        Assert.Contains(emitter.Events, e => e is DamageDealt d && d.TargetName == "Enemy");
+        Assert.Null(enemy.LastDamageType);   // the unleash left no counterable record
+        Assert.Equal(0, enemy.LastDamageTaken);
+    }
+
+    [Fact]
     public async Task BideAbsorbsNonStandardDamageToo()
     {
         // Bide stores damage from any category, not just normal attacks. The enemy uses Sonic Boom

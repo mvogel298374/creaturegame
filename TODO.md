@@ -795,21 +795,23 @@ Findings from a review of the move-mechanic batches (Recover/Mimic, the five bat
   all effect pins green.
 - [x] **`AttackAction.ExecuteInner(Attack)` helper** — Metronome and Mirror Move shared the same
   `new AttackAction(…, new PokemonAttack(x), …).ExecuteAsync()` construction; extracted to one helper.
-- [ ] **`AttackAction.ExecuteAsync` is a very long sequential pipeline** `[design]`. The four lock-in
-  mechanics (two-turn / rampage / rage / bide) each smear logic across three spots — the PP-skip
-  predicate at the top, a charge/store block mid-method, and `Battle.SelectMoveAsync`'s force-select.
-  It works and is well-commented, but every new mechanic adds another branch. Consider an
-  `ILockInMechanic`-style abstraction (or at least grouping the lock-in handling) when the next lock-in
-  move lands. Not worth a reactive refactor now.
-- [ ] **Bide records a type for "typeless" damage** `[fidelity nit]`. The release sets
-  `Target.LastDamageType = attackToUse.DamageType` (Normal) right after a comment calling Bide damage
-  "typeless," so a follow-up Counter could reflect it as Normal. Edge case; decide intended Gen 1
-  behaviour and either stop recording the type on Bide release or update the comment.
-- [ ] **Mirror Move's copyable filter is narrower than its comment** `[nit]`. It excludes only Mirror
-  Move + Struggle, so a foe's Mirror Move can also copy Mimic / two-turn moves (copying Bide is
-  intended + documented). Harmless; tighten the filter or the comment if it ever surprises.
-- [ ] **Cosmetic alignment** `[nit]`: in `Creature.cs` the `BideDamageAccumulated` delegating prop's
-  `set =>` column doesn't line up with its neighbours (long name). Trivial.
+- [x] **Bide "typeless" contradiction resolved.** The release no longer records `Target.LastDamageTaken`/
+  `LastDamageType`, so Bide damage is non-counterable like the other non-standard categories
+  (Fixed/OHKO/…) — matching this engine's "Counter only answers standard-path damage" simplification and
+  removing the comment contradiction. Pinned by `BideDamageIsTypelessAndNotCounterable`.
+- [x] **Mirror Move filter/comment made consistent.** Metronome/Mirror Move are never recorded as a
+  `LastMoveUsed` (documented at the recording site), so the filter only needs to exclude Struggle; dropped
+  the dead `last.Effect != MirrorMove` check and clarified that copying a lock-in move (Bide / two-turn)
+  is valid and resolves through the normal lock-in path.
+- [x] **`Creature.cs` delegating-prop alignment** normalised — the batch-11–13 props had `set =>` one
+  column short of the rest of the block; realigned.
+- [x] **PP-skip predicate named** — the `!isReleaseTurn && !rampageContinuation && …` chain is now a single
+  `isLockedInContinuation` local, naming the concept.
+- [ ] **`AttackAction.ExecuteAsync` lock-in abstraction** `[design, deferred]`. The four lock-in mechanics
+  (two-turn / rampage / rage / bide) still spread logic across selection (`Battle.SelectMoveAsync`), the
+  PP/continuation flags, and per-mechanic charge/store blocks. A full `ILockInMechanic`-style abstraction
+  is a high-risk refactor of the most central method with no third use case driving it — **deliberately
+  deferred** until the next lock-in move lands (that's the trigger to abstract). YAGNI for now.
 
 #### 7. Architecture / decision-log doc `[docs — after the above]`
 The doc set is strong, but the *why* behind the two-DB split, event sourcing, and the seam invariants lives only implicitly. For a project explicitly built to extend generation-by-generation, capture these as an `ARCHITECTURE.md` (or lightweight ADR log) so the invariants survive future drift.
