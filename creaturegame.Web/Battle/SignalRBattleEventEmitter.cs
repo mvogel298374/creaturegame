@@ -63,6 +63,8 @@ public sealed class SignalRBattleEventEmitter(
         StatStageChanged e => ("StatStageChanged", new { e.CreatureName, e.Stat, e.Delta, e.NewStage }),
         HazeClearedStages  => ("HazeClearedStages", new { }),
         DrainHealed e      => ("DrainHealed",      new { e.SourceName, e.HealAmount, e.HpAfter }),
+        Healed e           => ("Healed",           new { e.CreatureName, e.HealAmount, e.HpAfter }),
+        MimicLearned e     => ("MimicLearned",     new { e.CreatureName, e.MoveName }),
         LeechSeedApplied e => ("LeechSeedApplied", new { e.TargetName }),
         LeechSeedDamage e  => ("LeechSeedDamage",  new { e.DrainedName, e.Damage, e.HpAfter }),
         LeechSeedHealed e  => ("LeechSeedHealed",  new { e.HealedName, e.Amount, e.HpAfter }),

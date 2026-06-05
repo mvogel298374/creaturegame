@@ -331,6 +331,18 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       return { steps: [d({ type: 'UPDATE_HP', name: srcName, hp: hpAftr }), w(300), d(log(`${srcName} restored ${healAmount} HP!`))] };
     }
 
+    case 'Healed': {
+      const cName  = payload.creatureName as string;
+      const hpAftr = payload.hpAfter as number;
+      return { steps: [d({ type: 'UPDATE_HP', name: cName, hp: hpAftr }), w(300), d(log(`${cName} regained health!`))] };
+    }
+
+    case 'MimicLearned': {
+      const cName = payload.creatureName as string;
+      const mName = payload.moveName as string;
+      return { steps: [w(120), d(log(`${cName} learned ${formatMoveName(mName)}!`))] };
+    }
+
     case 'LeechSeedApplied': {
       const tName = payload.targetName as string;
       return { steps: [w(120), d(log(`${tName} was seeded!`))] };

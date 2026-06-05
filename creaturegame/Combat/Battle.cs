@@ -107,6 +107,11 @@ public class Battle
             _emitter?.Emit(new TurnEnded());
         }
 
+        // Mimic reverts when the battle ends (Gen 1 also reverts on switch-out) — undo the transient
+        // move-swap so it never leaks into the permanent MoveSet of a reused Creature.
+        PlayerCreature.RestoreMimickedMove();
+        EnemyCreature.RestoreMimickedMove();
+
         string winner = PlayerCreature.IsAlive() ? PlayerCreature.Name : EnemyCreature.Name;
         _emitter?.Emit(new BattleEnded(winner));
     }

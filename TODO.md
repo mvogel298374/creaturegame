@@ -437,10 +437,49 @@ event (Rage reuses `StatStageChanged`), so no frontend change.
 - Seam-review gate: PASS-WITH-ADVISORIES (0 blockers); all 3 advisories fixed before commit (rage
   data-pin, Rage/Disable doc comment, quirk-not-outcome assertion in the full-`Battle` Rage test).
 
+### Infra cleanup (2026-06-05, between batches 10 and 11)
+Extracted `Battle.SelectMoveAsync` from the duplicated 4-level player/enemy move-selection ternary
+(two-turn → rampage → rage → struggle/input) so the lock-precedence rule lives in one place; removed
+the unreachable `"bad-poison" => BadPoison` importer arm (PokeAPI emits `"poison"` for Toxic; the
+BadPoison promotion is the layer-2 override). Behavior-preserving.
+
+### Batch 11 (moves 101–110) ✅ DONE (2026-06-05)
+night-shade, mimic, screech, double-team, recover, harden, minimize, smokescreen, confuse-ray,
+withdraw. **605 .NET + 30 Vitest.** Two new engine mechanics (Recover, Mimic) + a correctness fix to
+the type-immunity guard; everything else coverage-only. Two new events (`Healed`, `MimicLearned`) wired
+through all 4 emitters + `timeline.ts` (+ Vitest).
+- Reused contracts (rows added): level-based (night-shade, Ghost — non-immune defender); phys/special
+  split (night-shade Physical; the eight status moves Undefined); self-buff stat stage (harden/withdraw
+  +1 Def, double-team +1 Eva, minimize +2 Eva — first Evasion movers); foe stat drop (smokescreen −1
+  Accuracy; screech −2 Defense, first −2 drop); pure confusion (confuse-ray, folded into a theory with
+  supersonic); immunity (night-shade & confuse-ray are Ghost ⇒ Normal immune; + a self-buff-vs-Ghost
+  test pinning the fix below).
+- New capability classes: **`HealContractTests`** (Recover restores ½ max HP, no over-heal) and
+  **`MimicContractTests`** (copies a random foe move; reverts after battle; reverts on `ResetBattleState`).
+- **Recover (`MoveEffect.Heal`):** heals `MaxHP × IBattleRules.RecoverHealFraction` (Gen 1 = ½, on the
+  seam) via `ReceiveHealing` (caps at max); emits `Healed` with the *actual* amount restored. (Gen 1
+  "(maxHP−HP)&255==255 fail" quirk documented, not modelled.) Soft-Boiled shares the importer clause +
+  a data pin; its behaviour coverage lands in its own batch.
+- **Mimic (`MoveEffect.Mimic`):** copies a random move from the target's set into the Mimic slot by
+  swapping `PokemonAttack.Base`, remembered in `BattleState.MimicWrapper`/`MimicOriginalBase`. The
+  revert lives in **`Creature.ResetBattleState`** (so Haze's mid-battle reset can't orphan it) and runs
+  again at battle end — the transient swap never leaks into the permanent `MoveSet`. Deliberately not
+  treated as foe-directed for type immunity (it copies, doesn't attack).
+- **Correctness fix (the immunity seam):** the batch-9 pure-status type-immunity guard now only fires
+  for **foe-directed** moves (status / confusion / Leech Seed / Disable / Counter / a foe stat drop), so
+  a Normal-type self-buff or Recover is no longer wrongly blocked against a Ghost. Counter (BaseDamage 0
+  but foe-directed) stays inside the guard — a failing test caught that.
+- Data pins added: recover/soft-boiled → Heal, mimic → Mimic, night-shade → LevelBased, screech −2 Def.
+  Re-imported via full `PokeApiConnector` run; verified Effects via MCP (mimic 19, recover 18,
+  night-shade LevelBased, confuse-ray Confuse).
+- Seam-review gate: PASS-WITH-ADVISORIES (0 blockers, 4 advisories); all fixed before commit — incl. a
+  **real bug** (Haze+Mimic permanent-MoveSet leak). New failure modes appended to the reviewer's log
+  (transient-vs-reset; self-vs-foe immunity scoping).
+
 ### Remaining batches (cadence)
-- [ ] Batches 11–17 (moves 101–165): query the next 10 → add `InlineData` rows to the matching
-  capability class → add a new capability class only for genuinely new mechanics. **Next: batch 11 =
-  moves 101–110.**
+- [ ] Batches 12–17 (moves 111–165): query the next 10 → add `InlineData` rows to the matching
+  capability class → add a new capability class only for genuinely new mechanics. **Next: batch 12 =
+  moves 111–120.**
 - [ ] **Fixed-2 multi-hit mover still pending**: bonemerang — the fixed-count mechanism exists
   (double-kick, twineedle); just needs mapping + coverage in its batch.
 - [x] **Rampage reuse**: petal-dance — done in batch 8 (already tagged in importer + coverage added).

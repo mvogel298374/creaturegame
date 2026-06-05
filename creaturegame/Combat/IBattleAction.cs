@@ -196,9 +196,18 @@ public class AttackAction : IBattleAction
         // user — both are excluded here.
         bool isPureStatusMove = category == DamageCategory.Standard && !usingStruggle
                                 && attackToUse.BaseDamage == 0;
+        // A pure-status move is only blocked by the target's type immunity when it actually acts on
+        // the foe (status, confusion, Leech Seed, Disable, Counter's reflected damage, a foe stat
+        // drop). Self-targeting moves (Recover, Swords Dance, Mist, Haze, …) never consult the
+        // target's type, so a Normal-type self-buff still works against a Ghost. Mimic is deliberately
+        // excluded too: it copies a move rather than acting on the foe, so it isn't type-blocked.
+        bool targetsFoe = attackToUse.StatusEffect != StatusCondition.None
+                          || attackToUse.Effect is MoveEffect.Confuse or MoveEffect.LeechSeed
+                                                or MoveEffect.Disable or MoveEffect.Counter
+                          || attackToUse.StatEffect is { Target: StageTarget.Foe };
         double typeImmunity = DamageCalculator.GetTypeEffectiveness(
             attackToUse.DamageType, Target.Type1, Target.Type2, _typeChart);
-        if (typeImmunity == 0 && (isPureStatusMove || category is DamageCategory.Fixed
+        if (typeImmunity == 0 && ((isPureStatusMove && targetsFoe) || category is DamageCategory.Fixed
                 or DamageCategory.LevelBased or DamageCategory.OHKO or DamageCategory.SuperFang))
         {
             _emitter?.Emit(new MoveHadNoEffect(Target.Name, attackToUse.Name ?? ""));
@@ -500,6 +509,40 @@ public class AttackAction : IBattleAction
                 {
                     Source.HasMist = true;
                     _emitter?.Emit(new MistApplied(Source.Name));
+                }
+                break;
+
+            case MoveEffect.Heal:
+                // Recover / Soft-Boiled: restore a fraction of max HP to the user (capped at max by
+                // ReceiveHealing). The heal fraction is gen-variable, so it comes from the rules seam.
+                if (Source.IsAlive())
+                {
+                    int hpBefore = Source.Attributes.HP;
+                    int heal     = Math.Max(1, (int)(Source.Attributes.MaxHP * _rules.RecoverHealFraction));
+                    Source.Attributes.ReceiveHealing(heal);
+                    // Report the amount actually restored (ReceiveHealing caps at max), not the request.
+                    _emitter?.Emit(new Healed(Source.Name, Source.Attributes.HP - hpBefore, Source.Attributes.HP));
+                }
+                break;
+
+            case MoveEffect.Mimic:
+                // Gen 1: copy a random move from the target's set; it replaces Mimic for the rest of
+                // the battle (Battle restores it on battle end). The user only copies this turn — no
+                // damage — then can use the copied move on later turns. Fails if already mimicked or
+                // the target has no copyable move.
+                if (Target.IsAlive() && _selectedMove != null && Source.MimicWrapper == null)
+                {
+                    var copyable = Target.MoveSet
+                        .Where(m => m.Base.Effect != MoveEffect.Mimic && m.Base.Name != "struggle")
+                        .ToList();
+                    if (copyable.Count > 0)
+                    {
+                        var chosen = copyable[_rng.Next(copyable.Count)].Base;
+                        Source.MimicWrapper      = _selectedMove;
+                        Source.MimicOriginalBase = _selectedMove.Base;
+                        _selectedMove.Base       = chosen;
+                        _emitter?.Emit(new MimicLearned(Source.Name, chosen.Name ?? ""));
+                    }
                 }
                 break;
 

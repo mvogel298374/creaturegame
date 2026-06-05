@@ -120,25 +120,30 @@ public class StatusMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
         Assert.Equal(StatusCondition.None, result.Defender.Status);
     }
 
-    [Fact]
-    public async Task SupersonicConfusesTheTargetWithoutDamage()
+    // Pure confusion moves (no damage): Supersonic (Normal) and Confuse Ray (Ghost).
+    [Theory]
+    [InlineData("supersonic")]
+    [InlineData("confuse-ray")]
+    public async Task ConfusesTheTargetWithoutDamage(string moveName)
     {
         var result = await new MoveScenario()
-            .Defender(TestCreatures.Make("D", hp: 500))
-            .Use(Move("supersonic"));
+            .Defender(TestCreatures.Make("D", type1: DamageType.Water, hp: 500))
+            .Use(Move(moveName));
 
-        Assert.False(result.Has<DamageDealt>(), "Supersonic is a status move — no damage");
+        Assert.False(result.Has<DamageDealt>(), $"{moveName} is a status move — no damage");
         Assert.True(result.Defender.ConfusedTurns > 0);
         Assert.Contains(result.Events, e => e is ConfusionStarted);
     }
 
-    [Fact]
-    public async Task SupersonicDoesNotConfuseOnMiss()
+    [Theory]
+    [InlineData("supersonic")]
+    [InlineData("confuse-ray")]
+    public async Task DoesNotConfuseOnMiss(string moveName)
     {
         var result = await new MoveScenario()
             .Rules(NeverHitRules.Instance)
-            .Defender(TestCreatures.Make("D", hp: 500))
-            .Use(Move("supersonic"));
+            .Defender(TestCreatures.Make("D", type1: DamageType.Water, hp: 500))
+            .Use(Move(moveName));
 
         Assert.True(result.Has<MoveMissed>());
         Assert.Equal(0, result.Defender.ConfusedTurns);

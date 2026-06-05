@@ -59,4 +59,34 @@ public class SecondaryChanceDataContractTests(MovesFixture moves) : Gen1MoveCont
     [Fact]
     public void RageHasRageMoveEffect()
         => Assert.Equal(MoveEffect.Rage, Move("rage").Effect);
+
+    // Recover/Mimic mechanics and Night Shade's level-based category are importer name/ID mappings
+    // PokeAPI can't express — pin them so a re-import can't silently revert them to plain status moves.
+    [Fact]
+    public void RecoverHasHealMoveEffect()
+        => Assert.Equal(MoveEffect.Heal, Move("recover").Effect);
+
+    // Soft-Boiled shares Recover's importer clause (both → Heal). Its behaviour coverage lands in its
+    // own batch, but pin the mapping now so the shared clause can't silently regress for either move.
+    [Fact]
+    public void SoftBoiledHasHealMoveEffect()
+        => Assert.Equal(MoveEffect.Heal, Move("soft-boiled").Effect);
+
+    [Fact]
+    public void MimicHasMimicMoveEffect()
+        => Assert.Equal(MoveEffect.Mimic, Move("mimic").Effect);
+
+    [Fact]
+    public void NightShadeIsLevelBased()
+        => Assert.Equal(DamageCategory.LevelBased, Move("night-shade").DamageCategory);
+
+    // Screech lowers the foe's Defense by two stages in every gen (the others in its family are −1).
+    [Fact]
+    public void ScreechLowersFoeDefenseByTwo()
+    {
+        var move = Move("screech");
+        Assert.Equal(StageStat.Defense, move.StatEffectStat);
+        Assert.Equal(StageTarget.Foe,   move.StatEffectTarget);
+        Assert.Equal(-2,                move.StatEffectDelta);
+    }
 }

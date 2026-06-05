@@ -48,6 +48,11 @@ public record HazeClearedStages : BattleEvent;
 
 // --- Drain / healing ---
 public record DrainHealed(string SourceName, int HealAmount, int HpAfter) : BattleEvent;
+/// <summary>A self-heal move (Recover, Soft-Boiled) restored HP to the user.</summary>
+public record Healed(string CreatureName, int HealAmount, int HpAfter) : BattleEvent;
+
+// --- Mimic (the move) ---
+public record MimicLearned(string CreatureName, string MoveName) : BattleEvent;
 
 // --- Leech Seed ---
 public record LeechSeedApplied(string TargetName) : BattleEvent;

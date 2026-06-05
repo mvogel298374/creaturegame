@@ -95,6 +95,9 @@ public sealed class Gen1BattleRules : IBattleRules
     // Gen 1: Rage raises the user's Attack by one stage each time it is hit while raging.
     public int RageAttackStagesPerHit => 1;
 
+    // Gen 1: Recover / Soft-Boiled restore half of max HP.
+    public double RecoverHealFraction => 0.5;
+
     // ── Type-based immunities ────────────────────────────────────────────────────
 
     // Gen 1 status immunities by type: Poison-types can't be poisoned, Fire-types can't be burned,

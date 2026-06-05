@@ -94,3 +94,12 @@ apply the litmus question from §5.0 ("when we build Gen 2, will this value/layo
   without a data-pin; a re-import could restore the modern 30% with every behaviour test still green.
 - **A test enshrined a wrong Gen 1 fact** (`SonicBoom` "hits Ghost") — fixed damage ignores
   effectiveness *scaling* but still respects 0× immunity.
+- **A transient mechanic mutated permanent state (Mimic swapped `PokemonAttack.Base` in `MoveSet`) but
+  its restore only ran at battle end** — Haze's mid-battle `ResetBattleState()` discarded the restore
+  bookkeeping, leaking the copied move into the permanent MoveSet. Class: transient-vs-reset. Any
+  battle effect that mutates a permanent structure must be undone *inside* `ResetBattleState`, not only
+  at battle end (Haze/switch reset state at arbitrary times).
+- **A pure-status type-immunity guard didn't distinguish self- vs foe-targeting moves** — a Normal-type
+  self-buff/Recover got blocked against a Ghost (0×). Self-targeting moves never consult the target's
+  type; scope any target-type-immunity check to foe-directed effects (and remember Counter is
+  BaseDamage 0 yet foe-directed — it must stay inside the guard).

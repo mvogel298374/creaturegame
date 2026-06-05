@@ -66,6 +66,13 @@ public class PhysicalSpecialSplitContractTests(MovesFixture moves) : Gen1MoveCon
     [InlineData("hypnosis",      AttackType.Undefined)]  // Psychic status move
     [InlineData("agility",       AttackType.Undefined)]  // Psychic status move
     [InlineData("teleport",      AttackType.Undefined)]  // Psychic status move
+    [InlineData("night-shade",   AttackType.Physical)]  // Ghost (level-based, still Physical by type)
+    [InlineData("mimic",         AttackType.Undefined)]  // Normal status move
+    [InlineData("screech",       AttackType.Undefined)]  // Normal status move
+    [InlineData("recover",       AttackType.Undefined)]  // Normal status (heal) move
+    [InlineData("minimize",      AttackType.Undefined)]  // Normal status move
+    [InlineData("confuse-ray",   AttackType.Undefined)]  // Ghost status move
+    [InlineData("withdraw",      AttackType.Undefined)]  // Water status move
     [InlineData("sand-attack",   AttackType.Undefined)]  // Normal in Gen 1 (retyped to Ground in Gen 2)
     [InlineData("tail-whip",     AttackType.Undefined)]
     [InlineData("string-shot",   AttackType.Undefined)]  // Bug status move

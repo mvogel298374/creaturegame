@@ -90,6 +90,46 @@ public class ImmunityContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     }
 
     [Fact]
+    public async Task NormalTypesAreImmuneToNightShade()
+    {
+        // Night Shade is Ghost-type (level-based damage); a Normal-type is immune (0×).
+        var result = await new MoveScenario()
+            .Defender(TestCreatures.Make("D", type1: DamageType.Normal, hp: 500))
+            .Use(Move("night-shade"));
+
+        Assert.False(result.Has<DamageDealt>());
+        Assert.Equal(500, result.Defender.Attributes.HP);
+        Assert.True(result.Has<MoveHadNoEffect>());
+    }
+
+    [Fact]
+    public async Task NormalTypesAreImmuneToConfuseRay()
+    {
+        // Confuse Ray is Ghost-type; a Normal-type is immune (0×), so this pure-status move does nothing.
+        var result = await new MoveScenario()
+            .Defender(TestCreatures.Make("D", type1: DamageType.Normal, hp: 500))
+            .Use(Move("confuse-ray"));
+
+        Assert.Equal(0, result.Defender.ConfusedTurns);
+        Assert.True(result.Has<MoveHadNoEffect>());
+    }
+
+    [Fact]
+    public async Task SelfTargetingMovesIgnoreTheTargetsTypeImmunity()
+    {
+        // A self-buff never consults the foe's type, so a Normal-type move (Swords Dance) still works
+        // against a Ghost — even though Normal is 0× vs Ghost. Guards the immunity fix that scopes the
+        // pure-status type-immunity check to foe-directed moves only.
+        var result = await new MoveScenario()
+            .Attacker(TestCreatures.Make("A"))
+            .Defender(TestCreatures.Make("D", type1: DamageType.Ghost, hp: 500))
+            .Use(Move("swords-dance"));
+
+        Assert.Equal(2, result.Attacker.Stages.Attack);
+        Assert.False(result.Has<MoveHadNoEffect>(), "a self-targeting move isn't blocked by the foe's type");
+    }
+
+    [Fact]
     public async Task GhostTypesAreImmuneToCounter()
     {
         // Counter is Fighting-type; a Ghost target is immune even when the user took counterable damage.

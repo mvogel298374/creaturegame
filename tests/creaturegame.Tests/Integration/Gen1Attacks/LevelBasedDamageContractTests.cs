@@ -36,4 +36,19 @@ public class LevelBasedDamageContractTests(MovesFixture moves) : Gen1MoveContrac
 
         Assert.Equal(50, result.TotalDamage);
     }
+
+    // Night Shade is the Ghost-type level-based mover; against a non-immune type it too deals exactly
+    // the user's level, ignoring bulk and the (non-zero) type matchup. (Ghost → Normal = 0× immunity
+    // is covered in ImmunityContractTests.)
+    [Theory]
+    [InlineData(30)] [InlineData(50)] [InlineData(100)]
+    public async Task NightShadeDealsDamageEqualToTheUsersLevel(int level)
+    {
+        var result = await new MoveScenario()
+            .Attacker(TestCreatures.Make("A", level: level))
+            .Defender(TestCreatures.Make("D", type1: DamageType.Water, hp: 9999, defense: 250, special: 250))
+            .Use(Move("night-shade"));
+
+        Assert.Equal(level, result.TotalDamage);
+    }
 }

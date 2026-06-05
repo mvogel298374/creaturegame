@@ -159,6 +159,14 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                 Console.WriteLine($"{e.SourceName} had its energy drained! ({e.HealAmount} HP restored)");
                 break;
 
+            case Healed e:
+                Console.WriteLine($"{e.CreatureName} regained health! ({e.HealAmount} HP restored)");
+                break;
+
+            case MimicLearned e:
+                Console.WriteLine($"{e.CreatureName} learned {e.MoveName}!");
+                break;
+
             case LeechSeedApplied e:
                 Console.WriteLine($"{e.TargetName} was seeded!");
                 break;

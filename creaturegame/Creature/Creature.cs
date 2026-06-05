@@ -111,6 +111,8 @@ public class Creature
     public bool HasMist               { get => Battle.HasMist;               set => Battle.HasMist = value; }
     public bool IsRaging              { get => Battle.IsRaging;              set => Battle.IsRaging = value; }
     public PokemonAttack? RageMove    { get => Battle.RageMove;             set => Battle.RageMove = value; }
+    public PokemonAttack? MimicWrapper { get => Battle.MimicWrapper;        set => Battle.MimicWrapper = value; }
+    public Attack? MimicOriginalBase  { get => Battle.MimicOriginalBase;    set => Battle.MimicOriginalBase = value; }
     public int  LastDamageTaken       { get => Battle.LastDamageTaken;       set => Battle.LastDamageTaken = value; }
     public DamageType? LastDamageType { get => Battle.LastDamageType;        set => Battle.LastDamageType = value; }
 
@@ -121,11 +123,30 @@ public class Creature
     public bool CanSelectAnyMove => MoveSet.Any(m => m.PowerPointsCurrent > 0 && m != DisabledMove);
 
     /// <summary>
+    /// Undoes a transient Mimic move-swap, putting the original move back in the slot. Safe to call
+    /// when no Mimic is active. Lives here (not just at battle end) because Mimic mutates the permanent
+    /// <see cref="MoveSet"/>, so any reset of the transient state must revert it first or the copied
+    /// move leaks — e.g. Haze resets battle state mid-fight.
+    /// </summary>
+    public void RestoreMimickedMove()
+    {
+        if (Battle.MimicWrapper is null || Battle.MimicOriginalBase is null) return;
+        Battle.MimicWrapper.Base   = Battle.MimicOriginalBase;
+        Battle.MimicWrapper        = null;
+        Battle.MimicOriginalBase   = null;
+    }
+
+    /// <summary>
     /// Clears all transient in-battle state by replacing it wholesale, so a newly added
     /// BattleState field can never be missed by a manual reset. Called by Battle at the
     /// start of each fight so the same Creature instance can be reused across battles.
+    /// Reverts any active Mimic swap first, since that lives on the permanent MoveSet.
     /// </summary>
-    public void ResetBattleState() => Battle = new BattleState();
+    public void ResetBattleState()
+    {
+        RestoreMimickedMove();
+        Battle = new BattleState();
+    }
 
     public IStatCalculator StatCalculator { get; set; } = Gen1StatCalculator.Instance;
 

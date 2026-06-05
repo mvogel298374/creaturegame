@@ -148,6 +148,18 @@ describe('expandEvent — Mist', () => {
   });
 });
 
+describe('expandEvent — Heal & Mimic', () => {
+  it('Healed updates HP before the regained-health line', () => {
+    const { steps } = expandEvent('Healed', { creatureName: 'CHANSEY', healAmount: 100, hpAfter: 150 }, CTX);
+    expect(steps![0]).toMatchObject({ kind: 'dispatch', action: { type: 'UPDATE_HP', name: 'CHANSEY', hp: 150 } });
+    expect(logLines(steps)).toEqual(['CHANSEY regained health!']);
+  });
+  it('MimicLearned formats the copied move name', () => {
+    expect(logLines(expandEvent('MimicLearned', { creatureName: 'DITTO', moveName: 'ice-beam' }, CTX).steps))
+      .toEqual(['DITTO learned ICE BEAM!']);
+  });
+});
+
 describe('expandEvent — confusion & coins', () => {
   it('ConfusionStarted plays the status sound and logs the line', () => {
     const { steps } = expandEvent('ConfusionStarted', { targetName: 'ARTICUNO' }, CTX);

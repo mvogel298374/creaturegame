@@ -84,10 +84,52 @@ public class StatStageMoveContractTests(MovesFixture moves) : Gen1MoveContract(m
         Assert.Equal(2, change.NewStage);
     }
 
-    // Foe-targeting stat drops: Sand Attack (−1 Accuracy), Tail Whip / Leer (−1 Defense),
-    // Growl (−1 Attack).
+    // Self-targeting raises beyond the special cases above: Harden / Withdraw (+1 Defense),
+    // Double Team (+1 Evasion), Minimize (+2 Evasion — first Evasion mover).
+    [Theory]
+    [InlineData("harden",      "Defense",  1)]
+    [InlineData("withdraw",    "Defense",  1)]
+    [InlineData("double-team", "Evasion",  1)]
+    [InlineData("minimize",    "Evasion",  2)]
+    public async Task RaisesUserStatBySpecifiedStages(string moveName, string stat, int delta)
+    {
+        var result = await new MoveScenario()
+            .Attacker(TestCreatures.Make("A"))
+            .Use(Move(moveName));
+
+        Assert.False(result.Has<DamageDealt>(), "a stat-stage move deals no damage");
+
+        var change = result.First<StatStageChanged>();
+        Assert.NotNull(change);
+        Assert.Equal(result.Attacker.Name, change!.CreatureName);   // affects the user
+        Assert.Equal(stat, change.Stat);
+        Assert.Equal(delta, change.Delta);
+        Assert.Equal(delta, change.NewStage);
+    }
+
+    [Fact]
+    public async Task ScreechLowersFoeDefenseByTwoStages()
+    {
+        // Screech is the first −2 foe drop (the others above are −1).
+        var result = await new MoveScenario()
+            .Defender(TestCreatures.Make("Defender", hp: 500))
+            .Use(Move("screech"));
+
+        Assert.False(result.Has<DamageDealt>(), "Screech deals no damage");
+
+        var change = result.First<StatStageChanged>();
+        Assert.NotNull(change);
+        Assert.Equal(result.Defender.Name, change!.CreatureName);
+        Assert.Equal("Defense", change.Stat);
+        Assert.Equal(-2, change.Delta);
+        Assert.Equal(-2, change.NewStage);
+    }
+
+    // Foe-targeting stat drops: Sand Attack / Smokescreen (−1 Accuracy), Tail Whip / Leer
+    // (−1 Defense), Growl (−1 Attack).
     [Theory]
     [InlineData("sand-attack",  "Accuracy")]
+    [InlineData("smokescreen",  "Accuracy")]
     [InlineData("tail-whip",    "Defense")]
     [InlineData("leer",         "Defense")]
     [InlineData("growl",        "Attack")]

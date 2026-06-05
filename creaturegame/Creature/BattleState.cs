@@ -50,6 +50,12 @@ public sealed class BattleState
     public bool IsRaging { get; set; }
     public PokemonAttack? RageMove { get; set; }
 
+    // Mimic (the move): when used, the Mimic slot's Base is swapped to a copied foe move for the rest
+    // of the battle. MimicWrapper is the slot whose Base was swapped and MimicOriginalBase is the move
+    // to put back; Battle restores it at battle end so the swap never leaks into the permanent MoveSet.
+    public PokemonAttack? MimicWrapper { get; set; }
+    public Attack? MimicOriginalBase { get; set; }
+
     // Counter: the damage this creature last took from a damaging move, and that move's type.
     // Counter returns 2× it when the type was Normal/Fighting (Gen 1). Persists until overwritten
     // by the next hit (a Gen 1 quirk — Counter can hit off a previous turn's damage).

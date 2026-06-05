@@ -200,6 +200,13 @@ public interface IBattleRules
     /// </summary>
     int RageAttackStagesPerHit { get; }
 
+    /// <summary>
+    /// Fraction of max HP restored by a Recover-family move (Recover, Soft-Boiled). Gen 1: 1/2.
+    /// (The famous Gen 1 "fails when (maxHP − HP) &amp; 255 == 255" quirk is not modelled.) Rest, which
+    /// heals fully and sleeps, is a separate mechanic. On the seam so a later generation can vary it.
+    /// </summary>
+    double RecoverHealFraction { get; }
+
     // ── Type-based immunities ────────────────────────────────────────────────────
 
     /// <summary>

@@ -249,6 +249,12 @@ public class MoveImport
         // the battle engine). PokeAPI's modern ailment data doesn't capture this Gen 1 mechanic.
         else if (pokeMove.Name == "rage")
             attack.Effect = MoveEffect.Rage;
+        // Recover / Soft-Boiled restore half the user's max HP (the heal fraction is a battle rule).
+        else if (pokeMove.Name is "recover" or "soft-boiled")
+            attack.Effect = MoveEffect.Heal;
+        // Mimic copies a random move from the target for the rest of the battle (enforced in the engine).
+        else if (pokeMove.Name == "mimic")
+            attack.Effect = MoveEffect.Mimic;
         // Rampage moves — lock the user in for 2–3 turns, then self-confuse. Matched by name BEFORE
         // the confusion-ailment branch so they map to Rampage (the confusion is a self-effect of the
         // lock, not a targeted secondary). Petal Dance joins in its batch.
