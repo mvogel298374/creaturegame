@@ -44,6 +44,19 @@ Guidelines for all `/dev` actions in this project.
 *   **File Tracking**: All new or modified files must be tracked by version control. Ensure all relevant files are staged and committed as part of the task.
 *   **Cleanup**: When removing files from the project, ensure they are also removed from version control.
 
+## Pre-commit Gate (two layers)
+The recurring failure mode on this project is shipping a generation-seam / Gen-1 fidelity leak that
+only surfaces in a post-hoc audit. Two layers move that check *before* the commit:
+*   **`/audit` skill (LLM)** — run before proposing a commit on any battle/stat/move change. It runs the
+    recurring-leak checklist (interaction/shadowing; data-change-needs-a-pin; the gen-variable
+    success-condition rule) and spawns the **`seam-reviewer`** subagent on the diff. Defined in
+    `.claude/skills/audit/SKILL.md`. A shell hook can't launch the subagent, so this is where the seam
+    review lives.
+*   **`.githooks/pre-commit` (deterministic)** — the unskippable backstop: `csharpier check .` always, and
+    the full `dotnet test` suite whenever `.cs` files are staged (pure docs/data commits skip it). Blocks
+    the commit on any failure. Enable once per clone: `git config core.hooksPath .githooks`. Emergency
+    bypass (avoid): `git commit --no-verify`.
+
 ## Testing Standards
 *   **Test Naming**: Test methods should clearly and succinctly state what they test without using the word "Test" or "test" as a prefix or suffix.
 *   **Folder Structure**: Separate tests from common/setup classes by using a structured directory (e.g., `tests/creaturegame.Tests/Unit`, `tests/creaturegame.Tests/Integration`).

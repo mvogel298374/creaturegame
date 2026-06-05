@@ -4,6 +4,9 @@
 # Force LF for shell scripts and Unix-targeted files regardless of platform.
 *.sh text eol=lf
 
+# Git hooks are run by sh — a CRLF shebang breaks them, so force LF.
+.githooks/* text eol=lf
+
 # Treat binary formats as binary — no line-ending normalisation.
 *.db binary
 *.dll binary

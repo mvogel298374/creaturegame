@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | File | Purpose |
 |:-----|:--------|
 | `TODO.md` | **Authoritative** task list — priorities, done items, tech debt. Always update it when finishing a task. |
-| `AI_CONTEXT.md` | Agent profiles and slash-command definitions (`/plan`, `/dev`, `/sync`, `/test`). |
+| `AI_CONTEXT.md` | Agent profiles, slash-commands (`/plan`, `/dev`, `/sync`, `/test`, `/audit`), and the **Tooling & Automation** reference (the `/audit` skill, `seam-reviewer` subagent, pre-commit hook, CSharpier, MCP servers — what each is for and how to use it). |
 | `DESIGN_GUIDES.md` | Gen 1 mechanics, type-balancing rules, move-import mapping. Read before `/plan` work. |
 | `DEV_STANDARDS.md` | .NET/EF coding conventions and architecture rules. Read before `/dev` work. |
 | `STATE_MODEL.md` | Deep-dive reference: the `Creature` permanent/transient state split (`BattleState`) — patterns + Gen 1 domain logic. Read when touching battle state. |
@@ -43,6 +43,15 @@ To run a single .NET test by name:
 ```powershell
 & "C:\Users\USER\.dotnet\dotnet.exe" test tests/creaturegame.Tests --filter "FullyQualifiedName~<MethodName>"
 ```
+
+Formatting & the pre-commit gate (see `AI_CONTEXT.md` → **Tooling & Automation** for the why):
+```powershell
+& "C:\Users\USER\.dotnet\dotnet.exe" tool restore          # once per clone — installs the pinned CSharpier
+& "C:\Users\USER\.dotnet\dotnet.exe" csharpier format .    # format C# (do NOT hand-align)
+& "C:\Users\USER\.dotnet\dotnet.exe" csharpier check .     # what the hook/CI runs
+git config core.hooksPath .githooks                         # once per clone — arms .githooks/pre-commit
+```
+The `.githooks/pre-commit` hook runs `csharpier check` (always) + the full test suite (when `.cs` is staged) and **blocks the commit on failure**. For battle/stat/move changes, run the `/audit` skill before proposing the commit — it adds the seam/fidelity review the hook can't do.
 
 EF Core migration commands require `DOTNET_ROOT` set so `dotnet-ef` finds the user-local SDK instead of the system runtime-only install:
 ```powershell
