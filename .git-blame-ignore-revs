@@ -1,0 +1,6 @@
+# Revisions to ignore in `git blame` (bulk, mechanical changes — no authorship value).
+# Enable locally with:  git config blame.ignoreRevsFile .git-blame-ignore-revs
+# GitHub/GitLab honor this file automatically.
+
+# Apply CSharpier formatting pass (no behavior change)
+6bcc49cba60d0647d4e1485f021360964d381ae4
