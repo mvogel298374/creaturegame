@@ -183,12 +183,7 @@ public class AttackAction : IBattleAction
                 .ToList();
 
             if (eligible.Count > 0)
-            {
-                var chosen = eligible[_rng.Next(eligible.Count)];
-                var inner  = new AttackAction(Source, Target,
-                    new PokemonAttack(chosen), _typeChart, _rules, _emitter, _movePool, _rng);
-                return inner.ExecuteAsync();
-            }
+                return ExecuteInner(eligible[_rng.Next(eligible.Count)]);
             return Task.CompletedTask;
         }
 
@@ -200,11 +195,7 @@ public class AttackAction : IBattleAction
         {
             var last = Target.LastMoveUsed;
             if (last != null && last.Effect != MoveEffect.MirrorMove && last.Name != "struggle")
-            {
-                var inner = new AttackAction(Source, Target,
-                    new PokemonAttack(last), _typeChart, _rules, _emitter, _movePool, _rng);
-                return inner.ExecuteAsync();
-            }
+                return ExecuteInner(last);
             _emitter?.Emit(new MoveMissed(Source.Name, attackToUse.Name ?? ""));
             return Task.CompletedTask;
         }
@@ -427,6 +418,13 @@ public class AttackAction : IBattleAction
 
         return Task.CompletedTask;
     }
+
+    // Runs another move in full as this turn's action — used by Metronome and Mirror Move, which call a
+    // move chosen at runtime. The move runs through a fresh AttackAction on a temporary wrapper (so the
+    // creature's own PP/moveset is untouched) and records itself as the user's last move.
+    private Task ExecuteInner(Attack move) =>
+        new AttackAction(Source, Target, new PokemonAttack(move),
+            _typeChart, _rules, _emitter, _movePool, _rng).ExecuteAsync();
 
     // Bide stores every hit the committed user takes — any damage category — to unleash 2× on release.
     private void AccumulateBideDamage(int dmg)

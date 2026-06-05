@@ -213,86 +213,26 @@ public class MoveImport
             }
         }
 
-        // Special move effects
-        if (pokeMove.Name == "haze")
-            attack.Effect = MoveEffect.Haze;
-        else if (pokeMove.Name == "leech-seed")
-            attack.Effect = MoveEffect.LeechSeed;
-        else if (pokeMove.Name is "hyper-beam")
-            attack.Effect = MoveEffect.Recharge;
-        else if (pokeMove.Name is "wrap" or "bind" or "clamp" or "fire-spin")
-            attack.Effect = MoveEffect.Binding;
-        // Gen 1 Skull Bash is a plain charge move — it does NOT raise Defense on the charge turn
-        // (that boost was added in Gen 2), so it maps to plain TwoTurn like Razor Wind / Sky Attack.
-        else if (pokeMove.Name is "fly" or "dig" or "solar-beam" or "razor-wind" or "sky-attack" or "skull-bash")
-            attack.Effect = MoveEffect.TwoTurn;
-        else if (pokeMove.Name == "metronome")
-            attack.Effect = MoveEffect.Metronome;
-        // Gen 1 multi-hit (variable 2–5 strikes) — count drawn from the gen rules at runtime.
-        else if (pokeMove.Name is "double-slap" or "comet-punch" or "fury-attack"
-                              or "pin-missile" or "barrage" or "fury-swipes" or "spike-cannon")
-            attack.Effect = MoveEffect.MultiHit;
-        // Fixed-count multi-hit — the count is stable move data (always 2), stored on the move.
-        // Twineedle strikes twice and carries its own 20% poison secondary (set above from the
-        // ailment); the fixed count drives the strike loop while TryApplyStatus handles the poison.
-        // Bonemerang joins here in its own coverage batch.
-        else if (pokeMove.Name is "double-kick" or "twineedle")
-        { attack.Effect = MoveEffect.MultiHit; attack.MultiHitCount = 2; }
-        // Gen 1: a missed Jump Kick deals crash damage to the user. Hi Jump Kick joins in its batch.
-        else if (pokeMove.Name == "jump-kick")
-            attack.Effect = MoveEffect.Crash;
-        // Recoil moves — the user takes back a fraction of the damage dealt.
-        else if (pokeMove.Name is "take-down" or "double-edge" or "submission")
-            attack.Effect = MoveEffect.Recoil;
-        // Counter returns twice the (Normal/Fighting) physical damage the user last took (priority −5).
-        else if (pokeMove.Name == "counter")
-            attack.Effect = MoveEffect.Counter;
-        // Rage locks the user into the move and raises its Attack each time it is hit (enforced in
-        // the battle engine). PokeAPI's modern ailment data doesn't capture this Gen 1 mechanic.
-        else if (pokeMove.Name == "rage")
-            attack.Effect = MoveEffect.Rage;
-        // Recover / Soft-Boiled restore half the user's max HP (the heal fraction is a battle rule).
-        else if (pokeMove.Name is "recover" or "soft-boiled")
-            attack.Effect = MoveEffect.Heal;
-        // Mimic copies a random move from the target for the rest of the battle (enforced in the engine).
-        else if (pokeMove.Name == "mimic")
-            attack.Effect = MoveEffect.Mimic;
-        // Reflect / Light Screen double the user's Defense / Special vs the matching damage (battle rule).
-        else if (pokeMove.Name == "reflect")
-            attack.Effect = MoveEffect.Reflect;
-        else if (pokeMove.Name == "light-screen")
-            attack.Effect = MoveEffect.LightScreen;
-        // Focus Energy: Gen 1's bugged crit modifier (applied in Gen1BattleRules.GetCritChance).
-        else if (pokeMove.Name == "focus-energy")
-            attack.Effect = MoveEffect.FocusEnergy;
-        // Bide stores damage for 2–3 turns then unleashes 2× (multi-turn lock-in in the engine).
-        else if (pokeMove.Name == "bide")
-            attack.Effect = MoveEffect.Bide;
-        // Mirror Move re-executes the opponent's last move (engine reads the foe's last-used move).
-        else if (pokeMove.Name == "mirror-move")
-            attack.Effect = MoveEffect.MirrorMove;
-        // Rampage moves — lock the user in for 2–3 turns, then self-confuse. Matched by name BEFORE
-        // the confusion-ailment branch so they map to Rampage (the confusion is a self-effect of the
-        // lock, not a targeted secondary). Petal Dance joins in its batch.
-        else if (pokeMove.Name is "thrash" or "petal-dance")
-            attack.Effect = MoveEffect.Rampage;
-        else if (pokeMove.Name == "pay-day")
-            attack.Effect = MoveEffect.PayDay;
-        // Mist shrouds the user so the opponent can't lower its stats (enforced in the battle engine).
-        else if (pokeMove.Name == "mist")
-            attack.Effect = MoveEffect.Mist;
-        // Disable locks one of the target's moves for a few turns; the lock itself is enforced at
-        // move-selection time. Matched by name (its ailment "disable" maps to no StatusCondition).
-        else if (pokeMove.Name == "disable")
-            attack.Effect = MoveEffect.Disable;
-        // Confusion isn't a StatusCondition (it's a separate per-battle counter), so it's
-        // modelled as a move effect. EffectChance (already set from the move) gates the
-        // secondary confusion on damaging moves (Psybeam 10%); pure confusion moves
-        // (Supersonic, Confuse Ray) have none ⇒ AttackAction treats null as always-confuse.
+        // Special move effects. Most are a fixed name → MoveEffect mapping (see Gen1MoveEffects); the
+        // two meta-based fallbacks below only apply when no name matched. That ordering preserves the
+        // Gen 1 rule that a rampage move (Thrash / Petal Dance) maps to Rampage rather than to its
+        // self-confusion ailment — the name lookup wins over the confusion-ailment fallback.
+        if (pokeMove.Name is { } moveName && Gen1MoveEffects.TryGetValue(moveName, out var namedEffect))
+            attack.Effect = namedEffect;
+        // Confusion isn't a StatusCondition (it's a separate per-battle counter), so it's modelled as a
+        // move effect. EffectChance (already set) gates the secondary confusion on damaging moves
+        // (Psybeam 10%); pure confusion moves (Supersonic, Confuse Ray) have none ⇒ AttackAction
+        // treats null as always-confuse.
         else if (pokeMove.Meta?.Ailment?.Name == "confusion")
             attack.Effect = MoveEffect.Confuse;
         else if (pokeMove.Meta?.FlinchChance > 0)
             attack.Effect = MoveEffect.Flinch;
+
+        // Fixed-count multi-hit — the strike count is stable move data (always 2), not a gen rule, so
+        // it rides alongside the MoveEffect.MultiHit set via the map above. Twineedle also carries its
+        // own 20% poison secondary (set from the ailment); Bonemerang joins here in its coverage batch.
+        if (pokeMove.Name is "double-kick" or "twineedle")
+            attack.MultiHitCount = 2;
 
         // ── Gen 1 secondary-effect corrections (layer 2: facts PokeAPI can't express) ──────────
         // PokeAPI reports each move's MODERN secondary chance/target and almost never backfills
@@ -355,6 +295,62 @@ public class MoveImport
 
         return attack;
     }
+
+    // Gen 1 special move mechanics keyed by PokeAPI move name. These are behaviours PokeAPI's
+    // meta/ailment data can't express, so they're mapped explicitly here (effects derivable from
+    // data — secondary status, stat changes — stay inline in MapToAttack). A few entries need extra
+    // per-move data beyond the effect (e.g. fixed multi-hit count); that's set in MapToAttack.
+    private static readonly Dictionary<string, MoveEffect> Gen1MoveEffects = new()
+    {
+        ["haze"]       = MoveEffect.Haze,
+        ["leech-seed"] = MoveEffect.LeechSeed,
+        ["hyper-beam"] = MoveEffect.Recharge,
+        // Binding — damages + traps the target for 2–5 turns.
+        ["wrap"] = MoveEffect.Binding, ["bind"] = MoveEffect.Binding,
+        ["clamp"] = MoveEffect.Binding, ["fire-spin"] = MoveEffect.Binding,
+        // Two-turn charge moves. Gen 1 Skull Bash is a plain charge — it does NOT raise Defense on the
+        // charge turn (that boost was added in Gen 2), so it maps to plain TwoTurn like the others.
+        ["fly"] = MoveEffect.TwoTurn, ["dig"] = MoveEffect.TwoTurn, ["solar-beam"] = MoveEffect.TwoTurn,
+        ["razor-wind"] = MoveEffect.TwoTurn, ["sky-attack"] = MoveEffect.TwoTurn,
+        ["skull-bash"] = MoveEffect.TwoTurn,
+        ["metronome"] = MoveEffect.Metronome,
+        // Variable multi-hit (2–5 strikes; count drawn from the gen rules at runtime).
+        ["double-slap"] = MoveEffect.MultiHit, ["comet-punch"] = MoveEffect.MultiHit,
+        ["fury-attack"] = MoveEffect.MultiHit, ["pin-missile"] = MoveEffect.MultiHit,
+        ["barrage"] = MoveEffect.MultiHit, ["fury-swipes"] = MoveEffect.MultiHit,
+        ["spike-cannon"] = MoveEffect.MultiHit,
+        // Fixed-count multi-hit (always 2 — MultiHitCount is set in MapToAttack).
+        ["double-kick"] = MoveEffect.MultiHit, ["twineedle"] = MoveEffect.MultiHit,
+        // Gen 1: a missed Jump Kick deals crash damage to the user. Hi Jump Kick joins in its batch.
+        ["jump-kick"] = MoveEffect.Crash,
+        // Recoil — the user takes back a fraction of the damage dealt.
+        ["take-down"] = MoveEffect.Recoil, ["double-edge"] = MoveEffect.Recoil,
+        ["submission"] = MoveEffect.Recoil,
+        // Counter returns 2× the (Normal/Fighting) physical damage the user last took (priority −5).
+        ["counter"] = MoveEffect.Counter,
+        // Rage locks the user in and raises Attack each time it is hit (enforced in the engine).
+        ["rage"] = MoveEffect.Rage,
+        // Recover / Soft-Boiled restore half the user's max HP (the heal fraction is a battle rule).
+        ["recover"] = MoveEffect.Heal, ["soft-boiled"] = MoveEffect.Heal,
+        // Mimic copies a random move from the target for the rest of the battle.
+        ["mimic"] = MoveEffect.Mimic,
+        // Reflect / Light Screen double the user's Defense / Special vs the matching damage.
+        ["reflect"] = MoveEffect.Reflect, ["light-screen"] = MoveEffect.LightScreen,
+        // Focus Energy: Gen 1's bugged crit modifier (applied in Gen1BattleRules.GetCritChance).
+        ["focus-energy"] = MoveEffect.FocusEnergy,
+        // Bide stores damage for 2–3 turns then unleashes 2× (multi-turn lock-in in the engine).
+        ["bide"] = MoveEffect.Bide,
+        // Mirror Move re-executes the opponent's last move (engine reads the foe's last-used move).
+        ["mirror-move"] = MoveEffect.MirrorMove,
+        // Rampage — lock in for 2–3 turns, then self-confuse. Mapped here so the name lookup wins over
+        // the confusion-ailment fallback in MapToAttack. Petal Dance joins in its batch.
+        ["thrash"] = MoveEffect.Rampage, ["petal-dance"] = MoveEffect.Rampage,
+        ["pay-day"] = MoveEffect.PayDay,
+        // Mist shrouds the user so the opponent can't lower its stats.
+        ["mist"] = MoveEffect.Mist,
+        // Disable locks one of the target's moves (enforced at move-selection time).
+        ["disable"] = MoveEffect.Disable,
+    };
 
     // Gen 1 physical types: Normal, Fighting, Flying, Poison, Ground, Rock, Bug, Ghost.
     // Every other (damaging) type — Fire, Water, Grass, Electric, Psychic, Ice, Dragon —

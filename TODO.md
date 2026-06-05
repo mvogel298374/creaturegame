@@ -786,6 +786,31 @@ The imperative `enqueue` / `waitForBridge` / hand-tuned `delay()` choreography i
 - [x] Playwright E2E landed — 9 specs via the `?e2e=1` seam (smoke / starter-select / battle / cadence); see the **Browser-Based UI Testing** section above for the remaining checklist gaps (CI, §6 status, §7 XP/QUIT, data-testids).
 - [x] Full-flow parity verified live this session — Puppeteer `ui_checklist` run + the Playwright faint→winner play-through; cadence confirmed.
 
+#### 6a. Code-review cleanups (batches 11–13, 2026-06-05)
+Findings from a review of the move-mechanic batches (Recover/Mimic, the five batch-12 mechanics, batch 13).
+- [x] **Importer name-dispatch consolidated** — `MoveImport.MapToAttack`'s ~20-arm `else if (Name == …)`
+  effect chain replaced by a `static readonly Dictionary<string, MoveEffect> Gen1MoveEffects`; the two
+  meta-based fallbacks (confusion ailment, flinch chance) run only when no name matched (preserving the
+  rampage-before-confusion ordering), and fixed multi-hit count stays a one-line follow-up. Re-imported +
+  all effect pins green.
+- [x] **`AttackAction.ExecuteInner(Attack)` helper** — Metronome and Mirror Move shared the same
+  `new AttackAction(…, new PokemonAttack(x), …).ExecuteAsync()` construction; extracted to one helper.
+- [ ] **`AttackAction.ExecuteAsync` is a very long sequential pipeline** `[design]`. The four lock-in
+  mechanics (two-turn / rampage / rage / bide) each smear logic across three spots — the PP-skip
+  predicate at the top, a charge/store block mid-method, and `Battle.SelectMoveAsync`'s force-select.
+  It works and is well-commented, but every new mechanic adds another branch. Consider an
+  `ILockInMechanic`-style abstraction (or at least grouping the lock-in handling) when the next lock-in
+  move lands. Not worth a reactive refactor now.
+- [ ] **Bide records a type for "typeless" damage** `[fidelity nit]`. The release sets
+  `Target.LastDamageType = attackToUse.DamageType` (Normal) right after a comment calling Bide damage
+  "typeless," so a follow-up Counter could reflect it as Normal. Edge case; decide intended Gen 1
+  behaviour and either stop recording the type on Bide release or update the comment.
+- [ ] **Mirror Move's copyable filter is narrower than its comment** `[nit]`. It excludes only Mirror
+  Move + Struggle, so a foe's Mirror Move can also copy Mimic / two-turn moves (copying Bide is
+  intended + documented). Harmless; tighten the filter or the comment if it ever surprises.
+- [ ] **Cosmetic alignment** `[nit]`: in `Creature.cs` the `BideDamageAccumulated` delegating prop's
+  `set =>` column doesn't line up with its neighbours (long name). Trivial.
+
 #### 7. Architecture / decision-log doc `[docs — after the above]`
 The doc set is strong, but the *why* behind the two-DB split, event sourcing, and the seam invariants lives only implicitly. For a project explicitly built to extend generation-by-generation, capture these as an `ARCHITECTURE.md` (or lightweight ADR log) so the invariants survive future drift.
 - [ ] Document: two-DB rationale, event-sourced engine + emitter pattern, the three seams (`ITypeChart`/`IBattleRules`/`IStatCalculator`) and the "never branch on generation" rule, the web session/SignalR flow, and the import-vs-runtime data boundary
