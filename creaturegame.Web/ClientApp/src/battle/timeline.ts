@@ -198,6 +198,21 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       return { steps: [w(650), d(log('But nothing happened!')), w(800)] };
     }
 
+    case 'SubstitutePutUp': {
+      const name = payload.creatureName as string;
+      return { steps: [w(300), d(log(`${name} put up a substitute!`)), w(600)] };
+    }
+
+    case 'SubstituteAbsorbedHit': {
+      const name = payload.creatureName as string;
+      return { steps: [w(300), d(log(`The substitute took damage for ${name}!`)), w(600)] };
+    }
+
+    case 'SubstituteFaded': {
+      const name = payload.creatureName as string;
+      return { steps: [w(300), d(log(`${name}'s substitute faded!`)), w(600)] };
+    }
+
     case 'DamageDealt': {
       const targetName = payload.targetName as string;
       const hpAfter    = payload.hpAfter as number;

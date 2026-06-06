@@ -47,6 +47,18 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                 Console.WriteLine("But nothing happened!");
                 break;
 
+            case SubstitutePutUp e:
+                Console.WriteLine($"{e.CreatureName} put up a substitute!");
+                break;
+
+            case SubstituteAbsorbedHit e:
+                Console.WriteLine($"The substitute took damage for {e.CreatureName}!");
+                break;
+
+            case SubstituteFaded e:
+                Console.WriteLine($"{e.CreatureName}'s substitute faded!");
+                break;
+
             case DamageDealt e:
                 if (e.TypeEffectiveness == 0.0)
                 {

@@ -45,6 +45,15 @@ public record MoveHadNoEffect(string TargetName, string MoveName) : BattleEvent;
 /// <summary>A move with no effect by design (Splash) resolved — the Gen 1 "But nothing happened!" line.</summary>
 public record ButNothingHappened(string CreatureName) : BattleEvent;
 
+/// <summary>The user spent HP to put up a Substitute decoy with <paramref name="SubstituteHp"/> HP.</summary>
+public record SubstitutePutUp(string CreatureName, int SubstituteHp) : BattleEvent;
+
+/// <summary>An incoming hit was soaked by the creature's Substitute (the user took no damage).</summary>
+public record SubstituteAbsorbedHit(string CreatureName, int SubstituteHpAfter) : BattleEvent;
+
+/// <summary>The Substitute ran out of HP and broke — the user is exposed again.</summary>
+public record SubstituteFaded(string CreatureName) : BattleEvent;
+
 public record DamageDealt(
     string TargetName,
     int Damage,

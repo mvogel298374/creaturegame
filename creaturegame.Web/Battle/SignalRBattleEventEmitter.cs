@@ -65,6 +65,12 @@ public sealed class SignalRBattleEventEmitter(
             MoveMissed e => ("MoveMissed", new { e.AttackerName, e.MoveName }),
             MoveHadNoEffect e => ("MoveHadNoEffect", new { e.TargetName, e.MoveName }),
             ButNothingHappened e => ("ButNothingHappened", new { e.CreatureName }),
+            SubstitutePutUp e => ("SubstitutePutUp", new { e.CreatureName, e.SubstituteHp }),
+            SubstituteAbsorbedHit e => (
+                "SubstituteAbsorbedHit",
+                new { e.CreatureName, e.SubstituteHpAfter }
+            ),
+            SubstituteFaded e => ("SubstituteFaded", new { e.CreatureName }),
             DamageDealt e => (
                 "DamageDealt",
                 new

@@ -114,6 +114,13 @@ apply the litmus question from §5.0 ("when we build Gen 2, will this value/layo
   Special / defender bulk, so a regression routing it through the Standard damage path would stay green.
   Class: data-pin-is-not-a-behaviour-test. A gen-variable damage/magnitude rule needs a test that
   exercises the *quirk* (bound + what it ignores), not just that the importer set the category.
+- **A "shield" flag was read AFTER the action mutated the state it guards (Substitute).** The shield
+  blocking a foe's secondary status/stat/confusion was keyed on the *live* `SubstituteHp > 0`, but the
+  damage step runs first and zeroes it on the breaking hit — so a damaging move's secondary leaked onto
+  the user the same turn the decoy shattered (should be blocked: the hit struck the substitute). Class:
+  ordering — a condition that gates an effect must be **snapshotted at impact**, before the same action
+  decrements the thing it reads. Fixed by capturing `_targetShieldedAtImpact` before the damage switch.
+  Always test the *breaking/last* hit of a soak/charge/lock mechanic, not just the steady state.
 - **Two layer-2 importer data overrides (bubble/constrict 33% Speed drop) had no data-pin in the first
   pass** — repeat of the `thunder` class above; behaviour tests force the roll so they'd stay green
   after a silent re-import revert to the modern 10%. Every importer value Gen 1 differs from modern on

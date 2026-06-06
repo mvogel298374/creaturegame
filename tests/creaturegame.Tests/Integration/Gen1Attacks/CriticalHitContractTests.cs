@@ -90,6 +90,17 @@ public class CriticalHitContractTests(MovesFixture moves) : Gen1MoveContract(mov
         );
     }
 
+    // Slash is a single-turn high-crit Normal move (Gen 1) — same high crit rate, no charge.
+    [Fact]
+    public async Task SlashCritsFarMoreOftenThanNormal()
+    {
+        int slash = await CritRuns("slash");
+        int pound = await CritRuns("pound");
+
+        Assert.True(slash > pound, $"slash crits ({slash}) should exceed pound ({pound})");
+        Assert.True(slash >= 40, $"high-crit move should crit most of the time (got {slash}/60)");
+    }
+
     private async Task<int> CritRuns(string moveName)
     {
         int crits = 0;

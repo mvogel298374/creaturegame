@@ -226,4 +226,26 @@ public class SecondaryChanceDataContractTests(MovesFixture moves) : Gen1MoveCont
         Assert.Equal(MoveEffect.Rest, move.Effect);
         Assert.Equal(StatusCondition.None, move.StatusEffect);
     }
+
+    // ── Batch 17 facts ─────────────────────────────────────────────────────────────────────────
+    // Tri Attack had no secondary effect in Gen 1; the 20% random burn/freeze/paralysis was added in
+    // Gen 2. The importer strips the modern secondary back off — pin the cleared effect + null chance.
+    [Fact]
+    public void TriAttackHasNoSecondaryEffectInGen1()
+    {
+        var move = Move("tri-attack");
+        Assert.Equal(MoveEffect.None, move.Effect);
+        Assert.Null(move.EffectChance);
+    }
+
+    // Super Fang's half-current-HP category is an importer ID mapping PokeAPI can't express via meta;
+    // Substitute's effect is a name mapping. Pin both so a re-import that drops a clause can't silently
+    // revert Super Fang to a 0-power Normal move or neuter Substitute.
+    [Fact]
+    public void SuperFangUsesTheSuperFangCategory() =>
+        Assert.Equal(DamageCategory.SuperFang, Move("super-fang").DamageCategory);
+
+    [Fact]
+    public void SubstituteHasSubstituteMoveEffect() =>
+        Assert.Equal(MoveEffect.Substitute, Move("substitute").Effect);
 }

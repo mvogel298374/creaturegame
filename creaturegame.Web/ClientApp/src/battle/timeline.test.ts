@@ -38,6 +38,15 @@ describe('expandEvent — move-name formatting', () => {
     const { steps } = expandEvent('ButNothingHappened', { creatureName: 'GYARADOS' }, CTX);
     expect(logLines(steps)).toEqual(['But nothing happened!']);
   });
+
+  it('narrates the Substitute lifecycle (put up, soak a hit, fade)', () => {
+    expect(logLines(expandEvent('SubstitutePutUp', { creatureName: 'CHANSEY', substituteHp: 90 }, CTX).steps))
+      .toEqual(['CHANSEY put up a substitute!']);
+    expect(logLines(expandEvent('SubstituteAbsorbedHit', { creatureName: 'CHANSEY', substituteHpAfter: 40 }, CTX).steps))
+      .toEqual(['The substitute took damage for CHANSEY!']);
+    expect(logLines(expandEvent('SubstituteFaded', { creatureName: 'CHANSEY' }, CTX).steps))
+      .toEqual(["CHANSEY's substitute faded!"]);
+  });
 });
 
 describe('expandEvent — DamageDealt', () => {

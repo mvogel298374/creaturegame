@@ -235,6 +235,11 @@ public class Creature
         get => Battle.BideMove;
         set => Battle.BideMove = value;
     }
+    public int SubstituteHp
+    {
+        get => Battle.SubstituteHp;
+        set => Battle.SubstituteHp = value;
+    }
     public Attack? LastMoveUsed
     {
         get => Battle.LastMoveUsed;

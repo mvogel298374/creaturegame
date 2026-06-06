@@ -46,6 +46,7 @@ public enum MoveEffect
     DreamEater,
     Splash,
     Rest,
+    Substitute,
 }
 
 public enum DamageCategory

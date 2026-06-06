@@ -21,6 +21,11 @@ public class AttackAction : IBattleAction
     private readonly IReadOnlyList<Attack> _movePool;
     private readonly IRandomSource _rng;
 
+    // Whether the Target had a Substitute up at the moment this move connected — captured before the
+    // damage is applied so the shield still blocks the secondary on the exact hit that breaks the decoy
+    // (Gen 1: that hit struck the substitute, so its status/stat/confusion doesn't reach the user).
+    private bool _targetShieldedAtImpact;
+
     // Null means Struggle — Battle passes null when the source has no selectable move
     // (out of PP, or its only move is Disabled), bypassing IBattleInput.
     private readonly PokemonAttack? _selectedMove;
@@ -147,16 +152,8 @@ public class AttackAction : IBattleAction
             Source.BideMove = null;
             if (unleashed > 0 && Target.IsAlive())
             {
-                Target.Attributes.ReceiveDamage(unleashed);
-                _emitter?.Emit(
-                    new DamageDealt(
-                        Target.Name,
-                        unleashed,
-                        1.0,
-                        Target.Attributes.HP,
-                        Target.Attributes.MaxHP
-                    )
-                );
+                // Routes through the shared helper so a foe Substitute soaks the unleash too.
+                DealDamageToTarget(unleashed, 1.0, false);
             }
             else
             {
@@ -334,6 +331,10 @@ public class AttackAction : IBattleAction
             return Task.CompletedTask;
         }
 
+        // Snapshot the Substitute shield before any damage is applied: a secondary effect is blocked
+        // if the Target was behind a decoy when the move landed, even if that same hit shatters it.
+        _targetShieldedAtImpact = Target.SubstituteHp > 0;
+
         // Damage calculation by category
         int damage = 0;
         bool isCrit = false;
@@ -371,6 +372,7 @@ public class AttackAction : IBattleAction
                         : 1;
 
                     int landed = 0;
+                    bool dealtRealDamage = false;
                     for (int i = 0; i < hits && Target.IsAlive(); i++)
                     {
                         int hitDamage = DamageCalculator.CalculateDamage(
@@ -383,22 +385,16 @@ public class AttackAction : IBattleAction
                             _rng,
                             screenDefenseMultiplier: screenMult
                         );
-                        Target.Attributes.ReceiveDamage(hitDamage);
-                        Target.LastDamageTaken = hitDamage; // for Counter (2× the last hit)
-                        Target.LastDamageType = attackToUse.DamageType;
-                        AccumulateBideDamage(hitDamage);
+                        if (DealDamageToTarget(hitDamage, eff, isCrit))
+                        {
+                            // Counter answers the last hit that actually connected with the creature
+                            // (a hit soaked by a Substitute didn't, so it doesn't update this).
+                            Target.LastDamageTaken = hitDamage;
+                            Target.LastDamageType = attackToUse.DamageType;
+                            dealtRealDamage = true;
+                        }
                         damage += hitDamage; // accumulated total gates drain/recoil/recharge below
                         landed++;
-                        _emitter?.Emit(
-                            new DamageDealt(
-                                Target.Name,
-                                hitDamage,
-                                eff,
-                                Target.Attributes.HP,
-                                Target.Attributes.MaxHP,
-                                isCrit
-                            )
-                        );
                     }
 
                     if (isMultiHit)
@@ -406,8 +402,9 @@ public class AttackAction : IBattleAction
 
                     // Rage: a raging creature that just got hit gains Attack stage(s). Triggered
                     // off the standard damage path only (the same boundary as Counter) — once per
-                    // connecting attack, not per multi-hit strike. Reuses StatStageChanged.
-                    if (landed > 0 && Target.IsRaging && Target.IsAlive())
+                    // connecting attack, not per multi-hit strike, and only when the hit reached the
+                    // creature itself (a Substitute soak doesn't enrage it). Reuses StatStageChanged.
+                    if (dealtRealDamage && Target.IsRaging && Target.IsAlive())
                     {
                         int newStage = ApplyStageChange(
                             Target,
@@ -436,47 +433,19 @@ public class AttackAction : IBattleAction
 
             case DamageCategory.Fixed:
                 damage = attackToUse.FixedDamageValue ?? 1;
-                Target.Attributes.ReceiveDamage(damage);
-                AccumulateBideDamage(damage);
-                _emitter?.Emit(
-                    new DamageDealt(
-                        Target.Name,
-                        damage,
-                        1.0,
-                        Target.Attributes.HP,
-                        Target.Attributes.MaxHP
-                    )
-                );
+                DealDamageToTarget(damage, 1.0, false);
                 break;
 
             case DamageCategory.LevelBased:
                 damage = DamageCalculator.CalculateLevelBasedDamage(Source);
-                Target.Attributes.ReceiveDamage(damage);
-                AccumulateBideDamage(damage);
-                _emitter?.Emit(
-                    new DamageDealt(
-                        Target.Name,
-                        damage,
-                        1.0,
-                        Target.Attributes.HP,
-                        Target.Attributes.MaxHP
-                    )
-                );
+                DealDamageToTarget(damage, 1.0, false);
                 break;
 
             case DamageCategory.OHKO:
+                // Against a Substitute the OHKO just breaks the decoy (the soak caps at the sub's HP);
+                // otherwise it removes the target's full current HP.
                 damage = Target.Attributes.HP;
-                Target.Attributes.ReceiveDamage(damage);
-                AccumulateBideDamage(damage);
-                _emitter?.Emit(
-                    new DamageDealt(
-                        Target.Name,
-                        damage,
-                        1.0,
-                        Target.Attributes.HP,
-                        Target.Attributes.MaxHP
-                    )
-                );
+                DealDamageToTarget(damage, 1.0, false);
                 break;
 
             case DamageCategory.SelfDestruct:
@@ -503,18 +472,7 @@ public class AttackAction : IBattleAction
                     screenDefenseMultiplier: screenMult
                 );
 
-                Target.Attributes.ReceiveDamage(damage);
-                AccumulateBideDamage(damage);
-                _emitter?.Emit(
-                    new DamageDealt(
-                        Target.Name,
-                        damage,
-                        eff,
-                        Target.Attributes.HP,
-                        Target.Attributes.MaxHP,
-                        isCrit
-                    )
-                );
+                DealDamageToTarget(damage, eff, isCrit);
 
                 // User faints unconditionally (already handled miss → faint above)
                 Source.Attributes.ReceiveDamage(Source.Attributes.HP);
@@ -523,34 +481,14 @@ public class AttackAction : IBattleAction
 
             case DamageCategory.SuperFang:
                 damage = DamageCalculator.CalculateSuperFangDamage(Target);
-                Target.Attributes.ReceiveDamage(damage);
-                AccumulateBideDamage(damage);
-                _emitter?.Emit(
-                    new DamageDealt(
-                        Target.Name,
-                        damage,
-                        1.0,
-                        Target.Attributes.HP,
-                        Target.Attributes.MaxHP
-                    )
-                );
+                DealDamageToTarget(damage, 1.0, false);
                 break;
 
             case DamageCategory.Psywave:
                 // Gen 1: a random 1..floor(1.5×level), ignoring Attack/Defense, type effectiveness,
                 // STAB and crits. The magnitude is gen-variable, so it comes from the rules seam.
                 damage = _rules.RollPsywaveDamage(Source, _rng);
-                Target.Attributes.ReceiveDamage(damage);
-                AccumulateBideDamage(damage);
-                _emitter?.Emit(
-                    new DamageDealt(
-                        Target.Name,
-                        damage,
-                        1.0,
-                        Target.Attributes.HP,
-                        Target.Attributes.MaxHP
-                    )
-                );
+                DealDamageToTarget(damage, 1.0, false);
                 break;
         }
 
@@ -599,6 +537,44 @@ public class AttackAction : IBattleAction
             Target.BideDamageAccumulated += dmg;
     }
 
+    // Applies <paramref name="dmg"/> to the Target, honoring an active Substitute. Gen 1: while a
+    // Substitute stands, the decoy soaks the whole hit — the user's HP is untouched and any overflow is
+    // lost (it does NOT carry through to the user, even from an OHKO). Returns true when the real
+    // creature took the damage (so a caller can run on-real-hit follow-ups like Counter recording or
+    // Rage), false when the Substitute absorbed it. Every damage category routes through here so the
+    // soak can't be missed by one branch (the recurring "hook added to only the Standard path" defect).
+    private bool DealDamageToTarget(int dmg, double effectiveness, bool isCrit)
+    {
+        if (Target.SubstituteHp > 0)
+        {
+            Target.SubstituteHp = Math.Max(0, Target.SubstituteHp - dmg);
+            if (Target.SubstituteHp == 0)
+                _emitter?.Emit(new SubstituteFaded(Target.Name));
+            else
+                _emitter?.Emit(new SubstituteAbsorbedHit(Target.Name, Target.SubstituteHp));
+            return false;
+        }
+
+        Target.Attributes.ReceiveDamage(dmg);
+        AccumulateBideDamage(dmg);
+        _emitter?.Emit(
+            new DamageDealt(
+                Target.Name,
+                dmg,
+                effectiveness,
+                Target.Attributes.HP,
+                Target.Attributes.MaxHP,
+                isCrit
+            )
+        );
+        return true;
+    }
+
+    // True while a foe-directed secondary (status, stat-drop, confusion) should be blocked because the
+    // Target is hiding behind a Substitute — Gen 1: the decoy shields the user from the opponent's
+    // status and stat changes while it stands.
+    private bool TargetShieldedBySubstitute => _targetShieldedAtImpact;
+
     private void TryApplyStatus(Attack attack)
     {
         if (attack.StatusEffect == StatusCondition.None)
@@ -606,6 +582,9 @@ public class AttackAction : IBattleAction
         if (Target.Status != StatusCondition.None)
             return;
         if (!Target.IsAlive())
+            return;
+        // Gen 1: a Substitute shields the user from the foe's status (the hit, if any, struck the decoy).
+        if (TargetShieldedBySubstitute)
             return;
 
         // Gen 1 type immunity (Poison can't be poisoned, Fire can't be burned, Body Slam can't
@@ -639,6 +618,11 @@ public class AttackAction : IBattleAction
             return;
 
         Creature affected = se.Target == StageTarget.Self ? Source : Target;
+
+        // Gen 1: a Substitute shields the user from the foe's stat changes while it stands. A
+        // self-targeting stat change (the user's own buff) is unaffected.
+        if (se.Target == StageTarget.Foe && TargetShieldedBySubstitute)
+            return;
 
         // Gen 1 Mist: the opponent cannot lower the Mist-holder's stats. Self-inflicted drops
         // (and any raise) are unaffected.
@@ -755,19 +739,11 @@ public class AttackAction : IBattleAction
                 )
                 {
                     int countered = Source.LastDamageTaken * 2;
-                    Target.Attributes.ReceiveDamage(countered);
-                    AccumulateBideDamage(countered);
-                    Target.LastDamageTaken = countered;
-                    Target.LastDamageType = attack.DamageType;
-                    _emitter?.Emit(
-                        new DamageDealt(
-                            Target.Name,
-                            countered,
-                            1.0,
-                            Target.Attributes.HP,
-                            Target.Attributes.MaxHP
-                        )
-                    );
+                    if (DealDamageToTarget(countered, 1.0, false))
+                    {
+                        Target.LastDamageTaken = countered;
+                        Target.LastDamageType = attack.DamageType;
+                    }
                 }
                 else
                 {
@@ -877,6 +853,29 @@ public class AttackAction : IBattleAction
                 _emitter?.Emit(new StatusApplied(Source.Name, StatusCondition.Sleep));
                 break;
 
+            case MoveEffect.Substitute:
+                // Gen 1: spend floor(maxHP/4) HP to raise a decoy with floor(maxHP/4)+1 HP that soaks
+                // the foe's hits (absorption handled in DealDamageToTarget; status/stat shielding in the
+                // Try* methods). Fails if a Substitute is already up or the user can't pay (current HP ≤
+                // the cost) — a state precondition, so it reuses MoveMissed like Counter/Rest. The ¼ cost
+                // is gen-invariant (¼ in every generation; litmus "would Gen 2 change it?" → no), so it's
+                // inline rather than on the seam. Self-targeting ⇒ the foe-immunity guard never blocks it.
+                if (Source.SubstituteHp > 0)
+                {
+                    _emitter?.Emit(new MoveMissed(Source.Name, attack.Name ?? ""));
+                    break;
+                }
+                int cost = Source.Attributes.MaxHP / 4;
+                if (Source.Attributes.HP <= cost)
+                {
+                    _emitter?.Emit(new MoveMissed(Source.Name, attack.Name ?? ""));
+                    break;
+                }
+                Source.Attributes.ReceiveDamage(cost);
+                Source.SubstituteHp = cost + 1;
+                _emitter?.Emit(new SubstitutePutUp(Source.Name, Source.SubstituteHp));
+                break;
+
             case MoveEffect.Splash:
                 // Splash does nothing by design — Gen 1's "But nothing happened!". It's a no-op
                 // move (no damage, no status, no stat change), so the only observable behavior is
@@ -890,7 +889,8 @@ public class AttackAction : IBattleAction
                 // confusion doesn't stack — only applies if the target isn't already confused.
                 // EffectChance gates secondary confusion on damaging moves (Psybeam 10%);
                 // pure confusion moves (Supersonic, Confuse Ray) have no chance ⇒ always land.
-                if (Target.IsAlive() && Target.ConfusedTurns == 0)
+                // A Substitute shields the user from the foe's confusion while it stands (Gen 1).
+                if (Target.IsAlive() && Target.ConfusedTurns == 0 && !TargetShieldedBySubstitute)
                 {
                     int chance = _rules.GetSecondaryEffectChance(
                         attack,

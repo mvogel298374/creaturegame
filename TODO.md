@@ -608,16 +608,46 @@ acid-armor, crabhammer, explosion, fury-swipes, bonemerang, rest, rock-slide, hy
   then **guarded it**: pinned `StatusEffect == None` + asserted the foe is never slept. Also applied the
   `ReceiveHealing(restored)` clarity fix. New failure mode logged to the seam-reviewer.
 
+### Batch 17 (moves 161–165) ✅ DONE (2026-06-07) — FINAL COVERAGE BATCH
+tri-attack, super-fang, slash, substitute, struggle (**moves 1–165 now covered except the two deferred
+mutation moves**). **802 .NET + 35 Vitest.** One big new mechanic (Substitute) + a data fix; rest reuse.
+- **Substitute (`MoveEffect.Substitute`):** costs floor(maxHP/4) HP, raises a decoy with floor(maxHP/4)+1
+  HP; fails (→ `MoveMissed`) if one is up or HP ≤ cost. The ¼ cost is inline (gen-invariant; litmus → no).
+  **Cross-cutting:** added one shared `DealDamageToTarget` helper that absorbs into the decoy (overflow
+  lost, user HP untouched) and routed **every** damage path through it (Standard/Drain loop, Fixed,
+  LevelBased, OHKO, SelfDestruct, SuperFang, Psywave, Counter, **and Bide unleash**) — closing the "hook
+  on only the Standard path" leak class; `LastDamageTaken`/Rage now fire only on real (non-absorbed) hits.
+  While up, the decoy shields the foe's status/stat-drop/confusion — snapshotted at impact
+  (`_targetShieldedAtImpact`) so the shield still blocks the secondary on the **breaking** hit. 3 new
+  events (`SubstitutePutUp`/`AbsorbedHit`/`Faded`) wired in all 4 places. `SubstituteContractTests` covers
+  create/cost, absorb (incl. a non-Standard category), break+overflow-lost, fail cases, status/stat/confuse
+  shield, breaking-hit shield, and a full-`Battle` persistence test.
+- Reused/coverage: super-fang (already-implemented SuperFang category → new `SuperFangContractTests` +
+  data pin); slash (single-turn high-crit → crit test + damage/PP rows); struggle (existing no-PP fallback;
+  its stray inert `EffectChance=10` left as-is).
+- **Layer-2 data fix (pinned):** tri-attack → no secondary in Gen 1 (the 20% random burn/freeze/para was
+  added Gen 2). Substitute effect + super-fang category also pinned in `SecondaryChanceDataContractTests`.
+- Seam-review gate: PASS-WITH-ADVISORIES (0 blockers). Advisory fixed pre-commit: the secondary-shield was
+  read after absorption, so a breaking hit's status leaked — snapshotted it at impact + added a pinning
+  test. New failure mode (snapshot-a-guard-at-impact) logged to the seam-reviewer.
+
 ### Remaining batches (cadence)
-- [ ] Batch 17 (moves 161–165): query the rows → add `InlineData` rows to the matching capability class →
-  add a new capability class only for genuinely new mechanics. **Next: batch 17 = moves 161–165** (the
-  final coverage batch), plus the two deferred type/identity-mutation moves below.
+- [x] **Move-coverage pass COMPLETE** (batches 1–17, moves 1–165) as of 2026-06-07 — every Gen 1 move has
+  behaviour/coverage tests except the two deferred identity/type-mutation moves below. Next up is that
+  deferred batch, then the post-coverage sequence.
 - [ ] **Deferred type/identity-mutation batch — Transform (144) + Conversion (160):** both mutate the
   user's identity and need snapshot/restore in `ResetBattleState` (like Mimic, but wider), so build the
   machinery once. **Transform** copies the target's species, types, the four non-HP stats, current stat
   stages, and full moveset (each move at 5 PP). **Conversion** (Gen 1) copies the *foe's* Type1/Type2 onto
   the user. Each needs its own event (`TransformedInto` / `ConvertedType`, 4-place wiring) + full-`Battle`
   tests. Deferred deliberately to keep batches 15–16 reviewable.
+- [ ] **Post-coverage sequencing** (set 2026-06-06): once all 165 moves are covered, the order is
+  (1) deferred type/identity-mutation batch (Transform + Conversion) → (2) jump-kick/hi-jump-kick
+  Ghost-immunity crash edge → (3) Counter fixed/level-based answer → (4) `AttackAction` lock-in
+  abstraction → **(5) the full integration-test pass** → (6) `BattleState` facade migration →
+  (7) `GameController` run-seed. The **integration-test pass was moved later** (after the lock-in
+  abstraction, before the facade migration) rather than running immediately after coverage — the
+  end-to-end tests are more valuable once the engine refactors that change call shapes have landed.
 - [x] **Tech debt — flaky OHKO tests** (fixed in batch 16): both `OHKOMove_*` tests in CoreMechanicsTests
   relied on level implying speed, but randomised DVs flipped the order intermittently (the pre-commit hook
   caught `OHKOMove_FaintsTargetIfLevelSufficient` failing). Rewrote both to set Speed explicitly and renamed

@@ -292,6 +292,7 @@ public class MoveImport
             case "waterfall": // Gen 1–3: no secondary effect; the 20% flinch was added in Gen 4
             case "dizzy-punch": // Gen 1: no secondary effect; the 20% confusion was added in Gen 5
             case "rock-slide": // Gen 1: no secondary effect; the 30% flinch was added in Gen 2
+            case "tri-attack": // Gen 1: no secondary effect; the 20% random burn/freeze/para is Gen 2+
                 attack.Effect = MoveEffect.None;
                 attack.EffectChance = null;
                 break;
@@ -403,6 +404,9 @@ public class MoveImport
         // Bonemerang strikes exactly twice (fixed-count multi-hit, like double-kick/twineedle); the
         // strike count is stable move data set in MultiHitCount below, not a 2–5 roll.
         ["bonemerang"] = MoveEffect.MultiHit,
+        // Substitute spends HP to raise a decoy that soaks the foe's hits (engine handles the HP cost,
+        // damage absorption, and status/stat shielding).
+        ["substitute"] = MoveEffect.Substitute,
     };
 
     // Gen 1 physical types: Normal, Fighting, Flying, Poison, Ground, Rock, Bug, Ghost.
