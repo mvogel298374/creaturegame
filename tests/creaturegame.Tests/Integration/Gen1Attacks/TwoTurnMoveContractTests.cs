@@ -21,6 +21,7 @@ public class TwoTurnMoveContractTests(MovesFixture moves) : Gen1MoveContract(mov
     [InlineData("solar-beam")]
     [InlineData("dig")]
     [InlineData("skull-bash")]
+    [InlineData("sky-attack")]
     public async Task ChargesFirstTurnThenStrikes(string moveName)
     {
         var move = Move(moveName);
@@ -48,6 +49,7 @@ public class TwoTurnMoveContractTests(MovesFixture moves) : Gen1MoveContract(mov
     [InlineData("solar-beam")]
     [InlineData("dig")]
     [InlineData("skull-bash")]
+    [InlineData("sky-attack")]
     public async Task MissesOnReleaseTurn(string moveName)
     {
         var turns = await new MoveScenario()

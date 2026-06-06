@@ -15,6 +15,7 @@ public class DrainContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     [Theory]
     [InlineData("absorb")]
     [InlineData("mega-drain")]
+    [InlineData("leech-life")]
     public async Task HealsHalfTheDamageDealt(string moveName)
     {
         var attacker = TestCreatures.Make("A", special: 120);

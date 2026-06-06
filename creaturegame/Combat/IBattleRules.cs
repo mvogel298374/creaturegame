@@ -234,6 +234,14 @@ public interface IBattleRules
     /// </summary>
     int BideDamageMultiplier { get; }
 
+    /// <summary>
+    /// Returns the variable damage Psywave deals on hit (it ignores Attack/Defense, type
+    /// effectiveness, STAB and crits). Gen 1: a random integer in [1, floor(1.5 × user level)].
+    /// (Gen 2 uses a different range, Gen 3+ is 50–150% of level — the formula is gen-variable,
+    /// so it lives on the seam rather than inline in the attack resolver.)
+    /// </summary>
+    int RollPsywaveDamage(Creature source, IRandomSource rng);
+
     // ── Type-based immunities ────────────────────────────────────────────────────
 
     /// <summary>

@@ -85,6 +85,9 @@ public abstract class DelegatingBattleRules : IBattleRules
 
     public virtual int BideDamageMultiplier => Gen1.BideDamageMultiplier;
 
+    public virtual int RollPsywaveDamage(Creature s, IRandomSource rng) =>
+        Gen1.RollPsywaveDamage(s, rng);
+
     public virtual bool CanReceiveStatus(Creature t, StatusCondition s, DamageType mt) =>
         Gen1.CanReceiveStatus(t, s, mt);
 

@@ -43,6 +43,10 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                 Console.WriteLine($"It doesn't affect {e.TargetName}...");
                 break;
 
+            case ButNothingHappened:
+                Console.WriteLine("But nothing happened!");
+                break;
+
             case DamageDealt e:
                 if (e.TypeEffectiveness == 0.0)
                 {

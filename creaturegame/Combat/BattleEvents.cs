@@ -42,6 +42,9 @@ public record MoveMissed(string AttackerName, string MoveName) : BattleEvent;
 /// <summary>The move hit but the target is immune (type-based) so nothing happened — "It doesn't affect …".</summary>
 public record MoveHadNoEffect(string TargetName, string MoveName) : BattleEvent;
 
+/// <summary>A move with no effect by design (Splash) resolved — the Gen 1 "But nothing happened!" line.</summary>
+public record ButNothingHappened(string CreatureName) : BattleEvent;
+
 public record DamageDealt(
     string TargetName,
     int Damage,

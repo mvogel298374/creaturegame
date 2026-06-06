@@ -313,6 +313,7 @@ public class AttackAction : IBattleAction
                         or DamageCategory.LevelBased
                         or DamageCategory.OHKO
                         or DamageCategory.SuperFang
+                        or DamageCategory.Psywave
             )
         )
         {
@@ -522,6 +523,23 @@ public class AttackAction : IBattleAction
 
             case DamageCategory.SuperFang:
                 damage = DamageCalculator.CalculateSuperFangDamage(Target);
+                Target.Attributes.ReceiveDamage(damage);
+                AccumulateBideDamage(damage);
+                _emitter?.Emit(
+                    new DamageDealt(
+                        Target.Name,
+                        damage,
+                        1.0,
+                        Target.Attributes.HP,
+                        Target.Attributes.MaxHP
+                    )
+                );
+                break;
+
+            case DamageCategory.Psywave:
+                // Gen 1: a random 1..floor(1.5×level), ignoring Attack/Defense, type effectiveness,
+                // STAB and crits. The magnitude is gen-variable, so it comes from the rules seam.
+                damage = _rules.RollPsywaveDamage(Source, _rng);
                 Target.Attributes.ReceiveDamage(damage);
                 AccumulateBideDamage(damage);
                 _emitter?.Emit(
@@ -837,6 +855,14 @@ public class AttackAction : IBattleAction
                         _emitter?.Emit(new MimicLearned(Source.Name, chosen.Name ?? ""));
                     }
                 }
+                break;
+
+            case MoveEffect.Splash:
+                // Splash does nothing by design — Gen 1's "But nothing happened!". It's a no-op
+                // move (no damage, no status, no stat change), so the only observable behavior is
+                // the message. Invariant across generations, so it stays inline rather than on the
+                // rules seam.
+                _emitter?.Emit(new ButNothingHappened(Source.Name));
                 break;
 
             case MoveEffect.Confuse:

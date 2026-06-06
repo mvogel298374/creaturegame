@@ -103,4 +103,30 @@ public class UniqueMoveEffectContractTests(MovesFixture moves) : Gen1MoveContrac
         Assert.True(result.Defender.Attributes.HP < 500);
         Assert.False(result.Attacker.IsAlive(), "the user faints from Self-Destruct");
     }
+
+    // Splash (real imported row) is the Gen 1 no-op: it announces "But nothing happened!" and leaves
+    // both battlers exactly as they were — no damage, no status, no stat change. The dedicated event
+    // is what distinguishes a faithfully-wired no-op from an unimplemented move.
+    [Fact]
+    public async Task SplashDoesNothingButAnnouncesIt()
+    {
+        var attacker = TestCreatures.Make("A");
+        attacker.Stages.RaiseAttack(2);
+        var defender = TestCreatures.Make("D", hp: 500);
+        defender.Stages.RaiseDefense(2);
+
+        var result = await new MoveScenario()
+            .Attacker(attacker)
+            .Defender(defender)
+            .Use(Move("splash"));
+
+        Assert.True(result.Has<ButNothingHappened>());
+        Assert.False(result.Has<DamageDealt>(), "Splash deals no damage");
+        // Nothing about either battler changed.
+        Assert.Equal(result.Attacker.Attributes.MaxHP, result.Attacker.Attributes.HP);
+        Assert.Equal(result.Defender.Attributes.MaxHP, result.Defender.Attributes.HP);
+        Assert.Equal(StatusCondition.None, result.Defender.Status);
+        Assert.Equal(2, result.Attacker.Stages.Attack);
+        Assert.Equal(2, result.Defender.Stages.Defense);
+    }
 }

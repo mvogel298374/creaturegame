@@ -44,6 +44,7 @@ public enum MoveEffect
     Bide,
     MirrorMove,
     DreamEater,
+    Splash,
 }
 
 public enum DamageCategory
@@ -55,6 +56,7 @@ public enum DamageCategory
     OHKO,
     SelfDestruct,
     SuperFang,
+    Psywave,
 }
 
 public record StatEffect(StageStat Stat, int Delta, StageTarget Target, int Chance);

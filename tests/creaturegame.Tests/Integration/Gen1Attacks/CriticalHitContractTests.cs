@@ -42,6 +42,20 @@ public class CriticalHitContractTests(MovesFixture moves) : Gen1MoveContract(mov
         );
     }
 
+    // Sky Attack is the other high-crit two-turn move — same high crit rate, only on the release turn.
+    [Fact]
+    public async Task SkyAttackCritsFarMoreOftenThanFlyOnRelease()
+    {
+        int skyAttack = await ReleaseCrits("sky-attack");
+        int fly = await ReleaseCrits("fly");
+
+        Assert.True(skyAttack > fly, $"sky-attack crits ({skyAttack}) should exceed fly ({fly})");
+        Assert.True(
+            skyAttack >= 40,
+            $"high-crit move should crit most of the time (got {skyAttack}/60)"
+        );
+    }
+
     // Razor Leaf is a single-turn high-crit Special move (Gen 1) — same high crit rate, no charge.
     [Fact]
     public async Task RazorLeafCritsFarMoreOftenThanNormal()

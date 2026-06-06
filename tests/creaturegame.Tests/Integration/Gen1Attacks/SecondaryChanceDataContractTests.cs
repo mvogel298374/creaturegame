@@ -147,4 +147,47 @@ public class SecondaryChanceDataContractTests(MovesFixture moves) : Gen1MoveCont
         Assert.Equal(MoveEffect.DreamEater, move.Effect);
         Assert.Equal(DamageCategory.Drain, move.DamageCategory);
     }
+
+    // ── Batch 15 layer-2 facts ─────────────────────────────────────────────────────────────────
+    // Bubble and Constrict both lowered Speed at 33% in Gen 1 (modern: 10%). PokeAPI reports the
+    // modern chance and can't express the Gen 1 value via past_values, so it's an importer override —
+    // pin both the stat-drop chance and the EffectChance the override sets alongside it.
+    [Theory]
+    [InlineData("bubble")]
+    [InlineData("constrict")]
+    public void Gen1ThirtyThreePercentSpeedDropChance(string move)
+    {
+        Assert.Equal(33, Move(move).StatEffectChance);
+        Assert.Equal(33, Move(move).EffectChance);
+        Assert.Equal(StageStat.Speed, Move(move).StatEffectStat);
+    }
+
+    // Dizzy Punch had no secondary effect in Gen 1 (the 20% confusion was added in Gen 5). The importer
+    // strips the modern secondary back off — pin both the cleared effect and the null chance.
+    [Fact]
+    public void DizzyPunchHasNoSecondaryEffectInGen1()
+    {
+        var move = Move("dizzy-punch");
+        Assert.Equal(MoveEffect.None, move.Effect);
+        Assert.Null(move.EffectChance);
+    }
+
+    // Gen 1–2 Sky Attack is a plain two-turn charge (mapped by name → TwoTurn). The 30% flinch was
+    // added in Gen 3; the importer clears the stale chance. Pin the TwoTurn mapping and the null chance.
+    [Fact]
+    public void SkyAttackIsTwoTurnWithNoFlinchInGen1()
+    {
+        var move = Move("sky-attack");
+        Assert.Equal(MoveEffect.TwoTurn, move.Effect);
+        Assert.Null(move.EffectChance);
+    }
+
+    // Psywave's variable-damage category and Splash's no-op effect are importer ID/name mappings PokeAPI
+    // can't express — pin them so a re-import that drops a clause can't silently revert either move.
+    [Fact]
+    public void PsywaveUsesTheVariableDamageCategory() =>
+        Assert.Equal(DamageCategory.Psywave, Move("psywave").DamageCategory);
+
+    [Fact]
+    public void SplashIsAGen1NoOp() => Assert.Equal(MoveEffect.Splash, Move("splash").Effect);
 }

@@ -193,6 +193,11 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       return { steps: [w(650), d(log(`It doesn't affect ${targetName}...`)), w(800)] };
     }
 
+    case 'ButNothingHappened': {
+      // Splash and other no-op moves — the Gen 1 "But nothing happened!" line.
+      return { steps: [w(650), d(log('But nothing happened!')), w(800)] };
+    }
+
     case 'DamageDealt': {
       const targetName = payload.targetName as string;
       const hpAfter    = payload.hpAfter as number;

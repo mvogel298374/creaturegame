@@ -33,6 +33,11 @@ describe('expandEvent — move-name formatting', () => {
     const { steps } = expandEvent('MoveHadNoEffect', { targetName: 'GENGAR', moveName: 'seismic-toss' }, CTX);
     expect(logLines(steps)).toEqual(["It doesn't affect GENGAR..."]);
   });
+
+  it('reads the Gen 1 "But nothing happened!" line for Splash', () => {
+    const { steps } = expandEvent('ButNothingHappened', { creatureName: 'GYARADOS' }, CTX);
+    expect(logLines(steps)).toEqual(['But nothing happened!']);
+  });
 });
 
 describe('expandEvent — DamageDealt', () => {

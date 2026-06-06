@@ -109,6 +109,10 @@ public sealed class Gen1BattleRules : IBattleRules
 
     public int BideDamageMultiplier => 2;
 
+    // Gen 1: Psywave deals a random 1..floor(1.5 × level), ignoring stats/type/STAB/crits.
+    public int RollPsywaveDamage(Creature source, IRandomSource rng) =>
+        rng.Next(1, Math.Max(1, source.Level * 3 / 2) + 1);
+
     // ── Type-based immunities ────────────────────────────────────────────────────
 
     // Gen 1 status immunities by type: Poison-types can't be poisoned, Fire-types can't be burned,

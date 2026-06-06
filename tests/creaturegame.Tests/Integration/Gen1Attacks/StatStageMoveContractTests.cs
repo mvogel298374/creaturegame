@@ -134,6 +134,7 @@ public class StatStageMoveContractTests(MovesFixture moves) : Gen1MoveContract(m
     [InlineData("growl", "Attack")]
     [InlineData("string-shot", "Speed")] // Gen 1: −1 Speed (modern: −2)
     [InlineData("kinesis", "Accuracy")] // −1 foe Accuracy
+    [InlineData("flash", "Accuracy")] // −1 foe Accuracy
     public async Task LowersFoeStatByOneStage(string moveName, string stat)
     {
         var result = await new MoveScenario()

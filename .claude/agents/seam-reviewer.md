@@ -109,3 +109,12 @@ apply the litmus question from §5.0 ("when we build Gen 2, will this value/layo
   of `AttackAction`'s multiple damage paths. Any hook that should fire "whenever the target takes
   damage" must run in *every* category branch (or via one shared apply-damage helper), not just the
   common Standard path — and the test must exercise a non-Standard category to prove it.
+- **A new variable-damage `DamageCategory` (Psywave) shipped with only an import-mapping data-pin and no
+  behaviour test of the quirk** — nothing asserted the damage is bounded by level and ignores attacker
+  Special / defender bulk, so a regression routing it through the Standard damage path would stay green.
+  Class: data-pin-is-not-a-behaviour-test. A gen-variable damage/magnitude rule needs a test that
+  exercises the *quirk* (bound + what it ignores), not just that the importer set the category.
+- **Two layer-2 importer data overrides (bubble/constrict 33% Speed drop) had no data-pin in the first
+  pass** — repeat of the `thunder` class above; behaviour tests force the roll so they'd stay green
+  after a silent re-import revert to the modern 10%. Every importer value Gen 1 differs from modern on
+  needs a pin in `SecondaryChanceDataContractTests` in the *same* batch that adds the override.

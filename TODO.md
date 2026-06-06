@@ -555,10 +555,40 @@ everything else coverage-only. No layer-2 data overrides needed (all values Gen-
   Eater fail uses `MoveMissed` over `MoveHadNoEffect`. Other advisory (the flaky OHKO test) is the
   pre-existing tech-debt item below.
 
+### Batch 15 (moves 141–150) ✅ DONE (2026-06-06)
+leech-life, lovely-kiss, sky-attack, bubble, dizzy-punch, spore, flash, psywave, splash (**9 of 10** —
+Transform deferred, see below). **758 .NET + 34 Vitest.** Two new engine bits, the rest coverage-only.
+- **Psywave (`DamageCategory.Psywave`):** variable damage = random 1..floor(1.5 × user level), ignoring
+  Attack/Defense, type effectiveness, STAB and crits. The magnitude is gen-variable, so it lives on the
+  seam (`IBattleRules.RollPsywaveDamage`, delegated in `DelegatingBattleRules`), NOT inline. New branch
+  routes through the shared Bide-accumulation + 0×-immunity guard like the other non-Standard categories.
+  **`PsywaveContractTests`** exercises the *quirk* (bound by level, ignores attacker Special + defender
+  bulk), not just the import mapping (which is pinned in `SecondaryChanceDataContractTests`).
+- **Splash (`MoveEffect.Splash`):** the Gen 1 no-op — new `ButNothingHappened` battle event wired in all
+  4 places (`BattleEvents.cs`, both emitters, `timeline.ts` + `timeline.test.ts`). Inline, not on the
+  seam: doing nothing is gen-invariant (litmus "would Gen 2 change it?" → no; seam-review agreed). Splash
+  self-targets, so `targetsFoe` is false and it correctly bypasses the foe-immunity guard. Lives in
+  `UniqueMoveEffectContractTests`.
+- Reused contracts (rows added): drain (leech-life); pure sleep status (lovely-kiss, spore); two-turn +
+  high-crit-on-release (sky-attack); secondary stat-drop (bubble Speed −1 at 33%); damage/PP/miss
+  (bubble, dizzy-punch); foe stat-drop (flash −1 Accuracy).
+- **Layer-2 importer data overrides** (Gen 1 ≠ modern; PokeAPI can't express via `past_values`) — all
+  pinned in `SecondaryChanceDataContractTests`: **bubble & constrict → 33% Speed drop** (modern 10%; also
+  corrects constrict, which batch 14 shipped at 10%); **dizzy-punch → no secondary** (Gen 5 confusion
+  stripped); **sky-attack → flinch chance cleared** (Gen 3 flinch). Re-imported via full `PokeApiConnector`
+  run + MCP-verified (splash Effect=Splash, psywave category=Psywave).
+- Seam-review gate: PASS-WITH-ADVISORIES (0 blockers). Both advisories fixed pre-commit: added the
+  Psywave behaviour test (`PsywaveContractTests`) and documented why no Psychic type-immunity case exists.
+
 ### Remaining batches (cadence)
-- [ ] Batches 15–17 (moves 141–165): query the next 10 → add `InlineData` rows to the matching
-  capability class → add a new capability class only for genuinely new mechanics. **Next: batch 15 =
-  moves 141–150.**
+- [ ] Batches 16–17 (moves 151–165): query the next 10 → add `InlineData` rows to the matching
+  capability class → add a new capability class only for genuinely new mechanics. **Next: batch 16 =
+  moves 151–160.**
+- [ ] **Deferred from batch 15 — Transform (move 144):** its own follow-up batch. Copies the target's
+  species, types, the four non-HP stats, current stat stages, and full moveset (each move at 5 PP), with
+  snapshot/restore on battle end (like Mimic, but far wider — restore must live in `ResetBattleState` so
+  Haze/battle-end can't orphan it). New `TransformedInto` event (4-place wiring) + full-`Battle` tests.
+  Largest single-move feature in the 1–165 set; deferred deliberately to keep batch 15 reviewable.
 - [ ] **Tech debt — flaky test:** `OHKOMove_FailsIfSourceLevelLowerThanTarget` (CoreMechanicsTests) is
   non-deterministic: it relies on level implying speed, but randomised DVs can flip the speed order so
   the OHKO succeeds. Rewrite to set attacker/defender Speed explicitly (Gen 1 uses the speed compare,

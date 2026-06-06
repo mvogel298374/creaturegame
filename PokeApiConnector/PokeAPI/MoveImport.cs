@@ -183,6 +183,8 @@ public class MoveImport
             attack.DamageCategory = DamageCategory.LevelBased;
         else if (pokeMove.Id == 162) // Super Fang
             attack.DamageCategory = DamageCategory.SuperFang;
+        else if (pokeMove.Id == 149) // Psywave (variable damage: random 1..floor(1.5×level))
+            attack.DamageCategory = DamageCategory.Psywave;
         else if (pokeMove.Id == 49) // Sonic Boom (fixed 20 damage)
         {
             attack.DamageCategory = DamageCategory.Fixed;
@@ -269,6 +271,8 @@ public class MoveImport
                 break;
             case "aurora-beam": // Gen 1: 33% to lower Attack (modern: 10%)
             case "bubble-beam": // Gen 1: 33% to lower Speed (modern: 10%)
+            case "bubble": // Gen 1: 33% to lower Speed (modern: 10%; past_values lacks the chance)
+            case "constrict": // Gen 1: 33% to lower Speed (modern: 10%)
                 attack.StatEffectChance = 33;
                 attack.EffectChance = 33;
                 break;
@@ -286,7 +290,12 @@ public class MoveImport
                 attack.EffectChance = 30;
                 break;
             case "waterfall": // Gen 1–3: no secondary effect; the 20% flinch was added in Gen 4
+            case "dizzy-punch": // Gen 1: no secondary effect; the 20% confusion was added in Gen 5
                 attack.Effect = MoveEffect.None;
+                attack.EffectChance = null;
+                break;
+            case "sky-attack": // Gen 1–2: plain two-turn charge (mapped to TwoTurn above). The 30%
+                // flinch was added in Gen 3; clear the stale, inert chance PokeAPI reports.
                 attack.EffectChance = null;
                 break;
             case "skull-bash": // Gen 1: plain two-turn charge (mapped to TwoTurn above). PokeAPI
@@ -386,6 +395,8 @@ public class MoveImport
         // Dream Eater drains HP but only works on a sleeping target (enforced in the engine). The 50%
         // drain heal rides on its DamageCategory.Drain (set from meta); this flag adds the sleep gate.
         ["dream-eater"] = MoveEffect.DreamEater,
+        // Splash does nothing by design — the engine emits the Gen 1 "But nothing happened!" line.
+        ["splash"] = MoveEffect.Splash,
     };
 
     // Gen 1 physical types: Normal, Fighting, Flying, Poison, Ground, Rock, Bug, Ghost.

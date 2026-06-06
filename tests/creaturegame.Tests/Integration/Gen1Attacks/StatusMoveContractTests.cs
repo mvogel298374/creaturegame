@@ -164,6 +164,40 @@ public class StatusMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
         Assert.Equal(StatusCondition.None, result.Defender.Status);
     }
 
+    // Lovely Kiss (Normal) and Spore (Grass): pure Sleep-inducing status moves, like Sing/Hypnosis.
+    // (Gen 1 has no Grass immunity to powder, and Sleep has no type immunity, so a plain defender works.)
+    [Theory]
+    [InlineData("lovely-kiss")]
+    [InlineData("spore")]
+    public async Task PutsTheTargetToSleepWithoutDamage(string moveName)
+    {
+        var result = await new MoveScenario()
+            .Defender(TestCreatures.Make("D", hp: 500))
+            .Use(Move(moveName));
+
+        Assert.False(result.Has<DamageDealt>(), $"{moveName} is a status move — no damage");
+        Assert.Equal(StatusCondition.Sleep, result.Defender.Status);
+        Assert.True(result.Defender.SleepTurns > 0);
+        Assert.Contains(
+            result.Events,
+            e => e is StatusApplied s && s.Status == StatusCondition.Sleep
+        );
+    }
+
+    [Theory]
+    [InlineData("lovely-kiss")]
+    [InlineData("spore")]
+    public async Task SleepMoveAppliesNothingOnMiss(string moveName)
+    {
+        var result = await new MoveScenario()
+            .Rules(NeverHitRules.Instance)
+            .Defender(TestCreatures.Make("D", hp: 500))
+            .Use(Move(moveName));
+
+        Assert.True(result.Has<MoveMissed>());
+        Assert.Equal(StatusCondition.None, result.Defender.Status);
+    }
+
     // Pure confusion moves (no damage): Supersonic (Normal) and Confuse Ray (Ghost).
     [Theory]
     [InlineData("supersonic")]
