@@ -88,6 +88,8 @@ public abstract class DelegatingBattleRules : IBattleRules
     public virtual int RollPsywaveDamage(Creature s, IRandomSource rng) =>
         Gen1.RollPsywaveDamage(s, rng);
 
+    public virtual int RestSleepTurns => Gen1.RestSleepTurns;
+
     public virtual bool CanReceiveStatus(Creature t, StatusCondition s, DamageType mt) =>
         Gen1.CanReceiveStatus(t, s, mt);
 

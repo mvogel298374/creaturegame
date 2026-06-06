@@ -118,3 +118,11 @@ apply the litmus question from §5.0 ("when we build Gen 2, will this value/layo
   pass** — repeat of the `thunder` class above; behaviour tests force the roll so they'd stay green
   after a silent re-import revert to the modern 10%. Every importer value Gen 1 differs from modern on
   needs a pin in `SecondaryChanceDataContractTests` in the *same* batch that adds the override.
+- **A self-inflicted-status move (Rest) had no test asserting the FOE is unaffected.** `TryApplyStatus`
+  runs *before* the move-effect handler, keyed on `attack.StatusEffect`. If a move's PokeAPI ailment
+  maps to a non-None `StatusEffect` (Rest's ailment could read "sleep"), the foe gets that status at
+  100% *in addition to* the intended self-effect — and a test that only checks the user's state stays
+  green. Class: self-vs-foe status leak via the pre-handler `TryApplyStatus`. For any self-targeting
+  status/heal move, (a) pin `Move(name).StatusEffect == None` in the data tests, and (b) assert
+  `result.Defender.Status == None` in behaviour tests. (In this batch the imported data was already
+  None — verified against the row, not assumed — but the test gap was real, so the guards were added.)

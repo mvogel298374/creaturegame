@@ -90,18 +90,24 @@ public class UniqueMoveEffectContractTests(MovesFixture moves) : Gen1MoveContrac
         Assert.True(result.Has<DamageDealt>(), "the called move deals damage");
     }
 
-    // Self-Destruct (real imported row) damages the foe and faints the user.
-    [Fact]
-    public async Task SelfDestructDamagesTheFoeAndFaintsTheUser()
+    // Self-Destruct and Explosion (real imported rows, DamageCategory.SelfDestruct) damage the foe and
+    // faint the user — Explosion is the higher-power sibling sharing the same category.
+    [Theory]
+    [InlineData("self-destruct")]
+    [InlineData("explosion")]
+    public async Task SelfDestructMoveDamagesTheFoeAndFaintsTheUser(string moveName)
     {
         var result = await new MoveScenario()
             .Attacker(TestCreatures.Make("A"))
             .Defender(TestCreatures.Make("D", hp: 500))
-            .Use(Move("self-destruct"));
+            .Use(Move(moveName));
 
         Assert.True(result.Has<DamageDealt>());
         Assert.True(result.Defender.Attributes.HP < 500);
-        Assert.False(result.Attacker.IsAlive(), "the user faints from Self-Destruct");
+        Assert.False(
+            result.Attacker.IsAlive(),
+            "the user faints from a Self-Destruct-category move"
+        );
     }
 
     // Splash (real imported row) is the Gen 1 no-op: it announces "But nothing happened!" and leaves

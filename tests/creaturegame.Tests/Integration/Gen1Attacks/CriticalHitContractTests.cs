@@ -73,6 +73,23 @@ public class CriticalHitContractTests(MovesFixture moves) : Gen1MoveContract(mov
         );
     }
 
+    // Crabhammer is a single-turn high-crit Water move (Gen 1) — same high crit rate, no charge.
+    [Fact]
+    public async Task CrabhammerCritsFarMoreOftenThanNormal()
+    {
+        int crabhammer = await CritRuns("crabhammer");
+        int pound = await CritRuns("pound");
+
+        Assert.True(
+            crabhammer > pound,
+            $"crabhammer crits ({crabhammer}) should exceed pound ({pound})"
+        );
+        Assert.True(
+            crabhammer >= 40,
+            $"high-crit move should crit most of the time (got {crabhammer}/60)"
+        );
+    }
+
     private async Task<int> CritRuns(string moveName)
     {
         int crits = 0;

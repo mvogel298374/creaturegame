@@ -252,7 +252,7 @@ public class MoveImport
         // Fixed-count multi-hit — the strike count is stable move data (always 2), not a gen rule, so
         // it rides alongside the MoveEffect.MultiHit set via the map above. Twineedle also carries its
         // own 20% poison secondary (set from the ailment); Bonemerang joins here in its coverage batch.
-        if (pokeMove.Name is "double-kick" or "twineedle")
+        if (pokeMove.Name is "double-kick" or "twineedle" or "bonemerang")
             attack.MultiHitCount = 2;
 
         // ── Gen 1 secondary-effect corrections (layer 2: facts PokeAPI can't express) ──────────
@@ -291,6 +291,7 @@ public class MoveImport
                 break;
             case "waterfall": // Gen 1–3: no secondary effect; the 20% flinch was added in Gen 4
             case "dizzy-punch": // Gen 1: no secondary effect; the 20% confusion was added in Gen 5
+            case "rock-slide": // Gen 1: no secondary effect; the 30% flinch was added in Gen 2
                 attack.Effect = MoveEffect.None;
                 attack.EffectChance = null;
                 break;
@@ -397,6 +398,11 @@ public class MoveImport
         ["dream-eater"] = MoveEffect.DreamEater,
         // Splash does nothing by design — the engine emits the Gen 1 "But nothing happened!" line.
         ["splash"] = MoveEffect.Splash,
+        // Rest fully heals + cures status, then forces a fixed-length sleep (engine reads RestSleepTurns).
+        ["rest"] = MoveEffect.Rest,
+        // Bonemerang strikes exactly twice (fixed-count multi-hit, like double-kick/twineedle); the
+        // strike count is stable move data set in MultiHitCount below, not a 2–5 roll.
+        ["bonemerang"] = MoveEffect.MultiHit,
     };
 
     // Gen 1 physical types: Normal, Fighting, Flying, Poison, Ground, Rock, Bug, Ghost.

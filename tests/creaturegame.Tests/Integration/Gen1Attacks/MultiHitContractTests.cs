@@ -17,6 +17,7 @@ public class MultiHitContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     [InlineData("pin-missile")]
     [InlineData("spike-cannon")]
     [InlineData("barrage")]
+    [InlineData("fury-swipes")]
     public async Task MultiHitStrikesTwoToFiveTimes(string moveName)
     {
         for (int seed = 0; seed < 25; seed++)
@@ -62,6 +63,7 @@ public class MultiHitContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     [Theory]
     [InlineData("double-kick", 2)]
     [InlineData("twineedle", 2)] // strikes twice; also carries a 20% poison secondary (see SecondaryStatusContractTests)
+    [InlineData("bonemerang", 2)] // strikes twice (closes the standing fixed-2 multi-hit deferral)
     public async Task FixedCountMoveStrikesExactlyItsMoveDataCount(
         string moveName,
         int expectedHits

@@ -857,6 +857,26 @@ public class AttackAction : IBattleAction
                 }
                 break;
 
+            case MoveEffect.Rest:
+                // Gen 1: the user fully restores HP, cures any major status, then forces itself asleep
+                // for a fixed number of turns (the duration is gen-variable ⇒ IBattleRules.RestSleepTurns,
+                // distinct from the random RollSleepTurns). Fails if already at full HP — a state
+                // precondition not met, so it reuses MoveMissed like Counter/Dream Eater, not the
+                // type-based MoveHadNoEffect. Self-targeting, so the foe-immunity guard never blocks it.
+                if (Source.Attributes.HP >= Source.Attributes.MaxHP)
+                {
+                    _emitter?.Emit(new MoveMissed(Source.Name, attack.Name ?? ""));
+                    break;
+                }
+                int restored = Source.Attributes.MaxHP - Source.Attributes.HP;
+                Source.Attributes.ReceiveHealing(restored); // heals exactly to full
+                // Sleep overwrites any prior major status (Gen 1 allows only one) — Rest's documented cure.
+                Source.Status = StatusCondition.Sleep;
+                Source.SleepTurns = _rules.RestSleepTurns;
+                _emitter?.Emit(new Healed(Source.Name, restored, Source.Attributes.HP));
+                _emitter?.Emit(new StatusApplied(Source.Name, StatusCondition.Sleep));
+                break;
+
             case MoveEffect.Splash:
                 // Splash does nothing by design — Gen 1's "But nothing happened!". It's a no-op
                 // move (no damage, no status, no stat change), so the only observable behavior is

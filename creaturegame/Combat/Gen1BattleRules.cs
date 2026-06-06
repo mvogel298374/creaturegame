@@ -113,6 +113,9 @@ public sealed class Gen1BattleRules : IBattleRules
     public int RollPsywaveDamage(Creature source, IRandomSource rng) =>
         rng.Next(1, Math.Max(1, source.Level * 3 / 2) + 1);
 
+    // Gen 1: Rest forces the user asleep for exactly 2 turns (then it wakes and acts).
+    public int RestSleepTurns => 2;
+
     // ── Type-based immunities ────────────────────────────────────────────────────
 
     // Gen 1 status immunities by type: Poison-types can't be poisoned, Fire-types can't be burned,

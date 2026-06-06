@@ -84,6 +84,9 @@ public class DamageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     [InlineData("constrict")]
     [InlineData("bubble")]
     [InlineData("dizzy-punch")]
+    [InlineData("crabhammer")]
+    [InlineData("hyper-fang")]
+    [InlineData("rock-slide")]
     public async Task DealsDamageOnHit(string moveName)
     {
         var result = await new MoveScenario()
@@ -168,6 +171,9 @@ public class DamageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     [InlineData("constrict")]
     [InlineData("bubble")]
     [InlineData("dizzy-punch")]
+    [InlineData("crabhammer")]
+    [InlineData("hyper-fang")]
+    [InlineData("rock-slide")]
     public async Task DecrementsPpByOneOnUse(string moveName)
     {
         var move = Move(moveName);

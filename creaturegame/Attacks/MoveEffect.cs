@@ -45,6 +45,7 @@ public enum MoveEffect
     MirrorMove,
     DreamEater,
     Splash,
+    Rest,
 }
 
 public enum DamageCategory

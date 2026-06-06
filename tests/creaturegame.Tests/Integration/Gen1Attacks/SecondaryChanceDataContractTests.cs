@@ -190,4 +190,40 @@ public class SecondaryChanceDataContractTests(MovesFixture moves) : Gen1MoveCont
 
     [Fact]
     public void SplashIsAGen1NoOp() => Assert.Equal(MoveEffect.Splash, Move("splash").Effect);
+
+    // ── Batch 16 facts ─────────────────────────────────────────────────────────────────────────
+    // Rock Slide had no secondary effect in Gen 1; the 30% flinch was added in Gen 2. The importer
+    // strips the modern flinch back off — pin both the cleared effect and the null chance.
+    [Fact]
+    public void RockSlideHasNoFlinchInGen1()
+    {
+        var move = Move("rock-slide");
+        Assert.Equal(MoveEffect.None, move.Effect);
+        Assert.Null(move.EffectChance);
+    }
+
+    // Bonemerang strikes exactly twice (fixed-count multi-hit) — an importer name mapping (→ MultiHit)
+    // plus the fixed MultiHitCount. PokeAPI's meta can't express the fixed-2; pin both so a re-import
+    // that drops a clause can't silently revert it to a single hit or a 2–5 roll.
+    [Fact]
+    public void BonemerangIsAFixedTwoHitInGen1()
+    {
+        var move = Move("bonemerang");
+        Assert.Equal(MoveEffect.MultiHit, move.Effect);
+        Assert.Equal(2, move.MultiHitCount);
+    }
+
+    // Rest's heal+sleep effect is an importer name mapping PokeAPI can't express — pin it so a
+    // re-import that drops the clause can't silently leave Rest a plain do-nothing status move.
+    // Also pin StatusEffect == None: Rest's sleep is self-inflicted by the engine, NOT a foe-directed
+    // ailment. PokeAPI reports Rest's ailment as "none" (correct for Gen 1), so no override is needed —
+    // but TryApplyStatus runs before the Rest handler, so if a re-import ever set StatusEffect = Sleep
+    // here, Rest would wrongly sleep the FOE at 100%. This pin fails loudly if that ever drifts.
+    [Fact]
+    public void RestHasRestMoveEffectAndNoFoeAilment()
+    {
+        var move = Move("rest");
+        Assert.Equal(MoveEffect.Rest, move.Effect);
+        Assert.Equal(StatusCondition.None, move.StatusEffect);
+    }
 }

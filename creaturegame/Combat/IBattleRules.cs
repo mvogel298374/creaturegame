@@ -242,6 +242,13 @@ public interface IBattleRules
     /// </summary>
     int RollPsywaveDamage(Creature source, IRandomSource rng);
 
+    /// <summary>
+    /// The fixed number of turns a Rest user sleeps (Rest heals to full and forces sleep for exactly
+    /// this many turns, unlike the random <see cref="RollSleepTurns"/>). Gen 1–2: 2 turns. The wake
+    /// timing was reworked in later generations, so the duration lives on the seam.
+    /// </summary>
+    int RestSleepTurns { get; }
+
     // ── Type-based immunities ────────────────────────────────────────────────────
 
     /// <summary>

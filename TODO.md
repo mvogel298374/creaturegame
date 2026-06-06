@@ -580,21 +580,51 @@ Transform deferred, see below). **758 .NET + 34 Vitest.** Two new engine bits, t
 - Seam-review gate: PASS-WITH-ADVISORIES (0 blockers). Both advisories fixed pre-commit: added the
   Psywave behaviour test (`PsywaveContractTests`) and documented why no Psychic type-immunity case exists.
 
+### Batch 16 (moves 151–160) ✅ DONE (2026-06-06)
+acid-armor, crabhammer, explosion, fury-swipes, bonemerang, rest, rock-slide, hyper-fang, sharpen
+(**9 of 10** — Conversion deferred, see below). **779 .NET** (no frontend change). One new mechanic
+(Rest) + the bonemerang mapping that closes a standing deferral; the rest coverage + one data fix.
+- **Rest (`MoveEffect.Rest`):** self-targeting heal+sleep. Fully restores HP (`ReceiveHealing(restored)`,
+  emits `Healed` with the actual amount), overwrites status with `Sleep`, and forces sleep for a **fixed**
+  `IBattleRules.RestSleepTurns` (Gen 1 = 2; on the seam since it's a gen-variable duration, distinct from
+  the random `RollSleepTurns`). Fails at full HP via `MoveMissed` (state-precondition path, like Counter/
+  Dream Eater); the full-HP fail is gen-invariant so it's inline (seam-review agreed). Self-targeting ⇒
+  bypasses the foe-immunity guard. The forced sleep is consumed by the existing `StatusResolver`.
+  **`RestContractTests`** covers heal+sleep, fail-at-full-HP, cure-status, **and a full-`Battle` test** that
+  the user is forced to skip turns (`ActionBlocked: Sleep`) — plus asserts the foe is never slept.
+- **Bonemerang (closes a standing deferral):** importer name-map → `MoveEffect.MultiHit` + `MultiHitCount=2`
+  (fixed-2, reusing the double-kick/twineedle mechanism — no new engine). Pinned in `SecondaryChanceDataContractTests`.
+- Reused contracts (rows added): self-buff (acid-armor +2 Def, sharpen +1 Atk); single-turn high-crit
+  (crabhammer → new `CriticalHitContractTests` fact); SelfDestruct category (explosion, parametrized with
+  self-destruct); variable multi-hit (fury-swipes); 10% flinch (hyper-fang — Gen-1-correct, no override);
+  damage/PP (crabhammer, hyper-fang, rock-slide).
+- **Layer-2 data fix (Gen 1 ≠ modern), pinned:** **rock-slide → flinch cleared** (Effect=None, EffectChance
+  =null; Gen 1 had no flinch, the 30% was added in Gen 2 — verified via Bulbapedia + PokeAPI past_values).
+  Re-imported via full `PokeApiConnector` run + MCP-verified (rest Effect=Rest/StatusEffect=None,
+  bonemerang MultiHit+count 2, rock-slide flinch gone).
+- Seam-review gate: PASS-WITH-ADVISORIES (0 blockers). Reviewer flagged a potential **self-vs-foe status
+  leak** (if Rest's PokeAPI ailment mapped to a foe `StatusEffect`, `TryApplyStatus` would sleep the foe
+  before the Rest handler). Verified against the imported row that Rest's `StatusEffect` is already None,
+  then **guarded it**: pinned `StatusEffect == None` + asserted the foe is never slept. Also applied the
+  `ReceiveHealing(restored)` clarity fix. New failure mode logged to the seam-reviewer.
+
 ### Remaining batches (cadence)
-- [ ] Batches 16–17 (moves 151–165): query the next 10 → add `InlineData` rows to the matching
-  capability class → add a new capability class only for genuinely new mechanics. **Next: batch 16 =
-  moves 151–160.**
-- [ ] **Deferred from batch 15 — Transform (move 144):** its own follow-up batch. Copies the target's
-  species, types, the four non-HP stats, current stat stages, and full moveset (each move at 5 PP), with
-  snapshot/restore on battle end (like Mimic, but far wider — restore must live in `ResetBattleState` so
-  Haze/battle-end can't orphan it). New `TransformedInto` event (4-place wiring) + full-`Battle` tests.
-  Largest single-move feature in the 1–165 set; deferred deliberately to keep batch 15 reviewable.
-- [ ] **Tech debt — flaky test:** `OHKOMove_FailsIfSourceLevelLowerThanTarget` (CoreMechanicsTests) is
-  non-deterministic: it relies on level implying speed, but randomised DVs can flip the speed order so
-  the OHKO succeeds. Rewrite to set attacker/defender Speed explicitly (Gen 1 uses the speed compare,
-  per `IBattleRules.OneHitKoSucceeds`) and drop the level dependency. (Flagged by seam-review in batch 13.)
-- [ ] **Fixed-2 multi-hit mover still pending**: bonemerang — the fixed-count mechanism exists
-  (double-kick, twineedle); just needs mapping + coverage in its batch.
+- [ ] Batch 17 (moves 161–165): query the rows → add `InlineData` rows to the matching capability class →
+  add a new capability class only for genuinely new mechanics. **Next: batch 17 = moves 161–165** (the
+  final coverage batch), plus the two deferred type/identity-mutation moves below.
+- [ ] **Deferred type/identity-mutation batch — Transform (144) + Conversion (160):** both mutate the
+  user's identity and need snapshot/restore in `ResetBattleState` (like Mimic, but wider), so build the
+  machinery once. **Transform** copies the target's species, types, the four non-HP stats, current stat
+  stages, and full moveset (each move at 5 PP). **Conversion** (Gen 1) copies the *foe's* Type1/Type2 onto
+  the user. Each needs its own event (`TransformedInto` / `ConvertedType`, 4-place wiring) + full-`Battle`
+  tests. Deferred deliberately to keep batches 15–16 reviewable.
+- [x] **Tech debt — flaky OHKO tests** (fixed in batch 16): both `OHKOMove_*` tests in CoreMechanicsTests
+  relied on level implying speed, but randomised DVs flipped the order intermittently (the pre-commit hook
+  caught `OHKOMove_FaintsTargetIfLevelSufficient` failing). Rewrote both to set Speed explicitly and renamed
+  them to the speed framing (`OHKOMove_FailsIfTargetFasterThanSource` / `OHKOMove_FaintsTargetIfSourceAtLeastAsFast`),
+  since Gen 1 OHKO is a Speed compare (`IBattleRules.OneHitKoSucceeds`), not the level check Gen 2 added.
+- [x] **Fixed-2 multi-hit mover**: bonemerang — done in batch 16 (importer → MultiHit + MultiHitCount=2,
+  reusing the double-kick/twineedle mechanism; coverage in `MultiHitContractTests`, pinned in the data tests).
 - [x] **Rampage reuse**: petal-dance — done in batch 8 (already tagged in importer + coverage added).
 - [x] **Gen 1 type immunities** (batch 8): Poison→poison, Fire→burn, Body Slam→Normal-paralysis,
   Grass→Leech Seed, and Ghost (0×) for fixed/level-based/OHKO/Super Fang/Counter — all on the seam now.

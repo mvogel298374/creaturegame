@@ -91,7 +91,9 @@ public class StatStageMoveContractTests(MovesFixture moves) : Gen1MoveContract(m
     [InlineData("double-team", "Evasion", 1)]
     [InlineData("minimize", "Evasion", 2)]
     [InlineData("barrier", "Defense", 2)]
+    [InlineData("acid-armor", "Defense", 2)]
     [InlineData("amnesia", "Special", 2)] // Gen 1: +2 to the combined Special stat
+    [InlineData("sharpen", "Attack", 1)]
     public async Task RaisesUserStatBySpecifiedStages(string moveName, string stat, int delta)
     {
         var result = await new MoveScenario().Attacker(TestCreatures.Make("A")).Use(Move(moveName));

@@ -1680,13 +1680,18 @@ public class CoreMechanicsTests
     }
 
     [Fact]
-    public async Task OHKOMove_FailsIfSourceLevelLowerThanTarget()
+    public async Task OHKOMove_FailsIfTargetFasterThanSource()
     {
-        var attacker = new Creature("Attacker") { Level = 5 };
+        // Gen 1 OHKO is a SPEED comparison (not the level check Gen 2 added). Set Speed explicitly so
+        // the outcome doesn't ride on randomised DVs flipping the order (the old level-based setup was
+        // flaky). Here the target out-speeds the user, so Fissure fails outright.
+        var attacker = new Creature("Attacker") { Level = 50 };
         attacker.CalculateStats();
+        attacker.Attributes.Speed = 50;
 
         var defender = new Creature("Defender") { Level = 50 };
         defender.CalculateStats();
+        defender.Attributes.Speed = 100;
 
         var fissure = new Attack
         {
@@ -1714,13 +1719,18 @@ public class CoreMechanicsTests
     }
 
     [Fact]
-    public async Task OHKOMove_FaintsTargetIfLevelSufficient()
+    public async Task OHKOMove_FaintsTargetIfSourceAtLeastAsFast()
     {
+        // Gen 1 OHKO succeeds when the user is at least as fast as the target — a SPEED comparison, not
+        // the level check Gen 2 added. Set Speed explicitly so the result is deterministic (the old
+        // level-based setup relied on DVs and was flaky).
         var attacker = new Creature("Attacker") { Level = 50 };
         attacker.CalculateStats();
+        attacker.Attributes.Speed = 100;
 
-        var defender = new Creature("Defender") { Level = 5 };
+        var defender = new Creature("Defender") { Level = 50 };
         defender.CalculateStats();
+        defender.Attributes.Speed = 50;
 
         var fissure = new Attack
         {

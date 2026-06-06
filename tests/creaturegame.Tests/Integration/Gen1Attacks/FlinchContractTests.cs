@@ -22,6 +22,7 @@ public class FlinchContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     [InlineData("bite")]
     [InlineData("low-kick")]
     [InlineData("bone-club")]
+    [InlineData("hyper-fang")] // Gen 1: 10% flinch
     public async Task SetsFlinchFlagOnHit(string moveName)
     {
         var result = await new MoveScenario()
@@ -40,6 +41,7 @@ public class FlinchContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     [InlineData("bite")]
     [InlineData("low-kick")]
     [InlineData("bone-club")]
+    [InlineData("hyper-fang")]
     public async Task NoFlinchOnMiss(string moveName)
     {
         var result = await new MoveScenario()
