@@ -135,17 +135,26 @@ public class TransformContractTests(MovesFixture moves) : Gen1MoveContract(moves
     [Fact]
     public async Task TransformRevertsWhenTheBattleEnds()
     {
-        // Player transforms into the enemy on turn 1, then a strong off-copied hit (Quick Attack copied
-        // from the enemy) finishes a near-dead enemy. When the battle ends the player's identity must
-        // revert to its original types/stats/moveset — never leaking the enemy's identity.
+        // Player transforms into the enemy on turn 1 (copying its Water type, 200 Attack and Quick
+        // Attack), then on turn 2 the copied Quick Attack — now backed by the enemy's 200 Attack —
+        // finishes the near-dead enemy. When the battle ends the player's identity must revert to its
+        // original Normal type / 60 Attack / lone Transform move — never leaking the enemy's identity.
+        //
+        // Determinism: the battle RNG is seeded AND the player's Defense is pinned. Defense is otherwise
+        // left to the random DV roll in CalculateStats, and the enemy's Quick Attack has +1 priority, so
+        // an unpinned low-Defense roll let the enemy one-shot the 500-HP player on turn 1 before it could
+        // Transform — the source of this test's former ~1-in-5 flake. The enemy is Water (not Ghost): a
+        // Ghost enemy is immune to the copied Normal-type Quick Attack (0×), so the old test only "won"
+        // by stalling ~40 turns until the enemy fainted on its own Struggle recoil — a false premise.
         var player = new Creature("Player") { Level = 50, Type1 = DamageType.Normal };
         player.CalculateStats();
         player.Attributes.HP = player.Attributes.MaxHP = 500;
         player.Attributes.Attack = 60;
+        player.Attributes.Defense = 100; // pin: don't let the +1-priority enemy randomly OHKO the player
         player.Attributes.Speed = 250; // outspeed so Transform lands first
         player.AddAttack(Move("transform"));
 
-        var enemy = new Creature("Enemy") { Level = 50, Type1 = DamageType.Ghost };
+        var enemy = new Creature("Enemy") { Level = 50, Type1 = DamageType.Water };
         enemy.CalculateStats();
         enemy.Attributes.HP = enemy.Attributes.MaxHP = 6;
         enemy.Attributes.Attack = 200;
@@ -161,7 +170,8 @@ public class TransformContractTests(MovesFixture moves) : Gen1MoveContract(moves
             AutoSelectInput.Instance,
             AutoSelectInput.Instance,
             rules: NoVarianceNoCritHitRules.Instance,
-            emitter: emitter
+            emitter: emitter,
+            rng: new SeededRandomSource(0)
         );
         await battle.StartFightAsync();
 
