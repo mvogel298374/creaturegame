@@ -142,10 +142,10 @@ public class AttackAction : IBattleAction
             Source.LastMoveUsed = attackToUse;
 
         // Bide release: the committed turns are done — unleash double the damage absorbed. The damage
-        // is typeless and never misses; like the other non-standard damage categories (Fixed, OHKO, …)
-        // it is deliberately not recorded as counterable, so Counter can't reflect it (matching this
-        // engine's "Counter only answers standard-path damage" simplification). Fails if nothing was
-        // stored. BideMove clears so Battle stops auto-repeating.
+        // is typeless and never misses, and — unlike the other damaging categories, which now record
+        // their type for the foe's Counter — it passes no type to the helper, so it is deliberately not
+        // counterable (a documented engine simplification; real Gen 1 Counter can answer Bide). Fails
+        // if nothing was stored. BideMove clears so Battle stops auto-repeating.
         if (isBide)
         {
             int unleashed = Source.BideDamageAccumulated * _rules.BideDamageMultiplier;
@@ -399,14 +399,8 @@ public class AttackAction : IBattleAction
                             _rng,
                             screenDefenseMultiplier: screenMult
                         );
-                        if (DealDamageToTarget(hitDamage, eff, isCrit))
-                        {
-                            // Counter answers the last hit that actually connected with the creature
-                            // (a hit soaked by a Substitute didn't, so it doesn't update this).
-                            Target.LastDamageTaken = hitDamage;
-                            Target.LastDamageType = attackToUse.DamageType;
+                        if (DealDamageToTarget(hitDamage, eff, isCrit, attackToUse.DamageType))
                             dealtRealDamage = true;
-                        }
                         damage += hitDamage; // accumulated total gates drain/recoil/recharge below
                         landed++;
                     }
@@ -447,19 +441,19 @@ public class AttackAction : IBattleAction
 
             case DamageCategory.Fixed:
                 damage = attackToUse.FixedDamageValue ?? 1;
-                DealDamageToTarget(damage, 1.0, false);
+                DealDamageToTarget(damage, 1.0, false, attackToUse.DamageType);
                 break;
 
             case DamageCategory.LevelBased:
                 damage = DamageCalculator.CalculateLevelBasedDamage(Source);
-                DealDamageToTarget(damage, 1.0, false);
+                DealDamageToTarget(damage, 1.0, false, attackToUse.DamageType);
                 break;
 
             case DamageCategory.OHKO:
                 // Against a Substitute the OHKO just breaks the decoy (the soak caps at the sub's HP);
                 // otherwise it removes the target's full current HP.
                 damage = Target.Attributes.HP;
-                DealDamageToTarget(damage, 1.0, false);
+                DealDamageToTarget(damage, 1.0, false, attackToUse.DamageType);
                 break;
 
             case DamageCategory.SelfDestruct:
@@ -486,7 +480,7 @@ public class AttackAction : IBattleAction
                     screenDefenseMultiplier: screenMult
                 );
 
-                DealDamageToTarget(damage, eff, isCrit);
+                DealDamageToTarget(damage, eff, isCrit, attackToUse.DamageType);
 
                 // User faints unconditionally (already handled miss → faint above)
                 Source.Attributes.ReceiveDamage(Source.Attributes.HP);
@@ -495,14 +489,14 @@ public class AttackAction : IBattleAction
 
             case DamageCategory.SuperFang:
                 damage = DamageCalculator.CalculateSuperFangDamage(Target);
-                DealDamageToTarget(damage, 1.0, false);
+                DealDamageToTarget(damage, 1.0, false, attackToUse.DamageType);
                 break;
 
             case DamageCategory.Psywave:
                 // Gen 1: a random 1..floor(1.5×level), ignoring Attack/Defense, type effectiveness,
                 // STAB and crits. The magnitude is gen-variable, so it comes from the rules seam.
                 damage = _rules.RollPsywaveDamage(Source, _rng);
-                DealDamageToTarget(damage, 1.0, false);
+                DealDamageToTarget(damage, 1.0, false, attackToUse.DamageType);
                 break;
         }
 
@@ -554,10 +548,21 @@ public class AttackAction : IBattleAction
     // Applies <paramref name="dmg"/> to the Target, honoring an active Substitute. Gen 1: while a
     // Substitute stands, the decoy soaks the whole hit — the user's HP is untouched and any overflow is
     // lost (it does NOT carry through to the user, even from an OHKO). Returns true when the real
-    // creature took the damage (so a caller can run on-real-hit follow-ups like Counter recording or
-    // Rage), false when the Substitute absorbed it. Every damage category routes through here so the
-    // soak can't be missed by one branch (the recurring "hook added to only the Standard path" defect).
-    private bool DealDamageToTarget(int dmg, double effectiveness, bool isCrit)
+    // creature took the damage (so a caller can run on-real-hit follow-ups like Rage), false when the
+    // Substitute absorbed it. Every damage category routes through here so the soak can't be missed by
+    // one branch (the recurring "hook added to only the Standard path" defect).
+    //
+    // <paramref name="counterableType"/> is the move's type when the hit should be recordable for the
+    // target's Counter (the value Counter reads back as 2× the last Normal/Fighting damage taken). It's
+    // recorded centrally here — gated on real damage landing — so every damaging category (Standard,
+    // Fixed, level-based, OHKO, Self-Destruct, Super Fang, Psywave) is counterable through one path, not
+    // just the Standard loop. Callers that must stay non-counterable (Bide's unleash) pass null.
+    private bool DealDamageToTarget(
+        int dmg,
+        double effectiveness,
+        bool isCrit,
+        DamageType? counterableType = null
+    )
     {
         if (Target.SubstituteHp > 0)
         {
@@ -571,6 +576,15 @@ public class AttackAction : IBattleAction
 
         Target.Attributes.ReceiveDamage(dmg);
         AccumulateBideDamage(dmg);
+
+        // Record for the target's Counter — the last hit that actually connected with the creature (a
+        // hit soaked by a Substitute returned above, so it never reaches here and doesn't update this).
+        if (counterableType is { } type)
+        {
+            Target.LastDamageTaken = dmg;
+            Target.LastDamageType = type;
+        }
+
         _emitter?.Emit(
             new DamageDealt(
                 Target.Name,
@@ -742,22 +756,21 @@ public class AttackAction : IBattleAction
                 // The −5 priority (move data) resolves Counter after the opponent's hit, so it
                 // counters this turn's damage. Fails if no qualifying damage was taken — Gen 1 keeps
                 // the last value until overwritten, so this can fire off a previous turn (a quirk we
-                // preserve). Fixed/level-based/self damage isn't recorded, so it isn't counterable.
-                // Type immunity (Counter is Fighting ⇒ Ghost is immune) is handled by the pure-status
-                // immunity guard above — Counter has BaseDamage 0, so an immune target already
-                // short-circuited to MoveHadNoEffect and never reaches here.
+                // preserve). Any damaging move records its type via DealDamageToTarget, so fixed and
+                // level-based Normal/Fighting moves (Sonic Boom, Seismic Toss, Super Fang) are now
+                // counterable; only Bide's unleash opts out. Whether a given last-damage type qualifies
+                // is gen-variable (Gen 1 keys on Normal/Fighting type; Gen 2+ on physical category), so
+                // it lives on the IBattleRules seam. Type immunity (Counter is Fighting ⇒ Ghost is
+                // immune) is handled by the pure-status immunity guard above — Counter has BaseDamage 0,
+                // so an immune target already short-circuited to MoveHadNoEffect and never reaches here.
                 if (
                     Target.IsAlive()
                     && Source.LastDamageTaken > 0
-                    && Source.LastDamageType is DamageType.Normal or DamageType.Fighting
+                    && _rules.CounterQualifies(Source.LastDamageType)
                 )
                 {
                     int countered = Source.LastDamageTaken * 2;
-                    if (DealDamageToTarget(countered, 1.0, false))
-                    {
-                        Target.LastDamageTaken = countered;
-                        Target.LastDamageType = attack.DamageType;
-                    }
+                    DealDamageToTarget(countered, 1.0, false, attack.DamageType);
                 }
                 else
                 {

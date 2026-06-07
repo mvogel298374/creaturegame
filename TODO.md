@@ -5,8 +5,8 @@
 > **See also:** `CLAUDE.md` (setup/commands) · `AI_CONTEXT.md` (profiles) · `DESIGN_GUIDES.md` (mechanics) · `DEV_STANDARDS.md` (conventions)
 
 **Current state (2026-06-07):** Move-coverage pass COMPLETE — all 165 Gen 1 moves have behaviour/coverage
-tests (incl. Transform + Conversion). Suite: 815 .NET + 37 Vitest. Next up: post-coverage sequencing item 3
-(Counter answer for fixed / level-based damage).
+tests (incl. Transform + Conversion). Suite: 821 .NET + 37 Vitest. Next up: post-coverage sequencing item 4
+(`AttackAction` lock-in abstraction — the `ILockInMechanic` refactor, Tech Debt #6a).
 
 ---
 
@@ -15,7 +15,7 @@ tests (incl. Transform + Conversion). Suite: 815 .NET + 37 Vitest. Next up: post
 Set 2026-06-06, with the mutation batch since done. Remaining order:
 1. ~~Deferred type/identity-mutation batch (Transform + Conversion)~~ ✅ DONE
 2. ~~jump-kick / hi-jump-kick Ghost-immunity crash edge (Gen 1 also crashes on Fighting→Ghost 0×)~~ ✅ DONE
-3. Counter answer for fixed / level-based damage (today only standard-path damage is counterable)
+3. ~~Counter answer for fixed / level-based damage (today only standard-path damage is counterable)~~ ✅ DONE
 4. `AttackAction` lock-in abstraction (the `ILockInMechanic` refactor — see Tech Debt #6a)
 5. **The full integration-test pass** — moved here (after the lock-in refactor, before the facade
    migration) because end-to-end tests are more valuable once the refactors that change call shapes land
@@ -278,8 +278,6 @@ moving target.
   a high-risk refactor of the most central method with no third use case driving it — **deferred** until the
   next lock-in move lands (the trigger to abstract). YAGNI for now.
 
-- [ ] **Counter only answers standard-path damage** — fixed/level-based damage isn't recorded, so it's not
-  counterable (documented simplification; item 3 in Post-coverage sequencing).
 
 - [ ] **Architecture / decision-log doc (`ARCHITECTURE.md`).** Capture the *why* behind the two-DB split,
   event-sourced engine + emitter pattern, the three seams and the "never branch on generation" rule, the web

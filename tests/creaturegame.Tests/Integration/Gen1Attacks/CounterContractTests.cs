@@ -62,6 +62,60 @@ public class CounterContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         Assert.False(result.Has<DamageDealt>());
     }
 
+    // Gen 1 Counter answers ANY Normal/Fighting damage, including the direct-damage categories that
+    // bypass the normal calc — Sonic Boom (fixed), Seismic Toss (level-based) and Super Fang. Each such
+    // move now records its type via the shared damage helper, so the foe's hit leaves a counterable
+    // value behind. The foe lands its move on the player (recording on the player's BattleState), then
+    // the player Counters the same shared instances and returns 2× the recorded damage.
+    [Theory]
+    [InlineData("sonic-boom")] // Normal, fixed 20
+    [InlineData("seismic-toss")] // Fighting, level-based
+    [InlineData("super-fang")] // Normal, half-HP
+    public async Task CounterAnswersFixedAndLevelBasedNormalOrFightingDamage(string foeMove)
+    {
+        // Water player: hit (non-0×) by every foe move under test, so the damage is always recorded.
+        var player = TestCreatures.Make("Player", type1: DamageType.Water, hp: 500);
+        var enemy = TestCreatures.Make("Enemy", hp: 9999);
+
+        await new MoveScenario().Attacker(enemy).Defender(player).Use(Move(foeMove));
+        int recorded = player.LastDamageTaken;
+        Assert.True(recorded > 0, "the foe's direct-damage move should record counterable damage");
+
+        var result = await new MoveScenario().Attacker(player).Defender(enemy).Use(Move("counter"));
+
+        var hit = result.First<DamageDealt>();
+        Assert.NotNull(hit);
+        Assert.Equal("Enemy", hit!.TargetName);
+        Assert.Equal(recorded * 2, hit.Damage);
+    }
+
+    // The mirror case: these direct-damage moves ARE recorded now (LastDamageTaken > 0), but Counter's
+    // Normal/Fighting gate still rejects them by type — proving the gate, not a recording gap, is what
+    // blocks them. Dragon Rage (Dragon, fixed), Night Shade (Ghost, level-based), Psywave (Psychic).
+    [Theory]
+    [InlineData("dragon-rage")]
+    [InlineData("night-shade")]
+    [InlineData("psywave")]
+    public async Task CounterStillFailsAgainstNonNormalOrFightingDirectDamage(string foeMove)
+    {
+        // Water player so Ghost Night Shade isn't 0× (Ghost is only immune vs Normal) — it still lands
+        // and records; Counter must reject it on type, not because nothing was recorded.
+        var player = TestCreatures.Make("Player", type1: DamageType.Water, hp: 500);
+        var enemy = TestCreatures.Make("Enemy", hp: 9999);
+
+        await new MoveScenario().Attacker(enemy).Defender(player).Use(Move(foeMove));
+        Assert.True(
+            player.LastDamageTaken > 0,
+            "the move still records — the type gate does the work"
+        );
+        Assert.True(player.LastDamageType is not (DamageType.Normal or DamageType.Fighting));
+
+        var result = await new MoveScenario().Attacker(player).Defender(enemy).Use(Move("counter"));
+
+        Assert.True(result.Has<MoveMissed>());
+        Assert.False(result.Has<DamageDealt>());
+    }
+
     [Fact]
     public async Task CounterAnswersTheOpponentsPhysicalHitInAFullBattle()
     {

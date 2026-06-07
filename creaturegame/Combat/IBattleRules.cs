@@ -192,6 +192,20 @@ public interface IBattleRules
     bool OneHitKoSucceeds(Creature user, Creature target);
 
     /// <summary>
+    /// Whether Counter qualifies to answer the damage the user last took, given that hit's type.
+    /// Counter returns double that damage when this is true.
+    /// <para>
+    /// Gen 1: qualifies when the last damaging move was <see cref="DamageType.Normal"/> or
+    /// <see cref="DamageType.Fighting"/> — a <i>type</i> check (so Sonic Boom, Seismic Toss and Super
+    /// Fang qualify, but Night Shade and Psywave don't). Gen 2+ switched to answering by the move's
+    /// <i>physical</i> category instead of its type, which is why this is a seam member rather than a
+    /// hardcoded type test in the engine. (A generation that keys on category will also need the engine
+    /// to record the last hit's <see cref="AttackType"/>, which Gen 1 doesn't require.)
+    /// </para>
+    /// </summary>
+    bool CounterQualifies(DamageType? lastDamageType);
+
+    /// <summary>
     /// Divisor applied to the target's defensive stat when computing Self-Destruct / Explosion
     /// damage — the move halves the target's Defense before the calculation, making it much
     /// stronger. Gen 1–4: 2. Gen 5+: 1 (the mechanic was removed).

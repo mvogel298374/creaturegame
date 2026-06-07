@@ -92,6 +92,12 @@ public sealed class Gen1BattleRules : IBattleRules
     public bool OneHitKoSucceeds(Creature user, Creature target) =>
         StatusResolver.EffectiveSpeed(user, this) >= StatusResolver.EffectiveSpeed(target, this);
 
+    // Gen 1: Counter answers the last damage taken when it came from a Normal- or Fighting-TYPE move
+    // (Gen 2+ keys on the physical category instead). Bide's typeless unleash never sets a type, so it
+    // arrives here as null and doesn't qualify.
+    public bool CounterQualifies(DamageType? lastDamageType) =>
+        lastDamageType is DamageType.Normal or DamageType.Fighting;
+
     // Gen 1–4: Self-Destruct / Explosion halve the target's Defense before the damage calculation.
     public int SelfDestructDefenseDivisor => 2;
 

@@ -76,6 +76,9 @@ public abstract class DelegatingBattleRules : IBattleRules
 
     public virtual bool OneHitKoSucceeds(Creature u, Creature t) => Gen1.OneHitKoSucceeds(u, t);
 
+    public virtual bool CounterQualifies(DamageType? lastDamageType) =>
+        Gen1.CounterQualifies(lastDamageType);
+
     public virtual int SelfDestructDefenseDivisor => Gen1.SelfDestructDefenseDivisor;
     public virtual int RageAttackStagesPerHit => Gen1.RageAttackStagesPerHit;
     public virtual double RecoverHealFraction => Gen1.RecoverHealFraction;
