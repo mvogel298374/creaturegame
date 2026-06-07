@@ -319,6 +319,19 @@ public class AttackAction : IBattleAction
             return Task.CompletedTask;
         }
 
+        // Gen 1: Jump Kick / Hi Jump Kick crash the user on a type immunity (Fighting → Ghost = 0×),
+        // not only on an accuracy miss. These are Standard-category moves, so they slip past the
+        // immunity block above (which excludes Standard, since it normally folds 0× into 0 damage) and
+        // would otherwise whiff harmlessly. Mirror the miss branch: announce no-effect, then crash.
+        if (attackToUse.Effect == MoveEffect.Crash && typeImmunity == 0)
+        {
+            _emitter?.Emit(new MoveHadNoEffect(Target.Name, attackToUse.Name ?? ""));
+            int crash = _rules.CalculateCrashDamage(Source);
+            Source.Attributes.ReceiveDamage(crash);
+            _emitter?.Emit(new CrashDamage(Source.Name, crash, Source.Attributes.HP));
+            return Task.CompletedTask;
+        }
+
         // Dream Eater only works on a sleeping target; against anything else it fails (no damage, no
         // heal). This requirement is invariant across generations — it's a property of the move, not a
         // gen-variable rule — so it's checked here rather than on the IBattleRules seam. The 50% drain

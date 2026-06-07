@@ -1,3 +1,4 @@
+using creaturegame.Attacks;
 using creaturegame.Combat;
 using creaturegame.Tests.TestSupport;
 
@@ -25,6 +26,32 @@ public class CrashDamageContractTests(MovesFixture moves) : Gen1MoveContract(mov
             .Use(Move(moveName));
 
         Assert.True(result.Has<MoveMissed>());
+        Assert.False(result.Has<DamageDealt>());
+        Assert.Equal(result.Defender.Attributes.MaxHP, result.Defender.Attributes.HP); // target untouched
+
+        int expected = Gen1BattleRules.Instance.CalculateCrashDamage(result.Attacker);
+        var crash = result.First<CrashDamage>();
+        Assert.NotNull(crash);
+        Assert.Equal(expected, crash!.Damage);
+        Assert.Equal(result.Attacker.Attributes.MaxHP - expected, result.Attacker.Attributes.HP);
+        Assert.Equal(result.Attacker.Attributes.HP, crash.HpAfter);
+    }
+
+    [Theory]
+    [InlineData("jump-kick")]
+    [InlineData("high-jump-kick")]
+    public async Task UserTakesCrashDamageOnTypeImmunity(string moveName)
+    {
+        // Gen 1: a Fighting Jump Kick at a Ghost (0×) crashes the user just like an accuracy miss —
+        // the move connects (AlwaysHit) but the type immunity, not a whiff, is what fails it.
+        var attacker = TestCreatures.Make("A", hp: 300, attack: 200);
+        var result = await new MoveScenario()
+            .Attacker(attacker)
+            .Defender(TestCreatures.Make("D", type1: DamageType.Ghost, hp: 500))
+            .Use(Move(moveName)); // default AlwaysHitRules ⇒ the failure is the immunity, not a miss
+
+        Assert.True(result.Has<MoveHadNoEffect>());
+        Assert.False(result.Has<MoveMissed>());
         Assert.False(result.Has<DamageDealt>());
         Assert.Equal(result.Defender.Attributes.MaxHP, result.Defender.Attributes.HP); // target untouched
 
