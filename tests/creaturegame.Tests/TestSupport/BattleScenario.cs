@@ -42,6 +42,7 @@ public sealed class ScriptableRules : DelegatingBattleRules
 {
     private bool _alwaysHit;
     private bool _noCrit;
+    private bool _alwaysCrit;
     private bool _noVariance;
     private bool _forceSecondary;
     private int? _sleepTurns;
@@ -69,6 +70,12 @@ public sealed class ScriptableRules : DelegatingBattleRules
     public ScriptableRules NoCrit()
     {
         _noCrit = true;
+        return this;
+    }
+
+    public ScriptableRules AlwaysCrit()
+    {
+        _alwaysCrit = true;
         return this;
     }
 
@@ -125,7 +132,9 @@ public sealed class ScriptableRules : DelegatingBattleRules
         _alwaysHit ? 256 : base.GetHitThreshold(acc, accStage, evaStage);
 
     public override double GetCritChance(Creature a, Attack m) =>
-        _noCrit ? 0.0 : base.GetCritChance(a, m);
+        _alwaysCrit ? 1.0
+        : _noCrit ? 0.0
+        : base.GetCritChance(a, m);
 
     public override double RollDamageVariance() => _noVariance ? 1.0 : base.RollDamageVariance();
 
