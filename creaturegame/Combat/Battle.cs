@@ -168,10 +168,13 @@ public class Battle
             _emitter?.Emit(new TurnEnded());
         }
 
-        // Mimic reverts when the battle ends (Gen 1 also reverts on switch-out) — undo the transient
-        // move-swap so it never leaks into the permanent MoveSet of a reused Creature.
+        // Mimic and Transform/Conversion all revert when the battle ends (Gen 1 also reverts on
+        // switch-out) — undo the transient move-swap and any copied identity so neither leaks into the
+        // permanent half (MoveSet, types, stats) of a reused Creature.
         PlayerCreature.RestoreMimickedMove();
         EnemyCreature.RestoreMimickedMove();
+        PlayerCreature.RestoreOriginalIdentity();
+        EnemyCreature.RestoreOriginalIdentity();
 
         string winner = PlayerCreature.IsAlive() ? PlayerCreature.Name : EnemyCreature.Name;
         _emitter?.Emit(new BattleEnded(winner));

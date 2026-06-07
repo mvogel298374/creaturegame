@@ -83,4 +83,29 @@ public sealed class BattleState
     // by the next hit (a Gen 1 quirk — Counter can hit off a previous turn's damage).
     public int LastDamageTaken { get; set; }
     public DamageType? LastDamageType { get; set; }
+
+    // Transform / Conversion: both mutate the creature's *permanent* identity (types, the four non-HP
+    // battle stats, SpeciesId, and — for Transform — the whole moveset). This snapshot of the original
+    // identity is taken the FIRST time either move mutates it, so a later mutation can't overwrite the
+    // true original; Creature.RestoreOriginalIdentity puts everything back on the per-battle reset (the
+    // same pattern as the Mimic move-swap revert). Null = identity untouched this battle.
+    public IdentitySnapshot? OriginalIdentity { get; set; }
+}
+
+/// <summary>
+/// The pre-mutation identity of a <see cref="Creature"/>, captured so Transform / Conversion can be
+/// undone at battle end (or on a mid-battle Haze reset). Holds the permanent fields those moves change
+/// — types, the four non-HP battle stats, SpeciesId, and the original moveset wrappers. HP/MaxHP and
+/// level are never copied by Transform, so they aren't snapshotted.
+/// </summary>
+public sealed class IdentitySnapshot
+{
+    public DamageType? Type1 { get; init; }
+    public DamageType? Type2 { get; init; }
+    public int SpeciesId { get; init; }
+    public int Attack { get; init; }
+    public int Defense { get; init; }
+    public int Special { get; init; }
+    public int Speed { get; init; }
+    public required List<PokemonAttack> MoveSet { get; init; }
 }

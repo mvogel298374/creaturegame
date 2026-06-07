@@ -205,6 +205,14 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                 Console.WriteLine($"{e.CreatureName} learned {e.MoveName}!");
                 break;
 
+            case TransformedInto e:
+                Console.WriteLine($"{e.CreatureName} transformed into {e.TargetName}!");
+                break;
+
+            case ConvertedType e:
+                Console.WriteLine($"{e.CreatureName} changed its type to {e.NewType}!");
+                break;
+
             case ScreenApplied e:
                 Console.WriteLine($"{e.CreatureName} was protected by {e.ScreenName}!");
                 break;

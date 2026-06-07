@@ -248,4 +248,22 @@ public class SecondaryChanceDataContractTests(MovesFixture moves) : Gen1MoveCont
     [Fact]
     public void SubstituteHasSubstituteMoveEffect() =>
         Assert.Equal(MoveEffect.Substitute, Move("substitute").Effect);
+
+    // ── Identity/type-mutation batch (Transform + Conversion) ────────────────────────────────────
+    // Both are importer name mappings PokeAPI's meta can't express — Transform copies the foe's
+    // identity, Conversion copies its types. Pin both effects so a re-import that drops a clause can't
+    // silently leave either a do-nothing 0-power status move (the behaviour tests would then fail
+    // obscurely instead of pointing at the data). Also pin StatusEffect == None on both: like Rest,
+    // these are self-affecting moves, and TryApplyStatus runs BEFORE the move-effect handler keyed only
+    // on attack.StatusEffect — so if a re-import ever set a non-None ailment here, the move would
+    // wrongly afflict the FOE at 100% before the Transform/Conversion handler ran. This pin fails
+    // loudly if that ever drifts.
+    [Theory]
+    [InlineData("transform", MoveEffect.Transform)]
+    [InlineData("conversion", MoveEffect.Conversion)]
+    public void IdentityMutationMoveHasItsEffectAndNoFoeAilment(string move, MoveEffect effect)
+    {
+        Assert.Equal(effect, Move(move).Effect);
+        Assert.Equal(StatusCondition.None, Move(move).StatusEffect);
+    }
 }

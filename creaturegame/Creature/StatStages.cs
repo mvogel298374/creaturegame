@@ -18,6 +18,21 @@ public class StatStages
 
     public void Clear() => Attack = Defense = Special = Speed = Accuracy = Evasion = 0;
 
+    /// <summary>
+    /// Returns an independent copy with the same stage values — used by Transform, which copies the
+    /// target's current stat stages onto the user (a separate object so later changes don't alias).
+    /// </summary>
+    public StatStages Copy() =>
+        new()
+        {
+            Attack = Attack,
+            Defense = Defense,
+            Special = Special,
+            Speed = Speed,
+            Accuracy = Accuracy,
+            Evasion = Evasion,
+        };
+
     private static int Clamp(int v) => Math.Clamp(v, -6, 6);
 
     public void RaiseAttack(int delta) => Attack = Clamp(Attack + delta);

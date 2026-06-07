@@ -407,6 +407,10 @@ public class MoveImport
         // Substitute spends HP to raise a decoy that soaks the foe's hits (engine handles the HP cost,
         // damage absorption, and status/stat shielding).
         ["substitute"] = MoveEffect.Substitute,
+        // Transform copies the target's species/types/stats/stages/moveset (engine handles the copy and
+        // the battle-end revert). Conversion copies the target's types onto the user (Gen 1 mechanic).
+        ["transform"] = MoveEffect.Transform,
+        ["conversion"] = MoveEffect.Conversion,
     };
 
     // Gen 1 physical types: Normal, Fighting, Flying, Poison, Ground, Rock, Bug, Ghost.

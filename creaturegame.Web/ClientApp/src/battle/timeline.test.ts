@@ -172,6 +172,14 @@ describe('expandEvent — Heal & Mimic', () => {
     expect(logLines(expandEvent('MimicLearned', { creatureName: 'DITTO', moveName: 'ice-beam' }, CTX).steps))
       .toEqual(['DITTO learned ICE BEAM!']);
   });
+  it('TransformedInto names both creatures', () => {
+    expect(logLines(expandEvent('TransformedInto', { creatureName: 'DITTO', targetName: 'PIKACHU' }, CTX).steps))
+      .toEqual(['DITTO transformed into PIKACHU!']);
+  });
+  it('ConvertedType reports the new type', () => {
+    expect(logLines(expandEvent('ConvertedType', { creatureName: 'PORYGON', newType: 'Water' }, CTX).steps))
+      .toEqual(['PORYGON changed its type to Water!']);
+  });
 });
 
 describe('expandEvent — Screens, Focus Energy & Bide', () => {

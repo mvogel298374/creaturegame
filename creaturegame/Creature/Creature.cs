@@ -278,14 +278,62 @@ public class Creature
     }
 
     /// <summary>
+    /// Captures the creature's pre-mutation identity (types, the four non-HP battle stats, SpeciesId,
+    /// and the current moveset wrappers) so Transform / Conversion can be undone at battle end. Taken
+    /// only once per battle — a second mutating move (e.g. Conversion after Transform) must NOT
+    /// overwrite the snapshot, or the original is lost. Safe to call repeatedly.
+    /// </summary>
+    public void SnapshotIdentityForMutation()
+    {
+        if (Battle.OriginalIdentity is not null)
+            return;
+        Battle.OriginalIdentity = new IdentitySnapshot
+        {
+            Type1 = Type1,
+            Type2 = Type2,
+            SpeciesId = SpeciesId,
+            Attack = Attributes.Attack,
+            Defense = Attributes.Defense,
+            Special = Attributes.Special,
+            Speed = Attributes.Speed,
+            MoveSet = [.. MoveSet],
+        };
+    }
+
+    /// <summary>
+    /// Undoes a Transform / Conversion identity change, restoring the original types, stats, SpeciesId,
+    /// and moveset. Current HP/MaxHP are preserved (Transform never copied them). Safe to call when no
+    /// mutation is active. Lives here (not just at battle end) for the same reason as the Mimic revert:
+    /// the change is to the *permanent* Creature, so any reset of transient state must undo it first or
+    /// the copied identity leaks — e.g. Haze resets battle state mid-fight.
+    /// </summary>
+    public void RestoreOriginalIdentity()
+    {
+        if (Battle.OriginalIdentity is not { } snap)
+            return;
+        Type1 = snap.Type1;
+        Type2 = snap.Type2;
+        SpeciesId = snap.SpeciesId;
+        Attributes.Attack = snap.Attack;
+        Attributes.Defense = snap.Defense;
+        Attributes.Special = snap.Special;
+        Attributes.Speed = snap.Speed;
+        MoveSet.Clear();
+        MoveSet.AddRange(snap.MoveSet);
+        Battle.OriginalIdentity = null;
+    }
+
+    /// <summary>
     /// Clears all transient in-battle state by replacing it wholesale, so a newly added
     /// BattleState field can never be missed by a manual reset. Called by Battle at the
     /// start of each fight so the same Creature instance can be reused across battles.
-    /// Reverts any active Mimic swap first, since that lives on the permanent MoveSet.
+    /// Reverts any active Mimic swap and Transform/Conversion identity change first, since
+    /// those live on the permanent half of the Creature (MoveSet, types, stats).
     /// </summary>
     public void ResetBattleState()
     {
         RestoreMimickedMove();
+        RestoreOriginalIdentity();
         Battle = new BattleState();
     }
 

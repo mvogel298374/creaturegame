@@ -285,8 +285,9 @@ public class AttackAction : IBattleAction
         // A pure-status move is only blocked by the target's type immunity when it actually acts on
         // the foe (status, confusion, Leech Seed, Disable, Counter's reflected damage, a foe stat
         // drop). Self-targeting moves (Recover, Swords Dance, Mist, Haze, …) never consult the
-        // target's type, so a Normal-type self-buff still works against a Ghost. Mimic is deliberately
-        // excluded too: it copies a move rather than acting on the foe, so it isn't type-blocked.
+        // target's type, so a Normal-type self-buff still works against a Ghost. Mimic, Transform and
+        // Conversion are deliberately excluded too: they read/copy the target's move or identity rather
+        // than acting on the foe, so they aren't type-blocked (Transform into a Ghost works).
         bool targetsFoe =
             attackToUse.StatusEffect != StatusCondition.None
             || attackToUse.Effect
@@ -830,6 +831,53 @@ public class AttackAction : IBattleAction
                         _selectedMove.Base = chosen;
                         _emitter?.Emit(new MimicLearned(Source.Name, chosen.Name ?? ""));
                     }
+                }
+                break;
+
+            case MoveEffect.Transform:
+                // Gen 1: the user becomes a copy of the target — its types, the four non-HP battle
+                // stats, current stat stages, SpeciesId and full moveset (each copied move at 5 PP, or
+                // the move's max if lower). HP, MaxHP and level stay the user's. The change is undone at
+                // battle end (RestoreOriginalIdentity, via ResetBattleState). Self-affecting copy, no
+                // damage; fails on a fainted target. The snapshot is taken before mutating so the
+                // original can be restored even if Conversion later changes the type too.
+                if (Target.IsAlive())
+                {
+                    Source.SnapshotIdentityForMutation();
+                    Source.Type1 = Target.Type1;
+                    Source.Type2 = Target.Type2;
+                    Source.SpeciesId = Target.SpeciesId;
+                    Source.Attributes.Attack = Target.Attributes.Attack;
+                    Source.Attributes.Defense = Target.Attributes.Defense;
+                    Source.Attributes.Special = Target.Attributes.Special;
+                    Source.Attributes.Speed = Target.Attributes.Speed;
+                    Source.Stages = Target.Stages.Copy();
+                    Source.MoveSet.Clear();
+                    foreach (var copied in Target.MoveSet)
+                        Source.MoveSet.Add(
+                            new PokemonAttack(copied.Base)
+                            {
+                                PowerPointsCurrent = Math.Min(5, copied.Base.PowerPointsMax),
+                            }
+                        );
+                    _emitter?.Emit(new TransformedInto(Source.Name, Target.Name));
+                }
+                break;
+
+            case MoveEffect.Conversion:
+                // Gen 1: the user copies the target's types onto itself (Gen 2+ instead changes to the
+                // type of one of the user's own moves — a different mechanic, so the Gen 1 behavior is
+                // kept inline and documented rather than abstracted onto a seam we couldn't exercise
+                // until Gen 2). Self-affecting, no damage; undone at battle end like Transform. Snapshot
+                // first so Transform-then-Conversion still restores the true original.
+                if (Target.IsAlive())
+                {
+                    Source.SnapshotIdentityForMutation();
+                    Source.Type1 = Target.Type1;
+                    Source.Type2 = Target.Type2;
+                    _emitter?.Emit(
+                        new ConvertedType(Source.Name, Source.Type1 ?? DamageType.Normal)
+                    );
                 }
                 break;
 

@@ -103,6 +103,13 @@ public record Healed(string CreatureName, int HealAmount, int HpAfter) : BattleE
 // --- Mimic (the move) ---
 public record MimicLearned(string CreatureName, string MoveName) : BattleEvent;
 
+// --- Transform / Conversion (identity & type mutation) ---
+/// <summary>The user copied the target's species, types, stats and moveset (Transform).</summary>
+public record TransformedInto(string CreatureName, string TargetName) : BattleEvent;
+
+/// <summary>The user changed its type — Gen 1 Conversion copies the foe's primary type.</summary>
+public record ConvertedType(string CreatureName, DamageType NewType) : BattleEvent;
+
 // --- Reflect / Light Screen ---
 public record ScreenApplied(string CreatureName, string ScreenName) : BattleEvent;
 

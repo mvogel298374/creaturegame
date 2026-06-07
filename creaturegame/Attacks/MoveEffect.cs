@@ -47,6 +47,8 @@ public enum MoveEffect
     Splash,
     Rest,
     Substitute,
+    Transform,
+    Conversion,
 }
 
 public enum DamageCategory

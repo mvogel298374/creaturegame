@@ -363,6 +363,18 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       return { steps: [w(120), d(log(`${cName} learned ${formatMoveName(mName)}!`))] };
     }
 
+    case 'TransformedInto': {
+      const cName = payload.creatureName as string;
+      const tName = payload.targetName as string;
+      return { steps: [w(300), d(log(`${cName} transformed into ${tName}!`))] };
+    }
+
+    case 'ConvertedType': {
+      const cName = payload.creatureName as string;
+      const nType = payload.newType as string;
+      return { steps: [w(300), d(log(`${cName} changed its type to ${nType}!`))] };
+    }
+
     case 'ScreenApplied': {
       const cName = payload.creatureName as string;
       const sName = payload.screenName as string;

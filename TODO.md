@@ -635,14 +635,45 @@ mutation moves**). **802 .NET + 35 Vitest.** One big new mechanic (Substitute) +
 - [x] **Move-coverage pass COMPLETE** (batches 1–17, moves 1–165) as of 2026-06-07 — every Gen 1 move has
   behaviour/coverage tests except the two deferred identity/type-mutation moves below. Next up is that
   deferred batch, then the post-coverage sequence.
-- [ ] **Deferred type/identity-mutation batch — Transform (144) + Conversion (160):** both mutate the
-  user's identity and need snapshot/restore in `ResetBattleState` (like Mimic, but wider), so build the
-  machinery once. **Transform** copies the target's species, types, the four non-HP stats, current stat
-  stages, and full moveset (each move at 5 PP). **Conversion** (Gen 1) copies the *foe's* Type1/Type2 onto
-  the user. Each needs its own event (`TransformedInto` / `ConvertedType`, 4-place wiring) + full-`Battle`
-  tests. Deferred deliberately to keep batches 15–16 reviewable.
+### Type/identity-mutation batch — Transform (144) + Conversion (160) ✅ DONE (2026-06-07)
+**813 .NET + 37 Vitest.** The two deferred identity/type-mutation moves — covered together so the
+snapshot/restore machinery (wider than Mimic's) is built once. No schema change, no new seam, no layer-2
+data override (both rows were already Gen-1-correct; only the `Effect` name-mapping was added).
+- **Shared identity-snapshot machinery:** new `BattleState.OriginalIdentity` (an `IdentitySnapshot`
+  holding the pre-mutation types, the four non-HP battle stats, SpeciesId, and original moveset wrappers)
+  + `Creature.SnapshotIdentityForMutation()` (captures **once** — a second mutating move can't overwrite
+  the true original) and `Creature.RestoreOriginalIdentity()` (restores all of it, preserving current
+  HP/MaxHP). `ResetBattleState()` calls the restore before the `Battle = new()` swap, and `Battle`'s
+  battle-end cleanup calls it alongside `RestoreMimickedMove()` — same leak-proofing as Mimic (Haze
+  mid-fight + battle end both revert). Stat stages live in `BattleState`, so the fresh-instance swap
+  clears the copied stages automatically. Added `StatStages.Copy()` for the independent stage copy.
+- **Transform (`MoveEffect.Transform`):** copies the target's types, Atk/Def/Spec/Speed, current stat
+  stages, SpeciesId, and full moveset (each copied move at `min(5, max)` PP); HP/MaxHP/level stay the
+  user's. Self-affecting, no damage; `targetsFoe` is false so the foe-immunity guard never blocks it
+  (Transform into a Ghost works). New `TransformedInto` event.
+- **Conversion (`MoveEffect.Conversion`):** copies the foe's Type1/Type2 onto the user (the Gen 1
+  mechanic — Gen 2+ matches one of the user's own moves instead, a different mechanic, so the Gen 1
+  behaviour is kept inline + documented rather than on a seam we couldn't exercise until Gen 2). New
+  `ConvertedType` event. Both events wired in all 4 places (`BattleEvents.cs`, both emitters,
+  `timeline.ts` + `timeline.test.ts`).
+- Tests: `TransformContractTests` (copies types/stats but keeps own HP, moveset@5PP, independent stat
+  stages, reverts on `ResetBattleState`, full-`Battle` battle-end revert) + `ConversionContractTests`
+  (copies foe types, leaves stats/moveset untouched, reverts on reset, **and the shared-machinery proof:
+  Conversion-after-Transform still restores the true pre-Transform original**). Both effects pinned in
+  `SecondaryChanceDataContractTests`. Re-imported via full `PokeApiConnector` run + MCP-verified
+  (transform Effect=29, conversion Effect=30).
+- Documented simplifications: re-using Transform when already transformed re-copies the current target
+  (no Gen 1 "already transformed" fail); a Mimic-then-Transform combo is an obscure, untested edge.
+- Seam-review gate: PASS-WITH-ADVISORIES (0 blockers, 2 advisories — both fixed pre-commit): (1) the
+  recurring self-status-leak class — pinned `StatusEffect == None` on both moves + asserted the foe's
+  status stays None in each behaviour test (TryApplyStatus runs before the move-effect handler); (2)
+  named Transform/Conversion in the `targetsFoe` immunity-guard scoping comment alongside Mimic.
+- [ ] **Tech debt — flaky `RestContractTests.RestUserIsForcedToSkipTurnsWhileAsleep`** (surfaced during
+  this batch's full-suite run, file untouched by it): uses `AutoSelectInput` + unseeded RNG and fails
+  ~every other run; passes in isolation. Same shape as the batch-13/16 flaky-OHKO debt — rewrite to a
+  seeded/deterministic path (set the relevant rolls explicitly) rather than relying on `AutoSelectInput`.
 - [ ] **Post-coverage sequencing** (set 2026-06-06): once all 165 moves are covered, the order is
-  (1) deferred type/identity-mutation batch (Transform + Conversion) → (2) jump-kick/hi-jump-kick
+  (1) ~~deferred type/identity-mutation batch (Transform + Conversion)~~ ✅ → (2) jump-kick/hi-jump-kick
   Ghost-immunity crash edge → (3) Counter fixed/level-based answer → (4) `AttackAction` lock-in
   abstraction → **(5) the full integration-test pass** → (6) `BattleState` facade migration →
   (7) `GameController` run-seed. The **integration-test pass was moved later** (after the lock-in

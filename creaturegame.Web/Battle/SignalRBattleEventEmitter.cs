@@ -171,6 +171,11 @@ public sealed class SignalRBattleEventEmitter(
                 }
             ),
             MimicLearned e => ("MimicLearned", new { e.CreatureName, e.MoveName }),
+            TransformedInto e => ("TransformedInto", new { e.CreatureName, e.TargetName }),
+            ConvertedType e => (
+                "ConvertedType",
+                new { e.CreatureName, NewType = e.NewType.ToString() }
+            ),
             ScreenApplied e => ("ScreenApplied", new { e.CreatureName, e.ScreenName }),
             FocusEnergyApplied e => ("FocusEnergyApplied", new { e.CreatureName }),
             BideStoring e => ("BideStoring", new { e.CreatureName }),
