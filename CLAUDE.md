@@ -2,17 +2,21 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Key Files (read these at the start of every session)
+## Key Files — read on demand, by trigger
 
-| File | Purpose |
-|:-----|:--------|
-| `TODO.md` | **Authoritative** task list — priorities, done items, tech debt. Always update it when finishing a task. |
-| `AI_CONTEXT.md` | Agent profiles, slash-commands (`/plan`, `/dev`, `/sync`, `/test`, `/audit`), and the **Tooling & Automation** reference (the `/audit` skill, `seam-reviewer` subagent, pre-commit hook, CSharpier, MCP servers — what each is for and how to use it). |
-| `DESIGN_GUIDES.md` | Gen 1 mechanics, type-balancing rules, move-import mapping. Read before `/plan` work. |
-| `DEV_STANDARDS.md` | .NET/EF coding conventions and architecture rules. Read before `/dev` work. |
-| `STATE_MODEL.md` | Deep-dive reference: the `Creature` permanent/transient state split (`BattleState`) — patterns + Gen 1 domain logic. Read when touching battle state. |
-| `GENERATION_SEAMS.md` | Deep-dive reference: the generation seams (`ITypeChart`, `IBattleRules`, `IStatCalculator`) — patterns + per-gen domain logic. Read before adding a gen-variable rule or a new generation. |
-| `DATA_IMPORT.md` | Deep-dive reference: the `PokeApiConnector` import pipeline — import-vs-runtime boundary, PokeAPI→model mapping, Gen 1 data decisions. Read before changing imported data. |
+**This file (`CLAUDE.md`) is the only always-on primer.** The rest below are reference docs: read one
+*when the task you're starting matches its trigger* — not preemptively at session start. (Reading all of
+them up front burns ~25k tokens before the work is even scoped; almost none of it primes any single task.)
+
+| File | Read it when… |
+|:-----|:--------------|
+| `TODO.md` | starting or finishing any task — it's the **authoritative** active task list. Always update it when a task completes. (Finished work is in `TODO_ARCHIVE.md`; read that only to recover the history of a done item.) |
+| `AI_CONTEXT.md` | you need a slash-command/profile definition (`/plan`, `/dev`, `/sync`, `/test`, `/audit`) or the **Tooling & Automation** reference (the `/audit` skill, `seam-reviewer`, pre-commit hook, CSharpier, MCP servers). |
+| `DESIGN_GUIDES.md` | doing `/plan` (design) work — Gen 1 mechanics, type-balancing, move-import mapping. |
+| `DEV_STANDARDS.md` | doing `/dev` (implementation) work — .NET/EF coding conventions and architecture rules. |
+| `STATE_MODEL.md` | touching battle state — the `Creature` permanent/transient split (`BattleState`). |
+| `GENERATION_SEAMS.md` | adding a gen-variable rule or a new generation — the seams (`ITypeChart`, `IBattleRules`, `IStatCalculator`) + the §5.0 gen-agnostic checklist. |
+| `DATA_IMPORT.md` | changing imported data — the `PokeApiConnector` pipeline, import-vs-runtime boundary, PokeAPI→model mapping. |
 
 ## Commands
 
@@ -99,6 +103,19 @@ Prefix messages to set context:
 | `/test` | Verification | Write and run tests for the current module |
 
 When no command is given, use judgment to blend profiles. If a request is ambiguous, ask whether it's `/plan` or `/dev`.
+
+## Model Strategy (cost vs. depth)
+
+Default to **Sonnet** for the main session — `/plan` discussion, `/sync`, `/test`, data verification,
+doc/TODO edits, and routine `/dev` work are all well within its range. Reserve **Opus** for the genuinely
+hard reasoning: designing a new generation seam, a tricky battle-math batch, or a high-risk refactor of a
+central method (`AttackAction`, `Battle`).
+
+Two ways to bring Opus in: switch the whole session with `/model opus` for a hard stretch, **or** stay on
+Sonnet and delegate the hard job to the **`opus-engineer`** subagent (`.claude/agents/opus-engineer.md`),
+which is pinned to Opus and returns a focused diff. Prefer delegation when the rest of the turn is routine;
+prefer a full switch when the whole task is hard. See `AI_CONTEXT.md` → **Model Strategy** for the
+profile→model mapping and how to brief the subagent so its cold start stays cheap.
 
 ## Design Principles
 

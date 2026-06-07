@@ -1,160 +1,87 @@
 # Battle Sim – TODO List
 
-> **See also:** `CLAUDE.md` (session setup, architecture, commands) · `AI_CONTEXT.md` (agent profiles) · `DESIGN_GUIDES.md` (mechanics rules) · `DEV_STANDARDS.md` (coding conventions)
+> **Active tasks only.** Completed work (batches 1–17, done tech-debt, fixed bugs) lives in
+> [`TODO_ARCHIVE.md`](TODO_ARCHIVE.md) — read it only if you need the history of a finished item.
+> **See also:** `CLAUDE.md` (setup/commands) · `AI_CONTEXT.md` (profiles) · `DESIGN_GUIDES.md` (mechanics) · `DEV_STANDARDS.md` (conventions)
+
+**Current state (2026-06-07):** Move-coverage pass COMPLETE — all 165 Gen 1 moves have behaviour/coverage
+tests (incl. Transform + Conversion). Suite: 813 .NET + 37 Vitest. Next up: the post-coverage sequencing below.
 
 ---
 
-## Completed ✅
+## Post-coverage sequencing (the planned order)
 
-<details>
-<summary>Type Chart, PP, Status, Crits, Move Effects, Damage Categories, Bad Poison, XP/Levelling, Enemy Encounters</summary>
-
-**Type Chart** — `ITypeChart` + `Gen1TypeChart` (15-type Gen 1 matrix, Ghost/Psychic bug, Poison→Bug quirk). Wired into `DamageCalculator` and `AttackAction`.
-
-**PP Tracking** — `PokemonAttack` wrapper; decrements on use; Struggle when all PP = 0.
-
-**Move Priority** — `AttackAction` reads `move.Priority` (was hardcoded 0).
-
-**Status Conditions** — Applied after damage; `EffectChance` roll; sleep turn counter; status blocked if target already statused.
-
-**Status Effects in Battle Loop** — Sleep/Freeze/Paralysis pre-turn; Burn/Poison end-of-turn 1/16; Confusion; Paralysis quarters Speed in sort order.
-
-**Critical Hits & Stat Stages** — Gen 1 Speed-based crit formula; high-crit moves; stat stage multipliers on `IBattleRules`; crits ignore stages and Burn.
-
-**Move Effects** — `MoveEffect` enum; stat-stage moves (Swords Dance, Growl); Haze; Flinch; Recharge; LeechSeed; Binding; TwoTurn.
-
-**Damage Categories** — Fixed (Dragon Rage), LevelBased (Seismic Toss), OHKO, SelfDestruct (halves target Defense), SuperFang, Drain.
-
-**Bad Poison (Toxic)** — `StatusCondition.BadPoison`; `ToxicCounter` escalates damage each turn; `IBattleRules.BadPoisonDamageFraction`.
-
-**Experience, Levelling & Level Picker** — Gen 1 wild XP formula; `LeveledUp` event; level slider in UI (5–100); `GainExperience → LevelUp` path. *(Core mechanic only — XP is awarded and the player levels up at the moment of victory, recalculating stats. The on-screen XP bar is still cosmetic and there's no level-up move learning; see "XP & Level-Up — finish the in-battle loop" below.)*
-
-**Enemy Encounter System** — BST-matched random selection (±15%, widens to ±50%/all); enemy level = player level ±3; player's own species excluded. `EncounterSelector` in core library.
-
-</details>
+Set 2026-06-06, with the mutation batch since done. Remaining order:
+1. ~~Deferred type/identity-mutation batch (Transform + Conversion)~~ ✅ DONE
+2. jump-kick / hi-jump-kick Ghost-immunity crash edge (Gen 1 also crashes on Fighting→Ghost 0×)
+3. Counter answer for fixed / level-based damage (today only standard-path damage is counterable)
+4. `AttackAction` lock-in abstraction (the `ILockInMechanic` refactor — see Tech Debt #6a)
+5. **The full integration-test pass** — moved here (after the lock-in refactor, before the facade
+   migration) because end-to-end tests are more valuable once the refactors that change call shapes land
+6. `BattleState` facade migration (drop the delegating props — Tech Debt #2 optional cleanup)
+7. `GameController` run-seed (Tech Debt #3 remaining)
 
 ---
 
-## Generation Abstraction — Stat Selection ✅ DONE
+## XP & Level-Up — finish the in-battle loop
 
-- [x] `IBattleRules.GetOffensiveStat(Creature, AttackType)` and `GetDefensiveStat(Creature, AttackType)` added
-- [x] `Gen1BattleRules`: Physical → Attack/Defense; Special → Special (combined Gen 1 stat)
-- [x] `DamageCalculator`: duplicated crit/non-crit stat selection block collapsed; stat reads delegated to rules
-- [x] `AlwaysHitRules` and `AlwaysCritRules` test helpers updated to implement new methods
-- [x] 2 new tests — `DamageCalculator_UsesOffensiveStatFromRules`, `DamageCalculator_UsesDefensiveStatFromRules` (124 total passing)
+**Slated: next combat-fidelity item.** Small, no new data/schema. Polishes the single-battle path that
+already exists (does **not** require the Game Loop).
+
+**What works today:** XP is awarded on enemy faint (`Battle.StartFightAsync` → `CalculateXpAwarded` →
+`GainExperience`), the player levels up (chained `LeveledUp` events, one per level), stats recalc and HP
+heals the delta. The frontend animates an XP-bar fill on `LeveledUp`.
+
+**What's missing / not "proper":**
+- [ ] **Live XP data to the client.** `TurnStarted` carries no XP, so the bar fills to a hardcoded
+  placeholder (`playerXpToNext = 100`). Add `PlayerExperience`, `PlayerXpThisLevel`, `XpToNextLevel`
+  (derived from `Creature.Experience` and `CalculateExperienceForLevel`) to `TurnStarted` (or a small
+  dedicated event); `useBattleHub.ts` dispatches them into `playerXp` / `playerXpToNext`.
+- [ ] **XP-gain animation.** On win, animate the bar filling by the XP earned *before* the level-up
+  fill/reset (today it only fills on `LeveledUp`).
+- [ ] **Verify the multi-level path end to end** — a big XP award crossing several levels emits N
+  `LeveledUp` events and the bar steps through each.
+- [ ] **Surface the level-up moment** clearly in the log/UI (the hook the deferred move-learning prompt
+  will attach to).
+
+**Tests:**
+- [ ] Backend: `TurnStarted` (or the new event) carries correct `XpToNextLevel` / current XP for a known
+  species+level.
+- [ ] Backend: an XP award spanning multiple levels emits the right sequence of `LeveledUp` events.
+- [ ] E2E: §7 — XP bar fills and the "grew to level N!" line appears on a win (see Browser-Based UI Testing §7).
 
 ---
 
-## Learnset System
+## Learnset System — Level-up move learning — DEFERRED
 
-Creatures used to receive 4 random moves from the full move pool (a Bulbasaur could roll
-Hydro Pump). Learnsets ensure Pokémon only know moves they can actually learn at their level.
-
-**Prerequisite:** Experience, Levelling & Level Picker ✅
-
-### Initial moveset from learnsets ✅ DONE (2026-06-02)
-
-Generation separation: learnsets are **data**, not a battle rule, so no new seam. The Gen 1
-decision (filter to `red-blue` level-up moves) is isolated in the importer & commented (like
-`Gen1TypeSlots`); rows are tagged with a `Generation` column; runtime filters by a single
-`GameController.ActiveGeneration` constant — no generation branching in logic.
-
-- [x] `PokemonLearnset` model (`Id`, `SpeciesId` FK→`PokemonSpecies`, `MoveId` logical
-  cross-DB ref to `moves.db`, `LearnLevel`, `Generation`) + index `(SpeciesId, Generation,
-  LearnLevel)`; `AddPokemonLearnset` migration on `PokemonDbContext`. Lives in `pokemon.db`.
-- [x] Import: `LearnsetMapper.ExtractGen1Learnset` (pure, testable) filters the already-fetched
-  `/pokemon/{id}` moves array to `red-blue` + `level-up`, parses MoveId from the URL, keeps
-  `MoveId <= 165`, lowest level on repeats; `PokemonImport.ImportLearnset` persists idempotently
-  (clear-then-insert). Re-imported → **989 rows across all 151 species** (verified via MCP).
-- [x] `LearnsetMoveSelector.Select(strategy, …)` (core, gen-agnostic, `IRandomSource`-seamed):
-  - **`CanonicalLatest`** (player) — deterministic, the 4 highest-level moves ≤ level.
-  - **`WeightedSmart`** (enemy) — semi-random, semi-intelligent: weight = power (or flat 60 for
-    Fixed/OHKO/etc., 35 for status) × 1.5 STAB × recency nudge; **always force-picks the top
-    damaging move** (never all-status), fills the rest by weighted draw without replacement so
-    same-species/level enemies vary. Deliberate precursor to the planned `IMoveEvaluator`.
-- [x] Wired into `GameController.BuildCreature` (player = Canonical, enemy = WeightedSmart),
-  replacing the random-4 block; graceful fallback to random if a species has no learnset rows.
-- [x] Tests (18 new, 156 total): `LearnsetImportTests` (filter/range/dedup/order, ×5),
-  `LearnsetMoveSelectorTests` (canonical, level-gating, ≤4 returns-all, always-damaging, seeded
-  determinism, statistical STAB/power bias, ×7), `MigrationTests` learnset schema + round-trip (×2),
-  `LearnsetIntegrationTests` (DB round-trip → EF query → selection: canonical legality, low-level
-  gating, **generation filter isolates gens**, WeightedSmart legal + always-attack, ×4).
-- [x] E2E: committed Playwright spec `e2e/learnset.spec.ts` — Bulbasaur@50 move menu equals the
-  canonical 4 (RAZOR LEAF/GROWTH/SLEEP POWDER/SOLAR BEAM); also verified live via Puppeteer
-  (enemy Paras used SCRATCH — legal, attacking — battle resolves).
-
-### Level-up move learning — DEFERRED (blocked by "XP & Level-Up — finish the in-battle loop")
-
-Only the **player** ever levels up; the enemy never gains XP, so its moveset is fully settled
-at build time (above). This interactive path is **blocked by the XP & Level-Up section below** —
-level-up move learning has no place to surface until the player can actually see and follow a
-level-up during play. Build that first, then this.
+(Initial moveset from learnsets ✅ done — see archive.) **Blocked by "XP & Level-Up" above** — level-up
+move learning has no place to surface until the player can see and follow a level-up during play. Only the
+**player** ever levels up; the enemy's moveset is fully settled at build time.
 - [ ] `Creature.LevelUp()` checks learnset for moves at the new level
 - [ ] Slot free → add automatically; emit `MoveLearned(string CreatureName, string MoveName)`
 - [ ] Slots full → emit `MoveReplacementRequired(…)` — blocking event; backend waits on an
   `IBattleInput`-style TCS (Battle must drive level-ups one at a time to interleave the prompt)
 - [ ] `BattleHub` + `SignalRInput` extended with `ForgetMove(int slotIndex)` / `SkipNewMove()` path
 - [ ] `MoveLearned` / `MoveReplacementRequired` handled by all emitters + `useBattleHub.ts` (+ React modal)
-- [ ] **XP bar:** `TurnStarted` carries `PlayerExperience` / `XpToNextLevel`; `useBattleHub.ts`
-  dispatches so the bar fills live
-- [ ] Tests: `Learnset_LevelUp_AddsNewMoveWhenSlotAvailable`,
-  `Learnset_LevelUp_EmitsMoveReplacementRequired_WhenFull`
-
----
-
-## XP & Level-Up — finish the in-battle loop
-
-**Slated: next combat-fidelity item after the Learnset System** (small, no new data/schema).
-This is the concrete "set up XP/level-up properly" work that the Learnset level-up section is
-blocked on. It does **not** require the Game Loop — it polishes the single-battle path that
-already exists.
-
-**What works today:** XP is awarded on enemy faint (`Battle.StartFightAsync` → `CalculateXpAwarded`
-→ `GainExperience`), the player levels up (chained `LeveledUp` events, one per level), stats
-recalc and HP heals the delta. The frontend animates an XP-bar fill on `LeveledUp`.
-
-**What's missing / not "proper":**
-- [ ] **Live XP data to the client.** `TurnStarted` carries no XP, so the bar fills to a hardcoded
-  placeholder (`playerXpToNext = 100`) instead of real progress. Add `PlayerExperience`,
-  `PlayerXpThisLevel`, `XpToNextLevel` (derived from `Creature.Experience` and
-  `CalculateExperienceForLevel`) to `TurnStarted` (or a small dedicated event); `useBattleHub.ts`
-  dispatches them into `playerXp` / `playerXpToNext` so the bar reflects actual XP.
-- [ ] **XP-gain animation.** On win, animate the bar filling by the XP earned *before* the
-  level-up fill/reset, so the gain reads correctly (today it only fills on `LeveledUp`).
-- [ ] **Verify the multi-level path end to end** — a big XP award crossing several levels emits
-  N `LeveledUp` events and the bar steps through each (the backend loop already emits per level;
-  confirm the timeline plays them in order).
-- [ ] **Surface the level-up moment** clearly in the log/UI (the hook the deferred move-learning
-  prompt will attach to).
-
-**Tests:**
-- [ ] Backend: `TurnStarted` (or the new event) carries correct `XpToNextLevel` / current XP for a
-  known species+level (unit/integration).
-- [ ] Backend: an XP award spanning multiple levels emits the right sequence of `LeveledUp` events.
-- [ ] E2E: §7 — XP bar fills and the "grew to level N!" line appears on a win (currently unasserted;
-  see Browser-Based UI Testing §7).
+- [ ] **XP bar:** `TurnStarted` carries `PlayerExperience` / `XpToNextLevel`; `useBattleHub.ts` dispatches
+  so the bar fills live
+- [ ] Tests: `Learnset_LevelUp_AddsNewMoveWhenSlotAvailable`, `Learnset_LevelUp_EmitsMoveReplacementRequired_WhenFull`
 
 ---
 
 ## AI Move Selection
 
-**Prerequisite:** Learnset System (so AI evaluates moves the Pokémon can actually learn)
+**Prerequisite:** Learnset System (so AI evaluates moves the Pokémon can actually learn).
 
-`IBattleInput` is the seam. AI scores available moves via `IMoveEvaluator` and picks using a selection strategy.
+`IBattleInput` is the seam. AI scores available moves via `IMoveEvaluator` and picks using a selection
+strategy. (`RandomMoveInput` ✅ already wired as the default enemy input — see archive. The evaluator-driven
+tiers below are pending.)
 
-**Evaluator dimensions:**
-- Expected damage — base power × type effectiveness × STAB × stat ratio
-- Type effectiveness bonus — super-effective moves strongly preferred
-- Stat-stage move value — Swords Dance high-value at full HP; Growl low-value when outmatched
-- Priority move value — prefer Quick Attack when own HP low or opponent near KO
-- Status move value — Thunder Wave high-value early; worthless if target already statused
-- PP conservation — small penalty for moves with ≤ 5 PP remaining
+**Evaluator dimensions:** expected damage (power × type eff × STAB × stat ratio); type-effectiveness bonus;
+stat-stage move value; priority move value; status move value; PP conservation.
 
-**Selection strategies:**
-- `RandomMoveInput` — ignores evaluators; pure random (wild Pokémon / lowest AI tier)
-- `WeightedAIInput(IMoveEvaluator)` — probabilistic, weighted by score (average trainer)
-- `GreedyAIInput(IMoveEvaluator)` — always picks highest score (Elite Four / boss tier)
-- `CompositeEvaluator` — weighted sum of multiple evaluators; trainer "personality" via different weights
+**Selection strategies:** `RandomMoveInput` (wild/lowest tier ✅); `WeightedAIInput` (probabilistic);
+`GreedyAIInput` (always best — boss tier); `CompositeEvaluator` (weighted sum; trainer "personality").
 
 **Tasks:**
 - [ ] `DamageEvaluator : IMoveEvaluator`
@@ -162,544 +89,8 @@ recalc and HP heals the delta. The frontend animates an XP-bar fill on `LeveledU
 - [ ] `StatStageMoveEvaluator : IMoveEvaluator`
 - [ ] `StatusMoveEvaluator : IMoveEvaluator`
 - [ ] `CompositeEvaluator : IMoveEvaluator`
-- [x] `RandomMoveInput : IBattleInput` — uniform pick among PP-available moves, `IRandomSource`-seamed (`Combat/RandomMoveInput.cs`)
 - [ ] `GreedyAIInput : IBattleInput`
 - [ ] `WeightedAIInput : IBattleInput`
-- [x] Wire `RandomMoveInput` as default enemy input in `GameSessionManager` (replaced `AutoSelectInput`) — fixed the "enemy only ever uses its slot-0 status move" bug (see Fixed below). The evaluator-driven tiers above are still pending.
-
----
-
-## Gen 1 Attack Behavior Coverage (batched)
-
-Prove **every Gen 1 attack does what it sets out to do** when given to a Pokémon and used in
-battle, in **batches of 10 moves**, via parametrized "effect contract" tests (`[Theory]` +
-`[InlineData]` — a shared effect like "deals damage" is written once and run over every move
-that has it). Real move rows come from the live `moves.db` (`MovesFixture`); the
-`MoveScenario` harness gives the move to a creature and runs one `AttackAction`.
-
-### Batch 1 (moves 1–10) ✅ DONE (2026-06-03)
-pound, karate-chop, double-slap, comet-punch, mega-punch, pay-day, fire-punch, ice-punch,
-thunder-punch, scratch. **+49 test cases (228 total).**
-- Harness built once for all batches: `TestSupport/MovesFixture` (live DB loader),
-  `MoveScenario`/`TestCreatures`, shared `RecordingEmitter` (deduped the 3 copies), and the
-  deterministic rules doubles (`NeverHitRules`, `ForceSecondaryRules`, `NoVarianceNoCritHitRules`,
-  `FixedMultiHitRules`) on `DelegatingBattleRules`.
-- Contracts: damage, PP decrement, accuracy/miss, secondary status (burn/freeze/paralysis incl.
-  miss + already-statused), Gen-1 special-by-type (the punches are Special), high-crit rate,
-  STAB ~1.5×, type-effectiveness scaling, multi-hit count, Pay Day coins.
-- **Two engine features implemented** (both behind the gen seam per `GENERATION_SEAMS.md §5.0`):
-  - **Multi-hit (2–5)** — `MoveEffect.MultiHit`, `IBattleRules.RollMultiHitCount` (Gen 1 weighted
-    2/3 = 3/8, 4/5 = 1/8), per-hit crit/variance, stop-on-faint, `MultiHitCompleted` event +
-    "Hit N times!" line. Maps double-slap/comet-punch/fury-attack/pin-missile/barrage/
-    fury-swipes/spike-cannon. Verified live (Clefairy Double Slap → "Hit 2 times!").
-  - **Pay Day** — `MoveEffect.PayDay`, `IBattleRules.PayDayCoinMultiplier` (Gen 1 = 2× level),
-    `CoinsScattered` event ("Coins scattered everywhere!"). No economy yet — the mechanic is the event.
-
-### Test layout: capability classes, not batch files
-Tests are organised by **what the move does**, not the batch it arrived in:
-`tests/.../Integration/Gen1Attacks/` — `DamageContractTests`, `StabAndTypeEffectivenessContractTests`,
-`CriticalHitContractTests`, `MultiHitContractTests`, `SecondaryStatusContractTests`,
-`PhysicalSpecialSplitContractTests`, `OneHitKoContractTests`, `TwoTurnMoveContractTests`,
-`StatStageMoveContractTests`, `BindingContractTests`, `UniqueMoveEffectContractTests`, over a shared
-`Gen1MoveContract` base. **Covering a new batch means adding `InlineData` rows to the matching
-class** and creating a new class only when a move introduces a genuinely new mechanic. (Batch 1 +
-batch 2 were merged into this structure when batch 2 landed — there are no `Batch1/Batch2` classes.)
-
-### Batch 2 (moves 11–20) ✅ DONE (2026-06-03)
-vice-grip, guillotine, razor-wind, swords-dance, cut, gust, wing-attack, whirlwind, fly, bind.
-**248 total.** All mechanics below were already implemented in the engine — this batch is
-**coverage only, no new engine code** — and each test drives the real `AttackAction` path (the only
-substitutions are RNG-gated rolls through the `IBattleRules` seam doubles).
-- Reused contracts (rows added to existing classes): damage, PP decrement, accuracy/miss, STAB
-  (added a Flying mover), type-effectiveness scaling (Flying super-effective vs Grass/Fighting),
-  physical/special-by-type (generalised to a category theory over Normal/Fighting/Flying/Fire/Ice/Electric).
-- New capability classes for first-seen mechanics:
-  - **One-hit KO** (guillotine) — deals full-HP damage & fells; **fails** (not misses) when user
-    level < target level (Gen 1 rule); misses on accuracy fail.
-  - **Two-turn charge** (razor-wind, fly) — turn 1 emits `ChargingUp` with no damage / no
-    `MoveUsed`; turn 2 lands & deals damage; PP spent once; misses on the release turn. Razor Wind's
-    high-crit verified on the release turn vs Fly. **Plus a full-`Battle` test** proving the release
-    turn is auto-driven from `ChargingMove` without re-asking input (`CountingInput.CallCount == 1`).
-  - **Self-targeting stat-stage** (swords-dance) — +2 user Attack, no damage, `StatStageChanged`
-    targets the user.
-  - **Binding** (bind) — damages + traps 2–5 turns (`BindingStarted`).
-  - **No-op status move** (whirlwind) — announced but no combat effect yet (switch/flee has no
-    home until the Game Loop); Gen 1 −6 priority pinned, so the gap is documented not silent.
-- Harness: added `MoveScenario.UseRepeated(move, turns)` — runs consecutive real `AttackAction`s on
-  one reused `PokemonAttack` wrapper (exactly what `Battle` feeds on a two-turn release), so PP +
-  two-turn state carry across turns like a real battle.
-
-### Batch 3 (moves 21–30) ✅ DONE (2026-06-03)
-slam, vine-whip, stomp, double-kick, mega-kick, jump-kick, rolling-kick, sand-attack, headbutt,
-horn-attack. **293 .NET + 18 Vitest.** Two genuine engine features this batch (both behind the gen
-seam per `GENERATION_SEAMS.md §5.0`); everything else coverage-only over real `AttackAction` paths.
-- Reused contracts (rows added): damage/PP/miss; STAB (first **Special-type** mover, vine-whip;
-  + Fighting jump-kick); type-effectiveness (Grass→Water, Fighting→Normal); physical/special split
-  (vine-whip→Special, the Fighting kicks + Normal movers→Physical, sand-attack→Undefined).
-- New capability classes (engine already supported these — coverage only):
-  - **Flinch** (`FlinchContractTests`: stomp, rolling-kick, headbutt) — sets the flag on hit, never
-    on miss, **plus a full-`Battle` test** where a faster flincher locks the target out
-    (`FlinchBlocked`, target never emits `MoveUsed`).
-  - **Foe stat-drop** (sand-attack) — −1 foe Accuracy, folded into `StatStageMoveContractTests`
-    alongside swords-dance's self-buff.
-- **Two new engine features:**
-  - **Fixed-count multi-hit** — `int? Attack.MultiHitCount` column (+`AddMoveMultiHitCount`
-    migration); `AttackAction` uses `MultiHitCount ?? RollMultiHitCount()`. The fixed count is move
-    data; the variable 2–5 distribution stays the gen rule. double-kick mapped (Effect=MultiHit,
-    count 2). Twineedle/bonemerang reuse the mechanism in their batches.
-  - **Jump Kick crash damage** — `MoveEffect.Crash` + `IBattleRules.CalculateCrashDamage`
-    (Gen 1 = flat 1 HP) + `CrashDamage` event (console + SignalR emitters + `timeline.ts`
-    "kept going and crashed!"). Applied on the accuracy-miss branch. jump-kick mapped. *Deferred
-    edge:* Gen 1 also crashes on a Ghost immunity (Fighting→Ghost 0×) — documented, not handled.
-- Data: full `PokeApiConnector` re-run (authoritative path) applied the migration + new mappings;
-  verified double-kick MultiHitCount=2 / jump-kick Effect=Crash via MCP.
-
-### Batch 4 (moves 31–40) ✅ DONE (2026-06-03)
-fury-attack, horn-drill, tackle, body-slam, wrap, take-down, thrash, double-edge, tail-whip,
-poison-sting. **342 .NET + 18 Vitest.** Two genuine engine features (both behind the gen seam);
-everything else coverage-only over real `AttackAction` paths.
-- Reused contracts (rows added): damage/PP/miss; OHKO parametrized (guillotine **+ horn-drill**);
-  binding parametrized (bind **+ wrap**); secondary status (body-slam Paralysis, poison-sting Poison);
-  variable multi-hit (fury-attack); foe stat-drop (tail-whip −1 Defense, with sand-attack);
-  physical/special split (Normal movers + poison-sting→Poison Physical, tail-whip→Undefined);
-  STAB/effectiveness (first **Poison** mover poison-sting; Poison→Grass 2×).
-- **Two new engine features:**
-  - **Recoil** (take-down, double-edge) — `MoveEffect.Recoil` + `IBattleRules.CalculateRecoilDamage`
-    (Gen 1 = ¼ damage dealt, min 1); `AttackAction` reuses the existing `RecoilDamage` event (already
-    wired through console/SignalR/`timeline.ts`). Recoil applies even on a KO. → `RecoilContractTests`.
-  - **Rampage** (thrash) — multi-turn lock + self-confusion, mirroring the two-turn pattern:
-    `BattleState.RampageTurnsRemaining`/`RampageMove` (+`Creature` props), `MoveEffect.Rampage`,
-    `IBattleRules.RollRampageTurns` (Gen 1 = 2–3). `Battle` force-selects the locked move (no input
-    consulted); when the lock expires the user confuses itself (reuses `ConfusedTurns` +
-    `ConfusionStarted`). Lock decrements even on a miss. → `RampageContractTests` incl. a full-`Battle`
-    test (turn 2 not consulted; player ends up confused). petal-dance reuses this in its batch.
-- Data: full `PokeApiConnector` re-run; verified take-down/double-edge→Recoil, thrash→Rampage,
-  wrap→Binding, horn-drill→OHKO, body-slam→Paralysis, poison-sting→Poison via MCP. No schema change
-  (recoil/rampage are runtime + the existing `Effect` column).
-
-### Batch 5 (moves 41–50) ✅ DONE (2026-06-04)
-twineedle, pin-missile, leer, bite, growl, roar, sing, supersonic, sonic-boom, disable.
-**375 .NET + 25 Vitest.** One major new engine feature (Disable) and a cross-cutting Gen 1
-**move-type correction pass**; everything else coverage-only over real `AttackAction`/`Battle` paths.
-- Reused contracts (rows added): damage/PP/miss (pin-missile, bite, twineedle); variable multi-hit
-  (pin-missile) + fixed-2 multi-hit (twineedle); foe stat-drop (leer −1 Defense, growl −1 Attack);
-  flinch (bite); secondary status (twineedle 20% Poison); no-op switch move (roar, folded with
-  whirlwind, −6 priority pinned); physical/special split (bite now Normal/Physical, +comment fixes).
-- New capability classes: **`StatusMoveContractTests`** (sing → Sleep, supersonic → Confuse; pure
-  status moves that afflict without damage, nothing on a miss) and **`FixedDamageContractTests`**
-  (sonic-boom deals exactly 20 regardless of stats/type, incl. immunities; can miss).
-- **Two genuine engine features this batch:**
-  - **Disable** (`MoveEffect.Disable`) — full mechanic: `BattleState.DisabledMove` +
-    `DisableTurnsRemaining` (+ `Creature` delegating props + `CanSelectAnyMove`),
-    `IBattleRules.RollDisableTurns` (Gen 1 = 1–7), `AttackAction` picks a random PP-bearing foe
-    move and locks it (fails if one's already disabled). Enforced at **move-selection time**:
-    `TurnContext.DisabledMove`, `RandomMoveInput`/`AutoSelectInput`/`SignalRInput` skip it, and
-    `Battle` Struggles when it's the only move; the counter ticks down in `StatusResolver` and
-    re-enables. New `MoveDisabled`/`MoveReEnabled` events wired through console + SignalR +
-    `timeline.ts` (+ Vitest). UI greys the locked move (`MoveInfo.Disabled` → move button). Covered
-    by `DisableContractTests` incl. a **full-`Battle`** lock→Struggle→re-enable test.
-  - **Twineedle** — mapped to the existing fixed-2 multi-hit mechanism (Effect=MultiHit,
-    MultiHitCount=2) + its 20% poison secondary; no new code (deferred item now closed).
-- **Gen 1 move-type correction pass** — PokeAPI returns each move's *modern* type, but four Gen 1
-  moves were retyped later: **karate-chop** (→Fighting), **gust** (→Flying), **sand-attack**
-  (→Ground), **bite** (→Dark). The importer now restores their RBY type (all Normal) right after the
-  type parse, so STAB, the type chart, and the type-derived physical/special split are Gen-1-correct
-  (bite flips Special→Physical). Affected STAB/type-effectiveness rows updated (Flying-effectiveness
-  coverage stays via wing-attack). Re-imported + verified all rows via MCP.
-- **Frontend Vitest gap closed**: `timeline.test.ts` now also covers `ConfusionStarted`,
-  `ConfusionMessage`/`Damage`/`Cleared`, `CoinsScattered`, and the new `MoveDisabled`/`MoveReEnabled`.
-
-### Batch 6 (moves 51–60) ✅ DONE (2026-06-04)
-acid, ember, flamethrower, mist, water-gun, hydro-pump, surf, ice-beam, blizzard, psybeam.
-**424 .NET + 27 Vitest.** First special-attack-heavy batch; introduced a **data-driven Gen 1
-move-data resolver**, the **Mist** mechanic, and a gen-seam cleanup. Everything else coverage-only
-over real `AttackAction` paths (first Water & Psychic STAB movers).
-- Reused contracts (rows added): damage/PP/miss (all nine damaging moves; hydro-pump 80 & blizzard 90
-  can miss); secondary status burn (ember, flamethrower) + freeze (ice-beam, blizzard); STAB + type-
-  effectiveness for **Water** (water-gun → Fire 2×) & **Psychic** (psybeam → Poison 2×) + Ice → Dragon;
-  physical/special split (Water/Ice/Psychic → Special, acid → Poison Physical).
-- New capability classes: **`SecondaryEffectContractTests`** (damaging moves whose secondary is a
-  stat drop (acid → −1 foe Defense) or confusion (psybeam) — distinct from the status secondaries)
-  and **`MistContractTests`**.
-- **`past_values` resolver (the big one)** — PokeAPI returns each move's *modern* stats; Gen 1 often
-  differed (special moves stronger, Blizzard 90% acc, several moves a different type). The importer
-  now reads PokeAPI's `past_values` array and applies the **earliest** recorded power/accuracy/pp/
-  effect_chance/**type** as the Gen 1 value — one data-driven source, no per-move hardcoding. This
-  **supersedes batch 5's hardcoded type switch** (karate-chop/gust/sand-attack/bite are now corrected
-  via `past_values`, hardcodes removed) and fixed special-move powers (Flamethrower/Surf/Ice Beam 95,
-  Hydro Pump/Blizzard 120), Blizzard accuracy 90, and even **double-edge → 100** (Gen 1) from batch 4.
-  One documented exception: **acid** (Gen 1 lowers **Defense** at 33%, not Sp.Def/10%) is a manual
-  override since PokeAPI's `past_values` is empty for it. Re-imported + verified all rows via MCP.
-- **Mist** (`MoveEffect.Mist`) — `BattleState.HasMist` (+ `Creature` prop); `AttackAction` sets it +
-  emits `MistApplied`; `TryApplyStatEffect` blocks foe-induced stat drops on the holder (emits
-  `StatDropBlocked`), leaving self-buffs/raises untouched. New events wired through console + SignalR
-  + `timeline.ts` (+ Vitest). → `MistContractTests`.
-- **Gen-seam cleanup (§5.0):** acid is the first chance-based stat drop on a *damaging* move, so the
-  stat-effect chance now routes through `IBattleRules.GetSecondaryEffectChance` (new
-  `SecondaryEffectKind.StatStage`) instead of reading the `StatEffectChance` column directly —
-  matching the status/flinch/confuse secondaries. Behavior-preserving for all existing moves.
-
-### Batch 7 (moves 61–70) ✅ DONE (2026-06-04)
-bubble-beam, aurora-beam, hyper-beam, peck, drill-peck, submission, low-kick, counter, seismic-toss,
-strength. **467 .NET + 27 Vitest.** One new mechanic (Counter), two new coverage contracts (Recharge,
-LevelBased), a **full Gen 1 secondary-chance override sweep**, and submission→Recoil. No frontend
-changes (Counter reuses `DamageDealt`/`MoveMissed`).
-- Reused contracts (rows added): damage/PP/miss (all eight damaging movers; hyper-beam 90 / submission
-  80 / low-kick 90 can miss); secondary stat-drop (bubble-beam −1 Speed, aurora-beam −1 Attack, with
-  acid); recoil (submission, with take-down/double-edge); flinch (low-kick); physical/special split
-  (hyper-beam→Normal Physical — the classic split case — peck→Flying, submission→Fighting).
-- New capability classes: **`RechargeContractTests`** (hyper-beam forces a skip turn after a hit;
-  miss → no recharge; full-`Battle`), **`LevelBasedDamageContractTests`** (seismic-toss = user level,
-  ignores bulk/type), **`CounterContractTests`** (2× last Normal/Fighting damage; fails otherwise;
-  full-`Battle`).
-- **Counter** (`MoveEffect.Counter`) — `BattleState.LastDamageTaken` + `LastDamageType` (+ `Creature`
-  props), recorded on the standard damage path; `AttackAction` returns 2× when the last hit was
-  Normal/Fighting (else `MoveMissed`); −5 priority (move data) resolves it after the opponent's hit.
-  Importer maps counter→Counter. Fixed/level-based/self damage isn't recorded ⇒ not counterable (a
-  documented simplification).
-- **Full Gen 1 secondary-chance override sweep** (layer 2, per `DATA_IMPORT.md` §5.5) — PokeAPI reports
-  modern secondary chances and rarely backfills `past_values` for them, so these verified Gen 1 values
-  are set in one commented block in the importer: **acid** 33% Def, **aurora-beam** 33% Atk,
-  **bubble-beam** 33% Spe, **bite** 10% flinch (was 30), **low-kick** 30% flinch (PokeAPI: none),
-  **poison-sting** 20% poison (was 30). Audited the rest (punches/beams 10%, body-slam 30%, twineedle
-  20%, stomp/rolling-kick/headbutt 30%, psybeam 10%) — confirmed unchanged. Re-imported + verified via MCP.
-
-### Batch 8 (moves 71–80) ✅ DONE (2026-06-04)
-absorb, mega-drain, leech-seed, growth, razor-leaf, solar-beam, poison-powder, stun-spore,
-sleep-powder, petal-dance. **490 .NET + 28 Vitest.** Almost entirely a coverage batch (all mechanics
-already existed), plus the **Gen 1 type-immunity seam** (the user asked to also clear the deferred
-immunity edges) and one new event.
-- New capability classes: **`DrainContractTests`** (absorb/mega-drain heal ½ damage dealt; no
-  over-heal), **`LeechSeedContractTests`** (seeds on hit; per-turn 1/16 drain + heal in full
-  `Battle`), **`ImmunityContractTests`** (all the type immunities below).
-- Reused contracts (rows added): two-turn (solar-beam), high-crit (razor-leaf), stat-stage
-  (growth = +1 **Special** self), pure-status (poison/stun/sleep powders), rampage (petal-dance —
-  already tagged in the importer).
-- **Type-immunity seam** — new `IBattleRules.CanReceiveStatus` (Poison-type can't be poisoned,
-  Fire-type can't be burned, Normal-move can't paralyze a Normal-type = the Body Slam quirk) and
-  `CanBeLeechSeeded` (Grass immune). Moves that bypass the damage calc (fixed/level-based/OHKO/Super
-  Fang) and Counter now respect 0× type immunity via `ITypeChart` (e.g. Ghost vs Sonic Boom /
-  Seismic Toss / Counter). New `MoveHadNoEffect` event ("It doesn't affect …") wired through console
-  + SignalR + `timeline.ts` (+ Vitest). This closes the previously-deferred body-slam + Ghost edges.
-- **Data fix:** Gen 1 **growth** raises Special (not Attack as modern data reports) — importer layer-2
-  override; re-imported + verified via MCP.
-- Latent fidelity bug fixed: `SonicBoomIgnoresTheTypeMatchup(Ghost)` asserted Sonic Boom hits Ghost;
-  it doesn't in Gen 1. Corrected to "ignores effectiveness *scaling*" + a Ghost-immunity test.
-
-### Batch 9 (moves 81–90) ✅ DONE (2026-06-04)
-string-shot, dragon-rage, fire-spin, thunder-shock, thunderbolt, thunder-wave, thunder, rock-throw,
-earthquake, fissure. **535 .NET + 28 Vitest.** Pure coverage batch + one small engine extension and
-two data fixes — no new mechanics, no new events (reused batch-8 `MoveHadNoEffect`).
-- Reused contracts (rows added): damage/PP/miss (rock-throw, earthquake, fire-spin); phys/special
-  split (rock-throw/earthquake Physical, dragon-rage/fire-spin/thunderbolt Special, fissure Physical,
-  string-shot/thunder-wave Undefined); fixed damage (dragon-rage = 40); binding (fire-spin); secondary
-  status (thunder-shock/thunderbolt/thunder → Paralysis); stat-stage (string-shot −1 Speed foe); pure
-  status (thunder-wave Paralysis); OHKO (fissure).
-- **Engine extension:** the batch-8 type-immunity guard now also covers **pure-status moves** — a
-  status move whose type is 0× against the target has no effect (Thunder Wave is Electric ⇒ Ground is
-  immune). Damaging 0× moves still render via `DamageDealt` (eff 0); only pure-status (BaseDamage 0,
-  Standard) moves take the new path. → `ImmunityContractTests` (Thunder Wave vs Ground; Fissure vs Flying).
-- **Data fixes (layer-2 overrides, Gen-1 facts past_values can't express):** string-shot Speed −2 → −1
-  (one stage in Gen 1–5; two since Gen 6); thunder paralysis 30% → 10% (Gen 1). Re-imported + verified via MCP.
-- **Self-audit fixes:** (1) removed a dead branch — batch-8's Counter Ghost-immunity check became
-  unreachable once the pure-status guard caught Counter (BaseDamage 0); immunity is now handled in one
-  place. (2) Added `SecondaryChanceDataContractTests` to pin the importer's layer-2 secondary-chance
-  overrides (thunder/bite/low-kick/poison-sting/acid/aurora-beam/bubble-beam, string-shot, growth) —
-  previously a re-import could silently restore modern values with every behaviour test still green.
-
-### Batch 10 (moves 91–100) ✅ DONE (2026-06-05)
-dig, toxic, confusion, psychic, hypnosis, meditate, agility, quick-attack, rage, teleport.
-**574 .NET + 28 Vitest.** One genuine new engine mechanic (Rage) + one Gen 1 data fix (Toxic →
-BadPoison); everything else coverage-only over real `AttackAction`/`Battle` paths. No new battle
-event (Rage reuses `StatStageChanged`), so no frontend change.
-- Reused contracts (rows added): damage/PP (confusion, psychic, quick-attack, rage); two-turn (dig);
-  phys/special split (dig Physical, confusion/psychic Special, quick-attack/rage Physical, +toxic/
-  hypnosis/agility/teleport Undefined); pure status (hypnosis → Sleep, toxic → BadPoison + miss);
-  stat-stage self-buff (meditate +1 Attack, agility +2 Speed); secondary stat-drop (psychic −1 foe
-  Special); secondary confusion (confusion folded into a theory with psybeam); no-op switch/flee
-  (teleport, with whirlwind/roar, −6 priority pinned).
-- New capability classes: **`RageContractTests`** and **`PriorityMoveContractTests`** (quick-attack;
-  engine already sorts by `Priority`, so coverage-only — a slower Quick Attack user strikes before a
-  faster foe + a control test proving the harness observes order).
-- **Rage (new mechanic, behind the gen seam):** `MoveEffect.Rage`; lock-in mirrors rampage/two-turn —
-  `BattleState.IsRaging` + `RageMove` (+ `Creature` delegating props; cleared by the wholesale
-  `ResetBattleState`), `Battle` force-selects `RageMove` while raging (both selection chains). On-hit
-  raise: in the standard damage path, a raging creature that's hit gains Attack by
-  `IBattleRules.RageAttackStagesPerHit` (Gen 1 = 1) once per connecting attack — magnitude on the seam,
-  not inline. Full-`Battle` test asserts the **quirk** (Attack rises once per *hit received*, not per
-  turn: raises == hits) + lock-in (input consulted once). Documented simplifications: builds on
-  standard-path damage only (same boundary as Counter); a Disabled Rage is still force-used (Gen 1's
-  Rage/Disable interaction is nuanced — noted in `Battle`, not enforced).
-- **Data fix:** Gen 1 **toxic** badly-poisons, but PokeAPI reports its ailment as plain `poison` →
-  importer layer-2 `case "toxic"` override sets `BadPoison` (the `ToxicCounter` escalation engine
-  already existed, just unwired). Pinned in `SecondaryChanceDataContractTests` (+ a `rage → Effect`
-  pin). Re-imported via full `PokeApiConnector` run; verified toxic StatusEffect=6 / rage Effect=17 via MCP.
-- Seam-review gate: PASS-WITH-ADVISORIES (0 blockers); all 3 advisories fixed before commit (rage
-  data-pin, Rage/Disable doc comment, quirk-not-outcome assertion in the full-`Battle` Rage test).
-
-### Infra cleanup (2026-06-05, between batches 10 and 11)
-Extracted `Battle.SelectMoveAsync` from the duplicated 4-level player/enemy move-selection ternary
-(two-turn → rampage → rage → struggle/input) so the lock-precedence rule lives in one place; removed
-the unreachable `"bad-poison" => BadPoison` importer arm (PokeAPI emits `"poison"` for Toxic; the
-BadPoison promotion is the layer-2 override). Behavior-preserving.
-
-### Batch 11 (moves 101–110) ✅ DONE (2026-06-05)
-night-shade, mimic, screech, double-team, recover, harden, minimize, smokescreen, confuse-ray,
-withdraw. **605 .NET + 30 Vitest.** Two new engine mechanics (Recover, Mimic) + a correctness fix to
-the type-immunity guard; everything else coverage-only. Two new events (`Healed`, `MimicLearned`) wired
-through all 4 emitters + `timeline.ts` (+ Vitest).
-- Reused contracts (rows added): level-based (night-shade, Ghost — non-immune defender); phys/special
-  split (night-shade Physical; the eight status moves Undefined); self-buff stat stage (harden/withdraw
-  +1 Def, double-team +1 Eva, minimize +2 Eva — first Evasion movers); foe stat drop (smokescreen −1
-  Accuracy; screech −2 Defense, first −2 drop); pure confusion (confuse-ray, folded into a theory with
-  supersonic); immunity (night-shade & confuse-ray are Ghost ⇒ Normal immune; + a self-buff-vs-Ghost
-  test pinning the fix below).
-- New capability classes: **`HealContractTests`** (Recover restores ½ max HP, no over-heal) and
-  **`MimicContractTests`** (copies a random foe move; reverts after battle; reverts on `ResetBattleState`).
-- **Recover (`MoveEffect.Heal`):** heals `MaxHP × IBattleRules.RecoverHealFraction` (Gen 1 = ½, on the
-  seam) via `ReceiveHealing` (caps at max); emits `Healed` with the *actual* amount restored. (Gen 1
-  "(maxHP−HP)&255==255 fail" quirk documented, not modelled.) Soft-Boiled shares the importer clause +
-  a data pin; its behaviour coverage lands in its own batch.
-- **Mimic (`MoveEffect.Mimic`):** copies a random move from the target's set into the Mimic slot by
-  swapping `PokemonAttack.Base`, remembered in `BattleState.MimicWrapper`/`MimicOriginalBase`. The
-  revert lives in **`Creature.ResetBattleState`** (so Haze's mid-battle reset can't orphan it) and runs
-  again at battle end — the transient swap never leaks into the permanent `MoveSet`. Deliberately not
-  treated as foe-directed for type immunity (it copies, doesn't attack).
-- **Correctness fix (the immunity seam):** the batch-9 pure-status type-immunity guard now only fires
-  for **foe-directed** moves (status / confusion / Leech Seed / Disable / Counter / a foe stat drop), so
-  a Normal-type self-buff or Recover is no longer wrongly blocked against a Ghost. Counter (BaseDamage 0
-  but foe-directed) stays inside the guard — a failing test caught that.
-- Data pins added: recover/soft-boiled → Heal, mimic → Mimic, night-shade → LevelBased, screech −2 Def.
-  Re-imported via full `PokeApiConnector` run; verified Effects via MCP (mimic 19, recover 18,
-  night-shade LevelBased, confuse-ray Confuse).
-- Seam-review gate: PASS-WITH-ADVISORIES (0 blockers, 4 advisories); all fixed before commit — incl. a
-  **real bug** (Haze+Mimic permanent-MoveSet leak). New failure modes appended to the reviewer's log
-  (transient-vs-reset; self-vs-foe immunity scoping).
-
-### Batch 12 (moves 111–120) ✅ DONE (2026-06-05)
-defense-curl, barrier, light-screen, haze, reflect, focus-energy, bide, metronome, mirror-move,
-self-destruct. **638 .NET + 33 Vitest.** Mechanic-heavy: **five** new mechanics (Reflect, Light Screen,
-Focus Energy, Bide, Mirror Move) + coverage for engine features already unit-tested. Three new events
-(`ScreenApplied`, `FocusEnergyApplied`, `BideStoring`) wired through all 4 emitters + `timeline.ts`.
-- Reused/coverage (rows added): self-buff stat stage (defense-curl +1 Def, barrier +2 Def); real-row
-  coverage in `UniqueMoveEffectContractTests` for haze (clears stages), metronome (calls a pooled move),
-  self-destruct (damages foe + faints user — engine already unit-tested in `CoreMechanicsTests`);
-  phys/special split rows; data pins for all five new mappings + haze + metronome.
-- New capability classes: **`ScreenContractTests`**, **`FocusEnergyContractTests`**,
-  **`BideContractTests`**, **`MirrorMoveContractTests`**.
-- **Reflect / Light Screen (`MoveEffect.Reflect`/`LightScreen`):** double the holder's Defense / Special
-  vs the matching damage via a new `DamageCalculator` `screenDefenseMultiplier` param applied in the
-  non-crit block (crits bypass screens, Gen 1). Factor on `IBattleRules.ScreenDefenseMultiplier` (Gen 1
-  = 2). `BattleState.HasReflect`/`HasLightScreen`.
-- **Focus Energy (`MoveEffect.FocusEnergy`):** the Gen 1 *bug* (quarters crit instead of ×4) lives in
-  `Gen1BattleRules.GetCritChance` reading `Creature.HasFocusEnergy`; test pins the ÷4 quirk, not a flag.
-- **Bide (`MoveEffect.Bide`):** lock-in like rampage (`BattleState.BideTurnsRemaining`/`BideDamage`
-  `Accumulated`/`BideMove`, `Battle` force-selects while committed). Storing turns emit `BideStoring`
-  and return before MoveUsed; release deals `accumulated × IBattleRules.BideDamageMultiplier` (Gen 1 =
-  2), typeless/never-miss. **Accumulation runs in every damage-category branch** (a shared
-  `AccumulateBideDamage` helper), not just Standard — a seam-review BLOCK caught the original
-  Standard-only gap; a fixed-damage test guards it. `RollBideTurns` (Gen 1 = 2–3) on the seam.
-- **Mirror Move (`MoveEffect.MirrorMove`):** records `BattleState.LastMoveUsed` after each real move
-  (skipping Metronome/Mirror themselves); re-executes the foe's last move via an inner action (like
-  Metronome); fails if the foe hasn't moved. Bide is intentionally copyable (documented).
-- Seam-review gate: BLOCK → 2 doc blockers (per-gen XML docs for the Bide seam members) + 4 advisories,
-  **all fixed** before commit; the Bide all-category accumulation gap was the substantive one. New
-  failure mode appended to the reviewer log (a damage-taken hook added to only one category branch).
-
-### Batch 13 (moves 121–130) ✅ DONE (2026-06-05)
-egg-bomb, lick, smog, sludge, bone-club, fire-blast, waterfall, clamp, swift, skull-bash.
-**690 .NET + 33 Vitest.** Pure **coverage + data-fidelity** batch — **no new engine code, no new
-events, no schema change, no new seam**. Every mechanic already existed; the only production change is
-three Gen 1 importer data fixes.
-- Reused contracts (rows added): damage/PP/miss (egg-bomb, smog, sludge, bone-club, fire-blast,
-  waterfall, clamp, swift); secondary status (smog/sludge → Poison, fire-blast → Burn); flinch
-  (bone-club); binding (clamp, with bind/wrap/fire-spin); two-turn (skull-bash, with razor-wind/fly);
-  phys/special split (10 rows — Ghost lick & Poison smog/sludge & Ground bone-club Physical; Fire/Water
-  Special).
-- New capability class: **`NeverMissContractTests`** (swift — first never-miss move covered at the
-  contract level; the `NeverMisses` short-circuit at `IBattleAction.cs:224` was already engine-honored
-  + unit-tested, so coverage-only).
-- **lick is Ghost-type → handled specially.** 0× vs Normal *and* (the famous Gen 1 bug) 0× vs Psychic.
-  A Standard 0× damaging move folds the immunity into the calc (emits `DamageDealt` at 0, **not**
-  `MoveHadNoEffect`), so lick's zero-damage cases live in `StabAndTypeEffectivenessContractTests`
-  (`GhostMovesDealNoDamageToImmuneTypesInGen1`), not `ImmunityContractTests`; its damage+paralysis
-  coverage uses a non-immune Water defender in `SecondaryStatusContractTests`.
-- **Three importer data fixes (layer-2 + name-match)** — re-imported via full `PokeApiConnector` run,
-  verified via MCP: **skull-bash → TwoTurn** (Gen 1 plain charge, no charge-turn Defense boost = Gen 2+;
-  also clears the stale `effect_chance=100`); **fire-blast** burn 30% (modern 10%); **waterfall** no
-  secondary (the 20% flinch was added in Gen 4). All three pinned in `SecondaryChanceDataContractTests`.
-- Seam-review gate: PASS-WITH-ADVISORIES (0 blockers). 2 batch-relevant advisories fixed (skull-bash
-  stale `EffectChance` cleared + pin strengthened to the whole stat-change row). 1 advisory surfaced &
-  deferred: pre-existing flaky `OHKOMove_FailsIfSourceLevelLowerThanTarget` (randomised DVs let a
-  low-level attacker occasionally out-speed) — out of batch scope; see tech debt.
-
-### Batch 14 (moves 131–140) ✅ DONE (2026-06-05)
-spike-cannon, constrict, amnesia, kinesis, soft-boiled, high-jump-kick, glare, dream-eater, poison-gas,
-barrage. **730 .NET + 33 Vitest.** One new engine mechanic (Dream Eater) + two importer mappings;
-everything else coverage-only. No layer-2 data overrides needed (all values Gen-1-correct via
-`past_values`). No new battle event, no schema change.
-- Reused contracts (rows added): multi-hit (spike-cannon, barrage); secondary stat-drop (constrict
-  Speed −1); self-buff stat stage (amnesia +2 combined Special); foe stat-drop (kinesis −1 Accuracy);
-  heal (soft-boiled, parametrized with recover); pure status (glare → Paralysis, poison-gas → Poison);
-  crash-on-miss (high-jump-kick, parametrized with jump-kick); damage/PP/miss; phys/special split.
-- New capability class: **`DreamEaterContractTests`**. Immunity facts added: glare vs Ghost (Normal 0×),
-  poison-gas vs Poison-type (`CanReceiveStatus`).
-- **Dream Eater (`MoveEffect.DreamEater`):** fails on a non-sleeping target (guard in `AttackAction`
-  before the damage switch → reuses `MoveMissed`, the state-precondition-failure path like Counter, not
-  the type-based `MoveHadNoEffect`). The sleep requirement is **gen-invariant**, so it's inline, not on
-  the seam (seam-review confirmed). The 50% drain heal rides on the existing `DamageCategory.Drain`.
-- **Two importer mappings** (in `Gen1MoveEffects`): high-jump-kick → Crash (reuses jump-kick's crash
-  mechanic), dream-eater → DreamEater (Drain category stays from meta). Re-imported + MCP-verified;
-  pinned in `SecondaryChanceDataContractTests`.
-- Seam-review gate: PASS-WITH-ADVISORIES (0 blockers). Advisory addressed: documented why the Dream
-  Eater fail uses `MoveMissed` over `MoveHadNoEffect`. Other advisory (the flaky OHKO test) is the
-  pre-existing tech-debt item below.
-
-### Batch 15 (moves 141–150) ✅ DONE (2026-06-06)
-leech-life, lovely-kiss, sky-attack, bubble, dizzy-punch, spore, flash, psywave, splash (**9 of 10** —
-Transform deferred, see below). **758 .NET + 34 Vitest.** Two new engine bits, the rest coverage-only.
-- **Psywave (`DamageCategory.Psywave`):** variable damage = random 1..floor(1.5 × user level), ignoring
-  Attack/Defense, type effectiveness, STAB and crits. The magnitude is gen-variable, so it lives on the
-  seam (`IBattleRules.RollPsywaveDamage`, delegated in `DelegatingBattleRules`), NOT inline. New branch
-  routes through the shared Bide-accumulation + 0×-immunity guard like the other non-Standard categories.
-  **`PsywaveContractTests`** exercises the *quirk* (bound by level, ignores attacker Special + defender
-  bulk), not just the import mapping (which is pinned in `SecondaryChanceDataContractTests`).
-- **Splash (`MoveEffect.Splash`):** the Gen 1 no-op — new `ButNothingHappened` battle event wired in all
-  4 places (`BattleEvents.cs`, both emitters, `timeline.ts` + `timeline.test.ts`). Inline, not on the
-  seam: doing nothing is gen-invariant (litmus "would Gen 2 change it?" → no; seam-review agreed). Splash
-  self-targets, so `targetsFoe` is false and it correctly bypasses the foe-immunity guard. Lives in
-  `UniqueMoveEffectContractTests`.
-- Reused contracts (rows added): drain (leech-life); pure sleep status (lovely-kiss, spore); two-turn +
-  high-crit-on-release (sky-attack); secondary stat-drop (bubble Speed −1 at 33%); damage/PP/miss
-  (bubble, dizzy-punch); foe stat-drop (flash −1 Accuracy).
-- **Layer-2 importer data overrides** (Gen 1 ≠ modern; PokeAPI can't express via `past_values`) — all
-  pinned in `SecondaryChanceDataContractTests`: **bubble & constrict → 33% Speed drop** (modern 10%; also
-  corrects constrict, which batch 14 shipped at 10%); **dizzy-punch → no secondary** (Gen 5 confusion
-  stripped); **sky-attack → flinch chance cleared** (Gen 3 flinch). Re-imported via full `PokeApiConnector`
-  run + MCP-verified (splash Effect=Splash, psywave category=Psywave).
-- Seam-review gate: PASS-WITH-ADVISORIES (0 blockers). Both advisories fixed pre-commit: added the
-  Psywave behaviour test (`PsywaveContractTests`) and documented why no Psychic type-immunity case exists.
-
-### Batch 16 (moves 151–160) ✅ DONE (2026-06-06)
-acid-armor, crabhammer, explosion, fury-swipes, bonemerang, rest, rock-slide, hyper-fang, sharpen
-(**9 of 10** — Conversion deferred, see below). **779 .NET** (no frontend change). One new mechanic
-(Rest) + the bonemerang mapping that closes a standing deferral; the rest coverage + one data fix.
-- **Rest (`MoveEffect.Rest`):** self-targeting heal+sleep. Fully restores HP (`ReceiveHealing(restored)`,
-  emits `Healed` with the actual amount), overwrites status with `Sleep`, and forces sleep for a **fixed**
-  `IBattleRules.RestSleepTurns` (Gen 1 = 2; on the seam since it's a gen-variable duration, distinct from
-  the random `RollSleepTurns`). Fails at full HP via `MoveMissed` (state-precondition path, like Counter/
-  Dream Eater); the full-HP fail is gen-invariant so it's inline (seam-review agreed). Self-targeting ⇒
-  bypasses the foe-immunity guard. The forced sleep is consumed by the existing `StatusResolver`.
-  **`RestContractTests`** covers heal+sleep, fail-at-full-HP, cure-status, **and a full-`Battle` test** that
-  the user is forced to skip turns (`ActionBlocked: Sleep`) — plus asserts the foe is never slept.
-- **Bonemerang (closes a standing deferral):** importer name-map → `MoveEffect.MultiHit` + `MultiHitCount=2`
-  (fixed-2, reusing the double-kick/twineedle mechanism — no new engine). Pinned in `SecondaryChanceDataContractTests`.
-- Reused contracts (rows added): self-buff (acid-armor +2 Def, sharpen +1 Atk); single-turn high-crit
-  (crabhammer → new `CriticalHitContractTests` fact); SelfDestruct category (explosion, parametrized with
-  self-destruct); variable multi-hit (fury-swipes); 10% flinch (hyper-fang — Gen-1-correct, no override);
-  damage/PP (crabhammer, hyper-fang, rock-slide).
-- **Layer-2 data fix (Gen 1 ≠ modern), pinned:** **rock-slide → flinch cleared** (Effect=None, EffectChance
-  =null; Gen 1 had no flinch, the 30% was added in Gen 2 — verified via Bulbapedia + PokeAPI past_values).
-  Re-imported via full `PokeApiConnector` run + MCP-verified (rest Effect=Rest/StatusEffect=None,
-  bonemerang MultiHit+count 2, rock-slide flinch gone).
-- Seam-review gate: PASS-WITH-ADVISORIES (0 blockers). Reviewer flagged a potential **self-vs-foe status
-  leak** (if Rest's PokeAPI ailment mapped to a foe `StatusEffect`, `TryApplyStatus` would sleep the foe
-  before the Rest handler). Verified against the imported row that Rest's `StatusEffect` is already None,
-  then **guarded it**: pinned `StatusEffect == None` + asserted the foe is never slept. Also applied the
-  `ReceiveHealing(restored)` clarity fix. New failure mode logged to the seam-reviewer.
-
-### Batch 17 (moves 161–165) ✅ DONE (2026-06-07) — FINAL COVERAGE BATCH
-tri-attack, super-fang, slash, substitute, struggle (**moves 1–165 now covered except the two deferred
-mutation moves**). **802 .NET + 35 Vitest.** One big new mechanic (Substitute) + a data fix; rest reuse.
-- **Substitute (`MoveEffect.Substitute`):** costs floor(maxHP/4) HP, raises a decoy with floor(maxHP/4)+1
-  HP; fails (→ `MoveMissed`) if one is up or HP ≤ cost. The ¼ cost is inline (gen-invariant; litmus → no).
-  **Cross-cutting:** added one shared `DealDamageToTarget` helper that absorbs into the decoy (overflow
-  lost, user HP untouched) and routed **every** damage path through it (Standard/Drain loop, Fixed,
-  LevelBased, OHKO, SelfDestruct, SuperFang, Psywave, Counter, **and Bide unleash**) — closing the "hook
-  on only the Standard path" leak class; `LastDamageTaken`/Rage now fire only on real (non-absorbed) hits.
-  While up, the decoy shields the foe's status/stat-drop/confusion — snapshotted at impact
-  (`_targetShieldedAtImpact`) so the shield still blocks the secondary on the **breaking** hit. 3 new
-  events (`SubstitutePutUp`/`AbsorbedHit`/`Faded`) wired in all 4 places. `SubstituteContractTests` covers
-  create/cost, absorb (incl. a non-Standard category), break+overflow-lost, fail cases, status/stat/confuse
-  shield, breaking-hit shield, and a full-`Battle` persistence test.
-- Reused/coverage: super-fang (already-implemented SuperFang category → new `SuperFangContractTests` +
-  data pin); slash (single-turn high-crit → crit test + damage/PP rows); struggle (existing no-PP fallback;
-  its stray inert `EffectChance=10` left as-is).
-- **Layer-2 data fix (pinned):** tri-attack → no secondary in Gen 1 (the 20% random burn/freeze/para was
-  added Gen 2). Substitute effect + super-fang category also pinned in `SecondaryChanceDataContractTests`.
-- Seam-review gate: PASS-WITH-ADVISORIES (0 blockers). Advisory fixed pre-commit: the secondary-shield was
-  read after absorption, so a breaking hit's status leaked — snapshotted it at impact + added a pinning
-  test. New failure mode (snapshot-a-guard-at-impact) logged to the seam-reviewer.
-
-### Remaining batches (cadence)
-- [x] **Move-coverage pass COMPLETE** (batches 1–17, moves 1–165) as of 2026-06-07 — every Gen 1 move has
-  behaviour/coverage tests except the two deferred identity/type-mutation moves below. Next up is that
-  deferred batch, then the post-coverage sequence.
-### Type/identity-mutation batch — Transform (144) + Conversion (160) ✅ DONE (2026-06-07)
-**813 .NET + 37 Vitest.** The two deferred identity/type-mutation moves — covered together so the
-snapshot/restore machinery (wider than Mimic's) is built once. No schema change, no new seam, no layer-2
-data override (both rows were already Gen-1-correct; only the `Effect` name-mapping was added).
-- **Shared identity-snapshot machinery:** new `BattleState.OriginalIdentity` (an `IdentitySnapshot`
-  holding the pre-mutation types, the four non-HP battle stats, SpeciesId, and original moveset wrappers)
-  + `Creature.SnapshotIdentityForMutation()` (captures **once** — a second mutating move can't overwrite
-  the true original) and `Creature.RestoreOriginalIdentity()` (restores all of it, preserving current
-  HP/MaxHP). `ResetBattleState()` calls the restore before the `Battle = new()` swap, and `Battle`'s
-  battle-end cleanup calls it alongside `RestoreMimickedMove()` — same leak-proofing as Mimic (Haze
-  mid-fight + battle end both revert). Stat stages live in `BattleState`, so the fresh-instance swap
-  clears the copied stages automatically. Added `StatStages.Copy()` for the independent stage copy.
-- **Transform (`MoveEffect.Transform`):** copies the target's types, Atk/Def/Spec/Speed, current stat
-  stages, SpeciesId, and full moveset (each copied move at `min(5, max)` PP); HP/MaxHP/level stay the
-  user's. Self-affecting, no damage; `targetsFoe` is false so the foe-immunity guard never blocks it
-  (Transform into a Ghost works). New `TransformedInto` event.
-- **Conversion (`MoveEffect.Conversion`):** copies the foe's Type1/Type2 onto the user (the Gen 1
-  mechanic — Gen 2+ matches one of the user's own moves instead, a different mechanic, so the Gen 1
-  behaviour is kept inline + documented rather than on a seam we couldn't exercise until Gen 2). New
-  `ConvertedType` event. Both events wired in all 4 places (`BattleEvents.cs`, both emitters,
-  `timeline.ts` + `timeline.test.ts`).
-- Tests: `TransformContractTests` (copies types/stats but keeps own HP, moveset@5PP, independent stat
-  stages, reverts on `ResetBattleState`, full-`Battle` battle-end revert) + `ConversionContractTests`
-  (copies foe types, leaves stats/moveset untouched, reverts on reset, **and the shared-machinery proof:
-  Conversion-after-Transform still restores the true pre-Transform original**). Both effects pinned in
-  `SecondaryChanceDataContractTests`. Re-imported via full `PokeApiConnector` run + MCP-verified
-  (transform Effect=29, conversion Effect=30).
-- Documented simplifications: re-using Transform when already transformed re-copies the current target
-  (no Gen 1 "already transformed" fail); a Mimic-then-Transform combo is an obscure, untested edge.
-- Seam-review gate: PASS-WITH-ADVISORIES (0 blockers, 2 advisories — both fixed pre-commit): (1) the
-  recurring self-status-leak class — pinned `StatusEffect == None` on both moves + asserted the foe's
-  status stays None in each behaviour test (TryApplyStatus runs before the move-effect handler); (2)
-  named Transform/Conversion in the `targetsFoe` immunity-guard scoping comment alongside Mimic.
-- [ ] **Tech debt — flaky `RestContractTests.RestUserIsForcedToSkipTurnsWhileAsleep`** (surfaced during
-  this batch's full-suite run, file untouched by it): uses `AutoSelectInput` + unseeded RNG and fails
-  ~every other run; passes in isolation. Same shape as the batch-13/16 flaky-OHKO debt — rewrite to a
-  seeded/deterministic path (set the relevant rolls explicitly) rather than relying on `AutoSelectInput`.
-- [ ] **Post-coverage sequencing** (set 2026-06-06): once all 165 moves are covered, the order is
-  (1) ~~deferred type/identity-mutation batch (Transform + Conversion)~~ ✅ → (2) jump-kick/hi-jump-kick
-  Ghost-immunity crash edge → (3) Counter fixed/level-based answer → (4) `AttackAction` lock-in
-  abstraction → **(5) the full integration-test pass** → (6) `BattleState` facade migration →
-  (7) `GameController` run-seed. The **integration-test pass was moved later** (after the lock-in
-  abstraction, before the facade migration) rather than running immediately after coverage — the
-  end-to-end tests are more valuable once the engine refactors that change call shapes have landed.
-- [x] **Tech debt — flaky OHKO tests** (fixed in batch 16): both `OHKOMove_*` tests in CoreMechanicsTests
-  relied on level implying speed, but randomised DVs flipped the order intermittently (the pre-commit hook
-  caught `OHKOMove_FaintsTargetIfLevelSufficient` failing). Rewrote both to set Speed explicitly and renamed
-  them to the speed framing (`OHKOMove_FailsIfTargetFasterThanSource` / `OHKOMove_FaintsTargetIfSourceAtLeastAsFast`),
-  since Gen 1 OHKO is a Speed compare (`IBattleRules.OneHitKoSucceeds`), not the level check Gen 2 added.
-- [x] **Fixed-2 multi-hit mover**: bonemerang — done in batch 16 (importer → MultiHit + MultiHitCount=2,
-  reusing the double-kick/twineedle mechanism; coverage in `MultiHitContractTests`, pinned in the data tests).
-- [x] **Rampage reuse**: petal-dance — done in batch 8 (already tagged in importer + coverage added).
-- [x] **Gen 1 type immunities** (batch 8): Poison→poison, Fire→burn, Body Slam→Normal-paralysis,
-  Grass→Leech Seed, and Ghost (0×) for fixed/level-based/OHKO/Super Fang/Counter — all on the seam now.
-  Remaining edge: Counter still only answers damage recorded on the standard damage path (not
-  fixed/level-based) — a documented simplification.
-- [x] **Seam audit (2026-06-04)** — fixed two move-specific damage quirks that had leaked out of the
-  seams: (1) **OHKO success** was using `Source.Level < Target.Level` (the *Gen 2+* rule, mislabelled
-  "Gen 1") → now `IBattleRules.OneHitKoSucceeds` with the correct Gen 1 **Speed** comparison; (2)
-  **Self-Destruct/Explosion Defense-halving** was an inline `/2` mutating `Target.Attributes` →
-  now `IBattleRules.SelfDestructDefenseDivisor` passed into `DamageCalculator` (no stat mutation).
-  Both now have tests asserting the *quirk* (speed-not-level; the damage boost), not just the outcome.
-- [x] **Gen 1 move-data fidelity** is data-driven via the `past_values` resolver (power/accuracy/pp/
-  effect_chance/type); **secondary chances/targets** that `past_values` can't express are a short,
-  verified override block in the importer (see batch 7). Add to it as later batches surface more.
 
 ---
 
@@ -707,35 +98,17 @@ data override (both rows were already Gen-1-correct; only the `Effect` name-mapp
 
 No prerequisites. All `ExpHP/Attack/Defense/Special/Speed` fields exist on `Creature` but are never written.
 
-- [ ] After awarding XP in `Battle.StartFightAsync`, add fainted enemy's base stats to player's corresponding `Exp*` fields; cap each at 65535 (Gen 1 has no per-stat cap); call `CalculateStats()` immediately
+- [ ] After awarding XP in `Battle.StartFightAsync`, add fainted enemy's base stats to player's corresponding
+  `Exp*` fields; cap each at 65535 (Gen 1 has no per-stat cap); call `CalculateStats()` immediately
 - [ ] No new battle event required (Gen 1 is silent about EVs)
 
 ---
 
-## Web UI
+## Web UI — Polish
 
-Stack: React 18 + TypeScript + SignalR. Phaser 3 for sprite/animation canvas.
+Stack: React 18 + TypeScript + SignalR + Phaser 3. (Phaser canvas & core animations ✅ done — see archive.)
 
-### Phaser Canvas ✅ DONE
-- [x] `phaser` + `mitt` npm dependencies added to `ClientApp`
-- [x] `BattleCanvas.tsx` — mounts Phaser `Game` lazily (dynamic import, separate chunk); destroys on unmount
-- [x] `BattleScene.ts` — loads front/back sprites, diagonal layout (enemy top-right, player bottom-left), entry slide-in animation with Web Audio cries
-- [x] `PhaserBridge.ts` — typed mitt emitter; React dispatches `playMoveAnimation` / `playFaintAnimation`; Phaser emits `animationComplete` back
-- [x] `AudioEngine.ts` — Web Audio API synth: `playCry`, `playFaintCry`, `playHit`, `playTick`
-- [x] CSS sprite `<img>` placeholders replaced by the Phaser canvas; React retains HP/status/nameplate overlay layer (z-index 2)
-
-### Animations ✅ DONE
-- [x] Entry: sprites slide in from edges with species cries; idle bob tween starts after entry
-- [x] `MoveUsed` → attacker lunges toward opponent (~150ms in, ~200ms back); target white-flash + `playHit()`
-- [x] `DamageDealt` → `UPDATE_HP` fires immediately (CSS `transition: width 0.6s ease-out`); log message appears after 650ms
-- [x] `CreatureFainted` → sprite slides down + fades (~500ms) with `playFaintCry()`; log appears after
-- [x] `LeveledUp` → XP bar fills to 100% (CSS `transition: width 0.9s linear`) then resets; log after
-- [x] All events enqueued — log text always appears **after** the relevant animation (Gen 1 feel)
-- [x] Move menu re-enabled only after animation queue drains (`animationComplete` bridge event)
-- [x] `useBattleHub` state gains `animating: boolean`; FIGHT + move buttons check `phase === 'choosing' && !animating`
-
-### Polish
-- [ ] `BattleEndedOverlay` — covers battle screen on `BattleEnded`; shows winner, "Play Again" → `/select`, "Main Menu" → `/`
+- [ ] `BattleEndedOverlay` — covers battle screen on `BattleEnded`; winner, "Play Again" → `/select`, "Main Menu" → `/`
 - [ ] Level-up notification toast on `LeveledUp` event
 - [ ] Move menu STAB indicator — subtle highlight on moves matching player's type
 - [ ] Color-coded effectiveness in battle log (super-effective green, not very effective grey, no effect red)
@@ -746,41 +119,40 @@ Stack: React 18 + TypeScript + SignalR. Phaser 3 for sprite/animation canvas.
 
 ## Browser-Based UI Testing (Playwright)
 
-Promote the manual Puppeteer checklist (`ui_checklist.md`) into a committed, CI-runnable E2E suite. Playwright drives the **React DOM** (≈70% of the checklist); the **Phaser canvas** is tested through the existing `mitt` bridge, not by inspecting pixels.
+Promote the manual Puppeteer checklist (`ui_checklist.md`) into a committed, CI-runnable E2E suite.
+Playwright drives the **React DOM** (≈70% of the checklist); the **Phaser canvas** is tested through the
+existing `mitt` bridge, not by inspecting pixels.
 
-**Key constraint:** Playwright/Puppeteer query the DOM only. Phaser renders to one opaque `<canvas>` — sprite slide-in, idle bob, lunge, faint fade, and audio (cries/hit/status) are **not** directly assertable. Don't attempt pixel/sprite selectors, and never assert wall-clock animation durations (the checklist's "~1.8 s silence", "~350 ms lunge", "~600 ms HP drain") in E2E — they are the #1 source of flake. Assert **event ordering** via the bridge instead; unit-test durations separately if needed.
+**Key constraint:** Playwright/Puppeteer query the DOM only. Phaser renders to one opaque `<canvas>` — sprite
+slide-in, idle bob, lunge, faint fade, and audio are **not** directly assertable. Don't attempt pixel/sprite
+selectors, and never assert wall-clock animation durations (the #1 source of flake). Assert **event ordering**
+via the bridge instead; unit-test durations separately if needed.
 
-Status: **harness + core specs landed** (9 specs, run via `npm run test:e2e` or the VS Code Playwright extension — see `ClientApp/e2e/README.md`). Remaining: a few checklist sections (§6 status, §7 XP/QUIT), `data-testid`s, and CI.
+Status: **harness + core specs landed** (9 specs, run via `npm run test:e2e` or the VS Code Playwright
+extension — see `ClientApp/e2e/README.md`). Remaining: a few checklist sections (§6 status, §7 XP/QUIT),
+`data-testid`s, and CI.
 
-**Testability seams (prerequisite plumbing):**
-- [ ] `data-testid` attributes — **deferred**: specs lean on stable semantic classes already present (`.btn-new-game`, `.species-card`, `.move-btn`, `.log-line`, `.bar-fill`, `.nameplate--*`). Add testids only where a class proves brittle.
-- [x] Expose the `PhaserBridge` `mitt` emitter on `window` behind a flag (`src/testEnv.ts` → `window.__CG_E2E__`) and **record every bridge event** on `window.__cgEvents` for ordering assertions (`PhaserBridge.ts`)
-- [x] "Instant animations" flag — under E2E, `timeline` collapses step delays + shortens the animation-complete wait, and `BattleScene` runs tweens/timers at 8× (`this.tweens/time.timeScale`)
+**Remaining:**
+- [ ] `data-testid` attributes — **deferred**: specs lean on stable semantic classes already present
+  (`.btn-new-game`, `.species-card`, `.move-btn`, `.log-line`, `.bar-fill`, `.nameplate--*`). Add testids
+  only where a class proves brittle.
+- [ ] CI step (or `dev.ps1`-adjacent script / `test.ps1 -StartStack`) that boots backend + frontend, runs
+  the suite headless, and tears down.
+- [ ] §6 Status conditions — badge on correct nameplate; log grammar (status is non-deterministic per
+  battle; needs a seeded or forced-status path).
+- [ ] §7 Faint & end — XP fill / level-up line / QUIT → title not yet asserted (battle play-through itself ✅).
+- [ ] §8 (optional) Visual regression snapshots of the canvas at settled states — skipped (maintenance cost).
 
-**Scaffold:**
-- [x] `@playwright/test` + Chromium installed; `playwright.config.ts` → Vite `:5173`, single Chromium, serial (battles are stateful), `webServer` reuses a running Vite; `test:e2e`/`test:e2e:ui` scripts; Vitest scoped to `src/` so the runners don't collide. The E2E flag rides on a `?e2e=1` URL param (`src/testEnv.ts`) so specs import straight from `@playwright/test` (reliable Rider/WebStorm gutter detection); `e2e/helpers.ts` (page objects) + `e2e/README.md`; shared Rider run config `.run/E2E_Playwright.run.xml`
-- [x] Repo-root `test.ps1` runs all three suites (.NET / Vitest / Playwright) with a per-suite pass/total + failing-test summary and a CI exit code (`-Dotnet`/`-Web`/`-E2E`/`-StartStack`); documented in `CLAUDE.md`
-- [ ] CI step (or `dev.ps1`-adjacent script / `test.ps1 -StartStack`) that boots backend + frontend, runs the suite headless, and tears down
-
-**Specs (mirror `ui_checklist.md` sections):**
-- [x] §1–2 Title + Starter selection — title loads (`smoke`), 151-card grid, Gen 1 type badges + BST, level slider range/default, CONFIRM → battle (`starter-select.spec.ts`)
-- [x] §3 Battle entry — player/enemy nameplates, "X VS Y" log, FIGHT/CHECK enabled (`battle.spec.ts`)
-- [x] §4 Move menu — 2×2 grid + PP, BACK returns (`battle.spec.ts`). *(0-PP greyed/unclickable not yet asserted.)*
-- [x] §5 Attack sequencing — bridge ordering (`playMoveAnimation` before `playHitSound`) and the move announced before resolution; **plus the cadence regression guard** (enemy HP doesn't snap to end-of-turn HP at choose-time) in `cadence.spec.ts`
-- [ ] §6 Status conditions — badge on correct nameplate; log grammar (not yet — status is non-deterministic per battle; needs a seeded or forced-status path)
-- [x] §7 Faint & end (partial) — plays through to faint → winner, asserting order (`battle.spec.ts`). *(XP fill / level-up line / QUIT → title not yet asserted.)*
-- [ ] §8 (optional) Visual regression snapshots of the canvas at settled states — still skipped (maintenance cost).
-
-**Notes:**
-- Keep Puppeteer-MCP for agent-driven, ad-hoc verification during a session; Playwright is the durable regression layer.
-- Audio is verified by asserting the bridge *fired* the sound event, never by capturing sound.
-- Deterministic §6 (status) and richer §7 (XP/level/QUIT) coverage would benefit from a **seeded battle** entry point (the `IRandomSource` seam exists in core; wiring a per-game seed through `GameController` would make these specs deterministic).
+**Notes:** keep Puppeteer-MCP for agent-driven ad-hoc verification; Playwright is the durable regression
+layer. Audio is verified by asserting the bridge *fired* the sound event. Deterministic §6/§7 coverage would
+benefit from a **seeded battle** entry point (the `IRandomSource` seam exists in core; wiring a per-game seed
+through `GameController` would make these specs deterministic).
 
 ---
 
 ## Catch Mechanic
 
-Deferred until Phaser animations exist — the mechanic needs a throw/shake/catch animation sequence to be meaningful.
+Deferred until Phaser animations exist — the mechanic needs a throw/shake/catch animation sequence.
 
 **When ready:**
 - [ ] Bag action in move menu; `Battle` extended with a "catching" state
@@ -793,64 +165,72 @@ Deferred until Phaser animations exist — the mechanic needs a throw/shake/catc
 
 ## Game Loop & Progression
 
-**Prerequisites:** Catch Mechanic, BattleState extraction (Tech Debt ✅ done), `PlayerDbContext` / `save.db`
+**Prerequisites:** Catch Mechanic, BattleState extraction (✅ done), `PlayerDbContext` / `save.db`
 
-> **Sequencing:** this whole layer is intentionally **deferred until combat fidelity is fully ironed out** — the battle sim is the foundation the roguelike/lite loop builds on.
+> **Sequencing:** this whole layer is intentionally **deferred until combat fidelity is fully ironed out** —
+> the battle sim is the foundation the roguelike/lite loop builds on.
 
 - Player starts with one Pokémon; win → new BST-scaled encounter; lose → game over with run summary
 - Catch → Pokémon added to party (up to 6); choose lead between battles
 - Progressive difficulty: `targetBst = party lead BST + (depth × 10)`; trainer encounters at milestones
-- Evolution: player Pokémon evolve at level threshold (requires `PokemonEvolution` table in `pokemon.db`); enemy evolves to correct form for their level before battle
+- Evolution: player Pokémon evolve at level threshold (requires `PokemonEvolution` table in `pokemon.db`);
+  enemy evolves to correct form for their level before battle
 - `PlayerSave` / `SavedCreature` models in `save.db`; auto-save after each battle
 - Party management UI between battles
-- **Cross-encounter persistence:** carry major status across encounters and revisit the current "reset *all* transient state per battle" behaviour — today HP persists between battles but status doesn't (canonical Gen 1 keeps major status out of battle). The `Creature`/`BattleState` split is the seam for this; see `STATE_MODEL.md §2`.
+- **Cross-encounter persistence:** carry major status across encounters and revisit the current "reset *all*
+  transient state per battle" behaviour — today HP persists between battles but status doesn't (canonical
+  Gen 1 keeps major status out of battle). The `Creature`/`BattleState` split is the seam; see `STATE_MODEL.md §2`.
 
 ---
 
 ## Multi-Generation: Data Model & Schema
 
-The stat-selection abstraction (← NEXT section) is the only change to do now. Everything below is deferred to the Gen 2 sprint.
+Deferred to the Gen 2 sprint. (The stat-selection abstraction — the only piece to do now — is ✅ done.)
 
 **`Attributes` stat split:**
-- [ ] `Attributes.Special` → `Attributes.SpAtk` + `Attributes.SpDef`; keep `Special` as a computed alias for Gen 1 (`SpAtk`, since they're equal) so existing tests migrate cleanly
+- [ ] `Attributes.Special` → `Attributes.SpAtk` + `Attributes.SpDef`; keep `Special` as a computed alias for
+  Gen 1 (`SpAtk`, since they're equal) so existing tests migrate cleanly
 - [ ] `Creature.BaseSpecial`, `DvSpecial`, `ExpSpecial` split in parallel
 
 **`PokemonSpecies` per-generation schema:**
-- [ ] Separate timeless identity (`Id`, `Name`, `CatchRate`, `BaseExperience`, `PokedexEntry`, `GrowthRate`) from generation-specific data
-- [ ] New `PokemonSpeciesGenData` table: `SpeciesId`, `Generation` (int), `Type1`, `Type2`, `BaseHP`, `BaseAttack`, `BaseDefense`, `BaseSpAtk`, `BaseSpDef`, `BaseSpeed`; Gen 3+ adds `Ability1/2/Hidden`
+- [ ] Separate timeless identity (`Id`, `Name`, `CatchRate`, `BaseExperience`, `PokedexEntry`, `GrowthRate`)
+  from generation-specific data
+- [ ] New `PokemonSpeciesGenData` table: `SpeciesId`, `Generation` (int), `Type1`, `Type2`, `BaseHP`,
+  `BaseAttack`, `BaseDefense`, `BaseSpAtk`, `BaseSpDef`, `BaseSpeed`; Gen 3+ adds `Ability1/2/Hidden`
 - [ ] Importer stores one row per species per generation; engine queries by active generation
-- [ ] **Note:** PokeAPI has no `past_stats` equivalent — Gen 1 stat corrections (e.g. Clefable, Beedrill, Pikachu line were buffed in Gen 6) will need a corrections table or separate data source
+- [ ] **Note:** PokeAPI has no `past_stats` equivalent — Gen 1 stat corrections (e.g. Clefable, Beedrill,
+  Pikachu line buffed in Gen 6) will need a corrections table or separate data source
 
 **Move per-generation data (intention — see `DATA_IMPORT.md` §4.1/§5.5):**
-- Today the importer resolves each move's **Gen 1** values from PokeAPI `past_values` by taking the
-  *earliest* recorded entry. The mechanism already carries the full history, so going multi-gen is a
-  **generalisation, not a rewrite**: resolve a field for target generation *G* as the value of the
-  earliest `past_values` entry whose `version_group` generation is **> G** (the change happened after
-  G, so the old value still applied at G), else the current value. "Earliest = Gen 1" is just the
-  *G = 1* case.
-- [ ] When moves go per-generation, either store one `Attack` row per `(moveId, generation)` (mirror
-  the **learnset model** — a `Generation` column + an `ActiveGeneration` filter, already the template
-  in `PokemonLearnset`) **or** resolve on demand for `ActiveGeneration`. Prefer the stored-per-gen row
-  for query simplicity and parity with `PokemonSpeciesGenData`.
-- [ ] Make the **layer-2 override table per-generation** too (e.g. Acid's stat target/chance differs
-  Gen 1 vs Gen 4+). The override key becomes `(moveName, generation)`, not just `moveName`.
-- [ ] Keep mechanic/formula differences on the **seams** (`IBattleRules` et al.), never in the
-  per-gen move data — the data layer answers "what are this move's numbers in gen G," the seam answers
-  "how does the engine apply them in gen G."
+- Today the importer resolves each move's **Gen 1** values from PokeAPI `past_values` by taking the *earliest*
+  recorded entry. Going multi-gen is a **generalisation, not a rewrite**: resolve a field for target generation
+  *G* as the value of the earliest `past_values` entry whose `version_group` generation is **> G**, else the
+  current value. "Earliest = Gen 1" is just the *G = 1* case.
+- [ ] When moves go per-generation, either store one `Attack` row per `(moveId, generation)` (mirror the
+  **learnset model** — a `Generation` column + an `ActiveGeneration` filter) **or** resolve on demand. Prefer
+  the stored-per-gen row for query simplicity and parity with `PokemonSpeciesGenData`.
+- [ ] Make the **layer-2 override table per-generation** too (e.g. Acid's stat target/chance differs Gen 1 vs
+  Gen 4+). The override key becomes `(moveName, generation)`.
+- [ ] Keep mechanic/formula differences on the **seams** (`IBattleRules` et al.), never in the per-gen move
+  data — the data layer answers "what are this move's numbers in gen G," the seam answers "how does the engine
+  apply them in gen G."
 
 **Generation filtering:**
 - [ ] `Attack.GenerationIntroduced` (int) + `PokemonSpecies.GenerationIntroduced` (int) — set on import
 - [ ] `EncounterSelector.PickByBst` and `GameController.BuildCreature` filter by `GenerationIntroduced <= activeGeneration`
-- [ ] `PokemonService.GetSpeciesForGenerationAsync(int)` + `AttackService.GetMovesForGenerationAsync(int)` replace unfiltered `ToListAsync()` calls
+- [ ] `PokemonService.GetSpeciesForGenerationAsync(int)` + `AttackService.GetMovesForGenerationAsync(int)`
+  replace unfiltered `ToListAsync()` calls
 
 ---
 
 ## User Documentation
 
-Target: after AI Move Selection lands — at that point battles are fully playable and docs won't describe a moving target.
+Target: after AI Move Selection lands — at that point battles are fully playable and docs won't describe a
+moving target.
 
 - [ ] `/help` route or modal — starter selection, battle controls, status icons, level picker
-- [ ] Expand `README.md` — architecture decisions (two-DB model, `IBattleRules` pattern, how to add a move effect, how to add a generation)
+- [ ] Expand `README.md` — architecture decisions (two-DB model, `IBattleRules` pattern, how to add a move
+  effect, how to add a generation)
 - [ ] `GEN_DIFFERENCES.md` (already written) — adapt for player-facing "what makes Gen 1 different" explainer
 
 ---
@@ -866,112 +246,51 @@ Target: after AI Move Selection lands — at that point battles are fully playab
 - Move-world data (Z-move mappings, move combos) → `moves.db`
 - Player save state (party, caught Pokémon, items) → `save.db` / `PlayerDbContext` (defer until Catch Mechanic)
 
-**Learnset import (part of Learnset System section above):**
-- [ ] Extend `PokeApiPokemon` DTO with `Moves` array
-- [ ] In `PokemonImport`, parse `version_group_details`, filter to `"red-blue"` + `"level-up"`, persist `PokemonLearnset` rows idempotently
-
 ---
 
-## Tech Debt / Cleanup
+## Tech Debt / Cleanup (open items)
 
-### Done ✅
-- Remove dead scaffolding (`Body`, `Brain`, `BodyPart`, `CreatureType`, etc.)
-- `.gitignore`, `.gitattributes`, `.editorconfig`, `global.json` (SDK pin)
-- EF Core migrations; `EnsureDatabaseCreated()` calls `Database.Migrate()`
-- `StatStages` struct→class (silent mutation fix)
-- `AsNoTracking()` on all read-only DB service methods
-- Pending-session TTL in `GameSessionManager` (2-min eviction)
-- `AlwaysHitRules` test helper (eliminates 1/256-miss flakiness)
+> Done items (Architecture Review #1/#2/#4/#5/#6, the #6a cleanups, struct→class, DI, RNG seam, etc.) are
+> in [`TODO_ARCHIVE.md`](TODO_ARCHIVE.md).
 
-### Architecture Review (2026-06-01) — prioritised
+- [ ] **Flaky `RestContractTests.RestUserIsForcedToSkipTurnsWhileAsleep`** — uses `AutoSelectInput` + unseeded
+  RNG; fails ~every other run, passes in isolation (same shape as the resolved flaky-OHKO debt). Rewrite to a
+  seeded/deterministic path (set the relevant rolls explicitly) rather than relying on `AutoSelectInput`.
 
-Findings from a full read of the core engine + web layer. The conceptual architecture (generation seams, headless event-sourced engine, `IBattleInput`) is sound and stays; these are concentrated in the web/runtime layer plus one consistency gap. Ordered by severity.
+- [ ] **RNG seam — remaining (Architecture Review #3).** The core library has no direct `Random.Shared`
+  (`IRandomSource` threaded through engine + setup). Still open: **`GameController` (web) uses `Random.Shared`**
+  for enemy level + random move assignment — deferred; it's the composition root where a per-run seed would be
+  injected, but there's no run-seed concept yet (Game Loop). Wire a run seed here when runs exist. *(Optional:
+  the `AlwaysHit/AlwaysCrit` rule shims could be replaced by seeded sources — low priority.)*
 
-#### 1. Web battle lifecycle — disconnect leak + broken reconnect + swallowed errors `[runtime bug]`
-`SignalRInput.ChooseMoveAsync` (`SignalRInput.cs:14`) awaits a `TaskCompletionSource<int>` with **no cancellation path**, and `BattleHub` has no `OnDisconnectedAsync`. If the player closes the tab mid-turn, the fire-and-forget battle loop (`GameSessionManager.cs:51`, `_ = Task.Run(...)`) awaits that TCS forever — the `SignalRInput`, the two `Creature`s, and the loop task are never collected. **Every abandoned battle is a permanent leak.**
+- [ ] **`BattleState` facade migration (Architecture Review #2 optional cleanup).** Migrate call sites to
+  `creature.Battle.X` and drop the delegating facade, so new per-battle fields can *only* be added to
+  `BattleState`. Deferred — not worth the ~120-site churn yet.
 
-Fix (minimal, no core-engine signature change — cancellation surfaces as the awaited input throwing):
-- [x] `SignalRInput`: add a `_cancelled` flag + `Cancel()` that sets it and calls `_tcs?.TrySetCanceled()`. `ChooseMoveAsync` checks the flag on entry and throws `OperationCanceledException` (covers disconnect during enemy turn/animation when `_tcs` is null and the *next* player turn would otherwise hang).
-- [x] `BattleHub.OnDisconnectedAsync` → `manager.AbandonBattle(connectionId)` → looks up the input and calls `Cancel()`.
-- [x] `GameSessionManager`: wrap the `Task.Run` body in try/catch — swallow/log `OperationCanceledException` at debug, log other exceptions at error (currently a throw in the loop is silent and the client just hangs).
-- [x] **Reconnect** — active battles are now keyed by `gameId` (`_active` + `_connToGame`), `SignalRBattleEventEmitter` resolves the current connection per-emit (`Func<string?>`), and a later `OnConnectedAsync` with the same `gameId` rebinds the battle to the new connection (`AttachConnection`). Disconnect no longer cancels immediately: `DetachConnection` arms a 40 s grace timer (covering the JS auto-reconnect policy) that abandons only if no reconnect arrives; a reconnect cancels it. Verified end-to-end via a SignalR client (start on conn1 → drop → reconnect as conn2 → `ChooseMove` on conn2 → resolution events arrive on conn2).
+- [ ] **`AttackAction.ExecuteAsync` lock-in abstraction (Architecture Review #6a, deferred).** The four
+  lock-in mechanics (two-turn / rampage / rage / bide) spread logic across selection (`Battle.SelectMoveAsync`),
+  the PP/continuation flags, and per-mechanic charge/store blocks. A full `ILockInMechanic`-style abstraction is
+  a high-risk refactor of the most central method with no third use case driving it — **deferred** until the
+  next lock-in move lands (the trigger to abstract). YAGNI for now.
 
-#### 2. Pull `BattleState` extraction forward (was: "when save system is built") `[latent bug source]` ✅ DONE
-`Creature` conflated persistent identity (Name, DVs, Exp, base stats), transient battle state, and behaviour. `ResetBattleState()` was a hand-maintained reset list that had to be updated for every new transient field — miss one and state silently leaks between battles (the `StatStages` struct→class bug was exactly this fault).
-- [x] Extracted transient fields (`Status`, `SleepTurns`, `ConfusedTurns`, `ToxicCounter`, `Stages`, `IsRecharging`, `IsFlinched`, `HasLeechSeed`, `BindingTurnsRemaining`, `IsTwoTurnCharging`, `ChargingMove`) into `BattleState` (`Creature/BattleState.cs`), held as `Creature.Battle`
-- [x] `ResetBattleState()` is now `=> Battle = new BattleState()` — whole-object swap, so a forgotten field is structurally impossible. Locked in by `ResetBattleState_ReplacesWholeBattleState_ClearingEveryTransientField`
-- [x] Used **delegating properties** on `Creature` (`Status => Battle.Status`, …) so the ~120 engine/test call sites stay unchanged and behavior is provably identical (136 tests pass). The save split is ready: persist Creature minus `Battle`.
-- [ ] Optional future cleanup (cosmetic, no behavior change): migrate call sites to `creature.Battle.X` and drop the delegating facade, so new per-battle fields can *only* be added to `BattleState`. Deferred — not worth the ~120-site churn now.
+- [ ] **Counter only answers standard-path damage** — fixed/level-based damage isn't recorded, so it's not
+  counterable (documented simplification; item 3 in Post-coverage sequencing).
 
-#### 3. RNG is the one fidelity-critical concern not behind a seam `[consistency]`
-Crit, accuracy, speed tie-break, Metronome, and move assignment call `Random.Shared` directly inside the engine. Tests route around it with `AlwaysHitRules`/`AlwaysCritRules`, but for a true Gen 1 clone heading toward roguelike runs, **seeded/replayable RNG** will matter — and it's the natural thing to inject through the same seam pattern used everywhere else.
-- [x] Add `IRandomSource` (`Next(int maxExclusive)`, `Next(int min, int max)`, `NextDouble()`) with a `SystemRandomSource` default and a `SeededRandomSource(seed)` for tests/replays (`Combat/IRandomSource.cs`)
-- [x] Thread it through the **battle engine** — `Battle`, `AttackAction`, `DamageCalculator`, `StatusResolver`, `Gen1BattleRules` (optional trailing ctor/method params defaulting to `SystemRandomSource.Instance`, so no existing call site broke; interface signatures unchanged so the test doubles compile as-is)
-- [x] Seeded determinism proven: `Battle_SameSeed_ProducesIdenticalEventSequence` (135 tests pass)
-- [x] **Setup-time RNG in the core library** routed through `IRandomSource` (optional params, default `SystemRandomSource`): `Gen1StatCalculator.RandomiseDvs` (injected source), `EncounterSelector.PickByBst`, `AttackService.GetRandomAttackAsync`/`GiveRandomMoveAsync`. The `creaturegame` library now has **no direct `Random.Shared`**. Seeded reproducibility proven by `Gen1StatCalculator_SeededRandomiseDvs_IsReproducible` and `EncounterSelector_PickByBst_SameSeed_PicksSameSpecies` (138 tests).
-- [ ] **`GameController` (web) still uses `Random.Shared`** for enemy level + random move assignment — deliberately deferred: it's the composition root where a per-run seed would be injected, but there's no run-seed concept yet (Game Loop), and the random-move-pick line is slated for replacement by the Learnset System. Wire a run seed here when runs exist.
-- [ ] Optional cleanup: the `AlwaysHit/AlwaysCrit` rule shims could be replaced by seeded sources now, but they still read clearly — low priority.
+- [ ] **jump-kick / hi-jump-kick Ghost-immunity crash edge** — Gen 1 also crashes on a Fighting→Ghost 0×
+  immunity; today only the accuracy-miss branch crashes (item 2 in Post-coverage sequencing).
 
-#### 4. Speed tie-break uses RNG as a sort key `[footgun]` ✅ DONE
-`Battle.cs` — `.ThenBy(_ => Random.Shared.Next())` called RNG inside the `OrderBy` comparator (ill-defined key; LINQ may invoke the selector multiple times per element).
-- [x] Now draws the tie-break once (`int tieBreak = _rng.Next(2)`) and uses it as a stable sort key via the injected `IRandomSource`
-
-#### 5. DbContext via `new()` instead of DI `[maintainability]` ✅ DONE
-`GameController` / `SpeciesController` did `new PokemonDbContext()` / `new MovesDbContext()`. Worked only because `OnConfiguring` hardcodes the path. The real costs were lost connection pooling and tests needing real SQLite files. (The background battle loop touches no DB — data is materialised up front and passed in — so the scoped-context-in-`Task.Run` hazard never applied.)
-- [x] Registered `AddDbContextFactory<PokemonDbContext>()` / `<MovesDbContext>()` in `Program.cs` (SQLite via `DbPathHelper`); both controllers now inject `IDbContextFactory<T>` and use `CreateDbContextAsync()`
-- [x] Verified at runtime: `GET /api/Species` → 151 species, `POST /api/Game/start` → gameId
-- n/a `PokemonService` / `AttackService` are not used by the web host (controllers query contexts directly), so there was nothing to register there. If they're adopted later, register them then.
-
-#### 6. Frontend battle-log queue is structurally racy `[design]` ✅ DONE
-The imperative `enqueue` / `waitForBridge` / hand-tuned `delay()` choreography in `useBattleHub` coordinating Phaser over the `mitt` bus is where two bugs lived (permanent freeze + listener leak).
-- [x] Split into a **pure** `expandEvent(eventType, payload, ctx) → { now, steps }` (`battle/timeline.ts`) that maps each backend event to immediate actions + an ordered list of primitive steps (`dispatch` | `emit` | `wait` | `awaitAnim`), and a small **driver** (`useBattleTimeline`) that plays steps one at a time — the only place with timers/bridge access, retaining the per-step try/catch + `awaitAnim` timeout hardening. `useBattleHub` slimmed to connection + reducer + feeding events to the timeline.
-- [x] Sequencing/timing/text is now unit-tested without a browser: `timeline.test.ts` (15 Vitest cases) pins move-name formatting, the immunity line, crit/effectiveness suffixes, two-turn charge text, stat-stage wording, the control-plane-vs-timeline split, and `MoveUsed`/`TurnStarted` ordering (the cadence guards).
-- [x] Playwright E2E landed — 9 specs via the `?e2e=1` seam (smoke / starter-select / battle / cadence); see the **Browser-Based UI Testing** section above for the remaining checklist gaps (CI, §6 status, §7 XP/QUIT, data-testids).
-- [x] Full-flow parity verified live this session — Puppeteer `ui_checklist` run + the Playwright faint→winner play-through; cadence confirmed.
-
-#### 6a. Code-review cleanups (batches 11–13, 2026-06-05)
-Findings from a review of the move-mechanic batches (Recover/Mimic, the five batch-12 mechanics, batch 13).
-- [x] **Importer name-dispatch consolidated** — `MoveImport.MapToAttack`'s ~20-arm `else if (Name == …)`
-  effect chain replaced by a `static readonly Dictionary<string, MoveEffect> Gen1MoveEffects`; the two
-  meta-based fallbacks (confusion ailment, flinch chance) run only when no name matched (preserving the
-  rampage-before-confusion ordering), and fixed multi-hit count stays a one-line follow-up. Re-imported +
-  all effect pins green.
-- [x] **`AttackAction.ExecuteInner(Attack)` helper** — Metronome and Mirror Move shared the same
-  `new AttackAction(…, new PokemonAttack(x), …).ExecuteAsync()` construction; extracted to one helper.
-- [x] **Bide "typeless" contradiction resolved.** The release no longer records `Target.LastDamageTaken`/
-  `LastDamageType`, so Bide damage is non-counterable like the other non-standard categories
-  (Fixed/OHKO/…) — matching this engine's "Counter only answers standard-path damage" simplification and
-  removing the comment contradiction. Pinned by `BideDamageIsTypelessAndNotCounterable`.
-- [x] **Mirror Move filter/comment made consistent.** Metronome/Mirror Move are never recorded as a
-  `LastMoveUsed` (documented at the recording site), so the filter only needs to exclude Struggle; dropped
-  the dead `last.Effect != MirrorMove` check and clarified that copying a lock-in move (Bide / two-turn)
-  is valid and resolves through the normal lock-in path.
-- [x] **`Creature.cs` delegating-prop alignment** normalised — the batch-11–13 props had `set =>` one
-  column short of the rest of the block; realigned.
-- [x] **PP-skip predicate named** — the `!isReleaseTurn && !rampageContinuation && …` chain is now a single
-  `isLockedInContinuation` local, naming the concept.
-- [ ] **`AttackAction.ExecuteAsync` lock-in abstraction** `[design, deferred]`. The four lock-in mechanics
-  (two-turn / rampage / rage / bide) still spread logic across selection (`Battle.SelectMoveAsync`), the
-  PP/continuation flags, and per-mechanic charge/store blocks. A full `ILockInMechanic`-style abstraction
-  is a high-risk refactor of the most central method with no third use case driving it — **deliberately
-  deferred** until the next lock-in move lands (that's the trigger to abstract). YAGNI for now.
-
-#### 7. Architecture / decision-log doc `[docs — after the above]`
-The doc set is strong, but the *why* behind the two-DB split, event sourcing, and the seam invariants lives only implicitly. For a project explicitly built to extend generation-by-generation, capture these as an `ARCHITECTURE.md` (or lightweight ADR log) so the invariants survive future drift.
-- [ ] Document: two-DB rationale, event-sourced engine + emitter pattern, the three seams (`ITypeChart`/`IBattleRules`/`IStatCalculator`) and the "never branch on generation" rule, the web session/SignalR flow, and the import-vs-runtime data boundary
-- [ ] Cross-link from `CLAUDE.md` Key Files table
+- [ ] **Architecture / decision-log doc (`ARCHITECTURE.md`).** Capture the *why* behind the two-DB split,
+  event-sourced engine + emitter pattern, the three seams and the "never branch on generation" rule, the web
+  session/SignalR flow, and the import-vs-runtime boundary. Cross-link from `CLAUDE.md`'s Key Files table.
 
 ### Known Gaps
-- Enemy encounter pool ignores game version — filter by `PokemonGameAvailability` once a version selector exists in the UI
+- Enemy encounter pool ignores game version — filter by `PokemonGameAvailability` once a version selector
+  exists in the UI
 - Enemy Pokémon do not evolve — wire into level-up system when Game Loop is built
-- ~~`GameController.BuildCreature` uses random moves~~ — **fixed** by the Learnset System (initial moveset now learnset-driven; see Learnset System section)
 
-### Fixed ✅
-- Post-feature gen-seam + smell cleanup (2026-06-02): closed three seam leaks surfaced by the Learnset/confusion work — confusion self-hit chance (`ConfusionSelfHitPercent`), STAB (`StabMultiplier`), and the EffectChance read (`GetSecondaryEffectChance` + `SecondaryEffectKind`, a Gen 1 pass-through stub showing the generic shape) are now all on `IBattleRules`; `CalculateConfusionDamage` reads stats via `GetOffensiveStat`/`GetDefensiveStat`. Killed the 5× duplicated `IBattleRules` test doubles with a `TestSupport/DelegatingBattleRules` base (new members are now a one-line change). Centralised move-selection policy in `LearnsetMoveSelector.SelectWithFallback` (dropped the split `BuildCreature` signature + fallback). **Strengthened the docs so this stops recurring:** new generation-agnostic checklist + definition-of-done in `GENERATION_SEAMS.md §5.0`, cross-linked from `DEV_STANDARDS.md` and the `/dev` profile in `AI_CONTEXT.md`. 179 tests green.
-- Enemy "only ever uses one status move" (e.g. a wild Charizard that just spammed Leer): the enemy ran on `AutoSelectInput`, which always returns move **slot 0**. `WeightedSmart`/`CanonicalLatest` order a moveset ascending by learn level, so a level-1 status move (Leer, Growl) lands in slot 0 and got used every turn. *(Not a learnset/pre-evolution data gap — Charizard's own learnset has Scratch/Ember/Rage/Slash/Fire Spin ≤ L50.)* Fixed by adding `RandomMoveInput` (uniform pick among PP-available moves, `IRandomSource`-seamed) and wiring it as the enemy input in `GameSessionManager`. Covered by `ConfusionAndInputTests` (only-available-PP, variety-over-many-turns, seeded determinism) and verified live (enemy Vaporeon used Bite/varied moves). The evaluator-driven AI tiers remain future work (AI Move Selection). *Pre-evolution movesets are a separate, lower-priority fidelity item: we use a species' own learnset only, which is correct for most mons but means a fully-evolved species whose own learnset is sparse below its level could get a thin pool — revisit when evolution-chain data is imported (Game Loop / Evolution).*
-- Confusion-inflicting moves did nothing (Supersonic appeared to "miss quietly" / have no effect): confusion is a per-battle counter (`ConfusedTurns`), **not** a `StatusCondition`, and nothing ever set it — the importer dropped the `"confusion"` ailment and no move effect applied it. Fixed end-to-end: added `MoveEffect.Confuse` + `IBattleRules.RollConfusionTurns` (Gen 1: 2–5 counter ≈ 1–4 turns), an `AttackAction` `Confuse` case (independent of major status, no stacking, `EffectChance`-gated for secondary confusion), a `ConfusionStarted` event wired through the console + SignalR emitters and the frontend `timeline.ts` ("X became confused!"), and the importer now maps ailment `"confusion"` → `MoveEffect.Confuse`. Re-imported: the 5 Gen 1 confusion moves (Supersonic, Psybeam, Confusion, Confuse Ray, Dizzy Punch) now carry the effect with correct chances; Thrash/Petal Dance correctly excluded. Covered by `ConfusionAndInputTests` and verified live ("VAPOREON became confused!" → "hurt itself in confusion!").
-- Attack cadence (Gen 1 feel): the lunge + target flash played **before** the "X used MOVE!" line, and the HP bar snapped to its end-of-turn value the instant a move was chosen (the next turn's `TurnStarted` was applied immediately). Fixed by announcing the move first then animating (`MoveUsed` expansion in `timeline.ts`) and routing `TurnStarted` **through the timeline** so HP/status sync only after the turn's damage animates — bars drain in step now. Verified live (Puppeteer) + locked by the `MoveUsed`/`TurnStarted` Vitest cases and `cadence.spec.ts`.
-- Gen 1 physical/special split miscategorised 18 of 110 damaging moves: the importer copied PokeAPI's per-move `damage_class` (the Gen 4+ split), but Gen 1 decides physical/special by the move's **type**. So Hyper Beam/Gust/Acid/Sludge/etc. used Special and Fire/Ice/Thunder Punch, Waterfall, Crabhammer, Vine Whip, Razor Leaf used Attack — computing damage off the wrong stat. Fixed in `MoveImport.MapToAttack` (now derives `AttackType` from `DamageType` via `Gen1DamageCategory`) and the existing `moves.db` rows were corrected in place by the same rule (verified 0 mismatches). See `DATA_IMPORT.md` §4.1/§6.
-- Battle log froze on faint (stuck on last damage line, no "fainted!"/winner): `BattleScene`'s `destroy()` was dead code (Phaser never calls it), so `bridge.on` listeners leaked across canvas remounts (HMR/StrictMode) and a stale scene's `playFaintAnimation` threw on a destroyed sprite — now removed via `SHUTDOWN`/`DESTROY` scene events (`teardown`). Hardened the queue too: `drainQueue` try/catch-continues per task with a `finally` reset, and `waitForBridge` times out after 3 s so a lost `animationComplete` can't hang the log.
-- Battle-log text polish: move names display formatted (`fury-attack` → `FURY ATTACK`) via `utils/format.ts#formatMoveName`, applied to the log (`MoveUsed`/`MoveMissed`/`BindingStarted`) and the move-menu grid; Gen 1 per-move two-turn charge lines (`chargingMsg`: Dig "dug a hole!", Fly "flew up high!", Solar Beam "took in sunlight!", etc.) replace the generic "is charging up X!"; immunity now reads "It doesn't affect X..." with no damage number/crit and no hit sound (was "took 0 damage! It had no effect.")
-- Metronome (`MoveEffect.Metronome`): picks a random eligible Gen 1 move and executes it in full; move pool threaded from `GameController` → `GameSessionManager` → `Battle` → `AttackAction`; DB updated via re-run of importer
+### Learnset import (DB-architecture detail, part of Learnset System)
+- [ ] Extend `PokeApiPokemon` DTO with `Moves` array *(✅ done in the initial-moveset work — see archive; kept
+  here as the schema-level note)*
+- [ ] In `PokemonImport`, parse `version_group_details`, filter to `"red-blue"` + `"level-up"`, persist
+  `PokemonLearnset` rows idempotently *(✅ done — see archive)*
+</content>

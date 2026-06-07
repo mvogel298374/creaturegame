@@ -57,11 +57,11 @@ Any mechanic that differs between Pokémon generations **must** be implemented b
 | `IBattleRules` | Battle mechanics that vary by generation — crit formula, damage variance, stat-stage multiplier table, accuracy scale, freeze/thaw rules, status damage rates, XP formula, **stat selection** (`GetOffensiveStat` / `GetDefensiveStat`) |
 | `IStatCalculator` | Stat calculation formulas — HP and other stat formula, DV randomisation, Stat Exp scaling. Gen 3+ will swap for a 0–31 IV / 252-cap EV implementation. |
 
-**Rules for contributors:**
-- Before implementing any mechanic: check whether it is the same in all generations.
-- If it differs: add a method or property to `IBattleRules` (or `ITypeChart` if it is purely a type relationship), implement it in `Gen1BattleRules`, and keep the caller generation-agnostic.
-- Never query a generation enum or a string like `"gen1"` inside battle logic.
-- `Gen1BattleRules.Instance` is the default everywhere; future generation support requires only a new implementation class.
+Before implementing any mechanic, check whether it is the same in all generations; if it differs, it goes
+on a seam (caller stays generation-agnostic, never branches on a generation enum). `Gen1BattleRules.Instance`
+is the default everywhere; a new generation is a new implementation class, not edits to battle logic. The
+implementation rules + the gen-agnostic checklist live in `GENERATION_SEAMS.md §5.0` (read before `/dev`
+work on a gen-variable rule).
 
 ## Move Design Constraints
 *   Moves with "Undefined" damage class should be reviewed and assigned a type if they are status moves.
