@@ -621,6 +621,11 @@ public class AttackAction : IBattleAction
                 break;
 
             case MoveEffect.LeechSeed:
+                // Deliberately NOT gated on TargetShieldedBySubstitute, unlike the foe's status / stat /
+                // confusion secondaries: in the English (localized) Gen 1 games Leech Seed lands THROUGH
+                // a Substitute. (It's blocked only in the Japanese games and Pokémon Stadium; Gen 2+
+                // blocks it everywhere.) This engine targets English RBY, so the seed takes hold here —
+                // do not "consistency-fix" this to match the other sub-shielded effects.
                 if (Target.IsAlive() && !_rules.CanBeLeechSeeded(Target))
                     _emitter?.Emit(new MoveHadNoEffect(Target.Name, attack.Name ?? "")); // Grass-types are immune
                 else if (!Target.HasLeechSeed && Target.IsAlive())
