@@ -68,66 +68,31 @@ public class AttackAction : IBattleAction
         bool usingStruggle = _selectedMove == null;
         Attack attackToUse = usingStruggle ? Source.Struggle : _selectedMove!.Base;
 
-        // Two-turn move: release turn is when IsTwoTurnCharging was set by the charge turn
-        bool isTwoTurn = !usingStruggle && attackToUse.Effect == MoveEffect.TwoTurn;
-        bool isReleaseTurn = isTwoTurn && Source.IsTwoTurnCharging;
+        // Lock-in mechanics (two-turn, rampage, rage, bide) own their own per-turn flow — charging,
+        // storing, unleashing, self-confusing — behind ILockInMechanic, rather than being branched
+        // inline here. A non-lock-in move (or Struggle) resolves with lockIn == null.
+        ILockInMechanic? lockIn = usingStruggle ? null : LockInMechanics.For(attackToUse.Effect);
+        bool isLockedInContinuation = lockIn?.IsLockedIn(Source) ?? false;
+        LockInContext? lockCtx = lockIn is null
+            ? null
+            : new LockInContext
+            {
+                Source = Source,
+                Target = Target,
+                Move = _selectedMove!,
+                MoveName = attackToUse.Name ?? "",
+                Rules = _rules,
+                Emitter = _emitter,
+                IsContinuation = isLockedInContinuation,
+            };
 
-        // Rampage (Thrash/Petal Dance): a continuation turn is one already locked in from before.
-        bool isRampage = !usingStruggle && attackToUse.Effect == MoveEffect.Rampage;
-        bool rampageContinuation = isRampage && Source.RampageTurnsRemaining > 0;
-
-        // Rage: once used, the user is locked into Rage indefinitely (auto-repeated by Battle). A
-        // continuation turn is any after the first, identified by the lock already being set.
-        bool isRage = !usingStruggle && attackToUse.Effect == MoveEffect.Rage;
-        bool rageContinuation = isRage && Source.IsRaging;
-
-        // Bide: commits the user for 2–3 turns (storing damage), then unleashes 2×. A continuation
-        // turn is one already committed from before (the lock auto-repeats via Battle).
-        bool isBide = !usingStruggle && attackToUse.Effect == MoveEffect.Bide;
-        bool bideContinuation = isBide && Source.BideTurnsRemaining > 0;
-
-        // A turn that continues an already-charged/committed lock-in: a two-turn release, or a rampage /
-        // rage / bide continuation. PP was spent on the first turn of the lock, so these don't re-spend.
-        bool isLockedInContinuation =
-            isReleaseTurn || rampageContinuation || rageContinuation || bideContinuation;
-
-        // PP decremented on the first turn only (don't double-spend a lock-in continuation).
+        // PP decremented on the first turn only — a lock-in continuation already paid on turn 1.
         if (!usingStruggle && !isLockedInContinuation)
             _selectedMove!.PowerPointsCurrent--;
 
-        // Charge phase: wind up and defer damage to the next turn
-        if (isTwoTurn && !isReleaseTurn)
-        {
-            Source.IsTwoTurnCharging = true;
-            Source.ChargingMove = _selectedMove;
-            _emitter?.Emit(new ChargingUp(Source.Name, attackToUse.Name ?? ""));
+        // Commit phase: a charge (two-turn) or store (bide) turn ends here, before the move is announced.
+        if (lockIn is not null && lockIn.OnCommit(lockCtx!).Flow == LockInFlow.Halt)
             return Task.CompletedTask;
-        }
-
-        // Clear two-turn state on the release turn
-        if (isReleaseTurn)
-        {
-            Source.IsTwoTurnCharging = false;
-            Source.ChargingMove = null;
-        }
-
-        // Bide: on first use commit for 2–3 turns and reset the absorbed total; every committed turn
-        // just stores (no attack) until the counter hits 0, when it falls through to unleash below.
-        if (isBide)
-        {
-            if (!bideContinuation)
-            {
-                Source.BideTurnsRemaining = _rules.RollBideTurns();
-                Source.BideDamageAccumulated = 0;
-                Source.BideMove = _selectedMove;
-            }
-            Source.BideTurnsRemaining--;
-            if (Source.BideTurnsRemaining > 0)
-            {
-                _emitter?.Emit(new BideStoring(Source.Name));
-                return Task.CompletedTask;
-            }
-        }
 
         _emitter?.Emit(new MoveUsed(Source.Name, attackToUse.Name ?? ""));
 
@@ -141,56 +106,18 @@ public class AttackAction : IBattleAction
         )
             Source.LastMoveUsed = attackToUse;
 
-        // Bide release: the committed turns are done — unleash double the damage absorbed. The damage
-        // is typeless and never misses, and — unlike the other damaging categories, which now record
-        // their type for the foe's Counter — it passes no type to the helper, so it is deliberately not
-        // counterable (a documented engine simplification; real Gen 1 Counter can answer Bide). Fails
-        // if nothing was stored. BideMove clears so Battle stops auto-repeating.
-        if (isBide)
+        // Release phase: the mechanic may unleash its own damage and end the turn (bide), or set up its
+        // lock (rampage/rage) and let the normal attack pipeline run.
+        if (lockIn is not null)
         {
-            int unleashed = Source.BideDamageAccumulated * _rules.BideDamageMultiplier;
-            Source.BideMove = null;
-            if (unleashed > 0 && Target.IsAlive())
+            var release = lockIn.OnRelease(lockCtx!);
+            if (release.Flow == LockInFlow.Halt)
             {
-                // Routes through the shared helper so a foe Substitute soaks the unleash too.
-                DealDamageToTarget(unleashed, 1.0, false);
-            }
-            else
-            {
-                _emitter?.Emit(new MoveMissed(Source.Name, attackToUse.Name ?? ""));
-            }
-            return Task.CompletedTask;
-        }
-
-        // Rampage: on the first turn roll the lock duration and remember the move; every turn counts
-        // down (even a miss), and when it expires the user confuses itself. EndRampageIfDone() runs
-        // after the attack resolves — including the miss early-return below — so the lock can't hang.
-        if (isRampage && !rampageContinuation)
-        {
-            Source.RampageTurnsRemaining = _rules.RollRampageTurns();
-            Source.RampageMove = _selectedMove;
-        }
-        if (isRampage)
-            Source.RampageTurnsRemaining--;
-
-        // Rage: lock the user in on first use (even a miss locks). Battle force-selects RageMove
-        // every turn thereafter; the lock clears only on the per-battle reset. The Attack-on-hit
-        // raise happens in the standard damage path below, when this creature is the one hit.
-        if (isRage && !rageContinuation)
-        {
-            Source.IsRaging = true;
-            Source.RageMove = _selectedMove;
-        }
-
-        void EndRampageIfDone()
-        {
-            if (!isRampage || Source.RampageTurnsRemaining > 0)
-                return;
-            Source.RampageMove = null;
-            if (Source.IsAlive() && Source.ConfusedTurns == 0)
-            {
-                Source.ConfusedTurns = _rules.RollConfusionTurns();
-                _emitter?.Emit(new ConfusionStarted(Source.Name));
+                // Bide's unleash is typeless and routes through the shared helper so a foe Substitute
+                // soaks it too; UnleashDamage is 0 when the mechanic already emitted its own outcome.
+                if (release.UnleashDamage > 0)
+                    DealDamageToTarget(release.UnleashDamage, 1.0, false);
+                return Task.CompletedTask;
             }
         }
 
@@ -261,7 +188,7 @@ public class AttackAction : IBattleAction
                     _emitter?.Emit(new CrashDamage(Source.Name, crash, Source.Attributes.HP));
                 }
 
-                EndRampageIfDone(); // a missed turn still counts toward the rampage lock
+                lockIn?.OnTurnEnd(lockCtx!); // a missed turn still counts toward the rampage lock
                 return Task.CompletedTask;
             }
         }
@@ -518,7 +445,7 @@ public class AttackAction : IBattleAction
         TryApplyStatEffect(attackToUse);
         TryApplyMoveEffect(attackToUse, damage);
 
-        EndRampageIfDone(); // confuse the user if this was the rampage's last turn
+        lockIn?.OnTurnEnd(lockCtx!); // confuse the user if this was the rampage's last turn
 
         return Task.CompletedTask;
     }

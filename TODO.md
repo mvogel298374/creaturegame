@@ -5,8 +5,8 @@
 > **See also:** `CLAUDE.md` (setup/commands) · `AI_CONTEXT.md` (profiles) · `DESIGN_GUIDES.md` (mechanics) · `DEV_STANDARDS.md` (conventions)
 
 **Current state (2026-06-07):** Move-coverage pass COMPLETE — all 165 Gen 1 moves have behaviour/coverage
-tests (incl. Transform + Conversion). Suite: 821 .NET + 37 Vitest. Next up: post-coverage sequencing item 4
-(`AttackAction` lock-in abstraction — the `ILockInMechanic` refactor, Tech Debt #6a).
+tests (incl. Transform + Conversion). Suite: 821 .NET + 37 Vitest. Next up: post-coverage sequencing item 5
+(the full integration-test pass — the lock-in refactor that preceded it is now done).
 
 ---
 
@@ -16,7 +16,7 @@ Set 2026-06-06, with the mutation batch since done. Remaining order:
 1. ~~Deferred type/identity-mutation batch (Transform + Conversion)~~ ✅ DONE
 2. ~~jump-kick / hi-jump-kick Ghost-immunity crash edge (Gen 1 also crashes on Fighting→Ghost 0×)~~ ✅ DONE
 3. ~~Counter answer for fixed / level-based damage (today only standard-path damage is counterable)~~ ✅ DONE
-4. `AttackAction` lock-in abstraction (the `ILockInMechanic` refactor — see Tech Debt #6a)
+4. ~~`AttackAction` lock-in abstraction (the `ILockInMechanic` refactor — see Tech Debt #6a)~~ ✅ DONE
 5. **The full integration-test pass** — moved here (after the lock-in refactor, before the facade
    migration) because end-to-end tests are more valuable once the refactors that change call shapes land
 6. `BattleState` facade migration (drop the delegating props — Tech Debt #2 optional cleanup)
@@ -272,11 +272,13 @@ moving target.
   `creature.Battle.X` and drop the delegating facade, so new per-battle fields can *only* be added to
   `BattleState`. Deferred — not worth the ~120-site churn yet.
 
-- [ ] **`AttackAction.ExecuteAsync` lock-in abstraction (Architecture Review #6a, deferred).** The four
-  lock-in mechanics (two-turn / rampage / rage / bide) spread logic across selection (`Battle.SelectMoveAsync`),
-  the PP/continuation flags, and per-mechanic charge/store blocks. A full `ILockInMechanic`-style abstraction is
-  a high-risk refactor of the most central method with no third use case driving it — **deferred** until the
-  next lock-in move lands (the trigger to abstract). YAGNI for now.
+- [x] **`AttackAction.ExecuteAsync` lock-in abstraction (Architecture Review #6a) — DONE 2026-06-07.** The
+  four lock-in mechanics (two-turn / rampage / rage / bide) now live behind `ILockInMechanic`
+  (`creaturegame/Combat/LockInMechanics.cs`): a registry Battle iterates for the forced move, and three
+  per-turn hooks (`OnCommit` charge/store, `OnRelease` unleash/counter-setup, `OnTurnEnd` rampage
+  self-confuse) that `AttackAction.ExecuteAsync` drives. Behaviour-preserving (821/821 unchanged;
+  seam-reviewer verified emission order, PP-once, RNG order, OnTurnEnd parity 1:1). Gen-variable numbers
+  still come from `IBattleRules` via the context; the mechanics encode only Gen-1 lock-in *structure*.
 
 
 - [ ] **Architecture / decision-log doc (`ARCHITECTURE.md`).** Capture the *why* behind the two-DB split,

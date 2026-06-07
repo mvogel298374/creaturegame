@@ -196,14 +196,11 @@ public class Battle
         IBattleInput input
     )
     {
-        if (attacker.IsTwoTurnCharging)
-            return attacker.ChargingMove;
-        if (attacker.RampageTurnsRemaining > 0)
-            return attacker.RampageMove;
-        if (attacker.BideTurnsRemaining > 0)
-            return attacker.BideMove;
-        if (attacker.IsRaging)
-            return attacker.RageMove;
+        foreach (var mechanic in LockInMechanics.All)
+        {
+            if (mechanic.ForcedMove(attacker) is { } forced)
+                return forced;
+        }
         if (!attacker.CanSelectAnyMove)
             return null;
 
