@@ -254,9 +254,13 @@ moving target.
 > Done items (Architecture Review #1/#2/#4/#5/#6, the #6a cleanups, struct→class, DI, RNG seam, etc.) are
 > in [`TODO_ARCHIVE.md`](TODO_ARCHIVE.md).
 
-- [ ] **Flaky `RestContractTests.RestUserIsForcedToSkipTurnsWhileAsleep`** — uses `AutoSelectInput` + unseeded
-  RNG; fails ~every other run, passes in isolation (same shape as the resolved flaky-OHKO debt). Rewrite to a
-  seeded/deterministic path (set the relevant rolls explicitly) rather than relying on `AutoSelectInput`.
+- [x] **Flaky full-`Battle` tests — DONE 2026-06-07.** Swept and deterministically fixed the three
+  intermittent flakes (all unseeded `Battle` RNG + un-pinned rolls): `RestContractTests` (random crit
+  one-shot the player before the forced-sleep turn → `NoVarianceNoCritHitRules` + seed),
+  `TransformRevertsWhenTheBattleEnds` (un-pinned Defense let the +1-priority enemy randomly OHKO before
+  Transform; plus a false premise — Normal move vs Ghost was 0× → switched enemy to Water + pinned Defense
+  + seed), and `BattleIntegrationTests.PicksSpecificMoveByIndex` (seeded + `AlwaysHitRules`). Verified by a
+  60× full-suite confidence sweep: **0 failures / ~49k test executions.**
 
 - [ ] **RNG seam — remaining (Architecture Review #3).** The core library has no direct `Random.Shared`
   (`IRandomSource` threaded through engine + setup). Still open: **`GameController` (web) uses `Random.Shared`**

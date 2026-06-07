@@ -96,8 +96,14 @@ public class RestContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             Gen1TypeChart.Instance,
             AutoSelectInput.Instance,
             AutoSelectInput.Instance,
-            rules: AlwaysHitRules.Instance,
-            emitter: emitter
+            // No-crit (and seeded) for determinism: the enemy's Tackle is Normal from a Normal-type
+            // enemy, so a random crit (1.5× STAB × 2× crit ≈ 162) could one-shot the freshly-healed
+            // 120-HP player on turn 1 — ending the battle before any forced-sleep turn and dropping the
+            // ActionBlocked assertion below. With no crit a single hit (~81) never kills from full, so
+            // the player reliably survives turn 1, is sleep-blocked on turn 2, and faints there.
+            rules: NoVarianceNoCritHitRules.Instance,
+            emitter: emitter,
+            rng: new SeededRandomSource(0)
         );
         await battle.StartFightAsync();
 

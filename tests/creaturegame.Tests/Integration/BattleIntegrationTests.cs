@@ -256,13 +256,17 @@ public class BattleIntegrationTests
 
         var emitter = new RecordingEmitter();
         var input = new TurnControlledInput(1); // pick Slam every turn
+        // Deterministic rules + seeded RNG: this test is about input/move selection, not accuracy, so
+        // remove the default Gen-1 1/256-miss and the unseeded SystemRandomSource fallback entirely.
         var battle = new Battle(
             player,
             enemy,
             new Gen1TypeChart(),
             input,
             AutoSelectInput.Instance,
-            emitter: emitter
+            rules: AlwaysHitRules.Instance,
+            emitter: emitter,
+            rng: new SeededRandomSource(0)
         );
         await battle.StartFightAsync();
 
