@@ -4,12 +4,13 @@
 > [`TODO_ARCHIVE.md`](TODO_ARCHIVE.md) — read it only if you need the history of a finished item.
 > **See also:** `CLAUDE.md` (setup/commands) · `AI_CONTEXT.md` (profiles) · `DESIGN_GUIDES.md` (mechanics) · `DEV_STANDARDS.md` (conventions)
 
-**Current state (2026-06-08):** Move-coverage pass COMPLETE — all 165 Gen 1 moves have behaviour/coverage
-tests (incl. Transform + Conversion). **Integration-test pass (item 5) in progress** — `BattleScenario`
-full-battle harness + interaction probes (Substitute, lock-in, status-stacking, crit, Counter, **Rage,
-Hyper Beam recharge, Bide**), the engine→web event-mapping contract test (`Integration/Web/`), and
-end-to-end battle-flow tests over real DB moves incl. the win→XP→`LeveledUp` chain (`Integration/Flow/`).
-Suite: 837 .NET + 37 Vitest.
+**Current state (2026-06-09):** Move-coverage pass COMPLETE — all 165 Gen 1 moves have behaviour/coverage
+tests (incl. Transform + Conversion). **Integration-test pass (item 5) COMPLETE** — `BattleScenario`
+full-battle harness + interaction probes (Substitute, lock-in, status-stacking, crit, Counter, Rage,
+Hyper Beam recharge, Bide, paralysis turn-order flip, Wrap trap-lock, poison+Leech-Seed end-of-turn
+stacking), the engine→web event-mapping contract test (`Integration/Web/`), and end-to-end battle-flow
+tests over real DB moves incl. the win→XP→`LeveledUp` chain (`Integration/Flow/`). No engine bugs
+surfaced. Suite: 840 .NET + 37 Vitest. Next up: item 6 (`BattleState` facade migration).
 
 ---
 
@@ -20,12 +21,13 @@ Set 2026-06-06, with the mutation batch since done. Remaining order:
 2. ~~jump-kick / hi-jump-kick Ghost-immunity crash edge (Gen 1 also crashes on Fighting→Ghost 0×)~~ ✅ DONE
 3. ~~Counter answer for fixed / level-based damage (today only standard-path damage is counterable)~~ ✅ DONE
 4. ~~`AttackAction` lock-in abstraction (the `ILockInMechanic` refactor — see Tech Debt #6a)~~ ✅ DONE
-5. **The full integration-test pass** — *in progress.* Landed: `BattleScenario` harness; interaction
-   probes for Substitute, lock-in/forced-selection, status-stacking, crit, Counter, Rage, Hyper Beam
-   recharge, and Bide; the engine→web `MapEvent` contract test; and end-to-end flow tests (well-formed
-   lifecycle event stream + win→XP→`LeveledUp` chain) over real DB moves. No engine bugs surfaced — the
-   probes pin Gen 1 quirks against regression. Remaining candidates: more cross-turn interactions as they
-   come up, and a seeded-battle entry point for deterministic §6/§7 E2E.
+5. ~~**The full integration-test pass**~~ ✅ DONE — `BattleScenario` harness; interaction probes for
+   Substitute, lock-in/forced-selection, status-stacking, crit, Counter, Rage, Hyper Beam recharge, Bide,
+   paralysis turn-order flip, Wrap trap-lock, and poison+Leech-Seed end-of-turn stacking; the engine→web
+   `MapEvent` contract test; and end-to-end flow tests (well-formed lifecycle event stream + win→XP→
+   `LeveledUp` chain) over real DB moves. No engine bugs surfaced — the probes pin Gen 1 quirks against
+   regression. (Frontend §6/§7 Playwright E2E and a `GameController` seed for deterministic specs remain,
+   tracked under "Browser-Based UI Testing" and item 7.)
 6. `BattleState` facade migration (drop the delegating props — Tech Debt #2 optional cleanup)
 7. `GameController` run-seed (Tech Debt #3 remaining)
 

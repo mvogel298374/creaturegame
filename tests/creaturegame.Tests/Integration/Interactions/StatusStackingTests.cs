@@ -7,7 +7,8 @@ namespace creaturegame.Tests.Integration.Interactions;
 
 /// <summary>
 /// Full-battle probes for how status conditions stack (or don't): Gen 1 allows only one *major* status
-/// at a time, but confusion is a separate volatile track that coexists with one.
+/// at a time, but confusion is a separate volatile track that coexists with one — and independent
+/// end-of-turn drains (major-status damage + Leech Seed) both bite the same creature each turn.
 /// </summary>
 [Collection(MovesCollection.Name)]
 public class StatusStackingTests(MovesFixture moves) : InteractionTest(moves)
@@ -77,5 +78,40 @@ public class StatusStackingTests(MovesFixture moves) : InteractionTest(moves)
             s => s.TargetName == "Player" && s.Status == StatusCondition.Paralysis
         );
         Assert.Contains(result.All<ConfusionStarted>(), c => c.TargetName == "Player");
+    }
+
+    // Gen 1: a major status and Leech Seed are independent end-of-turn drains — a poisoned, seeded
+    // creature is bitten by BOTH every turn (poison tick + seed drain), and the seeder is healed by the
+    // drain. The two damage sources coexist rather than one overriding the other.
+    [Fact]
+    public async Task PoisonAndLeechSeedBothDrainTheTargetEachTurn()
+    {
+        var player = Mon(
+            "Player",
+            hp: 999,
+            attack: 5,
+            speed: 200,
+            DamageType.Normal,
+            "leech-seed",
+            "poison-powder",
+            "splash"
+        );
+        var enemy = Mon("Enemy", hp: 400, attack: 5, speed: 1, DamageType.Normal, "splash");
+
+        var result = await new BattleScenario()
+            .Player(player)
+            .Enemy(enemy)
+            .PlayerUses("leech-seed", "poison-powder", "splash")
+            .EnemyUses("splash")
+            .RunAsync();
+
+        // Both independent drains land on the enemy…
+        Assert.Contains(
+            result.All<StatusDamage>(),
+            d => d.TargetName == "Enemy" && d.Source == StatusCondition.Poison
+        );
+        Assert.Contains(result.All<LeechSeedDamage>(), d => d.DrainedName == "Enemy");
+        // …and the seed feeds the player (proving the seed half ran, not just the poison).
+        Assert.Contains(result.All<LeechSeedHealed>(), h => h.HealedName == "Player");
     }
 }
