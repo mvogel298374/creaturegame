@@ -30,12 +30,12 @@ public class ScreenContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         int normal = await DamageTaken("tackle", _ => { }, NoVarianceNoCritHitRules.Instance);
         int reflected = await DamageTaken(
             "tackle",
-            d => d.HasReflect = true,
+            d => d.Battle.HasReflect = true,
             NoVarianceNoCritHitRules.Instance
         );
         int lightScreen = await DamageTaken(
             "tackle",
-            d => d.HasLightScreen = true,
+            d => d.Battle.HasLightScreen = true,
             NoVarianceNoCritHitRules.Instance
         );
 
@@ -49,12 +49,12 @@ public class ScreenContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         int normal = await DamageTaken("water-gun", _ => { }, NoVarianceNoCritHitRules.Instance);
         int lightScreen = await DamageTaken(
             "water-gun",
-            d => d.HasLightScreen = true,
+            d => d.Battle.HasLightScreen = true,
             NoVarianceNoCritHitRules.Instance
         );
         int reflected = await DamageTaken(
             "water-gun",
-            d => d.HasReflect = true,
+            d => d.Battle.HasReflect = true,
             NoVarianceNoCritHitRules.Instance
         );
 
@@ -69,7 +69,7 @@ public class ScreenContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         int critNoScreen = await DamageTaken("tackle", _ => { }, AlwaysCritRules.Instance);
         int critReflect = await DamageTaken(
             "tackle",
-            d => d.HasReflect = true,
+            d => d.Battle.HasReflect = true,
             AlwaysCritRules.Instance
         );
 
@@ -83,7 +83,7 @@ public class ScreenContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             .Attacker(TestCreatures.Make("A"))
             .Use(Move("reflect"));
 
-        Assert.True(result.Attacker.HasReflect);
+        Assert.True(result.Attacker.Battle.HasReflect);
         Assert.False(result.Has<DamageDealt>(), "Reflect is a status move — no damage");
         Assert.Contains(result.Events, e => e is ScreenApplied s && s.ScreenName == "Reflect");
     }
@@ -95,7 +95,7 @@ public class ScreenContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             .Attacker(TestCreatures.Make("A"))
             .Use(Move("light-screen"));
 
-        Assert.True(result.Attacker.HasLightScreen);
+        Assert.True(result.Attacker.Battle.HasLightScreen);
         Assert.Contains(result.Events, e => e is ScreenApplied s && s.ScreenName == "Light Screen");
     }
 }

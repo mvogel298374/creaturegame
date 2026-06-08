@@ -87,6 +87,6 @@ public class MimicContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 
         // ...and the swap reverted — the permanent move slot is Mimic again, not Tackle.
         Assert.Equal("mimic", player.MoveSet[0].Base.Name);
-        Assert.Null(player.MimicWrapper);
+        Assert.Null(player.Battle.MimicWrapper);
     }
 }

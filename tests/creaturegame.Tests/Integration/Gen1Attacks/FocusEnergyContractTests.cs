@@ -18,7 +18,7 @@ public class FocusEnergyContractTests(MovesFixture moves) : Gen1MoveContract(mov
             .Attacker(TestCreatures.Make("A"))
             .Use(Move("focus-energy"));
 
-        Assert.True(result.Attacker.HasFocusEnergy);
+        Assert.True(result.Attacker.Battle.HasFocusEnergy);
         Assert.False(result.Has<DamageDealt>(), "Focus Energy is a status move — no damage");
         Assert.Contains(result.Events, e => e is FocusEnergyApplied);
     }
@@ -30,7 +30,7 @@ public class FocusEnergyContractTests(MovesFixture moves) : Gen1MoveContract(mov
         var move = Move("tackle"); // not a high-crit move
 
         double normal = Gen1BattleRules.Instance.GetCritChance(attacker, move);
-        attacker.HasFocusEnergy = true;
+        attacker.Battle.HasFocusEnergy = true;
         double focused = Gen1BattleRules.Instance.GetCritChance(attacker, move);
 
         Assert.True(focused < normal, "the Gen 1 bug lowers crit rate instead of raising it");

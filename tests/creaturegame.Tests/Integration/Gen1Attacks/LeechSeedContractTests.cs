@@ -21,7 +21,7 @@ public class LeechSeedContractTests(MovesFixture moves) : Gen1MoveContract(moves
             .Defender(TestCreatures.Make("D", type1: DamageType.Water, hp: 500))
             .Use(Move("leech-seed"));
 
-        Assert.True(result.Defender.HasLeechSeed);
+        Assert.True(result.Defender.Battle.HasLeechSeed);
         Assert.Contains(result.Events, e => e is LeechSeedApplied);
         Assert.False(result.Has<DamageDealt>(), "Leech Seed is a status move — no direct damage");
     }
@@ -35,7 +35,7 @@ public class LeechSeedContractTests(MovesFixture moves) : Gen1MoveContract(moves
             .Use(Move("leech-seed"));
 
         Assert.True(result.Has<MoveMissed>());
-        Assert.False(result.Defender.HasLeechSeed);
+        Assert.False(result.Defender.Battle.HasLeechSeed);
     }
 
     [Fact]

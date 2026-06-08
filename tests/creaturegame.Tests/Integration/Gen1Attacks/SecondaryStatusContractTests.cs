@@ -35,7 +35,7 @@ public class SecondaryStatusContractTests(MovesFixture moves) : Gen1MoveContract
             .Defender(TestCreatures.Make("Defender", hp: 500))
             .Use(Move(moveName));
 
-        Assert.Equal(expected, result.Defender.Status);
+        Assert.Equal(expected, result.Defender.Battle.Status);
         Assert.Contains(result.Events, e => e is StatusApplied);
     }
 
@@ -59,7 +59,7 @@ public class SecondaryStatusContractTests(MovesFixture moves) : Gen1MoveContract
     {
         var result = await new MoveScenario().Rules(NeverHitRules.Instance).Use(Move(moveName));
 
-        Assert.Equal(StatusCondition.None, result.Defender.Status);
+        Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
     }
 
     [Theory]
@@ -81,14 +81,14 @@ public class SecondaryStatusContractTests(MovesFixture moves) : Gen1MoveContract
     public async Task NoSecondaryStatusWhenTargetAlreadyStatused(string moveName)
     {
         var defender = TestCreatures.Make("Defender", hp: 500);
-        defender.Status = StatusCondition.Poison;
+        defender.Battle.Status = StatusCondition.Poison;
 
         var result = await new MoveScenario()
             .Rules(ForceSecondaryRules.Instance)
             .Defender(defender)
             .Use(Move(moveName));
 
-        Assert.Equal(StatusCondition.Poison, result.Defender.Status); // not overwritten
+        Assert.Equal(StatusCondition.Poison, result.Defender.Battle.Status); // not overwritten
     }
 
     // Body Slam is special-cased: in Gen 1 it can't paralyze Normal-types (see ImmunityContractTests),
@@ -101,7 +101,7 @@ public class SecondaryStatusContractTests(MovesFixture moves) : Gen1MoveContract
             .Defender(TestCreatures.Make("Defender", type1: DamageType.Water, hp: 500))
             .Use(Move("body-slam"));
 
-        Assert.Equal(StatusCondition.Paralysis, result.Defender.Status);
+        Assert.Equal(StatusCondition.Paralysis, result.Defender.Battle.Status);
         Assert.Contains(result.Events, e => e is StatusApplied);
     }
 
@@ -118,7 +118,7 @@ public class SecondaryStatusContractTests(MovesFixture moves) : Gen1MoveContract
 
         Assert.True(result.Has<DamageDealt>());
         Assert.True(result.TotalDamage > 0);
-        Assert.Equal(StatusCondition.Paralysis, result.Defender.Status);
+        Assert.Equal(StatusCondition.Paralysis, result.Defender.Battle.Status);
         Assert.Equal(move.PowerPointsMax - 1, result.Move.PowerPointsCurrent);
     }
 }

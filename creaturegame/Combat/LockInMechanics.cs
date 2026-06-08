@@ -91,22 +91,23 @@ public sealed class TwoTurnMechanic : ILockInMechanic
 {
     public MoveEffect Effect => MoveEffect.TwoTurn;
 
-    public PokemonAttack? ForcedMove(Creature c) => c.IsTwoTurnCharging ? c.ChargingMove : null;
+    public PokemonAttack? ForcedMove(Creature c) =>
+        c.Battle.IsTwoTurnCharging ? c.Battle.ChargingMove : null;
 
     public LockInResult OnCommit(LockInContext ctx)
     {
         if (!ctx.IsContinuation)
         {
             // Charge turn: wind up and defer the strike to next turn.
-            ctx.Source.IsTwoTurnCharging = true;
-            ctx.Source.ChargingMove = ctx.Move;
+            ctx.Source.Battle.IsTwoTurnCharging = true;
+            ctx.Source.Battle.ChargingMove = ctx.Move;
             ctx.Emitter?.Emit(new ChargingUp(ctx.Source.Name, ctx.MoveName));
             return LockInResult.Halt;
         }
 
         // Release turn: clear the charge and let the attack run.
-        ctx.Source.IsTwoTurnCharging = false;
-        ctx.Source.ChargingMove = null;
+        ctx.Source.Battle.IsTwoTurnCharging = false;
+        ctx.Source.Battle.ChargingMove = null;
         return LockInResult.Proceed;
     }
 }
@@ -117,27 +118,27 @@ public sealed class RampageMechanic : ILockInMechanic
     public MoveEffect Effect => MoveEffect.Rampage;
 
     public PokemonAttack? ForcedMove(Creature c) =>
-        c.RampageTurnsRemaining > 0 ? c.RampageMove : null;
+        c.Battle.RampageTurnsRemaining > 0 ? c.Battle.RampageMove : null;
 
     public LockInResult OnRelease(LockInContext ctx)
     {
         if (!ctx.IsContinuation)
         {
-            ctx.Source.RampageTurnsRemaining = ctx.Rules.RollRampageTurns();
-            ctx.Source.RampageMove = ctx.Move;
+            ctx.Source.Battle.RampageTurnsRemaining = ctx.Rules.RollRampageTurns();
+            ctx.Source.Battle.RampageMove = ctx.Move;
         }
-        ctx.Source.RampageTurnsRemaining--; // a missed turn still counts toward the lock
+        ctx.Source.Battle.RampageTurnsRemaining--; // a missed turn still counts toward the lock
         return LockInResult.Proceed;
     }
 
     public void OnTurnEnd(LockInContext ctx)
     {
-        if (ctx.Source.RampageTurnsRemaining > 0)
+        if (ctx.Source.Battle.RampageTurnsRemaining > 0)
             return;
-        ctx.Source.RampageMove = null;
-        if (ctx.Source.IsAlive() && ctx.Source.ConfusedTurns == 0)
+        ctx.Source.Battle.RampageMove = null;
+        if (ctx.Source.IsAlive() && ctx.Source.Battle.ConfusedTurns == 0)
         {
-            ctx.Source.ConfusedTurns = ctx.Rules.RollConfusionTurns();
+            ctx.Source.Battle.ConfusedTurns = ctx.Rules.RollConfusionTurns();
             ctx.Emitter?.Emit(new ConfusionStarted(ctx.Source.Name));
         }
     }
@@ -148,14 +149,14 @@ public sealed class RageMechanic : ILockInMechanic
 {
     public MoveEffect Effect => MoveEffect.Rage;
 
-    public PokemonAttack? ForcedMove(Creature c) => c.IsRaging ? c.RageMove : null;
+    public PokemonAttack? ForcedMove(Creature c) => c.Battle.IsRaging ? c.Battle.RageMove : null;
 
     public LockInResult OnRelease(LockInContext ctx)
     {
         if (!ctx.IsContinuation)
         {
-            ctx.Source.IsRaging = true;
-            ctx.Source.RageMove = ctx.Move;
+            ctx.Source.Battle.IsRaging = true;
+            ctx.Source.Battle.RageMove = ctx.Move;
         }
         return LockInResult.Proceed;
     }
@@ -166,18 +167,19 @@ public sealed class BideMechanic : ILockInMechanic
 {
     public MoveEffect Effect => MoveEffect.Bide;
 
-    public PokemonAttack? ForcedMove(Creature c) => c.BideTurnsRemaining > 0 ? c.BideMove : null;
+    public PokemonAttack? ForcedMove(Creature c) =>
+        c.Battle.BideTurnsRemaining > 0 ? c.Battle.BideMove : null;
 
     public LockInResult OnCommit(LockInContext ctx)
     {
         if (!ctx.IsContinuation)
         {
-            ctx.Source.BideTurnsRemaining = ctx.Rules.RollBideTurns();
-            ctx.Source.BideDamageAccumulated = 0;
-            ctx.Source.BideMove = ctx.Move;
+            ctx.Source.Battle.BideTurnsRemaining = ctx.Rules.RollBideTurns();
+            ctx.Source.Battle.BideDamageAccumulated = 0;
+            ctx.Source.Battle.BideMove = ctx.Move;
         }
-        ctx.Source.BideTurnsRemaining--;
-        if (ctx.Source.BideTurnsRemaining > 0)
+        ctx.Source.Battle.BideTurnsRemaining--;
+        if (ctx.Source.Battle.BideTurnsRemaining > 0)
         {
             ctx.Emitter?.Emit(new BideStoring(ctx.Source.Name));
             return LockInResult.Halt;
@@ -190,8 +192,8 @@ public sealed class BideMechanic : ILockInMechanic
         // Unleash double the absorbed damage. Typeless and never recorded as counterable (it passes no
         // type to the damage helper); fails if nothing was stored. BideMove clears so Battle stops
         // auto-repeating.
-        int unleashed = ctx.Source.BideDamageAccumulated * ctx.Rules.BideDamageMultiplier;
-        ctx.Source.BideMove = null;
+        int unleashed = ctx.Source.Battle.BideDamageAccumulated * ctx.Rules.BideDamageMultiplier;
+        ctx.Source.Battle.BideMove = null;
         if (unleashed > 0 && ctx.Target.IsAlive())
             return LockInResult.Unleash(unleashed);
 

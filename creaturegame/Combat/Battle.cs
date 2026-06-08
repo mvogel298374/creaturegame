@@ -63,18 +63,18 @@ public class Battle
                     PlayerCreature.Name,
                     PlayerCreature.Attributes.HP,
                     PlayerCreature.Attributes.MaxHP,
-                    PlayerCreature.Status,
+                    PlayerCreature.Battle.Status,
                     EnemyCreature.Name,
                     EnemyCreature.Attributes.HP,
                     EnemyCreature.Attributes.MaxHP,
-                    EnemyCreature.Status,
+                    EnemyCreature.Battle.Status,
                     PlayerCreature
                         .MoveSet.Select(m => new MoveInfo(
                             m.Base.Name ?? "",
                             m.Base.DamageType,
                             m.PowerPointsCurrent,
                             m.Base.PowerPointsMax,
-                            m == PlayerCreature.DisabledMove
+                            m == PlayerCreature.Battle.DisabledMove
                         ))
                         .ToList()
                 )
@@ -212,14 +212,14 @@ public class Battle
                 TypeChart = _typeChart,
                 Rules = _rules,
                 TurnNumber = _turnNumber,
-                DisabledMove = attacker.DisabledMove,
+                DisabledMove = attacker.Battle.DisabledMove,
             }
         );
     }
 
     private void ApplyLeechSeedDrain(Creature drained, Creature healed)
     {
-        if (!drained.HasLeechSeed || !drained.IsAlive())
+        if (!drained.Battle.HasLeechSeed || !drained.IsAlive())
             return;
 
         int damage = Math.Max(1, drained.Attributes.MaxHP / _rules.PoisonDamageDenominator);

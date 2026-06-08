@@ -28,6 +28,6 @@ public class BindingContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         var binding = result.First<BindingStarted>();
         Assert.NotNull(binding);
         Assert.Equal(result.Defender.Name, binding!.TargetName);
-        Assert.InRange(result.Defender.BindingTurnsRemaining, 2, 5);
+        Assert.InRange(result.Defender.Battle.BindingTurnsRemaining, 2, 5);
     }
 }

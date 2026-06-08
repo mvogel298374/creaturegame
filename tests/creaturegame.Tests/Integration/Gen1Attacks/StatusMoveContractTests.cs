@@ -21,8 +21,8 @@ public class StatusMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
             .Use(Move("sing"));
 
         Assert.False(result.Has<DamageDealt>(), "Sing is a status move — no damage");
-        Assert.Equal(StatusCondition.Sleep, result.Defender.Status);
-        Assert.True(result.Defender.SleepTurns > 0);
+        Assert.Equal(StatusCondition.Sleep, result.Defender.Battle.Status);
+        Assert.True(result.Defender.Battle.SleepTurns > 0);
         Assert.Contains(
             result.Events,
             e => e is StatusApplied s && s.Status == StatusCondition.Sleep
@@ -38,7 +38,7 @@ public class StatusMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
             .Use(Move("sing"));
 
         Assert.True(result.Has<MoveMissed>());
-        Assert.Equal(StatusCondition.None, result.Defender.Status);
+        Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
     }
 
     // The powders: Poison Powder (Poison), Stun Spore (Paralysis), Sleep Powder (Sleep) — pure
@@ -57,7 +57,7 @@ public class StatusMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
             .Use(Move(moveName));
 
         Assert.False(result.Has<DamageDealt>(), "a powder is a status move — no damage");
-        Assert.Equal(expected, result.Defender.Status);
+        Assert.Equal(expected, result.Defender.Battle.Status);
         Assert.Contains(result.Events, e => e is StatusApplied);
     }
 
@@ -73,7 +73,7 @@ public class StatusMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
             .Use(Move(moveName));
 
         Assert.True(result.Has<MoveMissed>());
-        Assert.Equal(StatusCondition.None, result.Defender.Status);
+        Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
     }
 
     [Fact]
@@ -84,7 +84,7 @@ public class StatusMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
             .Use(Move("thunder-wave"));
 
         Assert.False(result.Has<DamageDealt>(), "Thunder Wave is a status move — no damage");
-        Assert.Equal(StatusCondition.Paralysis, result.Defender.Status);
+        Assert.Equal(StatusCondition.Paralysis, result.Defender.Battle.Status);
         Assert.Contains(result.Events, e => e is StatusApplied);
     }
 
@@ -96,8 +96,8 @@ public class StatusMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
             .Use(Move("hypnosis"));
 
         Assert.False(result.Has<DamageDealt>(), "Hypnosis is a status move — no damage");
-        Assert.Equal(StatusCondition.Sleep, result.Defender.Status);
-        Assert.True(result.Defender.SleepTurns > 0);
+        Assert.Equal(StatusCondition.Sleep, result.Defender.Battle.Status);
+        Assert.True(result.Defender.Battle.SleepTurns > 0);
         Assert.Contains(
             result.Events,
             e => e is StatusApplied s && s.Status == StatusCondition.Sleep
@@ -115,7 +115,7 @@ public class StatusMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
             .Use(Move("toxic"));
 
         Assert.False(result.Has<DamageDealt>(), "Toxic is a status move — no damage");
-        Assert.Equal(StatusCondition.BadPoison, result.Defender.Status);
+        Assert.Equal(StatusCondition.BadPoison, result.Defender.Battle.Status);
         Assert.Contains(
             result.Events,
             e => e is StatusApplied s && s.Status == StatusCondition.BadPoison
@@ -131,7 +131,7 @@ public class StatusMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
             .Use(Move("toxic"));
 
         Assert.True(result.Has<MoveMissed>());
-        Assert.Equal(StatusCondition.None, result.Defender.Status);
+        Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
     }
 
     // Glare (Normal → Paralysis) and Poison Gas (Poison → Poison): pure status moves that afflict a
@@ -146,7 +146,7 @@ public class StatusMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
             .Use(Move(moveName));
 
         Assert.False(result.Has<DamageDealt>(), $"{moveName} is a status move — no damage");
-        Assert.Equal(expected, result.Defender.Status);
+        Assert.Equal(expected, result.Defender.Battle.Status);
         Assert.Contains(result.Events, e => e is StatusApplied);
     }
 
@@ -161,7 +161,7 @@ public class StatusMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
             .Use(Move(moveName));
 
         Assert.True(result.Has<MoveMissed>());
-        Assert.Equal(StatusCondition.None, result.Defender.Status);
+        Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
     }
 
     // Lovely Kiss (Normal) and Spore (Grass): pure Sleep-inducing status moves, like Sing/Hypnosis.
@@ -176,8 +176,8 @@ public class StatusMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
             .Use(Move(moveName));
 
         Assert.False(result.Has<DamageDealt>(), $"{moveName} is a status move — no damage");
-        Assert.Equal(StatusCondition.Sleep, result.Defender.Status);
-        Assert.True(result.Defender.SleepTurns > 0);
+        Assert.Equal(StatusCondition.Sleep, result.Defender.Battle.Status);
+        Assert.True(result.Defender.Battle.SleepTurns > 0);
         Assert.Contains(
             result.Events,
             e => e is StatusApplied s && s.Status == StatusCondition.Sleep
@@ -195,7 +195,7 @@ public class StatusMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
             .Use(Move(moveName));
 
         Assert.True(result.Has<MoveMissed>());
-        Assert.Equal(StatusCondition.None, result.Defender.Status);
+        Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
     }
 
     // Pure confusion moves (no damage): Supersonic (Normal) and Confuse Ray (Ghost).
@@ -209,7 +209,7 @@ public class StatusMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
             .Use(Move(moveName));
 
         Assert.False(result.Has<DamageDealt>(), $"{moveName} is a status move — no damage");
-        Assert.True(result.Defender.ConfusedTurns > 0);
+        Assert.True(result.Defender.Battle.ConfusedTurns > 0);
         Assert.Contains(result.Events, e => e is ConfusionStarted);
     }
 
@@ -224,6 +224,6 @@ public class StatusMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
             .Use(Move(moveName));
 
         Assert.True(result.Has<MoveMissed>());
-        Assert.Equal(0, result.Defender.ConfusedTurns);
+        Assert.Equal(0, result.Defender.Battle.ConfusedTurns);
     }
 }

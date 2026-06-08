@@ -67,7 +67,7 @@ public class SecondaryEffectContractTests(MovesFixture moves) : Gen1MoveContract
             .Use(Move(moveName));
 
         Assert.True(result.Has<DamageDealt>(), $"{moveName} deals damage");
-        Assert.True(result.Defender.ConfusedTurns > 0);
+        Assert.True(result.Defender.Battle.ConfusedTurns > 0);
         Assert.Contains(result.Events, e => e is ConfusionStarted);
     }
 
@@ -82,6 +82,6 @@ public class SecondaryEffectContractTests(MovesFixture moves) : Gen1MoveContract
             .Use(Move(moveName));
 
         Assert.True(result.Has<MoveMissed>());
-        Assert.Equal(0, result.Defender.ConfusedTurns);
+        Assert.Equal(0, result.Defender.Battle.ConfusedTurns);
     }
 }

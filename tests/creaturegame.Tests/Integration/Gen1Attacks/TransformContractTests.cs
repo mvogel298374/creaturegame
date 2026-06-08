@@ -47,7 +47,7 @@ public class TransformContractTests(MovesFixture moves) : Gen1MoveContract(moves
         Assert.NotNull(result.First<TransformedInto>());
         // Transform is self-affecting: it must never apply a status to the foe (guards the pre-handler
         // TryApplyStatus path — the StatusEffect==None data pin's behavioural twin).
-        Assert.Equal(StatusCondition.None, result.Defender.Status);
+        Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
 
         // Types and the four non-HP stats are now the target's.
         Assert.Equal(DamageType.Water, attacker.Type1);
@@ -87,21 +87,21 @@ public class TransformContractTests(MovesFixture moves) : Gen1MoveContract(moves
     {
         var attacker = TestCreatures.Make("A");
         var target = TestCreatures.Make("B");
-        target.Stages.RaiseAttack(2);
-        target.Stages.RaiseSpeed(-1);
+        target.Battle.Stages.RaiseAttack(2);
+        target.Battle.Stages.RaiseSpeed(-1);
 
         var result = await new MoveScenario()
             .Attacker(attacker)
             .Defender(target)
             .Use(Move("transform"));
 
-        Assert.Equal(2, result.Attacker.Stages.Attack);
-        Assert.Equal(-1, result.Attacker.Stages.Speed);
+        Assert.Equal(2, result.Attacker.Battle.Stages.Attack);
+        Assert.Equal(-1, result.Attacker.Battle.Stages.Speed);
 
         // The copy is independent — raising the user's stage doesn't bleed back into the target.
-        result.Attacker.Stages.RaiseAttack(1);
-        Assert.Equal(3, result.Attacker.Stages.Attack);
-        Assert.Equal(2, target.Stages.Attack);
+        result.Attacker.Battle.Stages.RaiseAttack(1);
+        Assert.Equal(3, result.Attacker.Battle.Stages.Attack);
+        Assert.Equal(2, target.Battle.Stages.Attack);
     }
 
     [Fact]

@@ -23,7 +23,7 @@ public class BideContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 
         Assert.True(result.Has<BideStoring>());
         Assert.False(result.Has<DamageDealt>(), "Bide deals no damage while storing");
-        Assert.True(result.Attacker.BideTurnsRemaining > 0, "the user is committed to Bide");
+        Assert.True(result.Attacker.Battle.BideTurnsRemaining > 0, "the user is committed to Bide");
     }
 
     [Fact]
@@ -103,8 +103,8 @@ public class BideContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         await battle.StartFightAsync();
 
         Assert.Contains(emitter.Events, e => e is DamageDealt d && d.TargetName == "Enemy");
-        Assert.Null(enemy.LastDamageType); // the unleash left no counterable record
-        Assert.Equal(0, enemy.LastDamageTaken);
+        Assert.Null(enemy.Battle.LastDamageType); // the unleash left no counterable record
+        Assert.Equal(0, enemy.Battle.LastDamageTaken);
     }
 
     [Fact]

@@ -21,8 +21,8 @@ public class CounterContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     public async Task CounterReturnsDoubleTheLastNormalOrFightingDamage(DamageType lastType)
     {
         var attacker = TestCreatures.Make("A");
-        attacker.LastDamageTaken = 50;
-        attacker.LastDamageType = lastType;
+        attacker.Battle.LastDamageTaken = 50;
+        attacker.Battle.LastDamageType = lastType;
 
         var result = await new MoveScenario()
             .Attacker(attacker)
@@ -39,8 +39,8 @@ public class CounterContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     public async Task CounterFailsAgainstNonPhysicalTypeDamage()
     {
         var attacker = TestCreatures.Make("A");
-        attacker.LastDamageTaken = 50;
-        attacker.LastDamageType = DamageType.Water; // Gen 1 Counter only answers Normal/Fighting
+        attacker.Battle.LastDamageTaken = 50;
+        attacker.Battle.LastDamageType = DamageType.Water; // Gen 1 Counter only answers Normal/Fighting
 
         var result = await new MoveScenario()
             .Attacker(attacker)
@@ -78,7 +78,7 @@ public class CounterContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         var enemy = TestCreatures.Make("Enemy", hp: 9999);
 
         await new MoveScenario().Attacker(enemy).Defender(player).Use(Move(foeMove));
-        int recorded = player.LastDamageTaken;
+        int recorded = player.Battle.LastDamageTaken;
         Assert.True(recorded > 0, "the foe's direct-damage move should record counterable damage");
 
         var result = await new MoveScenario().Attacker(player).Defender(enemy).Use(Move("counter"));
@@ -105,10 +105,10 @@ public class CounterContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 
         await new MoveScenario().Attacker(enemy).Defender(player).Use(Move(foeMove));
         Assert.True(
-            player.LastDamageTaken > 0,
+            player.Battle.LastDamageTaken > 0,
             "the move still records — the type gate does the work"
         );
-        Assert.True(player.LastDamageType is not (DamageType.Normal or DamageType.Fighting));
+        Assert.True(player.Battle.LastDamageType is not (DamageType.Normal or DamageType.Fighting));
 
         var result = await new MoveScenario().Attacker(player).Defender(enemy).Use(Move("counter"));
 

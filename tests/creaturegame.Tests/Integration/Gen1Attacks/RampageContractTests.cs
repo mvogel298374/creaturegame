@@ -28,9 +28,9 @@ public class RampageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 
         Assert.True(result.Has<DamageDealt>());
         // Lock was rolled at 2–3 and decremented for this turn ⇒ 1–2 turns still remain.
-        Assert.InRange(result.Attacker.RampageTurnsRemaining, 1, 2);
-        Assert.NotNull(result.Attacker.RampageMove);
-        Assert.Equal(0, result.Attacker.ConfusedTurns); // not confused until the lock ends
+        Assert.InRange(result.Attacker.Battle.RampageTurnsRemaining, 1, 2);
+        Assert.NotNull(result.Attacker.Battle.RampageMove);
+        Assert.Equal(0, result.Attacker.Battle.ConfusedTurns); // not confused until the lock ends
     }
 
     [Fact]

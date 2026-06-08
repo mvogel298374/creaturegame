@@ -19,7 +19,7 @@ public class DreamEaterContractTests(MovesFixture moves) : Gen1MoveContract(move
         var attacker = TestCreatures.Make("A", special: 200);
         attacker.Attributes.HP = 50; // damaged, so the drain heal is observable
         var defender = TestCreatures.Make("D", hp: 500, special: 60);
-        defender.Status = StatusCondition.Sleep;
+        defender.Battle.Status = StatusCondition.Sleep;
 
         var result = await new MoveScenario()
             .Attacker(attacker)

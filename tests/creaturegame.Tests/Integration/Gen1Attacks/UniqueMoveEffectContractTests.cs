@@ -46,7 +46,7 @@ public class UniqueMoveEffectContractTests(MovesFixture moves) : Gen1MoveContrac
         Assert.True(result.Has<MoveUsed>());
         Assert.False(result.Has<DamageDealt>());
         Assert.Equal(result.Defender.Attributes.MaxHP, result.Defender.Attributes.HP);
-        Assert.Equal(StatusCondition.None, result.Defender.Status);
+        Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
         Assert.Equal(move.PowerPointsMax - 1, result.Move.PowerPointsCurrent);
     }
 
@@ -63,17 +63,17 @@ public class UniqueMoveEffectContractTests(MovesFixture moves) : Gen1MoveContrac
     public async Task HazeClearsStatStagesOnBothBattlers()
     {
         var attacker = TestCreatures.Make("A");
-        attacker.Stages.RaiseAttack(2);
+        attacker.Battle.Stages.RaiseAttack(2);
         var defender = TestCreatures.Make("D", hp: 500);
-        defender.Stages.RaiseDefense(2);
+        defender.Battle.Stages.RaiseDefense(2);
 
         var result = await new MoveScenario()
             .Attacker(attacker)
             .Defender(defender)
             .Use(Move("haze"));
 
-        Assert.Equal(0, result.Attacker.Stages.Attack);
-        Assert.Equal(0, result.Defender.Stages.Defense);
+        Assert.Equal(0, result.Attacker.Battle.Stages.Attack);
+        Assert.Equal(0, result.Defender.Battle.Stages.Defense);
         Assert.True(result.Has<HazeClearedStages>());
     }
 
@@ -117,9 +117,9 @@ public class UniqueMoveEffectContractTests(MovesFixture moves) : Gen1MoveContrac
     public async Task SplashDoesNothingButAnnouncesIt()
     {
         var attacker = TestCreatures.Make("A");
-        attacker.Stages.RaiseAttack(2);
+        attacker.Battle.Stages.RaiseAttack(2);
         var defender = TestCreatures.Make("D", hp: 500);
-        defender.Stages.RaiseDefense(2);
+        defender.Battle.Stages.RaiseDefense(2);
 
         var result = await new MoveScenario()
             .Attacker(attacker)
@@ -131,8 +131,8 @@ public class UniqueMoveEffectContractTests(MovesFixture moves) : Gen1MoveContrac
         // Nothing about either battler changed.
         Assert.Equal(result.Attacker.Attributes.MaxHP, result.Attacker.Attributes.HP);
         Assert.Equal(result.Defender.Attributes.MaxHP, result.Defender.Attributes.HP);
-        Assert.Equal(StatusCondition.None, result.Defender.Status);
-        Assert.Equal(2, result.Attacker.Stages.Attack);
-        Assert.Equal(2, result.Defender.Stages.Defense);
+        Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
+        Assert.Equal(2, result.Attacker.Battle.Stages.Attack);
+        Assert.Equal(2, result.Defender.Battle.Stages.Defense);
     }
 }

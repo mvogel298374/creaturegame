@@ -40,13 +40,13 @@ public static class DamageCalculator
             // Apply stat stage multipliers (skipped for crits in Gen 1).
             double atkStageMult = rules.GetStatMultiplier(
                 move.AttackType == AttackType.Physical
-                    ? attacker.Stages.Attack
-                    : attacker.Stages.Special
+                    ? attacker.Battle.Stages.Attack
+                    : attacker.Battle.Stages.Special
             );
             double defStageMult = rules.GetStatMultiplier(
                 move.AttackType == AttackType.Physical
-                    ? defender.Stages.Defense
-                    : defender.Stages.Special
+                    ? defender.Battle.Stages.Defense
+                    : defender.Battle.Stages.Special
             );
 
             attackStat = (int)(attackStat * atkStageMult);
@@ -57,7 +57,10 @@ public static class DamageCalculator
             defenseStat *= screenDefenseMultiplier;
 
             // Burn halves physical Attack (skipped on crit path in Gen 1).
-            if (move.AttackType == AttackType.Physical && attacker.Status == StatusCondition.Burn)
+            if (
+                move.AttackType == AttackType.Physical
+                && attacker.Battle.Status == StatusCondition.Burn
+            )
                 attackStat /= 2;
         }
 

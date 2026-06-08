@@ -25,10 +25,10 @@ public class RestContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 
         Assert.False(result.Has<DamageDealt>(), "Rest is a status move — no damage");
         Assert.Equal(user.Attributes.MaxHP, user.Attributes.HP); // fully healed
-        Assert.Equal(StatusCondition.Sleep, result.Attacker.Status);
+        Assert.Equal(StatusCondition.Sleep, result.Attacker.Battle.Status);
         // The sleep is self-inflicted — Rest must NOT put the foe to sleep (TryApplyStatus runs first).
-        Assert.Equal(StatusCondition.None, result.Defender.Status);
-        Assert.Equal(Gen1BattleRules.Instance.RestSleepTurns, result.Attacker.SleepTurns);
+        Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
+        Assert.Equal(Gen1BattleRules.Instance.RestSleepTurns, result.Attacker.Battle.SleepTurns);
 
         var healed = result.First<Healed>();
         Assert.NotNull(healed);
@@ -48,7 +48,7 @@ public class RestContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 
         Assert.True(result.Has<MoveMissed>(), "Rest fails (state precondition) at full HP");
         Assert.False(result.Has<Healed>());
-        Assert.Equal(StatusCondition.None, result.Attacker.Status); // didn't put itself to sleep
+        Assert.Equal(StatusCondition.None, result.Attacker.Battle.Status); // didn't put itself to sleep
         Assert.Equal(user.Attributes.MaxHP, user.Attributes.HP);
     }
 
@@ -57,12 +57,12 @@ public class RestContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     {
         var user = TestCreatures.Make("A", hp: 200);
         user.Attributes.ReceiveDamage(80);
-        user.Status = StatusCondition.Poison; // pre-existing status Rest should clear
+        user.Battle.Status = StatusCondition.Poison; // pre-existing status Rest should clear
 
         var result = await new MoveScenario().Attacker(user).Use(Move("rest"));
 
         // Poison is overwritten by Rest's own Sleep — the Gen 1 "cures status" behaviour.
-        Assert.Equal(StatusCondition.Sleep, result.Attacker.Status);
+        Assert.Equal(StatusCondition.Sleep, result.Attacker.Battle.Status);
         Assert.Equal(user.Attributes.MaxHP, user.Attributes.HP);
     }
 
@@ -127,7 +127,7 @@ public class RestContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             e => e is MoveUsed m && m.AttackerName == "Player" && m.MoveName != "rest"
         );
         // Rest's sleep is self-inflicted — the enemy must never be put to sleep by it.
-        Assert.NotEqual(StatusCondition.Sleep, enemy.Status);
+        Assert.NotEqual(StatusCondition.Sleep, enemy.Battle.Status);
         Assert.DoesNotContain(
             emitter.Events,
             e =>

@@ -64,7 +64,7 @@ public class ConfusionAndInputTests
         );
         await action.ExecuteAsync();
 
-        Assert.True(target.ConfusedTurns > 0, "Supersonic should have confused the target");
+        Assert.True(target.Battle.ConfusedTurns > 0, "Supersonic should have confused the target");
         Assert.Contains(emitter.Events, e => e is ConfusionStarted cs && cs.TargetName == "Target");
     }
 
@@ -73,7 +73,7 @@ public class ConfusionAndInputTests
     {
         var attacker = MakeCreature("Attacker");
         var target = MakeCreature("Target");
-        target.ConfusedTurns = 3;
+        target.Battle.ConfusedTurns = 3;
         attacker.MoveSet.Clear();
         attacker.AddAttack(ConfuseMove());
 
@@ -89,7 +89,7 @@ public class ConfusionAndInputTests
         );
         await action.ExecuteAsync();
 
-        Assert.Equal(3, target.ConfusedTurns); // unchanged
+        Assert.Equal(3, target.Battle.ConfusedTurns); // unchanged
         Assert.DoesNotContain(emitter.Events, e => e is ConfusionStarted);
     }
 
@@ -113,7 +113,7 @@ public class ConfusionAndInputTests
         );
         await action.ExecuteAsync();
 
-        Assert.Equal(0, target.ConfusedTurns);
+        Assert.Equal(0, target.Battle.ConfusedTurns);
     }
 
     // --- RandomMoveInput (Bug 1) --------------------------------------------

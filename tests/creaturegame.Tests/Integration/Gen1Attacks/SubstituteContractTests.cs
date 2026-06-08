@@ -25,7 +25,7 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
 
         int cost = 200 / 4; // 50
         Assert.True(result.Has<SubstitutePutUp>());
-        Assert.Equal(cost + 1, result.Attacker.SubstituteHp); // decoy has the cost +1 (Gen 1)
+        Assert.Equal(cost + 1, result.Attacker.Battle.SubstituteHp); // decoy has the cost +1 (Gen 1)
         Assert.Equal(200 - cost, result.Attacker.Attributes.HP); // user paid exactly the cost
         Assert.False(result.Has<DamageDealt>(), "Substitute deals no damage to the foe");
     }
@@ -34,7 +34,7 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
     public async Task DecoyAbsorbsAHitAndTheUserTakesNothing()
     {
         var defender = TestCreatures.Make("D", hp: 300, defense: 100);
-        defender.SubstituteHp = 200; // plenty to survive one weak hit
+        defender.Battle.SubstituteHp = 200; // plenty to survive one weak hit
         var attacker = TestCreatures.Make("A", attack: 80);
 
         var result = await new MoveScenario()
@@ -45,7 +45,7 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
         Assert.True(result.Has<SubstituteAbsorbedHit>());
         Assert.False(result.Has<DamageDealt>(), "the user behind the decoy takes no damage");
         Assert.Equal(300, result.Defender.Attributes.HP); // HP untouched
-        Assert.InRange(result.Defender.SubstituteHp, 1, 199); // decoy soaked the hit but didn't break
+        Assert.InRange(result.Defender.Battle.SubstituteHp, 1, 199); // decoy soaked the hit but didn't break
     }
 
     // The decoy soaks every damage category, not just the Standard path — Seismic Toss (level-based,
@@ -54,7 +54,7 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
     public async Task DecoyAbsorbsNonStandardDamageCategories()
     {
         var defender = TestCreatures.Make("D", hp: 300);
-        defender.SubstituteHp = 200;
+        defender.Battle.SubstituteHp = 200;
         var attacker = TestCreatures.Make("A", level: 50); // Seismic Toss deals 50 (= level)
 
         var result = await new MoveScenario()
@@ -65,14 +65,14 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
         Assert.True(result.Has<SubstituteAbsorbedHit>());
         Assert.False(result.Has<DamageDealt>());
         Assert.Equal(300, result.Defender.Attributes.HP); // user untouched
-        Assert.Equal(150, result.Defender.SubstituteHp); // decoy took the 50
+        Assert.Equal(150, result.Defender.Battle.SubstituteHp); // decoy took the 50
     }
 
     [Fact]
     public async Task DecoyBreaksWhenDepletedAndOverflowIsLost()
     {
         var defender = TestCreatures.Make("D", hp: 300, defense: 100);
-        defender.SubstituteHp = 1; // about to break; the incoming hit dwarfs it
+        defender.Battle.SubstituteHp = 1; // about to break; the incoming hit dwarfs it
         var attacker = TestCreatures.Make("A", attack: 150);
 
         var result = await new MoveScenario()
@@ -81,7 +81,7 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
             .Use(Move("tackle"));
 
         Assert.True(result.Has<SubstituteFaded>());
-        Assert.Equal(0, result.Defender.SubstituteHp);
+        Assert.Equal(0, result.Defender.Battle.SubstituteHp);
         // Gen 1: the overflow past the decoy's HP is NOT applied to the user.
         Assert.False(result.Has<DamageDealt>());
         Assert.Equal(300, result.Defender.Attributes.HP);
@@ -91,13 +91,13 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
     public async Task FailsWhenASubstituteIsAlreadyUp()
     {
         var user = TestCreatures.Make("A", hp: 200);
-        user.SubstituteHp = 51;
+        user.Battle.SubstituteHp = 51;
 
         var result = await new MoveScenario().Attacker(user).Use(Move("substitute"));
 
         Assert.True(result.Has<MoveMissed>());
         Assert.False(result.Has<SubstitutePutUp>());
-        Assert.Equal(51, result.Attacker.SubstituteHp); // unchanged
+        Assert.Equal(51, result.Attacker.Battle.SubstituteHp); // unchanged
         Assert.Equal(200, result.Attacker.Attributes.HP); // no extra HP paid
     }
 
@@ -110,7 +110,7 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
         var result = await new MoveScenario().Attacker(user).Use(Move("substitute"));
 
         Assert.True(result.Has<MoveMissed>());
-        Assert.Equal(0, result.Attacker.SubstituteHp); // no decoy raised
+        Assert.Equal(0, result.Attacker.Battle.SubstituteHp); // no decoy raised
         Assert.Equal(40, result.Attacker.Attributes.HP); // HP unchanged
     }
 
@@ -118,11 +118,11 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
     public async Task ShieldsTheUserFromTheFoesStatus()
     {
         var defender = TestCreatures.Make("D", hp: 300);
-        defender.SubstituteHp = 150;
+        defender.Battle.SubstituteHp = 150;
 
         var result = await new MoveScenario().Defender(defender).Use(Move("thunder-wave")); // would paralyze, but the decoy shields it
 
-        Assert.Equal(StatusCondition.None, result.Defender.Status);
+        Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
         Assert.False(result.Has<StatusApplied>());
     }
 
@@ -130,11 +130,11 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
     public async Task ShieldsTheUserFromTheFoesStatDrop()
     {
         var defender = TestCreatures.Make("D", hp: 300);
-        defender.SubstituteHp = 150;
+        defender.Battle.SubstituteHp = 150;
 
         var result = await new MoveScenario().Defender(defender).Use(Move("growl")); // −Attack
 
-        Assert.Equal(0, result.Defender.Stages.Attack);
+        Assert.Equal(0, result.Defender.Battle.Stages.Attack);
         Assert.False(result.Has<StatStageChanged>());
     }
 
@@ -142,11 +142,11 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
     public async Task ShieldsTheUserFromTheFoesConfusion()
     {
         var defender = TestCreatures.Make("D", hp: 300);
-        defender.SubstituteHp = 150;
+        defender.Battle.SubstituteHp = 150;
 
         var result = await new MoveScenario().Defender(defender).Use(Move("supersonic"));
 
-        Assert.Equal(0, result.Defender.ConfusedTurns);
+        Assert.Equal(0, result.Defender.Battle.ConfusedTurns);
         Assert.False(result.Has<ConfusionStarted>());
     }
 
@@ -157,7 +157,7 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
     public async Task SecondaryStatusIsBlockedEvenOnTheHitThatBreaksTheDecoy()
     {
         var defender = TestCreatures.Make("D", type1: DamageType.Water, hp: 300);
-        defender.SubstituteHp = 1; // the incoming Body Slam shatters it this hit
+        defender.Battle.SubstituteHp = 1; // the incoming Body Slam shatters it this hit
 
         var result = await new MoveScenario()
             .Rules(ForceSecondaryRules.Instance) // forces the paralysis chance to "land"
@@ -165,7 +165,7 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
             .Use(Move("body-slam"));
 
         Assert.True(result.Has<SubstituteFaded>(), "the decoy broke on this hit");
-        Assert.Equal(StatusCondition.None, result.Defender.Status); // …but the paralysis was shielded
+        Assert.Equal(StatusCondition.None, result.Defender.Battle.Status); // …but the paralysis was shielded
         Assert.False(result.Has<StatusApplied>());
     }
 

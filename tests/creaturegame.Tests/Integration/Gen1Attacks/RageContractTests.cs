@@ -21,7 +21,7 @@ public class RageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         // The raging creature is the one being hit: a foe's ordinary attack lands on it and its
         // Attack rises by one stage (Gen 1 RageAttackStagesPerHit = 1).
         var rager = TestCreatures.Make("Rager", hp: 500);
-        rager.IsRaging = true;
+        rager.Battle.IsRaging = true;
 
         var result = await new MoveScenario()
             .Attacker(TestCreatures.Make("Foe"))
@@ -29,7 +29,7 @@ public class RageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             .Use(Move("pound"));
 
         Assert.True(result.Has<DamageDealt>(), "the foe's attack lands");
-        Assert.Equal(1, rager.Stages.Attack);
+        Assert.Equal(1, rager.Battle.Stages.Attack);
 
         var change = result.First<StatStageChanged>();
         Assert.NotNull(change);
@@ -42,7 +42,7 @@ public class RageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     public async Task RageDoesNotRaiseAttackWhenTheAttackerMisses()
     {
         var rager = TestCreatures.Make("Rager", hp: 500);
-        rager.IsRaging = true;
+        rager.Battle.IsRaging = true;
 
         var result = await new MoveScenario()
             .Rules(NeverHitRules.Instance)
@@ -51,7 +51,7 @@ public class RageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             .Use(Move("pound"));
 
         Assert.True(result.Has<MoveMissed>());
-        Assert.Equal(0, rager.Stages.Attack); // no hit ⇒ no Rage build-up
+        Assert.Equal(0, rager.Battle.Stages.Attack); // no hit ⇒ no Rage build-up
     }
 
     [Fact]
@@ -94,7 +94,7 @@ public class RageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         await battle.StartFightAsync();
 
         Assert.False(enemy.IsAlive()); // Rage ramped up and won
-        Assert.True(player.IsRaging); // still locked in at battle's end
+        Assert.True(player.Battle.IsRaging); // still locked in at battle's end
         Assert.Equal(1, input.CallCount); // asked only on the first turn — lock-in drives the rest
 
         // The quirk, not just the outcome: Attack rises exactly once per hit *received*, not once per

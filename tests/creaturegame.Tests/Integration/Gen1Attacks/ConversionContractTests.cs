@@ -29,7 +29,7 @@ public class ConversionContractTests(MovesFixture moves) : Gen1MoveContract(move
         Assert.False(result.Has<DamageDealt>(), "Conversion deals no damage");
         // Self-affecting: it must never apply a status to the foe (guards the pre-handler TryApplyStatus
         // path — the StatusEffect==None data pin's behavioural twin).
-        Assert.Equal(StatusCondition.None, result.Defender.Status);
+        Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
         Assert.Equal(DamageType.Water, attacker.Type1);
         Assert.Equal(DamageType.Ground, attacker.Type2);
 

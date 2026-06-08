@@ -67,14 +67,14 @@ public class StatusConditionIntegrationTests : IDisposable
         // --- Run combat actions until status applied (max 20 turns as safety net) ---
         var chart = new Gen1TypeChart();
         int turns = 0;
-        while (defender.Status == StatusCondition.None && turns < 20)
+        while (defender.Battle.Status == StatusCondition.None && turns < 20)
         {
             var action = new AttackAction(attacker, defender, attacker.MoveSet[0], chart);
             await action.ExecuteAsync();
             turns++;
         }
 
-        Assert.Equal(StatusCondition.Paralysis, defender.Status);
+        Assert.Equal(StatusCondition.Paralysis, defender.Battle.Status);
     }
 
     [Fact]
@@ -122,7 +122,7 @@ public class StatusConditionIntegrationTests : IDisposable
             await action.ExecuteAsync();
         }
 
-        Assert.Equal(StatusCondition.None, defender.Status);
+        Assert.Equal(StatusCondition.None, defender.Battle.Status);
     }
 
     public void Dispose()

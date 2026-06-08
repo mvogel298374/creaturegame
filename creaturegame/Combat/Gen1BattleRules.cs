@@ -197,7 +197,7 @@ public sealed class Gen1BattleRules : IBattleRules
         if (move.IsHighCrit)
             numerator = Math.Min(numerator * 8, 255);
         // Gen 1 bug: Focus Energy was meant to quadruple the crit rate but instead quarters it.
-        if (attacker.HasFocusEnergy)
+        if (attacker.Battle.HasFocusEnergy)
             numerator = Math.Floor(numerator / 4.0);
         return numerator / 256.0;
     }

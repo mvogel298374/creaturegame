@@ -58,9 +58,9 @@ public class AttackAction : IBattleAction
             return Task.CompletedTask;
 
         // Recharge: skip this turn and clear the flag (Hyper Beam, etc.)
-        if (Source.IsRecharging)
+        if (Source.Battle.IsRecharging)
         {
-            Source.IsRecharging = false;
+            Source.Battle.IsRecharging = false;
             _emitter?.Emit(new Recharging(Source.Name));
             return Task.CompletedTask;
         }
@@ -104,7 +104,7 @@ public class AttackAction : IBattleAction
             !usingStruggle
             && attackToUse.Effect is not (MoveEffect.Metronome or MoveEffect.MirrorMove)
         )
-            Source.LastMoveUsed = attackToUse;
+            Source.Battle.LastMoveUsed = attackToUse;
 
         // Release phase: the mechanic may unleash its own damage and end the turn (bide), or set up its
         // lock (rampage/rage) and let the normal attack pipeline run.
@@ -146,7 +146,7 @@ public class AttackAction : IBattleAction
         // through the normal lock-in path on this user.
         if (!usingStruggle && attackToUse.Effect == MoveEffect.MirrorMove)
         {
-            var last = Target.LastMoveUsed;
+            var last = Target.Battle.LastMoveUsed;
             if (last != null && last.Name != "struggle")
                 return ExecuteInner(last);
             _emitter?.Emit(new MoveMissed(Source.Name, attackToUse.Name ?? ""));
@@ -169,8 +169,8 @@ public class AttackAction : IBattleAction
         {
             int threshold = _rules.GetHitThreshold(
                 attackToUse.Accuracy,
-                Source.Stages.Accuracy,
-                Target.Stages.Evasion
+                Source.Battle.Stages.Accuracy,
+                Target.Battle.Stages.Evasion
             );
             if (_rng.Next(_rules.AccuracyRollBound) >= threshold)
             {
@@ -195,9 +195,12 @@ public class AttackAction : IBattleAction
 
         // Thaw a frozen target if the move meets the generation's thaw criteria
         bool justThawed = false;
-        if (Target.Status == StatusCondition.Freeze && _rules.CanThawFrozenTarget(attackToUse))
+        if (
+            Target.Battle.Status == StatusCondition.Freeze
+            && _rules.CanThawFrozenTarget(attackToUse)
+        )
         {
-            Target.Status = StatusCondition.None;
+            Target.Battle.Status = StatusCondition.None;
             _emitter?.Emit(new StatusCleared(Target.Name, StatusCondition.Freeze));
             justThawed = true;
         }
@@ -266,7 +269,10 @@ public class AttackAction : IBattleAction
         // *state* precondition not met (target awake), like Counter having no damage to return — so it
         // reuses MoveMissed, the established path for that, not MoveHadNoEffect (which is the type-based
         // "doesn't affect" line for immunities).
-        if (attackToUse.Effect == MoveEffect.DreamEater && Target.Status != StatusCondition.Sleep)
+        if (
+            attackToUse.Effect == MoveEffect.DreamEater
+            && Target.Battle.Status != StatusCondition.Sleep
+        )
         {
             _emitter?.Emit(new MoveMissed(Source.Name, attackToUse.Name ?? ""));
             return Task.CompletedTask;
@@ -274,7 +280,7 @@ public class AttackAction : IBattleAction
 
         // Snapshot the Substitute shield before any damage is applied: a secondary effect is blocked
         // if the Target was behind a decoy when the move landed, even if that same hit shatters it.
-        _targetShieldedAtImpact = Target.SubstituteHp > 0;
+        _targetShieldedAtImpact = Target.Battle.SubstituteHp > 0;
 
         // Damage calculation by category
         int damage = 0;
@@ -283,8 +289,8 @@ public class AttackAction : IBattleAction
         // Reflect (vs physical) / Light Screen (vs special) double the defender's defensive stat while
         // up; the calculator ignores it on a crit. Computed once and passed into every damage call.
         int screenMult =
-            (attackToUse.AttackType == AttackType.Physical && Target.HasReflect)
-            || (attackToUse.AttackType == AttackType.Special && Target.HasLightScreen)
+            (attackToUse.AttackType == AttackType.Physical && Target.Battle.HasReflect)
+            || (attackToUse.AttackType == AttackType.Special && Target.Battle.HasLightScreen)
                 ? _rules.ScreenDefenseMultiplier
                 : 1;
 
@@ -339,7 +345,7 @@ public class AttackAction : IBattleAction
                     // off the standard damage path only (the same boundary as Counter) — once per
                     // connecting attack, not per multi-hit strike, and only when the hit reached the
                     // creature itself (a Substitute soak doesn't enrage it). Reuses StatStageChanged.
-                    if (dealtRealDamage && Target.IsRaging && Target.IsAlive())
+                    if (dealtRealDamage && Target.Battle.IsRaging && Target.IsAlive())
                     {
                         int newStage = ApplyStageChange(
                             Target,
@@ -437,7 +443,7 @@ public class AttackAction : IBattleAction
 
         // Recharge next turn (Hyper Beam): only set when the move actually dealt damage
         if (!usingStruggle && attackToUse.Effect == MoveEffect.Recharge && damage > 0)
-            Source.IsRecharging = true;
+            Source.Battle.IsRecharging = true;
 
         if (!justThawed)
             TryApplyStatus(attackToUse);
@@ -468,8 +474,8 @@ public class AttackAction : IBattleAction
     // Bide stores every hit the committed user takes — any damage category — to unleash 2× on release.
     private void AccumulateBideDamage(int dmg)
     {
-        if (Target.BideTurnsRemaining > 0)
-            Target.BideDamageAccumulated += dmg;
+        if (Target.Battle.BideTurnsRemaining > 0)
+            Target.Battle.BideDamageAccumulated += dmg;
     }
 
     // Applies <paramref name="dmg"/> to the Target, honoring an active Substitute. Gen 1: while a
@@ -491,13 +497,13 @@ public class AttackAction : IBattleAction
         DamageType? counterableType = null
     )
     {
-        if (Target.SubstituteHp > 0)
+        if (Target.Battle.SubstituteHp > 0)
         {
-            Target.SubstituteHp = Math.Max(0, Target.SubstituteHp - dmg);
-            if (Target.SubstituteHp == 0)
+            Target.Battle.SubstituteHp = Math.Max(0, Target.Battle.SubstituteHp - dmg);
+            if (Target.Battle.SubstituteHp == 0)
                 _emitter?.Emit(new SubstituteFaded(Target.Name));
             else
-                _emitter?.Emit(new SubstituteAbsorbedHit(Target.Name, Target.SubstituteHp));
+                _emitter?.Emit(new SubstituteAbsorbedHit(Target.Name, Target.Battle.SubstituteHp));
             return false;
         }
 
@@ -508,8 +514,8 @@ public class AttackAction : IBattleAction
         // hit soaked by a Substitute returned above, so it never reaches here and doesn't update this).
         if (counterableType is { } type)
         {
-            Target.LastDamageTaken = dmg;
-            Target.LastDamageType = type;
+            Target.Battle.LastDamageTaken = dmg;
+            Target.Battle.LastDamageType = type;
         }
 
         _emitter?.Emit(
@@ -534,7 +540,7 @@ public class AttackAction : IBattleAction
     {
         if (attack.StatusEffect == StatusCondition.None)
             return;
-        if (Target.Status != StatusCondition.None)
+        if (Target.Battle.Status != StatusCondition.None)
             return;
         if (!Target.IsAlive())
             return;
@@ -556,10 +562,10 @@ public class AttackAction : IBattleAction
         if (_rng.Next(1, 101) > chance)
             return;
 
-        Target.Status = attack.StatusEffect;
+        Target.Battle.Status = attack.StatusEffect;
 
         if (attack.StatusEffect == StatusCondition.Sleep)
-            Target.SleepTurns = _rules.RollSleepTurns();
+            Target.Battle.SleepTurns = _rules.RollSleepTurns();
 
         _emitter?.Emit(new StatusApplied(Target.Name, attack.StatusEffect));
     }
@@ -581,7 +587,7 @@ public class AttackAction : IBattleAction
 
         // Gen 1 Mist: the opponent cannot lower the Mist-holder's stats. Self-inflicted drops
         // (and any raise) are unaffected.
-        if (se.Target == StageTarget.Foe && se.Delta < 0 && affected.HasMist)
+        if (se.Target == StageTarget.Foe && se.Delta < 0 && affected.Battle.HasMist)
         {
             _emitter?.Emit(new StatDropBlocked(affected.Name));
             return;
@@ -616,7 +622,7 @@ public class AttackAction : IBattleAction
                         SecondaryEffectKind.Flinch
                     );
                     if (_rng.Next(1, 101) <= chance)
-                        Target.IsFlinched = true;
+                        Target.Battle.IsFlinched = true;
                 }
                 break;
 
@@ -628,17 +634,17 @@ public class AttackAction : IBattleAction
                 // do not "consistency-fix" this to match the other sub-shielded effects.
                 if (Target.IsAlive() && !_rules.CanBeLeechSeeded(Target))
                     _emitter?.Emit(new MoveHadNoEffect(Target.Name, attack.Name ?? "")); // Grass-types are immune
-                else if (!Target.HasLeechSeed && Target.IsAlive())
+                else if (!Target.Battle.HasLeechSeed && Target.IsAlive())
                 {
-                    Target.HasLeechSeed = true;
+                    Target.Battle.HasLeechSeed = true;
                     _emitter?.Emit(new LeechSeedApplied(Target.Name));
                 }
                 break;
 
             case MoveEffect.Binding:
-                if (Target.BindingTurnsRemaining == 0 && damage > 0 && Target.IsAlive())
+                if (Target.Battle.BindingTurnsRemaining == 0 && damage > 0 && Target.IsAlive())
                 {
-                    Target.BindingTurnsRemaining = _rules.RollBindingTurns();
+                    Target.Battle.BindingTurnsRemaining = _rules.RollBindingTurns();
                     _emitter?.Emit(new BindingStarted(Target.Name, attack.Name ?? ""));
                 }
                 break;
@@ -670,14 +676,14 @@ public class AttackAction : IBattleAction
                 // documented rather than on a single-use seam member we wouldn't vary until Gen 3.
                 // The lock is *enforced* at move-selection time (Battle/IBattleInput skip
                 // DisabledMove); the counter ticks down end-of-turn (StatusResolver) and re-enables.
-                if (Target.IsAlive() && Target.DisableTurnsRemaining == 0)
+                if (Target.IsAlive() && Target.Battle.DisableTurnsRemaining == 0)
                 {
                     var disableable = Target.MoveSet.Where(m => m.PowerPointsCurrent > 0).ToList();
                     if (disableable.Count > 0)
                     {
                         var locked = disableable[_rng.Next(disableable.Count)];
-                        Target.DisabledMove = locked;
-                        Target.DisableTurnsRemaining = _rules.RollDisableTurns();
+                        Target.Battle.DisabledMove = locked;
+                        Target.Battle.DisableTurnsRemaining = _rules.RollDisableTurns();
                         _emitter?.Emit(new MoveDisabled(Target.Name, locked.Base.Name ?? ""));
                     }
                 }
@@ -697,11 +703,11 @@ public class AttackAction : IBattleAction
                 // so an immune target already short-circuited to MoveHadNoEffect and never reaches here.
                 if (
                     Target.IsAlive()
-                    && Source.LastDamageTaken > 0
-                    && _rules.CounterQualifies(Source.LastDamageType)
+                    && Source.Battle.LastDamageTaken > 0
+                    && _rules.CounterQualifies(Source.Battle.LastDamageType)
                 )
                 {
-                    int countered = Source.LastDamageTaken * 2;
+                    int countered = Source.Battle.LastDamageTaken * 2;
                     DealDamageToTarget(countered, 1.0, false, attack.DamageType);
                 }
                 else
@@ -713,36 +719,36 @@ public class AttackAction : IBattleAction
             case MoveEffect.Mist:
                 // Mist shrouds the user; the opponent can't lower its stats until the battle ends
                 // (enforced in TryApplyStatEffect). Self-targeting, no damage.
-                if (!Source.HasMist)
+                if (!Source.Battle.HasMist)
                 {
-                    Source.HasMist = true;
+                    Source.Battle.HasMist = true;
                     _emitter?.Emit(new MistApplied(Source.Name));
                 }
                 break;
 
             case MoveEffect.Reflect:
                 // Doubles the user's Defense vs physical damage until the battle ends (self-targeting).
-                if (!Source.HasReflect)
+                if (!Source.Battle.HasReflect)
                 {
-                    Source.HasReflect = true;
+                    Source.Battle.HasReflect = true;
                     _emitter?.Emit(new ScreenApplied(Source.Name, "Reflect"));
                 }
                 break;
 
             case MoveEffect.LightScreen:
                 // Doubles the user's Special vs special damage until the battle ends (self-targeting).
-                if (!Source.HasLightScreen)
+                if (!Source.Battle.HasLightScreen)
                 {
-                    Source.HasLightScreen = true;
+                    Source.Battle.HasLightScreen = true;
                     _emitter?.Emit(new ScreenApplied(Source.Name, "Light Screen"));
                 }
                 break;
 
             case MoveEffect.FocusEnergy:
                 // Self-targeting crit modifier — Gen 1's bugged ÷4 is applied in Gen1BattleRules.GetCritChance.
-                if (!Source.HasFocusEnergy)
+                if (!Source.Battle.HasFocusEnergy)
                 {
-                    Source.HasFocusEnergy = true;
+                    Source.Battle.HasFocusEnergy = true;
                     _emitter?.Emit(new FocusEnergyApplied(Source.Name));
                 }
                 break;
@@ -774,7 +780,7 @@ public class AttackAction : IBattleAction
                 // the battle (Battle restores it on battle end). The user only copies this turn — no
                 // damage — then can use the copied move on later turns. Fails if already mimicked or
                 // the target has no copyable move.
-                if (Target.IsAlive() && _selectedMove != null && Source.MimicWrapper == null)
+                if (Target.IsAlive() && _selectedMove != null && Source.Battle.MimicWrapper == null)
                 {
                     var copyable = Target
                         .MoveSet.Where(m =>
@@ -784,8 +790,8 @@ public class AttackAction : IBattleAction
                     if (copyable.Count > 0)
                     {
                         var chosen = copyable[_rng.Next(copyable.Count)].Base;
-                        Source.MimicWrapper = _selectedMove;
-                        Source.MimicOriginalBase = _selectedMove.Base;
+                        Source.Battle.MimicWrapper = _selectedMove;
+                        Source.Battle.MimicOriginalBase = _selectedMove.Base;
                         _selectedMove.Base = chosen;
                         _emitter?.Emit(new MimicLearned(Source.Name, chosen.Name ?? ""));
                     }
@@ -809,7 +815,7 @@ public class AttackAction : IBattleAction
                     Source.Attributes.Defense = Target.Attributes.Defense;
                     Source.Attributes.Special = Target.Attributes.Special;
                     Source.Attributes.Speed = Target.Attributes.Speed;
-                    Source.Stages = Target.Stages.Copy();
+                    Source.Battle.Stages = Target.Battle.Stages.Copy();
                     Source.MoveSet.Clear();
                     foreach (var copied in Target.MoveSet)
                         Source.MoveSet.Add(
@@ -853,8 +859,8 @@ public class AttackAction : IBattleAction
                 int restored = Source.Attributes.MaxHP - Source.Attributes.HP;
                 Source.Attributes.ReceiveHealing(restored); // heals exactly to full
                 // Sleep overwrites any prior major status (Gen 1 allows only one) — Rest's documented cure.
-                Source.Status = StatusCondition.Sleep;
-                Source.SleepTurns = _rules.RestSleepTurns;
+                Source.Battle.Status = StatusCondition.Sleep;
+                Source.Battle.SleepTurns = _rules.RestSleepTurns;
                 _emitter?.Emit(new Healed(Source.Name, restored, Source.Attributes.HP));
                 _emitter?.Emit(new StatusApplied(Source.Name, StatusCondition.Sleep));
                 break;
@@ -866,7 +872,7 @@ public class AttackAction : IBattleAction
                 // the cost) — a state precondition, so it reuses MoveMissed like Counter/Rest. The ¼ cost
                 // is gen-invariant (¼ in every generation; litmus "would Gen 2 change it?" → no), so it's
                 // inline rather than on the seam. Self-targeting ⇒ the foe-immunity guard never blocks it.
-                if (Source.SubstituteHp > 0)
+                if (Source.Battle.SubstituteHp > 0)
                 {
                     _emitter?.Emit(new MoveMissed(Source.Name, attack.Name ?? ""));
                     break;
@@ -878,8 +884,8 @@ public class AttackAction : IBattleAction
                     break;
                 }
                 Source.Attributes.ReceiveDamage(cost);
-                Source.SubstituteHp = cost + 1;
-                _emitter?.Emit(new SubstitutePutUp(Source.Name, Source.SubstituteHp));
+                Source.Battle.SubstituteHp = cost + 1;
+                _emitter?.Emit(new SubstitutePutUp(Source.Name, Source.Battle.SubstituteHp));
                 break;
 
             case MoveEffect.Splash:
@@ -896,7 +902,11 @@ public class AttackAction : IBattleAction
                 // EffectChance gates secondary confusion on damaging moves (Psybeam 10%);
                 // pure confusion moves (Supersonic, Confuse Ray) have no chance ⇒ always land.
                 // A Substitute shields the user from the foe's confusion while it stands (Gen 1).
-                if (Target.IsAlive() && Target.ConfusedTurns == 0 && !TargetShieldedBySubstitute)
+                if (
+                    Target.IsAlive()
+                    && Target.Battle.ConfusedTurns == 0
+                    && !TargetShieldedBySubstitute
+                )
                 {
                     int chance = _rules.GetSecondaryEffectChance(
                         attack,
@@ -904,7 +914,7 @@ public class AttackAction : IBattleAction
                     );
                     if (_rng.Next(1, 101) <= chance)
                     {
-                        Target.ConfusedTurns = _rules.RollConfusionTurns();
+                        Target.Battle.ConfusedTurns = _rules.RollConfusionTurns();
                         _emitter?.Emit(new ConfusionStarted(Target.Name));
                     }
                 }
@@ -916,28 +926,28 @@ public class AttackAction : IBattleAction
         stat switch
         {
             StageStat.Attack => After(
-                () => creature.Stages.RaiseAttack(delta),
-                () => creature.Stages.Attack
+                () => creature.Battle.Stages.RaiseAttack(delta),
+                () => creature.Battle.Stages.Attack
             ),
             StageStat.Defense => After(
-                () => creature.Stages.RaiseDefense(delta),
-                () => creature.Stages.Defense
+                () => creature.Battle.Stages.RaiseDefense(delta),
+                () => creature.Battle.Stages.Defense
             ),
             StageStat.Special => After(
-                () => creature.Stages.RaiseSpecial(delta),
-                () => creature.Stages.Special
+                () => creature.Battle.Stages.RaiseSpecial(delta),
+                () => creature.Battle.Stages.Special
             ),
             StageStat.Speed => After(
-                () => creature.Stages.RaiseSpeed(delta),
-                () => creature.Stages.Speed
+                () => creature.Battle.Stages.RaiseSpeed(delta),
+                () => creature.Battle.Stages.Speed
             ),
             StageStat.Accuracy => After(
-                () => creature.Stages.RaiseAccuracy(delta),
-                () => creature.Stages.Accuracy
+                () => creature.Battle.Stages.RaiseAccuracy(delta),
+                () => creature.Battle.Stages.Accuracy
             ),
             StageStat.Evasion => After(
-                () => creature.Stages.RaiseEvasion(delta),
-                () => creature.Stages.Evasion
+                () => creature.Battle.Stages.RaiseEvasion(delta),
+                () => creature.Battle.Stages.Evasion
             ),
             _ => 0,
         };

@@ -31,7 +31,7 @@ public class FlinchContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             .Use(Move(moveName));
 
         Assert.True(result.Has<DamageDealt>());
-        Assert.True(result.Defender.IsFlinched);
+        Assert.True(result.Defender.Battle.IsFlinched);
     }
 
     [Theory]
@@ -50,7 +50,7 @@ public class FlinchContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             .Use(Move(moveName));
 
         Assert.True(result.Has<MoveMissed>());
-        Assert.False(result.Defender.IsFlinched);
+        Assert.False(result.Defender.Battle.IsFlinched);
     }
 
     [Fact]

@@ -547,7 +547,8 @@ public class BattleIntegrationTests
             }
         );
 
-        var enemy = new Creature("Enemy") { Level = 50, Status = StatusCondition.Poison };
+        var enemy = new Creature("Enemy") { Level = 50 };
+        enemy.Battle.Status = StatusCondition.Poison;
         enemy.CalculateStats();
         enemy.Attributes.HP = 1;
         enemy.Attributes.MaxHP = 160;

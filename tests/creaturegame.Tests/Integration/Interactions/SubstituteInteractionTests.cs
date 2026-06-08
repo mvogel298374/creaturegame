@@ -62,7 +62,7 @@ public class SubstituteInteractionTests(MovesFixture moves) : Gen1MoveContract(m
             result.All<StatusApplied>(),
             s => s.TargetName == "Enemy" && s.Status == StatusCondition.Paralysis
         );
-        Assert.NotEqual(StatusCondition.Paralysis, enemy.Status);
+        Assert.NotEqual(StatusCondition.Paralysis, enemy.Battle.Status);
     }
 
     // English RBY quirk: unlike status / stat-drops / confusion, Leech Seed lands THROUGH a Substitute

@@ -26,9 +26,9 @@ public class DisableContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         var disabled = result.First<MoveDisabled>();
         Assert.NotNull(disabled);
         Assert.Equal("D", disabled!.TargetName);
-        Assert.True(result.Defender.DisableTurnsRemaining > 0);
-        Assert.NotNull(result.Defender.DisabledMove);
-        Assert.Contains(result.Defender.MoveSet, m => m == result.Defender.DisabledMove);
+        Assert.True(result.Defender.Battle.DisableTurnsRemaining > 0);
+        Assert.NotNull(result.Defender.Battle.DisabledMove);
+        Assert.Contains(result.Defender.MoveSet, m => m == result.Defender.Battle.DisabledMove);
     }
 
     [Fact]
@@ -37,14 +37,14 @@ public class DisableContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         var defender = TestCreatures.Make("D", hp: 500);
         defender.AddAttack(Move("pound"));
         defender.AddAttack(Move("scratch"));
-        defender.DisabledMove = defender.MoveSet[0];
-        defender.DisableTurnsRemaining = 3;
+        defender.Battle.DisabledMove = defender.MoveSet[0];
+        defender.Battle.DisableTurnsRemaining = 3;
 
         var result = await new MoveScenario().Defender(defender).Use(Move("disable"));
 
         Assert.DoesNotContain(result.Events, e => e is MoveDisabled);
-        Assert.Equal(3, result.Defender.DisableTurnsRemaining); // unchanged
-        Assert.Same(defender.MoveSet[0], result.Defender.DisabledMove); // same locked move
+        Assert.Equal(3, result.Defender.Battle.DisableTurnsRemaining); // unchanged
+        Assert.Same(defender.MoveSet[0], result.Defender.Battle.DisabledMove); // same locked move
     }
 
     [Fact]

@@ -21,7 +21,7 @@ public class MistContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             .Use(Move("mist"));
 
         Assert.False(result.Has<DamageDealt>(), "Mist is a status move — no damage");
-        Assert.True(result.Attacker.HasMist);
+        Assert.True(result.Attacker.Battle.HasMist);
         var applied = result.First<MistApplied>();
         Assert.NotNull(applied);
         Assert.Equal(result.Attacker.Name, applied!.CreatureName);
@@ -32,11 +32,11 @@ public class MistContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     {
         // The defender is already shrouded in Mist; the attacker's Growl (−1 foe Attack) is blocked.
         var defender = TestCreatures.Make("Defender", hp: 500);
-        defender.HasMist = true;
+        defender.Battle.HasMist = true;
 
         var result = await new MoveScenario().Defender(defender).Use(Move("growl"));
 
-        Assert.Equal(0, result.Defender.Stages.Attack); // not lowered
+        Assert.Equal(0, result.Defender.Battle.Stages.Attack); // not lowered
         Assert.False(result.Has<StatStageChanged>());
         Assert.Contains(result.Events, e => e is StatDropBlocked s && s.CreatureName == "Defender");
     }
@@ -46,11 +46,11 @@ public class MistContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     {
         // Mist only blocks the opponent's reductions — a self-targeting raise still applies.
         var attacker = TestCreatures.Make("A");
-        attacker.HasMist = true;
+        attacker.Battle.HasMist = true;
 
         var result = await new MoveScenario().Attacker(attacker).Use(Move("swords-dance"));
 
-        Assert.Equal(2, result.Attacker.Stages.Attack);
+        Assert.Equal(2, result.Attacker.Battle.Stages.Attack);
         Assert.False(result.Has<StatDropBlocked>());
     }
 }

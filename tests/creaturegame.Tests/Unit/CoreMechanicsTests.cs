@@ -280,7 +280,7 @@ public class CoreMechanicsTests
         );
         await action.ExecuteAsync();
 
-        Assert.Equal(StatusCondition.Paralysis, defender.Status);
+        Assert.Equal(StatusCondition.Paralysis, defender.Battle.Status);
     }
 
     [Fact]
@@ -290,7 +290,7 @@ public class CoreMechanicsTests
         attacker.CalculateStats();
         var defender = new Creature("Defender") { Level = 10 };
         defender.CalculateStats();
-        defender.Status = StatusCondition.Burn;
+        defender.Battle.Status = StatusCondition.Burn;
 
         var thunderWave = new Attack
         {
@@ -311,7 +311,7 @@ public class CoreMechanicsTests
         );
         await action.ExecuteAsync();
 
-        Assert.Equal(StatusCondition.Burn, defender.Status);
+        Assert.Equal(StatusCondition.Burn, defender.Battle.Status);
     }
 
     [Fact]
@@ -342,8 +342,8 @@ public class CoreMechanicsTests
         );
         await action.ExecuteAsync();
 
-        Assert.Equal(StatusCondition.Sleep, defender.Status);
-        Assert.InRange(defender.SleepTurns, 1, 7);
+        Assert.Equal(StatusCondition.Sleep, defender.Battle.Status);
+        Assert.InRange(defender.Battle.SleepTurns, 1, 7);
     }
 
     [Fact]
@@ -374,7 +374,7 @@ public class CoreMechanicsTests
         );
         await action.ExecuteAsync();
 
-        Assert.Equal(StatusCondition.None, defender.Status);
+        Assert.Equal(StatusCondition.None, defender.Battle.Status);
     }
 
     // --- Type Chart Tests ---
@@ -536,7 +536,7 @@ public class CoreMechanicsTests
             await action.ExecuteAsync();
         }
 
-        Assert.Equal(StatusCondition.None, defender.Status);
+        Assert.Equal(StatusCondition.None, defender.Battle.Status);
     }
 
     // --- STAB Tests ---
@@ -659,49 +659,44 @@ public class CoreMechanicsTests
     [Fact]
     public void Sleep_SkipsActionAndDecrementsCounter()
     {
-        var creature = new Creature("Drowzee")
-        {
-            Level = 50,
-            Status = StatusCondition.Sleep,
-            SleepTurns = 3,
-        };
+        var creature = new Creature("Drowzee") { Level = 50 };
+        creature.Battle.Status = StatusCondition.Sleep;
+        creature.Battle.SleepTurns = 3;
         creature.CalculateStats();
 
         bool canAct = StatusResolver.CanAct(creature);
 
         Assert.False(canAct);
-        Assert.Equal(2, creature.SleepTurns);
-        Assert.Equal(StatusCondition.Sleep, creature.Status);
+        Assert.Equal(2, creature.Battle.SleepTurns);
+        Assert.Equal(StatusCondition.Sleep, creature.Battle.Status);
     }
 
     [Fact]
     public void Sleep_WakesAndClearsStatusWhenCounterHitsZero()
     {
-        var creature = new Creature("Drowzee")
-        {
-            Level = 50,
-            Status = StatusCondition.Sleep,
-            SleepTurns = 1,
-        };
+        var creature = new Creature("Drowzee") { Level = 50 };
+        creature.Battle.Status = StatusCondition.Sleep;
+        creature.Battle.SleepTurns = 1;
         creature.CalculateStats();
 
         bool canAct = StatusResolver.CanAct(creature);
 
         Assert.False(canAct);
-        Assert.Equal(StatusCondition.None, creature.Status);
-        Assert.Equal(0, creature.SleepTurns);
+        Assert.Equal(StatusCondition.None, creature.Battle.Status);
+        Assert.Equal(0, creature.Battle.SleepTurns);
     }
 
     [Fact]
     public void Freeze_SkipsAction()
     {
-        var creature = new Creature("Articuno") { Level = 50, Status = StatusCondition.Freeze };
+        var creature = new Creature("Articuno") { Level = 50 };
+        creature.Battle.Status = StatusCondition.Freeze;
         creature.CalculateStats();
 
         bool canAct = StatusResolver.CanAct(creature);
 
         Assert.False(canAct);
-        Assert.Equal(StatusCondition.Freeze, creature.Status);
+        Assert.Equal(StatusCondition.Freeze, creature.Battle.Status);
     }
 
     [Fact]
@@ -723,7 +718,8 @@ public class CoreMechanicsTests
             }
         );
 
-        var defender = new Creature("Articuno") { Level = 50, Status = StatusCondition.Freeze };
+        var defender = new Creature("Articuno") { Level = 50 };
+        defender.Battle.Status = StatusCondition.Freeze;
         defender.CalculateStats();
 
         var action = new AttackAction(
@@ -736,7 +732,7 @@ public class CoreMechanicsTests
         );
         await action.ExecuteAsync();
 
-        Assert.Equal(StatusCondition.None, defender.Status);
+        Assert.Equal(StatusCondition.None, defender.Battle.Status);
         Assert.True(defender.Attributes.HP < defender.Attributes.MaxHP);
     }
 
@@ -758,7 +754,8 @@ public class CoreMechanicsTests
             }
         );
 
-        var defender = new Creature("Articuno") { Level = 50, Status = StatusCondition.Freeze };
+        var defender = new Creature("Articuno") { Level = 50 };
+        defender.Battle.Status = StatusCondition.Freeze;
         defender.CalculateStats();
 
         var action = new AttackAction(
@@ -770,13 +767,14 @@ public class CoreMechanicsTests
         );
         await action.ExecuteAsync();
 
-        Assert.Equal(StatusCondition.Freeze, defender.Status);
+        Assert.Equal(StatusCondition.Freeze, defender.Battle.Status);
     }
 
     [Fact]
     public void Paralysis_EffectiveSpeedIsQuartered()
     {
-        var creature = new Creature("Pikachu") { Level = 50, Status = StatusCondition.Paralysis };
+        var creature = new Creature("Pikachu") { Level = 50 };
+        creature.Battle.Status = StatusCondition.Paralysis;
         creature.CalculateStats();
         creature.Attributes.Speed = 100;
 
@@ -790,7 +788,8 @@ public class CoreMechanicsTests
     {
         // Burn damage range (31–37) is entirely below non-burn range (61–72) for these stats,
         // so the assertion holds for all random rolls.
-        var attacker = new Creature("Attacker") { Level = 50, Status = StatusCondition.Burn };
+        var attacker = new Creature("Attacker") { Level = 50 };
+        attacker.Battle.Status = StatusCondition.Burn;
         attacker.CalculateStats();
         attacker.Attributes.Attack = 100;
 
@@ -812,7 +811,7 @@ public class CoreMechanicsTests
             new Gen1TypeChart()
         );
 
-        attacker.Status = StatusCondition.None;
+        attacker.Battle.Status = StatusCondition.None;
         int normalDamage = DamageCalculator.CalculateDamage(
             attacker,
             defender,
@@ -829,7 +828,8 @@ public class CoreMechanicsTests
     [Fact]
     public void Burn_EndOfTurnDamageIs1Over16MaxHP()
     {
-        var creature = new Creature("Charizard") { Level = 50, Status = StatusCondition.Burn };
+        var creature = new Creature("Charizard") { Level = 50 };
+        creature.Battle.Status = StatusCondition.Burn;
         creature.CalculateStats();
         creature.Attributes.MaxHP = 160;
         creature.Attributes.HP = 160;
@@ -842,7 +842,8 @@ public class CoreMechanicsTests
     [Fact]
     public void Poison_EndOfTurnDamageIs1Over16MaxHP()
     {
-        var creature = new Creature("Bulbasaur") { Level = 50, Status = StatusCondition.Poison };
+        var creature = new Creature("Bulbasaur") { Level = 50 };
+        creature.Battle.Status = StatusCondition.Poison;
         creature.CalculateStats();
         creature.Attributes.MaxHP = 160;
         creature.Attributes.HP = 160;
@@ -855,7 +856,8 @@ public class CoreMechanicsTests
     [Fact]
     public void EndOfTurnDamage_NotAppliedToFaintedCreature()
     {
-        var creature = new Creature("Bulbasaur") { Level = 50, Status = StatusCondition.Poison };
+        var creature = new Creature("Bulbasaur") { Level = 50 };
+        creature.Battle.Status = StatusCondition.Poison;
         creature.CalculateStats();
         creature.Attributes.HP = 0;
 
@@ -867,19 +869,21 @@ public class CoreMechanicsTests
     [Fact]
     public void Confusion_SnapsOutWhenCounterReachesZero()
     {
-        var creature = new Creature("Psyduck") { Level = 50, ConfusedTurns = 1 };
+        var creature = new Creature("Psyduck") { Level = 50 };
+        creature.Battle.ConfusedTurns = 1;
         creature.CalculateStats();
 
         bool canAct = StatusResolver.CanAct(creature);
 
         Assert.True(canAct);
-        Assert.Equal(0, creature.ConfusedTurns);
+        Assert.Equal(0, creature.Battle.ConfusedTurns);
     }
 
     [Fact]
     public void Confusion_CounterDecrementsEachTurn()
     {
-        var creature = new Creature("Psyduck") { Level = 50, ConfusedTurns = 3 };
+        var creature = new Creature("Psyduck") { Level = 50 };
+        creature.Battle.ConfusedTurns = 3;
         creature.CalculateStats();
         creature.Attributes.HP = 9999;
         creature.Attributes.MaxHP = 9999;
@@ -887,8 +891,8 @@ public class CoreMechanicsTests
         StatusResolver.CanAct(creature);
 
         Assert.True(
-            creature.ConfusedTurns < 3,
-            $"ConfusedTurns should have decremented from 3 but is {creature.ConfusedTurns}"
+            creature.Battle.ConfusedTurns < 3,
+            $"ConfusedTurns should have decremented from 3 but is {creature.Battle.ConfusedTurns}"
         );
     }
 
@@ -1091,9 +1095,9 @@ public class CoreMechanicsTests
             new Gen1TypeChart()
         );
 
-        var stages = attacker.Stages;
+        var stages = attacker.Battle.Stages;
         stages.RaiseAttack(6);
-        attacker.Stages = stages;
+        attacker.Battle.Stages = stages;
         int stage6 = DamageCalculator.CalculateDamage(
             attacker,
             defender,
@@ -1132,9 +1136,9 @@ public class CoreMechanicsTests
             new Gen1TypeChart()
         );
 
-        var stages = attacker.Stages;
+        var stages = attacker.Battle.Stages;
         stages.RaiseAttack(-6);
-        attacker.Stages = stages;
+        attacker.Battle.Stages = stages;
         int stageM6 = DamageCalculator.CalculateDamage(
             attacker,
             defender,
@@ -1160,9 +1164,9 @@ public class CoreMechanicsTests
 
         int baseSpeed = StatusResolver.EffectiveSpeed(creature, Gen1BattleRules.Instance);
 
-        var stages = creature.Stages;
+        var stages = creature.Battle.Stages;
         stages.RaiseSpeed(6);
-        creature.Stages = stages;
+        creature.Battle.Stages = stages;
         int boostedSpeed = StatusResolver.EffectiveSpeed(creature, Gen1BattleRules.Instance);
 
         Assert.Equal(400, boostedSpeed); // 100 × 4.0
@@ -1172,13 +1176,14 @@ public class CoreMechanicsTests
     public void SpeedStage_StacksWithParalysisQuartering()
     {
         // Paralysis quarters; Speed +6 gives 4×. Net = 1×, so effective speed ≈ base.
-        var creature = new Creature("Pikachu") { Level = 50, Status = StatusCondition.Paralysis };
+        var creature = new Creature("Pikachu") { Level = 50 };
+        creature.Battle.Status = StatusCondition.Paralysis;
         creature.CalculateStats();
         creature.Attributes.Speed = 100;
 
-        var stages = creature.Stages;
+        var stages = creature.Battle.Stages;
         stages.RaiseSpeed(6);
-        creature.Stages = stages;
+        creature.Battle.Stages = stages;
 
         int effective = StatusResolver.EffectiveSpeed(creature, Gen1BattleRules.Instance);
 
@@ -1271,9 +1276,9 @@ public class CoreMechanicsTests
             out _
         );
 
-        var stages = attacker.Stages;
+        var stages = attacker.Battle.Stages;
         stages.RaiseAttack(-6);
-        attacker.Stages = stages;
+        attacker.Battle.Stages = stages;
 
         int penalisedCrit = DamageCalculator.CalculateDamage(
             attacker,
@@ -1315,9 +1320,9 @@ public class CoreMechanicsTests
             out _
         );
 
-        var stages = defender.Stages;
+        var stages = defender.Battle.Stages;
         stages.RaiseDefense(6);
-        defender.Stages = stages;
+        defender.Battle.Stages = stages;
 
         int boostedDefCrit = DamageCalculator.CalculateDamage(
             attacker,
@@ -1359,7 +1364,7 @@ public class CoreMechanicsTests
             out _
         );
 
-        attacker.Status = StatusCondition.Burn;
+        attacker.Battle.Status = StatusCondition.Burn;
         int burnedCrit = DamageCalculator.CalculateDamage(
             attacker,
             defender,
@@ -1406,8 +1411,8 @@ public class CoreMechanicsTests
         );
         await action.ExecuteAsync();
 
-        Assert.Equal(2, attacker.Stages.Attack);
-        Assert.Equal(0, defender.Stages.Attack);
+        Assert.Equal(2, attacker.Battle.Stages.Attack);
+        Assert.Equal(0, defender.Battle.Stages.Attack);
     }
 
     [Fact]
@@ -1441,8 +1446,8 @@ public class CoreMechanicsTests
         );
         await action.ExecuteAsync();
 
-        Assert.Equal(-1, defender.Stages.Attack);
-        Assert.Equal(0, attacker.Stages.Attack);
+        Assert.Equal(-1, defender.Battle.Stages.Attack);
+        Assert.Equal(0, attacker.Battle.Stages.Attack);
     }
 
     [Fact]
@@ -1468,12 +1473,12 @@ public class CoreMechanicsTests
     {
         var attacker = new Creature("Attacker") { Level = 50 };
         attacker.CalculateStats();
-        attacker.Stages.RaiseAttack(3);
+        attacker.Battle.Stages.RaiseAttack(3);
 
         var defender = new Creature("Defender") { Level = 50 };
         defender.CalculateStats();
-        defender.Stages.RaiseSpeed(-2);
-        defender.Status = StatusCondition.Burn;
+        defender.Battle.Stages.RaiseSpeed(-2);
+        defender.Battle.Status = StatusCondition.Burn;
 
         var move = new Attack
         {
@@ -1495,8 +1500,8 @@ public class CoreMechanicsTests
         );
         await action.ExecuteAsync();
 
-        Assert.Equal(0, attacker.Stages.Attack);
-        Assert.Equal(0, defender.Stages.Speed);
+        Assert.Equal(0, attacker.Battle.Stages.Attack);
+        Assert.Equal(0, defender.Battle.Stages.Speed);
     }
 
     [Fact]
@@ -1536,7 +1541,7 @@ public class CoreMechanicsTests
             await action.ExecuteAsync();
         }
 
-        Assert.Equal(0, defender.Stages.Defense);
+        Assert.Equal(0, defender.Battle.Stages.Defense);
     }
 
     [Fact]
@@ -1570,7 +1575,7 @@ public class CoreMechanicsTests
         );
         await action.ExecuteAsync();
 
-        Assert.Equal(-1, defender.Stages.Speed);
+        Assert.Equal(-1, defender.Battle.Stages.Speed);
     }
 
     // ── Move Execution Completeness Tests ────────────────────────────────────
@@ -1938,7 +1943,7 @@ public class CoreMechanicsTests
             ConsoleBattleEventEmitter.Instance
         );
         await action1.ExecuteAsync();
-        Assert.True(attacker.IsRecharging);
+        Assert.True(attacker.Battle.IsRecharging);
 
         // Turn 2: restore defender HP so the recharge-blocked assertion is clean
         defender.Attributes.HP = defender.Attributes.MaxHP;
@@ -1954,7 +1959,7 @@ public class CoreMechanicsTests
         );
         await action2.ExecuteAsync();
 
-        Assert.False(attacker.IsRecharging); // flag cleared
+        Assert.False(attacker.Battle.IsRecharging); // flag cleared
         Assert.Equal(hpBefore, defender.Attributes.HP); // no damage on recharge turn
     }
 
@@ -1987,7 +1992,7 @@ public class CoreMechanicsTests
         );
         await action.ExecuteAsync();
 
-        Assert.True(defender.HasLeechSeed);
+        Assert.True(defender.Battle.HasLeechSeed);
     }
 
     [Fact]
@@ -2067,19 +2072,19 @@ public class CoreMechanicsTests
         );
         await action.ExecuteAsync();
 
-        Assert.True(defender.BindingTurnsRemaining > 0);
+        Assert.True(defender.Battle.BindingTurnsRemaining > 0);
     }
 
     [Fact]
     public void Binding_BlocksTargetViaCanAct()
     {
         var creature = new Creature("Bound");
-        creature.BindingTurnsRemaining = 3;
+        creature.Battle.BindingTurnsRemaining = 3;
 
         bool canAct = StatusResolver.CanAct(creature, AlwaysHitRules.Instance);
 
         Assert.False(canAct);
-        Assert.Equal(3, creature.BindingTurnsRemaining); // CanAct doesn't decrement; ApplyEndOfTurnDamage does
+        Assert.Equal(3, creature.Battle.BindingTurnsRemaining); // CanAct doesn't decrement; ApplyEndOfTurnDamage does
     }
 
     [Fact]
@@ -2116,21 +2121,21 @@ public class CoreMechanicsTests
         );
         await action1.ExecuteAsync();
 
-        Assert.True(attacker.IsTwoTurnCharging);
+        Assert.True(attacker.Battle.IsTwoTurnCharging);
         Assert.Equal(hpBefore, defender.Attributes.HP);
 
         // Turn 2: release phase — IsTwoTurnCharging was set, damage fires
         var action2 = new AttackAction(
             attacker,
             defender,
-            attacker.ChargingMove!,
+            attacker.Battle.ChargingMove!,
             new Gen1TypeChart(),
             AlwaysHitRules.Instance,
             ConsoleBattleEventEmitter.Instance
         );
         await action2.ExecuteAsync();
 
-        Assert.False(attacker.IsTwoTurnCharging);
+        Assert.False(attacker.Battle.IsTwoTurnCharging);
         Assert.True(defender.Attributes.HP < hpBefore);
     }
 
@@ -2174,12 +2179,12 @@ public class CoreMechanicsTests
     public void Flinch_BlocksTargetViaCanAct_AndSelfClears()
     {
         var creature = new Creature("Flinched");
-        creature.IsFlinched = true;
+        creature.Battle.IsFlinched = true;
 
         bool canAct = StatusResolver.CanAct(creature, AlwaysHitRules.Instance);
 
         Assert.False(canAct);
-        Assert.False(creature.IsFlinched); // flag self-clears after blocking
+        Assert.False(creature.Battle.IsFlinched); // flag self-clears after blocking
     }
 
     // ── Bad Poison (Toxic) Tests ─────────────────────────────────────────────
@@ -2187,39 +2192,42 @@ public class CoreMechanicsTests
     [Fact]
     public void BadPoison_FirstTurn_Deals1_16MaxHP()
     {
-        var creature = new Creature("Weezing") { Level = 50, Status = StatusCondition.BadPoison };
+        var creature = new Creature("Weezing") { Level = 50 };
+        creature.Battle.Status = StatusCondition.BadPoison;
         creature.CalculateStats();
         creature.Attributes.MaxHP = 160;
         creature.Attributes.HP = 160;
-        creature.ToxicCounter = 1;
+        creature.Battle.ToxicCounter = 1;
 
         StatusResolver.ApplyEndOfTurnDamage(creature);
 
         // floor(160 × 1/16) = 10
         Assert.Equal(150, creature.Attributes.HP);
-        Assert.Equal(2, creature.ToxicCounter);
+        Assert.Equal(2, creature.Battle.ToxicCounter);
     }
 
     [Fact]
     public void BadPoison_SecondTurn_Deals2_16MaxHP()
     {
-        var creature = new Creature("Weezing") { Level = 50, Status = StatusCondition.BadPoison };
+        var creature = new Creature("Weezing") { Level = 50 };
+        creature.Battle.Status = StatusCondition.BadPoison;
         creature.CalculateStats();
         creature.Attributes.MaxHP = 160;
         creature.Attributes.HP = 160;
-        creature.ToxicCounter = 2;
+        creature.Battle.ToxicCounter = 2;
 
         StatusResolver.ApplyEndOfTurnDamage(creature);
 
         // floor(160 × 2/16) = 20
         Assert.Equal(140, creature.Attributes.HP);
-        Assert.Equal(3, creature.ToxicCounter);
+        Assert.Equal(3, creature.Battle.ToxicCounter);
     }
 
     [Fact]
     public void BadPoison_DoesNotBlockAction()
     {
-        var creature = new Creature("Weezing") { Level = 50, Status = StatusCondition.BadPoison };
+        var creature = new Creature("Weezing") { Level = 50 };
+        creature.Battle.Status = StatusCondition.BadPoison;
         creature.CalculateStats();
 
         bool canAct = StatusResolver.CanAct(creature);
@@ -2232,13 +2240,13 @@ public class CoreMechanicsTests
     {
         var creature = new Creature("Weezing") { Level = 50 };
         creature.CalculateStats();
-        creature.Status = StatusCondition.BadPoison;
-        creature.ToxicCounter = 7;
+        creature.Battle.Status = StatusCondition.BadPoison;
+        creature.Battle.ToxicCounter = 7;
 
         creature.ResetBattleState();
 
-        Assert.Equal(StatusCondition.None, creature.Status);
-        Assert.Equal(1, creature.ToxicCounter);
+        Assert.Equal(StatusCondition.None, creature.Battle.Status);
+        Assert.Equal(1, creature.Battle.ToxicCounter);
     }
 
     [Fact]
@@ -2251,32 +2259,34 @@ public class CoreMechanicsTests
         creature.CalculateStats();
 
         var before = creature.Battle;
-        creature.Status = StatusCondition.Sleep;
-        creature.SleepTurns = 5;
-        creature.ConfusedTurns = 3;
-        creature.ToxicCounter = 7;
-        creature.Stages.RaiseAttack(4);
-        creature.IsRecharging = true;
-        creature.IsFlinched = true;
-        creature.HasLeechSeed = true;
-        creature.BindingTurnsRemaining = 3;
-        creature.IsTwoTurnCharging = true;
-        creature.ChargingMove = new PokemonAttack(new Attack { Name = "Dig", BaseDamage = 80 });
+        creature.Battle.Status = StatusCondition.Sleep;
+        creature.Battle.SleepTurns = 5;
+        creature.Battle.ConfusedTurns = 3;
+        creature.Battle.ToxicCounter = 7;
+        creature.Battle.Stages.RaiseAttack(4);
+        creature.Battle.IsRecharging = true;
+        creature.Battle.IsFlinched = true;
+        creature.Battle.HasLeechSeed = true;
+        creature.Battle.BindingTurnsRemaining = 3;
+        creature.Battle.IsTwoTurnCharging = true;
+        creature.Battle.ChargingMove = new PokemonAttack(
+            new Attack { Name = "Dig", BaseDamage = 80 }
+        );
 
         creature.ResetBattleState();
 
         Assert.NotSame(before, creature.Battle);
-        Assert.Equal(StatusCondition.None, creature.Status);
-        Assert.Equal(0, creature.SleepTurns);
-        Assert.Equal(0, creature.ConfusedTurns);
-        Assert.Equal(1, creature.ToxicCounter);
-        Assert.Equal(0, creature.Stages.Attack);
-        Assert.False(creature.IsRecharging);
-        Assert.False(creature.IsFlinched);
-        Assert.False(creature.HasLeechSeed);
-        Assert.Equal(0, creature.BindingTurnsRemaining);
-        Assert.False(creature.IsTwoTurnCharging);
-        Assert.Null(creature.ChargingMove);
+        Assert.Equal(StatusCondition.None, creature.Battle.Status);
+        Assert.Equal(0, creature.Battle.SleepTurns);
+        Assert.Equal(0, creature.Battle.ConfusedTurns);
+        Assert.Equal(1, creature.Battle.ToxicCounter);
+        Assert.Equal(0, creature.Battle.Stages.Attack);
+        Assert.False(creature.Battle.IsRecharging);
+        Assert.False(creature.Battle.IsFlinched);
+        Assert.False(creature.Battle.HasLeechSeed);
+        Assert.Equal(0, creature.Battle.BindingTurnsRemaining);
+        Assert.False(creature.Battle.IsTwoTurnCharging);
+        Assert.Null(creature.Battle.ChargingMove);
     }
 
     // ── XP & Levelling Tests ─────────────────────────────────────────────────
@@ -2834,7 +2844,7 @@ public class CoreMechanicsTests
         );
         await action.ExecuteAsync();
 
-        Assert.Equal(StatusCondition.Sleep, defender.Status);
+        Assert.Equal(StatusCondition.Sleep, defender.Battle.Status);
         Assert.NotEmpty(recorder.Of<StatusApplied>());
     }
 

@@ -100,167 +100,18 @@ public class Creature
 
     // ── Transient per-battle state ───────────────────────────────────────────
     // Owned by BattleState; reset by assigning a fresh instance (see ResetBattleState).
-    // The properties below delegate to it so the engine and tests keep reading e.g.
-    // creature.Status unchanged. Add NEW per-battle fields to BattleState, never here —
-    // that is what makes a forgotten reset structurally impossible.
+    // Access every per-battle field through this property (creature.Battle.X) — there is
+    // deliberately no delegating facade on Creature, so a NEW per-battle field can only be
+    // added to BattleState, never accidentally onto Creature. That is what makes a forgotten
+    // reset structurally impossible.
     public BattleState Battle { get; set; } = new();
-
-    public StatusCondition Status
-    {
-        get => Battle.Status;
-        set => Battle.Status = value;
-    }
-    public int SleepTurns
-    {
-        get => Battle.SleepTurns;
-        set => Battle.SleepTurns = value;
-    }
-    public int ConfusedTurns
-    {
-        get => Battle.ConfusedTurns;
-        set => Battle.ConfusedTurns = value;
-    }
-    public int ToxicCounter
-    {
-        get => Battle.ToxicCounter;
-        set => Battle.ToxicCounter = value;
-    }
-    public StatStages Stages
-    {
-        get => Battle.Stages;
-        set => Battle.Stages = value;
-    }
-    public bool IsRecharging
-    {
-        get => Battle.IsRecharging;
-        set => Battle.IsRecharging = value;
-    }
-    public bool IsFlinched
-    {
-        get => Battle.IsFlinched;
-        set => Battle.IsFlinched = value;
-    }
-    public bool HasLeechSeed
-    {
-        get => Battle.HasLeechSeed;
-        set => Battle.HasLeechSeed = value;
-    }
-    public int BindingTurnsRemaining
-    {
-        get => Battle.BindingTurnsRemaining;
-        set => Battle.BindingTurnsRemaining = value;
-    }
-    public bool IsTwoTurnCharging
-    {
-        get => Battle.IsTwoTurnCharging;
-        set => Battle.IsTwoTurnCharging = value;
-    }
-    public PokemonAttack? ChargingMove
-    {
-        get => Battle.ChargingMove;
-        set => Battle.ChargingMove = value;
-    }
-    public int RampageTurnsRemaining
-    {
-        get => Battle.RampageTurnsRemaining;
-        set => Battle.RampageTurnsRemaining = value;
-    }
-    public PokemonAttack? RampageMove
-    {
-        get => Battle.RampageMove;
-        set => Battle.RampageMove = value;
-    }
-    public PokemonAttack? DisabledMove
-    {
-        get => Battle.DisabledMove;
-        set => Battle.DisabledMove = value;
-    }
-    public int DisableTurnsRemaining
-    {
-        get => Battle.DisableTurnsRemaining;
-        set => Battle.DisableTurnsRemaining = value;
-    }
-    public bool HasMist
-    {
-        get => Battle.HasMist;
-        set => Battle.HasMist = value;
-    }
-    public bool IsRaging
-    {
-        get => Battle.IsRaging;
-        set => Battle.IsRaging = value;
-    }
-    public PokemonAttack? RageMove
-    {
-        get => Battle.RageMove;
-        set => Battle.RageMove = value;
-    }
-    public PokemonAttack? MimicWrapper
-    {
-        get => Battle.MimicWrapper;
-        set => Battle.MimicWrapper = value;
-    }
-    public Attack? MimicOriginalBase
-    {
-        get => Battle.MimicOriginalBase;
-        set => Battle.MimicOriginalBase = value;
-    }
-    public bool HasReflect
-    {
-        get => Battle.HasReflect;
-        set => Battle.HasReflect = value;
-    }
-    public bool HasLightScreen
-    {
-        get => Battle.HasLightScreen;
-        set => Battle.HasLightScreen = value;
-    }
-    public bool HasFocusEnergy
-    {
-        get => Battle.HasFocusEnergy;
-        set => Battle.HasFocusEnergy = value;
-    }
-    public int BideTurnsRemaining
-    {
-        get => Battle.BideTurnsRemaining;
-        set => Battle.BideTurnsRemaining = value;
-    }
-    public int BideDamageAccumulated
-    {
-        get => Battle.BideDamageAccumulated;
-        set => Battle.BideDamageAccumulated = value;
-    }
-    public PokemonAttack? BideMove
-    {
-        get => Battle.BideMove;
-        set => Battle.BideMove = value;
-    }
-    public int SubstituteHp
-    {
-        get => Battle.SubstituteHp;
-        set => Battle.SubstituteHp = value;
-    }
-    public Attack? LastMoveUsed
-    {
-        get => Battle.LastMoveUsed;
-        set => Battle.LastMoveUsed = value;
-    }
-    public int LastDamageTaken
-    {
-        get => Battle.LastDamageTaken;
-        set => Battle.LastDamageTaken = value;
-    }
-    public DamageType? LastDamageType
-    {
-        get => Battle.LastDamageType;
-        set => Battle.LastDamageType = value;
-    }
 
     /// <summary>
     /// True when at least one move can be chosen this turn: it has PP and isn't Disabled. When
     /// false the creature must Struggle (out of PP, or its only PP-bearing move is disabled).
     /// </summary>
-    public bool CanSelectAnyMove => MoveSet.Any(m => m.PowerPointsCurrent > 0 && m != DisabledMove);
+    public bool CanSelectAnyMove =>
+        MoveSet.Any(m => m.PowerPointsCurrent > 0 && m != Battle.DisabledMove);
 
     /// <summary>
     /// Undoes a transient Mimic move-swap, putting the original move back in the slot. Safe to call

@@ -14,7 +14,7 @@ public class MirrorMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
     public async Task MirrorMoveReExecutesTheFoesLastMove()
     {
         var defender = TestCreatures.Make("D", hp: 500);
-        defender.LastMoveUsed = Move("tackle"); // the foe's last move
+        defender.Battle.LastMoveUsed = Move("tackle"); // the foe's last move
 
         var result = await new MoveScenario().Defender(defender).Use(Move("mirror-move"));
 

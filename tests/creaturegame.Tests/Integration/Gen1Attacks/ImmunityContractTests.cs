@@ -22,7 +22,7 @@ public class ImmunityContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             .Defender(TestCreatures.Make("D", type1: DamageType.Poison, hp: 500))
             .Use(Move("poison-powder"));
 
-        Assert.Equal(StatusCondition.None, result.Defender.Status);
+        Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
         Assert.True(result.Has<MoveHadNoEffect>());
     }
 
@@ -34,7 +34,7 @@ public class ImmunityContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             .Defender(TestCreatures.Make("D", type1: DamageType.Poison, hp: 500))
             .Use(Move("poison-gas"));
 
-        Assert.Equal(StatusCondition.None, result.Defender.Status);
+        Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
         Assert.True(result.Has<MoveHadNoEffect>());
     }
 
@@ -46,7 +46,7 @@ public class ImmunityContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             .Defender(TestCreatures.Make("D", type1: DamageType.Ghost, hp: 500))
             .Use(Move("glare"));
 
-        Assert.Equal(StatusCondition.None, result.Defender.Status);
+        Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
         Assert.True(result.Has<MoveHadNoEffect>());
     }
 
@@ -57,7 +57,7 @@ public class ImmunityContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             .Defender(TestCreatures.Make("D", type1: DamageType.Grass, hp: 500))
             .Use(Move("leech-seed"));
 
-        Assert.False(result.Defender.HasLeechSeed);
+        Assert.False(result.Defender.Battle.HasLeechSeed);
         Assert.True(result.Has<MoveHadNoEffect>());
     }
 
@@ -71,7 +71,7 @@ public class ImmunityContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             .Use(Move("body-slam"));
 
         Assert.True(result.Has<DamageDealt>());
-        Assert.Equal(StatusCondition.None, result.Defender.Status);
+        Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
         Assert.False(
             result.Has<MoveHadNoEffect>(),
             "the move connected; only the secondary status was blocked"
@@ -99,7 +99,7 @@ public class ImmunityContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             .Defender(TestCreatures.Make("D", type1: DamageType.Ground, hp: 500))
             .Use(Move("thunder-wave"));
 
-        Assert.Equal(StatusCondition.None, result.Defender.Status);
+        Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
         Assert.True(result.Has<MoveHadNoEffect>());
     }
 
@@ -137,7 +137,7 @@ public class ImmunityContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             .Defender(TestCreatures.Make("D", type1: DamageType.Normal, hp: 500))
             .Use(Move("confuse-ray"));
 
-        Assert.Equal(0, result.Defender.ConfusedTurns);
+        Assert.Equal(0, result.Defender.Battle.ConfusedTurns);
         Assert.True(result.Has<MoveHadNoEffect>());
     }
 
@@ -152,7 +152,7 @@ public class ImmunityContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             .Defender(TestCreatures.Make("D", type1: DamageType.Ghost, hp: 500))
             .Use(Move("swords-dance"));
 
-        Assert.Equal(2, result.Attacker.Stages.Attack);
+        Assert.Equal(2, result.Attacker.Battle.Stages.Attack);
         Assert.False(
             result.Has<MoveHadNoEffect>(),
             "a self-targeting move isn't blocked by the foe's type"
@@ -164,8 +164,8 @@ public class ImmunityContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     {
         // Counter is Fighting-type; a Ghost target is immune even when the user took counterable damage.
         var attacker = TestCreatures.Make("A");
-        attacker.LastDamageTaken = 50;
-        attacker.LastDamageType = DamageType.Fighting;
+        attacker.Battle.LastDamageTaken = 50;
+        attacker.Battle.LastDamageType = DamageType.Fighting;
 
         var result = await new MoveScenario()
             .Attacker(attacker)

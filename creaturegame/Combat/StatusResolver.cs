@@ -7,8 +7,9 @@ public static class StatusResolver
     public static int EffectiveSpeed(Creature creature, IBattleRules? rules = null)
     {
         var r = rules ?? Gen1BattleRules.Instance;
-        double speed = creature.Attributes.Speed * r.GetStatMultiplier(creature.Stages.Speed);
-        if (creature.Status == StatusCondition.Paralysis)
+        double speed =
+            creature.Attributes.Speed * r.GetStatMultiplier(creature.Battle.Stages.Speed);
+        if (creature.Battle.Status == StatusCondition.Paralysis)
             speed /= 4;
         return (int)speed;
     }
@@ -24,27 +25,27 @@ public static class StatusResolver
         var random = rng ?? SystemRandomSource.Instance;
 
         // Flinch: self-clearing flag set by a faster attacker this turn
-        if (creature.IsFlinched)
+        if (creature.Battle.IsFlinched)
         {
-            creature.IsFlinched = false;
+            creature.Battle.IsFlinched = false;
             emitter?.Emit(new FlinchBlocked(creature.Name));
             return false;
         }
 
         // Binding: trapped by Wrap/Bind/Clamp/Fire Spin
-        if (creature.BindingTurnsRemaining > 0)
+        if (creature.Battle.BindingTurnsRemaining > 0)
         {
             emitter?.Emit(new BindingBlocked(creature.Name));
             return false;
         }
 
-        if (creature.Status == StatusCondition.Sleep)
+        if (creature.Battle.Status == StatusCondition.Sleep)
         {
-            creature.SleepTurns--;
-            if (creature.SleepTurns <= 0)
+            creature.Battle.SleepTurns--;
+            if (creature.Battle.SleepTurns <= 0)
             {
-                creature.SleepTurns = 0;
-                creature.Status = StatusCondition.None;
+                creature.Battle.SleepTurns = 0;
+                creature.Battle.Status = StatusCondition.None;
                 emitter?.Emit(new StatusCleared(creature.Name, StatusCondition.Sleep));
             }
             else
@@ -54,14 +55,14 @@ public static class StatusResolver
             return false;
         }
 
-        if (creature.Status == StatusCondition.Freeze)
+        if (creature.Battle.Status == StatusCondition.Freeze)
         {
             if (
                 battleRules.FreezeRandomThawPercent > 0
                 && random.Next(100) < battleRules.FreezeRandomThawPercent
             )
             {
-                creature.Status = StatusCondition.None;
+                creature.Battle.Status = StatusCondition.None;
                 emitter?.Emit(new StatusCleared(creature.Name, StatusCondition.Freeze));
                 return true;
             }
@@ -69,17 +70,17 @@ public static class StatusResolver
             return false;
         }
 
-        if (creature.Status == StatusCondition.Paralysis && random.Next(4) == 0)
+        if (creature.Battle.Status == StatusCondition.Paralysis && random.Next(4) == 0)
         {
             emitter?.Emit(new ActionBlocked(creature.Name, StatusCondition.Paralysis));
             return false;
         }
 
-        if (creature.ConfusedTurns > 0)
+        if (creature.Battle.ConfusedTurns > 0)
         {
             emitter?.Emit(new ConfusionMessage(creature.Name));
-            creature.ConfusedTurns--;
-            if (creature.ConfusedTurns == 0)
+            creature.Battle.ConfusedTurns--;
+            if (creature.Battle.ConfusedTurns == 0)
             {
                 emitter?.Emit(new ConfusionCleared(creature.Name));
                 return true;
@@ -110,21 +111,21 @@ public static class StatusResolver
         var battleRules = rules ?? Gen1BattleRules.Instance;
 
         // Disable countdown — tick down each turn and re-enable the move when the lock expires.
-        if (creature.DisableTurnsRemaining > 0)
+        if (creature.Battle.DisableTurnsRemaining > 0)
         {
-            creature.DisableTurnsRemaining--;
-            if (creature.DisableTurnsRemaining == 0 && creature.DisabledMove != null)
+            creature.Battle.DisableTurnsRemaining--;
+            if (creature.Battle.DisableTurnsRemaining == 0 && creature.Battle.DisabledMove != null)
             {
-                string reEnabled = creature.DisabledMove.Base.Name ?? "";
-                creature.DisabledMove = null;
+                string reEnabled = creature.Battle.DisabledMove.Base.Name ?? "";
+                creature.Battle.DisabledMove = null;
                 emitter?.Emit(new MoveReEnabled(creature.Name, reEnabled));
             }
         }
 
         // Binding damage — decrement counter and deal 1/16 max HP
-        if (creature.BindingTurnsRemaining > 0)
+        if (creature.Battle.BindingTurnsRemaining > 0)
         {
-            creature.BindingTurnsRemaining--;
+            creature.Battle.BindingTurnsRemaining--;
             int bindDamage = Math.Max(
                 1,
                 creature.Attributes.MaxHP / battleRules.BindingDamageDenominator
@@ -139,28 +140,28 @@ public static class StatusResolver
         int damage = 0;
         StatusCondition source = StatusCondition.None;
 
-        if (creature.Status == StatusCondition.Burn)
+        if (creature.Battle.Status == StatusCondition.Burn)
         {
             damage = Math.Max(1, creature.Attributes.MaxHP / battleRules.BurnDamageDenominator);
             source = StatusCondition.Burn;
         }
-        else if (creature.Status == StatusCondition.Poison)
+        else if (creature.Battle.Status == StatusCondition.Poison)
         {
             damage = Math.Max(1, creature.Attributes.MaxHP / battleRules.PoisonDamageDenominator);
             source = StatusCondition.Poison;
         }
-        else if (creature.Status == StatusCondition.BadPoison)
+        else if (creature.Battle.Status == StatusCondition.BadPoison)
         {
             damage = Math.Max(
                 1,
                 (int)
                     Math.Floor(
                         creature.Attributes.MaxHP
-                            * battleRules.BadPoisonDamageFraction(creature.ToxicCounter)
+                            * battleRules.BadPoisonDamageFraction(creature.Battle.ToxicCounter)
                     )
             );
             source = StatusCondition.BadPoison;
-            creature.ToxicCounter++;
+            creature.Battle.ToxicCounter++;
         }
 
         if (damage > 0)

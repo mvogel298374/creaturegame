@@ -18,7 +18,7 @@ public class StatStageMoveContractTests(MovesFixture moves) : Gen1MoveContract(m
             .Attacker(TestCreatures.Make("A"))
             .Use(Move("swords-dance"));
 
-        Assert.Equal(2, result.Attacker.Stages.Attack);
+        Assert.Equal(2, result.Attacker.Battle.Stages.Attack);
         Assert.False(result.Has<DamageDealt>(), "Swords Dance is a status move — no damage");
 
         var change = result.First<StatStageChanged>();
@@ -35,7 +35,7 @@ public class StatStageMoveContractTests(MovesFixture moves) : Gen1MoveContract(m
         // reports. This pins the importer's Gen 1 override.
         var result = await new MoveScenario().Attacker(TestCreatures.Make("A")).Use(Move("growth"));
 
-        Assert.Equal(1, result.Attacker.Stages.Special);
+        Assert.Equal(1, result.Attacker.Battle.Stages.Special);
         Assert.False(result.Has<DamageDealt>(), "Growth is a status move — no damage");
 
         var change = result.First<StatStageChanged>();
@@ -53,7 +53,7 @@ public class StatStageMoveContractTests(MovesFixture moves) : Gen1MoveContract(m
             .Attacker(TestCreatures.Make("A"))
             .Use(Move("meditate"));
 
-        Assert.Equal(1, result.Attacker.Stages.Attack);
+        Assert.Equal(1, result.Attacker.Battle.Stages.Attack);
         Assert.False(result.Has<DamageDealt>(), "Meditate is a status move — no damage");
 
         var change = result.First<StatStageChanged>();
@@ -71,7 +71,7 @@ public class StatStageMoveContractTests(MovesFixture moves) : Gen1MoveContract(m
             .Attacker(TestCreatures.Make("A"))
             .Use(Move("agility"));
 
-        Assert.Equal(2, result.Attacker.Stages.Speed);
+        Assert.Equal(2, result.Attacker.Battle.Stages.Speed);
         Assert.False(result.Has<DamageDealt>(), "Agility is a status move — no damage");
 
         var change = result.First<StatStageChanged>();

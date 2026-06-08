@@ -93,21 +93,18 @@ public sealed class BattleState
 The defaults baked into this class **are** the reset values. There is no separate list
 of "what to reset to" — the field initializers are the single source of truth.
 
-### `Creature` — owns a `BattleState` and delegates to it
+### `Creature` — owns a `BattleState`
 
 ```csharp
 public BattleState Battle { get; set; } = new();
 
-// Delegating properties keep the engine reading `creature.Status` etc. unchanged.
-public StatusCondition Status { get => Battle.Status; set => Battle.Status = value; }
-public int  SleepTurns        { get => Battle.SleepTurns; set => Battle.SleepTurns = value; }
-// … one per transient field …
-
 public void ResetBattleState() => Battle = new BattleState();
 ```
 
-So `creature.Status` still works everywhere it did before — it just forwards to
-`creature.Battle.Status`. The *storage* moved; the *access* didn't.
+There is **no delegating facade** on `Creature` — every transient field is read and
+written directly through `Battle`, e.g. `creature.Battle.Status`, `creature.Battle.Stages`.
+That is deliberate: it makes a new per-battle field impossible to add accidentally onto
+`Creature` (the only place it can live is `BattleState`). See section 4.3 for the history.
 
 ### How a battle uses it
 
@@ -117,7 +114,7 @@ instances are driven through the turn loop:
 ```csharp
 PlayerCreature.ResetBattleState();   // fresh BattleState
 EnemyCreature.ResetBattleState();
-// … turn loop reads/writes creature.Status, creature.Stages, etc. …
+// … turn loop reads/writes creature.Battle.Status, creature.Battle.Stages, etc. …
 ```
 
 ---
@@ -164,23 +161,23 @@ structurally impossible**. The reset can never drift out of sync with the field 
 because it doesn't enumerate the fields at all. *Prefer replacing an object over
 mutating it back to defaults whenever "defaults" is the entire goal.*
 
-### 4.3 Delegating-property facade (and the trade-off we accepted)
-We *could* have changed all ~120 call sites from `creature.Status` to
-`creature.Battle.Status`. We deliberately didn't. Instead, `Creature` keeps thin
-`get/set` properties that forward to `Battle`.
+### 4.3 Delegating-property facade (a deliberate interim step, now removed)
+When `BattleState` was first extracted, `Creature` kept thin `get/set` properties that
+forwarded to `Battle` (e.g. `public StatusCondition Status { get => Battle.Status; set => Battle.Status = value; }`).
+That facade was a deliberate interim step: extracting the class and migrating every call
+site at once would have been one large diff, so the facade let the *storage* move while the
+*access* (`creature.Status`) stayed unchanged — a small, provably behavior-preserving first
+refactor.
 
-- **Why:** zero churn across the engine and the test suite, so the refactor is
-  **provably behavior-preserving** (the existing 130+ tests pass untouched — see 6).
-  Low risk, small reviewable diff.
-- **The cost we accepted:** the facade doesn't *force* future fields into
-  `BattleState` — a careless dev could still add a transient field directly on
-  `Creature`. We mitigate that with the convention in section 5 and a doc-comment on
-  the code. Removing the facade later (migrating call sites to `creature.Battle.X`) is
-  a purely cosmetic follow-up, tracked in `TODO.md`.
+It has since been **removed**. The ~220 call sites across the engine and the test suite were
+migrated to `creature.Battle.X` in a single compiler-driven pass with the full test suite as
+the safety net (identical pass count before and after). The motivation was the one cost the
+facade carried: it didn't *force* future fields into `BattleState` — a careless dev could
+still add a transient field directly on `Creature`. With the facade gone, that is now
+structurally impossible: a per-battle field can only be added to `BattleState`.
 
-This is a real engineering judgment, not a shortcut: when a compatibility facade buys
-you a safe, test-verified refactor, take it — and write down the trade-off so the next
-person knows it was a choice.
+This is the textbook arc for a compatibility facade: it buys you a safe, test-verified
+refactor up front, and you retire it once the call-site migration is done.
 
 ### 4.4 Permanent / transient split for persistence
 Separating the two halves isn't just tidy — it's **forward design for the save
@@ -212,9 +209,8 @@ recharge for 2 turns" or a "is protected this turn"):
 
 1. Add the field to **`BattleState`**, with the correct default as its initializer.
    *Never* add a transient field directly to `Creature`.
-2. If the engine reads it as `creature.MyFlag` (matching existing style), add a
-   one-line delegating property on `Creature`. If you're comfortable using
-   `creature.Battle.MyFlag` directly, prefer that — it's the direction we're heading.
+2. Read and write it as `creature.Battle.MyFlag` everywhere. There is no delegating
+   facade on `Creature` — that is the whole point, so don't add one back.
 3. **Do not touch `ResetBattleState()`** — the fresh-object reset covers your field for
    free. (If you find yourself editing it, you're doing something unusual; stop and
    ask.)
@@ -237,13 +233,12 @@ Player's creature uses **Body Slam** (10% chance to paralyze) into an enemy alre
 
 1. `Battle.StartFightAsync` already called `ResetBattleState()` on both — both
    `Battle` objects are fresh (`Stages` at 0, `Status` None, etc.).
-2. Earlier, the enemy used Swords Dance → `enemy.Stages.RaiseAttack(2)` (writes through
-   to `enemy.Battle.Stages`).
+2. Earlier, the enemy used Swords Dance → `enemy.Battle.Stages.RaiseAttack(2)`.
 3. This turn, `AttackAction` computes damage; `DamageCalculator` reads
-   `attacker.Stages.Attack` and `attacker.Status` (for the Burn penalty) — all via the
-   delegating properties into `BattleState`.
+   `attacker.Battle.Stages.Attack` and `attacker.Battle.Status` (for the Burn penalty) —
+   directly off `BattleState`.
 4. Body Slam's 10% effect rolls (through `IRandomSource`); on success it sets
-   `enemy.Status = Paralysis` → stored in `enemy.Battle.Status`.
+   `enemy.Battle.Status = Paralysis`.
 5. `StatusResolver` will, on the enemy's future turns, read that `Status` to maybe skip
    the turn (25% full-paralysis chance) and quarter its Speed in the turn-order sort.
 6. When this battle ends and a new one starts, `ResetBattleState()` discards both
@@ -256,9 +251,9 @@ Player's creature uses **Body Slam** (10% chance to paralyze) into an enemy alre
 - **Save system / Game Loop:** persist `Creature` minus `Battle`. Expect major
   `Status` (and the HP/transient asymmetry noted in section 2) to be revisited — likely
   by moving `Status` to the persistent half or introducing a finer-grained split.
-- **Optional facade removal:** migrate call sites to `creature.Battle.X` and delete the
-  delegating properties, so new transient fields can *only* be added to `BattleState`.
-  Cosmetic, no behavior change; deferred in `TODO.md`.
+- **Facade removal — done.** The delegating properties have been deleted and all call
+  sites migrated to `creature.Battle.X`, so new transient fields can *only* be added to
+  `BattleState`. No behavior change (see section 4.3).
 - **Multi-generation:** if a later generation needs different transient state (e.g.
   abilities that persist differently), `BattleState` is the place that varies — keep it
   behind the same seam discipline as `IBattleRules`.
