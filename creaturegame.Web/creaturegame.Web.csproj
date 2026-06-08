@@ -3,6 +3,11 @@
     <ProjectReference Include="..\creaturegame\creaturegame.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- The event-contract test reflects over the internal MapEvent switch. -->
+    <InternalsVisibleTo Include="creaturegame.Tests" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>

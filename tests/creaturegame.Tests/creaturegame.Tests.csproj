@@ -20,6 +20,13 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\creaturegame\creaturegame.csproj" />
+    <ProjectReference Include="..\..\creaturegame.Web\creaturegame.Web.csproj" />
     <ProjectReference Include="..\..\PokeApiConnector\PokeApiConnector.csproj" />
+  </ItemGroup>
+
+  <!-- Referencing the Web (ASP.NET) project pulls in the shared framework, needed for the
+       web-layer contract tests (SignalR event mapping, etc.). -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 </Project>

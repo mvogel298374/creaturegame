@@ -23,7 +23,9 @@ public sealed class SignalRBattleEventEmitter(
         _ = hubContext.Clients.Client(connectionId).OnBattleEvent(type, payload);
     }
 
-    private static (string type, object payload) MapEvent(BattleEvent evt) =>
+    // internal for the web event-contract test (reflection-checks every BattleEvent maps to a
+    // non-"Unknown" type); not part of the public API.
+    internal static (string type, object payload) MapEvent(BattleEvent evt) =>
         evt switch
         {
             BattleStarted e => (
