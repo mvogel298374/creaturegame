@@ -4,9 +4,12 @@
 > [`TODO_ARCHIVE.md`](TODO_ARCHIVE.md) — read it only if you need the history of a finished item.
 > **See also:** `CLAUDE.md` (setup/commands) · `AI_CONTEXT.md` (profiles) · `DESIGN_GUIDES.md` (mechanics) · `DEV_STANDARDS.md` (conventions)
 
-**Current state (2026-06-07):** Move-coverage pass COMPLETE — all 165 Gen 1 moves have behaviour/coverage
-tests (incl. Transform + Conversion). Suite: 821 .NET + 37 Vitest. Next up: post-coverage sequencing item 5
-(the full integration-test pass — the lock-in refactor that preceded it is now done).
+**Current state (2026-06-08):** Move-coverage pass COMPLETE — all 165 Gen 1 moves have behaviour/coverage
+tests (incl. Transform + Conversion). **Integration-test pass (item 5) in progress** — `BattleScenario`
+full-battle harness + interaction probes (Substitute, lock-in, status-stacking, crit, Counter, **Rage,
+Hyper Beam recharge, Bide**), the engine→web event-mapping contract test (`Integration/Web/`), and
+end-to-end battle-flow tests over real DB moves incl. the win→XP→`LeveledUp` chain (`Integration/Flow/`).
+Suite: 837 .NET + 37 Vitest.
 
 ---
 
@@ -17,8 +20,12 @@ Set 2026-06-06, with the mutation batch since done. Remaining order:
 2. ~~jump-kick / hi-jump-kick Ghost-immunity crash edge (Gen 1 also crashes on Fighting→Ghost 0×)~~ ✅ DONE
 3. ~~Counter answer for fixed / level-based damage (today only standard-path damage is counterable)~~ ✅ DONE
 4. ~~`AttackAction` lock-in abstraction (the `ILockInMechanic` refactor — see Tech Debt #6a)~~ ✅ DONE
-5. **The full integration-test pass** — moved here (after the lock-in refactor, before the facade
-   migration) because end-to-end tests are more valuable once the refactors that change call shapes land
+5. **The full integration-test pass** — *in progress.* Landed: `BattleScenario` harness; interaction
+   probes for Substitute, lock-in/forced-selection, status-stacking, crit, Counter, Rage, Hyper Beam
+   recharge, and Bide; the engine→web `MapEvent` contract test; and end-to-end flow tests (well-formed
+   lifecycle event stream + win→XP→`LeveledUp` chain) over real DB moves. No engine bugs surfaced — the
+   probes pin Gen 1 quirks against regression. Remaining candidates: more cross-turn interactions as they
+   come up, and a seeded-battle entry point for deterministic §6/§7 E2E.
 6. `BattleState` facade migration (drop the delegating props — Tech Debt #2 optional cleanup)
 7. `GameController` run-seed (Tech Debt #3 remaining)
 
