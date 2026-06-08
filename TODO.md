@@ -4,32 +4,11 @@
 > [`TODO_ARCHIVE.md`](TODO_ARCHIVE.md) — read it only if you need the history of a finished item.
 > **See also:** `CLAUDE.md` (setup/commands) · `AI_CONTEXT.md` (profiles) · `DESIGN_GUIDES.md` (mechanics) · `DEV_STANDARDS.md` (conventions)
 
-**Current state (2026-06-09):** Move-coverage pass COMPLETE — all 165 Gen 1 moves have behaviour/coverage
-tests (incl. Transform + Conversion). **Integration-test pass (item 5) COMPLETE** — `BattleScenario`
-full-battle harness + interaction probes (Substitute, lock-in, status-stacking, crit, Counter, Rage,
-Hyper Beam recharge, Bide, paralysis turn-order flip, Wrap trap-lock, poison+Leech-Seed end-of-turn
-stacking), the engine→web event-mapping contract test (`Integration/Web/`), and end-to-end battle-flow
-tests over real DB moves incl. the win→XP→`LeveledUp` chain (`Integration/Flow/`). No engine bugs
-surfaced. Suite: 840 .NET + 37 Vitest. Next up: item 6 (`BattleState` facade migration).
-
----
-
-## Post-coverage sequencing (the planned order)
-
-Set 2026-06-06, with the mutation batch since done. Remaining order:
-1. ~~Deferred type/identity-mutation batch (Transform + Conversion)~~ ✅ DONE
-2. ~~jump-kick / hi-jump-kick Ghost-immunity crash edge (Gen 1 also crashes on Fighting→Ghost 0×)~~ ✅ DONE
-3. ~~Counter answer for fixed / level-based damage (today only standard-path damage is counterable)~~ ✅ DONE
-4. ~~`AttackAction` lock-in abstraction (the `ILockInMechanic` refactor — see Tech Debt #6a)~~ ✅ DONE
-5. ~~**The full integration-test pass**~~ ✅ DONE — `BattleScenario` harness; interaction probes for
-   Substitute, lock-in/forced-selection, status-stacking, crit, Counter, Rage, Hyper Beam recharge, Bide,
-   paralysis turn-order flip, Wrap trap-lock, and poison+Leech-Seed end-of-turn stacking; the engine→web
-   `MapEvent` contract test; and end-to-end flow tests (well-formed lifecycle event stream + win→XP→
-   `LeveledUp` chain) over real DB moves. No engine bugs surfaced — the probes pin Gen 1 quirks against
-   regression. (Frontend §6/§7 Playwright E2E and a `GameController` seed for deterministic specs remain,
-   tracked under "Browser-Based UI Testing" and item 7.)
-6. `BattleState` facade migration (drop the delegating props — Tech Debt #2 optional cleanup)
-7. `GameController` run-seed (Tech Debt #3 remaining)
+**Current state (2026-06-09):** Move-coverage pass COMPLETE (all 165 Gen 1 moves), integration-test pass
+COMPLETE, and the `BattleState` facade migration COMPLETE — the whole **post-coverage sequencing** is done
+(archived in `TODO_ARCHIVE.md`). The only deferred item from it is the `GameController` run-seed (needs the
+Game Loop; tracked under Tech Debt #3). Suite: 840 .NET + 37 Vitest. **Next combat-fidelity item:
+XP & Level-Up — finish the in-battle loop** (below).
 
 ---
 
@@ -260,35 +239,14 @@ moving target.
 
 ## Tech Debt / Cleanup (open items)
 
-> Done items (Architecture Review #1/#2/#4/#5/#6, the #6a cleanups, struct→class, DI, RNG seam, etc.) are
-> in [`TODO_ARCHIVE.md`](TODO_ARCHIVE.md).
-
-- [x] **Flaky full-`Battle` tests — DONE 2026-06-07.** Swept and deterministically fixed the three
-  intermittent flakes (all unseeded `Battle` RNG + un-pinned rolls): `RestContractTests` (random crit
-  one-shot the player before the forced-sleep turn → `NoVarianceNoCritHitRules` + seed),
-  `TransformRevertsWhenTheBattleEnds` (un-pinned Defense let the +1-priority enemy randomly OHKO before
-  Transform; plus a false premise — Normal move vs Ghost was 0× → switched enemy to Water + pinned Defense
-  + seed), and `BattleIntegrationTests.PicksSpecificMoveByIndex` (seeded + `AlwaysHitRules`). Verified by a
-  60× full-suite confidence sweep: **0 failures / ~49k test executions.**
+> Done items (Architecture Review #1/#2/#4/#5/#6, the #6a lock-in abstraction, the `BattleState` facade
+> migration, flaky-test sweep, struct→class, DI, RNG seam, etc.) are in [`TODO_ARCHIVE.md`](TODO_ARCHIVE.md).
 
 - [ ] **RNG seam — remaining (Architecture Review #3).** The core library has no direct `Random.Shared`
   (`IRandomSource` threaded through engine + setup). Still open: **`GameController` (web) uses `Random.Shared`**
   for enemy level + random move assignment — deferred; it's the composition root where a per-run seed would be
   injected, but there's no run-seed concept yet (Game Loop). Wire a run seed here when runs exist. *(Optional:
   the `AlwaysHit/AlwaysCrit` rule shims could be replaced by seeded sources — low priority.)*
-
-- [ ] **`BattleState` facade migration (Architecture Review #2 optional cleanup).** Migrate call sites to
-  `creature.Battle.X` and drop the delegating facade, so new per-battle fields can *only* be added to
-  `BattleState`. Deferred — not worth the ~120-site churn yet.
-
-- [x] **`AttackAction.ExecuteAsync` lock-in abstraction (Architecture Review #6a) — DONE 2026-06-07.** The
-  four lock-in mechanics (two-turn / rampage / rage / bide) now live behind `ILockInMechanic`
-  (`creaturegame/Combat/LockInMechanics.cs`): a registry Battle iterates for the forced move, and three
-  per-turn hooks (`OnCommit` charge/store, `OnRelease` unleash/counter-setup, `OnTurnEnd` rampage
-  self-confuse) that `AttackAction.ExecuteAsync` drives. Behaviour-preserving (821/821 unchanged;
-  seam-reviewer verified emission order, PP-once, RNG order, OnTurnEnd parity 1:1). Gen-variable numbers
-  still come from `IBattleRules` via the context; the mechanics encode only Gen-1 lock-in *structure*.
-
 
 - [ ] **Architecture / decision-log doc (`ARCHITECTURE.md`).** Capture the *why* behind the two-DB split,
   event-sourced engine + emitter pattern, the three seams and the "never branch on generation" rule, the web

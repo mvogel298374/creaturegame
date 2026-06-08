@@ -39,6 +39,46 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Post-coverage sequencing — DONE (2026-06-06 → 09)
+
+The ordered pass that followed the move-coverage completion. All six items done; only the deferred
+`GameController` run-seed (Tech Debt #3, needs the Game Loop) remained open in `TODO.md`.
+
+1. **Type/identity-mutation batch** (Transform + Conversion) — completed the 165-move coverage.
+2. **jump-kick / hi-jump-kick Ghost-immunity crash edge** — Gen 1 also crashes the user on Fighting→Ghost 0×.
+3. **Counter for fixed / level-based damage** — Sonic Boom / Seismic Toss / Super Fang are now counterable;
+   only Bide's unleash opts out. The Normal/Fighting last-damage-type gate lives on `IBattleRules`.
+4. **`AttackAction` lock-in abstraction (`ILockInMechanic`, Architecture Review #6a).** The four lock-in
+   mechanics (two-turn / rampage / rage / bide) live behind `ILockInMechanic`
+   (`creaturegame/Combat/LockInMechanics.cs`): a registry Battle iterates for the forced move, and three
+   per-turn hooks (`OnCommit` charge/store, `OnRelease` unleash/counter-setup, `OnTurnEnd` rampage
+   self-confuse) that `AttackAction.ExecuteAsync` drives. Behaviour-preserving (821/821 unchanged;
+   seam-reviewer verified emission order, PP-once, RNG order, OnTurnEnd parity 1:1). Gen-variable numbers
+   still come from `IBattleRules` via the context; the mechanics encode only Gen-1 lock-in *structure*.
+5. **The full integration-test pass.** `BattleScenario` full-battle harness; interaction probes for
+   Substitute, lock-in/forced-selection, status-stacking, crit, Counter, Rage, Hyper Beam recharge, Bide,
+   paralysis turn-order flip, Wrap trap-lock, and poison+Leech-Seed end-of-turn stacking; the engine→web
+   `MapEvent` contract test (`Integration/Web/`); and end-to-end flow tests (well-formed lifecycle event
+   stream + win→XP→`LeveledUp` chain) over real DB moves (`Integration/Flow/`). No engine bugs surfaced —
+   the probes pin Gen 1 quirks against regression. Suite 821 → 840 .NET.
+6. **`BattleState` facade migration (Architecture Review #2).** Deleted the ~33 delegating properties on
+   `Creature` and migrated ~222 call sites across the engine + test suite to `creature.Battle.X` in a
+   single compiler-driven pass (full suite green before and after: 840 passed / 0 failed). New per-battle
+   fields can now *only* be added to `BattleState` — a forgotten reset is structurally impossible.
+   `STATE_MODEL.md` updated to match (facade documented as removed).
+
+## Tech-Debt cleanups — DONE
+
+- **Flaky full-`Battle` tests (2026-06-07).** Swept and deterministically fixed the three intermittent
+  flakes (all unseeded `Battle` RNG + un-pinned rolls): `RestContractTests` (random crit one-shot the
+  player before the forced-sleep turn → `NoVarianceNoCritHitRules` + seed), `TransformRevertsWhenTheBattleEnds`
+  (un-pinned Defense let the +1-priority enemy randomly OHKO before Transform; plus a false premise — Normal
+  move vs Ghost was 0× → switched enemy to Water + pinned Defense + seed), and
+  `BattleIntegrationTests.PicksSpecificMoveByIndex` (seeded + `AlwaysHitRules`). Verified by a 60× full-suite
+  confidence sweep: **0 failures / ~49k test executions.**
+
+---
+
 ## Generation Abstraction — Stat Selection ✅ DONE
 
 - [x] `IBattleRules.GetOffensiveStat(Creature, AttackType)` and `GetDefensiveStat(Creature, AttackType)` added
