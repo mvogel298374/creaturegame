@@ -91,6 +91,70 @@ public class BattleRunnerTests
         Assert.Empty(recorder.Of<RunEnded>());
     }
 
+    // Gen 1 keeps major status on a Pokémon out of battle, so it must carry into the next encounter — and
+    // Toxic reverts to regular Poison out of battle. Encounter 1 badly-poisons the player; encounter 2 must
+    // start with the player already (regularly) Poisoned, never BadPoisoned.
+    [Fact]
+    public async Task Runner_CarriesMajorStatusAcrossEncounters_NormalisingToxicToPoison()
+    {
+        var player = Fighter("Player", hp: 300, attack: 999, speed: 1, level: 50); // slow: the foe strikes first
+
+        int built = 0;
+        Func<Creature, Task<Creature>> supplier = _ =>
+        {
+            built++;
+            Creature enemy;
+            if (built == 1)
+            {
+                // A 1-HP foe that badly-poisons the player (forced) before being one-shot.
+                enemy = Fighter("Toxic", hp: 1, attack: 5, speed: 999, level: 50);
+                enemy.MoveSet.Clear();
+                enemy.AddAttack(
+                    new Attack
+                    {
+                        Name = "toxic",
+                        BaseDamage = 5,
+                        Accuracy = 100,
+                        AttackType = AttackType.Physical,
+                        PowerPointsMax = 99,
+                        StatusEffect = StatusCondition.BadPoison,
+                        EffectChance = 100,
+                    }
+                );
+            }
+            else
+            {
+                enemy = Fighter("Bruiser", hp: 999, attack: 999, speed: 999, level: 50); // ends the run
+            }
+            enemy.SpeciesBaseExperience = 50;
+            return Task.FromResult(enemy);
+        };
+
+        var recorder = new RecordingEmitter();
+        var runner = new BattleRunner(
+            player,
+            supplier,
+            Gen1TypeChart.Instance,
+            new ScriptedInput("tackle"),
+            new RandomMoveInput(), // enemy uses whatever move it has (toxic, then tackle)
+            movePool: Array.Empty<Attack>(),
+            emitter: recorder,
+            rules: new ScriptableRules().Deterministic().ForceSecondary(),
+            rng: new SeededRandomSource(0)
+        );
+
+        await runner.RunAsync();
+
+        // Proves the carry actually fired (not vacuously): the player ends the run regularly Poisoned —
+        // that status was wiped by encounter 2's reset and only re-appears because it was carried + normalised.
+        Assert.Equal(StatusCondition.Poison, player.Battle.Status);
+
+        var playerStatuses = recorder.Of<TurnStarted>().Select(t => t.PlayerStatus).ToList();
+        // Encounter 2's first turn sees the carried status; it must be regular Poison, never BadPoison.
+        Assert.Contains(StatusCondition.Poison, playerStatuses);
+        Assert.DoesNotContain(StatusCondition.BadPoison, playerStatuses);
+    }
+
     // An input that always cancels — stands in for a disconnected client (mirrors SignalRInput.Cancel()).
     private sealed class CancelledInput : IBattleInput
     {

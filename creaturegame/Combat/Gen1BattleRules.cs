@@ -145,6 +145,11 @@ public sealed class Gen1BattleRules : IBattleRules
     // Grass-types are immune to Leech Seed (all generations).
     public bool CanBeLeechSeeded(Creature target) => !HasType(target, DamageType.Grass);
 
+    // Gen 1: Toxic reverts to regular Poison out of battle (the escalating counter is volatile); every
+    // other major status carries unchanged.
+    public StatusCondition CarryStatusOutOfBattle(StatusCondition status) =>
+        status == StatusCondition.BadPoison ? StatusCondition.Poison : status;
+
     private static bool HasType(Creature c, DamageType type) => c.Type1 == type || c.Type2 == type;
 
     // ── Stat stages ────────────────────────────────────────────────────────────

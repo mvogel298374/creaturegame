@@ -98,6 +98,9 @@ public abstract class DelegatingBattleRules : IBattleRules
 
     public virtual bool CanBeLeechSeeded(Creature t) => Gen1.CanBeLeechSeeded(t);
 
+    public virtual StatusCondition CarryStatusOutOfBattle(StatusCondition status) =>
+        Gen1.CarryStatusOutOfBattle(status);
+
     public virtual int CalculateXpAwarded(int baseExp, int enemyLevel) =>
         Gen1.CalculateXpAwarded(baseExp, enemyLevel);
 

@@ -14,6 +14,7 @@ public class Battle
     private readonly IBattleEventEmitter? _emitter;
     private readonly IReadOnlyList<Attack> _movePool;
     private readonly IRandomSource _rng;
+    private readonly CarriedStatus? _playerEntryStatus;
     private int _turnNumber;
 
     public Battle(
@@ -25,7 +26,8 @@ public class Battle
         IReadOnlyList<Attack>? movePool = null,
         IBattleRules? rules = null,
         IBattleEventEmitter? emitter = null,
-        IRandomSource? rng = null
+        IRandomSource? rng = null,
+        CarriedStatus? playerEntryStatus = null
     )
     {
         PlayerCreature = player;
@@ -37,12 +39,23 @@ public class Battle
         _movePool = movePool ?? Array.Empty<Attack>();
         _emitter = emitter;
         _rng = rng ?? SystemRandomSource.Instance;
+        _playerEntryStatus = playerEntryStatus;
     }
 
     public async Task StartFightAsync()
     {
         PlayerCreature.ResetBattleState();
         EnemyCreature.ResetBattleState();
+
+        // A player carried over from a previous encounter in an endless run keeps its major status — Gen 1
+        // persists status out of battle, but the per-battle reset above just cleared it, so re-apply.
+        // Volatiles (confusion, stat stages, …) are deliberately NOT carried. Enemies are always freshly
+        // built, so they never carry anything.
+        if (_playerEntryStatus is { Status: not StatusCondition.None } entry)
+        {
+            PlayerCreature.Battle.Status = entry.Status;
+            PlayerCreature.Battle.SleepTurns = entry.SleepTurns;
+        }
 
         _emitter?.Emit(
             new BattleStarted(

@@ -26,6 +26,7 @@ public sealed class BattleRunner(
     public async Task RunAsync()
     {
         int battlesWon = 0;
+        CarriedStatus? carried = null; // the player's major status, carried into the next encounter
         while (player.IsAlive())
         {
             var enemy = await enemySupplier(player);
@@ -38,7 +39,8 @@ public sealed class BattleRunner(
                 movePool: movePool,
                 rules: rules,
                 emitter: emitter,
-                rng: rng
+                rng: rng,
+                playerEntryStatus: carried
             );
             await battle.StartFightAsync();
 
@@ -47,8 +49,23 @@ public sealed class BattleRunner(
             if (!player.IsAlive())
                 break;
             battlesWon++;
+            carried = CaptureCarriedStatus(player);
         }
 
         emitter?.Emit(new RunEnded(battlesWon, player.Level, player.Name));
+    }
+
+    // Major status carries into the next encounter; the generation decides what each status becomes out of
+    // battle (Gen 1 reverts Toxic to regular Poison) via IBattleRules.CarryStatusOutOfBattle. Volatile
+    // conditions (confusion, stat stages, …) live only in BattleState and are dropped by the per-battle
+    // reset — they are never captured here. The sleep counter carries so a sleeping creature keeps counting
+    // down across the boundary.
+    private CarriedStatus? CaptureCarriedStatus(Creature c)
+    {
+        var status = (rules ?? Gen1BattleRules.Instance).CarryStatusOutOfBattle(c.Battle.Status);
+        if (status == StatusCondition.None)
+            return null;
+        int sleepTurns = status == StatusCondition.Sleep ? c.Battle.SleepTurns : 0;
+        return new CarriedStatus(status, sleepTurns);
     }
 }

@@ -227,9 +227,12 @@ Deferred until Phaser animations exist — the mechanic needs a throw/shake/catc
   enemy evolves to correct form for their level before battle
 - `PlayerSave` / `SavedCreature` models in `save.db`; auto-save after each battle
 - Party management UI between battles
-- **Cross-encounter persistence:** carry major status across encounters and revisit the current "reset *all*
-  transient state per battle" behaviour — today HP persists between battles but status doesn't (canonical
-  Gen 1 keeps major status out of battle). The `Creature`/`BattleState` split is the seam; see `STATE_MODEL.md §2`.
+- **Cross-encounter persistence:** ✅ major status now carries across encounters in the Endless Battle Chain
+  (2026-06-10) — `BattleRunner` snapshots the player's status after each win and re-applies it into the next
+  `Battle` (via `playerEntryStatus`), with `IBattleRules.CarryStatusOutOfBattle` deciding the out-of-battle
+  transform (Gen 1: Toxic→Poison). Volatiles (confusion, stages) still reset per battle — canonical. HP/PP
+  already persisted. (Sleep carries its counter; Freeze persists.) Remaining: only matters again when
+  switching/party exists. See `STATE_MODEL.md §2`.
 
 ---
 

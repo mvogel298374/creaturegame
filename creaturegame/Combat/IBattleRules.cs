@@ -281,6 +281,16 @@ public interface IBattleRules
     /// </summary>
     bool CanBeLeechSeeded(Creature target);
 
+    /// <summary>
+    /// The major status a creature retains when it leaves a battle — used by an endless run to carry
+    /// status into the next encounter. All generations keep Sleep/Poison/Burn/Paralysis/Freeze. Gen 1
+    /// reverts Bad Poison (Toxic) to regular <see cref="StatusCondition.Poison"/> out of battle (the
+    /// escalating counter is volatile), whereas Gen 2+ keeps it Toxic and only resets the counter — so
+    /// this is gen-variable and lives on the seam. Volatile conditions (confusion, stat stages, …) are
+    /// never carried; they are dropped by the per-battle reset, not here.
+    /// </summary>
+    StatusCondition CarryStatusOutOfBattle(StatusCondition status);
+
     // ── Stat selection ─────────────────────────────────────────────────────────
 
     /// <summary>
