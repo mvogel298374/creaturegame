@@ -228,6 +228,72 @@ public class FullBattleFlowTests(MovesFixture moves) : InteractionTest(moves)
         Assert.Equal(span, firstTurn.PlayerXpToNextLevel);
     }
 
+    // The foundation of the Endless Battle Chain: reusing one player Creature across consecutive battles
+    // must persist the permanent half (HP, PP, XP, Level) while the next battle's start resets the
+    // transient half (status, stat-stages, …). No machinery needed — the permanent/transient split does it.
+    [Fact]
+    public async Task ConsecutiveBattles_OnOnePlayer_PersistHpPpXpLevel_AndResetTransientState()
+    {
+        // Level 50 with real stats; a tiny XP award (low-level enemy) so neither battle triggers a
+        // level-up — that keeps the Speed override and the carried HP stable (a level-up would recompute
+        // stats and heal the MaxHP delta, muddying the persistence assertions).
+        var player = BuildStatTestCreature("Player", level: 50);
+        player.Experience = player.CalculateExperienceForLevel(50);
+        player.Attributes.Speed = 1; // slower than the enemy, so the player takes a hit (HP to carry)
+        player.AddAttack(Move("tackle"));
+        int ppMax = player.MoveSet[0].Base.PowerPointsMax;
+        int fullHp = player.Attributes.MaxHP;
+
+        // Battle 1. Enemy has 1 HP (guaranteed one-shot) and a weak hit (player survives easily).
+        var enemy1 = Mon("Enemy1", hp: 1, attack: 20, speed: 200, DamageType.Normal, "tackle");
+        enemy1.Level = 5;
+        enemy1.SpeciesBaseExperience = 50;
+        var r1 = await new BattleScenario()
+            .Player(player)
+            .Enemy(enemy1)
+            .PlayerUses("tackle")
+            .EnemyUses("tackle")
+            .RunAsync();
+        Assert.Equal("Player", r1.Winner);
+
+        int hpAfter1 = player.Attributes.HP;
+        int xpAfter1 = player.Experience;
+        int levelAfter1 = player.Level;
+        int ppAfter1 = player.MoveSet[0].PowerPointsCurrent;
+        Assert.Equal(50, player.Level); // award too small to level — keeps overrides/HP stable
+        Assert.True(hpAfter1 < fullHp, "player took damage in battle 1");
+        Assert.True(ppAfter1 < ppMax, "player spent PP in battle 1");
+
+        // Dirty the transient half to prove the next battle's start wipes it.
+        player.Battle.Status = StatusCondition.Poison;
+
+        // Battle 2 — the SAME player instance against a fresh enemy.
+        var enemy2 = Mon("Enemy2", hp: 1, attack: 20, speed: 200, DamageType.Normal, "tackle");
+        enemy2.Level = 5;
+        enemy2.SpeciesBaseExperience = 50;
+        var r2 = await new BattleScenario()
+            .Player(player)
+            .Enemy(enemy2)
+            .PlayerUses("tackle")
+            .EnemyUses("tackle")
+            .RunAsync();
+        Assert.Equal("Player", r2.Winner);
+
+        // Transient reset + HP persistence: the first turn of battle 2 reports no status and the HP
+        // carried out of battle 1 (nothing has healed it).
+        var firstTurn2 = r2.All<TurnStarted>()[0];
+        Assert.Equal(StatusCondition.None, firstTurn2.PlayerStatus);
+        Assert.Equal(hpAfter1, firstTurn2.PlayerHp);
+
+        // Permanent half accumulates across both battles — never reset.
+        Assert.True(player.Experience > xpAfter1, "XP accumulates across battles");
+        Assert.True(player.Level >= levelAfter1, "level never regresses");
+        Assert.True(
+            player.MoveSet[0].PowerPointsCurrent < ppAfter1,
+            "PP keeps depleting across battles (not restored between them)"
+        );
+    }
+
     // At the level cap the XP-bar helpers report a full bar (XpThisLevel == XpToNextLevel > 0) instead of a
     // span into a non-existent level 101 — the client neither divides by a meaningless denominator nor
     // shows an empty bar on a maxed creature.

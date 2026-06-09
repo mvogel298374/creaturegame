@@ -65,6 +65,15 @@ public sealed class SignalRBattleEventEmitter(
             ),
             TurnEnded => ("TurnEnded", new { }),
             BattleEnded e => ("BattleEnded", new { e.WinnerName }),
+            RunEnded e => (
+                "RunEnded",
+                new
+                {
+                    e.BattlesWon,
+                    e.FinalLevel,
+                    e.FinalCreatureName,
+                }
+            ),
             MoveUsed e => ("MoveUsed", new { e.AttackerName, e.MoveName }),
             MoveMissed e => ("MoveMissed", new { e.AttackerName, e.MoveName }),
             MoveHadNoEffect e => ("MoveHadNoEffect", new { e.TargetName, e.MoveName }),

@@ -36,6 +36,10 @@ public record TurnEnded : BattleEvent;
 
 public record BattleEnded(string WinnerName) : BattleEvent;
 
+/// <summary>The endless battle chain ended — the player's creature fainted. Carries the run summary for
+/// the game-over screen. Emitted once, after the final <see cref="BattleEnded"/>.</summary>
+public record RunEnded(int BattlesWon, int FinalLevel, string FinalCreatureName) : BattleEvent;
+
 // --- Move actions ---
 public record MoveUsed(string AttackerName, string MoveName) : BattleEvent;
 

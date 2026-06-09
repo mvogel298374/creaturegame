@@ -276,6 +276,12 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
             case LeveledUp e:
                 Console.WriteLine($"{e.CreatureName} grew to level {e.NewLevel}!");
                 break;
+
+            case RunEnded e:
+                Console.WriteLine(
+                    $"Run over — {e.FinalCreatureName} fainted after {e.BattlesWon} win(s), reaching level {e.FinalLevel}."
+                );
+                break;
         }
     }
 }

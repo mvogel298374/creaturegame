@@ -13,7 +13,7 @@ namespace creaturegame.DB;
 /// <para>
 /// <see cref="Generation"/> keeps generations separated in one table: every row is 1
 /// today; a future generation seeds its own rows and the runtime query filters by the
-/// active generation (see <c>GameController.ActiveGeneration</c>).
+/// active generation (see <c>EncounterFactory.ActiveGeneration</c>).
 /// </para>
 /// </summary>
 public class PokemonLearnset

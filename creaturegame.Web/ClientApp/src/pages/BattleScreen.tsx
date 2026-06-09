@@ -93,7 +93,8 @@ export function BattleScreen() {
               playerName={playerName}
               canFight={state.phase === 'choosing' && !state.animating}
               battleEnded={state.phase === 'ended'}
-              winner={state.winner}
+              battlesWon={state.battlesWon}
+              finalLevel={state.playerLevel}
               onFight={() => setControlView('fight')}
               onCheck={() => setControlView('check')}
               onBack={() => nav('/')}
@@ -168,11 +169,12 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function ActionMenu({ playerName, canFight, battleEnded, winner, onFight, onCheck, onBack }: {
+function ActionMenu({ playerName, canFight, battleEnded, battlesWon, finalLevel, onFight, onCheck, onBack }: {
   playerName: string;
   canFight: boolean;
   battleEnded: boolean;
-  winner: string | null;
+  battlesWon: number;
+  finalLevel: number;
   onFight: () => void;
   onCheck: () => void;
   onBack: () => void;
@@ -181,7 +183,7 @@ function ActionMenu({ playerName, canFight, battleEnded, winner, onFight, onChec
     <div className="action-menu">
       <p className="action-prompt">
         {battleEnded
-          ? (winner ? `${winner} wins!` : 'Battle over!')
+          ? `Game over — ${battlesWon} win${battlesWon === 1 ? '' : 's'}, reached Lv${finalLevel}.`
           : `What will ${playerName} do?`}
       </p>
       {!battleEnded && (

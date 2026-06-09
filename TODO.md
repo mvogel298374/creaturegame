@@ -7,9 +7,10 @@
 **Current state (2026-06-09):** Move-coverage pass COMPLETE (all 165 Gen 1 moves), integration-test pass
 COMPLETE, and the `BattleState` facade migration COMPLETE — the whole **post-coverage sequencing** is done
 (archived in `TODO_ARCHIVE.md`). The only deferred item from it is the `GameController` run-seed (needs the
-Game Loop; tracked under Tech Debt #3). Suite: 840 .NET + 37 Vitest. **Next up — XP & progression, in two
-pieces:** (1) **XP & Level-Up** fidelity, then (2) the **Endless Battle Chain** (a minimal run loop so XP/HP
-have stakes). Both below.
+Game Loop; tracked under Tech Debt #3). **XP & progression DONE (2026-06-09):** (1) **XP & Level-Up**
+fidelity and (2) the **Endless Battle Chain** (minimal run loop — endless wild battles on one persistent
+creature) both landed; only their **E2E specs remain** (deferred to a combined E2E pass). Suite: 847 .NET +
+40 Vitest.
 
 ---
 
@@ -56,46 +57,45 @@ regardless of the real amount, and nothing animates on a win that doesn't level.
 
 ## Endless Battle Chain (minimal run loop)
 
-**Slated: PIECE 2, after XP & Level-Up.** A deliberate **minimal slice** of the deferred *Game Loop &
-Progression* (below) — pulled forward so XP and HP have stakes: **battle after battle with no end** until
-the player's single Pokémon faints. **Not** the full loop — no catch, no party, no save, no evolution, no
-version filtering (those stay in *Game Loop & Progression*). One persistent player `Creature` vs a fresh
-wild enemy each encounter.
+**PIECE 2 — DONE (2026-06-09)** except the E2E spec (below). One persistent player runs battle after
+battle (fresh wild enemy each time) until it faints; HP/PP/XP/Level carry, transient resets, `RunEnded`
+drives a game-over summary. Suite 847 .NET + 40 Vitest, `/audit` PASS-WITH-ADVISORIES (resolved; double-
+faint test consciously deferred). A deliberate **minimal slice** of the deferred *Game Loop & Progression*
+(below) — no catch/party/save/evolution/version-filtering.
 
-**Persistence (mostly free — the permanent/transient split already does it):** reusing one player `Creature`
-across consecutive `Battle` instances carries HP, PP (`PowerPointsCurrent`), Experience and Level forward
-(permanent half); status / stat-stages / confusion reset per battle (transient `BattleState`) — canonical
-Gen 1. No between-battle heal, so HP and PP matter. See `STATE_MODEL.md §2`.
-- [ ] **Verify + lock** with a test that runs two consecutive battles on one `Creature` and asserts
-  HP/PP/XP/Level persist while transient state resets. Add `Creature.ResetForNewEncounter()` only if a gap
-  surfaces.
+**Persistence (free — the permanent/transient split does it):** reusing one player `Creature` across
+consecutive `Battle` instances carries HP, PP (`PowerPointsCurrent`), Experience and Level (permanent half);
+status / stat-stages / confusion reset per `Battle.StartFightAsync` (transient `BattleState`) — canonical
+Gen 1. No between-battle heal. See `STATE_MODEL.md §2`.
+- [x] Verified + locked by `ConsecutiveBattles_OnOnePlayer_PersistHpPpXpLevel_AndResetTransientState`. No
+  `ResetForNewEncounter()` needed.
 
 **Encounter factory (web):**
-- [ ] Extract enemy construction from `GameController.Start` into an injectable `EncounterFactory`
-  (DB-backed: species + learnsets + moves). `GameController` uses it for encounter 1; the run loop uses it
-  for every encounter after.
-- [ ] Level-scaling rule: enemy level tracks the player's **current** level (a leveled-up player keeps
-  meeting same-tier foes); BST tracks the current lead. (Depth ramp / difficulty curve = future Game Loop.)
+- [x] `EncounterFactory` (`CreatePlayerSetupAsync` + `CreateEnemyAsync`) — `BuildCreature` moved out of
+  `GameController`; the factory builds every enemy (the run loop calls it each encounter).
+- [x] Level-scaling: enemy level = player's **current** level ± 3, BST-matched. (`CreateEnemyAsync` takes an
+  optional `IRandomSource` — seedable; defaults to system RNG. Depth ramp = future Game Loop.)
 
-**Run loop (web orchestrator):**
-- [ ] Replace the single `StartFightAsync` in `GameSessionManager` (or a new `BattleRunner`) with a loop:
-  run battle → player alive? build next enemy via the factory + start the next battle → repeat; player
-  fainted → end the run. Per-encounter `BattleEnded(winner)` stays unchanged.
-- [ ] New `RunEnded(int BattlesWon, int FinalLevel, string FinalCreatureName)` event (terminal).
-- [ ] RNG/seed: this is the composition root for the deferred per-run seed (Tech Debt #3) — wire a seed here
-  when seeding lands; not required now.
+**Run loop (core orchestrator):**
+- [x] `BattleRunner` (core) drives the chain; `GameSessionManager` runs it instead of one `Battle`.
+- [x] New `RunEnded(BattlesWon, FinalLevel, FinalCreatureName)` event (terminal; mapped in both emitters).
+- [x] Abandon path (client disconnect) throws out of the loop **before** `RunEnded` — pinned by a test.
+- [ ] RNG/seed: full per-run seed through `GameSessionManager` → `BattleRunner`/`EncounterFactory` still
+  pending (Tech Debt #3); the factory now accepts a seedable source, so this is just the wiring.
 
 **Frontend:**
-- [ ] `BattleEnded` with the player as winner → brief **intermission** ("next foe approaches"), keep the
-  HP/XP bars, then the next `BattleStarted` resumes play (no terminal screen).
-- [ ] `RunEnded` → game-over screen with a run summary (battles won, final level) → back to title. (Folds in
-  the deferred `BattleEndedOverlay` Web-UI item, now run-scoped.)
+- [x] `BattleEnded` (player win) → non-terminal intermission ("A new challenger approaches!"), bars persist,
+  next `BattleStarted` resumes. `BattleEnded` (player loss) → no-op; `RunEnded` owns the end.
+- [x] `RunEnded` → game-over screen with run summary (wins, final level). `state.winner` → `state.battlesWon`.
 
 **Tests:**
-- [ ] Backend: the chain runs N encounters on one `Creature`; a player faint emits `RunEnded` with the
-  correct summary.
-- [ ] Web contract: `RunEnded` maps to a named client event (extend `WebEventContractTests`).
-- [ ] E2E: win an encounter → next encounter starts with HP/XP carried; faint → game-over summary.
+- [x] Backend: `BattleRunnerTests` — chain → `RunEnded` summary; abandon emits no `RunEnded`.
+- [x] Web contract: `RunEnded` auto-covered by `WebEventContractTests` (reflects over all events).
+- [ ] **E2E (deferred — do in the E2E pass):** `e2e/battle.spec.ts` + `e2e/helpers.ts` still assert the old
+  terminal `"wins!"` line, which the chain removed. Update them: win → "A new challenger approaches!" +
+  next encounter with HP/XP carried; faint → "Run over"/game-over summary.
+- [ ] Backend (deferred edge): a double-faint (mutual end-of-turn DoT) counts as a loss (`break` before the
+  win-count) — behavior correct, no deterministic test yet.
 
 ---
 

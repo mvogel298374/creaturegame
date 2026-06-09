@@ -12,6 +12,7 @@ builder
     .AddJsonProtocol(opts =>
         opts.PayloadSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     );
+builder.Services.AddSingleton<EncounterFactory>();
 builder.Services.AddSingleton<GameSessionManager>();
 
 // DbContext factories — the battle runs on a background task outside any request

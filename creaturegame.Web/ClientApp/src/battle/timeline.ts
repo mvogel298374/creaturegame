@@ -29,7 +29,7 @@ export type Action =
   | { type: 'TURN_STARTED'; turnNumber: number; playerHp: number; playerMaxHp: number; playerStatus: string; playerXpThisLevel: number; playerXpToNextLevel: number; enemyHp: number; enemyMaxHp: number; enemyStatus: string; moves: MoveInfo[] }
   | { type: 'TURN_ENDED' }
   | { type: 'PLAYER_CHOSE' }
-  | { type: 'BATTLE_ENDED'; winner: string }
+  | { type: 'RUN_ENDED'; battlesWon: number; finalLevel: number }
   | { type: 'LOG'; message: string }
   | { type: 'UPDATE_HP'; name: string; hp: number }
   | { type: 'UPDATE_STATUS'; name: string; status: string }
@@ -166,9 +166,28 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       return { now: [{ type: 'TURN_ENDED' }] };
 
     case 'BattleEnded': {
+      // Per-encounter, NOT terminal in an endless chain. If the player won, it's an intermission — the
+      // next BattleStarted resumes play. If the player lost, RunEnded follows and drives the game-over
+      // screen, so there's nothing to do here.
       const winner = payload.winnerName as string;
-      // Phase flips immediately; the winner line plays after the queue drains.
-      return { now: [{ type: 'BATTLE_ENDED', winner }], steps: [w(200), d(log(`${winner} wins!`))] };
+      if (side(winner) === 'player') {
+        return { steps: [w(300), d(log('A new challenger approaches!')), w(500)] };
+      }
+      return {};
+    }
+
+    case 'RunEnded': {
+      // Terminal: the player's creature fainted. Flip to the game-over screen after the faint animation
+      // (queued) has drained, and log the run summary.
+      const battlesWon = payload.battlesWon as number;
+      const finalLevel = payload.finalLevel as number;
+      const name = payload.finalCreatureName as string;
+      const wins = `${battlesWon} win${battlesWon === 1 ? '' : 's'}`;
+      return { steps: [
+        w(400),
+        d(log(`${name} fainted! Run over — ${wins}, reached level ${finalLevel}.`)),
+        d({ type: 'RUN_ENDED', battlesWon, finalLevel }),
+      ] };
     }
 
     // ── Turn events: sequenced through the animation timeline ──────────────────

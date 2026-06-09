@@ -113,10 +113,32 @@ describe('expandEvent — control plane vs timeline', () => {
     expect(steps![0]).toMatchObject({ kind: 'dispatch', action: { type: 'TURN_STARTED', enemyHp: 80 } });
   });
 
-  it('BattleEnded flips phase immediately but logs the winner via the timeline', () => {
+  it('BattleEnded with the player winning is a non-terminal intermission', () => {
+    // Endless chain: a player win is not the end — the next BattleStarted resumes play.
     const { now, steps } = expandEvent('BattleEnded', { winnerName: 'MEWTWO' }, CTX);
-    expect(now).toEqual([{ type: 'BATTLE_ENDED', winner: 'MEWTWO' }]);
-    expect(logLines(steps)).toEqual(['MEWTWO wins!']);
+    expect(now).toBeUndefined();
+    expect(logLines(steps)).toEqual(['A new challenger approaches!']);
+  });
+
+  it('BattleEnded with the player losing does nothing (RunEnded drives the game over)', () => {
+    expect(expandEvent('BattleEnded', { winnerName: 'GENGAR' }, CTX)).toEqual({});
+  });
+
+  it('RunEnded logs the run summary and queues the game-over phase flip', () => {
+    const { now, steps } = expandEvent(
+      'RunEnded', { battlesWon: 3, finalLevel: 52, finalCreatureName: 'MEWTWO' }, CTX);
+    expect(now).toBeUndefined();
+    expect(logLines(steps)).toEqual(['MEWTWO fainted! Run over — 3 wins, reached level 52.']);
+    const dispatched = (steps ?? [])
+      .filter((s): s is Extract<Step, { kind: 'dispatch' }> => s.kind === 'dispatch')
+      .map(s => s.action.type);
+    expect(dispatched).toContain('RUN_ENDED');
+  });
+
+  it('RunEnded uses the singular "win" for a single victory', () => {
+    const { steps } = expandEvent(
+      'RunEnded', { battlesWon: 1, finalLevel: 6, finalCreatureName: 'PIDGEY' }, CTX);
+    expect(logLines(steps)).toEqual(['PIDGEY fainted! Run over — 1 win, reached level 6.']);
   });
 });
 

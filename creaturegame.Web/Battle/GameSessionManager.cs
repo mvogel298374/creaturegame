@@ -4,11 +4,13 @@ using creaturegame.Combat;
 using creaturegame.Creatures;
 using creaturegame.Web.Hubs;
 using Microsoft.AspNetCore.SignalR;
-using BattleEngine = creaturegame.Combat.Battle;
 
 namespace creaturegame.Web.Battle;
 
-public sealed class GameSessionManager(IHubContext<BattleHub, IBattleClient> hubContext)
+public sealed class GameSessionManager(
+    IHubContext<BattleHub, IBattleClient> hubContext,
+    EncounterFactory encounters
+)
 {
     private readonly ConcurrentDictionary<string, PendingSession> _pending = new(); // gameId → registered, not yet started
     private readonly ConcurrentDictionary<string, ActiveBattle> _active = new(); // gameId → running battle
@@ -21,10 +23,10 @@ public sealed class GameSessionManager(IHubContext<BattleHub, IBattleClient> hub
     // the battle — covers the JS client's automatic-reconnect policy (gives up ~30 s).
     private static readonly TimeSpan ReconnectGrace = TimeSpan.FromSeconds(40);
 
-    public string RegisterSession(Creature player, Creature enemy, IReadOnlyList<Attack> allMoves)
+    public string RegisterSession(Creature player, IReadOnlyList<Attack> allMoves)
     {
         var gameId = Guid.NewGuid().ToString("N");
-        _pending[gameId] = new PendingSession(player, enemy, allMoves, DateTimeOffset.UtcNow);
+        _pending[gameId] = new PendingSession(player, allMoves, DateTimeOffset.UtcNow);
         EvictExpiredPendingSessions();
         return gameId;
     }
@@ -66,9 +68,11 @@ public sealed class GameSessionManager(IHubContext<BattleHub, IBattleClient> hub
 
         // Emitter resolves the current connection per-event, so output follows reconnects.
         var emitter = new SignalRBattleEventEmitter(hubContext, () => battle.CurrentConnectionId);
-        var engine = new BattleEngine(
+        // Endless chain: one persistent player, a fresh DB-built enemy per encounter. A single enemy input
+        // is reused across encounters (RandomMoveInput is stateless per turn).
+        var runner = new BattleRunner(
             session.Player,
-            session.Enemy,
+            p => encounters.CreateEnemyAsync(p, session.AllMoves),
             Gen1TypeChart.Instance,
             battle.Input,
             new RandomMoveInput(),
@@ -80,18 +84,19 @@ public sealed class GameSessionManager(IHubContext<BattleHub, IBattleClient> hub
         {
             try
             {
-                await engine.StartFightAsync();
+                await runner.RunAsync();
             }
             catch (OperationCanceledException)
             {
-                // Expected when the reconnect grace expires — see DetachConnection.
+                // Expected when the reconnect grace expires — see DetachConnection. The run is abandoned
+                // without a RunEnded (that's reserved for the player actually fainting).
                 Console.WriteLine(
-                    $"[GameSessionManager] Battle {gameId} abandoned (client did not reconnect)."
+                    $"[GameSessionManager] Run {gameId} abandoned (client did not reconnect)."
                 );
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[GameSessionManager] Battle {gameId} failed: {ex}");
+                Console.WriteLine($"[GameSessionManager] Run {gameId} failed: {ex}");
             }
             finally
             {
@@ -133,7 +138,6 @@ public sealed class GameSessionManager(IHubContext<BattleHub, IBattleClient> hub
 
 sealed record PendingSession(
     Creature Player,
-    Creature Enemy,
     IReadOnlyList<Attack> AllMoves,
     DateTimeOffset RegisteredAt
 );

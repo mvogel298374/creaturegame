@@ -20,7 +20,7 @@ export interface BattleState {
   enemySpeciesId: number;
   enemyLevel: number;
   moves: MoveInfo[];
-  winner: string | null;
+  battlesWon: number;
   log: string[];
   turnNumber: number;
 }
@@ -42,7 +42,7 @@ const initialState: BattleState = {
   enemySpeciesId: 0,
   enemyLevel: 0,
   moves: [],
-  winner: null,
+  battlesWon: 0,
   log: [],
   turnNumber: 0,
 };
@@ -71,8 +71,9 @@ function reducer(state: BattleState, action: Action): BattleState {
       return { ...state, phase: 'battling', animating: true };
     case 'TURN_ENDED':
       return { ...state, phase: 'battling' };
-    case 'BATTLE_ENDED':
-      return { ...state, phase: 'ended', winner: action.winner };
+    case 'RUN_ENDED':
+      // Terminal — the player fainted. Show the game-over screen with the run summary.
+      return { ...state, phase: 'ended', battlesWon: action.battlesWon, playerLevel: action.finalLevel };
     case 'LOG':
       return { ...state, log: [...state.log, action.message] };
     case 'UPDATE_HP':
