@@ -434,3 +434,45 @@
 .status-badge--burn      { background: #ff9c54; color: #fff; }
 .status-badge--paralysis { background: #f3d23b; color: #333; }
 .status-badge--freeze    { background: #74cec0; color: #fff; }
+/* ── Level-up stat panel (Gen 1 box) ─────────────── */
+.levelup-panel {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 3;
+  background: var(--clr-bg-deep);
+  border: 2px solid var(--clr-text);
+  border-radius: 4px;
+  padding: var(--sp-sm) var(--sp-md);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.55);
+  animation: levelup-pop 160ms ease-out;
+}
+
+@keyframes levelup-pop {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+.levelup-title {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--clr-sky);
+  text-align: center;
+  margin-bottom: var(--sp-xs);
+}
+
+.levelup-table {
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+  color: var(--clr-text);
+}
+
+.levelup-table td {
+  padding: 2px 0;
+}
+
+.levelup-stat  { text-align: left;  padding-right: var(--sp-md); letter-spacing: 1px; }
+.levelup-gain  { text-align: right; padding-right: var(--sp-sm); color: #44cc44; font-weight: 700; }
+.levelup-total { text-align: right; color: var(--clr-text); opacity: 0.85; }

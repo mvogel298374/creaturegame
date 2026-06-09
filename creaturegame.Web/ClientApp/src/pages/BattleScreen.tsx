@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { TypeBadge } from '../components/TypeBadge';
 import { BattleCanvas } from '../battle/BattleCanvas';
-import { useBattleHub } from '../hooks/useBattleHub';
+import { useBattleHub, type LevelUpPanel } from '../hooks/useBattleHub';
 import type { Species } from '../types/Species';
 import type { MoveInfo } from '../types/BattleEvents';
 import { formatMoveName } from '../utils/format';
@@ -75,6 +75,8 @@ export function BattleScreen() {
           <StatusBadge status={state.playerStatus} />
           <XpBar xp={state.playerXp} xpToNext={state.playerXpToNext} />
         </div>
+
+        {state.levelUp && <LevelUpStatPanel panel={state.levelUp} />}
       </div>
 
       <div className="battle-panel">
@@ -152,6 +154,34 @@ function XpBar({ xp, xpToNext }: { xp: number; xpToNext: number }) {
       <div className="bar-track">
         <div className="bar-fill bar-fill--xp" style={{ width: `${pct}%` }} />
       </div>
+    </div>
+  );
+}
+
+// Gen 1 level-up box: the stat names with the gain (+N) from this level and the new total.
+function LevelUpStatPanel({ panel }: { panel: LevelUpPanel }) {
+  const { gains, totals } = panel;
+  const rows: [string, number, number][] = [
+    ['HP', gains.maxHp, totals.maxHp],
+    ['ATTACK', gains.attack, totals.attack],
+    ['DEFENSE', gains.defense, totals.defense],
+    ['SPECIAL', gains.special, totals.special],
+    ['SPEED', gains.speed, totals.speed],
+  ];
+  return (
+    <div className="levelup-panel" role="status" aria-label={`Level ${panel.level}`}>
+      <div className="levelup-title">LEVEL UP! · Lv {panel.level}</div>
+      <table className="levelup-table">
+        <tbody>
+          {rows.map(([label, gain, total]) => (
+            <tr key={label}>
+              <td className="levelup-stat">{label}</td>
+              <td className="levelup-gain">+{gain}</td>
+              <td className="levelup-total">{total}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

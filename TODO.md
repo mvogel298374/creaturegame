@@ -157,7 +157,8 @@ Stack: React 18 + TypeScript + SignalR + Phaser 3. (Phaser canvas & core animati
 
 - [ ] `BattleEndedOverlay` — **superseded by the Endless Battle Chain's `RunEnded` game-over screen** (a
   per-`BattleEnded` overlay no longer fits an endless chain); build it there, run-scoped, not per battle
-- [ ] Level-up notification toast on `LeveledUp` event
+- [x] Level-up notification toast — Gen 1 stat-gain panel (HP/ATTACK/DEFENSE/SPECIAL/SPEED with +gains and
+  new totals) on `LeveledUp`. Engine sends per-stat `StatGains` (before/after `TryLevelUp` delta).
 - [ ] Move menu STAB indicator — subtle highlight on moves matching player's type
 - [ ] Color-coded effectiveness in battle log (super-effective green, not very effective grey, no effect red)
 - [ ] Sprite shake tween on damage received

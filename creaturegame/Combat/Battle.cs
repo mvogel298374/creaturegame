@@ -167,17 +167,22 @@ public class Battle
                 );
                 PlayerCreature.AddExperience(xp);
                 _emitter?.Emit(new ExperienceGained(PlayerCreature.Name, xp));
-                // Drive level-ups one at a time so each event carries that level's resulting stats and
-                // bar parameters (also the seam the deferred level-up move-learning will hook into).
-                while (PlayerCreature.TryLevelUp())
+                // Drive level-ups one at a time so each event carries that level's resulting stats, the
+                // per-stat gains, and bar parameters (also the seam the deferred move-learning will use).
+                while (true)
                 {
+                    var before = PlayerCreature.StatSnapshot();
+                    if (!PlayerCreature.TryLevelUp())
+                        break;
+                    var after = PlayerCreature.StatSnapshot();
                     _emitter?.Emit(
                         new LeveledUp(
                             PlayerCreature.Name,
                             PlayerCreature.Level,
                             PlayerCreature.XpThisLevel,
                             PlayerCreature.XpToNextLevel,
-                            PlayerCreature.StatSnapshot()
+                            after,
+                            after.Minus(before)
                         )
                     );
                 }

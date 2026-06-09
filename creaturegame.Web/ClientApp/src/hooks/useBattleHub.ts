@@ -1,7 +1,13 @@
 import { useEffect, useRef, useReducer, useCallback } from 'react';
 import * as signalR from '@microsoft/signalr';
 import type { MoveInfo } from '../types/BattleEvents';
-import { type Action, type Payload, expandEvent, useBattleTimeline } from '../battle/timeline';
+import { type Action, type Payload, type StatBlock, expandEvent, useBattleTimeline } from '../battle/timeline';
+
+export interface LevelUpPanel {
+  level: number;
+  gains: StatBlock;
+  totals: StatBlock;
+}
 
 export interface BattleState {
   phase: 'connecting' | 'waiting' | 'choosing' | 'battling' | 'ended';
@@ -21,6 +27,7 @@ export interface BattleState {
   enemyLevel: number;
   moves: MoveInfo[];
   battlesWon: number;
+  levelUp: LevelUpPanel | null;
   log: string[];
   turnNumber: number;
 }
@@ -43,6 +50,7 @@ const initialState: BattleState = {
   enemyLevel: 0,
   moves: [],
   battlesWon: 0,
+  levelUp: null,
   log: [],
   turnNumber: 0,
 };
@@ -104,6 +112,10 @@ function reducer(state: BattleState, action: Action): BattleState {
     case 'LEVELED_UP':
       // Tick the level and reset the bar onto the new level's scale (refilled by a following XP_SET).
       return { ...state, playerLevel: action.newLevel, playerXpToNext: action.xpToNextLevel, playerXp: 0 };
+    case 'SHOW_LEVEL_UP':
+      return { ...state, levelUp: { level: action.level, gains: action.gains, totals: action.totals } };
+    case 'HIDE_LEVEL_UP':
+      return { ...state, levelUp: null };
     case 'ANIMATING_START':
       return { ...state, animating: true };
     case 'ANIMATING_DONE':

@@ -157,6 +157,28 @@ describe('expandEvent — control plane vs timeline', () => {
       'RunEnded', { battlesWon: 1, finalLevel: 6, finalCreatureName: 'PIDGEY' }, CTX);
     expect(logLines(steps)).toEqual(['PIDGEY fainted! Run over — 1 win, reached level 6.']);
   });
+
+  it('LeveledUp announces the level then shows the stat-gain panel (gains + new totals) and hides it', () => {
+    const { steps } = expandEvent('LeveledUp', {
+      creatureName: 'MEWTWO', newLevel: 12, xpThisLevel: 40, xpToNextLevel: 100,
+      stats: { maxHp: 130, attack: 78, defense: 65, special: 70, speed: 90 },
+      statGains: { maxHp: 3, attack: 2, defense: 2, special: 1, speed: 2 },
+    }, CTX);
+    expect(logLines(steps)).toEqual(['MEWTWO grew to level 12!']);
+    const dispatched = (steps ?? [])
+      .filter((s): s is Extract<Step, { kind: 'dispatch' }> => s.kind === 'dispatch')
+      .map(s => s.action.type);
+    expect(dispatched).toContain('SHOW_LEVEL_UP');
+    expect(dispatched).toContain('HIDE_LEVEL_UP');
+    expect(dispatched.indexOf('SHOW_LEVEL_UP')).toBeLessThan(dispatched.indexOf('HIDE_LEVEL_UP'));
+
+    const show = (steps ?? []).find(
+      (s): s is Extract<Step, { kind: 'dispatch' }> => s.kind === 'dispatch' && s.action.type === 'SHOW_LEVEL_UP');
+    const action = show!.action as Extract<Action, { type: 'SHOW_LEVEL_UP' }>;
+    expect(action.level).toBe(12);
+    expect(action.gains).toEqual({ maxHp: 3, attack: 2, defense: 2, special: 1, speed: 2 });
+    expect(action.totals.maxHp).toBe(130);
+  });
 });
 
 describe('expandEvent — crash / flinch / multi-hit', () => {

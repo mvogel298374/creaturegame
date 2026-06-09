@@ -169,12 +169,14 @@ public record CreatureFainted(string Name) : BattleEvent;
 public record ExperienceGained(string CreatureName, int Amount) : BattleEvent;
 
 /// <summary>One level gained. Carries the new level's bar parameters (<paramref name="XpThisLevel"/> /
-/// <paramref name="XpToNextLevel"/>) and the resulting stat totals so the client can refill the bar and show
-/// the stat-growth panel. A multi-level award emits one of these per level, in order.</summary>
+/// <paramref name="XpToNextLevel"/>), the resulting stat totals (<paramref name="Stats"/>) and the per-stat
+/// gains from this level (<paramref name="StatGains"/>) so the client can refill the bar and show the Gen 1
+/// level-up stat panel. A multi-level award emits one of these per level, in order.</summary>
 public record LeveledUp(
     string CreatureName,
     int NewLevel,
     int XpThisLevel,
     int XpToNextLevel,
-    StatBlock Stats
+    StatBlock Stats,
+    StatBlock StatGains
 ) : BattleEvent;

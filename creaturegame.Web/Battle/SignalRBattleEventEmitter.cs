@@ -236,6 +236,7 @@ public sealed class SignalRBattleEventEmitter(
                     e.XpThisLevel,
                     e.XpToNextLevel,
                     e.Stats,
+                    e.StatGains,
                 }
             ),
             _ => ("Unknown", new { }),

@@ -35,6 +35,9 @@ export type Action =
   | { type: 'UPDATE_STATUS'; name: string; status: string }
   | { type: 'CLEAR_STATUS'; name: string }
   | { type: 'LEVELED_UP'; newLevel: number; xpToNextLevel: number }
+  // The Gen 1 level-up stat panel: per-stat gains + the new totals. Shown then hidden by the timeline.
+  | { type: 'SHOW_LEVEL_UP'; level: number; gains: StatBlock; totals: StatBlock }
+  | { type: 'HIDE_LEVEL_UP' }
   | { type: 'ANIMATING_START' }
   | { type: 'ANIMATING_DONE' }
   // Bar fills by an awarded amount, capped at the current level's max (a level-up follows if it caps out).
@@ -336,17 +339,21 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       const xpThisLevel   = payload.xpThisLevel as number;
       const xpToNextLevel = payload.xpToNextLevel as number;
       const stats         = payload.stats as StatBlock;
-      // The bar is full from the preceding gain (or prior level). Reset it onto the new level's scale,
-      // tick the level, then fill to the leftover XP carried into this level — which is "full again"
-      // for an intermediate level in a multi-level award, or a partial fill for the final one.
+      const gains         = payload.statGains as StatBlock;
+      // The bar is full from the preceding gain (or prior level). Reset it onto the new level's scale and
+      // tick the level, announce the level, then show the Gen 1 stat-gain panel (gains + new totals) before
+      // refilling the bar to the leftover XP — "full again" for an intermediate level in a multi-level
+      // award, or a partial fill for the final one.
       return { steps: [
         w(300),
         d({ type: 'LEVELED_UP', newLevel, xpToNextLevel }),
         w(150),
         d(log(`${cName} grew to level ${newLevel}!`)),
-        d(log(`HP ${stats.maxHp}  ATK ${stats.attack}  DEF ${stats.defense}  SPC ${stats.special}  SPD ${stats.speed}`)),
+        d({ type: 'SHOW_LEVEL_UP', level: newLevel, gains, totals: stats }),
+        w(1900),
+        d({ type: 'HIDE_LEVEL_UP' }),
         d({ type: 'XP_SET', value: Math.min(xpThisLevel, xpToNextLevel) }),
-        w(700),
+        w(500),
       ] };
     }
 

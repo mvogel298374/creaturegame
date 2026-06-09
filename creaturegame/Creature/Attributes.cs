@@ -31,4 +31,15 @@ public class Attributes
 
 /// <summary>An immutable snapshot of a creature's stat totals — carried by the level-up event so the
 /// client can show the Gen 1 stat-growth panel without reaching into mutable <see cref="Attributes"/>.</summary>
-public record StatBlock(int MaxHp, int Attack, int Defense, int Special, int Speed);
+public record StatBlock(int MaxHp, int Attack, int Defense, int Special, int Speed)
+{
+    /// <summary>Per-stat difference (<c>this − other</c>) — used to report the gains from a level-up.</summary>
+    public StatBlock Minus(StatBlock other) =>
+        new(
+            MaxHp - other.MaxHp,
+            Attack - other.Attack,
+            Defense - other.Defense,
+            Special - other.Special,
+            Speed - other.Speed
+        );
+}

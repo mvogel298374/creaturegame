@@ -172,12 +172,10 @@ public class FullBattleFlowTests(MovesFixture moves) : InteractionTest(moves)
     [Fact]
     public async Task LeveledUp_StatBlock_MatchesCalculateStatsAtTheNewLevel()
     {
+        // Clean stats (no Attribute overrides): the level-up's "before" snapshot must be the real level-10
+        // stats so StatGains reflects natural growth. A 1-HP enemy using Splash lets the player win anyway.
         var player = BuildStatTestCreature("Player", level: 10);
         player.Experience = player.CalculateExperienceForLevel(10);
-        player.Attributes.MaxHP = 999;
-        player.Attributes.HP = 999;
-        player.Attributes.Attack = 999; // win cleanly; overwritten by CalculateStats on level-up
-        player.Attributes.Speed = 200;
         player.AddAttack(Move("tackle"));
 
         var enemy = Mon("Enemy", hp: 1, attack: 1, speed: 1, DamageType.Normal, "splash");
@@ -197,6 +195,12 @@ public class FullBattleFlowTests(MovesFixture moves) : InteractionTest(moves)
         var reference = BuildStatTestCreature("Ref", level: 11);
         reference.CalculateStats();
         Assert.Equal(reference.StatSnapshot(), lu.Stats);
+
+        // StatGains are the per-stat deltas from the previous level — what the Gen 1 level-up panel shows.
+        var atLevel10 = BuildStatTestCreature("Ref10", level: 10).StatSnapshot();
+        Assert.Equal(reference.StatSnapshot().Minus(atLevel10), lu.StatGains);
+        // Every Gen 1 stat grows by at least 1 per level given non-zero base stats.
+        Assert.True(lu.StatGains.MaxHp > 0 && lu.StatGains.Attack > 0 && lu.StatGains.Speed > 0);
     }
 
     // TurnStarted must carry the player's level-relative XP so the bar is correct on entry and every turn —
