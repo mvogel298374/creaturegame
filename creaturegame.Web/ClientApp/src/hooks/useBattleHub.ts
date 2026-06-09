@@ -50,7 +50,20 @@ const initialState: BattleState = {
 function reducer(state: BattleState, action: Action): BattleState {
   switch (action.type) {
     case 'BATTLE_STARTED':
-      return { ...state, phase: 'waiting', playerName: action.playerName, enemyName: action.enemyName, enemySpeciesId: action.enemySpeciesId, enemyLevel: action.enemyLevel };
+      // Reset the enemy nameplate for the incoming foe (the previous one fainted at 0 HP) — the next
+      // TurnStarted fills in its real HP. enemyMaxHp: 1 makes BattleScreen show the estimate-full bar
+      // during the slide-in rather than the old enemy's empty bar.
+      return {
+        ...state,
+        phase: 'waiting',
+        playerName: action.playerName,
+        enemyName: action.enemyName,
+        enemySpeciesId: action.enemySpeciesId,
+        enemyLevel: action.enemyLevel,
+        enemyHp: 1,
+        enemyMaxHp: 1,
+        enemyStatus: 'None',
+      };
     case 'TURN_STARTED':
       return {
         ...state,
@@ -110,6 +123,9 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
 
   // Player name drives the player/enemy side split inside expandEvent.
   const playerNameRef = useRef('');
+  // Counts BattleStarted events so expandEvent can tell the first encounter (scene entry animation) from a
+  // chained one (slide a new enemy sprite into the running scene).
+  const encounterIndexRef = useRef(0);
 
   // The animation timeline: backend events expand into steps it plays in order.
   const enqueueSteps = useBattleTimeline(dispatch);
@@ -123,9 +139,15 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
       .build();
 
     conn.on('OnBattleEvent', (eventType: string, payload: Payload) => {
-      if (eventType === 'BattleStarted') playerNameRef.current = payload.playerName as string;
+      if (eventType === 'BattleStarted') {
+        playerNameRef.current = payload.playerName as string;
+        encounterIndexRef.current += 1;
+      }
 
-      const { now, steps } = expandEvent(eventType, payload, { playerName: playerNameRef.current });
+      const { now, steps } = expandEvent(eventType, payload, {
+        playerName: playerNameRef.current,
+        encounterIndex: encounterIndexRef.current,
+      });
       now?.forEach(action => dispatch(action));   // control plane — immediate
       if (steps) enqueueSteps(steps);              // animated — sequenced
     });

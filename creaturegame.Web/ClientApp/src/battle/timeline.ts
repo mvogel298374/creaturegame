@@ -47,7 +47,8 @@ export type BridgeCommand =
   | { type: 'playMoveAnimation'; attackerSide: Side; targetSide: Side }
   | { type: 'playFaintAnimation'; side: Side }
   | { type: 'playHitSound'; isCrit: boolean }
-  | { type: 'playStatusSound' };
+  | { type: 'playStatusSound' }
+  | { type: 'spawnEnemy'; enemySpeciesId: number };
 
 // One primitive instruction in a timeline.
 export type Step =
@@ -63,6 +64,10 @@ export interface Expansion {
 
 export interface ExpandContext {
   playerName: string;
+  // 1 for the first battle of the run, 2+ for each chained encounter. Drives whether BattleStarted is the
+  // scene's initial entry (handled by create()) or a mid-run enemy swap (slide in a new sprite). Optional
+  // for tests; treated as the first encounter when absent.
+  encounterIndex?: number;
 }
 
 // ── Step builders (keep expandEvent readable) ───────────────────────────────
@@ -127,16 +132,34 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
   const side = (name: string): Side => (name === ctx.playerName ? 'player' : 'enemy');
 
   switch (eventType) {
-    // ── Control plane: dispatched immediately on receipt ──────────────────────
+    // ── Control plane ──────────────────────────────────────────────────────────
     case 'BattleStarted': {
       const pName = payload.playerName as string;
       const eName = payload.enemyName as string;
-      return {
-        now: [
-          { type: 'BATTLE_STARTED', playerName: pName, enemyName: eName, enemySpeciesId: payload.enemySpeciesId as number, enemyLevel: payload.enemyLevel as number },
-          log(`${pName} VS ${eName}`),
-        ],
+      const enemySpeciesId = payload.enemySpeciesId as number;
+      // Queued, NOT immediate. In the endless chain the next encounter's BattleStarted arrives the instant
+      // the backend finishes the previous battle — if applied immediately it jumps ahead of the still-
+      // draining damage/faint/XP steps (the "KINGLER VS ARBOK" line landing mid-attack). Routing it through
+      // the queue syncs the new enemy only after the previous battle's animation has played. (At run start
+      // the queue is empty, so the first BattleStarted still applies at once.)
+      const started: Action = {
+        type: 'BATTLE_STARTED',
+        playerName: pName,
+        enemyName: eName,
+        enemySpeciesId,
+        enemyLevel: payload.enemyLevel as number,
       };
+      // First encounter: the scene's create() plays the entry animation. Subsequent encounters: tell the
+      // scene to load + slide in the new enemy sprite (the canvas is never remounted).
+      if ((ctx.encounterIndex ?? 1) <= 1) {
+        return { steps: [d(started), d(log(`${pName} VS ${eName}`))] };
+      }
+      return { steps: [
+        d(started),
+        d(log(`${pName} VS ${eName}`)),
+        emit({ type: 'spawnEnemy', enemySpeciesId }),
+        w(450), // let the new enemy slide in before the first turn's prompt
+      ] };
     }
 
     case 'TurnStarted':
@@ -547,6 +570,7 @@ function emitCommand(c: BridgeCommand): void {
     case 'playFaintAnimation': bridge.emit('playFaintAnimation', { side: c.side }); break;
     case 'playHitSound':       bridge.emit('playHitSound', { isCrit: c.isCrit }); break;
     case 'playStatusSound':    bridge.emit('playStatusSound', undefined); break;
+    case 'spawnEnemy':         bridge.emit('spawnEnemy', { enemySpeciesId: c.enemySpeciesId }); break;
   }
 }
 

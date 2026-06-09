@@ -20,6 +20,7 @@ export class BattleScene extends Phaser.Scene {
   private onFaintAnim  = (e: { side: 'player' | 'enemy' }) => this.playFaintAnimation(e.side);
   private onHitSound    = (e: { isCrit: boolean }) => (e.isCrit ? Audio.playHitCrit() : Audio.playHit());
   private onStatusSound = () => Audio.playStatusApplied();
+  private onSpawnEnemy  = (e: { enemySpeciesId: number }) => this.spawnEnemy(e.enemySpeciesId);
 
   constructor() {
     super({ key: 'BattleScene' });
@@ -71,6 +72,7 @@ export class BattleScene extends Phaser.Scene {
     bridge.on('playFaintAnimation', this.onFaintAnim);
     bridge.on('playHitSound', this.onHitSound);
     bridge.on('playStatusSound', this.onStatusSound);
+    bridge.on('spawnEnemy', this.onSpawnEnemy);
 
     // Remove our bridge listeners when this scene is torn down so they can't
     // fire on a destroyed scene (which throws and freezes the battle queue).
@@ -190,10 +192,56 @@ export class BattleScene extends Phaser.Scene {
     });
   }
 
+  // A new wild enemy for the next encounter: load its sprite (if not cached), reset the slot the previous
+  // enemy fainted out of (alpha/position), then slide the newcomer in and resume the idle bob. The player
+  // sprite and the canvas persist across the whole run — only the enemy is swapped.
+  private spawnEnemy(enemySpeciesId: number) {
+    this.enemySpeciesId = enemySpeciesId;
+    const key = `enemy-${enemySpeciesId}`;
+
+    const reveal = () => {
+      const W = this.scale.width;
+      const H = this.scale.height;
+      const enemyRestX = W * 0.68;
+      const enemyRestY = H * 0.3;
+
+      this.enemyIdleTween?.stop();
+      this.enemySprite.setTexture(key);
+      this.enemySprite.setAlpha(1).setPosition(W + 120, enemyRestY);
+
+      this.tweens.add({
+        targets: this.enemySprite,
+        x: enemyRestX,
+        duration: 400,
+        ease: 'Cubic.easeOut',
+        onComplete: () => {
+          this.playCry('enemy');
+          this.enemyIdleTween = this.tweens.add({
+            targets: this.enemySprite,
+            y: `-=5`,
+            yoyo: true,
+            repeat: -1,
+            duration: 700,
+            ease: 'Sine.easeInOut',
+          });
+        },
+      });
+    };
+
+    if (this.textures.exists(key)) {
+      reveal();
+    } else {
+      this.load.image(key, `/sprites/front/${enemySpeciesId}.png`);
+      this.load.once(Phaser.Loader.Events.COMPLETE, reveal);
+      this.load.start();
+    }
+  }
+
   private teardown() {
     bridge.off('playMoveAnimation', this.onMoveAnim);
     bridge.off('playFaintAnimation', this.onFaintAnim);
     bridge.off('playHitSound', this.onHitSound);
     bridge.off('playStatusSound', this.onStatusSound);
+    bridge.off('spawnEnemy', this.onSpawnEnemy);
   }
 }

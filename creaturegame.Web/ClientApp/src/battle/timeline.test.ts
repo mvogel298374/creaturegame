@@ -98,11 +98,28 @@ describe('expandEvent — stat stages', () => {
 });
 
 describe('expandEvent — control plane vs timeline', () => {
-  it('BattleStarted dispatches immediately (now) with the VS log, no steps', () => {
+  it('the first BattleStarted is queued (not immediate) with the VS log — the scene plays its own entry', () => {
     const { now, steps } = expandEvent('BattleStarted',
-      { playerName: 'MEWTWO', enemyName: 'ARTICUNO', enemySpeciesId: 144, enemyLevel: 50 }, CTX);
-    expect(now?.map(a => a.type)).toEqual(['BATTLE_STARTED', 'LOG']);
-    expect(steps).toBeUndefined();
+      { playerName: 'MEWTWO', enemyName: 'ARTICUNO', enemySpeciesId: 144, enemyLevel: 50 },
+      { playerName: 'MEWTWO', encounterIndex: 1 });
+    // Queued so it never jumps ahead of a draining animation queue; no spawnEnemy on the first encounter.
+    expect(now).toBeUndefined();
+    const dispatched = (steps ?? [])
+      .filter((s): s is Extract<Step, { kind: 'dispatch' }> => s.kind === 'dispatch')
+      .map(s => s.action.type);
+    expect(dispatched).toEqual(['BATTLE_STARTED', 'LOG']);
+    expect((steps ?? []).some(s => s.kind === 'emit')).toBe(false);
+  });
+
+  it('a chained BattleStarted (2nd+ encounter) also emits a spawnEnemy bridge command', () => {
+    const { now, steps } = expandEvent('BattleStarted',
+      { playerName: 'MEWTWO', enemyName: 'ARBOK', enemySpeciesId: 24, enemyLevel: 52 },
+      { playerName: 'MEWTWO', encounterIndex: 2 });
+    expect(now).toBeUndefined();
+    const spawn = (steps ?? []).find(
+      (s): s is Extract<Step, { kind: 'emit' }> => s.kind === 'emit' && s.command.type === 'spawnEnemy');
+    expect(spawn).toBeDefined();
+    expect((spawn!.command as { enemySpeciesId: number }).enemySpeciesId).toBe(24);
   });
 
   it('TurnStarted flows through the timeline (queued), not immediately — so HP syncs after damage animates', () => {
