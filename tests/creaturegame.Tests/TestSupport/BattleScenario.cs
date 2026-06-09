@@ -50,6 +50,7 @@ public sealed class ScriptableRules : DelegatingBattleRules
     private int? _rampageTurns;
     private int? _bideTurns;
     private int? _bindingTurns;
+    private int? _disableTurns;
     private int? _multiHitCount;
 
     /// <summary>Always hit, never crit, no damage variance — the usual deterministic-damage baseline.</summary>
@@ -122,6 +123,12 @@ public sealed class ScriptableRules : DelegatingBattleRules
         return this;
     }
 
+    public ScriptableRules DisableTurns(int n)
+    {
+        _disableTurns = n;
+        return this;
+    }
+
     public ScriptableRules MultiHits(int n)
     {
         _multiHitCount = n;
@@ -150,6 +157,8 @@ public sealed class ScriptableRules : DelegatingBattleRules
     public override int RollBideTurns() => _bideTurns ?? base.RollBideTurns();
 
     public override int RollBindingTurns() => _bindingTurns ?? base.RollBindingTurns();
+
+    public override int RollDisableTurns() => _disableTurns ?? base.RollDisableTurns();
 
     public override int RollMultiHitCount() => _multiHitCount ?? base.RollMultiHitCount();
 }

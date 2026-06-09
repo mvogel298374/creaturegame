@@ -64,6 +64,8 @@ public class Battle
                     PlayerCreature.Attributes.HP,
                     PlayerCreature.Attributes.MaxHP,
                     PlayerCreature.Battle.Status,
+                    PlayerCreature.XpThisLevel,
+                    PlayerCreature.XpToNextLevel,
                     EnemyCreature.Name,
                     EnemyCreature.Attributes.HP,
                     EnemyCreature.Attributes.MaxHP,
@@ -150,12 +152,21 @@ public class Battle
                     EnemyCreature.SpeciesBaseExperience,
                     EnemyCreature.Level
                 );
-                int priorLevel = PlayerCreature.Level;
-                PlayerCreature.GainExperience(xp);
-                while (priorLevel < PlayerCreature.Level)
+                PlayerCreature.AddExperience(xp);
+                _emitter?.Emit(new ExperienceGained(PlayerCreature.Name, xp));
+                // Drive level-ups one at a time so each event carries that level's resulting stats and
+                // bar parameters (also the seam the deferred level-up move-learning will hook into).
+                while (PlayerCreature.TryLevelUp())
                 {
-                    priorLevel++;
-                    _emitter?.Emit(new LeveledUp(PlayerCreature.Name, priorLevel));
+                    _emitter?.Emit(
+                        new LeveledUp(
+                            PlayerCreature.Name,
+                            PlayerCreature.Level,
+                            PlayerCreature.XpThisLevel,
+                            PlayerCreature.XpToNextLevel,
+                            PlayerCreature.StatSnapshot()
+                        )
+                    );
                 }
                 break;
             }

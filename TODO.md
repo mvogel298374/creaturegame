@@ -7,37 +7,95 @@
 **Current state (2026-06-09):** Move-coverage pass COMPLETE (all 165 Gen 1 moves), integration-test pass
 COMPLETE, and the `BattleState` facade migration COMPLETE — the whole **post-coverage sequencing** is done
 (archived in `TODO_ARCHIVE.md`). The only deferred item from it is the `GameController` run-seed (needs the
-Game Loop; tracked under Tech Debt #3). Suite: 840 .NET + 37 Vitest. **Next combat-fidelity item:
-XP & Level-Up — finish the in-battle loop** (below).
+Game Loop; tracked under Tech Debt #3). Suite: 840 .NET + 37 Vitest. **Next up — XP & progression, in two
+pieces:** (1) **XP & Level-Up** fidelity, then (2) the **Endless Battle Chain** (a minimal run loop so XP/HP
+have stakes). Both below.
 
 ---
 
 ## XP & Level-Up — finish the in-battle loop
 
-**Slated: next combat-fidelity item.** Small, no new data/schema. Polishes the single-battle path that
-already exists (does **not** require the Game Loop).
+**PIECE 1 — DONE (2026-06-09)** except the E2E §7 spec (below). Engine emits `ExperienceGained` + an
+enriched `LeveledUp`/`TurnStarted`; the frontend bar fills honestly and a stat-growth line surfaces on
+level-up. Suite 844 .NET + 37 Vitest, `/audit` PASS-WITH-ADVISORIES (all resolved). No new data/schema; did
+not require the Game Loop.
+
+**Scope (decided 2026-06-09):** live XP display + honest gain/multi-level animation + **stat-growth
+surfacing** and proper level-up output. **Out of scope:** EV gain (its own section below) and level-up move
+learning (still deferred). Enemies are **wild** for now, so the XP `a`-multiplier = 1; the trainer 1.5×
+lands with trainer encounters later.
 
 **What works today:** XP is awarded on enemy faint (`Battle.StartFightAsync` → `CalculateXpAwarded` →
-`GainExperience`), the player levels up (chained `LeveledUp` events, one per level), stats recalc and HP
-heals the delta. The frontend animates an XP-bar fill on `LeveledUp`.
+`GainExperience`), the player levels up (one `LeveledUp` per level), and `CalculateStats` heals the MaxHP
+delta. The frontend animates a *placeholder* bar — `playerXpToNext = 100`, fills to full on `LeveledUp`
+regardless of the real amount, and nothing animates on a win that doesn't level.
 
-**What's missing / not "proper":**
-- [ ] **Live XP data to the client.** `TurnStarted` carries no XP, so the bar fills to a hardcoded
-  placeholder (`playerXpToNext = 100`). Add `PlayerExperience`, `PlayerXpThisLevel`, `XpToNextLevel`
-  (derived from `Creature.Experience` and `CalculateExperienceForLevel`) to `TurnStarted` (or a small
-  dedicated event); `useBattleHub.ts` dispatches them into `playerXp` / `playerXpToNext`.
-- [ ] **XP-gain animation.** On win, animate the bar filling by the XP earned *before* the level-up
-  fill/reset (today it only fills on `LeveledUp`).
-- [ ] **Verify the multi-level path end to end** — a big XP award crossing several levels emits N
-  `LeveledUp` events and the bar steps through each.
-- [ ] **Surface the level-up moment** clearly in the log/UI (the hook the deferred move-learning prompt
-  will attach to).
+**Event model (engine emits facts; `timeline.ts` owns cadence):**
+- [x] New `ExperienceGained(string CreatureName, int Amount)` — emitted on win before any `LeveledUp`.
+- [x] Extend `LeveledUp` → level-relative XP pair (`XpThisLevel`, `XpToNextLevel`) + post-level `StatBlock`.
+- [x] Enrich `TurnStarted` with `PlayerXpThisLevel` / `PlayerXpToNextLevel` (hardcoded `100` gone).
+- [x] Battle drives level-ups **one at a time** (`AddExperience` + `while (TryLevelUp())`) — the seam the
+  deferred move-learning will reuse.
+- [x] `Creature` exposes `XpThisLevel` / `XpToNextLevel` (full-bar at the level cap) + `StatSnapshot()`.
+
+**Frontend:**
+- [x] Honest fill: `XP_GAIN` fills toward the boundary (capped at the level max); each `LeveledUp` resets +
+  refills to the leftover via `XP_SET`. `XP_FILL`-to-full slam removed.
+- [x] Level-up stat-growth surfaced as a log line (HP/ATK/DEF/SPC/SPD totals). *A richer toast/panel is the
+  deferred "Level-up notification toast" Web-UI Polish item.*
+- [x] `useBattleHub.ts` dispatches the new XP fields into `playerXp` / `playerXpToNext`.
 
 **Tests:**
-- [ ] Backend: `TurnStarted` (or the new event) carries correct `XpToNextLevel` / current XP for a known
-  species+level.
-- [ ] Backend: an XP award spanning multiple levels emits the right sequence of `LeveledUp` events.
-- [ ] E2E: §7 — XP bar fills and the "grew to level N!" line appears on a win (see Browser-Based UI Testing §7).
+- [x] Backend: `TurnStarted` carries correct level-relative XP for a known species+level.
+- [x] Backend: a multi-level award emits `ExperienceGained` then the right `LeveledUp` sequence, each with
+  correct thresholds + stats; intermediate levels overshoot their span (client caps), final is a partial fill.
+- [x] Backend: the `LeveledUp` stat block matches `CalculateStats` at the new level; max-level helpers full-bar.
+- [ ] E2E §7 — bar fills and "grew to level N!" + the stat line appear on a win. *(Remaining — Playwright spec.)*
+
+---
+
+## Endless Battle Chain (minimal run loop)
+
+**Slated: PIECE 2, after XP & Level-Up.** A deliberate **minimal slice** of the deferred *Game Loop &
+Progression* (below) — pulled forward so XP and HP have stakes: **battle after battle with no end** until
+the player's single Pokémon faints. **Not** the full loop — no catch, no party, no save, no evolution, no
+version filtering (those stay in *Game Loop & Progression*). One persistent player `Creature` vs a fresh
+wild enemy each encounter.
+
+**Persistence (mostly free — the permanent/transient split already does it):** reusing one player `Creature`
+across consecutive `Battle` instances carries HP, PP (`PowerPointsCurrent`), Experience and Level forward
+(permanent half); status / stat-stages / confusion reset per battle (transient `BattleState`) — canonical
+Gen 1. No between-battle heal, so HP and PP matter. See `STATE_MODEL.md §2`.
+- [ ] **Verify + lock** with a test that runs two consecutive battles on one `Creature` and asserts
+  HP/PP/XP/Level persist while transient state resets. Add `Creature.ResetForNewEncounter()` only if a gap
+  surfaces.
+
+**Encounter factory (web):**
+- [ ] Extract enemy construction from `GameController.Start` into an injectable `EncounterFactory`
+  (DB-backed: species + learnsets + moves). `GameController` uses it for encounter 1; the run loop uses it
+  for every encounter after.
+- [ ] Level-scaling rule: enemy level tracks the player's **current** level (a leveled-up player keeps
+  meeting same-tier foes); BST tracks the current lead. (Depth ramp / difficulty curve = future Game Loop.)
+
+**Run loop (web orchestrator):**
+- [ ] Replace the single `StartFightAsync` in `GameSessionManager` (or a new `BattleRunner`) with a loop:
+  run battle → player alive? build next enemy via the factory + start the next battle → repeat; player
+  fainted → end the run. Per-encounter `BattleEnded(winner)` stays unchanged.
+- [ ] New `RunEnded(int BattlesWon, int FinalLevel, string FinalCreatureName)` event (terminal).
+- [ ] RNG/seed: this is the composition root for the deferred per-run seed (Tech Debt #3) — wire a seed here
+  when seeding lands; not required now.
+
+**Frontend:**
+- [ ] `BattleEnded` with the player as winner → brief **intermission** ("next foe approaches"), keep the
+  HP/XP bars, then the next `BattleStarted` resumes play (no terminal screen).
+- [ ] `RunEnded` → game-over screen with a run summary (battles won, final level) → back to title. (Folds in
+  the deferred `BattleEndedOverlay` Web-UI item, now run-scoped.)
+
+**Tests:**
+- [ ] Backend: the chain runs N encounters on one `Creature`; a player faint emits `RunEnded` with the
+  correct summary.
+- [ ] Web contract: `RunEnded` maps to a named client event (extend `WebEventContractTests`).
+- [ ] E2E: win an encounter → next encounter starts with HP/XP carried; faint → game-over summary.
 
 ---
 
@@ -97,7 +155,8 @@ No prerequisites. All `ExpHP/Attack/Defense/Special/Speed` fields exist on `Crea
 
 Stack: React 18 + TypeScript + SignalR + Phaser 3. (Phaser canvas & core animations ✅ done — see archive.)
 
-- [ ] `BattleEndedOverlay` — covers battle screen on `BattleEnded`; winner, "Play Again" → `/select`, "Main Menu" → `/`
+- [ ] `BattleEndedOverlay` — **superseded by the Endless Battle Chain's `RunEnded` game-over screen** (a
+  per-`BattleEnded` overlay no longer fits an endless chain); build it there, run-scoped, not per battle
 - [ ] Level-up notification toast on `LeveledUp` event
 - [ ] Move menu STAB indicator — subtle highlight on moves matching player's type
 - [ ] Color-coded effectiveness in battle log (super-effective green, not very effective grey, no effect red)
@@ -157,7 +216,9 @@ Deferred until Phaser animations exist — the mechanic needs a throw/shake/catc
 **Prerequisites:** Catch Mechanic, BattleState extraction (✅ done), `PlayerDbContext` / `save.db`
 
 > **Sequencing:** this whole layer is intentionally **deferred until combat fidelity is fully ironed out** —
-> the battle sim is the foundation the roguelike/lite loop builds on.
+> the battle sim is the foundation the roguelike/lite loop builds on. The **Endless Battle Chain** (above) is
+> the first minimal slice of this layer (persistent single creature, endless wild encounters); the items
+> here are everything it deliberately leaves out (catch, party, save, evolution, difficulty curve).
 
 - Player starts with one Pokémon; win → new BST-scaled encounter; lose → game over with run summary
 - Catch → Pokémon added to party (up to 6); choose lead between battles
@@ -247,6 +308,12 @@ moving target.
   for enemy level + random move assignment — deferred; it's the composition root where a per-run seed would be
   injected, but there's no run-seed concept yet (Game Loop). Wire a run seed here when runs exist. *(Optional:
   the `AlwaysHit/AlwaysCrit` rule shims could be replaced by seeded sources — low priority.)*
+  - **Also (found 2026-06-09):** `IBattleRules.Roll*Turns` roll from the *rules object's own* RNG
+    (`Random.Shared`-backed for the `Gen1BattleRules`/`DelegatingBattleRules` default), **not** the battle's
+    injected `IRandomSource`. So a `BattleScenario.Seed(...)` only makes deterministic the rolls
+    `ScriptableRules` explicitly pins — any unpinned `Roll*Turns` stays globally nondeterministic and
+    test-order-flaky (this surfaced as a Disable flake; worked around by pinning `DisableTurns`). Proper fix:
+    thread the battle's `IRandomSource` into the rules' rolls (or give the rules a seedable source).
 
 - [ ] **Architecture / decision-log doc (`ARCHITECTURE.md`).** Capture the *why* behind the two-DB split,
   event-sourced engine + emitter pattern, the three seams and the "never branch on generation" rule, the web

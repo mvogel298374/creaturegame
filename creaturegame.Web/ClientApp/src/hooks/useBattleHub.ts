@@ -60,6 +60,8 @@ function reducer(state: BattleState, action: Action): BattleState {
         playerHp: action.playerHp,
         playerMaxHp: action.playerMaxHp,
         playerStatus: action.playerStatus,
+        playerXp: action.playerXpThisLevel,
+        playerXpToNext: action.playerXpToNextLevel,
         enemyHp: action.enemyHp,
         enemyMaxHp: action.enemyMaxHp,
         enemyStatus: action.enemyStatus,
@@ -86,15 +88,16 @@ function reducer(state: BattleState, action: Action): BattleState {
       if (action.name === state.enemyName)  return { ...state, enemyStatus: 'None' };
       return state;
     case 'LEVELED_UP':
-      return { ...state, playerLevel: action.newLevel };
+      // Tick the level and reset the bar onto the new level's scale (refilled by a following XP_SET).
+      return { ...state, playerLevel: action.newLevel, playerXpToNext: action.xpToNextLevel, playerXp: 0 };
     case 'ANIMATING_START':
       return { ...state, animating: true };
     case 'ANIMATING_DONE':
       return { ...state, animating: false };
-    case 'XP_FILL':
-      return { ...state, playerXp: state.playerXpToNext };
-    case 'XP_RESET':
-      return { ...state, playerXp: 0 };
+    case 'XP_GAIN':
+      return { ...state, playerXp: Math.min(state.playerXp + action.amount, state.playerXpToNext) };
+    case 'XP_SET':
+      return { ...state, playerXp: action.value };
     default:
       return state;
   }

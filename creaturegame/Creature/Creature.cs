@@ -40,15 +40,61 @@ public class Creature
     public int Experience { get; set; } = 0;
     public const int MaxLevel = 100;
 
+    /// <summary>
+    /// XP accumulated into the current level — the numerator for the level-progress bar. At the level cap
+    /// there is no next level, so the bar reads full (this equals <see cref="XpToNextLevel"/>).
+    /// </summary>
+    public int XpThisLevel =>
+        Level >= MaxLevel ? 1 : Experience - CalculateExperienceForLevel(Level);
+
+    /// <summary>
+    /// Total XP that fills the current level's bar (the denominator) — the span from this level to the next.
+    /// NOT the remaining amount; <see cref="XpThisLevel"/> of this much means a level-up. At the level cap
+    /// this is 1 (with <see cref="XpThisLevel"/> == 1) so the bar renders full instead of dividing by a span
+    /// into a non-existent level.
+    /// </summary>
+    public int XpToNextLevel =>
+        Level >= MaxLevel
+            ? 1
+            : CalculateExperienceForLevel(Level + 1) - CalculateExperienceForLevel(Level);
+
+    /// <summary>The current stat totals — snapshot for the level-up stat-growth panel.</summary>
+    public StatBlock StatSnapshot() =>
+        new(
+            Attributes.MaxHP,
+            Attributes.Attack,
+            Attributes.Defense,
+            Attributes.Special,
+            Attributes.Speed
+        );
+
+    /// <summary>
+    /// Adds XP and levels up as many times as that allows — the convenience path for callers that don't
+    /// need to observe each level individually. The battle loop instead drives <see cref="AddExperience"/>
+    /// + <see cref="TryLevelUp"/> so it can emit a per-level event carrying that level's stats.
+    /// </summary>
     public void GainExperience(int amount)
     {
-        Experience += amount;
-        int nextLevelExperience = CalculateExperienceForLevel(Level + 1);
-        while (Experience >= nextLevelExperience && Level < MaxLevel)
-        {
-            LevelUp();
-            nextLevelExperience = CalculateExperienceForLevel(Level + 1);
-        }
+        AddExperience(amount);
+        while (TryLevelUp()) { }
+    }
+
+    /// <summary>Accumulates XP without applying any level-ups (see <see cref="TryLevelUp"/>).</summary>
+    public void AddExperience(int amount) => Experience += amount;
+
+    /// <summary>
+    /// Levels up once if the accumulated XP has crossed the next threshold and the cap isn't reached.
+    /// Returns true if a level was gained, so a caller can loop to step through a multi-level award and
+    /// observe each level's resulting stats.
+    /// </summary>
+    public bool TryLevelUp()
+    {
+        if (Level >= MaxLevel)
+            return false;
+        if (Experience < CalculateExperienceForLevel(Level + 1))
+            return false;
+        LevelUp();
+        return true;
     }
 
     public void LevelUp()

@@ -61,6 +61,10 @@ public class LockInInteractionTests(MovesFixture moves) : InteractionTest(moves)
         var result = await new BattleScenario()
             .Player(player)
             .Enemy(enemy)
+            // Pin the disable duration: RollDisableTurns is otherwise rolled from the rules' own RNG
+            // (not the scenario seed), so a full disable (7 turns) keeps the lone move locked for the
+            // whole short fight and the Struggle assertion below is deterministic.
+            .Rules(new ScriptableRules().Deterministic().DisableTurns(7))
             .PlayerUses("disable", "tackle")
             .EnemyUses("tackle")
             .RunAsync();

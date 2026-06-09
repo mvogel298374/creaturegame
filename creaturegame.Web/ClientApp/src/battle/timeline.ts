@@ -20,10 +20,13 @@ import { E2E } from '../testEnv';
 export type Payload = Record<string, unknown>;
 type Side = 'player' | 'enemy';
 
+// The stat totals carried by a level-up (matches the engine's StatBlock).
+export interface StatBlock { maxHp: number; attack: number; defense: number; special: number; speed: number }
+
 // View-state actions — consumed by the reducer in useBattleHub.
 export type Action =
   | { type: 'BATTLE_STARTED'; playerName: string; enemyName: string; enemySpeciesId: number; enemyLevel: number }
-  | { type: 'TURN_STARTED'; turnNumber: number; playerHp: number; playerMaxHp: number; playerStatus: string; enemyHp: number; enemyMaxHp: number; enemyStatus: string; moves: MoveInfo[] }
+  | { type: 'TURN_STARTED'; turnNumber: number; playerHp: number; playerMaxHp: number; playerStatus: string; playerXpThisLevel: number; playerXpToNextLevel: number; enemyHp: number; enemyMaxHp: number; enemyStatus: string; moves: MoveInfo[] }
   | { type: 'TURN_ENDED' }
   | { type: 'PLAYER_CHOSE' }
   | { type: 'BATTLE_ENDED'; winner: string }
@@ -31,11 +34,13 @@ export type Action =
   | { type: 'UPDATE_HP'; name: string; hp: number }
   | { type: 'UPDATE_STATUS'; name: string; status: string }
   | { type: 'CLEAR_STATUS'; name: string }
-  | { type: 'LEVELED_UP'; newLevel: number }
+  | { type: 'LEVELED_UP'; newLevel: number; xpToNextLevel: number }
   | { type: 'ANIMATING_START' }
   | { type: 'ANIMATING_DONE' }
-  | { type: 'XP_FILL' }
-  | { type: 'XP_RESET' };
+  // Bar fills by an awarded amount, capped at the current level's max (a level-up follows if it caps out).
+  | { type: 'XP_GAIN'; amount: number }
+  // Bar set to an absolute level-relative value (used to refill to the leftover after a level-up reset).
+  | { type: 'XP_SET'; value: number };
 
 // Phaser commands sent over the mitt bridge.
 export type BridgeCommand =
@@ -148,6 +153,8 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
           playerHp: payload.playerHp as number,
           playerMaxHp: payload.playerMaxHp as number,
           playerStatus: payload.playerStatus as string,
+          playerXpThisLevel: payload.playerXpThisLevel as number,
+          playerXpToNextLevel: payload.playerXpToNextLevel as number,
           enemyHp: payload.enemyHp as number,
           enemyMaxHp: payload.enemyMaxHp as number,
           enemyStatus: payload.enemyStatus as string,
@@ -269,15 +276,35 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       ] };
     }
 
-    case 'LeveledUp': {
-      const newLevel = payload.newLevel as number;
-      const cName    = payload.creatureName as string;
+    case 'ExperienceGained': {
+      const cName  = payload.creatureName as string;
+      const amount = payload.amount as number;
+      // Fill the bar by the award, capped at the current level's max. If it tops out, the level-up
+      // events that follow handle the reset + refill into the next level.
       return { steps: [
-        d({ type: 'XP_FILL' }),
-        w(900),
-        d({ type: 'XP_RESET' }),
-        d({ type: 'LEVELED_UP', newLevel }),
+        d(log(`${cName} gained ${amount} EXP. Points!`)),
+        d({ type: 'XP_GAIN', amount }),
+        w(800),
+      ] };
+    }
+
+    case 'LeveledUp': {
+      const cName         = payload.creatureName as string;
+      const newLevel      = payload.newLevel as number;
+      const xpThisLevel   = payload.xpThisLevel as number;
+      const xpToNextLevel = payload.xpToNextLevel as number;
+      const stats         = payload.stats as StatBlock;
+      // The bar is full from the preceding gain (or prior level). Reset it onto the new level's scale,
+      // tick the level, then fill to the leftover XP carried into this level — which is "full again"
+      // for an intermediate level in a multi-level award, or a partial fill for the final one.
+      return { steps: [
+        w(300),
+        d({ type: 'LEVELED_UP', newLevel, xpToNextLevel }),
+        w(150),
         d(log(`${cName} grew to level ${newLevel}!`)),
+        d(log(`HP ${stats.maxHp}  ATK ${stats.attack}  DEF ${stats.defense}  SPC ${stats.special}  SPD ${stats.speed}`)),
+        d({ type: 'XP_SET', value: Math.min(xpThisLevel, xpToNextLevel) }),
+        w(700),
       ] };
     }
 

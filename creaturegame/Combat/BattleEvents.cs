@@ -15,6 +15,8 @@ public record TurnStarted(
     int PlayerHp,
     int PlayerMaxHp,
     StatusCondition PlayerStatus,
+    int PlayerXpThisLevel,
+    int PlayerXpToNextLevel,
     string EnemyName,
     int EnemyHp,
     int EnemyMaxHp,
@@ -158,4 +160,17 @@ public record StatDropBlocked(string CreatureName) : BattleEvent;
 // --- Creature ---
 public record CreatureFainted(string Name) : BattleEvent;
 
-public record LeveledUp(string CreatureName, int NewLevel) : BattleEvent;
+/// <summary>The amount of XP a creature earned from a win — emitted once, before any <see cref="LeveledUp"/>
+/// events, so the client can show the gain and begin filling the XP bar.</summary>
+public record ExperienceGained(string CreatureName, int Amount) : BattleEvent;
+
+/// <summary>One level gained. Carries the new level's bar parameters (<paramref name="XpThisLevel"/> /
+/// <paramref name="XpToNextLevel"/>) and the resulting stat totals so the client can refill the bar and show
+/// the stat-growth panel. A multi-level award emits one of these per level, in order.</summary>
+public record LeveledUp(
+    string CreatureName,
+    int NewLevel,
+    int XpThisLevel,
+    int XpToNextLevel,
+    StatBlock Stats
+) : BattleEvent;

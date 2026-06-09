@@ -47,6 +47,8 @@ public sealed class SignalRBattleEventEmitter(
                     e.PlayerHp,
                     e.PlayerMaxHp,
                     PlayerStatus = e.PlayerStatus.ToString(),
+                    e.PlayerXpThisLevel,
+                    e.PlayerXpToNextLevel,
                     e.EnemyName,
                     e.EnemyHp,
                     e.EnemyMaxHp,
@@ -215,7 +217,18 @@ public sealed class SignalRBattleEventEmitter(
             FlinchBlocked e => ("FlinchBlocked", new { e.CreatureName }),
             ChargingUp e => ("ChargingUp", new { e.CreatureName, e.MoveName }),
             CreatureFainted e => ("CreatureFainted", new { e.Name }),
-            LeveledUp e => ("LeveledUp", new { e.CreatureName, e.NewLevel }),
+            ExperienceGained e => ("ExperienceGained", new { e.CreatureName, e.Amount }),
+            LeveledUp e => (
+                "LeveledUp",
+                new
+                {
+                    e.CreatureName,
+                    e.NewLevel,
+                    e.XpThisLevel,
+                    e.XpToNextLevel,
+                    e.Stats,
+                }
+            ),
             _ => ("Unknown", new { }),
         };
 }

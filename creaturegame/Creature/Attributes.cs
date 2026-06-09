@@ -28,3 +28,7 @@ public class Attributes
             this.HP = this.MaxHP;
     }
 }
+
+/// <summary>An immutable snapshot of a creature's stat totals — carried by the level-up event so the
+/// client can show the Gen 1 stat-growth panel without reaching into mutable <see cref="Attributes"/>.</summary>
+public record StatBlock(int MaxHp, int Attack, int Defense, int Special, int Speed);
