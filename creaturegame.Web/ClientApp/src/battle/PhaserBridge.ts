@@ -8,6 +8,7 @@ type BridgeEvents = {
   playHitSound: { isCrit: boolean };
   playFaintAnimation: { side: 'player' | 'enemy' };
   playStatusSound: void;
+  playLevelUpSound: void;
   // A new wild enemy for the next encounter in the chain — load + slide in the sprite.
   spawnEnemy: { enemySpeciesId: number };
   // Phaser → React

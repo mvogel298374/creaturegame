@@ -212,20 +212,15 @@ public class AttackAction : IBattleAction
         // user — both are excluded here.
         bool isPureStatusMove =
             category == DamageCategory.Standard && !usingStruggle && attackToUse.BaseDamage == 0;
-        // A pure-status move is only blocked by the target's type immunity when it actually acts on
-        // the foe (status, confusion, Leech Seed, Disable, Counter's reflected damage, a foe stat
-        // drop). Self-targeting moves (Recover, Swords Dance, Mist, Haze, …) never consult the
-        // target's type, so a Normal-type self-buff still works against a Ghost. Mimic, Transform and
-        // Conversion are deliberately excluded too: they read/copy the target's move or identity rather
-        // than acting on the foe, so they aren't type-blocked (Transform into a Ghost works).
-        bool targetsFoe =
-            attackToUse.StatusEffect != StatusCondition.None
-            || attackToUse.Effect
-                is MoveEffect.Confuse
-                    or MoveEffect.LeechSeed
-                    or MoveEffect.Disable
-                    or MoveEffect.Counter
-            || attackToUse.StatEffect is { Target: StageTarget.Foe };
+        // Gen 1: a non-damaging move almost always IGNORES the target's type immunity — Confuse Ray
+        // confuses a Normal-type, Glare paralyses a Ghost, Growl lowers a Ghost's Attack, sleep / Disable
+        // land regardless of the move's type matchup. Only Thunder Wave and Counter still consult the
+        // chart, and which moves do is gen-variable (Gen 2 makes status moves respect immunity), so the
+        // decision lives on IBattleRules, not inline. (Self-targeting moves — Recover, Swords Dance, Mist,
+        // Mimic, Transform … — never consult the foe's type, so the seam never returns true for them; and
+        // Leech Seed vs Grass / "Poison can't be poisoned" have their own immunity via CanBeLeechSeeded /
+        // CanReceiveStatus.) Damaging moves are unaffected: they fold 0× into zero damage below.
+        bool pureStatusChecksImmunity = _rules.PureStatusMoveChecksTypeImmunity(attackToUse);
         double typeImmunity = DamageCalculator.GetTypeEffectiveness(
             attackToUse.DamageType,
             Target.Type1,
@@ -235,7 +230,7 @@ public class AttackAction : IBattleAction
         if (
             typeImmunity == 0
             && (
-                (isPureStatusMove && targetsFoe)
+                (isPureStatusMove && pureStatusChecksImmunity)
                 || category
                     is DamageCategory.Fixed
                         or DamageCategory.LevelBased

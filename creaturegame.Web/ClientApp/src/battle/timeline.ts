@@ -51,6 +51,7 @@ export type BridgeCommand =
   | { type: 'playFaintAnimation'; side: Side }
   | { type: 'playHitSound'; isCrit: boolean }
   | { type: 'playStatusSound' }
+  | { type: 'playLevelUpSound' }
   | { type: 'spawnEnemy'; enemySpeciesId: number };
 
 // One primitive instruction in a timeline.
@@ -341,17 +342,18 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       const stats         = payload.stats as StatBlock;
       const gains         = payload.statGains as StatBlock;
       // The bar is full from the preceding gain (or prior level). Reset it onto the new level's scale and
-      // tick the level, announce the level, then show the Gen 1 stat-gain panel (gains + new totals) before
-      // refilling the bar to the leftover XP — "full again" for an intermediate level in a multi-level
-      // award, or a partial fill for the final one.
+      // tick the level, announce the level, play the level-up fanfare, then show the Gen 1 stat-gain panel
+      // (gains + new totals) and refill the bar to the leftover XP — "full again" for an intermediate level
+      // in a multi-level award, or a partial fill for the final one. The panel is NOT auto-hidden here: it
+      // stays up until the player's next input (BattleScreen dispatches HIDE_LEVEL_UP on any action).
       return { steps: [
         w(300),
         d({ type: 'LEVELED_UP', newLevel, xpToNextLevel }),
         w(150),
         d(log(`${cName} grew to level ${newLevel}!`)),
+        emit({ type: 'playLevelUpSound' }),
         d({ type: 'SHOW_LEVEL_UP', level: newLevel, gains, totals: stats }),
-        w(1900),
-        d({ type: 'HIDE_LEVEL_UP' }),
+        w(300),
         d({ type: 'XP_SET', value: Math.min(xpThisLevel, xpToNextLevel) }),
         w(500),
       ] };
@@ -577,6 +579,7 @@ function emitCommand(c: BridgeCommand): void {
     case 'playFaintAnimation': bridge.emit('playFaintAnimation', { side: c.side }); break;
     case 'playHitSound':       bridge.emit('playHitSound', { isCrit: c.isCrit }); break;
     case 'playStatusSound':    bridge.emit('playStatusSound', undefined); break;
+    case 'playLevelUpSound':   bridge.emit('playLevelUpSound', undefined); break;
     case 'spawnEnemy':         bridge.emit('spawnEnemy', { enemySpeciesId: c.enemySpeciesId }); break;
   }
 }

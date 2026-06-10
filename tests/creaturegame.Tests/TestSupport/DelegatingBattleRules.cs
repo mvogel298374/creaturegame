@@ -96,6 +96,9 @@ public abstract class DelegatingBattleRules : IBattleRules
     public virtual bool CanReceiveStatus(Creature t, StatusCondition s, DamageType mt) =>
         Gen1.CanReceiveStatus(t, s, mt);
 
+    public virtual bool PureStatusMoveChecksTypeImmunity(Attack move) =>
+        Gen1.PureStatusMoveChecksTypeImmunity(move);
+
     public virtual bool CanBeLeechSeeded(Creature t) => Gen1.CanBeLeechSeeded(t);
 
     public virtual StatusCondition CarryStatusOutOfBattle(StatusCondition status) =>

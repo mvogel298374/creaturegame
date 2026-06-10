@@ -179,5 +179,9 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
       console.error('[SignalR] ChooseMove failed:', err));
   }, []);
 
-  return { state, chooseMove };
+  // The level-up stat panel stays up until the player does anything; BattleScreen calls this on any
+  // action (open FIGHT / CHECK, pick a move, QUIT) to dismiss it.
+  const dismissLevelUp = useCallback(() => dispatch({ type: 'HIDE_LEVEL_UP' }), []);
+
+  return { state, chooseMove, dismissLevelUp };
 }

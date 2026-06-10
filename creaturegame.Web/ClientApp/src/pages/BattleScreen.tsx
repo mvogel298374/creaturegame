@@ -22,7 +22,7 @@ export function BattleScreen() {
   const gameId: string | null = location.state?.gameId ?? null;
   const startLevel: number = location.state?.level ?? 50;
 
-  const { state, chooseMove } = useBattleHub(gameId, startLevel);
+  const { state, chooseMove, dismissLevelUp } = useBattleHub(gameId, startLevel);
   const [controlView, setControlView] = useState<ControlView>('menu');
   const logRef = useRef<HTMLDivElement>(null);
 
@@ -31,7 +31,11 @@ export function BattleScreen() {
       logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [state.log]);
 
+  // The level-up panel stays up until the player does anything — clear it on the first interaction.
+  const onAnyInput = () => { if (state.levelUp) dismissLevelUp(); };
+
   const handleChooseMove = (index: number) => {
+    onAnyInput();
     chooseMove(index);
     setControlView('menu');
   };
@@ -97,9 +101,9 @@ export function BattleScreen() {
               battleEnded={state.phase === 'ended'}
               battlesWon={state.battlesWon}
               finalLevel={state.playerLevel}
-              onFight={() => setControlView('fight')}
-              onCheck={() => setControlView('check')}
-              onBack={() => nav('/')}
+              onFight={() => { onAnyInput(); setControlView('fight'); }}
+              onCheck={() => { onAnyInput(); setControlView('check'); }}
+              onBack={() => { onAnyInput(); nav('/'); }}
             />
           )}
           {controlView === 'fight' && (

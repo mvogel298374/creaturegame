@@ -39,15 +39,17 @@ public class ImmunityContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     }
 
     [Fact]
-    public async Task GhostTypesAreImmuneToGlare()
+    public async Task GlareParalyzesGhostTypesInGen1()
     {
-        // Glare is a Normal-type pure-status move; Normal is 0× vs Ghost, so it has no effect.
+        // Glare is a Normal-type pure-status move (Normal is 0× vs Ghost), but Gen 1 only immunity-checks
+        // Thunder Wave among status moves — so Glare paralyses a Ghost-type. (The Ghost immunity to Glare
+        // wasn't introduced until Gen 2.)
         var result = await new MoveScenario()
             .Defender(TestCreatures.Make("D", type1: DamageType.Ghost, hp: 500))
             .Use(Move("glare"));
 
-        Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
-        Assert.True(result.Has<MoveHadNoEffect>());
+        Assert.Equal(StatusCondition.Paralysis, result.Defender.Battle.Status);
+        Assert.False(result.Has<MoveHadNoEffect>());
     }
 
     [Fact]
@@ -130,15 +132,17 @@ public class ImmunityContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     }
 
     [Fact]
-    public async Task NormalTypesAreImmuneToConfuseRay()
+    public async Task ConfuseRayConfusesNormalTypesInGen1()
     {
-        // Confuse Ray is Ghost-type; a Normal-type is immune (0×), so this pure-status move does nothing.
+        // Confuse Ray is Ghost-type (Ghost is 0× vs Normal), but confusion moves aren't immunity-checked
+        // in Gen 1 — a non-damaging move only consults the type chart for Thunder Wave. So Confuse Ray
+        // confuses a Normal-type. (Same family as Supersonic confusing a Ghost.)
         var result = await new MoveScenario()
             .Defender(TestCreatures.Make("D", type1: DamageType.Normal, hp: 500))
             .Use(Move("confuse-ray"));
 
-        Assert.Equal(0, result.Defender.Battle.ConfusedTurns);
-        Assert.True(result.Has<MoveHadNoEffect>());
+        Assert.True(result.Defender.Battle.ConfusedTurns > 0);
+        Assert.False(result.Has<MoveHadNoEffect>());
     }
 
     [Fact]

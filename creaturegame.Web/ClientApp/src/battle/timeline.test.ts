@@ -158,7 +158,7 @@ describe('expandEvent — control plane vs timeline', () => {
     expect(logLines(steps)).toEqual(['PIDGEY fainted! Run over — 1 win, reached level 6.']);
   });
 
-  it('LeveledUp announces the level then shows the stat-gain panel (gains + new totals) and hides it', () => {
+  it('LeveledUp announces the level, plays the fanfare, and shows the stat-gain panel (no auto-hide)', () => {
     const { steps } = expandEvent('LeveledUp', {
       creatureName: 'MEWTWO', newLevel: 12, xpThisLevel: 40, xpToNextLevel: 100,
       stats: { maxHp: 130, attack: 78, defense: 65, special: 70, speed: 90 },
@@ -169,8 +169,11 @@ describe('expandEvent — control plane vs timeline', () => {
       .filter((s): s is Extract<Step, { kind: 'dispatch' }> => s.kind === 'dispatch')
       .map(s => s.action.type);
     expect(dispatched).toContain('SHOW_LEVEL_UP');
-    expect(dispatched).toContain('HIDE_LEVEL_UP');
-    expect(dispatched.indexOf('SHOW_LEVEL_UP')).toBeLessThan(dispatched.indexOf('HIDE_LEVEL_UP'));
+    // The panel now persists until the player's next input — the timeline must NOT auto-hide it.
+    expect(dispatched).not.toContain('HIDE_LEVEL_UP');
+
+    // The quick level-up fanfare fires.
+    expect((steps ?? []).some(s => s.kind === 'emit' && s.command.type === 'playLevelUpSound')).toBe(true);
 
     const show = (steps ?? []).find(
       (s): s is Extract<Step, { kind: 'dispatch' }> => s.kind === 'dispatch' && s.action.type === 'SHOW_LEVEL_UP');

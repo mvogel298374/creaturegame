@@ -435,11 +435,12 @@
 .status-badge--paralysis { background: #f3d23b; color: #333; }
 .status-badge--freeze    { background: #74cec0; color: #fff; }
 /* ── Level-up stat panel (Gen 1 box) ─────────────── */
+/* Sits at the bottom-right of the battle field — i.e. right-aligned directly above the battle menu —
+   and stays until the player's next input (see BattleScreen onAnyInput). */
 .levelup-panel {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  bottom: var(--sp-md);
+  right: var(--sp-md);
   z-index: 3;
   background: var(--clr-bg-deep);
   border: 2px solid var(--clr-text);
@@ -450,8 +451,8 @@
 }
 
 @keyframes levelup-pop {
-  from { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
-  to   { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  from { opacity: 0; transform: translateY(8px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .levelup-title {
@@ -473,6 +474,6 @@
   padding: 2px 0;
 }
 
-.levelup-stat  { text-align: left;  padding-right: var(--sp-md); letter-spacing: 1px; }
-.levelup-gain  { text-align: right; padding-right: var(--sp-sm); color: #44cc44; font-weight: 700; }
+.levelup-stat  { text-align: left;  padding-right: var(--sp-lg); letter-spacing: 1px; }
+.levelup-gain  { text-align: right; padding-right: var(--sp-lg); color: #44cc44; font-weight: 700; }
 .levelup-total { text-align: right; color: var(--clr-text); opacity: 0.85; }

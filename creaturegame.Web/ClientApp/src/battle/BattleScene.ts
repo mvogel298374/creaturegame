@@ -20,6 +20,7 @@ export class BattleScene extends Phaser.Scene {
   private onFaintAnim  = (e: { side: 'player' | 'enemy' }) => this.playFaintAnimation(e.side);
   private onHitSound    = (e: { isCrit: boolean }) => (e.isCrit ? Audio.playHitCrit() : Audio.playHit());
   private onStatusSound = () => Audio.playStatusApplied();
+  private onLevelUpSound = () => Audio.playLevelUp();
   private onSpawnEnemy  = (e: { enemySpeciesId: number }) => this.spawnEnemy(e.enemySpeciesId);
 
   constructor() {
@@ -72,6 +73,7 @@ export class BattleScene extends Phaser.Scene {
     bridge.on('playFaintAnimation', this.onFaintAnim);
     bridge.on('playHitSound', this.onHitSound);
     bridge.on('playStatusSound', this.onStatusSound);
+    bridge.on('playLevelUpSound', this.onLevelUpSound);
     bridge.on('spawnEnemy', this.onSpawnEnemy);
 
     // Remove our bridge listeners when this scene is torn down so they can't
@@ -242,6 +244,7 @@ export class BattleScene extends Phaser.Scene {
     bridge.off('playFaintAnimation', this.onFaintAnim);
     bridge.off('playHitSound', this.onHitSound);
     bridge.off('playStatusSound', this.onStatusSound);
+    bridge.off('playLevelUpSound', this.onLevelUpSound);
     bridge.off('spawnEnemy', this.onSpawnEnemy);
   }
 }
