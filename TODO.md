@@ -9,8 +9,8 @@ COMPLETE, and the `BattleState` facade migration COMPLETE — the whole **post-c
 (archived in `TODO_ARCHIVE.md`). The only deferred item from it is the `GameController` run-seed (needs the
 Game Loop; tracked under Tech Debt #3). **XP & progression DONE (2026-06-09):** (1) **XP & Level-Up**
 fidelity and (2) the **Endless Battle Chain** (minimal run loop — endless wild battles on one persistent
-creature) both landed; only their **E2E specs remain** (deferred to a combined E2E pass). Suite: 847 .NET +
-40 Vitest.
+creature) both landed, and their **E2E specs landed in the 2026-06-10 E2E pass** (`endless-chain` /
+`level-up` / `status`). Suite: 848 .NET + 42 Vitest + 16 Playwright E2E.
 
 ---
 
@@ -51,7 +51,8 @@ regardless of the real amount, and nothing animates on a win that doesn't level.
 - [x] Backend: a multi-level award emits `ExperienceGained` then the right `LeveledUp` sequence, each with
   correct thresholds + stats; intermediate levels overshoot their span (client caps), final is a partial fill.
 - [x] Backend: the `LeveledUp` stat block matches `CalculateStats` at the new level; max-level helpers full-bar.
-- [ ] E2E §7 — bar fills and "grew to level N!" + the stat line appear on a win. *(Remaining — Playwright spec.)*
+- [x] E2E §7 — `level-up.spec.ts`: a low-level win fills XP, shows "grew to level N!" + the stat panel + the
+  fanfare, and the panel persists until input. (2026-06-10 E2E pass.)
 
 ---
 
@@ -91,9 +92,10 @@ Gen 1. No between-battle heal. See `STATE_MODEL.md §2`.
 **Tests:**
 - [x] Backend: `BattleRunnerTests` — chain → `RunEnded` summary; abandon emits no `RunEnded`.
 - [x] Web contract: `RunEnded` auto-covered by `WebEventContractTests` (reflects over all events).
-- [ ] **E2E (deferred — do in the E2E pass):** `e2e/battle.spec.ts` + `e2e/helpers.ts` still assert the old
-  terminal `"wins!"` line, which the chain removed. Update them: win → "A new challenger approaches!" +
-  next encounter with HP/XP carried; faint → "Run over"/game-over summary.
+- [x] **E2E (2026-06-10 pass):** `battle.spec.ts` + `helpers.ts` updated off the removed `"wins!"` line, and
+  `endless-chain.spec.ts` covers win → "A new challenger approaches!" + a fresh enemy + carried XP; QUIT →
+  title; play-to-faint → "Run over"/game-over screen. Matched coin-flip battles are handled by a
+  restart-on-loss helper (`reachLog`), not a seed.
 - [ ] Backend (deferred edge): a double-faint (mutual end-of-turn DoT) counts as a loss (`break` before the
   win-count) — behavior correct, no deterministic test yet.
 
@@ -180,9 +182,9 @@ slide-in, idle bob, lunge, faint fade, and audio are **not** directly assertable
 selectors, and never assert wall-clock animation durations (the #1 source of flake). Assert **event ordering**
 via the bridge instead; unit-test durations separately if needed.
 
-Status: **harness + core specs landed** (9 specs, run via `npm run test:e2e` or the VS Code Playwright
-extension — see `ClientApp/e2e/README.md`). Remaining: a few checklist sections (§6 status, §7 XP/QUIT),
-`data-testid`s, and CI.
+Status: **suite landed** (16 specs across 8 files, run via `npm run test:e2e` or the VS Code Playwright
+extension — see `ClientApp/e2e/README.md`). §6 status, §7 XP/level-up/QUIT, and the endless chain are now
+covered. Remaining: `data-testid`s and CI.
 
 **Remaining:**
 - [ ] `data-testid` attributes — **deferred**: specs lean on stable semantic classes already present
@@ -190,9 +192,11 @@ extension — see `ClientApp/e2e/README.md`). Remaining: a few checklist section
   only where a class proves brittle.
 - [ ] CI step (or `dev.ps1`-adjacent script / `test.ps1 -StartStack`) that boots backend + frontend, runs
   the suite headless, and tears down.
-- [ ] §6 Status conditions — badge on correct nameplate; log grammar (status is non-deterministic per
-  battle; needs a seeded or forced-status path).
-- [ ] §7 Faint & end — XP fill / level-up line / QUIT → title not yet asserted (battle play-through itself ✅).
+- [x] §6 Status conditions — `status.spec.ts`: player-inflicted Sleep Powder → sleep badge on the enemy
+  nameplate + "fell asleep!" (player move + retry-until-lands; enemy-inflicted / immunity edges stay at the
+  integration layer). (2026-06-10.)
+- [x] §7 Faint & end — XP fill + level-up panel (`level-up.spec.ts`); run-over / game-over + QUIT → title
+  (`endless-chain.spec.ts`). (2026-06-10.)
 - [ ] §8 (optional) Visual regression snapshots of the canvas at settled states — skipped (maintenance cost).
 
 **Notes:** keep Puppeteer-MCP for agent-driven ad-hoc verification; Playwright is the durable regression

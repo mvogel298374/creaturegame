@@ -1,8 +1,40 @@
 # End-to-end tests (Playwright)
 
-Browser-driven tests that exercise the real app: title → starter select → battle →
-attack cadence → faint → winner. They run against the Vite dev server (`:5173`), which
-proxies `/api`, `/hubs` (SignalR), `/sprites`, `/audio` to the .NET backend (`:5100`).
+Browser-driven tests that exercise the real app: title → starter select → battle → attack cadence →
+status/XP/level-up → the endless chain (win = "a new challenger approaches", faint = run-over/game-over).
+They run against the Vite dev server (`:5173`), which proxies `/api`, `/hubs` (SignalR), `/sprites`,
+`/audio` to the .NET backend (`:5100`).
+
+## Determinism (client-only)
+
+The test client controls only **starter species, starting level** (`startBattle(page, species, level?)`),
+**and its own move each turn** — the enemy (species, level, moves) is server-side random. So the specs lean
+on a few patterns instead of a seed:
+
+- **Force a level-up** → start at level 5 (`startBattle(page, 'CHARIZARD', 5)`) and `attackUntilLog(page,
+  /grew to level/)`.
+- **Force a status/stat effect** → use a *player* move that applies it (e.g. Bulbasaur's Sleep Powder /
+  Growth) with a **retry-until-lands** loop (Gen 1 accuracy can whiff; the L50 starter survives the misses).
+- **Drive the chain** → `playToNextEncounter` (one win → intermission) / `playToRunEnd` (play to player
+  faint → game-over).
+- **Assert via DOM + the mitt bridge** (`bridgeEvents(page)` reads `window.__cgEvents`), never canvas pixels
+  or wall-clock durations.
+
+Enemy-inflicted status and type-immunity specifics (Confuse Ray / Glare / Thunder Wave) are covered at the
+unit/integration layer — forcing them in E2E needs the backend seed hook (Tech Debt #3), not built yet.
+
+## Specs
+
+- `smoke` / `starter-select` — title + the 151-species select screen, level slider, confirm → battle.
+- `battle` — entry, the move-menu grid, a chosen move resolves (lunge-before-hit ordering), and a won battle
+  is an **intermission** (faint → "a new challenger approaches"), not a terminal "wins!".
+- `cadence` — HP doesn't snap to its end-of-turn value at choose-time.
+- `endless-chain` — win → intermission + a fresh enemy + carried XP; QUIT → title; play-to-faint → run-over
+  summary + game-over screen.
+- `level-up` — a low-level win fills XP, levels up with the fanfare (`playLevelUpSound`) + stat panel, and the
+  panel stays up until the next input.
+- `status` — Sleep Powder sleeps the enemy (badge on its nameplate + log line).
+- `stat-stage` — Growth raises Bulbasaur's Special. `learnset` — the starter's moves come from its learnset.
 
 ## Prerequisites
 

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { startBattle, fightButton, chooseMove, logLines, bridgeEvents, playToEnd } from './helpers';
+import { startBattle, fightButton, chooseMove, bridgeEvents, reachLog } from './helpers';
 
 // Mirrors §3–§7 of the UI checklist — battle entry, menus, sequencing, end.
 test.describe('Battle', () => {
@@ -42,19 +42,17 @@ test.describe('Battle', () => {
     if (firstHit !== -1) expect(firstHit).toBeGreaterThan(firstLunge);
   });
 
-  test('plays through to a winner with faint then victory line, in order', async ({ page }) => {
-    test.setTimeout(90_000);   // battle length is random; allow many turns
-    await startBattle(page, 'CHARIZARD');
-    const log = await playToEnd(page);
+  test('a won battle is an intermission (faint → new challenger), not a terminal "wins!"', async ({ page }) => {
+    test.setTimeout(120_000);   // matched coin-flip battles — reachLog restarts the run until a win
+    const log = await reachLog(page, /A new challenger approaches!/);
 
-    // Reached a terminal "X wins!" line.
-    const winsIdx = log.findIndex(l => /wins!$/.test(l));
-    expect(winsIdx).toBeGreaterThan(-1);
-
-    // A faint precedes the victory line.
+    // The endless chain replaced the terminal "X wins!" with an intermission line.
+    const challengerIdx = log.findIndex(l => /A new challenger approaches!/.test(l));
     const faintIdx = log.findIndex(l => /fainted!$/.test(l));
+    expect(challengerIdx).toBeGreaterThan(-1);
     expect(faintIdx).toBeGreaterThan(-1);
-    expect(winsIdx).toBeGreaterThan(faintIdx);
+    expect(challengerIdx).toBeGreaterThan(faintIdx);   // a faint precedes the intermission
+    expect(log.some(l => /wins!$/.test(l))).toBe(false);
 
     // Every "took N damage" line is preceded somewhere earlier by a "used" line.
     const firstUsed = log.findIndex(l => /\bused\b/.test(l));
