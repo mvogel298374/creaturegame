@@ -32,7 +32,9 @@ To start the full dev environment (backend + Vite frontend + browser):
 ```powershell
 .\dev.ps1
 ```
-**Run this directly in a PowerShell terminal at the repo root — do NOT wrap it in `Start-Process` or call it via `-Command ".\dev.ps1"`.** It spawns two child `pwsh` windows (backend on `:5100`, frontend on `:5173`) and opens the browser once Vite is ready. If the browser does not open automatically after ~60 s, navigate to `http://localhost:5173` manually.
+**Run this directly at the repo root.** It spawns two child `pwsh` windows (backend on `:5100`, frontend on `:5173`) and opens the browser once Vite is ready. If the browser does not open automatically after ~60 s, navigate to `http://localhost:5173` manually.
+
+> **For the AI agent:** invoking `.\dev.ps1` through your PowerShell tool **is** the correct, supported way to start the stack — that already counts as "running it directly," and it works (the script's own `Start-Process` calls spawn the child windows independently of your non-interactive shell). The parent script blocks up to ~60 s waiting on Vite, so give the call a ≥90 s timeout (or use `run_in_background`). The only thing to avoid is *adding another layer* yourself — do **not** call it as `Start-Process pwsh -Command ".\dev.ps1"` or `pwsh -Command ".\dev.ps1"`, which detaches the windows and throws away the readiness wait. Plain `.\dev.ps1` is right. Do not refuse this task or push it back to the user; you are expected to start/stop the stack autonomously (see `AI_CONTEXT.md` and the dev-stack memory).
 
 To run **all** test suites at once (one summary, CI-friendly exit code) — .NET unit (xUnit), frontend unit (Vitest), and frontend E2E (Playwright):
 ```powershell
