@@ -167,6 +167,13 @@ public class Battle
                 );
                 PlayerCreature.AddExperience(xp);
                 _emitter?.Emit(new ExperienceGained(PlayerCreature.Name, xp));
+                // Move learning below mutates the PERMANENT MoveSet. If the player Transformed/Mimicked this
+                // battle, MoveSet currently holds the copied moveset and the end-of-battle restore would
+                // discard any learn — so revert the player's copied identity first. Learning (and the
+                // level-up's stat recompute) then act on the real moveset/stats. The restore is idempotent,
+                // so the unconditional one after the loop stays correct for the player-fainted/other paths.
+                PlayerCreature.RestoreMimickedMove();
+                PlayerCreature.RestoreOriginalIdentity();
                 // Drive level-ups one at a time so each event carries that level's resulting stats, the
                 // per-stat gains, and bar parameters (also the seam the deferred move-learning will use).
                 while (true)
@@ -185,6 +192,9 @@ public class Battle
                             after.Minus(before)
                         )
                     );
+                    // Learn this level's moves before stepping to the next level, so a multi-level award
+                    // prompts in canonical order (one move, one level, at a time).
+                    await LearnMovesForLevelAsync(PlayerCreature, PlayerCreature.Level);
                 }
                 break;
             }
@@ -244,6 +254,48 @@ public class Battle
                 DisabledMove = attacker.Battle.DisabledMove,
             }
         );
+    }
+
+    /// <summary>
+    /// Teaches the creature every move it learns at <paramref name="level"/>. A free slot auto-learns; a full
+    /// moveset emits <see cref="MoveReplacementRequired"/> and blocks on the player's input — a chosen slot
+    /// (0–3) is replaced, <c>null</c> declines (canonical Gen 1 "don't learn"). Driven once per level so a
+    /// multi-level award prompts in order. Only the player ever learns, so this always uses the player input.
+    /// </summary>
+    private async Task LearnMovesForLevelAsync(Creature learner, int level)
+    {
+        foreach (var move in learner.MovesLearnedAtLevel(level).ToList())
+        {
+            if (learner.AddAttack(move))
+            {
+                _emitter?.Emit(new MoveLearned(learner.Name, move.Name ?? ""));
+                continue;
+            }
+
+            // Four slots full — ask the player which move to forget (or to decline).
+            _emitter?.Emit(
+                new MoveReplacementRequired(
+                    learner.Name,
+                    move.Name ?? "",
+                    learner.MoveSet.Select(m => m.Base.Name ?? "").ToList()
+                )
+            );
+            int? slot = await _playerInput.ChooseMoveToForgetAsync(
+                new MoveReplacementContext(learner, move)
+            );
+            if (slot is int s && s >= 0 && s < learner.MoveSet.Count)
+            {
+                string forgotten = learner.MoveSet[s].Base.Name ?? "";
+                learner.ReplaceMove(s, move);
+                _emitter?.Emit(new MoveForgotten(learner.Name, forgotten));
+                _emitter?.Emit(new MoveLearned(learner.Name, move.Name ?? ""));
+            }
+            else
+            {
+                // null / out of range → declined: the moveset is unchanged.
+                _emitter?.Emit(new MoveLearnDeclined(learner.Name, move.Name ?? ""));
+            }
+        }
     }
 
     private void ApplyLeechSeedDrain(Creature drained, Creature healed)

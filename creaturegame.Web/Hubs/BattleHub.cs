@@ -21,6 +21,17 @@ public class BattleHub(GameSessionManager manager) : Hub<IBattleClient>
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Answers a level-up move-replacement prompt: <paramref name="slotIndex"/> is the move (0–3) to forget
+    /// and replace, or <c>null</c> to decline (SkipNewMove). Mirrors <see cref="ChooseMove"/> — fire-and-forget
+    /// completion of the input TCS the battle loop is blocked on.
+    /// </summary>
+    public Task ForgetMove(int? slotIndex)
+    {
+        manager.SetForgetChoice(Context.ConnectionId, slotIndex);
+        return Task.CompletedTask;
+    }
+
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         // Start the reconnect grace window; the battle is abandoned only if the client

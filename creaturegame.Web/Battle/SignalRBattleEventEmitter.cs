@@ -239,6 +239,18 @@ public sealed class SignalRBattleEventEmitter(
                     e.StatGains,
                 }
             ),
+            MoveLearned e => ("MoveLearned", new { e.CreatureName, e.MoveName }),
+            MoveReplacementRequired e => (
+                "MoveReplacementRequired",
+                new
+                {
+                    e.CreatureName,
+                    e.NewMoveName,
+                    e.CurrentMoves,
+                }
+            ),
+            MoveForgotten e => ("MoveForgotten", new { e.CreatureName, e.MoveName }),
+            MoveLearnDeclined e => ("MoveLearnDeclined", new { e.CreatureName, e.MoveName }),
             _ => ("Unknown", new { }),
         };
 }

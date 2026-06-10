@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { TypeBadge } from '../components/TypeBadge';
 import { BattleCanvas } from '../battle/BattleCanvas';
-import { useBattleHub, type LevelUpPanel } from '../hooks/useBattleHub';
+import { useBattleHub, type LevelUpPanel, type MoveReplacementPrompt } from '../hooks/useBattleHub';
 import type { Species } from '../types/Species';
 import type { MoveInfo } from '../types/BattleEvents';
 import { formatMoveName } from '../utils/format';
@@ -22,7 +22,7 @@ export function BattleScreen() {
   const gameId: string | null = location.state?.gameId ?? null;
   const startLevel: number = location.state?.level ?? 50;
 
-  const { state, chooseMove, dismissLevelUp } = useBattleHub(gameId, startLevel);
+  const { state, chooseMove, dismissLevelUp, forgetMove } = useBattleHub(gameId, startLevel);
   const [controlView, setControlView] = useState<ControlView>('menu');
   const logRef = useRef<HTMLDivElement>(null);
 
@@ -126,11 +126,63 @@ export function BattleScreen() {
           )}
         </div>
       </div>
+
+      {state.moveReplacement && (
+        <MoveReplacementModal prompt={state.moveReplacement} onForget={forgetMove} />
+      )}
     </div>
   );
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
+
+// Level-up move learning: the four slots are full, so the player chooses one to forget for the new move —
+// or declines. Two steps with a confirmation so a move is never deleted on a single misclick.
+function MoveReplacementModal({ prompt, onForget }: {
+  prompt: MoveReplacementPrompt;
+  onForget: (slot: number | null) => void;
+}) {
+  // null → choosing; { slot } → confirming that choice (slot null = confirming a decline).
+  const [pending, setPending] = useState<{ slot: number | null } | null>(null);
+  const newMove = formatMoveName(prompt.newMoveName);
+
+  if (pending) {
+    const declining = pending.slot === null;
+    const question = declining
+      ? `Stop learning ${newMove}?`
+      : `Forget ${formatMoveName(prompt.currentMoves[pending.slot!])} and learn ${newMove}?`;
+    return (
+      <div className="modal-overlay">
+        <div className="move-replace-modal" role="alertdialog" aria-label="Confirm move change">
+          <p className="move-replace-question">{question}</p>
+          <div className="move-replace-confirm">
+            <button className="action-btn action-btn--fight" onClick={() => onForget(pending.slot)}>YES</button>
+            <button className="action-btn" onClick={() => setPending(null)}>NO</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="modal-overlay">
+      <div className="move-replace-modal" role="alertdialog" aria-label="Choose a move to forget">
+        <p className="move-replace-title">{prompt.creatureName} wants to learn {newMove}!</p>
+        <p className="move-replace-sub">But it already knows 4 moves. Forget one?</p>
+        <div className="move-replace-grid">
+          {prompt.currentMoves.map((move, i) => (
+            <button key={i} className="move-btn" onClick={() => setPending({ slot: i })}>
+              <span className="move-name">{formatMoveName(move)}</span>
+            </button>
+          ))}
+        </div>
+        <button className="btn-ghost action-back" onClick={() => setPending({ slot: null })}>
+          Don't learn {newMove}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function HpBar({ hp, maxHp, showNumbers = false }: {
   hp: number; maxHp: number; showNumbers?: boolean;

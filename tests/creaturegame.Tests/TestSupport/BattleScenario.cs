@@ -16,6 +16,18 @@ public sealed class ScriptedInput(params string[] moveNames) : IBattleInput
 {
     private readonly Queue<string> _script = new(moveNames);
     private string? _last;
+    private int? _forgetSlot;
+
+    /// <summary>
+    /// The fixed answer to a level-up replace-move prompt: a slot index (0–3) to forget, or <c>null</c> to
+    /// decline (the default — same as the interface default, so an un-configured input never learns on a
+    /// full moveset). Returned by <see cref="ChooseMoveToForgetAsync"/>.
+    /// </summary>
+    public ScriptedInput ForgetsSlot(int? slot)
+    {
+        _forgetSlot = slot;
+        return this;
+    }
 
     public Task<PokemonAttack> ChooseMoveAsync(TurnContext context)
     {
@@ -30,6 +42,9 @@ public sealed class ScriptedInput(params string[] moveNames) : IBattleInput
             );
         return Task.FromResult(move);
     }
+
+    public Task<int?> ChooseMoveToForgetAsync(MoveReplacementContext context) =>
+        Task.FromResult(_forgetSlot);
 }
 
 /// <summary>
@@ -178,10 +193,19 @@ public sealed class BattleScenario
     private string[] _enemyScript = [];
     private IBattleRules _rules = new ScriptableRules().Deterministic();
     private int _seed;
+    private int? _playerForgetSlot;
 
     public BattleScenario Player(Creature c)
     {
         _player = c;
+        return this;
+    }
+
+    /// <summary>The player's answer to a level-up replace-move prompt: slot 0–3 to forget, or null to decline
+    /// (the default). Lets a flow test drive the full-moveset learn path deterministically.</summary>
+    public BattleScenario PlayerForgetsSlot(int? slot)
+    {
+        _playerForgetSlot = slot;
         return this;
     }
 
@@ -224,7 +248,7 @@ public sealed class BattleScenario
             _player,
             _enemy,
             Gen1TypeChart.Instance,
-            new ScriptedInput(_playerScript),
+            new ScriptedInput(_playerScript).ForgetsSlot(_playerForgetSlot),
             new ScriptedInput(_enemyScript),
             rules: _rules,
             emitter: emitter,

@@ -180,3 +180,26 @@ public record LeveledUp(
     StatBlock Stats,
     StatBlock StatGains
 ) : BattleEvent;
+
+// --- Learnset (level-up move learning) ---
+/// <summary>The creature learned a new move — either into a free slot, or after a replacement. Drives the
+/// canonical "{NAME} learned {MOVE}!" line.</summary>
+public record MoveLearned(string CreatureName, string MoveName) : BattleEvent;
+
+/// <summary>The creature levelled into a move but its four slots are full, so the player must choose a move to
+/// forget (or decline). A blocking event: the battle loop awaits the player's decision via
+/// <see cref="IBattleInput.ChooseMoveToForgetAsync"/> before continuing. Carries the current move names so the
+/// UI can present the choice.</summary>
+public record MoveReplacementRequired(
+    string CreatureName,
+    string NewMoveName,
+    IReadOnlyList<string> CurrentMoves
+) : BattleEvent;
+
+/// <summary>A move was forgotten to make room for a new one — emitted just before the paired
+/// <see cref="MoveLearned"/>. Drives the "{NAME} forgot {MOVE}!" line.</summary>
+public record MoveForgotten(string CreatureName, string MoveName) : BattleEvent;
+
+/// <summary>The player declined to learn the offered move (kept the current four). Drives the
+/// "{NAME} did not learn {MOVE}." line.</summary>
+public record MoveLearnDeclined(string CreatureName, string MoveName) : BattleEvent;

@@ -1,4 +1,5 @@
 using creaturegame.Attacks;
+using creaturegame.Creatures;
 
 namespace creaturegame.Combat;
 
@@ -17,4 +18,16 @@ namespace creaturegame.Combat;
 public interface IBattleInput
 {
     Task<PokemonAttack> ChooseMoveAsync(TurnContext context);
+
+    /// <summary>
+    /// Asked when the creature levels into a new move but its four slots are full: return the slot index
+    /// (0–3) to forget and replace, or <c>null</c> to decline (keep the current moveset). Only the player
+    /// input is ever consulted. The default is to decline, so AI / automated inputs never block on a
+    /// level-up prompt — only an interactive input (the web <c>SignalRInput</c>) overrides it.
+    /// </summary>
+    Task<int?> ChooseMoveToForgetAsync(MoveReplacementContext context) =>
+        Task.FromResult<int?>(null);
 }
+
+/// <summary>Context for a level-up move-replacement decision: who is learning, and the move on offer.</summary>
+public sealed record MoveReplacementContext(Creature Learner, Attack NewMove);

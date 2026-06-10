@@ -43,7 +43,10 @@ export type Action =
   // Bar fills by an awarded amount, capped at the current level's max (a level-up follows if it caps out).
   | { type: 'XP_GAIN'; amount: number }
   // Bar set to an absolute level-relative value (used to refill to the leftover after a level-up reset).
-  | { type: 'XP_SET'; value: number };
+  | { type: 'XP_SET'; value: number }
+  // Level-up move learning: prompt to replace a move (4 slots full), shown then hidden by the player's answer.
+  | { type: 'SHOW_MOVE_REPLACEMENT'; creatureName: string; newMoveName: string; currentMoves: string[] }
+  | { type: 'HIDE_MOVE_REPLACEMENT' };
 
 // Phaser commands sent over the mitt bridge.
 export type BridgeCommand =
@@ -357,6 +360,41 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
         d({ type: 'XP_SET', value: Math.min(xpThisLevel, xpToNextLevel) }),
         w(500),
       ] };
+    }
+
+    // ── Level-up move learning ─────────────────────────────────────────────────
+    case 'MoveLearned': {
+      const cName = payload.creatureName as string;
+      const mName = payload.moveName as string;
+      return { steps: [w(150), d(log(`${cName} learned ${formatMoveName(mName)}!`)), w(600)] };
+    }
+
+    case 'MoveReplacementRequired': {
+      // Four slots full — announce, then raise the replace-move modal. The backend is now blocked awaiting
+      // the player's ForgetMove answer, so the timeline naturally idles here until the modal resolves.
+      const cName        = payload.creatureName as string;
+      const newMoveName  = payload.newMoveName as string;
+      const currentMoves = payload.currentMoves as string[];
+      return { steps: [
+        w(300),
+        d(log(`${cName} is trying to learn ${formatMoveName(newMoveName)}!`)),
+        w(500),
+        d(log(`But ${cName} already knows 4 moves.`)),
+        w(300),
+        d({ type: 'SHOW_MOVE_REPLACEMENT', creatureName: cName, newMoveName, currentMoves }),
+      ] };
+    }
+
+    case 'MoveForgotten': {
+      const cName = payload.creatureName as string;
+      const mName = payload.moveName as string;
+      return { steps: [w(150), d(log(`${cName} forgot ${formatMoveName(mName)}!`)), w(400)] };
+    }
+
+    case 'MoveLearnDeclined': {
+      const cName = payload.creatureName as string;
+      const mName = payload.moveName as string;
+      return { steps: [w(150), d(log(`${cName} did not learn ${formatMoveName(mName)}.`)), w(500)] };
     }
 
     case 'StatusApplied': {

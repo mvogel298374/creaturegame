@@ -9,6 +9,12 @@ export interface LevelUpPanel {
   totals: StatBlock;
 }
 
+export interface MoveReplacementPrompt {
+  creatureName: string;
+  newMoveName: string;
+  currentMoves: string[];
+}
+
 export interface BattleState {
   phase: 'connecting' | 'waiting' | 'choosing' | 'battling' | 'ended';
   animating: boolean;
@@ -28,6 +34,7 @@ export interface BattleState {
   moves: MoveInfo[];
   battlesWon: number;
   levelUp: LevelUpPanel | null;
+  moveReplacement: MoveReplacementPrompt | null;
   log: string[];
   turnNumber: number;
 }
@@ -51,6 +58,7 @@ const initialState: BattleState = {
   moves: [],
   battlesWon: 0,
   levelUp: null,
+  moveReplacement: null,
   log: [],
   turnNumber: 0,
 };
@@ -116,6 +124,15 @@ function reducer(state: BattleState, action: Action): BattleState {
       return { ...state, levelUp: { level: action.level, gains: action.gains, totals: action.totals } };
     case 'HIDE_LEVEL_UP':
       return { ...state, levelUp: null };
+    case 'SHOW_MOVE_REPLACEMENT':
+      // The replace prompt supersedes the level-up panel (Gen 1 shows the stat panel, then the prompt).
+      return {
+        ...state,
+        levelUp: null,
+        moveReplacement: { creatureName: action.creatureName, newMoveName: action.newMoveName, currentMoves: action.currentMoves },
+      };
+    case 'HIDE_MOVE_REPLACEMENT':
+      return { ...state, moveReplacement: null };
     case 'ANIMATING_START':
       return { ...state, animating: true };
     case 'ANIMATING_DONE':
@@ -183,5 +200,14 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
   // action (open FIGHT / CHECK, pick a move, QUIT) to dismiss it.
   const dismissLevelUp = useCallback(() => dispatch({ type: 'HIDE_LEVEL_UP' }), []);
 
-  return { state, chooseMove, dismissLevelUp };
+  // Answer the level-up replace-move prompt: slot 0–3 to forget, or null to decline. Hide the modal at once
+  // (the backend is blocked on this answer); the resulting MoveForgotten/MoveLearned/MoveLearnDeclined events
+  // drive the log lines, so nothing is logged locally here.
+  const forgetMove = useCallback((slot: number | null) => {
+    dispatch({ type: 'HIDE_MOVE_REPLACEMENT' });
+    connRef.current?.invoke('ForgetMove', slot).catch(err =>
+      console.error('[SignalR] ForgetMove failed:', err));
+  }, []);
+
+  return { state, chooseMove, dismissLevelUp, forgetMove };
 }

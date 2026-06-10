@@ -277,6 +277,25 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                 Console.WriteLine($"{e.CreatureName} grew to level {e.NewLevel}!");
                 break;
 
+            case MoveLearned e:
+                Console.WriteLine($"{e.CreatureName} learned {e.MoveName}!");
+                break;
+
+            case MoveReplacementRequired e:
+                Console.WriteLine(
+                    $"{e.CreatureName} is trying to learn {e.NewMoveName}, but already knows "
+                        + $"{string.Join(", ", e.CurrentMoves)}."
+                );
+                break;
+
+            case MoveForgotten e:
+                Console.WriteLine($"{e.CreatureName} forgot {e.MoveName}!");
+                break;
+
+            case MoveLearnDeclined e:
+                Console.WriteLine($"{e.CreatureName} did not learn {e.MoveName}.");
+                break;
+
             case RunEnded e:
                 Console.WriteLine(
                     $"Run over — {e.FinalCreatureName} fainted after {e.BattlesWon} win(s), reaching level {e.FinalLevel}."

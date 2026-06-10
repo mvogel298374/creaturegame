@@ -6,6 +6,7 @@ namespace creaturegame.Web.Battle;
 public sealed class SignalRInput : IBattleInput
 {
     private volatile TaskCompletionSource<int>? _tcs;
+    private volatile TaskCompletionSource<int?>? _forgetTcs;
     private volatile bool _cancelled;
 
     public async Task<PokemonAttack> ChooseMoveAsync(TurnContext context)
@@ -41,6 +42,32 @@ public sealed class SignalRInput : IBattleInput
     }
 
     /// <summary>
+    /// Awaits the player's level-up replace-move decision: the slot index (0–3) to forget, or <c>null</c> to
+    /// decline. Mirrors <see cref="ChooseMoveAsync"/>'s TCS handshake (the hub's <c>ForgetMove</c> completes it
+    /// via <see cref="SetForgetChoice"/>); the <see cref="_cancelled"/> guard makes a disconnect throw rather
+    /// than hang the loop on the prompt.
+    /// </summary>
+    public async Task<int?> ChooseMoveToForgetAsync(MoveReplacementContext context)
+    {
+        if (_cancelled)
+            throw new OperationCanceledException("Battle input cancelled (client disconnected).");
+
+        var tcs = new TaskCompletionSource<int?>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        _forgetTcs = tcs;
+        var slot = await tcs.Task; // throws OperationCanceledException if Cancel() ran
+        _forgetTcs = null;
+        return slot;
+    }
+
+    public void SetForgetChoice(int? slot)
+    {
+        var tcs = _forgetTcs;
+        tcs?.TrySetResult(slot);
+    }
+
+    /// <summary>
     /// Unblocks a battle loop waiting on player input when the client disconnects,
     /// so the fire-and-forget battle task can complete and be collected.
     /// </summary>
@@ -48,5 +75,6 @@ public sealed class SignalRInput : IBattleInput
     {
         _cancelled = true;
         _tcs?.TrySetCanceled();
+        _forgetTcs?.TrySetCanceled();
     }
 }

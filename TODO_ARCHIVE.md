@@ -8,6 +8,52 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Learnset System — Level-up move learning ✅ DONE (2026-06-11)
+
+Closes the learnset loop: on a win, when the player levels into a move on its species learnset, Battle now
+teaches it. Only the player ever learns (enemies are settled at build time). Built as a **full vertical
+slice** (engine + SignalR + React modal + tests), audit-gated.
+
+**Engine (`creaturegame`):**
+- `LearnsetMove(int Level, Attack Move)` record; `Creature.Learnset` (permanent half, untouched by
+  `ResetBattleState`, so learns persist across the chain) + `MovesLearnedAtLevel(level)` (filters
+  already-known) + `ReplaceMove(slot, move)`.
+- Events: `MoveLearned`, `MoveReplacementRequired` (blocking), `MoveForgotten`, `MoveLearnDeclined` — so
+  **all four log lines are engine-driven**, not frontend-local (consistent with the event→timeline pattern;
+  covered by the web event-contract test).
+- `IBattleInput.ChooseMoveToForgetAsync(MoveReplacementContext)` — **default interface method ⇒ decline**, so
+  AI / auto / scripted inputs never block; only `SignalRInput` overrides it.
+- `Battle` faint loop: after each `LeveledUp`, `LearnMovesForLevelAsync` auto-adds (free slot → `MoveLearned`)
+  or emits `MoveReplacementRequired` and **awaits `_playerInput`** — a slot → `MoveForgotten` + `MoveLearned`,
+  null → `MoveLearnDeclined`. Drives moves/levels one at a time (canonical order).
+- **Transform/Mimic interaction (seam-reviewer catch):** the win branch now reverts the player's copied
+  identity (`RestoreMimickedMove` / `RestoreOriginalIdentity`) **before** the learn loop, so a move learned
+  while Transformed lands on (and persists to) the real moveset instead of being discarded by the
+  end-of-battle restore. Guarded by `Learnset_LevelUp_AfterTransform_PersistsLearnedMoveOntoOriginalMoveset`.
+
+**Web (`creaturegame.Web`):** `SignalRInput` second TCS + `SetForgetChoice`; `BattleHub.ForgetMove(int?)`
+(null = SkipNewMove); `GameSessionManager.SetForgetChoice`; `SignalRBattleEventEmitter` + `ConsoleBattleEventEmitter`
+cases for the four events; `EncounterFactory.CreatePlayerSetupAsync` resolves + attaches `player.Learnset`
+(enemies get none). The XP bar already filled live (`TurnStarted` carries `XpThisLevel`/`XpToNextLevel` from
+the XP & Level-Up work) — verified, no change needed.
+
+**Frontend:** `timeline.ts` cases for the four events; `useBattleHub` `moveReplacement` state + `forgetMove`;
+**two-step replace-move modal** in `BattleScreen.tsx` — choose a slot (or "Don't learn"), then a **Yes/No
+confirm** so no move is deleted on a single misclick. The modal supersedes the level-up stat panel (Gen 1
+order). Canonical text: "is trying to learn X!" / "forgot Y!" / "learned X!" / "did not learn X."
+
+**Gen-seam call (ran §5.0):** the mechanic is **gen-invariant** — no new `IBattleRules` member. The only
+gen-variable input is the learnset *data* (`PokemonLearnset.Generation`, filtered by `ActiveGeneration`); the
+4-slot cap reuses `AddAttack`/`MaxMoves`.
+
+**Tests:** `LearnsetLevelUpTests` (free-slot auto-learn; full-slots prompt + decline; forget-a-slot replace;
+Transform-persistence) + `ScriptedInput.ForgetsSlot` / `BattleScenario.PlayerForgetsSlot` harness; Vitest
+timeline cases. Suite **852 .NET + 45 Vitest**. **Deferred:** a learnset Playwright E2E (needs the
+seeded-battle entry point — Tech Debt #3); a console `IBattleInput` that can answer the prompt (none exists
+yet — the default-decline is the documented placeholder).
+
+---
+
 ## Completed ✅
 
 <details>
@@ -76,6 +122,68 @@ The ordered pass that followed the move-coverage completion. All six items done;
   move vs Ghost was 0× → switched enemy to Water + pinned Defense + seed), and
   `BattleIntegrationTests.PicksSpecificMoveByIndex` (seeded + `AlwaysHitRules`). Verified by a 60× full-suite
   confidence sweep: **0 failures / ~49k test executions.**
+
+---
+
+## XP, Level-Up & the Endless Battle Chain — DONE (2026-06-09 → 10)
+
+The "XP & progression" milestone: a live, honest in-battle XP loop, a Gen 1 stat-gain panel on
+level-up, and a minimal endless run loop (one persistent creature, endless wild encounters). All
+E2E specs landed in the 2026-06-10 pass. Suite at completion: **848 .NET + 42 Vitest + 16 Playwright**.
+
+### XP & Level-Up — finish the in-battle loop ✅
+Engine emits `ExperienceGained(CreatureName, Amount)` before any `LeveledUp`; `LeveledUp` carries the
+level-relative XP pair (`XpThisLevel`/`XpToNextLevel`) + post-level `StatBlock`; `TurnStarted` carries
+`PlayerXpThisLevel`/`PlayerXpToNextLevel` (the hardcoded `100` is gone). `Battle` drives level-ups one
+at a time (`AddExperience` + `while (TryLevelUp())`) — the seam the deferred move-learning reuses.
+`Creature` exposes `XpThisLevel`/`XpToNextLevel` (full-bar at cap) + `StatSnapshot()`.
+- **Frontend:** honest fill — `XP_GAIN` fills toward the level boundary (capped at the max); each
+  `LeveledUp` resets + refills the leftover via `XP_SET`; the slam-to-full removed. `useBattleHub.ts`
+  dispatches the new XP fields into `playerXp`/`playerXpToNext`.
+- **Level-up stat panel (Web-UI Polish item, done here):** Gen 1 stat-gain box (HP/ATTACK/DEFENSE/
+  SPECIAL/SPEED with +gains and new totals) on `LeveledUp`; engine sends per-stat `StatGains`
+  (before/after `TryLevelUp` delta). Plays the level-up fanfare (`playLevelUpSound` → `Audio.playLevelUp`);
+  the panel sits bottom-right above the battle menu and stays until the player's next input
+  (`useBattleHub.dismissLevelUp`) — no auto-hide.
+- **Tests:** backend — `TurnStarted` carries correct level-relative XP; a multi-level award emits
+  `ExperienceGained` then the right `LeveledUp` sequence (intermediates overshoot, client caps, final is
+  partial); the `LeveledUp` stat block matches `CalculateStats` at the new level. E2E — `level-up.spec.ts`:
+  a low-level win fills XP, shows "grew to level N!" + the stat panel + the fanfare, panel persists until input.
+- Scope decided 2026-06-09: live XP display + honest multi-level animation + stat-growth surfacing.
+  Out of scope (own sections): EV gain, level-up move learning. Enemies wild ⇒ XP `a`-multiplier = 1.
+  `/audit` PASS-WITH-ADVISORIES (all resolved). No new data/schema; did not need the Game Loop.
+
+### Endless Battle Chain (minimal run loop) ✅
+One persistent player runs battle after battle (fresh wild enemy each time) until it faints; HP/PP/XP/Level
+carry, transient resets, `RunEnded` drives a game-over summary. A deliberate **minimal slice** of the
+deferred *Game Loop & Progression* — no catch/party/save/evolution/version-filtering.
+- **Persistence (free — the permanent/transient split):** reusing one player `Creature` across consecutive
+  `Battle` instances carries HP, PP (`PowerPointsCurrent`), Experience, Level; status / stat-stages /
+  confusion reset per `Battle.StartFightAsync`. No between-battle heal. Locked by
+  `ConsecutiveBattles_OnOnePlayer_PersistHpPpXpLevel_AndResetTransientState`. See `STATE_MODEL.md §2`.
+- **Cross-encounter status carry (2026-06-10):** major status now carries across encounters — `BattleRunner`
+  snapshots the player's status after each win and re-applies it into the next `Battle` (`playerEntryStatus`),
+  with `IBattleRules.CarryStatusOutOfBattle` deciding the out-of-battle transform (Gen 1: Toxic→Poison).
+  Volatiles still reset per battle. Sleep carries its counter; Freeze persists.
+- **Encounter factory (web):** `EncounterFactory` (`CreatePlayerSetupAsync` + `CreateEnemyAsync`) —
+  `BuildCreature` moved out of `GameController`; builds every enemy. Enemy level = player's **current**
+  level ± 3, BST-matched; `CreateEnemyAsync` takes an optional seedable `IRandomSource` (defaults to system RNG).
+- **Run loop:** `BattleRunner` (core) drives the chain; `GameSessionManager` runs it instead of one `Battle`.
+  New terminal `RunEnded(BattlesWon, FinalLevel, FinalCreatureName)` event (mapped in both emitters). Abandon
+  path (client disconnect) throws out of the loop **before** `RunEnded` — pinned by a test.
+- **Frontend:** `BattleEnded` (win) → non-terminal intermission ("A new challenger approaches!"), bars persist,
+  next `BattleStarted` resumes; `BattleEnded` (loss) → no-op (`RunEnded` owns the end). `RunEnded` → game-over
+  screen with run summary (wins, final level); `state.winner` → `state.battlesWon`.
+- **Tests:** `BattleRunnerTests` (chain → `RunEnded`; abandon emits none); `RunEnded` auto-covered by
+  `WebEventContractTests`; E2E `endless-chain.spec.ts` (win → "A new challenger approaches!" + fresh enemy +
+  carried XP; QUIT → title; play-to-faint → "Run over"/game-over). Matched coin-flip battles handled by the
+  `reachLog` restart-on-loss helper, not a seed. `battle.spec.ts`/`helpers.ts` updated off the removed `"wins!"` line.
+- `/audit` PASS-WITH-ADVISORIES (resolved).
+- **Two items intentionally left open (tracked in `TODO.md`, not done here):** (1) full per-run seed through
+  `GameSessionManager` → `BattleRunner`/`EncounterFactory` — Tech Debt #3 (needs a run-seed concept); the
+  factory already accepts a seedable source, so it's just wiring. (2) a deterministic test that a double-faint
+  (mutual end-of-turn DoT) counts as a loss (`break` before the win-count) — behavior is correct, no
+  deterministic test yet (Known Gaps).
 
 ---
 

@@ -31,6 +31,32 @@ public class Creature
         return false;
     }
 
+    /// <summary>
+    /// The creature's level-up learnset — the moves it gains at given levels, resolved to real
+    /// <see cref="Attack"/>s. Part of the permanent half (not reset between battles), so a move learned
+    /// mid-run persists into the next encounter. Only the player populates this; enemies never level up.
+    /// </summary>
+    public IReadOnlyList<LearnsetMove> Learnset { get; set; } = [];
+
+    /// <summary>
+    /// The moves this creature learns exactly at <paramref name="level"/>, excluding any it already knows.
+    /// Consulted by the battle loop after each level gained to drive auto-learn / replacement prompts.
+    /// </summary>
+    public IEnumerable<Attack> MovesLearnedAtLevel(int level) =>
+        Learnset
+            .Where(e => e.Level == level && MoveSet.All(m => m.Base.Id != e.Move.Id))
+            .Select(e => e.Move);
+
+    /// <summary>
+    /// Overwrites the move in <paramref name="slot"/> (0–3) with a freshly-PP'd <paramref name="move"/> —
+    /// the level-up "forget a move to make room" path. No-op if the slot is out of range.
+    /// </summary>
+    public void ReplaceMove(int slot, Attack move)
+    {
+        if (slot >= 0 && slot < MoveSet.Count)
+            MoveSet[slot] = new PokemonAttack(move);
+    }
+
     public DamageType? Type1 { get; set; }
     public DamageType? Type2 { get; set; }
     public GrowthRate GrowthRate { get; set; } = GrowthRate.MediumFast;

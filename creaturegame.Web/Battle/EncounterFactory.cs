@@ -51,6 +51,9 @@ public sealed class EncounterFactory(
             level,
             MoveSelectionStrategy.CanonicalLatest
         );
+        // Only the player levels up, so only the player carries a learnset (its moves resolved up-front and
+        // consulted by the battle loop on each level gained). Persists with the creature across the chain.
+        player.Learnset = BuildLearnset(learnsets, allMoves);
         return new RunSetup(player, allMoves);
     }
 
@@ -124,6 +127,25 @@ public sealed class EncounterFactory(
         foreach (var move in moves)
             creature.AddAttack(move);
         return creature;
+    }
+
+    /// <summary>
+    /// Resolves a species' learnset rows (already filtered to the species + active generation) into the
+    /// engine's <see cref="LearnsetMove"/> list, ordered by learn level. Rows whose move id isn't in the pool
+    /// are skipped, mirroring <see cref="LearnsetMoveSelector"/>.
+    /// </summary>
+    private static IReadOnlyList<LearnsetMove> BuildLearnset(
+        IReadOnlyList<PokemonLearnset> learnsets,
+        IReadOnlyList<Attack> allMoves
+    )
+    {
+        var movesById = allMoves.ToDictionary(m => m.Id);
+        return learnsets
+            .Where(l => movesById.ContainsKey(l.MoveId))
+            .OrderBy(l => l.LearnLevel)
+            .ThenBy(l => l.MoveId)
+            .Select(l => new LearnsetMove(l.LearnLevel, movesById[l.MoveId]))
+            .ToList();
     }
 }
 

@@ -477,3 +477,55 @@
 .levelup-stat  { text-align: left;  padding-right: var(--sp-lg); letter-spacing: 1px; }
 .levelup-gain  { text-align: right; padding-right: var(--sp-lg); color: #44cc44; font-weight: 700; }
 .levelup-total { text-align: right; color: var(--clr-text); opacity: 0.85; }
+
+/* ── Move-replacement modal (level-up move learning) ── */
+.modal-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  animation: levelup-pop 160ms ease-out;
+}
+
+.move-replace-modal {
+  min-width: 280px;
+  max-width: 90%;
+  background: var(--clr-bg-deep);
+  border: 2px solid var(--clr-text);
+  border-radius: 4px;
+  padding: var(--sp-md) var(--sp-lg);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6);
+}
+
+.move-replace-title {
+  font-size: var(--fs-base);
+  font-weight: 700;
+  letter-spacing: var(--ls-normal);
+  color: var(--clr-sky);
+  text-align: center;
+  margin-bottom: var(--sp-xs);
+}
+
+.move-replace-sub,
+.move-replace-question {
+  font-size: var(--fs-sm);
+  color: var(--clr-text);
+  text-align: center;
+  margin-bottom: var(--sp-md);
+}
+
+.move-replace-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-sm);
+  margin-bottom: var(--sp-md);
+}
+
+.move-replace-confirm {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-md);
+}

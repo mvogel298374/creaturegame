@@ -184,6 +184,36 @@ describe('expandEvent — control plane vs timeline', () => {
   });
 });
 
+describe('expandEvent — level-up move learning', () => {
+  it('MoveLearned formats the learned move name', () => {
+    expect(logLines(expandEvent('MoveLearned', { creatureName: 'CHARMANDER', moveName: 'ember' }, CTX).steps))
+      .toEqual(['CHARMANDER learned EMBER!']);
+  });
+
+  it('MoveReplacementRequired announces the attempt and raises the replace-move modal', () => {
+    const { now, steps } = expandEvent('MoveReplacementRequired',
+      { creatureName: 'CHARMANDER', newMoveName: 'ember', currentMoves: ['tackle', 'growl', 'tail-whip', 'scratch'] }, CTX);
+    expect(now).toBeUndefined();
+    expect(logLines(steps)).toEqual([
+      'CHARMANDER is trying to learn EMBER!',
+      'But CHARMANDER already knows 4 moves.',
+    ]);
+    const show = (steps ?? []).find(
+      (s): s is Extract<Step, { kind: 'dispatch' }> => s.kind === 'dispatch' && s.action.type === 'SHOW_MOVE_REPLACEMENT');
+    expect(show).toBeDefined();
+    const action = show!.action as Extract<Action, { type: 'SHOW_MOVE_REPLACEMENT' }>;
+    expect(action.newMoveName).toBe('ember');
+    expect(action.currentMoves).toEqual(['tackle', 'growl', 'tail-whip', 'scratch']);
+  });
+
+  it('MoveForgotten and MoveLearnDeclined read the canonical Gen 1 lines', () => {
+    expect(logLines(expandEvent('MoveForgotten', { creatureName: 'CHARMANDER', moveName: 'growl' }, CTX).steps))
+      .toEqual(['CHARMANDER forgot GROWL!']);
+    expect(logLines(expandEvent('MoveLearnDeclined', { creatureName: 'CHARMANDER', moveName: 'ember' }, CTX).steps))
+      .toEqual(['CHARMANDER did not learn EMBER.']);
+  });
+});
+
 describe('expandEvent — crash / flinch / multi-hit', () => {
   it('CrashDamage updates the user HP before logging the Gen 1 crash line', () => {
     const { steps } = expandEvent('CrashDamage', { sourceName: 'HITMONLEE', damage: 1, hpAfter: 119 }, CTX);

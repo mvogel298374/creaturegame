@@ -117,6 +117,16 @@ public sealed class GameSessionManager(
             battle.Input.SetChoice(moveIndex);
     }
 
+    /// <summary>Routes a level-up replace-move answer (slot 0–3, or null to decline) to the battle's input.</summary>
+    public void SetForgetChoice(string connectionId, int? slotIndex)
+    {
+        if (
+            _connToGame.TryGetValue(connectionId, out var gameId)
+            && _active.TryGetValue(gameId, out var battle)
+        )
+            battle.Input.SetForgetChoice(slotIndex);
+    }
+
     /// <summary>
     /// Called when a connection drops. If it is the battle's current connection, a grace
     /// timer is started; the battle is abandoned (its input cancelled so the loop ends and
