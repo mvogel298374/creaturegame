@@ -8,10 +8,11 @@
 migration, the whole "XP & progression" milestone, **and the Learnset System (Level-up move learning)**
 are all COMPLETE and archived in `TODO_ARCHIVE.md` — XP & Level-Up fidelity, the Endless Battle Chain, and
 now level-up move learning (auto-learn on a free slot; blocking replace-move prompt + confirm modal when the
-four slots are full; learned moves persist across the chain). Suite: 852 .NET + 45 Vitest + 16 Playwright
-E2E. **Next up: AI Move Selection** (now unblocked — Learnset System was its prerequisite). Two deferred
-edges from the chain remain live: the per-run seed wiring (Tech Debt #3) and a deterministic
-double-faint-as-loss test (Known Gaps). A learnset E2E spec is deferred for the same seeded-battle reason.
+four slots are full; learned moves persist across the chain). Suite: 852 .NET + 45 Vitest + 17 Playwright
+E2E (the new spec: a low-level Mew auto-learns Transform on reaching its learn level). **Next up: AI Move
+Selection** (now unblocked — Learnset System was its prerequisite). Two deferred edges from the chain remain
+live: the per-run seed wiring (Tech Debt #3) and a deterministic double-faint-as-loss test (Known Gaps). The
+replace-move **modal** E2E is deferred for the same seeded-battle reason (auto-learn is covered).
 
 ---
 

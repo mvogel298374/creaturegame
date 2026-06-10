@@ -17,7 +17,12 @@ export async function startBattle(page: Page, species = 'CHARIZARD', level?: num
 
   if (level !== undefined) await setStartLevel(page, level);
 
-  const card = page.locator('.species-card', { hasText: species });
+  // Match the card by its EXACT name (the .card-name element) so a prefix like MEW doesn't also grab
+  // MEWTWO (a strict-mode violation). The search box narrows the grid first.
+  await page.locator('.select-search').fill(species);
+  const card = page.locator('.species-card', {
+    has: page.locator('.card-name', { hasText: new RegExp(`^${species}$`, 'i') }),
+  });
   await expect(card).toBeVisible();
   await card.click();
   await page.getByRole('button', { name: /CONFIRM/i }).click();

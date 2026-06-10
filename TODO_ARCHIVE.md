@@ -48,9 +48,12 @@ gen-variable input is the learnset *data* (`PokemonLearnset.Generation`, filtere
 
 **Tests:** `LearnsetLevelUpTests` (free-slot auto-learn; full-slots prompt + decline; forget-a-slot replace;
 Transform-persistence) + `ScriptedInput.ForgetsSlot` / `BattleScenario.PlayerForgetsSlot` harness; Vitest
-timeline cases. Suite **852 .NET + 45 Vitest**. **Deferred:** a learnset Playwright E2E (needs the
-seeded-battle entry point — Tech Debt #3); a console `IBattleInput` that can answer the prompt (none exists
-yet — the default-decline is the documented placeholder).
+timeline cases; **Playwright `learnset.spec.ts`** — a low-level **Mew** (BST 500 ⇒ BST-matched-strong foes ⇒
+fast XP) started at L9 auto-learns Transform on reaching L10, via the `reachLog` restart-on-loss pattern
+(`startBattle` now matches the card by EXACT name so `MEW` doesn't also grab `MEWTWO`). Suite **852 .NET + 45
+Vitest + 17 Playwright E2E**. **Deferred:** the replace-MODAL E2E (needs four full slots AT a learn-level —
+not reliably reachable without the seeded-battle entry point, Tech Debt #3; covered at the .NET/Vitest layer);
+a console `IBattleInput` that can answer the prompt (none exists yet — the default-decline is the placeholder).
 
 ---
 
