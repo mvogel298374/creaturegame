@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { TypeBadge } from '../components/TypeBadge';
 import { BattleCanvas } from '../battle/BattleCanvas';
-import { useBattleHub, type LevelUpPanel, type MoveReplacementPrompt } from '../hooks/useBattleHub';
+import { useBattleHub, type LevelUpPanel, type MoveReplacementPrompt, type RecoveryPrompt } from '../hooks/useBattleHub';
 import type { Species } from '../types/Species';
 import type { MoveInfo } from '../types/BattleEvents';
 import { formatMoveName } from '../utils/format';
@@ -22,7 +22,7 @@ export function BattleScreen() {
   const gameId: string | null = location.state?.gameId ?? null;
   const startLevel: number = location.state?.level ?? 50;
 
-  const { state, chooseMove, dismissLevelUp, forgetMove } = useBattleHub(gameId, startLevel);
+  const { state, chooseMove, dismissLevelUp, forgetMove, respondRecovery } = useBattleHub(gameId, startLevel);
   const [controlView, setControlView] = useState<ControlView>('menu');
   const logRef = useRef<HTMLDivElement>(null);
 
@@ -130,6 +130,44 @@ export function BattleScreen() {
       {state.moveReplacement && (
         <MoveReplacementModal prompt={state.moveReplacement} onForget={forgetMove} />
       )}
+
+      {state.recovery && (
+        <RecoveryModal prompt={state.recovery} onRespond={respondRecovery} />
+      )}
+    </div>
+  );
+}
+
+// Roguelite Poké Center: a between-encounter heal step. Shows the player's creature with a heal glow and
+// offers a single Heal / Skip press — that one input both decides the heal and continues the chain (the
+// backend is blocked awaiting it). Skipping leaves the creature as it was.
+function RecoveryModal({ prompt, onRespond }: {
+  prompt: RecoveryPrompt;
+  onRespond: (accept: boolean) => void;
+}) {
+  return (
+    <div className="modal-overlay">
+      <div className="recovery-modal" role="alertdialog" aria-label="Poké Center recovery">
+        <p className="recovery-title">Poké Center</p>
+        <p className="recovery-sub">{prompt.creatureName} can be fully healed.</p>
+        <div className="recovery-sprite-wrap">
+          <span className="recovery-glow" aria-hidden="true" />
+          <img
+            className="recovery-sprite"
+            src={`/sprites/front/${prompt.speciesId}.png`}
+            alt={prompt.creatureName}
+            draggable={false}
+          />
+        </div>
+        <div className="recovery-buttons">
+          <button className="action-btn action-btn--fight" onClick={() => onRespond(true)}>
+            HEAL
+          </button>
+          <button className="action-btn" onClick={() => onRespond(false)}>
+            SKIP
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

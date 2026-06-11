@@ -15,6 +15,12 @@ export interface MoveReplacementPrompt {
   currentMoves: string[];
 }
 
+export interface RecoveryPrompt {
+  creatureName: string;
+  speciesId: number;
+  battlesWon: number;
+}
+
 export interface BattleState {
   phase: 'connecting' | 'waiting' | 'choosing' | 'battling' | 'ended';
   animating: boolean;
@@ -35,6 +41,7 @@ export interface BattleState {
   battlesWon: number;
   levelUp: LevelUpPanel | null;
   moveReplacement: MoveReplacementPrompt | null;
+  recovery: RecoveryPrompt | null;
   log: string[];
   turnNumber: number;
 }
@@ -59,6 +66,7 @@ const initialState: BattleState = {
   battlesWon: 0,
   levelUp: null,
   moveReplacement: null,
+  recovery: null,
   log: [],
   turnNumber: 0,
 };
@@ -133,6 +141,13 @@ function reducer(state: BattleState, action: Action): BattleState {
       };
     case 'HIDE_MOVE_REPLACEMENT':
       return { ...state, moveReplacement: null };
+    case 'SHOW_RECOVERY':
+      return {
+        ...state,
+        recovery: { creatureName: action.creatureName, speciesId: action.speciesId, battlesWon: action.battlesWon },
+      };
+    case 'HIDE_RECOVERY':
+      return { ...state, recovery: null };
     case 'ANIMATING_START':
       return { ...state, animating: true };
     case 'ANIMATING_DONE':
@@ -209,5 +224,13 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
       console.error('[SignalR] ForgetMove failed:', err));
   }, []);
 
-  return { state, chooseMove, dismissLevelUp, forgetMove };
+  // Answer the Poké Center recovery offer: true to heal, false to skip. Hide the modal at once (the backend is
+  // blocked on this answer); the resulting PlayerRecovered / RecoveryDeclined events drive the log + HP refill.
+  const respondRecovery = useCallback((accept: boolean) => {
+    dispatch({ type: 'HIDE_RECOVERY' });
+    connRef.current?.invoke('RespondRecovery', accept).catch(err =>
+      console.error('[SignalR] RespondRecovery failed:', err));
+  }, []);
+
+  return { state, chooseMove, dismissLevelUp, forgetMove, respondRecovery };
 }

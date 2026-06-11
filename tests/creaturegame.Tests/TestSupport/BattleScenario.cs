@@ -17,6 +17,7 @@ public sealed class ScriptedInput(params string[] moveNames) : IBattleInput
     private readonly Queue<string> _script = new(moveNames);
     private string? _last;
     private int? _forgetSlot;
+    private bool _acceptRecovery = true;
 
     /// <summary>
     /// The fixed answer to a level-up replace-move prompt: a slot index (0–3) to forget, or <c>null</c> to
@@ -45,6 +46,17 @@ public sealed class ScriptedInput(params string[] moveNames) : IBattleInput
 
     public Task<int?> ChooseMoveToForgetAsync(MoveReplacementContext context) =>
         Task.FromResult(_forgetSlot);
+
+    /// <summary>Makes this input skip the between-encounter Poké Center recovery (default is to accept, same as
+    /// the interface default). Returned by <see cref="ConfirmRecoveryAsync"/>.</summary>
+    public ScriptedInput DeclinesRecovery()
+    {
+        _acceptRecovery = false;
+        return this;
+    }
+
+    public Task<bool> ConfirmRecoveryAsync(RecoveryContext context) =>
+        Task.FromResult(_acceptRecovery);
 }
 
 /// <summary>

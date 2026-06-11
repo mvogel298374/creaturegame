@@ -27,7 +27,19 @@ public interface IBattleInput
     /// </summary>
     Task<int?> ChooseMoveToForgetAsync(MoveReplacementContext context) =>
         Task.FromResult<int?>(null);
+
+    /// <summary>
+    /// Asked between encounters when a roguelite "Poké Center" recovery is offered: return <c>true</c> to fully
+    /// restore the creature (HP/PP/status), <c>false</c> to skip it. Only the interactive player input is ever
+    /// consulted; the default accepts, so automated / AI inputs never block on the prompt and the chain still
+    /// heals on schedule — only the web <see cref="SignalRInput"/> blocks awaiting a real choice.
+    /// </summary>
+    Task<bool> ConfirmRecoveryAsync(RecoveryContext context) => Task.FromResult(true);
 }
 
 /// <summary>Context for a level-up move-replacement decision: who is learning, and the move on offer.</summary>
 public sealed record MoveReplacementContext(Creature Learner, Attack NewMove);
+
+/// <summary>Context for a between-encounter Poké Center recovery offer: the player creature and the running
+/// win count (so an input could vary its answer by depth — the default just accepts).</summary>
+public sealed record RecoveryContext(Creature Player, int BattlesWon);

@@ -250,6 +250,46 @@ public class CoreMechanicsTests
         Assert.Equal(0, move.PowerPointsCurrent);
     }
 
+    [Fact]
+    public void FullHeal_RestoresHpAndAllPp_AndClearsMajorStatus()
+    {
+        var creature = new Creature("Healme") { Level = 20 };
+        creature.CalculateStats();
+        creature.AddAttack(
+            new Attack
+            {
+                Id = 1,
+                Name = "Tackle",
+                PowerPointsMax = 35,
+            }
+        );
+        creature.AddAttack(
+            new Attack
+            {
+                Id = 2,
+                Name = "Ember",
+                PowerPointsMax = 25,
+            }
+        );
+
+        // Wound it: HP down, PP spent on both moves, and a persisting major status set.
+        creature.Attributes.HP = 1;
+        creature.MoveSet[0].PowerPointsCurrent = 0;
+        creature.MoveSet[1].PowerPointsCurrent = 3;
+        creature.Battle.Status = StatusCondition.BadPoison;
+        creature.Battle.ToxicCounter = 5;
+        creature.Battle.SleepTurns = 2;
+
+        creature.FullHeal();
+
+        Assert.Equal(creature.Attributes.MaxHP, creature.Attributes.HP);
+        Assert.Equal(35, creature.MoveSet[0].PowerPointsCurrent);
+        Assert.Equal(25, creature.MoveSet[1].PowerPointsCurrent);
+        Assert.Equal(StatusCondition.None, creature.Battle.Status);
+        Assert.Equal(1, creature.Battle.ToxicCounter); // back to baseline
+        Assert.Equal(0, creature.Battle.SleepTurns);
+    }
+
     // --- Status Condition Tests ---
 
     [Fact]

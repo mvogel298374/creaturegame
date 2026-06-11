@@ -155,6 +155,163 @@ public class BattleRunnerTests
         Assert.DoesNotContain(StatusCondition.BadPoison, playerStatuses);
     }
 
+    // Roguelite Poké Center: after every 3rd win the player is fully restored (HP, PP, status) before the
+    // next encounter. Encounters 1–3 are fast foes that chip + poison the slow player; the heal must fire
+    // exactly once (after win 3) and the player must enter encounter 4 at full HP, full PP, and unstatused.
+    [Fact]
+    public async Task Runner_FullyHealsPlayer_AfterEveryThirdWin_RestoringHpPpAndClearingStatus()
+    {
+        var player = Fighter("Player", hp: 250, attack: 999, speed: 1, level: 50); // slow: foes strike first
+        int maxHp = player.Attributes.MaxHP;
+        int maxPp = player.MoveSet[0].Base.PowerPointsMax;
+
+        // Capture the player's condition at the moment encounter 4 is built — i.e. just after the win-3 heal.
+        int hpEntering4 = -1,
+            ppEntering4 = -1;
+        var statusEntering4 = StatusCondition.Sleep; // sentinel; overwritten when encounter 4 is built
+
+        int built = 0;
+        Func<Creature, Task<Creature>> supplier = p =>
+        {
+            built++;
+            if (built == 4)
+            {
+                hpEntering4 = p.Attributes.HP;
+                ppEntering4 = p.MoveSet[0].PowerPointsCurrent;
+                statusEntering4 = p.Battle.Status;
+            }
+            Creature enemy;
+            if (built <= 3)
+            {
+                // A 1-HP foe that out-speeds the player: it lands a chip hit + poison, then is one-shot.
+                enemy = Fighter("Chip", hp: 1, attack: 20, speed: 999, level: 50);
+                enemy.MoveSet.Clear();
+                enemy.AddAttack(
+                    new Attack
+                    {
+                        Name = "poisonbite",
+                        BaseDamage = 20,
+                        Accuracy = 100,
+                        AttackType = AttackType.Physical,
+                        PowerPointsMax = 99,
+                        StatusEffect = StatusCondition.Poison,
+                        EffectChance = 100,
+                    }
+                );
+            }
+            else
+            {
+                enemy = Fighter("Bruiser", hp: 999, attack: 999, speed: 999, level: 50); // ends the run
+            }
+            enemy.SpeciesBaseExperience = 50;
+            return Task.FromResult(enemy);
+        };
+
+        var recorder = new RecordingEmitter();
+        var runner = new BattleRunner(
+            player,
+            supplier,
+            Gen1TypeChart.Instance,
+            new ScriptedInput("tackle"),
+            new RandomMoveInput(),
+            movePool: Array.Empty<Attack>(),
+            emitter: recorder,
+            rules: new ScriptableRules().Deterministic().ForceSecondary(),
+            rng: new SeededRandomSource(0)
+        );
+
+        await runner.RunAsync();
+
+        // The offer + heal each fired exactly once — after win 3, not after wins 1 or 2.
+        Assert.Single(recorder.Of<RecoveryOffered>());
+        var recovered = Assert.Single(recorder.Of<PlayerRecovered>());
+        Assert.Equal("Player", recovered.CreatureName);
+        Assert.Equal(maxHp, recovered.HpAfter);
+        Assert.Empty(recorder.Of<RecoveryDeclined>()); // the default input accepts
+
+        // Entering encounter 4 (right after that heal) everything is restored.
+        Assert.Equal(maxHp, hpEntering4); // HP back to full despite three chip hits + poison ticks
+        Assert.Equal(maxPp, ppEntering4); // PP restored despite three tackles
+        Assert.Equal(StatusCondition.None, statusEntering4); // poison cured by the Center
+
+        // Not vacuous: the player really was poisoned across the first three encounters.
+        Assert.Contains(
+            StatusCondition.Poison,
+            recorder.Of<TurnStarted>().Select(t => t.PlayerStatus)
+        );
+    }
+
+    // The recovery offer is a real choice: a player who declines is NOT healed. After win 3 the declining
+    // input skips the heal, so the player enters encounter 4 still wounded + poisoned, RecoveryDeclined fires,
+    // and no PlayerRecovered is emitted.
+    [Fact]
+    public async Task Runner_DoesNotHeal_WhenPlayerDeclinesRecovery()
+    {
+        var player = Fighter("Player", hp: 250, attack: 999, speed: 1, level: 50); // slow: foes strike first
+        int maxHp = player.Attributes.MaxHP;
+
+        int built = 0;
+        int hpEntering4 = -1;
+        var statusEntering4 = StatusCondition.None;
+        Func<Creature, Task<Creature>> supplier = p =>
+        {
+            built++;
+            if (built == 4)
+            {
+                hpEntering4 = p.Attributes.HP;
+                statusEntering4 = p.Battle.Status;
+            }
+            Creature enemy;
+            if (built <= 3)
+            {
+                enemy = Fighter("Chip", hp: 1, attack: 20, speed: 999, level: 50);
+                enemy.MoveSet.Clear();
+                enemy.AddAttack(
+                    new Attack
+                    {
+                        Name = "poisonbite",
+                        BaseDamage = 20,
+                        Accuracy = 100,
+                        AttackType = AttackType.Physical,
+                        PowerPointsMax = 99,
+                        StatusEffect = StatusCondition.Poison,
+                        EffectChance = 100,
+                    }
+                );
+            }
+            else
+            {
+                enemy = Fighter("Bruiser", hp: 999, attack: 999, speed: 999, level: 50);
+            }
+            enemy.SpeciesBaseExperience = 50;
+            return Task.FromResult(enemy);
+        };
+
+        var recorder = new RecordingEmitter();
+        var runner = new BattleRunner(
+            player,
+            supplier,
+            Gen1TypeChart.Instance,
+            new ScriptedInput("tackle").DeclinesRecovery(),
+            new RandomMoveInput(),
+            movePool: Array.Empty<Attack>(),
+            emitter: recorder,
+            rules: new ScriptableRules().Deterministic().ForceSecondary(),
+            rng: new SeededRandomSource(0)
+        );
+
+        await runner.RunAsync();
+
+        // The offer was made, but declined — no heal.
+        Assert.Single(recorder.Of<RecoveryOffered>());
+        Assert.Single(recorder.Of<RecoveryDeclined>());
+        Assert.Empty(recorder.Of<PlayerRecovered>());
+
+        // Entering encounter 4 the player is still wounded and still poisoned (status carried, not cured).
+        Assert.True(hpEntering4 > 0 && hpEntering4 < maxHp, "declining leaves the player wounded");
+        Assert.Equal(StatusCondition.Poison, statusEntering4);
+    }
+
     // An input that always cancels — stands in for a disconnected client (mirrors SignalRInput.Cancel()).
     private sealed class CancelledInput : IBattleInput
     {

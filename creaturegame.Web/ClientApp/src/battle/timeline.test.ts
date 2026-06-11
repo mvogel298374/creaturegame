@@ -111,11 +111,14 @@ describe('expandEvent — control plane vs timeline', () => {
     expect((steps ?? []).some(s => s.kind === 'emit')).toBe(false);
   });
 
-  it('a chained BattleStarted (2nd+ encounter) also emits a spawnEnemy bridge command', () => {
+  it('a chained BattleStarted (2nd+ encounter) announces the new challenger and emits a spawnEnemy command', () => {
     const { now, steps } = expandEvent('BattleStarted',
       { playerName: 'MEWTWO', enemyName: 'ARBOK', enemySpeciesId: 24, enemyLevel: 52 },
       { playerName: 'MEWTWO', encounterIndex: 2 });
     expect(now).toBeUndefined();
+    // The challenger line lives HERE now (not on the previous BattleEnded), so it can't precede an
+    // unresolved between-battle instance like the Poké Center recovery. It comes before the VS line.
+    expect(logLines(steps)).toEqual(['A new challenger approaches!', 'MEWTWO VS ARBOK']);
     const spawn = (steps ?? []).find(
       (s): s is Extract<Step, { kind: 'emit' }> => s.kind === 'emit' && s.command.type === 'spawnEnemy');
     expect(spawn).toBeDefined();
@@ -130,11 +133,12 @@ describe('expandEvent — control plane vs timeline', () => {
     expect(steps![0]).toMatchObject({ kind: 'dispatch', action: { type: 'TURN_STARTED', enemyHp: 80 } });
   });
 
-  it('BattleEnded with the player winning is a non-terminal intermission', () => {
-    // Endless chain: a player win is not the end — the next BattleStarted resumes play.
+  it('BattleEnded with the player winning is a silent intermission beat (challenger is announced by the next BattleStarted)', () => {
+    // Endless chain: a player win is not the end — the next BattleStarted resumes play. It logs NOTHING here,
+    // so a between-battle instance (e.g. the Poké Center recovery) is never preceded by "a new challenger".
     const { now, steps } = expandEvent('BattleEnded', { winnerName: 'MEWTWO' }, CTX);
     expect(now).toBeUndefined();
-    expect(logLines(steps)).toEqual(['A new challenger approaches!']);
+    expect(logLines(steps)).toEqual([]);
   });
 
   it('BattleEnded with the player losing does nothing (RunEnded drives the game over)', () => {
@@ -156,6 +160,36 @@ describe('expandEvent — control plane vs timeline', () => {
     const { steps } = expandEvent(
       'RunEnded', { battlesWon: 1, finalLevel: 6, finalCreatureName: 'PIDGEY' }, CTX);
     expect(logLines(steps)).toEqual(['PIDGEY fainted! Run over — 1 win, reached level 6.']);
+  });
+
+  it('RecoveryOffered announces the Poké Center and raises the heal modal (queued, blocking)', () => {
+    const { now, steps } = expandEvent(
+      'RecoveryOffered', { creatureName: 'MEWTWO', speciesId: 150, battlesWon: 3 }, CTX);
+    expect(now).toBeUndefined();
+    expect(logLines(steps)).toEqual(['MEWTWO reached a Poké Center!']);
+    const show = (steps ?? []).find(
+      (s): s is Extract<Step, { kind: 'dispatch' }> => s.kind === 'dispatch' && s.action.type === 'SHOW_RECOVERY');
+    expect(show).toBeDefined();
+    const action = show!.action as Extract<Action, { type: 'SHOW_RECOVERY' }>;
+    expect(action.speciesId).toBe(150);
+    expect(action.battlesWon).toBe(3);
+  });
+
+  it('PlayerRecovered logs the Poké Center heal, refills HP to full, and clears the status badge', () => {
+    const { now, steps } = expandEvent(
+      'PlayerRecovered', { creatureName: 'MEWTWO', hpAfter: 150 }, CTX);
+    expect(now).toBeUndefined();
+    expect(logLines(steps)).toEqual(['MEWTWO was fully healed!']);
+    const dispatched = (steps ?? [])
+      .filter((s): s is Extract<Step, { kind: 'dispatch' }> => s.kind === 'dispatch')
+      .map(s => s.action);
+    expect(dispatched).toContainEqual({ type: 'UPDATE_HP', name: 'MEWTWO', hp: 150 });
+    expect(dispatched).toContainEqual({ type: 'CLEAR_STATUS', name: 'MEWTWO' });
+  });
+
+  it('RecoveryDeclined logs the keep-going line', () => {
+    const { steps } = expandEvent('RecoveryDeclined', { creatureName: 'MEWTWO' }, CTX);
+    expect(logLines(steps)).toEqual(['MEWTWO decided to keep going!']);
   });
 
   it('LeveledUp announces the level, plays the fanfare, and shows the stat-gain panel (no auto-hide)', () => {

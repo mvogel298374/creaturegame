@@ -7,6 +7,7 @@ public sealed class SignalRInput : IBattleInput
 {
     private volatile TaskCompletionSource<int>? _tcs;
     private volatile TaskCompletionSource<int?>? _forgetTcs;
+    private volatile TaskCompletionSource<bool>? _recoveryTcs;
     private volatile bool _cancelled;
 
     public async Task<PokemonAttack> ChooseMoveAsync(TurnContext context)
@@ -68,6 +69,32 @@ public sealed class SignalRInput : IBattleInput
     }
 
     /// <summary>
+    /// Awaits the player's between-encounter Poké Center decision: <c>true</c> to heal, <c>false</c> to skip.
+    /// Same TCS handshake as the other prompts (the hub's <c>RespondRecovery</c> completes it via
+    /// <see cref="SetRecoveryChoice"/>); the <see cref="_cancelled"/> guard makes a disconnect throw rather
+    /// than hang the run on the prompt.
+    /// </summary>
+    public async Task<bool> ConfirmRecoveryAsync(RecoveryContext context)
+    {
+        if (_cancelled)
+            throw new OperationCanceledException("Battle input cancelled (client disconnected).");
+
+        var tcs = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        _recoveryTcs = tcs;
+        var accept = await tcs.Task; // throws OperationCanceledException if Cancel() ran
+        _recoveryTcs = null;
+        return accept;
+    }
+
+    public void SetRecoveryChoice(bool accept)
+    {
+        var tcs = _recoveryTcs;
+        tcs?.TrySetResult(accept);
+    }
+
+    /// <summary>
     /// Unblocks a battle loop waiting on player input when the client disconnects,
     /// so the fire-and-forget battle task can complete and be collected.
     /// </summary>
@@ -76,5 +103,6 @@ public sealed class SignalRInput : IBattleInput
         _cancelled = true;
         _tcs?.TrySetCanceled();
         _forgetTcs?.TrySetCanceled();
+        _recoveryTcs?.TrySetCanceled();
     }
 }

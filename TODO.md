@@ -8,8 +8,9 @@
 migration, the whole "XP & progression" milestone, **and the Learnset System (Level-up move learning)**
 are all COMPLETE and archived in `TODO_ARCHIVE.md` — XP & Level-Up fidelity, the Endless Battle Chain, and
 now level-up move learning (auto-learn on a free slot; blocking replace-move prompt + confirm modal when the
-four slots are full; learned moves persist across the chain). Suite: 852 .NET + 45 Vitest + 17 Playwright
-E2E (the new spec: a low-level Mew auto-learns Transform on reaching its learn level). **Next up: AI Move
+four slots are full; learned moves persist across the chain). **Also done (2026-06-11): the Roguelite Run
+Layer — an interactive Poké Center recovery (offer/HEAL/SKIP modal) every 3rd win + a 50–80%-of-player wild
+level band** (see the section below). Suite: 862 .NET + 48 Vitest + 17 Playwright E2E. **Next up: AI Move
 Selection** (now unblocked — Learnset System was its prerequisite). Two deferred edges from the chain remain
 live: the per-run seed wiring (Tech Debt #3) and a deterministic double-faint-as-loss test (Known Gaps). The
 replace-move **modal** E2E is deferred for the same seeded-battle reason (auto-learn is covered).
@@ -114,6 +115,38 @@ Deferred until Phaser animations exist — the mechanic needs a throw/shake/catc
 - [ ] `PokemonSpecies.CatchRate` already imported ✓
 - [ ] `CaptureAttempted(string TargetName, bool Caught)` battle event
 - [ ] `BattleEnded` variant: `reason: "Caught"`
+
+---
+
+## Roguelite Run Layer — Recovery & Encounter Scaling ✅ (2026-06-11)
+
+Two run-layer features on top of the Endless Battle Chain. Both are **run/game-loop concerns, not battle
+mechanics**, so they stay in the run orchestrator (`BattleRunner`) / web encounter builder (`EncounterFactory`)
+and are *not* behind an `IBattleRules` seam — `/audit` §5.0 clears them (no new engine magic numbers, no gen
+checks, full heal + level band are generation-invariant choices).
+
+- [x] **Poké Center recovery every 3rd win — an interactive game-loop step.** After every 3rd chained win the
+  player is *offered* a full restore before the next encounter; it's its own blocking node in the loop, not a
+  silent auto-heal. `Creature.FullHeal()` does the restore (HP→max, all PP→max, major status cleared, Toxic
+  counter reset) — matches the Gen 1 Poké Center exactly (HP + PP + status, unconditional/free), identical in
+  every generation, so it's ordinary engine logic, not a seam. Interval is `BattleRunner.healEveryNBattles`
+  (default 3, 0 disables).
+  - **Blocking choice** reuses the move-replacement plumbing: `IBattleInput.ConfirmRecoveryAsync` (default
+    accepts, so AI/headless never block) ↔ hub `RespondRecovery` ↔ `SignalRInput` TCS. `BattleRunner` emits
+    `RecoveryOffered(name, speciesId, battlesWon)` then awaits the choice; on accept → `FullHeal` +
+    `PlayerRecovered`, on skip → `RecoveryDeclined` (status still carries). All three events mapped in both
+    emitters + `timeline.ts`.
+  - **UI:** in-page `RecoveryModal` (BattleScreen) shows the player's creature sprite with a CSS heal-glow and a
+    single **HEAL / SKIP** press that both decides and advances the chain. Verified live (Puppeteer): offer →
+    modal blocks → HEAL → "was fully healed!" → next battle; and the SKIP path → "decided to keep going!".
+  - Tests: `BattleRunnerTests` (heals once after win 3 restoring HP/PP/status; **declining** leaves the player
+    wounded/poisoned), `CoreMechanicsTests.FullHeal_*`, auto-covering `WebEventContractTests`, `timeline.test.ts`
+    (offer/heal/decline). **Deferred:** a recovery-modal **E2E** spec (needs the seeded-battle entry point to
+    reach 3 wins deterministically — same reason the replace-move modal E2E is deferred).
+- [x] **Wild level band 50–80% of player level.** `EncounterFactory.ScaleWildLevel` replaces the old
+  `playerLevel ± 3` with a uniform pick in `[floor(0.5·L), floor(0.8·L)]`, floored at 2 — wild foes sit a step
+  below the player so the chain stays winnable while still scaling. Tests: `EncounterLevelBandTests` (band
+  bounds across levels, both ends reachable, never < 2).
 
 ---
 

@@ -10,6 +10,11 @@ namespace creaturegame.Combat;
 /// start (canonical Gen 1). When the player faints the run ends and a single <see cref="RunEnded"/> is
 /// emitted with the summary. The next enemy comes from <paramref name="enemySupplier"/>, so the data/DB
 /// concern (building a scaled encounter) stays in the web layer and core stays generation-agnostic.
+///
+/// Roguelite "Poké Center" recovery: after every <paramref name="healEveryNBattles"/>-th win the player is
+/// fully restored (HP, PP, status) before the next encounter — a full heal is generation-invariant (every
+/// gen's Center does the same), so this is run-layer logic, not a battle seam. Set the interval to 0 to
+/// disable recovery entirely.
 /// </summary>
 public sealed class BattleRunner(
     Creature player,
@@ -20,7 +25,8 @@ public sealed class BattleRunner(
     IReadOnlyList<Attack> movePool,
     IBattleEventEmitter? emitter = null,
     IBattleRules? rules = null,
-    IRandomSource? rng = null
+    IRandomSource? rng = null,
+    int healEveryNBattles = 3
 )
 {
     public async Task RunAsync()
@@ -49,7 +55,33 @@ public sealed class BattleRunner(
             if (!player.IsAlive())
                 break;
             battlesWon++;
-            carried = CaptureCarriedStatus(player);
+
+            // Poké Center pause: every Nth win, offer a full restore before the next foe. The prompt is its own
+            // step in the game loop — it blocks awaiting the player's accept/skip choice (interactive input
+            // only; automated inputs accept by default, so the chain still heals headless/in tests). Accepting
+            // cures status, so nothing carries; declining leaves the player as they were (status carries).
+            if (healEveryNBattles > 0 && battlesWon % healEveryNBattles == 0)
+            {
+                emitter?.Emit(new RecoveryOffered(player.Name, player.SpeciesId, battlesWon));
+                bool accept = await playerInput.ConfirmRecoveryAsync(
+                    new RecoveryContext(player, battlesWon)
+                );
+                if (accept)
+                {
+                    player.FullHeal();
+                    carried = null;
+                    emitter?.Emit(new PlayerRecovered(player.Name, player.Attributes.HP));
+                }
+                else
+                {
+                    carried = CaptureCarriedStatus(player);
+                    emitter?.Emit(new RecoveryDeclined(player.Name));
+                }
+            }
+            else
+            {
+                carried = CaptureCarriedStatus(player);
+            }
         }
 
         emitter?.Emit(new RunEnded(battlesWon, player.Level, player.Name));

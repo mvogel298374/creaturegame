@@ -40,6 +40,21 @@ public record BattleEnded(string WinnerName) : BattleEvent;
 /// the game-over screen. Emitted once, after the final <see cref="BattleEnded"/>.</summary>
 public record RunEnded(int BattlesWon, int FinalLevel, string FinalCreatureName) : BattleEvent;
 
+/// <summary>A roguelite "Poké Center" recovery is offered between encounters (after a set number of wins).
+/// A blocking event: the run loop awaits the player's accept/skip decision via
+/// <see cref="IBattleInput.ConfirmRecoveryAsync"/> before continuing, so the client raises the heal modal here.
+/// Carries the species id so the modal can show the creature's sprite.</summary>
+public record RecoveryOffered(string CreatureName, int SpeciesId, int BattlesWon) : BattleEvent;
+
+/// <summary>The player accepted a Poké Center recovery and the creature was fully restored (HP, PP, and
+/// status). Carries the post-heal HP so the client can fill the bar. Emitted between encounters, never inside
+/// a battle.</summary>
+public record PlayerRecovered(string CreatureName, int HpAfter) : BattleEvent;
+
+/// <summary>The player declined the offered Poké Center recovery (kept current HP/PP/status). Drives the
+/// "decided to keep going" line.</summary>
+public record RecoveryDeclined(string CreatureName) : BattleEvent;
+
 // --- Move actions ---
 public record MoveUsed(string AttackerName, string MoveName) : BattleEvent;
 

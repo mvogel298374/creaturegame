@@ -60,8 +60,8 @@ public sealed class EncounterFactory(
     /// <summary>
     /// Builds a fresh wild enemy scaled to the player's current level and BST, excluding the player's own
     /// species, reusing the run's already-loaded move pool. The enemy gets a semi-random "smart" moveset so
-    /// encounters vary. Enemy level tracks the player's current level (±3) so a levelled-up player keeps
-    /// meeting same-tier foes.
+    /// encounters vary. Enemy level sits in a roguelite band below the player (see <see cref="ScaleWildLevel"/>)
+    /// so the chain stays winnable while still scaling up as the player levels.
     /// </summary>
     public async Task<Creature> CreateEnemyAsync(
         Creature player,
@@ -86,7 +86,7 @@ public sealed class EncounterFactory(
             PickByBst(pool, playerBst, source)
             ?? throw new InvalidOperationException("No species available to build an encounter.");
 
-        int enemyLevel = Math.Clamp(player.Level + source.Next(-3, 4), 5, 100);
+        int enemyLevel = ScaleWildLevel(player.Level, source);
 
         var learnsets = await pokemonCtx
             .Learnsets.AsNoTracking()
@@ -100,6 +100,20 @@ public sealed class EncounterFactory(
             enemyLevel,
             MoveSelectionStrategy.WeightedSmart
         );
+    }
+
+    /// <summary>
+    /// Picks a wild encounter's level as a roguelite difficulty band: uniformly in [50%, 80%] of the player's
+    /// current level (floored), never below 2. This deliberately keeps wild foes a step under the player so the
+    /// endless chain stays winnable while still scaling up as the player levels. It is a run-layer tuning
+    /// choice, not a Gen 1 mechanic (Gen 1 wild levels come from per-area encounter tables), so it lives here
+    /// in the web/run layer rather than behind a battle seam. <c>internal</c> for direct unit testing.
+    /// </summary>
+    internal static int ScaleWildLevel(int playerLevel, IRandomSource rng)
+    {
+        int min = Math.Max(2, (int)(playerLevel * 0.5));
+        int max = Math.Max(min, (int)(playerLevel * 0.8));
+        return rng.Next(min, max + 1); // Next's upper bound is exclusive → +1 makes max inclusive
     }
 
     private static Creature BuildCreature(

@@ -46,7 +46,10 @@ export type Action =
   | { type: 'XP_SET'; value: number }
   // Level-up move learning: prompt to replace a move (4 slots full), shown then hidden by the player's answer.
   | { type: 'SHOW_MOVE_REPLACEMENT'; creatureName: string; newMoveName: string; currentMoves: string[] }
-  | { type: 'HIDE_MOVE_REPLACEMENT' };
+  | { type: 'HIDE_MOVE_REPLACEMENT' }
+  // Roguelite Poké Center: heal offer between encounters — shown then hidden by the player's Heal/Skip press.
+  | { type: 'SHOW_RECOVERY'; creatureName: string; speciesId: number; battlesWon: number }
+  | { type: 'HIDE_RECOVERY' };
 
 // Phaser commands sent over the mitt bridge.
 export type BridgeCommand =
@@ -161,8 +164,13 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       if ((ctx.encounterIndex ?? 1) <= 1) {
         return { steps: [d(started), d(log(`${pName} VS ${eName}`))] };
       }
+      // A chained encounter: announce the new challenger HERE, at the start of the next battle — not on the
+      // previous BattleEnded. The run loop emits this only after any interleaved instance (e.g. a Poké Center
+      // recovery) is fully resolved, so "a new challenger approaches" can never jump ahead of an unfinished
+      // between-battle step.
       return { steps: [
         d(started),
+        d(log('A new challenger approaches!')),
         d(log(`${pName} VS ${eName}`)),
         emit({ type: 'spawnEnemy', enemySpeciesId }),
         w(450), // let the new enemy slide in before the first turn's prompt
@@ -196,12 +204,13 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       return { now: [{ type: 'TURN_ENDED' }] };
 
     case 'BattleEnded': {
-      // Per-encounter, NOT terminal in an endless chain. If the player won, it's an intermission — the
-      // next BattleStarted resumes play. If the player lost, RunEnded follows and drives the game-over
-      // screen, so there's nothing to do here.
+      // Per-encounter, NOT terminal in an endless chain. A player win is just a short intermission beat — the
+      // "new challenger" announcement now belongs to the NEXT encounter's BattleStarted (so it never precedes
+      // an interleaved Poké Center recovery the run loop hasn't resolved yet). A loss is followed by RunEnded,
+      // which drives the game-over screen, so there's nothing to do here.
       const winner = payload.winnerName as string;
       if (side(winner) === 'player') {
-        return { steps: [w(300), d(log('A new challenger approaches!')), w(500)] };
+        return { steps: [w(300)] };
       }
       return {};
     }
@@ -218,6 +227,41 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
         d(log(`${name} fainted! Run over — ${wins}, reached level ${finalLevel}.`)),
         d({ type: 'RUN_ENDED', battlesWon, finalLevel }),
       ] };
+    }
+
+    case 'RecoveryOffered': {
+      // Roguelite Poké Center step in the game loop: announce it and raise the heal modal. The backend is now
+      // blocked awaiting the player's Heal/Skip press (RespondRecovery), so the timeline idles here — exactly
+      // like MoveReplacementRequired — until the modal resolves.
+      const cName      = payload.creatureName as string;
+      const speciesId  = payload.speciesId as number;
+      const battlesWon = payload.battlesWon as number;
+      return { steps: [
+        w(300),
+        d(log(`${cName} reached a Poké Center!`)),
+        w(300),
+        d({ type: 'SHOW_RECOVERY', creatureName: cName, speciesId, battlesWon }),
+      ] };
+    }
+
+    case 'PlayerRecovered': {
+      // The player accepted the heal: fully restored (HP/PP/status). Fill the bar back to full and clear any
+      // lingering status badge, with the Gen 1 heal line. (The modal already closed on the player's press.)
+      const cName   = payload.creatureName as string;
+      const hpAfter = payload.hpAfter as number;
+      return { steps: [
+        w(300),
+        d(log(`${cName} was fully healed!`)),
+        d({ type: 'UPDATE_HP', name: cName, hp: hpAfter }),
+        d({ type: 'CLEAR_STATUS', name: cName }),
+        w(500),
+      ] };
+    }
+
+    case 'RecoveryDeclined': {
+      // The player skipped the heal — keep going as they were.
+      const cName = payload.creatureName as string;
+      return { steps: [w(150), d(log(`${cName} decided to keep going!`)), w(400)] };
     }
 
     // ── Turn events: sequenced through the animation timeline ──────────────────

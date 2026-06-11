@@ -260,6 +260,24 @@ public class Creature
         Battle = new BattleState();
     }
 
+    /// <summary>
+    /// Restores the creature to full fighting condition — HP to max, every move's PP to its maximum, and
+    /// any major status cleared. This is the Gen 1 Poké Center heal (HP + PP + status, unconditional and
+    /// free), and it is generation-invariant: every generation's Center does exactly this, so it is ordinary
+    /// engine logic, not a generation seam. Volatile per-battle state (confusion, stat stages, …) is owned by
+    /// <see cref="BattleState"/> and wiped by the per-battle reset, so it isn't touched here; only the major
+    /// status that *persists* out of battle is cleared (the Toxic counter is returned to its baseline too).
+    /// </summary>
+    public void FullHeal()
+    {
+        Attributes.HP = Attributes.MaxHP;
+        foreach (var move in MoveSet)
+            move.PowerPointsCurrent = move.Base.PowerPointsMax;
+        Battle.Status = StatusCondition.None;
+        Battle.SleepTurns = 0;
+        Battle.ToxicCounter = 1;
+    }
+
     public IStatCalculator StatCalculator { get; set; } = Gen1StatCalculator.Instance;
 
     private bool _statsInitialized;

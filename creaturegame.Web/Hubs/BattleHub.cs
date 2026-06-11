@@ -32,6 +32,17 @@ public class BattleHub(GameSessionManager manager) : Hub<IBattleClient>
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Answers a between-encounter Poké Center recovery offer: <paramref name="accept"/> true to heal, false to
+    /// skip. Mirrors <see cref="ForgetMove"/> — fire-and-forget completion of the input TCS the run loop is
+    /// blocked on.
+    /// </summary>
+    public Task RespondRecovery(bool accept)
+    {
+        manager.SetRecoveryChoice(Context.ConnectionId, accept);
+        return Task.CompletedTask;
+    }
+
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         // Start the reconnect grace window; the battle is abandoned only if the client

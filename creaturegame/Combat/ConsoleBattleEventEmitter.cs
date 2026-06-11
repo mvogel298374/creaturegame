@@ -301,6 +301,18 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                     $"Run over — {e.FinalCreatureName} fainted after {e.BattlesWon} win(s), reaching level {e.FinalLevel}."
                 );
                 break;
+
+            case RecoveryOffered e:
+                Console.WriteLine($"{e.CreatureName} reached a Poké Center! Heal up?");
+                break;
+
+            case PlayerRecovered e:
+                Console.WriteLine($"{e.CreatureName} was fully healed!");
+                break;
+
+            case RecoveryDeclined e:
+                Console.WriteLine($"{e.CreatureName} decided to keep going!");
+                break;
         }
     }
 }

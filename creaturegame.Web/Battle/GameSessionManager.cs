@@ -127,6 +127,16 @@ public sealed class GameSessionManager(
             battle.Input.SetForgetChoice(slotIndex);
     }
 
+    /// <summary>Routes a Poké Center recovery answer (true = heal, false = skip) to the battle's input.</summary>
+    public void SetRecoveryChoice(string connectionId, bool accept)
+    {
+        if (
+            _connToGame.TryGetValue(connectionId, out var gameId)
+            && _active.TryGetValue(gameId, out var battle)
+        )
+            battle.Input.SetRecoveryChoice(accept);
+    }
+
     /// <summary>
     /// Called when a connection drops. If it is the battle's current connection, a grace
     /// timer is started; the battle is abandoned (its input cancelled so the loop ends and

@@ -74,6 +74,17 @@ public sealed class SignalRBattleEventEmitter(
                     e.FinalCreatureName,
                 }
             ),
+            RecoveryOffered e => (
+                "RecoveryOffered",
+                new
+                {
+                    e.CreatureName,
+                    e.SpeciesId,
+                    e.BattlesWon,
+                }
+            ),
+            PlayerRecovered e => ("PlayerRecovered", new { e.CreatureName, e.HpAfter }),
+            RecoveryDeclined e => ("RecoveryDeclined", new { e.CreatureName }),
             MoveUsed e => ("MoveUsed", new { e.AttackerName, e.MoveName }),
             MoveMissed e => ("MoveMissed", new { e.AttackerName, e.MoveName }),
             MoveHadNoEffect e => ("MoveHadNoEffect", new { e.TargetName, e.MoveName }),
