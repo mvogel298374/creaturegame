@@ -10,8 +10,9 @@ are all COMPLETE and archived in `TODO_ARCHIVE.md` — XP & Level-Up fidelity, t
 now level-up move learning (auto-learn on a free slot; blocking replace-move prompt + confirm modal when the
 four slots are full; learned moves persist across the chain). **Also done (2026-06-11): the Roguelite Run
 Layer — an interactive Poké Center recovery (offer/HEAL/SKIP modal) every 3rd win + a 50–80%-of-player wild
-level band** (see the section below). Suite: 867 .NET + 48 Vitest + 17 Playwright E2E. **Next up: AI Move
-Selection** (now unblocked — Learnset System was its prerequisite). **Resolved 2026-06-12:** the RNG seam is
+level band** (see the section below). Suite: 867 .NET + 48 Vitest + 17 Playwright E2E. **Logged 2026-06-12: a whole-repo
+architecture/code-smell review → `ARCHITECTURE.md` (immediate next task) + Architecture Review #7 (see Tech
+Debt). Next feature after that: AI Move Selection** (now unblocked — Learnset System was its prerequisite). **Resolved 2026-06-12:** the RNG seam is
 now seedable end-to-end — `BattleScenario.Seed(...)` makes every roll deterministic (`SeededRulesTests`) — and
 the deferred **double-faint-as-loss** test is landed (`BattleRunnerTests`). Remaining from the chain: only the
 *production* per-run seed at the web composition root (Tech Debt #3); the replace-move/recovery **modal** E2Es
@@ -260,9 +261,54 @@ moving target.
     including the rules' previously-global `Roll*` draws (the old Disable/double-faint test-order flakiness).
     Proven by `SeededRulesTests`. **Closed — do not re-file "Roll*/Roll*Turns draws ignore the battle seed."**
 
-- [ ] **Architecture / decision-log doc (`ARCHITECTURE.md`).** Capture the *why* behind the two-DB split,
-  event-sourced engine + emitter pattern, the three seams and the "never branch on generation" rule, the web
-  session/SignalR flow, and the import-vs-runtime boundary. Cross-link from `CLAUDE.md`'s Key Files table.
+- [ ] **Architecture / decision-log doc (`ARCHITECTURE.md`) — NEXT UP (start here).** Capture the *why*
+  behind the two-DB split, the event-sourced engine + emitter pattern, the three seams and the "never branch
+  on generation" rule, the web session/SignalR + reconnect-grace flow, and the import-vs-runtime boundary.
+  Cross-link from `CLAUDE.md`'s Key Files table. It should *point to* — not restate — the existing
+  requirements/lookup docs: `GENERATION_SEAMS.md` (the seam contract + §5.0 checklist), `GEN_DIFFERENCES.md`
+  and `GAME_AVAILABILITY.md` (Gen-1 mechanic / game-version requirements references, consulted loosely when
+  filling a seam, since the seam check is the real gate). Several existing docs shrink once this exists to
+  link to. See **Architecture Review #7** below for the structural debt this doc will reference.
+
+- [ ] **Architecture Review #7 — whole-repo code-smell pass (2026-06-12).** Ordered by leverage. None are
+  correctness bugs — the engine, the three seams, and the no-facade `BattleState` reset trick are all sound;
+  this is about the two or three files that concentrate all the complexity not becoming change-risky as Gen 2
+  and AI move-selection land. `ARCHITECTURE.md` (above) is the first task and should cross-link these.
+  - [ ] **`AttackAction` god-object → `IMoveEffect` registry (highest leverage).** `Combat/IBattleAction.cs`
+    is ~960 lines holding the interface + the whole `AttackAction`; `ExecuteAsync` is ~400 lines and
+    `TryApplyMoveEffect` is a ~320-line switch over ~25 `MoveEffect` cases (Haze, Counter, Mist, Reflect,
+    Transform, Rest, Substitute…). Extract each post-damage effect behind an `IMoveEffect` registry keyed by
+    `MoveEffect`, mirroring the proven `ILockInMechanic` / `LockInMechanics.For(effect)` pattern (lock-ins
+    were already pulled out this way). Shrinks the pipeline to its stages, makes each effect independently
+    testable, and structurally kills the recurring "hook added to only the Standard path" defect class the
+    engine comments keep warning about. Hand to `opus-engineer`; gate with `/audit` + seam-reviewer. Rename
+    the file to `AttackAction.cs` while here (see renames below).
+  - [ ] **`timeline.ts` event-coverage guard.** Every `BattleEvent` is hand-mapped in three exhaustive
+    switches — `SignalRBattleEventEmitter.MapEvent` (payload), `ConsoleBattleEventEmitter` (text), and
+    `timeline.ts expandEvent` (text + steps); adding one event means editing three files in two languages.
+    The C# legs are guarded by `WebEventContractTests` (nothing maps to `"Unknown"`); the **TS leg is not** —
+    a new event silently falls through `default: {}` and never renders. Add a contract test (or a generated
+    shared event-name list) asserting every backend event name has a non-empty `expandEvent` arm.
+  - [ ] **Delete or re-scope `ConsoleBattleEventEmitter` (254 lines, production-dead).** Never instantiated
+    in app code (`new ConsoleBattleEventEmitter` = 0 hits); used only in `CoreMechanicsTests` as a "run the
+    formatter" emitter that spams stdout no one reads. It is a 3rd exhaustive event-map with no live
+    consumer. Either delete it (point those tests at `RecordingEmitter` / a null emitter) or document the
+    test-only role and bring it under the `timeline.ts`-style coverage guard so it can't silently rot.
+  - [ ] **Split `CoreMechanicsTests.cs` by capability.** ~3100 lines, one class, ~130 tests across 14
+    unrelated `// ──` regions (stat stages, crit, XP, Metronome, EncounterSelector, seeded stat-calc…).
+    Violates our own "tests grouped by capability, not batch" rule — which the **Integration** suite already
+    follows (`Gen1Attacks/*`, `Interactions/*`). Split the unit suite the same way.
+  - [ ] **Filename ≠ contained type (renames).** `IBattleAction.cs` → `AttackAction.cs` (its primary type);
+    `GameDbContext.cs` holds `MovesDbContext` + `PokemonDbContext` and **no** `GameDbContext` type — rename /
+    split to match what's inside. Pure navigation friction, no behavior change.
+  - [ ] **Importer `new HttpClient()` per request.** `MoveImport.FetchMoveDataByUrl` and the
+    `PokeApiConnector` downloaders create a client per call (socket-exhaustion antipattern). One-shot tool so
+    low blast radius — swap to a single shared/static `HttpClient`.
+  - [ ] **Minor cleanups.** Drop the legacy `out`-less `DamageCalculator.CalculateDamage` overload if only
+    tests use it; dedupe the repeated `_rng.Next(1, 101)` secondary-roll idiom (written as both `> chance`
+    and `<= chance` in the same file) behind a `rules.SecondaryHits(...)` helper; name the magic move IDs in
+    `MoveImport.MapToAttack` (120/153/69/101/162…) and split its three concerns — `past_values` resolution,
+    name→effect map, layer-2 corrections — into private methods.
 
 ### Known Gaps
 - Enemy encounter pool ignores game version — filter by `PokemonGameAvailability` once a version selector
