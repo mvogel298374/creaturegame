@@ -11,6 +11,12 @@ type BridgeEvents = {
   playLevelUpSound: void;
   // A new wild enemy for the next encounter in the chain — load + slide in the sprite.
   spawnEnemy: { enemySpeciesId: number };
+  // Transform (Ditto/Mew): morph the named side's sprite to the copied species (player → back sprite,
+  // enemy → front sprite).
+  transformSprite: { side: 'player' | 'enemy'; speciesId: number };
+  // Revert the player sprite to its true species after a battle ends — Transform is undone at battle end,
+  // and the player sprite (unlike the enemy's) isn't otherwise reset across the endless chain.
+  resetPlayerSprite: void;
   // Phaser → React
   entryComplete: void;
   animationComplete: void;

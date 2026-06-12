@@ -10,6 +10,7 @@ export class BattleScene extends Phaser.Scene {
   private enemyIdleTween!: Phaser.Tweens.Tween;
   private playerSpeciesId = 1;
   private enemySpeciesId = 1;
+  private playerTrueSpeciesId = 1; // the player's real species, restored after a Transform reverts
   private criesAvailable = false;
 
   // Kept so we can remove exactly these listeners on teardown — Phaser never
@@ -22,6 +23,9 @@ export class BattleScene extends Phaser.Scene {
   private onStatusSound = () => Audio.playStatusApplied();
   private onLevelUpSound = () => Audio.playLevelUp();
   private onSpawnEnemy  = (e: { enemySpeciesId: number }) => this.spawnEnemy(e.enemySpeciesId);
+  private onTransformSprite = (e: { side: 'player' | 'enemy'; speciesId: number }) =>
+    this.transformSprite(e.side, e.speciesId);
+  private onResetPlayerSprite = () => this.resetPlayerSprite();
 
   constructor() {
     super({ key: 'BattleScene' });
@@ -29,6 +33,7 @@ export class BattleScene extends Phaser.Scene {
 
   init(data: { playerSpeciesId: number; enemySpeciesId: number }) {
     this.playerSpeciesId = data.playerSpeciesId;
+    this.playerTrueSpeciesId = data.playerSpeciesId;
     this.enemySpeciesId = data.enemySpeciesId;
   }
 
@@ -75,6 +80,8 @@ export class BattleScene extends Phaser.Scene {
     bridge.on('playStatusSound', this.onStatusSound);
     bridge.on('playLevelUpSound', this.onLevelUpSound);
     bridge.on('spawnEnemy', this.onSpawnEnemy);
+    bridge.on('transformSprite', this.onTransformSprite);
+    bridge.on('resetPlayerSprite', this.onResetPlayerSprite);
 
     // Remove our bridge listeners when this scene is torn down so they can't
     // fire on a destroyed scene (which throws and freezes the battle queue).
@@ -239,6 +246,47 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
+  // Transform (Ditto/Mew): morph a side's sprite to the copied species in place — no slide-in. The player
+  // shows the back sprite, the enemy the front sprite (same viewing angle as its own species). The tracked
+  // speciesId is updated so the synth cry matches. Loads the sprite on demand, mirroring spawnEnemy.
+  private transformSprite(side: 'player' | 'enemy', speciesId: number) {
+    const dir = side === 'player' ? 'back' : 'front';
+    const key = `${dir}-${speciesId}`;
+    const sprite = side === 'player' ? this.playerSprite : this.enemySprite;
+    if (side === 'player') this.playerSpeciesId = speciesId;
+    else this.enemySpeciesId = speciesId;
+
+    const morph = () => {
+      const baseSx = sprite.scaleX;
+      const baseSy = sprite.scaleY;
+      sprite.setTexture(key);
+      // A brief scale pulse as the morph cue.
+      this.tweens.add({
+        targets: sprite,
+        scaleX: baseSx * 1.12,
+        scaleY: baseSy * 1.12,
+        duration: 130,
+        yoyo: true,
+        ease: 'Sine.easeInOut',
+      });
+    };
+
+    if (this.textures.exists(key)) {
+      morph();
+    } else {
+      this.load.image(key, `/sprites/${dir}/${speciesId}.png`);
+      this.load.once(Phaser.Loader.Events.COMPLETE, morph);
+      this.load.start();
+    }
+  }
+
+  // Revert the player sprite to its true species after a battle (Transform is undone at battle end). The
+  // base 'player' texture is the true back sprite loaded in preload, so this is a no-op if no Transform ran.
+  private resetPlayerSprite() {
+    this.playerSpeciesId = this.playerTrueSpeciesId;
+    this.playerSprite.setTexture('player');
+  }
+
   private teardown() {
     bridge.off('playMoveAnimation', this.onMoveAnim);
     bridge.off('playFaintAnimation', this.onFaintAnim);
@@ -246,5 +294,7 @@ export class BattleScene extends Phaser.Scene {
     bridge.off('playStatusSound', this.onStatusSound);
     bridge.off('playLevelUpSound', this.onLevelUpSound);
     bridge.off('spawnEnemy', this.onSpawnEnemy);
+    bridge.off('transformSprite', this.onTransformSprite);
+    bridge.off('resetPlayerSprite', this.onResetPlayerSprite);
   }
 }

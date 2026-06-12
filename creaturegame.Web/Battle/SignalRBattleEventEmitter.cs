@@ -195,7 +195,15 @@ public sealed class SignalRBattleEventEmitter(
                 }
             ),
             MimicLearned e => ("MimicLearned", new { e.CreatureName, e.MoveName }),
-            TransformedInto e => ("TransformedInto", new { e.CreatureName, e.TargetName }),
+            TransformedInto e => (
+                "TransformedInto",
+                new
+                {
+                    e.CreatureName,
+                    e.TargetName,
+                    e.IntoSpeciesId,
+                }
+            ),
             ConvertedType e => (
                 "ConvertedType",
                 new { e.CreatureName, NewType = e.NewType.ToString() }

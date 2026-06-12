@@ -826,7 +826,7 @@ public class AttackAction : IBattleAction
                                 PowerPointsCurrent = Math.Min(5, copied.Base.PowerPointsMax),
                             }
                         );
-                    _emitter?.Emit(new TransformedInto(Source.Name, Target.Name));
+                    _emitter?.Emit(new TransformedInto(Source.Name, Target.Name, Target.SpeciesId));
                 }
                 break;
 

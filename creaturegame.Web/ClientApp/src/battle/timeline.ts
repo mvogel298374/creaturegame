@@ -58,7 +58,9 @@ export type BridgeCommand =
   | { type: 'playHitSound'; isCrit: boolean }
   | { type: 'playStatusSound' }
   | { type: 'playLevelUpSound' }
-  | { type: 'spawnEnemy'; enemySpeciesId: number };
+  | { type: 'spawnEnemy'; enemySpeciesId: number }
+  | { type: 'transformSprite'; side: Side; speciesId: number }
+  | { type: 'resetPlayerSprite' };
 
 // One primitive instruction in a timeline.
 export type Step =
@@ -210,7 +212,9 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       // which drives the game-over screen, so there's nothing to do here.
       const winner = payload.winnerName as string;
       if (side(winner) === 'player') {
-        return { steps: [w(300)] };
+        // Revert the player sprite in case it Transformed this battle (Transform is undone at battle end;
+        // the enemy sprite self-corrects via the next encounter's spawnEnemy, the player's does not).
+        return { steps: [emit({ type: 'resetPlayerSprite' }), w(300)] };
       }
       return {};
     }
@@ -526,7 +530,15 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
     case 'TransformedInto': {
       const cName = payload.creatureName as string;
       const tName = payload.targetName as string;
-      return { steps: [w(300), d(log(`${cName} transformed into ${tName}!`))] };
+      const intoSpeciesId = payload.intoSpeciesId as number;
+      // Morph the transforming side's sprite to the copied species, then announce it (player → back sprite,
+      // enemy → front sprite; the scene resolves the directory from the side).
+      return { steps: [
+        w(300),
+        emit({ type: 'transformSprite', side: side(cName), speciesId: intoSpeciesId }),
+        d(log(`${cName} transformed into ${tName}!`)),
+        w(500),
+      ] };
     }
 
     case 'ConvertedType': {
@@ -657,6 +669,8 @@ function emitCommand(c: BridgeCommand): void {
     case 'playStatusSound':    bridge.emit('playStatusSound', undefined); break;
     case 'playLevelUpSound':   bridge.emit('playLevelUpSound', undefined); break;
     case 'spawnEnemy':         bridge.emit('spawnEnemy', { enemySpeciesId: c.enemySpeciesId }); break;
+    case 'transformSprite':    bridge.emit('transformSprite', { side: c.side, speciesId: c.speciesId }); break;
+    case 'resetPlayerSprite':  bridge.emit('resetPlayerSprite', undefined); break;
   }
 }
 

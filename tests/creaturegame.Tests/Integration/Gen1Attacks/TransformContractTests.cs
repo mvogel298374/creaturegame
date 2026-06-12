@@ -37,6 +37,7 @@ public class TransformContractTests(MovesFixture moves) : Gen1MoveContract(moves
             special: 199,
             speed: 175
         );
+        target.SpeciesId = 134; // Vaporeon — Transform copies the species id (it drives the client sprite morph)
 
         var result = await new MoveScenario()
             .Attacker(attacker)
@@ -45,6 +46,10 @@ public class TransformContractTests(MovesFixture moves) : Gen1MoveContract(moves
 
         Assert.False(result.Has<DamageDealt>(), "Transform deals no damage");
         Assert.NotNull(result.First<TransformedInto>());
+        // The copied species id rides on the event (the client morphs the transforming sprite to it) and is
+        // applied to the user.
+        Assert.Equal(134, result.First<TransformedInto>()!.IntoSpeciesId);
+        Assert.Equal(134, attacker.SpeciesId);
         // Transform is self-affecting: it must never apply a status to the foe (guards the pre-handler
         // TryApplyStatus path — the StatusEffect==None data pin's behavioural twin).
         Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);

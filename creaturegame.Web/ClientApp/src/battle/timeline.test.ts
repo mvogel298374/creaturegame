@@ -12,6 +12,9 @@ const logLines = (steps: Step[] = []): string[] =>
 
 const kinds = (steps: Step[] = []): string[] => steps.map(s => s.kind);
 
+const emits = (steps: Step[] = []) =>
+  steps.filter((s): s is Extract<Step, { kind: 'emit' }> => s.kind === 'emit').map(s => s.command);
+
 describe('expandEvent — move-name formatting', () => {
   it('formats the slug in "used" lines', () => {
     const { steps } = expandEvent('MoveUsed', { attackerName: 'MEWTWO', moveName: 'fury-attack' }, CTX);
@@ -133,12 +136,14 @@ describe('expandEvent — control plane vs timeline', () => {
     expect(steps![0]).toMatchObject({ kind: 'dispatch', action: { type: 'TURN_STARTED', enemyHp: 80 } });
   });
 
-  it('BattleEnded with the player winning is a silent intermission beat (challenger is announced by the next BattleStarted)', () => {
-    // Endless chain: a player win is not the end — the next BattleStarted resumes play. It logs NOTHING here,
-    // so a between-battle instance (e.g. the Poké Center recovery) is never preceded by "a new challenger".
+  it('BattleEnded with the player winning is a silent intermission beat that reverts the player sprite', () => {
+    // Endless chain: a player win is not the end — the next BattleStarted resumes play. It logs NOTHING here
+    // (so a between-battle instance like the Poké Center recovery is never preceded by "a new challenger"),
+    // but it does revert the player sprite in case it Transformed this battle.
     const { now, steps } = expandEvent('BattleEnded', { winnerName: 'MEWTWO' }, CTX);
     expect(now).toBeUndefined();
     expect(logLines(steps)).toEqual([]);
+    expect(emits(steps)).toContainEqual({ type: 'resetPlayerSprite' });
   });
 
   it('BattleEnded with the player losing does nothing (RunEnded drives the game over)', () => {
@@ -300,9 +305,17 @@ describe('expandEvent — Heal & Mimic', () => {
     expect(logLines(expandEvent('MimicLearned', { creatureName: 'DITTO', moveName: 'ice-beam' }, CTX).steps))
       .toEqual(['DITTO learned ICE BEAM!']);
   });
-  it('TransformedInto names both creatures', () => {
-    expect(logLines(expandEvent('TransformedInto', { creatureName: 'DITTO', targetName: 'PIKACHU' }, CTX).steps))
-      .toEqual(['DITTO transformed into PIKACHU!']);
+  it('TransformedInto names both creatures and morphs the transforming side to the copied species', () => {
+    // DITTO is the enemy here (player is MEWTWO) → the enemy front sprite morphs to species 25 (Pikachu).
+    const { steps } = expandEvent('TransformedInto',
+      { creatureName: 'DITTO', targetName: 'PIKACHU', intoSpeciesId: 25 }, CTX);
+    expect(logLines(steps)).toEqual(['DITTO transformed into PIKACHU!']);
+    expect(emits(steps)).toContainEqual({ type: 'transformSprite', side: 'enemy', speciesId: 25 });
+  });
+  it('TransformedInto morphs the player back sprite when the player transforms', () => {
+    const { steps } = expandEvent('TransformedInto',
+      { creatureName: 'MEWTWO', targetName: 'DITTO', intoSpeciesId: 132 }, CTX);
+    expect(emits(steps)).toContainEqual({ type: 'transformSprite', side: 'player', speciesId: 132 });
   });
   it('ConvertedType reports the new type', () => {
     expect(logLines(expandEvent('ConvertedType', { creatureName: 'PORYGON', newType: 'Water' }, CTX).steps))

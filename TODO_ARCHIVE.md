@@ -589,6 +589,12 @@ layer-2 override (only the `Effect` name-mapping was added).
 - [x] All events enqueued — log text always appears **after** the relevant animation (Gen 1 feel)
 - [x] Move menu re-enabled only after animation queue drains (`animationComplete` bridge event)
 - [x] `useBattleHub` state gains `animating: boolean`; FIGHT + move buttons check `phase === 'choosing' && !animating`
+- [x] **Transform (Ditto/Mew) morphs the sprite (2026-06-12).** `TransformedInto` now carries `IntoSpeciesId`;
+  a `transformSprite` bridge command morphs the transforming side's sprite in place (player → back sprite,
+  enemy → front sprite) with a scale-pulse cue, and `resetPlayerSprite` reverts the player on a win (Transform
+  is undone at battle end; the enemy self-corrects via the next `spawnEnemy`). The Transform *mechanic* was
+  already fully Gen-1-faithful (verified vs Bulbapedia: copies species/types/stats/stages/moveset@5PP, keeps
+  own HP/level/status, reverts at battle end) — this was the only missing visual.
 
 ---
 
