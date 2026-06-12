@@ -470,8 +470,13 @@
   color: var(--clr-text);
 }
 
+/* Vertical padding only — the shorthand `padding: 2px 0` used to also set padding-right:0, which (being
+   more specific than the column rules below) silently killed their gap, so long labels like DEFENSE/SPECIAL
+   collided with the value and the gain (+2) and total (20) rendered glued as "+220". Set only the block
+   padding so each column's padding-right actually applies. Guarded by level-up.spec.ts "column spacing". */
 .levelup-table td {
-  padding: 2px 0;
+  padding-top: 2px;
+  padding-bottom: 2px;
 }
 
 .levelup-stat  { text-align: left;  padding-right: var(--sp-lg); letter-spacing: 1px; }

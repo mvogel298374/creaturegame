@@ -28,4 +28,48 @@ test.describe('Level-up', () => {
     await fightButton(page).click();
     await expect(panel).toHaveCount(0);
   });
+
+  // Regression guard for the stat-panel column spacing. The bug: `.levelup-table td { padding: 2px 0 }`
+  // out-specified the columns' `padding-right`, collapsing it to 0, so the gain (+2) and total (20) rendered
+  // touching as "+220" — unreadable. Asserted via real rendered-text geometry (a Range box per cell), so it
+  // fails if the numbers ever collide again. DOM geometry is deterministic — no timing, no canvas.
+  test('the gain and total numbers stay visibly separated (column spacing)', async ({ page }) => {
+    test.setTimeout(120_000);
+    await reachLog(page, /grew to level \d+!/);
+
+    const panel = page.locator('.levelup-panel');
+    await expect(panel).toBeVisible();
+
+    const m = await page.evaluate(() => {
+      const row = document.querySelector('.levelup-table tr');
+      if (!row) return null;
+      const stat = row.querySelector('.levelup-stat') as HTMLElement;
+      const gain = row.querySelector('.levelup-gain') as HTMLElement;
+      const total = row.querySelector('.levelup-total') as HTMLElement;
+      if (!stat || !gain || !total) return null;
+      // Measure the actual rendered TEXT box (not the cell box) so we see what the player sees.
+      const textRect = (el: HTMLElement) => {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        return range.getBoundingClientRect();
+      };
+      return {
+        gap: textRect(total).left - textRect(gain).right, // horizontal space between +gain and total
+        statPadRight: parseFloat(getComputedStyle(stat).paddingRight),
+        gainPadRight: parseFloat(getComputedStyle(gain).paddingRight),
+        gainText: (gain.textContent ?? '').trim(),
+        totalText: (total.textContent ?? '').trim(),
+      };
+    });
+
+    expect(m).not.toBeNull();
+    // Both a gain (+N) and a separate total (N) are actually rendered.
+    expect(m!.gainText).toMatch(/^\+\d+$/);
+    expect(m!.totalText).toMatch(/^\d+$/);
+    // The two numbers are clearly apart, not glued into one (the regression rendered them touching, gap ~0).
+    expect(m!.gap).toBeGreaterThan(10);
+    // ...and the per-column right padding actually resolves (the specificity bug forced these to 0).
+    expect(m!.statPadRight).toBeGreaterThanOrEqual(8);
+    expect(m!.gainPadRight).toBeGreaterThanOrEqual(8);
+  });
 });
