@@ -4,16 +4,18 @@
 > [`TODO_ARCHIVE.md`](TODO_ARCHIVE.md) — read it only if you need the history of a finished item.
 > **See also:** `CLAUDE.md` (setup/commands) · `AI_CONTEXT.md` (profiles) · `DESIGN_GUIDES.md` (mechanics) · `DEV_STANDARDS.md` (conventions)
 
-**Current state (2026-06-11):** Move-coverage pass, integration-test pass, the `BattleState` facade
+**Current state (2026-06-12):** Move-coverage pass, integration-test pass, the `BattleState` facade
 migration, the whole "XP & progression" milestone, **and the Learnset System (Level-up move learning)**
 are all COMPLETE and archived in `TODO_ARCHIVE.md` — XP & Level-Up fidelity, the Endless Battle Chain, and
 now level-up move learning (auto-learn on a free slot; blocking replace-move prompt + confirm modal when the
 four slots are full; learned moves persist across the chain). **Also done (2026-06-11): the Roguelite Run
 Layer — an interactive Poké Center recovery (offer/HEAL/SKIP modal) every 3rd win + a 50–80%-of-player wild
-level band** (see the section below). Suite: 862 .NET + 48 Vitest + 17 Playwright E2E. **Next up: AI Move
-Selection** (now unblocked — Learnset System was its prerequisite). Two deferred edges from the chain remain
-live: the per-run seed wiring (Tech Debt #3) and a deterministic double-faint-as-loss test (Known Gaps). The
-replace-move **modal** E2E is deferred for the same seeded-battle reason (auto-learn is covered).
+level band** (see the section below). Suite: 867 .NET + 48 Vitest + 17 Playwright E2E. **Next up: AI Move
+Selection** (now unblocked — Learnset System was its prerequisite). **Resolved 2026-06-12:** the RNG seam is
+now seedable end-to-end — `BattleScenario.Seed(...)` makes every roll deterministic (`SeededRulesTests`) — and
+the deferred **double-faint-as-loss** test is landed (`BattleRunnerTests`). Remaining from the chain: only the
+*production* per-run seed at the web composition root (Tech Debt #3); the replace-move/recovery **modal** E2Es
+stay deferred until that web seed exists (the .NET coverage is already complete).
 
 ---
 
@@ -245,17 +247,18 @@ moving target.
 > Done items (Architecture Review #1/#2/#4/#5/#6, the #6a lock-in abstraction, the `BattleState` facade
 > migration, flaky-test sweep, struct→class, DI, RNG seam, etc.) are in [`TODO_ARCHIVE.md`](TODO_ARCHIVE.md).
 
-- [ ] **RNG seam — remaining (Architecture Review #3).** The core library has no direct `Random.Shared`
-  (`IRandomSource` threaded through engine + setup). Still open: **`GameController` (web) uses `Random.Shared`**
-  for enemy level + random move assignment — deferred; it's the composition root where a per-run seed would be
-  injected, but there's no run-seed concept yet (Game Loop). Wire a run seed here when runs exist. *(Optional:
-  the `AlwaysHit/AlwaysCrit` rule shims could be replaced by seeded sources — low priority.)*
-  - **Also (found 2026-06-09):** `IBattleRules.Roll*Turns` roll from the *rules object's own* RNG
-    (`Random.Shared`-backed for the `Gen1BattleRules`/`DelegatingBattleRules` default), **not** the battle's
-    injected `IRandomSource`. So a `BattleScenario.Seed(...)` only makes deterministic the rolls
-    `ScriptableRules` explicitly pins — any unpinned `Roll*Turns` stays globally nondeterministic and
-    test-order-flaky (this surfaced as a Disable flake; worked around by pinning `DisableTurns`). Proper fix:
-    thread the battle's `IRandomSource` into the rules' rolls (or give the rules a seedable source).
+- [ ] **RNG seam — only the web run-seed remains (Architecture Review #3).** The core library has no direct
+  `Random.Shared` (`IRandomSource` threaded through engine + setup). Still open: the **web composition root**
+  builds runs unseeded — `GameSessionManager` constructs `BattleRunner` with no `rng`/seed, and
+  `EncounterFactory` (enemy level + move assignment) plus `Gen1StatCalculator` (random DVs) use `Random.Shared`.
+  That's where a *per-run* seed would be injected so a whole run replays; wire it when a run needs to be
+  reproducible (the recovery/replace **modal** E2Es are the first concrete consumer). Note: reproducing a run
+  means seeding creature **construction** (DVs) too, not just the battle. *(Optional: the `AlwaysHit/AlwaysCrit`
+  rule shims could be replaced by seeded sources — low priority.)*
+  - [x] **Rules-RNG seedable (fixed 2026-06-12).** `DelegatingBattleRules`/`ScriptableRules` now delegate to a
+    *seedable* inner `Gen1BattleRules`, and `BattleScenario.Seed(...)` makes EVERY roll deterministic —
+    including the rules' previously-global `Roll*` draws (the old Disable/double-faint test-order flakiness).
+    Proven by `SeededRulesTests`. **Closed — do not re-file "Roll*/Roll*Turns draws ignore the battle seed."**
 
 - [ ] **Architecture / decision-log doc (`ARCHITECTURE.md`).** Capture the *why* behind the two-DB split,
   event-sourced engine + emitter pattern, the three seams and the "never branch on generation" rule, the web
@@ -265,9 +268,9 @@ moving target.
 - Enemy encounter pool ignores game version — filter by `PokemonGameAvailability` once a version selector
   exists in the UI
 - Enemy Pokémon do not evolve — wire into level-up system when Game Loop is built
-- **Endless-chain double-faint (deferred edge):** a double-faint (mutual end-of-turn DoT) counts as a loss
-  (`break` before the win-count) — behavior is correct, but there's no deterministic test yet (needs the
-  seeded-battle entry point; see Tech Debt #3 / the RNG seam).
+- **Endless-chain double-faint:** ✅ tested (2026-06-12). A mutual end-of-turn DoT double-faint counts as a
+  loss (`break` before the win-count); pinned deterministically by
+  `BattleRunnerTests.Runner_DoubleFaintFromEndOfTurnPoison_CountsAsLoss_NotAWin`.
 
 ### Learnset import (DB-architecture detail, part of Learnset System)
 - [ ] Extend `PokeApiPokemon` DTO with `Moves` array *(✅ done in the initial-moveset work — see archive; kept

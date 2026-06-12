@@ -16,100 +16,111 @@ namespace creaturegame.Tests.TestSupport;
 /// </summary>
 public abstract class DelegatingBattleRules : IBattleRules
 {
-    private static IBattleRules Gen1 => Gen1BattleRules.Instance;
+    // Every member delegates to this inner Gen 1 ruleset. By default it is the shared global singleton, but a
+    // subclass may pass a seeded IRandomSource so the inner ruleset's *unpinned* random rolls (RollSleepTurns,
+    // RollMultiHitCount, RollDamageVariance, …) draw from that seed instead of Random.Shared. Without this hook
+    // a seeded BattleScenario could never make those rolls reproducible — they would always hit the global RNG,
+    // which is exactly the test-order flakiness this seam closes.
+    private readonly IBattleRules _inner;
 
-    public virtual bool CanThawFrozenTarget(Attack move) => Gen1.CanThawFrozenTarget(move);
+    protected DelegatingBattleRules()
+        : this(null) { }
 
-    public virtual int FreezeRandomThawPercent => Gen1.FreezeRandomThawPercent;
-    public virtual double StabMultiplier => Gen1.StabMultiplier;
-    public virtual int ConfusionSelfHitPercent => Gen1.ConfusionSelfHitPercent;
+    protected DelegatingBattleRules(IRandomSource? rng) =>
+        _inner = rng is null ? Gen1BattleRules.Instance : new Gen1BattleRules(rng);
+
+    public virtual bool CanThawFrozenTarget(Attack move) => _inner.CanThawFrozenTarget(move);
+
+    public virtual int FreezeRandomThawPercent => _inner.FreezeRandomThawPercent;
+    public virtual double StabMultiplier => _inner.StabMultiplier;
+    public virtual int ConfusionSelfHitPercent => _inner.ConfusionSelfHitPercent;
 
     public virtual int GetSecondaryEffectChance(Attack m, SecondaryEffectKind e) =>
-        Gen1.GetSecondaryEffectChance(m, e);
+        _inner.GetSecondaryEffectChance(m, e);
 
-    public virtual int RollMultiHitCount() => Gen1.RollMultiHitCount();
+    public virtual int RollMultiHitCount() => _inner.RollMultiHitCount();
 
-    public virtual int PayDayCoinMultiplier => Gen1.PayDayCoinMultiplier;
+    public virtual int PayDayCoinMultiplier => _inner.PayDayCoinMultiplier;
 
-    public virtual double RollDamageVariance() => Gen1.RollDamageVariance();
+    public virtual double RollDamageVariance() => _inner.RollDamageVariance();
 
-    public virtual int RollSleepTurns() => Gen1.RollSleepTurns();
+    public virtual int RollSleepTurns() => _inner.RollSleepTurns();
 
-    public virtual int RollConfusionTurns() => Gen1.RollConfusionTurns();
+    public virtual int RollConfusionTurns() => _inner.RollConfusionTurns();
 
     public virtual int CalculateStruggleRecoil(Creature s, int d) =>
-        Gen1.CalculateStruggleRecoil(s, d);
+        _inner.CalculateStruggleRecoil(s, d);
 
-    public virtual int BurnDamageDenominator => Gen1.BurnDamageDenominator;
-    public virtual int PoisonDamageDenominator => Gen1.PoisonDamageDenominator;
+    public virtual int BurnDamageDenominator => _inner.BurnDamageDenominator;
+    public virtual int PoisonDamageDenominator => _inner.PoisonDamageDenominator;
 
     public virtual double BadPoisonDamageFraction(int toxicCounter) =>
-        Gen1.BadPoisonDamageFraction(toxicCounter);
+        _inner.BadPoisonDamageFraction(toxicCounter);
 
-    public virtual double GetStatMultiplier(int stage) => Gen1.GetStatMultiplier(stage);
+    public virtual double GetStatMultiplier(int stage) => _inner.GetStatMultiplier(stage);
 
     public virtual double GetAccuracyStageMultiplier(int stage) =>
-        Gen1.GetAccuracyStageMultiplier(stage);
+        _inner.GetAccuracyStageMultiplier(stage);
 
     public virtual int GetHitThreshold(int acc, int accStage, int evaStage) =>
-        Gen1.GetHitThreshold(acc, accStage, evaStage);
+        _inner.GetHitThreshold(acc, accStage, evaStage);
 
-    public virtual int AccuracyRollBound => Gen1.AccuracyRollBound;
+    public virtual int AccuracyRollBound => _inner.AccuracyRollBound;
 
-    public virtual double GetCritChance(Creature a, Attack m) => Gen1.GetCritChance(a, m);
+    public virtual double GetCritChance(Creature a, Attack m) => _inner.GetCritChance(a, m);
 
-    public virtual double CritMultiplier => Gen1.CritMultiplier;
-    public virtual bool CritIgnoresStatStages => Gen1.CritIgnoresStatStages;
+    public virtual double CritMultiplier => _inner.CritMultiplier;
+    public virtual bool CritIgnoresStatStages => _inner.CritIgnoresStatStages;
 
-    public virtual int RollBindingTurns() => Gen1.RollBindingTurns();
+    public virtual int RollBindingTurns() => _inner.RollBindingTurns();
 
-    public virtual int BindingDamageDenominator => Gen1.BindingDamageDenominator;
+    public virtual int BindingDamageDenominator => _inner.BindingDamageDenominator;
 
-    public virtual int CalculateCrashDamage(Creature user) => Gen1.CalculateCrashDamage(user);
+    public virtual int CalculateCrashDamage(Creature user) => _inner.CalculateCrashDamage(user);
 
     public virtual int CalculateRecoilDamage(int damageDealt) =>
-        Gen1.CalculateRecoilDamage(damageDealt);
+        _inner.CalculateRecoilDamage(damageDealt);
 
-    public virtual int RollRampageTurns() => Gen1.RollRampageTurns();
+    public virtual int RollRampageTurns() => _inner.RollRampageTurns();
 
-    public virtual int RollDisableTurns() => Gen1.RollDisableTurns();
+    public virtual int RollDisableTurns() => _inner.RollDisableTurns();
 
-    public virtual bool OneHitKoSucceeds(Creature u, Creature t) => Gen1.OneHitKoSucceeds(u, t);
+    public virtual bool OneHitKoSucceeds(Creature u, Creature t) => _inner.OneHitKoSucceeds(u, t);
 
     public virtual bool CounterQualifies(DamageType? lastDamageType) =>
-        Gen1.CounterQualifies(lastDamageType);
+        _inner.CounterQualifies(lastDamageType);
 
-    public virtual int SelfDestructDefenseDivisor => Gen1.SelfDestructDefenseDivisor;
-    public virtual int RageAttackStagesPerHit => Gen1.RageAttackStagesPerHit;
-    public virtual double RecoverHealFraction => Gen1.RecoverHealFraction;
-    public virtual int ScreenDefenseMultiplier => Gen1.ScreenDefenseMultiplier;
+    public virtual int SelfDestructDefenseDivisor => _inner.SelfDestructDefenseDivisor;
+    public virtual int RageAttackStagesPerHit => _inner.RageAttackStagesPerHit;
+    public virtual double RecoverHealFraction => _inner.RecoverHealFraction;
+    public virtual int ScreenDefenseMultiplier => _inner.ScreenDefenseMultiplier;
 
-    public virtual int RollBideTurns() => Gen1.RollBideTurns();
+    public virtual int RollBideTurns() => _inner.RollBideTurns();
 
-    public virtual int BideDamageMultiplier => Gen1.BideDamageMultiplier;
+    public virtual int BideDamageMultiplier => _inner.BideDamageMultiplier;
 
     public virtual int RollPsywaveDamage(Creature s, IRandomSource rng) =>
-        Gen1.RollPsywaveDamage(s, rng);
+        _inner.RollPsywaveDamage(s, rng);
 
-    public virtual int RestSleepTurns => Gen1.RestSleepTurns;
+    public virtual int RestSleepTurns => _inner.RestSleepTurns;
 
     public virtual bool CanReceiveStatus(Creature t, StatusCondition s, DamageType mt) =>
-        Gen1.CanReceiveStatus(t, s, mt);
+        _inner.CanReceiveStatus(t, s, mt);
 
     public virtual bool PureStatusMoveChecksTypeImmunity(Attack move) =>
-        Gen1.PureStatusMoveChecksTypeImmunity(move);
+        _inner.PureStatusMoveChecksTypeImmunity(move);
 
-    public virtual bool CanBeLeechSeeded(Creature t) => Gen1.CanBeLeechSeeded(t);
+    public virtual bool CanBeLeechSeeded(Creature t) => _inner.CanBeLeechSeeded(t);
 
     public virtual StatusCondition CarryStatusOutOfBattle(StatusCondition status) =>
-        Gen1.CarryStatusOutOfBattle(status);
+        _inner.CarryStatusOutOfBattle(status);
 
     public virtual int CalculateXpAwarded(int baseExp, int enemyLevel) =>
-        Gen1.CalculateXpAwarded(baseExp, enemyLevel);
+        _inner.CalculateXpAwarded(baseExp, enemyLevel);
 
-    public virtual int GetOffensiveStat(Creature a, AttackType t) => Gen1.GetOffensiveStat(a, t);
+    public virtual int GetOffensiveStat(Creature a, AttackType t) => _inner.GetOffensiveStat(a, t);
 
-    public virtual int GetDefensiveStat(Creature d, AttackType t) => Gen1.GetDefensiveStat(d, t);
+    public virtual int GetDefensiveStat(Creature d, AttackType t) => _inner.GetDefensiveStat(d, t);
 }
 
 /// <summary>Always-hits double — overrides only the accuracy threshold. Shared by tests

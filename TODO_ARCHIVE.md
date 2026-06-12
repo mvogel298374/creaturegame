@@ -187,6 +187,9 @@ deferred *Game Loop & Progression* — no catch/party/save/evolution/version-fil
   factory already accepts a seedable source, so it's just wiring. (2) a deterministic test that a double-faint
   (mutual end-of-turn DoT) counts as a loss (`break` before the win-count) — behavior is correct, no
   deterministic test yet (Known Gaps).
+  **Update (2026-06-12):** (2) is DONE — `BattleRunnerTests.Runner_DoubleFaintFromEndOfTurnPoison_CountsAsLoss_NotAWin`.
+  The rules-RNG half of (1) is also closed — `BattleScenario.Seed(...)` is now fully deterministic
+  (`SeededRulesTests`); only the *production* web run-seed wiring remains open (`TODO.md` Tech Debt #3).
 
 ---
 

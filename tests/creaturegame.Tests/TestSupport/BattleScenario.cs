@@ -67,6 +67,11 @@ public sealed class ScriptedInput(params string[] moveNames) : IBattleInput
 /// </summary>
 public sealed class ScriptableRules : DelegatingBattleRules
 {
+    /// <summary>Forwards an optional seeded RNG to the base, so this double's unpinned rolls (anything not
+    /// overridden below) draw reproducibly from that seed instead of the global RNG.</summary>
+    public ScriptableRules(IRandomSource? rng = null)
+        : base(rng) { }
+
     private bool _alwaysHit;
     private bool _noCrit;
     private bool _alwaysCrit;
@@ -203,7 +208,7 @@ public sealed class BattleScenario
     private Creature _enemy = TestCreatures.Make("Enemy");
     private string[] _playerScript = [];
     private string[] _enemyScript = [];
-    private IBattleRules _rules = new ScriptableRules().Deterministic();
+    private IBattleRules? _rules; // null → default rules sharing the run's seed (built in RunAsync)
     private int _seed;
     private int? _playerForgetSlot;
 
@@ -256,13 +261,19 @@ public sealed class BattleScenario
     public async Task<BattleScenarioResult> RunAsync()
     {
         var emitter = new RecordingEmitter();
+        // Both the battle and (unless a test overrides them) its rules draw from a seeded source, so EVERY
+        // roll — including the rules' unpinned Roll* draws — is reproducible from the seed, not only the ones a
+        // test explicitly pins. The default rules get their own SeededRandomSource(_seed) rather than sharing
+        // the battle's instance, so the battle's own seeded draw order (tie-break, accuracy, crit) is identical
+        // to before this wiring and existing seeded scenarios don't shift.
+        var rules = _rules ?? new ScriptableRules(new SeededRandomSource(_seed)).Deterministic();
         var battle = new Battle(
             _player,
             _enemy,
             Gen1TypeChart.Instance,
             new ScriptedInput(_playerScript).ForgetsSlot(_playerForgetSlot),
             new ScriptedInput(_enemyScript),
-            rules: _rules,
+            rules: rules,
             emitter: emitter,
             rng: new SeededRandomSource(_seed)
         );

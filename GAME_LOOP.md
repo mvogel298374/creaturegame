@@ -149,10 +149,25 @@ timeline semantics (`timeline.ts` deciding `BattleEnded` ⇒ "announce next"). T
    the web layer supplies DB-backed events, as it already supplies enemies.)
 2. **Interaction-event plumbing.** A shared minimal contract so an interaction-event can emit/await without the
    full Battle apparatus.
-3. **Event replay on reconnect.** The residual gap (§2.1): an event emitted in the sub-second window while
-   disconnected isn't re-sent on reconnect. Resend the current turn / pending prompt on rebind.
-4. **Per-run seed.** Wire `IRandomSource` as a run seed through the sequencer so an event *sequence* is
-   reproducible (`TODO.md` Tech Debt #3 / RNG seam).
+3. **Event replay on reconnect — NOT A BUG; settled, do not re-open.** The recurring temptation is to flag that
+   `SignalRBattleEventEmitter.Emit` drops events while no connection is bound, "so a reconnect desyncs the
+   client." It does **not**, and this has been traced more than once — stop re-raising it as egregious. The
+   engine emits each turn's events as a synchronous burst and then **blocks on player input**
+   (`Battle.StartFightAsync` → `ChooseMoveAsync`). A real disconnect lands during the multi-second animation
+   playback — i.e. while the loop is parked on input, emitting nothing — and the client already received that
+   burst *before* dropping; the rebind (`GameSessionManager.AttachConnection`) then restores the input channel.
+   Nothing is lost on that path. The *only* loss window is a disconnect landing inside the sub-millisecond emit
+   burst or the few-ms between-battle DB fetch: a rare stall, never the "client desync" it gets mis-filed as.
+   If we ever want belt-and-suspenders, the proportionate fix is a one-shot resync emit on rebind (resend the
+   current `TurnStarted` + any pending prompt) — **not** an event buffer, and **not** urgent.
+4. **Per-run seed — seam DONE (2026-06-12); only the production web wiring remains.** A battle is now fully
+   reproducible from a seed: `Gen1BattleRules` takes an `IRandomSource`, `DelegatingBattleRules`/`ScriptableRules`
+   forward a seed to it, and `BattleScenario.Seed(...)` makes **every** roll deterministic — including the rules'
+   previously-global `Roll*` draws (`SeededRulesTests`). Do **not** re-file "Roll* draws ignore the battle seed";
+   that edge is closed. The remaining (smaller) work is only the *run* seed at the web composition root
+   (`GameSessionManager` → `BattleRunner` + `EncounterFactory`) so a whole run replays — and note creature
+   **construction** also rolls random DVs (`Gen1StatCalculator`), so a reproducible run must seed that too, not
+   just the battle (`TODO.md` Tech Debt #3).
 5. **Persistence.** An event boundary is the natural save point — a resumed run re-enters at the next event.
 
 ---

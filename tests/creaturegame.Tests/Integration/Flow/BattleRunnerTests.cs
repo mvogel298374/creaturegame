@@ -312,6 +312,43 @@ public class BattleRunnerTests
         Assert.Equal(StatusCondition.Poison, statusEntering4);
     }
 
+    // A mutual end-of-turn DoT faint: both creatures survive the (0-damage) poison-move turn but are now
+    // poisoned, then BOTH drop on the same end-of-turn poison tick. The enemy-faint branch is checked first
+    // (so XP is awarded), but the player is dead too — so the run ends as a LOSS and the would-be win is
+    // never counted. Pins the documented double-faint edge (TODO Known Gaps): it counts as a loss, full stop.
+    [Fact]
+    public async Task Runner_DoubleFaintFromEndOfTurnPoison_CountsAsLoss_NotAWin()
+    {
+        // maxHP 160 → poison tick = 160/16 = 10; HP 5 → the first tick is lethal. Both use a 0-damage poison
+        // move, so the attack phase changes nothing and both are alive (poisoned) entering end-of-turn.
+        var player = Poisoner("Player", maxHp: 160, hp: 5, speed: 100);
+        var enemy = Poisoner("Enemy", maxHp: 160, hp: 5, speed: 1);
+
+        var recorder = new RecordingEmitter();
+        var runner = new BattleRunner(
+            player,
+            _ => Task.FromResult(enemy),
+            Gen1TypeChart.Instance,
+            new ScriptedInput("poisonpowder"),
+            new ScriptedInput("poisonpowder"),
+            movePool: Array.Empty<Attack>(),
+            emitter: recorder,
+            rules: new ScriptableRules().Deterministic(), // alwaysHit so each status move lands
+            rng: new SeededRandomSource(0)
+        );
+
+        await runner.RunAsync();
+
+        // Both fainted, and both from a poison tick on the same end-of-turn (two StatusDamage/Poison events).
+        Assert.False(player.IsAlive());
+        Assert.False(enemy.IsAlive());
+        Assert.Equal(2, recorder.Of<StatusDamage>().Count(d => d.Source == StatusCondition.Poison));
+
+        // The run ends as a loss: exactly one RunEnded, ZERO wins counted despite the enemy also fainting.
+        var runEnded = Assert.Single(recorder.Of<RunEnded>());
+        Assert.Equal(0, runEnded.BattlesWon);
+    }
+
     // An input that always cancels — stands in for a disconnected client (mirrors SignalRInput.Cancel()).
     private sealed class CancelledInput : IBattleInput
     {
@@ -341,6 +378,37 @@ public class BattleRunnerTests
                 Accuracy = 100,
                 AttackType = AttackType.Physical,
                 PowerPointsMax = 99,
+            }
+        );
+        return c;
+    }
+
+    // A Normal-type creature whose only move is a 0-damage poison move (Poison status on a Normal-type lands,
+    // and a 0-power Normal move clears type immunity). HP/MaxHP are set directly so a single poison tick is
+    // lethal — the setup for a deterministic mutual end-of-turn faint.
+    private static Creature Poisoner(string name, int maxHp, int hp, int speed)
+    {
+        var c = new Creature(name)
+        {
+            Level = 50,
+            GrowthRate = GrowthRate.MediumFast,
+            Type1 = DamageType.Normal,
+        };
+        c.CalculateStats();
+        c.Experience = c.CalculateExperienceForLevel(50);
+        c.Attributes.MaxHP = maxHp;
+        c.Attributes.HP = hp;
+        c.Attributes.Speed = speed;
+        c.AddAttack(
+            new Attack
+            {
+                Name = "poisonpowder",
+                BaseDamage = 0,
+                Accuracy = 100,
+                AttackType = AttackType.Physical,
+                PowerPointsMax = 99,
+                StatusEffect = StatusCondition.Poison,
+                EffectChance = 100,
             }
         );
         return c;
