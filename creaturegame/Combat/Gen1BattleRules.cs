@@ -71,8 +71,6 @@ public sealed class Gen1BattleRules : IBattleRules
     // Gen 1: binding traps for 2–5 turns.
     public int RollBindingTurns() => _rng.Next(2, 6);
 
-    public int BindingDamageDenominator => 16;
-
     // Gen 1: a missed Jump Kick / Hi Jump Kick deals a flat 1 HP of crash damage to the user.
     public int CalculateCrashDamage(Creature user) => 1;
 

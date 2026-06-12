@@ -74,8 +74,6 @@ public abstract class DelegatingBattleRules : IBattleRules
 
     public virtual int RollBindingTurns() => _inner.RollBindingTurns();
 
-    public virtual int BindingDamageDenominator => _inner.BindingDamageDenominator;
-
     public virtual int CalculateCrashDamage(Creature user) => _inner.CalculateCrashDamage(user);
 
     public virtual int CalculateRecoilDamage(int damageDealt) =>

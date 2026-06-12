@@ -637,9 +637,16 @@ public class AttackAction : IBattleAction
                 break;
 
             case MoveEffect.Binding:
+                // Gen 1 partial trap: on a hit, trap the VICTIM (it loses its turn for 2–5 turns, no residual
+                // chip) and lock THIS user into re-using the move each turn — BindingMechanic.ForcedMove reads
+                // the victim's counter to keep forcing it. Guarded so a forced continuation hit (the victim is
+                // still bound) doesn't re-roll the duration. Damage is recalculated per re-hit rather than
+                // locked to the first hit (a documented Gen 1 simplification).
                 if (Target.Battle.BindingTurnsRemaining == 0 && damage > 0 && Target.IsAlive())
                 {
                     Target.Battle.BindingTurnsRemaining = _rules.RollBindingTurns();
+                    Source.Battle.BindingMove = _selectedMove;
+                    Source.Battle.BindingTarget = Target;
                     _emitter?.Emit(new BindingStarted(Target.Name, attack.Name ?? ""));
                 }
                 break;

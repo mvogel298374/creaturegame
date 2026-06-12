@@ -149,12 +149,6 @@ public interface IBattleRules
     int RollBindingTurns();
 
     /// <summary>
-    /// Divisor applied to max HP for end-of-turn binding damage (e.g. 16 → 1/16 max HP).
-    /// Gen 1–5: 16.
-    /// </summary>
-    int BindingDamageDenominator { get; }
-
-    /// <summary>
     /// Returns the crash damage a jump-kick user takes when the move misses.
     /// Gen 1: a flat 1 HP (a famous quirk). Gen 2–4: based on the damage that would have been
     /// dealt; Gen 5+: half the user's max HP — those generations would read <paramref name="user"/>

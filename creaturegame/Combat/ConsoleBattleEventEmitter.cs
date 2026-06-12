@@ -253,10 +253,6 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                 Console.WriteLine($"{e.CreatureName} is bound and can't move!");
                 break;
 
-            case BindingDamage e:
-                Console.WriteLine($"{e.TargetName} is hurt by the bind! ({e.Damage} damage)");
-                break;
-
             case FlinchBlocked e:
                 Console.WriteLine($"{e.CreatureName} flinched and couldn't move!");
                 break;

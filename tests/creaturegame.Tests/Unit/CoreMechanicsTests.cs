@@ -2308,6 +2308,8 @@ public class CoreMechanicsTests
         creature.Battle.IsFlinched = true;
         creature.Battle.HasLeechSeed = true;
         creature.Battle.BindingTurnsRemaining = 3;
+        creature.Battle.BindingMove = new PokemonAttack(new Attack { Name = "wrap" });
+        creature.Battle.BindingTarget = new Creature("Victim");
         creature.Battle.IsTwoTurnCharging = true;
         creature.Battle.ChargingMove = new PokemonAttack(
             new Attack { Name = "Dig", BaseDamage = 80 }
@@ -2325,6 +2327,8 @@ public class CoreMechanicsTests
         Assert.False(creature.Battle.IsFlinched);
         Assert.False(creature.Battle.HasLeechSeed);
         Assert.Equal(0, creature.Battle.BindingTurnsRemaining);
+        Assert.Null(creature.Battle.BindingMove);
+        Assert.Null(creature.Battle.BindingTarget);
         Assert.False(creature.Battle.IsTwoTurnCharging);
         Assert.Null(creature.Battle.ChargingMove);
     }

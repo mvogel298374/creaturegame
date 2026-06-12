@@ -45,7 +45,8 @@ Here is every field, what it represents in Gen 1 terms, and why it's transient.
 | `IsRecharging` | `bool` | The **Hyper Beam** recharge: after a damaging Hyper Beam, the user spends the next turn doing nothing. | Only meaningful between two consecutive turns of one battle. |
 | `IsFlinched` | `bool` | Set when a **faster** attacker lands a flinching move (e.g. Bite, Stomp); the victim loses that turn. Cleared as soon as it's checked. | Lasts a fraction of a single turn. |
 | `HasLeechSeed` | `bool` | Whether **Leech Seed** is attached — each turn the seeded creature loses HP and the seeder gains it. | Volatile; clears on switch/battle end. |
-| `BindingTurnsRemaining` | `int` | **Wrap / Bind / Clamp / Fire Spin** trap counter (Gen 1: **2–5 turns**). While > 0 the creature can't act and takes chip damage. | Trap only exists during the fight. |
+| `BindingTurnsRemaining` | `int` | On the **trapped victim**: the **Wrap / Bind / Clamp / Fire Spin** trap counter (Gen 1: **2–5 turns**). While > 0 the victim can't act. Gen 1 deals **no residual chip** — damage is the binder re-hitting each turn. | Trap only exists during the fight. |
+| `BindingMove` / `BindingTarget` | `PokemonAttack?` / `Creature?` | On the **binder**: the move it is locked into and the victim it is trapping. `BindingMechanic.ForcedMove` re-forces the move while the victim's counter is alive (Gen 1 locks the binder in too). | Lock only exists during the fight. |
 | `IsTwoTurnCharging` | `bool` | Whether the creature is **mid two-turn move** (Dig, Fly, Solar Beam, Razor Wind, Skull Bash, Sky Attack). Set on the charge turn, cleared on the release turn. | Spans exactly two turns of one battle. |
 | `ChargingMove` | `PokemonAttack?` | *Which* move is being charged, so the release turn knows what to fire without re-asking the player. | Pairs with `IsTwoTurnCharging`. |
 
@@ -85,6 +86,8 @@ public sealed class BattleState
     public bool IsFlinched { get; set; }
     public bool HasLeechSeed { get; set; }
     public int BindingTurnsRemaining { get; set; }
+    public PokemonAttack? BindingMove { get; set; }
+    public Creature? BindingTarget { get; set; }
     public bool IsTwoTurnCharging { get; set; }
     public PokemonAttack? ChargingMove { get; set; }
 }

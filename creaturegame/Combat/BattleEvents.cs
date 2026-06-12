@@ -155,8 +155,6 @@ public record BindingStarted(string TargetName, string MoveName) : BattleEvent;
 
 public record BindingBlocked(string CreatureName) : BattleEvent;
 
-public record BindingDamage(string TargetName, int Damage, int HpAfter) : BattleEvent;
-
 // --- Flinch ---
 public record FlinchBlocked(string CreatureName) : BattleEvent;
 

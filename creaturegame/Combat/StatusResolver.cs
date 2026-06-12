@@ -122,19 +122,10 @@ public static class StatusResolver
             }
         }
 
-        // Binding damage — decrement counter and deal 1/16 max HP
+        // Binding (Wrap/Bind/Clamp/Fire Spin): tick the victim's trap counter toward release. Gen 1 deals NO
+        // residual chip — the damage is the binder's move re-hitting each turn (the attack path), not here.
         if (creature.Battle.BindingTurnsRemaining > 0)
-        {
             creature.Battle.BindingTurnsRemaining--;
-            int bindDamage = Math.Max(
-                1,
-                creature.Attributes.MaxHP / battleRules.BindingDamageDenominator
-            );
-            creature.Attributes.ReceiveDamage(bindDamage);
-            emitter?.Emit(new BindingDamage(creature.Name, bindDamage, creature.Attributes.HP));
-            if (!creature.IsAlive())
-                return;
-        }
 
         // Status damage
         int damage = 0;

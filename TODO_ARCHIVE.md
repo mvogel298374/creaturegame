@@ -663,6 +663,16 @@ listener leak).
 ---
 
 ## Fixed ✅ (battle/UI bugs)
+- **Gen 1 binding (Wrap/Bind/Clamp/Fire Spin) was a Gen 1 / Gen 2 hybrid (2026-06-12).** The trapped foe lost
+  its turn (Gen 1) but the attacker was free to use other moves and the victim took a separate 1/16-HP
+  end-of-turn "hurt by the bind" residual (both Gen 2). Fixed to true Gen 1 (Bulbapedia-confirmed): the BINDER
+  is now locked into re-using the move every turn — new `BindingMechanic : ILockInMechanic` whose `ForcedMove`
+  re-forces the move while the victim's counter is alive (`BattleState.BindingMove`/`BindingTarget`); the victim
+  still can't act; the 1/16 residual is gone (the re-hit IS the damage). Removed the now-dead `BindingDamage`
+  event and `IBattleRules.BindingDamageDenominator` (they return with the Gen 2 residual). Proven by
+  `BindingInteractionTests` (binder locked into Wrap, ignores its scripted Tackle; foe never gets a move off).
+  `/audit` PASS-WITH-ADVISORIES (0 blockers; the per-re-hit-vs-locked-first-hit-damage nuance is deferred +
+  documented inline). Level-up stat-panel column-spacing CSS bug + its E2E guard landed the same day.
 - Post-feature gen-seam + smell cleanup (2026-06-02): closed three seam leaks surfaced by the
   Learnset/confusion work — confusion self-hit chance (`ConfusionSelfHitPercent`), STAB (`StabMultiplier`),
   and the EffectChance read (`GetSecondaryEffectChance` + `SecondaryEffectKind`) are now all on

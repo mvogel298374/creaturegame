@@ -4,9 +4,10 @@ using creaturegame.Tests.TestSupport;
 namespace creaturegame.Tests.Integration.Gen1Attacks;
 
 /// <summary>
-/// Binding moves (Bind, Wrap, Clamp, Fire Spin, …) deal damage and trap the target for 2–5 turns.
-/// The per-turn binding damage itself is applied at end-of-turn by <c>Battle</c>/<c>StatusResolver</c>;
-/// this contract pins that a single use starts the trap and sets the turn counter.
+/// Binding moves (Bind, Wrap, Clamp, Fire Spin, …) deal damage and trap the target for 2–5 turns. Gen 1 deals
+/// NO end-of-turn residual chip — the per-turn damage is the binder re-using the move (the binder is locked in;
+/// see <c>BindingMechanic</c> / <c>BindingInteractionTests</c>). This contract pins that a single use deals
+/// damage, starts the trap, and sets the victim's turn counter.
 /// </summary>
 [Collection(MovesCollection.Name)]
 public class BindingContractTests(MovesFixture moves) : Gen1MoveContract(moves)

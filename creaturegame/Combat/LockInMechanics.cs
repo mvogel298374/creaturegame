@@ -202,6 +202,27 @@ public sealed class BideMechanic : ILockInMechanic
     }
 }
 
+/// <summary>
+/// Binding (Wrap, Bind, Clamp, Fire Spin): Gen 1 partial trap. The binder is locked into re-using the move
+/// every turn — dealing its damage — while the trapped foe can't act ("neither the user nor the target will
+/// be able to select moves"). The trap is STARTED on a hit by <see cref="AttackAction"/> (it sets the victim's
+/// <c>BindingTurnsRemaining</c> and this binder's <c>BindingMove</c>/<c>BindingTarget</c>); this mechanic only
+/// force-repeats the move while the victim's counter is alive. That counter — ticked down end-of-turn — is the
+/// single source of truth for the duration, so the binder is freed automatically when the trap expires (or the
+/// victim faints). Unlike rampage, there is NO residual chip and the lock begins on hit, not on commit.
+/// </summary>
+public sealed class BindingMechanic : ILockInMechanic
+{
+    public MoveEffect Effect => MoveEffect.Binding;
+
+    public PokemonAttack? ForcedMove(Creature c) =>
+        c.Battle.BindingTarget is { } victim
+        && victim.IsAlive()
+        && victim.Battle.BindingTurnsRemaining > 0
+            ? c.Battle.BindingMove
+            : null;
+}
+
 /// <summary>The registry of lock-in mechanics, keyed by the move effect that drives each.</summary>
 public static class LockInMechanics
 {
@@ -212,6 +233,7 @@ public static class LockInMechanics
         new RampageMechanic(),
         new BideMechanic(),
         new RageMechanic(),
+        new BindingMechanic(),
     };
 
     // Effect → mechanic, derived from All so each mechanic's own Effect is the single source of truth:

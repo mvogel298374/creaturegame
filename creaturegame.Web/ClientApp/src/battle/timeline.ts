@@ -584,12 +584,6 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       return { steps: [w(120), d(log(`${cName} is bound and can't move!`))] };
     }
 
-    case 'BindingDamage': {
-      const tName  = payload.targetName as string;
-      const hpAftr = payload.hpAfter as number;
-      return { steps: [d({ type: 'UPDATE_HP', name: tName, hp: hpAftr }), w(400), d(log(`${tName} is hurt by the bind!`))] };
-    }
-
     case 'FlinchBlocked': {
       const cName = payload.creatureName as string;
       return { steps: [w(120), d(log(`${cName} flinched and couldn't move!`))] };

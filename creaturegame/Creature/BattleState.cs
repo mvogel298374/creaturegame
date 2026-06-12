@@ -25,7 +25,18 @@ public sealed class BattleState
     public bool IsRecharging { get; set; }
     public bool IsFlinched { get; set; }
     public bool HasLeechSeed { get; set; }
+
+    // Binding (Wrap/Bind/Clamp/Fire Spin) — Gen 1 partial trap, two halves of one effect:
+    //  • On the VICTIM: BindingTurnsRemaining > 0 means trapped — it loses its turn (StatusResolver.CanAct)
+    //    until the counter ticks to 0 end-of-turn. Gen 1 deals NO residual chip; the damage is the binder's
+    //    move re-hitting each turn, not an end-of-turn tick.
+    //  • On the BINDER: BindingMove is the move it is locked into and BindingTarget is the trapped creature.
+    //    BindingMechanic.ForcedMove re-forces the move while the victim's counter is alive, so the binder
+    //    can't act freely (Gen 1: "neither the user nor the target can select moves" during a bind).
     public int BindingTurnsRemaining { get; set; }
+    public PokemonAttack? BindingMove { get; set; }
+    public Creature? BindingTarget { get; set; }
+
     public bool IsTwoTurnCharging { get; set; }
     public PokemonAttack? ChargingMove { get; set; }
 
