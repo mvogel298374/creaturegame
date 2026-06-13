@@ -261,9 +261,10 @@ next run, rather than aborting the whole import.
   corrects power/accuracy/pp/effect_chance/type, but it does **not** see stat-target changes,
   ailment/secondary-chance changes PokeAPI omitted, priority, or whole-effect rewrites — those need
   a verified override (layer 2) and won't be caught by tests. See §5.5 for the strategy + limits.
-- **`new HttpClient()` per request.** Convenient but not best practice (socket pressure at
-  scale). Tolerable here given the one-shot, low-volume nature; would be a shared client /
-  `IHttpClientFactory` in long-running code.
+- **Shared `HttpClient`.** All requests go through one process-wide `PokeApiHttp.Client` (static, never
+  disposed, carries the raw.githubusercontent User-Agent). This replaced the old per-request
+  `new HttpClient()` pattern, whose disposed sockets risked ephemeral-port exhaustion under the ~165× fetch
+  loops. A long-running host would instead use `IHttpClientFactory`.
 - **Per-record `SaveChanges`.** Many round-trips; fine for a one-shot tool, not a pattern
   to copy into the web host.
 - **Hardcoded Gen 1.** Move/species ranges and mappings assume Gen 1; generalising to

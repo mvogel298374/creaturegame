@@ -10,13 +10,18 @@ are all COMPLETE and archived in `TODO_ARCHIVE.md` — XP & Level-Up fidelity, t
 now level-up move learning (auto-learn on a free slot; blocking replace-move prompt + confirm modal when the
 four slots are full; learned moves persist across the chain). **Also done (2026-06-11): the Roguelite Run
 Layer — an interactive Poké Center recovery (offer/HEAL/SKIP modal) every 3rd win + a 50–80%-of-player wild
-level band** (see the section below). Suite: 867 .NET + 48 Vitest + 17 Playwright E2E. **Logged 2026-06-12: a whole-repo
-architecture/code-smell review → `ARCHITECTURE.md` (immediate next task) + Architecture Review #7 (see Tech
-Debt). Next feature after that: AI Move Selection** (now unblocked — Learnset System was its prerequisite). **Resolved 2026-06-12:** the RNG seam is
-now seedable end-to-end — `BattleScenario.Seed(...)` makes every roll deterministic (`SeededRulesTests`) — and
-the deferred **double-faint-as-loss** test is landed (`BattleRunnerTests`). Remaining from the chain: only the
-*production* per-run seed at the web composition root (Tech Debt #3); the replace-move/recovery **modal** E2Es
-stay deferred until that web seed exists (the .NET coverage is already complete).
+level band** (see the section below). Suite: **888 .NET + 54 Vitest + 18 Playwright E2E** (all green).
+**Logged 2026-06-12: a whole-repo architecture/code-smell review → `ARCHITECTURE.md` + Architecture Review #7
+(see Tech Debt). Next feature: AI Move Selection** (unblocked — Learnset System was its prerequisite).
+**Update 2026-06-14: `ARCHITECTURE.md` and Review #7's higher-leverage structural items are all DONE** —
+`IMoveEffect` registry, `timeline.ts` event guard, `CG_BATTLE_LOG` debug narrator, the `CoreMechanicsTests`
+capability split (+`EffectRegistryTests`), both file renames (`AttackAction.cs`, `MovesDbContext.cs`/
+`PokemonDbContext.cs`), and the shared importer `HttpClient`. Remaining #7: only the **minor cleanups** bullet.
+**Resolved 2026-06-12:** the RNG seam is now seedable end-to-end — `BattleScenario.Seed(...)` makes every roll
+deterministic (`SeededRulesTests`) — and the deferred **double-faint-as-loss** test is landed
+(`BattleRunnerTests`). Remaining from the chain: only the *production* per-run seed at the web composition root
+(Tech Debt #3); the replace-move/recovery **modal** E2Es stay deferred until that web seed exists (the .NET
+coverage is already complete).
 
 ---
 
