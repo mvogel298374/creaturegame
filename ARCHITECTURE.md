@@ -109,7 +109,7 @@ Each entry: **Decision · Why · Where it lives.**
 - **Why:** the split follows the natural object boundaries of the domain, and is meant to be **extensible** —
   a new unique object domain (items, etc.) would get its own database + context rather than being bolted onto
   an existing one. Each domain then versions and imports independently.
-- **Where:** `DB/GameDbContext.cs` (holds both contexts today — ⚠ see Review #7 rename), `DB/Migrations/{Moves,Pokemon}`.
+- **Where:** `DB/MovesDbContext.cs`, `DB/PokemonDbContext.cs` (one file per context), `DB/Migrations/{Moves,Pokemon}`.
 
 ### 2.6 Import-vs-runtime boundary (Gen-1 corrections happen at import)
 - **Decision:** PokeAPI returns *modern* move data; all Gen-1 corrections (power/accuracy/type from

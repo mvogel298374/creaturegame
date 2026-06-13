@@ -41,7 +41,7 @@ The core goal is a faithful Gen 1 battle engine — accurate damage formula, typ
 ### Data flow
 
 ```
-PokéAPI → PokeApiConnector → pokemon.db / moves.db → GameDbContext → PokemonService / AttackService → Creature → Battle
+PokéAPI → PokeApiConnector → pokemon.db / moves.db → PokemonDbContext / MovesDbContext → PokemonService / AttackService → Creature → Battle
 ```
 
 ### Battle engine

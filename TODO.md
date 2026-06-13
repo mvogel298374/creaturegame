@@ -301,10 +301,11 @@ moving target.
     (test count held at 868 across the move). **Quick-win coverage added** while here: `EffectRegistryTests`
     (+20) pins both effect-strategy registries (`MoveEffects` + `LockInMechanics`) — round-trip, unique keys,
     null-for-effects-handled-elsewhere, and the deliberate Binding-only overlap. Suite 868 → **888 .NET**.
-  - [ ] **Filename ≠ contained type (renames).** ~~`IBattleAction.cs` → `AttackAction.cs`~~ ✅ (done with the
-    `IMoveEffect` extraction above — interface split into its own `IBattleAction.cs`). Still open:
-    `GameDbContext.cs` holds `MovesDbContext` + `PokemonDbContext` and **no** `GameDbContext` type — rename /
-    split to match what's inside. Pure navigation friction, no behavior change.
+  - [x] **Filename ≠ contained type (renames). DONE 2026-06-14.** ~~`IBattleAction.cs` → `AttackAction.cs`~~ ✅
+    (done with the `IMoveEffect` extraction — interface split into its own `IBattleAction.cs`).
+    ~~`GameDbContext.cs` (held `MovesDbContext` + `PokemonDbContext`, no `GameDbContext` type)~~ ✅ split into
+    `DB/MovesDbContext.cs` + `DB/PokemonDbContext.cs`, one file per context. Pure navigation friction, no
+    behaviour change — build green, 888 tests unaffected. Docs (`ARCHITECTURE.md §2.5`, `README.md`) updated.
   - [ ] **Importer `new HttpClient()` per request.** `MoveImport.FetchMoveDataByUrl` and the
     `PokeApiConnector` downloaders create a client per call (socket-exhaustion antipattern). One-shot tool so
     low blast radius — swap to a single shared/static `HttpClient`.

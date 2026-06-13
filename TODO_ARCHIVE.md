@@ -137,7 +137,8 @@ The ordered pass that followed the move-coverage completion. All six items done;
   through a `MoveEffectContext.DealDamage` delegate, so the Substitute-soak / Bide-accumulation /
   Counter-recording stay in one place. Also renamed the file `IBattleAction.cs` → `AttackAction.cs` (its
   primary type) and split the small `IBattleAction` interface into its own `IBattleAction.cs` (part of the
-  Review #7 "filename ≠ type" item; `GameDbContext.cs` split still open). Pure structural refactor, no
+  Review #7 "filename ≠ type" item; `GameDbContext.cs` → `MovesDbContext.cs` + `PokemonDbContext.cs` followed
+  on 2026-06-14). Pure structural refactor, no
   behaviour change — seam-reviewer **CLEAN** (0 blockers / 0 advisories; diffed all 20 arms 1:1), csharpier
   clean, **867/867 .NET tests green**. `ARCHITECTURE.md §2.4/§2.11/§3` updated to match.
 
