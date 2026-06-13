@@ -292,10 +292,15 @@ moving target.
     to a small test set) to watch a battle narrate. Documented on the class (XML-doc) + `AI_CONTEXT.md`
     → Tooling. **No coverage guard** — unlike the client `timeline.ts` leg (a miss there = a real render
     bug), a missing case in a debug narrator is just one fewer line, so the rot-guard isn't worth it here.
-  - [ ] **Split `CoreMechanicsTests.cs` by capability.** ~3100 lines, one class, ~130 tests across 14
-    unrelated `// ──` regions (stat stages, crit, XP, Metronome, EncounterSelector, seeded stat-calc…).
-    Violates our own "tests grouped by capability, not batch" rule — which the **Integration** suite already
-    follows (`Gen1Attacks/*`, `Interactions/*`). Split the unit suite the same way.
+  - [x] **Split `CoreMechanicsTests.cs` by capability. DONE 2026-06-14.** The 3144-line single class (120
+    tests + 2 nested rules-doubles across 14 `// ──` regions) is split into 13 capability files under `Unit/`
+    — `StatCalculationTests`, `ExperienceAndLevelingTests`, `DamageCalculationTests`, `TypeChartTests`,
+    `StatStageTests`, `TurnOrderTests`, `AccuracyAndCritTests`, `StatusConditionTests`, `MoveExecutionTests`,
+    `MetronomeTests`, `MovesetAndPpTests`, `AttributesAndRulesTests`, `EncounterSelectorTests` — matching the
+    Integration suite's per-capability layout and our "group by capability, not batch" rule. Behaviour-identical
+    (test count held at 868 across the move). **Quick-win coverage added** while here: `EffectRegistryTests`
+    (+20) pins both effect-strategy registries (`MoveEffects` + `LockInMechanics`) — round-trip, unique keys,
+    null-for-effects-handled-elsewhere, and the deliberate Binding-only overlap. Suite 868 → **888 .NET**.
   - [ ] **Filename ≠ contained type (renames).** ~~`IBattleAction.cs` → `AttackAction.cs`~~ ✅ (done with the
     `IMoveEffect` extraction above — interface split into its own `IBattleAction.cs`). Still open:
     `GameDbContext.cs` holds `MovesDbContext` + `PokemonDbContext` and **no** `GameDbContext` type — rename /
