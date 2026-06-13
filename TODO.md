@@ -277,12 +277,13 @@ moving target.
   - [x] **`AttackAction` god-object → `IMoveEffect` registry (highest leverage). DONE 2026-06-13** — moved
     to `TODO_ARCHIVE.md` (Tech-Debt cleanups). The ~320-line effect switch now lives behind an `IMoveEffect`
     registry in `Combat/MoveEffects.cs`, mirroring `ILockInMechanic`; file renamed to `AttackAction.cs`.
-  - [ ] **`timeline.ts` event-coverage guard.** Every `BattleEvent` is hand-mapped in three exhaustive
-    switches — `SignalRBattleEventEmitter.MapEvent` (payload), `ConsoleBattleEventEmitter` (text), and
-    `timeline.ts expandEvent` (text + steps); adding one event means editing three files in two languages.
-    The C# legs are guarded by `WebEventContractTests` (nothing maps to `"Unknown"`); the **TS leg is not** —
-    a new event silently falls through `default: {}` and never renders. Add a contract test (or a generated
-    shared event-name list) asserting every backend event name has a non-empty `expandEvent` arm.
+  - [x] **`timeline.ts` event-coverage guard. DONE 2026-06-13.** The TS leg of the 3-way event map was the
+    one unguarded by a contract test — a new `BattleEvent` would silently fall through `expandEvent`'s
+    `default: {}` and never render. Added `WebEventContractTests.EveryBattleEventHasATimelineArm`: it reflects
+    over every concrete `BattleEvent` (the same drift-proof source as the existing SignalR-leg test) and
+    asserts each has a `case '<Name>'` arm in `timeline.ts` (located via `[CallerFilePath]`, read as text —
+    no codegen, single source of truth = backend reflection). Verified it fails-and-names the event when an
+    arm is removed. Suite 867 → **868 .NET**.
   - [ ] **Delete or re-scope `ConsoleBattleEventEmitter` (254 lines, production-dead).** Never instantiated
     in app code (`new ConsoleBattleEventEmitter` = 0 hits); used only in `CoreMechanicsTests` as a "run the
     formatter" emitter that spams stdout no one reads. It is a 3rd exhaustive event-map with no live
