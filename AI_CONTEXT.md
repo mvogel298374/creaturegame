@@ -80,6 +80,19 @@ Version-pinned local tool (`.config/dotnet-tools.json`); config `.csharpierrc.js
 .` as the gate. **Do not hand-align code** — let the formatter own whitespace (the one-shot reformat is in
 `.git-blame-ignore-revs`).
 
+### Debug battle narration (`CG_BATTLE_LOG`)
+`ConsoleBattleEventEmitter` (in core) narrates a battle to stdout in Gen 1 flavour text — a dev aid for
+watching a unit test play out (it is **never** wired into the app; the web client renders via `timeline.ts`).
+Many `CoreMechanicsTests` already pass it as their emitter, but it is **silent by default**: output is gated
+on the `CG_BATTLE_LOG` env var. To watch a test narrate, set the flag and filter to a small set (every test
+using the emitter narrates while it's on, so an unfiltered run is a wall of text):
+```powershell
+$env:CG_BATTLE_LOG = "1"
+& "C:\Users\USER\.dotnet\dotnet.exe" test tests/creaturegame.Tests --filter "FullyQualifiedName~Substitute"
+$env:CG_BATTLE_LOG = $null   # turn it back off
+```
+Any value other than `0`/`false` (or unset/empty) enables it.
+
 ### MCP servers (data & UI inspection)
 - **`sqlite-moves` / `sqlite-pokemon`** — read/verify `moves.db` / `pokemon.db` rows after a
   `PokeApiConnector` run, without throwaway code. Treat as read-only: fix data by editing the importer +

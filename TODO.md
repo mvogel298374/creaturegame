@@ -284,11 +284,14 @@ moving target.
     asserts each has a `case '<Name>'` arm in `timeline.ts` (located via `[CallerFilePath]`, read as text —
     no codegen, single source of truth = backend reflection). Verified it fails-and-names the event when an
     arm is removed. Suite 867 → **868 .NET**.
-  - [ ] **Delete or re-scope `ConsoleBattleEventEmitter` (254 lines, production-dead).** Never instantiated
-    in app code (`new ConsoleBattleEventEmitter` = 0 hits); used only in `CoreMechanicsTests` as a "run the
-    formatter" emitter that spams stdout no one reads. It is a 3rd exhaustive event-map with no live
-    consumer. Either delete it (point those tests at `RecordingEmitter` / a null emitter) or document the
-    test-only role and bring it under the `timeline.ts`-style coverage guard so it can't silently rot.
+  - [x] **Re-scope `ConsoleBattleEventEmitter` as a documented debug narrator. DONE 2026-06-14.** Decision:
+    *keep* it (it's a deliberate dev aid — narrates a battle to stdout in Gen 1 flavour text for watching a
+    unit test play out), but fix the "spams stdout no one reads" problem by gating output on the
+    `CG_BATTLE_LOG` env var — **silent by default**, so the ~30 `CoreMechanicsTests` sites that pass it as
+    their emitter stay quiet on a normal run with zero call-site churn. Set `$env:CG_BATTLE_LOG=1` (filtered
+    to a small test set) to watch a battle narrate. Documented on the class (XML-doc) + `AI_CONTEXT.md`
+    → Tooling. **No coverage guard** — unlike the client `timeline.ts` leg (a miss there = a real render
+    bug), a missing case in a debug narrator is just one fewer line, so the rot-guard isn't worth it here.
   - [ ] **Split `CoreMechanicsTests.cs` by capability.** ~3100 lines, one class, ~130 tests across 14
     unrelated `// ──` regions (stat stages, crit, XP, Metronome, EncounterSelector, seeded stat-calc…).
     Violates our own "tests grouped by capability, not batch" rule — which the **Integration** suite already

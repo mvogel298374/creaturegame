@@ -2,14 +2,47 @@ using creaturegame.Creatures;
 
 namespace creaturegame.Combat;
 
+/// <summary>
+/// A debug <see cref="IBattleEventEmitter"/> that narrates a battle to <see cref="Console"/> in Gen 1
+/// flavour text — a developer aid for watching a unit test play out, not a production/client emitter
+/// (the web client renders events via <c>timeline.ts</c>; this is never wired into the app).
+/// </summary>
+/// <remarks>
+/// <para><b>Silent by default.</b> Output is gated on the <c>CG_BATTLE_LOG</c> environment variable so the
+/// many tests that pass <see cref="Instance"/> as their emitter don't spam stdout on a normal run. With the
+/// flag unset, <see cref="Emit"/> is a no-op.</para>
+/// <para><b>To watch a battle narrate</b>, set the flag for the run (PowerShell):</para>
+/// <code>
+/// $env:CG_BATTLE_LOG = "1"
+/// &amp; "C:\Users\USER\.dotnet\dotnet.exe" test tests/creaturegame.Tests --filter "FullyQualifiedName~Substitute"
+/// </code>
+/// <para>Filter to one test (or a small set) — every test that uses this emitter narrates while the flag is
+/// on, so an unfiltered run is a wall of text. Any value other than <c>0</c>/<c>false</c> enables it.</para>
+/// </remarks>
 public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
 {
     public static readonly ConsoleBattleEventEmitter Instance = new();
+
+    // Read once: whether CG_BATTLE_LOG opts this run into battle narration. "0"/"false" (any case) count as
+    // off, as does an unset/empty value; anything else is on. Cached so Emit stays allocation-free per event.
+    private static readonly bool Verbose = ResolveVerbose();
+
+    private static bool ResolveVerbose()
+    {
+        var flag = Environment.GetEnvironmentVariable("CG_BATTLE_LOG");
+        if (string.IsNullOrWhiteSpace(flag))
+            return false;
+        return !flag.Equals("0", StringComparison.OrdinalIgnoreCase)
+            && !flag.Equals("false", StringComparison.OrdinalIgnoreCase);
+    }
 
     private ConsoleBattleEventEmitter() { }
 
     public void Emit(BattleEvent evt)
     {
+        if (!Verbose)
+            return;
+
         switch (evt)
         {
             case BattleStarted e:
