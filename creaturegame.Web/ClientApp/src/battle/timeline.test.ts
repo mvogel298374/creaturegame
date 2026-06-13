@@ -376,3 +376,40 @@ describe('expandEvent — faint side resolves against the player name', () => {
     expect(emit.command).toEqual({ type: 'playFaintAnimation', side: 'enemy' });
   });
 });
+
+// The run-layer arms (Poké Center recovery, endless-chain game-over, the honest XP bar) are the newest
+// features; the C# WebEventContractTests guards that each has an arm — these pin what the arm renders.
+describe('expandEvent — run layer (recovery, run-end, XP)', () => {
+  const actions = (steps: Step[] = []) =>
+    steps.filter((s): s is Extract<Step, { kind: 'dispatch' }> => s.kind === 'dispatch').map(s => s.action);
+
+  it('raises the Poké Center recovery modal after announcing it', () => {
+    const { steps } = expandEvent('RecoveryOffered', { creatureName: 'MEWTWO', speciesId: 150, battlesWon: 3 }, CTX);
+    expect(logLines(steps)).toEqual(['MEWTWO reached a Poké Center!']);
+    expect(actions(steps)).toContainEqual({ type: 'SHOW_RECOVERY', creatureName: 'MEWTWO', speciesId: 150, battlesWon: 3 });
+  });
+
+  it('fills HP and clears any status when the heal is accepted (PlayerRecovered)', () => {
+    const { steps } = expandEvent('PlayerRecovered', { creatureName: 'MEWTWO', hpAfter: 226 }, CTX);
+    expect(logLines(steps)).toEqual(['MEWTWO was fully healed!']);
+    expect(actions(steps)).toContainEqual({ type: 'UPDATE_HP', name: 'MEWTWO', hp: 226 });
+    expect(actions(steps)).toContainEqual({ type: 'CLEAR_STATUS', name: 'MEWTWO' });
+  });
+
+  it('announces the run summary and flips to game-over on RunEnded (plural wins)', () => {
+    const { steps } = expandEvent('RunEnded', { battlesWon: 5, finalLevel: 22, finalCreatureName: 'MEWTWO' }, CTX);
+    expect(logLines(steps)).toEqual(['MEWTWO fainted! Run over — 5 wins, reached level 22.']);
+    expect(actions(steps)).toContainEqual({ type: 'RUN_ENDED', battlesWon: 5, finalLevel: 22 });
+  });
+
+  it('uses the singular "win" in the run summary after exactly one win', () => {
+    const { steps } = expandEvent('RunEnded', { battlesWon: 1, finalLevel: 8, finalCreatureName: 'PIKACHU' }, CTX);
+    expect(logLines(steps)).toEqual(['PIKACHU fainted! Run over — 1 win, reached level 8.']);
+  });
+
+  it('fills the XP bar by the awarded amount on ExperienceGained', () => {
+    const { steps } = expandEvent('ExperienceGained', { creatureName: 'MEWTWO', amount: 137 }, CTX);
+    expect(logLines(steps)).toEqual(['MEWTWO gained 137 EXP. Points!']);
+    expect(actions(steps)).toContainEqual({ type: 'XP_GAIN', amount: 137 });
+  });
+});
