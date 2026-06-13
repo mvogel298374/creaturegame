@@ -274,15 +274,17 @@ moving target.
   correctness bugs — the engine, the three seams, and the no-facade `BattleState` reset trick are all sound;
   this is about the two or three files that concentrate all the complexity not becoming change-risky as Gen 2
   and AI move-selection land. `ARCHITECTURE.md` (above) is the first task and should cross-link these.
-  - [ ] **`AttackAction` god-object → `IMoveEffect` registry (highest leverage).** `Combat/IBattleAction.cs`
-    is ~960 lines holding the interface + the whole `AttackAction`; `ExecuteAsync` is ~400 lines and
-    `TryApplyMoveEffect` is a ~320-line switch over ~25 `MoveEffect` cases (Haze, Counter, Mist, Reflect,
-    Transform, Rest, Substitute…). Extract each post-damage effect behind an `IMoveEffect` registry keyed by
-    `MoveEffect`, mirroring the proven `ILockInMechanic` / `LockInMechanics.For(effect)` pattern (lock-ins
-    were already pulled out this way). Shrinks the pipeline to its stages, makes each effect independently
-    testable, and structurally kills the recurring "hook added to only the Standard path" defect class the
-    engine comments keep warning about. Hand to `opus-engineer`; gate with `/audit` + seam-reviewer. Rename
-    the file to `AttackAction.cs` while here (see renames below).
+  - [x] **`AttackAction` god-object → `IMoveEffect` registry (highest leverage). DONE 2026-06-13.** The
+    ~320-line `switch (attack.Effect)` in `TryApplyMoveEffect` is extracted into `Combat/MoveEffects.cs`:
+    an `IMoveEffect` interface + `MoveEffectContext` + one sealed class per post-damage effect (the 20
+    cases: Haze, Flinch, LeechSeed, Binding, PayDay, Recoil, Disable, Counter, Mist, Reflect, LightScreen,
+    FocusEnergy, Heal, Mimic, Transform, Conversion, Rest, Substitute, Splash, Confuse), routed by a
+    `MoveEffects.For(effect)` registry **derived from the `All` list** — exactly mirroring the proven
+    `ILockInMechanic` / `LockInMechanics.For(effect)` pattern. `TryApplyMoveEffect` is now a 3-line lookup;
+    damage-dealing effects (Counter) reach the centralized `DealDamageToTarget` through a context delegate,
+    so the Substitute-soak / Bide-accumulation / Counter-recording stay in one place. The file was renamed
+    `IBattleAction.cs` → `AttackAction.cs` (interface split into its own `IBattleAction.cs`). Pure structural
+    refactor, no behavior change — seam-reviewer **CLEAN**, 867/867 .NET tests green.
   - [ ] **`timeline.ts` event-coverage guard.** Every `BattleEvent` is hand-mapped in three exhaustive
     switches — `SignalRBattleEventEmitter.MapEvent` (payload), `ConsoleBattleEventEmitter` (text), and
     `timeline.ts expandEvent` (text + steps); adding one event means editing three files in two languages.
@@ -298,7 +300,8 @@ moving target.
     unrelated `// ──` regions (stat stages, crit, XP, Metronome, EncounterSelector, seeded stat-calc…).
     Violates our own "tests grouped by capability, not batch" rule — which the **Integration** suite already
     follows (`Gen1Attacks/*`, `Interactions/*`). Split the unit suite the same way.
-  - [ ] **Filename ≠ contained type (renames).** `IBattleAction.cs` → `AttackAction.cs` (its primary type);
+  - [ ] **Filename ≠ contained type (renames).** ~~`IBattleAction.cs` → `AttackAction.cs`~~ ✅ (done with the
+    `IMoveEffect` extraction above — interface split into its own `IBattleAction.cs`). Still open:
     `GameDbContext.cs` holds `MovesDbContext` + `PokemonDbContext` and **no** `GameDbContext` type — rename /
     split to match what's inside. Pure navigation friction, no behavior change.
   - [ ] **Importer `new HttpClient()` per request.** `MoveImport.FetchMoveDataByUrl` and the
