@@ -15,9 +15,7 @@ public static class CryDownloader
         string cryDir = Path.Combine(root, "creaturegame.Web", "wwwroot", "audio", "cries");
         Directory.CreateDirectory(cryDir);
 
-        using var http = new HttpClient();
-        http.DefaultRequestHeaders.UserAgent.ParseAdd("CreatureGame-Importer/1.0");
-        http.Timeout = TimeSpan.FromSeconds(30);
+        var http = PokeApiHttp.Client;
 
         int downloaded = 0,
             skipped = 0,

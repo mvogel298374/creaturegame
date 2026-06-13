@@ -306,9 +306,11 @@ moving target.
     ~~`GameDbContext.cs` (held `MovesDbContext` + `PokemonDbContext`, no `GameDbContext` type)~~ ✅ split into
     `DB/MovesDbContext.cs` + `DB/PokemonDbContext.cs`, one file per context. Pure navigation friction, no
     behaviour change — build green, 888 tests unaffected. Docs (`ARCHITECTURE.md §2.5`, `README.md`) updated.
-  - [ ] **Importer `new HttpClient()` per request.** `MoveImport.FetchMoveDataByUrl` and the
-    `PokeApiConnector` downloaders create a client per call (socket-exhaustion antipattern). One-shot tool so
-    low blast radius — swap to a single shared/static `HttpClient`.
+  - [x] **Importer `new HttpClient()` per request. DONE 2026-06-14.** All six per-call/per-pass
+    `new HttpClient()` sites (`MoveImport`/`PokemonImport` Fetch* — the worst, ~165× in a loop — plus the
+    sprite/cry downloaders) now share one process-wide `PokeApiHttp.Client` (static, never disposed, carries
+    the raw.githubusercontent User-Agent). Kills the socket-exhaustion antipattern. Verified by a full
+    PokeApiConnector run: both imports + sprites + cries complete cleanly with no socket errors (exit 0).
   - [ ] **Minor cleanups.** Drop the legacy `out`-less `DamageCalculator.CalculateDamage` overload if only
     tests use it; dedupe the repeated `_rng.Next(1, 101)` secondary-roll idiom (written as both `> chance`
     and `<= chance` in the same file) behind a `rules.SecondaryHits(...)` helper; name the magic move IDs in

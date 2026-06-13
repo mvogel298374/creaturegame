@@ -18,9 +18,7 @@ public static class SpriteDownloader
         Directory.CreateDirectory(frontDir);
         Directory.CreateDirectory(backDir);
 
-        using var http = new HttpClient();
-        http.DefaultRequestHeaders.UserAgent.ParseAdd("CreatureGame-Importer/1.0");
-        http.Timeout = TimeSpan.FromSeconds(30);
+        var http = PokeApiHttp.Client;
 
         int downloaded = 0,
             skipped = 0,

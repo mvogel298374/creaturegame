@@ -11,11 +11,10 @@ public class PokemonImport
     public static async Task FetchPokemonByGeneration(int generation)
     {
         string url = $"https://pokeapi.co/api/v2/generation/{generation}/";
-        using HttpClient client = new HttpClient();
 
         try
         {
-            HttpResponseMessage response = await client.GetAsync(url);
+            HttpResponseMessage response = await PokeApiHttp.Client.GetAsync(url);
             response.EnsureSuccessStatusCode();
 
             string json = await response.Content.ReadAsStringAsync();
@@ -55,11 +54,10 @@ public class PokemonImport
         PokemonDbContext context
     )
     {
-        using HttpClient client = new HttpClient();
         try
         {
             // Fetch Pokemon Data
-            HttpResponseMessage response = await client.GetAsync(url);
+            HttpResponseMessage response = await PokeApiHttp.Client.GetAsync(url);
             response.EnsureSuccessStatusCode();
             string json = await response.Content.ReadAsStringAsync();
             PokeApiPokemon? pokeData = JsonSerializer.Deserialize<PokeApiPokemon>(
@@ -68,7 +66,7 @@ public class PokemonImport
             );
 
             // Fetch Species Data for Growth Rate
-            HttpResponseMessage speciesResponse = await client.GetAsync(speciesUrl);
+            HttpResponseMessage speciesResponse = await PokeApiHttp.Client.GetAsync(speciesUrl);
             speciesResponse.EnsureSuccessStatusCode();
             string speciesJson = await speciesResponse.Content.ReadAsStringAsync();
             PokeApiPokemonSpecies? speciesData = JsonSerializer.Deserialize<PokeApiPokemonSpecies>(

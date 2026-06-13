@@ -12,11 +12,10 @@ public class MoveImport
     public static async Task FetchMovesByGeneration(int generation)
     {
         string url = $"https://pokeapi.co/api/v2/generation/{generation}/";
-        using HttpClient client = new HttpClient();
 
         try
         {
-            HttpResponseMessage response = await client.GetAsync(url);
+            HttpResponseMessage response = await PokeApiHttp.Client.GetAsync(url);
             response.EnsureSuccessStatusCode();
 
             string json = await response.Content.ReadAsStringAsync();
@@ -51,10 +50,9 @@ public class MoveImport
 
     private static async Task FetchMoveDataByUrl(string url, MovesDbContext context)
     {
-        using HttpClient client = new HttpClient();
         try
         {
-            HttpResponseMessage response = await client.GetAsync(url);
+            HttpResponseMessage response = await PokeApiHttp.Client.GetAsync(url);
             response.EnsureSuccessStatusCode();
 
             string json = await response.Content.ReadAsStringAsync();
