@@ -274,17 +274,9 @@ moving target.
   correctness bugs — the engine, the three seams, and the no-facade `BattleState` reset trick are all sound;
   this is about the two or three files that concentrate all the complexity not becoming change-risky as Gen 2
   and AI move-selection land. `ARCHITECTURE.md` (above) is the first task and should cross-link these.
-  - [x] **`AttackAction` god-object → `IMoveEffect` registry (highest leverage). DONE 2026-06-13.** The
-    ~320-line `switch (attack.Effect)` in `TryApplyMoveEffect` is extracted into `Combat/MoveEffects.cs`:
-    an `IMoveEffect` interface + `MoveEffectContext` + one sealed class per post-damage effect (the 20
-    cases: Haze, Flinch, LeechSeed, Binding, PayDay, Recoil, Disable, Counter, Mist, Reflect, LightScreen,
-    FocusEnergy, Heal, Mimic, Transform, Conversion, Rest, Substitute, Splash, Confuse), routed by a
-    `MoveEffects.For(effect)` registry **derived from the `All` list** — exactly mirroring the proven
-    `ILockInMechanic` / `LockInMechanics.For(effect)` pattern. `TryApplyMoveEffect` is now a 3-line lookup;
-    damage-dealing effects (Counter) reach the centralized `DealDamageToTarget` through a context delegate,
-    so the Substitute-soak / Bide-accumulation / Counter-recording stay in one place. The file was renamed
-    `IBattleAction.cs` → `AttackAction.cs` (interface split into its own `IBattleAction.cs`). Pure structural
-    refactor, no behavior change — seam-reviewer **CLEAN**, 867/867 .NET tests green.
+  - [x] **`AttackAction` god-object → `IMoveEffect` registry (highest leverage). DONE 2026-06-13** — moved
+    to `TODO_ARCHIVE.md` (Tech-Debt cleanups). The ~320-line effect switch now lives behind an `IMoveEffect`
+    registry in `Combat/MoveEffects.cs`, mirroring `ILockInMechanic`; file renamed to `AttackAction.cs`.
   - [ ] **`timeline.ts` event-coverage guard.** Every `BattleEvent` is hand-mapped in three exhaustive
     switches — `SignalRBattleEventEmitter.MapEvent` (payload), `ConsoleBattleEventEmitter` (text), and
     `timeline.ts expandEvent` (text + steps); adding one event means editing three files in two languages.

@@ -126,6 +126,21 @@ The ordered pass that followed the move-coverage completion. All six items done;
   `BattleIntegrationTests.PicksSpecificMoveByIndex` (seeded + `AlwaysHitRules`). Verified by a 60× full-suite
   confidence sweep: **0 failures / ~49k test executions.**
 
+- **`AttackAction` god-object → `IMoveEffect` registry (Architecture Review #7, highest-leverage item;
+  2026-06-13).** The ~320-line `switch (attack.Effect)` in `AttackAction.TryApplyMoveEffect` was extracted
+  into `creaturegame/Combat/MoveEffects.cs`: an `IMoveEffect` interface + `MoveEffectContext` + one sealed
+  class per post-damage effect (the 20 cases — Haze, Flinch, LeechSeed, Binding, PayDay, Recoil, Disable,
+  Counter, Mist, Reflect, LightScreen, FocusEnergy, Heal, Mimic, Transform, Conversion, Rest, Substitute,
+  Splash, Confuse), routed by `MoveEffects.For(effect)` **derived from the `All` list** — exactly mirroring
+  the proven `ILockInMechanic` / `LockInMechanics.For(effect)` pattern (Review #6a). `TryApplyMoveEffect` is
+  now a 3-line lookup. Counter (the only damage-dealing effect) reaches the centralized `DealDamageToTarget`
+  through a `MoveEffectContext.DealDamage` delegate, so the Substitute-soak / Bide-accumulation /
+  Counter-recording stay in one place. Also renamed the file `IBattleAction.cs` → `AttackAction.cs` (its
+  primary type) and split the small `IBattleAction` interface into its own `IBattleAction.cs` (part of the
+  Review #7 "filename ≠ type" item; `GameDbContext.cs` split still open). Pure structural refactor, no
+  behaviour change — seam-reviewer **CLEAN** (0 blockers / 0 advisories; diffed all 20 arms 1:1), csharpier
+  clean, **867/867 .NET tests green**. `ARCHITECTURE.md §2.4/§2.11/§3` updated to match.
+
 ---
 
 ## XP, Level-Up & the Endless Battle Chain — DONE (2026-06-09 → 10)

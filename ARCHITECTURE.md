@@ -99,8 +99,8 @@ Each entry: **Decision · Why · Where it lives.**
 - **Why:** decouples "what the combatant decides" from "how the turn executes," so new action types and new
   deciders — notably **AI move selection** (the next feature, scoring via `IMoveEvaluator`) — drop in without
   touching `Battle`'s turn loop. <!-- confirm -->
-- **Where:** `Combat/IBattleAction.cs` (+ `AttackAction`), `Combat/IBattleInput.cs`
-  (+ `AutoSelectInput` / `RandomMoveInput`), `creaturegame.Web/Battle/SignalRInput.cs`.
+- **Where:** `Combat/IBattleAction.cs` (the interface) + `Combat/AttackAction.cs` (`AttackAction`),
+  `Combat/IBattleInput.cs` (+ `AutoSelectInput` / `RandomMoveInput`), `creaturegame.Web/Battle/SignalRInput.cs`.
 
 ### 2.5 Database-per-domain split (`pokemon.db` + `moves.db`)
 - **Decision:** data is partitioned by **overarching domain object** — Pokémon-world data in `pokemon.db`,
@@ -156,14 +156,17 @@ Each entry: **Decision · Why · Where it lives.**
   for the deferred recovery/replace-move E2E specs — **Tech Debt #3**.
 - **Where:** `Combat/IRandomSource.cs`, `tests/.../TestSupport/BattleScenario.cs`.
 
-### 2.11 Effect strategies (lock-ins now, post-damage effects next)
-- **Decision:** multi-turn "lock-in" moves (two-turn, rampage, rage, bide, binding) are each an
-  `ILockInMechanic` resolved via `LockInMechanics.For(effect)`, rather than branched inline in `AttackAction`.
-- **Why:** they differ sharply turn-to-turn (charge / store / strike); owning their own hooks keeps the main
-  pipeline linear.
-- **Next:** the ~320-line `TryApplyMoveEffect` switch (post-damage effects) is slated to follow the same
-  pattern as an `IMoveEffect` registry — **Tech Debt → Architecture Review #7**.
-- **Where:** `Combat/LockInMechanics.cs`.
+### 2.11 Effect strategies (lock-ins + post-damage effects)
+- **Decision:** two parallel registries follow the same shape. Multi-turn "lock-in" moves (two-turn, rampage,
+  rage, bide, binding) are each an `ILockInMechanic` resolved via `LockInMechanics.For(effect)`. The ~20
+  post-damage effects (Haze, Counter, Reflect, Transform, Rest, Substitute…) are each an `IMoveEffect`
+  resolved via `MoveEffects.For(effect)` — neither is branched inline in `AttackAction`.
+- **Why:** lock-ins differ sharply turn-to-turn (charge / store / strike); post-damage effects were a
+  ~320-line switch that concentrated change-risk. Owning their own hooks keeps the main pipeline linear and
+  each effect independently testable. Damage-dealing effects (Counter) reach `AttackAction`'s centralized
+  `DealDamageToTarget` through a context delegate, so the Substitute-soak / Bide / Counter-recording stays in
+  one place.
+- **Where:** `Combat/LockInMechanics.cs`, `Combat/MoveEffects.cs` (extraction done — Architecture Review #7).
 
 ---
 
@@ -173,8 +176,8 @@ One-liners for orientation — the full procedure for each lives in the linked d
 
 - **Add a damaging/secondary move:** usually pure data — confirm `MapToAttack` resolves its Gen-1 values (add
   a layer-2 correction only if PokeAPI can't express it). → `DATA_IMPORT.md`.
-- **Add a move with new behavior:** add a `MoveEffect`, implement it (post-#7: an `IMoveEffect`; today: a
-  `TryApplyMoveEffect` arm), emit a `BattleEvent`, map it in all three emitter legs, add a contract test.
+- **Add a move with new behavior:** add a `MoveEffect`, implement it as an `IMoveEffect` (a class in
+  `MoveEffects.All`), emit a `BattleEvent`, map it in all three emitter legs, add a contract test.
 - **Add a generation:** implement new `IBattleRules` / `ITypeChart` / `IStatCalculator`; never branch on
   generation in engine code; run the §5.0 gen-agnostic checklist. → `GENERATION_SEAMS.md`.
 - **Add an AI / alternative input:** implement `IBattleInput` (score moves via `IMoveEvaluator`) and wire it
