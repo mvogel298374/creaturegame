@@ -106,7 +106,8 @@ The following Gen 1 behaviours are intentionally kept accurate:
 
 **Stats / formulas:**
 - HP DV derived from lowest bits of Attack, Defense, Speed, and Special DVs
-- Stat Exp (EVs) use the `sqrt(StatExp) / 4` bonus formula
+- Stat Exp (EVs) use the `sqrt(StatExp) / 4` bonus formula; a win adds the defeated foe's base stats to the
+  victor's Stat Exp (capped 65535/stat), realized into stats on the next level-up
 - Stat formula differs between HP and all other stats
 - Sleep lasts 1–7 turns (Gen 2+: 2–5); Freeze is permanent until hit by an appropriate Fire move
 

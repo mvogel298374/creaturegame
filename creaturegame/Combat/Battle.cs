@@ -167,6 +167,13 @@ public class Battle
                 );
                 PlayerCreature.AddExperience(xp);
                 _emitter?.Emit(new ExperienceGained(PlayerCreature.Name, xp));
+                // Gen 1 Stat Exp: the win adds the defeated foe's base stats to the player's accumulated Stat
+                // Exp (capped per stat by the calculator). It's silent (no event) and only realizes into
+                // actual stats on the next CalculateStats — so award it BEFORE the level-up loop below, so a
+                // level gained this battle already reflects the new training. Single-participant scope: one
+                // player creature, no switching, so the finisher is the only participant — a multi-mon party
+                // would instead call GainStatExp once per participant that was sent out against this foe.
+                PlayerCreature.GainStatExp(EnemyCreature);
                 // Move learning below mutates the PERMANENT MoveSet. If the player Transformed/Mimicked this
                 // battle, MoveSet currently holds the copied moveset and the end-of-battle restore would
                 // discard any learn — so revert the player's copied identity first. Learning (and the

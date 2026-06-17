@@ -8,6 +8,111 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## EV Gain (Stat Experience) ✅ DONE (2026-06-17)
+
+Gen 1 "EVs" = **Stat Experience**: a win adds the defeated foe's base stats to the player's `Exp*` (the
+fields existed but were never written). Realized into actual stats **only on the next level-up** (Gen 1 never
+applies Stat Exp mid-level), so it pays off through the chain's regular level-ups.
+
+- `IStatCalculator.AwardStatExp(victor, defeated)` seam — gain rule + per-stat 65535 cap live on
+  `Gen1StatCalculator` (both are gen-variable: Gen 3 uses EV yields + 252/510 caps), **not** inline in
+  `Battle`. Thin `Creature.GainStatExp(defeated)` delegates to its `StatCalculator`.
+- Hooked in `Battle`'s win branch after `AddExperience`, **before** the level-up loop, so a level gained
+  that battle already reflects the new training. No immediate `CalculateStats` (the level-up's recompute is
+  the realization point — authentic).
+- No new battle event (Gen 1 is silent about Stat Exp).
+- **DV→IV doc hooks** (requested groundwork): `IStatCalculator` XML documents the per-generation evolution
+  (DV 0–15 / 4-stored+derived-HP → IV 0–31 / 6-independent; Special DV stays shared in Gen 1–2, splits to
+  Sp.Atk/Sp.Def IVs in Gen 3; Stat Exp → EV yields/caps). `Creature`'s `Dv*`/`Exp*` regions documented as the
+  IV/EV precursors. A `Gen3StatCalculator` is a drop-in implementation of that seam.
+- Tests: `Unit/StatExpGainTests` (per-stat gain, accumulation, 65535 cap, realize-only-on-level-up +
+  no-mid-level-change, end-to-end win awards the foe's base stats). Suite 911 → **917 .NET**.
+- Audit: `/audit` PASS-WITH-ADVISORIES (0 blockers); fixed the Special-row doc (Gen 2 splits the *stat*, the
+  DV→IV change is Gen 3) + noted the single-participant scope at the call site. Deferred: the `65535` test
+  literal (promoting the private `StatExpMax` just for tests would over-expose it).
+- **Single-participant scope:** one player creature, no switching, so the finisher is the only participant.
+  Gen 1 splits Stat Exp among all participants — revisit `AwardStatExp`'s call site when a party/switching exists.
+
+---
+
+## AI Move Selection ✅ DONE (2026-06-17)
+
+**Prerequisite:** Learnset System (so AI evaluates moves the Pokémon can actually learn) — done.
+
+Shipped an intelligent-but-fallible Gen 1 enemy brain behind a new generation/game-specific seam, **live**
+on the chained enemy (`GameSessionManager` now uses `new AiBattleInput(new Gen1TrainerAi())` instead of the
+old uniform-random `RandomMoveInput`). Per the brief: smarter than random, but keeps Gen 1 quirks /
+bad decision-making rather than being a perfect optimiser.
+
+**Architecture (two seams + an adapter):**
+- **`IBattleAi`** (new) — the gen/game-specific *brain*: `ChooseMove(candidates, TurnContext)`. Split from
+  `IBattleInput` (the I/O plumbing) so brains (wild/trainer/gym/future-gen) and plumbing vary independently.
+- **`AiBattleInput : IBattleInput`** — thin adapter hosting any brain; owns the candidate filter (PP>0, not
+  Disabled). `RandomMoveInput` stays available as the trivial wild-tier brain.
+- **`IMoveEvaluator`** building blocks (gen-agnostic, score one dimension each), combined by
+  `CompositeEvaluator` (weighted sum = "personality"): `DamageEvaluator` (expected-damage fraction of target
+  HP, KO scores >1, accuracy-discounted, handles every `DamageCategory`, uses the new deterministic
+  `DamageCalculator.EstimateDamage`); `TypeEffectivenessEvaluator` (log-scale SE bonus / NVE penalty / hard 0×
+  penalty — the authentic Gen 1 lean); `StatStageMoveEvaluator` (self-buff/foe-debuff by headroom, penalise a
+  maxed stat); `StatusMoveEvaluator` (value fresh status by severity; redundant if already statused or
+  type-immune — immunity routed through the authoritative `IBattleRules.CanReceiveStatus`, not an inline
+  guess). Default mix: damage 1.0, type 0.6, stat-stage 0.5, status 0.6.
+- **`Gen1TrainerAi : IBattleAi`** — scores candidates then picks *probabilistically* via a softmax (not
+  argmax). An `intelligence` knob (0 = near-random, 1 = near-greedy, default 0.7) maps to the softmax
+  temperature, so trainer tiers are one number. The fallible pick **is** the "keep some Gen 1 bad
+  decision-making"; the quirks live in the evaluators. Replaces the planned separate `GreedyAIInput`/
+  `WeightedAIInput` — both are just temperature settings on one brain.
+
+**Engine support:** `DamageCalculator` refactored to extract a private no-RNG `ComputeDamage` core shared by
+the live `CalculateDamage` (rolls crit+variance) and the new `EstimateDamage` (deterministic, AI-only) — a
+behavior-preserving extraction, pinned by `Estimate_MatchesLiveCalcWithNoCritAndNoVariance`.
+
+**Tests:** `Unit/MoveEvaluatorTests` + `Unit/BattleAiTests`. Suite 888 → **911 .NET**.
+
+**Audit:** seam-reviewer BLOCK (wrong inline Gen-1 Ice→Freeze status immunity) fixed by routing through
+`IBattleRules.CanReceiveStatus` + a guarding `Status_FreezeIsValuedAgainstAnIceFoe` test. Deferred advisory:
+`DamageEvaluator` normalises accuracy as `Accuracy/100.0` rather than the engine's 0–255 `GetHitThreshold`
+model — a pure ranking heuristic (stages cancel in relative ranking), not a seam break. **New failure mode
+(seam-reviewer log):** even a read-only AI *heuristic* that re-derives a gen-variable rule inline is a §5.0.1
+leak — consult the rules seam, never reimplement the fact.
+
+**Future tiers (not needed yet):** distinct trainer-class weight vectors / `intelligence` values
+(wild < trainer < gym); revert the *wild* enemy to `RandomMoveInput` once explicit trainer battles exist.
+
+---
+
+## Roguelite Run Layer — Recovery & Encounter Scaling ✅ DONE (2026-06-11)
+
+Two run-layer features on top of the Endless Battle Chain. Both are **run/game-loop concerns, not battle
+mechanics**, so they stay in the run orchestrator (`BattleRunner`) / web encounter builder (`EncounterFactory`)
+and are *not* behind an `IBattleRules` seam — `/audit` §5.0 clears them (no new engine magic numbers, no gen
+checks, full heal + level band are generation-invariant choices).
+
+- **Poké Center recovery every 3rd win — an interactive game-loop step.** After every 3rd chained win the
+  player is *offered* a full restore before the next encounter; it's its own blocking node in the loop, not a
+  silent auto-heal. `Creature.FullHeal()` does the restore (HP→max, all PP→max, major status cleared, Toxic
+  counter reset) — matches the Gen 1 Poké Center exactly (HP + PP + status, unconditional/free), identical in
+  every generation, so it's ordinary engine logic, not a seam. Interval is `BattleRunner.healEveryNBattles`
+  (default 3, 0 disables).
+  - **Blocking choice** reuses the move-replacement plumbing: `IBattleInput.ConfirmRecoveryAsync` (default
+    accepts, so AI/headless never block) ↔ hub `RespondRecovery` ↔ `SignalRInput` TCS. `BattleRunner` emits
+    `RecoveryOffered(name, speciesId, battlesWon)` then awaits the choice; on accept → `FullHeal` +
+    `PlayerRecovered`, on skip → `RecoveryDeclined` (status still carries). All three events mapped in both
+    emitters + `timeline.ts`.
+  - **UI:** in-page `RecoveryModal` (BattleScreen) shows the player's creature sprite with a CSS heal-glow and a
+    single **HEAL / SKIP** press that both decides and advances the chain. Verified live (Puppeteer): offer →
+    modal blocks → HEAL → "was fully healed!" → next battle; and the SKIP path → "decided to keep going!".
+  - Tests: `BattleRunnerTests` (heals once after win 3 restoring HP/PP/status; **declining** leaves the player
+    wounded/poisoned), `CoreMechanicsTests.FullHeal_*`, auto-covering `WebEventContractTests`, `timeline.test.ts`
+    (offer/heal/decline). **Deferred:** a recovery-modal **E2E** spec (needs the seeded-battle entry point to
+    reach 3 wins deterministically — same reason the replace-move modal E2E is deferred).
+- **Wild level band 50–80% of player level.** `EncounterFactory.ScaleWildLevel` replaces the old
+  `playerLevel ± 3` with a uniform pick in `[floor(0.5·L), floor(0.8·L)]`, floored at 2 — wild foes sit a step
+  below the player so the chain stays winnable while still scaling. Tests: `EncounterLevelBandTests` (band
+  bounds across levels, both ends reachable, never < 2).
+
+---
+
 ## Learnset System — Level-up move learning ✅ DONE (2026-06-11)
 
 Closes the learnset loop: on a win, when the player levels into a move on its species learnset, Battle now

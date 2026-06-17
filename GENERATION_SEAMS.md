@@ -23,7 +23,7 @@ implementations you swap in.**
 |:-----|:--------|:-----------|:------------------|
 | `ITypeChart` | The type-effectiveness matrix (Fire beats Grass, etc.) | `Gen1TypeChart` | `Gen1TypeChart.Instance` |
 | `IBattleRules` | All other battle math that varies by gen: crit formula & multiplier, damage variance, stat-stage tables, accuracy scale, freeze/thaw, sleep & binding durations, status-damage denominators, stat selection, XP formula | `Gen1BattleRules` | `Gen1BattleRules.Instance` |
-| `IStatCalculator` | Stat formulas: HP & other stats, DV/IV randomisation, Stat-Exp/EV scaling | `Gen1StatCalculator` | `Gen1StatCalculator.Instance` |
+| `IStatCalculator` | Stat formulas: HP & other stats, DV/IV randomisation, Stat-Exp/EV scaling **and award** | `Gen1StatCalculator` | `Gen1StatCalculator.Instance` |
 
 > **Not a generation seam, but related:** `IRandomSource` (see `STATE_MODEL.md` / the
 > RNG section of `TODO.md`) controls *randomness*, not generation. It's orthogonal —
@@ -99,6 +99,13 @@ The formulas that turn base stats + per-individual values into a creature's actu
 - **Gen 3+** replaces these with **IVs** (0–31, six independent) and **EVs** (capped at
   252 per stat, ÷4). A `Gen3StatCalculator` swaps the formula and the `RandomiseDvs`
   logic; nothing that *calls* the calculator changes.
+
+The *awarding* of training is on the seam too — `AwardStatExp(victor, defeated)` owns the
+gen-variable **gain rule and cap**: Gen 1 adds the defeated species' **base stats**, capped
+65535 per stat, and the gain is realized into actual stats only on the next stat recompute (a
+level-up — never mid-level); a `Gen3StatCalculator` would instead add the defeated species'
+**EV yield** under the 252/stat & 510-total caps. The call site (`Battle`'s win branch) just
+calls `AwardStatExp` and stays generation-blind.
 
 ---
 

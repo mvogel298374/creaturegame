@@ -109,6 +109,15 @@ public class Creature
     public void AddExperience(int amount) => Experience += amount;
 
     /// <summary>
+    /// Awards the Stat Exp (Gen 1) / EVs (later gens) gained for defeating <paramref name="defeated"/>,
+    /// delegating the gen-variable gain rule and cap to <see cref="StatCalculator"/>. Like Gen 1, this only
+    /// accumulates — the gain is realized into actual stats on the next <see cref="CalculateStats"/> (a
+    /// level-up), never mid-level. Call it before the win's level-up loop so a level gained this battle picks
+    /// the new training up.
+    /// </summary>
+    public void GainStatExp(Creature defeated) => StatCalculator.AwardStatExp(this, defeated);
+
+    /// <summary>
     /// Levels up once if the accumulated XP has crossed the next threshold and the cap isn't reached.
     /// Returns true if a level was gained, so a caller can loop to step through a multi-level award and
     /// observe each level's resulting stats.
@@ -156,14 +165,20 @@ public class Creature
     public int BaseSpecial { get; set; }
     public int BaseSpeed { get; set; }
 
-    // DVs (Individual Values in Gen 1: 0-15)
+    // DVs (Determinant Values) — Gen 1/2's per-individual genetic roll, each 0–15. The HP DV is NOT stored
+    // independently: it's derived from the low bits of the other four (see Gen1StatCalculator.RandomiseDvs).
+    // These are the ancestor of Gen 3+ IVs (0–31, six independent values incl. an own HP IV, and Special
+    // split into SpAtk/SpDef DV→IV). When a generation changes that shape it does so in IStatCalculator, not
+    // here — these fields stay the storage; see IStatCalculator's XML doc + TODO.md "Multi-Generation".
     public int DvHP { get; set; } = 0;
     public int DvAttack { get; set; } = 0;
     public int DvDefense { get; set; } = 0;
     public int DvSpecial { get; set; } = 0;
     public int DvSpeed { get; set; } = 0;
 
-    // Stat Exp (Effort Values in Gen 1: 0-65535)
+    // Stat Exp — Gen 1/2's training accumulator (the precursor to Gen 3+ EVs), each 0–65535. Grown by
+    // GainStatExp on a win and realized into actual stats only on the next CalculateStats (a level-up). The
+    // gain rule + cap are gen-variable and live on IStatCalculator.AwardStatExp, not here.
     public int ExpHP { get; set; } = 0;
     public int ExpAttack { get; set; } = 0;
     public int ExpDefense { get; set; } = 0;

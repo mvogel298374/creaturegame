@@ -4,86 +4,16 @@
 > [`TODO_ARCHIVE.md`](TODO_ARCHIVE.md) — read it only if you need the history of a finished item.
 > **See also:** `CLAUDE.md` (setup/commands) · `AI_CONTEXT.md` (profiles) · `DESIGN_GUIDES.md` (mechanics) · `DEV_STANDARDS.md` (conventions)
 
-**Current state (2026-06-12):** Move-coverage pass, integration-test pass, the `BattleState` facade
-migration, the whole "XP & progression" milestone, **and the Learnset System (Level-up move learning)**
-are all COMPLETE and archived in `TODO_ARCHIVE.md` — XP & Level-Up fidelity, the Endless Battle Chain, and
-now level-up move learning (auto-learn on a free slot; blocking replace-move prompt + confirm modal when the
-four slots are full; learned moves persist across the chain). **Also done (2026-06-11): the Roguelite Run
-Layer — an interactive Poké Center recovery (offer/HEAL/SKIP modal) every 3rd win + a 50–80%-of-player wild
-level band** (see the section below). Suite: **911 .NET + 54 Vitest + 18 Playwright E2E** (all green).
-**Logged 2026-06-12: a whole-repo architecture/code-smell review → `ARCHITECTURE.md` + Architecture Review #7
-(see Tech Debt). AI Move Selection ✅ shipped 2026-06-17** (intelligent-but-fallible Gen 1 enemy brain behind
-a new `IBattleAi` seam, live on the chained enemy — see the section below). **Next feature: EV Gain** (no
-prerequisites) or the Web UI polish items.
-**Update 2026-06-14: `ARCHITECTURE.md` and Review #7's higher-leverage structural items are all DONE** —
-`IMoveEffect` registry, `timeline.ts` event guard, `CG_BATTLE_LOG` debug narrator, the `CoreMechanicsTests`
-capability split (+`EffectRegistryTests`), both file renames (`AttackAction.cs`, `MovesDbContext.cs`/
-`PokemonDbContext.cs`), and the shared importer `HttpClient`. Remaining #7: only the **minor cleanups** bullet.
-**Resolved 2026-06-12:** the RNG seam is now seedable end-to-end — `BattleScenario.Seed(...)` makes every roll
-deterministic (`SeededRulesTests`) — and the deferred **double-faint-as-loss** test is landed
-(`BattleRunnerTests`). Remaining from the chain: only the *production* per-run seed at the web composition root
-(Tech Debt #3); the replace-move/recovery **modal** E2Es stay deferred until that web seed exists (the .NET
-coverage is already complete).
+**Current state (2026-06-17):** The Gen 1 battle engine is feature-complete — all 165 moves, XP & level-up,
+the Endless Battle Chain, the Roguelite recovery/encounter layer, the Learnset System, **AI move selection**
+(a gen-specific `IBattleAi` brain), and **EV / Stat-Exp gain** are all done and archived in
+[`TODO_ARCHIVE.md`](TODO_ARCHIVE.md) (read it for the history of any finished item). `ARCHITECTURE.md` +
+Architecture Review #7's higher-leverage structural items are also done (only the **minor cleanups** bullet
+remains — see Tech Debt). Suite: **917 .NET + 54 Vitest + 18 Playwright E2E** (all green).
 
----
-
-## AI Move Selection — ✅ (2026-06-17)
-
-**Prerequisite:** Learnset System (so AI evaluates moves the Pokémon can actually learn) — done.
-
-Shipped an intelligent-but-fallible Gen 1 enemy brain behind a new generation/game-specific seam, **live**
-on the chained enemy (`GameSessionManager` now uses `new AiBattleInput(new Gen1TrainerAi())` instead of the
-old uniform-random `RandomMoveInput`). Per the brief: smarter than random, but keeps Gen 1 quirks /
-bad decision-making rather than being a perfect optimiser.
-
-**Architecture (two seams + an adapter):**
-- **`IBattleAi`** (new) — the gen/game-specific *brain*: `ChooseMove(candidates, TurnContext)`. Split from
-  `IBattleInput` (the I/O plumbing) so brains (wild/trainer/gym/future-gen) and plumbing vary independently.
-- **`AiBattleInput : IBattleInput`** — thin adapter hosting any brain; owns the candidate filter (PP>0, not
-  Disabled). `RandomMoveInput` stays available as the trivial wild-tier brain.
-- **`IMoveEvaluator`** building blocks (gen-agnostic, score one dimension each), combined by
-  `CompositeEvaluator` (weighted sum = "personality"):
-  - [x] `DamageEvaluator` — expected-damage fraction of target HP (KO scores >1), discounted by accuracy;
-    handles every `DamageCategory`. Uses the new deterministic `DamageCalculator.EstimateDamage`.
-  - [x] `TypeEffectivenessEvaluator` — log-scale bonus for super-effective, penalty for resisted, hard
-    penalty for 0× (the authentic Gen 1 "encourage SE / discourage NVE" lean).
-  - [x] `StatStageMoveEvaluator` — values self-buff/foe-debuff by remaining headroom; penalises a maxed stat.
-  - [x] `StatusMoveEvaluator` — values a fresh status by severity; redundant if foe already statused or
-    type-immune (immunity routed through the authoritative `IBattleRules.CanReceiveStatus` seam — **not**
-    an inline guess; a seam-audit blocker on the first pass was a wrong inline Ice→Freeze immunity).
-  - [x] `CompositeEvaluator` — default mix: damage 1.0, type 0.6, stat-stage 0.5, status 0.6.
-- **`Gen1TrainerAi : IBattleAi`** — scores candidates with the composite evaluator then picks
-  *probabilistically* via a softmax over scores (not argmax). An `intelligence` knob (0 = near-random,
-  1 = near-greedy, default 0.7) maps to the softmax temperature, so trainer tiers are one number. The
-  fallible pick **is** the "keep some Gen 1 bad decision-making"; the Gen 1 quirks (encourage type
-  advantage, discourage redundant status) live in the evaluators. Replaces the planned separate
-  `GreedyAIInput`/`WeightedAIInput` — both are just temperature settings on one brain.
-
-**Engine support:** `DamageCalculator` refactored to extract a private no-RNG `ComputeDamage` core shared by
-the live `CalculateDamage` (rolls crit+variance) and the new `EstimateDamage` (deterministic, AI-only) — a
-behavior-preserving extraction, pinned by `Estimate_MatchesLiveCalcWithNoCritAndNoVariance`.
-
-**Tests:** `Unit/MoveEvaluatorTests` (per-dimension scoring) + `Unit/BattleAiTests` (greedy/fallible
-selection, single/empty candidates, adapter filtering, `EstimateDamage` parity). Suite 888 → **911 .NET**.
-
-**Audit:** `/audit` run; seam-reviewer BLOCK (wrong inline Gen-1 status immunity) fixed by routing through
-`IBattleRules.CanReceiveStatus` + a guarding `Status_FreezeIsValuedAgainstAnIceFoe` test. Deferred advisory:
-`DamageEvaluator` normalises accuracy as `Accuracy/100.0` rather than the engine's 0–255 `GetHitThreshold`
-model — a pure ranking heuristic (stages cancel in relative ranking), not a seam break.
-
-**Future tiers (not needed yet):** distinct trainer-class weight vectors / `intelligence` values
-(wild < trainer < gym); revert the *wild* enemy to `RandomMoveInput` once explicit trainer battles exist
-(today the chain's wild foes deliberately use the smarter brain per the brief).
-
----
-
-## EV Gain (Effort Values)
-
-No prerequisites. All `ExpHP/Attack/Defense/Special/Speed` fields exist on `Creature` but are never written.
-
-- [ ] After awarding XP in `Battle.StartFightAsync`, add fainted enemy's base stats to player's corresponding
-  `Exp*` fields; cap each at 65535 (Gen 1 has no per-stat cap); call `CalculateStats()` immediately
-- [ ] No new battle event required (Gen 1 is silent about EVs)
+**Next:** Web UI polish, then the Catch Mechanic / Game-Loop layer (party, save, evolution). The one loose end
+from the RNG work is the *production* per-run seed at the web composition root (Tech Debt #3); the
+recovery/replace-move **modal** E2Es stay deferred until that exists.
 
 ---
 
@@ -150,38 +80,6 @@ Deferred until Phaser animations exist — the mechanic needs a throw/shake/catc
 - [ ] `PokemonSpecies.CatchRate` already imported ✓
 - [ ] `CaptureAttempted(string TargetName, bool Caught)` battle event
 - [ ] `BattleEnded` variant: `reason: "Caught"`
-
----
-
-## Roguelite Run Layer — Recovery & Encounter Scaling ✅ (2026-06-11)
-
-Two run-layer features on top of the Endless Battle Chain. Both are **run/game-loop concerns, not battle
-mechanics**, so they stay in the run orchestrator (`BattleRunner`) / web encounter builder (`EncounterFactory`)
-and are *not* behind an `IBattleRules` seam — `/audit` §5.0 clears them (no new engine magic numbers, no gen
-checks, full heal + level band are generation-invariant choices).
-
-- [x] **Poké Center recovery every 3rd win — an interactive game-loop step.** After every 3rd chained win the
-  player is *offered* a full restore before the next encounter; it's its own blocking node in the loop, not a
-  silent auto-heal. `Creature.FullHeal()` does the restore (HP→max, all PP→max, major status cleared, Toxic
-  counter reset) — matches the Gen 1 Poké Center exactly (HP + PP + status, unconditional/free), identical in
-  every generation, so it's ordinary engine logic, not a seam. Interval is `BattleRunner.healEveryNBattles`
-  (default 3, 0 disables).
-  - **Blocking choice** reuses the move-replacement plumbing: `IBattleInput.ConfirmRecoveryAsync` (default
-    accepts, so AI/headless never block) ↔ hub `RespondRecovery` ↔ `SignalRInput` TCS. `BattleRunner` emits
-    `RecoveryOffered(name, speciesId, battlesWon)` then awaits the choice; on accept → `FullHeal` +
-    `PlayerRecovered`, on skip → `RecoveryDeclined` (status still carries). All three events mapped in both
-    emitters + `timeline.ts`.
-  - **UI:** in-page `RecoveryModal` (BattleScreen) shows the player's creature sprite with a CSS heal-glow and a
-    single **HEAL / SKIP** press that both decides and advances the chain. Verified live (Puppeteer): offer →
-    modal blocks → HEAL → "was fully healed!" → next battle; and the SKIP path → "decided to keep going!".
-  - Tests: `BattleRunnerTests` (heals once after win 3 restoring HP/PP/status; **declining** leaves the player
-    wounded/poisoned), `CoreMechanicsTests.FullHeal_*`, auto-covering `WebEventContractTests`, `timeline.test.ts`
-    (offer/heal/decline). **Deferred:** a recovery-modal **E2E** spec (needs the seeded-battle entry point to
-    reach 3 wins deterministically — same reason the replace-move modal E2E is deferred).
-- [x] **Wild level band 50–80% of player level.** `EncounterFactory.ScaleWildLevel` replaces the old
-  `playerLevel ± 3` with a uniform pick in `[floor(0.5·L), floor(0.8·L)]`, floored at 2 — wild foes sit a step
-  below the player so the chain stays winnable while still scaling. Tests: `EncounterLevelBandTests` (band
-  bounds across levels, both ends reachable, never < 2).
 
 ---
 
