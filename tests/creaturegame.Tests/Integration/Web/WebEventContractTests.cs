@@ -120,6 +120,46 @@ public class WebEventContractTests
         Assert.True(stab.GetBoolean());
     }
 
+    /// <summary>Same projection guard for <see cref="MoveInfo.Effectiveness"/> — the ×N effectiveness pill
+    /// can't render if the field is dropped on the wire (the failure mode the STAB flag hit).</summary>
+    [Fact]
+    public void TurnStarted_MoveProjection_CarriesEffectiveness()
+    {
+        var move = new MoveInfo(
+            "flamethrower",
+            DamageType.Fire,
+            15,
+            15,
+            Disabled: false,
+            Stab: false,
+            Effectiveness: 2.0
+        );
+        var evt = new TurnStarted(
+            1,
+            "PLAYER",
+            100,
+            100,
+            StatusCondition.None,
+            0,
+            100,
+            "ENEMY",
+            80,
+            80,
+            StatusCondition.None,
+            new[] { move }
+        );
+
+        var (_, payload) = SignalRBattleEventEmitter.MapEvent(evt);
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+        var firstMove = doc.RootElement.GetProperty("Moves")[0];
+
+        Assert.True(
+            firstMove.TryGetProperty("Effectiveness", out var eff),
+            $"TurnStarted move projection dropped the Effectiveness field — the move menu can't show the ×N pill. Payload: {doc.RootElement}"
+        );
+        Assert.Equal(2.0, eff.GetDouble());
+    }
+
     // Concrete (non-abstract) BattleEvent subtypes — the exact set the engine can emit to the client.
     private static List<Type> ConcreteBattleEventTypes()
     {

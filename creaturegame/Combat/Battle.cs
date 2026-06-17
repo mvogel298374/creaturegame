@@ -96,7 +96,17 @@ public class Battle
                                 && (
                                     PlayerCreature.Type1 == m.Base.DamageType
                                     || PlayerCreature.Type2 == m.Base.DamageType
+                                ),
+                            // Type effectiveness vs the live enemy, via the active type chart — damaging moves
+                            // only (fixed-damage/status moves ignore the chart, so they report neutral 1.0).
+                            m.Base.BaseDamage > 0
+                                ? DamageCalculator.GetTypeEffectiveness(
+                                    m.Base.DamageType,
+                                    EnemyCreature.Type1,
+                                    EnemyCreature.Type2,
+                                    _typeChart
                                 )
+                                : 1.0
                         ))
                         .ToList()
                 )

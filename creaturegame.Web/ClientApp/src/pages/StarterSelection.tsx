@@ -4,6 +4,17 @@ import { TypeBadge } from '../components/TypeBadge';
 import type { Species } from '../types/Species';
 import './StarterSelection.css';
 
+// fetch() rejects with a TypeError (e.g. "NetworkError when attempting to fetch resource") when the server
+// is unreachable — backend not running, port closed, or the connection dropped. Turn that (and HTTP error
+// statuses) into a message that points at the real problem instead of dumping the raw exception.
+function friendlyFetchError(e: unknown): string {
+  if (e instanceof TypeError)
+    return "Couldn't reach the game server. Make sure the backend is running, then reload.";
+  if (e instanceof Error && e.message.startsWith('HTTP '))
+    return `The game server returned an error (${e.message}). Please try again.`;
+  return e instanceof Error ? e.message : String(e);
+}
+
 export function StarterSelection() {
   const nav = useNavigate();
   const [species, setSpecies]   = useState<Species[]>([]);
@@ -17,9 +28,9 @@ export function StarterSelection() {
 
   useEffect(() => {
     fetch('/api/species')
-      .then(r => { if (!r.ok) throw new Error(`${r.status}`); return r.json(); })
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
       .then((data: Species[]) => { setSpecies(data); setFiltered(data); setLoading(false); })
-      .catch(e => { setError(String(e)); setLoading(false); });
+      .catch(e => { setError(friendlyFetchError(e)); setLoading(false); });
   }, []);
 
   useEffect(() => {
@@ -29,13 +40,18 @@ export function StarterSelection() {
 
   const confirm = async () => {
     if (!selected) return;
-    const res = await fetch('/api/game/start', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ speciesId: selected.id, level: levelChoice }),
-    });
-    const { gameId } = await res.json() as { gameId: string };
-    nav('/battle', { state: { species: selected, gameId, level: levelChoice } });
+    try {
+      const res = await fetch('/api/game/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ speciesId: selected.id, level: levelChoice }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const { gameId } = await res.json() as { gameId: string };
+      nav('/battle', { state: { species: selected, gameId, level: levelChoice } });
+    } catch (e) {
+      setError(friendlyFetchError(e));
+    }
   };
 
   return (
@@ -65,7 +81,7 @@ export function StarterSelection() {
 
       <main className="select-main">
         {loading && <p className="text-muted" style={{ padding: 'var(--sp-xl)' }}>Loading…</p>}
-        {error   && <p className="text-muted" style={{ padding: 'var(--sp-xl)', color: 'var(--clr-accent)' }}>Error: {error}</p>}
+        {error   && <p className="text-muted" style={{ padding: 'var(--sp-xl)', color: 'var(--clr-accent)' }}>{error}</p>}
         {!loading && !error && filtered.length === 0 && (
           <p className="text-muted" style={{ padding: 'var(--sp-xl)' }}>No results for "{search}"</p>
         )}

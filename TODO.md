@@ -7,14 +7,15 @@
 **Current state (2026-06-17):** The Gen 1 battle engine is feature-complete — all 165 moves, XP & level-up,
 the Endless Battle Chain, the Roguelite recovery/encounter layer, the Learnset System, **AI move selection**
 (a gen-specific `IBattleAi` brain), and **EV / Stat-Exp gain** are all done and archived in
-[`TODO_ARCHIVE.md`](TODO_ARCHIVE.md) (read it for the history of any finished item). `ARCHITECTURE.md` +
-Architecture Review #7's higher-leverage structural items are also done (only the **minor cleanups** bullet
-remains — see Tech Debt). Suite: **917 .NET + 54 Vitest + 18 Playwright E2E** (all green).
+[`TODO_ARCHIVE.md`](TODO_ARCHIVE.md) (read it for the history of any finished item). `ARCHITECTURE.md`, the RNG
+**per-run web seed** (Tech Debt #3), and Architecture Review #7's higher-leverage structural items are also
+done (only the **minor cleanups** bullet remains — see Tech Debt). A round of **Web UI polish** also landed —
+STAB indicator, per-move effectiveness pill, colour-coded battle log, friendlier connection-error message (all
+archived). Suite: **930 .NET + 55 Vitest + 19 Playwright E2E** (all green).
 
-**Next:** Web UI polish, then the Catch Mechanic / Game-Loop layer (party, save, evolution). The RNG seam is
-now fully closed — the web composition root seeds each run end-to-end (Tech Debt #3, done 2026-06-17), so the
-recovery/replace-move **modal** E2Es are unblocked (pass a fixed `seed` in the `start` request for a
-deterministic run).
+**Next:** More Web UI polish (Pokémon overview screen, sprite-shake on damage), then the Catch Mechanic /
+Game-Loop layer (party, save, evolution). The recovery/replace-move **modal** E2Es are unblocked now the
+per-run seed exists (pass a fixed `seed` in the `start` request for a deterministic run).
 
 ---
 
@@ -22,28 +23,13 @@ deterministic run).
 
 Stack: React 18 + TypeScript + SignalR + Phaser 3. (Phaser canvas & core animations ✅ done — see archive.)
 
+> Done UI-polish items (level-up toast, STAB indicator, per-move effectiveness pill, colour-coded battle log,
+> friendlier connection-error message) are archived under **Web UI Polish pass (2026-06-17)** in `TODO_ARCHIVE.md`.
+
 - [ ] `BattleEndedOverlay` — **superseded by the Endless Battle Chain's `RunEnded` game-over screen** (a
   per-`BattleEnded` overlay no longer fits an endless chain); build it there, run-scoped, not per battle
-- [x] Level-up notification toast — Gen 1 stat-gain panel (HP/ATTACK/DEFENSE/SPECIAL/SPEED with +gains and
-  new totals) on `LeveledUp`. Engine sends per-stat `StatGains` (before/after `TryLevelUp` delta). **Polish
-  (2026-06-10):** plays the level-up fanfare (`playLevelUpSound` bridge → `Audio.playLevelUp`), and the
-  panel no longer auto-hides — it sits bottom-right above the battle menu and stays until the player's next
-  input (`useBattleHub.dismissLevelUp`).
 - [ ] **Pokémon overview screen** — a better, richer creature-overview view (stats, types, moveset/PP,
   level/XP, status) than the current battle nameplates expose; surfaced between battles / on demand
-- [x] Move menu STAB indicator — subtle highlight on moves matching player's type. **DONE 2026-06-17.**
-  The engine computes STAB per move on `TurnStarted` (`MoveInfo.Stab` = damaging move whose type matches the
-  user's *current* type — correct under Conversion/Transform, mirrors the `DamageCalculator` condition); the
-  move menu renders a gold left-edge accent + a small `STAB` corner tag (`move-btn--stab`). **Coverage spans
-  all three layers** after a verification miss: engine (`MoveInfoStabTests`, single + dual type), the SignalR
-  wire (`WebEventContractTests.TurnStarted_MoveProjection_CarriesStabFlag` — the projection hand-maps moves to
-  an anonymous object and had *dropped* the flag, so it never reached the client), and the client render
-  (`e2e/battle-ui-cues.spec.ts` — Charizard's deterministic L50 moveset flags FLAMETHROWER, not SCRATCH).
-  Suite 919 → 922 .NET + 18 → 19 E2E.
-- [x] Color-coded effectiveness in battle log (super-effective green, not very effective grey, no effect red).
-  **DONE 2026-06-17.** `DamageDealt` tags its log line with a `LogTone` (`super`/`weak`/`immune`) carried
-  through the `LOG` action → `LogEntry` → a `log-line--{tone}` CSS class; neutral hits stay the default colour.
-  Guarded by a `timeline.test.ts` tone test. Vitest 54 → 55.
 - [ ] Sprite shake tween on damage received
 - [ ] `ConsoleInput : IBattleInput` — numbered move menu for terminal play (low priority)
 
@@ -192,71 +178,23 @@ moving target.
 > Done items (Architecture Review #1/#2/#4/#5/#6, the #6a lock-in abstraction, the `BattleState` facade
 > migration, flaky-test sweep, struct→class, DI, RNG seam, etc.) are in [`TODO_ARCHIVE.md`](TODO_ARCHIVE.md).
 
-- [x] **RNG seam — web run-seed wired (Architecture Review #3). DONE 2026-06-17.** The core library already
-  had no direct `Random.Shared`; the remaining leak was the **web composition root** building runs unseeded.
-  Fixed: `GameController.Start` picks one seed per run (client may supply `StartGameRequest.Seed`; otherwise a
-  random int, logged + returned as `{ gameId, seed }`), constructs a single `SeededRandomSource`, and threads
-  that one instance through the whole run — player + every enemy's construction (`EncounterFactory` now seeds
-  `Gen1StatCalculator` for DVs and passes the source to `LearnsetMoveSelector`/`PickByBst`/`ScaleWildLevel`),
-  the battle (`BattleRunner` `rng`), and the AI (`Gen1TrainerAi` `rng`). The run is single-threaded so one
-  shared stream is deterministic. Proven by `RunSeedReproducibilityTests` (same seed → identical player and
-  identical enemy: species, level, DVs, moveset). Suite 917 → **919 .NET**. *(Optional, still open: the
-  `AlwaysHit/AlwaysCrit` rule shims could be replaced by seeded sources — low priority.)*
-  - [x] **Rules-RNG seedable (fixed 2026-06-12).** `DelegatingBattleRules`/`ScriptableRules` now delegate to a
-    *seedable* inner `Gen1BattleRules`, and `BattleScenario.Seed(...)` makes EVERY roll deterministic —
-    including the rules' previously-global `Roll*` draws (the old Disable/double-faint test-order flakiness).
-    Proven by `SeededRulesTests`. **Closed — do not re-file "Roll*/Roll*Turns draws ignore the battle seed."**
+- [ ] **RNG seam — only an optional test shim remains.** The per-run web seed (Architecture Review #3,
+  2026-06-17), the rules-RNG seeding (2026-06-12), and the engine `IRandomSource` thread are all closed and
+  archived (see **Web UI Polish + per-run seed pass** in `TODO_ARCHIVE.md`). *Optional, low priority:* replace
+  the `AlwaysHit`/`AlwaysCrit` rule shims with seeded `IRandomSource`s. **Do not re-file** "web composition
+  root builds runs unseeded" or "Roll*/Roll*Turns draws ignore the battle seed" — both closed.
 
-- [ ] **Architecture / decision-log doc (`ARCHITECTURE.md`) — NEXT UP (start here).** Capture the *why*
-  behind the two-DB split, the event-sourced engine + emitter pattern, the three seams and the "never branch
-  on generation" rule, the web session/SignalR + reconnect-grace flow, and the import-vs-runtime boundary.
-  Cross-link from `CLAUDE.md`'s Key Files table. It should *point to* — not restate — the existing
-  requirements/lookup docs: `GENERATION_SEAMS.md` (the seam contract + §5.0 checklist), `GEN_DIFFERENCES.md`
-  and `GAME_AVAILABILITY.md` (Gen-1 mechanic / game-version requirements references, consulted loosely when
-  filling a seam, since the seam check is the real gate). Several existing docs shrink once this exists to
-  link to. See **Architecture Review #7** below for the structural debt this doc will reference.
+- [x] **Architecture / decision-log doc (`ARCHITECTURE.md`) — DONE.** Documents the two-DB split, the
+  event-sourced engine + emitter pattern, the three seams + "never branch on generation" rule, the web
+  session/SignalR + reconnect-grace flow, and the import-vs-runtime boundary; cross-linked from `CLAUDE.md`'s
+  Key Files table (kept in sync this session — §2.10 RNG per-run seed).
 
-- [ ] **Architecture Review #7 — whole-repo code-smell pass (2026-06-12).** Ordered by leverage. None are
-  correctness bugs — the engine, the three seams, and the no-facade `BattleState` reset trick are all sound;
-  this is about the two or three files that concentrate all the complexity not becoming change-risky as Gen 2
-  and AI move-selection land. `ARCHITECTURE.md` (above) is the first task and should cross-link these.
-  - [x] **`AttackAction` god-object → `IMoveEffect` registry (highest leverage). DONE 2026-06-13** — moved
-    to `TODO_ARCHIVE.md` (Tech-Debt cleanups). The ~320-line effect switch now lives behind an `IMoveEffect`
-    registry in `Combat/MoveEffects.cs`, mirroring `ILockInMechanic`; file renamed to `AttackAction.cs`.
-  - [x] **`timeline.ts` event-coverage guard. DONE 2026-06-13.** The TS leg of the 3-way event map was the
-    one unguarded by a contract test — a new `BattleEvent` would silently fall through `expandEvent`'s
-    `default: {}` and never render. Added `WebEventContractTests.EveryBattleEventHasATimelineArm`: it reflects
-    over every concrete `BattleEvent` (the same drift-proof source as the existing SignalR-leg test) and
-    asserts each has a `case '<Name>'` arm in `timeline.ts` (located via `[CallerFilePath]`, read as text —
-    no codegen, single source of truth = backend reflection). Verified it fails-and-names the event when an
-    arm is removed. Suite 867 → **868 .NET**.
-  - [x] **Re-scope `ConsoleBattleEventEmitter` as a documented debug narrator. DONE 2026-06-14.** Decision:
-    *keep* it (it's a deliberate dev aid — narrates a battle to stdout in Gen 1 flavour text for watching a
-    unit test play out), but fix the "spams stdout no one reads" problem by gating output on the
-    `CG_BATTLE_LOG` env var — **silent by default**, so the ~30 `CoreMechanicsTests` sites that pass it as
-    their emitter stay quiet on a normal run with zero call-site churn. Set `$env:CG_BATTLE_LOG=1` (filtered
-    to a small test set) to watch a battle narrate. Documented on the class (XML-doc) + `AI_CONTEXT.md`
-    → Tooling. **No coverage guard** — unlike the client `timeline.ts` leg (a miss there = a real render
-    bug), a missing case in a debug narrator is just one fewer line, so the rot-guard isn't worth it here.
-  - [x] **Split `CoreMechanicsTests.cs` by capability. DONE 2026-06-14.** The 3144-line single class (120
-    tests + 2 nested rules-doubles across 14 `// ──` regions) is split into 13 capability files under `Unit/`
-    — `StatCalculationTests`, `ExperienceAndLevelingTests`, `DamageCalculationTests`, `TypeChartTests`,
-    `StatStageTests`, `TurnOrderTests`, `AccuracyAndCritTests`, `StatusConditionTests`, `MoveExecutionTests`,
-    `MetronomeTests`, `MovesetAndPpTests`, `AttributesAndRulesTests`, `EncounterSelectorTests` — matching the
-    Integration suite's per-capability layout and our "group by capability, not batch" rule. Behaviour-identical
-    (test count held at 868 across the move). **Quick-win coverage added** while here: `EffectRegistryTests`
-    (+20) pins both effect-strategy registries (`MoveEffects` + `LockInMechanics`) — round-trip, unique keys,
-    null-for-effects-handled-elsewhere, and the deliberate Binding-only overlap. Suite 868 → **888 .NET**.
-  - [x] **Filename ≠ contained type (renames). DONE 2026-06-14.** ~~`IBattleAction.cs` → `AttackAction.cs`~~ ✅
-    (done with the `IMoveEffect` extraction — interface split into its own `IBattleAction.cs`).
-    ~~`GameDbContext.cs` (held `MovesDbContext` + `PokemonDbContext`, no `GameDbContext` type)~~ ✅ split into
-    `DB/MovesDbContext.cs` + `DB/PokemonDbContext.cs`, one file per context. Pure navigation friction, no
-    behaviour change — build green, 888 tests unaffected. Docs (`ARCHITECTURE.md §2.5`, `README.md`) updated.
-  - [x] **Importer `new HttpClient()` per request. DONE 2026-06-14.** All six per-call/per-pass
-    `new HttpClient()` sites (`MoveImport`/`PokemonImport` Fetch* — the worst, ~165× in a loop — plus the
-    sprite/cry downloaders) now share one process-wide `PokeApiHttp.Client` (static, never disposed, carries
-    the raw.githubusercontent User-Agent). Kills the socket-exhaustion antipattern. Verified by a full
-    PokeApiConnector run: both imports + sprites + cries complete cleanly with no socket errors (exit 0).
+- [ ] **Architecture Review #7 — only "Minor cleanups" remains.** The higher-leverage structural items are
+  all done (2026-06-13/14) and archived in `TODO_ARCHIVE.md`: `AttackAction` god-object → `IMoveEffect`
+  registry, the `timeline.ts` event-coverage guard, the `ConsoleBattleEventEmitter` debug-narrator re-scope,
+  the `CoreMechanicsTests` split-by-capability (+`EffectRegistryTests`), the filename≠type renames, and the
+  importer's shared `HttpClient`. None were correctness bugs — the goal was keeping the few
+  complexity-concentrating files change-safe as Gen 2 lands. Remaining:
   - [ ] **Minor cleanups.** Drop the legacy `out`-less `DamageCalculator.CalculateDamage` overload if only
     tests use it; dedupe the repeated `_rng.Next(1, 101)` secondary-roll idiom (written as both `> chance`
     and `<= chance` in the same file) behind a `rules.SecondaryHits(...)` helper; name the magic move IDs in

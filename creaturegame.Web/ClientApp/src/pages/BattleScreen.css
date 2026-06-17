@@ -377,6 +377,7 @@
 }
 
 .move-btn {
+  position: relative; /* anchors the absolute STAB tag + effectiveness pill */
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -430,7 +431,6 @@
 /* STAB (Same-Type Attack Bonus): a subtle gold left-edge accent + faint tint, plus a small corner tag.
    Damaging moves matching the player's type — flagged by the engine (MoveInfo.stab). */
 .move-btn--stab {
-  position: relative;
   border-left-color: #f0c674;
   border-left-width: 4px;
   background: rgba(240, 198, 116, 0.07);
@@ -452,6 +452,42 @@
   padding: 0 3px;
   border-radius: 2px;
   line-height: 1.4;
+}
+
+/* Type-effectiveness pill: ×N multiplier vs the current enemy, bottom-right corner. Colour-graded
+   super (green) → resisted (amber/orange) → no-effect (red). Shown only for non-neutral matchups. */
+.move-eff {
+  position: absolute;
+  bottom: 3px;
+  right: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #16140f;
+  padding: 0 4px;
+  border-radius: 2px;
+  line-height: 1.45;
+}
+
+.move-eff--x4 {
+  background: #5fd068;
+}
+
+.move-eff--x2 {
+  background: #4caf50;
+}
+
+.move-eff--half {
+  background: #d8a657;
+}
+
+.move-eff--quarter {
+  background: #e0883c;
+}
+
+.move-eff--zero {
+  background: #e5533c;
+  color: #fff;
 }
 
 /* ── Action btn waiting state ────────────────── */

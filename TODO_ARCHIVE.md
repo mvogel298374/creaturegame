@@ -8,6 +8,56 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Web UI Polish + Per-Run Web Seed ✅ DONE (2026-06-17)
+
+A polish pass over the battle UI plus the final RNG-seam closure. Three of the move-menu/log cues share one
+pattern — the engine computes the fact and ships it on `TurnStarted`/`DamageDealt`; the client only renders —
+and one recurring trap surfaced (SignalR projection silently dropping new fields).
+
+**Per-run web seed (Architecture Review #3 / Tech Debt #3).** The core was already seedable (`IRandomSource`
+threaded through engine + rules; `BattleScenario.Seed`); the leak was the web composition root building runs
+unseeded. `GameController.Start` now picks one seed per run (client may supply `StartGameRequest.Seed`, else a
+random int — logged + returned as `{ gameId, seed }`) and threads a single `SeededRandomSource` through the
+whole run: player + every enemy's construction (`EncounterFactory` seeds `Gen1StatCalculator` for DVs and
+passes the source to `LearnsetMoveSelector`/`PickByBst`/`ScaleWildLevel`), the battle (`BattleRunner`), and the
+AI (`Gen1TrainerAi`). One shared instance is safe — the run is single-threaded. Proven by
+`RunSeedReproducibilityTests` (same seed → identical player + enemy: species, level, DVs, moveset). Unblocks
+the deferred recovery/replace-move modal E2Es (pass a fixed seed). Docs: `ARCHITECTURE.md §2.10`,
+`GAME_LOOP.md §4`. (Earlier rules-RNG seeding, 2026-06-12, already closed the `Roll*` flakiness.)
+
+**Move-menu STAB indicator.** `MoveInfo.Stab` on `TurnStarted` = damaging move whose type matches the user's
+*current* type (computed engine-side, so it's correct under Conversion/Transform; mirrors the
+`DamageCalculator` STAB condition). Renders as a gold left-edge accent + a `STAB` corner pill. Tests:
+`MoveInfoStabTests` (single + dual type; status/off-type excluded), `e2e/battle-ui-cues.spec.ts` (deterministic
+on Charizard's L50 set).
+
+**Move-menu effectiveness pill.** `MoveInfo.Effectiveness` = the move's type multiplier vs the *current* enemy
+(product over the enemy's types via the active `ITypeChart`; damaging moves only — fixed-damage/status report
+neutral 1.0). Renders bottom-right (opposite STAB) as a colour-graded ×N pill: ×4/×2 green, ×0.5/×0.25
+amber/orange, ×0 red; neutral 1× hidden. Decimal labels (×0.5) chosen over vulgar-fraction glyphs (½) — the
+pixel font renders the fractions too small. Tests: `MoveInfoEffectivenessTests` (incl. dual-type ×4/×0.25 and
+0× immunity).
+
+**Colour-coded battle log.** `DamageDealt` tags its log line with a `LogTone` (`super`/`weak`/`immune`),
+carried via the `LOG` action → `LogEntry` → a `log-line--{tone}` class (green / muted / red); neutral hits keep
+the default colour. Test: `timeline.test.ts` tone arm.
+
+**Recurring trap — SignalR projection drops new fields.** `SignalRBattleEventEmitter.MapEvent` hand-maps each
+event (and nested `MoveInfo`) into an anonymous object; the STAB flag passed its engine test but never rendered
+because the projection didn't forward it. Fix: forward the field + a field-level guard
+(`WebEventContractTests.TurnStarted_MoveProjection_Carries{Stab,Effectiveness}`) — the reflection contract test
+can't catch this (it builds events with empty move lists). Captured in the `web-event-field-projection-gap`
+memory.
+
+**Friendlier connection error.** `StarterSelection.tsx` maps a failed fetch (the `TypeError: NetworkError…`
+case) to "Couldn't reach the game server. Make sure the backend is running, then reload." (HTTP-status errors
+get their own message), and the start-game fetch gained the `try/catch` it was missing.
+
+**Earlier move-menu polish (2026-06-10):** level-up stat-gain panel on `LeveledUp` (per-stat `StatGains`,
+fanfare, stays until next input). Suite across the pass: 917 → **930 .NET**, 54 → **55 Vitest**, 18 → **19 E2E**.
+
+---
+
 ## EV Gain (Stat Experience) ✅ DONE (2026-06-17)
 
 Gen 1 "EVs" = **Stat Experience**: a win adds the defeated foe's base stats to the player's `Exp*` (the

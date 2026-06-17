@@ -329,6 +329,20 @@ function ActionMenu({ playerName, canFight, battleEnded, battlesWon, finalLevel,
   );
 }
 
+// The ×N type-effectiveness pill for a move vs the current enemy. Neutral (1×) and non-damaging moves
+// (effectiveness 1) show nothing — the engine sends 1.0 for both. Gen 1 multipliers are exact in IEEE-754
+// (0, ¼, ½, 1, 2, 4), so direct equality is safe.
+function effectivenessPill(eff: number | undefined): { label: string; cls: string } | null {
+  switch (eff) {
+    case 4:    return { label: '×4', cls: 'move-eff--x4' };
+    case 2:    return { label: '×2', cls: 'move-eff--x2' };
+    case 0.5:  return { label: '×0.5', cls: 'move-eff--half' };
+    case 0.25: return { label: '×0.25', cls: 'move-eff--quarter' };
+    case 0:    return { label: '×0', cls: 'move-eff--zero' };
+    default:   return null; // 1× neutral, non-damaging, or undefined → no pill
+  }
+}
+
 function MoveMenu({ moves, canChoose, onChoose, onBack }: {
   moves: MoveInfo[];
   canChoose: boolean;
@@ -347,13 +361,13 @@ function MoveMenu({ moves, canChoose, onChoose, onBack }: {
           const isDisabled = !isEmpty && !!move.disabled;   // locked out by Disable
           const disabled = !canChoose || isEmpty || outOfPp || isDisabled;
           const isStab = !isEmpty && !!move.stab;            // same-type damaging move → STAB bonus
+          const eff = isEmpty ? null : effectivenessPill(move.effectiveness); // type matchup vs enemy
           return (
             <button
               key={i}
               className={`move-btn ${disabled ? 'move-btn--disabled' : ''} ${isStab ? 'move-btn--stab' : ''}`}
               disabled={disabled}
               onClick={() => onChoose(i)}
-              title={isStab ? 'Same-Type Attack Bonus (1.5× damage)' : undefined}
             >
               <span className="move-name">{formatMoveName(move.name)}</span>
               {!isEmpty && (
@@ -363,6 +377,11 @@ function MoveMenu({ moves, canChoose, onChoose, onBack }: {
               )}
               {!isEmpty && <TypeBadge type={move.type} size="sm" />}
               {isStab && <span className="move-stab" aria-label="STAB">STAB</span>}
+              {eff && (
+                <span className={`move-eff ${eff.cls}`} aria-label={`effectiveness ${eff.label}`}>
+                  {eff.label}
+                </span>
+              )}
             </button>
           );
         })}
