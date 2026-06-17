@@ -10,9 +10,11 @@ are all COMPLETE and archived in `TODO_ARCHIVE.md` — XP & Level-Up fidelity, t
 now level-up move learning (auto-learn on a free slot; blocking replace-move prompt + confirm modal when the
 four slots are full; learned moves persist across the chain). **Also done (2026-06-11): the Roguelite Run
 Layer — an interactive Poké Center recovery (offer/HEAL/SKIP modal) every 3rd win + a 50–80%-of-player wild
-level band** (see the section below). Suite: **888 .NET + 54 Vitest + 18 Playwright E2E** (all green).
+level band** (see the section below). Suite: **911 .NET + 54 Vitest + 18 Playwright E2E** (all green).
 **Logged 2026-06-12: a whole-repo architecture/code-smell review → `ARCHITECTURE.md` + Architecture Review #7
-(see Tech Debt). Next feature: AI Move Selection** (unblocked — Learnset System was its prerequisite).
+(see Tech Debt). AI Move Selection ✅ shipped 2026-06-17** (intelligent-but-fallible Gen 1 enemy brain behind
+a new `IBattleAi` seam, live on the chained enemy — see the section below). **Next feature: EV Gain** (no
+prerequisites) or the Web UI polish items.
 **Update 2026-06-14: `ARCHITECTURE.md` and Review #7's higher-leverage structural items are all DONE** —
 `IMoveEffect` registry, `timeline.ts` event guard, `CG_BATTLE_LOG` debug narrator, the `CoreMechanicsTests`
 capability split (+`EffectRegistryTests`), both file renames (`AttackAction.cs`, `MovesDbContext.cs`/
@@ -25,28 +27,53 @@ coverage is already complete).
 
 ---
 
-## AI Move Selection — NEXT UP
+## AI Move Selection — ✅ (2026-06-17)
 
-**Prerequisite:** Learnset System (so AI evaluates moves the Pokémon can actually learn).
+**Prerequisite:** Learnset System (so AI evaluates moves the Pokémon can actually learn) — done.
 
-`IBattleInput` is the seam. AI scores available moves via `IMoveEvaluator` and picks using a selection
-strategy. (`RandomMoveInput` ✅ already wired as the default enemy input — see archive. The evaluator-driven
-tiers below are pending.)
+Shipped an intelligent-but-fallible Gen 1 enemy brain behind a new generation/game-specific seam, **live**
+on the chained enemy (`GameSessionManager` now uses `new AiBattleInput(new Gen1TrainerAi())` instead of the
+old uniform-random `RandomMoveInput`). Per the brief: smarter than random, but keeps Gen 1 quirks /
+bad decision-making rather than being a perfect optimiser.
 
-**Evaluator dimensions:** expected damage (power × type eff × STAB × stat ratio); type-effectiveness bonus;
-stat-stage move value; priority move value; status move value; PP conservation.
+**Architecture (two seams + an adapter):**
+- **`IBattleAi`** (new) — the gen/game-specific *brain*: `ChooseMove(candidates, TurnContext)`. Split from
+  `IBattleInput` (the I/O plumbing) so brains (wild/trainer/gym/future-gen) and plumbing vary independently.
+- **`AiBattleInput : IBattleInput`** — thin adapter hosting any brain; owns the candidate filter (PP>0, not
+  Disabled). `RandomMoveInput` stays available as the trivial wild-tier brain.
+- **`IMoveEvaluator`** building blocks (gen-agnostic, score one dimension each), combined by
+  `CompositeEvaluator` (weighted sum = "personality"):
+  - [x] `DamageEvaluator` — expected-damage fraction of target HP (KO scores >1), discounted by accuracy;
+    handles every `DamageCategory`. Uses the new deterministic `DamageCalculator.EstimateDamage`.
+  - [x] `TypeEffectivenessEvaluator` — log-scale bonus for super-effective, penalty for resisted, hard
+    penalty for 0× (the authentic Gen 1 "encourage SE / discourage NVE" lean).
+  - [x] `StatStageMoveEvaluator` — values self-buff/foe-debuff by remaining headroom; penalises a maxed stat.
+  - [x] `StatusMoveEvaluator` — values a fresh status by severity; redundant if foe already statused or
+    type-immune (immunity routed through the authoritative `IBattleRules.CanReceiveStatus` seam — **not**
+    an inline guess; a seam-audit blocker on the first pass was a wrong inline Ice→Freeze immunity).
+  - [x] `CompositeEvaluator` — default mix: damage 1.0, type 0.6, stat-stage 0.5, status 0.6.
+- **`Gen1TrainerAi : IBattleAi`** — scores candidates with the composite evaluator then picks
+  *probabilistically* via a softmax over scores (not argmax). An `intelligence` knob (0 = near-random,
+  1 = near-greedy, default 0.7) maps to the softmax temperature, so trainer tiers are one number. The
+  fallible pick **is** the "keep some Gen 1 bad decision-making"; the Gen 1 quirks (encourage type
+  advantage, discourage redundant status) live in the evaluators. Replaces the planned separate
+  `GreedyAIInput`/`WeightedAIInput` — both are just temperature settings on one brain.
 
-**Selection strategies:** `RandomMoveInput` (wild/lowest tier ✅); `WeightedAIInput` (probabilistic);
-`GreedyAIInput` (always best — boss tier); `CompositeEvaluator` (weighted sum; trainer "personality").
+**Engine support:** `DamageCalculator` refactored to extract a private no-RNG `ComputeDamage` core shared by
+the live `CalculateDamage` (rolls crit+variance) and the new `EstimateDamage` (deterministic, AI-only) — a
+behavior-preserving extraction, pinned by `Estimate_MatchesLiveCalcWithNoCritAndNoVariance`.
 
-**Tasks:**
-- [ ] `DamageEvaluator : IMoveEvaluator`
-- [ ] `TypeEffectivenessEvaluator : IMoveEvaluator`
-- [ ] `StatStageMoveEvaluator : IMoveEvaluator`
-- [ ] `StatusMoveEvaluator : IMoveEvaluator`
-- [ ] `CompositeEvaluator : IMoveEvaluator`
-- [ ] `GreedyAIInput : IBattleInput`
-- [ ] `WeightedAIInput : IBattleInput`
+**Tests:** `Unit/MoveEvaluatorTests` (per-dimension scoring) + `Unit/BattleAiTests` (greedy/fallible
+selection, single/empty candidates, adapter filtering, `EstimateDamage` parity). Suite 888 → **911 .NET**.
+
+**Audit:** `/audit` run; seam-reviewer BLOCK (wrong inline Gen-1 status immunity) fixed by routing through
+`IBattleRules.CanReceiveStatus` + a guarding `Status_FreezeIsValuedAgainstAnIceFoe` test. Deferred advisory:
+`DamageEvaluator` normalises accuracy as `Accuracy/100.0` rather than the engine's 0–255 `GetHitThreshold`
+model — a pure ranking heuristic (stages cancel in relative ranking), not a seam break.
+
+**Future tiers (not needed yet):** distinct trainer-class weight vectors / `intelligence` values
+(wild < trainer < gym); revert the *wild* enemy to `RandomMoveInput` once explicit trainer battles exist
+(today the chain's wild foes deliberately use the smarter brain per the brief).
 
 ---
 

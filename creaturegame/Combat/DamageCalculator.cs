@@ -29,7 +29,69 @@ public static class DamageCalculator
 
         isCrit =
             (rng ?? SystemRandomSource.Instance).NextDouble() < rules.GetCritChance(attacker, move);
+        double variance = rules.RollDamageVariance();
 
+        return ComputeDamage(
+            attacker,
+            defender,
+            move,
+            typeChart,
+            rules,
+            isCrit,
+            variance,
+            defenseDivisor,
+            screenDefenseMultiplier
+        );
+    }
+
+    /// <summary>
+    /// Deterministic, no-RNG damage estimate for AI move scoring. Assumes no critical hit and pins the damage
+    /// variance to 1.0 (no roll) — variance is a single multiplicative factor shared by every move, so it
+    /// cancels out when <i>ranking</i> moves; fixing it at 1.0 keeps no gen-variable variance constant leaking
+    /// into the estimate. Honours the current stat stages, Burn, STAB and the type chart exactly like the live
+    /// calculator (Reflect/Light Screen are ignored — the AI doesn't model the foe's screens). Returns 0 for
+    /// a non-damaging move; the special damage categories (Fixed, LevelBased, OHKO, …) are resolved by the
+    /// caller, since this covers only the Standard power-based formula.
+    /// </summary>
+    public static int EstimateDamage(
+        Creature attacker,
+        Creature defender,
+        Attack move,
+        ITypeChart typeChart,
+        IBattleRules? rules = null
+    ) =>
+        move.BaseDamage == 0
+            ? 0
+            : ComputeDamage(
+                attacker,
+                defender,
+                move,
+                typeChart,
+                rules ?? Gen1BattleRules.Instance,
+                isCrit: false,
+                variance: 1.0,
+                defenseDivisor: 1,
+                screenDefenseMultiplier: 1
+            );
+
+    /// <summary>
+    /// The pure Gen 1 damage formula given an already-decided crit and variance roll. Shared by the live
+    /// <see cref="CalculateDamage(Creature, Creature, Attack, ITypeChart, IBattleRules, out bool, IRandomSource?, int, int)"/>
+    /// (which rolls crit + variance) and the deterministic <see cref="EstimateDamage"/> (which pins them), so
+    /// both stay in lock-step with no duplicated formula. Caller guarantees <c>move.BaseDamage &gt; 0</c>.
+    /// </summary>
+    private static int ComputeDamage(
+        Creature attacker,
+        Creature defender,
+        Attack move,
+        ITypeChart typeChart,
+        IBattleRules rules,
+        bool isCrit,
+        double variance,
+        int defenseDivisor,
+        int screenDefenseMultiplier
+    )
+    {
         // Stat selection is delegated to rules — Gen 1 uses Special for both special offence
         // and defence; Gen 2+ will return SpAtk / SpDef respectively.
         int attackStat = rules.GetOffensiveStat(attacker, move.AttackType);
@@ -87,9 +149,8 @@ public static class DamageCalculator
             typeChart
         );
         double critMult = isCrit ? rules.CritMultiplier : 1.0;
-        double random = rules.RollDamageVariance();
 
-        return (int)(baseDamage * stab * typeEffectiveness * critMult * random);
+        return (int)(baseDamage * stab * typeEffectiveness * critMult * variance);
     }
 
     /// <summary>Backward-compatible overload — discards the crit result.</summary>

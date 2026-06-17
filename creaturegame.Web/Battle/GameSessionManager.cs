@@ -69,13 +69,16 @@ public sealed class GameSessionManager(
         // Emitter resolves the current connection per-event, so output follows reconnects.
         var emitter = new SignalRBattleEventEmitter(hubContext, () => battle.CurrentConnectionId);
         // Endless chain: one persistent player, a fresh DB-built enemy per encounter. A single enemy input
-        // is reused across encounters (RandomMoveInput is stateless per turn).
+        // is reused across encounters (the AI is stateless per turn — it scores from the live TurnContext).
+        // The enemy now thinks with Gen1TrainerAi: an intelligent-but-fallible Gen 1 move selector (scores
+        // moves, then picks probabilistically so it usually plays the strong move but keeps some RBY
+        // bad-decision flavour) instead of the old uniform-random RandomMoveInput.
         var runner = new BattleRunner(
             session.Player,
             p => encounters.CreateEnemyAsync(p, session.AllMoves),
             Gen1TypeChart.Instance,
             battle.Input,
-            new RandomMoveInput(),
+            new AiBattleInput(new Gen1TrainerAi()),
             movePool: session.AllMoves,
             emitter: emitter
         );
