@@ -427,6 +427,33 @@
   color: var(--clr-accent);
 }
 
+/* STAB (Same-Type Attack Bonus): a subtle gold left-edge accent + faint tint, plus a small corner tag.
+   Damaging moves matching the player's type — flagged by the engine (MoveInfo.stab). */
+.move-btn--stab {
+  position: relative;
+  border-left-color: #f0c674;
+  border-left-width: 4px;
+  background: rgba(240, 198, 116, 0.07);
+}
+
+.move-btn--stab:hover:not(:disabled) {
+  background: rgba(240, 198, 116, 0.12);
+}
+
+.move-stab {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  font-size: 0.5rem;
+  font-weight: bold;
+  letter-spacing: 0.05em;
+  color: #2a2118;
+  background: #f0c674;
+  padding: 0 3px;
+  border-radius: 2px;
+  line-height: 1.4;
+}
+
 /* ── Action btn waiting state ────────────────── */
 .action-btn--waiting {
   opacity: 0.4;

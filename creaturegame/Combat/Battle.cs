@@ -89,7 +89,14 @@ public class Battle
                             m.Base.DamageType,
                             m.PowerPointsCurrent,
                             m.Base.PowerPointsMax,
-                            m == PlayerCreature.Battle.DisabledMove
+                            m == PlayerCreature.Battle.DisabledMove,
+                            // STAB: a damaging move whose type matches the user's current type (mirrors the
+                            // DamageCalculator condition). Fixed-damage moves (BaseDamage 0) get no STAB.
+                            m.Base.BaseDamage > 0
+                                && (
+                                    PlayerCreature.Type1 == m.Base.DamageType
+                                    || PlayerCreature.Type2 == m.Base.DamageType
+                                )
                         ))
                         .ToList()
                 )

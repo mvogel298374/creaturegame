@@ -31,7 +31,15 @@ Stack: React 18 + TypeScript + SignalR + Phaser 3. (Phaser canvas & core animati
   input (`useBattleHub.dismissLevelUp`).
 - [ ] **Pokémon overview screen** — a better, richer creature-overview view (stats, types, moveset/PP,
   level/XP, status) than the current battle nameplates expose; surfaced between battles / on demand
-- [ ] Move menu STAB indicator — subtle highlight on moves matching player's type
+- [x] Move menu STAB indicator — subtle highlight on moves matching player's type. **DONE 2026-06-17.**
+  The engine computes STAB per move on `TurnStarted` (`MoveInfo.Stab` = damaging move whose type matches the
+  user's *current* type — correct under Conversion/Transform, mirrors the `DamageCalculator` condition); the
+  move menu renders a gold left-edge accent + a small `STAB` corner tag (`move-btn--stab`). **Coverage spans
+  all three layers** after a verification miss: engine (`MoveInfoStabTests`, single + dual type), the SignalR
+  wire (`WebEventContractTests.TurnStarted_MoveProjection_CarriesStabFlag` — the projection hand-maps moves to
+  an anonymous object and had *dropped* the flag, so it never reached the client), and the client render
+  (`e2e/battle-ui-cues.spec.ts` — Charizard's deterministic L50 moveset flags FLAMETHROWER, not SCRATCH).
+  Suite 919 → 922 .NET + 18 → 19 E2E.
 - [x] Color-coded effectiveness in battle log (super-effective green, not very effective grey, no effect red).
   **DONE 2026-06-17.** `DamageDealt` tags its log line with a `LogTone` (`super`/`weak`/`immune`) carried
   through the `LOG` action → `LogEntry` → a `log-line--{tone}` CSS class; neutral hits stay the default colour.

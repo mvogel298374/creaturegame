@@ -29,7 +29,11 @@ public record MoveInfo(
     DamageType Type,
     int PpCurrent,
     int PpMax,
-    bool Disabled = false
+    bool Disabled = false,
+    // True when this move gets the Same-Type Attack Bonus for its user: a damaging move whose type matches
+    // one of the user's current types. Computed against the creature's live type (so it stays correct after
+    // Conversion/Transform), letting the UI flag STAB moves in the menu without re-deriving the rule client-side.
+    bool Stab = false
 );
 
 public record TurnEnded : BattleEvent;

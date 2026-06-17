@@ -1,7 +1,10 @@
 using System.Collections;
 using System.Reflection;
 using System.Runtime.CompilerServices;
+using System.Text.Json;
+using creaturegame.Attacks;
 using creaturegame.Combat;
+using creaturegame.Creatures;
 using creaturegame.Web.Battle;
 
 namespace creaturegame.Tests.Integration.Web;
@@ -71,6 +74,50 @@ public class WebEventContractTests
                 + "never render). Add a `case '<Name>'` for each:\n  "
                 + string.Join("\n  ", unhandled)
         );
+    }
+
+    /// <summary>
+    /// Field-level guard for the <see cref="TurnStarted"/> move projection: <see cref="MapEvent"/> hand-maps
+    /// each <see cref="MoveInfo"/> into an anonymous object, so a field added to <c>MoveInfo</c> (here:
+    /// <c>Stab</c>, which drives the move-menu STAB highlight) is silently dropped unless it's listed in the
+    /// projection. The reflection-based contract test above instantiates events with an *empty* move list, so
+    /// it can't catch this. Pins the move fields the client actually reads.
+    /// </summary>
+    [Fact]
+    public void TurnStarted_MoveProjection_CarriesStabFlag()
+    {
+        var move = new MoveInfo(
+            "flamethrower",
+            DamageType.Fire,
+            15,
+            15,
+            Disabled: false,
+            Stab: true
+        );
+        var evt = new TurnStarted(
+            1,
+            "PLAYER",
+            100,
+            100,
+            StatusCondition.None,
+            0,
+            100,
+            "ENEMY",
+            80,
+            80,
+            StatusCondition.None,
+            new[] { move }
+        );
+
+        var (_, payload) = SignalRBattleEventEmitter.MapEvent(evt);
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+        var firstMove = doc.RootElement.GetProperty("Moves")[0];
+
+        Assert.True(
+            firstMove.TryGetProperty("Stab", out var stab),
+            $"TurnStarted move projection dropped the Stab field — the move menu can't show STAB. Payload: {doc.RootElement}"
+        );
+        Assert.True(stab.GetBoolean());
     }
 
     // Concrete (non-abstract) BattleEvent subtypes — the exact set the engine can emit to the client.

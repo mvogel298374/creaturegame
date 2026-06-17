@@ -60,6 +60,7 @@ public sealed class SignalRBattleEventEmitter(
                         m.PpCurrent,
                         m.PpMax,
                         m.Disabled,
+                        m.Stab,
                     }),
                 }
             ),

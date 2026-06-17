@@ -346,12 +346,14 @@ function MoveMenu({ moves, canChoose, onChoose, onBack }: {
           const outOfPp = !isEmpty && move.ppCurrent <= 0;
           const isDisabled = !isEmpty && !!move.disabled;   // locked out by Disable
           const disabled = !canChoose || isEmpty || outOfPp || isDisabled;
+          const isStab = !isEmpty && !!move.stab;            // same-type damaging move → STAB bonus
           return (
             <button
               key={i}
-              className={`move-btn ${disabled ? 'move-btn--disabled' : ''}`}
+              className={`move-btn ${disabled ? 'move-btn--disabled' : ''} ${isStab ? 'move-btn--stab' : ''}`}
               disabled={disabled}
               onClick={() => onChoose(i)}
+              title={isStab ? 'Same-Type Attack Bonus (1.5× damage)' : undefined}
             >
               <span className="move-name">{formatMoveName(move.name)}</span>
               {!isEmpty && (
@@ -360,6 +362,7 @@ function MoveMenu({ moves, canChoose, onChoose, onBack }: {
                 </span>
               )}
               {!isEmpty && <TypeBadge type={move.type} size="sm" />}
+              {isStab && <span className="move-stab" aria-label="STAB">STAB</span>}
             </button>
           );
         })}
