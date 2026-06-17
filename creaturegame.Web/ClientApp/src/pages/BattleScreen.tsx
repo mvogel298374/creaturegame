@@ -85,8 +85,8 @@ export function BattleScreen() {
 
       <div className="battle-panel">
         <div className="battle-log" ref={logRef}>
-          {state.log.map((msg, i) => (
-            <p key={i} className="log-line">{msg}</p>
+          {state.log.map((entry, i) => (
+            <p key={i} className={`log-line${entry.tone ? ` log-line--${entry.tone}` : ''}`}>{entry.message}</p>
           ))}
           {state.phase === 'connecting' && (
             <p className="log-line log-line--muted">Connecting…</p>

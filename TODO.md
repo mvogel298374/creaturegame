@@ -32,7 +32,10 @@ Stack: React 18 + TypeScript + SignalR + Phaser 3. (Phaser canvas & core animati
 - [ ] **Pokémon overview screen** — a better, richer creature-overview view (stats, types, moveset/PP,
   level/XP, status) than the current battle nameplates expose; surfaced between battles / on demand
 - [ ] Move menu STAB indicator — subtle highlight on moves matching player's type
-- [ ] Color-coded effectiveness in battle log (super-effective green, not very effective grey, no effect red)
+- [x] Color-coded effectiveness in battle log (super-effective green, not very effective grey, no effect red).
+  **DONE 2026-06-17.** `DamageDealt` tags its log line with a `LogTone` (`super`/`weak`/`immune`) carried
+  through the `LOG` action → `LogEntry` → a `log-line--{tone}` CSS class; neutral hits stay the default colour.
+  Guarded by a `timeline.test.ts` tone test. Vitest 54 → 55.
 - [ ] Sprite shake tween on damage received
 - [ ] `ConsoleInput : IBattleInput` — numbered move menu for terminal play (low priority)
 

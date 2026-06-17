@@ -20,6 +20,11 @@ import { E2E } from '../testEnv';
 export type Payload = Record<string, unknown>;
 type Side = 'player' | 'enemy';
 
+// Colour cue for a battle-log line. Drives a CSS class on the rendered line: super-effective (green),
+// not-very-effective (muted/grey), no-effect/immune (red). Undefined tone = the default neutral line.
+export type LogTone = 'super' | 'weak' | 'immune';
+export interface LogEntry { message: string; tone?: LogTone }
+
 // The stat totals carried by a level-up (matches the engine's StatBlock).
 export interface StatBlock { maxHp: number; attack: number; defense: number; special: number; speed: number }
 
@@ -30,7 +35,7 @@ export type Action =
   | { type: 'TURN_ENDED' }
   | { type: 'PLAYER_CHOSE' }
   | { type: 'RUN_ENDED'; battlesWon: number; finalLevel: number }
-  | { type: 'LOG'; message: string }
+  | { type: 'LOG'; message: string; tone?: LogTone }
   | { type: 'UPDATE_HP'; name: string; hp: number }
   | { type: 'UPDATE_STATUS'; name: string; status: string }
   | { type: 'CLEAR_STATUS'; name: string }
@@ -87,7 +92,7 @@ const d    = (action: Action): Step => ({ kind: 'dispatch', action });
 const emit = (command: BridgeCommand): Step => ({ kind: 'emit', command });
 const w    = (ms: number): Step => ({ kind: 'wait', ms });
 const anim = (): Step => ({ kind: 'awaitAnim' });
-const log  = (message: string): Action => ({ type: 'LOG', message });
+const log  = (message: string, tone?: LogTone): Action => ({ type: 'LOG', message, tone });
 
 // ── Text helpers (pure) ──────────────────────────────────────────────────────
 function statusAppliedMsg(name: string, status: string): string {
@@ -324,13 +329,15 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       const eff        = payload.typeEffectiveness as number;
       const damage     = payload.damage as number;
 
-      // Immunity: no hit, no damage number — just the Gen 1 line.
+      // Immunity: no hit, no damage number — just the Gen 1 line (red).
       if (eff === 0) {
-        return { steps: [w(650), d(log(`It doesn't affect ${targetName}...`)), w(800)] };
+        return { steps: [w(650), d(log(`It doesn't affect ${targetName}...`, 'immune')), w(800)] };
       }
 
       let msg = `${targetName} took ${damage} damage!`;
       if (isCrit) msg += ' A critical hit!';
+      // Tint the line by type effectiveness: super-effective green, not-very-effective grey.
+      const tone: LogTone | undefined = eff > 1 ? 'super' : eff < 1 ? 'weak' : undefined;
       if (eff > 1)      msg += " It's super effective!";
       else if (eff < 1) msg += " It's not very effective...";
 
@@ -338,7 +345,7 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
         emit({ type: 'playHitSound', isCrit }),
         d({ type: 'UPDATE_HP', name: targetName, hp: hpAfter }),
         w(650),
-        d(log(msg)),
+        d(log(msg, tone)),
         w(800),   // breathing room between the two attackers' sequences
       ] };
     }

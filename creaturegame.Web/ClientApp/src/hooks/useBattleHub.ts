@@ -1,7 +1,7 @@
 import { useEffect, useRef, useReducer, useCallback } from 'react';
 import * as signalR from '@microsoft/signalr';
 import type { MoveInfo } from '../types/BattleEvents';
-import { type Action, type Payload, type StatBlock, expandEvent, useBattleTimeline } from '../battle/timeline';
+import { type Action, type Payload, type StatBlock, type LogEntry, expandEvent, useBattleTimeline } from '../battle/timeline';
 
 export interface LevelUpPanel {
   level: number;
@@ -42,7 +42,7 @@ export interface BattleState {
   levelUp: LevelUpPanel | null;
   moveReplacement: MoveReplacementPrompt | null;
   recovery: RecoveryPrompt | null;
-  log: string[];
+  log: LogEntry[];
   turnNumber: number;
 }
 
@@ -112,7 +112,7 @@ function reducer(state: BattleState, action: Action): BattleState {
       // Terminal — the player fainted. Show the game-over screen with the run summary.
       return { ...state, phase: 'ended', battlesWon: action.battlesWon, playerLevel: action.finalLevel };
     case 'LOG':
-      return { ...state, log: [...state.log, action.message] };
+      return { ...state, log: [...state.log, { message: action.message, tone: action.tone }] };
     case 'UPDATE_HP':
       if (action.name === state.playerName) return { ...state, playerHp: action.hp };
       if (action.name === state.enemyName)  return { ...state, enemyHp: action.hp };

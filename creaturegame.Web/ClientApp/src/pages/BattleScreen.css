@@ -183,6 +183,21 @@
   color: var(--clr-text-muted);
 }
 
+/* Type-effectiveness cues on damage lines: super-effective green, not-very-effective grey, no-effect red. */
+.log-line--super {
+  color: #4caf50;
+  font-weight: 600;
+}
+
+.log-line--weak {
+  color: var(--clr-text-muted);
+}
+
+.log-line--immune {
+  color: #e5533c;
+  font-weight: 600;
+}
+
 /* ── Battle controls (right half) ───────────── */
 .battle-controls {
   flex: 1;

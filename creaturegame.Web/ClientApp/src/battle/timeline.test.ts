@@ -10,6 +10,12 @@ const logLines = (steps: Step[] = []): string[] =>
        .filter((a): a is Extract<Action, { type: 'LOG' }> => a.type === 'LOG')
        .map(a => a.message);
 
+const logTones = (steps: Step[] = []): (string | undefined)[] =>
+  steps.filter((s): s is Extract<Step, { kind: 'dispatch' }> => s.kind === 'dispatch')
+       .map(s => s.action)
+       .filter((a): a is Extract<Action, { type: 'LOG' }> => a.type === 'LOG')
+       .map(a => a.tone);
+
 const kinds = (steps: Step[] = []): string[] => steps.map(s => s.kind);
 
 const emits = (steps: Step[] = []) =>
@@ -71,6 +77,15 @@ describe('expandEvent — DamageDealt', () => {
     const { steps } = expandEvent('DamageDealt',
       { targetName: 'ARTICUNO', damage: 10, typeEffectiveness: 0.5, hpAfter: 90, isCrit: false }, CTX);
     expect(logLines(steps)).toEqual(["ARTICUNO took 10 damage! It's not very effective..."]);
+  });
+
+  it('tags damage lines with a colour tone by effectiveness (super/weak/immune, none for neutral)', () => {
+    const at = (eff: number) => logTones(expandEvent('DamageDealt',
+      { targetName: 'ARTICUNO', damage: 10, typeEffectiveness: eff, hpAfter: 90, isCrit: false }, CTX).steps);
+    expect(at(2)).toEqual(['super']);
+    expect(at(0.5)).toEqual(['weak']);
+    expect(at(0)).toEqual(['immune']);
+    expect(at(1)).toEqual([undefined]); // neutral hit — default line colour
   });
 
   it('emits the hit sound and updates HP before the log line', () => {
