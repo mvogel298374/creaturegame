@@ -495,6 +495,31 @@
   animation: levelup-pop 160ms ease-out;
 }
 
+/* The move-replacement prompt is a menu decision, so anchor it to the player menu in the bottom-right
+   corner (and dim the field more lightly) instead of floating centred over the combat area, which read
+   as jarring. It rises in from the menu rather than popping in the middle of the battlefield. */
+.modal-overlay--corner {
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: var(--sp-md);
+  background: rgba(0, 0, 0, 0.35);
+  animation: modal-fade 140ms ease-out;
+}
+
+.modal-overlay--corner .move-replace-modal {
+  animation: modal-rise 160ms ease-out;
+}
+
+@keyframes modal-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes modal-rise {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 .move-replace-modal {
   min-width: 280px;
   max-width: 90%;

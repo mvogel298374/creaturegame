@@ -190,7 +190,7 @@ function MoveReplacementModal({ prompt, onForget }: {
       ? `Stop learning ${newMove}?`
       : `Forget ${formatMoveName(prompt.currentMoves[pending.slot!])} and learn ${newMove}?`;
     return (
-      <div className="modal-overlay">
+      <div className="modal-overlay modal-overlay--corner">
         <div className="move-replace-modal" role="alertdialog" aria-label="Confirm move change">
           <p className="move-replace-question">{question}</p>
           <div className="move-replace-confirm">
@@ -203,7 +203,7 @@ function MoveReplacementModal({ prompt, onForget }: {
   }
 
   return (
-    <div className="modal-overlay">
+    <div className="modal-overlay modal-overlay--corner">
       <div className="move-replace-modal" role="alertdialog" aria-label="Choose a move to forget">
         <p className="move-replace-title">{prompt.creatureName} wants to learn {newMove}!</p>
         <p className="move-replace-sub">But it already knows 4 moves. Forget one?</p>
