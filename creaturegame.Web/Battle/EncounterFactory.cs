@@ -25,8 +25,13 @@ public sealed class EncounterFactory(
     /// Loads the move pool and builds the player creature with its canonical moveset. Returns null if the
     /// species id is unknown or the move database is empty.
     /// </summary>
-    public async Task<RunSetup?> CreatePlayerSetupAsync(int speciesId, int level)
+    public async Task<RunSetup?> CreatePlayerSetupAsync(
+        int speciesId,
+        int level,
+        IRandomSource? rng = null
+    )
     {
+        var source = rng ?? SystemRandomSource.Instance;
         await using var pokemonCtx = await pokemonFactory.CreateDbContextAsync();
         var species = await pokemonCtx
             .Species.AsNoTracking()
@@ -49,7 +54,8 @@ public sealed class EncounterFactory(
             learnsets,
             allMoves,
             level,
-            MoveSelectionStrategy.CanonicalLatest
+            MoveSelectionStrategy.CanonicalLatest,
+            source
         );
         // Only the player levels up, so only the player carries a learnset (its moves resolved up-front and
         // consulted by the battle loop on each level gained). Persists with the creature across the chain.
@@ -98,7 +104,8 @@ public sealed class EncounterFactory(
             learnsets,
             allMoves,
             enemyLevel,
-            MoveSelectionStrategy.WeightedSmart
+            MoveSelectionStrategy.WeightedSmart,
+            source
         );
     }
 
@@ -121,10 +128,16 @@ public sealed class EncounterFactory(
         IReadOnlyList<PokemonLearnset> learnsets,
         IReadOnlyList<Attack> allMoves,
         int level,
-        MoveSelectionStrategy strategy
+        MoveSelectionStrategy strategy,
+        IRandomSource rng
     )
     {
+        // Construction rolls DVs (the Creature ctor used the global-RNG default calculator); re-seat the
+        // stat calculator on the run's seeded source and re-roll so a run with a fixed seed reproduces the
+        // same DVs. DV randomisation is a per-generation rule, so it stays behind IStatCalculator.
         var creature = new Creature(species.Name.ToUpper()) { Level = level };
+        creature.StatCalculator = new Gen1StatCalculator(rng);
+        creature.StatCalculator.RandomiseDvs(creature);
         creature.InitializeFromSpecies(species);
         creature.Experience = creature.CalculateExperienceForLevel(level);
 
@@ -135,7 +148,8 @@ public sealed class EncounterFactory(
             allMoves,
             level,
             species.Type1,
-            species.Type2
+            species.Type2,
+            rng
         );
 
         foreach (var move in moves)

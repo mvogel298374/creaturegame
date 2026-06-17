@@ -23,10 +23,15 @@ public sealed class GameSessionManager(
     // the battle — covers the JS client's automatic-reconnect policy (gives up ~30 s).
     private static readonly TimeSpan ReconnectGrace = TimeSpan.FromSeconds(40);
 
-    public string RegisterSession(Creature player, IReadOnlyList<Attack> allMoves)
+    public string RegisterSession(
+        Creature player,
+        IReadOnlyList<Attack> allMoves,
+        IRandomSource rng,
+        int seed
+    )
     {
         var gameId = Guid.NewGuid().ToString("N");
-        _pending[gameId] = new PendingSession(player, allMoves, DateTimeOffset.UtcNow);
+        _pending[gameId] = new PendingSession(player, allMoves, rng, seed, DateTimeOffset.UtcNow);
         EvictExpiredPendingSessions();
         return gameId;
     }
@@ -73,14 +78,20 @@ public sealed class GameSessionManager(
         // The enemy now thinks with Gen1TrainerAi: an intelligent-but-fallible Gen 1 move selector (scores
         // moves, then picks probabilistically so it usually plays the strong move but keeps some RBY
         // bad-decision flavour) instead of the old uniform-random RandomMoveInput.
+        //
+        // The run's single seeded RNG threads through every nondeterministic step — enemy construction
+        // (species/level/DVs/moves), the battle rolls, and the AI's probabilistic move pick — so the whole
+        // run replays from session.Seed. It's safe to share one instance: the run is single-threaded and
+        // draws sequentially on this task.
         var runner = new BattleRunner(
             session.Player,
-            p => encounters.CreateEnemyAsync(p, session.AllMoves),
+            p => encounters.CreateEnemyAsync(p, session.AllMoves, session.Rng),
             Gen1TypeChart.Instance,
             battle.Input,
-            new AiBattleInput(new Gen1TrainerAi()),
+            new AiBattleInput(new Gen1TrainerAi(rng: session.Rng)),
             movePool: session.AllMoves,
-            emitter: emitter
+            emitter: emitter,
+            rng: session.Rng
         );
 
         _ = Task.Run(async () =>
@@ -162,6 +173,8 @@ public sealed class GameSessionManager(
 sealed record PendingSession(
     Creature Player,
     IReadOnlyList<Attack> AllMoves,
+    IRandomSource Rng,
+    int Seed,
     DateTimeOffset RegisteredAt
 );
 

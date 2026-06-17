@@ -153,10 +153,15 @@ Each entry: **Decision · Why · Where it lives.**
 ### 2.10 Determinism / the RNG seam
 - **Decision:** all randomness goes through `IRandomSource`; the engine and battle setup are seedable, and
   `BattleScenario.Seed(...)` makes every roll deterministic in tests.
-- **Open gap:** the **web composition root** still builds runs unseeded (`GameSessionManager`,
-  `EncounterFactory`, `Gen1StatCalculator` reach `Random.Shared`). A per-run seed there is the prerequisite
-  for the deferred recovery/replace-move E2E specs — **Tech Debt #3**.
-- **Where:** `Combat/IRandomSource.cs`, `tests/.../TestSupport/BattleScenario.cs`.
+- **Web run seed (done 2026-06-17):** the composition root now seeds each run end-to-end. `GameController.Start`
+  picks one seed per run (client may supply `StartGameRequest.Seed`; else a random int, logged + returned as
+  `{ gameId, seed }`) and threads a single `SeededRandomSource` through the whole run — player + every enemy's
+  construction (`EncounterFactory` seeds `Gen1StatCalculator` for DVs and passes the source to move selection /
+  `PickByBst` / `ScaleWildLevel`), the battle (`BattleRunner`), and the AI (`Gen1TrainerAi`). One shared stream
+  is safe because a run is single-threaded. This unblocks the deferred recovery/replace-move E2E specs (pass a
+  fixed `seed`). Guarded by `RunSeedReproducibilityTests`.
+- **Where:** `Combat/IRandomSource.cs`, `Web/Controllers/GameController.cs`, `Web/Battle/EncounterFactory.cs`,
+  `tests/.../TestSupport/BattleScenario.cs`.
 
 ### 2.11 Effect strategies (lock-ins + post-damage effects)
 - **Decision:** two parallel registries follow the same shape. Multi-turn "lock-in" moves (two-turn, rampage,

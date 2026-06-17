@@ -11,9 +11,10 @@ the Endless Battle Chain, the Roguelite recovery/encounter layer, the Learnset S
 Architecture Review #7's higher-leverage structural items are also done (only the **minor cleanups** bullet
 remains — see Tech Debt). Suite: **917 .NET + 54 Vitest + 18 Playwright E2E** (all green).
 
-**Next:** Web UI polish, then the Catch Mechanic / Game-Loop layer (party, save, evolution). The one loose end
-from the RNG work is the *production* per-run seed at the web composition root (Tech Debt #3); the
-recovery/replace-move **modal** E2Es stay deferred until that exists.
+**Next:** Web UI polish, then the Catch Mechanic / Game-Loop layer (party, save, evolution). The RNG seam is
+now fully closed — the web composition root seeds each run end-to-end (Tech Debt #3, done 2026-06-17), so the
+recovery/replace-move **modal** E2Es are unblocked (pass a fixed `seed` in the `start` request for a
+deterministic run).
 
 ---
 
@@ -28,6 +29,8 @@ Stack: React 18 + TypeScript + SignalR + Phaser 3. (Phaser canvas & core animati
   (2026-06-10):** plays the level-up fanfare (`playLevelUpSound` bridge → `Audio.playLevelUp`), and the
   panel no longer auto-hides — it sits bottom-right above the battle menu and stays until the player's next
   input (`useBattleHub.dismissLevelUp`).
+- [ ] **Pokémon overview screen** — a better, richer creature-overview view (stats, types, moveset/PP,
+  level/XP, status) than the current battle nameplates expose; surfaced between battles / on demand
 - [ ] Move menu STAB indicator — subtle highlight on moves matching player's type
 - [ ] Color-coded effectiveness in battle log (super-effective green, not very effective grey, no effect red)
 - [ ] Sprite shake tween on damage received
@@ -178,14 +181,16 @@ moving target.
 > Done items (Architecture Review #1/#2/#4/#5/#6, the #6a lock-in abstraction, the `BattleState` facade
 > migration, flaky-test sweep, struct→class, DI, RNG seam, etc.) are in [`TODO_ARCHIVE.md`](TODO_ARCHIVE.md).
 
-- [ ] **RNG seam — only the web run-seed remains (Architecture Review #3).** The core library has no direct
-  `Random.Shared` (`IRandomSource` threaded through engine + setup). Still open: the **web composition root**
-  builds runs unseeded — `GameSessionManager` constructs `BattleRunner` with no `rng`/seed, and
-  `EncounterFactory` (enemy level + move assignment) plus `Gen1StatCalculator` (random DVs) use `Random.Shared`.
-  That's where a *per-run* seed would be injected so a whole run replays; wire it when a run needs to be
-  reproducible (the recovery/replace **modal** E2Es are the first concrete consumer). Note: reproducing a run
-  means seeding creature **construction** (DVs) too, not just the battle. *(Optional: the `AlwaysHit/AlwaysCrit`
-  rule shims could be replaced by seeded sources — low priority.)*
+- [x] **RNG seam — web run-seed wired (Architecture Review #3). DONE 2026-06-17.** The core library already
+  had no direct `Random.Shared`; the remaining leak was the **web composition root** building runs unseeded.
+  Fixed: `GameController.Start` picks one seed per run (client may supply `StartGameRequest.Seed`; otherwise a
+  random int, logged + returned as `{ gameId, seed }`), constructs a single `SeededRandomSource`, and threads
+  that one instance through the whole run — player + every enemy's construction (`EncounterFactory` now seeds
+  `Gen1StatCalculator` for DVs and passes the source to `LearnsetMoveSelector`/`PickByBst`/`ScaleWildLevel`),
+  the battle (`BattleRunner` `rng`), and the AI (`Gen1TrainerAi` `rng`). The run is single-threaded so one
+  shared stream is deterministic. Proven by `RunSeedReproducibilityTests` (same seed → identical player and
+  identical enemy: species, level, DVs, moveset). Suite 917 → **919 .NET**. *(Optional, still open: the
+  `AlwaysHit/AlwaysCrit` rule shims could be replaced by seeded sources — low priority.)*
   - [x] **Rules-RNG seedable (fixed 2026-06-12).** `DelegatingBattleRules`/`ScriptableRules` now delegate to a
     *seedable* inner `Gen1BattleRules`, and `BattleScenario.Seed(...)` makes EVERY roll deterministic —
     including the rules' previously-global `Roll*` draws (the old Disable/double-faint test-order flakiness).

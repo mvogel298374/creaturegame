@@ -160,14 +160,15 @@ timeline semantics (`timeline.ts` deciding `BattleEnded` ⇒ "announce next"). T
    burst or the few-ms between-battle DB fetch: a rare stall, never the "client desync" it gets mis-filed as.
    If we ever want belt-and-suspenders, the proportionate fix is a one-shot resync emit on rebind (resend the
    current `TurnStarted` + any pending prompt) — **not** an event buffer, and **not** urgent.
-4. **Per-run seed — seam DONE (2026-06-12); only the production web wiring remains.** A battle is now fully
-   reproducible from a seed: `Gen1BattleRules` takes an `IRandomSource`, `DelegatingBattleRules`/`ScriptableRules`
-   forward a seed to it, and `BattleScenario.Seed(...)` makes **every** roll deterministic — including the rules'
+4. **Per-run seed — DONE end-to-end (seam 2026-06-12, web wiring 2026-06-17).** A battle is fully reproducible
+   from a seed: `Gen1BattleRules` takes an `IRandomSource`, `DelegatingBattleRules`/`ScriptableRules` forward a
+   seed to it, and `BattleScenario.Seed(...)` makes **every** roll deterministic — including the rules'
    previously-global `Roll*` draws (`SeededRulesTests`). Do **not** re-file "Roll* draws ignore the battle seed";
-   that edge is closed. The remaining (smaller) work is only the *run* seed at the web composition root
-   (`GameSessionManager` → `BattleRunner` + `EncounterFactory`) so a whole run replays — and note creature
-   **construction** also rolls random DVs (`Gen1StatCalculator`), so a reproducible run must seed that too, not
-   just the battle (`TODO.md` Tech Debt #3).
+   that edge is closed. The **whole run** is now reproducible too: `GameController.Start` picks one seed per run
+   (or accepts `StartGameRequest.Seed`) and threads a single `SeededRandomSource` through enemy construction
+   (`EncounterFactory` — incl. creature **construction**'s random DVs via a seeded `Gen1StatCalculator`), the
+   battle (`BattleRunner`), and the AI (`Gen1TrainerAi`). Guarded by `RunSeedReproducibilityTests` (`TODO.md`
+   Tech Debt #3, closed).
 5. **Persistence.** An event boundary is the natural save point — a resumed run re-enters at the next event.
 
 ---
