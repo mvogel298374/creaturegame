@@ -178,8 +178,11 @@ through `GameController` would make these specs deterministic).
   reliably reach it without a test-only entry hook). The bridge **ordering contract** is already covered
   deterministically at the timeline layer (Vitest). Revisit if a seeded "evolve now" hook is added.
 
-> Minor known limitation: after evolving, the creature's *cry* still uses the pre-evolution OGG (preloaded as
-> `cry-player`); the synth fallback uses the evolved id. Cosmetic; fix by loading the evolved cry on morph.
+- [x] **Cry-mismatch fix (2026-06-18)** — the OGG cry keys were bound once in `preload()` to the *initial*
+  species (`cry-player`/`cry-enemy`), so with cries present (production) **every chained enemy** played the
+  first enemy's cry and an evolved/transformed player played its pre-form cry. Re-keyed cries by species id
+  (`cry-{id}`), loaded on demand wherever the sprite changes (`spawnEnemy`, evolution morph, `transformSprite`)
+  and at `preload`; `playCry` resolves the live id's cry, synth-fallback unchanged. `tsc` clean, 57 Vitest green.
 
 ---
 

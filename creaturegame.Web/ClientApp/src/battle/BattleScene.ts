@@ -12,7 +12,6 @@ export class BattleScene extends Phaser.Scene {
   private enemySpeciesId = 1;
   private playerTrueSpeciesId = 1; // the player's real species, restored after a Transform reverts
   private initialPlayerSpeciesId = 1; // the species loaded under the 'player' texture key (pre-evolution)
-  private criesAvailable = false;
 
   // Kept so we can remove exactly these listeners on teardown — Phaser never
   // calls a method named destroy(), so listeners must be cleaned up via the
@@ -45,16 +44,24 @@ export class BattleScene extends Phaser.Scene {
     this.load.image('player', `/sprites/back/${this.playerSpeciesId}.png`);
     this.load.image('enemy', `/sprites/front/${this.enemySpeciesId}.png`);
 
-    // Attempt to load OGG cries; if the files don't exist yet (importer not run)
-    // the load will silently fail and we fall back to Web Audio synth
-    this.load.audio(`cry-player`, `/audio/cries/${this.playerSpeciesId}.ogg`);
-    this.load.audio(`cry-enemy`,  `/audio/cries/${this.enemySpeciesId}.ogg`);
+    // Attempt to load OGG cries, keyed by species id so each creature gets its own (the chain swaps enemies,
+    // and the player can evolve/Transform). If a file doesn't exist yet (importer not run) the load silently
+    // fails, exists() stays false, and playCry falls back to the Web Audio synth.
+    this.queueCry(this.playerSpeciesId);
+    this.queueCry(this.enemySpeciesId);
+  }
 
-    this.load.once(Phaser.Loader.Events.COMPLETE, () => {
-      this.criesAvailable =
-        this.cache.audio.exists('cry-player') &&
-        this.cache.audio.exists('cry-enemy');
-    });
+  // Per-species cry texture/audio key.
+  private cryKey(speciesId: number) {
+    return `cry-${speciesId}`;
+  }
+
+  // Queue a species' OGG cry for loading if it isn't already cached. The caller owns load.start()/COMPLETE;
+  // for preload the scene's boot loader runs it. Idempotent — re-queuing an existing key is skipped.
+  private queueCry(speciesId: number) {
+    const key = this.cryKey(speciesId);
+    if (!this.cache.audio.exists(key))
+      this.load.audio(key, `/audio/cries/${speciesId}.ogg`);
   }
 
   create() {
@@ -98,11 +105,12 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private playCry(who: 'player' | 'enemy', detune = 0) {
-    if (this.criesAvailable) {
-      const key = who === 'player' ? 'cry-player' : 'cry-enemy';
+    const id = who === 'player' ? this.playerSpeciesId : this.enemySpeciesId;
+    const key = this.cryKey(id);
+    if (this.cache.audio.exists(key)) {
       this.sound.play(key, { volume: 0.7, detune });
     } else {
-      const id = who === 'player' ? this.playerSpeciesId : this.enemySpeciesId;
+      // No OGG for this species (importer not run, or load failed) — synth fallback, keyed to the live id.
       Audio.playCry(id);
     }
   }
@@ -231,7 +239,7 @@ export class BattleScene extends Phaser.Scene {
   // sprite and the canvas persist across the whole run — only the enemy is swapped.
   private spawnEnemy(enemySpeciesId: number) {
     this.enemySpeciesId = enemySpeciesId;
-    const key = `enemy-${enemySpeciesId}`;
+    const spriteKey = `enemy-${enemySpeciesId}`;
 
     const reveal = () => {
       const W = this.scale.width;
@@ -240,7 +248,7 @@ export class BattleScene extends Phaser.Scene {
       const enemyRestY = H * 0.3;
 
       this.enemyIdleTween?.stop();
-      this.enemySprite.setTexture(key);
+      this.enemySprite.setTexture(spriteKey);
       this.enemySprite.setAlpha(1).setPosition(W + 120, enemyRestY);
 
       this.tweens.add({
@@ -262,10 +270,13 @@ export class BattleScene extends Phaser.Scene {
       });
     };
 
-    if (this.textures.exists(key)) {
+    const cryKey = this.cryKey(enemySpeciesId);
+    if (this.textures.exists(spriteKey) && this.cache.audio.exists(cryKey)) {
       reveal();
     } else {
-      this.load.image(key, `/sprites/front/${enemySpeciesId}.png`);
+      if (!this.textures.exists(spriteKey))
+        this.load.image(spriteKey, `/sprites/front/${enemySpeciesId}.png`);
+      this.queueCry(enemySpeciesId);
       this.load.once(Phaser.Loader.Events.COMPLETE, reveal);
       this.load.start();
     }
@@ -296,10 +307,12 @@ export class BattleScene extends Phaser.Scene {
       });
     };
 
-    if (this.textures.exists(key)) {
+    const cryKey = this.cryKey(speciesId);
+    if (this.textures.exists(key) && this.cache.audio.exists(cryKey)) {
       morph();
     } else {
-      this.load.image(key, `/sprites/${dir}/${speciesId}.png`);
+      if (!this.textures.exists(key)) this.load.image(key, `/sprites/${dir}/${speciesId}.png`);
+      this.queueCry(speciesId); // so a faint after Transform cries as the copied species
       this.load.once(Phaser.Loader.Events.COMPLETE, morph);
       this.load.start();
     }
@@ -340,10 +353,12 @@ export class BattleScene extends Phaser.Scene {
       flip(0);
     };
 
-    if (this.textures.exists(newKey)) {
+    const cryKey = this.cryKey(toSpeciesId);
+    if (this.textures.exists(newKey) && this.cache.audio.exists(cryKey)) {
       run();
     } else {
-      this.load.image(newKey, `/sprites/back/${toSpeciesId}.png`);
+      if (!this.textures.exists(newKey)) this.load.image(newKey, `/sprites/back/${toSpeciesId}.png`);
+      this.queueCry(toSpeciesId); // the settle plays the evolved cry, not the pre-evolution one
       this.load.once(Phaser.Loader.Events.COMPLETE, run);
       this.load.start();
     }
