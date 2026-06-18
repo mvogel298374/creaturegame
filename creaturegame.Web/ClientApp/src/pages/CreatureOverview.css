@@ -1,0 +1,208 @@
+.overview-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: var(--sp-sm) var(--sp-lg);
+  gap: var(--sp-sm);
+  min-width: 0;
+}
+
+.overview-header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-md);
+  padding-bottom: var(--sp-xs);
+  border-bottom: 1px solid var(--clr-border);
+}
+
+.overview-title {
+  font-weight: bold;
+  letter-spacing: var(--ls-tight);
+}
+
+.overview-sub {
+  margin-left: auto;
+  font-size: var(--fs-sm);
+  color: var(--clr-text-sub);
+}
+
+.overview-error { color: var(--clr-accent); padding: var(--sp-md); font-size: var(--fs-sm); }
+.overview-loading { color: var(--clr-text-muted); padding: var(--sp-md); font-size: var(--fs-sm); }
+
+/* ── Tabs ───────────────────────────────────── */
+.overview-tabs {
+  display: flex;
+  gap: var(--sp-xs);
+}
+
+.overview-tab {
+  flex: 1;
+  padding: 4px var(--sp-sm);
+  background: transparent;
+  border: 1px solid var(--clr-border);
+  color: var(--clr-text-sub);
+  font-family: var(--font);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-tight);
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition), color var(--transition);
+}
+
+.overview-tab:hover { border-color: var(--clr-accent); }
+
+.overview-tab--active {
+  border-color: var(--clr-accent);
+  color: var(--clr-text);
+  background: rgba(233, 69, 96, 0.10);
+}
+
+.overview-body {
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--clr-border) transparent;
+}
+
+/* ── INFO tab ───────────────────────────────── */
+/* Fills the panel: identity column (sprite + types) beside a field column whose rows spread to use the full
+   height, so it reads well even in the short (~35vh) controls panel at a small window. */
+.overview-info {
+  display: flex;
+  gap: var(--sp-lg);
+  height: 100%;
+  align-items: stretch;
+  padding: var(--sp-xs) 0;
+}
+
+.overview-identity {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-sm);
+  flex-shrink: 0;
+}
+
+.overview-sprite {
+  width: clamp(96px, 18vh, 144px);
+  height: clamp(96px, 18vh, 144px);
+  image-rendering: pixelated;
+}
+
+.overview-types { display: flex; gap: var(--sp-xs); }
+
+.overview-fields {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  gap: var(--sp-xs);
+}
+
+.overview-field {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--sp-sm);
+  font-size: var(--fs-sm);
+  letter-spacing: var(--ls-tight);
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--clr-border);
+}
+.overview-field span:first-child { color: var(--clr-text-sub); }
+.overview-field span:last-child { font-weight: bold; white-space: nowrap; }
+
+.overview-xp-track {
+  height: 6px;
+  background: var(--clr-border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.overview-xp-bar { height: 100%; background: #4a9fe0; }
+
+/* ── STATS tab ──────────────────────────────── */
+/* No comparison bars (the stats don't share a scale). Clean rows that fill the height: stat name, a
+   prominent value, and DV / EV chips. */
+.overview-stats {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  height: 100%;
+  padding: var(--sp-xs) 0;
+}
+
+.overview-stat-row {
+  display: grid;
+  grid-template-columns: 5.5em auto 1fr;
+  align-items: center;
+  gap: var(--sp-sm);
+  padding: 5px 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.overview-stat-row:last-child { border-bottom: none; }
+
+.overview-stat-name {
+  font-size: var(--fs-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--ls-wide);
+  color: var(--clr-text-sub);
+}
+
+.overview-stat-value {
+  font-size: var(--fs-base);
+  font-weight: bold;
+  color: var(--clr-text);
+  white-space: nowrap;
+}
+
+.overview-stat-chips {
+  display: flex;
+  gap: var(--sp-xs);
+  justify-content: flex-end;
+}
+
+.overview-chip {
+  font-size: 0.58rem;
+  font-weight: bold;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: 999px;
+  white-space: nowrap;
+  border: 1px solid var(--clr-border);
+  color: var(--clr-text-sub);
+}
+.overview-chip--dv { background: rgba(95, 159, 224, 0.12); border-color: rgba(95, 159, 224, 0.4); }
+.overview-chip--ev { background: rgba(95, 184, 106, 0.12); border-color: rgba(95, 184, 106, 0.4); }
+
+/* ── MOVES tab ──────────────────────────────── */
+.overview-moves {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+  padding-top: var(--sp-xs);
+}
+
+.overview-move {
+  border: 1px solid var(--clr-border);
+  padding: var(--sp-xs) var(--sp-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.overview-move-top { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-xs); }
+.overview-move-name { font-weight: bold; font-size: var(--fs-xs); letter-spacing: var(--ls-tight); }
+
+.overview-move-meta {
+  display: flex;
+  gap: var(--sp-sm);
+  font-size: 0.62rem;
+  color: var(--clr-text-sub);
+}
+
+.overview-move-desc {
+  font-size: 0.62rem;
+  color: var(--clr-text-muted);
+  line-height: 1.4;
+}

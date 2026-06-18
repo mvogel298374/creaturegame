@@ -28,8 +28,14 @@ Stack: React 18 + TypeScript + SignalR + Phaser 3. (Phaser canvas & core animati
 
 - [ ] `BattleEndedOverlay` — **superseded by the Endless Battle Chain's `RunEnded` game-over screen** (a
   per-`BattleEnded` overlay no longer fits an endless chain); build it there, run-scoped, not per battle
-- [ ] **Pokémon overview screen** — a better, richer creature-overview view (stats, types, moveset/PP,
-  level/XP, status) than the current battle nameplates expose; surfaced between battles / on demand
+- [x] **Pokémon overview screen** — **DONE 2026-06-18.** Tabbed INFO / STATS / MOVES overview replacing the
+  old base-stats `CheckPanel`, opened by the in-battle CHECK POKEMON action. Shows actual stats + per-stat DV
+  (0–15) + Stat-Exp, types/status/HP/XP/BST + front sprite (INFO), and per-move type/category/power/accuracy/
+  PP/description (MOVES). Data via a new on-demand REST snapshot `GET /api/game/{gameId}/player`
+  (`PlayerOverviewDto.From(Creature)` reading the live in-session creature from `GameSessionManager`) — kept
+  off the per-turn event stream. Gen-1 model (single Special; physical/special by move type). Tests:
+  `PlayerOverviewDtoTests` (stat + category mapping), `e2e/overview.spec.ts` (tab structure), live-verified.
+  *(Between-battles/party entry stays with the deferred Game-Loop layer.)*
 - [ ] Sprite shake tween on damage received
 - [ ] `ConsoleInput : IBattleInput` — numbered move menu for terminal play (low priority)
 

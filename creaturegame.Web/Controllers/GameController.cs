@@ -40,6 +40,19 @@ public class GameController(GameSessionManager sessionManager, EncounterFactory 
             return StatusCode(500, new { error = "Failed to start game" });
         }
     }
+
+    /// <summary>
+    /// On-demand snapshot of the run's live player creature for the in-battle overview (CHECK POKEMON):
+    /// actual stats, DVs, Stat-Exp, XP, and full move data. Reads the in-session <see cref="creaturegame.Creatures.Creature"/>.
+    /// </summary>
+    [HttpGet("{gameId}/player")]
+    public IActionResult GetPlayer(string gameId)
+    {
+        var player = sessionManager.GetPlayerCreature(gameId);
+        if (player is null)
+            return NotFound(new { error = "No active game with that id" });
+        return Ok(PlayerOverviewDto.From(player));
+    }
 }
 
 public record StartGameRequest(int SpeciesId, int? Level = null, int? Seed = null);

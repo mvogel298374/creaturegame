@@ -67,7 +67,11 @@ public sealed class GameSessionManager(
         if (!_pending.TryRemove(gameId, out var session))
             return; // unknown or already-consumed gameId
 
-        var battle = new ActiveBattle { CurrentConnectionId = connectionId };
+        var battle = new ActiveBattle
+        {
+            CurrentConnectionId = connectionId,
+            Player = session.Player,
+        };
         _active[gameId] = battle;
         _connToGame[connectionId] = gameId;
 
@@ -120,6 +124,20 @@ public sealed class GameSessionManager(
                     _connToGame.TryRemove(battle.CurrentConnectionId!, out _);
             }
         });
+    }
+
+    /// <summary>
+    /// The live player <see cref="Creature"/> for a game, for the on-demand overview snapshot (CHECK POKEMON).
+    /// Checks the running battle first, then a not-yet-started pending session; null if the game is unknown.
+    /// A display-only read of live state — no lock (the battle thread only mutates scalar stat fields).
+    /// </summary>
+    public Creature? GetPlayerCreature(string gameId)
+    {
+        if (_active.TryGetValue(gameId, out var battle) && battle.Player is not null)
+            return battle.Player;
+        if (_pending.TryGetValue(gameId, out var pending))
+            return pending.Player;
+        return null;
     }
 
     public void SetMoveChoice(string connectionId, int moveIndex)
@@ -183,6 +201,9 @@ sealed class ActiveBattle
 {
     public SignalRInput Input { get; } = new();
     public volatile string? CurrentConnectionId;
+
+    // The persistent player creature for this run, for the on-demand overview snapshot (read-only display use).
+    public Creature? Player;
 
     private readonly object _lock = new();
     private CancellationTokenSource? _abandonCts;

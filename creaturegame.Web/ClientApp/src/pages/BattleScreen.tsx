@@ -6,6 +6,7 @@ import { useBattleHub, type LevelUpPanel, type MoveReplacementPrompt, type Recov
 import type { Species } from '../types/Species';
 import type { MoveInfo } from '../types/BattleEvents';
 import { formatMoveName } from '../utils/format';
+import { CreatureOverview } from './CreatureOverview';
 import './BattleScreen.css';
 
 // Gen 1 HP estimate at level 50, no DVs/EVs — used until first TurnStarted arrives
@@ -115,14 +116,7 @@ export function BattleScreen() {
             />
           )}
           {controlView === 'check' && (
-            <CheckPanel
-              playerName={playerName}
-              playerHp={playerHp}
-              playerMaxHp={playerMaxHp}
-              playerLevel={state.playerLevel}
-              playerSpecies={playerSpecies}
-              onBack={() => setControlView('menu')}
-            />
+            <CreatureOverview gameId={gameId} onBack={() => setControlView('menu')} />
           )}
         </div>
       </div>
@@ -391,56 +385,3 @@ function MoveMenu({ moves, canChoose, onChoose, onBack }: {
   );
 }
 
-const STAT_ROWS: Array<{ label: string; key: keyof Species }> = [
-  { label: 'ATK', key: 'baseAttack' },
-  { label: 'DEF', key: 'baseDefense' },
-  { label: 'SPC', key: 'baseSpecial' },
-  { label: 'SPD', key: 'baseSpeed' },
-];
-
-function CheckPanel({ playerName, playerHp, playerMaxHp, playerLevel, playerSpecies, onBack }: {
-  playerName: string;
-  playerHp: number;
-  playerMaxHp: number;
-  playerLevel: number;
-  playerSpecies: Species | null;
-  onBack: () => void;
-}) {
-  return (
-    <div className="check-panel">
-      <div className="check-header">
-        <button className="btn-ghost" onClick={onBack}>← BACK</button>
-        <span className="check-title">{playerName}</span>
-        <span className="check-level">Lv{playerLevel}</span>
-      </div>
-      <div className="check-body">
-        <div className="check-hp-row">
-          <span className="check-stat-label">HP</span>
-          <span className="check-hp-value">{playerHp} / {playerMaxHp}</span>
-        </div>
-        {playerSpecies && (
-          <div className="check-base-stats">
-            {STAT_ROWS.map(({ label, key }) => {
-              const val = playerSpecies[key] as number;
-              return (
-                <div className="check-stat-row" key={label}>
-                  <span className="check-stat-label">{label}</span>
-                  <div className="check-stat-track">
-                    <div className="check-stat-bar" style={{ width: `${Math.min(100, (val / 155) * 100)}%` }} />
-                  </div>
-                  <span className="check-stat-value">{val}</span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-        {playerSpecies && (
-          <div className="check-types">
-            <TypeBadge type={playerSpecies.type1} size="md" />
-            {playerSpecies.type2 && <TypeBadge type={playerSpecies.type2} size="md" />}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
