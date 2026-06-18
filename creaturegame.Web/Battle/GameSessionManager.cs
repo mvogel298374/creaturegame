@@ -95,7 +95,10 @@ public sealed class GameSessionManager(
             new AiBattleInput(new Gen1TrainerAi(rng: session.Rng)),
             movePool: session.AllMoves,
             emitter: emitter,
-            rng: session.Rng
+            rng: session.Rng,
+            // Between encounters, resolve any pending evolution against the DB (edges → IEvolutionRules →
+            // evolved species + learnset). The runner applies it; the data concern stays in the web layer.
+            checkEvolution: p => encounters.ResolvePlayerEvolutionAsync(p, session.AllMoves)
         );
 
         _ = Task.Run(async () =>

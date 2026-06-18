@@ -323,6 +323,25 @@ public class Creature
         CalculateStats();
     }
 
+    /// <summary>
+    /// Evolves this creature into <paramref name="newForm"/>. Adopts the evolved species' base stats, types,
+    /// growth rate, base-experience and id, then recomputes stats in place via <see cref="InitializeFromSpecies"/>.
+    /// The individual half carries over untouched — DVs, Stat Exp, Level, Experience, PP and the moveset are
+    /// all kept (Gen 1: evolution preserves your IVs/training and current moves). Because
+    /// <see cref="CalculateStats"/> heals only the max-HP delta on an increase, current HP rises by exactly
+    /// the HP gained and damage already taken is preserved — the authentic Gen 1 behaviour.
+    /// <para>
+    /// Evolution itself grants no moves; learning the evolved form's level-up moves is the caller's job (the
+    /// run loop assigns the new <see cref="Learnset"/> and drives the same auto-learn / replacement prompt as
+    /// a level-up). The name is upper-cased to match how creatures are named at construction.
+    /// </para>
+    /// </summary>
+    public void EvolveTo(DB.PokemonSpecies newForm)
+    {
+        Name = newForm.Name.ToUpper();
+        InitializeFromSpecies(newForm);
+    }
+
     public void CalculateStats()
     {
         int newMaxHP = StatCalculator.CalculateHP(BaseHP, DvHP, ExpHP, Level);

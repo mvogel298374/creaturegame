@@ -1,5 +1,6 @@
 using creaturegame.Attacks;
 using creaturegame.Creatures;
+using creaturegame.Evolution;
 
 namespace creaturegame.Combat;
 
@@ -15,6 +16,12 @@ namespace creaturegame.Combat;
 /// fully restored (HP, PP, status) before the next encounter — a full heal is generation-invariant (every
 /// gen's Center does the same), so this is run-layer logic, not a battle seam. Set the interval to 0 to
 /// disable recovery entirely.
+///
+/// Evolution: after each win (and its level-ups) the optional <paramref name="checkEvolution"/> is consulted.
+/// It is the data/DB seam for evolution — the web layer resolves the player's evolution edges through
+/// <see cref="creaturegame.Evolution.IEvolutionRules"/> and, if one fires, returns the evolved species +
+/// its learnset; the runner just applies it (mirrors <paramref name="enemySupplier"/>, keeping core
+/// generation- and data-agnostic). Null (the default) means no evolution — the plain endless chain.
 /// </summary>
 public sealed class BattleRunner(
     Creature player,
@@ -26,7 +33,8 @@ public sealed class BattleRunner(
     IBattleEventEmitter? emitter = null,
     IBattleRules? rules = null,
     IRandomSource? rng = null,
-    int healEveryNBattles = 3
+    int healEveryNBattles = 3,
+    Func<Creature, Task<EvolutionOutcome?>>? checkEvolution = null
 )
 {
     public async Task RunAsync()
@@ -55,6 +63,13 @@ public sealed class BattleRunner(
             if (!player.IsAlive())
                 break;
             battlesWon++;
+
+            // Evolution check: the battle has already applied this win's XP/level-ups, so the player's level
+            // is current. The web resolver runs the IEvolutionRules decision against the DB; if it fires we
+            // apply the new form, seat the evolved learnset, announce it, then drive the same move-learning
+            // flow a level-up uses (the evolved form may learn a move at this level). Logic drives sequence —
+            // the event is emitted for the client to replay the morph animation.
+            await TryEvolveAsync();
 
             // Poké Center pause: every Nth win, offer a full restore before the next foe. The prompt is its own
             // step in the game loop — it blocks awaiting the player's accept/skip choice (interactive input
@@ -85,6 +100,28 @@ public sealed class BattleRunner(
         }
 
         emitter?.Emit(new RunEnded(battlesWon, player.Level, player.Name));
+    }
+
+    // Applies a pending evolution, if the resolver reports one for the player's current state. The
+    // from-identity is captured before EvolveTo (which overwrites name/species/stats) so the event carries
+    // both forms for the sprite morph.
+    private async Task TryEvolveAsync()
+    {
+        if (checkEvolution is null)
+            return;
+        if (await checkEvolution(player) is not { } evolution)
+            return;
+
+        string fromName = player.Name;
+        int fromSpeciesId = player.SpeciesId;
+
+        player.EvolveTo(evolution.NewForm);
+        player.Learnset = evolution.NewLearnset;
+
+        emitter?.Emit(new CreatureEvolved(fromName, player.Name, fromSpeciesId, player.SpeciesId));
+
+        // Evolution grants no moves itself, but the evolved form may learn one at the current level.
+        await MoveLearning.LearnMovesForLevelAsync(player, player.Level, emitter, playerInput);
     }
 
     // Major status carries into the next encounter; the generation decides what each status becomes out of

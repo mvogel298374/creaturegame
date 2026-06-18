@@ -454,6 +454,22 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       return { steps: [w(150), d(log(`${cName} did not learn ${formatMoveName(mName)}.`)), w(500)] };
     }
 
+    // ── Evolution (between encounters) ─────────────────────────────────────────
+    // Stage 2: announce the evolution in the battle log. The Phaser sprite morph
+    // (old → white silhouette → new, via a BridgeCommand + BattleScene handler with
+    // an awaitAnim) lands in Stage 3; the arm's presence is the contract guard.
+    case 'CreatureEvolved': {
+      const fromName = payload.fromName as string;
+      const toName   = payload.toName as string;
+      return { steps: [
+        w(300),
+        d(log(`What? ${fromName} is evolving!`)),
+        w(600),
+        d(log(`${fromName} evolved into ${toName}!`)),
+        w(600),
+      ] };
+    }
+
     case 'StatusApplied': {
       const tName  = payload.targetName as string;
       const status = payload.status as string;

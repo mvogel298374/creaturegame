@@ -14,9 +14,10 @@ STAB indicator, per-move effectiveness pill, colour-coded battle log, friendlier
 the tabbed **Pokémon overview screen** (CHECK POKEMON) (all archived). Suite: **932 .NET + 55 Vitest + 20
 Playwright E2E** (all green).
 
-**Next:** the **Evolution System** (designed & staged 2026-06-18 — see its section): full player-side level-up
-evolution end-to-end, built in stages (data+seam → core+loop → web+animation). Trade lines → level 37; stones
-deferred with the Catch/bag work. After that, the rest of the Catch Mechanic / Game-Loop layer (party, save).
+**Next:** the **Evolution System** — Stages 1 (data+seam) & 2 (core+loop+event) are ✅ DONE & committed; only
+**Stage 3 (Phaser sprite-morph animation)** remains (the event already fires + logs; Stage 3 adds the visual
+morph). Trade lines → level 37; stones deferred with the Catch/bag work. After that, the rest of the Catch
+Mechanic / Game-Loop layer (party, save).
 Web UI polish is essentially done (only the low-priority `ConsoleInput` terminal menu remains). The
 recovery/replace-move **modal** E2Es are unblocked now the per-run seed exists (pass a fixed `seed` in the
 `start` request for a deterministic run).
@@ -136,19 +137,29 @@ through `GameController` would make these specs deterministic).
   `PokemonEvolutionDataContractTests` (live-db pin: 72/52/16/4, the 4 trade lines, Eevee's 3 branches,
   dex-bounds). Suite: **951 .NET** green.
 
-### Stage 2 — Core application + game loop
-- [ ] **`Creature.EvolveTo(PokemonSpecies newForm)`** — swap species/base stats/types, recompute via the
-  existing `IStatCalculator` (same DVs + Stat Exp + level; current HP rises by the max-HP delta — authentic
-  Gen 1). No new stat magic numbers.
-- [ ] **Learnset on evolution** — reuse the existing level-up move-learn / replace-move flow: if the new form
-  learns a move at the current level, offer it.
-- [ ] **Loop wiring** — after a win's XP/level-up resolves, the runner/director calls
-  `CheckEvolution(LeveledTo(newLevel))`; if it fires, compute result → (Stage 3 event/anim) → apply
-  `EvolveTo` → continue. Logic drives sequence.
-- [ ] **Enemy form** — verify BST encounter selection already yields level-appropriate evolved enemies; add a
-  light "promote to level-appropriate final form" guard only if it looks wrong in practice.
-- [ ] **Tests:** `EvolveTo` recomputes stats + preserves the HP delta; loop fires evolution after the
-  triggering level-up; trade-line creature evolves at 37, native line at its real threshold.
+### Stage 2 — Core application + game loop ✅ DONE (2026-06-18; audit PASS-WITH-ADVISORIES, both resolved)
+- [x] **`Creature.EvolveTo(PokemonSpecies newForm)`** — adopts new base stats/types/growth-rate/base-exp/id
+  and recomputes via the existing `InitializeFromSpecies`→`CalculateStats` (no new stat math). Individual half
+  (DVs/Stat Exp/Level/Experience/PP/moveset) carries over; current HP rises by exactly the max-HP delta.
+- [x] **Learnset on evolution** — extracted `MoveLearning.LearnMovesForLevelAsync` from `Battle` (shared,
+  behaviour-preserving) and reused it: after evolving, the run loop seats the evolved learnset and runs the
+  same auto-learn / replace-move flow for moves learned at the current level.
+- [x] **Loop wiring** — `BattleRunner` takes an optional injected `checkEvolution` resolver (mirrors
+  `enemySupplier`, keeping core data/gen-agnostic; null = plain chain). After each win it applies `EvolveTo`,
+  emits `CreatureEvolved`, then drives move-learning. Web resolver = `EncounterFactory.ResolvePlayerEvolutionAsync`
+  (edges → `Gen1EvolutionRules` → evolved species + learnset), wired in `GameSessionManager`.
+- [x] **`CreatureEvolved` event** + SignalR projection + `timeline.ts` log arm + field-level contract guard
+  (the recurring web event field-projection gap) + console-emitter line. *(Phaser sprite-morph animation is
+  Stage 3.)*
+- [x] **Enemy form** — confirmed BST encounter selection already yields level-appropriate evolved enemies (the
+  full 1–151 pool is in scope and evolved forms outrank pre-evos by BST as depth scales); no guard needed.
+- [x] **Tests (+9):** `EvolveToTests` (stat recompute + HP-delta + individual-half preservation),
+  `BattleRunnerEvolutionTests` (wiring: fires after win, emits event then learns; null-resolver = plain chain),
+  `EncounterEvolutionTests` (live DB: level fires at threshold, trade→37, stone dormant), `CreatureEvolved`
+  field guard + Vitest timeline arm. Suite: **962 .NET + 57 Vitest** green.
+
+> **Known limitation (accepted):** a multi-threshold level jump in a single battle evolves only one stage that
+> win (the next stage fires on the next win). Fine for the roguelite; not a bug.
 
 ### Stage 3 — Web event + animation
 - [ ] **`CreatureEvolved(FromName, ToName, FromSpeciesId, ToSpeciesId)`** battle event — **mind the recurring

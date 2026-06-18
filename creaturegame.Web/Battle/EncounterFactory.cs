@@ -2,6 +2,7 @@ using creaturegame.Attacks;
 using creaturegame.Combat;
 using creaturegame.Creatures;
 using creaturegame.DB;
+using creaturegame.Evolution;
 using Microsoft.EntityFrameworkCore;
 using static creaturegame.Creatures.EncounterSelector;
 
@@ -107,6 +108,49 @@ public sealed class EncounterFactory(
             MoveSelectionStrategy.WeightedSmart,
             source
         );
+    }
+
+    /// <summary>
+    /// The evolution data/DB seam for the run loop (<see cref="BattleRunner"/>). Loads the player species'
+    /// evolution edges, runs the Gen 1 <see cref="IEvolutionRules"/> decision against the player's current
+    /// level, and — if one fires — resolves the evolved species plus its learnset into an
+    /// <see cref="EvolutionOutcome"/>. Returns null when nothing evolves, so the runner leaves the player as
+    /// is. The generation choice is made here at the composition layer (like <c>Gen1TypeChart.Instance</c> in
+    /// <see cref="GameSessionManager"/>), keeping the runner generation-agnostic.
+    /// </summary>
+    public async Task<EvolutionOutcome?> ResolvePlayerEvolutionAsync(
+        Creature player,
+        IReadOnlyList<Attack> allMoves
+    )
+    {
+        await using var pokemonCtx = await pokemonFactory.CreateDbContextAsync();
+        var edges = await pokemonCtx
+            .Evolutions.AsNoTracking()
+            .Where(e => e.Generation == ActiveGeneration && e.FromSpeciesId == player.SpeciesId)
+            .ToListAsync();
+        if (edges.Count == 0)
+            return null;
+
+        var result = Gen1EvolutionRules.Instance.CheckEvolution(
+            player,
+            new EvolutionContext.LeveledTo(player.Level),
+            edges
+        );
+        if (result is null)
+            return null;
+
+        var newForm = await pokemonCtx
+            .Species.AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Id == result.ToSpeciesId);
+        if (newForm is null)
+            return null;
+
+        var learnsets = await pokemonCtx
+            .Learnsets.AsNoTracking()
+            .Where(l => l.Generation == ActiveGeneration && l.SpeciesId == newForm.Id)
+            .ToListAsync();
+
+        return new EvolutionOutcome(newForm, BuildLearnset(learnsets, allMoves));
     }
 
     /// <summary>

@@ -160,6 +160,25 @@ public class WebEventContractTests
         Assert.Equal(2.0, eff.GetDouble());
     }
 
+    /// <summary>Field-level guard for the <see cref="CreatureEvolved"/> projection: the client needs both
+    /// names and both species ids (from → to) to render the morph. The reflection contract test only checks
+    /// the event is mapped, not that every field survives the hand-written projection — this pins them.</summary>
+    [Fact]
+    public void CreatureEvolved_Projection_CarriesBothFormsAndSpeciesIds()
+    {
+        var evt = new CreatureEvolved("CHARMANDER", "CHARMELEON", 4, 5);
+
+        var (type, payload) = SignalRBattleEventEmitter.MapEvent(evt);
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+        var root = doc.RootElement;
+
+        Assert.Equal("CreatureEvolved", type);
+        Assert.Equal("CHARMANDER", root.GetProperty("FromName").GetString());
+        Assert.Equal("CHARMELEON", root.GetProperty("ToName").GetString());
+        Assert.Equal(4, root.GetProperty("FromSpeciesId").GetInt32());
+        Assert.Equal(5, root.GetProperty("ToSpeciesId").GetInt32());
+    }
+
     // Concrete (non-abstract) BattleEvent subtypes — the exact set the engine can emit to the client.
     private static List<Type> ConcreteBattleEventTypes()
     {

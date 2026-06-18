@@ -222,6 +222,16 @@ describe('expandEvent — control plane vs timeline', () => {
     expect(logLines(steps)).toEqual(['MEWTWO decided to keep going!']);
   });
 
+  it('CreatureEvolved announces the evolution (both forms)', () => {
+    const { steps } = expandEvent('CreatureEvolved', {
+      fromName: 'CHARMANDER', toName: 'CHARMELEON', fromSpeciesId: 4, toSpeciesId: 5,
+    }, CTX);
+    expect(logLines(steps)).toEqual([
+      'What? CHARMANDER is evolving!',
+      'CHARMANDER evolved into CHARMELEON!',
+    ]);
+  });
+
   it('LeveledUp announces the level, plays the fanfare, and shows the stat-gain panel (no auto-hide)', () => {
     const { steps } = expandEvent('LeveledUp', {
       creatureName: 'MEWTWO', newLevel: 12, xpThisLevel: 40, xpToNextLevel: 100,

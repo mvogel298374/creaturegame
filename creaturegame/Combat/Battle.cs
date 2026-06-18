@@ -218,7 +218,12 @@ public class Battle
                     );
                     // Learn this level's moves before stepping to the next level, so a multi-level award
                     // prompts in canonical order (one move, one level, at a time).
-                    await LearnMovesForLevelAsync(PlayerCreature, PlayerCreature.Level);
+                    await MoveLearning.LearnMovesForLevelAsync(
+                        PlayerCreature,
+                        PlayerCreature.Level,
+                        _emitter,
+                        _playerInput
+                    );
                 }
                 break;
             }
@@ -278,48 +283,6 @@ public class Battle
                 DisabledMove = attacker.Battle.DisabledMove,
             }
         );
-    }
-
-    /// <summary>
-    /// Teaches the creature every move it learns at <paramref name="level"/>. A free slot auto-learns; a full
-    /// moveset emits <see cref="MoveReplacementRequired"/> and blocks on the player's input — a chosen slot
-    /// (0–3) is replaced, <c>null</c> declines (canonical Gen 1 "don't learn"). Driven once per level so a
-    /// multi-level award prompts in order. Only the player ever learns, so this always uses the player input.
-    /// </summary>
-    private async Task LearnMovesForLevelAsync(Creature learner, int level)
-    {
-        foreach (var move in learner.MovesLearnedAtLevel(level).ToList())
-        {
-            if (learner.AddAttack(move))
-            {
-                _emitter?.Emit(new MoveLearned(learner.Name, move.Name ?? ""));
-                continue;
-            }
-
-            // Four slots full — ask the player which move to forget (or to decline).
-            _emitter?.Emit(
-                new MoveReplacementRequired(
-                    learner.Name,
-                    move.Name ?? "",
-                    learner.MoveSet.Select(m => m.Base.Name ?? "").ToList()
-                )
-            );
-            int? slot = await _playerInput.ChooseMoveToForgetAsync(
-                new MoveReplacementContext(learner, move)
-            );
-            if (slot is int s && s >= 0 && s < learner.MoveSet.Count)
-            {
-                string forgotten = learner.MoveSet[s].Base.Name ?? "";
-                learner.ReplaceMove(s, move);
-                _emitter?.Emit(new MoveForgotten(learner.Name, forgotten));
-                _emitter?.Emit(new MoveLearned(learner.Name, move.Name ?? ""));
-            }
-            else
-            {
-                // null / out of range → declined: the moveset is unchanged.
-                _emitter?.Emit(new MoveLearnDeclined(learner.Name, move.Name ?? ""));
-            }
-        }
     }
 
     private void ApplyLeechSeedDrain(Creature drained, Creature healed)

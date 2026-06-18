@@ -306,6 +306,10 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                 Console.WriteLine($"{e.CreatureName} grew to level {e.NewLevel}!");
                 break;
 
+            case CreatureEvolved e:
+                Console.WriteLine($"{e.FromName} evolved into {e.ToName}!");
+                break;
+
             case MoveLearned e:
                 Console.WriteLine($"{e.CreatureName} learned {e.MoveName}!");
                 break;

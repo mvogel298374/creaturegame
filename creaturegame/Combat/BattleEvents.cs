@@ -206,6 +206,14 @@ public record LeveledUp(
     StatBlock StatGains
 ) : BattleEvent;
 
+/// <summary>The player's creature evolved between encounters. Carries both the old and new names plus the
+/// <paramref name="FromSpeciesId"/>/<paramref name="ToSpeciesId"/> so the client can morph the sprite
+/// (old → silhouette → new) — the same id-driven approach as <see cref="TransformedInto"/>. Emitted in the
+/// run loop after a win's level-ups resolve, before any evolution move-learning. Followed by the evolved
+/// form's <see cref="MoveLearned"/> events, if any.</summary>
+public record CreatureEvolved(string FromName, string ToName, int FromSpeciesId, int ToSpeciesId)
+    : BattleEvent;
+
 // --- Learnset (level-up move learning) ---
 /// <summary>The creature learned a new move — either into a free slot, or after a replacement. Drives the
 /// canonical "{NAME} learned {MOVE}!" line.</summary>
