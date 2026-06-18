@@ -25,30 +25,38 @@ The recovery/replace-move **modal** E2Es are unblocked now the per-run seed exis
 
 Stack: React 18 + TypeScript + SignalR + Phaser 3. (Phaser canvas & core animations ✅ done — see archive.)
 
-> Done UI-polish items (level-up toast, STAB indicator, per-move effectiveness pill, colour-coded battle log,
-> friendlier connection-error message) are archived under **Web UI Polish pass (2026-06-17)** in `TODO_ARCHIVE.md`.
+> Done UI-polish items are archived in `TODO_ARCHIVE.md`: level-up toast, STAB indicator, per-move
+> effectiveness pill, colour-coded battle log, friendlier connection-error message under **Web UI Polish pass
+> (2026-06-17)**; the run-over screen (`BattleEndedOverlay`), Pokémon overview screen (CHECK POKEMON), and
+> sprite-shake-on-damage under **Web UI Polish — Run-Over Screen, Overview, Sprite-Shake (2026-06-18)**.
 
-- [x] `BattleEndedOverlay` — **DONE 2026-06-18.** Run-scoped game-over screen for the Endless Battle Chain,
-  driven by the terminal `RunEnded` event (→ `phase: 'ended'`), **not** a per-`BattleEnded` overlay (a win is
-  just an intermission in the chain). Full-field `alertdialog` over a hard-dimmed field: "GAME OVER", a greyed
-  faint sprite, a run summary (BATTLES WON / FINAL LEVEL), and **PLAY AGAIN** (→ `/select`, fresh starter pick)
-  / **QUIT** (→ title). Replaces the old one-line "Game over" action-prompt; the in-battle FIGHT/CHECK menu is
-  hidden when ended. Tests: `endless-chain.spec.ts` "a run ends…" asserts the overlay + PLAY AGAIN → `/select`
-  (timeline's `RUN_ENDED` dispatch already unit-covered), live-verified.
-- [x] **Pokémon overview screen** — **DONE 2026-06-18.** Tabbed INFO / STATS / MOVES overview replacing the
-  old base-stats `CheckPanel`, opened by the in-battle CHECK POKEMON action. Shows actual stats + per-stat DV
-  (0–15) + Stat-Exp, types/status/HP/XP/BST + front sprite (INFO), and per-move type/category/power/accuracy/
-  PP/description (MOVES). Data via a new on-demand REST snapshot `GET /api/game/{gameId}/player`
-  (`PlayerOverviewDto.From(Creature)` reading the live in-session creature from `GameSessionManager`) — kept
-  off the per-turn event stream. Gen-1 model (single Special; physical/special by move type). Tests:
-  `PlayerOverviewDtoTests` (stat + category mapping), `e2e/overview.spec.ts` (tab structure), live-verified.
-  *(Between-battles/party entry stays with the deferred Game-Loop layer.)*
-- [x] **Sprite shake tween on damage received** — **DONE 2026-06-18.** A quick directional horizontal jolt on
-  the struck sprite, emitted from the `DamageDealt` timeline step (`playDamageShake` bridge command → scene
-  `shakeSprite`). Fire-and-forget (overlaps the hit sound + HP drain, not awaited), touches only x so it
-  coexists with the idle bob, jolts away from the attacker, and snaps back to rest x. No shake on an immune
-  no-hit (the eff=0 early-return). Tests: `timeline.test.ts` (emit present + correct side; absent on immunity),
-  battle E2E lunge→hit ordering still green, live-verified.
+- [ ] **Move-specific attack animations (grouped, not per-move)** — today every move plays the one generic
+  lunge (`BattleScene.playMoveAnimation`) + the type-neutral white tint + the new `playDamageShake`. Give moves
+  distinct animations by mapping each to one of a small set of **animation families** (≈5–7), keyed off data we
+  already have — `DamageType` (Gen 1: 15 types) and `AttackType` (Physical / Special) — plus a few special-cased
+  effects. Goal is a believable variety **without** 165 bespoke clips.
+  - **Proposed families** (refine in `/plan`):
+    - *Physical contact* — the current lunge (Tackle, Body Slam, most Normal/Fighting/Ground physical). Keep as-is.
+    - *Projectile / ranged special* — a sprite/particle travels attacker→target, no lunge (Water/Fire/Electric/
+      Psychic/Ice/Grass specials: Ember, Water Gun, Thunderbolt, Psybeam, Ice Beam…).
+    - *Status / self-buff (no contact)* — a glow/pulse on the **user**, no lunge or target shake (stat-stage moves,
+      screens, Mist/Focus Energy, Sleep/Poison/Para powders target-side instead).
+    - *Two-turn / charge* — pair with the existing charge text + a charge-glow on turn 1, release burst on turn 2
+      (Fly, Dig, Solar Beam, Sky Attack, Razor Wind, Skull Bash).
+    - *Multi-hit / flurry* — repeat a quick jab N times in step with `MultiHitCompleted` (Fury Attack, Double Slap…).
+    - *(Cheap layered win, any family)* tint the contact flash + shake/particle colour by the move's **type colour**
+      (reuse the `TypeBadge` palette) instead of flat white.
+  - **Plumbing (the real work, mind the seam):** the animation is driven by `MoveUsed`, which today carries only
+    `(AttackerName, MoveName)` — the client can't see the *enemy's* move type/category (the player's is in the
+    turn's `MoveInfo`, the foe's is not). So project `DamageType` + `AttackType` onto the `MoveUsed` event and its
+    `SignalRBattleEventEmitter` mapping, with the matching field-level guard (this is exactly the recurring
+    **web event field-projection gap** — engine tests don't catch the missing wire field; see the memory +
+    `WebEventContractTests`). Then add a pure `moveAnimationFamily(type, category, slug)` map in the client
+    (unit-testable like `timeline.ts`), new per-family `BridgeCommand`s + `BattleScene` handlers, each still
+    emitting `animationComplete` so the timeline's `awaitAnim` contract holds.
+  - **Builds on** the existing `playMoveAnimation` / `playDamageShake` seam and the `timeline.ts` step model;
+    keep durations unit-tested away from the wall clock and assert ordering via the bridge in E2E (per
+    `e2e/README.md`). Polish-tier — after the current run-over/shake items, before/with the Catch animation work.
 - [ ] `ConsoleInput : IBattleInput` — numbered move menu for terminal play (low priority)
 
 ---

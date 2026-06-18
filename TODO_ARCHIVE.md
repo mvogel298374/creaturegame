@@ -8,6 +8,39 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Web UI Polish — Run-Over Screen, Overview, Sprite-Shake ✅ DONE (2026-06-18)
+
+Three more battle-UI polish items, all frontend — the engine already emitted the driving events
+(`RunEnded`, `DamageDealt`) and exposed the live creature; the work was rendering/animation + one new REST
+snapshot. Suite after the pass: **932 .NET + 56 Vitest + 20 Playwright E2E** (all green).
+
+**Run-scoped game-over screen (`BattleEndedOverlay`).** Built into the Endless Battle Chain's terminal
+`RunEnded` event (→ `phase: 'ended'`), **not** a per-`BattleEnded` overlay — a win is just a mid-chain
+intermission, so a game-over screen only fits at the run's true end. Full-field `alertdialog` over a
+hard-dimmed field: "GAME OVER", a greyed faint sprite, a run summary (BATTLES WON / FINAL LEVEL), and
+**PLAY AGAIN** (→ `/select`, fresh starter pick) / **QUIT** (→ title). Replaced the old one-line "Game over"
+action-prompt; the in-battle FIGHT/CHECK menu is hidden when ended. Tests: `endless-chain.spec.ts` "a run
+ends…" asserts the overlay + PLAY AGAIN → `/select` (the timeline's `RUN_ENDED` dispatch was already
+unit-covered), live-verified.
+
+**Pokémon overview screen (CHECK POKEMON).** Tabbed INFO / STATS / MOVES overview replacing the old
+base-stats `CheckPanel`, opened by the in-battle CHECK POKEMON action. Shows actual stats + per-stat DV
+(0–15) + Stat-Exp, types/status/HP/XP/BST + front sprite (INFO), and per-move type/category/power/accuracy/
+PP/description (MOVES). Data via a new on-demand REST snapshot `GET /api/game/{gameId}/player`
+(`PlayerOverviewDto.From(Creature)` reading the live in-session creature from `GameSessionManager`) — kept
+off the per-turn event stream. Gen-1 model (single Special; physical/special by move type). Tests:
+`PlayerOverviewDtoTests` (stat + category mapping), `e2e/overview.spec.ts` (tab structure), live-verified.
+*(Between-battles/party entry stays with the deferred Game-Loop layer.)*
+
+**Sprite shake tween on damage received.** A quick directional horizontal jolt on the struck sprite, emitted
+from the `DamageDealt` timeline step (`playDamageShake` bridge command → `BattleScene.shakeSprite`).
+Fire-and-forget (overlaps the hit sound + HP drain, not awaited), touches only x so it coexists with the idle
+y-bob, jolts away from the attacker, and snaps back to rest x. No shake on an immune no-hit (the `eff=0`
+early-return path emits nothing). Tests: `timeline.test.ts` (emit present + correct side; absent on immunity),
+battle E2E lunge→hit ordering still green, live-verified.
+
+---
+
 ## Web UI Polish + Per-Run Web Seed ✅ DONE (2026-06-17)
 
 A polish pass over the battle UI plus the final RNG-seam closure. Three of the move-menu/log cues share one
