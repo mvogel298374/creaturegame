@@ -13,6 +13,7 @@ public class PokemonDbContext : DbContext
     public DbSet<PokemonSpecies> Species { get; set; }
     public DbSet<PokemonGameAvailability> GameAvailability { get; set; }
     public DbSet<PokemonLearnset> Learnsets { get; set; }
+    public DbSet<PokemonEvolution> Evolutions { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
@@ -49,6 +50,28 @@ public class PokemonDbContext : DbContext
                 l.Generation,
                 l.LearnLevel,
             });
+
+        modelBuilder.Entity<PokemonEvolution>().ToTable("PokemonEvolution");
+        modelBuilder
+            .Entity<PokemonEvolution>()
+            .HasOne<PokemonSpecies>()
+            .WithMany()
+            .HasForeignKey(e => e.FromSpeciesId)
+            .OnDelete(DeleteBehavior.Cascade);
+        // Drives the runtime lookup: evolution edges for a species in the active generation.
+        modelBuilder
+            .Entity<PokemonEvolution>()
+            .HasIndex(e => new { e.FromSpeciesId, e.Generation });
+        // One edge per (from, to) per generation — keeps the idempotent re-import convergent.
+        modelBuilder
+            .Entity<PokemonEvolution>()
+            .HasIndex(e => new
+            {
+                e.FromSpeciesId,
+                e.ToSpeciesId,
+                e.Generation,
+            })
+            .IsUnique();
     }
 
     public void EnsureDatabaseCreated()

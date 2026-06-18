@@ -18,6 +18,16 @@ public class PokeApiPokemonSpecies
 
     [JsonPropertyName("flavor_text_entries")]
     public List<FlavorTextEntry>? FlavorTextEntries { get; set; }
+
+    [JsonPropertyName("evolution_chain")]
+    public EvolutionChainResource? EvolutionChain { get; set; }
+}
+
+/// <summary>Points at the <c>/evolution-chain/{id}</c> resource for this species' family.</summary>
+public class EvolutionChainResource
+{
+    [JsonPropertyName("url")]
+    public string? Url { get; set; }
 }
 
 public class FlavorTextEntry
