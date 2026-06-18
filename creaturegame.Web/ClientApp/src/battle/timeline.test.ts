@@ -88,10 +88,20 @@ describe('expandEvent — DamageDealt', () => {
     expect(at(1)).toEqual([undefined]); // neutral hit — default line colour
   });
 
-  it('emits the hit sound and updates HP before the log line', () => {
+  it('emits the hit sound + damage shake and updates HP before the log line', () => {
     const { steps } = expandEvent('DamageDealt',
       { targetName: 'ARTICUNO', damage: 20, typeEffectiveness: 1, hpAfter: 80, isCrit: false }, CTX);
-    expect(kinds(steps)).toEqual(['emit', 'dispatch', 'wait', 'dispatch', 'wait']);
+    expect(kinds(steps)).toEqual(['emit', 'emit', 'dispatch', 'wait', 'dispatch', 'wait']);
+  });
+
+  it('shakes the struck sprite (enemy side here), and not on an immune no-hit', () => {
+    const hit = expandEvent('DamageDealt',
+      { targetName: 'ARTICUNO', damage: 20, typeEffectiveness: 1, hpAfter: 80, isCrit: false }, CTX);
+    expect(emits(hit.steps)).toContainEqual({ type: 'playDamageShake', side: 'enemy' });
+
+    const immune = expandEvent('DamageDealt',
+      { targetName: 'ARTICUNO', damage: 0, typeEffectiveness: 0, hpAfter: 100, isCrit: false }, CTX);
+    expect(emits(immune.steps).some(c => c.type === 'playDamageShake')).toBe(false);
   });
 });
 

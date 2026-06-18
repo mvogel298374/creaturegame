@@ -19,6 +19,7 @@ export class BattleScene extends Phaser.Scene {
   private onMoveAnim   = (e: { attackerSide: 'player' | 'enemy'; targetSide: 'player' | 'enemy' }) =>
     this.playMoveAnimation(e.attackerSide, e.targetSide);
   private onFaintAnim  = (e: { side: 'player' | 'enemy' }) => this.playFaintAnimation(e.side);
+  private onDamageShake = (e: { side: 'player' | 'enemy' }) => this.shakeSprite(e.side);
   private onHitSound    = (e: { isCrit: boolean }) => (e.isCrit ? Audio.playHitCrit() : Audio.playHit());
   private onStatusSound = () => Audio.playStatusApplied();
   private onLevelUpSound = () => Audio.playLevelUp();
@@ -76,6 +77,7 @@ export class BattleScene extends Phaser.Scene {
 
     bridge.on('playMoveAnimation', this.onMoveAnim);
     bridge.on('playFaintAnimation', this.onFaintAnim);
+    bridge.on('playDamageShake', this.onDamageShake);
     bridge.on('playHitSound', this.onHitSound);
     bridge.on('playStatusSound', this.onStatusSound);
     bridge.on('playLevelUpSound', this.onLevelUpSound);
@@ -201,6 +203,25 @@ export class BattleScene extends Phaser.Scene {
     });
   }
 
+  // Hit reaction: a quick horizontal jolt on the sprite that just took damage. Fire-and-forget (not awaited
+  // by the timeline — it overlaps the hit sound + HP drain), and it only touches x, so it runs alongside the
+  // idle bob (which tweens y) without conflict. The jolt is directional — away from the attacker (player on
+  // the left flinches left, enemy on the right flinches right) — and snaps back to the rest x on completion.
+  private shakeSprite(side: 'player' | 'enemy') {
+    const sprite = side === 'player' ? this.playerSprite : this.enemySprite;
+    const originX = sprite.x;
+    const amp = side === 'player' ? -8 : 8;
+    this.tweens.add({
+      targets: sprite,
+      x: originX + amp,
+      duration: 45,
+      ease: 'Sine.easeInOut',
+      yoyo: true,
+      repeat: 2,
+      onComplete: () => { sprite.x = originX; },
+    });
+  }
+
   // A new wild enemy for the next encounter: load its sprite (if not cached), reset the slot the previous
   // enemy fainted out of (alpha/position), then slide the newcomer in and resume the idle bob. The player
   // sprite and the canvas persist across the whole run — only the enemy is swapped.
@@ -290,6 +311,7 @@ export class BattleScene extends Phaser.Scene {
   private teardown() {
     bridge.off('playMoveAnimation', this.onMoveAnim);
     bridge.off('playFaintAnimation', this.onFaintAnim);
+    bridge.off('playDamageShake', this.onDamageShake);
     bridge.off('playHitSound', this.onHitSound);
     bridge.off('playStatusSound', this.onStatusSound);
     bridge.off('playLevelUpSound', this.onLevelUpSound);

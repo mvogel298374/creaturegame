@@ -7,6 +7,8 @@ type BridgeEvents = {
   playMoveAnimation: { attackerSide: 'player' | 'enemy'; targetSide: 'player' | 'enemy' };
   playHitSound: { isCrit: boolean };
   playFaintAnimation: { side: 'player' | 'enemy' };
+  // Hit reaction: a quick horizontal jolt on the sprite that just took damage (fire-and-forget; not awaited).
+  playDamageShake: { side: 'player' | 'enemy' };
   playStatusSound: void;
   playLevelUpSound: void;
   // A new wild enemy for the next encounter in the chain — load + slide in the sprite.

@@ -14,9 +14,10 @@ STAB indicator, per-move effectiveness pill, colour-coded battle log, friendlier
 the tabbed **Pokémon overview screen** (CHECK POKEMON) (all archived). Suite: **932 .NET + 55 Vitest + 20
 Playwright E2E** (all green).
 
-**Next:** Remaining Web UI polish (sprite-shake on damage; `BattleEndedOverlay`/run-over screen ✅ done), then the
-Catch Mechanic / Game-Loop layer (party, save, evolution). The recovery/replace-move **modal** E2Es are
-unblocked now the per-run seed exists (pass a fixed `seed` in the `start` request for a deterministic run).
+**Next:** Web UI polish is essentially done (run-over screen + sprite-shake ✅; only the low-priority
+`ConsoleInput` terminal menu remains) — next is the Catch Mechanic / Game-Loop layer (party, save, evolution).
+The recovery/replace-move **modal** E2Es are unblocked now the per-run seed exists (pass a fixed `seed` in the
+`start` request for a deterministic run).
 
 ---
 
@@ -42,7 +43,12 @@ Stack: React 18 + TypeScript + SignalR + Phaser 3. (Phaser canvas & core animati
   off the per-turn event stream. Gen-1 model (single Special; physical/special by move type). Tests:
   `PlayerOverviewDtoTests` (stat + category mapping), `e2e/overview.spec.ts` (tab structure), live-verified.
   *(Between-battles/party entry stays with the deferred Game-Loop layer.)*
-- [ ] Sprite shake tween on damage received
+- [x] **Sprite shake tween on damage received** — **DONE 2026-06-18.** A quick directional horizontal jolt on
+  the struck sprite, emitted from the `DamageDealt` timeline step (`playDamageShake` bridge command → scene
+  `shakeSprite`). Fire-and-forget (overlaps the hit sound + HP drain, not awaited), touches only x so it
+  coexists with the idle bob, jolts away from the attacker, and snaps back to rest x. No shake on an immune
+  no-hit (the eff=0 early-return). Tests: `timeline.test.ts` (emit present + correct side; absent on immunity),
+  battle E2E lunge→hit ordering still green, live-verified.
 - [ ] `ConsoleInput : IBattleInput` — numbered move menu for terminal play (low priority)
 
 ---

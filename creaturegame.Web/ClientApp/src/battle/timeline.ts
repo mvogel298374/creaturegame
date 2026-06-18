@@ -60,6 +60,7 @@ export type Action =
 export type BridgeCommand =
   | { type: 'playMoveAnimation'; attackerSide: Side; targetSide: Side }
   | { type: 'playFaintAnimation'; side: Side }
+  | { type: 'playDamageShake'; side: Side }
   | { type: 'playHitSound'; isCrit: boolean }
   | { type: 'playStatusSound' }
   | { type: 'playLevelUpSound' }
@@ -343,6 +344,7 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
 
       return { steps: [
         emit({ type: 'playHitSound', isCrit }),
+        emit({ type: 'playDamageShake', side: side(targetName) }), // hit reaction: jolt the struck sprite
         d({ type: 'UPDATE_HP', name: targetName, hp: hpAfter }),
         w(650),
         d(log(msg, tone)),
@@ -672,6 +674,7 @@ function emitCommand(c: BridgeCommand): void {
   switch (c.type) {
     case 'playMoveAnimation':  bridge.emit('playMoveAnimation', { attackerSide: c.attackerSide, targetSide: c.targetSide }); break;
     case 'playFaintAnimation': bridge.emit('playFaintAnimation', { side: c.side }); break;
+    case 'playDamageShake':    bridge.emit('playDamageShake', { side: c.side }); break;
     case 'playHitSound':       bridge.emit('playHitSound', { isCrit: c.isCrit }); break;
     case 'playStatusSound':    bridge.emit('playStatusSound', undefined); break;
     case 'playLevelUpSound':   bridge.emit('playLevelUpSound', undefined); break;
