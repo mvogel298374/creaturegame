@@ -222,14 +222,27 @@ describe('expandEvent — control plane vs timeline', () => {
     expect(logLines(steps)).toEqual(['MEWTWO decided to keep going!']);
   });
 
-  it('CreatureEvolved announces the evolution (both forms)', () => {
+  it('CreatureEvolved announces both forms, plays the morph, and waits for it before the confirm line', () => {
     const { steps } = expandEvent('CreatureEvolved', {
       fromName: 'CHARMANDER', toName: 'CHARMELEON', fromSpeciesId: 4, toSpeciesId: 5,
     }, CTX);
+
     expect(logLines(steps)).toEqual([
       'What? CHARMANDER is evolving!',
       'CHARMANDER evolved into CHARMELEON!',
     ]);
+
+    // The morph command carries the evolved species id...
+    expect(emits(steps)).toContainEqual({ type: 'playEvolutionAnimation', toSpeciesId: 5 });
+
+    // ...and the timeline awaits it BEFORE the "evolved into" confirm line lands on the new sprite.
+    const animIdx = (steps ?? []).findIndex(s => s.kind === 'awaitAnim');
+    const confirmIdx = (steps ?? []).findIndex(
+      s => s.kind === 'dispatch' && s.action.type === 'LOG'
+        && s.action.message === 'CHARMANDER evolved into CHARMELEON!',
+    );
+    expect(animIdx).toBeGreaterThanOrEqual(0);
+    expect(animIdx).toBeLessThan(confirmIdx);
   });
 
   it('LeveledUp announces the level, plays the fanfare, and shows the stat-gain panel (no auto-hide)', () => {

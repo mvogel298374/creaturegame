@@ -19,6 +19,9 @@ type BridgeEvents = {
   // Revert the player sprite to its true species after a battle ends — Transform is undone at battle end,
   // and the player sprite (unlike the enemy's) isn't otherwise reset across the endless chain.
   resetPlayerSprite: void;
+  // Evolution (permanent): morph the player sprite into the evolved species with the classic Gen 1
+  // white-silhouette flicker. Awaited by the timeline (emits animationComplete on finish).
+  playEvolutionAnimation: { toSpeciesId: number };
   // Phaser → React
   entryComplete: void;
   animationComplete: void;

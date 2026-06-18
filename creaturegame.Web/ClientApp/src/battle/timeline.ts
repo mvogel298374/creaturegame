@@ -66,7 +66,8 @@ export type BridgeCommand =
   | { type: 'playLevelUpSound' }
   | { type: 'spawnEnemy'; enemySpeciesId: number }
   | { type: 'transformSprite'; side: Side; speciesId: number }
-  | { type: 'resetPlayerSprite' };
+  | { type: 'resetPlayerSprite' }
+  | { type: 'playEvolutionAnimation'; toSpeciesId: number };
 
 // One primitive instruction in a timeline.
 export type Step =
@@ -455,16 +456,18 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
     }
 
     // ── Evolution (between encounters) ─────────────────────────────────────────
-    // Stage 2: announce the evolution in the battle log. The Phaser sprite morph
-    // (old → white silhouette → new, via a BridgeCommand + BattleScene handler with
-    // an awaitAnim) lands in Stage 3; the arm's presence is the contract guard.
+    // Announce, play the white-silhouette morph (awaited so the log line lands on the evolved
+    // sprite), then confirm. The morph swaps front+back to the evolved species in the scene.
     case 'CreatureEvolved': {
-      const fromName = payload.fromName as string;
-      const toName   = payload.toName as string;
+      const fromName    = payload.fromName as string;
+      const toName      = payload.toName as string;
+      const toSpeciesId = payload.toSpeciesId as number;
       return { steps: [
         w(300),
         d(log(`What? ${fromName} is evolving!`)),
-        w(600),
+        w(400),
+        emit({ type: 'playEvolutionAnimation', toSpeciesId }),
+        anim(),
         d(log(`${fromName} evolved into ${toName}!`)),
         w(600),
       ] };
@@ -697,6 +700,7 @@ function emitCommand(c: BridgeCommand): void {
     case 'spawnEnemy':         bridge.emit('spawnEnemy', { enemySpeciesId: c.enemySpeciesId }); break;
     case 'transformSprite':    bridge.emit('transformSprite', { side: c.side, speciesId: c.speciesId }); break;
     case 'resetPlayerSprite':  bridge.emit('resetPlayerSprite', undefined); break;
+    case 'playEvolutionAnimation': bridge.emit('playEvolutionAnimation', { toSpeciesId: c.toSpeciesId }); break;
   }
 }
 

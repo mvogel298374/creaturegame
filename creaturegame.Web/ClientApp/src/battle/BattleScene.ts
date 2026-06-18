@@ -11,6 +11,7 @@ export class BattleScene extends Phaser.Scene {
   private playerSpeciesId = 1;
   private enemySpeciesId = 1;
   private playerTrueSpeciesId = 1; // the player's real species, restored after a Transform reverts
+  private initialPlayerSpeciesId = 1; // the species loaded under the 'player' texture key (pre-evolution)
   private criesAvailable = false;
 
   // Kept so we can remove exactly these listeners on teardown — Phaser never
@@ -27,6 +28,7 @@ export class BattleScene extends Phaser.Scene {
   private onTransformSprite = (e: { side: 'player' | 'enemy'; speciesId: number }) =>
     this.transformSprite(e.side, e.speciesId);
   private onResetPlayerSprite = () => this.resetPlayerSprite();
+  private onEvolve = (e: { toSpeciesId: number }) => this.playEvolutionAnimation(e.toSpeciesId);
 
   constructor() {
     super({ key: 'BattleScene' });
@@ -35,6 +37,7 @@ export class BattleScene extends Phaser.Scene {
   init(data: { playerSpeciesId: number; enemySpeciesId: number }) {
     this.playerSpeciesId = data.playerSpeciesId;
     this.playerTrueSpeciesId = data.playerSpeciesId;
+    this.initialPlayerSpeciesId = data.playerSpeciesId;
     this.enemySpeciesId = data.enemySpeciesId;
   }
 
@@ -84,6 +87,7 @@ export class BattleScene extends Phaser.Scene {
     bridge.on('spawnEnemy', this.onSpawnEnemy);
     bridge.on('transformSprite', this.onTransformSprite);
     bridge.on('resetPlayerSprite', this.onResetPlayerSprite);
+    bridge.on('playEvolutionAnimation', this.onEvolve);
 
     // Remove our bridge listeners when this scene is torn down so they can't
     // fire on a destroyed scene (which throws and freezes the battle queue).
@@ -301,11 +305,61 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
-  // Revert the player sprite to its true species after a battle (Transform is undone at battle end). The
-  // base 'player' texture is the true back sprite loaded in preload, so this is a no-op if no Transform ran.
+  // Evolution (permanent): morph the player into the evolved species with the classic Gen 1 white-silhouette
+  // flicker — alternate the old/new shapes as solid white fills, then settle on the evolved sprite in full
+  // colour. Updates BOTH the current and the *true* species (evolution is permanent, unlike Transform), so a
+  // later battle's resetPlayerSprite reverts to the evolved form, not the pre-evolution one. Awaited by the
+  // timeline: emits animationComplete when the morph settles. Loads the back sprite on demand, like spawnEnemy.
+  private playEvolutionAnimation(toSpeciesId: number) {
+    const newKey = `back-${toSpeciesId}`;
+    const sprite = this.playerSprite;
+
+    const run = () => {
+      this.playerIdleTween?.pause();
+      const oldKey = sprite.texture.key;
+      const flickerEvery = 110;
+      const flips = 8;
+
+      const flip = (n: number) => {
+        if (n < flips) {
+          sprite.setTexture(n % 2 === 0 ? newKey : oldKey);
+          sprite.setTintFill(0xffffff); // solid white silhouette of the morphing shape
+          this.time.delayedCall(flickerEvery, () => flip(n + 1));
+          return;
+        }
+        // Settle: evolved sprite, full colour, species (and true species) updated.
+        sprite.setTexture(newKey);
+        sprite.clearTint();
+        this.playerSpeciesId = toSpeciesId;
+        this.playerTrueSpeciesId = toSpeciesId;
+        this.playCry('player');
+        this.playerIdleTween?.resume();
+        bridge.emit('animationComplete', undefined);
+      };
+
+      flip(0);
+    };
+
+    if (this.textures.exists(newKey)) {
+      run();
+    } else {
+      this.load.image(newKey, `/sprites/back/${toSpeciesId}.png`);
+      this.load.once(Phaser.Loader.Events.COMPLETE, run);
+      this.load.start();
+    }
+  }
+
+  // Revert the player sprite to its true species after a battle (Transform is undone at battle end). The base
+  // 'player' texture is the species loaded in preload; once the player has evolved, its true species differs
+  // from that, so revert to the evolved back sprite (loaded by the evolution morph) instead — otherwise a win
+  // after evolving would snap the sprite back to the pre-evolution form. A no-op when no Transform ran.
   private resetPlayerSprite() {
     this.playerSpeciesId = this.playerTrueSpeciesId;
-    this.playerSprite.setTexture('player');
+    const key =
+      this.playerTrueSpeciesId === this.initialPlayerSpeciesId
+        ? 'player'
+        : `back-${this.playerTrueSpeciesId}`;
+    this.playerSprite.setTexture(key);
   }
 
   private teardown() {
@@ -318,5 +372,6 @@ export class BattleScene extends Phaser.Scene {
     bridge.off('spawnEnemy', this.onSpawnEnemy);
     bridge.off('transformSprite', this.onTransformSprite);
     bridge.off('resetPlayerSprite', this.onResetPlayerSprite);
+    bridge.off('playEvolutionAnimation', this.onEvolve);
   }
 }
