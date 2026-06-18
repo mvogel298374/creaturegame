@@ -621,3 +621,76 @@
 @media (prefers-reduced-motion: reduce) {
   .recovery-glow, .recovery-sprite { animation: none; }
 }
+
+/* ── Run-over / game-over screen (Endless Battle Chain RunEnded) ── */
+/* A heavier backdrop than the in-battle modals — the run is over, so dim the field hard and rise the
+   summary card in. Reuses .modal-overlay for the centred full-field cover. */
+.battle-end-overlay {
+  background: rgba(0, 0, 0, 0.78);
+}
+
+.battle-end-modal {
+  min-width: 280px;
+  max-width: 90%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--clr-bg-deep);
+  border: 2px solid #c0392b;
+  border-radius: 4px;
+  padding: var(--sp-lg);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.7), 0 0 24px rgba(192, 57, 43, 0.25);
+  animation: modal-rise 200ms ease-out;
+}
+
+.battle-end-title {
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #e8503a;
+  text-align: center;
+  margin-bottom: var(--sp-sm);
+}
+
+.battle-end-sprite-wrap {
+  width: 112px;
+  height: 112px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--sp-sm);
+}
+
+/* Greyscale + dimmed: the run's creature has fainted. */
+.battle-end-sprite {
+  width: 96px;
+  height: 96px;
+  image-rendering: pixelated;
+  filter: grayscale(1) brightness(0.7);
+  opacity: 0.85;
+}
+
+.battle-end-sub {
+  font-size: var(--fs-sm);
+  color: var(--clr-text);
+  text-align: center;
+  margin-bottom: var(--sp-md);
+}
+
+.battle-end-stats {
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+  color: var(--clr-text);
+  margin-bottom: var(--sp-md);
+}
+
+.battle-end-stats td { padding: 2px 0; }
+.battle-end-stat  { text-align: left;  padding-right: var(--sp-lg); letter-spacing: 1px; opacity: 0.8; }
+.battle-end-value { text-align: right; font-weight: 700; color: var(--clr-sky); }
+
+.battle-end-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-md);
+  width: 100%;
+}

@@ -4,18 +4,19 @@
 > [`TODO_ARCHIVE.md`](TODO_ARCHIVE.md) — read it only if you need the history of a finished item.
 > **See also:** `CLAUDE.md` (setup/commands) · `AI_CONTEXT.md` (profiles) · `DESIGN_GUIDES.md` (mechanics) · `DEV_STANDARDS.md` (conventions)
 
-**Current state (2026-06-17):** The Gen 1 battle engine is feature-complete — all 165 moves, XP & level-up,
+**Current state (2026-06-18):** The Gen 1 battle engine is feature-complete — all 165 moves, XP & level-up,
 the Endless Battle Chain, the Roguelite recovery/encounter layer, the Learnset System, **AI move selection**
 (a gen-specific `IBattleAi` brain), and **EV / Stat-Exp gain** are all done and archived in
 [`TODO_ARCHIVE.md`](TODO_ARCHIVE.md) (read it for the history of any finished item). `ARCHITECTURE.md`, the RNG
 **per-run web seed** (Tech Debt #3), and Architecture Review #7's higher-leverage structural items are also
-done (only the **minor cleanups** bullet remains — see Tech Debt). A round of **Web UI polish** also landed —
-STAB indicator, per-move effectiveness pill, colour-coded battle log, friendlier connection-error message (all
-archived). Suite: **930 .NET + 55 Vitest + 19 Playwright E2E** (all green).
+done (only the **minor cleanups** bullet remains — see Tech Debt). A round of **Web UI polish** landed too —
+STAB indicator, per-move effectiveness pill, colour-coded battle log, friendlier connection-error message, and
+the tabbed **Pokémon overview screen** (CHECK POKEMON) (all archived). Suite: **932 .NET + 55 Vitest + 20
+Playwright E2E** (all green).
 
-**Next:** More Web UI polish (Pokémon overview screen, sprite-shake on damage), then the Catch Mechanic /
-Game-Loop layer (party, save, evolution). The recovery/replace-move **modal** E2Es are unblocked now the
-per-run seed exists (pass a fixed `seed` in the `start` request for a deterministic run).
+**Next:** Remaining Web UI polish (sprite-shake on damage; `BattleEndedOverlay`/run-over screen ✅ done), then the
+Catch Mechanic / Game-Loop layer (party, save, evolution). The recovery/replace-move **modal** E2Es are
+unblocked now the per-run seed exists (pass a fixed `seed` in the `start` request for a deterministic run).
 
 ---
 
@@ -26,8 +27,13 @@ Stack: React 18 + TypeScript + SignalR + Phaser 3. (Phaser canvas & core animati
 > Done UI-polish items (level-up toast, STAB indicator, per-move effectiveness pill, colour-coded battle log,
 > friendlier connection-error message) are archived under **Web UI Polish pass (2026-06-17)** in `TODO_ARCHIVE.md`.
 
-- [ ] `BattleEndedOverlay` — **superseded by the Endless Battle Chain's `RunEnded` game-over screen** (a
-  per-`BattleEnded` overlay no longer fits an endless chain); build it there, run-scoped, not per battle
+- [x] `BattleEndedOverlay` — **DONE 2026-06-18.** Run-scoped game-over screen for the Endless Battle Chain,
+  driven by the terminal `RunEnded` event (→ `phase: 'ended'`), **not** a per-`BattleEnded` overlay (a win is
+  just an intermission in the chain). Full-field `alertdialog` over a hard-dimmed field: "GAME OVER", a greyed
+  faint sprite, a run summary (BATTLES WON / FINAL LEVEL), and **PLAY AGAIN** (→ `/select`, fresh starter pick)
+  / **QUIT** (→ title). Replaces the old one-line "Game over" action-prompt; the in-battle FIGHT/CHECK menu is
+  hidden when ended. Tests: `endless-chain.spec.ts` "a run ends…" asserts the overlay + PLAY AGAIN → `/select`
+  (timeline's `RUN_ENDED` dispatch already unit-covered), live-verified.
 - [x] **Pokémon overview screen** — **DONE 2026-06-18.** Tabbed INFO / STATS / MOVES overview replacing the
   old base-stats `CheckPanel`, opened by the in-battle CHECK POKEMON action. Shows actual stats + per-stat DV
   (0–15) + Stat-Exp, types/status/HP/XP/BST + front sprite (INFO), and per-move type/category/power/accuracy/

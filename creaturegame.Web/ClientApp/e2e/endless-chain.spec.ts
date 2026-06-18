@@ -35,10 +35,18 @@ test.describe('Endless chain', () => {
     const log = await playToRunEnd(page);
     expect(log.some(l => /Run over/.test(l))).toBe(true);
 
-    // Game-over phase: the action prompt switches to the run summary and the FIGHT/CHECK actions are gone,
-    // leaving only QUIT.
-    await expect(page.locator('.action-prompt')).toContainText(/Game over/);
-    await expect(page.getByRole('button', { name: /QUIT/i })).toBeVisible();
+    // Game-over phase: the run-scoped game-over overlay takes over. It shows the run summary and offers
+    // PLAY AGAIN / QUIT; the in-battle FIGHT/CHECK action menu is gone.
+    const overlay = page.getByRole('alertdialog', { name: /Game over/i });
+    await expect(overlay).toBeVisible();
+    await expect(overlay.getByText('GAME OVER')).toBeVisible();
+    await expect(overlay.getByText(/BATTLES WON/i)).toBeVisible();
+    await expect(overlay.getByRole('button', { name: /PLAY AGAIN/i })).toBeVisible();
+    await expect(overlay.getByRole('button', { name: /QUIT/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /^FIGHT/i })).toHaveCount(0);
+
+    // PLAY AGAIN starts a fresh run from the starter-selection screen.
+    await overlay.getByRole('button', { name: /PLAY AGAIN/i }).click();
+    await expect(page).toHaveURL(/\/select$/);
   });
 });

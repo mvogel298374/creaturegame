@@ -95,13 +95,10 @@ export function BattleScreen() {
         </div>
 
         <div className="battle-controls">
-          {controlView === 'menu' && (
+          {controlView === 'menu' && state.phase !== 'ended' && (
             <ActionMenu
               playerName={playerName}
               canFight={state.phase === 'choosing' && !state.animating}
-              battleEnded={state.phase === 'ended'}
-              battlesWon={state.battlesWon}
-              finalLevel={state.playerLevel}
               onFight={() => { onAnyInput(); setControlView('fight'); }}
               onCheck={() => { onAnyInput(); setControlView('check'); }}
               onBack={() => { onAnyInput(); nav('/'); }}
@@ -128,6 +125,63 @@ export function BattleScreen() {
       {state.recovery && (
         <RecoveryModal prompt={state.recovery} onRespond={respondRecovery} />
       )}
+
+      {state.phase === 'ended' && (
+        <BattleEndedOverlay
+          creatureName={playerName}
+          speciesId={playerSpecies?.id ?? 1}
+          battlesWon={state.battlesWon}
+          finalLevel={state.playerLevel}
+          onPlayAgain={() => nav('/select')}
+          onQuit={() => nav('/')}
+        />
+      )}
+    </div>
+  );
+}
+
+// Run-scoped game-over screen for the Endless Battle Chain: shown once the player's creature faints and the
+// run ends (driven by the terminal RunEnded event → phase 'ended'). Not a per-battle overlay — a win is just
+// an intermission in the chain, so this only appears at the run's true end. Summarises the run (creature,
+// battles won, final level) over a greyed faint sprite and offers PLAY AGAIN (a fresh starter pick) or QUIT.
+function BattleEndedOverlay({ creatureName, speciesId, battlesWon, finalLevel, onPlayAgain, onQuit }: {
+  creatureName: string;
+  speciesId: number;
+  battlesWon: number;
+  finalLevel: number;
+  onPlayAgain: () => void;
+  onQuit: () => void;
+}) {
+  return (
+    <div className="modal-overlay battle-end-overlay">
+      <div className="battle-end-modal" role="alertdialog" aria-label="Game over">
+        <p className="battle-end-title">GAME OVER</p>
+        <div className="battle-end-sprite-wrap">
+          <img
+            className="battle-end-sprite"
+            src={`/sprites/front/${speciesId}.png`}
+            alt={creatureName}
+            draggable={false}
+          />
+        </div>
+        <p className="battle-end-sub">{creatureName} fainted.</p>
+        <table className="battle-end-stats">
+          <tbody>
+            <tr>
+              <td className="battle-end-stat">BATTLES WON</td>
+              <td className="battle-end-value">{battlesWon}</td>
+            </tr>
+            <tr>
+              <td className="battle-end-stat">FINAL LEVEL</td>
+              <td className="battle-end-value">Lv{finalLevel}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div className="battle-end-buttons">
+          <button className="action-btn action-btn--fight" onClick={onPlayAgain}>PLAY AGAIN</button>
+          <button className="action-btn" onClick={onQuit}>QUIT</button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -287,37 +341,28 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function ActionMenu({ playerName, canFight, battleEnded, battlesWon, finalLevel, onFight, onCheck, onBack }: {
+function ActionMenu({ playerName, canFight, onFight, onCheck, onBack }: {
   playerName: string;
   canFight: boolean;
-  battleEnded: boolean;
-  battlesWon: number;
-  finalLevel: number;
   onFight: () => void;
   onCheck: () => void;
   onBack: () => void;
 }) {
   return (
     <div className="action-menu">
-      <p className="action-prompt">
-        {battleEnded
-          ? `Game over — ${battlesWon} win${battlesWon === 1 ? '' : 's'}, reached Lv${finalLevel}.`
-          : `What will ${playerName} do?`}
-      </p>
-      {!battleEnded && (
-        <div className="action-buttons">
-          <button
-            className={`action-btn action-btn--fight ${!canFight ? 'action-btn--waiting' : ''}`}
-            onClick={onFight}
-            disabled={!canFight}
-          >
-            FIGHT
-          </button>
-          <button className="action-btn" onClick={onCheck}>
-            CHECK POKEMON
-          </button>
-        </div>
-      )}
+      <p className="action-prompt">What will {playerName} do?</p>
+      <div className="action-buttons">
+        <button
+          className={`action-btn action-btn--fight ${!canFight ? 'action-btn--waiting' : ''}`}
+          onClick={onFight}
+          disabled={!canFight}
+        >
+          FIGHT
+        </button>
+        <button className="action-btn" onClick={onCheck}>
+          CHECK POKEMON
+        </button>
+      </div>
       <button className="btn-ghost action-back" onClick={onBack}>← QUIT</button>
     </div>
   );
