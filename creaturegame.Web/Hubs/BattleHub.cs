@@ -22,6 +22,18 @@ public class BattleHub(GameSessionManager manager) : Hub<IBattleClient>
     }
 
     /// <summary>
+    /// Uses a bag item this turn: <paramref name="itemId"/> is the item to use and
+    /// <paramref name="targetMoveSlot"/> the move slot (0–3) a single-move PP restore targets (null
+    /// otherwise). Mirrors <see cref="ChooseMove"/> — fire-and-forget completion of the turn handshake the
+    /// battle loop is blocked on. An item that has no effect is resolved by the engine (`ItemUseFailed`).
+    /// </summary>
+    public Task UseItem(int itemId, int? targetMoveSlot)
+    {
+        manager.SetItemChoice(Context.ConnectionId, itemId, targetMoveSlot);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
     /// Answers a level-up move-replacement prompt: <paramref name="slotIndex"/> is the move (0–3) to forget
     /// and replace, or <c>null</c> to decline (SkipNewMove). Mirrors <see cref="ChooseMove"/> — fire-and-forget
     /// completion of the input TCS the battle loop is blocked on.

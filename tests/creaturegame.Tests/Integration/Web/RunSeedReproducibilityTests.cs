@@ -20,7 +20,8 @@ public class RunSeedReproducibilityTests
     private static EncounterFactory BuildFactory() =>
         new(
             new LiveDbContextFactory<PokemonDbContext>(() => new PokemonDbContext()),
-            new LiveDbContextFactory<MovesDbContext>(() => new MovesDbContext())
+            new LiveDbContextFactory<MovesDbContext>(() => new MovesDbContext()),
+            new LiveDbContextFactory<ItemsDbContext>(() => new ItemsDbContext())
         );
 
     private const int Bulbasaur = 1;
@@ -36,6 +37,20 @@ public class RunSeedReproducibilityTests
         Assert.NotNull(a);
         Assert.NotNull(b);
         AssertSameCreature(a!.Player, b!.Player);
+    }
+
+    [Fact]
+    public async Task CreatePlayerSetup_SeedsTheRunBagFromTheItemCatalog()
+    {
+        var setup = await BuildFactory()
+            .CreatePlayerSetupAsync(Bulbasaur, 50, new SeededRandomSource(1));
+
+        Assert.NotNull(setup);
+        Assert.NotEmpty(setup!.AllItems);
+        // Every catalog item is stocked in the bag with a positive quantity (the generous test loadout).
+        Assert.All(setup.AllItems, i => Assert.True(setup.Bag.Count(i.Id) > 0));
+        // A known battle item is present (Potion, id 17).
+        Assert.True(setup.Bag.Count(17) > 0);
     }
 
     [Fact]

@@ -3,6 +3,7 @@ using creaturegame.Combat;
 using creaturegame.Creatures;
 using creaturegame.DB;
 using creaturegame.Evolution;
+using creaturegame.Items;
 using Microsoft.EntityFrameworkCore;
 using static creaturegame.Creatures.EncounterSelector;
 
@@ -16,11 +17,17 @@ namespace creaturegame.Web.Battle;
 /// </summary>
 public sealed class EncounterFactory(
     IDbContextFactory<PokemonDbContext> pokemonFactory,
-    IDbContextFactory<MovesDbContext> movesFactory
+    IDbContextFactory<MovesDbContext> movesFactory,
+    IDbContextFactory<ItemsDbContext> itemsFactory
 )
 {
     // The single generation switch — learnset rows are tagged by generation and filtered by this.
     private const int ActiveGeneration = 1;
+
+    // Generous test-bag loadout: every imported item, this many each. The bag is transient (no save
+    // layer yet) and per-run; the acquisition layer will replace this fixed seed later. (Items with no
+    // in-battle effect yet — Balls, Revives — ride along and simply report "no effect" if used.)
+    private const int TestBagQuantityEach = 20;
 
     /// <summary>
     /// Loads the move pool and builds the player creature with its canonical moveset. Returns null if the
@@ -61,7 +68,14 @@ public sealed class EncounterFactory(
         // Only the player levels up, so only the player carries a learnset (its moves resolved up-front and
         // consulted by the battle loop on each level gained). Persists with the creature across the chain.
         player.Learnset = BuildLearnset(learnsets, allMoves);
-        return new RunSetup(player, allMoves);
+
+        // Seed the run's bag from the item catalog. Held by the session and threaded into every Battle;
+        // consumed items stay gone across the chain (the Poké Center refills HP/PP/status, not the bag).
+        await using var itemsCtx = await itemsFactory.CreateDbContextAsync();
+        var allItems = await itemsCtx.Items.AsNoTracking().ToListAsync();
+        var bag = Bag.WithEach(allItems.Select(i => i.Id), TestBagQuantityEach);
+
+        return new RunSetup(player, allMoves, bag, allItems);
     }
 
     /// <summary>
@@ -221,5 +235,12 @@ public sealed class EncounterFactory(
     }
 }
 
-/// <summary>The starting state of a run: the built player and the shared move pool the chain reuses.</summary>
-public sealed record RunSetup(Creature Player, IReadOnlyList<Attack> AllMoves);
+/// <summary>The starting state of a run: the built player, the shared move pool the chain reuses, the run's
+/// starting <see cref="Bag"/>, and the item catalog (id → <see cref="Item"/>) used to resolve item uses and
+/// render the bag.</summary>
+public sealed record RunSetup(
+    Creature Player,
+    IReadOnlyList<Attack> AllMoves,
+    Bag Bag,
+    IReadOnlyList<Item> AllItems
+);

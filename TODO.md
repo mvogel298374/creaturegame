@@ -12,10 +12,11 @@ evolution end-to-end incl. the Phaser sprite-morph + a Gen 1 B-cancel prompt) ar
 **per-run web seed** (Tech Debt #3), and Architecture Review #7's higher-leverage structural items are also
 done (only the **minor cleanups** bullet remains — see Tech Debt). A round of **Web UI polish** landed too —
 STAB indicator, per-move effectiveness pill, colour-coded battle log, friendlier connection-error message, and
-the tabbed **Pokémon overview screen** (CHECK POKEMON) (all archived). Suite: **1055 .NET + 62 Vitest + 20
+the tabbed **Pokémon overview screen** (CHECK POKEMON) (all archived). Suite: **1062 .NET + 62 Vitest + 20
 Playwright E2E** (all green). The **Gen 1 item-data import** (battle-usable items → `items.db`) and the
-**item-use battle layer Phase 1** (engine: Bag, ItemAction, item-effect registry) are also done
-(2026-06-19) — see their sections.
+**item-use battle layer Phases 1–2** (engine: Bag, ItemAction, item-effect registry; web wire: bag
+threaded through the run, `BattleHub.UseItem`, `GET /{gameId}/bag`) are also done (2026-06-19/20) — see
+their sections. Item use is now reachable backend-to-engine; only the **Phase 3 frontend bag UI** remains.
 
 **Next:** **Encounter Logic** (see its section) — the design of *what* the player faces and *how* they can
 acquire it, which must land **before** any catch/acquisition mechanic. The Catch Mechanic is intentionally
@@ -253,11 +254,18 @@ Pokémon using bag items in battle: the use-in-battle layer on top of the item-d
 - [x] Tests: `ItemEffectTests` (effects + Bag) + `ItemActionBattleTests` (item-first priority, use-while-
   asleep, consume, no-effect failure) + 3 Vitest timeline arms. Suite **1055 .NET + 62 Vitest**, all green.
 
-**Phase 2 — web wire (NOT started):**
-- [ ] `BattleHub.UseItem(gameId, itemId, targetMoveSlot?)` → `SignalRInput` resolves an `ItemTurnChoice`
-  (TCS handshake like the other prompts); thread a `Bag` through `GameSessionManager`/`BattleRunner` into
-  `Battle` (seed the generous test bag from `ItemService`).
-- [ ] `GET /{gameId}/bag` endpoint (item id/name/category/qty) for the menu.
+**Phase 2 — web wire — ✅ DONE 2026-06-20:**
+- [x] `BattleHub.UseItem(itemId, targetMoveSlot?)` → `GameSessionManager.SetItemChoice` → `SignalRInput`.
+  `SignalRInput` refactored to a single per-turn handshake (`ChooseTurnActionAsync` backed by one TCS that
+  resolves to a move **or** an item; `SetChoice`/`SetItemChoice` complete it; `ChooseMoveAsync` is a thin
+  move-only wrapper). Closes seam-reviewer Advisory #2 — items only ever flow when a bag is wired.
+- [x] Bag threaded end-to-end: `EncounterFactory` seeds a per-run `Bag` from `items.db` (generous test
+  loadout — every item ×20) + item catalog on `RunSetup` → `GameController` → `GameSessionManager` →
+  `BattleRunner(playerBag:)` → every `Battle`. Bag is per-run (consumed items stay gone; Poké Center
+  refills HP/PP/status only).
+- [x] `GET /{gameId}/bag` endpoint (`BagItemView`: id/name/category/qty/description) for the menu.
+- [x] Tests: `SignalRInputTests` (move/item/fallback/cancel handshake) + bag-seeding assertion in
+  `RunSeedReproducibilityTests`. Suite **1062 .NET + 62 Vitest**, all green.
 
 **Phase 3 — frontend (NOT started):**
 - [ ] Bag button + item list in the battle menu (fetch the bag, send `UseItem`); PP-restore move-slot pick.

@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+
 namespace creaturegame.Items;
 
 /// <summary>
@@ -5,10 +7,13 @@ namespace creaturegame.Items;
 /// <para><b>Not persisted yet</b> — there is no save layer (deferred with the Catch milestone). For now
 /// the web/session layer seeds a bag per run; later the acquisition layer fills it. The battle engine
 /// consumes from it when an item is successfully used.</para>
+/// <para>Backed by a <see cref="ConcurrentDictionary{TKey,TValue}"/>: the battle loop is the single writer
+/// (consume on use), but a web request thread may read <see cref="Entries"/> concurrently for the bag UI,
+/// and a concurrent dictionary enumeration is safe (a plain <c>Dictionary</c> can throw on a racing read).</para>
 /// </summary>
 public sealed class Bag
 {
-    private readonly Dictionary<int, int> _quantities = new();
+    private readonly ConcurrentDictionary<int, int> _quantities = new();
 
     public Bag() { }
 
@@ -17,6 +22,16 @@ public sealed class Bag
         foreach (var (id, qty) in entries)
             if (qty > 0)
                 _quantities[id] = qty;
+    }
+
+    /// <summary>Builds a bag holding <paramref name="quantity"/> of each of the given item ids — used to
+    /// seed a run's starting bag (e.g. the generous test loadout from the item catalog).</summary>
+    public static Bag WithEach(IEnumerable<int> itemIds, int quantity)
+    {
+        var bag = new Bag();
+        foreach (var id in itemIds)
+            bag.Add(id, quantity);
+        return bag;
     }
 
     /// <summary>How many of <paramref name="itemId"/> are held (0 if none).</summary>
@@ -31,14 +46,15 @@ public sealed class Bag
         _quantities[itemId] = Count(itemId) + quantity;
     }
 
-    /// <summary>Removes one of <paramref name="itemId"/>; returns false (no change) if none are held.</summary>
+    /// <summary>Removes one of <paramref name="itemId"/>; returns false (no change) if none are held.
+    /// Called only from the single-writer battle loop, so the read-modify-write needs no extra locking.</summary>
     public bool Consume(int itemId)
     {
         int held = Count(itemId);
         if (held <= 0)
             return false;
         if (held == 1)
-            _quantities.Remove(itemId);
+            _quantities.TryRemove(itemId, out _);
         else
             _quantities[itemId] = held - 1;
         return true;

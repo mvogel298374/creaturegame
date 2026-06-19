@@ -18,7 +18,8 @@ public class EncounterEvolutionTests
     private static EncounterFactory BuildFactory() =>
         new(
             new LiveEvoDbContextFactory<PokemonDbContext>(() => new PokemonDbContext()),
-            new LiveEvoDbContextFactory<MovesDbContext>(() => new MovesDbContext())
+            new LiveEvoDbContextFactory<MovesDbContext>(() => new MovesDbContext()),
+            new LiveEvoDbContextFactory<ItemsDbContext>(() => new ItemsDbContext())
         );
 
     private const int Bulbasaur = 1;

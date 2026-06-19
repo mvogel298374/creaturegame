@@ -1,28 +1,64 @@
 using creaturegame.Attacks;
 using creaturegame.Combat;
+using creaturegame.Items;
 
 namespace creaturegame.Web.Battle;
 
 public sealed class SignalRInput : IBattleInput
 {
-    private volatile TaskCompletionSource<int>? _tcs;
+    // One pending turn choice — the player picks either a move (FIGHT) or a bag item (ITEM); both
+    // complete this same TCS, so the battle loop blocks on a single handshake per turn.
+    private volatile TaskCompletionSource<TurnRequest>? _turnTcs;
     private volatile TaskCompletionSource<int?>? _forgetTcs;
     private volatile TaskCompletionSource<bool>? _recoveryTcs;
     private volatile TaskCompletionSource<bool>? _evolutionTcs;
     private volatile bool _cancelled;
 
-    public async Task<PokemonAttack> ChooseMoveAsync(TurnContext context)
+    // The raw request the hub completes the turn handshake with, mapped to a TurnChoice below.
+    private abstract record TurnRequest;
+
+    private sealed record MoveRequest(int Index) : TurnRequest;
+
+    private sealed record ItemRequest(Item Item, int? TargetMoveSlot) : TurnRequest;
+
+    /// <summary>
+    /// The player's whole-turn choice: FIGHT (a move) or ITEM (a bag item). Overrides the default
+    /// (move-only) so the interactive player can use the bag; the hub completes the handshake via
+    /// <see cref="SetChoice"/> or <see cref="SetItemChoice"/>.
+    /// </summary>
+    public async Task<TurnChoice> ChooseTurnActionAsync(TurnContext context)
     {
-        // Disconnect may land while it's the enemy's turn (no pending _tcs); the
-        // flag makes the *next* player turn throw immediately instead of hanging.
+        // Disconnect may land while it's the enemy's turn (no pending TCS); the flag makes the *next*
+        // player turn throw immediately instead of hanging.
         if (_cancelled)
             throw new OperationCanceledException("Battle input cancelled (client disconnected).");
 
-        var tcs = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
-        _tcs = tcs;
-        var index = await tcs.Task; // throws OperationCanceledException if Cancel() ran
-        _tcs = null;
+        var tcs = new TaskCompletionSource<TurnRequest>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        _turnTcs = tcs;
+        var request = await tcs.Task; // throws OperationCanceledException if Cancel() ran
+        _turnTcs = null;
 
+        return request switch
+        {
+            ItemRequest item => new ItemTurnChoice(item.Item, item.TargetMoveSlot),
+            MoveRequest move => new MoveTurnChoice(ResolveMove(context, move.Index)),
+            _ => new MoveTurnChoice(ResolveMove(context, -1)),
+        };
+    }
+
+    // FIGHT only — kept so the interface contract holds; never returns an item to a move-only caller.
+    public async Task<PokemonAttack> ChooseMoveAsync(TurnContext context)
+    {
+        var choice = await ChooseTurnActionAsync(context);
+        return choice is MoveTurnChoice m ? m.Move : ResolveMove(context, -1);
+    }
+
+    // Maps a chosen slot index to a usable move, with the same validation as before: in range, has PP,
+    // not Disabled — else fall back to the first selectable move (an out-of-range -1 always falls back).
+    private static PokemonAttack ResolveMove(TurnContext context, int index)
+    {
         var moves = context.Attacker.MoveSet;
         if (
             index >= 0
@@ -32,15 +68,22 @@ public sealed class SignalRInput : IBattleInput
         )
             return moves[index];
 
-        // Fallback (out-of-range / a Disabled or PP-less slot slipped through): first selectable move.
         return moves.FirstOrDefault(m => m.PowerPointsCurrent > 0 && m != context.DisabledMove)
             ?? throw new InvalidOperationException($"{context.Attacker.Name}: no moves available");
     }
 
     public void SetChoice(int index)
     {
-        var tcs = _tcs;
-        tcs?.TrySetResult(index);
+        var tcs = _turnTcs;
+        tcs?.TrySetResult(new MoveRequest(index));
+    }
+
+    /// <summary>Completes the turn handshake with a bag-item choice (the resolved <see cref="Item"/> and,
+    /// for a single-move PP restore, the target move slot). Routed from <c>BattleHub.UseItem</c>.</summary>
+    public void SetItemChoice(Item item, int? targetMoveSlot)
+    {
+        var tcs = _turnTcs;
+        tcs?.TrySetResult(new ItemRequest(item, targetMoveSlot));
     }
 
     /// <summary>
@@ -128,7 +171,7 @@ public sealed class SignalRInput : IBattleInput
     public void Cancel()
     {
         _cancelled = true;
-        _tcs?.TrySetCanceled();
+        _turnTcs?.TrySetCanceled();
         _forgetTcs?.TrySetCanceled();
         _recoveryTcs?.TrySetCanceled();
         _evolutionTcs?.TrySetCanceled();

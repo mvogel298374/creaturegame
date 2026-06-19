@@ -27,10 +27,17 @@ public class GameController(GameSessionManager sessionManager, EncounterFactory 
             if (setup == null)
                 return BadRequest(new { error = "Unknown species or empty move database" });
 
-            // The session holds the persistent player, the shared move pool, and the run's seeded RNG; each
-            // encounter's enemy is built by the run loop via the EncounterFactory (so the chain can keep
-            // producing foes), all drawing from the same stream.
-            var gameId = sessionManager.RegisterSession(setup.Player, setup.AllMoves, rng, seed);
+            // The session holds the persistent player, the shared move pool, the run's bag + item catalog, and
+            // the run's seeded RNG; each encounter's enemy is built by the run loop via the EncounterFactory
+            // (so the chain can keep producing foes), all drawing from the same stream.
+            var gameId = sessionManager.RegisterSession(
+                setup.Player,
+                setup.AllMoves,
+                setup.Bag,
+                setup.AllItems,
+                rng,
+                seed
+            );
             Console.WriteLine($"[GameController] Started run {gameId} with seed {seed}.");
             return Ok(new { gameId, seed });
         }
@@ -52,6 +59,19 @@ public class GameController(GameSessionManager sessionManager, EncounterFactory 
         if (player is null)
             return NotFound(new { error = "No active game with that id" });
         return Ok(PlayerOverviewDto.From(player));
+    }
+
+    /// <summary>
+    /// The run's current bag contents (held quantity joined with item data) for the in-battle bag menu.
+    /// Reads the live session bag; 404 if the game is unknown or not yet started.
+    /// </summary>
+    [HttpGet("{gameId}/bag")]
+    public IActionResult GetBag(string gameId)
+    {
+        var bag = sessionManager.GetBagContents(gameId);
+        if (bag is null)
+            return NotFound(new { error = "No active game with that id" });
+        return Ok(bag);
     }
 }
 

@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using creaturegame.Attacks;
 using creaturegame.Combat;
 using creaturegame.Creatures;
+using creaturegame.Items;
 using creaturegame.Web.Hubs;
 using Microsoft.AspNetCore.SignalR;
 
@@ -26,12 +27,22 @@ public sealed class GameSessionManager(
     public string RegisterSession(
         Creature player,
         IReadOnlyList<Attack> allMoves,
+        Bag bag,
+        IReadOnlyList<Item> allItems,
         IRandomSource rng,
         int seed
     )
     {
         var gameId = Guid.NewGuid().ToString("N");
-        _pending[gameId] = new PendingSession(player, allMoves, rng, seed, DateTimeOffset.UtcNow);
+        _pending[gameId] = new PendingSession(
+            player,
+            allMoves,
+            bag,
+            allItems,
+            rng,
+            seed,
+            DateTimeOffset.UtcNow
+        );
         EvictExpiredPendingSessions();
         return gameId;
     }
@@ -71,6 +82,8 @@ public sealed class GameSessionManager(
         {
             CurrentConnectionId = connectionId,
             Player = session.Player,
+            Bag = session.Bag,
+            ItemsById = session.AllItems.ToDictionary(i => i.Id),
         };
         _active[gameId] = battle;
         _connToGame[connectionId] = gameId;
@@ -98,7 +111,9 @@ public sealed class GameSessionManager(
             rng: session.Rng,
             // Between encounters, resolve any pending evolution against the DB (edges → IEvolutionRules →
             // evolved species + learnset). The runner applies it; the data concern stays in the web layer.
-            checkEvolution: p => encounters.ResolvePlayerEvolutionAsync(p, session.AllMoves)
+            checkEvolution: p => encounters.ResolvePlayerEvolutionAsync(p, session.AllMoves),
+            // The run's bag, threaded into every Battle's player side; consumed items stay gone across the chain.
+            playerBag: session.Bag
         );
 
         _ = Task.Run(async () =>
@@ -150,6 +165,55 @@ public sealed class GameSessionManager(
             && _active.TryGetValue(gameId, out var battle)
         )
             battle.Input.SetChoice(moveIndex);
+    }
+
+    /// <summary>Routes a bag-item use to the battle's input: resolves the item from the run's catalog and
+    /// completes the turn handshake. The engine's <c>ItemAction</c> does the has-in-bag + would-have-effect
+    /// checks (a no-op use yields <c>ItemUseFailed</c> and the turn proceeds), so this only validates that the
+    /// id is a real catalog item. An unknown id is ignored (a malformed client request).</summary>
+    public void SetItemChoice(string connectionId, int itemId, int? targetMoveSlot)
+    {
+        if (
+            !_connToGame.TryGetValue(connectionId, out var gameId)
+            || !_active.TryGetValue(gameId, out var battle)
+        )
+            return;
+
+        if (battle.ItemsById.TryGetValue(itemId, out var item))
+        {
+            battle.Input.SetItemChoice(item, targetMoveSlot);
+        }
+        else
+        {
+            // Unknown item id (malformed/stale client request): don't leave the turn handshake parked.
+            // Advance the turn with a move fallback (ResolveMove(-1) → first selectable), mirroring the
+            // out-of-range move-slot handling. ItemAction stays the authority for a *known* item that's out
+            // of stock or would have no effect (it soft-fails with ItemUseFailed and the turn proceeds).
+            battle.Input.SetChoice(-1);
+        }
+    }
+
+    /// <summary>The run's current bag contents (held quantity joined with item data) for the bag UI, or null
+    /// if the game is unknown / not yet started. Reads live session state — display-only.</summary>
+    public IReadOnlyList<BagItemView>? GetBagContents(string gameId)
+    {
+        if (!_active.TryGetValue(gameId, out var battle) || battle.Bag is null)
+            return null;
+        return battle
+            .Bag.Entries.Where(e => e.Value > 0 && battle.ItemsById.ContainsKey(e.Key))
+            .Select(e =>
+            {
+                var item = battle.ItemsById[e.Key];
+                return new BagItemView(
+                    item.Id,
+                    item.Name ?? "",
+                    item.Category.ToString(),
+                    e.Value,
+                    item.Description ?? ""
+                );
+            })
+            .OrderBy(v => v.Id)
+            .ToList();
     }
 
     /// <summary>Routes a level-up replace-move answer (slot 0–3, or null to decline) to the battle's input.</summary>
@@ -204,9 +268,20 @@ public sealed class GameSessionManager(
 sealed record PendingSession(
     Creature Player,
     IReadOnlyList<Attack> AllMoves,
+    Bag Bag,
+    IReadOnlyList<Item> AllItems,
     IRandomSource Rng,
     int Seed,
     DateTimeOffset RegisteredAt
+);
+
+/// <summary>A bag entry for the client: the item plus how many the run is holding.</summary>
+public sealed record BagItemView(
+    int Id,
+    string Name,
+    string Category,
+    int Quantity,
+    string Description
 );
 
 /// <summary>A running battle plus the connection currently bound to it and its abandon timer.</summary>
@@ -217,6 +292,11 @@ sealed class ActiveBattle
 
     // The persistent player creature for this run, for the on-demand overview snapshot (read-only display use).
     public Creature? Player;
+
+    // The run's bag (threaded into every Battle) and the item catalog used to resolve a UseItem and render
+    // the bag. Set when the session is claimed; never reassigned.
+    public Bag? Bag;
+    public IReadOnlyDictionary<int, Item> ItemsById = new Dictionary<int, Item>();
 
     private readonly object _lock = new();
     private CancellationTokenSource? _abandonCts;

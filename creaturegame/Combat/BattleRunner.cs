@@ -1,6 +1,7 @@
 using creaturegame.Attacks;
 using creaturegame.Creatures;
 using creaturegame.Evolution;
+using creaturegame.Items;
 
 namespace creaturegame.Combat;
 
@@ -34,7 +35,8 @@ public sealed class BattleRunner(
     IBattleRules? rules = null,
     IRandomSource? rng = null,
     int healEveryNBattles = 3,
-    Func<Creature, Task<EvolutionOutcome?>>? checkEvolution = null
+    Func<Creature, Task<EvolutionOutcome?>>? checkEvolution = null,
+    Bag? playerBag = null
 )
 {
     public async Task RunAsync()
@@ -55,7 +57,8 @@ public sealed class BattleRunner(
                 rules: rules,
                 emitter: emitter,
                 rng: rng,
-                playerEntryStatus: carried
+                playerEntryStatus: carried,
+                playerBag: playerBag
             );
             await battle.StartFightAsync();
 
