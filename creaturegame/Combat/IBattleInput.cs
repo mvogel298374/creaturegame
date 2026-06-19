@@ -1,7 +1,18 @@
 using creaturegame.Attacks;
 using creaturegame.Creatures;
+using creaturegame.Items;
 
 namespace creaturegame.Combat;
+
+/// <summary>What a side chose to do this turn: use a move (FIGHT) or use a bag item (ITEM).</summary>
+public abstract record TurnChoice;
+
+/// <summary>FIGHT: the selected move for this turn.</summary>
+public sealed record MoveTurnChoice(PokemonAttack Move) : TurnChoice;
+
+/// <summary>ITEM: use a bag item on the user's creature. <paramref name="TargetMoveSlot"/> is the move
+/// slot (0–3) a single-move PP restore targets; null for everything else.</summary>
+public sealed record ItemTurnChoice(Item Item, int? TargetMoveSlot = null) : TurnChoice;
 
 /// <summary>
 /// Abstracts move selection for one side of a battle.
@@ -18,6 +29,16 @@ namespace creaturegame.Combat;
 public interface IBattleInput
 {
     Task<PokemonAttack> ChooseMoveAsync(TurnContext context);
+
+    /// <summary>
+    /// The player's whole-turn choice: FIGHT (a move) or ITEM (a bag item). Only consulted for a side that
+    /// can actually open the menu — <see cref="Battle"/> still resolves lock-in/Struggle first, and only the
+    /// player side has a bag. The default delegates to <see cref="ChooseMoveAsync"/> (FIGHT only), so AI /
+    /// automated inputs never need to know about items; only the interactive <c>SignalRInput</c> overrides
+    /// this to offer the bag.
+    /// </summary>
+    async Task<TurnChoice> ChooseTurnActionAsync(TurnContext context) =>
+        new MoveTurnChoice(await ChooseMoveAsync(context));
 
     /// <summary>
     /// Asked when the creature levels into a new move but its four slots are full: return the slot index

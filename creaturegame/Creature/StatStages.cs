@@ -1,3 +1,5 @@
+using creaturegame.Attacks;
+
 namespace creaturegame.Creatures;
 
 /// <summary>
@@ -46,4 +48,49 @@ public class StatStages
     public void RaiseAccuracy(int delta) => Accuracy = Clamp(Accuracy + delta);
 
     public void RaiseEvasion(int delta) => Evasion = Clamp(Evasion + delta);
+
+    /// <summary>
+    /// Raises one stat stage by <paramref name="delta"/> (clamped to [-6, +6]) and returns the resulting
+    /// stage. The generic counterpart to the per-stat Raise* helpers — lets callers that hold a
+    /// <see cref="StageStat"/> value (X-items, move stat effects) apply it without a six-arm switch.
+    /// </summary>
+    public int Raise(StageStat stat, int delta)
+    {
+        switch (stat)
+        {
+            case StageStat.Attack:
+                RaiseAttack(delta);
+                return Attack;
+            case StageStat.Defense:
+                RaiseDefense(delta);
+                return Defense;
+            case StageStat.Special:
+                RaiseSpecial(delta);
+                return Special;
+            case StageStat.Speed:
+                RaiseSpeed(delta);
+                return Speed;
+            case StageStat.Accuracy:
+                RaiseAccuracy(delta);
+                return Accuracy;
+            case StageStat.Evasion:
+                RaiseEvasion(delta);
+                return Evasion;
+            default:
+                return 0;
+        }
+    }
+
+    /// <summary>Reads the current stage for <paramref name="stat"/> without mutating it.</summary>
+    public int Of(StageStat stat) =>
+        stat switch
+        {
+            StageStat.Attack => Attack,
+            StageStat.Defense => Defense,
+            StageStat.Special => Special,
+            StageStat.Speed => Speed,
+            StageStat.Accuracy => Accuracy,
+            StageStat.Evasion => Evasion,
+            _ => 0,
+        };
 }

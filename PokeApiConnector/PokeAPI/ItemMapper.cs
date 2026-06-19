@@ -150,14 +150,21 @@ public static class ItemMapper
                 item.RevivePercent = 100;
                 break;
 
-            // PP restore (Ether/Elixir restore 10 PP; Max variants fully restore)
+            // PP restore. Ether/Elixir restore 10 PP; Max variants fully restore. Ether/Max Ether target
+            // ONE move; Elixir/Max Elixir restore EVERY move (RestoresPpAllMoves).
             case "ether":
-            case "elixir":
                 item.PpRestoreAmount = 10;
                 break;
             case "max-ether":
+                item.RestoresAllPp = true;
+                break;
+            case "elixir":
+                item.PpRestoreAmount = 10;
+                item.RestoresPpAllMoves = true;
+                break;
             case "max-elixir":
                 item.RestoresAllPp = true;
+                item.RestoresPpAllMoves = true;
                 break;
 
             // X-items — raise one stat by one stage in battle ("x-special" is current "x-sp-atk").

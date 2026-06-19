@@ -100,6 +100,18 @@ public record MultiHitCompleted(int Hits) : BattleEvent;
 
 public record CoinsScattered(string SourceName, int Amount) : BattleEvent;
 
+// --- Items (using a bag item in battle) ---
+/// <summary>A bag item was used on a creature this turn (e.g. "Used POTION on PIKACHU"). Emitted before
+/// the item's effect events (Healed / StatusCleared / StatStageChanged / PpRestored).</summary>
+public record ItemUsed(string ItemName, string TargetName) : BattleEvent;
+
+/// <summary>A PP-restore item refilled a move's PP. One per move restored (Elixir restores all four).</summary>
+public record PpRestored(string CreatureName, string MoveName, int PpAfter) : BattleEvent;
+
+/// <summary>An item selection had no effect (e.g. a Potion at full HP, an Antidote with no poison, a ball
+/// or revive in single-creature scope). Nothing is consumed. The Gen 1 "It won't have any effect!" line.</summary>
+public record ItemUseFailed(string ItemName) : BattleEvent;
+
 // --- Status conditions ---
 public record StatusApplied(string TargetName, StatusCondition Status) : BattleEvent;
 

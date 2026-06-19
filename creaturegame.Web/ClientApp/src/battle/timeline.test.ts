@@ -477,3 +477,20 @@ describe('expandEvent — run layer (recovery, run-end, XP)', () => {
     expect(actions(steps)).toContainEqual({ type: 'XP_GAIN', amount: 137 });
   });
 });
+
+describe('expandEvent — items', () => {
+  it('narrates an item use, uppercasing the slug', () => {
+    const { steps } = expandEvent('ItemUsed', { itemName: 'super-potion', targetName: 'MEWTWO' }, CTX);
+    expect(logLines(steps)).toEqual(['Used SUPER POTION on MEWTWO!']);
+  });
+
+  it('narrates a PP restore with the formatted move name', () => {
+    const { steps } = expandEvent('PpRestored', { creatureName: 'MEWTWO', moveName: 'ice-beam', ppAfter: 24 }, CTX);
+    expect(logLines(steps)).toEqual(["MEWTWO's ICE BEAM PP was restored!"]);
+  });
+
+  it('reads the Gen 1 "won\'t have any effect" line on a failed item use', () => {
+    const { steps } = expandEvent('ItemUseFailed', { itemName: 'potion' }, CTX);
+    expect(logLines(steps)).toEqual(["It won't have any effect!"]);
+  });
+});

@@ -12,9 +12,10 @@ evolution end-to-end incl. the Phaser sprite-morph + a Gen 1 B-cancel prompt) ar
 **per-run web seed** (Tech Debt #3), and Architecture Review #7's higher-leverage structural items are also
 done (only the **minor cleanups** bullet remains — see Tech Debt). A round of **Web UI polish** landed too —
 STAB indicator, per-move effectiveness pill, colour-coded battle log, friendlier connection-error message, and
-the tabbed **Pokémon overview screen** (CHECK POKEMON) (all archived). Suite: **1021 .NET + 59 Vitest + 20
-Playwright E2E** (all green). The **Gen 1 item-data import** (battle-usable items → `items.db`) is also
-done (2026-06-19) — see its section.
+the tabbed **Pokémon overview screen** (CHECK POKEMON) (all archived). Suite: **1055 .NET + 62 Vitest + 20
+Playwright E2E** (all green). The **Gen 1 item-data import** (battle-usable items → `items.db`) and the
+**item-use battle layer Phase 1** (engine: Bag, ItemAction, item-effect registry) are also done
+(2026-06-19) — see their sections.
 
 **Next:** **Encounter Logic** (see its section) — the design of *what* the player faces and *how* they can
 acquire it, which must land **before** any catch/acquisition mechanic. The Catch Mechanic is intentionally
@@ -220,6 +221,47 @@ it has **no blockers** and can land standalone.
 - [ ] **Deferred to UI time (flagged, not built):** item sprite download into `wwwroot/sprites/items/` via the
   idempotent `SpriteDownloader` pattern; the `cost` field is PokeAPI's *current* price (a few Gen 1 prices
   differ — uncorrected, not battle-relevant; see DATA_IMPORT.md §4.5).
+
+---
+
+## Item System — Use in Battle  ⟵ Phase 1 DONE 2026-06-19
+
+Pokémon using bag items in battle: the use-in-battle layer on top of the item-data import. Item use is a
+**turn action** (FIGHT vs ITEM); item effects mirror the `IMoveEffect`/`MoveEffects` registry.
+
+**Locked design (`/plan`, 2026-06-19):**
+- **`ItemAction : IBattleAction`** with priority **above any move** (Gen 1: items resolve first). Slots
+  straight into Battle's existing priority queue — `[ItemAction(player), AttackAction(enemy)]`.
+- **`IItemEffect`/`ItemEffects` registry** keyed by `ItemCategory` (parallel to `IMoveEffect`). In-scope
+  effects: Heal, StatusCure, PpRestore, X-item stat boost. **Revive** (needs a party) and **Ball** (catch,
+  gated on Encounter Logic) are deferred — `ItemEffects.For` returns null ⇒ `ItemUseFailed`.
+- **Transient `Bag`** (item-id → qty), no persistence yet (save.db deferred). Player-only; AI/enemy never
+  use items. The "generous test bag" (all in-scope items) is seeded by the web/session layer in Phase 2.
+- **Additive input seam:** `IBattleInput.ChooseTurnActionAsync` (default delegates to `ChooseMoveAsync`),
+  so AI/auto inputs are untouched; only the player path offers the bag. Lock-in/Struggle take precedence
+  (a locked-in creature can't open the bag); `ItemAction` bypasses the `CanAct` status gate (item use is
+  legal while asleep/paralyzed).
+
+**Phase 1 — core engine — ✅ DONE (2026-06-19):**
+- [x] `Bag` (`Items/Bag.cs`); `ItemAction` (`Combat/ItemAction.cs`); `IItemEffect`/`ItemEffects` +
+  Heal/StatusCure/PpRestore/X-item (`Combat/ItemEffects.cs`).
+- [x] Turn-loop integration in `Battle` (player builds move-or-item; AttackAction-scoped turn guards);
+  `ChooseTurnActionAsync` + `TurnChoice` seam; `StatStages.Raise/Of` helper.
+- [x] Events `ItemUsed`/`PpRestored`/`ItemUseFailed` + **SignalR projection + timeline.ts arms**
+  (`WebEventContractTests` forces the wire even pre-UI — the field-projection-gap guard).
+- [x] Data: added `Item.RestoresPpAllMoves` (Ether=one move, Elixir=all moves) + migration + re-import.
+- [x] Tests: `ItemEffectTests` (effects + Bag) + `ItemActionBattleTests` (item-first priority, use-while-
+  asleep, consume, no-effect failure) + 3 Vitest timeline arms. Suite **1055 .NET + 62 Vitest**, all green.
+
+**Phase 2 — web wire (NOT started):**
+- [ ] `BattleHub.UseItem(gameId, itemId, targetMoveSlot?)` → `SignalRInput` resolves an `ItemTurnChoice`
+  (TCS handshake like the other prompts); thread a `Bag` through `GameSessionManager`/`BattleRunner` into
+  `Battle` (seed the generous test bag from `ItemService`).
+- [ ] `GET /{gameId}/bag` endpoint (item id/name/category/qty) for the menu.
+
+**Phase 3 — frontend (NOT started):**
+- [ ] Bag button + item list in the battle menu (fetch the bag, send `UseItem`); PP-restore move-slot pick.
+- [ ] Playwright E2E for an item-use turn (heal/status-cure visible, enemy still attacks).
 
 ---
 

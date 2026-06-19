@@ -1,5 +1,6 @@
 using creaturegame.Attacks;
 using creaturegame.Creatures;
+using creaturegame.Items;
 
 namespace creaturegame.Combat;
 
@@ -15,6 +16,7 @@ public class Battle
     private readonly IReadOnlyList<Attack> _movePool;
     private readonly IRandomSource _rng;
     private readonly CarriedStatus? _playerEntryStatus;
+    private readonly Bag? _playerBag;
     private int _turnNumber;
 
     public Battle(
@@ -27,7 +29,8 @@ public class Battle
         IBattleRules? rules = null,
         IBattleEventEmitter? emitter = null,
         IRandomSource? rng = null,
-        CarriedStatus? playerEntryStatus = null
+        CarriedStatus? playerEntryStatus = null,
+        Bag? playerBag = null
     )
     {
         PlayerCreature = player;
@@ -40,6 +43,7 @@ public class Battle
         _emitter = emitter;
         _rng = rng ?? SystemRandomSource.Instance;
         _playerEntryStatus = playerEntryStatus;
+        _playerBag = playerBag;
     }
 
     public async Task StartFightAsync()
@@ -112,26 +116,12 @@ public class Battle
                 )
             );
 
-            PokemonAttack? playerMove = await SelectMoveAsync(
-                PlayerCreature,
-                EnemyCreature,
-                _playerInput
-            );
+            // The player may FIGHT or use a bag ITEM this turn; the enemy only ever attacks.
+            IBattleAction playerAction = await BuildPlayerActionAsync();
             PokemonAttack? enemyMove = await SelectMoveAsync(
                 EnemyCreature,
                 PlayerCreature,
                 _enemyInput
-            );
-
-            var playerAction = new AttackAction(
-                PlayerCreature,
-                EnemyCreature,
-                playerMove,
-                _typeChart,
-                _rules,
-                _emitter,
-                _movePool,
-                _rng
             );
             var enemyAction = new AttackAction(
                 EnemyCreature,
@@ -160,10 +150,16 @@ public class Battle
             {
                 if (!action.Source.IsAlive())
                     continue;
-                if ((action as AttackAction)?.Target.IsAlive() != true)
-                    continue;
-                if (!StatusResolver.CanAct(action.Source, _rules, _emitter, _rng))
-                    continue;
+                // The dead-target and status (sleep/para/confusion) gates are attack-specific. An
+                // ItemAction has no foe target and isn't blocked by status — using an item is the turn —
+                // so it executes as long as its user is alive.
+                if (action is AttackAction attack)
+                {
+                    if (!attack.Target.IsAlive())
+                        continue;
+                    if (!StatusResolver.CanAct(action.Source, _rules, _emitter, _rng))
+                        continue;
+                }
                 await action.ExecuteAsync();
             }
 
@@ -284,6 +280,52 @@ public class Battle
             }
         );
     }
+
+    /// <summary>
+    /// Builds the player's action for the turn: a bag <see cref="ItemAction"/> if the player chose ITEM
+    /// (and a bag is wired), otherwise an <see cref="AttackAction"/>. Lock-in/Struggle take precedence —
+    /// the same pre-checks as <see cref="SelectMoveAsync"/> — and on those turns the bag isn't offered (a
+    /// locked-in creature can't open the menu), so the action is always a forced/Struggle attack.
+    /// </summary>
+    private async Task<IBattleAction> BuildPlayerActionAsync()
+    {
+        var attacker = PlayerCreature;
+
+        foreach (var mechanic in LockInMechanics.All)
+        {
+            if (mechanic.ForcedMove(attacker) is { } forced)
+                return NewPlayerAttack(forced);
+        }
+        if (!attacker.CanSelectAnyMove)
+            return NewPlayerAttack(null); // Struggle
+
+        var context = new TurnContext
+        {
+            Attacker = attacker,
+            Defender = EnemyCreature,
+            TypeChart = _typeChart,
+            Rules = _rules,
+            TurnNumber = _turnNumber,
+            DisabledMove = attacker.Battle.DisabledMove,
+        };
+
+        var choice = await _playerInput.ChooseTurnActionAsync(context);
+        if (choice is ItemTurnChoice item && _playerBag is not null)
+            return new ItemAction(attacker, item.Item, item.TargetMoveSlot, _playerBag, _emitter);
+
+        // FIGHT: the input's already-validated move. (A MoveTurnChoice carries it; the only other case —
+        // an item choice with no bag wired — falls back to the first selectable move, never Struggle,
+        // since CanSelectAnyMove was true above.)
+        PokemonAttack? move = choice is MoveTurnChoice mv
+            ? mv.Move
+            : attacker.MoveSet.FirstOrDefault(m =>
+                m.PowerPointsCurrent > 0 && m != attacker.Battle.DisabledMove
+            );
+        return NewPlayerAttack(move);
+    }
+
+    private AttackAction NewPlayerAttack(PokemonAttack? move) =>
+        new(PlayerCreature, EnemyCreature, move, _typeChart, _rules, _emitter, _movePool, _rng);
 
     private void ApplyLeechSeedDrain(Creature drained, Creature healed)
     {

@@ -67,6 +67,7 @@ public class ItemsDbServiceTests : IDisposable
                 "RevivePercent",
                 "PpRestoreAmount",
                 "RestoresAllPp",
+                "RestoresPpAllMoves",
                 "StatBoostStat",
                 "StatBoostStages",
             }

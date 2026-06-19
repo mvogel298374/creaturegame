@@ -196,6 +196,17 @@ public class ItemImportTests
     }
 
     [Theory]
+    [InlineData("ether", false)] // Ether / Max Ether target ONE move
+    [InlineData("max-ether", false)]
+    [InlineData("elixir", true)] // Elixir / Max Elixir restore EVERY move
+    [InlineData("max-elixir", true)]
+    public void MapToItem_PpRestore_AllMovesScope(string name, bool allMoves)
+    {
+        var item = ItemMapper.MapToItem(PokeItem(name, "pp-recovery"));
+        Assert.Equal(allMoves, item.RestoresPpAllMoves);
+    }
+
+    [Theory]
     [InlineData("x-attack", StageStat.Attack)]
     [InlineData("x-defense", StageStat.Defense)]
     [InlineData("x-speed", StageStat.Speed)]

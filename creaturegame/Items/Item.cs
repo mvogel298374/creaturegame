@@ -48,11 +48,15 @@ public class Item
     /// <summary>Percent of max HP a fainted Pokémon is revived with (Revive 50, Max Revive 100).</summary>
     public int? RevivePercent { get; set; }
 
-    /// <summary>PP restored to one move (Ether 10, Elixir 10). Null when not a fixed PP restore.</summary>
+    /// <summary>PP restored to a move (Ether 10, Elixir 10). Null when not a fixed PP restore.</summary>
     public int? PpRestoreAmount { get; set; }
 
-    /// <summary>Fully restores PP (Max Ether for one move, Max Elixir for all moves).</summary>
+    /// <summary>Fully restores PP rather than a fixed amount (Max Ether, Max Elixir).</summary>
     public bool RestoresAllPp { get; set; }
+
+    /// <summary>Applies the PP restore to every move rather than one chosen move (Elixir, Max Elixir).
+    /// Ether/Max Ether target a single move; Elixir/Max Elixir hit the whole moveset.</summary>
+    public bool RestoresPpAllMoves { get; set; }
 
     /// <summary>X-item stat raised (X Attack → Attack, …) and by how many stages. Null when not an X-item.</summary>
     public StageStat? StatBoostStat { get; set; }

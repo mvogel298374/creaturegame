@@ -572,6 +572,23 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       return { steps: [d({ type: 'UPDATE_HP', name: cName, hp: hpAftr }), w(300), d(log(`${cName} regained health!`))] };
     }
 
+    // --- Items (using a bag item in battle). The HP/status/PP result rides on the effect events that
+    // follow (Healed / StatusCleared / StatStageChanged / PpRestored); these arms just narrate. ---
+    case 'ItemUsed': {
+      const itemName = (payload.itemName as string).replace(/-/g, ' ').toUpperCase();
+      const target   = payload.targetName as string;
+      return { steps: [d(log(`Used ${itemName} on ${target}!`)), w(400)] };
+    }
+
+    case 'PpRestored': {
+      const cName = payload.creatureName as string;
+      const mName = payload.moveName as string;
+      return { steps: [w(120), d(log(`${cName}'s ${formatMoveName(mName)} PP was restored!`))] };
+    }
+
+    case 'ItemUseFailed':
+      return { steps: [w(120), d(log(`It won't have any effect!`))] };
+
     case 'MimicLearned': {
       const cName = payload.creatureName as string;
       const mName = payload.moveName as string;
