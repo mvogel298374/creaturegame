@@ -63,7 +63,7 @@ The `.githooks/pre-commit` hook runs `csharpier check` (always) + the full test 
 EF Core migration commands require `DOTNET_ROOT` set so `dotnet-ef` finds the user-local SDK instead of the system runtime-only install:
 ```powershell
 $env:DOTNET_ROOT = "C:\Users\USER\.dotnet"; $env:PATH = "C:\Users\USER\.dotnet;C:\Users\USER\.dotnet\tools;$env:PATH"
-& "C:\Users\USER\.dotnet\dotnet.exe" ef migrations add <MigrationName> --project creaturegame --context <ContextName> --output-dir DB/Migrations/<Moves|Pokemon>
+& "C:\Users\USER\.dotnet\dotnet.exe" ef migrations add <MigrationName> --project creaturegame --context <ContextName> --output-dir DB/Migrations/<Moves|Pokemon|Items>
 & "C:\Users\USER\.dotnet\dotnet.exe" ef migrations remove --project creaturegame --context <ContextName>
 ```
 
@@ -78,19 +78,20 @@ Four-project .NET 9 solution:
 
 ### Data flow
 
-PokeApiConnector fetches Gen 1 Pokémon and moves (IDs 1–165) from `pokeapi.co`, persists them to `pokemon.db` and `moves.db` (SQLite). The main app loads from those databases via **Entity Framework Core** (`PokemonDbContext` / `MovesDbContext`) using `PokemonService` / `AttackService`, constructs `Creature` instances with Gen 1 stat formulas, then runs them through `Battle`.
+PokeApiConnector fetches Gen 1 Pokémon, moves (IDs 1–165), and the battle-usable items from `pokeapi.co`, persisting them to `pokemon.db`, `moves.db`, and `items.db` (SQLite). The main app loads from those databases via **Entity Framework Core** (`PokemonDbContext` / `MovesDbContext` / `ItemsDbContext`) using `PokemonService` / `AttackService` / `ItemService`, constructs `Creature` instances with Gen 1 stat formulas, then runs them through `Battle`. (Items have no `/generation` list endpoint, so their Gen 1 set is a hand-curated roster — see `DATA_IMPORT.md` §4.5.)
 
 ### Battle system
 
-`Battle` drives a turn loop: each side submits an `IBattleAction` (currently only `AttackAction`), actions are sorted by `Priority` → effective Speed (stage-adjusted, Paralysis quartered) → random tie-break, then executed in order via `ExecuteAsync()`. `DamageCalculator` computes Gen 1 damage (base power × Attack/Defense ratio × STAB 1.5× × type effectiveness × stat stage multipliers × critical hit 2× × random variance 217–255/255). All generation-specific rules — stat stage tables, crit formula, accuracy scale, freeze thaw, status damage rates — are delegated to `IBattleRules`; `Gen1BattleRules` is the only implementation. Type effectiveness comes from `ITypeChart`; `Gen1TypeChart` preserves Gen 1 quirks (Ghost → Psychic = 0×, Poison → Bug = 2×, no Steel/Dark/Fairy types, Ice → Fire = 1×). Accuracy uses the Gen 1 0–255 internal scale; a roll of 255 always misses (1/256 bug).
+`Battle` drives a turn loop: each side submits an `IBattleAction` (`AttackAction`, or `ItemAction` when the player uses a bag item), actions are sorted by `Priority` → effective Speed (stage-adjusted, Paralysis quartered) → random tie-break, then executed in order via `ExecuteAsync()`. (Items resolve first — `ItemAction.Priority` sits above any move; the per-action `CanAct`/dead-target guards apply only to `AttackAction`.) `DamageCalculator` computes Gen 1 damage (base power × Attack/Defense ratio × STAB 1.5× × type effectiveness × stat stage multipliers × critical hit 2× × random variance 217–255/255). All generation-specific rules — stat stage tables, crit formula, accuracy scale, freeze thaw, status damage rates — are delegated to `IBattleRules`; `Gen1BattleRules` is the only implementation. Type effectiveness comes from `ITypeChart`; `Gen1TypeChart` preserves Gen 1 quirks (Ghost → Psychic = 0×, Poison → Bug = 2×, no Steel/Dark/Fairy types, Ice → Fire = 1×). Accuracy uses the Gen 1 0–255 internal scale; a roll of 255 always misses (1/256 bug).
 
 ### Key patterns
 
 - **`ITypeChart`** — strategy interface; swap implementations to change the type effectiveness matrix.
 - **`IBattleRules`** — strategy interface for all generation-variable mechanics: stat stage multipliers, accuracy/evasion scale, crit formula, freeze thaw, sleep duration, status damage rates. `Gen1BattleRules.Instance` is the singleton default everywhere.
-- **`IBattleAction`** — encapsulates a single turn action; `Priority` + `ExecuteAsync()`.
-- **`IBattleInput`** — abstracts move selection (console, AI, UI); `AutoSelectInput` is the current default.
-- **`StatStages`** — struct on `Creature`; holds per-battle Attack/Defense/Special/Speed/Accuracy/Evasion stages clamped to [−6, +6]; cleared between battles.
+- **`IBattleAction`** — encapsulates a single turn action; `Priority` + `ExecuteAsync()`. `AttackAction` (a move/Struggle) and `ItemAction` (use a bag item) are the implementations.
+- **`IBattleInput`** — abstracts the side's turn choice (console, AI, UI). `ChooseMoveAsync` picks a move; the additive `ChooseTurnActionAsync` returns a `TurnChoice` (FIGHT `MoveTurnChoice` / ITEM `ItemTurnChoice`) and defaults to delegating to `ChooseMoveAsync`, so only the interactive player input offers the bag. `AutoSelectInput` is the current default.
+- **`IItemEffect` / `ItemEffects`** — the item-effect registry, keyed by `ItemCategory` (the item-side analogue of `IMoveEffect` / `MoveEffects`): Heal, StatusCure, PpRestore, X-item. Item *amounts* are data (read off the `Item` row); Revive/Ball are deferred (`ItemEffects.For` returns null). A transient **`Bag`** (item-id → qty, not yet persisted) gates and is consumed by `ItemAction`.
+- **`StatStages`** — class on `Creature`; holds per-battle Attack/Defense/Special/Speed/Accuracy/Evasion stages clamped to [−6, +6]; cleared between battles. `Raise(stat, delta)` / `Of(stat)` are the generic accessors.
 - All DB reads use `AsNoTracking()` before upserts. All DB operations are async.
 - Schema uses EF Core migrations (in `creaturegame/DB/Migrations/`). `EnsureDatabaseCreated()` calls `Database.Migrate()` — run `PokeApiConnector` on a fresh setup to create and populate the databases. Add new migrations with `dotnet ef migrations add` (see migration command above).
 

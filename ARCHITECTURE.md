@@ -14,14 +14,14 @@ section bottoms out in mechanics, state, import mapping, or the seam contract, i
 ```
   IMPORT (one-shot)
   -----------------
-    pokeapi.co --> PokeApiConnector --> moves.db / pokemon.db
+    pokeapi.co --> PokeApiConnector --> moves.db / pokemon.db / items.db
                    (Gen-1 corrections applied here)
 
   RUNTIME
   -------
     moves.db  --(EF Core)--+
-                           +--> EncounterFactory --> builds Creatures
-    pokemon.db --(EF Core)-+
+    pokemon.db --(EF Core)-+--> EncounterFactory --> builds Creatures
+    items.db  --(EF Core)--+    (items.db: ItemService → the player's Bag)
 
     +------------------- creaturegame . core engine -------------------+
     |  BattleRunner --> Battle --> AttackAction                        |
@@ -94,24 +94,35 @@ Each entry: **Decision · Why · Where it lives.**
   **Run loop / event model → `GAME_LOOP.md`.**
 
 ### 2.4 Turn-action & input seams (`IBattleAction` + `IBattleInput`)
-- **Decision:** a turn is an `IBattleAction` (`Priority` + `ExecuteAsync`) — today only `AttackAction`, but
-  the seam is where switch / item / run / catch will plug in. *What a combatant decides* is an `IBattleInput`
-  (`ChooseMoveAsync` + the level-up / recovery prompts), with `AutoSelectInput`, `RandomMoveInput`, and the
-  web's `SignalRInput` as implementations.
+- **Decision:** a turn is an `IBattleAction` (`Priority` + `ExecuteAsync`) — `AttackAction` (a move/Struggle)
+  and `ItemAction` (use a bag item), with switch / catch the future plug-ins. *What a combatant decides* is an
+  `IBattleInput`: `ChooseMoveAsync` picks a move, and the additive `ChooseTurnActionAsync` returns a
+  `TurnChoice` (FIGHT `MoveTurnChoice` / ITEM `ItemTurnChoice`). Its default just delegates to
+  `ChooseMoveAsync`, so `AutoSelectInput` / `RandomMoveInput` / the AI never need to know about items — only
+  the web's `SignalRInput` offers the bag.
 - **Why:** decouples "what the combatant decides" from "how the turn executes," so new action types and new
-  deciders — notably **AI move selection** (the next feature, scoring via `IMoveEvaluator`) — drop in without
-  touching `Battle`'s turn loop. <!-- confirm -->
-- **Where:** `Combat/IBattleAction.cs` (the interface) + `Combat/AttackAction.cs` (`AttackAction`),
-  `Combat/IBattleInput.cs` (+ `AutoSelectInput` / `RandomMoveInput`), `creaturegame.Web/Battle/SignalRInput.cs`.
+  deciders drop in without touching `Battle`'s turn loop. The additive default-interface-method keeps every
+  non-interactive input untouched when a player-only choice (item, recovery, evolution) is added.
+- **Item turn specifics (Gen 1):** an item **resolves before any move** — `ItemAction.Priority` sits above
+  the move range, so it sorts to the front of the same priority queue. Lock-in/Struggle take precedence over
+  the bag (a locked-in creature can't open the menu), and the per-action `CanAct`/dead-target guards apply
+  only to `AttackAction`, so an item can be used while asleep/paralyzed (using it *is* the turn). The bag
+  itself is a **transient `Bag`** (item-id → qty) — not persisted yet (save layer deferred with Catch).
+- **Where:** `Combat/IBattleAction.cs` + `Combat/AttackAction.cs` + `Combat/ItemAction.cs`,
+  `Combat/IBattleInput.cs` (the `TurnChoice` seam, + `AutoSelectInput` / `RandomMoveInput`), `Items/Bag.cs`,
+  `creaturegame.Web/Battle/SignalRInput.cs`. **Item effects → §2.11.**
 
-### 2.5 Database-per-domain split (`pokemon.db` + `moves.db`)
+### 2.5 Database-per-domain split (`pokemon.db` + `moves.db` + `items.db`)
 - **Decision:** data is partitioned by **overarching domain object** — Pokémon-world data in `pokemon.db`,
-  move-world data in `moves.db` — each with its own `DbContext` (`PokemonDbContext` / `MovesDbContext`) and
-  its own migration folder.
-- **Why:** the split follows the natural object boundaries of the domain, and is meant to be **extensible** —
-  a new unique object domain (items, etc.) would get its own database + context rather than being bolted onto
-  an existing one. Each domain then versions and imports independently.
-- **Where:** `DB/MovesDbContext.cs`, `DB/PokemonDbContext.cs` (one file per context), `DB/Migrations/{Moves,Pokemon}`.
+  move-world data in `moves.db`, item-world data in `items.db` — each with its own `DbContext`
+  (`PokemonDbContext` / `MovesDbContext` / `ItemsDbContext`), service (`PokemonService` / `AttackService` /
+  `ItemService`), and migration folder.
+- **Why:** the split follows the natural object boundaries of the domain and is **extensible** — items proved
+  the pattern: a new unique object domain gets its own database + context rather than being bolted onto an
+  existing one, so each domain versions and imports independently. (Player save state will likewise be its own
+  `save.db` / `PlayerDbContext` when it lands.)
+- **Where:** `DB/MovesDbContext.cs`, `DB/PokemonDbContext.cs`, `DB/ItemsDbContext.cs` (one file per context),
+  `DB/Migrations/{Moves,Pokemon,Items}`.
 
 ### 2.6 Import-vs-runtime boundary (Gen-1 corrections happen at import)
 - **Decision:** PokeAPI returns *modern* move data; all Gen-1 corrections (power/accuracy/type from
@@ -163,17 +174,22 @@ Each entry: **Decision · Why · Where it lives.**
 - **Where:** `Combat/IRandomSource.cs`, `Web/Controllers/GameController.cs`, `Web/Battle/EncounterFactory.cs`,
   `tests/.../TestSupport/BattleScenario.cs`.
 
-### 2.11 Effect strategies (lock-ins + post-damage effects)
-- **Decision:** two parallel registries follow the same shape. Multi-turn "lock-in" moves (two-turn, rampage,
-  rage, bide, binding) are each an `ILockInMechanic` resolved via `LockInMechanics.For(effect)`. The ~20
-  post-damage effects (Haze, Counter, Reflect, Transform, Rest, Substitute…) are each an `IMoveEffect`
-  resolved via `MoveEffects.For(effect)` — neither is branched inline in `AttackAction`.
+### 2.11 Effect strategies (lock-ins + post-damage move effects + item effects)
+- **Decision:** three parallel registries follow the same shape — each resolved by a `For(key)` lookup, none
+  branched inline. Multi-turn "lock-in" moves (two-turn, rampage, rage, bide, binding) are each an
+  `ILockInMechanic` via `LockInMechanics.For(effect)`. The ~20 post-damage move effects (Haze, Counter,
+  Reflect, Transform, Rest, Substitute…) are each an `IMoveEffect` via `MoveEffects.For(effect)`. The in-battle
+  **item effects** (Heal, StatusCure, PpRestore, X-item) are each an `IItemEffect` via
+  `ItemEffects.For(category)`, keyed by `ItemCategory`.
 - **Why:** lock-ins differ sharply turn-to-turn (charge / store / strike); post-damage effects were a
   ~320-line switch that concentrated change-risk. Owning their own hooks keeps the main pipeline linear and
-  each effect independently testable. Damage-dealing effects (Counter) reach `AttackAction`'s centralized
+  each effect independently testable. Damage-dealing move effects (Counter) reach `AttackAction`'s centralized
   `DealDamageToTarget` through a context delegate, so the Substitute-soak / Bide / Counter-recording stays in
-  one place.
-- **Where:** `Combat/LockInMechanics.cs`, `Combat/MoveEffects.cs` (extraction done — Architecture Review #7).
+  one place. **Item effects** mirror the same shape: `CanApply` gates the announce + bag-consume (the Gen 1
+  "won't have any effect" rule), `Apply` mutates state and emits events; their *amounts* are **data** read off
+  the `Item` row (never inlined), and deferred categories (Revive needs a party, Ball needs Catch) are simply
+  absent from the registry so `For` returns null.
+- **Where:** `Combat/LockInMechanics.cs`, `Combat/MoveEffects.cs`, `Combat/ItemEffects.cs`.
 
 ---
 
@@ -185,6 +201,9 @@ One-liners for orientation — the full procedure for each lives in the linked d
   a layer-2 correction only if PokeAPI can't express it). → `DATA_IMPORT.md`.
 - **Add a move with new behavior:** add a `MoveEffect`, implement it as an `IMoveEffect` (a class in
   `MoveEffects.All`), emit a `BattleEvent`, map it in all three emitter legs, add a contract test.
+- **Add an item effect:** implement an `IItemEffect` (a class in `ItemEffects.All`) keyed by `ItemCategory`;
+  read amounts off the `Item` row (never inline); gate use with `CanApply`; emit a `BattleEvent` and map it in
+  all three emitter legs (the `WebEventContractTests` guard enforces this even before the bag UI exists).
 - **Add a generation:** implement new `IBattleRules` / `ITypeChart` / `IStatCalculator`; never branch on
   generation in engine code; run the §5.0 gen-agnostic checklist. → `GENERATION_SEAMS.md`.
 - **Add an AI / alternative input:** implement `IBattleInput` (score moves via `IMoveEvaluator`) and wire it

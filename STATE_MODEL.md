@@ -254,6 +254,11 @@ Player's creature uses **Body Slam** (10% chance to paralyze) into an enemy alre
 - **Save system / Game Loop:** persist `Creature` minus `Battle`. Expect major
   `Status` (and the HP/transient asymmetry noted in section 2) to be revisited — likely
   by moving `Status` to the persistent half or introducing a finer-grained split.
+- **Player inventory (`Bag`):** the item-use battle layer adds a `Bag` (item-id → qty,
+  `creaturegame/Items/Bag.cs`) — this is **run/player-level state, not creature state**, so it lives
+  *outside* this model (it's passed into `Battle` for the player side, not held on `Creature`). It is
+  **transient today** (no `save.db` yet), but it belongs on the *persistent* side of the eventual save
+  boundary, alongside `Creature` — when the save system lands, a run persists its party **and** its bag.
 - **Facade removal — done.** The delegating properties have been deleted and all call
   sites migrated to `creature.Battle.X`, so new transient fields can *only* be added to
   `BattleState`. No behavior change (see section 4.3).

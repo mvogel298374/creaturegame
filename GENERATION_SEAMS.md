@@ -281,6 +281,21 @@ HP"), never the *quirk* ("damage is higher because Defense was halved", "it fail
 level"). A test that doesn't exercise the gen-variable bit will keep a leak green forever. When you
 add one of these, **write the assertion against the quirk itself.**
 
+### 5.0.2 Item effects — data vs seam (and a deferred gen-variable point)
+The in-battle item effects (`IItemEffect` / `ItemEffects`, see `ARCHITECTURE.md` §2.11) clear the
+checklist by keeping their **numbers in data, not on a seam**: a Potion's 20 HP, an X-item's +1 stage,
+Ether's +10 PP all live on the `Item` row (Gen-1 values set at import in `ItemMapper.ApplyGen1Gameplay`),
+read generically by the effect — so they're the data-layer's job (like a move's power), not an
+`IBattleRules` member. Two seam judgments worth recording:
+- **`ItemAction.ItemPriority` (items resolve before moves)** is an inline constant, not a rules member —
+  judged generation-invariant (item-first holds across mainline gens; it's turn-order, not battle math).
+  If a later gen ever changes item turn-order, move it to `IBattleRules`.
+- **⚠️ Deferred gen-variable rule (the §5.0.1 shape, caught not shipped):** in **Gen 1 no item cures
+  confusion** (it's volatile, cleared only by switching) — the cure effects deliberately never touch
+  `ConfusedTurns`. But **Gen 2+ Full Heal / Full Restore *do* cure confusion.** This is currently a
+  documented *absence* (Gen-1-correct), not a seam. When Gen 2 lands, this becomes an `IBattleRules`
+  decision (e.g. "does a status-cure item also clear confusion") — don't re-implement it inline.
+
 ### Adding a new *rule* that varies by generation
 1. Ask the decision question: **"Is this the same in every generation?"** If yes, it's
    ordinary engine logic — don't put it on a seam. If no, continue.
