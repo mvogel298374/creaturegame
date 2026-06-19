@@ -85,6 +85,10 @@ covered. Remaining: `data-testid`s and CI.
   only where a class proves brittle.
 - [ ] CI step (or `dev.ps1`-adjacent script / `test.ps1 -StartStack`) that boots backend + frontend, runs
   the suite headless, and tears down.
+- [ ] **Between-encounter modal E2Es** — deterministic via a fixed `seed` in the `start` request: Poké Center
+  recovery Heal/Skip, move-replacement forget/decline, and **evolution Allow/Cancel** (the Gen 1 B-cancel
+  prompt). All three share the same blocking-modal shape and are unblocked by the per-run seed; none are
+  written yet. Each is unit/integration-covered (runner + timeline arms); this closes the DOM-level gap.
 - [x] §6 Status conditions — `status.spec.ts`: player-inflicted Sleep Powder → sleep badge on the enemy
   nameplate + "fell asleep!" (player move + retry-until-lands; enemy-inflicted / immunity edges stay at the
   integration layer). (2026-06-10.)
