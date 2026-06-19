@@ -21,6 +21,13 @@ export interface RecoveryPrompt {
   battlesWon: number;
 }
 
+export interface EvolutionPrompt {
+  fromName: string;
+  toName: string;
+  fromSpeciesId: number;
+  toSpeciesId: number;
+}
+
 export interface BattleState {
   phase: 'connecting' | 'waiting' | 'choosing' | 'battling' | 'ended';
   animating: boolean;
@@ -42,6 +49,7 @@ export interface BattleState {
   levelUp: LevelUpPanel | null;
   moveReplacement: MoveReplacementPrompt | null;
   recovery: RecoveryPrompt | null;
+  evolution: EvolutionPrompt | null;
   log: LogEntry[];
   turnNumber: number;
 }
@@ -67,6 +75,7 @@ const initialState: BattleState = {
   levelUp: null,
   moveReplacement: null,
   recovery: null,
+  evolution: null,
   log: [],
   turnNumber: 0,
 };
@@ -148,6 +157,18 @@ function reducer(state: BattleState, action: Action): BattleState {
       };
     case 'HIDE_RECOVERY':
       return { ...state, recovery: null };
+    case 'SHOW_EVOLUTION_PROMPT':
+      return {
+        ...state,
+        evolution: {
+          fromName: action.fromName,
+          toName: action.toName,
+          fromSpeciesId: action.fromSpeciesId,
+          toSpeciesId: action.toSpeciesId,
+        },
+      };
+    case 'HIDE_EVOLUTION_PROMPT':
+      return { ...state, evolution: null };
     case 'ANIMATING_START':
       return { ...state, animating: true };
     case 'ANIMATING_DONE':
@@ -226,11 +247,17 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
 
   // Answer the Poké Center recovery offer: true to heal, false to skip. Hide the modal at once (the backend is
   // blocked on this answer); the resulting PlayerRecovered / RecoveryDeclined events drive the log + HP refill.
+  const respondEvolution = useCallback((allow: boolean) => {
+    dispatch({ type: 'HIDE_EVOLUTION_PROMPT' });
+    connRef.current?.invoke('RespondEvolution', allow).catch(err =>
+      console.error('[SignalR] RespondEvolution failed:', err));
+  }, []);
+
   const respondRecovery = useCallback((accept: boolean) => {
     dispatch({ type: 'HIDE_RECOVERY' });
     connRef.current?.invoke('RespondRecovery', accept).catch(err =>
       console.error('[SignalR] RespondRecovery failed:', err));
   }, []);
 
-  return { state, chooseMove, dismissLevelUp, forgetMove, respondRecovery };
+  return { state, chooseMove, dismissLevelUp, forgetMove, respondRecovery, respondEvolution };
 }

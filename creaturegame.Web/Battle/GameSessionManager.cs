@@ -172,6 +172,16 @@ public sealed class GameSessionManager(
             battle.Input.SetRecoveryChoice(accept);
     }
 
+    /// <summary>Routes an evolution answer (true = evolve, false = cancel) to the battle's input.</summary>
+    public void SetEvolutionChoice(string connectionId, bool allow)
+    {
+        if (
+            _connToGame.TryGetValue(connectionId, out var gameId)
+            && _active.TryGetValue(gameId, out var battle)
+        )
+            battle.Input.SetEvolutionChoice(allow);
+    }
+
     /// <summary>
     /// Called when a connection drops. If it is the battle's current connection, a grace
     /// timer is started; the battle is abandoned (its input cancelled so the loop ends and

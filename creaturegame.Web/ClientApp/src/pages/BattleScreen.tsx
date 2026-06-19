@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { TypeBadge } from '../components/TypeBadge';
 import { BattleCanvas } from '../battle/BattleCanvas';
-import { useBattleHub, type LevelUpPanel, type MoveReplacementPrompt, type RecoveryPrompt } from '../hooks/useBattleHub';
+import { useBattleHub, type LevelUpPanel, type MoveReplacementPrompt, type RecoveryPrompt, type EvolutionPrompt } from '../hooks/useBattleHub';
 import type { Species } from '../types/Species';
 import type { MoveInfo } from '../types/BattleEvents';
 import { formatMoveName } from '../utils/format';
@@ -23,7 +23,7 @@ export function BattleScreen() {
   const gameId: string | null = location.state?.gameId ?? null;
   const startLevel: number = location.state?.level ?? 50;
 
-  const { state, chooseMove, dismissLevelUp, forgetMove, respondRecovery } = useBattleHub(gameId, startLevel);
+  const { state, chooseMove, dismissLevelUp, forgetMove, respondRecovery, respondEvolution } = useBattleHub(gameId, startLevel);
   const [controlView, setControlView] = useState<ControlView>('menu');
   const logRef = useRef<HTMLDivElement>(null);
 
@@ -126,6 +126,10 @@ export function BattleScreen() {
         <RecoveryModal prompt={state.recovery} onRespond={respondRecovery} />
       )}
 
+      {state.evolution && (
+        <EvolutionPromptModal prompt={state.evolution} onRespond={respondEvolution} />
+      )}
+
       {state.phase === 'ended' && (
         <BattleEndedOverlay
           creatureName={playerName}
@@ -213,6 +217,40 @@ function RecoveryModal({ prompt, onRespond }: {
           </button>
           <button className="action-btn" onClick={() => onRespond(false)}>
             SKIP
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Evolution offer: a between-encounter Allow / Cancel step (Gen 1 B-cancel). Shows the current creature with
+// an evolution glow; one press both answers the prompt and continues the run (the backend is blocked awaiting
+// it). Cancel keeps the current form — it will be offered again at the next level-up.
+function EvolutionPromptModal({ prompt, onRespond }: {
+  prompt: EvolutionPrompt;
+  onRespond: (allow: boolean) => void;
+}) {
+  return (
+    <div className="modal-overlay">
+      <div className="recovery-modal" role="alertdialog" aria-label="Evolution">
+        <p className="recovery-title">Evolution</p>
+        <p className="recovery-sub">{prompt.fromName} is evolving into {prompt.toName}!</p>
+        <div className="recovery-sprite-wrap">
+          <span className="recovery-glow" aria-hidden="true" />
+          <img
+            className="recovery-sprite"
+            src={`/sprites/front/${prompt.fromSpeciesId}.png`}
+            alt={prompt.fromName}
+            draggable={false}
+          />
+        </div>
+        <div className="recovery-buttons">
+          <button className="action-btn action-btn--fight" onClick={() => onRespond(true)}>
+            ALLOW
+          </button>
+          <button className="action-btn" onClick={() => onRespond(false)}>
+            CANCEL
           </button>
         </div>
       </div>

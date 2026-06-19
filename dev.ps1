@@ -26,7 +26,7 @@ for ($i = 0; $i -lt 60; $i++) {
 }
 
 if ($ready) {
-    Write-Host "Ready — opening http://localhost:5173"
+    Write-Host "Ready - opening http://localhost:5173"
     Start-Process "http://localhost:5173"
 } else {
     Write-Host "Frontend did not respond in 60s. Open http://localhost:5173 manually."

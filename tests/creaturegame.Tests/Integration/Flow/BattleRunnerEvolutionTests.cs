@@ -8,36 +8,19 @@ using creaturegame.Tests.TestSupport;
 namespace creaturegame.Tests.Integration.Flow;
 
 /// <summary>
-/// The evolution wiring in <see cref="BattleRunner"/>: after a win, the injected resolver is consulted and,
-/// if it returns an outcome, the runner applies <see cref="Creature.EvolveTo"/>, seats the evolved learnset,
-/// emits <see cref="CreatureEvolved"/>, and drives the evolved form's level-up move learning. The resolver is
-/// stubbed here (the IEvolutionRules decision + DB resolution are tested separately) so this pins the
-/// orchestration: that it fires after the win, mutates the player, and produces the right event stream.
+/// The evolution wiring in <see cref="BattleRunner"/>: after a win that <b>levels the player up</b> (Gen 1
+/// attempts evolution on level-up), the injected resolver is consulted; the player is then offered the
+/// evolution and can allow or cancel it. The resolver is stubbed here (the IEvolutionRules decision + DB
+/// resolution are tested separately) so this pins the orchestration — the level-up gate, the offer→decision
+/// flow, the apply/learn on allow, and the no-op on cancel.
 /// </summary>
 public class BattleRunnerEvolutionTests
 {
-    [Fact]
-    public async Task Runner_AfterWin_AppliesResolvedEvolution_AndEmitsEventThenLearnsMove()
+    // Charmander(4) → Charmeleon(5); a learnset move at level 6 (the level the player reaches below), so the
+    // post-evolution learn step auto-learns it into a free slot.
+    private static (PokemonSpecies Form, EvolutionOutcome Outcome) Charmeleon()
     {
-        var player = Fighter("CHARMANDER", hp: 200, attack: 999, speed: 100, level: 50);
-        player.SpeciesId = 4;
-
-        // One pushover (a guaranteed win), then a bruiser that ends the run — so exactly one evolution check.
-        int built = 0;
-        Func<Creature, Task<Creature>> supplier = _ =>
-        {
-            built++;
-            var enemy =
-                built == 1
-                    ? Fighter("Pushover", hp: 1, attack: 1, speed: 1, level: 5)
-                    : Fighter("Bruiser", hp: 999, attack: 999, speed: 999, level: 50);
-            enemy.SpeciesBaseExperience = 50; // small award at L50 — no level-up
-            return Task.FromResult(enemy);
-        };
-
-        // The evolved form (Charmeleon) + a learnset move available at the player's current level (50),
-        // so the post-evolution learn step auto-learns it into a free slot.
-        var charmeleon = new PokemonSpecies
+        var form = new PokemonSpecies
         {
             Id = 5,
             Name = "charmeleon",
@@ -51,18 +34,37 @@ public class BattleRunnerEvolutionTests
             BaseExperience = 142,
         };
         var evoMove = new Attack("flamethrower", "") { Id = 53, BaseDamage = 95 };
-        var outcome = new EvolutionOutcome(charmeleon, [new LearnsetMove(50, evoMove)]);
+        return (form, new EvolutionOutcome(form, [new LearnsetMove(6, evoMove)]));
+    }
 
-        int checks = 0;
-        Func<Creature, Task<EvolutionOutcome?>> checkEvolution = _ =>
-            Task.FromResult<EvolutionOutcome?>(checks++ == 0 ? outcome : null);
+    // A win that levels a level-5 MediumFast player to exactly level 6: floor(199 * 5 / 7) = 142 XP, and
+    // exp(5)=125, exp(6)=216, exp(7)=343 → 267 lands on 6. Then a bruiser ends the run (one evolution check).
+    private static Func<Creature, Task<Creature>> WinThenLose()
+    {
+        int built = 0;
+        return _ =>
+        {
+            built++;
+            var enemy =
+                built == 1
+                    ? Fighter("Pushover", hp: 1, attack: 1, speed: 1, level: 5)
+                    : Fighter("Bruiser", hp: 999, attack: 999, speed: 999, level: 50);
+            enemy.SpeciesBaseExperience = built == 1 ? 199 : 50;
+            return Task.FromResult(enemy);
+        };
+    }
 
-        var recorder = new RecordingEmitter();
-        var runner = new BattleRunner(
+    private static BattleRunner BuildRunner(
+        Creature player,
+        IBattleInput playerInput,
+        RecordingEmitter recorder,
+        Func<Creature, Task<EvolutionOutcome?>> checkEvolution
+    ) =>
+        new(
             player,
-            supplier,
+            WinThenLose(),
             Gen1TypeChart.Instance,
-            new ScriptedInput("tackle"),
+            playerInput,
             new ScriptedInput("tackle"),
             movePool: Array.Empty<Attack>(),
             emitter: recorder,
@@ -71,50 +73,117 @@ public class BattleRunnerEvolutionTests
             checkEvolution: checkEvolution
         );
 
+    [Fact]
+    public async Task Runner_OnLevelUp_OffersAndAppliesEvolution_WhenAllowed()
+    {
+        var player = Fighter("CHARMANDER", hp: 200, attack: 999, speed: 100, level: 5);
+        player.SpeciesId = 4;
+        var (_, outcome) = Charmeleon();
+
+        int checks = 0;
+        var recorder = new RecordingEmitter();
+        // Default ScriptedInput allows the evolution (ConfirmEvolutionAsync default = true).
+        var runner = BuildRunner(
+            player,
+            new ScriptedInput("tackle"),
+            recorder,
+            _ => Task.FromResult<EvolutionOutcome?>(checks++ == 0 ? outcome : null)
+        );
+
         await runner.RunAsync();
 
-        // Evolution fired exactly once, carrying both forms for the sprite morph.
+        // Offered, then evolved — both carry the from/to identity for the modal + morph.
+        var offered = Assert.Single(recorder.Of<EvolutionOffered>());
+        Assert.Equal(
+            (4, 5, "CHARMANDER", "CHARMELEON"),
+            (offered.FromSpeciesId, offered.ToSpeciesId, offered.FromName, offered.ToName)
+        );
         var evolved = Assert.Single(recorder.Of<CreatureEvolved>());
-        Assert.Equal(4, evolved.FromSpeciesId);
         Assert.Equal(5, evolved.ToSpeciesId);
-        Assert.Equal("CHARMANDER", evolved.FromName);
-        Assert.Equal("CHARMELEON", evolved.ToName);
 
-        // The player was actually mutated into the new form.
+        // The player was mutated into the new form and the evolved learnset was seated.
         Assert.Equal(5, player.SpeciesId);
         Assert.Equal("CHARMELEON", player.Name);
         Assert.Equal(58, player.BaseHP);
 
-        // The evolved form's level-50 move was learned, after the evolution event.
+        // The evolved form's level-6 move was learned, after the evolution event.
         var learned = Assert.Single(recorder.Of<MoveLearned>());
         Assert.Equal("flamethrower", learned.MoveName);
         Assert.Contains(player.MoveSet, m => m.Base.Id == 53);
+        Assert.Empty(recorder.Of<EvolutionCancelled>());
 
-        int evolvedAt = recorder.Events.ToList().IndexOf(evolved);
-        int learnedAt = recorder.Events.ToList().IndexOf(learned);
-        Assert.True(evolvedAt < learnedAt, "CreatureEvolved precedes the evolution move learn");
+        var events = recorder.Events.ToList();
+        Assert.True(events.IndexOf(offered) < events.IndexOf(evolved));
+        Assert.True(events.IndexOf(evolved) < events.IndexOf(learned));
+    }
+
+    [Fact]
+    public async Task Runner_OnLevelUp_Cancelled_LeavesCreatureUnchanged()
+    {
+        var player = Fighter("CHARMANDER", hp: 200, attack: 999, speed: 100, level: 5);
+        player.SpeciesId = 4;
+        var (_, outcome) = Charmeleon();
+
+        var recorder = new RecordingEmitter();
+        // This input declines the evolution (Gen 1 B-cancel). It re-offers at the next level-up (not tested
+        // here — the run ends after this battle); the point is the creature is untouched on cancel.
+        var runner = BuildRunner(
+            player,
+            new CancelEvolutionInput("tackle"),
+            recorder,
+            _ => Task.FromResult<EvolutionOutcome?>(outcome)
+        );
+
+        await runner.RunAsync();
+
+        Assert.Single(recorder.Of<EvolutionOffered>());
+        Assert.Single(recorder.Of<EvolutionCancelled>());
+        Assert.Empty(recorder.Of<CreatureEvolved>());
+
+        // Untouched: still Charmander, no evolution move learned.
+        Assert.Equal(4, player.SpeciesId);
+        Assert.Equal("CHARMANDER", player.Name);
+        Assert.DoesNotContain(player.MoveSet, m => m.Base.Id == 53);
+    }
+
+    [Fact]
+    public async Task Runner_NoLevelUp_DoesNotOfferEvolution()
+    {
+        // A level-50 player winning a tiny-XP pushover gains no level → the evolution check never runs, even
+        // though the resolver would return an outcome.
+        var player = Fighter("CHARMANDER", hp: 200, attack: 999, speed: 100, level: 50);
+        player.SpeciesId = 4;
+        var (_, outcome) = Charmeleon();
+
+        int calls = 0;
+        var recorder = new RecordingEmitter();
+        var runner = BuildRunner(
+            player,
+            new ScriptedInput("tackle"),
+            recorder,
+            _ =>
+            {
+                calls++;
+                return Task.FromResult<EvolutionOutcome?>(outcome);
+            }
+        );
+
+        await runner.RunAsync();
+
+        Assert.Equal(0, calls); // resolver never consulted without a level-up
+        Assert.Empty(recorder.Of<EvolutionOffered>());
+        Assert.Empty(recorder.Of<CreatureEvolved>());
     }
 
     [Fact]
     public async Task Runner_NullResolver_BehavesAsPlainChain_NoEvolution()
     {
-        var player = Fighter("PLAYER", hp: 200, attack: 999, speed: 100, level: 50);
-        int built = 0;
-        Func<Creature, Task<Creature>> supplier = _ =>
-        {
-            built++;
-            var enemy =
-                built == 1
-                    ? Fighter("Pushover", hp: 1, attack: 1, speed: 1, level: 5)
-                    : Fighter("Bruiser", hp: 999, attack: 999, speed: 999, level: 50);
-            enemy.SpeciesBaseExperience = 50;
-            return Task.FromResult(enemy);
-        };
+        var player = Fighter("PLAYER", hp: 200, attack: 999, speed: 100, level: 5);
 
         var recorder = new RecordingEmitter();
         var runner = new BattleRunner(
             player,
-            supplier,
+            WinThenLose(),
             Gen1TypeChart.Instance,
             new ScriptedInput("tackle"),
             new ScriptedInput("tackle"),
@@ -126,8 +195,21 @@ public class BattleRunnerEvolutionTests
 
         await runner.RunAsync();
 
+        Assert.Empty(recorder.Of<EvolutionOffered>());
         Assert.Empty(recorder.Of<CreatureEvolved>());
         Assert.Single(recorder.Of<RunEnded>());
+    }
+
+    // A player input that plays a scripted move but declines any evolution offer.
+    private sealed class CancelEvolutionInput(string move) : IBattleInput
+    {
+        private readonly ScriptedInput _inner = new(move);
+
+        public Task<PokemonAttack> ChooseMoveAsync(TurnContext context) =>
+            _inner.ChooseMoveAsync(context);
+
+        public Task<bool> ConfirmEvolutionAsync(EvolutionPromptContext context) =>
+            Task.FromResult(false);
     }
 
     private static Creature Fighter(string name, int hp, int attack, int speed, int level)

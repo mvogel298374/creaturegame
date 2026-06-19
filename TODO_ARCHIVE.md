@@ -8,6 +8,65 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Evolution System ✅ DONE (2026-06-18 → 2026-06-19)
+
+Full **level-up evolution end-to-end** — data + seam, core + run-loop, Phaser sprite-morph, plus a Gen 1
+B-cancel prompt. Designed with the user (`/plan`); built and committed in reviewable stages, each through the
+`/audit` gate. Suite after the work: **965 .NET + 59 Vitest + 20 Playwright** (all green).
+
+**Design calls (with the user):** trade evolutions have no trading in a single-player roguelite, so the 4 Gen 1
+trade lines (Kadabra→Alakazam, Machoke→Machamp, Graveler→Golem, Haunter→Gengar) evolve at **level 37** (flat);
+**stone** evolutions are **deferred with the Catch/bag work** (the `Stone` trigger + `IEvolutionRules.StoneUsed`
+are built but dormant — no caller emits a stone-use until a bag exists). The data stays **faithful** (a trade
+evo is a `Trade` row); the level-37 conversion lives on the seam, not in the data.
+
+**Stage 1 — data + seam (commit `2259a33`).** `PokemonEvolution` table in `pokemon.db` (`FromSpeciesId`,
+`ToSpeciesId`, `Trigger`, `LevelThreshold?`, `StoneItemId?`, `Generation`) + migration `AddPokemonEvolution`.
+Importer: `EvolutionMapper` (pure chain→Gen-1-edge filter — rejects happiness/time/held-item level-ups,
+held-item trade, and >151 species) + `EvolutionImport` (idempotent, dedup-by-chain) + DTOs + an `-- evolutions`
+re-run arg. **Live import: 72 Gen 1 edges (52 Level / 16 Stone / 4 Trade)** — matches canon. New generation
+seam **`IEvolutionRules`** + `Gen1EvolutionRules.Instance` (`creaturegame/Evolution/`); `EvolutionContext` is a
+closed record hierarchy (`LeveledTo` / `StoneUsed` / `Traded`). Tests (20): `EvolutionImportTests`,
+`Gen1EvolutionRulesTests` (asserts the level-37 quirk + stone dormant-on-levelup/ready-on-stoneuse),
+`PokemonEvolutionDataContractTests` (live-db pin: 72/52/16/4, trade lines, Eevee's 3 branches, dex-bounds).
+
+**Stage 2 — core + run-loop + event (commit `7eea368`).** `Creature.EvolveTo(PokemonSpecies)` adopts the new
+species and recomputes via the existing `IStatCalculator` path (no new stat math); the individual half
+(DVs/Stat Exp/Level/XP/PP/moveset) carries over and current HP rises by exactly the max-HP delta — authentic
+Gen 1. `MoveLearning.LearnMovesForLevelAsync` extracted from `Battle` (behaviour-preserving) and reused for the
+evolved form's moves. `BattleRunner` takes an injected `checkEvolution` resolver (mirrors `enemySupplier` —
+core stays data/gen-agnostic; null = plain chain); the web resolver is
+`EncounterFactory.ResolvePlayerEvolutionAsync` (edges → `Gen1EvolutionRules` → evolved species + learnset).
+`CreatureEvolved` event + SignalR projection + field-level contract guard (the recurring web event
+field-projection gap) + console line. Tests (+9): `EvolveToTests`, `BattleRunnerEvolutionTests`,
+`EncounterEvolutionTests`.
+
+**Stage 3 — Phaser morph (commit `4f78d1d`).** `playEvolutionAnimation` bridge command + `BattleScene`
+handler: the classic Gen 1 **white-silhouette flicker** (`setTintFill(0xffffff)` alternating old/new shapes,
+settling on the evolved back sprite), loaded on demand, emitting `animationComplete` so the `timeline.ts`
+`awaitAnim` contract holds. Correctness fix: evolution updates `playerTrueSpeciesId` (+ `initialPlayerSpeciesId`)
+so the post-win `resetPlayerSprite` reverts to the *evolved* form. Vitest pins the arm order.
+
+**Cry-mismatch fix (commit `d863ca9`).** Surfaced while building the morph: the OGG cry keys were bound once in
+`preload()` to the *initial* species, so with cries present (production) every chained enemy played the first
+enemy's cry and an evolved/transformed player cried as its pre-form. Re-keyed cries by species id (`cry-{id}`),
+loaded on demand wherever the sprite changes.
+
+**Cancel/abort evolution + level-up gate (2026-06-19).** Gen 1 B-cancel: evolution is offered via a blocking
+`EvolutionOffered` event + an Allow/Cancel modal (mirrors the Poké Center recovery prompt end-to-end —
+`IBattleInput.ConfirmEvolutionAsync` default-allow, `SignalRInput` TCS handshake, hub `RespondEvolution`, React
+`EvolutionPromptModal`); on cancel → `EvolutionCancelled`, creature untouched. Made the check **Gen 1-canonical**:
+evolution is attempted only on an actual **level-up** that battle, so a declined evo re-offers at the *next*
+level-up (not every win). Tests (+5): runner allow/cancel/no-level-up, `EvolutionOffered` field guard, timeline
+offer/cancel arms.
+
+**Accepted limitation:** a multi-threshold level jump in a single battle evolves only one stage that win (the
+next stage fires on the next win). **Deferred:** an in-run Playwright E2E (a real evolution is hard to force
+deterministically without a test-only "evolve now" hook; the bridge ordering contract is covered at the
+timeline layer). **Still open:** stone evolutions (need the bag — Catch Mechanic).
+
+---
+
 ## Web UI Polish — Run-Over Screen, Overview, Sprite-Shake ✅ DONE (2026-06-18)
 
 Three more battle-UI polish items, all frontend — the engine already emitted the driving events

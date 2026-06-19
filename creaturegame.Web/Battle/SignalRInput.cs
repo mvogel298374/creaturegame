@@ -8,6 +8,7 @@ public sealed class SignalRInput : IBattleInput
     private volatile TaskCompletionSource<int>? _tcs;
     private volatile TaskCompletionSource<int?>? _forgetTcs;
     private volatile TaskCompletionSource<bool>? _recoveryTcs;
+    private volatile TaskCompletionSource<bool>? _evolutionTcs;
     private volatile bool _cancelled;
 
     public async Task<PokemonAttack> ChooseMoveAsync(TurnContext context)
@@ -95,6 +96,32 @@ public sealed class SignalRInput : IBattleInput
     }
 
     /// <summary>
+    /// Awaits the player's evolution allow/cancel decision: <c>true</c> to evolve, <c>false</c> to cancel.
+    /// Same TCS handshake as the other prompts (the hub's <c>RespondEvolution</c> completes it via
+    /// <see cref="SetEvolutionChoice"/>); the <see cref="_cancelled"/> guard makes a disconnect throw rather
+    /// than hang the run on the prompt.
+    /// </summary>
+    public async Task<bool> ConfirmEvolutionAsync(EvolutionPromptContext context)
+    {
+        if (_cancelled)
+            throw new OperationCanceledException("Battle input cancelled (client disconnected).");
+
+        var tcs = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        _evolutionTcs = tcs;
+        var allow = await tcs.Task; // throws OperationCanceledException if Cancel() ran
+        _evolutionTcs = null;
+        return allow;
+    }
+
+    public void SetEvolutionChoice(bool allow)
+    {
+        var tcs = _evolutionTcs;
+        tcs?.TrySetResult(allow);
+    }
+
+    /// <summary>
     /// Unblocks a battle loop waiting on player input when the client disconnects,
     /// so the fire-and-forget battle task can complete and be collected.
     /// </summary>
@@ -104,5 +131,6 @@ public sealed class SignalRInput : IBattleInput
         _tcs?.TrySetCanceled();
         _forgetTcs?.TrySetCanceled();
         _recoveryTcs?.TrySetCanceled();
+        _evolutionTcs?.TrySetCanceled();
     }
 }

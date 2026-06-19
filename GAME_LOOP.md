@@ -127,7 +127,7 @@ GameLoop:                                       // the ONLY place that decides s
 | Elite / boss battle | loop-event | future — a Battle variant with a tougher `chooseNextEvent` branch |
 | Catch | interaction/loop-event | future — see `TODO.md` Catch Mechanic |
 | Shop / rest site / event card | interaction-event | future — roguelite layer |
-| Evolution | interaction-event | future — at a level threshold between battles |
+| **Evolution** | interaction-event | ✅ implemented (in `BattleRunner.TryEvolveAsync`) — on a level-up, offer → ALLOW/CANCEL → morph/decline. Data/decision injected via `checkEvolution` (web `EncounterFactory` + `IEvolutionRules`); see archive |
 | Party / lead swap | interaction-event | future — once a party exists |
 
 Each future event must obey §3: handed the run context, emits text, may await input, returns a typed outcome,

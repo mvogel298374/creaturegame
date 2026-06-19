@@ -251,6 +251,17 @@ public sealed class SignalRBattleEventEmitter(
                     e.StatGains,
                 }
             ),
+            EvolutionOffered e => (
+                "EvolutionOffered",
+                new
+                {
+                    e.FromName,
+                    e.ToName,
+                    e.FromSpeciesId,
+                    e.ToSpeciesId,
+                }
+            ),
+            EvolutionCancelled e => ("EvolutionCancelled", new { e.CreatureName }),
             CreatureEvolved e => (
                 "CreatureEvolved",
                 new

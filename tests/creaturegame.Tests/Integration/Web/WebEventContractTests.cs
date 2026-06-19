@@ -179,6 +179,24 @@ public class WebEventContractTests
         Assert.Equal(5, root.GetProperty("ToSpeciesId").GetInt32());
     }
 
+    /// <summary>Field-level guard for the <see cref="EvolutionOffered"/> projection: the cancel modal needs
+    /// both names + species ids to render. The reflection contract test only checks it's mapped.</summary>
+    [Fact]
+    public void EvolutionOffered_Projection_CarriesBothFormsAndSpeciesIds()
+    {
+        var evt = new EvolutionOffered("CHARMANDER", "CHARMELEON", 4, 5);
+
+        var (type, payload) = SignalRBattleEventEmitter.MapEvent(evt);
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+        var root = doc.RootElement;
+
+        Assert.Equal("EvolutionOffered", type);
+        Assert.Equal("CHARMANDER", root.GetProperty("FromName").GetString());
+        Assert.Equal("CHARMELEON", root.GetProperty("ToName").GetString());
+        Assert.Equal(4, root.GetProperty("FromSpeciesId").GetInt32());
+        Assert.Equal(5, root.GetProperty("ToSpeciesId").GetInt32());
+    }
+
     // Concrete (non-abstract) BattleEvent subtypes — the exact set the engine can emit to the client.
     private static List<Type> ConcreteBattleEventTypes()
     {

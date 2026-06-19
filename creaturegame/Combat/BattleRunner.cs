@@ -44,6 +44,7 @@ public sealed class BattleRunner(
         while (player.IsAlive())
         {
             var enemy = await enemySupplier(player);
+            int levelBefore = player.Level;
             var battle = new Battle(
                 player,
                 enemy,
@@ -64,12 +65,11 @@ public sealed class BattleRunner(
                 break;
             battlesWon++;
 
-            // Evolution check: the battle has already applied this win's XP/level-ups, so the player's level
-            // is current. The web resolver runs the IEvolutionRules decision against the DB; if it fires we
-            // apply the new form, seat the evolved learnset, announce it, then drive the same move-learning
-            // flow a level-up uses (the evolved form may learn a move at this level). Logic drives sequence —
-            // the event is emitted for the client to replay the morph animation.
-            await TryEvolveAsync();
+            // Evolution check — Gen 1 attempts evolution on a level-up, so only when this battle actually
+            // raised the player's level (a declined evolution then re-offers at the next level-up, not every
+            // win). The battle has already applied the level-ups, so the level is current.
+            if (player.Level > levelBefore)
+                await TryEvolveAsync();
 
             // Poké Center pause: every Nth win, offer a full restore before the next foe. The prompt is its own
             // step in the game loop — it blocks awaiting the player's accept/skip choice (interactive input
@@ -102,9 +102,10 @@ public sealed class BattleRunner(
         emitter?.Emit(new RunEnded(battlesWon, player.Level, player.Name));
     }
 
-    // Applies a pending evolution, if the resolver reports one for the player's current state. The
-    // from-identity is captured before EvolveTo (which overwrites name/species/stats) so the event carries
-    // both forms for the sprite morph.
+    // Offers, then applies, a pending evolution if the resolver reports one. The player can cancel (Gen 1
+    // B-cancel) — the prompt blocks awaiting the decision; on cancel the creature is untouched and re-offered
+    // at the next level-up. The from-identity is captured before EvolveTo (which overwrites name/species/stats)
+    // so the events carry both forms for the sprite morph.
     private async Task TryEvolveAsync()
     {
         if (checkEvolution is null)
@@ -114,8 +115,20 @@ public sealed class BattleRunner(
 
         string fromName = player.Name;
         int fromSpeciesId = player.SpeciesId;
+        var newForm = evolution.NewForm;
+        string toName = newForm.Name.ToUpper(); // matches how EvolveTo names the creature
 
-        player.EvolveTo(evolution.NewForm);
+        emitter?.Emit(new EvolutionOffered(fromName, toName, fromSpeciesId, newForm.Id));
+        bool allow = await playerInput.ConfirmEvolutionAsync(
+            new EvolutionPromptContext(player, newForm.Id, toName)
+        );
+        if (!allow)
+        {
+            emitter?.Emit(new EvolutionCancelled(fromName));
+            return;
+        }
+
+        player.EvolveTo(newForm);
         player.Learnset = evolution.NewLearnset;
 
         emitter?.Emit(new CreatureEvolved(fromName, player.Name, fromSpeciesId, player.SpeciesId));

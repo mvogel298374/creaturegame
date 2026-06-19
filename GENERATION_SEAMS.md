@@ -24,6 +24,13 @@ implementations you swap in.**
 | `ITypeChart` | The type-effectiveness matrix (Fire beats Grass, etc.) | `Gen1TypeChart` | `Gen1TypeChart.Instance` |
 | `IBattleRules` | All other battle math that varies by gen: crit formula & multiplier, damage variance, stat-stage tables, accuracy scale, freeze/thaw, sleep & binding durations, status-damage denominators, stat selection, XP formula | `Gen1BattleRules` | `Gen1BattleRules.Instance` |
 | `IStatCalculator` | Stat formulas: HP & other stats, DV/IV randomisation, Stat-Exp/EV scaling **and award** | `Gen1StatCalculator` | `Gen1StatCalculator.Instance` |
+| `IEvolutionRules` | Evolution triggers: which condition (level / stone / trade) fires, and how a generation/game-mode interprets it (Gen 1 here = level fires at threshold, trade→level 37 for this roguelite, stone on item-use) | `Gen1EvolutionRules` | `Gen1EvolutionRules.Instance` |
+
+These are the **battle-and-progression** seams. `IEvolutionRules` is a progression seam (consulted between
+battles by `BattleRunner`, not in the damage path), but it follows the identical pattern — interface +
+`Gen1*.Instance` default, faithful data on `PokemonEvolution`, the gen/mode rule on the seam. A new generation
+implements all four; the engine and loop never change. (Older sections below that say "the three seams" predate
+it — the count is four.)
 
 > **Not a generation seam, but related:** `IRandomSource` (see `STATE_MODEL.md` / the
 > RNG section of `TODO.md`) controls *randomness*, not generation. It's orthogonal —

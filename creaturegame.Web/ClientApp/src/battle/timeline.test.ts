@@ -222,15 +222,31 @@ describe('expandEvent — control plane vs timeline', () => {
     expect(logLines(steps)).toEqual(['MEWTWO decided to keep going!']);
   });
 
-  it('CreatureEvolved announces both forms, plays the morph, and waits for it before the confirm line', () => {
+  it('EvolutionOffered announces it and raises the Allow/Cancel modal (queued, blocking)', () => {
+    const { steps } = expandEvent('EvolutionOffered', {
+      fromName: 'MACHOKE', toName: 'MACHAMP', fromSpeciesId: 67, toSpeciesId: 68,
+    }, CTX);
+    expect(logLines(steps)).toEqual(['What? MACHOKE is evolving!']);
+    const dispatched = (steps ?? [])
+      .filter((s): s is Extract<Step, { kind: 'dispatch' }> => s.kind === 'dispatch')
+      .map(s => s.action);
+    expect(dispatched).toContainEqual({
+      type: 'SHOW_EVOLUTION_PROMPT', fromName: 'MACHOKE', toName: 'MACHAMP', fromSpeciesId: 67, toSpeciesId: 68,
+    });
+  });
+
+  it('EvolutionCancelled logs the stopped-evolving line', () => {
+    const { steps } = expandEvent('EvolutionCancelled', { creatureName: 'MACHOKE' }, CTX);
+    expect(logLines(steps)).toEqual(['MACHOKE stopped evolving.']);
+  });
+
+  it('CreatureEvolved plays the morph and waits for it before the confirm line (no duplicate "evolving" line)', () => {
     const { steps } = expandEvent('CreatureEvolved', {
       fromName: 'CHARMANDER', toName: 'CHARMELEON', fromSpeciesId: 4, toSpeciesId: 5,
     }, CTX);
 
-    expect(logLines(steps)).toEqual([
-      'What? CHARMANDER is evolving!',
-      'CHARMANDER evolved into CHARMELEON!',
-    ]);
+    // The "is evolving!" line plays in the offer, not here — this arm only confirms.
+    expect(logLines(steps)).toEqual(['CHARMANDER evolved into CHARMELEON!']);
 
     // The morph command carries the evolved species id...
     expect(emits(steps)).toContainEqual({ type: 'playEvolutionAnimation', toSpeciesId: 5 });

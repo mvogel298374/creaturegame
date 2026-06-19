@@ -206,6 +206,18 @@ public record LeveledUp(
     StatBlock StatGains
 ) : BattleEvent;
 
+/// <summary>An evolution is offered between encounters (after a level-up crosses the threshold). A blocking
+/// event: the run loop awaits the player's allow/cancel decision via
+/// <see cref="IBattleInput.ConfirmEvolutionAsync"/> before continuing, so the client raises the evolution
+/// modal here. Carries both names + the from/to species ids so the modal can show the creature and what it
+/// would become. On allow, <see cref="CreatureEvolved"/> follows; on cancel, <see cref="EvolutionCancelled"/>.</summary>
+public record EvolutionOffered(string FromName, string ToName, int FromSpeciesId, int ToSpeciesId)
+    : BattleEvent;
+
+/// <summary>The player declined an offered evolution (Gen 1 B-cancel). The creature keeps its current form;
+/// it will be offered again at the next level-up while still eligible. Drives the "stopped evolving" line.</summary>
+public record EvolutionCancelled(string CreatureName) : BattleEvent;
+
 /// <summary>The player's creature evolved between encounters. Carries both the old and new names plus the
 /// <paramref name="FromSpeciesId"/>/<paramref name="ToSpeciesId"/> so the client can morph the sprite
 /// (old → silhouette → new) — the same id-driven approach as <see cref="TransformedInto"/>. Emitted in the

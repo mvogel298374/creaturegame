@@ -43,6 +43,17 @@ public class BattleHub(GameSessionManager manager) : Hub<IBattleClient>
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Answers an evolution offer: <paramref name="allow"/> true to evolve, false to cancel (Gen 1 B-cancel).
+    /// Mirrors <see cref="RespondRecovery"/> — fire-and-forget completion of the input TCS the run loop is
+    /// blocked on.
+    /// </summary>
+    public Task RespondEvolution(bool allow)
+    {
+        manager.SetEvolutionChoice(Context.ConnectionId, allow);
+        return Task.CompletedTask;
+    }
+
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         // Start the reconnect grace window; the battle is abandoned only if the client

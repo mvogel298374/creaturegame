@@ -54,7 +54,10 @@ export type Action =
   | { type: 'HIDE_MOVE_REPLACEMENT' }
   // Roguelite Poké Center: heal offer between encounters — shown then hidden by the player's Heal/Skip press.
   | { type: 'SHOW_RECOVERY'; creatureName: string; speciesId: number; battlesWon: number }
-  | { type: 'HIDE_RECOVERY' };
+  | { type: 'HIDE_RECOVERY' }
+  // Evolution offer between encounters — shown then hidden by the player's Allow/Cancel press.
+  | { type: 'SHOW_EVOLUTION_PROMPT'; fromName: string; toName: string; fromSpeciesId: number; toSpeciesId: number }
+  | { type: 'HIDE_EVOLUTION_PROMPT' };
 
 // Phaser commands sent over the mitt bridge.
 export type BridgeCommand =
@@ -456,16 +459,36 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
     }
 
     // ── Evolution (between encounters) ─────────────────────────────────────────
+    // The offer raises a blocking Allow/Cancel modal — the backend is now waiting on RespondEvolution, so
+    // the timeline idles here (like RecoveryOffered) until the player answers. Allow → CreatureEvolved
+    // (morph); Cancel → EvolutionCancelled (log).
+    case 'EvolutionOffered': {
+      const fromName      = payload.fromName as string;
+      const toName        = payload.toName as string;
+      const fromSpeciesId = payload.fromSpeciesId as number;
+      const toSpeciesId   = payload.toSpeciesId as number;
+      return { steps: [
+        w(300),
+        d(log(`What? ${fromName} is evolving!`)),
+        w(300),
+        d({ type: 'SHOW_EVOLUTION_PROMPT', fromName, toName, fromSpeciesId, toSpeciesId }),
+      ] };
+    }
+
+    case 'EvolutionCancelled': {
+      const cName = payload.creatureName as string;
+      return { steps: [w(150), d(log(`${cName} stopped evolving.`)), w(500)] };
+    }
+
     // Announce, play the white-silhouette morph (awaited so the log line lands on the evolved
     // sprite), then confirm. The morph swaps front+back to the evolved species in the scene.
     case 'CreatureEvolved': {
+      // Reached only after the player allowed the offer, so the "is evolving!" line already played there.
       const fromName    = payload.fromName as string;
       const toName      = payload.toName as string;
       const toSpeciesId = payload.toSpeciesId as number;
       return { steps: [
-        w(300),
-        d(log(`What? ${fromName} is evolving!`)),
-        w(400),
+        w(200),
         emit({ type: 'playEvolutionAnimation', toSpeciesId }),
         anim(),
         d(log(`${fromName} evolved into ${toName}!`)),

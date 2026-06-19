@@ -35,6 +35,15 @@ public interface IBattleInput
     /// heals on schedule — only the web <see cref="SignalRInput"/> blocks awaiting a real choice.
     /// </summary>
     Task<bool> ConfirmRecoveryAsync(RecoveryContext context) => Task.FromResult(true);
+
+    /// <summary>
+    /// Asked between encounters when an evolution is offered (after a level-up crosses the threshold): return
+    /// <c>true</c> to let it evolve, <c>false</c> to cancel (Gen 1 B-cancel — it re-offers at the next
+    /// level-up). Only the interactive player input is ever consulted; the default allows it, so automated /
+    /// AI inputs never block on the prompt and still evolve on schedule — only the web
+    /// <see cref="SignalRInput"/> blocks awaiting a real choice.
+    /// </summary>
+    Task<bool> ConfirmEvolutionAsync(EvolutionPromptContext context) => Task.FromResult(true);
 }
 
 /// <summary>Context for a level-up move-replacement decision: who is learning, and the move on offer.</summary>
@@ -43,3 +52,7 @@ public sealed record MoveReplacementContext(Creature Learner, Attack NewMove);
 /// <summary>Context for a between-encounter Poké Center recovery offer: the player creature and the running
 /// win count (so an input could vary its answer by depth — the default just accepts).</summary>
 public sealed record RecoveryContext(Creature Player, int BattlesWon);
+
+/// <summary>Context for a between-encounter evolution offer: the player creature and the form it would become
+/// (id + display name), so an input could decide based on it — the default just allows.</summary>
+public sealed record EvolutionPromptContext(Creature Player, int ToSpeciesId, string ToName);

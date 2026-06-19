@@ -4,21 +4,21 @@
 > [`TODO_ARCHIVE.md`](TODO_ARCHIVE.md) — read it only if you need the history of a finished item.
 > **See also:** `CLAUDE.md` (setup/commands) · `AI_CONTEXT.md` (profiles) · `DESIGN_GUIDES.md` (mechanics) · `DEV_STANDARDS.md` (conventions)
 
-**Current state (2026-06-18):** The Gen 1 battle engine is feature-complete — all 165 moves, XP & level-up,
+**Current state (2026-06-19):** The Gen 1 battle engine is feature-complete — all 165 moves, XP & level-up,
 the Endless Battle Chain, the Roguelite recovery/encounter layer, the Learnset System, **AI move selection**
-(a gen-specific `IBattleAi` brain), and **EV / Stat-Exp gain** are all done and archived in
+(a gen-specific `IBattleAi` brain), **EV / Stat-Exp gain**, and the full **Evolution System** (level-up
+evolution end-to-end incl. the Phaser sprite-morph + a Gen 1 B-cancel prompt) are all done and archived in
 [`TODO_ARCHIVE.md`](TODO_ARCHIVE.md) (read it for the history of any finished item). `ARCHITECTURE.md`, the RNG
 **per-run web seed** (Tech Debt #3), and Architecture Review #7's higher-leverage structural items are also
 done (only the **minor cleanups** bullet remains — see Tech Debt). A round of **Web UI polish** landed too —
 STAB indicator, per-move effectiveness pill, colour-coded battle log, friendlier connection-error message, and
-the tabbed **Pokémon overview screen** (CHECK POKEMON) (all archived). Suite: **932 .NET + 55 Vitest + 20
+the tabbed **Pokémon overview screen** (CHECK POKEMON) (all archived). Suite: **965 .NET + 59 Vitest + 20
 Playwright E2E** (all green).
 
-**Next:** the **Evolution System** is ✅ DONE — all three stages (data+seam, core+loop+event, Phaser
-sprite-morph). Trade lines → level 37; stones remain deferred with the Catch/bag work. Stage 3's commit is
-pending approval; an in-run E2E is deferred (see its note). After this, the next layer is the **Catch
-Mechanic** (bag — which also unlocks stone evolutions) → the rest of the Game-Loop layer (party, save).
-Web UI polish is essentially done (only the low-priority `ConsoleInput` terminal menu remains). The
+**Next:** the **Catch Mechanic** (bag action + Gen 1 capture formula — see its section). It's the gateway to
+the rest of the Game-Loop layer (party, save) **and** unlocks the dormant **stone evolutions** (the `Stone`
+trigger + `IEvolutionRules.StoneUsed` are already built and waiting on a bag). Web UI polish is essentially
+done (move-specific attack animations + the low-priority `ConsoleInput` terminal menu remain). The
 recovery/replace-move **modal** E2Es are unblocked now the per-run seed exists (pass a fixed `seed` in the
 `start` request for a deterministic run).
 
@@ -99,90 +99,12 @@ through `GameController` would make these specs deterministic).
 
 ---
 
-## Evolution System
+## Evolution System ✅ DONE — archived
 
-**Decided (2026-06-18, `/plan` with the user):**
-- **Trade evolutions → level-up.** No trading in a single-player roguelite, so the 4 Gen 1 trade lines
-  (Kadabra→Alakazam, Machoke→Machamp, Graveler→Golem, Haunter→Gengar) all evolve at **level 37** (flat, for
-  consistency). This roguelite conversion lives **on the seam**, not in the data.
-- **Stone evolutions → deferred** with the Catch/bag work (they need an item/bag system). The `Stone` trigger
-  is imported + modelled now but kept a **documented dormant stub** — Eevee, Pikachu→Raichu, Clefairy→Clefable,
-  etc. simply don't evolve player-side until the bag exists. (Enemies can still *spawn* as the evolved form —
-  that's emergent from BST encounter selection, not the evolution trigger.)
-- **Scope = full level-up system end-to-end**, built in reviewable **stages** (below).
-
-**Architecture (matches the existing seam pattern — see `GENERATION_SEAMS.md`):**
-- *Data is faithful, seam does the adaptation.* `PokemonEvolution` stores the **real** Gen 1 trigger
-  (`Trade` stays `Trade`); `Gen1EvolutionRules` interprets a `Trade` edge as level-37. Keeps the
-  data honest and the roguelite/gen rule swappable in one place.
-- New generation seam **`IEvolutionRules`** + `Gen1EvolutionRules.Instance` default, per-gen XML docs on every
-  member. A future `Gen2EvolutionRules` adds friendship/time/held-item triggers by *implementing the
-  interface* — zero engine changes.
-
-### Stage 1 — Data + seam ✅ DONE (2026-06-18; audit PASS-WITH-ADVISORIES, both resolved)
-- [x] **`PokemonEvolution` table** in `pokemon.db` (`FromSpeciesId`, `ToSpeciesId`, `Trigger`,
-  `LevelThreshold?`, `StoneItemId?`, `Generation`) + migration `AddPokemonEvolution`. Unique index on
-  (From, To, Generation); lookup index on (From, Generation).
-- [x] **Importer** — `EvolutionMapper` (pure chain→Gen-1-edge filter) + `EvolutionImport` (idempotent,
-  dedup-by-chain), new DTOs (`PokeApiEvolutionChain` + `evolution_chain` on the species DTO), wired into
-  `Program.cs` (+ an `-- evolutions` arg to re-run just this stage). **Live import verified: 72 Gen 1 edges
-  (52 Level / 16 Stone / 4 Trade)** — matches canon; triggers stored faithfully (Trade stays Trade).
-- [x] **`IEvolutionRules` seam** + `Gen1EvolutionRules.Instance` in `creaturegame/Evolution/`.
-  `EvolutionContext` = closed record hierarchy (`LeveledTo` / `StoneUsed` / `Traded`). Gen 1: Level fires at
-  `Level >= threshold`; Trade → `TradeEvolutionLevel` (37) named constant on the seam; Stone fully
-  implemented but dormant (no caller emits `StoneUsed` until the bag exists). Mutual-exclusivity assumption
-  documented on the interface.
-- [x] **Tests (20):** `EvolutionImportTests` (mapper, incl. multi-detail precedence), `Gen1EvolutionRulesTests`
-  (seam — asserts the level-37 quirk + stone dormant-on-levelup/ready-on-stoneuse), and
-  `PokemonEvolutionDataContractTests` (live-db pin: 72/52/16/4, the 4 trade lines, Eevee's 3 branches,
-  dex-bounds). Suite: **951 .NET** green.
-
-### Stage 2 — Core application + game loop ✅ DONE (2026-06-18; audit PASS-WITH-ADVISORIES, both resolved)
-- [x] **`Creature.EvolveTo(PokemonSpecies newForm)`** — adopts new base stats/types/growth-rate/base-exp/id
-  and recomputes via the existing `InitializeFromSpecies`→`CalculateStats` (no new stat math). Individual half
-  (DVs/Stat Exp/Level/Experience/PP/moveset) carries over; current HP rises by exactly the max-HP delta.
-- [x] **Learnset on evolution** — extracted `MoveLearning.LearnMovesForLevelAsync` from `Battle` (shared,
-  behaviour-preserving) and reused it: after evolving, the run loop seats the evolved learnset and runs the
-  same auto-learn / replace-move flow for moves learned at the current level.
-- [x] **Loop wiring** — `BattleRunner` takes an optional injected `checkEvolution` resolver (mirrors
-  `enemySupplier`, keeping core data/gen-agnostic; null = plain chain). After each win it applies `EvolveTo`,
-  emits `CreatureEvolved`, then drives move-learning. Web resolver = `EncounterFactory.ResolvePlayerEvolutionAsync`
-  (edges → `Gen1EvolutionRules` → evolved species + learnset), wired in `GameSessionManager`.
-- [x] **`CreatureEvolved` event** + SignalR projection + `timeline.ts` log arm + field-level contract guard
-  (the recurring web event field-projection gap) + console-emitter line. *(Phaser sprite-morph animation is
-  Stage 3.)*
-- [x] **Enemy form** — confirmed BST encounter selection already yields level-appropriate evolved enemies (the
-  full 1–151 pool is in scope and evolved forms outrank pre-evos by BST as depth scales); no guard needed.
-- [x] **Tests (+9):** `EvolveToTests` (stat recompute + HP-delta + individual-half preservation),
-  `BattleRunnerEvolutionTests` (wiring: fires after win, emits event then learns; null-resolver = plain chain),
-  `EncounterEvolutionTests` (live DB: level fires at threshold, trade→37, stone dormant), `CreatureEvolved`
-  field guard + Vitest timeline arm. Suite: **962 .NET + 57 Vitest** green.
-
-> **Known limitation (accepted):** a multi-threshold level jump in a single battle evolves only one stage that
-> win (the next stage fires on the next win). Fine for the roguelite; not a bug.
-
-### Stage 3 — Web event + animation ✅ DONE (2026-06-18)
-- [x] **`CreatureEvolved` event** — done in Stage 2 (event + SignalR projection + field-level guard +
-  timeline arm + console line). See Stage 2.
-- [x] **Client morph** — `playEvolutionAnimation` `BridgeCommand` + `PhaserBridge` event + `BattleScene`
-  handler: the classic Gen 1 **white-silhouette flicker** (`setTintFill(0xffffff)` alternating old/new shapes,
-  then settle on the evolved back sprite in colour), loaded on demand. Emits `animationComplete` so
-  `timeline.ts`'s `awaitAnim` holds; the "evolved into" line lands on the new sprite. The `CreatureEvolved`
-  timeline arm now emits the morph + awaits it. **Correctness fix:** evolution updates `playerTrueSpeciesId`
-  (+ a new `initialPlayerSpeciesId`) so the post-win `resetPlayerSprite` reverts to the *evolved* form, not
-  the pre-evolution sprite.
-- [x] **Timeline unit test** — Vitest pins the arm's order (announce → emit `playEvolutionAnimation` →
-  `awaitAnim` → confirm line). Suite: **962 .NET + 57 Vitest** green; `tsc --noEmit` clean.
-- [ ] **E2E (deferred, with reason)** — a Playwright spec driving a *real* in-run evolution is hard to force
-  deterministically (the player must win battles and cross a level/trade-37 threshold; one seeded run can't
-  reliably reach it without a test-only entry hook). The bridge **ordering contract** is already covered
-  deterministically at the timeline layer (Vitest). Revisit if a seeded "evolve now" hook is added.
-
-- [x] **Cry-mismatch fix (2026-06-18)** — the OGG cry keys were bound once in `preload()` to the *initial*
-  species (`cry-player`/`cry-enemy`), so with cries present (production) **every chained enemy** played the
-  first enemy's cry and an evolved/transformed player played its pre-form cry. Re-keyed cries by species id
-  (`cry-{id}`), loaded on demand wherever the sprite changes (`spawnEnemy`, evolution morph, `transformSprite`)
-  and at `preload`; `playCry` resolves the live id's cry, synth-fallback unchanged. `tsc` clean, 57 Vitest green.
+Full level-up evolution end-to-end (data+seam → core+loop → Phaser morph) + a Gen 1 B-cancel prompt, all
+shipped and committed. See **Evolution System** in [`TODO_ARCHIVE.md`](TODO_ARCHIVE.md) for the full record.
+**Only open piece:** stone evolutions, deferred with the **Catch Mechanic** (the `Stone` trigger +
+`IEvolutionRules.StoneUsed` are built and dormant, waiting on a bag).
 
 ---
 
@@ -211,8 +133,8 @@ Deferred until Phaser animations exist — the mechanic needs a throw/shake/catc
 - Player starts with one Pokémon; win → new BST-scaled encounter; lose → game over with run summary
 - Catch → Pokémon added to party (up to 6); choose lead between battles
 - Progressive difficulty: `targetBst = party lead BST + (depth × 10)`; trainer encounters at milestones
-- Evolution: **now its own section** — see **Evolution System** above (designed 2026-06-18, staged). Player
-  level-up evolution end-to-end; trade lines → level 37; stones deferred with the bag.
+- Evolution: ✅ **DONE** (level-up evolution end-to-end + Gen 1 B-cancel; trade lines → level 37) — see
+  **Evolution System** in `TODO_ARCHIVE.md`. Only **stone** evolutions remain, gated on the bag (Catch Mechanic).
 - `PlayerSave` / `SavedCreature` models in `save.db`; auto-save after each battle
 - Party management UI between battles
 - **Cross-encounter persistence:** ✅ major status now carries across encounters in the Endless Battle Chain
