@@ -26,6 +26,7 @@ that the game never touches PokeAPI again.
 |:-------------|:-----|
 | `moves.db` (`MovesDbContext`) | Gen 1 moves → `Attack` rows |
 | `pokemon.db` (`PokemonDbContext`) | Gen 1 species → `PokemonSpecies` rows + `PokemonGameAvailability` rows |
+| `items.db` (`ItemsDbContext`) | Gen 1 battle-usable items → `Item` rows |
 | `creaturegame.Web/wwwroot/sprites/{front,back}/{id}.png` | Battle sprites |
 | `creaturegame.Web/wwwroot/audio/cries/{id}.ogg` | Legacy 8-bit cries |
 
@@ -62,17 +63,23 @@ the model (with a migration) and re-run — **never add a runtime PokeAPI call.*
 
 Six sequential steps:
 
-1. **Ensure databases** — `EnsureDatabaseCreated()` on both contexts runs EF migrations
-   (`Database.Migrate()`), creating/updating `moves.db` and `pokemon.db`.
+1. **Ensure databases** — `EnsureDatabaseCreated()` on all contexts runs EF migrations
+   (`Database.Migrate()`), creating/updating `moves.db`, `pokemon.db` and `items.db`.
 2. **Import moves** — `MoveImport.FetchMovesByGeneration(1)`.
 3. **Import species** — `PokemonImport.FetchPokemonByGeneration(1)`.
-4. **Seed game availability** — `GameAvailabilitySeeder.SeedGen1Async()`.
-5. **Download sprites** — `SpriteDownloader.DownloadAllAsync()`.
-6. **Download cries** — `CryDownloader.DownloadAllAsync()`.
+4. **Import evolutions** — `EvolutionImport.ImportAllAsync()`.
+5. **Import items** — `ItemImport.ImportGen1BattleItemsAsync()` (see §4.5).
+6. **Seed game availability** — `GameAvailabilitySeeder.SeedGen1Async()`.
+7. **Download sprites** — `SpriteDownloader.DownloadAllAsync()`.
+8. **Download cries** — `CryDownloader.DownloadAllAsync()`.
 
 Steps 2 and 3 follow the same **index-then-detail** shape: hit the *generation* endpoint
 (`/generation/1/`) to get the list of move/species URLs, then fetch each entity's detail
-endpoint and map it.
+endpoint and map it. Items can't use that shape — there is no `/generation/{n}` item list — so
+step 5 fetches a hand-curated roster by slug instead (§4.5).
+
+Individual stages can be re-run without the full network-heavy import: `run --project
+PokeApiConnector -- evolutions` and `-- items` each run just that idempotent stage.
 
 ---
 
@@ -175,6 +182,41 @@ to the solution root. Both are **idempotent**: a file that already exists is ski
 re-runs only fetch what's missing. The frontend's Phaser canvas serves these as static
 files (front for the enemy, back for the player); cries fall back to a Web Audio synth if
 an OGG is missing.
+
+---
+
+### 4.5 Items (`ItemImport` / `ItemMapper` → `Item`)
+The **Gen 1 battle-usable** items only — Poké Balls, healing, status cures, revives, PP restore, and the
+X-items (X Attack/Defense/Speed/Special/Accuracy, Dire Hit, Guard Spec). Deliberately **excluded**:
+evolution stones, vitamins, Rare Candy, key items, TMs, and berries. Written to `items.db`
+(`ItemsDbContext`); read at runtime via `ItemService`. This is **data only** — there is no bag or
+use-in-battle layer yet.
+
+**The Gen 1 filter is hand-curated, because PokeAPI has no Gen 1 item signal.** Moves and species are
+listed by `/generation/1/`, and their Gen 1 *values* come from `past_values` / `past_types` (§4.1/§4.2).
+**Items have neither.** There is no `/generation/{n}` item index, and an item's `game_indices` and
+`flavor_text_entries` both only reach back to **Gen 3** — e.g. Poké Ball, a Gen 1 staple, has no Gen 1
+entry in either. So there is no data-driven way to ask "did this item exist in Gen 1." Following the same
+practice as `GameAvailabilitySeeder` (§4.3/§5.4), the Gen 1 roster is encoded as **hand-verified domain
+knowledge**: `ItemMapper.Gen1BattleItemNames` is the curated allowlist of PokeAPI item slugs, and it
+**drives the fetch** — `ItemImport` requests exactly those `/item/{slug}` details, maps, and upserts.
+("x-sp-atk" is the modern slug for Gen 1's single X Special; X Sp. Def didn't exist in Gen 1.)
+
+**Gen 1 gameplay numbers are a layer-2 override**, exactly like the moves importer. PokeAPI gives no
+machine-readable "this heals 20 HP" / "this cures poison," so `ItemMapper.ApplyGen1Gameplay` sets the
+well-defined Gen 1 facts by item name from an authority: `HealAmount`/`HealsAllHp`,
+`CuredStatus`/`CuresAllStatus`, `RevivePercent`, `PpRestoreAmount`/`RestoresAllPp`, and the X-item
+`StatBoostStat`/`Stages`. Dire Hit (crit) and Guard Spec (Mist) are battle-usable but aren't stat-stage
+changes, so they're imported as data-only rows; their effect is deferred to the use-in-battle layer.
+
+**Deliberately NOT modelled here:** Poké Ball catch-rate multipliers — Gen 1 capture is a battle
+*formula*, which belongs with the (deferred) Catch mechanic on the seam side, not in the item data row.
+**Caveat:** `cost` is PokeAPI's *current* price (taken as-is, like move `Priority`/`Description`); a few
+Gen 1 prices differ (Antidote was ¥100, not ¥200). Cost isn't battle-relevant and there's no shop, so
+it's left uncorrected — revisit with a curated cost table only if an economy is ever added.
+
+The split mirrors `EvolutionImport`/`EvolutionMapper`: `ItemImport` does network + DB; `ItemMapper`
+holds the pure, unit-tested mapping and the Gen 1 roster.
 
 ---
 

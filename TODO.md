@@ -12,15 +12,18 @@ evolution end-to-end incl. the Phaser sprite-morph + a Gen 1 B-cancel prompt) ar
 **per-run web seed** (Tech Debt #3), and Architecture Review #7's higher-leverage structural items are also
 done (only the **minor cleanups** bullet remains — see Tech Debt). A round of **Web UI polish** landed too —
 STAB indicator, per-move effectiveness pill, colour-coded battle log, friendlier connection-error message, and
-the tabbed **Pokémon overview screen** (CHECK POKEMON) (all archived). Suite: **965 .NET + 59 Vitest + 20
-Playwright E2E** (all green).
+the tabbed **Pokémon overview screen** (CHECK POKEMON) (all archived). Suite: **1021 .NET + 59 Vitest + 20
+Playwright E2E** (all green). The **Gen 1 item-data import** (battle-usable items → `items.db`) is also
+done (2026-06-19) — see its section.
 
-**Next:** the **Catch Mechanic** (bag action + Gen 1 capture formula — see its section). It's the gateway to
-the rest of the Game-Loop layer (party, save) **and** unlocks the dormant **stone evolutions** (the `Stone`
-trigger + `IEvolutionRules.StoneUsed` are already built and waiting on a bag). Web UI polish is essentially
-done (move-specific attack animations + the low-priority `ConsoleInput` terminal menu remain). The
-recovery/replace-move **modal** E2Es are unblocked now the per-run seed exists (pass a fixed `seed` in the
-`start` request for a deterministic run).
+**Next:** **Encounter Logic** (see its section) — the design of *what* the player faces and *how* they can
+acquire it, which must land **before** any catch/acquisition mechanic. The Catch Mechanic is intentionally
+**pushed back behind it** (see the note in its section): in a roguelite, letting the player catch *truly
+random* Pokémon balloons the party's power curve and breaks balance fast, so encounter/acquisition rules are
+the real prerequisite, and "catch" is likely a misnomer for what will be a broader **acquisition** layer.
+Web UI polish is essentially done (move-specific attack animations + the low-priority `ConsoleInput` terminal
+menu remain). The recovery/replace-move **modal** E2Es are unblocked now the per-run seed exists (pass a fixed
+`seed` in the `start` request for a deterministic run).
 
 ---
 
@@ -112,16 +115,47 @@ shipped and committed. See **Evolution System** in [`TODO_ARCHIVE.md`](TODO_ARCH
 
 ---
 
-## Catch Mechanic
+## Encounter Logic  ⟵ do this BEFORE the Catch / acquisition mechanic
 
-Deferred until Phaser animations exist — the mechanic needs a throw/shake/catch animation sequence.
+> **Why this comes first.** This is **not** a normal Pokémon game — it's a roguelite. If the player can
+> acquire *truly random* Pokémon, the party's power curve balloons and balance breaks fast (a lucky
+> early high-BST catch trivialises the run; an unlucky one strands it). So the rules governing **what the
+> player faces** and **how/whether they can take it** have to be designed *before* any acquisition mechanic
+> is wired in — otherwise we'd be balancing the catch formula against an undefined encounter distribution.
 
-**When ready:**
+The seam already exists (`EncounterSelector.PickByBst`, `GameController.BuildCreature`, the
+`targetBst = lead BST + depth × 10` curve in **Game Loop & Progression**) — this is about turning that into a
+deliberate, balance-aware encounter *design*, not an ad-hoc pick.
+
+- [ ] **`/plan` pass first** — define the encounter model for a roguelite run, e.g.:
+  - encounter pool / distribution per depth (BST band + variance, not a flat random draw from all 151)
+  - what is even *eligible* to be acquired (cap the BST ceiling relative to the lead? rarity tiers? curated
+    "offer" set per encounter rather than "whatever you fought")
+  - how acquisition interacts with the difficulty curve so a single lucky pickup can't break the run
+- [ ] Gate the eventual acquisition mechanic on these rules (the catch formula's odds are meaningless until
+  the encounter distribution is fixed).
+
+---
+
+## Catch / Acquisition Mechanic  ⟵ pushed back behind Encounter Logic
+
+**Deferred — now gated on Encounter Logic above** (random acquisition is a balance hazard in a roguelite; the
+encounter/eligibility rules must exist first). Also still wants Phaser animation work (throw/shake/catch — or
+whatever the acquisition flow turns out to be).
+
+> **"Catch" is likely a misnomer.** Because this isn't a normal Pokémon game, the player may receive Pokémon
+> in **several different ways** — classic in-battle capture, but also (e.g.) post-battle rewards, gifts/offers,
+> picking from a curated set, etc. Treat this as a broader **acquisition** layer when it's designed; the
+> in-battle "catch" below is just *one* possible channel, not the whole feature.
+
+**When ready (in-battle capture channel — Gen 1 reference):**
 - [ ] Bag action in move menu; `Battle` extended with a "catching" state
 - [ ] Gen 1 capture formula: `floor((MaxHP × 3 − HP × 2) × CatchRate / (MaxHP × 3))` vs. 0–255 roll
 - [ ] `PokemonSpecies.CatchRate` already imported ✓
 - [ ] `CaptureAttempted(string TargetName, bool Caught)` battle event
 - [ ] `BattleEnded` variant: `reason: "Caught"`
+- [ ] Unlocks the dormant **stone evolutions** (`Stone` trigger + `IEvolutionRules.StoneUsed` are built and
+  waiting on a bag).
 
 ---
 
@@ -147,6 +181,45 @@ Deferred until Phaser animations exist — the mechanic needs a throw/shake/catc
   transform (Gen 1: Toxic→Poison). Volatiles (confusion, stages) still reset per battle — canonical. HP/PP
   already persisted. (Sleep carries its counter; Freeze persists.) Remaining: only matters again when
   switching/party exists. See `STATE_MODEL.md §2`.
+
+---
+
+## Item System — Data Import (Gen 1)  ⟵ unblocked, data-layer only · `/plan` DONE 2026-06-19
+
+Bring Gen 1 items into the data layer, mirroring the existing two-DB / EF-import pattern (`PokeApiConnector`
+→ SQLite → EF Core context → service). **Import only** for now — no in-game bag, use, or effects yet; this is
+the foundation the later **acquisition / bag** layer (and held-item / consumable mechanics) will sit on, but
+it has **no blockers** and can land standalone.
+
+**Locked design decisions (`/plan`, 2026-06-19):**
+- **DB home:** new `items.db` + `ItemsDbContext`, parallel to `moves.db`/`pokemon.db` (own
+  `DB/Migrations/Items` folder). Keeps two-DB symmetry; isolates item schema churn.
+- **Scope = "anything usable *in battle*"**: Poké Balls (standard + special), healing
+  (Potion→Full Restore), status cures (Antidote/Burn Heal/Ice Heal/Awakening/Paralyze Heal/Full Heal),
+  Revive/Max Revive, PP restore (Ether/Max Ether/Elixir/Max Elixir), and X-items (X Attack/Defense/Speed/
+  Special/Accuracy, Dire Hit, Guard Spec). **Excluded:** evolution stones, vitamins (HP Up/Protein/…/PP Up),
+  Rare Candy, key items, TMs, berries — all menu-only or out of a battle roguelite's scope.
+- **Gen 1 filter:** ⚠️ the planned `game_indices = generation-i` filter **does not work** — PokeAPI items
+  have no `/generation/1` list AND their `game_indices`/`flavor_text_entries` only reach back to **Gen 3**
+  (Poké Ball has no Gen 1 entry in either). There is **no data-driven Gen 1 item signal**. So, as
+  `GameAvailabilitySeeder` does for species (DATA_IMPORT.md §4.3/§5.4), the Gen 1 roster is a **hand-curated
+  allowlist** (`ItemMapper.Gen1BattleItemNames`) that also drives the fetch (fetch each `/item/{slug}`).
+
+**Implementation — ✅ DONE (2026-06-19):**
+- [x] `Item` model (`creaturegame/Items/Item.cs`) + `ItemCategory` enum; layer-2 Gen 1 gameplay numbers
+  (heal amount, cured status, revive %, PP restore, X-item stat boost). Ball catch-rate multiplier
+  deliberately NOT modelled (capture is a battle formula → deferred Catch mechanic).
+- [x] `ItemsDbContext` (`items.db`) + EF migration `DB/Migrations/Items`; `DbPathHelper` path.
+- [x] `PokeApiItem` DTO + `ItemImport` (network+DB) + `ItemMapper` (pure mapping + roster), mirroring the
+  `EvolutionImport`/`EvolutionMapper` split. Idempotent upsert; `Program.cs` step + `-- items` single-stage.
+- [x] `ItemService` read API (by id / name / all / by category), parallel to `AttackService`.
+- [x] `AddDbContextFactory<ItemsDbContext>` registered in `creaturegame.Web/Program.cs`.
+- [x] Tests: `ItemImportTests` (mapping + roster) + `ItemsDbServiceTests` (migration + service round-trip) —
+  drive real code. **Import run verified** against PokeAPI: 29 items, categories + gameplay numbers correct.
+- [x] `DATA_IMPORT.md` updated (new §4.5 + the no-Gen-1-signal/curated-roster wrinkle).
+- [ ] **Deferred to UI time (flagged, not built):** item sprite download into `wwwroot/sprites/items/` via the
+  idempotent `SpriteDownloader` pattern; the `cost` field is PokeAPI's *current* price (a few Gen 1 prices
+  differ — uncorrected, not battle-relevant; see DATA_IMPORT.md §4.5).
 
 ---
 

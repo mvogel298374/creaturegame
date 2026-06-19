@@ -17,6 +17,16 @@ class Program
             return;
         }
 
+        if (args.Length > 0 && args[0].Equals("items", StringComparison.OrdinalIgnoreCase))
+        {
+            using (var itemsContext = new creaturegame.DB.ItemsDbContext())
+                itemsContext.EnsureDatabaseCreated();
+            Console.WriteLine("Importing Gen 1 battle items only...");
+            await ItemImport.ImportGen1BattleItemsAsync();
+            Console.WriteLine("\nDone.");
+            return;
+        }
+
         using (var moveContext = new creaturegame.DB.MovesDbContext())
         {
             Console.WriteLine("Ensuring moves database is created...");
@@ -29,6 +39,12 @@ class Program
             pokemonContext.EnsureDatabaseCreated();
         }
 
+        using (var itemsContext = new creaturegame.DB.ItemsDbContext())
+        {
+            Console.WriteLine("Ensuring items database is created...");
+            itemsContext.EnsureDatabaseCreated();
+        }
+
         Console.WriteLine("Importing Gen 1 Moves...");
         await MoveImport.FetchMovesByGeneration(1);
 
@@ -37,6 +53,9 @@ class Program
 
         Console.WriteLine("\nImporting Gen 1 evolutions...");
         await EvolutionImport.ImportAllAsync();
+
+        Console.WriteLine("\nImporting Gen 1 battle items...");
+        await ItemImport.ImportGen1BattleItemsAsync();
 
         Console.WriteLine("\nSeeding Gen 1 game availability...");
         await GameAvailabilitySeeder.SeedGen1Async();

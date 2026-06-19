@@ -24,6 +24,9 @@ builder.Services.AddDbContextFactory<PokemonDbContext>(opts =>
 builder.Services.AddDbContextFactory<MovesDbContext>(opts =>
     opts.UseSqlite($"Data Source={DbPathHelper.GetDatabasePath("moves.db")}")
 );
+builder.Services.AddDbContextFactory<ItemsDbContext>(opts =>
+    opts.UseSqlite($"Data Source={DbPathHelper.GetDatabasePath("items.db")}")
+);
 builder.Services.AddCors(opts =>
     opts.AddDefaultPolicy(policy =>
         policy
