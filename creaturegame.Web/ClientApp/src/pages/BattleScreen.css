@@ -434,8 +434,8 @@
 .bag-item {
   position: relative;
   display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: baseline;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
   gap: var(--sp-xs) var(--sp-sm);
   padding: var(--sp-xs) var(--sp-sm);
   background: transparent;
@@ -445,6 +445,16 @@
   cursor: pointer;
   text-align: left;
   transition: background var(--transition), border-color var(--transition);
+}
+
+/* Item sprite sits in the first column, spanning the name + (optional) description rows. */
+.bag-item-sprite {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  width: 28px;
+  height: 28px;
+  image-rendering: pixelated;
+  object-fit: contain;
 }
 
 .bag-item:hover:not(:disabled) {
@@ -470,7 +480,8 @@
 }
 
 .bag-item-desc {
-  grid-column: 1 / -1;
+  grid-column: 2 / -1;
+  grid-row: 2;
   font-size: 0.6rem;
   line-height: 1.4;
   color: var(--clr-text-muted);

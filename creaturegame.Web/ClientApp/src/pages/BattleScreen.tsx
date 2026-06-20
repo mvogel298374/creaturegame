@@ -548,6 +548,14 @@ function BagMenu({ gameId, moves, onUse, onBack }: {
             <p className="bag-group-label">{group.label}</p>
             {group.items.map(item => (
               <button key={item.id} className="bag-item" onClick={() => pick(item)}>
+                <img
+                  className="bag-item-sprite"
+                  src={`/sprites/items/${item.id}.png`}
+                  alt=""
+                  aria-hidden="true"
+                  draggable={false}
+                  onError={e => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }}
+                />
                 <span className="bag-item-name">{formatItemName(item.name)}</span>
                 <span className="bag-item-qty">×{item.quantity}</span>
                 {item.description && <span className="bag-item-desc">{item.description}</span>}

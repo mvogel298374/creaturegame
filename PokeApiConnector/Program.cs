@@ -23,6 +23,8 @@ class Program
                 itemsContext.EnsureDatabaseCreated();
             Console.WriteLine("Importing Gen 1 battle items only...");
             await ItemImport.ImportGen1BattleItemsAsync();
+            Console.WriteLine("\nDownloading item sprites...");
+            await ItemSpriteDownloader.DownloadAllAsync();
             Console.WriteLine("\nDone.");
             return;
         }
@@ -62,6 +64,9 @@ class Program
 
         Console.WriteLine("\nDownloading battle sprites...");
         await SpriteDownloader.DownloadAllAsync();
+
+        Console.WriteLine("\nDownloading item sprites...");
+        await ItemSpriteDownloader.DownloadAllAsync();
 
         Console.WriteLine("\nDownloading Pokémon cries (legacy 8-bit)...");
         await CryDownloader.DownloadAllAsync();
