@@ -33,4 +33,24 @@ test.describe('Item use', () => {
     // …and the turn loop comes back round to the player.
     await expect(fightButton(page)).toBeEnabled({ timeout: 15_000 });
   });
+
+  // Guard Spec. is the other new BattleStatBoost effect — it reuses the Mist move's state + event, so the
+  // log shows the Mist line. Same "item is the whole turn" assertion as above.
+  test('using GUARD SPEC from the bag shrouds the user in Mist', async ({ page }) => {
+    test.setTimeout(60_000);
+    await startBattle(page, 'CHARIZARD');
+
+    const playerName = (await page.locator('.nameplate--player .nameplate-name').textContent())?.trim() ?? '';
+
+    await page.getByRole('button', { name: /^BAG$/ }).click();
+    const guardSpec = page.locator('.bag-item', {
+      has: page.locator('.bag-item-name', { hasText: /^GUARD SPEC$/ }),
+    });
+    await expect(guardSpec).toBeVisible();
+    await guardSpec.click();
+
+    await waitForLog(page, new RegExp(`Used GUARD SPEC on ${playerName}!`));
+    await waitForLog(page, new RegExp(`${playerName} became shrouded in mist!`));
+    await expect(fightButton(page)).toBeEnabled({ timeout: 15_000 });
+  });
 });

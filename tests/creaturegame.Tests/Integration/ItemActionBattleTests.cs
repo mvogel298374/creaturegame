@@ -157,6 +157,38 @@ public class ItemActionBattleTests
     }
 
     [Fact]
+    public async Task UsingDireHit_SetsFocusEnergyAndConsumes()
+    {
+        // Dire Hit is a BattleStatBoost booster whose effect is the Gen 1 Focus Energy state — driven
+        // through a real Battle it sets HasFocusEnergy, emits FocusEnergyApplied, and consumes one.
+        var player = TestCreatures.Make("Player", hp: 200, speed: 200);
+        player.AddAttack(Tackle());
+        var enemy = TestCreatures.Make("Enemy", hp: 60, speed: 1);
+        enemy.AddAttack(Tackle());
+
+        var direHit = new Item
+        {
+            Id = 56,
+            Name = "dire-hit",
+            Category = ItemCategory.BattleStatBoost,
+            BoostsCrit = true,
+        };
+        var bag = new Bag();
+        bag.Add(56, 1);
+
+        var em = await RunAsync(
+            new TurnChoiceInput(new ItemTurnChoice(direHit)),
+            bag,
+            player,
+            enemy
+        );
+
+        Assert.True(player.Battle.HasFocusEnergy);
+        Assert.Equal("Player", em.Of<FocusEnergyApplied>().Single().CreatureName);
+        Assert.Equal(0, bag.Count(56)); // consumed
+    }
+
+    [Fact]
     public async Task UnusableItem_FailsWithoutConsuming()
     {
         // A Ball has no in-battle effect in this scope — it reports failure and isn't consumed.

@@ -70,6 +70,8 @@ public class ItemsDbServiceTests : IDisposable
                 "RestoresPpAllMoves",
                 "StatBoostStat",
                 "StatBoostStages",
+                "BoostsCrit",
+                "SetsMist",
             }
         )
             Assert.Contains(col, columns);

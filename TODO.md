@@ -12,7 +12,7 @@ evolution end-to-end incl. the Phaser sprite-morph + a Gen 1 B-cancel prompt) ar
 **per-run web seed** (Tech Debt #3), and Architecture Review #7's higher-leverage structural items are also
 done (only the **minor cleanups** bullet remains — see Tech Debt). A round of **Web UI polish** landed too —
 STAB indicator, per-move effectiveness pill, colour-coded battle log, friendlier connection-error message, and
-the tabbed **Pokémon overview screen** (CHECK POKEMON) (all archived). Suite: **1062 .NET + 72 Vitest + 21
+the tabbed **Pokémon overview screen** (CHECK POKEMON) (all archived). Suite: **1066 .NET + 72 Vitest + 22
 Playwright E2E** (all green). The **Gen 1 item-data import** (battle-usable items → `items.db`) and the
 **item-use battle layer Phases 1–3** are also done (2026-06-19/20) — engine (Bag, ItemAction, item-effect
 registry), web wire (bag threaded through the run, `BattleHub.UseItem`, `GET /{gameId}/bag`), and the
@@ -316,11 +316,23 @@ Pokémon using bag items in battle: the use-in-battle layer on top of the item-d
   unit-tested in `bag.test.ts` (10 Vitest cases), and a Playwright `item-use.spec.ts` (use X ATTACK → stat
   rises → enemy still attacks). Suite **1062 .NET + 72 Vitest + 21 Playwright E2E**, all green.
 
-**Deferred from this layer** (moved to the **Item Acquisition · Bag Persistence · Catch** cluster above — see
-it for the full plan + code anchors): the **Poké Ball / catch** effect, **real item acquisition** (replacing
-the fixed test loadout), and **bag persistence** (`save.db`). Still parked in *this* scope but not part of the
-cluster: **Revive** (needs a party) and the **Dire Hit / Guard Spec** effects (`ItemEffects` has no arm — they
-need a crit-stage / Mist volatile).
+**Phase 4 — Dire Hit + Guard Spec effects — ✅ DONE 2026-06-20:**
+- [x] The last two implementable in-scope item effects. Both are `ItemCategory.BattleStatBoost` boosters
+  whose effect isn't a stat-stage change, so they reuse the matching Gen 1 move mechanics + events:
+  **Dire Hit** → `BattleState.HasFocusEnergy` + `FocusEnergyApplied` (incl. Gen 1's bugged ÷4 crit, applied
+  in `Gen1BattleRules.GetCritChance`); **Guard Spec.** → `HasMist` + `MistApplied`. Zero web/wire work — those
+  events already have SignalR projections + timeline arms (from the Focus Energy / Mist moves).
+- [x] `Item.BoostsCrit` / `Item.SetsMist` data fields (`ItemMapper` sets them for dire-hit/guard-spec) +
+  migration `AddItemCritAndMistBoosts` + re-import. `XItemEffect` → `BattleBoostItemEffect` (dispatches
+  X-item / Dire Hit / Guard Spec by item data; one effect per category since the registry is category-keyed).
+- [x] Tests: `ItemEffectTests` (set/already-applied for both), `ItemImportTests` (mapping),
+  `ItemsDbServiceTests` (schema columns), `ItemActionBattleTests` (Dire Hit through a real Battle), and a
+  Guard Spec Playwright case. Suite **1066 .NET + 72 Vitest + 22 Playwright E2E**, all green.
+
+**Still deferred:** the **Poké Ball / catch** effect, **real item acquisition**, and **bag persistence** moved
+to the **Item Acquisition · Bag Persistence · Catch** cluster above (full plan + code anchors there). The only
+in-scope effect left is **Revive / Max Revive** — blocked on a party system (no fainted-but-revivable creature
+exists in the single-creature endless chain; `ItemEffects.For(Revive)` stays null until Game Loop adds a party).
 
 ---
 

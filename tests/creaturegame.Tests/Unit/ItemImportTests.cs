@@ -220,16 +220,22 @@ public class ItemImportTests
         Assert.Equal(1, item.StatBoostStages);
     }
 
-    [Theory]
-    [InlineData("dire-hit")]
-    [InlineData("guard-spec")]
-    public void MapToItem_NonStatBattleItems_LeftDataOnly(string name)
+    [Fact]
+    public void MapToItem_DireHit_BoostsCrit()
     {
-        // dire-hit (crit) and guard-spec (Mist) are battle-usable but not stat-stage changes — their
-        // effect is deferred to the use-in-battle layer, so no gameplay override is set.
-        var item = ItemMapper.MapToItem(PokeItem(name, "stat-boosts"));
+        // Dire Hit raises crit (Gen 1 Focus Energy state); it's a booster, not a stat-stage change.
+        var item = ItemMapper.MapToItem(PokeItem("dire-hit", "stat-boosts"));
+        Assert.True(item.BoostsCrit);
+        Assert.False(item.SetsMist);
         Assert.Null(item.StatBoostStat);
-        Assert.Null(item.HealAmount);
-        Assert.Null(item.CuredStatus);
+    }
+
+    [Fact]
+    public void MapToItem_GuardSpec_SetsMist()
+    {
+        var item = ItemMapper.MapToItem(PokeItem("guard-spec", "stat-boosts"));
+        Assert.True(item.SetsMist);
+        Assert.False(item.BoostsCrit);
+        Assert.Null(item.StatBoostStat);
     }
 }

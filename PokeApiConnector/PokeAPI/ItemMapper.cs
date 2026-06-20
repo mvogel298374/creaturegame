@@ -189,9 +189,15 @@ public static class ItemMapper
                 item.StatBoostStat = StageStat.Accuracy;
                 item.StatBoostStages = 1;
                 break;
-            // dire-hit (boosts crit) and guard-spec (sets Mist) are battle-usable but their effects
-            // aren't a stat-stage change — left as data-only rows; their effect is deferred to the
-            // use-in-battle layer.
+            // dire-hit and guard-spec are battle-usable boosters whose effect isn't a stat-stage change:
+            // Dire Hit raises crit (Gen 1: the Focus Energy state); Guard Spec. sets Mist (blocks foe stat
+            // drops). Flagged here so the BattleStatBoost item effect can mirror the Focus Energy / Mist moves.
+            case "dire-hit":
+                item.BoostsCrit = true;
+                break;
+            case "guard-spec":
+                item.SetsMist = true;
+                break;
         }
     }
 }

@@ -152,21 +152,51 @@ public sealed class PpRestoreItemEffect : IItemEffect
     }
 }
 
-/// <summary>X Attack / Defense / Speed / Special / Accuracy — raise a stat stage in battle.</summary>
-public sealed class XItemEffect : IItemEffect
+/// <summary>
+/// The in-battle "booster" items, all <see cref="ItemCategory.BattleStatBoost"/>, dispatched by item data:
+/// the X-items (X Attack/Defense/Speed/Special/Accuracy) raise a stat stage; <b>Dire Hit</b> raises crit (Gen
+/// 1: the Focus Energy state — and its famous ÷4 bug, applied in <c>Gen1BattleRules.GetCritChance</c>); and
+/// <b>Guard Spec.</b> sets Mist (blocks foe stat drops). Dire Hit / Guard Spec reuse the Focus Energy / Mist
+/// volatiles and events so they narrate and wire exactly like the matching moves. (One effect per category —
+/// the registry is keyed by category — so the three behaviours live here rather than in separate classes.)
+/// </summary>
+public sealed class BattleBoostItemEffect : IItemEffect
 {
     public ItemCategory Category => ItemCategory.BattleStatBoost;
 
-    // dire-hit (crit) and guard-spec (Mist) carry no StatBoostStat — their effect is deferred, so they
-    // report no effect here. An X-item with the stat already at +6 also won't change anything.
-    public bool CanApply(ItemEffectContext ctx) =>
-        ctx.User.IsAlive()
-        && ctx.Item.StatBoostStat is { } stat
-        && (ctx.Item.StatBoostStages ?? 0) != 0
-        && ctx.User.Battle.Stages.Of(stat) < 6;
+    public bool CanApply(ItemEffectContext ctx)
+    {
+        if (!ctx.User.IsAlive())
+            return false;
+
+        // Dire Hit / Guard Spec only do anything the first time (the state is a boolean, set-once per battle).
+        if (ctx.Item.BoostsCrit)
+            return !ctx.User.Battle.HasFocusEnergy;
+        if (ctx.Item.SetsMist)
+            return !ctx.User.Battle.HasMist;
+
+        // X-item: a stat boost that would actually move the stage (not already capped at +6).
+        return ctx.Item.StatBoostStat is { } stat
+            && (ctx.Item.StatBoostStages ?? 0) != 0
+            && ctx.User.Battle.Stages.Of(stat) < 6;
+    }
 
     public void Apply(ItemEffectContext ctx)
     {
+        if (ctx.Item.BoostsCrit)
+        {
+            ctx.User.Battle.HasFocusEnergy = true;
+            ctx.Emitter?.Emit(new FocusEnergyApplied(ctx.User.Name));
+            return;
+        }
+
+        if (ctx.Item.SetsMist)
+        {
+            ctx.User.Battle.HasMist = true;
+            ctx.Emitter?.Emit(new MistApplied(ctx.User.Name));
+            return;
+        }
+
         var stat = ctx.Item.StatBoostStat!.Value;
         int delta = ctx.Item.StatBoostStages ?? 0;
         int newStage = ctx.User.Battle.Stages.Raise(stat, delta);
@@ -187,7 +217,7 @@ public static class ItemEffects
         new HealingItemEffect(),
         new StatusCureItemEffect(),
         new PpRestoreItemEffect(),
-        new XItemEffect(),
+        new BattleBoostItemEffect(),
     };
 
     private static readonly IReadOnlyDictionary<ItemCategory, IItemEffect> ByCategory =

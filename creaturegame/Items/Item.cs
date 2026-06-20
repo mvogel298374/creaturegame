@@ -62,6 +62,13 @@ public class Item
     public StageStat? StatBoostStat { get; set; }
     public int? StatBoostStages { get; set; }
 
+    /// <summary>Dire Hit — raises the user's critical-hit ratio (Gen 1: sets the Focus Energy state). In Gen 1
+    /// this faithfully reproduces the famous bug where "focusing" actually <i>quarters</i> crit chance.</summary>
+    public bool BoostsCrit { get; set; }
+
+    /// <summary>Guard Spec. — shrouds the user in Mist (the opponent can't lower its stat stages this battle).</summary>
+    public bool SetsMist { get; set; }
+
     public Item() { }
 
     public override string ToString() => $"Name: {Name}, Category: {Category}, Cost: {Cost}";
