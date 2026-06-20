@@ -12,11 +12,12 @@ evolution end-to-end incl. the Phaser sprite-morph + a Gen 1 B-cancel prompt) ar
 **per-run web seed** (Tech Debt #3), and Architecture Review #7's higher-leverage structural items are also
 done (only the **minor cleanups** bullet remains — see Tech Debt). A round of **Web UI polish** landed too —
 STAB indicator, per-move effectiveness pill, colour-coded battle log, friendlier connection-error message, and
-the tabbed **Pokémon overview screen** (CHECK POKEMON) (all archived). Suite: **1062 .NET + 62 Vitest + 20
+the tabbed **Pokémon overview screen** (CHECK POKEMON) (all archived). Suite: **1062 .NET + 72 Vitest + 21
 Playwright E2E** (all green). The **Gen 1 item-data import** (battle-usable items → `items.db`) and the
-**item-use battle layer Phases 1–2** (engine: Bag, ItemAction, item-effect registry; web wire: bag
-threaded through the run, `BattleHub.UseItem`, `GET /{gameId}/bag`) are also done (2026-06-19/20) — see
-their sections. Item use is now reachable backend-to-engine; only the **Phase 3 frontend bag UI** remains.
+**item-use battle layer Phases 1–3** are also done (2026-06-19/20) — engine (Bag, ItemAction, item-effect
+registry), web wire (bag threaded through the run, `BattleHub.UseItem`, `GET /{gameId}/bag`), and the
+**frontend bag UI** (BAG menu grouped by pocket + PP-restore move-slot pick). Item use is now playable
+end-to-end through the browser; the whole Item System milestone is complete.
 
 **Next:** **Encounter Logic** (see its section) — the design of *what* the player faces and *how* they can
 acquire it, which must land **before** any catch/acquisition mechanic. The Catch Mechanic is intentionally
@@ -139,25 +140,60 @@ deliberate, balance-aware encounter *design*, not an ad-hoc pick.
 
 ---
 
-## Catch / Acquisition Mechanic  ⟵ pushed back behind Encounter Logic
+## Item Acquisition · Bag Persistence · Catch — TRULY DEFERRED CLUSTER  ⟵ gated on Encounter Logic
 
-**Deferred — now gated on Encounter Logic above** (random acquisition is a balance hazard in a roguelite; the
-encounter/eligibility rules must exist first). Also still wants Phaser animation work (throw/shake/catch — or
-whatever the acquisition flow turns out to be).
+**One interlocked cluster, deliberately deferred together.** These three depend on each other and on a
+prior design gate, so none can be done well in isolation:
+- You can't design **real item acquisition** until the encounter / eligibility model exists (**Encounter
+  Logic** above) — otherwise you're balancing drop rates against an undefined distribution.
+- You can't sensibly **persist a bag** until acquisition defines *what's* in it and *when* it's earned —
+  persistence is meaningless while the bag is a fresh fixed handout each run.
+- **Catch** is just *one* acquisition channel, and a random high-BST catch is the canonical roguelite balance
+  hazard — so it waits behind both the encounter rules and the acquisition design.
 
 > **"Catch" is likely a misnomer.** Because this isn't a normal Pokémon game, the player may receive Pokémon
-> in **several different ways** — classic in-battle capture, but also (e.g.) post-battle rewards, gifts/offers,
-> picking from a curated set, etc. Treat this as a broader **acquisition** layer when it's designed; the
-> in-battle "catch" below is just *one* possible channel, not the whole feature.
+> in **several different ways** — classic in-battle capture, but also post-battle rewards, gifts/offers,
+> picking from a curated set, etc. Treat this as a broader **acquisition** layer when it's designed; in-battle
+> "catch" below is one channel, not the whole feature.
 
-**When ready (in-battle capture channel — Gen 1 reference):**
-- [ ] Bag action in move menu; `Battle` extended with a "catching" state
-- [ ] Gen 1 capture formula: `floor((MaxHP × 3 − HP × 2) × CatchRate / (MaxHP × 3))` vs. 0–255 roll
-- [ ] `PokemonSpecies.CatchRate` already imported ✓
-- [ ] `CaptureAttempted(string TargetName, bool Caught)` battle event
-- [ ] `BattleEnded` variant: `reason: "Caught"`
+### Current state — what's built vs. stubbed (code anchors)
+- **Bag is transient** — `creaturegame/Items/Bag.cs` is an in-memory `id → qty`, reseeded every run, never
+  saved (no save layer yet). Per-run: consumed items stay gone; the Poké Center refills HP/PP/status, not the
+  bag.
+- **The run bag is a fixed test loadout, not earned** — `EncounterFactory.BuildRunSetupAsync` seeds
+  `Bag.WithEach(allItems, TestBagQuantityEach = 20)` (every imported item ×20). This stub stands in for a real
+  acquisition source.
+- **Poké Balls are imported data only** — `ItemMapper.Gen1BattleItemNames` includes the 5 balls mapped to
+  `ItemCategory.Ball`, but `ItemEffects.For(Ball)` returns `null`, so `ItemAction` emits `ItemUseFailed`.
+  Per-ball catch-rate multipliers are deliberately **not** on the `Item` row (Gen 1 capture is a battle
+  formula). The frontend hides Ball (and Revive) via `bag.ts isUsableInBattle`, so they can't waste a turn.
+- `PokemonSpecies.CatchRate` is already imported ✓.
+
+### 1 — Item acquisition (the design gate) · do FIRST, `/plan`, after Encounter Logic
+- [ ] `/plan` the acquisition model: **how** items enter the bag (battle drops? a between-encounter shop?
+  curated offers?), at **what rate**, and how that meshes with the difficulty curve. This replaces the fixed
+  `TestBagQuantityEach` loadout in `EncounterFactory`.
+- [ ] Gate amount / rarity so a lucky early haul can't trivialise a run (same balance concern as Encounter
+  Logic — the catch odds and drop rates are meaningless until the encounter distribution is fixed).
+
+### 2 — Bag persistence · once acquisition defines what a bag holds
+- [ ] Persist the `Bag` to `save.db` / `PlayerDbContext` (rides on the broader save layer — see **Game Loop &
+  Progression**, where `PlayerSave` / `SavedCreature` / auto-save live). Today `Bag` is transient and per-run;
+  persistence only becomes meaningful once items are *earned* (acquisition) rather than handed out fresh.
+- [ ] Decide bag scope explicitly: **per-run** (roguelite — lost on death) vs. **meta-progression** (carries
+  across runs). The acquisition design (item 1) drives this choice.
+
+### 3 — Catch / Poké Ball effect (one acquisition channel) · Gen 1 reference
+- [ ] `BallItemEffect : IItemEffect` for `ItemCategory.Ball`, registered in `ItemEffects.All` (the registry
+  currently has no Ball arm → `ItemUseFailed`); extend `Battle` with a "catching" state/outcome.
+- [ ] Gen 1 capture formula: `floor((MaxHP × 3 − HP × 2) × CatchRate / (MaxHP × 3))` vs. a 0–255 roll
+  (per-ball modifier lives in the formula, not the `Item` row).
+- [ ] `CaptureAttempted(string TargetName, bool Caught)` battle event; `BattleEnded` variant `reason: "Caught"`.
+- [ ] Caught creature → party (needs party / switching — see **Game Loop & Progression**) → closes the
+  acquisition loop that fills the bag/party.
 - [ ] Unlocks the dormant **stone evolutions** (`Stone` trigger + `IEvolutionRules.StoneUsed` are built and
   waiting on a bag).
+- [ ] Phaser throw / shake / catch animation.
 
 ---
 
@@ -267,9 +303,24 @@ Pokémon using bag items in battle: the use-in-battle layer on top of the item-d
 - [x] Tests: `SignalRInputTests` (move/item/fallback/cancel handshake) + bag-seeding assertion in
   `RunSeedReproducibilityTests`. Suite **1062 .NET + 62 Vitest**, all green.
 
-**Phase 3 — frontend (NOT started):**
-- [ ] Bag button + item list in the battle menu (fetch the bag, send `UseItem`); PP-restore move-slot pick.
-- [ ] Playwright E2E for an item-use turn (heal/status-cure visible, enemy still attacks).
+**Phase 3 — frontend — ✅ DONE 2026-06-20:**
+- [x] **BAG button + grouped item list** in the battle menu (`BattleScreen` `'bag'` control view → `BagMenu`).
+  Fetches `GET /{gameId}/bag` fresh on each open, filters to battle-usable pockets (Healing / Status / PP
+  Restore / Battle — Ball & Revive hidden so a guaranteed no-op can't waste the turn), groups by pocket with
+  qty + description. BAG is gated on the player's turn like FIGHT (using an item *is* the turn).
+- [x] **PP-restore move-slot pick** — a single-move PP restore (Ether / Max Ether) opens a `PpTargetPicker`
+  (reuses the move-grid; full-PP slots disabled); whole-moveset restores (Elixir) use directly. Distinguished
+  via a new `BagItemView.RestoresPpAllMoves` field (no name-sniffing on the client).
+- [x] `useBattleHub.useItem(itemId, targetMoveSlot)` invokes the hub's `UseItem` and marks the turn chosen.
+- [x] Pure `bag.ts` helpers (`isUsableInBattle` / `needsMoveTarget` / `groupBagItems` / `formatItemName`),
+  unit-tested in `bag.test.ts` (10 Vitest cases), and a Playwright `item-use.spec.ts` (use X ATTACK → stat
+  rises → enemy still attacks). Suite **1062 .NET + 72 Vitest + 21 Playwright E2E**, all green.
+
+**Deferred from this layer** (moved to the **Item Acquisition · Bag Persistence · Catch** cluster above — see
+it for the full plan + code anchors): the **Poké Ball / catch** effect, **real item acquisition** (replacing
+the fixed test loadout), and **bag persistence** (`save.db`). Still parked in *this* scope but not part of the
+cluster: **Revive** (needs a party) and the **Dire Hit / Guard Spec** effects (`ItemEffects` has no arm — they
+need a crit-stage / Mist volatile).
 
 ---
 

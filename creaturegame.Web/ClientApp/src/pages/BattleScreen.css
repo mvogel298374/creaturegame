@@ -397,6 +397,103 @@
   color: #fff;
 }
 
+/* ── Bag menu ─────────────────────────────────── */
+.bag-menu {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: var(--sp-sm) var(--sp-md);
+  gap: var(--sp-sm);
+  min-height: 0;
+}
+
+.bag-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-sm);
+  scrollbar-width: thin;
+  scrollbar-color: var(--clr-border) transparent;
+}
+
+.bag-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bag-group-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--clr-text-sub);
+  margin-top: var(--sp-xs);
+}
+
+.bag-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  gap: var(--sp-xs) var(--sp-sm);
+  padding: var(--sp-xs) var(--sp-sm);
+  background: transparent;
+  border: 2px solid var(--clr-border);
+  color: var(--clr-text);
+  font-family: var(--font);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition), border-color var(--transition);
+}
+
+.bag-item:hover:not(:disabled) {
+  border-color: var(--clr-accent);
+  background: rgba(233, 69, 96, 0.08);
+}
+
+.bag-item:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.bag-item-name {
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-tight);
+  font-weight: bold;
+}
+
+.bag-item-qty {
+  font-size: var(--fs-xs);
+  color: var(--clr-text-sub);
+  letter-spacing: 0;
+  justify-self: end;
+}
+
+.bag-item-desc {
+  grid-column: 1 / -1;
+  font-size: 0.6rem;
+  line-height: 1.4;
+  color: var(--clr-text-muted);
+  letter-spacing: 0;
+}
+
+.bag-empty,
+.bag-error {
+  font-size: var(--fs-sm);
+  color: var(--clr-text-muted);
+  padding: var(--sp-sm);
+}
+
+.bag-error {
+  color: var(--clr-accent);
+}
+
+.bag-pp-prompt {
+  font-size: var(--fs-sm);
+  letter-spacing: var(--ls-tight);
+  color: var(--clr-text);
+}
+
 /* ── Action btn waiting state ────────────────── */
 .action-btn--waiting {
   opacity: 0.4;

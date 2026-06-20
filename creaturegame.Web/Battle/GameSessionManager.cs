@@ -209,7 +209,8 @@ public sealed class GameSessionManager(
                     item.Name ?? "",
                     item.Category.ToString(),
                     e.Value,
-                    item.Description ?? ""
+                    item.Description ?? "",
+                    item.RestoresPpAllMoves
                 );
             })
             .OrderBy(v => v.Id)
@@ -276,12 +277,16 @@ sealed record PendingSession(
 );
 
 /// <summary>A bag entry for the client: the item plus how many the run is holding.</summary>
+/// <remarks><see cref="RestoresPpAllMoves"/> lets the bag menu tell a whole-moveset PP restore (Elixir/Max
+/// Elixir — use directly) from a single-move one (Ether/Max Ether — needs a move-slot pick) without
+/// re-deriving it from the item name.</remarks>
 public sealed record BagItemView(
     int Id,
     string Name,
     string Category,
     int Quantity,
-    string Description
+    string Description,
+    bool RestoresPpAllMoves
 );
 
 /// <summary>A running battle plus the connection currently bound to it and its abandon timer.</summary>

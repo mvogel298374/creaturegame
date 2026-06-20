@@ -6,6 +6,8 @@ import { useBattleHub, type LevelUpPanel, type MoveReplacementPrompt, type Recov
 import type { Species } from '../types/Species';
 import type { MoveInfo } from '../types/BattleEvents';
 import { formatMoveName } from '../utils/format';
+import { friendlyFetchError } from '../utils/fetchError';
+import { type BagItem, groupBagItems, needsMoveTarget, formatItemName } from '../battle/bag';
 import { CreatureOverview } from './CreatureOverview';
 import './BattleScreen.css';
 
@@ -14,7 +16,7 @@ function estimateHp(baseHp: number): number {
   return Math.floor((baseHp * 2 * 50) / 100) + 60;
 }
 
-type ControlView = 'menu' | 'fight' | 'check';
+type ControlView = 'menu' | 'fight' | 'bag' | 'check';
 
 export function BattleScreen() {
   const location = useLocation();
@@ -23,7 +25,7 @@ export function BattleScreen() {
   const gameId: string | null = location.state?.gameId ?? null;
   const startLevel: number = location.state?.level ?? 50;
 
-  const { state, chooseMove, dismissLevelUp, forgetMove, respondRecovery, respondEvolution } = useBattleHub(gameId, startLevel);
+  const { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution } = useBattleHub(gameId, startLevel);
   const [controlView, setControlView] = useState<ControlView>('menu');
   const logRef = useRef<HTMLDivElement>(null);
 
@@ -38,6 +40,12 @@ export function BattleScreen() {
   const handleChooseMove = (index: number) => {
     onAnyInput();
     chooseMove(index);
+    setControlView('menu');
+  };
+
+  const handleUseItem = (itemId: number, targetMoveSlot: number | null) => {
+    onAnyInput();
+    useItem(itemId, targetMoveSlot);
     setControlView('menu');
   };
 
@@ -98,8 +106,9 @@ export function BattleScreen() {
           {controlView === 'menu' && state.phase !== 'ended' && (
             <ActionMenu
               playerName={playerName}
-              canFight={state.phase === 'choosing' && !state.animating}
+              canAct={state.phase === 'choosing' && !state.animating}
               onFight={() => { onAnyInput(); setControlView('fight'); }}
+              onBag={() => { onAnyInput(); setControlView('bag'); }}
               onCheck={() => { onAnyInput(); setControlView('check'); }}
               onBack={() => { onAnyInput(); nav('/'); }}
             />
@@ -109,6 +118,14 @@ export function BattleScreen() {
               moves={state.moves}
               canChoose={state.phase === 'choosing' && !state.animating}
               onChoose={handleChooseMove}
+              onBack={() => setControlView('menu')}
+            />
+          )}
+          {controlView === 'bag' && (
+            <BagMenu
+              gameId={gameId}
+              moves={state.moves}
+              onUse={handleUseItem}
               onBack={() => setControlView('menu')}
             />
           )}
@@ -379,23 +396,33 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function ActionMenu({ playerName, canFight, onFight, onCheck, onBack }: {
+function ActionMenu({ playerName, canAct, onFight, onBag, onCheck, onBack }: {
   playerName: string;
-  canFight: boolean;
+  canAct: boolean;
   onFight: () => void;
+  onBag: () => void;
   onCheck: () => void;
   onBack: () => void;
 }) {
+  // FIGHT and BAG both spend the turn, so they're gated on it being the player's turn (canAct). CHECK
+  // POKEMON is read-only, so it's always available.
   return (
     <div className="action-menu">
       <p className="action-prompt">What will {playerName} do?</p>
       <div className="action-buttons">
         <button
-          className={`action-btn action-btn--fight ${!canFight ? 'action-btn--waiting' : ''}`}
+          className={`action-btn action-btn--fight ${!canAct ? 'action-btn--waiting' : ''}`}
           onClick={onFight}
-          disabled={!canFight}
+          disabled={!canAct}
         >
           FIGHT
+        </button>
+        <button
+          className={`action-btn ${!canAct ? 'action-btn--waiting' : ''}`}
+          onClick={onBag}
+          disabled={!canAct}
+        >
+          BAG
         </button>
         <button className="action-btn" onClick={onCheck}>
           CHECK POKEMON
@@ -459,6 +486,114 @@ function MoveMenu({ moves, canChoose, onChoose, onBack }: {
                   {eff.label}
                 </span>
               )}
+            </button>
+          );
+        })}
+      </div>
+      <button className="btn-ghost action-back" onClick={onBack}>← BACK</button>
+    </div>
+  );
+}
+
+// The in-battle bag: fetched fresh each time it opens (quantities change as items are consumed), grouped by
+// pocket, with only battle-usable categories shown (see bag.ts). Picking an item uses it as the turn —
+// except a single-move PP restore (Ether), which first asks which move slot to refill via PpTargetPicker.
+function BagMenu({ gameId, moves, onUse, onBack }: {
+  gameId: string | null;
+  moves: MoveInfo[];
+  onUse: (itemId: number, targetMoveSlot: number | null) => void;
+  onBack: () => void;
+}) {
+  const [items, setItems] = useState<BagItem[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  // When set, we're picking the move slot for this single-move PP-restore item instead of the item list.
+  const [ppTarget, setPpTarget] = useState<BagItem | null>(null);
+
+  useEffect(() => {
+    if (!gameId) { setError('No active game.'); return; }
+    let live = true;
+    fetch(`/api/game/${gameId}/bag`)
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+      .then((d: BagItem[]) => { if (live) setItems(d); })
+      .catch(e => { if (live) setError(friendlyFetchError(e)); });
+    return () => { live = false; };
+  }, [gameId]);
+
+  const pick = (item: BagItem) => {
+    if (needsMoveTarget(item)) setPpTarget(item);
+    else onUse(item.id, null);
+  };
+
+  if (ppTarget) {
+    return (
+      <PpTargetPicker
+        item={ppTarget}
+        moves={moves}
+        onPick={slot => onUse(ppTarget.id, slot)}
+        onBack={() => setPpTarget(null)}
+      />
+    );
+  }
+
+  const groups = items ? groupBagItems(items) : [];
+
+  return (
+    <div className="bag-menu">
+      <div className="bag-list">
+        {error && <p className="bag-error">{error}</p>}
+        {!error && !items && <p className="bag-empty">Loading…</p>}
+        {items && groups.length === 0 && <p className="bag-empty">No usable items.</p>}
+        {groups.map(group => (
+          <div className="bag-group" key={group.label}>
+            <p className="bag-group-label">{group.label}</p>
+            {group.items.map(item => (
+              <button key={item.id} className="bag-item" onClick={() => pick(item)}>
+                <span className="bag-item-name">{formatItemName(item.name)}</span>
+                <span className="bag-item-qty">×{item.quantity}</span>
+                {item.description && <span className="bag-item-desc">{item.description}</span>}
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
+      <button className="btn-ghost action-back" onClick={onBack}>← BACK</button>
+    </div>
+  );
+}
+
+// Move-slot pick for a single-move PP restore (Ether / Max Ether). Reuses the move-grid look; a slot already
+// at full PP is disabled (restoring it would have no effect → the engine refuses the use).
+function PpTargetPicker({ item, moves, onPick, onBack }: {
+  item: BagItem;
+  moves: MoveInfo[];
+  onPick: (slot: number) => void;
+  onBack: () => void;
+}) {
+  const slots = [...moves];
+  while (slots.length < 4) slots.push({ name: '---', type: 'Normal', ppCurrent: 0, ppMax: 0 });
+
+  return (
+    <div className="move-menu">
+      <p className="bag-pp-prompt">Restore PP to which move? ({formatItemName(item.name)})</p>
+      <div className="move-grid">
+        {slots.map((move, i) => {
+          const isEmpty = move.name === '---';
+          const full = !isEmpty && move.ppCurrent >= move.ppMax;
+          const disabled = isEmpty || full;
+          return (
+            <button
+              key={i}
+              className={`move-btn ${disabled ? 'move-btn--disabled' : ''}`}
+              disabled={disabled}
+              onClick={() => onPick(i)}
+            >
+              <span className="move-name">{formatMoveName(move.name)}</span>
+              {!isEmpty && (
+                <span className={`move-pp ${full ? '' : 'move-pp--low'}`}>
+                  {move.ppCurrent}/{move.ppMax}
+                </span>
+              )}
+              {!isEmpty && <TypeBadge type={move.type} size="sm" />}
             </button>
           );
         })}
