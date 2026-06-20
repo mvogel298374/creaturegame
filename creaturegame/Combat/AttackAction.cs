@@ -547,7 +547,7 @@ public class AttackAction : IBattleAction
         }
 
         int chance = _rules.GetSecondaryEffectChance(attack, SecondaryEffectKind.Status);
-        if (_rng.Next(1, 101) > chance)
+        if (!_rules.SecondaryHits(chance, _rng))
             return;
 
         Target.Battle.Status = attack.StatusEffect;
@@ -585,7 +585,7 @@ public class AttackAction : IBattleAction
         // secondary kind) rather than the StatEffectChance column directly — keeps the call site
         // generation-agnostic, like the status/flinch/confuse secondaries.
         int chance = _rules.GetSecondaryEffectChance(attack, SecondaryEffectKind.StatStage);
-        if (_rng.Next(1, 101) > chance)
+        if (!_rules.SecondaryHits(chance, _rng))
             return;
 
         int newStage = ApplyStageChange(affected, se.Stat, se.Delta);

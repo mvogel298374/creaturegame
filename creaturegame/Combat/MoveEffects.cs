@@ -84,7 +84,7 @@ public sealed class FlinchEffect : IMoveEffect
         if (ctx.Target.IsAlive())
         {
             int chance = ctx.Rules.GetSecondaryEffectChance(ctx.Attack, SecondaryEffectKind.Flinch);
-            if (ctx.Rng.Next(1, 101) <= chance)
+            if (ctx.Rules.SecondaryHits(chance, ctx.Rng))
                 ctx.Target.Battle.IsFlinched = true;
         }
     }
@@ -514,7 +514,7 @@ public sealed class ConfuseEffect : IMoveEffect
                 ctx.Attack,
                 SecondaryEffectKind.Confuse
             );
-            if (ctx.Rng.Next(1, 101) <= chance)
+            if (ctx.Rules.SecondaryHits(chance, ctx.Rng))
             {
                 ctx.Target.Battle.ConfusedTurns = ctx.Rules.RollConfusionTurns();
                 ctx.Emitter?.Emit(new ConfusionStarted(ctx.Target.Name));

@@ -38,6 +38,9 @@ public abstract class DelegatingBattleRules : IBattleRules
     public virtual int GetSecondaryEffectChance(Attack m, SecondaryEffectKind e) =>
         _inner.GetSecondaryEffectChance(m, e);
 
+    public virtual bool SecondaryHits(int chancePercent, IRandomSource rng) =>
+        _inner.SecondaryHits(chancePercent, rng);
+
     public virtual int RollMultiHitCount() => _inner.RollMultiHitCount();
 
     public virtual int PayDayCoinMultiplier => _inner.PayDayCoinMultiplier;

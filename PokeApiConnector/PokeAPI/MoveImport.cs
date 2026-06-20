@@ -88,7 +88,41 @@ public class MoveImport
         }
     }
 
-    private static Attack MapToAttack(PokeApiMove pokeMove)
+    // PokeAPI move IDs for the handful of moves whose Gen 1 damage behaviour isn't expressible via
+    // meta.category. Named so the special-case branches in ApplyDamageCategory read as intent, not magic.
+    private const int SelfDestructId = 120;
+    private const int ExplosionId = 153;
+    private const int SeismicTossId = 69;
+    private const int NightShadeId = 101;
+    private const int SuperFangId = 162;
+    private const int PsywaveId = 149;
+    private const int SonicBoomId = 49;
+    private const int DragonRageId = 82;
+    private const int SwiftId = 129; // never-miss: bypasses the accuracy roll entirely
+
+    /// <summary>
+    /// Maps a PokeAPI move to a Gen-1-correct <see cref="Attack"/>, in focused stages: resolve the base
+    /// stats from <c>past_values</c>, classify the damage category, layer on the data-derived effects,
+    /// then apply the hand-verified Gen 1 corrections. Order matters — corrections run last so they win
+    /// over the mappings above. Public (a pure DTO→model function, no network/DB) so it's unit-testable
+    /// directly, like <c>EvolutionMapper</c>/<c>ItemMapper</c>.
+    /// </summary>
+    public static Attack MapToAttack(PokeApiMove pokeMove)
+    {
+        Attack attack = BuildGen1Attack(pokeMove);
+        ApplyDamageCategory(attack, pokeMove);
+        ApplyStatStageEffect(attack, pokeMove);
+        ApplySpecialEffects(attack, pokeMove);
+        ApplyGen1Corrections(attack, pokeMove);
+        return attack;
+    }
+
+    /// <summary>
+    /// Concern 1 — resolve the move's Gen 1 numbers from PokeAPI <c>past_values</c> and build the core
+    /// <see cref="Attack"/> (power/accuracy/pp/type/category, the type-derived physical/special split,
+    /// and the secondary status from the ailment).
+    /// </summary>
+    private static Attack BuildGen1Attack(PokeApiMove pokeMove)
     {
         // PokeAPI returns each move's MODERN stats; Gen 1 often differed (special moves were
         // stronger, Blizzard was 90% accurate, and several moves were a different type — e.g.
@@ -166,6 +200,16 @@ public class MoveImport
 
         attack.IsHighCrit = pokeMove.Meta?.CritRate > 0;
 
+        return attack;
+    }
+
+    /// <summary>
+    /// Concern 2a — the damage category: PokeAPI's <c>meta.category</c>, plus the moves it can't classify,
+    /// identified by their named move IDs (Self-Destruct, Seismic Toss, Super Fang, …). Also sets the
+    /// drain percentage and the never-miss flag.
+    /// </summary>
+    private static void ApplyDamageCategory(Attack attack, PokeApiMove pokeMove)
+    {
         // Damage category — derived from meta.category and specific move IDs
         attack.DamageCategory = pokeMove.Meta?.Category?.Name switch
         {
@@ -174,21 +218,21 @@ public class MoveImport
             _ => DamageCategory.Standard,
         };
 
-        // Moves that PokeAPI doesn't classify via meta.category — identify by ID or name
-        if (pokeMove.Id is 120 or 153) // Self-Destruct, Explosion
+        // Moves that PokeAPI doesn't classify via meta.category — identify by their named IDs.
+        if (pokeMove.Id is SelfDestructId or ExplosionId)
             attack.DamageCategory = DamageCategory.SelfDestruct;
-        else if (pokeMove.Id is 69 or 101) // Seismic Toss, Night Shade
+        else if (pokeMove.Id is SeismicTossId or NightShadeId)
             attack.DamageCategory = DamageCategory.LevelBased;
-        else if (pokeMove.Id == 162) // Super Fang
+        else if (pokeMove.Id == SuperFangId)
             attack.DamageCategory = DamageCategory.SuperFang;
-        else if (pokeMove.Id == 149) // Psywave (variable damage: random 1..floor(1.5×level))
+        else if (pokeMove.Id == PsywaveId) // variable damage: random 1..floor(1.5×level)
             attack.DamageCategory = DamageCategory.Psywave;
-        else if (pokeMove.Id == 49) // Sonic Boom (fixed 20 damage)
+        else if (pokeMove.Id == SonicBoomId) // fixed 20 damage
         {
             attack.DamageCategory = DamageCategory.Fixed;
             attack.FixedDamageValue = 20;
         }
-        else if (pokeMove.Id == 82) // Dragon Rage (fixed 40 damage)
+        else if (pokeMove.Id == DragonRageId) // fixed 40 damage
         {
             attack.DamageCategory = DamageCategory.Fixed;
             attack.FixedDamageValue = 40;
@@ -198,10 +242,13 @@ public class MoveImport
         if (attack.DamageCategory == DamageCategory.Drain && pokeMove.Meta?.Drain > 0)
             attack.DrainPercent = pokeMove.Meta.Drain;
 
-        // Never-miss moves (Swift — bypasses accuracy roll entirely)
-        if (pokeMove.Id == 129)
+        if (pokeMove.Id == SwiftId)
             attack.NeverMisses = true;
+    }
 
+    /// <summary>Concern 2b — the move's stat-stage effect (Gen 1 moves carry at most one).</summary>
+    private static void ApplyStatStageEffect(Attack attack, PokeApiMove pokeMove)
+    {
         // Stat-stage effect — take the first entry (Gen 1 moves have at most one)
         var statChange = pokeMove.StatChanges?.FirstOrDefault();
         if (statChange?.Stat?.Name != null)
@@ -228,7 +275,14 @@ public class MoveImport
                     attack.BaseDamage > 0 ? (attack.EffectChance ?? 100) : 100;
             }
         }
+    }
 
+    /// <summary>
+    /// Concern 2c — special move effects: the name → <see cref="MoveEffect"/> map (<see cref="Gen1MoveEffects"/>)
+    /// plus the meta-based confusion/flinch fallbacks and the fixed multi-hit counts.
+    /// </summary>
+    private static void ApplySpecialEffects(Attack attack, PokeApiMove pokeMove)
+    {
         // Special move effects. Most are a fixed name → MoveEffect mapping (see Gen1MoveEffects); the
         // two meta-based fallbacks below only apply when no name matched. That ordering preserves the
         // Gen 1 rule that a rampage move (Thrash / Petal Dance) maps to Rampage rather than to its
@@ -252,12 +306,16 @@ public class MoveImport
         // own 20% poison secondary (set from the ailment); Bonemerang joins here in its coverage batch.
         if (pokeMove.Name is "double-kick" or "twineedle" or "bonemerang")
             attack.MultiHitCount = 2;
+    }
 
-        // ── Gen 1 secondary-effect corrections (layer 2: facts PokeAPI can't express) ──────────
-        // PokeAPI reports each move's MODERN secondary chance/target and almost never backfills
-        // `past_values` for them, so these are applied here from an authority (Bulbapedia). Keep the
-        // list short, verified, and commented — see DATA_IMPORT.md §4.1/§5.5. Runs last so it wins
-        // over the stat-change and effect mapping above.
+    /// <summary>
+    /// Concern 3 — layer-2 Gen 1 secondary-effect corrections: facts PokeAPI can't express (it reports
+    /// each move's MODERN secondary chance/target and almost never backfills <c>past_values</c> for them),
+    /// applied here from an authority (Bulbapedia). Keep the list short, verified, and commented — see
+    /// DATA_IMPORT.md §4.1/§5.5. Runs last so it wins over the stat-change and effect mapping above.
+    /// </summary>
+    private static void ApplyGen1Corrections(Attack attack, PokeApiMove pokeMove)
+    {
         switch (pokeMove.Name)
         {
             case "acid": // Gen 1: 33% to lower Defense (modern: 10% Sp. Def; past_values empty)
@@ -320,8 +378,6 @@ public class MoveImport
                 attack.StatusEffect = StatusCondition.BadPoison;
                 break;
         }
-
-        return attack;
     }
 
     // Gen 1 special move mechanics keyed by PokeAPI move name. These are behaviours PokeAPI's

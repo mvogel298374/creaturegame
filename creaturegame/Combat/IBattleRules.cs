@@ -69,6 +69,16 @@ public interface IBattleRules
     int GetSecondaryEffectChance(Attack move, SecondaryEffectKind effect);
 
     /// <summary>
+    /// Rolls whether a move's secondary effect procs, given its <paramref name="chancePercent"/>
+    /// (0–100, from <see cref="GetSecondaryEffectChance"/>). Gen 1 models this as a 1–100 roll
+    /// (a simplification of the true internal n/256 scale); a later generation could roll
+    /// differently. Takes the <paramref name="rng"/> explicitly so the caller's battle RNG stream
+    /// stays the source of the roll (the rules' own RNG is for its self-owned rolls like
+    /// <see cref="RollDamageVariance"/>). Returns true when the effect should apply.
+    /// </summary>
+    bool SecondaryHits(int chancePercent, IRandomSource rng);
+
+    /// <summary>
     /// Returns the random damage multiplier for one hit.
     /// Gen 1: uniform draw from 217–255, divided by 255.
     /// Gen 2+: uniform draw from 85–100, divided by 100.

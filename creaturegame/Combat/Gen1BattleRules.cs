@@ -44,6 +44,11 @@ public sealed class Gen1BattleRules : IBattleRules
     public int GetSecondaryEffectChance(Attack move, SecondaryEffectKind effect) =>
         move.EffectChance ?? 100;
 
+    // Gen 1: a 1–100 roll lands the secondary effect when it's <= the percent chance (chance 0
+    // never procs, 100 always does). A simplification of Gen 1's true n/256 internal scale.
+    public bool SecondaryHits(int chancePercent, IRandomSource rng) =>
+        rng.Next(1, 101) <= chancePercent;
+
     // Gen 1 multi-hit distribution: 2 and 3 hits at 3/8 each, 4 and 5 hits at 1/8 each.
     public int RollMultiHitCount() =>
         _rng.Next(8) switch

@@ -8,6 +8,61 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Item System ✅ DONE (2026-06-19 → 2026-06-20)
+
+The full Gen 1 **Item System** — data import + use-in-battle — designed with the user (`/plan`, 2026-06-19)
+and built in reviewable stages. Item use is playable end-to-end through the browser. Suite after the work:
+**1066 .NET + 72 Vitest + 22 Playwright** (all green). **Still deferred** (moved to the *Item Acquisition ·
+Bag Persistence · Catch* cluster in `TODO.md`): the Poké Ball / catch effect, real item acquisition, bag
+persistence, and Revive/Max Revive (blocked on a party system).
+
+**Locked design (`/plan`):** `items.db` + `ItemsDbContext` parallel to `moves.db`/`pokemon.db`; scope =
+"anything usable *in battle*"; Gen 1 roster is a **hand-curated allowlist** (`ItemMapper.Gen1BattleItemNames`)
+because PokeAPI has no Gen 1 item signal (no `/generation/1`, `game_indices` only reach Gen 3). `ItemAction`
+priority **above any move** (Gen 1 items resolve first); `IItemEffect`/`ItemEffects` registry keyed by
+`ItemCategory` (the item analogue of `IMoveEffect`); transient player-only `Bag`; additive
+`IBattleInput.ChooseTurnActionAsync` seam (default delegates to `ChooseMoveAsync`, so AI/auto inputs untouched).
+
+**Data import.** `Item` model + `ItemCategory` enum (Gen 1 gameplay numbers — heal amount, cured status,
+revive %, PP restore, X-item boost — as **data on the row**, not a seam; ball catch-rate deliberately NOT
+modelled, capture is a battle formula). `ItemsDbContext` + migration `DB/Migrations/Items`; `PokeApiItem` DTO
++ `ItemImport` + `ItemMapper` (pure mapping + roster, mirroring the `EvolutionImport`/`EvolutionMapper` split);
+idempotent upsert; `Program.cs` step + `-- items` stage. `ItemService` read API. **Live import: 29 items**,
+categories + numbers verified. `ItemSpriteDownloader` → `wwwroot/sprites/items/{id}.png` (idempotent, gitignored
+like creature sprites); bag menu shows each sprite. Tests: `ItemImportTests` + `ItemsDbServiceTests`.
+
+**Phase 1 — core engine.** `Bag` (`Items/Bag.cs`, ConcurrentDictionary id→qty), `ItemAction`
+(`Combat/ItemAction.cs`), `IItemEffect`/`ItemEffects` + Heal/StatusCure/PpRestore/X-item
+(`Combat/ItemEffects.cs`). Turn-loop integration in `Battle` (player builds move-or-item; `CanAct`/dead-target
+guards scoped to `AttackAction` only — item use is legal while asleep); `ChooseTurnActionAsync` + `TurnChoice`
+seam; `StatStages.Raise/Of` helper. Events `ItemUsed`/`PpRestored`/`ItemUseFailed` + SignalR projection +
+timeline arms (`WebEventContractTests` forced the wire pre-UI). `Item.RestoresPpAllMoves` added (Ether=one
+move, Elixir=all). Tests: `ItemEffectTests` + `ItemActionBattleTests`.
+
+**Phase 2 — web wire.** `BattleHub.UseItem` → `GameSessionManager.SetItemChoice` → `SignalRInput` (refactored
+to a single per-turn handshake — one TCS resolves to a move **or** an item; `ChooseMoveAsync` is a thin
+move-only wrapper). Bag threaded end-to-end: `EncounterFactory` seeds a per-run `Bag` from `items.db` (generous
+test loadout, every item ×20) + item catalog → `GameController` → `GameSessionManager` → `BattleRunner` → every
+`Battle`. `GET /{gameId}/bag` endpoint (`BagItemView`). Tests: `SignalRInputTests` + a bag-seed assertion.
+
+**Phase 3 — frontend.** BAG button + grouped item list (`BattleScreen` `'bag'` view → `BagMenu`); fetches the
+bag fresh on open, filters to battle-usable pockets (Ball & Revive hidden so a guaranteed no-op can't waste a
+turn), groups by pocket. PP-restore move-slot pick: single-move restores open a `PpTargetPicker` (reuses the
+move-grid), whole-moveset restores use directly — distinguished via the `BagItemView.RestoresPpAllMoves` field
+(no client name-sniffing). Pure `bag.ts` helpers unit-tested (`bag.test.ts`, 10 cases) + `item-use.spec.ts`.
+
+**Phase 4 — Dire Hit + Guard Spec.** The last two in-scope effects, both `BattleStatBoost` boosters reusing the
+matching Gen 1 move mechanics: **Dire Hit** → `BattleState.HasFocusEnergy` + `FocusEnergyApplied` (incl. Gen 1's
+bugged ÷4 crit in `Gen1BattleRules.GetCritChance`); **Guard Spec.** → `HasMist` + `MistApplied`. Zero web work
+(those events already had projections + arms). `Item.BoostsCrit`/`SetsMist` fields + migration
+`AddItemCritAndMistBoosts`; `XItemEffect` → `BattleBoostItemEffect` (one category-keyed effect dispatching
+X-item / Dire Hit / Guard Spec by item data). Tests across `ItemEffectTests`, `ItemImportTests`,
+`ItemsDbServiceTests`, `ItemActionBattleTests` + a Guard Spec Playwright case.
+
+**`dev.ps1`:** added `-NoBrowser` flag (skip auto-open) and fixed the backend opening a stray `:5100` tab.
+
+---
+
 ## Evolution System ✅ DONE (2026-06-18 → 2026-06-19)
 
 Full **level-up evolution end-to-end** — data + seam, core + run-loop, Phaser sprite-morph, plus a Gen 1

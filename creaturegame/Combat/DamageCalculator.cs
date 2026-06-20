@@ -153,7 +153,11 @@ public static class DamageCalculator
         return (int)(baseDamage * stab * typeEffectiveness * critMult * variance);
     }
 
-    /// <summary>Backward-compatible overload — discards the crit result.</summary>
+    /// <summary>
+    /// Convenience overload for callers that don't need the crit-out — the damage-only tests
+    /// (STAB/stage/burn/stat-selection asserts that don't pin crit). Defaults <c>rules</c> to the
+    /// Gen 1 singleton and discards the crit result; production code uses the crit-out overload above.
+    /// </summary>
     public static int CalculateDamage(
         Creature attacker,
         Creature defender,
