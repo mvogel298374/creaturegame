@@ -1,3 +1,9 @@
+param(
+    # Skip auto-opening the browser once the frontend is ready (the stack still starts and the URL is
+    # printed). Handy when driving the app from tests/agents that don't want a tab popping up.
+    [switch]$NoBrowser
+)
+
 $dotnet = "C:\Users\USER\.dotnet\dotnet.exe"
 $root   = $PSScriptRoot
 
@@ -26,8 +32,12 @@ for ($i = 0; $i -lt 60; $i++) {
 }
 
 if ($ready) {
-    Write-Host "Ready - opening http://localhost:5173"
-    Start-Process "http://localhost:5173"
+    if ($NoBrowser) {
+        Write-Host "Ready - http://localhost:5173 (browser not opened: -NoBrowser)"
+    } else {
+        Write-Host "Ready - opening http://localhost:5173"
+        Start-Process "http://localhost:5173"
+    }
 } else {
     Write-Host "Frontend did not respond in 60s. Open http://localhost:5173 manually."
 }
