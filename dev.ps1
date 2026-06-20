@@ -7,8 +7,12 @@ param(
 $dotnet = "C:\Users\USER\.dotnet\dotnet.exe"
 $root   = $PSScriptRoot
 
-# Set env vars in the child process so dotnet watch doesn't open its own browser tab
-$backendCmd  = "`$env:ASPNETCORE_ENVIRONMENT='Development'; `$env:ASPNETCORE_URLS='http://localhost:5100'; & '$dotnet' watch run --project '$root\creaturegame.Web'"
+# Stop the backend from opening a :5100 browser tab. The launch profile (Properties/launchSettings.json)
+# has launchBrowser:true, which the runtime honours on startup — so `--no-launch-profile` ignores the
+# profile entirely (no launchBrowser, no applicationUrl); we set the URL + environment explicitly here
+# instead. DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER additionally covers `dotnet watch`'s browser-refresh path.
+# dev.ps1 opens the single :5173 tab itself (unless -NoBrowser).
+$backendCmd  = "`$env:ASPNETCORE_ENVIRONMENT='Development'; `$env:ASPNETCORE_URLS='http://localhost:5100'; `$env:DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER='1'; & '$dotnet' watch run --no-launch-profile --project '$root\creaturegame.Web'"
 $frontendCmd = "Set-Location '$root\creaturegame.Web\ClientApp'; npm run dev"
 
 Start-Process pwsh -ArgumentList "-NoExit", "-Command", $backendCmd
