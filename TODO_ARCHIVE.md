@@ -11,8 +11,7 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 ## Item System ✅ DONE (2026-06-19 → 2026-06-20)
 
 The full Gen 1 **Item System** — data import + use-in-battle — designed with the user (`/plan`, 2026-06-19)
-and built in reviewable stages. Item use is playable end-to-end through the browser. Suite after the work:
-**1066 .NET + 72 Vitest + 22 Playwright** (all green). **Still deferred** (moved to the *Item Acquisition ·
+and built in reviewable stages. Item use is playable end-to-end through the browser. **Still deferred** (moved to the *Item Acquisition ·
 Bag Persistence · Catch* cluster in `TODO.md`): the Poké Ball / catch effect, real item acquisition, bag
 persistence, and Revive/Max Revive (blocked on a party system).
 
@@ -67,7 +66,7 @@ X-item / Dire Hit / Guard Spec by item data). Tests across `ItemEffectTests`, `I
 
 Full **level-up evolution end-to-end** — data + seam, core + run-loop, Phaser sprite-morph, plus a Gen 1
 B-cancel prompt. Designed with the user (`/plan`); built and committed in reviewable stages, each through the
-`/audit` gate. Suite after the work: **965 .NET + 59 Vitest + 20 Playwright** (all green).
+`/audit` gate.
 
 **Design calls (with the user):** trade evolutions have no trading in a single-player roguelite, so the 4 Gen 1
 trade lines (Kadabra→Alakazam, Machoke→Machamp, Graveler→Golem, Haunter→Gengar) evolve at **level 37** (flat);
@@ -126,7 +125,7 @@ timeline layer). **Still open:** stone evolutions (need the bag — Catch Mechan
 
 Three more battle-UI polish items, all frontend — the engine already emitted the driving events
 (`RunEnded`, `DamageDealt`) and exposed the live creature; the work was rendering/animation + one new REST
-snapshot. Suite after the pass: **932 .NET + 56 Vitest + 20 Playwright E2E** (all green).
+snapshot.
 
 **Run-scoped game-over screen (`BattleEndedOverlay`).** Built into the Endless Battle Chain's terminal
 `RunEnded` event (→ `phase: 'ended'`), **not** a per-`BattleEnded` overlay — a win is just a mid-chain
@@ -201,7 +200,7 @@ case) to "Couldn't reach the game server. Make sure the backend is running, then
 get their own message), and the start-game fetch gained the `try/catch` it was missing.
 
 **Earlier move-menu polish (2026-06-10):** level-up stat-gain panel on `LeveledUp` (per-stat `StatGains`,
-fanfare, stays until next input). Suite across the pass: 917 → **930 .NET**, 54 → **55 Vitest**, 18 → **19 E2E**.
+fanfare, stays until next input).
 
 ---
 
@@ -223,7 +222,7 @@ applies Stat Exp mid-level), so it pays off through the chain's regular level-up
   Sp.Atk/Sp.Def IVs in Gen 3; Stat Exp → EV yields/caps). `Creature`'s `Dv*`/`Exp*` regions documented as the
   IV/EV precursors. A `Gen3StatCalculator` is a drop-in implementation of that seam.
 - Tests: `Unit/StatExpGainTests` (per-stat gain, accumulation, 65535 cap, realize-only-on-level-up +
-  no-mid-level-change, end-to-end win awards the foe's base stats). Suite 911 → **917 .NET**.
+  no-mid-level-change, end-to-end win awards the foe's base stats).
 - Audit: `/audit` PASS-WITH-ADVISORIES (0 blockers); fixed the Special-row doc (Gen 2 splits the *stat*, the
   DV→IV change is Gen 3) + noted the single-participant scope at the call site. Deferred: the `65535` test
   literal (promoting the private `StatExpMax` just for tests would over-expose it).
@@ -264,7 +263,7 @@ bad decision-making rather than being a perfect optimiser.
 the live `CalculateDamage` (rolls crit+variance) and the new `EstimateDamage` (deterministic, AI-only) — a
 behavior-preserving extraction, pinned by `Estimate_MatchesLiveCalcWithNoCritAndNoVariance`.
 
-**Tests:** `Unit/MoveEvaluatorTests` + `Unit/BattleAiTests`. Suite 888 → **911 .NET**.
+**Tests:** `Unit/MoveEvaluatorTests` + `Unit/BattleAiTests`.
 
 **Audit:** seam-reviewer BLOCK (wrong inline Gen-1 Ice→Freeze status immunity) fixed by routing through
 `IBattleRules.CanReceiveStatus` + a guarding `Status_FreezeIsValuedAgainstAnIceFoe` test. Deferred advisory:
@@ -352,8 +351,7 @@ gen-variable input is the learnset *data* (`PokemonLearnset.Generation`, filtere
 Transform-persistence) + `ScriptedInput.ForgetsSlot` / `BattleScenario.PlayerForgetsSlot` harness; Vitest
 timeline cases; **Playwright `learnset.spec.ts`** — a low-level **Mew** (BST 500 ⇒ BST-matched-strong foes ⇒
 fast XP) started at L9 auto-learns Transform on reaching L10, via the `reachLog` restart-on-loss pattern
-(`startBattle` now matches the card by EXACT name so `MEW` doesn't also grab `MEWTWO`). Suite **852 .NET + 45
-Vitest + 17 Playwright E2E**. **Deferred:** the replace-MODAL E2E (needs four full slots AT a learn-level —
+(`startBattle` now matches the card by EXACT name so `MEW` doesn't also grab `MEWTWO`). **Deferred:** the replace-MODAL E2E (needs four full slots AT a learn-level —
 not reliably reachable without the seeded-battle entry point, Tech Debt #3; covered at the .NET/Vitest layer);
 a console `IBattleInput` that can answer the prompt (none exists yet — the default-decline is the placeholder).
 
@@ -411,7 +409,7 @@ The ordered pass that followed the move-coverage completion. All six items done;
    paralysis turn-order flip, Wrap trap-lock, and poison+Leech-Seed end-of-turn stacking; the engine→web
    `MapEvent` contract test (`Integration/Web/`); and end-to-end flow tests (well-formed lifecycle event
    stream + win→XP→`LeveledUp` chain) over real DB moves (`Integration/Flow/`). No engine bugs surfaced —
-   the probes pin Gen 1 quirks against regression. Suite 821 → 840 .NET.
+   the probes pin Gen 1 quirks against regression.
 6. **`BattleState` facade migration (Architecture Review #2).** Deleted the ~33 delegating properties on
    `Creature` and migrated ~222 call sites across the engine + test suite to `creature.Battle.X` in a
    single compiler-driven pass (full suite green before and after: 840 passed / 0 failed). New per-battle
@@ -450,7 +448,7 @@ The ordered pass that followed the move-coverage completion. All six items done;
 
 The "XP & progression" milestone: a live, honest in-battle XP loop, a Gen 1 stat-gain panel on
 level-up, and a minimal endless run loop (one persistent creature, endless wild encounters). All
-E2E specs landed in the 2026-06-10 pass. Suite at completion: **848 .NET + 42 Vitest + 16 Playwright**.
+E2E specs landed in the 2026-06-10 pass.
 
 ### XP & Level-Up — finish the in-battle loop ✅
 Engine emits `ExperienceGained(CreatureName, Amount)` before any `LeveledUp`; `LeveledUp` carries the
@@ -616,7 +614,7 @@ substitutions are RNG-gated rolls through the `IBattleRules` seam doubles).
 
 ### Batch 3 (moves 21–30) ✅ DONE (2026-06-03)
 slam, vine-whip, stomp, double-kick, mega-kick, jump-kick, rolling-kick, sand-attack, headbutt,
-horn-attack. **293 .NET + 18 Vitest.** Two genuine engine features this batch (both behind the gen
+horn-attack. Two genuine engine features this batch (both behind the gen
 seam per `GENERATION_SEAMS.md §5.0`); everything else coverage-only over real `AttackAction` paths.
 - Reused contracts (rows added): damage/PP/miss; STAB (first **Special-type** mover, vine-whip;
   + Fighting jump-kick); type-effectiveness (Grass→Water, Fighting→Normal); physical/special split
@@ -641,7 +639,7 @@ seam per `GENERATION_SEAMS.md §5.0`); everything else coverage-only over real `
 
 ### Batch 4 (moves 31–40) ✅ DONE (2026-06-03)
 fury-attack, horn-drill, tackle, body-slam, wrap, take-down, thrash, double-edge, tail-whip,
-poison-sting. **342 .NET + 18 Vitest.** Two genuine engine features (both behind the gen seam);
+poison-sting. Two genuine engine features (both behind the gen seam);
 everything else coverage-only over real `AttackAction` paths.
 - Reused contracts (rows added): damage/PP/miss; OHKO parametrized (guillotine **+ horn-drill**);
   binding parametrized (bind **+ wrap**); secondary status (body-slam Paralysis, poison-sting Poison);
@@ -663,7 +661,7 @@ everything else coverage-only over real `AttackAction` paths.
 
 ### Batch 5 (moves 41–50) ✅ DONE (2026-06-04)
 twineedle, pin-missile, leer, bite, growl, roar, sing, supersonic, sonic-boom, disable.
-**375 .NET + 25 Vitest.** One major new engine feature (Disable) and a cross-cutting Gen 1
+ One major new engine feature (Disable) and a cross-cutting Gen 1
 **move-type correction pass**; everything else coverage-only over real `AttackAction`/`Battle` paths.
 - Reused contracts (rows added): damage/PP/miss (pin-missile, bite, twineedle); variable multi-hit
   (pin-missile) + fixed-2 multi-hit (twineedle); foe stat-drop (leer −1 Defense, growl −1 Attack);
@@ -690,7 +688,7 @@ twineedle, pin-missile, leer, bite, growl, roar, sing, supersonic, sonic-boom, d
 
 ### Batch 6 (moves 51–60) ✅ DONE (2026-06-04)
 acid, ember, flamethrower, mist, water-gun, hydro-pump, surf, ice-beam, blizzard, psybeam.
-**424 .NET + 27 Vitest.** First special-attack-heavy batch; introduced a **data-driven Gen 1
+ First special-attack-heavy batch; introduced a **data-driven Gen 1
 move-data resolver**, the **Mist** mechanic, and a gen-seam cleanup.
 - New capability classes: **`SecondaryEffectContractTests`** (damaging moves whose secondary is a
   stat drop (acid → −1 foe Defense) or confusion (psybeam)) and **`MistContractTests`**.
@@ -707,7 +705,7 @@ move-data resolver**, the **Mist** mechanic, and a gen-seam cleanup.
 
 ### Batch 7 (moves 61–70) ✅ DONE (2026-06-04)
 bubble-beam, aurora-beam, hyper-beam, peck, drill-peck, submission, low-kick, counter, seismic-toss,
-strength. **467 .NET + 27 Vitest.** One new mechanic (Counter), two new coverage contracts (Recharge,
+strength. One new mechanic (Counter), two new coverage contracts (Recharge,
 LevelBased), a **full Gen 1 secondary-chance override sweep**, and submission→Recoil.
 - New capability classes: **`RechargeContractTests`** (hyper-beam), **`LevelBasedDamageContractTests`**
   (seismic-toss = user level), **`CounterContractTests`** (2× last Normal/Fighting damage; full-`Battle`).
@@ -720,7 +718,7 @@ LevelBased), a **full Gen 1 secondary-chance override sweep**, and submission→
 
 ### Batch 8 (moves 71–80) ✅ DONE (2026-06-04)
 absorb, mega-drain, leech-seed, growth, razor-leaf, solar-beam, poison-powder, stun-spore,
-sleep-powder, petal-dance. **490 .NET + 28 Vitest.** Almost entirely a coverage batch, plus the
+sleep-powder, petal-dance. Almost entirely a coverage batch, plus the
 **Gen 1 type-immunity seam** and one new event.
 - New capability classes: **`DrainContractTests`**, **`LeechSeedContractTests`**, **`ImmunityContractTests`**.
 - **Type-immunity seam** — new `IBattleRules.CanReceiveStatus` (Poison-type can't be poisoned, Fire-type
@@ -734,7 +732,7 @@ sleep-powder, petal-dance. **490 .NET + 28 Vitest.** Almost entirely a coverage 
 
 ### Batch 9 (moves 81–90) ✅ DONE (2026-06-04)
 string-shot, dragon-rage, fire-spin, thunder-shock, thunderbolt, thunder-wave, thunder, rock-throw,
-earthquake, fissure. **535 .NET + 28 Vitest.** Pure coverage batch + one small engine extension and
+earthquake, fissure. Pure coverage batch + one small engine extension and
 two data fixes — no new mechanics.
 - **Engine extension:** the batch-8 type-immunity guard now also covers **pure-status moves** — a status
   move whose type is 0× against the target has no effect (Thunder Wave is Electric ⇒ Ground immune).
@@ -744,7 +742,7 @@ two data fixes — no new mechanics.
 
 ### Batch 10 (moves 91–100) ✅ DONE (2026-06-05)
 dig, toxic, confusion, psychic, hypnosis, meditate, agility, quick-attack, rage, teleport.
-**574 .NET + 28 Vitest.** One genuine new mechanic (Rage) + one Gen 1 data fix (Toxic → BadPoison).
+ One genuine new mechanic (Rage) + one Gen 1 data fix (Toxic → BadPoison).
 - New capability classes: **`RageContractTests`** and **`PriorityMoveContractTests`** (quick-attack).
 - **Rage (new mechanic, behind the gen seam):** `MoveEffect.Rage`; lock-in mirrors rampage/two-turn. On
   hit, a raging creature gains Attack by `IBattleRules.RageAttackStagesPerHit` (Gen 1 = 1) once per
@@ -759,7 +757,7 @@ unreachable `"bad-poison"` importer arm. Behavior-preserving.
 
 ### Batch 11 (moves 101–110) ✅ DONE (2026-06-05)
 night-shade, mimic, screech, double-team, recover, harden, minimize, smokescreen, confuse-ray,
-withdraw. **605 .NET + 30 Vitest.** Two new mechanics (Recover, Mimic) + a correctness fix to the
+withdraw. Two new mechanics (Recover, Mimic) + a correctness fix to the
 type-immunity guard. Two new events (`Healed`, `MimicLearned`).
 - New capability classes: **`HealContractTests`** (Recover ½ max HP) and **`MimicContractTests`**.
 - **Recover (`MoveEffect.Heal`):** heals `MaxHP × IBattleRules.RecoverHealFraction` (Gen 1 = ½); emits
@@ -775,7 +773,7 @@ type-immunity guard. Two new events (`Healed`, `MimicLearned`).
 
 ### Batch 12 (moves 111–120) ✅ DONE (2026-06-05)
 defense-curl, barrier, light-screen, haze, reflect, focus-energy, bide, metronome, mirror-move,
-self-destruct. **638 .NET + 33 Vitest.** Mechanic-heavy: **five** new mechanics (Reflect, Light Screen,
+self-destruct. Mechanic-heavy: **five** new mechanics (Reflect, Light Screen,
 Focus Energy, Bide, Mirror Move). Three new events (`ScreenApplied`, `FocusEnergyApplied`, `BideStoring`).
 - New capability classes: **`ScreenContractTests`**, **`FocusEnergyContractTests`**, **`BideContractTests`**,
   **`MirrorMoveContractTests`**.
@@ -793,7 +791,7 @@ Focus Energy, Bide, Mirror Move). Three new events (`ScreenApplied`, `FocusEnerg
 
 ### Batch 13 (moves 121–130) ✅ DONE (2026-06-05)
 egg-bomb, lick, smog, sludge, bone-club, fire-blast, waterfall, clamp, swift, skull-bash.
-**690 .NET + 33 Vitest.** Pure **coverage + data-fidelity** batch — no new engine code, events,
+ Pure **coverage + data-fidelity** batch — no new engine code, events,
 schema, or seam. Only production change: three Gen 1 importer data fixes.
 - New capability class: **`NeverMissContractTests`** (swift).
 - **lick is Ghost-type** — 0× vs Normal *and* (the Gen 1 bug) 0× vs Psychic; folds the immunity into the
@@ -804,7 +802,7 @@ schema, or seam. Only production change: three Gen 1 importer data fixes.
 
 ### Batch 14 (moves 131–140) ✅ DONE (2026-06-05)
 spike-cannon, constrict, amnesia, kinesis, soft-boiled, high-jump-kick, glare, dream-eater, poison-gas,
-barrage. **730 .NET + 33 Vitest.** One new mechanic (Dream Eater) + two importer mappings. No layer-2
+barrage. One new mechanic (Dream Eater) + two importer mappings. No layer-2
 override needed.
 - New capability class: **`DreamEaterContractTests`**.
 - **Dream Eater (`MoveEffect.DreamEater`):** fails on a non-sleeping target (reuses `MoveMissed`, the
@@ -815,7 +813,7 @@ override needed.
 
 ### Batch 15 (moves 141–150) ✅ DONE (2026-06-06)
 leech-life, lovely-kiss, sky-attack, bubble, dizzy-punch, spore, flash, psywave, splash (**9 of 10** —
-Transform deferred). **758 .NET + 34 Vitest.** Two new engine bits, rest coverage-only.
+Transform deferred). Two new engine bits, rest coverage-only.
 - **Psywave (`DamageCategory.Psywave`):** variable damage = random 1..floor(1.5 × user level), ignoring
   Attack/Defense, type, STAB, crits. Magnitude on the seam (`IBattleRules.RollPsywaveDamage`).
   **`PsywaveContractTests`** exercises the *quirk*, not just the import mapping.
@@ -837,7 +835,7 @@ coverage + one data fix.
   leak on Rest; verified the row's `StatusEffect` is None, then guarded + pinned it.
 
 ### Batch 17 (moves 161–165) ✅ DONE (2026-06-07) — FINAL COVERAGE BATCH
-tri-attack, super-fang, slash, substitute, struggle. **802 .NET + 35 Vitest.** One big mechanic
+tri-attack, super-fang, slash, substitute, struggle. One big mechanic
 (Substitute) + a data fix; rest reuse.
 - **Substitute (`MoveEffect.Substitute`):** costs floor(maxHP/4) HP, raises a decoy with floor(maxHP/4)+1
   HP; fails if one's up or HP ≤ cost. **Cross-cutting:** added one shared `DealDamageToTarget` helper that
@@ -851,7 +849,7 @@ tri-attack, super-fang, slash, substitute, struggle. **802 .NET + 35 Vitest.** O
 - Seam-review gate: PASS-WITH-ADVISORIES (0 blockers). Advisory fixed: secondary-shield snapshotted at impact.
 
 ### Type/identity-mutation batch — Transform (144) + Conversion (160) ✅ DONE (2026-06-07)
-**813 .NET + 37 Vitest.** The two deferred identity/type-mutation moves — covered together so the
+ The two deferred identity/type-mutation moves — covered together so the
 snapshot/restore machinery (wider than Mimic's) is built once. No schema change, no new seam, no
 layer-2 override (only the `Effect` name-mapping was added).
 - **Shared identity-snapshot machinery:** new `BattleState.OriginalIdentity` (an `IdentitySnapshot` of

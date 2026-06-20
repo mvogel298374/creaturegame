@@ -9,8 +9,7 @@
 The Gen 1 battle engine is **feature-complete**: all 165 moves, XP & level-up, the Endless Battle Chain, the
 Roguelite recovery/encounter layer, the Learnset System, AI move selection, EV / Stat-Exp gain, the full
 Evolution System, and the complete **Item System** (data import + use-in-battle, playable end-to-end) are all
-done and archived. `ARCHITECTURE.md` and the per-run web seed are done. **Suite: 1066 .NET + 72 Vitest + 22
-Playwright E2E** (all green).
+done and archived. `ARCHITECTURE.md` and the per-run web seed are done.
 
 **Next up, in order:**
 1. **Encounter Logic** (`/plan`) — design *what* the player faces and *how* it can be acquired. Gates the
