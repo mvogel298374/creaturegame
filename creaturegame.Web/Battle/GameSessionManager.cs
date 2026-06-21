@@ -147,7 +147,10 @@ public sealed class GameSessionManager(
     /// <summary>
     /// The live player <see cref="Creature"/> for a game, for the on-demand overview snapshot (CHECK POKEMON).
     /// Checks the running battle first, then a not-yet-started pending session; null if the game is unknown.
-    /// A display-only read of live state — no lock (the battle thread only mutates scalar stat fields).
+    /// A display-only read of live state — no lock. The battle thread mutates concurrently, but the two
+    /// fields this read enumerates are both safe against that: MoveSet is copy-on-write (mutations swing the
+    /// reference, see Creature.MoveSet) and Bag is a ConcurrentDictionary. Worst case the snapshot is one tick
+    /// stale; it never throws "Collection was modified".
     /// </summary>
     public Creature? GetPlayerCreature(string gameId)
     {

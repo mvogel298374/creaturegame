@@ -7,6 +7,13 @@ public class Creature
     public string Name { get; set; } = string.Empty;
     public int Level { get; set; } = 1;
     public Attributes Attributes { get; set; } = new Attributes();
+
+    // The moveset is mutated only by the battle thread, but a web request thread may enumerate it
+    // concurrently for the CHECK POKEMON overview (PlayerOverviewDto.From). A plain List can throw
+    // "Collection was modified" if a structural change races that read, so every mutation here is
+    // copy-on-write: build a new list and swing the reference (assignment is atomic) rather than
+    // mutating in place. A concurrent reader then safely enumerates the prior list — worst case it
+    // sees the pre-mutation moveset for one tick, the same staleness already accepted for Bag/scalars.
     public List<PokemonAttack> MoveSet { get; private set; } = [];
 
     // Struggle is a system-level fallback — never exposed publicly.
@@ -25,7 +32,7 @@ public class Creature
     {
         if (MoveSet.Count < 4 && !MoveSet.Any(m => m.Base.Id == attack.Id))
         {
-            MoveSet.Add(new PokemonAttack(attack));
+            MoveSet = [.. MoveSet, new PokemonAttack(attack)];
             return true;
         }
         return false;
@@ -54,8 +61,19 @@ public class Creature
     public void ReplaceMove(int slot, Attack move)
     {
         if (slot >= 0 && slot < MoveSet.Count)
-            MoveSet[slot] = new PokemonAttack(move);
+        {
+            var updated = new List<PokemonAttack>(MoveSet);
+            updated[slot] = new PokemonAttack(move);
+            MoveSet = updated;
+        }
     }
+
+    /// <summary>
+    /// Replaces the whole moveset in one atomic reference swap — the copy-on-write entry point for effects
+    /// (e.g. Transform) that rebuild the moveset from outside <see cref="Creature"/>. See the
+    /// <see cref="MoveSet"/> field comment for why mutations swing the reference rather than edit in place.
+    /// </summary>
+    internal void SetMoveSet(IEnumerable<PokemonAttack> moves) => MoveSet = [.. moves];
 
     public DamageType? Type1 { get; set; }
     public DamageType? Type2 { get; set; }
@@ -256,8 +274,7 @@ public class Creature
         Attributes.Defense = snap.Defense;
         Attributes.Special = snap.Special;
         Attributes.Speed = snap.Speed;
-        MoveSet.Clear();
-        MoveSet.AddRange(snap.MoveSet);
+        MoveSet = [.. snap.MoveSet];
         Battle.OriginalIdentity = null;
     }
 

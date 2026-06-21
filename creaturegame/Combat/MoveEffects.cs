@@ -381,14 +381,15 @@ public sealed class TransformEffect : IMoveEffect
             ctx.Source.Attributes.Special = ctx.Target.Attributes.Special;
             ctx.Source.Attributes.Speed = ctx.Target.Attributes.Speed;
             ctx.Source.Battle.Stages = ctx.Target.Battle.Stages.Copy();
-            ctx.Source.MoveSet.Clear();
-            foreach (var copied in ctx.Target.MoveSet)
-                ctx.Source.MoveSet.Add(
-                    new PokemonAttack(copied.Base)
-                    {
-                        PowerPointsCurrent = Math.Min(5, copied.Base.PowerPointsMax),
-                    }
-                );
+            // Copy-on-write: build the copied moveset, then swap it onto Source via the engine entry
+            // point so a concurrent CHECK POKEMON read never enumerates a half-built list (see the
+            // MoveSet field comment on Creature).
+            ctx.Source.SetMoveSet(
+                ctx.Target.MoveSet.Select(copied => new PokemonAttack(copied.Base)
+                {
+                    PowerPointsCurrent = Math.Min(5, copied.Base.PowerPointsMax),
+                })
+            );
             ctx.Emitter?.Emit(
                 new TransformedInto(ctx.Source.Name, ctx.Target.Name, ctx.Target.SpeciesId)
             );

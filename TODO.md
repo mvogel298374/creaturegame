@@ -182,6 +182,69 @@ Battles are fully playable now — docs won't describe a moving target.
 
 ## Tech Debt / Cleanup
 
+> **Code-review pass (2026-06-21)** — a docs-blind, engine-first read. The four items below came out of it.
+> None block current work; **(A) is the only correctness item** and is cheap.
+
+- [x] **(A) `MoveSet` cross-thread mutation can throw on the CHECK POKEMON read** — **DONE (2026-06-21).**
+  Fixed lock-free copy-on-write: every structural `MoveSet` mutation now swings the reference to a new list
+  instead of editing in place — `AddAttack` (`[.. MoveSet, …]`), `ReplaceMove` (copy→set slot→assign),
+  `RestoreOriginalIdentity` (`[.. snap.MoveSet]`), and Transform via a new `internal Creature.SetMoveSet`
+  (the setter is private and Transform lives in `MoveEffects`). A concurrent CHECK POKEMON reader enumerates
+  the prior list safely (one-tick staleness, same model already accepted for `Bag`/scalars). Corrected the
+  wrong "scalar fields only" comment in `GetPlayerCreature`. Behaviour-preserving (1081/1081 tests, seam
+  review CLEAN). Original analysis kept below for reference.
+- [ ] ~~**(A) original analysis**~~ *(code review, 2026-06-21).*
+  The battle runs on a background `Task.Run` (`GameSessionManager.AttachConnection`) while the web request thread
+  reads the live player via `GetPlayerCreature` → `PlayerOverviewDto.From`, which enumerates `c.MoveSet`
+  (`PlayerOverviewDto.cs:50`). `MoveSet` is a plain `List<PokemonAttack>` that the battle thread **structurally
+  mutates** — `MoveSet.Clear()`+`AddRange` in `Creature.RestoreOriginalIdentity` (`Creature.cs:259`, also fires
+  mid-battle via Haze→`ResetBattleState`), `Clear()`+`Add` in the Transform effect (`MoveEffects.cs:384`),
+  `AddAttack` (`Creature.cs:28`), `ReplaceMove` (`Creature.cs:57`). A `Clear`/`AddRange` racing the enumeration
+  throws `InvalidOperationException: Collection was modified`. Note the asymmetry: `Bag` already defends this exact
+  hazard (it's a `ConcurrentDictionary`, see `Bag.cs:16` + its class comment) — only `MoveSet` was left exposed,
+  and the `GetPlayerCreature` comment that claims "the battle thread only mutates scalar stat fields"
+  (`GameSessionManager.cs:151`) is factually wrong.
+  **Fix (lock-free copy-on-write, mirrors the staleness model already accepted for `Bag`/scalars):** make every
+  `MoveSet` mutation swing the reference to a new list instead of mutating in place — `AddAttack` →
+  `MoveSet = [.. MoveSet, new(attack)]`, `ReplaceMove` → rebuild+assign, `RestoreOriginalIdentity` →
+  `MoveSet = [.. snap.MoveSet]`, Transform → build+assign. Reference assignment is atomic and the property already
+  has a private setter, so a concurrent reader enumerates the old list safely (worst case: CHECK shows the
+  pre-mutation moveset for one tick — identical to the staleness `Bag` already accepts). Then delete/correct the
+  wrong "scalar fields only" comment. ~5 line-level edits; no locks.
+
+- [ ] **(B) `AttackAction.ExecuteAsync` is a ~400-line orchestrator** *(code review, 2026-06-21).* The registry
+  extractions (`IMoveEffect`, `ILockInMechanic`) already landed, but the method itself is still a long linear
+  pipeline. Two low-risk extractions roughly halve it: **(1)** pull the `switch (category)` damage block
+  (`AttackAction.cs:285–422` — multi-hit loop, drain, self-destruct, Super Fang, Psywave) into
+  `private int ResolveDamage(Attack move, DamageCategory category, int screenMult, out bool isCrit)` — ~140 lines,
+  clean inputs/outputs, biggest volume for least entanglement; **(2)** extract the pre-damage gate sequence
+  (OHKO-fail → accuracy+miss side-effects → thaw → type-immunity → crash-on-immunity → Dream-Eater precondition,
+  `:149–267`) into `ResolvePreDamageGates(...)` returning a small `{ Proceed, Halt }` result (a result record
+  carries the crash/self-destruct-faint side-effects). Leaves `ExecuteAsync` reading top-to-bottom: recharge →
+  lock-in → redirect → gates → resolve-damage → post-damage. **Stop there** — do *not* registry-ify
+  Metronome/Mirror Move or the lock-in orchestration: they're entangled with PP decrement + last-move recording
+  and the ordering is load-bearing; scattering them trades a long-but-linear method for action-at-a-distance.
+
+- [ ] **(C) Comment-density pass — "why, not what"** *(code review, 2026-06-21).* Comment volume (largely from the
+  AI implementation) is unusually high, concentrated in `AttackAction` and the effect classes. It's **more asset
+  than liability** — most of it encodes non-recoverable Gen 1 domain knowledge (Ghost→Psychic 0×, 255-always-miss,
+  "this check is on the seam because Gen 2 makes status moves respect immunity") and is the institutional memory
+  that stops a future change from reintroducing a quirk bug. **Keep all of that.** Cut/compress only: (i) lines that
+  restate the next statement; (ii) the Substitute-shield rationale, re-explained nearly in full in ~4 places —
+  consolidate to one canonical paragraph (on `DealDamageToTarget`) + one-line pointers; (iii) any comment
+  describing *other* code's behavior (the class that rots — see item D's `respondEvolution` note). Rule of thumb:
+  **a comment that can go stale without the local code changing is a liability.** Target ~30–40% volume reduction
+  with zero information loss; do **not** strip wholesale.
+
+- [ ] **(D) Minor batch** *(code review, 2026-06-21).* (i) `useBattleHub.ts:259` — `respondEvolution` carries a
+  copy-pasted comment describing "the Poké Center recovery offer" (wrong handler); fix the comment. (ii)
+  `PendingSession.Seed` (`GameSessionManager.cs`) is stored but never read — the run threads the `Rng`; the seed is
+  only logged at the controller. Drop the field or wire it where a seed (not the live RNG) is actually needed.
+  (iii) *(context, not a task)* The gitignored `*.db` concern from the review is **downgraded to a non-issue**: the
+  data-contract tests (`SecondaryChanceDataContractTests`) hardcode independent Gen 1 values and validate the
+  imported rows, so the fidelity truth lives in committed source + tests, not the derived `.db`. Only residual is
+  on-disk-cache *staleness* vs. importer source, which a re-import + those tests immediately catch. No action.
+
 - [ ] **`bag.ts` re-encodes the engine's effect registry** *(new, 2026-06-20 architecture pass).* The frontend
   `USABLE_CATEGORIES` set in `bag.ts:20` hardcodes which `ItemCategory`s are usable in battle — knowledge the
   backend already owns (`ItemEffects.For(category) != null`). When Ball/Revive get effects, **two places must
