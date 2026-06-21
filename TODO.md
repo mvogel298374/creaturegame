@@ -253,10 +253,17 @@ Battles are fully playable now — docs won't describe a moving target.
   the client filter on that flag. Single source of truth; same field-projection discipline as the rest of the
   wire. Low risk today (documented), but a drift seam to close before the acquisition cluster lands.
 
-- [ ] **RNG seam — only an optional test shim remains.** The per-run web seed, rules-RNG seeding, and the
-  engine `IRandomSource` thread are all closed/archived. *Optional, low priority:* replace the
-  `AlwaysHit`/`AlwaysCrit` rule shims with seeded `IRandomSource`s. **Do not re-file** "web composition root
-  builds runs unseeded" or "Roll* draws ignore the battle seed" — both closed.
+- [x] **RNG seam — CLOSED, nothing left to do (2026-06-21).** The per-run web seed, rules-RNG seeding, and the
+  engine `IRandomSource` thread are all done/archived. The lone remaining "optional" idea — replace the
+  `AlwaysHit`/`AlwaysCrit` rule shims with seeded `IRandomSource`s — was evaluated and **deliberately declined**:
+  it would be a regression, not a win. Those shims are test doubles that override the *seam members themselves*
+  (`GetHitThreshold => 256`, `GetCritChance => 1.0`) — the correct, fidelity-clean way to force an outcome. A
+  seed can't replace them cleanly because the draws aren't isolated: the accuracy roll shares `AttackAction._rng`
+  with the secondary-effect roll / Metronome pick, and crit (`NextDouble()` on that stream) vs. max variance
+  (`Next(217,256)` on `Gen1BattleRules`' *separate* inner `_rng`) can't both be forced from one seed. Replacing a
+  one-line rule override with per-draw rigged sources coupled to call order is strictly more fragile for zero
+  fidelity gain. **Do not re-file** this, "web composition root builds runs unseeded", or "Roll* draws ignore the
+  battle seed" — all closed.
 
 - **Architecture Review #7 — "Minor cleanups" — essentially DONE (2026-06-20).** None were correctness bugs;
   the goal was keeping complexity-concentrating files change-safe as Gen 2 lands.
