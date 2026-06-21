@@ -29,8 +29,7 @@ public sealed class GameSessionManager(
         IReadOnlyList<Attack> allMoves,
         Bag bag,
         IReadOnlyList<Item> allItems,
-        IRandomSource rng,
-        int seed
+        IRandomSource rng
     )
     {
         var gameId = Guid.NewGuid().ToString("N");
@@ -40,7 +39,6 @@ public sealed class GameSessionManager(
             bag,
             allItems,
             rng,
-            seed,
             DateTimeOffset.UtcNow
         );
         EvictExpiredPendingSessions();
@@ -98,7 +96,7 @@ public sealed class GameSessionManager(
         //
         // The run's single seeded RNG threads through every nondeterministic step — enemy construction
         // (species/level/DVs/moves), the battle rolls, and the AI's probabilistic move pick — so the whole
-        // run replays from session.Seed. It's safe to share one instance: the run is single-threaded and
+        // run replays from its seed (held as session.Rng). It's safe to share one instance: the run is single-threaded and
         // draws sequentially on this task.
         var runner = new BattleRunner(
             session.Player,
@@ -275,7 +273,6 @@ sealed record PendingSession(
     Bag Bag,
     IReadOnlyList<Item> AllItems,
     IRandomSource Rng,
-    int Seed,
     DateTimeOffset RegisteredAt
 );
 

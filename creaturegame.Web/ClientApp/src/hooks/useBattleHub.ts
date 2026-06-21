@@ -255,8 +255,8 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
       console.error('[SignalR] ForgetMove failed:', err));
   }, []);
 
-  // Answer the Poké Center recovery offer: true to heal, false to skip. Hide the modal at once (the backend is
-  // blocked on this answer); the resulting PlayerRecovered / RecoveryDeclined events drive the log + HP refill.
+  // Answer the evolution prompt: true to allow, false to cancel (Gen 1 B-cancel). Hide the modal at once (the
+  // backend is blocked on this answer); the resulting evolution events drive the log + sprite/stat refresh.
   const respondEvolution = useCallback((allow: boolean) => {
     dispatch({ type: 'HIDE_EVOLUTION_PROMPT' });
     connRef.current?.invoke('RespondEvolution', allow).catch(err =>

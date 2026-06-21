@@ -237,14 +237,14 @@ Battles are fully playable now — docs won't describe a moving target.
   left intact — they *are* the institutional knowledge the item says to keep, so compressing them would be
   net-negative. Comments-only; build + 1081/1081 unchanged.
 
-- [ ] **(D) Minor batch** *(code review, 2026-06-21).* (i) `useBattleHub.ts:259` — `respondEvolution` carries a
-  copy-pasted comment describing "the Poké Center recovery offer" (wrong handler); fix the comment. (ii)
-  `PendingSession.Seed` (`GameSessionManager.cs`) is stored but never read — the run threads the `Rng`; the seed is
-  only logged at the controller. Drop the field or wire it where a seed (not the live RNG) is actually needed.
-  (iii) *(context, not a task)* The gitignored `*.db` concern from the review is **downgraded to a non-issue**: the
-  data-contract tests (`SecondaryChanceDataContractTests`) hardcode independent Gen 1 values and validate the
-  imported rows, so the fidelity truth lives in committed source + tests, not the derived `.db`. Only residual is
-  on-disk-cache *staleness* vs. importer source, which a re-import + those tests immediately catch. No action.
+- [x] **(D) Minor batch** — **DONE (2026-06-22).** (i) Fixed `respondEvolution`'s copy-pasted comment in
+  `useBattleHub.ts` (it described the Poké Center recovery offer — the *next* handler — instead of the evolution
+  Allow/Cancel prompt). (ii) Dropped the dead `PendingSession.Seed` field: the run threads `Rng` and the seed is
+  logged + returned straight from `GameController`'s local, so the field was never read — removed it plus the
+  `RegisterSession(int seed)` param and its call-site arg, and corrected the prose `session.Seed` reference.
+  (iii) *(context, not a task)* The gitignored `*.db` concern stays a non-issue — the data-contract tests
+  (`SecondaryChanceDataContractTests`) hardcode independent Gen 1 values and validate the imported rows, so the
+  fidelity truth lives in committed source + tests, not the derived `.db`. No action. Build + 1081/1081 unchanged.
 
 - [ ] **`bag.ts` re-encodes the engine's effect registry** *(new, 2026-06-20 architecture pass).* The frontend
   `USABLE_CATEGORIES` set in `bag.ts:20` hardcodes which `ItemCategory`s are usable in battle — knowledge the
