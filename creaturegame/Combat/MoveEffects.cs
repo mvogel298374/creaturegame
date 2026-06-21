@@ -119,11 +119,10 @@ public sealed class BindingEffect : IMoveEffect
 
     public void Apply(MoveEffectContext ctx)
     {
-        // Gen 1 partial trap: on a hit, trap the VICTIM (it loses its turn for 2–5 turns, no residual
-        // chip) and lock THIS user into re-using the move each turn — BindingMechanic.ForcedMove reads
-        // the victim's counter to keep forcing it. Guarded so a forced continuation hit (the victim is
-        // still bound) doesn't re-roll the duration. Damage is recalculated per re-hit rather than
-        // locked to the first hit (a documented Gen 1 simplification).
+        // Gen 1 partial trap: on a hit, trap the VICTIM (loses its turn for 2–5 turns, no residual chip)
+        // and lock THIS user into re-using the move — BindingMechanic.ForcedMove reads the victim's counter
+        // to keep forcing it. Guarded so a forced continuation hit doesn't re-roll the duration. Damage is
+        // recalculated per re-hit, not locked to the first (a documented Gen 1 simplification).
         if (ctx.Target.Battle.BindingTurnsRemaining == 0 && ctx.Damage > 0 && ctx.Target.IsAlive())
         {
             ctx.Target.Battle.BindingTurnsRemaining = ctx.Rules.RollBindingTurns();
@@ -141,8 +140,7 @@ public sealed class PayDayEffect : IMoveEffect
 
     public void Apply(MoveEffectContext ctx)
     {
-        // Deals normal damage (handled above) and scatters coins on hit; the money is
-        // collected after the battle. No economy yet — the mechanic is the event.
+        // Coins are collected after the battle — no economy yet, so the event is the whole mechanic.
         ctx.Emitter?.Emit(
             new CoinsScattered(ctx.Source.Name, ctx.Rules.PayDayCoinMultiplier * ctx.Source.Level)
         );
@@ -156,7 +154,6 @@ public sealed class RecoilEffect : IMoveEffect
 
     public void Apply(MoveEffectContext ctx)
     {
-        // Take Down / Double-Edge: the user takes back a fraction of the damage it dealt.
         if (ctx.Damage > 0 && ctx.Source.IsAlive())
         {
             int recoil = ctx.Rules.CalculateRecoilDamage(ctx.Damage);
@@ -173,13 +170,10 @@ public sealed class DisableEffect : IMoveEffect
 
     public void Apply(MoveEffectContext ctx)
     {
-        // Disable locks one of the target's moves out of selection for several turns; it
-        // fails if the target already has a move disabled or has no usable move. The
-        // duration is gen-variable and lives on the seam (IBattleRules.RollDisableTurns).
-        // The *which move* picked is also gen-variable — Gen 1 & 2 choose a random PP-bearing
-        // move (below), Gen 3+ target the last-used move. We keep that choice inline and
-        // documented rather than on a single-use seam member we wouldn't vary until Gen 3.
-        // The lock is *enforced* at move-selection time (Battle/IBattleInput skip
+        // Disable locks one of the target's moves out for several turns; fails if it already has one
+        // disabled or no usable move. Duration is gen-variable ⇒ the seam (RollDisableTurns). *Which* move
+        // is also gen-variable (Gen 1/2 pick a random PP-bearing move, below; Gen 3+ the last-used) but kept
+        // inline until Gen 3 needs it. The lock is enforced at selection time (Battle/IBattleInput skip
         // DisabledMove); the counter ticks down end-of-turn (StatusResolver) and re-enables.
         if (ctx.Target.IsAlive() && ctx.Target.Battle.DisableTurnsRemaining == 0)
         {
@@ -202,17 +196,14 @@ public sealed class CounterEffect : IMoveEffect
 
     public void Apply(MoveEffectContext ctx)
     {
-        // Gen 1: returns double the damage the user last took from a Normal/Fighting move.
-        // The −5 priority (move data) resolves Counter after the opponent's hit, so it
-        // counters this turn's damage. Fails if no qualifying damage was taken — Gen 1 keeps
-        // the last value until overwritten, so this can fire off a previous turn (a quirk we
-        // preserve). Any damaging move records its type via DealDamageToTarget, so fixed and
-        // level-based Normal/Fighting moves (Sonic Boom, Seismic Toss, Super Fang) are now
-        // counterable; only Bide's unleash opts out. Whether a given last-damage type qualifies
-        // is gen-variable (Gen 1 keys on Normal/Fighting type; Gen 2+ on physical category), so
-        // it lives on the IBattleRules seam. Type immunity (Counter is Fighting ⇒ Ghost is
-        // immune) is handled by the pure-status immunity guard above — Counter has BaseDamage 0,
-        // so an immune target already short-circuited to MoveHadNoEffect and never reaches here.
+        // Gen 1: returns 2× the damage the user last took from a Normal/Fighting move. The −5 priority
+        // (move data) resolves Counter after the foe's hit. Fails if no qualifying damage was taken — Gen 1
+        // keeps the last value until overwritten, so it can fire off a previous turn (a quirk we preserve).
+        // Any damaging move records its type via DealDamageToTarget, so fixed/level-based Normal/Fighting
+        // moves (Sonic Boom, Seismic Toss, Super Fang) are counterable too; only Bide's unleash opts out.
+        // Which type qualifies is gen-variable (Gen 1: Normal/Fighting; Gen 2+: physical category) ⇒ the
+        // seam. Type immunity (Fighting ⇒ Ghost) is already handled by the pure-status guard above (Counter's
+        // BaseDamage 0 short-circuits to MoveHadNoEffect before here).
         if (
             ctx.Target.IsAlive()
             && ctx.Source.Battle.LastDamageTaken > 0
@@ -236,8 +227,7 @@ public sealed class MistEffect : IMoveEffect
 
     public void Apply(MoveEffectContext ctx)
     {
-        // Mist shrouds the user; the opponent can't lower its stats until the battle ends
-        // (enforced in TryApplyStatEffect). Self-targeting, no damage.
+        // Self-targeting; the opponent's stat-drops are then blocked in TryApplyStatEffect.
         if (!ctx.Source.Battle.HasMist)
         {
             ctx.Source.Battle.HasMist = true;
@@ -253,7 +243,6 @@ public sealed class ReflectEffect : IMoveEffect
 
     public void Apply(MoveEffectContext ctx)
     {
-        // Doubles the user's Defense vs physical damage until the battle ends (self-targeting).
         if (!ctx.Source.Battle.HasReflect)
         {
             ctx.Source.Battle.HasReflect = true;
@@ -269,7 +258,6 @@ public sealed class LightScreenEffect : IMoveEffect
 
     public void Apply(MoveEffectContext ctx)
     {
-        // Doubles the user's Special vs special damage until the battle ends (self-targeting).
         if (!ctx.Source.Battle.HasLightScreen)
         {
             ctx.Source.Battle.HasLightScreen = true;
@@ -285,7 +273,7 @@ public sealed class FocusEnergyEffect : IMoveEffect
 
     public void Apply(MoveEffectContext ctx)
     {
-        // Self-targeting crit modifier — Gen 1's bugged ÷4 is applied in Gen1BattleRules.GetCritChance.
+        // The bugged ÷4 itself is applied in Gen1BattleRules.GetCritChance.
         if (!ctx.Source.Battle.HasFocusEnergy)
         {
             ctx.Source.Battle.HasFocusEnergy = true;
@@ -301,8 +289,7 @@ public sealed class HealEffect : IMoveEffect
 
     public void Apply(MoveEffectContext ctx)
     {
-        // Recover / Soft-Boiled: restore a fraction of max HP to the user (capped at max by
-        // ReceiveHealing). The heal fraction is gen-variable, so it comes from the rules seam.
+        // The heal fraction is gen-variable, so it comes from the rules seam (ReceiveHealing caps at max).
         if (ctx.Source.IsAlive())
         {
             int hpBefore = ctx.Source.Attributes.HP;
@@ -330,10 +317,9 @@ public sealed class MimicEffect : IMoveEffect
 
     public void Apply(MoveEffectContext ctx)
     {
-        // Gen 1: copy a random move from the target's set; it replaces Mimic for the rest of
-        // the battle (Battle restores it on battle end). The user only copies this turn — no
-        // damage — then can use the copied move on later turns. Fails if already mimicked or
-        // the target has no copyable move.
+        // Gen 1: copy a random move from the target's set; it replaces Mimic for the rest of the battle
+        // (Battle restores it on end). Copying is this turn's action (no damage); the move is usable on
+        // later turns. Fails if already mimicked or the target has no copyable move.
         if (
             ctx.Target.IsAlive()
             && ctx.SelectedMove != null
@@ -364,12 +350,11 @@ public sealed class TransformEffect : IMoveEffect
 
     public void Apply(MoveEffectContext ctx)
     {
-        // Gen 1: the user becomes a copy of the target — its types, the four non-HP battle
-        // stats, current stat stages, SpeciesId and full moveset (each copied move at 5 PP, or
-        // the move's max if lower). HP, MaxHP and level stay the user's. The change is undone at
-        // battle end (RestoreOriginalIdentity, via ResetBattleState). Self-affecting copy, no
-        // damage; fails on a fainted target. The snapshot is taken before mutating so the
-        // original can be restored even if Conversion later changes the type too.
+        // Gen 1: the user becomes a copy of the target — types, the four non-HP stats, current stat stages,
+        // SpeciesId and full moveset (each copied move at 5 PP, or its max if lower). HP/MaxHP/level stay the
+        // user's. Undone at battle end (RestoreOriginalIdentity via ResetBattleState). Self-affecting, no
+        // damage; fails on a fainted target. Snapshot taken before mutating so the original survives even if
+        // Conversion later changes the type too.
         if (ctx.Target.IsAlive())
         {
             ctx.Source.SnapshotIdentityForMutation();
@@ -404,11 +389,10 @@ public sealed class ConversionEffect : IMoveEffect
 
     public void Apply(MoveEffectContext ctx)
     {
-        // Gen 1: the user copies the target's types onto itself (Gen 2+ instead changes to the
-        // type of one of the user's own moves — a different mechanic, so the Gen 1 behavior is
-        // kept inline and documented rather than abstracted onto a seam we couldn't exercise
-        // until Gen 2). Self-affecting, no damage; undone at battle end like Transform. Snapshot
-        // first so Transform-then-Conversion still restores the true original.
+        // Gen 1: the user copies the target's types (Gen 2+ instead picks one of the user's own moves' type
+        // — a different mechanic, kept inline until Gen 2 can exercise a seam). Self-affecting, no damage;
+        // undone at battle end like Transform. Snapshot first so Transform-then-Conversion still restores the
+        // true original.
         if (ctx.Target.IsAlive())
         {
             ctx.Source.SnapshotIdentityForMutation();
@@ -428,11 +412,10 @@ public sealed class RestEffect : IMoveEffect
 
     public void Apply(MoveEffectContext ctx)
     {
-        // Gen 1: the user fully restores HP, cures any major status, then forces itself asleep
-        // for a fixed number of turns (the duration is gen-variable ⇒ IBattleRules.RestSleepTurns,
-        // distinct from the random RollSleepTurns). Fails if already at full HP — a state
-        // precondition not met, so it reuses MoveMissed like Counter/Dream Eater, not the
-        // type-based MoveHadNoEffect. Self-targeting, so the foe-immunity guard never blocks it.
+        // Gen 1: fully restore HP, cure any major status, then force sleep for a fixed number of turns
+        // (gen-variable ⇒ RestSleepTurns, distinct from the random RollSleepTurns). Fails if already at full
+        // HP — a state precondition, so it reuses MoveMissed like Counter/Dream Eater, not the type-based
+        // MoveHadNoEffect. Self-targeting ⇒ the foe-immunity guard never blocks it.
         if (ctx.Source.Attributes.HP >= ctx.Source.Attributes.MaxHP)
         {
             ctx.Emitter?.Emit(new MoveMissed(ctx.Source.Name, ctx.Attack.Name ?? ""));
@@ -455,12 +438,11 @@ public sealed class SubstituteEffect : IMoveEffect
 
     public void Apply(MoveEffectContext ctx)
     {
-        // Gen 1: spend floor(maxHP/4) HP to raise a decoy with floor(maxHP/4)+1 HP that soaks
-        // the foe's hits (absorption handled in DealDamageToTarget; status/stat shielding in the
-        // Try* methods). Fails if a Substitute is already up or the user can't pay (current HP ≤
-        // the cost) — a state precondition, so it reuses MoveMissed like Counter/Rest. The ¼ cost
-        // is gen-invariant (¼ in every generation; litmus "would Gen 2 change it?" → no), so it's
-        // inline rather than on the seam. Self-targeting ⇒ the foe-immunity guard never blocks it.
+        // Gen 1: spend floor(maxHP/4) HP to raise a decoy with floor(maxHP/4)+1 HP that soaks the foe's hits
+        // (absorption in DealDamageToTarget; status/stat shielding in the Try* methods). Fails if one is
+        // already up or the user can't pay (HP ≤ cost) — a state precondition, so it reuses MoveMissed like
+        // Counter/Rest. The ¼ cost is gen-invariant (litmus "would Gen 2 change it?" → no) ⇒ inline, not the
+        // seam. Self-targeting ⇒ the foe-immunity guard never blocks it.
         if (ctx.Source.Battle.SubstituteHp > 0)
         {
             ctx.Emitter?.Emit(new MoveMissed(ctx.Source.Name, ctx.Attack.Name ?? ""));
@@ -485,10 +467,7 @@ public sealed class SplashEffect : IMoveEffect
 
     public void Apply(MoveEffectContext ctx)
     {
-        // Splash does nothing by design — Gen 1's "But nothing happened!". It's a no-op
-        // move (no damage, no status, no stat change), so the only observable behavior is
-        // the message. Invariant across generations, so it stays inline rather than on the
-        // rules seam.
+        // No-op by design; invariant across generations, so it stays inline rather than on the seam.
         ctx.Emitter?.Emit(new ButNothingHappened(ctx.Source.Name));
     }
 }
@@ -500,11 +479,10 @@ public sealed class ConfuseEffect : IMoveEffect
 
     public void Apply(MoveEffectContext ctx)
     {
-        // Confusion is independent of major status (a creature can be both). Gen 1
-        // confusion doesn't stack — only applies if the target isn't already confused.
-        // EffectChance gates secondary confusion on damaging moves (Psybeam 10%);
-        // pure confusion moves (Supersonic, Confuse Ray) have no chance ⇒ always land.
-        // A Substitute shields the user from the foe's confusion while it stands (Gen 1).
+        // Confusion is independent of major status (both can apply) and doesn't stack (Gen 1: only if not
+        // already confused). EffectChance gates secondary confusion on damaging moves (Psybeam 10%); pure
+        // confusion moves (Supersonic, Confuse Ray) have no chance ⇒ always land. A Substitute shields the
+        // foe's confusion while it stands (Gen 1).
         if (
             ctx.Target.IsAlive()
             && ctx.Target.Battle.ConfusedTurns == 0

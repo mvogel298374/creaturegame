@@ -204,12 +204,11 @@ public sealed class BideMechanic : ILockInMechanic
 
 /// <summary>
 /// Binding (Wrap, Bind, Clamp, Fire Spin): Gen 1 partial trap. The binder is locked into re-using the move
-/// every turn — dealing its damage — while the trapped foe can't act ("neither the user nor the target will
-/// be able to select moves"). The trap is STARTED on a hit by <see cref="AttackAction"/> (it sets the victim's
-/// <c>BindingTurnsRemaining</c> and this binder's <c>BindingMove</c>/<c>BindingTarget</c>); this mechanic only
-/// force-repeats the move while the victim's counter is alive. That counter — ticked down end-of-turn — is the
-/// single source of truth for the duration, so the binder is freed automatically when the trap expires (or the
-/// victim faints). Unlike rampage, there is NO residual chip and the lock begins on hit, not on commit.
+/// each turn (dealing its damage) while the trapped foe can't act. <see cref="AttackAction"/> STARTS the trap
+/// on a hit (setting the victim's <c>BindingTurnsRemaining</c> + this binder's <c>BindingMove</c>/
+/// <c>BindingTarget</c>); this mechanic only force-repeats while the victim's counter is alive. That counter —
+/// ticked down end-of-turn — is the single source of truth, so the binder is freed automatically when it
+/// expires (or the victim faints). Unlike rampage, there's NO residual chip and the lock begins on hit, not commit.
 /// </summary>
 public sealed class BindingMechanic : ILockInMechanic
 {

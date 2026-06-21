@@ -280,24 +280,20 @@ public interface IBattleRules
     bool CanReceiveStatus(Creature target, StatusCondition status, DamageType moveType);
 
     /// <summary>
-    /// Whether a <i>non-damaging</i> move consults the target's type immunity (a 0× matchup ⇒ "it
-    /// doesn't affect …"). This is the move-type-vs-target-type check, distinct from the status-vs-type
-    /// check in <see cref="CanReceiveStatus"/>.
+    /// Whether a <i>non-damaging</i> move consults the target's type immunity (a 0× matchup ⇒ "it doesn't
+    /// affect …") — distinct from the status-vs-type check in <see cref="CanReceiveStatus"/>.
     /// <para>
-    /// Gen 1: almost no status move checks it — Confuse Ray confuses a Normal-type, Glare paralyses a
-    /// Ghost, Supersonic confuses a Ghost, Growl lowers a Ghost's Attack, sleep/Disable land regardless
-    /// of type. Only Thunder Wave (the lone immunity-checked status move: Electric ⇒ a Ground-type is
-    /// immune) and Counter (reflects damage ⇒ a Ghost takes none of its Fighting type) return true.
-    /// Gen 2 makes status moves respect type immunity generally (e.g. Glare can no longer hit Ghosts),
-    /// so this is a seam member rather than a hardcoded engine check.
+    /// Gen 1: almost no status move checks it — Confuse Ray/Supersonic confuse a Ghost, Glare paralyses a
+    /// Ghost, Growl lowers a Ghost's Attack, sleep/Disable land regardless of type. Only Thunder Wave
+    /// (Electric ⇒ Ground is immune) and Counter (reflects damage ⇒ Ghost takes none of its Fighting type)
+    /// return true. Gen 2 makes status moves respect immunity generally ⇒ seam, not a hardcoded check.
+    /// Damaging moves are unaffected (they fold 0× into zero damage regardless).
     /// </para>
-    /// Damaging moves are unaffected — they always fold 0× into zero damage regardless of this.
     /// <para>
-    /// Implementations may key off the move's status/effect/type instead of an explicit foe-direction
-    /// flag, which is only safe because every qualifying move is inherently foe-directed (Thunder Wave
-    /// and Counter both hit the opponent). A future move that returns true here MUST be foe-directed —
-    /// the engine applies the result against the <i>target's</i> type — so don't add a self-targeting
-    /// move to the qualifying set without also re-adding a target-direction guard.
+    /// Implementations may key off the move's status/effect/type rather than a foe-direction flag — safe
+    /// only because every qualifying move (Thunder Wave, Counter) is inherently foe-directed. A future move
+    /// returning true here MUST be foe-directed (the result is applied against the <i>target's</i> type), or
+    /// re-add a target-direction guard.
     /// </para>
     /// </summary>
     bool PureStatusMoveChecksTypeImmunity(Attack move);

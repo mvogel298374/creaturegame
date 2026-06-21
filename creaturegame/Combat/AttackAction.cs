@@ -14,9 +14,8 @@ public class AttackAction : IBattleAction
     private readonly IReadOnlyList<Attack> _movePool;
     private readonly IRandomSource _rng;
 
-    // Whether the Target had a Substitute up at the moment this move connected — captured before the
-    // damage is applied so the shield still blocks the secondary on the exact hit that breaks the decoy
-    // (Gen 1: that hit struck the substitute, so its status/stat/confusion doesn't reach the user).
+    // Whether the Target had a Substitute up when this move connected — snapshotted pre-damage so a
+    // secondary is still shielded on the very hit that breaks the decoy (Gen 1: that hit struck the sub).
     private bool _targetShieldedAtImpact;
 
     // Null means Struggle — Battle passes null when the source has no selectable move
@@ -61,9 +60,8 @@ public class AttackAction : IBattleAction
         bool usingStruggle = _selectedMove == null;
         Attack attackToUse = usingStruggle ? Source.Struggle : _selectedMove!.Base;
 
-        // Lock-in mechanics (two-turn, rampage, rage, bide) own their own per-turn flow — charging,
-        // storing, unleashing, self-confusing — behind ILockInMechanic, rather than being branched
-        // inline here. A non-lock-in move (or Struggle) resolves with lockIn == null.
+        // Lock-in mechanics (two-turn, rampage, rage, bide) own their per-turn flow — charge/store/
+        // unleash/self-confuse — behind ILockInMechanic. A non-lock-in move (or Struggle) leaves lockIn null.
         ILockInMechanic? lockIn = usingStruggle ? null : LockInMechanics.For(attackToUse.Effect);
         bool isLockedInContinuation = lockIn?.IsLockedIn(Source) ?? false;
         LockInContext? lockCtx = lockIn is null
@@ -89,10 +87,9 @@ public class AttackAction : IBattleAction
 
         _emitter?.Emit(new MoveUsed(Source.Name, attackToUse.Name ?? ""));
 
-        // Remember the move actually used so the opponent's Mirror Move can copy it. Metronome and
-        // Mirror Move themselves aren't recorded here — the move they *call* records itself via its
-        // inner action — so neither can ever be the foe's LastMoveUsed (that's why the Mirror Move
-        // filter below only has to exclude Struggle, not them).
+        // Remember the move actually used so the foe's Mirror Move can copy it. Metronome / Mirror Move
+        // don't record themselves — the move they *call* does — so neither is ever the foe's LastMoveUsed
+        // (hence the Mirror Move filter below only excludes Struggle, not them).
         if (
             !usingStruggle
             && attackToUse.Effect is not (MoveEffect.Metronome or MoveEffect.MirrorMove)
@@ -131,12 +128,10 @@ public class AttackAction : IBattleAction
             return Task.CompletedTask;
         }
 
-        // Mirror Move: re-execute the opponent's last used move. Like Metronome, the copied move runs in
-        // full through its own inner action (which records it as this creature's last move). Fails if the
-        // foe hasn't used a copyable move yet. Metronome/Mirror Move are never recorded as a LastMoveUsed
-        // (see above), so only Struggle needs excluding here. Copying a lock-in move is valid Gen 1
-        // behavior: Bide starts a fresh commitment, and a two-turn move (Fly) charges then auto-releases
-        // through the normal lock-in path on this user.
+        // Mirror Move: re-run the foe's last move in full (through its own inner action, which records it
+        // as this user's last move). Fails if the foe has no copyable move yet; only Struggle is excluded
+        // (see above). Copying a lock-in move is valid Gen 1 — Bide starts a fresh commitment, and a
+        // two-turn move (Fly) charges then auto-releases through the normal lock-in path on this user.
         if (!usingStruggle && attackToUse.Effect == MoveEffect.MirrorMove)
         {
             var last = Target.Battle.LastMoveUsed;
@@ -148,21 +143,18 @@ public class AttackAction : IBattleAction
 
         var category = usingStruggle ? DamageCategory.Standard : attackToUse.DamageCategory;
 
-        // Pre-damage gates (OHKO success, accuracy + miss side-effects, thaw, type immunity, crash-on-
-        // immunity, Dream Eater precondition). Halt ends the turn (the gate already emitted the
-        // miss/no-effect event and applied any miss side-effects); otherwise it reports whether the
-        // target was thawed, which the post-damage status step needs.
+        // Pre-damage gates (OHKO / accuracy+miss-effects / thaw / immunity / crash / Dream Eater — see
+        // ResolvePreDamageGates). Halt ends the turn; otherwise JustThawed feeds the post-damage status step.
         var gate = ResolvePreDamageGates(attackToUse, category, usingStruggle, lockIn, lockCtx);
         if (!gate.Proceed)
             return Task.CompletedTask;
         bool justThawed = gate.JustThawed;
 
-        // Snapshot the Substitute shield before any damage is applied: a secondary effect is blocked
-        // if the Target was behind a decoy when the move landed, even if that same hit shatters it.
+        // Snapshot the shield state before any damage lands (see the _targetShieldedAtImpact field).
         _targetShieldedAtImpact = Target.Battle.SubstituteHp > 0;
 
-        // Reflect (vs physical) / Light Screen (vs special) double the defender's defensive stat while
-        // up; the calculator ignores it on a crit. Computed once and passed into every damage call.
+        // Reflect (physical) / Light Screen (special) double the defender's defensive stat while up
+        // (ignored on a crit); computed once and passed into every damage call.
         int screenMult =
             (attackToUse.AttackType == AttackType.Physical && Target.Battle.HasReflect)
             || (attackToUse.AttackType == AttackType.Special && Target.Battle.HasLightScreen)
@@ -194,10 +186,9 @@ public class AttackAction : IBattleAction
         return Task.CompletedTask;
     }
 
-    // Outcome of the pre-damage gate sequence. Proceed == false means the turn is over: the gate has
-    // already emitted the miss / no-effect event and applied any miss-time side-effects (Self-Destruct
-    // faint, Jump Kick crash, the rampage turn-count tick). JustThawed flows back so the post-damage
-    // status step can tell whether this move just thawed the target (it then skips re-freezing logic).
+    // Outcome of the pre-damage gates. Proceed == false ends the turn — the gate already emitted the
+    // miss / no-effect event and applied any miss-time side-effects (Self-Destruct faint, Jump Kick crash,
+    // rampage tick). JustThawed feeds the post-damage status step (it skips status the turn we thawed).
     private readonly record struct PreDamageGateResult(bool Proceed, bool JustThawed)
     {
         public static readonly PreDamageGateResult Halt = new(false, false);
@@ -205,12 +196,10 @@ public class AttackAction : IBattleAction
         public static PreDamageGateResult Continue(bool justThawed) => new(true, justThawed);
     }
 
-    // The gauntlet a move must clear before damage is resolved, in Gen 1 order: OHKO success rule →
-    // accuracy roll (with the on-miss Self-Destruct faint / Jump Kick crash / rampage tick) → freeze
-    // thaw → type-immunity wall → Jump Kick crash on a type-immune target → Dream Eater's sleeping-target
-    // precondition. Each failing gate emits its own outcome event and returns Halt; clearing them all
-    // returns Continue carrying the thaw flag. Side-effects stay here (not on a result record) because
-    // the gate owns the emitter/rules and the caller would otherwise have to re-derive each one.
+    // The gauntlet a move clears before damage, in Gen 1 order: OHKO success → accuracy (with on-miss
+    // Self-Destruct faint / Jump Kick crash / rampage tick) → freeze thaw → type-immunity wall → Jump Kick
+    // crash on immunity → Dream Eater sleep precondition. Each failing gate emits its outcome and returns
+    // Halt. Side-effects stay here (not on the result) since the gate owns the emitter/rules.
     private PreDamageGateResult ResolvePreDamageGates(
         Attack move,
         DamageCategory category,
@@ -219,9 +208,8 @@ public class AttackAction : IBattleAction
         LockInContext? lockCtx
     )
     {
-        // OHKO: fails (not just misses) per the generation's success rule — Gen 1 fails when the
-        // target out-speeds the user (the level check is a Gen 2+ rule). The condition is gen-variable
-        // so it lives on the seam, not inline here. Independent of the accuracy roll below.
+        // OHKO *fails* (not misses) by the gen's success rule — Gen 1: fails if the target out-speeds the
+        // user (the level check is Gen 2+). Gen-variable ⇒ on the seam. Independent of the accuracy roll.
         if (category == DamageCategory.OHKO && !_rules.OneHitKoSucceeds(Source, Target))
         {
             _emitter?.Emit(new MoveMissed(Source.Name, move.Name ?? ""));
@@ -266,21 +254,17 @@ public class AttackAction : IBattleAction
             justThawed = true;
         }
 
-        // Gen 1: a target immune to the move's type takes nothing — even from moves that bypass the
-        // normal damage calc (fixed / level-based / OHKO / Super Fang) and from pure-status moves
-        // (Thunder Wave is Electric, so a Ground-type is immune). A damaging Standard/Drain move
-        // already folds 0× into its damage (DamageDealt at 0), and Self-Destruct still detonates the
-        // user — both are excluded here.
+        // Gen 1: a target immune to the move's type takes nothing — including moves that bypass the normal
+        // calc (fixed / level-based / OHKO / Super Fang) and pure-status moves (Thunder Wave is Electric ⇒
+        // Ground is immune). Damaging Standard/Drain folds 0× into 0 damage, and Self-Destruct still
+        // detonates the user — both excluded here.
         bool isPureStatusMove =
             category == DamageCategory.Standard && !usingStruggle && move.BaseDamage == 0;
-        // Gen 1: a non-damaging move almost always IGNORES the target's type immunity — Confuse Ray
-        // confuses a Normal-type, Glare paralyses a Ghost, Growl lowers a Ghost's Attack, sleep / Disable
-        // land regardless of the move's type matchup. Only Thunder Wave and Counter still consult the
-        // chart, and which moves do is gen-variable (Gen 2 makes status moves respect immunity), so the
-        // decision lives on IBattleRules, not inline. (Self-targeting moves — Recover, Swords Dance, Mist,
-        // Mimic, Transform … — never consult the foe's type, so the seam never returns true for them; and
-        // Leech Seed vs Grass / "Poison can't be poisoned" have their own immunity via CanBeLeechSeeded /
-        // CanReceiveStatus.) Damaging moves are unaffected: they fold 0× into zero damage below.
+        // Gen 1: a non-damaging move almost always IGNORES type immunity — Confuse Ray confuses a Normal-
+        // type, Glare paralyses a Ghost, Growl / sleep / Disable land regardless of matchup. Only Thunder
+        // Wave and Counter still consult the chart, and which do is gen-variable (Gen 2 makes status moves
+        // respect immunity) ⇒ on IBattleRules. (Self-targeting moves never check the foe's type; Leech Seed
+        // vs Grass and "Poison can't be poisoned" have their own immunity via CanBeLeechSeeded/CanReceiveStatus.)
         bool pureStatusChecksImmunity = _rules.PureStatusMoveChecksTypeImmunity(move);
         double typeImmunity = DamageCalculator.GetTypeEffectiveness(
             move.DamageType,
@@ -305,10 +289,9 @@ public class AttackAction : IBattleAction
             return PreDamageGateResult.Halt;
         }
 
-        // Gen 1: Jump Kick / Hi Jump Kick crash the user on a type immunity (Fighting → Ghost = 0×),
-        // not only on an accuracy miss. These are Standard-category moves, so they slip past the
-        // immunity block above (which excludes Standard, since it normally folds 0× into 0 damage) and
-        // would otherwise whiff harmlessly. Mirror the miss branch: announce no-effect, then crash.
+        // Gen 1: Jump Kick / Hi Jump Kick also crash on a type immunity (Fighting → Ghost 0×), not just an
+        // accuracy miss. They're Standard-category so they slip past the immunity block above (which excludes
+        // Standard) and would otherwise whiff harmlessly. Mirror the miss branch: announce no-effect, then crash.
         if (move.Effect == MoveEffect.Crash && typeImmunity == 0)
         {
             _emitter?.Emit(new MoveHadNoEffect(Target.Name, move.Name ?? ""));
@@ -318,13 +301,10 @@ public class AttackAction : IBattleAction
             return PreDamageGateResult.Halt;
         }
 
-        // Dream Eater only works on a sleeping target; against anything else it fails (no damage, no
-        // heal). This requirement is invariant across generations — it's a property of the move, not a
-        // gen-variable rule — so it's checked here rather than on the IBattleRules seam. The 50% drain
-        // heal rides on the normal Drain category once the target is confirmed asleep. The failure is a
-        // *state* precondition not met (target awake), like Counter having no damage to return — so it
-        // reuses MoveMissed, the established path for that, not MoveHadNoEffect (which is the type-based
-        // "doesn't affect" line for immunities).
+        // Dream Eater only works on a sleeping target; else it fails (no damage, no heal). Invariant across
+        // gens (a property of the move, not a rule) ⇒ inline, not on the seam. The 50% drain heal rides the
+        // Drain category once sleep is confirmed. The failure is a *state* precondition (target awake), like
+        // Counter with no damage to return — so it reuses MoveMissed, not the type-based MoveHadNoEffect.
         if (move.Effect == MoveEffect.DreamEater && Target.Battle.Status != StatusCondition.Sleep)
         {
             _emitter?.Emit(new MoveMissed(Source.Name, move.Name ?? ""));
@@ -334,11 +314,9 @@ public class AttackAction : IBattleAction
         return PreDamageGateResult.Continue(justThawed);
     }
 
-    // Resolves the move's damage for its DamageCategory and applies it to the Target via
-    // DealDamageToTarget (so the Substitute soak, Counter recording and Bide accumulation all stay
-    // centralized in one place). Returns the total damage dealt — the figure ExecuteAsync gates Struggle
-    // recoil, the Drain heal and the Hyper Beam recharge on. Runs only after ResolvePreDamageGates has
-    // cleared the move to connect.
+    // Resolves the move's damage by category and applies it via DealDamageToTarget (so the Substitute soak,
+    // Counter recording and Bide accumulation stay centralized). Returns the total dealt — what ExecuteAsync
+    // gates Struggle recoil, the Drain heal and the Hyper Beam recharge on. Runs after the gates clear.
     private int ResolveDamage(
         Attack move,
         DamageCategory category,
@@ -363,11 +341,10 @@ public class AttackAction : IBattleAction
                         _typeChart
                     );
 
-                    // Multi-hit (Double Slap, Comet Punch, …): accuracy was already rolled once
-                    // above; each of the 2–5 strikes rolls its own crit + variance and stops if
-                    // the target faints. Normal moves take the hits == 1 path (identical output).
-                    // Fixed-count movers (Double Kick = 2) carry the count as move data; variable
-                    // movers (Double Slap) leave it null and draw the 2–5 count from the gen rules.
+                    // Multi-hit (Double Slap, …): accuracy was rolled once above; each of the 2–5 strikes
+                    // rolls its own crit + variance and stops if the target faints (a normal move = the
+                    // hits==1 path, same output). Fixed-count movers (Double Kick = 2) carry the count as
+                    // data; variable movers leave it null and draw the 2–5 count from the gen rules.
                     bool isMultiHit = !usingStruggle && move.Effect == MoveEffect.MultiHit;
                     int hits = isMultiHit ? (move.MultiHitCount ?? _rules.RollMultiHitCount()) : 1;
 
@@ -394,9 +371,8 @@ public class AttackAction : IBattleAction
                     if (isMultiHit)
                         _emitter?.Emit(new MultiHitCompleted(landed));
 
-                    // Rage: a raging creature that just got hit gains Attack stage(s). Triggered
-                    // off the standard damage path only (the same boundary as Counter) — once per
-                    // connecting attack, not per multi-hit strike, and only when the hit reached the
+                    // Rage: a raging creature that's hit gains Attack stage(s) — once per connecting attack
+                    // (the Counter boundary), not per multi-hit strike, and only when the hit reached the
                     // creature itself (a Substitute soak doesn't enrage it). Reuses StatStageChanged.
                     if (dealtRealDamage && Target.Battle.IsRaging && Target.IsAlive())
                     {
@@ -444,10 +420,9 @@ public class AttackAction : IBattleAction
 
             case DamageCategory.SelfDestruct:
             {
-                // Gen 1: the target's Defense is halved before damage calculation, making
-                // Explosion/Self-Destruct significantly stronger. The divisor is gen-variable
-                // (dropped in Gen 5+), so it comes from the rules seam and is passed into the
-                // calculator — we no longer mutate-and-restore the creature's real stats.
+                // Gen 1: the target's Defense is halved before the calc, making Explosion/Self-Destruct much
+                // stronger. The divisor is gen-variable (gone in Gen 5+) ⇒ from the seam, passed into the
+                // calculator — no longer mutate-and-restore the creature's real stats.
                 double eff = DamageCalculator.GetTypeEffectiveness(
                     move.DamageType,
                     Target.Type1,
@@ -489,9 +464,8 @@ public class AttackAction : IBattleAction
         return damage;
     }
 
-    // Runs another move in full as this turn's action — used by Metronome and Mirror Move, which call a
-    // move chosen at runtime. The move runs through a fresh AttackAction on a temporary wrapper (so the
-    // creature's own PP/moveset is untouched) and records itself as the user's last move.
+    // Runs another move in full as this turn's action (Metronome / Mirror Move). A fresh AttackAction on a
+    // temporary wrapper leaves the creature's own PP/moveset untouched and records it as the user's last move.
     private Task ExecuteInner(Attack move) =>
         new AttackAction(
             Source,
@@ -511,18 +485,15 @@ public class AttackAction : IBattleAction
             Target.Battle.BideDamageAccumulated += dmg;
     }
 
-    // Applies <paramref name="dmg"/> to the Target, honoring an active Substitute. Gen 1: while a
-    // Substitute stands, the decoy soaks the whole hit — the user's HP is untouched and any overflow is
-    // lost (it does NOT carry through to the user, even from an OHKO). Returns true when the real
-    // creature took the damage (so a caller can run on-real-hit follow-ups like Rage), false when the
-    // Substitute absorbed it. Every damage category routes through here so the soak can't be missed by
-    // one branch (the recurring "hook added to only the Standard path" defect).
+    // Applies <paramref name="dmg"/> to the Target, honoring an active Substitute. Gen 1: while a Substitute
+    // stands the decoy soaks the whole hit — the user's HP is untouched and overflow is lost (it does NOT
+    // carry through, even from an OHKO). Returns true when the real creature took the hit (so a caller can
+    // run on-real-hit follow-ups like Rage), false when the sub absorbed it. Every damage category routes
+    // through here so the soak can't be missed by one branch (the recurring "hook on only Standard" defect).
     //
-    // <paramref name="counterableType"/> is the move's type when the hit should be recordable for the
-    // target's Counter (the value Counter reads back as 2× the last Normal/Fighting damage taken). It's
-    // recorded centrally here — gated on real damage landing — so every damaging category (Standard,
-    // Fixed, level-based, OHKO, Self-Destruct, Super Fang, Psywave) is counterable through one path, not
-    // just the Standard loop. Callers that must stay non-counterable (Bide's unleash) pass null.
+    // <paramref name="counterableType"/> is the move's type when the hit is recordable for the target's
+    // Counter (read back as 2× the last Normal/Fighting damage). Recorded centrally here, gated on real
+    // damage, so every damaging category is counterable through one path; callers that must not be (Bide) pass null.
     private bool DealDamageToTarget(
         int dmg,
         double effectiveness,
@@ -564,9 +535,8 @@ public class AttackAction : IBattleAction
         return true;
     }
 
-    // True while a foe-directed secondary (status, stat-drop, confusion) should be blocked because the
-    // Target is hiding behind a Substitute — Gen 1: the decoy shields the user from the opponent's
-    // status and stat changes while it stands.
+    // The shield flag consumed by the foe-directed secondaries (status / stat-drop / confusion);
+    // see the _targetShieldedAtImpact field for the Gen 1 rationale.
     private bool TargetShieldedBySubstitute => _targetShieldedAtImpact;
 
     private void TryApplyStatus(Attack attack)
@@ -637,11 +607,9 @@ public class AttackAction : IBattleAction
         _emitter?.Emit(new StatStageChanged(affected.Name, se.Stat.ToString(), se.Delta, newStage));
     }
 
-    // Post-damage move effects (Haze, Counter, Reflect, Transform, Rest, Substitute …) each live behind
-    // IMoveEffect in the MoveEffects registry, keyed by MoveEffect — mirroring the ILockInMechanic /
-    // LockInMechanics.For pattern. Exactly one effect runs per move; a move with no post-damage effect
-    // resolves to null. The effect reaches the shared damage helper through the context's DealDamage
-    // delegate so the Substitute soak / Bide accumulation / Counter recording stay centralized here.
+    // Post-damage move effects (Haze, Counter, Reflect, Transform, Rest, Substitute …) live behind
+    // IMoveEffect in the MoveEffects registry, keyed by MoveEffect (mirroring LockInMechanics.For). One
+    // runs per move; the context's DealDamage delegate keeps the soak / Bide / Counter recording centralized.
     private void TryApplyMoveEffect(Attack attack, int damage)
     {
         var effect = MoveEffects.For(attack.Effect);

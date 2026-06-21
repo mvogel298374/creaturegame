@@ -224,16 +224,18 @@ Battles are fully playable now — docs won't describe a moving target.
   multi-hit/Struggle branches need it). Metronome/Mirror-Move + lock-in orchestration left untouched, as the
   note required. Seam review CLEAN, 1081/1081 tests.
 
-- [ ] **(C) Comment-density pass — "why, not what"** *(code review, 2026-06-21).* Comment volume (largely from the
-  AI implementation) is unusually high, concentrated in `AttackAction` and the effect classes. It's **more asset
-  than liability** — most of it encodes non-recoverable Gen 1 domain knowledge (Ghost→Psychic 0×, 255-always-miss,
-  "this check is on the seam because Gen 2 makes status moves respect immunity") and is the institutional memory
-  that stops a future change from reintroducing a quirk bug. **Keep all of that.** Cut/compress only: (i) lines that
-  restate the next statement; (ii) the Substitute-shield rationale, re-explained nearly in full in ~4 places —
-  consolidate to one canonical paragraph (on `DealDamageToTarget`) + one-line pointers; (iii) any comment
-  describing *other* code's behavior (the class that rots — see item D's `respondEvolution` note). Rule of thumb:
-  **a comment that can go stale without the local code changing is a liability.** Target ~30–40% volume reduction
-  with zero information loss; do **not** strip wholesale.
+- [x] **(C) Comment-density pass — "why, not what"** — **DONE (2026-06-21).** Two parts: first the flagged
+  redundancy classes (restatements of an effect's own class `<summary>`/the next statement; the Substitute-shield
+  rationale consolidated onto the canonical `_targetShieldedAtImpact` field; "describes other code" phrasings),
+  then a full compression pass tightening the padded multi-line blocks down to their essential *why* — same
+  discipline applied repo-wide, not just the two named files. Touched `AttackAction`, `MoveEffects`, the one
+  bloated `IBattleRules` doc (`PureStatusMoveChecksTypeImmunity`), `LockInMechanics` (Binding), and the
+  `MoveImport` `past_values` block. **Net ≈ −60 comment lines, zero information loss** — every Gen 1 quirk,
+  formula, cross-gen note and seam-justification preserved (seam-reviewer verified fact-by-fact). The seam
+  contract's per-member Gen 1/Gen 2+ tables (`IBattleRules`/`Gen1BattleRules`), the `BattleState`/`BattleEvents`
+  field-semantics docs, and the `MoveImport` `// Gen 1: X (modern: Y)` provenance comments were deliberately
+  left intact — they *are* the institutional knowledge the item says to keep, so compressing them would be
+  net-negative. Comments-only; build + 1081/1081 unchanged.
 
 - [ ] **(D) Minor batch** *(code review, 2026-06-21).* (i) `useBattleHub.ts:259` — `respondEvolution` carries a
   copy-pasted comment describing "the Poké Center recovery offer" (wrong handler); fix the comment. (ii)

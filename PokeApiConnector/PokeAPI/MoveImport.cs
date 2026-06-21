@@ -124,15 +124,13 @@ public class MoveImport
     /// </summary>
     private static Attack BuildGen1Attack(PokeApiMove pokeMove)
     {
-        // PokeAPI returns each move's MODERN stats; Gen 1 often differed (special moves were
-        // stronger, Blizzard was 90% accurate, and several moves were a different type — e.g.
-        // Bite/Gust/Karate Chop/Sand Attack were Normal). PokeAPI records the history in
-        // `past_values`: each entry's value was in effect in every generation *before* its
-        // version_group, so the EARLIEST recorded value is the Gen 1 one. We resolve power /
-        // accuracy / pp / effect_chance / type from it here so every downstream decision (STAB,
-        // type chart, the type-derived physical/special split, damage) is Gen-1-correct. This is
-        // the single, data-driven source for Gen 1 move data — no per-move hardcoded corrections.
-        // (A future multi-gen importer would store one row per generation; today it's Gen 1 only.)
+        // PokeAPI returns each move's MODERN stats; Gen 1 often differed (special moves stronger,
+        // Blizzard 90% accurate, several moves a different type — Bite/Gust/Karate Chop/Sand Attack were
+        // Normal). The history lives in `past_values`: each entry's value held in every generation *before*
+        // its version_group, so the EARLIEST recorded value is the Gen 1 one. Resolving power / accuracy /
+        // pp / effect_chance / type from it keeps every downstream decision (STAB, type chart, the
+        // type-derived physical/special split, damage) Gen-1-correct — one data-driven source, no per-move
+        // hardcoding. (A future multi-gen importer would store one row per generation; today it's Gen 1 only.)
         var pasts = pokeMove.PastValues ?? new List<MovePastValue>();
         int gen1Power =
             pasts.Select(p => p.Power).FirstOrDefault(v => v != null) ?? pokeMove.Power ?? 0;
