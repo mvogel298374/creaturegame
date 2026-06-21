@@ -212,18 +212,17 @@ Battles are fully playable now — docs won't describe a moving target.
   pre-mutation moveset for one tick — identical to the staleness `Bag` already accepts). Then delete/correct the
   wrong "scalar fields only" comment. ~5 line-level edits; no locks.
 
-- [ ] **(B) `AttackAction.ExecuteAsync` is a ~400-line orchestrator** *(code review, 2026-06-21).* The registry
-  extractions (`IMoveEffect`, `ILockInMechanic`) already landed, but the method itself is still a long linear
-  pipeline. Two low-risk extractions roughly halve it: **(1)** pull the `switch (category)` damage block
-  (`AttackAction.cs:285–422` — multi-hit loop, drain, self-destruct, Super Fang, Psywave) into
-  `private int ResolveDamage(Attack move, DamageCategory category, int screenMult, out bool isCrit)` — ~140 lines,
-  clean inputs/outputs, biggest volume for least entanglement; **(2)** extract the pre-damage gate sequence
-  (OHKO-fail → accuracy+miss side-effects → thaw → type-immunity → crash-on-immunity → Dream-Eater precondition,
-  `:149–267`) into `ResolvePreDamageGates(...)` returning a small `{ Proceed, Halt }` result (a result record
-  carries the crash/self-destruct-faint side-effects). Leaves `ExecuteAsync` reading top-to-bottom: recharge →
-  lock-in → redirect → gates → resolve-damage → post-damage. **Stop there** — do *not* registry-ify
-  Metronome/Mirror Move or the lock-in orchestration: they're entangled with PP decrement + last-move recording
-  and the ordering is load-bearing; scattering them trades a long-but-linear method for action-at-a-distance.
+- [x] **(B) `AttackAction.ExecuteAsync` is a ~400-line orchestrator** — **DONE (2026-06-21).** Two
+  behaviour-preserving extractions roughly halved the method: **(1)** `ResolveDamage(move, category,
+  usingStruggle, screenMult)` — the whole `switch (category)` damage block (multi-hit/drain/self-destruct/
+  Super Fang/Psywave), returns the accumulated damage; **(2)** `ResolvePreDamageGates(move, category,
+  usingStruggle, lockIn, lockCtx)` — the OHKO→accuracy→thaw→type-immunity→crash→Dream-Eater gate sequence,
+  returning a `PreDamageGateResult(bool Proceed, bool JustThawed)` (the gate fires its own miss/crash/faint
+  side-effects internally). `ExecuteAsync` now reads recharge → lock-in → redirect → gates → resolve-damage →
+  post-damage. Two intentional deviations from the suggested signature: dropped the `out bool isCrit` (the
+  caller never read it — it stays local to `ResolveDamage`) and added the `usingStruggle` param (the gates and
+  multi-hit/Struggle branches need it). Metronome/Mirror-Move + lock-in orchestration left untouched, as the
+  note required. Seam review CLEAN, 1081/1081 tests.
 
 - [ ] **(C) Comment-density pass — "why, not what"** *(code review, 2026-06-21).* Comment volume (largely from the
   AI implementation) is unusually high, concentrated in `AttackAction` and the effect classes. It's **more asset

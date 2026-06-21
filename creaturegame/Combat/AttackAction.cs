@@ -148,33 +148,104 @@ public class AttackAction : IBattleAction
 
         var category = usingStruggle ? DamageCategory.Standard : attackToUse.DamageCategory;
 
+        // Pre-damage gates (OHKO success, accuracy + miss side-effects, thaw, type immunity, crash-on-
+        // immunity, Dream Eater precondition). Halt ends the turn (the gate already emitted the
+        // miss/no-effect event and applied any miss side-effects); otherwise it reports whether the
+        // target was thawed, which the post-damage status step needs.
+        var gate = ResolvePreDamageGates(attackToUse, category, usingStruggle, lockIn, lockCtx);
+        if (!gate.Proceed)
+            return Task.CompletedTask;
+        bool justThawed = gate.JustThawed;
+
+        // Snapshot the Substitute shield before any damage is applied: a secondary effect is blocked
+        // if the Target was behind a decoy when the move landed, even if that same hit shatters it.
+        _targetShieldedAtImpact = Target.Battle.SubstituteHp > 0;
+
+        // Reflect (vs physical) / Light Screen (vs special) double the defender's defensive stat while
+        // up; the calculator ignores it on a crit. Computed once and passed into every damage call.
+        int screenMult =
+            (attackToUse.AttackType == AttackType.Physical && Target.Battle.HasReflect)
+            || (attackToUse.AttackType == AttackType.Special && Target.Battle.HasLightScreen)
+                ? _rules.ScreenDefenseMultiplier
+                : 1;
+
+        int damage = ResolveDamage(attackToUse, category, usingStruggle, screenMult);
+
+        // Struggle recoil
+        if (usingStruggle)
+        {
+            int recoil = _rules.CalculateStruggleRecoil(Source, damage);
+            Source.Attributes.ReceiveDamage(recoil);
+            _emitter?.Emit(new RecoilDamage(Source.Name, recoil, Source.Attributes.HP));
+        }
+
+        // Recharge next turn (Hyper Beam): only set when the move actually dealt damage
+        if (!usingStruggle && attackToUse.Effect == MoveEffect.Recharge && damage > 0)
+            Source.Battle.IsRecharging = true;
+
+        if (!justThawed)
+            TryApplyStatus(attackToUse);
+
+        TryApplyStatEffect(attackToUse);
+        TryApplyMoveEffect(attackToUse, damage);
+
+        lockIn?.OnTurnEnd(lockCtx!); // confuse the user if this was the rampage's last turn
+
+        return Task.CompletedTask;
+    }
+
+    // Outcome of the pre-damage gate sequence. Proceed == false means the turn is over: the gate has
+    // already emitted the miss / no-effect event and applied any miss-time side-effects (Self-Destruct
+    // faint, Jump Kick crash, the rampage turn-count tick). JustThawed flows back so the post-damage
+    // status step can tell whether this move just thawed the target (it then skips re-freezing logic).
+    private readonly record struct PreDamageGateResult(bool Proceed, bool JustThawed)
+    {
+        public static readonly PreDamageGateResult Halt = new(false, false);
+
+        public static PreDamageGateResult Continue(bool justThawed) => new(true, justThawed);
+    }
+
+    // The gauntlet a move must clear before damage is resolved, in Gen 1 order: OHKO success rule →
+    // accuracy roll (with the on-miss Self-Destruct faint / Jump Kick crash / rampage tick) → freeze
+    // thaw → type-immunity wall → Jump Kick crash on a type-immune target → Dream Eater's sleeping-target
+    // precondition. Each failing gate emits its own outcome event and returns Halt; clearing them all
+    // returns Continue carrying the thaw flag. Side-effects stay here (not on a result record) because
+    // the gate owns the emitter/rules and the caller would otherwise have to re-derive each one.
+    private PreDamageGateResult ResolvePreDamageGates(
+        Attack move,
+        DamageCategory category,
+        bool usingStruggle,
+        ILockInMechanic? lockIn,
+        LockInContext? lockCtx
+    )
+    {
         // OHKO: fails (not just misses) per the generation's success rule — Gen 1 fails when the
         // target out-speeds the user (the level check is a Gen 2+ rule). The condition is gen-variable
         // so it lives on the seam, not inline here. Independent of the accuracy roll below.
         if (category == DamageCategory.OHKO && !_rules.OneHitKoSucceeds(Source, Target))
         {
-            _emitter?.Emit(new MoveMissed(Source.Name, attackToUse.Name ?? ""));
-            return Task.CompletedTask;
+            _emitter?.Emit(new MoveMissed(Source.Name, move.Name ?? ""));
+            return PreDamageGateResult.Halt;
         }
 
         // Accuracy check — Struggle and NeverMisses moves always hit
-        if (!usingStruggle && !attackToUse.NeverMisses)
+        if (!usingStruggle && !move.NeverMisses)
         {
             int threshold = _rules.GetHitThreshold(
-                attackToUse.Accuracy,
+                move.Accuracy,
                 Source.Battle.Stages.Accuracy,
                 Target.Battle.Stages.Evasion
             );
             if (_rng.Next(_rules.AccuracyRollBound) >= threshold)
             {
-                _emitter?.Emit(new MoveMissed(Source.Name, attackToUse.Name ?? ""));
+                _emitter?.Emit(new MoveMissed(Source.Name, move.Name ?? ""));
 
                 // Gen 1: Self-Destruct user faints even on miss
                 if (category == DamageCategory.SelfDestruct)
                     Source.Attributes.ReceiveDamage(Source.Attributes.HP);
 
                 // Gen 1: Jump Kick / Hi Jump Kick deal crash damage to the user on a miss
-                if (attackToUse.Effect == MoveEffect.Crash)
+                if (move.Effect == MoveEffect.Crash)
                 {
                     int crash = _rules.CalculateCrashDamage(Source);
                     Source.Attributes.ReceiveDamage(crash);
@@ -182,16 +253,13 @@ public class AttackAction : IBattleAction
                 }
 
                 lockIn?.OnTurnEnd(lockCtx!); // a missed turn still counts toward the rampage lock
-                return Task.CompletedTask;
+                return PreDamageGateResult.Halt;
             }
         }
 
         // Thaw a frozen target if the move meets the generation's thaw criteria
         bool justThawed = false;
-        if (
-            Target.Battle.Status == StatusCondition.Freeze
-            && _rules.CanThawFrozenTarget(attackToUse)
-        )
+        if (Target.Battle.Status == StatusCondition.Freeze && _rules.CanThawFrozenTarget(move))
         {
             Target.Battle.Status = StatusCondition.None;
             _emitter?.Emit(new StatusCleared(Target.Name, StatusCondition.Freeze));
@@ -204,7 +272,7 @@ public class AttackAction : IBattleAction
         // already folds 0× into its damage (DamageDealt at 0), and Self-Destruct still detonates the
         // user — both are excluded here.
         bool isPureStatusMove =
-            category == DamageCategory.Standard && !usingStruggle && attackToUse.BaseDamage == 0;
+            category == DamageCategory.Standard && !usingStruggle && move.BaseDamage == 0;
         // Gen 1: a non-damaging move almost always IGNORES the target's type immunity — Confuse Ray
         // confuses a Normal-type, Glare paralyses a Ghost, Growl lowers a Ghost's Attack, sleep / Disable
         // land regardless of the move's type matchup. Only Thunder Wave and Counter still consult the
@@ -213,9 +281,9 @@ public class AttackAction : IBattleAction
         // Mimic, Transform … — never consult the foe's type, so the seam never returns true for them; and
         // Leech Seed vs Grass / "Poison can't be poisoned" have their own immunity via CanBeLeechSeeded /
         // CanReceiveStatus.) Damaging moves are unaffected: they fold 0× into zero damage below.
-        bool pureStatusChecksImmunity = _rules.PureStatusMoveChecksTypeImmunity(attackToUse);
+        bool pureStatusChecksImmunity = _rules.PureStatusMoveChecksTypeImmunity(move);
         double typeImmunity = DamageCalculator.GetTypeEffectiveness(
-            attackToUse.DamageType,
+            move.DamageType,
             Target.Type1,
             Target.Type2,
             _typeChart
@@ -233,21 +301,21 @@ public class AttackAction : IBattleAction
             )
         )
         {
-            _emitter?.Emit(new MoveHadNoEffect(Target.Name, attackToUse.Name ?? ""));
-            return Task.CompletedTask;
+            _emitter?.Emit(new MoveHadNoEffect(Target.Name, move.Name ?? ""));
+            return PreDamageGateResult.Halt;
         }
 
         // Gen 1: Jump Kick / Hi Jump Kick crash the user on a type immunity (Fighting → Ghost = 0×),
         // not only on an accuracy miss. These are Standard-category moves, so they slip past the
         // immunity block above (which excludes Standard, since it normally folds 0× into 0 damage) and
         // would otherwise whiff harmlessly. Mirror the miss branch: announce no-effect, then crash.
-        if (attackToUse.Effect == MoveEffect.Crash && typeImmunity == 0)
+        if (move.Effect == MoveEffect.Crash && typeImmunity == 0)
         {
-            _emitter?.Emit(new MoveHadNoEffect(Target.Name, attackToUse.Name ?? ""));
+            _emitter?.Emit(new MoveHadNoEffect(Target.Name, move.Name ?? ""));
             int crash = _rules.CalculateCrashDamage(Source);
             Source.Attributes.ReceiveDamage(crash);
             _emitter?.Emit(new CrashDamage(Source.Name, crash, Source.Attributes.HP));
-            return Task.CompletedTask;
+            return PreDamageGateResult.Halt;
         }
 
         // Dream Eater only works on a sleeping target; against anything else it fails (no damage, no
@@ -257,40 +325,39 @@ public class AttackAction : IBattleAction
         // *state* precondition not met (target awake), like Counter having no damage to return — so it
         // reuses MoveMissed, the established path for that, not MoveHadNoEffect (which is the type-based
         // "doesn't affect" line for immunities).
-        if (
-            attackToUse.Effect == MoveEffect.DreamEater
-            && Target.Battle.Status != StatusCondition.Sleep
-        )
+        if (move.Effect == MoveEffect.DreamEater && Target.Battle.Status != StatusCondition.Sleep)
         {
-            _emitter?.Emit(new MoveMissed(Source.Name, attackToUse.Name ?? ""));
-            return Task.CompletedTask;
+            _emitter?.Emit(new MoveMissed(Source.Name, move.Name ?? ""));
+            return PreDamageGateResult.Halt;
         }
 
-        // Snapshot the Substitute shield before any damage is applied: a secondary effect is blocked
-        // if the Target was behind a decoy when the move landed, even if that same hit shatters it.
-        _targetShieldedAtImpact = Target.Battle.SubstituteHp > 0;
+        return PreDamageGateResult.Continue(justThawed);
+    }
 
-        // Damage calculation by category
+    // Resolves the move's damage for its DamageCategory and applies it to the Target via
+    // DealDamageToTarget (so the Substitute soak, Counter recording and Bide accumulation all stay
+    // centralized in one place). Returns the total damage dealt — the figure ExecuteAsync gates Struggle
+    // recoil, the Drain heal and the Hyper Beam recharge on. Runs only after ResolvePreDamageGates has
+    // cleared the move to connect.
+    private int ResolveDamage(
+        Attack move,
+        DamageCategory category,
+        bool usingStruggle,
+        int screenMult
+    )
+    {
         int damage = 0;
         bool isCrit = false;
-
-        // Reflect (vs physical) / Light Screen (vs special) double the defender's defensive stat while
-        // up; the calculator ignores it on a crit. Computed once and passed into every damage call.
-        int screenMult =
-            (attackToUse.AttackType == AttackType.Physical && Target.Battle.HasReflect)
-            || (attackToUse.AttackType == AttackType.Special && Target.Battle.HasLightScreen)
-                ? _rules.ScreenDefenseMultiplier
-                : 1;
 
         switch (category)
         {
             case DamageCategory.Standard:
             case DamageCategory.Drain:
             {
-                if (usingStruggle || attackToUse.BaseDamage > 0)
+                if (usingStruggle || move.BaseDamage > 0)
                 {
                     double eff = DamageCalculator.GetTypeEffectiveness(
-                        attackToUse.DamageType,
+                        move.DamageType,
                         Target.Type1,
                         Target.Type2,
                         _typeChart
@@ -301,10 +368,8 @@ public class AttackAction : IBattleAction
                     // the target faints. Normal moves take the hits == 1 path (identical output).
                     // Fixed-count movers (Double Kick = 2) carry the count as move data; variable
                     // movers (Double Slap) leave it null and draw the 2–5 count from the gen rules.
-                    bool isMultiHit = !usingStruggle && attackToUse.Effect == MoveEffect.MultiHit;
-                    int hits = isMultiHit
-                        ? (attackToUse.MultiHitCount ?? _rules.RollMultiHitCount())
-                        : 1;
+                    bool isMultiHit = !usingStruggle && move.Effect == MoveEffect.MultiHit;
+                    int hits = isMultiHit ? (move.MultiHitCount ?? _rules.RollMultiHitCount()) : 1;
 
                     int landed = 0;
                     bool dealtRealDamage = false;
@@ -313,14 +378,14 @@ public class AttackAction : IBattleAction
                         int hitDamage = DamageCalculator.CalculateDamage(
                             Source,
                             Target,
-                            attackToUse,
+                            move,
                             _typeChart,
                             _rules,
                             out isCrit,
                             _rng,
                             screenDefenseMultiplier: screenMult
                         );
-                        if (DealDamageToTarget(hitDamage, eff, isCrit, attackToUse.DamageType))
+                        if (DealDamageToTarget(hitDamage, eff, isCrit, move.DamageType))
                             dealtRealDamage = true;
                         damage += hitDamage; // accumulated total gates drain/recoil/recharge below
                         landed++;
@@ -352,7 +417,7 @@ public class AttackAction : IBattleAction
 
                     if (category == DamageCategory.Drain && damage > 0)
                     {
-                        int heal = Math.Max(1, damage * attackToUse.DrainPercent / 100);
+                        int heal = Math.Max(1, damage * move.DrainPercent / 100);
                         Source.Attributes.ReceiveHealing(heal);
                         _emitter?.Emit(new DrainHealed(Source.Name, heal, Source.Attributes.HP));
                     }
@@ -361,20 +426,20 @@ public class AttackAction : IBattleAction
             }
 
             case DamageCategory.Fixed:
-                damage = attackToUse.FixedDamageValue ?? 1;
-                DealDamageToTarget(damage, 1.0, false, attackToUse.DamageType);
+                damage = move.FixedDamageValue ?? 1;
+                DealDamageToTarget(damage, 1.0, false, move.DamageType);
                 break;
 
             case DamageCategory.LevelBased:
                 damage = DamageCalculator.CalculateLevelBasedDamage(Source);
-                DealDamageToTarget(damage, 1.0, false, attackToUse.DamageType);
+                DealDamageToTarget(damage, 1.0, false, move.DamageType);
                 break;
 
             case DamageCategory.OHKO:
                 // Against a Substitute the OHKO just breaks the decoy (the soak caps at the sub's HP);
                 // otherwise it removes the target's full current HP.
                 damage = Target.Attributes.HP;
-                DealDamageToTarget(damage, 1.0, false, attackToUse.DamageType);
+                DealDamageToTarget(damage, 1.0, false, move.DamageType);
                 break;
 
             case DamageCategory.SelfDestruct:
@@ -384,7 +449,7 @@ public class AttackAction : IBattleAction
                 // (dropped in Gen 5+), so it comes from the rules seam and is passed into the
                 // calculator — we no longer mutate-and-restore the creature's real stats.
                 double eff = DamageCalculator.GetTypeEffectiveness(
-                    attackToUse.DamageType,
+                    move.DamageType,
                     Target.Type1,
                     Target.Type2,
                     _typeChart
@@ -392,7 +457,7 @@ public class AttackAction : IBattleAction
                 damage = DamageCalculator.CalculateDamage(
                     Source,
                     Target,
-                    attackToUse,
+                    move,
                     _typeChart,
                     _rules,
                     out isCrit,
@@ -401,7 +466,7 @@ public class AttackAction : IBattleAction
                     screenDefenseMultiplier: screenMult
                 );
 
-                DealDamageToTarget(damage, eff, isCrit, attackToUse.DamageType);
+                DealDamageToTarget(damage, eff, isCrit, move.DamageType);
 
                 // User faints unconditionally (already handled miss → faint above)
                 Source.Attributes.ReceiveDamage(Source.Attributes.HP);
@@ -410,38 +475,18 @@ public class AttackAction : IBattleAction
 
             case DamageCategory.SuperFang:
                 damage = DamageCalculator.CalculateSuperFangDamage(Target);
-                DealDamageToTarget(damage, 1.0, false, attackToUse.DamageType);
+                DealDamageToTarget(damage, 1.0, false, move.DamageType);
                 break;
 
             case DamageCategory.Psywave:
                 // Gen 1: a random 1..floor(1.5×level), ignoring Attack/Defense, type effectiveness,
                 // STAB and crits. The magnitude is gen-variable, so it comes from the rules seam.
                 damage = _rules.RollPsywaveDamage(Source, _rng);
-                DealDamageToTarget(damage, 1.0, false, attackToUse.DamageType);
+                DealDamageToTarget(damage, 1.0, false, move.DamageType);
                 break;
         }
 
-        // Struggle recoil
-        if (usingStruggle)
-        {
-            int recoil = _rules.CalculateStruggleRecoil(Source, damage);
-            Source.Attributes.ReceiveDamage(recoil);
-            _emitter?.Emit(new RecoilDamage(Source.Name, recoil, Source.Attributes.HP));
-        }
-
-        // Recharge next turn (Hyper Beam): only set when the move actually dealt damage
-        if (!usingStruggle && attackToUse.Effect == MoveEffect.Recharge && damage > 0)
-            Source.Battle.IsRecharging = true;
-
-        if (!justThawed)
-            TryApplyStatus(attackToUse);
-
-        TryApplyStatEffect(attackToUse);
-        TryApplyMoveEffect(attackToUse, damage);
-
-        lockIn?.OnTurnEnd(lockCtx!); // confuse the user if this was the rampage's last turn
-
-        return Task.CompletedTask;
+        return damage;
     }
 
     // Runs another move in full as this turn's action — used by Metronome and Mirror Move, which call a
