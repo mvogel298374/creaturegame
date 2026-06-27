@@ -16,6 +16,7 @@ them up front burns ~25k tokens before the work is even scoped; almost none of i
 | `DEV_STANDARDS.md` | doing `/dev` (implementation) work — .NET/EF coding conventions and architecture rules. |
 | `STATE_MODEL.md` | touching battle state — the `Creature` permanent/transient split (`BattleState`). |
 | `GAME_LOOP.md` | working on the **run/roguelite loop** — the game-loop ↔ event model (battle & heal as events), the logic-drives-sequence rule, and the target event abstraction. |
+| `ENCOUNTER_DESIGN.md` | working on **encounters/acquisition** — the biome-graph run model, the `IEnemyArchetype` strength tiers, the type-themed pool, and the two gated acquisition channels (boss catch + themed draft). |
 | `GENERATION_SEAMS.md` | adding a gen-variable rule or a new generation — the seams (`ITypeChart`, `IBattleRules`, `IStatCalculator`) + the §5.0 gen-agnostic checklist. |
 | `DATA_IMPORT.md` | changing imported data — the `PokeApiConnector` pipeline, import-vs-runtime boundary, PokeAPI→model mapping. |
 

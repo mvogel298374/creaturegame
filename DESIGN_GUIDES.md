@@ -78,4 +78,6 @@ work on a gen-variable rule).
 | `AI_CONTEXT.md` | Agent profiles and slash-command definitions |
 | `DEV_STANDARDS.md` | .NET/EF coding conventions (implementation counterpart to this file) |
 | `GENERATION_SEAMS.md` | Developer deep-dive on the generation seams that implement the architecture principle above |
+| `GAME_LOOP.md` | The run/roguelite loop — the game-loop ↔ event model a battle is one event inside |
+| `ENCOUNTER_DESIGN.md` | The roguelite encounter layer — biome-graph run model, enemy strength tiers, type-themed pools, gated acquisition |
 | `DATA_IMPORT.md` | Developer deep-dive on the `PokeApiConnector` import pipeline and the import-vs-runtime boundary |

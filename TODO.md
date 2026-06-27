@@ -12,9 +12,9 @@ Evolution System, and the complete **Item System** (data import + use-in-battle,
 done and archived. `ARCHITECTURE.md` and the per-run web seed are done.
 
 **Next up, in order:**
-1. **Encounter Logic** (`/plan`) — design *what* the player faces and *how* it can be acquired. Gates the
-   whole acquisition/catch cluster below.
-2. **Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by (1).
+1. **Encounter Logic** — *design DONE* (`ENCOUNTER_DESIGN.md`, 2026-06-27). Next is its **phased build**
+   (biome model → enemy tiers → biome graph/`RunDirector` → acquisition channels — see the section below).
+2. **Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by (1)'s acquisition phase.
 3. **Game Loop & Progression** — party, switching, save layer (`save.db`).
 
 Lower priority / opportunistic: Web UI polish (move-specific animations), Multi-Generation groundwork, Tech
@@ -29,14 +29,27 @@ Debt cleanup, User Documentation.
 > **how/whether they can take it** must be designed *before* any acquisition mechanic — otherwise we'd be
 > balancing a catch formula against an undefined encounter distribution.
 
-The seam exists (`EncounterSelector.PickByBst`, `GameController.BuildCreature`, the `targetBst = lead BST +
-depth × 10` curve) — this is about turning it into a deliberate, balance-aware *design*.
+- [x] **`/plan` design pass — DONE (2026-06-27).** Designed in **`ENCOUNTER_DESIGN.md`**. Run = a **graph of
+  themed biomes** under a regional origin (Kanto first); biome **type theme** drives the encounter pool which
+  *is* the **fought-only** acquisition guardrail. Enemy strength is an **`IEnemyArchetype`** seam
+  (Weak/Medium/Strong/Boss) composing existing levers (moveset quality, DV/Stat-Exp, BST band, level), with
+  biome **depth** setting the baseline band (restores the never-coded `depth × 10` curve) and tier modulating
+  it. Two **gated** acquisition channels: **boss catch** (after a boss, *n%*) + **themed draft** (every 3rd
+  encounter, *n%*). Node **bones** for all kinds (battle/elite/shop/mystery/treasure/rest) as `IRunEvent`s,
+  sequenced by `chooseNextEvent` (`BattleRunner` → `RunDirector`, per `GAME_LOOP.md §3`).
 
-- [ ] **`/plan` pass:** encounter pool / distribution per depth (BST band + variance, not a flat draw from all
-  151); what is *eligible* to be acquired (BST ceiling relative to lead? rarity tiers? a curated per-encounter
-  "offer" set vs "whatever you fought"); how acquisition meshes with the difficulty curve so one lucky pickup
-  can't break a run.
-- [ ] Gate the eventual acquisition mechanic on these rules.
+**Phased build (from `ENCOUNTER_DESIGN.md §7` — implementation, gated on the design above):**
+- [ ] **Phase 1 — Biome model + type-filtered pool.** *Design + roster specced* in `ENCOUNTER_DESIGN.md §2`
+  (`BiomeDefinition`/`Region` static-registry model, the three membership rules — either-type match,
+  Wild-available only, empty biomes don't generate — and the verified **18-biome Kanto roster**). **Remaining =
+  implementation:** the static biome registry + a biome-type + Wild predicate on `EncounterSelector.PickByBst`
+  (in-theme BST widening), wired through `EncounterFactory.CreateEnemyAsync`.
+- [ ] **Phase 2 — `IEnemyArchetype` tiers + depth-scaled bands.** Weak/Medium/Strong/Boss strategies; replace
+  the flat `playerBst` draw with a depth-scaled BST + level band that the tier modulates.
+- [ ] **Phase 3 — Biome graph + `chooseNextEvent` / `RunDirector`.** Map traversal; node kinds land as
+  `IRunEvent` stubs (bones).
+- [ ] **Phase 4 — Acquisition channels** (boss catch + themed draft, fought-only). Gates the cluster below;
+  *n%* rates tuned here.
 
 ---
 
