@@ -48,8 +48,22 @@ Debt cleanup, User Documentation.
   supplies one). Tests: `BiomeTests` (coverage, 2–3 spread, no post-Gen-1 types, graph symmetry+connectivity,
   membership, `Playable`) + biome cases in `EncounterSelectorTests` + a `CreateEnemy_DrawsOnlyFromWildAvailable`
   pin. Seam review PASS (3 advisories all addressed); 1094/1094. Specced in `ENCOUNTER_DESIGN.md §2`.
-- [ ] **Phase 2 — `IEnemyArchetype` tiers + depth-scaled bands.** Weak/Medium/Strong/Boss strategies; replace
-  the flat `playerBst` draw with a depth-scaled BST + level band that the tier modulates.
+- [ ] **Phase 2 — `IEnemyArchetype` tiers + depth-scaled bands.** *Design specced* in `ENCOUNTER_DESIGN.md §3`
+  (archetype→`EnemyTierSpec`→factory; depth=`battlesWon` linear baseline × tier modulation; levers = BST band,
+  level band, `DvQuality` seam, 3-level moveset). Sub-steps, in order:
+  - [ ] **2a — Import real TM/HM learnability** (data; gates TmEnhanced). Add `LearnMethod` to `PokemonLearnset`
+    (migration, existing rows default `LevelUp`); `LearnsetMapper` keeps machine moves tagged by method;
+    re-import; pin with a data-contract test. ⚠️ Filter `LearnMethod == LevelUp` in every level-up path
+    (base moveset selection, `MoveLearning`) so TM rows don't leak into level-up learning.
+  - [ ] **2b — `DvQuality{Poor,Average,Perfect}` on `IStatCalculator.RandomiseDvs`** (always explicit; drop the
+    no-arg overload, player passes `Average`). Gen 1 maps Poor 0–7 / Average 0–15 / Perfect 15; HP-DV derivation
+    stays on the seam.
+  - [ ] **2c — Generalize the bands.** `PickByBst` gains an explicit `targetBst` (defaults to `playerBst`);
+    `ScaleWildLevel` gains `depth` + a tier band. Thread `depth` (`battlesWon`) `BattleRunner → CreateEnemyAsync`.
+  - [ ] **2d — `IEnemyArchetype` + `EnemyTierSpec`** (Weak/Medium/Strong/Boss) + the `TmEnhanced`/`Optimal`
+    moveset strategies (no level gate; rank by power/STAB/coverage). `CreateEnemyAsync` gains an optional
+    archetype (default Medium); tier *selection* is Phase 3.
+  - **Deferred (per §3.6):** Stat-Exp lever; Boss ceiling (out-class-the-player design) — revisited a later phase.
 - [ ] **Phase 3 — Biome graph + `chooseNextEvent` / `RunDirector`.** Map traversal; node kinds land as
   `IRunEvent` stubs (bones).
 - [ ] **Phase 4 — Acquisition channels** (boss catch + themed draft, fought-only). Gates the cluster below;

@@ -147,26 +147,82 @@ none stuck in one, none in more than three:
 
 ---
 
-## 3. Enemy generation — a strength-tier interface
+## 3. Enemy generation — a strength-tier interface  *(Phase 2 spec)*
 
 Enemy strength is a **strategy seam** — `IEnemyArchetype` — with implementations **Weak / Medium / Strong /
-Boss**. Each tier decides *which levers it pulls* to compose an enemy; it does not hardcode a stat block.
+Boss**. Each tier is its own class that decides *which levers it pulls*; it does not hardcode a stat block.
 
-| Lever | Composed from | Weak → Boss progression |
+### 3.1 Shape — archetype returns a spec, the factory builds
+
+The archetype is a **pure function** of the run context, returning a lever spec the factory consumes — so the
+tiers are DB-free and unit-testable ("Boss at depth 5 → these levers", no database).
+
+```
+record EnemyContext   ( int PlayerLevel, int PlayerBst, int Depth, IRandomSource Rng )
+record EnemyTierSpec  ( int TargetBst, double BandPct, (int Min,int Max) LevelBand,
+                        DvQuality Dvs, MovesetLevel Moves, int MoveCount )
+interface IEnemyArchetype { EnemyTierSpec Build(EnemyContext ctx); }   // Weak/Medium/Strong/Boss
+```
+
+`EncounterFactory` turns the spec into a `Creature` (DB + construction stay in the factory). This composition
+layer is **web/run-layer** — tier banding is roguelite tuning, not a Gen 1 mechanic, so it stays out of the
+battle seams (as `ScaleWildLevel`'s own doc comment already argues); only the *DV* lever crosses into a seam
+(§3.3), because DV ranges are gen-specific.
+
+### 3.2 Depth × tier (orthogonal)
+
+`depth = battlesWon`, threaded `BattleRunner → enemySupplier → CreateEnemyAsync`. Biome **depth** sets the
+*baseline band* — `targetBst = playerBst + depth × K` and a depth-lifted level band (this **restores the depth
+curve** `TODO.md` described as `lead BST + depth × 10` but which was never coded; today `CreateEnemyAsync`
+passes raw `playerBst`). The **tier** then shifts that baseline up/down. So "Medium @ depth 5" is genuinely
+tougher than "Medium @ depth 1." Phase 3 later swaps `battlesWon` for a richer biome-position depth.
+
+### 3.3 The four levers
+
+| Lever | Lands on | Weak → Boss |
 |:--|:--|:--|
-| **Moveset quality** | `MoveSelectionStrategy` (`CanonicalLatest` / `WeightedSmart`, + a future "optimal") | sparse/suboptimal → optimal coverage |
-| **DV / Stat-Exp** | `IStatCalculator.RandomiseDvs` / Stat-Exp | low rolls → max DVs + Stat-Exp |
-| **BST band** | `EncounterSelector.PickByBst` window | tightens / raises by tier |
-| **Level** | `EncounterFactory.ScaleWildLevel` band | tier offsets the band |
+| **BST band** | `PickByBst` gains an explicit `targetBst` (defaults to `playerBst`) | tier shifts target/width off the depth baseline |
+| **Level** | `ScaleWildLevel` gains `depth` + a tier band | tier raises/lowers the band |
+| **DVs** | **new `DvQuality{Poor,Average,Perfect}` on `IStatCalculator.RandomiseDvs`** | Poor 0–7 → Average 0–15 → Perfect 15 |
+| **Moveset** | `MovesetLevel` (see §3.4) + move count | Base → TmEnhanced → Optimal |
 
-**Depth and tier are orthogonal.** Biome **depth** sets the *baseline band* — BST and level climb as the run
-goes deeper (this **restores the depth curve** that `TODO.md` described as `lead BST + depth × 10` but which was
-never actually coded; today `CreateEnemyAsync` passes raw `playerBst` with no depth term). The **tier** then
-*modulates* within/above that band. So "Medium in biome 5" is genuinely tougher than "Medium in biome 1."
+**DV lever — seam-clean.** `DvQuality` is *intent*; the Gen 1 mapping (Poor 0–7, Average 0–15, Perfect 15, HP
+DV still derived from the four stat DVs' low bits) lives inside `Gen1StatCalculator`. Gen 3 (IVs 0–31) maps the
+same intents differently. **Quality is always explicit** — the no-arg `RandomiseDvs()` is dropped; the player's
+construction passes `Average` (still randomized within range, so same-tier creatures aren't clones; only Perfect
+is deterministic).
 
-This composition layer lives in the **web/run layer** (alongside `EncounterFactory` / `ScaleWildLevel`), keeping
-the engine generation-agnostic. Wild-level and tier banding are run-layer tuning choices, not Gen 1 mechanics,
-so they stay out of the battle seams — exactly as `ScaleWildLevel`'s own doc comment already argues.
+### 3.4 Moveset levels (3-tier quality axis)
+
+Extends `MoveSelectionStrategy`; selection ranks by power/STAB/coverage. **No level gate** — the strong/optimal
+pools always pick the best moves for the creature's types; *level only drives stats*, so a boss-grade enemy can
+punch above its level (intended).
+
+| Level | Pool | Notes |
+|:--|:--|:--|
+| **Base** | species **level-up** learnset | current `CanonicalLatest` (player) / `WeightedSmart` (enemy) — unchanged |
+| **TmEnhanced** | level-up **+ TM/HM-legal** same-type strong moves | needs real TM/HM data (§3.5) |
+| **Optimal** | **any** move, best for the creature's types + coverage | the min-maxed boss-grade set |
+
+### 3.5 Sub-task: import real TM/HM learnability *(gates TmEnhanced)*
+
+The importer (`LearnsetMapper`) keeps **only** `move_learn_method == "level-up"` today, so `pokemon.db` has no
+machine-move data. To make `TmEnhanced` faithful (a creature only gets moves it could actually learn via TM/HM):
+- Add a **`LearnMethod`** field to `PokemonLearnset` (EF migration; existing rows default `LevelUp`).
+- `LearnsetMapper` keeps **machine** moves too, tagged by method; re-import `pokemon.db`.
+- **Pin** it with a data-contract test (a re-import mustn't silently revert it).
+- ⚠️ **Integration hazard (two places change together):** every existing *level-up* path — base moveset
+  selection and `MoveLearning` on level-up — must filter `LearnMethod == LevelUp` so TM rows don't leak into
+  level-up learning.
+
+### 3.6 Deferred (flagged)
+
+- **Stat-Exp lever** — enemies use natural-gain-only for now; pre-seeding trained Stat-Exp is a later tuning lever.
+- **Boss ceiling** — Boss's distinctive design (out-classing the player: can exceed player level, perfect DVs,
+  optimal coverage, BST above band) is **revisited in a later phase**; Phase 2 ships Boss as a modest bump over
+  Strong.
+- **Tier *selection*** — which tier per encounter is **Phase 3** (node types pick it). `CreateEnemyAsync` gains
+  an optional `IEnemyArchetype` (default Medium ≈ today at depth 0), the same seam pattern as the biome param.
 
 ---
 
@@ -232,6 +288,9 @@ generation-agnostic and data-agnostic.
    membership rules, the verified 18-biome Kanto roster, and the live Wild filter; biome selection is the
    `CreateEnemyAsync` seam Phase 3 fills. (Specced in §2.)
 2. **`IEnemyArchetype` tiers** (Weak/Medium/Strong/Boss) + **depth-scaled bands** — replaces flat `playerBst`.
+   **Specced in §3.** Sub-steps: (2a) import real TM/HM learnability (§3.5, gates TmEnhanced) → (2b) `DvQuality`
+   seam → (2c) `PickByBst` explicit `targetBst` + `ScaleWildLevel` depth band → (2d) `IEnemyArchetype` +
+   `EnemyTierSpec` + depth threading + the `TmEnhanced`/`Optimal` moveset strategies.
 3. **Biome graph + `chooseNextEvent` / `RunDirector`** — map traversal; node kinds land as event stubs (bones).
 4. **Acquisition channels** (boss catch + themed draft, fought-only) — gated on (1)–(3) and the deferred Catch
    cluster.
