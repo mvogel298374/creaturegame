@@ -126,6 +126,45 @@ public class RunSeedReproducibilityTests
         }
     }
 
+    [Fact]
+    public async Task SameSeed_BuildsIdenticalEnemy_AcrossStrengthTiers()
+    {
+        // The non-default tiers take distinct RNG-draw paths — e.g. Boss rolls no DVs (Perfect) and picks an
+        // Optimal moveset deterministically, so it consumes a different stream than Medium. Each must still be
+        // fully reproducible from a seed (the 2b stream-shift pin).
+        var factory = BuildFactory();
+        var setup = await factory.CreatePlayerSetupAsync(Bulbasaur, 50, new SeededRandomSource(7));
+        Assert.NotNull(setup);
+
+        foreach (
+            var tier in new[] { EnemyArchetypes.Weak, EnemyArchetypes.Strong, EnemyArchetypes.Boss }
+        )
+        {
+            var a = await factory.CreateEnemyAsync(
+                setup!.Player,
+                setup.AllMoves,
+                new SeededRandomSource(55),
+                depth: 3,
+                archetype: tier
+            );
+            var b = await factory.CreateEnemyAsync(
+                setup.Player,
+                setup.AllMoves,
+                new SeededRandomSource(55),
+                depth: 3,
+                archetype: tier
+            );
+            Assert.Equal(a.SpeciesId, b.SpeciesId);
+            Assert.Equal(a.Level, b.Level);
+            AssertSameCreature(a, b);
+
+            // End-to-end MoveCount wiring (spec.MoveCount → BuildCreature → SelectWithFallback maxMoves):
+            // Weak caps at 3, the others at 4. Catches a regression where the cap is dropped on the way through.
+            int cap = tier == EnemyArchetypes.Weak ? 3 : 4;
+            Assert.InRange(a.MoveSet.Count, 1, cap);
+        }
+    }
+
     private static void AssertSameCreature(Creature x, Creature y)
     {
         Assert.Equal(x.SpeciesId, y.SpeciesId);

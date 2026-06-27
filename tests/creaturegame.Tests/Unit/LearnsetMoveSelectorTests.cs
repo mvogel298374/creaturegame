@@ -304,6 +304,83 @@ public class LearnsetMoveSelectorTests
         Assert.All(result, m => Assert.Contains(m, pool));
     }
 
+    // --- Optimal / TmEnhanced (strong tiers) --------------------------------
+
+    [Fact]
+    public void Learnset_Optimal_PicksHighestScoreMovesFromAllMoves_IgnoringLearnsetAndLevel()
+    {
+        // Optimal ranks the WHOLE move table by score (power × STAB), ignoring the learnset and the level.
+        var moves = Dict(
+            Move(1, "Tackle", 40, DamageType.Normal),
+            Move(2, "Vine Whip", 45, DamageType.Grass),
+            Move(3, "Hydro Pump", 110, DamageType.Water),
+            Move(4, "Surf", 95, DamageType.Water),
+            Move(5, "Growl", 0, DamageType.Normal)
+        );
+
+        var result = LearnsetMoveSelector.Select(
+            MoveSelectionStrategy.Optimal,
+            Array.Empty<PokemonLearnset>(), // ignored
+            moves,
+            level: 5, // ignored
+            DamageType.Water,
+            null
+        );
+
+        // Water STAB: Hydro 110×1.5=165, Surf 95×1.5=142.5, then Vine 45, Tackle 40 (Growl 35 drops out).
+        Assert.Equal(new[] { 3, 4, 2, 1 }, result.Select(m => m.Id).ToArray());
+    }
+
+    [Fact]
+    public void Learnset_TmEnhanced_PicksBestSpeciesLegalMoves_IgnoringLevel_ExcludingIllegal()
+    {
+        // TmEnhanced ranks the species-legal pool (level-up + TM/HM rows the caller supplies), ignoring level,
+        // but never a move the species can't learn.
+        var moves = Dict(
+            Move(1, "Tackle", 40, DamageType.Normal),
+            Move(2, "Solar Beam", 120, DamageType.Grass), // legal but learned far above the creature's level
+            Move(3, "Razor Leaf", 55, DamageType.Grass), // a TM/HM (machine) move
+            Move(9, "Hydro Pump", 110, DamageType.Water) // in the pool but NOT in the learnset → illegal
+        );
+        var learnset = new[] { Entry(1, 1), Entry(2, 48), Entry(3, 0) };
+
+        var result = LearnsetMoveSelector.Select(
+            MoveSelectionStrategy.TmEnhanced,
+            learnset,
+            moves,
+            level: 10, // below Solar Beam's learn level, but TmEnhanced ignores level
+            DamageType.Grass,
+            null
+        );
+
+        // Grass STAB: Solar 180, Razor 82.5, Tackle 40 — all legal; Hydro Pump excluded (not learnable).
+        Assert.Equal(new[] { 2, 3, 1 }, result.Select(m => m.Id).ToArray());
+        Assert.DoesNotContain(result, m => m.Id == 9);
+    }
+
+    [Fact]
+    public void Learnset_MaxMoves_CapsTheMovesetSize()
+    {
+        var moves = Dict(
+            Move(1, "Tackle", 40, DamageType.Normal),
+            Move(3, "Hydro Pump", 110, DamageType.Water),
+            Move(4, "Surf", 95, DamageType.Water),
+            Move(5, "Growl", 0, DamageType.Normal)
+        );
+
+        var result = LearnsetMoveSelector.Select(
+            MoveSelectionStrategy.Optimal,
+            Array.Empty<PokemonLearnset>(),
+            moves,
+            level: 50,
+            DamageType.Water,
+            null,
+            maxMoves: 2
+        );
+
+        Assert.Equal(new[] { 3, 4 }, result.Select(m => m.Id).ToArray()); // the two strongest only
+    }
+
     [Fact]
     public void Learnset_SelectWithFallback_WithLearnset_UsesLearnsetNotFallback()
     {

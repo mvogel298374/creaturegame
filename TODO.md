@@ -12,8 +12,9 @@ Evolution System, and the complete **Item System** (data import + use-in-battle,
 done and archived. `ARCHITECTURE.md` and the per-run web seed are done.
 
 **Next up, in order:**
-1. **Encounter Logic** — *design DONE* (`ENCOUNTER_DESIGN.md`, 2026-06-27). Next is its **phased build**
-   (biome model → enemy tiers → biome graph/`RunDirector` → acquisition channels — see the section below).
+1. **Encounter Logic** — *design DONE* (`ENCOUNTER_DESIGN.md`, 2026-06-27). Phased build: **Phase 1 (biome
+   model)** ✅ + **Phase 2 (enemy tiers + depth bands)** ✅ done. **Next: Phase 3** — biome graph /
+   `chooseNextEvent` / `RunDirector` (map traversal; node-kind stubs), then Phase 4 acquisition channels.
 2. **Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by (1)'s acquisition phase.
 3. **Game Loop & Progression** — party, switching, save layer (`save.db`).
 
@@ -48,9 +49,9 @@ Debt cleanup, User Documentation.
   supplies one). Tests: `BiomeTests` (coverage, 2–3 spread, no post-Gen-1 types, graph symmetry+connectivity,
   membership, `Playable`) + biome cases in `EncounterSelectorTests` + a `CreateEnemy_DrawsOnlyFromWildAvailable`
   pin. Seam review PASS (3 advisories all addressed); 1094/1094. Specced in `ENCOUNTER_DESIGN.md §2`.
-- [ ] **Phase 2 — `IEnemyArchetype` tiers + depth-scaled bands.** *Design specced* in `ENCOUNTER_DESIGN.md §3`
-  (archetype→`EnemyTierSpec`→factory; depth=`battlesWon` linear baseline × tier modulation; levers = BST band,
-  level band, `DvQuality` seam, 3-level moveset). Sub-steps, in order:
+- [x] **Phase 2 — `IEnemyArchetype` tiers + depth-scaled bands — COMPLETE (2026-06-28).** Specced in
+  `ENCOUNTER_DESIGN.md §3` (archetype→`EnemyTierSpec`→factory; depth=`battlesWon` baseline × tier modulation;
+  levers = BST band, level band, `DvQuality` seam, 3-level moveset). All sub-steps done:
   - [x] **2a — Import real TM/HM learnability — DONE (2026-06-27).** `LearnMethod{LevelUp,Machine}` enum +
     `Method` field on `PokemonLearnset`; migration `AddLearnsetMethod` (`Method INTEGER` default 0=LevelUp),
     applied to local `pokemon.db` (989 rows → LevelUp). `LearnsetMapper.ExtractGen1Learnset` now returns
@@ -75,11 +76,18 @@ Debt cleanup, User Documentation.
     `battlesWon` (0 first encounter); `GameSessionManager` threads it. Behaviour-preserving at depth 0. Pins:
     depth-lift band, `ScaleTargetBst` curve, depth>0 seed reproducibility. Seam review PASS (1 advisory
     addressed); 1101/1101.
-  - [ ] **2d — `IEnemyArchetype` + `EnemyTierSpec`** (Weak/Medium/Strong/Boss) + the `TmEnhanced`/`Optimal`
-    moveset strategies (no level gate; rank by power/STAB/coverage). `CreateEnemyAsync` gains an optional
-    archetype (default Medium); tier *selection* is Phase 3. ⚠️ **Seam note (from 2b review):** `DvQuality.Perfect`
-    makes 0 RNG draws, so it shifts the shared seeded stream vs Average/Poor — add a seeded-stream reproducibility
-    pin for a Perfect-tier build (seed → expected moveset) so the stream-shift can't silently regress.
+  - [x] **2d — `IEnemyArchetype` + tiers + moveset strategies — DONE (2026-06-28).** `EnemyArchetype.cs`:
+    `EnemyContext`/`EnemyTierSpec`/`IEnemyArchetype` + Weak/Medium/Strong/Boss singletons (`Default`=Medium).
+    Each tier shifts the depth baseline — Weak ×0.85 BST/−3 lvl/Poor/3 moves, Medium = baseline/Average/4,
+    Strong ×1.10/+3/High/`TmEnhanced`, Boss ×1.20/+6/Perfect/`Optimal`. `LearnsetMoveSelector` gained
+    `TmEnhanced` (best species-legal incl. TM/HM) + `Optimal` (best of any move) — deterministic top-N by a
+    shared `MoveScore`, no level gate — and a `maxMoves` cap. `CreateEnemyAsync(archetype = Medium)` builds the
+    spec, pulls Machine rows only for `TmEnhanced`, and threads DvQuality/maxMoves into `BuildCreature`.
+    Behaviour-preserving at Medium (modulo RNG draw order). Tier *selection* per encounter = Phase 3. Pins:
+    selector TmEnhanced/Optimal/maxMoves, `EnemyArchetypeTests` (lever climb), all-tiers seed reproducibility
+    (closes the 2b Perfect/Optimal stream-shift note). Seam review PASS (advisory addressed); 1111/1111.
+  - **Phase 2 COMPLETE** (2a–2d). ⚠️ Still pending a full `PokeApiConnector` re-import (network) to populate the
+    TM/HM rows `TmEnhanced` consumes; until then Strong-tier movesets rank level-up moves only.
   - **Deferred (per §3.6):** Stat-Exp lever; Boss ceiling (out-class-the-player design) — revisited a later phase.
 - [ ] **Phase 3 — Biome graph + `chooseNextEvent` / `RunDirector`.** Map traversal; node kinds land as
   `IRunEvent` stubs (bones).

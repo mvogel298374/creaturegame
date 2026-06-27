@@ -100,7 +100,8 @@ public sealed class EncounterFactory(
         IReadOnlyList<Attack> allMoves,
         IRandomSource? rng = null,
         BiomeDefinition? biome = null,
-        int depth = 0
+        int depth = 0,
+        IEnemyArchetype? archetype = null
     )
     {
         var source = rng ?? SystemRandomSource.Instance;
@@ -111,7 +112,12 @@ public sealed class EncounterFactory(
             + player.BaseDefense
             + player.BaseSpecial
             + player.BaseSpeed;
-        int targetBst = ScaleTargetBst(playerBst, depth);
+
+        // The strength tier resolves the levers (BST target, level, DV quality, moveset) from the run context;
+        // Medium ≈ the pre-tier behaviour. Tier selection per encounter is Phase 3 (defaults to Medium here).
+        var spec = (archetype ?? EnemyArchetypes.Default).Build(
+            new EnemyContext(player.Level, playerBst, depth, source)
+        );
 
         // Encounters draw only from wild-available species (excludes legendaries/statics/gifts/fossils — the
         // canonical lucky-spike hazard). Fall back to the full dex if availability data is absent (a
@@ -132,19 +138,21 @@ public sealed class EncounterFactory(
             pool = pool.Where(s => wildSet.Contains(s.Id)).ToList();
 
         var enemySpecies =
-            PickByBst(pool, targetBst, source, biome)
+            PickByBst(pool, spec.TargetBst, source, biome)
             ?? throw new InvalidOperationException("No species available to build an encounter.");
 
-        int enemyLevel = ScaleWildLevel(player.Level, depth, source);
-
+        // The TmEnhanced tier draws from level-up AND TM/HM (Machine) moves; base tiers use level-up only and
+        // Optimal ranks the whole move pool, so neither needs Machine rows. Include them only when used.
+        var allowedMethods =
+            spec.Moves == MoveSelectionStrategy.TmEnhanced
+                ? new[] { LearnMethod.LevelUp, LearnMethod.Machine }
+                : new[] { LearnMethod.LevelUp };
         var learnsets = await pokemonCtx
             .Learnsets.AsNoTracking()
-            // Base-tier enemy moveset: level-up moves only. The TM/HM (Machine) rows are read by the
-            // TmEnhanced/Optimal moveset tiers (Phase 2d), not the base selection here.
             .Where(l =>
                 l.Generation == ActiveGeneration
                 && l.SpeciesId == enemySpecies.Id
-                && l.Method == LearnMethod.LevelUp
+                && allowedMethods.Contains(l.Method)
             )
             .ToListAsync();
 
@@ -152,9 +160,11 @@ public sealed class EncounterFactory(
             enemySpecies,
             learnsets,
             allMoves,
-            enemyLevel,
-            MoveSelectionStrategy.WeightedSmart,
-            source
+            spec.Level,
+            spec.Moves,
+            source,
+            spec.Dvs,
+            spec.MoveCount
         );
     }
 
@@ -242,16 +252,17 @@ public sealed class EncounterFactory(
         IReadOnlyList<Attack> allMoves,
         int level,
         MoveSelectionStrategy strategy,
-        IRandomSource rng
+        IRandomSource rng,
+        DvQuality dvQuality = DvQuality.Average,
+        int maxMoves = LearnsetMoveSelector.MaxMoves
     )
     {
         // Construction rolls DVs (the Creature ctor used the global-RNG default calculator); re-seat the
-        // stat calculator on the run's seeded source and re-roll so a run with a fixed seed reproduces the
-        // same DVs. DV randomisation is a per-generation rule, so it stays behind IStatCalculator.
+        // stat calculator on the run's seeded source and re-roll at the requested quality so a run with a fixed
+        // seed reproduces the same DVs. DV randomisation is a per-generation rule, so it stays behind IStatCalculator.
         var creature = new Creature(species.Name.ToUpper()) { Level = level };
         creature.StatCalculator = new Gen1StatCalculator(rng);
-        // Ordinary DVs today; Phase 2d's enemy strength tier passes the spec's DvQuality here.
-        creature.StatCalculator.RandomiseDvs(creature, DvQuality.Average);
+        creature.StatCalculator.RandomiseDvs(creature, dvQuality);
         creature.InitializeFromSpecies(species);
         creature.Experience = creature.CalculateExperienceForLevel(level);
 
@@ -263,7 +274,8 @@ public sealed class EncounterFactory(
             level,
             species.Type1,
             species.Type2,
-            rng
+            rng,
+            maxMoves
         );
 
         foreach (var move in moves)
