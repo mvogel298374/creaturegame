@@ -265,6 +265,7 @@ public class MigrationTests : IDisposable
         Assert.Contains("SpeciesId", columns);
         Assert.Contains("MoveId", columns);
         Assert.Contains("LearnLevel", columns);
+        Assert.Contains("Method", columns);
         Assert.Contains("Generation", columns);
     }
 
@@ -283,21 +284,34 @@ public class MigrationTests : IDisposable
         context.Species.Add(species);
         context.SaveChanges();
 
-        context.Learnsets.Add(
+        context.Learnsets.AddRange(
             new PokemonLearnset
             {
                 SpeciesId = 1,
                 MoveId = 22,
                 LearnLevel = 13,
                 Generation = 1,
+                // Method left unset — must persist as the default LevelUp (the value pre-existing rows get).
+            },
+            new PokemonLearnset
+            {
+                SpeciesId = 1,
+                MoveId = 75,
+                LearnLevel = 0,
+                Method = LearnMethod.Machine, // a TM/HM row must round-trip too (data-contract pin)
+                Generation = 1,
             }
         );
         context.SaveChanges();
 
-        var loaded = context.Learnsets.AsNoTracking().Single(l => l.SpeciesId == 1);
-        Assert.Equal(22, loaded.MoveId);
-        Assert.Equal(13, loaded.LearnLevel);
-        Assert.Equal(1, loaded.Generation);
+        var levelUp = context.Learnsets.AsNoTracking().Single(l => l.MoveId == 22);
+        Assert.Equal(13, levelUp.LearnLevel);
+        Assert.Equal(1, levelUp.Generation);
+        Assert.Equal(LearnMethod.LevelUp, levelUp.Method);
+
+        var machine = context.Learnsets.AsNoTracking().Single(l => l.MoveId == 75);
+        Assert.Equal(LearnMethod.Machine, machine.Method);
+        Assert.Equal(0, machine.LearnLevel);
     }
 
     // --- Helpers ---

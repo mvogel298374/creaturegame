@@ -1,3 +1,4 @@
+using creaturegame.DB;
 using PokeApiConnector.PokeAPI;
 
 namespace creaturegame.Tests.Unit;
@@ -31,16 +32,16 @@ public class LearnsetImportTests
         };
 
     [Fact]
-    public void ExtractGen1Learnset_KeepsOnlyRedBlueLevelUpEntries()
+    public void ExtractGen1Learnset_KeepsRedBlueLevelUpAndMachine_ExcludesOtherVersionGroups()
     {
         var pokemon = new PokeApiPokemon
         {
             Id = 1,
             Moves =
             [
-                MoveEntry(33, (1, "level-up", "red-blue")), // ✓ Tackle
-                MoveEntry(22, (13, "level-up", "red-blue")), // ✓ Vine Whip
-                MoveEntry(75, (10, "machine", "red-blue")), // ✗ TM, not level-up
+                MoveEntry(33, (1, "level-up", "red-blue")), // ✓ Tackle (level-up)
+                MoveEntry(22, (13, "level-up", "red-blue")), // ✓ Vine Whip (level-up)
+                MoveEntry(75, (0, "machine", "red-blue")), // ✓ TM, now kept as Machine
                 MoveEntry(76, (1, "level-up", "yellow")), // ✗ wrong version group
                 MoveEntry(14, (20, "level-up", "gold-silver")), // ✗ Gen 2 version group
             ],
@@ -48,9 +49,10 @@ public class LearnsetImportTests
 
         var result = LearnsetMapper.ExtractGen1Learnset(pokemon);
 
-        Assert.Equal(2, result.Count);
-        Assert.Contains((33, 1), result);
-        Assert.Contains((22, 13), result);
+        Assert.Equal(3, result.Count);
+        Assert.Contains((33, 1, LearnMethod.LevelUp), result);
+        Assert.Contains((22, 13, LearnMethod.LevelUp), result);
+        Assert.Contains((75, 0, LearnMethod.Machine), result);
     }
 
     [Fact]
@@ -64,7 +66,23 @@ public class LearnsetImportTests
 
         var result = LearnsetMapper.ExtractGen1Learnset(pokemon);
 
-        Assert.Equal((33, 1), Assert.Single(result));
+        Assert.Equal((33, 1, LearnMethod.LevelUp), Assert.Single(result));
+    }
+
+    [Fact]
+    public void ExtractGen1Learnset_MoveLearnableBothWays_KeptAsLevelUp()
+    {
+        // A move that is both a level-up move and a TM is already in the level-up pool, so it is emitted once,
+        // as LevelUp — never duplicated as a separate Machine row.
+        var pokemon = new PokeApiPokemon
+        {
+            Id = 1,
+            Moves = [MoveEntry(34, (20, "level-up", "red-blue"), (0, "machine", "red-blue"))],
+        };
+
+        var result = LearnsetMapper.ExtractGen1Learnset(pokemon);
+
+        Assert.Equal((34, 20, LearnMethod.LevelUp), Assert.Single(result));
     }
 
     [Fact]
@@ -77,22 +95,24 @@ public class LearnsetImportTests
             [
                 MoveEntry(33, (1, "level-up", "red-blue")), // ✓ in range
                 MoveEntry(200, (1, "level-up", "red-blue")), // ✗ id > 165
+                MoveEntry(201, (0, "machine", "red-blue")), // ✗ id > 165 (machine too)
             ],
         };
 
         var result = LearnsetMapper.ExtractGen1Learnset(pokemon);
 
-        Assert.Equal((33, 1), Assert.Single(result));
+        Assert.Equal((33, 1, LearnMethod.LevelUp), Assert.Single(result));
     }
 
     [Fact]
-    public void ExtractGen1Learnset_OrdersByLevelThenMoveId()
+    public void ExtractGen1Learnset_OrdersLevelUpBeforeMachine_ThenByLevelThenId()
     {
         var pokemon = new PokeApiPokemon
         {
             Id = 1,
             Moves =
             [
+                MoveEntry(85, (0, "machine", "red-blue")), // machine — sorts last
                 MoveEntry(45, (1, "level-up", "red-blue")),
                 MoveEntry(33, (1, "level-up", "red-blue")),
                 MoveEntry(22, (13, "level-up", "red-blue")),
@@ -101,7 +121,15 @@ public class LearnsetImportTests
 
         var result = LearnsetMapper.ExtractGen1Learnset(pokemon);
 
-        Assert.Equal([(33, 1), (45, 1), (22, 13)], result);
+        Assert.Equal(
+            [
+                (33, 1, LearnMethod.LevelUp),
+                (45, 1, LearnMethod.LevelUp),
+                (22, 13, LearnMethod.LevelUp),
+                (85, 0, LearnMethod.Machine),
+            ],
+            result
+        );
     }
 
     [Fact]

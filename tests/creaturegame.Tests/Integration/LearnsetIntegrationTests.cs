@@ -128,7 +128,9 @@ public class LearnsetIntegrationTests : IDisposable
     private static List<PokemonLearnset> LoadGen1Learnset(PokemonDbContext ctx, int speciesId) =>
         ctx
             .Learnsets.AsNoTracking()
-            .Where(l => l.SpeciesId == speciesId && l.Generation == 1)
+            .Where(l =>
+                l.SpeciesId == speciesId && l.Generation == 1 && l.Method == LearnMethod.LevelUp
+            )
             .ToList();
 
     [Fact]

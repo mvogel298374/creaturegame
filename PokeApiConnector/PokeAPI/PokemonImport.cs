@@ -112,10 +112,10 @@ public class PokemonImport
     // Gen 1 is the only generation we import today; the column keeps the table multi-gen ready.
     private const int Gen1 = 1;
 
-    // Persist the species' Gen 1 level-up learnset. Idempotent: clears this species' Gen 1
-    // rows then re-inserts, so re-running the importer converges (same pattern as the
-    // game-availability seeder). The (MoveId, LearnLevel) data comes straight off the
-    // already-fetched /pokemon response — no extra API call.
+    // Persist the species' Gen 1 learnset — level-up moves plus TM/HM (machine) rows, each tagged by
+    // LearnMethod. Idempotent: clears this species' Gen 1 rows then re-inserts, so re-running the importer
+    // converges (same pattern as the game-availability seeder). The (MoveId, LearnLevel, Method) data comes
+    // straight off the already-fetched /pokemon response — no extra API call.
     private static async Task ImportLearnset(PokeApiPokemon pokeData, PokemonDbContext context)
     {
         var entries = LearnsetMapper.ExtractGen1Learnset(pokeData);
@@ -133,11 +133,15 @@ public class PokemonImport
                 SpeciesId = pokeData.Id,
                 MoveId = e.MoveId,
                 LearnLevel = e.LearnLevel,
+                Method = e.Method,
                 Generation = Gen1,
             })
         );
         await context.SaveChangesAsync();
-        Console.WriteLine($"  Learnset: {entries.Count} Gen 1 level-up moves for ID {pokeData.Id}");
+        int levelUp = entries.Count(e => e.Method == LearnMethod.LevelUp);
+        Console.WriteLine(
+            $"  Learnset: {levelUp} level-up + {entries.Count - levelUp} TM/HM Gen 1 moves for ID {pokeData.Id}"
+        );
     }
 
     private static PokemonSpecies MapToSpecies(

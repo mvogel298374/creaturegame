@@ -54,7 +54,11 @@ public sealed class EncounterFactory(
 
         var learnsets = await pokemonCtx
             .Learnsets.AsNoTracking()
-            .Where(l => l.Generation == ActiveGeneration && l.SpeciesId == species.Id)
+            .Where(l =>
+                l.Generation == ActiveGeneration
+                && l.SpeciesId == species.Id
+                && l.Method == LearnMethod.LevelUp
+            )
             .ToListAsync();
 
         var player = BuildCreature(
@@ -130,7 +134,13 @@ public sealed class EncounterFactory(
 
         var learnsets = await pokemonCtx
             .Learnsets.AsNoTracking()
-            .Where(l => l.Generation == ActiveGeneration && l.SpeciesId == enemySpecies.Id)
+            // Base-tier enemy moveset: level-up moves only. The TM/HM (Machine) rows are read by the
+            // TmEnhanced/Optimal moveset tiers (Phase 2d), not the base selection here.
+            .Where(l =>
+                l.Generation == ActiveGeneration
+                && l.SpeciesId == enemySpecies.Id
+                && l.Method == LearnMethod.LevelUp
+            )
             .ToListAsync();
 
         return BuildCreature(
@@ -180,7 +190,11 @@ public sealed class EncounterFactory(
 
         var learnsets = await pokemonCtx
             .Learnsets.AsNoTracking()
-            .Where(l => l.Generation == ActiveGeneration && l.SpeciesId == newForm.Id)
+            .Where(l =>
+                l.Generation == ActiveGeneration
+                && l.SpeciesId == newForm.Id
+                && l.Method == LearnMethod.LevelUp
+            )
             .ToListAsync();
 
         return new EvolutionOutcome(newForm, BuildLearnset(learnsets, allMoves));

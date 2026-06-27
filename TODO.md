@@ -51,10 +51,17 @@ Debt cleanup, User Documentation.
 - [ ] **Phase 2 — `IEnemyArchetype` tiers + depth-scaled bands.** *Design specced* in `ENCOUNTER_DESIGN.md §3`
   (archetype→`EnemyTierSpec`→factory; depth=`battlesWon` linear baseline × tier modulation; levers = BST band,
   level band, `DvQuality` seam, 3-level moveset). Sub-steps, in order:
-  - [ ] **2a — Import real TM/HM learnability** (data; gates TmEnhanced). Add `LearnMethod` to `PokemonLearnset`
-    (migration, existing rows default `LevelUp`); `LearnsetMapper` keeps machine moves tagged by method;
-    re-import; pin with a data-contract test. ⚠️ Filter `LearnMethod == LevelUp` in every level-up path
-    (base moveset selection, `MoveLearning`) so TM rows don't leak into level-up learning.
+  - [x] **2a — Import real TM/HM learnability — DONE (2026-06-27).** `LearnMethod{LevelUp,Machine}` enum +
+    `Method` field on `PokemonLearnset`; migration `AddLearnsetMethod` (`Method INTEGER` default 0=LevelUp),
+    applied to local `pokemon.db` (989 rows → LevelUp). `LearnsetMapper.ExtractGen1Learnset` now returns
+    `(MoveId, LearnLevel, Method)` and keeps red-blue **machine** moves too (one row/move, level-up precedence);
+    `ImportLearnset` persists `Method`. All three `EncounterFactory` learnset queries filter
+    `Method == LevelUp` (base selection + level-up learning unchanged). Pins: `LearnsetImportTests` (machine
+    extraction, both-ways→LevelUp, ordering, id-range) + `MigrationTests` (Method column + LevelUp/Machine
+    round-trip). Seam review PASS (4 advisories all addressed); 1095/1095. ⚠️ **Deferred deploy step: a full
+    `PokeApiConnector` re-import (network) is needed to populate the machine rows** — until then the column is
+    correct but holds only LevelUp data; 2a is behaviour-preserving without it. 2d's TmEnhanced/Optimal tiers
+    consume the machine rows.
   - [ ] **2b — `DvQuality{Poor,Average,Perfect}` on `IStatCalculator.RandomiseDvs`** (always explicit; drop the
     no-arg overload, player passes `Average`). Gen 1 maps Poor 0–7 / Average 0–15 / Perfect 15; HP-DV derivation
     stays on the seam.
