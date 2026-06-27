@@ -53,7 +53,7 @@ This single cascade gives theming, balance guardrail, and acquisition source fro
 
 ## 2. Biomes — curated, region-grouped, seeded per run  *(Phase 1 spec)*
 
-### 2.1 Data model
+### 2.1 Data model  *(✅ implemented — `creaturegame/Creatures/Biome.cs`)*
 
 A biome is **authored design content** (not imported — there is no per-area location table in `pokemon.db`;
 `PokemonGameAvailability` carries only `GameVersion` + `AvailabilityType`). It lives in a **static C# registry**
@@ -61,35 +61,45 @@ A biome is **authored design content** (not imported — there is no per-area lo
 JSON static file later if designers need to edit without a rebuild.)
 
 ```
-Region            = { Id (Kanto, Johto, …), Biomes : BiomeDefinition[] }   // a region OWNS a biome list
-BiomeDefinition   = { Id, Name, Region, Types[1..3], Neighbours[] }        // Neighbours authored now,
-                                                                          //   TRAVERSED in Phase 3
+enum Region              { Kanto, … }                                   // a content-grouping axis (= the multi-gen axis)
+record BiomeDefinition   ( Id, Name, Region, Types[1..3], Neighbours[] ) // Neighbours authored now, TRAVERSED in Phase 3
+   .Contains(species)    => Type1 ∈ Types || Type2 ∈ Types              // either-type match
+   .HasAnyIn(pool)       => any on-theme species in pool
+static Biomes            // the registry — region ⇒ biome list
+   .For(region)          -> BiomeDefinition[]                           // "Kanto OWNS these 18"
+   .Playable(region,pool)-> BiomeDefinition[]                           // For(region) minus empty biomes
 ```
 
-A **region owns its biome list** ("Kanto has these 18"). Biome *archetypes* (forest, cave, shore) recur across
-regions, but every instance is **region- and generation-scoped** — Johto later declares its own biome list over
-the Gen 2 dex, reusing the archetype, not the loop code. This is the same axis as the multi-generation roadmap,
-so it is free forward-compat. **Region naming is flavour only** — a biome need not map to a real in-game place.
+`Region` is an **enum** (not a record with an embedded list); the "a region owns its biome list" ownership is
+expressed by the `Biomes.For(region)` lookup. Biome *archetypes* (forest, cave, shore) recur across regions, but
+every instance is **region- and generation-scoped** — Johto later declares its own biome list over the Gen 2
+dex, reusing the archetype, not the loop code. This is the same axis as the multi-generation roadmap, so it is
+free forward-compat. **Region naming is flavour only** — a biome need not map to a real in-game place. The
+`Neighbours` graph is authored now and guarded for symmetry + full connectivity by `BiomeTests`, but only
+*traversed* in Phase 3.
 
 **Seeded per run.** *Which* biomes appear and *how the graph wires up* is randomised per run, riding the per-run
 seed that is already done end-to-end (`GameController.Start` → `SeededRandomSource`, `GAME_LOOP.md §6.4`) — same
 seed ⇒ same map.
 
-### 2.2 Pool membership rules (settled)
+### 2.2 Pool membership rules (settled — ✅ implemented)
 
-1. **Either-type match.** A species is in a biome's pool if **`Type1` OR `Type2`** is in the biome's theme.
-   Inclusive — dual-types aren't orphaned and naturally appear in several biomes (a Bug/Flying belongs in a
-   forest *and* on a windy route).
+1. **Either-type match.** A species is in a biome's pool if **`Type1` OR `Type2`** is in the biome's theme
+   (`BiomeDefinition.Contains`). Inclusive — dual-types aren't orphaned and naturally appear in several biomes
+   (a Bug/Flying belongs in a forest *and* on a windy route).
 2. **Wild-available only.** The pool is restricted to species with `AvailabilityType == "Wild"` in
-   `PokemonGameAvailability` — excludes legendaries, statics, gifts, and fossils (19 of 151 in Gen 1), the
-   canonical lucky-spike hazard. (Version-specific Red/Blue/Yellow filtering stays deferred — see
-   `TODO.md` *Known Gaps*.)
+   `PokemonGameAvailability` (`EncounterFactory.CreateEnemyAsync`) — excludes legendaries, statics, gifts, and
+   fossils (19 of 151 in Gen 1), the canonical lucky-spike hazard. *Resilience:* if no availability rows exist
+   (a minimally-seeded DB) the filter falls back to the full dex so the selector never starves. (Version-specific
+   Red/Blue/Yellow filtering stays deferred — see `TODO.md` *Known Gaps*.)
 3. **Empty biomes never generate.** A biome whose Wild pool is empty for the active generation is **excluded at
-   map-generation time** — it simply isn't placed. Within a *valid* biome, if the target-BST band finds no
-   candidate, the band **widens in-theme** to the nearest-BST themed species. **The theme is never broken** —
-   you never face an off-theme creature inside a biome.
+   map-generation time** (`Biomes.Playable` returns only non-empty biomes) — it simply isn't placed. Within a
+   *valid* biome, if the target-BST band finds no candidate, the band **widens in-theme** to the nearest-BST
+   themed species (`PickByBst`'s `MinBy` fallback when a `biome` is passed). **The theme is never broken** — you
+   never face an off-theme creature inside a biome.
 
-These rules apply on top of `EncounterSelector.PickByBst` (which gains a biome-type + Wild predicate) — see §6.
+These rules live on `EncounterSelector.PickByBst` (optional `biome` filter) + `Biomes.Playable`, applied by
+`EncounterFactory.CreateEnemyAsync` — see §6.
 
 ### 2.3 Kanto roster (18 biomes, all 15 Gen 1 types homed)
 
@@ -203,7 +213,7 @@ loop body changing. `BattleRunner` graduates into the **`RunDirector`** that `GA
 
 | This design | Lands on / replaces | Note |
 |:--|:--|:--|
-| Type-filtered biome pool | `EncounterSelector.PickByBst` (add a type filter), `EncounterFactory.CreateEnemyAsync` | pool query gains a biome-type predicate |
+| Type-filtered biome pool + Wild filter | `Biome.cs` (new), `EncounterSelector.PickByBst` (biome param), `EncounterFactory.CreateEnemyAsync` | ✅ **done (Phase 1)** — biome param null until Phase 3 supplies one |
 | Depth-scaled BST + level band | `CreateEnemyAsync` (raw `playerBst` today), `ScaleWildLevel` | add the depth term the TODO claimed existed |
 | `IEnemyArchetype` tiers | new, web/run layer beside `EncounterFactory` | composes existing levers; reuses `MoveSelectionStrategy`, `IStatCalculator` |
 | Biome graph + `chooseNextEvent` | `BattleRunner.RunAsync` (hardcoded `while` today) → `RunDirector` | per `GAME_LOOP.md §3` target |
@@ -218,8 +228,9 @@ generation-agnostic and data-agnostic.
 ## 7. Phased build (buildable order, not boil-the-ocean)
 
 1. **Biome model + region grouping** (authored definitions) and the **type-filtered pool** in
-   `EncounterSelector` / `EncounterFactory`. **Specced in §2** — `BiomeDefinition`/`Region` model, the three
-   membership rules, and the verified 18-biome Kanto roster; ready to implement.
+   `EncounterSelector` / `EncounterFactory`. ✅ **DONE (2026-06-27)** — `Biome.cs` registry, the three
+   membership rules, the verified 18-biome Kanto roster, and the live Wild filter; biome selection is the
+   `CreateEnemyAsync` seam Phase 3 fills. (Specced in §2.)
 2. **`IEnemyArchetype` tiers** (Weak/Medium/Strong/Boss) + **depth-scaled bands** — replaces flat `playerBst`.
 3. **Biome graph + `chooseNextEvent` / `RunDirector`** — map traversal; node kinds land as event stubs (bones).
 4. **Acquisition channels** (boss catch + themed draft, fought-only) — gated on (1)–(3) and the deferred Catch
