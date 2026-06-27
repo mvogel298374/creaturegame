@@ -77,6 +77,37 @@ public class RunSeedReproducibilityTests
         AssertSameCreature(e1, e2);
     }
 
+    [Fact]
+    public async Task CreateEnemy_DrawsOnlyFromWildAvailableSpecies()
+    {
+        // Pins the Phase 1 Wild filter: enemies never come from non-wild species (legendaries/statics/gifts/
+        // fossils). Without the filter, in-band non-wild species (fossils, Eeveelutions, Hitmons, …) would
+        // surface — this would catch a regression that the determinism test alone (full-dex fallback stays
+        // deterministic too) would not.
+        var factory = BuildFactory();
+        var setup = await factory.CreatePlayerSetupAsync(Bulbasaur, 50, new SeededRandomSource(3));
+        Assert.NotNull(setup);
+
+        await using var ctx = new PokemonDbContext();
+        var wild = ctx
+            .GameAvailability.AsNoTracking()
+            .Where(a => a.AvailabilityType == "Wild")
+            .Select(a => a.SpeciesId)
+            .Distinct()
+            .ToHashSet();
+        Assert.NotEmpty(wild); // guard: the live DB carries availability data, so the filter is exercised
+
+        for (int i = 0; i < 100; i++)
+        {
+            var enemy = await factory.CreateEnemyAsync(
+                setup!.Player,
+                setup.AllMoves,
+                new SeededRandomSource(i)
+            );
+            Assert.Contains(enemy.SpeciesId, wild);
+        }
+    }
+
     private static void AssertSameCreature(Creature x, Creature y)
     {
         Assert.Equal(x.SpeciesId, y.SpeciesId);

@@ -83,11 +83,16 @@ public sealed class EncounterFactory(
     /// species, reusing the run's already-loaded move pool. The enemy gets a semi-random "smart" moveset so
     /// encounters vary. Enemy level sits in a roguelite band below the player (see <see cref="ScaleWildLevel"/>)
     /// so the chain stays winnable while still scaling up as the player levels.
+    /// <para>The pool is restricted to <em>wild-available</em> species (excludes legendaries/statics/gifts).
+    /// When <paramref name="biome"/> is supplied the pool is further filtered to that biome's type theme
+    /// (<see cref="EncounterSelector.PickByBst"/>); it is null until Phase 3's biome graph selects one per
+    /// encounter (see <c>ENCOUNTER_DESIGN.md §2</c>).</para>
     /// </summary>
     public async Task<Creature> CreateEnemyAsync(
         Creature player,
         IReadOnlyList<Attack> allMoves,
-        IRandomSource? rng = null
+        IRandomSource? rng = null,
+        BiomeDefinition? biome = null
     )
     {
         var source = rng ?? SystemRandomSource.Instance;
@@ -99,12 +104,26 @@ public sealed class EncounterFactory(
             + player.BaseSpecial
             + player.BaseSpeed;
 
+        // Encounters draw only from wild-available species (excludes legendaries/statics/gifts/fossils — the
+        // canonical lucky-spike hazard). Fall back to the full dex if availability data is absent (a
+        // minimally-seeded DB), so the selector never starves.
+        var wildIds = await pokemonCtx
+            .GameAvailability.AsNoTracking()
+            .Where(a => a.AvailabilityType == "Wild")
+            .Select(a => a.SpeciesId)
+            .Distinct()
+            .ToListAsync();
+        var wildSet = wildIds.ToHashSet();
+
         var pool = await pokemonCtx
             .Species.AsNoTracking()
             .Where(s => s.Id != player.SpeciesId)
             .ToListAsync();
+        if (wildSet.Count > 0)
+            pool = pool.Where(s => wildSet.Contains(s.Id)).ToList();
+
         var enemySpecies =
-            PickByBst(pool, playerBst, source)
+            PickByBst(pool, playerBst, source, biome)
             ?? throw new InvalidOperationException("No species available to build an encounter.");
 
         int enemyLevel = ScaleWildLevel(player.Level, source);

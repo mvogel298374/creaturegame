@@ -39,11 +39,15 @@ Debt cleanup, User Documentation.
   sequenced by `chooseNextEvent` (`BattleRunner` → `RunDirector`, per `GAME_LOOP.md §3`).
 
 **Phased build (from `ENCOUNTER_DESIGN.md §7` — implementation, gated on the design above):**
-- [ ] **Phase 1 — Biome model + type-filtered pool.** *Design + roster specced* in `ENCOUNTER_DESIGN.md §2`
-  (`BiomeDefinition`/`Region` static-registry model, the three membership rules — either-type match,
-  Wild-available only, empty biomes don't generate — and the verified **18-biome Kanto roster**). **Remaining =
-  implementation:** the static biome registry + a biome-type + Wild predicate on `EncounterSelector.PickByBst`
-  (in-theme BST widening), wired through `EncounterFactory.CreateEnemyAsync`.
+- [x] **Phase 1 — Biome model + type-filtered pool — DONE (2026-06-27).** `creaturegame/Creatures/Biome.cs`:
+  `Region` enum (multi-gen axis) + `BiomeDefinition` record (Types + Neighbours, `Contains` = either-type
+  match) + static `Biomes` registry (18-biome Kanto roster, `For`/`Playable` — empty biomes never generate).
+  `EncounterSelector.PickByBst` gained an optional biome filter with **in-theme nearest-BST widening** (theme
+  never broken). `EncounterFactory.CreateEnemyAsync` now restricts to **wild-available** species (`"Wild"`
+  `GameAvailability`, full-dex fallback if absent) + threads an optional biome param (null until Phase 3
+  supplies one). Tests: `BiomeTests` (coverage, 2–3 spread, no post-Gen-1 types, graph symmetry+connectivity,
+  membership, `Playable`) + biome cases in `EncounterSelectorTests` + a `CreateEnemy_DrawsOnlyFromWildAvailable`
+  pin. Seam review PASS (3 advisories all addressed); 1094/1094. Specced in `ENCOUNTER_DESIGN.md §2`.
 - [ ] **Phase 2 — `IEnemyArchetype` tiers + depth-scaled bands.** Weak/Medium/Strong/Boss strategies; replace
   the flat `playerBst` draw with a depth-scaled BST + level band that the tier modulates.
 - [ ] **Phase 3 — Biome graph + `chooseNextEvent` / `RunDirector`.** Map traversal; node kinds land as
