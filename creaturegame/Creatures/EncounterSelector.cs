@@ -15,7 +15,9 @@ public static class EncounterSelector
 
     /// <summary>
     /// Picks a random species from <paramref name="pool"/> whose BST falls within ±15 % of
-    /// <paramref name="playerBst"/>, widening to ±25 %, ±50 %, then ±100 % if a tighter window is empty.
+    /// <paramref name="targetBst"/>, widening to ±25 %, ±50 %, then ±100 % if a tighter window is empty.
+    /// The target is normally the player's BST, but the run layer passes a depth-scaled / tier-shifted target
+    /// (see <c>EncounterFactory.ScaleTargetBst</c>) to climb the curve.
     /// <para>When <paramref name="biome"/> is given, the pool is first filtered to that biome's theme
     /// (<see cref="BiomeDefinition.Contains"/>) and the theme is <em>never</em> broken: if no themed species
     /// falls in any band, it returns the nearest-BST themed species rather than an off-theme one. When the biome
@@ -24,7 +26,7 @@ public static class EncounterSelector
     /// </summary>
     public static PokemonSpecies? PickByBst(
         List<PokemonSpecies> pool,
-        int playerBst,
+        int targetBst,
         IRandomSource? rng = null,
         BiomeDefinition? biome = null
     )
@@ -36,8 +38,8 @@ public static class EncounterSelector
 
         foreach (var pct in new[] { 0.15, 0.25, 0.50, 1.0 })
         {
-            int lo = (int)(playerBst * (1.0 - pct));
-            int hi = (int)(playerBst * (1.0 + pct));
+            int lo = (int)(targetBst * (1.0 - pct));
+            int hi = (int)(targetBst * (1.0 + pct));
             var candidates = candidatePool.Where(s => Bst(s) >= lo && Bst(s) <= hi).ToList();
             if (candidates.Count > 0)
                 return candidates[r.Next(candidates.Count)];
@@ -46,6 +48,6 @@ public static class EncounterSelector
         // otherwise keep the legacy random-from-pool fallback.
         return biome is null
             ? candidatePool[r.Next(candidatePool.Count)]
-            : candidatePool.MinBy(s => Math.Abs(Bst(s) - playerBst));
+            : candidatePool.MinBy(s => Math.Abs(Bst(s) - targetBst));
     }
 }

@@ -23,7 +23,7 @@ public class BattleRunnerTests
         // The first `targetWins` enemies are slow 1-HP pushovers (player strikes first, one-shots, takes no
         // damage); the next is a fast bruiser that one-shots the player and ends the run.
         int built = 0;
-        Func<Creature, Task<Creature>> supplier = _ =>
+        Func<Creature, int, Task<Creature>> supplier = (_, _) =>
         {
             built++;
             var enemy =
@@ -77,7 +77,7 @@ public class BattleRunnerTests
 
         var runner = new BattleRunner(
             player,
-            _ => Task.FromResult(enemy),
+            (_, _) => Task.FromResult(enemy),
             Gen1TypeChart.Instance,
             new CancelledInput(), // simulates the client having dropped — input throws on first choice
             new ScriptedInput("tackle"),
@@ -100,7 +100,7 @@ public class BattleRunnerTests
         var player = Fighter("Player", hp: 300, attack: 999, speed: 1, level: 50); // slow: the foe strikes first
 
         int built = 0;
-        Func<Creature, Task<Creature>> supplier = _ =>
+        Func<Creature, int, Task<Creature>> supplier = (_, _) =>
         {
             built++;
             Creature enemy;
@@ -171,7 +171,7 @@ public class BattleRunnerTests
         var statusEntering4 = StatusCondition.Sleep; // sentinel; overwritten when encounter 4 is built
 
         int built = 0;
-        Func<Creature, Task<Creature>> supplier = p =>
+        Func<Creature, int, Task<Creature>> supplier = (p, _) =>
         {
             built++;
             if (built == 4)
@@ -253,7 +253,7 @@ public class BattleRunnerTests
         int built = 0;
         int hpEntering4 = -1;
         var statusEntering4 = StatusCondition.None;
-        Func<Creature, Task<Creature>> supplier = p =>
+        Func<Creature, int, Task<Creature>> supplier = (p, _) =>
         {
             built++;
             if (built == 4)
@@ -327,7 +327,7 @@ public class BattleRunnerTests
         var recorder = new RecordingEmitter();
         var runner = new BattleRunner(
             player,
-            _ => Task.FromResult(enemy),
+            (_, _) => Task.FromResult(enemy),
             Gen1TypeChart.Instance,
             new ScriptedInput("poisonpowder"),
             new ScriptedInput("poisonpowder"),

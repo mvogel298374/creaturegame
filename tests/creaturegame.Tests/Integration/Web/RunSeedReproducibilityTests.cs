@@ -75,6 +75,24 @@ public class RunSeedReproducibilityTests
         Assert.Equal(e1.SpeciesId, e2.SpeciesId); // same species pick (PickByBst)
         Assert.Equal(e1.Level, e2.Level); // same level (ScaleWildLevel)
         AssertSameCreature(e1, e2);
+
+        // Depth > 0 takes a distinct RNG-draw path: ScaleTargetBst shifts targetBst, changing the candidate
+        // set PickByBst indexes into, and ScaleWildLevel lifts the band. It must still be seed-reproducible.
+        var d1 = await factory.CreateEnemyAsync(
+            setup.Player,
+            setup.AllMoves,
+            new SeededRandomSource(1234),
+            depth: 5
+        );
+        var d2 = await factory.CreateEnemyAsync(
+            setup.Player,
+            setup.AllMoves,
+            new SeededRandomSource(1234),
+            depth: 5
+        );
+        Assert.Equal(d1.SpeciesId, d2.SpeciesId);
+        Assert.Equal(d1.Level, d2.Level);
+        AssertSameCreature(d1, d2);
     }
 
     [Fact]

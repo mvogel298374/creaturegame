@@ -26,7 +26,7 @@ namespace creaturegame.Combat;
 /// </summary>
 public sealed class BattleRunner(
     Creature player,
-    Func<Creature, Task<Creature>> enemySupplier,
+    Func<Creature, int, Task<Creature>> enemySupplier,
     ITypeChart typeChart,
     IBattleInput playerInput,
     IBattleInput enemyInput,
@@ -45,7 +45,9 @@ public sealed class BattleRunner(
         CarriedStatus? carried = null; // the player's major status, carried into the next encounter
         while (player.IsAlive())
         {
-            var enemy = await enemySupplier(player);
+            // battlesWon is the run depth — 0 for the first encounter, climbing each win. The supplier scales
+            // the next foe (BST band, level) to it; see EncounterFactory.CreateEnemyAsync.
+            var enemy = await enemySupplier(player, battlesWon);
             int levelBefore = player.Level;
             var battle = new Battle(
                 player,

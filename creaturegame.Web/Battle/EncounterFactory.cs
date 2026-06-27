@@ -83,20 +83,24 @@ public sealed class EncounterFactory(
     }
 
     /// <summary>
-    /// Builds a fresh wild enemy scaled to the player's current level and BST, excluding the player's own
-    /// species, reusing the run's already-loaded move pool. The enemy gets a semi-random "smart" moveset so
-    /// encounters vary. Enemy level sits in a roguelite band below the player (see <see cref="ScaleWildLevel"/>)
-    /// so the chain stays winnable while still scaling up as the player levels.
+    /// Builds a fresh wild enemy scaled to the player and the run's <paramref name="depth"/>, excluding the
+    /// player's own species, reusing the run's already-loaded move pool. The enemy gets a semi-random "smart"
+    /// moveset so encounters vary. Both the target BST (<see cref="ScaleTargetBst"/>) and the level band
+    /// (<see cref="ScaleWildLevel"/>) climb with depth: at depth 0 the foe sits a step under the player (the
+    /// original behaviour); deeper foes target stronger species and higher levels.
     /// <para>The pool is restricted to <em>wild-available</em> species (excludes legendaries/statics/gifts).
     /// When <paramref name="biome"/> is supplied the pool is further filtered to that biome's type theme
     /// (<see cref="EncounterSelector.PickByBst"/>); it is null until Phase 3's biome graph selects one per
-    /// encounter (see <c>ENCOUNTER_DESIGN.md §2</c>).</para>
+    /// encounter (see <c>ENCOUNTER_DESIGN.md §2</c>). <paramref name="depth"/> is the run's <c>battlesWon</c>,
+    /// threaded by <see cref="creaturegame.Combat.BattleRunner"/>; Phase 2d's enemy tier modulates the band
+    /// further.</para>
     /// </summary>
     public async Task<Creature> CreateEnemyAsync(
         Creature player,
         IReadOnlyList<Attack> allMoves,
         IRandomSource? rng = null,
-        BiomeDefinition? biome = null
+        BiomeDefinition? biome = null,
+        int depth = 0
     )
     {
         var source = rng ?? SystemRandomSource.Instance;
@@ -107,6 +111,7 @@ public sealed class EncounterFactory(
             + player.BaseDefense
             + player.BaseSpecial
             + player.BaseSpeed;
+        int targetBst = ScaleTargetBst(playerBst, depth);
 
         // Encounters draw only from wild-available species (excludes legendaries/statics/gifts/fossils — the
         // canonical lucky-spike hazard). Fall back to the full dex if availability data is absent (a
@@ -127,10 +132,10 @@ public sealed class EncounterFactory(
             pool = pool.Where(s => wildSet.Contains(s.Id)).ToList();
 
         var enemySpecies =
-            PickByBst(pool, playerBst, source, biome)
+            PickByBst(pool, targetBst, source, biome)
             ?? throw new InvalidOperationException("No species available to build an encounter.");
 
-        int enemyLevel = ScaleWildLevel(player.Level, source);
+        int enemyLevel = ScaleWildLevel(player.Level, depth, source);
 
         var learnsets = await pokemonCtx
             .Learnsets.AsNoTracking()
@@ -200,17 +205,34 @@ public sealed class EncounterFactory(
         return new EvolutionOutcome(newForm, BuildLearnset(learnsets, allMoves));
     }
 
+    // Depth-scaling tuning (run-layer roguelite knobs, not Gen 1 mechanics — see ScaleWildLevel's note).
+    private const int BstGainPerDepth = 10; // each step deeper raises the target BST by this (the TODO curve)
+    private const double LevelLiftPerDepth = 0.02; // each step lifts the level band's fractions by this
+    private const double MaxLevelLift = 0.40; // …capped here, so the band tops out around [90%, 120%] of player
+
     /// <summary>
-    /// Picks a wild encounter's level as a roguelite difficulty band: uniformly in [50%, 80%] of the player's
-    /// current level (floored), never below 2. This deliberately keeps wild foes a step under the player so the
-    /// endless chain stays winnable while still scaling up as the player levels. It is a run-layer tuning
-    /// choice, not a Gen 1 mechanic (Gen 1 wild levels come from per-area encounter tables), so it lives here
-    /// in the web/run layer rather than behind a battle seam. <c>internal</c> for direct unit testing.
+    /// The depth-scaled BST the encounter aims for: the player's BST plus <c>depth × <see cref="BstGainPerDepth"/></c>.
+    /// At depth 0 it is exactly the player's BST (the old behaviour); deeper encounters target progressively
+    /// stronger species. <see cref="PickByBst"/> bands around this and the pool naturally caps it (no species
+    /// exceeds the highest BST available). A run-layer tuning choice, not a battle seam. <c>internal</c> for tests.
     /// </summary>
-    internal static int ScaleWildLevel(int playerLevel, IRandomSource rng)
+    internal static int ScaleTargetBst(int playerBst, int depth) =>
+        playerBst + Math.Max(0, depth) * BstGainPerDepth;
+
+    /// <summary>
+    /// Picks a wild encounter's level as a roguelite difficulty band that climbs with <paramref name="depth"/>:
+    /// uniformly within a [min%, max%] window of the player's current level (floored, never below 2). At depth 0
+    /// the window is [50%, 80%] (the original behaviour — foes a step under the player); each step deeper lifts
+    /// both ends by <see cref="LevelLiftPerDepth"/>, capped at <see cref="MaxLevelLift"/> (≈ [90%, 120%]), so
+    /// deep foes reach and then exceed the player's level. A run-layer tuning choice, not a Gen 1 mechanic
+    /// (Gen 1 wild levels come from per-area encounter tables), so it lives here, not behind a battle seam.
+    /// <c>internal</c> for direct unit testing.
+    /// </summary>
+    internal static int ScaleWildLevel(int playerLevel, int depth, IRandomSource rng)
     {
-        int min = Math.Max(2, (int)(playerLevel * 0.5));
-        int max = Math.Max(min, (int)(playerLevel * 0.8));
+        double lift = Math.Min(Math.Max(0, depth) * LevelLiftPerDepth, MaxLevelLift);
+        int min = Math.Max(2, (int)(playerLevel * (0.5 + lift)));
+        int max = Math.Max(min, (int)(playerLevel * (0.8 + lift)));
         return rng.Next(min, max + 1); // Next's upper bound is exclusive → +1 makes max inclusive
     }
 

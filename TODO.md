@@ -68,8 +68,13 @@ Debt cleanup, User Documentation.
     Both callers (`Creature` ctor, `EncounterFactory.BuildCreature`) pass `Average` (behaviour-preserving;
     `Next(0,16)`≡ old `Next(16)`). Pins: Perfect maxed+deterministic, Poor ≤7, Average full-range. Seam review
     PASS (advisories addressed); 1098/1098.
-  - [ ] **2c — Generalize the bands.** `PickByBst` gains an explicit `targetBst` (defaults to `playerBst`);
-    `ScaleWildLevel` gains `depth` + a tier band. Thread `depth` (`battlesWon`) `BattleRunner → CreateEnemyAsync`.
+  - [x] **2c — Depth-scaled bands — DONE (2026-06-27).** `PickByBst`'s center param renamed `targetBst`;
+    new `EncounterFactory.ScaleTargetBst(playerBst, depth)` = `playerBst + depth×10`; `ScaleWildLevel` gains
+    `depth`, lifting the [50%,80%] band by 0.02/depth capped +0.40 (→ ~[90%,120%]). `CreateEnemyAsync` takes
+    `int depth = 0`. `BattleRunner`'s enemy supplier is now `Func<Creature,int,Task<Creature>>`, called with
+    `battlesWon` (0 first encounter); `GameSessionManager` threads it. Behaviour-preserving at depth 0. Pins:
+    depth-lift band, `ScaleTargetBst` curve, depth>0 seed reproducibility. Seam review PASS (1 advisory
+    addressed); 1101/1101.
   - [ ] **2d — `IEnemyArchetype` + `EnemyTierSpec`** (Weak/Medium/Strong/Boss) + the `TmEnhanced`/`Optimal`
     moveset strategies (no level gate; rank by power/STAB/coverage). `CreateEnemyAsync` gains an optional
     archetype (default Medium); tier *selection* is Phase 3. ⚠️ **Seam note (from 2b review):** `DvQuality.Perfect`
