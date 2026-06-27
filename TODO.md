@@ -59,11 +59,10 @@ Debt cleanup, User Documentation.
     `ImportLearnset` persists `Method`. All three `EncounterFactory` learnset queries filter
     `Method == LevelUp` (base selection + level-up learning unchanged). Pins: `LearnsetImportTests` (machine
     extraction, both-ways→LevelUp, ordering, id-range) + `MigrationTests` (Method column + LevelUp/Machine
-    round-trip). Seam review PASS (4 advisories all addressed); 1095/1095. ⚠️ **Deferred deploy step: a full
-    `PokeApiConnector` re-import (network) is needed to populate the machine rows** — until then the column is
-    correct but holds only LevelUp data; 2a is behaviour-preserving without it. 2d's TmEnhanced/Optimal tiers
-    consume the machine rows.
-  - [x] **2b — `DvQuality` seam — DONE (2026-06-27).** `DvQuality{Poor,Average,Perfect}` enum;
+    round-trip). Seam review PASS (4 advisories all addressed); 1095/1095. **Re-import done (2026-06-28):**
+    `pokemon.db` now carries 2,860 Machine rows across 145 species (6 no-TM-learners have none) + the 989
+    level-up rows. 2d's TmEnhanced/Optimal tiers consume them.
+  - [x] **2b — `DvQuality` seam — DONE (2026-06-27).** `DvQuality{Poor,Average,High,Perfect}` enum;
     `IStatCalculator.RandomiseDvs(creature, quality)` (no-arg overload dropped — always explicit). `Gen1StatCalculator`
     maps Perfect→15 (fixed, no roll), High→8–15, Poor→0–7, Average→0–15 via `RollDv`; HP-DV derivation unchanged on the seam.
     Both callers (`Creature` ctor, `EncounterFactory.BuildCreature`) pass `Average` (behaviour-preserving;
@@ -86,8 +85,8 @@ Debt cleanup, User Documentation.
     Behaviour-preserving at Medium (modulo RNG draw order). Tier *selection* per encounter = Phase 3. Pins:
     selector TmEnhanced/Optimal/maxMoves, `EnemyArchetypeTests` (lever climb), all-tiers seed reproducibility
     (closes the 2b Perfect/Optimal stream-shift note). Seam review PASS (advisory addressed); 1111/1111.
-  - **Phase 2 COMPLETE** (2a–2d). ⚠️ Still pending a full `PokeApiConnector` re-import (network) to populate the
-    TM/HM rows `TmEnhanced` consumes; until then Strong-tier movesets rank level-up moves only.
+  - **Phase 2 COMPLETE** (2a–2d), including the TM/HM re-import (2026-06-28) — Strong-tier (`TmEnhanced`)
+    movesets now draw on real TM/HM data.
   - **Deferred (per §3.6):** Stat-Exp lever; Boss ceiling (out-class-the-player design) — revisited a later phase.
 - [ ] **Phase 3 — Biome graph + `chooseNextEvent` / `RunDirector`.** Map traversal; node kinds land as
   `IRunEvent` stubs (bones).

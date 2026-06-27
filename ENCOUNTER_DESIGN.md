@@ -152,18 +152,20 @@ none stuck in one, none in more than three:
 Enemy strength is a **strategy seam** — `IEnemyArchetype` — with implementations **Weak / Medium / Strong /
 Boss**. Each tier is its own class that decides *which levers it pulls*; it does not hardcode a stat block.
 
-### 3.1 Shape — archetype returns a spec, the factory builds
+### 3.1 Shape — archetype returns a spec, the factory builds  *(✅ implemented — `EnemyArchetype.cs`)*
 
 The archetype is a **pure function** of the run context, returning a lever spec the factory consumes — so the
 tiers are DB-free and unit-testable ("Boss at depth 5 → these levers", no database).
 
 ```
 record EnemyContext   ( int PlayerLevel, int PlayerBst, int Depth, IRandomSource Rng )
-record EnemyTierSpec  ( int TargetBst, double BandPct, (int Min,int Max) LevelBand,
-                        DvQuality Dvs, MovesetLevel Moves, int MoveCount )
+record EnemyTierSpec  ( int TargetBst, int Level, DvQuality Dvs, MoveSelectionStrategy Moves, int MoveCount )
 interface IEnemyArchetype { EnemyTierSpec Build(EnemyContext ctx); }   // Weak/Medium/Strong/Boss
+// EnemyArchetypes.{Weak,Medium,Strong,Boss} singletons; Default = Medium.
 ```
 
+The archetype rolls the final `Level` (the depth-scaled band ± its tier offset) and computes the final
+`TargetBst` (the depth baseline × its tier multiplier); the BST band *width* stays fixed inside `PickByBst`.
 `EncounterFactory` turns the spec into a `Creature` (DB + construction stay in the factory). This composition
 layer is **web/run-layer** — tier banding is roguelite tuning, not a Gen 1 mechanic, so it stays out of the
 battle seams (as `ScaleWildLevel`'s own doc comment already argues); only the *DV* lever crosses into a seam
@@ -181,10 +183,10 @@ tougher than "Medium @ depth 1." Phase 3 later swaps `battlesWon` for a richer b
 
 | Lever | Lands on | Weak → Boss |
 |:--|:--|:--|
-| **BST band** | `PickByBst` gains an explicit `targetBst` (defaults to `playerBst`) | tier shifts target/width off the depth baseline |
-| **Level** | `ScaleWildLevel` gains `depth` + a tier band | tier raises/lowers the band |
-| **DVs** | **new `DvQuality{Poor,Average,High,Perfect}` on `IStatCalculator.RandomiseDvs`** | Poor 0–7 → Average 0–15 → High 8–15 → Perfect 15 |
-| **Moveset** | `MovesetLevel` (see §3.4) + move count | Base → TmEnhanced → Optimal |
+| **BST** | `PickByBst`'s explicit `targetBst` | tier multiplies the depth-scaled target (band width fixed in `PickByBst`) |
+| **Level** | `ScaleWildLevel(depth)` | tier applies a flat level offset to the rolled band value |
+| **DVs** | **`DvQuality{Poor,Average,High,Perfect}` on `IStatCalculator.RandomiseDvs`** | Poor 0–7 → Average 0–15 → High 8–15 → Perfect 15 |
+| **Moveset** | `MoveSelectionStrategy` (see §3.4) + move count | Base → TmEnhanced → Optimal |
 
 **DV lever — seam-clean.** `DvQuality` is *intent*; the Gen 1 mapping (Poor 0–7, Average 0–15, High 8–15,
 Perfect 15, HP DV still derived from the four stat DVs' low bits) lives inside `Gen1StatCalculator`. Gen 3 (IVs 0–31) maps the
@@ -192,9 +194,10 @@ same intents differently. **Quality is always explicit** — the no-arg `Randomi
 construction passes `Average` (still randomized within range, so same-tier creatures aren't clones; only Perfect
 is deterministic).
 
-### 3.4 Moveset levels (3-tier quality axis)
+### 3.4 Moveset levels (3-tier quality axis)  *(✅ implemented — `LearnsetMoveSelector`)*
 
-Extends `MoveSelectionStrategy`; selection ranks by power/STAB/coverage. **No level gate** — the strong/optimal
+Two new `MoveSelectionStrategy` values (`TmEnhanced`, `Optimal`) — deterministic top-N by a shared `MoveScore`
+(power × STAB). **No level gate** — the strong/optimal
 pools always pick the best moves for the creature's types; *level only drives stats*, so a boss-grade enemy can
 punch above its level (intended).
 
@@ -204,16 +207,16 @@ punch above its level (intended).
 | **TmEnhanced** | level-up **+ TM/HM-legal** same-type strong moves | needs real TM/HM data (§3.5) |
 | **Optimal** | **any** move, best for the creature's types + coverage | the min-maxed boss-grade set |
 
-### 3.5 Sub-task: import real TM/HM learnability *(gates TmEnhanced)*
+### 3.5 Sub-task: import real TM/HM learnability *(gates TmEnhanced)*  *(✅ done — incl. re-import)*
 
-The importer (`LearnsetMapper`) keeps **only** `move_learn_method == "level-up"` today, so `pokemon.db` has no
-machine-move data. To make `TmEnhanced` faithful (a creature only gets moves it could actually learn via TM/HM):
-- Add a **`LearnMethod`** field to `PokemonLearnset` (EF migration; existing rows default `LevelUp`).
-- `LearnsetMapper` keeps **machine** moves too, tagged by method; re-import `pokemon.db`.
-- **Pin** it with a data-contract test (a re-import mustn't silently revert it).
-- ⚠️ **Integration hazard (two places change together):** every existing *level-up* path — base moveset
-  selection and `MoveLearning` on level-up — must filter `LearnMethod == LevelUp` so TM rows don't leak into
-  level-up learning.
+`LearnsetMapper` originally kept **only** `move_learn_method == "level-up"`. Now it also keeps **machine**
+(TM/HM) rows, tagged by a new `LearnMethod` field on `PokemonLearnset` (EF migration `AddLearnsetMethod`,
+existing rows default `LevelUp`). A full `PokeApiConnector` re-import has been run — `pokemon.db` carries
+**2,860 Machine rows across 145 species** (the 6 no-TM-learners like Caterpie/Magikarp have none) alongside the
+989 level-up rows. Pinned by `LearnsetImportTests` (mapper) + `MigrationTests` (column + round-trip).
+- ⚠️ **Integration hazard (two places change together):** every *level-up* path — base moveset selection,
+  player setup, evolution, and `MoveLearning` on level-up — filters `LearnMethod == LevelUp` so TM rows can't
+  leak into level-up learning. `CreateEnemyAsync` includes Machine rows **only** for the `TmEnhanced` tier.
 
 ### 3.6 Deferred (flagged)
 
@@ -270,8 +273,8 @@ loop body changing. `BattleRunner` graduates into the **`RunDirector`** that `GA
 | This design | Lands on / replaces | Note |
 |:--|:--|:--|
 | Type-filtered biome pool + Wild filter | `Biome.cs` (new), `EncounterSelector.PickByBst` (biome param), `EncounterFactory.CreateEnemyAsync` | ✅ **done (Phase 1)** — biome param null until Phase 3 supplies one |
-| Depth-scaled BST + level band | `CreateEnemyAsync` (raw `playerBst` today), `ScaleWildLevel` | add the depth term the TODO claimed existed |
-| `IEnemyArchetype` tiers | new, web/run layer beside `EncounterFactory` | composes existing levers; reuses `MoveSelectionStrategy`, `IStatCalculator` |
+| Depth-scaled BST + level band | `ScaleTargetBst`/`ScaleWildLevel`, `CreateEnemyAsync` (`depth`), `BattleRunner` supplier | ✅ **done (Phase 2c)** — depth = `battlesWon` |
+| `IEnemyArchetype` tiers + `TmEnhanced`/`Optimal` movesets | `EnemyArchetype.cs` (new), `LearnsetMoveSelector`, `EncounterFactory` | ✅ **done (Phase 2d)** — tier *selection* per encounter is Phase 3 |
 | Biome graph + `chooseNextEvent` | `BattleRunner.RunAsync` (hardcoded `while` today) → `RunDirector` | per `GAME_LOOP.md §3` target |
 | Node bones | new `IRunEvent` stubs | rest/battle already behave like events |
 | Acquisition channels | deferred `TODO.md` Catch cluster | gated on §1–§5 |
@@ -288,9 +291,10 @@ generation-agnostic and data-agnostic.
    membership rules, the verified 18-biome Kanto roster, and the live Wild filter; biome selection is the
    `CreateEnemyAsync` seam Phase 3 fills. (Specced in §2.)
 2. **`IEnemyArchetype` tiers** (Weak/Medium/Strong/Boss) + **depth-scaled bands** — replaces flat `playerBst`.
-   **Specced in §3.** Sub-steps: (2a) import real TM/HM learnability (§3.5, gates TmEnhanced) → (2b) `DvQuality`
-   seam → (2c) `PickByBst` explicit `targetBst` + `ScaleWildLevel` depth band → (2d) `IEnemyArchetype` +
-   `EnemyTierSpec` + depth threading + the `TmEnhanced`/`Optimal` moveset strategies.
+   ✅ **DONE (2026-06-28).** All sub-steps shipped: (2a) real TM/HM learnability + re-import (§3.5) → (2b)
+   `DvQuality` seam (4 bands) → (2c) `PickByBst` `targetBst` + `ScaleWildLevel` depth band + `battlesWon`
+   threading → (2d) `IEnemyArchetype`/`EnemyTierSpec` + the `TmEnhanced`/`Optimal` moveset strategies.
+   (Specced in §3.)
 3. **Biome graph + `chooseNextEvent` / `RunDirector`** — map traversal; node kinds land as event stubs (bones).
 4. **Acquisition channels** (boss catch + themed draft, fought-only) — gated on (1)–(3) and the deferred Catch
    cluster.
