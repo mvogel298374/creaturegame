@@ -316,7 +316,8 @@ public class Creature
 
     private Creature()
     {
-        StatCalculator.RandomiseDvs(this);
+        // Ordinary individual values; enemy strength tiers re-roll at a chosen DvQuality after construction.
+        StatCalculator.RandomiseDvs(this, DvQuality.Average);
     }
 
     public Creature(string name)

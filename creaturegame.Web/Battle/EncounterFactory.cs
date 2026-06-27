@@ -228,7 +228,8 @@ public sealed class EncounterFactory(
         // same DVs. DV randomisation is a per-generation rule, so it stays behind IStatCalculator.
         var creature = new Creature(species.Name.ToUpper()) { Level = level };
         creature.StatCalculator = new Gen1StatCalculator(rng);
-        creature.StatCalculator.RandomiseDvs(creature);
+        // Ordinary DVs today; Phase 2d's enemy strength tier passes the spec's DvQuality here.
+        creature.StatCalculator.RandomiseDvs(creature, DvQuality.Average);
         creature.InitializeFromSpecies(species);
         creature.Experience = creature.CalculateExperienceForLevel(level);
 

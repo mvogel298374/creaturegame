@@ -62,14 +62,19 @@ Debt cleanup, User Documentation.
     `PokeApiConnector` re-import (network) is needed to populate the machine rows** — until then the column is
     correct but holds only LevelUp data; 2a is behaviour-preserving without it. 2d's TmEnhanced/Optimal tiers
     consume the machine rows.
-  - [ ] **2b — `DvQuality{Poor,Average,Perfect}` on `IStatCalculator.RandomiseDvs`** (always explicit; drop the
-    no-arg overload, player passes `Average`). Gen 1 maps Poor 0–7 / Average 0–15 / Perfect 15; HP-DV derivation
-    stays on the seam.
+  - [x] **2b — `DvQuality` seam — DONE (2026-06-27).** `DvQuality{Poor,Average,Perfect}` enum;
+    `IStatCalculator.RandomiseDvs(creature, quality)` (no-arg overload dropped — always explicit). `Gen1StatCalculator`
+    maps Perfect→15 (fixed, no roll), High→8–15, Poor→0–7, Average→0–15 via `RollDv`; HP-DV derivation unchanged on the seam.
+    Both callers (`Creature` ctor, `EncounterFactory.BuildCreature`) pass `Average` (behaviour-preserving;
+    `Next(0,16)`≡ old `Next(16)`). Pins: Perfect maxed+deterministic, Poor ≤7, Average full-range. Seam review
+    PASS (advisories addressed); 1098/1098.
   - [ ] **2c — Generalize the bands.** `PickByBst` gains an explicit `targetBst` (defaults to `playerBst`);
     `ScaleWildLevel` gains `depth` + a tier band. Thread `depth` (`battlesWon`) `BattleRunner → CreateEnemyAsync`.
   - [ ] **2d — `IEnemyArchetype` + `EnemyTierSpec`** (Weak/Medium/Strong/Boss) + the `TmEnhanced`/`Optimal`
     moveset strategies (no level gate; rank by power/STAB/coverage). `CreateEnemyAsync` gains an optional
-    archetype (default Medium); tier *selection* is Phase 3.
+    archetype (default Medium); tier *selection* is Phase 3. ⚠️ **Seam note (from 2b review):** `DvQuality.Perfect`
+    makes 0 RNG draws, so it shifts the shared seeded stream vs Average/Poor — add a seeded-stream reproducibility
+    pin for a Perfect-tier build (seed → expected moveset) so the stream-shift can't silently regress.
   - **Deferred (per §3.6):** Stat-Exp lever; Boss ceiling (out-class-the-player design) — revisited a later phase.
 - [ ] **Phase 3 — Biome graph + `chooseNextEvent` / `RunDirector`.** Map traversal; node kinds land as
   `IRunEvent` stubs (bones).

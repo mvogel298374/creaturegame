@@ -28,19 +28,31 @@ public sealed class Gen1StatCalculator : IStatCalculator
         return (int)Math.Floor(((baseStat + dv) * 2 + expBonus) * level / 100) + 5;
     }
 
-    // Gen 1 DVs: four stats each 0–15; HP DV derived from lowest bits (ATK, DEF, SPD, SPC order).
-    public void RandomiseDvs(Creature creature)
+    private const int MaxDv = 15; // Gen 1 DVs are 4-bit: 0–15.
+
+    // Gen 1 DVs: four stats each drawn from the quality's band; HP DV derived from their lowest bits (ATK,
+    // DEF, SPD, SPC order). Perfect is a fixed 15 (deterministic); Poor/Average roll within their range.
+    public void RandomiseDvs(Creature creature, DvQuality quality)
     {
-        creature.DvAttack = _rng.Next(16);
-        creature.DvDefense = _rng.Next(16);
-        creature.DvSpecial = _rng.Next(16);
-        creature.DvSpeed = _rng.Next(16);
+        creature.DvAttack = RollDv(quality);
+        creature.DvDefense = RollDv(quality);
+        creature.DvSpecial = RollDv(quality);
+        creature.DvSpeed = RollDv(quality);
         creature.DvHP =
             ((creature.DvAttack & 1) << 3)
             | ((creature.DvDefense & 1) << 2)
             | ((creature.DvSpeed & 1) << 1)
             | (creature.DvSpecial & 1);
     }
+
+    private int RollDv(DvQuality quality) =>
+        quality switch
+        {
+            DvQuality.Perfect => MaxDv, // top-tier: fixed max, no roll
+            DvQuality.High => _rng.Next((MaxDv + 1) / 2, MaxDv + 1), // 8–15 (upper half)
+            DvQuality.Poor => _rng.Next(0, (MaxDv + 1) / 2), // 0–7 (lower half)
+            _ => _rng.Next(0, MaxDv + 1), // Average: 0–15 (the ordinary roll)
+        };
 
     // Gen 1 Stat Experience: defeating a Pokémon adds its base stats to the victor's Stat Exp, per stat,
     // capped at 65535. The cap and the gain rule are Gen-1 values (Gen 3+ uses EV yields + 252/510 caps), so

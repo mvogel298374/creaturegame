@@ -1,6 +1,21 @@
 namespace creaturegame.Creatures;
 
 /// <summary>
+/// The quality band a caller requests when rolling a creature's individual values. It is *intent* — the
+/// mapping to actual DV/IV ranges is generation-specific and lives on the <see cref="IStatCalculator"/>
+/// implementation (Gen 1: <see cref="Poor"/> 0–7, <see cref="Average"/> 0–15, <see cref="High"/> 8–15,
+/// <see cref="Perfect"/> = max). Enemy strength tiers pick a quality; <see cref="Average"/> is the ordinary
+/// roll (the player's). Quality is always passed explicitly — there is no implicit "just random" overload.
+/// </summary>
+public enum DvQuality
+{
+    Poor,
+    Average,
+    High,
+    Perfect,
+}
+
+/// <summary>
 /// Generation-specific stat formulas: how base stats + per-individual values + accumulated training turn into
 /// a creature's actual stats, and how those per-individual values are rolled. Swap the implementation to
 /// change generation; callers stay generation-agnostic.
@@ -35,11 +50,13 @@ public interface IStatCalculator
     int CalculateOtherStat(int baseStat, int dv, int statExp, int level);
 
     /// <summary>
-    /// Randomises a creature's individual values (DVs/IVs) in place.
-    /// Gen 1: Attack/Defense/Special/Speed each draw from [0, 15]; HP DV derived from their low bits.
-    /// Gen 3+: six independent IVs from [0, 31].
+    /// Randomises a creature's individual values (DVs/IVs) in place, at the requested
+    /// <paramref name="quality"/>. The quality → range mapping is generation-specific.
+    /// Gen 1: Attack/Defense/Special/Speed each draw from the quality's band (Poor 0–7, Average 0–15,
+    /// High 8–15, Perfect = 15 fixed); HP DV derived from their low bits.
+    /// Gen 3+: six independent IVs from the quality's band within [0, 31].
     /// </summary>
-    void RandomiseDvs(Creature creature);
+    void RandomiseDvs(Creature creature, DvQuality quality);
 
     /// <summary>
     /// Awards the per-individual <i>training</i> a victor gains for defeating <paramref name="defeated"/>,

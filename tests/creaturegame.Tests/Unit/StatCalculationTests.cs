@@ -99,13 +99,84 @@ public class StatCalculationTests
         // Same seed ⇒ identical DVs, so seeded creature creation is reproducible.
         var c1 = new Creature("A");
         var c2 = new Creature("B");
-        new Gen1StatCalculator(new SeededRandomSource(99)).RandomiseDvs(c1);
-        new Gen1StatCalculator(new SeededRandomSource(99)).RandomiseDvs(c2);
+        new Gen1StatCalculator(new SeededRandomSource(99)).RandomiseDvs(c1, DvQuality.Average);
+        new Gen1StatCalculator(new SeededRandomSource(99)).RandomiseDvs(c2, DvQuality.Average);
 
         Assert.Equal(c1.DvAttack, c2.DvAttack);
         Assert.Equal(c1.DvDefense, c2.DvDefense);
         Assert.Equal(c1.DvSpecial, c2.DvSpecial);
         Assert.Equal(c1.DvSpeed, c2.DvSpeed);
         Assert.Equal(c1.DvHP, c2.DvHP); // HP DV is derived from the others' low bits
+    }
+
+    [Fact]
+    public void Gen1StatCalculator_PerfectDvs_AreMaxedAndDeterministic()
+    {
+        var c = new Creature("A");
+        // Different seed each call, yet Perfect must always produce the same maxed DVs (no roll).
+        for (int seed = 0; seed < 10; seed++)
+        {
+            new Gen1StatCalculator(new SeededRandomSource(seed)).RandomiseDvs(c, DvQuality.Perfect);
+            Assert.Equal(15, c.DvAttack);
+            Assert.Equal(15, c.DvDefense);
+            Assert.Equal(15, c.DvSpecial);
+            Assert.Equal(15, c.DvSpeed);
+            Assert.Equal(15, c.DvHP); // all low bits set ⇒ derived HP DV is 15
+        }
+    }
+
+    [Fact]
+    public void Gen1StatCalculator_PoorDvs_NeverExceedSeven()
+    {
+        var c = new Creature("A");
+        for (int seed = 0; seed < 200; seed++)
+        {
+            new Gen1StatCalculator(new SeededRandomSource(seed)).RandomiseDvs(c, DvQuality.Poor);
+            Assert.InRange(c.DvAttack, 0, 7);
+            Assert.InRange(c.DvDefense, 0, 7);
+            Assert.InRange(c.DvSpecial, 0, 7);
+            Assert.InRange(c.DvSpeed, 0, 7);
+            // DvHP is intentionally not asserted: it's derived from the four stat DVs' low bits and so
+            // ranges [0,15] regardless of quality — asserting it would test the HP derivation, not the band.
+        }
+    }
+
+    [Fact]
+    public void Gen1StatCalculator_HighDvs_StayInUpperHalf_ButAreNotAlwaysMax()
+    {
+        // High is the upper half [8,15] — strictly above Poor's ceiling, but still a roll (not fixed 15).
+        var c = new Creature("A");
+        bool sawBelowMax = false;
+        for (int seed = 0; seed < 200; seed++)
+        {
+            new Gen1StatCalculator(new SeededRandomSource(seed)).RandomiseDvs(c, DvQuality.High);
+            Assert.InRange(c.DvAttack, 8, 15);
+            Assert.InRange(c.DvDefense, 8, 15);
+            Assert.InRange(c.DvSpecial, 8, 15);
+            Assert.InRange(c.DvSpeed, 8, 15);
+            if (c.DvAttack < 15 || c.DvDefense < 15 || c.DvSpecial < 15 || c.DvSpeed < 15)
+                sawBelowMax = true;
+        }
+        Assert.True(sawBelowMax); // distinct from Perfect — High actually rolls
+    }
+
+    [Fact]
+    public void Gen1StatCalculator_AverageDvs_UseTheFullRange()
+    {
+        // Average spans 0–15: across many seeds at least one stat DV must exceed Poor's 0–7 ceiling
+        // (otherwise Average would be indistinguishable from Poor).
+        var c = new Creature("A");
+        bool sawAboveSeven = false;
+        for (int seed = 0; seed < 200; seed++)
+        {
+            new Gen1StatCalculator(new SeededRandomSource(seed)).RandomiseDvs(c, DvQuality.Average);
+            Assert.InRange(c.DvAttack, 0, 15);
+            Assert.InRange(c.DvDefense, 0, 15);
+            Assert.InRange(c.DvSpecial, 0, 15);
+            Assert.InRange(c.DvSpeed, 0, 15);
+            if (c.DvAttack > 7 || c.DvDefense > 7 || c.DvSpecial > 7 || c.DvSpeed > 7)
+                sawAboveSeven = true;
+        }
+        Assert.True(sawAboveSeven);
     }
 }

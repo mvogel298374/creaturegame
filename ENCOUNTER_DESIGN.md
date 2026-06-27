@@ -183,11 +183,11 @@ tougher than "Medium @ depth 1." Phase 3 later swaps `battlesWon` for a richer b
 |:--|:--|:--|
 | **BST band** | `PickByBst` gains an explicit `targetBst` (defaults to `playerBst`) | tier shifts target/width off the depth baseline |
 | **Level** | `ScaleWildLevel` gains `depth` + a tier band | tier raises/lowers the band |
-| **DVs** | **new `DvQuality{Poor,Average,Perfect}` on `IStatCalculator.RandomiseDvs`** | Poor 0–7 → Average 0–15 → Perfect 15 |
+| **DVs** | **new `DvQuality{Poor,Average,High,Perfect}` on `IStatCalculator.RandomiseDvs`** | Poor 0–7 → Average 0–15 → High 8–15 → Perfect 15 |
 | **Moveset** | `MovesetLevel` (see §3.4) + move count | Base → TmEnhanced → Optimal |
 
-**DV lever — seam-clean.** `DvQuality` is *intent*; the Gen 1 mapping (Poor 0–7, Average 0–15, Perfect 15, HP
-DV still derived from the four stat DVs' low bits) lives inside `Gen1StatCalculator`. Gen 3 (IVs 0–31) maps the
+**DV lever — seam-clean.** `DvQuality` is *intent*; the Gen 1 mapping (Poor 0–7, Average 0–15, High 8–15,
+Perfect 15, HP DV still derived from the four stat DVs' low bits) lives inside `Gen1StatCalculator`. Gen 3 (IVs 0–31) maps the
 same intents differently. **Quality is always explicit** — the no-arg `RandomiseDvs()` is dropped; the player's
 construction passes `Average` (still randomized within range, so same-tier creatures aren't clones; only Perfect
 is deterministic).
