@@ -8,13 +8,13 @@ using creaturegame.Tests.TestSupport;
 namespace creaturegame.Tests.Integration.Flow;
 
 /// <summary>
-/// The evolution wiring in <see cref="BattleRunner"/>: after a win that <b>levels the player up</b> (Gen 1
+/// The evolution wiring in <see cref="RunDirector"/>: after a win that <b>levels the player up</b> (Gen 1
 /// attempts evolution on level-up), the injected resolver is consulted; the player is then offered the
 /// evolution and can allow or cancel it. The resolver is stubbed here (the IEvolutionRules decision + DB
 /// resolution are tested separately) so this pins the orchestration — the level-up gate, the offer→decision
 /// flow, the apply/learn on allow, and the no-op on cancel.
 /// </summary>
-public class BattleRunnerEvolutionTests
+public class RunDirectorEvolutionTests
 {
     // Charmander(4) → Charmeleon(5); a learnset move at level 6 (the level the player reaches below), so the
     // post-evolution learn step auto-learns it into a free slot.
@@ -54,7 +54,7 @@ public class BattleRunnerEvolutionTests
         };
     }
 
-    private static BattleRunner BuildRunner(
+    private static RunDirector BuildRunner(
         Creature player,
         IBattleInput playerInput,
         RecordingEmitter recorder,
@@ -181,7 +181,7 @@ public class BattleRunnerEvolutionTests
         var player = Fighter("PLAYER", hp: 200, attack: 999, speed: 100, level: 5);
 
         var recorder = new RecordingEmitter();
-        var runner = new BattleRunner(
+        var runner = new RunDirector(
             player,
             WinThenLose(),
             Gen1TypeChart.Instance,

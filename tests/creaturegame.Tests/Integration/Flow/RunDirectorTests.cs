@@ -11,7 +11,7 @@ namespace creaturegame.Tests.Integration.Flow;
 /// summary. Verifies the win-counting, the per-encounter BattleStarted stream, cross-encounter XP
 /// accumulation, and that RunEnded fires exactly once with the right totals.
 /// </summary>
-public class BattleRunnerTests
+public class RunDirectorTests
 {
     [Fact]
     public async Task Runner_ChainsWins_ThenEmitsRunEndedWithSummary_WhenPlayerFaints()
@@ -35,7 +35,7 @@ public class BattleRunnerTests
         };
 
         var recorder = new RecordingEmitter();
-        var runner = new BattleRunner(
+        var runner = new RunDirector(
             player,
             supplier,
             Gen1TypeChart.Instance,
@@ -75,7 +75,7 @@ public class BattleRunnerTests
 
         var recorder = new RecordingEmitter();
 
-        var runner = new BattleRunner(
+        var runner = new RunDirector(
             player,
             (_, _) => Task.FromResult(enemy),
             Gen1TypeChart.Instance,
@@ -131,7 +131,7 @@ public class BattleRunnerTests
         };
 
         var recorder = new RecordingEmitter();
-        var runner = new BattleRunner(
+        var runner = new RunDirector(
             player,
             supplier,
             Gen1TypeChart.Instance,
@@ -208,7 +208,7 @@ public class BattleRunnerTests
         };
 
         var recorder = new RecordingEmitter();
-        var runner = new BattleRunner(
+        var runner = new RunDirector(
             player,
             supplier,
             Gen1TypeChart.Instance,
@@ -288,7 +288,7 @@ public class BattleRunnerTests
         };
 
         var recorder = new RecordingEmitter();
-        var runner = new BattleRunner(
+        var runner = new RunDirector(
             player,
             supplier,
             Gen1TypeChart.Instance,
@@ -325,7 +325,7 @@ public class BattleRunnerTests
         var enemy = Poisoner("Enemy", maxHp: 160, hp: 5, speed: 1);
 
         var recorder = new RecordingEmitter();
-        var runner = new BattleRunner(
+        var runner = new RunDirector(
             player,
             (_, _) => Task.FromResult(enemy),
             Gen1TypeChart.Instance,

@@ -4,7 +4,7 @@ namespace creaturegame.Combat;
 
 /// <summary>
 /// The level-up move-learning flow, shared by <see cref="Battle"/> (a level gained mid-fight) and
-/// <see cref="BattleRunner"/> (the evolved form's moves, between encounters). A free slot auto-learns; a
+/// <see cref="RunDirector"/> (the evolved form's moves, between encounters). A free slot auto-learns; a
 /// full moveset emits <see cref="MoveReplacementRequired"/> and blocks on the player's input — a chosen
 /// slot (0–3) is replaced, <c>null</c> declines (canonical Gen 1 "don't learn"). Only the player ever
 /// learns, so it always uses the player input. Extracted so the evolution path reuses the exact same

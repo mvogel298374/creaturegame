@@ -58,10 +58,10 @@ units. This section is deliberately candid so the gap is visible.
 
 | Concept (from §1) | Where it lives today | Honest state |
 |:------------------|:---------------------|:-------------|
-| **Game loop** | `BattleRunner.RunAsync` (core) | Real, but **hardcoded**: it inlines "run a Battle, then every 3rd win run a recovery, repeat until faint → `RunEnded`." Battle and recovery are not modeled as events; the sequence is a literal `while` body, not a logic-driven `nextEvent` decision. |
+| **Game loop** | `RunDirector.RunAsync` (core) | **§3 model, shipped (Phase 3a, 2026-06-28).** Battle and recovery are first-class `IRunEvent`s; `chooseNextEvent` is the single logic-driven sequencer. (Was the hardcoded `BattleRunner` `while` body; renamed + restructured behaviour-preservingly.) |
 | **Battle (loop-event)** | `Battle.StartFightAsync` (core) | A genuinely well-formed event loop: turn loop, player input via `IBattleInput.ChooseMoveAsync`, lock-in mechanics, end-of-turn resolution, faint → XP → level-up → move-learn, variable outcome (win/lose), emits a rich `BattleEvent` stream. This is the template for "what a loop-event looks like." |
-| **Recovery (interaction-event)** | **inline in `BattleRunner.RunAsync`** | Behaves like an interaction-event (emit `RecoveryOffered` → `await ConfirmRecoveryAsync` → `FullHeal`+`PlayerRecovered` *or* `RecoveryDeclined`) but is **not** a separate object — it's a code block inside the loop. |
-| **Outcome** | implicit | Battle's outcome is read as `player.IsAlive()`; recovery's as the `bool` from the input. No typed `Outcome` the loop dispatches on. |
+| **Recovery (interaction-event)** | `RecoveryRunEvent` (core) | **Now a first-class event** (Phase 3a): emit `RecoveryOffered` → `await ConfirmRecoveryAsync` → `FullHeal`+`PlayerRecovered` *or* `RecoveryDeclined`, returning a `RecoveryOutcome`. (Was an inline code block in the loop.) |
+| **Outcome** | typed `Outcome` records (core) | **Shipped (Phase 3a):** `BattleOutcome(Won)` / `RecoveryOutcome(Healed)`; the director's `Apply` folds them back into `RunState`. (Was implicit — `player.IsAlive()` + an input `bool`.) |
 
 ### 2.1 Seams every event already shares
 - **Output (one-way, fire-and-forget):** `IBattleEventEmitter.Emit(BattleEvent)` → `SignalRBattleEventEmitter`
@@ -78,8 +78,8 @@ units. This section is deliberately candid so the gap is visible.
 
 ## 3. The contract an event should satisfy (target abstraction)
 
-Not yet code — this is the shape the inlined logic in §2 should converge on, so the loop can treat every event
-uniformly and new events drop in without touching the loop body.
+Shipped in Phase 3a (2026-06-28) as `creaturegame/Combat/RunLoop.cs` + `RunDirector.cs` — the loop treats
+every event uniformly and new events drop in by branching `chooseNextEvent`, without touching the loop body.
 
 ```
 RunContext        = { player, runState, emitter, input, rng }
@@ -144,9 +144,10 @@ timeline semantics (`timeline.ts` deciding `BattleEnded` ⇒ "announce next"). T
 (the loop) and stops the client from inferring run structure.
 
 **Open questions (to resolve as the loop grows):**
-1. **Where does the sequencer live?** Evolve `BattleRunner` into a `RunDirector` that holds `chooseNextEvent`,
-   or keep it as `BattleRunner` with events injected? (Core stays generation- and data-agnostic either way;
-   the web layer supplies DB-backed events, as it already supplies enemies.)
+1. **Where does the sequencer live? — RESOLVED (Phase 3a, 2026-06-28).** `BattleRunner` graduated into
+   `RunDirector`, which holds `chooseNextEvent` and builds its events internally (same public constructor;
+   the web layer still supplies the DB-backed enemy/evolution seams). Core stays generation- and
+   data-agnostic. New node kinds branch `chooseNextEvent`; the loop body is now fixed.
 2. **Interaction-event plumbing.** A shared minimal contract so an interaction-event can emit/await without the
    full Battle apparatus.
 3. **Event replay on reconnect — NOT A BUG; settled, do not re-open.** The recurring temptation is to flag that

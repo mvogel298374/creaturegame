@@ -13,8 +13,9 @@ done and archived. `ARCHITECTURE.md` and the per-run web seed are done.
 
 **Next up, in order:**
 1. **Encounter Logic** — *design DONE* (`ENCOUNTER_DESIGN.md`, 2026-06-27). Phased build: **Phase 1 (biome
-   model)** ✅ + **Phase 2 (enemy tiers + depth bands)** ✅ done. **Next: Phase 3** — biome graph /
-   `chooseNextEvent` / `RunDirector` (map traversal; node-kind stubs), then Phase 4 acquisition channels.
+   model)** ✅ + **Phase 2 (enemy tiers + depth bands)** ✅ + **Phase 3a (event model / `RunDirector`)** ✅ done.
+   **Next: Phase 3b** — biome graph map traversal (thread the current biome + node-derived tier into encounter
+   construction), then **3c** node-kind bones, then Phase 4 acquisition channels.
 2. **Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by (1)'s acquisition phase.
 3. **Game Loop & Progression** — party, switching, save layer (`save.db`).
 
@@ -88,8 +89,28 @@ Debt cleanup, User Documentation.
   - **Phase 2 COMPLETE** (2a–2d), including the TM/HM re-import (2026-06-28) — Strong-tier (`TmEnhanced`)
     movesets now draw on real TM/HM data.
   - **Deferred (per §3.6):** Stat-Exp lever; Boss ceiling (out-class-the-player design) — revisited a later phase.
-- [ ] **Phase 3 — Biome graph + `chooseNextEvent` / `RunDirector`.** Map traversal; node kinds land as
-  `IRunEvent` stubs (bones).
+- [~] **Phase 3 — Biome graph + `chooseNextEvent` / `RunDirector`.** Map traversal; node kinds land as
+  `IRunEvent` stubs (bones). Decomposed into 3a–3c (like Phase 2's 2a–2d):
+  - [x] **3a — Event model + `RunDirector` graduation — DONE (2026-06-28).** Replaced the hardcoded
+    `BattleRunner` `while` body with the first-class event/outcome model `GAME_LOOP.md §3` targets.
+    `creaturegame/Combat/RunLoop.cs`: `RunState` (Player, BattlesWon, RecoveriesDone, CarriedStatus) +
+    `RunContext` (State+Emitter+PlayerInput+Rng) + abstract `Outcome` (`BattleOutcome`/`RecoveryOutcome`) +
+    `IRunEvent.RunAsync(RunContext)→Outcome`. `RunDirector.cs` (renamed from `BattleRunner`, same ctor
+    signature) owns the single sequencer `chooseNextEvent` (Poké Center after every Nth win via
+    `BattlesWon / N > RecoveriesDone`, else the next encounter) plus two internal events: `BattleRunEvent`
+    (build foe → `Battle` → on win: depth++, level-up evolution offer, capture carried status) and
+    `RecoveryRunEvent` (offer → heal/decline). **Behaviour-preserving** — the endless chain is identical;
+    the new formula reproduces the old `% N` once-per-milestone offer, evolution/carry ordering and the
+    fatal/double-faint edges are unchanged (1111/1111). Rename threaded through `GameSessionManager`,
+    `EncounterFactory`/`EvolutionOutcome`/`MoveLearning` xmldoc, and the two renamed test files
+    (`RunDirectorTests`/`RunDirectorEvolutionTests`). Seam review CLEAN (0 blockers/0 advisories). New node
+    kinds now drop in by branching `chooseNextEvent` — the loop body never changes again.
+  - [ ] **3b — Biome graph + map traversal.** Generate a seeded route through `Biomes.Playable` for the
+    run's region; the director walks it and supplies the current `BiomeDefinition` (fills the null `biome`
+    param on `CreateEnemyAsync`) + the node-derived `IEnemyArchetype` (tier *selection* per encounter, the
+    Phase-2 deferral). Replaces `depth = battlesWon` with biome-position depth (per `ENCOUNTER_DESIGN.md §3.2`).
+  - [ ] **3c — Node-kind bones.** Shop / Mystery / Treasure / Elite / Boss as `IRunEvent` stubs dropped into
+    `chooseNextEvent` (data + event stub now, behaviour later — `ENCOUNTER_DESIGN.md §5`).
 - [ ] **Phase 4 — Acquisition channels** (boss catch + themed draft, fought-only). Gates the cluster below;
   *n%* rates tuned here.
 

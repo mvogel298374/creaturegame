@@ -275,8 +275,9 @@ loop body changing. `BattleRunner` graduates into the **`RunDirector`** that `GA
 | Type-filtered biome pool + Wild filter | `Biome.cs` (new), `EncounterSelector.PickByBst` (biome param), `EncounterFactory.CreateEnemyAsync` | ✅ **done (Phase 1)** — biome param null until Phase 3 supplies one |
 | Depth-scaled BST + level band | `ScaleTargetBst`/`ScaleWildLevel`, `CreateEnemyAsync` (`depth`), `BattleRunner` supplier | ✅ **done (Phase 2c)** — depth = `battlesWon` |
 | `IEnemyArchetype` tiers + `TmEnhanced`/`Optimal` movesets | `EnemyArchetype.cs` (new), `LearnsetMoveSelector`, `EncounterFactory` | ✅ **done (Phase 2d)** — tier *selection* per encounter is Phase 3 |
-| Biome graph + `chooseNextEvent` | `BattleRunner.RunAsync` (hardcoded `while` today) → `RunDirector` | per `GAME_LOOP.md §3` target |
-| Node bones | new `IRunEvent` stubs | rest/battle already behave like events |
+| Event model + `chooseNextEvent` | `BattleRunner.RunAsync` (hardcoded `while`) → `RunDirector` + `RunLoop.cs` | ✅ **done (Phase 3a)** — `IRunEvent`/`Outcome`/`RunContext`, single sequencer; battle + recovery first-class |
+| Biome graph map traversal | `RunDirector` walks a seeded route; threads biome + tier into `CreateEnemyAsync` | Phase 3b — fills the null `biome` param + the deferred tier *selection* |
+| Node bones | new `IRunEvent` stubs (shop/treasure/mystery/elite/boss) | Phase 3c — battle + recovery already are events |
 | Acquisition channels | deferred `TODO.md` Catch cluster | gated on §1–§5 |
 
 Every touch reuses an existing seam or adds one in the established style; the core engine stays
@@ -296,6 +297,11 @@ generation-agnostic and data-agnostic.
    threading → (2d) `IEnemyArchetype`/`EnemyTierSpec` + the `TmEnhanced`/`Optimal` moveset strategies.
    (Specced in §3.)
 3. **Biome graph + `chooseNextEvent` / `RunDirector`** — map traversal; node kinds land as event stubs (bones).
+   **3a ✅ DONE (2026-06-28):** the event model — `RunLoop.cs` (`RunState`/`RunContext`/`Outcome`/`IRunEvent`)
+   + `RunDirector` (renamed from `BattleRunner`) holding the single `chooseNextEvent` sequencer, with battle
+   and Poké Center recovery as first-class `IRunEvent`s. Behaviour-preserving (endless chain unchanged).
+   **3b** = seeded biome-graph route + threading the current biome / per-node `IEnemyArchetype` into encounter
+   construction; **3c** = the remaining node-kind bones (shop/treasure/mystery/elite/boss).
 4. **Acquisition channels** (boss catch + themed draft, fought-only) — gated on (1)–(3) and the deferred Catch
    cluster.
 

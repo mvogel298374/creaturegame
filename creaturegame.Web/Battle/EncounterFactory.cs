@@ -13,7 +13,7 @@ namespace creaturegame.Web.Battle;
 /// Builds creatures from the databases for a run: the player once at the start, and a fresh wild enemy
 /// scaled to the player before each encounter. Centralises the species/learnset/move queries and the
 /// move-selection strategy so both the initial setup (<see cref="GameController"/>) and the chain loop
-/// (<see cref="BattleRunner"/> via <see cref="GameSessionManager"/>) build creatures the same way.
+/// (<see cref="RunDirector"/> via <see cref="GameSessionManager"/>) build creatures the same way.
 /// </summary>
 public sealed class EncounterFactory(
     IDbContextFactory<PokemonDbContext> pokemonFactory,
@@ -92,7 +92,7 @@ public sealed class EncounterFactory(
     /// When <paramref name="biome"/> is supplied the pool is further filtered to that biome's type theme
     /// (<see cref="EncounterSelector.PickByBst"/>); it is null until Phase 3's biome graph selects one per
     /// encounter (see <c>ENCOUNTER_DESIGN.md §2</c>). <paramref name="depth"/> is the run's <c>battlesWon</c>,
-    /// threaded by <see cref="creaturegame.Combat.BattleRunner"/>; Phase 2d's enemy tier modulates the band
+    /// threaded by <see cref="creaturegame.Combat.RunDirector"/>; Phase 2d's enemy tier modulates the band
     /// further.</para>
     /// </summary>
     public async Task<Creature> CreateEnemyAsync(
@@ -169,7 +169,7 @@ public sealed class EncounterFactory(
     }
 
     /// <summary>
-    /// The evolution data/DB seam for the run loop (<see cref="BattleRunner"/>). Loads the player species'
+    /// The evolution data/DB seam for the run loop (<see cref="RunDirector"/>). Loads the player species'
     /// evolution edges, runs the Gen 1 <see cref="IEvolutionRules"/> decision against the player's current
     /// level, and — if one fires — resolves the evolved species plus its learnset into an
     /// <see cref="EvolutionOutcome"/>. Returns null when nothing evolves, so the runner leaves the player as

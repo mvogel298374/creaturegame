@@ -98,7 +98,7 @@ public sealed class GameSessionManager(
         // (species/level/DVs/moves), the battle rolls, and the AI's probabilistic move pick — so the whole
         // run replays from its seed (held as session.Rng). It's safe to share one instance: the run is single-threaded and
         // draws sequentially on this task.
-        var runner = new BattleRunner(
+        var runner = new RunDirector(
             session.Player,
             (p, depth) =>
                 encounters.CreateEnemyAsync(p, session.AllMoves, session.Rng, depth: depth),
