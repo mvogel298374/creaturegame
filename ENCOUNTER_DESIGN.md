@@ -277,7 +277,7 @@ loop body changing. `BattleRunner` graduates into the **`RunDirector`** that `GA
 | `IEnemyArchetype` tiers + `TmEnhanced`/`Optimal` movesets | `EnemyArchetype.cs` (new), `LearnsetMoveSelector`, `EncounterFactory` | ✅ **done (Phase 2d)** — tier *selection* per encounter is Phase 3 |
 | Event model + `chooseNextEvent` | `BattleRunner.RunAsync` (hardcoded `while`) → `RunDirector` + `RunLoop.cs` | ✅ **done (Phase 3a)** — `IRunEvent`/`Outcome`/`RunContext`, single sequencer; battle + recovery first-class |
 | Biome graph map traversal | `RunDirector` walks a seeded route (`BiomeChoiceEvent` + `ChooseBiomeAsync` seam); threads the biome into `CreateEnemyAsync` | ✅ **done (Phase 3b)** — 3b-1 backend + 3b-2 map screen; biome mode live (`RunSetup.PlayableBiomes` → session → director; `BiomeChoiceModal`) |
-| Node bones | new `IRunEvent` stubs (shop/treasure/mystery/elite/boss) + node-derived tier *selection* | Phase 3c — battle + recovery already are events |
+| Node bones | new `IRunEvent` stubs (shop/treasure/mystery/elite/boss) + node-derived tier *selection* | ✅ **3c-1 done** — seeded `BiomeNodePlan` dispatched by `EventForNode`; `EncounterTier` intent (core) → `EnemyArchetypes.For` (web); Boss apex per biome. Tuned curve + biome-position depth = **3c-2** |
 | Acquisition channels | deferred `TODO.md` Catch cluster | gated on §1–§5 |
 
 Every touch reuses an existing seam or adds one in the established style; the core engine stays
@@ -307,8 +307,14 @@ generation-agnostic and data-agnostic.
    the app — `EncounterFactory.CreatePlayerSetupAsync` computes `Biomes.Playable(Kanto, wildPool)` (same Wild
    filter as encounter generation) into `RunSetup.PlayableBiomes`, threaded session → `RunDirector`; the
    `SignalRInput.ChooseBiomeAsync` override + `BattleHub.ChooseBiome` + the React `BiomeChoiceModal` (biome cards
-   with type badges) make the route a real on-screen choice; `BiomeEntered` titles each leg. **3c** = the
-   remaining node-kind bones + per-node tier selection / biome-position depth (shop/treasure/mystery/elite/boss).
+   with type badges) make the route a real on-screen choice; `BiomeEntered` titles each leg. **3c-1 ✅ DONE
+   (2026-06-28):** node-kind bones — a biome's route is a seeded `RunState.BiomeNodePlan` (`RunNodeKind`: wild /
+   elite / boss battles + shop / treasure / mystery interaction bones) the director dispatches via
+   `EventForNode`, each biome capped by a **Boss** apex (§4). Tier selection respects layering: the core passes a
+   generation-agnostic `EncounterTier {Normal,Elite,Boss}` through the enemy supplier and the web maps it to an
+   archetype (`EnemyArchetypes.For`), the same intent/mapping split as `DvQuality`. Interaction nodes are
+   `InteractionStubEvent` bones (emit a `RunNodeEntered` banner, advance the biome, behaviour later). Interior
+   node mix is a flagged placeholder. **3c-2** = the tuned node/tier distribution + biome-position depth (§3.2).
 4. **Acquisition channels** (boss catch + themed draft, fought-only) — gated on (1)–(3) and the deferred Catch
    cluster.
 

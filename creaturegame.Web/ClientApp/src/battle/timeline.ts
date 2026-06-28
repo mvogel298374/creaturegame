@@ -130,6 +130,18 @@ function statusClearedMsg(name: string, wasStatus: string): string {
   }
 }
 
+// Banner line for a route node (RunNodeEntered). Kinds are the RunNodeKind names the backend emits.
+function runNodeBannerMsg(kind: string): string {
+  switch (kind) {
+    case 'EliteBattle': return 'An Elite trainer blocks the path!';
+    case 'BossBattle':  return 'The biome boss looms ahead!';
+    case 'Shop':        return 'You happened upon a shop.';
+    case 'Treasure':    return 'You found a treasure cache!';
+    case 'Mystery':     return 'Something mysterious stirs…';
+    default:            return `Reached a ${kind} node.`;
+  }
+}
+
 function actionBlockedMsg(name: string, reason: string): string {
   switch (reason) {
     case 'Sleep':     return `${name} is fast asleep!`;
@@ -301,6 +313,13 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       // The player entered a biome (or the run auto-picked one) — title the next leg of the route.
       const biomeName = payload.biomeName as string;
       return { steps: [w(200), d(log(`Entered ${biomeName}!`)), w(300)] };
+    }
+
+    case 'RunNodeEntered': {
+      // A route node banner (Phase 3c-1 bones): Elite/Boss precede the battle stream; Shop/Treasure/Mystery
+      // are interaction bones with no behaviour yet, so the banner line is the whole node for now.
+      const kind = payload.kind as string;
+      return { steps: [w(200), d(log(runNodeBannerMsg(kind))), w(300)] };
     }
 
     // ── Turn events: sequenced through the animation timeline ──────────────────

@@ -244,6 +244,19 @@ public class WebEventContractTests
         Assert.Equal("Ghost", root.GetProperty("Types")[0].GetString());
     }
 
+    /// <summary>Projection guard for <see cref="RunNodeEntered"/>: the client titles the node from
+    /// <c>Kind</c> (the reflection contract test instantiates it with an empty string, so this pins a real
+    /// value round-trips).</summary>
+    [Fact]
+    public void RunNodeEntered_Projection_CarriesKind()
+    {
+        var (type, payload) = SignalRBattleEventEmitter.MapEvent(new RunNodeEntered("BossBattle"));
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+
+        Assert.Equal("RunNodeEntered", type);
+        Assert.Equal("BossBattle", doc.RootElement.GetProperty("Kind").GetString());
+    }
+
     // Concrete (non-abstract) BattleEvent subtypes — the exact set the engine can emit to the client.
     private static List<Type> ConcreteBattleEventTypes()
     {

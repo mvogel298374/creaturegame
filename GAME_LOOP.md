@@ -122,16 +122,19 @@ GameLoop:                                       // the ONLY place that decides s
 
 | Event | Kind | State |
 |:------|:-----|:------|
-| **Battle** | loop-event | ✅ implemented (`Battle.StartFightAsync`) |
-| **Poké Center recovery** | interaction-event | ✅ implemented (inline in `BattleRunner`); offer → HEAL/SKIP → heal/decline |
-| Elite / boss battle | loop-event | future — a Battle variant with a tougher `chooseNextEvent` branch |
+| **Battle** | loop-event | ✅ implemented (`Battle.StartFightAsync`, run via `BattleRunEvent`) |
+| **Poké Center recovery** | interaction-event | ✅ implemented (`RecoveryRunEvent`); offer → HEAL/SKIP → heal/decline |
+| **Biome route choice** | interaction-event | ✅ implemented (Phase 3b, `BiomeChoiceEvent`) — the player charts the next leg through the biome graph; offer the candidate biomes → `ChooseBiomeAsync` → `BiomeChoiceOutcome` |
+| **Elite / boss battle** | loop-event | ✅ implemented (Phase 3c-1) — a `BattleRunEvent` carrying a generation-agnostic `EncounterTier` the web maps to a tougher `IEnemyArchetype`; placed by the biome **node plan** (Boss caps each biome). Not a separate event class — a parameterised battle node |
+| **Shop / Treasure / Mystery** | interaction-event | ✅ **bones** (Phase 3c-1, `InteractionStubEvent`) — emit a `RunNodeEntered` banner + return a `NodeVisitedOutcome` that advances the biome; per-kind behaviour (economy / reward / event card) is later, each graduating to its own event |
 | Catch | interaction/loop-event | future — see `TODO.md` Catch Mechanic |
-| Shop / rest site / event card | interaction-event | future — roguelite layer |
-| **Evolution** | interaction-event | ✅ implemented (in `BattleRunner.TryEvolveAsync`) — on a level-up, offer → ALLOW/CANCEL → morph/decline. Data/decision injected via `checkEvolution` (web `EncounterFactory` + `IEvolutionRules`); see archive |
+| **Evolution** | interaction-event | ✅ implemented (`BattleRunEvent.TryEvolveAsync` in `RunDirector`) — on a level-up, offer → ALLOW/CANCEL → morph/decline. Data/decision injected via `checkEvolution` (web `EncounterFactory` + `IEvolutionRules`); see archive |
 | Party / lead swap | interaction-event | future — once a party exists |
 
 Each future event must obey §3: handed the run context, emits text, may await input, returns a typed outcome,
-**never** decides the next event.
+**never** decides the next event. The implemented set above already spans both kinds and the loop body has not
+changed since 3a — new kinds drop in by branching `chooseNextEvent` (today: `RunDirector.EventForNode` over the
+biome's seeded `RunNodeKind` plan).
 
 ---
 
@@ -148,8 +151,12 @@ timeline semantics (`timeline.ts` deciding `BattleEnded` ⇒ "announce next"). T
    `RunDirector`, which holds `chooseNextEvent` and builds its events internally (same public constructor;
    the web layer still supplies the DB-backed enemy/evolution seams). Core stays generation- and
    data-agnostic. New node kinds branch `chooseNextEvent`; the loop body is now fixed.
-2. **Interaction-event plumbing.** A shared minimal contract so an interaction-event can emit/await without the
-   full Battle apparatus.
+2. **Interaction-event plumbing — RESOLVED (Phases 3a/3b/3c-1).** The `IRunEvent.RunAsync(RunContext) → Outcome`
+   contract *is* the shared minimal plumbing: `RecoveryRunEvent`, `BiomeChoiceEvent`, and the
+   `InteractionStubEvent` bones (shop/treasure/mystery) all emit through `RunContext.Emitter` and await through
+   `RunContext.PlayerInput` (a thin slice of the same `IBattleInput` the battle uses — `ConfirmRecoveryAsync`,
+   `ChooseBiomeAsync`) with **no** `Battle` apparatus. New interaction events need only a `BattleEvent` (+ its
+   SignalR/timeline projection) and an `Outcome`.
 3. **Event replay on reconnect — NOT A BUG; settled, do not re-open.** The recurring temptation is to flag that
    `SignalRBattleEventEmitter.Emit` drops events while no connection is bound, "so a reconnect desyncs the
    client." It does **not**, and this has been traced more than once — stop re-raising it as egregious. The

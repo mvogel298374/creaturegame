@@ -3,6 +3,35 @@ using creaturegame.Creatures;
 namespace creaturegame.Combat;
 
 /// <summary>
+/// The kinds of node a biome's route can contain (<c>ENCOUNTER_DESIGN.md §5</c> / <c>GAME_LOOP.md §5</c>) — the
+/// run-structure vocabulary the director's per-biome plan is written in. The three battle kinds map to an
+/// <see cref="EncounterTier"/> for the enemy supplier; the three interaction kinds map to their own
+/// <see cref="IRunEvent"/> bones. Generation-agnostic: a node kind is run structure, not a Gen 1 mechanic.
+/// </summary>
+public enum RunNodeKind
+{
+    WildBattle,
+    EliteBattle,
+    BossBattle,
+    Shop,
+    Treasure,
+    Mystery,
+}
+
+/// <summary>
+/// The difficulty <em>intent</em> a battle node carries to the enemy supplier — kept generation-agnostic in the
+/// core (the same intent/mapping split as <c>DvQuality</c>): the web layer maps it to a concrete
+/// <c>IEnemyArchetype</c> (Normal→Medium, Elite→Strong, Boss→Boss), which is web-layer roguelite tuning, not a
+/// battle seam (<c>ENCOUNTER_DESIGN.md §3.1</c>). The core never names an archetype.
+/// </summary>
+public enum EncounterTier
+{
+    Normal,
+    Elite,
+    Boss,
+}
+
+/// <summary>
 /// The run's logic state — the <em>only</em> thing <c>chooseNextEvent</c> reads to decide what happens next
 /// (<c>GAME_LOOP.md §3/§4</c>). It is mutated by an event's <see cref="Outcome"/> (via the director's apply
 /// step) and by the events themselves; never by player input directly — the player only changes an event's
@@ -37,8 +66,21 @@ public sealed class RunState(Creature player)
     /// </summary>
     public BiomeDefinition? CurrentBiome { get; set; }
 
-    /// <summary>Battles won inside the current biome — drives the per-biome length (the Poké Center caps it).</summary>
+    /// <summary>
+    /// How many of the current biome's planned nodes have been resolved — the index into
+    /// <see cref="BiomeNodePlan"/>. When it reaches the plan length the biome is cleared (Poké Center caps it,
+    /// then the next route choice). Advances on every resolved node in the biome (battle won or interaction
+    /// visited), not just battles.
+    /// </summary>
     public int EventsInCurrentBiome { get; set; }
+
+    /// <summary>
+    /// The ordered node kinds of the current biome's route, generated (seeded) when the biome is entered. Empty
+    /// before the first choice / in the legacy chain. <c>chooseNextEvent</c> dispatches
+    /// <c>BiomeNodePlan[EventsInCurrentBiome]</c>; the final node is the biome's Boss
+    /// (<c>ENCOUNTER_DESIGN.md §4</c>).
+    /// </summary>
+    public IReadOnlyList<RunNodeKind> BiomeNodePlan { get; set; } = [];
 
     /// <summary>
     /// True when the next event should be a route choice (run start, or after a biome's Poké Center). Set by the
@@ -74,6 +116,14 @@ public sealed record RecoveryOutcome(bool Healed) : Outcome;
 
 /// <summary>Outcome of a route-choice event: the biome the player elected to enter next.</summary>
 public sealed record BiomeChoiceOutcome(BiomeDefinition Chosen) : Outcome;
+
+/// <summary>
+/// Outcome of an interaction-node bone (Shop / Treasure / Mystery): records which kind was visited so the
+/// director advances the biome. These nodes have no behaviour yet (<c>ENCOUNTER_DESIGN.md §5</c> — bones now,
+/// behaviour later); each graduates to its own richer outcome (bought/skipped, reward taken, …) when its
+/// behaviour lands.
+/// </summary>
+public sealed record NodeVisitedOutcome(RunNodeKind Kind) : Outcome;
 
 /// <summary>
 /// One unit the run plays to completion before advancing (<c>GAME_LOOP.md §1.2</c>). Battle (a loop-event)

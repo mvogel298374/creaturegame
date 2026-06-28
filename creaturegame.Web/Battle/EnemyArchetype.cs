@@ -41,6 +41,20 @@ public static class EnemyArchetypes
 
     /// <summary>The tier used when an encounter doesn't specify one (reproduces the pre-tier behaviour).</summary>
     public static readonly IEnemyArchetype Default = Medium;
+
+    /// <summary>
+    /// Maps the core's generation-agnostic <see cref="EncounterTier"/> intent (which node the run director is
+    /// running) to a concrete archetype — the web-layer half of the intent/mapping split
+    /// (<c>ENCOUNTER_DESIGN.md §3.1</c>). Normal ≈ a plain wild encounter (Medium); Elite/Boss climb. Weak is
+    /// not currently selected by a node kind.
+    /// </summary>
+    public static IEnemyArchetype For(EncounterTier tier) =>
+        tier switch
+        {
+            EncounterTier.Elite => Strong,
+            EncounterTier.Boss => Boss,
+            _ => Medium,
+        };
 }
 
 // The depth baseline (EncounterFactory.ScaleTargetBst / ScaleWildLevel) is the Medium tier; the others shift

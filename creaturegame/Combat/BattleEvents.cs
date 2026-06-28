@@ -80,6 +80,12 @@ public record BiomeOption(string Id, string Name, IReadOnlyList<DamageType> Type
 public record BiomeEntered(string BiomeId, string BiomeName, IReadOnlyList<DamageType> Types)
     : BattleEvent;
 
+/// <summary>The run reached a route node — a banner the client titles the node with. <see cref="Kind"/> is the
+/// <c>RunNodeKind</c> name (Elite/Boss before that battle begins; Shop/Treasure/Mystery for the interaction
+/// bones). Behaviour for the non-battle kinds is a later phase (<c>ENCOUNTER_DESIGN.md §5</c>); for now the
+/// banner is the whole node.</summary>
+public record RunNodeEntered(string Kind) : BattleEvent;
+
 // --- Move actions ---
 public record MoveUsed(string AttackerName, string MoveName) : BattleEvent;
 

@@ -39,10 +39,16 @@ public class RunDirectorEvolutionTests
 
     // A win that levels a level-5 MediumFast player to exactly level 6: floor(199 * 5 / 7) = 142 XP, and
     // exp(5)=125, exp(6)=216, exp(7)=343 → 267 lands on 6. Then a bruiser ends the run (one evolution check).
-    private static Func<Creature, int, BiomeDefinition?, Task<Creature>> WinThenLose()
+    private static Func<
+        Creature,
+        int,
+        BiomeDefinition?,
+        EncounterTier,
+        Task<Creature>
+    > WinThenLose()
     {
         int built = 0;
-        return (_, _, _) =>
+        return (_, _, _, _) =>
         {
             built++;
             var enemy =

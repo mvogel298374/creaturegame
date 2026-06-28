@@ -31,13 +31,19 @@ public sealed class RunDirector
     private readonly int _healEveryNBattles;
     private readonly int _eventsPerBiome;
     private readonly bool _biomeModeActive;
+    private readonly Func<int, IRandomSource, IReadOnlyList<RunNodeKind>> _nodePlanFactory;
     private readonly IRunEvent _battleEvent;
+    private readonly IRunEvent _eliteEvent;
+    private readonly IRunEvent _bossEvent;
     private readonly IRunEvent _recoveryEvent;
     private readonly IRunEvent _biomeChoiceEvent;
+    private readonly IRunEvent _shopEvent;
+    private readonly IRunEvent _treasureEvent;
+    private readonly IRunEvent _mysteryEvent;
 
     public RunDirector(
         Creature player,
-        Func<Creature, int, BiomeDefinition?, Task<Creature>> enemySupplier,
+        Func<Creature, int, BiomeDefinition?, EncounterTier, Task<Creature>> enemySupplier,
         ITypeChart typeChart,
         IBattleInput playerInput,
         IBattleInput enemyInput,
@@ -50,7 +56,8 @@ public sealed class RunDirector
         Bag? playerBag = null,
         IReadOnlyList<BiomeDefinition>? playableBiomes = null,
         int eventsPerBiome = 3,
-        int biomeOptionCount = 3
+        int biomeOptionCount = 3,
+        Func<int, IRandomSource, IReadOnlyList<RunNodeKind>>? nodePlanFactory = null
     )
     {
         _state = new RunState(player);
@@ -59,20 +66,38 @@ public sealed class RunDirector
         _rng = rng;
         _healEveryNBattles = healEveryNBattles;
         _eventsPerBiome = eventsPerBiome;
+        // How each biome's node route is laid out — defaults to the seeded placeholder; injectable so tests pin
+        // a deterministic plan and 3c-2 can swap the tuned curve without touching the director.
+        _nodePlanFactory = nodePlanFactory ?? DefaultNodePlan;
         // Biome mode kicks in only when the composition layer supplies a non-empty playable set; otherwise the
         // director runs the legacy endless chain (no route choices), so tests/uses without biomes are unchanged.
         _biomeModeActive = playableBiomes is { Count: > 0 };
-        _battleEvent = new BattleRunEvent(
-            enemySupplier,
-            typeChart,
-            enemyInput,
-            movePool,
-            rules,
-            playerBag,
-            checkEvolution
-        );
+
+        // The three battle nodes differ only by the EncounterTier they hand the supplier (which the web layer
+        // maps to an IEnemyArchetype): WildBattle ≈ today's Medium, Elite/Boss climb. Same collaborators
+        // otherwise. Elite/Boss also emit a node banner before the fight.
+        BattleRunEvent Battle(EncounterTier tier) =>
+            new(
+                enemySupplier,
+                tier,
+                typeChart,
+                enemyInput,
+                movePool,
+                rules,
+                playerBag,
+                checkEvolution
+            );
+        _battleEvent = Battle(EncounterTier.Normal);
+        _eliteEvent = Battle(EncounterTier.Elite);
+        _bossEvent = Battle(EncounterTier.Boss);
+
         _recoveryEvent = new RecoveryRunEvent();
         _biomeChoiceEvent = new BiomeChoiceEvent(playableBiomes ?? [], biomeOptionCount);
+
+        // Interaction-node bones (ENCOUNTER_DESIGN.md §5): emit a banner + advance the biome, no behaviour yet.
+        _shopEvent = new InteractionStubEvent(RunNodeKind.Shop);
+        _treasureEvent = new InteractionStubEvent(RunNodeKind.Treasure);
+        _mysteryEvent = new InteractionStubEvent(RunNodeKind.Mystery);
     }
 
     public async Task RunAsync()
@@ -100,15 +125,31 @@ public sealed class RunDirector
         {
             if (s.NeedsBiomeChoice)
                 return _biomeChoiceEvent; // run start / post-Center: pick the next biome
-            if (s.EventsInCurrentBiome >= _eventsPerBiome)
-                return _recoveryEvent; // biome cleared → its Poké Center cap
-            return _battleEvent; // a themed encounter inside the current biome
+            if (s.EventsInCurrentBiome >= s.BiomeNodePlan.Count)
+                return _recoveryEvent; // biome's nodes cleared → its Poké Center cap
+            return EventForNode(s.BiomeNodePlan[s.EventsInCurrentBiome]); // the planned node
         }
 
         return _healEveryNBattles > 0 && s.BattlesWon / _healEveryNBattles > s.RecoveriesDone
             ? _recoveryEvent
             : _battleEvent;
     }
+
+    // The event that runs one planned node kind. The three battle tiers and three interaction bones drop in
+    // here; the loop body never branches on node kind (GAME_LOOP.md §3).
+    private IRunEvent EventForNode(RunNodeKind kind) =>
+        kind switch
+        {
+            RunNodeKind.WildBattle => _battleEvent,
+            RunNodeKind.EliteBattle => _eliteEvent,
+            RunNodeKind.BossBattle => _bossEvent,
+            RunNodeKind.Shop => _shopEvent,
+            RunNodeKind.Treasure => _treasureEvent,
+            RunNodeKind.Mystery => _mysteryEvent,
+            // Every kind has an explicit arm; throw rather than silently route a future unmapped kind to a
+            // wild battle (which would mask the missing arm). Caught at the first test run.
+            _ => throw new InvalidOperationException($"No run event mapped for RunNodeKind {kind}"),
+        };
 
     // Folds an outcome back into run state, the only channel from a (player-influenced) outcome to future
     // sequencing. A battle event already advanced BattlesWon / CarriedStatus itself, and a loss is read by the
@@ -121,11 +162,20 @@ public sealed class RunDirector
             case BiomeChoiceOutcome biome:
                 s.CurrentBiome = biome.Chosen;
                 s.EventsInCurrentBiome = 0;
+                // Lay out the biome's route now (seeded → reproducible): interior nodes then the Boss apex.
+                s.BiomeNodePlan = _nodePlanFactory(
+                    _eventsPerBiome,
+                    _rng ?? SystemRandomSource.Instance
+                );
                 s.NeedsBiomeChoice = false;
                 break;
             case BattleOutcome { Won: true }:
                 if (_biomeModeActive)
-                    s.EventsInCurrentBiome++; // per-biome length counter, capped by the Poké Center
+                    s.EventsInCurrentBiome++; // node resolved → advance the biome (Poké Center caps the plan)
+                break;
+            case NodeVisitedOutcome:
+                if (_biomeModeActive)
+                    s.EventsInCurrentBiome++; // an interaction node also consumes a biome slot
                 break;
             case RecoveryOutcome:
                 s.RecoveriesDone++; // legacy milestone bookkeeping
@@ -135,6 +185,36 @@ public sealed class RunDirector
                 break;
         }
     }
+
+    /// <summary>
+    /// The default biome route layout: <paramref name="length"/> nodes, the last always the Boss (the themed
+    /// apex — <c>ENCOUNTER_DESIGN.md §4</c>), the interior sampled from a PLACEHOLDER weighted table (mostly wild
+    /// battles, with the odd elite or interaction node) so every node-kind bone is reachable. Seeded on
+    /// <paramref name="rng"/> → reproducible. The tuned distribution + biome-position depth are Phase 3c-2; this
+    /// only has to be seeded and exercise the kinds. Public + injectable via the director's <c>nodePlanFactory</c>.
+    /// </summary>
+    public static IReadOnlyList<RunNodeKind> DefaultNodePlan(int length, IRandomSource rng)
+    {
+        if (length <= 1)
+            return [RunNodeKind.BossBattle];
+
+        var plan = new RunNodeKind[length];
+        for (int i = 0; i < length - 1; i++)
+            plan[i] = PickInteriorNode(rng);
+        plan[length - 1] = RunNodeKind.BossBattle;
+        return plan;
+    }
+
+    // PLACEHOLDER interior-node weights (sum 100) — replaced by the designed curve in 3c-2.
+    private static RunNodeKind PickInteriorNode(IRandomSource rng) =>
+        rng.Next(100) switch
+        {
+            < 60 => RunNodeKind.WildBattle,
+            < 75 => RunNodeKind.EliteBattle,
+            < 85 => RunNodeKind.Shop,
+            < 95 => RunNodeKind.Treasure,
+            _ => RunNodeKind.Mystery,
+        };
 }
 
 /// <summary>
@@ -145,7 +225,8 @@ public sealed class RunDirector
 /// level-up, not an independently sequenced event (<c>GAME_LOOP.md §5</c>).
 /// </summary>
 internal sealed class BattleRunEvent(
-    Func<Creature, int, BiomeDefinition?, Task<Creature>> enemySupplier,
+    Func<Creature, int, BiomeDefinition?, EncounterTier, Task<Creature>> enemySupplier,
+    EncounterTier tier,
     ITypeChart typeChart,
     IBattleInput enemyInput,
     IReadOnlyList<Attack> movePool,
@@ -159,10 +240,20 @@ internal sealed class BattleRunEvent(
         var s = ctx.State;
         var player = s.Player;
 
+        // Elite/Boss nodes announce themselves before the fight (a wild battle just slides the foe in, as today).
+        string? bannerKind = tier switch
+        {
+            EncounterTier.Elite => nameof(RunNodeKind.EliteBattle),
+            EncounterTier.Boss => nameof(RunNodeKind.BossBattle),
+            _ => null,
+        };
+        if (bannerKind is not null)
+            ctx.Emitter?.Emit(new RunNodeEntered(bannerKind));
+
         // BattlesWon is the run depth — 0 for the first encounter, climbing each win. The supplier scales the
-        // next foe (BST band, level, tier) to it and themes it to the current biome (null in the legacy chain);
-        // see EncounterFactory.CreateEnemyAsync.
-        var enemy = await enemySupplier(player, s.BattlesWon, s.CurrentBiome);
+        // next foe (BST band, level) to it, themes it to the current biome (null in the legacy chain), and maps
+        // this node's EncounterTier to an archetype; see EncounterFactory.CreateEnemyAsync.
+        var enemy = await enemySupplier(player, s.BattlesWon, s.CurrentBiome, tier);
         int levelBefore = player.Level;
         var battle = new Battle(
             player,
@@ -344,5 +435,22 @@ internal sealed class BiomeChoiceEvent(IReadOnlyList<BiomeDefinition> playable, 
             (copy[i], copy[j]) = (copy[j], copy[i]);
         }
         return copy.GetRange(0, take);
+    }
+}
+
+/// <summary>
+/// A node-kind bone (interaction-event) for Shop / Treasure / Mystery (<c>ENCOUNTER_DESIGN.md §5</c>): announce
+/// the node with a <see cref="RunNodeEntered"/> banner and resolve immediately, no behaviour yet. It satisfies
+/// the <see cref="IRunEvent"/> contract (emits, returns a <see cref="NodeVisitedOutcome"/> the director folds
+/// in to advance the biome) so the node kind is reachable and sequenced now; each graduates to its own event
+/// (shop economy, reward, event card) when its behaviour lands — the loop body never changes (<c>GAME_LOOP.md
+/// §3</c>).
+/// </summary>
+internal sealed class InteractionStubEvent(RunNodeKind kind) : IRunEvent
+{
+    public Task<Outcome> RunAsync(RunContext ctx)
+    {
+        ctx.Emitter?.Emit(new RunNodeEntered(kind.ToString()));
+        return Task.FromResult<Outcome>(new NodeVisitedOutcome(kind));
     }
 }

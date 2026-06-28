@@ -38,6 +38,14 @@ public class RunDirectorBiomeTests
     );
     private static readonly IReadOnlyList<BiomeDefinition> Playable = [A, B, C];
 
+    // These tests pin biome *traversal* (route open / theme / cap / neighbours), not the 3c-1 node-kind mix, so
+    // they force an all-wild-battle plan — the biome is N battles, the way 3b modelled it. The node-plan variety
+    // (Boss apex, interaction nodes) is exercised by RunDirectorNodeTests instead.
+    private static readonly Func<int, IRandomSource, IReadOnlyList<RunNodeKind>> AllWildPlan = (
+        n,
+        _
+    ) => Enumerable.Repeat(RunNodeKind.WildBattle, n).ToList();
+
     [Fact]
     public async Task BiomeMode_OpensWithRouteChoice_ThemesEncounters_AndCapsEachBiomeWithRecovery()
     {
@@ -45,7 +53,12 @@ public class RunDirectorBiomeTests
 
         int built = 0;
         var biomesSeen = new List<string?>();
-        Func<Creature, int, BiomeDefinition?, Task<Creature>> supplier = (_, _, biome) =>
+        Func<Creature, int, BiomeDefinition?, EncounterTier, Task<Creature>> supplier = (
+            _,
+            _,
+            biome,
+            _
+        ) =>
         {
             built++;
             biomesSeen.Add(biome?.Id);
@@ -72,7 +85,8 @@ public class RunDirectorBiomeTests
             rules: new ScriptableRules().Deterministic(),
             rng: new SeededRandomSource(0),
             playableBiomes: Playable,
-            eventsPerBiome: 3
+            eventsPerBiome: 3,
+            nodePlanFactory: AllWildPlan
         );
 
         await runner.RunAsync();
@@ -120,7 +134,12 @@ public class RunDirectorBiomeTests
 
         var player = Fighter("Player", hp: 300, attack: 999, speed: 100, level: 50);
         int built = 0;
-        Func<Creature, int, BiomeDefinition?, Task<Creature>> supplier = (_, _, _) =>
+        Func<Creature, int, BiomeDefinition?, EncounterTier, Task<Creature>> supplier = (
+            _,
+            _,
+            _,
+            _
+        ) =>
         {
             built++;
             var enemy =
@@ -143,7 +162,8 @@ public class RunDirectorBiomeTests
             rules: new ScriptableRules().Deterministic(),
             rng: new SeededRandomSource(0),
             playableBiomes: playable,
-            eventsPerBiome: 1 // a one-battle biome, so the second choice is reached quickly
+            eventsPerBiome: 1, // a one-battle biome, so the second choice is reached quickly
+            nodePlanFactory: AllWildPlan
         );
 
         await runner.RunAsync();
@@ -171,7 +191,12 @@ public class RunDirectorBiomeTests
     private static async Task<List<string>> CaptureOpeningRoute(int seed)
     {
         var player = Fighter("Player", hp: 200, attack: 1, speed: 1, level: 50); // slow & weak: loses at once
-        Func<Creature, int, BiomeDefinition?, Task<Creature>> supplier = (_, _, _) =>
+        Func<Creature, int, BiomeDefinition?, EncounterTier, Task<Creature>> supplier = (
+            _,
+            _,
+            _,
+            _
+        ) =>
         {
             var enemy = Fighter("Bruiser", hp: 999, attack: 999, speed: 999, level: 50);
             enemy.SpeciesBaseExperience = 50;
@@ -189,7 +214,8 @@ public class RunDirectorBiomeTests
             rules: new ScriptableRules().Deterministic(),
             rng: new SeededRandomSource(seed),
             playableBiomes: Biomes.Kanto,
-            eventsPerBiome: 3
+            eventsPerBiome: 3,
+            nodePlanFactory: AllWildPlan
         );
 
         await runner.RunAsync();
@@ -200,7 +226,12 @@ public class RunDirectorBiomeTests
     public async Task LegacyMode_NoBiomesSupplied_EmitsNoBiomeEvents_AndSuppliesNullBiome()
     {
         var player = Fighter("Player", hp: 200, attack: 999, speed: 100, level: 50);
-        Func<Creature, int, BiomeDefinition?, Task<Creature>> supplier = (_, _, biome) =>
+        Func<Creature, int, BiomeDefinition?, EncounterTier, Task<Creature>> supplier = (
+            _,
+            _,
+            biome,
+            _
+        ) =>
         {
             Assert.Null(biome); // legacy chain never themes an encounter
             var enemy = Fighter("Bruiser", hp: 999, attack: 999, speed: 999, level: 50);

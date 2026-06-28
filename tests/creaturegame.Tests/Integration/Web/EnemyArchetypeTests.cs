@@ -45,6 +45,16 @@ public class EnemyArchetypeTests
     }
 
     [Fact]
+    public void For_MapsEncounterTierIntentToArchetype()
+    {
+        // 3c-1: the core passes a generation-agnostic EncounterTier per node; the web maps it to a concrete
+        // archetype. Normal ≈ a plain wild encounter (the default Medium); Elite/Boss climb.
+        Assert.Same(EnemyArchetypes.Medium, EnemyArchetypes.For(EncounterTier.Normal));
+        Assert.Same(EnemyArchetypes.Strong, EnemyArchetypes.For(EncounterTier.Elite));
+        Assert.Same(EnemyArchetypes.Boss, EnemyArchetypes.For(EncounterTier.Boss));
+    }
+
+    [Fact]
     public void Medium_IsTheDepthBaseline()
     {
         var spec = EnemyArchetypes.Medium.Build(Ctx());

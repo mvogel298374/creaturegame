@@ -108,6 +108,7 @@ public sealed class SignalRBattleEventEmitter(
                     Types = e.Types.Select(t => t.ToString()),
                 }
             ),
+            RunNodeEntered e => ("RunNodeEntered", new { e.Kind }),
             ItemUsed e => ("ItemUsed", new { e.ItemName, e.TargetName }),
             PpRestored e => (
                 "PpRestored",

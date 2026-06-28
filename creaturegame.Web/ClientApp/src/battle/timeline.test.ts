@@ -254,6 +254,17 @@ describe('expandEvent — control plane vs timeline', () => {
     expect(logLines(steps)).toEqual(['Entered Phantom Marsh!']);
   });
 
+  it.each([
+    ['EliteBattle', 'An Elite trainer blocks the path!'],
+    ['BossBattle',  'The biome boss looms ahead!'],
+    ['Shop',        'You happened upon a shop.'],
+    ['Treasure',    'You found a treasure cache!'],
+    ['Mystery',     'Something mysterious stirs…'],
+  ])('RunNodeEntered banners the %s node', (kind, message) => {
+    const { steps } = expandEvent('RunNodeEntered', { kind }, CTX);
+    expect(logLines(steps)).toEqual([message]);
+  });
+
   it('EvolutionOffered announces it and raises the Allow/Cancel modal (queued, blocking)', () => {
     const { steps } = expandEvent('EvolutionOffered', {
       fromName: 'MACHOKE', toName: 'MACHAMP', fromSpeciesId: 67, toSpeciesId: 68,

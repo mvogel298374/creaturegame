@@ -102,13 +102,16 @@ public sealed class GameSessionManager(
         // draws sequentially on this task.
         var runner = new RunDirector(
             session.Player,
-            (p, depth, biome) =>
+            (p, depth, biome, tier) =>
                 encounters.CreateEnemyAsync(
                     p,
                     session.AllMoves,
                     session.Rng,
                     biome: biome,
-                    depth: depth
+                    depth: depth,
+                    // Node-derived tier (3c-1): the director passes a generation-agnostic EncounterTier per
+                    // node; the web layer maps it to a concrete archetype (Elite→Strong, Boss→Boss).
+                    archetype: EnemyArchetypes.For(tier)
                 ),
             Gen1TypeChart.Instance,
             battle.Input,
