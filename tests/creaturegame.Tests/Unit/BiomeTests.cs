@@ -1,4 +1,5 @@
 using creaturegame.Attacks;
+using creaturegame.Combat;
 using creaturegame.Creatures;
 using creaturegame.DB;
 
@@ -114,6 +115,77 @@ public class BiomeTests
         Assert.NotEmpty(playable);
         Assert.All(playable, b => Assert.Contains(DamageType.Bug, b.Types));
         Assert.Equal(Biomes.Kanto.Count(b => b.Types.Contains(DamageType.Bug)), playable.Count);
+    }
+
+    // --- Per-run biome-map randomisation (ENCOUNTER_DESIGN.md §2.1) ---
+
+    [Fact]
+    public void RandomConnectedMap_DrawsAConnectedSubsetOfTheRequestedSize()
+    {
+        var map = Biomes.RandomConnectedMap(Biomes.Kanto, 10, new SeededRandomSource(7));
+
+        Assert.Equal(10, map.Count);
+        Assert.Equal(10, map.Select(b => b.Id).Distinct().Count()); // no duplicates
+        Assert.All(map, b => Assert.Contains(b, Biomes.Kanto)); // all real Kanto biomes
+        AssertConnectedWithinSubset(map); // the route can never strand the player
+    }
+
+    [Fact]
+    public void RandomConnectedMap_IsReproducibleFromSeed()
+    {
+        var a = Biomes.RandomConnectedMap(Biomes.Kanto, 10, new SeededRandomSource(123));
+        var b = Biomes.RandomConnectedMap(Biomes.Kanto, 10, new SeededRandomSource(123));
+
+        Assert.Equal(a.Select(x => x.Id), b.Select(x => x.Id)); // same seed → same map (biomes + order)
+    }
+
+    [Fact]
+    public void RandomConnectedMap_DifferentSeeds_GiveDifferentMaps()
+    {
+        var a = Biomes
+            .RandomConnectedMap(Biomes.Kanto, 10, new SeededRandomSource(1))
+            .Select(b => b.Id)
+            .ToHashSet();
+        var b = Biomes
+            .RandomConnectedMap(Biomes.Kanto, 10, new SeededRandomSource(2))
+            .Select(x => x.Id)
+            .ToHashSet();
+
+        Assert.NotEqual(a, b); // which biomes appear actually varies run to run
+    }
+
+    [Fact]
+    public void RandomConnectedMap_ReturnsWholeSet_WhenCountAtLeastAvailable()
+    {
+        var map = Biomes.RandomConnectedMap(Biomes.Kanto, 999, new SeededRandomSource(0));
+        Assert.Equal(Biomes.Kanto.Count, map.Count);
+    }
+
+    [Fact]
+    public void RandomConnectedMap_Empty_ForZeroCountOrEmptyPool()
+    {
+        Assert.Empty(Biomes.RandomConnectedMap(Biomes.Kanto, 0, new SeededRandomSource(0)));
+        Assert.Empty(Biomes.RandomConnectedMap([], 5, new SeededRandomSource(0)));
+    }
+
+    // Every biome in the map is reachable from the first using only edges that stay inside the map — i.e. the
+    // induced subgraph is connected, so route-choice never reaches an island.
+    private static void AssertConnectedWithinSubset(IReadOnlyList<BiomeDefinition> map)
+    {
+        var ids = map.Select(b => b.Id).ToHashSet();
+        var byId = map.ToDictionary(b => b.Id);
+        var seen = new HashSet<string>();
+        var stack = new Stack<string>();
+        stack.Push(map[0].Id);
+        while (stack.Count > 0)
+        {
+            var id = stack.Pop();
+            if (!seen.Add(id))
+                continue;
+            foreach (var n in byId[id].Neighbours.Where(ids.Contains))
+                stack.Push(n);
+        }
+        Assert.Equal(map.Count, seen.Count);
     }
 
     private static PokemonSpecies Species(int id, DamageType t1, DamageType? t2) =>

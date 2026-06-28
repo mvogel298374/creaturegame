@@ -27,19 +27,58 @@ public class RunSetupBiomeTests
     private const int Bulbasaur = 1;
 
     [Fact]
-    public async Task CreatePlayerSetup_ComputesTheFullKantoBiomeMap()
+    public async Task CreatePlayerSetup_DrawsASeededPerRunBiomeMap()
     {
         var setup = await BuildFactory()
             .CreatePlayerSetupAsync(Bulbasaur, 50, new SeededRandomSource(1));
 
         Assert.NotNull(setup);
-        // Every authored Kanto biome is non-empty against the live Wild pool (ENCOUNTER_DESIGN.md §2.3 verified
-        // the thinnest at 5), so the whole roster is playable — none dropped at map-generation time.
-        Assert.Equal(Biomes.Kanto.Count, setup!.PlayableBiomes.Count);
+        // The run map is a seeded subset of the playable set (ENCOUNTER_DESIGN.md §2.1) — RunBiomeMapSize biomes
+        // (the full Kanto roster is non-empty against the live Wild pool, §2.3, so the subset is exactly that
+        // size), all real Kanto biomes, no duplicates.
+        Assert.Equal(EncounterFactory.RunBiomeMapSize, setup!.PlayableBiomes.Count);
         Assert.All(setup.PlayableBiomes, b => Assert.Equal(Region.Kanto, b.Region));
-        // A known biome is present, with its authored theme intact (the cards render these badges).
-        var marsh = Assert.Single(setup.PlayableBiomes, b => b.Id == "phantom-marsh");
-        Assert.Equal(new[] { DamageType.Ghost, DamageType.Poison }, marsh.Types.ToArray());
+        Assert.All(setup.PlayableBiomes, b => Assert.Contains(b, Biomes.Kanto));
+        Assert.Equal(
+            setup.PlayableBiomes.Count,
+            setup.PlayableBiomes.Select(b => b.Id).Distinct().Count()
+        );
+    }
+
+    [Fact]
+    public async Task CreatePlayerSetup_BiomeMap_IsReproducibleFromSeed()
+    {
+        var a = await BuildFactory()
+            .CreatePlayerSetupAsync(Bulbasaur, 50, new SeededRandomSource(42));
+        var b = await BuildFactory()
+            .CreatePlayerSetupAsync(Bulbasaur, 50, new SeededRandomSource(42));
+
+        Assert.Equal(a!.PlayableBiomes.Select(x => x.Id), b!.PlayableBiomes.Select(x => x.Id)); // same seed ⇒ same map
+    }
+
+    [Fact]
+    public async Task FirstEncounter_AtPlayerLevel25_NeverDropsBelowTheDepthZeroBand()
+    {
+        // Repro guard for the "level-9 foe vs a level-25 player on the first battle" report. Builds the player
+        // the way the run does (CreatePlayerSetupAsync) and the first foe the way the director does at depth 0
+        // (default Medium tier), over many seeds. At player 25 the [50%,80%] band is [12,20] — the foe must
+        // never fall below 12, so a single-digit level is impossible from this path.
+        var factory = BuildFactory();
+        var setup = await factory.CreatePlayerSetupAsync(Bulbasaur, 25, new SeededRandomSource(1));
+
+        Assert.NotNull(setup);
+        Assert.Equal(25, setup!.Player.Level); // the player genuinely is level 25 out of setup
+
+        for (int seed = 0; seed < 60; seed++)
+        {
+            var enemy = await factory.CreateEnemyAsync(
+                setup.Player,
+                setup.AllMoves,
+                new SeededRandomSource(seed),
+                depth: 0
+            );
+            Assert.InRange(enemy.Level, 12, 20);
+        }
     }
 
     [Fact]

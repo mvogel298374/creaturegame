@@ -29,6 +29,12 @@ public sealed class EncounterFactory(
     // in-battle effect yet — Balls, Revives — ride along and simply report "no effect" if used.)
     private const int TestBagQuantityEach = 20;
 
+    // How many biomes a single run's map draws from the region's playable set (ENCOUNTER_DESIGN.md §2.1):
+    // a seeded connected subset, so runs traverse different slices of Kanto. Tuning lever — smaller = a more
+    // distinct per-run "region", larger = richer route choice. The full set has 18; if it ever has fewer than
+    // this, the whole set is used.
+    public const int RunBiomeMapSize = 10;
+
     /// <summary>
     /// Loads the move pool and builds the player creature with its canonical moveset. Returns null if the
     /// species id is unknown or the move database is empty.
@@ -79,13 +85,16 @@ public sealed class EncounterFactory(
         var allItems = await itemsCtx.Items.AsNoTracking().ToListAsync();
         var bag = Bag.WithEach(allItems.Select(i => i.Id), TestBagQuantityEach);
 
-        // The run's biome map: the region's biomes that can actually generate against the wild-available pool
-        // (empty biomes never appear — ENCOUNTER_DESIGN.md §2.2). Computed once here and threaded into the
-        // RunDirector, which charts the route. The same Wild filter CreateEnemyAsync applies is used, so every
-        // offered biome is guaranteed to have an encounter (PickByBst can't starve on its themed pool).
-        var playableBiomes = await ComputePlayableBiomesAsync(pokemonCtx, Region.Kanto);
+        // The run's biome map: a seeded, connected random subset of the region's playable biomes (the ones that
+        // can generate against the wild-available pool — empty biomes never appear, ENCOUNTER_DESIGN.md §2.2).
+        // Randomising *which* biomes appear makes each run traverse a different slice of Kanto (§2.1); the subset
+        // is connected so the route never strands, and the same Wild filter CreateEnemyAsync applies, so every
+        // offered biome is guaranteed an encounter (PickByBst can't starve on its themed pool). Same seed ⇒ same
+        // map. Threaded into the RunDirector, which charts the route through it.
+        var playable = await ComputePlayableBiomesAsync(pokemonCtx, Region.Kanto);
+        var runMap = Biomes.RandomConnectedMap(playable, RunBiomeMapSize, source);
 
-        return new RunSetup(player, allMoves, bag, allItems, playableBiomes);
+        return new RunSetup(player, allMoves, bag, allItems, runMap);
     }
 
     /// <summary>

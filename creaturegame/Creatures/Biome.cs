@@ -1,4 +1,5 @@
 using creaturegame.Attacks;
+using creaturegame.Combat;
 using creaturegame.DB;
 
 namespace creaturegame.Creatures;
@@ -194,4 +195,53 @@ public static class Biomes
         Region region,
         IReadOnlyList<PokemonSpecies> pool
     ) => For(region).Where(b => b.HasAnyIn(pool)).ToList();
+
+    /// <summary>
+    /// A single run's biome map: a seeded, <strong>connected</strong> random subset of <paramref name="playable"/>
+    /// of up to <paramref name="count"/> biomes (<c>ENCOUNTER_DESIGN.md §2.1</c> — <em>which</em> biomes appear is
+    /// randomised per run, so runs traverse different slices of the region; same seed ⇒ same map). Grown by
+    /// randomized frontier expansion over the authored neighbour graph restricted to <paramref name="playable"/>:
+    /// each added biome is adjacent (within the subset) to one already chosen, so the induced subgraph is always
+    /// connected — the route can never strand the player. Returns all of <paramref name="playable"/> when
+    /// <paramref name="count"/> ≥ its size, and <c>[]</c> when it is empty. All randomness is drawn from
+    /// <paramref name="rng"/> so the map replays from the run seed.
+    /// </summary>
+    public static IReadOnlyList<BiomeDefinition> RandomConnectedMap(
+        IReadOnlyList<BiomeDefinition> playable,
+        int count,
+        IRandomSource rng
+    )
+    {
+        if (count <= 0 || playable.Count == 0)
+            return [];
+        if (count >= playable.Count)
+            return playable;
+
+        var byId = playable.ToDictionary(b => b.Id);
+        var chosen = new List<BiomeDefinition>();
+        var inMap = new HashSet<string>();
+        var frontier = new List<string>(); // playable ids adjacent to the chosen set, not yet chosen
+        var frontierSet = new HashSet<string>(); // de-dupes the frontier (a biome adjacent to several chosen)
+
+        void Add(BiomeDefinition b)
+        {
+            chosen.Add(b);
+            inMap.Add(b.Id);
+            foreach (var id in b.Neighbours)
+                if (byId.ContainsKey(id) && !inMap.Contains(id) && frontierSet.Add(id))
+                    frontier.Add(id);
+        }
+
+        Add(playable[rng.Next(playable.Count)]); // a random seed biome
+        while (chosen.Count < count && frontier.Count > 0)
+        {
+            int i = rng.Next(frontier.Count);
+            var id = frontier[i];
+            frontier[i] = frontier[^1]; // O(1) swap-remove (order is irrelevant — the pick is random)
+            frontier.RemoveAt(frontier.Count - 1);
+            frontierSet.Remove(id);
+            Add(byId[id]);
+        }
+        return chosen;
+    }
 }

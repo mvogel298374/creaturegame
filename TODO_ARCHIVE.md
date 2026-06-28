@@ -8,6 +8,76 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Encounter Logic (roguelite run layer) ✅ DONE (2026-06-27 → 2026-06-28)
+
+The roguelite **encounter layer** — *what the player faces, how the run is shaped, and the eligibility
+guardrail acquisition will ride* — designed with the user (`/plan`, 2026-06-27, `ENCOUNTER_DESIGN.md`) and built
+in reviewable phases. The run is now a **route through a graph of themed biomes**, each biome a sequence of
+varied nodes capped by a Boss, playable end-to-end through the browser. **Phase 4 (acquisition channels — boss
+catch + themed draft)** stays live in `TODO.md` as the bridge into the *Item Acquisition · Bag Persistence ·
+Catch* cluster; everything below is the implemented §1–§3 of `ENCOUNTER_DESIGN.md`.
+
+**Locked design (`/plan`, §1–§7).** A run is a **graph of type-themed biomes** under a regional origin (Kanto
+first). The biome **type theme** is the cascade root: it drives the type-filtered encounter pool, which *is* the
+**fought-only** acquisition guardrail. Enemy strength is an **`IEnemyArchetype`** seam (Weak/Medium/Strong/Boss)
+composing existing levers (moveset quality, DV quality, BST band, level); biome **depth** sets the baseline band
+and tier modulates it. Two **gated** acquisition channels (deferred to Phase 4): boss catch + themed draft. All
+node kinds are `IRunEvent`s sequenced by the single `chooseNextEvent` (`BattleRunner` → `RunDirector`, per
+`GAME_LOOP.md §3`).
+
+**Phase 1 — Biome model + type-filtered pool (2026-06-27).** `creaturegame/Creatures/Biome.cs`: `Region` enum
+(the multi-gen axis) + `BiomeDefinition` (Types + Neighbours, `Contains` = either-type match) + static `Biomes`
+registry (verified 18-biome Kanto roster, all 15 Gen 1 types homed in 2–3 biomes each; `For`/`Playable` — empty
+biomes never generate). `EncounterSelector.PickByBst` gained an optional biome filter with **in-theme
+nearest-BST widening** (theme never broken). `CreateEnemyAsync` restricts to **wild-available** species (`"Wild"`
+`GameAvailability`, full-dex fallback) + an optional biome param. Pins: `BiomeTests` (coverage/spread/graph
+symmetry+connectivity/membership/`Playable`), `EncounterSelectorTests` biome cases, wild-only pin. Seam review
+PASS; 1094/1094. (`ENCOUNTER_DESIGN.md §2`.)
+
+**Phase 2 — `IEnemyArchetype` tiers + depth-scaled bands (2026-06-28).** Built 2a–2d:
+- **2a — real TM/HM learnability:** `LearnMethod{LevelUp,Machine}` + `Method` on `PokemonLearnset`; migration
+  `AddLearnsetMethod`; `LearnsetMapper` keeps machine rows; full re-import → `pokemon.db` carries 2,860 Machine
+  rows across 145 species + 989 level-up rows. All level-up paths filter `Method == LevelUp`.
+- **2b — `DvQuality{Poor,Average,High,Perfect}` seam** on `IStatCalculator.RandomiseDvs` (no-arg overload
+  dropped, always explicit); `Gen1StatCalculator` maps the intents (Perfect=15 fixed, High 8–15, Poor 0–7,
+  Average 0–15). Both callers pass `Average` (behaviour-preserving).
+- **2c — depth-scaled bands:** `ScaleTargetBst(playerBst, depth)=playerBst+depth×10` + `ScaleWildLevel` depth
+  lift ([50,80]%→~[90,120]%); `CreateEnemyAsync(depth)`; supplier `Func<Creature,int,Task<Creature>>` threaded
+  `battlesWon`. Behaviour-preserving at depth 0.
+- **2d — `IEnemyArchetype`/`EnemyTierSpec`** + Weak/Medium/Strong/Boss singletons (Default=Medium), each
+  shifting the depth baseline; `LearnsetMoveSelector` gained `TmEnhanced` (best species-legal incl. TM/HM) +
+  `Optimal` (best of any move) — deterministic top-N by a shared `MoveScore`, no level gate — and a `maxMoves`
+  cap. All-tiers seed reproducibility pinned. Seam reviews PASS; 1111/1111. (`ENCOUNTER_DESIGN.md §3`.)
+- **Deferred (§3.6):** Stat-Exp lever; the Boss out-class-the-player ceiling.
+
+**Phase 3 — Biome graph + `RunDirector` + node bones (2026-06-28).** Built 3a–3c:
+- **3a — event model / `RunDirector` graduation:** `RunLoop.cs` (`RunState`/`RunContext`/`Outcome`/`IRunEvent`) +
+  `RunDirector` (renamed from `BattleRunner`) holding the single `chooseNextEvent`, with battle + Poké Center
+  recovery as first-class events. Behaviour-preserving (endless chain identical). Seam review CLEAN.
+- **3b — biome graph + map screen:** 3b-1 backend — `BiomeChoiceEvent` + `IBattleInput.ChooseBiomeAsync` seam;
+  the run charts a route (region → choose biome → themed events capped by a Poké Center → choose a neighbour →
+  repeat), threading the current biome into `CreateEnemyAsync`; `BiomeChoiceOffered`/`BiomeEntered` wire events.
+  3b-2 activated it live — `CreatePlayerSetupAsync` computes `Biomes.Playable(Kanto, wildPool)` →
+  `RunSetup.PlayableBiomes` → session → director; `SignalRInput.ChooseBiomeAsync` + `BattleHub.ChooseBiome` +
+  the React `BiomeChoiceModal` (biome cards with type badges). Verified live.
+- **3c — node-kind bones + tuned curve:** 3c-1 — a biome's route is a seeded `RunState.BiomeNodePlan` dispatched
+  by `RunDirector.EventForNode`; six `RunNodeKind`s (wild/elite/boss battles + shop/treasure/mystery bones),
+  each biome Boss-capped (§4). **Layering:** `IEnemyArchetype` is web-layer, so the core passes a
+  generation-agnostic `EncounterTier {Normal,Elite,Boss}` through the supplier seam and the web maps it
+  (`EnemyArchetypes.For` → Medium/Strong/Boss) — the same intent/mapping split as `DvQuality`.
+  `InteractionStubEvent` bones emit a `RunNodeEntered` banner + advance the biome (`NodeVisitedOutcome`),
+  behaviour later. `EventForNode`'s default arm throws (no silent mis-route). 3c-2 — tuned interior weights
+  (Wild 70 / Elite 18 / Treasure 6 / Shop 4 / Mystery 2, independent per slot) + **biome-position depth**
+  (`RunState.RunDepth` = nodes traversed, replacing `battlesWon` as the scaling axis; legacy chain unchanged).
+  Pins: `RunDirectorBiomeTests`, `RunDirectorNodeTests`, `RunSetupBiomeTests`, `EnemyArchetypes.For`, Vitest
+  banner/map arms. Seam reviews PASS. Verified live (map → themed encounter; shop + boss banners; boss is a
+  tough optimal-moveset foe). 1132/1132 + Vitest 80/80. (`ENCOUNTER_DESIGN.md §5`/§3.2.)
+
+**Run model (confirmed with the user):** region (Kanto) → player chooses a biome → ~3 themed nodes capped by a
+Poké Center → choose the next biome (its neighbours; dead-end → any playable) → repeat until death.
+
+---
+
 ## Item System ✅ DONE (2026-06-19 → 2026-06-20)
 
 The full Gen 1 **Item System** — data import + use-in-battle — designed with the user (`/plan`, 2026-06-19)

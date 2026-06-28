@@ -80,7 +80,11 @@ free forward-compat. **Region naming is flavour only** — a biome need not map 
 
 **Seeded per run.** *Which* biomes appear and *how the graph wires up* is randomised per run, riding the per-run
 seed that is already done end-to-end (`GameController.Start` → `SeededRandomSource`, `GAME_LOOP.md §6.4`) — same
-seed ⇒ same map.
+seed ⇒ same map. **Status ✅ (2026-06-28):** each run draws a seeded **connected subset** of the playable set
+(`Biomes.RandomConnectedMap`, `RunBiomeMapSize` = 10 of 18) at setup, threaded into the `RunDirector` as today's
+`playableBiomes` — so *which* biomes appear varies per run (same seed ⇒ same map) and the route through it is
+seeded too (`BiomeChoiceEvent` option sampling). Per-run graph **re-wiring** + §8 intersection mechanics remain
+deferred (only if the subset draw alone doesn't give enough variety).
 
 ### 2.2 Pool membership rules (settled — ✅ implemented)
 
@@ -253,20 +257,22 @@ biome — already on-theme, and impossible to roll something far outside the ban
 
 ## 5. Node types — bones for every kind, now
 
-Scaffold every node kind up front (data + event stub), flesh out behaviour later:
+Scaffold every node kind up front (data + event stub), flesh out behaviour later. **All scaffolded ✅ (Phase 3c);
+the interaction kinds are reachable bones awaiting behaviour:**
 
 | Node | Kind (`GAME_LOOP.md` taxonomy) | State |
 |:--|:--|:--|
-| Wild battle | loop-event | exists (`Battle`) |
-| Elite / Boss | loop-event | bones — a battle variant on a tougher tier |
-| Rest / Poké Center | interaction-event | exists (inline in `BattleRunner`) |
-| Shop | interaction-event | bones |
-| Mystery / Event | interaction-event | bones |
-| Treasure / Reward | interaction-event | bones |
+| Wild battle | loop-event | ✅ `BattleRunEvent` (Normal tier) |
+| Elite / Boss | loop-event | ✅ `BattleRunEvent` on `EncounterTier` Elite/Boss (3c-1); **Boss caps each biome** |
+| Rest / Poké Center | interaction-event | ✅ `RecoveryRunEvent` |
+| Shop | interaction-event | ✅ bone (`InteractionStubEvent`, 3c-1) — banner + advance, behaviour later |
+| Mystery / Event | interaction-event | ✅ bone (`InteractionStubEvent`, 3c-1) — behaviour later |
+| Treasure / Reward | interaction-event | ✅ bone (`InteractionStubEvent`, 3c-1) — behaviour later |
 
 Each node is an **`IRunEvent` returning a typed `Outcome`** (the target abstraction in `GAME_LOOP.md §3`). The
-**biome graph is walked by `chooseNextEvent`** — the *single* owner of sequence — so nodes drop in without the
-loop body changing. `BattleRunner` graduates into the **`RunDirector`** that `GAME_LOOP.md §6 Q1` anticipates.
+**biome's seeded node plan is walked by `chooseNextEvent` / `EventForNode`** — the *single* owner of sequence —
+so nodes drop in without the loop body changing. `BattleRunner` has graduated into the **`RunDirector`** that
+`GAME_LOOP.md §6 Q1` anticipated.
 
 ---
 
