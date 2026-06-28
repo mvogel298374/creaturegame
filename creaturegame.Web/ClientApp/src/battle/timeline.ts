@@ -28,6 +28,9 @@ export interface LogEntry { message: string; tone?: LogTone }
 // The stat totals carried by a level-up (matches the engine's StatBlock).
 export interface StatBlock { maxHp: number; attack: number; defense: number; special: number; speed: number }
 
+// One biome offered on the map screen: stable id, display name, and 1–3 theme types (for the card's badges).
+export interface BiomeOption { id: string; name: string; types: string[] }
+
 // View-state actions — consumed by the reducer in useBattleHub.
 export type Action =
   | { type: 'BATTLE_STARTED'; playerName: string; enemyName: string; enemySpeciesId: number; enemyLevel: number }
@@ -57,7 +60,10 @@ export type Action =
   | { type: 'HIDE_RECOVERY' }
   // Evolution offer between encounters — shown then hidden by the player's Allow/Cancel press.
   | { type: 'SHOW_EVOLUTION_PROMPT'; fromName: string; toName: string; fromSpeciesId: number; toSpeciesId: number }
-  | { type: 'HIDE_EVOLUTION_PROMPT' };
+  | { type: 'HIDE_EVOLUTION_PROMPT' }
+  // Biome map / route choice — shown then hidden by the player's pick (charts the next leg of the run).
+  | { type: 'SHOW_BIOME_CHOICE'; options: BiomeOption[] }
+  | { type: 'HIDE_BIOME_CHOICE' };
 
 // Phaser commands sent over the mitt bridge.
 export type BridgeCommand =
@@ -279,11 +285,17 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
     }
 
     // ── Biome / route map (between biomes) ─────────────────────────────────────
-    // The route choice raises a blocking map modal — the backend waits on ChooseBiome before continuing. The
-    // interactive map UI + a SHOW_BIOME_CHOICE action are wired in 3b-2; for now the arm exists so the event
-    // renders (a present arm with an empty expansion is a valid contract arm).
-    case 'BiomeChoiceOffered':
-      return {};
+    // The route choice raises a blocking map modal: the backend is now blocked awaiting the player's pick
+    // (ChooseBiome), so the timeline idles here — exactly like RecoveryOffered — until the modal resolves.
+    // Queued (not immediate) so it follows any in-flight recovery animation cleanly.
+    case 'BiomeChoiceOffered': {
+      const options: BiomeOption[] = ((payload.options as Array<Record<string, unknown>>) ?? []).map(o => ({
+        id: o.id as string,
+        name: o.name as string,
+        types: (o.types as string[]) ?? [],
+      }));
+      return { steps: [w(200), d({ type: 'SHOW_BIOME_CHOICE', options })] };
+    }
 
     case 'BiomeEntered': {
       // The player entered a biome (or the run auto-picked one) — title the next leg of the route.

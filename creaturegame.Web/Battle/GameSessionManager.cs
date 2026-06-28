@@ -29,7 +29,8 @@ public sealed class GameSessionManager(
         IReadOnlyList<Attack> allMoves,
         Bag bag,
         IReadOnlyList<Item> allItems,
-        IRandomSource rng
+        IRandomSource rng,
+        IReadOnlyList<BiomeDefinition> playableBiomes
     )
     {
         var gameId = Guid.NewGuid().ToString("N");
@@ -39,6 +40,7 @@ public sealed class GameSessionManager(
             bag,
             allItems,
             rng,
+            playableBiomes,
             DateTimeOffset.UtcNow
         );
         EvictExpiredPendingSessions();
@@ -118,7 +120,11 @@ public sealed class GameSessionManager(
             // evolved species + learnset). The runner applies it; the data concern stays in the web layer.
             checkEvolution: p => encounters.ResolvePlayerEvolutionAsync(p, session.AllMoves),
             // The run's bag, threaded into every Battle's player side; consumed items stay gone across the chain.
-            playerBag: session.Bag
+            playerBag: session.Bag,
+            // Biome mode: the run charts a route through this region's playable biomes (the map screen). A
+            // non-empty set flips the director from the legacy endless chain to biome traversal; the chosen
+            // biome themes each encounter. ENCOUNTER_DESIGN.md §7 Phase 3b-2.
+            playableBiomes: session.PlayableBiomes
         );
 
         _ = Task.Run(async () =>
@@ -255,6 +261,17 @@ public sealed class GameSessionManager(
             battle.Input.SetEvolutionChoice(allow);
     }
 
+    /// <summary>Routes a map-screen route choice (the chosen biome id) to the battle's input. An unknown id is
+    /// tolerated by the run loop (falls back to the first offered biome), so this only forwards.</summary>
+    public void SetBiomeChoice(string connectionId, string biomeId)
+    {
+        if (
+            _connToGame.TryGetValue(connectionId, out var gameId)
+            && _active.TryGetValue(gameId, out var battle)
+        )
+            battle.Input.SetBiomeChoice(biomeId);
+    }
+
     /// <summary>
     /// Called when a connection drops. If it is the battle's current connection, a grace
     /// timer is started; the battle is abandoned (its input cancelled so the loop ends and
@@ -280,6 +297,7 @@ sealed record PendingSession(
     Bag Bag,
     IReadOnlyList<Item> AllItems,
     IRandomSource Rng,
+    IReadOnlyList<BiomeDefinition> PlayableBiomes,
     DateTimeOffset RegisteredAt
 );
 

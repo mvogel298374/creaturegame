@@ -276,7 +276,7 @@ loop body changing. `BattleRunner` graduates into the **`RunDirector`** that `GA
 | Depth-scaled BST + level band | `ScaleTargetBst`/`ScaleWildLevel`, `CreateEnemyAsync` (`depth`), `BattleRunner` supplier | ✅ **done (Phase 2c)** — depth = `battlesWon` |
 | `IEnemyArchetype` tiers + `TmEnhanced`/`Optimal` movesets | `EnemyArchetype.cs` (new), `LearnsetMoveSelector`, `EncounterFactory` | ✅ **done (Phase 2d)** — tier *selection* per encounter is Phase 3 |
 | Event model + `chooseNextEvent` | `BattleRunner.RunAsync` (hardcoded `while`) → `RunDirector` + `RunLoop.cs` | ✅ **done (Phase 3a)** — `IRunEvent`/`Outcome`/`RunContext`, single sequencer; battle + recovery first-class |
-| Biome graph map traversal | `RunDirector` walks a seeded route (`BiomeChoiceEvent` + `ChooseBiomeAsync` seam); threads the biome into `CreateEnemyAsync` | ✅ **3b-1 done** (backend; fills the null `biome` param) — UI + biome-mode activation = **3b-2** |
+| Biome graph map traversal | `RunDirector` walks a seeded route (`BiomeChoiceEvent` + `ChooseBiomeAsync` seam); threads the biome into `CreateEnemyAsync` | ✅ **done (Phase 3b)** — 3b-1 backend + 3b-2 map screen; biome mode live (`RunSetup.PlayableBiomes` → session → director; `BiomeChoiceModal`) |
 | Node bones | new `IRunEvent` stubs (shop/treasure/mystery/elite/boss) + node-derived tier *selection* | Phase 3c — battle + recovery already are events |
 | Acquisition channels | deferred `TODO.md` Catch cluster | gated on §1–§5 |
 
@@ -303,9 +303,12 @@ generation-agnostic and data-agnostic.
    **3b-1 ✅ DONE (2026-06-28):** the biome-traversal backend — `BiomeChoiceEvent` + `ChooseBiomeAsync` seam,
    the run charts a route through the biome graph (run model: region → choose biome → ~3 themed events capped by
    a Poké Center → choose the next biome's neighbours → repeat), the current biome threads into `CreateEnemyAsync`.
-   Gated on a supplied playable set (legacy chain otherwise); biome mode not yet activated in the app. **3b-2** =
-   the visible map/route screen + activating biome mode; **3c** = the remaining node-kind bones + per-node tier
-   selection (shop/treasure/mystery/elite/boss).
+   Gated on a supplied playable set (legacy chain otherwise). **3b-2 ✅ DONE (2026-06-28):** biome mode is live in
+   the app — `EncounterFactory.CreatePlayerSetupAsync` computes `Biomes.Playable(Kanto, wildPool)` (same Wild
+   filter as encounter generation) into `RunSetup.PlayableBiomes`, threaded session → `RunDirector`; the
+   `SignalRInput.ChooseBiomeAsync` override + `BattleHub.ChooseBiome` + the React `BiomeChoiceModal` (biome cards
+   with type badges) make the route a real on-screen choice; `BiomeEntered` titles each leg. **3c** = the
+   remaining node-kind bones + per-node tier selection / biome-position depth (shop/treasure/mystery/elite/boss).
 4. **Acquisition channels** (boss catch + themed draft, fought-only) — gated on (1)–(3) and the deferred Catch
    cluster.
 

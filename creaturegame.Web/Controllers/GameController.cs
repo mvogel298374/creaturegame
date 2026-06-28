@@ -35,7 +35,8 @@ public class GameController(GameSessionManager sessionManager, EncounterFactory 
                 setup.AllMoves,
                 setup.Bag,
                 setup.AllItems,
-                rng
+                rng,
+                setup.PlayableBiomes
             );
             Console.WriteLine($"[GameController] Started run {gameId} with seed {seed}.");
             return Ok(new { gameId, seed });

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useReducer, useCallback } from 'react';
 import * as signalR from '@microsoft/signalr';
 import type { MoveInfo } from '../types/BattleEvents';
-import { type Action, type Payload, type StatBlock, type LogEntry, expandEvent, useBattleTimeline } from '../battle/timeline';
+import { type Action, type Payload, type StatBlock, type LogEntry, type BiomeOption, expandEvent, useBattleTimeline } from '../battle/timeline';
 
 export interface LevelUpPanel {
   level: number;
@@ -28,6 +28,10 @@ export interface EvolutionPrompt {
   toSpeciesId: number;
 }
 
+export interface BiomeChoicePrompt {
+  options: BiomeOption[];
+}
+
 export interface BattleState {
   phase: 'connecting' | 'waiting' | 'choosing' | 'battling' | 'ended';
   animating: boolean;
@@ -50,6 +54,7 @@ export interface BattleState {
   moveReplacement: MoveReplacementPrompt | null;
   recovery: RecoveryPrompt | null;
   evolution: EvolutionPrompt | null;
+  biomeChoice: BiomeChoicePrompt | null;
   log: LogEntry[];
   turnNumber: number;
 }
@@ -76,6 +81,7 @@ const initialState: BattleState = {
   moveReplacement: null,
   recovery: null,
   evolution: null,
+  biomeChoice: null,
   log: [],
   turnNumber: 0,
 };
@@ -169,6 +175,10 @@ function reducer(state: BattleState, action: Action): BattleState {
       };
     case 'HIDE_EVOLUTION_PROMPT':
       return { ...state, evolution: null };
+    case 'SHOW_BIOME_CHOICE':
+      return { ...state, biomeChoice: { options: action.options } };
+    case 'HIDE_BIOME_CHOICE':
+      return { ...state, biomeChoice: null };
     case 'ANIMATING_START':
       return { ...state, animating: true };
     case 'ANIMATING_DONE':
@@ -269,5 +279,13 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
       console.error('[SignalR] RespondRecovery failed:', err));
   }, []);
 
-  return { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution };
+  // Answer the map-screen route choice: the chosen biome id. Hide the modal at once (the backend is blocked
+  // awaiting the pick); the resulting BiomeEntered event titles the next leg in the log.
+  const chooseBiome = useCallback((biomeId: string) => {
+    dispatch({ type: 'HIDE_BIOME_CHOICE' });
+    connRef.current?.invoke('ChooseBiome', biomeId).catch(err =>
+      console.error('[SignalR] ChooseBiome failed:', err));
+  }, []);
+
+  return { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome };
 }

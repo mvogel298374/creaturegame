@@ -12,6 +12,7 @@ public sealed class SignalRInput : IBattleInput
     private volatile TaskCompletionSource<int?>? _forgetTcs;
     private volatile TaskCompletionSource<bool>? _recoveryTcs;
     private volatile TaskCompletionSource<bool>? _evolutionTcs;
+    private volatile TaskCompletionSource<string>? _biomeTcs;
     private volatile bool _cancelled;
 
     // The raw request the hub completes the turn handshake with, mapped to a TurnChoice below.
@@ -165,6 +166,33 @@ public sealed class SignalRInput : IBattleInput
     }
 
     /// <summary>
+    /// Awaits the player's route choice on the map screen: the <see cref="BiomeDefinition.Id"/> of the biome to
+    /// enter next. Same TCS handshake as the other prompts (the hub's <c>ChooseBiome</c> completes it via
+    /// <see cref="SetBiomeChoice"/>); the <see cref="_cancelled"/> guard makes a disconnect throw rather than
+    /// hang the run on the map. An unknown / stale id is tolerated downstream — the run loop's
+    /// <c>BiomeChoiceEvent</c> falls back to the first offered biome.
+    /// </summary>
+    public async Task<string> ChooseBiomeAsync(BiomeChoiceContext context)
+    {
+        if (_cancelled)
+            throw new OperationCanceledException("Battle input cancelled (client disconnected).");
+
+        var tcs = new TaskCompletionSource<string>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        _biomeTcs = tcs;
+        var biomeId = await tcs.Task; // throws OperationCanceledException if Cancel() ran
+        _biomeTcs = null;
+        return biomeId;
+    }
+
+    public void SetBiomeChoice(string biomeId)
+    {
+        var tcs = _biomeTcs;
+        tcs?.TrySetResult(biomeId);
+    }
+
+    /// <summary>
     /// Unblocks a battle loop waiting on player input when the client disconnects,
     /// so the fire-and-forget battle task can complete and be collected.
     /// </summary>
@@ -175,5 +203,6 @@ public sealed class SignalRInput : IBattleInput
         _forgetTcs?.TrySetCanceled();
         _recoveryTcs?.TrySetCanceled();
         _evolutionTcs?.TrySetCanceled();
+        _biomeTcs?.TrySetCanceled();
     }
 }

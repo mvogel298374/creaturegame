@@ -14,10 +14,11 @@ done and archived. `ARCHITECTURE.md` and the per-run web seed are done.
 **Next up, in order:**
 1. **Encounter Logic** — *design DONE* (`ENCOUNTER_DESIGN.md`, 2026-06-27). Phased build: **Phase 1 (biome
    model)** ✅ + **Phase 2 (enemy tiers + depth bands)** ✅ + **Phase 3a (event model / `RunDirector`)** ✅ +
-   **Phase 3b-1 (biome traversal backend)** ✅ done. **Next: Phase 3b-2** — the visible map/route screen (wire
-   the choice to the UI + activate biome mode in the app), then **3c** node-kind bones, then Phase 4 acquisition
-   channels. **Run model (confirmed with the user):** region (Kanto) → player chooses a biome → ~3 themed
-   events (battles for now) capped by a Poké Center → choose the next biome (its neighbours) → repeat until death.
+   **Phase 3b (biome graph + map screen)** ✅ done — biome mode is live in the app. **Next: Phase 3c** —
+   node-kind bones (shop/treasure/mystery/elite/boss as `IRunEvent` stubs) + the deferred per-node
+   `IEnemyArchetype` tier *selection* and biome-position depth, then Phase 4 acquisition channels. **Run model
+   (confirmed with the user):** region (Kanto) → player chooses a biome → ~3 themed events (battles for now)
+   capped by a Poké Center → choose the next biome (its neighbours) → repeat until death.
 2. **Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by (1)'s acquisition phase.
 3. **Game Loop & Progression** — party, switching, save layer (`save.db`).
 
@@ -107,7 +108,7 @@ Debt cleanup, User Documentation.
     `EncounterFactory`/`EvolutionOutcome`/`MoveLearning` xmldoc, and the two renamed test files
     (`RunDirectorTests`/`RunDirectorEvolutionTests`). Seam review CLEAN (0 blockers/0 advisories). New node
     kinds now drop in by branching `chooseNextEvent` — the loop body never changes again.
-  - [~] **3b — Biome graph + map traversal.** Split into backend (3b-1) + UI (3b-2):
+  - [x] **3b — Biome graph + map traversal — DONE (2026-06-28).** Split into backend (3b-1) + UI (3b-2):
     - [x] **3b-1 — Biome traversal backend — DONE (2026-06-28).** `RunDirector` becomes a route through the
       biome graph when a non-empty `playableBiomes` set is supplied (else the legacy chain, unchanged): opens
       with a route choice, runs `eventsPerBiome` (3) themed encounters, caps each biome with the Poké Center,
@@ -120,11 +121,16 @@ Debt cleanup, User Documentation.
       no biomes, so the web app is behaviour-unchanged; 3b-2 flips it on with the UI. Pins: `RunDirectorBiomeTests`
       (route open/theme/cap, neighbour options, dead-end fallback, seed reproducibility, legacy-mode unchanged).
       Seam review PASS (2 advisories both fixed); 1117/1117 + Vitest 72/72.
-    - [ ] **3b-2 — The map/route screen (visible).** Activate biome mode in `GameSessionManager` (compute
-      `Biomes.Playable` at run setup → `RunSetup` → session → `RunDirector`); `SignalRInput.ChooseBiomeAsync`
-      override + `BattleHub.ChooseBiome` + `SetBiomeChoice`; React map screen (handle `BiomeChoiceOffered` →
-      `SHOW_BIOME_CHOICE` modal with biome cards/type badges → send the pick; `BiomeEntered` titles the leg).
-      Optional: node-derived `IEnemyArchetype` (tier *selection* — the Phase-2 deferral) + biome-position depth.
+    - [x] **3b-2 — The map/route screen (visible) — DONE (2026-06-28).** Biome mode is now live in the app:
+      `EncounterFactory.CreatePlayerSetupAsync` computes `Biomes.Playable(Kanto, wildPool)` (same Wild filter
+      `CreateEnemyAsync` uses, so no offered biome can starve) → `RunSetup.PlayableBiomes` → `RegisterSession`
+      → `RunDirector`. `SignalRInput.ChooseBiomeAsync` override (TCS handshake, cancel-safe) + `BattleHub.ChooseBiome`
+      + `GameSessionManager.SetBiomeChoice`. React map screen: `BiomeChoiceOffered` → queued `SHOW_BIOME_CHOICE`
+      modal (`BiomeChoiceModal` — biome cards with name + `TypeBadge` theme; one press picks + continues);
+      `BiomeEntered` titles the leg in the log. Pins: `SignalRInputTests` (biome handshake + cancel),
+      `RunSetupBiomeTests` (full Kanto map computed, non-empty themes), Vitest map-modal arms. Verified live
+      (Puppeteer: run-start map → pick Phantom Marsh → themed Gastly encounter). **Deferred (still open):**
+      node-derived `IEnemyArchetype` tier *selection* + biome-position depth → folded into 3c.
   - [ ] **3c — Node-kind bones.** Shop / Mystery / Treasure / Elite / Boss as `IRunEvent` stubs dropped into
     `chooseNextEvent` (data + event stub now, behaviour later — `ENCOUNTER_DESIGN.md §5`).
 - [ ] **Phase 4 — Acquisition channels** (boss catch + themed draft, fought-only). Gates the cluster below;

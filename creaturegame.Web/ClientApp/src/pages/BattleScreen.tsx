@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { TypeBadge } from '../components/TypeBadge';
 import { BattleCanvas } from '../battle/BattleCanvas';
-import { useBattleHub, type LevelUpPanel, type MoveReplacementPrompt, type RecoveryPrompt, type EvolutionPrompt } from '../hooks/useBattleHub';
+import { useBattleHub, type LevelUpPanel, type MoveReplacementPrompt, type RecoveryPrompt, type EvolutionPrompt, type BiomeChoicePrompt } from '../hooks/useBattleHub';
 import type { Species } from '../types/Species';
 import type { MoveInfo } from '../types/BattleEvents';
 import { formatMoveName } from '../utils/format';
@@ -25,7 +25,7 @@ export function BattleScreen() {
   const gameId: string | null = location.state?.gameId ?? null;
   const startLevel: number = location.state?.level ?? 50;
 
-  const { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution } = useBattleHub(gameId, startLevel);
+  const { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome } = useBattleHub(gameId, startLevel);
   const [controlView, setControlView] = useState<ControlView>('menu');
   const logRef = useRef<HTMLDivElement>(null);
 
@@ -145,6 +145,10 @@ export function BattleScreen() {
 
       {state.evolution && (
         <EvolutionPromptModal prompt={state.evolution} onRespond={respondEvolution} />
+      )}
+
+      {state.biomeChoice && (
+        <BiomeChoiceModal prompt={state.biomeChoice} onChoose={chooseBiome} />
       )}
 
       {state.phase === 'ended' && (
@@ -269,6 +273,40 @@ function EvolutionPromptModal({ prompt, onRespond }: {
           <button className="action-btn" onClick={() => onRespond(false)}>
             CANCEL
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Biome map / route choice: between biomes the player charts the next leg of the run. Shows the offered
+// biomes (the current biome's playable neighbours, or every playable biome at run start) as cards with their
+// type theme; one press picks the biome and continues the run (the backend is blocked awaiting it). The run
+// loop always offers at least one option, so there is no empty/decline state — this is a required choice.
+function BiomeChoiceModal({ prompt, onChoose }: {
+  prompt: BiomeChoicePrompt;
+  onChoose: (biomeId: string) => void;
+}) {
+  return (
+    <div className="modal-overlay">
+      <div className="biome-modal" role="alertdialog" aria-label="Choose your route">
+        <p className="biome-title">Choose your route</p>
+        <p className="biome-sub">Where will you head next?</p>
+        <div className="biome-cards">
+          {prompt.options.map(biome => (
+            <button
+              key={biome.id}
+              className="biome-card"
+              onClick={() => onChoose(biome.id)}
+            >
+              <span className="biome-card-name">{biome.name}</span>
+              <span className="biome-card-types">
+                {biome.types.map(t => (
+                  <TypeBadge key={t} type={t} size="sm" />
+                ))}
+              </span>
+            </button>
+          ))}
         </div>
       </div>
     </div>

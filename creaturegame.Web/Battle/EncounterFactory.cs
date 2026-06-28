@@ -79,7 +79,39 @@ public sealed class EncounterFactory(
         var allItems = await itemsCtx.Items.AsNoTracking().ToListAsync();
         var bag = Bag.WithEach(allItems.Select(i => i.Id), TestBagQuantityEach);
 
-        return new RunSetup(player, allMoves, bag, allItems);
+        // The run's biome map: the region's biomes that can actually generate against the wild-available pool
+        // (empty biomes never appear — ENCOUNTER_DESIGN.md §2.2). Computed once here and threaded into the
+        // RunDirector, which charts the route. The same Wild filter CreateEnemyAsync applies is used, so every
+        // offered biome is guaranteed to have an encounter (PickByBst can't starve on its themed pool).
+        var playableBiomes = await ComputePlayableBiomesAsync(pokemonCtx, Region.Kanto);
+
+        return new RunSetup(player, allMoves, bag, allItems, playableBiomes);
+    }
+
+    /// <summary>
+    /// The biomes for <paramref name="region"/> that can actually generate against the active generation's
+    /// wild-available species (legendaries/statics/gifts excluded — the same filter as
+    /// <see cref="CreateEnemyAsync"/>). Empty biomes never appear; if no availability data exists (a minimally
+    /// seeded DB) the full dex is the pool, mirroring the encounter fallback so the map never starves.
+    /// </summary>
+    private static async Task<IReadOnlyList<BiomeDefinition>> ComputePlayableBiomesAsync(
+        PokemonDbContext pokemonCtx,
+        Region region
+    )
+    {
+        var allSpecies = await pokemonCtx.Species.AsNoTracking().ToListAsync();
+        var wildSet = (
+            await pokemonCtx
+                .GameAvailability.AsNoTracking()
+                .Where(a => a.AvailabilityType == "Wild")
+                .Select(a => a.SpeciesId)
+                .Distinct()
+                .ToListAsync()
+        ).ToHashSet();
+
+        var wildPool =
+            wildSet.Count > 0 ? allSpecies.Where(s => wildSet.Contains(s.Id)).ToList() : allSpecies;
+        return Biomes.Playable(region, wildPool);
     }
 
     /// <summary>
@@ -304,11 +336,13 @@ public sealed class EncounterFactory(
 }
 
 /// <summary>The starting state of a run: the built player, the shared move pool the chain reuses, the run's
-/// starting <see cref="Bag"/>, and the item catalog (id → <see cref="Item"/>) used to resolve item uses and
-/// render the bag.</summary>
+/// starting <see cref="Bag"/>, the item catalog (id → <see cref="Item"/>) used to resolve item uses and
+/// render the bag, and the run's <see cref="PlayableBiomes"/> map (the region's non-empty biomes the
+/// RunDirector charts a route through).</summary>
 public sealed record RunSetup(
     Creature Player,
     IReadOnlyList<Attack> AllMoves,
     Bag Bag,
-    IReadOnlyList<Item> AllItems
+    IReadOnlyList<Item> AllItems,
+    IReadOnlyList<BiomeDefinition> PlayableBiomes
 );

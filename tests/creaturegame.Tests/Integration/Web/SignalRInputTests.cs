@@ -130,4 +130,33 @@ public class SignalRInputTests
             await input.ChooseTurnActionAsync(ctx)
         );
     }
+
+    [Fact]
+    public async Task SetBiomeChoice_YieldsTheChosenBiomeId()
+    {
+        var input = new SignalRInput();
+        var ctx = new BiomeChoiceContext([
+            new BiomeDefinition("a", "Alpha", Region.Kanto, [DamageType.Normal], []),
+            new BiomeDefinition("b", "Bravo", Region.Kanto, [DamageType.Fire], []),
+        ]);
+
+        var task = input.ChooseBiomeAsync(ctx); // blocks on the map handshake
+        input.SetBiomeChoice("b"); // hub: ChooseBiome("b")
+
+        Assert.Equal("b", await task);
+    }
+
+    [Fact]
+    public async Task Cancel_UnblocksThePendingBiomeChoice()
+    {
+        var input = new SignalRInput();
+        var ctx = new BiomeChoiceContext([
+            new BiomeDefinition("a", "Alpha", Region.Kanto, [DamageType.Normal], []),
+        ]);
+
+        var task = input.ChooseBiomeAsync(ctx);
+        input.Cancel(); // client disconnected on the map screen
+
+        await Assert.ThrowsAsync<TaskCanceledException>(async () => await task);
+    }
 }

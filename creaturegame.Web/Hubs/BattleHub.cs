@@ -66,6 +66,17 @@ public class BattleHub(GameSessionManager manager) : Hub<IBattleClient>
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Answers the map-screen route choice: <paramref name="biomeId"/> is the biome to enter next. Mirrors
+    /// <see cref="RespondRecovery"/> — fire-and-forget completion of the input TCS the run loop is blocked on.
+    /// An unknown id is tolerated by the run loop (falls back to the first offered biome).
+    /// </summary>
+    public Task ChooseBiome(string biomeId)
+    {
+        manager.SetBiomeChoice(Context.ConnectionId, biomeId);
+        return Task.CompletedTask;
+    }
+
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         // Start the reconnect grace window; the battle is abandoned only if the client

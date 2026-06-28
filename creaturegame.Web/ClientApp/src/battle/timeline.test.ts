@@ -222,6 +222,38 @@ describe('expandEvent — control plane vs timeline', () => {
     expect(logLines(steps)).toEqual(['MEWTWO decided to keep going!']);
   });
 
+  it('BiomeChoiceOffered raises the map modal with the offered biomes (queued, blocking)', () => {
+    const { now, steps } = expandEvent('BiomeChoiceOffered', {
+      options: [
+        { id: 'phantom-marsh', name: 'Phantom Marsh', types: ['Ghost', 'Poison'] },
+        { id: 'tranquil-lake', name: 'Tranquil Lake', types: ['Water', 'Psychic'] },
+      ],
+    }, CTX);
+    expect(now).toBeUndefined(); // queued through the timeline, not dispatched immediately
+    const show = (steps ?? []).find(
+      (s): s is Extract<Step, { kind: 'dispatch' }> =>
+        s.kind === 'dispatch' && s.action.type === 'SHOW_BIOME_CHOICE');
+    expect(show).toBeDefined();
+    const action = show!.action as Extract<Action, { type: 'SHOW_BIOME_CHOICE' }>;
+    expect(action.options.map(o => o.id)).toEqual(['phantom-marsh', 'tranquil-lake']);
+    expect(action.options[0].types).toEqual(['Ghost', 'Poison']);
+  });
+
+  it('BiomeChoiceOffered tolerates a missing options list', () => {
+    const { steps } = expandEvent('BiomeChoiceOffered', {}, CTX);
+    const show = (steps ?? []).find(
+      (s): s is Extract<Step, { kind: 'dispatch' }> =>
+        s.kind === 'dispatch' && s.action.type === 'SHOW_BIOME_CHOICE');
+    expect((show!.action as Extract<Action, { type: 'SHOW_BIOME_CHOICE' }>).options).toEqual([]);
+  });
+
+  it('BiomeEntered titles the next leg of the route', () => {
+    const { steps } = expandEvent('BiomeEntered', {
+      biomeId: 'phantom-marsh', biomeName: 'Phantom Marsh', types: ['Ghost', 'Poison'],
+    }, CTX);
+    expect(logLines(steps)).toEqual(['Entered Phantom Marsh!']);
+  });
+
   it('EvolutionOffered announces it and raises the Allow/Cancel modal (queued, blocking)', () => {
     const { steps } = expandEvent('EvolutionOffered', {
       fromName: 'MACHOKE', toName: 'MACHAMP', fromSpeciesId: 67, toSpeciesId: 68,
