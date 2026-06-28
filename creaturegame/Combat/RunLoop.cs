@@ -42,8 +42,17 @@ public sealed class RunState(Creature player)
     /// <summary>The one persistent creature the run is played with; its permanent half carries across events.</summary>
     public Creature Player { get; } = player;
 
-    /// <summary>Encounters won so far — the run "depth". Climbs on each battle win and scales the next foe.</summary>
+    /// <summary>Encounters won so far. Drives the run summary and the legacy Poké Center milestone; in biome
+    /// mode the foe-scaling depth axis is <see cref="RunDepth"/> instead (which also counts interaction nodes).</summary>
     public int BattlesWon { get; set; }
+
+    /// <summary>
+    /// The run's progression depth — <em>nodes traversed</em> (battle wins + interaction visits) — the axis the
+    /// enemy supplier scales the next foe to (<c>ENCOUNTER_DESIGN.md §3.2</c>). In the legacy chain (battles
+    /// only) it equals <see cref="BattlesWon"/>; in biome mode it also counts shop/treasure/mystery nodes, so a
+    /// foe deeper in a biome — the Boss especially — scales harder than its win-count alone would imply.
+    /// </summary>
+    public int RunDepth { get; set; }
 
     /// <summary>
     /// Poké Center recoveries completed — one per heal milestone. <c>chooseNextEvent</c> compares this against

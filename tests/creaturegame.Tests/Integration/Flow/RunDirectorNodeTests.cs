@@ -14,7 +14,7 @@ namespace creaturegame.Tests.Integration.Flow;
 /// </summary>
 public class RunDirectorNodeTests
 {
-    // --- The default biome route layout (the placeholder generator; tuned curve is 3c-2) -------------------
+    // --- The default biome route layout (battle-heavy tuned curve, Boss-capped — 3c-2) ---------------------
 
     [Theory]
     [InlineData(3)]
@@ -44,6 +44,46 @@ public class RunDirectorNodeTests
         var b = RunDirector.DefaultNodePlan(6, new SeededRandomSource(99));
 
         Assert.Equal(a.ToArray(), b.ToArray()); // same seed → same interior mix + order
+    }
+
+    [Fact]
+    public void DefaultNodePlan_InteriorIsBattleHeavy_AndCoversEveryKind()
+    {
+        // Sample many interior slots (every node but the Boss apex) from one seeded stream and tally the mix.
+        // Pins the 3c-2 distribution's *shape* without coupling to exact percentages: wild battles dominate,
+        // and every non-boss kind is reachable.
+        var rng = new SeededRandomSource(2024);
+        var tally = new Dictionary<RunNodeKind, int>();
+        for (int i = 0; i < 500; i++)
+            foreach (var kind in RunDirector.DefaultNodePlan(6, rng).Take(5)) // 5 interior slots per length-6 plan
+                tally[kind] = tally.GetValueOrDefault(kind) + 1;
+
+        Assert.DoesNotContain(RunNodeKind.BossBattle, tally.Keys); // the Boss is the apex, never an interior slot
+        foreach (
+            var kind in new[]
+            {
+                RunNodeKind.WildBattle,
+                RunNodeKind.EliteBattle,
+                RunNodeKind.Treasure,
+                RunNodeKind.Shop,
+                RunNodeKind.Mystery,
+            }
+        )
+            Assert.True(
+                tally.GetValueOrDefault(kind) > 0,
+                $"{kind} never appeared in 2500 interior slots"
+            );
+
+        // Battle-heavy: wild battles are the plurality, and outnumber every feature bone.
+        int wild = tally[RunNodeKind.WildBattle];
+        Assert.All(
+            tally.Where(kv => kv.Key != RunNodeKind.WildBattle),
+            kv =>
+                Assert.True(
+                    wild > kv.Value,
+                    $"WildBattle ({wild}) should outnumber {kv.Key} ({kv.Value})"
+                )
+        );
     }
 
     // --- Node dispatch: tiers reach the supplier, interaction bones emit + advance the biome ----------------
@@ -132,6 +172,68 @@ public class RunDirectorNodeTests
         // exactly once, after all six nodes resolved — proof the bones consume a slot.
         Assert.Single(recorder.Of<PlayerRecovered>());
         Assert.Equal(3, Assert.Single(recorder.Of<RunEnded>()).BattlesWon); // only the 3 first-biome wins count
+    }
+
+    [Fact]
+    public async Task BiomeMode_RunDepth_CountsInteractionNodesNotJustWins()
+    {
+        // Biome-position depth (3c-2): the depth the supplier scales to counts every node traversed, including
+        // the interaction bones — not just battle wins. With a Shop opening each biome, the depths the battles
+        // see skip ahead by the shop they followed.
+        var solo = new BiomeDefinition("solo", "Solo", Region.Kanto, [DamageType.Normal], []);
+        IReadOnlyList<RunNodeKind> plan =
+        [
+            RunNodeKind.Shop,
+            RunNodeKind.WildBattle,
+            RunNodeKind.BossBattle,
+        ];
+
+        var player = Fighter("Player", hp: 300, attack: 999, speed: 100, level: 50);
+        var depthsSeen = new List<int>();
+        int built = 0;
+        Func<Creature, int, BiomeDefinition?, EncounterTier, Task<Creature>> supplier = (
+            _,
+            depth,
+            _,
+            _
+        ) =>
+        {
+            built++;
+            depthsSeen.Add(depth);
+            // Biome 1's two battles (wild, boss) are pushovers; biome 2's opening battle ends the run.
+            var enemy =
+                built <= 2
+                    ? Fighter($"Push{built}", hp: 1, attack: 1, speed: 1, level: 5)
+                    : Fighter("Bruiser", hp: 999, attack: 999, speed: 999, level: 50);
+            enemy.SpeciesBaseExperience = 50;
+            return Task.FromResult(enemy);
+        };
+
+        var recorder = new RecordingEmitter();
+        var runner = new RunDirector(
+            player,
+            supplier,
+            Gen1TypeChart.Instance,
+            new ScriptedInput("tackle"),
+            new ScriptedInput("tackle"),
+            movePool: Array.Empty<Attack>(),
+            emitter: recorder,
+            rules: new ScriptableRules().Deterministic(),
+            rng: new SeededRandomSource(0),
+            playableBiomes: [solo],
+            eventsPerBiome: 3,
+            nodePlanFactory: (_, _) => plan
+        );
+
+        await runner.RunAsync();
+
+        // Biome 1: shop (depth 0→1), wild battle sees 1, boss sees 2. Biome 2: shop (depth 3→4), wild sees 4.
+        // The jump 2 → 4 (skipping 3) is the second biome's shop counting toward depth before its battle.
+        Assert.Equal(new[] { 1, 2, 4 }, depthsSeen.ToArray());
+
+        // BattlesWon stays independent of RunDepth: only the two won battles count it (biome-1 wild + boss),
+        // never the shops — so an accidental BattlesWon++ in the interaction arm couldn't hide behind the depths.
+        Assert.Equal(2, recorder.Of<RunEnded>().Single().BattlesWon);
     }
 
     [Fact]

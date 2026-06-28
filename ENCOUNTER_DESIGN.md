@@ -173,11 +173,13 @@ battle seams (as `ScaleWildLevel`'s own doc comment already argues); only the *D
 
 ### 3.2 Depth × tier (orthogonal)
 
-`depth = battlesWon`, threaded `BattleRunner → enemySupplier → CreateEnemyAsync`. Biome **depth** sets the
-*baseline band* — `targetBst = playerBst + depth × K` and a depth-lifted level band (this **restores the depth
-curve** `TODO.md` described as `lead BST + depth × 10` but which was never coded; today `CreateEnemyAsync`
-passes raw `playerBst`). The **tier** then shifts that baseline up/down. So "Medium @ depth 5" is genuinely
-tougher than "Medium @ depth 1." Phase 3 later swaps `battlesWon` for a richer biome-position depth.
+`depth` is threaded `RunDirector → enemySupplier → CreateEnemyAsync`. Biome **depth** sets the *baseline band* —
+`targetBst = playerBst + depth × K` and a depth-lifted level band (this **restores the depth curve** `TODO.md`
+described as `lead BST + depth × 10`). The **tier** then shifts that baseline up/down. So "Medium @ depth 5" is
+genuinely tougher than "Medium @ depth 1." **Phase 3c-2 ✅** replaced the original `battlesWon` proxy with
+**biome-position depth** (`RunState.RunDepth` = *nodes traversed* — battle wins + interaction visits), so a foe
+scales by how deep into the run/biome it sits; the Boss apex (last node) scales hardest. In the legacy chain
+(battles only) `RunDepth == battlesWon`, so that path is unchanged.
 
 ### 3.3 The four levers
 
@@ -277,7 +279,7 @@ loop body changing. `BattleRunner` graduates into the **`RunDirector`** that `GA
 | `IEnemyArchetype` tiers + `TmEnhanced`/`Optimal` movesets | `EnemyArchetype.cs` (new), `LearnsetMoveSelector`, `EncounterFactory` | ✅ **done (Phase 2d)** — tier *selection* per encounter is Phase 3 |
 | Event model + `chooseNextEvent` | `BattleRunner.RunAsync` (hardcoded `while`) → `RunDirector` + `RunLoop.cs` | ✅ **done (Phase 3a)** — `IRunEvent`/`Outcome`/`RunContext`, single sequencer; battle + recovery first-class |
 | Biome graph map traversal | `RunDirector` walks a seeded route (`BiomeChoiceEvent` + `ChooseBiomeAsync` seam); threads the biome into `CreateEnemyAsync` | ✅ **done (Phase 3b)** — 3b-1 backend + 3b-2 map screen; biome mode live (`RunSetup.PlayableBiomes` → session → director; `BiomeChoiceModal`) |
-| Node bones | new `IRunEvent` stubs (shop/treasure/mystery/elite/boss) + node-derived tier *selection* | ✅ **3c-1 done** — seeded `BiomeNodePlan` dispatched by `EventForNode`; `EncounterTier` intent (core) → `EnemyArchetypes.For` (web); Boss apex per biome. Tuned curve + biome-position depth = **3c-2** |
+| Node bones | new `IRunEvent` stubs (shop/treasure/mystery/elite/boss) + node-derived tier *selection* | ✅ **done (Phase 3c)** — 3c-1 seeded `BiomeNodePlan` dispatched by `EventForNode`, `EncounterTier` intent (core) → `EnemyArchetypes.For` (web), Boss apex per biome; 3c-2 tuned the interior distribution + biome-position depth (`RunState.RunDepth`) |
 | Acquisition channels | deferred `TODO.md` Catch cluster | gated on §1–§5 |
 
 Every touch reuses an existing seam or adds one in the established style; the core engine stays
@@ -313,8 +315,11 @@ generation-agnostic and data-agnostic.
    `EventForNode`, each biome capped by a **Boss** apex (§4). Tier selection respects layering: the core passes a
    generation-agnostic `EncounterTier {Normal,Elite,Boss}` through the enemy supplier and the web maps it to an
    archetype (`EnemyArchetypes.For`), the same intent/mapping split as `DvQuality`. Interaction nodes are
-   `InteractionStubEvent` bones (emit a `RunNodeEntered` banner, advance the biome, behaviour later). Interior
-   node mix is a flagged placeholder. **3c-2** = the tuned node/tier distribution + biome-position depth (§3.2).
+   `InteractionStubEvent` bones (emit a `RunNodeEntered` banner, advance the biome, behaviour later). **3c-2 ✅
+   DONE (2026-06-28):** the interior distribution is now a battle-heavy tuned table (Wild 70 / Elite 18 /
+   Treasure 6 / Shop 4 / Mystery 2, independent per slot) and the foe-scaling axis is **biome-position depth**
+   (`RunState.RunDepth` = nodes traversed) instead of the `battlesWon` proxy (§3.2). **Phase 3 is complete** —
+   the next phase is acquisition (§4 / item 4 below).
 4. **Acquisition channels** (boss catch + themed draft, fought-only) — gated on (1)–(3) and the deferred Catch
    cluster.
 

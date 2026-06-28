@@ -14,10 +14,10 @@ done and archived. `ARCHITECTURE.md` and the per-run web seed are done.
 **Next up, in order:**
 1. **Encounter Logic** — *design DONE* (`ENCOUNTER_DESIGN.md`, 2026-06-27). Phased build: **Phase 1 (biome
    model)** ✅ + **Phase 2 (enemy tiers + depth bands)** ✅ + **Phase 3a (event model / `RunDirector`)** ✅ +
-   **Phase 3b (biome graph + map screen)** ✅ + **Phase 3c-1 (node-kind bones + tier wiring)** ✅ done — biome
-   runs now route through varied nodes (wild/elite/boss/shop/treasure/mystery), each biome capped by a Boss.
-   **Next: Phase 3c-2** — the tuned node/tier distribution + biome-position depth (`ENCOUNTER_DESIGN.md §3.2`),
-   then Phase 4 acquisition channels. **Run model
+   **Phase 3b (biome graph + map screen)** ✅ + **Phase 3c (node-kind bones + tuned curve)** ✅ done — biome
+   runs route through varied nodes (wild/elite/boss/shop/treasure/mystery) on a battle-heavy tuned distribution,
+   each biome capped by a Boss apex, foes scaled by biome-position depth. **Phase 3 (Encounter Logic) is
+   complete. Next: Phase 4 — Acquisition channels** (boss catch + themed draft, fought-only). **Run model
    (confirmed with the user):** region (Kanto) → player chooses a biome → ~3 themed events (battles for now)
    capped by a Poké Center → choose the next biome (its neighbours) → repeat until death.
 2. **Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by (1)'s acquisition phase.
@@ -132,7 +132,7 @@ Debt cleanup, User Documentation.
       `RunSetupBiomeTests` (full Kanto map computed, non-empty themes), Vitest map-modal arms. Verified live
       (Puppeteer: run-start map → pick Phantom Marsh → themed Gastly encounter). **Deferred (still open):**
       node-derived `IEnemyArchetype` tier *selection* + biome-position depth → folded into 3c.
-  - [~] **3c — Node-kind bones.** Split into the bones (3c-1) + the tuned curve (3c-2):
+  - [x] **3c — Node-kind bones — DONE (2026-06-28).** Split into the bones (3c-1) + the tuned curve (3c-2):
     - [x] **3c-1 — Node kinds + tier wiring — DONE (2026-06-28).** A biome's route is now a seeded node *plan*
       (`RunState.BiomeNodePlan`) the director dispatches via `ChooseNextEvent`/`EventForNode` — not "N wild
       battles". Six `RunNodeKind`s: three battle tiers + three interaction bones. **Layering:** archetypes are
@@ -148,9 +148,15 @@ Debt cleanup, User Documentation.
       legacy never banners), `EnemyArchetypes.For` mapping, Vitest banner arms. `/audit` seam review
       PASS (1 advisory fixed: `EventForNode` default now throws). Verified live (shop + boss banners; boss is a
       tough optimal-moveset foe). 1130/1130 + Vitest 80/80.
-    - [ ] **3c-2 — Tuned distribution + biome-position depth.** Replace the placeholder interior weights with the
-      designed node/tier curve, and swap `depth = battlesWon` for the richer biome-position depth
-      (`ENCOUNTER_DESIGN.md §3.2`). Gets `/audit` (difficulty curve).
+    - [x] **3c-2 — Tuned distribution + biome-position depth — DONE (2026-06-28).** Two parts: (a)
+      **biome-position depth** — new `RunState.RunDepth` = *nodes traversed* (wins + interaction visits) replaces
+      `battlesWon` as the supplier's scaling axis; legacy chain unchanged (RunDepth == BattlesWon with no
+      interaction nodes), biome mode now scales a foe by how deep into the biome it sits, so the Boss apex scales
+      hardest (`ENCOUNTER_DESIGN.md §3.2`). `BattlesWon` still drives the recovery milestone + run summary.
+      (b) **tuned interior weights** — `PickInteriorNode` is now battle-heavy (Wild 70 / Elite 18 / Treasure 6 /
+      Shop 4 / Mystery 2), independent roll per slot (the chosen model); features are rare while they're no-op
+      bones. Pins: `RunDirectorNodeTests` (depth counts interaction nodes; interior battle-heavy + every kind
+      reachable + Boss never interior). `/audit` seam review PASS. 1132/1132.
 - [ ] **Phase 4 — Acquisition channels** (boss catch + themed draft, fought-only). Gates the cluster below;
   *n%* rates tuned here.
 

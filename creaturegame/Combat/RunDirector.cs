@@ -170,12 +170,16 @@ public sealed class RunDirector
                 s.NeedsBiomeChoice = false;
                 break;
             case BattleOutcome { Won: true }:
+                s.RunDepth++; // progression depth (= BattlesWon in legacy; biome mode adds interaction nodes too)
                 if (_biomeModeActive)
                     s.EventsInCurrentBiome++; // node resolved → advance the biome (Poké Center caps the plan)
                 break;
             case NodeVisitedOutcome:
                 if (_biomeModeActive)
-                    s.EventsInCurrentBiome++; // an interaction node also consumes a biome slot
+                {
+                    s.RunDepth++; // an interaction node consumes a biome slot AND advances the depth axis
+                    s.EventsInCurrentBiome++;
+                }
                 break;
             case RecoveryOutcome:
                 s.RecoveriesDone++; // legacy milestone bookkeeping
@@ -188,10 +192,10 @@ public sealed class RunDirector
 
     /// <summary>
     /// The default biome route layout: <paramref name="length"/> nodes, the last always the Boss (the themed
-    /// apex — <c>ENCOUNTER_DESIGN.md §4</c>), the interior sampled from a PLACEHOLDER weighted table (mostly wild
-    /// battles, with the odd elite or interaction node) so every node-kind bone is reachable. Seeded on
-    /// <paramref name="rng"/> → reproducible. The tuned distribution + biome-position depth are Phase 3c-2; this
-    /// only has to be seeded and exercise the kinds. Public + injectable via the director's <c>nodePlanFactory</c>.
+    /// apex — <c>ENCOUNTER_DESIGN.md §4</c>), each interior slot rolled independently from the weighted table in
+    /// <see cref="PickInteriorNode"/> (battle-heavy, with elites the step-up and the no-op feature bones rare).
+    /// Seeded on <paramref name="rng"/> → reproducible. Public + injectable via the director's
+    /// <c>nodePlanFactory</c> so a run can supply a different layout without touching the director.
     /// </summary>
     public static IReadOnlyList<RunNodeKind> DefaultNodePlan(int length, IRandomSource rng)
     {
@@ -205,15 +209,18 @@ public sealed class RunDirector
         return plan;
     }
 
-    // PLACEHOLDER interior-node weights (sum 100) — replaced by the designed curve in 3c-2.
+    // Interior-node weights (sum 100). Battle-heavy — the run is a battle game, so most slots are encounters and
+    // Elites are the intra-biome step-up before the Boss. The feature bones (shop/treasure/mystery) are rare
+    // while they're still no-op banners; Treasure (a player-positive reward) leads them, Mystery (the wildcard)
+    // trails. Independent roll per slot (the chosen 3c-2 model); raise the feature weights as their behaviour lands.
     private static RunNodeKind PickInteriorNode(IRandomSource rng) =>
         rng.Next(100) switch
         {
-            < 60 => RunNodeKind.WildBattle,
-            < 75 => RunNodeKind.EliteBattle,
-            < 85 => RunNodeKind.Shop,
-            < 95 => RunNodeKind.Treasure,
-            _ => RunNodeKind.Mystery,
+            < 70 => RunNodeKind.WildBattle, // 70
+            < 88 => RunNodeKind.EliteBattle, // 18
+            < 94 => RunNodeKind.Treasure, // 6
+            < 98 => RunNodeKind.Shop, // 4
+            _ => RunNodeKind.Mystery, // 2
         };
 }
 
@@ -250,10 +257,11 @@ internal sealed class BattleRunEvent(
         if (bannerKind is not null)
             ctx.Emitter?.Emit(new RunNodeEntered(bannerKind));
 
-        // BattlesWon is the run depth — 0 for the first encounter, climbing each win. The supplier scales the
-        // next foe (BST band, level) to it, themes it to the current biome (null in the legacy chain), and maps
-        // this node's EncounterTier to an archetype; see EncounterFactory.CreateEnemyAsync.
-        var enemy = await enemySupplier(player, s.BattlesWon, s.CurrentBiome, tier);
+        // RunDepth is the progression depth — 0 for the first node, climbing per node traversed (wins +
+        // interaction visits; = BattlesWon in the legacy chain). The supplier scales the next foe (BST band,
+        // level) to it, themes it to the current biome (null in the legacy chain), and maps this node's
+        // EncounterTier to an archetype; see EncounterFactory.CreateEnemyAsync.
+        var enemy = await enemySupplier(player, s.RunDepth, s.CurrentBiome, tier);
         int levelBefore = player.Level;
         var battle = new Battle(
             player,
