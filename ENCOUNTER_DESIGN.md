@@ -276,8 +276,8 @@ loop body changing. `BattleRunner` graduates into the **`RunDirector`** that `GA
 | Depth-scaled BST + level band | `ScaleTargetBst`/`ScaleWildLevel`, `CreateEnemyAsync` (`depth`), `BattleRunner` supplier | ✅ **done (Phase 2c)** — depth = `battlesWon` |
 | `IEnemyArchetype` tiers + `TmEnhanced`/`Optimal` movesets | `EnemyArchetype.cs` (new), `LearnsetMoveSelector`, `EncounterFactory` | ✅ **done (Phase 2d)** — tier *selection* per encounter is Phase 3 |
 | Event model + `chooseNextEvent` | `BattleRunner.RunAsync` (hardcoded `while`) → `RunDirector` + `RunLoop.cs` | ✅ **done (Phase 3a)** — `IRunEvent`/`Outcome`/`RunContext`, single sequencer; battle + recovery first-class |
-| Biome graph map traversal | `RunDirector` walks a seeded route; threads biome + tier into `CreateEnemyAsync` | Phase 3b — fills the null `biome` param + the deferred tier *selection* |
-| Node bones | new `IRunEvent` stubs (shop/treasure/mystery/elite/boss) | Phase 3c — battle + recovery already are events |
+| Biome graph map traversal | `RunDirector` walks a seeded route (`BiomeChoiceEvent` + `ChooseBiomeAsync` seam); threads the biome into `CreateEnemyAsync` | ✅ **3b-1 done** (backend; fills the null `biome` param) — UI + biome-mode activation = **3b-2** |
+| Node bones | new `IRunEvent` stubs (shop/treasure/mystery/elite/boss) + node-derived tier *selection* | Phase 3c — battle + recovery already are events |
 | Acquisition channels | deferred `TODO.md` Catch cluster | gated on §1–§5 |
 
 Every touch reuses an existing seam or adds one in the established style; the core engine stays
@@ -300,8 +300,12 @@ generation-agnostic and data-agnostic.
    **3a ✅ DONE (2026-06-28):** the event model — `RunLoop.cs` (`RunState`/`RunContext`/`Outcome`/`IRunEvent`)
    + `RunDirector` (renamed from `BattleRunner`) holding the single `chooseNextEvent` sequencer, with battle
    and Poké Center recovery as first-class `IRunEvent`s. Behaviour-preserving (endless chain unchanged).
-   **3b** = seeded biome-graph route + threading the current biome / per-node `IEnemyArchetype` into encounter
-   construction; **3c** = the remaining node-kind bones (shop/treasure/mystery/elite/boss).
+   **3b-1 ✅ DONE (2026-06-28):** the biome-traversal backend — `BiomeChoiceEvent` + `ChooseBiomeAsync` seam,
+   the run charts a route through the biome graph (run model: region → choose biome → ~3 themed events capped by
+   a Poké Center → choose the next biome's neighbours → repeat), the current biome threads into `CreateEnemyAsync`.
+   Gated on a supplied playable set (legacy chain otherwise); biome mode not yet activated in the app. **3b-2** =
+   the visible map/route screen + activating biome mode; **3c** = the remaining node-kind bones + per-node tier
+   selection (shop/treasure/mystery/elite/boss).
 4. **Acquisition channels** (boss catch + themed draft, fought-only) — gated on (1)–(3) and the deferred Catch
    cluster.
 

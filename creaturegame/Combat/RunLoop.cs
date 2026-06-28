@@ -28,6 +28,23 @@ public sealed class RunState(Creature player)
     /// battle). Null means nothing carries. Captured after a win and cleared by a Poké Center heal.
     /// </summary>
     public CarriedStatus? CarriedStatus { get; set; }
+
+    // --- Biome traversal (only meaningful when the director runs in biome mode; ignored by the legacy chain) ---
+
+    /// <summary>
+    /// The biome the run is currently in (the type theme its encounters draw from), or null before the first
+    /// choice. Retained while the next route choice is offered so the biome's neighbours can be the options.
+    /// </summary>
+    public BiomeDefinition? CurrentBiome { get; set; }
+
+    /// <summary>Battles won inside the current biome — drives the per-biome length (the Poké Center caps it).</summary>
+    public int EventsInCurrentBiome { get; set; }
+
+    /// <summary>
+    /// True when the next event should be a route choice (run start, or after a biome's Poké Center). Set by the
+    /// director in biome mode; the legacy chain never reads it.
+    /// </summary>
+    public bool NeedsBiomeChoice { get; set; } = true;
 }
 
 /// <summary>
@@ -54,6 +71,9 @@ public sealed record BattleOutcome(bool Won) : Outcome;
 
 /// <summary>Outcome of a Poké Center recovery event: whether the player accepted the heal.</summary>
 public sealed record RecoveryOutcome(bool Healed) : Outcome;
+
+/// <summary>Outcome of a route-choice event: the biome the player elected to enter next.</summary>
+public sealed record BiomeChoiceOutcome(BiomeDefinition Chosen) : Outcome;
 
 /// <summary>
 /// One unit the run plays to completion before advancing (<c>GAME_LOOP.md §1.2</c>). Battle (a loop-event)

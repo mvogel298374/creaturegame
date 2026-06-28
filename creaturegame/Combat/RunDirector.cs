@@ -29,12 +29,15 @@ public sealed class RunDirector
     private readonly IBattleInput _playerInput;
     private readonly IRandomSource? _rng;
     private readonly int _healEveryNBattles;
+    private readonly int _eventsPerBiome;
+    private readonly bool _biomeModeActive;
     private readonly IRunEvent _battleEvent;
     private readonly IRunEvent _recoveryEvent;
+    private readonly IRunEvent _biomeChoiceEvent;
 
     public RunDirector(
         Creature player,
-        Func<Creature, int, Task<Creature>> enemySupplier,
+        Func<Creature, int, BiomeDefinition?, Task<Creature>> enemySupplier,
         ITypeChart typeChart,
         IBattleInput playerInput,
         IBattleInput enemyInput,
@@ -44,7 +47,10 @@ public sealed class RunDirector
         IRandomSource? rng = null,
         int healEveryNBattles = 3,
         Func<Creature, Task<EvolutionOutcome?>>? checkEvolution = null,
-        Bag? playerBag = null
+        Bag? playerBag = null,
+        IReadOnlyList<BiomeDefinition>? playableBiomes = null,
+        int eventsPerBiome = 3,
+        int biomeOptionCount = 3
     )
     {
         _state = new RunState(player);
@@ -52,6 +58,10 @@ public sealed class RunDirector
         _playerInput = playerInput;
         _rng = rng;
         _healEveryNBattles = healEveryNBattles;
+        _eventsPerBiome = eventsPerBiome;
+        // Biome mode kicks in only when the composition layer supplies a non-empty playable set; otherwise the
+        // director runs the legacy endless chain (no route choices), so tests/uses without biomes are unchanged.
+        _biomeModeActive = playableBiomes is { Count: > 0 };
         _battleEvent = new BattleRunEvent(
             enemySupplier,
             typeChart,
@@ -62,6 +72,7 @@ public sealed class RunDirector
             checkEvolution
         );
         _recoveryEvent = new RecoveryRunEvent();
+        _biomeChoiceEvent = new BiomeChoiceEvent(playableBiomes ?? [], biomeOptionCount);
     }
 
     public async Task RunAsync()
@@ -78,22 +89,51 @@ public sealed class RunDirector
     }
 
     /// <summary>
-    /// The single decider of sequence — pure over run state (<c>GAME_LOOP.md §3/§4</c>). Today: a Poké Center
-    /// pause after every Nth win (exactly once per milestone, via <see cref="RunState.RecoveriesDone"/>),
-    /// otherwise the next encounter. Future node kinds branch here; the loop body never reads run structure.
+    /// The single decider of sequence — pure over run state (<c>GAME_LOOP.md §3/§4</c>). In biome mode: chart a
+    /// route at the start of each biome, run that biome's encounters, then a Poké Center caps it before the next
+    /// choice. Legacy (no biomes): a Poké Center after every Nth win, otherwise the next encounter. Future node
+    /// kinds branch here; the loop body never reads run structure.
     /// </summary>
-    private IRunEvent ChooseNextEvent(RunState s) =>
-        _healEveryNBattles > 0 && s.BattlesWon / _healEveryNBattles > s.RecoveriesDone
+    private IRunEvent ChooseNextEvent(RunState s)
+    {
+        if (_biomeModeActive)
+        {
+            if (s.NeedsBiomeChoice)
+                return _biomeChoiceEvent; // run start / post-Center: pick the next biome
+            if (s.EventsInCurrentBiome >= _eventsPerBiome)
+                return _recoveryEvent; // biome cleared → its Poké Center cap
+            return _battleEvent; // a themed encounter inside the current biome
+        }
+
+        return _healEveryNBattles > 0 && s.BattlesWon / _healEveryNBattles > s.RecoveriesDone
             ? _recoveryEvent
             : _battleEvent;
+    }
 
     // Folds an outcome back into run state, the only channel from a (player-influenced) outcome to future
     // sequencing. A battle event already advanced BattlesWon / CarriedStatus itself, and a loss is read by the
-    // while-loop's IsAlive() guard — so only the recovery milestone needs recording here.
-    private static void Apply(RunState s, Outcome outcome)
+    // while-loop's IsAlive() guard — so this records the route choice, the per-biome progress, and the recovery
+    // milestone / biome boundary.
+    private void Apply(RunState s, Outcome outcome)
     {
-        if (outcome is RecoveryOutcome)
-            s.RecoveriesDone++; // milestone consumed whether the player healed or declined
+        switch (outcome)
+        {
+            case BiomeChoiceOutcome biome:
+                s.CurrentBiome = biome.Chosen;
+                s.EventsInCurrentBiome = 0;
+                s.NeedsBiomeChoice = false;
+                break;
+            case BattleOutcome { Won: true }:
+                if (_biomeModeActive)
+                    s.EventsInCurrentBiome++; // per-biome length counter, capped by the Poké Center
+                break;
+            case RecoveryOutcome:
+                s.RecoveriesDone++; // legacy milestone bookkeeping
+                if (_biomeModeActive)
+                    // Biome done; keep CurrentBiome so its neighbours are the next options, then re-choose.
+                    s.NeedsBiomeChoice = true;
+                break;
+        }
     }
 }
 
@@ -105,7 +145,7 @@ public sealed class RunDirector
 /// level-up, not an independently sequenced event (<c>GAME_LOOP.md §5</c>).
 /// </summary>
 internal sealed class BattleRunEvent(
-    Func<Creature, int, Task<Creature>> enemySupplier,
+    Func<Creature, int, BiomeDefinition?, Task<Creature>> enemySupplier,
     ITypeChart typeChart,
     IBattleInput enemyInput,
     IReadOnlyList<Attack> movePool,
@@ -120,8 +160,9 @@ internal sealed class BattleRunEvent(
         var player = s.Player;
 
         // BattlesWon is the run depth — 0 for the first encounter, climbing each win. The supplier scales the
-        // next foe (BST band, level, tier) to it; see EncounterFactory.CreateEnemyAsync.
-        var enemy = await enemySupplier(player, s.BattlesWon);
+        // next foe (BST band, level, tier) to it and themes it to the current biome (null in the legacy chain);
+        // see EncounterFactory.CreateEnemyAsync.
+        var enemy = await enemySupplier(player, s.BattlesWon, s.CurrentBiome);
         int levelBefore = player.Level;
         var battle = new Battle(
             player,
@@ -241,5 +282,67 @@ internal sealed class RecoveryRunEvent : IRunEvent
         }
 
         return new RecoveryOutcome(accept);
+    }
+}
+
+/// <summary>
+/// The route-choice node (interaction-event): offer the next leg of the run and await the player's pick. At run
+/// start the options are any playable biome; afterwards they are the current biome's playable neighbours — so
+/// the player charts a route through the authored biome graph (<c>ENCOUNTER_DESIGN.md §1</c>). The offered set
+/// (and its order) is sampled on the run RNG, so a seed reproduces the same map. The chosen biome becomes the
+/// theme for the next stretch of encounters via <see cref="RunState.CurrentBiome"/>.
+/// </summary>
+internal sealed class BiomeChoiceEvent(IReadOnlyList<BiomeDefinition> playable, int optionCount)
+    : IRunEvent
+{
+    private readonly Dictionary<string, BiomeDefinition> _byId = playable.ToDictionary(b => b.Id);
+
+    public async Task<Outcome> RunAsync(RunContext ctx)
+    {
+        var options = PickOptions(ctx.State.CurrentBiome, ctx.Rng);
+
+        ctx.Emitter?.Emit(
+            new BiomeChoiceOffered(
+                options.Select(b => new BiomeOption(b.Id, b.Name, b.Types)).ToList()
+            )
+        );
+        string chosenId = await ctx.PlayerInput.ChooseBiomeAsync(new BiomeChoiceContext(options));
+        // An unknown id (stale / malformed pick) falls back to the first offered biome — mirrors the move-slot
+        // fallback; the route is never left unset.
+        var chosen = options.FirstOrDefault(b => b.Id == chosenId) ?? options[0];
+
+        ctx.Emitter?.Emit(new BiomeEntered(chosen.Id, chosen.Name, chosen.Types));
+        return new BiomeChoiceOutcome(chosen);
+    }
+
+    // The biomes to offer: at run start (no current biome) any playable biome; otherwise the current biome's
+    // playable neighbours (charting a route through the authored graph). A dead-end with no playable neighbours
+    // falls back to the whole playable set so the run never stalls. Up to optionCount, sampled on the run RNG.
+    private IReadOnlyList<BiomeDefinition> PickOptions(BiomeDefinition? current, IRandomSource? rng)
+    {
+        IReadOnlyList<BiomeDefinition> pool = current is null
+            ? playable
+            : current.Neighbours.Where(_byId.ContainsKey).Select(id => _byId[id]).ToList();
+        if (pool.Count == 0)
+            pool = playable;
+        return Sample(pool, optionCount, rng ?? SystemRandomSource.Instance);
+    }
+
+    // Up to k items in a seed-reproducible random order (partial Fisher–Yates over a copy), so the offered set
+    // and its order replay from the run seed.
+    private static IReadOnlyList<BiomeDefinition> Sample(
+        IReadOnlyList<BiomeDefinition> pool,
+        int k,
+        IRandomSource rng
+    )
+    {
+        var copy = pool.ToList();
+        int take = Math.Min(k, copy.Count);
+        for (int i = 0; i < take; i++)
+        {
+            int j = i + rng.Next(copy.Count - i);
+            (copy[i], copy[j]) = (copy[j], copy[i]);
+        }
+        return copy.GetRange(0, take);
     }
 }

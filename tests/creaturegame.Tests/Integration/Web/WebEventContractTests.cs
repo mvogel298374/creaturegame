@@ -197,6 +197,53 @@ public class WebEventContractTests
         Assert.Equal(5, root.GetProperty("ToSpeciesId").GetInt32());
     }
 
+    /// <summary>Field-level guard for the <see cref="BiomeChoiceOffered"/> projection: each
+    /// <see cref="BiomeOption"/> is hand-mapped into an anonymous object, so the map screen's id/name/type-badge
+    /// fields are silently dropped unless listed. The reflection contract test instantiates the event with an
+    /// <i>empty</i> options list, so it can't catch this — pins the nested sub-fields the 3b-2 map UI reads.</summary>
+    [Fact]
+    public void BiomeChoiceOffered_Projection_CarriesOptionSubFields()
+    {
+        var evt = new BiomeChoiceOffered([
+            new BiomeOption(
+                "phantom-marsh",
+                "Phantom Marsh",
+                [DamageType.Ghost, DamageType.Poison]
+            ),
+        ]);
+
+        var (type, payload) = SignalRBattleEventEmitter.MapEvent(evt);
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+        var option = doc.RootElement.GetProperty("Options")[0];
+
+        Assert.Equal("BiomeChoiceOffered", type);
+        Assert.Equal("phantom-marsh", option.GetProperty("Id").GetString());
+        Assert.Equal("Phantom Marsh", option.GetProperty("Name").GetString());
+        Assert.Equal("Ghost", option.GetProperty("Types")[0].GetString());
+        Assert.Equal("Poison", option.GetProperty("Types")[1].GetString());
+    }
+
+    /// <summary>Same projection guard for <see cref="BiomeEntered"/> — the client titles/themes the next leg
+    /// from these fields, dropped on the wire if not listed (the failure mode the STAB flag hit).</summary>
+    [Fact]
+    public void BiomeEntered_Projection_CarriesAllFields()
+    {
+        var evt = new BiomeEntered(
+            "phantom-marsh",
+            "Phantom Marsh",
+            [DamageType.Ghost, DamageType.Poison]
+        );
+
+        var (type, payload) = SignalRBattleEventEmitter.MapEvent(evt);
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+        var root = doc.RootElement;
+
+        Assert.Equal("BiomeEntered", type);
+        Assert.Equal("phantom-marsh", root.GetProperty("BiomeId").GetString());
+        Assert.Equal("Phantom Marsh", root.GetProperty("BiomeName").GetString());
+        Assert.Equal("Ghost", root.GetProperty("Types")[0].GetString());
+    }
+
     // Concrete (non-abstract) BattleEvent subtypes — the exact set the engine can emit to the client.
     private static List<Type> ConcreteBattleEventTypes()
     {

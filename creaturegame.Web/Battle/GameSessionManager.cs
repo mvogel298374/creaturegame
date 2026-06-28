@@ -100,8 +100,14 @@ public sealed class GameSessionManager(
         // draws sequentially on this task.
         var runner = new RunDirector(
             session.Player,
-            (p, depth) =>
-                encounters.CreateEnemyAsync(p, session.AllMoves, session.Rng, depth: depth),
+            (p, depth, biome) =>
+                encounters.CreateEnemyAsync(
+                    p,
+                    session.AllMoves,
+                    session.Rng,
+                    biome: biome,
+                    depth: depth
+                ),
             Gen1TypeChart.Instance,
             battle.Input,
             new AiBattleInput(new Gen1TrainerAi(rng: session.Rng)),

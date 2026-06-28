@@ -87,6 +87,27 @@ public sealed class SignalRBattleEventEmitter(
             ),
             PlayerRecovered e => ("PlayerRecovered", new { e.CreatureName, e.HpAfter }),
             RecoveryDeclined e => ("RecoveryDeclined", new { e.CreatureName }),
+            BiomeChoiceOffered e => (
+                "BiomeChoiceOffered",
+                new
+                {
+                    Options = e.Options.Select(o => new
+                    {
+                        o.Id,
+                        o.Name,
+                        Types = o.Types.Select(t => t.ToString()),
+                    }),
+                }
+            ),
+            BiomeEntered e => (
+                "BiomeEntered",
+                new
+                {
+                    e.BiomeId,
+                    e.BiomeName,
+                    Types = e.Types.Select(t => t.ToString()),
+                }
+            ),
             ItemUsed e => ("ItemUsed", new { e.ItemName, e.TargetName }),
             PpRestored e => (
                 "PpRestored",

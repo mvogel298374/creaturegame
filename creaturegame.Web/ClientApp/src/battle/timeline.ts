@@ -278,6 +278,19 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       return { steps: [w(150), d(log(`${cName} decided to keep going!`)), w(400)] };
     }
 
+    // ── Biome / route map (between biomes) ─────────────────────────────────────
+    // The route choice raises a blocking map modal — the backend waits on ChooseBiome before continuing. The
+    // interactive map UI + a SHOW_BIOME_CHOICE action are wired in 3b-2; for now the arm exists so the event
+    // renders (a present arm with an empty expansion is a valid contract arm).
+    case 'BiomeChoiceOffered':
+      return {};
+
+    case 'BiomeEntered': {
+      // The player entered a biome (or the run auto-picked one) — title the next leg of the route.
+      const biomeName = payload.biomeName as string;
+      return { steps: [w(200), d(log(`Entered ${biomeName}!`)), w(300)] };
+    }
+
     // ── Turn events: sequenced through the animation timeline ──────────────────
     case 'MoveUsed': {
       const attacker = payload.attackerName as string;

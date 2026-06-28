@@ -65,6 +65,21 @@ public record PlayerRecovered(string CreatureName, int HpAfter) : BattleEvent;
 /// "decided to keep going" line.</summary>
 public record RecoveryDeclined(string CreatureName) : BattleEvent;
 
+/// <summary>A between-biome route choice is offered: the candidate biomes (the current biome's playable
+/// neighbours, or the run's opening set) the player picks the next leg from. A blocking event — the run loop
+/// awaits the player's pick via <see cref="IBattleInput.ChooseBiomeAsync"/> before continuing, so the client
+/// raises the map screen here. Each option carries id + display name + type theme for the biome card.</summary>
+public record BiomeChoiceOffered(IReadOnlyList<BiomeOption> Options) : BattleEvent;
+
+/// <summary>One biome on offer in a <see cref="BiomeChoiceOffered"/>: stable id, display name, and the type
+/// theme (1–3 types) for the card's badges.</summary>
+public record BiomeOption(string Id, string Name, IReadOnlyList<DamageType> Types);
+
+/// <summary>The player entered a biome (after choosing it / at run start). Carries the biome's id, name and
+/// type theme so the client can title and theme the next leg of the run. Followed by that biome's encounters.</summary>
+public record BiomeEntered(string BiomeId, string BiomeName, IReadOnlyList<DamageType> Types)
+    : BattleEvent;
+
 // --- Move actions ---
 public record MoveUsed(string AttackerName, string MoveName) : BattleEvent;
 

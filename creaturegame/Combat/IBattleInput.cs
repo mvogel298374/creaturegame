@@ -65,10 +65,24 @@ public interface IBattleInput
     /// <see cref="SignalRInput"/> blocks awaiting a real choice.
     /// </summary>
     Task<bool> ConfirmEvolutionAsync(EvolutionPromptContext context) => Task.FromResult(true);
+
+    /// <summary>
+    /// Asked at the start of each biome (run start, and after each Poké Center) when the player charts the next
+    /// leg of the route: return the <see cref="BiomeDefinition.Id"/> of the biome to enter from the offered
+    /// <see cref="BiomeChoiceContext.Options"/>. Only the interactive player input is ever consulted; the default
+    /// takes the first option, so automated / AI inputs never block on the map prompt and a headless run still
+    /// auto-pilots the route — only the web <see cref="SignalRInput"/> blocks awaiting a real choice.
+    /// </summary>
+    Task<string> ChooseBiomeAsync(BiomeChoiceContext context) =>
+        Task.FromResult(context.Options[0].Id);
 }
 
 /// <summary>Context for a level-up move-replacement decision: who is learning, and the move on offer.</summary>
 public sealed record MoveReplacementContext(Creature Learner, Attack NewMove);
+
+/// <summary>Context for a between-biome route choice: the biomes on offer (the current biome's playable
+/// neighbours, or the run's opening set). An input picks one by <see cref="BiomeDefinition.Id"/>.</summary>
+public sealed record BiomeChoiceContext(IReadOnlyList<BiomeDefinition> Options);
 
 /// <summary>Context for a between-encounter Poké Center recovery offer: the player creature and the running
 /// win count (so an input could vary its answer by depth — the default just accepts).</summary>
