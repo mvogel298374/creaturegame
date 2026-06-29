@@ -313,8 +313,9 @@ generation-agnostic and data-agnostic.
    + `RunDirector` (renamed from `BattleRunner`) holding the single `chooseNextEvent` sequencer, with battle
    and Poké Center recovery as first-class `IRunEvent`s. Behaviour-preserving (endless chain unchanged).
    **3b-1 ✅ DONE (2026-06-28):** the biome-traversal backend — `BiomeChoiceEvent` + `ChooseBiomeAsync` seam,
-   the run charts a route through the biome graph (run model: region → choose biome → ~3 themed events capped by
-   a Poké Center → choose the next biome's neighbours → repeat), the current biome threads into `CreateEnemyAsync`.
+   the run charts a route through the biome graph (run model: region → choose biome → a per-biome **randomised
+   4–6 themed events** capped by a Poké Center → choose the next biome's neighbours → repeat), the current biome
+   threads into `CreateEnemyAsync`.
    Gated on a supplied playable set (legacy chain otherwise). **3b-2 ✅ DONE (2026-06-28):** biome mode is live in
    the app — `EncounterFactory.CreatePlayerSetupAsync` computes `Biomes.Playable(Kanto, wildPool)` (same Wild
    filter as encounter generation) into `RunSetup.PlayableBiomes`, threaded session → `RunDirector`; the

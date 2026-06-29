@@ -85,7 +85,8 @@ public class RunDirectorBiomeTests
             rules: new ScriptableRules().Deterministic(),
             rng: new SeededRandomSource(0),
             playableBiomes: Playable,
-            eventsPerBiome: 3,
+            minEventsPerBiome: 3,
+            maxEventsPerBiome: 3,
             nodePlanFactory: AllWildPlan
         );
 
@@ -162,7 +163,9 @@ public class RunDirectorBiomeTests
             rules: new ScriptableRules().Deterministic(),
             rng: new SeededRandomSource(0),
             playableBiomes: playable,
-            eventsPerBiome: 1, // a one-battle biome, so the second choice is reached quickly
+            // a one-battle biome, so the second choice is reached quickly
+            minEventsPerBiome: 1,
+            maxEventsPerBiome: 1,
             nodePlanFactory: AllWildPlan
         );
 
@@ -244,7 +247,8 @@ public class RunDirectorBiomeTests
             rules: new ScriptableRules().Deterministic(),
             rng: new SeededRandomSource(seed),
             playableBiomes: Biomes.Kanto,
-            eventsPerBiome: 3,
+            minEventsPerBiome: 3,
+            maxEventsPerBiome: 3,
             nodePlanFactory: AllWildPlan
         );
 
@@ -296,7 +300,8 @@ public class RunDirectorBiomeTests
             rules: new ScriptableRules().Deterministic(),
             rng: new SeededRandomSource(seed),
             playableBiomes: Biomes.Kanto,
-            eventsPerBiome: 3,
+            minEventsPerBiome: 3,
+            maxEventsPerBiome: 3,
             nodePlanFactory: AllWildPlan
         );
 

@@ -29,7 +29,8 @@ public sealed class RunDirector
     private readonly IBattleInput _playerInput;
     private readonly IRandomSource? _rng;
     private readonly int _healEveryNBattles;
-    private readonly int _eventsPerBiome;
+    private readonly int _minEventsPerBiome;
+    private readonly int _maxEventsPerBiome;
     private readonly bool _biomeModeActive;
     private readonly Func<int, IRandomSource, IReadOnlyList<RunNodeKind>> _nodePlanFactory;
     private readonly IRunEvent _battleEvent;
@@ -55,7 +56,8 @@ public sealed class RunDirector
         Func<Creature, Task<EvolutionOutcome?>>? checkEvolution = null,
         Bag? playerBag = null,
         IReadOnlyList<BiomeDefinition>? playableBiomes = null,
-        int eventsPerBiome = 3,
+        int minEventsPerBiome = 4,
+        int maxEventsPerBiome = 6,
         int biomeOptionCount = 3,
         Func<int, IRandomSource, IReadOnlyList<RunNodeKind>>? nodePlanFactory = null
     )
@@ -65,7 +67,11 @@ public sealed class RunDirector
         _playerInput = playerInput;
         _rng = rng;
         _healEveryNBattles = healEveryNBattles;
-        _eventsPerBiome = eventsPerBiome;
+        // Each biome's route is a randomised length in [min, max] nodes, rolled per biome when the biome is
+        // entered (see Apply) — so biomes vary in size and a longer one has more room for impactful nodes
+        // (ENCOUNTER_DESIGN.md §7). Clamped so the range is always valid (≥1 node, max ≥ min) however configured.
+        _minEventsPerBiome = Math.Max(1, minEventsPerBiome);
+        _maxEventsPerBiome = Math.Max(_minEventsPerBiome, maxEventsPerBiome);
         // How each biome's node route is laid out — defaults to the seeded placeholder; injectable so tests pin
         // a deterministic plan and 3c-2 can swap the tuned curve without touching the director.
         _nodePlanFactory = nodePlanFactory ?? DefaultNodePlan;
@@ -162,11 +168,12 @@ public sealed class RunDirector
             case BiomeChoiceOutcome biome:
                 s.CurrentBiome = biome.Chosen;
                 s.EventsInCurrentBiome = 0;
-                // Lay out the biome's route now (seeded → reproducible): interior nodes then the Boss apex.
-                s.BiomeNodePlan = _nodePlanFactory(
-                    _eventsPerBiome,
-                    _rng ?? SystemRandomSource.Instance
-                );
+                // Roll this biome's length (4–6 by default), then lay out its route now (seeded → reproducible):
+                // interior nodes then the Boss apex. Both the length and the node mix draw from the run RNG, so
+                // the same seed reproduces the same biome size and contents.
+                var planRng = _rng ?? SystemRandomSource.Instance;
+                int length = planRng.Next(_minEventsPerBiome, _maxEventsPerBiome + 1); // +1 → max inclusive
+                s.BiomeNodePlan = _nodePlanFactory(length, planRng);
                 s.NeedsBiomeChoice = false;
                 break;
             case BattleOutcome { Won: true }:

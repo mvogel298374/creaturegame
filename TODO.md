@@ -19,7 +19,7 @@ done and archived. `ARCHITECTURE.md` and the per-run web seed are done.
    each biome capped by a Boss apex, foes scaled by biome-position depth, **plus per-run biome-map randomisation**
    (each run draws a seeded connected subset of Kanto's biomes). **Phase 3 (Encounter Logic) is complete. Next:
    Phase 4 — Acquisition channels** (boss catch + themed draft, fought-only). **Run model
-   (confirmed with the user):** region (Kanto) → player chooses a biome → ~3 themed events (battles for now)
+   (confirmed with the user):** region (Kanto) → player chooses a biome → a **randomised 4–6 themed events**
    capped by a Poké Center → choose the next biome (its neighbours) → repeat until death.
 2. **Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by (1)'s acquisition phase.
 3. **Game Loop & Progression** — party, switching, save layer (`save.db`).
@@ -51,6 +51,13 @@ curve (Phase 3). Full per-phase record (design pass, 1 / 2a–2d / 3a–3c, seam
   `RunSetupBiomeTests` (run map is a seeded `RunBiomeMapSize` subset + reproducible). Verified live (map renders
   from the subset). 1138/1138. *(Deferred: per-run graph **re-wiring** + §8 intersection mechanics — only if the
   subset draw alone doesn't give enough variety.)*
+- [x] **Randomised per-biome route length (4–6) — DONE (2026-06-29).** Each biome's route length is now rolled
+  per biome in `[4, 6]` (was a fixed 3), so biomes vary in size and a longer one has more room for impactful
+  nodes. The `RunDirector` ctor's single `eventsPerBiome` became a `minEventsPerBiome`/`maxEventsPerBiome` range
+  (default 4/6, clamped ≥1 and max ≥ min); the length is drawn from the run RNG in `Apply` on biome entry, then
+  handed to the unchanged `nodePlanFactory` (`DefaultNodePlan` still builds exactly that many nodes, Boss-capped).
+  Same seed ⇒ same biome size + node mix. Pins: `RunDirectorNodeTests` (length always in 4–6 with the full range
+  reachable, reproducible-from-seed); existing biome/node tests pin exact lengths via `min == max`.
 - [x] **Roar / Whirlwind → `ForceFlee` — DONE.** Now that the run layer distinguishes wild (`Normal`) from
   the trainer-analog tiers (`Elite`/`Boss`), Roar/Whirlwind are no longer announced-but-harmless no-ops: in a
   **wild** (escapable) battle the targeted creature is scared off and the battle ends in a flee

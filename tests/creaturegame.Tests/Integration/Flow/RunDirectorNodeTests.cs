@@ -86,6 +86,91 @@ public class RunDirectorNodeTests
         );
     }
 
+    // --- Per-biome route length: randomised 4–6 (Boss-capped), seeded ---------------------------------------
+
+    [Fact]
+    public async Task BiomeMode_RollsBiomeRouteLength_BetweenFourAndSix_FullRangeReachable()
+    {
+        // The director rolls each biome's route length in [4, 6] (the default range) when the biome is entered,
+        // then hands that length to the node-plan factory. A recording factory captures the rolled length; the
+        // run faints on its first battle so exactly one biome (one roll) is observed per seed. Across seeds the
+        // whole 4–6 range must be reachable, and every roll must stay in band.
+        var observed = new HashSet<int>();
+        for (int seed = 0; seed < 60; seed++)
+        {
+            int? rolled = null;
+            // Capture the length the director asks for, then build a real Boss-capped plan of that length.
+            Func<int, IRandomSource, IReadOnlyList<RunNodeKind>> recording = (n, r) =>
+            {
+                rolled ??= n;
+                return RunDirector.DefaultNodePlan(n, r);
+            };
+            await RunUntilFirstFaint(seed, recording);
+
+            Assert.NotNull(rolled);
+            Assert.InRange(rolled!.Value, 4, 6); // default min/max — never out of band
+            observed.Add(rolled.Value);
+        }
+
+        Assert.Equal(new[] { 4, 5, 6 }, observed.Order().ToArray()); // not stuck on one length
+    }
+
+    [Fact]
+    public async Task BiomeMode_BiomeRouteLength_IsReproducibleFromSeed()
+    {
+        async Task<int?> RollFor(int seed)
+        {
+            int? rolled = null;
+            Func<int, IRandomSource, IReadOnlyList<RunNodeKind>> recording = (n, r) =>
+            {
+                rolled ??= n;
+                return RunDirector.DefaultNodePlan(n, r);
+            };
+            await RunUntilFirstFaint(seed, recording);
+            return rolled;
+        }
+
+        Assert.Equal(await RollFor(4242), await RollFor(4242)); // same seed → same biome length
+    }
+
+    // Runs a solo-biome run that faints on its first battle node, so exactly one biome's route is laid out (one
+    // length roll captured by nodePlanFactory). The director uses its default 4–6 length range.
+    private static async Task RunUntilFirstFaint(
+        int seed,
+        Func<int, IRandomSource, IReadOnlyList<RunNodeKind>> nodePlanFactory
+    )
+    {
+        var solo = new BiomeDefinition("solo", "Solo", Region.Kanto, [DamageType.Normal], []);
+        var player = Fighter("Player", hp: 50, attack: 1, speed: 1, level: 50); // slow & weak: loses at once
+        Func<Creature, int, BiomeDefinition?, EncounterTier, Task<Creature>> supplier = (
+            _,
+            _,
+            _,
+            _
+        ) =>
+        {
+            var enemy = Fighter("Bruiser", hp: 999, attack: 999, speed: 999, level: 50);
+            enemy.SpeciesBaseExperience = 50;
+            return Task.FromResult(enemy);
+        };
+
+        var runner = new RunDirector(
+            player,
+            supplier,
+            Gen1TypeChart.Instance,
+            new ScriptedInput("tackle"),
+            new ScriptedInput("tackle"),
+            movePool: Array.Empty<Attack>(),
+            emitter: new RecordingEmitter(),
+            rules: new ScriptableRules().Deterministic(),
+            rng: new SeededRandomSource(seed),
+            playableBiomes: [solo],
+            nodePlanFactory: nodePlanFactory // default min/max (4–6) — not overridden
+        );
+
+        await runner.RunAsync();
+    }
+
     // --- Node dispatch: tiers reach the supplier, interaction bones emit + advance the biome ----------------
 
     [Fact]
@@ -141,7 +226,8 @@ public class RunDirectorNodeTests
             rules: new ScriptableRules().Deterministic(),
             rng: new SeededRandomSource(0),
             playableBiomes: [solo],
-            eventsPerBiome: 6,
+            minEventsPerBiome: 6,
+            maxEventsPerBiome: 6,
             nodePlanFactory: (_, _) => plan
         );
 
@@ -221,7 +307,8 @@ public class RunDirectorNodeTests
             rules: new ScriptableRules().Deterministic(),
             rng: new SeededRandomSource(0),
             playableBiomes: [solo],
-            eventsPerBiome: 3,
+            minEventsPerBiome: 3,
+            maxEventsPerBiome: 3,
             nodePlanFactory: (_, _) => plan
         );
 
