@@ -186,6 +186,36 @@ public class RunDirectorBiomeTests
         Assert.Equal(3, first.Count); // sampled down to the option count, from the 18-biome Kanto set
     }
 
+    // The opening route choice must always hand the starter at least one favourable lane — a biome whose theme
+    // the starter's type hits super-effectively — so a run never opens with only bad matchups. Checked across
+    // many seeds (the guarantee is unconditional, not luck) for two starters with clear Gen 1 coverage.
+    [Theory]
+    [InlineData(DamageType.Water)] // super-effective vs Fire / Ground / Rock
+    [InlineData(DamageType.Electric)] // super-effective vs Water / Flying
+    public async Task OpeningRoute_AlwaysOffersAtLeastOneFavourableMatchup(DamageType starterType)
+    {
+        var chart = Gen1TypeChart.Instance;
+        for (int seed = 0; seed < 40; seed++)
+        {
+            var offered = await CaptureOpeningOffer(starterType, seed);
+            Assert.Equal(3, offered.Count); // still a full 3-of-18 offer
+            Assert.Contains(
+                offered,
+                b => b.Types.Any(t => chart.GetMultiplier(starterType, t) > 1.0)
+            );
+        }
+    }
+
+    // A starter with no super-effective coverage (pure Normal hits nothing for extra) can't be given a
+    // favourable lane — the guarantee simply can't apply, so the opening offer is the plain seeded sample: no
+    // crash, still a full option count.
+    [Fact]
+    public async Task OpeningRoute_StarterWithNoSuperEffectiveCoverage_StillOffersAFullRoute()
+    {
+        var offered = await CaptureOpeningOffer(DamageType.Normal, seed: 7);
+        Assert.Equal(3, offered.Count);
+    }
+
     // Runs until the player faints on the first encounter, so only the opening route choice is recorded; returns
     // the offered biome ids in order. Uses the real Kanto roster so the sample is a meaningful 3-of-18 draw.
     private static async Task<List<string>> CaptureOpeningRoute(int seed)
@@ -220,6 +250,58 @@ public class RunDirectorBiomeTests
 
         await runner.RunAsync();
         return input.OfferedOptions[0].Select(b => b.Id).ToList();
+    }
+
+    // As CaptureOpeningRoute, but the starter's type is set so the favourable-matchup bias is exercised, and it
+    // returns the offered biome definitions (so the test can inspect their themes). The player still faints on
+    // the first encounter, so only the opening offer is captured.
+    private static async Task<IReadOnlyList<BiomeDefinition>> CaptureOpeningOffer(
+        DamageType starterType,
+        int seed
+    )
+    {
+        var player = new Creature("Player")
+        {
+            Level = 50,
+            GrowthRate = GrowthRate.MediumFast,
+            Type1 = starterType,
+        };
+        player.CalculateStats();
+        player.Experience = player.CalculateExperienceForLevel(50);
+        player.Attributes.MaxHP = 200;
+        player.Attributes.HP = 200;
+        player.Attributes.Attack = 1;
+        player.Attributes.Speed = 1; // slow & weak: loses at once, so only the opening route is recorded
+        player.AddAttack(
+            new Attack
+            {
+                Name = "tackle",
+                BaseDamage = 40,
+                Accuracy = 100,
+                AttackType = AttackType.Physical,
+                PowerPointsMax = 99,
+            }
+        );
+
+        var input = new BiomeScriptedInput([], "tackle");
+        var runner = new RunDirector(
+            player,
+            (_, _, _, _) =>
+                Task.FromResult(Fighter("Bruiser", hp: 999, attack: 999, speed: 999, level: 50)),
+            Gen1TypeChart.Instance,
+            input,
+            new ScriptedInput("tackle"),
+            movePool: Array.Empty<Attack>(),
+            emitter: new RecordingEmitter(),
+            rules: new ScriptableRules().Deterministic(),
+            rng: new SeededRandomSource(seed),
+            playableBiomes: Biomes.Kanto,
+            eventsPerBiome: 3,
+            nodePlanFactory: AllWildPlan
+        );
+
+        await runner.RunAsync();
+        return input.OfferedOptions[0];
     }
 
     [Fact]

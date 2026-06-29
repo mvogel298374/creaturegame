@@ -35,6 +35,10 @@ A run is **not** the current flat endless chain. It plays out across a **graph o
 - **Graph, not a line** — biomes connect by **sensible geographic adjacency** (Forest → Cave → Mountain) and
   may **intersect**: an intersection point lets a path cross from one biome's cluster into an adjacent biome's.
   The player **charts a route** through this graph — route choice is the core roguelite verb.
+- **Fair opening** — the **first** route choice guarantees at least one offered biome is a *favourable*
+  matchup for the chosen starter (its type hits that biome's theme super-effectively, read off the active
+  `ITypeChart`), so a run never opens with only bad lanes. First choice only; later choices are the plain
+  neighbour sample (a starter with no super-effective coverage, e.g. pure Normal, falls back to the sample).
 - **Regional origin** — every biome belongs to an overarching region: **Kanto** first (matches the Gen 1
   focus), Johto/etc. later. A run is seeded within a region. This "origin" axis lines up with the
   **multi-generation roadmap** (`TODO.md` → *Multi-Generation*): a new region is largely a new biome set, not

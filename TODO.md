@@ -64,6 +64,13 @@ curve (Phase 3). Full per-phase record (design pass, 1 / 2a–2d / 3a–3c, seam
   both wording branches, non-escapable fail→KO, run-advances-without-win/XP, Metronome→Roar honours
   non-escapable), `WebEventContractTests` `IsPlayer` field-guard, `SecondaryChanceDataContractTests` row pin
   (effect mapping + no status leak), `timeline.test.ts` both branches.
+- [x] **Opening-route favourable-matchup guarantee — DONE.** The first biome choice now reserves at least one
+  offered biome whose theme the starter's type(s) hit super-effectively (read off the active `ITypeChart` — no
+  hardcoded matchups), so a run never opens with only bad lanes (`ENCOUNTER_DESIGN.md §1` "Fair opening").
+  First choice only (`BiomeChoiceEvent`, gated on `current is null`); later neighbour choices stay the plain
+  seeded sample, and a starter with no super-effective coverage (pure Normal) falls back to it. All draws on
+  the run RNG ⇒ still seed-reproducible. Pins: `RunDirectorBiomeTests` (Water/Electric starters always get a
+  favourable lane across 40 seeds; Normal-starter fallback still offers a full route).
 - [ ] **Phase 4 — Acquisition channels** (boss catch + themed draft, fought-only) — the remaining
   `ENCOUNTER_DESIGN.md §4` piece, and the bridge into the *Item Acquisition · Bag Persistence · Catch* cluster
   below. Now unblocked (the §1–§3 layer is done): a biome's **Boss** node is the catch hook, the **fought-only
