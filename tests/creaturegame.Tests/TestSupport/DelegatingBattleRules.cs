@@ -113,6 +113,8 @@ public abstract class DelegatingBattleRules : IBattleRules
 
     public virtual bool CanBeLeechSeeded(Creature t) => _inner.CanBeLeechSeeded(t);
 
+    public virtual bool ForceFleeFailsVsTrainer => _inner.ForceFleeFailsVsTrainer;
+
     public virtual StatusCondition CarryStatusOutOfBattle(StatusCondition status) =>
         _inner.CarryStatusOutOfBattle(status);
 

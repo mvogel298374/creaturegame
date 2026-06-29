@@ -49,6 +49,10 @@ public enum MoveEffect
     Substitute,
     Transform,
     Conversion,
+
+    // Roar / Whirlwind: in a wild battle, the targeted creature flees and the battle ends (Gen 1). Appended
+    // last so existing persisted Effect values (moves.db) stay stable — no data migration for other moves.
+    ForceFlee,
 }
 
 public enum DamageCategory

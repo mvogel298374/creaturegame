@@ -120,6 +120,14 @@ public abstract record Outcome;
 /// <summary>Outcome of a battle event: whether the player survived. A loss ends the run.</summary>
 public sealed record BattleOutcome(bool Won) : Outcome;
 
+/// <summary>
+/// Outcome of a battle that ended because a side fled (Roar/Whirlwind in a wild encounter) — neither a win
+/// nor a loss. The run continues (the player is alive), the node is consumed (advances the biome), and no XP
+/// is awarded (nothing fainted). <see cref="PlayerFled"/> records who was scared off (the player blown away
+/// vs the foe fleeing); both advance the run identically today.
+/// </summary>
+public sealed record FledOutcome(bool PlayerFled) : Outcome;
+
 /// <summary>Outcome of a Poké Center recovery event: whether the player accepted the heal.</summary>
 public sealed record RecoveryOutcome(bool Healed) : Outcome;
 

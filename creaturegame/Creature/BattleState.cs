@@ -26,6 +26,11 @@ public sealed class BattleState
     public bool IsFlinched { get; set; }
     public bool HasLeechSeed { get; set; }
 
+    // Roar / Whirlwind: set on a creature when it is scared off (the move's target flees). The Battle loop
+    // ends the encounter when either side has fled — no faint. Transient like the rest; the per-battle reset
+    // clears it.
+    public bool HasFled { get; set; }
+
     // Binding (Wrap/Bind/Clamp/Fire Spin) — Gen 1 partial trap, two halves of one effect:
     //  • On the VICTIM: BindingTurnsRemaining > 0 means trapped — it loses its turn (StatusResolver.CanAct)
     //    until the counter ticks to 0 end-of-turn. Gen 1 deals NO residual chip; the damage is the binder's

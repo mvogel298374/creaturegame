@@ -271,6 +271,7 @@ public sealed class SignalRBattleEventEmitter(
             FlinchBlocked e => ("FlinchBlocked", new { e.CreatureName }),
             ChargingUp e => ("ChargingUp", new { e.CreatureName, e.MoveName }),
             CreatureFainted e => ("CreatureFainted", new { e.Name }),
+            CreatureFled e => ("CreatureFled", new { e.Name, e.IsPlayer }),
             ExperienceGained e => ("ExperienceGained", new { e.CreatureName, e.Amount }),
             LeveledUp e => (
                 "LeveledUp",

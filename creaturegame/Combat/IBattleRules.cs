@@ -305,6 +305,17 @@ public interface IBattleRules
     bool CanBeLeechSeeded(Creature target);
 
     /// <summary>
+    /// Whether Roar / Whirlwind (<see cref="MoveEffect.ForceFlee"/>) have <em>no effect</em> against a
+    /// trainer-analog (non-escapable) opponent. <b>Gen 1:</b> <c>true</c> — they only end a <i>wild</i>
+    /// battle and simply fail in a trainer battle. <b>Gen 2+:</b> <c>false</c> — they force the opponent to
+    /// switch instead, so a Gen 2 ruleset returns false and <see cref="MoveEffect.ForceFlee"/>'s effect runs
+    /// its force-switch path. The wild-vs-trainer distinction itself is a run-layer fact, carried by
+    /// <see cref="MoveEffectContext.BattleEscapable"/>; this seam owns the gen-variable <em>consequence</em>
+    /// of facing a non-escapable foe (fail vs. force-switch).
+    /// </summary>
+    bool ForceFleeFailsVsTrainer { get; }
+
+    /// <summary>
     /// The major status a creature retains when it leaves a battle — used by an endless run to carry
     /// status into the next encounter. All generations keep Sleep/Poison/Burn/Paralysis/Freeze. Gen 1
     /// reverts Bad Poison (Toxic) to regular <see cref="StatusCondition.Poison"/> out of battle (the

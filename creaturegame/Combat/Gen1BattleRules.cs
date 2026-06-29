@@ -157,6 +157,10 @@ public sealed class Gen1BattleRules : IBattleRules
     // Grass-types are immune to Leech Seed (all generations).
     public bool CanBeLeechSeeded(Creature target) => !HasType(target, DamageType.Grass);
 
+    // Gen 1: Roar/Whirlwind have NO effect in a trainer battle — they only end a wild battle. (Gen 2+ would
+    // force a switch instead, so a Gen 2 ruleset returns false and the effect runs its force-switch path.)
+    public bool ForceFleeFailsVsTrainer => true;
+
     // Gen 1: Toxic reverts to regular Poison out of battle (the escalating counter is volatile); every
     // other major status carries unchanged.
     public StatusCondition CarryStatusOutOfBattle(StatusCondition status) =>

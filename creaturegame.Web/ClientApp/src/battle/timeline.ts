@@ -430,6 +430,16 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       ] };
     }
 
+    case 'CreatureFled': {
+      // Roar/Whirlwind ended the wild battle — a side was scared off (no faint). Reset the player sprite in
+      // case it Transformed this battle (we skip BattleEnded on a flee, which is where that revert normally
+      // fires); the foe's sprite self-corrects via the next encounter's spawnEnemy.
+      const name = payload.name as string;
+      const isPlayer = payload.isPlayer as boolean;
+      const msg = isPlayer ? `${name} was blown away!` : `${name} fled!`;
+      return { steps: [emit({ type: 'resetPlayerSprite' }), w(150), d(log(msg)), w(500)] };
+    }
+
     case 'ExperienceGained': {
       const cName  = payload.creatureName as string;
       const amount = payload.amount as number;

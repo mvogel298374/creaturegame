@@ -175,6 +175,21 @@ describe('expandEvent — control plane vs timeline', () => {
     expect(expandEvent('BattleEnded', { winnerName: 'GENGAR' }, CTX)).toEqual({});
   });
 
+  it('CreatureFled (foe scared off) logs the wild flee and resets the player sprite', () => {
+    // Roar/Whirlwind ended the wild battle. We skip BattleEnded on a flee, so this is where the player
+    // sprite reverts (in case it Transformed). The foe-fled branch words it as the wild Pokémon fleeing.
+    const { now, steps } = expandEvent('CreatureFled', { name: 'PIDGEY', isPlayer: false }, CTX);
+    expect(now).toBeUndefined();
+    expect(logLines(steps)).toEqual(['PIDGEY fled!']);
+    expect(emits(steps)).toContainEqual({ type: 'resetPlayerSprite' });
+  });
+
+  it('CreatureFled (player blown away) words it from the player side', () => {
+    const { steps } = expandEvent('CreatureFled', { name: 'MEWTWO', isPlayer: true }, CTX);
+    expect(logLines(steps)).toEqual(['MEWTWO was blown away!']);
+    expect(emits(steps)).toContainEqual({ type: 'resetPlayerSprite' });
+  });
+
   it('RunEnded logs the run summary and queues the game-over phase flip', () => {
     const { now, steps } = expandEvent(
       'RunEnded', { battlesWon: 3, finalLevel: 52, finalCreatureName: 'MEWTWO' }, CTX);

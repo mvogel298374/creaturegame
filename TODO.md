@@ -51,6 +51,19 @@ curve (Phase 3). Full per-phase record (design pass, 1 / 2a–2d / 3a–3c, seam
   `RunSetupBiomeTests` (run map is a seeded `RunBiomeMapSize` subset + reproducible). Verified live (map renders
   from the subset). 1138/1138. *(Deferred: per-run graph **re-wiring** + §8 intersection mechanics — only if the
   subset draw alone doesn't give enough variety.)*
+- [x] **Roar / Whirlwind → `ForceFlee` — DONE.** Now that the run layer distinguishes wild (`Normal`) from
+  the trainer-analog tiers (`Elite`/`Boss`), Roar/Whirlwind are no longer announced-but-harmless no-ops: in a
+  **wild** (escapable) battle the targeted creature is scared off and the battle ends in a flee
+  (`CreatureFled` instead of `BattleEnded`, no faint/win/XP — the `RunDirector` reads `Battle.EndedInFlee` →
+  new `FledOutcome`, advancing the run as neither a win nor a loss). Against an **Elite/Boss** (non-escapable)
+  foe the move just fails — the Gen 1 trainer-battle rule, and the **gen-variable consequence sits on the
+  seam**: new `IBattleRules.ForceFleeFailsVsTrainer` (Gen 1 `true`; Gen 2+ returns `false` and implements the
+  force-switch path). New transient `BattleState.HasFled`; `escapable` threaded `Battle`→`AttackAction`→
+  `MoveEffectContext.BattleEscapable` (and through the Metronome/Mirror-Move inner action). Web: `CreatureFled`
+  projected + a worded `timeline.ts` arm ("… fled!" / "… was blown away!"). Pins: `ForceFleeTests` (wild flee
+  both wording branches, non-escapable fail→KO, run-advances-without-win/XP, Metronome→Roar honours
+  non-escapable), `WebEventContractTests` `IsPlayer` field-guard, `SecondaryChanceDataContractTests` row pin
+  (effect mapping + no status leak), `timeline.test.ts` both branches.
 - [ ] **Phase 4 — Acquisition channels** (boss catch + themed draft, fought-only) — the remaining
   `ENCOUNTER_DESIGN.md §4` piece, and the bridge into the *Item Acquisition · Bag Persistence · Catch* cluster
   below. Now unblocked (the §1–§3 layer is done): a biome's **Boss** node is the catch hook, the **fought-only

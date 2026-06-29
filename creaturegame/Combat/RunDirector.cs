@@ -181,6 +181,13 @@ public sealed class RunDirector
                     s.EventsInCurrentBiome++;
                 }
                 break;
+            case FledOutcome:
+                // A flee consumes the encounter node (so it doesn't repeat) and advances the depth axis, but
+                // is not a win (BattlesWon unchanged) and awards no XP. The player survived → the run continues.
+                s.RunDepth++;
+                if (_biomeModeActive)
+                    s.EventsInCurrentBiome++;
+                break;
             case RecoveryOutcome:
                 s.RecoveriesDone++; // legacy milestone bookkeeping
                 if (_biomeModeActive)
@@ -274,9 +281,19 @@ internal sealed class BattleRunEvent(
             emitter: ctx.Emitter,
             rng: ctx.Rng,
             playerEntryStatus: s.CarriedStatus,
-            playerBag: playerBag
+            playerBag: playerBag,
+            // Roar/Whirlwind escape a plain wild battle but fail vs the trainer-analog tiers (Elite/Boss).
+            escapable: tier == EncounterTier.Normal
         );
         await battle.StartFightAsync();
+
+        // Roar/Whirlwind ended the encounter (a side fled) — neither a win nor a loss. The player survives, so
+        // carry its status into the next event and advance the run; no XP/evolution (nothing fainted).
+        if (battle.EndedInFlee)
+        {
+            s.CarriedStatus = CaptureCarriedStatus(player);
+            return new FledOutcome(PlayerFled: player.Battle.HasFled);
+        }
 
         // The battle ends when one side faints. If the player dropped, the run is over (read by the director's
         // while-loop); otherwise it is a win.

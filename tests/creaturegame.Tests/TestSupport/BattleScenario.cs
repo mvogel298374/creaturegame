@@ -211,6 +211,7 @@ public sealed class BattleScenario
     private IBattleRules? _rules; // null → default rules sharing the run's seed (built in RunAsync)
     private int _seed;
     private int? _playerForgetSlot;
+    private bool _escapable = true; // wild battle by default; false = the Elite/Boss trainer analog
 
     public BattleScenario Player(Creature c)
     {
@@ -258,6 +259,14 @@ public sealed class BattleScenario
         return this;
     }
 
+    /// <summary>Whether the battle can be fled — Roar/Whirlwind (ForceFlee) end an escapable wild battle but
+    /// fail in a non-escapable one (the Elite/Boss trainer analog). Defaults to true (a plain wild battle).</summary>
+    public BattleScenario Escapable(bool escapable)
+    {
+        _escapable = escapable;
+        return this;
+    }
+
     public async Task<BattleScenarioResult> RunAsync()
     {
         var emitter = new RecordingEmitter();
@@ -275,7 +284,8 @@ public sealed class BattleScenario
             new ScriptedInput(_enemyScript),
             rules: rules,
             emitter: emitter,
-            rng: new SeededRandomSource(_seed)
+            rng: new SeededRandomSource(_seed),
+            escapable: _escapable
         );
         await battle.StartFightAsync();
         return new BattleScenarioResult(emitter, _player, _enemy);

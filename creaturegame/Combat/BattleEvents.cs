@@ -222,6 +222,12 @@ public record StatDropBlocked(string CreatureName) : BattleEvent;
 // --- Creature ---
 public record CreatureFainted(string Name) : BattleEvent;
 
+/// <summary>A creature was scared off by Roar/Whirlwind and fled — the wild battle ends with no faint
+/// (Gen 1). <see cref="IsPlayer"/> distinguishes the player being blown away from the wild foe fleeing, so
+/// the client can word it ("… was blown away!" vs "The wild … fled!"). Emitted instead of
+/// <see cref="BattleEnded"/>; the run loop advances the encounter as neither a win nor a loss.</summary>
+public record CreatureFled(string Name, bool IsPlayer) : BattleEvent;
+
 /// <summary>The amount of XP a creature earned from a win — emitted once, before any <see cref="LeveledUp"/>
 /// events, so the client can show the gain and begin filling the XP bar.</summary>
 public record ExperienceGained(string CreatureName, int Amount) : BattleEvent;

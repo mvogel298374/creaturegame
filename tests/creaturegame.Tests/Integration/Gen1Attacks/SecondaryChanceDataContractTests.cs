@@ -59,6 +59,18 @@ public class SecondaryChanceDataContractTests(MovesFixture moves) : Gen1MoveCont
     [Fact]
     public void RageHasRageMoveEffect() => Assert.Equal(MoveEffect.Rage, Move("rage").Effect);
 
+    // Roar/Whirlwind map by name to ForceFlee (end a wild battle); PokeAPI's "force switch" ailment can't
+    // express the Gen 1 semantics. Pin the mapping AND that neither carries a status — TryApplyStatus runs
+    // before the effect, so a re-import that resolved a non-None StatusEffect would leak a status on the flee.
+    [Theory]
+    [InlineData("roar")]
+    [InlineData("whirlwind")]
+    public void RoarAndWhirlwindForceFleeWithoutStatus(string move)
+    {
+        Assert.Equal(MoveEffect.ForceFlee, Move(move).Effect);
+        Assert.Equal(StatusCondition.None, Move(move).StatusEffect);
+    }
+
     // Recover/Mimic mechanics and Night Shade's level-based category are importer name/ID mappings
     // PokeAPI can't express — pin them so a re-import can't silently revert them to plain status moves.
     [Fact]

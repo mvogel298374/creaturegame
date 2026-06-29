@@ -14,6 +14,10 @@ public class AttackAction : IBattleAction
     private readonly IReadOnlyList<Attack> _movePool;
     private readonly IRandomSource _rng;
 
+    // Whether this battle can be fled — gates Roar/Whirlwind (ForceFlee). True for a plain wild battle / the
+    // legacy chain; the run layer sets it false for the trainer-analog encounters (Elite/Boss).
+    private readonly bool _battleEscapable;
+
     // Whether the Target had a Substitute up when this move connected — snapshotted pre-damage so a
     // secondary is still shielded on the very hit that breaks the decoy (Gen 1: that hit struck the sub).
     private bool _targetShieldedAtImpact;
@@ -30,7 +34,8 @@ public class AttackAction : IBattleAction
         IBattleRules? rules = null,
         IBattleEventEmitter? emitter = null,
         IReadOnlyList<Attack>? movePool = null,
-        IRandomSource? rng = null
+        IRandomSource? rng = null,
+        bool battleEscapable = true
     )
     {
         Source = source;
@@ -41,6 +46,7 @@ public class AttackAction : IBattleAction
         _selectedMove = selectedMove;
         _movePool = movePool ?? Array.Empty<Attack>();
         _rng = rng ?? SystemRandomSource.Instance;
+        _battleEscapable = battleEscapable;
         Priority = selectedMove?.Base.Priority ?? 0;
     }
 
@@ -475,7 +481,8 @@ public class AttackAction : IBattleAction
             _rules,
             _emitter,
             _movePool,
-            _rng
+            _rng,
+            _battleEscapable
         ).ExecuteAsync();
 
     // Bide stores every hit the committed user takes — any damage category — to unleash 2× on release.
@@ -628,6 +635,7 @@ public class AttackAction : IBattleAction
                 Rng = _rng,
                 Emitter = _emitter,
                 TargetShieldedBySubstitute = TargetShieldedBySubstitute,
+                BattleEscapable = _battleEscapable,
                 DealDamage = DealDamageToTarget,
             }
         );

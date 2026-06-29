@@ -463,6 +463,10 @@ public class MoveImport
         // the battle-end revert). Conversion copies the target's types onto the user (Gen 1 mechanic).
         ["transform"] = MoveEffect.Transform,
         ["conversion"] = MoveEffect.Conversion,
+        // Roar / Whirlwind end a WILD battle — the target flees (engine handles the flee + run advance; the
+        // run layer marks Elite/Boss non-escapable so the move fails there, the Gen 1 trainer-battle rule).
+        ["roar"] = MoveEffect.ForceFlee,
+        ["whirlwind"] = MoveEffect.ForceFlee,
     };
 
     // Gen 1 physical types: Normal, Fighting, Flying, Poison, Ground, Rock, Bug, Ghost.

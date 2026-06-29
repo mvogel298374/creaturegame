@@ -17,7 +17,14 @@ public class Battle
     private readonly IRandomSource _rng;
     private readonly CarriedStatus? _playerEntryStatus;
     private readonly Bag? _playerBag;
+    private readonly bool _escapable;
     private int _turnNumber;
+
+    /// <summary>
+    /// True if this battle ended because a side fled (Roar/Whirlwind in a wild battle) rather than fainting.
+    /// The run loop reads it to advance the encounter without a win/loss or XP. False until then.
+    /// </summary>
+    public bool EndedInFlee { get; private set; }
 
     public Battle(
         Creature player,
@@ -30,7 +37,8 @@ public class Battle
         IBattleEventEmitter? emitter = null,
         IRandomSource? rng = null,
         CarriedStatus? playerEntryStatus = null,
-        Bag? playerBag = null
+        Bag? playerBag = null,
+        bool escapable = true
     )
     {
         PlayerCreature = player;
@@ -44,6 +52,7 @@ public class Battle
         _rng = rng ?? SystemRandomSource.Instance;
         _playerEntryStatus = playerEntryStatus;
         _playerBag = playerBag;
+        _escapable = escapable;
     }
 
     public async Task StartFightAsync()
@@ -131,7 +140,8 @@ public class Battle
                 _rules,
                 _emitter,
                 _movePool,
-                _rng
+                _rng,
+                _escapable
             );
 
             // Turn resolution: Priority → effective Speed (Paralysis quarters) → random tie-breaker.
@@ -229,6 +239,17 @@ public class Battle
                 break;
             }
 
+            // Roar / Whirlwind: a side was scared off (no faint). Ends the wild battle — the run loop reads
+            // EndedInFlee and advances the encounter without a win/loss. A faint above takes precedence (a KO
+            // is a real result); checked here so the fled creature's last action still resolved this turn.
+            if (PlayerCreature.Battle.HasFled || EnemyCreature.Battle.HasFled)
+            {
+                var fled = PlayerCreature.Battle.HasFled ? PlayerCreature : EnemyCreature;
+                _emitter?.Emit(new CreatureFled(fled.Name, fled == PlayerCreature));
+                EndedInFlee = true;
+                break;
+            }
+
             _emitter?.Emit(new TurnEnded());
         }
 
@@ -240,8 +261,13 @@ public class Battle
         PlayerCreature.RestoreOriginalIdentity();
         EnemyCreature.RestoreOriginalIdentity();
 
-        string winner = PlayerCreature.IsAlive() ? PlayerCreature.Name : EnemyCreature.Name;
-        _emitter?.Emit(new BattleEnded(winner));
+        // A flee already announced the end via CreatureFled; the normal win/loss BattleEnded (which the client
+        // turns into a "challenger approaches" intermission / game-over) would mis-signal it, so skip it.
+        if (!EndedInFlee)
+        {
+            string winner = PlayerCreature.IsAlive() ? PlayerCreature.Name : EnemyCreature.Name;
+            _emitter?.Emit(new BattleEnded(winner));
+        }
     }
 
     /// <summary>
@@ -325,7 +351,17 @@ public class Battle
     }
 
     private AttackAction NewPlayerAttack(PokemonAttack? move) =>
-        new(PlayerCreature, EnemyCreature, move, _typeChart, _rules, _emitter, _movePool, _rng);
+        new(
+            PlayerCreature,
+            EnemyCreature,
+            move,
+            _typeChart,
+            _rules,
+            _emitter,
+            _movePool,
+            _rng,
+            _escapable
+        );
 
     private void ApplyLeechSeedDrain(Creature drained, Creature healed)
     {

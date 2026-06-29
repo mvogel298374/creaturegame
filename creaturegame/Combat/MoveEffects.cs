@@ -38,6 +38,13 @@ public sealed class MoveEffectContext
     public required bool TargetShieldedBySubstitute { get; init; }
 
     /// <summary>
+    /// Whether this battle can be fled — Roar/Whirlwind end a <em>wild</em> battle but fail against the
+    /// trainer-analog encounters (Elite/Boss). The run layer sets it per encounter tier; defaults true (a
+    /// plain wild battle / the legacy chain). Read by <see cref="ForceFleeEffect"/>.
+    /// </summary>
+    public bool BattleEscapable { get; init; } = true;
+
+    /// <summary>
     /// Applies damage to the Target through <see cref="AttackAction"/>'s shared helper (Substitute soak +
     /// Bide accumulation + Counter recording). Signature mirrors <c>DealDamageToTarget</c>:
     /// (damage, effectiveness, isCrit, counterableType) → true when the real creature took the hit.
@@ -472,6 +479,34 @@ public sealed class SplashEffect : IMoveEffect
     }
 }
 
+/// <summary>Roar / Whirlwind: end a wild battle — the target is scared off and flees.</summary>
+public sealed class ForceFleeEffect : IMoveEffect
+{
+    public MoveEffect Effect => MoveEffect.ForceFlee;
+
+    public void Apply(MoveEffectContext ctx)
+    {
+        // The run layer marks Elite/Boss encounters non-escapable (the trainer analog). What that *means* for
+        // Roar/Whirlwind is gen-variable, so it lives on the seam: Gen 1 makes the move simply fail there
+        // (ForceFleeFailsVsTrainer), whereas Gen 2+ forces a switch — a Gen 2 ruleset returns false and the
+        // force-switch path is implemented in the else branch. No type-immunity check (Gen 1 non-damaging
+        // move; it already cleared accuracy).
+        if (!ctx.BattleEscapable)
+        {
+            if (ctx.Rules.ForceFleeFailsVsTrainer)
+            {
+                ctx.Emitter?.Emit(new MoveHadNoEffect(ctx.Target.Name, ctx.Attack.Name ?? ""));
+                return;
+            }
+            // Gen 2+ force-switch path goes here when a Gen 2 ruleset lands; unreachable today (Gen 1 fails).
+        }
+
+        // Wild battle (escapable): the targeted creature is scared off — the Battle loop sees HasFled and ends.
+        if (ctx.Target.IsAlive())
+            ctx.Target.Battle.HasFled = true;
+    }
+}
+
 /// <summary>Confuse: confuse the target (pure or as a secondary on a damaging move).</summary>
 public sealed class ConfuseEffect : IMoveEffect
 {
@@ -528,6 +563,7 @@ public static class MoveEffects
         new SubstituteEffect(),
         new SplashEffect(),
         new ConfuseEffect(),
+        new ForceFleeEffect(),
     };
 
     // Effect → effect, derived from All so each effect's own Effect is the single source of truth:
