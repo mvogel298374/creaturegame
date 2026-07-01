@@ -24,10 +24,12 @@ SOFTWARE.
 
 The MIT license above covers only the original source code in this repository.
 
-This is an unofficial, non-commercial fan project. Pokémon and all associated
-names, characters, sprites, audio, and data are trademarks and copyright of
-Nintendo, Game Freak, and The Pokémon Company. This project is not affiliated
-with, endorsed by, or sponsored by any of them.
+This is an unofficial, non-commercial fan project. It is provided entirely for
+free: no money is charged for it and the author derives no monetary benefit from
+it whatsoever (no sales, donations, advertising, or other revenue). Pokémon and
+all associated names, characters, sprites, audio, and data are trademarks and
+copyright of Nintendo, Game Freak, and The Pokémon Company. This project is not
+affiliated with, endorsed by, or sponsored by any of them.
 
 No copyrighted game assets are distributed in this repository. Pokémon data and
 sprites are fetched at build time from the community-run PokéAPI (https://pokeapi.co)

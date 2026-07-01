@@ -4,7 +4,7 @@ A Gen 1 Pokémon battle simulator written in C# / .NET 9, designed from the grou
 
 The core goal is a faithful Gen 1 battle engine — accurate damage formula, type chart quirks, stat formulas, PP tracking, turn ordering — with an architecture that makes swapping generations, adding roguelike mechanics, or wiring up a UI a matter of implementing an interface rather than rewriting the engine. On top of the engine sits a playable web client (React + Phaser 3 + SignalR) and an emerging roguelite run layer.
 
-> **Disclaimer.** This is an unofficial, non-commercial fan project and is not affiliated with, endorsed by, or sponsored by Nintendo, Game Freak, or The Pokémon Company. Pokémon and all associated names, data, sprites, and audio are their trademarks and copyright. **No game assets are stored in this repository** — species data and sprites are fetched at build time from the community-run [PokéAPI](https://pokeapi.co) into local, git-ignored files. The MIT license (see [`LICENSE`](LICENSE)) covers only the original source code here.
+> **Disclaimer.** This is an unofficial, non-commercial fan project, provided entirely for free — no money is charged and the author gains no monetary benefit from it (no sales, donations, ads, or other revenue). It is not affiliated with, endorsed by, or sponsored by Nintendo, Game Freak, or The Pokémon Company. Pokémon and all associated names, data, sprites, and audio are their trademarks and copyright. **No game assets are stored in this repository** — species data and sprites are fetched at build time from the community-run [PokéAPI](https://pokeapi.co) into local, git-ignored files. The MIT license (see [`LICENSE`](LICENSE)) covers only the original source code here.
 
 ---
 
