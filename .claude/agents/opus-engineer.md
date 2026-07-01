@@ -31,8 +31,8 @@ correctly, and hand back a tight summary.
 5. **Test the quirk, not just the outcome.** Assert "damage doubled because Defense was halved" / "fails
    on Speed, not level" — not merely "the target faints." Any importer data value Gen 1 differs from modern
    on needs a pin in `SecondaryChanceDataContractTests` in the same change.
-6. **Build and test** with the user-local SDK (the system `dotnet` is runtime-only):
-   `& "C:\Users\USER\.dotnet\dotnet.exe" test tests/creaturegame.Tests`. Report the result verbatim.
+6. **Build and test**: `dotnet test tests/creaturegame.Tests` (use your SDK 9.0.200 install — see `CLAUDE.md`
+   if the system `dotnet` is runtime-only). Report the result verbatim.
 7. **Data changes go through the importer, not the DB.** `moves.db`/`pokemon.db` are gitignored; the
    `PokeApiConnector` mapping is the committed artifact. Edit the importer; note that a re-run + MCP verify
    is needed (the delegating session runs it).

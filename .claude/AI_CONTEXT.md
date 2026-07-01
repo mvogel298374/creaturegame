@@ -88,7 +88,7 @@ on the `CG_BATTLE_LOG` env var. To watch a test narrate, set the flag and filter
 using the emitter narrates while it's on, so an unfiltered run is a wall of text):
 ```powershell
 $env:CG_BATTLE_LOG = "1"
-& "C:\Users\USER\.dotnet\dotnet.exe" test tests/creaturegame.Tests --filter "FullyQualifiedName~Substitute"
+dotnet test tests/creaturegame.Tests --filter "FullyQualifiedName~Substitute"
 $env:CG_BATTLE_LOG = $null   # turn it back off
 ```
 Any value other than `0`/`false` (or unset/empty) enables it.

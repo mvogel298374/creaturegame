@@ -19,7 +19,7 @@ sprite/cry assets into the web app's `wwwroot`. Run it once on a fresh checkout;
 that the game never touches PokeAPI again.
 
 ```powershell
-& "C:\Users\USER\.dotnet\dotnet.exe" run --project PokeApiConnector
+dotnet run --project PokeApiConnector
 ```
 
 | It populates | With |

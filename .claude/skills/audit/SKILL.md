@@ -43,8 +43,8 @@ Authoritative rubric (re-read each run): `GENERATION_SEAMS.md` §5.0 + §5.0.1, 
    When a new failure mode is found, append it to the reviewer's Failure log so it strengthens over time.
 
 5. **Format + tests (the deterministic gate).** Run:
-   - `& "C:\Users\USER\.dotnet\dotnet.exe" csharpier check .`
-   - `& "C:\Users\USER\.dotnet\dotnet.exe" test tests/creaturegame.Tests`
+   - `dotnet csharpier check .`
+   - `dotnet test tests/creaturegame.Tests`
    - `.\test.ps1 -Web` if the frontend changed.
    Relay the TEST SUMMARY / pass counts verbatim (e.g. "730/730"). These also run in the pre-commit hook,
    but run them here so the audit report is complete and failures are caught before you write the message.

@@ -4,7 +4,10 @@ param(
     [switch]$NoBrowser
 )
 
-$dotnet = "C:\Users\USER\.dotnet\dotnet.exe"
+# Resolve the SDK 9.0.200 dotnet: explicit override → user-local install → PATH (mirrors test.ps1).
+$dotnet = if ($env:DOTNET_EXE) { $env:DOTNET_EXE }
+          elseif (Test-Path "$env:USERPROFILE\.dotnet\dotnet.exe") { "$env:USERPROFILE\.dotnet\dotnet.exe" }
+          else { 'dotnet' }
 $root   = $PSScriptRoot
 
 # Stop the backend from opening a :5100 browser tab. The launch profile (Properties/launchSettings.json)

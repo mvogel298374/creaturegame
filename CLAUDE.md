@@ -10,24 +10,28 @@ them up front burns ~25k tokens before the work is even scoped; almost none of i
 
 | File | Read it when… |
 |:-----|:--------------|
-| `TODO.md` | starting or finishing any task — it's the **authoritative** active task list. Always update it when a task completes. (Finished work is in `TODO_ARCHIVE.md`; read that only to recover the history of a done item.) |
-| `AI_CONTEXT.md` | you need a slash-command/profile definition (`/plan`, `/dev`, `/sync`, `/test`, `/audit`) or the **Tooling & Automation** reference (the `/audit` skill, `seam-reviewer`, pre-commit hook, CSharpier, MCP servers). |
-| `DESIGN_GUIDES.md` | doing `/plan` (design) work — Gen 1 mechanics, type-balancing, move-import mapping. |
-| `DEV_STANDARDS.md` | doing `/dev` (implementation) work — .NET/EF coding conventions and architecture rules. |
-| `STATE_MODEL.md` | touching battle state — the `Creature` permanent/transient split (`BattleState`). |
-| `GAME_LOOP.md` | working on the **run/roguelite loop** — the game-loop ↔ event model (battle & heal as events), the logic-drives-sequence rule, and the target event abstraction. |
-| `ENCOUNTER_DESIGN.md` | working on **encounters/acquisition** — the biome-graph run model, the `IEnemyArchetype` strength tiers, the type-themed pool, and the two gated acquisition channels (boss catch + themed draft). |
-| `GENERATION_SEAMS.md` | adding a gen-variable rule or a new generation — the seams (`ITypeChart`, `IBattleRules`, `IStatCalculator`) + the §5.0 gen-agnostic checklist. |
-| `DATA_IMPORT.md` | changing imported data — the `PokeApiConnector` pipeline, import-vs-runtime boundary, PokeAPI→model mapping. |
+| `ARCHITECTURE.md` | you need the **why** behind a design decision, the system map, or the full doc catalog (its §5 indexes every doc in the repo). The decision-log entry point. |
+| `docs/TODO.md` | starting or finishing any task — it's the **authoritative** active task list. Always update it when a task completes. (Finished work is in `docs/TODO_ARCHIVE.md`; read that only to recover the history of a done item.) |
+| `.claude/AI_CONTEXT.md` | you need a slash-command/profile definition (`/plan`, `/dev`, `/sync`, `/test`, `/audit`) or the **Tooling & Automation** reference (the `/audit` skill, `seam-reviewer`, pre-commit hook, CSharpier, MCP servers). |
+| `docs/DESIGN_GUIDES.md` | doing `/plan` (design) work — Gen 1 mechanics, type-balancing, move-import mapping. |
+| `docs/DEV_STANDARDS.md` | doing `/dev` (implementation) work — .NET/EF coding conventions and architecture rules. |
+| `docs/STATE_MODEL.md` | touching battle state — the `Creature` permanent/transient split (`BattleState`). |
+| `docs/GAME_LOOP.md` | working on the **run/roguelite loop** — the game-loop ↔ event model (battle & heal as events), the logic-drives-sequence rule, and the target event abstraction. |
+| `docs/ENCOUNTER_DESIGN.md` | working on **encounters/acquisition** — the biome-graph run model, the `IEnemyArchetype` strength tiers, the type-themed pool, and the two gated acquisition channels (boss catch + themed draft). |
+| `docs/GENERATION_SEAMS.md` | adding a gen-variable rule or a new generation — the seams (`ITypeChart`, `IBattleRules`, `IStatCalculator`) + the §5.0 gen-agnostic checklist. |
+| `docs/DATA_IMPORT.md` | changing imported data — the `PokeApiConnector` pipeline, import-vs-runtime boundary, PokeAPI→model mapping. |
 
 ## Commands
 
-The system `dotnet` at `C:\Program Files\dotnet\dotnet.exe` is a runtime-only install with no SDK. Use the user-local SDK at `C:\Users\USER\.dotnet\dotnet.exe` (NET 9.0.200) for all build and test commands.
+> **`dotnet` = your SDK 9.0.200 install** (pinned in `global.json`). In the commands below, plain `dotnet`
+> assumes the SDK is on your PATH. If your system `dotnet` is a runtime-only install with no SDK, invoke the
+> SDK's full path instead — e.g. on this dev machine the SDK lives at `C:\Users\USER\.dotnet\dotnet.exe`, so
+> every `dotnet …` below becomes `& "C:\Users\USER\.dotnet\dotnet.exe" …`. Substitute your own SDK path.
 
 ```powershell
-& "C:\Users\USER\.dotnet\dotnet.exe" build                          # Build all projects
-& "C:\Users\USER\.dotnet\dotnet.exe" run --project PokeApiConnector # Import data from PokeAPI
-& "C:\Users\USER\.dotnet\dotnet.exe" test tests/creaturegame.Tests  # Run all tests
+dotnet build                          # Build all projects
+dotnet run --project PokeApiConnector # Import data from PokeAPI
+dotnet test tests/creaturegame.Tests  # Run all tests
 ```
 
 To start the full dev environment (backend + Vite frontend + browser):
@@ -49,23 +53,24 @@ Playwright E2E needs the app running (`.\dev.ps1`); without `-StartStack` it's s
 
 To run a single .NET test by name:
 ```powershell
-& "C:\Users\USER\.dotnet\dotnet.exe" test tests/creaturegame.Tests --filter "FullyQualifiedName~<MethodName>"
+dotnet test tests/creaturegame.Tests --filter "FullyQualifiedName~<MethodName>"
 ```
 
 Formatting & the pre-commit gate (see `AI_CONTEXT.md` → **Tooling & Automation** for the why):
 ```powershell
-& "C:\Users\USER\.dotnet\dotnet.exe" tool restore          # once per clone — installs the pinned CSharpier
-& "C:\Users\USER\.dotnet\dotnet.exe" csharpier format .    # format C# (do NOT hand-align)
-& "C:\Users\USER\.dotnet\dotnet.exe" csharpier check .     # what the hook/CI runs
+dotnet tool restore          # once per clone — installs the pinned CSharpier
+dotnet csharpier format .    # format C# (do NOT hand-align)
+dotnet csharpier check .     # what the hook/CI runs
 git config core.hooksPath .githooks                         # once per clone — arms .githooks/pre-commit
 ```
 The `.githooks/pre-commit` hook runs `csharpier check` (always) + the full test suite (when `.cs` is staged) and **blocks the commit on failure**. For battle/stat/move changes, run the `/audit` skill before proposing the commit — it adds the seam/fidelity review the hook can't do.
 
 EF Core migration commands require `DOTNET_ROOT` set so `dotnet-ef` finds the user-local SDK instead of the system runtime-only install:
 ```powershell
-$env:DOTNET_ROOT = "C:\Users\USER\.dotnet"; $env:PATH = "C:\Users\USER\.dotnet;C:\Users\USER\.dotnet\tools;$env:PATH"
-& "C:\Users\USER\.dotnet\dotnet.exe" ef migrations add <MigrationName> --project creaturegame --context <ContextName> --output-dir DB/Migrations/<Moves|Pokemon|Items>
-& "C:\Users\USER\.dotnet\dotnet.exe" ef migrations remove --project creaturegame --context <ContextName>
+# Point DOTNET_ROOT/PATH at your SDK dir so dotnet-ef resolves it (example dir: C:\Users\USER\.dotnet)
+$env:DOTNET_ROOT = "$HOME\.dotnet"; $env:PATH = "$HOME\.dotnet;$HOME\.dotnet\tools;$env:PATH"
+dotnet ef migrations add <MigrationName> --project creaturegame --context <ContextName> --output-dir DB/Migrations/<Moves|Pokemon|Items>
+dotnet ef migrations remove --project creaturegame --context <ContextName>
 ```
 
 ## Architecture
@@ -96,7 +101,7 @@ PokeApiConnector fetches Gen 1 Pokémon, moves (IDs 1–165), and the battle-usa
 - All DB reads use `AsNoTracking()` before upserts. All DB operations are async.
 - Schema uses EF Core migrations (in `creaturegame/DB/Migrations/`). `EnsureDatabaseCreated()` calls `Database.Migrate()` — run `PokeApiConnector` on a fresh setup to create and populate the databases. Add new migrations with `dotnet ef migrations add` (see migration command above).
 
-## Agent Profiles (AI_CONTEXT.md)
+## Agent Profiles (.claude/AI_CONTEXT.md)
 
 Prefix messages to set context:
 
@@ -128,7 +133,7 @@ The target is a **true Gen 1 Pokémon battle clone** with future layers inspired
 
 ## TODO State
 
-See `TODO.md` for the full prioritised task list, completed items, and tech debt. Always update `TODO.md` when finishing a task.
+See `docs/TODO.md` for the full prioritised task list, completed items, and tech debt. Always update `docs/TODO.md` when finishing a task.
 
 ## Permissions
 

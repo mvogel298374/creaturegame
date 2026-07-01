@@ -28,9 +28,9 @@ Re-read them each run; the rubric below is a summary, those files are the source
    with code outside the hunk (reachability, shadowing, an existing handler of the same concern).
 3. When the change adds a **broad rule** (a guard, a category check, an immunity), Grep for existing
    **narrow** handlers of the same concern and verify they aren't now dead/contradictory.
-4. Run the build + tests with the user-local SDK and report the result verbatim:
-   `& "C:\Users\USER\.dotnet\dotnet.exe" test tests/creaturegame.Tests` (PowerShell via Bash is fine;
-   use the full path — the system `dotnet` is runtime-only). Also run `.\test.ps1 -Web` if frontend
+4. Run the build + tests and report the result verbatim:
+   `dotnet test tests/creaturegame.Tests` (PowerShell via Bash is fine; use your SDK 9.0.200 install —
+   see `CLAUDE.md` if the system `dotnet` is runtime-only). Also run `.\test.ps1 -Web` if frontend
    files changed.
 
 ## BLOCKERS — generation-seam integrity (the commit must not proceed until fixed)

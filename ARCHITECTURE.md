@@ -239,18 +239,19 @@ Every doc in the repo and what it answers, in a line. This file (`ARCHITECTURE.m
 
 | Doc | What it is |
 |:----|:-----------|
-| `CLAUDE.md` | Always-on primer: setup, commands, architecture overview, the read-on-demand trigger table. |
-| `ARCHITECTURE.md` | **This file** — the decision log (the *why*) + system map. |
-| `GENERATION_SEAMS.md` | The seam contract + the §5.0 gen-agnostic definition-of-done checklist (the real gate). |
-| `STATE_MODEL.md` | The `Creature` permanent/transient split (`BattleState`). |
-| `GAME_LOOP.md` | The run/roguelite loop ↔ event model (battle & heal as events). |
-| `DATA_IMPORT.md` | The PokeAPI import pipeline + the import-vs-runtime boundary and field mapping. |
-| `DESIGN_GUIDES.md` | Design reference: Gen-1 mechanics, type-balancing, move-import mapping. |
-| `DEV_STANDARDS.md` | .NET / EF coding conventions and architecture rules. |
-| `GEN_DIFFERENCES.md` | Gen-1 mechanic requirements — lookup reference, consulted loosely (the seam check gates). |
-| `GAME_AVAILABILITY.md` | Game-version availability requirements — lookup reference, consulted loosely. |
-| `FRONTEND_PLAN.md` | Frontend plan: React + SignalR + Phaser structure and intent. |
-| `AI_CONTEXT.md` | Agent profiles (`/plan` `/dev` …) + the tooling/automation reference. |
-| `README.md` | Project overview / getting started. |
-| `TODO.md` | The authoritative active task list (finished work → `TODO_ARCHIVE.md`). |
-| `TODO_ARCHIVE.md` | History of completed tasks, batches, and resolved tech debt. |
+| `README.md` | Project overview / getting started (repo root). |
+| `CLAUDE.md` | Always-on primer: setup, commands, architecture overview, the read-on-demand trigger table (repo root). |
+| `ARCHITECTURE.md` | **This file** — the decision log (the *why*) + system map (repo root). |
+| `docs/GENERATION_SEAMS.md` | The seam contract + the §5.0 gen-agnostic definition-of-done checklist (the real gate). |
+| `docs/STATE_MODEL.md` | The `Creature` permanent/transient split (`BattleState`). |
+| `docs/GAME_LOOP.md` | The run/roguelite loop ↔ event model (battle & heal as events). |
+| `docs/ENCOUNTER_DESIGN.md` | The biome-graph run model, enemy strength tiers, themed pool, gated acquisition channels. |
+| `docs/DATA_IMPORT.md` | The PokeAPI import pipeline + the import-vs-runtime boundary and field mapping. |
+| `docs/DESIGN_GUIDES.md` | Design reference: Gen-1 mechanics, type-balancing, move-import mapping. |
+| `docs/DEV_STANDARDS.md` | .NET / EF coding conventions and architecture rules. |
+| `docs/GEN_DIFFERENCES.md` | Gen-1 mechanic requirements — lookup reference, consulted loosely (the seam check gates). |
+| `docs/GAME_AVAILABILITY.md` | Game-version availability requirements — lookup reference, consulted loosely. |
+| `docs/FRONTEND_PLAN.md` | Frontend plan: React + SignalR + Phaser structure and intent. |
+| `docs/TODO.md` | The authoritative active task list (finished work → `docs/TODO_ARCHIVE.md`). |
+| `docs/TODO_ARCHIVE.md` | History of completed tasks, batches, and resolved tech debt. |
+| `.claude/AI_CONTEXT.md` | Agent profiles (`/plan` `/dev` …) + the tooling/automation reference. |
