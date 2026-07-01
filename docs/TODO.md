@@ -12,6 +12,9 @@ Evolution System, and the complete **Item System** (data import + use-in-battle,
 done and archived. `ARCHITECTURE.md` and the per-run web seed are done.
 
 **Next up, in order:**
+0. **Run Economy — gold, item rewards, transient bag & Treasure/Mystery nodes** — *plan APPROVED, in progress
+   (2026-07-01).* The active work; full plan recorded below. Delivers the first slice of the deferred *Item
+   Acquisition* cluster (economy), and gives the stubbed Treasure/Mystery nodes real behaviour.
 1. **Encounter Logic** — *design DONE* (`ENCOUNTER_DESIGN.md`, 2026-06-27). Phased build: **Phase 1 (biome
    model)** ✅ + **Phase 2 (enemy tiers + depth bands)** ✅ + **Phase 3a (event model / `RunDirector`)** ✅ +
    **Phase 3b (biome graph + map screen)** ✅ + **Phase 3c (node-kind bones + tuned curve)** ✅ done — biome
@@ -41,6 +44,108 @@ opening-route favourable-matchup guarantee. Full per-phase record (design, pins,
   `ENCOUNTER_DESIGN.md §4` piece, and the bridge into the *Item Acquisition · Bag Persistence · Catch* cluster
   below. Now unblocked (the §1–§3 layer is done): a biome's **Boss** node is the catch hook, the **fought-only
   themed pool** is the draft source. `/plan` first; *n%* rates tuned here.
+
+---
+
+## Run Economy — Gold, Item Rewards, Transient Bag & Treasure/Mystery Nodes  ⟵ ACTIVE (plan approved 2026-07-01)
+
+> **Full approved plan — recorded here so implementation can resume cold (also in
+> `~/.claude/plans/imperative-imagining-knuth.md`).** Delivers the economy slice of the *Item Acquisition* cluster
+> below: **beating a Pokémon can drop gold and/or items**, an **earned transient bag** (start light, grow through
+> play), and real behaviour for the **Treasure/Mystery** nodes (today `InteractionStubEvent` banner-only bones).
+>
+> ⚠️ **Provisional — pending further `/plan` iteration (user will drive these):** the **entire Phase C frontend/UI
+> design** (gold HUD, reward/treasure modals) and the **Mystery-node behaviour** (§ node design). Do **not** build
+> those first-pass as settled — re-plan with the user before implementing. Phases A/B are settled.
+
+### Locked design decisions
+- **Rewards (per user):** each battle win has a *generous* chance to drop **gold and/or items** — a low amount
+  almost always found, a high amount rare (skewed). Gold sized like **Gen 1 trainer prize money** (`base × foe
+  level × tier multiplier`).
+- **Scope (per user):** currency + battle rewards + **Treasure & Mystery** node behaviour this pass. **Shop
+  deferred** to an immediate follow-up (needs a spend-gold purchase modal).
+- **Persistence:** gold + bag are **per-run transient** (lost on death). No `save.db`. Gold is modeled like the
+  transient `Bag`, **not** on `RunState` — `chooseNextEvent` never reads gold (same reasoning that keeps `Bag`
+  external), and it gives the reconnect snapshot for free.
+- **Guardrail:** reward *policy* (drop rates, gold curve, item eligibility) is run-layer roguelite tuning — same
+  class as enemy scaling (`EncounterFactory.ScaleWildLevel`, explicitly *not* a battle seam). The **core stays
+  generation/data-agnostic**: it defines reward *types + state + event + where rewards apply* and consumes an
+  **injected reward supplier** (same pattern as `enemySupplier`/`checkEvolution`); the concrete policy +
+  item-catalog lookup live in a new web-layer `RewardCalculator` (unit-tested like `ScaleWildLevel`).
+
+### Phase A — Core (`creaturegame`), generation-agnostic  *(settled)*
+- [ ] **`Items/Wallet.cs` (new)** — transient per-run currency, mirroring `Bag.cs` shape/threading: `int Balance`,
+  `Credit(int)`, `bool TrySpend(int)` (future Shop consumer). Same single-writer/snapshot-read concurrency note.
+- [ ] **`Combat/RunLoop.cs`** — reward vocabulary by the `Outcome` records: `record RewardedItem(int ItemId,
+  string ItemName)` (id + name **pre-resolved by the supplier** so the core never touches the catalog);
+  `record RunReward(int Gold, IReadOnlyList<RewardedItem> Items)` + `static Empty`; `record RewardContext(int
+  EnemyLevel, EncounterTier Tier, int Depth)`.
+- [ ] **`Combat/BattleEvents.cs`** — `record RewardGranted(string Source, int Gold, int GoldTotal,
+  IReadOnlyList<string> ItemNames)`. `Source` = `"Battle"` (inline) or a `RunNodeKind` name (Treasure/Mystery) so
+  the client picks modal-vs-inline.
+- [ ] **`Combat/IBattleInput.cs`** — blocking ack prompt following the `ConfirmRecoveryAsync` precedent exactly:
+  `Task AcknowledgeRewardAsync(RewardAckContext context) => Task.CompletedTask;` + `record RewardAckContext(string
+  Source, int Gold, IReadOnlyList<string> ItemNames)`. Default non-blocking → AutoSelect/AI/tests never stall.
+- [ ] **`Combat/RunDirector.cs`** — ctor gains `Wallet? wallet` + `Func<RewardContext, IRandomSource, RunReward>?
+  rewardSupplier` (default → `RunReward.Empty`, legacy unchanged). `BattleRunEvent`: after `s.BattlesWon++`
+  (alongside the existing evolution/`CaptureCarriedStatus` win resolution) roll the supplier with `(enemy.Level,
+  tier, s.RunDepth)`, `wallet.Credit`, `playerBag.Add` per item, emit `RewardGranted("Battle", …)` — **non-blocking**.
+  New `TreasureRunEvent`/`MysteryRunEvent` replace the `InteractionStubEvent` wiring for those kinds in
+  `EventForNode` (Shop keeps its stub): roll → apply to wallet+bag → emit `RunNodeEntered(kind)` +
+  `RewardGranted(kind, …)` → **`await ctx.PlayerInput.AcknowledgeRewardAsync(...)`** → return `NodeVisitedOutcome`
+  (no `Apply` change). ⚠️ Mystery's exact reward mix is provisional (see flag above).
+
+### Phase B — Web (`creaturegame.Web`)  *(settled)*
+- [ ] **`Battle/RewardCalculator.cs` (new)** — pure `internal static`, unit-testable like `ScaleWildLevel`.
+  `RollBattleReward(enemyLevel, tier, depth, usableItems, rng)`: **gold** ~85% chance, `TierBase(tier) × enemyLevel
+  × skew` with `skew` low-biased (e.g. `min` of two uniforms → mostly ≈0.5–1.0×, rarely ~3×); **items** skewed by
+  **inverse `Item.Cost`** (cheap common, Hyper Potion/Full Restore/X-items/Ether rare), usually 0–1, Boss bonus.
+  `RollTreasureReward` (guaranteed gold + ≥1 item, richer). `RollMysteryReward` (wildcard). **Eligibility:** only
+  `Healing`/`StatusCure`/`PpRestore`/`BattleStatBoost` (mirrors `ItemEffects` + `bag.ts:20 USABLE_CATEGORIES`);
+  **excludes Ball/Revive** (no effect → dead loot). Seeded → reproducible.
+- [ ] **`Battle/EncounterFactory.cs`** — replace `TestBagQuantityEach = 20` / `Bag.WithEach(allItems, 20)` with
+  `BuildStartingBag(allItems)` — curated modest loadout by **category/cost** (no hardcoded ids): e.g. cheapest
+  Healing ×4, two cheapest StatusCure ×1, cheapest PpRestore ×1. Add the reward-supplier factory (closes over the
+  usable-item subset → `RewardCalculator`). Add `Wallet` (0) to `RunSetup`.
+- [ ] **`Battle/GameSessionManager.cs`** — thread `Wallet` like `Bag` through `RegisterSession`/`PendingSession`/
+  `ActiveBattle`; pass `wallet` + `rewardSupplier` into `RunDirector`; add `GetWallet(gameId)` (reconnect snapshot,
+  parity with `GetBagContents`) + `SetRewardAck(connectionId)`.
+- [ ] **`Battle/SignalRInput.cs`** — `_rewardAckTcs` + `AcknowledgeRewardAsync` override + `SetRewardAck` + include
+  in `Cancel()` (verbatim copy of the `ConfirmRecoveryAsync` handshake).
+- [ ] **`Hubs/BattleHub.cs`** — `Task AcknowledgeReward()` → `manager.SetRewardAck(...)` (mirrors `RespondRecovery`).
+- [ ] **`Battle/SignalRBattleEventEmitter.cs`** — add the `RewardGranted` arm to `MapEvent`. **Required** —
+  `WebEventContractTests` reflection-forces it (the recurring web event field-projection gap).
+- [ ] **`Controllers/GameController.cs`** — `GET {gameId}/gold` → `{ gold }` (parity with `{gameId}/bag`), HUD
+  hydrate on load/reconnect.
+
+### Phase C — Frontend (`ClientApp/src`)  ⚠️ *PROVISIONAL — re-`/plan` with user before building*
+- [ ] `battle/timeline.ts` `expandEvent` — `RewardGranted` → `SET_GOLD` + LOG line; when `Source !== 'Battle'`
+  also `SHOW_REWARD`. Handle Treasure/Mystery `RunNodeEntered` banner (Elite/Boss already handled).
+- [ ] `hooks/useBattleHub.ts` — `gold` + `reward` modal in `BattleState`; `SET_GOLD`/`SHOW_REWARD`/`HIDE_REWARD`
+  cases; `acknowledgeReward()` callback (`invoke('AcknowledgeReward')`, mirrors `respondRecovery`); hydrate `gold`
+  from `GET {gameId}/gold`.
+- [ ] `components/RewardModal.tsx` (new) — mirror `RecoveryModal`/`BiomeChoiceModal`; OK → `acknowledgeReward()`.
+  Gold HUD in `pages/BattleScreen.tsx`. Battle-drop (`Source "Battle"`) = HUD bump + log only, no modal.
+- [ ] Bag refresh on `RewardGranted` (BattleScreen already GETs `/bag` on menu open).
+
+### Testing
+- [ ] Core: `WalletTests`; `RunDirectorNodeTests` — deterministic stub supplier: battle win credits wallet+bag +
+  emits `RewardGranted("Battle")` non-blocking; Treasure/Mystery emits `RunNodeEntered`+`RewardGranted` and
+  **blocks on ack**; AutoSelect default does **not** block (headless completes).
+- [ ] Web: `RewardCalculatorTests` (gold scales with level/tier; skew is low-biased over a seeded stream; items
+  only from usable categories, never Ball/Revive; seeded reproducibility); `EncounterFactory` starting-bag test.
+- [ ] `WebEventContractTests` forces the `RewardGranted` projection. Frontend `timeline.test.ts` for `RewardGranted`.
+- [ ] E2E: Treasure-modal Playwright spec = follow-up (fits the between-encounter modal E2E gap), not this pass.
+
+### Docs to update on completion
+- This section → archive; `ENCOUNTER_DESIGN.md §5/§8` (Treasure/Mystery graduate from bones; currency model no
+  longer fully deferred) + `GAME_LOOP.md §5` (node states).
+
+### Verification
+- `dotnet build`; `.\test.ps1 -Dotnet -Web` (relay TEST SUMMARY verbatim). Run `/audit` before any commit
+  (touches `BattleEvents`/`IBattleInput`/`RunDirector`; confirms reward policy stayed out of the battle seams).
+  Manual: gold HUD climbs on wins, dropped items appear in bag, Treasure/Mystery modals advance, headless run
+  still completes. **No commit without explicit per-commit approval.**
 
 ---
 
