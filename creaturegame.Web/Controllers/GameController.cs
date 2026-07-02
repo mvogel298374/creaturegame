@@ -34,6 +34,7 @@ public class GameController(GameSessionManager sessionManager, EncounterFactory 
                 setup.Player,
                 setup.AllMoves,
                 setup.Bag,
+                setup.Wallet,
                 setup.AllItems,
                 rng,
                 setup.PlayableBiomes
@@ -72,6 +73,17 @@ public class GameController(GameSessionManager sessionManager, EncounterFactory 
         if (bag is null)
             return NotFound(new { error = "No active game with that id" });
         return Ok(bag);
+    }
+
+    /// <summary>The run's current gold balance for the HUD. 404 if the game is unknown or not yet started —
+    /// parity with <see cref="GetBag"/>.</summary>
+    [HttpGet("{gameId}/gold")]
+    public IActionResult GetGold(string gameId)
+    {
+        var gold = sessionManager.GetWallet(gameId);
+        if (gold is null)
+            return NotFound(new { error = "No active game with that id" });
+        return Ok(new { gold });
     }
 }
 

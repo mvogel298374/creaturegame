@@ -28,6 +28,7 @@ public sealed class GameSessionManager(
         Creature player,
         IReadOnlyList<Attack> allMoves,
         Bag bag,
+        Wallet wallet,
         IReadOnlyList<Item> allItems,
         IRandomSource rng,
         IReadOnlyList<BiomeDefinition> playableBiomes
@@ -38,6 +39,7 @@ public sealed class GameSessionManager(
             player,
             allMoves,
             bag,
+            wallet,
             allItems,
             rng,
             playableBiomes,
@@ -83,6 +85,7 @@ public sealed class GameSessionManager(
             CurrentConnectionId = connectionId,
             Player = session.Player,
             Bag = session.Bag,
+            Wallet = session.Wallet,
             ItemsById = session.AllItems.ToDictionary(i => i.Id),
         };
         _active[gameId] = battle;
@@ -127,7 +130,18 @@ public sealed class GameSessionManager(
             // Biome mode: the run charts a route through this region's playable biomes (the map screen). A
             // non-empty set flips the director from the legacy endless chain to biome traversal; the chosen
             // biome themes each encounter. ENCOUNTER_DESIGN.md §7 Phase 3b-2.
-            playableBiomes: session.PlayableBiomes
+            playableBiomes: session.PlayableBiomes,
+            // Run Economy: the wallet battle wins and Treasure/Mystery credit, and the reward policy
+            // (drop rates / gold curve / item eligibility) closed over this run's item catalog.
+            wallet: session.Wallet,
+            rewardSupplier: EncounterFactory.BuildRewardSupplier(session.AllItems),
+            // Frontend-readiness gate: Treasure/Mystery nodes now block on AcknowledgeRewardAsync, but the
+            // client reward modal (Phase C) isn't wired yet — a live run reaching one would hang. Until the
+            // client AcknowledgeReward call lands, remap those two kinds to plain wild battles on the web path
+            // only. The core keeps its full node distribution (design + tests unchanged); this is purely a
+            // "the UI can't answer the ack yet" gate. REMOVE when Phase C ships. Battle wins still drop gold/items
+            // (inline, no ack), so the economy is live; only the two blocking interaction nodes are held back.
+            nodePlanFactory: GateBlockingRewardNodes
         );
 
         _ = Task.Run(async () =>
@@ -157,6 +171,21 @@ public sealed class GameSessionManager(
             }
         });
     }
+
+    // Web node-plan gate: builds the core's default Boss-capped route, then remaps Treasure/Mystery (the two
+    // kinds that now block on the reward ack) to plain wild battles, since the client can't answer the ack yet
+    // (Phase C). Seeded via the same rng, so runs stay reproducible. Delete this and drop the nodePlanFactory
+    // argument above once the frontend AcknowledgeReward call is wired.
+    private static IReadOnlyList<RunNodeKind> GateBlockingRewardNodes(
+        int length,
+        IRandomSource rng
+    ) =>
+        RunDirector
+            .DefaultNodePlan(length, rng)
+            .Select(k =>
+                k is RunNodeKind.Treasure or RunNodeKind.Mystery ? RunNodeKind.WildBattle : k
+            )
+            .ToList();
 
     /// <summary>
     /// The live player <see cref="Creature"/> for a game, for the on-demand overview snapshot (CHECK POKEMON).
@@ -264,6 +293,25 @@ public sealed class GameSessionManager(
             battle.Input.SetEvolutionChoice(allow);
     }
 
+    /// <summary>Routes a Treasure/Mystery reward-modal dismissal to the battle's input.</summary>
+    public void SetRewardAck(string connectionId)
+    {
+        if (
+            _connToGame.TryGetValue(connectionId, out var gameId)
+            && _active.TryGetValue(gameId, out var battle)
+        )
+            battle.Input.SetRewardAck();
+    }
+
+    /// <summary>The run's current gold balance for the HUD, or null if the game is unknown / not yet started.
+    /// Reads live session state — display-only, parity with <see cref="GetBagContents"/>.</summary>
+    public int? GetWallet(string gameId)
+    {
+        if (!_active.TryGetValue(gameId, out var battle) || battle.Wallet is null)
+            return null;
+        return battle.Wallet.Balance;
+    }
+
     /// <summary>Routes a map-screen route choice (the chosen biome id) to the battle's input. An unknown id is
     /// tolerated by the run loop (falls back to the first offered biome), so this only forwards.</summary>
     public void SetBiomeChoice(string connectionId, string biomeId)
@@ -298,6 +346,7 @@ sealed record PendingSession(
     Creature Player,
     IReadOnlyList<Attack> AllMoves,
     Bag Bag,
+    Wallet Wallet,
     IReadOnlyList<Item> AllItems,
     IRandomSource Rng,
     IReadOnlyList<BiomeDefinition> PlayableBiomes,
@@ -326,9 +375,10 @@ sealed class ActiveBattle
     // The persistent player creature for this run, for the on-demand overview snapshot (read-only display use).
     public Creature? Player;
 
-    // The run's bag (threaded into every Battle) and the item catalog used to resolve a UseItem and render
-    // the bag. Set when the session is claimed; never reassigned.
+    // The run's bag (threaded into every Battle), wallet (credited by reward rolls), and the item catalog
+    // used to resolve a UseItem and render the bag. Set when the session is claimed; never reassigned.
     public Bag? Bag;
+    public Wallet? Wallet;
     public IReadOnlyDictionary<int, Item> ItemsById = new Dictionary<int, Item>();
 
     private readonly object _lock = new();

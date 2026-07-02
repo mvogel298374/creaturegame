@@ -142,6 +142,15 @@ function runNodeBannerMsg(kind: string): string {
   }
 }
 
+// Log line for a reward payout (battle drop or Treasure/Mystery node). A real gold HUD / reward modal is a
+// later, separately-planned pass (Run Economy Phase C) — for now this just narrates what was granted so the
+// event isn't silently dropped.
+function rewardGrantedMsg(source: string, gold: number, itemNames: string[]): string {
+  const parts = [gold > 0 ? `${gold}G` : null, ...itemNames].filter((p): p is string => p !== null);
+  const reward = parts.length > 0 ? parts.join(', ') : 'nothing this time';
+  return source === 'Battle' ? `Found ${reward}!` : `The ${source.toLowerCase()} held ${reward}!`;
+}
+
 function actionBlockedMsg(name: string, reason: string): string {
   switch (reason) {
     case 'Sleep':     return `${name} is fast asleep!`;
@@ -313,6 +322,13 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       // The player entered a biome (or the run auto-picked one) — title the next leg of the route.
       const biomeName = payload.biomeName as string;
       return { steps: [w(200), d(log(`Entered ${biomeName}!`)), w(300)] };
+    }
+
+    case 'RewardGranted': {
+      const rSource = payload.source as string;
+      const gold = payload.gold as number;
+      const itemNames = (payload.itemNames as string[]) ?? [];
+      return { steps: [w(200), d(log(rewardGrantedMsg(rSource, gold, itemNames))), w(300)] };
     }
 
     case 'RunNodeEntered': {

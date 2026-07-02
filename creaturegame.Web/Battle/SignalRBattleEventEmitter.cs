@@ -109,6 +109,16 @@ public sealed class SignalRBattleEventEmitter(
                 }
             ),
             RunNodeEntered e => ("RunNodeEntered", new { e.Kind }),
+            RewardGranted e => (
+                "RewardGranted",
+                new
+                {
+                    e.Source,
+                    e.Gold,
+                    e.GoldTotal,
+                    e.ItemNames,
+                }
+            ),
             ItemUsed e => ("ItemUsed", new { e.ItemName, e.TargetName }),
             PpRestored e => (
                 "PpRestored",

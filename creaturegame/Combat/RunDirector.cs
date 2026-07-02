@@ -59,7 +59,9 @@ public sealed class RunDirector
         int minEventsPerBiome = 4,
         int maxEventsPerBiome = 6,
         int biomeOptionCount = 3,
-        Func<int, IRandomSource, IReadOnlyList<RunNodeKind>>? nodePlanFactory = null
+        Func<int, IRandomSource, IReadOnlyList<RunNodeKind>>? nodePlanFactory = null,
+        Wallet? wallet = null,
+        Func<RewardContext, IRandomSource, RunReward>? rewardSupplier = null
     )
     {
         _state = new RunState(player);
@@ -79,6 +81,11 @@ public sealed class RunDirector
         // director runs the legacy endless chain (no route choices), so tests/uses without biomes are unchanged.
         _biomeModeActive = playableBiomes is { Count: > 0 };
 
+        // Reward policy (drop rates, gold curve, item eligibility) is web-layer roguelite tuning, not a battle
+        // seam — the core just defines the vocabulary and consumes whatever's injected. No supplier → every
+        // reward roll is RunReward.Empty, so callers without one (tests, the legacy chain) are unchanged.
+        rewardSupplier ??= (_, _) => RunReward.Empty;
+
         // The three battle nodes differ only by the EncounterTier they hand the supplier (which the web layer
         // maps to an IEnemyArchetype): WildBattle ≈ today's Medium, Elite/Boss climb. Same collaborators
         // otherwise. Elite/Boss also emit a node banner before the fight.
@@ -91,7 +98,9 @@ public sealed class RunDirector
                 movePool,
                 rules,
                 playerBag,
-                checkEvolution
+                checkEvolution,
+                wallet,
+                rewardSupplier
             );
         _battleEvent = Battle(EncounterTier.Normal);
         _eliteEvent = Battle(EncounterTier.Elite);
@@ -100,10 +109,17 @@ public sealed class RunDirector
         _recoveryEvent = new RecoveryRunEvent();
         _biomeChoiceEvent = new BiomeChoiceEvent(playableBiomes ?? [], biomeOptionCount, typeChart);
 
-        // Interaction-node bones (ENCOUNTER_DESIGN.md §5): emit a banner + advance the biome, no behaviour yet.
+        // Interaction-node bones (ENCOUNTER_DESIGN.md §5): Shop is still a no-op banner (deferred to an
+        // immediate follow-up — needs a spend-gold purchase modal); Treasure/Mystery now roll and apply a
+        // reward, blocking on the player's acknowledgement.
         _shopEvent = new InteractionStubEvent(RunNodeKind.Shop);
-        _treasureEvent = new InteractionStubEvent(RunNodeKind.Treasure);
-        _mysteryEvent = new InteractionStubEvent(RunNodeKind.Mystery);
+        _treasureEvent = new RewardRunEvent(
+            RunNodeKind.Treasure,
+            wallet,
+            playerBag,
+            rewardSupplier
+        );
+        _mysteryEvent = new RewardRunEvent(RunNodeKind.Mystery, wallet, playerBag, rewardSupplier);
     }
 
     public async Task RunAsync()
@@ -253,7 +269,9 @@ internal sealed class BattleRunEvent(
     IReadOnlyList<Attack> movePool,
     IBattleRules? rules,
     Bag? playerBag,
-    Func<Creature, Task<EvolutionOutcome?>>? checkEvolution
+    Func<Creature, Task<EvolutionOutcome?>>? checkEvolution,
+    Wallet? wallet,
+    Func<RewardContext, IRandomSource, RunReward> rewardSupplier
 ) : IRunEvent
 {
     public async Task<Outcome> RunAsync(RunContext ctx)
@@ -307,6 +325,7 @@ internal sealed class BattleRunEvent(
         if (!player.IsAlive())
             return new BattleOutcome(false);
         s.BattlesWon++;
+        GrantBattleReward(enemy, s, ctx);
 
         // Evolution check — Gen 1 attempts evolution on a level-up, so only when this battle actually raised
         // the player's level (a declined evolution re-offers at the next level-up, not every win). The battle
@@ -319,6 +338,40 @@ internal sealed class BattleRunEvent(
         s.CarriedStatus = CaptureCarriedStatus(player);
         return new BattleOutcome(true);
     }
+
+    // Rolls and applies this win's reward — a battle drop is inline (no ack; the gold/item bump rides the
+    // normal log), unlike the blocking Treasure/Mystery reward. Silent when nothing was rolled (RunReward.Empty
+    // is the common case — a battle win is a *chance* at a drop, not a guarantee).
+    private void GrantBattleReward(Creature enemy, RunState s, RunContext ctx)
+    {
+        var reward = rewardSupplier(
+            new RewardContext(NodeKindForTier(tier), enemy.Level, s.RunDepth),
+            ctx.Rng ?? SystemRandomSource.Instance
+        );
+        if (reward.Gold <= 0 && reward.Items.Count == 0)
+            return;
+
+        wallet?.Credit(reward.Gold);
+        foreach (var item in reward.Items)
+            playerBag?.Add(item.ItemId);
+
+        ctx.Emitter?.Emit(
+            new RewardGranted(
+                "Battle",
+                reward.Gold,
+                wallet?.Balance ?? reward.Gold,
+                reward.Items.Select(i => i.ItemName).ToList()
+            )
+        );
+    }
+
+    private static RunNodeKind NodeKindForTier(EncounterTier tier) =>
+        tier switch
+        {
+            EncounterTier.Elite => RunNodeKind.EliteBattle,
+            EncounterTier.Boss => RunNodeKind.BossBattle,
+            _ => RunNodeKind.WildBattle,
+        };
 
     // Offers, then applies, a pending evolution if the resolver reports one. The player can cancel (Gen 1
     // B-cancel) — the prompt blocks awaiting the decision; on cancel the creature is untouched and re-offered
@@ -552,5 +605,48 @@ internal sealed class InteractionStubEvent(RunNodeKind kind) : IRunEvent
     {
         ctx.Emitter?.Emit(new RunNodeEntered(kind.ToString()));
         return Task.FromResult<Outcome>(new NodeVisitedOutcome(kind));
+    }
+}
+
+/// <summary>
+/// The Treasure/Mystery node (interaction-event): announce the node, roll and apply its reward (guaranteed for
+/// Treasure, a wildcard for Mystery — the web-layer <c>RewardCalculator</c> policy), then block on the player's
+/// acknowledgement before advancing the biome (unlike a battle-win reward, which is inline/non-blocking — these
+/// two are the "open a chest" beat the client raises a modal for). No reward supplier configured → the roll is
+/// <see cref="RunReward.Empty"/> and the ack still fires (an empty Mystery is itself a valid outcome).
+/// </summary>
+internal sealed class RewardRunEvent(
+    RunNodeKind kind,
+    Wallet? wallet,
+    Bag? playerBag,
+    Func<RewardContext, IRandomSource, RunReward> rewardSupplier
+) : IRunEvent
+{
+    public async Task<Outcome> RunAsync(RunContext ctx)
+    {
+        ctx.Emitter?.Emit(new RunNodeEntered(kind.ToString()));
+
+        var reward = rewardSupplier(
+            new RewardContext(kind, EnemyLevel: 0, ctx.State.RunDepth),
+            ctx.Rng ?? SystemRandomSource.Instance
+        );
+        wallet?.Credit(reward.Gold);
+        foreach (var item in reward.Items)
+            playerBag?.Add(item.ItemId);
+
+        var itemNames = reward.Items.Select(i => i.ItemName).ToList();
+        ctx.Emitter?.Emit(
+            new RewardGranted(
+                kind.ToString(),
+                reward.Gold,
+                wallet?.Balance ?? reward.Gold,
+                itemNames
+            )
+        );
+        await ctx.PlayerInput.AcknowledgeRewardAsync(
+            new RewardAckContext(kind.ToString(), reward.Gold, itemNames)
+        );
+
+        return new NodeVisitedOutcome(kind);
     }
 }

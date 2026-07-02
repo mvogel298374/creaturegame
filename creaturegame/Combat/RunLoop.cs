@@ -110,6 +110,23 @@ public sealed record RunContext(
     IRandomSource? Rng
 );
 
+/// <summary>One item awarded by a reward roll — id + name pre-resolved by the supplier (the concrete web-layer
+/// <c>RewardCalculator</c>) so the core never touches the item catalog.</summary>
+public sealed record RewardedItem(int ItemId, string ItemName);
+
+/// <summary>The result of a reward roll (battle win, Treasure, Mystery): gold and/or items. <see cref="Empty"/>
+/// is nothing rolled (e.g. the ~15% no-drop chance on a battle win).</summary>
+public sealed record RunReward(int Gold, IReadOnlyList<RewardedItem> Items)
+{
+    public static readonly RunReward Empty = new(0, []);
+}
+
+/// <summary>What a reward roll needs to know about the moment it fires, handed to the injected reward supplier
+/// (same pattern as the enemy supplier). <see cref="Source"/> is the node kind that earned the reward — battle
+/// wins carry the beaten foe's <see cref="EnemyLevel"/> (0 for Treasure/Mystery, which have no foe) — letting
+/// one supplier delegate dispatch to the right web-layer roll (battle vs Treasure vs Mystery) by node kind.</summary>
+public sealed record RewardContext(RunNodeKind Source, int EnemyLevel, int Depth);
+
 /// <summary>
 /// The typed result of an event, which the <see cref="RunDirector"/> reads to advance the run
 /// (<c>GAME_LOOP.md §3</c>). An event emits narration and may await input, then returns an <c>Outcome</c>; it

@@ -24,11 +24,6 @@ public sealed class EncounterFactory(
     // The single generation switch — learnset rows are tagged by generation and filtered by this.
     private const int ActiveGeneration = 1;
 
-    // Generous test-bag loadout: every imported item, this many each. The bag is transient (no save
-    // layer yet) and per-run; the acquisition layer will replace this fixed seed later. (Items with no
-    // in-battle effect yet — Balls, Revives — ride along and simply report "no effect" if used.)
-    private const int TestBagQuantityEach = 20;
-
     // How many biomes a single run's map draws from the region's playable set (ENCOUNTER_DESIGN.md §2.1):
     // a seeded connected subset, so runs traverse different slices of Kanto. Tuning lever — smaller = a more
     // distinct per-run "region", larger = richer route choice. The full set has 18; if it ever has fewer than
@@ -79,11 +74,13 @@ public sealed class EncounterFactory(
         // consulted by the battle loop on each level gained). Persists with the creature across the chain.
         player.Learnset = BuildLearnset(learnsets, allMoves);
 
-        // Seed the run's bag from the item catalog. Held by the session and threaded into every Battle;
-        // consumed items stay gone across the chain (the Poké Center refills HP/PP/status, not the bag).
+        // Seed the run's starting bag from the item catalog — a curated modest loadout (not the whole
+        // catalog), gated so a lucky early haul can't trivialise a run; the run economy (battle drops,
+        // Treasure/Mystery) grows it from here. Held by the session and threaded into every Battle; consumed
+        // items stay gone across the chain (the Poké Center refills HP/PP/status, not the bag).
         await using var itemsCtx = await itemsFactory.CreateDbContextAsync();
         var allItems = await itemsCtx.Items.AsNoTracking().ToListAsync();
-        var bag = Bag.WithEach(allItems.Select(i => i.Id), TestBagQuantityEach);
+        var bag = BuildStartingBag(allItems);
 
         // The run's biome map: a seeded, connected random subset of the region's playable biomes (the ones that
         // can generate against the wild-available pool — empty biomes never appear, ENCOUNTER_DESIGN.md §2.2).
@@ -94,7 +91,57 @@ public sealed class EncounterFactory(
         var playable = await ComputePlayableBiomesAsync(pokemonCtx, Region.Kanto);
         var runMap = Biomes.RandomConnectedMap(playable, RunBiomeMapSize, source);
 
-        return new RunSetup(player, allMoves, bag, allItems, runMap);
+        return new RunSetup(player, allMoves, bag, new Wallet(), allItems, runMap);
+    }
+
+    /// <summary>
+    /// A curated, modest starting loadout by category/cost (no hardcoded item ids, so it survives a catalog
+    /// re-import): the cheapest Healing item ×4, the two cheapest StatusCure items ×1, the cheapest PpRestore
+    /// item ×1. Replaces the old fixed "every item ×20" test seed now that the run economy (battle drops,
+    /// Treasure/Mystery) grows the bag from here — a lucky early haul still can't trivialise a run because
+    /// this start is deliberately light.
+    /// </summary>
+    internal static Bag BuildStartingBag(IReadOnlyList<Item> allItems)
+    {
+        var bag = new Bag();
+        AddCheapest(bag, allItems, ItemCategory.Healing, count: 1, quantity: 4);
+        AddCheapest(bag, allItems, ItemCategory.StatusCure, count: 2, quantity: 1);
+        AddCheapest(bag, allItems, ItemCategory.PpRestore, count: 1, quantity: 1);
+        return bag;
+    }
+
+    private static void AddCheapest(
+        Bag bag,
+        IReadOnlyList<Item> allItems,
+        ItemCategory category,
+        int count,
+        int quantity
+    )
+    {
+        foreach (
+            var item in allItems.Where(i => i.Category == category).OrderBy(i => i.Cost).Take(count)
+        )
+            bag.Add(item.Id, quantity);
+    }
+
+    /// <summary>
+    /// Builds the run's reward supplier: the injected <c>Func&lt;RewardContext, IRandomSource, RunReward&gt;</c>
+    /// <see cref="RunDirector"/> rolls after a battle win and on Treasure/Mystery nodes. Closes over the
+    /// catalog's usable-item subset once per run and dispatches by node kind to the <see cref="RewardCalculator"/>
+    /// policy (drop rates / gold curve / item eligibility — run-layer tuning, not a battle seam).
+    /// </summary>
+    internal static Func<RewardContext, IRandomSource, RunReward> BuildRewardSupplier(
+        IReadOnlyList<Item> allItems
+    )
+    {
+        var usable = RewardCalculator.UsableItems(allItems);
+        return (ctx, rng) =>
+            ctx.Source switch
+            {
+                RunNodeKind.Treasure => RewardCalculator.RollTreasureReward(ctx.Depth, usable, rng),
+                RunNodeKind.Mystery => RewardCalculator.RollMysteryReward(ctx.Depth, usable, rng),
+                _ => RewardCalculator.RollBattleReward(ctx.EnemyLevel, ctx.Source, usable, rng),
+            };
     }
 
     /// <summary>
@@ -345,13 +392,14 @@ public sealed class EncounterFactory(
 }
 
 /// <summary>The starting state of a run: the built player, the shared move pool the chain reuses, the run's
-/// starting <see cref="Bag"/>, the item catalog (id → <see cref="Item"/>) used to resolve item uses and
-/// render the bag, and the run's <see cref="PlayableBiomes"/> map (the region's non-empty biomes the
-/// RunDirector charts a route through).</summary>
+/// starting <see cref="Bag"/> and <see cref="Wallet"/> (both transient — lost on death, no save layer yet),
+/// the item catalog (id → <see cref="Item"/>) used to resolve item uses and render the bag, and the run's
+/// <see cref="PlayableBiomes"/> map (the region's non-empty biomes the RunDirector charts a route through).</summary>
 public sealed record RunSetup(
     Creature Player,
     IReadOnlyList<Attack> AllMoves,
     Bag Bag,
+    Wallet Wallet,
     IReadOnlyList<Item> AllItems,
     IReadOnlyList<BiomeDefinition> PlayableBiomes
 );

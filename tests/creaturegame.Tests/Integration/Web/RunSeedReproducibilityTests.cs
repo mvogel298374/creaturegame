@@ -40,17 +40,28 @@ public class RunSeedReproducibilityTests
     }
 
     [Fact]
-    public async Task CreatePlayerSetup_SeedsTheRunBagFromTheItemCatalog()
+    public async Task CreatePlayerSetup_SeedsTheRunBagFromACuratedStartingLoadout()
     {
         var setup = await BuildFactory()
             .CreatePlayerSetupAsync(Bulbasaur, 50, new SeededRandomSource(1));
 
         Assert.NotNull(setup);
         Assert.NotEmpty(setup!.AllItems);
-        // Every catalog item is stocked in the bag with a positive quantity (the generous test loadout).
-        Assert.All(setup.AllItems, i => Assert.True(setup.Bag.Count(i.Id) > 0));
-        // A known battle item is present (Potion, id 17).
-        Assert.True(setup.Bag.Count(17) > 0);
+        // The Run Economy starting bag is a curated modest loadout (EncounterFactory.BuildStartingBag), not
+        // the whole catalog — the run's reward drops/Treasure/Mystery grow it from here.
+        var expected = EncounterFactory.BuildStartingBag(setup.AllItems);
+        Assert.All(setup.AllItems, i => Assert.Equal(expected.Count(i.Id), setup.Bag.Count(i.Id)));
+        Assert.True(setup.Bag.Entries.Values.Sum() > 0); // the bag isn't empty
+    }
+
+    [Fact]
+    public async Task CreatePlayerSetup_SeedsAnEmptyWallet()
+    {
+        var setup = await BuildFactory()
+            .CreatePlayerSetupAsync(Bulbasaur, 50, new SeededRandomSource(1));
+
+        Assert.NotNull(setup);
+        Assert.Equal(0, setup!.Wallet.Balance);
     }
 
     [Fact]

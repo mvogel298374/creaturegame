@@ -77,6 +77,16 @@ public class BattleHub(GameSessionManager manager) : Hub<IBattleClient>
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Dismisses a Treasure/Mystery reward modal. Mirrors <see cref="RespondRecovery"/> — fire-and-forget
+    /// completion of the input TCS the run loop is blocked on.
+    /// </summary>
+    public Task AcknowledgeReward()
+    {
+        manager.SetRewardAck(Context.ConnectionId);
+        return Task.CompletedTask;
+    }
+
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         // Start the reconnect grace window; the battle is abandoned only if the client

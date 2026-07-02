@@ -274,6 +274,30 @@ public class WebEventContractTests
         Assert.Equal("BossBattle", doc.RootElement.GetProperty("Kind").GetString());
     }
 
+    /// <summary>Field-level guard for the <see cref="RewardGranted"/> projection: the client reads the source,
+    /// the gold delta + running total, and the item-name list to drive the HUD/log/modal. The reflection
+    /// contract test instantiates the event with an <i>empty</i> item list, so it can't catch a dropped
+    /// <c>ItemNames</c> — this pins the real values round-trip.</summary>
+    [Fact]
+    public void RewardGranted_Projection_CarriesSourceGoldTotalsAndItemNames()
+    {
+        var evt = new RewardGranted("Treasure", 40, 165, new[] { "Potion", "Ether" });
+
+        var (type, payload) = SignalRBattleEventEmitter.MapEvent(evt);
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+        var root = doc.RootElement;
+
+        Assert.Equal("RewardGranted", type);
+        Assert.Equal("Treasure", root.GetProperty("Source").GetString());
+        Assert.Equal(40, root.GetProperty("Gold").GetInt32());
+        Assert.Equal(165, root.GetProperty("GoldTotal").GetInt32());
+        var names = root.GetProperty("ItemNames")
+            .EnumerateArray()
+            .Select(e => e.GetString())
+            .ToArray();
+        Assert.Equal(new[] { "Potion", "Ether" }, names);
+    }
+
     // Concrete (non-abstract) BattleEvent subtypes — the exact set the engine can emit to the client.
     private static List<Type> ConcreteBattleEventTypes()
     {

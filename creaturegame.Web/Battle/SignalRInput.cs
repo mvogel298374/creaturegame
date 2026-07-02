@@ -13,6 +13,7 @@ public sealed class SignalRInput : IBattleInput
     private volatile TaskCompletionSource<bool>? _recoveryTcs;
     private volatile TaskCompletionSource<bool>? _evolutionTcs;
     private volatile TaskCompletionSource<string>? _biomeTcs;
+    private volatile TaskCompletionSource<bool>? _rewardAckTcs;
     private volatile bool _cancelled;
 
     // The raw request the hub completes the turn handshake with, mapped to a TurnChoice below.
@@ -193,6 +194,30 @@ public sealed class SignalRInput : IBattleInput
     }
 
     /// <summary>
+    /// Awaits the player's dismissal of a Treasure/Mystery reward modal. Same TCS handshake as the other
+    /// prompts (the hub's <c>AcknowledgeReward</c> completes it via <see cref="SetRewardAck"/>); the
+    /// <see cref="_cancelled"/> guard makes a disconnect throw rather than hang the run on the modal.
+    /// </summary>
+    public async Task AcknowledgeRewardAsync(RewardAckContext context)
+    {
+        if (_cancelled)
+            throw new OperationCanceledException("Battle input cancelled (client disconnected).");
+
+        var tcs = new TaskCompletionSource<bool>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        _rewardAckTcs = tcs;
+        await tcs.Task; // throws OperationCanceledException if Cancel() ran
+        _rewardAckTcs = null;
+    }
+
+    public void SetRewardAck()
+    {
+        var tcs = _rewardAckTcs;
+        tcs?.TrySetResult(true);
+    }
+
+    /// <summary>
     /// Unblocks a battle loop waiting on player input when the client disconnects,
     /// so the fire-and-forget battle task can complete and be collected.
     /// </summary>
@@ -204,5 +229,6 @@ public sealed class SignalRInput : IBattleInput
         _recoveryTcs?.TrySetCanceled();
         _evolutionTcs?.TrySetCanceled();
         _biomeTcs?.TrySetCanceled();
+        _rewardAckTcs?.TrySetCanceled();
     }
 }

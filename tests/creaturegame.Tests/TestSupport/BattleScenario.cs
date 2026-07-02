@@ -57,6 +57,17 @@ public sealed class ScriptedInput(params string[] moveNames) : IBattleInput
 
     public Task<bool> ConfirmRecoveryAsync(RecoveryContext context) =>
         Task.FromResult(_acceptRecovery);
+
+    /// <summary>Reward acknowledgements this input has received, in order — lets a test prove a
+    /// Treasure/Mystery node actually blocked on <see cref="AcknowledgeRewardAsync"/> (and a battle-win
+    /// reward, which is inline/non-blocking, never reaches it).</summary>
+    public List<RewardAckContext> RewardAcksReceived { get; } = [];
+
+    public Task AcknowledgeRewardAsync(RewardAckContext context)
+    {
+        RewardAcksReceived.Add(context);
+        return Task.CompletedTask;
+    }
 }
 
 /// <summary>

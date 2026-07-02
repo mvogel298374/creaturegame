@@ -75,6 +75,15 @@ public interface IBattleInput
     /// </summary>
     Task<string> ChooseBiomeAsync(BiomeChoiceContext context) =>
         Task.FromResult(context.Options[0].Id);
+
+    /// <summary>
+    /// Asked after a Treasure/Mystery node's reward is rolled and applied: blocks until the player acknowledges
+    /// (dismisses the reward modal) before the run continues. Battle-win rewards are inline (no ack — the
+    /// gold/item bump rides the normal log) so this is only ever raised for the two interaction nodes. The
+    /// default is non-blocking, so automated / AI inputs never stall on it and a headless run still completes —
+    /// only the web <see cref="SignalRInput"/> blocks awaiting a real dismissal.
+    /// </summary>
+    Task AcknowledgeRewardAsync(RewardAckContext context) => Task.CompletedTask;
 }
 
 /// <summary>Context for a level-up move-replacement decision: who is learning, and the move on offer.</summary>
@@ -91,3 +100,7 @@ public sealed record RecoveryContext(Creature Player, int BattlesWon);
 /// <summary>Context for a between-encounter evolution offer: the player creature and the form it would become
 /// (id + display name), so an input could decide based on it — the default just allows.</summary>
 public sealed record EvolutionPromptContext(Creature Player, int ToSpeciesId, string ToName);
+
+/// <summary>Context for a Treasure/Mystery reward acknowledgement: what was rolled, so an input could log or
+/// display it before dismissing — the default just returns immediately.</summary>
+public sealed record RewardAckContext(string Source, int Gold, IReadOnlyList<string> ItemNames);

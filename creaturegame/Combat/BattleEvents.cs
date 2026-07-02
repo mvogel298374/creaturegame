@@ -86,6 +86,13 @@ public record BiomeEntered(string BiomeId, string BiomeName, IReadOnlyList<Damag
 /// banner is the whole node.</summary>
 public record RunNodeEntered(string Kind) : BattleEvent;
 
+/// <summary>A reward roll paid out gold and/or items — a battle win (inline, <paramref name="Source"/> =
+/// <c>"Battle"</c>) or a Treasure/Mystery node (<paramref name="Source"/> = the <c>RunNodeKind</c> name, which
+/// blocks on an ack so the client can raise a modal instead of an inline log line). <paramref name="GoldTotal"/>
+/// is the wallet balance after crediting, so the HUD can set rather than accumulate.</summary>
+public record RewardGranted(string Source, int Gold, int GoldTotal, IReadOnlyList<string> ItemNames)
+    : BattleEvent;
+
 // --- Move actions ---
 public record MoveUsed(string AttackerName, string MoveName) : BattleEvent;
 

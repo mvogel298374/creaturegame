@@ -280,6 +280,24 @@ describe('expandEvent — control plane vs timeline', () => {
     expect(logLines(steps)).toEqual([message]);
   });
 
+  it('RewardGranted (battle drop) logs the gold + items found', () => {
+    const { steps } = expandEvent('RewardGranted',
+      { source: 'Battle', gold: 25, goldTotal: 25, itemNames: ['Potion'] }, CTX);
+    expect(logLines(steps)).toEqual(['Found 25G, Potion!']);
+  });
+
+  it('RewardGranted (Treasure node) words the payout as the node holding it', () => {
+    const { steps } = expandEvent('RewardGranted',
+      { source: 'Treasure', gold: 40, goldTotal: 65, itemNames: ['Full Restore'] }, CTX);
+    expect(logLines(steps)).toEqual(['The treasure held 40G, Full Restore!']);
+  });
+
+  it('RewardGranted with nothing rolled still logs a line', () => {
+    const { steps } = expandEvent('RewardGranted',
+      { source: 'Mystery', gold: 0, goldTotal: 10, itemNames: [] }, CTX);
+    expect(logLines(steps)).toEqual(['The mystery held nothing this time!']);
+  });
+
   it('EvolutionOffered announces it and raises the Allow/Cancel modal (queued, blocking)', () => {
     const { steps } = expandEvent('EvolutionOffered', {
       fromName: 'MACHOKE', toName: 'MACHAMP', fromSpeciesId: 67, toSpeciesId: 68,
