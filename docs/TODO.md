@@ -163,9 +163,14 @@ tested through the `mitt` bridge (assert **event ordering**, never wall-clock du
 
 **Remaining:**
 - [ ] **Between-encounter modal E2Es** — deterministic via a fixed `seed` in the `start` request: Poké Center
-  recovery Heal/Skip, move-replacement forget/decline, evolution Allow/Cancel (Gen 1 B-cancel). All share the
-  blocking-modal shape and are unblocked by the per-run seed; each is unit/integration-covered, this closes the
-  DOM-level gap.
+  recovery Heal/Skip, move-replacement forget/decline, evolution Allow/Cancel (Gen 1 B-cancel), and the **Run
+  Economy reward modal** (Treasure/Mystery OK → `acknowledgeReward`, run continues; battle-win drop = gold-HUD
+  bump + log, no modal). All share the blocking-modal shape and are unblocked by the per-run seed; each is
+  unit/integration-covered, this closes the DOM-level gap.
+  - **Known live-verification gap (Run Economy):** the gold HUD render/hydrate (`₽0`) was Puppeteer-verified, but
+    an actual **battle-win gold drop and the reward modal were not observed in a browser** — a DOM auto-player
+    couldn't reliably win a scaled battle to trigger one. Those paths rest on the unit + integration coverage
+    (`RunDirectorNodeTests`, `timeline.test.ts`). A seeded reward-modal spec here is what closes it.
 - [ ] **CI step** (or `test.ps1 -StartStack`-adjacent) that boots backend + frontend, runs headless, tears down.
 - [ ] `data-testid` attributes — **deferred**: specs lean on stable semantic classes (`.btn-new-game`,
   `.species-card`, `.move-btn`, `.log-line`, `.bar-fill`, `.nameplate--*`). Add testids only where a class
