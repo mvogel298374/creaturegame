@@ -8,6 +8,56 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Run Economy — gold, item rewards, transient bag & Treasure/Mystery nodes ✅ DONE (2026-07-02)
+
+The economy slice of the deferred *Item Acquisition* cluster, `/plan`ned with the user (approved 2026-07-01) and
+built in three phases. **Beating a Pokémon can drop gold and/or items; Treasure/Mystery nodes give real rewards;
+the run bag is now earned** (a curated modest start that grows through play). Commits `ea41531` (A/B) + `7d9afc5`
+(C). **Follow-up still live in `TODO.md`: the Shop node** (spend-gold purchase modal). 1267 tests green.
+
+**Locked design.** Rewards are *generous but skewed* (a low amount almost always, a high amount rare); gold sized
+like Gen 1 trainer prize money (`base × foe level × tier`). Gold + bag are **per-run transient** (lost on death,
+no `save.db`) — gold modeled like the transient `Bag`, external to `RunState` so `chooseNextEvent` never reads it.
+**Guardrail:** reward *policy* (drop rates / gold curve / item eligibility) is run-layer roguelite tuning (same
+class as `EncounterFactory.ScaleWildLevel`, **not** a battle seam). The core stays generation/data-agnostic — it
+defines reward *types + state + event + where they apply* and consumes an **injected reward supplier** (same
+pattern as `enemySupplier`/`checkEvolution`); the concrete policy + item-catalog lookup live in the web layer.
+
+**Phase A — Core (`creaturegame`), generation-agnostic.** `Items/Wallet.cs` (transient per-run gold, mirrors
+`Bag`). `Combat/RunLoop.cs` reward vocabulary — `RewardedItem`, `RunReward` (+ `Empty`), `RewardContext(RunNodeKind
+Source, EnemyLevel, Depth)`. `Combat/BattleEvents.cs` `RewardGranted(Source, Gold, GoldTotal, ItemNames)`.
+`Combat/IBattleInput.cs` default-non-blocking `AcknowledgeRewardAsync` + `RewardAckContext`. `Combat/RunDirector.cs`
+ctor gains `Wallet?` + `rewardSupplier` (default = a **no-RNG-draw** `RunReward.Empty` lambda, so seeded runs
+without a supplier are byte-identical); `BattleRunEvent.GrantBattleReward` (inline/non-blocking after
+`BattlesWon++`, only on a genuine win); new `RewardRunEvent` replaces the stub for Treasure/Mystery (roll → apply
+to wallet+bag → emit → **await ack**). Shop keeps its `InteractionStubEvent`.
+
+**Phase B — Web (`creaturegame.Web`), the policy layer.** `Battle/RewardCalculator.cs` (`internal static`, unit-
+tested like `ScaleWildLevel`): gold `base × level × skew` (min-of-two-uniforms, low-biased); items weighted by
+inverse `Item.Cost`; eligibility = `Healing`/`StatusCure`/`PpRestore`/`BattleStatBoost` (mirrors `ItemEffects`,
+excludes Ball/Revive dead-loot); `RollTreasureReward` (guaranteed gold + ≥1 item) / `RollMysteryReward`
+(wildcard). `EncounterFactory.BuildStartingBag` (curated cheapest-of-category loadout) replaces the old
+`TestBagQuantityEach = 20` seed; `BuildRewardSupplier` closes over the usable subset. `Wallet` threaded through
+`RunSetup`/`GameSessionManager`/`SignalRInput`/`BattleHub`; `RewardGranted` wire projection; `GET {gameId}/gold`.
+
+**Phase C — Frontend (`ClientApp/src`).** `timeline.ts` `SET_GOLD`/`SHOW_REWARD`/`HIDE_REWARD`; `RewardGranted`
+bumps the gold HUD + logs always, raises the modal only for Treasure/Mystery. `useBattleHub.ts` gold + reward
+state, `acknowledgeReward()` (mirrors `respondRecovery`), `/gold` hydrate on load + reconnect. `BattleScreen.tsx`
+inline `RewardModal` + run-scoped gold HUD. **The A/B web-path gate** (`GateBlockingRewardNodes`, which remapped
+the blocking Treasure/Mystery nodes to wild battles while the client couldn't answer the ack) was **removed** here
+now that `acknowledgeReward()` is wired — those nodes run at the full core distribution.
+
+**Audit (A/B).** `/audit` → seam-reviewer **PASS-WITH-ADVISORIES**: no seam breaks; reward policy confirmed
+web-side; default no-draw supplier preserves seeded-run RNG. The two advisories (the live Treasure/Mystery
+deadlock → fixed by the Phase-C ack + interim gate; `RollGold` tuning constants documented as provisional) are
+both resolved. Phase C touched no battle seam, so no separate audit.
+
+**Recurring lesson (memory `feedback_hang_is_a_real_signal`):** a "hanging" test suite here means an infinite-run
+test, not a broken harness — every `RunDirector.RunAsync()` test needs a guaranteed faint (a dead-end biome +
+constant-pushover supplier loops forever; only a *battle* node can end a run).
+
+---
+
 ## Encounter Logic (roguelite run layer) ✅ DONE (2026-06-27 → 2026-06-28)
 
 The roguelite **encounter layer** — *what the player faces, how the run is shaped, and the eligibility
