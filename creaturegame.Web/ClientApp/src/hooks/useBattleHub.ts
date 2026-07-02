@@ -32,6 +32,13 @@ export interface BiomeChoicePrompt {
   options: BiomeOption[];
 }
 
+export interface RewardPrompt {
+  source: string;      // the RunNodeKind name ("Treasure" / "Mystery") — battle drops never raise a modal
+  gold: number;        // gold granted by this reward (0 if none)
+  goldTotal: number;   // wallet balance after crediting (for the modal's running-total line)
+  itemNames: string[]; // display names of any items granted
+}
+
 export interface BattleState {
   phase: 'connecting' | 'waiting' | 'choosing' | 'battling' | 'ended';
   animating: boolean;
@@ -55,6 +62,8 @@ export interface BattleState {
   recovery: RecoveryPrompt | null;
   evolution: EvolutionPrompt | null;
   biomeChoice: BiomeChoicePrompt | null;
+  reward: RewardPrompt | null;
+  gold: number;
   log: LogEntry[];
   turnNumber: number;
 }
@@ -82,6 +91,8 @@ const initialState: BattleState = {
   recovery: null,
   evolution: null,
   biomeChoice: null,
+  reward: null,
+  gold: 0,
   log: [],
   turnNumber: 0,
 };
@@ -179,6 +190,15 @@ function reducer(state: BattleState, action: Action): BattleState {
       return { ...state, biomeChoice: { options: action.options } };
     case 'HIDE_BIOME_CHOICE':
       return { ...state, biomeChoice: null };
+    case 'SET_GOLD':
+      return { ...state, gold: action.gold };
+    case 'SHOW_REWARD':
+      return {
+        ...state,
+        reward: { source: action.source, gold: action.gold, goldTotal: action.goldTotal, itemNames: action.itemNames },
+      };
+    case 'HIDE_REWARD':
+      return { ...state, reward: null };
     case 'ANIMATING_START':
       return { ...state, animating: true };
     case 'ANIMATING_DONE':
@@ -227,7 +247,22 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
       if (steps) enqueueSteps(steps);              // animated — sequenced
     });
 
-    conn.start().catch(err => console.error('[SignalR] Connection failed:', err));
+    // Pull the wallet balance for the gold HUD. Needed on first load and after a reconnect — events don't
+    // replay across a disconnect gap (the emitter drops them while offline), so the HUD must re-hydrate from
+    // the endpoint. A failure just leaves the HUD at its last value; it's not fatal to the run.
+    const hydrateGold = () => {
+      fetch(`/api/game/${gameId}/gold`)
+        .then(r => (r.ok ? r.json() : null))
+        .then((d: { gold: number } | null) => {
+          if (d && typeof d.gold === 'number') dispatch({ type: 'SET_GOLD', gold: d.gold });
+        })
+        .catch(() => { /* keep the current HUD value */ });
+    };
+
+    conn.onreconnected(() => hydrateGold());
+    conn.start()
+      .then(() => hydrateGold())
+      .catch(err => console.error('[SignalR] Connection failed:', err));
     connRef.current = conn;
 
     return () => {
@@ -287,5 +322,13 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
       console.error('[SignalR] ChooseBiome failed:', err));
   }, []);
 
-  return { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome };
+  // Dismiss a Treasure/Mystery reward modal. Hide it at once (the backend is blocked awaiting the ack); the
+  // gold/bag were already applied server-side, so there's nothing to log locally. Mirrors respondRecovery.
+  const acknowledgeReward = useCallback(() => {
+    dispatch({ type: 'HIDE_REWARD' });
+    connRef.current?.invoke('AcknowledgeReward').catch(err =>
+      console.error('[SignalR] AcknowledgeReward failed:', err));
+  }, []);
+
+  return { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, acknowledgeReward };
 }

@@ -11,6 +11,9 @@ obj/
 # SQLite databases (runtime-generated, use PokeApiConnector to regenerate)
 *.db
 *.sqlite
+# WAL/shared-memory sidecars created while the DB is open (e.g. running the dev stack)
+*.db-wal
+*.db-shm
 
 # Logs
 *.log

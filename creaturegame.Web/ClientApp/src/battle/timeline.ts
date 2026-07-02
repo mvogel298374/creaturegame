@@ -63,7 +63,13 @@ export type Action =
   | { type: 'HIDE_EVOLUTION_PROMPT' }
   // Biome map / route choice — shown then hidden by the player's pick (charts the next leg of the run).
   | { type: 'SHOW_BIOME_CHOICE'; options: BiomeOption[] }
-  | { type: 'HIDE_BIOME_CHOICE' };
+  | { type: 'HIDE_BIOME_CHOICE' }
+  // Run economy: set the gold HUD to the wallet's running total (RewardGranted carries the post-credit total).
+  | { type: 'SET_GOLD'; gold: number }
+  // Treasure/Mystery reward — shown then hidden by the player's OK (the backend blocks on the ack). A battle
+  // drop never raises this (it's inline: HUD bump + log only).
+  | { type: 'SHOW_REWARD'; source: string; gold: number; goldTotal: number; itemNames: string[] }
+  | { type: 'HIDE_REWARD' };
 
 // Phaser commands sent over the mitt bridge.
 export type BridgeCommand =
@@ -327,8 +333,19 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
     case 'RewardGranted': {
       const rSource = payload.source as string;
       const gold = payload.gold as number;
+      const goldTotal = payload.goldTotal as number;
       const itemNames = (payload.itemNames as string[]) ?? [];
-      return { steps: [w(200), d(log(rewardGrantedMsg(rSource, gold, itemNames))), w(300)] };
+      // Always bump the gold HUD to the wallet's running total and log the payout. Battle drops stop there
+      // (inline, non-blocking). Treasure/Mystery also raise the reward modal — the backend blocks on its ack.
+      const steps: Step[] = [
+        w(200),
+        d({ type: 'SET_GOLD', gold: goldTotal }),
+        d(log(rewardGrantedMsg(rSource, gold, itemNames))),
+        w(300),
+      ];
+      if (rSource !== 'Battle')
+        steps.push(d({ type: 'SHOW_REWARD', source: rSource, gold, goldTotal, itemNames }));
+      return { steps };
     }
 
     case 'RunNodeEntered': {

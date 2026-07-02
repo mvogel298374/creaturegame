@@ -18,6 +18,11 @@ const logTones = (steps: Step[] = []): (string | undefined)[] =>
 
 const kinds = (steps: Step[] = []): string[] => steps.map(s => s.kind);
 
+// The dispatched actions (control-plane), for asserting reducer actions like SET_GOLD / SHOW_REWARD.
+const dispatched = (steps: Step[] = []): Action[] =>
+  steps.filter((s): s is Extract<Step, { kind: 'dispatch' }> => s.kind === 'dispatch')
+       .map(s => s.action);
+
 const emits = (steps: Step[] = []) =>
   steps.filter((s): s is Extract<Step, { kind: 'emit' }> => s.kind === 'emit').map(s => s.command);
 
@@ -280,22 +285,37 @@ describe('expandEvent — control plane vs timeline', () => {
     expect(logLines(steps)).toEqual([message]);
   });
 
-  it('RewardGranted (battle drop) logs the gold + items found', () => {
+  it('RewardGranted (battle drop) bumps the gold HUD + logs, but raises no modal', () => {
     const { steps } = expandEvent('RewardGranted',
       { source: 'Battle', gold: 25, goldTotal: 25, itemNames: ['Potion'] }, CTX);
     expect(logLines(steps)).toEqual(['Found 25G, Potion!']);
+    const actions = dispatched(steps);
+    // HUD set to the running total…
+    expect(actions).toContainEqual({ type: 'SET_GOLD', gold: 25 });
+    // …but a battle drop is inline — no reward modal (the backend didn't block on an ack for it).
+    expect(actions.map(a => a.type)).not.toContain('SHOW_REWARD');
   });
 
-  it('RewardGranted (Treasure node) words the payout as the node holding it', () => {
+  it('RewardGranted (Treasure node) bumps gold, logs, and raises the reward modal', () => {
     const { steps } = expandEvent('RewardGranted',
       { source: 'Treasure', gold: 40, goldTotal: 65, itemNames: ['Full Restore'] }, CTX);
     expect(logLines(steps)).toEqual(['The treasure held 40G, Full Restore!']);
+    const actions = dispatched(steps);
+    expect(actions).toContainEqual({ type: 'SET_GOLD', gold: 65 });
+    expect(actions).toContainEqual({
+      type: 'SHOW_REWARD', source: 'Treasure', gold: 40, goldTotal: 65, itemNames: ['Full Restore'],
+    });
   });
 
-  it('RewardGranted with nothing rolled still logs a line', () => {
+  it('RewardGranted (Mystery, nothing rolled) still bumps gold, logs, and raises the modal', () => {
     const { steps } = expandEvent('RewardGranted',
       { source: 'Mystery', gold: 0, goldTotal: 10, itemNames: [] }, CTX);
     expect(logLines(steps)).toEqual(['The mystery held nothing this time!']);
+    const actions = dispatched(steps);
+    expect(actions).toContainEqual({ type: 'SET_GOLD', gold: 10 });
+    expect(actions).toContainEqual({
+      type: 'SHOW_REWARD', source: 'Mystery', gold: 0, goldTotal: 10, itemNames: [],
+    });
   });
 
   it('EvolutionOffered announces it and raises the Allow/Cancel modal (queued, blocking)', () => {

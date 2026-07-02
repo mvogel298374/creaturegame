@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { TypeBadge } from '../components/TypeBadge';
 import { BattleCanvas } from '../battle/BattleCanvas';
-import { useBattleHub, type LevelUpPanel, type MoveReplacementPrompt, type RecoveryPrompt, type EvolutionPrompt, type BiomeChoicePrompt } from '../hooks/useBattleHub';
+import { useBattleHub, type LevelUpPanel, type MoveReplacementPrompt, type RecoveryPrompt, type EvolutionPrompt, type BiomeChoicePrompt, type RewardPrompt } from '../hooks/useBattleHub';
 import type { Species } from '../types/Species';
 import type { MoveInfo } from '../types/BattleEvents';
 import { formatMoveName } from '../utils/format';
@@ -25,7 +25,7 @@ export function BattleScreen() {
   const gameId: string | null = location.state?.gameId ?? null;
   const startLevel: number = location.state?.level ?? 50;
 
-  const { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome } = useBattleHub(gameId, startLevel);
+  const { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, acknowledgeReward } = useBattleHub(gameId, startLevel);
   const [controlView, setControlView] = useState<ControlView>('menu');
   const logRef = useRef<HTMLDivElement>(null);
 
@@ -63,6 +63,11 @@ export function BattleScreen() {
   return (
     <div className="battle-screen">
       <div className="battle-field">
+        <div className="gold-hud" aria-label={`${state.gold} gold`}>
+          <span className="gold-hud-coin" aria-hidden="true">₽</span>
+          <span className="gold-hud-amount">{state.gold}</span>
+        </div>
+
         <div className="nameplate nameplate--enemy">
           <div className="nameplate-row">
             <span className="nameplate-name">{enemyName}</span>
@@ -149,6 +154,10 @@ export function BattleScreen() {
 
       {state.biomeChoice && (
         <BiomeChoiceModal prompt={state.biomeChoice} onChoose={chooseBiome} />
+      )}
+
+      {state.reward && (
+        <RewardModal prompt={state.reward} onAck={acknowledgeReward} />
       )}
 
       {state.phase === 'ended' && (
@@ -307,6 +316,40 @@ function BiomeChoiceModal({ prompt, onChoose }: {
               </span>
             </button>
           ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Treasure/Mystery reward: a between-encounter "you found something" step. Shows the gold and any items the
+// node granted (already credited server-side) and a single OK press — that press both dismisses the modal and
+// continues the run (the backend is blocked awaiting the ack). Battle-win drops never reach here (they're
+// inline: a gold-HUD bump + a log line, no modal).
+function RewardModal({ prompt, onAck }: {
+  prompt: RewardPrompt;
+  onAck: () => void;
+}) {
+  const title = prompt.source === 'Treasure' ? 'You found treasure!' : 'A mysterious find!';
+  const emptyHanded = prompt.gold === 0 && prompt.itemNames.length === 0;
+  return (
+    <div className="modal-overlay">
+      <div className="reward-modal" role="alertdialog" aria-label="Reward">
+        <p className="reward-title">{title}</p>
+        {emptyHanded ? (
+          <p className="reward-empty">…but there was nothing inside.</p>
+        ) : (
+          <ul className="reward-list">
+            {prompt.gold > 0 && (
+              <li className="reward-line reward-line--gold">+{prompt.gold}₽</li>
+            )}
+            {prompt.itemNames.map((name, i) => (
+              <li key={i} className="reward-line reward-line--item">{name}</li>
+            ))}
+          </ul>
+        )}
+        <div className="reward-buttons">
+          <button className="action-btn action-btn--fight" onClick={onAck}>OK</button>
         </div>
       </div>
     </div>

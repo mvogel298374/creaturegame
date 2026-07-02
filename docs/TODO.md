@@ -12,13 +12,12 @@ Evolution System, and the complete **Item System** (data import + use-in-battle,
 done and archived. `ARCHITECTURE.md` and the per-run web seed are done.
 
 **Next up, in order:**
-0. **Run Economy — gold, item rewards, transient bag & Treasure/Mystery nodes** — *Phases A + B DONE & audited
-   (2026-07-02, PASS-WITH-ADVISORIES); Phase C (frontend) deferred — provisional, needs a `/plan` pass.* Backend
-   currency + battle/Treasure/Mystery reward rolls + earned transient bag + the reward wire are built and green
-   (1267 tests). **Battle-win gold/item drops are live** (inline, no ack). ⚠️ **Treasure/Mystery are gated OFF on
-   the web path** (`GameSessionManager.GateBlockingRewardNodes` remaps them to wild battles) because they block on
-   `AcknowledgeRewardAsync` and the client reward modal isn't wired yet — **remove that gate when Phase C lands.**
-   See the Phase C checklist + the frontend-ack coupling below.
+0. **Run Economy — gold, item rewards, transient bag & Treasure/Mystery nodes** — *Phases A + B + C DONE
+   (2026-07-02; A/B audited PASS-WITH-ADVISORIES).* Backend currency + battle/Treasure/Mystery reward rolls +
+   earned transient bag + the reward wire, **plus the Phase C frontend** (gold HUD, reward modal, `acknowledgeReward`
+   wiring). The web-path node-plan gate is **removed** — Treasure/Mystery run at full distribution and the client
+   answers their reward ack. Playable end-to-end. **Remaining follow-up: the Shop node** (spend-gold purchase
+   modal — see the *Item Acquisition* cluster / its own item below).
 1. **Encounter Logic** — *design DONE* (`ENCOUNTER_DESIGN.md`, 2026-06-27). Phased build: **Phase 1 (biome
    model)** ✅ + **Phase 2 (enemy tiers + depth bands)** ✅ + **Phase 3a (event model / `RunDirector`)** ✅ +
    **Phase 3b (biome graph + map screen)** ✅ + **Phase 3c (node-kind bones + tuned curve)** ✅ done — biome
@@ -102,23 +101,18 @@ opening-route favourable-matchup guarantee. Full per-phase record (design, pins,
 - [x] **`Battle/SignalRBattleEventEmitter.cs`** — `RewardGranted` arm (pinned by `WebEventContractTests`).
 - [x] **`Controllers/GameController.cs`** — `GET {gameId}/gold`.
 
-### Phase C — Frontend (`ClientApp/src`)  ⚠️ *PROVISIONAL — re-`/plan` with user before building*
-> 🔴 **Blocking coupling (why this can't be skipped before Treasure/Mystery go live):** the backend
-> `RewardRunEvent` **awaits** `AcknowledgeRewardAsync` on every Treasure/Mystery node, and nothing in the client
-> answers it yet — a live run reaching one would hang. Interim mitigation is in place
-> (`GameSessionManager.GateBlockingRewardNodes` remaps Treasure/Mystery → wild battles on the web path). **The
-> minimum to un-gate is the `acknowledgeReward()` invoke; the modal/HUD look is the provisional part.** Remove the
-> gate in the same batch that wires the client ack.
-> A minimal timeline arm + `timeline.test.ts` cases for `RewardGranted` are **already in** (needed for the backend
-> contract test); the log line words the payout. The reducer/modal/HUD below are what remains.
-- [ ] `battle/timeline.ts` `expandEvent` — `RewardGranted` → `SET_GOLD` + LOG line; when `Source !== 'Battle'`
-  also `SHOW_REWARD`. Handle Treasure/Mystery `RunNodeEntered` banner (Elite/Boss already handled).
-- [ ] `hooks/useBattleHub.ts` — `gold` + `reward` modal in `BattleState`; `SET_GOLD`/`SHOW_REWARD`/`HIDE_REWARD`
-  cases; `acknowledgeReward()` callback (`invoke('AcknowledgeReward')`, mirrors `respondRecovery`); hydrate `gold`
-  from `GET {gameId}/gold`.
-- [ ] `components/RewardModal.tsx` (new) — mirror `RecoveryModal`/`BiomeChoiceModal`; OK → `acknowledgeReward()`.
-  Gold HUD in `pages/BattleScreen.tsx`. Battle-drop (`Source "Battle"`) = HUD bump + log only, no modal.
-- [ ] Bag refresh on `RewardGranted` (BattleScreen already GETs `/bag` on menu open).
+### Phase C — Frontend (`ClientApp/src`)  *(DONE 2026-07-02)*
+> The blocking coupling is resolved: the client now answers the Treasure/Mystery reward ack, so the web-path
+> node-plan gate was **removed** (`GameSessionManager` no longer injects a `nodePlanFactory`) and those nodes run
+> at the full core distribution.
+- [x] `battle/timeline.ts` `expandEvent` — `RewardGranted` → `SET_GOLD` (running total) + LOG always; when
+  `source !== 'Battle'` also `SHOW_REWARD`. New `SET_GOLD`/`SHOW_REWARD`/`HIDE_REWARD` actions.
+- [x] `hooks/useBattleHub.ts` — `gold` + `reward` in `BattleState`; the three reducer cases; `acknowledgeReward()`
+  callback (`invoke('AcknowledgeReward')`, mirrors `respondRecovery`); hydrate `gold` from `GET {gameId}/gold` on
+  load + `onreconnected`.
+- [x] `pages/BattleScreen.tsx` — inline `RewardModal` (mirrors `RecoveryModal`; OK → `acknowledgeReward()`) + a
+  run-scoped gold HUD (`.gold-hud` in `BattleScreen.css`). Battle drops = HUD bump + log only, no modal.
+- [x] Bag refresh: `BagMenu` already GETs `/bag` on open, so dropped items appear next open (no change needed).
 
 ### Testing
 - [x] Core: `WalletTests`; `RunDirectorNodeTests` — battle win credits wallet+bag + emits `RewardGranted("Battle")`
@@ -128,18 +122,20 @@ opening-route favourable-matchup guarantee. Full per-phase record (design, pins,
 - [x] Web: `RewardCalculatorTests` (gold scales with level/tier; skew low-biased over a seeded stream; items only
   from usable categories, never Ball/Revive; reproducibility); `StartingBagTests` (curated modest loadout).
 - [x] `WebEventContractTests` forces the `RewardGranted` projection (arm + field-level guard). Frontend
-  `timeline.test.ts` for `RewardGranted` (battle / Treasure / empty). **1267 green (1182 .NET + 85 Vitest).**
-- [ ] E2E: Treasure-modal Playwright spec = Phase C follow-up (fits the between-encounter modal E2E gap).
+  `timeline.test.ts` for `RewardGranted` asserts the dispatched actions: `SET_GOLD` always; `SHOW_REWARD` only for
+  Treasure/Mystery (not battle drops). **1267 green (1182 .NET + 85 Vitest).**
+- [ ] E2E: Treasure-modal Playwright spec = follow-up (fits the between-encounter modal E2E gap). Live-verified
+  the gold HUD render/hydrate (`₽0`) via Puppeteer; the win-drop/modal paths rest on the unit+integration coverage
+  above (a DOM auto-player couldn't reliably win a scaled battle to trigger a live drop).
 
-### Docs to update on completion
-- This section → archive; `ENCOUNTER_DESIGN.md §5/§8` (Treasure/Mystery graduate from bones; currency model no
-  longer fully deferred) + `GAME_LOOP.md §5` (node states).
+### Docs updated on completion
+- `ENCOUNTER_DESIGN.md §5/§8` (Treasure/Mystery graduate from bones to real reward nodes) + `GAME_LOOP.md §5`
+  (node states) — done. This section stays until the **Shop** follow-up lands, then archives.
 
-### Verification
-- `dotnet build`; `.\test.ps1 -Dotnet -Web` (relay TEST SUMMARY verbatim). Run `/audit` before any commit
-  (touches `BattleEvents`/`IBattleInput`/`RunDirector`; confirms reward policy stayed out of the battle seams).
-  Manual: gold HUD climbs on wins, dropped items appear in bag, Treasure/Mystery modals advance, headless run
-  still completes. **No commit without explicit per-commit approval.**
+### Verification (done)
+- `.\test.ps1 -Dotnet -Web` → 1267 green. No `/audit` for Phase C (frontend + web-composition gate removal — no
+  battle/stat/move seam touched; the A/B seam change was audited PASS-WITH-ADVISORIES). **No commit without
+  explicit per-commit approval.**
 
 ---
 

@@ -878,3 +878,88 @@
   gap: 4px;
   flex-shrink: 0;
 }
+
+/* ── Gold HUD (run-scoped, top-left of the field) ── */
+.gold-hud {
+  position: absolute;
+  top: var(--sp-md);
+  left: var(--sp-md);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px var(--sp-sm);
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid #e6c24a;
+  border-radius: 4px;
+  font-weight: 700;
+  letter-spacing: var(--ls-normal);
+}
+
+.gold-hud-coin {
+  color: #f2d75e;
+  text-shadow: 0 0 4px rgba(242, 215, 94, 0.6);
+}
+
+.gold-hud-amount {
+  color: var(--clr-text);
+  font-size: var(--fs-sm);
+}
+
+/* ── Treasure/Mystery reward modal ── */
+.reward-modal {
+  min-width: 280px;
+  max-width: 90%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--clr-bg-deep);
+  border: 2px solid #e6c24a;
+  border-radius: 4px;
+  padding: var(--sp-md) var(--sp-lg);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6), 0 0 24px rgba(230, 194, 74, 0.25);
+}
+
+.reward-title {
+  font-size: var(--fs-base);
+  font-weight: 700;
+  letter-spacing: var(--ls-normal);
+  color: #f2d75e;
+  text-align: center;
+  margin-bottom: var(--sp-sm);
+}
+
+.reward-list {
+  list-style: none;
+  margin: 0 0 var(--sp-md);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.reward-line {
+  font-size: var(--fs-sm);
+  color: var(--clr-text);
+}
+
+.reward-line--gold {
+  color: #f2d75e;
+  font-weight: 700;
+}
+
+.reward-empty {
+  font-size: var(--fs-sm);
+  color: var(--clr-text-dim, var(--clr-text));
+  text-align: center;
+  margin-bottom: var(--sp-md);
+}
+
+.reward-buttons {
+  width: 100%;
+}
+
+.reward-buttons .action-btn {
+  width: 100%;
+}

@@ -132,16 +132,11 @@ public sealed class GameSessionManager(
             // biome themes each encounter. ENCOUNTER_DESIGN.md §7 Phase 3b-2.
             playableBiomes: session.PlayableBiomes,
             // Run Economy: the wallet battle wins and Treasure/Mystery credit, and the reward policy
-            // (drop rates / gold curve / item eligibility) closed over this run's item catalog.
+            // (drop rates / gold curve / item eligibility) closed over this run's item catalog. The client
+            // now answers the Treasure/Mystery reward ack (Phase C), so those nodes run at their full core
+            // distribution (no node-plan gate).
             wallet: session.Wallet,
-            rewardSupplier: EncounterFactory.BuildRewardSupplier(session.AllItems),
-            // Frontend-readiness gate: Treasure/Mystery nodes now block on AcknowledgeRewardAsync, but the
-            // client reward modal (Phase C) isn't wired yet — a live run reaching one would hang. Until the
-            // client AcknowledgeReward call lands, remap those two kinds to plain wild battles on the web path
-            // only. The core keeps its full node distribution (design + tests unchanged); this is purely a
-            // "the UI can't answer the ack yet" gate. REMOVE when Phase C ships. Battle wins still drop gold/items
-            // (inline, no ack), so the economy is live; only the two blocking interaction nodes are held back.
-            nodePlanFactory: GateBlockingRewardNodes
+            rewardSupplier: EncounterFactory.BuildRewardSupplier(session.AllItems)
         );
 
         _ = Task.Run(async () =>
@@ -171,21 +166,6 @@ public sealed class GameSessionManager(
             }
         });
     }
-
-    // Web node-plan gate: builds the core's default Boss-capped route, then remaps Treasure/Mystery (the two
-    // kinds that now block on the reward ack) to plain wild battles, since the client can't answer the ack yet
-    // (Phase C). Seeded via the same rng, so runs stay reproducible. Delete this and drop the nodePlanFactory
-    // argument above once the frontend AcknowledgeReward call is wired.
-    private static IReadOnlyList<RunNodeKind> GateBlockingRewardNodes(
-        int length,
-        IRandomSource rng
-    ) =>
-        RunDirector
-            .DefaultNodePlan(length, rng)
-            .Select(k =>
-                k is RunNodeKind.Treasure or RunNodeKind.Mystery ? RunNodeKind.WildBattle : k
-            )
-            .ToList();
 
     /// <summary>
     /// The live player <see cref="Creature"/> for a game, for the on-demand overview snapshot (CHECK POKEMON).
