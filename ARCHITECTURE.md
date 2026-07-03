@@ -248,6 +248,8 @@ Every doc in the repo and what it answers, in a line. This file (`ARCHITECTURE.m
 | `docs/ENCOUNTER_DESIGN.md` | The biome-graph run model, enemy strength tiers, themed pool, gated acquisition channels. |
 | `docs/DATA_IMPORT.md` | The PokeAPI import pipeline + the import-vs-runtime boundary and field mapping. |
 | `docs/DESIGN_GUIDES.md` | Design reference: Gen-1 mechanics, type-balancing, move-import mapping. |
+| `docs/DEFINITION_OF_READY.md` | DoR — the exit criteria for a `/plan` pass (a plan isn't done until every item is covered). |
+| `docs/DEFINITION_OF_DONE.md` | DoD (technical) — the rubric the `pr-review` subagent checks at feature-finish. |
 | `docs/DEV_STANDARDS.md` | .NET / EF coding conventions and architecture rules. |
 | `docs/GEN_DIFFERENCES.md` | Gen-1 mechanic requirements — lookup reference, consulted loosely (the seam check gates). |
 | `docs/GAME_AVAILABILITY.md` | Game-version availability requirements — lookup reference, consulted loosely. |

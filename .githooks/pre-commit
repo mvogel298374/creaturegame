@@ -1,9 +1,9 @@
 #!/bin/sh
 # Deterministic pre-commit gate: formatting + tests must pass before a commit lands.
 #
-# This is the hard, unskippable backstop for the *deterministic* checks. The LLM-side fidelity /
-# generation-seam review is the `/audit` skill (run that before committing move logic) — a shell hook
-# can't launch the seam-reviewer subagent, so the two pieces work together.
+# This is the hard, unskippable backstop for the *deterministic* checks. The LLM-side reviews — domain /
+# Gen-1 fidelity (`requirements-review`) and technical + generation-seam architecture (`pr-review`) — run in
+# the main session before commit; a shell hook can't launch a subagent, so the pieces work together.
 #
 # Enable once per clone:  git config core.hooksPath .githooks
 # Bypass in a genuine emergency:  git commit --no-verify  (don't make a habit of it)

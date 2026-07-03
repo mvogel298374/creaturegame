@@ -45,11 +45,12 @@ Guidelines for all `/dev` actions in this project.
 *   **File Tracking**: All new or modified files must be tracked by version control. Ensure all relevant files are staged and committed as part of the task.
 *   **Cleanup**: When removing files from the project, ensure they are also removed from version control.
 
-## Pre-commit Gate
-Two layers catch the seam/fidelity leak before commit: the **`/audit` skill** (LLM — the recurring-leak
-checklist + `seam-reviewer` on the diff) and the **`.githooks/pre-commit`** hook (deterministic — CSharpier
-+ tests). Both are documented in `AI_CONTEXT.md` → **Tooling & Automation**; run `/audit` before proposing
-a commit on any battle/stat/move change.
+## Pre-finish Gates
+When a feature is close to done, run the pre-finish gate sequence before proposing a commit — `format-gate`
+(CSharpier), `test-runner` (full suite), `requirements-review` (Gen-1 / roguelite domain fidelity — a hard
+gate to the pipeline, soft to the user) and `pr-review` (Opus technical DoD, incl. generation-seam
+architecture). The **`.githooks/pre-commit`** hook is the deterministic backstop (CSharpier + tests) at
+commit time. All are documented in `AI_CONTEXT.md` → **Tooling & Automation**.
 
 ## Testing Standards
 *   **Test Naming**: Test methods should clearly and succinctly state what they test without using the word "Test" or "test" as a prefix or suffix.

@@ -12,9 +12,11 @@ them up front burns ~25k tokens before the work is even scoped; almost none of i
 |:-----|:--------------|
 | `ARCHITECTURE.md` | you need the **why** behind a design decision, the system map, or the full doc catalog (its §5 indexes every doc in the repo). The decision-log entry point. |
 | `docs/TODO.md` | starting or finishing any task — it's the **authoritative** active task list. Always update it when a task completes. (Finished work is in `docs/TODO_ARCHIVE.md`; read that only to recover the history of a done item.) |
-| `.claude/AI_CONTEXT.md` | you need a slash-command/profile definition (`/plan`, `/dev`, `/sync`, `/test`, `/audit`) or the **Tooling & Automation** reference (the `/audit` skill, `seam-reviewer`, pre-commit hook, CSharpier, MCP servers). |
+| `.claude/AI_CONTEXT.md` | you need a slash-command/profile definition (`/plan`, `/dev`, `/sync`, `/test`) or the **Tooling & Automation** reference (the pre-finish gate sequence — `format-gate`, `test-runner`, `requirements-review`, `pr-review` — the pre-commit hook, CSharpier, MCP servers). |
 | `docs/DESIGN_GUIDES.md` | doing `/plan` (design) work — Gen 1 mechanics, type-balancing, move-import mapping. |
+| `docs/DEFINITION_OF_READY.md` | doing `/plan` — the DoR checklist that is `/plan`'s exit criteria (a plan isn't done until every item is covered). |
 | `docs/DEV_STANDARDS.md` | doing `/dev` (implementation) work — .NET/EF coding conventions and architecture rules. |
+| `docs/DEFINITION_OF_DONE.md` | finishing a feature — the technical DoD the `pr-review` subagent checks. |
 | `docs/STATE_MODEL.md` | touching battle state — the `Creature` permanent/transient split (`BattleState`). |
 | `docs/GAME_LOOP.md` | working on the **run/roguelite loop** — the game-loop ↔ event model (battle & heal as events), the logic-drives-sequence rule, and the target event abstraction. |
 | `docs/ENCOUNTER_DESIGN.md` | working on **encounters/acquisition** — the biome-graph run model, the `IEnemyArchetype` strength tiers, the type-themed pool, and the two gated acquisition channels (boss catch + themed draft). |
@@ -63,7 +65,7 @@ dotnet csharpier format .    # format C# (do NOT hand-align)
 dotnet csharpier check .     # what the hook/CI runs
 git config core.hooksPath .githooks                         # once per clone — arms .githooks/pre-commit
 ```
-The `.githooks/pre-commit` hook runs `csharpier check` (always) + the full test suite (when `.cs` is staged) and **blocks the commit on failure**. For battle/stat/move changes, run the `/audit` skill before proposing the commit — it adds the seam/fidelity review the hook can't do.
+The `.githooks/pre-commit` hook runs `csharpier check` (always) + the full test suite (when `.cs` is staged) and **blocks the commit on failure**. When a feature is close to done, run the pre-finish gate sequence before proposing a commit — the **`format-gate`** subagent (CSharpier), the **`test-runner`** subagent (full suite), for battle/stat/move work the **`requirements-review`** subagent (Gen-1 / roguelite domain fidelity — a hard gate to the pipeline, soft to you: only you waive a discrepancy), and finally the **`pr-review`** subagent (Opus, technical DoD incl. generation-seam architecture, from `docs/DEFINITION_OF_DONE.md`). Each is a separate subagent so it can be invoked or edited on its own.
 
 EF Core migration commands require `DOTNET_ROOT` set so `dotnet-ef` finds the user-local SDK instead of the system runtime-only install:
 ```powershell
