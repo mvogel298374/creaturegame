@@ -158,7 +158,7 @@ Stack: React 18 + TypeScript + SignalR + Phaser 3. (Canvas & core animations don
 
 ## Browser-Based UI Testing (Playwright)
 
-Suite landed (16 specs / 8 files, `npm run test:e2e`). Playwright drives the React DOM; the Phaser canvas is
+Suite lives in `ClientApp/e2e/` (`npm run test:e2e`). Playwright drives the React DOM; the Phaser canvas is
 tested through the `mitt` bridge (assert **event ordering**, never wall-clock durations — the #1 flake source).
 
 **Done (2026-07-05):**
@@ -177,16 +177,24 @@ tested through the `mitt` bridge (assert **event ordering**, never wall-clock du
   the VS line); removed the two `item-use` specs (X ATTACK / GUARD SPEC aren't battle-1 obtainable anymore — the
   item-effect logic stays covered by `ItemEffectTests`, bag grouping by `bag.test.ts`).
 
-**Remaining:**
-- [ ] **Inter-test E2E flakiness** — several battle-dependent specs (`stat-stage`, `level-up` column-spacing,
-  `battle-ui-cues`) pass **run alone** but flake **in-suite**: the specs share one stateful backend (serial,
-  "one in-flight battle per connection") and biome mode's extra async step widened the timing windows. Stabilise
-  by threading a fixed `seed` through these specs (now that seed plumbing exists) so their battles are
-  deterministic, and/or firming up per-test teardown. Pre-existing fragility, surfaced by the biome-mode timing.
-- [ ] **Other between-encounter modal E2Es** — still to do, same seeded/blocking-modal shape as the reward modal:
-  Poké Center recovery Heal/Skip, move-replacement forget/decline, evolution Allow/Cancel (Gen 1 B-cancel).
+**Remaining (in priority order):**
+- [ ] **⏭ NEXT — Stabilise inter-test E2E flakiness (a seed-determinism pass).** `stat-stage`, `level-up`
+  (column-spacing), and `battle-ui-cues` pass **run alone** but flake **in-suite** — the specs share one
+  stateful backend (serial, "one in-flight battle per connection") and biome mode's extra async step widened the
+  timing windows. Not a product bug; a test-determinism gap. Approach (leverages the new seed plumbing):
+  1. Add optional `seed` (and species/level) params to the `startBattle` helper; when a seed is given it lands
+     directly on `/select?e2e=1&seed=…` (the `reward-modal.spec` pattern) so the whole run — enemy, biome offer,
+     battle rolls — is deterministic.
+  2. Per flaky spec, discover a stable seed that yields the matchup it needs (player moves first / a survivable
+     turn 1 / the right enemy type), the way `reward-modal.spec` pins seed 31.
+  3. Replace the coin-flip `reachLog` / retry loops in those specs with the seeded setup.
+  **Done when:** `npm run test:e2e` is green across 3 consecutive runs with `retries: 0`.
+- [ ] **Other between-encounter modal E2Es** — same seeded/blocking-modal shape as the reward modal, now
+  unblocked by the seed plumbing: Poké Center recovery Heal/Skip, move-replacement forget/decline, evolution
+  Allow/Cancel (Gen 1 B-cancel).
 - [ ] **CI step** (or `test.ps1 -StartStack`-adjacent) that boots backend + frontend, runs headless, tears down.
-  **This is why the rot went unnoticed** — E2E isn't gated in CI and `test.ps1` skips it when the stack is down.
+  **This is the root cause of the rot going unnoticed** — E2E isn't gated in CI and `test.ps1` skips it when the
+  stack is down, so a red suite stayed invisible. Wiring E2E into the gate is what prevents a repeat.
 - [ ] `data-testid` attributes — **deferred**: specs lean on stable semantic classes (`.btn-new-game`,
   `.species-card`, `.move-btn`, `.log-line`, `.bar-fill`, `.nameplate--*`). Add testids only where a class
   proves brittle.
