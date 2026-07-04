@@ -14,18 +14,16 @@ const item = (over: Partial<BagItem> = {}): BagItem => ({
   quantity: 5,
   description: '',
   restoresPpAllMoves: false,
+  usableInBattle: true,
   ...over,
 });
 
 describe('isUsableInBattle', () => {
-  it('accepts the categories the engine has an in-battle effect for', () => {
-    for (const c of ['Healing', 'StatusCure', 'PpRestore', 'BattleStatBoost'])
-      expect(isUsableInBattle(c)).toBe(true);
-  });
-
-  it('rejects categories that would just waste the turn (Ball, Revive, Other)', () => {
-    for (const c of ['Ball', 'Revive', 'Other', 'unknown'])
-      expect(isUsableInBattle(c)).toBe(false);
+  // Usability is the server's verdict (BagItemView.UsableInBattle, from the engine's ItemEffects
+  // registry); the client just reflects the flag rather than re-encoding the category→effect mapping.
+  it('reflects the server-computed usableInBattle flag', () => {
+    expect(isUsableInBattle(item({ usableInBattle: true }))).toBe(true);
+    expect(isUsableInBattle(item({ usableInBattle: false }))).toBe(false);
   });
 });
 
@@ -57,12 +55,12 @@ describe('formatItemName', () => {
 });
 
 describe('groupBagItems', () => {
-  it('drops non-usable categories and groups the rest by pocket, in order', () => {
+  it('drops non-usable items and groups the rest by pocket, in order', () => {
     const items: BagItem[] = [
       item({ id: 1, name: 'potion', category: 'Healing' }),
-      item({ id: 2, name: 'poke-ball', category: 'Ball' }),
+      item({ id: 2, name: 'poke-ball', category: 'Ball', usableInBattle: false }),
       item({ id: 3, name: 'antidote', category: 'StatusCure' }),
-      item({ id: 4, name: 'revive', category: 'Revive' }),
+      item({ id: 4, name: 'revive', category: 'Revive', usableInBattle: false }),
       item({ id: 5, name: 'ether', category: 'PpRestore' }),
       item({ id: 6, name: 'x-attack', category: 'BattleStatBoost' }),
     ];
@@ -83,6 +81,11 @@ describe('groupBagItems', () => {
   });
 
   it('returns no groups when nothing is usable', () => {
-    expect(groupBagItems([item({ category: 'Ball' }), item({ category: 'Revive' })])).toEqual([]);
+    expect(
+      groupBagItems([
+        item({ category: 'Ball', usableInBattle: false }),
+        item({ category: 'Revive', usableInBattle: false }),
+      ])
+    ).toEqual([]);
   });
 });

@@ -225,23 +225,37 @@ public sealed class GameSessionManager(
     {
         if (!_active.TryGetValue(gameId, out var battle) || battle.Bag is null)
             return null;
-        return battle
-            .Bag.Entries.Where(e => e.Value > 0 && battle.ItemsById.ContainsKey(e.Key))
+        return ProjectBagView(battle.Bag, battle.ItemsById);
+    }
+
+    /// <summary>Projects the held bag (id → qty) plus the item catalog into the client's <see cref="BagItemView"/>
+    /// list, ordered by id. Pure (no session state) so the wire projection — notably the
+    /// <see cref="BagItemView.UsableInBattle"/> flag — is unit-testable without standing up a live battle.</summary>
+    internal static IReadOnlyList<BagItemView> ProjectBagView(
+        Bag bag,
+        IReadOnlyDictionary<int, Item> itemsById
+    ) =>
+        bag
+            .Entries.Where(e => e.Value > 0 && itemsById.ContainsKey(e.Key))
             .Select(e =>
             {
-                var item = battle.ItemsById[e.Key];
+                var item = itemsById[e.Key];
                 return new BagItemView(
                     item.Id,
                     item.Name ?? "",
                     item.Category.ToString(),
                     e.Value,
                     item.Description ?? "",
-                    item.RestoresPpAllMoves
+                    item.RestoresPpAllMoves,
+                    // Single source of truth for "does anything in battle": the engine's effect registry.
+                    // Ball/Revive/Other have no effect yet ⇒ null ⇒ the bag menu hides them, so this can't
+                    // drift out of lockstep with ItemEffects the way a client-side category list would.
+                    ItemEffects.For(item.Category)
+                        is not null
                 );
             })
             .OrderBy(v => v.Id)
             .ToList();
-    }
 
     /// <summary>Routes a level-up replace-move answer (slot 0–3, or null to decline) to the battle's input.</summary>
     public void SetForgetChoice(string connectionId, int? slotIndex)
@@ -336,14 +350,17 @@ sealed record PendingSession(
 /// <summary>A bag entry for the client: the item plus how many the run is holding.</summary>
 /// <remarks><see cref="RestoresPpAllMoves"/> lets the bag menu tell a whole-moveset PP restore (Elixir/Max
 /// Elixir — use directly) from a single-move one (Ether/Max Ether — needs a move-slot pick) without
-/// re-deriving it from the item name.</remarks>
+/// re-deriving it from the item name. <see cref="UsableInBattle"/> is the server's verdict (from the
+/// <see cref="ItemEffects"/> registry) on whether using the item now would do anything, so the client
+/// filters the menu on a flag instead of re-encoding the category→effect mapping.</remarks>
 public sealed record BagItemView(
     int Id,
     string Name,
     string Category,
     int Quantity,
     string Description,
-    bool RestoresPpAllMoves
+    bool RestoresPpAllMoves,
+    bool UsableInBattle
 );
 
 /// <summary>A running battle plus the connection currently bound to it and its abandon timer.</summary>

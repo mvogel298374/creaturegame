@@ -222,13 +222,15 @@ comment-density pass; (D) minor comment/dead-field batch; the **RNG seam** (CLOS
 and Architecture Review #7 (`SecondaryHits` seam dedup, `MoveImport.MapToAttack` split + `MoveMappingTests`).
 
 **Still open:**
-- [ ] **`bag.ts` re-encodes the engine's effect registry** *(2026-06-20 architecture pass).* The frontend
-  `USABLE_CATEGORIES` set in `bag.ts:20` hardcodes which `ItemCategory`s are usable in battle — knowledge the
-  backend already owns (`ItemEffects.For(category) != null`). When Ball/Revive get effects, **two places must
-  change in lockstep** or the menu silently hides a now-usable item. Fix mirrors the `RestoresPpAllMoves`
-  precedent: project a server-computed `usableInBattle` boolean onto `BagItemView` (from the registry) and have
-  the client filter on that flag. Single source of truth; same field-projection discipline as the rest of the
-  wire. Low risk today (documented), but a drift seam to close before the acquisition cluster lands.
+
+*(none — the `bag.ts` effect-registry drift seam below is now closed.)*
+
+**Done & archived:**
+- [x] **`bag.ts` re-encodes the engine's effect registry** — CLOSED (2026-07-04). The frontend
+  `USABLE_CATEGORIES` set (which hardcoded which `ItemCategory`s are usable in battle) is gone; the backend now
+  projects a server-computed `UsableInBattle` boolean onto `BagItemView` (from `ItemEffects.For(category)`), and
+  the client filters the bag menu on that flag. Single source of truth — when Ball/Revive get effects, only the
+  registry changes and the menu follows. Mirrors the `RestoresPpAllMoves` field-projection precedent.
 
 ### Known Gaps
 - Enemy encounter pool ignores game version — filter by `PokemonGameAvailability` once a version selector exists.

@@ -11,16 +11,16 @@ export interface BagItem {
   // True for a whole-moveset PP restore (Elixir / Max Elixir). Single-move restores (Ether / Max Ether)
   // are false and need a move-slot pick before use.
   restoresPpAllMoves: boolean;
+  // Whether using the item in battle now would do anything — the server's verdict, computed from the
+  // engine's ItemEffects registry (BagItemView.UsableInBattle). Ball (catch — gated on Encounter Logic)
+  // and Revive (needs a party) have no effect yet, so they arrive false and the menu hides them rather
+  // than letting the player burn a turn on a guaranteed no-op. Read this flag; don't re-derive usability
+  // from `category` here — that mapping lives in the backend and only the backend.
+  usableInBattle: boolean;
 }
 
-// The categories that actually do something when used in battle this scope — the same set the engine's
-// ItemEffects registry implements (Healing, StatusCure, PpRestore, BattleStatBoost). Ball (catch — gated on
-// Encounter Logic) and Revive (needs a party) resolve to ItemUseFailed and would just waste the turn, so the
-// menu hides them rather than letting the player burn a turn on a guaranteed no-op.
-const USABLE_CATEGORIES = new Set(['Healing', 'StatusCure', 'PpRestore', 'BattleStatBoost']);
-
-export function isUsableInBattle(category: string): boolean {
-  return USABLE_CATEGORIES.has(category);
+export function isUsableInBattle(item: Pick<BagItem, 'usableInBattle'>): boolean {
+  return item.usableInBattle;
 }
 
 // Only a single-move PP restore (Ether / Max Ether) needs the player to choose which move slot to refill.
@@ -51,7 +51,7 @@ export const CATEGORY_LABELS: ReadonlyArray<{ category: string; label: string }>
 export function groupBagItems(
   items: BagItem[]
 ): ReadonlyArray<{ label: string; items: BagItem[] }> {
-  const usable = items.filter(i => isUsableInBattle(i.category) && i.quantity > 0);
+  const usable = items.filter(i => isUsableInBattle(i) && i.quantity > 0);
   return CATEGORY_LABELS.map(({ category, label }) => ({
     label,
     items: usable.filter(i => i.category === category),
