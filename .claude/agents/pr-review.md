@@ -69,8 +69,11 @@ Litmus for anything ambiguous: "when we build Gen 2, will this value/layout chan
 - **Code quality & conventions** (`DEV_STANDARDS.md`) — primary constructors for DTOs, nullable handled,
   async DB with `AsNoTracking()`, try/catch + logging on API/DB calls, honest naming, no needless
   duplication, test names that state what they test, CSharpier owns whitespace.
-- **Integration completeness** — a new `BattleEvent`/`MoveInfo` field also has its SignalR emitter projection
-  + a field-level guard (engine tests miss the wire gap).
+- **Integration completeness** — any new field on a **client-facing wire DTO** (a SignalR `BattleEvent`/`MoveInfo`
+  *or* a REST payload like `BagItemView`/`BagItem`) has both its server projection **and** a field-level guard
+  test pinning it (engine/unit tests miss the wire gap). This is a **required** lane → a new wire field without
+  a projection guard is `CHANGES-REQUESTED`, not an advisory. "It's buried in a live-session read" is not a
+  waiver — a pure-helper extraction (e.g. `ProjectBagView`) makes it testable; that's the fix.
 - **Test quality (technical)** — coverage matches the change surface (edge/error paths, not only happy path);
   a data change Gen 1 differs from modern on has a pinning contract test so a re-import can't silently revert
   it. (Whether the *value* is the right Gen-1 number is `requirements-review`'s.)
@@ -99,6 +102,17 @@ Litmus for anything ambiguous: "when we build Gen 2, will this value/layout chan
   change, with only behaviour coverage; a re-import can silently revert it. Needs a `SecondaryChanceDataContractTests`
   (or equivalent) pin in the same change.
 
+## Calibration — don't soften a real finding
+- **"Matches precedent" is not a waiver.** That an existing sibling is also untested/unguarded (e.g. another
+  wire field with no projection guard) means the debt *predates* this change — it does **not** make the new
+  gap acceptable, and it is not grounds to downgrade a finding to a nit. Flag both: the new gap at its DoD
+  lane, the pre-existing one as an advisory to backfill.
+- **A concrete, cheap fix is `RECOMMENDED`, not `ADVISORY`.** If you can name the exact test or small refactor
+  that closes a gap, it goes under `RECOMMENDED` — the default is that it gets done (only the user may waive
+  it; the main session must not self-waive). Reserve `ADVISORY` for genuinely optional judgment calls with no
+  concrete cheap action, or findings owned by another reviewer. Never justify a gap by the cost of the
+  *hardest* way to close it — if code isn't testable, the recommendation **is** the extraction that makes it so.
+
 ## Output contract
 ```
 PR-REVIEW: PR-READY | CHANGES-REQUESTED
@@ -107,13 +121,17 @@ CHANGES-REQUESTED (n)  — each tied to a DoD lane; must be fixed before commit
 - <file:line> — <lane: seam-architecture | architecture | conventions | integration | test | docs> — <what's wrong> — <what "done" looks like>
   ...
 
-ADVISORIES (n)  — optional
+RECOMMENDED (n)  — a concrete, cheap fix; the default is to do it (only the user waives, never a self-waiver)
+- <file:line> — <lane> — <the exact test/refactor that closes it> — <why it's cheap>
+
+ADVISORIES (n)  — genuinely optional, or owned elsewhere (requirements-review / technical-nit)
 - <file:line> — <owner: requirements-review | technical-nit> — <what>
 
 PRECONDITIONS: format=<state> tests=<state> requirements=<state>
 ```
-`PR-READY` only when preconditions are green and there are no CHANGES-REQUESTED items. Be specific and terse —
-exact `file:line`, tie every requested change to a DoD lane, no praise or preamble.
+`PR-READY` only when preconditions are green and there are no CHANGES-REQUESTED items. `RECOMMENDED` items do
+not block the verdict, but each must be **done or explicitly user-waived** before commit — never self-waived.
+Be specific and terse — exact `file:line`, tie every requested change to a DoD lane, no praise or preamble.
 
 ## Scope
 You review technical quality and report. You do **not** implement, refactor, fix tests, or commit — the main

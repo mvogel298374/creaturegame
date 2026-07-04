@@ -48,8 +48,13 @@ hard gate to the pipeline but soft to the user: only the user waives a requireme
   test (no `Test` prefix/suffix). Whitespace is CSharpier's — no hand alignment.
 
 **D. Integration completeness**
-- A new `BattleEvent` / `MoveInfo` field also has its SignalR emitter projection **and** a field-level guard
-  — engine tests pass while the wire projection is silently missing, so this must be checked directly.
+- **Any new field on a client-facing wire DTO** — a SignalR `BattleEvent` / `MoveInfo`, *or* a REST payload
+  (`BagItemView`, `BagItem`, and the like) — carries both its server-side projection **and** a field-level
+  guard test that pins that projection. Engine/unit tests pass while a wire projection is silently missing or
+  mis-wired (negated), so this is verified directly, per field. This is a **required** lane, not an advisory:
+  a new wire field without a projection guard is `CHANGES-REQUESTED`. "The projection is buried in a
+  live-session read, so it's hard to test" is not a waiver — extract a pure helper to make it testable
+  (precedent: `GameSessionManager.ProjectBagView`, `EncounterFactory.BuildStartingBag`) and pin it.
 
 **E. Test quality (technical)**
 - Coverage matches the change surface: edge and error paths exercised, not just the happy path. A data value
