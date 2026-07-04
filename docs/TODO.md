@@ -177,6 +177,30 @@ tested through the `mitt` bridge (assert **event ordering**, never wall-clock du
   proves brittle.
 - [ ] §8 visual-regression canvas snapshots — skipped (maintenance cost).
 
+## Frontend Unit Coverage (Vitest)
+
+Test-harness audit (2026-07-05) — the .NET engine + event-wire seam are near-exhaustively covered; the gap was
+the frontend. Closed the pure-logic gaps and pinned the suite split.
+
+**Done (2026-07-05):** extracted the pure `battleReducer` out of `useBattleHub` (`hooks/battleReducer.ts`,
+type-only imports → zero runtime deps) and added `battleReducer.test.ts` — the edge transitions a live
+playthrough can't deterministically force (name-mismatch HP/status no-ops, `XP_GAIN` clamp, the level-up→
+move-replacement supersede, the `BATTLE_STARTED` enemy-nameplate reset, biome-choice which has no E2E spec).
+Plus `format`/`fetchError` unit tests (the backend-unreachable path is invisible to E2E). 84 → 107 Vitest tests.
+
+**The suite-split rule (so future tests land in the right place):** Vitest owns **pure decision logic**
+(input → exact output, especially branches E2E can't force or that an assembled-state test hits trivially).
+Playwright owns anything needing the **full stack or the DOM** (rendering, flows, modal gating, event/animation
+ordering). *Do not* add a second DOM harness (`jsdom`/RTL) to re-assert what E2E already renders — the one real
+component-gating gap (the Run Economy reward modal) is closed by a **seeded Playwright spec** (see Browser-Based
+UI Testing above), not RTL.
+
+**Open (opt-in, low urgency):**
+- [ ] **`GameSessionManager` connection lifecycle** — reconnect rebind, abandon grace, pending-session eviction
+  TTL, and the run-loop `Task.Run` are covered by *neither* suite (they're entangled with `IHubContext` +
+  `Task.Run` + wall-clock timers). Regression-insurance only: the reconnect behaviour is a settled/validated
+  edge, not a suspected bug. Would need an injectable clock to unit-test the timing without real delays.
+
 ---
 
 ## Multi-Generation: Data Model & Schema
