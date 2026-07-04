@@ -27,8 +27,22 @@ export async function startBattle(page: Page, species = 'CHARIZARD', level?: num
   await card.click();
   await page.getByRole('button', { name: /CONFIRM/i }).click();
 
-  // Entry animation plays, then the action menu enables for the first turn.
+  // Biome mode (Phase 3b-2): the run opens on the route-choice modal — pick the first offered biome — before
+  // the first battle. It arrives a beat after CONFIRM (connect + emit), so wait for it. Then the entry
+  // animation plays and the action menu enables for the first turn.
+  await page.locator('.biome-card').first().click({ timeout: 15_000 });
   await expect(fightButton(page)).toBeEnabled({ timeout: 15_000 });
+}
+
+/** Answers a route-choice modal if one is up (picks the first offered biome). Returns whether it acted.
+ * The run opens on one, and one follows each Poké Center, so the play loop calls this too. */
+export async function chooseBiomeIfPresent(page: Page): Promise<boolean> {
+  const firstCard = page.locator('.biome-card').first();
+  if (await firstCard.isVisible().catch(() => false)) {
+    await firstCard.click();
+    return true;
+  }
+  return false;
 }
 
 /** Set the starter level slider (defaults to 50 if left untouched). Driven by keyboard so the React

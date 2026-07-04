@@ -161,17 +161,32 @@ Stack: React 18 + TypeScript + SignalR + Phaser 3. (Canvas & core animations don
 Suite landed (16 specs / 8 files, `npm run test:e2e`). Playwright drives the React DOM; the Phaser canvas is
 tested through the `mitt` bridge (assert **event ordering**, never wall-clock durations — the #1 flake source).
 
+**Done (2026-07-05):**
+- [x] **Seed plumbing** — `StarterSelection` forwards an optional `?seed=<int>` URL param into the `/start`
+  request (backend already accepted `Seed`), so an E2E can pin a fully deterministic run. `?e2e=1` still sets
+  test mode. react-router drops the query on nav from the title, so seeded specs land directly on `/select?seed=`.
+- [x] **Run Economy reward-modal E2E** (`reward-modal.spec.ts`) — seed 31 / CHARIZARD @ L50 lays the first
+  biome node as a **Treasure**, so the modal fires right after the opening route pick (no battle to win). Asserts
+  the modal + title, a gold line (`+N₽`) + item line, the **gold HUD credit** (was `₽0`), and OK →
+  `acknowledgeReward` → modal closes + run continues into the next node. **Closes the known live-verification
+  gap** — the reward modal + gold credit are now observed in a browser, not just unit/integration.
+- [x] **E2E harness recovered from spec-rot** — the suite was fully red: **biome mode (Phase 3b-2)** added an
+  opening route-choice modal that blocked before every battle (the `startBattle` helper didn't answer it), and
+  the **Run Economy** starting bag stopped seeding `BattleStatBoost` items. Fixed `startBattle` to pick the
+  opening biome (`chooseBiomeIfPresent`); fixed `battle.spec` (the first log line is now the biome banner, not
+  the VS line); removed the two `item-use` specs (X ATTACK / GUARD SPEC aren't battle-1 obtainable anymore — the
+  item-effect logic stays covered by `ItemEffectTests`, bag grouping by `bag.test.ts`).
+
 **Remaining:**
-- [ ] **Between-encounter modal E2Es** — deterministic via a fixed `seed` in the `start` request: Poké Center
-  recovery Heal/Skip, move-replacement forget/decline, evolution Allow/Cancel (Gen 1 B-cancel), and the **Run
-  Economy reward modal** (Treasure/Mystery OK → `acknowledgeReward`, run continues; battle-win drop = gold-HUD
-  bump + log, no modal). All share the blocking-modal shape and are unblocked by the per-run seed; each is
-  unit/integration-covered, this closes the DOM-level gap.
-  - **Known live-verification gap (Run Economy):** the gold HUD render/hydrate (`₽0`) was Puppeteer-verified, but
-    an actual **battle-win gold drop and the reward modal were not observed in a browser** — a DOM auto-player
-    couldn't reliably win a scaled battle to trigger one. Those paths rest on the unit + integration coverage
-    (`RunDirectorNodeTests`, `timeline.test.ts`). A seeded reward-modal spec here is what closes it.
+- [ ] **Inter-test E2E flakiness** — several battle-dependent specs (`stat-stage`, `level-up` column-spacing,
+  `battle-ui-cues`) pass **run alone** but flake **in-suite**: the specs share one stateful backend (serial,
+  "one in-flight battle per connection") and biome mode's extra async step widened the timing windows. Stabilise
+  by threading a fixed `seed` through these specs (now that seed plumbing exists) so their battles are
+  deterministic, and/or firming up per-test teardown. Pre-existing fragility, surfaced by the biome-mode timing.
+- [ ] **Other between-encounter modal E2Es** — still to do, same seeded/blocking-modal shape as the reward modal:
+  Poké Center recovery Heal/Skip, move-replacement forget/decline, evolution Allow/Cancel (Gen 1 B-cancel).
 - [ ] **CI step** (or `test.ps1 -StartStack`-adjacent) that boots backend + frontend, runs headless, tears down.
+  **This is why the rot went unnoticed** — E2E isn't gated in CI and `test.ps1` skips it when the stack is down.
 - [ ] `data-testid` attributes — **deferred**: specs lean on stable semantic classes (`.btn-new-game`,
   `.species-card`, `.move-btn`, `.log-line`, `.bar-fill`, `.nameplate--*`). Add testids only where a class
   proves brittle.

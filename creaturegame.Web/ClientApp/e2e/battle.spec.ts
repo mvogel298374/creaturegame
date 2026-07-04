@@ -8,7 +8,9 @@ test.describe('Battle', () => {
 
     await expect(page.locator('.nameplate--player')).toContainText('CHARIZARD');
     await expect(page.locator('.nameplate--enemy')).toBeVisible();
-    await expect(page.locator('.log-line').first()).toContainText('CHARIZARD VS');
+    // Biome mode: the first log line is now the "Entered <biome>!" banner, so the VS line is no longer
+    // first — assert it's present, not that it leads.
+    await expect(page.locator('.log-line').filter({ hasText: /CHARIZARD VS/ })).toBeVisible();
     await expect(fightButton(page)).toBeEnabled();
     await expect(page.getByRole('button', { name: /CHECK POKEMON/i })).toBeEnabled();
   });

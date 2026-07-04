@@ -31,10 +31,21 @@ export function StarterSelection() {
   const confirm = async () => {
     if (!selected) return;
     try {
+      // An optional ?seed=<int> in the URL forces the run's seed (deterministic replay / E2E); the backend
+      // otherwise picks a random one. Only a finite integer is forwarded — anything else falls through to the
+      // server's random seed.
+      const seedParam = new URLSearchParams(window.location.search).get('seed');
+      const seed = seedParam !== null && seedParam.trim() !== '' ? Number(seedParam) : NaN;
+      const body: { speciesId: number; level: number; seed?: number } = {
+        speciesId: selected.id,
+        level: levelChoice,
+      };
+      if (Number.isInteger(seed)) body.seed = seed;
+
       const res = await fetch('/api/game/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ speciesId: selected.id, level: levelChoice }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const { gameId } = await res.json() as { gameId: string };
