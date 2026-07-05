@@ -24,6 +24,20 @@ public sealed class GameSessionManager(
     // the battle — covers the JS client's automatic-reconnect policy (gives up ~30 s).
     private static readonly TimeSpan ReconnectGrace = TimeSpan.FromSeconds(40);
 
+    // Roguelite run-balance rules for the web run — the tunable "game rules" bag, separate from the Gen-1 seam
+    // (see RunRules). The XP curve is a soft level-aware ramp: ~1.5× at low levels (leveling is already brisk
+    // there under Gen-1's cheap early thresholds, so we barely nudge it — no sharp multi-level jumps) climbing
+    // to 4.5× near the cap (where the Gen-1 grind is glacial). Around the default level-50 start it lands ~3×
+    // (2.98×), so a biome (~4–6 encounters) advances the creature roughly 0.8–1.5 levels instead of a slow
+    // crawl. These two anchors are the dials (trivially exposable as sliders); provisional, expected to be
+    // retuned by playtesting. A deliberate, documented deviation from strict Gen-1 XP — see GENERATION_SEAMS.md
+    // — kept out of the Gen-1 seam (Battle scales the seam's result; the formula itself is untouched).
+    private static readonly RunRules RunTuning = new()
+    {
+        XpMultiplierEarly = 1.5,
+        XpMultiplierLate = 4.5,
+    };
+
     public string RegisterSession(
         Creature player,
         IReadOnlyList<Attack> allMoves,
@@ -136,7 +150,9 @@ public sealed class GameSessionManager(
             // now answers the Treasure/Mystery reward ack (Phase C), so those nodes run at their full core
             // distribution (no node-plan gate).
             wallet: session.Wallet,
-            rewardSupplier: EncounterFactory.BuildRewardSupplier(session.AllItems)
+            rewardSupplier: EncounterFactory.BuildRewardSupplier(session.AllItems),
+            // Roguelite run-balance rules (the level-aware XP curve, boosted above pure Gen-1) — see RunTuning.
+            runRules: RunTuning
         );
 
         _ = Task.Run(async () =>

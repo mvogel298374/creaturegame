@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { TypeBadge } from '../components/TypeBadge';
 import { BattleCanvas } from '../battle/BattleCanvas';
-import { useBattleHub, type LevelUpPanel, type MoveReplacementPrompt, type RecoveryPrompt, type EvolutionPrompt, type BiomeChoicePrompt, type RewardPrompt } from '../hooks/useBattleHub';
+import { useBattleHub, type LevelUpPanel, type MoveReplacementPrompt, type RecoveryPrompt, type EvolutionPrompt, type BiomeChoicePrompt, type RewardPrompt, type DropToast } from '../hooks/useBattleHub';
 import type { Species } from '../types/Species';
 import type { MoveInfo } from '../types/BattleEvents';
 import { formatMoveName } from '../utils/format';
@@ -18,6 +18,10 @@ function estimateHp(baseHp: number): number {
 
 type ControlView = 'menu' | 'fight' | 'bag' | 'check';
 
+// How long a battle-drop hover stays on the field before auto-dismissing (kept in sync with the CSS
+// drop-toast animation duration). ~2.8s: long enough to read the loot, short enough not to stall the run.
+const DROP_TOAST_MS = 2800;
+
 export function BattleScreen() {
   const location = useLocation();
   const nav = useNavigate();
@@ -25,7 +29,7 @@ export function BattleScreen() {
   const gameId: string | null = location.state?.gameId ?? null;
   const startLevel: number = location.state?.level ?? 50;
 
-  const { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, acknowledgeReward } = useBattleHub(gameId, startLevel);
+  const { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, acknowledgeReward, dismissDrop } = useBattleHub(gameId, startLevel);
   const [controlView, setControlView] = useState<ControlView>('menu');
   const logRef = useRef<HTMLDivElement>(null);
 
@@ -33,6 +37,14 @@ export function BattleScreen() {
     if (logRef.current)
       logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [state.log]);
+
+  // Auto-dismiss the battle-drop hover after its on-screen beat. A fresh drop replaces the state object, so
+  // this re-runs and restarts the timer; clearing on unmount/replace prevents a stale timer hiding a new toast.
+  useEffect(() => {
+    if (!state.dropToast) return;
+    const t = window.setTimeout(dismissDrop, DROP_TOAST_MS);
+    return () => window.clearTimeout(t);
+  }, [state.dropToast, dismissDrop]);
 
   // The level-up panel stays up until the player does anything — clear it on the first interaction.
   const onAnyInput = () => { if (state.levelUp) dismissLevelUp(); };
@@ -95,6 +107,8 @@ export function BattleScreen() {
         </div>
 
         {state.levelUp && <LevelUpStatPanel panel={state.levelUp} />}
+
+        {state.dropToast && <DropHover drop={state.dropToast} />}
       </div>
 
       <div className="battle-panel">
@@ -352,6 +366,30 @@ function RewardModal({ prompt, onAck }: {
           <button className="action-btn action-btn--fight" onClick={onAck}>OK</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// Battle-win drop hover: a transient floating loot popup over the field (gold + any items the win dropped),
+// like the item-pickup toasts in loot games. Purely cosmetic and non-blocking — the reducer sets it, a timer
+// in BattleScreen clears it after DROP_TOAST_MS, and the CSS floats + fades it over that same beat. It never
+// intercepts input (pointer-events: none) so it can't block the menu underneath.
+function DropHover({ drop }: { drop: DropToast }) {
+  return (
+    <div className="drop-hover" role="status" aria-label="Drop">
+      <span className="drop-hover-title">Found!</span>
+      <ul className="drop-hover-list">
+        {drop.itemNames.map((name, i) => (
+          <li key={i} className="drop-chip drop-chip--item">
+            <span className="drop-chip-icon" aria-hidden="true">✦</span>{name}
+          </li>
+        ))}
+        {drop.gold > 0 && (
+          <li className="drop-chip drop-chip--gold">
+            <span className="drop-chip-icon" aria-hidden="true">₽</span>+{drop.gold}
+          </li>
+        )}
+      </ul>
     </div>
   );
 }

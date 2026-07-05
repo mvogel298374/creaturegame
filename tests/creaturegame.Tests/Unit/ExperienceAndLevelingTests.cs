@@ -121,6 +121,87 @@ public class ExperienceAndLevelingTests
         Assert.Equal(expectedXP, player.Experience);
     }
 
+    [Theory]
+    [InlineData(1.0)] // pure Gen 1 — the default; no scaling
+    [InlineData(3.0)] // the run's roguelite XP boost
+    public async Task RunRulesXpCurve_ScalesTheGen1Award_AndTheEmittedGain(double multiplier)
+    {
+        // Charmander base experience = 64 at Lv50 → pure Gen-1 award floor(64 × 50 / 7) = 457. A flat RunRules
+        // curve (early == late) scales that result at any level (Gen-1 formula in IBattleRules stays untouched);
+        // both the applied XP and the emitted ExperienceGained must carry the SAME scaled amount so the client's
+        // bar fill matches.
+        var runRules = new RunRules
+        {
+            XpMultiplierEarly = multiplier,
+            XpMultiplierLate = multiplier,
+        };
+        int enemyBaseExp = 64;
+        int enemyLevel = 50;
+        int gen1Award = (int)Math.Floor((double)enemyBaseExp * enemyLevel / 7); // 457
+        int expectedXP = (int)Math.Round(gen1Award * multiplier, MidpointRounding.AwayFromZero);
+
+        var player = new Creature("Bulbasaur") { Level = 50 };
+        player.CalculateStats();
+        player.Attributes.Attack = 999;
+        player.Attributes.Speed = 100;
+        player.AddAttack(
+            new Attack
+            {
+                Name = "Tackle",
+                BaseDamage = 100,
+                Accuracy = 100,
+                AttackType = AttackType.Physical,
+            }
+        );
+
+        var enemy = new Creature("Charmander")
+        {
+            Level = enemyLevel,
+            SpeciesBaseExperience = enemyBaseExp,
+        };
+        enemy.CalculateStats();
+        enemy.Attributes.HP = 1;
+        enemy.Attributes.MaxHP = 1;
+        enemy.Attributes.Speed = 1;
+        enemy.AddAttack(
+            new Attack
+            {
+                Name = "Scratch",
+                BaseDamage = 40,
+                Accuracy = 100,
+                AttackType = AttackType.Physical,
+            }
+        );
+
+        var recorder = new RecordingEmitter();
+        var battle = new Battle(
+            player,
+            enemy,
+            new Gen1TypeChart(),
+            AutoSelectInput.Instance,
+            AutoSelectInput.Instance,
+            rules: AlwaysHitRules.Instance,
+            emitter: recorder,
+            runRules: runRules
+        );
+        await battle.StartFightAsync();
+
+        Assert.Equal(expectedXP, player.Experience);
+        var gain = Assert.Single(recorder.Of<ExperienceGained>());
+        Assert.Equal(expectedXP, gain.Amount);
+    }
+
+    [Fact]
+    public void Gen1XpFormula_AppliesTrainerBonus_1_5x_InsideTheFloor()
+    {
+        // Gen 1 already split wild vs trainer XP: floor(a × baseExp × level / 7), a = 1.5 for a trainer-owned
+        // foe. baseExp 100 at level 40 → wild floor(100×40/7) = 571; trainer floor(1.5×100×40/7) = 857 (the
+        // 1.5 is inside the floor, so it is NOT just 571×1.5 = 856.5 rounded — it is floor of the scaled value).
+        var rules = Gen1BattleRules.Instance;
+        Assert.Equal(571, rules.CalculateXpAwarded(100, 40, trainerOwned: false));
+        Assert.Equal(857, rules.CalculateXpAwarded(100, 40, trainerOwned: true));
+    }
+
     [Fact]
     public void XP_LevelUpTriggered_WhenThresholdReached()
     {

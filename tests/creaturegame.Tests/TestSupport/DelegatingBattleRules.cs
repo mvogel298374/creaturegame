@@ -118,8 +118,8 @@ public abstract class DelegatingBattleRules : IBattleRules
     public virtual StatusCondition CarryStatusOutOfBattle(StatusCondition status) =>
         _inner.CarryStatusOutOfBattle(status);
 
-    public virtual int CalculateXpAwarded(int baseExp, int enemyLevel) =>
-        _inner.CalculateXpAwarded(baseExp, enemyLevel);
+    public virtual int CalculateXpAwarded(int baseExp, int enemyLevel, bool trainerOwned) =>
+        _inner.CalculateXpAwarded(baseExp, enemyLevel, trainerOwned);
 
     public virtual int GetOffensiveStat(Creature a, AttackType t) => _inner.GetOffensiveStat(a, t);
 

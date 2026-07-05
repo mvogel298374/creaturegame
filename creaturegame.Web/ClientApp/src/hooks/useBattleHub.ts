@@ -13,6 +13,7 @@ export type {
   EvolutionPrompt,
   BiomeChoicePrompt,
   RewardPrompt,
+  DropToast,
 } from './battleReducer';
 
 export function useBattleHub(gameId: string | null, initialLevel = 50) {
@@ -133,5 +134,9 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
       console.error('[SignalR] AcknowledgeReward failed:', err));
   }, []);
 
-  return { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, acknowledgeReward };
+  // Clear the transient battle-drop hover. Purely local (nothing server-side blocks on it) — the view runs a
+  // timer and calls this to auto-dismiss the toast after its on-screen beat.
+  const dismissDrop = useCallback(() => dispatch({ type: 'HIDE_DROP' }), []);
+
+  return { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, acknowledgeReward, dismissDrop };
 }

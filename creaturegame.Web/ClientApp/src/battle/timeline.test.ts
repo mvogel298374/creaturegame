@@ -285,15 +285,27 @@ describe('expandEvent — control plane vs timeline', () => {
     expect(logLines(steps)).toEqual([message]);
   });
 
-  it('RewardGranted (battle drop) bumps the gold HUD + logs, but raises no modal', () => {
+  it('RewardGranted (battle drop) bumps the gold HUD, logs, and raises the inline drop hover (no modal)', () => {
     const { steps } = expandEvent('RewardGranted',
       { source: 'Battle', gold: 25, goldTotal: 25, itemNames: ['Potion'] }, CTX);
     expect(logLines(steps)).toEqual(['Found 25G, Potion!']);
     const actions = dispatched(steps);
     // HUD set to the running total…
     expect(actions).toContainEqual({ type: 'SET_GOLD', gold: 25 });
+    // …plus the transient loot hover (inline, non-blocking)…
+    expect(actions).toContainEqual({ type: 'SHOW_DROP', gold: 25, itemNames: ['Potion'] });
     // …but a battle drop is inline — no reward modal (the backend didn't block on an ack for it).
     expect(actions.map(a => a.type)).not.toContain('SHOW_REWARD');
+  });
+
+  it('RewardGranted (empty battle drop) still logs but raises no drop hover', () => {
+    const { steps } = expandEvent('RewardGranted',
+      { source: 'Battle', gold: 0, goldTotal: 12, itemNames: [] }, CTX);
+    expect(logLines(steps)).toEqual(['Found nothing this time!']);
+    const actions = dispatched(steps);
+    expect(actions).toContainEqual({ type: 'SET_GOLD', gold: 12 });
+    // Nothing actually dropped → no hover (it would be an empty popup).
+    expect(actions.map(a => a.type)).not.toContain('SHOW_DROP');
   });
 
   it('RewardGranted (Treasure node) bumps gold, logs, and raises the reward modal', () => {
@@ -305,6 +317,8 @@ describe('expandEvent — control plane vs timeline', () => {
     expect(actions).toContainEqual({
       type: 'SHOW_REWARD', source: 'Treasure', gold: 40, goldTotal: 65, itemNames: ['Full Restore'],
     });
+    // A node reward uses the blocking modal, not the inline battle-drop hover.
+    expect(actions.map(a => a.type)).not.toContain('SHOW_DROP');
   });
 
   it('RewardGranted (Mystery, nothing rolled) still bumps gold, logs, and raises the modal', () => {

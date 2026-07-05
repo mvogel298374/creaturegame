@@ -40,6 +40,13 @@ export interface RewardPrompt {
   itemNames: string[]; // display names of any items granted
 }
 
+// A transient battle-win drop hover (gold + items) floated over the field, then auto-dismissed by the view.
+// Distinct from RewardPrompt (the blocking Treasure/Mystery modal): this is inline and non-blocking.
+export interface DropToast {
+  gold: number;        // gold dropped by this win (0 if none)
+  itemNames: string[]; // display names of any items dropped
+}
+
 export interface BattleState {
   phase: 'connecting' | 'waiting' | 'choosing' | 'battling' | 'ended';
   animating: boolean;
@@ -64,6 +71,7 @@ export interface BattleState {
   evolution: EvolutionPrompt | null;
   biomeChoice: BiomeChoicePrompt | null;
   reward: RewardPrompt | null;
+  dropToast: DropToast | null;
   gold: number;
   log: LogEntry[];
   turnNumber: number;
@@ -93,6 +101,7 @@ export const initialState: BattleState = {
   evolution: null,
   biomeChoice: null,
   reward: null,
+  dropToast: null,
   gold: 0,
   log: [],
   turnNumber: 0,
@@ -200,6 +209,10 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
       };
     case 'HIDE_REWARD':
       return { ...state, reward: null };
+    case 'SHOW_DROP':
+      return { ...state, dropToast: { gold: action.gold, itemNames: action.itemNames } };
+    case 'HIDE_DROP':
+      return { ...state, dropToast: null };
     case 'ANIMATING_START':
       return { ...state, animating: true };
     case 'ANIMATING_DONE':

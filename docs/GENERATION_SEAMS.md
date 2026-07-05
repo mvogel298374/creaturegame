@@ -80,7 +80,37 @@ Things that genuinely differ generation to generation, each a member on the inte
 | **Freeze** | permanent until hit by a damaging Fire move that can burn | 20%/turn random thaw; any Fire move thaws |
 | **Burn/Poison damage** | 1/16 max HP per turn | 1/8 in Gen 6+ |
 | **Special stat** | one combined **Special** stat for both offense and defense | split into Sp. Atk / Sp. Def (Gen 2) |
-| **XP on faint** | `floor(baseExp × level / 7)` (wild) | divided by party size; trainer bonus |
+| **XP on faint** | wild `floor(baseExp × level / 7)`; **trainer-owned ×1.5** (Gen 1 already split wild vs trainer) | Gen 5+ divides among participants; the trainer ×1.5 persists |
+
+> **Roguelite XP curve (not a seam change).** The Gen-1 *wild* formula above is preserved verbatim in
+> `Gen1BattleRules.CalculateXpAwarded`. On top of it, the run layer applies a **level-aware XP multiplier** —
+> `RunRules.XpMultiplierForLevel(winnerLevel)` threaded `GameSessionManager → RunDirector → BattleRunEvent →
+> Battle` and applied to the seam's result at faint time. This is deliberate roguelite pacing, **not** a
+> generation rule: it lives in **`RunRules`** — a separate "game-balance dials" bag, explicitly *not* part of
+> `IBattleRules` (which stays a faithful Gen-1 impl) — and is a no-op (`RunRules.Default`, 1.0 at every level)
+> everywhere except the web run. The web run passes a soft, **linear-by-level** ramp between two anchors
+> (`XpMultiplierEarly = 1.5` at level 1 → `XpMultiplierLate = 4.5` at level 100): low levels — already fast
+> under Gen-1's cheap early thresholds — get only a light nudge (no sharp multi-level jumps), while the glacial
+> high-level grind gets the bigger lift, landing ~3× (2.98×) around the default level-50 start. The **design
+> target** (from the reward brief) is that a biome (~4–6 encounters) advances the creature roughly **0.8–1.5
+> levels** rather than the slow Gen-1 crawl, and — because it's level-aware — that it stays in that ballpark
+> across the picker's whole 5–100 start range. That levels-per-biome figure is a *tuning goal validated by
+> playtest*, not a pinned invariant (it also rides on species base-XP and `EncounterFactory.ScaleWildLevel`);
+> `RunRulesTests` pins the curve's *shape* (anchors/monotonicity/clamp), not the pacing outcome. The two anchors
+> are the tuning dials (trivially exposable as sliders); provisional, retune by playtest.
+>
+> The Gen-1 trainer bonus **is** modelled: Elite/Boss nodes are "trainer-analog" tiers, so `CalculateXpAwarded`
+> applies the Gen-1 trainer **×1.5** for them (`trainerOwned = true`) — a wild battle gets none. This lives in
+> the **seam** (it's genuine Gen-1 formula math, `a = 1.5`), separate from the roguelite `RunRules` curve which
+> then scales the result; the run layer only supplies the *tier → trainer-owned* fact. So a Boss win pays
+> `floor(1.5 × baseExp × level / 7)` × the level's `RunRules` multiplier.
+>
+> Two scoping notes: (1) "trainer-analog" here borrows only the Gen-1 *flee-block* and *XP-bonus* consequences
+> of trainer ownership — **not** its catch-blocking one; the Boss stays catchable by design (`ENCOUNTER_DESIGN.md`
+> Phase 4 catch channel). (2) Because Boss caps every biome and Elite is a common interior tier — both already
+> higher-level than Wild, so already the biggest base-XP contributors — the ×1.5 *stacks* on top of the
+> `RunRules` curve, pushing a typical biome (a Wild/Elite/Boss mix) to the **upper end of (or a touch above)**
+> the 0.8–1.5-levels target. That's the intended "beefier boss reward" and part of the provisional tuning.
 
 The Special-stat split is a good illustration of the seam doing its job. Rather than the
 damage formula knowing about generations, `IBattleRules` exposes **`GetOffensiveStat`**

@@ -69,6 +69,68 @@ public class RunDirectorTests
         Assert.True(player.Experience > startXp, "XP accumulates across chained encounters");
     }
 
+    // Guards the whole run-layer XP-scaling path — GameSessionManager passes its RunRules into RunDirector,
+    // which must thread it RunDirector → BattleRunEvent → Battle so the encounter's award is scaled. The
+    // Battle-level unit test pins the scaling; this pins the *plumbing* (a dropped arg anywhere in that chain
+    // would silently revert the live web run to pure Gen-1 XP while every direct-Battle test stayed green).
+    [Fact]
+    public async Task Runner_ThreadsRunRules_IntoTheEncounterBattle()
+    {
+        const double multiplier = 3.0;
+        const int enemyLevel = 5;
+        const int enemyBaseExp = 50;
+        int gen1Award = (int)Math.Floor((double)enemyBaseExp * enemyLevel / 7); // 35
+        int expected = (int)Math.Round(gen1Award * multiplier, MidpointRounding.AwayFromZero); // 105
+
+        // A flat curve (early == late) so the expected amount is level-independent — this test is about the
+        // plumbing, not the curve shape (RunRulesTests covers the level ramp).
+        var runRules = new RunRules
+        {
+            XpMultiplierEarly = multiplier,
+            XpMultiplierLate = multiplier,
+        };
+        var player = Fighter("Player", hp: 200, attack: 999, speed: 100, level: 50);
+
+        // First foe: a one-shot pushover (the win whose XP we measure). Second: a bruiser that ends the run.
+        int built = 0;
+        Func<Creature, int, BiomeDefinition?, EncounterTier, Task<Creature>> supplier = (
+            _,
+            _,
+            _,
+            _
+        ) =>
+        {
+            built++;
+            var enemy =
+                built == 1
+                    ? Fighter("Pushover", hp: 1, attack: 5, speed: 1, level: enemyLevel)
+                    : Fighter("Bruiser", hp: 999, attack: 999, speed: 999, level: 50);
+            enemy.SpeciesBaseExperience = enemyBaseExp;
+            return Task.FromResult(enemy);
+        };
+
+        var recorder = new RecordingEmitter();
+        var runner = new RunDirector(
+            player,
+            supplier,
+            Gen1TypeChart.Instance,
+            new ScriptedInput("tackle"),
+            new ScriptedInput("tackle"),
+            movePool: Array.Empty<Attack>(),
+            emitter: recorder,
+            rules: new ScriptableRules().Deterministic(),
+            rng: new SeededRandomSource(0),
+            runRules: runRules
+        );
+
+        await runner.RunAsync();
+
+        // The first win's XP award (emitted once, before any level-up) must be the SCALED amount, proving the
+        // RunRules survived every hop from the RunDirector constructor down into the Battle.
+        var firstGain = recorder.Of<ExperienceGained>().First();
+        Assert.Equal(expected, firstGain.Amount);
+    }
+
     // Load-bearing for the client: RunEnded drives the game-over screen, so it must fire ONLY on a real
     // faint — never when the run is abandoned (client disconnect cancels the input mid-fight). A cancelled
     // input throws out of RunAsync before the emit, so no RunEnded should be recorded.

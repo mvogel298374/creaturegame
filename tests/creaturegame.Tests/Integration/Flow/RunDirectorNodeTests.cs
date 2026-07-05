@@ -134,6 +134,61 @@ public class RunDirectorNodeTests
         Assert.Equal(await RollFor(4242), await RollFor(4242)); // same seed → same biome length
     }
 
+    // The tier→"trainer-owned" wiring for XP: a Boss node is a trainer-analog tier, so its win must carry the
+    // Gen-1 trainer ×1.5 bonus (proving BattleRunEvent maps the tier → Battle's trainerBattle → the seam).
+    // RunRules is left at Default (1.0) to isolate the Gen-1 factor from the roguelite curve.
+    [Fact]
+    public async Task BossBattle_AwardsGen1TrainerXpBonus_NotThePlainWildAward()
+    {
+        const int enemyLevel = 40;
+        const int enemyBaseExp = 100;
+        int wildAward = (int)Math.Floor((double)enemyBaseExp * enemyLevel / 7); // 571
+        int trainerAward = (int)Math.Floor(1.5 * enemyBaseExp * enemyLevel / 7); // 857
+
+        var solo = new BiomeDefinition("solo", "Solo", Region.Kanto, [DamageType.Normal], []);
+        var player = Fighter("Player", hp: 400, attack: 999, speed: 100, level: 50);
+
+        // Every biome is a single Boss node. First Boss is a one-shot pushover (the win we measure); the second
+        // biome's Boss is unbeatable and ends the run.
+        int built = 0;
+        Func<Creature, int, BiomeDefinition?, EncounterTier, Task<Creature>> supplier = (
+            _,
+            _,
+            _,
+            _
+        ) =>
+        {
+            built++;
+            var enemy =
+                built == 1
+                    ? Fighter("Boss", hp: 1, attack: 5, speed: 1, level: enemyLevel)
+                    : Fighter("FinalBoss", hp: 999, attack: 999, speed: 999, level: 50);
+            enemy.SpeciesBaseExperience = enemyBaseExp;
+            return Task.FromResult(enemy);
+        };
+
+        var recorder = new RecordingEmitter();
+        var runner = new RunDirector(
+            player,
+            supplier,
+            Gen1TypeChart.Instance,
+            new ScriptedInput("tackle"),
+            new ScriptedInput("tackle"),
+            movePool: Array.Empty<Attack>(),
+            emitter: recorder,
+            rules: new ScriptableRules().Deterministic(),
+            rng: new SeededRandomSource(0),
+            playableBiomes: [solo],
+            nodePlanFactory: (_, _) => [RunNodeKind.BossBattle]
+        );
+
+        await runner.RunAsync();
+
+        var firstGain = recorder.Of<ExperienceGained>().First();
+        Assert.Equal(trainerAward, firstGain.Amount);
+        Assert.NotEqual(wildAward, firstGain.Amount); // it's the trainer-boosted amount, not the wild one
+    }
+
     // Runs a solo-biome run that faints on its first battle node, so exactly one biome's route is laid out (one
     // length roll captured by nodePlanFactory). The director uses its default 4–6 length range.
     private static async Task RunUntilFirstFaint(

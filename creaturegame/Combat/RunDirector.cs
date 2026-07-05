@@ -61,7 +61,10 @@ public sealed class RunDirector
         int biomeOptionCount = 3,
         Func<int, IRandomSource, IReadOnlyList<RunNodeKind>>? nodePlanFactory = null,
         Wallet? wallet = null,
-        Func<RewardContext, IRandomSource, RunReward>? rewardSupplier = null
+        Func<RewardContext, IRandomSource, RunReward>? rewardSupplier = null,
+        // Roguelite run-balance rules passed straight through to each encounter's Battle (game-balance tuning,
+        // not a seam — see Battle's runRules / RunRules). Null keeps the legacy chain / tests on pure Gen-1 XP.
+        RunRules? runRules = null
     )
     {
         _state = new RunState(player);
@@ -100,7 +103,8 @@ public sealed class RunDirector
                 playerBag,
                 checkEvolution,
                 wallet,
-                rewardSupplier
+                rewardSupplier,
+                runRules
             );
         _battleEvent = Battle(EncounterTier.Normal);
         _eliteEvent = Battle(EncounterTier.Elite);
@@ -271,7 +275,8 @@ internal sealed class BattleRunEvent(
     Bag? playerBag,
     Func<Creature, Task<EvolutionOutcome?>>? checkEvolution,
     Wallet? wallet,
-    Func<RewardContext, IRandomSource, RunReward> rewardSupplier
+    Func<RewardContext, IRandomSource, RunReward> rewardSupplier,
+    RunRules? runRules
 ) : IRunEvent
 {
     public async Task<Outcome> RunAsync(RunContext ctx)
@@ -308,7 +313,11 @@ internal sealed class BattleRunEvent(
             playerEntryStatus: s.CarriedStatus,
             playerBag: playerBag,
             // Roar/Whirlwind escape a plain wild battle but fail vs the trainer-analog tiers (Elite/Boss).
-            escapable: tier == EncounterTier.Normal
+            escapable: tier == EncounterTier.Normal,
+            // Those same trainer-analog tiers (Elite/Boss) are "trainer-owned" for XP — the Gen-1 trainer ×1.5
+            // bonus (applied in the seam); a plain wild battle gets none.
+            trainerBattle: tier != EncounterTier.Normal,
+            runRules: runRules
         );
         await battle.StartFightAsync();
 

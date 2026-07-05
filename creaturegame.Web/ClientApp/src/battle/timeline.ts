@@ -69,7 +69,12 @@ export type Action =
   // Treasure/Mystery reward — shown then hidden by the player's OK (the backend blocks on the ack). A battle
   // drop never raises this (it's inline: HUD bump + log only).
   | { type: 'SHOW_REWARD'; source: string; gold: number; goldTotal: number; itemNames: string[] }
-  | { type: 'HIDE_REWARD' };
+  | { type: 'HIDE_REWARD' }
+  // Battle-win drop hover: a transient floating "you found …" toast (gold + items) shown over the field for a
+  // moment, then auto-dismissed by the view (non-blocking — the run keeps flowing). Battle source only;
+  // Treasure/Mystery use the blocking SHOW_REWARD modal instead.
+  | { type: 'SHOW_DROP'; gold: number; itemNames: string[] }
+  | { type: 'HIDE_DROP' };
 
 // Phaser commands sent over the mitt bridge.
 export type BridgeCommand =
@@ -343,8 +348,15 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
         d(log(rewardGrantedMsg(rSource, gold, itemNames))),
         w(300),
       ];
-      if (rSource !== 'Battle')
+      if (rSource === 'Battle') {
+        // Inline battle drop: besides the HUD bump + log line, raise a transient drop hover so the loot is
+        // visible on the field (only when something actually dropped — an empty roll stays silent). The view
+        // auto-dismisses it, so no HIDE step here — it must not block the run flowing on to the next encounter.
+        if (gold > 0 || itemNames.length > 0)
+          steps.push(d({ type: 'SHOW_DROP', gold, itemNames }));
+      } else {
         steps.push(d({ type: 'SHOW_REWARD', source: rSource, gold, goldTotal, itemNames }));
+      }
       return { steps };
     }
 

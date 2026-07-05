@@ -367,8 +367,9 @@ public interface IBattleRules
 
     /// <summary>
     /// Returns XP awarded to the winner when an enemy faints.
-    /// Gen 1 wild formula: floor(BaseExperience × EnemyLevel / 7).
-    /// Gen 5+: gain / party size; trainer battles apply 1.5× modifier.
+    /// Gen 1 formula: floor(a × BaseExperience × EnemyLevel / 7), where <paramref name="trainerOwned"/> sets
+    /// a = 1.5 (the trainer bonus, which has existed since Gen 1) vs a = 1 for a wild foe.
+    /// Gen 5+: additionally divides the gain by the number of participants.
     /// </summary>
-    int CalculateXpAwarded(int baseExp, int enemyLevel);
+    int CalculateXpAwarded(int baseExp, int enemyLevel, bool trainerOwned);
 }

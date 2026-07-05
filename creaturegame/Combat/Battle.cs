@@ -18,6 +18,8 @@ public class Battle
     private readonly CarriedStatus? _playerEntryStatus;
     private readonly Bag? _playerBag;
     private readonly bool _escapable;
+    private readonly bool _trainerBattle;
+    private readonly RunRules _runRules;
     private int _turnNumber;
 
     /// <summary>
@@ -38,7 +40,16 @@ public class Battle
         IRandomSource? rng = null,
         CarriedStatus? playerEntryStatus = null,
         Bag? playerBag = null,
-        bool escapable = true
+        bool escapable = true,
+        // True when the defeated foe is trainer-owned (the Elite/Boss "trainer-analog" tiers) — the run layer
+        // supplies this fact and the Gen-1 seam applies the trainer ×1.5 XP bonus. False (default) = a wild foe,
+        // so every direct Battle caller stays on pure wild XP.
+        bool trainerBattle = false,
+        // Roguelite run-balance rules applied on top of the Gen-1 seam (see the XP award site in the turn loop).
+        // NOT a generation seam: the Gen-1 formula stays pure in IBattleRules.CalculateXpAwarded; RunRules only
+        // scales its result so the run layer can tune levelling pace without touching Gen-1 fidelity. Null →
+        // RunRules.Default (a 1.0 no-op), so every direct Battle caller (tests, the legacy chain) is unchanged.
+        RunRules? runRules = null
     )
     {
         PlayerCreature = player;
@@ -53,6 +64,8 @@ public class Battle
         _playerEntryStatus = playerEntryStatus;
         _playerBag = playerBag;
         _escapable = escapable;
+        _trainerBattle = trainerBattle;
+        _runRules = runRules ?? RunRules.Default;
     }
 
     public async Task StartFightAsync()
@@ -184,10 +197,23 @@ public class Battle
             if (!EnemyCreature.IsAlive())
             {
                 _emitter?.Emit(new CreatureFainted(EnemyCreature.Name));
-                int xp = _rules.CalculateXpAwarded(
+                // Gen-1 base award (pure, from the seam), then the run's roguelite XP curve — a soft
+                // level-aware multiplier keyed on the winner's current level (RunRules, kept out of the seam).
+                // The emitted and applied amounts are the same scaled value, so the client's ExperienceGained
+                // matches the bar fill.
+                int baseXp = _rules.CalculateXpAwarded(
                     EnemyCreature.SpeciesBaseExperience,
-                    EnemyCreature.Level
+                    EnemyCreature.Level,
+                    _trainerBattle
                 );
+                double xpMult = _runRules.XpMultiplierForLevel(PlayerCreature.Level);
+                int xp =
+                    xpMult == 1.0
+                        ? baseXp
+                        : Math.Max(
+                            0,
+                            (int)Math.Round(baseXp * xpMult, MidpointRounding.AwayFromZero)
+                        );
                 PlayerCreature.AddExperience(xp);
                 _emitter?.Emit(new ExperienceGained(PlayerCreature.Name, xp));
                 // Gen 1 Stat Exp: the win adds the defeated foe's base stats to the player's accumulated Stat

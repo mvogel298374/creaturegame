@@ -52,6 +52,31 @@ opening-route favourable-matchup guarantee. Full per-phase record (design, pins,
 
 ---
 
+## Reward Visibility & XP Pacing  ✅ DONE (2026-07-05, pending gates + commit)
+
+Compelling-rewards pass — boost reward *amount* and *visibility*:
+
+- **XP boost (soft level-aware curve).** New **`RunRules`** — a roguelite "game-balance dials" bag kept
+  **separate from the Gen-1 `IBattleRules` seam** (which stays untouched) — carries a level-aware XP curve,
+  threaded `GameSessionManager → RunDirector → BattleRunEvent → Battle` and applied to the pure Gen-1 award
+  (`floor(baseExp × level / 7)`) at faint time. `RunRules.Default` is a 1.0 no-op (all existing callers/tests =
+  pure Gen 1); the web run passes a linear ramp `XpMultiplierEarly = 1.5` (L1) → `XpMultiplierLate = 4.5`
+  (L100). Low levels (already fast) get a light nudge — no sharp multi-level jumps — while the high-level grind
+  gets the bigger lift, ~3× (2.98×) around the default L50. Design target (from the brief): a biome (~4–6
+  encounters) ≈ **0.8–1.5 levels** across the picker's 5–100 range — a playtest-validated tuning goal, not a
+  tested invariant (`RunRulesTests` pins the curve *shape*, not the pacing outcome). The two anchors are the
+  tuning dials (slider-ready); provisional. Elite/Boss (trainer-analog tiers) get the **Gen-1 trainer ×1.5** XP
+  bonus (user-approved) — applied in the seam (`CalculateXpAwarded(…, trainerOwned)`), separate from the curve,
+  wired by tier in `BattleRunEvent`. That ×1.5 *stacks* on the curve for the (higher-XP) Elite/Boss nodes, so a
+  typical biome trends to the upper end of / slightly above the 0.8–1.5 band — intended (beefier bosses), retune
+  the anchors down if playtest wants it back in-band. See `GENERATION_SEAMS.md`.
+- **Drop hover.** Battle-win drops (the `Battle`-source `RewardGranted`) now raise a transient floating loot
+  toast (gold + items) over the field for ~2.8 s (`DROP_TOAST_MS`) — inline & non-blocking, `pointer-events:
+  none`, auto-dismissed by the view — in addition to the existing gold-HUD bump + battle-chat line. Reuses the
+  existing `RewardGranted` fields (no new wire projection). Treasure/Mystery keep their blocking modal.
+
+---
+
 ## Run Economy — Gold, Item Rewards, Transient Bag & Treasure/Mystery Nodes  ✅ DONE (2026-07-02)
 
 Phases **A** (core, generation-agnostic) + **B** (web-layer reward policy) + **C** (frontend gold HUD + reward

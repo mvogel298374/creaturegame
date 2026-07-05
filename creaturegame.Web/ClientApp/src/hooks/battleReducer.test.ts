@@ -83,6 +83,11 @@ describe('battleReducer — modal gating', () => {
     expect(shown.reward).toEqual({ source: 'Treasure', gold: 40, goldTotal: 165, itemNames: ['Potion'] });
     expect(battleReducer(shown, { type: 'HIDE_REWARD' }).reward).toBeNull();
 
+    // The inline battle-drop hover (its own slice, distinct from the reward modal above).
+    const drop = battleReducer(ready(), { type: 'SHOW_DROP', gold: 8, itemNames: ['Potion'] });
+    expect(drop.dropToast).toEqual({ gold: 8, itemNames: ['Potion'] });
+    expect(battleReducer(drop, { type: 'HIDE_DROP' }).dropToast).toBeNull();
+
     // Biome choice has no E2E coverage (no map spec), so its transitions are only pinned here.
     const opts = [{ id: 'marsh', name: 'Marsh', types: ['Ghost'] }];
     const biome = battleReducer(ready(), { type: 'SHOW_BIOME_CHOICE', options: opts });

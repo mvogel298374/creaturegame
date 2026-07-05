@@ -963,3 +963,91 @@
 .reward-buttons .action-btn {
   width: 100%;
 }
+
+/* ── Battle-win drop hover (transient loot popup) ── */
+/* Floated over the field on a battle drop, then auto-removed by BattleScreen's DROP_TOAST_MS timer. The
+   animation duration is kept in sync with that constant so it fades out just as the element unmounts.
+   pointer-events:none so it never blocks the menu/canvas beneath it. */
+.drop-hover {
+  position: absolute;
+  top: 34%;
+  left: 50%;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: drop-hover-float 2800ms ease-out forwards;
+}
+
+.drop-hover-title {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  letter-spacing: var(--ls-wide, var(--ls-normal));
+  color: #f2d75e;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
+
+.drop-hover-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.drop-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px var(--sp-sm);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--clr-text);
+  background: rgba(0, 0, 0, 0.62);
+  border: 1px solid var(--clr-text);
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+}
+
+.drop-chip--gold {
+  color: #f2d75e;
+  border-color: #e6c24a;
+}
+
+.drop-chip--item {
+  border-color: #8fd08f;
+}
+
+.drop-chip-icon {
+  color: #f2d75e;
+  text-shadow: 0 0 4px rgba(242, 215, 94, 0.6);
+}
+
+.drop-chip--item .drop-chip-icon {
+  color: #8fd08f;
+  text-shadow: 0 0 4px rgba(143, 208, 143, 0.6);
+}
+
+/* Pop in, hold while drifting up, then fade — spans the full DROP_TOAST_MS beat. */
+@keyframes drop-hover-float {
+  0%   { opacity: 0; transform: translateX(-50%) translateY(14px) scale(0.9); }
+  9%   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  78%  { opacity: 1; transform: translateX(-50%) translateY(-8px) scale(1); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-22px) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drop-hover { animation: drop-hover-fade 2800ms ease-out forwards; }
+  @keyframes drop-hover-fade {
+    0%   { opacity: 0; }
+    9%   { opacity: 1; }
+    82%  { opacity: 1; }
+    100% { opacity: 0; }
+  }
+}
