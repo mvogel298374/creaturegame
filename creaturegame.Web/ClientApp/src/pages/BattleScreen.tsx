@@ -75,11 +75,6 @@ export function BattleScreen() {
   return (
     <div className="battle-screen">
       <div className="battle-field">
-        <div className="gold-hud" aria-label={`${state.gold} gold`}>
-          <span className="gold-hud-coin" aria-hidden="true">₽</span>
-          <span className="gold-hud-amount">{state.gold}</span>
-        </div>
-
         <div className="nameplate nameplate--enemy">
           <div className="nameplate-row">
             <span className="nameplate-name">{enemyName}</span>
@@ -143,6 +138,7 @@ export function BattleScreen() {
           {controlView === 'bag' && (
             <BagMenu
               gameId={gameId}
+              gold={state.gold}
               moves={state.moves}
               onUse={handleUseItem}
               onBack={() => setControlView('menu')}
@@ -617,8 +613,9 @@ function MoveMenu({ moves, canChoose, onChoose, onBack }: {
 // The in-battle bag: fetched fresh each time it opens (quantities change as items are consumed), grouped by
 // pocket, with only battle-usable categories shown (see bag.ts). Picking an item uses it as the turn —
 // except a single-move PP restore (Ether), which first asks which move slot to refill via PpTargetPicker.
-function BagMenu({ gameId, moves, onUse, onBack }: {
+function BagMenu({ gameId, gold, moves, onUse, onBack }: {
   gameId: string | null;
+  gold: number;
   moves: MoveInfo[];
   onUse: (itemId: number, targetMoveSlot: number | null) => void;
   onBack: () => void;
@@ -658,6 +655,13 @@ function BagMenu({ gameId, moves, onUse, onBack }: {
 
   return (
     <div className="bag-menu">
+      <div className="bag-gold" aria-label={`${gold} gold`}>
+        <span className="bag-gold-label">MONEY</span>
+        <span className="bag-gold-value">
+          <span className="bag-gold-coin" aria-hidden="true">₽</span>
+          <span className="bag-gold-amount">{gold}</span>
+        </span>
+      </div>
       <div className="bag-list">
         {error && <p className="bag-error">{error}</p>}
         {!error && !items && <p className="bag-empty">Loading…</p>}

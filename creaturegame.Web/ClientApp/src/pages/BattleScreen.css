@@ -879,31 +879,42 @@
   flex-shrink: 0;
 }
 
-/* ── Gold HUD (run-scoped, top-left of the field) ── */
-.gold-hud {
-  position: absolute;
-  top: var(--sp-md);
-  left: var(--sp-md);
-  z-index: 2;
+/* ── Bag money box (run-scoped wallet, shown atop the BAG menu) ── */
+.bag-gold {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px var(--sp-sm);
-  background: rgba(0, 0, 0, 0.5);
+  justify-content: space-between;
+  flex: 0 0 auto;
+  gap: var(--sp-sm);
+  padding: var(--sp-xs) var(--sp-sm);
+  background: rgba(0, 0, 0, 0.35);
   border: 1px solid #e6c24a;
   border-radius: 4px;
+}
+
+.bag-gold-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--clr-text-sub);
+}
+
+.bag-gold-value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
   font-weight: 700;
   letter-spacing: var(--ls-normal);
 }
 
-.gold-hud-coin {
+.bag-gold-coin {
   color: #f2d75e;
   text-shadow: 0 0 4px rgba(242, 215, 94, 0.6);
 }
 
-.gold-hud-amount {
+.bag-gold-amount {
   color: var(--clr-text);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-base);
 }
 
 /* ── Treasure/Mystery reward modal ── */
