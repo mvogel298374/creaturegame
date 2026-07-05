@@ -198,6 +198,18 @@
   font-weight: 600;
 }
 
+/* Loot/reward payouts — gold (matches the ₽ coin colour). */
+.log-line--loot {
+  color: #f2d75e;
+  font-weight: 600;
+}
+
+/* Special-event banners — a nonstandard encounter (Elite/Boss) or a non-battle node (Shop/Treasure/Mystery). */
+.log-line--event {
+  color: #5cc8e0;
+  font-weight: 600;
+}
+
 /* ── Battle controls (right half) ───────────── */
 .battle-controls {
   flex: 1;
@@ -917,65 +929,7 @@
   font-size: var(--fs-base);
 }
 
-/* ── Treasure/Mystery reward modal ── */
-.reward-modal {
-  min-width: 280px;
-  max-width: 90%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  background: var(--clr-bg-deep);
-  border: 2px solid #e6c24a;
-  border-radius: 4px;
-  padding: var(--sp-md) var(--sp-lg);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6), 0 0 24px rgba(230, 194, 74, 0.25);
-}
-
-.reward-title {
-  font-size: var(--fs-base);
-  font-weight: 700;
-  letter-spacing: var(--ls-normal);
-  color: #f2d75e;
-  text-align: center;
-  margin-bottom: var(--sp-sm);
-}
-
-.reward-list {
-  list-style: none;
-  margin: 0 0 var(--sp-md);
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-}
-
-.reward-line {
-  font-size: var(--fs-sm);
-  color: var(--clr-text);
-}
-
-.reward-line--gold {
-  color: #f2d75e;
-  font-weight: 700;
-}
-
-.reward-empty {
-  font-size: var(--fs-sm);
-  color: var(--clr-text-dim, var(--clr-text));
-  text-align: center;
-  margin-bottom: var(--sp-md);
-}
-
-.reward-buttons {
-  width: 100%;
-}
-
-.reward-buttons .action-btn {
-  width: 100%;
-}
-
-/* ── Battle-win drop hover (transient loot popup) ── */
+/* ── Loot drop hover (transient reward popup) ── */
 /* Floated over the field on a battle drop, then auto-removed by BattleScreen's DROP_TOAST_MS timer. The
    animation duration is kept in sync with that constant so it fades out just as the element unmounts.
    pointer-events:none so it never blocks the menu/canvas beneath it. */

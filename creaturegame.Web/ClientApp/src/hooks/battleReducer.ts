@@ -33,17 +33,11 @@ export interface BiomeChoicePrompt {
   options: BiomeOption[];
 }
 
-export interface RewardPrompt {
-  source: string;      // the RunNodeKind name ("Treasure" / "Mystery") — battle drops never raise a modal
-  gold: number;        // gold granted by this reward (0 if none)
-  goldTotal: number;   // wallet balance after crediting (for the modal's running-total line)
-  itemNames: string[]; // display names of any items granted
-}
-
-// A transient battle-win drop hover (gold + items) floated over the field, then auto-dismissed by the view.
-// Distinct from RewardPrompt (the blocking Treasure/Mystery modal): this is inline and non-blocking.
+// A transient loot hover (gold + items) floated over the field, then auto-dismissed by the view. The single,
+// generic reward popup: every source — a battle-win drop and a Treasure/Mystery node — uses it (node rewards
+// no longer raise a blocking modal; the client auto-acks them).
 export interface DropToast {
-  gold: number;        // gold dropped by this win (0 if none)
+  gold: number;        // gold dropped by this reward (0 if none)
   itemNames: string[]; // display names of any items dropped
 }
 
@@ -70,7 +64,6 @@ export interface BattleState {
   recovery: RecoveryPrompt | null;
   evolution: EvolutionPrompt | null;
   biomeChoice: BiomeChoicePrompt | null;
-  reward: RewardPrompt | null;
   dropToast: DropToast | null;
   gold: number;
   log: LogEntry[];
@@ -100,7 +93,6 @@ export const initialState: BattleState = {
   recovery: null,
   evolution: null,
   biomeChoice: null,
-  reward: null,
   dropToast: null,
   gold: 0,
   log: [],
@@ -202,13 +194,6 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
       return { ...state, biomeChoice: null };
     case 'SET_GOLD':
       return { ...state, gold: action.gold };
-    case 'SHOW_REWARD':
-      return {
-        ...state,
-        reward: { source: action.source, gold: action.gold, goldTotal: action.goldTotal, itemNames: action.itemNames },
-      };
-    case 'HIDE_REWARD':
-      return { ...state, reward: null };
     case 'SHOW_DROP':
       return { ...state, dropToast: { gold: action.gold, itemNames: action.itemNames } };
     case 'HIDE_DROP':

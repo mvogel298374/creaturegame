@@ -18,7 +18,7 @@ const logTones = (steps: Step[] = []): (string | undefined)[] =>
 
 const kinds = (steps: Step[] = []): string[] => steps.map(s => s.kind);
 
-// The dispatched actions (control-plane), for asserting reducer actions like SET_GOLD / SHOW_REWARD.
+// The dispatched actions (control-plane), for asserting reducer actions like SET_GOLD / SHOW_DROP.
 const dispatched = (steps: Step[] = []): Action[] =>
   steps.filter((s): s is Extract<Step, { kind: 'dispatch' }> => s.kind === 'dispatch')
        .map(s => s.action);
@@ -280,25 +280,24 @@ describe('expandEvent — control plane vs timeline', () => {
     ['Shop',        'You happened upon a shop.'],
     ['Treasure',    'You found a treasure cache!'],
     ['Mystery',     'Something mysterious stirs…'],
-  ])('RunNodeEntered banners the %s node', (kind, message) => {
+  ])('RunNodeEntered banners the %s node in the event tone', (kind, message) => {
     const { steps } = expandEvent('RunNodeEntered', { kind }, CTX);
     expect(logLines(steps)).toEqual([message]);
+    // Nonstandard encounters (Elite/Boss) and non-battle nodes get the special-event colour.
+    expect(logTones(steps)).toEqual(['event']);
   });
 
-  it('RewardGranted (battle drop) bumps the gold HUD, logs, and raises the inline drop hover (no modal)', () => {
+  it('RewardGranted (battle drop) bumps the gold total, logs a loot line, and raises the drop hover', () => {
     const { steps } = expandEvent('RewardGranted',
       { source: 'Battle', gold: 25, goldTotal: 25, itemNames: ['Potion'] }, CTX);
     expect(logLines(steps)).toEqual(['Found 25G, Potion!']);
+    expect(logTones(steps)).toEqual(['loot']); // reward lines are yellow
     const actions = dispatched(steps);
-    // HUD set to the running total…
     expect(actions).toContainEqual({ type: 'SET_GOLD', gold: 25 });
-    // …plus the transient loot hover (inline, non-blocking)…
     expect(actions).toContainEqual({ type: 'SHOW_DROP', gold: 25, itemNames: ['Potion'] });
-    // …but a battle drop is inline — no reward modal (the backend didn't block on an ack for it).
-    expect(actions.map(a => a.type)).not.toContain('SHOW_REWARD');
   });
 
-  it('RewardGranted (empty battle drop) still logs but raises no drop hover', () => {
+  it('RewardGranted (empty drop) still logs but raises no drop hover', () => {
     const { steps } = expandEvent('RewardGranted',
       { source: 'Battle', gold: 0, goldTotal: 12, itemNames: [] }, CTX);
     expect(logLines(steps)).toEqual(['Found nothing this time!']);
@@ -308,28 +307,27 @@ describe('expandEvent — control plane vs timeline', () => {
     expect(actions.map(a => a.type)).not.toContain('SHOW_DROP');
   });
 
-  it('RewardGranted (Treasure node) bumps gold, logs, and raises the reward modal', () => {
+  it('RewardGranted (Treasure node) uses the SAME drop hover as a battle drop — no blocking modal', () => {
     const { steps } = expandEvent('RewardGranted',
       { source: 'Treasure', gold: 40, goldTotal: 65, itemNames: ['Full Restore'] }, CTX);
     expect(logLines(steps)).toEqual(['The treasure held 40G, Full Restore!']);
+    expect(logTones(steps)).toEqual(['loot']);
     const actions = dispatched(steps);
     expect(actions).toContainEqual({ type: 'SET_GOLD', gold: 65 });
-    expect(actions).toContainEqual({
-      type: 'SHOW_REWARD', source: 'Treasure', gold: 40, goldTotal: 65, itemNames: ['Full Restore'],
-    });
-    // A node reward uses the blocking modal, not the inline battle-drop hover.
-    expect(actions.map(a => a.type)).not.toContain('SHOW_DROP');
+    // The generic vanishing hover — the same one a battle drop raises (the OK modal is gone).
+    expect(actions).toContainEqual({ type: 'SHOW_DROP', gold: 40, itemNames: ['Full Restore'] });
+    expect(actions.map(a => a.type)).not.toContain('SHOW_REWARD');
   });
 
-  it('RewardGranted (Mystery, nothing rolled) still bumps gold, logs, and raises the modal', () => {
+  it('RewardGranted (Mystery, nothing rolled) still bumps gold and logs, but raises no hover', () => {
     const { steps } = expandEvent('RewardGranted',
       { source: 'Mystery', gold: 0, goldTotal: 10, itemNames: [] }, CTX);
     expect(logLines(steps)).toEqual(['The mystery held nothing this time!']);
     const actions = dispatched(steps);
     expect(actions).toContainEqual({ type: 'SET_GOLD', gold: 10 });
-    expect(actions).toContainEqual({
-      type: 'SHOW_REWARD', source: 'Mystery', gold: 0, goldTotal: 10, itemNames: [],
-    });
+    // An empty node reward: no hover (nothing to show), and no modal (it's gone).
+    expect(actions.map(a => a.type)).not.toContain('SHOW_DROP');
+    expect(actions.map(a => a.type)).not.toContain('SHOW_REWARD');
   });
 
   it('EvolutionOffered announces it and raises the Allow/Cancel modal (queued, blocking)', () => {

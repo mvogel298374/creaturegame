@@ -77,13 +77,7 @@ describe('battleReducer — modal gating', () => {
   });
 
   it('each show/hide pair sets then clears exactly its own slice', () => {
-    const shown = battleReducer(ready(), {
-      type: 'SHOW_REWARD', source: 'Treasure', gold: 40, goldTotal: 165, itemNames: ['Potion'],
-    });
-    expect(shown.reward).toEqual({ source: 'Treasure', gold: 40, goldTotal: 165, itemNames: ['Potion'] });
-    expect(battleReducer(shown, { type: 'HIDE_REWARD' }).reward).toBeNull();
-
-    // The inline battle-drop hover (its own slice, distinct from the reward modal above).
+    // The generic loot hover — the single reward popup for every source (battle drop + Treasure/Mystery).
     const drop = battleReducer(ready(), { type: 'SHOW_DROP', gold: 8, itemNames: ['Potion'] });
     expect(drop.dropToast).toEqual({ gold: 8, itemNames: ['Potion'] });
     expect(battleReducer(drop, { type: 'HIDE_DROP' }).dropToast).toBeNull();

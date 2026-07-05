@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { TypeBadge } from '../components/TypeBadge';
 import { BattleCanvas } from '../battle/BattleCanvas';
-import { useBattleHub, type LevelUpPanel, type MoveReplacementPrompt, type RecoveryPrompt, type EvolutionPrompt, type BiomeChoicePrompt, type RewardPrompt, type DropToast } from '../hooks/useBattleHub';
+import { useBattleHub, type LevelUpPanel, type MoveReplacementPrompt, type RecoveryPrompt, type EvolutionPrompt, type BiomeChoicePrompt, type DropToast } from '../hooks/useBattleHub';
 import type { Species } from '../types/Species';
 import type { MoveInfo } from '../types/BattleEvents';
 import { formatMoveName } from '../utils/format';
@@ -29,7 +29,7 @@ export function BattleScreen() {
   const gameId: string | null = location.state?.gameId ?? null;
   const startLevel: number = location.state?.level ?? 50;
 
-  const { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, acknowledgeReward, dismissDrop } = useBattleHub(gameId, startLevel);
+  const { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, dismissDrop } = useBattleHub(gameId, startLevel);
   const [controlView, setControlView] = useState<ControlView>('menu');
   const logRef = useRef<HTMLDivElement>(null);
 
@@ -164,10 +164,6 @@ export function BattleScreen() {
 
       {state.biomeChoice && (
         <BiomeChoiceModal prompt={state.biomeChoice} onChoose={chooseBiome} />
-      )}
-
-      {state.reward && (
-        <RewardModal prompt={state.reward} onAck={acknowledgeReward} />
       )}
 
       {state.phase === 'ended' && (
@@ -332,41 +328,7 @@ function BiomeChoiceModal({ prompt, onChoose }: {
   );
 }
 
-// Treasure/Mystery reward: a between-encounter "you found something" step. Shows the gold and any items the
-// node granted (already credited server-side) and a single OK press — that press both dismisses the modal and
-// continues the run (the backend is blocked awaiting the ack). Battle-win drops never reach here (they're
-// inline: a gold-HUD bump + a log line, no modal).
-function RewardModal({ prompt, onAck }: {
-  prompt: RewardPrompt;
-  onAck: () => void;
-}) {
-  const title = prompt.source === 'Treasure' ? 'You found treasure!' : 'A mysterious find!';
-  const emptyHanded = prompt.gold === 0 && prompt.itemNames.length === 0;
-  return (
-    <div className="modal-overlay">
-      <div className="reward-modal" role="alertdialog" aria-label="Reward">
-        <p className="reward-title">{title}</p>
-        {emptyHanded ? (
-          <p className="reward-empty">…but there was nothing inside.</p>
-        ) : (
-          <ul className="reward-list">
-            {prompt.gold > 0 && (
-              <li className="reward-line reward-line--gold">+{prompt.gold}₽</li>
-            )}
-            {prompt.itemNames.map((name, i) => (
-              <li key={i} className="reward-line reward-line--item">{name}</li>
-            ))}
-          </ul>
-        )}
-        <div className="reward-buttons">
-          <button className="action-btn action-btn--fight" onClick={onAck}>OK</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Battle-win drop hover: a transient floating loot popup over the field (gold + any items the win dropped),
+// Loot drop hover: a transient floating loot popup over the field (gold + any items the reward dropped),
 // like the item-pickup toasts in loot games. Purely cosmetic and non-blocking — the reducer sets it, a timer
 // in BattleScreen clears it after DROP_TOAST_MS, and the CSS floats + fades it over that same beat. It never
 // intercepts input (pointer-events: none) so it can't block the menu underneath.

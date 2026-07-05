@@ -21,8 +21,10 @@ export type Payload = Record<string, unknown>;
 type Side = 'player' | 'enemy';
 
 // Colour cue for a battle-log line. Drives a CSS class on the rendered line: super-effective (green),
-// not-very-effective (muted/grey), no-effect/immune (red). Undefined tone = the default neutral line.
-export type LogTone = 'super' | 'weak' | 'immune';
+// not-very-effective (muted/grey), no-effect/immune (red), loot/reward (yellow), and special-event banners —
+// a nonstandard encounter (Elite/Boss) or a non-battle node (Shop/Treasure/Mystery) — in their own accent.
+// Undefined tone = the default neutral line.
+export type LogTone = 'super' | 'weak' | 'immune' | 'loot' | 'event';
 export interface LogEntry { message: string; tone?: LogTone }
 
 // The stat totals carried by a level-up (matches the engine's StatBlock).
@@ -64,15 +66,11 @@ export type Action =
   // Biome map / route choice — shown then hidden by the player's pick (charts the next leg of the run).
   | { type: 'SHOW_BIOME_CHOICE'; options: BiomeOption[] }
   | { type: 'HIDE_BIOME_CHOICE' }
-  // Run economy: set the gold HUD to the wallet's running total (RewardGranted carries the post-credit total).
+  // Run economy: set the gold total (RewardGranted carries the post-credit total) shown in the BAG money box.
   | { type: 'SET_GOLD'; gold: number }
-  // Treasure/Mystery reward — shown then hidden by the player's OK (the backend blocks on the ack). A battle
-  // drop never raises this (it's inline: HUD bump + log only).
-  | { type: 'SHOW_REWARD'; source: string; gold: number; goldTotal: number; itemNames: string[] }
-  | { type: 'HIDE_REWARD' }
-  // Battle-win drop hover: a transient floating "you found …" toast (gold + items) shown over the field for a
-  // moment, then auto-dismissed by the view (non-blocking — the run keeps flowing). Battle source only;
-  // Treasure/Mystery use the blocking SHOW_REWARD modal instead.
+  // Loot drop hover: a transient floating "you found …" toast (gold + items) shown over the field for a
+  // moment, then auto-dismissed by the view (non-blocking — the run keeps flowing). The SAME hover for every
+  // reward source now: a battle-win drop and a Treasure/Mystery node both use it (node acks are automatic).
   | { type: 'SHOW_DROP'; gold: number; itemNames: string[] }
   | { type: 'HIDE_DROP' };
 
@@ -340,31 +338,27 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       const gold = payload.gold as number;
       const goldTotal = payload.goldTotal as number;
       const itemNames = (payload.itemNames as string[]) ?? [];
-      // Always bump the gold HUD to the wallet's running total and log the payout. Battle drops stop there
-      // (inline, non-blocking). Treasure/Mystery also raise the reward modal — the backend blocks on its ack.
+      // Every reward is inline now — a battle-win drop AND a Treasure/Mystery node use the SAME vanishing drop
+      // hover (no blocking OK modal). Bump the running total, log a yellow loot line, and (only when something
+      // actually dropped) raise the transient hover; the view auto-dismisses it, so no HIDE step — it must not
+      // block the run. Node rewards still block server-side on an ack, but useBattleHub auto-acks them so the
+      // run flows straight on, exactly like a battle drop.
       const steps: Step[] = [
         w(200),
         d({ type: 'SET_GOLD', gold: goldTotal }),
-        d(log(rewardGrantedMsg(rSource, gold, itemNames))),
+        d(log(rewardGrantedMsg(rSource, gold, itemNames), 'loot')),
         w(300),
       ];
-      if (rSource === 'Battle') {
-        // Inline battle drop: besides the HUD bump + log line, raise a transient drop hover so the loot is
-        // visible on the field (only when something actually dropped — an empty roll stays silent). The view
-        // auto-dismisses it, so no HIDE step here — it must not block the run flowing on to the next encounter.
-        if (gold > 0 || itemNames.length > 0)
-          steps.push(d({ type: 'SHOW_DROP', gold, itemNames }));
-      } else {
-        steps.push(d({ type: 'SHOW_REWARD', source: rSource, gold, goldTotal, itemNames }));
-      }
+      if (gold > 0 || itemNames.length > 0)
+        steps.push(d({ type: 'SHOW_DROP', gold, itemNames }));
       return { steps };
     }
 
     case 'RunNodeEntered': {
-      // A route node banner (Phase 3c-1 bones): Elite/Boss precede the battle stream; Shop/Treasure/Mystery
-      // are interaction bones with no behaviour yet, so the banner line is the whole node for now.
+      // A route node banner: a nonstandard encounter (Elite/Boss) or a non-battle node (Shop/Treasure/Mystery).
+      // Tone it 'event' so these stand out from the normal battle stream (a plain wild encounter has no banner).
       const kind = payload.kind as string;
-      return { steps: [w(200), d(log(runNodeBannerMsg(kind))), w(300)] };
+      return { steps: [w(200), d(log(runNodeBannerMsg(kind), 'event')), w(300)] };
     }
 
     // ── Turn events: sequenced through the animation timeline ──────────────────
