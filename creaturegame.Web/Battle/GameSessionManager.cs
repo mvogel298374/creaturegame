@@ -303,14 +303,14 @@ public sealed class GameSessionManager(
             battle.Input.SetEvolutionChoice(allow);
     }
 
-    /// <summary>Routes a Treasure/Mystery reward-modal dismissal to the battle's input.</summary>
-    public void SetRewardAck(string connectionId)
+    /// <summary>Routes a reward-choice modal pick (the chosen option index) to the battle's input.</summary>
+    public void SetRewardChoice(string connectionId, int index)
     {
         if (
             _connToGame.TryGetValue(connectionId, out var gameId)
             && _active.TryGetValue(gameId, out var battle)
         )
-            battle.Input.SetRewardAck();
+            battle.Input.SetRewardChoice(index);
     }
 
     /// <summary>The run's current gold balance for the HUD, or null if the game is unknown / not yet started.

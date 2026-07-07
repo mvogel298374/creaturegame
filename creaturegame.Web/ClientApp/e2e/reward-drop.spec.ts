@@ -1,14 +1,15 @@
 import { test, expect } from '@playwright/test';
 import { fightButton } from './helpers';
 
-// The Run Economy reward flow at a Treasure/Mystery node, driven deterministically by a fixed seed. This closes
-// the known live-verification gap: the reward + wallet credit had unit/integration coverage but were never
-// observed in a browser (a DOM auto-player couldn't reliably win a battle to trigger a drop). Seeding sidesteps
-// that — seed 31 with CHARIZARD @ L50 lays the FIRST biome node as a Treasure, so the reward fires right after
-// the opening route pick, no battle required.
+// The Run Economy reward flow at a Treasure node, driven deterministically by a fixed seed. This closes the
+// known live-verification gap: the reward + wallet credit had unit/integration coverage but were never observed
+// in a browser (a DOM auto-player couldn't reliably win a battle to trigger a drop). Seeding sidesteps that —
+// seed 31 with CHARIZARD @ L50 lays the FIRST biome node as a Treasure, so the reward fires right after the
+// opening route pick, no battle required.
 //
-// Node rewards now use the SAME vanishing loot hover as a battle drop (no blocking OK modal) — the client
-// auto-acknowledges them so the run flows straight on.
+// Every rolled reward now presents a BLOCKING pick-one-of-N choice modal (two rarity items or a gold bag); the
+// player's pick is what releases the run loop. This spec picks the gold bag (a deterministic credit) and
+// verifies it lands in the BAG money box, the drop hover, and the loot log.
 //
 // If the reward-tuning (RewardCalculator) or node-weighting (RunDirector.PickInteriorNode) changes, this seed
 // may no longer land a Treasure first — re-discover a reward-first seed and update the constant below.
@@ -26,31 +27,38 @@ async function startSeededRun(page: import('@playwright/test').Page, seed: numbe
   await page.locator('.biome-card').first().click({ timeout: 15_000 });
 }
 
-test.describe('Run Economy reward drop (Treasure node)', () => {
-  test('a Treasure node pops the vanishing loot hover (no OK modal), auto-continues, and credits the BAG', async ({ page }) => {
+test.describe('Run Economy reward choice (Treasure node)', () => {
+  test('a Treasure node pops the pick-one-of-N choice modal; taking the gold bag credits the BAG and continues', async ({ page }) => {
     test.setTimeout(60_000);
     await startSeededRun(page, REWARD_FIRST_SEED);
 
-    // No blocking OK modal anymore — the node uses the same vanishing loot hover as a battle drop.
-    await expect(page.locator('.reward-modal')).toHaveCount(0);
+    // The reward-choice modal blocks the run — it offers cards including the always-present gold bag.
+    const modal = page.locator('.reward-modal');
+    await expect(modal).toBeVisible({ timeout: 15_000 });
+    await expect(modal.locator('.reward-card')).not.toHaveCount(0);
+    const goldCard = modal.locator('.reward-card--gold');
+    await expect(goldCard).toBeVisible();
 
-    // The yellow loot line is logged and the transient drop hover pops (with its gold chip). Caught while the
-    // hover is up (it self-dismisses after ~2.8s) — assert it before waiting on the next node.
-    const lootLine = page.locator('.log-line--loot').filter({ hasText: /treasure held/i });
-    await expect(lootLine).toBeVisible({ timeout: 15_000 });
+    // Read the gold-bag amount off the card ("60₽") so we can assert it's exactly what gets credited.
+    const goldAmount = Number((await goldCard.locator('.reward-card-name').textContent())?.match(/(\d+)/)?.[1]);
+    expect(goldAmount).toBeGreaterThan(0);
+
+    // Pick the gold bag → ChooseReward releases the run loop; the modal closes and the reward is applied.
+    await goldCard.click();
+    await expect(modal).toHaveCount(0);
+
+    // The chosen reward is announced: the yellow loot line + the transient drop hover with its gold chip.
+    await expect(page.locator('.log-line--loot').filter({ hasText: new RegExp(`treasure held ${goldAmount}G`, 'i') }))
+      .toBeVisible({ timeout: 15_000 });
     await expect(page.locator('.drop-hover .drop-chip--gold')).toBeVisible();
 
-    // The credited amount, read from the (persistent) log line: "The treasure held 40G, …".
-    const granted = Number((await lootLine.textContent())?.match(/(\d+)G/)?.[1]);
-    expect(granted).toBeGreaterThan(0);
-
-    // The run flows straight on (auto-acked — no button to press) into the next node, a battle whose menu enables.
+    // The run flows on into the next node — a battle whose menu enables.
     await expect(fightButton(page)).toBeEnabled({ timeout: 20_000 });
 
-    // The credited gold lives in the BAG money box — proving the reward was credited server-side and shown
-    // where the player looks for money.
+    // The credited gold lives in the BAG money box — proving the pick was applied server-side and shown where
+    // the player looks for money.
     await page.getByRole('button', { name: /^BAG$/i }).click();
-    await expect(page.locator('.bag-gold-amount')).toHaveText(String(granted));
+    await expect(page.locator('.bag-gold-amount')).toHaveText(String(goldAmount));
     await page.getByRole('button', { name: /BACK/i }).click();
   });
 });

@@ -78,12 +78,13 @@ public class BattleHub(GameSessionManager manager) : Hub<IBattleClient>
     }
 
     /// <summary>
-    /// Dismisses a Treasure/Mystery reward modal. Mirrors <see cref="RespondRecovery"/> — fire-and-forget
-    /// completion of the input TCS the run loop is blocked on.
+    /// Answers a reward-choice modal: <paramref name="index"/> is the chosen option (item or gold bag). Mirrors
+    /// <see cref="RespondRecovery"/> — fire-and-forget completion of the input TCS the run loop is blocked on.
+    /// An out-of-range index is tolerated by the run loop (falls back to the first option).
     /// </summary>
-    public Task AcknowledgeReward()
+    public Task ChooseReward(int index)
     {
-        manager.SetRewardAck(Context.ConnectionId);
+        manager.SetRewardChoice(Context.ConnectionId, index);
         return Task.CompletedTask;
     }
 

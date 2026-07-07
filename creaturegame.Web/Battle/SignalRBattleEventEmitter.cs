@@ -119,6 +119,10 @@ public sealed class SignalRBattleEventEmitter(
                     e.ItemNames,
                 }
             ),
+            RewardChoiceOffered e => (
+                "RewardChoiceOffered",
+                new { e.Source, Options = e.Options.Select(ProjectRewardOption) }
+            ),
             ItemUsed e => ("ItemUsed", new { e.ItemName, e.TargetName }),
             PpRestored e => (
                 "PpRestored",
@@ -329,5 +333,37 @@ public sealed class SignalRBattleEventEmitter(
             MoveForgotten e => ("MoveForgotten", new { e.CreatureName, e.MoveName }),
             MoveLearnDeclined e => ("MoveLearnDeclined", new { e.CreatureName, e.MoveName }),
             _ => ("Unknown", new { }),
+        };
+
+    // Projects one reward-choice option to the wire: a discriminated "kind" plus the fields the modal card
+    // needs. An item carries its id/name/rarity (rarity colours the card); a gold bag carries its amount. Kept
+    // flat (not a nested union) so the TypeScript client reads one shape and branches on Kind.
+    private static object ProjectRewardOption(RewardOption option) =>
+        option switch
+        {
+            ItemRewardOption i => new
+            {
+                Kind = "item",
+                i.ItemId,
+                ItemName = (string?)i.ItemName,
+                Rarity = (string?)i.Rarity.ToString(),
+                Gold = 0,
+            },
+            GoldRewardOption g => new
+            {
+                Kind = "gold",
+                ItemId = 0,
+                ItemName = (string?)null,
+                Rarity = (string?)null,
+                g.Gold,
+            },
+            _ => new
+            {
+                Kind = "unknown",
+                ItemId = 0,
+                ItemName = (string?)null,
+                Rarity = (string?)null,
+                Gold = 0,
+            },
         };
 }

@@ -33,6 +33,20 @@ export interface StatBlock { maxHp: number; attack: number; defense: number; spe
 // One biome offered on the map screen: stable id, display name, and 1–3 theme types (for the card's badges).
 export interface BiomeOption { id: string; name: string; types: string[] }
 
+// A rolled item's value tier (rarer = more expensive); drives the reward-card accent colour.
+export type RewardRarity = 'Common' | 'Uncommon' | 'Rare' | 'Epic';
+
+// One option in a reward choice, flat to match the wire projection (SignalRBattleEventEmitter.ProjectRewardOption):
+// an item (kind 'item', with id/name/rarity) or a gold bag (kind 'gold', with an amount). The other fields are
+// zero/null for the branch that doesn't use them.
+export interface RewardOption {
+  kind: 'item' | 'gold';
+  itemId: number;
+  itemName: string | null;
+  rarity: RewardRarity | null;
+  gold: number;
+}
+
 // View-state actions — consumed by the reducer in useBattleHub.
 export type Action =
   | { type: 'BATTLE_STARTED'; playerName: string; enemyName: string; enemySpeciesId: number; enemyLevel: number }
@@ -66,6 +80,10 @@ export type Action =
   // Biome map / route choice — shown then hidden by the player's pick (charts the next leg of the run).
   | { type: 'SHOW_BIOME_CHOICE'; options: BiomeOption[] }
   | { type: 'HIDE_BIOME_CHOICE' }
+  // Reward choice — a pick-one-of-N (two rarity-rolled items or a gold bag) shown after a rolled reward, then
+  // hidden by the player's pick. Blocks the run server-side until ChooseReward(index) answers.
+  | { type: 'SHOW_REWARD_CHOICE'; source: string; options: RewardOption[] }
+  | { type: 'HIDE_REWARD_CHOICE' }
   // Run economy: set the gold total (RewardGranted carries the post-credit total) shown in the BAG money box.
   | { type: 'SET_GOLD'; gold: number }
   // Loot drop hover: a transient floating "you found …" toast (gold + items) shown over the field for a
@@ -331,6 +349,22 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       // The player entered a biome (or the run auto-picked one) — title the next leg of the route.
       const biomeName = payload.biomeName as string;
       return { steps: [w(200), d(log(`Entered ${biomeName}!`)), w(300)] };
+    }
+
+    case 'RewardChoiceOffered': {
+      // A rolled reward is offered as a pick-one-of-N (two rarity-rolled items or a larger gold bag). Parse the
+      // options off the wire and raise the choice modal; the run blocks server-side until ChooseReward answers
+      // (the same blocking-modal shape as the biome route choice). The chosen option is applied + announced by
+      // a following RewardGranted (the drop hover), so this arm only shows the picker.
+      const rcSource = payload.source as string;
+      const options: RewardOption[] = ((payload.options as Array<Record<string, unknown>>) ?? []).map(o => ({
+        kind: o.kind as 'item' | 'gold',
+        itemId: (o.itemId as number) ?? 0,
+        itemName: (o.itemName as string | null) ?? null,
+        rarity: (o.rarity as RewardRarity | null) ?? null,
+        gold: (o.gold as number) ?? 0,
+      }));
+      return { steps: [w(200), d({ type: 'SHOW_REWARD_CHOICE', source: rcSource, options })] };
     }
 
     case 'RewardGranted': {

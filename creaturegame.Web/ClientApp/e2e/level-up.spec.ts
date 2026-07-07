@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { fightButton, bridgeEvents, reachLog } from './helpers';
+import { fightButton, bridgeEvents, reachLog, dismissRewardChoiceIfPresent } from './helpers';
 
 // XP & Level-Up, end-to-end. Determinism is client-only: starting at the minimum level (5) makes a win or
 // two level the player quickly, so we play until the "grew to level N!" line appears, then assert the XP
@@ -20,11 +20,14 @@ test.describe('Level-up', () => {
     await expect(panel).toBeVisible();
     await expect(panel).toContainText('LEVEL UP!');
 
-    // Persist-until-input: it does NOT auto-hide — still visible after a wait...
+    // Persist-until-input: it does NOT auto-hide — still visible after a wait (the win's reward-choice modal
+    // may pop over it in the meantime; that doesn't dismiss the panel).
     await page.waitForTimeout(1200);
     await expect(panel).toBeVisible();
 
-    // ...and is dismissed by any player input (opening the FIGHT menu).
+    // A win now also offers a reward choice that covers the field — take the gold bag so the FIGHT menu
+    // underneath is reachable (the stat panel persists behind the modal), then confirm an input dismisses it.
+    await dismissRewardChoiceIfPresent(page);
     await fightButton(page).click();
     await expect(panel).toHaveCount(0);
   });

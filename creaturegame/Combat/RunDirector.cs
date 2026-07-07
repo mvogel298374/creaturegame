@@ -61,7 +61,7 @@ public sealed class RunDirector
         int biomeOptionCount = 3,
         Func<int, IRandomSource, IReadOnlyList<RunNodeKind>>? nodePlanFactory = null,
         Wallet? wallet = null,
-        Func<RewardContext, IRandomSource, RunReward>? rewardSupplier = null,
+        Func<RewardContext, IRandomSource, RewardChoice>? rewardSupplier = null,
         // Roguelite run-balance rules passed straight through to each encounter's Battle (game-balance tuning,
         // not a seam — see Battle's runRules / RunRules). Null keeps the legacy chain / tests on pure Gen-1 XP.
         RunRules? runRules = null
@@ -84,10 +84,10 @@ public sealed class RunDirector
         // director runs the legacy endless chain (no route choices), so tests/uses without biomes are unchanged.
         _biomeModeActive = playableBiomes is { Count: > 0 };
 
-        // Reward policy (drop rates, gold curve, item eligibility) is web-layer roguelite tuning, not a battle
+        // Reward policy (drop rates, rarity curve, item eligibility) is web-layer roguelite tuning, not a battle
         // seam — the core just defines the vocabulary and consumes whatever's injected. No supplier → every
-        // reward roll is RunReward.Empty, so callers without one (tests, the legacy chain) are unchanged.
-        rewardSupplier ??= (_, _) => RunReward.Empty;
+        // reward roll is RewardChoice.None, so callers without one (tests, the legacy chain) are unchanged.
+        rewardSupplier ??= (_, _) => RewardChoice.None;
 
         // The three battle nodes differ only by the EncounterTier they hand the supplier (which the web layer
         // maps to an IEnemyArchetype): WildBattle ≈ today's Medium, Elite/Boss climb. Same collaborators
@@ -275,7 +275,7 @@ internal sealed class BattleRunEvent(
     Bag? playerBag,
     Func<Creature, Task<EvolutionOutcome?>>? checkEvolution,
     Wallet? wallet,
-    Func<RewardContext, IRandomSource, RunReward> rewardSupplier,
+    Func<RewardContext, IRandomSource, RewardChoice> rewardSupplier,
     RunRules? runRules
 ) : IRunEvent
 {
@@ -334,7 +334,7 @@ internal sealed class BattleRunEvent(
         if (!player.IsAlive())
             return new BattleOutcome(false);
         s.BattlesWon++;
-        GrantBattleReward(enemy, s, ctx);
+        await GrantBattleRewardAsync(enemy, s, ctx);
 
         // Evolution check — Gen 1 attempts evolution on a level-up, so only when this battle actually raised
         // the player's level (a declined evolution re-offers at the next level-up, not every win). The battle
@@ -348,30 +348,17 @@ internal sealed class BattleRunEvent(
         return new BattleOutcome(true);
     }
 
-    // Rolls and applies this win's reward — a battle drop is inline (no ack; the gold/item bump rides the
-    // normal log), unlike the blocking Treasure/Mystery reward. Silent when nothing was rolled (RunReward.Empty
-    // is the common case — a battle win is a *chance* at a drop, not a guarantee).
-    private void GrantBattleReward(Creature enemy, RunState s, RunContext ctx)
+    // Rolls this win's reward and — if anything rolled — offers it as a pick-one-of-N choice (blocking; the
+    // client raises the modal), then applies the chosen option. Silent when nothing was rolled
+    // (RewardChoice.None is the common case for a wild win — a chance at a drop, not a guarantee; a Boss always
+    // rolls). Headless/AI inputs auto-pick option 0, so the chain never stalls.
+    private Task GrantBattleRewardAsync(Creature enemy, RunState s, RunContext ctx)
     {
-        var reward = rewardSupplier(
+        var choice = rewardSupplier(
             new RewardContext(NodeKindForTier(tier), enemy.Level, s.RunDepth),
             ctx.Rng ?? SystemRandomSource.Instance
         );
-        if (reward.Gold <= 0 && reward.Items.Count == 0)
-            return;
-
-        wallet?.Credit(reward.Gold);
-        foreach (var item in reward.Items)
-            playerBag?.Add(item.ItemId);
-
-        ctx.Emitter?.Emit(
-            new RewardGranted(
-                "Battle",
-                reward.Gold,
-                wallet?.Balance ?? reward.Gold,
-                reward.Items.Select(i => i.ItemName).ToList()
-            )
-        );
+        return RewardResolution.OfferAndApplyAsync(choice, "Battle", wallet, playerBag, ctx);
     }
 
     private static RunNodeKind NodeKindForTier(EncounterTier tier) =>
@@ -618,44 +605,77 @@ internal sealed class InteractionStubEvent(RunNodeKind kind) : IRunEvent
 }
 
 /// <summary>
-/// The Treasure/Mystery node (interaction-event): announce the node, roll and apply its reward (guaranteed for
-/// Treasure, a wildcard for Mystery — the web-layer <c>RewardCalculator</c> policy), then block on the player's
-/// acknowledgement before advancing the biome (unlike a battle-win reward, which is inline/non-blocking — these
-/// two are the "open a chest" beat the client raises a modal for). No reward supplier configured → the roll is
-/// <see cref="RunReward.Empty"/> and the ack still fires (an empty Mystery is itself a valid outcome).
+/// The Treasure/Mystery node (interaction-event): announce the node, roll its reward (guaranteed for Treasure,
+/// a wildcard for Mystery — the web-layer <c>RewardCalculator</c> policy), then offer it as a pick-one-of-N
+/// choice the player resolves before advancing the biome (the "open a chest" beat the client raises a modal
+/// for). No reward supplier configured → the roll is <see cref="RewardChoice.None"/> and the node resolves
+/// silently (an empty Mystery is itself a valid outcome).
 /// </summary>
 internal sealed class RewardRunEvent(
     RunNodeKind kind,
     Wallet? wallet,
     Bag? playerBag,
-    Func<RewardContext, IRandomSource, RunReward> rewardSupplier
+    Func<RewardContext, IRandomSource, RewardChoice> rewardSupplier
 ) : IRunEvent
 {
     public async Task<Outcome> RunAsync(RunContext ctx)
     {
         ctx.Emitter?.Emit(new RunNodeEntered(kind.ToString()));
 
-        var reward = rewardSupplier(
+        var choice = rewardSupplier(
             new RewardContext(kind, EnemyLevel: 0, ctx.State.RunDepth),
             ctx.Rng ?? SystemRandomSource.Instance
         );
-        wallet?.Credit(reward.Gold);
-        foreach (var item in reward.Items)
-            playerBag?.Add(item.ItemId);
-
-        var itemNames = reward.Items.Select(i => i.ItemName).ToList();
-        ctx.Emitter?.Emit(
-            new RewardGranted(
-                kind.ToString(),
-                reward.Gold,
-                wallet?.Balance ?? reward.Gold,
-                itemNames
-            )
-        );
-        await ctx.PlayerInput.AcknowledgeRewardAsync(
-            new RewardAckContext(kind.ToString(), reward.Gold, itemNames)
-        );
+        await RewardResolution.OfferAndApplyAsync(choice, kind.ToString(), wallet, playerBag, ctx);
 
         return new NodeVisitedOutcome(kind);
+    }
+}
+
+/// <summary>
+/// Shared reward-choice resolution used by every reward-earning node (battle win, Treasure, Mystery): if the
+/// roll produced a choice, offer it — a blocking pick-one-of-N the client raises the modal for — clamp the
+/// picked index, apply the chosen option (gold → wallet, item → bag), and announce it with a
+/// <see cref="RewardGranted"/> (so the HUD/log render exactly as before, now driven by the <em>chosen</em>
+/// option). An empty roll (<see cref="RewardChoice.None"/>) is silent. Headless / AI inputs auto-pick option 0
+/// via the <see cref="IBattleInput.ChooseRewardAsync"/> default, so a run never stalls on the modal.
+/// </summary>
+internal static class RewardResolution
+{
+    public static async Task OfferAndApplyAsync(
+        RewardChoice choice,
+        string source,
+        Wallet? wallet,
+        Bag? playerBag,
+        RunContext ctx
+    )
+    {
+        if (choice.IsEmpty)
+            return;
+
+        ctx.Emitter?.Emit(new RewardChoiceOffered(source, choice.Options));
+        int index = await ctx.PlayerInput.ChooseRewardAsync(
+            new RewardChoiceContext(source, choice.Options)
+        );
+        // Tolerate a stale / malformed pick — fall back to the first option (mirrors the biome-choice fallback),
+        // so the run is never left unresolved on an out-of-range index.
+        if (index < 0 || index >= choice.Options.Count)
+            index = 0;
+
+        int gold = 0;
+        var itemNames = new List<string>();
+        switch (choice.Options[index])
+        {
+            case GoldRewardOption g:
+                gold = g.Gold;
+                wallet?.Credit(gold);
+                break;
+            case ItemRewardOption item:
+                playerBag?.Add(item.ItemId);
+                itemNames.Add(item.ItemName);
+                break;
+        }
+
+        ctx.Emitter?.Emit(new RewardGranted(source, gold, wallet?.Balance ?? gold, itemNames));
     }
 }

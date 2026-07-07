@@ -2,7 +2,7 @@
 // it's unit-testable without React, SignalR, or a DOM (this module has only type imports, no runtime deps).
 // The hook owns the effects (the SignalR connection, the timeline driver); this owns the state transitions.
 import type { MoveInfo } from '../types/BattleEvents';
-import type { Action, StatBlock, LogEntry, BiomeOption } from '../battle/timeline';
+import type { Action, StatBlock, LogEntry, BiomeOption, RewardOption } from '../battle/timeline';
 
 export interface LevelUpPanel {
   level: number;
@@ -33,9 +33,16 @@ export interface BiomeChoicePrompt {
   options: BiomeOption[];
 }
 
-// A transient loot hover (gold + items) floated over the field, then auto-dismissed by the view. The single,
-// generic reward popup: every source — a battle-win drop and a Treasure/Mystery node — uses it (node rewards
-// no longer raise a blocking modal; the client auto-acks them).
+// A reward pick-one-of-N: the earning source (for the modal title) and the options on offer (two rarity-rolled
+// items and a gold bag by default). A blocking modal — the run waits server-side until the player picks one.
+export interface RewardChoicePrompt {
+  source: string;
+  options: RewardOption[];
+}
+
+// A transient loot hover (gold + items) floated over the field, then auto-dismissed by the view. Shows the
+// *granted* reward (the option the player picked) after the blocking pick-one-of-N choice resolves — every
+// source (a battle-win drop and a Treasure/Mystery node) funnels its RewardGranted through this same hover.
 export interface DropToast {
   gold: number;        // gold dropped by this reward (0 if none)
   itemNames: string[]; // display names of any items dropped
@@ -64,6 +71,7 @@ export interface BattleState {
   recovery: RecoveryPrompt | null;
   evolution: EvolutionPrompt | null;
   biomeChoice: BiomeChoicePrompt | null;
+  rewardChoice: RewardChoicePrompt | null;
   dropToast: DropToast | null;
   gold: number;
   log: LogEntry[];
@@ -93,6 +101,7 @@ export const initialState: BattleState = {
   recovery: null,
   evolution: null,
   biomeChoice: null,
+  rewardChoice: null,
   dropToast: null,
   gold: 0,
   log: [],
@@ -192,6 +201,10 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
       return { ...state, biomeChoice: { options: action.options } };
     case 'HIDE_BIOME_CHOICE':
       return { ...state, biomeChoice: null };
+    case 'SHOW_REWARD_CHOICE':
+      return { ...state, rewardChoice: { source: action.source, options: action.options } };
+    case 'HIDE_REWARD_CHOICE':
+      return { ...state, rewardChoice: null };
     case 'SET_GOLD':
       return { ...state, gold: action.gold };
     case 'SHOW_DROP':

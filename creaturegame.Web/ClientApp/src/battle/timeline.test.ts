@@ -319,6 +319,27 @@ describe('expandEvent — control plane vs timeline', () => {
     expect(actions.map(a => a.type)).not.toContain('SHOW_REWARD');
   });
 
+  it('RewardChoiceOffered parses the options off the wire and raises the choice modal', () => {
+    const { steps } = expandEvent('RewardChoiceOffered', {
+      source: 'Battle',
+      options: [
+        { kind: 'item', itemId: 25, itemName: 'hyper-potion', rarity: 'Rare', gold: 0 },
+        { kind: 'item', itemId: 42, itemName: 'antidote', rarity: 'Common', gold: 0 },
+        { kind: 'gold', itemId: 0, itemName: null, rarity: null, gold: 60 },
+      ],
+    }, CTX);
+    const actions = dispatched(steps);
+    expect(actions).toContainEqual({
+      type: 'SHOW_REWARD_CHOICE',
+      source: 'Battle',
+      options: [
+        { kind: 'item', itemId: 25, itemName: 'hyper-potion', rarity: 'Rare', gold: 0 },
+        { kind: 'item', itemId: 42, itemName: 'antidote', rarity: 'Common', gold: 0 },
+        { kind: 'gold', itemId: 0, itemName: null, rarity: null, gold: 60 },
+      ],
+    });
+  });
+
   it('RewardGranted (Mystery, nothing rolled) still bumps gold and logs, but raises no hover', () => {
     const { steps } = expandEvent('RewardGranted',
       { source: 'Mystery', gold: 0, goldTotal: 10, itemNames: [] }, CTX);

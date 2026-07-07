@@ -891,6 +891,102 @@
   flex-shrink: 0;
 }
 
+/* ── Reward choice (pick-one-of-N after a rolled reward) ──
+   Reuses .modal-overlay for the centred cover; a gold-accented card (loot) distinct from the sky-blue route
+   modal and green Poké Center. Two rarity-coloured item cards + a gold bag, laid out in a row. */
+.reward-modal {
+  min-width: 300px;
+  max-width: 94%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--clr-bg-deep);
+  border: 2px solid #e6c24a;
+  border-radius: 4px;
+  padding: var(--sp-md) var(--sp-lg);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6), 0 0 24px rgba(242, 215, 94, 0.22);
+}
+
+.reward-title {
+  font-size: var(--fs-base);
+  font-weight: 700;
+  letter-spacing: var(--ls-normal);
+  color: #f2d75e;
+  text-align: center;
+}
+
+.reward-sub {
+  font-size: var(--fs-sm);
+  color: var(--clr-text);
+  text-align: center;
+  margin-bottom: var(--sp-md);
+}
+
+.reward-cards {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--sp-sm);
+  width: 100%;
+}
+
+/* One offered option: a vertical card (icon → name → rarity/kind tag). Hover/focus lifts it. The rarity
+   modifier classes below tint the border + glow so the premium options read as more valuable at a glance. */
+.reward-card {
+  flex: 1 1 130px;
+  min-width: 120px;
+  max-width: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: var(--sp-md) var(--sp-sm);
+  background: var(--clr-bg);
+  border: 1px solid var(--clr-text-dim, #6b7280);
+  border-radius: 4px;
+  color: var(--clr-text);
+  cursor: pointer;
+  transition: transform 90ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+
+.reward-card:hover,
+.reward-card:focus-visible {
+  transform: translateY(-3px);
+  background: var(--clr-bg-deep);
+  outline: none;
+}
+
+.reward-card-icon { font-size: var(--fs-lg); line-height: 1; }
+.reward-card-name {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  letter-spacing: var(--ls-tight);
+  text-align: center;
+}
+.reward-card-tag {
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-normal);
+  opacity: 0.85;
+}
+
+/* Rarity accents — cheap/neutral → premium. */
+.reward-card--common   { border-color: #9aa4b2; }
+.reward-card--common:hover,   .reward-card--common:focus-visible   { box-shadow: 0 0 12px rgba(154, 164, 178, 0.4); }
+.reward-card--uncommon { border-color: #8fd08f; }
+.reward-card--uncommon:hover, .reward-card--uncommon:focus-visible { box-shadow: 0 0 12px rgba(143, 208, 143, 0.45); }
+.reward-card--rare     { border-color: var(--clr-sky); }
+.reward-card--rare:hover,     .reward-card--rare:focus-visible     { box-shadow: 0 0 14px rgba(77, 144, 213, 0.5); }
+.reward-card--epic     { border-color: #c07be0; }
+.reward-card--epic:hover,     .reward-card--epic:focus-visible     { box-shadow: 0 0 16px rgba(192, 123, 224, 0.55); }
+.reward-card--epic .reward-card-tag { color: #c07be0; }
+
+/* The gold-bag escape hatch: always offered, gold-accented like the drop chip. */
+.reward-card--gold { border-color: #e6c24a; }
+.reward-card--gold .reward-card-icon,
+.reward-card--gold .reward-card-name { color: #f2d75e; }
+.reward-card--gold:hover,
+.reward-card--gold:focus-visible { box-shadow: 0 0 14px rgba(242, 215, 94, 0.5); }
+
 /* ── Bag money box (run-scoped wallet, shown atop the BAG menu) ── */
 .bag-gold {
   display: flex;

@@ -415,13 +415,14 @@ public class RunDirectorNodeTests
         Assert.Empty(recorder.Of<RunNodeEntered>());
     }
 
-    // --- Run Economy: reward supplier wiring (battle drops inline; Treasure/Mystery block on ack) ------------
+    // --- Run Economy: reward-choice supplier wiring (every reward is a blocking pick-one-of-N) ---------------
 
     [Fact]
-    public async Task BattleWin_WithRewardSupplier_CreditsWalletAndBag_EmitsRewardGranted_NonBlocking()
+    public async Task BattleWin_WithRewardSupplier_OffersChoice_AppliesThePickedItemOption()
     {
         // Legacy chain (no biomes): one winnable battle, then an unbeatable foe ends the run so the reward
-        // supplier is exercised exactly once.
+        // supplier is exercised exactly once. The choice offers an item (index 0) and a gold bag (index 1); the
+        // scripted input picks the item, so the bag gains it and the wallet stays at 0.
         var player = Fighter("Player", hp: 200, attack: 999, speed: 100, level: 50);
         int built = 0;
         Func<Creature, int, BiomeDefinition?, EncounterTier, Task<Creature>> supplier = (
@@ -442,7 +443,7 @@ public class RunDirectorNodeTests
 
         var wallet = new Wallet();
         var bag = new Bag();
-        var input = new ScriptedInput("tackle");
+        var input = new ScriptedInput("tackle").PicksReward(0); // take the item, not the gold
         var recorder = new RecordingEmitter();
         var runner = new RunDirector(
             player,
@@ -459,27 +460,90 @@ public class RunDirectorNodeTests
             wallet: wallet,
             rewardSupplier: (ctx, _) =>
                 ctx.Source == RunNodeKind.WildBattle
-                    ? new RunReward(25, [new RewardedItem(17, "Potion")])
-                    : RunReward.Empty
+                    ? new RewardChoice([
+                        new ItemRewardOption(17, "Potion", RewardRarity.Common),
+                        new GoldRewardOption(25),
+                    ])
+                    : RewardChoice.None
         );
 
         await runner.RunAsync();
 
-        Assert.Equal(25, wallet.Balance);
+        // Picked the item → bag gains it, wallet untouched (the gold option was declined).
+        Assert.Equal(0, wallet.Balance);
         Assert.Equal(1, bag.Count(17));
+
+        // The choice was offered (Source "Battle", both options), and the chosen item announced via RewardGranted.
+        var offered = Assert.Single(input.RewardChoicesOffered);
+        Assert.Equal("Battle", offered.Source);
+        Assert.Equal(2, offered.Options.Count);
 
         var granted = Assert.Single(recorder.Of<RewardGranted>());
         Assert.Equal("Battle", granted.Source);
-        Assert.Equal(25, granted.Gold);
-        Assert.Equal(25, granted.GoldTotal);
+        Assert.Equal(0, granted.Gold); // an item was taken, not gold
         Assert.Equal(["Potion"], granted.ItemNames);
-
-        // A battle-win reward is inline, not a blocking prompt — the player input never sees an ack.
-        Assert.Empty(input.RewardAcksReceived);
     }
 
     [Fact]
-    public async Task BattleWin_NoRewardRolled_EmitsNoRewardGranted()
+    public async Task BattleWin_PickingTheGoldOption_CreditsWallet_NotTheBag()
+    {
+        var player = Fighter("Player", hp: 200, attack: 999, speed: 100, level: 50);
+        int built = 0;
+        Func<Creature, int, BiomeDefinition?, EncounterTier, Task<Creature>> supplier = (
+            _,
+            _,
+            _,
+            _
+        ) =>
+        {
+            built++;
+            var enemy =
+                built == 1
+                    ? Fighter("Push", hp: 1, attack: 1, speed: 1, level: 5)
+                    : Fighter("Bruiser", hp: 999, attack: 999, speed: 999, level: 50);
+            enemy.SpeciesBaseExperience = 50;
+            return Task.FromResult(enemy);
+        };
+
+        var wallet = new Wallet();
+        var bag = new Bag();
+        var input = new ScriptedInput("tackle").PicksReward(1); // take the gold bag, not the item
+        var recorder = new RecordingEmitter();
+        var runner = new RunDirector(
+            player,
+            supplier,
+            Gen1TypeChart.Instance,
+            input,
+            input,
+            movePool: Array.Empty<Attack>(),
+            emitter: recorder,
+            rules: new ScriptableRules().Deterministic(),
+            rng: new SeededRandomSource(0),
+            healEveryNBattles: 0,
+            playerBag: bag,
+            wallet: wallet,
+            rewardSupplier: (ctx, _) =>
+                ctx.Source == RunNodeKind.WildBattle
+                    ? new RewardChoice([
+                        new ItemRewardOption(17, "Potion", RewardRarity.Common),
+                        new GoldRewardOption(25),
+                    ])
+                    : RewardChoice.None
+        );
+
+        await runner.RunAsync();
+
+        Assert.Equal(25, wallet.Balance); // gold taken
+        Assert.Equal(0, bag.Count(17)); // item declined
+
+        var granted = Assert.Single(recorder.Of<RewardGranted>());
+        Assert.Equal(25, granted.Gold);
+        Assert.Equal(25, granted.GoldTotal);
+        Assert.Empty(granted.ItemNames);
+    }
+
+    [Fact]
+    public async Task BattleWin_NoRewardRolled_OffersNoChoice_EmitsNoRewardGranted()
     {
         var player = Fighter("Player", hp: 200, attack: 999, speed: 100, level: 50);
         Func<Creature, int, BiomeDefinition?, EncounterTier, Task<Creature>> supplier = (
@@ -489,31 +553,35 @@ public class RunDirectorNodeTests
             _
         ) => Task.FromResult(Fighter("Bruiser", hp: 999, attack: 999, speed: 999, level: 50));
 
+        var input = new ScriptedInput("tackle");
         var recorder = new RecordingEmitter();
         var runner = new RunDirector(
             player,
             supplier,
             Gen1TypeChart.Instance,
-            new ScriptedInput("tackle"),
-            new ScriptedInput("tackle"),
+            input,
+            input,
             movePool: Array.Empty<Attack>(),
             emitter: recorder,
             rules: new ScriptableRules().Deterministic(),
             rng: new SeededRandomSource(0)
-        // no wallet / rewardSupplier — defaults to RunReward.Empty
+        // no wallet / rewardSupplier — defaults to RewardChoice.None
         );
 
         await runner.RunAsync();
 
+        Assert.Empty(recorder.Of<RewardChoiceOffered>());
         Assert.Empty(recorder.Of<RewardGranted>());
+        Assert.Empty(input.RewardChoicesOffered);
     }
 
     [Fact]
-    public async Task TreasureAndMystery_RollRewards_ApplyThemAndBlockOnAck()
+    public async Task TreasureAndMystery_RollRewards_OfferChoicesAndApplyThePicks()
     {
         // A single biome, Treasure → Mystery → Boss. The Boss is unbeatable, so the run ends at it — but only
-        // AFTER the two interaction nodes ahead of it have emitted their rewards. This bounds the run to exactly
-        // one biome's worth of rewards (a pushover boss in a dead-end biome would loop forever).
+        // AFTER the two interaction nodes ahead of it have offered their rewards. This bounds the run to exactly
+        // one biome's worth of rewards (a pushover boss in a dead-end biome would loop forever). The input picks
+        // option 0 at each: the Treasure's item and the Mystery's (only) gold option.
         var solo = new BiomeDefinition("solo", "Solo", Region.Kanto, [DamageType.Normal], []);
         IReadOnlyList<RunNodeKind> plan =
         [
@@ -532,7 +600,7 @@ public class RunDirectorNodeTests
 
         var wallet = new Wallet();
         var bag = new Bag();
-        var input = new ScriptedInput("tackle");
+        var input = new ScriptedInput("tackle").PicksReward(0);
         var recorder = new RecordingEmitter();
         var runner = new RunDirector(
             player,
@@ -553,41 +621,101 @@ public class RunDirectorNodeTests
             rewardSupplier: (ctx, _) =>
                 ctx.Source switch
                 {
-                    RunNodeKind.Treasure => new RunReward(40, [new RewardedItem(1, "Master Ball")]),
-                    RunNodeKind.Mystery => new RunReward(5, []),
-                    _ => RunReward.Empty,
+                    RunNodeKind.Treasure => new RewardChoice([
+                        new ItemRewardOption(1, "Potion", RewardRarity.Common),
+                        new GoldRewardOption(40),
+                    ]),
+                    RunNodeKind.Mystery => new RewardChoice([new GoldRewardOption(5)]),
+                    _ => RewardChoice.None,
                 }
         );
 
         await runner.RunAsync();
 
-        Assert.Equal(45, wallet.Balance); // 40 (Treasure) + 5 (Mystery)
+        Assert.Equal(5, wallet.Balance); // Treasure item taken (no gold), Mystery's only option is 5 gold
         Assert.Equal(1, bag.Count(1));
 
         var granted = recorder.Of<RewardGranted>().ToList();
         Assert.Equal(2, granted.Count);
         Assert.Equal("Treasure", granted[0].Source);
-        Assert.Equal(40, granted[0].Gold);
-        Assert.Equal(40, granted[0].GoldTotal); // wallet total after this credit
-        Assert.Equal(["Master Ball"], granted[0].ItemNames);
+        Assert.Equal(0, granted[0].Gold);
+        Assert.Equal(["Potion"], granted[0].ItemNames);
         Assert.Equal("Mystery", granted[1].Source);
         Assert.Equal(5, granted[1].Gold);
-        Assert.Equal(45, granted[1].GoldTotal);
+        Assert.Equal(5, granted[1].GoldTotal);
         Assert.Empty(granted[1].ItemNames);
 
-        // Both interaction nodes blocked on the player's acknowledgement, in node order.
-        Assert.Equal(2, input.RewardAcksReceived.Count);
-        Assert.Equal("Treasure", input.RewardAcksReceived[0].Source);
-        Assert.Equal("Mystery", input.RewardAcksReceived[1].Source);
+        // Both interaction nodes offered a choice, in node order.
+        Assert.Equal(2, input.RewardChoicesOffered.Count);
+        Assert.Equal("Treasure", input.RewardChoicesOffered[0].Source);
+        Assert.Equal("Mystery", input.RewardChoicesOffered[1].Source);
+    }
+
+    [Fact]
+    public async Task RewardChoice_WithOutOfRangePick_FallsBackToTheFirstOption()
+    {
+        // A stale / malformed client index must never leave a reward unresolved: RewardResolution clamps an
+        // out-of-range pick to option 0. PicksReward(99) overshoots every choice, so the Treasure's first option
+        // (the Potion) is applied — never the gold, never nothing.
+        var solo = new BiomeDefinition("solo", "Solo", Region.Kanto, [DamageType.Normal], []);
+        IReadOnlyList<RunNodeKind> plan = [RunNodeKind.Treasure, RunNodeKind.BossBattle];
+
+        var player = Fighter("Player", hp: 300, attack: 999, speed: 100, level: 50);
+        Func<Creature, int, BiomeDefinition?, EncounterTier, Task<Creature>> supplier = (
+            _,
+            _,
+            _,
+            _
+        ) => Task.FromResult(Fighter("Bruiser", hp: 999, attack: 999, speed: 999, level: 50));
+
+        var wallet = new Wallet();
+        var bag = new Bag();
+        var input = new ScriptedInput("tackle").PicksReward(99); // overshoot — must clamp to option 0
+        var recorder = new RecordingEmitter();
+        var runner = new RunDirector(
+            player,
+            supplier,
+            Gen1TypeChart.Instance,
+            input,
+            input,
+            movePool: Array.Empty<Attack>(),
+            emitter: recorder,
+            rules: new ScriptableRules().Deterministic(),
+            rng: new SeededRandomSource(0),
+            playableBiomes: [solo],
+            minEventsPerBiome: 2,
+            maxEventsPerBiome: 2,
+            nodePlanFactory: (_, _) => plan,
+            playerBag: bag,
+            wallet: wallet,
+            rewardSupplier: (ctx, _) =>
+                ctx.Source == RunNodeKind.Treasure
+                    ? new RewardChoice([
+                        new ItemRewardOption(1, "Potion", RewardRarity.Common),
+                        new GoldRewardOption(40),
+                    ])
+                    : RewardChoice.None
+        );
+
+        await runner.RunAsync();
+
+        // Clamped to option 0: the Potion is in the bag, and the gold bag (option 1) was NOT taken.
+        Assert.Equal(1, bag.Count(1));
+        Assert.Equal(0, wallet.Balance);
+
+        var granted = Assert.Single(recorder.Of<RewardGranted>());
+        Assert.Equal("Treasure", granted.Source);
+        Assert.Equal(0, granted.Gold);
+        Assert.Equal(["Potion"], granted.ItemNames);
     }
 
     [Fact]
     public async Task TreasureAndMystery_WithAutoSelectInput_DoNotBlockHeadlessRun()
     {
-        // The default (non-interactive) input never overrides AcknowledgeRewardAsync, so a headless run
-        // (AI/tests) sails through Treasure/Mystery without stalling on the ack prompt. First biome's Boss is
-        // a pushover (the win completes the biome and reaches its Poké Center); the second biome's Boss is
-        // unbeatable, ending the run deterministically after exactly two Treasure/Mystery pairs.
+        // The default (non-interactive) input never overrides ChooseRewardAsync (auto-picks option 0), so a
+        // headless run (AI/tests) sails through Treasure/Mystery without stalling on the modal. First biome's
+        // Boss is a pushover (the win completes the biome and reaches its Poké Center); the second biome's Boss
+        // is unbeatable, ending the run deterministically after exactly two Treasure/Mystery pairs.
         var solo = new BiomeDefinition("solo", "Solo", Region.Kanto, [DamageType.Normal], []);
         IReadOnlyList<RunNodeKind> plan =
         [
@@ -630,10 +758,10 @@ public class RunDirectorNodeTests
             maxEventsPerBiome: 3,
             nodePlanFactory: (_, _) => plan,
             wallet: new Wallet(),
-            rewardSupplier: (_, _) => new RunReward(10, [])
+            rewardSupplier: (_, _) => new RewardChoice([new GoldRewardOption(10)])
         );
 
-        await runner.RunAsync(); // completes at all — no deadlock on the ack prompt — is the assertion
+        await runner.RunAsync(); // completes at all — no deadlock on the modal — is the assertion
 
         int interactionRewards = recorder
             .Of<RewardGranted>()

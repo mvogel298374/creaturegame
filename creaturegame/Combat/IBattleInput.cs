@@ -77,13 +77,14 @@ public interface IBattleInput
         Task.FromResult(context.Options[0].Id);
 
     /// <summary>
-    /// Asked after a Treasure/Mystery node's reward is rolled and applied: blocks until the player acknowledges
-    /// (dismisses the reward modal) before the run continues. Battle-win rewards are inline (no ack — the
-    /// gold/item bump rides the normal log) so this is only ever raised for the two interaction nodes. The
-    /// default is non-blocking, so automated / AI inputs never stall on it and a headless run still completes —
-    /// only the web <see cref="SignalRInput"/> blocks awaiting a real dismissal.
+    /// Asked whenever a rolled reward is offered as a pick-one-of-N choice (two rarity-rolled items or a larger
+    /// gold bag — every reward-earning node now offers one): return the index of the chosen option. Blocks the
+    /// run until the player picks. Only the interactive player input is ever consulted; the default takes option
+    /// 0 (the first item), so automated / AI inputs never stall on the modal and a headless run still auto-picks
+    /// — only the web <see cref="SignalRInput"/> blocks awaiting a real choice. An out-of-range index is clamped
+    /// to the first option downstream, so a stale / malformed pick never strands the run.
     /// </summary>
-    Task AcknowledgeRewardAsync(RewardAckContext context) => Task.CompletedTask;
+    Task<int> ChooseRewardAsync(RewardChoiceContext context) => Task.FromResult(0);
 }
 
 /// <summary>Context for a level-up move-replacement decision: who is learning, and the move on offer.</summary>
@@ -101,6 +102,7 @@ public sealed record RecoveryContext(Creature Player, int BattlesWon);
 /// (id + display name), so an input could decide based on it — the default just allows.</summary>
 public sealed record EvolutionPromptContext(Creature Player, int ToSpeciesId, string ToName);
 
-/// <summary>Context for a Treasure/Mystery reward acknowledgement: what was rolled, so an input could log or
-/// display it before dismissing — the default just returns immediately.</summary>
-public sealed record RewardAckContext(string Source, int Gold, IReadOnlyList<string> ItemNames);
+/// <summary>Context for a reward-choice offer: the earning source label (<c>"Battle"</c> / the
+/// <c>RunNodeKind</c> name) and the options on offer (two rarity-rolled items and a gold bag by default). An
+/// input picks one by index.</summary>
+public sealed record RewardChoiceContext(string Source, IReadOnlyList<RewardOption> Options);

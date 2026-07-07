@@ -13,7 +13,7 @@ public sealed class SignalRInput : IBattleInput
     private volatile TaskCompletionSource<bool>? _recoveryTcs;
     private volatile TaskCompletionSource<bool>? _evolutionTcs;
     private volatile TaskCompletionSource<string>? _biomeTcs;
-    private volatile TaskCompletionSource<bool>? _rewardAckTcs;
+    private volatile TaskCompletionSource<int>? _rewardChoiceTcs;
     private volatile bool _cancelled;
 
     // The raw request the hub completes the turn handshake with, mapped to a TurnChoice below.
@@ -194,27 +194,28 @@ public sealed class SignalRInput : IBattleInput
     }
 
     /// <summary>
-    /// Awaits the player's dismissal of a Treasure/Mystery reward modal. Same TCS handshake as the other
-    /// prompts (the hub's <c>AcknowledgeReward</c> completes it via <see cref="SetRewardAck"/>); the
-    /// <see cref="_cancelled"/> guard makes a disconnect throw rather than hang the run on the modal.
+    /// Awaits the player's reward-choice pick: the index of the chosen option (an item or the gold bag). Same
+    /// TCS handshake as the other prompts (the hub's <c>ChooseReward</c> completes it via
+    /// <see cref="SetRewardChoice"/>); the <see cref="_cancelled"/> guard makes a disconnect throw rather than
+    /// hang the run on the modal. An out-of-range index is tolerated downstream — the run loop's
+    /// <c>RewardResolution</c> falls back to the first option.
     /// </summary>
-    public async Task AcknowledgeRewardAsync(RewardAckContext context)
+    public async Task<int> ChooseRewardAsync(RewardChoiceContext context)
     {
         if (_cancelled)
             throw new OperationCanceledException("Battle input cancelled (client disconnected).");
 
-        var tcs = new TaskCompletionSource<bool>(
-            TaskCreationOptions.RunContinuationsAsynchronously
-        );
-        _rewardAckTcs = tcs;
-        await tcs.Task; // throws OperationCanceledException if Cancel() ran
-        _rewardAckTcs = null;
+        var tcs = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _rewardChoiceTcs = tcs;
+        var index = await tcs.Task; // throws OperationCanceledException if Cancel() ran
+        _rewardChoiceTcs = null;
+        return index;
     }
 
-    public void SetRewardAck()
+    public void SetRewardChoice(int index)
     {
-        var tcs = _rewardAckTcs;
-        tcs?.TrySetResult(true);
+        var tcs = _rewardChoiceTcs;
+        tcs?.TrySetResult(index);
     }
 
     /// <summary>
@@ -229,6 +230,6 @@ public sealed class SignalRInput : IBattleInput
         _recoveryTcs?.TrySetCanceled();
         _evolutionTcs?.TrySetCanceled();
         _biomeTcs?.TrySetCanceled();
-        _rewardAckTcs?.TrySetCanceled();
+        _rewardChoiceTcs?.TrySetCanceled();
     }
 }

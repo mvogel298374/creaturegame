@@ -18,6 +18,7 @@ public sealed class ScriptedInput(params string[] moveNames) : IBattleInput
     private string? _last;
     private int? _forgetSlot;
     private bool _acceptRecovery = true;
+    private int _rewardPick;
 
     /// <summary>
     /// The fixed answer to a level-up replace-move prompt: a slot index (0–3) to forget, or <c>null</c> to
@@ -58,15 +59,23 @@ public sealed class ScriptedInput(params string[] moveNames) : IBattleInput
     public Task<bool> ConfirmRecoveryAsync(RecoveryContext context) =>
         Task.FromResult(_acceptRecovery);
 
-    /// <summary>Reward acknowledgements this input has received, in order — lets a test prove a
-    /// Treasure/Mystery node actually blocked on <see cref="AcknowledgeRewardAsync"/> (and a battle-win
-    /// reward, which is inline/non-blocking, never reaches it).</summary>
-    public List<RewardAckContext> RewardAcksReceived { get; } = [];
-
-    public Task AcknowledgeRewardAsync(RewardAckContext context)
+    /// <summary>Sets which reward-choice option this input picks (the index returned by
+    /// <see cref="ChooseRewardAsync"/>); default 0 (the first option). An out-of-range pick is clamped to the
+    /// first option by the run loop, so a test can safely over-shoot.</summary>
+    public ScriptedInput PicksReward(int index)
     {
-        RewardAcksReceived.Add(context);
-        return Task.CompletedTask;
+        _rewardPick = index;
+        return this;
+    }
+
+    /// <summary>Reward-choice offers this input has received, in order — lets a test prove a reward-earning node
+    /// actually offered a pick-one-of-N (and inspect the options presented).</summary>
+    public List<RewardChoiceContext> RewardChoicesOffered { get; } = [];
+
+    public Task<int> ChooseRewardAsync(RewardChoiceContext context)
+    {
+        RewardChoicesOffered.Add(context);
+        return Task.FromResult(_rewardPick);
     }
 }
 

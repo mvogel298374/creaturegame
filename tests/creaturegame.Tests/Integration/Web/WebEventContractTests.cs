@@ -298,6 +298,40 @@ public class WebEventContractTests
         Assert.Equal(new[] { "Potion", "Ether" }, names);
     }
 
+    /// <summary>Field-level guard for the <see cref="RewardChoiceOffered"/> projection: each
+    /// <see cref="RewardOption"/> is hand-mapped by <c>ProjectRewardOption</c> into a flat discriminated shape, so
+    /// the pick-one-of-N modal's per-card fields are silently dropped (or the <c>Rarity</c> string mis-cased)
+    /// unless listed. The reflection contract test instantiates the event with an <i>empty</i> options list, so it
+    /// can't catch this — pins the sub-fields the reward modal reads and the PascalCase rarity the TS
+    /// <c>RewardRarity</c> union depends on.</summary>
+    [Fact]
+    public void RewardChoiceOffered_Projection_CarriesOptionSubFields()
+    {
+        var evt = new RewardChoiceOffered(
+            "Boss",
+            [new ItemRewardOption(15, "Full Restore", RewardRarity.Rare), new GoldRewardOption(120)]
+        );
+
+        var (type, payload) = SignalRBattleEventEmitter.MapEvent(evt);
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+        var root = doc.RootElement;
+
+        Assert.Equal("RewardChoiceOffered", type);
+        Assert.Equal("Boss", root.GetProperty("Source").GetString());
+
+        var options = root.GetProperty("Options");
+        var item = options[0];
+        Assert.Equal("item", item.GetProperty("Kind").GetString());
+        Assert.Equal(15, item.GetProperty("ItemId").GetInt32());
+        Assert.Equal("Full Restore", item.GetProperty("ItemName").GetString());
+        // PascalCase — the exact casing the TS RewardRarity union matches on to colour the card.
+        Assert.Equal("Rare", item.GetProperty("Rarity").GetString());
+
+        var gold = options[1];
+        Assert.Equal("gold", gold.GetProperty("Kind").GetString());
+        Assert.Equal(120, gold.GetProperty("Gold").GetInt32());
+    }
+
     // Concrete (non-abstract) BattleEvent subtypes — the exact set the engine can emit to the client.
     private static List<Type> ConcreteBattleEventTypes()
     {

@@ -270,8 +270,8 @@ the interaction kinds are reachable bones awaiting behaviour:**
 | Elite / Boss | loop-event | ✅ `BattleRunEvent` on `EncounterTier` Elite/Boss (3c-1); **Boss caps each biome** |
 | Rest / Poké Center | interaction-event | ✅ `RecoveryRunEvent` |
 | Shop | interaction-event | ✅ bone (`InteractionStubEvent`, 3c-1) — banner + advance; spend-gold behaviour = next follow-up |
-| Mystery / Event | interaction-event | ✅ **Run Economy** — `RewardRunEvent`: rolls a wildcard reward (gold/item/sometimes nothing), blocks on the client ack |
-| Treasure / Reward | interaction-event | ✅ **Run Economy** — `RewardRunEvent`: guaranteed gold + ≥1 item, blocks on the client ack |
+| Mystery / Event | interaction-event | ✅ **Run Economy → Reward Choice** — `RewardRunEvent`: rolls a wildcard reward (sometimes nothing), else offers a **pick-one-of-N** (`RewardChoiceOffered` → `ChooseRewardAsync`) — one item or the gold bag |
+| Treasure / Reward | interaction-event | ✅ **Run Economy → Reward Choice** — `RewardRunEvent`: always rewards; offers a **pick-one-of-N** (two rarity-rolled items or a larger gold bag) — the player takes one, never both |
 
 Each node is an **`IRunEvent` returning a typed `Outcome`** (the target abstraction in `GAME_LOOP.md §3`). The
 **biome's seeded node plan is walked by `chooseNextEvent` / `EventForNode`** — the *single* owner of sequence —
@@ -344,6 +344,7 @@ Each phase is shippable on its own and tightens the existing endless chain towar
 - **Multi-region** (Johto+) — biome sets per region; rides the multi-generation sprint.
 - **Intersection mechanics** — exact rule for how two biomes' clusters join (shared node vs. cross-edge) is a
   phase-3 detail.
-- **Currency** — ✅ done (**Run Economy**): a transient per-run `Wallet`, earned from battle-win drops and
-  Treasure/Mystery nodes (web-layer `RewardCalculator` policy). **Shop economy** (what the shop spends it on) is
-  the remaining follow-up, designed when the Shop node is fleshed out.
+- **Currency** — ✅ done (**Run Economy → Reward Choice**): a transient per-run `Wallet`, earned from battle-win
+  drops and Treasure/Mystery nodes via a **pick-one-of-N** offer (gold bag **or** one item, never both; web-layer
+  `RewardCalculator` policy). **Shop economy** (what the shop spends it on) is the remaining follow-up, designed
+  when the Shop node is fleshed out.

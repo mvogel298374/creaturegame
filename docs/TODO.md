@@ -37,6 +37,116 @@ Debt cleanup, User Documentation.
 
 ---
 
+## Reward Choice — pick-1-of-3 rarity rewards  ✅ DONE (2026-07-07, gates green — pending commit)
+
+> **Both slices done & green** — build clean, all suites pass, CSharpier clean; requirements-review and
+> pr-review both green (added a `RewardChoiceOffered` wire field-guard, Treasure/Mystery + gold-bag-rarity
+> coverage, and an out-of-range-pick clamp test). Verified live in a browser (choice modal renders with
+> rarity-coloured cards; picking the gold bag credits the BAG and the run continues).
+>
+> **Slice 1 — core + web + wire backend.** The `RewardRarity`/`RewardOption`/`RewardChoice` core vocabulary +
+> `RewardChoiceOffered` event + `IBattleInput.ChooseRewardAsync` (replaced the old `AcknowledgeRewardAsync`
+> ack); the shared `RewardResolution` offer→pick→apply→`RewardGranted` helper (every reward-earning node offers
+> a blocking pick-one-of-N); the `RewardCalculator` rewrite (rarity roll + tier/depth bias + Boss replenishment
+> skew + gold-bag option); the wire (`SignalRInput.ChooseRewardAsync`/`BattleHub.ChooseReward`/emitter
+> projection/`GameSessionManager.SetRewardChoice`).
+>
+> **Slice 2 — frontend.** The 3-card rarity-coloured `RewardChoiceModal` (reuses the biome-modal shell),
+> `SHOW_REWARD_CHOICE`/`HIDE_REWARD_CHOICE` reducer actions + `rewardChoice` state, the real `timeline.ts`
+> `RewardChoiceOffered` arm, `chooseReward(index)` hub call in `useBattleHub` (removed the dead auto-ack), and
+> CSS rarity accents. E2E: reworked `reward-drop.spec.ts` to drive the choice modal (take the gold bag); added a
+> shared `dismissRewardChoiceIfPresent` helper wired into the play loop + `startBattle` (every win now blocks on
+> the modal), which also fixed 3 specs the new blocking modal had broken.
+>
+> **⚠ Provisional tuning knobs (retune by playtest, none blocks the feature):** `BattleDropChance` (0.85 — a
+> win pops a modal ~85% of the time; may want lowering); the rarity weight tables + depth-lift; the Boss
+> category-bias weights; the gold-bag `×2 × rarityFactor` formula; whether Treasure keeps a multi-item feel.
+> **Revive** stays out of the live pool (dead loot) but its Boss category-bias arm is written and dormant —
+> auto-joins when the Catch/party layer makes Revive usable.
+
+
+
+Turns every rolled reward from a silent random grant into a **player choice of three**: two rarity-rolled
+items **or** a fatter ₽ bag. Replaces the current inverse-cost auto-drop (which over-favoured the flat 200g
+status-cure cluster — ~56% of all item drops were single-status cures) with a rarity roll where **rarer =
+more expensive**, plus agency (pick the item you want) and an escape hatch (take gold when neither item fits).
+
+**Two decisions locked with the user (2026-07-06):**
+1. **Every rolled reward** presents the modal — wild wins too, not just special/Elite/Boss nodes. The ~85%
+   `BattleDropChance` still gates *whether* a choice appears (a no-roll win stays instant), so ~15% of wild
+   wins are modal-free. ⚠ **Knob to revisit:** now that a wild win can mean a modal, we may want to *lower*
+   the wild `BattleDropChance` so the grind isn't a modal after nearly every fight — flag for playtest.
+2. **4-tier rarity, tier+depth-biased** — `Common / Uncommon / Rare / Epic`; the roll table shifts upward
+   with node `EncounterTier` (Elite/Boss) and run depth, so deep Boss nodes can offer two Rares.
+
+### The rarity model (web-layer `RewardCalculator` tuning — provisional, retuned by playtest)
+Roll a **rarity** per item option, then pick an item **uniformly within that rarity's cost band** over the
+real catalog:
+
+| Rarity | Cost band | Pool (from `items.db`) |
+|:--|:--|:--|
+| Common   | ≤ 400       | Potion(200), the 5 status cures(200), Full Heal(400) |
+| Uncommon | 401–1200    | Super Potion(700), 6 X-items/Dire Hit(1000), Ether(1200) |
+| Rare     | 1201–2500   | Hyper Potion(1500), Guard Spec(1500), Max Ether(2000), X-Defense(2000), Max Potion(2500) |
+| Epic     | > 2500      | Full Restore(3000), Elixir(3000), Max Elixir(4500) |
+
+Placeholder rarity weight tables (sum 100), lifted upward by tier + a per-depth nudge (like
+`EncounterFactory` depth-scaling): Wild `C60/U30/R9/E1` → Elite `C45/U35/R17/E3` → Boss `C30/U35/R25/E10`.
+All numbers provisional, like the existing `RewardCalculator` skew constants (tests pin *shape*, not values).
+
+### The three options
+- **Item A** — rarity-rolled.
+- **Item B** — rarity-rolled, **distinct** from A (re-roll / cross-band fallback if the rolled rarity's pool
+  can't yield a second distinct item — e.g. a tiny Epic pool).
+- **₽ Bag** — gold larger than the old passive drop (candidate: scaled to the better item option's rarity, so
+  passing up a Rare pays more). The fix for the original complaint: when both items are junk, take gold.
+
+### Boss nodes are special (user addendum, 2026-07-06)
+A Boss reward is the run's premium node — **overall better** and **skewed toward strong replenishing items**:
+- **Rarity skewed hardest** to Rare/Epic (bump Epic well up, strip most Common) so Boss options are strong
+  potions — Max Potion, Full Restore, Hyper Potion, the Elixirs — not trivia.
+- **Category bias toward replenishment** *within* the picked band: up-weight `Healing` (and `PpRestore`, and
+  `Revive` once functional) over `BattleStatBoost`, so a Boss leans max-heals/strong-potions, not X-items.
+  This is a second lever on top of rarity (rarity picks the cost tier; the category bias picks *what kind*).
+- **Better node overall:** guaranteed drop (ignore the ~85% whiff — a Boss always rewards), a fatter ₽ bag,
+  and all three options premium.
+- ⚠ **Revive caveat:** `ItemCategory.Revive` is **dead loot today** (`ItemEffects.For(Revive)` → null, blocked
+  on the party/Catch layer), so it stays out of the *live* eligible set — but the category-bias framework is
+  written so Revive **auto-joins the Boss pool** the moment it becomes usable. No hand-out of non-functional
+  Revives in the meantime.
+
+### Architecture (follows the existing seams — mirrors the biome route-choice pattern end-to-end)
+- **Core (`creaturegame.Combat`)** — gen-agnostic vocabulary only:
+  - `RewardChoice` (2 item options + 1 gold option) + `RewardOption`/rarity enum types.
+  - `RewardChoiceOffered` battle event (mirrors `BiomeChoiceOffered`). *As built:* the **pick** is announced by
+    reusing the existing `RewardGranted` event (driven by the chosen option) — no separate `RewardChosen` type,
+    mirroring how `BiomeEntered` announces a biome pick without a `BiomeChosen` event.
+  - `IBattleInput.ChooseRewardAsync(RewardChoiceContext)` → picked index; **default = index 0** so
+    headless/AI/test runs keep auto-piloting (matches `ChooseBiomeAsync`'s first-option default).
+  - The injected supplier return type shifts `RunReward` → `RewardChoice`. `BattleRunEvent.GrantBattleReward`
+    becomes a **blocking** choice event (like Treasure/Mystery already are), applying only the picked option.
+- **Web (`RewardCalculator`)** — `RollRarity(tier, depth, rng)` + band-pick + `RollRewardChoice(...)`; the
+  inverse-cost `TryPickItem` is retired (or repurposed as within-band pick). `BuildRewardSupplier` returns the
+  new type.
+- **Wire (SignalR)** — `SignalRInput.ChooseRewardAsync` TCS handshake + `BattleHub.ChooseReward(index)` +
+  **emitter projection** for the new `RewardChoiceOffered` event (the recurring *web event field-projection gap*
+  — a new event needs the `SignalRBattleEventEmitter` mapping + a field-level guard, not just the engine type).
+- **Frontend** — a 3-card choice modal (reuse the biome-choice modal shell), rarity-coloured; replaces the
+  passive drop toast for the choice case. ⚠ **Provisional pending sign-off** (frontend/node UX).
+
+### Open / to settle during build (DoR follow-ups)
+- Gold-bag sizing formula (flat multiple vs. rarity-scaled) — pick one, mark provisional.
+- Distinct-item fallback rule when a rarity pool is too small.
+- Whether Treasure (a *guaranteed* chest) offers a 3-choice too, or keeps its richer multi-item grant —
+  reconcile with `RollTreasureReward`.
+- Lower `BattleDropChance`? (see decision 1 knob).
+- **Gen-agnostic checklist** (`GENERATION_SEAMS.md §5.0`) — confirm nothing here leaks a Gen-1 assumption into
+  the core (it shouldn't: rarity/gold is run-economy tuning, all web-layer, like the existing reward policy).
+- Tests: `RewardCalculatorTests` extend to pin rarity-shape (upward bias with tier/depth, band membership,
+  distinct options, gold-bag ≥ passive), seeded reproducibility; a seeded Playwright spec for the modal.
+
+---
+
 ## Encounter Logic — Phase 4 (the only open piece)
 
 Phases 1–3 (biome model + type-filtered pool, `IEnemyArchetype` tiers + depth bands, `RunDirector` event model

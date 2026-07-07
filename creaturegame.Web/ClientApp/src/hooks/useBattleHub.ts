@@ -12,6 +12,7 @@ export type {
   RecoveryPrompt,
   EvolutionPrompt,
   BiomeChoicePrompt,
+  RewardChoicePrompt,
   DropToast,
 } from './battleReducer';
 
@@ -48,14 +49,8 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
       });
       now?.forEach(action => dispatch(action));   // control plane — immediate
       if (steps) enqueueSteps(steps);              // animated — sequenced
-
-      // A Treasure/Mystery node reward still blocks server-side awaiting an ack (the same handshake the OK modal
-      // used to answer). The client now shows the SAME non-blocking drop hover as a battle drop, so there's no
-      // button to wait on — ack immediately to release the run loop. Battle-win drops carry no ack.
-      if (eventType === 'RewardGranted' && (payload.source as string) !== 'Battle') {
-        connRef.current?.invoke('AcknowledgeReward').catch(err =>
-          console.error('[SignalR] AcknowledgeReward failed:', err));
-      }
+      // Every rolled reward now blocks server-side on a pick-one-of-N (RewardChoiceOffered → the choice modal
+      // → ChooseReward). There is no auto-ack: the player's pick is what releases the run loop.
     });
 
     // Pull the wallet balance for the gold HUD. Needed on first load and after a reconnect — events don't
@@ -133,9 +128,18 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
       console.error('[SignalR] ChooseBiome failed:', err));
   }, []);
 
+  // Answer the reward-choice modal: the chosen option index (an item or the gold bag). Hide the modal at once
+  // (the backend is blocked awaiting the pick); the resulting RewardGranted event bumps the gold HUD, logs the
+  // loot line, and raises the drop hover for the chosen reward.
+  const chooseReward = useCallback((index: number) => {
+    dispatch({ type: 'HIDE_REWARD_CHOICE' });
+    connRef.current?.invoke('ChooseReward', index).catch(err =>
+      console.error('[SignalR] ChooseReward failed:', err));
+  }, []);
+
   // Clear the transient loot hover. Purely local (nothing server-side blocks on it) — the view runs a timer
   // and calls this to auto-dismiss the toast after its on-screen beat.
   const dismissDrop = useCallback(() => dispatch({ type: 'HIDE_DROP' }), []);
 
-  return { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, dismissDrop };
+  return { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, dismissDrop };
 }

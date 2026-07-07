@@ -93,6 +93,14 @@ public record RunNodeEntered(string Kind) : BattleEvent;
 public record RewardGranted(string Source, int Gold, int GoldTotal, IReadOnlyList<string> ItemNames)
     : BattleEvent;
 
+/// <summary>A rolled reward is offered to the player as a pick-one-of-N choice (two rarity-rolled items or a
+/// larger gold bag). A blocking event — the run loop awaits the player's pick via
+/// <see cref="IBattleInput.ChooseRewardAsync"/> before applying the chosen option, so the client raises the
+/// reward-choice modal here. <paramref name="Source"/> is the earning node (<c>"Battle"</c> / the
+/// <c>RunNodeKind</c> name). The chosen option is then applied and announced by a following
+/// <see cref="RewardGranted"/>. Each <see cref="RewardOption"/> is an item (id + name + rarity) or a gold bag.</summary>
+public record RewardChoiceOffered(string Source, IReadOnlyList<RewardOption> Options) : BattleEvent;
+
 // --- Move actions ---
 public record MoveUsed(string AttackerName, string MoveName) : BattleEvent;
 

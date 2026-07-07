@@ -125,23 +125,18 @@ public sealed class EncounterFactory(
     }
 
     /// <summary>
-    /// Builds the run's reward supplier: the injected <c>Func&lt;RewardContext, IRandomSource, RunReward&gt;</c>
+    /// Builds the run's reward supplier: the injected <c>Func&lt;RewardContext, IRandomSource, RewardChoice&gt;</c>
     /// <see cref="RunDirector"/> rolls after a battle win and on Treasure/Mystery nodes. Closes over the
-    /// catalog's usable-item subset once per run and dispatches by node kind to the <see cref="RewardCalculator"/>
-    /// policy (drop rates / gold curve / item eligibility — run-layer tuning, not a battle seam).
+    /// catalog's usable-item subset once per run; <see cref="RewardCalculator.RollRewardChoice"/> dispatches by
+    /// node kind (drop rates / rarity curve / gold curve / item eligibility — run-layer tuning, not a battle
+    /// seam).
     /// </summary>
-    internal static Func<RewardContext, IRandomSource, RunReward> BuildRewardSupplier(
+    internal static Func<RewardContext, IRandomSource, RewardChoice> BuildRewardSupplier(
         IReadOnlyList<Item> allItems
     )
     {
         var usable = RewardCalculator.UsableItems(allItems);
-        return (ctx, rng) =>
-            ctx.Source switch
-            {
-                RunNodeKind.Treasure => RewardCalculator.RollTreasureReward(ctx.Depth, usable, rng),
-                RunNodeKind.Mystery => RewardCalculator.RollMysteryReward(ctx.Depth, usable, rng),
-                _ => RewardCalculator.RollBattleReward(ctx.EnemyLevel, ctx.Source, usable, rng),
-            };
+        return (ctx, rng) => RewardCalculator.RollRewardChoice(ctx, usable, rng);
     }
 
     /// <summary>

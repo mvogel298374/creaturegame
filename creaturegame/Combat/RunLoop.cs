@@ -110,15 +110,40 @@ public sealed record RunContext(
     IRandomSource? Rng
 );
 
-/// <summary>One item awarded by a reward roll — id + name pre-resolved by the supplier (the concrete web-layer
-/// <c>RewardCalculator</c>) so the core never touches the item catalog.</summary>
-public sealed record RewardedItem(int ItemId, string ItemName);
-
-/// <summary>The result of a reward roll (battle win, Treasure, Mystery): gold and/or items. <see cref="Empty"/>
-/// is nothing rolled (e.g. the ~15% no-drop chance on a battle win).</summary>
-public sealed record RunReward(int Gold, IReadOnlyList<RewardedItem> Items)
+/// <summary>How valuable a rolled item reward is — Common is cheap/frequent, Epic is the premium tier
+/// (<em>rarer = more expensive</em>; the web-layer <c>RewardCalculator</c> maps item cost → rarity, and skews
+/// the roll upward with node tier + run depth). Run-economy vocabulary, generation-agnostic; carried on an
+/// <see cref="ItemRewardOption"/> so the client can colour the choice card.</summary>
+public enum RewardRarity
 {
-    public static readonly RunReward Empty = new(0, []);
+    Common,
+    Uncommon,
+    Rare,
+    Epic,
+}
+
+/// <summary>One selectable option in a post-reward pick-one-of-N choice: either a specific item (with its
+/// rolled rarity) or a gold bag. Ids/names/amounts are pre-resolved by the injected reward supplier (the
+/// concrete web-layer <c>RewardCalculator</c>) so the core never touches the item catalog.</summary>
+public abstract record RewardOption;
+
+/// <summary>An item option: the resolved item id + display name and the rarity it rolled at.</summary>
+public sealed record ItemRewardOption(int ItemId, string ItemName, RewardRarity Rarity)
+    : RewardOption;
+
+/// <summary>A gold-bag option — take this many ₽ instead of an item (the escape hatch when neither offered
+/// item is useful).</summary>
+public sealed record GoldRewardOption(int Gold) : RewardOption;
+
+/// <summary>A rolled reward offered to the player as a pick-one-of-N choice (two rarity-rolled items and a
+/// gold bag by default). <see cref="None"/> means nothing rolled (e.g. the ~15% no-drop on a wild win) — no
+/// choice is offered. The player picks exactly one option, which is then applied and announced by a following
+/// <see cref="RewardGranted"/>.</summary>
+public sealed record RewardChoice(IReadOnlyList<RewardOption> Options)
+{
+    public static readonly RewardChoice None = new([]);
+
+    public bool IsEmpty => Options.Count == 0;
 }
 
 /// <summary>What a reward roll needs to know about the moment it fires, handed to the injected reward supplier

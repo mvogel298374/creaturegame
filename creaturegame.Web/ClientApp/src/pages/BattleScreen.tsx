@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { TypeBadge } from '../components/TypeBadge';
 import { BattleCanvas } from '../battle/BattleCanvas';
-import { useBattleHub, type LevelUpPanel, type MoveReplacementPrompt, type RecoveryPrompt, type EvolutionPrompt, type BiomeChoicePrompt, type DropToast } from '../hooks/useBattleHub';
+import { useBattleHub, type LevelUpPanel, type MoveReplacementPrompt, type RecoveryPrompt, type EvolutionPrompt, type BiomeChoicePrompt, type RewardChoicePrompt, type DropToast } from '../hooks/useBattleHub';
 import type { Species } from '../types/Species';
 import type { MoveInfo } from '../types/BattleEvents';
 import { formatMoveName } from '../utils/format';
@@ -29,7 +29,7 @@ export function BattleScreen() {
   const gameId: string | null = location.state?.gameId ?? null;
   const startLevel: number = location.state?.level ?? 50;
 
-  const { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, dismissDrop } = useBattleHub(gameId, startLevel);
+  const { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, dismissDrop } = useBattleHub(gameId, startLevel);
   const [controlView, setControlView] = useState<ControlView>('menu');
   const logRef = useRef<HTMLDivElement>(null);
 
@@ -164,6 +164,10 @@ export function BattleScreen() {
 
       {state.biomeChoice && (
         <BiomeChoiceModal prompt={state.biomeChoice} onChoose={chooseBiome} />
+      )}
+
+      {state.rewardChoice && (
+        <RewardChoiceModal prompt={state.rewardChoice} onChoose={chooseReward} />
       )}
 
       {state.phase === 'ended' && (
@@ -320,6 +324,51 @@ function BiomeChoiceModal({ prompt, onChoose }: {
                   <TypeBadge key={t} type={t} size="sm" />
                 ))}
               </span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Reward choice: a pick-one-of-N shown after a rolled reward — two rarity-coloured item cards and a gold bag.
+// One click picks that option (the backend is blocked awaiting the pick) and the chosen reward is then applied
+// + announced by the drop hover. A required choice: the run always offers at least the gold bag, so there is
+// no empty/decline state.
+function RewardChoiceModal({ prompt, onChoose }: {
+  prompt: RewardChoicePrompt;
+  onChoose: (index: number) => void;
+}) {
+  return (
+    <div className="modal-overlay">
+      <div className="reward-modal" role="alertdialog" aria-label="Choose your reward">
+        <p className="reward-title">Choose your reward</p>
+        <p className="reward-sub">Pick one — the rest are left behind.</p>
+        <div className="reward-cards">
+          {prompt.options.map((option, i) => (
+            <button
+              key={i}
+              className={
+                option.kind === 'gold'
+                  ? 'reward-card reward-card--gold'
+                  : `reward-card reward-card--item reward-card--${(option.rarity ?? 'Common').toLowerCase()}`
+              }
+              onClick={() => onChoose(i)}
+            >
+              {option.kind === 'gold' ? (
+                <>
+                  <span className="reward-card-icon" aria-hidden="true">₽</span>
+                  <span className="reward-card-name">{option.gold}₽</span>
+                  <span className="reward-card-tag">GOLD BAG</span>
+                </>
+              ) : (
+                <>
+                  <span className="reward-card-icon" aria-hidden="true">✦</span>
+                  <span className="reward-card-name">{formatItemName(option.itemName ?? '')}</span>
+                  <span className="reward-card-tag">{(option.rarity ?? 'Common').toUpperCase()}</span>
+                </>
+              )}
             </button>
           ))}
         </div>

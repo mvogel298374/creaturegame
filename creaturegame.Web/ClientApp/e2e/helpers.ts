@@ -29,9 +29,13 @@ export async function startBattle(page: Page, species = 'CHARIZARD', level?: num
 
   // Biome mode (Phase 3b-2): the run opens on the route-choice modal — pick the first offered biome — before
   // the first battle. It arrives a beat after CONFIRM (connect + emit), so wait for it. Then the entry
-  // animation plays and the action menu enables for the first turn.
+  // animation plays and the action menu enables for the first turn — unless the first node is a reward node
+  // (Treasure/Mystery), whose choice modal blocks first, so clear that before waiting on the fight menu.
   await page.locator('.biome-card').first().click({ timeout: 15_000 });
-  await expect(fightButton(page)).toBeEnabled({ timeout: 15_000 });
+  await expect(async () => {
+    await dismissRewardChoiceIfPresent(page);
+    expect(await fightButton(page).isEnabled().catch(() => false)).toBe(true);
+  }).toPass({ timeout: 20_000 });
 }
 
 /** Answers a route-choice modal if one is up (picks the first offered biome). Returns whether it acted.
@@ -40,6 +44,18 @@ export async function chooseBiomeIfPresent(page: Page): Promise<boolean> {
   const firstCard = page.locator('.biome-card').first();
   if (await firstCard.isVisible().catch(() => false)) {
     await firstCard.click();
+    return true;
+  }
+  return false;
+}
+
+/** Answers a reward-choice modal if one is up by taking the gold bag (always offered, so a deterministic
+ * pick). Every rolled reward — a battle win, a Treasure/Mystery node — now blocks on this pick-one-of-N until
+ * answered, so the play loop and startBattle both clear it to keep the run flowing. Returns whether it acted. */
+export async function dismissRewardChoiceIfPresent(page: Page): Promise<boolean> {
+  const goldCard = page.locator('.reward-card--gold').first();
+  if (await goldCard.isVisible().catch(() => false)) {
+    await goldCard.click();
     return true;
   }
   return false;
@@ -107,6 +123,9 @@ async function attackUntil(
 ): Promise<string[]> {
   for (let i = 0; i < maxTurns; i++) {
     if (done(await logLines(page))) break;
+    // A battle win (and a Treasure/Mystery node) now blocks on a reward-choice modal — take the gold bag to
+    // release the run loop so the chain continues to the next encounter.
+    await dismissRewardChoiceIfPresent(page);
     if (await fightButton(page).isEnabled().catch(() => false)) {
       // A turn/battle can end mid-choice (the move we picked is lethal); the click on the
       // now-disabled button then fails — swallow it and let the next iteration re-check.
