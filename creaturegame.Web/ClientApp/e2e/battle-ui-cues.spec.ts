@@ -14,8 +14,10 @@ import { startBattle, fightButton } from './helpers';
 test.describe('Move-menu STAB highlight', () => {
   test('flags the player’s same-type damaging move, not off-type moves', async ({ page }) => {
     // Charizard @ L50 has a deterministic CanonicalLatest moveset: SCRATCH/RAGE/SLASH (Normal) + FLAMETHROWER
-    // (Fire). Charizard is Fire/Flying, so only FLAMETHROWER earns STAB — no RNG, so this is stable.
-    await startBattle(page, 'CHARIZARD', 50);
+    // (Fire). Charizard is Fire/Flying, so only FLAMETHROWER earns STAB. The STAB flag itself has no RNG, but
+    // in-suite the shared backend + biome mode's extra async step widened the setup timing; a fixed seed pins
+    // the whole run (enemy, biome offer) so the start is reproducible and the spec no longer flakes in-suite.
+    await startBattle(page, 'CHARIZARD', 50, 1);
     await fightButton(page).click();
 
     const flamethrower = page.locator('.move-btn', { hasText: 'FLAMETHROWER' });

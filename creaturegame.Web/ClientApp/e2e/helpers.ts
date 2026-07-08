@@ -9,12 +9,31 @@ import { expect, type Page, type Locator } from '@playwright/test';
 
 export type BridgeEvent = { name: string; t: number };
 
-/** Title → starter select → confirm → battle, returning once it's the player's turn. */
-export async function startBattle(page: Page, species = 'CHARIZARD', level?: number): Promise<void> {
+/**
+ * Title → starter select → confirm → battle, returning once it's the player's turn.
+ *
+ * Pass a `seed` to pin a **fully deterministic** run: the backend threads one seed through every
+ * nondeterministic step (enemy species/DVs/moves, the biome offer, every battle roll, the AI's choices), so a
+ * seeded run replays identically. This is the lever a spec uses to stop depending on coin-flip battle outcomes.
+ * react-router drops the query string on nav from the title, so a seeded run lands **directly on /select** (the
+ * `reward-drop.spec` pattern) — the level slider lives on that screen, so a custom `level` still works there.
+ */
+export async function startBattle(
+  page: Page,
+  species = 'CHARIZARD',
+  level?: number,
+  seed?: number
+): Promise<void> {
   // ?e2e=1 puts the app in test mode (bridge recording + collapsed animation delays).
-  await page.goto('/?e2e=1');
-  await page.locator('.btn-new-game').click();
+  if (seed !== undefined) {
+    await page.goto(`/select?e2e=1&seed=${seed}`);
+    await page.locator('.species-card').first().waitFor({ state: 'visible', timeout: 10_000 });
+  } else {
+    await page.goto('/?e2e=1');
+    await page.locator('.btn-new-game').click();
+  }
 
+  // The level slider is on the select screen, which both entry paths reach.
   if (level !== undefined) await setStartLevel(page, level);
 
   // Match the card by its EXACT name (the .card-name element) so a prefix like MEW doesn't also grab
@@ -153,6 +172,25 @@ export const playToNextEncounter = (page: Page, maxTurns = 80): Promise<string[]
  * timeout — a natural run-to-loss can span several battles. */
 export const playToRunEnd = (page: Page, maxTurns = 300): Promise<string[]> =>
   attackUntilLog(page, /Run over/, maxTurns);
+
+/**
+ * Attack each turn until the "grew to level N!" line appears, then stop — for the level-up specs, run on a
+ * fixed seed via `startBattle(…, seed)` so a low-level start reliably wins into a level-up. Unlike the generic
+ * play loop this does NOT dismiss the post-win reward-choice modal: the level-up specs assert the level-up
+ * panel + reward-modal interaction themselves, so we leave the modal standing where they expect it.
+ */
+export async function playToLevelUp(page: Page, maxTurns = 60): Promise<string[]> {
+  const grew = (log: string[]) => log.some(l => /grew to level \d+!/.test(l));
+  for (let i = 0; i < maxTurns; i++) {
+    if (grew(await logLines(page))) break;
+    if (await fightButton(page).isEnabled().catch(() => false)) {
+      // A lethal hit ends the turn mid-choice and disables the button; swallow and let the loop re-check.
+      await chooseMove(page).catch(() => {});
+    }
+    await page.waitForTimeout(150);
+  }
+  return logLines(page);
+}
 
 /**
  * Start fresh runs until one reaches a log line matching `re`, returning that run's log. Wild enemies are

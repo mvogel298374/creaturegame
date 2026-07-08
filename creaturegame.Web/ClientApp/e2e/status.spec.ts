@@ -8,7 +8,9 @@ import { startBattle, fightButton, chooseMove, bridgeEvents } from './helpers';
 test.describe('Status conditions', () => {
   test('Sleep Powder puts the enemy to sleep — status badge on its nameplate + log line', async ({ page }) => {
     test.setTimeout(60_000);
-    await startBattle(page, 'BULBASAUR');
+    // Fixed seed → a reproducible enemy/run so this can't race on a shared in-suite backend (the badge assertion
+    // had flaked when a coin-flip enemy state shifted between the log line and the nameplate check).
+    await startBattle(page, 'BULBASAUR', 50, 1);
 
     const asleepLine = page.locator('.log-line').filter({ hasText: /fell asleep!/ }).first();
 

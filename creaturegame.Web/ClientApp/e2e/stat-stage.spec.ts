@@ -7,7 +7,9 @@ import { startBattle, fightButton, chooseMove } from './helpers';
 test.describe('Stat-stage moves', () => {
   test("Growth raises Bulbasaur's Special and logs it", async ({ page }) => {
     test.setTimeout(60_000);
-    await startBattle(page, 'BULBASAUR');
+    // Fixed seed → a reproducible enemy/run, so this can't flake on a shared in-suite backend. On seed 1 Growth
+    // lands turn 1 and Bulbasaur (bulky at L50) survives; the retry below is a belt-and-suspenders guard.
+    await startBattle(page, 'BULBASAUR', 50, 1);
 
     // Growth can whiff on the Gen 1 1/256 accuracy bug; retry across a few turns until it lands
     // (Bulbasaur is bulky enough at L50 to survive the attempts). It almost always lands turn 1.
