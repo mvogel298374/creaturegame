@@ -15,7 +15,7 @@ The core goal is a faithful Gen 1 battle engine — accurate damage formula, typ
 | `creaturegame` | Core battle engine **class library** — damage, type chart, status, stat stages, crits, move effects |
 | `creaturegame.Web` | ASP.NET Core host — REST API, SignalR hub, and a Vite + React + Phaser 3 frontend under `ClientApp/`. Run via `.\dev.ps1` |
 | `PokeApiConnector` | One-shot importer: fetches Gen 1 data from PokéAPI and writes to SQLite |
-| `tests/creaturegame.Tests` | xUnit unit + integration tests — 600+ test methods, including a per-move Gen 1 fidelity-contract suite |
+| `tests/creaturegame.Tests` | xUnit unit + integration tests — 670+ test methods, including a per-move Gen 1 fidelity-contract suite |
 
 ---
 
@@ -87,39 +87,25 @@ Three SQLite databases are managed by **EF Core migrations** (`creaturegame/DB/M
 
 ---
 
-## Gen 1 quirks preserved
+## Gen 1 fidelity
 
-The following Gen 1 behaviours are intentionally kept accurate:
+Faithfulness to Gen 1 is the point, so the engine deliberately reproduces the era's quirks and bugs rather than "fixing" them — for example the **Ghost → Psychic = 0×** type bug, the **1/256 miss** on 100%-accurate moves, the special DV-based HP formula and Stat Exp gain, and Gen 1's permanent Freeze. These live behind the generation seams (`ITypeChart` / `IBattleRules` / `IStatCalculator`), so swapping a later generation in doesn't mean editing them out.
 
-**Type chart:**
-- **Ghost → Psychic = 0×** (should be 2×; famous RBY bug)
-- **Poison → Bug = 2×** (changed to 0.5× in Gen 2)
-- **Ice → Fire = 1×** (changed to 0.5× in Gen 2)
-- **Bug → Poison/Psychic = 2×** (both changed in Gen 2)
-- No Steel, Dark, or Fairy types
-
-**Accuracy:**
-- Internal 0–255 scale (not the Gen 2+ 0–100 scale)
-- A roll of 255 always misses — **1/256 miss bug** applies to all moves including 100%-accurate ones
-- Accuracy and evasion stages use the 3/9…9/3 table (distinct from the 2/8…8/2 damage-stat table)
-
-**Critical hits:**
-- Crit chance = `floor(BaseSpeed / 2) / 256`; high-crit moves (Slash, Crabhammer, etc.) multiply numerator by 8
-- Crits deal 2× and **bypass all stat stage modifiers and the Burn Attack penalty**
-
-**Stats / formulas:**
-- HP DV derived from lowest bits of Attack, Defense, Speed, and Special DVs
-- Stat Exp (EVs) use the `sqrt(StatExp) / 4` bonus formula; a win adds the defeated foe's base stats to the victor's Stat Exp (capped 65535/stat), realized into stats on the next level-up
-- Stat formula differs between HP and all other stats
-- Sleep lasts 1–7 turns (Gen 2+: 2–5); Freeze is permanent until hit by an appropriate Fire move
-
-The full mechanic-by-mechanic reference lives in [`docs/GEN_DIFFERENCES.md`](docs/GEN_DIFFERENCES.md).
+The full mechanic-by-mechanic breakdown (type-chart differences, accuracy scale, crit formula, stat formulas, status timing) is in [`docs/GEN_DIFFERENCES.md`](docs/GEN_DIFFERENCES.md).
 
 ---
 
 ## Status
 
-The Gen 1 battle engine is **feature-complete**: all 165 moves, status conditions, stat stages, crits, PP/Struggle, XP & level-up, the learnset system, EV/Stat-Exp gain, evolution, and an in-battle item system are implemented and covered by tests. A roguelite run layer (biome-graph encounters, enemy strength tiers, a live map) sits on top and is actively being extended.
+The Gen 1 battle engine is **feature-complete**: all 165 moves, status conditions, stat stages, crits, PP/Struggle, XP & level-up, the learnset system, EV/Stat-Exp gain, evolution, and an in-battle item system are implemented and covered by tests.
+
+On top of the engine sits a playable **roguelite run layer**, also live:
+- **Biome-graph encounters** — each run draws a seeded connected subset of Kanto's biomes; the player picks a biome, routes through a randomised 4–6 themed events (wild / elite / boss / shop / treasure / mystery) capped by a Poké Center, then chooses the next biome.
+- **Depth-scaled difficulty** — `IEnemyArchetype` strength tiers and biome-position depth bands scale foes as a run deepens.
+- **Run economy** — earned gold with a gold HUD, and a rarity-rolled **reward choice**: a win (or a Treasure/Mystery node) offers a pick-1-of-3 of rarity-coloured items or a ₽ bag, with Boss nodes skewed toward premium replenishing items.
+- **Level-aware XP curve** — a roguelite XP ramp (kept separate from the Gen 1 `IBattleRules` seam) plus the Gen 1 trainer ×1.5 bonus for Elite/Boss nodes.
+
+Still being built out: **acquisition channels** (boss catch + themed draft), the **Shop** node, bag persistence, and a party / save layer.
 
 For the concrete, prioritised list of what's being worked on next, see [`docs/TODO.md`](docs/TODO.md).
 

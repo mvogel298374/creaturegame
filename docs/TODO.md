@@ -4,146 +4,24 @@
 > history of a finished item. **See also:** `CLAUDE.md` (setup/commands) · `AI_CONTEXT.md` (profiles) ·
 > `DESIGN_GUIDES.md` (mechanics) · `DEV_STANDARDS.md` (conventions).
 
-## Current state (2026-07-02)
+## Current state (2026-07-08)
 
-The Gen 1 battle engine is **feature-complete**: all 165 moves, XP & level-up, the Endless Battle Chain, the
-Roguelite recovery/encounter layer, the Learnset System, AI move selection, EV / Stat-Exp gain, the full
-Evolution System, and the complete **Item System** (data import + use-in-battle, playable end-to-end) are all
-done and archived. The **Encounter Logic** run layer (biome graph + node kinds) and the **Run Economy** (gold,
-battle/Treasure/Mystery rewards, earned transient bag, gold HUD + reward modal) are done and archived.
-`ARCHITECTURE.md` and the per-run web seed are done.
+The Gen 1 battle engine is **feature-complete** (all 165 moves, XP & level-up, learnsets, AI move selection,
+EV / Stat-Exp gain, evolution, in-battle item system), and the roguelite run layer on top is playable end-to-end:
+the **Encounter Logic** biome-graph run (biome pick → randomised 4–6 nodes → Poké Center → next biome, per-run
+randomised map, depth-scaled foes), the **Run Economy** (gold + rewards), the **Reward Choice** modal (pick-1-of-3
+rarity rewards), and the **level-aware XP curve + trainer bonus** are all done and archived (→ `TODO_ARCHIVE.md`).
 
-**Next up, in order:**
-0. **Run Economy — gold, item rewards, transient bag & Treasure/Mystery nodes** — *Phases A + B + C DONE
-   (2026-07-02; A/B audited PASS-WITH-ADVISORIES).* Backend currency + battle/Treasure/Mystery reward rolls +
-   earned transient bag + the reward wire, **plus the Phase C frontend** (gold HUD, reward modal, `acknowledgeReward`
-   wiring). The web-path node-plan gate is **removed** — Treasure/Mystery run at full distribution and the client
-   answers their reward ack. Playable end-to-end. **Remaining follow-up: the Shop node** (spend-gold purchase
-   modal — see the *Item Acquisition* cluster / its own item below).
-1. **Encounter Logic** — *design DONE* (`ENCOUNTER_DESIGN.md`, 2026-06-27). Phased build: **Phase 1 (biome
-   model)** ✅ + **Phase 2 (enemy tiers + depth bands)** ✅ + **Phase 3a (event model / `RunDirector`)** ✅ +
-   **Phase 3b (biome graph + map screen)** ✅ + **Phase 3c (node-kind bones + tuned curve)** ✅ done — biome
-   runs route through varied nodes (wild/elite/boss/shop/treasure/mystery) on a battle-heavy tuned distribution,
-   each biome capped by a Boss apex, foes scaled by biome-position depth, **plus per-run biome-map randomisation**
-   (each run draws a seeded connected subset of Kanto's biomes). **Phase 3 (Encounter Logic) is complete. Next:
-   Phase 4 — Acquisition channels** (boss catch + themed draft, fought-only). **Run model
-   (confirmed with the user):** region (Kanto) → player chooses a biome → a **randomised 4–6 themed events**
-   capped by a Poké Center → choose the next biome (its neighbours) → repeat until death.
-2. **Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by (1)'s acquisition phase.
-3. **Game Loop & Progression** — party, switching, save layer (`save.db`).
+**Next up, in priority order:**
+1. **Encounter Logic — Phase 4: Acquisition channels** (boss catch + themed draft, fought-only). The last open
+   piece of Encounter Logic and the bridge into the deferred Catch cluster. `/plan` first.
+2. **Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by (1). *(Item acquisition
+   itself is already done via the Run Economy; bag persistence + catch remain.)*
+3. **Shop node** — the one remaining Run Economy follow-up (spend-gold purchase modal).
+4. **Game Loop & Progression** — party, switching, save layer (`save.db`).
 
-Lower priority / opportunistic: Web UI polish (move-specific animations), Multi-Generation groundwork, Tech
-Debt cleanup, User Documentation.
-
----
-
-## Reward Choice — pick-1-of-3 rarity rewards  ✅ DONE (2026-07-07, gates green — pending commit)
-
-> **Both slices done & green** — build clean, all suites pass, CSharpier clean; requirements-review and
-> pr-review both green (added a `RewardChoiceOffered` wire field-guard, Treasure/Mystery + gold-bag-rarity
-> coverage, and an out-of-range-pick clamp test). Verified live in a browser (choice modal renders with
-> rarity-coloured cards; picking the gold bag credits the BAG and the run continues).
->
-> **Slice 1 — core + web + wire backend.** The `RewardRarity`/`RewardOption`/`RewardChoice` core vocabulary +
-> `RewardChoiceOffered` event + `IBattleInput.ChooseRewardAsync` (replaced the old `AcknowledgeRewardAsync`
-> ack); the shared `RewardResolution` offer→pick→apply→`RewardGranted` helper (every reward-earning node offers
-> a blocking pick-one-of-N); the `RewardCalculator` rewrite (rarity roll + tier/depth bias + Boss replenishment
-> skew + gold-bag option); the wire (`SignalRInput.ChooseRewardAsync`/`BattleHub.ChooseReward`/emitter
-> projection/`GameSessionManager.SetRewardChoice`).
->
-> **Slice 2 — frontend.** The 3-card rarity-coloured `RewardChoiceModal` (reuses the biome-modal shell),
-> `SHOW_REWARD_CHOICE`/`HIDE_REWARD_CHOICE` reducer actions + `rewardChoice` state, the real `timeline.ts`
-> `RewardChoiceOffered` arm, `chooseReward(index)` hub call in `useBattleHub` (removed the dead auto-ack), and
-> CSS rarity accents. E2E: reworked `reward-drop.spec.ts` to drive the choice modal (take the gold bag); added a
-> shared `dismissRewardChoiceIfPresent` helper wired into the play loop + `startBattle` (every win now blocks on
-> the modal), which also fixed 3 specs the new blocking modal had broken.
->
-> **⚠ Provisional tuning knobs (retune by playtest, none blocks the feature):** `BattleDropChance` (0.85 — a
-> win pops a modal ~85% of the time; may want lowering); the rarity weight tables + depth-lift; the Boss
-> category-bias weights; the gold-bag `×2 × rarityFactor` formula; whether Treasure keeps a multi-item feel.
-> **Revive** stays out of the live pool (dead loot) but its Boss category-bias arm is written and dormant —
-> auto-joins when the Catch/party layer makes Revive usable.
-
-
-
-Turns every rolled reward from a silent random grant into a **player choice of three**: two rarity-rolled
-items **or** a fatter ₽ bag. Replaces the current inverse-cost auto-drop (which over-favoured the flat 200g
-status-cure cluster — ~56% of all item drops were single-status cures) with a rarity roll where **rarer =
-more expensive**, plus agency (pick the item you want) and an escape hatch (take gold when neither item fits).
-
-**Two decisions locked with the user (2026-07-06):**
-1. **Every rolled reward** presents the modal — wild wins too, not just special/Elite/Boss nodes. The ~85%
-   `BattleDropChance` still gates *whether* a choice appears (a no-roll win stays instant), so ~15% of wild
-   wins are modal-free. ⚠ **Knob to revisit:** now that a wild win can mean a modal, we may want to *lower*
-   the wild `BattleDropChance` so the grind isn't a modal after nearly every fight — flag for playtest.
-2. **4-tier rarity, tier+depth-biased** — `Common / Uncommon / Rare / Epic`; the roll table shifts upward
-   with node `EncounterTier` (Elite/Boss) and run depth, so deep Boss nodes can offer two Rares.
-
-### The rarity model (web-layer `RewardCalculator` tuning — provisional, retuned by playtest)
-Roll a **rarity** per item option, then pick an item **uniformly within that rarity's cost band** over the
-real catalog:
-
-| Rarity | Cost band | Pool (from `items.db`) |
-|:--|:--|:--|
-| Common   | ≤ 400       | Potion(200), the 5 status cures(200), Full Heal(400) |
-| Uncommon | 401–1200    | Super Potion(700), 6 X-items/Dire Hit(1000), Ether(1200) |
-| Rare     | 1201–2500   | Hyper Potion(1500), Guard Spec(1500), Max Ether(2000), X-Defense(2000), Max Potion(2500) |
-| Epic     | > 2500      | Full Restore(3000), Elixir(3000), Max Elixir(4500) |
-
-Placeholder rarity weight tables (sum 100), lifted upward by tier + a per-depth nudge (like
-`EncounterFactory` depth-scaling): Wild `C60/U30/R9/E1` → Elite `C45/U35/R17/E3` → Boss `C30/U35/R25/E10`.
-All numbers provisional, like the existing `RewardCalculator` skew constants (tests pin *shape*, not values).
-
-### The three options
-- **Item A** — rarity-rolled.
-- **Item B** — rarity-rolled, **distinct** from A (re-roll / cross-band fallback if the rolled rarity's pool
-  can't yield a second distinct item — e.g. a tiny Epic pool).
-- **₽ Bag** — gold larger than the old passive drop (candidate: scaled to the better item option's rarity, so
-  passing up a Rare pays more). The fix for the original complaint: when both items are junk, take gold.
-
-### Boss nodes are special (user addendum, 2026-07-06)
-A Boss reward is the run's premium node — **overall better** and **skewed toward strong replenishing items**:
-- **Rarity skewed hardest** to Rare/Epic (bump Epic well up, strip most Common) so Boss options are strong
-  potions — Max Potion, Full Restore, Hyper Potion, the Elixirs — not trivia.
-- **Category bias toward replenishment** *within* the picked band: up-weight `Healing` (and `PpRestore`, and
-  `Revive` once functional) over `BattleStatBoost`, so a Boss leans max-heals/strong-potions, not X-items.
-  This is a second lever on top of rarity (rarity picks the cost tier; the category bias picks *what kind*).
-- **Better node overall:** guaranteed drop (ignore the ~85% whiff — a Boss always rewards), a fatter ₽ bag,
-  and all three options premium.
-- ⚠ **Revive caveat:** `ItemCategory.Revive` is **dead loot today** (`ItemEffects.For(Revive)` → null, blocked
-  on the party/Catch layer), so it stays out of the *live* eligible set — but the category-bias framework is
-  written so Revive **auto-joins the Boss pool** the moment it becomes usable. No hand-out of non-functional
-  Revives in the meantime.
-
-### Architecture (follows the existing seams — mirrors the biome route-choice pattern end-to-end)
-- **Core (`creaturegame.Combat`)** — gen-agnostic vocabulary only:
-  - `RewardChoice` (2 item options + 1 gold option) + `RewardOption`/rarity enum types.
-  - `RewardChoiceOffered` battle event (mirrors `BiomeChoiceOffered`). *As built:* the **pick** is announced by
-    reusing the existing `RewardGranted` event (driven by the chosen option) — no separate `RewardChosen` type,
-    mirroring how `BiomeEntered` announces a biome pick without a `BiomeChosen` event.
-  - `IBattleInput.ChooseRewardAsync(RewardChoiceContext)` → picked index; **default = index 0** so
-    headless/AI/test runs keep auto-piloting (matches `ChooseBiomeAsync`'s first-option default).
-  - The injected supplier return type shifts `RunReward` → `RewardChoice`. `BattleRunEvent.GrantBattleReward`
-    becomes a **blocking** choice event (like Treasure/Mystery already are), applying only the picked option.
-- **Web (`RewardCalculator`)** — `RollRarity(tier, depth, rng)` + band-pick + `RollRewardChoice(...)`; the
-  inverse-cost `TryPickItem` is retired (or repurposed as within-band pick). `BuildRewardSupplier` returns the
-  new type.
-- **Wire (SignalR)** — `SignalRInput.ChooseRewardAsync` TCS handshake + `BattleHub.ChooseReward(index)` +
-  **emitter projection** for the new `RewardChoiceOffered` event (the recurring *web event field-projection gap*
-  — a new event needs the `SignalRBattleEventEmitter` mapping + a field-level guard, not just the engine type).
-- **Frontend** — a 3-card choice modal (reuse the biome-choice modal shell), rarity-coloured; replaces the
-  passive drop toast for the choice case. ⚠ **Provisional pending sign-off** (frontend/node UX).
-
-### Open / to settle during build (DoR follow-ups)
-- Gold-bag sizing formula (flat multiple vs. rarity-scaled) — pick one, mark provisional.
-- Distinct-item fallback rule when a rarity pool is too small.
-- Whether Treasure (a *guaranteed* chest) offers a 3-choice too, or keeps its richer multi-item grant —
-  reconcile with `RollTreasureReward`.
-- Lower `BattleDropChance`? (see decision 1 knob).
-- **Gen-agnostic checklist** (`GENERATION_SEAMS.md §5.0`) — confirm nothing here leaks a Gen-1 assumption into
-  the core (it shouldn't: rarity/gold is run-economy tuning, all web-layer, like the existing reward policy).
-- Tests: `RewardCalculatorTests` extend to pin rarity-shape (upward bias with tier/depth, band membership,
-  distinct options, gold-bag ≥ passive), seeded reproducibility; a seeded Playwright spec for the modal.
+Lower priority / opportunistic: E2E flakiness stabilisation, Web UI polish (move-specific animations),
+Multi-Generation groundwork, User Documentation.
 
 ---
 
@@ -159,31 +37,6 @@ opening-route favourable-matchup guarantee. Full per-phase record (design, pins,
   `ENCOUNTER_DESIGN.md §4` piece, and the bridge into the *Item Acquisition · Bag Persistence · Catch* cluster
   below. Now unblocked (the §1–§3 layer is done): a biome's **Boss** node is the catch hook, the **fought-only
   themed pool** is the draft source. `/plan` first; *n%* rates tuned here.
-
----
-
-## Reward Visibility & XP Pacing  ✅ DONE (2026-07-05, pending gates + commit)
-
-Compelling-rewards pass — boost reward *amount* and *visibility*:
-
-- **XP boost (soft level-aware curve).** New **`RunRules`** — a roguelite "game-balance dials" bag kept
-  **separate from the Gen-1 `IBattleRules` seam** (which stays untouched) — carries a level-aware XP curve,
-  threaded `GameSessionManager → RunDirector → BattleRunEvent → Battle` and applied to the pure Gen-1 award
-  (`floor(baseExp × level / 7)`) at faint time. `RunRules.Default` is a 1.0 no-op (all existing callers/tests =
-  pure Gen 1); the web run passes a linear ramp `XpMultiplierEarly = 1.5` (L1) → `XpMultiplierLate = 4.5`
-  (L100). Low levels (already fast) get a light nudge — no sharp multi-level jumps — while the high-level grind
-  gets the bigger lift, ~3× (2.98×) around the default L50. Design target (from the brief): a biome (~4–6
-  encounters) ≈ **0.8–1.5 levels** across the picker's 5–100 range — a playtest-validated tuning goal, not a
-  tested invariant (`RunRulesTests` pins the curve *shape*, not the pacing outcome). The two anchors are the
-  tuning dials (slider-ready); provisional. Elite/Boss (trainer-analog tiers) get the **Gen-1 trainer ×1.5** XP
-  bonus (user-approved) — applied in the seam (`CalculateXpAwarded(…, trainerOwned)`), separate from the curve,
-  wired by tier in `BattleRunEvent`. That ×1.5 *stacks* on the curve for the (higher-XP) Elite/Boss nodes, so a
-  typical biome trends to the upper end of / slightly above the 0.8–1.5 band — intended (beefier bosses), retune
-  the anchors down if playtest wants it back in-band. See `GENERATION_SEAMS.md`.
-- **Drop hover.** Battle-win drops (the `Battle`-source `RewardGranted`) now raise a transient floating loot
-  toast (gold + items) over the field for ~2.8 s (`DROP_TOAST_MS`) — inline & non-blocking, `pointer-events:
-  none`, auto-dismissed by the view — in addition to the existing gold-HUD bump + battle-chat line. Reuses the
-  existing `RewardGranted` fields (no new wire projection). Treasure/Mystery keep their blocking modal.
 
 ---
 
@@ -313,17 +166,16 @@ tested through the `mitt` bridge (assert **event ordering**, never wall-clock du
   item-effect logic stays covered by `ItemEffectTests`, bag grouping by `bag.test.ts`).
 
 **Remaining (in priority order):**
-- [ ] **⏭ NEXT — Stabilise inter-test E2E flakiness (a seed-determinism pass).** `stat-stage`, `level-up`
-  (column-spacing), and `battle-ui-cues` pass **run alone** but flake **in-suite** — the specs share one
-  stateful backend (serial, "one in-flight battle per connection") and biome mode's extra async step widened the
-  timing windows. Not a product bug; a test-determinism gap. Approach (leverages the new seed plumbing):
-  1. Add optional `seed` (and species/level) params to the `startBattle` helper; when a seed is given it lands
-     directly on `/select?e2e=1&seed=…` (the `reward-modal.spec` pattern) so the whole run — enemy, biome offer,
-     battle rolls — is deterministic.
-  2. Per flaky spec, discover a stable seed that yields the matchup it needs (player moves first / a survivable
-     turn 1 / the right enemy type), the way `reward-modal.spec` pins seed 31.
-  3. Replace the coin-flip `reachLog` / retry loops in those specs with the seeded setup.
-  **Done when:** `npm run test:e2e` is green across 3 consecutive runs with `retries: 0`.
+- [x] **Stabilise inter-test E2E flakiness (a seed-determinism pass)** — DONE (2026-07-08). `startBattle` gained
+  an optional `seed` param: when given it lands directly on `/select?e2e=1&seed=…` (the `reward-drop.spec`
+  pattern; the level slider lives on that screen so a custom `level` still works), pinning the whole run — enemy,
+  DVs, moves, biome offer, every battle roll, AI choice. Converted the flaky coin-flip specs to seed 1:
+  `battle-ui-cues` + `stat-stage` (seeded `startBattle`), `status` (was also flaky — same treatment), and
+  `level-up` (both tests: replaced the `reachLog` restart loop with seeded `startBattle` + a new `playToLevelUp`
+  helper that stops at the level-up line *without* dismissing the reward modal the test asserts). `reachLog`
+  stays for `battle`/`endless-chain`/`learnset` (not flaky; their retry keeps them reliable). **Verified:** full
+  `npm run test:e2e` green across 3 consecutive runs (21 passed each, `retries: 0`), and the converted specs run
+  in seconds instead of coin-flip minutes.
 - [ ] **Other between-encounter modal E2Es** — same seeded/blocking-modal shape as the reward modal, now
   unblocked by the seed plumbing: Poké Center recovery Heal/Skip, move-replacement forget/decline, evolution
   Allow/Cancel (Gen 1 B-cancel).

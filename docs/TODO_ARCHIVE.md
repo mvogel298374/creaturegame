@@ -8,6 +8,69 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Reward Choice — pick-1-of-3 rarity rewards ✅ DONE (2026-07-07)
+
+Commit `1a9f6eb`. Turns every rolled reward from a silent random grant into a **player choice of three** — two
+rarity-rolled items **or** a fatter ₽ bag — replacing the old inverse-cost auto-drop (which over-favoured the
+flat 200g status cures: ~56% of item drops were single-status cures). Rarer = more expensive, plus agency and
+an escape hatch (take gold when neither item fits). All gates green; verified live in a browser.
+
+**Two decisions locked with the user (2026-07-06):** (1) **every** rolled reward presents the modal — wild wins
+too, still gated by the ~85% `BattleDropChance` so a no-roll win stays instant; (2) **4-tier rarity**
+(`Common / Uncommon / Rare / Epic`), roll table biased upward by node `EncounterTier` (Elite/Boss) and run depth,
+so deep Boss nodes can offer two Rares.
+
+**Rarity model (web-layer `RewardCalculator`, provisional).** Roll a rarity per option, then pick an item
+uniformly within that rarity's cost band over the real catalog: Common ≤400 · Uncommon 401–1200 · Rare
+1201–2500 · Epic >2500. Placeholder weights (sum 100), lifted by tier + per-depth nudge: Wild `C60/U30/R9/E1` →
+Elite `C45/U35/R17/E3` → Boss `C30/U35/R25/E10`. The three options: Item A (rarity-rolled), Item B (distinct
+from A, cross-band fallback if the pool can't yield a second), ₽ Bag (`×2 × rarityFactor`, scaled to the better
+item so passing up a Rare pays more). **Boss nodes** are the premium node — skewed hardest to Rare/Epic, a
+second category-bias lever up-weighting `Healing`/`PpRestore` (and `Revive` once functional) over
+`BattleStatBoost`, a guaranteed drop (ignore the whiff), and a fatter bag.
+
+**Architecture (mirrors the biome route-choice pattern end-to-end).** Core (`creaturegame.Combat`): gen-agnostic
+`RewardChoice`/`RewardOption`/`RewardRarity` vocabulary + `RewardChoiceOffered` event (the pick is announced by
+reusing `RewardGranted`, like `BiomeEntered`); `IBattleInput.ChooseRewardAsync(RewardChoiceContext)` → picked
+index (default 0, so headless/AI/test runs auto-pilot); the shared `RewardResolution` offer→pick→apply→
+`RewardGranted` helper; supplier return type `RunReward` → `RewardChoice`; `GrantBattleReward` becomes a
+**blocking** choice event. Wire: `SignalRInput.ChooseRewardAsync` TCS handshake + `BattleHub.ChooseReward` +
+`RewardChoiceOffered` emitter projection + field-level guard (the recurring *web event field-projection gap*).
+Frontend: 3-card rarity-coloured `RewardChoiceModal` (reuses the biome-modal shell), `SHOW/HIDE_REWARD_CHOICE`
+reducer actions + `rewardChoice` state, `timeline.ts` arm, `chooseReward(index)` in `useBattleHub` (removed the
+dead auto-ack). E2E: reworked `reward-drop.spec.ts` to drive the choice modal; a shared
+`dismissRewardChoiceIfPresent` helper wired into the play loop + `startBattle` (also fixed 3 specs the new
+blocking modal had broken).
+
+**⚠ Provisional tuning knobs (retune by playtest, none blocks the feature):** `BattleDropChance` (0.85 — may
+want lowering now a wild win can pop a modal); the rarity weight tables + depth-lift; the Boss category-bias
+weights; the gold-bag `×2 × rarityFactor` formula; whether Treasure keeps a multi-item feel. **Revive** stays
+out of the live pool (dead loot: `ItemEffects.For(Revive)` → null) but its Boss category-bias arm is written and
+dormant — auto-joins the moment the Catch/party layer makes Revive usable.
+
+---
+
+## Reward Visibility & XP Pacing ✅ DONE (2026-07-05)
+
+Commit `5e1f770`. Compelling-rewards pass — boost reward *amount* and *visibility*.
+
+- **XP boost (soft level-aware curve).** New **`RunRules`** — a roguelite "game-balance dials" bag kept
+  **separate from the Gen-1 `IBattleRules` seam** (which stays untouched) — carries a level-aware XP curve,
+  threaded `GameSessionManager → RunDirector → BattleRunEvent → Battle` and applied to the pure Gen-1 award
+  (`floor(baseExp × level / 7)`) at faint time. `RunRules.Default` is a 1.0 no-op (all existing callers/tests =
+  pure Gen 1); the web run passes a linear ramp `XpMultiplierEarly = 1.5` (L1) → `XpMultiplierLate = 4.5`
+  (L100), ~3× around the default L50. Design target: a biome (~4–6 encounters) ≈ **0.8–1.5 levels** across the
+  5–100 range — a playtest goal, not a tested invariant (`RunRulesTests` pins curve *shape*, not pacing). The two
+  anchors are the tuning dials (slider-ready), provisional. Elite/Boss get the **Gen-1 trainer ×1.5** XP bonus
+  (applied in the seam via `CalculateXpAwarded(…, trainerOwned)`, wired by tier in `BattleRunEvent`), stacking on
+  the curve so a typical biome trends to the upper end of the band — intended.
+- **Drop hover.** Battle-win drops now raise a transient floating loot toast (gold + items) over the field for
+  ~2.8 s (`DROP_TOAST_MS`) — inline, non-blocking, `pointer-events: none`, auto-dismissed — in addition to the
+  gold-HUD bump + battle-chat line. Reuses existing `RewardGranted` fields (no new wire projection).
+  Treasure/Mystery keep their blocking modal.
+
+---
+
 ## Run Economy — gold, item rewards, transient bag & Treasure/Mystery nodes ✅ DONE (2026-07-02)
 
 The economy slice of the deferred *Item Acquisition* cluster, `/plan`ned with the user (approved 2026-07-01) and
