@@ -32,6 +32,8 @@ public sealed class RunDirector
     private readonly int _minEventsPerBiome;
     private readonly int _maxEventsPerBiome;
     private readonly bool _biomeModeActive;
+    private readonly Wallet? _wallet;
+    private readonly int _minShopBudget;
     private readonly Func<int, IRandomSource, IReadOnlyList<RunNodeKind>> _nodePlanFactory;
     private readonly IRunEvent _battleEvent;
     private readonly IRunEvent _eliteEvent;
@@ -62,6 +64,12 @@ public sealed class RunDirector
         Func<int, IRandomSource, IReadOnlyList<RunNodeKind>>? nodePlanFactory = null,
         Wallet? wallet = null,
         Func<RewardContext, IRandomSource, RewardChoice>? rewardSupplier = null,
+        Func<ShopStockContext, IRandomSource, ShopOffer>? shopSupplier = null,
+        // A Shop node is only worth visiting if the player can afford something, so a biome's plan only keeps its
+        // Shop slots when the wallet is at least this many ₽ when the biome is entered (the moment the route is
+        // fixed — ENCOUNTER_DESIGN.md §5). The web layer passes the cheapest stock price; 0 (the default) never
+        // gates, so the legacy chain / tests are unchanged.
+        int minShopBudget = 0,
         // Roguelite run-balance rules passed straight through to each encounter's Battle (game-balance tuning,
         // not a seam — see Battle's runRules / RunRules). Null keeps the legacy chain / tests on pure Gen-1 XP.
         RunRules? runRules = null
@@ -83,11 +91,18 @@ public sealed class RunDirector
         // Biome mode kicks in only when the composition layer supplies a non-empty playable set; otherwise the
         // director runs the legacy endless chain (no route choices), so tests/uses without biomes are unchanged.
         _biomeModeActive = playableBiomes is { Count: > 0 };
+        _wallet = wallet;
+        _minShopBudget = Math.Max(0, minShopBudget);
 
         // Reward policy (drop rates, rarity curve, item eligibility) is web-layer roguelite tuning, not a battle
         // seam — the core just defines the vocabulary and consumes whatever's injected. No supplier → every
         // reward roll is RewardChoice.None, so callers without one (tests, the legacy chain) are unchanged.
         rewardSupplier ??= (_, _) => RewardChoice.None;
+
+        // Shop stock policy (which items, run-scaled prices) is web-layer roguelite tuning, not a battle seam —
+        // same class as the reward supplier. No supplier → every shop rolls ShopOffer.None, so the node resolves
+        // as a silent banner (callers without one — tests, the legacy chain — are unchanged).
+        shopSupplier ??= (_, _) => ShopOffer.None;
 
         // The three battle nodes differ only by the EncounterTier they hand the supplier (which the web layer
         // maps to an IEnemyArchetype): WildBattle ≈ today's Medium, Elite/Boss climb. Same collaborators
@@ -113,10 +128,10 @@ public sealed class RunDirector
         _recoveryEvent = new RecoveryRunEvent();
         _biomeChoiceEvent = new BiomeChoiceEvent(playableBiomes ?? [], biomeOptionCount, typeChart);
 
-        // Interaction-node bones (ENCOUNTER_DESIGN.md §5): Shop is still a no-op banner (deferred to an
-        // immediate follow-up — needs a spend-gold purchase modal); Treasure/Mystery now roll and apply a
-        // reward, blocking on the player's acknowledgement.
-        _shopEvent = new InteractionStubEvent(RunNodeKind.Shop);
+        // Interaction nodes (ENCOUNTER_DESIGN.md §5): Shop rolls run-scaled stock and runs a spend-gold buy
+        // loop against the wallet/bag; Treasure/Mystery roll and apply a reward. All three block on the player's
+        // choices (buy/leave, reward pick) so the client raises a modal.
+        _shopEvent = new ShopRunEvent(wallet, playerBag, shopSupplier);
         _treasureEvent = new RewardRunEvent(
             RunNodeKind.Treasure,
             wallet,
@@ -193,7 +208,7 @@ public sealed class RunDirector
                 // the same seed reproduces the same biome size and contents.
                 var planRng = _rng ?? SystemRandomSource.Instance;
                 int length = planRng.Next(_minEventsPerBiome, _maxEventsPerBiome + 1); // +1 → max inclusive
-                s.BiomeNodePlan = _nodePlanFactory(length, planRng);
+                s.BiomeNodePlan = GateShopsByBudget(_nodePlanFactory(length, planRng));
                 s.NeedsBiomeChoice = false;
                 break;
             case BattleOutcome { Won: true }:
@@ -224,6 +239,20 @@ public sealed class RunDirector
         }
     }
 
+    // A Shop is a dead node when the player can't afford anything, so a biome only keeps its Shop slots if the
+    // wallet clears the minimum stock price at biome entry (the moment the route is fixed — the player's
+    // "encounters possible" are decided then). Below budget, swap this biome's Shop slots for wild battles. The
+    // node-plan roll's RNG draw already happened, so only the node *kind* changes — the run's seeded stream (and
+    // the rest of the plan) is untouched. A no-op when unconfigured (_minShopBudget 0) or the wallet clears it.
+    private IReadOnlyList<RunNodeKind> GateShopsByBudget(IReadOnlyList<RunNodeKind> plan)
+    {
+        if (_minShopBudget <= 0 || (_wallet?.Balance ?? 0) >= _minShopBudget)
+            return plan;
+        if (!plan.Contains(RunNodeKind.Shop))
+            return plan;
+        return plan.Select(k => k == RunNodeKind.Shop ? RunNodeKind.WildBattle : k).ToList();
+    }
+
     /// <summary>
     /// The default biome route layout: <paramref name="length"/> nodes, the last always the Boss (the themed
     /// apex — <c>ENCOUNTER_DESIGN.md §4</c>), each interior slot rolled independently from the weighted table in
@@ -244,9 +273,9 @@ public sealed class RunDirector
     }
 
     // Interior-node weights (sum 100). Battle-heavy — the run is a battle game, so most slots are encounters and
-    // Elites are the intra-biome step-up before the Boss. The feature bones (shop/treasure/mystery) are rare
-    // while they're still no-op banners; Treasure (a player-positive reward) leads them, Mystery (the wildcard)
-    // trails. Independent roll per slot (the chosen 3c-2 model); raise the feature weights as their behaviour lands.
+    // Elites are the intra-biome step-up before the Boss. The interaction nodes (shop/treasure/mystery) stay a
+    // minority of slots so they punctuate rather than dilute the combat; Treasure (a player-positive reward)
+    // leads them, Mystery (the wildcard) trails. Independent roll per slot (the chosen 3c-2 model).
     private static RunNodeKind PickInteriorNode(IRandomSource rng) =>
         rng.Next(100) switch
         {
@@ -588,19 +617,58 @@ internal sealed class BiomeChoiceEvent(
 }
 
 /// <summary>
-/// A node-kind bone (interaction-event) for Shop / Treasure / Mystery (<c>ENCOUNTER_DESIGN.md §5</c>): announce
-/// the node with a <see cref="RunNodeEntered"/> banner and resolve immediately, no behaviour yet. It satisfies
-/// the <see cref="IRunEvent"/> contract (emits, returns a <see cref="NodeVisitedOutcome"/> the director folds
-/// in to advance the biome) so the node kind is reachable and sequenced now; each graduates to its own event
-/// (shop economy, reward, event card) when its behaviour lands — the loop body never changes (<c>GAME_LOOP.md
-/// §3</c>).
+/// The Shop node (interaction-event): announce the node, roll this visit's run-scaled stock (the web-layer
+/// <c>ShopCalculator</c> policy), then run a spend-gold <em>buy loop</em> — offer the stock, and repeatedly take
+/// the player's buy/leave choice, charging the <see cref="Wallet"/> and adding to the <see cref="Bag"/> on each
+/// affordable purchase — until the player leaves. Unlike the one-shot reward/biome prompts, a shop is iterative
+/// (buy several, then go). No stock rolled (<see cref="ShopOffer.None"/> — no supplier / empty catalog) → the
+/// node resolves as a silent banner. Headless / AI inputs leave immediately via the
+/// <see cref="IBattleInput.ChooseShopActionAsync"/> default, so a run never stalls on the shop.
 /// </summary>
-internal sealed class InteractionStubEvent(RunNodeKind kind) : IRunEvent
+internal sealed class ShopRunEvent(
+    Wallet? wallet,
+    Bag? playerBag,
+    Func<ShopStockContext, IRandomSource, ShopOffer> shopSupplier
+) : IRunEvent
 {
-    public Task<Outcome> RunAsync(RunContext ctx)
+    public async Task<Outcome> RunAsync(RunContext ctx)
     {
-        ctx.Emitter?.Emit(new RunNodeEntered(kind.ToString()));
-        return Task.FromResult<Outcome>(new NodeVisitedOutcome(kind));
+        ctx.Emitter?.Emit(new RunNodeEntered(RunNodeKind.Shop.ToString()));
+
+        var offer = shopSupplier(
+            new ShopStockContext(ctx.State.RunDepth),
+            ctx.Rng ?? SystemRandomSource.Instance
+        );
+        if (offer.IsEmpty)
+            return new NodeVisitedOutcome(RunNodeKind.Shop); // no stock → the banner is the whole node
+
+        int Balance() => wallet?.Balance ?? 0;
+        ctx.Emitter?.Emit(new ShopOffered(offer.Items, Balance()));
+
+        // The buy loop: keep taking buy/leave choices until the player leaves. A buy charges the wallet and adds
+        // to the bag only if affordable; a stale / out-of-range / unaffordable index is a no-op (the client's
+        // balance is already correct, so no event is needed), so the loop simply re-prompts.
+        while (
+            await ctx.PlayerInput.ChooseShopActionAsync(new ShopContext(offer.Items, Balance()))
+                is BuyShopItem buy
+        )
+        {
+            if (buy.Index < 0 || buy.Index >= offer.Items.Count)
+                continue;
+
+            var item = offer.Items[buy.Index];
+            // Refuse a buy that would exceed the Gen 1 99-per-slot ceiling — check before charging, so the
+            // wallet is never spent on a clamped no-op.
+            if (playerBag is not null && playerBag.IsFull(item.ItemId))
+                continue;
+            if (wallet is null || !wallet.TrySpend(item.Price))
+                continue; // can't afford (or no wallet) → nothing bought, re-prompt
+
+            playerBag?.Add(item.ItemId);
+            ctx.Emitter?.Emit(new ShopItemPurchased(item.ItemName, item.Price, wallet.Balance));
+        }
+
+        return new NodeVisitedOutcome(RunNodeKind.Shop);
     }
 }
 

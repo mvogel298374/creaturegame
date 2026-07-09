@@ -13,6 +13,7 @@ export type {
   EvolutionPrompt,
   BiomeChoicePrompt,
   RewardChoicePrompt,
+  ShopPrompt,
   DropToast,
 } from './battleReducer';
 
@@ -137,9 +138,25 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
       console.error('[SignalR] ChooseReward failed:', err));
   }, []);
 
+  // Buy a shop stock item by index. Unlike the one-shot prompts, the shop is iterative — the modal stays open
+  // (do NOT hide it), and the resulting ShopItemPurchased event updates the balance + gold HUD and logs the buy.
+  // An unaffordable/stale index is a no-op server-side, so the run just re-prompts.
+  const buyShopItem = useCallback((index: number) => {
+    connRef.current?.invoke('BuyShopItem', index).catch(err =>
+      console.error('[SignalR] BuyShopItem failed:', err));
+  }, []);
+
+  // Leave the shop. Close the modal at once (optimistic — the backend advances to the next node, whose banner
+  // confirms the move); the run loop is blocked awaiting this Leave.
+  const leaveShop = useCallback(() => {
+    dispatch({ type: 'HIDE_SHOP' });
+    connRef.current?.invoke('LeaveShop').catch(err =>
+      console.error('[SignalR] LeaveShop failed:', err));
+  }, []);
+
   // Clear the transient loot hover. Purely local (nothing server-side blocks on it) — the view runs a timer
   // and calls this to auto-dismiss the toast after its on-screen beat.
   const dismissDrop = useCallback(() => dispatch({ type: 'HIDE_DROP' }), []);
 
-  return { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, dismissDrop };
+  return { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, buyShopItem, leaveShop, dismissDrop };
 }

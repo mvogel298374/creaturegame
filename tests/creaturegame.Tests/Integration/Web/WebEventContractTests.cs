@@ -332,6 +332,51 @@ public class WebEventContractTests
         Assert.Equal(120, gold.GetProperty("Gold").GetInt32());
     }
 
+    /// <summary>Field-level guard for the <see cref="ShopOffered"/> projection: each <see cref="ShopOfferItem"/>
+    /// is hand-mapped by <c>ProjectShopItem</c> into a flat shape, so the shop modal's per-row fields (id / name /
+    /// price / rarity colour) and the header balance are silently dropped unless listed. The reflection contract
+    /// test instantiates the event with an <i>empty</i> items list, so it can't catch this — pins the sub-fields
+    /// the shop modal reads and the PascalCase rarity the TS <c>RewardRarity</c> union depends on.</summary>
+    [Fact]
+    public void ShopOffered_Projection_CarriesBalanceAndItemSubFields()
+    {
+        var evt = new ShopOffered(
+            [new ShopOfferItem(17, "Super Potion", 20, RewardRarity.Uncommon)],
+            Balance: 142
+        );
+
+        var (type, payload) = SignalRBattleEventEmitter.MapEvent(evt);
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+        var root = doc.RootElement;
+
+        Assert.Equal("ShopOffered", type);
+        Assert.Equal(142, root.GetProperty("Balance").GetInt32());
+
+        var item = root.GetProperty("Items")[0];
+        Assert.Equal(17, item.GetProperty("ItemId").GetInt32());
+        Assert.Equal("Super Potion", item.GetProperty("ItemName").GetString());
+        Assert.Equal(20, item.GetProperty("Price").GetInt32());
+        // PascalCase — the exact casing the TS RewardRarity union matches on to colour the row.
+        Assert.Equal("Uncommon", item.GetProperty("Rarity").GetString());
+    }
+
+    /// <summary>Field-level guard for the <see cref="ShopItemPurchased"/> projection: the client updates the gold
+    /// HUD + modal balance and logs the buy from these fields, dropped on the wire if not listed.</summary>
+    [Fact]
+    public void ShopItemPurchased_Projection_CarriesNamePriceAndBalance()
+    {
+        var (type, payload) = SignalRBattleEventEmitter.MapEvent(
+            new ShopItemPurchased("Super Potion", 20, 122)
+        );
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+        var root = doc.RootElement;
+
+        Assert.Equal("ShopItemPurchased", type);
+        Assert.Equal("Super Potion", root.GetProperty("ItemName").GetString());
+        Assert.Equal(20, root.GetProperty("Price").GetInt32());
+        Assert.Equal(122, root.GetProperty("Balance").GetInt32());
+    }
+
     // Concrete (non-abstract) BattleEvent subtypes — the exact set the engine can emit to the client.
     private static List<Type> ConcreteBattleEventTypes()
     {

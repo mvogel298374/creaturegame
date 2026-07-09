@@ -340,6 +340,43 @@ describe('expandEvent — control plane vs timeline', () => {
     });
   });
 
+  it('ShopOffered parses the stock off the wire and raises the shop modal with the balance', () => {
+    const { now, steps } = expandEvent('ShopOffered', {
+      balance: 142,
+      items: [
+        { itemId: 17, itemName: 'potion', price: 8, rarity: 'Common' },
+        { itemId: 20, itemName: 'elixir', price: 90, rarity: 'Epic' },
+      ],
+    }, CTX);
+    expect(now).toBeUndefined(); // queued through the timeline, not dispatched immediately
+    const actions = dispatched(steps);
+    expect(actions).toContainEqual({
+      type: 'SHOW_SHOP',
+      balance: 142,
+      items: [
+        { itemId: 17, itemName: 'potion', price: 8, rarity: 'Common' },
+        { itemId: 20, itemName: 'elixir', price: 90, rarity: 'Epic' },
+      ],
+    });
+  });
+
+  it('ShopOffered tolerates a missing items list', () => {
+    const { steps } = expandEvent('ShopOffered', { balance: 50 }, CTX);
+    const actions = dispatched(steps);
+    expect(actions).toContainEqual({ type: 'SHOW_SHOP', balance: 50, items: [] });
+  });
+
+  it('ShopItemPurchased updates the balance/gold and logs the buy — modal stays open (no HIDE_SHOP)', () => {
+    const { steps } = expandEvent('ShopItemPurchased',
+      { itemName: 'super-potion', price: 20, balance: 122 }, CTX);
+    expect(logLines(steps)).toEqual(['Bought super-potion for 20₽!']);
+    expect(logTones(steps)).toEqual(['loot']);
+    const actions = dispatched(steps);
+    expect(actions).toContainEqual({ type: 'SHOP_PURCHASED', itemName: 'super-potion', price: 20, balance: 122 });
+    // The modal stays open across buys — closing is the player's Leave, not a purchase.
+    expect(actions.map(a => a.type)).not.toContain('HIDE_SHOP');
+  });
+
   it('RewardGranted (Mystery, nothing rolled) still bumps gold and logs, but raises no hover', () => {
     const { steps } = expandEvent('RewardGranted',
       { source: 'Mystery', gold: 0, goldTotal: 10, itemNames: [] }, CTX);

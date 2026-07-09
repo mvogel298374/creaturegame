@@ -151,6 +151,11 @@ public sealed class GameSessionManager(
             // distribution (no node-plan gate).
             wallet: session.Wallet,
             rewardSupplier: EncounterFactory.BuildRewardSupplier(session.AllItems),
+            // Shop nodes spend the same wallet: run-scaled stock + prices closed over this run's item catalog.
+            shopSupplier: EncounterFactory.BuildShopSupplier(session.AllItems),
+            // A Shop only rolls into a biome when the player can afford the cheapest possible item — so a broke
+            // player (e.g. the opening node with a 0₽ wallet) never gets a dead, all-unaffordable shop.
+            minShopBudget: ShopCalculator.MinItemPrice,
             // Roguelite run-balance rules (the level-aware XP curve, boosted above pure Gen-1) — see RunTuning.
             runRules: RunTuning
         );
@@ -311,6 +316,16 @@ public sealed class GameSessionManager(
             && _active.TryGetValue(gameId, out var battle)
         )
             battle.Input.SetRewardChoice(index);
+    }
+
+    /// <summary>Routes a shop buy/leave choice to the battle's input (the shop node loops on these).</summary>
+    public void SetShopAction(string connectionId, ShopAction action)
+    {
+        if (
+            _connToGame.TryGetValue(connectionId, out var gameId)
+            && _active.TryGetValue(gameId, out var battle)
+        )
+            battle.Input.SetShopAction(action);
     }
 
     /// <summary>The run's current gold balance for the HUD, or null if the game is unknown / not yet started.

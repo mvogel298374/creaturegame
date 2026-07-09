@@ -13,6 +13,11 @@ namespace creaturegame.Items;
 /// </summary>
 public sealed class Bag
 {
+    /// <summary>The Gen 1 per-slot stack ceiling — a bag slot never exceeds 99 of one item. Reward drops add
+    /// one at a time so never approach it; the shop's repeatable buy is the first path that can, so
+    /// <see cref="Add"/> clamps here and callers gate a purchase on <see cref="IsFull"/>.</summary>
+    public const int MaxPerSlot = 99;
+
     private readonly ConcurrentDictionary<int, int> _quantities = new();
 
     public Bag() { }
@@ -39,11 +44,18 @@ public sealed class Bag
 
     public bool Has(int itemId) => Count(itemId) > 0;
 
+    /// <summary>True when this slot is at the <see cref="MaxPerSlot"/> ceiling — a further add is a no-op, so
+    /// the shop refuses a buy that would exceed it (rather than charging for a clamped nothing).</summary>
+    public bool IsFull(int itemId) => Count(itemId) >= MaxPerSlot;
+
+    /// <summary>Adds <paramref name="quantity"/> of <paramref name="itemId"/>, clamped at the Gen 1
+    /// <see cref="MaxPerSlot"/> ceiling (a slot never exceeds 99). Single-writer (the run/battle loop), so the
+    /// read-modify-write needs no extra locking.</summary>
     public void Add(int itemId, int quantity = 1)
     {
         if (quantity <= 0)
             return;
-        _quantities[itemId] = Count(itemId) + quantity;
+        _quantities[itemId] = Math.Min(Count(itemId) + quantity, MaxPerSlot);
     }
 
     /// <summary>Removes one of <paramref name="itemId"/>; returns false (no change) if none are held.

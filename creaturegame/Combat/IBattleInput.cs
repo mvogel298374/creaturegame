@@ -85,6 +85,17 @@ public interface IBattleInput
     /// to the first option downstream, so a stale / malformed pick never strands the run.
     /// </summary>
     Task<int> ChooseRewardAsync(RewardChoiceContext context) => Task.FromResult(0);
+
+    /// <summary>
+    /// Asked repeatedly while the player is in a Shop node: return a <see cref="BuyShopItem"/> to purchase a
+    /// stock item, or <see cref="LeaveShop"/> to end the visit — the shop event loops on this until the player
+    /// leaves. Only the interactive player input is ever consulted; the default leaves immediately, so AI /
+    /// automated inputs never buy and a headless run walks straight past the shop — only the web
+    /// <see cref="SignalRInput"/> blocks awaiting real buy/leave choices. An out-of-range / unaffordable buy is
+    /// a no-op downstream, so a stale pick never strands the run.
+    /// </summary>
+    Task<ShopAction> ChooseShopActionAsync(ShopContext context) =>
+        Task.FromResult<ShopAction>(LeaveShop.Instance);
 }
 
 /// <summary>Context for a level-up move-replacement decision: who is learning, and the move on offer.</summary>
@@ -106,3 +117,7 @@ public sealed record EvolutionPromptContext(Creature Player, int ToSpeciesId, st
 /// <c>RunNodeKind</c> name) and the options on offer (two rarity-rolled items and a gold bag by default). An
 /// input picks one by index.</summary>
 public sealed record RewardChoiceContext(string Source, IReadOnlyList<RewardOption> Options);
+
+/// <summary>Context for a shop buy/leave decision: the stock on offer this visit and the player's current
+/// <see cref="Balance"/> in ₽ (so an input can gate its choice on affordability — the default just leaves).</summary>
+public sealed record ShopContext(IReadOnlyList<ShopOfferItem> Items, int Balance);

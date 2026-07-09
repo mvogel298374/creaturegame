@@ -2,7 +2,7 @@
 // it's unit-testable without React, SignalR, or a DOM (this module has only type imports, no runtime deps).
 // The hook owns the effects (the SignalR connection, the timeline driver); this owns the state transitions.
 import type { MoveInfo } from '../types/BattleEvents';
-import type { Action, StatBlock, LogEntry, BiomeOption, RewardOption } from '../battle/timeline';
+import type { Action, StatBlock, LogEntry, BiomeOption, RewardOption, ShopOfferItem } from '../battle/timeline';
 
 export interface LevelUpPanel {
   level: number;
@@ -40,6 +40,14 @@ export interface RewardChoicePrompt {
   options: RewardOption[];
 }
 
+// An open Shop node's stock + the player's live balance (updated on each purchase so Buy buttons re-gate on
+// affordability). A blocking modal — the run waits server-side until the player leaves. Unlike the reward
+// pick-one-of-N, the shop is iterative: it stays open across purchases.
+export interface ShopPrompt {
+  items: ShopOfferItem[];
+  balance: number;
+}
+
 // A transient loot hover (gold + items) floated over the field, then auto-dismissed by the view. Shows the
 // *granted* reward (the option the player picked) after the blocking pick-one-of-N choice resolves — every
 // source (a battle-win drop and a Treasure/Mystery node) funnels its RewardGranted through this same hover.
@@ -72,6 +80,7 @@ export interface BattleState {
   evolution: EvolutionPrompt | null;
   biomeChoice: BiomeChoicePrompt | null;
   rewardChoice: RewardChoicePrompt | null;
+  shop: ShopPrompt | null;
   dropToast: DropToast | null;
   gold: number;
   log: LogEntry[];
@@ -102,6 +111,7 @@ export const initialState: BattleState = {
   evolution: null,
   biomeChoice: null,
   rewardChoice: null,
+  shop: null,
   dropToast: null,
   gold: 0,
   log: [],
@@ -205,6 +215,18 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
       return { ...state, rewardChoice: { source: action.source, options: action.options } };
     case 'HIDE_REWARD_CHOICE':
       return { ...state, rewardChoice: null };
+    case 'SHOW_SHOP':
+      return { ...state, shop: { items: action.items, balance: action.balance }, gold: action.balance };
+    case 'SHOP_PURCHASED':
+      // Update the modal's live balance (so Buy buttons re-gate) and the gold HUD in lockstep; the modal stays
+      // open for more buys. Guard the modal update in case it already closed (a late echo after Leave).
+      return {
+        ...state,
+        shop: state.shop ? { ...state.shop, balance: action.balance } : null,
+        gold: action.balance,
+      };
+    case 'HIDE_SHOP':
+      return { ...state, shop: null };
     case 'SET_GOLD':
       return { ...state, gold: action.gold };
     case 'SHOW_DROP':

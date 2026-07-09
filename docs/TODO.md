@@ -17,8 +17,10 @@ rarity rewards), and the **level-aware XP curve + trainer bonus** are all done a
    piece of Encounter Logic and the bridge into the deferred Catch cluster. `/plan` first.
 2. **Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by (1). *(Item acquisition
    itself is already done via the Run Economy; bag persistence + catch remain.)*
-3. **Shop node** — the one remaining Run Economy follow-up (spend-gold purchase modal).
-4. **Game Loop & Progression** — party, switching, save layer (`save.db`).
+3. **Game Loop & Progression** — party, switching, save layer (`save.db`).
+
+*(The **Shop node** — the last Run Economy follow-up — is now done: `ShopRunEvent` + `ShopCalculator`, a
+spend-gold buy modal. See below.)*
 
 Lower priority / opportunistic: E2E flakiness stabilisation, Web UI polish (move-specific animations),
 Multi-Generation groundwork, User Documentation.
@@ -47,10 +49,19 @@ modal) are done — currency, battle-win + Treasure/Mystery reward rolls, an ear
 end-to-end. Commits `ea41531` (A/B, audited **PASS-WITH-ADVISORIES**) + `7d9afc5` (C). 1267 tests green.
 **Full record → [`TODO_ARCHIVE.md`](TODO_ARCHIVE.md) → *Run Economy*.**
 
-**Remaining follow-up — the Shop node** (the one deferred piece): a between-encounter shop that **spends** the
-transient `Wallet` (`Wallet.TrySpend` is built and waiting). Needs a shop inventory + pricing + a purchase modal;
-`GameSessionManager` currently routes Shop nodes to the no-op `InteractionStubEvent` (banner + advance). `/plan`
-the inventory/pricing/purchase UX before building.
+**Follow-up — the Shop node** ✅ DONE (2026-07-09): a between-encounter shop that **spends** the transient
+`Wallet`. `ShopRunEvent` (replacing the old no-op `InteractionStubEvent`) rolls a per-visit, run-scaled stock via
+the web-layer `ShopCalculator` (rarity-derived prices — *not* the unaffordable Gen 1 `Item.Cost`), emits a
+blocking `ShopOffered`, then runs an iterative buy loop (`ChooseShopActionAsync` → buy/leave) charging the
+`Wallet` and filling the `Bag`. Full stack: core event + `IBattleInput`/`SignalRInput` handshake +
+`BattleHub.BuyShopItem`/`LeaveShop` + `SignalRBattleEventEmitter` projection + a React shop modal
+(`BattleScreen`). Buy-only MVP — selling / restock / persistence remain out of scope (persistence rides the
+deferred `save.db` layer). Two refinements from review: the shop is **affordability-gated** (a biome keeps a Shop
+node only when the wallet clears `ShopCalculator.MinItemPrice` at biome entry — no dead 0₽ shop, so the opening
+node is never a shop), and purchases respect the Gen 1 **99-per-slot** `Bag` ceiling (a buy that would overfill
+is refused before charging). Covered by `RunDirectorNodeTests` (buy/leave/no-op/headless/gate/99-cap),
+`ShopCalculatorTests` (pricing shape + seed), `BagTests` (99-cap), `WebEventContractTests` (wire projection),
+Vitest (`timeline` + `battleReducer`), and a Playwright `shop.spec` (earn gold → buy at a shop).
 
 ---
 

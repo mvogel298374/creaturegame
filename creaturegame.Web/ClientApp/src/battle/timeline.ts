@@ -47,6 +47,15 @@ export interface RewardOption {
   gold: number;
 }
 
+// One item on a Shop node's shelf, flat to match the wire projection (SignalRBattleEventEmitter.ProjectShopItem):
+// the resolved item id + name, its run-scaled price in ₽, and the rarity that drives the card accent colour.
+export interface ShopOfferItem {
+  itemId: number;
+  itemName: string;
+  price: number;
+  rarity: RewardRarity;
+}
+
 // View-state actions — consumed by the reducer in useBattleHub.
 export type Action =
   | { type: 'BATTLE_STARTED'; playerName: string; enemyName: string; enemySpeciesId: number; enemyLevel: number }
@@ -84,6 +93,11 @@ export type Action =
   // hidden by the player's pick. Blocks the run server-side until ChooseReward(index) answers.
   | { type: 'SHOW_REWARD_CHOICE'; source: string; options: RewardOption[] }
   | { type: 'HIDE_REWARD_CHOICE' }
+  // Shop node — a spend-gold buy modal that stays open across purchases, then hidden by the player's Leave.
+  // Blocks the run server-side until LeaveShop; each buy sends BuyShopItem(index) and echoes SHOP_PURCHASED.
+  | { type: 'SHOW_SHOP'; items: ShopOfferItem[]; balance: number }
+  | { type: 'SHOP_PURCHASED'; itemName: string; price: number; balance: number }
+  | { type: 'HIDE_SHOP' }
   // Run economy: set the gold total (RewardGranted carries the post-credit total) shown in the BAG money box.
   | { type: 'SET_GOLD'; gold: number }
   // Loot drop hover: a transient floating "you found …" toast (gold + items) shown over the field for a
@@ -386,6 +400,34 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       if (gold > 0 || itemNames.length > 0)
         steps.push(d({ type: 'SHOW_DROP', gold, itemNames }));
       return { steps };
+    }
+
+    case 'ShopOffered': {
+      // A Shop node opened: parse the stock off the wire and raise the buy modal. The run blocks server-side
+      // until LeaveShop (the same blocking-modal shape as the reward/biome choice), but the shop is iterative —
+      // the modal stays open across purchases (each BuyShopItem echoes a ShopItemPurchased), so no HIDE step
+      // here; the player's Leave closes it (optimistically in useBattleHub).
+      const shopItems: ShopOfferItem[] = ((payload.items as Array<Record<string, unknown>>) ?? []).map(o => ({
+        itemId: (o.itemId as number) ?? 0,
+        itemName: (o.itemName as string) ?? '',
+        price: (o.price as number) ?? 0,
+        rarity: o.rarity as RewardRarity,
+      }));
+      return { steps: [w(200), d({ type: 'SHOW_SHOP', items: shopItems, balance: payload.balance as number })] };
+    }
+
+    case 'ShopItemPurchased': {
+      // A shop purchase resolved: update the wallet (HUD + the modal's live balance so Buy buttons re-gate) and
+      // log a loot line. The modal stays open for more buys.
+      const boughtName = payload.itemName as string;
+      const price = payload.price as number;
+      const balance = payload.balance as number;
+      return { steps: [
+        w(150),
+        d({ type: 'SHOP_PURCHASED', itemName: boughtName, price, balance }),
+        d(log(`Bought ${boughtName} for ${price}₽!`, 'loot')),
+        w(200),
+      ] };
     }
 
     case 'RunNodeEntered': {

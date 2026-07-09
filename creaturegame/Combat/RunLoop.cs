@@ -152,6 +152,43 @@ public sealed record RewardChoice(IReadOnlyList<RewardOption> Options)
 /// one supplier delegate dispatch to the right web-layer roll (battle vs Treasure vs Mystery) by node kind.</summary>
 public sealed record RewardContext(RunNodeKind Source, int EnemyLevel, int Depth);
 
+// --- Shop (spend-gold purchase node) -----------------------------------------------------------------------
+
+/// <summary>One item on offer in a Shop node's stock: the resolved item id + display name, its run-scaled
+/// <see cref="Price"/> in ₽, and the <see cref="RewardRarity"/> it rolled at (for the client's card colour).
+/// Ids/names/prices are pre-resolved by the injected shop supplier (the web-layer <c>ShopCalculator</c>), so the
+/// core never touches the item catalog — the mirror of <see cref="ItemRewardOption"/> on the spend side.</summary>
+public sealed record ShopOfferItem(int ItemId, string ItemName, int Price, RewardRarity Rarity);
+
+/// <summary>A Shop node's stock: the items the player may buy this visit. Infinite quantity while affordable
+/// (Gen-1 style — re-buyable until the wallet runs out). <see cref="None"/> means no stock rolled (no supplier
+/// configured / empty catalog) — the node resolves silently, the mirror of <see cref="RewardChoice.None"/>.</summary>
+public sealed record ShopOffer(IReadOnlyList<ShopOfferItem> Items)
+{
+    public static readonly ShopOffer None = new([]);
+
+    public bool IsEmpty => Items.Count == 0;
+}
+
+/// <summary>What a shop-stock roll needs to know about the moment it fires, handed to the injected shop supplier
+/// (mirrors <see cref="RewardContext"/>): the run's progression <see cref="Depth"/>, which the web-layer policy
+/// scales stock rarity / price to.</summary>
+public sealed record ShopStockContext(int Depth);
+
+/// <summary>The player's choice each step of a Shop visit: buy the stock item at <see cref="BuyShopItem.Index"/>,
+/// or <see cref="LeaveShop"/> to end the visit. The shop event loops on this until the player leaves.</summary>
+public abstract record ShopAction;
+
+/// <summary>Buy the stock item at this index (into the offered <see cref="ShopOffer.Items"/>). An out-of-range
+/// or unaffordable index is a no-op downstream, so a stale pick never strands the run.</summary>
+public sealed record BuyShopItem(int Index) : ShopAction;
+
+/// <summary>End the shop visit — the run advances to the next node. Singleton (no state).</summary>
+public sealed record LeaveShop : ShopAction
+{
+    public static readonly LeaveShop Instance = new();
+}
+
 /// <summary>
 /// The typed result of an event, which the <see cref="RunDirector"/> reads to advance the run
 /// (<c>GAME_LOOP.md §3</c>). An event emits narration and may await input, then returns an <c>Outcome</c>; it
@@ -177,10 +214,9 @@ public sealed record RecoveryOutcome(bool Healed) : Outcome;
 public sealed record BiomeChoiceOutcome(BiomeDefinition Chosen) : Outcome;
 
 /// <summary>
-/// Outcome of an interaction-node bone (Shop / Treasure / Mystery): records which kind was visited so the
-/// director advances the biome. These nodes have no behaviour yet (<c>ENCOUNTER_DESIGN.md §5</c> — bones now,
-/// behaviour later); each graduates to its own richer outcome (bought/skipped, reward taken, …) when its
-/// behaviour lands.
+/// Outcome of an interaction node (Shop / Treasure / Mystery): records which kind was visited so the director
+/// advances the biome. The node's own effect (items bought, reward taken) is applied inside the event against
+/// the wallet/bag; this outcome only carries the sequencing fact (a node was resolved), not its economic result.
 /// </summary>
 public sealed record NodeVisitedOutcome(RunNodeKind Kind) : Outcome;
 

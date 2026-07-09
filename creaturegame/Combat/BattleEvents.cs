@@ -101,6 +101,17 @@ public record RewardGranted(string Source, int Gold, int GoldTotal, IReadOnlyLis
 /// <see cref="RewardGranted"/>. Each <see cref="RewardOption"/> is an item (id + name + rarity) or a gold bag.</summary>
 public record RewardChoiceOffered(string Source, IReadOnlyList<RewardOption> Options) : BattleEvent;
 
+/// <summary>A Shop node opened with this stock (<paramref name="Items"/>) and the player's current
+/// <paramref name="Balance"/> in ₽. A blocking event — the run loop awaits the player's buy/leave choices via
+/// <see cref="IBattleInput.ChooseShopActionAsync"/>, so the client raises the shop modal here. Each purchase is
+/// announced by a following <see cref="ShopItemPurchased"/>; the visit ends when the player leaves.</summary>
+public record ShopOffered(IReadOnlyList<ShopOfferItem> Items, int Balance) : BattleEvent;
+
+/// <summary>The player bought <paramref name="ItemName"/> for <paramref name="Price"/>₽; <paramref name="Balance"/>
+/// is the wallet balance after the spend (so the HUD/modal can set rather than subtract). The item was added to
+/// the bag.</summary>
+public record ShopItemPurchased(string ItemName, int Price, int Balance) : BattleEvent;
+
 // --- Move actions ---
 public record MoveUsed(string AttackerName, string MoveName) : BattleEvent;
 

@@ -127,7 +127,7 @@ GameLoop:                                       // the ONLY place that decides s
 | **Biome route choice** | interaction-event | ✅ implemented (Phase 3b, `BiomeChoiceEvent`) — the player charts the next leg through the biome graph; offer the candidate biomes → `ChooseBiomeAsync` → `BiomeChoiceOutcome` |
 | **Elite / boss battle** | loop-event | ✅ implemented (Phase 3c-1) — a `BattleRunEvent` carrying a generation-agnostic `EncounterTier` the web maps to a tougher `IEnemyArchetype`; placed by the biome **node plan** (Boss caps each biome). Not a separate event class — a parameterised battle node |
 | **Treasure / Mystery** | interaction-event | ✅ implemented (**Run Economy** → **Reward Choice**, `RewardRunEvent`) — roll a reward via an injected supplier, then offer the player a **pick-one-of-N** (two rarity-rolled items or a larger gold bag): emit `RewardChoiceOffered` → block on `ChooseRewardAsync` → credit the chosen option to the transient `Wallet` / `Bag` → emit `RewardGranted`. Treasure always rewards; Mystery is the wildcard (sometimes nothing). The player takes gold **or** one item, never both. Reward *policy* is web-layer (`RewardCalculator`), like enemy scaling — not a battle seam |
-| **Shop** | interaction-event | ✅ **bone** (Phase 3c-1, `InteractionStubEvent`) — banner + advance; spend-gold behaviour is the next follow-up (needs a purchase modal + `Wallet.TrySpend`) |
+| **Shop** | interaction-event | ✅ implemented (**Run Economy** → **Shop**, `ShopRunEvent`) — roll a run-scaled per-visit stock via an injected supplier (`ShopCalculator` — rarity-derived prices, not the unaffordable Gen 1 `Item.Cost`), emit `ShopOffered`, then run a spend-gold **buy loop**: block on `ChooseShopActionAsync` (buy/leave) → `Wallet.TrySpend` + `Bag.Add` + emit `ShopItemPurchased` per affordable buy → leave to advance. Iterative (buy several, then go), unlike the one-shot reward pick. Pricing *policy* is web-layer, not a battle seam |
 | Catch | interaction/loop-event | future — see `TODO.md` Catch Mechanic |
 | **Evolution** | interaction-event | ✅ implemented (`BattleRunEvent.TryEvolveAsync` in `RunDirector`) — on a level-up, offer → ALLOW/CANCEL → morph/decline. Data/decision injected via `checkEvolution` (web `EncounterFactory` + `IEvolutionRules`); see archive |
 | Party / lead swap | interaction-event | future — once a party exists |
@@ -153,11 +153,11 @@ timeline semantics (`timeline.ts` deciding `BattleEnded` ⇒ "announce next"). T
    the web layer still supplies the DB-backed enemy/evolution seams). Core stays generation- and
    data-agnostic. New node kinds branch `chooseNextEvent`; the loop body is now fixed.
 2. **Interaction-event plumbing — RESOLVED (Phases 3a/3b/3c-1).** The `IRunEvent.RunAsync(RunContext) → Outcome`
-   contract *is* the shared minimal plumbing: `RecoveryRunEvent`, `BiomeChoiceEvent`, and the
-   `InteractionStubEvent` bones (shop/treasure/mystery) all emit through `RunContext.Emitter` and await through
+   contract *is* the shared minimal plumbing: `RecoveryRunEvent`, `BiomeChoiceEvent`, `RewardRunEvent`
+   (treasure/mystery), and `ShopRunEvent` all emit through `RunContext.Emitter` and await through
    `RunContext.PlayerInput` (a thin slice of the same `IBattleInput` the battle uses — `ConfirmRecoveryAsync`,
-   `ChooseBiomeAsync`) with **no** `Battle` apparatus. New interaction events need only a `BattleEvent` (+ its
-   SignalR/timeline projection) and an `Outcome`.
+   `ChooseBiomeAsync`, `ChooseRewardAsync`, `ChooseShopActionAsync`) with **no** `Battle` apparatus. New
+   interaction events need only a `BattleEvent` (+ its SignalR/timeline projection) and an `Outcome`.
 3. **Event replay on reconnect — NOT A BUG; settled, do not re-open.** The recurring temptation is to flag that
    `SignalRBattleEventEmitter.Emit` drops events while no connection is bound, "so a reconnect desyncs the
    client." It does **not**, and this has been traced more than once — stop re-raising it as egregious. The

@@ -14,6 +14,7 @@ public sealed class SignalRInput : IBattleInput
     private volatile TaskCompletionSource<bool>? _evolutionTcs;
     private volatile TaskCompletionSource<string>? _biomeTcs;
     private volatile TaskCompletionSource<int>? _rewardChoiceTcs;
+    private volatile TaskCompletionSource<ShopAction>? _shopTcs;
     private volatile bool _cancelled;
 
     // The raw request the hub completes the turn handshake with, mapped to a TurnChoice below.
@@ -219,6 +220,33 @@ public sealed class SignalRInput : IBattleInput
     }
 
     /// <summary>
+    /// Awaits the player's next shop choice: buy a stock item or leave. Same TCS handshake as the other prompts
+    /// (the hub's <c>BuyShopItem</c>/<c>LeaveShop</c> complete it via <see cref="SetShopAction"/>); the shop node
+    /// loops on this, so it is awaited once per buy/leave. The <see cref="_cancelled"/> guard makes a disconnect
+    /// throw rather than hang the run in the shop. An out-of-range / unaffordable buy is tolerated downstream —
+    /// the run loop's <c>ShopRunEvent</c> treats it as a no-op and re-prompts.
+    /// </summary>
+    public async Task<ShopAction> ChooseShopActionAsync(ShopContext context)
+    {
+        if (_cancelled)
+            throw new OperationCanceledException("Battle input cancelled (client disconnected).");
+
+        var tcs = new TaskCompletionSource<ShopAction>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        _shopTcs = tcs;
+        var action = await tcs.Task; // throws OperationCanceledException if Cancel() ran
+        _shopTcs = null;
+        return action;
+    }
+
+    public void SetShopAction(ShopAction action)
+    {
+        var tcs = _shopTcs;
+        tcs?.TrySetResult(action);
+    }
+
+    /// <summary>
     /// Unblocks a battle loop waiting on player input when the client disconnects,
     /// so the fire-and-forget battle task can complete and be collected.
     /// </summary>
@@ -231,5 +259,6 @@ public sealed class SignalRInput : IBattleInput
         _evolutionTcs?.TrySetCanceled();
         _biomeTcs?.TrySetCanceled();
         _rewardChoiceTcs?.TrySetCanceled();
+        _shopTcs?.TrySetCanceled();
     }
 }

@@ -7,11 +7,12 @@ using creaturegame.Tests.TestSupport;
 namespace creaturegame.Tests.Integration.Flow;
 
 /// <summary>
-/// Phase 3c-1 node-kind bones in <see cref="RunDirector"/>: a biome's route is a plan of <see cref="RunNodeKind"/>
+/// Node-kind dispatch in <see cref="RunDirector"/>: a biome's route is a plan of <see cref="RunNodeKind"/>
 /// nodes the director dispatches — three battle tiers (mapped to a generation-agnostic <see cref="EncounterTier"/>
-/// the supplier consumes) and three interaction bones (Shop/Treasure/Mystery: emit a banner, advance the biome,
-/// no behaviour yet). The default layout caps each biome with a Boss apex. Enemies are supplied by a delegate
-/// (no DB), so these pin sequencing + the tier/banner wiring, not encounter contents.
+/// the supplier consumes) and three interaction nodes (Shop/Treasure/Mystery: emit a banner, advance the biome,
+/// and — for Shop/Treasure/Mystery — run their economy behaviour). The default layout caps each biome with a
+/// Boss apex. Enemies are supplied by a delegate (no DB), so these pin sequencing + the tier/banner wiring, not
+/// encounter contents.
 /// </summary>
 public class RunDirectorNodeTests
 {
@@ -768,6 +769,255 @@ public class RunDirectorNodeTests
             .Count(e => e.Source is "Treasure" or "Mystery");
         Assert.Equal(4, interactionRewards); // Treasure+Mystery × two biomes
         Assert.Single(recorder.Of<RunEnded>());
+    }
+
+    // --- Run Economy: the Shop node (spend-gold buy loop) --------------------------------------------------
+
+    // A single biome, Shop → Boss. The Boss is unbeatable, so the run ends at it — but only after the shop
+    // ahead of it has run its buy loop. Stock is a cheap Potion (8₽) and a premium Elixir (90₽).
+    private static readonly ShopOffer TwoItemStock = new([
+        new ShopOfferItem(17, "Potion", 8, RewardRarity.Common),
+        new ShopOfferItem(20, "Elixir", 90, RewardRarity.Epic),
+    ]);
+
+    private static (RunDirector runner, RecordingEmitter recorder) BuildShopRun(
+        ScriptedInput input,
+        Wallet wallet,
+        Bag bag,
+        Func<ShopStockContext, IRandomSource, ShopOffer>? shopSupplier,
+        int minShopBudget = 0
+    )
+    {
+        var solo = new BiomeDefinition("solo", "Solo", Region.Kanto, [DamageType.Normal], []);
+        IReadOnlyList<RunNodeKind> plan = [RunNodeKind.Shop, RunNodeKind.BossBattle];
+        var player = Fighter("Player", hp: 300, attack: 999, speed: 100, level: 50);
+        Func<Creature, int, BiomeDefinition?, EncounterTier, Task<Creature>> supplier = (
+            _,
+            _,
+            _,
+            _
+        ) => Task.FromResult(Fighter("Bruiser", hp: 999, attack: 999, speed: 999, level: 50));
+
+        var recorder = new RecordingEmitter();
+        var runner = new RunDirector(
+            player,
+            supplier,
+            Gen1TypeChart.Instance,
+            input,
+            input,
+            movePool: Array.Empty<Attack>(),
+            emitter: recorder,
+            rules: new ScriptableRules().Deterministic(),
+            rng: new SeededRandomSource(0),
+            playableBiomes: [solo],
+            minEventsPerBiome: 2,
+            maxEventsPerBiome: 2,
+            nodePlanFactory: (_, _) => plan,
+            playerBag: bag,
+            wallet: wallet,
+            shopSupplier: shopSupplier,
+            minShopBudget: minShopBudget
+        );
+        return (runner, recorder);
+    }
+
+    [Fact]
+    public async Task Shop_OffersStock_BuySpendsWalletFillsBag_AndAnnouncesEachPurchase()
+    {
+        var wallet = new Wallet();
+        wallet.Credit(100);
+        var bag = new Bag();
+        var input = new ScriptedInput("tackle").BuysThenLeaves(0, 0); // buy the Potion twice, then leave
+        var (runner, recorder) = BuildShopRun(input, wallet, bag, (_, _) => TwoItemStock);
+
+        await runner.RunAsync();
+
+        Assert.Equal(84, wallet.Balance); // 100 − 8 − 8
+        Assert.Equal(2, bag.Count(17)); // two Potions bought
+
+        // The shop opened once with the entry balance, then a purchase event per buy carrying the running balance.
+        var offered = Assert.Single(recorder.Of<ShopOffered>());
+        Assert.Equal(100, offered.Balance);
+        Assert.Equal(2, offered.Items.Count);
+
+        var buys = recorder.Of<ShopItemPurchased>().ToList();
+        Assert.Equal(2, buys.Count);
+        Assert.Equal(("Potion", 8, 92), (buys[0].ItemName, buys[0].Price, buys[0].Balance));
+        Assert.Equal(("Potion", 8, 84), (buys[1].ItemName, buys[1].Price, buys[1].Balance));
+
+        // The input saw the balance fall across the visit (entry 100 → after buy 1 92 → after buy 2 84).
+        Assert.Equal(
+            new[] { 100, 92, 84 },
+            input.ShopContextsSeen.Select(c => c.Balance).ToArray()
+        );
+    }
+
+    [Fact]
+    public async Task Shop_UnaffordableBuy_IsANoOp_NothingSpentOrBought()
+    {
+        var wallet = new Wallet();
+        wallet.Credit(10); // can't afford either item's price... except the Potion (8) — so buy the Elixir (90)
+        var bag = new Bag();
+        var input = new ScriptedInput("tackle").BuysThenLeaves(1); // try the 90₽ Elixir with only 10₽
+        var (runner, recorder) = BuildShopRun(input, wallet, bag, (_, _) => TwoItemStock);
+
+        await runner.RunAsync();
+
+        Assert.Equal(10, wallet.Balance); // untouched — the buy failed affordability
+        Assert.Equal(0, bag.Count(20));
+        Assert.Empty(recorder.Of<ShopItemPurchased>()); // no purchase announced
+        Assert.Single(recorder.Of<ShopOffered>()); // but the shop did open
+    }
+
+    [Fact]
+    public async Task Shop_OutOfRangeBuyIndex_IsANoOp_NothingSpentOrBought()
+    {
+        // A stale / malformed client index must never charge or strand the run: ShopRunEvent guards the index
+        // and treats an out-of-range buy as a no-op, then re-prompts (the script leaves next). Distinct from the
+        // unaffordable no-op above — this pins the index-bounds sibling guard.
+        var wallet = new Wallet();
+        wallet.Credit(100);
+        var bag = new Bag();
+        var input = new ScriptedInput("tackle").BuysThenLeaves(99); // overshoot every stock slot
+        var (runner, recorder) = BuildShopRun(input, wallet, bag, (_, _) => TwoItemStock);
+
+        await runner.RunAsync();
+
+        Assert.Equal(100, wallet.Balance); // untouched
+        Assert.Equal(0, bag.Entries.Values.Sum()); // nothing bought
+        Assert.Empty(recorder.Of<ShopItemPurchased>());
+        Assert.Single(recorder.Of<ShopOffered>()); // the shop still opened
+    }
+
+    [Fact]
+    public async Task Shop_NoSupplier_ResolvesSilently_BannerOnly()
+    {
+        var wallet = new Wallet();
+        wallet.Credit(100);
+        var bag = new Bag();
+        var input = new ScriptedInput("tackle").BuysThenLeaves(0); // would buy — but there's no stock to offer
+        var (runner, recorder) = BuildShopRun(input, wallet, bag, shopSupplier: null);
+
+        await runner.RunAsync();
+
+        // The Shop node still announces itself, but with no stock it never offers or charges anything.
+        Assert.Contains(recorder.Of<RunNodeEntered>(), e => e.Kind == "Shop");
+        Assert.Empty(recorder.Of<ShopOffered>());
+        Assert.Empty(recorder.Of<ShopItemPurchased>());
+        Assert.Empty(input.ShopContextsSeen); // the buy loop was never entered
+        Assert.Equal(100, wallet.Balance);
+    }
+
+    [Fact]
+    public async Task Shop_GatedOut_WhenWalletBelowMinBudget_BecomesAWildBattle()
+    {
+        // Affordability gate: a Shop is a dead node if the player can't afford the cheapest item, so a biome
+        // with the wallet below minShopBudget swaps its Shop slots for wild battles when the route is fixed. With
+        // a 0₽ wallet and a budget of 8, the planned Shop→Boss becomes WildBattle→Boss — no shop offered, no shop
+        // banner, and the swapped node runs as a battle (the unbeatable Bruiser ends the run there).
+        var wallet = new Wallet(); // 0₽ — below budget
+        var bag = new Bag();
+        var input = new ScriptedInput("tackle").BuysThenLeaves(0);
+        var (runner, recorder) = BuildShopRun(
+            input,
+            wallet,
+            bag,
+            (_, _) => TwoItemStock,
+            minShopBudget: 8
+        );
+
+        await runner.RunAsync();
+
+        Assert.Empty(recorder.Of<ShopOffered>());
+        Assert.Empty(input.ShopContextsSeen); // the buy loop never ran
+        Assert.DoesNotContain(recorder.Of<RunNodeEntered>(), e => e.Kind == "Shop"); // node 0 is a wild battle now
+    }
+
+    [Fact]
+    public async Task Shop_Kept_WhenWalletMeetsMinBudget_AndTheCheapestItemIsAffordable()
+    {
+        // The gate's boundary: a wallet exactly at minShopBudget keeps the Shop, and the cheapest item is buyable.
+        var wallet = new Wallet();
+        wallet.Credit(8); // exactly the budget / the Potion's price
+        var bag = new Bag();
+        var input = new ScriptedInput("tackle").BuysThenLeaves(0); // buy the 8₽ Potion
+        var (runner, recorder) = BuildShopRun(
+            input,
+            wallet,
+            bag,
+            (_, _) => TwoItemStock,
+            minShopBudget: 8
+        );
+
+        await runner.RunAsync();
+
+        Assert.Single(recorder.Of<ShopOffered>()); // shop kept — wallet cleared the budget
+        Assert.Equal(0, wallet.Balance); // spent the 8₽
+        Assert.Equal(1, bag.Count(17));
+    }
+
+    [Fact]
+    public async Task Shop_BuyRefused_WhenBagSlotAtNinetyNine_NoChargeNoPurchase()
+    {
+        // The Gen 1 99-per-slot ceiling: a buy that would overfill a slot is refused *before* charging, so the
+        // wallet is never spent on a clamped no-op. The bag already holds 99 Potions; the buy is a no-op.
+        var wallet = new Wallet();
+        wallet.Credit(100);
+        var bag = new Bag();
+        bag.Add(17, Bag.MaxPerSlot); // 99 Potions — the slot is full
+        var input = new ScriptedInput("tackle").BuysThenLeaves(0); // try to buy another Potion
+        var (runner, recorder) = BuildShopRun(input, wallet, bag, (_, _) => TwoItemStock);
+
+        await runner.RunAsync();
+
+        Assert.Equal(100, wallet.Balance); // untouched — the full-slot buy was refused before spending
+        Assert.Equal(Bag.MaxPerSlot, bag.Count(17)); // still 99, not overfilled
+        Assert.Empty(recorder.Of<ShopItemPurchased>());
+        Assert.Single(recorder.Of<ShopOffered>());
+    }
+
+    [Fact]
+    public async Task Shop_WithAutoSelectInput_DoesNotBlockHeadlessRun()
+    {
+        // The default (non-interactive) input never overrides ChooseShopActionAsync (leaves at once), so a
+        // headless run sails past the shop without buying or deadlocking on the modal.
+        var wallet = new Wallet();
+        wallet.Credit(100);
+        var solo = new BiomeDefinition("solo", "Solo", Region.Kanto, [DamageType.Normal], []);
+        IReadOnlyList<RunNodeKind> plan = [RunNodeKind.Shop, RunNodeKind.BossBattle];
+        var player = Fighter("Player", hp: 300, attack: 999, speed: 100, level: 50);
+        Func<Creature, int, BiomeDefinition?, EncounterTier, Task<Creature>> supplier = (
+            _,
+            _,
+            _,
+            _
+        ) => Task.FromResult(Fighter("Bruiser", hp: 999, attack: 999, speed: 999, level: 50));
+
+        var recorder = new RecordingEmitter();
+        var runner = new RunDirector(
+            player,
+            supplier,
+            Gen1TypeChart.Instance,
+            AutoSelectInput.Instance,
+            AutoSelectInput.Instance,
+            movePool: Array.Empty<Attack>(),
+            emitter: recorder,
+            rules: new ScriptableRules().Deterministic(),
+            rng: new SeededRandomSource(0),
+            playableBiomes: [solo],
+            minEventsPerBiome: 2,
+            maxEventsPerBiome: 2,
+            nodePlanFactory: (_, _) => plan,
+            wallet: wallet,
+            shopSupplier: (_, _) => TwoItemStock
+        );
+
+        await runner.RunAsync(); // completing at all (no deadlock) is the assertion
+
+        Assert.Single(recorder.Of<ShopOffered>());
+        Assert.Empty(recorder.Of<ShopItemPurchased>()); // auto input bought nothing
+        Assert.Single(recorder.Of<RunEnded>());
+        Assert.Equal(100, wallet.Balance); // nothing spent headless
     }
 
     private static Creature Fighter(string name, int hp, int attack, int speed, int level)

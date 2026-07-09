@@ -99,6 +99,38 @@ describe('battleReducer — modal gating', () => {
   });
 });
 
+describe('battleReducer — shop', () => {
+  const stock = [
+    { itemId: 17, itemName: 'potion', price: 8, rarity: 'Common' as const },
+    { itemId: 20, itemName: 'elixir', price: 90, rarity: 'Epic' as const },
+  ];
+
+  it('SHOW_SHOP opens the modal with stock and seeds the gold HUD from the balance', () => {
+    const shop = battleReducer(ready(), { type: 'SHOW_SHOP', items: stock, balance: 142 });
+    expect(shop.shop).toEqual({ items: stock, balance: 142 });
+    expect(shop.gold).toBe(142); // the HUD tracks the shop balance
+  });
+
+  it('SHOP_PURCHASED lowers the modal balance and the gold HUD in lockstep, modal stays open', () => {
+    const shop = battleReducer(ready(), { type: 'SHOW_SHOP', items: stock, balance: 142 });
+    const bought = battleReducer(shop, { type: 'SHOP_PURCHASED', itemName: 'potion', price: 8, balance: 134 });
+    expect(bought.shop).toEqual({ items: stock, balance: 134 }); // still open, balance updated
+    expect(bought.gold).toBe(134);
+  });
+
+  it('SHOP_PURCHASED after the modal already closed still updates gold but leaves shop null (late echo)', () => {
+    const closed = battleReducer(ready({ gold: 100 }), { type: 'HIDE_SHOP' });
+    const late = battleReducer(closed, { type: 'SHOP_PURCHASED', itemName: 'potion', price: 8, balance: 92 });
+    expect(late.shop).toBeNull();
+    expect(late.gold).toBe(92);
+  });
+
+  it('HIDE_SHOP clears the modal', () => {
+    const shop = battleReducer(ready(), { type: 'SHOW_SHOP', items: stock, balance: 50 });
+    expect(battleReducer(shop, { type: 'HIDE_SHOP' }).shop).toBeNull();
+  });
+});
+
 describe('battleReducer — phase transitions', () => {
   it('BATTLE_STARTED resets the enemy nameplate for the incoming foe', () => {
     // The previous foe fainted at 0 HP; the new one must show a full estimate bar during slide-in

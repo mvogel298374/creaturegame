@@ -77,6 +77,31 @@ public sealed class ScriptedInput(params string[] moveNames) : IBattleInput
         RewardChoicesOffered.Add(context);
         return Task.FromResult(_rewardPick);
     }
+
+    private readonly Queue<ShopAction> _shopScript = new();
+
+    /// <summary>Scripts a shop visit: buy each of these stock indices in order, then leave. When the script is
+    /// exhausted the input leaves (so a visit always terminates — a bare unscripted shop just leaves at once,
+    /// same as the interface default). Returned by <see cref="ChooseShopActionAsync"/>.</summary>
+    public ScriptedInput BuysThenLeaves(params int[] indices)
+    {
+        foreach (var i in indices)
+            _shopScript.Enqueue(new BuyShopItem(i));
+        return this;
+    }
+
+    /// <summary>Shop stock offers this input has been asked to act on, in order — lets a test inspect the stock
+    /// and the live balance presented at each buy/leave step (one entry per prompt, so a two-buy visit records
+    /// three: after entry, after buy 1, after buy 2).</summary>
+    public List<ShopContext> ShopContextsSeen { get; } = [];
+
+    public Task<ShopAction> ChooseShopActionAsync(ShopContext context)
+    {
+        ShopContextsSeen.Add(context);
+        return Task.FromResult(
+            _shopScript.Count > 0 ? _shopScript.Dequeue() : (ShopAction)LeaveShop.Instance
+        );
+    }
 }
 
 /// <summary>

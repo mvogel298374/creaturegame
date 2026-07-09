@@ -987,6 +987,122 @@
 .reward-card--gold:hover,
 .reward-card--gold:focus-visible { box-shadow: 0 0 14px rgba(242, 215, 94, 0.5); }
 
+/* Shop node — a spend-gold buy modal. Iterative (stays open across purchases), so it lists stock as rows with a
+   per-item Buy button rather than the reward modal's one-shot cards. Gold-accented like the reward modal. */
+.shop-modal {
+  min-width: 300px;
+  max-width: 94%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--clr-bg-deep);
+  border: 2px solid #e6c24a;
+  border-radius: 4px;
+  padding: var(--sp-md) var(--sp-lg);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6), 0 0 24px rgba(242, 215, 94, 0.22);
+}
+
+.shop-title {
+  font-size: var(--fs-base);
+  font-weight: 700;
+  letter-spacing: var(--ls-normal);
+  color: #f2d75e;
+  text-align: center;
+}
+
+.shop-sub {
+  font-size: var(--fs-sm);
+  color: var(--clr-text);
+  text-align: center;
+  margin-bottom: var(--sp-md);
+}
+.shop-balance { color: #f2d75e; font-weight: 700; }
+
+.shop-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-sm);
+  width: 100%;
+}
+
+/* One stock row: icon → name → rarity tag → Buy button (price). The rarity modifier tints the left border. */
+.shop-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-sm);
+  padding: var(--sp-sm) var(--sp-md);
+  background: var(--clr-bg);
+  border: 1px solid var(--clr-text-dim, #6b7280);
+  border-left-width: 3px;
+  border-radius: 4px;
+  color: var(--clr-text);
+}
+.shop-item-icon { font-size: var(--fs-base); line-height: 1; }
+.shop-item-name {
+  flex: 1 1 auto;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  letter-spacing: var(--ls-tight);
+}
+.shop-item-tag {
+  font-size: var(--fs-xs);
+  letter-spacing: var(--ls-normal);
+  opacity: 0.7;
+}
+
+/* Rarity accents on the left border — reuses the reward palette. */
+.shop-item--common   { border-left-color: #9aa4b2; }
+.shop-item--uncommon { border-left-color: #8fd08f; }
+.shop-item--rare     { border-left-color: var(--clr-sky); }
+.shop-item--epic     { border-left-color: #c07be0; }
+.shop-item--epic .shop-item-tag { color: #c07be0; }
+
+.shop-buy-btn {
+  flex: 0 0 auto;
+  min-width: 56px;
+  padding: 6px var(--sp-sm);
+  background: var(--clr-bg-deep);
+  border: 1px solid #e6c24a;
+  border-radius: 4px;
+  color: #f2d75e;
+  font-weight: 700;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  transition: transform 90ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+.shop-buy-btn:hover:not(:disabled),
+.shop-buy-btn:focus-visible:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 0 12px rgba(242, 215, 94, 0.5);
+  outline: none;
+}
+.shop-buy-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  color: var(--clr-text-dim, #6b7280);
+  border-color: var(--clr-text-dim, #6b7280);
+}
+
+.shop-leave-btn {
+  margin-top: var(--sp-md);
+  padding: var(--sp-sm) var(--sp-lg);
+  background: var(--clr-bg);
+  border: 1px solid var(--clr-text-dim, #6b7280);
+  border-radius: 4px;
+  color: var(--clr-text);
+  font-weight: 700;
+  font-size: var(--fs-sm);
+  letter-spacing: var(--ls-normal);
+  cursor: pointer;
+  transition: transform 90ms ease, background 120ms ease;
+}
+.shop-leave-btn:hover,
+.shop-leave-btn:focus-visible {
+  transform: translateY(-2px);
+  background: var(--clr-bg-deep);
+  outline: none;
+}
+
 /* ── Bag money box (run-scoped wallet, shown atop the BAG menu) ── */
 .bag-gold {
   display: flex;

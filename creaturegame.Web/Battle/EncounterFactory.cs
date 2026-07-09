@@ -140,6 +140,20 @@ public sealed class EncounterFactory(
     }
 
     /// <summary>
+    /// Builds the run's shop supplier: the injected <c>Func&lt;ShopStockContext, IRandomSource, ShopOffer&gt;</c>
+    /// <see cref="RunDirector"/> rolls when a Shop node opens. Closes over the same usable-item subset as the
+    /// reward supplier once per run; <see cref="ShopCalculator.BuildStock"/> rolls the per-visit stock and its
+    /// run-scaled prices (spend-side run-layer tuning, not a battle seam — the mirror of the reward supplier).
+    /// </summary>
+    internal static Func<ShopStockContext, IRandomSource, ShopOffer> BuildShopSupplier(
+        IReadOnlyList<Item> allItems
+    )
+    {
+        var usable = RewardCalculator.UsableItems(allItems);
+        return (ctx, rng) => ShopCalculator.BuildStock(ctx.Depth, usable, rng);
+    }
+
+    /// <summary>
     /// The biomes for <paramref name="region"/> that can actually generate against the active generation's
     /// wild-available species (legendaries/statics/gifts excluded — the same filter as
     /// <see cref="CreateEnemyAsync"/>). Empty biomes never appear; if no availability data exists (a minimally

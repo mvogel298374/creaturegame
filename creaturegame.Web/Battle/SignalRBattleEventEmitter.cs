@@ -123,6 +123,19 @@ public sealed class SignalRBattleEventEmitter(
                 "RewardChoiceOffered",
                 new { e.Source, Options = e.Options.Select(ProjectRewardOption) }
             ),
+            ShopOffered e => (
+                "ShopOffered",
+                new { Items = e.Items.Select(ProjectShopItem), e.Balance }
+            ),
+            ShopItemPurchased e => (
+                "ShopItemPurchased",
+                new
+                {
+                    e.ItemName,
+                    e.Price,
+                    e.Balance,
+                }
+            ),
             ItemUsed e => ("ItemUsed", new { e.ItemName, e.TargetName }),
             PpRestored e => (
                 "PpRestored",
@@ -365,5 +378,17 @@ public sealed class SignalRBattleEventEmitter(
                 Rarity = (string?)null,
                 Gold = 0,
             },
+        };
+
+    // Projects one shop stock item to the wire shape the client's shop modal reads (id + name + price + rarity
+    // colour). Mirrors ProjectRewardOption's field-level projection — the recurring web event field-projection
+    // gap (a new ShopOfferItem field is invisible on the wire until it's added here).
+    private static object ProjectShopItem(ShopOfferItem item) =>
+        new
+        {
+            item.ItemId,
+            ItemName = (string?)item.ItemName,
+            item.Price,
+            Rarity = item.Rarity.ToString(),
         };
 }

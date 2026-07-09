@@ -52,6 +52,7 @@ export async function startBattle(
   // (Treasure/Mystery), whose choice modal blocks first, so clear that before waiting on the fight menu.
   await page.locator('.biome-card').first().click({ timeout: 15_000 });
   await expect(async () => {
+    await leaveShopIfPresent(page);
     await dismissRewardChoiceIfPresent(page);
     expect(await fightButton(page).isEnabled().catch(() => false)).toBe(true);
   }).toPass({ timeout: 20_000 });
@@ -63,6 +64,19 @@ export async function chooseBiomeIfPresent(page: Page): Promise<boolean> {
   const firstCard = page.locator('.biome-card').first();
   if (await firstCard.isVisible().catch(() => false)) {
     await firstCard.click();
+    return true;
+  }
+  return false;
+}
+
+/** Leaves a Shop node's buy modal if one is up (a shop is a blocking between-node modal, like the reward/biome
+ * choice). A shop-first node opens with an empty wallet, so there's nothing to buy — the play loop and
+ * startBattle just leave to keep the run flowing (shop *purchasing* is covered by shop.spec + unit tests).
+ * Returns whether it acted. */
+export async function leaveShopIfPresent(page: Page): Promise<boolean> {
+  const leave = page.locator('.shop-leave-btn');
+  if (await leave.isVisible().catch(() => false)) {
+    await leave.click();
     return true;
   }
   return false;
@@ -142,8 +156,9 @@ async function attackUntil(
 ): Promise<string[]> {
   for (let i = 0; i < maxTurns; i++) {
     if (done(await logLines(page))) break;
-    // A battle win (and a Treasure/Mystery node) now blocks on a reward-choice modal — take the gold bag to
-    // release the run loop so the chain continues to the next encounter.
+    // Between-node blocking modals must be cleared to keep the chain flowing: leave a Shop (nothing to buy in
+    // an auto-played run) and take the gold bag at a reward node (battle win / Treasure / Mystery).
+    await leaveShopIfPresent(page);
     await dismissRewardChoiceIfPresent(page);
     if (await fightButton(page).isEnabled().catch(() => false)) {
       // A turn/battle can end mid-choice (the move we picked is lethal); the click on the
@@ -183,6 +198,9 @@ export async function playToLevelUp(page: Page, maxTurns = 60): Promise<string[]
   const grew = (log: string[]) => log.some(l => /grew to level \d+!/.test(l));
   for (let i = 0; i < maxTurns; i++) {
     if (grew(await logLines(page))) break;
+    // Leave a Shop node if one blocks before the level-up win (nothing to buy in an auto-played run). The
+    // post-win reward modal is deliberately NOT dismissed here — the level-up specs assert it themselves.
+    await leaveShopIfPresent(page);
     if (await fightButton(page).isEnabled().catch(() => false)) {
       // A lethal hit ends the turn mid-choice and disables the button; swallow and let the loop re-check.
       await chooseMove(page).catch(() => {});

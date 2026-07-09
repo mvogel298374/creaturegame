@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { TypeBadge } from '../components/TypeBadge';
 import { BattleCanvas } from '../battle/BattleCanvas';
-import { useBattleHub, type LevelUpPanel, type MoveReplacementPrompt, type RecoveryPrompt, type EvolutionPrompt, type BiomeChoicePrompt, type RewardChoicePrompt, type DropToast } from '../hooks/useBattleHub';
+import { useBattleHub, type LevelUpPanel, type MoveReplacementPrompt, type RecoveryPrompt, type EvolutionPrompt, type BiomeChoicePrompt, type RewardChoicePrompt, type ShopPrompt, type DropToast } from '../hooks/useBattleHub';
 import type { Species } from '../types/Species';
 import type { MoveInfo } from '../types/BattleEvents';
 import { formatMoveName } from '../utils/format';
@@ -29,7 +29,7 @@ export function BattleScreen() {
   const gameId: string | null = location.state?.gameId ?? null;
   const startLevel: number = location.state?.level ?? 50;
 
-  const { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, dismissDrop } = useBattleHub(gameId, startLevel);
+  const { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, buyShopItem, leaveShop, dismissDrop } = useBattleHub(gameId, startLevel);
   const [controlView, setControlView] = useState<ControlView>('menu');
   const logRef = useRef<HTMLDivElement>(null);
 
@@ -168,6 +168,10 @@ export function BattleScreen() {
 
       {state.rewardChoice && (
         <RewardChoiceModal prompt={state.rewardChoice} onChoose={chooseReward} />
+      )}
+
+      {state.shop && (
+        <ShopModal prompt={state.shop} onBuy={buyShopItem} onLeave={leaveShop} />
       )}
 
       {state.phase === 'ended' && (
@@ -372,6 +376,47 @@ function RewardChoiceModal({ prompt, onChoose }: {
             </button>
           ))}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// Shop node: a spend-gold buy modal. Unlike the one-shot reward pick, the shop is iterative — it stays open
+// across purchases, each Buy sends BuyShopItem(index) and the balance updates live (Buy disables when the item
+// costs more than the current balance). Leave ends the visit and advances the run. Prices are run-scaled ₽.
+function ShopModal({ prompt, onBuy, onLeave }: {
+  prompt: ShopPrompt;
+  onBuy: (index: number) => void;
+  onLeave: () => void;
+}) {
+  return (
+    <div className="modal-overlay">
+      <div className="shop-modal" role="alertdialog" aria-label="Shop">
+        <p className="shop-title">Shop</p>
+        <p className="shop-sub">Balance: <span className="shop-balance">{prompt.balance}₽</span></p>
+        <div className="shop-items">
+          {prompt.items.map((item, i) => {
+            const affordable = item.price <= prompt.balance;
+            return (
+              <div
+                key={i}
+                className={`shop-item shop-item--${item.rarity.toLowerCase()}`}
+              >
+                <span className="shop-item-icon" aria-hidden="true">✦</span>
+                <span className="shop-item-name">{formatItemName(item.itemName)}</span>
+                <span className="shop-item-tag">{item.rarity.toUpperCase()}</span>
+                <button
+                  className="shop-buy-btn"
+                  disabled={!affordable}
+                  onClick={() => onBuy(i)}
+                >
+                  {item.price}₽
+                </button>
+              </div>
+            );
+          })}
+        </div>
+        <button className="shop-leave-btn" onClick={onLeave}>Leave</button>
       </div>
     </div>
   );

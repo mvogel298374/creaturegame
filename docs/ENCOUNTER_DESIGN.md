@@ -269,7 +269,7 @@ the interaction kinds are reachable bones awaiting behaviour:**
 | Wild battle | loop-event | ✅ `BattleRunEvent` (Normal tier) |
 | Elite / Boss | loop-event | ✅ `BattleRunEvent` on `EncounterTier` Elite/Boss (3c-1); **Boss caps each biome** |
 | Rest / Poké Center | interaction-event | ✅ `RecoveryRunEvent` |
-| Shop | interaction-event | ✅ bone (`InteractionStubEvent`, 3c-1) — banner + advance; spend-gold behaviour = next follow-up |
+| Shop | interaction-event | ✅ **Run Economy → Shop** — `ShopRunEvent`: rolls run-scaled stock (`ShopCalculator`), then a spend-gold buy loop (`ShopOffered` → `ChooseShopActionAsync`, buy/leave) against the `Wallet`/`Bag`. **Affordability-gated:** a biome only keeps a Shop node if the wallet clears the cheapest stock price (`ShopCalculator.MinItemPrice`) when the route is fixed at biome entry — so a broke player never gets a dead, all-unaffordable shop (the opening 0₽ node is never a shop). Purchases respect the Gen 1 **99-per-slot** bag ceiling (`Bag.MaxPerSlot`) — a buy that would overfill is refused before charging |
 | Mystery / Event | interaction-event | ✅ **Run Economy → Reward Choice** — `RewardRunEvent`: rolls a wildcard reward (sometimes nothing), else offers a **pick-one-of-N** (`RewardChoiceOffered` → `ChooseRewardAsync`) — one item or the gold bag |
 | Treasure / Reward | interaction-event | ✅ **Run Economy → Reward Choice** — `RewardRunEvent`: always rewards; offers a **pick-one-of-N** (two rarity-rolled items or a larger gold bag) — the player takes one, never both |
 
@@ -325,8 +325,9 @@ generation-agnostic and data-agnostic.
    elite / boss battles + shop / treasure / mystery interaction bones) the director dispatches via
    `EventForNode`, each biome capped by a **Boss** apex (§4). Tier selection respects layering: the core passes a
    generation-agnostic `EncounterTier {Normal,Elite,Boss}` through the enemy supplier and the web maps it to an
-   archetype (`EnemyArchetypes.For`), the same intent/mapping split as `DvQuality`. Interaction nodes are
-   `InteractionStubEvent` bones (emit a `RunNodeEntered` banner, advance the biome, behaviour later). **3c-2 ✅
+   archetype (`EnemyArchetypes.For`), the same intent/mapping split as `DvQuality`. Interaction nodes each have
+   their own `IRunEvent` (Treasure/Mystery → `RewardRunEvent`, Shop → `ShopRunEvent`, Rest → `RecoveryRunEvent`).
+   **3c-2 ✅
    DONE (2026-06-28):** the interior distribution is now a battle-heavy tuned table (Wild 70 / Elite 18 /
    Treasure 6 / Shop 4 / Mystery 2, independent per slot) and the foe-scaling axis is **biome-position depth**
    (`RunState.RunDepth` = nodes traversed) instead of the `battlesWon` proxy (§3.2). **Phase 3 is complete** —
@@ -346,5 +347,5 @@ Each phase is shippable on its own and tightens the existing endless chain towar
   phase-3 detail.
 - **Currency** — ✅ done (**Run Economy → Reward Choice**): a transient per-run `Wallet`, earned from battle-win
   drops and Treasure/Mystery nodes via a **pick-one-of-N** offer (gold bag **or** one item, never both; web-layer
-  `RewardCalculator` policy). **Shop economy** (what the shop spends it on) is the remaining follow-up, designed
-  when the Shop node is fleshed out.
+  `RewardCalculator` policy). **Shop economy** — ✅ done: the `ShopRunEvent` spends the wallet on a per-visit,
+  run-scaled stock (`ShopCalculator` — rarity-derived prices, not the unaffordable Gen 1 `Item.Cost`).

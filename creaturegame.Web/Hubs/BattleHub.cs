@@ -88,6 +88,27 @@ public class BattleHub(GameSessionManager manager) : Hub<IBattleClient>
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Buys the shop stock item at <paramref name="index"/> — completes the shop input TCS the run loop is
+    /// blocked on with a <see cref="BuyShopItem"/>. The shop node loops, so the modal stays open for more buys;
+    /// an out-of-range / unaffordable index is tolerated (a no-op that re-prompts). Fire-and-forget, like the
+    /// other prompt answers.
+    /// </summary>
+    public Task BuyShopItem(int index)
+    {
+        // Fully-qualified: this hub method's name shadows the record type of the same name in the class scope.
+        manager.SetShopAction(Context.ConnectionId, new creaturegame.Combat.BuyShopItem(index));
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Leaves the shop — completes the shop input TCS with <c>LeaveShop</c> so the run advances to the
+    /// next node.</summary>
+    public Task LeaveShop()
+    {
+        manager.SetShopAction(Context.ConnectionId, creaturegame.Combat.LeaveShop.Instance);
+        return Task.CompletedTask;
+    }
+
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         // Start the reconnect grace window; the battle is abandoned only if the client
