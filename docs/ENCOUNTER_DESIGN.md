@@ -66,7 +66,7 @@ JSON static file later if designers need to edit without a rebuild.)
 
 ```
 enum Region              { Kanto, … }                                   // a content-grouping axis (= the multi-gen axis)
-record BiomeDefinition   ( Id, Name, Region, Types[1..3], Neighbours[] ) // Neighbours authored now, TRAVERSED in Phase 3
+record BiomeDefinition   ( Id, Name, Region, Types[1..3], Neighbours[], MapX, MapY ) // Neighbours TRAVERSED in Phase 3; MapX/MapY = authored region-map coords (Encounter Map)
    .Contains(species)    => Type1 ∈ Types || Type2 ∈ Types              // either-type match
    .HasAnyIn(pool)       => any on-theme species in pool
 static Biomes            // the registry — region ⇒ biome list
@@ -296,7 +296,7 @@ so nodes drop in without the loop body changing. `BattleRunner` has graduated in
 | Depth-scaled BST + level band | `ScaleTargetBst`/`ScaleWildLevel`, `CreateEnemyAsync` (`depth`), `BattleRunner` supplier | ✅ **done (Phase 2c)** — depth = `battlesWon` |
 | `IEnemyArchetype` tiers + `TmEnhanced`/`Optimal` movesets | `EnemyArchetype.cs` (new), `LearnsetMoveSelector`, `EncounterFactory` | ✅ **done (Phase 2d)** — tier *selection* per encounter is Phase 3 |
 | Event model + `chooseNextEvent` | `BattleRunner.RunAsync` (hardcoded `while`) → `RunDirector` + `RunLoop.cs` | ✅ **done (Phase 3a)** — `IRunEvent`/`Outcome`/`RunContext`, single sequencer; battle + recovery first-class |
-| Biome graph map traversal | `RunDirector` walks a seeded route (`BiomeChoiceEvent` + `ChooseBiomeAsync` seam); threads the biome into `CreateEnemyAsync` | ✅ **done (Phase 3b)** — 3b-1 backend + 3b-2 map screen; biome mode live (`RunSetup.PlayableBiomes` → session → director; `BiomeChoiceModal`) |
+| Biome graph map traversal | `RunDirector` walks a seeded route (`BiomeChoiceEvent` + `ChooseBiomeAsync` seam); threads the biome into `CreateEnemyAsync` | ✅ **done (Phase 3b)** — 3b-1 backend + 3b-2 map screen; biome mode live (`RunSetup.PlayableBiomes` → session → director). The route pick is now the **Encounter Map** overlay — `RouteChoiceMap` on the region graph (replaced the earlier `BiomeChoiceModal` cards) |
 | Node bones | new `IRunEvent` stubs (shop/treasure/mystery/elite/boss) + node-derived tier *selection* | ✅ **done (Phase 3c)** — 3c-1 seeded `BiomeNodePlan` dispatched by `EventForNode`, `EncounterTier` intent (core) → `EnemyArchetypes.For` (web), Boss apex per biome; 3c-2 tuned the interior distribution + biome-position depth (`RunState.RunDepth`) |
 | Acquisition channels | deferred `TODO.md` Catch cluster | gated on §1–§5 |
 

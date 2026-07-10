@@ -304,7 +304,9 @@ public class WebEventContractTests
                 "phantom-marsh",
                 "Phantom Marsh",
                 [DamageType.Ghost, DamageType.Poison],
-                ["mire-swamp", "haunted-spire"]
+                ["mire-swamp", "haunted-spire"],
+                MapX: 54,
+                MapY: 84
             ),
         ]);
 
@@ -318,6 +320,9 @@ public class WebEventContractTests
         Assert.Equal("Ghost", biome.GetProperty("Types")[0].GetString());
         Assert.Equal("mire-swamp", biome.GetProperty("Neighbours")[0].GetString());
         Assert.Equal("haunted-spire", biome.GetProperty("Neighbours")[1].GetString());
+        // The authored map coords ride the wire too (the region-map overlay positions waypoints from them).
+        Assert.Equal(54, biome.GetProperty("MapX").GetInt32());
+        Assert.Equal(84, biome.GetProperty("MapY").GetInt32());
     }
 
     /// <summary>Field-level guard for the <see cref="RewardGranted"/> projection: the client reads the source,

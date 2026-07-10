@@ -267,12 +267,12 @@ describe('expandEvent — control plane vs timeline', () => {
     expect((show!.action as Extract<Action, { type: 'SHOW_BIOME_CHOICE' }>).options).toEqual([]);
   });
 
-  it('BiomeEntered titles the next leg of the route and the encounter-map ladder', () => {
+  it('BiomeEntered titles the next leg of the route and traces it on the map (by id + name)', () => {
     const { steps } = expandEvent('BiomeEntered', {
       biomeId: 'phantom-marsh', biomeName: 'Phantom Marsh', types: ['Ghost', 'Poison'],
     }, CTX);
     expect(logLines(steps)).toEqual(['Entered Phantom Marsh!']);
-    expect(dispatched(steps)).toContainEqual({ type: 'MAP_BIOME_ENTERED', biomeName: 'Phantom Marsh' });
+    expect(dispatched(steps)).toContainEqual({ type: 'MAP_BIOME_ENTERED', biomeId: 'phantom-marsh', biomeName: 'Phantom Marsh' });
   });
 
   it.each([
@@ -305,10 +305,20 @@ describe('expandEvent — control plane vs timeline', () => {
     expect(logLines(steps)).toEqual([]);
   });
 
-  it('RegionMapRevealed emits nothing on the battle timeline (drawn by the Phase 3 region overlay)', () => {
-    const { steps, now } = expandEvent('RegionMapRevealed', { biomes: [] }, CTX);
-    expect(steps ?? []).toEqual([]);
-    expect(now ?? []).toEqual([]);
+  it('RegionMapRevealed feeds the region-map overlay the playable biome graph (id/types/edges/coords)', () => {
+    const { steps } = expandEvent('RegionMapRevealed', {
+      biomes: [
+        { id: 'a', name: 'Alpha', types: ['Fire'], neighbours: ['b'], mapX: 10, mapY: 20 },
+        { id: 'b', name: 'Beta', types: ['Water'], neighbours: ['a'], mapX: 30, mapY: 40 },
+      ],
+    }, CTX);
+    expect(dispatched(steps)).toEqual([
+      { type: 'REGION_MAP_REVEALED', biomes: [
+        { id: 'a', name: 'Alpha', types: ['Fire'], neighbours: ['b'], x: 10, y: 20 },
+        { id: 'b', name: 'Beta', types: ['Water'], neighbours: ['a'], x: 30, y: 40 },
+      ] },
+    ]);
+    expect(logLines(steps)).toEqual([]);
   });
 
   it('RecoveryOffered advances the map pin onto the synthesized Poké Center (Rest) cap', () => {

@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { TypeBadge } from '../components/TypeBadge';
+import { TypeBadge, typeColor } from '../components/TypeBadge';
 import { BattleCanvas } from '../battle/BattleCanvas';
-import { useBattleHub, type LevelUpPanel, type MoveReplacementPrompt, type RecoveryPrompt, type EvolutionPrompt, type BiomeChoicePrompt, type RewardChoicePrompt, type ShopPrompt, type DropToast } from '../hooks/useBattleHub';
+import { useBattleHub, type LevelUpPanel, type MoveReplacementPrompt, type RecoveryPrompt, type EvolutionPrompt, type RewardChoicePrompt, type ShopPrompt, type DropToast } from '../hooks/useBattleHub';
+import type { RegionBiome, BiomeOption } from '../battle/timeline';
+import { regionEdgeKey, travelledEdgeKeys } from '../battle/regionMap';
 import type { Species } from '../types/Species';
 import type { MoveInfo } from '../types/BattleEvents';
 import { formatMoveName } from '../utils/format';
@@ -122,9 +124,9 @@ export function BattleScreen() {
 
         {state.dropToast && <DropHover drop={state.dropToast} />}
 
-        {/* Encounter map (biome mode only — the legacy chain has no node plan). The MAP button pins it open; it
+        {/* Encounter map (biome mode only — the legacy chain has no region graph). The MAP button pins it open; it
             also auto-peeks at each ladder change. Presentation over the run — the route is fixed and logic-driven. */}
-        {state.mapNodePlan.length > 0 && (
+        {state.regionBiomes.length > 0 && (
           <>
             <button
               className={`map-toggle-btn${mapPinned ? ' map-toggle-btn--on' : ''}`}
@@ -135,7 +137,10 @@ export function BattleScreen() {
               MAP
             </button>
             {(mapPinned || mapPeek) && (
-              <EncounterLadder
+              <RunMapPanel
+                biomes={state.regionBiomes}
+                routePath={state.routePath}
+                currentId={state.currentBiomeId}
                 biomeName={state.mapBiomeName}
                 nodePlan={state.mapNodePlan}
                 pin={state.mapPin}
@@ -204,7 +209,13 @@ export function BattleScreen() {
       )}
 
       {state.biomeChoice && (
-        <BiomeChoiceModal prompt={state.biomeChoice} onChoose={chooseBiome} />
+        <RouteChoiceMap
+          biomes={state.regionBiomes}
+          routePath={state.routePath}
+          currentId={state.currentBiomeId}
+          options={state.biomeChoice.options}
+          onChoose={chooseBiome}
+        />
       )}
 
       {state.rewardChoice && (
@@ -275,6 +286,10 @@ function BattleEndedOverlay({ creatureName, speciesId, battlesWon, finalLevel, o
   );
 }
 
+// Stable empty set for the read-only region map (no offered/choosable waypoints), so RunMapPanel doesn't mint a
+// new Set each render.
+const EMPTY_ID_SET: ReadonlySet<string> = new Set<string>();
+
 // Per-node icon + label for the encounter-map ladder. Keys are the backend RunNodeKind names plus the
 // client-synthesized 'Rest' cap. Glyphs are text (not sprites) so the ladder stays cheap and E2E-legible.
 const LADDER_NODE_META: Record<string, { glyph: string; label: string }> = {
@@ -291,36 +306,143 @@ const LADDER_NODE_META: Record<string, { glyph: string; label: string }> = {
 // one node per revealed RunNodeKind (the Boss its apex), capped by a synthesized Poké Center 'Rest' (which isn't
 // a plan node — see ENCOUNTER_DESIGN.md §5). The pin marks the node in progress; earlier nodes read as done,
 // later as upcoming. CSS column-reverse puts node 0 at the bottom so the player climbs upward to the apex.
-// Presentation only — the route is fixed and logic-driven; nodes aren't clickable (Phase 3 adds route choice).
-function EncounterLadder({ biomeName, nodePlan, pin, pinned, onClose }: {
+// The current biome's route drawn as a vertical Slay-the-Spire-style ladder — one node per revealed RunNodeKind
+// (the Boss its apex), capped by a synthesized Poké Center 'Rest' (not a plan node — see ENCOUNTER_DESIGN.md §5).
+// The pin marks the node in progress; earlier nodes read done, later upcoming. CSS column-reverse puts node 0 at
+// the bottom so the player climbs upward to the apex. Presentation only — the route is fixed and logic-driven.
+function NodeLadder({ nodePlan, pin }: { nodePlan: string[]; pin: number }) {
+  const nodes = [...nodePlan, 'Rest'];
+  return (
+    <ol className="ladder">
+      {nodes.map((kind, i) => {
+        const meta = LADDER_NODE_META[kind] ?? { glyph: '•', label: kind };
+        const nodeState = i < pin ? 'done' : i === pin ? 'current' : 'upcoming';
+        return (
+          <li key={i} className={`ladder-node ladder-node--${kind.toLowerCase()} ladder-node--${nodeState}`}>
+            <span className="ladder-icon" aria-hidden="true">{meta.glyph}</span>
+            <span className="ladder-label">{meta.label}</span>
+            {nodeState === 'current' && <span className="ladder-here" aria-label="you are here">◄</span>}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+// The region-map graph: the run's playable biomes as waypoints at their authored 2-D coords, wired by their
+// (playable-subset) neighbour edges, with the travelled route highlighted and the current biome marked. When
+// `onChoose` is supplied, the biomes in `offeredIds` become clickable route picks (the map-based route choice);
+// otherwise it's a read-only overview. A presentation view — the offered set is decided server-side.
+function RegionMap({ biomes, routePath, currentId, offeredIds, onChoose }: {
+  biomes: RegionBiome[];
+  routePath: string[];
+  currentId: string;
+  offeredIds: ReadonlySet<string>;
+  onChoose?: (id: string) => void;
+}) {
+  const byId = new Map(biomes.map(b => [b.id, b]));
+  const visited = new Set(routePath); // node-visited membership
+  const travelled = travelledEdgeKeys(routePath); // edges actually walked (consecutive hops, not "both visited")
+  // Undirected edges, de-duped by drawing each pair once (id order) — both endpoints must be in the sent subset.
+  const edges: Array<{ a: RegionBiome; b: RegionBiome }> = [];
+  for (const b of biomes)
+    for (const nid of b.neighbours) {
+      const n = byId.get(nid);
+      if (n && b.id < n.id) edges.push({ a: b, b: n });
+    }
+  return (
+    <div className="region-map">
+      <svg className="region-map-edges" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        {edges.map(({ a, b }, i) => (
+          <line
+            key={i}
+            x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+            className={`region-edge${travelled.has(regionEdgeKey(a.id, b.id)) ? ' region-edge--travelled' : ''}`}
+          />
+        ))}
+      </svg>
+      {biomes.map(b => {
+        const isCurrent = b.id === currentId;
+        const isOffered = offeredIds.has(b.id);
+        const choosable = isOffered && !!onChoose;
+        const cls = [
+          'region-node',
+          isCurrent ? 'region-node--current' : '',
+          visited.has(b.id) && !isCurrent ? 'region-node--visited' : '',
+          isOffered ? 'region-node--offered' : '',
+        ].filter(Boolean).join(' ');
+        return (
+          <button
+            key={b.id}
+            type="button"
+            className={cls}
+            style={{ left: `${b.x}%`, top: `${b.y}%`, '--node-clr': typeColor(b.types[0] ?? 'Normal') } as CSSProperties}
+            disabled={!choosable}
+            onClick={choosable ? () => onChoose!(b.id) : undefined}
+            aria-label={`${b.name}${isCurrent ? ' (current)' : ''}${choosable ? ' — choose this route' : ''}`}
+          >
+            <span className="region-node-dot" aria-hidden="true" />
+            <span className="region-node-label">{b.name}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// The pinned/peeked route-map overlay: the whole-run region graph plus, when a biome is active, its node ladder.
+// Toggled by the MAP button and auto-peeked at each ladder change. Read-only (no route pick here — that happens
+// in the RouteChoiceMap when the run offers a choice).
+function RunMapPanel({ biomes, routePath, currentId, biomeName, nodePlan, pin, pinned, onClose }: {
+  biomes: RegionBiome[];
+  routePath: string[];
+  currentId: string;
   biomeName: string;
   nodePlan: string[];
   pin: number;
   pinned: boolean;
   onClose: () => void;
 }) {
-  const nodes = [...nodePlan, 'Rest'];
   return (
     <div className={`encounter-map${pinned ? ' encounter-map--pinned' : ''}`} role="complementary" aria-label="Route map">
       <div className="encounter-map-head">
-        <span className="encounter-map-biome">{biomeName || 'Route'}</span>
+        <span className="encounter-map-biome">{biomeName || 'Region map'}</span>
         {pinned && (
           <button className="encounter-map-close" onClick={onClose} aria-label="Close map">×</button>
         )}
       </div>
-      <ol className="ladder">
-        {nodes.map((kind, i) => {
-          const meta = LADDER_NODE_META[kind] ?? { glyph: '•', label: kind };
-          const nodeState = i < pin ? 'done' : i === pin ? 'current' : 'upcoming';
-          return (
-            <li key={i} className={`ladder-node ladder-node--${kind.toLowerCase()} ladder-node--${nodeState}`}>
-              <span className="ladder-icon" aria-hidden="true">{meta.glyph}</span>
-              <span className="ladder-label">{meta.label}</span>
-              {nodeState === 'current' && <span className="ladder-here" aria-label="you are here">◄</span>}
-            </li>
-          );
-        })}
-      </ol>
+      <RegionMap biomes={biomes} routePath={routePath} currentId={currentId} offeredIds={EMPTY_ID_SET} />
+      {nodePlan.length > 0 && <NodeLadder nodePlan={nodePlan} pin={pin} />}
+    </div>
+  );
+}
+
+// The map-based route choice (replaces the old biome-card modal): a blocking, prominent region map where the
+// offered biomes glow as clickable waypoints. Clicking one charts the route (the backend is blocked awaiting it).
+// The run always offers at least one option, so there is no empty/decline state — it's a required choice.
+function RouteChoiceMap({ biomes, routePath, currentId, options, onChoose }: {
+  biomes: RegionBiome[];
+  routePath: string[];
+  currentId: string;
+  options: BiomeOption[];
+  onChoose: (biomeId: string) => void;
+}) {
+  const offeredIds = new Set(options.map(o => o.id));
+  return (
+    <div className="modal-overlay">
+      <div className="route-choice-modal" role="alertdialog" aria-label="Choose your route">
+        <p className="biome-title">Choose your route</p>
+        <p className="biome-sub">Click a highlighted biome to chart your path.</p>
+        <RegionMap biomes={biomes} routePath={routePath} currentId={currentId} offeredIds={offeredIds} onChoose={onChoose} />
+        <div className="route-choice-legend">
+          {options.map(o => (
+            <span key={o.id} className="route-choice-legend-item">
+              <span className="route-choice-legend-name">{o.name}</span>
+              {o.types.map(t => <TypeBadge key={t} type={t} size="sm" />)}
+            </span>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -387,40 +509,6 @@ function EvolutionPromptModal({ prompt, onRespond }: {
           <button className="action-btn" onClick={() => onRespond(false)}>
             CANCEL
           </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Biome map / route choice: between biomes the player charts the next leg of the run. Shows the offered
-// biomes (the current biome's playable neighbours, or every playable biome at run start) as cards with their
-// type theme; one press picks the biome and continues the run (the backend is blocked awaiting it). The run
-// loop always offers at least one option, so there is no empty/decline state — this is a required choice.
-function BiomeChoiceModal({ prompt, onChoose }: {
-  prompt: BiomeChoicePrompt;
-  onChoose: (biomeId: string) => void;
-}) {
-  return (
-    <div className="modal-overlay">
-      <div className="biome-modal" role="alertdialog" aria-label="Choose your route">
-        <p className="biome-title">Choose your route</p>
-        <p className="biome-sub">Where will you head next?</p>
-        <div className="biome-cards">
-          {prompt.options.map(biome => (
-            <button
-              key={biome.id}
-              className="biome-card"
-              onClick={() => onChoose(biome.id)}
-            >
-              <span className="biome-card-name">{biome.name}</span>
-              <span className="biome-card-types">
-                {biome.types.map(t => (
-                  <TypeBadge key={t} type={t} size="sm" />
-                ))}
-              </span>
-            </button>
-          ))}
         </div>
       </div>
     </div>

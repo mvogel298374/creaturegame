@@ -101,14 +101,17 @@ public record BiomeNodePlanRevealed(IReadOnlyList<string> NodeKinds) : BattleEve
 /// map); the legacy endless chain never emits it.</summary>
 public record RegionMapRevealed(IReadOnlyList<RegionMapBiome> Biomes) : BattleEvent;
 
-/// <summary>One biome node on the region map: stable id, display name, type theme (for the waypoint colour), and
-/// the ids of its neighbours <em>within the playable subset</em> (edges to draw). Neighbours outside the subset
-/// are filtered out server-side so the client never references a biome it wasn't sent.</summary>
+/// <summary>One biome node on the region map: stable id, display name, type theme (for the waypoint colour), the
+/// ids of its neighbours <em>within the playable subset</em> (edges to draw), and its authored 2-D map position
+/// (<see cref="MapX"/> / <see cref="MapY"/>, 0–100 each, y down). Neighbours outside the subset are filtered out
+/// server-side so the client never references a biome it wasn't sent.</summary>
 public record RegionMapBiome(
     string Id,
     string Name,
     IReadOnlyList<DamageType> Types,
-    IReadOnlyList<string> Neighbours
+    IReadOnlyList<string> Neighbours,
+    int MapX,
+    int MapY
 );
 
 /// <summary>A reward roll paid out gold and/or items — a battle win (inline, <paramref name="Source"/> =

@@ -27,7 +27,13 @@ public sealed record BiomeDefinition(
     string Name,
     Region Region,
     IReadOnlyList<DamageType> Types,
-    IReadOnlyList<string> Neighbours
+    IReadOnlyList<string> Neighbours,
+    // Authored 2-D map coordinates (0–100 each, y increasing downward) for the client's region-map overlay —
+    // presentation metadata on this authored biome content (the Encounter Map feature; ENCOUNTER_DESIGN.md §2.1).
+    // Positioned to roughly reflect the neighbour graph so drawn edges read as a coherent overworld. Default 0 so
+    // non-registry constructions (tests) need not supply them; the Kanto roster below sets real positions.
+    int MapX = 0,
+    int MapY = 0
 )
 {
     /// <summary>Either-type match: a species is on-theme if its primary or secondary type is in this biome.</summary>
@@ -55,126 +61,162 @@ public static class Biomes
             "Meadow Trail",
             Region.Kanto,
             [DamageType.Normal, DamageType.Flying],
-            ["whispering-woods", "bramble-thicket", "storm-plateau"]
+            ["whispering-woods", "bramble-thicket", "storm-plateau"],
+            12,
+            34
         ),
         new(
             "whispering-woods",
             "Whispering Woods",
             Region.Kanto,
             [DamageType.Bug, DamageType.Grass],
-            ["meadow-trail", "bramble-thicket", "verdant-glade"]
+            ["meadow-trail", "bramble-thicket", "verdant-glade"],
+            16,
+            54
         ),
         new(
             "bramble-thicket",
             "Bramble Thicket",
             Region.Kanto,
             [DamageType.Grass, DamageType.Poison],
-            ["meadow-trail", "whispering-woods", "mire-swamp", "verdant-glade"]
+            ["meadow-trail", "whispering-woods", "mire-swamp", "verdant-glade"],
+            28,
+            64
         ),
         new(
             "mire-swamp",
             "Mire Swamp",
             Region.Kanto,
             [DamageType.Poison, DamageType.Ground],
-            ["bramble-thicket", "phantom-marsh", "tranquil-lake"]
+            ["bramble-thicket", "phantom-marsh", "tranquil-lake"],
+            40,
+            80
         ),
         new(
             "crystal-cavern",
             "Crystal Cavern",
             Region.Kanto,
             [DamageType.Rock, DamageType.Ground],
-            ["sunbaked-canyon", "granite-cliffs", "magma-ridge"]
+            ["sunbaked-canyon", "granite-cliffs", "magma-ridge"],
+            58,
+            32
         ),
         new(
             "sunbaked-canyon",
             "Sunbaked Canyon",
             Region.Kanto,
             [DamageType.Ground, DamageType.Fighting],
-            ["crystal-cavern", "granite-cliffs", "magma-ridge"]
+            ["crystal-cavern", "granite-cliffs", "magma-ridge"],
+            62,
+            48
         ),
         new(
             "granite-cliffs",
             "Granite Cliffs",
             Region.Kanto,
             [DamageType.Rock, DamageType.Flying, DamageType.Fighting],
-            ["crystal-cavern", "sunbaked-canyon", "storm-plateau"]
+            ["crystal-cavern", "sunbaked-canyon", "storm-plateau"],
+            44,
+            40
         ),
         new(
             "storm-plateau",
             "Storm Plateau",
             Region.Kanto,
             [DamageType.Electric, DamageType.Flying],
-            ["meadow-trail", "granite-cliffs", "sparkwire-ruins"]
+            ["meadow-trail", "granite-cliffs", "sparkwire-ruins"],
+            32,
+            20
         ),
         new(
             "sparkwire-ruins",
             "Sparkwire Ruins",
             Region.Kanto,
             [DamageType.Electric, DamageType.Psychic],
-            ["storm-plateau", "haunted-spire"]
+            ["storm-plateau", "haunted-spire"],
+            50,
+            24
         ),
         new(
             "magma-ridge",
             "Magma Ridge",
             Region.Kanto,
             [DamageType.Fire, DamageType.Rock],
-            ["crystal-cavern", "sunbaked-canyon", "cinder-hollow"]
+            ["crystal-cavern", "sunbaked-canyon", "cinder-hollow"],
+            74,
+            38
         ),
         new(
             "cinder-hollow",
             "Cinder Hollow",
             Region.Kanto,
             [DamageType.Fire, DamageType.Ghost],
-            ["magma-ridge", "haunted-spire"]
+            ["magma-ridge", "haunted-spire"],
+            82,
+            52
         ),
         new(
             "haunted-spire",
             "Haunted Spire",
             Region.Kanto,
             [DamageType.Ghost, DamageType.Psychic],
-            ["sparkwire-ruins", "cinder-hollow", "phantom-marsh"]
+            ["sparkwire-ruins", "cinder-hollow", "phantom-marsh"],
+            68,
+            62
         ),
         new(
             "phantom-marsh",
             "Phantom Marsh",
             Region.Kanto,
             [DamageType.Ghost, DamageType.Poison],
-            ["mire-swamp", "haunted-spire", "tranquil-lake"]
+            ["mire-swamp", "haunted-spire", "tranquil-lake"],
+            54,
+            84
         ),
         new(
             "tranquil-lake",
             "Tranquil Lake",
             Region.Kanto,
             [DamageType.Water, DamageType.Psychic],
-            ["mire-swamp", "phantom-marsh", "frostbound-shore"]
+            ["mire-swamp", "phantom-marsh", "frostbound-shore"],
+            56,
+            66
         ),
         new(
             "frostbound-shore",
             "Frostbound Shore",
             Region.Kanto,
             [DamageType.Water, DamageType.Ice],
-            ["tranquil-lake", "glacier-hollow", "abyssal-reef"]
+            ["tranquil-lake", "glacier-hollow", "abyssal-reef"],
+            74,
+            80
         ),
         new(
             "glacier-hollow",
             "Glacier Hollow",
             Region.Kanto,
             [DamageType.Ice, DamageType.Dragon],
-            ["frostbound-shore", "abyssal-reef"]
+            ["frostbound-shore", "abyssal-reef"],
+            90,
+            88
         ),
         new(
             "abyssal-reef",
             "Abyssal Reef",
             Region.Kanto,
             [DamageType.Water, DamageType.Dragon],
-            ["frostbound-shore", "glacier-hollow"]
+            ["frostbound-shore", "glacier-hollow"],
+            92,
+            68
         ),
         new(
             "verdant-glade",
             "Verdant Glade",
             Region.Kanto,
             [DamageType.Grass, DamageType.Normal, DamageType.Bug],
-            ["whispering-woods", "bramble-thicket"]
+            ["whispering-woods", "bramble-thicket"],
+            10,
+            74
         ),
     ];
 

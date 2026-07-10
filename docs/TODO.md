@@ -266,9 +266,17 @@ plan, `BiomeEntered`/`RunNodeEntered`); the work is exposing it + drawing it. In
    Covered by Vitest (reducer + timeline, incl. the `RecoveryOffered`→Rest-cap pin dispatch) + a seeded
    Playwright `encounter-map.spec` (opening ladder structure **and** a win advancing the pin so the cleared node
    reads `done`); also live-verified end-to-end. The STS "path" feel within a biome is now visible.
-3. **Region graph + map-based route choice:** the overworld waypoint map, route trace, and folding the biome
-   pick onto the map (retire `BiomeChoiceModal`).
-4. **Polish:** authored coords, transition animation/easing, icon art, accessibility pass.
+3. ✅ **DONE (2026-07-10) — Region graph + map-based route choice:** authored 2-D coords on the 18 Kanto biomes
+   (`BiomeDefinition.MapX/MapY`, guarded by `BiomeTests`) projected onto `RegionMapRevealed` (wire + field guard);
+   the frontend consumes the graph (`REGION_MAP_REVEALED`) + traces the route by id (`MAP_BIOME_ENTERED` →
+   `visitedBiomeIds`/`currentBiomeId`). New `RegionMap` component draws the overworld node-link graph (type-
+   coloured waypoints at their coords, neighbour edges, travelled-route + current-biome highlight); the MAP
+   overlay now shows the region graph **above** the current biome's node ladder (`RunMapPanel`). The route pick
+   is **on the map** — `RouteChoiceMap` (a prominent blocking region map with glowing clickable offered
+   waypoints) **replaces `BiomeChoiceModal`** (retired). E2E helpers repointed to `.region-node--offered`.
+   Covered by Vitest (reducer + timeline) + Playwright (region-choice + trace); full suite + live-verified.
+4. **Polish (optional):** transition animation/easing, icon art, accessibility pass, coord/edge-crossing tuning.
+   *(Authored coords landed in Phase 3.)*
 
 ---
 

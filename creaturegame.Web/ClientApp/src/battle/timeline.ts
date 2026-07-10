@@ -33,6 +33,10 @@ export interface StatBlock { maxHp: number; attack: number; defense: number; spe
 // One biome offered on the map screen: stable id, display name, and 1–3 theme types (for the card's badges).
 export interface BiomeOption { id: string; name: string; types: string[] }
 
+// One biome node on the region-map overlay: id, name, type theme, the playable-subset neighbour ids (edges to
+// draw), and its authored 2-D map position (0–100 each, y down). Matches RegionMapRevealed's wire projection.
+export interface RegionBiome { id: string; name: string; types: string[]; neighbours: string[]; x: number; y: number }
+
 // A rolled item's value tier (rarer = more expensive); drives the reward-card accent colour.
 export type RewardRarity = 'Common' | 'Uncommon' | 'Rare' | 'Epic';
 
@@ -105,10 +109,12 @@ export type Action =
   // reward source now: a battle-win drop and a Treasure/Mystery node both use it (node acks are automatic).
   | { type: 'SHOW_DROP'; gold: number; itemNames: string[] }
   | { type: 'HIDE_DROP' }
-  // Encounter-map ladder (current biome): title the biome, reveal its seeded node plan, and advance the pin one
-  // node at a time. A presentation view over the run — the sequence stays logic-driven (one MAP_NODE_ENTERED
-  // per RunNodeEntered, incl. the wild nodes that carry no banner).
-  | { type: 'MAP_BIOME_ENTERED'; biomeName: string }
+  // Region-map overlay (whole run): the playable biome graph, revealed once at run start.
+  | { type: 'REGION_MAP_REVEALED'; biomes: RegionBiome[] }
+  // Encounter-map ladder (current biome): title the biome (+ trace the route by id), reveal its seeded node
+  // plan, and advance the pin one node at a time. A presentation view over the run — the sequence stays
+  // logic-driven (one MAP_NODE_ENTERED per RunNodeEntered, incl. the wild nodes that carry no banner).
+  | { type: 'MAP_BIOME_ENTERED'; biomeId: string; biomeName: string }
   | { type: 'MAP_PLAN_REVEALED'; nodeKinds: string[] }
   | { type: 'MAP_NODE_ENTERED' };
 
@@ -370,16 +376,25 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
     }
 
     case 'BiomeEntered': {
-      // The player entered a biome (or the run auto-picked one) — title the next leg of the route, and title the
-      // encounter-map ladder (its node plan follows in BiomeNodePlanRevealed).
+      // The player entered a biome (or the run auto-picked one) — title the next leg of the route, trace it on the
+      // region map (by id), and title the encounter-map ladder (its node plan follows in BiomeNodePlanRevealed).
+      const biomeId = payload.biomeId as string;
       const biomeName = payload.biomeName as string;
-      return { steps: [d({ type: 'MAP_BIOME_ENTERED', biomeName }), w(200), d(log(`Entered ${biomeName}!`)), w(300)] };
+      return { steps: [d({ type: 'MAP_BIOME_ENTERED', biomeId, biomeName }), w(200), d(log(`Entered ${biomeName}!`)), w(300)] };
     }
 
-    case 'RegionMapRevealed':
-      // The playable region graph, sent once at run start. Consumed by the region-map overlay (Phase 3), not the
-      // battle log — no timeline steps. Explicit arm so the every-event contract test is satisfied.
-      return {};
+    case 'RegionMapRevealed': {
+      // The playable region graph, sent once at run start — feed it to the region-map overlay (no battle-log line).
+      const biomes: RegionBiome[] = ((payload.biomes as Array<Record<string, unknown>>) ?? []).map(b => ({
+        id: b.id as string,
+        name: b.name as string,
+        types: (b.types as string[]) ?? [],
+        neighbours: (b.neighbours as string[]) ?? [],
+        x: b.mapX as number,
+        y: b.mapY as number,
+      }));
+      return { steps: [d({ type: 'REGION_MAP_REVEALED', biomes })] };
+    }
 
     case 'BiomeNodePlanRevealed':
       // The current biome's seeded node ladder — feed it to the encounter-map overlay. No battle-log line.

@@ -46,11 +46,11 @@ export async function startBattle(
   await card.click();
   await page.getByRole('button', { name: /CONFIRM/i }).click();
 
-  // Biome mode (Phase 3b-2): the run opens on the route-choice modal — pick the first offered biome — before
+  // Biome mode: the run opens on the map-based route choice — click the first offered biome waypoint — before
   // the first battle. It arrives a beat after CONFIRM (connect + emit), so wait for it. Then the entry
   // animation plays and the action menu enables for the first turn — unless the first node is a reward node
   // (Treasure/Mystery), whose choice modal blocks first, so clear that before waiting on the fight menu.
-  await page.locator('.biome-card').first().click({ timeout: 15_000 });
+  await page.locator('.region-node--offered').first().click({ timeout: 15_000 });
   await expect(async () => {
     await leaveShopIfPresent(page);
     await dismissRewardChoiceIfPresent(page);
@@ -58,12 +58,12 @@ export async function startBattle(
   }).toPass({ timeout: 20_000 });
 }
 
-/** Answers a route-choice modal if one is up (picks the first offered biome). Returns whether it acted.
+/** Answers a route-choice map if one is up (clicks the first offered biome waypoint). Returns whether it acted.
  * The run opens on one, and one follows each Poké Center, so the play loop calls this too. */
 export async function chooseBiomeIfPresent(page: Page): Promise<boolean> {
-  const firstCard = page.locator('.biome-card').first();
-  if (await firstCard.isVisible().catch(() => false)) {
-    await firstCard.click();
+  const firstOffered = page.locator('.region-node--offered').first();
+  if (await firstOffered.isVisible().catch(() => false)) {
+    await firstOffered.click();
     return true;
   }
   return false;

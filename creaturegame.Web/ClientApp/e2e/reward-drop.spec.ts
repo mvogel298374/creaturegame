@@ -23,8 +23,8 @@ async function startSeededRun(page: import('@playwright/test').Page, seed: numbe
   await page.locator('.select-search').fill(species);
   await page.locator('.species-card', { has: page.locator('.card-name', { hasText: new RegExp(`^${species}$`, 'i') }) }).click();
   await page.getByRole('button', { name: /CONFIRM/i }).click();
-  // Opening route choice — pick the first offered biome; its first node is the seeded Treasure.
-  await page.locator('.biome-card').first().click({ timeout: 15_000 });
+  // Opening route choice (map-based) — click the first offered biome waypoint; its first node is the Treasure.
+  await page.locator('.region-node--offered').first().click({ timeout: 15_000 });
 }
 
 test.describe('Run Economy reward choice (Treasure node)', () => {

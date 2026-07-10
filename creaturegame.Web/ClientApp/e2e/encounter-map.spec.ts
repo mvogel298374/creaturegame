@@ -11,6 +11,40 @@ import { startBattle, playToNextEncounter } from './helpers';
 // this seed's opening node becomes an interaction node, pick another wild-first seed.
 const MAP_SEED = 1;
 
+// Reach the opening route choice (the map) without picking, so a test can assert its pre-pick state.
+async function gotoOpeningRouteChoice(page: import('@playwright/test').Page, seed: number, species = 'BULBASAUR') {
+  await page.goto(`/select?e2e=1&seed=${seed}`);
+  await page.locator('.species-card').first().waitFor({ state: 'visible', timeout: 10_000 });
+  await page.locator('.select-search').fill(species);
+  await page.locator('.species-card', { has: page.locator('.card-name', { hasText: new RegExp(`^${species}$`, 'i') }) }).click();
+  await page.getByRole('button', { name: /CONFIRM/i }).click();
+}
+
+test.describe('Encounter map (region graph + route choice)', () => {
+  test('the run opens on a map-based route choice — a region graph with clickable offered waypoints (no card modal)', async ({ page }) => {
+    test.setTimeout(60_000);
+    await gotoOpeningRouteChoice(page, MAP_SEED);
+
+    // The route choice is the region map, not the retired biome-card modal.
+    const choice = page.locator('.route-choice-modal');
+    await expect(choice).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('.biome-card')).toHaveCount(0); // the old card modal is gone
+
+    // A graph of waypoints wired by edges, with at least one glowing, clickable offered biome.
+    await expect(choice.locator('.region-node')).not.toHaveCount(0);
+    await expect(choice.locator('.region-edge')).not.toHaveCount(0);
+    const offered = choice.locator('.region-node--offered');
+    await expect(offered.first()).toBeVisible();
+
+    // Clicking an offered waypoint charts the route: the choice closes, the biome is entered, and the region map
+    // (in the pinned overlay) marks it current — the route is traced.
+    await offered.first().click();
+    await expect(choice).toHaveCount(0);
+    await page.locator('.map-toggle-btn').click();
+    await expect(page.locator('.encounter-map .region-node--current')).toHaveCount(1);
+  });
+});
+
 test.describe('Encounter map (route ladder)', () => {
   test('entering a biome reveals a node ladder — Boss apex, synthesized Rest cap, one current pin — toggled by MAP', async ({ page }) => {
     test.setTimeout(60_000);

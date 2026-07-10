@@ -815,23 +815,9 @@
   width: 100%;
 }
 
-/* ── Biome map / route choice (Phase 3b-2) ── */
-/* Reuses .modal-overlay for the centred full-field cover; a sky-blue card to read as a "map/route" step
-   distinct from the green Poké Center and red game-over modals. */
-.biome-modal {
-  min-width: 300px;
-  max-width: 92%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  background: var(--clr-bg-deep);
-  border: 2px solid var(--clr-sky);
-  border-radius: 4px;
-  padding: var(--sp-md) var(--sp-lg);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6), 0 0 24px rgba(77, 144, 213, 0.25);
-  animation: modal-rise 200ms ease-out;
-}
-
+/* ── Route-choice heading (shared by the map-based RouteChoiceMap) ── */
+/* The biome-card list modal was retired in Phase 3 (route choice is now on the region map — see
+   ".Map-based route choice" below); only the sky-blue title/subtitle survive, reused by RouteChoiceMap. */
 .biome-title {
   font-size: var(--fs-base);
   font-weight: 700;
@@ -845,50 +831,6 @@
   color: var(--clr-text);
   text-align: center;
   margin-bottom: var(--sp-md);
-}
-
-.biome-cards {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-sm);
-  width: 100%;
-}
-
-/* One offered biome: name on the left, its 1–3 type badges on the right. Hover/focus lifts it like the
-   route is being selected. */
-.biome-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-md);
-  width: 100%;
-  padding: var(--sp-sm) var(--sp-md);
-  background: var(--clr-bg);
-  border: 1px solid var(--clr-sky);
-  border-radius: 4px;
-  color: var(--clr-text);
-  cursor: pointer;
-  transition: transform 90ms ease-out, box-shadow 90ms ease-out, background 90ms ease-out;
-}
-
-.biome-card:hover,
-.biome-card:focus-visible {
-  transform: translateX(3px);
-  background: var(--clr-bg-deep);
-  box-shadow: 0 0 12px rgba(77, 144, 213, 0.4);
-  outline: none;
-}
-
-.biome-card-name {
-  font-size: var(--fs-sm);
-  font-weight: 700;
-  letter-spacing: var(--ls-normal);
-}
-
-.biome-card-types {
-  display: flex;
-  gap: 4px;
-  flex-shrink: 0;
 }
 
 /* ── Reward choice (pick-one-of-N after a rolled reward) ──
@@ -1363,4 +1305,122 @@
 
 @media (prefers-reduced-motion: reduce) {
   .encounter-map { animation: none; }
+}
+
+/* Widen the pinned/peeked panel now that it carries the region map above the ladder. */
+.encounter-map { width: 12rem; }
+
+/* ── Region map (overworld node-link graph) ───── */
+.region-map {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  margin-bottom: var(--sp-sm);
+}
+.region-map-edges {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.region-edge {
+  stroke: var(--clr-border);
+  stroke-width: 0.7;
+  vector-effect: non-scaling-stroke;
+}
+.region-edge--travelled { stroke: var(--clr-gold); stroke-width: 1.4; vector-effect: non-scaling-stroke; }
+
+/* A biome waypoint: absolutely placed at its authored %-coords, centred on the point. */
+.region-node {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 0;
+  background: none;
+  border: none;
+  font-family: var(--font);
+  color: var(--clr-text-sub);
+  cursor: default;
+}
+.region-node-dot {
+  width: 0.72rem;
+  height: 0.72rem;
+  border-radius: 50%;
+  background: var(--node-clr, #888);
+  border: 2px solid var(--clr-bg-deep);
+  box-shadow: 0 0 0 1px var(--clr-border);
+}
+.region-node-label {
+  font-size: 0.6rem;
+  line-height: 1;
+  color: var(--clr-text-sub);
+  white-space: nowrap;
+  text-shadow: 0 1px 2px #000, 0 0 3px #000;
+}
+
+/* Route state: visited (dim), current (gold ring + "you are here" scale), offered (glowing, clickable). */
+.region-node--visited { opacity: 0.85; }
+.region-node--current .region-node-dot {
+  box-shadow: 0 0 0 2px var(--clr-gold), 0 0 8px rgba(255, 215, 0, 0.5);
+}
+.region-node--current .region-node-label { color: var(--clr-gold); font-weight: bold; }
+.region-node--offered {
+  cursor: pointer;
+  z-index: 2;
+}
+.region-node--offered .region-node-dot {
+  box-shadow: 0 0 0 2px var(--clr-accent), 0 0 10px var(--clr-accent-glow);
+  animation: region-node-pulse 1.3s ease-in-out infinite;
+}
+.region-node--offered .region-node-label { color: var(--clr-text); }
+.region-node--offered:hover .region-node-dot,
+.region-node--offered:focus-visible .region-node-dot { transform: scale(1.25); }
+
+@keyframes region-node-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px var(--clr-accent), 0 0 6px var(--clr-accent-glow); }
+  50%      { box-shadow: 0 0 0 2px var(--clr-accent), 0 0 14px var(--clr-accent-glow); }
+}
+
+/* Compact (corner) region map: dots only, no labels (too many to read small). */
+.encounter-map .region-map { aspect-ratio: 4 / 3; }
+.encounter-map .region-map .region-node-label { display: none; }
+
+/* ── Map-based route choice (prominent, blocking) ── */
+.route-choice-modal {
+  background: var(--clr-bg-deep);
+  border: 2px solid var(--clr-gold);
+  box-shadow: 0 0 32px rgba(0, 0, 0, 0.6);
+  padding: var(--sp-md);
+  width: min(92vw, 640px);
+  max-height: 92vh;
+  overflow-y: auto;
+}
+.route-choice-modal .region-map {
+  aspect-ratio: 3 / 2;
+  max-height: 58vh;
+}
+.route-choice-modal .region-node-label { font-size: 0.66rem; }
+.route-choice-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--sp-sm);
+  margin-top: var(--sp-sm);
+}
+.route-choice-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-xs);
+  font-family: var(--font);
+  font-size: 0.72rem;
+  color: var(--clr-text);
+}
+.route-choice-legend-name { color: var(--clr-gold); }
+
+@media (prefers-reduced-motion: reduce) {
+  .region-node--offered .region-node-dot { animation: none; }
 }

@@ -198,12 +198,32 @@ describe('battleReducer — misc', () => {
 });
 
 describe('battleReducer — encounter-map ladder', () => {
-  it('MAP_BIOME_ENTERED titles the ladder and clears the previous plan + pin', () => {
-    const s = ready({ mapBiomeName: 'Old', mapNodePlan: ['WildBattle', 'BossBattle'], mapPin: 1 });
-    const next = battleReducer(s, { type: 'MAP_BIOME_ENTERED', biomeName: 'Whispering Woods' });
+  it('MAP_BIOME_ENTERED titles the ladder, clears the previous plan + pin, and traces the route (in hop order)', () => {
+    const s = ready({ mapBiomeName: 'Old', mapNodePlan: ['WildBattle', 'BossBattle'], mapPin: 1, currentBiomeId: 'meadow-trail', routePath: ['meadow-trail'] });
+    const next = battleReducer(s, { type: 'MAP_BIOME_ENTERED', biomeId: 'whispering-woods', biomeName: 'Whispering Woods' });
     expect(next.mapBiomeName).toBe('Whispering Woods');
     expect(next.mapNodePlan).toEqual([]);
     expect(next.mapPin).toBe(-1);
+    expect(next.currentBiomeId).toBe('whispering-woods');
+    expect(next.routePath).toEqual(['meadow-trail', 'whispering-woods']); // hop appended, in order
+  });
+
+  it('MAP_BIOME_ENTERED records a re-visit as a real hop (with repeat) so the return edge can light', () => {
+    // Going back to a prior biome IS a hop the player walked — the path keeps the repeat so the travelled-edge
+    // logic sees the b→a return (node-visited membership de-dups via a Set of the path; the edges need the order).
+    const s = ready({ routePath: ['meadow-trail', 'whispering-woods'], currentBiomeId: 'whispering-woods' });
+    const next = battleReducer(s, { type: 'MAP_BIOME_ENTERED', biomeId: 'meadow-trail', biomeName: 'Meadow Trail' });
+    expect(next.routePath).toEqual(['meadow-trail', 'whispering-woods', 'meadow-trail']);
+    expect(next.currentBiomeId).toBe('meadow-trail');
+  });
+
+  it('REGION_MAP_REVEALED stores the playable biome graph for the overlay', () => {
+    const biomes = [
+      { id: 'a', name: 'Alpha', types: ['Fire'], neighbours: ['b'], x: 10, y: 20 },
+      { id: 'b', name: 'Beta', types: ['Water'], neighbours: ['a'], x: 30, y: 40 },
+    ];
+    const next = battleReducer(ready(), { type: 'REGION_MAP_REVEALED', biomes });
+    expect(next.regionBiomes).toEqual(biomes);
   });
 
   it('MAP_PLAN_REVEALED sets the node plan and resets the pin to −1 (no node entered yet)', () => {

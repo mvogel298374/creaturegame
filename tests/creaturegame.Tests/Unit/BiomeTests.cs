@@ -34,6 +34,22 @@ public class BiomeTests
     }
 
     [Fact]
+    public void Kanto_EveryBiomeHasAuthoredDistinctInRangeMapCoords()
+    {
+        // The region-map overlay positions each waypoint from its authored MapX/MapY. Guard that every biome has
+        // real (non-default) coords in the 0–100 authoring space, and that no two biomes collide on the same
+        // point (which would stack their waypoints). A new biome without coords fails here loudly.
+        foreach (var b in Biomes.Kanto)
+        {
+            Assert.InRange(b.MapX, 1, 100); // 1–100: (0,0) is the "unset" default, disallowed for the roster
+            Assert.InRange(b.MapY, 1, 100);
+        }
+
+        var points = Biomes.Kanto.Select(b => (b.MapX, b.MapY)).ToList();
+        Assert.Equal(points.Count, points.Distinct().Count()); // no two biomes share a coordinate
+    }
+
+    [Fact]
     public void Kanto_HomesEveryGen1Type()
     {
         var homed = Biomes.Kanto.SelectMany(b => b.Types).ToHashSet();

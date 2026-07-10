@@ -120,6 +120,8 @@ public sealed class SignalRBattleEventEmitter(
                         b.Name,
                         Types = b.Types.Select(t => t.ToString()),
                         b.Neighbours,
+                        b.MapX,
+                        b.MapY,
                     }),
                 }
             ),

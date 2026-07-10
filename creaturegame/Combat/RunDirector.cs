@@ -265,7 +265,9 @@ public sealed class RunDirector
                     b.Id,
                     b.Name,
                     b.Types,
-                    b.Neighbours.Where(playableIds.Contains).ToList()
+                    b.Neighbours.Where(playableIds.Contains).ToList(),
+                    b.MapX,
+                    b.MapY
                 ))
                 .ToList()
         );

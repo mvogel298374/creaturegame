@@ -2,7 +2,7 @@
 // it's unit-testable without React, SignalR, or a DOM (this module has only type imports, no runtime deps).
 // The hook owns the effects (the SignalR connection, the timeline driver); this owns the state transitions.
 import type { MoveInfo } from '../types/BattleEvents';
-import type { Action, StatBlock, LogEntry, BiomeOption, RewardOption, ShopOfferItem } from '../battle/timeline';
+import type { Action, StatBlock, LogEntry, BiomeOption, RegionBiome, RewardOption, ShopOfferItem } from '../battle/timeline';
 
 export interface LevelUpPanel {
   level: number;
@@ -87,10 +87,17 @@ export interface BattleState {
   turnNumber: number;
   // Encounter-map ladder (current biome): its revealed node plan (RunNodeKind names, Boss last) and the pin —
   // the index of the node currently in progress, −1 before the biome's first node starts. An empty plan means
-  // the legacy chain / pre-first-biome, and the map overlay stays hidden.
+  // the legacy chain / pre-first-biome, and the ladder stays hidden.
   mapBiomeName: string;
   mapNodePlan: string[];
   mapPin: number;
+  // Region-map overlay (whole run): the playable biome graph (revealed once at run start), the biome ids in the
+  // order entered — *with repeats on a re-visit* so consecutive pairs are the actual hops walked (the travelled
+  // route; node-visited membership is the set of these) — and the id of the current biome. Empty in the legacy
+  // chain (no map).
+  regionBiomes: RegionBiome[];
+  routePath: string[];
+  currentBiomeId: string;
 }
 
 export const initialState: BattleState = {
@@ -125,6 +132,9 @@ export const initialState: BattleState = {
   mapBiomeName: '',
   mapNodePlan: [],
   mapPin: -1,
+  regionBiomes: [],
+  routePath: [],
+  currentBiomeId: '',
 };
 
 export function battleReducer(state: BattleState, action: Action): BattleState {
@@ -250,9 +260,21 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
       return { ...state, playerXp: Math.min(state.playerXp + action.amount, state.playerXpToNext) };
     case 'XP_SET':
       return { ...state, playerXp: action.value };
+    case 'REGION_MAP_REVEALED':
+      // The playable biome graph, revealed once at run start — the region-map overlay draws its waypoints/edges.
+      return { ...state, regionBiomes: action.biomes };
     case 'MAP_BIOME_ENTERED':
-      // Entered a biome — title the ladder and clear the previous plan until this biome's is revealed.
-      return { ...state, mapBiomeName: action.biomeName, mapNodePlan: [], mapPin: -1 };
+      // Entered a biome — title the ladder, clear the previous plan until this biome's is revealed, mark it
+      // current, and append it to the route path (with repeats, so consecutive pairs are the hops actually walked
+      // — the travelled-edge highlight reads them; node-visited membership is the set of the path).
+      return {
+        ...state,
+        mapBiomeName: action.biomeName,
+        mapNodePlan: [],
+        mapPin: -1,
+        currentBiomeId: action.biomeId,
+        routePath: [...state.routePath, action.biomeId],
+      };
     case 'MAP_PLAN_REVEALED':
       // The biome's seeded node ladder, drawn ahead of time; pin resets to −1 (no node entered yet).
       return { ...state, mapNodePlan: action.nodeKinds, mapPin: -1 };
