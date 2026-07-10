@@ -1424,3 +1424,35 @@
 @media (prefers-reduced-motion: reduce) {
   .region-node--offered .region-node-dot { animation: none; }
 }
+
+/* ── Encounter map — Phase 4 polish (easing, keyboard focus, rest accent, choice rise) ── */
+/* Ease the state changes so the pin advance, a lit travelled edge, and a waypoint's ring animate rather than
+   snap. Decorative only — no E2E assertion waits on these. */
+.region-node-dot { transition: box-shadow 160ms ease, transform 120ms ease; }
+.region-edge     { transition: stroke 320ms ease, stroke-width 320ms ease; }
+.ladder-node     { transition: opacity 200ms ease; }
+.ladder-icon     { transition: color 200ms ease, box-shadow 200ms ease, border-color 200ms ease; }
+
+/* Keyboard focus ring on the choosable waypoints — mouse users get the hover scale, keyboard users need a clear
+   ring (the RouteChoiceMap focuses the first offered waypoint on open). */
+.region-node--offered:focus-visible { outline: none; }
+.region-node--offered:focus-visible .region-node-dot {
+  transform: scale(1.25);
+  box-shadow: 0 0 0 2px var(--clr-gold), 0 0 0 4px var(--clr-bg-deep), 0 0 12px var(--clr-accent-glow);
+}
+.region-node--offered:focus-visible .region-node-label { color: var(--clr-gold); }
+
+/* The Poké Center 'Rest' cap reads as a heal (soft pink), set apart from the combat nodes. */
+.ladder-node--rest .ladder-icon { border-color: #ff8fa3; color: #ff8fa3; }
+
+/* The route choice rises in, matching the game's other between-node modals. */
+.route-choice-modal { animation: route-choice-rise 200ms ease-out; }
+@keyframes route-choice-rise {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .region-node-dot, .region-edge, .ladder-node, .ladder-icon { transition: none; }
+  .route-choice-modal { animation: none; }
+}

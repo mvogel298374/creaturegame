@@ -296,10 +296,10 @@ const LADDER_NODE_META: Record<string, { glyph: string; label: string }> = {
   WildBattle:  { glyph: '⚔', label: 'Wild' },
   EliteBattle: { glyph: '★', label: 'Elite' },
   BossBattle:  { glyph: '☠', label: 'Boss' },
-  Shop:        { glyph: '$', label: 'Shop' },
+  Shop:        { glyph: '₽', label: 'Shop' },
   Treasure:    { glyph: '◆', label: 'Treasure' },
   Mystery:     { glyph: '?', label: 'Mystery' },
-  Rest:        { glyph: '+', label: 'Rest' },
+  Rest:        { glyph: '♥', label: 'Rest' },
 };
 
 // The encounter-map ladder (Phase 2): the current biome's route drawn as a vertical Slay-the-Spire-style path —
@@ -379,6 +379,7 @@ function RegionMap({ biomes, routePath, currentId, offeredIds, onChoose }: {
             style={{ left: `${b.x}%`, top: `${b.y}%`, '--node-clr': typeColor(b.types[0] ?? 'Normal') } as CSSProperties}
             disabled={!choosable}
             onClick={choosable ? () => onChoose!(b.id) : undefined}
+            aria-current={isCurrent ? 'location' : undefined}
             aria-label={`${b.name}${isCurrent ? ' (current)' : ''}${choosable ? ' — choose this route' : ''}`}
           >
             <span className="region-node-dot" aria-hidden="true" />
@@ -428,9 +429,15 @@ function RouteChoiceMap({ biomes, routePath, currentId, options, onChoose }: {
   onChoose: (biomeId: string) => void;
 }) {
   const offeredIds = new Set(options.map(o => o.id));
+  // Move keyboard focus onto the first offered waypoint when the choice opens, so a keyboard/screen-reader user
+  // lands on an actionable route pick (not stranded on the backdrop) and can Tab between the offered biomes.
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    ref.current?.querySelector<HTMLButtonElement>('.region-node--offered')?.focus();
+  }, []);
   return (
     <div className="modal-overlay">
-      <div className="route-choice-modal" role="alertdialog" aria-label="Choose your route">
+      <div ref={ref} className="route-choice-modal" role="alertdialog" aria-modal="true" aria-label="Choose your route">
         <p className="biome-title">Choose your route</p>
         <p className="biome-sub">Click a highlighted biome to chart your path.</p>
         <RegionMap biomes={biomes} routePath={routePath} currentId={currentId} offeredIds={offeredIds} onChoose={onChoose} />

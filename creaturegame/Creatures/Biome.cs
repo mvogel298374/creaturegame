@@ -197,8 +197,8 @@ public static class Biomes
             Region.Kanto,
             [DamageType.Ice, DamageType.Dragon],
             ["frostbound-shore", "abyssal-reef"],
-            90,
-            88
+            86,
+            86
         ),
         new(
             "abyssal-reef",
@@ -206,8 +206,8 @@ public static class Biomes
             Region.Kanto,
             [DamageType.Water, DamageType.Dragon],
             ["frostbound-shore", "glacier-hollow"],
-            92,
-            68
+            89,
+            65
         ),
         new(
             "verdant-glade",

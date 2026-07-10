@@ -35,6 +35,8 @@ test.describe('Encounter map (region graph + route choice)', () => {
     await expect(choice.locator('.region-edge')).not.toHaveCount(0);
     const offered = choice.locator('.region-node--offered');
     await expect(offered.first()).toBeVisible();
+    // A11y: the choice focuses the first offered waypoint on open, so a keyboard user lands on an actionable pick.
+    await expect(offered.first()).toBeFocused();
 
     // Clicking an offered waypoint charts the route: the choice closes, the biome is entered, and the region map
     // (in the pinned overlay) marks it current — the route is traced.

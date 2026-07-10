@@ -275,8 +275,15 @@ plan, `BiomeEntered`/`RunNodeEntered`); the work is exposing it + drawing it. In
    is **on the map** — `RouteChoiceMap` (a prominent blocking region map with glowing clickable offered
    waypoints) **replaces `BiomeChoiceModal`** (retired). E2E helpers repointed to `.region-node--offered`.
    Covered by Vitest (reducer + timeline) + Playwright (region-choice + trace); full suite + live-verified.
-4. **Polish (optional):** transition animation/easing, icon art, accessibility pass, coord/edge-crossing tuning.
-   *(Authored coords landed in Phase 3.)*
+4. ✅ **DONE (2026-07-10) — Polish:** **a11y** — the route choice focuses the first offered waypoint on open
+   (E2E-asserted), `aria-current` on the current biome, `aria-modal`, a keyboard focus-visible ring on choosable
+   waypoints; **easing** — CSS transitions on the pin/edge/waypoint state changes + a route-choice rise, all
+   reduced-motion-guarded (decorative, no E2E waits on them); **glyphs** — ♥ heal-pink Rest cap, ₽ Shop; **coords**
+   — pulled the two edge-most waypoints inward so labels don't clip. *(Finer edge-crossing tuning deferred as
+   low-ROI — each run shows a random 10-of-18 subset at fixed positions, so crossings vary by subset.)*
+
+**Feature complete** — the Encounter Map ships all four phases. Any future work is net-new (e.g. the map as the
+persistent run screen, or wiring Phase 4 acquisition's boss-catch/themed-draft offers onto the map).
 
 ---
 
