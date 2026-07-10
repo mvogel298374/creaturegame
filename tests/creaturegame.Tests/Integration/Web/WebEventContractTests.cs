@@ -274,6 +274,52 @@ public class WebEventContractTests
         Assert.Equal("BossBattle", doc.RootElement.GetProperty("Kind").GetString());
     }
 
+    /// <summary>Field-level guard for the <see cref="BiomeNodePlanRevealed"/> projection: the encounter-map
+    /// overlay draws the biome's node ladder from this ordered list, dropped on the wire if not projected. The
+    /// reflection contract test instantiates it with an <i>empty</i> list, so this pins the real values.</summary>
+    [Fact]
+    public void BiomeNodePlanRevealed_Projection_CarriesOrderedKinds()
+    {
+        var evt = new BiomeNodePlanRevealed(["WildBattle", "Shop", "BossBattle"]);
+
+        var (type, payload) = SignalRBattleEventEmitter.MapEvent(evt);
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+        var kinds = doc.RootElement.GetProperty("NodeKinds");
+
+        Assert.Equal("BiomeNodePlanRevealed", type);
+        Assert.Equal("WildBattle", kinds[0].GetString());
+        Assert.Equal("Shop", kinds[1].GetString());
+        Assert.Equal("BossBattle", kinds[2].GetString());
+    }
+
+    /// <summary>Field-level guard for the <see cref="RegionMapRevealed"/> projection: each
+    /// <see cref="RegionMapBiome"/> is hand-mapped, so the map's id/name/type-badge/edge fields are silently
+    /// dropped unless listed. The reflection contract test instantiates the event with an <i>empty</i> biome
+    /// list, so it can't catch this — pins the nested sub-fields (incl. the neighbour-id edges).</summary>
+    [Fact]
+    public void RegionMapRevealed_Projection_CarriesBiomeSubFieldsAndEdges()
+    {
+        var evt = new RegionMapRevealed([
+            new RegionMapBiome(
+                "phantom-marsh",
+                "Phantom Marsh",
+                [DamageType.Ghost, DamageType.Poison],
+                ["mire-swamp", "haunted-spire"]
+            ),
+        ]);
+
+        var (type, payload) = SignalRBattleEventEmitter.MapEvent(evt);
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+        var biome = doc.RootElement.GetProperty("Biomes")[0];
+
+        Assert.Equal("RegionMapRevealed", type);
+        Assert.Equal("phantom-marsh", biome.GetProperty("Id").GetString());
+        Assert.Equal("Phantom Marsh", biome.GetProperty("Name").GetString());
+        Assert.Equal("Ghost", biome.GetProperty("Types")[0].GetString());
+        Assert.Equal("mire-swamp", biome.GetProperty("Neighbours")[0].GetString());
+        Assert.Equal("haunted-spire", biome.GetProperty("Neighbours")[1].GetString());
+    }
+
     /// <summary>Field-level guard for the <see cref="RewardGranted"/> projection: the client reads the source,
     /// the gold delta + running total, and the item-name list to drive the HUD/log/modal. The reflection
     /// contract test instantiates the event with an <i>empty</i> item list, so it can't catch a dropped

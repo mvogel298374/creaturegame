@@ -80,11 +80,36 @@ public record BiomeOption(string Id, string Name, IReadOnlyList<DamageType> Type
 public record BiomeEntered(string BiomeId, string BiomeName, IReadOnlyList<DamageType> Types)
     : BattleEvent;
 
-/// <summary>The run reached a route node — a banner the client titles the node with. <see cref="Kind"/> is the
-/// <c>RunNodeKind</c> name (Elite/Boss before that battle begins; Shop/Treasure/Mystery for the interaction
-/// bones). Behaviour for the non-battle kinds is a later phase (<c>ENCOUNTER_DESIGN.md §5</c>); for now the
-/// banner is the whole node.</summary>
+/// <summary>The run reached a route node. <see cref="Kind"/> is the <c>RunNodeKind</c> name. In biome mode this
+/// fires once per node <em>in plan order</em> — including <c>WildBattle</c> — so the encounter-map overlay can
+/// advance its position pin uniformly; the client titles a text banner only for the standout kinds
+/// (Elite/Boss/Shop/Treasure/Mystery) and filters <c>WildBattle</c> out of the log (a plain wild encounter has
+/// no banner, as before). The legacy endless chain (no biome map) never emits it for a wild node.</summary>
 public record RunNodeEntered(string Kind) : BattleEvent;
+
+/// <summary>Emitted once when a biome is entered and its seeded node route is rolled — the ordered
+/// <c>RunNodeKind</c> names the encounter-map overlay draws as the biome's ladder ahead of time (wild / elite /
+/// shop / treasure / mystery … capped by the <c>BossBattle</c> apex). Revealing the plan is a pure presentation
+/// signal: it does <em>not</em> change sequencing (the plan is already deterministic once the biome is entered —
+/// <c>GAME_LOOP.md §4</c>). Follows the <see cref="BiomeEntered"/> for that biome.</summary>
+public record BiomeNodePlanRevealed(IReadOnlyList<string> NodeKinds) : BattleEvent;
+
+/// <summary>Emitted once at the start of a biome-mode run: the whole playable biome subset (the seeded 10-of-18)
+/// so the client can draw the region as a node-link map. Each <see cref="RegionMapBiome"/> carries its id, name,
+/// type theme, and the ids of its playable neighbours (the graph edges) — the client wires the overworld map and
+/// traces the route through it as <see cref="BiomeEntered"/> events arrive. Static for the run (same seed ⇒ same
+/// map); the legacy endless chain never emits it.</summary>
+public record RegionMapRevealed(IReadOnlyList<RegionMapBiome> Biomes) : BattleEvent;
+
+/// <summary>One biome node on the region map: stable id, display name, type theme (for the waypoint colour), and
+/// the ids of its neighbours <em>within the playable subset</em> (edges to draw). Neighbours outside the subset
+/// are filtered out server-side so the client never references a biome it wasn't sent.</summary>
+public record RegionMapBiome(
+    string Id,
+    string Name,
+    IReadOnlyList<DamageType> Types,
+    IReadOnlyList<string> Neighbours
+);
 
 /// <summary>A reward roll paid out gold and/or items — a battle win (inline, <paramref name="Source"/> =
 /// <c>"Battle"</c>) or a Treasure/Mystery node (<paramref name="Source"/> = the <c>RunNodeKind</c> name, which

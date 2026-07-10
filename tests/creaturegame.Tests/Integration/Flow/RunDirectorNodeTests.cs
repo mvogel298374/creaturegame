@@ -303,11 +303,21 @@ public class RunDirectorNodeTests
             tiersSeen.ToArray()
         );
 
-        // Banners: Elite/Boss announce before their fight; the interaction bones each emit their kind. A plain
-        // wild battle emits none.
+        // Node signals: in biome mode every node fires RunNodeEntered in plan order — including the wild nodes
+        // (they drive the encounter-map pin; the client filters WildBattle out of the text log). So the first
+        // biome's six nodes emit in order, then the second biome's wild opener.
         var banners = recorder.Of<RunNodeEntered>().Select(e => e.Kind).ToList();
         Assert.Equal(
-            new[] { "EliteBattle", "Shop", "Treasure", "Mystery", "BossBattle" },
+            new[]
+            {
+                "WildBattle",
+                "EliteBattle",
+                "Shop",
+                "Treasure",
+                "Mystery",
+                "BossBattle",
+                "WildBattle",
+            },
             banners.ToArray()
         );
 
@@ -315,6 +325,133 @@ public class RunDirectorNodeTests
         // exactly once, after all six nodes resolved — proof the bones consume a slot.
         Assert.Single(recorder.Of<PlayerRecovered>());
         Assert.Equal(3, Assert.Single(recorder.Of<RunEnded>()).BattlesWon); // only the 3 first-biome wins count
+    }
+
+    [Fact]
+    public async Task BiomeMode_RevealsNodePlan_MatchingTheWalkedRoute_WithoutChangingSequence()
+    {
+        // The encounter map draws the biome's ladder from BiomeNodePlanRevealed. Pin that the revealed kinds are
+        // exactly the plan the director then walks — and that revealing it is a *no-op to sequencing* (the tiers
+        // handed the supplier and the win count are unchanged, so the reveal is pure presentation).
+        var solo = new BiomeDefinition("solo", "Solo", Region.Kanto, [DamageType.Normal], []);
+        IReadOnlyList<RunNodeKind> plan =
+        [
+            RunNodeKind.WildBattle,
+            RunNodeKind.Shop,
+            RunNodeKind.BossBattle,
+        ];
+
+        var player = Fighter("Player", hp: 300, attack: 999, speed: 100, level: 50);
+        var tiersSeen = new List<EncounterTier>();
+        int built = 0;
+        Func<Creature, int, BiomeDefinition?, EncounterTier, Task<Creature>> supplier = (
+            _,
+            _,
+            _,
+            tier
+        ) =>
+        {
+            built++;
+            tiersSeen.Add(tier);
+            // The first biome's wild + boss are pushovers; the second biome's wild opener is unbeatable and ends
+            // the run after exactly one full biome (the Shop builds no enemy).
+            var enemy =
+                built <= 2
+                    ? Fighter($"Push{built}", hp: 1, attack: 1, speed: 1, level: 5)
+                    : Fighter("Bruiser", hp: 999, attack: 999, speed: 999, level: 50);
+            enemy.SpeciesBaseExperience = 50;
+            return Task.FromResult(enemy);
+        };
+
+        var recorder = new RecordingEmitter();
+        var runner = new RunDirector(
+            player,
+            supplier,
+            Gen1TypeChart.Instance,
+            new ScriptedInput("tackle"),
+            new ScriptedInput("tackle"),
+            movePool: Array.Empty<Attack>(),
+            emitter: recorder,
+            rules: new ScriptableRules().Deterministic(),
+            rng: new SeededRandomSource(0),
+            playableBiomes: [solo],
+            minEventsPerBiome: 3,
+            maxEventsPerBiome: 3,
+            nodePlanFactory: (_, _) => plan
+        );
+
+        await runner.RunAsync();
+
+        // The reveal matches the walked route (first biome's plan), and fires once per biome entered.
+        var reveals = recorder.Of<BiomeNodePlanRevealed>().ToList();
+        Assert.Equal(new[] { "WildBattle", "Shop", "BossBattle" }, reveals[0].NodeKinds.ToArray());
+        // It slots in right after the biome is entered, before that biome's first node signal — proof it's an
+        // additive presentation event, not part of the walked sequence.
+        int enteredIdx = recorder.Events.ToList().FindIndex(e => e is BiomeEntered);
+        int revealIdx = recorder.Events.ToList().FindIndex(e => e is BiomeNodePlanRevealed);
+        int firstNodeIdx = recorder.Events.ToList().FindIndex(e => e is RunNodeEntered);
+        Assert.True(enteredIdx < revealIdx && revealIdx < firstNodeIdx);
+
+        // No-op to sequencing: the tiers the supplier saw and the win count are exactly what they'd be without
+        // the reveal (wild → boss in biome 1, then the unbeatable wild opener in biome 2).
+        Assert.Equal(
+            new[] { EncounterTier.Normal, EncounterTier.Boss, EncounterTier.Normal },
+            tiersSeen.ToArray()
+        );
+        Assert.Equal(2, Assert.Single(recorder.Of<RunEnded>()).BattlesWon);
+    }
+
+    [Fact]
+    public async Task BiomeMode_RevealsRegionMap_OnceAtStart_WithNeighbourEdgesFilteredToPlayable()
+    {
+        // The region-map overlay draws the whole playable graph from a single RegionMapRevealed at run start.
+        // Pin that it fires once, before the first route choice, and that a biome's neighbour edges are filtered
+        // to the playable subset (a neighbour id the client wasn't sent is dropped, never drawn as a dangling edge).
+        var a = new BiomeDefinition("a", "Alpha", Region.Kanto, [DamageType.Fire], ["b", "x"]);
+        var b = new BiomeDefinition("b", "Beta", Region.Kanto, [DamageType.Water], ["a"]);
+
+        var player = Fighter("Player", hp: 10, attack: 1, speed: 1, level: 50);
+        Func<Creature, int, BiomeDefinition?, EncounterTier, Task<Creature>> supplier = (
+            _,
+            _,
+            _,
+            _
+        ) =>
+        {
+            var enemy = Fighter("Bruiser", hp: 999, attack: 999, speed: 999, level: 50);
+            enemy.SpeciesBaseExperience = 50;
+            return Task.FromResult(enemy); // unbeatable → the run ends on the first node
+        };
+
+        var recorder = new RecordingEmitter();
+        var runner = new RunDirector(
+            player,
+            supplier,
+            Gen1TypeChart.Instance,
+            new ScriptedInput("tackle"),
+            new ScriptedInput("tackle"),
+            movePool: Array.Empty<Attack>(),
+            emitter: recorder,
+            rules: new ScriptableRules().Deterministic(),
+            rng: new SeededRandomSource(0),
+            playableBiomes: [a, b],
+            minEventsPerBiome: 1,
+            maxEventsPerBiome: 1,
+            nodePlanFactory: (_, _) => [RunNodeKind.WildBattle]
+        );
+
+        await runner.RunAsync();
+
+        var map = Assert.Single(recorder.Of<RegionMapRevealed>());
+        var byId = map.Biomes.ToDictionary(m => m.Id);
+        Assert.Equal(2, map.Biomes.Count);
+        Assert.Equal(new[] { "b" }, byId["a"].Neighbours.ToArray()); // "x" isn't playable → filtered out
+        Assert.Equal(new[] { "a" }, byId["b"].Neighbours.ToArray());
+
+        // Fires at run start, before any route choice is offered.
+        int mapIdx = recorder.Events.ToList().FindIndex(e => e is RegionMapRevealed);
+        int firstChoiceIdx = recorder.Events.ToList().FindIndex(e => e is BiomeChoiceOffered);
+        Assert.True(mapIdx >= 0 && mapIdx < firstChoiceIdx);
     }
 
     [Fact]
@@ -414,6 +551,10 @@ public class RunDirectorNodeTests
         await runner.RunAsync();
 
         Assert.Empty(recorder.Of<RunNodeEntered>());
+        // The map-reveal events are biome-mode-only too — the legacy chain has no region map or node ladder, so
+        // a future gating regression can't silently leak either onto the wire here.
+        Assert.Empty(recorder.Of<RegionMapRevealed>());
+        Assert.Empty(recorder.Of<BiomeNodePlanRevealed>());
     }
 
     // --- Run Economy: reward-choice supplier wiring (every reward is a blocking pick-one-of-N) ---------------

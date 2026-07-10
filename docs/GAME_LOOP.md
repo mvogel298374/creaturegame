@@ -137,6 +137,15 @@ Each future event must obey §3: handed the run context, emits text, may await i
 changed since 3a — new kinds drop in by branching `chooseNextEvent` (today: `RunDirector.EventForNode` over the
 biome's seeded `RunNodeKind` plan).
 
+**Encounter-map reveal events (2026-07-10, presentation-only).** Two additive `BattleEvent`s let the client draw
+the run as a Slay-the-Spire-style map without changing any sequencing (`docs/TODO.md` → *Encounter Map*):
+`RegionMapRevealed` (the whole playable biome graph + neighbour edges, emitted once at run start) and
+`BiomeNodePlanRevealed` (the seeded `RunNodeKind` ladder, emitted when a biome is entered). Both are gated to
+biome mode. **`RunNodeEntered` semantics widened:** in biome mode it now fires for **every** node *including
+`WildBattle`* (previously only Elite/Boss/interaction nodes) so the map has one uniform position signal — the
+client filters `WildBattle` out of the text log, so the banner behaviour is unchanged. The legacy endless chain
+emits none of the three.
+
 ---
 
 ## 6. Why formalize now — and the open questions

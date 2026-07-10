@@ -32,6 +32,7 @@ public sealed class RunDirector
     private readonly int _minEventsPerBiome;
     private readonly int _maxEventsPerBiome;
     private readonly bool _biomeModeActive;
+    private readonly IReadOnlyList<BiomeDefinition> _playableBiomes;
     private readonly Wallet? _wallet;
     private readonly int _minShopBudget;
     private readonly Func<int, IRandomSource, IReadOnlyList<RunNodeKind>> _nodePlanFactory;
@@ -91,6 +92,7 @@ public sealed class RunDirector
         // Biome mode kicks in only when the composition layer supplies a non-empty playable set; otherwise the
         // director runs the legacy endless chain (no route choices), so tests/uses without biomes are unchanged.
         _biomeModeActive = playableBiomes is { Count: > 0 };
+        _playableBiomes = playableBiomes ?? [];
         _wallet = wallet;
         _minShopBudget = Math.Max(0, minShopBudget);
 
@@ -144,6 +146,13 @@ public sealed class RunDirector
     public async Task RunAsync()
     {
         var ctx = new RunContext(_state, _emitter, _playerInput, _rng);
+
+        // Reveal the whole playable region graph once up front so the client can draw the encounter map (a
+        // presentation signal — the run's route is still charted one BiomeChoice at a time). Neighbours are
+        // filtered to the playable subset so the client never references a biome it wasn't sent.
+        if (_biomeModeActive)
+            _emitter?.Emit(BuildRegionMap());
+
         while (_state.Player.IsAlive())
         {
             var next = ChooseNextEvent(_state);
@@ -210,6 +219,11 @@ public sealed class RunDirector
                 int length = planRng.Next(_minEventsPerBiome, _maxEventsPerBiome + 1); // +1 → max inclusive
                 s.BiomeNodePlan = GateShopsByBudget(_nodePlanFactory(length, planRng));
                 s.NeedsBiomeChoice = false;
+                // Reveal the rolled ladder so the encounter map can draw this biome's nodes ahead of time. Pure
+                // presentation — the plan is already fixed for the biome, so emitting it changes no sequencing.
+                _emitter?.Emit(
+                    new BiomeNodePlanRevealed(s.BiomeNodePlan.Select(k => k.ToString()).ToList())
+                );
                 break;
             case BattleOutcome { Won: true }:
                 s.RunDepth++; // progression depth (= BattlesWon in legacy; biome mode adds interaction nodes too)
@@ -237,6 +251,24 @@ public sealed class RunDirector
                     s.NeedsBiomeChoice = true;
                 break;
         }
+    }
+
+    // Projects the playable biome subset into the region-map payload the client draws: each biome with its type
+    // theme and the ids of its neighbours that are *also* in the playable subset (the graph edges). Filtering
+    // neighbours to the subset means the client never gets an edge to a biome it wasn't sent.
+    private RegionMapRevealed BuildRegionMap()
+    {
+        var playableIds = _playableBiomes.Select(b => b.Id).ToHashSet();
+        return new RegionMapRevealed(
+            _playableBiomes
+                .Select(b => new RegionMapBiome(
+                    b.Id,
+                    b.Name,
+                    b.Types,
+                    b.Neighbours.Where(playableIds.Contains).ToList()
+                ))
+                .ToList()
+        );
     }
 
     // A Shop is a dead node when the player can't afford anything, so a biome only keeps its Shop slots if the
@@ -313,15 +345,18 @@ internal sealed class BattleRunEvent(
         var s = ctx.State;
         var player = s.Player;
 
-        // Elite/Boss nodes announce themselves before the fight (a wild battle just slides the foe in, as today).
-        string? bannerKind = tier switch
+        // Announce the node so the encounter map can advance its position pin. Elite/Boss always fire (and the
+        // client titles a text banner for them, as before); a plain wild node fires only in biome mode — it
+        // drives the map pin but the client filters WildBattle out of the text log, so the wild encounter still
+        // slides the foe in with no banner. The legacy endless chain (no current biome, no map) stays silent.
+        string nodeKind = tier switch
         {
             EncounterTier.Elite => nameof(RunNodeKind.EliteBattle),
             EncounterTier.Boss => nameof(RunNodeKind.BossBattle),
-            _ => null,
+            _ => nameof(RunNodeKind.WildBattle),
         };
-        if (bannerKind is not null)
-            ctx.Emitter?.Emit(new RunNodeEntered(bannerKind));
+        if (tier != EncounterTier.Normal || s.CurrentBiome is not null)
+            ctx.Emitter?.Emit(new RunNodeEntered(nodeKind));
 
         // RunDepth is the progression depth — 0 for the first node, climbing per node traversed (wins +
         // interaction visits; = BattlesWon in the legacy chain). The supplier scales the next foe (BST band,

@@ -365,6 +365,16 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       return { steps: [w(200), d(log(`Entered ${biomeName}!`)), w(300)] };
     }
 
+    case 'RegionMapRevealed':
+      // The playable region graph, sent once at run start. Consumed by the encounter-map overlay (Phase 2), not
+      // the battle log — no timeline steps. Explicit arm so the every-event contract test is satisfied.
+      return {};
+
+    case 'BiomeNodePlanRevealed':
+      // The current biome's seeded node ladder, revealed on entry. Drawn by the encounter-map overlay (Phase 2),
+      // not the battle log — no timeline steps. Explicit arm for the every-event contract test.
+      return {};
+
     case 'RewardChoiceOffered': {
       // A rolled reward is offered as a pick-one-of-N (two rarity-rolled items or a larger gold bag). Parse the
       // options off the wire and raise the choice modal; the run blocks server-side until ChooseReward answers
@@ -432,8 +442,10 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
 
     case 'RunNodeEntered': {
       // A route node banner: a nonstandard encounter (Elite/Boss) or a non-battle node (Shop/Treasure/Mystery).
-      // Tone it 'event' so these stand out from the normal battle stream (a plain wild encounter has no banner).
+      // Tone it 'event' so these stand out from the normal battle stream. A plain wild node also fires this
+      // (in biome mode) to drive the encounter-map pin, but carries no banner — it slides the foe in as before.
       const kind = payload.kind as string;
+      if (kind === 'WildBattle') return {};
       return { steps: [w(200), d(log(runNodeBannerMsg(kind), 'event')), w(300)] };
     }
 

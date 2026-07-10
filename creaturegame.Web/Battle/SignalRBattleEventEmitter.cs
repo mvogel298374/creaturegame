@@ -109,6 +109,20 @@ public sealed class SignalRBattleEventEmitter(
                 }
             ),
             RunNodeEntered e => ("RunNodeEntered", new { e.Kind }),
+            BiomeNodePlanRevealed e => ("BiomeNodePlanRevealed", new { e.NodeKinds }),
+            RegionMapRevealed e => (
+                "RegionMapRevealed",
+                new
+                {
+                    Biomes = e.Biomes.Select(b => new
+                    {
+                        b.Id,
+                        b.Name,
+                        Types = b.Types.Select(t => t.ToString()),
+                        b.Neighbours,
+                    }),
+                }
+            ),
             RewardGranted e => (
                 "RewardGranted",
                 new

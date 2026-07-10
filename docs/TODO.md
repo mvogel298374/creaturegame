@@ -155,6 +155,116 @@ Stack: React 18 + TypeScript + SignalR + Phaser 3. (Canvas & core animations don
 
 ---
 
+## Encounter Map — Slay-the-Spire-style route overlay  *(design pass 2026-07-10 — `/plan`; sub-decisions ratified by the user 2026-07-10)*
+
+Make the run **visible**: a striking secondary overlay that shows the region as a node map — biomes as
+waypoints wired by their `Neighbours`, the route you've charted traced through them, and the **current biome's
+node ladder revealed inline** (wild / elite / treasure / shop / mystery … → **Boss** apex). Replaces the flavour
+gap where the biome plan is walked *invisibly* today. The backend already holds every fact this draws — this is
+overwhelmingly a **presentation** feature over existing run state plus a few **additive** events.
+
+**Decided in the `/plan` pass (three forks):**
+1. **Reveal the path, don't branch it.** The overlay *shows* the biome's seeded node sequence and your position
+   on it; it grants **no** new in-biome choice. This honours the settled `GAME_LOOP.md §4` governing rule (logic
+   owns the sequence; the player only changes an event's outcome). The only real choice stays the **between-biome
+   route pick**, which the map surfaces as clickable waypoints. *(Full STS branching was considered and rejected —
+   it would overturn §4 and rework `RunDirector`/`chooseNextEvent`.)*
+2. **Whole region graph.** One map of the run's playable biome subset (the seeded 10-of-18) wired by neighbours,
+   the traversed route highlighted, the **current biome expanded** to its node ladder. (Not just the current
+   biome; not the deferred multi-panel nesting.)
+3. **Both reveal triggers.** The overlay **auto-peeks** at each node transition (pin advances one step, then it
+   fades back to the scene) **and** a persistent **Map** toggle reopens it on demand.
+
+**Acceptance condition (DoR #1):** From the battle screen the player can (a) see, at any time via a Map button, a
+region node-map with biomes-as-waypoints, their neighbour edges, the route so far, and the current biome's node
+ladder with per-node icons + done/current/upcoming state and the Boss at the apex; (b) watch the pin auto-advance
+one node at each transition; and (c) chart the next biome by clicking a highlighted neighbour waypoint on the map
+(folding in the old `BiomeChoiceModal`). Same seed ⇒ same map. Adding the reveal changes **no** run sequencing.
+
+**Gen-variable surface (DoR #3): none.** This touches no `IBattleRules` / `ITypeChart` / `IStatCalculator`. Node
+kinds (`RunNodeKind`) and biomes are already generation-agnostic *run structure* (biomes are the multi-gen axis —
+Johto ships its own set), and biome type colours reuse the chart-agnostic `TypeBadge` palette. Litmus "does this
+change for Gen 2?" → no; the map renders whatever playable set/plan it is handed. (Satisfies the
+`GENERATION_SEAMS.md §5.0` checklist trivially — no seam is added or read.)
+
+**Gen-1 source of truth (DoR #4): N/A — no Gen 1 mechanic.** Behavioural truth is the existing run model
+(`ENCOUNTER_DESIGN.md §1/§5`, `GAME_LOOP.md §3-5`); Slay the Spire is the **UX** reference only.
+
+**Data vs runtime boundary (DoR #5):** web + frontend, plus a few **additive core events**. **No importer change,
+no DB migration.** The one optional *data* choice is authored 2-D coords for map layout (below).
+
+**Backend surface — additive, small (the reveal plumbing):**
+- **Region graph payload at run start.** The client needs the full playable subset + neighbour edges (today only
+  the 3 *offered* biomes reach the client via `BiomeChoiceOffered`; `RunSetup.PlayableBiomes` is server-only).
+  Expose it once — either embedded in the game-start/setup response or a new `RegionMapRevealed(biomes[], edges)`
+  event. Edges = each playable biome's `Neighbours` filtered to the playable id set.
+- **`BiomeNodePlanRevealed(nodeKinds[])`** — emit the seeded `BiomeNodePlan` when it's rolled (in
+  `RunDirector.Apply` on `BiomeChoiceOutcome`, right after `GateShopsByBudget`, via `_emitter` — same
+  director-emits precedent as `RunEnded`). This is the ladder the overlay draws ahead of time. Revealing it is a
+  **sequencing no-op** (the plan is already deterministic once entered).
+- **`RunNodeEntered` for *every* node.** Today wild battles emit nothing (`RunDirector` only banners
+  Elite/Boss/interaction nodes); emit it for wild too so the map has one uniform pin-advance signal. Keep the
+  *text banner* filtered to Elite/Boss in the frontend timeline (don't add wild-battle banner noise).
+- **Field-level wire guards.** Every new event/field needs its `SignalRBattleEventEmitter` projection **and** a
+  field-level `WebEventContractTests` guard — the recurring *web event field-projection gap* (see memory +
+  existing `BiomeChoiceOffered`/`BiomeEntered` projection guards).
+
+**Frontend surface (the bulk of the work):**
+- **`EncounterMap` overlay component.** Region = a node-link **overworld** map (waypoints + neighbour edges,
+  visited route traced, current biome highlighted, offered neighbours flagged choosable). Current biome = a
+  vertical **ladder** to the Boss apex, one icon per revealed plan node (wild ⚔ / elite ★ / boss 💀 / shop $ /
+  treasure ▧ / mystery ?), each in done / current / upcoming state, plus a "you are here" pin. Type-
+  coloured waypoints reuse the `TypeBadge` palette; theme-aware (light/dark).
+  - **Note — the Poké Center cap is not a plan node.** The mandatory recovery after each biome's Boss is a
+    separate `RunDirector` branch (`EventsInCurrentBiome >= BiomeNodePlan.Count`), **not** a `RunNodeKind` and so
+    **not** in `BiomeNodePlan` / `BiomeNodePlanRevealed`. Phase 2's ladder must **synthesize** a terminal rest ♥
+    step after the Boss client-side (it's implied by the model, not carried by the reveal event) — or Phase 1.5
+    emits it explicitly if that proves cleaner.
+- **Reducer/hub wiring** (`battleReducer` + `useBattleHub`): accumulate region graph (start) → route trace
+  (`BiomeEntered`) → node ladder (`BiomeNodePlanRevealed`) → pin index (`RunNodeEntered`) → choosable set
+  (`BiomeChoiceOffered`). Pure-logic accumulation → Vitest (per the suite-split rule).
+- **Overlay behaviour:** auto-peek + fade at each transition; Map toggle to reopen; the between-biome route pick
+  happens **on the map** (click a choosable waypoint → existing `chooseBiome`), replacing `BiomeChoiceModal`.
+
+**What tests assert (DoR #6 — the invariants, since there's no gen-quirk):**
+- **Reveal is a no-op to sequencing** — a `RunDirector` test proving the emitted battle/event *order* is
+  unchanged with the new reveal event present (the map must not alter the run).
+- `BiomeNodePlanRevealed` carries the exact seeded plan **and** projects over SignalR (field-level guard).
+- `RunNodeEntered` now fires once per node incl. wild (count == plan length per biome).
+- Region payload carries the full playable set + correct filtered edges.
+- Reducer accumulates map state correctly across the event stream (Vitest).
+- E2E (seeded, Playwright): open the Map overlay, see the ladder + pin, advance a node, and chart the next biome
+  by clicking a waypoint.
+
+**Dependencies (DoR #7): none blocking.** Everything the map visualizes already exists (biome graph, seeded node
+plan, `BiomeEntered`/`RunNodeEntered`); the work is exposing it + drawing it. Independent of Phase 4 acquisition.
+
+**Sub-decisions — ratified by the user (2026-07-10):**
+- **Map-based route choice replaces `BiomeChoiceModal`** *(chosen)* — the choice happens by clicking a
+  waypoint, so "user choices" become the visible verb. (Alt considered: keep the card modal *and* add a passive
+  map — rejected as redundant surface.)
+- **Layout coords: authored per-biome 2-D coords in the `Biomes` registry** *(chosen — cheap, geographic,
+  seed-stable)* over a client-side computed/force-directed layout (no data, but wobblier + less "designed").
+- **Fog of war** *(chosen)*: region topology fully visible from start, biome interiors revealed on entry
+  (tunable later).
+
+**Phased build (shippable slices):**
+1. ✅ **DONE (2026-07-10) — Reveal plumbing (backend):** `RegionMapRevealed` (playable subset + neighbour edges,
+   filtered to the subset) emitted once at run start; `BiomeNodePlanRevealed` (the seeded ladder) emitted on
+   biome entry; `RunNodeEntered` now fires for *every* node incl. `WildBattle` in biome mode (the frontend
+   filters `WildBattle` out of the log). SignalR projections + field-level `WebEventContractTests` guards for
+   both new events; explicit no-op timeline arms (every-event contract). Reveal proven a **sequencing no-op**
+   (`BiomeMode_RevealsNodePlan_…WithoutChangingSequence`). No visible change; full suite + E2E green. *(Sub-
+   decisions confirmed: map replaces `BiomeChoiceModal`; authored biome coords; region topology visible from
+   start.)*
+2. **Current-biome ladder overlay (frontend):** the vertical node ladder + pin + auto-peek/toggle. First visible
+   slice — the STS "path" feel within a biome.
+3. **Region graph + map-based route choice:** the overworld waypoint map, route trace, and folding the biome
+   pick onto the map (retire `BiomeChoiceModal`).
+4. **Polish:** authored coords, transition animation/easing, icon art, accessibility pass.
+
+---
+
 ## Browser-Based UI Testing (Playwright)
 
 Suite lives in `ClientApp/e2e/` (`npm run test:e2e`). Playwright drives the React DOM; the Phaser canvas is

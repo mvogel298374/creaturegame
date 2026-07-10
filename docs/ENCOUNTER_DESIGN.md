@@ -278,6 +278,14 @@ Each node is an **`IRunEvent` returning a typed `Outcome`** (the target abstract
 so nodes drop in without the loop body changing. `BattleRunner` has graduated into the **`RunDirector`** that
 `GAME_LOOP.md §6 Q1` anticipated.
 
+> **Making the plan visible (Encounter Map, 2026-07-10).** This seeded node plan is now *revealed* to the client
+> so it can draw the biome as a Slay-the-Spire-style ladder — `BiomeNodePlanRevealed` carries the ordered
+> `RunNodeKind`s on biome entry, `RegionMapRevealed` carries the whole playable biome graph at run start, and
+> `RunNodeEntered` fires per node (incl. `WildBattle`) as the position pin. Presentation only — no change to the
+> plan or its sequencing. Note the **Poké Center cap** after the Boss is a director branch, *not* a `RunNodeKind`
+> in the plan, so it isn't in `BiomeNodePlanRevealed` (the ladder synthesizes it client-side). Design +
+> phasing: `docs/TODO.md` → *Encounter Map*; event/loop detail: `GAME_LOOP.md §5`.
+
 ---
 
 ## 6. Mapping onto today's code
