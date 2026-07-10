@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { TypeBadge, typeColor } from '../components/TypeBadge';
+import { MapGlyphSprite, TypeChip, typeIconId, nodeIconId } from './mapGlyphs';
 import { BattleCanvas } from '../battle/BattleCanvas';
 import { useBattleHub, type LevelUpPanel, type MoveReplacementPrompt, type RecoveryPrompt, type EvolutionPrompt, type RewardChoicePrompt, type ShopPrompt, type DropToast } from '../hooks/useBattleHub';
 import type { RegionBiome, BiomeOption } from '../battle/timeline';
@@ -93,6 +94,7 @@ export function BattleScreen() {
 
   return (
     <div className="battle-screen">
+      <MapGlyphSprite />
       <div className="battle-field">
         <div className="nameplate nameplate--enemy">
           <div className="nameplate-row">
@@ -290,16 +292,16 @@ function BattleEndedOverlay({ creatureName, speciesId, battlesWon, finalLevel, o
 // new Set each render.
 const EMPTY_ID_SET: ReadonlySet<string> = new Set<string>();
 
-// Per-node icon + label for the encounter-map ladder. Keys are the backend RunNodeKind names plus the
-// client-synthesized 'Rest' cap. Glyphs are text (not sprites) so the ladder stays cheap and E2E-legible.
-const LADDER_NODE_META: Record<string, { glyph: string; label: string }> = {
-  WildBattle:  { glyph: '⚔', label: 'Wild' },
-  EliteBattle: { glyph: '★', label: 'Elite' },
-  BossBattle:  { glyph: '☠', label: 'Boss' },
-  Shop:        { glyph: '₽', label: 'Shop' },
-  Treasure:    { glyph: '◆', label: 'Treasure' },
-  Mystery:     { glyph: '?', label: 'Mystery' },
-  Rest:        { glyph: '♥', label: 'Rest' },
+// Per-node label + sub-label for the encounter-map ladder. Keys are the backend RunNodeKind names plus the
+// client-synthesized 'Rest' cap; the drawn icon comes from nodeIconId (a shared vector glyph, no longer text).
+const LADDER_NODE_META: Record<string, { label: string; sub: string }> = {
+  WildBattle:  { label: 'Wild Battle',  sub: 'Encounter' },
+  EliteBattle: { label: 'Elite Battle', sub: 'Tough foe' },
+  BossBattle:  { label: 'Boss',         sub: 'Region gate' },
+  Shop:        { label: 'Shop',         sub: 'Spend gold' },
+  Treasure:    { label: 'Treasure',     sub: 'Free reward' },
+  Mystery:     { label: 'Mystery',      sub: '???' },
+  Rest:        { label: 'Poké Center',  sub: 'Rest & heal' },
 };
 
 // The encounter-map ladder (Phase 2): the current biome's route drawn as a vertical Slay-the-Spire-style path —
@@ -315,12 +317,17 @@ function NodeLadder({ nodePlan, pin }: { nodePlan: string[]; pin: number }) {
   return (
     <ol className="ladder">
       {nodes.map((kind, i) => {
-        const meta = LADDER_NODE_META[kind] ?? { glyph: '•', label: kind };
+        const meta = LADDER_NODE_META[kind] ?? { label: kind, sub: '' };
         const nodeState = i < pin ? 'done' : i === pin ? 'current' : 'upcoming';
         return (
           <li key={i} className={`ladder-node ladder-node--${kind.toLowerCase()} ladder-node--${nodeState}`}>
-            <span className="ladder-icon" aria-hidden="true">{meta.glyph}</span>
-            <span className="ladder-label">{meta.label}</span>
+            <span className="ladder-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><use href={`#${nodeIconId(kind)}`} /></svg>
+            </span>
+            <span className="ladder-text">
+              <span className="ladder-label">{meta.label}</span>
+              {meta.sub && <span className="ladder-sub">{meta.sub}</span>}
+            </span>
             {nodeState === 'current' && <span className="ladder-here" aria-label="you are here">◄</span>}
           </li>
         );
@@ -350,16 +357,47 @@ function RegionMap({ biomes, routePath, currentId, offeredIds, onChoose }: {
       const n = byId.get(nid);
       if (n && b.id < n.id) edges.push({ a: b, b: n });
     }
+  const primary = (b: RegionBiome) => b.types[0] ?? 'Normal';
   return (
     <div className="region-map">
-      <svg className="region-map-edges" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-        {edges.map(({ a, b }, i) => (
-          <line
-            key={i}
-            x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-            className={`region-edge${travelled.has(regionEdgeKey(a.id, b.id)) ? ' region-edge--travelled' : ''}`}
-          />
+      {/* Territory layer: each biome glows in its type colour (background imagery), watermarked with its
+          primary-type icon. screen-blended so neighbours bleed into one painterly overworld. */}
+      <div className="region-terr" aria-hidden="true">
+        {biomes.map(b => (
+          <span
+            key={b.id}
+            className="region-territory"
+            style={{ left: `${b.x}%`, top: `${b.y}%`, '--c': typeColor(primary(b)) } as CSSProperties}
+          >
+            <svg className="region-territory-motif" viewBox="0 0 24 24"><use href={`#${typeIconId(primary(b))}`} /></svg>
+          </span>
         ))}
+      </div>
+      {/* Edge layer: a path per neighbour link, its gradient blending the two biomes' type colours. */}
+      <svg className="region-map-edges" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          {edges.map(({ a, b }, i) => (
+            <linearGradient key={i} id={`edge-grad-${i}`} gradientUnits="userSpaceOnUse" x1={a.x} y1={a.y} x2={b.x} y2={b.y}>
+              <stop offset="0" stopColor={typeColor(primary(a))} />
+              <stop offset="1" stopColor={typeColor(primary(b))} />
+            </linearGradient>
+          ))}
+        </defs>
+        {edges.map(({ a, b }, i) => {
+          const isTravelled = travelled.has(regionEdgeKey(a.id, b.id));
+          // Gentle perpendicular bow so links read as drawn paths, not a stiff mesh.
+          const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+          const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
+          const cx = mx + (-dy / len) * 5, cy = my + (dx / len) * 5;
+          return (
+            <path
+              key={i}
+              d={`M${a.x} ${a.y} Q${cx} ${cy} ${b.x} ${b.y}`}
+              stroke={isTravelled ? undefined : `url(#edge-grad-${i})`}
+              className={`region-edge${isTravelled ? ' region-edge--travelled' : ''}`}
+            />
+          );
+        })}
       </svg>
       {biomes.map(b => {
         const isCurrent = b.id === currentId;
@@ -376,14 +414,21 @@ function RegionMap({ biomes, routePath, currentId, offeredIds, onChoose }: {
             key={b.id}
             type="button"
             className={cls}
-            style={{ left: `${b.x}%`, top: `${b.y}%`, '--node-clr': typeColor(b.types[0] ?? 'Normal') } as CSSProperties}
+            style={{ left: `${b.x}%`, top: `${b.y}%`, '--node-clr': typeColor(primary(b)) } as CSSProperties}
             disabled={!choosable}
             onClick={choosable ? () => onChoose!(b.id) : undefined}
             aria-current={isCurrent ? 'location' : undefined}
             aria-label={`${b.name}${isCurrent ? ' (current)' : ''}${choosable ? ' — choose this route' : ''}`}
           >
-            <span className="region-node-dot" aria-hidden="true" />
+            {isCurrent && <span className="region-node-flag" aria-hidden="true">You are here</span>}
+            {choosable && <span className="region-node-flag region-node-flag--pick" aria-hidden="true">Choose</span>}
+            <span className="region-node-disc" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><use href={`#${typeIconId(primary(b))}`} /></svg>
+            </span>
             <span className="region-node-label">{b.name}</span>
+            <span className="region-node-chips" aria-hidden="true">
+              {b.types.map(t => <TypeChip key={t} type={t} />)}
+            </span>
           </button>
         );
       })}
@@ -404,16 +449,60 @@ function RunMapPanel({ biomes, routePath, currentId, biomeName, nodePlan, pin, p
   pinned: boolean;
   onClose: () => void;
 }) {
+  // When pinned open as the full-screen map, Escape closes it (matches the game's other dismissable overlays).
+  useEffect(() => {
+    if (!pinned) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [pinned, onClose]);
+
+  // Compact corner peek (auto-shown at each ladder change): the current biome's ladder only — the full graph
+  // belongs to the pinned full-screen view, so the peek stays small and unobtrusive.
+  if (!pinned) {
+    return (
+      <div className="encounter-map" role="complementary" aria-label="Route map">
+        <div className="encounter-map-head">
+          <span className="encounter-map-biome">{biomeName || 'Region map'}</span>
+        </div>
+        {nodePlan.length > 0 && <NodeLadder nodePlan={nodePlan} pin={pin} />}
+      </div>
+    );
+  }
+
+  // Pinned: the full-screen overworld. Backdrop click (outside the stage) closes it.
   return (
-    <div className={`encounter-map${pinned ? ' encounter-map--pinned' : ''}`} role="complementary" aria-label="Route map">
-      <div className="encounter-map-head">
-        <span className="encounter-map-biome">{biomeName || 'Region map'}</span>
-        {pinned && (
-          <button className="encounter-map-close" onClick={onClose} aria-label="Close map">×</button>
+    <div
+      className="encounter-map encounter-map--pinned"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Route map"
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="map-topbar">
+        <div className="map-brand">
+          <h2 className="map-title">Run Map</h2>
+          <span className="encounter-map-biome">{biomeName || 'Region map'}</span>
+        </div>
+        <button className="encounter-map-close" onClick={onClose} aria-label="Close map">×</button>
+      </div>
+      <div className="map-stage">
+        <div className="map-overworld">
+          <RegionMap biomes={biomes} routePath={routePath} currentId={currentId} offeredIds={EMPTY_ID_SET} />
+        </div>
+        {nodePlan.length > 0 && (
+          <aside className="map-ladder-panel">
+            <h3 className="map-ladder-head">Encounter Path</h3>
+            <div className="map-ladder-biome">{biomeName}</div>
+            <NodeLadder nodePlan={nodePlan} pin={pin} />
+          </aside>
         )}
       </div>
-      <RegionMap biomes={biomes} routePath={routePath} currentId={currentId} offeredIds={EMPTY_ID_SET} />
-      {nodePlan.length > 0 && <NodeLadder nodePlan={nodePlan} pin={pin} />}
+      <div className="map-legend" aria-hidden="true">
+        <span className="map-legend-key"><span className="map-legend-swatch map-legend-swatch--here" />You are here</span>
+        <span className="map-legend-key"><span className="map-legend-swatch map-legend-swatch--travelled" />Travelled</span>
+        <span className="map-legend-key map-legend-note">Territory colour = biome type</span>
+      </div>
     </div>
   );
 }
@@ -445,7 +534,7 @@ function RouteChoiceMap({ biomes, routePath, currentId, options, onChoose }: {
           {options.map(o => (
             <span key={o.id} className="route-choice-legend-item">
               <span className="route-choice-legend-name">{o.name}</span>
-              {o.types.map(t => <TypeBadge key={t} type={t} size="sm" />)}
+              {o.types.map(t => <TypeChip key={t} type={t} />)}
             </span>
           ))}
         </div>

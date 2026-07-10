@@ -1171,7 +1171,16 @@
   }
 }
 
-/* ── Encounter map (route ladder overlay) ─────── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   RUN MAP — dark-fantasy night-overworld (visual overhaul)
+   Biome territories glow in their own type colour (background imagery), paths
+   blend the colours of the biomes they link, the active biome's encounter
+   ladder runs up the side. The MAP button opens the full-screen map; a small
+   corner peek auto-shows the ladder at each ladder change.
+   Map-local ink tokens deepen the ground below the app's own navy.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── MAP toggle button ─────────────────────────────────────── */
 .map-toggle-btn {
   position: absolute;
   top: var(--sp-sm);
@@ -1180,39 +1189,68 @@
   font-family: var(--font);
   font-size: 0.72rem;
   font-weight: bold;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.1em;
   color: var(--clr-text);
   background: rgba(13, 13, 26, 0.82);
   border: 2px solid var(--clr-text);
-  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  padding: 0.25rem 0.7rem;
   cursor: pointer;
+  transition: color 140ms, border-color 140ms, box-shadow 140ms;
 }
 .map-toggle-btn:hover { border-color: var(--clr-gold); color: var(--clr-gold); }
-.map-toggle-btn--on   { border-color: var(--clr-gold); color: var(--clr-gold); box-shadow: 0 0 10px rgba(255, 215, 0, 0.35); }
+.map-toggle-btn--on   { border-color: var(--clr-gold); color: var(--clr-gold); box-shadow: 0 0 12px rgba(255, 215, 0, 0.4); }
 
+/* ── Type chip (icon-in-frame — reads clearly as a type) ───── */
+.type-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 7px 1px 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--cc) 18%, #05050c);
+  border: 1px solid color-mix(in srgb, var(--cc) 55%, transparent);
+  font-family: var(--font);
+  font-size: 0.5rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  white-space: nowrap;
+}
+.type-chip-frame {
+  width: 0.92rem;
+  height: 0.92rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--cc) 80%, #fff), var(--cc));
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+.type-chip-frame svg { width: 0.64rem; height: 0.64rem; color: #fff; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5)); }
+.type-chip-name { color: color-mix(in srgb, var(--cc) 45%, #ffffff); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6); }
+
+/* ── Compact corner peek (ladder only) ─────────────────────── */
 .encounter-map {
   position: absolute;
-  top: calc(var(--sp-sm) + 1.9rem);
+  top: calc(var(--sp-sm) + 2.1rem);
   right: var(--sp-sm);
   z-index: 6;
-  width: 9rem;
-  max-height: calc(65vh - 4rem);
+  width: 12rem;
+  max-height: calc(70vh - 4rem);
   overflow-y: auto;
-  padding: var(--sp-sm);
-  background: rgba(13, 13, 26, 0.9);
+  padding: var(--sp-sm) 0.7rem 0.7rem;
+  background: rgba(8, 8, 18, 0.92);
   border: 2px solid var(--clr-border);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
   animation: encounter-map-in 160ms ease-out;
   scrollbar-width: thin;
   scrollbar-color: var(--clr-border) transparent;
 }
-.encounter-map--pinned { border-color: var(--clr-gold); }
-
 @keyframes encounter-map-in {
   from { opacity: 0; transform: translateX(8px); }
   to   { opacity: 1; transform: translateX(0); }
 }
-
 .encounter-map-head {
   display: flex;
   align-items: center;
@@ -1228,95 +1266,201 @@
   font-weight: bold;
   color: var(--clr-gold);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
 }
 .encounter-map-close {
   font-family: var(--font);
-  font-size: 0.9rem;
+  font-size: 1rem;
   line-height: 1;
   color: var(--clr-text-sub);
-  background: none;
-  border: none;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--clr-border);
+  border-radius: 4px;
+  width: 2rem;
+  height: 2rem;
   cursor: pointer;
-  padding: 0 0.15rem;
+  transition: color 140ms, border-color 140ms;
 }
-.encounter-map-close:hover { color: var(--clr-accent); }
+.encounter-map-close:hover { color: var(--clr-accent); border-color: var(--clr-accent); }
 
-/* column-reverse: node 0 (start) sits at the bottom, the Boss/Rest apex at the top — the player climbs upward. */
-.ladder {
-  list-style: none;
-  margin: 0;
+/* ── Full-screen map (MAP pinned) ──────────────────────────── */
+.encounter-map--pinned {
+  position: fixed;
+  inset: 0;
+  top: 0;
+  z-index: 60;
+  width: auto;
+  max-height: none;
+  overflow: hidden;
   padding: 0;
+  border: none;
+  border-radius: 0;
   display: flex;
-  flex-direction: column-reverse;
-  gap: 0;
+  flex-direction: column;
+  /* map-local deep-night ground */
+  --ink-0: #05050c;
+  --ink-1: #0b0b16;
+  --ink-2: #141428;
+  --ink-3: #1d1d38;
+  background: radial-gradient(120% 90% at 50% 0%, var(--ink-2) 0%, var(--ink-1) 46%, var(--ink-0) 100%);
+  animation: map-fullscreen-in 200ms ease-out;
 }
-.ladder-node {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: var(--sp-xs);
-  padding: 0.28rem 0.15rem;
-  font-family: var(--font);
-  font-size: 0.72rem;
-  color: var(--clr-text-sub);
+@keyframes map-fullscreen-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
-/* connector line between rungs */
-.ladder-node:not(:first-child)::after {
+/* faint surveyor grid + vignette so the ground reads as a chart, not a void */
+.encounter-map--pinned::before {
   content: '';
   position: absolute;
-  left: 0.72rem;
-  bottom: 100%;
-  width: 2px;
-  height: 0.28rem;
-  background: var(--clr-border);
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(140% 110% at 50% 40%, #000 55%, transparent 100%);
+  pointer-events: none;
 }
-.ladder-icon {
-  flex: 0 0 1.15rem;
-  height: 1.15rem;
-  display: grid;
-  place-items: center;
-  border: 1px solid var(--clr-border);
-  border-radius: 2px;
-  font-size: 0.72rem;
-  color: var(--clr-text);
+.encounter-map--pinned::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 240px 40px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
 }
-.ladder-label { flex: 1; }
-.ladder-here { color: var(--clr-gold); font-size: 0.7rem; }
 
-/* Node states: done (dim), current (accent + glow), upcoming (muted). */
-.ladder-node--done { opacity: 0.5; }
-.ladder-node--done .ladder-icon { color: var(--clr-text-sub); }
-.ladder-node--current { color: var(--clr-text); font-weight: bold; }
-.ladder-node--current .ladder-icon {
-  border-color: var(--clr-gold);
+.map-topbar {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1.4rem;
+  border-bottom: 1px solid var(--clr-border);
+  background: linear-gradient(180deg, rgba(5, 5, 12, 0.9), rgba(5, 5, 12, 0.15));
+}
+.map-brand { display: flex; align-items: baseline; gap: 0.9rem; }
+.map-title {
+  margin: 0;
+  font-family: var(--font);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
   color: var(--clr-gold);
-  box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+  text-shadow: 0 0 18px rgba(255, 215, 0, 0.25);
 }
-.ladder-node--upcoming { opacity: 0.85; }
+.map-topbar .encounter-map-biome { font-size: 0.78rem; }
 
-/* Boss apex reads hot even when upcoming. */
-.ladder-node--bossbattle .ladder-icon { border-color: var(--clr-accent); color: var(--clr-accent); }
-.ladder-node--bossbattle.ladder-node--current .ladder-icon {
-  border-color: var(--clr-accent);
-  color: var(--clr-accent);
-  box-shadow: 0 0 10px var(--clr-accent-glow);
+.map-stage {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.map-overworld {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.map-overworld .region-map {
+  position: absolute;
+  inset: 1.5rem 1.5rem 0.5rem;
+  width: auto;
+  aspect-ratio: auto;
+  margin: 0;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .encounter-map { animation: none; }
+/* ladder panel on the right of the full-screen map */
+.map-ladder-panel {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 15rem;
+  border-left: 1px solid var(--clr-border);
+  background: linear-gradient(180deg, rgba(8, 8, 18, 0.72), rgba(8, 8, 18, 0.45));
+  padding: 1.1rem 1rem 1.4rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--clr-border) transparent;
+}
+.map-ladder-head {
+  margin: 0 0 0.2rem;
+  font-family: var(--font);
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--clr-text-muted);
+}
+.map-ladder-biome {
+  font-family: var(--font);
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--clr-gold);
+  margin-bottom: 1.1rem;
 }
 
-/* Widen the pinned/peeked panel now that it carries the region map above the ladder. */
-.encounter-map { width: 12rem; }
+.map-legend {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1.4rem;
+  padding: 0.65rem 1.4rem;
+  border-top: 1px solid var(--clr-border);
+  background: rgba(5, 5, 12, 0.7);
+  font-family: var(--font);
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--clr-text-sub);
+}
+.map-legend-key { display: inline-flex; align-items: center; gap: 0.5rem; }
+.map-legend-note { color: var(--clr-text-muted); }
+.map-legend-swatch { width: 14px; height: 14px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.4); }
+.map-legend-swatch--here { background: var(--clr-gold); box-shadow: 0 0 8px rgba(255, 215, 0, 0.6); }
+.map-legend-swatch--travelled { width: 20px; height: 3px; border-radius: 2px; background: var(--clr-gold); }
 
-/* ── Region map (overworld node-link graph) ───── */
+/* ── Region map (node-link overworld) ──────────────────────── */
 .region-map {
   position: relative;
   width: 100%;
   aspect-ratio: 1 / 1;
   margin-bottom: var(--sp-sm);
+  container-type: size;
 }
+
+/* Territory layer: each biome's type-coloured bloom (background imagery), watermarked with its type icon. */
+.region-terr { position: absolute; inset: 0; pointer-events: none; }
+.region-territory {
+  position: absolute;
+  width: 34cqmin;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%,
+    color-mix(in srgb, var(--c) 58%, transparent) 0%,
+    color-mix(in srgb, var(--c) 24%, transparent) 34%,
+    transparent 68%);
+  mix-blend-mode: screen;
+  filter: blur(2px);
+  display: grid;
+  place-items: center;
+}
+.region-territory-motif {
+  width: 34%;
+  height: 34%;
+  color: var(--c);
+  opacity: 0.16;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--c) 50%, transparent));
+}
+
+/* Edge layer: gradient-stroked links (colour blends the two biomes). */
 .region-map-edges {
   position: absolute;
   inset: 0;
@@ -1325,91 +1469,234 @@
   overflow: visible;
 }
 .region-edge {
+  fill: none;
   stroke: var(--clr-border);
-  stroke-width: 0.7;
+  stroke-width: 3;
+  stroke-linecap: round;
+  opacity: 0.92;
   vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.55));
 }
-.region-edge--travelled { stroke: var(--clr-gold); stroke-width: 1.4; vector-effect: non-scaling-stroke; }
+.region-edge--travelled {
+  stroke: var(--clr-gold);
+  opacity: 1;
+  stroke-width: 3;
+  filter: drop-shadow(0 0 5px rgba(255, 215, 0, 0.55));
+  stroke-dasharray: 5 7;
+  animation: region-edge-flow 1.1s linear infinite;
+}
+@keyframes region-edge-flow { to { stroke-dashoffset: -12; } }
 
-/* A biome waypoint: absolutely placed at its authored %-coords, centred on the point. */
+/* A biome waypoint: emblem disc + name + type chips, centred on its authored %-coords. */
 .region-node {
   position: absolute;
   transform: translate(-50%, -50%);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: 0.35rem;
   padding: 0;
   background: none;
   border: none;
   font-family: var(--font);
-  color: var(--clr-text-sub);
+  color: var(--clr-text);
   cursor: default;
-}
-.region-node-dot {
-  width: 0.72rem;
-  height: 0.72rem;
-  border-radius: 50%;
-  background: var(--node-clr, #888);
-  border: 2px solid var(--clr-bg-deep);
-  box-shadow: 0 0 0 1px var(--clr-border);
-}
-.region-node-label {
-  font-size: 0.6rem;
-  line-height: 1;
-  color: var(--clr-text-sub);
-  white-space: nowrap;
-  text-shadow: 0 1px 2px #000, 0 0 3px #000;
-}
-
-/* Route state: visited (dim), current (gold ring + "you are here" scale), offered (glowing, clickable). */
-.region-node--visited { opacity: 0.85; }
-.region-node--current .region-node-dot {
-  box-shadow: 0 0 0 2px var(--clr-gold), 0 0 8px rgba(255, 215, 0, 0.5);
-}
-.region-node--current .region-node-label { color: var(--clr-gold); font-weight: bold; }
-.region-node--offered {
-  cursor: pointer;
   z-index: 2;
 }
-.region-node--offered .region-node-dot {
-  box-shadow: 0 0 0 2px var(--clr-accent), 0 0 10px var(--clr-accent-glow);
+.region-node-disc {
+  position: relative;
+  width: 3.4rem;
+  height: 3.4rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 34% 28%,
+    color-mix(in srgb, var(--node-clr) 92%, #fff 8%) 0%,
+    var(--node-clr) 46%,
+    color-mix(in srgb, var(--node-clr) 60%, #000) 100%);
+  box-shadow:
+    0 0 0 2px var(--clr-bg-deep),
+    0 0 0 3px color-mix(in srgb, var(--node-clr) 70%, #000),
+    0 6px 16px rgba(0, 0, 0, 0.55);
+}
+.region-node-disc svg {
+  width: 1.85rem;
+  height: 1.85rem;
+  color: rgba(255, 255, 255, 0.94);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+}
+.region-node-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--clr-text);
+  white-space: nowrap;
+  text-shadow: 0 1px 3px #000, 0 0 8px #000;
+}
+.region-node-chips { display: flex; gap: 3px; }
+.region-node-flag {
+  position: absolute;
+  top: -1.35rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.54rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--clr-bg-deep);
+  background: var(--clr-gold);
+  padding: 2px 8px;
+  border-radius: 3px;
+  white-space: nowrap;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.5);
+}
+.region-node-flag::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: var(--clr-gold);
+}
+.region-node-flag--pick { color: #fff; background: var(--clr-accent); }
+.region-node-flag--pick::after { border-top-color: var(--clr-accent); }
+
+/* Route state: visited (dim), current (gold ring + flag), offered (crimson pulse, clickable). */
+.region-node--visited .region-node-disc { filter: saturate(0.7) brightness(0.82); }
+.region-node--visited .region-node-label { color: var(--clr-text-sub); }
+.region-node--current .region-node-disc {
+  box-shadow:
+    0 0 0 2px var(--clr-bg-deep),
+    0 0 0 4px var(--clr-gold),
+    0 0 22px rgba(255, 215, 0, 0.55),
+    0 6px 16px rgba(0, 0, 0, 0.55);
+  animation: region-node-here 2.2s ease-in-out infinite;
+}
+@keyframes region-node-here {
+  0%, 100% { box-shadow: 0 0 0 2px var(--clr-bg-deep), 0 0 0 4px var(--clr-gold), 0 0 16px rgba(255, 215, 0, 0.4), 0 6px 16px rgba(0, 0, 0, 0.55); }
+  50%      { box-shadow: 0 0 0 2px var(--clr-bg-deep), 0 0 0 4px var(--clr-gold), 0 0 30px rgba(255, 215, 0, 0.75), 0 6px 16px rgba(0, 0, 0, 0.55); }
+}
+.region-node--current .region-node-label { color: var(--clr-gold); }
+.region-node--offered {
+  cursor: pointer;
+  z-index: 3;
+}
+.region-node--offered .region-node-disc {
+  box-shadow:
+    0 0 0 2px var(--clr-bg-deep),
+    0 0 0 4px var(--clr-accent),
+    0 0 20px var(--clr-accent-glow),
+    0 6px 16px rgba(0, 0, 0, 0.55);
   animation: region-node-pulse 1.3s ease-in-out infinite;
 }
-.region-node--offered .region-node-label { color: var(--clr-text); }
-.region-node--offered:hover .region-node-dot,
-.region-node--offered:focus-visible .region-node-dot { transform: scale(1.25); }
-
 @keyframes region-node-pulse {
-  0%, 100% { box-shadow: 0 0 0 2px var(--clr-accent), 0 0 6px var(--clr-accent-glow); }
-  50%      { box-shadow: 0 0 0 2px var(--clr-accent), 0 0 14px var(--clr-accent-glow); }
+  0%, 100% { box-shadow: 0 0 0 2px var(--clr-bg-deep), 0 0 0 4px var(--clr-accent), 0 0 12px var(--clr-accent-glow), 0 6px 16px rgba(0, 0, 0, 0.55); }
+  50%      { box-shadow: 0 0 0 2px var(--clr-bg-deep), 0 0 0 4px var(--clr-accent), 0 0 28px var(--clr-accent-glow), 0 6px 16px rgba(0, 0, 0, 0.55); }
 }
+.region-node--offered:hover .region-node-disc,
+.region-node--offered:focus-visible .region-node-disc { transform: scale(1.08); }
+.region-node--offered:focus-visible { outline: none; }
+.region-node--offered:focus-visible .region-node-disc {
+  box-shadow:
+    0 0 0 2px var(--clr-bg-deep),
+    0 0 0 4px var(--clr-gold),
+    0 0 0 6px var(--clr-bg-deep),
+    0 0 16px var(--clr-accent-glow);
+}
+.region-node--offered:focus-visible .region-node-label { color: var(--clr-gold); }
 
-/* Compact (corner) region map: dots only, no labels (too many to read small). */
-.encounter-map .region-map { aspect-ratio: 4 / 3; }
-.encounter-map .region-map .region-node-label { display: none; }
+/* ── Encounter ladder (vertical Slay-the-Spire path) ───────── */
+/* column-reverse: node 0 (start) sits at the bottom, Boss/Rest apex at the top — the player climbs upward. */
+.ladder {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column-reverse;
+}
+.ladder-node {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.5rem 0.1rem;
+  font-family: var(--font);
+  color: var(--clr-text-sub);
+  transition: opacity 200ms ease;
+}
+/* connector spine between rungs */
+.ladder-node:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 1.02rem;
+  top: -0.5rem;
+  width: 2px;
+  height: 0.85rem;
+  background: var(--clr-border);
+}
+.ladder-node--done:not(:last-child)::before,
+.ladder-node--current:not(:last-child)::before { background: var(--gold-dim, #b89b1f); }
+.ladder-icon {
+  flex: 0 0 2.05rem;
+  height: 2.05rem;
+  display: grid;
+  place-items: center;
+  background: rgba(20, 20, 40, 0.7);
+  border: 1.5px solid var(--clr-border);
+  border-radius: 8px;
+  color: var(--clr-text-sub);
+  transition: color 200ms ease, box-shadow 200ms ease, border-color 200ms ease, background 200ms ease;
+}
+.ladder-icon svg { width: 1.15rem; height: 1.15rem; }
+.ladder-text { display: flex; flex-direction: column; gap: 1px; }
+.ladder-label { font-size: 0.74rem; letter-spacing: 0.02em; }
+.ladder-sub { font-size: 0.54rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--clr-text-muted); }
+.ladder-here { margin-left: auto; color: var(--clr-gold); font-size: 0.7rem; }
 
-/* ── Map-based route choice (prominent, blocking) ── */
+/* Node states: done (dim, gold edge), current (gold glow), upcoming (muted). */
+.ladder-node--done { opacity: 0.55; }
+.ladder-node--done .ladder-icon { border-color: var(--gold-dim, #b89b1f); color: var(--gold-dim, #b89b1f); }
+.ladder-node--current .ladder-label { color: var(--clr-text); font-weight: 700; }
+.ladder-node--current .ladder-icon {
+  border-color: var(--clr-gold);
+  color: var(--clr-gold);
+  background: color-mix(in srgb, var(--clr-gold) 14%, rgba(20, 20, 40, 0.7));
+  box-shadow: 0 0 14px rgba(255, 215, 0, 0.4);
+}
+.ladder-node--upcoming { opacity: 0.9; }
+
+/* Boss apex reads hot even when upcoming; Rest cap reads as a heal (soft pink). */
+.ladder-node--bossbattle .ladder-icon { border-color: var(--clr-accent); color: var(--clr-accent); }
+.ladder-node--bossbattle.ladder-node--current .ladder-icon { box-shadow: 0 0 16px var(--clr-accent-glow); }
+.ladder-node--rest .ladder-icon { border-color: #ff8fa3; color: #ff8fa3; }
+
+/* ── Map-based route choice (prominent, blocking) ──────────── */
 .route-choice-modal {
-  background: var(--clr-bg-deep);
+  --ink-0: #05050c;
+  background: radial-gradient(120% 90% at 50% 0%, #141428 0%, #0b0b16 55%, #05050c 100%);
   border: 2px solid var(--clr-gold);
-  box-shadow: 0 0 32px rgba(0, 0, 0, 0.6);
-  padding: var(--sp-md);
-  width: min(92vw, 640px);
-  max-height: 92vh;
+  border-radius: 12px;
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.65);
+  padding: var(--sp-md) var(--sp-md) var(--sp-lg);
+  width: min(96vw, 960px);
+  max-height: 94vh;
   overflow-y: auto;
+  animation: route-choice-rise 200ms ease-out;
+}
+@keyframes route-choice-rise {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 .route-choice-modal .region-map {
   aspect-ratio: 3 / 2;
-  max-height: 58vh;
+  max-height: 62vh;
 }
-.route-choice-modal .region-node-label { font-size: 0.66rem; }
 .route-choice-legend {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: var(--sp-sm);
-  margin-top: var(--sp-sm);
+  gap: var(--sp-md);
+  margin-top: var(--sp-md);
 }
 .route-choice-legend-item {
   display: inline-flex;
@@ -1419,40 +1706,21 @@
   font-size: 0.72rem;
   color: var(--clr-text);
 }
-.route-choice-legend-name { color: var(--clr-gold); }
+.route-choice-legend-name { color: var(--clr-gold); font-weight: 700; }
 
+/* ── Responsive + reduced-motion ───────────────────────────── */
+@media (max-width: 720px) {
+  .map-ladder-panel { display: none; }
+  .map-title { letter-spacing: 0.2em; font-size: 0.85rem; }
+  .region-node-disc { width: 2.8rem; height: 2.8rem; }
+  .region-node-disc svg { width: 1.5rem; height: 1.5rem; }
+}
 @media (prefers-reduced-motion: reduce) {
-  .region-node--offered .region-node-dot { animation: none; }
-}
-
-/* ── Encounter map — Phase 4 polish (easing, keyboard focus, rest accent, choice rise) ── */
-/* Ease the state changes so the pin advance, a lit travelled edge, and a waypoint's ring animate rather than
-   snap. Decorative only — no E2E assertion waits on these. */
-.region-node-dot { transition: box-shadow 160ms ease, transform 120ms ease; }
-.region-edge     { transition: stroke 320ms ease, stroke-width 320ms ease; }
-.ladder-node     { transition: opacity 200ms ease; }
-.ladder-icon     { transition: color 200ms ease, box-shadow 200ms ease, border-color 200ms ease; }
-
-/* Keyboard focus ring on the choosable waypoints — mouse users get the hover scale, keyboard users need a clear
-   ring (the RouteChoiceMap focuses the first offered waypoint on open). */
-.region-node--offered:focus-visible { outline: none; }
-.region-node--offered:focus-visible .region-node-dot {
-  transform: scale(1.25);
-  box-shadow: 0 0 0 2px var(--clr-gold), 0 0 0 4px var(--clr-bg-deep), 0 0 12px var(--clr-accent-glow);
-}
-.region-node--offered:focus-visible .region-node-label { color: var(--clr-gold); }
-
-/* The Poké Center 'Rest' cap reads as a heal (soft pink), set apart from the combat nodes. */
-.ladder-node--rest .ladder-icon { border-color: #ff8fa3; color: #ff8fa3; }
-
-/* The route choice rises in, matching the game's other between-node modals. */
-.route-choice-modal { animation: route-choice-rise 200ms ease-out; }
-@keyframes route-choice-rise {
-  from { opacity: 0; transform: translateY(10px) scale(0.98); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .region-node-dot, .region-edge, .ladder-node, .ladder-icon { transition: none; }
+  .encounter-map,
+  .encounter-map--pinned,
   .route-choice-modal { animation: none; }
+  .region-edge--travelled,
+  .region-node--current .region-node-disc,
+  .region-node--offered .region-node-disc { animation: none; }
+  .region-node-disc, .region-edge, .ladder-node, .ladder-icon { transition: none; }
 }

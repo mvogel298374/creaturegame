@@ -282,8 +282,25 @@ plan, `BiomeEntered`/`RunNodeEntered`); the work is exposing it + drawing it. In
    — pulled the two edge-most waypoints inward so labels don't clip. *(Finer edge-crossing tuning deferred as
    low-ROI — each run shows a random 10-of-18 subset at fixed positions, so crossings vary by subset.)*
 
-**Feature complete** — the Encounter Map ships all four phases. Any future work is net-new (e.g. the map as the
-persistent run screen, or wiring Phase 4 acquisition's boss-catch/themed-draft offers onto the map).
+5. ✅ **DONE (2026-07-11) — Visual overhaul (full-screen dark-fantasy overworld):** the corner map was too small
+   and flat. The MAP button now opens a **full-screen** night-overworld (`.encounter-map--pinned`): biomes render
+   as **type-coloured bioluminescent territories** (`.region-territory`, screen-blended, watermarked with the
+   primary-type icon = procedural "background imagery"), **paths are gradient-stroked to blend the two biomes'
+   type colours** (per-edge `<linearGradient>`, gently bowed `<path>`), and the active biome's encounter ladder
+   runs up a right-hand panel with **real SVG node-kind icons** (sword/star/skull/coin/gem/?/heart) replacing the
+   old text glyphs. Biome waypoints gained an emblem disc + name + **type chips with an icon-in-frame** (new
+   shared `mapGlyphs.tsx`: 15 per-type icons + 7 node icons + `TypeChip` + `MapGlyphSprite`; `RouteChoiceMap`
+   legend uses it too). The auto-peek stays a small corner ladder; Escape/backdrop/× close the full-screen view.
+   All required test selectors preserved (`.encounter-map`, `.region-node/-edge`, `.ladder-node--*`, etc.);
+   full suite green + live Puppeteer-verified. Committed dark single-theme by design (a night chart).
+
+**Feature complete** — the Encounter Map ships all four phases + the visual overhaul. Any future work is net-new
+(e.g. the map as the persistent run screen, or wiring Phase 4 acquisition's boss-catch/themed-draft offers).
+
+**Follow-up (deferred, user-approved 2026-07-11 — "procedural now, real art later"):** replace the procedural
+type-colour+motif territories with **real painted per-biome scenery** (forest/cave/shore illustrations). Needs an
+image-asset pipeline (source/generate + store under `ClientApp/public`); the current `.region-territory` layer is
+the drop-in seam. Low priority — the procedural look reads clearly on its own.
 
 ---
 
