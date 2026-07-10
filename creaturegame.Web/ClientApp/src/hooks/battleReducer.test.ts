@@ -196,3 +196,32 @@ describe('battleReducer — misc', () => {
     expect(JSON.stringify(s)).toBe(snapshot);
   });
 });
+
+describe('battleReducer — encounter-map ladder', () => {
+  it('MAP_BIOME_ENTERED titles the ladder and clears the previous plan + pin', () => {
+    const s = ready({ mapBiomeName: 'Old', mapNodePlan: ['WildBattle', 'BossBattle'], mapPin: 1 });
+    const next = battleReducer(s, { type: 'MAP_BIOME_ENTERED', biomeName: 'Whispering Woods' });
+    expect(next.mapBiomeName).toBe('Whispering Woods');
+    expect(next.mapNodePlan).toEqual([]);
+    expect(next.mapPin).toBe(-1);
+  });
+
+  it('MAP_PLAN_REVEALED sets the node plan and resets the pin to −1 (no node entered yet)', () => {
+    const next = battleReducer(ready(), {
+      type: 'MAP_PLAN_REVEALED',
+      nodeKinds: ['WildBattle', 'Shop', 'BossBattle'],
+    });
+    expect(next.mapNodePlan).toEqual(['WildBattle', 'Shop', 'BossBattle']);
+    expect(next.mapPin).toBe(-1);
+  });
+
+  it('MAP_NODE_ENTERED advances the pin one step per node (walks the ladder)', () => {
+    let s = battleReducer(ready(), { type: 'MAP_PLAN_REVEALED', nodeKinds: ['WildBattle', 'BossBattle'] });
+    s = battleReducer(s, { type: 'MAP_NODE_ENTERED' }); // enter node 0
+    expect(s.mapPin).toBe(0);
+    s = battleReducer(s, { type: 'MAP_NODE_ENTERED' }); // enter node 1 (Boss)
+    expect(s.mapPin).toBe(1);
+    s = battleReducer(s, { type: 'MAP_NODE_ENTERED' }); // Poké Center cap (the synthesized Rest, index = length)
+    expect(s.mapPin).toBe(2);
+  });
+});

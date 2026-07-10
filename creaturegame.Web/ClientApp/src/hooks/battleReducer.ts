@@ -85,6 +85,12 @@ export interface BattleState {
   gold: number;
   log: LogEntry[];
   turnNumber: number;
+  // Encounter-map ladder (current biome): its revealed node plan (RunNodeKind names, Boss last) and the pin —
+  // the index of the node currently in progress, −1 before the biome's first node starts. An empty plan means
+  // the legacy chain / pre-first-biome, and the map overlay stays hidden.
+  mapBiomeName: string;
+  mapNodePlan: string[];
+  mapPin: number;
 }
 
 export const initialState: BattleState = {
@@ -116,6 +122,9 @@ export const initialState: BattleState = {
   gold: 0,
   log: [],
   turnNumber: 0,
+  mapBiomeName: '',
+  mapNodePlan: [],
+  mapPin: -1,
 };
 
 export function battleReducer(state: BattleState, action: Action): BattleState {
@@ -241,6 +250,15 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
       return { ...state, playerXp: Math.min(state.playerXp + action.amount, state.playerXpToNext) };
     case 'XP_SET':
       return { ...state, playerXp: action.value };
+    case 'MAP_BIOME_ENTERED':
+      // Entered a biome — title the ladder and clear the previous plan until this biome's is revealed.
+      return { ...state, mapBiomeName: action.biomeName, mapNodePlan: [], mapPin: -1 };
+    case 'MAP_PLAN_REVEALED':
+      // The biome's seeded node ladder, drawn ahead of time; pin resets to −1 (no node entered yet).
+      return { ...state, mapNodePlan: action.nodeKinds, mapPin: -1 };
+    case 'MAP_NODE_ENTERED':
+      // A node started (incl. the Poké Center cap after the Boss) — advance the pin one step along the ladder.
+      return { ...state, mapPin: state.mapPin + 1 };
     default:
       return state;
   }

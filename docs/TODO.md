@@ -257,8 +257,15 @@ plan, `BiomeEntered`/`RunNodeEntered`); the work is exposing it + drawing it. In
    (`BiomeMode_RevealsNodePlan_…WithoutChangingSequence`). No visible change; full suite + E2E green. *(Sub-
    decisions confirmed: map replaces `BiomeChoiceModal`; authored biome coords; region topology visible from
    start.)*
-2. **Current-biome ladder overlay (frontend):** the vertical node ladder + pin + auto-peek/toggle. First visible
-   slice — the STS "path" feel within a biome.
+2. ✅ **DONE (2026-07-10) — Current-biome ladder overlay (frontend):** the reveal events are consumed into
+   reducer state (`mapBiomeName` / `mapNodePlan` / `mapPin`) via the timeline (`MAP_BIOME_ENTERED` /
+   `MAP_PLAN_REVEALED` / `MAP_NODE_ENTERED`); `RunNodeEntered` now advances the pin per node (incl. the
+   banner-less `WildBattle`), and the Poké Center cap advances it onto a client-synthesized terminal `Rest`. New
+   `EncounterLadder` overlay in `BattleScreen` draws the vertical ladder (icons per kind, done/current/upcoming,
+   Boss apex + Rest cap, "you are here" pin), auto-peeks at each ladder change and toggles via a `MAP` button.
+   Covered by Vitest (reducer + timeline, incl. the `RecoveryOffered`→Rest-cap pin dispatch) + a seeded
+   Playwright `encounter-map.spec` (opening ladder structure **and** a win advancing the pin so the cleared node
+   reads `done`); also live-verified end-to-end. The STS "path" feel within a biome is now visible.
 3. **Region graph + map-based route choice:** the overworld waypoint map, route trace, and folding the biome
    pick onto the map (retire `BiomeChoiceModal`).
 4. **Polish:** authored coords, transition animation/easing, icon art, accessibility pass.

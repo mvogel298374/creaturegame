@@ -104,7 +104,13 @@ export type Action =
   // moment, then auto-dismissed by the view (non-blocking — the run keeps flowing). The SAME hover for every
   // reward source now: a battle-win drop and a Treasure/Mystery node both use it (node acks are automatic).
   | { type: 'SHOW_DROP'; gold: number; itemNames: string[] }
-  | { type: 'HIDE_DROP' };
+  | { type: 'HIDE_DROP' }
+  // Encounter-map ladder (current biome): title the biome, reveal its seeded node plan, and advance the pin one
+  // node at a time. A presentation view over the run — the sequence stays logic-driven (one MAP_NODE_ENTERED
+  // per RunNodeEntered, incl. the wild nodes that carry no banner).
+  | { type: 'MAP_BIOME_ENTERED'; biomeName: string }
+  | { type: 'MAP_PLAN_REVEALED'; nodeKinds: string[] }
+  | { type: 'MAP_NODE_ENTERED' };
 
 // Phaser commands sent over the mitt bridge.
 export type BridgeCommand =
@@ -319,6 +325,10 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       const speciesId  = payload.speciesId as number;
       const battlesWon = payload.battlesWon as number;
       return { steps: [
+        // Advance the ladder pin onto its synthesized Poké Center cap (the biome's rest step after the Boss —
+        // not a plan node, so the overlay draws it and this walks the pin to it). A no-op on the map in the
+        // legacy chain (empty plan → overlay hidden).
+        d({ type: 'MAP_NODE_ENTERED' }),
         w(300),
         d(log(`${cName} reached a Poké Center!`)),
         w(300),
@@ -360,20 +370,20 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
     }
 
     case 'BiomeEntered': {
-      // The player entered a biome (or the run auto-picked one) — title the next leg of the route.
+      // The player entered a biome (or the run auto-picked one) — title the next leg of the route, and title the
+      // encounter-map ladder (its node plan follows in BiomeNodePlanRevealed).
       const biomeName = payload.biomeName as string;
-      return { steps: [w(200), d(log(`Entered ${biomeName}!`)), w(300)] };
+      return { steps: [d({ type: 'MAP_BIOME_ENTERED', biomeName }), w(200), d(log(`Entered ${biomeName}!`)), w(300)] };
     }
 
     case 'RegionMapRevealed':
-      // The playable region graph, sent once at run start. Consumed by the encounter-map overlay (Phase 2), not
-      // the battle log — no timeline steps. Explicit arm so the every-event contract test is satisfied.
+      // The playable region graph, sent once at run start. Consumed by the region-map overlay (Phase 3), not the
+      // battle log — no timeline steps. Explicit arm so the every-event contract test is satisfied.
       return {};
 
     case 'BiomeNodePlanRevealed':
-      // The current biome's seeded node ladder, revealed on entry. Drawn by the encounter-map overlay (Phase 2),
-      // not the battle log — no timeline steps. Explicit arm for the every-event contract test.
-      return {};
+      // The current biome's seeded node ladder — feed it to the encounter-map overlay. No battle-log line.
+      return { steps: [d({ type: 'MAP_PLAN_REVEALED', nodeKinds: (payload.nodeKinds as string[]) ?? [] })] };
 
     case 'RewardChoiceOffered': {
       // A rolled reward is offered as a pick-one-of-N (two rarity-rolled items or a larger gold bag). Parse the
@@ -441,12 +451,13 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
     }
 
     case 'RunNodeEntered': {
-      // A route node banner: a nonstandard encounter (Elite/Boss) or a non-battle node (Shop/Treasure/Mystery).
-      // Tone it 'event' so these stand out from the normal battle stream. A plain wild node also fires this
-      // (in biome mode) to drive the encounter-map pin, but carries no banner — it slides the foe in as before.
+      // Every node advances the encounter-map pin one step (incl. WildBattle, which drives the pin but shows no
+      // banner — a plain wild encounter reads as before). Elite/Boss and the interaction nodes also title a
+      // standout 'event' banner in the log.
       const kind = payload.kind as string;
-      if (kind === 'WildBattle') return {};
-      return { steps: [w(200), d(log(runNodeBannerMsg(kind), 'event')), w(300)] };
+      const advance = d({ type: 'MAP_NODE_ENTERED' });
+      if (kind === 'WildBattle') return { steps: [advance] };
+      return { steps: [advance, w(200), d(log(runNodeBannerMsg(kind), 'event')), w(300)] };
     }
 
     // ── Turn events: sequenced through the animation timeline ──────────────────

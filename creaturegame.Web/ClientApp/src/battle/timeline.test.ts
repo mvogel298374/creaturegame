@@ -267,11 +267,12 @@ describe('expandEvent — control plane vs timeline', () => {
     expect((show!.action as Extract<Action, { type: 'SHOW_BIOME_CHOICE' }>).options).toEqual([]);
   });
 
-  it('BiomeEntered titles the next leg of the route', () => {
+  it('BiomeEntered titles the next leg of the route and the encounter-map ladder', () => {
     const { steps } = expandEvent('BiomeEntered', {
       biomeId: 'phantom-marsh', biomeName: 'Phantom Marsh', types: ['Ghost', 'Poison'],
     }, CTX);
     expect(logLines(steps)).toEqual(['Entered Phantom Marsh!']);
+    expect(dispatched(steps)).toContainEqual({ type: 'MAP_BIOME_ENTERED', biomeName: 'Phantom Marsh' });
   });
 
   it.each([
@@ -280,11 +281,43 @@ describe('expandEvent — control plane vs timeline', () => {
     ['Shop',        'You happened upon a shop.'],
     ['Treasure',    'You found a treasure cache!'],
     ['Mystery',     'Something mysterious stirs…'],
-  ])('RunNodeEntered banners the %s node in the event tone', (kind, message) => {
+  ])('RunNodeEntered banners the %s node in the event tone and advances the map pin', (kind, message) => {
     const { steps } = expandEvent('RunNodeEntered', { kind }, CTX);
     expect(logLines(steps)).toEqual([message]);
     // Nonstandard encounters (Elite/Boss) and non-battle nodes get the special-event colour.
     expect(logTones(steps)).toEqual(['event']);
+    // …and every node advances the encounter-map pin one step.
+    expect(dispatched(steps)).toContainEqual({ type: 'MAP_NODE_ENTERED' });
+  });
+
+  it('a WildBattle node advances the map pin but shows no banner (reads as a plain wild encounter)', () => {
+    const { steps } = expandEvent('RunNodeEntered', { kind: 'WildBattle' }, CTX);
+    expect(dispatched(steps)).toEqual([{ type: 'MAP_NODE_ENTERED' }]);
+    expect(logLines(steps)).toEqual([]);
+  });
+
+  it('BiomeNodePlanRevealed feeds the ladder its seeded node plan (no battle-log line)', () => {
+    const { steps } = expandEvent(
+      'BiomeNodePlanRevealed', { nodeKinds: ['WildBattle', 'Shop', 'BossBattle'] }, CTX);
+    expect(dispatched(steps)).toEqual([
+      { type: 'MAP_PLAN_REVEALED', nodeKinds: ['WildBattle', 'Shop', 'BossBattle'] },
+    ]);
+    expect(logLines(steps)).toEqual([]);
+  });
+
+  it('RegionMapRevealed emits nothing on the battle timeline (drawn by the Phase 3 region overlay)', () => {
+    const { steps, now } = expandEvent('RegionMapRevealed', { biomes: [] }, CTX);
+    expect(steps ?? []).toEqual([]);
+    expect(now ?? []).toEqual([]);
+  });
+
+  it('RecoveryOffered advances the map pin onto the synthesized Poké Center (Rest) cap', () => {
+    // The Poké Center caps every biome after the Boss but is NOT a plan node (ENCOUNTER_DESIGN.md §5), so the
+    // ladder synthesizes a terminal Rest step — and RecoveryOffered walks the pin onto it. Pins that dispatch so
+    // a future edit can't silently drop it (the ladder would then stall on the Boss).
+    const { steps } = expandEvent(
+      'RecoveryOffered', { creatureName: 'MEWTWO', speciesId: 150, battlesWon: 3 }, CTX);
+    expect(dispatched(steps)).toContainEqual({ type: 'MAP_NODE_ENTERED' });
   });
 
   it('RewardGranted (battle drop) bumps the gold total, logs a loot line, and raises the drop hover', () => {

@@ -1228,3 +1228,139 @@
     100% { opacity: 0; }
   }
 }
+
+/* ── Encounter map (route ladder overlay) ─────── */
+.map-toggle-btn {
+  position: absolute;
+  top: var(--sp-sm);
+  right: var(--sp-sm);
+  z-index: 6;
+  font-family: var(--font);
+  font-size: 0.72rem;
+  font-weight: bold;
+  letter-spacing: 0.06em;
+  color: var(--clr-text);
+  background: rgba(13, 13, 26, 0.82);
+  border: 2px solid var(--clr-text);
+  padding: 0.2rem 0.5rem;
+  cursor: pointer;
+}
+.map-toggle-btn:hover { border-color: var(--clr-gold); color: var(--clr-gold); }
+.map-toggle-btn--on   { border-color: var(--clr-gold); color: var(--clr-gold); box-shadow: 0 0 10px rgba(255, 215, 0, 0.35); }
+
+.encounter-map {
+  position: absolute;
+  top: calc(var(--sp-sm) + 1.9rem);
+  right: var(--sp-sm);
+  z-index: 6;
+  width: 9rem;
+  max-height: calc(65vh - 4rem);
+  overflow-y: auto;
+  padding: var(--sp-sm);
+  background: rgba(13, 13, 26, 0.9);
+  border: 2px solid var(--clr-border);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  animation: encounter-map-in 160ms ease-out;
+  scrollbar-width: thin;
+  scrollbar-color: var(--clr-border) transparent;
+}
+.encounter-map--pinned { border-color: var(--clr-gold); }
+
+@keyframes encounter-map-in {
+  from { opacity: 0; transform: translateX(8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.encounter-map-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-xs);
+  margin-bottom: var(--sp-sm);
+  padding-bottom: var(--sp-xs);
+  border-bottom: 1px solid var(--clr-border);
+}
+.encounter-map-biome {
+  font-family: var(--font);
+  font-size: 0.72rem;
+  font-weight: bold;
+  color: var(--clr-gold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.encounter-map-close {
+  font-family: var(--font);
+  font-size: 0.9rem;
+  line-height: 1;
+  color: var(--clr-text-sub);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 0.15rem;
+}
+.encounter-map-close:hover { color: var(--clr-accent); }
+
+/* column-reverse: node 0 (start) sits at the bottom, the Boss/Rest apex at the top — the player climbs upward. */
+.ladder {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 0;
+}
+.ladder-node {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-xs);
+  padding: 0.28rem 0.15rem;
+  font-family: var(--font);
+  font-size: 0.72rem;
+  color: var(--clr-text-sub);
+}
+/* connector line between rungs */
+.ladder-node:not(:first-child)::after {
+  content: '';
+  position: absolute;
+  left: 0.72rem;
+  bottom: 100%;
+  width: 2px;
+  height: 0.28rem;
+  background: var(--clr-border);
+}
+.ladder-icon {
+  flex: 0 0 1.15rem;
+  height: 1.15rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--clr-border);
+  border-radius: 2px;
+  font-size: 0.72rem;
+  color: var(--clr-text);
+}
+.ladder-label { flex: 1; }
+.ladder-here { color: var(--clr-gold); font-size: 0.7rem; }
+
+/* Node states: done (dim), current (accent + glow), upcoming (muted). */
+.ladder-node--done { opacity: 0.5; }
+.ladder-node--done .ladder-icon { color: var(--clr-text-sub); }
+.ladder-node--current { color: var(--clr-text); font-weight: bold; }
+.ladder-node--current .ladder-icon {
+  border-color: var(--clr-gold);
+  color: var(--clr-gold);
+  box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+}
+.ladder-node--upcoming { opacity: 0.85; }
+
+/* Boss apex reads hot even when upcoming. */
+.ladder-node--bossbattle .ladder-icon { border-color: var(--clr-accent); color: var(--clr-accent); }
+.ladder-node--bossbattle.ladder-node--current .ladder-icon {
+  border-color: var(--clr-accent);
+  color: var(--clr-accent);
+  box-shadow: 0 0 10px var(--clr-accent-glow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .encounter-map { animation: none; }
+}

@@ -22,6 +22,10 @@ type ControlView = 'menu' | 'fight' | 'bag' | 'check';
 // drop-toast animation duration). ~2.8s: long enough to read the loot, short enough not to stall the run.
 const DROP_TOAST_MS = 2800;
 
+// How long the encounter map auto-peeks after a ladder change (a node advancing / a new biome plan) before it
+// fades back — unless the player has pinned it open. Long enough to register the move, short enough not to nag.
+const MAP_PEEK_MS = 2600;
+
 export function BattleScreen() {
   const location = useLocation();
   const nav = useNavigate();
@@ -31,6 +35,9 @@ export function BattleScreen() {
 
   const { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, buyShopItem, leaveShop, dismissDrop } = useBattleHub(gameId, startLevel);
   const [controlView, setControlView] = useState<ControlView>('menu');
+  // Encounter-map overlay: pinned open by the MAP button, and briefly auto-peeked at each ladder change.
+  const [mapPinned, setMapPinned] = useState(false);
+  const [mapPeek, setMapPeek] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -45,6 +52,16 @@ export function BattleScreen() {
     const t = window.setTimeout(dismissDrop, DROP_TOAST_MS);
     return () => window.clearTimeout(t);
   }, [state.dropToast, dismissDrop]);
+
+  // Auto-peek the encounter map whenever the ladder changes (a node advances or a new biome plan arrives) so the
+  // player sees the run move, then fade it back — unless it's pinned open. A fresh pin/plan re-runs and restarts
+  // the timer; clearing on change prevents a stale timer hiding a later peek. Skipped in the legacy chain (no plan).
+  useEffect(() => {
+    if (state.mapNodePlan.length === 0) return;
+    setMapPeek(true);
+    const t = window.setTimeout(() => setMapPeek(false), MAP_PEEK_MS);
+    return () => window.clearTimeout(t);
+  }, [state.mapPin, state.mapNodePlan]);
 
   // The level-up panel stays up until the player does anything — clear it on the first interaction.
   const onAnyInput = () => { if (state.levelUp) dismissLevelUp(); };
@@ -104,6 +121,30 @@ export function BattleScreen() {
         {state.levelUp && <LevelUpStatPanel panel={state.levelUp} />}
 
         {state.dropToast && <DropHover drop={state.dropToast} />}
+
+        {/* Encounter map (biome mode only — the legacy chain has no node plan). The MAP button pins it open; it
+            also auto-peeks at each ladder change. Presentation over the run — the route is fixed and logic-driven. */}
+        {state.mapNodePlan.length > 0 && (
+          <>
+            <button
+              className={`map-toggle-btn${mapPinned ? ' map-toggle-btn--on' : ''}`}
+              onClick={() => setMapPinned(o => !o)}
+              aria-pressed={mapPinned}
+              aria-label="Toggle route map"
+            >
+              MAP
+            </button>
+            {(mapPinned || mapPeek) && (
+              <EncounterLadder
+                biomeName={state.mapBiomeName}
+                nodePlan={state.mapNodePlan}
+                pin={state.mapPin}
+                pinned={mapPinned}
+                onClose={() => setMapPinned(false)}
+              />
+            )}
+          </>
+        )}
       </div>
 
       <div className="battle-panel">
@@ -230,6 +271,56 @@ function BattleEndedOverlay({ creatureName, speciesId, battlesWon, finalLevel, o
           <button className="action-btn" onClick={onQuit}>QUIT</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// Per-node icon + label for the encounter-map ladder. Keys are the backend RunNodeKind names plus the
+// client-synthesized 'Rest' cap. Glyphs are text (not sprites) so the ladder stays cheap and E2E-legible.
+const LADDER_NODE_META: Record<string, { glyph: string; label: string }> = {
+  WildBattle:  { glyph: '⚔', label: 'Wild' },
+  EliteBattle: { glyph: '★', label: 'Elite' },
+  BossBattle:  { glyph: '☠', label: 'Boss' },
+  Shop:        { glyph: '$', label: 'Shop' },
+  Treasure:    { glyph: '◆', label: 'Treasure' },
+  Mystery:     { glyph: '?', label: 'Mystery' },
+  Rest:        { glyph: '+', label: 'Rest' },
+};
+
+// The encounter-map ladder (Phase 2): the current biome's route drawn as a vertical Slay-the-Spire-style path —
+// one node per revealed RunNodeKind (the Boss its apex), capped by a synthesized Poké Center 'Rest' (which isn't
+// a plan node — see ENCOUNTER_DESIGN.md §5). The pin marks the node in progress; earlier nodes read as done,
+// later as upcoming. CSS column-reverse puts node 0 at the bottom so the player climbs upward to the apex.
+// Presentation only — the route is fixed and logic-driven; nodes aren't clickable (Phase 3 adds route choice).
+function EncounterLadder({ biomeName, nodePlan, pin, pinned, onClose }: {
+  biomeName: string;
+  nodePlan: string[];
+  pin: number;
+  pinned: boolean;
+  onClose: () => void;
+}) {
+  const nodes = [...nodePlan, 'Rest'];
+  return (
+    <div className={`encounter-map${pinned ? ' encounter-map--pinned' : ''}`} role="complementary" aria-label="Route map">
+      <div className="encounter-map-head">
+        <span className="encounter-map-biome">{biomeName || 'Route'}</span>
+        {pinned && (
+          <button className="encounter-map-close" onClick={onClose} aria-label="Close map">×</button>
+        )}
+      </div>
+      <ol className="ladder">
+        {nodes.map((kind, i) => {
+          const meta = LADDER_NODE_META[kind] ?? { glyph: '•', label: kind };
+          const nodeState = i < pin ? 'done' : i === pin ? 'current' : 'upcoming';
+          return (
+            <li key={i} className={`ladder-node ladder-node--${kind.toLowerCase()} ladder-node--${nodeState}`}>
+              <span className="ladder-icon" aria-hidden="true">{meta.glyph}</span>
+              <span className="ladder-label">{meta.label}</span>
+              {nodeState === 'current' && <span className="ladder-here" aria-label="you are here">◄</span>}
+            </li>
+          );
+        })}
+      </ol>
     </div>
   );
 }
