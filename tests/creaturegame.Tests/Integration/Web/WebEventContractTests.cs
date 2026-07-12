@@ -359,8 +359,12 @@ public class WebEventContractTests
     public void RewardChoiceOffered_Projection_CarriesOptionSubFields()
     {
         var evt = new RewardChoiceOffered(
-            "Boss",
-            [new ItemRewardOption(15, "Full Restore", RewardRarity.Rare), new GoldRewardOption(120)]
+            "Battle",
+            [
+                new ItemRewardOption(15, "Full Restore", RewardRarity.Rare),
+                new HealRewardOption(24, CureStatus: true, RestoreLowPp: true, Label: "Quick Heal"),
+                new GoldRewardOption(120),
+            ]
         );
 
         var (type, payload) = SignalRBattleEventEmitter.MapEvent(evt);
@@ -368,7 +372,7 @@ public class WebEventContractTests
         var root = doc.RootElement;
 
         Assert.Equal("RewardChoiceOffered", type);
-        Assert.Equal("Boss", root.GetProperty("Source").GetString());
+        Assert.Equal("Battle", root.GetProperty("Source").GetString());
 
         var options = root.GetProperty("Options");
         var item = options[0];
@@ -378,7 +382,15 @@ public class WebEventContractTests
         // PascalCase — the exact casing the TS RewardRarity union matches on to colour the card.
         Assert.Equal("Rare", item.GetProperty("Rarity").GetString());
 
-        var gold = options[1];
+        // The heal arm: the modal card reads these to render "Quick Heal" + what it will restore.
+        var heal = options[1];
+        Assert.Equal("heal", heal.GetProperty("Kind").GetString());
+        Assert.Equal(24, heal.GetProperty("HpRestore").GetInt32());
+        Assert.True(heal.GetProperty("CureStatus").GetBoolean());
+        Assert.True(heal.GetProperty("RestoreLowPp").GetBoolean());
+        Assert.Equal("Quick Heal", heal.GetProperty("Label").GetString());
+
+        var gold = options[2];
         Assert.Equal("gold", gold.GetProperty("Kind").GetString());
         Assert.Equal(120, gold.GetProperty("Gold").GetInt32());
     }

@@ -321,4 +321,128 @@ public class RewardCalculatorTests
                 }
             )
         );
+
+    // --- Quick Heal (smart-random) -------------------------------------------------------------------------
+
+    private static PlayerCondition Cond(
+        int cur,
+        int max,
+        bool status = false,
+        double lowPp = 1.0
+    ) => new(cur, max, status, lowPp);
+
+    [Fact]
+    public void TryRollHeal_ReturnsNull_WithoutCondition()
+    {
+        // Condition-less callers (the legacy chain, existing tests) never see a heal option.
+        Assert.Null(RewardCalculator.TryRollHeal(null, new SeededRandomSource(1)));
+    }
+
+    [Fact]
+    public void TryRollHeal_ReturnsNull_WhenFullyHealthy()
+    {
+        // Full HP, no status, full PP → nothing to restore → never a dead option, whatever the roll.
+        var healthy = Cond(50, 50);
+        for (int seed = 0; seed < 50; seed++)
+            Assert.Null(RewardCalculator.TryRollHeal(healthy, new SeededRandomSource(seed)));
+    }
+
+    [Fact]
+    public void TryRollHeal_FiresForAStrongMajority_WhenBadlyHurt()
+    {
+        // Smart: a badly-hurt creature is offered the heal far more often than a healthy one (which is never).
+        var hurt = Cond(3, 50);
+        var rng = new SeededRandomSource(99);
+        int fired = 0;
+        for (int i = 0; i < 400; i++)
+            if (RewardCalculator.TryRollHeal(hurt, rng) is not null)
+                fired++;
+        Assert.True(fired > 250, $"expected a strong majority when badly hurt, got {fired}/400");
+    }
+
+    [Fact]
+    public void TryRollHeal_HpRestoreNeverExceedsMissing()
+    {
+        var hurt = Cond(40, 50); // 10 missing
+        var rng = new SeededRandomSource(7);
+        for (int i = 0; i < 400; i++)
+        {
+            var heal = RewardCalculator.TryRollHeal(hurt, rng);
+            if (heal is not null)
+                Assert.InRange(heal.HpRestore, 1, 10);
+        }
+    }
+
+    [Fact]
+    public void TryRollHeal_SetsOnlyTheApplicableComponents()
+    {
+        // Statused + low PP but full HP → HP component off, status + PP on (adaptive, not a blanket heal).
+        var rng = new SeededRandomSource(3);
+        HealRewardOption? heal = null;
+        for (int i = 0; i < 100 && heal is null; i++)
+            heal = RewardCalculator.TryRollHeal(Cond(50, 50, status: true, lowPp: 0.1), rng);
+
+        Assert.NotNull(heal);
+        Assert.Equal(0, heal!.HpRestore); // full HP → no HP restore
+        Assert.True(heal.CureStatus);
+        Assert.True(heal.RestoreLowPp);
+    }
+
+    [Fact]
+    public void RollRewardChoice_CanOfferQuickHeal_WhenConditionShowsNeed()
+    {
+        var usable = RewardCalculator.UsableItems(FullCatalog());
+        var needy = Cond(2, 50, status: true, lowPp: 0.1);
+        var rng = new SeededRandomSource(11);
+        bool sawHeal = false;
+        for (int i = 0; i < 200 && !sawHeal; i++)
+        {
+            var choice = RewardCalculator.RollRewardChoice(
+                new RewardContext(RunNodeKind.Treasure, 0, 2, needy),
+                usable,
+                rng
+            );
+            sawHeal = choice.Options.OfType<HealRewardOption>().Any();
+        }
+        Assert.True(
+            sawHeal,
+            "a needy player should be offered a Quick Heal within many reward rolls"
+        );
+    }
+
+    [Fact]
+    public void RollRewardChoice_NeverOffersQuickHeal_OnBossNodes_EvenWhenNeedy()
+    {
+        // Boss rewards stay elevated (all items/gold) and a full-heal Poké Center follows the Boss anyway, so a
+        // Boss node never rolls Quick Heal — even for a badly-hurt creature that would trigger it elsewhere.
+        var usable = RewardCalculator.UsableItems(FullCatalog());
+        var needy = Cond(1, 50, status: true, lowPp: 0.05);
+        var rng = new SeededRandomSource(77);
+        for (int i = 0; i < 300; i++)
+        {
+            var choice = RewardCalculator.RollRewardChoice(
+                new RewardContext(RunNodeKind.BossBattle, 40, 3, needy),
+                usable,
+                rng
+            );
+            Assert.Empty(choice.Options.OfType<HealRewardOption>());
+        }
+    }
+
+    [Fact]
+    public void RollRewardChoice_NeverOffersQuickHeal_WithoutCondition()
+    {
+        // Existing condition-less behaviour is preserved: no heal option ever leaks into those choices.
+        var usable = RewardCalculator.UsableItems(FullCatalog());
+        var rng = new SeededRandomSource(4);
+        for (int i = 0; i < 200; i++)
+        {
+            var choice = RewardCalculator.RollRewardChoice(
+                new RewardContext(RunNodeKind.Treasure, 0, 2),
+                usable,
+                rng
+            );
+            Assert.Empty(choice.Options.OfType<HealRewardOption>());
+        }
+    }
 }

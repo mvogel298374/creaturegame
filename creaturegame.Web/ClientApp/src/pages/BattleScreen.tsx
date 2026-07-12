@@ -611,6 +611,17 @@ function EvolutionPromptModal({ prompt, onRespond }: {
   );
 }
 
+// A terse tag describing what a Quick Heal option will restore (only the components it actually carries), e.g.
+// "+24 HP · CURE · PP". Mirrors the smart-random policy: HP is present when there's damage, CURE when statused,
+// PP when a move is low. Falls back to a generic label if (defensively) nothing is set.
+function healSummary(option: { hpRestore: number; cureStatus: boolean; restoreLowPp: boolean }): string {
+  const parts: string[] = [];
+  if (option.hpRestore > 0) parts.push(`+${option.hpRestore} HP`);
+  if (option.cureStatus) parts.push('CURE');
+  if (option.restoreLowPp) parts.push('PP');
+  return parts.length > 0 ? parts.join(' · ') : 'RESTORE';
+}
+
 // Reward choice: a pick-one-of-N shown after a rolled reward — two rarity-coloured item cards and a gold bag.
 // One click picks that option (the backend is blocked awaiting the pick) and the chosen reward is then applied
 // + announced by the drop hover. A required choice: the run always offers at least the gold bag, so there is
@@ -631,7 +642,9 @@ function RewardChoiceModal({ prompt, onChoose }: {
               className={
                 option.kind === 'gold'
                   ? 'reward-card reward-card--gold'
-                  : `reward-card reward-card--item reward-card--${(option.rarity ?? 'Common').toLowerCase()}`
+                  : option.kind === 'heal'
+                    ? 'reward-card reward-card--heal'
+                    : `reward-card reward-card--item reward-card--${(option.rarity ?? 'Common').toLowerCase()}`
               }
               onClick={() => onChoose(i)}
             >
@@ -640,6 +653,12 @@ function RewardChoiceModal({ prompt, onChoose }: {
                   <span className="reward-card-icon" aria-hidden="true">₽</span>
                   <span className="reward-card-name">{option.gold}₽</span>
                   <span className="reward-card-tag">GOLD BAG</span>
+                </>
+              ) : option.kind === 'heal' ? (
+                <>
+                  <span className="reward-card-icon" aria-hidden="true">✚</span>
+                  <span className="reward-card-name">{option.label ?? 'Quick Heal'}</span>
+                  <span className="reward-card-tag">{healSummary(option)}</span>
                 </>
               ) : (
                 <>

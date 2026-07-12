@@ -55,6 +55,34 @@ public class EnemyArchetypeTests
     }
 
     [Fact]
+    public void For_WithRng_RollsWeakOrMediumForNormal_ButKeepsEliteBossFixed()
+    {
+        // A plain Normal wild encounter varies in strength (Weak vs Medium) so wild fights aren't all the same,
+        // while presenting identically to the player. Elite/Boss stay a fixed mapping regardless of the roll.
+        var rng = new SeededRandomSource(1234);
+        int weak = 0,
+            medium = 0;
+        for (int i = 0; i < 400; i++)
+        {
+            var a = EnemyArchetypes.For(EncounterTier.Normal, rng);
+            if (ReferenceEquals(a, EnemyArchetypes.Weak))
+                weak++;
+            else if (ReferenceEquals(a, EnemyArchetypes.Medium))
+                medium++;
+            else
+                Assert.Fail("Normal must map to Weak or Medium only");
+        }
+
+        // Both tiers appear, at roughly equal frequency (undifferentiated, ~50/50).
+        Assert.True(weak > 100, $"expected a meaningful share of Weak, got {weak}/400");
+        Assert.True(medium > 100, $"expected a meaningful share of Medium, got {medium}/400");
+
+        // Elite/Boss ignore the roll entirely.
+        Assert.Same(EnemyArchetypes.Strong, EnemyArchetypes.For(EncounterTier.Elite, rng));
+        Assert.Same(EnemyArchetypes.Boss, EnemyArchetypes.For(EncounterTier.Boss, rng));
+    }
+
+    [Fact]
     public void Medium_IsTheDepthBaseline()
     {
         var spec = EnemyArchetypes.Medium.Build(Ctx());

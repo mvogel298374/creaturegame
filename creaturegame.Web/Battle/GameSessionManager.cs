@@ -127,8 +127,10 @@ public sealed class GameSessionManager(
                     biome: biome,
                     depth: depth,
                     // Node-derived tier (3c-1): the director passes a generation-agnostic EncounterTier per
-                    // node; the web layer maps it to a concrete archetype (Elite→Strong, Boss→Boss).
-                    archetype: EnemyArchetypes.For(tier)
+                    // node; the web layer maps it to a concrete archetype (Elite→Strong, Boss→Boss). A plain
+                    // Normal wild encounter rolls Weak vs Medium on the run RNG so wild fights vary in strength
+                    // while presenting identically (ENCOUNTER_DESIGN.md §3.1).
+                    archetype: EnemyArchetypes.For(tier, session.Rng)
                 ),
             Gen1TypeChart.Instance,
             battle.Input,

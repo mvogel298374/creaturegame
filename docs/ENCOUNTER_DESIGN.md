@@ -165,6 +165,12 @@ Boss**. Each tier is its own class that decides *which levers it pulls*; it does
 The archetype is a **pure function** of the run context, returning a lever spec the factory consumes — so the
 tiers are DB-free and unit-testable ("Boss at depth 5 → these levers", no database).
 
+> **Difficulty easing (2026-07-12).** A plain `Normal` wild encounter no longer always maps to **Medium**: the
+> web-layer `EnemyArchetypes.For(tier, rng)` rolls **Weak vs Medium ~50/50** on the run RNG, so wild fights vary
+> in strength while presenting **identically** to the player (same `RunNodeKind.WildBattle` / `EncounterTier.Normal`
+> / node banner / encounter-map reveal — only the built enemy's levers differ). Elite→Strong, Boss→Boss are
+> unchanged. Run-layer tuning only.
+
 ```
 record EnemyContext   ( int PlayerLevel, int PlayerBst, int Depth, IRandomSource Rng )
 record EnemyTierSpec  ( int TargetBst, int Level, DvQuality Dvs, MoveSelectionStrategy Moves, int MoveCount )

@@ -90,8 +90,8 @@ describe('battleReducer — modal gating', () => {
 
     // Reward choice: the pick-one-of-N modal — set by SHOW_REWARD_CHOICE, cleared when the player picks.
     const rewardOpts = [
-      { kind: 'item' as const, itemId: 25, itemName: 'hyper-potion', rarity: 'Rare' as const, gold: 0 },
-      { kind: 'gold' as const, itemId: 0, itemName: null, rarity: null, gold: 60 },
+      { kind: 'item' as const, itemId: 25, itemName: 'hyper-potion', rarity: 'Rare' as const, gold: 0, hpRestore: 0, cureStatus: false, restoreLowPp: false, label: null },
+      { kind: 'gold' as const, itemId: 0, itemName: null, rarity: null, gold: 60, hpRestore: 0, cureStatus: false, restoreLowPp: false, label: null },
     ];
     const reward = battleReducer(ready(), { type: 'SHOW_REWARD_CHOICE', source: 'Battle', options: rewardOpts });
     expect(reward.rewardChoice).toEqual({ source: 'Battle', options: rewardOpts });

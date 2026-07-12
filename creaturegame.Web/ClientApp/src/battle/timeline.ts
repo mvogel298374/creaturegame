@@ -41,14 +41,18 @@ export interface RegionBiome { id: string; name: string; types: string[]; neighb
 export type RewardRarity = 'Common' | 'Uncommon' | 'Rare' | 'Epic';
 
 // One option in a reward choice, flat to match the wire projection (SignalRBattleEventEmitter.ProjectRewardOption):
-// an item (kind 'item', with id/name/rarity) or a gold bag (kind 'gold', with an amount). The other fields are
-// zero/null for the branch that doesn't use them.
+// an item (kind 'item', with id/name/rarity), a gold bag (kind 'gold', with an amount), or a smart quick heal
+// (kind 'heal', carrying what it will restore). The other fields are zero/null for the branch that doesn't use them.
 export interface RewardOption {
-  kind: 'item' | 'gold';
+  kind: 'item' | 'gold' | 'heal';
   itemId: number;
   itemName: string | null;
   rarity: RewardRarity | null;
   gold: number;
+  hpRestore: number;
+  cureStatus: boolean;
+  restoreLowPp: boolean;
+  label: string | null;
 }
 
 // One item on a Shop node's shelf, flat to match the wire projection (SignalRBattleEventEmitter.ProjectShopItem):
@@ -407,11 +411,15 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       // a following RewardGranted (the drop hover), so this arm only shows the picker.
       const rcSource = payload.source as string;
       const options: RewardOption[] = ((payload.options as Array<Record<string, unknown>>) ?? []).map(o => ({
-        kind: o.kind as 'item' | 'gold',
+        kind: o.kind as 'item' | 'gold' | 'heal',
         itemId: (o.itemId as number) ?? 0,
         itemName: (o.itemName as string | null) ?? null,
         rarity: (o.rarity as RewardRarity | null) ?? null,
         gold: (o.gold as number) ?? 0,
+        hpRestore: (o.hpRestore as number) ?? 0,
+        cureStatus: (o.cureStatus as boolean) ?? false,
+        restoreLowPp: (o.restoreLowPp as boolean) ?? false,
+        label: (o.label as string | null) ?? null,
       }));
       return { steps: [w(200), d({ type: 'SHOW_REWARD_CHOICE', source: rcSource, options })] };
     }

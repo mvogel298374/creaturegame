@@ -365,8 +365,9 @@ public sealed class SignalRBattleEventEmitter(
         };
 
     // Projects one reward-choice option to the wire: a discriminated "kind" plus the fields the modal card
-    // needs. An item carries its id/name/rarity (rarity colours the card); a gold bag carries its amount. Kept
-    // flat (not a nested union) so the TypeScript client reads one shape and branches on Kind.
+    // needs. An item carries its id/name/rarity (rarity colours the card); a gold bag carries its amount; a
+    // quick heal carries what it will restore (HP/status/PP + label). Every arm carries the *same* flat field
+    // set (same names + order = one anonymous type) so the TypeScript client reads one shape and branches on Kind.
     private static object ProjectRewardOption(RewardOption option) =>
         option switch
         {
@@ -377,6 +378,10 @@ public sealed class SignalRBattleEventEmitter(
                 ItemName = (string?)i.ItemName,
                 Rarity = (string?)i.Rarity.ToString(),
                 Gold = 0,
+                HpRestore = 0,
+                CureStatus = false,
+                RestoreLowPp = false,
+                Label = (string?)null,
             },
             GoldRewardOption g => new
             {
@@ -385,6 +390,22 @@ public sealed class SignalRBattleEventEmitter(
                 ItemName = (string?)null,
                 Rarity = (string?)null,
                 g.Gold,
+                HpRestore = 0,
+                CureStatus = false,
+                RestoreLowPp = false,
+                Label = (string?)null,
+            },
+            HealRewardOption h => new
+            {
+                Kind = "heal",
+                ItemId = 0,
+                ItemName = (string?)null,
+                Rarity = (string?)null,
+                Gold = 0,
+                h.HpRestore,
+                h.CureStatus,
+                h.RestoreLowPp,
+                Label = (string?)h.Label,
             },
             _ => new
             {
@@ -393,6 +414,10 @@ public sealed class SignalRBattleEventEmitter(
                 ItemName = (string?)null,
                 Rarity = (string?)null,
                 Gold = 0,
+                HpRestore = 0,
+                CureStatus = false,
+                RestoreLowPp = false,
+                Label = (string?)null,
             },
         };
 

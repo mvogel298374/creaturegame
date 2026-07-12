@@ -42,6 +42,30 @@ opening-route favourable-matchup guarantee. Full per-phase record (design, pins,
 
 ---
 
+## Difficulty easing — weak wild encounters + Quick Heal reward  ✅ DONE (2026-07-12)
+
+Playtest feedback: the run was overall too hard, and the player wanted an on-the-spot heal among the reward
+options. Two run-layer tuning changes (no battle-seam touch; no importer/DB change):
+
+- **Weak wild encounters.** A plain `Normal`-tier wild encounter now rolls the existing **Weak** archetype vs
+  **Medium** ~50/50 on the run RNG (`EnemyArchetypes.For(tier, rng)`, wired at `GameSessionManager`). The two
+  are **undifferentiated to the player** — the node kind / tier / encounter-map reveal / banner are unchanged;
+  only the built enemy's levers differ. *Acceptance:* wild fights vary in strength while presenting identically.
+- **Quick Heal reward (smart-random).** A new `HealRewardOption` appears among the pick-one-of-N reward options,
+  biased toward when the creature needs it (hurt / statused / low PP) with a small base chance otherwise, and
+  **never as a dead option** (offered only when there's something to restore). When picked it restores only the
+  applicable components — a random slice of missing HP (≤ missing), cure status, top non-full PP (Elixir-style)
+  — reusing the gen-invariant heal primitives + events (`Healed` / `StatusCleared` / `PpRestored`). Policy in
+  the web `RewardCalculator.TryRollHeal`; application in core `RewardResolution.ApplyHeal`. **Boss nodes are
+  exempt** (their reward stays elevated, and the post-Boss Poké Center heals anyway). *Acceptance:* a Quick Heal
+  option shows up in reward choices when useful (never on Boss nodes) and, when picked, heals the applicable
+  HP/status/PP.
+
+**Deferred (considered, not done this pass):** lowering Elite frequency and the foe level-scaling ceiling —
+revisit after re-playtest if the weak-encounter mix alone doesn't ease it enough.
+
+---
+
 ## Run Economy — Gold, Item Rewards, Transient Bag & Treasure/Mystery Nodes  ✅ DONE (2026-07-02)
 
 Phases **A** (core, generation-agnostic) + **B** (web-layer reward policy) + **C** (frontend gold HUD + reward

@@ -55,6 +55,27 @@ public static class EnemyArchetypes
             EncounterTier.Boss => Boss,
             _ => Medium,
         };
+
+    /// <summary>How often a plain (Normal-tier) wild encounter draws the <see cref="Weak"/> tier instead of
+    /// <see cref="Medium"/>. Roughly half — weak and normal wild fights are meant to occur about equally, and
+    /// the two are <em>undifferentiated to the player</em> (same node kind, tier, banner, and encounter-map
+    /// reveal — only the built enemy's levers differ). Run-layer difficulty tuning, provisional.</summary>
+    private const double WeakWildChance = 0.5;
+
+    /// <summary>
+    /// The RNG-aware mapping used in a live run: identical to <see cref="For(EncounterTier)"/> for Elite/Boss,
+    /// but a Normal wild encounter rolls <see cref="Weak"/> vs <see cref="Medium"/> (~<see cref="WeakWildChance"/>)
+    /// so wild fights vary in strength while presenting identically (<c>ENCOUNTER_DESIGN.md §3.1</c>). The roll
+    /// rides the run's single seeded RNG, so it stays reproducible per seed. The no-RNG overload keeps the
+    /// deterministic Normal→Medium mapping for callers/tests that assert the plain intent.
+    /// </summary>
+    public static IEnemyArchetype For(EncounterTier tier, IRandomSource rng) =>
+        tier switch
+        {
+            EncounterTier.Elite => Strong,
+            EncounterTier.Boss => Boss,
+            _ => rng.NextDouble() < WeakWildChance ? Weak : Medium,
+        };
 }
 
 // The depth baseline (EncounterFactory.ScaleTargetBst / ScaleWildLevel) is the Medium tier; the others shift

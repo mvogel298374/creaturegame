@@ -929,6 +929,13 @@
 .reward-card--gold:hover,
 .reward-card--gold:focus-visible { box-shadow: 0 0 14px rgba(242, 215, 94, 0.5); }
 
+/* The smart Quick Heal option — green-accented (restorative), distinct from item/gold cards. */
+.reward-card--heal { border-color: #57c96a; }
+.reward-card--heal .reward-card-icon,
+.reward-card--heal .reward-card-name { color: #6ee07f; }
+.reward-card--heal:hover,
+.reward-card--heal:focus-visible { box-shadow: 0 0 14px rgba(110, 224, 127, 0.5); }
+
 /* Shop node — a spend-gold buy modal. Iterative (stays open across purchases), so it lists stock as rows with a
    per-item Buy button rather than the reward modal's one-shot cards. Gold-accented like the reward modal. */
 .shop-modal {

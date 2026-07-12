@@ -135,6 +135,21 @@ public sealed record ItemRewardOption(int ItemId, string ItemName, RewardRarity 
 /// item is useful).</summary>
 public sealed record GoldRewardOption(int Gold) : RewardOption;
 
+/// <summary>A "quick heal" option — a potion-style heal applied on the spot to the player's creature, restoring
+/// only the components that currently apply. The magnitude/components are pre-resolved by the web-layer reward
+/// policy (like the other options' amounts), so the core applies them deterministically. Offered
+/// <em>smart-randomly</em> — only when the creature has something to heal, biased toward how badly it needs it.
+/// <see cref="HpRestore"/> is an absolute HP amount (0 = no HP component); <see cref="CureStatus"/> clears any
+/// major status; <see cref="RestoreLowPp"/>, when set, tops <em>every</em> non-full move back to max
+/// (Elixir-style — set by the policy when any move is below its low-PP threshold). <see cref="Label"/> is the
+/// display name for the choice card.</summary>
+public sealed record HealRewardOption(
+    int HpRestore,
+    bool CureStatus,
+    bool RestoreLowPp,
+    string Label
+) : RewardOption;
+
 /// <summary>A rolled reward offered to the player as a pick-one-of-N choice (two rarity-rolled items and a
 /// gold bag by default). <see cref="None"/> means nothing rolled (e.g. the ~15% no-drop on a wild win) — no
 /// choice is offered. The player picks exactly one option, which is then applied and announced by a following
@@ -150,7 +165,43 @@ public sealed record RewardChoice(IReadOnlyList<RewardOption> Options)
 /// (same pattern as the enemy supplier). <see cref="Source"/> is the node kind that earned the reward — battle
 /// wins carry the beaten foe's <see cref="EnemyLevel"/> (0 for Treasure/Mystery, which have no foe) — letting
 /// one supplier delegate dispatch to the right web-layer roll (battle vs Treasure vs Mystery) by node kind.</summary>
-public sealed record RewardContext(RunNodeKind Source, int EnemyLevel, int Depth);
+public sealed record RewardContext(
+    RunNodeKind Source,
+    int EnemyLevel,
+    int Depth,
+    PlayerCondition? Condition = null
+);
+
+/// <summary>A lightweight, generation-agnostic snapshot of the player creature's current condition, handed to
+/// the reward supplier so it can offer a context-sensitive <see cref="HealRewardOption"/> (more likely, and
+/// sized, when the creature is hurt / statused / low on PP). Null when a caller doesn't supply it (e.g. tests),
+/// in which case the policy simply never offers a heal. <see cref="LowestPpFraction"/> is the minimum
+/// current/max PP ratio across the creature's moves (1.0 when every move is full or it has no moves).</summary>
+public sealed record PlayerCondition(
+    int CurrentHp,
+    int MaxHp,
+    bool HasStatus,
+    double LowestPpFraction
+)
+{
+    /// <summary>Snapshots the given creature's current condition for a reward roll.</summary>
+    public static PlayerCondition From(Creature c)
+    {
+        double lowestPp = 1.0;
+        foreach (var move in c.MoveSet)
+        {
+            int max = move.Base.PowerPointsMax;
+            if (max > 0)
+                lowestPp = Math.Min(lowestPp, (double)move.PowerPointsCurrent / max);
+        }
+        return new PlayerCondition(
+            c.Attributes.HP,
+            c.Attributes.MaxHP,
+            c.Battle.Status != StatusCondition.None,
+            lowestPp
+        );
+    }
+}
 
 // --- Shop (spend-gold purchase node) -----------------------------------------------------------------------
 

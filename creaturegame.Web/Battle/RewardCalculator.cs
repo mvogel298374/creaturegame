@@ -41,6 +41,19 @@ internal static class RewardCalculator
     /// <summary>A Mystery node's chance to produce a reward at all (else nothing — the wildcard downside).</summary>
     private const double MysteryRewardChance = 0.7;
 
+    // --- Quick Heal (smart-random) tuning ------------------------------------------------------------------
+    // The heal option appears smart-randomly: gated on the creature having *some* need (so it's never a dead
+    // option), then a probability that's a small base rate lifted by how badly it needs healing. Its magnitude
+    // is randomized too. All provisional balance knobs — the tests assert only the shape (biased to need, HP
+    // never exceeds the missing amount), never the exact numbers.
+    private const double HealBaseChance = 0.10; // the "also randomly" floor, applied whenever there's any need
+    private const double HealHpNeedWeight = 0.7; // + up to this much as HP approaches empty
+    private const double HealStatusNeedBonus = 0.35; // + this when statused
+    private const double HealLowPpNeedBonus = 0.15; // + this when a move is below the low-PP threshold
+    private const double HealMaxChance = 0.9; // cap, so it's never a certainty
+    private const double LowPpThreshold = 0.5; // a move at/under half PP counts as "low"
+    private const string QuickHealLabel = "Quick Heal";
+
     /// <summary>The categories a reward can hand out — mirrors <see cref="creaturegame.Combat.ItemEffects"/>'s
     /// registry (the same set <c>bag.ts</c> filters on server-side): Ball/Revive have no in-battle effect yet,
     /// so they're dead loot and never eligible here. <b>Revive is framework-ready</b> in the category bias below
@@ -72,7 +85,14 @@ internal static class RewardCalculator
         {
             case RunNodeKind.BossBattle:
                 // A Boss always rewards, and richly — no drop-chance gate.
-                return BuildChoice(ctx.Source, ctx.EnemyLevel, ctx.Depth, usableItems, rng);
+                return BuildChoice(
+                    ctx.Source,
+                    ctx.EnemyLevel,
+                    ctx.Depth,
+                    usableItems,
+                    ctx.Condition,
+                    rng
+                );
 
             case RunNodeKind.Treasure:
                 // A chest is never empty-handed — guaranteed, scaled by run depth (no foe level to scale off).
@@ -81,6 +101,7 @@ internal static class RewardCalculator
                     DepthLevelProxy(ctx.Depth),
                     ctx.Depth,
                     usableItems,
+                    ctx.Condition,
                     rng
                 );
 
@@ -92,13 +113,21 @@ internal static class RewardCalculator
                     DepthLevelProxy(ctx.Depth),
                     ctx.Depth,
                     usableItems,
+                    ctx.Condition,
                     rng
                 );
 
             default: // WildBattle / EliteBattle — a chance at a drop, not a guarantee
                 if (rng.NextDouble() >= BattleDropChance)
                     return RewardChoice.None;
-                return BuildChoice(ctx.Source, ctx.EnemyLevel, ctx.Depth, usableItems, rng);
+                return BuildChoice(
+                    ctx.Source,
+                    ctx.EnemyLevel,
+                    ctx.Depth,
+                    usableItems,
+                    ctx.Condition,
+                    rng
+                );
         }
     }
 
@@ -111,6 +140,7 @@ internal static class RewardCalculator
         int level,
         int depth,
         IReadOnlyList<Item> usable,
+        PlayerCondition? condition,
         IRandomSource rng
     )
     {
@@ -118,9 +148,23 @@ internal static class RewardCalculator
         var first = RollItemOption(usable, tier, depth, rng, excludeId: null);
         if (first is not null)
             options.Add(first);
-        var second = RollItemOption(usable, tier, depth, rng, excludeId: first?.ItemId);
-        if (second is not null)
-            options.Add(second);
+
+        // Smart-random Quick Heal: when the creature actually needs it, offer an on-the-spot heal in place of the
+        // second item slot — so the choice stays a pick-one-of-N alongside the gold bag. Only surfaces components
+        // that apply; never a dead option (TryRollHeal gates on need). Boss nodes are exempt: their item reward is
+        // deliberately elevated, and a biome caps with a free full-heal Poké Center right after the Boss, so a
+        // heal there is redundant.
+        var heal = tier == RunNodeKind.BossBattle ? null : TryRollHeal(condition, rng);
+        if (heal is not null)
+        {
+            options.Add(heal);
+        }
+        else
+        {
+            var second = RollItemOption(usable, tier, depth, rng, excludeId: first?.ItemId);
+            if (second is not null)
+                options.Add(second);
+        }
 
         var bestRarity = options
             .OfType<ItemRewardOption>()
@@ -156,6 +200,43 @@ internal static class RewardCalculator
 
         var chosen = WeightedPickByCategory(band, tier, rng);
         return new ItemRewardOption(chosen.Id, chosen.Name ?? "", RarityOf(chosen));
+    }
+
+    // --- Quick Heal ------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// Rolls the smart-random <see cref="HealRewardOption"/>, or null when one shouldn't be offered. Null when
+    /// there's no condition snapshot (callers that don't pass one — e.g. tests — never see a heal) or the
+    /// creature has nothing to heal (full HP, no status, full PP) — so the heal is never a dead option. When it
+    /// does fire, it restores only the components that apply, sized randomly (HP a random slice of the missing
+    /// amount, so it always helps but the amount varies). <c>internal</c> so the shape is directly unit-testable.
+    /// </summary>
+    internal static HealRewardOption? TryRollHeal(PlayerCondition? condition, IRandomSource rng)
+    {
+        if (condition is not { } c)
+            return null;
+
+        int missingHp = Math.Max(0, c.MaxHp - c.CurrentHp);
+        bool lowPp = c.LowestPpFraction < LowPpThreshold;
+        bool anyNeed = missingHp > 0 || c.HasStatus || lowPp;
+        if (!anyNeed)
+            return null; // nothing to restore → never offer a useless heal
+
+        double missingHpFrac = c.MaxHp > 0 ? (double)missingHp / c.MaxHp : 0;
+        double chance = HealBaseChance + missingHpFrac * HealHpNeedWeight;
+        if (c.HasStatus)
+            chance += HealStatusNeedBonus;
+        if (lowPp)
+            chance += HealLowPpNeedBonus;
+        if (rng.NextDouble() >= Math.Min(HealMaxChance, chance))
+            return null;
+
+        // Restore a random slice of the missing HP — [50%, 100%], so it's always a meaningful heal but varies.
+        int hpRestore = 0;
+        if (missingHp > 0)
+            hpRestore = Math.Max(1, (int)Math.Ceiling(missingHp * (0.5 + 0.5 * rng.NextDouble())));
+
+        return new HealRewardOption(hpRestore, c.HasStatus, lowPp, QuickHealLabel);
     }
 
     // --- Rarity ---------------------------------------------------------------------------------------------

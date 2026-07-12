@@ -421,7 +421,12 @@ internal sealed class BattleRunEvent(
     private Task GrantBattleRewardAsync(Creature enemy, RunState s, RunContext ctx)
     {
         var choice = rewardSupplier(
-            new RewardContext(NodeKindForTier(tier), enemy.Level, s.RunDepth),
+            new RewardContext(
+                NodeKindForTier(tier),
+                enemy.Level,
+                s.RunDepth,
+                PlayerCondition.From(s.Player)
+            ),
             ctx.Rng ?? SystemRandomSource.Instance
         );
         return RewardResolution.OfferAndApplyAsync(choice, "Battle", wallet, playerBag, ctx);
@@ -728,7 +733,12 @@ internal sealed class RewardRunEvent(
         ctx.Emitter?.Emit(new RunNodeEntered(kind.ToString()));
 
         var choice = rewardSupplier(
-            new RewardContext(kind, EnemyLevel: 0, ctx.State.RunDepth),
+            new RewardContext(
+                kind,
+                EnemyLevel: 0,
+                ctx.State.RunDepth,
+                PlayerCondition.From(ctx.State.Player)
+            ),
             ctx.Rng ?? SystemRandomSource.Instance
         );
         await RewardResolution.OfferAndApplyAsync(choice, kind.ToString(), wallet, playerBag, ctx);
@@ -779,8 +789,51 @@ internal static class RewardResolution
                 playerBag?.Add(item.ItemId);
                 itemNames.Add(item.ItemName);
                 break;
+            case HealRewardOption heal:
+                ApplyHeal(heal, ctx.State.Player, ctx.Emitter);
+                itemNames.Add(heal.Label);
+                break;
         }
 
         ctx.Emitter?.Emit(new RewardGranted(source, gold, wallet?.Balance ?? gold, itemNames));
+    }
+
+    // Applies a pre-resolved quick-heal to the player's creature on the spot — but only the components the option
+    // carries (the web policy set each flag from what the creature actually needed): restore some HP, cure any
+    // status, and — when RestoreLowPp is set — top EVERY non-full move back to max (Elixir-style, matching
+    // PpRestoreItemEffect's all-moves precedent), not only the move that tripped the low-PP threshold. Reuses the
+    // same gen-invariant primitives + events as item use (Healed / StatusCleared / PpRestored), so the client's
+    // timeline renders it exactly like a potion/status-cure.
+    internal static void ApplyHeal(
+        HealRewardOption heal,
+        Creature player,
+        IBattleEventEmitter? emitter
+    )
+    {
+        if (heal.HpRestore > 0 && player.Attributes.HP < player.Attributes.MaxHP)
+        {
+            int before = player.Attributes.HP;
+            player.Attributes.ReceiveHealing(heal.HpRestore); // caps at MaxHP
+            emitter?.Emit(
+                new Healed(player.Name, player.Attributes.HP - before, player.Attributes.HP)
+            );
+        }
+
+        if (heal.CureStatus && player.Battle.Status != StatusCondition.None)
+            HealingItemEffect.ClearStatus(player, emitter);
+
+        if (heal.RestoreLowPp)
+        {
+            foreach (var move in player.MoveSet)
+            {
+                if (move.PowerPointsCurrent < move.Base.PowerPointsMax)
+                {
+                    move.PowerPointsCurrent = move.Base.PowerPointsMax;
+                    emitter?.Emit(
+                        new PpRestored(player.Name, move.Base.Name ?? "", move.PowerPointsCurrent)
+                    );
+                }
+            }
+        }
     }
 }

@@ -376,9 +376,9 @@ describe('expandEvent — control plane vs timeline', () => {
       type: 'SHOW_REWARD_CHOICE',
       source: 'Battle',
       options: [
-        { kind: 'item', itemId: 25, itemName: 'hyper-potion', rarity: 'Rare', gold: 0 },
-        { kind: 'item', itemId: 42, itemName: 'antidote', rarity: 'Common', gold: 0 },
-        { kind: 'gold', itemId: 0, itemName: null, rarity: null, gold: 60 },
+        { kind: 'item', itemId: 25, itemName: 'hyper-potion', rarity: 'Rare', gold: 0, hpRestore: 0, cureStatus: false, restoreLowPp: false, label: null },
+        { kind: 'item', itemId: 42, itemName: 'antidote', rarity: 'Common', gold: 0, hpRestore: 0, cureStatus: false, restoreLowPp: false, label: null },
+        { kind: 'gold', itemId: 0, itemName: null, rarity: null, gold: 60, hpRestore: 0, cureStatus: false, restoreLowPp: false, label: null },
       ],
     });
   });
