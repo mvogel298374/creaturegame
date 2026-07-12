@@ -518,6 +518,60 @@ public class RunDirectorNodeTests
     }
 
     [Fact]
+    public async Task BiomeMode_FoughtSpeciesInBiome_AccumulatesPerBiome_AndResetsOnBiomeChange()
+    {
+        // The "fought-only" acquisition pool (ENCOUNTER_DESIGN.md §4, DoR #6): the fought set accumulates every
+        // species faced in the CURRENT biome and is cleared when a new biome is entered — so a future themed
+        // draft can only ever offer a species you actually fought here. A dead-end solo biome (two wild nodes,
+        // no boss → capped by its Poké Center) loops: biome 1 fights species 1 & 2 (both pushovers, cleared on
+        // re-entry), biome 2 fights species 3 (pushover) then 4 (unbeatable → run ends). After the run the fought
+        // set must be exactly biome 2's {3, 4} — proving accumulation of multiple AND that biome 1's {1, 2} reset.
+        var solo = new BiomeDefinition("solo", "Solo", Region.Kanto, [DamageType.Normal], []);
+        IReadOnlyList<RunNodeKind> plan = [RunNodeKind.WildBattle, RunNodeKind.WildBattle];
+
+        var player = Fighter("Player", hp: 300, attack: 999, speed: 100, level: 50);
+        int built = 0;
+        Func<Creature, int, BiomeDefinition?, EncounterTier, Task<Creature>> supplier = (
+            _,
+            _,
+            _,
+            _
+        ) =>
+        {
+            built++;
+            // Species ids 1..4, one per encounter; the 4th (biome 2's second node) is unbeatable and ends the run.
+            var enemy =
+                built <= 3
+                    ? Fighter($"Push{built}", hp: 1, attack: 1, speed: 1, level: 5)
+                    : Fighter("Bruiser", hp: 999, attack: 999, speed: 999, level: 50);
+            enemy.SpeciesId = built;
+            enemy.SpeciesBaseExperience = 50;
+            return Task.FromResult(enemy);
+        };
+
+        var runner = new RunDirector(
+            player,
+            supplier,
+            Gen1TypeChart.Instance,
+            new ScriptedInput("tackle"),
+            new ScriptedInput("tackle"),
+            movePool: Array.Empty<Attack>(),
+            emitter: new RecordingEmitter(),
+            rules: new ScriptableRules().Deterministic(),
+            rng: new SeededRandomSource(0),
+            playableBiomes: [solo],
+            minEventsPerBiome: 2,
+            maxEventsPerBiome: 2,
+            nodePlanFactory: (_, _) => plan
+        );
+
+        await runner.RunAsync();
+
+        // Only biome 2's fought species survive — biome 1's {1, 2} were cleared when biome 2 was entered.
+        Assert.Equal([3, 4], runner.State.FoughtSpeciesInBiome.Order().ToArray());
+    }
+
+    [Fact]
     public async Task LegacyMode_NeverEmitsNodeBanners()
     {
         // No playable biomes → the legacy endless chain: plain wild battles, no node plan, no banners.

@@ -143,6 +143,11 @@ public sealed class RunDirector
         _mysteryEvent = new RewardRunEvent(RunNodeKind.Mystery, wallet, playerBag, rewardSupplier);
     }
 
+    /// <summary>The live run state — exposed <c>internal</c> as a test seam so a test can assert run-state
+    /// invariants (e.g. the fought-only pool accumulating per biome and resetting on a biome change) after a
+    /// controlled run. Not part of the public surface; production code never reads it from outside.</summary>
+    internal RunState State => _state;
+
     public async Task RunAsync()
     {
         var ctx = new RunContext(_state, _emitter, _playerInput, _rng);
@@ -212,6 +217,9 @@ public sealed class RunDirector
             case BiomeChoiceOutcome biome:
                 s.CurrentBiome = biome.Chosen;
                 s.EventsInCurrentBiome = 0;
+                // A fresh biome starts with an empty fought-only pool — the themed draft only ever offers
+                // species faced in the biome you're currently in (ENCOUNTER_DESIGN.md §4).
+                s.FoughtSpeciesInBiome.Clear();
                 // Roll this biome's length (4–6 by default), then lay out its route now (seeded → reproducible):
                 // interior nodes then the Boss apex. Both the length and the node mix draw from the run RNG, so
                 // the same seed reproduces the same biome size and contents.
@@ -365,6 +373,10 @@ internal sealed class BattleRunEvent(
         // level) to it, themes it to the current biome (null in the legacy chain), and maps this node's
         // EncounterTier to an archetype; see EncounterFactory.CreateEnemyAsync.
         var enemy = await enemySupplier(player, s.RunDepth, s.CurrentBiome, tier);
+        // Remember every species faced in this biome — the "fought-only" pool the themed draft may offer from
+        // (ENCOUNTER_DESIGN.md §4). Recorded on encounter (win, loss, or flee all count as "faced"); the set is
+        // cleared when the next biome is entered. Empty in the legacy chain (no biome), so no draft can fire.
+        s.FoughtSpeciesInBiome.Add(enemy.SpeciesId);
         int levelBefore = player.Level;
         var battle = new Battle(
             player,
@@ -515,7 +527,11 @@ internal sealed class RecoveryRunEvent : IRunEvent
         );
         if (accept)
         {
-            player.FullHeal();
+            // A Poké Center restores the WHOLE party, not just the lead — benched members keep permanent HP
+            // across biomes, so this tops every owned creature back up (HP/PP/status). The lead is included
+            // (it's a party member); the carried status the battle captured was the lead's, so clearing it here.
+            foreach (var member in s.Party.Members)
+                member.FullHeal();
             s.CarriedStatus = null;
             ctx.Emitter?.Emit(new PlayerRecovered(player.Name, player.Attributes.HP));
         }

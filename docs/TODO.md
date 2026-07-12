@@ -38,7 +38,20 @@ opening-route favourable-matchup guarantee. Full per-phase record (design, pins,
 - [ ] **Phase 4 — Acquisition channels** (boss catch + themed draft, fought-only) — the remaining
   `ENCOUNTER_DESIGN.md §4` piece, and the bridge into the *Item Acquisition · Bag Persistence · Catch* cluster
   below. Now unblocked (the §1–§3 layer is done): a biome's **Boss** node is the catch hook, the **fought-only
-  themed pool** is the draft source. `/plan` first; *n%* rates tuned here.
+  themed pool** is the draft source. *n%* rates tuned here. **`/plan` done** (2026-07-12) — approved design +
+  scope decisions in the session plan (`kind-cooking-moler.md`): a **proper roster** (party up to 6, lead
+  management), **draft first then catch**, and **boss catch = a small post-win chance** (the boss is defeated
+  first, so the win XP/reward is kept), not an in-battle Poké Ball throw. Built as staged increments:
+  - [x] **Stage 1a/1b — roster foundation** (2026-07-12): the `Party` container (`creaturegame/Creature/Party.cs`
+    — up to 6, `Lead`/`Add`/`IsFull`/`Replace`/`SetLead`), `RunState.Party` (`Player` = the lead) + per-biome
+    `FoughtSpeciesInBiome` tracking, and whole-party Poké Center recovery. Backend-only, no wire/UI yet; covered
+    by `PartyTests` + a `RunDirector` fought-accumulate/reset test. *(Known deferral to Stage 1c: whole-party
+    heal is state-correct but only the lead's `PlayerRecovered` is emitted — the bench heal surfaces on the wire
+    with the `PartyUpdated` snapshot the party panel needs.)*
+  - [ ] **Stage 1c — themed draft, end-to-end**: fought-pool-bounded post-win offer + the acquisition-offer wire
+    (event → SignalR → modal), `PartyUpdated` snapshot + party panel, deposit into the roster.
+  - [ ] **Stage 1d — lead-swap** between biomes; **Stage 2 — boss catch** (post-win chance, reuses the offer +
+    roster plumbing); **Stage 3 — forced-switch-on-faint** (the battle-seam party upgrade, borders Game Loop).
 
 ---
 

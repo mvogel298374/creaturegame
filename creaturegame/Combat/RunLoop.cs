@@ -37,10 +37,37 @@ public enum EncounterTier
 /// step) and by the events themselves; never by player input directly — the player only changes an event's
 /// outcome, which then feeds back here. Deterministic given <c>(state, rng)</c>.
 /// </summary>
-public sealed class RunState(Creature player)
+public sealed class RunState
 {
-    /// <summary>The one persistent creature the run is played with; its permanent half carries across events.</summary>
-    public Creature Player { get; } = player;
+    /// <summary>
+    /// The run's party — up to six owned creatures, one of which is the active <see cref="Player"/> (the lead).
+    /// The acquisition channels (<c>ENCOUNTER_DESIGN.md §4</c>) fill it; the between-biome lead choice picks
+    /// which member battles next. A single-creature run is just a party of one (the legacy shape).
+    /// </summary>
+    public Party Party { get; }
+
+    /// <summary>Constructs a run around an existing <paramref name="party"/> (its lead is the active creature).</summary>
+    public RunState(Party party)
+    {
+        Party = party;
+    }
+
+    /// <summary>Convenience: start a run with a single-creature party seeded from the <paramref name="player"/>
+    /// starter — the legacy shape used by the endless chain and most tests.</summary>
+    public RunState(Creature player)
+        : this(new Party(player)) { }
+
+    /// <summary>The active creature the run is played with — the party's <see cref="Creatures.Party.Lead"/>; its
+    /// permanent half carries across events. Changing the lead (between biomes) changes what this returns.</summary>
+    public Creature Player => Party.Lead;
+
+    /// <summary>
+    /// The distinct species ids the player has faced in the <em>current</em> biome — the "fought-only"
+    /// acquisition pool (<c>ENCOUNTER_DESIGN.md §4</c>): the themed draft may only offer a species from this set,
+    /// so a run can never draft something it never fought. Populated as each encounter is built and cleared when
+    /// a new biome is entered (a fresh biome starts with an empty fought pool). Empty in the legacy chain.
+    /// </summary>
+    public HashSet<int> FoughtSpeciesInBiome { get; } = [];
 
     /// <summary>Encounters won so far. Drives the run summary and the legacy Poké Center milestone; in biome
     /// mode the foe-scaling depth axis is <see cref="RunDepth"/> instead (which also counts interaction nodes).</summary>

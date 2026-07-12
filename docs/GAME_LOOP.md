@@ -130,7 +130,7 @@ GameLoop:                                       // the ONLY place that decides s
 | **Shop** | interaction-event | ✅ implemented (**Run Economy** → **Shop**, `ShopRunEvent`) — roll a run-scaled per-visit stock via an injected supplier (`ShopCalculator` — rarity-derived prices, not the unaffordable Gen 1 `Item.Cost`), emit `ShopOffered`, then run a spend-gold **buy loop**: block on `ChooseShopActionAsync` (buy/leave) → `Wallet.TrySpend` + `Bag.Add` + emit `ShopItemPurchased` per affordable buy → leave to advance. Iterative (buy several, then go), unlike the one-shot reward pick. Pricing *policy* is web-layer, not a battle seam |
 | Catch | interaction/loop-event | future — see `TODO.md` Catch Mechanic |
 | **Evolution** | interaction-event | ✅ implemented (`BattleRunEvent.TryEvolveAsync` in `RunDirector`) — on a level-up, offer → ALLOW/CANCEL → morph/decline. Data/decision injected via `checkEvolution` (web `EncounterFactory` + `IEvolutionRules`); see archive |
-| Party / lead swap | interaction-event | future — once a party exists |
+| Party / lead swap | interaction-event | 🚧 in progress (Phase 4 Stage 1) — the `Party` roster (`creaturegame/Creature/Party.cs`, up to 6, held on `RunState.Party`; `Player` = the lead) and per-biome fought-species tracking now exist, and the Poké Center heals the whole party. Acquisition-into-party (themed draft / boss catch) and the between-biome lead-swap event are the next increments; in-battle switching stays with the Game Loop milestone |
 
 Each future event must obey §3: handed the run context, emits text, may await input, returns a typed outcome,
 **never** decides the next event. The implemented set above already spans both kinds and the loop body has not
