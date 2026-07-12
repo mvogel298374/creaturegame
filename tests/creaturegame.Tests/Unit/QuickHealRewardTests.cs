@@ -116,6 +116,52 @@ public class QuickHealRewardTests
     }
 
     [Fact]
+    public void PlayerCondition_From_SnapshotsHp_Status_AndLowestPpFraction()
+    {
+        var creature = Wounded(); // HP 1/max, Tackle 2/35, Ember 25/25, BadPoison
+        int max = creature.Attributes.MaxHP;
+
+        var condition = PlayerCondition.From(creature);
+
+        Assert.Equal(1, condition.CurrentHp);
+        Assert.Equal(max, condition.MaxHp);
+        Assert.True(condition.HasStatus);
+        // Minimum current/max PP ratio across moves — the drained Tackle (2/35), not the full Ember (25/25).
+        Assert.Equal(2.0 / 35.0, condition.LowestPpFraction, precision: 5);
+    }
+
+    [Fact]
+    public void PlayerCondition_From_HealthyCreature_ReportsFullPp_NoStatus_FullHp()
+    {
+        var creature = new Creature("Fit") { Level = 20 };
+        creature.CalculateStats();
+        creature.AddAttack(
+            new Attack
+            {
+                Id = 1,
+                Name = "Tackle",
+                PowerPointsMax = 35,
+            }
+        );
+
+        var condition = PlayerCondition.From(creature);
+
+        Assert.Equal(creature.Attributes.MaxHP, condition.CurrentHp);
+        Assert.False(condition.HasStatus);
+        Assert.Equal(1.0, condition.LowestPpFraction); // every move full
+    }
+
+    [Fact]
+    public void PlayerCondition_From_NoMoves_ReportsFullPpFraction()
+    {
+        var creature = new Creature("Moveless") { Level = 20 };
+        creature.CalculateStats();
+
+        // No moves → the "lowest PP" is vacuously full (1.0), so an empty moveset never triggers a PP heal.
+        Assert.Equal(1.0, PlayerCondition.From(creature).LowestPpFraction);
+    }
+
+    [Fact]
     public async Task OfferAndApplyAsync_WithHealOption_HealsPlayer_AndAnnouncesLabelWithNoGold()
     {
         // End-to-end through the reward-resolution dispatch (not just ApplyHeal): the HealRewardOption case heals

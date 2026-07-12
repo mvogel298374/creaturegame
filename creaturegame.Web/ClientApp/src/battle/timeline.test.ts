@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { expandEvent, type Step, type Action } from './timeline';
+import { expandEvent, healSummary, type Step, type Action } from './timeline';
 
 const CTX = { playerName: 'MEWTWO' };
 
@@ -383,6 +383,25 @@ describe('expandEvent — control plane vs timeline', () => {
     });
   });
 
+  it('RewardChoiceOffered parses a Quick Heal option (kind "heal") with its restore fields off the wire', () => {
+    const { steps } = expandEvent('RewardChoiceOffered', {
+      source: 'Battle',
+      options: [
+        { kind: 'heal', itemId: 0, itemName: null, rarity: null, gold: 0, hpRestore: 24, cureStatus: true, restoreLowPp: false, label: 'Quick Heal' },
+        { kind: 'gold', itemId: 0, itemName: null, rarity: null, gold: 60 },
+      ],
+    }, CTX);
+    const actions = dispatched(steps);
+    expect(actions).toContainEqual({
+      type: 'SHOW_REWARD_CHOICE',
+      source: 'Battle',
+      options: [
+        { kind: 'heal', itemId: 0, itemName: null, rarity: null, gold: 0, hpRestore: 24, cureStatus: true, restoreLowPp: false, label: 'Quick Heal' },
+        { kind: 'gold', itemId: 0, itemName: null, rarity: null, gold: 60, hpRestore: 0, cureStatus: false, restoreLowPp: false, label: null },
+      ],
+    });
+  });
+
   it('ShopOffered parses the stock off the wire and raises the shop modal with the balance', () => {
     const { now, steps } = expandEvent('ShopOffered', {
       balance: 142,
@@ -701,5 +720,24 @@ describe('expandEvent — items', () => {
   it('reads the Gen 1 "won\'t have any effect" line on a failed item use', () => {
     const { steps } = expandEvent('ItemUseFailed', { itemName: 'potion' }, CTX);
     expect(logLines(steps)).toEqual(["It won't have any effect!"]);
+  });
+});
+
+describe('healSummary — Quick Heal reward card tag', () => {
+  it('lists only the components the option carries, in HP · CURE · PP order', () => {
+    expect(healSummary({ hpRestore: 24, cureStatus: true, restoreLowPp: true })).toBe('+24 HP · CURE · PP');
+  });
+
+  it('omits the HP part when nothing is restored', () => {
+    expect(healSummary({ hpRestore: 0, cureStatus: true, restoreLowPp: false })).toBe('CURE');
+    expect(healSummary({ hpRestore: 0, cureStatus: false, restoreLowPp: true })).toBe('PP');
+  });
+
+  it('shows only HP when that is the sole component', () => {
+    expect(healSummary({ hpRestore: 12, cureStatus: false, restoreLowPp: false })).toBe('+12 HP');
+  });
+
+  it('falls back to RESTORE when (defensively) nothing is set', () => {
+    expect(healSummary({ hpRestore: 0, cureStatus: false, restoreLowPp: false })).toBe('RESTORE');
   });
 });

@@ -4,7 +4,7 @@ import { TypeBadge, typeColor } from '../components/TypeBadge';
 import { MapGlyphSprite, TypeChip, typeIconId, nodeIconId } from './mapGlyphs';
 import { BattleCanvas } from '../battle/BattleCanvas';
 import { useBattleHub, type LevelUpPanel, type MoveReplacementPrompt, type RecoveryPrompt, type EvolutionPrompt, type RewardChoicePrompt, type ShopPrompt, type DropToast } from '../hooks/useBattleHub';
-import type { RegionBiome, BiomeOption } from '../battle/timeline';
+import { healSummary, type RegionBiome, type BiomeOption } from '../battle/timeline';
 import { regionEdgeKey, travelledEdgeKeys } from '../battle/regionMap';
 import type { Species } from '../types/Species';
 import type { MoveInfo } from '../types/BattleEvents';
@@ -609,17 +609,6 @@ function EvolutionPromptModal({ prompt, onRespond }: {
       </div>
     </div>
   );
-}
-
-// A terse tag describing what a Quick Heal option will restore (only the components it actually carries), e.g.
-// "+24 HP · CURE · PP". Mirrors the smart-random policy: HP is present when there's damage, CURE when statused,
-// PP when a move is low. Falls back to a generic label if (defensively) nothing is set.
-function healSummary(option: { hpRestore: number; cureStatus: boolean; restoreLowPp: boolean }): string {
-  const parts: string[] = [];
-  if (option.hpRestore > 0) parts.push(`+${option.hpRestore} HP`);
-  if (option.cureStatus) parts.push('CURE');
-  if (option.restoreLowPp) parts.push('PP');
-  return parts.length > 0 ? parts.join(' · ') : 'RESTORE';
 }
 
 // Reward choice: a pick-one-of-N shown after a rolled reward — two rarity-coloured item cards and a gold bag.

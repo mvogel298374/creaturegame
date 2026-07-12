@@ -52,8 +52,8 @@ options. Two run-layer tuning changes (no battle-seam touch; no importer/DB chan
   are **undifferentiated to the player** — the node kind / tier / encounter-map reveal / banner are unchanged;
   only the built enemy's levers differ. *Acceptance:* wild fights vary in strength while presenting identically.
 - **Quick Heal reward (smart-random).** A new `HealRewardOption` appears among the pick-one-of-N reward options,
-  biased toward when the creature needs it (hurt / statused / low PP) with a small base chance otherwise, and
-  **never as a dead option** (offered only when there's something to restore). When picked it restores only the
+  offered only when the creature has something to restore (hurt / statused / low PP) — **never a dead option** —
+  at a base chance lifted by how badly it's needed. When picked it restores only the
   applicable components — a random slice of missing HP (≤ missing), cure status, top non-full PP (Elixir-style)
   — reusing the gen-invariant heal primitives + events (`Healed` / `StatusCleared` / `PpRestored`). Policy in
   the web `RewardCalculator.TryRollHeal`; application in core `RewardResolution.ApplyHeal`. **Boss nodes are

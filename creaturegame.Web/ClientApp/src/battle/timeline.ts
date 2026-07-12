@@ -55,6 +55,19 @@ export interface RewardOption {
   label: string | null;
 }
 
+// A terse tag describing what a Quick Heal option will restore (only the components it actually carries), e.g.
+// "+24 HP · CURE · PP". Mirrors the smart-random policy: HP is present when there's damage, CURE when statused,
+// PP when a move is low. Falls back to a generic label if (defensively) nothing is set.
+export function healSummary(
+  option: Pick<RewardOption, 'hpRestore' | 'cureStatus' | 'restoreLowPp'>,
+): string {
+  const parts: string[] = [];
+  if (option.hpRestore > 0) parts.push(`+${option.hpRestore} HP`);
+  if (option.cureStatus) parts.push('CURE');
+  if (option.restoreLowPp) parts.push('PP');
+  return parts.length > 0 ? parts.join(' · ') : 'RESTORE';
+}
+
 // One item on a Shop node's shelf, flat to match the wire projection (SignalRBattleEventEmitter.ProjectShopItem):
 // the resolved item id + name, its run-scaled price in ₽, and the rarity that drives the card accent colour.
 export interface ShopOfferItem {
