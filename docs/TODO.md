@@ -35,23 +35,72 @@ refinements — per-run biome-map randomisation, randomised 4–6 route length, 
 opening-route favourable-matchup guarantee. Full per-phase record (design, pins, seam reviews) in
 [`TODO_ARCHIVE.md`](TODO_ARCHIVE.md) → *Encounter Logic*.
 
-- [ ] **Phase 4 — Acquisition channels** (boss catch + themed draft, fought-only) — the remaining
-  `ENCOUNTER_DESIGN.md §4` piece, and the bridge into the *Item Acquisition · Bag Persistence · Catch* cluster
-  below. Now unblocked (the §1–§3 layer is done): a biome's **Boss** node is the catch hook, the **fought-only
-  themed pool** is the draft source. *n%* rates tuned here. **`/plan` done** (2026-07-12) — approved design +
-  scope decisions in the session plan (`kind-cooking-moler.md`): a **proper roster** (party up to 6, lead
-  management), **draft first then catch**, and **boss catch = a small post-win chance** (the boss is defeated
-  first, so the win XP/reward is kept), not an in-battle Poké Ball throw. Built as staged increments:
-  - [x] **Stage 1a/1b — roster foundation** (2026-07-12): the `Party` container (`creaturegame/Creature/Party.cs`
-    — up to 6, `Lead`/`Add`/`IsFull`/`Replace`/`SetLead`), `RunState.Party` (`Player` = the lead) + per-biome
-    `FoughtSpeciesInBiome` tracking, and whole-party Poké Center recovery. Backend-only, no wire/UI yet; covered
-    by `PartyTests` + a `RunDirector` fought-accumulate/reset test. *(Known deferral to Stage 1c: whole-party
-    heal is state-correct but only the lead's `PlayerRecovered` is emitted — the bench heal surfaces on the wire
-    with the `PartyUpdated` snapshot the party panel needs.)*
-  - [ ] **Stage 1c — themed draft, end-to-end**: fought-pool-bounded post-win offer + the acquisition-offer wire
-    (event → SignalR → modal), `PartyUpdated` snapshot + party panel, deposit into the roster.
-  - [ ] **Stage 1d — lead-swap** between biomes; **Stage 2 — boss catch** (post-win chance, reuses the offer +
-    roster plumbing); **Stage 3 — forced-switch-on-faint** (the battle-seam party upgrade, borders Game Loop).
+**Phase 4 — Acquisition & the Roster** (the remaining `ENCOUNTER_DESIGN.md §4` piece, and the bridge into the
+*Item Acquisition · Bag Persistence · Catch* cluster below). **`/plan` done** (2026-07-12) — the full design
+below (session plan mirrored here for durability; the ephemeral copy was `kind-cooking-moler.md`).
+
+**Scope decisions locked with the user (2026-07-12):**
+1. **Proper roster** — a real party (up to 6, the Gen 1 ceiling), lead management, party UI. Not a minimal
+   collectible, not a single-slot swap.
+2. **Draft first, then catch** — ship the cheaper themed-draft channel first, the boss catch second.
+3. **Boss catch = a small post-win chance, NOT an in-battle ball throw.** "Beat the boss → small chance at a
+   catch event." The boss is defeated first (you keep the win XP/reward), then a small-% offer to add it. This
+   makes **both** channels post-battle acquisition offers reusing the reward-modal pattern — the in-battle Poké
+   Ball mechanic (`BallItemEffect`, catch-rate-vs-HP formula) is **out of scope** and stays deferred in the Catch
+   cluster below.
+
+**Architecture (what we reuse).** Two new run-layer primitives + one reusable offer:
+- **A `Party` container** threaded like `Bag`/`Wallet` (single instance: `EncounterFactory` → `RunSetup` →
+  `PendingSession` → `ActiveBattle.Party` → `RunState.Party`; GC'd on run end). `RunState.Player` stays "the
+  current **lead**" so `Battle` (which only knows one creature) is untouched.
+- **Fought-species tracking** — `RunState.FoughtSpeciesInBiome` (HashSet), populated per encounter in
+  `BattleRunEvent`, reset per biome in `RunDirector.Apply`.
+- **One reusable "acquisition offer"** — a new blocking prompt mirroring the **Reward Choice** wire end-to-end
+  (the ~13-leg path: `RunLoop` option records → `BattleEvents` `AcquisitionOffered`/`CreatureAcquired` →
+  `IBattleInput.ChooseAcquisitionAsync` → `SignalRInput` TCS + `Cancel()` → `RunDirector` emit/await/deposit →
+  `SignalRBattleEventEmitter` projection + `ProjectCreatureOption` → `BattleHub` → `GameSessionManager` route →
+  field-level `WebEventContractTests` guard → `timeline.ts`/`battleReducer.ts`/`useBattleHub.ts`/`BattleScreen`
+  modal). Both channels emit the *same* offer; only the *source* + how the offered creature is chosen differ.
+- **Gen-variable surface (DoR #3): none.** Party size 6, draft cadence, and the *n%* rates are run-layer tuning
+  (web-layer policy like `RewardCalculator`), NOT battle seams. Zero importer/DB change; transient (no `save.db`).
+
+**Staged build (each increment independently shippable + greenlit separately):**
+- [x] **Stage 1a/1b — roster foundation** ✅ DONE (2026-07-12, commit `4c2b9b2`): the `Party` container
+  (`creaturegame/Creature/Party.cs` — `MaxSize` 6, `Lead`/`Add`/`IsFull`/`Replace`/`SetLead`), `RunState.Party`
+  (`Player` = the lead) + per-biome `FoughtSpeciesInBiome` tracking, and whole-party Poké Center recovery.
+  `RunDirector` owns the party internally for now (session threading lands with 1c's UI). Backend-only, no
+  wire/UI; covered by `PartyTests` + a `RunDirector` fought-accumulate/reset test. **Known deferral to 1c:**
+  whole-party heal is state-correct but only the lead's `PlayerRecovered` is emitted — the bench heal surfaces on
+  the wire with the `PartyUpdated` snapshot the panel needs (user-approved deferral).
+- [ ] **Stage 1c — themed draft, end-to-end** (the headline): a post-win offer in `BattleRunEvent` (after
+  `GrantBattleRewardAsync`), gated by cadence (~every 3rd win) × an *n%* web-policy roll × non-empty fought pool.
+  The offered creature is built web-side by a new injected `draftSupplier` (`EncounterFactory` via `BuildCreature`
+  + `PickByBst` with the pool **intersected to `FoughtSpeciesInBiome`** — the fought-only guardrail), scaled to
+  player/depth. Full acquisition-offer wire (above) + a `PartyUpdated` snapshot event + a party panel; deposit
+  into `Party` (party-full ⇒ "swap out which member?" path). Also threads the `Party` through the session
+  (`RunSetup`/`PendingSession`/`ActiveBattle`) so the overview/UI read it.
+- [ ] **Stage 1d — lead-swap between biomes**: a `ChooseLeadAsync` prompt at the biome boundary (after the Poké
+  Center, before the next `BiomeChoiceEvent`) when `Party.Count > 1` — reassigns `Party.Lead` (⇒ `RunState.Player`)
+  for the next biome. Same offer-wire pattern + a lead-select modal. *(Interim faint handling through Stages 1–2:
+  the lead fainting still ends the run — the party matters via between-biome lead choice; upgraded in Stage 3.)*
+- [ ] **Stage 2 — boss catch (post-win chance)**: after a boss win, a small *n%* roll → the **same**
+  `AcquisitionOffered` with `source: "BossCatch"` and a single option = the defeated boss's species → into the
+  `Party`. Reuses all of 1c's offer + roster plumbing; the win reward/XP already applied (catching is pure upside).
+- [ ] **Stage 3 — forced-switch-on-faint** (the battle-seam party upgrade, borders the Game Loop milestone):
+  when the lead faints and another member is alive, send out the next healthy creature instead of ending the run;
+  the run ends only when the **whole party** is down. Voluntary in-battle switching + `save.db` stay beyond Phase 4.
+
+**DoR #6 — quirks the tests must assert:** fought-only guardrail (never offer an un-fought species; set resets on
+biome change ✅ done); cadence + **never a dead offer** when the fought pool is empty; roster cap 6 + party-full
+swap; **decline is a sequencing no-op** (`RunDirector` order test); each new offer event **field-level** projects
+over SignalR (field guard, not just the type-map test); lead-swap reassigns the active creature deterministically;
+whole-party heal ✅ done; (Stage 2) boss-catch chance + boss into party while win XP/reward still applied;
+(Stage 3) forced-switch when the bench has a live creature vs. run-loss when it doesn't. **DoR #4 (Gen-1 truth):**
+party size 6; only the lead earns XP (no Exp Share); major status persists on benched creatures per the carry model.
+
+**Out of scope this phase:** the in-battle Poké Ball throw + `BallItemEffect` + catch-rate-vs-HP formula (stays
+in the Catch cluster below); voluntary in-battle switching; `save.db`/`PlayerDbContext` persistence + cross-run
+meta-progression; Exp Share; Revive (needs a fainted-but-revivable party member — possible after Stage 3, not built here).
 
 ---
 
