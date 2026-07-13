@@ -88,16 +88,22 @@ below (session plan mirrored here for durability; the ephemeral copy was `kind-c
   panel. Covered by `RunDirectorAcquisitionTests` (accept/decline-no-op/full-swap/lead-guard), `DraftCalculatorTests`
   (cadence/empty-pool/roll boundary), `EncounterFactoryDraftTests` (fought-only build over the live DB),
   `WebEventContractTests` field guards, and Vitest (reducer + timeline).
-- [ ] **Stage 1d — lead-swap between biomes**: a `ChooseLeadAsync` prompt at the biome boundary (after the Poké
-  Center, before the next `BiomeChoiceEvent`) when `Party.Count > 1` — reassigns `Party.Lead` (⇒ `RunState.Player`)
-  for the next biome. Same offer-wire pattern + a lead-select modal. *(Interim faint handling through Stages 1–2:
-  the lead fainting still ends the run — the party matters via between-biome lead choice; upgraded in Stage 3.)*
+- [ ] **Stage 1d — lead-swap between biomes** *(between-biome only — NOT in-combat)*: a `ChooseLeadAsync` prompt
+  at the biome boundary (after the Poké Center, before the next `BiomeChoiceEvent`) when `Party.Count > 1` —
+  reassigns `Party.Lead` (⇒ `RunState.Player`) for the next biome. Same offer-wire pattern + a lead-select modal;
+  touches **nothing** in the battle engine (`Battle` still sees one creature per side). *(Interim faint handling
+  through Stages 1–2: the lead fainting still ends the run — the party matters via between-biome lead choice;
+  upgraded in Stage 3.)* Switching mid-fight is a **separate, larger** feature — see
+  [**In-Combat Switching**](#in-combat-switching--voluntary-in-battle-party-switching-planned-core-feature) below.
 - [ ] **Stage 2 — boss catch (post-win chance)**: after a boss win, a small *n%* roll → the **same**
   `AcquisitionOffered` with `source: "BossCatch"` and a single option = the defeated boss's species → into the
   `Party`. Reuses all of 1c's offer + roster plumbing; the win reward/XP already applied (catching is pure upside).
 - [ ] **Stage 3 — forced-switch-on-faint** (the battle-seam party upgrade, borders the Game Loop milestone):
   when the lead faints and another member is alive, send out the next healthy creature instead of ending the run;
-  the run ends only when the **whole party** is down. Voluntary in-battle switching + `save.db` stay beyond Phase 4.
+  the run ends only when the **whole party** is down. **This is where `Battle` first learns about the party** (it
+  must hold the benched creatures, not just the lead) — the plumbing the fully-voluntary
+  [**In-Combat Switching**](#in-combat-switching--voluntary-in-battle-party-switching-planned-core-feature)
+  feature then builds a SWITCH turn-action on top of. Voluntary in-battle switching + `save.db` stay beyond Phase 4.
 
 **DoR #6 — quirks the tests must assert:** fought-only guardrail (never offer an un-fought species; set resets on
 biome change ✅ done); cadence + **never a dead offer** when the fought pool is empty; roster cap 6 + party-full
@@ -108,8 +114,54 @@ whole-party heal ✅ done; (Stage 2) boss-catch chance + boss into party while w
 party size 6; only the lead earns XP (no Exp Share); major status persists on benched creatures per the carry model.
 
 **Out of scope this phase:** the in-battle Poké Ball throw + `BallItemEffect` + catch-rate-vs-HP formula (stays
-in the Catch cluster below); voluntary in-battle switching; `save.db`/`PlayerDbContext` persistence + cross-run
-meta-progression; Exp Share; Revive (needs a fainted-but-revivable party member — possible after Stage 3, not built here).
+in the Catch cluster below); voluntary in-battle switching (its own planned core feature —
+[**In-Combat Switching**](#in-combat-switching--voluntary-in-battle-party-switching-planned-core-feature));
+`save.db`/`PlayerDbContext` persistence + cross-run meta-progression; Exp Share; Revive (needs a
+fainted-but-revivable party member — possible after Stage 3, not built here).
+
+---
+
+## In-Combat Switching — voluntary in-battle party switching *(planned core feature)*
+
+**Status: planned, not started.** Confirmed a core feature we *will* build (user, 2026-07-13) — a first-class
+"SWITCH" turn action so the player can swap the active creature **mid-battle**, like the mainline games. This is
+distinct from — and much larger than — Phase 4's lead management:
+
+- **Stage 1d** (above) only picks the lead **between biomes**; no engine change.
+- **Stage 3** (above) only handles a **forced** switch when the lead faints.
+- **This feature** is the **voluntary, any-turn** switch: choose SWITCH instead of FIGHT/BAG/RUN, pick a benched
+  creature, and it comes in at the cost of your turn.
+
+**Why it's a central `Battle` change (the reason it's deferred, not incidental).** `Battle` is constructed with a
+*single* `player` creature and a *single* `enemy`; the whole engine (turn sorting, `AttackAction`, status ticks,
+the SignalR `TurnStarted`/turn events, `IBattleInput`) assumes one creature per side. Phase 4 Stage 1c deliberately
+kept it that way ("`Battle`, which only knows one creature, is untouched"). Voluntary switching breaks that
+assumption and is best built **on top of Stage 3's groundwork** (which is where `Battle` first holds the party).
+
+**Scope when built:**
+- **Engine:** `Battle` takes the `Party` (or the benched creatures) for the player side; a new SWITCH
+  `TurnChoice` / `IBattleAction` resolved at **switch priority** — Gen 1 order: the swap happens *before* attacks,
+  and the incoming creature then takes the opponent's move that turn (switching **costs** your turn). Reset the
+  outgoing creature's transient `BattleState`; bring in the incoming creature's permanent half + carried major
+  status.
+- **Gen 1 fidelity (DoR #4):** switching **resets stat stages and volatile conditions** (confusion, Leech Seed,
+  Disable, substitute, two-turn/charge lock, etc.) but **keeps major status** (sleep/poison/burn/etc.) on the
+  creature; **partial-trapping moves (Wrap / Bind / Clamp / Fire Spin) trap the opponent and block its switch**
+  while active. No hazards (no Spikes in Gen 1), no abilities, no Pursuit, no Baton Pass — all post-Gen-1, so
+  *out* of scope by construction. Confirm against the type/rules seams (`GENERATION_SEAMS.md §5.0`) — switching
+  order/trap rules are generation-variable and belong on `IBattleRules`, not hardcoded in `Battle`.
+- **Events + wire:** new `CreatureSwitchedOut` / `CreatureSwitchedIn` battle events (+ `SignalRBattleEventEmitter`
+  projection + field-level `WebEventContractTests` guards — the recurring web-event field-projection gap); the
+  enemy AI may also switch (a later refinement — start with player-only).
+- **Frontend:** a SWITCH entry in the action menu → a party-select modal (reusing the `PartyStrip` / roster
+  panel), the sprite swap on the canvas, and the timeline arms for the new events.
+- **Interactions to get right:** a forced faint-switch (Stage 3) and a voluntary switch share the send-in path;
+  Struggle/lock-in and a trapped creature must correctly *disable* the SWITCH option; the turn is consumed even if
+  the incoming creature faints to the foe's move (a valid Gen 1 outcome).
+
+**Dependencies:** best sequenced **after Stage 3** (Battle-holds-party plumbing). Independent of `save.db`.
+**Effort:** large — a central refactor of `Battle` / `AttackAction` turn resolution; a good candidate for the
+`opus-engineer` subagent and a dedicated `/plan` pass before implementation.
 
 ---
 
@@ -217,7 +269,12 @@ Encounter Logic gate:
 is fully ironed out (the battle sim is the foundation). The **Endless Battle Chain** (done) is the first minimal
 slice; the items below are what it deliberately leaves out.
 
-- [ ] Catch → Pokémon added to party (up to 6); choose lead between battles.
+- [ ] Catch → Pokémon added to party (up to 6); choose lead between battles (the party container + between-biome
+  lead choice land earlier in **Encounter Logic Phase 4** — Stage 1c ✅ / Stage 1d).
+- [ ] **Voluntary in-battle switching** — a SWITCH turn action to swap the active creature mid-fight. Its own
+  documented core feature (planned, user-confirmed 2026-07-13): see
+  [**In-Combat Switching**](#in-combat-switching--voluntary-in-battle-party-switching-planned-core-feature). Best
+  built after Phase 4 Stage 3 (forced-switch-on-faint) wires the party into `Battle`.
 - [ ] Progressive difficulty beyond the current `targetBst = lead BST + depth × 10`; trainer encounters at
   milestones.
 - [ ] `PlayerSave` / `SavedCreature` models in `save.db`; auto-save after each battle; party-management UI.
