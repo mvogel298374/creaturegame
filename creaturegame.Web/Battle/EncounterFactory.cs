@@ -154,6 +154,79 @@ public sealed class EncounterFactory(
     }
 
     /// <summary>
+    /// Builds the run's themed-draft supplier: the injected
+    /// <c>Func&lt;DraftContext, IRandomSource, Task&lt;Creature?&gt;&gt;</c> <see cref="RunDirector"/> rolls after
+    /// every win. The policy gate (cadence × n% × non-empty fought pool) is <see cref="DraftCalculator"/>; when it
+    /// fires, a creature is built here from the <em>fought-only</em> pool (the guardrail — never an un-fought
+    /// species), scaled to the lead's BST/level and run depth like a wild encounter, with its best natural
+    /// moveset + a learnset (so it can level up if it later becomes the lead). Returns null on any gate miss (the
+    /// common case) — the acquisition-side mirror of <see cref="BuildRewardSupplier"/>.
+    /// </summary>
+    public Func<DraftContext, IRandomSource, Task<Creature?>> BuildDraftSupplier(
+        IReadOnlyList<Attack> allMoves
+    ) => (ctx, rng) => TryBuildDraftAsync(ctx, allMoves, rng);
+
+    private async Task<Creature?> TryBuildDraftAsync(
+        DraftContext ctx,
+        IReadOnlyList<Attack> allMoves,
+        IRandomSource rng
+    )
+    {
+        // Policy gate first (no RNG unless a cadence win with a non-empty pool) — a non-offer win leaves the
+        // seeded run stream untouched.
+        if (!DraftCalculator.ShouldOffer(ctx.BattlesWon, ctx.FoughtSpecies, rng))
+            return null;
+
+        await using var pokemonCtx = await pokemonFactory.CreateDbContextAsync();
+
+        // The fought-only pool: exactly the species faced in this biome (ENCOUNTER_DESIGN.md §4). The enemy
+        // supplier never spawns the player's own species, so it can't leak in here.
+        var foughtIds = ctx.FoughtSpecies.ToHashSet();
+        var pool = await pokemonCtx
+            .Species.AsNoTracking()
+            .Where(s => foughtIds.Contains(s.Id))
+            .ToListAsync();
+        if (pool.Count == 0)
+            return null;
+
+        int leadBst =
+            ctx.Lead.BaseHP
+            + ctx.Lead.BaseAttack
+            + ctx.Lead.BaseDefense
+            + ctx.Lead.BaseSpecial
+            + ctx.Lead.BaseSpeed;
+
+        // Bias toward a fought species near the lead's depth-scaled BST band (same target as a wild encounter);
+        // the pool is already biome-themed, so no further biome filter. Level rides the same depth band.
+        var species = PickByBst(pool, ScaleTargetBst(leadBst, ctx.Depth), rng, biome: null);
+        if (species is null)
+            return null;
+
+        int level = ScaleWildLevel(ctx.Lead.Level, ctx.Depth, rng);
+        var learnsets = await pokemonCtx
+            .Learnsets.AsNoTracking()
+            .Where(l =>
+                l.Generation == ActiveGeneration
+                && l.SpeciesId == species.Id
+                && l.Method == LearnMethod.LevelUp
+            )
+            .ToListAsync();
+
+        var creature = BuildCreature(
+            species,
+            learnsets,
+            allMoves,
+            level,
+            MoveSelectionStrategy.CanonicalLatest,
+            rng
+        );
+        // A drafted member may later become the lead (Stage 1d) and level up, so give it a learnset like the
+        // starter — resolved up-front, consulted on each level gained.
+        creature.Learnset = BuildLearnset(learnsets, allMoves);
+        return creature;
+    }
+
+    /// <summary>
     /// The biomes for <paramref name="region"/> that can actually generate against the active generation's
     /// wild-available species (legendaries/statics/gifts excluded — the same filter as
     /// <see cref="CreateEnemyAsync"/>). Empty biomes never appear; if no availability data exists (a minimally

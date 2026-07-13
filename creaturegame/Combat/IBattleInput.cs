@@ -87,6 +87,17 @@ public interface IBattleInput
     Task<int> ChooseRewardAsync(RewardChoiceContext context) => Task.FromResult(0);
 
     /// <summary>
+    /// Asked whenever an acquisition is offered (the themed draft after a win; later the boss catch): return an
+    /// <see cref="AcquisitionDecision"/> — decline, add to the party, or (when the party is full) add by
+    /// replacing a chosen member. Blocks the run until the player answers. Only the interactive player input is
+    /// ever consulted; the default <em>declines</em>, so automated / AI inputs never stall on the offer and a
+    /// headless run simply never builds a party — only the web <see cref="SignalRInput"/> blocks awaiting a real
+    /// choice. A decline (or an accept the roster can't honour) is a pure sequencing no-op downstream.
+    /// </summary>
+    Task<AcquisitionDecision> ChooseAcquisitionAsync(AcquisitionContext context) =>
+        Task.FromResult(AcquisitionDecision.Decline);
+
+    /// <summary>
     /// Asked repeatedly while the player is in a Shop node: return a <see cref="BuyShopItem"/> to purchase a
     /// stock item, or <see cref="LeaveShop"/> to end the visit — the shop event loops on this until the player
     /// leaves. Only the interactive player input is ever consulted; the default leaves immediately, so AI /
@@ -121,3 +132,25 @@ public sealed record RewardChoiceContext(string Source, IReadOnlyList<RewardOpti
 /// <summary>Context for a shop buy/leave decision: the stock on offer this visit and the player's current
 /// <see cref="Balance"/> in ₽ (so an input can gate its choice on affordability — the default just leaves).</summary>
 public sealed record ShopContext(IReadOnlyList<ShopOfferItem> Items, int Balance);
+
+/// <summary>Context for an acquisition offer: the <see cref="Offered"/> creature and the current
+/// <see cref="Party"/> (so an interactive input can present the swap-out choice when the roster is full). The
+/// <see cref="Source"/> is the channel label (<c>"ThemedDraft"</c> / <c>"BossCatch"</c>).</summary>
+public sealed record AcquisitionContext(Creature Offered, Party Party, string Source);
+
+/// <summary>The player's answer to an acquisition offer: <see cref="Accept"/> false = decline (roster
+/// unchanged); accept with a null <see cref="ReplaceSlot"/> = add to a party with room; accept with a
+/// <see cref="ReplaceSlot"/> index = add by swapping out that member (the full-party path). An accept the roster
+/// can't honour (full party with no valid slot) is treated as a decline downstream, so a stale pick never
+/// strands the run.</summary>
+public sealed record AcquisitionDecision(bool Accept, int? ReplaceSlot)
+{
+    /// <summary>Decline the offer — leave the roster as-is (the default for automated / AI inputs).</summary>
+    public static readonly AcquisitionDecision Decline = new(false, null);
+
+    /// <summary>Accept into an open party slot.</summary>
+    public static AcquisitionDecision Add() => new(true, null);
+
+    /// <summary>Accept by replacing the member at <paramref name="slot"/> (the full-party swap path).</summary>
+    public static AcquisitionDecision Replace(int slot) => new(true, slot);
+}

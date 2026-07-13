@@ -245,3 +245,25 @@ describe('battleReducer — encounter-map ladder', () => {
     expect(s.mapPin).toBe(2);
   });
 });
+
+describe('battleReducer — party & acquisition (Phase 4 Stage 1c)', () => {
+  const member = (over: Partial<import('../battle/timeline').PartyMember> = {}) => ({
+    speciesId: 25, name: 'PIKACHU', level: 12, hp: 30, maxHp: 34, status: 'None', isLead: true, ...over,
+  });
+
+  it('PARTY_SET replaces the roster snapshot', () => {
+    const members = [member(), member({ speciesId: 4, name: 'CHARMANDER', isLead: false })];
+    const next = battleReducer(ready(), { type: 'PARTY_SET', members });
+    expect(next.party).toEqual(members);
+  });
+
+  it('SHOW_ACQUISITION opens the offer; HIDE_ACQUISITION clears it', () => {
+    const offer = {
+      source: 'ThemedDraft', speciesId: 25, name: 'PIKACHU', level: 12, types: ['Electric'],
+      maxHp: 34, partyFull: false, party: [member()],
+    };
+    const shown = battleReducer(ready(), { type: 'SHOW_ACQUISITION', offer });
+    expect(shown.acquisition).toEqual(offer);
+    expect(battleReducer(shown, { type: 'HIDE_ACQUISITION' }).acquisition).toBeNull();
+  });
+});

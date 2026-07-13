@@ -98,6 +98,10 @@ public sealed class GameSessionManager(
         {
             CurrentConnectionId = connectionId,
             Player = session.Player,
+            // The run's party — its Lead is the persistent player. The session owns this single instance so the
+            // party-hydrate endpoint (GetParty) and the RunDirector's RunState read the same roster; the themed
+            // draft (below) deposits acquired creatures into it.
+            Party = new Party(session.Player),
             Bag = session.Bag,
             Wallet = session.Wallet,
             ItemsById = session.AllItems.ToDictionary(i => i.Id),
@@ -159,7 +163,14 @@ public sealed class GameSessionManager(
             // player (e.g. the opening node with a 0₽ wallet) never gets a dead, all-unaffordable shop.
             minShopBudget: ShopCalculator.MinItemPrice,
             // Roguelite run-balance rules (the level-aware XP curve, boosted above pure Gen-1) — see RunTuning.
-            runRules: RunTuning
+            runRules: RunTuning,
+            // Party threading: the RunDirector plays the run over this same party instance (its Lead is the
+            // active player), so the party-hydrate endpoint and the roster panel read the live roster.
+            party: battle.Party,
+            // Themed-draft acquisition (ENCOUNTER_DESIGN.md §4): rolled after every win, gated by cadence × n% ×
+            // the fought-only pool (DraftCalculator), building the offered creature from this run's move pool +
+            // DB. Deposits accepted creatures into the party above.
+            draftSupplier: encounters.BuildDraftSupplier(session.AllMoves)
         );
 
         _ = Task.Run(async () =>
@@ -330,6 +341,37 @@ public sealed class GameSessionManager(
             battle.Input.SetShopAction(action);
     }
 
+    /// <summary>Routes an acquisition answer (decline / add / add-by-replacing a slot) to the battle's input.
+    /// A decline or unhonourable accept is a no-op in the run loop, so this only forwards.</summary>
+    public void SetAcquisitionDecision(string connectionId, AcquisitionDecision decision)
+    {
+        if (
+            _connToGame.TryGetValue(connectionId, out var gameId)
+            && _active.TryGetValue(gameId, out var battle)
+        )
+            battle.Input.SetAcquisitionDecision(decision);
+    }
+
+    /// <summary>The run's current party roster (the same wire shape as the pushed <c>PartyUpdated</c> event), for
+    /// the roster panel to hydrate on load / after a reconnect — parity with <see cref="GetBagContents"/> /
+    /// <see cref="GetWallet"/>. A running battle's live party first, else the not-yet-started session's lone
+    /// starter (a party of one); null if the game is unknown. Projected through the emitter's member projector so
+    /// the pulled snapshot matches the pushed events exactly.</summary>
+    public IReadOnlyList<object>? GetParty(string gameId)
+    {
+        Party? party = null;
+        if (_active.TryGetValue(gameId, out var battle) && battle.Party is not null)
+            party = battle.Party;
+        else if (_pending.TryGetValue(gameId, out var pending))
+            party = new Party(pending.Player);
+        if (party is null)
+            return null;
+        return PartyProjection
+            .Snapshot(party)
+            .Select(SignalRBattleEventEmitter.ProjectPartyMember)
+            .ToList();
+    }
+
     /// <summary>The run's current gold balance for the HUD, or null if the game is unknown / not yet started.
     /// Reads live session state — display-only, parity with <see cref="GetBagContents"/>.</summary>
     public int? GetWallet(string gameId)
@@ -404,6 +446,10 @@ sealed class ActiveBattle
 
     // The persistent player creature for this run, for the on-demand overview snapshot (read-only display use).
     public Creature? Player;
+
+    // The run's party (up to six; its Lead is Player). The same instance the RunDirector's RunState plays over,
+    // so the party-hydrate endpoint reads the live roster. Set when the session is claimed; never reassigned.
+    public Party? Party;
 
     // The run's bag (threaded into every Battle), wallet (credited by reward rolls), and the item catalog
     // used to resolve a UseItem and render the bag. Set when the session is claimed; never reassigned.

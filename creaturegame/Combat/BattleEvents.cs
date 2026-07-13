@@ -140,6 +140,84 @@ public record ShopOffered(IReadOnlyList<ShopOfferItem> Items, int Balance) : Bat
 /// the bag.</summary>
 public record ShopItemPurchased(string ItemName, int Price, int Balance) : BattleEvent;
 
+// --- Acquisition (party roster — themed draft / boss catch, ENCOUNTER_DESIGN.md §4) ---
+/// <summary>A creature is offered to add to the party — the reusable acquisition offer both channels raise (the
+/// themed draft after a win, and later the boss catch). A blocking event: the run loop awaits the player's
+/// accept/decline (and, when the party is full, which member to swap out) via
+/// <see cref="IBattleInput.ChooseAcquisitionAsync"/> before continuing, so the client raises the offer modal here.
+/// The offered creature's display fields ride flat (<paramref name="SpeciesId"/> for the sprite,
+/// <paramref name="Name"/>/<paramref name="Level"/>/<paramref name="Types"/>/<paramref name="MaxHp"/> for the
+/// card); <paramref name="PartyFull"/> + the current <paramref name="Party"/> snapshot let the modal show the
+/// swap-out choice when the roster is at its cap. <paramref name="Source"/> is the channel
+/// (<c>"ThemedDraft"</c> / <c>"BossCatch"</c>).</summary>
+public record AcquisitionOffered(
+    string Source,
+    int SpeciesId,
+    string Name,
+    int Level,
+    IReadOnlyList<DamageType> Types,
+    int MaxHp,
+    bool PartyFull,
+    IReadOnlyList<PartyMemberInfo> Party
+) : BattleEvent;
+
+/// <summary>A snapshot of one party member for the client's roster panel + acquisition swap picker: species id
+/// (sprite), name, level, current/max HP, major status, and whether it is the active <see cref="IsLead"/>. The
+/// lead is excluded as a swap target client-side (a mid-biome lead change is Stage 1d, not this offer).</summary>
+public record PartyMemberInfo(
+    int SpeciesId,
+    string Name,
+    int Level,
+    int Hp,
+    int MaxHp,
+    StatusCondition Status,
+    bool IsLead
+);
+
+/// <summary>Projects a <see cref="Party"/> into the <see cref="PartyMemberInfo"/> snapshot the client's roster
+/// panel + acquisition swap picker read. The single source of truth for that shape — used by the run loop when
+/// it emits <see cref="PartyUpdated"/> / <see cref="AcquisitionOffered"/> and by the web layer's on-demand party
+/// hydrate endpoint, so the pushed event and the pulled snapshot can never drift apart. The member at the party's
+/// lead index is flagged <see cref="PartyMemberInfo.IsLead"/> (the client excludes it as a swap target).</summary>
+public static class PartyProjection
+{
+    public static IReadOnlyList<PartyMemberInfo> Snapshot(Party party)
+    {
+        var members = new List<PartyMemberInfo>(party.Count);
+        for (int i = 0; i < party.Count; i++)
+        {
+            var c = party.Members[i];
+            members.Add(
+                new PartyMemberInfo(
+                    c.SpeciesId,
+                    c.Name,
+                    c.Level,
+                    c.Attributes.HP,
+                    c.Attributes.MaxHP,
+                    c.Battle.Status,
+                    IsLead: i == party.LeadIndex
+                )
+            );
+        }
+        return members;
+    }
+}
+
+/// <summary>The offered creature was added to the party (accepted). <paramref name="Replaced"/> is true when it
+/// took a full party's slot (<paramref name="ReplacedName"/> = the released member); false when it filled an
+/// empty slot. Followed by a <see cref="PartyUpdated"/> snapshot.</summary>
+public record CreatureAcquired(string Name, int SpeciesId, bool Replaced, string? ReplacedName)
+    : BattleEvent;
+
+/// <summary>The player declined an acquisition offer — the roster is unchanged and the run advances (a decline
+/// is a pure sequencing no-op). Drives the "left it in the wild" line.</summary>
+public record AcquisitionDeclined(string Name) : BattleEvent;
+
+/// <summary>The party roster changed — the full member snapshot the client's party panel re-renders from.
+/// Emitted after an acquisition deposit; also the vehicle for surfacing a whole-party Poké Center heal (benched
+/// members' restored HP) that the lead-only <see cref="PlayerRecovered"/> doesn't carry.</summary>
+public record PartyUpdated(IReadOnlyList<PartyMemberInfo> Members) : BattleEvent;
+
 // --- Move actions ---
 public record MoveUsed(string AttackerName, string MoveName) : BattleEvent;
 

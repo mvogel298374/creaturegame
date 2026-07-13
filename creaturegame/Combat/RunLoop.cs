@@ -230,6 +230,23 @@ public sealed record PlayerCondition(
     }
 }
 
+// --- Acquisition (party draft) -----------------------------------------------------------------------------
+
+/// <summary>What a themed-draft roll needs to know about the moment it fires, handed to the injected draft
+/// supplier (the mirror of <see cref="RewardContext"/> / <see cref="ShopStockContext"/> on the acquisition side).
+/// The supplier decides — from all of these — whether to offer a creature this win and, if so, builds one: the
+/// <see cref="Lead"/> and <see cref="Depth"/> scale it (BST target / level), <see cref="Biome"/> is the current
+/// theme, and <see cref="FoughtSpecies"/> is the fought-only pool it must draw from (never an un-fought species —
+/// <c>ENCOUNTER_DESIGN.md §4</c>). <see cref="BattlesWon"/> drives the cadence gate. Returns null (no offer) on
+/// any gate miss — the common case, exactly like a no-drop reward roll.</summary>
+public sealed record DraftContext(
+    Creature Lead,
+    int Depth,
+    BiomeDefinition? Biome,
+    IReadOnlyCollection<int> FoughtSpecies,
+    int BattlesWon
+);
+
 // --- Shop (spend-gold purchase node) -----------------------------------------------------------------------
 
 /// <summary>One item on offer in a Shop node's stock: the resolved item id + display name, its run-scaled

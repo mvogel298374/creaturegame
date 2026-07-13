@@ -440,6 +440,101 @@ public class WebEventContractTests
         Assert.Equal(122, root.GetProperty("Balance").GetInt32());
     }
 
+    /// <summary>Field-level guard for the <see cref="AcquisitionOffered"/> projection: the offer modal reads the
+    /// offered creature's flat card fields (source / species id / name / level / types / max HP / party-full) and
+    /// the nested current-party snapshot (each member's sprite id, name, level, HP, status string, lead flag). The
+    /// reflection contract test instantiates the event with an <i>empty</i> party list, so it can't catch a
+    /// dropped member sub-field — this pins them (and the offered creature's own fields).</summary>
+    [Fact]
+    public void AcquisitionOffered_Projection_CarriesOfferedCreatureAndPartySubFields()
+    {
+        var evt = new AcquisitionOffered(
+            "ThemedDraft",
+            SpeciesId: 25,
+            Name: "PIKACHU",
+            Level: 12,
+            Types: [DamageType.Electric],
+            MaxHp: 34,
+            PartyFull: true,
+            Party:
+            [
+                new PartyMemberInfo(
+                    4,
+                    "CHARMANDER",
+                    14,
+                    20,
+                    40,
+                    StatusCondition.Burn,
+                    IsLead: true
+                ),
+            ]
+        );
+
+        var (type, payload) = SignalRBattleEventEmitter.MapEvent(evt);
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+        var root = doc.RootElement;
+
+        Assert.Equal("AcquisitionOffered", type);
+        Assert.Equal("ThemedDraft", root.GetProperty("Source").GetString());
+        Assert.Equal(25, root.GetProperty("SpeciesId").GetInt32());
+        Assert.Equal("PIKACHU", root.GetProperty("Name").GetString());
+        Assert.Equal(12, root.GetProperty("Level").GetInt32());
+        Assert.Equal("Electric", root.GetProperty("Types")[0].GetString());
+        Assert.Equal(34, root.GetProperty("MaxHp").GetInt32());
+        Assert.True(root.GetProperty("PartyFull").GetBoolean());
+
+        var member = root.GetProperty("Party")[0];
+        Assert.Equal(4, member.GetProperty("SpeciesId").GetInt32());
+        Assert.Equal("CHARMANDER", member.GetProperty("Name").GetString());
+        Assert.Equal(14, member.GetProperty("Level").GetInt32());
+        Assert.Equal(20, member.GetProperty("Hp").GetInt32());
+        Assert.Equal(40, member.GetProperty("MaxHp").GetInt32());
+        // Status projects as its string name (not the enum number) so the client reads one shape everywhere.
+        Assert.Equal("Burn", member.GetProperty("Status").GetString());
+        Assert.True(member.GetProperty("IsLead").GetBoolean());
+    }
+
+    /// <summary>Field-level guard for the <see cref="PartyUpdated"/> projection: the roster panel re-renders from
+    /// the member snapshot, dropped on the wire if not projected. The reflection contract test instantiates it
+    /// with an <i>empty</i> list, so this pins the member sub-fields (and the string-projected status).</summary>
+    [Fact]
+    public void PartyUpdated_Projection_CarriesMemberSubFields()
+    {
+        var evt = new PartyUpdated([
+            new PartyMemberInfo(6, "CHARIZARD", 36, 100, 120, StatusCondition.None, IsLead: true),
+            new PartyMemberInfo(9, "BLASTOISE", 34, 0, 110, StatusCondition.None, IsLead: false),
+        ]);
+
+        var (type, payload) = SignalRBattleEventEmitter.MapEvent(evt);
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+        var members = doc.RootElement.GetProperty("Members");
+
+        Assert.Equal("PartyUpdated", type);
+        Assert.Equal(6, members[0].GetProperty("SpeciesId").GetInt32());
+        Assert.Equal("CHARIZARD", members[0].GetProperty("Name").GetString());
+        Assert.True(members[0].GetProperty("IsLead").GetBoolean());
+        Assert.Equal(0, members[1].GetProperty("Hp").GetInt32()); // a fainted bench member reads HP 0
+        Assert.False(members[1].GetProperty("IsLead").GetBoolean());
+    }
+
+    /// <summary>Field-level guard for the <see cref="CreatureAcquired"/> projection: the log line needs the name,
+    /// species id, and — on a full-party swap — the replaced flag + released member's name.</summary>
+    [Fact]
+    public void CreatureAcquired_Projection_CarriesNameSpeciesReplacedAndReplacedName()
+    {
+        var (type, payload) = SignalRBattleEventEmitter.MapEvent(
+            new CreatureAcquired("PIKACHU", 25, Replaced: true, ReplacedName: "RATTATA")
+        );
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+        var root = doc.RootElement;
+
+        Assert.Equal("CreatureAcquired", type);
+        Assert.Equal("PIKACHU", root.GetProperty("Name").GetString());
+        Assert.Equal(25, root.GetProperty("SpeciesId").GetInt32());
+        Assert.True(root.GetProperty("Replaced").GetBoolean());
+        Assert.Equal("RATTATA", root.GetProperty("ReplacedName").GetString());
+    }
+
     // Concrete (non-abstract) BattleEvent subtypes — the exact set the engine can emit to the client.
     private static List<Type> ConcreteBattleEventTypes()
     {

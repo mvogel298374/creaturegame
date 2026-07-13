@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { TypeBadge, typeColor } from '../components/TypeBadge';
 import { MapGlyphSprite, TypeChip, typeIconId, nodeIconId } from './mapGlyphs';
 import { BattleCanvas } from '../battle/BattleCanvas';
-import { useBattleHub, type LevelUpPanel, type MoveReplacementPrompt, type RecoveryPrompt, type EvolutionPrompt, type RewardChoicePrompt, type ShopPrompt, type DropToast } from '../hooks/useBattleHub';
+import { useBattleHub, type LevelUpPanel, type MoveReplacementPrompt, type RecoveryPrompt, type EvolutionPrompt, type RewardChoicePrompt, type ShopPrompt, type AcquisitionPrompt, type PartyMember, type DropToast } from '../hooks/useBattleHub';
 import { healSummary, type RegionBiome, type BiomeOption } from '../battle/timeline';
 import { regionEdgeKey, travelledEdgeKeys } from '../battle/regionMap';
 import type { Species } from '../types/Species';
@@ -36,7 +36,7 @@ export function BattleScreen() {
   const gameId: string | null = location.state?.gameId ?? null;
   const startLevel: number = location.state?.level ?? 50;
 
-  const { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, buyShopItem, leaveShop, dismissDrop } = useBattleHub(gameId, startLevel);
+  const { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, buyShopItem, leaveShop, respondAcquisition, dismissDrop } = useBattleHub(gameId, startLevel);
   const [controlView, setControlView] = useState<ControlView>('menu');
   // Encounter-map overlay: pinned open by the MAP button, and briefly auto-peeked at each ladder change.
   const [mapPinned, setMapPinned] = useState(false);
@@ -123,6 +123,10 @@ export function BattleScreen() {
         </div>
 
         {state.levelUp && <LevelUpStatPanel panel={state.levelUp} />}
+
+        {/* Party roster strip — the run's owned creatures (shown once the party grows past the lone starter via a
+            themed draft). The lead is flagged; benched members show a compact HP read. */}
+        {state.party.length > 1 && <PartyStrip members={state.party} />}
 
         {state.dropToast && <DropHover drop={state.dropToast} />}
 
@@ -226,6 +230,10 @@ export function BattleScreen() {
 
       {state.shop && (
         <ShopModal prompt={state.shop} onBuy={buyShopItem} onLeave={leaveShop} />
+      )}
+
+      {state.acquisition && (
+        <AcquisitionModal prompt={state.acquisition} onRespond={respondAcquisition} />
       )}
 
       {state.phase === 'ended' && (
@@ -700,6 +708,139 @@ function ShopModal({ prompt, onBuy, onLeave }: {
           })}
         </div>
         <button className="shop-leave-btn" onClick={onLeave}>Leave</button>
+      </div>
+    </div>
+  );
+}
+
+// Party roster strip: the run's owned creatures as a compact row over the field. The active lead is flagged
+// and pulled to the front; benched members show a small HP bar + level. Fed by PartyUpdated snapshots (and the
+// /party hydrate on load). Read-only here — the between-biome lead swap (Stage 1d) is where the lead changes.
+function PartyStrip({ members }: { members: PartyMember[] }) {
+  return (
+    <div className="party-strip" role="group" aria-label="Party roster">
+      {members.map((m, i) => (
+        <div
+          key={i}
+          className={`party-chip${m.isLead ? ' party-chip--lead' : ''}`}
+          title={`${m.name} · Lv${m.level} · ${m.hp}/${m.maxHp} HP`}
+        >
+          <img
+            className="party-chip-sprite"
+            src={`/sprites/front/${m.speciesId}.png`}
+            alt={m.name}
+            draggable={false}
+            onError={e => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }}
+          />
+          <span className="party-chip-lvl">Lv{m.level}</span>
+          <div className="party-chip-hp">
+            <div
+              className={`party-chip-hp-fill party-chip-hp-fill--${hpState(m.hp, m.maxHp)}`}
+              style={{ width: `${m.maxHp > 0 ? Math.max(0, Math.min(100, (m.hp / m.maxHp) * 100)) : 0}%` }}
+            />
+          </div>
+          {m.isLead && <span className="party-chip-tag" aria-label="lead">LEAD</span>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function hpState(hp: number, maxHp: number): 'high' | 'mid' | 'low' {
+  const pct = maxHp > 0 ? (hp / maxHp) * 100 : 0;
+  return pct > 50 ? 'high' : pct > 25 ? 'mid' : 'low';
+}
+
+// Acquisition offer (themed draft / boss catch): a blocking modal to add the offered creature to the party.
+// With room, it's a simple ACCEPT / DECLINE. When the party is full, ACCEPT opens a "release which member?"
+// step over the benched members (the lead is excluded — a mid-biome lead change is Stage 1d) with a two-step
+// confirm so no creature is released on a single misclick. That one flow answers RespondAcquisition, which the
+// run loop is blocked on.
+function AcquisitionModal({ prompt, onRespond }: {
+  prompt: AcquisitionPrompt;
+  onRespond: (accept: boolean, replaceSlot: number | null) => void;
+}) {
+  // null → the offer; 'swap' → picking a member to release (full party); { slot } → confirming that release.
+  const [phase, setPhase] = useState<'offer' | 'swap' | { slot: number }>('offer');
+  const label = prompt.source === 'BossCatch' ? 'Catch!' : 'A creature wants to join!';
+
+  // Full-party release confirm.
+  if (typeof phase === 'object') {
+    const releasing = prompt.party[phase.slot];
+    return (
+      <div className="modal-overlay">
+        <div className="acquire-modal" role="alertdialog" aria-label="Confirm release">
+          <p className="acquire-question">Release {releasing.name} to make room for {prompt.name}?</p>
+          <div className="acquire-buttons">
+            <button className="action-btn action-btn--fight" onClick={() => onRespond(true, phase.slot)}>YES</button>
+            <button className="action-btn" onClick={() => setPhase('swap')}>NO</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Full-party swap picker: choose a benched member to release (the lead can't be swapped out here).
+  if (phase === 'swap') {
+    return (
+      <div className="modal-overlay">
+        <div className="acquire-modal" role="alertdialog" aria-label="Choose a member to release">
+          <p className="acquire-title">Party is full!</p>
+          <p className="acquire-sub">Release which creature for {prompt.name}?</p>
+          <div className="acquire-swap-grid">
+            {prompt.party.map((m, i) => (
+              <button
+                key={i}
+                className="acquire-swap-btn"
+                disabled={m.isLead}
+                onClick={() => setPhase({ slot: i })}
+                title={m.isLead ? 'The lead cannot be released here' : undefined}
+              >
+                <img
+                  className="acquire-swap-sprite"
+                  src={`/sprites/front/${m.speciesId}.png`}
+                  alt={m.name}
+                  draggable={false}
+                  onError={e => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }}
+                />
+                <span className="acquire-swap-name">{m.name}</span>
+                <span className="acquire-swap-lvl">Lv{m.level}{m.isLead ? ' · LEAD' : ''}</span>
+              </button>
+            ))}
+          </div>
+          <button className="btn-ghost action-back" onClick={() => setPhase('offer')}>← BACK</button>
+        </div>
+      </div>
+    );
+  }
+
+  // The offer itself.
+  return (
+    <div className="modal-overlay">
+      <div className="acquire-modal" role="alertdialog" aria-label="Creature offer">
+        <p className="acquire-title">{label}</p>
+        <p className="acquire-sub">{prompt.name} (Lv{prompt.level}) wants to join your party!</p>
+        <div className="acquire-sprite-wrap">
+          <span className="acquire-glow" aria-hidden="true" />
+          <img
+            className="acquire-sprite"
+            src={`/sprites/front/${prompt.speciesId}.png`}
+            alt={prompt.name}
+            draggable={false}
+          />
+        </div>
+        <div className="acquire-types" aria-hidden="true">
+          {prompt.types.map(t => <TypeBadge key={t} type={t} size="sm" />)}
+        </div>
+        <div className="acquire-buttons">
+          <button
+            className="action-btn action-btn--fight"
+            onClick={() => (prompt.partyFull ? setPhase('swap') : onRespond(true, null))}
+          >
+            {prompt.partyFull ? 'ADD (SWAP)' : 'ADD'}
+          </button>
+          <button className="action-btn" onClick={() => onRespond(false, null)}>DECLINE</button>
+        </div>
       </div>
     </div>
   );

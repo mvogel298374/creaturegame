@@ -109,6 +109,22 @@ public class BattleHub(GameSessionManager manager) : Hub<IBattleClient>
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Answers an acquisition offer (themed draft / boss catch): <paramref name="accept"/> false = decline;
+    /// true with a null <paramref name="replaceSlot"/> = add to the party; true with a slot index = add by
+    /// swapping out that member (the full-party path). Mirrors <see cref="RespondRecovery"/> — fire-and-forget
+    /// completion of the input TCS the run loop is blocked on. A decline / unhonourable accept is a no-op in the
+    /// run loop (the roster is left unchanged).
+    /// </summary>
+    public Task RespondAcquisition(bool accept, int? replaceSlot)
+    {
+        manager.SetAcquisitionDecision(
+            Context.ConnectionId,
+            new creaturegame.Combat.AcquisitionDecision(accept, replaceSlot)
+        );
+        return Task.CompletedTask;
+    }
+
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         // Start the reconnect grace window; the battle is abandoned only if the client

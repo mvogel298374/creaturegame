@@ -15,6 +15,7 @@ public sealed class SignalRInput : IBattleInput
     private volatile TaskCompletionSource<string>? _biomeTcs;
     private volatile TaskCompletionSource<int>? _rewardChoiceTcs;
     private volatile TaskCompletionSource<ShopAction>? _shopTcs;
+    private volatile TaskCompletionSource<AcquisitionDecision>? _acquisitionTcs;
     private volatile bool _cancelled;
 
     // The raw request the hub completes the turn handshake with, mapped to a TurnChoice below.
@@ -247,6 +248,33 @@ public sealed class SignalRInput : IBattleInput
     }
 
     /// <summary>
+    /// Awaits the player's acquisition answer: decline, add, or (full party) add-by-replacing a slot. Same TCS
+    /// handshake as the other prompts (the hub's <c>RespondAcquisition</c> completes it via
+    /// <see cref="SetAcquisitionDecision"/>); the <see cref="_cancelled"/> guard makes a disconnect throw rather
+    /// than hang the run on the offer. A decline / unhonourable accept is a no-op downstream — the run loop's
+    /// <c>AcquisitionResolution</c> leaves the roster unchanged.
+    /// </summary>
+    public async Task<AcquisitionDecision> ChooseAcquisitionAsync(AcquisitionContext context)
+    {
+        if (_cancelled)
+            throw new OperationCanceledException("Battle input cancelled (client disconnected).");
+
+        var tcs = new TaskCompletionSource<AcquisitionDecision>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        _acquisitionTcs = tcs;
+        var decision = await tcs.Task; // throws OperationCanceledException if Cancel() ran
+        _acquisitionTcs = null;
+        return decision;
+    }
+
+    public void SetAcquisitionDecision(AcquisitionDecision decision)
+    {
+        var tcs = _acquisitionTcs;
+        tcs?.TrySetResult(decision);
+    }
+
+    /// <summary>
     /// Unblocks a battle loop waiting on player input when the client disconnects,
     /// so the fire-and-forget battle task can complete and be collected.
     /// </summary>
@@ -260,5 +288,6 @@ public sealed class SignalRInput : IBattleInput
         _biomeTcs?.TrySetCanceled();
         _rewardChoiceTcs?.TrySetCanceled();
         _shopTcs?.TrySetCanceled();
+        _acquisitionTcs?.TrySetCanceled();
     }
 }

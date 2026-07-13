@@ -102,6 +102,34 @@ public sealed class ScriptedInput(params string[] moveNames) : IBattleInput
             _shopScript.Count > 0 ? _shopScript.Dequeue() : (ShopAction)LeaveShop.Instance
         );
     }
+
+    private AcquisitionDecision _acquisitionDecision = AcquisitionDecision.Decline;
+
+    /// <summary>Makes this input accept an acquisition offer into an open party slot (default is to decline, same
+    /// as the interface default). Returned by <see cref="ChooseAcquisitionAsync"/>.</summary>
+    public ScriptedInput AcceptsAcquisition()
+    {
+        _acquisitionDecision = AcquisitionDecision.Add();
+        return this;
+    }
+
+    /// <summary>Makes this input accept an acquisition by swapping out the member at <paramref name="slot"/> (the
+    /// full-party path). Returned by <see cref="ChooseAcquisitionAsync"/>.</summary>
+    public ScriptedInput AcceptsAcquisitionReplacing(int slot)
+    {
+        _acquisitionDecision = AcquisitionDecision.Replace(slot);
+        return this;
+    }
+
+    /// <summary>Acquisition offers this input has received, in order — lets a test prove a themed draft actually
+    /// fired (and inspect the offered creature + the party snapshot presented).</summary>
+    public List<AcquisitionContext> AcquisitionsOffered { get; } = [];
+
+    public Task<AcquisitionDecision> ChooseAcquisitionAsync(AcquisitionContext context)
+    {
+        AcquisitionsOffered.Add(context);
+        return Task.FromResult(_acquisitionDecision);
+    }
 }
 
 /// <summary>

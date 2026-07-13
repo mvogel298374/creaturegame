@@ -2,7 +2,7 @@
 // it's unit-testable without React, SignalR, or a DOM (this module has only type imports, no runtime deps).
 // The hook owns the effects (the SignalR connection, the timeline driver); this owns the state transitions.
 import type { MoveInfo } from '../types/BattleEvents';
-import type { Action, StatBlock, LogEntry, BiomeOption, RegionBiome, RewardOption, ShopOfferItem } from '../battle/timeline';
+import type { Action, StatBlock, LogEntry, BiomeOption, RegionBiome, RewardOption, ShopOfferItem, PartyMember, AcquisitionOffer } from '../battle/timeline';
 
 export interface LevelUpPanel {
   level: number;
@@ -48,6 +48,11 @@ export interface ShopPrompt {
   balance: number;
 }
 
+// An acquisition offer (themed draft / boss catch): the offered creature + the current party (for the swap-out
+// picker when full). A blocking modal — the run waits server-side until the player accepts (optionally naming a
+// member to swap out) or declines. Aliased to the timeline's wire shape.
+export type AcquisitionPrompt = AcquisitionOffer;
+
 // A transient loot hover (gold + items) floated over the field, then auto-dismissed by the view. Shows the
 // *granted* reward (the option the player picked) after the blocking pick-one-of-N choice resolves — every
 // source (a battle-win drop and a Treasure/Mystery node) funnels its RewardGranted through this same hover.
@@ -81,6 +86,8 @@ export interface BattleState {
   biomeChoice: BiomeChoicePrompt | null;
   rewardChoice: RewardChoicePrompt | null;
   shop: ShopPrompt | null;
+  acquisition: AcquisitionPrompt | null;
+  party: PartyMember[];
   dropToast: DropToast | null;
   gold: number;
   log: LogEntry[];
@@ -125,6 +132,8 @@ export const initialState: BattleState = {
   biomeChoice: null,
   rewardChoice: null,
   shop: null,
+  acquisition: null,
+  party: [],
   dropToast: null,
   gold: 0,
   log: [],
@@ -246,6 +255,12 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
       };
     case 'HIDE_SHOP':
       return { ...state, shop: null };
+    case 'SHOW_ACQUISITION':
+      return { ...state, acquisition: action.offer };
+    case 'HIDE_ACQUISITION':
+      return { ...state, acquisition: null };
+    case 'PARTY_SET':
+      return { ...state, party: action.members };
     case 'SET_GOLD':
       return { ...state, gold: action.gold };
     case 'SHOW_DROP':

@@ -152,6 +152,35 @@ public sealed class SignalRBattleEventEmitter(
                     e.Balance,
                 }
             ),
+            AcquisitionOffered e => (
+                "AcquisitionOffered",
+                new
+                {
+                    e.Source,
+                    e.SpeciesId,
+                    e.Name,
+                    e.Level,
+                    Types = e.Types.Select(t => t.ToString()),
+                    e.MaxHp,
+                    e.PartyFull,
+                    Party = e.Party.Select(ProjectPartyMember),
+                }
+            ),
+            CreatureAcquired e => (
+                "CreatureAcquired",
+                new
+                {
+                    e.Name,
+                    e.SpeciesId,
+                    e.Replaced,
+                    e.ReplacedName,
+                }
+            ),
+            AcquisitionDeclined e => ("AcquisitionDeclined", new { e.Name }),
+            PartyUpdated e => (
+                "PartyUpdated",
+                new { Members = e.Members.Select(ProjectPartyMember) }
+            ),
             ItemUsed e => ("ItemUsed", new { e.ItemName, e.TargetName }),
             PpRestored e => (
                 "PpRestored",
@@ -431,5 +460,23 @@ public sealed class SignalRBattleEventEmitter(
             ItemName = (string?)item.ItemName,
             item.Price,
             Rarity = item.Rarity.ToString(),
+        };
+
+    // Projects one party member to the wire shape the client's roster panel + acquisition swap picker read
+    // (species id for the sprite, name/level/HP, status string, lead flag). Shared by the AcquisitionOffered and
+    // PartyUpdated projections — same field-level guard concern (a new PartyMemberInfo field is invisible on the
+    // wire until it's added here).
+    // internal (not private) so the on-demand party-hydrate endpoint (GameSessionManager.GetParty) serves the
+    // *exact same* wire shape as the pushed PartyUpdated / AcquisitionOffered events — no pull-vs-push drift.
+    internal static object ProjectPartyMember(PartyMemberInfo m) =>
+        new
+        {
+            m.SpeciesId,
+            m.Name,
+            m.Level,
+            m.Hp,
+            m.MaxHp,
+            Status = m.Status.ToString(),
+            m.IsLead,
         };
 }

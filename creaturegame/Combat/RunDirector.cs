@@ -73,10 +73,19 @@ public sealed class RunDirector
         int minShopBudget = 0,
         // Roguelite run-balance rules passed straight through to each encounter's Battle (game-balance tuning,
         // not a seam — see Battle's runRules / RunRules). Null keeps the legacy chain / tests on pure Gen-1 XP.
-        RunRules? runRules = null
+        RunRules? runRules = null,
+        // The run's party container (up to six owned creatures; its Lead is the active player). Passed in so the
+        // web session owns the same instance the overview/party panel read (Party threading, ENCOUNTER_DESIGN.md
+        // §4). Null keeps the legacy shape — a party of one seeded from `player`.
+        Party? party = null,
+        // The themed-draft acquisition supplier (web-layer policy): rolled after every win, it decides whether to
+        // offer a creature (cadence × n% × the fought-only pool) and builds one when it does — the mirror of the
+        // reward / shop suppliers on the acquisition side. Null (the default) = no draft, so tests / the legacy
+        // chain never offer one and draw no extra RNG.
+        Func<DraftContext, IRandomSource, Task<Creature?>>? draftSupplier = null
     )
     {
-        _state = new RunState(player);
+        _state = party is not null ? new RunState(party) : new RunState(player);
         _emitter = emitter;
         _playerInput = playerInput;
         _rng = rng;
@@ -121,7 +130,8 @@ public sealed class RunDirector
                 checkEvolution,
                 wallet,
                 rewardSupplier,
-                runRules
+                runRules,
+                draftSupplier
             );
         _battleEvent = Battle(EncounterTier.Normal);
         _eliteEvent = Battle(EncounterTier.Elite);
@@ -347,7 +357,8 @@ internal sealed class BattleRunEvent(
     Func<Creature, Task<EvolutionOutcome?>>? checkEvolution,
     Wallet? wallet,
     Func<RewardContext, IRandomSource, RewardChoice> rewardSupplier,
-    RunRules? runRules
+    RunRules? runRules,
+    Func<DraftContext, IRandomSource, Task<Creature?>>? draftSupplier
 ) : IRunEvent
 {
     public async Task<Outcome> RunAsync(RunContext ctx)
@@ -423,7 +434,38 @@ internal sealed class BattleRunEvent(
         // Default: the player's major status carries into the next encounter (a Poké Center heal clears it on
         // the next event); the generation decides the out-of-battle form (Gen 1 reverts Toxic to Poison).
         s.CarriedStatus = CaptureCarriedStatus(player);
+
+        // Themed-draft acquisition (ENCOUNTER_DESIGN.md §4): the last beat of a win. The supplier owns the whole
+        // policy — cadence (~every Nth win) × an n% roll × the fought-only pool — and returns a built creature
+        // only when it fires, else null (the common case, like a no-drop reward roll). When it fires, offer it
+        // as the reusable blocking acquisition offer; a headless / AI input declines by default, so the chain
+        // never stalls and never builds a party.
+        await OfferDraftAsync(s, ctx);
+
         return new BattleOutcome(true);
+    }
+
+    // Rolls the themed draft for this win and, if the supplier offers a creature, raises the acquisition offer
+    // (blocking; the client shows the modal) and deposits the result into the party. Silent when no supplier is
+    // configured (tests / the legacy chain) or the roll declined to offer (null) — no RNG is drawn on a
+    // non-cadence win, so the seeded stream only moves when a draft actually rolls.
+    private async Task OfferDraftAsync(RunState s, RunContext ctx)
+    {
+        if (draftSupplier is null)
+            return;
+        var offered = await draftSupplier(
+            new DraftContext(
+                s.Player,
+                s.RunDepth,
+                s.CurrentBiome,
+                s.FoughtSpeciesInBiome,
+                s.BattlesWon
+            ),
+            ctx.Rng ?? SystemRandomSource.Instance
+        );
+        if (offered is null)
+            return;
+        await AcquisitionResolution.OfferAndDepositAsync(offered, "ThemedDraft", s.Party, ctx);
     }
 
     // Rolls this win's reward and — if anything rolled — offers it as a pick-one-of-N choice (blocking; the
@@ -534,6 +576,11 @@ internal sealed class RecoveryRunEvent : IRunEvent
                 member.FullHeal();
             s.CarriedStatus = null;
             ctx.Emitter?.Emit(new PlayerRecovered(player.Name, player.Attributes.HP));
+            // The lead-only PlayerRecovered above can't carry the bench's restored HP — so push a fresh party
+            // snapshot too (the 1a/1b deferral: whole-party heal is state-correct, this makes the benched
+            // members' heal visible on the wire for the party panel). A no-op-looking single-member party still
+            // keeps the panel in lockstep.
+            ctx.Emitter?.Emit(new PartyUpdated(PartyProjection.Snapshot(s.Party)));
         }
         else
         {
@@ -851,5 +898,90 @@ internal static class RewardResolution
                 }
             }
         }
+    }
+}
+
+/// <summary>
+/// Shared acquisition-offer resolution used by every acquisition channel (themed draft now; boss catch later):
+/// raise the blocking offer — the client shows the modal, so the player accepts / declines / (on a full party)
+/// picks a member to swap out — then deposit the result into the <see cref="Party"/> and announce it. A
+/// <em>decline</em> (the automated / AI default) is a pure sequencing no-op: the roster is unchanged and only an
+/// <see cref="AcquisitionDeclined"/> line is emitted. An accept a full party can't honour (no valid replace slot)
+/// falls back to a decline, so a stale pick never strands the run. On a deposit a <see cref="CreatureAcquired"/>
+/// plus a fresh <see cref="PartyUpdated"/> snapshot follow. Both channels reuse this — only the offered creature
+/// and the <paramref name="source"/> label differ.
+/// </summary>
+internal static class AcquisitionResolution
+{
+    public static async Task OfferAndDepositAsync(
+        Creature offered,
+        string source,
+        Party party,
+        RunContext ctx
+    )
+    {
+        ctx.Emitter?.Emit(
+            new AcquisitionOffered(
+                source,
+                offered.SpeciesId,
+                offered.Name,
+                offered.Level,
+                CreatureTypes(offered),
+                offered.Attributes.MaxHP,
+                party.IsFull,
+                PartyProjection.Snapshot(party)
+            )
+        );
+
+        var decision = await ctx.PlayerInput.ChooseAcquisitionAsync(
+            new AcquisitionContext(offered, party, source)
+        );
+
+        if (!decision.Accept)
+        {
+            ctx.Emitter?.Emit(new AcquisitionDeclined(offered.Name));
+            return;
+        }
+
+        if (party.IsFull)
+        {
+            // Full roster → the accept must name a bench slot to swap out; an out-of-range / missing slot (a
+            // stale pick) is tolerated as a decline rather than stranding the run. The lead slot is refused too:
+            // swapping the active creature mid-chain is a lead change, which is Stage 1d's between-biome
+            // ChooseLeadAsync flow — this offer must never reassign the lead (the client hides it as a target,
+            // and the server enforces the same rule so a malformed / regressed client can't slip it through).
+            if (
+                decision.ReplaceSlot is not int slot
+                || slot < 0
+                || slot >= party.Count
+                || slot == party.LeadIndex
+            )
+            {
+                ctx.Emitter?.Emit(new AcquisitionDeclined(offered.Name));
+                return;
+            }
+            string replacedName = party.Members[slot].Name;
+            party.Replace(slot, offered);
+            ctx.Emitter?.Emit(
+                new CreatureAcquired(offered.Name, offered.SpeciesId, true, replacedName)
+            );
+        }
+        else
+        {
+            party.Add(offered);
+            ctx.Emitter?.Emit(new CreatureAcquired(offered.Name, offered.SpeciesId, false, null));
+        }
+
+        ctx.Emitter?.Emit(new PartyUpdated(PartyProjection.Snapshot(party)));
+    }
+
+    private static IReadOnlyList<DamageType> CreatureTypes(Creature c)
+    {
+        var types = new List<DamageType>(2);
+        if (c.Type1 is { } t1)
+            types.Add(t1);
+        if (c.Type2 is { } t2)
+            types.Add(t2);
+        return types;
     }
 }

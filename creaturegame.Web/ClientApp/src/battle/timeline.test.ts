@@ -741,3 +741,50 @@ describe('healSummary — Quick Heal reward card tag', () => {
     expect(healSummary({ hpRestore: 0, cureStatus: false, restoreLowPp: false })).toBe('RESTORE');
   });
 });
+
+describe('expandEvent — party & acquisition (Phase 4 Stage 1c)', () => {
+  const dispatchedOf = (steps: Step[] = [], type: string): Action[] =>
+    dispatched(steps).filter(a => a.type === type);
+
+  it('AcquisitionOffered parses the offer and raises the blocking modal', () => {
+    const { steps } = expandEvent('AcquisitionOffered', {
+      source: 'ThemedDraft', speciesId: 25, name: 'PIKACHU', level: 12, types: ['Electric'],
+      maxHp: 34, partyFull: true,
+      party: [{ speciesId: 4, name: 'CHARMANDER', level: 14, hp: 20, maxHp: 40, status: 'Burn', isLead: true }],
+    }, CTX);
+    const show = dispatchedOf(steps, 'SHOW_ACQUISITION')[0] as Extract<Action, { type: 'SHOW_ACQUISITION' }>;
+    expect(show.offer.name).toBe('PIKACHU');
+    expect(show.offer.partyFull).toBe(true);
+    expect(show.offer.types).toEqual(['Electric']);
+    expect(show.offer.party[0].name).toBe('CHARMANDER');
+    expect(show.offer.party[0].isLead).toBe(true);
+  });
+
+  it('PartyUpdated dispatches PARTY_SET with the parsed members (no log line)', () => {
+    const { steps } = expandEvent('PartyUpdated', {
+      members: [
+        { speciesId: 6, name: 'CHARIZARD', level: 36, hp: 100, maxHp: 120, status: 'None', isLead: true },
+        { speciesId: 9, name: 'BLASTOISE', level: 34, hp: 0, maxHp: 110, status: 'None', isLead: false },
+      ],
+    }, CTX);
+    const set = dispatchedOf(steps, 'PARTY_SET')[0] as Extract<Action, { type: 'PARTY_SET' }>;
+    expect(set.members).toHaveLength(2);
+    expect(set.members[1].name).toBe('BLASTOISE');
+    expect(set.members[1].hp).toBe(0);
+    expect(logLines(steps)).toEqual([]); // roster refresh carries no battle-log line
+  });
+
+  it('CreatureAcquired logs "joined the party" — with the released member on a full-party swap', () => {
+    expect(logLines(expandEvent('CreatureAcquired',
+      { name: 'PIKACHU', speciesId: 25, replaced: false, replacedName: null }, CTX).steps))
+      .toEqual(['PIKACHU joined the party!']);
+    expect(logLines(expandEvent('CreatureAcquired',
+      { name: 'PIKACHU', speciesId: 25, replaced: true, replacedName: 'RATTATA' }, CTX).steps))
+      .toEqual(['PIKACHU joined the party! (RATTATA was released.)']);
+  });
+
+  it('AcquisitionDeclined logs the left-in-the-wild line', () => {
+    expect(logLines(expandEvent('AcquisitionDeclined', { name: 'PIKACHU' }, CTX).steps))
+      .toEqual(['Left PIKACHU in the wild.']);
+  });
+});

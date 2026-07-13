@@ -14,8 +14,10 @@ export type {
   BiomeChoicePrompt,
   RewardChoicePrompt,
   ShopPrompt,
+  AcquisitionPrompt,
   DropToast,
 } from './battleReducer';
+export type { PartyMember } from '../battle/timeline';
 
 export function useBattleHub(gameId: string | null, initialLevel = 50) {
   const [state, dispatch] = useReducer(battleReducer, { ...initialState, playerLevel: initialLevel });
@@ -66,9 +68,20 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
         .catch(() => { /* keep the current HUD value */ });
     };
 
-    conn.onreconnected(() => hydrateGold());
+    // Pull the party roster for the roster panel. Like the gold HUD, events (PartyUpdated) don't replay across a
+    // disconnect gap, so hydrate on first load and after a reconnect. A failure leaves the panel at its last value.
+    const hydrateParty = () => {
+      fetch(`/api/game/${gameId}/party`)
+        .then(r => (r.ok ? r.json() : null))
+        .then((members: unknown) => {
+          if (Array.isArray(members)) dispatch({ type: 'PARTY_SET', members: members as never });
+        })
+        .catch(() => { /* keep the current panel value */ });
+    };
+
+    conn.onreconnected(() => { hydrateGold(); hydrateParty(); });
     conn.start()
-      .then(() => hydrateGold())
+      .then(() => { hydrateGold(); hydrateParty(); })
       .catch(err => console.error('[SignalR] Connection failed:', err));
     connRef.current = conn;
 
@@ -154,9 +167,18 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
       console.error('[SignalR] LeaveShop failed:', err));
   }, []);
 
+  // Answer an acquisition offer: accept (optionally naming a member slot to swap out when the party is full) or
+  // decline. Hide the modal at once (the backend is blocked awaiting the answer); the resulting CreatureAcquired
+  // /AcquisitionDeclined + PartyUpdated events drive the log line and refresh the roster panel.
+  const respondAcquisition = useCallback((accept: boolean, replaceSlot: number | null) => {
+    dispatch({ type: 'HIDE_ACQUISITION' });
+    connRef.current?.invoke('RespondAcquisition', accept, replaceSlot).catch(err =>
+      console.error('[SignalR] RespondAcquisition failed:', err));
+  }, []);
+
   // Clear the transient loot hover. Purely local (nothing server-side blocks on it) — the view runs a timer
   // and calls this to auto-dismiss the toast after its on-screen beat.
   const dismissDrop = useCallback(() => dispatch({ type: 'HIDE_DROP' }), []);
 
-  return { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, buyShopItem, leaveShop, dismissDrop };
+  return { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, buyShopItem, leaveShop, respondAcquisition, dismissDrop };
 }

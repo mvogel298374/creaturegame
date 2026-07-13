@@ -85,6 +85,18 @@ public class GameController(GameSessionManager sessionManager, EncounterFactory 
             return NotFound(new { error = "No active game with that id" });
         return Ok(new { gold });
     }
+
+    /// <summary>The run's current party roster for the roster panel to hydrate on load / after a reconnect
+    /// (events don't replay across a disconnect gap). Same wire shape as the pushed <c>PartyUpdated</c> event.
+    /// 404 if the game is unknown — parity with <see cref="GetBag"/> / <see cref="GetGold"/>.</summary>
+    [HttpGet("{gameId}/party")]
+    public IActionResult GetParty(string gameId)
+    {
+        var party = sessionManager.GetParty(gameId);
+        if (party is null)
+            return NotFound(new { error = "No active game with that id" });
+        return Ok(party);
+    }
 }
 
 public record StartGameRequest(int SpeciesId, int? Level = null, int? Seed = null);

@@ -72,13 +72,22 @@ below (session plan mirrored here for durability; the ephemeral copy was `kind-c
   wire/UI; covered by `PartyTests` + a `RunDirector` fought-accumulate/reset test. **Known deferral to 1c:**
   whole-party heal is state-correct but only the lead's `PlayerRecovered` is emitted — the bench heal surfaces on
   the wire with the `PartyUpdated` snapshot the panel needs (user-approved deferral).
-- [ ] **Stage 1c — themed draft, end-to-end** (the headline): a post-win offer in `BattleRunEvent` (after
-  `GrantBattleRewardAsync`), gated by cadence (~every 3rd win) × an *n%* web-policy roll × non-empty fought pool.
-  The offered creature is built web-side by a new injected `draftSupplier` (`EncounterFactory` via `BuildCreature`
-  + `PickByBst` with the pool **intersected to `FoughtSpeciesInBiome`** — the fought-only guardrail), scaled to
-  player/depth. Full acquisition-offer wire (above) + a `PartyUpdated` snapshot event + a party panel; deposit
-  into `Party` (party-full ⇒ "swap out which member?" path). Also threads the `Party` through the session
-  (`RunSetup`/`PendingSession`/`ActiveBattle`) so the overview/UI read it.
+- [x] **Stage 1c — themed draft, end-to-end** ✅ DONE (2026-07-13): a post-win offer in `BattleRunEvent`
+  (`OfferDraftAsync`, after `GrantBattleRewardAsync`/evolution/status-capture), gated by cadence (every 3rd win)
+  × a 55% web-policy roll × non-empty fought pool (`DraftCalculator.ShouldOffer` — no RNG drawn on a non-cadence
+  win). The offered creature is built web-side by the injected `draftSupplier` (`EncounterFactory.BuildDraftSupplier`
+  → `BuildCreature` + `PickByBst` over the pool **intersected to `FoughtSpeciesInBiome`** — the fought-only
+  guardrail), scaled to lead/depth. Full acquisition-offer wire (`AcquisitionOffered`/`CreatureAcquired`/
+  `AcquisitionDeclined`/`PartyUpdated` + `IBattleInput.ChooseAcquisitionAsync` + `SignalRInput` TCS +
+  `AcquisitionResolution.OfferAndDepositAsync` + emitter projections & field-level `WebEventContractTests` guards +
+  `BattleHub.RespondAcquisition` + `GameController` `GET /party` hydrate + `timeline`/`battleReducer`/`useBattleHub`
+  + `BattleScreen` `PartyStrip` + `AcquisitionModal`). Deposit into `Party` (party-full ⇒ swap-out picker; a
+  server-side guard refuses swapping the **lead** — that's Stage 1d). The session owns the single `Party`
+  (`GameSessionManager` → `ActiveBattle.Party` → `RunState.Party`). **Stage 1a/1b deferral closed:** the
+  whole-party Poké Center heal now emits a `PartyUpdated` snapshot so benched members' restored HP reaches the
+  panel. Covered by `RunDirectorAcquisitionTests` (accept/decline-no-op/full-swap/lead-guard), `DraftCalculatorTests`
+  (cadence/empty-pool/roll boundary), `EncounterFactoryDraftTests` (fought-only build over the live DB),
+  `WebEventContractTests` field guards, and Vitest (reducer + timeline).
 - [ ] **Stage 1d — lead-swap between biomes**: a `ChooseLeadAsync` prompt at the biome boundary (after the Poké
   Center, before the next `BiomeChoiceEvent`) when `Party.Count > 1` — reassigns `Party.Lead` (⇒ `RunState.Player`)
   for the next biome. Same offer-wire pattern + a lead-select modal. *(Interim faint handling through Stages 1–2:

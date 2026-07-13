@@ -68,6 +68,33 @@ export function healSummary(
   return parts.length > 0 ? parts.join(' · ') : 'RESTORE';
 }
 
+// One party member (roster panel + acquisition swap picker), matching the wire projection
+// (SignalRBattleEventEmitter.ProjectPartyMember) — species id for the sprite, name/level/HP, status, and whether
+// it is the active lead (excluded as a swap target). Same shape from the pushed PartyUpdated event and the pulled
+// /party hydrate endpoint.
+export interface PartyMember {
+  speciesId: number;
+  name: string;
+  level: number;
+  hp: number;
+  maxHp: number;
+  status: string;
+  isLead: boolean;
+}
+
+// An acquisition offer (themed draft / boss catch): the offered creature's card fields + whether the party is
+// full (→ show the swap-out picker over the current members). Mirrors AcquisitionOffered's wire projection.
+export interface AcquisitionOffer {
+  source: string;
+  speciesId: number;
+  name: string;
+  level: number;
+  types: string[];
+  maxHp: number;
+  partyFull: boolean;
+  party: PartyMember[];
+}
+
 // One item on a Shop node's shelf, flat to match the wire projection (SignalRBattleEventEmitter.ProjectShopItem):
 // the resolved item id + name, its run-scaled price in ₽, and the rarity that drives the card accent colour.
 export interface ShopOfferItem {
@@ -119,6 +146,14 @@ export type Action =
   | { type: 'SHOW_SHOP'; items: ShopOfferItem[]; balance: number }
   | { type: 'SHOP_PURCHASED'; itemName: string; price: number; balance: number }
   | { type: 'HIDE_SHOP' }
+  // Acquisition (themed draft / boss catch): a blocking offer to add a creature to the party — shown, then
+  // hidden by the player's Accept/Decline (and, when the party is full, which member to swap out). The run waits
+  // server-side until RespondAcquisition answers.
+  | { type: 'SHOW_ACQUISITION'; offer: AcquisitionOffer }
+  | { type: 'HIDE_ACQUISITION' }
+  // Party roster snapshot — set from a PartyUpdated event (deposit / whole-party heal) or the /party hydrate
+  // endpoint on load / reconnect. Drives the roster panel.
+  | { type: 'PARTY_SET'; members: PartyMember[] }
   // Run economy: set the gold total (RewardGranted carries the post-credit total) shown in the BAG money box.
   | { type: 'SET_GOLD'; gold: number }
   // Loot drop hover: a transient floating "you found …" toast (gold + items) shown over the field for a
@@ -485,6 +520,63 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
         w(200),
       ] };
     }
+
+    case 'AcquisitionOffered': {
+      // A themed draft (or boss catch) offers a creature to add to the party. Parse it off the wire and raise the
+      // blocking offer modal; the run waits server-side until RespondAcquisition answers (same blocking-modal
+      // shape as the reward/biome choice). Queued (not immediate) so it follows any in-flight win animation.
+      const party: PartyMember[] = ((payload.party as Array<Record<string, unknown>>) ?? []).map(m => ({
+        speciesId: m.speciesId as number,
+        name: m.name as string,
+        level: m.level as number,
+        hp: m.hp as number,
+        maxHp: m.maxHp as number,
+        status: (m.status as string) ?? 'None',
+        isLead: (m.isLead as boolean) ?? false,
+      }));
+      const offer: AcquisitionOffer = {
+        source: payload.source as string,
+        speciesId: payload.speciesId as number,
+        name: payload.name as string,
+        level: payload.level as number,
+        types: (payload.types as string[]) ?? [],
+        maxHp: payload.maxHp as number,
+        partyFull: (payload.partyFull as boolean) ?? false,
+        party,
+      };
+      return { steps: [w(200), d({ type: 'SHOW_ACQUISITION', offer })] };
+    }
+
+    case 'CreatureAcquired': {
+      // The offer was accepted — the creature joined the roster. (The modal already closed on the player's press;
+      // the PartyUpdated snapshot that follows refreshes the panel.) Log a loot-toned line.
+      const name = payload.name as string;
+      const replaced = payload.replaced as boolean;
+      const replacedName = payload.replacedName as string | null;
+      const msg = replaced && replacedName
+        ? `${name} joined the party! (${replacedName} was released.)`
+        : `${name} joined the party!`;
+      return { steps: [w(150), d(log(msg, 'loot')), w(400)] };
+    }
+
+    case 'AcquisitionDeclined': {
+      // The offer was declined — a pure no-op; narrate it so the beat isn't silent.
+      const name = payload.name as string;
+      return { steps: [w(120), d(log(`Left ${name} in the wild.`)), w(300)] };
+    }
+
+    case 'PartyUpdated':
+      // The roster changed (a deposit) or was re-snapshotted (whole-party heal) — refresh the party panel. No
+      // battle-log line (the CreatureAcquired / heal lines carry the narration).
+      return { steps: [d({ type: 'PARTY_SET', members: ((payload.members as Array<Record<string, unknown>>) ?? []).map(m => ({
+        speciesId: m.speciesId as number,
+        name: m.name as string,
+        level: m.level as number,
+        hp: m.hp as number,
+        maxHp: m.maxHp as number,
+        status: (m.status as string) ?? 'None',
+        isLead: (m.isLead as boolean) ?? false,
+      })) })] };
 
     case 'RunNodeEntered': {
       // Every node advances the encounter-map pin one step (incl. WildBattle, which drives the pin but shows no
