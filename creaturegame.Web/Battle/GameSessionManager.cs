@@ -352,6 +352,17 @@ public sealed class GameSessionManager(
             battle.Input.SetAcquisitionDecision(decision);
     }
 
+    /// <summary>Routes a between-biome lead pick (the chosen party-member index) to the battle's input. An
+    /// out-of-range / unchanged index is a no-op in the run loop (keeps the current lead), so this only forwards.</summary>
+    public void SetLeadChoice(string connectionId, int index)
+    {
+        if (
+            _connToGame.TryGetValue(connectionId, out var gameId)
+            && _active.TryGetValue(gameId, out var battle)
+        )
+            battle.Input.SetLeadChoice(index);
+    }
+
     /// <summary>The run's current party roster (the same wire shape as the pushed <c>PartyUpdated</c> event), for
     /// the roster panel to hydrate on load / after a reconnect — parity with <see cref="GetBagContents"/> /
     /// <see cref="GetWallet"/>. A running battle's live party first, else the not-yet-started session's lone

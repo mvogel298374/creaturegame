@@ -16,6 +16,7 @@ public sealed class SignalRInput : IBattleInput
     private volatile TaskCompletionSource<int>? _rewardChoiceTcs;
     private volatile TaskCompletionSource<ShopAction>? _shopTcs;
     private volatile TaskCompletionSource<AcquisitionDecision>? _acquisitionTcs;
+    private volatile TaskCompletionSource<int>? _leadTcs;
     private volatile bool _cancelled;
 
     // The raw request the hub completes the turn handshake with, mapped to a TurnChoice below.
@@ -275,6 +276,31 @@ public sealed class SignalRInput : IBattleInput
     }
 
     /// <summary>
+    /// Awaits the player's between-biome lead pick: the party-member index to lead into the next biome. Same TCS
+    /// handshake as the other prompts (the hub's <c>ChooseLead</c> completes it via <see cref="SetLeadChoice"/>);
+    /// the <see cref="_cancelled"/> guard makes a disconnect throw rather than hang the run on the prompt. An
+    /// out-of-range / unchanged index is tolerated downstream — the run loop's <c>LeadChoiceEvent</c> treats it
+    /// as keeping the current lead (a no-op).
+    /// </summary>
+    public async Task<int> ChooseLeadAsync(LeadChoiceContext context)
+    {
+        if (_cancelled)
+            throw new OperationCanceledException("Battle input cancelled (client disconnected).");
+
+        var tcs = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _leadTcs = tcs;
+        var index = await tcs.Task; // throws OperationCanceledException if Cancel() ran
+        _leadTcs = null;
+        return index;
+    }
+
+    public void SetLeadChoice(int index)
+    {
+        var tcs = _leadTcs;
+        tcs?.TrySetResult(index);
+    }
+
+    /// <summary>
     /// Unblocks a battle loop waiting on player input when the client disconnects,
     /// so the fire-and-forget battle task can complete and be collected.
     /// </summary>
@@ -289,5 +315,6 @@ public sealed class SignalRInput : IBattleInput
         _rewardChoiceTcs?.TrySetCanceled();
         _shopTcs?.TrySetCanceled();
         _acquisitionTcs?.TrySetCanceled();
+        _leadTcs?.TrySetCanceled();
     }
 }

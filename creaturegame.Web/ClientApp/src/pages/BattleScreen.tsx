@@ -36,7 +36,7 @@ export function BattleScreen() {
   const gameId: string | null = location.state?.gameId ?? null;
   const startLevel: number = location.state?.level ?? 50;
 
-  const { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, buyShopItem, leaveShop, respondAcquisition, dismissDrop } = useBattleHub(gameId, startLevel);
+  const { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, buyShopItem, leaveShop, respondAcquisition, chooseLead, dismissDrop } = useBattleHub(gameId, startLevel);
   const [controlView, setControlView] = useState<ControlView>('menu');
   // Encounter-map overlay: pinned open by the MAP button, and briefly auto-peeked at each ladder change.
   const [mapPinned, setMapPinned] = useState(false);
@@ -234,6 +234,10 @@ export function BattleScreen() {
 
       {state.acquisition && (
         <AcquisitionModal prompt={state.acquisition} onRespond={respondAcquisition} />
+      )}
+
+      {state.leadChoice && (
+        <LeadChoiceModal party={state.leadChoice} onChoose={chooseLead} />
       )}
 
       {state.phase === 'ended' && (
@@ -840,6 +844,50 @@ function AcquisitionModal({ prompt, onRespond }: {
             {prompt.partyFull ? 'ADD (SWAP)' : 'ADD'}
           </button>
           <button className="action-btn" onClick={() => onRespond(false, null)}>DECLINE</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Between-biome lead choice (Stage 1d): a blocking pick of which party member leads into the next biome. Shown
+// at the biome boundary (after the Poké Center) when the party has more than one creature. Clicking a member
+// makes it the lead (clicking the current lead keeps it — a no-op); the run is blocked server-side awaiting this.
+// This is NOT in-battle switching — it only sets the lead for the next biome.
+function LeadChoiceModal({ party, onChoose }: {
+  party: PartyMember[];
+  onChoose: (index: number) => void;
+}) {
+  return (
+    <div className="modal-overlay">
+      <div className="lead-modal" role="alertdialog" aria-modal="true" aria-label="Choose your lead">
+        <p className="lead-title">Choose your lead</p>
+        <p className="lead-sub">Who leads into the next biome?</p>
+        <div className="lead-grid">
+          {party.map((m, i) => (
+            <button
+              key={i}
+              className={`lead-card${m.isLead ? ' lead-card--current' : ''}`}
+              onClick={() => onChoose(i)}
+              aria-current={m.isLead ? 'true' : undefined}
+            >
+              <img
+                className="lead-card-sprite"
+                src={`/sprites/front/${m.speciesId}.png`}
+                alt={m.name}
+                draggable={false}
+                onError={e => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }}
+              />
+              <span className="lead-card-name">{m.name}</span>
+              <span className="lead-card-lvl">Lv{m.level}{m.isLead ? ' · current' : ''}</span>
+              <div className="lead-card-hp">
+                <div
+                  className={`lead-card-hp-fill party-chip-hp-fill--${hpState(m.hp, m.maxHp)}`}
+                  style={{ width: `${m.maxHp > 0 ? Math.max(0, Math.min(100, (m.hp / m.maxHp) * 100)) : 0}%` }}
+                />
+              </div>
+            </button>
+          ))}
         </div>
       </div>
     </div>

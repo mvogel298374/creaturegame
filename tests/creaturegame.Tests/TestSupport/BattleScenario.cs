@@ -130,6 +130,26 @@ public sealed class ScriptedInput(params string[] moveNames) : IBattleInput
         AcquisitionsOffered.Add(context);
         return Task.FromResult(_acquisitionDecision);
     }
+
+    private int? _leadPick;
+
+    /// <summary>Makes this input pick the party member at <paramref name="index"/> as the next biome's lead (the
+    /// default keeps the current lead, same as the interface default). Returned by <see cref="ChooseLeadAsync"/>.</summary>
+    public ScriptedInput PicksLead(int index)
+    {
+        _leadPick = index;
+        return this;
+    }
+
+    /// <summary>Lead-choice offers this input has received, in order — lets a test prove the between-biome lead
+    /// choice fired (and inspect the roster presented).</summary>
+    public List<LeadChoiceContext> LeadChoicesOffered { get; } = [];
+
+    public Task<int> ChooseLeadAsync(LeadChoiceContext context)
+    {
+        LeadChoicesOffered.Add(context);
+        return Task.FromResult(_leadPick ?? context.Party.LeadIndex);
+    }
 }
 
 /// <summary>

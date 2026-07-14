@@ -87,6 +87,9 @@ export interface BattleState {
   rewardChoice: RewardChoicePrompt | null;
   shop: ShopPrompt | null;
   acquisition: AcquisitionPrompt | null;
+  // Between-biome lead choice (Stage 1d): the roster to pick the next biome's lead from (the active one flagged),
+  // or null when no choice is open. A blocking modal — the run waits server-side until the player picks.
+  leadChoice: PartyMember[] | null;
   party: PartyMember[];
   dropToast: DropToast | null;
   gold: number;
@@ -133,6 +136,7 @@ export const initialState: BattleState = {
   rewardChoice: null,
   shop: null,
   acquisition: null,
+  leadChoice: null,
   party: [],
   dropToast: null,
   gold: 0,
@@ -261,6 +265,10 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
       return { ...state, acquisition: null };
     case 'PARTY_SET':
       return { ...state, party: action.members };
+    case 'SHOW_LEAD_CHOICE':
+      return { ...state, leadChoice: action.party };
+    case 'HIDE_LEAD_CHOICE':
+      return { ...state, leadChoice: null };
     case 'SET_GOLD':
       return { ...state, gold: action.gold };
     case 'SHOW_DROP':

@@ -267,3 +267,16 @@ describe('battleReducer — party & acquisition (Phase 4 Stage 1c)', () => {
     expect(battleReducer(shown, { type: 'HIDE_ACQUISITION' }).acquisition).toBeNull();
   });
 });
+
+describe('battleReducer — between-biome lead choice (Stage 1d)', () => {
+  const member = (over: Partial<import('../battle/timeline').PartyMember> = {}) => ({
+    speciesId: 6, name: 'CHARIZARD', level: 36, hp: 100, maxHp: 120, status: 'None', isLead: true, ...over,
+  });
+
+  it('SHOW_LEAD_CHOICE opens the picker with the roster; HIDE_LEAD_CHOICE clears it', () => {
+    const party = [member(), member({ speciesId: 9, name: 'BLASTOISE', isLead: false })];
+    const shown = battleReducer(ready(), { type: 'SHOW_LEAD_CHOICE', party });
+    expect(shown.leadChoice).toEqual(party);
+    expect(battleReducer(shown, { type: 'HIDE_LEAD_CHOICE' }).leadChoice).toBeNull();
+  });
+});

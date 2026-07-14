@@ -1,4 +1,5 @@
 ﻿using creaturegame.Attacks;
+using creaturegame.Combat;
 
 namespace creaturegame.Creatures;
 
@@ -293,6 +294,17 @@ public class Creature
     }
 
     /// <summary>
+    /// This creature's major status <em>out of battle</em> — the multi-creature carry model (<c>STATE_MODEL.md
+    /// §2</c>). Permanent half: unlike the transient <see cref="Battle"/> status (wiped by
+    /// <see cref="ResetBattleState"/> every fight), this persists with the creature across encounters and while
+    /// benched, so each party member keeps its own ailment until cured. The run loop captures it after a battle
+    /// (via <see cref="IBattleRules.CarryStatusOutOfBattle"/> — Gen 1 reverts Toxic → Poison out of battle) and
+    /// re-applies it as the next fight's entry status; <see cref="FullHeal"/> (the Poké Center) clears it. Null =
+    /// no carried status. Belongs on the persistent side of the eventual <c>save.db</c> boundary.
+    /// </summary>
+    public CarriedStatus? CarriedStatus { get; set; }
+
+    /// <summary>
     /// Restores the creature to full fighting condition — HP to max, every move's PP to its maximum, and
     /// any major status cleared. This is the Gen 1 Poké Center heal (HP + PP + status, unconditional and
     /// free), and it is generation-invariant: every generation's Center does exactly this, so it is ordinary
@@ -308,6 +320,9 @@ public class Creature
         Battle.Status = StatusCondition.None;
         Battle.SleepTurns = 0;
         Battle.ToxicCounter = 1;
+        // Clear the persisted out-of-battle status too — a Poké Center heals the ailment a benched member was
+        // carrying (multi-creature carry model), not just the in-battle state.
+        CarriedStatus = null;
     }
 
     public IStatCalculator StatCalculator { get; set; } = Gen1StatCalculator.Instance;

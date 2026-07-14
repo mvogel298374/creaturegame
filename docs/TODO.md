@@ -88,12 +88,23 @@ below (session plan mirrored here for durability; the ephemeral copy was `kind-c
   panel. Covered by `RunDirectorAcquisitionTests` (accept/decline-no-op/full-swap/lead-guard), `DraftCalculatorTests`
   (cadence/empty-pool/roll boundary), `EncounterFactoryDraftTests` (fought-only build over the live DB),
   `WebEventContractTests` field guards, and Vitest (reducer + timeline).
-- [ ] **Stage 1d — lead-swap between biomes** *(between-biome only — NOT in-combat)*: a `ChooseLeadAsync` prompt
-  at the biome boundary (after the Poké Center, before the next `BiomeChoiceEvent`) when `Party.Count > 1` —
-  reassigns `Party.Lead` (⇒ `RunState.Player`) for the next biome. Same offer-wire pattern + a lead-select modal;
-  touches **nothing** in the battle engine (`Battle` still sees one creature per side). *(Interim faint handling
-  through Stages 1–2: the lead fainting still ends the run — the party matters via between-biome lead choice;
-  upgraded in Stage 3.)* Switching mid-fight is a **separate, larger** feature — see
+- [x] **Stage 1d — lead-swap between biomes** ✅ DONE (2026-07-13) *(between-biome only — NOT in-combat)*: a
+  `ChooseLeadAsync` prompt at the biome boundary (after the Poké Center, before the next `BiomeChoiceEvent`), gated
+  on `Party.Count > 1` via a one-shot `RunState.LeadChoicePending` flag (set on the Poké Center outcome, cleared by
+  the `LeadChoiceEvent`) — reassigns `Party.Lead` (⇒ `RunState.Player`) for the next biome. Lead swaps need no
+  status reconciliation because this same stage **implemented the multi-creature carry model**: major out-of-battle
+  status now lives per-creature on `Creature.CarriedStatus` (replacing the old single-slot `RunState.CarriedStatus`),
+  so each benched member keeps its own ailment and the previous lead's status can never leak onto the switch-in
+  (`STATE_MODEL.md §2`; captured by `RunDirector`, cleared by `Creature.FullHeal` = the Poké Center). New `LeadChoiceOffered`/`LeadChanged` events + the full
+  wire (`IBattleInput.ChooseLeadAsync` + `SignalRInput` TCS + `GameSessionManager.SetLeadChoice` +
+  `BattleHub.ChooseLead` + emitter projections & field guards + `timeline`/`battleReducer`/`useBattleHub` +
+  `BattleScreen` `LeadChoiceModal`). Touches **nothing** in the battle engine (`Battle` still sees one creature per
+  side). Covered by `RunDirectorLeadChoiceTests` (reassigns-active-creature / boundary order / keep-current no-op /
+  out-of-range no-op / status-no-leak both surgically and end-to-end through a declined Poké Center / lone-starter
+  never-fires), `PartyTests` (`FullHeal` clears the carried ailment), `WebEventContractTests` field guards, and
+  Vitest (reducer + timeline). *(Interim faint
+  handling through Stages 1–2 stands: the lead fainting still ends the run.)* Switching mid-fight is a **separate,
+  larger** feature — see
   [**In-Combat Switching**](#in-combat-switching--voluntary-in-battle-party-switching-planned-core-feature) below.
 - [ ] **Stage 2 — boss catch (post-win chance)**: after a boss win, a small *n%* roll → the **same**
   `AcquisitionOffered` with `source: "BossCatch"` and a single option = the defeated boss's species → into the

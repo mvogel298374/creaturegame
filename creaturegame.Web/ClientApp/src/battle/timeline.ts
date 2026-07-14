@@ -154,6 +154,10 @@ export type Action =
   // Party roster snapshot — set from a PartyUpdated event (deposit / whole-party heal) or the /party hydrate
   // endpoint on load / reconnect. Drives the roster panel.
   | { type: 'PARTY_SET'; members: PartyMember[] }
+  // Between-biome lead choice (Stage 1d): a blocking pick of which party member leads the next biome — shown,
+  // then hidden by the player's pick. The run waits server-side until ChooseLead answers.
+  | { type: 'SHOW_LEAD_CHOICE'; party: PartyMember[] }
+  | { type: 'HIDE_LEAD_CHOICE' }
   // Run economy: set the gold total (RewardGranted carries the post-credit total) shown in the BAG money box.
   | { type: 'SET_GOLD'; gold: number }
   // Loot drop hover: a transient floating "you found …" toast (gold + items) shown over the field for a
@@ -254,6 +258,20 @@ function rewardGrantedMsg(source: string, gold: number, itemNames: string[]): st
   const parts = [gold > 0 ? `${gold}G` : null, ...itemNames].filter((p): p is string => p !== null);
   const reward = parts.length > 0 ? parts.join(', ') : 'nothing this time';
   return source === 'Battle' ? `Found ${reward}!` : `The ${source.toLowerCase()} held ${reward}!`;
+}
+
+// Parse a wire party/roster array (AcquisitionOffered.party, PartyUpdated.members, LeadChoiceOffered.party) into
+// PartyMember[] — one shape, one parser (mirrors SignalRBattleEventEmitter.ProjectPartyMember on the server).
+function parsePartyMembers(raw: unknown): PartyMember[] {
+  return ((raw as Array<Record<string, unknown>>) ?? []).map(m => ({
+    speciesId: m.speciesId as number,
+    name: m.name as string,
+    level: m.level as number,
+    hp: m.hp as number,
+    maxHp: m.maxHp as number,
+    status: (m.status as string) ?? 'None',
+    isLead: (m.isLead as boolean) ?? false,
+  }));
 }
 
 function actionBlockedMsg(name: string, reason: string): string {
@@ -525,15 +543,7 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       // A themed draft (or boss catch) offers a creature to add to the party. Parse it off the wire and raise the
       // blocking offer modal; the run waits server-side until RespondAcquisition answers (same blocking-modal
       // shape as the reward/biome choice). Queued (not immediate) so it follows any in-flight win animation.
-      const party: PartyMember[] = ((payload.party as Array<Record<string, unknown>>) ?? []).map(m => ({
-        speciesId: m.speciesId as number,
-        name: m.name as string,
-        level: m.level as number,
-        hp: m.hp as number,
-        maxHp: m.maxHp as number,
-        status: (m.status as string) ?? 'None',
-        isLead: (m.isLead as boolean) ?? false,
-      }));
+      const party = parsePartyMembers(payload.party);
       const offer: AcquisitionOffer = {
         source: payload.source as string,
         speciesId: payload.speciesId as number,
@@ -566,17 +576,21 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
     }
 
     case 'PartyUpdated':
-      // The roster changed (a deposit) or was re-snapshotted (whole-party heal) — refresh the party panel. No
-      // battle-log line (the CreatureAcquired / heal lines carry the narration).
-      return { steps: [d({ type: 'PARTY_SET', members: ((payload.members as Array<Record<string, unknown>>) ?? []).map(m => ({
-        speciesId: m.speciesId as number,
-        name: m.name as string,
-        level: m.level as number,
-        hp: m.hp as number,
-        maxHp: m.maxHp as number,
-        status: (m.status as string) ?? 'None',
-        isLead: (m.isLead as boolean) ?? false,
-      })) })] };
+      // The roster changed (a deposit / lead swap) or was re-snapshotted (whole-party heal) — refresh the party
+      // panel. No battle-log line (the CreatureAcquired / LeadChanged / heal lines carry the narration).
+      return { steps: [d({ type: 'PARTY_SET', members: parsePartyMembers(payload.members) })] };
+
+    case 'LeadChoiceOffered':
+      // A between-biome lead choice (Stage 1d): raise the blocking lead-select modal over the current roster. The
+      // run waits server-side until ChooseLead answers (same blocking-modal shape as the reward/biome/acquire).
+      return { steps: [w(200), d({ type: 'SHOW_LEAD_CHOICE', party: parsePartyMembers(payload.party) })] };
+
+    case 'LeadChanged': {
+      // The lead was reassigned (the modal already closed on the player's press; a PartyUpdated snapshot follows
+      // to re-flag the lead). Narrate the swap.
+      const name = payload.name as string;
+      return { steps: [w(150), d(log(`${name} is now your lead!`, 'event')), w(400)] };
+    }
 
     case 'RunNodeEntered': {
       // Every node advances the encounter-map pin one step (incl. WildBattle, which drives the pin but shows no

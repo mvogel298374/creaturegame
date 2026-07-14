@@ -88,12 +88,6 @@ public sealed class RunState
     /// </summary>
     public int RecoveriesDone { get; set; }
 
-    /// <summary>
-    /// The player's major status to re-apply when the next encounter is built (Gen 1 keeps major status out of
-    /// battle). Null means nothing carries. Captured after a win and cleared by a Poké Center heal.
-    /// </summary>
-    public CarriedStatus? CarriedStatus { get; set; }
-
     // --- Biome traversal (only meaningful when the director runs in biome mode; ignored by the legacy chain) ---
 
     /// <summary>
@@ -123,6 +117,14 @@ public sealed class RunState
     /// director in biome mode; the legacy chain never reads it.
     /// </summary>
     public bool NeedsBiomeChoice { get; set; } = true;
+
+    /// <summary>
+    /// True when a between-biome lead choice is owed before the next route choice (Phase 4 Stage 1d) — set at a
+    /// biome boundary (after the Poké Center) when the party holds more than one creature, and cleared once the
+    /// lead choice resolves. Gates the one-shot <c>ChooseLeadAsync</c> prompt so it fires exactly once per
+    /// boundary, ahead of the <c>BiomeChoiceEvent</c>. Never set at run start (the party is the lone starter).
+    /// </summary>
+    public bool LeadChoicePending { get; set; }
 }
 
 /// <summary>
@@ -307,6 +309,11 @@ public sealed record RecoveryOutcome(bool Healed) : Outcome;
 
 /// <summary>Outcome of a route-choice event: the biome the player elected to enter next.</summary>
 public sealed record BiomeChoiceOutcome(BiomeDefinition Chosen) : Outcome;
+
+/// <summary>Outcome of a between-biome lead choice: the lead reassignment (if any) was already applied inside the
+/// event; this only carries the sequencing fact that the choice resolved, so the director clears the
+/// <see cref="RunState.LeadChoicePending"/> gate and proceeds to the route choice.</summary>
+public sealed record LeadChoiceOutcome : Outcome;
 
 /// <summary>
 /// Outcome of an interaction node (Shop / Treasure / Mystery): records which kind was visited so the director

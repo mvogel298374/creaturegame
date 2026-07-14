@@ -57,16 +57,30 @@ In **canonical Gen 1**, the major status conditions (`Sleep`/`Freeze`/`Paralysis
 (confusion, Leech Seed, stat stages, binding, flinch, recharge, two-turn) clear when
 the Pokémon switches out or the battle ends.
 
-**This codebase currently treats *all* of them as transient** — `ResetBattleState()`
-clears `Status` too, so every battle begins with a clean major status. That's a
-deliberate simplification for today's "each encounter is independent" model. Note one
-asymmetry that follows from it: **current HP is *not* in `BattleState`**, so damage
-*does* carry across battles, but a burn does not.
+`BattleState.Status` itself is still **transient** — `ResetBattleState()` clears it, so every *battle* begins
+from a clean slate. Cross-encounter persistence is layered *on top* by the run loop, not by `BattleState`:
 
-When the **Game Loop / save system** lands (see `TODO.md`), expect the permanent/
-transient boundary to move: major `Status` (and possibly more) will likely be promoted
-to the persistent half so a poisoned creature stays poisoned between encounters. The
-model is structured to make that an easy change — see section 7.
+**The multi-creature carry model (`Creature.CarriedStatus`).** Each creature carries its **own** out-of-battle
+major status on a permanent-half `Creature.CarriedStatus` field. After a win the `RunDirector` captures the lead's
+status via `IBattleRules.CarryStatusOutOfBattle` (Gen 1 reverts Toxic → regular Poison out of battle) onto that
+lead creature, and the next `Battle` sources its `playerEntryStatus` from the incoming lead's own field. So a
+poisoned creature **does** stay poisoned between encounters — *and* a benched party member keeps its ailment while
+it sits out (each member has its own slot). A Poké Center heal (`Creature.FullHeal`) clears it per member.
+Volatiles (confusion, Leech Seed, stat stages, binding, flinch, recharge, two-turn) are never captured — they die
+with the per-battle reset, exactly as Gen 1 requires.
+
+Because status lives per-creature, a **between-biome lead swap** (Encounter Logic Phase 4 Stage 1d) needs no
+status reconciliation: the outgoing lead keeps its own status on the bench, the switch-in enters on its own, and
+the previous lead's status can never leak onto the switch-in. (This replaced an earlier single-slot
+`RunState.CarriedStatus` that only tracked the active lead and would have dropped a benched creature's status on a
+swap.) When the **save system** lands (§7), `CarriedStatus` serialises with the rest of `Creature`'s permanent
+half, so a run's whole party persists its ailments.
+
+Both **current HP and carried status now live directly on `Creature`** (its permanent half) — neither is in the
+transient `BattleState`. The difference is only in *who touches them*: HP is never captured or re-applied by the
+run loop — it's simply always current on the object across battles — whereas major status **is** explicitly
+captured after each win and re-applied as the next fight's entry status by the `RunDirector` (so the generation
+can transform it out of battle, e.g. Gen 1 Toxic → Poison).
 
 ---
 
@@ -224,8 +238,10 @@ on `Creature` (or the relevant DB model), *not* in `BattleState`.
 
 **Deciding which half a field belongs in** — ask: *"If the creature walked into the
 next battle, should this value still be there?"* Yes → permanent (`Creature`). No →
-transient (`BattleState`). (Remember the section-2 nuance: canonical Gen 1 would put
-major `Status` on the "yes" side; today we don't, but that's the known seam to revisit.)
+transient (`BattleState`). (Remember the section-2 nuance: canonical Gen 1 keeps major
+`Status` on the "yes" side — the *transient* `Battle.Status` is wiped every fight, but
+the persistent `Creature.CarriedStatus` carries the ailment across encounters and is
+re-applied as the next battle's entry status.)
 
 ---
 
@@ -251,9 +267,9 @@ Player's creature uses **Body Slam** (10% chance to paralyze) into an enemy alre
 
 ## 7. Future direction
 
-- **Save system / Game Loop:** persist `Creature` minus `Battle`. Expect major
-  `Status` (and the HP/transient asymmetry noted in section 2) to be revisited — likely
-  by moving `Status` to the persistent half or introducing a finer-grained split.
+- **Save system / Game Loop:** persist `Creature` minus `Battle`. Major out-of-battle
+  `Status` already lives on the persistent half (`Creature.CarriedStatus`, §2), so it
+  serialises with the creature; the transient `Battle` is the part skipped.
 - **Player inventory (`Bag`):** the item-use battle layer adds a `Bag` (item-id → qty,
   `creaturegame/Items/Bag.cs`) — this is **run/player-level state, not creature state**, so it lives
   *outside* this model (it's passed into `Battle` for the player side, not held on `Creature`). It is

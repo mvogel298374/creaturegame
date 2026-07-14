@@ -1899,3 +1899,72 @@
 @media (prefers-reduced-motion: reduce) {
   .acquire-glow, .acquire-sprite { animation: none; }
 }
+
+/* ── Between-biome lead choice modal (Stage 1d) ──────────────
+   A roster picker at the biome boundary — sky-accented (a route/planning beat, like the map), distinct from the
+   violet acquisition offer and the green heal. */
+.lead-modal {
+  min-width: 300px;
+  max-width: 92%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--clr-bg-deep);
+  border: 2px solid var(--clr-sky);
+  border-radius: 4px;
+  padding: var(--sp-md) var(--sp-lg);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6), 0 0 24px rgba(120, 190, 255, 0.22);
+}
+
+.lead-title {
+  font-size: var(--fs-base);
+  font-weight: 700;
+  letter-spacing: var(--ls-normal);
+  color: var(--clr-sky);
+  text-align: center;
+}
+
+.lead-sub {
+  font-size: var(--fs-sm);
+  color: var(--clr-text);
+  text-align: center;
+  margin-bottom: var(--sp-md);
+}
+
+.lead-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-sm);
+  width: 100%;
+}
+
+.lead-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--sp-sm) var(--sp-xs);
+  background: var(--clr-bg);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  color: var(--clr-text);
+  cursor: pointer;
+}
+
+.lead-card:hover { border-color: var(--clr-sky); }
+.lead-card--current { border-color: var(--clr-sky); box-shadow: 0 0 8px rgba(120, 190, 255, 0.35); }
+
+.lead-card-sprite { width: 48px; height: 48px; image-rendering: pixelated; }
+.lead-card-name { font-size: var(--fs-sm); }
+.lead-card-lvl { font-size: 9px; color: var(--clr-text-dim, #b9c0d0); letter-spacing: var(--ls-normal); }
+
+.lead-card-hp {
+  width: 100%;
+  height: 4px;
+  margin-top: 3px;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.lead-card-hp-fill { height: 100%; border-radius: 2px; }

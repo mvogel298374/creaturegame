@@ -98,6 +98,17 @@ public interface IBattleInput
         Task.FromResult(AcquisitionDecision.Decline);
 
     /// <summary>
+    /// Asked at a biome boundary (after the Poké Center, before the route choice) when the party holds more than
+    /// one creature: return the <see cref="Creatures.Party.Members"/> index of the creature to lead into the next
+    /// biome. Blocks the run until the player picks. Only the interactive player input is ever consulted; the
+    /// default keeps the <em>current</em> lead (<see cref="AcquisitionContext"/>-style no-op), so automated / AI
+    /// inputs never stall on the prompt and a headless run keeps its lead. An out-of-range / unchanged pick is a
+    /// no-op downstream. This is a between-biome choice only — not in-battle switching.
+    /// </summary>
+    Task<int> ChooseLeadAsync(LeadChoiceContext context) =>
+        Task.FromResult(context.Party.LeadIndex);
+
+    /// <summary>
     /// Asked repeatedly while the player is in a Shop node: return a <see cref="BuyShopItem"/> to purchase a
     /// stock item, or <see cref="LeaveShop"/> to end the visit — the shop event loops on this until the player
     /// leaves. Only the interactive player input is ever consulted; the default leaves immediately, so AI /
@@ -137,6 +148,11 @@ public sealed record ShopContext(IReadOnlyList<ShopOfferItem> Items, int Balance
 /// <see cref="Party"/> (so an interactive input can present the swap-out choice when the roster is full). The
 /// <see cref="Source"/> is the channel label (<c>"ThemedDraft"</c> / <c>"BossCatch"</c>).</summary>
 public sealed record AcquisitionContext(Creature Offered, Party Party, string Source);
+
+/// <summary>Context for a between-biome lead choice: the current <see cref="Party"/> (the members to pick from,
+/// the active one at <see cref="Creatures.Party.LeadIndex"/>). An input returns the chosen member index; the
+/// default keeps the current lead.</summary>
+public sealed record LeadChoiceContext(Party Party);
 
 /// <summary>The player's answer to an acquisition offer: <see cref="Accept"/> false = decline (roster
 /// unchanged); accept with a null <see cref="ReplaceSlot"/> = add to a party with room; accept with a

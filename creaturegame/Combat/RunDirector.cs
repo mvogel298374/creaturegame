@@ -41,6 +41,7 @@ public sealed class RunDirector
     private readonly IRunEvent _bossEvent;
     private readonly IRunEvent _recoveryEvent;
     private readonly IRunEvent _biomeChoiceEvent;
+    private readonly IRunEvent _leadChoiceEvent;
     private readonly IRunEvent _shopEvent;
     private readonly IRunEvent _treasureEvent;
     private readonly IRunEvent _mysteryEvent;
@@ -139,6 +140,7 @@ public sealed class RunDirector
 
         _recoveryEvent = new RecoveryRunEvent();
         _biomeChoiceEvent = new BiomeChoiceEvent(playableBiomes ?? [], biomeOptionCount, typeChart);
+        _leadChoiceEvent = new LeadChoiceEvent();
 
         // Interaction nodes (ENCOUNTER_DESIGN.md §5): Shop rolls run-scaled stock and runs a spend-gold buy
         // loop against the wallet/bag; Treasure/Mystery roll and apply a reward. All three block on the player's
@@ -189,7 +191,14 @@ public sealed class RunDirector
         if (_biomeModeActive)
         {
             if (s.NeedsBiomeChoice)
+            {
+                // Between-biome lead choice (Stage 1d): a one-shot prompt owed at this boundary, ahead of the
+                // route choice, when the party has more than one creature. Gated so it fires exactly once (the
+                // event clears LeadChoicePending via its outcome). A lone-starter party never sees it.
+                if (s.LeadChoicePending && s.Party.Count > 1)
+                    return _leadChoiceEvent;
                 return _biomeChoiceEvent; // run start / post-Center: pick the next biome
+            }
             if (s.EventsInCurrentBiome >= s.BiomeNodePlan.Count)
                 return _recoveryEvent; // biome's nodes cleared → its Poké Center cap
             return EventForNode(s.BiomeNodePlan[s.EventsInCurrentBiome]); // the planned node
@@ -265,8 +274,19 @@ public sealed class RunDirector
             case RecoveryOutcome:
                 s.RecoveriesDone++; // legacy milestone bookkeeping
                 if (_biomeModeActive)
+                {
                     // Biome done; keep CurrentBiome so its neighbours are the next options, then re-choose.
                     s.NeedsBiomeChoice = true;
+                    // Owe a between-biome lead choice before that route choice iff the party has grown past the
+                    // lone starter (Stage 1d). Decided here (the boundary) — the party can't change between the
+                    // Poké Center and the route choice, so this reads the final roster for the boundary.
+                    s.LeadChoicePending = s.Party.Count > 1;
+                }
+                break;
+            case LeadChoiceOutcome:
+                // The lead reassignment (if any) was applied inside the event; just clear the gate so the next
+                // event is the route choice.
+                s.LeadChoicePending = false;
                 break;
         }
     }
@@ -399,7 +419,7 @@ internal sealed class BattleRunEvent(
             rules: rules,
             emitter: ctx.Emitter,
             rng: ctx.Rng,
-            playerEntryStatus: s.CarriedStatus,
+            playerEntryStatus: player.CarriedStatus,
             playerBag: playerBag,
             // Roar/Whirlwind escape a plain wild battle but fail vs the trainer-analog tiers (Elite/Boss).
             escapable: tier == EncounterTier.Normal,
@@ -414,7 +434,7 @@ internal sealed class BattleRunEvent(
         // carry its status into the next event and advance the run; no XP/evolution (nothing fainted).
         if (battle.EndedInFlee)
         {
-            s.CarriedStatus = CaptureCarriedStatus(player);
+            player.CarriedStatus = CaptureCarriedStatus(player);
             return new FledOutcome(PlayerFled: player.Battle.HasFled);
         }
 
@@ -431,9 +451,10 @@ internal sealed class BattleRunEvent(
         if (player.Level > levelBefore)
             await TryEvolveAsync(player, ctx);
 
-        // Default: the player's major status carries into the next encounter (a Poké Center heal clears it on
-        // the next event); the generation decides the out-of-battle form (Gen 1 reverts Toxic to Poison).
-        s.CarriedStatus = CaptureCarriedStatus(player);
+        // Default: the lead's major status carries into its next encounter, stored ON the creature (the
+        // multi-creature carry model — each party member keeps its own ailment while benched); a Poké Center heal
+        // clears it. The generation decides the out-of-battle form (Gen 1 reverts Toxic to Poison).
+        player.CarriedStatus = CaptureCarriedStatus(player);
 
         // Themed-draft acquisition (ENCOUNTER_DESIGN.md §4): the last beat of a win. The supplier owns the whole
         // policy — cadence (~every Nth win) × an n% roll × the fought-only pool — and returns a built creature
@@ -570,11 +591,10 @@ internal sealed class RecoveryRunEvent : IRunEvent
         if (accept)
         {
             // A Poké Center restores the WHOLE party, not just the lead — benched members keep permanent HP
-            // across biomes, so this tops every owned creature back up (HP/PP/status). The lead is included
-            // (it's a party member); the carried status the battle captured was the lead's, so clearing it here.
+            // across biomes, so this tops every owned creature back up (HP/PP/status). FullHeal also clears each
+            // member's own persisted CarriedStatus (the multi-creature carry model), so nothing carries onward.
             foreach (var member in s.Party.Members)
                 member.FullHeal();
-            s.CarriedStatus = null;
             ctx.Emitter?.Emit(new PlayerRecovered(player.Name, player.Attributes.HP));
             // The lead-only PlayerRecovered above can't carry the bench's restored HP — so push a fresh party
             // snapshot too (the 1a/1b deferral: whole-party heal is state-correct, this makes the benched
@@ -588,6 +608,45 @@ internal sealed class RecoveryRunEvent : IRunEvent
         }
 
         return new RecoveryOutcome(accept);
+    }
+}
+
+/// <summary>
+/// The between-biome lead choice (interaction-event, Phase 4 Stage 1d): at a biome boundary — after the Poké
+/// Center, before the route choice — offer the party and let the player pick which member leads into the next
+/// biome. Only reached when the party holds more than one creature (the director gates it). Reassigns
+/// <see cref="Creatures.Party.Lead"/> (⇒ <see cref="RunState.Player"/>) when the pick differs from the current
+/// lead; keeping the current lead (or a stale / out-of-range pick) is a no-op. Automated / AI inputs keep the
+/// current lead via the <see cref="IBattleInput.ChooseLeadAsync"/> default, so a headless run never stalls.
+/// <para>Touches nothing in the battle engine — this is a between-biome choice, not in-battle switching. A swap
+/// never touches either creature's <see cref="Creature.CarriedStatus"/>: the outgoing lead keeps whatever it is
+/// carrying while it benches (still ailed if the preceding Poké Center was declined), and the incoming lead
+/// enters on its own carried status. Nothing transfers between them, so the previous lead's status can never leak
+/// onto the switch-in.</para>
+/// </summary>
+internal sealed class LeadChoiceEvent : IRunEvent
+{
+    public async Task<Outcome> RunAsync(RunContext ctx)
+    {
+        var party = ctx.State.Party;
+
+        ctx.Emitter?.Emit(new LeadChoiceOffered(PartyProjection.Snapshot(party)));
+        int index = await ctx.PlayerInput.ChooseLeadAsync(new LeadChoiceContext(party));
+
+        // Apply only a real change: an in-range index that isn't already the lead. Keeping the current lead or a
+        // stale / out-of-range pick leaves the roster untouched and emits nothing (a pure no-op).
+        if (index >= 0 && index < party.Count && index != party.LeadIndex)
+        {
+            party.SetLead(index);
+            // No status reconciliation needed: under the multi-creature carry model each creature carries its own
+            // out-of-battle status (Creature.CarriedStatus), so the incoming lead enters on its own status and the
+            // outgoing lead keeps its ailment while benched. The next battle sources playerEntryStatus from the
+            // new lead directly, so the previous lead's status can never leak onto the switch-in.
+            ctx.Emitter?.Emit(new LeadChanged(party.Lead.Name, party.Lead.SpeciesId));
+            ctx.Emitter?.Emit(new PartyUpdated(PartyProjection.Snapshot(party)));
+        }
+
+        return new LeadChoiceOutcome();
     }
 }
 

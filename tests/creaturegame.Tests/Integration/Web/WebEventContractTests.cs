@@ -535,6 +535,43 @@ public class WebEventContractTests
         Assert.Equal("RATTATA", root.GetProperty("ReplacedName").GetString());
     }
 
+    /// <summary>Field-level guard for the <see cref="LeadChoiceOffered"/> projection: the lead-select modal reads
+    /// the roster snapshot (each member's sprite id / name / level / HP / status / lead flag). The reflection
+    /// contract test instantiates it with an <i>empty</i> party list, so this pins the member sub-fields.</summary>
+    [Fact]
+    public void LeadChoiceOffered_Projection_CarriesPartyMemberSubFields()
+    {
+        var evt = new LeadChoiceOffered([
+            new PartyMemberInfo(6, "CHARIZARD", 36, 100, 120, StatusCondition.None, IsLead: true),
+            new PartyMemberInfo(9, "BLASTOISE", 34, 80, 110, StatusCondition.Poison, IsLead: false),
+        ]);
+
+        var (type, payload) = SignalRBattleEventEmitter.MapEvent(evt);
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+        var party = doc.RootElement.GetProperty("Party");
+
+        Assert.Equal("LeadChoiceOffered", type);
+        Assert.Equal(6, party[0].GetProperty("SpeciesId").GetInt32());
+        Assert.Equal("CHARIZARD", party[0].GetProperty("Name").GetString());
+        Assert.True(party[0].GetProperty("IsLead").GetBoolean());
+        Assert.Equal("Poison", party[1].GetProperty("Status").GetString()); // string-projected status
+        Assert.False(party[1].GetProperty("IsLead").GetBoolean());
+    }
+
+    /// <summary>Field-level guard for the <see cref="LeadChanged"/> projection: the log line needs the new lead's
+    /// name + species id.</summary>
+    [Fact]
+    public void LeadChanged_Projection_CarriesNameAndSpeciesId()
+    {
+        var (type, payload) = SignalRBattleEventEmitter.MapEvent(new LeadChanged("BLASTOISE", 9));
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+        var root = doc.RootElement;
+
+        Assert.Equal("LeadChanged", type);
+        Assert.Equal("BLASTOISE", root.GetProperty("Name").GetString());
+        Assert.Equal(9, root.GetProperty("SpeciesId").GetInt32());
+    }
+
     // Concrete (non-abstract) BattleEvent subtypes — the exact set the engine can emit to the client.
     private static List<Type> ConcreteBattleEventTypes()
     {

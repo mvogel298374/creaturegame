@@ -176,9 +176,18 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
       console.error('[SignalR] RespondAcquisition failed:', err));
   }, []);
 
+  // Answer the between-biome lead choice: the chosen party-member index (the current lead index = keep, a no-op).
+  // Hide the modal at once (the backend is blocked awaiting the pick); the resulting LeadChanged + PartyUpdated
+  // events narrate the swap and re-flag the lead in the roster panel.
+  const chooseLead = useCallback((index: number) => {
+    dispatch({ type: 'HIDE_LEAD_CHOICE' });
+    connRef.current?.invoke('ChooseLead', index).catch(err =>
+      console.error('[SignalR] ChooseLead failed:', err));
+  }, []);
+
   // Clear the transient loot hover. Purely local (nothing server-side blocks on it) — the view runs a timer
   // and calls this to auto-dismiss the toast after its on-screen beat.
   const dismissDrop = useCallback(() => dispatch({ type: 'HIDE_DROP' }), []);
 
-  return { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, buyShopItem, leaveShop, respondAcquisition, dismissDrop };
+  return { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, buyShopItem, leaveShop, respondAcquisition, chooseLead, dismissDrop };
 }

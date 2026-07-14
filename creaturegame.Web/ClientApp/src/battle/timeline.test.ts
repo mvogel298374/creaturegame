@@ -788,3 +788,27 @@ describe('expandEvent — party & acquisition (Phase 4 Stage 1c)', () => {
       .toEqual(['Left PIKACHU in the wild.']);
   });
 });
+
+describe('expandEvent — between-biome lead choice (Stage 1d)', () => {
+  const dispatchedOf = (steps: Step[] = [], type: string): Action[] =>
+    dispatched(steps).filter(a => a.type === type);
+
+  it('LeadChoiceOffered raises the blocking lead picker with the parsed roster', () => {
+    const { steps } = expandEvent('LeadChoiceOffered', {
+      party: [
+        { speciesId: 6, name: 'CHARIZARD', level: 36, hp: 100, maxHp: 120, status: 'None', isLead: true },
+        { speciesId: 9, name: 'BLASTOISE', level: 34, hp: 80, maxHp: 110, status: 'Poison', isLead: false },
+      ],
+    }, CTX);
+    const show = dispatchedOf(steps, 'SHOW_LEAD_CHOICE')[0] as Extract<Action, { type: 'SHOW_LEAD_CHOICE' }>;
+    expect(show.party).toHaveLength(2);
+    expect(show.party[0].isLead).toBe(true);
+    expect(show.party[1].name).toBe('BLASTOISE');
+    expect(show.party[1].status).toBe('Poison');
+  });
+
+  it('LeadChanged logs the "is now your lead" line', () => {
+    expect(logLines(expandEvent('LeadChanged', { name: 'BLASTOISE', speciesId: 9 }, CTX).steps))
+      .toEqual(['BLASTOISE is now your lead!']);
+  });
+});

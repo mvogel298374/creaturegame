@@ -181,6 +181,11 @@ public sealed class SignalRBattleEventEmitter(
                 "PartyUpdated",
                 new { Members = e.Members.Select(ProjectPartyMember) }
             ),
+            LeadChoiceOffered e => (
+                "LeadChoiceOffered",
+                new { Party = e.Party.Select(ProjectPartyMember) }
+            ),
+            LeadChanged e => ("LeadChanged", new { e.Name, e.SpeciesId }),
             ItemUsed e => ("ItemUsed", new { e.ItemName, e.TargetName }),
             PpRestored e => (
                 "PpRestored",

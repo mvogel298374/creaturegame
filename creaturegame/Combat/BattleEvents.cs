@@ -218,6 +218,20 @@ public record AcquisitionDeclined(string Name) : BattleEvent;
 /// members' restored HP) that the lead-only <see cref="PlayerRecovered"/> doesn't carry.</summary>
 public record PartyUpdated(IReadOnlyList<PartyMemberInfo> Members) : BattleEvent;
 
+/// <summary>A between-biome lead choice is offered (Phase 4 Stage 1d): pick which party member leads into the
+/// next biome. Fires at the biome boundary — after the Poké Center, before the route choice — only when the
+/// party holds more than one creature. A blocking event: the run loop awaits the player's pick via
+/// <see cref="IBattleInput.ChooseLeadAsync"/> before continuing, so the client raises the lead-select modal here.
+/// Carries the current roster snapshot (the picked-from members, the active one flagged
+/// <see cref="PartyMemberInfo.IsLead"/>). Purely a between-biome choice — this is <em>not</em> in-battle
+/// switching (that stays a separate, later feature; the battle engine is untouched).</summary>
+public record LeadChoiceOffered(IReadOnlyList<PartyMemberInfo> Party) : BattleEvent;
+
+/// <summary>The party's lead was reassigned (the between-biome lead choice picked a different member). The named
+/// creature is now the active <c>RunState.Player</c> for the next biome. Followed by a <see cref="PartyUpdated"/>
+/// snapshot (with the new lead flagged). Not emitted when the player keeps the current lead (a no-op).</summary>
+public record LeadChanged(string Name, int SpeciesId) : BattleEvent;
+
 // --- Move actions ---
 public record MoveUsed(string AttackerName, string MoveName) : BattleEvent;
 

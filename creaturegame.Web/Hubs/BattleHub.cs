@@ -125,6 +125,17 @@ public class BattleHub(GameSessionManager manager) : Hub<IBattleClient>
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Answers a between-biome lead choice: <paramref name="index"/> is the party-member slot to lead into the
+    /// next biome. Mirrors <see cref="RespondRecovery"/> — fire-and-forget completion of the input TCS the run
+    /// loop is blocked on. An out-of-range / unchanged index keeps the current lead (a no-op in the run loop).
+    /// </summary>
+    public Task ChooseLead(int index)
+    {
+        manager.SetLeadChoice(Context.ConnectionId, index);
+        return Task.CompletedTask;
+    }
+
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         // Start the reconnect grace window; the battle is abandoned only if the client

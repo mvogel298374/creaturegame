@@ -144,6 +144,7 @@ public class PartyTests
                 m => Assert.Equal(m.Base.PowerPointsMax, m.PowerPointsCurrent)
             );
             Assert.Equal(StatusCondition.None, member.Battle.Status); // status cured
+            Assert.Null(member.CarriedStatus); // carried out-of-battle ailment cleared too
         }
     }
 
@@ -167,7 +168,10 @@ public class PartyTests
 
         Assert.Equal(new RecoveryOutcome(false), outcome);
         foreach (var member in party.Members)
+        {
             Assert.Equal(1, member.Attributes.HP); // still at the wounded HP set below
+            Assert.Equal(StatusCondition.Poison, member.CarriedStatus?.Status); // carried ailment untouched
+        }
     }
 
     // A wounded creature: HP dropped to 1, one move drained, and a persisting major status — so a full heal is
@@ -190,6 +194,9 @@ public class PartyTests
         c.Attributes.HP = 1;
         c.MoveSet[0].PowerPointsCurrent = 2;
         c.Battle.Status = StatusCondition.Poison;
+        // A persisted out-of-battle ailment too (the multi-creature carry model): a Poké Center heals this on a
+        // benched member, not just the in-battle status — so a full heal is observable on CarriedStatus as well.
+        c.CarriedStatus = new CarriedStatus(StatusCondition.Poison, 0);
         return c;
     }
 
