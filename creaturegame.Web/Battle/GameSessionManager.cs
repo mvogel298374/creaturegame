@@ -170,7 +170,11 @@ public sealed class GameSessionManager(
             // Themed-draft acquisition (ENCOUNTER_DESIGN.md §4): rolled after every win, gated by cadence × n% ×
             // the fought-only pool (DraftCalculator), building the offered creature from this run's move pool +
             // DB. Deposits accepted creatures into the party above.
-            draftSupplier: encounters.BuildDraftSupplier(session.AllMoves)
+            draftSupplier: encounters.BuildDraftSupplier(session.AllMoves),
+            // Boss-catch acquisition (ENCOUNTER_DESIGN.md §4 Stage 2): rolled after a Boss win only, a small n%
+            // chance (BossCatchCalculator) to add the defeated boss — built as a fresh full-HP copy of its species
+            // at the boss's level. The win reward/XP is already applied, so the catch is pure upside.
+            bossCatchSupplier: encounters.BuildBossCatchSupplier(session.AllMoves)
         );
 
         _ = Task.Run(async () =>

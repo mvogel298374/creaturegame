@@ -13,10 +13,12 @@ randomised map, depth-scaled foes), the **Run Economy** (gold + rewards), the **
 rarity rewards), and the **level-aware XP curve + trainer bonus** are all done and archived (→ `TODO_ARCHIVE.md`).
 
 **Next up, in priority order:**
-1. **Encounter Logic — Phase 4: Acquisition channels** (boss catch + themed draft, fought-only). The last open
-   piece of Encounter Logic and the bridge into the deferred Catch cluster. `/plan` first.
-2. **Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by (1). *(Item acquisition
-   itself is already done via the Run Economy; bag persistence + catch remain.)*
+1. **Encounter Logic — Phase 4: Stage 3 — forced-switch-on-faint** (the last open Phase 4 piece; the acquisition
+   channels — themed draft + boss catch — are both done). This is where `Battle` first learns about the party, and
+   the groundwork the voluntary [In-Combat Switching](#in-combat-switching--voluntary-in-battle-party-switching-planned-core-feature)
+   feature then builds on. `/plan` first.
+2. **Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by the acquisition channels.
+   *(Item acquisition itself is already done via the Run Economy; bag persistence + catch remain.)*
 3. **Game Loop & Progression** — party, switching, save layer (`save.db`).
 
 *(The **Shop node** — the last Run Economy follow-up — is now done: `ShopRunEvent` + `ShopCalculator`, a
@@ -106,9 +108,18 @@ below (session plan mirrored here for durability; the ephemeral copy was `kind-c
   handling through Stages 1–2 stands: the lead fainting still ends the run.)* Switching mid-fight is a **separate,
   larger** feature — see
   [**In-Combat Switching**](#in-combat-switching--voluntary-in-battle-party-switching-planned-core-feature) below.
-- [ ] **Stage 2 — boss catch (post-win chance)**: after a boss win, a small *n%* roll → the **same**
-  `AcquisitionOffered` with `source: "BossCatch"` and a single option = the defeated boss's species → into the
-  `Party`. Reuses all of 1c's offer + roster plumbing; the win reward/XP already applied (catching is pure upside).
+- [x] **Stage 2 — boss catch (post-win chance)** ✅ DONE (2026-07-14): after a **Boss** win, a small *n%* roll
+  (`BossCatchCalculator.ShouldOffer`, 20%) → the **same** `AcquisitionOffered` with `source: "BossCatch"` and a
+  single option = a fresh full-HP copy of the defeated boss's species at the boss's level (built by
+  `EncounterFactory.BuildBossCatchSupplier`, with a learnset so it can level up if it later leads) → into the
+  `Party`. Backend-only — reuses all of 1c's offer + roster wire end-to-end (`AcquisitionResolution.OfferAndDepositAsync`,
+  the `AcquisitionOffered`/`CreatureAcquired`/`AcquisitionDeclined`/`PartyUpdated` events, the SignalR projection +
+  field guards, and the `AcquisitionModal`, which already renders the `BossCatch` source as "Catch!"). Threaded like
+  the draft supplier (`RunDirector` → `BattleRunEvent` → `GameSessionManager`). **One acquisition offer per win,
+  routed by tier:** a Boss win boss-catches, every other win themed-drafts (never both). The win reward/XP is
+  already applied, so the catch is pure upside. Covered by `RunDirectorAcquisitionTests` (accept/decline-no-op/
+  no-supplier/channel-distinctness), `BossCatchCalculatorTests` (roll boundary), and `EncounterFactoryBossCatchTests`
+  (full-HP boss-species copy over the live DB / roll-miss offers nothing).
 - [ ] **Stage 3 — forced-switch-on-faint** (the battle-seam party upgrade, borders the Game Loop milestone):
   when the lead faints and another member is alive, send out the next healthy creature instead of ending the run;
   the run ends only when the **whole party** is down. **This is where `Battle` first learns about the party** (it

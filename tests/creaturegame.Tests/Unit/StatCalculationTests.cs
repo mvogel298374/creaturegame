@@ -179,4 +179,41 @@ public class StatCalculationTests
         }
         Assert.True(sawAboveSeven);
     }
+
+    [Fact]
+    public void Gen1StatCalculator_SuperbDvs_StayInRange_MostlyTopBand_ButNotAlwaysMax()
+    {
+        // Superb is the boss-catch band: every DV in [0,15], but each has a 50% shot at the 12–15 top band, so
+        // across many seeds we must see BOTH a top-band value (≥12) and a below-top value (<12) — proving it's
+        // neither Perfect (fixed 15) nor a plain roll, and that the top band is actually reached.
+        var c = new Creature("A");
+        bool sawTopBand = false;
+        bool sawBelowTopBand = false;
+        for (int seed = 0; seed < 200; seed++)
+        {
+            new Gen1StatCalculator(new SeededRandomSource(seed)).RandomiseDvs(c, DvQuality.Superb);
+            foreach (int dv in new[] { c.DvAttack, c.DvDefense, c.DvSpecial, c.DvSpeed })
+            {
+                Assert.InRange(dv, 0, 15);
+                if (dv >= 12)
+                    sawTopBand = true;
+                else
+                    sawBelowTopBand = true;
+            }
+        }
+        Assert.True(sawTopBand); // the top percentile band (12–15) is reached
+        Assert.True(sawBelowTopBand); // …but not every DV — distinct from Perfect
+
+        // And it's markedly stronger than an ordinary Average roll: over a large sample the mean Superb DV clears
+        // the midpoint (7.5) comfortably, since ~half the draws are pinned to 12–15.
+        double total = 0;
+        int n = 0;
+        for (int seed = 0; seed < 400; seed++)
+        {
+            new Gen1StatCalculator(new SeededRandomSource(seed)).RandomiseDvs(c, DvQuality.Superb);
+            total += c.DvAttack + c.DvDefense + c.DvSpecial + c.DvSpeed;
+            n += 4;
+        }
+        Assert.True(total / n > 9.0, $"mean Superb DV {total / n:0.0} should exceed 9.0");
+    }
 }

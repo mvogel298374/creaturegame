@@ -171,6 +171,161 @@ public class RunDirectorAcquisitionTests
         Assert.Empty(recorder.Of<PartyUpdated>());
     }
 
+    // --- Boss catch (post-Boss-win chance — Phase 4 Stage 2) -----------------------------------------------
+
+    [Fact]
+    public async Task BossCatch_WhenOffered_AndAccepted_AddsBossToParty_AndAnnounces()
+    {
+        var input = new ScriptedInput("tackle").AcceptsAcquisition();
+        var (runner, recorder) = BuildBossRun(input, offersCatch: true);
+
+        await runner.RunAsync();
+
+        // The offer fired once, after the Boss win, tagged as the boss-catch channel with the lone-starter party.
+        var offer = Assert.Single(recorder.Of<AcquisitionOffered>());
+        Assert.Equal("BossCatch", offer.Source);
+        Assert.Equal("Boss", offer.Name);
+        Assert.False(offer.PartyFull);
+        Assert.Single(offer.Party);
+
+        // Accepted → the boss joined (party 1 → 2), announced by CreatureAcquired + a fresh PartyUpdated.
+        var acquired = Assert.Single(recorder.Of<CreatureAcquired>());
+        Assert.False(acquired.Replaced);
+        Assert.Equal("Boss", acquired.Name);
+        Assert.Equal(2, runner.State.Party.Count);
+        Assert.Contains(runner.State.Party.Members, m => m.Name == "Boss");
+    }
+
+    [Fact]
+    public async Task BossCatch_Declined_LeavesRosterUnchanged()
+    {
+        var input = new ScriptedInput("tackle"); // default declines
+        var (runner, recorder) = BuildBossRun(input, offersCatch: true);
+
+        await runner.RunAsync();
+
+        // Exactly one offer per Boss win, and a decline is a pure no-op — no deposit, roster still the lone starter.
+        Assert.Single(recorder.Of<AcquisitionOffered>());
+        Assert.Single(recorder.Of<AcquisitionDeclined>());
+        Assert.Empty(recorder.Of<CreatureAcquired>());
+        Assert.Equal(1, runner.State.Party.Count);
+    }
+
+    [Fact]
+    public async Task BossCatch_NoSupplier_NeverOffers()
+    {
+        // A Boss win with no boss-catch supplier draws no offer — no acquisition events leak onto the wire.
+        var (runner, recorder) = BuildBossRun(new ScriptedInput("tackle"), offersCatch: false);
+
+        await runner.RunAsync();
+
+        Assert.Empty(recorder.Of<AcquisitionOffered>());
+        Assert.Empty(recorder.Of<CreatureAcquired>());
+    }
+
+    [Fact]
+    public async Task BossCatch_ChannelsAreDistinct_BossWinCatches_WildWinDrafts()
+    {
+        // At most one acquisition offer per win, routed by tier: the Boss win raises the boss-catch offer, and the
+        // wild win ahead of it (in the same biome) raises the themed draft — never both channels on one win. Wiring
+        // both suppliers proves the Boss win doesn't also draft and a wild win doesn't boss-catch.
+        var input = new ScriptedInput("tackle"); // declines both — we assert the channels, not the deposits
+        var (runner, recorder) = BuildBossRun(
+            input,
+            offersCatch: true,
+            offersDraft: true,
+            wildThenBoss: true
+        );
+
+        await runner.RunAsync();
+
+        var sources = recorder.Of<AcquisitionOffered>().Select(o => o.Source).ToList();
+        Assert.Equal(new[] { "ThemedDraft", "BossCatch" }, sources); // wild → draft, boss → catch, in node order
+    }
+
+    // Builds a solo-biome run whose route is a single Boss node (or a WildBattle→Boss pair when
+    // <paramref name="wildThenBoss"/> is set): the first biome's boss (and optional wild) are pushovers so the
+    // observed win(s) land, then the second biome's boss is unbeatable and ends the run. When
+    // <paramref name="offersCatch"/> is set the boss-catch supplier always offers a fresh "Boss" copy (no n% gate
+    // here — that policy is BossCatchCalculator's job); the core offer/deposit plumbing is what's under test.
+    private static (RunDirector runner, RecordingEmitter recorder) BuildBossRun(
+        ScriptedInput input,
+        bool offersCatch,
+        bool offersDraft = false,
+        bool wildThenBoss = false
+    )
+    {
+        var solo = new BiomeDefinition("solo", "Solo", Region.Kanto, [DamageType.Normal], []);
+        IReadOnlyList<RunNodeKind> plan = wildThenBoss
+            ? [RunNodeKind.WildBattle, RunNodeKind.BossBattle]
+            : [RunNodeKind.BossBattle];
+        int winnable = wildThenBoss ? 2 : 1;
+
+        var player = Fighter("Player", hp: 300, attack: 999, speed: 100, level: 50);
+        int built = 0;
+        Func<Creature, int, BiomeDefinition?, EncounterTier, Task<Creature>> supplier = (
+            _,
+            _,
+            _,
+            _
+        ) =>
+        {
+            built++;
+            var enemy =
+                built <= winnable
+                    ? Fighter($"Push{built}", hp: 1, attack: 1, speed: 1, level: 5)
+                    : Fighter("Bruiser", hp: 999, attack: 999, speed: 999, level: 50);
+            enemy.SpeciesId = 100 + built;
+            enemy.SpeciesBaseExperience = 50;
+            return Task.FromResult(enemy);
+        };
+
+        Func<BossCatchContext, IRandomSource, Task<Creature?>>? bossCatchSupplier = offersCatch
+            ? (bctx, _) =>
+            {
+                // Echo the defeated boss as the single caught option (the real supplier rebuilds its species).
+                var caught = Fighter(
+                    "Boss",
+                    hp: 120,
+                    attack: 60,
+                    speed: 40,
+                    level: bctx.Boss.Level
+                );
+                caught.SpeciesId = bctx.Boss.SpeciesId;
+                return Task.FromResult<Creature?>(caught);
+            }
+            : null;
+
+        Func<DraftContext, IRandomSource, Task<Creature?>>? draftSupplier = offersDraft
+            ? (_, _) =>
+            {
+                var d = Fighter("Draftee", hp: 100, attack: 50, speed: 50, level: 40);
+                d.SpeciesId = 999;
+                return Task.FromResult<Creature?>(d);
+            }
+            : null;
+
+        var recorder = new RecordingEmitter();
+        var runner = new RunDirector(
+            player,
+            supplier,
+            Gen1TypeChart.Instance,
+            input,
+            input,
+            movePool: Array.Empty<Attack>(),
+            emitter: recorder,
+            rules: new ScriptableRules().Deterministic(),
+            rng: new SeededRandomSource(0),
+            playableBiomes: [solo],
+            minEventsPerBiome: plan.Count,
+            maxEventsPerBiome: plan.Count,
+            nodePlanFactory: (_, _) => plan,
+            draftSupplier: draftSupplier,
+            bossCatchSupplier: bossCatchSupplier
+        );
+        return (runner, recorder);
+    }
+
     // Builds a legacy-chain run that ends after exactly <paramref name="endAfterWins"/> wins (the next foe is
     // unbeatable). When <paramref name="offersDraft"/> is set, the injected draft supplier offers a fresh
     // "Draftee" on every win — no cadence/pool gate here (that policy is the web DraftCalculator's job); the core

@@ -253,15 +253,30 @@ biome — already on-theme, and impossible to roll something far outside the ban
 
 | Channel | Gate | What it offers |
 |:--|:--|:--|
-| **Boss catch** | after a biome **boss** battle | *n%* chance at an in-battle catch of **that boss** — the themed apex; a strong, earned pickup |
+| **Boss catch** | after a biome **boss** battle (post-win) | *n%* chance to add **that boss** to the party — a post-win pick-one offer (the boss you just beat), **not** an in-battle ball throw |
 | **Themed draft** | every **3rd** encounter | *n%* chance to pick a creature themed to the current biome, bounded by its fought pool |
 
 - ***n%* values are tunable placeholders.** Concrete rates are an implementation/tuning concern, not this
-  design pass — they get set against the real curve once the channels exist.
-- Boss catch is the **in-battle catch** channel (Gen 1 catch-rate formula — see `TODO.md` → *Catch / Poké Ball
-  effect*); the themed draft is the **curated post-battle offer** channel. Both feed the eventual party.
+  design pass — they get set against the real curve. (Shipped values: boss catch 20%, themed draft cadence-3 × 55%.)
+- **Both channels are post-battle offers**, not in-battle catches — they reuse the reward-modal wire end-to-end
+  (the `AcquisitionOffered` event with `source` `"BossCatch"` / `"ThemedDraft"`, resolved by
+  `AcquisitionResolution`). Boss catch is the biome-apex pickup; the themed draft is the recurring biome-themed
+  pick. **At most one acquisition offer per win, routed by tier** — a Boss win boss-catches, every other win
+  themed-drafts (never both). The win's XP/reward is already applied first, so the catch is pure upside.
+- **Caught-boss strength** — a caught boss is a fresh party-ready copy of that species at the boss's own level,
+  built at **`DvQuality.Superb`** (each DV a 50% chance at the 80–100% band, else an ordinary roll) with a legal
+  canonical moveset. It's a strong, earned pickup — notably above an ordinary catch — but deliberately **not** the
+  boss's own `Perfect`-DV / all-pool (`Optimal`) build, so the player doesn't get a min-maxed clone of the
+  encounter they beat.
+- The in-battle Poké Ball throw (the Gen 1 catch-rate-vs-HP formula) is deliberately **out of scope** and stays
+  deferred in `TODO.md` → *Catch / Poké Ball effect*. Note authentic Gen 1 forbids catching a **Trainer's**
+  Pokémon at all, and Boss/Elite are modelled as trainer-analog tiers (they carry the trainer XP bonus) — so this
+  post-win boss-catch offer is an **intentional roguelite liberty**, not the Gen 1 catch rule.
 - This is the design that **unblocks** the deferred *Item Acquisition · Bag Persistence · Catch* cluster in
   `TODO.md`, and the dormant **stone evolutions** (a bag-gated acquisition consumer).
+
+> **Status (2026-07-14):** both channels are **shipped** — themed draft (Phase 4 Stage 1c) and boss catch
+> (Phase 4 Stage 2). Full per-stage record in `TODO.md` → *Encounter Logic Phase 4*.
 
 ---
 
@@ -304,7 +319,7 @@ so nodes drop in without the loop body changing. `BattleRunner` has graduated in
 | Event model + `chooseNextEvent` | `BattleRunner.RunAsync` (hardcoded `while`) → `RunDirector` + `RunLoop.cs` | ✅ **done (Phase 3a)** — `IRunEvent`/`Outcome`/`RunContext`, single sequencer; battle + recovery first-class |
 | Biome graph map traversal | `RunDirector` walks a seeded route (`BiomeChoiceEvent` + `ChooseBiomeAsync` seam); threads the biome into `CreateEnemyAsync` | ✅ **done (Phase 3b)** — 3b-1 backend + 3b-2 map screen; biome mode live (`RunSetup.PlayableBiomes` → session → director). The route pick is now the **Encounter Map** overlay — `RouteChoiceMap` on the region graph (replaced the earlier `BiomeChoiceModal` cards) |
 | Node bones | new `IRunEvent` stubs (shop/treasure/mystery/elite/boss) + node-derived tier *selection* | ✅ **done (Phase 3c)** — 3c-1 seeded `BiomeNodePlan` dispatched by `EventForNode`, `EncounterTier` intent (core) → `EnemyArchetypes.For` (web), Boss apex per biome; 3c-2 tuned the interior distribution + biome-position depth (`RunState.RunDepth`) |
-| Acquisition channels | deferred `TODO.md` Catch cluster | gated on §1–§5 |
+| Acquisition channels | `RunDirector` (`OfferDraftAsync` / `OfferBossCatchAsync`) + web `DraftCalculator` / `BossCatchCalculator` policies + `EncounterFactory` suppliers, reusing `AcquisitionResolution` + the `AcquisitionOffered` wire into `Party` | ✅ **done (Phase 4 Stage 1c themed draft / Stage 2 boss catch)** — post-win pick-one offers; the in-battle ball throw stays deferred in the `TODO.md` Catch cluster |
 
 Every touch reuses an existing seam or adds one in the established style; the core engine stays
 generation-agnostic and data-agnostic.

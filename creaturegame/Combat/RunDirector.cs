@@ -83,7 +83,12 @@ public sealed class RunDirector
         // offer a creature (cadence × n% × the fought-only pool) and builds one when it does — the mirror of the
         // reward / shop suppliers on the acquisition side. Null (the default) = no draft, so tests / the legacy
         // chain never offer one and draw no extra RNG.
-        Func<DraftContext, IRandomSource, Task<Creature?>>? draftSupplier = null
+        Func<DraftContext, IRandomSource, Task<Creature?>>? draftSupplier = null,
+        // The boss-catch acquisition supplier (web-layer policy, Phase 4 Stage 2): rolled after a Boss win only —
+        // a small n% chance to add the defeated boss to the party (pure upside; the win XP/reward already applied).
+        // Builds a party-ready copy of the boss's species when it fires, else null. Null (the default) = no boss
+        // catch, so tests / the legacy chain never offer one and draw no extra RNG.
+        Func<BossCatchContext, IRandomSource, Task<Creature?>>? bossCatchSupplier = null
     )
     {
         _state = party is not null ? new RunState(party) : new RunState(player);
@@ -132,7 +137,8 @@ public sealed class RunDirector
                 wallet,
                 rewardSupplier,
                 runRules,
-                draftSupplier
+                draftSupplier,
+                bossCatchSupplier
             );
         _battleEvent = Battle(EncounterTier.Normal);
         _eliteEvent = Battle(EncounterTier.Elite);
@@ -378,7 +384,8 @@ internal sealed class BattleRunEvent(
     Wallet? wallet,
     Func<RewardContext, IRandomSource, RewardChoice> rewardSupplier,
     RunRules? runRules,
-    Func<DraftContext, IRandomSource, Task<Creature?>>? draftSupplier
+    Func<DraftContext, IRandomSource, Task<Creature?>>? draftSupplier,
+    Func<BossCatchContext, IRandomSource, Task<Creature?>>? bossCatchSupplier
 ) : IRunEvent
 {
     public async Task<Outcome> RunAsync(RunContext ctx)
@@ -456,12 +463,16 @@ internal sealed class BattleRunEvent(
         // clears it. The generation decides the out-of-battle form (Gen 1 reverts Toxic to Poison).
         player.CarriedStatus = CaptureCarriedStatus(player);
 
-        // Themed-draft acquisition (ENCOUNTER_DESIGN.md §4): the last beat of a win. The supplier owns the whole
-        // policy — cadence (~every Nth win) × an n% roll × the fought-only pool — and returns a built creature
-        // only when it fires, else null (the common case, like a no-drop reward roll). When it fires, offer it
-        // as the reusable blocking acquisition offer; a headless / AI input declines by default, so the chain
-        // never stalls and never builds a party.
-        await OfferDraftAsync(s, ctx);
+        // Acquisition (ENCOUNTER_DESIGN.md §4): the last beat of a win, and at most one offer per win. A Boss win
+        // routes to the boss-catch channel — a small chance to add the boss you just beat (Stage 2); every other
+        // win routes to the themed draft — cadence × n% × the fought-only pool (Stage 1c). Both raise the same
+        // reusable blocking AcquisitionOffered (only the source + how the offered creature is chosen differ); each
+        // supplier owns its whole policy and returns a built creature only when it fires, else null (the common
+        // case). A headless / AI input declines by default, so neither channel stalls the chain or builds a party.
+        if (tier == EncounterTier.Boss)
+            await OfferBossCatchAsync(enemy, s, ctx);
+        else
+            await OfferDraftAsync(s, ctx);
 
         return new BattleOutcome(true);
     }
@@ -487,6 +498,24 @@ internal sealed class BattleRunEvent(
         if (offered is null)
             return;
         await AcquisitionResolution.OfferAndDepositAsync(offered, "ThemedDraft", s.Party, ctx);
+    }
+
+    // Rolls the boss catch for this Boss win and, if the supplier offers the defeated boss, raises the acquisition
+    // offer (blocking; the client shows the modal) and deposits it into the party — the same offer + roster
+    // plumbing the draft uses, only the source ("BossCatch") + the single offered option differ. Silent when no
+    // supplier is configured (tests / the legacy chain) or the small catch roll declined (null). Only reached on a
+    // Boss win, so a plain wild/elite win never draws the catch roll and can't perturb the seeded stream.
+    private async Task OfferBossCatchAsync(Creature boss, RunState s, RunContext ctx)
+    {
+        if (bossCatchSupplier is null)
+            return;
+        var offered = await bossCatchSupplier(
+            new BossCatchContext(boss),
+            ctx.Rng ?? SystemRandomSource.Instance
+        );
+        if (offered is null)
+            return;
+        await AcquisitionResolution.OfferAndDepositAsync(offered, "BossCatch", s.Party, ctx);
     }
 
     // Rolls this win's reward and — if anything rolled — offers it as a pick-one-of-N choice (blocking; the
@@ -961,7 +990,7 @@ internal static class RewardResolution
 }
 
 /// <summary>
-/// Shared acquisition-offer resolution used by every acquisition channel (themed draft now; boss catch later):
+/// Shared acquisition-offer resolution used by every acquisition channel (themed draft and boss catch):
 /// raise the blocking offer — the client shows the modal, so the player accepts / declines / (on a full party)
 /// picks a member to swap out — then deposit the result into the <see cref="Party"/> and announce it. A
 /// <em>decline</em> (the automated / AI default) is a pure sequencing no-op: the roster is unchanged and only an

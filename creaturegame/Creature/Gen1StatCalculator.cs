@@ -30,6 +30,10 @@ public sealed class Gen1StatCalculator : IStatCalculator
 
     private const int MaxDv = 15; // Gen 1 DVs are 4-bit: 0–15.
 
+    // The floor of the "80–100% percentile" band — a top-band DV roll (0.8 × MaxDv = 12, so 12–15). Used by the
+    // Superb quality; kept a named constant so the percentile intent is explicit rather than a bare 12.
+    private const int TopPercentileFloor = 12;
+
     // Gen 1 DVs: four stats each drawn from the quality's band; HP DV derived from their lowest bits (ATK,
     // DEF, SPD, SPC order). Perfect is a fixed 15 (deterministic); Poor/Average roll within their range.
     public void RandomiseDvs(Creature creature, DvQuality quality)
@@ -49,6 +53,11 @@ public sealed class Gen1StatCalculator : IStatCalculator
         quality switch
         {
             DvQuality.Perfect => MaxDv, // top-tier: fixed max, no roll
+            // Superb: a coin flip per value — 50% draws from the top percentile band (12–15), else an ordinary
+            // roll (0–15). Two draws on a "heads", one on a "tails", but deterministic given the seed.
+            DvQuality.Superb => _rng.Next(2) == 0
+                ? _rng.Next(TopPercentileFloor, MaxDv + 1) // top band: 12–15
+                : _rng.Next(0, MaxDv + 1), // else the ordinary roll
             DvQuality.High => _rng.Next((MaxDv + 1) / 2, MaxDv + 1), // 8–15 (upper half)
             DvQuality.Poor => _rng.Next(0, (MaxDv + 1) / 2), // 0–7 (lower half)
             _ => _rng.Next(0, MaxDv + 1), // Average: 0–15 (the ordinary roll)

@@ -249,6 +249,16 @@ public sealed record DraftContext(
     int BattlesWon
 );
 
+/// <summary>What a boss-catch roll needs to know, handed to the injected boss-catch supplier after a <em>Boss</em>
+/// win (Phase 4 Stage 2, <c>ENCOUNTER_DESIGN.md §4</c>) — the boss channel's mirror of <see cref="DraftContext"/>.
+/// The boss-catch offer is <em>not</em> an in-battle ball throw: the boss is defeated first (its win XP/reward
+/// already applied), then a small catch chance may offer it as pure upside. The supplier rolls that chance and, if
+/// it fires, builds a party-ready copy of the defeated <see cref="Boss"/>'s species at the boss's own level (its
+/// species/level/types the only inputs — no depth scaling, unlike the draft's BST band); it returns null on the
+/// (common) no-catch roll. A single offered option, so there is no fought-only pool — the boss you just beat is
+/// the only candidate.</summary>
+public sealed record BossCatchContext(Creature Boss);
+
 // --- Shop (spend-gold purchase node) -----------------------------------------------------------------------
 
 /// <summary>One item on offer in a Shop node's stock: the resolved item id + display name, its run-scaled

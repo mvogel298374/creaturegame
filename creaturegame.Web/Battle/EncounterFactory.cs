@@ -227,6 +227,65 @@ public sealed class EncounterFactory(
     }
 
     /// <summary>
+    /// Builds the run's boss-catch supplier: the injected
+    /// <c>Func&lt;BossCatchContext, IRandomSource, Task&lt;Creature?&gt;&gt;</c> <see cref="RunDirector"/> rolls
+    /// after a Boss win. The policy gate (a small n% catch chance) is <see cref="BossCatchCalculator"/>; when it
+    /// fires, a fresh party-ready copy of the defeated boss's species is built here at the boss's level, with its
+    /// best natural moveset + a learnset (so it can level up if it later becomes the lead). Returns null on the
+    /// (common) no-catch roll — the boss channel's mirror of <see cref="BuildDraftSupplier"/>.
+    /// </summary>
+    public Func<BossCatchContext, IRandomSource, Task<Creature?>> BuildBossCatchSupplier(
+        IReadOnlyList<Attack> allMoves
+    ) => (ctx, rng) => TryBuildBossCatchAsync(ctx, allMoves, rng);
+
+    private async Task<Creature?> TryBuildBossCatchAsync(
+        BossCatchContext ctx,
+        IReadOnlyList<Attack> allMoves,
+        IRandomSource rng
+    )
+    {
+        // Policy gate first (a single n% roll) — a Boss win that doesn't catch leaves the seeded run stream after
+        // just this roll, and a non-catch never touches the DB.
+        if (!BossCatchCalculator.ShouldOffer(rng))
+            return null;
+
+        await using var pokemonCtx = await pokemonFactory.CreateDbContextAsync();
+        // The only candidate is the boss you just beat — look its species up by id and build a fresh full-HP copy
+        // (the "catch" model: a party-ready specimen of that species, not the fainted battle instance).
+        var species = await pokemonCtx
+            .Species.AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Id == ctx.Boss.SpeciesId);
+        if (species is null)
+            return null;
+
+        var learnsets = await pokemonCtx
+            .Learnsets.AsNoTracking()
+            .Where(l =>
+                l.Generation == ActiveGeneration
+                && l.SpeciesId == species.Id
+                && l.Method == LearnMethod.LevelUp
+            )
+            .ToListAsync();
+
+        // Built at the boss's own level with its canonical latest moveset — the caught creature matches the boss
+        // you fought in species and level (the biome's themed apex), unlike the draft which picks by BST band.
+        // Rolled at Superb DV quality (each value a 50% shot at the 12–15 top band): a strong, earned pickup that
+        // reflects beating the boss, without handing the player the boss's own Perfect-DV / all-pool-move build.
+        var creature = BuildCreature(
+            species,
+            learnsets,
+            allMoves,
+            ctx.Boss.Level,
+            MoveSelectionStrategy.CanonicalLatest,
+            rng,
+            DvQuality.Superb
+        );
+        // A caught boss may later become the lead (Stage 1d) and level up, so give it a learnset like the starter.
+        creature.Learnset = BuildLearnset(learnsets, allMoves);
+        return creature;
+    }
+
+    /// <summary>
     /// The biomes for <paramref name="region"/> that can actually generate against the active generation's
     /// wild-available species (legendaries/statics/gifts excluded — the same filter as
     /// <see cref="CreateEnemyAsync"/>). Empty biomes never appear; if no availability data exists (a minimally

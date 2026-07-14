@@ -4,6 +4,7 @@ namespace creaturegame.Creatures;
 /// The quality band a caller requests when rolling a creature's individual values. It is *intent* — the
 /// mapping to actual DV/IV ranges is generation-specific and lives on the <see cref="IStatCalculator"/>
 /// implementation (Gen 1: <see cref="Poor"/> 0–7, <see cref="Average"/> 0–15, <see cref="High"/> 8–15,
+/// <see cref="Superb"/> = each value a 50% chance at the top percentile band else an ordinary roll,
 /// <see cref="Perfect"/> = max). Enemy strength tiers pick a quality; <see cref="Average"/> is the ordinary
 /// roll (the player's). Quality is always passed explicitly — there is no implicit "just random" overload.
 /// </summary>
@@ -12,6 +13,13 @@ public enum DvQuality
     Poor,
     Average,
     High,
+
+    /// <summary>A strong-but-not-flawless roll: each individual value has a 50% chance to land in the top
+    /// percentile band (Gen 1: the 80–100% band, DV 12–15), otherwise an ordinary roll. So about half the values
+    /// come out near-max and the rest are luck of the draw — above <see cref="High"/> in expectation without the
+    /// guaranteed floor of <see cref="Perfect"/>. Used for the boss-catch pickup (a beaten boss you add to the
+    /// party: notably strong, but not a min-maxed clone of the encounter you fought).</summary>
+    Superb,
     Perfect,
 }
 
@@ -53,7 +61,7 @@ public interface IStatCalculator
     /// Randomises a creature's individual values (DVs/IVs) in place, at the requested
     /// <paramref name="quality"/>. The quality → range mapping is generation-specific.
     /// Gen 1: Attack/Defense/Special/Speed each draw from the quality's band (Poor 0–7, Average 0–15,
-    /// High 8–15, Perfect = 15 fixed); HP DV derived from their low bits.
+    /// High 8–15, Superb 50% at 12–15 else 0–15, Perfect = 15 fixed); HP DV derived from their low bits.
     /// Gen 3+: six independent IVs from the quality's band within [0, 31].
     /// </summary>
     void RandomiseDvs(Creature creature, DvQuality quality);
