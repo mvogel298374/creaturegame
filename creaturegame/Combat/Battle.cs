@@ -234,11 +234,13 @@ public class Battle
                 // Gen 1 Stat Exp: the win adds the defeated foe's base stats to the player's accumulated Stat
                 // Exp (capped per stat by the calculator). It's silent (no event) and only realizes into
                 // actual stats on the next CalculateStats — so award it BEFORE the level-up loop below, so a
-                // level gained this battle already reflects the new training. Single-recipient scope: only the
-                // FINISHER (the active creature at the KO) is awarded, even though a forced faint-switch means
-                // several party members may have been sent out against this foe. That's the deliberate "only the
-                // lead earns XP / no Exp Share" model, not an absence of switching — the participant-split award
-                // (GainStatExp once per creature that fought this foe) is the documented deferral.
+                // level gained this battle already reflects the new training.
+                // KNOWN DEFECT (TODO.md → "Switched-in creature is the active creature"): only the FINISHER is
+                // awarded here. Gen 1 divides Exp and Stat Exp among every creature that was SENT OUT and has not
+                // fainted, so this is right only by coincidence — a forced switch leaves the survivor as the sole
+                // eligible participant anyway. It will diverge as soon as voluntary switching lands with both
+                // creatures alive. Needs a per-battle participant set; do NOT read the old "only the lead earns
+                // XP / no Exp Share" note as intent — that pin was wrong and the user corrected it (2026-07-15).
                 PlayerCreature.GainStatExp(EnemyCreature);
                 // Move learning below mutates the PERMANENT MoveSet. If the player Transformed/Mimicked this
                 // battle, MoveSet currently holds the copied moveset and the end-of-battle restore would

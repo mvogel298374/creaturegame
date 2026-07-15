@@ -464,9 +464,13 @@ internal sealed class BattleRunEvent(
         await GrantBattleRewardAsync(enemy, s, ctx);
 
         // Evolution check — Gen 1 attempts evolution on a level-up, so only when this battle actually raised the
-        // finisher's level. Gated to the no-switch case: `levelBefore` is the creature that STARTED the battle, so
-        // a switched-in finisher (a different creature) can't be compared against it — its evolution is offered on
-        // its next clean win instead. A declined evolution re-offers at the next level-up.
+        // finisher's level. A declined evolution re-offers at the next level-up.
+        // KNOWN DEFECT (TODO.md → "Switched-in creature is the active creature"): the ReferenceEquals gate skips
+        // evolution for a switched-in finisher, so a creature that came in and levelled up does NOT evolve. That
+        // is NOT a design decision — it is an implementation convenience, because `levelBefore` belongs to the
+        // creature that STARTED the battle and there is nothing to compare a different creature against. A
+        // switched-in creature is the active creature and must evolve on the same terms (user ruling 2026-07-15).
+        // Fix = capture the pre-battle level per creature that takes the field, and drop this gate.
         if (ReferenceEquals(active, player) && active.Level > levelBefore)
             await TryEvolveAsync(active, ctx);
 
