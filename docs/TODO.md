@@ -414,12 +414,14 @@ Encounter Logic gate:
 is fully ironed out (the battle sim is the foundation). The **Endless Battle Chain** (done) is the first minimal
 slice; the items below are what it deliberately leaves out.
 
-- [ ] Catch → Pokémon added to party (up to 6); choose lead between battles (the party container + between-biome
-  lead choice land earlier in **Encounter Logic Phase 4** — Stage 1c ✅ / Stage 1d).
+- [ ] Catch → Pokémon added to party (up to 6). **The roster half is done** — the `Party` container, both
+  post-battle acquisition channels, the between-biome lead choice and the forced faint-switch all shipped in
+  **Encounter Logic Phase 4** (Stages 1a–3 ✅, complete 2026-07-15). What remains here is only the **in-battle
+  ball throw** as a third acquisition channel — see the Catch cluster above; it deposits into the existing `Party`.
 - [ ] **Voluntary in-battle switching** — a SWITCH turn action to swap the active creature mid-fight. Its own
   documented core feature (planned, user-confirmed 2026-07-13): see
-  [**In-Combat Switching**](#in-combat-switching--voluntary-in-battle-party-switching-planned-core-feature). Best
-  built after Phase 4 Stage 3 (forced-switch-on-faint) wires the party into `Battle`.
+  [**In-Combat Switching**](#in-combat-switching--voluntary-in-battle-party-switching-planned-core-feature).
+  **Now unblocked:** Phase 4 Stage 3 wired the party into `Battle` and built the shared send-in path.
 - [ ] Progressive difficulty beyond the current `targetBst = lead BST + depth × 10`; trainer encounters at
   milestones.
 - [ ] `PlayerSave` / `SavedCreature` models in `save.db`; auto-save after each battle; party-management UI.
