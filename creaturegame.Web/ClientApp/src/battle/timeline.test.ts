@@ -812,3 +812,35 @@ describe('expandEvent — between-biome lead choice (Stage 1d)', () => {
       .toEqual(['BLASTOISE is now your lead!']);
   });
 });
+
+describe('expandEvent — forced faint-switch (Stage 3)', () => {
+  const dispatchedOf = (steps: Step[] = [], type: string): Action[] =>
+    dispatched(steps).filter(a => a.type === type);
+
+  it('SwitchInOffered raises the blocking forced picker with the parsed roster + fainted name', () => {
+    const { steps } = expandEvent('SwitchInOffered', {
+      faintedName: 'CHARIZARD',
+      party: [
+        { speciesId: 6, name: 'CHARIZARD', level: 36, hp: 0, maxHp: 120, status: 'None', isLead: true },
+        { speciesId: 9, name: 'BLASTOISE', level: 34, hp: 90, maxHp: 110, status: 'Poison', isLead: false },
+      ],
+    }, CTX);
+    const show = dispatchedOf(steps, 'SHOW_SWITCH_IN')[0] as Extract<Action, { type: 'SHOW_SWITCH_IN' }>;
+    expect(show.faintedName).toBe('CHARIZARD');
+    expect(show.party).toHaveLength(2);
+    expect(show.party[0].hp).toBe(0); // the fainted lead — the modal disables it
+    expect(show.party[1].name).toBe('BLASTOISE');
+  });
+
+  it('CreatureSwitchedIn swaps the player sprite, retargets the nameplate, and logs the send-in', () => {
+    const { steps } = expandEvent('CreatureSwitchedIn',
+      { name: 'BLASTOISE', speciesId: 9, level: 34, hp: 90, maxHp: 110, status: 'Poison' }, CTX);
+    const swap = emits(steps).find(c => c.type === 'swapPlayerCreature') as Extract<
+      import('./timeline').BridgeCommand, { type: 'swapPlayerCreature' }
+    >;
+    expect(swap.speciesId).toBe(9);
+    const set = dispatchedOf(steps, 'SWITCHED_IN')[0] as Extract<Action, { type: 'SWITCHED_IN' }>;
+    expect(set).toMatchObject({ name: 'BLASTOISE', level: 34, hp: 90, maxHp: 110, status: 'Poison' });
+    expect(logLines(steps)).toEqual(['Go! BLASTOISE!']);
+  });
+});

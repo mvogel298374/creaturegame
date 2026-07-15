@@ -136,6 +136,19 @@ public class BattleHub(GameSessionManager manager) : Hub<IBattleClient>
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Answers a forced faint-switch (Phase 4 Stage 3): <paramref name="index"/> is the party-member slot to send
+    /// in against the same enemy after the active creature fainted. Mirrors <see cref="ChooseLead"/> —
+    /// fire-and-forget completion of the input TCS the battle loop is blocked on. A stale / out-of-range / fainted
+    /// index is corrected to the first live member in the engine, so a malformed pick never sends in a downed
+    /// creature.
+    /// </summary>
+    public Task RespondSwitchIn(int index)
+    {
+        manager.SetSwitchInChoice(Context.ConnectionId, index);
+        return Task.CompletedTask;
+    }
+
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         // Start the reconnect grace window; the battle is abandoned only if the client

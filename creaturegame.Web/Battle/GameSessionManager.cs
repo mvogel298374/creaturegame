@@ -223,9 +223,10 @@ public sealed class GameSessionManager(
     }
 
     /// <summary>The creature the panel should describe: the party's <em>live</em> lead when a party is wired,
-    /// else the session's starter. The lead moves — the between-biome lead swap (Phase 4 Stage 1d) reassigns it —
-    /// so it must be resolved per read, never captured at session claim. Pure + internal so the rule is
-    /// unit-testable on its own (as <c>ProjectBagView</c> is).</summary>
+    /// else the session's starter. The lead moves — the between-biome lead swap (Phase 4 Stage 1d) reassigns it,
+    /// and since the forced faint-switch (Stage 3) so does a mid-battle send-in — so it must be resolved per read,
+    /// never captured at session claim. Pure + internal so the rule is unit-testable on its own (as
+    /// <c>ProjectBagView</c> is).</summary>
     internal static Creature? ActiveCreature(Party? party, Creature? starter) =>
         party?.Lead ?? starter;
 
@@ -374,6 +375,17 @@ public sealed class GameSessionManager(
             battle.Input.SetLeadChoice(index);
     }
 
+    /// <summary>Routes a forced faint-switch pick (the chosen party-member index) to the battle's input. A stale /
+    /// out-of-range / fainted index is corrected to the first live member in the engine, so this only forwards.</summary>
+    public void SetSwitchInChoice(string connectionId, int index)
+    {
+        if (
+            _connToGame.TryGetValue(connectionId, out var gameId)
+            && _active.TryGetValue(gameId, out var battle)
+        )
+            battle.Input.SetSwitchInChoice(index);
+    }
+
     /// <summary>The run's current party roster (the same wire shape as the pushed <c>PartyUpdated</c> event), for
     /// the roster panel to hydrate on load / after a reconnect — parity with <see cref="GetBagContents"/> /
     /// <see cref="GetWallet"/>. A running battle's live party first, else the not-yet-started session's lone
@@ -473,7 +485,7 @@ sealed class ActiveBattle
 
     // The run's party (up to six). The same instance the RunDirector's RunState plays over, so the party-hydrate
     // endpoint reads the live roster — and its Lead is the creature actually on the field (the between-biome lead
-    // swap moves it). Set when the session is claimed; never reassigned.
+    // swap and the forced faint-switch both move it). Set when the session is claimed; never reassigned.
     public Party? Party;
 
     // The run's bag (threaded into every Battle), wallet (credited by reward rolls), and the item catalog

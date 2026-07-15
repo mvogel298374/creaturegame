@@ -433,35 +433,47 @@ internal sealed class BattleRunEvent(
             // Those same trainer-analog tiers (Elite/Boss) are "trainer-owned" for XP — the Gen-1 trainer ×1.5
             // bonus (applied in the seam); a plain wild battle gets none.
             trainerBattle: tier != EncounterTier.Normal,
-            runRules: runRules
+            runRules: runRules,
+            // Party-aware battle (Phase 4 Stage 3): when the lead faints and a bench member is alive, Battle sends
+            // in a replacement against this same enemy instead of ending the run. `player` is the party's Lead, so
+            // a switch reassigns Party.Lead (⇒ RunState.Player) and the run continues on the survivor.
+            playerParty: s.Party
         );
         await battle.StartFightAsync();
+
+        // A forced switch-on-faint (Phase 4 Stage 3) may have changed the active creature mid-battle: Battle
+        // reassigns Party.Lead when it sends in a replacement, so the finisher is the *current* lead, not the
+        // `player` that started the fight (which may now be fainted on the bench). Re-read it for every post-battle
+        // consequence (win/loss, carried status, evolution). When no switch happened, `active` == `player`.
+        var active = s.Player;
 
         // Roar/Whirlwind ended the encounter (a side fled) — neither a win nor a loss. The player survives, so
         // carry its status into the next event and advance the run; no XP/evolution (nothing fainted).
         if (battle.EndedInFlee)
         {
-            player.CarriedStatus = CaptureCarriedStatus(player);
-            return new FledOutcome(PlayerFled: player.Battle.HasFled);
+            active.CarriedStatus = CaptureCarriedStatus(active);
+            return new FledOutcome(PlayerFled: active.Battle.HasFled);
         }
 
-        // The battle ends when one side faints. If the player dropped, the run is over (read by the director's
-        // while-loop); otherwise it is a win.
-        if (!player.IsAlive())
+        // The battle ends when one side faints. With a party, Battle keeps sending in survivors, so reaching here
+        // with a fainted active creature means the WHOLE party is down → the run is over (read by the director's
+        // while-loop); otherwise it is a win (whoever finished is the active creature).
+        if (!active.IsAlive())
             return new BattleOutcome(false);
         s.BattlesWon++;
         await GrantBattleRewardAsync(enemy, s, ctx);
 
-        // Evolution check — Gen 1 attempts evolution on a level-up, so only when this battle actually raised
-        // the player's level (a declined evolution re-offers at the next level-up, not every win). The battle
-        // has already applied the level-ups, so the level is current.
-        if (player.Level > levelBefore)
-            await TryEvolveAsync(player, ctx);
+        // Evolution check — Gen 1 attempts evolution on a level-up, so only when this battle actually raised the
+        // finisher's level. Gated to the no-switch case: `levelBefore` is the creature that STARTED the battle, so
+        // a switched-in finisher (a different creature) can't be compared against it — its evolution is offered on
+        // its next clean win instead. A declined evolution re-offers at the next level-up.
+        if (ReferenceEquals(active, player) && active.Level > levelBefore)
+            await TryEvolveAsync(active, ctx);
 
-        // Default: the lead's major status carries into its next encounter, stored ON the creature (the
+        // Default: the finisher's major status carries into its next encounter, stored ON the creature (the
         // multi-creature carry model — each party member keeps its own ailment while benched); a Poké Center heal
         // clears it. The generation decides the out-of-battle form (Gen 1 reverts Toxic to Poison).
-        player.CarriedStatus = CaptureCarriedStatus(player);
+        active.CarriedStatus = CaptureCarriedStatus(active);
 
         // Acquisition (ENCOUNTER_DESIGN.md §4): the last beat of a win, and at most one offer per win. A Boss win
         // routes to the boss-catch channel — a small chance to add the boss you just beat (Stage 2); every other

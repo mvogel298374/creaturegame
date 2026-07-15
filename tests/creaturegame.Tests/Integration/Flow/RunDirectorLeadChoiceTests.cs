@@ -50,16 +50,21 @@ public class RunDirectorLeadChoiceTests
 
         await runner.RunAsync();
 
-        // The choice fired once and reassigned the lead: Bravo is now the active creature and fought biome 2.
+        // The choice fired once and reassigned the lead: Bravo led biome 2. The battler record is the
+        // forced-switch-immune proof (it captures the lead handed to each biome's battle at its start). Stage 3's
+        // forced switch may bring Alpha back in when Bravo faints to the unbeatable biome-2 boss, so the *final*
+        // Party.Lead is no longer the choice's observable — the battler record and the LeadChanged event are.
         Assert.Single(input.LeadChoicesOffered);
         var changed = Assert.Single(recorder.Of<LeadChanged>());
         Assert.Equal("Bravo", changed.Name);
-        Assert.Same(lead1, runner.State.Party.Lead);
         Assert.Equal(new[] { "Alpha", "Bravo" }, battlers.ToArray());
 
-        // A PartyUpdated snapshot followed the swap, with the new lead flagged.
-        var snapshot = recorder.Of<PartyUpdated>().Last();
-        Assert.Equal("Bravo", snapshot.Members.Single(m => m.IsLead).Name);
+        // A PartyUpdated snapshot from the swap flagged the new lead (a later forced-switch snapshot may re-flag
+        // Alpha, so match on any snapshot flagging Bravo rather than the last one).
+        Assert.Contains(
+            recorder.Of<PartyUpdated>(),
+            s => s.Members.Single(m => m.IsLead).Name == "Bravo"
+        );
     }
 
     [Fact]
@@ -111,20 +116,23 @@ public class RunDirectorLeadChoiceTests
     public async Task LeadChoice_KeepingTheCurrentLead_IsANoOp()
     {
         // The prompt still fires (party > 1), but keeping the current lead (the ScriptedInput default returns the
-        // current index) reassigns nothing: no LeadChanged, no lead-swap PartyUpdated, lead unchanged.
+        // current index) reassigns nothing: no LeadChanged, and Alpha still leads biome 2 (the battler record —
+        // Stage 3's forced switch changes the *final* lead on the biome-2 wipe, so the battler is the proof).
         var lead0 = Fighter("Alpha", hp: 300, attack: 999, speed: 100, level: 50);
         var party = new Party(lead0);
         party.Add(Fighter("Bravo", hp: 300, attack: 999, speed: 100, level: 50));
 
+        var battlers = new List<string>();
         int built = 0;
         Func<Creature, int, BiomeDefinition?, EncounterTier, Task<Creature>> supplier = (
-            _,
+            p,
             _,
             _,
             _
         ) =>
         {
             built++;
+            battlers.Add(p.Name); // the lead handed to this biome's battle
             var enemy =
                 built == 1
                     ? Fighter("Boss1", hp: 1, attack: 1, speed: 1, level: 5)
@@ -140,7 +148,7 @@ public class RunDirectorLeadChoiceTests
 
         Assert.Single(input.LeadChoicesOffered); // the choice was offered
         Assert.Empty(recorder.Of<LeadChanged>()); // …but nothing changed
-        Assert.Same(lead0, runner.State.Party.Lead);
+        Assert.Equal(new[] { "Alpha", "Alpha" }, battlers.ToArray()); // Alpha still led biome 2 (kept the lead)
     }
 
     [Fact]
@@ -152,15 +160,17 @@ public class RunDirectorLeadChoiceTests
         var party = new Party(lead0);
         party.Add(Fighter("Bravo", hp: 300, attack: 999, speed: 100, level: 50));
 
+        var battlers = new List<string>();
         int built = 0;
         Func<Creature, int, BiomeDefinition?, EncounterTier, Task<Creature>> supplier = (
-            _,
+            p,
             _,
             _,
             _
         ) =>
         {
             built++;
+            battlers.Add(p.Name);
             var enemy =
                 built == 1
                     ? Fighter("Boss1", hp: 1, attack: 1, speed: 1, level: 5)
@@ -176,7 +186,7 @@ public class RunDirectorLeadChoiceTests
 
         Assert.Single(input.LeadChoicesOffered); // the choice fired
         Assert.Empty(recorder.Of<LeadChanged>()); // …but the out-of-range pick changed nothing
-        Assert.Same(lead0, runner.State.Party.Lead);
+        Assert.Equal(new[] { "Alpha", "Alpha" }, battlers.ToArray()); // Alpha still led biome 2
     }
 
     [Fact]
@@ -219,15 +229,17 @@ public class RunDirectorLeadChoiceTests
         var party = new Party(lead0);
         party.Add(lead1);
 
+        var battlers = new List<string>();
         int built = 0;
         Func<Creature, int, BiomeDefinition?, EncounterTier, Task<Creature>> supplier = (
-            _,
+            p,
             _,
             _,
             _
         ) =>
         {
             built++;
+            battlers.Add(p.Name);
             var enemy =
                 built == 1
                     ? Fighter("Boss1", hp: 1, attack: 1, speed: 1, level: 5)
@@ -241,9 +253,11 @@ public class RunDirectorLeadChoiceTests
 
         await runner.RunAsync();
 
-        Assert.Same(lead1, runner.State.Party.Lead); // the swap took effect
+        Assert.Equal(new[] { "Alpha", "Bravo" }, battlers.ToArray()); // the swap took effect: Bravo led biome 2
         // The outgoing lead kept its Poison on the bench (the Center was declined, so nothing cured it), and the
-        // switch-in entered on its own footing — the previous lead's status never leaked onto it.
+        // switch-in entered on its own footing — the previous lead's status never leaked onto it. (Stage 3's
+        // forced switch may bring Alpha back in on the biome-2 wipe; the loss path never re-captures status, so
+        // Alpha's carried Poison and Bravo's clean slate both stand.)
         Assert.Equal(StatusCondition.Poison, lead0.CarriedStatus?.Status);
         Assert.Null(lead1.CarriedStatus);
     }

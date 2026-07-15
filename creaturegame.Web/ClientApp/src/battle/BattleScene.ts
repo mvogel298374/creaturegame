@@ -27,6 +27,7 @@ export class BattleScene extends Phaser.Scene {
   private onTransformSprite = (e: { side: 'player' | 'enemy'; speciesId: number }) =>
     this.transformSprite(e.side, e.speciesId);
   private onResetPlayerSprite = () => this.resetPlayerSprite();
+  private onSwapPlayer = (e: { speciesId: number }) => this.swapPlayerCreature(e.speciesId);
   private onEvolve = (e: { toSpeciesId: number }) => this.playEvolutionAnimation(e.toSpeciesId);
 
   constructor() {
@@ -94,6 +95,7 @@ export class BattleScene extends Phaser.Scene {
     bridge.on('spawnEnemy', this.onSpawnEnemy);
     bridge.on('transformSprite', this.onTransformSprite);
     bridge.on('resetPlayerSprite', this.onResetPlayerSprite);
+    bridge.on('swapPlayerCreature', this.onSwapPlayer);
     bridge.on('playEvolutionAnimation', this.onEvolve);
 
     // Remove our bridge listeners when this scene is torn down so they can't
@@ -364,6 +366,56 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
+  // Forced faint-switch (Stage 3): the active creature fainted (its faint animation already played, so the sprite
+  // is dropped + faded) and a bench member is sent in — slide the incoming species' back sprite in from the left,
+  // mirroring spawnEnemy for the player side. Updates BOTH the current and the *true* species (the switch is a
+  // real creature change, like an evolution — so a later win's resetPlayerSprite reverts to THIS creature, not the
+  // fainted one). Loads the back sprite on demand. Fire-and-forget: the timeline paces the beat with its own waits.
+  private swapPlayerCreature(speciesId: number) {
+    this.playerSpeciesId = speciesId;
+    this.playerTrueSpeciesId = speciesId;
+    const key = `back-${speciesId}`;
+
+    const reveal = () => {
+      const W = this.scale.width;
+      const H = this.scale.height;
+      const playerRestX = W * 0.28;
+      const playerRestY = H * 0.65;
+
+      this.playerIdleTween?.stop();
+      this.playerSprite.setTexture(key);
+      this.playerSprite.setAlpha(1).setPosition(-120, playerRestY);
+
+      this.tweens.add({
+        targets: this.playerSprite,
+        x: playerRestX,
+        duration: 400,
+        ease: 'Cubic.easeOut',
+        onComplete: () => {
+          this.playCry('player');
+          this.playerIdleTween = this.tweens.add({
+            targets: this.playerSprite,
+            y: `-=5`,
+            yoyo: true,
+            repeat: -1,
+            duration: 700,
+            ease: 'Sine.easeInOut',
+          });
+        },
+      });
+    };
+
+    const cryKey = this.cryKey(speciesId);
+    if (this.textures.exists(key) && this.cache.audio.exists(cryKey)) {
+      reveal();
+    } else {
+      if (!this.textures.exists(key)) this.load.image(key, `/sprites/back/${speciesId}.png`);
+      this.queueCry(speciesId);
+      this.load.once(Phaser.Loader.Events.COMPLETE, reveal);
+      this.load.start();
+    }
+  }
+
   // Revert the player sprite to its true species after a battle (Transform is undone at battle end). The base
   // 'player' texture is the species loaded in preload; once the player has evolved, its true species differs
   // from that, so revert to the evolved back sprite (loaded by the evolution morph) instead — otherwise a win
@@ -387,6 +439,7 @@ export class BattleScene extends Phaser.Scene {
     bridge.off('spawnEnemy', this.onSpawnEnemy);
     bridge.off('transformSprite', this.onTransformSprite);
     bridge.off('resetPlayerSprite', this.onResetPlayerSprite);
+    bridge.off('swapPlayerCreature', this.onSwapPlayer);
     bridge.off('playEvolutionAnimation', this.onEvolve);
   }
 }

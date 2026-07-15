@@ -118,6 +118,24 @@ public interface IBattleInput
     /// </summary>
     Task<ShopAction> ChooseShopActionAsync(ShopContext context) =>
         Task.FromResult<ShopAction>(LeaveShop.Instance);
+
+    /// <summary>
+    /// Asked mid-battle when the active creature faints but a bench member is still alive (the forced
+    /// faint-switch, Phase 4 Stage 3): return the <see cref="Creatures.Party.Members"/> index of the creature to
+    /// send in against the same enemy. A <em>forced</em> choice — unlike the between-biome lead pick it can't be
+    /// declined (the alternative is losing the run). Only the interactive player input is ever consulted; the
+    /// default sends in the first <em>alive</em> member, so automated / AI inputs never stall on the prompt and
+    /// never send in a fainted creature — only the web <see cref="SignalRInput"/> blocks awaiting a real choice.
+    /// A stale / out-of-range / <em>fainted</em> pick is corrected to the first live member downstream
+    /// (<see cref="Battle"/>), so a malformed client can never send in a downed creature.
+    /// </summary>
+    Task<int> ChooseSwitchInAsync(SwitchInContext context)
+    {
+        for (int i = 0; i < context.Party.Count; i++)
+            if (context.Party.Members[i].IsAlive())
+                return Task.FromResult(i);
+        return Task.FromResult(context.Party.LeadIndex);
+    }
 }
 
 /// <summary>Context for a level-up move-replacement decision: who is learning, and the move on offer.</summary>
@@ -153,6 +171,12 @@ public sealed record AcquisitionContext(Creature Offered, Party Party, string So
 /// the active one at <see cref="Creatures.Party.LeadIndex"/>). An input returns the chosen member index; the
 /// default keeps the current lead.</summary>
 public sealed record LeadChoiceContext(Party Party);
+
+/// <summary>Context for a forced faint-switch (Phase 4 Stage 3): the current <see cref="Party"/> — the active
+/// creature at <see cref="Creatures.Party.LeadIndex"/> has just fainted, so an input returns the index of a live
+/// member to send in against the same enemy (the default picks the first alive one). Carries the live
+/// <see cref="Creatures.Party"/> so an input can inspect each member's <see cref="Creature.IsAlive"/> state.</summary>
+public sealed record SwitchInContext(Party Party);
 
 /// <summary>The player's answer to an acquisition offer: <see cref="Accept"/> false = decline (roster
 /// unchanged); accept with a null <see cref="ReplaceSlot"/> = add to a party with room; accept with a

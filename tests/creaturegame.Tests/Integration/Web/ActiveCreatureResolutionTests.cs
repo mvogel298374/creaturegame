@@ -5,10 +5,11 @@ namespace creaturegame.Tests.Integration.Web;
 
 /// <summary>
 /// The active-creature resolution rule (<see cref="GameSessionManager.ActiveCreature"/>) behind the on-demand
-/// CHECK POKEMON overview (<c>GET /api/game/{id}/player</c>). The creature on the field <em>moves</em> — the
-/// between-biome lead swap (Phase 4 Stage 1d) reassigns the lead — so the session's captured starter is only a
-/// fallback: resolving to it once a party is wired shows the panel a benched creature's stats/moves/PP instead of
-/// the one actually fighting. Pure rule, pinned on its own (the
+/// CHECK POKEMON overview (<c>GET /api/game/{id}/player</c>). The creature on the field <em>moves</em>: the
+/// between-biome lead swap (Phase 4 Stage 1d) reassigns the lead, and the forced faint-switch (Stage 3) does so
+/// mid-battle. The session's captured starter is therefore only a fallback — resolving to it once a party is
+/// wired shows the panel a benched (after a forced switch, fainted) creature's stats/moves/PP instead of the one
+/// actually fighting. Pure rule, pinned on its own (the
 /// <see cref="GameSessionManager.ProjectBagView"/> / <c>BagViewProjectionTests</c> precedent).
 /// </summary>
 public class ActiveCreatureResolutionTests
@@ -41,8 +42,8 @@ public class ActiveCreatureResolutionTests
     [Fact]
     public void ActiveCreature_TracksTheLeadAcrossASwitch_NotTheCapturedStarter()
     {
-        // A lead swap moves Party.Lead. The panel must follow it — resolving to the captured starter here is
-        // exactly the stale read that describes a benched creature instead of the one on the field.
+        // A forced faint-switch (or a between-biome swap) moves Party.Lead. The panel must follow it — resolving
+        // to the captured starter here is exactly the stale read that shows the fainted creature's sheet.
         var starter = Mon("Starter");
         var bench = Mon("Bench");
         var party = new Party(starter);

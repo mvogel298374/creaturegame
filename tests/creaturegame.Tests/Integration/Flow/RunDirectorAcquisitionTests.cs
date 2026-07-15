@@ -145,12 +145,16 @@ public class RunDirectorAcquisitionTests
 
         await runner.RunAsync();
 
-        // The offer fired, but the lead-targeting accept resolved as a decline: no deposit, roster + lead intact.
+        // The offer fired, but the lead-targeting accept resolved as a decline: no deposit, roster intact and the
+        // lead's slot never overwritten. Asserted on the SLOT rather than Party.Lead because the run then wipes on
+        // the unbeatable Bruiser and Stage 3's forced switch cycles LeadIndex across the party — but a refused
+        // swap is precisely "slot 0 still holds the original creature", which SetLead (LeadIndex only, never a
+        // reorder) can't disturb. That keeps the original claim exact rather than weakening it to "still a member".
         Assert.Single(recorder.Of<AcquisitionOffered>());
         Assert.Empty(recorder.Of<CreatureAcquired>());
         Assert.Single(recorder.Of<AcquisitionDeclined>());
         Assert.Equal(Party.MaxSize, runner.State.Party.Count);
-        Assert.Same(lead, runner.State.Party.Lead); // the active creature is unchanged
+        Assert.Same(lead, runner.State.Party.Members[0]); // the lead's slot was never swapped out
         Assert.DoesNotContain(runner.State.Party.Members, m => m.Name == "Draftee");
     }
 

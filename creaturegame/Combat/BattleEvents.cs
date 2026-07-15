@@ -374,6 +374,31 @@ public record CreatureFainted(string Name) : BattleEvent;
 /// <see cref="BattleEnded"/>; the run loop advances the encounter as neither a win nor a loss.</summary>
 public record CreatureFled(string Name, bool IsPlayer) : BattleEvent;
 
+// --- Forced switch on faint (Encounter Logic Phase 4 Stage 3) ---
+/// <summary>The player's active creature fainted <em>but the party still has a live bench member</em>, so the run
+/// does not end — the player must send in a replacement. A blocking event: <see cref="Battle"/> awaits the pick via
+/// <see cref="IBattleInput.ChooseSwitchInAsync"/> before continuing (against the same enemy), so the client raises
+/// the forced (non-dismissable) switch-in modal here. Carries the current roster snapshot (the members to pick
+/// from — the fainted one reads HP 0 and is not a valid target) and the <paramref name="FaintedName"/> that just
+/// dropped. This is a <em>forced</em> faint-switch; voluntary in-battle switching is a separate, later feature.</summary>
+public record SwitchInOffered(IReadOnlyList<PartyMemberInfo> Party, string FaintedName)
+    : BattleEvent;
+
+/// <summary>A replacement creature was sent in after the active one fainted (the forced faint-switch). It battles
+/// the same enemy from the next turn. Carries the incoming creature's <paramref name="SpeciesId"/> (the client
+/// swaps the player sprite), <paramref name="Name"/> (the nameplate + the player/enemy side split for later
+/// events), its <paramref name="Level"/> (the nameplate level — <see cref="TurnStarted"/> carries no level), and
+/// its current HP / status (the nameplate bars). Followed by a <see cref="PartyUpdated"/> snapshot (with the new
+/// active creature flagged and the fainted member at HP 0).</summary>
+public record CreatureSwitchedIn(
+    string Name,
+    int SpeciesId,
+    int Level,
+    int Hp,
+    int MaxHp,
+    StatusCondition Status
+) : BattleEvent;
+
 /// <summary>The amount of XP a creature earned from a win — emitted once, before any <see cref="LeveledUp"/>
 /// events, so the client can show the gain and begin filling the XP bar.</summary>
 public record ExperienceGained(string CreatureName, int Amount) : BattleEvent;

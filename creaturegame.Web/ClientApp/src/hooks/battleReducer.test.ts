@@ -280,3 +280,31 @@ describe('battleReducer — between-biome lead choice (Stage 1d)', () => {
     expect(battleReducer(shown, { type: 'HIDE_LEAD_CHOICE' }).leadChoice).toBeNull();
   });
 });
+
+describe('battleReducer — forced faint-switch (Stage 3)', () => {
+  const member = (over: Partial<import('../battle/timeline').PartyMember> = {}) => ({
+    speciesId: 6, name: 'CHARIZARD', level: 36, hp: 100, maxHp: 120, status: 'None', isLead: true, ...over,
+  });
+
+  it('SHOW_SWITCH_IN opens the picker with the roster + fainted name; HIDE_SWITCH_IN clears it', () => {
+    const party = [
+      member({ hp: 0 }), // the fainted lead — the modal disables it
+      member({ speciesId: 9, name: 'BLASTOISE', isLead: false }),
+    ];
+    const shown = battleReducer(ready(), { type: 'SHOW_SWITCH_IN', party, faintedName: 'CHARIZARD' });
+    expect(shown.switchIn).toEqual({ party, faintedName: 'CHARIZARD' });
+    expect(battleReducer(shown, { type: 'HIDE_SWITCH_IN' }).switchIn).toBeNull();
+  });
+
+  it('SWITCHED_IN retargets the player nameplate (name/level/HP/status) onto the incoming creature', () => {
+    // The nameplate tracked the fainted lead; the send-in must move it onto the new creature — including its
+    // level, which no TurnStarted carries (so a dropped level would freeze the nameplate on the old creature).
+    const s = ready({ playerName: 'CHARIZARD', playerLevel: 36, playerHp: 0, playerMaxHp: 120, playerStatus: 'None' });
+    const next = battleReducer(s, { type: 'SWITCHED_IN', name: 'BLASTOISE', level: 34, hp: 90, maxHp: 110, status: 'Poison' });
+    expect(next.playerName).toBe('BLASTOISE');
+    expect(next.playerLevel).toBe(34);
+    expect(next.playerHp).toBe(90);
+    expect(next.playerMaxHp).toBe(110);
+    expect(next.playerStatus).toBe('Poison');
+  });
+});

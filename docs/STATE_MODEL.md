@@ -61,9 +61,12 @@ the Pokémon switches out or the battle ends.
 from a clean slate. Cross-encounter persistence is layered *on top* by the run loop, not by `BattleState`:
 
 **The multi-creature carry model (`Creature.CarriedStatus`).** Each creature carries its **own** out-of-battle
-major status on a permanent-half `Creature.CarriedStatus` field. After a win the `RunDirector` captures the lead's
-status via `IBattleRules.CarryStatusOutOfBattle` (Gen 1 reverts Toxic → regular Poison out of battle) onto that
-lead creature, and the next `Battle` sources its `playerEntryStatus` from the incoming lead's own field. So a
+major status on a permanent-half `Creature.CarriedStatus` field. After a win the `RunDirector` captures the
+**finisher's** status via `IBattleRules.CarryStatusOutOfBattle` (Gen 1 reverts Toxic → regular Poison out of
+battle) onto that creature, and the next `Battle` sources its `playerEntryStatus` from the incoming lead's own
+field. The finisher is the creature *active at the KO* — normally the lead that started the encounter, but since
+the forced faint-switch (Phase 4 Stage 3) a mid-battle switch-in can finish instead, so `BattleRunEvent` re-reads
+`s.Player` post-battle and captures onto whoever actually ended the fight. So a
 poisoned creature **does** stay poisoned between encounters — *and* a benched party member keeps its ailment while
 it sits out (each member has its own slot). A Poké Center heal (`Creature.FullHeal`) clears it per member.
 Volatiles (confusion, Leech Seed, stat stages, binding, flinch, recharge, two-turn) are never captured — they die

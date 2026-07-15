@@ -15,6 +15,7 @@ export type {
   RewardChoicePrompt,
   ShopPrompt,
   AcquisitionPrompt,
+  SwitchInPrompt,
   DropToast,
 } from './battleReducer';
 export type { PartyMember } from '../battle/timeline';
@@ -44,6 +45,11 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
       if (eventType === 'BattleStarted') {
         playerNameRef.current = payload.playerName as string;
         encounterIndexRef.current += 1;
+      }
+      // A forced faint-switch changes which creature is "the player": retarget the side split immediately (at
+      // receive time, before later events expand) so the incoming creature's moves/damage are sided correctly.
+      if (eventType === 'CreatureSwitchedIn') {
+        playerNameRef.current = payload.name as string;
       }
 
       const { now, steps } = expandEvent(eventType, payload, {
@@ -185,9 +191,18 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
       console.error('[SignalR] ChooseLead failed:', err));
   }, []);
 
+  // Answer the forced faint-switch: the chosen live party-member index to send in. Hide the modal at once (the
+  // battle is blocked awaiting it); the resulting CreatureSwitchedIn + PartyUpdated events swap the sprite,
+  // retarget the nameplate, and refresh the roster panel. A stale/fainted index is corrected server-side.
+  const respondSwitchIn = useCallback((index: number) => {
+    dispatch({ type: 'HIDE_SWITCH_IN' });
+    connRef.current?.invoke('RespondSwitchIn', index).catch(err =>
+      console.error('[SignalR] RespondSwitchIn failed:', err));
+  }, []);
+
   // Clear the transient loot hover. Purely local (nothing server-side blocks on it) — the view runs a timer
   // and calls this to auto-dismiss the toast after its on-screen beat.
   const dismissDrop = useCallback(() => dispatch({ type: 'HIDE_DROP' }), []);
 
-  return { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, buyShopItem, leaveShop, respondAcquisition, chooseLead, dismissDrop };
+  return { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, buyShopItem, leaveShop, respondAcquisition, chooseLead, respondSwitchIn, dismissDrop };
 }

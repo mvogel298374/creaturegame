@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { TypeBadge, typeColor } from '../components/TypeBadge';
 import { MapGlyphSprite, TypeChip, typeIconId, nodeIconId } from './mapGlyphs';
 import { BattleCanvas } from '../battle/BattleCanvas';
-import { useBattleHub, type LevelUpPanel, type MoveReplacementPrompt, type RecoveryPrompt, type EvolutionPrompt, type RewardChoicePrompt, type ShopPrompt, type AcquisitionPrompt, type PartyMember, type DropToast } from '../hooks/useBattleHub';
+import { useBattleHub, type LevelUpPanel, type MoveReplacementPrompt, type RecoveryPrompt, type EvolutionPrompt, type RewardChoicePrompt, type ShopPrompt, type AcquisitionPrompt, type SwitchInPrompt, type PartyMember, type DropToast } from '../hooks/useBattleHub';
 import { healSummary, type RegionBiome, type BiomeOption } from '../battle/timeline';
 import { regionEdgeKey, travelledEdgeKeys } from '../battle/regionMap';
 import type { Species } from '../types/Species';
@@ -36,7 +36,7 @@ export function BattleScreen() {
   const gameId: string | null = location.state?.gameId ?? null;
   const startLevel: number = location.state?.level ?? 50;
 
-  const { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, buyShopItem, leaveShop, respondAcquisition, chooseLead, dismissDrop } = useBattleHub(gameId, startLevel);
+  const { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, buyShopItem, leaveShop, respondAcquisition, chooseLead, respondSwitchIn, dismissDrop } = useBattleHub(gameId, startLevel);
   const [controlView, setControlView] = useState<ControlView>('menu');
   // Encounter-map overlay: pinned open by the MAP button, and briefly auto-peeked at each ladder change.
   const [mapPinned, setMapPinned] = useState(false);
@@ -238,6 +238,10 @@ export function BattleScreen() {
 
       {state.leadChoice && (
         <LeadChoiceModal party={state.leadChoice} onChoose={chooseLead} />
+      )}
+
+      {state.switchIn && (
+        <SwitchInModal prompt={state.switchIn} onChoose={respondSwitchIn} />
       )}
 
       {state.phase === 'ended' && (
@@ -888,6 +892,55 @@ function LeadChoiceModal({ party, onChoose }: {
               </div>
             </button>
           ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Forced faint-switch (Stage 3): the active creature fainted but the bench has a live member, so the player MUST
+// send in a replacement — a blocking, non-dismissable modal (no decline/close) over the roster. Only live members
+// are choosable; the fainted one (and any other downed member) is greyed and disabled. Clicking a live member
+// answers RespondSwitchIn, which the battle is blocked on; the run ends only if the whole party is down (in which
+// case this modal never opens). Distinct from the between-biome LeadChoiceModal — this is a mid-battle send-in.
+function SwitchInModal({ prompt, onChoose }: {
+  prompt: SwitchInPrompt;
+  onChoose: (index: number) => void;
+}) {
+  return (
+    <div className="modal-overlay">
+      <div className="lead-modal" role="alertdialog" aria-modal="true" aria-label="Send in a creature">
+        <p className="lead-title">{prompt.faintedName} fainted!</p>
+        <p className="lead-sub">Send in your next creature.</p>
+        <div className="lead-grid">
+          {prompt.party.map((m, i) => {
+            const fainted = m.hp <= 0;
+            return (
+              <button
+                key={i}
+                className={`lead-card${fainted ? ' lead-card--fainted' : ''}`}
+                disabled={fainted}
+                onClick={() => onChoose(i)}
+                title={fainted ? `${m.name} has fainted` : undefined}
+              >
+                <img
+                  className="lead-card-sprite"
+                  src={`/sprites/front/${m.speciesId}.png`}
+                  alt={m.name}
+                  draggable={false}
+                  onError={e => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }}
+                />
+                <span className="lead-card-name">{m.name}</span>
+                <span className="lead-card-lvl">Lv{m.level}{fainted ? ' · FNT' : ''}</span>
+                <div className="lead-card-hp">
+                  <div
+                    className={`lead-card-hp-fill party-chip-hp-fill--${hpState(m.hp, m.maxHp)}`}
+                    style={{ width: `${m.maxHp > 0 ? Math.max(0, Math.min(100, (m.hp / m.maxHp) * 100)) : 0}%` }}
+                  />
+                </div>
+              </button>
+            );
+          })}
         </div>
       </div>
     </div>

@@ -53,6 +53,14 @@ export interface ShopPrompt {
 // member to swap out) or declines. Aliased to the timeline's wire shape.
 export type AcquisitionPrompt = AcquisitionOffer;
 
+// A forced faint-switch (Stage 3): the roster to send a replacement in from (fainted members disabled) + the name
+// that just fainted (for the title). A blocking, non-dismissable modal — the battle waits server-side until the
+// player picks a live member (RespondSwitchIn).
+export interface SwitchInPrompt {
+  party: PartyMember[];
+  faintedName: string;
+}
+
 // A transient loot hover (gold + items) floated over the field, then auto-dismissed by the view. Shows the
 // *granted* reward (the option the player picked) after the blocking pick-one-of-N choice resolves — every
 // source (a battle-win drop and a Treasure/Mystery node) funnels its RewardGranted through this same hover.
@@ -90,6 +98,8 @@ export interface BattleState {
   // Between-biome lead choice (Stage 1d): the roster to pick the next biome's lead from (the active one flagged),
   // or null when no choice is open. A blocking modal — the run waits server-side until the player picks.
   leadChoice: PartyMember[] | null;
+  // Forced faint-switch (Stage 3): the send-in prompt when the lead faints with a live bench member, or null.
+  switchIn: SwitchInPrompt | null;
   party: PartyMember[];
   dropToast: DropToast | null;
   gold: number;
@@ -137,6 +147,7 @@ export const initialState: BattleState = {
   shop: null,
   acquisition: null,
   leadChoice: null,
+  switchIn: null,
   party: [],
   dropToast: null,
   gold: 0,
@@ -269,6 +280,21 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
       return { ...state, leadChoice: action.party };
     case 'HIDE_LEAD_CHOICE':
       return { ...state, leadChoice: null };
+    case 'SHOW_SWITCH_IN':
+      return { ...state, switchIn: { party: action.party, faintedName: action.faintedName } };
+    case 'HIDE_SWITCH_IN':
+      return { ...state, switchIn: null };
+    case 'SWITCHED_IN':
+      // Retarget the player nameplate onto the incoming creature (name/level/HP/status). The XP bar + move menu
+      // refresh on the next TurnStarted (which carries no level, hence Level rides on the switch-in event).
+      return {
+        ...state,
+        playerName: action.name,
+        playerLevel: action.level,
+        playerHp: action.hp,
+        playerMaxHp: action.maxHp,
+        playerStatus: action.status,
+      };
     case 'SET_GOLD':
       return { ...state, gold: action.gold };
     case 'SHOW_DROP':

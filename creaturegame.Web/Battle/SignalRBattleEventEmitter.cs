@@ -349,6 +349,22 @@ public sealed class SignalRBattleEventEmitter(
             ChargingUp e => ("ChargingUp", new { e.CreatureName, e.MoveName }),
             CreatureFainted e => ("CreatureFainted", new { e.Name }),
             CreatureFled e => ("CreatureFled", new { e.Name, e.IsPlayer }),
+            SwitchInOffered e => (
+                "SwitchInOffered",
+                new { Party = e.Party.Select(ProjectPartyMember), e.FaintedName }
+            ),
+            CreatureSwitchedIn e => (
+                "CreatureSwitchedIn",
+                new
+                {
+                    e.Name,
+                    e.SpeciesId,
+                    e.Level,
+                    e.Hp,
+                    e.MaxHp,
+                    Status = e.Status.ToString(),
+                }
+            ),
             ExperienceGained e => ("ExperienceGained", new { e.CreatureName, e.Amount }),
             LeveledUp e => (
                 "LeveledUp",

@@ -158,6 +158,13 @@ export type Action =
   // then hidden by the player's pick. The run waits server-side until ChooseLead answers.
   | { type: 'SHOW_LEAD_CHOICE'; party: PartyMember[] }
   | { type: 'HIDE_LEAD_CHOICE' }
+  // Forced faint-switch (Stage 3): the active creature fainted but the bench has a live member, so the player
+  // MUST send in a replacement — a blocking, non-dismissable modal over the roster (fainted members disabled).
+  // The battle waits server-side until RespondSwitchIn answers.
+  | { type: 'SHOW_SWITCH_IN'; party: PartyMember[]; faintedName: string }
+  | { type: 'HIDE_SWITCH_IN' }
+  // A replacement was sent in — retarget the player nameplate (name/level/HP/status) onto the incoming creature.
+  | { type: 'SWITCHED_IN'; name: string; level: number; hp: number; maxHp: number; status: string }
   // Run economy: set the gold total (RewardGranted carries the post-credit total) shown in the BAG money box.
   | { type: 'SET_GOLD'; gold: number }
   // Loot drop hover: a transient floating "you found …" toast (gold + items) shown over the field for a
@@ -185,6 +192,9 @@ export type BridgeCommand =
   | { type: 'spawnEnemy'; enemySpeciesId: number }
   | { type: 'transformSprite'; side: Side; speciesId: number }
   | { type: 'resetPlayerSprite' }
+  // Forced faint-switch (Stage 3): swap the player sprite to the incoming creature's species and make it the new
+  // "true" species (so a later win's resetPlayerSprite reverts to it, not the fainted one).
+  | { type: 'swapPlayerCreature'; speciesId: number }
   | { type: 'playEvolutionAnimation'; toSpeciesId: number };
 
 // One primitive instruction in a timeline.
@@ -590,6 +600,34 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       // to re-flag the lead). Narrate the swap.
       const name = payload.name as string;
       return { steps: [w(150), d(log(`${name} is now your lead!`, 'event')), w(400)] };
+    }
+
+    case 'SwitchInOffered': {
+      // The active creature fainted but the bench has a live member — raise the forced (non-dismissable) switch-in
+      // modal. The battle blocks server-side until RespondSwitchIn answers, so the timeline idles here (like the
+      // other blocking prompts) until the player picks. Queued so it follows the faint animation cleanly.
+      const party = parsePartyMembers(payload.party);
+      const faintedName = payload.faintedName as string;
+      return { steps: [w(200), d({ type: 'SHOW_SWITCH_IN', party, faintedName })] };
+    }
+
+    case 'CreatureSwitchedIn': {
+      // A replacement was sent in (the modal already closed on the player's press). Swap the player sprite to the
+      // incoming species, retarget the nameplate onto it, and narrate the send-in. It battles the same enemy from
+      // the next turn (which refreshes the XP bar + moves). The PartyUpdated snapshot that follows re-flags the lead.
+      const name = payload.name as string;
+      const speciesId = payload.speciesId as number;
+      const level = payload.level as number;
+      const hp = payload.hp as number;
+      const maxHp = payload.maxHp as number;
+      const status = payload.status as string;
+      return { steps: [
+        w(200),
+        emit({ type: 'swapPlayerCreature', speciesId }),
+        d({ type: 'SWITCHED_IN', name, level, hp, maxHp, status }),
+        d(log(`Go! ${name}!`, 'event')),
+        w(400),
+      ] };
     }
 
     case 'RunNodeEntered': {
@@ -1074,6 +1112,7 @@ function emitCommand(c: BridgeCommand): void {
     case 'spawnEnemy':         bridge.emit('spawnEnemy', { enemySpeciesId: c.enemySpeciesId }); break;
     case 'transformSprite':    bridge.emit('transformSprite', { side: c.side, speciesId: c.speciesId }); break;
     case 'resetPlayerSprite':  bridge.emit('resetPlayerSprite', undefined); break;
+    case 'swapPlayerCreature': bridge.emit('swapPlayerCreature', { speciesId: c.speciesId }); break;
     case 'playEvolutionAnimation': bridge.emit('playEvolutionAnimation', { toSpeciesId: c.toSpeciesId }); break;
   }
 }

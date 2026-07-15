@@ -150,6 +150,33 @@ public sealed class ScriptedInput(params string[] moveNames) : IBattleInput
         LeadChoicesOffered.Add(context);
         return Task.FromResult(_leadPick ?? context.Party.LeadIndex);
     }
+
+    private int? _switchInPick;
+
+    /// <summary>Makes this input send in the party member at <paramref name="index"/> on a forced faint-switch
+    /// (the default falls back to the interface default — the first live member). An out-of-range / fainted pick
+    /// is corrected to the first live member by <see cref="Battle"/>, so a test can safely over-shoot.</summary>
+    public ScriptedInput PicksSwitchIn(int index)
+    {
+        _switchInPick = index;
+        return this;
+    }
+
+    /// <summary>Forced faint-switch prompts this input has received, in order — lets a test prove the switch was
+    /// offered (and inspect the roster + the fainted member presented).</summary>
+    public List<SwitchInContext> SwitchInsOffered { get; } = [];
+
+    public Task<int> ChooseSwitchInAsync(SwitchInContext context)
+    {
+        SwitchInsOffered.Add(context);
+        // Fall back to the interface default (first live member) when the test didn't pin a pick.
+        if (_switchInPick is int pick)
+            return Task.FromResult(pick);
+        for (int i = 0; i < context.Party.Count; i++)
+            if (context.Party.Members[i].IsAlive())
+                return Task.FromResult(i);
+        return Task.FromResult(context.Party.LeadIndex);
+    }
 }
 
 /// <summary>

@@ -17,6 +17,7 @@ public sealed class SignalRInput : IBattleInput
     private volatile TaskCompletionSource<ShopAction>? _shopTcs;
     private volatile TaskCompletionSource<AcquisitionDecision>? _acquisitionTcs;
     private volatile TaskCompletionSource<int>? _leadTcs;
+    private volatile TaskCompletionSource<int>? _switchInTcs;
     private volatile bool _cancelled;
 
     // The raw request the hub completes the turn handshake with, mapped to a TurnChoice below.
@@ -301,6 +302,31 @@ public sealed class SignalRInput : IBattleInput
     }
 
     /// <summary>
+    /// Awaits the player's forced faint-switch pick: the party-member index to send in against the same enemy
+    /// (Phase 4 Stage 3). Same TCS handshake as the other prompts (the hub's <c>RespondSwitchIn</c> completes it
+    /// via <see cref="SetSwitchInChoice"/>); the <see cref="_cancelled"/> guard makes a disconnect throw rather
+    /// than hang the battle on the prompt. A stale / out-of-range / fainted index is corrected to the first live
+    /// member downstream (<c>Battle</c>), so a malformed pick never sends in a downed creature.
+    /// </summary>
+    public async Task<int> ChooseSwitchInAsync(SwitchInContext context)
+    {
+        if (_cancelled)
+            throw new OperationCanceledException("Battle input cancelled (client disconnected).");
+
+        var tcs = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _switchInTcs = tcs;
+        var index = await tcs.Task; // throws OperationCanceledException if Cancel() ran
+        _switchInTcs = null;
+        return index;
+    }
+
+    public void SetSwitchInChoice(int index)
+    {
+        var tcs = _switchInTcs;
+        tcs?.TrySetResult(index);
+    }
+
+    /// <summary>
     /// Unblocks a battle loop waiting on player input when the client disconnects,
     /// so the fire-and-forget battle task can complete and be collected.
     /// </summary>
@@ -316,5 +342,6 @@ public sealed class SignalRInput : IBattleInput
         _shopTcs?.TrySetCanceled();
         _acquisitionTcs?.TrySetCanceled();
         _leadTcs?.TrySetCanceled();
+        _switchInTcs?.TrySetCanceled();
     }
 }

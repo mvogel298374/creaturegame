@@ -13,13 +13,16 @@ randomised map, depth-scaled foes), the **Run Economy** (gold + rewards), the **
 rarity rewards), and the **level-aware XP curve + trainer bonus** are all done and archived (→ `TODO_ARCHIVE.md`).
 
 **Next up, in priority order:**
-1. **Encounter Logic — Phase 4: Stage 3 — forced-switch-on-faint** (the last open Phase 4 piece; the acquisition
-   channels — themed draft + boss catch — are both done). This is where `Battle` first learns about the party, and
-   the groundwork the voluntary [In-Combat Switching](#in-combat-switching--voluntary-in-battle-party-switching-planned-core-feature)
-   feature then builds on. `/plan` first.
+1. **In-Combat Switching** — the voluntary, any-turn SWITCH turn-action (its own documented core feature below),
+   now unblocked: Phase 4 **Stage 3 (forced-switch-on-faint) is DONE**, so `Battle` already holds the party and the
+   forced + voluntary send-in path exists. `/plan` first; a good `opus-engineer` candidate (central `Battle` /
+   `AttackAction` turn-resolution change).
 2. **Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by the acquisition channels.
    *(Item acquisition itself is already done via the Run Economy; bag persistence + catch remain.)*
-3. **Game Loop & Progression** — party, switching, save layer (`save.db`).
+3. **Game Loop & Progression** — save layer (`save.db`); party + between-biome lead + forced-switch are done.
+
+*(**Phase 4 is now complete** — the roster, both acquisition channels, between-biome lead swap, and
+forced-switch-on-faint all shipped.)*
 
 *(The **Shop node** — the last Run Economy follow-up — is now done: `ShopRunEvent` + `ShopCalculator`, a
 spend-gold buy modal. See below.)*
@@ -29,7 +32,7 @@ Multi-Generation groundwork, User Documentation.
 
 ---
 
-## Encounter Logic — Phase 4 (the only open piece)
+## Encounter Logic — Phase 4 ✅ COMPLETE (2026-07-15)
 
 Phases 1–3 (biome model + type-filtered pool, `IEnemyArchetype` tiers + depth bands, `RunDirector` event model
 + live biome-graph map + tuned Boss-capped node curve) are **done and archived**, along with the four follow-on
@@ -120,12 +123,126 @@ below (session plan mirrored here for durability; the ephemeral copy was `kind-c
   already applied, so the catch is pure upside. Covered by `RunDirectorAcquisitionTests` (accept/decline-no-op/
   no-supplier/channel-distinctness), `BossCatchCalculatorTests` (roll boundary), and `EncounterFactoryBossCatchTests`
   (full-HP boss-species copy over the live DB / roll-miss offers nothing).
-- [ ] **Stage 3 — forced-switch-on-faint** (the battle-seam party upgrade, borders the Game Loop milestone):
-  when the lead faints and another member is alive, send out the next healthy creature instead of ending the run;
-  the run ends only when the **whole party** is down. **This is where `Battle` first learns about the party** (it
-  must hold the benched creatures, not just the lead) — the plumbing the fully-voluntary
-  [**In-Combat Switching**](#in-combat-switching--voluntary-in-battle-party-switching-planned-core-feature)
-  feature then builds a SWITCH turn-action on top of. Voluntary in-battle switching + `save.db` stay beyond Phase 4.
+- [x] **Stage 3 — forced-switch-on-faint** ✅ DONE (2026-07-15) — the battle-seam party upgrade; `Battle` now holds
+  the party and, on the active creature's faint with a live bench member, blocks on a forced (non-dismissable)
+  switch-in modal → sends the chosen survivor in against the **same** enemy → continues; the run ends only when the
+  **whole party** is down. New `SwitchInOffered`/`CreatureSwitchedIn` events + `ChooseSwitchInAsync` input seam
+  (default = first live member) + `SignalRInput` TCS + `BattleHub.RespondSwitchIn` + emitter projections & field
+  guards + `timeline`/`battleReducer`/`useBattleHub` (`playerNameRef` retarget on switch-in) + `BattleScreen`
+  `SwitchInModal` + a `swapPlayerCreature` Phaser command (slide the incoming back-sprite in; new *true* species so
+  a later win's `resetPlayerSprite` keeps it). `BattleRunEvent` re-reads `s.Player` post-battle so win/loss, carried
+  status, and evolution act on the **finisher** (evolution gated to the no-switch case; a switched-in finisher's
+  evolution offers on its next clean win). Only the **finisher** earns XP/Stat-Exp (= the DoR's "only the lead earns
+  XP"). No generation seam (gen-invariant); zero importer/DB change.
+
+  **Two edges closed during the pre-finish gates (2026-07-15):** (1) **flee + faint on the same turn** — a
+  switch-in `continue`s past the end-of-turn flee gate, so a foe already scared off by Roar/Whirlwind would have
+  got a free turn against the incoming creature. The flee is now snapshotted *before* the faint branches and the
+  switch is gated on it (`!fledThisTurn && await TrySwitchInAsync()`): a fled foe means there's nobody to send
+  anyone in against, so the documented "a faint takes precedence (a KO is a real result)" ordering stands and the
+  battle ends as a loss (user-decided 2026-07-15). (2) **the CHECK POKEMON panel read the wrong creature** —
+  `ActiveBattle.Player` is captured at session claim and never reassigned, so `GET /api/game/{id}/player` showed
+  the *fainted* starter's sheet after a switch. Now resolved live through the new pure
+  `GameSessionManager.ActiveCreature(party, starter)` (= `party?.Lead ?? starter`, the `GetParty` precedent).
+  *(This debt predated Stage 3 — Stage 1d's between-biome swap already staled the read — but Stage 3 opened the
+  common mid-battle path into it; one fix closes both.)* The duplicated entry-status rule was also folded into a
+  single `Battle.ApplyEntryStatus` used by both the opening lead and the send-in.
+
+  Covered by `BattleForcedSwitchTests`
+  (switch/enemy-state-preserved / no-live-bench = loss / legacy single-creature / carried-status-no-leak /
+  stale-pick fallback incl. negative + out-of-range / party-wired **double-faint offers no switch** / incoming
+  **neither acts nor takes end-of-turn DoT** on its entry turn / **flee + faint** ends without a switch or a free
+  turn), `BattleForcedSwitchIdentityTests` (a **Transform**ed creature that faints into a switch is restored *as it
+  leaves* — the end-of-battle restore can't reach a benched creature; driven through the real moves DB),
+  `RunDirectorForcedSwitchTests` (run continues past a lead faint + `RunState.Player` tracks
+  the finisher / whole-party wipe ends the run), `ActiveCreatureResolutionTests` (the panel follows the lead across
+  a switch), `WebEventContractTests` field guards, Vitest (reducer +
+  timeline), and **E2E `forced-switch.spec.ts`** (seeded run → draft accepted → lead faints → forced modal with the
+  fainted member disabled → pick → "Go! X!", nameplate retargets, battle continues — the DoR's opportunistic E2E,
+  now actually covered). **The five Stage 1d / acquisition lead-identity tests that encoded the interim "lead faint ends the
+  run" model were updated to Stage-3 reality** — four in `RunDirectorLeadChoiceTests` (assert the lead-choice
+  effect via the battler record, not the post-wipe final lead) and `RunDirectorAcquisitionTests`'
+  `ThemedDraft_PartyFull_AcceptTargetingTheLead_IsRefusedAsADecline` (asserts the refused swap on the lead's
+  **slot**, `Members[0]`, instead of `Party.Lead` — `SetLead` moves `LeadIndex` only and never reorders, so the
+  slot assertion is exact where `Party.Lead` is now churned by the post-decline wipe's forced switches).
+  *(`CreatureSwitchedIn` also carries a `Level` beyond the signature sketched below — `TurnStarted` carries no
+  level and the nameplate needs it.)* This is the Battle-holds-party groundwork the voluntary
+  [**In-Combat Switching**](#in-combat-switching--voluntary-in-battle-party-switching-planned-core-feature) feature
+  builds its SWITCH turn-action on.
+
+  **`/plan` (2026-07-14) — the design as built:** When the **active** creature faints and a bench member is
+  still alive, the run **does not end**: the player **picks** the replacement from a forced (non-dismissable)
+  party-select modal — "player chooses", the faithful Gen-1 forced-switch, decided with the user 2026-07-14 —
+  and it comes in against the **same (damaged) enemy**; the run ends only when the **whole party** is down.
+  **This is where `Battle` first learns about the party** — it must hold the benched creatures so it can bring in
+  the next one against the live enemy — and it is deliberately the *choose*-a-replacement path (not auto-send-next)
+  so it front-loads the in-battle party-select modal + `ChooseSwitchInAsync` prompt that the deferred
+  [**In-Combat Switching**](#in-combat-switching--voluntary-in-battle-party-switching-planned-core-feature) feature
+  reuses (forced + voluntary **share the send-in path**, so that later feature shrinks to "add the voluntary SWITCH
+  turn-action trigger + enemy-AI switching"). Voluntary in-battle switching + `save.db` stay beyond Phase 4.
+
+  **Design (the finalized `/plan`):**
+  - **Engine — `Battle` holds the party (the central change).** Add an optional `Party? playerParty = null`
+    constructor param (threaded from `BattleRunEvent` as `s.Party`); null keeps the legacy **single-creature**
+    behaviour (break-on-faint) so every direct `Battle` caller (tests, the endless chain) is untouched. Make the
+    today-readonly `PlayerCreature` a **reassignable** field (the active creature). The faint check already sits at
+    the clean **end-of-turn** boundary (after both actions + end-of-turn DoT/Leech), and the **enemy-faint (win)
+    check runs first** — so the forced switch only fires on the *isolated* new path **enemy alive + active creature
+    fainted**, leaving the existing **double-faint** semantics (`BattleRunnerTests.Runner_DoubleFaint…`) intact. On
+    that path: emit `CreatureFainted` (already fires) → if `playerParty` has a live bench member, restore the
+    outgoing creature's Mimic/Transform identity *before it leaves* (so a transformed-then-fainted mon can't leak
+    its copied moveset/stats), block on `ChooseSwitchInAsync`, then bring the chosen member in and **`continue`** the
+    turn loop against the same enemy; if **no** bench member is alive, `break` as today (loss). Bringing a member in
+    = `party.SetLead(index)` (⇒ `RunState.Player` and the director's `while (Player.IsAlive())` guard "just work") +
+    reassign `PlayerCreature` + `ResetBattleState()` + re-apply **that creature's own** `CarriedStatus` (same as the
+    battle-start entry-status path) + emit `CreatureSwitchedIn` + `PartyUpdated`. The replacement **does not act**
+    the turn it enters (the turn already resolved) and takes **no** end-of-turn DoT that turn (freshly reset) —
+    canonical Gen 1; it acts normally next turn, and the enemy gets **no** free hit.
+  - **Input seam.** `IBattleInput.ChooseSwitchInAsync(SwitchInContext) -> int` (index of the chosen live member),
+    with a **default** that returns the first live bench member — so `AutoSelectInput` / the AI / headless tests
+    never stall and never send in a fainted mon. `SignalRInput` adds the TCS handshake (mirrors the mid-battle
+    `ChooseMoveToForgetAsync` and the `ChooseAcquisitionAsync`/`ChooseLeadAsync` prompts); `Cancel()` faults it on
+    disconnect. Called from **inside `Battle`** via `_playerInput` (like the move/forget prompts), not from a
+    `RunEvent`. A stale / out-of-range / **dead** pick falls back to the first live member (never strands, never
+    sends in a fainted creature).
+  - **Events + wire (mind the recurring web-event field-projection gap — memory `web_event_field_projection_gap`):**
+    two new `BattleEvent`s, each needing its `SignalRBattleEventEmitter` projection **and** a field-level
+    `WebEventContractTests` guard — `SwitchInOffered(PartyMemberView[] party, string faintedName)` (client raises the
+    forced modal; reuses `PartyProjection.Snapshot`) and `CreatureSwitchedIn(name, speciesId, hp, maxHp, status)`
+    (client swaps the canvas sprite + nameplate and logs "… was sent out!"), plus the existing `PartyUpdated`
+    snapshot. Named `CreatureSwitchedIn` to align with In-Combat Switching's planned `CreatureSwitchedOut/In` (the
+    "switched out" here **is** the `CreatureFainted` already emitted). `BattleHub.RespondSwitchIn(int)` completes the
+    TCS; `GameSessionManager` routes it.
+  - **Frontend — provisional-pending-refinement (flag per `feedback_plan_durability_and_iteration`).** Shape:
+    `timeline.ts` arms `SwitchInOffered` (raise modal / pause) + `CreatureSwitchedIn` (sprite-swap + nameplate + log)
+    + `PartyUpdated`; `battleReducer.ts` sets a forced-switch-pending flag (gates the modal) and updates the active
+    nameplate/sprite/HP on switch-in; `useBattleHub.ts` adds `respondSwitchIn(index)`; a new **forced (non-closable)**
+    `SwitchInModal` reuses `PartyStrip`/`AcquisitionModal` styling — live members selectable, fainted greyed &
+    disabled; a Phaser `BridgeCommand` swaps the player sprite to the new species. Finalize the exact component split
+    at implementation time.
+  - **DoR #3 — gen-variable surface: none.** Forced faint-switch (a fainted mon is replaced; no free hit; no
+    turn-order or partial-trap question — those are *voluntary*-switch concerns owned by In-Combat Switching) is
+    generation-invariant. No `IBattleRules`/`ITypeChart`/`IStatCalculator` touched; satisfies `GENERATION_SEAMS.md`
+    §5.0 trivially. Zero importer/DB change; transient (no `save.db`).
+  - **DoR #4 — Gen-1 truth:** incoming resets **volatiles** (stat stages, confusion, Leech Seed, binding, …) but
+    **keeps its own major status** (the carry model — status can't leak from the outgoing mon); replacement doesn't
+    act the entry turn; enemy keeps its HP/status/stages. **XP/Stat-Exp to the finisher only** — the active creature
+    that lands the KO earns it, a fainted member earns nothing; this is the DoR's "only the lead earns XP (no Exp
+    Share)" under switching (the finisher *is* the active lead), i.e. **not** a deviation, and the participant-split
+    Exp remains the documented deferral. Post-win, `BattleRunEvent` captures `CarriedStatus` on `s.Player` = the
+    (possibly switched-in) finisher; the fainted member stays at 0 HP on the bench until the next Poké Center
+    `FullHeal` — and the Poké Center caps each biome **before** the between-biome lead choice, so a fainted member is
+    always healed before it can be re-picked as lead.
+  - **DoR #6 — tests must assert:** (Battle) active faints + live bench ⇒ chosen member sent in, **enemy state
+    preserved**, loop continues; active faints + no live bench ⇒ loss; incoming `BattleState` reset + its own
+    `CarriedStatus` applied (**status-no-leak** from the outgoing); incoming **doesn't act** its entry turn;
+    stale/out-of-range/**dead** pick ⇒ fallback to first live member; **double-faint semantics unchanged**. (Director)
+    run continues past a lead faint with a live bench and **ends when the whole party is down**; `RunState.Player`
+    tracks the switched-in creature; post-win capture on the finisher. (Wire) `SwitchInOffered` + `CreatureSwitchedIn`
+    **field-level** projection guards. (Vitest) reducer switch-in transition + timeline arms. (E2E, opportunistic) a
+    seeded run: lead faints → forced modal → pick a replacement → battle continues.
+  - **DoR #7 — dependencies:** builds directly on Stages 1a–2 (the `Party`, carry model, and acquisition/lead wire
+    precedents). Independent of `save.db`. It is the prerequisite for **In-Combat Switching** (Battle-holds-party).
 
 **DoR #6 — quirks the tests must assert:** fought-only guardrail (never offer an un-fought species; set resets on
 biome change ✅ done); cadence + **never a dead offer** when the fought pool is empty; roster cap 6 + party-full
@@ -181,9 +298,14 @@ assumption and is best built **on top of Stage 3's groundwork** (which is where 
   Struggle/lock-in and a trapped creature must correctly *disable* the SWITCH option; the turn is consumed even if
   the incoming creature faints to the foe's move (a valid Gen 1 outcome).
 
-**Dependencies:** best sequenced **after Stage 3** (Battle-holds-party plumbing). Independent of `save.db`.
-**Effort:** large — a central refactor of `Battle` / `AttackAction` turn resolution; a good candidate for the
-`opus-engineer` subagent and a dedicated `/plan` pass before implementation.
+**Dependencies:** **Stage 3 (forced-switch-on-faint) is DONE (2026-07-15)** — `Battle` now holds the party
+(`playerParty`), the forced send-in path exists (`TrySwitchInAsync` → `SetLead` + reset + carried-status re-apply +
+`CreatureSwitchedIn`/`PartyUpdated`), and the client has a party-select send-in modal (`SwitchInModal`) + a
+`swapPlayerCreature` sprite swap. So this feature now just adds the **voluntary trigger**: a SWITCH `TurnChoice` /
+`IBattleAction` at switch priority (the swap resolves before attacks; the incoming creature then takes the foe's
+move that turn), the partial-trapping-blocks-switch rule (`IBattleRules`), the SWITCH action-menu entry, and later
+enemy-AI switching. Independent of `save.db`. **Effort:** still a central refactor of `Battle` / `AttackAction`
+turn resolution; a good candidate for the `opus-engineer` subagent and a dedicated `/plan` pass before implementation.
 
 ---
 

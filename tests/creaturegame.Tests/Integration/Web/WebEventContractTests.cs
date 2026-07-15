@@ -572,6 +572,65 @@ public class WebEventContractTests
         Assert.Equal(9, root.GetProperty("SpeciesId").GetInt32());
     }
 
+    /// <summary>Field-level guard for the <see cref="SwitchInOffered"/> projection (Phase 4 Stage 3): the forced
+    /// switch-in modal reads the roster snapshot (each member's sprite id / name / level / HP / status / lead flag —
+    /// a fainted member reads HP 0 and is disabled) and the fainted name for the title. The reflection contract test
+    /// instantiates it with an <i>empty</i> party list, so this pins the member sub-fields + the fainted name.</summary>
+    [Fact]
+    public void SwitchInOffered_Projection_CarriesPartyMemberSubFieldsAndFaintedName()
+    {
+        var evt = new SwitchInOffered(
+            [
+                new PartyMemberInfo(6, "CHARIZARD", 40, 0, 130, StatusCondition.None, IsLead: true),
+                new PartyMemberInfo(
+                    9,
+                    "BLASTOISE",
+                    38,
+                    90,
+                    120,
+                    StatusCondition.Poison,
+                    IsLead: false
+                ),
+            ],
+            FaintedName: "CHARIZARD"
+        );
+
+        var (type, payload) = SignalRBattleEventEmitter.MapEvent(evt);
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+        var root = doc.RootElement;
+
+        Assert.Equal("SwitchInOffered", type);
+        Assert.Equal("CHARIZARD", root.GetProperty("FaintedName").GetString());
+        var party = root.GetProperty("Party");
+        Assert.Equal(0, party[0].GetProperty("Hp").GetInt32()); // the fainted lead reads HP 0 (client disables it)
+        Assert.Equal(9, party[1].GetProperty("SpeciesId").GetInt32());
+        Assert.Equal("BLASTOISE", party[1].GetProperty("Name").GetString());
+        Assert.Equal("Poison", party[1].GetProperty("Status").GetString()); // string-projected status
+        Assert.False(party[1].GetProperty("IsLead").GetBoolean());
+    }
+
+    /// <summary>Field-level guard for the <see cref="CreatureSwitchedIn"/> projection (Phase 4 Stage 3): the client
+    /// swaps the player sprite (<c>SpeciesId</c>) and retargets the nameplate (<c>Name</c>/<c>Level</c>/HP/status)
+    /// onto the incoming creature. <c>Level</c> especially must survive — <see cref="TurnStarted"/> carries none, so
+    /// a dropped level would freeze the nameplate on the fainted creature's level.</summary>
+    [Fact]
+    public void CreatureSwitchedIn_Projection_CarriesNameSpeciesLevelHpAndStatus()
+    {
+        var (type, payload) = SignalRBattleEventEmitter.MapEvent(
+            new CreatureSwitchedIn("BLASTOISE", 9, 38, 90, 120, StatusCondition.Poison)
+        );
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+        var root = doc.RootElement;
+
+        Assert.Equal("CreatureSwitchedIn", type);
+        Assert.Equal("BLASTOISE", root.GetProperty("Name").GetString());
+        Assert.Equal(9, root.GetProperty("SpeciesId").GetInt32());
+        Assert.Equal(38, root.GetProperty("Level").GetInt32());
+        Assert.Equal(90, root.GetProperty("Hp").GetInt32());
+        Assert.Equal(120, root.GetProperty("MaxHp").GetInt32());
+        Assert.Equal("Poison", root.GetProperty("Status").GetString());
+    }
+
     // Concrete (non-abstract) BattleEvent subtypes — the exact set the engine can emit to the client.
     private static List<Type> ConcreteBattleEventTypes()
     {

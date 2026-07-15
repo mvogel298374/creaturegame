@@ -6,7 +6,9 @@ namespace creaturegame.Combat;
 
 public class Battle
 {
-    private Creature PlayerCreature { get; }
+    // The active player creature. Reassignable because a forced faint-switch (Phase 4 Stage 3) can bring in a
+    // bench member mid-battle when this one faints — every turn-loop read below follows the active creature.
+    private Creature PlayerCreature { get; set; }
     private Creature EnemyCreature { get; }
     private readonly ITypeChart _typeChart;
     private readonly IBattleRules _rules;
@@ -20,6 +22,12 @@ public class Battle
     private readonly bool _escapable;
     private readonly bool _trainerBattle;
     private readonly RunRules _runRules;
+
+    // The player's party, threaded from the run loop when the battle is party-aware (Phase 4 Stage 3). When set,
+    // a faint of the active creature that leaves a live bench member triggers a forced switch-in instead of ending
+    // the battle; null keeps the legacy single-creature behaviour (a faint ends the battle), so every direct
+    // Battle caller (tests, the endless chain) is unchanged.
+    private readonly Party? _playerParty;
     private int _turnNumber;
 
     /// <summary>
@@ -49,7 +57,12 @@ public class Battle
         // NOT a generation seam: the Gen-1 formula stays pure in IBattleRules.CalculateXpAwarded; RunRules only
         // scales its result so the run layer can tune levelling pace without touching Gen-1 fidelity. Null →
         // RunRules.Default (a 1.0 no-op), so every direct Battle caller (tests, the legacy chain) is unchanged.
-        RunRules? runRules = null
+        RunRules? runRules = null,
+        // The player's party (Phase 4 Stage 3, forced-switch-on-faint). When supplied, `player` must be its
+        // current Lead; a faint of the active creature that leaves a live bench member sends in a replacement
+        // against the same enemy instead of ending the battle. Null (the default) = the legacy single-creature
+        // battle (a faint ends it), so every existing Battle caller is unchanged.
+        Party? playerParty = null
     )
     {
         PlayerCreature = player;
@@ -66,6 +79,7 @@ public class Battle
         _escapable = escapable;
         _trainerBattle = trainerBattle;
         _runRules = runRules ?? RunRules.Default;
+        _playerParty = playerParty;
     }
 
     public async Task StartFightAsync()
@@ -77,11 +91,7 @@ public class Battle
         // persists status out of battle, but the per-battle reset above just cleared it, so re-apply.
         // Volatiles (confusion, stat stages, …) are deliberately NOT carried. Enemies are always freshly
         // built, so they never carry anything.
-        if (_playerEntryStatus is { Status: not StatusCondition.None } entry)
-        {
-            PlayerCreature.Battle.Status = entry.Status;
-            PlayerCreature.Battle.SleepTurns = entry.SleepTurns;
-        }
+        ApplyEntryStatus(_playerEntryStatus);
 
         _emitter?.Emit(
             new BattleStarted(
@@ -194,6 +204,11 @@ public class Battle
             ApplyLeechSeedDrain(PlayerCreature, EnemyCreature);
             ApplyLeechSeedDrain(EnemyCreature, PlayerCreature);
 
+            // Snapshot the flee BEFORE the faint branches: a forced switch-in `continue`s past the flee gate
+            // below, so without this a foe already scared off (Roar/Whirlwind) would get a free turn against the
+            // incoming creature before the gate is finally read. Read here, while it still describes this turn.
+            bool fledThisTurn = PlayerCreature.Battle.HasFled || EnemyCreature.Battle.HasFled;
+
             if (!EnemyCreature.IsAlive())
             {
                 _emitter?.Emit(new CreatureFainted(EnemyCreature.Name));
@@ -219,9 +234,11 @@ public class Battle
                 // Gen 1 Stat Exp: the win adds the defeated foe's base stats to the player's accumulated Stat
                 // Exp (capped per stat by the calculator). It's silent (no event) and only realizes into
                 // actual stats on the next CalculateStats — so award it BEFORE the level-up loop below, so a
-                // level gained this battle already reflects the new training. Single-participant scope: one
-                // player creature, no switching, so the finisher is the only participant — a multi-mon party
-                // would instead call GainStatExp once per participant that was sent out against this foe.
+                // level gained this battle already reflects the new training. Single-recipient scope: only the
+                // FINISHER (the active creature at the KO) is awarded, even though a forced faint-switch means
+                // several party members may have been sent out against this foe. That's the deliberate "only the
+                // lead earns XP / no Exp Share" model, not an absence of switching — the participant-split award
+                // (GainStatExp once per creature that fought this foe) is the documented deferral.
                 PlayerCreature.GainStatExp(EnemyCreature);
                 // Move learning below mutates the PERMANENT MoveSet. If the player Transformed/Mimicked this
                 // battle, MoveSet currently holds the copied moveset and the end-of-battle restore would
@@ -262,6 +279,13 @@ public class Battle
             if (!PlayerCreature.IsAlive())
             {
                 _emitter?.Emit(new CreatureFainted(PlayerCreature.Name));
+                // Forced switch-on-faint (Phase 4 Stage 3): if the party still has a live bench member, send one
+                // in against the same enemy and keep fighting; the run ends only when the whole party is down.
+                // A single-creature battle (no party wired, or no live member left) falls through to the break.
+                // Not when a side fled this turn, though: there's no longer a foe on the field to send anyone in
+                // against, so the flee gate below owns the ending (the switch would otherwise skip past it).
+                if (!fledThisTurn && await TrySwitchInAsync())
+                    continue;
                 break;
             }
 
@@ -388,6 +412,84 @@ public class Battle
             _rng,
             _escapable
         );
+
+    /// <summary>
+    /// The forced faint-switch (Phase 4 Stage 3). Called after the active player creature has fainted: if the
+    /// party is wired and still holds a live bench member, ask the player which one to send in against the same
+    /// enemy, bring it in, and return true so the turn loop continues. Returns false — the battle ends as a loss —
+    /// when there's no party or every member is down (a single-creature battle always returns false, its legacy
+    /// behaviour). The replacement does <em>not</em> act the turn it enters (this turn already resolved) and the
+    /// enemy is untouched — canonical Gen 1.
+    /// </summary>
+    private async Task<bool> TrySwitchInAsync()
+    {
+        if (_playerParty is null || FirstLiveMemberIndex() < 0)
+            return false;
+
+        // The outgoing (fainted) creature leaves the field. Undo any Mimic/Transform it copied this battle before
+        // it benches, so a transformed-then-fainted creature can't leak its copied moveset/stats into its
+        // permanent half (the end-of-battle restore only reaches the creature that's active then).
+        PlayerCreature.RestoreMimickedMove();
+        PlayerCreature.RestoreOriginalIdentity();
+
+        _emitter?.Emit(
+            new SwitchInOffered(PartyProjection.Snapshot(_playerParty), PlayerCreature.Name)
+        );
+        int index = await _playerInput.ChooseSwitchInAsync(new SwitchInContext(_playerParty));
+        // Never send in a fainted / out-of-range creature: correct a stale or malformed pick to the first live
+        // member (the interface default already picks a live one, but the web hub can forward an arbitrary int).
+        if (index < 0 || index >= _playerParty.Count || !_playerParty.Members[index].IsAlive())
+            index = FirstLiveMemberIndex();
+
+        _playerParty.SetLead(index);
+        PlayerCreature = _playerParty.Lead;
+        PlayerCreature.ResetBattleState();
+        // The incoming creature enters on its OWN carried major status (Gen 1 keeps sleep/poison/burn/etc. on a
+        // benched creature) — the same entry-status application as a fresh battle's lead. Volatiles were just
+        // cleared by the reset; the previous creature's status can't leak (each member carries its own).
+        ApplyEntryStatus(PlayerCreature.CarriedStatus);
+
+        _emitter?.Emit(
+            new CreatureSwitchedIn(
+                PlayerCreature.Name,
+                PlayerCreature.SpeciesId,
+                PlayerCreature.Level,
+                PlayerCreature.Attributes.HP,
+                PlayerCreature.Attributes.MaxHP,
+                PlayerCreature.Battle.Status
+            )
+        );
+        _emitter?.Emit(new PartyUpdated(PartyProjection.Snapshot(_playerParty)));
+        return true;
+    }
+
+    /// <summary>
+    /// Applies a creature's carried out-of-battle major status as it takes the field, on top of the freshly
+    /// reset <see cref="BattleState"/>. The single rule for both entry points — the battle's opening lead
+    /// (from the ctor's carried status) and a forced faint-switch send-in (from the incoming member's own
+    /// <see cref="Creature.CarriedStatus"/>) — so the two can never drift apart. Only the major status and its
+    /// sleep counter cross; volatiles are deliberately left cleared (Gen 1).
+    /// </summary>
+    private void ApplyEntryStatus(CarriedStatus? carried)
+    {
+        if (carried is { Status: not StatusCondition.None } entry)
+        {
+            PlayerCreature.Battle.Status = entry.Status;
+            PlayerCreature.Battle.SleepTurns = entry.SleepTurns;
+        }
+    }
+
+    // The index of the first alive party member, or -1 if the whole party is down. The active (fainted) creature
+    // reads dead here too, so this only ever returns a benched live member (or -1 → the run is over).
+    private int FirstLiveMemberIndex()
+    {
+        if (_playerParty is null)
+            return -1;
+        for (int i = 0; i < _playerParty.Count; i++)
+            if (_playerParty.Members[i].IsAlive())
+                return i;
+        return -1;
+    }
 
     private void ApplyLeechSeedDrain(Creature drained, Creature healed)
     {

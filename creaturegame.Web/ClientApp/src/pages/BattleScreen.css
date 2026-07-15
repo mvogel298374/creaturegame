@@ -1953,6 +1953,9 @@
 
 .lead-card:hover { border-color: var(--clr-sky); }
 .lead-card--current { border-color: var(--clr-sky); box-shadow: 0 0 8px rgba(120, 190, 255, 0.35); }
+/* A fainted member in the forced switch-in picker: greyed and not choosable (the run's other survivors are). */
+.lead-card--fainted { opacity: 0.4; cursor: not-allowed; filter: grayscale(0.8); }
+.lead-card--fainted:hover { border-color: rgba(255, 255, 255, 0.25); }
 
 .lead-card-sprite { width: 48px; height: 48px; image-rendering: pixelated; }
 .lead-card-name { font-size: var(--fs-sm); }
