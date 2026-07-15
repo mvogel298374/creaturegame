@@ -216,11 +216,18 @@ public sealed class GameSessionManager(
     public Creature? GetPlayerCreature(string gameId)
     {
         if (_active.TryGetValue(gameId, out var battle) && battle.Player is not null)
-            return battle.Player;
+            return ActiveCreature(battle.Party, battle.Player);
         if (_pending.TryGetValue(gameId, out var pending))
             return pending.Player;
         return null;
     }
+
+    /// <summary>The creature the panel should describe: the party's <em>live</em> lead when a party is wired,
+    /// else the session's starter. The lead moves — the between-biome lead swap (Phase 4 Stage 1d) reassigns it —
+    /// so it must be resolved per read, never captured at session claim. Pure + internal so the rule is
+    /// unit-testable on its own (as <c>ProjectBagView</c> is).</summary>
+    internal static Creature? ActiveCreature(Party? party, Creature? starter) =>
+        party?.Lead ?? starter;
 
     public void SetMoveChoice(string connectionId, int moveIndex)
     {
@@ -459,11 +466,14 @@ sealed class ActiveBattle
     public SignalRInput Input { get; } = new();
     public volatile string? CurrentConnectionId;
 
-    // The persistent player creature for this run, for the on-demand overview snapshot (read-only display use).
+    // The run's STARTER, captured at claim and never reassigned — a fallback for the on-demand overview snapshot
+    // when no party is wired. It is NOT necessarily the creature now on the field: read the active one through
+    // GameSessionManager.ActiveCreature, which prefers the party's live Lead.
     public Creature? Player;
 
-    // The run's party (up to six; its Lead is Player). The same instance the RunDirector's RunState plays over,
-    // so the party-hydrate endpoint reads the live roster. Set when the session is claimed; never reassigned.
+    // The run's party (up to six). The same instance the RunDirector's RunState plays over, so the party-hydrate
+    // endpoint reads the live roster — and its Lead is the creature actually on the field (the between-biome lead
+    // swap moves it). Set when the session is claimed; never reassigned.
     public Party? Party;
 
     // The run's bag (threaded into every Battle), wallet (credited by reward rolls), and the item catalog
