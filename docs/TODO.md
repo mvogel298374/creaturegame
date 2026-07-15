@@ -27,8 +27,9 @@ forced-switch-on-faint all shipped.)*
 *(The **Shop node** — the last Run Economy follow-up — is now done: `ShopRunEvent` + `ShopCalculator`, a
 spend-gold buy modal. See below.)*
 
-Lower priority / opportunistic: E2E flakiness stabilisation, Web UI polish (move-specific animations),
-Multi-Generation groundwork, User Documentation.
+Lower priority / opportunistic: E2E flakiness stabilisation (`status.spec.ts` **fixed 2026-07-15** — root cause
+was a spec asserting a transient badge, not an engine bug; see *Browser-Based UI Testing* for the seed-≠-determinism
+lesson it taught), Web UI polish (move-specific animations), Multi-Generation groundwork, User Documentation.
 
 ---
 
@@ -607,8 +608,14 @@ tested through the `mitt` bridge (assert **event ordering**, never wall-clock du
 
 **Done (2026-07-05):**
 - [x] **Seed plumbing** — `StarterSelection` forwards an optional `?seed=<int>` URL param into the `/start`
-  request (backend already accepted `Seed`), so an E2E can pin a fully deterministic run. `?e2e=1` still sets
+  request (backend already accepted `Seed`), so an E2E can pin a repeatable run. `?e2e=1` still sets
   test mode. react-router drops the query on nav from the title, so seeded specs land directly on `/select?seed=`.
+  > **A seed is not by itself determinism** (learned the hard way, 2026-07-15 — it flaked two specs). The seed
+  > fixes the *server's* RNG stream, but the **client's move sequence is what draws from it**: a spec that races
+  > (polling loops, `waitFor` timeouts, a swallowed click) submits moves on different turns under load, which
+  > shifts every later roll and plays out a different run. A seeded spec is only deterministic if the driving loop
+  > is **paced** — settle each turn (wait for the action menu to come back) before the next input. Otherwise write
+  > the assertions not to care (retry/walk seeds). See `status.spec.ts` and `forced-switch.spec.ts`.
 - [x] **Run Economy reward-modal E2E** (`reward-modal.spec.ts`) — seed 31 / CHARIZARD @ L50 lays the first
   biome node as a **Treasure**, so the modal fires right after the opening route pick (no battle to win). Asserts
   the modal + title, a gold line (`+N₽`) + item line, the **gold HUD credit** (was `₽0`), and OK →
