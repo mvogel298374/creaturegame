@@ -784,11 +784,74 @@ comment-density pass; (D) minor comment/dead-field batch; the **RNG seam** (CLOS
 `AlwaysHit`/`AlwaysCrit` shim idea, the unseeded-web-composition-root, or "Roll\* ignores the battle seed");
 and Architecture Review #7 (`SecondaryHits` seam dedup, `MoveImport.MapToAttack` split + `MoveMappingTests`).
 
-**Still open:**
+**Still open** (filed 2026-07-16 from a repo-wide structural review — ranked by cost-of-deferring, not size):
 
-*(none — the `bag.ts` effect-registry drift seam below is now closed.)*
+- [ ] **`RunDirector`'s constructor takes 22 parameters → a parameter object.** `RunDirector.cs:49-92`; the
+  call site in `GameSessionManager.cs:124` runs 45+ lines. 12 params are optional, most are `Func<>` policy
+  suppliers (`enemySupplier`, `rewardSupplier`, `shopSupplier`, `draftSupplier`, `bossCatchSupplier`,
+  `nodePlanFactory`, `checkEvolution`). **The injection pattern itself is right** — web-layer policy into a
+  policy-free core is what `GAME_LOOP.md` / `ENCOUNTER_DESIGN.md` argue for; only the delivery mechanism is at
+  its limit. Every new node kind or acquisition channel adds another param + another default, and the defaults
+  now encode the legacy-chain-vs-biome-mode switch in a way that's hard to read as a whole.
+  *Fix:* a `RunDirectorOptions` record with the optional/supplier surface on it; keep the genuinely required
+  args (player, enemySupplier, typeChart, inputs, movePool) positional. Absorbs future growth without touching
+  the signature. **Do this before the next node kind lands** — it gets more expensive per parameter added.
+- [ ] **TypeScript is never typechecked by any gate.** `tsc` runs only in `npm run build`; neither `test.ps1`
+  nor `.githooks/pre-commit` invokes it, and Vitest strips types via esbuild without checking them. So a TS
+  type error passes every gate and lands. Sharply asymmetric with the C# side, where the hook blocks on
+  CSharpier *and* the full suite — and `tsconfig` is already `strict` with `noUnusedLocals`/`noUnusedParameters`,
+  so the rigour is configured but unenforced. *Fix:* add `tsc --noEmit` to `test.ps1`'s `-Web` leg (one line).
+  There is also no ESLint/Prettier config in `ClientApp/` at all — separate, lower-value call.
+- [ ] **`RunDirector.cs` is 1091 lines holding 9 types** — the director, 6 `IRunEvent` classes
+  (`BattleRunEvent`, `RecoveryRunEvent`, `LeadChoiceEvent`, `BiomeChoiceEvent`, `ShopRunEvent`,
+  `RewardRunEvent`) and 2 static resolution helpers (`RewardResolution`, `AcquisitionResolution`). Split the
+  events out per-file under `Combat/RunEvents/`. It also carries a small live duplication: `PlayerAttackTypes`
+  (:801) and `CreatureTypes` (:1082) both walk `Type1`/`Type2` in different shapes — collapse to one helper.
+  *Note:* `RunLoop.cs` also has ~28 types but is **fine** — a cohesive vocabulary file of small records. Don't
+  let a type-count metric drive a split there.
+- [ ] **`BattleScreen.tsx` — 1317 lines, ~25 components.** 8 modals (`Recovery`, `EvolutionPrompt`,
+  `RewardChoice`, `Shop`, `Acquisition`, `LeadChoice`, `SwitchIn`, `MoveReplacement`) + 11 hand-rolled
+  `<div className="modal-overlay">` blocks. Escape-to-close is ad hoc: the map overlay has it (:468), the
+  blocking modals don't — plausibly deliberate for blocking prompts, but currently an accident of each
+  component rather than a stated rule. *Fix:* a shared `<Modal>` wrapper that makes the escapable/blocking
+  choice explicit; lift the modals into `components/modals/`.
+- [ ] **`Creature/` and `Creatures/` are two directories that both declare `namespace creaturegame.Creatures`.**
+  (`Creature/` holds Creature, Attributes, BattleState, Party, StatStages, stat calc; `Creatures/` holds Biome,
+  EncounterSelector, LearnsetMove(Selector).) The split carries no meaning, and it quietly violates the
+  folder=namespace convention the test project follows perfectly (verified: zero mismatches under `tests/`).
+  *Fix:* merge into `Creatures/` — a pure file move, no namespace/using churn since both already share it.
+- [ ] *(low)* **No `Directory.Build.props`** — `TargetFramework`/`ImplicitUsings`/`Nullable` are copy-pasted
+  across all four csprojs, and there are no analyzers or `TreatWarningsAsErrors`. Build is clean (0 warnings)
+  today, so this is cheap insurance to keep it that way, not a fix for a live problem.
+- [ ] *(low, watch — do not refactor speculatively)* **`AttackAction` still has three large methods**:
+  `ResolveDamage` (145 lines), `ExecuteAsync` (140), `ResolvePreDamageGates` (112), despite the earlier split
+  archived as (B). It is central and well-tested; revisit only if a change makes it hurt.
 
 **Done & archived:**
+- [x] **Event wire contract was guarded by name but not by field** — CLOSED (2026-07-16). Every `BattleEvent`
+  crosses three layers by hand (record in `BattleEvents.cs` → hand-listed anonymous object in
+  `SignalRBattleEventEmitter.MapEvent` → `case` arm in `timeline.ts`). The *name* leg was already generically
+  guarded (`EveryBattleEventMapsToItsOwnNamedClientEvent` + `EveryBattleEventHasATimelineArm`), but the *field*
+  leg was ~21 bespoke `*_Projection_Carries*` tests — so **adding a field to an existing event record passed
+  every gate while the field silently never reached the client** (the recurring `MoveInfo` trap). Closed by
+  `WebEventContractTests.EveryBattleEventProjectsAllOfItsFields`: reflects over every concrete event, asserts
+  each record property appears on the projected payload, and **recurses into nested payload records** (all six
+  reachable from an event: `MoveInfo`, `PartyMemberInfo`, `BiomeOption`, `RegionMapBiome`, `ShopOfferItem`,
+  `StatBlock`) **and into every variant of a union family**
+  (`RewardOption` → Item/Gold/Heal — each variant is hand-mapped in its own `ProjectRewardOption` arm, so each is
+  its own place for a field to go missing). The probe instantiator fills collections from `ProbeElementTypes` —
+  *the single source the checker also reads*, so the two can't disagree about what's in the list — which is what
+  makes those inline `Select(… => new { … })` arms actually get exercised rather than skipped over an empty list.
+  Deliberate renames/omissions register in `ProjectionExceptions` with a reason (only one today:
+  `TurnStarted.PlayerMoves` → `Moves`); a registered omission is asserted *absent*, so the list can't rot into a
+  blanket mute. Verified by mutation at each level — an unprojected field on `BattleEnded`, on nested `MoveInfo`,
+  and on the union's `ItemRewardOption` each fail with the exact path (e.g.
+  `RewardChoiceOffered.Options[ItemRewardOption].UnionProbeField`). Found no live drops: the projection was
+  already complete. The per-event one-off tests were **kept** — they pin *values / semantics* (string-cast enums,
+  the PascalCase rarity the TS union needs, HP-0-means-fainted), which the generic test does not check; their doc
+  comments were corrected, since several justified themselves on the empty-list gap this closed.
+  **Still manual (not closed by this):** the TS leg — the client type + `timeline.ts` mapping — and `tsc` is not
+  run by any gate (see the TypeScript item above).
 - [x] **`bag.ts` re-encodes the engine's effect registry** — CLOSED (2026-07-04). The frontend
   `USABLE_CATEGORIES` set (which hardcoded which `ItemCategory`s are usable in battle) is gone; the backend now
   projects a server-computed `UsableInBattle` boolean onto `BagItemView` (from `ItemEffects.For(category)`), and

@@ -10,12 +10,21 @@ using creaturegame.Web.Battle;
 namespace creaturegame.Tests.Integration.Web;
 
 /// <summary>
-/// Contract test for the engine→client seam: <see cref="SignalRBattleEventEmitter"/> maps every
-/// <see cref="BattleEvent"/> the engine can emit to a named client event. Its <c>switch</c> ends in a
-/// <c>_ =&gt; ("Unknown", …)</c> fallback, so an event type added to the engine but forgotten here would
-/// silently reach the web client as "Unknown" and never render. This reflects over every concrete
-/// BattleEvent subtype and fails loudly if any is unmapped or mis-named — so adding an event to the
-/// engine forces the web mapping to keep up.
+/// Contract tests for the engine→client seam. Every <see cref="BattleEvent"/> is hand-carried across three
+/// layers — the record here, <see cref="SignalRBattleEventEmitter.MapEvent"/>'s anonymous-object projection,
+/// and a <c>case</c> arm in <c>timeline.ts</c> — so the wire contract is only as good as what these tests pin.
+/// Three kinds of guard live here, in widening order:
+/// <list type="bullet">
+/// <item><b>Name</b> (generic): every event maps to its own named client event and has a timeline arm — so a
+/// <em>new event</em> can't be forgotten (it would reach the client as "Unknown", or fall through
+/// <c>default: {}</c> and never render).</item>
+/// <item><b>Field</b> (generic): every event projects <em>all</em> of its properties — including those of nested
+/// payload records (<c>MoveInfo</c>, <c>PartyMemberInfo</c>, …) and of every variant of a union family
+/// (<c>RewardOption</c>), each of which is hand-mapped in its own arm and so is its own place for a field to go
+/// missing. This is what stops a <em>field added to an existing event</em> being silently dropped on the wire.</item>
+/// <item><b>Value</b> (per event): the one-off <c>*_Projection_Carries*</c> tests, pinning what the generic
+/// field check can't — projected values and their semantics (enums cast to strings, sub-field meaning).</item>
+/// </list>
 /// </summary>
 public class WebEventContractTests
 {
@@ -77,11 +86,197 @@ public class WebEventContractTests
     }
 
     /// <summary>
-    /// Field-level guard for the <see cref="TurnStarted"/> move projection: <see cref="MapEvent"/> hand-maps
-    /// each <see cref="MoveInfo"/> into an anonymous object, so a field added to <c>MoveInfo</c> (here:
-    /// <c>Stab</c>, which drives the move-menu STAB highlight) is silently dropped unless it's listed in the
-    /// projection. The reflection-based contract test above instantiates events with an *empty* move list, so
-    /// it can't catch this. Pins the move fields the client actually reads.
+    /// The <b>field-level</b> counterpart to the two name-level guards above, and the general form of the
+    /// one-off <c>*_Projection_Carries*</c> tests that follow. <see cref="MapEvent"/> hand-lists each event's
+    /// fields into an anonymous object, so <em>adding a property to an existing event record</em> compiles,
+    /// emits, and passes every other gate while the property silently never reaches the client — the name-level
+    /// tests only prove the event itself is mapped, not that it is mapped <em>completely</em>.
+    /// <para>This reflects over every concrete event and asserts each of its properties appears on the projected
+    /// payload under its own name. A property that is deliberately renamed or withheld must be registered in
+    /// <see cref="ProjectionExceptions"/> with a reason — so the omission becomes a decision on the record
+    /// rather than an oversight.</para>
+    /// </summary>
+    [Fact]
+    public void EveryBattleEventProjectsAllOfItsFields()
+    {
+        var problems = new List<string>();
+
+        foreach (var type in ConcreteBattleEventTypes())
+        {
+            var evt = (BattleEvent)Instantiate(type);
+            var (_, payload) = SignalRBattleEventEmitter.MapEvent(evt);
+            using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+            CheckProjection(type, doc.RootElement, type.Name, problems);
+        }
+
+        Assert.True(
+            problems.Count == 0,
+            "SignalR event projection drops record fields — each is a field the engine sets and the client "
+                + "never sees. Add it to the event's arm in SignalRBattleEventEmitter.MapEvent, or register it "
+                + $"in ProjectionExceptions with a reason:\n  {string.Join("\n  ", problems)}"
+        );
+    }
+
+    /// <summary>
+    /// Asserts every property of <paramref name="recordType"/> appears on its projected <paramref name="payload"/>
+    /// object, then recurses through nested payload records (a <c>MoveInfo</c> in <c>TurnStarted.PlayerMoves</c>, a
+    /// <c>PartyMemberInfo</c> in a party snapshot, …). The nested leg is the one that matters most in practice:
+    /// the sub-records are hand-mapped in their own inline <c>Select(… => new { … })</c>, which is exactly where a
+    /// newly added field goes missing.
+    /// </summary>
+    private static void CheckProjection(
+        Type recordType,
+        JsonElement payload,
+        string path,
+        List<string> problems
+    )
+    {
+        if (payload.ValueKind != JsonValueKind.Object)
+            return;
+
+        var projected = payload
+            .EnumerateObject()
+            .ToDictionary(p => p.Name, p => p.Value, StringComparer.Ordinal);
+
+        foreach (var prop in EventProperties(recordType))
+        {
+            string name = prop.Name;
+
+            if (ProjectionExceptions.TryGetValue((recordType.Name, prop.Name), out var expected))
+            {
+                // A registered omission (null) is asserted *absent*, so quietly re-adding it later trips the
+                // test too — the exception list can't rot into a blanket mute.
+                if (expected is null)
+                {
+                    if (projected.ContainsKey(prop.Name))
+                        problems.Add(
+                            $"{path}.{prop.Name}: registered as a deliberate omission but IS projected "
+                                + "— drop the ProjectionExceptions entry."
+                        );
+                    continue;
+                }
+                name = expected;
+            }
+
+            if (!projected.TryGetValue(name, out var value))
+            {
+                problems.Add(
+                    $"{path}.{prop.Name}: not projected by MapEvent — the client never receives it "
+                        + $"(payload has: {string.Join(", ", projected.Keys)})."
+                );
+                continue;
+            }
+
+            // Recurse into nested payload records. A collection is probed with one element per expected type
+            // (see ProbeElementTypes) and the projection is an order-preserving Select, so element i is checked
+            // against expected type i — that is what lets a union family like RewardOption be checked variant
+            // by variant.
+            var elementTypes = ProbeElementTypes(prop.PropertyType);
+            if (elementTypes.Count > 0)
+            {
+                if (value.ValueKind != JsonValueKind.Array)
+                    continue;
+                int length = value.GetArrayLength();
+
+                // The probe fills a list all-or-nothing (DefaultArg), so the only legitimate lengths are 0 (the
+                // depth cap declined to build elements) or exactly one per expected type. Anything between means
+                // the projection filtered or reordered the list — which would silently leave the variants that
+                // fell off the end unchecked, so fail rather than check fewer.
+                if (length != 0 && length != elementTypes.Count)
+                {
+                    problems.Add(
+                        $"{path}.{name}: projection returned {length} element(s) for {elementTypes.Count} "
+                            + "probe(s) — the list is filtered or reordered, so the per-variant correspondence "
+                            + "is unsafe and some variants would go unchecked."
+                    );
+                    continue;
+                }
+
+                for (int i = 0; i < elementTypes.Count && i < length; i++)
+                    CheckProjection(
+                        elementTypes[i],
+                        value[i],
+                        $"{path}.{name}[{elementTypes[i].Name}]",
+                        problems
+                    );
+            }
+            else if (ProbeType(prop.PropertyType) is { } single)
+            {
+                CheckProjection(single, value, $"{path}.{name}", problems);
+            }
+        }
+    }
+
+    /// <summary>
+    /// The element types a probed collection property is filled with, in order — <em>the single source both the
+    /// probe builder (<see cref="DefaultArg"/>) and the checker (<see cref="CheckProjection"/>) read</em>, so the
+    /// two can never disagree about what is in the list. Empty for a leaf collection (strings, enums) — nothing
+    /// to recurse into.
+    /// <para>An <b>abstract</b> element type is a union family (<c>RewardOption</c> → Item/Gold/Heal): the probe
+    /// carries one element of <em>every</em> concrete variant, because <see cref="SignalRBattleEventEmitter"/>
+    /// hand-maps each variant in its own arm — so each variant is its own place for a field to go missing, and
+    /// probing only one would leave the rest unguarded. Ordered by name so the fill order is deterministic
+    /// (<c>GetTypes()</c> order is not guaranteed).</para>
+    /// </summary>
+    private static IReadOnlyList<Type> ProbeElementTypes(Type collectionType)
+    {
+        if (!collectionType.IsGenericType || !typeof(IEnumerable).IsAssignableFrom(collectionType))
+            return [];
+
+        var elem = collectionType.GetGenericArguments()[0];
+        if (elem.IsAbstract && elem.Assembly == typeof(BattleEvent).Assembly)
+            return elem
+                .Assembly.GetTypes()
+                .Where(t => t.IsSubclassOf(elem) && ProbeType(t) is not null)
+                .OrderBy(t => t.Name, StringComparer.Ordinal)
+                .ToList();
+
+        return ProbeType(elem) is { } single ? [single] : [];
+    }
+
+    /// <summary>
+    /// The record type to probe for a given type, or null when it is a leaf on the wire. Only engine-assembly,
+    /// concrete, constructible, non-enum types qualify — strings/enums/primitives project to JSON scalars, and an
+    /// abstract type can't be instantiated directly (its concrete variants are probed instead, via
+    /// <see cref="ProbeElementTypes"/>).
+    /// </summary>
+    private static Type? ProbeType(Type t) =>
+        t.Assembly == typeof(BattleEvent).Assembly
+        && !t.IsAbstract
+        && !t.IsEnum
+        && t != typeof(string)
+        && t.GetConstructors().Length > 0
+            ? t
+            : null;
+
+    /// <summary>
+    /// The registered departures from "every record property is projected under its own name", keyed by
+    /// (event, property). Value = the field name on the payload, or <c>null</c> for a property deliberately
+    /// withheld from the client. Every entry needs a reason — an unexplained entry is just the silent drop this
+    /// test exists to prevent, moved into a dictionary.
+    /// </summary>
+    private static readonly Dictionary<
+        (string Event, string Property),
+        string?
+    > ProjectionExceptions = new()
+    {
+        // The client's TurnStarted payload calls the move list `Moves` (the UI's own vocabulary); the record
+        // says PlayerMoves because it sits beside the Enemy* fields. Pinned field-by-field by the
+        // TurnStarted_MoveProjection_* tests below.
+        [(nameof(TurnStarted), nameof(TurnStarted.PlayerMoves))] = "Moves",
+    };
+
+    // A record's own data properties. Records emit their compiler-generated EqualityContract as protected, so
+    // the Public flag already excludes it — no filtering needed.
+    private static IEnumerable<PropertyInfo> EventProperties(Type type) =>
+        type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
+
+    /// <summary>
+    /// Value-level guard for the <see cref="TurnStarted"/> move projection: <see cref="MapEvent"/> hand-maps
+    /// each <see cref="MoveInfo"/> into an anonymous object. <see cref="EveryBattleEventProjectsAllOfItsFields"/>
+    /// already proves every <c>MoveInfo</c> field is <em>present</em> on the wire; this pins that the values
+    /// <em>arrive intact</em> — specifically <c>Stab</c>, which drives the move-menu STAB highlight and would be
+    /// just as broken projected as a constant.
     /// </summary>
     [Fact]
     public void TurnStarted_MoveProjection_CarriesStabFlag()
@@ -197,10 +392,10 @@ public class WebEventContractTests
         Assert.Equal(5, root.GetProperty("ToSpeciesId").GetInt32());
     }
 
-    /// <summary>Field-level guard for the <see cref="BiomeChoiceOffered"/> projection: each
-    /// <see cref="BiomeOption"/> is hand-mapped into an anonymous object, so the map screen's id/name/type-badge
-    /// fields are silently dropped unless listed. The reflection contract test instantiates the event with an
-    /// <i>empty</i> options list, so it can't catch this — pins the nested sub-fields the 3b-2 map UI reads.</summary>
+    /// <summary>Value-level guard for the <see cref="BiomeChoiceOffered"/> projection: each
+    /// <see cref="BiomeOption"/> is hand-mapped into an anonymous object.
+    /// <see cref="EveryBattleEventProjectsAllOfItsFields"/> proves the id/name/type-badge fields are present;
+    /// this pins the values the 3b-2 map UI reads — notably the type list projected as <em>strings</em>.</summary>
     [Fact]
     public void BiomeChoiceOffered_Projection_CarriesOptionSubFields()
     {
@@ -292,10 +487,11 @@ public class WebEventContractTests
         Assert.Equal("BossBattle", kinds[2].GetString());
     }
 
-    /// <summary>Field-level guard for the <see cref="RegionMapRevealed"/> projection: each
-    /// <see cref="RegionMapBiome"/> is hand-mapped, so the map's id/name/type-badge/edge fields are silently
-    /// dropped unless listed. The reflection contract test instantiates the event with an <i>empty</i> biome
-    /// list, so it can't catch this — pins the nested sub-fields (incl. the neighbour-id edges).</summary>
+    /// <summary>Value-level guard for the <see cref="RegionMapRevealed"/> projection: each
+    /// <see cref="RegionMapBiome"/> is hand-mapped.
+    /// <see cref="EveryBattleEventProjectsAllOfItsFields"/> proves the id/name/type-badge/edge fields are
+    /// present; this pins their values — notably that the neighbour-id <em>edges</em> survive as a list, which
+    /// is what makes the map a graph rather than a scatter of nodes.</summary>
     [Fact]
     public void RegionMapRevealed_Projection_CarriesBiomeSubFieldsAndEdges()
     {
@@ -349,12 +545,12 @@ public class WebEventContractTests
         Assert.Equal(new[] { "Potion", "Ether" }, names);
     }
 
-    /// <summary>Field-level guard for the <see cref="RewardChoiceOffered"/> projection: each
-    /// <see cref="RewardOption"/> is hand-mapped by <c>ProjectRewardOption</c> into a flat discriminated shape, so
-    /// the pick-one-of-N modal's per-card fields are silently dropped (or the <c>Rarity</c> string mis-cased)
-    /// unless listed. The reflection contract test instantiates the event with an <i>empty</i> options list, so it
-    /// can't catch this — pins the sub-fields the reward modal reads and the PascalCase rarity the TS
-    /// <c>RewardRarity</c> union depends on.</summary>
+    /// <summary>Value-level guard for the <see cref="RewardChoiceOffered"/> projection: each
+    /// <see cref="RewardOption"/> variant is hand-mapped by <c>ProjectRewardOption</c> into a flat discriminated
+    /// shape. <see cref="EveryBattleEventProjectsAllOfItsFields"/> proves every variant's fields are present (it
+    /// probes the union family variant by variant); this pins what that can't see — the <c>Kind</c> discriminator
+    /// each card is chosen by, and the PascalCase <c>Rarity</c> string the TS <c>RewardRarity</c> union depends
+    /// on (mis-cased, it is present but useless).</summary>
     [Fact]
     public void RewardChoiceOffered_Projection_CarriesOptionSubFields()
     {
@@ -395,11 +591,11 @@ public class WebEventContractTests
         Assert.Equal(120, gold.GetProperty("Gold").GetInt32());
     }
 
-    /// <summary>Field-level guard for the <see cref="ShopOffered"/> projection: each <see cref="ShopOfferItem"/>
-    /// is hand-mapped by <c>ProjectShopItem</c> into a flat shape, so the shop modal's per-row fields (id / name /
-    /// price / rarity colour) and the header balance are silently dropped unless listed. The reflection contract
-    /// test instantiates the event with an <i>empty</i> items list, so it can't catch this — pins the sub-fields
-    /// the shop modal reads and the PascalCase rarity the TS <c>RewardRarity</c> union depends on.</summary>
+    /// <summary>Value-level guard for the <see cref="ShopOffered"/> projection: each <see cref="ShopOfferItem"/>
+    /// is hand-mapped by <c>ProjectShopItem</c> into a flat shape.
+    /// <see cref="EveryBattleEventProjectsAllOfItsFields"/> proves the per-row fields and the header balance are
+    /// present; this pins their values — notably the PascalCase rarity the TS <c>RewardRarity</c> union depends
+    /// on (mis-cased, it is present but useless).</summary>
     [Fact]
     public void ShopOffered_Projection_CarriesBalanceAndItemSubFields()
     {
@@ -440,11 +636,11 @@ public class WebEventContractTests
         Assert.Equal(122, root.GetProperty("Balance").GetInt32());
     }
 
-    /// <summary>Field-level guard for the <see cref="AcquisitionOffered"/> projection: the offer modal reads the
+    /// <summary>Value-level guard for the <see cref="AcquisitionOffered"/> projection: the offer modal reads the
     /// offered creature's flat card fields (source / species id / name / level / types / max HP / party-full) and
-    /// the nested current-party snapshot (each member's sprite id, name, level, HP, status string, lead flag). The
-    /// reflection contract test instantiates the event with an <i>empty</i> party list, so it can't catch a
-    /// dropped member sub-field — this pins them (and the offered creature's own fields).</summary>
+    /// the nested current-party snapshot. <see cref="EveryBattleEventProjectsAllOfItsFields"/> proves those
+    /// fields are present; this pins their values — the string-cast types and each member's status string, which
+    /// arrive present-but-wrong if the enum cast is dropped.</summary>
     [Fact]
     public void AcquisitionOffered_Projection_CarriesOfferedCreatureAndPartySubFields()
     {
@@ -494,9 +690,9 @@ public class WebEventContractTests
         Assert.True(member.GetProperty("IsLead").GetBoolean());
     }
 
-    /// <summary>Field-level guard for the <see cref="PartyUpdated"/> projection: the roster panel re-renders from
-    /// the member snapshot, dropped on the wire if not projected. The reflection contract test instantiates it
-    /// with an <i>empty</i> list, so this pins the member sub-fields (and the string-projected status).</summary>
+    /// <summary>Value-level guard for the <see cref="PartyUpdated"/> projection: the roster panel re-renders from
+    /// the member snapshot. <see cref="EveryBattleEventProjectsAllOfItsFields"/> proves the member sub-fields are
+    /// present; this pins their values — notably the string-projected status.</summary>
     [Fact]
     public void PartyUpdated_Projection_CarriesMemberSubFields()
     {
@@ -572,10 +768,11 @@ public class WebEventContractTests
         Assert.Equal(9, root.GetProperty("SpeciesId").GetInt32());
     }
 
-    /// <summary>Field-level guard for the <see cref="SwitchInOffered"/> projection (Phase 4 Stage 3): the forced
-    /// switch-in modal reads the roster snapshot (each member's sprite id / name / level / HP / status / lead flag —
-    /// a fainted member reads HP 0 and is disabled) and the fainted name for the title. The reflection contract test
-    /// instantiates it with an <i>empty</i> party list, so this pins the member sub-fields + the fainted name.</summary>
+    /// <summary>Value-level guard for the <see cref="SwitchInOffered"/> projection (Phase 4 Stage 3): the forced
+    /// switch-in modal reads the roster snapshot and the fainted name for the title.
+    /// <see cref="EveryBattleEventProjectsAllOfItsFields"/> proves the member sub-fields are present; this pins the
+    /// <em>semantics</em> the modal depends on — a fainted member reading HP 0 (which is how the client knows to
+    /// disable it) and the string-projected status.</summary>
     [Fact]
     public void SwitchInOffered_Projection_CarriesPartyMemberSubFieldsAndFaintedName()
     {
@@ -665,16 +862,22 @@ public class WebEventContractTests
     }
 
     // Build a BattleEvent via its primary constructor with harmless default arguments — enough for
-    // MapEvent's type-switch and payload projection (it only reads scalar/string/enum props and, for
-    // TurnStarted, an empty move list).
-    private static object Instantiate(Type type)
+    // MapEvent's type-switch and payload projection.
+    private static object Instantiate(Type type) => Instantiate(type, depth: 0);
+
+    private static object Instantiate(Type type, int depth)
     {
         var ctor = type.GetConstructors().OrderByDescending(c => c.GetParameters().Length).First();
-        var args = ctor.GetParameters().Select(p => DefaultArg(p.ParameterType)).ToArray();
+        var args = ctor.GetParameters().Select(p => DefaultArg(p.ParameterType, depth)).ToArray();
         return ctor.Invoke(args);
     }
 
-    private static object? DefaultArg(Type t)
+    // A harmless probe value for one constructor parameter. Collections are filled with one element per type in
+    // ProbeElementTypes (the same source the checker reads), so the projection of a nested payload record —
+    // MoveInfo, PartyMemberInfo, and every RewardOption variant — is actually exercised rather than skipped over
+    // an empty list; those inline Select(… => new { … }) arms are where a dropped field hides. Depth-capped so a
+    // self-referencing record can't recurse forever.
+    private static object? DefaultArg(Type t, int depth)
     {
         if (t == typeof(string))
             return "";
@@ -683,8 +886,18 @@ public class WebEventContractTests
         if (t.IsGenericType && typeof(IEnumerable).IsAssignableFrom(t))
         {
             var elem = t.GetGenericArguments()[0];
-            return Activator.CreateInstance(typeof(List<>).MakeGenericType(elem));
+            var list = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(elem))!;
+            if (depth < MaxProbeDepth)
+                foreach (var probe in ProbeElementTypes(t))
+                    list.Add(Instantiate(probe, depth + 1));
+            return list;
         }
+        if (depth < MaxProbeDepth && ProbeType(t) is { } nested)
+            return Instantiate(nested, depth + 1);
         return null;
     }
+
+    // Events nest payload records at most a couple of levels (event → PartyMemberInfo); the cap only exists so
+    // a future self-referencing record can't spin the probe builder forever.
+    private const int MaxProbeDepth = 4;
 }
