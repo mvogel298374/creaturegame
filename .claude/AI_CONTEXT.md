@@ -77,12 +77,31 @@ each is its own subagent so it can be invoked or edited independently:
 4. **`pr-review`** (Subagent, `.claude/agents/pr-review.md`, **Opus**) — the technical capstone, run **after**
    1–3 are green. Reviews the diff against the technical Definition of Done (`docs/DEFINITION_OF_DONE.md`) —
    generation-seam architecture, code quality, integration completeness, test adequacy, docs/TODO → `PR-READY
-   | CHANGES-REQUESTED` (a hard technical gate). Technical quality only; domain fidelity is
-   `requirements-review`'s. It treats format/tests/requirements as preconditions.
+   | CHANGES-REQUESTED`. Technical quality only; domain fidelity is `requirements-review`'s. It treats
+   format/tests/requirements as preconditions.
 
-All four run and report; they don't fix or commit — and `requirements-review`'s discrepancies are cleared
-only by the user. The `.githooks/pre-commit` hook still runs CSharpier + tests as the deterministic backstop
-at commit time.
+   **Scope — it is Opus and costs real money (~80–100k tokens a run), so it is not automatic.** Run it when the
+   diff touches **product code** (engine, web layer, importer) or a generation seam. A **test-only or docs-only
+   diff skips it** unless the user asks: gates 1–2 plus the pre-commit hook already cover those, and a review
+   that costs more than the change it reviews is a bad trade. Borderline? Say what it will cost and let the
+   user pick — don't decide silently in either direction.
+
+   **A `CHANGES-REQUESTED` goes to the user — do not self-service it.** Report the findings, what each would
+   cost to fix, and your recommendation, then **stop and let the user choose** (fix / waive / defer / narrow
+   the scope). Do **not** run the fix→re-review loop on your own initiative: re-review only when the user asks
+   for it, and only when the fix is itself risky enough to warrant a second Opus pass. Applying an agreed fix
+   and reporting the verification yourself is the default — a second review to confirm three lines is waste.
+   This mirrors `requirements-review`: **hard gate to the pipeline, soft gate to the user.** The user
+   adjudicates both lanes; the difference is only which kind of finding each raises.
+
+All four run and report; they don't fix or commit — and **neither a `requirements-review` discrepancy nor a
+`pr-review` CHANGES-REQUESTED is cleared by a subagent: only the user adjudicates.** The `.githooks/pre-commit`
+hook still runs CSharpier + tests as the deterministic backstop at commit time.
+
+> **Why the escalation rule exists** (2026-07-16): a test-only diff drew two Opus `pr-review` runs (~185k
+> tokens) because the gate read as mandatory-and-self-serviced. Review #1 earned it — it caught a real hole.
+> Review #2 was self-initiated and returned a 3-line finding. The user was never consulted on either. The cost
+> driver was the *technical* gate, precisely because it was the one lane with no escalation path.
 
 > The old `/audit` skill and `seam-reviewer` subagent are **retired.** Their two jobs were split by lane:
 > Gen-1 / domain fidelity → `requirements-review`; generation-seam *architecture* (the first invariant) →
