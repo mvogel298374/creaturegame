@@ -792,14 +792,13 @@ Battles are fully playable now — docs won't describe a moving target.
 - *2026-07-16:* **TypeScript typechecked by no gate** → `tsc --noEmit` in the pre-commit hook (on staged
   `.ts`/`.tsx`) + a `TypeScript` row in `test.ps1`; `tsconfig` now covers `e2e/` as well as `src/`
   (**keep it that way**).
+- *2026-07-16:* **`RunDirector`'s 25-parameter constructor** → a `RunDirectorOptions` record (commit `7875d64`).
+- *2026-07-17:* **No ESLint/Prettier in `ClientApp/`** — **decided, not deferred: the frontend stays
+  deliberately un-linted and un-formatted** (user ruling). The typecheck (`tsc`) is the only frontend gate.
+  Don't re-file this as tech debt; the rule now lives in `DEV_STANDARDS.md` → *Coding Conventions*.
 
 **Still open** (filed 2026-07-16 from a repo-wide structural review — ranked by cost-of-deferring, not size):
 
-- [ ] **No ESLint/Prettier config in `ClientApp/` at all.** The C# side has CSharpier pinned + hook-enforced;
-  the frontend has no linter and no formatter, so style/quality drift is unpoliced. The *typecheck* half of
-  this gap is closed (`tsc` in the hook — archived above); this is the remaining lint/format half. Lower value
-  than the debt above; worth a call on whether to adopt ESLint flat config + Prettier, or to keep the frontend
-  deliberately un-linted.
 - [ ] **`RunDirector.cs` is 1058 lines holding 9 types** — the director, 6 `IRunEvent` classes
   (`BattleRunEvent`, `RecoveryRunEvent`, `LeadChoiceEvent`, `BiomeChoiceEvent`, `ShopRunEvent`,
   `RewardRunEvent`) and 2 static resolution helpers (`RewardResolution`, `AcquisitionResolution`). Split the

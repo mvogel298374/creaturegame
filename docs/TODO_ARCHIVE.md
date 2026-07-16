@@ -601,6 +601,14 @@ The ordered pass that followed the move-coverage completion. All six items done;
 
 ## Tech-Debt cleanups — DONE
 
+- **Frontend linting: decided against (2026-07-17).** Filed as debt on the grounds that `ClientApp/` has no
+  ESLint and no Prettier while the C# side has CSharpier pinned + hook-enforced. **The user ruled the frontend
+  stays deliberately un-linted and un-formatted** — the asymmetry is intentional, so this is *closed by
+  decision*, not deferred, and **must not be re-filed** because a future review notices the inconsistency.
+  The frontend's one gate remains the typecheck (`tsc --noEmit` in the pre-commit hook + the `TypeScript` row
+  in `test.ps1`). Codified in `DEV_STANDARDS.md` → *Coding Conventions* so it reads as a rule rather than an
+  omission.
+
 - **`RunDirector`'s 25-parameter constructor → a parameter object (2026-07-16).** The signature had grown to
   6 required args + 19 optional ones (mostly `Func<>` policy suppliers: `rewardSupplier`, `shopSupplier`,
   `draftSupplier`, `bossCatchSupplier`, `nodePlanFactory`, `checkEvolution`), and the web call site in

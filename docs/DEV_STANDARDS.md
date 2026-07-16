@@ -34,6 +34,14 @@ Guidelines for all `/dev` actions in this project.
 *   **Formatting**: [CSharpier](https://csharpier.com) is the source of truth for C# layout — do **not**
     hand-align code into columns; let the formatter own whitespace. Commands + tool details: `CLAUDE.md`
     (commands) and `AI_CONTEXT.md` → **Tooling & Automation**.
+*   **The frontend is deliberately un-linted and un-formatted** (decided 2026-07-17). `ClientApp/` has **no
+    ESLint and no Prettier**, and that is a settled choice, not a gap someone forgot to fill: the asymmetry
+    with CSharpier is intentional. **Do not add a linter or formatter, and do not re-file its absence as tech
+    debt** — if it ever gets revisited, it will be because the user asks, not because a review noticed the
+    inconsistency. What *does* police the frontend is the **typecheck**: `tsc --noEmit` runs in the pre-commit
+    hook on staged `.ts`/`.tsx` and as a `TypeScript` row in `test.ps1`, with `tsconfig` covering `e2e/` as
+    well as `src/` (**keep it that way** — Vitest strips types without checking them, so nothing else catches
+    a type error). Match the surrounding file's existing style by hand.
 
 ## Database Management
 *   **Property Tracking**: When adding new properties to models (`PokemonSpecies`, `Attack`, etc.), always add an EF Core migration — see `CLAUDE.md` for the migration command. Never use raw `ALTER TABLE`.
