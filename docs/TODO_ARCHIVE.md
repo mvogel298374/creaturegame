@@ -601,6 +601,25 @@ The ordered pass that followed the move-coverage completion. All six items done;
 
 ## Tech-Debt cleanups — DONE
 
+- **`RunDirector.cs` was 1058 lines holding 9 types → one type per file (2026-07-17).** The file carried the
+  director itself plus 6 `IRunEvent` classes (`BattleRunEvent`, `RecoveryRunEvent`, `LeadChoiceEvent`,
+  `BiomeChoiceEvent`, `ShopRunEvent`, `RewardRunEvent`) and 2 static resolution helpers (`RewardResolution`,
+  `AcquisitionResolution`) — every node kind the run can sequence, in the same file as the sequencer. Split the
+  8 non-director types out one-per-file under `creaturegame/Combat/RunEvents/`, following the **`Combat/Ai/`
+  precedent**: the subfolder keeps `namespace creaturegame.Combat`, so this is a pure file move with zero
+  namespace or `using` churn at any call site. `RunDirector.cs` is now 332 lines and holds only the director
+  (`ChooseNextEvent` / `Apply` / the node-plan roll) — the sequencing brain, which is what the file's name and
+  its `GAME_LOOP.md §3` docs always claimed it was.
+  The item's live duplication went with it: `BiomeChoiceEvent.PlayerAttackTypes` and
+  `AcquisitionResolution.CreatureTypes` both walked `Type1`/`Type2` in different shapes (one an
+  `IEnumerable<DamageType>` for a type-chart sweep, one an `IReadOnlyList<DamageType>` for the wire) — collapsed
+  into a single `Creature.Types` property (slot order, nulls dropped) that both now read. The remaining
+  `Type1`/`Type2` sites repo-wide are *per-slot tests* (`Type1 == moveType`) or live on `PokemonSpecies`, not
+  the iterate-the-typing shape, so they were deliberately left alone.
+  **Strictly behaviour-preserving** — no logic touched, only file boundaries; 1461 tests green, 0 build warnings.
+  *Note for a future reviewer:* `RunLoop.cs` also holds ~28 types and is **fine** — a cohesive vocabulary file
+  of small records. Don't let a type-count metric drive a split there.
+
 - **Frontend linting: decided against (2026-07-17).** Filed as debt on the grounds that `ClientApp/` has no
   ESLint and no Prettier while the C# side has CSharpier pinned + hook-enforced. **The user ruled the frontend
   stays deliberately un-linted and un-formatted** — the asymmetry is intentional, so this is *closed by

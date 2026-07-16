@@ -78,6 +78,25 @@ public class Creature
 
     public DamageType? Type1 { get; set; }
     public DamageType? Type2 { get; set; }
+
+    /// <summary>
+    /// The creature's types as a list — 0, 1 or 2 entries, in slot order, nulls dropped. The one place that
+    /// knows a creature's typing is the <see cref="Type1"/>/<see cref="Type2"/> pair, for callers that want to
+    /// iterate the typing rather than test a specific slot (type-chart sweeps, wire projections).
+    /// </summary>
+    public IReadOnlyList<DamageType> Types
+    {
+        get
+        {
+            var types = new List<DamageType>(2);
+            if (Type1 is { } t1)
+                types.Add(t1);
+            if (Type2 is { } t2)
+                types.Add(t2);
+            return types;
+        }
+    }
+
     public GrowthRate GrowthRate { get; set; } = GrowthRate.MediumFast;
     public int SpeciesId { get; set; }
     public int SpeciesBaseExperience { get; set; }

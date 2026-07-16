@@ -304,7 +304,7 @@ domain check instead of inviting it. Two specific traps to recognise again:
 ### Open points
 - [ ] **Evolution must apply to any creature that levelled up this battle**, switched-in or not. Track the
   pre-battle level **per creature that takes the field** (capture on send-in) instead of the single
-  `levelBefore` local for the starting lead. Anchor: `RunDirector.cs` `BattleRunEvent` — the
+  `levelBefore` local for the starting lead. Anchor: `Combat/RunEvents/BattleRunEvent.cs` — the
   `ReferenceEquals(active, player) && active.Level > levelBefore` gate, and its comment, both go.
 - [ ] **XP / Stat-Exp follow Gen 1 participation, not "the finisher".** Gen 1 divides Exp (and the Stat-Exp
   award) among every party member that was **sent out** during the battle and has **not fainted**; a participant
@@ -796,16 +796,13 @@ Battles are fully playable now — docs won't describe a moving target.
 - *2026-07-17:* **No ESLint/Prettier in `ClientApp/`** — **decided, not deferred: the frontend stays
   deliberately un-linted and un-formatted** (user ruling). The typecheck (`tsc`) is the only frontend gate.
   Don't re-file this as tech debt; the rule now lives in `DEV_STANDARDS.md` → *Coding Conventions*.
+- *2026-07-17:* **`RunDirector.cs` was 1058 lines holding 9 types** → the 6 `IRunEvent` classes + 2 resolution
+  helpers split one-per-file into `Combat/RunEvents/` (which keeps `namespace creaturegame.Combat`, per the
+  `Combat/Ai/` precedent); the `PlayerAttackTypes`/`CreatureTypes` duplication collapsed into `Creature.Types`.
+  **`RunLoop.cs`'s ~28 types are fine** — a cohesive vocabulary file; don't let a type-count metric split it.
 
 **Still open** (filed 2026-07-16 from a repo-wide structural review — ranked by cost-of-deferring, not size):
 
-- [ ] **`RunDirector.cs` is 1058 lines holding 9 types** — the director, 6 `IRunEvent` classes
-  (`BattleRunEvent`, `RecoveryRunEvent`, `LeadChoiceEvent`, `BiomeChoiceEvent`, `ShopRunEvent`,
-  `RewardRunEvent`) and 2 static resolution helpers (`RewardResolution`, `AcquisitionResolution`). Split the
-  events out per-file under `Combat/RunEvents/`. It also carries a small live duplication: `PlayerAttackTypes`
-  and `CreatureTypes` both walk `Type1`/`Type2` in different shapes — collapse to one helper.
-  *Note:* `RunLoop.cs` also has ~28 types but is **fine** — a cohesive vocabulary file of small records. Don't
-  let a type-count metric drive a split there.
 - [ ] **`BattleScreen.tsx` — 1317 lines, ~25 components.** 8 modals (`Recovery`, `EvolutionPrompt`,
   `RewardChoice`, `Shop`, `Acquisition`, `LeadChoice`, `SwitchIn`, `MoveReplacement`) + 11 hand-rolled
   `<div className="modal-overlay">` blocks. Escape-to-close is ad hoc: the map overlay has it (:468), the
