@@ -41,7 +41,7 @@ runtime-only.
 
 ## How to inspect
 1. `git status --short` and `git diff HEAD` for the change set. Read any new (`??`) files in full.
-2. For every engine file touched (`creaturegame/Combat/*`, `creaturegame/Creature/*`) and any non-trivial
+2. For every engine file touched (`creaturegame/Combat/*`, `creaturegame/Creatures/*`) and any non-trivial
    file, Read the **whole file**, not just the hunks — technical defects here are usually about how a change
    interacts with code outside the diff (reachability, an existing handler of the same concern, the
    control-flow contracts in `AttackAction` / `Battle` / `DamageCalculator`).

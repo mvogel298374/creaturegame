@@ -601,6 +601,20 @@ The ordered pass that followed the move-coverage completion. All six items done;
 
 ## Tech-Debt cleanups — DONE
 
+- **`Creature/` and `Creatures/` merged into one directory (2026-07-17).** Two sibling directories both declared
+  `namespace creaturegame.Creatures` — `Creature/` held Creature, Attributes, BattleState, Party, StatStages and
+  the stat calc; `Creatures/` held Biome, EncounterSelector, LearnsetMove(Selector). The split carried no meaning
+  (nothing distinguished the two sets — they were not a singular/plural or entity/service boundary, just an
+  accident of when each file was added) and it quietly violated the folder=namespace convention the test project
+  follows perfectly. Fixed by `git mv`-ing all 9 files into `Creatures/` and deleting `Creature/`.
+  **Zero code churn** — because both directories already shared the namespace, not one `using`, namespace
+  declaration, or type reference changed anywhere in the solution; the csprojs are SDK-style and glob their
+  sources, so no project file referenced the path either. Build stayed at 0 warnings and the suite at 1317 green,
+  which is the whole proof: a move that changed nothing but where the files sit. Five stale doc anchors were
+  retargeted (`ARCHITECTURE.md` ×2, `GAME_LOOP.md`, `STATE_MODEL.md`, `TODO.md`, plus the `pr-review` agent's
+  engine-file glob). Historical anchors inside this archive were deliberately left as-written — the archive
+  records what was true at the time.
+
 - **`RunDirector.cs` was 1058 lines holding 9 types → one type per file (2026-07-17).** The file carried the
   director itself plus 6 `IRunEvent` classes (`BattleRunEvent`, `RecoveryRunEvent`, `LeadChoiceEvent`,
   `BiomeChoiceEvent`, `ShopRunEvent`, `RewardRunEvent`) and 2 static resolution helpers (`RewardResolution`,

@@ -89,7 +89,7 @@ can transform it out of battle, e.g. Gen 1 Toxic → Poison).
 
 ## 3. The code shape
 
-### `BattleState` — the transient bag (`creaturegame/Creature/BattleState.cs`)
+### `BattleState` — the transient bag (`creaturegame/Creatures/BattleState.cs`)
 
 ```csharp
 public sealed class BattleState

@@ -78,7 +78,7 @@ below (session plan mirrored here for durability; the ephemeral copy was `kind-c
 
 **Staged build (each increment independently shippable + greenlit separately):**
 - [x] **Stage 1a/1b — roster foundation** ✅ DONE (2026-07-12, commit `4c2b9b2`): the `Party` container
-  (`creaturegame/Creature/Party.cs` — `MaxSize` 6, `Lead`/`Add`/`IsFull`/`Replace`/`SetLead`), `RunState.Party`
+  (`creaturegame/Creatures/Party.cs` — `MaxSize` 6, `Lead`/`Add`/`IsFull`/`Replace`/`SetLead`), `RunState.Party`
   (`Player` = the lead) + per-biome `FoughtSpeciesInBiome` tracking, and whole-party Poké Center recovery.
   `RunDirector` owns the party internally for now (session threading lands with 1c's UI). Backend-only, no
   wire/UI; covered by `PartyTests` + a `RunDirector` fought-accumulate/reset test. **Known deferral to 1c:**
@@ -800,6 +800,8 @@ Battles are fully playable now — docs won't describe a moving target.
   helpers split one-per-file into `Combat/RunEvents/` (which keeps `namespace creaturegame.Combat`, per the
   `Combat/Ai/` precedent); the `PlayerAttackTypes`/`CreatureTypes` duplication collapsed into `Creature.Types`.
   **`RunLoop.cs`'s ~28 types are fine** — a cohesive vocabulary file; don't let a type-count metric split it.
+- *2026-07-17:* **`Creature/` and `Creatures/` both declared `namespace creaturegame.Creatures`** → the 9 files
+  merged into `Creatures/`; the `Creature/` directory is gone. Pure file move (`git mv`), no code changed.
 
 **Still open** (filed 2026-07-16 from a repo-wide structural review — ranked by cost-of-deferring, not size):
 
@@ -809,11 +811,6 @@ Battles are fully playable now — docs won't describe a moving target.
   blocking modals don't — plausibly deliberate for blocking prompts, but currently an accident of each
   component rather than a stated rule. *Fix:* a shared `<Modal>` wrapper that makes the escapable/blocking
   choice explicit; lift the modals into `components/modals/`.
-- [ ] **`Creature/` and `Creatures/` are two directories that both declare `namespace creaturegame.Creatures`.**
-  (`Creature/` holds Creature, Attributes, BattleState, Party, StatStages, stat calc; `Creatures/` holds Biome,
-  EncounterSelector, LearnsetMove(Selector).) The split carries no meaning, and it quietly violates the
-  folder=namespace convention the test project follows perfectly (verified: zero mismatches under `tests/`).
-  *Fix:* merge into `Creatures/` — a pure file move, no namespace/using churn since both already share it.
 - [ ] *(low)* **No `Directory.Build.props`** — `TargetFramework`/`ImplicitUsings`/`Nullable` are copy-pasted
   across all four csprojs, and there are no analyzers or `TreatWarningsAsErrors`. Build is clean (0 warnings)
   today, so this is cheap insurance to keep it that way, not a fix for a live problem.

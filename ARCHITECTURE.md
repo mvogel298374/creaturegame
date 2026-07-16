@@ -66,7 +66,7 @@ Each entry: **Decision · Why · Where it lives.**
 - **Why:** Gen 2+ becomes a new implementation, not a rewrite; the litmus test ("would Gen 2 change this
   number?") decides whether a value goes on the seam or stays inline.
 - **Where:** `Combat/IBattleRules.cs` (+ `Gen1BattleRules`), `Combat/ITypeChart.cs` (+ `Gen1TypeChart`),
-  `Creature/IStatCalculator.cs` (+ `Gen1StatCalculator`). **Full contract + §5.0 checklist → `GENERATION_SEAMS.md`.**
+  `Creatures/IStatCalculator.cs` (+ `Gen1StatCalculator`). **Full contract + §5.0 checklist → `GENERATION_SEAMS.md`.**
 
 ### 2.2 Event-sourced engine + emitter pattern
 - **Decision:** the engine computes outcomes and **emits `BattleEvent` records**; it never writes to a
@@ -159,7 +159,7 @@ Each entry: **Decision · Why · Where it lives.**
   a fresh instance. There is **deliberately no delegating property** on `Creature` for these fields.
 - **Why:** a new per-battle field *must* be added to `BattleState`, so it is automatically covered by the
   wholesale reset — a forgotten reset becomes structurally impossible, not just discipline.
-- **Where:** `Creature/BattleState.cs`, `Creature.ResetBattleState()`. **Full split → `STATE_MODEL.md`.**
+- **Where:** `Creatures/BattleState.cs`, `Creature.ResetBattleState()`. **Full split → `STATE_MODEL.md`.**
 
 ### 2.10 Determinism / the RNG seam
 - **Decision:** all randomness goes through `IRandomSource`; the engine and battle setup are seedable, and
