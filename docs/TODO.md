@@ -795,26 +795,16 @@ Battles are fully playable now — docs won't describe a moving target.
 
 **Still open** (filed 2026-07-16 from a repo-wide structural review — ranked by cost-of-deferring, not size):
 
-- [ ] **`RunDirector`'s constructor takes 22 parameters → a parameter object.** `RunDirector.cs:49-92`; the
-  call site in `GameSessionManager.cs:124` runs 45+ lines. 12 params are optional, most are `Func<>` policy
-  suppliers (`enemySupplier`, `rewardSupplier`, `shopSupplier`, `draftSupplier`, `bossCatchSupplier`,
-  `nodePlanFactory`, `checkEvolution`). **The injection pattern itself is right** — web-layer policy into a
-  policy-free core is what `GAME_LOOP.md` / `ENCOUNTER_DESIGN.md` argue for; only the delivery mechanism is at
-  its limit. Every new node kind or acquisition channel adds another param + another default, and the defaults
-  now encode the legacy-chain-vs-biome-mode switch in a way that's hard to read as a whole.
-  *Fix:* a `RunDirectorOptions` record with the optional/supplier surface on it; keep the genuinely required
-  args (player, enemySupplier, typeChart, inputs, movePool) positional. Absorbs future growth without touching
-  the signature. **Do this before the next node kind lands** — it gets more expensive per parameter added.
 - [ ] **No ESLint/Prettier config in `ClientApp/` at all.** The C# side has CSharpier pinned + hook-enforced;
   the frontend has no linter and no formatter, so style/quality drift is unpoliced. The *typecheck* half of
   this gap is closed (`tsc` in the hook — archived above); this is the remaining lint/format half. Lower value
   than the debt above; worth a call on whether to adopt ESLint flat config + Prettier, or to keep the frontend
   deliberately un-linted.
-- [ ] **`RunDirector.cs` is 1091 lines holding 9 types** — the director, 6 `IRunEvent` classes
+- [ ] **`RunDirector.cs` is 1058 lines holding 9 types** — the director, 6 `IRunEvent` classes
   (`BattleRunEvent`, `RecoveryRunEvent`, `LeadChoiceEvent`, `BiomeChoiceEvent`, `ShopRunEvent`,
   `RewardRunEvent`) and 2 static resolution helpers (`RewardResolution`, `AcquisitionResolution`). Split the
   events out per-file under `Combat/RunEvents/`. It also carries a small live duplication: `PlayerAttackTypes`
-  (:801) and `CreatureTypes` (:1082) both walk `Type1`/`Type2` in different shapes — collapse to one helper.
+  and `CreatureTypes` both walk `Type1`/`Type2` in different shapes — collapse to one helper.
   *Note:* `RunLoop.cs` also has ~28 types but is **fine** — a cohesive vocabulary file of small records. Don't
   let a type-count metric drive a split there.
 - [ ] **`BattleScreen.tsx` — 1317 lines, ~25 components.** 8 modals (`Recovery`, `EvolutionPrompt`,

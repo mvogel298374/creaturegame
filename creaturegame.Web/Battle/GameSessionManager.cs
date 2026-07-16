@@ -140,41 +140,44 @@ public sealed class GameSessionManager(
             battle.Input,
             new AiBattleInput(new Gen1TrainerAi(rng: session.Rng)),
             movePool: session.AllMoves,
-            emitter: emitter,
-            rng: session.Rng,
-            // Between encounters, resolve any pending evolution against the DB (edges → IEvolutionRules →
-            // evolved species + learnset). The runner applies it; the data concern stays in the web layer.
-            checkEvolution: p => encounters.ResolvePlayerEvolutionAsync(p, session.AllMoves),
-            // The run's bag, threaded into every Battle's player side; consumed items stay gone across the chain.
-            playerBag: session.Bag,
-            // Biome mode: the run charts a route through this region's playable biomes (the map screen). A
-            // non-empty set flips the director from the legacy endless chain to biome traversal; the chosen
-            // biome themes each encounter. ENCOUNTER_DESIGN.md §7 Phase 3b-2.
-            playableBiomes: session.PlayableBiomes,
-            // Run Economy: the wallet battle wins and Treasure/Mystery credit, and the reward policy
-            // (drop rates / gold curve / item eligibility) closed over this run's item catalog. The client
-            // now answers the Treasure/Mystery reward ack (Phase C), so those nodes run at their full core
-            // distribution (no node-plan gate).
-            wallet: session.Wallet,
-            rewardSupplier: EncounterFactory.BuildRewardSupplier(session.AllItems),
-            // Shop nodes spend the same wallet: run-scaled stock + prices closed over this run's item catalog.
-            shopSupplier: EncounterFactory.BuildShopSupplier(session.AllItems),
-            // A Shop only rolls into a biome when the player can afford the cheapest possible item — so a broke
-            // player (e.g. the opening node with a 0₽ wallet) never gets a dead, all-unaffordable shop.
-            minShopBudget: ShopCalculator.MinItemPrice,
-            // Roguelite run-balance rules (the level-aware XP curve, boosted above pure Gen-1) — see RunTuning.
-            runRules: RunTuning,
-            // Party threading: the RunDirector plays the run over this same party instance (its Lead is the
-            // active player), so the party-hydrate endpoint and the roster panel read the live roster.
-            party: battle.Party,
-            // Themed-draft acquisition (ENCOUNTER_DESIGN.md §4): rolled after every win, gated by cadence × n% ×
-            // the fought-only pool (DraftCalculator), building the offered creature from this run's move pool +
-            // DB. Deposits accepted creatures into the party above.
-            draftSupplier: encounters.BuildDraftSupplier(session.AllMoves),
-            // Boss-catch acquisition (ENCOUNTER_DESIGN.md §4 Stage 2): rolled after a Boss win only, a small n%
-            // chance (BossCatchCalculator) to add the defeated boss — built as a fresh full-HP copy of its species
-            // at the boss's level. The win reward/XP is already applied, so the catch is pure upside.
-            bossCatchSupplier: encounters.BuildBossCatchSupplier(session.AllMoves)
+            new RunDirectorOptions
+            {
+                Emitter = emitter,
+                Rng = session.Rng,
+                // Between encounters, resolve any pending evolution against the DB (edges → IEvolutionRules →
+                // evolved species + learnset). The runner applies it; the data concern stays in the web layer.
+                CheckEvolution = p => encounters.ResolvePlayerEvolutionAsync(p, session.AllMoves),
+                // The run's bag, threaded into every Battle's player side; consumed items stay gone across the chain.
+                PlayerBag = session.Bag,
+                // Biome mode: the run charts a route through this region's playable biomes (the map screen). A
+                // non-empty set flips the director from the legacy endless chain to biome traversal; the chosen
+                // biome themes each encounter. ENCOUNTER_DESIGN.md §7 Phase 3b-2.
+                PlayableBiomes = session.PlayableBiomes,
+                // Run Economy: the wallet battle wins and Treasure/Mystery credit, and the reward policy
+                // (drop rates / gold curve / item eligibility) closed over this run's item catalog. The client
+                // now answers the Treasure/Mystery reward ack (Phase C), so those nodes run at their full core
+                // distribution (no node-plan gate).
+                Wallet = session.Wallet,
+                RewardSupplier = EncounterFactory.BuildRewardSupplier(session.AllItems),
+                // Shop nodes spend the same wallet: run-scaled stock + prices closed over this run's item catalog.
+                ShopSupplier = EncounterFactory.BuildShopSupplier(session.AllItems),
+                // A Shop only rolls into a biome when the player can afford the cheapest possible item — so a broke
+                // player (e.g. the opening node with a 0₽ wallet) never gets a dead, all-unaffordable shop.
+                MinShopBudget = ShopCalculator.MinItemPrice,
+                // Roguelite run-balance rules (the level-aware XP curve, boosted above pure Gen-1) — see RunTuning.
+                RunRules = RunTuning,
+                // Party threading: the RunDirector plays the run over this same party instance (its Lead is the
+                // active player), so the party-hydrate endpoint and the roster panel read the live roster.
+                Party = battle.Party,
+                // Themed-draft acquisition (ENCOUNTER_DESIGN.md §4): rolled after every win, gated by cadence × n% ×
+                // the fought-only pool (DraftCalculator), building the offered creature from this run's move pool +
+                // DB. Deposits accepted creatures into the party above.
+                DraftSupplier = encounters.BuildDraftSupplier(session.AllMoves),
+                // Boss-catch acquisition (ENCOUNTER_DESIGN.md §4 Stage 2): rolled after a Boss win only, a small n%
+                // chance (BossCatchCalculator) to add the defeated boss — built as a fresh full-HP copy of its species
+                // at the boss's level. The win reward/XP is already applied, so the catch is pure upside.
+                BossCatchSupplier = encounters.BuildBossCatchSupplier(session.AllMoves),
+            }
         );
 
         _ = Task.Run(async () =>

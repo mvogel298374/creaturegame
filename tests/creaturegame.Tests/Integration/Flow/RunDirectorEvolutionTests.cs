@@ -73,10 +73,13 @@ public class RunDirectorEvolutionTests
             playerInput,
             new ScriptedInput("tackle"),
             movePool: Array.Empty<Attack>(),
-            emitter: recorder,
-            rules: new ScriptableRules().Deterministic(),
-            rng: new SeededRandomSource(0),
-            checkEvolution: checkEvolution
+            new RunDirectorOptions
+            {
+                Emitter = recorder,
+                Rules = new ScriptableRules().Deterministic(),
+                Rng = new SeededRandomSource(0),
+                CheckEvolution = checkEvolution,
+            }
         );
 
     [Fact]
@@ -194,9 +197,12 @@ public class RunDirectorEvolutionTests
             new ScriptedInput("tackle"),
             new ScriptedInput("tackle"),
             movePool: Array.Empty<Attack>(),
-            emitter: recorder,
-            rules: new ScriptableRules().Deterministic(),
-            rng: new SeededRandomSource(0)
+            new RunDirectorOptions
+            {
+                Emitter = recorder,
+                Rules = new ScriptableRules().Deterministic(),
+                Rng = new SeededRandomSource(0),
+            }
         );
 
         await runner.RunAsync();

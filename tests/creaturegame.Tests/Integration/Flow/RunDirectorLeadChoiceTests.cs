@@ -314,14 +314,17 @@ public class RunDirectorLeadChoiceTests
             input,
             input,
             movePool: Array.Empty<Attack>(),
-            emitter: recorder,
-            rules: new ScriptableRules().Deterministic(),
-            rng: new SeededRandomSource(0),
-            playableBiomes: [solo],
-            minEventsPerBiome: 1,
-            maxEventsPerBiome: 1,
-            nodePlanFactory: (_, _) => [RunNodeKind.BossBattle],
-            party: party
+            new RunDirectorOptions
+            {
+                Emitter = recorder,
+                Rules = new ScriptableRules().Deterministic(),
+                Rng = new SeededRandomSource(0),
+                PlayableBiomes = [solo],
+                MinEventsPerBiome = 1,
+                MaxEventsPerBiome = 1,
+                NodePlanFactory = (_, _) => [RunNodeKind.BossBattle],
+                Party = party,
+            }
         );
         return (runner, recorder);
     }

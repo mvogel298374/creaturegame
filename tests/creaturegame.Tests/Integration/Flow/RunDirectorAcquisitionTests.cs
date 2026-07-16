@@ -317,15 +317,18 @@ public class RunDirectorAcquisitionTests
             input,
             input,
             movePool: Array.Empty<Attack>(),
-            emitter: recorder,
-            rules: new ScriptableRules().Deterministic(),
-            rng: new SeededRandomSource(0),
-            playableBiomes: [solo],
-            minEventsPerBiome: plan.Count,
-            maxEventsPerBiome: plan.Count,
-            nodePlanFactory: (_, _) => plan,
-            draftSupplier: draftSupplier,
-            bossCatchSupplier: bossCatchSupplier
+            new RunDirectorOptions
+            {
+                Emitter = recorder,
+                Rules = new ScriptableRules().Deterministic(),
+                Rng = new SeededRandomSource(0),
+                PlayableBiomes = [solo],
+                MinEventsPerBiome = plan.Count,
+                MaxEventsPerBiome = plan.Count,
+                NodePlanFactory = (_, _) => plan,
+                DraftSupplier = draftSupplier,
+                BossCatchSupplier = bossCatchSupplier,
+            }
         );
         return (runner, recorder);
     }
@@ -378,12 +381,15 @@ public class RunDirectorAcquisitionTests
             input,
             input,
             movePool: Array.Empty<Attack>(),
-            emitter: recorder,
-            rules: new ScriptableRules().Deterministic(),
-            rng: new SeededRandomSource(0),
-            healEveryNBattles: 0, // no Poké Center between the observed wins
-            party: party,
-            draftSupplier: draftSupplier
+            new RunDirectorOptions
+            {
+                Emitter = recorder,
+                Rules = new ScriptableRules().Deterministic(),
+                Rng = new SeededRandomSource(0),
+                HealEveryNBattles = 0, // no Poké Center between the observed wins
+                Party = party,
+                DraftSupplier = draftSupplier,
+            }
         );
         return (runner, recorder);
     }

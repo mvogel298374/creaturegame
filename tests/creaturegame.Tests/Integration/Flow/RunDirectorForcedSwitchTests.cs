@@ -116,14 +116,17 @@ public class RunDirectorForcedSwitchTests
             input,
             input,
             movePool: Array.Empty<Attack>(),
-            emitter: recorder,
-            rules: new ScriptableRules().Deterministic(),
-            rng: new SeededRandomSource(0),
-            playableBiomes: [solo],
-            minEventsPerBiome: plan.Count,
-            maxEventsPerBiome: plan.Count,
-            nodePlanFactory: (_, _) => plan,
-            party: party
+            new RunDirectorOptions
+            {
+                Emitter = recorder,
+                Rules = new ScriptableRules().Deterministic(),
+                Rng = new SeededRandomSource(0),
+                PlayableBiomes = [solo],
+                MinEventsPerBiome = plan.Count,
+                MaxEventsPerBiome = plan.Count,
+                NodePlanFactory = (_, _) => plan,
+                Party = party,
+            }
         );
         return (runner, recorder);
     }

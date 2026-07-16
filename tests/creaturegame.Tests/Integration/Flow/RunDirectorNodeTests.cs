@@ -176,11 +176,14 @@ public class RunDirectorNodeTests
             new ScriptedInput("tackle"),
             new ScriptedInput("tackle"),
             movePool: Array.Empty<Attack>(),
-            emitter: recorder,
-            rules: new ScriptableRules().Deterministic(),
-            rng: new SeededRandomSource(0),
-            playableBiomes: [solo],
-            nodePlanFactory: (_, _) => [RunNodeKind.BossBattle]
+            new RunDirectorOptions
+            {
+                Emitter = recorder,
+                Rules = new ScriptableRules().Deterministic(),
+                Rng = new SeededRandomSource(0),
+                PlayableBiomes = [solo],
+                NodePlanFactory = (_, _) => [RunNodeKind.BossBattle],
+            }
         );
 
         await runner.RunAsync();
@@ -218,11 +221,14 @@ public class RunDirectorNodeTests
             new ScriptedInput("tackle"),
             new ScriptedInput("tackle"),
             movePool: Array.Empty<Attack>(),
-            emitter: new RecordingEmitter(),
-            rules: new ScriptableRules().Deterministic(),
-            rng: new SeededRandomSource(seed),
-            playableBiomes: [solo],
-            nodePlanFactory: nodePlanFactory // default min/max (4–6) — not overridden
+            new RunDirectorOptions
+            {
+                Emitter = new RecordingEmitter(),
+                Rules = new ScriptableRules().Deterministic(),
+                Rng = new SeededRandomSource(seed),
+                PlayableBiomes = [solo],
+                NodePlanFactory = nodePlanFactory, // default min/max (4–6) — not overridden
+            }
         );
 
         await runner.RunAsync();
@@ -279,13 +285,16 @@ public class RunDirectorNodeTests
             new ScriptedInput("tackle"), // player: auto-picks the only biome (default ChooseBiomeAsync), scripts moves
             new ScriptedInput("tackle"),
             movePool: Array.Empty<Attack>(),
-            emitter: recorder,
-            rules: new ScriptableRules().Deterministic(),
-            rng: new SeededRandomSource(0),
-            playableBiomes: [solo],
-            minEventsPerBiome: 6,
-            maxEventsPerBiome: 6,
-            nodePlanFactory: (_, _) => plan
+            new RunDirectorOptions
+            {
+                Emitter = recorder,
+                Rules = new ScriptableRules().Deterministic(),
+                Rng = new SeededRandomSource(0),
+                PlayableBiomes = [solo],
+                MinEventsPerBiome = 6,
+                MaxEventsPerBiome = 6,
+                NodePlanFactory = (_, _) => plan,
+            }
         );
 
         await runner.RunAsync();
@@ -371,13 +380,16 @@ public class RunDirectorNodeTests
             new ScriptedInput("tackle"),
             new ScriptedInput("tackle"),
             movePool: Array.Empty<Attack>(),
-            emitter: recorder,
-            rules: new ScriptableRules().Deterministic(),
-            rng: new SeededRandomSource(0),
-            playableBiomes: [solo],
-            minEventsPerBiome: 3,
-            maxEventsPerBiome: 3,
-            nodePlanFactory: (_, _) => plan
+            new RunDirectorOptions
+            {
+                Emitter = recorder,
+                Rules = new ScriptableRules().Deterministic(),
+                Rng = new SeededRandomSource(0),
+                PlayableBiomes = [solo],
+                MinEventsPerBiome = 3,
+                MaxEventsPerBiome = 3,
+                NodePlanFactory = (_, _) => plan,
+            }
         );
 
         await runner.RunAsync();
@@ -431,13 +443,16 @@ public class RunDirectorNodeTests
             new ScriptedInput("tackle"),
             new ScriptedInput("tackle"),
             movePool: Array.Empty<Attack>(),
-            emitter: recorder,
-            rules: new ScriptableRules().Deterministic(),
-            rng: new SeededRandomSource(0),
-            playableBiomes: [a, b],
-            minEventsPerBiome: 1,
-            maxEventsPerBiome: 1,
-            nodePlanFactory: (_, _) => [RunNodeKind.WildBattle]
+            new RunDirectorOptions
+            {
+                Emitter = recorder,
+                Rules = new ScriptableRules().Deterministic(),
+                Rng = new SeededRandomSource(0),
+                PlayableBiomes = [a, b],
+                MinEventsPerBiome = 1,
+                MaxEventsPerBiome = 1,
+                NodePlanFactory = (_, _) => [RunNodeKind.WildBattle],
+            }
         );
 
         await runner.RunAsync();
@@ -497,13 +512,16 @@ public class RunDirectorNodeTests
             new ScriptedInput("tackle"),
             new ScriptedInput("tackle"),
             movePool: Array.Empty<Attack>(),
-            emitter: recorder,
-            rules: new ScriptableRules().Deterministic(),
-            rng: new SeededRandomSource(0),
-            playableBiomes: [solo],
-            minEventsPerBiome: 3,
-            maxEventsPerBiome: 3,
-            nodePlanFactory: (_, _) => plan
+            new RunDirectorOptions
+            {
+                Emitter = recorder,
+                Rules = new ScriptableRules().Deterministic(),
+                Rng = new SeededRandomSource(0),
+                PlayableBiomes = [solo],
+                MinEventsPerBiome = 3,
+                MaxEventsPerBiome = 3,
+                NodePlanFactory = (_, _) => plan,
+            }
         );
 
         await runner.RunAsync();
@@ -556,13 +574,16 @@ public class RunDirectorNodeTests
             new ScriptedInput("tackle"),
             new ScriptedInput("tackle"),
             movePool: Array.Empty<Attack>(),
-            emitter: new RecordingEmitter(),
-            rules: new ScriptableRules().Deterministic(),
-            rng: new SeededRandomSource(0),
-            playableBiomes: [solo],
-            minEventsPerBiome: 2,
-            maxEventsPerBiome: 2,
-            nodePlanFactory: (_, _) => plan
+            new RunDirectorOptions
+            {
+                Emitter = new RecordingEmitter(),
+                Rules = new ScriptableRules().Deterministic(),
+                Rng = new SeededRandomSource(0),
+                PlayableBiomes = [solo],
+                MinEventsPerBiome = 2,
+                MaxEventsPerBiome = 2,
+                NodePlanFactory = (_, _) => plan,
+            }
         );
 
         await runner.RunAsync();
@@ -597,9 +618,12 @@ public class RunDirectorNodeTests
             new ScriptedInput("tackle"),
             new ScriptedInput("tackle"),
             movePool: Array.Empty<Attack>(),
-            emitter: recorder,
-            rules: new ScriptableRules().Deterministic(),
-            rng: new SeededRandomSource(0)
+            new RunDirectorOptions
+            {
+                Emitter = recorder,
+                Rules = new ScriptableRules().Deterministic(),
+                Rng = new SeededRandomSource(0),
+            }
         );
 
         await runner.RunAsync();
@@ -648,19 +672,22 @@ public class RunDirectorNodeTests
             input,
             input,
             movePool: Array.Empty<Attack>(),
-            emitter: recorder,
-            rules: new ScriptableRules().Deterministic(),
-            rng: new SeededRandomSource(0),
-            healEveryNBattles: 0, // no Poké Center in the way of the single win being observed
-            playerBag: bag,
-            wallet: wallet,
-            rewardSupplier: (ctx, _) =>
-                ctx.Source == RunNodeKind.WildBattle
-                    ? new RewardChoice([
-                        new ItemRewardOption(17, "Potion", RewardRarity.Common),
-                        new GoldRewardOption(25),
-                    ])
-                    : RewardChoice.None
+            new RunDirectorOptions
+            {
+                Emitter = recorder,
+                Rules = new ScriptableRules().Deterministic(),
+                Rng = new SeededRandomSource(0),
+                HealEveryNBattles = 0, // no Poké Center in the way of the single win being observed
+                PlayerBag = bag,
+                Wallet = wallet,
+                RewardSupplier = (ctx, _) =>
+                    ctx.Source == RunNodeKind.WildBattle
+                        ? new RewardChoice([
+                            new ItemRewardOption(17, "Potion", RewardRarity.Common),
+                            new GoldRewardOption(25),
+                        ])
+                        : RewardChoice.None,
+            }
         );
 
         await runner.RunAsync();
@@ -712,19 +739,22 @@ public class RunDirectorNodeTests
             input,
             input,
             movePool: Array.Empty<Attack>(),
-            emitter: recorder,
-            rules: new ScriptableRules().Deterministic(),
-            rng: new SeededRandomSource(0),
-            healEveryNBattles: 0,
-            playerBag: bag,
-            wallet: wallet,
-            rewardSupplier: (ctx, _) =>
-                ctx.Source == RunNodeKind.WildBattle
-                    ? new RewardChoice([
-                        new ItemRewardOption(17, "Potion", RewardRarity.Common),
-                        new GoldRewardOption(25),
-                    ])
-                    : RewardChoice.None
+            new RunDirectorOptions
+            {
+                Emitter = recorder,
+                Rules = new ScriptableRules().Deterministic(),
+                Rng = new SeededRandomSource(0),
+                HealEveryNBattles = 0,
+                PlayerBag = bag,
+                Wallet = wallet,
+                RewardSupplier = (ctx, _) =>
+                    ctx.Source == RunNodeKind.WildBattle
+                        ? new RewardChoice([
+                            new ItemRewardOption(17, "Potion", RewardRarity.Common),
+                            new GoldRewardOption(25),
+                        ])
+                        : RewardChoice.None,
+            }
         );
 
         await runner.RunAsync();
@@ -758,10 +788,13 @@ public class RunDirectorNodeTests
             input,
             input,
             movePool: Array.Empty<Attack>(),
-            emitter: recorder,
-            rules: new ScriptableRules().Deterministic(),
-            rng: new SeededRandomSource(0)
-        // no wallet / rewardSupplier — defaults to RewardChoice.None
+            new RunDirectorOptions
+            {
+                Emitter = recorder,
+                Rules = new ScriptableRules().Deterministic(),
+                Rng = new SeededRandomSource(0),
+                // no Wallet / RewardSupplier — defaults to RewardChoice.None
+            }
         );
 
         await runner.RunAsync();
@@ -805,25 +838,28 @@ public class RunDirectorNodeTests
             input,
             input,
             movePool: Array.Empty<Attack>(),
-            emitter: recorder,
-            rules: new ScriptableRules().Deterministic(),
-            rng: new SeededRandomSource(0),
-            playableBiomes: [solo],
-            minEventsPerBiome: 3,
-            maxEventsPerBiome: 3,
-            nodePlanFactory: (_, _) => plan,
-            playerBag: bag,
-            wallet: wallet,
-            rewardSupplier: (ctx, _) =>
-                ctx.Source switch
-                {
-                    RunNodeKind.Treasure => new RewardChoice([
-                        new ItemRewardOption(1, "Potion", RewardRarity.Common),
-                        new GoldRewardOption(40),
-                    ]),
-                    RunNodeKind.Mystery => new RewardChoice([new GoldRewardOption(5)]),
-                    _ => RewardChoice.None,
-                }
+            new RunDirectorOptions
+            {
+                Emitter = recorder,
+                Rules = new ScriptableRules().Deterministic(),
+                Rng = new SeededRandomSource(0),
+                PlayableBiomes = [solo],
+                MinEventsPerBiome = 3,
+                MaxEventsPerBiome = 3,
+                NodePlanFactory = (_, _) => plan,
+                PlayerBag = bag,
+                Wallet = wallet,
+                RewardSupplier = (ctx, _) =>
+                    ctx.Source switch
+                    {
+                        RunNodeKind.Treasure => new RewardChoice([
+                            new ItemRewardOption(1, "Potion", RewardRarity.Common),
+                            new GoldRewardOption(40),
+                        ]),
+                        RunNodeKind.Mystery => new RewardChoice([new GoldRewardOption(5)]),
+                        _ => RewardChoice.None,
+                    },
+            }
         );
 
         await runner.RunAsync();
@@ -875,22 +911,25 @@ public class RunDirectorNodeTests
             input,
             input,
             movePool: Array.Empty<Attack>(),
-            emitter: recorder,
-            rules: new ScriptableRules().Deterministic(),
-            rng: new SeededRandomSource(0),
-            playableBiomes: [solo],
-            minEventsPerBiome: 2,
-            maxEventsPerBiome: 2,
-            nodePlanFactory: (_, _) => plan,
-            playerBag: bag,
-            wallet: wallet,
-            rewardSupplier: (ctx, _) =>
-                ctx.Source == RunNodeKind.Treasure
-                    ? new RewardChoice([
-                        new ItemRewardOption(1, "Potion", RewardRarity.Common),
-                        new GoldRewardOption(40),
-                    ])
-                    : RewardChoice.None
+            new RunDirectorOptions
+            {
+                Emitter = recorder,
+                Rules = new ScriptableRules().Deterministic(),
+                Rng = new SeededRandomSource(0),
+                PlayableBiomes = [solo],
+                MinEventsPerBiome = 2,
+                MaxEventsPerBiome = 2,
+                NodePlanFactory = (_, _) => plan,
+                PlayerBag = bag,
+                Wallet = wallet,
+                RewardSupplier = (ctx, _) =>
+                    ctx.Source == RunNodeKind.Treasure
+                        ? new RewardChoice([
+                            new ItemRewardOption(1, "Potion", RewardRarity.Common),
+                            new GoldRewardOption(40),
+                        ])
+                        : RewardChoice.None,
+            }
         );
 
         await runner.RunAsync();
@@ -946,15 +985,18 @@ public class RunDirectorNodeTests
             AutoSelectInput.Instance,
             AutoSelectInput.Instance,
             movePool: Array.Empty<Attack>(),
-            emitter: recorder,
-            rules: new ScriptableRules().Deterministic(),
-            rng: new SeededRandomSource(0),
-            playableBiomes: [solo],
-            minEventsPerBiome: 3,
-            maxEventsPerBiome: 3,
-            nodePlanFactory: (_, _) => plan,
-            wallet: new Wallet(),
-            rewardSupplier: (_, _) => new RewardChoice([new GoldRewardOption(10)])
+            new RunDirectorOptions
+            {
+                Emitter = recorder,
+                Rules = new ScriptableRules().Deterministic(),
+                Rng = new SeededRandomSource(0),
+                PlayableBiomes = [solo],
+                MinEventsPerBiome = 3,
+                MaxEventsPerBiome = 3,
+                NodePlanFactory = (_, _) => plan,
+                Wallet = new Wallet(),
+                RewardSupplier = (_, _) => new RewardChoice([new GoldRewardOption(10)]),
+            }
         );
 
         await runner.RunAsync(); // completes at all — no deadlock on the modal — is the assertion
@@ -1001,17 +1043,20 @@ public class RunDirectorNodeTests
             input,
             input,
             movePool: Array.Empty<Attack>(),
-            emitter: recorder,
-            rules: new ScriptableRules().Deterministic(),
-            rng: new SeededRandomSource(0),
-            playableBiomes: [solo],
-            minEventsPerBiome: 2,
-            maxEventsPerBiome: 2,
-            nodePlanFactory: (_, _) => plan,
-            playerBag: bag,
-            wallet: wallet,
-            shopSupplier: shopSupplier,
-            minShopBudget: minShopBudget
+            new RunDirectorOptions
+            {
+                Emitter = recorder,
+                Rules = new ScriptableRules().Deterministic(),
+                Rng = new SeededRandomSource(0),
+                PlayableBiomes = [solo],
+                MinEventsPerBiome = 2,
+                MaxEventsPerBiome = 2,
+                NodePlanFactory = (_, _) => plan,
+                PlayerBag = bag,
+                Wallet = wallet,
+                ShopSupplier = shopSupplier,
+                MinShopBudget = minShopBudget,
+            }
         );
         return (runner, recorder);
     }
@@ -1196,15 +1241,18 @@ public class RunDirectorNodeTests
             AutoSelectInput.Instance,
             AutoSelectInput.Instance,
             movePool: Array.Empty<Attack>(),
-            emitter: recorder,
-            rules: new ScriptableRules().Deterministic(),
-            rng: new SeededRandomSource(0),
-            playableBiomes: [solo],
-            minEventsPerBiome: 2,
-            maxEventsPerBiome: 2,
-            nodePlanFactory: (_, _) => plan,
-            wallet: wallet,
-            shopSupplier: (_, _) => TwoItemStock
+            new RunDirectorOptions
+            {
+                Emitter = recorder,
+                Rules = new ScriptableRules().Deterministic(),
+                Rng = new SeededRandomSource(0),
+                PlayableBiomes = [solo],
+                MinEventsPerBiome = 2,
+                MaxEventsPerBiome = 2,
+                NodePlanFactory = (_, _) => plan,
+                Wallet = wallet,
+                ShopSupplier = (_, _) => TwoItemStock,
+            }
         );
 
         await runner.RunAsync(); // completing at all (no deadlock) is the assertion

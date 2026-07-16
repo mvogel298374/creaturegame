@@ -81,13 +81,16 @@ public class RunDirectorBiomeTests
             input,
             new ScriptedInput("tackle"),
             movePool: Array.Empty<Attack>(),
-            emitter: recorder,
-            rules: new ScriptableRules().Deterministic(),
-            rng: new SeededRandomSource(0),
-            playableBiomes: Playable,
-            minEventsPerBiome: 3,
-            maxEventsPerBiome: 3,
-            nodePlanFactory: AllWildPlan
+            new RunDirectorOptions
+            {
+                Emitter = recorder,
+                Rules = new ScriptableRules().Deterministic(),
+                Rng = new SeededRandomSource(0),
+                PlayableBiomes = Playable,
+                MinEventsPerBiome = 3,
+                MaxEventsPerBiome = 3,
+                NodePlanFactory = AllWildPlan,
+            }
         );
 
         await runner.RunAsync();
@@ -159,14 +162,17 @@ public class RunDirectorBiomeTests
             input,
             new ScriptedInput("tackle"),
             movePool: Array.Empty<Attack>(),
-            emitter: new RecordingEmitter(),
-            rules: new ScriptableRules().Deterministic(),
-            rng: new SeededRandomSource(0),
-            playableBiomes: playable,
-            // a one-battle biome, so the second choice is reached quickly
-            minEventsPerBiome: 1,
-            maxEventsPerBiome: 1,
-            nodePlanFactory: AllWildPlan
+            new RunDirectorOptions
+            {
+                Emitter = new RecordingEmitter(),
+                Rules = new ScriptableRules().Deterministic(),
+                Rng = new SeededRandomSource(0),
+                PlayableBiomes = playable,
+                // a one-battle biome, so the second choice is reached quickly
+                MinEventsPerBiome = 1,
+                MaxEventsPerBiome = 1,
+                NodePlanFactory = AllWildPlan,
+            }
         );
 
         await runner.RunAsync();
@@ -243,13 +249,16 @@ public class RunDirectorBiomeTests
             input,
             new ScriptedInput("tackle"),
             movePool: Array.Empty<Attack>(),
-            emitter: new RecordingEmitter(),
-            rules: new ScriptableRules().Deterministic(),
-            rng: new SeededRandomSource(seed),
-            playableBiomes: Biomes.Kanto,
-            minEventsPerBiome: 3,
-            maxEventsPerBiome: 3,
-            nodePlanFactory: AllWildPlan
+            new RunDirectorOptions
+            {
+                Emitter = new RecordingEmitter(),
+                Rules = new ScriptableRules().Deterministic(),
+                Rng = new SeededRandomSource(seed),
+                PlayableBiomes = Biomes.Kanto,
+                MinEventsPerBiome = 3,
+                MaxEventsPerBiome = 3,
+                NodePlanFactory = AllWildPlan,
+            }
         );
 
         await runner.RunAsync();
@@ -296,13 +305,16 @@ public class RunDirectorBiomeTests
             input,
             new ScriptedInput("tackle"),
             movePool: Array.Empty<Attack>(),
-            emitter: new RecordingEmitter(),
-            rules: new ScriptableRules().Deterministic(),
-            rng: new SeededRandomSource(seed),
-            playableBiomes: Biomes.Kanto,
-            minEventsPerBiome: 3,
-            maxEventsPerBiome: 3,
-            nodePlanFactory: AllWildPlan
+            new RunDirectorOptions
+            {
+                Emitter = new RecordingEmitter(),
+                Rules = new ScriptableRules().Deterministic(),
+                Rng = new SeededRandomSource(seed),
+                PlayableBiomes = Biomes.Kanto,
+                MinEventsPerBiome = 3,
+                MaxEventsPerBiome = 3,
+                NodePlanFactory = AllWildPlan,
+            }
         );
 
         await runner.RunAsync();
@@ -334,10 +346,13 @@ public class RunDirectorBiomeTests
             new ScriptedInput("tackle"),
             new ScriptedInput("tackle"),
             movePool: Array.Empty<Attack>(),
-            emitter: recorder,
-            rules: new ScriptableRules().Deterministic(),
-            rng: new SeededRandomSource(0)
-        ); // no playableBiomes → legacy mode
+            new RunDirectorOptions
+            {
+                Emitter = recorder,
+                Rules = new ScriptableRules().Deterministic(),
+                Rng = new SeededRandomSource(0),
+            }
+        ); // no PlayableBiomes → legacy mode
 
         await runner.RunAsync();
 

@@ -139,12 +139,23 @@ The target is a **true Gen 1 Pokémon battle clone** with future layers inspired
 
 ## TODO State
 
-See `docs/TODO.md` for the full prioritised task list, completed items, and tech debt. Always update `docs/TODO.md` when finishing a task.
+`docs/TODO.md` is the **authoritative** prioritised task list; finished work lives in `docs/TODO_ARCHIVE.md`.
+
+**Updating `docs/TODO.md` is part of the commit that finishes the work — not a follow-up.** Stage the doc edit
+in the *same* commit as the code, before proposing the commit for approval. A diff that completes an item while
+`TODO.md` still lists it as open is an incomplete diff.
+
+When an item is done, all of the following, not just the first:
+- Mark it ✅ DONE with the date, or move the whole write-up to `docs/TODO_ARCHIVE.md` — a finished feature or a
+  closed tech-debt item belongs in the archive, because `TODO.md` holds **active work only**.
+- Clear the stale framing around it: the "Next up" ordering, "blocked on X" / "gated on Y" notes, `⚠️ known
+  defect` banners, and any dependency prose that now describes a world that no longer exists.
+- Never leave a done item in the open list "for the record" — the archive *is* the record.
 
 ## Permissions
 
 - **File edits and creation are always allowed** — make changes to existing files or create new ones without asking for confirmation first.
-- **Git commits require explicit approval** — stage changes and propose a commit message, but do not run `git commit` until the user confirms. **Once a commit is approved, always push it to `origin`** (`master`) as part of the same step — no separate confirmation is needed for the push; approving the commit approves the push.
+- **Git commits require explicit approval** — stage changes and propose a commit message, but do not run `git commit` until the user confirms. **Before proposing, check that the staged set includes the `docs/TODO.md` cleanup** for whatever the commit finishes (see **TODO State**). **Once a commit is approved, always push it to `origin`** (`master`) as part of the same step — no separate confirmation is needed for the push; approving the commit approves the push.
 - **Dev stack is freely managed** — start, stop, restart, or kill the dev servers (backend `:5100`, Vite `:5173`) whenever a task needs it (build lock, fresh-code reload, test run), without asking. Don't append their running status to responses as a routine heads-up; only mention it when directly relevant (e.g. a test failed because the backend was down).
 
 ## Communication Style

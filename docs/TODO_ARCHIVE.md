@@ -601,6 +601,23 @@ The ordered pass that followed the move-coverage completion. All six items done;
 
 ## Tech-Debt cleanups — DONE
 
+- **`RunDirector`'s 25-parameter constructor → a parameter object (2026-07-16).** The signature had grown to
+  6 required args + 19 optional ones (mostly `Func<>` policy suppliers: `rewardSupplier`, `shopSupplier`,
+  `draftSupplier`, `bossCatchSupplier`, `nodePlanFactory`, `checkEvolution`), and the web call site in
+  `GameSessionManager` ran 45+ lines. The **injection pattern itself was never the problem** — web-layer policy
+  into a policy-free core is what `GAME_LOOP.md` / `ENCOUNTER_DESIGN.md` argue for — only the delivery
+  mechanism had hit its limit. Fixed by a new `creaturegame/Combat/RunDirectorOptions.cs` record carrying the
+  whole optional/supplier surface (each property documenting what its absence implies); the constructor now
+  takes the 6 genuinely required args positionally (player, enemySupplier, typeChart, both inputs, movePool)
+  plus an optional `RunDirectorOptions?`, so omitting it *is* the legacy endless chain. A new node kind or
+  acquisition channel now adds a property instead of a positional parameter + another default.
+  **Strictly behaviour-preserving** — every option maps 1:1 to the parameter it replaced with identical
+  defaults (verified parameter-by-parameter, and across all 36 call sites, by `pr-review`). The web
+  composition root + 35 test call sites were updated (the tests scripted, then swept by hand for
+  comment-attribution damage). Verified by the full suite (1314 .NET / 147 Vitest / tsc clean) **plus a live
+  Playwright run — 26/26** against the real composition root, which is what a mis-mapped option (a wrong
+  wiring still compiles) would actually have caught.
+
 - **Flaky full-`Battle` tests (2026-06-07).** Swept and deterministically fixed the three intermittent
   flakes (all unseeded `Battle` RNG + un-pinned rolls): `RestContractTests` (random crit one-shot the
   player before the forced-sleep turn → `NoVarianceNoCritHitRules` + seed), `TransformRevertsWhenTheBattleEnds`

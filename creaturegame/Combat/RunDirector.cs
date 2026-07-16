@@ -14,13 +14,15 @@ namespace creaturegame.Combat;
 ///
 /// Today the chain is the endless run: a wild <see cref="Battle"/> per encounter (one persistent player whose
 /// permanent half — HP, PP, XP, Level — carries across; each battle resets the transient half at its start,
-/// canonical Gen 1), with a Poké Center pause after every <paramref name="healEveryNBattles"/>-th win. When the
-/// player faints the run ends and a single <see cref="RunEnded"/> carries the summary.
+/// canonical Gen 1), with a Poké Center pause after every <see cref="RunDirectorOptions.HealEveryNBattles"/>-th
+/// win. When the player faints the run ends and a single <see cref="RunEnded"/> carries the summary.
 ///
 /// Core stays generation- and data-agnostic via injected seams: <paramref name="enemySupplier"/> builds the
-/// scaled foe (the DB concern lives in the web layer), and <paramref name="checkEvolution"/> resolves a
-/// pending evolution between encounters (null = the plain chain). (Renamed from <c>BattleRunner</c>: the run
-/// loop graduates into the <c>RunDirector</c> that <c>GAME_LOOP.md §6 Q1</c> anticipated.)
+/// scaled foe (the DB concern lives in the web layer), and the rest of the injected policy —
+/// <see cref="RunDirectorOptions.CheckEvolution"/>, the reward / shop / acquisition suppliers, the biome set —
+/// arrives on <see cref="RunDirectorOptions"/>; omit it entirely for the plain chain. (Renamed from
+/// <c>BattleRunner</c>: the run loop graduates into the <c>RunDirector</c> that <c>GAME_LOOP.md §6 Q1</c>
+/// anticipated.)
 /// </summary>
 public sealed class RunDirector
 {
@@ -53,73 +55,33 @@ public sealed class RunDirector
         IBattleInput playerInput,
         IBattleInput enemyInput,
         IReadOnlyList<Attack> movePool,
-        IBattleEventEmitter? emitter = null,
-        IBattleRules? rules = null,
-        IRandomSource? rng = null,
-        int healEveryNBattles = 3,
-        Func<Creature, Task<EvolutionOutcome?>>? checkEvolution = null,
-        Bag? playerBag = null,
-        IReadOnlyList<BiomeDefinition>? playableBiomes = null,
-        int minEventsPerBiome = 4,
-        int maxEventsPerBiome = 6,
-        int biomeOptionCount = 3,
-        Func<int, IRandomSource, IReadOnlyList<RunNodeKind>>? nodePlanFactory = null,
-        Wallet? wallet = null,
-        Func<RewardContext, IRandomSource, RewardChoice>? rewardSupplier = null,
-        Func<ShopStockContext, IRandomSource, ShopOffer>? shopSupplier = null,
-        // A Shop node is only worth visiting if the player can afford something, so a biome's plan only keeps its
-        // Shop slots when the wallet is at least this many ₽ when the biome is entered (the moment the route is
-        // fixed — ENCOUNTER_DESIGN.md §5). The web layer passes the cheapest stock price; 0 (the default) never
-        // gates, so the legacy chain / tests are unchanged.
-        int minShopBudget = 0,
-        // Roguelite run-balance rules passed straight through to each encounter's Battle (game-balance tuning,
-        // not a seam — see Battle's runRules / RunRules). Null keeps the legacy chain / tests on pure Gen-1 XP.
-        RunRules? runRules = null,
-        // The run's party container (up to six owned creatures; its Lead is the active player). Passed in so the
-        // web session owns the same instance the overview/party panel read (Party threading, ENCOUNTER_DESIGN.md
-        // §4). Null keeps the legacy shape — a party of one seeded from `player`.
-        Party? party = null,
-        // The themed-draft acquisition supplier (web-layer policy): rolled after every win, it decides whether to
-        // offer a creature (cadence × n% × the fought-only pool) and builds one when it does — the mirror of the
-        // reward / shop suppliers on the acquisition side. Null (the default) = no draft, so tests / the legacy
-        // chain never offer one and draw no extra RNG.
-        Func<DraftContext, IRandomSource, Task<Creature?>>? draftSupplier = null,
-        // The boss-catch acquisition supplier (web-layer policy, Phase 4 Stage 2): rolled after a Boss win only —
-        // a small n% chance to add the defeated boss to the party (pure upside; the win XP/reward already applied).
-        // Builds a party-ready copy of the boss's species when it fires, else null. Null (the default) = no boss
-        // catch, so tests / the legacy chain never offer one and draw no extra RNG.
-        Func<BossCatchContext, IRandomSource, Task<Creature?>>? bossCatchSupplier = null
+        RunDirectorOptions? options = null
     )
     {
-        _state = party is not null ? new RunState(party) : new RunState(player);
-        _emitter = emitter;
+        // Every knob and injected policy supplier lives on the options record; omitting it is the legacy endless
+        // chain. See RunDirectorOptions for what each one means and what its absence implies.
+        var o = options ?? new RunDirectorOptions();
+
+        _state = o.Party is not null ? new RunState(o.Party) : new RunState(player);
+        _emitter = o.Emitter;
         _playerInput = playerInput;
-        _rng = rng;
-        _healEveryNBattles = healEveryNBattles;
+        _rng = o.Rng;
+        _healEveryNBattles = o.HealEveryNBattles;
         // Each biome's route is a randomised length in [min, max] nodes, rolled per biome when the biome is
         // entered (see Apply) — so biomes vary in size and a longer one has more room for impactful nodes
         // (ENCOUNTER_DESIGN.md §7). Clamped so the range is always valid (≥1 node, max ≥ min) however configured.
-        _minEventsPerBiome = Math.Max(1, minEventsPerBiome);
-        _maxEventsPerBiome = Math.Max(_minEventsPerBiome, maxEventsPerBiome);
-        // How each biome's node route is laid out — defaults to the seeded placeholder; injectable so tests pin
-        // a deterministic plan and 3c-2 can swap the tuned curve without touching the director.
-        _nodePlanFactory = nodePlanFactory ?? DefaultNodePlan;
+        _minEventsPerBiome = Math.Max(1, o.MinEventsPerBiome);
+        _maxEventsPerBiome = Math.Max(_minEventsPerBiome, o.MaxEventsPerBiome);
+        _nodePlanFactory = o.NodePlanFactory ?? DefaultNodePlan;
         // Biome mode kicks in only when the composition layer supplies a non-empty playable set; otherwise the
         // director runs the legacy endless chain (no route choices), so tests/uses without biomes are unchanged.
-        _biomeModeActive = playableBiomes is { Count: > 0 };
-        _playableBiomes = playableBiomes ?? [];
-        _wallet = wallet;
-        _minShopBudget = Math.Max(0, minShopBudget);
+        _biomeModeActive = o.PlayableBiomes is { Count: > 0 };
+        _playableBiomes = o.PlayableBiomes ?? [];
+        _wallet = o.Wallet;
+        _minShopBudget = Math.Max(0, o.MinShopBudget);
 
-        // Reward policy (drop rates, rarity curve, item eligibility) is web-layer roguelite tuning, not a battle
-        // seam — the core just defines the vocabulary and consumes whatever's injected. No supplier → every
-        // reward roll is RewardChoice.None, so callers without one (tests, the legacy chain) are unchanged.
-        rewardSupplier ??= (_, _) => RewardChoice.None;
-
-        // Shop stock policy (which items, run-scaled prices) is web-layer roguelite tuning, not a battle seam —
-        // same class as the reward supplier. No supplier → every shop rolls ShopOffer.None, so the node resolves
-        // as a silent banner (callers without one — tests, the legacy chain — are unchanged).
-        shopSupplier ??= (_, _) => ShopOffer.None;
+        var rewardSupplier = o.RewardSupplier ?? ((_, _) => RewardChoice.None);
+        var shopSupplier = o.ShopSupplier ?? ((_, _) => ShopOffer.None);
 
         // The three battle nodes differ only by the EncounterTier they hand the supplier (which the web layer
         // maps to an IEnemyArchetype): WildBattle ≈ today's Medium, Elite/Boss climb. Same collaborators
@@ -131,34 +93,39 @@ public sealed class RunDirector
                 typeChart,
                 enemyInput,
                 movePool,
-                rules,
-                playerBag,
-                checkEvolution,
-                wallet,
+                o.Rules,
+                o.PlayerBag,
+                o.CheckEvolution,
+                o.Wallet,
                 rewardSupplier,
-                runRules,
-                draftSupplier,
-                bossCatchSupplier
+                o.RunRules,
+                o.DraftSupplier,
+                o.BossCatchSupplier
             );
         _battleEvent = Battle(EncounterTier.Normal);
         _eliteEvent = Battle(EncounterTier.Elite);
         _bossEvent = Battle(EncounterTier.Boss);
 
         _recoveryEvent = new RecoveryRunEvent();
-        _biomeChoiceEvent = new BiomeChoiceEvent(playableBiomes ?? [], biomeOptionCount, typeChart);
+        _biomeChoiceEvent = new BiomeChoiceEvent(_playableBiomes, o.BiomeOptionCount, typeChart);
         _leadChoiceEvent = new LeadChoiceEvent();
 
         // Interaction nodes (ENCOUNTER_DESIGN.md §5): Shop rolls run-scaled stock and runs a spend-gold buy
         // loop against the wallet/bag; Treasure/Mystery roll and apply a reward. All three block on the player's
         // choices (buy/leave, reward pick) so the client raises a modal.
-        _shopEvent = new ShopRunEvent(wallet, playerBag, shopSupplier);
+        _shopEvent = new ShopRunEvent(o.Wallet, o.PlayerBag, shopSupplier);
         _treasureEvent = new RewardRunEvent(
             RunNodeKind.Treasure,
-            wallet,
-            playerBag,
+            o.Wallet,
+            o.PlayerBag,
             rewardSupplier
         );
-        _mysteryEvent = new RewardRunEvent(RunNodeKind.Mystery, wallet, playerBag, rewardSupplier);
+        _mysteryEvent = new RewardRunEvent(
+            RunNodeKind.Mystery,
+            o.Wallet,
+            o.PlayerBag,
+            rewardSupplier
+        );
     }
 
     /// <summary>The live run state — exposed <c>internal</c> as a test seam so a test can assert run-state

@@ -47,9 +47,12 @@ public class RunDirectorTests
             new ScriptedInput("tackle"),
             new ScriptedInput("tackle"),
             movePool: Array.Empty<Attack>(),
-            emitter: recorder,
-            rules: new ScriptableRules().Deterministic(),
-            rng: new SeededRandomSource(0)
+            new RunDirectorOptions
+            {
+                Emitter = recorder,
+                Rules = new ScriptableRules().Deterministic(),
+                Rng = new SeededRandomSource(0),
+            }
         );
 
         await runner.RunAsync();
@@ -117,10 +120,13 @@ public class RunDirectorTests
             new ScriptedInput("tackle"),
             new ScriptedInput("tackle"),
             movePool: Array.Empty<Attack>(),
-            emitter: recorder,
-            rules: new ScriptableRules().Deterministic(),
-            rng: new SeededRandomSource(0),
-            runRules: runRules
+            new RunDirectorOptions
+            {
+                Emitter = recorder,
+                Rules = new ScriptableRules().Deterministic(),
+                Rng = new SeededRandomSource(0),
+                RunRules = runRules,
+            }
         );
 
         await runner.RunAsync();
@@ -149,9 +155,12 @@ public class RunDirectorTests
             new CancelledInput(), // simulates the client having dropped — input throws on first choice
             new ScriptedInput("tackle"),
             movePool: Array.Empty<Attack>(),
-            emitter: recorder,
-            rules: new ScriptableRules().Deterministic(),
-            rng: new SeededRandomSource(0)
+            new RunDirectorOptions
+            {
+                Emitter = recorder,
+                Rules = new ScriptableRules().Deterministic(),
+                Rng = new SeededRandomSource(0),
+            }
         );
 
         await Assert.ThrowsAsync<OperationCanceledException>(() => runner.RunAsync());
@@ -210,9 +219,12 @@ public class RunDirectorTests
             new ScriptedInput("tackle"),
             new RandomMoveInput(), // enemy uses whatever move it has (toxic, then tackle)
             movePool: Array.Empty<Attack>(),
-            emitter: recorder,
-            rules: new ScriptableRules().Deterministic().ForceSecondary(),
-            rng: new SeededRandomSource(0)
+            new RunDirectorOptions
+            {
+                Emitter = recorder,
+                Rules = new ScriptableRules().Deterministic().ForceSecondary(),
+                Rng = new SeededRandomSource(0),
+            }
         );
 
         await runner.RunAsync();
@@ -292,9 +304,12 @@ public class RunDirectorTests
             new ScriptedInput("tackle"),
             new RandomMoveInput(),
             movePool: Array.Empty<Attack>(),
-            emitter: recorder,
-            rules: new ScriptableRules().Deterministic().ForceSecondary(),
-            rng: new SeededRandomSource(0)
+            new RunDirectorOptions
+            {
+                Emitter = recorder,
+                Rules = new ScriptableRules().Deterministic().ForceSecondary(),
+                Rng = new SeededRandomSource(0),
+            }
         );
 
         await runner.RunAsync();
@@ -377,9 +392,12 @@ public class RunDirectorTests
             new ScriptedInput("tackle").DeclinesRecovery(),
             new RandomMoveInput(),
             movePool: Array.Empty<Attack>(),
-            emitter: recorder,
-            rules: new ScriptableRules().Deterministic().ForceSecondary(),
-            rng: new SeededRandomSource(0)
+            new RunDirectorOptions
+            {
+                Emitter = recorder,
+                Rules = new ScriptableRules().Deterministic().ForceSecondary(),
+                Rng = new SeededRandomSource(0),
+            }
         );
 
         await runner.RunAsync();
@@ -414,9 +432,12 @@ public class RunDirectorTests
             new ScriptedInput("poisonpowder"),
             new ScriptedInput("poisonpowder"),
             movePool: Array.Empty<Attack>(),
-            emitter: recorder,
-            rules: new ScriptableRules().Deterministic(), // alwaysHit so each status move lands
-            rng: new SeededRandomSource(0)
+            new RunDirectorOptions
+            {
+                Emitter = recorder,
+                Rules = new ScriptableRules().Deterministic(), // alwaysHit so each status move lands
+                Rng = new SeededRandomSource(0),
+            }
         );
 
         await runner.RunAsync();

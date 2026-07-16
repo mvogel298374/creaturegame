@@ -139,9 +139,12 @@ public class ForceFleeTests(MovesFixture moves) : InteractionTest(moves)
             new ScriptedInput("roar"),
             new ScriptedInput("splash", "tackle"),
             movePool: Array.Empty<Attack>(),
-            emitter: recorder,
-            rules: new ScriptableRules().Deterministic(),
-            rng: new SeededRandomSource(0)
+            new RunDirectorOptions
+            {
+                Emitter = recorder,
+                Rules = new ScriptableRules().Deterministic(),
+                Rng = new SeededRandomSource(0),
+            }
         );
 
         await runner.RunAsync();
