@@ -777,12 +777,21 @@ Battles are fully playable now — docs won't describe a moving target.
 
 ## Tech Debt / Cleanup
 
-**Done & archived** (2026-06-20 → 22 code-review + Architecture Review #7 pass — full write-ups in
-[`TODO_ARCHIVE.md`](TODO_ARCHIVE.md)): (A) `MoveSet` cross-thread mutation → lock-free copy-on-write;
-(B) `AttackAction.ExecuteAsync` split into `ResolveDamage` + `ResolvePreDamageGates`; (C) repo-wide
-comment-density pass; (D) minor comment/dead-field batch; the **RNG seam** (CLOSED — do not re-file the
-`AlwaysHit`/`AlwaysCrit` shim idea, the unseeded-web-composition-root, or "Roll\* ignores the battle seed");
-and Architecture Review #7 (`SecondaryHits` seam dedup, `MoveImport.MapToAttack` split + `MoveMappingTests`).
+**Done & archived** — full write-ups in [`TODO_ARCHIVE.md`](TODO_ARCHIVE.md) → *Tech-Debt cleanups*:
+
+- *2026-06-20 → 22 code-review + Architecture Review #7 pass:* (A) `MoveSet` cross-thread mutation →
+  lock-free copy-on-write; (B) `AttackAction.ExecuteAsync` split into `ResolveDamage` +
+  `ResolvePreDamageGates`; (C) repo-wide comment-density pass; (D) minor comment/dead-field batch; the
+  **RNG seam** (CLOSED — do not re-file the `AlwaysHit`/`AlwaysCrit` shim idea, the
+  unseeded-web-composition-root, or "Roll\* ignores the battle seed"); and Architecture Review #7
+  (`SecondaryHits` seam dedup, `MoveImport.MapToAttack` split + `MoveMappingTests`).
+- *2026-07-04:* `bag.ts` re-encoded the engine's effect registry → backend-projected `UsableInBattle`.
+- *2026-07-16:* **event wire contract guarded by name but not by field** → the generic
+  `EveryBattleEventProjectsAllOfItsFields` (nested records + union variants). Don't re-file "add a
+  field-level guard per event" — presence is now automatic; a one-off test is only for *values/semantics*.
+- *2026-07-16:* **TypeScript typechecked by no gate** → `tsc --noEmit` in the pre-commit hook (on staged
+  `.ts`/`.tsx`) + a `TypeScript` row in `test.ps1`; `tsconfig` now covers `e2e/` as well as `src/`
+  (**keep it that way**).
 
 **Still open** (filed 2026-07-16 from a repo-wide structural review — ranked by cost-of-deferring, not size):
 
@@ -797,9 +806,10 @@ and Architecture Review #7 (`SecondaryHits` seam dedup, `MoveImport.MapToAttack`
   args (player, enemySupplier, typeChart, inputs, movePool) positional. Absorbs future growth without touching
   the signature. **Do this before the next node kind lands** — it gets more expensive per parameter added.
 - [ ] **No ESLint/Prettier config in `ClientApp/` at all.** The C# side has CSharpier pinned + hook-enforced;
-  the frontend has no linter and no formatter, so style/quality drift is unpoliced. (The *typecheck* half of
-  this gap is now closed — see below.) Lower value than the debt above; worth a call on whether to adopt
-  ESLint flat config + Prettier, or to keep the frontend deliberately un-linted.
+  the frontend has no linter and no formatter, so style/quality drift is unpoliced. The *typecheck* half of
+  this gap is closed (`tsc` in the hook — archived above); this is the remaining lint/format half. Lower value
+  than the debt above; worth a call on whether to adopt ESLint flat config + Prettier, or to keep the frontend
+  deliberately un-linted.
 - [ ] **`RunDirector.cs` is 1091 lines holding 9 types** — the director, 6 `IRunEvent` classes
   (`BattleRunEvent`, `RecoveryRunEvent`, `LeadChoiceEvent`, `BiomeChoiceEvent`, `ShopRunEvent`,
   `RewardRunEvent`) and 2 static resolution helpers (`RewardResolution`, `AcquisitionResolution`). Split the
@@ -824,55 +834,6 @@ and Architecture Review #7 (`SecondaryHits` seam dedup, `MoveImport.MapToAttack`
 - [ ] *(low, watch — do not refactor speculatively)* **`AttackAction` still has three large methods**:
   `ResolveDamage` (145 lines), `ExecuteAsync` (140), `ResolvePreDamageGates` (112), despite the earlier split
   archived as (B). It is central and well-tested; revisit only if a change makes it hurt.
-
-**Done & archived:**
-- [x] **TypeScript was never typechecked by any gate** — CLOSED (2026-07-16). `tsc` ran only in
-  `npm run build`, which no gate invokes; Vitest transpiles via esbuild, which **strips types without checking
-  them**; and the pre-commit hook gated C# only. So `tsconfig`'s `strict` +
-  `noUnusedLocals`/`noUnusedParameters` were configured but unenforced, and a TS type error passed every gate
-  and landed. Closed by the **TS mirror of the `.cs` → tests rule**: `.githooks/pre-commit` now runs
-  `npm run typecheck` (`tsc --noEmit`, ~6s) when `.ts`/`.tsx` is staged and **blocks on failure** (with an
-  explicit block + `npm install` hint when `node_modules` is missing, so the gate can never silently no-op);
-  `test.ps1` reports it as its own `TypeScript` row ahead of Vitest, so a type break reads as itself rather
-  than as a confusing test failure. Verified by mutation at both levels: a real type error fails
-  `npm run typecheck` (exit 2) and the hook blocks with exit 1.
-  **Scope widened during the work (user-approved):** `tsconfig` covered only `src`, leaving `e2e/` — including
-  the 240-line `helpers.ts` — completely unchecked, with **3 latent errors** found the moment it was included:
-  an unused local (`cadence.spec.ts`), a type re-exported without `export type` (illegal under
-  `isolatedModules`, `helpers.ts:240`), and `.at()` used against an ES2020 `lib` (`helpers.ts:125`). All three
-  fixed; `include` is now `["src", "e2e"]` and `lib` raised to `ES2022` (additive — it can only add known-good
-  types, never invalidate existing `src` code). **Keep `e2e` in `include`** — dropping it silently un-guards
-  the test infrastructure.
-  *Still open, separate:* no ESLint/Prettier on the frontend (see above).
-- [x] **Event wire contract was guarded by name but not by field** — CLOSED (2026-07-16). Every `BattleEvent`
-  crosses three layers by hand (record in `BattleEvents.cs` → hand-listed anonymous object in
-  `SignalRBattleEventEmitter.MapEvent` → `case` arm in `timeline.ts`). The *name* leg was already generically
-  guarded (`EveryBattleEventMapsToItsOwnNamedClientEvent` + `EveryBattleEventHasATimelineArm`), but the *field*
-  leg was ~21 bespoke `*_Projection_Carries*` tests — so **adding a field to an existing event record passed
-  every gate while the field silently never reached the client** (the recurring `MoveInfo` trap). Closed by
-  `WebEventContractTests.EveryBattleEventProjectsAllOfItsFields`: reflects over every concrete event, asserts
-  each record property appears on the projected payload, and **recurses into nested payload records** (all six
-  reachable from an event: `MoveInfo`, `PartyMemberInfo`, `BiomeOption`, `RegionMapBiome`, `ShopOfferItem`,
-  `StatBlock`) **and into every variant of a union family**
-  (`RewardOption` → Item/Gold/Heal — each variant is hand-mapped in its own `ProjectRewardOption` arm, so each is
-  its own place for a field to go missing). The probe instantiator fills collections from `ProbeElementTypes` —
-  *the single source the checker also reads*, so the two can't disagree about what's in the list — which is what
-  makes those inline `Select(… => new { … })` arms actually get exercised rather than skipped over an empty list.
-  Deliberate renames/omissions register in `ProjectionExceptions` with a reason (only one today:
-  `TurnStarted.PlayerMoves` → `Moves`); a registered omission is asserted *absent*, so the list can't rot into a
-  blanket mute. Verified by mutation at each level — an unprojected field on `BattleEnded`, on nested `MoveInfo`,
-  and on the union's `ItemRewardOption` each fail with the exact path (e.g.
-  `RewardChoiceOffered.Options[ItemRewardOption].UnionProbeField`). Found no live drops: the projection was
-  already complete. The per-event one-off tests were **kept** — they pin *values / semantics* (string-cast enums,
-  the PascalCase rarity the TS union needs, HP-0-means-fainted), which the generic test does not check; their doc
-  comments were corrected, since several justified themselves on the empty-list gap this closed.
-  **Still manual (not closed by this):** the TS leg — the client type + `timeline.ts` mapping — and `tsc` is not
-  run by any gate (see the TypeScript item above).
-- [x] **`bag.ts` re-encodes the engine's effect registry** — CLOSED (2026-07-04). The frontend
-  `USABLE_CATEGORIES` set (which hardcoded which `ItemCategory`s are usable in battle) is gone; the backend now
-  projects a server-computed `UsableInBattle` boolean onto `BagItemView` (from `ItemEffects.For(category)`), and
-  the client filters the bag menu on that flag. Single source of truth — when Ball/Revive get effects, only the
-  registry changes and the menu follows. Mirrors the `RestoresPpAllMoves` field-projection precedent.
 
 ### Known Gaps
 - Enemy encounter pool ignores game version — filter by `PokemonGameAvailability` once a version selector exists.

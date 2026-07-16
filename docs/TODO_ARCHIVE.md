@@ -625,6 +625,59 @@ The ordered pass that followed the move-coverage completion. All six items done;
   behaviour change — seam-reviewer **CLEAN** (0 blockers / 0 advisories; diffed all 20 arms 1:1), csharpier
   clean, **867/867 .NET tests green**. `ARCHITECTURE.md §2.4/§2.11/§3` updated to match.
 
+- **`bag.ts` re-encoded the engine's effect registry (2026-07-04).** The frontend `USABLE_CATEGORIES` set
+  (which hardcoded which `ItemCategory`s are usable in battle) is gone; the backend now projects a
+  server-computed `UsableInBattle` boolean onto `BagItemView` (from `ItemEffects.For(category)`), and the
+  client filters the bag menu on that flag. Single source of truth — when Ball/Revive get effects, only the
+  registry changes and the menu follows. Mirrors the `RestoresPpAllMoves` field-projection precedent.
+
+- **Event wire contract was guarded by name but not by field (2026-07-16).** Every `BattleEvent` crosses three
+  layers by hand (record in `BattleEvents.cs` → hand-listed anonymous object in
+  `SignalRBattleEventEmitter.MapEvent` → `case` arm in `timeline.ts`). The *name* leg was already generically
+  guarded (`EveryBattleEventMapsToItsOwnNamedClientEvent` + `EveryBattleEventHasATimelineArm`), but the *field*
+  leg was ~21 bespoke `*_Projection_Carries*` tests — so **adding a field to an existing event record passed
+  every gate while the field silently never reached the client** (the recurring `MoveInfo` trap; see the
+  `web_event_field_projection_gap` history). Closed by
+  `WebEventContractTests.EveryBattleEventProjectsAllOfItsFields`: reflects over every concrete event, asserts
+  each record property appears on the projected payload, and **recurses into nested payload records** (all six
+  reachable from an event: `MoveInfo`, `PartyMemberInfo`, `BiomeOption`, `RegionMapBiome`, `ShopOfferItem`,
+  `StatBlock`) **and into every variant of a union family** (`RewardOption` → Item/Gold/Heal — each variant is
+  hand-mapped in its own `ProjectRewardOption` arm, so each is its own place for a field to go missing). The
+  probe instantiator fills collections from `ProbeElementTypes` — *the single source the checker also reads*,
+  so the two can't disagree about what's in the list — which is what makes those inline
+  `Select(… => new { … })` arms actually get exercised rather than skipped over an empty list. A projection
+  that filters or reorders a probed list is rejected outright (the probe fills all-or-nothing, so a non-empty
+  short array is *provably* a filter, never a depth-cap artifact). Deliberate renames/omissions register in
+  `ProjectionExceptions` with a reason (only one: `TurnStarted.PlayerMoves` → `Moves`); a registered omission
+  is asserted *absent*, so the list can't rot into a blanket mute. Verified by mutation at each level — an
+  unprojected field on `BattleEnded`, on nested `MoveInfo`, and on the union's `ItemRewardOption` each fail
+  with the exact path (e.g. `RewardChoiceOffered.Options[ItemRewardOption].UnionProbeField`). Found no live
+  drops: the projection was already complete. The per-event one-off tests were **kept** — they pin
+  *values / semantics* (string-cast enums, the PascalCase rarity the TS union needs, HP-0-means-fainted),
+  which the generic test does not check; their doc comments were corrected, since several justified themselves
+  on the empty-list gap this closed. **Process note:** the first `pr-review` caught the abstract/union family
+  going unprobed — the claim had outrun the coverage — which is why the guard now probes union variants at all.
+  *Still manual:* the TS leg (client type + `timeline.ts` mapping) is not machine-checked; only its *presence*
+  is (`EveryBattleEventHasATimelineArm`).
+
+- **TypeScript was never typechecked by any gate (2026-07-16).** `tsc` ran only in `npm run build`, which no
+  gate invokes; Vitest transpiles via esbuild, which **strips types without checking them**; and the
+  pre-commit hook gated C# only. So `tsconfig`'s `strict` + `noUnusedLocals`/`noUnusedParameters` were
+  configured but unenforced, and a TS type error passed every gate and landed. Closed by the **TS mirror of
+  the `.cs` → tests rule**: `.githooks/pre-commit` runs `npm run typecheck` (`tsc --noEmit`, ~6s) when
+  `.ts`/`.tsx` is staged and **blocks on failure** (with an explicit block + `npm install` hint when
+  `node_modules` is missing, so the gate can never silently no-op); `test.ps1` reports it as its own
+  `TypeScript` row ahead of Vitest, so a type break reads as itself rather than as a confusing test failure.
+  Verified by mutation at both levels: a real type error fails `npm run typecheck` (exit 2) and the hook
+  blocks (exit 1). **Scope widened during the work (user-approved):** `tsconfig` covered only `src`, leaving
+  `e2e/` — including the 240-line `helpers.ts` — completely unchecked, with **3 latent errors** found the
+  moment it was included: an unused local (`cadence.spec.ts`), a type re-exported without `export type`
+  (illegal under `isolatedModules`, `helpers.ts:240`), and `.at()` used against an ES2020 `lib`
+  (`helpers.ts:125`). All three fixed; `include` is now `["src", "e2e"]` and `lib` raised to `ES2022`
+  (additive — it can only add known-good types, never invalidate existing `src` code). **Keep `e2e` in
+  `include`** — dropping it silently un-guards the test infrastructure. Full suite green at close: .NET 1314,
+  Vitest 147, Playwright 26, `npm run build` clean.
+
 ---
 
 ## XP, Level-Up & the Endless Battle Chain — DONE (2026-06-09 → 10)
