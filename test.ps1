@@ -3,6 +3,7 @@
 .SYNOPSIS
   Runs every test suite in the solution and prints a verbose, aggregated summary:
     • .NET unit tests (xUnit)      — tests/creaturegame.Tests
+    • Frontend typecheck (tsc)     — creaturegame.Web/ClientApp  (src/ + e2e/; Vitest can't catch this)
     • Frontend unit tests (Vitest) — creaturegame.Web/ClientApp  (src/**/*.test.ts)
     • Frontend E2E (Playwright)    — creaturegame.Web/ClientApp/e2e
 
@@ -45,9 +46,11 @@ function Test-Backend {
   catch { return $false }
 }
 
+# $Detail overrides the "N/M passed" summary text for a suite that isn't count-shaped (the typecheck is
+# pass/fail, not a tally) — everything else leaves it null and reports counts as before.
 function New-Result {
-  param($Status, $Passed = 0, $Failed = 0, $Skipped = 0, $Total = 0, $FailedNames = @())
-  [pscustomobject]@{ Status = $Status; Passed = $Passed; Failed = $Failed; Skipped = $Skipped; Total = $Total; FailedNames = @($FailedNames) }
+  param($Status, $Passed = 0, $Failed = 0, $Skipped = 0, $Total = 0, $FailedNames = @(), $Detail = $null)
+  [pscustomobject]@{ Status = $Status; Passed = $Passed; Failed = $Failed; Skipped = $Skipped; Total = $Total; FailedNames = @($FailedNames); Detail = $Detail }
 }
 
 # Test runners emit ANSI colour codes even when piped, which breaks `\s+`-based
@@ -68,6 +71,23 @@ if ($Dotnet -or $runAll) {
   }
   $names = @($lines | ForEach-Object { if ($_ -match '^\s*Failed\s+(.+?)\s+\[') { $Matches[1] } })
   $results['.NET (xUnit)'] = New-Result -Status ($ok ? 'PASS' : 'FAIL') -Passed $passed -Failed $failed -Skipped $skipped -Total $total -FailedNames $names
+}
+
+# ── Frontend typecheck (tsc) ─────────────────────────────────────────────────
+# Vitest transpiles via esbuild, which strips types WITHOUT checking them, so nothing below catches a type
+# error — `tsc` otherwise runs only in `npm run build`. Runs before Vitest so a type break is reported as
+# itself rather than as a confusing test failure. Covers src/ + e2e/ per tsconfig.
+if ($Web -or $runAll) {
+  Write-Host "`n=== Frontend typecheck (tsc) ===" -ForegroundColor Cyan
+  Push-Location $clientApp
+  try { npm run typecheck 2>&1 | Tee-Object -Variable raw } finally { Pop-Location }
+  $ok = ($LASTEXITCODE -eq 0)
+  $lines = Strip-Ansi $raw
+  # tsc prints one line per error: `src/foo.ts(12,3): error TS2345: <message>`.
+  $names = @($lines | ForEach-Object { if ($_ -match '^\s*(\S+\(\d+,\d+\):\s*error\s+TS\d+:.+)$') { ($Matches[1]).Trim() } })
+  $errs  = $names.Count
+  $results['TypeScript'] = New-Result -Status ($ok ? 'PASS' : 'FAIL') -Failed $errs -FailedNames $names `
+    -Detail ($ok ? 'no type errors' : ("{0} type error(s)" -f $errs))
 }
 
 # ── Frontend unit tests (Vitest) ─────────────────────────────────────────────
@@ -132,10 +152,14 @@ foreach ($k in $results.Keys) {
   $r = $results[$k]
   switch ($r.Status) {
     'SKIPPED' { Write-Host ("  {0,-16} SKIPPED" -f $k) -ForegroundColor Yellow }
-    'PASS'    { Write-Host ("  {0,-16} PASS    {1}/{2} passed" -f $k, $r.Passed, $r.Total) -ForegroundColor Green }
+    'PASS'    {
+      $d = if ($r.Detail) { $r.Detail } else { "{0}/{1} passed" -f $r.Passed, $r.Total }
+      Write-Host ("  {0,-16} PASS    {1}" -f $k, $d) -ForegroundColor Green
+    }
     'FAIL'    {
       $anyFail = $true
-      Write-Host ("  {0,-16} FAIL    {1}/{2} passed, {3} failed" -f $k, $r.Passed, $r.Total, $r.Failed) -ForegroundColor Red
+      $d = if ($r.Detail) { $r.Detail } else { "{0}/{1} passed, {2} failed" -f $r.Passed, $r.Total, $r.Failed }
+      Write-Host ("  {0,-16} FAIL    {1}" -f $k, $d) -ForegroundColor Red
       foreach ($n in $r.FailedNames) { Write-Host ("                     ✗ {0}" -f $n) -ForegroundColor Red }
       if ($r.Failed -gt 0 -and $r.FailedNames.Count -eq 0) {
         Write-Host "                     (failing test names not parsed — see output above)" -ForegroundColor DarkYellow

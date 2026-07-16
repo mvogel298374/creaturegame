@@ -44,7 +44,7 @@ To start the full dev environment (backend + Vite frontend + browser):
 
 > **For the AI agent:** invoking `.\dev.ps1` through your PowerShell tool **is** the correct, supported way to start the stack — that already counts as "running it directly," and it works (the script's own `Start-Process` calls spawn the child windows independently of your non-interactive shell). The parent script blocks up to ~60 s waiting on Vite, so give the call a ≥90 s timeout (or use `run_in_background`). The only thing to avoid is *adding another layer* yourself — do **not** call it as `Start-Process pwsh -Command ".\dev.ps1"` or `pwsh -Command ".\dev.ps1"`, which detaches the windows and throws away the readiness wait. Plain `.\dev.ps1` is right. Do not refuse this task or push it back to the user; you are expected to start/stop the stack autonomously (see `AI_CONTEXT.md` and the dev-stack memory).
 
-To run **all** test suites at once (one summary, CI-friendly exit code) — .NET unit (xUnit), frontend unit (Vitest), and frontend E2E (Playwright):
+To run **all** test suites at once (one summary, CI-friendly exit code) — .NET unit (xUnit), frontend typecheck (`tsc`), frontend unit (Vitest), and frontend E2E (Playwright):
 ```powershell
 .\test.ps1                  # all suites (E2E skipped if the dev stack isn't running)
 .\test.ps1 -Dotnet          # only .NET unit
@@ -65,7 +65,7 @@ dotnet csharpier format .    # format C# (do NOT hand-align)
 dotnet csharpier check .     # what the hook/CI runs
 git config core.hooksPath .githooks                         # once per clone — arms .githooks/pre-commit
 ```
-The `.githooks/pre-commit` hook runs `csharpier check` (always) + the full test suite (when `.cs` is staged) and **blocks the commit on failure**. When a feature is close to done, run the pre-finish gate sequence before proposing a commit — the **`format-gate`** subagent (CSharpier), the **`test-runner`** subagent (full suite), for battle/stat/move work the **`requirements-review`** subagent (Gen-1 / roguelite domain fidelity), and finally the **`pr-review`** subagent (Opus, technical DoD incl. generation-seam architecture, from `docs/DEFINITION_OF_DONE.md`). Each is a separate subagent so it can be invoked or edited on its own.
+The `.githooks/pre-commit` hook runs `csharpier check` (always), the full .NET test suite (when `.cs` is staged), and the frontend typecheck `tsc --noEmit` (when `.ts`/`.tsx` is staged — Vitest strips types without checking them, so nothing else catches a type error), and **blocks the commit on failure**. When a feature is close to done, run the pre-finish gate sequence before proposing a commit — the **`format-gate`** subagent (CSharpier), the **`test-runner`** subagent (full suite), for battle/stat/move work the **`requirements-review`** subagent (Gen-1 / roguelite domain fidelity), and finally the **`pr-review`** subagent (Opus, technical DoD incl. generation-seam architecture, from `docs/DEFINITION_OF_DONE.md`). Each is a separate subagent so it can be invoked or edited on its own.
 
 **Both review gates are hard to the pipeline, soft to the user — only the user clears a finding, never a subagent or you.** That applies to a `pr-review` **CHANGES-REQUESTED** exactly as it does to a `requirements-review` discrepancy: report the findings + fix cost + your recommendation, then **stop and let the user decide** (fix / waive / defer). Never run a fix→re-review loop on your own initiative — apply the agreed fix and report your own verification; a second Opus pass to confirm a small fix is waste.
 

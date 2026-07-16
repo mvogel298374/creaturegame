@@ -237,4 +237,4 @@ export async function reachLog(
   throw new Error(`reachLog: never reached /${re.source}/ in ${attempts} runs`);
 }
 
-export { BridgeEventWindow };
+export type { BridgeEventWindow };

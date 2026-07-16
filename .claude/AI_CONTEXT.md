@@ -108,9 +108,16 @@ hook still runs CSharpier + tests as the deterministic backstop at commit time.
 > `pr-review`. There is no longer an orchestrator skill — the main session runs the four gates in sequence.
 
 ### Pre-commit hook (`.githooks/pre-commit`)
-Deterministic backstop: `csharpier check .` always, plus the full `dotnet test` suite when `.cs` is staged
-(pure docs/data commits skip it). Blocks on failure. Enable once per clone: `git config core.hooksPath
-.githooks`. Emergency bypass (avoid): `git commit --no-verify`.
+Deterministic backstop, per staged file type: `csharpier check .` always; the full `dotnet test` suite when
+`.cs` is staged; `tsc --noEmit` (`npm run typecheck`, ~6s, covering `src/` + `e2e/`) when `.ts`/`.tsx` is
+staged. A pure docs/data commit skips both slow legs. Blocks on failure. Enable once per clone: `git config
+core.hooksPath .githooks`. Emergency bypass (avoid): `git commit --no-verify`.
+
+> **Why the typecheck leg exists** (2026-07-16): Vitest transpiles via esbuild, which **strips types without
+> checking them**, and `tsc` otherwise ran only in `npm run build` — which no gate invokes. So `tsconfig`'s
+> `strict` was configured but unenforced, and a TypeScript type error passed every gate and landed. This is
+> the TS mirror of the `.cs` → tests rule. `tsconfig` covers `e2e/` as well as `src/`; keep it that way — the
+> e2e helpers are 240 lines of real TypeScript and were previously unchecked.
 
 ### CSharpier (formatter)
 Version-pinned local tool (`.config/dotnet-tools.json`); config `.csharpierrc.json`; EF migrations excluded

@@ -27,4 +27,22 @@ else
   echo "[pre-commit] No .cs changes staged — skipping the test suite."
 fi
 
+# The TypeScript mirror of the .cs rule above. Vitest transpiles via esbuild, which strips types WITHOUT
+# checking them, so without this a type error passes every gate and lands — `tsc` otherwise runs only in
+# `npm run build`. tsconfig covers src/ + e2e/ and takes ~6s.
+if git diff --cached --name-only --diff-filter=ACM | grep -qE '\.tsx?$'; then
+  echo "[pre-commit] .ts/.tsx changes staged — typechecking the frontend..."
+  if [ ! -d creaturegame.Web/ClientApp/node_modules ]; then
+    echo "[pre-commit] BLOCKED: creaturegame.Web/ClientApp/node_modules is missing, so the staged" >&2
+    echo "            TypeScript cannot be checked. Run: cd creaturegame.Web/ClientApp && npm install" >&2
+    exit 1
+  fi
+  if ! ( cd creaturegame.Web/ClientApp && npm run --silent typecheck ) ; then
+    echo "[pre-commit] BLOCKED: TypeScript type errors. Fix them before committing." >&2
+    exit 1
+  fi
+else
+  echo "[pre-commit] No .ts/.tsx changes staged — skipping the frontend typecheck."
+fi
+
 echo "[pre-commit] OK."

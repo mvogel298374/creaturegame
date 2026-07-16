@@ -796,12 +796,10 @@ and Architecture Review #7 (`SecondaryHits` seam dedup, `MoveImport.MapToAttack`
   *Fix:* a `RunDirectorOptions` record with the optional/supplier surface on it; keep the genuinely required
   args (player, enemySupplier, typeChart, inputs, movePool) positional. Absorbs future growth without touching
   the signature. **Do this before the next node kind lands** — it gets more expensive per parameter added.
-- [ ] **TypeScript is never typechecked by any gate.** `tsc` runs only in `npm run build`; neither `test.ps1`
-  nor `.githooks/pre-commit` invokes it, and Vitest strips types via esbuild without checking them. So a TS
-  type error passes every gate and lands. Sharply asymmetric with the C# side, where the hook blocks on
-  CSharpier *and* the full suite — and `tsconfig` is already `strict` with `noUnusedLocals`/`noUnusedParameters`,
-  so the rigour is configured but unenforced. *Fix:* add `tsc --noEmit` to `test.ps1`'s `-Web` leg (one line).
-  There is also no ESLint/Prettier config in `ClientApp/` at all — separate, lower-value call.
+- [ ] **No ESLint/Prettier config in `ClientApp/` at all.** The C# side has CSharpier pinned + hook-enforced;
+  the frontend has no linter and no formatter, so style/quality drift is unpoliced. (The *typecheck* half of
+  this gap is now closed — see below.) Lower value than the debt above; worth a call on whether to adopt
+  ESLint flat config + Prettier, or to keep the frontend deliberately un-linted.
 - [ ] **`RunDirector.cs` is 1091 lines holding 9 types** — the director, 6 `IRunEvent` classes
   (`BattleRunEvent`, `RecoveryRunEvent`, `LeadChoiceEvent`, `BiomeChoiceEvent`, `ShopRunEvent`,
   `RewardRunEvent`) and 2 static resolution helpers (`RewardResolution`, `AcquisitionResolution`). Split the
@@ -828,6 +826,24 @@ and Architecture Review #7 (`SecondaryHits` seam dedup, `MoveImport.MapToAttack`
   archived as (B). It is central and well-tested; revisit only if a change makes it hurt.
 
 **Done & archived:**
+- [x] **TypeScript was never typechecked by any gate** — CLOSED (2026-07-16). `tsc` ran only in
+  `npm run build`, which no gate invokes; Vitest transpiles via esbuild, which **strips types without checking
+  them**; and the pre-commit hook gated C# only. So `tsconfig`'s `strict` +
+  `noUnusedLocals`/`noUnusedParameters` were configured but unenforced, and a TS type error passed every gate
+  and landed. Closed by the **TS mirror of the `.cs` → tests rule**: `.githooks/pre-commit` now runs
+  `npm run typecheck` (`tsc --noEmit`, ~6s) when `.ts`/`.tsx` is staged and **blocks on failure** (with an
+  explicit block + `npm install` hint when `node_modules` is missing, so the gate can never silently no-op);
+  `test.ps1` reports it as its own `TypeScript` row ahead of Vitest, so a type break reads as itself rather
+  than as a confusing test failure. Verified by mutation at both levels: a real type error fails
+  `npm run typecheck` (exit 2) and the hook blocks with exit 1.
+  **Scope widened during the work (user-approved):** `tsconfig` covered only `src`, leaving `e2e/` — including
+  the 240-line `helpers.ts` — completely unchecked, with **3 latent errors** found the moment it was included:
+  an unused local (`cadence.spec.ts`), a type re-exported without `export type` (illegal under
+  `isolatedModules`, `helpers.ts:240`), and `.at()` used against an ES2020 `lib` (`helpers.ts:125`). All three
+  fixed; `include` is now `["src", "e2e"]` and `lib` raised to `ES2022` (additive — it can only add known-good
+  types, never invalidate existing `src` code). **Keep `e2e` in `include`** — dropping it silently un-guards
+  the test infrastructure.
+  *Still open, separate:* no ESLint/Prettier on the frontend (see above).
 - [x] **Event wire contract was guarded by name but not by field** — CLOSED (2026-07-16). Every `BattleEvent`
   crosses three layers by hand (record in `BattleEvents.cs` → hand-listed anonymous object in
   `SignalRBattleEventEmitter.MapEvent` → `case` arm in `timeline.ts`). The *name* leg was already generically

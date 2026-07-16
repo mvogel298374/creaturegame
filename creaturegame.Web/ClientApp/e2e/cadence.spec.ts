@@ -11,7 +11,6 @@ test('enemy HP does not snap to its end-of-turn value when a move is chosen', as
   await fightButton(page).click();
 
   const timeline = await page.evaluate(async () => {
-    const wait = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
     const btn = [...document.querySelectorAll('.move-btn')]
       .find(b => !(b as HTMLButtonElement).disabled) as HTMLButtonElement;
     const enemyHp = () =>
