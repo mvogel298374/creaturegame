@@ -615,6 +615,9 @@ Battles are fully playable now — docs won't describe a moving target.
   **`RunLoop.cs`'s ~28 types are fine** — a cohesive vocabulary file; don't let a type-count metric split it.
 - *2026-07-17:* **`Creature/` and `Creatures/` both declared `namespace creaturegame.Creatures`** → the 9 files
   merged into `Creatures/`; the `Creature/` directory is gone. Pure file move (`git mv`), no code changed.
+- *2026-07-17:* **csproj boilerplate copy-pasted across all four projects** → a root `Directory.Build.props`
+  carrying the shared `TargetFramework`/`ImplicitUsings`/`Nullable` **plus `TreatWarningsAsErrors`** (verified
+  clean first, so a new warning now fails the build). Closes the *No `Directory.Build.props`* debt below.
 - *2026-07-17:* **`BattleScreen.tsx` was 1317 lines with 13 hand-rolled modal overlays** → a shared `<Modal>` with
   an explicit **`dismiss`** prop (`'blocking'` vs `{ onEscape }`) + the escape rule in one `useEscapeKey` hook; the
   8 prompts + `BattleEndedOverlay` lifted into `components/modals/`. **`BattleScreen.tsx` is now 842 lines with zero
@@ -625,9 +628,6 @@ Battles are fully playable now — docs won't describe a moving target.
 
 **Still open** (filed 2026-07-16 from a repo-wide structural review — ranked by cost-of-deferring, not size):
 
-- [ ] *(low)* **No `Directory.Build.props`** — `TargetFramework`/`ImplicitUsings`/`Nullable` are copy-pasted
-  across all four csprojs, and there are no analyzers or `TreatWarningsAsErrors`. Build is clean (0 warnings)
-  today, so this is cheap insurance to keep it that way, not a fix for a live problem.
 - [ ] *(low, watch — do not refactor speculatively)* **`AttackAction` still has three large methods**:
   `ResolveDamage` (145 lines), `ExecuteAsync` (140), `ResolvePreDamageGates` (112), despite the earlier split
   archived as (B). It is central and well-tested; revisit only if a change makes it hurt.

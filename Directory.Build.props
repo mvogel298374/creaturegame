@@ -1,0 +1,18 @@
+<Project>
+  <!--
+    Shared build settings for every project in the solution. MSBuild auto-imports this
+    file into each project before the csproj is evaluated, so these properties no longer
+    need to be copy-pasted into the four .csproj files.
+
+    net9.0 is pinned by global.json's SDK; the language defaults (implicit usings,
+    nullable reference types) are the repo-wide convention (see CLAUDE.md → Coding
+    Conventions). TreatWarningsAsErrors keeps the build at its current 0-warning state:
+    a new warning now fails the build instead of accumulating silently.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+</Project>

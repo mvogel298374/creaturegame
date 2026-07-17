@@ -8,9 +8,5 @@
     <InternalsVisibleTo Include="creaturegame.Tests" />
   </ItemGroup>
 
-  <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-  </PropertyGroup>
+  <!-- TargetFramework, ImplicitUsings, and Nullable come from ..\Directory.Build.props. -->
 </Project>

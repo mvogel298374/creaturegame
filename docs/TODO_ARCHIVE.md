@@ -675,6 +675,22 @@ The ordered pass that followed the move-coverage completion. All six items done;
 
 ## Tech-Debt cleanups — DONE
 
+- **csproj boilerplate → `Directory.Build.props` (2026-07-17).** All four projects copy-pasted the same three
+  properties — `<TargetFramework>net9.0`, `<ImplicitUsings>enable`, `<Nullable>enable` — and there was no
+  solution-wide place for build policy, so keeping them in sync was manual and nothing enforced the repo's
+  0-warning state. Added a root `Directory.Build.props` (MSBuild auto-imports it into every project) carrying
+  those three plus **`<TreatWarningsAsErrors>true`**, and deleted the now-redundant `<PropertyGroup>` lines from
+  each csproj (leaving only each project's genuinely local settings — `OutputType`, `IsPackable`, the
+  `InternalsVisibleTo`/package/project item groups). `TreatWarningsAsErrors` was safe to switch on precisely
+  because the build was verified clean first: a full `--no-incremental` rebuild stayed at **0 warnings / 0 errors**
+  after the change, and a new warning now fails the build instead of accumulating silently. The clean rebuild is
+  also the proof the import works — all four csprojs now build with no `TargetFramework` of their own.
+  **Strictly a build-config change** — no product code touched; the full .NET suite stayed at 1317 green.
+  *Deliberately not included:* raising `AnalysisMode`/`AnalysisLevel` beyond the SDK default (that surfaces a
+  large batch of new style/design warnings — a real cleanup, not the "cheap insurance to keep the build clean"
+  this item was), and a `Directory.Packages.props` central-package-versions pass (only EF Core `9.0.6` is shared
+  across projects today — not yet worth the indirection).
+
 - **`BattleScreen.tsx` was 1317 lines with 13 hand-rolled modal overlays → a shared `<Modal>` + `components/modals/`
   (2026-07-17).** The page held ~25 components, among them 8 blocking run prompts (`Recovery`, `EvolutionPrompt`,
   `RewardChoice`, `Shop`, `Acquisition`, `LeadChoice`, `SwitchIn`, `MoveReplacement`), each hand-rolling its own
