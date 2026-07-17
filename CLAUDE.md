@@ -12,7 +12,7 @@ them up front burns ~25k tokens before the work is even scoped; almost none of i
 |:-----|:--------------|
 | `ARCHITECTURE.md` | you need the **why** behind a design decision, the system map, or the full doc catalog (its §5 indexes every doc in the repo). The decision-log entry point. |
 | `docs/TODO.md` | starting or finishing any task — it's the **authoritative** active task list. Always update it when a task completes. (Finished work is in `docs/TODO_ARCHIVE.md`; read that only to recover the history of a done item.) |
-| `.claude/AI_CONTEXT.md` | you need a slash-command/profile definition (`/plan`, `/dev`, `/sync`, `/test`) or the **Tooling & Automation** reference (the pre-finish gate sequence — `format-gate`, `test-runner`, `requirements-review`, `pr-review` — the pre-commit hook, CSharpier, MCP servers). |
+| `.claude/AI_CONTEXT.md` | you need a slash-command/profile definition (`/plan`, `/dev`, `/sync`, `/test`) or the **Tooling & Automation** reference (the pre-finish gate sequence — `docs-cleanup`, `format-gate`, `test-runner`, `requirements-review`, `pr-review` — the pre-commit hook, CSharpier, MCP servers). |
 | `docs/DESIGN_GUIDES.md` | doing `/plan` (design) work — Gen 1 mechanics, type-balancing, move-import mapping. |
 | `docs/DEFINITION_OF_READY.md` | doing `/plan` — the DoR checklist that is `/plan`'s exit criteria (a plan isn't done until every item is covered). |
 | `docs/DEV_STANDARDS.md` | doing `/dev` (implementation) work — .NET/EF coding conventions and architecture rules. |
@@ -65,7 +65,7 @@ dotnet csharpier format .    # format C# (do NOT hand-align)
 dotnet csharpier check .     # what the hook/CI runs
 git config core.hooksPath .githooks                         # once per clone — arms .githooks/pre-commit
 ```
-The `.githooks/pre-commit` hook runs `csharpier check` (always), the full .NET test suite (when `.cs` is staged), and the frontend typecheck `tsc --noEmit` (when `.ts`/`.tsx` is staged — Vitest strips types without checking them, so nothing else catches a type error), and **blocks the commit on failure**. When a feature is close to done, run the pre-finish gate sequence before proposing a commit — the **`format-gate`** subagent (CSharpier), the **`test-runner`** subagent (full suite), for battle/stat/move work the **`requirements-review`** subagent (Gen-1 / roguelite domain fidelity), and finally the **`pr-review`** subagent (Opus, technical DoD incl. generation-seam architecture, from `docs/DEFINITION_OF_DONE.md`). Each is a separate subagent so it can be invoked or edited on its own.
+The `.githooks/pre-commit` hook runs `csharpier check` (always), the full .NET test suite (when `.cs` is staged), and the frontend typecheck `tsc --noEmit` (when `.ts`/`.tsx` is staged — Vitest strips types without checking them, so nothing else catches a type error), and **blocks the commit on failure**. When a feature is close to done, run the pre-finish gate sequence before proposing a commit — first the **`docs-cleanup`** subagent (the **mandatory, unskippable** docs-hygiene gate: archive the finished item to `TODO_ARCHIVE.md`, clear its stale framing; runs for **every** finished feature, no scope exception), then the **`format-gate`** subagent (CSharpier), the **`test-runner`** subagent (full suite), for battle/stat/move work the **`requirements-review`** subagent (Gen-1 / roguelite domain fidelity), and finally the **`pr-review`** subagent (Opus, technical DoD incl. generation-seam architecture, from `docs/DEFINITION_OF_DONE.md`). Each is a separate subagent so it can be invoked or edited on its own.
 
 **Both review gates are hard to the pipeline, soft to the user — only the user clears a finding, never a subagent or you.** That applies to a `pr-review` **CHANGES-REQUESTED** exactly as it does to a `requirements-review` discrepancy: report the findings + fix cost + your recommendation, then **stop and let the user decide** (fix / waive / defer). Never run a fix→re-review loop on your own initiative — apply the agreed fix and report your own verification; a second Opus pass to confirm a small fix is waste.
 
@@ -145,12 +145,21 @@ The target is a **true Gen 1 Pokémon battle clone** with future layers inspired
 in the *same* commit as the code, before proposing the commit for approval. A diff that completes an item while
 `TODO.md` still lists it as open is an incomplete diff.
 
+**This cleanup is not optional and not ad hoc — it is enforced by the mandatory `docs-cleanup` subagent, the
+first step of the pre-finish gate sequence.** After *every* finished feature or closed task, that subagent runs
+(no scope exception) and performs the reconciliation below; the main session stages its edits into the finishing
+commit. See `.claude/agents/docs-cleanup.md`.
+
 When an item is done, all of the following, not just the first:
 - Mark it ✅ DONE with the date, or move the whole write-up to `docs/TODO_ARCHIVE.md` — a finished feature or a
   closed tech-debt item belongs in the archive, because `TODO.md` holds **active work only**.
 - Clear the stale framing around it: the "Next up" ordering, "blocked on X" / "gated on Y" notes, `⚠️ known
   defect` banners, and any dependency prose that now describes a world that no longer exists.
 - Never leave a done item in the open list "for the record" — the archive *is* the record.
+- **Before dropping any summary as "already archived," verify the full record actually is in the archive** — not
+  a stale placeholder. (Real trap: a "Run Economy" summary pointed to an archive section that said the Shop-node
+  follow-up was *"still live in TODO.md"* and described its pre-ship state, so the record lived only in TODO.md;
+  dropping the summary would have destroyed it. Relocate + fix the archive's stale framing instead.)
 
 ## Permissions
 

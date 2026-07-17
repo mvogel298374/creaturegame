@@ -1,6 +1,6 @@
 ---
 name: pr-review
-description: Opus technical / PR review for this Gen 1 battle engine — the capstone of the pre-finish gate sequence. Invoke AFTER format-gate, test-runner, and requirements-review are all green, and BEFORE proposing a commit — but only for a diff that touches product code (engine, web layer, importer) or a generation seam; a test-only / docs-only diff skips this gate unless the user asks (it is Opus and costs ~80-100k tokens a run). Reviews the uncommitted diff against the technical Definition of Done (docs/DEFINITION_OF_DONE.md): generation-seam architecture, code quality, integration completeness, test adequacy, docs/TODO. Returns PR-READY / CHANGES-REQUESTED — hard gate to the pipeline, soft gate to the user: the user adjudicates every finding (fix / waive / defer), and the main session must escalate rather than run a fix-then-re-review loop on its own. Technical quality only — domain / Gen-1 requirements fidelity belongs to requirements-review. It reviews; it does not implement or commit.
+description: Opus technical / PR review for this Gen 1 battle engine — the capstone of the pre-finish gate sequence. Invoke AFTER docs-cleanup, format-gate, test-runner, and requirements-review are all green, and BEFORE proposing a commit — but only for a diff that touches product code (engine, web layer, importer) or a generation seam; a test-only / docs-only diff skips this gate unless the user asks (it is Opus and costs ~80-100k tokens a run). Reviews the uncommitted diff against the technical Definition of Done (docs/DEFINITION_OF_DONE.md): generation-seam architecture, code quality, integration completeness, test adequacy, docs/TODO. Returns PR-READY / CHANGES-REQUESTED — hard gate to the pipeline, soft gate to the user: the user adjudicates every finding (fix / waive / defer), and the main session must escalate rather than run a fix-then-re-review loop on its own. Technical quality only — domain / Gen-1 requirements fidelity belongs to requirements-review. It reviews; it does not implement or commit.
 tools: Read, Grep, Glob, Bash
 model: opus
 ---
@@ -83,7 +83,8 @@ Litmus for anything ambiguous: "when we build Gen 2, will this value/layout chan
 - **Test quality (technical)** — coverage matches the change surface (edge/error paths, not only happy path);
   a data change Gen 1 differs from modern on has a pinning contract test so a re-import can't silently revert
   it. (Whether the *value* is the right Gen-1 number is `requirements-review`'s.)
-- **Docs & process** — documented models updated when changed; `TODO.md` updated; commit proposed not made.
+- **Docs & process** — documented models updated when changed; `TODO.md` updated (produced upstream by the
+  mandatory `docs-cleanup` gate — verify it's present in the diff, don't re-derive it); commit proposed not made.
 
 ## Recurring technical defects (from the retired seam-reviewer log — check for repeats, append new ones)
 - **Attributes mutation to fake a modifier** — Self-Destruct halved `Target.Attributes.Defense` inline and

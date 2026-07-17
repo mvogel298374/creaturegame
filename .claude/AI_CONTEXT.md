@@ -18,7 +18,7 @@ Clean, testable, EF-optimized C# 13 / .NET 9; PokeAPI integration. Knowledge bas
 `GENERATION_SEAMS.md §5.0` *as part of the feature* — no inline gen-variable magic numbers, no direct
 `Attributes.Attack/Special/Defense` reads in damage math, everything gen-variable behind the seams. Not a
 follow-up cleanup. (That file is the source of truth for the rule; don't restate it, run it.) **When the
-feature is close to done, run the pre-finish gate sequence** (`format-gate`, `test-runner`,
+feature is close to done, run the pre-finish gate sequence** (`docs-cleanup`, `format-gate`, `test-runner`,
 `requirements-review`, `pr-review`) before proposing a commit — see Tooling & Automation.
 
 ## Action Commands
@@ -65,20 +65,29 @@ deterministic shell hook (format + tests) and LLM reasoning a shell can't do.
 When a feature is close to done, the main session runs these **separable** gates before proposing a commit —
 each is its own subagent so it can be invoked or edited independently:
 
-1. **`format-gate`** (Subagent, `.claude/agents/format-gate.md`) — the CSharpier gate: `check`, auto-`format`
+1. **`docs-cleanup`** (Subagent, `.claude/agents/docs-cleanup.md`, Sonnet) — **the mandatory, unskippable
+   docs-hygiene gate.** After *any* finished feature/task, before the commit, it reconciles `docs/TODO.md`
+   against reality: archives the finished write-up to `TODO_ARCHIVE.md` (TODO.md is active work only), clears
+   its stale framing (Next-up ordering, blocked-on/gated-on notes, ⚠️ banners, dangling refs), and — the
+   load-bearing check — **verifies a finished write-up's full record is in the archive before any summary of it
+   is dropped** (the Shop-node trap: an archive that said "still live in TODO.md" and described the pre-ship
+   state). → `DOCS: CLEAN | UPDATED`. **No scope exception** — it runs for *every* finished feature (every one
+   changes what TODO.md should say), unlike gates 4–5 below which are scoped. Runs **first**, because its doc
+   edits ride in the finishing commit and gate 5 (`pr-review`) checks docs/TODO. It edits docs only.
+2. **`format-gate`** (Subagent, `.claude/agents/format-gate.md`) — the CSharpier gate: `check`, auto-`format`
    + re-check if it fails → `FORMAT: PASS | REFORMATTED | FAIL`.
-2. **`test-runner`** (Subagent, `.claude/agents/test-runner.md`) — the full suite via `.\test.ps1`, TEST
+3. **`test-runner`** (Subagent, `.claude/agents/test-runner.md`) — the full suite via `.\test.ps1`, TEST
    SUMMARY relayed verbatim, failing tests named → `TESTS: PASS | FAIL`.
-3. **`requirements-review`** (Subagent, `.claude/agents/requirements-review.md`, Sonnet) — the domain gate,
+4. **`requirements-review`** (Subagent, `.claude/agents/requirements-review.md`, Sonnet) — the domain gate,
    for battle/stat/move work. A Pokémon-Gen-1 + roguelite expert that challenges the implementation against
    the DoR-finalized plan, the internal docs, and its own knowledge, and flags undocumented behavior →
    `REQUIREMENTS: MET | DISCREPANCIES`. **Hard gate to the pipeline, soft gate to the user:** a discrepancy
    blocks progress to done/commit and no subagent may clear it; only the **user** adjudicates (fix or waive).
-4. **`pr-review`** (Subagent, `.claude/agents/pr-review.md`, **Opus**) — the technical capstone, run **after**
-   1–3 are green. Reviews the diff against the technical Definition of Done (`docs/DEFINITION_OF_DONE.md`) —
+5. **`pr-review`** (Subagent, `.claude/agents/pr-review.md`, **Opus**) — the technical capstone, run **after**
+   1–4 are green. Reviews the diff against the technical Definition of Done (`docs/DEFINITION_OF_DONE.md`) —
    generation-seam architecture, code quality, integration completeness, test adequacy, docs/TODO → `PR-READY
    | CHANGES-REQUESTED`. Technical quality only; domain fidelity is `requirements-review`'s. It treats
-   format/tests/requirements as preconditions.
+   docs-cleanup/format/tests/requirements as preconditions.
 
    **Scope — it is Opus and costs real money (~80–100k tokens a run), so it is not automatic.** Run it when the
    diff touches **product code** (engine, web layer, importer) or a generation seam. A **test-only or docs-only
@@ -94,9 +103,11 @@ each is its own subagent so it can be invoked or edited independently:
    This mirrors `requirements-review`: **hard gate to the pipeline, soft gate to the user.** The user
    adjudicates both lanes; the difference is only which kind of finding each raises.
 
-All four run and report; they don't fix or commit — and **neither a `requirements-review` discrepancy nor a
-`pr-review` CHANGES-REQUESTED is cleared by a subagent: only the user adjudicates.** The `.githooks/pre-commit`
-hook still runs CSharpier + tests as the deterministic backstop at commit time.
+The four *review* gates (2–5) run and report; they don't fix or commit — and **neither a `requirements-review`
+discrepancy nor a `pr-review` CHANGES-REQUESTED is cleared by a subagent: only the user adjudicates.**
+`docs-cleanup` (1) is the one *action* gate: it edits the task docs so the finishing commit carries them, then
+reports. None of the five commits. The `.githooks/pre-commit` hook still runs CSharpier + tests as the
+deterministic backstop at commit time.
 
 > **Why the escalation rule exists** (2026-07-16): a test-only diff drew two Opus `pr-review` runs (~185k
 > tokens) because the gate read as mandatory-and-self-serviced. Review #1 earned it — it caught a real hole.
@@ -105,7 +116,7 @@ hook still runs CSharpier + tests as the deterministic backstop at commit time.
 
 > The old `/audit` skill and `seam-reviewer` subagent are **retired.** Their two jobs were split by lane:
 > Gen-1 / domain fidelity → `requirements-review`; generation-seam *architecture* (the first invariant) →
-> `pr-review`. There is no longer an orchestrator skill — the main session runs the four gates in sequence.
+> `pr-review`. There is no longer an orchestrator skill — the main session runs the five gates in sequence.
 
 ### Pre-commit hook (`.githooks/pre-commit`)
 Deterministic backstop, per staged file type: `csharpier check .` always; the full `dotnet test` suite when
@@ -158,6 +169,7 @@ Any value other than `0`/`false` (or unset/empty) enables it.
 | File | Role |
 |:-----|:-----|
 | `CLAUDE.md` | Session setup, architecture, build commands, model strategy — loaded automatically |
+| `agents/docs-cleanup.md` | Mandatory docs-hygiene gate — archives finished TODO items, clears stale framing (Subagent) |
 | `agents/format-gate.md` | CSharpier formatting gate (Subagent) |
 | `agents/test-runner.md` | Full test-suite runner (Subagent) |
 | `agents/requirements-review.md` | Gen-1 / roguelite domain & requirements gate — hard to pipeline, soft to user (Subagent) |

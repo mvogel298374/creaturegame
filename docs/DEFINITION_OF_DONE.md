@@ -65,7 +65,8 @@ hard gate to the pipeline but soft to the user: only the user waives a requireme
 **F. Docs & process**
 - Any documented model the change alters is updated (`STATE_MODEL`, `GAME_LOOP`, `ENCOUNTER_DESIGN`,
   `GENERATION_SEAMS`, `DATA_IMPORT`, …).
-- `TODO.md` updated (task → done / archive).
+- `TODO.md` updated (task → done / archive) — this is produced by the mandatory `docs-cleanup` gate (step 1 of
+  the pre-finish sequence) and must already be staged in the finishing commit by the time `pr-review` runs.
 - Commit message proposed; commit only on explicit user approval.
 
 ## Verdict
