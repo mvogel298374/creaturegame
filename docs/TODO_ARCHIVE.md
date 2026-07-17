@@ -8,6 +8,65 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Difficulty easing — weak wild encounters + Quick Heal reward ✅ DONE (2026-07-12)
+
+Playtest feedback: the run was overall too hard, and the player wanted an on-the-spot heal among the reward
+options. Two run-layer tuning changes (no battle-seam touch; no importer/DB change):
+
+- **Weak wild encounters.** A plain `Normal`-tier wild encounter now rolls the existing **Weak** archetype vs
+  **Medium** ~50/50 on the run RNG (`EnemyArchetypes.For(tier, rng)`, wired at `GameSessionManager`). The two
+  are **undifferentiated to the player** — the node kind / tier / encounter-map reveal / banner are unchanged;
+  only the built enemy's levers differ. *Acceptance:* wild fights vary in strength while presenting identically.
+- **Quick Heal reward (smart-random).** A new `HealRewardOption` appears among the pick-one-of-N reward options,
+  offered only when the creature has something to restore (hurt / statused / low PP) — **never a dead option** —
+  at a base chance lifted by how badly it's needed. When picked it restores only the
+  applicable components — a random slice of missing HP (≤ missing), cure status, top non-full PP (Elixir-style)
+  — reusing the gen-invariant heal primitives + events (`Healed` / `StatusCleared` / `PpRestored`). Policy in
+  the web `RewardCalculator.TryRollHeal`; application in core `RewardResolution.ApplyHeal`. **Boss nodes are
+  exempt** (their reward stays elevated, and the post-Boss Poké Center heals anyway). *Acceptance:* a Quick Heal
+  option shows up in reward choices when useful (never on Boss nodes) and, when picked, heals the applicable
+  HP/status/PP.
+
+**Deferred (considered, not done this pass):** lowering Elite frequency and the foe level-scaling ceiling —
+revisit after re-playtest if the weak-encounter mix alone doesn't ease it enough.
+
+---
+
+## Encounter Map — Slay-the-Spire-style route overlay ✅ FEATURE COMPLETE (2026-07-11)
+
+The run made **visible**: a full-screen dark-fantasy overworld overlay showing the region as a node map — biomes
+as waypoints wired by their `Neighbours`, the charted route traced through them, and the current biome's node
+ladder revealed inline (wild / elite / treasure / shop / mystery … → **Boss** apex, capped by a synthesized Poké
+Center rest). Overwhelmingly a **presentation** feature over existing run state plus a few additive events; no
+importer change, no DB migration, no battle seam. `/plan` design pass 2026-07-10; sub-decisions ratified with the
+user the same day. **All five build phases shipped:**
+
+1. ✅ **Reveal plumbing (backend), 2026-07-10** — `RegionMapRevealed` (playable subset + neighbour edges,
+   filtered to the sent subset), `BiomeNodePlanRevealed` (the seeded `BiomeNodePlan`, emitted in `RunDirector.Apply`
+   on the biome-choice outcome), and `RunNodeEntered` for **every** node incl. wild (one uniform pin-advance
+   signal), each with its `SignalRBattleEventEmitter` projection + field-level `WebEventContractTests` guard. A
+   `RunDirector` test proved the reveal is a **sequencing no-op** (the emitted event order is unchanged).
+2. ✅ **Current-biome ladder overlay (frontend), 2026-07-10** — the reveal events accumulate into reducer state
+   (region graph → route trace → node ladder → pin index); an `EncounterLadder` draws the vertical ladder (icons
+   per kind, done/current/upcoming state, "you are here" pin), synthesizing the terminal Poké Center rest
+   client-side (it's implied by the model, not a plan node). Live-verified end-to-end.
+3. ✅ **Region graph + map-based route choice, 2026-07-10** — authored 2-D coords on the 18 Kanto biomes; the
+   between-biome route pick now happens **on the map** (click a highlighted neighbour waypoint → existing
+   `chooseBiome`), folding in and replacing the old `BiomeChoiceModal`.
+4. ✅ **Polish, 2026-07-10** — a11y (the route choice focuses the first offered waypoint on open; ARIA labels),
+   auto-peek + fade at each transition, the Map toggle to reopen, theme-aware type-coloured waypoints.
+5. ✅ **Visual overhaul (full-screen dark-fantasy overworld), 2026-07-11** — the corner map was too small; the
+   pinned view became a full-screen overworld with a painterly territory layer (type-colour glow + motif),
+   neighbour edges as gradient-blended drawn paths, and the ladder as a side panel.
+
+**Feature complete** — ships all four phases + the visual overhaul. Any future work is net-new (e.g. the map as
+the persistent run screen). **Follow-up (deferred, user-approved 2026-07-11 — "procedural now, real art later"):**
+replace the procedural type-colour+motif territories with **real painted per-biome scenery** (forest/cave/shore
+illustrations); needs an image-asset pipeline (store under `ClientApp/public`), with the current `.region-territory`
+layer as the drop-in seam. Low priority — the procedural look reads clearly on its own.
+
+---
+
 ## Reward Choice — pick-1-of-3 rarity rewards ✅ DONE (2026-07-07)
 
 Commit `1a9f6eb`. Turns every rolled reward from a silent random grant into a **player choice of three** — two
@@ -76,7 +135,7 @@ Commit `5e1f770`. Compelling-rewards pass — boost reward *amount* and *visibil
 The economy slice of the deferred *Item Acquisition* cluster, `/plan`ned with the user (approved 2026-07-01) and
 built in three phases. **Beating a Pokémon can drop gold and/or items; Treasure/Mystery nodes give real rewards;
 the run bag is now earned** (a curated modest start that grows through play). Commits `ea41531` (A/B) + `7d9afc5`
-(C). **Follow-up still live in `TODO.md`: the Shop node** (spend-gold purchase modal). 1267 tests green.
+(C). **Follow-up — the Shop node (spend-gold purchase modal) — shipped 2026-07-09; see the end of this section.** 1267 tests green.
 
 **Locked design.** Rewards are *generous but skewed* (a low amount almost always, a high amount rare); gold sized
 like Gen 1 trainer prize money (`base × foe level × tier`). Gold + bag are **per-run transient** (lost on death,
@@ -118,6 +177,21 @@ both resolved. Phase C touched no battle seam, so no separate audit.
 **Recurring lesson (memory `feedback_hang_is_a_real_signal`):** a "hanging" test suite here means an infinite-run
 test, not a broken harness — every `RunDirector.RunAsync()` test needs a guaranteed faint (a dead-end biome +
 constant-pushover supplier loops forever; only a *battle* node can end a run).
+
+**Follow-up — the Shop node ✅ DONE (2026-07-09).** A between-encounter shop that **spends** the transient
+`Wallet`. `ShopRunEvent` **replaced** the Phase-A `InteractionStubEvent` (the "Shop keeps its `InteractionStubEvent`"
+note above was the 2026-07-02 state) and rolls a per-visit, run-scaled stock via the web-layer `ShopCalculator`
+(rarity-derived prices — *not* the unaffordable Gen 1 `Item.Cost`), emits a blocking `ShopOffered`, then runs an
+iterative buy loop (`ChooseShopActionAsync` → buy/leave) charging the `Wallet` and filling the `Bag`. Full stack:
+core event + `IBattleInput`/`SignalRInput` handshake + `BattleHub.BuyShopItem`/`LeaveShop` +
+`SignalRBattleEventEmitter` projection + a React shop modal (`BattleScreen`). Buy-only MVP — selling / restock /
+persistence remain out of scope (persistence rides the deferred `save.db` layer). Two refinements from review: the
+shop is **affordability-gated** (a biome keeps a Shop node only when the wallet clears `ShopCalculator.MinItemPrice`
+at biome entry — no dead 0₽ shop, so the opening node is never a shop), and purchases respect the Gen 1
+**99-per-slot** `Bag` ceiling (a buy that would overfill is refused before charging). Covered by `RunDirectorNodeTests`
+(buy/leave/no-op/headless/gate/99-cap), `ShopCalculatorTests` (pricing shape + seed), `BagTests` (99-cap),
+`WebEventContractTests` (wire projection), Vitest (`timeline` + `battleReducer`), and a Playwright `shop.spec`
+(earn gold → buy at a shop).
 
 ---
 
