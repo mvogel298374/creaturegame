@@ -40,8 +40,14 @@ builder.Services.AddCors(opts =>
 var app = builder.Build();
 
 app.UseCors();
+
+// Serve the built React SPA (published into wwwroot) as a single unit with the API:
+// UseDefaultFiles rewrites "/" to index.html, UseStaticFiles serves the assets, and
+// MapFallbackToFile sends any non-API/-hub path to index.html for client-side routing.
+app.UseDefaultFiles();
 app.UseStaticFiles();
 app.MapControllers();
 app.MapHub<BattleHub>("/hubs/battle");
+app.MapFallbackToFile("index.html");
 
 app.Run();

@@ -8,5 +8,16 @@
     <InternalsVisibleTo Include="creaturegame.Tests" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Ship the imported SQLite DBs next to the app binary so the published output is
+         self-contained (a real host has no creaturegame.sln for DbPathHelper to find).
+         Source of truth stays the repo-root files the importer writes; PreserveNewest
+         re-copies them whenever the importer regenerates them. -->
+    <Content Include="..\pokemon.db;..\moves.db;..\items.db">
+      <Link>%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
   <!-- TargetFramework, ImplicitUsings, and Nullable come from ..\Directory.Build.props. -->
 </Project>

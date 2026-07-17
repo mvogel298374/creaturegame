@@ -1,0 +1,28 @@
+# Keep the build context small. NOTE: unlike .gitignore this must NOT exclude
+# *.db (the DBs are baked into the image) nor wwwroot/sprites + wwwroot/audio.
+
+# .NET build outputs
+**/bin/
+**/obj/
+publish/
+
+# Node / Vite (frontend is rebuilt inside the image)
+**/node_modules/
+creaturegame.Web/ClientApp/dist/
+creaturegame.Web/ClientApp/.vite/
+
+# VCS / IDE / tooling
+.git/
+.gitignore
+.vs/
+.idea/
+.claude/
+
+# Test outputs
+creaturegame.Web/ClientApp/test-results/
+creaturegame.Web/ClientApp/playwright-report/
+creaturegame.Web/ClientApp/blob-report/
+creaturegame.Web/ClientApp/.playwright/
+
+# Logs & local scratch
+*.log

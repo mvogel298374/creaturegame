@@ -1,6 +1,12 @@
 ﻿# Build output
 bin/
 obj/
+/publish/
+
+# Release build artifacts copied into wwwroot by build-release.ps1 / Dockerfile
+# (the SPA is generated from ClientApp/, not source)
+creaturegame.Web/wwwroot/index.html
+creaturegame.Web/wwwroot/assets/
 
 # .NET
 *.user

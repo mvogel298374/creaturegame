@@ -12,15 +12,24 @@ public static class DbPathHelper
         if (_rootPath == null)
         {
             string baseDir = AppContext.BaseDirectory;
-            DirectoryInfo? dir = new DirectoryInfo(baseDir);
 
-            // Search upwards for the solution directory as a heuristic for the project root.
-            while (dir != null && !File.Exists(Path.Combine(dir.FullName, "creaturegame.sln")))
+            // Deployed layout: the .db files are published next to the app binary (see
+            // creaturegame.Web.csproj), and a real host has no solution file to find.
+            if (File.Exists(Path.Combine(baseDir, dbName)))
             {
-                dir = dir.Parent;
+                _rootPath = baseDir;
             }
+            else
+            {
+                // Dev/repo layout: walk up to the solution directory (repo root holds the DBs).
+                DirectoryInfo? dir = new DirectoryInfo(baseDir);
+                while (dir != null && !File.Exists(Path.Combine(dir.FullName, "creaturegame.sln")))
+                {
+                    dir = dir.Parent;
+                }
 
-            _rootPath = dir?.FullName ?? baseDir;
+                _rootPath = dir?.FullName ?? baseDir;
+            }
         }
 
         return Path.Combine(_rootPath, dbName);
