@@ -159,13 +159,19 @@ Any value other than `0`/`false` (or unset/empty) enables it.
 - **`github`** — GitHub's **remote hosted** MCP server (`https://api.githubcopilot.com/mcp/`, HTTP transport),
   for working the `origin` repo remotely: read/manage issues & PRs, inspect CI/Actions runs (incl. the Fly
   deploy workflow), push branches, comment. Registered at **project scope** in the repo-root `.mcp.json`
-  (that file holds only the URL — auth is never committed). Access is **full read/write** by the current
-  grant, but every write still goes through the normal per-call tool-approval prompt. No Docker or `gh` CLI
+  (that file holds only the URL + a `${GITHUB_MCP_PAT}` header reference — the token itself is never
+  committed). Every write still goes through the normal per-call tool-approval prompt. No Docker or `gh` CLI
   needed (the remote server replaces the local Docker image).
-  - **First-time connect (per clone / per machine):** on next `claude` start, approve the project MCP server
-    when prompted, then run `/mcp` → **github** → **Authenticate** to complete the browser OAuth flow against
-    your GitHub account. The OAuth grant is stored in Claude's own credential store, not in the repo.
-  - **Revoke:** remove the connection under GitHub → *Settings → Applications*, or `claude mcp remove github`.
+  - **Auth = a Personal Access Token in the environment.** `.mcp.json` sends
+    `Authorization: Bearer ${GITHUB_MCP_PAT}`; Claude expands `${GITHUB_MCP_PAT}` from its own process
+    environment at connect time. The token stays in the env var, never in the repo.
+  - **First-time setup (per clone / per machine):** create a GitHub PAT with the scopes you want the server to
+    have (repo / issues / PRs / actions), set it as the **`GITHUB_MCP_PAT`** environment variable
+    (`setx GITHUB_MCP_PAT <token>` for a persistent User-scoped var on Windows), then **restart `claude`** so
+    the new process inherits it, and approve the project MCP server when prompted. A var set after `claude`
+    launched won't be visible until a restart.
+  - **Revoke:** delete the token under GitHub → *Settings → Developer settings → Personal access tokens*, and
+    clear the env var (`setx GITHUB_MCP_PAT ""`), or `claude mcp remove github`.
 
 ---
 
