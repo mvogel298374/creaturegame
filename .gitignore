@@ -14,9 +14,14 @@ creaturegame.Web/wwwroot/assets/
 .vs/
 .idea/
 
-# SQLite databases (runtime-generated, use PokeApiConnector to regenerate)
+# SQLite databases (runtime-generated, use PokeApiConnector to regenerate).
+# Exception: the three shipped Gen 1 data DBs are committed so CI / deploy has
+# them without a network import step. Everything else matching *.db stays ignored.
 *.db
 *.sqlite
+!/pokemon.db
+!/moves.db
+!/items.db
 # WAL/shared-memory sidecars created while the DB is open (e.g. running the dev stack)
 *.db-wal
 *.db-shm
