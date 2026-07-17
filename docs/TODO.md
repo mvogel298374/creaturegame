@@ -514,6 +514,14 @@ Stack: React 18 + TypeScript + SignalR + Phaser 3. (Canvas & core animations don
     gap** — see the memory + `WebEventContractTests`). Then a pure `moveAnimationFamily(type, category, slug)`
     map (unit-testable like `timeline.ts`), new per-family `BridgeCommand`s + `BattleScene` handlers, each still
     emitting `animationComplete` so the timeline's `awaitAnim` contract holds.
+- [ ] *(small)* **Escape = B-cancel on the prompts that have a negative action.** Surfaced by the `<Modal>` refactor
+  (2026-07-17) and deliberately left out of it — a refactor commit shouldn't carry a behaviour change. Today Escape
+  does nothing on every run prompt, which is right for the four that are *required* choices (`RouteChoice`,
+  `RewardChoice`, `LeadChoice`, `SwitchIn` — there is no answer a dismissal could send). But four others do have a
+  negative answer, and Gen 1's B-cancel is exactly that: evolution→CANCEL, acquisition→DECLINE, shop→LEAVE,
+  move-replacement→don't-learn. *Fix:* give those four `dismiss={{ onEscape: () => <their decline> }}` — the wrapper
+  already supports it; the escapable branch of `ModalDismiss` currently has no caller. Needs Vitest coverage and a
+  `requirements-review` pass on the B-cancel claim (per the *plan-asserted domain facts are claims* lesson).
 - [ ] `ConsoleInput : IBattleInput` — numbered move menu for terminal play (low priority).
 
 ---
@@ -802,15 +810,16 @@ Battles are fully playable now — docs won't describe a moving target.
   **`RunLoop.cs`'s ~28 types are fine** — a cohesive vocabulary file; don't let a type-count metric split it.
 - *2026-07-17:* **`Creature/` and `Creatures/` both declared `namespace creaturegame.Creatures`** → the 9 files
   merged into `Creatures/`; the `Creature/` directory is gone. Pure file move (`git mv`), no code changed.
+- *2026-07-17:* **`BattleScreen.tsx` was 1317 lines with 13 hand-rolled modal overlays** → a shared `<Modal>` with
+  an explicit **`dismiss`** prop (`'blocking'` vs `{ onEscape }`) + the escape rule in one `useEscapeKey` hook; the
+  8 prompts + `BattleEndedOverlay` lifted into `components/modals/`. **`BattleScreen.tsx` is now 842 lines with zero
+  hand-rolled overlays.** Every run prompt is `'blocking'` **by construction, not by taste** — each parks a
+  server-side await, so dismissing one would strand the run; don't re-file "the modals should close on Escape".
+  The pinned map is the one escapable overlay and calls `useEscapeKey` directly (it *is* the full-screen surface,
+  so it can't share the wrapper's overlay+card DOM). CSS untouched.
 
 **Still open** (filed 2026-07-16 from a repo-wide structural review — ranked by cost-of-deferring, not size):
 
-- [ ] **`BattleScreen.tsx` — 1317 lines, ~25 components.** 8 modals (`Recovery`, `EvolutionPrompt`,
-  `RewardChoice`, `Shop`, `Acquisition`, `LeadChoice`, `SwitchIn`, `MoveReplacement`) + 11 hand-rolled
-  `<div className="modal-overlay">` blocks. Escape-to-close is ad hoc: the map overlay has it (:468), the
-  blocking modals don't — plausibly deliberate for blocking prompts, but currently an accident of each
-  component rather than a stated rule. *Fix:* a shared `<Modal>` wrapper that makes the escapable/blocking
-  choice explicit; lift the modals into `components/modals/`.
 - [ ] *(low)* **No `Directory.Build.props`** — `TargetFramework`/`ImplicitUsings`/`Nullable` are copy-pasted
   across all four csprojs, and there are no analyzers or `TreatWarningsAsErrors`. Build is clean (0 warnings)
   today, so this is cheap insurance to keep it that way, not a fix for a live problem.

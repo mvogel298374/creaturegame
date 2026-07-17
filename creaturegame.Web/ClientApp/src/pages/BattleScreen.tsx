@@ -3,14 +3,26 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { TypeBadge, typeColor } from '../components/TypeBadge';
 import { MapGlyphSprite, TypeChip, typeIconId, nodeIconId } from './mapGlyphs';
 import { BattleCanvas } from '../battle/BattleCanvas';
-import { useBattleHub, type LevelUpPanel, type MoveReplacementPrompt, type RecoveryPrompt, type EvolutionPrompt, type RewardChoicePrompt, type ShopPrompt, type AcquisitionPrompt, type SwitchInPrompt, type PartyMember, type DropToast } from '../hooks/useBattleHub';
-import { healSummary, type RegionBiome, type BiomeOption } from '../battle/timeline';
+import { useBattleHub, type LevelUpPanel, type DropToast } from '../hooks/useBattleHub';
+import { useEscapeKey } from '../hooks/useEscapeKey';
+import { type RegionBiome, type BiomeOption } from '../battle/timeline';
 import { regionEdgeKey, travelledEdgeKeys } from '../battle/regionMap';
 import type { Species } from '../types/Species';
 import type { MoveInfo } from '../types/BattleEvents';
 import { formatMoveName } from '../utils/format';
 import { friendlyFetchError } from '../utils/fetchError';
 import { type BagItem, groupBagItems, needsMoveTarget, formatItemName } from '../battle/bag';
+import { PartyStrip } from '../components/PartyStrip';
+import { Modal } from '../components/modals/Modal';
+import { BattleEndedOverlay } from '../components/modals/BattleEndedOverlay';
+import { RecoveryModal } from '../components/modals/RecoveryModal';
+import { EvolutionPromptModal } from '../components/modals/EvolutionPromptModal';
+import { RewardChoiceModal } from '../components/modals/RewardChoiceModal';
+import { ShopModal } from '../components/modals/ShopModal';
+import { AcquisitionModal } from '../components/modals/AcquisitionModal';
+import { LeadChoiceModal } from '../components/modals/LeadChoiceModal';
+import { SwitchInModal } from '../components/modals/SwitchInModal';
+import { MoveReplacementModal } from '../components/modals/MoveReplacementModal';
 import { CreatureOverview } from './CreatureOverview';
 import './BattleScreen.css';
 
@@ -258,52 +270,6 @@ export function BattleScreen() {
   );
 }
 
-// Run-scoped game-over screen for the Endless Battle Chain: shown once the player's creature faints and the
-// run ends (driven by the terminal RunEnded event → phase 'ended'). Not a per-battle overlay — a win is just
-// an intermission in the chain, so this only appears at the run's true end. Summarises the run (creature,
-// battles won, final level) over a greyed faint sprite and offers PLAY AGAIN (a fresh starter pick) or QUIT.
-function BattleEndedOverlay({ creatureName, speciesId, battlesWon, finalLevel, onPlayAgain, onQuit }: {
-  creatureName: string;
-  speciesId: number;
-  battlesWon: number;
-  finalLevel: number;
-  onPlayAgain: () => void;
-  onQuit: () => void;
-}) {
-  return (
-    <div className="modal-overlay battle-end-overlay">
-      <div className="battle-end-modal" role="alertdialog" aria-label="Game over">
-        <p className="battle-end-title">GAME OVER</p>
-        <div className="battle-end-sprite-wrap">
-          <img
-            className="battle-end-sprite"
-            src={`/sprites/front/${speciesId}.png`}
-            alt={creatureName}
-            draggable={false}
-          />
-        </div>
-        <p className="battle-end-sub">{creatureName} fainted.</p>
-        <table className="battle-end-stats">
-          <tbody>
-            <tr>
-              <td className="battle-end-stat">BATTLES WON</td>
-              <td className="battle-end-value">{battlesWon}</td>
-            </tr>
-            <tr>
-              <td className="battle-end-stat">FINAL LEVEL</td>
-              <td className="battle-end-value">Lv{finalLevel}</td>
-            </tr>
-          </tbody>
-        </table>
-        <div className="battle-end-buttons">
-          <button className="action-btn action-btn--fight" onClick={onPlayAgain}>PLAY AGAIN</button>
-          <button className="action-btn" onClick={onQuit}>QUIT</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // Stable empty set for the read-only region map (no offered/choosable waypoints), so RunMapPanel doesn't mint a
 // new Set each render.
 const EMPTY_ID_SET: ReadonlySet<string> = new Set<string>();
@@ -465,13 +431,10 @@ function RunMapPanel({ biomes, routePath, currentId, biomeName, nodePlan, pin, p
   pinned: boolean;
   onClose: () => void;
 }) {
-  // When pinned open as the full-screen map, Escape closes it (matches the game's other dismissable overlays).
-  useEffect(() => {
-    if (!pinned) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [pinned, onClose]);
+  // The map is the one overlay Escape may close: it only draws run state the client already has, so leaving it
+  // costs nothing. Every other overlay is a prompt the run is blocked on — see Modal's `dismiss`. It can't use
+  // that wrapper (the pinned panel *is* the full-screen surface, not an overlay + card), but it shares the rule.
+  useEscapeKey(pinned ? onClose : null);
 
   // Compact corner peek (auto-shown at each ladder change): the current biome's ladder only — the full graph
   // belongs to the pinned full-screen view, so the peek stays small and unobtrusive.
@@ -541,409 +504,19 @@ function RouteChoiceMap({ biomes, routePath, currentId, options, onChoose }: {
     ref.current?.querySelector<HTMLButtonElement>('.region-node--offered')?.focus();
   }, []);
   return (
-    <div className="modal-overlay">
-      <div ref={ref} className="route-choice-modal" role="alertdialog" aria-modal="true" aria-label="Choose your route">
-        <p className="biome-title">Choose your route</p>
-        <p className="biome-sub">Click a highlighted biome to chart your path.</p>
-        <RegionMap biomes={biomes} routePath={routePath} currentId={currentId} offeredIds={offeredIds} onChoose={onChoose} />
-        <div className="route-choice-legend">
-          {options.map(o => (
-            <span key={o.id} className="route-choice-legend-item">
-              <span className="route-choice-legend-name">{o.name}</span>
-              {o.types.map(t => <TypeChip key={t} type={t} />)}
-            </span>
-          ))}
-        </div>
+    <Modal label="Choose your route" dismiss="blocking" card="route-choice-modal" cardRef={ref}>
+      <p className="biome-title">Choose your route</p>
+      <p className="biome-sub">Click a highlighted biome to chart your path.</p>
+      <RegionMap biomes={biomes} routePath={routePath} currentId={currentId} offeredIds={offeredIds} onChoose={onChoose} />
+      <div className="route-choice-legend">
+        {options.map(o => (
+          <span key={o.id} className="route-choice-legend-item">
+            <span className="route-choice-legend-name">{o.name}</span>
+            {o.types.map(t => <TypeChip key={t} type={t} />)}
+          </span>
+        ))}
       </div>
-    </div>
-  );
-}
-
-// Roguelite Poké Center: a between-encounter heal step. Shows the player's creature with a heal glow and
-// offers a single Heal / Skip press — that one input both decides the heal and continues the chain (the
-// backend is blocked awaiting it). Skipping leaves the creature as it was.
-function RecoveryModal({ prompt, onRespond }: {
-  prompt: RecoveryPrompt;
-  onRespond: (accept: boolean) => void;
-}) {
-  return (
-    <div className="modal-overlay">
-      <div className="recovery-modal" role="alertdialog" aria-label="Poké Center recovery">
-        <p className="recovery-title">Poké Center</p>
-        <p className="recovery-sub">{prompt.creatureName} can be fully healed.</p>
-        <div className="recovery-sprite-wrap">
-          <span className="recovery-glow" aria-hidden="true" />
-          <img
-            className="recovery-sprite"
-            src={`/sprites/front/${prompt.speciesId}.png`}
-            alt={prompt.creatureName}
-            draggable={false}
-          />
-        </div>
-        <div className="recovery-buttons">
-          <button className="action-btn action-btn--fight" onClick={() => onRespond(true)}>
-            HEAL
-          </button>
-          <button className="action-btn" onClick={() => onRespond(false)}>
-            SKIP
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Evolution offer: a between-encounter Allow / Cancel step (Gen 1 B-cancel). Shows the current creature with
-// an evolution glow; one press both answers the prompt and continues the run (the backend is blocked awaiting
-// it). Cancel keeps the current form — it will be offered again at the next level-up.
-function EvolutionPromptModal({ prompt, onRespond }: {
-  prompt: EvolutionPrompt;
-  onRespond: (allow: boolean) => void;
-}) {
-  return (
-    <div className="modal-overlay">
-      <div className="recovery-modal" role="alertdialog" aria-label="Evolution">
-        <p className="recovery-title">Evolution</p>
-        <p className="recovery-sub">{prompt.fromName} is evolving into {prompt.toName}!</p>
-        <div className="recovery-sprite-wrap">
-          <span className="recovery-glow" aria-hidden="true" />
-          <img
-            className="recovery-sprite"
-            src={`/sprites/front/${prompt.fromSpeciesId}.png`}
-            alt={prompt.fromName}
-            draggable={false}
-          />
-        </div>
-        <div className="recovery-buttons">
-          <button className="action-btn action-btn--fight" onClick={() => onRespond(true)}>
-            ALLOW
-          </button>
-          <button className="action-btn" onClick={() => onRespond(false)}>
-            CANCEL
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Reward choice: a pick-one-of-N shown after a rolled reward — two rarity-coloured item cards and a gold bag.
-// One click picks that option (the backend is blocked awaiting the pick) and the chosen reward is then applied
-// + announced by the drop hover. A required choice: the run always offers at least the gold bag, so there is
-// no empty/decline state.
-function RewardChoiceModal({ prompt, onChoose }: {
-  prompt: RewardChoicePrompt;
-  onChoose: (index: number) => void;
-}) {
-  return (
-    <div className="modal-overlay">
-      <div className="reward-modal" role="alertdialog" aria-label="Choose your reward">
-        <p className="reward-title">Choose your reward</p>
-        <p className="reward-sub">Pick one — the rest are left behind.</p>
-        <div className="reward-cards">
-          {prompt.options.map((option, i) => (
-            <button
-              key={i}
-              className={
-                option.kind === 'gold'
-                  ? 'reward-card reward-card--gold'
-                  : option.kind === 'heal'
-                    ? 'reward-card reward-card--heal'
-                    : `reward-card reward-card--item reward-card--${(option.rarity ?? 'Common').toLowerCase()}`
-              }
-              onClick={() => onChoose(i)}
-            >
-              {option.kind === 'gold' ? (
-                <>
-                  <span className="reward-card-icon" aria-hidden="true">₽</span>
-                  <span className="reward-card-name">{option.gold}₽</span>
-                  <span className="reward-card-tag">GOLD BAG</span>
-                </>
-              ) : option.kind === 'heal' ? (
-                <>
-                  <span className="reward-card-icon" aria-hidden="true">✚</span>
-                  <span className="reward-card-name">{option.label ?? 'Quick Heal'}</span>
-                  <span className="reward-card-tag">{healSummary(option)}</span>
-                </>
-              ) : (
-                <>
-                  <span className="reward-card-icon" aria-hidden="true">✦</span>
-                  <span className="reward-card-name">{formatItemName(option.itemName ?? '')}</span>
-                  <span className="reward-card-tag">{(option.rarity ?? 'Common').toUpperCase()}</span>
-                </>
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Shop node: a spend-gold buy modal. Unlike the one-shot reward pick, the shop is iterative — it stays open
-// across purchases, each Buy sends BuyShopItem(index) and the balance updates live (Buy disables when the item
-// costs more than the current balance). Leave ends the visit and advances the run. Prices are run-scaled ₽.
-function ShopModal({ prompt, onBuy, onLeave }: {
-  prompt: ShopPrompt;
-  onBuy: (index: number) => void;
-  onLeave: () => void;
-}) {
-  return (
-    <div className="modal-overlay">
-      <div className="shop-modal" role="alertdialog" aria-label="Shop">
-        <p className="shop-title">Shop</p>
-        <p className="shop-sub">Balance: <span className="shop-balance">{prompt.balance}₽</span></p>
-        <div className="shop-items">
-          {prompt.items.map((item, i) => {
-            const affordable = item.price <= prompt.balance;
-            return (
-              <div
-                key={i}
-                className={`shop-item shop-item--${item.rarity.toLowerCase()}`}
-              >
-                <span className="shop-item-icon" aria-hidden="true">✦</span>
-                <span className="shop-item-name">{formatItemName(item.itemName)}</span>
-                <span className="shop-item-tag">{item.rarity.toUpperCase()}</span>
-                <button
-                  className="shop-buy-btn"
-                  disabled={!affordable}
-                  onClick={() => onBuy(i)}
-                >
-                  {item.price}₽
-                </button>
-              </div>
-            );
-          })}
-        </div>
-        <button className="shop-leave-btn" onClick={onLeave}>Leave</button>
-      </div>
-    </div>
-  );
-}
-
-// Party roster strip: the run's owned creatures as a compact row over the field. The active lead is flagged
-// and pulled to the front; benched members show a small HP bar + level. Fed by PartyUpdated snapshots (and the
-// /party hydrate on load). Read-only here — the between-biome lead swap (Stage 1d) is where the lead changes.
-function PartyStrip({ members }: { members: PartyMember[] }) {
-  return (
-    <div className="party-strip" role="group" aria-label="Party roster">
-      {members.map((m, i) => (
-        <div
-          key={i}
-          className={`party-chip${m.isLead ? ' party-chip--lead' : ''}`}
-          title={`${m.name} · Lv${m.level} · ${m.hp}/${m.maxHp} HP`}
-        >
-          <img
-            className="party-chip-sprite"
-            src={`/sprites/front/${m.speciesId}.png`}
-            alt={m.name}
-            draggable={false}
-            onError={e => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }}
-          />
-          <span className="party-chip-lvl">Lv{m.level}</span>
-          <div className="party-chip-hp">
-            <div
-              className={`party-chip-hp-fill party-chip-hp-fill--${hpState(m.hp, m.maxHp)}`}
-              style={{ width: `${m.maxHp > 0 ? Math.max(0, Math.min(100, (m.hp / m.maxHp) * 100)) : 0}%` }}
-            />
-          </div>
-          {m.isLead && <span className="party-chip-tag" aria-label="lead">LEAD</span>}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function hpState(hp: number, maxHp: number): 'high' | 'mid' | 'low' {
-  const pct = maxHp > 0 ? (hp / maxHp) * 100 : 0;
-  return pct > 50 ? 'high' : pct > 25 ? 'mid' : 'low';
-}
-
-// Acquisition offer (themed draft / boss catch): a blocking modal to add the offered creature to the party.
-// With room, it's a simple ACCEPT / DECLINE. When the party is full, ACCEPT opens a "release which member?"
-// step over the benched members (the lead is excluded — a mid-biome lead change is Stage 1d) with a two-step
-// confirm so no creature is released on a single misclick. That one flow answers RespondAcquisition, which the
-// run loop is blocked on.
-function AcquisitionModal({ prompt, onRespond }: {
-  prompt: AcquisitionPrompt;
-  onRespond: (accept: boolean, replaceSlot: number | null) => void;
-}) {
-  // null → the offer; 'swap' → picking a member to release (full party); { slot } → confirming that release.
-  const [phase, setPhase] = useState<'offer' | 'swap' | { slot: number }>('offer');
-  const label = prompt.source === 'BossCatch' ? 'Catch!' : 'A creature wants to join!';
-
-  // Full-party release confirm.
-  if (typeof phase === 'object') {
-    const releasing = prompt.party[phase.slot];
-    return (
-      <div className="modal-overlay">
-        <div className="acquire-modal" role="alertdialog" aria-label="Confirm release">
-          <p className="acquire-question">Release {releasing.name} to make room for {prompt.name}?</p>
-          <div className="acquire-buttons">
-            <button className="action-btn action-btn--fight" onClick={() => onRespond(true, phase.slot)}>YES</button>
-            <button className="action-btn" onClick={() => setPhase('swap')}>NO</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Full-party swap picker: choose a benched member to release (the lead can't be swapped out here).
-  if (phase === 'swap') {
-    return (
-      <div className="modal-overlay">
-        <div className="acquire-modal" role="alertdialog" aria-label="Choose a member to release">
-          <p className="acquire-title">Party is full!</p>
-          <p className="acquire-sub">Release which creature for {prompt.name}?</p>
-          <div className="acquire-swap-grid">
-            {prompt.party.map((m, i) => (
-              <button
-                key={i}
-                className="acquire-swap-btn"
-                disabled={m.isLead}
-                onClick={() => setPhase({ slot: i })}
-                title={m.isLead ? 'The lead cannot be released here' : undefined}
-              >
-                <img
-                  className="acquire-swap-sprite"
-                  src={`/sprites/front/${m.speciesId}.png`}
-                  alt={m.name}
-                  draggable={false}
-                  onError={e => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }}
-                />
-                <span className="acquire-swap-name">{m.name}</span>
-                <span className="acquire-swap-lvl">Lv{m.level}{m.isLead ? ' · LEAD' : ''}</span>
-              </button>
-            ))}
-          </div>
-          <button className="btn-ghost action-back" onClick={() => setPhase('offer')}>← BACK</button>
-        </div>
-      </div>
-    );
-  }
-
-  // The offer itself.
-  return (
-    <div className="modal-overlay">
-      <div className="acquire-modal" role="alertdialog" aria-label="Creature offer">
-        <p className="acquire-title">{label}</p>
-        <p className="acquire-sub">{prompt.name} (Lv{prompt.level}) wants to join your party!</p>
-        <div className="acquire-sprite-wrap">
-          <span className="acquire-glow" aria-hidden="true" />
-          <img
-            className="acquire-sprite"
-            src={`/sprites/front/${prompt.speciesId}.png`}
-            alt={prompt.name}
-            draggable={false}
-          />
-        </div>
-        <div className="acquire-types" aria-hidden="true">
-          {prompt.types.map(t => <TypeBadge key={t} type={t} size="sm" />)}
-        </div>
-        <div className="acquire-buttons">
-          <button
-            className="action-btn action-btn--fight"
-            onClick={() => (prompt.partyFull ? setPhase('swap') : onRespond(true, null))}
-          >
-            {prompt.partyFull ? 'ADD (SWAP)' : 'ADD'}
-          </button>
-          <button className="action-btn" onClick={() => onRespond(false, null)}>DECLINE</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Between-biome lead choice (Stage 1d): a blocking pick of which party member leads into the next biome. Shown
-// at the biome boundary (after the Poké Center) when the party has more than one creature. Clicking a member
-// makes it the lead (clicking the current lead keeps it — a no-op); the run is blocked server-side awaiting this.
-// This is NOT in-battle switching — it only sets the lead for the next biome.
-function LeadChoiceModal({ party, onChoose }: {
-  party: PartyMember[];
-  onChoose: (index: number) => void;
-}) {
-  return (
-    <div className="modal-overlay">
-      <div className="lead-modal" role="alertdialog" aria-modal="true" aria-label="Choose your lead">
-        <p className="lead-title">Choose your lead</p>
-        <p className="lead-sub">Who leads into the next biome?</p>
-        <div className="lead-grid">
-          {party.map((m, i) => (
-            <button
-              key={i}
-              className={`lead-card${m.isLead ? ' lead-card--current' : ''}`}
-              onClick={() => onChoose(i)}
-              aria-current={m.isLead ? 'true' : undefined}
-            >
-              <img
-                className="lead-card-sprite"
-                src={`/sprites/front/${m.speciesId}.png`}
-                alt={m.name}
-                draggable={false}
-                onError={e => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }}
-              />
-              <span className="lead-card-name">{m.name}</span>
-              <span className="lead-card-lvl">Lv{m.level}{m.isLead ? ' · current' : ''}</span>
-              <div className="lead-card-hp">
-                <div
-                  className={`lead-card-hp-fill party-chip-hp-fill--${hpState(m.hp, m.maxHp)}`}
-                  style={{ width: `${m.maxHp > 0 ? Math.max(0, Math.min(100, (m.hp / m.maxHp) * 100)) : 0}%` }}
-                />
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Forced faint-switch (Stage 3): the active creature fainted but the bench has a live member, so the player MUST
-// send in a replacement — a blocking, non-dismissable modal (no decline/close) over the roster. Only live members
-// are choosable; the fainted one (and any other downed member) is greyed and disabled. Clicking a live member
-// answers RespondSwitchIn, which the battle is blocked on; the run ends only if the whole party is down (in which
-// case this modal never opens). Distinct from the between-biome LeadChoiceModal — this is a mid-battle send-in.
-function SwitchInModal({ prompt, onChoose }: {
-  prompt: SwitchInPrompt;
-  onChoose: (index: number) => void;
-}) {
-  return (
-    <div className="modal-overlay">
-      <div className="lead-modal" role="alertdialog" aria-modal="true" aria-label="Send in a creature">
-        <p className="lead-title">{prompt.faintedName} fainted!</p>
-        <p className="lead-sub">Send in your next creature.</p>
-        <div className="lead-grid">
-          {prompt.party.map((m, i) => {
-            const fainted = m.hp <= 0;
-            return (
-              <button
-                key={i}
-                className={`lead-card${fainted ? ' lead-card--fainted' : ''}`}
-                disabled={fainted}
-                onClick={() => onChoose(i)}
-                title={fainted ? `${m.name} has fainted` : undefined}
-              >
-                <img
-                  className="lead-card-sprite"
-                  src={`/sprites/front/${m.speciesId}.png`}
-                  alt={m.name}
-                  draggable={false}
-                  onError={e => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }}
-                />
-                <span className="lead-card-name">{m.name}</span>
-                <span className="lead-card-lvl">Lv{m.level}{fainted ? ' · FNT' : ''}</span>
-                <div className="lead-card-hp">
-                  <div
-                    className={`lead-card-hp-fill party-chip-hp-fill--${hpState(m.hp, m.maxHp)}`}
-                    style={{ width: `${m.maxHp > 0 ? Math.max(0, Math.min(100, (m.hp / m.maxHp) * 100)) : 0}%` }}
-                  />
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -972,54 +545,6 @@ function DropHover({ drop }: { drop: DropToast }) {
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
-
-// Level-up move learning: the four slots are full, so the player chooses one to forget for the new move —
-// or declines. Two steps with a confirmation so a move is never deleted on a single misclick.
-function MoveReplacementModal({ prompt, onForget }: {
-  prompt: MoveReplacementPrompt;
-  onForget: (slot: number | null) => void;
-}) {
-  // null → choosing; { slot } → confirming that choice (slot null = confirming a decline).
-  const [pending, setPending] = useState<{ slot: number | null } | null>(null);
-  const newMove = formatMoveName(prompt.newMoveName);
-
-  if (pending) {
-    const declining = pending.slot === null;
-    const question = declining
-      ? `Stop learning ${newMove}?`
-      : `Forget ${formatMoveName(prompt.currentMoves[pending.slot!])} and learn ${newMove}?`;
-    return (
-      <div className="modal-overlay modal-overlay--corner">
-        <div className="move-replace-modal" role="alertdialog" aria-label="Confirm move change">
-          <p className="move-replace-question">{question}</p>
-          <div className="move-replace-confirm">
-            <button className="action-btn action-btn--fight" onClick={() => onForget(pending.slot)}>YES</button>
-            <button className="action-btn" onClick={() => setPending(null)}>NO</button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="modal-overlay modal-overlay--corner">
-      <div className="move-replace-modal" role="alertdialog" aria-label="Choose a move to forget">
-        <p className="move-replace-title">{prompt.creatureName} wants to learn {newMove}!</p>
-        <p className="move-replace-sub">But it already knows 4 moves. Forget one?</p>
-        <div className="move-replace-grid">
-          {prompt.currentMoves.map((move, i) => (
-            <button key={i} className="move-btn" onClick={() => setPending({ slot: i })}>
-              <span className="move-name">{formatMoveName(move)}</span>
-            </button>
-          ))}
-        </div>
-        <button className="btn-ghost action-back" onClick={() => setPending({ slot: null })}>
-          Don't learn {newMove}
-        </button>
-      </div>
-    </div>
-  );
-}
 
 function HpBar({ hp, maxHp, showNumbers = false }: {
   hp: number; maxHp: number; showNumbers?: boolean;

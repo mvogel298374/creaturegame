@@ -601,6 +601,34 @@ The ordered pass that followed the move-coverage completion. All six items done;
 
 ## Tech-Debt cleanups — DONE
 
+- **`BattleScreen.tsx` was 1317 lines with 13 hand-rolled modal overlays → a shared `<Modal>` + `components/modals/`
+  (2026-07-17).** The page held ~25 components, among them 8 blocking run prompts (`Recovery`, `EvolutionPrompt`,
+  `RewardChoice`, `Shop`, `Acquisition`, `LeadChoice`, `SwitchIn`, `MoveReplacement`), each hand-rolling its own
+  `<div className="modal-overlay">` + card + ARIA. Escape-to-close was the visible symptom: the map overlay had it,
+  the prompts didn't, and nothing recorded whether that was a decision or an oversight.
+  **It was a decision, and the refactor made it sayable.** Every prompt parks a server-side await (the run loop sits
+  on a TCS until the player answers), so a prompt has no "close" to perform — dismissing one would strand the run
+  with nothing to send back. Their negative buttons (DECLINE / CANCEL / SKIP / Leave) are *answers*, not dismissals.
+  So the new `Modal` takes an explicit **`dismiss`** prop — `'blocking'` (no Escape, no backdrop close) vs
+  `{ onEscape }` — and all 9 lifted overlays declare `'blocking'`. The escape rule itself lives in one place, the
+  `useEscapeKey` hook, which `Modal` consumes and the map calls directly: the pinned map **is** the full-screen
+  surface (a flex column whose children are its flex items), not an overlay-plus-card, so it can't share the
+  wrapper's DOM without breaking `.encounter-map--pinned`'s layout — but it shares the rule.
+  Lifted the 8 prompts + `BattleEndedOverlay` into `components/modals/`, `PartyStrip` into `components/`, and the
+  duplicated HP-bar maths into `utils/hp.ts` (`hpState`/`hpPercent`). `LeadChoiceModal` and `SwitchInModal` rendered
+  near-identical roster markup → one shared `PartyCard`. `RouteChoiceMap` also moved onto the wrapper (it needed
+  `cardRef`, to keep its focus-the-first-offered-waypoint query scoped to its own card). **`BattleScreen.tsx` is now
+  842 lines with zero hand-rolled overlays**; the map layer and control menus deliberately stay (the modals were the
+  filed debt — the rest is a further split nobody has asked for).
+  **Strictly behaviour-preserving, with one deliberate exception:** `aria-modal="true"` is now uniform across all
+  modals, where before it was on 4 of them and absent from the rest — the same "accident of each component" the item
+  was filed about, so it was normalised rather than faithfully copied. The CSS was left entirely alone (per the
+  user's call), so every class/DOM shape the stylesheet and E2E selectors depend on is unchanged. Verified by
+  typecheck + 1489 tests + a live drive of the app (route-choice renders and ignores Escape; the map closes on it).
+  *Not done, and deliberately:* Escape→fires-the-decline (a Gen-1 B-cancel for the four prompts that have a negative
+  action) is a genuine behaviour change and was ruled out of a refactor commit — **still open as an idea**, see
+  `TODO.md`.
+
 - **`Creature/` and `Creatures/` merged into one directory (2026-07-17).** Two sibling directories both declared
   `namespace creaturegame.Creatures` — `Creature/` held Creature, Attributes, BattleState, Party, StatStages and
   the stat calc; `Creatures/` held Biome, EncounterSelector, LearnsetMove(Selector). The split carried no meaning
