@@ -156,6 +156,16 @@ Any value other than `0`/`false` (or unset/empty) enables it.
 - **`puppeteer`** — drives the running web UI to confirm the full game flow (title → select → battle →
   status → faint → end) for changes tests can't capture. Start the dev stack (`.\dev.ps1`), then follow the
   UI checklist.
+- **`github`** — GitHub's **remote hosted** MCP server (`https://api.githubcopilot.com/mcp/`, HTTP transport),
+  for working the `origin` repo remotely: read/manage issues & PRs, inspect CI/Actions runs (incl. the Fly
+  deploy workflow), push branches, comment. Registered at **project scope** in the repo-root `.mcp.json`
+  (that file holds only the URL — auth is never committed). Access is **full read/write** by the current
+  grant, but every write still goes through the normal per-call tool-approval prompt. No Docker or `gh` CLI
+  needed (the remote server replaces the local Docker image).
+  - **First-time connect (per clone / per machine):** on next `claude` start, approve the project MCP server
+    when prompted, then run `/mcp` → **github** → **Authenticate** to complete the browser OAuth flow against
+    your GitHub account. The OAuth grant is stored in Claude's own credential store, not in the repo.
+  - **Revoke:** remove the connection under GitHub → *Settings → Applications*, or `claude mcp remove github`.
 
 ---
 
