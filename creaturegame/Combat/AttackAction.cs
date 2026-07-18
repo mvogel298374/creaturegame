@@ -551,7 +551,25 @@ public class AttackAction : IBattleAction
         if (attack.StatusEffect == StatusCondition.None)
             return;
         if (Target.Battle.Status != StatusCondition.None)
+        {
+            // Gen 1: a major status never stacks. A DEDICATED status move (a non-damaging move — BaseDamage 0,
+            // e.g. Thunder Wave / Sleep Powder / Poison Powder) announces the no-op: a sleep move on an
+            // already-asleep target says "… is already asleep!" (AlreadyAsleepText), every other already-statused
+            // case says "It doesn't affect …" (PrintDidntAffectText). A secondary status on a damaging move (Body
+            // Slam etc.) fails silently — the hit already landed. Confusion's "But it failed!" is a separate,
+            // confusion-only line (see ConfuseEffect); status never uses it.
+            if (attack.BaseDamage == 0)
+            {
+                if (
+                    attack.StatusEffect == StatusCondition.Sleep
+                    && Target.Battle.Status == StatusCondition.Sleep
+                )
+                    _emitter?.Emit(new AlreadyAsleep(Target.Name));
+                else
+                    _emitter?.Emit(new MoveHadNoEffect(Target.Name, attack.Name ?? ""));
+            }
             return;
+        }
         if (!Target.IsAlive())
             return;
         // Gen 1: a Substitute shields the user from the foe's status (the hit, if any, struck the decoy).

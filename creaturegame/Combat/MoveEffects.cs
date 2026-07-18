@@ -518,21 +518,36 @@ public sealed class ConfuseEffect : IMoveEffect
         // already confused). EffectChance gates secondary confusion on damaging moves (Psybeam 10%); pure
         // confusion moves (Supersonic, Confuse Ray) have no chance ⇒ always land. A Substitute shields the
         // foe's confusion while it stands (Gen 1).
-        if (
-            ctx.Target.IsAlive()
-            && ctx.Target.Battle.ConfusedTurns == 0
-            && !ctx.TargetShieldedBySubstitute
-        )
+        if (!ctx.Target.IsAlive() || ctx.TargetShieldedBySubstitute)
+            return;
+
+        // Already confused: the counter is NEVER re-rolled — true in every generation (pokered checks the
+        // CONFUSED bit before setting the counter), so it's gen-agnostic and lives here. Only the message is
+        // gen-variable: a DEDICATED confusion move (a non-damaging status move — BaseDamage 0, i.e. Confuse
+        // Ray / Supersonic) announces the failure; the ruleset picks the wording (Gen 1 = generic "But it
+        // failed!"). A secondary confusion on a damaging move fails silently in every generation.
+        if (ctx.Target.Battle.ConfusedTurns > 0)
         {
-            int chance = ctx.Rules.GetSecondaryEffectChance(
-                ctx.Attack,
-                SecondaryEffectKind.Confuse
-            );
-            if (ctx.Rules.SecondaryHits(chance, ctx.Rng))
+            bool isDedicatedConfusionMove = ctx.Attack.BaseDamage == 0;
+            if (isDedicatedConfusionMove)
             {
-                ctx.Target.Battle.ConfusedTurns = ctx.Rules.RollConfusionTurns();
-                ctx.Emitter?.Emit(new ConfusionStarted(ctx.Target.Name));
+                BattleEvent announcement = ctx.Rules.RedundantConfusionAnnouncement switch
+                {
+                    RedundantConfuseAnnouncement.AlreadyConfused => new ConfusionAlready(
+                        ctx.Target.Name
+                    ),
+                    _ => new MoveFailed(), // FailedGeneric (Gen 1): "But it failed!"
+                };
+                ctx.Emitter?.Emit(announcement);
             }
+            return;
+        }
+
+        int chance = ctx.Rules.GetSecondaryEffectChance(ctx.Attack, SecondaryEffectKind.Confuse);
+        if (ctx.Rules.SecondaryHits(chance, ctx.Rng))
+        {
+            ctx.Target.Battle.ConfusedTurns = ctx.Rules.RollConfusionTurns();
+            ctx.Emitter?.Emit(new ConfusionStarted(ctx.Target.Name));
         }
     }
 }

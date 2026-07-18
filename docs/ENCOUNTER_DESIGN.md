@@ -287,8 +287,8 @@ the interaction kinds are reachable bones awaiting behaviour:**
 
 | Node | Kind (`GAME_LOOP.md` taxonomy) | State |
 |:--|:--|:--|
-| Wild battle | loop-event | ✅ `BattleRunEvent` (Normal tier) |
-| Elite / Boss | loop-event | ✅ `BattleRunEvent` on `EncounterTier` Elite/Boss (3c-1); **Boss caps each biome** |
+| Wild battle | loop-event | ✅ `BattleRunEvent` (Normal tier); **always the biome's opening node** (`plan[0]` is fixed — never an Elite/interaction on entry) |
+| Elite / Boss | loop-event | ✅ `BattleRunEvent` on `EncounterTier` Elite/Boss (3c-1); **Boss caps each biome**; Elite never opens a biome |
 | Rest / Poké Center | interaction-event | ✅ `RecoveryRunEvent` |
 | Shop | interaction-event | ✅ **Run Economy → Shop** — `ShopRunEvent`: rolls run-scaled stock (`ShopCalculator`), then a spend-gold buy loop (`ShopOffered` → `ChooseShopActionAsync`, buy/leave) against the `Wallet`/`Bag`. **Affordability-gated:** a biome only keeps a Shop node if the wallet clears the cheapest stock price (`ShopCalculator.MinItemPrice`) when the route is fixed at biome entry — so a broke player never gets a dead, all-unaffordable shop (the opening 0₽ node is never a shop). Purchases respect the Gen 1 **99-per-slot** bag ceiling (`Bag.MaxPerSlot`) — a buy that would overfill is refused before charging |
 | Mystery / Event | interaction-event | ✅ **Run Economy → Reward Choice** — `RewardRunEvent`: rolls a wildcard reward (sometimes nothing), else offers a **pick-one-of-N** (`RewardChoiceOffered` → `ChooseRewardAsync`) — one item or the gold bag |
@@ -361,6 +361,10 @@ generation-agnostic and data-agnostic.
    Treasure 6 / Shop 4 / Mystery 2, independent per slot) and the foe-scaling axis is **biome-position depth**
    (`RunState.RunDepth` = nodes traversed) instead of the `battlesWon` proxy (§3.2). **Phase 3 is complete** —
    the next phase is acquisition (§4 / item 4 below).
+   **Opening-node rule (2026-07-18):** a biome's **first** node is always a plain **Wild** battle — the rolled
+   distribution above applies only to the *middle* interior slots. So every biome opens with a soft wild fight
+   (never an Elite spike or a non-combat interaction on entry) and closes on the Boss apex; only the slots
+   between them are rolled (`RunDirector.DefaultNodePlan` fixes `plan[0]`).
 4. **Acquisition channels** (boss catch + themed draft, fought-only) — gated on (1)–(3) and the deferred Catch
    cluster.
 

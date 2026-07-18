@@ -669,6 +669,12 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       return { steps: [w(650), d(log(`It doesn't affect ${targetName}...`)), w(800)] };
     }
 
+    case 'AlreadyAsleep': {
+      // A sleep move on an already-asleep target (Gen 1's distinct line).
+      const targetName = payload.targetName as string;
+      return { steps: [w(120), d(log(`${targetName} is already asleep!`))] };
+    }
+
     case 'ButNothingHappened': {
       // Splash and other no-op moves — the Gen 1 "But nothing happened!" line.
       return { steps: [w(650), d(log('But nothing happened!')), w(800)] };
@@ -901,6 +907,15 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
     case 'ConfusionStarted': {
       const tName = payload.targetName as string;
       return { steps: [emit({ type: 'playStatusSound' }), w(300), d(log(`${tName} became confused!`))] };
+    }
+
+    case 'ConfusionAlready': {
+      const tName = payload.targetName as string;
+      return { steps: [w(120), d(log(`${tName} is already confused!`))] };
+    }
+
+    case 'MoveFailed': {
+      return { steps: [w(120), d(log('But it failed!'))] };
     }
 
     case 'ConfusionMessage': {

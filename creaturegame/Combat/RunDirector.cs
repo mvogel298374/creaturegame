@@ -298,9 +298,10 @@ public sealed class RunDirector
     }
 
     /// <summary>
-    /// The default biome route layout: <paramref name="length"/> nodes, the last always the Boss (the themed
-    /// apex — <c>ENCOUNTER_DESIGN.md §4</c>), each interior slot rolled independently from the weighted table in
-    /// <see cref="PickInteriorNode"/> (battle-heavy, with elites the step-up and the no-op feature bones rare).
+    /// The default biome route layout: <paramref name="length"/> nodes, the first always a plain wild battle
+    /// (a soft opening — never an Elite or an interaction node) and the last always the Boss (the themed apex —
+    /// <c>ENCOUNTER_DESIGN.md §4</c>), each remaining interior slot rolled independently from the weighted table
+    /// in <see cref="PickInteriorNode"/> (battle-heavy, with elites the step-up and the no-op feature bones rare).
     /// Seeded on <paramref name="rng"/> → reproducible. Public + injectable via the director's
     /// <c>nodePlanFactory</c> so a run can supply a different layout without touching the director.
     /// </summary>
@@ -310,7 +311,10 @@ public sealed class RunDirector
             return [RunNodeKind.BossBattle];
 
         var plan = new RunNodeKind[length];
-        for (int i = 0; i < length - 1; i++)
+        // The opening node of a biome is always a plain wild battle — never an Elite or an interaction node —
+        // so a biome can't greet the player with a difficulty spike or a non-combat slot on entry.
+        plan[0] = RunNodeKind.WildBattle;
+        for (int i = 1; i < length - 1; i++)
             plan[i] = PickInteriorNode(rng);
         plan[length - 1] = RunNodeKind.BossBattle;
         return plan;

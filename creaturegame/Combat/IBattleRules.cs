@@ -18,6 +18,24 @@ public enum SecondaryEffectKind
     StatStage,
 }
 
+/// <summary>
+/// How a <i>dedicated</i> confusion move (a non-damaging status move — Confuse Ray / Supersonic) announces
+/// hitting an <b>already-confused</b> target. The counter is never re-rolled in any generation (that rule is
+/// gen-agnostic and lives in <c>ConfuseEffect</c>); only the message differs, so it rides the seam.
+/// <para>Gen 1–2: <see cref="FailedGeneric"/> — the generic "But it failed!" (<c>ConditionalPrintButItFailed</c>
+/// in pokered). Gen 3+: <see cref="AlreadyConfused"/> — names the redundancy ("… is already confused!").
+/// A <i>secondary</i> confusion on a damaging move (Psybeam etc.) fails <b>silently</b> in every generation and
+/// never consults this.</para>
+/// </summary>
+public enum RedundantConfuseAnnouncement
+{
+    /// <summary>The generic move-failure line ("But it failed!"). Gen 1–2.</summary>
+    FailedGeneric,
+
+    /// <summary>A message naming the redundancy ("… is already confused!"). Gen 3+.</summary>
+    AlreadyConfused,
+}
+
 public interface IBattleRules
 {
     /// <summary>
@@ -97,6 +115,13 @@ public interface IBattleRules
     /// decrements before its cleared-check. Gen 1: 2–5 (≈1–4 turns of confusion).
     /// </summary>
     int RollConfusionTurns();
+
+    /// <summary>
+    /// How a dedicated confusion move announces hitting an already-confused target — see
+    /// <see cref="RedundantConfuseAnnouncement"/>. Gen 1: <see cref="RedundantConfuseAnnouncement.FailedGeneric"/>
+    /// ("But it failed!"). The counter is never re-rolled regardless (gen-agnostic); this only picks the message.
+    /// </summary>
+    RedundantConfuseAnnouncement RedundantConfusionAnnouncement { get; }
 
     /// <summary>
     /// Returns the recoil damage dealt to a Struggle user.

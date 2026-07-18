@@ -200,6 +200,7 @@ public sealed class SignalRBattleEventEmitter(
             MoveUsed e => ("MoveUsed", new { e.AttackerName, e.MoveName }),
             MoveMissed e => ("MoveMissed", new { e.AttackerName, e.MoveName }),
             MoveHadNoEffect e => ("MoveHadNoEffect", new { e.TargetName, e.MoveName }),
+            AlreadyAsleep e => ("AlreadyAsleep", new { e.TargetName }),
             ButNothingHappened e => ("ButNothingHappened", new { e.CreatureName }),
             SubstitutePutUp e => ("SubstitutePutUp", new { e.CreatureName, e.SubstituteHp }),
             SubstituteAbsorbedHit e => (
@@ -266,6 +267,8 @@ public sealed class SignalRBattleEventEmitter(
                 new { e.CreatureName, Reason = e.Reason.ToString() }
             ),
             ConfusionStarted e => ("ConfusionStarted", new { e.TargetName }),
+            ConfusionAlready e => ("ConfusionAlready", new { e.TargetName }),
+            MoveFailed => ("MoveFailed", new { }),
             ConfusionMessage e => ("ConfusionMessage", new { e.CreatureName }),
             ConfusionDamage e => (
                 "ConfusionDamage",

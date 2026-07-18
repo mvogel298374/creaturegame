@@ -6,6 +6,11 @@
       "headers": {
         "Authorization": "Bearer ${GITHUB_MCP_PAT}"
       }
+    },
+    "fly": {
+      "type": "stdio",
+      "command": "fly",
+      "args": ["mcp", "server"]
     }
   }
 }

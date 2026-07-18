@@ -71,6 +71,120 @@ public class StatusConditionTests
     }
 
     [Fact]
+    public async Task DedicatedSleepMove_OnAlreadyAsleepTarget_EmitsAlreadyAsleep()
+    {
+        // Gen 1: a sleep move on an already-asleep target prints the distinct "… is already asleep!"
+        // (AlreadyAsleepText), not the generic "doesn't affect". Status is not re-applied.
+        var attacker = new Creature("Attacker") { Level = 10 };
+        attacker.CalculateStats();
+        var defender = new Creature("Defender") { Level = 10 };
+        defender.CalculateStats();
+        defender.Battle.Status = StatusCondition.Sleep;
+        defender.Battle.SleepTurns = 2;
+
+        attacker.AddAttack(
+            new Attack
+            {
+                Name = "Sleep Powder",
+                BaseDamage = 0,
+                Accuracy = 100,
+                StatusEffect = StatusCondition.Sleep,
+                EffectChance = 100,
+            }
+        );
+
+        var emitter = new RecordingEmitter();
+        await new AttackAction(
+            attacker,
+            defender,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            AlwaysHitRules.Instance,
+            emitter
+        ).ExecuteAsync();
+
+        Assert.Equal(2, defender.Battle.SleepTurns); // counter untouched
+        Assert.Contains(emitter.Events, e => e is AlreadyAsleep a && a.TargetName == "Defender");
+        Assert.DoesNotContain(emitter.Events, e => e is MoveHadNoEffect);
+    }
+
+    [Fact]
+    public async Task DedicatedStatusMove_OnDifferentlyStatusedTarget_EmitsMoveHadNoEffect()
+    {
+        // Gen 1: any other already-statused case (here Thunder Wave onto a burned target) prints the generic
+        // "It doesn't affect …" (PrintDidntAffectText) — NOT "already asleep!" and NOT "But it failed!".
+        var attacker = new Creature("Attacker") { Level = 10 };
+        attacker.CalculateStats();
+        var defender = new Creature("Defender") { Level = 10 };
+        defender.CalculateStats();
+        defender.Battle.Status = StatusCondition.Burn;
+
+        attacker.AddAttack(
+            new Attack
+            {
+                Name = "Thunder Wave",
+                BaseDamage = 0,
+                Accuracy = 100,
+                StatusEffect = StatusCondition.Paralysis,
+                EffectChance = 100,
+            }
+        );
+
+        var emitter = new RecordingEmitter();
+        await new AttackAction(
+            attacker,
+            defender,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            AlwaysHitRules.Instance,
+            emitter
+        ).ExecuteAsync();
+
+        Assert.Equal(StatusCondition.Burn, defender.Battle.Status); // unchanged
+        Assert.Contains(emitter.Events, e => e is MoveHadNoEffect m && m.TargetName == "Defender");
+        Assert.DoesNotContain(emitter.Events, e => e is AlreadyAsleep);
+    }
+
+    [Fact]
+    public async Task SecondaryStatus_OnAlreadyStatusedTarget_IsSilent()
+    {
+        // A secondary status on a DAMAGING move (Body Slam etc.) that hits an already-statused target fails
+        // silently in Gen 1 — the hit already landed, so no "doesn't affect"/"already asleep" line.
+        var attacker = new Creature("Attacker") { Level = 50, BaseAttack = 60 };
+        attacker.CalculateStats();
+        var defender = new Creature("Defender") { Level = 50, BaseHP = 250 };
+        defender.CalculateStats();
+        defender.Battle.Status = StatusCondition.Burn;
+
+        attacker.AddAttack(
+            new Attack
+            {
+                Name = "Body Slam",
+                BaseDamage = 85,
+                Accuracy = 100,
+                DamageType = DamageType.Normal,
+                AttackType = AttackType.Physical,
+                StatusEffect = StatusCondition.Paralysis,
+                EffectChance = 100,
+            }
+        );
+
+        var emitter = new RecordingEmitter();
+        await new AttackAction(
+            attacker,
+            defender,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            AlwaysHitRules.Instance,
+            emitter
+        ).ExecuteAsync();
+
+        Assert.Equal(StatusCondition.Burn, defender.Battle.Status); // unchanged
+        Assert.DoesNotContain(emitter.Events, e => e is AlreadyAsleep);
+        Assert.DoesNotContain(emitter.Events, e => e is MoveHadNoEffect);
+    }
+
+    [Fact]
     public async Task Status_SleepSetsSleepTurns()
     {
         var attacker = new Creature("Attacker") { Level = 10 };

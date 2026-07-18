@@ -240,6 +240,10 @@ public record MoveMissed(string AttackerName, string MoveName) : BattleEvent;
 /// <summary>The move hit but the target is immune (type-based) so nothing happened — "It doesn't affect …".</summary>
 public record MoveHadNoEffect(string TargetName, string MoveName) : BattleEvent;
 
+/// <summary>A sleep move hit a target that is already asleep — Gen 1's distinct "… is already asleep!"
+/// (AlreadyAsleepText), as opposed to the generic "It doesn't affect …" every other already-statused case uses.</summary>
+public record AlreadyAsleep(string TargetName) : BattleEvent;
+
 /// <summary>A move with no effect by design (Splash) resolved — the Gen 1 "But nothing happened!" line.</summary>
 public record ButNothingHappened(string CreatureName) : BattleEvent;
 
@@ -291,6 +295,15 @@ public record ActionBlocked(string CreatureName, StatusCondition Reason) : Battl
 
 // --- Confusion (pseudo-status — separate from StatusCondition enum) ---
 public record ConfusionStarted(string TargetName) : BattleEvent;
+
+// A dedicated confusion move that hits an already-confused target, when the ruleset names the redundancy
+// ("… is already confused!") — the Gen 3+ arm of IBattleRules.RedundantConfusionAnnouncement. Gen 1 instead
+// emits the generic MoveFailed ("But it failed!"); neither ever re-rolls the confusion counter.
+public record ConfusionAlready(string TargetName) : BattleEvent;
+
+// The generic "But it failed!" line (pokered ConditionalPrintButItFailed) — Gen 1's message for a dedicated
+// confusion move (Confuse Ray / Supersonic) that fails on an already-confused target.
+public record MoveFailed : BattleEvent;
 
 public record ConfusionMessage(string CreatureName) : BattleEvent;
 

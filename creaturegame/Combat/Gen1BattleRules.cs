@@ -33,6 +33,11 @@ public sealed class Gen1BattleRules : IBattleRules
     // StatusResolver decrements it before checking for clear (see RollConfusionTurns doc).
     public int RollConfusionTurns() => _rng.Next(2, 6);
 
+    // Gen 1: a dedicated confusion move on an already-confused target prints the generic "But it failed!"
+    // (ConditionalPrintButItFailed in pokered) — there is no "already confused!" line until Gen 3.
+    public RedundantConfuseAnnouncement RedundantConfusionAnnouncement =>
+        RedundantConfuseAnnouncement.FailedGeneric;
+
     // Gen 1–6: a confused creature hits itself 50% of the time.
     public int ConfusionSelfHitPercent => 50;
 

@@ -89,8 +89,40 @@ public class ConfusionAndInputTests
         );
         await action.ExecuteAsync();
 
-        Assert.Equal(3, target.Battle.ConfusedTurns); // unchanged
+        Assert.Equal(3, target.Battle.ConfusedTurns); // unchanged — no re-roll of the counter
         Assert.DoesNotContain(emitter.Events, e => e is ConfusionStarted);
+        // Gen 1: a dedicated confusion move (Confuse Ray / Supersonic) on an already-confused target prints the
+        // generic "But it failed!" (MoveFailed) — there is no "already confused!" line until Gen 3.
+        Assert.Contains(emitter.Events, e => e is MoveFailed);
+        Assert.DoesNotContain(emitter.Events, e => e is ConfusionAlready);
+    }
+
+    [Fact]
+    public async Task SecondaryConfusion_OnAlreadyConfusedTarget_IsSilent()
+    {
+        // A partial-chance secondary on a damaging move (Psybeam etc.) that hits an already-confused target
+        // fails silently in every generation — no MoveFailed line, unlike a dedicated confusion move.
+        var attacker = MakeCreature("Attacker");
+        var target = MakeCreature("Target");
+        target.Battle.ConfusedTurns = 3;
+        attacker.MoveSet.Clear();
+        attacker.AddAttack(ConfuseMove(chance: 50, power: 65)); // damaging move, partial-chance secondary
+
+        var emitter = new RecordingEmitter();
+        var action = new AttackAction(
+            attacker,
+            target,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            AlwaysHitRules.Instance,
+            emitter,
+            rng: new SeededRandomSource(1)
+        );
+        await action.ExecuteAsync();
+
+        Assert.Equal(3, target.Battle.ConfusedTurns); // unchanged
+        Assert.DoesNotContain(emitter.Events, e => e is MoveFailed);
+        Assert.DoesNotContain(emitter.Events, e => e is ConfusionAlready);
     }
 
     [Fact]
@@ -114,6 +146,43 @@ public class ConfusionAndInputTests
         await action.ExecuteAsync();
 
         Assert.Equal(0, target.Battle.ConfusedTurns);
+    }
+
+    // Gen-3-style always-hit ruleset: the seam names the redundancy instead of the generic failure.
+    private sealed class NamedRedundantConfusionRules : DelegatingBattleRules
+    {
+        public override int GetHitThreshold(int acc, int accStage, int evaStage) => 256; // never miss
+
+        public override RedundantConfuseAnnouncement RedundantConfusionAnnouncement =>
+            RedundantConfuseAnnouncement.AlreadyConfused;
+    }
+
+    [Fact]
+    public async Task DedicatedConfuseMove_AlreadyConfused_UsesSeamMessage_WhenRulesetNamesIt()
+    {
+        // The failure message rides IBattleRules: a ruleset returning AlreadyConfused (Gen 3+) emits the named
+        // "already confused!" line instead of Gen 1's generic MoveFailed. Counter still never re-rolls.
+        var attacker = MakeCreature("Attacker");
+        var target = MakeCreature("Target");
+        target.Battle.ConfusedTurns = 3;
+        attacker.MoveSet.Clear();
+        attacker.AddAttack(ConfuseMove()); // dedicated (BaseDamage 0)
+
+        var emitter = new RecordingEmitter();
+        var action = new AttackAction(
+            attacker,
+            target,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            new NamedRedundantConfusionRules(),
+            emitter,
+            rng: new SeededRandomSource(1)
+        );
+        await action.ExecuteAsync();
+
+        Assert.Equal(3, target.Battle.ConfusedTurns); // still no re-roll
+        Assert.Contains(emitter.Events, e => e is ConfusionAlready ca && ca.TargetName == "Target");
+        Assert.DoesNotContain(emitter.Events, e => e is MoveFailed);
     }
 
     // --- RandomMoveInput (Bug 1) --------------------------------------------

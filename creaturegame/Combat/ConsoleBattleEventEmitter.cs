@@ -76,6 +76,10 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                 Console.WriteLine($"It doesn't affect {e.TargetName}...");
                 break;
 
+            case AlreadyAsleep e:
+                Console.WriteLine($"{e.TargetName} is already asleep!");
+                break;
+
             case ButNothingHappened:
                 Console.WriteLine("But nothing happened!");
                 break;
@@ -141,6 +145,14 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
 
             case ConfusionStarted e:
                 Console.WriteLine($"{e.TargetName} became confused!");
+                break;
+
+            case ConfusionAlready e:
+                Console.WriteLine($"{e.TargetName} is already confused!");
+                break;
+
+            case MoveFailed:
+                Console.WriteLine("But it failed!");
                 break;
 
             case ConfusionMessage e:

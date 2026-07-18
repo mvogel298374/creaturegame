@@ -30,6 +30,20 @@ public class RunDirectorNodeTests
         Assert.Equal(RunNodeKind.BossBattle, plan[^1]); // the biome apex (ENCOUNTER_DESIGN.md §4)
     }
 
+    [Theory]
+    [InlineData(2)]
+    [InlineData(4)]
+    [InlineData(6)]
+    public void DefaultNodePlan_FirstNode_IsAlwaysAWildBattle(int length)
+    {
+        // The biome opener is a fixed plain wild battle — never an Elite or interaction node — across every seed.
+        for (int seed = 0; seed < 200; seed++)
+        {
+            var plan = RunDirector.DefaultNodePlan(length, new SeededRandomSource(seed));
+            Assert.Equal(RunNodeKind.WildBattle, plan[0]);
+        }
+    }
+
     [Fact]
     public void DefaultNodePlan_LengthOne_IsJustTheBoss()
     {
@@ -51,13 +65,14 @@ public class RunDirectorNodeTests
     [Fact]
     public void DefaultNodePlan_InteriorIsBattleHeavy_AndCoversEveryKind()
     {
-        // Sample many interior slots (every node but the Boss apex) from one seeded stream and tally the mix.
-        // Pins the 3c-2 distribution's *shape* without coupling to exact percentages: wild battles dominate,
-        // and every non-boss kind is reachable.
+        // Sample only the *rolled* interior slots (skip the fixed Wild opener at index 0 and the Boss apex at
+        // the end) from one seeded stream and tally the mix. Pins the 3c-2 distribution's *shape* without
+        // coupling to exact percentages: wild battles dominate, and every non-boss kind is reachable.
         var rng = new SeededRandomSource(2024);
         var tally = new Dictionary<RunNodeKind, int>();
         for (int i = 0; i < 500; i++)
-            foreach (var kind in RunDirector.DefaultNodePlan(6, rng).Take(5)) // 5 interior slots per length-6 plan
+            // Skip(1) drops the fixed opener; Take(4) is the 4 rolled interior slots of a length-6 plan.
+            foreach (var kind in RunDirector.DefaultNodePlan(6, rng).Skip(1).Take(4))
                 tally[kind] = tally.GetValueOrDefault(kind) + 1;
 
         Assert.DoesNotContain(RunNodeKind.BossBattle, tally.Keys); // the Boss is the apex, never an interior slot
@@ -73,7 +88,7 @@ public class RunDirectorNodeTests
         )
             Assert.True(
                 tally.GetValueOrDefault(kind) > 0,
-                $"{kind} never appeared in 2500 interior slots"
+                $"{kind} never appeared in 2000 rolled interior slots"
             );
 
         // Battle-heavy: wild battles are the plurality, and outnumber every feature bone.
