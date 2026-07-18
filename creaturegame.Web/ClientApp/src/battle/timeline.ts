@@ -117,7 +117,7 @@ export type Action =
   | { type: 'CLEAR_STATUS'; name: string }
   | { type: 'LEVELED_UP'; newLevel: number; xpToNextLevel: number }
   // The Gen 1 level-up stat panel: per-stat gains + the new totals. Shown then hidden by the timeline.
-  | { type: 'SHOW_LEVEL_UP'; level: number; gains: StatBlock; totals: StatBlock }
+  | { type: 'SHOW_LEVEL_UP'; creatureName: string; level: number; gains: StatBlock; totals: StatBlock }
   | { type: 'HIDE_LEVEL_UP' }
   | { type: 'ANIMATING_START' }
   | { type: 'ANIMATING_DONE' }
@@ -783,18 +783,32 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       const xpToNextLevel = payload.xpToNextLevel as number;
       const stats         = payload.stats as StatBlock;
       const gains         = payload.statGains as StatBlock;
-      // The bar is full from the preceding gain (or prior level). Reset it onto the new level's scale and
-      // tick the level, announce the level, play the level-up fanfare, then show the Gen 1 stat-gain panel
-      // (gains + new totals) and refill the bar to the leftover XP — "full again" for an intermediate level
-      // in a multi-level award, or a partial fill for the final one. The panel is NOT auto-hidden here: it
-      // stays up until the player's next input (BattleScreen dispatches HIDE_LEVEL_UP on any action).
+      const onBench        = payload.onBench as boolean;
+      // A benched party member levelled up from the innate Exp-Share. Surface it the same way — announce it,
+      // play the fanfare, and show the attributed stat panel (named, so the player sees WHICH creature) — but
+      // do NOT touch the on-field creature's nameplate level or XP bar (no LEVELED_UP / XP_SET): only the
+      // active lead drives those. The party strip reflects the bench member's new level via PartyUpdated.
+      if (onBench) {
+        return { steps: [
+          w(150),
+          d(log(`${cName} grew to level ${newLevel}!`)),
+          emit({ type: 'playLevelUpSound' }),
+          d({ type: 'SHOW_LEVEL_UP', creatureName: cName, level: newLevel, gains, totals: stats }),
+          w(700),
+        ] };
+      }
+      // The active creature. The bar is full from the preceding gain (or prior level). Reset it onto the new
+      // level's scale and tick the level, announce the level, play the level-up fanfare, then show the Gen 1
+      // stat-gain panel (gains + new totals) and refill the bar to the leftover XP — "full again" for an
+      // intermediate level in a multi-level award, or a partial fill for the final one. The panel is NOT
+      // auto-hidden here: it stays up until the player's next input (BattleScreen dispatches HIDE_LEVEL_UP).
       return { steps: [
         w(300),
         d({ type: 'LEVELED_UP', newLevel, xpToNextLevel }),
         w(150),
         d(log(`${cName} grew to level ${newLevel}!`)),
         emit({ type: 'playLevelUpSound' }),
-        d({ type: 'SHOW_LEVEL_UP', level: newLevel, gains, totals: stats }),
+        d({ type: 'SHOW_LEVEL_UP', creatureName: cName, level: newLevel, gains, totals: stats }),
         w(300),
         d({ type: 'XP_SET', value: Math.min(xpThisLevel, xpToNextLevel) }),
         w(500),

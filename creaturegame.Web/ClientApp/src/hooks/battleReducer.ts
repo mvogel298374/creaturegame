@@ -5,6 +5,7 @@ import type { MoveInfo } from '../types/BattleEvents';
 import type { Action, StatBlock, LogEntry, BiomeOption, RegionBiome, RewardOption, ShopOfferItem, PartyMember, AcquisitionOffer } from '../battle/timeline';
 
 export interface LevelUpPanel {
+  creatureName: string;
   level: number;
   gains: StatBlock;
   totals: StatBlock;
@@ -219,7 +220,7 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
       // Tick the level and reset the bar onto the new level's scale (refilled by a following XP_SET).
       return { ...state, playerLevel: action.newLevel, playerXpToNext: action.xpToNextLevel, playerXp: 0 };
     case 'SHOW_LEVEL_UP':
-      return { ...state, levelUp: { level: action.level, gains: action.gains, totals: action.totals } };
+      return { ...state, levelUp: { creatureName: action.creatureName, level: action.level, gains: action.gains, totals: action.totals } };
     case 'HIDE_LEVEL_UP':
       return { ...state, levelUp: null };
     case 'SHOW_MOVE_REPLACEMENT':

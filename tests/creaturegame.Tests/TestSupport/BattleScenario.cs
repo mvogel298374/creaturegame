@@ -332,10 +332,29 @@ public sealed class BattleScenario
     private int _seed;
     private int? _playerForgetSlot;
     private bool _escapable = true; // wild battle by default; false = the Elite/Boss trainer analog
+    private Party? _playerParty; // party-aware battle (forced switch-in + innate Exp-Share) when set
+    private RunRules? _runRules; // roguelite run-tuning (XP curve, bench Exp-Share) when set
 
     public BattleScenario Player(Creature c)
     {
         _player = c;
+        return this;
+    }
+
+    /// <summary>Runs the battle party-aware: enables forced switch-on-faint and the innate party Exp-Share. Sets
+    /// the active player to the party's lead (the constructor requires <c>player</c> to be that lead).</summary>
+    public BattleScenario Party(Party party)
+    {
+        _playerParty = party;
+        _player = party.Lead;
+        return this;
+    }
+
+    /// <summary>Roguelite run-tuning applied on top of the Gen-1 seam (XP curve + <c>BenchXpShare</c>). Null (the
+    /// default) leaves pure Gen-1 pacing and no Exp-Share.</summary>
+    public BattleScenario RunRules(RunRules runRules)
+    {
+        _runRules = runRules;
         return this;
     }
 
@@ -405,7 +424,9 @@ public sealed class BattleScenario
             rules: rules,
             emitter: emitter,
             rng: new SeededRandomSource(_seed),
-            escapable: _escapable
+            escapable: _escapable,
+            runRules: _runRules,
+            playerParty: _playerParty
         );
         await battle.StartFightAsync();
         return new BattleScenarioResult(emitter, _player, _enemy);

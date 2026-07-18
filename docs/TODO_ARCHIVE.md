@@ -8,6 +8,70 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Innate Party XP Share (roguelite Exp-All) ✅ DONE (2026-07-18)
+
+`/plan`ned and built the same session. Closes the XP/Stat-Exp half of the **Switched-in creature is the active
+creature** open defect (TODO.md, user ruling 2026-07-15) — not by implementing Gen 1's participant split, but by
+**superseding** it with a deliberate roguelite deviation the user chose instead. The defect's *evolution* half was
+fixed in the same change. See `TODO.md` → *Switched-in creature is the active creature* for the closing record of
+that defect (evolution fixed, XP/Stat-Exp superseded, one small residual sweep still open there).
+
+**Design decisions locked with the user this session:**
+- **Split model = active full + bench a share**, not Gen 1's participant split and not a flat full-to-all. New
+  `RunRules.BenchXpShare` dial (`Combat/RunRules.cs`, default `0.0` = off/no-op — every existing direct-`Battle`
+  caller and test is unaffected), set to `0.5` in the live web run (`creaturegame.Web/Battle/GameSessionManager.cs`
+  `RunTuning`). A roguelite game-balance knob, deliberately kept **outside** the Gen-1 `IBattleRules` seam — same
+  separation as the existing XP-curve deviation (`RunRules.XpMultiplierForLevel`, see `GENERATION_SEAMS.md`).
+- **Fainted bench members are excluded** — a fainted participant earns nothing, per Gen 1. "Fainted" here is
+  the *current HP state* (`Creature.IsAlive()`, HP > 0, checked at award time), so it also excludes a member left
+  KO'd from an earlier unhealed encounter — a deliberate roguelite reading, slightly broader than the literal
+  Gen-1 "fainted during this battle" rule (an unhealed KO'd creature shouldn't passively train).
+- **Shares both XP and Stat-Exp.** Stat-Exp is granted **in full** to each living member (it's a coarse, capped
+  accumulator already — not fractionalised like XP).
+- **Bench level-ups are surfaced and overtly attributed**, not silent — each carries the levelling creature's name
+  so the player can tell which party member just grew, distinct from the active creature's own level-up panel.
+
+**Implementation:**
+- `Combat/Battle.cs` — after the active creature is paid in full (unchanged Gen-1 award), a new private
+  `ShareExperienceWithBenchAsync(int activeAward)` pays every **living** bench member
+  `floor(activeAward × RunRules.BenchXpShare)` XP + full Stat-Exp, then runs the same level-up + move-learn loop
+  used for the active creature. No-op without a party or with a zero share (a direct single-creature `Battle` is
+  provably unaffected). Bench XP itself is silent (no per-member `ExperienceGained`) until it produces a level-up.
+- `Combat/BattleEvents.cs` — `LeveledUp` gained a trailing `bool OnBench = false` so the client can tell a
+  bench level-up from the active creature's and render an attributed panel without moving the active nameplate.
+- `Combat/RunEvents/BattleRunEvent.cs` — replaced the single starting-lead `levelBefore` local +
+  `ReferenceEquals(active, player)` evolution gate with a **per-party pre-battle level snapshot** (`preLevel`, one
+  entry per party member) and a new `EvolutionOrder` helper; **every** creature that levelled this battle now
+  evolves — active, forced switch-in, or bench — active-first then roster order. This is the fix for the
+  defect's evolution half; the old `ReferenceEquals` gate and its "KNOWN DEFECT" comment are gone from this file.
+- Web: `SignalRBattleEventEmitter` projects `OnBench`; `timeline.ts` branches on it (bench = attributed panel +
+  fanfare, no `LEVELED_UP`/`XP_SET` on the active nameplate); `battleReducer`'s `LevelUpPanel` + `SHOW_LEVEL_UP`
+  now carry `creatureName`; `BattleScreen.tsx` renders the name in the panel; `MoveReplacementModal`'s confirm
+  step is named too.
+- Tests: new `tests/creaturegame.Tests/Unit/PartyExpShareTests.cs` (3 cases — bench share applied/withheld from
+  the fainted/zero-share no-op), a new bench-path case in `timeline.test.ts`, an updated `battleReducer.test.ts`
+  fixture, and `BattleScenario` gained `.Party()`/`.RunRules()` builders for this and future party-aware tests.
+  Full suite green.
+
+**Why this is not "the Gen 1 participant split" (do not re-file as such):** Gen 1 divides one Exp/Stat-Exp pool
+among only the creatures that were **sent out** and did not faint. The Innate Party XP Share instead pays the
+active creature in full and *additionally* shares a fraction with the **whole living bench**, whether or not it
+was ever sent out — a wider, more generous, always-on Exp-All-style grant. **Today** there is no observable
+conflict with the "switched-in creature is the active creature" requirement: voluntary switching isn't
+implemented yet, and a forced switch always leaves the outgoing lead fainted (excluded from any share anyway), so
+the only "switched-in" case that exists — the finisher — is simply the active creature, paid in full, exactly as
+before this change. **The divergence is real for a *future* case, by design:** once voluntary in-combat switching
+ships, a creature that fought part of a battle and was then swapped out *while still alive* will earn only the
+flat `BenchXpShare` — the same as a bench member that never entered — rather than a participation-weighted share.
+That is intended (the whole point of choosing the roguelite share over the Gen-1 participant split), but the
+[**In-Combat Switching**](TODO.md) work should treat it as a decision already made here, not re-open it as a bug.
+
+**Docs:** the deviation is written into `docs/GENERATION_SEAMS.md` (alongside the XP-curve deviation) and the
+party-wide XP/evolution invariant into `docs/STATE_MODEL.md` (the party-wide end-of-battle effects section) as a
+documented fact for future `requirements-review` runs to cite, per the *plan-asserted domain facts are claims* lesson.
+
+---
+
 ## Difficulty easing — weak wild encounters + Quick Heal reward ✅ DONE (2026-07-12)
 
 Playtest feedback: the run was overall too hard, and the player wanted an on-the-spot heal among the reward

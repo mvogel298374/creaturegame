@@ -32,7 +32,7 @@ export function MoveReplacementModal({ prompt, onForget }: {
   return (
     <Modal label="Choose a move to forget" dismiss="blocking" card="move-replace-modal" overlay="modal-overlay--corner">
       <p className="move-replace-title">{prompt.creatureName} wants to learn {newMove}!</p>
-      <p className="move-replace-sub">But it already knows 4 moves. Forget one?</p>
+      <p className="move-replace-sub">But {prompt.creatureName} already knows 4 moves. Forget one?</p>
       <div className="move-replace-grid">
         {prompt.currentMoves.map((move, i) => (
           <button key={i} className="move-btn" onClick={() => setPending({ slot: i })}>

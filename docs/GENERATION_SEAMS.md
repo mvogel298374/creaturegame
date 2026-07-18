@@ -112,6 +112,21 @@ Things that genuinely differ generation to generation, each a member on the inte
 > `RunRules` curve, pushing a typical biome (a Wild/Elite/Boss mix) to the **upper end of (or a touch above)**
 > the 0.8–1.5-levels target. That's the intended "beefier boss reward" and part of the provisional tuning.
 
+> **Innate party XP share (not a seam change).** A second roguelite dial on the same `RunRules` bag:
+> `RunRules.BenchXpShare`. After a win the active creature is paid its full award (the Gen-1 seam result × the
+> XP-curve multiplier above, unchanged), then **every living bench member additionally earns `floor(activeAward ×
+> BenchXpShare)` XP + the defeated foe's full Stat-Exp**, and runs the same level-up / move-learn loop; fainted
+> members earn nothing. This keeps a drafted roster swappable between biomes. It is **not** the Gen-1 participant
+> split (which divides one pool among only the creatures sent out) — it is a wider, always-on Exp-All-style grant,
+> a deliberate roguelite deviation, so it lives in **`RunRules`** and never touches `IBattleRules`. Property
+> default `0.0` (off — so `RunRules.Default`, every test, and any party-less `Battle` stay a pure no-op); the web
+> run sets **`0.5`** in `GameSessionManager.RunTuning` beside the XP-curve anchors. It only fires when a party is
+> threaded into `Battle`. Note the share is taken off the *curve-scaled* `activeAward` (the multiplier compounds
+> into it), so a low-level bench member can jump several levels off one late-run win — an intended, generous
+> catch-up for underleveled drafts (user-confirmed keep-as-is, not the tamer pre-curve base-XP option). Fainted
+> exclusion is by current HP (`IsAlive()`), so an unhealed KO'd member is skipped too. Provisional, retune by
+> playtest. Covered by `PartyExpShareTests` (incl. a both-dials curve × share case).
+
 The Special-stat split is a good illustration of the seam doing its job. Rather than the
 damage formula knowing about generations, `IBattleRules` exposes **`GetOffensiveStat`**
 and **`GetDefensiveStat`**:

@@ -251,31 +251,17 @@ public class Battle
                 PlayerCreature.RestoreOriginalIdentity();
                 // Drive level-ups one at a time so each event carries that level's resulting stats, the
                 // per-stat gains, and bar parameters (also the seam the deferred move-learning will use).
-                while (true)
-                {
-                    var before = PlayerCreature.StatSnapshot();
-                    if (!PlayerCreature.TryLevelUp())
-                        break;
-                    var after = PlayerCreature.StatSnapshot();
-                    _emitter?.Emit(
-                        new LeveledUp(
-                            PlayerCreature.Name,
-                            PlayerCreature.Level,
-                            PlayerCreature.XpThisLevel,
-                            PlayerCreature.XpToNextLevel,
-                            after,
-                            after.Minus(before)
-                        )
-                    );
-                    // Learn this level's moves before stepping to the next level, so a multi-level award
-                    // prompts in canonical order (one move, one level, at a time).
-                    await MoveLearning.LearnMovesForLevelAsync(
-                        PlayerCreature,
-                        PlayerCreature.Level,
-                        _emitter,
-                        _playerInput
-                    );
-                }
+                await RunLevelUpLoopAsync(PlayerCreature, onBench: false);
+
+                // Innate party Exp-Share (roguelite Exp-All, RunRules.BenchXpShare): after the active creature is
+                // paid in full above, every LIVING bench member earns a fraction of that same award + the full
+                // Stat-Exp, so a drafted roster keeps pace and stays swappable. Fainted members are excluded (a
+                // fainted participant earns nothing, per Gen 1). Deliberately a roguelite deviation from Gen 1's
+                // participant split — kept out of the seam; scales the seam's result only. Never fires for a direct
+                // single-creature Battle (no party threaded) or when the share is 0. Each bench level-up surfaces
+                // an attributed LeveledUp + move-learn prompt (same events/name as the active), so the player sees
+                // which creature levelled; bench XP itself is silent (no per-member log line) until it does.
+                await ShareExperienceWithBenchAsync(xp);
                 break;
             }
             if (!PlayerCreature.IsAlive())
@@ -320,6 +306,84 @@ public class Battle
             string winner = PlayerCreature.IsAlive() ? PlayerCreature.Name : EnemyCreature.Name;
             _emitter?.Emit(new BattleEnded(winner));
         }
+    }
+
+    /// <summary>
+    /// Innate party Exp-Share (roguelite Exp-All): pays each <em>living bench</em> member a fraction
+    /// (<see cref="RunRules.BenchXpShare"/>) of the active creature's XP award (<paramref name="activeAward"/>)
+    /// plus the full Stat-Exp, then runs its level-up + move-learn loop. The active creature was already paid in
+    /// full at the award site, so it is skipped here; a fainted member earns nothing (Gen 1). Each level emits an
+    /// attributed <see cref="LeveledUp"/> (carrying the member's name) so the player sees which creature levelled;
+    /// bench XP is otherwise silent. No-op without a party or with a zero share — so a direct single-creature
+    /// <see cref="Battle"/> is unaffected.
+    /// </summary>
+    private async Task ShareExperienceWithBenchAsync(int activeAward)
+    {
+        if (_playerParty is null || _runRules.BenchXpShare <= 0)
+            return;
+
+        int share = (int)Math.Floor(activeAward * _runRules.BenchXpShare);
+        bool anyLevelled = false;
+        foreach (var member in _playerParty.Members)
+        {
+            if (ReferenceEquals(member, PlayerCreature) || !member.IsAlive())
+                continue;
+
+            if (share > 0)
+                member.AddExperience(share);
+            // Stat-Exp is a coarse, capped accumulator — granted in full to each living member, not fractionalised
+            // (and unconditionally: a member still trains off a win even when the fractional XP floors to 0).
+            member.GainStatExp(EnemyCreature);
+
+            // Same level-up loop as the active creature (flagged OnBench so the client attributes it without
+            // moving the active nameplate), so the surfacing is identical.
+            anyLevelled |= await RunLevelUpLoopAsync(member, onBench: true);
+        }
+
+        // The bench members' level/stat changes are otherwise invisible: the party strip is fed only by
+        // PartyUpdated snapshots (+ the connect-time /party hydrate), so without this its levels/HP would read
+        // stale until some later party-carrying event. Push a fresh snapshot when any bench member levelled —
+        // the same projection TrySwitchInAsync emits — so the roster panel matches the level-up it just showed.
+        if (anyLevelled)
+            _emitter?.Emit(new PartyUpdated(PartyProjection.Snapshot(_playerParty)));
+    }
+
+    /// <summary>
+    /// Drives one creature's level-ups one at a time after an XP award: each crossed threshold emits a
+    /// <see cref="LeveledUp"/> carrying that level's resulting stats + per-stat gains (and <paramref name="onBench"/>
+    /// so the client attributes a benched member's level-up without disturbing the active nameplate), then learns
+    /// that level's moves before stepping on — so a multi-level award prompts in canonical Gen 1 order (one move,
+    /// one level, at a time). Returns whether at least one level was gained.
+    /// </summary>
+    private async Task<bool> RunLevelUpLoopAsync(Creature creature, bool onBench)
+    {
+        bool levelled = false;
+        while (true)
+        {
+            var before = creature.StatSnapshot();
+            if (!creature.TryLevelUp())
+                break;
+            levelled = true;
+            var after = creature.StatSnapshot();
+            _emitter?.Emit(
+                new LeveledUp(
+                    creature.Name,
+                    creature.Level,
+                    creature.XpThisLevel,
+                    creature.XpToNextLevel,
+                    after,
+                    after.Minus(before),
+                    OnBench: onBench
+                )
+            );
+            await MoveLearning.LearnMovesForLevelAsync(
+                creature,
+                creature.Level,
+                _emitter,
+                _playerInput
+            );
+        }
+        return levelled;
     }
 
     /// <summary>

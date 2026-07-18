@@ -591,8 +591,8 @@ function LevelUpStatPanel({ panel }: { panel: LevelUpPanel }) {
     ['SPEED', gains.speed, totals.speed],
   ];
   return (
-    <div className="levelup-panel" role="status" aria-label={`Level ${panel.level}`}>
-      <div className="levelup-title">LEVEL UP! · Lv {panel.level}</div>
+    <div className="levelup-panel" role="status" aria-label={`${panel.creatureName} reached level ${panel.level}`}>
+      <div className="levelup-title">{panel.creatureName} · LEVEL UP! · Lv {panel.level}</div>
       <table className="levelup-table">
         <tbody>
           {rows.map(([label, gain, total]) => (

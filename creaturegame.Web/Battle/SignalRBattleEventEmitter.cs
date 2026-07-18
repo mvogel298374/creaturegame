@@ -379,6 +379,7 @@ public sealed class SignalRBattleEventEmitter(
                     e.XpToNextLevel,
                     e.Stats,
                     e.StatGains,
+                    e.OnBench,
                 }
             ),
             EvolutionOffered e => (

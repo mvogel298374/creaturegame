@@ -36,6 +36,10 @@ public sealed class GameSessionManager(
     {
         XpMultiplierEarly = 1.5,
         XpMultiplierLate = 4.5,
+        // Innate party Exp-Share: each living bench member earns 50% of the lead's award off every win, so a
+        // drafted roster keeps pace and stays swappable between biomes. Provisional — expected to be retuned by
+        // playtesting (0 = off, 1 = full XP to all). A roguelite dial, kept out of the Gen-1 seam (see RunRules).
+        BenchXpShare = 0.5,
     };
 
     public string RegisterSession(

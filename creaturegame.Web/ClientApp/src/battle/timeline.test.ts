@@ -510,8 +510,28 @@ describe('expandEvent — control plane vs timeline', () => {
       (s): s is Extract<Step, { kind: 'dispatch' }> => s.kind === 'dispatch' && s.action.type === 'SHOW_LEVEL_UP');
     const action = show!.action as Extract<Action, { type: 'SHOW_LEVEL_UP' }>;
     expect(action.level).toBe(12);
+    expect(action.creatureName).toBe('MEWTWO');
     expect(action.gains).toEqual({ maxHp: 3, attack: 2, defense: 2, special: 1, speed: 2 });
     expect(action.totals.maxHp).toBe(130);
+  });
+
+  it('a bench Exp-Share level-up (onBench) shows the attributed panel but does NOT move the active nameplate', () => {
+    const { steps } = expandEvent('LeveledUp', {
+      creatureName: 'BLASTOISE', newLevel: 41, xpThisLevel: 20, xpToNextLevel: 120, onBench: true,
+      stats: { maxHp: 150, attack: 95, defense: 110, special: 100, speed: 88 },
+      statGains: { maxHp: 4, attack: 2, defense: 3, special: 2, speed: 1 },
+    }, CTX);
+    // Announced and shown, attributed to the bench member…
+    expect(logLines(steps)).toEqual(['BLASTOISE grew to level 41!']);
+    const show = (steps ?? []).find(
+      (s): s is Extract<Step, { kind: 'dispatch' }> => s.kind === 'dispatch' && s.action.type === 'SHOW_LEVEL_UP');
+    expect((show!.action as Extract<Action, { type: 'SHOW_LEVEL_UP' }>).creatureName).toBe('BLASTOISE');
+    // …but the on-field creature's nameplate/XP bar must be left untouched: no LEVELED_UP, no XP_SET.
+    const dispatched = (steps ?? [])
+      .filter((s): s is Extract<Step, { kind: 'dispatch' }> => s.kind === 'dispatch')
+      .map(s => s.action.type);
+    expect(dispatched).not.toContain('LEVELED_UP');
+    expect(dispatched).not.toContain('XP_SET');
   });
 });
 

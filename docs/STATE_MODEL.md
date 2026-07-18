@@ -85,6 +85,23 @@ run loop — it's simply always current on the object across battles — whereas
 captured after each win and re-applied as the next fight's entry status by the `RunDirector` (so the generation
 can transform it out of battle, e.g. Gen 1 Toxic → Poison).
 
+**End-of-battle effects are party-wide, not lead-only (invariant, 2026-07-18).** A switched-in creature *is* the
+active creature — there is no second-class participant (user ruling 2026-07-15). Two end-of-battle effects act on
+the whole party rather than only the creature that started the fight:
+- **Evolution** applies to **any** creature that gained a level this battle — the active lead, a forced switch-in
+  that finished, or a bench member levelled by the XP share. `BattleRunEvent` snapshots each member's pre-battle
+  level (`preLevel`) and evolves every one that levelled (active-first, then roster order); there is no
+  starting-lead-only `levelBefore` gate.
+- **XP + Stat-Exp** are shared by the innate party XP share (`RunRules.BenchXpShare`): the active creature is paid
+  in full, then every **living** bench member additionally earns `floor(activeAward × BenchXpShare)` XP + the
+  foe's full Stat-Exp; fainted members earn nothing. This is a roguelite deviation (see `GENERATION_SEAMS.md`),
+  deliberately wider than the Gen-1 participant split. A bench level-up carries its own creature's name
+  (`LeveledUp.OnBench`) so it surfaces attributed, without disturbing the on-field creature's nameplate.
+
+These are documented invariants (not plan claims) that `requirements-review` can cite. The general rule — *no
+end-of-battle effect may silently assume the starting lead* — still has one open audit item (sweep the rest of the
+post-battle path for stray `player`/`levelBefore` reads; see `TODO.md`).
+
 ---
 
 ## 3. The code shape

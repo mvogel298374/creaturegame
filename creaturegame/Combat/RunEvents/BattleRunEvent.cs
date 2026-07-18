@@ -55,7 +55,11 @@ internal sealed class BattleRunEvent(
         // (ENCOUNTER_DESIGN.md §4). Recorded on encounter (win, loss, or flee all count as "faced"); the set is
         // cleared when the next biome is entered. Empty in the legacy chain (no biome), so no draft can fire.
         s.FoughtSpeciesInBiome.Add(enemy.SpeciesId);
-        int levelBefore = player.Level;
+        // Snapshot every party member's pre-battle level (keyed by reference) so the post-win evolution check can
+        // fire for ANY creature that levelled this battle — the active lead, a forced switch-in that finished, or a
+        // bench member raised by the innate Exp-Share — each compared against its own starting level, not a single
+        // local that only describes the creature that started the fight.
+        var preLevel = s.Party.Members.ToDictionary(m => m, m => m.Level);
         var battle = new Battle(
             player,
             enemy,
@@ -103,16 +107,18 @@ internal sealed class BattleRunEvent(
         s.BattlesWon++;
         await GrantBattleRewardAsync(enemy, s, ctx);
 
-        // Evolution check — Gen 1 attempts evolution on a level-up, so only when this battle actually raised the
-        // finisher's level. A declined evolution re-offers at the next level-up.
-        // KNOWN DEFECT (TODO.md → "Switched-in creature is the active creature"): the ReferenceEquals gate skips
-        // evolution for a switched-in finisher, so a creature that came in and levelled up does NOT evolve. That
-        // is NOT a design decision — it is an implementation convenience, because `levelBefore` belongs to the
-        // creature that STARTED the battle and there is nothing to compare a different creature against. A
-        // switched-in creature is the active creature and must evolve on the same terms (user ruling 2026-07-15).
-        // Fix = capture the pre-battle level per creature that takes the field, and drop this gate.
-        if (ReferenceEquals(active, player) && active.Level > levelBefore)
-            await TryEvolveAsync(active, ctx);
+        // Evolution check — Gen 1 attempts evolution on a level-up, so only for creatures that actually gained a
+        // level this battle. Every such creature evolves on the same terms — the active lead, a forced switch-in
+        // that finished, or a bench member raised by the innate Exp-Share (user ruling 2026-07-15: a switched-in
+        // creature IS the active creature; there is no second-class participant). Each member is compared against
+        // its own pre-battle level captured above, active first (the creature the player just watched), then the
+        // bench in roster order. A declined evolution re-offers at the next level-up; a creature added mid-battle
+        // (a draft) isn't in the snapshot and is skipped.
+        foreach (var member in EvolutionOrder(s.Party, active))
+        {
+            if (member.IsAlive() && preLevel.TryGetValue(member, out int lvl) && member.Level > lvl)
+                await TryEvolveAsync(member, ctx);
+        }
 
         // Default: the finisher's major status carries into its next encounter, stored ON the creature (the
         // multi-creature carry model — each party member keeps its own ailment while benched); a Poké Center heal
@@ -199,6 +205,17 @@ internal sealed class BattleRunEvent(
             EncounterTier.Boss => RunNodeKind.BossBattle,
             _ => RunNodeKind.WildBattle,
         };
+
+    // Evolution offer order: the on-field finisher first (the creature the player just watched level up), then the
+    // other party members in roster order. Keeps a bench member's evolution prompt from jumping ahead of the
+    // active creature's, so the surfacing reads in the order the player expects.
+    private static IEnumerable<Creature> EvolutionOrder(Party party, Creature active)
+    {
+        yield return active;
+        foreach (var m in party.Members)
+            if (!ReferenceEquals(m, active))
+                yield return m;
+    }
 
     // Offers, then applies, a pending evolution if the resolver reports one. The player can cancel (Gen 1
     // B-cancel) — the prompt blocks awaiting the decision; on cancel the creature is untouched and re-offered

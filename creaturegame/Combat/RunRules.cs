@@ -19,6 +19,19 @@ public sealed class RunRules
     /// <summary>XP award multiplier at the top of the level range (<see cref="Creature.MaxLevel"/>). 1.0 = untouched Gen-1.</summary>
     public double XpMultiplierLate { get; init; } = 1.0;
 
+    /// <summary>
+    /// Innate party Exp-Share (roguelite Exp-All): the fraction of the <em>active</em> creature's XP award that
+    /// each <em>living bench</em> member also earns from a win, so the whole roster keeps pace and stays swappable.
+    /// The active creature is always paid in full — this only tops up the bench. <c>0.0</c> = off (only the active
+    /// earns, legacy Gen-1-ish behaviour — the property <b>default</b>, so <see cref="Default"/> and every unopted
+    /// caller stay a pure no-op); <c>0.5</c> = each bench member earns half the lead's award (the live run's
+    /// <c>RunTuning</c> value); <c>1.0</c> = full XP to everyone. A run-balance dial, deliberately outside the
+    /// Gen-1 seam. Fainted members are excluded regardless (a fainted participant earns nothing, per Gen 1). Only
+    /// fires when a party is threaded into <see cref="Battle"/>; direct single-creature callers pass no party, so
+    /// it never applies there.
+    /// </summary>
+    public double BenchXpShare { get; init; } = 0.0;
+
     /// <summary>Gen-1-faithful default: no XP scaling at any level (multiplier 1.0 throughout) — so every caller
     /// that doesn't opt in (tests, the legacy chain, direct <see cref="Battle"/> use) runs pure Gen-1 pace.</summary>
     public static readonly RunRules Default = new();

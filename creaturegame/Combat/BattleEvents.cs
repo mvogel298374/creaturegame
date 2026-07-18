@@ -419,14 +419,18 @@ public record ExperienceGained(string CreatureName, int Amount) : BattleEvent;
 /// <summary>One level gained. Carries the new level's bar parameters (<paramref name="XpThisLevel"/> /
 /// <paramref name="XpToNextLevel"/>), the resulting stat totals (<paramref name="Stats"/>) and the per-stat
 /// gains from this level (<paramref name="StatGains"/>) so the client can refill the bar and show the Gen 1
-/// level-up stat panel. A multi-level award emits one of these per level, in order.</summary>
+/// level-up stat panel. A multi-level award emits one of these per level, in order.
+/// <para><paramref name="OnBench"/> marks a level-up earned by a benched party member via the innate Exp-Share
+/// (not the on-field creature). The client shows the same attributed stat panel + fanfare for it, but must NOT
+/// move the active creature's nameplate level / XP bar — only the active lead drives those.</para></summary>
 public record LeveledUp(
     string CreatureName,
     int NewLevel,
     int XpThisLevel,
     int XpToNextLevel,
     StatBlock Stats,
-    StatBlock StatGains
+    StatBlock StatGains,
+    bool OnBench = false
 ) : BattleEvent;
 
 /// <summary>An evolution is offered between encounters (after a level-up crosses the threshold). A blocking

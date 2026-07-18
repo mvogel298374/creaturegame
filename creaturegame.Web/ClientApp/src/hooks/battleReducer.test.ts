@@ -65,7 +65,7 @@ describe('battleReducer — XP bar math', () => {
 
 describe('battleReducer — modal gating', () => {
   it('SHOW_MOVE_REPLACEMENT supersedes the level-up panel (Gen 1 order)', () => {
-    const s = ready({ levelUp: { level: 13, gains: {} as never, totals: {} as never } });
+    const s = ready({ levelUp: { creatureName: 'PIKACHU', level: 13, gains: {} as never, totals: {} as never } });
     const next = battleReducer(s, {
       type: 'SHOW_MOVE_REPLACEMENT',
       creatureName: 'PIKACHU',

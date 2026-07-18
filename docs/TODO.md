@@ -4,31 +4,35 @@
 > history of a finished item. **See also:** `CLAUDE.md` (setup/commands) · `AI_CONTEXT.md` (profiles) ·
 > `DESIGN_GUIDES.md` (mechanics) · `DEV_STANDARDS.md` (conventions).
 
-## Current state (2026-07-08)
+## Current state (2026-07-18)
 
 The Gen 1 battle engine is **feature-complete** (all 165 moves, XP & level-up, learnsets, AI move selection,
 EV / Stat-Exp gain, evolution, in-battle item system), and the roguelite run layer on top is playable end-to-end:
 the **Encounter Logic** biome-graph run (biome pick → randomised 4–6 nodes → Poké Center → next biome, per-run
 randomised map, depth-scaled foes), the **Run Economy** (gold + rewards), the **Reward Choice** modal (pick-1-of-3
-rarity rewards), and the **level-aware XP curve + trainer bonus** are all done and archived (→ `TODO_ARCHIVE.md`).
+rarity rewards), the **level-aware XP curve + trainer bonus**, and the **Innate Party XP Share** (the living bench
+shares in every battle's XP/Stat-Exp and evolution alongside the active creature) are all done and archived
+(→ `TODO_ARCHIVE.md`).
 
 **Next up, in priority order:**
-1. **[Switched-in creature is the active creature](#switched-in-creature-is-the-active-creature--open-defect)** —
-   an **open defect in shipped Stage 3 code** (user ruling 2026-07-15): a switched-in creature must take every
-   end-of-battle effect exactly as the starting lead would — evolve, earn/share XP + Stat-Exp, everything. Today
-   evolution is gated out for it and XP ignores Gen 1 participation. Do this **before** In-Combat Switching, which
-   makes the participant split load-bearing. `/plan` first.
-2. **In-Combat Switching** — the voluntary, any-turn SWITCH turn-action (its own documented core feature below),
+1. **In-Combat Switching** — the voluntary, any-turn SWITCH turn-action (its own documented core feature below),
    now unblocked: Phase 4 **Stage 3 (forced-switch-on-faint) is DONE**, so `Battle` already holds the party and the
-   forced + voluntary send-in path exists. `/plan` first; a good `opus-engineer` candidate (central `Battle` /
+   forced + voluntary send-in path exists, and the **Switched-in creature is the active creature** defect that used
+   to gate this on the participant split is resolved (evolution fixed, XP/Stat-Exp superseded by the **Innate
+   Party XP Share** — see `TODO_ARCHIVE.md`). `/plan` first; a good `opus-engineer` candidate (central `Battle` /
    `AttackAction` turn-resolution change).
-3. **Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by the acquisition channels.
+2. **Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by the acquisition channels.
    *(Item acquisition itself is already done via the Run Economy; bag persistence + catch remain.)*
-4. **Game Loop & Progression** — save layer (`save.db`); party + between-biome lead + forced-switch are done.
+3. **Game Loop & Progression** — save layer (`save.db`); party + between-biome lead + forced-switch are done.
+
+*(Small residual, not urgent: **sweep other end-of-battle effects that assume the starting lead** — see
+[**Switched-in creature is the active creature**](#switched-in-creature-is-the-active-creature--resolved) below.)*
 
 *(**Phase 4 shipped in full** — the roster, both acquisition channels, between-biome lead swap, and
-forced-switch-on-faint — **but not cleanly**: Stage 3 carries the open end-of-battle defect above, which came from
-wrong requirement pins in its own plan rather than from the domain.)*
+forced-switch-on-faint. Stage 3's end-of-battle defect (wrong requirement pins in its own plan, not the domain)
+is now **resolved** (2026-07-18) — evolution fixed, XP/Stat-Exp superseded by the Innate Party XP Share; see
+[**Switched-in creature is the active creature**](#switched-in-creature-is-the-active-creature--resolved) below
+for the closing record.)*
 
 *(The **Run Economy** — gold, rewards, the transient bag, and the spend-gold **Shop node** — plus the
 **Encounter Map** route overlay and the **Difficulty easing** tuning pass are all done and archived
@@ -140,10 +144,13 @@ below (session plan mirrored here for durability; the ephemeral copy was `kind-c
   `SwitchInModal` + a `swapPlayerCreature` Phaser command (slide the incoming back-sprite in; new *true* species so
   a later win's `resetPlayerSprite` keeps it). `BattleRunEvent` re-reads `s.Player` post-battle so win/loss and carried
   status act on the **finisher**. No generation seam (gen-invariant); zero importer/DB change.
-  **⚠️ Shipped with a known defect** — evolution is gated to the no-switch case, so a switched-in finisher that
-  levels up does **not** evolve, and XP/Stat-Exp go to the finisher alone rather than being shared per Gen 1. Both
-  came from wrong pins in this plan, not from the domain; see
-  [**Switched-in creature is the active creature**](#switched-in-creature-is-the-active-creature--open-defect).
+  **Known defect, resolved 2026-07-18** — evolution used to be gated to the no-switch case (a switched-in
+  finisher that levelled up did not evolve), and XP/Stat-Exp went to the finisher alone. Both came from wrong pins
+  in this plan, not from the domain. Evolution is fixed (per-member pre-battle-level snapshot); XP/Stat-Exp
+  participation is superseded by the **Innate Party XP Share**, a deliberate roguelite deviation from the Gen-1
+  participant split. See
+  [**Switched-in creature is the active creature**](#switched-in-creature-is-the-active-creature--resolved) for
+  the closing record.
 
   **Two edges closed during the pre-finish gates (2026-07-15):** (1) **flee + faint on the same turn** — a
   switch-in `continue`s past the end-of-turn flee gate, so a foe already scared off by Roar/Whirlwind would have
@@ -243,8 +250,8 @@ below (session plan mirrored here for durability; the ephemeral copy was `kind-c
     > ⚠️ **This bullet previously pinned two rules that were WRONG** — "XP/Stat-Exp to the finisher only … the DoR's
     > *only the lead earns XP (no Exp Share)* … **not** a deviation" and an evolution gate. Both were invented by
     > this plan, not by the domain, and `requirements-review` returned MET because the code faithfully matched the
-    > plan. Corrected by the user 2026-07-15 → see
-    > [**Switched-in creature is the active creature**](#switched-in-creature-is-the-active-creature--open-defect)
+    > plan. Corrected by the user 2026-07-15, **resolved 2026-07-18** → see
+    > [**Switched-in creature is the active creature**](#switched-in-creature-is-the-active-creature--resolved)
     > below. Kept visible rather than silently deleted: the wrong pin is why the defect shipped.
   - **DoR #6 — tests must assert:** (Battle) active faints + live bench ⇒ chosen member sent in, **enemy state
     preserved**, loop continues; active faints + no live bench ⇒ loss; incoming `BattleState` reset + its own
@@ -263,20 +270,23 @@ swap; **decline is a sequencing no-op** (`RunDirector` order test); each new off
 over SignalR (field guard, not just the type-map test); lead-swap reassigns the active creature deterministically;
 whole-party heal ✅ done; (Stage 2) boss-catch chance + boss into party while win XP/reward still applied;
 (Stage 3) forced-switch when the bench has a live creature vs. run-loss when it doesn't. **DoR #4 (Gen-1 truth):**
-party size 6; **every creature sent out shares in the battle's end-of-battle effects per Gen 1** (see the open
-defect below — the earlier "only the lead earns XP (no Exp Share)" pin was wrong); major status persists on
-benched creatures per the carry model.
+party size 6; **every creature that levelled shares in evolution, and the whole living party shares in XP/Stat-Exp**
+(see *Switched-in creature is the active creature*, resolved 2026-07-18 — the earlier "only the lead earns XP (no
+Exp Share)" pin was wrong; the eventual fix was the **Innate Party XP Share**, a deliberate deviation from the
+literal Gen-1 participant split, not a re-implementation of it); major status persists on benched creatures per
+the carry model.
 
 **Out of scope this phase:** the in-battle Poké Ball throw + `BallItemEffect` + catch-rate-vs-HP formula (stays
 in the Catch cluster below); voluntary in-battle switching (its own planned core feature —
 [**In-Combat Switching**](#in-combat-switching--voluntary-in-battle-party-switching-planned-core-feature));
 `save.db`/`PlayerDbContext` persistence + cross-run meta-progression; the **Exp. Share / Exp. All item**
-(distinct from participant sharing — see the open defect below); Revive (needs a fainted-but-revivable party
-member — possible after Stage 3, not built here).
+(a held item that pays a *non-participant* — distinct from the innate party-wide XP share that shipped 2026-07-18,
+see *Switched-in creature is the active creature* below); Revive (needs a fainted-but-revivable party member —
+possible after Stage 3, not built here).
 
 ---
 
-## Switched-in creature is the active creature  ⟵ OPEN DEFECT (user ruling 2026-07-15)
+## Switched-in creature is the active creature  ⟵ RESOLVED (2026-07-18) — one small residual open
 
 **The requirement, in the user's words:** *"A switched-in Pokémon is for all intents and purposes the active
 Pokémon, therefore all effects that happen at the end of battle happen to it as well. So it can evolve, it shares
@@ -285,44 +295,47 @@ XP, EVs, everything. Just like it would work in Gen 1 / generically in Pokémon.
 **There is no special case for a switched-in creature.** It is not a second-class participant, it does not "wait
 until its next clean win", and it is not excluded from any end-of-battle effect. Anything the starting lead would
 receive, a creature that took the field receives on the same terms. This governs the forced faint-switch (shipped)
-and the voluntary SWITCH action (planned) alike, and it **overrides** the two pins the Stage 3 plan invented.
+and the voluntary SWITCH action (planned) alike.
 
 ### Why this shipped wrong (keep this — it is the reason the gate is being tightened)
 Neither rule came from Gen 1 or from any design doc. Both were written *by the plan*, then implemented faithfully,
 and `requirements-review` returned **MET** because the code matched the plan. The plan even pre-argued the point
 (*"i.e. **not** a deviation, and the participant-split Exp remains the documented deferral"*), which suppressed the
 domain check instead of inviting it. Two specific traps to recognise again:
-- **An implementation convenience written up as design.** The evolution gate exists only because one `levelBefore`
-  local belongs to the creature that *started* the battle, so a switched-in finisher "can't be compared against
-  it". That is a five-line fix, not a design position.
-- **A rule that is right by coincidence.** "Finisher earns the XP" happens to match Gen 1 *today* only because the
-  outgoing lead has fainted and a fainted participant earns nothing anyway — so it was never tested against the
-  real rule, and it would silently diverge the moment voluntary switching lands with both creatures alive.
+- **An implementation convenience written up as design.** The evolution gate existed only because one `levelBefore`
+  local belonged to the creature that *started* the battle, so a switched-in finisher "couldn't be compared against
+  it". That was a five-line fix, not a design position.
+- **A rule that was right by coincidence.** "Finisher earns the XP" happened to match Gen 1 only because the
+  outgoing lead had fainted and a fainted participant earns nothing anyway — so it was never tested against the
+  real rule, and it would have silently diverged the moment voluntary switching lands with both creatures alive.
 
 → `requirements-review` now escalates by default and treats plan-asserted domain facts as claims to verify
 (`.claude/agents/requirements-review.md`, "Escalate by default" + the recurring-discrepancy log).
 
-### Open points
-- [ ] **Evolution must apply to any creature that levelled up this battle**, switched-in or not. Track the
-  pre-battle level **per creature that takes the field** (capture on send-in) instead of the single
-  `levelBefore` local for the starting lead. Anchor: `Combat/RunEvents/BattleRunEvent.cs` — the
-  `ReferenceEquals(active, player) && active.Level > levelBefore` gate, and its comment, both go.
-- [ ] **XP / Stat-Exp follow Gen 1 participation, not "the finisher".** Gen 1 divides Exp (and the Stat-Exp
-  award) among every party member that was **sent out** during the battle and has **not fainted**; a participant
-  that fainted earns nothing. So a forced switch = the survivor takes the full award (matching today's behaviour
-  by coincidence), while a voluntary switch with both alive = a genuine split. Anchors: `Battle.cs` — the XP /
-  `GainStatExp` award site (single-recipient today, and its comment); needs a per-battle participant set.
-  *(The **Exp. Share / Exp. All item** stays deferred — that is an item that pays a *non*-participant, a separate
-  feature from participant sharing.)*
-- [ ] **Sweep for other end-of-battle effects that assume the starting lead** rather than only fixing the two
-  found. The rule is general, so audit the whole post-battle path (carried status ✅ already reads `s.Player`;
-  move-learning on level-up; anything else keyed off `player` or `levelBefore`).
-- [ ] Once fixed, write the rule into `docs/STATE_MODEL.md` / `docs/GAME_LOOP.md` so it is a documented invariant
-  (source #2) rather than a plan claim — future `requirements-review` runs can then cite it.
-
-**Sequencing:** worth doing **before** [In-Combat Switching](#in-combat-switching--voluntary-in-battle-party-switching-planned-core-feature),
-which makes the participant split load-bearing (both creatures alive at the end) and multiplies the blast radius.
-`/plan` first — the participant set touches `Battle`'s award site, a central method.
+### How it closed (2026-07-18 — Innate Party XP Share)
+- [x] **Evolution now applies to any creature that levelled this battle**, switched-in or not. `BattleRunEvent`
+  takes a **per-party pre-battle level snapshot** (`preLevel`, per member) instead of the single starting-lead
+  `levelBefore` local, and a new `EvolutionOrder` helper evolves every creature that levelled — active, forced
+  switch-in, or bench — active-first then roster order. The `ReferenceEquals(active, player)` gate is gone.
+- [x] **XP / Stat-Exp is SUPERSEDED, not literally "Gen 1 participation".** The user's ruling asked for the Gen 1
+  participant split (one pool divided among the creatures sent out); the design session instead chose a
+  deliberate **roguelite deviation** — the **Innate Party XP Share** (`RunRules.BenchXpShare`, live `0.5` in the
+  web run): the active creature is paid in full (unchanged), then every **living** bench member additionally
+  earns `floor(activeAward × BenchXpShare)` XP + full Stat-Exp, running the same level-up + move-learn loop;
+  fainted members earn nothing. This is wider and more generous than the literal participant split, and is kept
+  out of `IBattleRules` in `RunRules`, alongside the existing XP-curve deviation (see `GENERATION_SEAMS.md`).
+  **No live conflict** with the requirement above: voluntary switching isn't implemented yet, and a forced switch
+  always leaves the outgoing lead fainted (excluded from any share anyway), so today's only "switched-in" case —
+  the finisher — is simply the active creature, paid in full, same as before this change. Full write-up →
+  `TODO_ARCHIVE.md` → *Innate Party XP Share*. *(The **Exp. Share / Exp. All item** — a held item that pays a
+  non-participant — stays deferred; it's a separate feature from this innate, always-on party share.)*
+- [x] The invariant is now written into `docs/STATE_MODEL.md` (the party-wide end-of-battle effects section) as a
+  documented fact, not a plan claim — future `requirements-review` runs can cite it directly.
+- [ ] **Residual: sweep other end-of-battle effects that assume the starting lead.** The rule is general;
+  evolution and XP/Stat-Exp are now confirmed party-wide, move-learning already rides the per-member evolution
+  loop, and carried status already reads `s.Player` (the finisher) — but nothing has specifically audited the
+  *rest* of the post-battle path for a stray `player`/`levelBefore` reference. Small, cheap, not urgent; no known
+  instance today.
 
 ---
 
