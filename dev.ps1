@@ -10,6 +10,18 @@ $dotnet = if ($env:DOTNET_EXE) { $env:DOTNET_EXE }
           else { 'dotnet' }
 $root   = $PSScriptRoot
 
+# Self-clean before starting: if a previous stack is still up (or left orphaned wrapper shells behind),
+# tear it down first so repeated starts can't accumulate processes. stop-dev.ps1 is a no-op when nothing
+# is running, and is scoped to this repo (never touches unrelated shells / MCP servers / build servers).
+$portsBusy = @(5100, 5173 | Where-Object {
+    Get-NetTCPConnection -LocalPort $_ -State Listen -ErrorAction SilentlyContinue
+})
+if ($portsBusy) {
+    Write-Host "Existing dev stack detected on port(s) $($portsBusy -join ', ') - stopping it first..."
+    & "$root\stop-dev.ps1" -Quiet | Out-Null
+    Start-Sleep -Milliseconds 400
+}
+
 # Stop the backend from opening a :5100 browser tab. The launch profile (Properties/launchSettings.json)
 # has launchBrowser:true, which the runtime honours on startup — so `--no-launch-profile` ignores the
 # profile entirely (no launchBrowser, no applicationUrl); we set the URL + environment explicitly here
