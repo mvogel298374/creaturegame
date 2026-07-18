@@ -827,9 +827,13 @@ describe('expandEvent — between-biome lead choice (Stage 1d)', () => {
     expect(show.party[1].status).toBe('Poison');
   });
 
-  it('LeadChanged logs the "is now your lead" line', () => {
-    expect(logLines(expandEvent('LeadChanged', { name: 'BLASTOISE', speciesId: 9 }, CTX).steps))
-      .toEqual(['BLASTOISE is now your lead!']);
+  it('LeadChanged swaps the player sprite to the new lead and logs the "is now your lead" line', () => {
+    const { steps } = expandEvent('LeadChanged', { name: 'BLASTOISE', speciesId: 9 }, CTX);
+    const swap = emits(steps).find(c => c.type === 'swapPlayerCreature') as Extract<
+      import('./timeline').BridgeCommand, { type: 'swapPlayerCreature' }
+    >;
+    expect(swap.speciesId).toBe(9);
+    expect(logLines(steps)).toEqual(['BLASTOISE is now your lead!']);
   });
 });
 

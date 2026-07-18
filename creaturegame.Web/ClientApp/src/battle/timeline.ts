@@ -597,9 +597,17 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
 
     case 'LeadChanged': {
       // The lead was reassigned (the modal already closed on the player's press; a PartyUpdated snapshot follows
-      // to re-flag the lead). Narrate the swap.
+      // to re-flag the lead). Swap the player sprite to the new lead's species — like CreatureSwitchedIn, this is
+      // a permanent creature change (swapPlayerCreature updates the *true* species too), so the next battle keeps
+      // it rather than reverting to the old lead. Then narrate the swap.
       const name = payload.name as string;
-      return { steps: [w(150), d(log(`${name} is now your lead!`, 'event')), w(400)] };
+      const speciesId = payload.speciesId as number;
+      return { steps: [
+        w(150),
+        emit({ type: 'swapPlayerCreature', speciesId }),
+        d(log(`${name} is now your lead!`, 'event')),
+        w(400),
+      ] };
     }
 
     case 'SwitchInOffered': {
