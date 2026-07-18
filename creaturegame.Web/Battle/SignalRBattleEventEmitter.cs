@@ -62,6 +62,7 @@ public sealed class SignalRBattleEventEmitter(
                         m.Disabled,
                         m.Stab,
                         m.Effectiveness,
+                        m.Power,
                     }),
                 }
             ),

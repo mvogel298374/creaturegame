@@ -142,7 +142,10 @@ public class Battle
                                     EnemyCreature.Type2,
                                     _typeChart
                                 )
-                                : 1.0
+                                : 1.0,
+                            // Raw base power for the menu's strength cue — plain move data (fixed-damage/status
+                            // moves have BaseDamage 0, so they carry no power and the UI shows no pill).
+                            m.Base.BaseDamage
                         ))
                         .ToList()
                 )

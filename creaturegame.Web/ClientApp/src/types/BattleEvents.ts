@@ -10,4 +10,7 @@ export interface MoveInfo {
   // Type-effectiveness multiplier vs the current enemy (0, 0.25, 0.5, 1, 2, 4); 1 for neutral/non-damaging.
   // Computed by the engine via the type chart; drives the ×N effectiveness pill in the move menu.
   effectiveness?: number;
+  // The move's raw base power (Gen-1 move data). Drives the strength pill in the move menu. Fixed-damage /
+  // status moves have no base power and report 0 (no pill shown) — mirroring stab/effectiveness's "no cue".
+  power?: number;
 }

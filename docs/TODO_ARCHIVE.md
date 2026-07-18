@@ -8,6 +8,40 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Move-menu strength cue + attack-grid polish (QoL) ✅ DONE (2026-07-18)
+
+`/plan`ned and built the same session. The FIGHT menu already surfaced name, PP, type badge, the STAB tag and
+the ×N effectiveness pill, but nothing conveyed a move's raw power — a neutral Tackle (35) and a neutral Hyper
+Beam (150) read alike. Added a base-power strength cue for damaging moves.
+
+**Design decisions locked with the user:**
+- **"Strength" = the move's raw Gen-1 base power** (static per move), *not* an effective/combined value — the
+  player keeps reading it against the separate STAB / ×N pills. This keeps every gen-variable rule (the STAB
+  ×1.5, the type chart) engine-side; the client receives only a plain data number.
+- **Rendered as a numeric pill, colour-graded on a cool→hot ramp** (steel `#45525f` → blue `#3f6fa3` → indigo
+  `#7159c9` → magenta-ember `#b5468a`) so relative strength reads at a glance. The ramp is deliberately
+  **distinct from the effectiveness pill's green/amber/red** (which means *matchup*, not power) so the two are
+  never confused. Placed beside the type badge (lower-left), leaving the ×N pill's bottom-right corner clear.
+  Tier thresholds (`<50` weak / `50–79` mid / `80–109` strong / `≥110` max) are a pure display bucketing.
+
+**Gen-variability:** base power is **move data**, already imported Gen-1-pinned via the importer's `past_values`
+(the same `Base.BaseDamage` the STAB condition reads). No runtime gen-constant, no importer change — pure
+projection. Fixed-damage / status moves (`BaseDamage 0`) carry no power → no pill (the "no cue" rule STAB/Eff
+already follow).
+
+**Data vs runtime:** runtime only. One new `Power` field on `MoveInfo` (`Combat/BattleEvents.cs`), populated in
+`Combat/Battle.cs`'s projection from `m.Base.BaseDamage`; **added to the hand-written SignalR projection**
+(`SignalRBattleEventEmitter.cs` — this was the one real trap: the projection silently dropped the new field, so
+a dev screenshot showed no pill until it was added, and a `WebEventContractTests` field guard now pins it);
+mirrored as `power?: number` on the TS `MoveInfo`; the tier→class helper lives in a pure module
+`src/battle/movePower.ts` (imported by `BattleScreen.tsx`'s `MoveMenu`).
+
+**Coverage:** `MoveInfoPowerTests` (engine projects base power; fixed-damage move → 0), the
+`TurnStarted_MoveProjection_CarriesPower` wire guard, `movePower.test.ts` (tier bucketing + no-pill boundaries),
+and a `battle-ui-cues.spec.ts` E2E asserting the pill + tier colour reach the DOM in a real battle (mirroring the
+STAB render-layer spec — this cue hit the same projection failure mode). Grid-polish beyond the pill was deferred
+as non-blocking visual iteration.
+
 ## Innate Party XP Share (roguelite Exp-All) ✅ DONE (2026-07-18)
 
 `/plan`ned and built the same session. Closes the XP/Stat-Exp half of the **Switched-in creature is the active

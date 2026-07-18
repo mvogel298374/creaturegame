@@ -417,6 +417,45 @@
   color: #fff;
 }
 
+/* Type badge + strength pill share a row at the button's lower-left, keeping the ×N effectiveness pill's
+   bottom-right corner clear. */
+.move-meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* Base-power strength pill: the raw power number on a cool→hot ramp (steel → ember). Deliberately NOT the
+   effectiveness pill's green/amber/red — that scale means matchup, this one means the move's own power, so
+   they must never be confused. Shown only for moves with a base power (damaging, non-fixed). */
+.move-pow {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 0 4px;
+  border-radius: 2px;
+  line-height: 1.5;
+  color: #f4f6fa;
+}
+
+.move-pow--weak {
+  background: #45525f; /* dim slate — a low-power move */
+}
+
+.move-pow--mid {
+  background: #3f6fa3; /* cool steel-blue */
+}
+
+.move-pow--strong {
+  background: #7159c9; /* indigo — climbing the ramp */
+  color: #fdfbff;
+}
+
+.move-pow--max {
+  background: #b5468a; /* hot magenta-ember — top tier */
+  color: #fff;
+}
+
 /* ── Bag menu ─────────────────────────────────── */
 .bag-menu {
   display: flex;

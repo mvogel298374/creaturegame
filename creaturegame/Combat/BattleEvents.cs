@@ -39,7 +39,12 @@ public record MoveInfo(
     // reflects the live matchup incl. enemy Conversion/Transform and chart quirks); non-damaging/fixed-damage
     // moves report 1.0 (neutral = "no cue"). Lets the menu show a ×N effectiveness pill without the UI knowing
     // the type chart.
-    double Effectiveness = 1.0
+    double Effectiveness = 1.0,
+    // The move's raw base power (the move's own data, Gen-1-pinned via the importer) — lets the menu show a
+    // strength cue so a neutral Tackle (35) and a neutral Hyper Beam (150) don't read alike. It is plain move
+    // data, so no gen-variable rule crosses to the client (the STAB ×1.5 and the type chart stay engine-side).
+    // Fixed-damage / status moves have no base power and report 0 (the UI's "no cue", mirroring STAB/Eff).
+    int Power = 0
 );
 
 public record TurnEnded : BattleEvent;

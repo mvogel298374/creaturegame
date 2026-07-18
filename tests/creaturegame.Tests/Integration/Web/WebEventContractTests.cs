@@ -355,6 +355,48 @@ public class WebEventContractTests
         Assert.Equal(2.0, eff.GetDouble());
     }
 
+    /// <summary>Same projection guard for <see cref="MoveInfo.Power"/> — the base-power strength pill can't
+    /// render if the field is dropped on the wire (the failure mode the STAB flag hit, and the one this cue
+    /// actually hit in dev: the hand-written projection silently omitted Power until this guard was added).</summary>
+    [Fact]
+    public void TurnStarted_MoveProjection_CarriesPower()
+    {
+        var move = new MoveInfo(
+            "flamethrower",
+            DamageType.Fire,
+            15,
+            15,
+            Disabled: false,
+            Stab: false,
+            Effectiveness: 1.0,
+            Power: 95
+        );
+        var evt = new TurnStarted(
+            1,
+            "PLAYER",
+            100,
+            100,
+            StatusCondition.None,
+            0,
+            100,
+            "ENEMY",
+            80,
+            80,
+            StatusCondition.None,
+            new[] { move }
+        );
+
+        var (_, payload) = SignalRBattleEventEmitter.MapEvent(evt);
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+        var firstMove = doc.RootElement.GetProperty("Moves")[0];
+
+        Assert.True(
+            firstMove.TryGetProperty("Power", out var power),
+            $"TurnStarted move projection dropped the Power field — the move menu can't show the strength pill. Payload: {doc.RootElement}"
+        );
+        Assert.Equal(95, power.GetInt32());
+    }
+
     /// <summary>Field-level guard for the <see cref="CreatureEvolved"/> projection: the client needs both
     /// names and both species ids (from → to) to render the morph. The reflection contract test only checks
     /// the event is mapped, not that every field survives the hand-written projection — this pins them.</summary>

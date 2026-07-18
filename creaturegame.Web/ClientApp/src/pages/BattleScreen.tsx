@@ -7,6 +7,7 @@ import { useBattleHub, type LevelUpPanel, type DropToast } from '../hooks/useBat
 import { useEscapeKey } from '../hooks/useEscapeKey';
 import { type RegionBiome, type BiomeOption } from '../battle/timeline';
 import { regionEdgeKey, travelledEdgeKeys } from '../battle/regionMap';
+import { powerPill } from '../battle/movePower';
 import { bossTrainerName } from '../battle/bossTrainer';
 import type { Species } from '../types/Species';
 import type { MoveInfo } from '../types/BattleEvents';
@@ -700,6 +701,7 @@ function MoveMenu({ moves, canChoose, onChoose, onBack }: {
           const disabled = !canChoose || isEmpty || outOfPp || isDisabled;
           const isStab = !isEmpty && !!move.stab;            // same-type damaging move → STAB bonus
           const eff = isEmpty ? null : effectivenessPill(move.effectiveness); // type matchup vs enemy
+          const pow = isEmpty ? null : powerPill(move.power); // raw base-power strength cue
           return (
             <button
               key={i}
@@ -713,7 +715,16 @@ function MoveMenu({ moves, canChoose, onChoose, onBack }: {
                   {move.ppCurrent}/{move.ppMax}
                 </span>
               )}
-              {!isEmpty && <TypeBadge type={move.type} size="sm" />}
+              {!isEmpty && (
+                <span className="move-meta">
+                  <TypeBadge type={move.type} size="sm" />
+                  {pow && (
+                    <span className={`move-pow ${pow.cls}`} aria-label={`power ${pow.label}`}>
+                      {pow.label}
+                    </span>
+                  )}
+                </span>
+              )}
               {isStab && <span className="move-stab" aria-label="STAB">STAB</span>}
               {eff && (
                 <span className={`move-eff ${eff.cls}`} aria-label={`effectiveness ${eff.label}`}>

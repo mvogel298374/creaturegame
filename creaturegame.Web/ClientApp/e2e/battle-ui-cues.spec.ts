@@ -29,3 +29,24 @@ test.describe('Move-menu STAB highlight', () => {
     await expect(scratch.locator('.move-stab')).toHaveCount(0);
   });
 });
+
+// The base-power strength pill exercises the same client RENDER layer as the STAB cue, and it hit the exact
+// same silent failure in dev — the hand-written SignalR projection dropped MoveInfo.Power, so a screenshot
+// showed no pill. The wire drop is now guarded in WebEventContractTests and the tier→class bucketing in
+// movePower.test.ts; here we only assert the number + tier colour reach the DOM in a real battle. Power is
+// static move data (no RNG), so this is deterministic without a seed dependency for the value itself.
+test.describe('Move-menu strength pill', () => {
+  test('shows the raw base power with the tier colour for damaging moves', async ({ page }) => {
+    // Charizard @ L50 (CanonicalLatest): FLAMETHROWER 95 → strong tier, SCRATCH 40 → weak tier.
+    await startBattle(page, 'CHARIZARD', 50, 1);
+    await fightButton(page).click();
+
+    const flamethrower = page.locator('.move-btn', { hasText: 'FLAMETHROWER' });
+    await expect(flamethrower.locator('.move-pow')).toHaveText('95');
+    await expect(flamethrower.locator('.move-pow')).toHaveClass(/move-pow--strong/);
+
+    const scratch = page.locator('.move-btn', { hasText: 'SCRATCH' });
+    await expect(scratch.locator('.move-pow')).toHaveText('40');
+    await expect(scratch.locator('.move-pow')).toHaveClass(/move-pow--weak/);
+  });
+});
