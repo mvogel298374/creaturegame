@@ -56,11 +56,19 @@
   left: var(--sp-md);
 }
 
-.nameplate--player {
+/* Bottom-right corner stack: party strip (if any) above the player's nameplate. Anchored to the corner; the
+   flex column keeps the strip clear of the HP bar at every window scale. */
+.player-corner {
   position: absolute;
   bottom: var(--sp-md);
   right: var(--sp-md);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--sp-sm);
 }
+/* .nameplate--player has no positioning of its own — its .player-corner parent places it. */
 
 .nameplate-row {
   display: flex;
@@ -546,7 +554,7 @@
   position: absolute;
   bottom: var(--sp-md);
   right: var(--sp-md);
-  z-index: 3;
+  z-index: 7; /* above the party strip (z 6) — the modal reads on top of it, see PartyStrip */
   background: var(--clr-bg-deep);
   border: 2px solid var(--clr-text);
   border-radius: 4px;
@@ -1736,13 +1744,14 @@
    A compact row of the run's owned creatures; appears once the party grows past the lone starter (a themed
    draft). The lead is accented; benched members show a small HP read. Top-left so it stays clear of the
    enemy nameplate (top-right) and the MAP button. */
+/* In-flow row inside .player-corner, sitting above the player nameplate. Single non-wrapping row, right-aligned,
+   so up to 6 chips fit in a constant footprint at any window scale. */
 .party-strip {
-  position: absolute;
-  top: var(--sp-sm);
-  left: var(--sp-sm);
-  z-index: 6;
   display: flex;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
   gap: var(--sp-xs);
+  max-width: 100%;
   pointer-events: none; /* purely informational — never intercepts field/menu input */
 }
 
