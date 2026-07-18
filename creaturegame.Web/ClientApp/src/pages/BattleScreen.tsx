@@ -7,6 +7,7 @@ import { useBattleHub, type LevelUpPanel, type DropToast } from '../hooks/useBat
 import { useEscapeKey } from '../hooks/useEscapeKey';
 import { type RegionBiome, type BiomeOption } from '../battle/timeline';
 import { regionEdgeKey, travelledEdgeKeys } from '../battle/regionMap';
+import { bossTrainerName } from '../battle/bossTrainer';
 import type { Species } from '../types/Species';
 import type { MoveInfo } from '../types/BattleEvents';
 import { formatMoveName } from '../utils/format';
@@ -283,7 +284,7 @@ const EMPTY_ID_SET: ReadonlySet<string> = new Set<string>();
 const LADDER_NODE_META: Record<string, { label: string; sub: string }> = {
   WildBattle:  { label: 'Wild Battle',  sub: 'Encounter' },
   EliteBattle: { label: 'Elite Battle', sub: 'Tough foe' },
-  BossBattle:  { label: 'Boss',         sub: 'Region gate' },
+  BossBattle:  { label: 'Boss',         sub: 'Gate boss' },
   Shop:        { label: 'Shop',         sub: 'Spend gold' },
   Treasure:    { label: 'Treasure',     sub: 'Free reward' },
   Mystery:     { label: 'Mystery',      sub: '???' },
@@ -298,12 +299,15 @@ const LADDER_NODE_META: Record<string, { label: string; sub: string }> = {
 // (the Boss its apex), capped by a synthesized Poké Center 'Rest' (not a plan node — see ENCOUNTER_DESIGN.md §5).
 // The pin marks the node in progress; earlier nodes read done, later upcoming. CSS column-reverse puts node 0 at
 // the bottom so the player climbs upward to the apex. Presentation only — the route is fixed and logic-driven.
-function NodeLadder({ nodePlan, pin }: { nodePlan: string[]; pin: number }) {
+function NodeLadder({ nodePlan, pin, bossSub }: { nodePlan: string[]; pin: number; bossSub?: string }) {
   const nodes = [...nodePlan, 'Rest'];
   return (
     <ol className="ladder">
       {nodes.map((kind, i) => {
-        const meta = LADDER_NODE_META[kind] ?? { label: kind, sub: '' };
+        const base = LADDER_NODE_META[kind] ?? { label: kind, sub: '' };
+        // The Boss node names a themed gate-boss trainer (from bossTrainer.ts) instead of the static
+        // "Region gate" — everything else uses its fixed meta.
+        const meta = kind === 'BossBattle' && bossSub ? { ...base, sub: bossSub } : base;
         const nodeState = i < pin ? 'done' : i === pin ? 'current' : 'upcoming';
         return (
           <li key={i} className={`ladder-node ladder-node--${kind.toLowerCase()} ladder-node--${nodeState}`}>
@@ -440,6 +444,11 @@ function RunMapPanel({ biomes, routePath, currentId, biomeName, nodePlan, pin, p
   // that wrapper (the pinned panel *is* the full-screen surface, not an overlay + card), but it shares the rule.
   useEscapeKey(pinned ? onClose : null);
 
+  // The biome boss's themed trainer name (stable per biome visit — see bossTrainer.ts), used for the Boss
+  // node's ladder sub-label in place of the behind-the-curtain "Region gate".
+  const primaryType = biomes.find(b => b.id === currentId)?.types[0];
+  const bossSub = `Trainer ${bossTrainerName(currentId, primaryType, nodePlan)}`;
+
   // Compact corner peek (auto-shown at each ladder change): the current biome's ladder only — the full graph
   // belongs to the pinned full-screen view, so the peek stays small and unobtrusive.
   if (!pinned) {
@@ -448,7 +457,7 @@ function RunMapPanel({ biomes, routePath, currentId, biomeName, nodePlan, pin, p
         <div className="encounter-map-head">
           <span className="encounter-map-biome">{biomeName || 'Region map'}</span>
         </div>
-        {nodePlan.length > 0 && <NodeLadder nodePlan={nodePlan} pin={pin} />}
+        {nodePlan.length > 0 && <NodeLadder nodePlan={nodePlan} pin={pin} bossSub={bossSub} />}
       </div>
     );
   }
@@ -477,7 +486,7 @@ function RunMapPanel({ biomes, routePath, currentId, biomeName, nodePlan, pin, p
           <aside className="map-ladder-panel">
             <h3 className="map-ladder-head">Encounter Path</h3>
             <div className="map-ladder-biome">{biomeName}</div>
-            <NodeLadder nodePlan={nodePlan} pin={pin} />
+            <NodeLadder nodePlan={nodePlan} pin={pin} bossSub={bossSub} />
           </aside>
         )}
       </div>

@@ -2,6 +2,7 @@ import { useEffect, useRef, useReducer, useCallback } from 'react';
 import * as signalR from '@microsoft/signalr';
 import { type Payload, expandEvent, useBattleTimeline } from '../battle/timeline';
 import { battleReducer, initialState } from './battleReducer';
+import { bossTrainerName } from '../battle/bossTrainer';
 
 // The view-state shape + modal-prompt types live with the reducer now; re-export them so existing
 // consumers (BattleScreen) keep importing them from the hook.
@@ -30,6 +31,15 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
   // chained one (slide a new enemy sprite into the running scene).
   const encounterIndexRef = useRef(0);
 
+  // Fresh mirror of the reducer state for the event handler (registered once), so it can read the current
+  // biome + node plan at event time to name the gate-boss trainer — the same derivation the map ladder uses,
+  // so the ladder label and the battle framing always agree.
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  // True while the just-entered route node is the Boss, so only the boss fight gets the trainer framing.
+  // Set on RunNodeEntered (BossBattle → true, any other node → false), read by its following BattleStarted.
+  const bossNodeActiveRef = useRef(false);
+
   // The animation timeline: backend events expand into steps it plays in order.
   const enqueueSteps = useBattleTimeline(dispatch);
 
@@ -51,10 +61,24 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
       if (eventType === 'CreatureSwitchedIn') {
         playerNameRef.current = payload.name as string;
       }
+      // Track whether the active node is the Boss (its BattleStarted follows), so the trainer framing is
+      // scoped to the boss fight only.
+      if (eventType === 'RunNodeEntered') {
+        bossNodeActiveRef.current = (payload.kind as string) === 'BossBattle';
+      }
+
+      // The current biome's gate-boss trainer name (themed by biome type; stable per visit) — read from the
+      // live reducer mirror so it matches the ladder label exactly.
+      const s = stateRef.current;
+      const primaryType = s.regionBiomes.find(b => b.id === s.currentBiomeId)?.types[0];
+      const bossName = bossTrainerName(s.currentBiomeId, primaryType, s.mapNodePlan);
 
       const { now, steps } = expandEvent(eventType, payload, {
         playerName: playerNameRef.current,
         encounterIndex: encounterIndexRef.current,
+        bossTrainerName: bossName,
+        isBossBattle: bossNodeActiveRef.current,
+        biomeName: s.mapBiomeName,
       });
       now?.forEach(action => dispatch(action));   // control plane — immediate
       if (steps) enqueueSteps(steps);              // animated — sequenced

@@ -65,6 +65,8 @@ test.describe('Encounter map (route ladder)', () => {
     await expect(ladder.locator('.encounter-map-biome')).not.toBeEmpty();
     await expect(ladder.locator('.ladder-node')).not.toHaveCount(0);
     await expect(ladder.locator('.ladder-node--bossbattle')).toHaveCount(1); // the single Boss apex
+    // The Boss apex names a themed gate-boss trainer (bossTrainer.ts), not the behind-the-curtain "Region gate".
+    await expect(ladder.locator('.ladder-node--bossbattle .ladder-sub')).toHaveText(/^Trainer .+/);
     await expect(ladder.locator('.ladder-node--rest')).toHaveCount(1);        // the synthesized Poké Center cap
     await expect(ladder.locator('.ladder-node--current')).toHaveCount(1);     // exactly one "you are here" pin
 

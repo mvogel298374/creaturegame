@@ -215,6 +215,16 @@ export interface ExpandContext {
   // scene's initial entry (handled by create()) or a mid-run enemy swap (slide in a new sprite). Optional
   // for tests; treated as the first encounter when absent.
   encounterIndex?: number;
+  // The current biome's themed gate-boss trainer name (from bossTrainer.ts — same derivation the map ladder
+  // uses, so the two never disagree). Set by useBattleHub; used to frame the Boss node's banner + VS line as
+  // a trainer battle. Absent → the generic boss wording.
+  bossTrainerName?: string;
+  // True only for the BattleStarted / RunNodeEntered of a Boss node, so the trainer framing applies to the
+  // boss fight and nothing else.
+  isBossBattle?: boolean;
+  // The current biome's display name (the one the player picked on the map) — used to title the boss banner
+  // ("<Biome> boss Trainer <Name> looms ahead!"). Set by useBattleHub.
+  biomeName?: string;
 }
 
 // ── Step builders (keep expandEvent readable) ───────────────────────────────
@@ -250,10 +260,12 @@ function statusClearedMsg(name: string, wasStatus: string): string {
 }
 
 // Banner line for a route node (RunNodeEntered). Kinds are the RunNodeKind names the backend emits.
-function runNodeBannerMsg(kind: string): string {
+// A Boss node names its themed trainer when one is known (bossName), titled by the biome the player picked
+// ("<Biome> boss Trainer <Name> looms ahead!"), else the generic wording.
+function runNodeBannerMsg(kind: string, bossName?: string, biomeName?: string): string {
   switch (kind) {
     case 'EliteBattle': return 'An Elite trainer blocks the path!';
-    case 'BossBattle':  return 'The biome boss looms ahead!';
+    case 'BossBattle':  return bossName ? `${biomeName || 'The biome'} boss Trainer ${bossName} looms ahead!` : 'The biome boss looms ahead!';
     case 'Shop':        return 'You happened upon a shop.';
     case 'Treasure':    return 'You found a treasure cache!';
     case 'Mystery':     return 'Something mysterious stirs…';
@@ -331,19 +343,24 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
         enemySpeciesId,
         enemyLevel: payload.enemyLevel as number,
       };
+      // A Boss node frames the fight as a trainer battle: the VS line credits the enemy to the gate-boss
+      // trainer, and the challenger line announces the trainer by name.
+      const boss = ctx.isBossBattle && ctx.bossTrainerName ? ctx.bossTrainerName : null;
+      const vsLine = boss ? `${pName} VS Trainer ${boss}'s ${eName}` : `${pName} VS ${eName}`;
       // First encounter: the scene's create() plays the entry animation. Subsequent encounters: tell the
       // scene to load + slide in the new enemy sprite (the canvas is never remounted).
       if ((ctx.encounterIndex ?? 1) <= 1) {
-        return { steps: [d(started), d(log(`${pName} VS ${eName}`))] };
+        return { steps: [d(started), d(log(vsLine))] };
       }
       // A chained encounter: announce the new challenger HERE, at the start of the next battle — not on the
       // previous BattleEnded. The run loop emits this only after any interleaved instance (e.g. a Poké Center
       // recovery) is fully resolved, so "a new challenger approaches" can never jump ahead of an unfinished
       // between-battle step.
+      const challenger = boss ? `Trainer ${boss} wants to battle!` : 'A new challenger approaches!';
       return { steps: [
         d(started),
-        d(log('A new challenger approaches!')),
-        d(log(`${pName} VS ${eName}`)),
+        d(log(challenger, boss ? 'event' : undefined)),
+        d(log(vsLine)),
         emit({ type: 'spawnEnemy', enemySpeciesId }),
         w(450), // let the new enemy slide in before the first turn's prompt
       ] };
@@ -645,7 +662,8 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       const kind = payload.kind as string;
       const advance = d({ type: 'MAP_NODE_ENTERED' });
       if (kind === 'WildBattle') return { steps: [advance] };
-      return { steps: [advance, w(200), d(log(runNodeBannerMsg(kind), 'event')), w(300)] };
+      const bossName = kind === 'BossBattle' ? ctx.bossTrainerName : undefined;
+      return { steps: [advance, w(200), d(log(runNodeBannerMsg(kind, bossName, ctx.biomeName), 'event')), w(300)] };
     }
 
     // ── Turn events: sequenced through the animation timeline ──────────────────

@@ -296,6 +296,19 @@ describe('expandEvent — control plane vs timeline', () => {
     expect(logLines(steps)).toEqual([]);
   });
 
+  it('a Boss node names its trainer in the banner, titled by the picked biome, when one is known', () => {
+    const { steps } = expandEvent('RunNodeEntered', { kind: 'BossBattle' },
+      { playerName: 'P', bossTrainerName: 'Misty', isBossBattle: true, biomeName: 'Cerulean Cove' });
+    expect(logLines(steps)).toEqual(['Cerulean Cove boss Trainer Misty looms ahead!']);
+  });
+
+  it('a Boss BattleStarted frames the fight as a trainer battle (named challenger + possessive VS line)', () => {
+    const { steps } = expandEvent('BattleStarted',
+      { playerName: 'BULBASAUR', enemyName: 'ONIX', enemySpeciesId: 95, enemyLevel: 30 },
+      { playerName: 'BULBASAUR', encounterIndex: 2, bossTrainerName: 'Misty', isBossBattle: true });
+    expect(logLines(steps)).toEqual(['Trainer Misty wants to battle!', "BULBASAUR VS Trainer Misty's ONIX"]);
+  });
+
   it('BiomeNodePlanRevealed feeds the ladder its seeded node plan (no battle-log line)', () => {
     const { steps } = expandEvent(
       'BiomeNodePlanRevealed', { nodeKinds: ['WildBattle', 'Shop', 'BossBattle'] }, CTX);
