@@ -88,4 +88,58 @@ public class LeechSeedContractTests(MovesFixture moves) : Gen1MoveContract(moves
         Assert.Equal(80 / 16, drain!.Damage); // 1/16 of the seeded creature's max HP
         Assert.Equal(drain.Damage, heal!.Amount);
     }
+
+    [Fact]
+    public async Task DrainReadsItsOwnSeamMemberNotThePoisonDenominator()
+    {
+        // The drain divisor is LeechSeedDrainDenominator, NOT PoisonDamageDenominator — numerically
+        // equal in Gen 1, but they diverge in Gen 2 (drain 1/8, poison still 1/16), so the drain
+        // must not borrow the poison member. Override only the leech member and assert the drain
+        // follows it while the poison rate is untouched.
+        var player = TestCreatures.Make("Player", type1: DamageType.Grass, hp: 400, speed: 200);
+        player.AddAttack(Move("leech-seed"));
+
+        var enemy = TestCreatures.Make(
+            "Enemy",
+            type1: DamageType.Water,
+            hp: 80,
+            defense: 200,
+            speed: 1
+        );
+        enemy.AddAttack(
+            new Attack
+            {
+                Name = "Splash",
+                BaseDamage = 0,
+                Accuracy = 100,
+                AttackType = AttackType.Physical,
+            }
+        );
+
+        var emitter = new RecordingEmitter();
+        var battle = new Battle(
+            player,
+            enemy,
+            Gen1TypeChart.Instance,
+            AutoSelectInput.Instance,
+            AutoSelectInput.Instance,
+            rules: new LeechEightPoisonSixteenRules(),
+            emitter: emitter
+        );
+        await battle.StartFightAsync();
+
+        var drain = emitter
+            .Events.OfType<LeechSeedDamage>()
+            .FirstOrDefault(d => d.DrainedName == "Enemy");
+        Assert.NotNull(drain);
+        Assert.Equal(80 / 8, drain!.Damage); // follows the overridden leech member (1/8), not poison (1/16)
+    }
+
+    /// <summary>Always-hit rules with the leech drain at 1/8 while poison stays 1/16 — the Gen 2 split.</summary>
+    private sealed class LeechEightPoisonSixteenRules : DelegatingBattleRules
+    {
+        public override int LeechSeedDrainDenominator => 8;
+
+        public override int GetHitThreshold(int acc, int accStage, int evaStage) => 256;
+    }
 }

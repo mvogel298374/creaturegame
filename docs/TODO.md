@@ -662,19 +662,13 @@ Battles are fully playable now — docs won't describe a moving target.
 ### Repo-wide PR-audit findings — open (2026-07-19)
 
 Filed from a whole-repo `pr-review`-style audit (gen-seam architecture, central-method contracts, conventions,
-wire completeness). User-adjudicated 2026-07-19: the three checkboxes below are accepted as real work; ranked by
+wire completeness). User-adjudicated 2026-07-19: the two checkboxes below are accepted as real work; ranked by
 severity. *(A fifth finding — a narrow `SignalRInput` cancel/prompt race that can leak an abandoned run task —
 was deliberately **not** filed: the user doesn't care about abandoned-run leakage while game state is this
-transient. Don't re-raise it until persistence/save-layer work makes run lifetime matter.)* *(The first finding
-— 0× type immunity not gating secondary effects — was FIXED 2026-07-19; see `TODO_ARCHIVE.md` → "0× type
-immunity does not gate secondary effects".)*
+transient. Don't re-raise it until persistence/save-layer work makes run lifetime matter.)* *(Two findings are
+FIXED and archived — 2026-07-19: "0× type immunity does not gate secondary effects"; 2026-07-20: "Leech Seed
+drain borrows PoisonDamageDenominator" — see `TODO_ARCHIVE.md`.)*
 
-- [ ] **Leech Seed drain borrows `PoisonDamageDenominator`** (`Battle.ApplyLeechSeedDrain`, `Battle.cs:576`).
-  Same 1/16 value in Gen 1, but it is a *distinct game rule* read off the wrong seam member — a later gen
-  changing one and not the other forces a split, and the member name misdocuments what the drain reads. Fix: a
-  dedicated `IBattleRules.LeechSeedDrainDenominator` (Gen 1 = 16) with the per-generation XML doc, read at the
-  drain site; pin with a test against the new member. *(Promoted from a minor audit note to a real bug by the
-  user, 2026-07-19.)*
 - [ ] **Paralysis Speed quartering is an inline gen-variable magic number** (`StatusResolver.EffectiveSpeed`,
   `StatusResolver.cs:13` — `speed /= 4`). The divisor is gen-variable (Gen 7+ halves instead of quarters) and
   `StatusResolver` is explicitly on §5.0's no-magic-number list ⇒ belongs on `IBattleRules` (e.g.

@@ -8,6 +8,23 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Leech Seed drain borrows PoisonDamageDenominator ✅ DONE (2026-07-20)
+
+Filed from the 2026-07-19 repo-wide audit (promoted from a minor note to a real bug by the user): the end-of-turn
+Leech Seed drain in `Battle.ApplyLeechSeedDrain` read `_rules.PoisonDamageDenominator` — the same 1/16 value in
+Gen 1, but a *distinct game rule* on the wrong seam member. The two change on different generation boundaries
+(Gen 2 raises the drain to 1/8 while Gen 1–5 Poison stays at 1/16), so a later gen changing one and not the other
+would have forced a split, and the member name misdocumented what the drain reads.
+
+Fixed 2026-07-20: new seam member `IBattleRules.LeechSeedDrainDenominator` with the per-generation XML doc
+(Gen 1: 16; Gen 2+: 8), implemented as `Gen1BattleRules.LeechSeedDrainDenominator => 16`, pass-through added to
+the `DelegatingBattleRules` test double, and the drain site now reads the new member. Pinned by
+`LeechSeedContractTests.DrainReadsItsOwnSeamMemberNotThePoisonDenominator` — a rules double overrides only the
+leech member to 8 (poison untouched at 16) and asserts the drain follows it, proving the drain no longer borrows
+the poison member. Full .NET suite green: 1366/1366.
+
+---
+
 ## 0× type immunity does not gate secondary effects ✅ DONE (2026-07-19)
 
 Filed from the 2026-07-19 repo-wide audit: the pre-damage immunity halt in `AttackAction` deliberately excluded
@@ -35,6 +52,28 @@ Struggle-vs-Ghost no-recoil. Stale comment updated on
 Thrash locked onto a Ghost never resolved its rampage lock or fired the end-of-lock self-confusion (the miss
 branch ticks it; the immunity halt didn't). Fixed by mirroring the miss branch's tick inside the halt; pinned by
 `TypeImmunityContractTests.RampageLockedOntoImmuneTargetStillResolvesAndSelfConfuses`.
+
+---
+
+## Leech Seed drain borrows `PoisonDamageDenominator` ✅ DONE (2026-07-19)
+
+Filed from the same 2026-07-19 repo-wide audit: `Battle.ApplyLeechSeedDrain` (`Battle.cs:576`) read
+`_rules.PoisonDamageDenominator` for its 1/16 drain. Numerically identical to Poison in Gen 1, but Leech Seed
+drain and Poison damage are distinct game rules that don't necessarily move together across generations — reading
+one off the other's seam member misdocuments what the drain actually is and would silently desync the moment a
+later gen changes one without the other. *(Promoted from a minor audit note to a real bug by the user,
+2026-07-19.)*
+
+Fixed: new `IBattleRules.LeechSeedDrainDenominator` member with its own per-generation XML doc (Gen 1 = 16;
+Gen 2+ = 8 — noting the two denominators change on different generation boundaries, which is exactly why the
+member must not be shared with Poison's). `Gen1BattleRules.LeechSeedDrainDenominator => 16` with the Gen-1
+comment; `DelegatingBattleRules` (the test double) got the pass-through. `Battle.ApplyLeechSeedDrain` now reads
+the new member instead of `PoisonDamageDenominator`.
+
+Pinned by new `LeechSeedContractTests.DrainReadsItsOwnSeamMemberNotThePoisonDenominator`: a rules double overrides
+only the leech member (8) while leaving Poison untouched (16), asserting the drain follows the leech value — this
+would fail against the old shared-member code and proves the fix reads the correct seam. Full .NET suite green:
+1366/1366.
 
 ---
 

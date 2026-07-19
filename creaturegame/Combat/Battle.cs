@@ -573,7 +573,7 @@ public class Battle
         if (!drained.Battle.HasLeechSeed || !drained.IsAlive())
             return;
 
-        int damage = Math.Max(1, drained.Attributes.MaxHP / _rules.PoisonDamageDenominator);
+        int damage = Math.Max(1, drained.Attributes.MaxHP / _rules.LeechSeedDrainDenominator);
         drained.Attributes.ReceiveDamage(damage);
         _emitter?.Emit(new LeechSeedDamage(drained.Name, damage, drained.Attributes.HP));
 

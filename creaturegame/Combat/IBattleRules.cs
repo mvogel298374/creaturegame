@@ -168,6 +168,13 @@ public interface IBattleRules
     int PoisonDamageDenominator { get; }
 
     /// <summary>
+    /// Divisor applied to the seeded creature's max HP for the end-of-turn Leech Seed drain
+    /// (e.g. 16 → 1/16 max HP). Gen 1: 16. Gen 2+: 8. Numerically equal to Poison in Gen 1 but a
+    /// distinct rule on its own member — the two change on different generation boundaries.
+    /// </summary>
+    int LeechSeedDrainDenominator { get; }
+
+    /// <summary>
     /// Returns the fraction of max HP dealt by Bad Poison (Toxic) on the given counter tick.
     /// Gen 1: counter/16 — escalates each turn with no cap (counter starts at 1, increments after damage).
     /// </summary>
