@@ -23,8 +23,8 @@ public class RewardCalculatorTests
             Cost = cost,
         };
 
-    // A catalog spanning every category, including the two dead-loot ones (Ball / Revive have no in-battle
-    // effect yet, so a reward must never hand them out), with costs across all four rarity bands.
+    // A catalog spanning every category, including Ball/Other (still dead loot — no in-battle effect) and Revive
+    // (eligible now, but a Boss-reward-only drop — the reward roll further restricts it), across all four bands.
     private static IReadOnlyList<Item> FullCatalog() =>
         [
             MakeItem(1, ItemCategory.Healing, 200), // Common
@@ -34,23 +34,79 @@ public class RewardCalculatorTests
             MakeItem(5, ItemCategory.PpRestore, 1200), // Uncommon
             MakeItem(6, ItemCategory.BattleStatBoost, 1000), // Uncommon
             MakeItem(7, ItemCategory.Ball, 200),
-            MakeItem(8, ItemCategory.Revive, 1500),
+            MakeItem(8, ItemCategory.Revive, 1500), // Rare band — Boss reward + shop only
             MakeItem(9, ItemCategory.Other, 50),
         ];
 
     [Fact]
-    public void UsableItems_KeepsOnlyEffectCategories_ExcludesBallReviveAndOther()
+    public void UsableItems_KeepsEffectCategoriesInclRevive_ExcludesBallAndOther()
     {
+        // Revive is pool-eligible (it feeds the shop, and Boss rewards); only Ball (catch) and Other stay out.
         var usable = RewardCalculator.UsableItems(FullCatalog());
 
         Assert.Equal(
-            new[] { 1, 2, 3, 4, 5, 6 },
+            new[] { 1, 2, 3, 4, 5, 6, 8 },
             usable.Select(i => i.Id).OrderBy(x => x).ToArray()
         );
-        Assert.DoesNotContain(
-            usable,
-            i => i.Category is ItemCategory.Ball or ItemCategory.Revive or ItemCategory.Other
-        );
+        Assert.DoesNotContain(usable, i => i.Category is ItemCategory.Ball or ItemCategory.Other);
+    }
+
+    [Fact]
+    public void UsableItems_HoldsOutMaxRevive_ButKeepsRevive()
+    {
+        // Max Revive is a Gen-2 item — imported + effect-supported (scaffolding) but held out of every obtainable
+        // channel until multi-gen, so it never reaches a reward or the shop. The Gen-1 Revive is unaffected.
+        IReadOnlyList<Item> catalog =
+        [
+            MakeItem(1, ItemCategory.Healing, 200),
+            MakeItem(62, ItemCategory.Revive, 2000, name: "revive"),
+            MakeItem(63, ItemCategory.Revive, 4000, name: "max-revive"),
+        ];
+
+        var usable = RewardCalculator.UsableItems(catalog);
+
+        Assert.Contains(usable, i => i.Name == "revive");
+        Assert.DoesNotContain(usable, i => i.Name == "max-revive");
+    }
+
+    [Fact]
+    public void RollRewardChoice_OffersRevive_OnBossNodes()
+    {
+        // Revive (id 8) is a prime Boss reward (category weight 4.0, Rare band) — over many Boss rolls it surfaces.
+        var usable = RewardCalculator.UsableItems(FullCatalog());
+        var rng = new SeededRandomSource(31);
+        bool sawRevive = false;
+        for (int i = 0; i < 500 && !sawRevive; i++)
+        {
+            var choice = RewardCalculator.RollRewardChoice(
+                new RewardContext(RunNodeKind.BossBattle, EnemyLevel: 40, Depth: 4),
+                usable,
+                rng
+            );
+            sawRevive = choice.Options.OfType<ItemRewardOption>().Any(o => o.ItemId == 8);
+        }
+        Assert.True(sawRevive, "a Boss reward should surface a Revive within many rolls");
+    }
+
+    [Theory]
+    [InlineData(RunNodeKind.WildBattle)]
+    [InlineData(RunNodeKind.EliteBattle)]
+    [InlineData(RunNodeKind.Treasure)]
+    [InlineData(RunNodeKind.Mystery)]
+    public void RollRewardChoice_NeverOffersRevive_OnNonBossNodes(RunNodeKind tier)
+    {
+        // "Extremely rare" = Boss-reward-only: no non-Boss reward node ever hands out a Revive (id 8).
+        var usable = RewardCalculator.UsableItems(FullCatalog());
+        var rng = new SeededRandomSource(52);
+        for (int i = 0; i < 3000; i++)
+        {
+            var choice = RewardCalculator.RollRewardChoice(
+                new RewardContext(tier, EnemyLevel: 40, Depth: 8),
+                usable,
+                rng
+            );
+            Assert.DoesNotContain(choice.Options.OfType<ItemRewardOption>(), o => o.ItemId == 8);
+        }
     }
 
     // --- Rarity classification & roll ------------------------------------------------------------------------

@@ -10,9 +10,14 @@ public abstract record TurnChoice;
 /// <summary>FIGHT: the selected move for this turn.</summary>
 public sealed record MoveTurnChoice(PokemonAttack Move) : TurnChoice;
 
-/// <summary>ITEM: use a bag item on the user's creature. <paramref name="TargetMoveSlot"/> is the move
-/// slot (0–3) a single-move PP restore targets; null for everything else.</summary>
-public sealed record ItemTurnChoice(Item Item, int? TargetMoveSlot = null) : TurnChoice;
+/// <summary>ITEM: use a bag item. <paramref name="TargetMoveSlot"/> is the move slot (0–3) a single-move PP
+/// restore targets; <paramref name="TargetPartySlot"/> is the party-member index a Revive targets (a fainted
+/// benched member). Both null for the ordinary self-targeting items (they act on the active creature).</summary>
+public sealed record ItemTurnChoice(
+    Item Item,
+    int? TargetMoveSlot = null,
+    int? TargetPartySlot = null
+) : TurnChoice;
 
 /// <summary>
 /// Abstracts move selection for one side of a battle.

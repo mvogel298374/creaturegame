@@ -22,14 +22,15 @@ public class BattleHub(GameSessionManager manager) : Hub<IBattleClient>
     }
 
     /// <summary>
-    /// Uses a bag item this turn: <paramref name="itemId"/> is the item to use and
-    /// <paramref name="targetMoveSlot"/> the move slot (0–3) a single-move PP restore targets (null
-    /// otherwise). Mirrors <see cref="ChooseMove"/> — fire-and-forget completion of the turn handshake the
-    /// battle loop is blocked on. An item that has no effect is resolved by the engine (`ItemUseFailed`).
+    /// Uses a bag item this turn: <paramref name="itemId"/> is the item to use, <paramref name="targetMoveSlot"/>
+    /// the move slot (0–3) a single-move PP restore targets, and <paramref name="targetPartySlot"/> the party-member
+    /// index a Revive targets (a fainted benched member); the latter two are null for the ordinary self-targeting
+    /// items. Mirrors <see cref="ChooseMove"/> — fire-and-forget completion of the turn handshake the battle loop is
+    /// blocked on. An item that has no effect is resolved by the engine (`ItemUseFailed`).
     /// </summary>
-    public Task UseItem(int itemId, int? targetMoveSlot)
+    public Task UseItem(int itemId, int? targetMoveSlot, int? targetPartySlot)
     {
-        manager.SetItemChoice(Context.ConnectionId, itemId, targetMoveSlot);
+        manager.SetItemChoice(Context.ConnectionId, itemId, targetMoveSlot, targetPartySlot);
         return Task.CompletedTask;
     }
 

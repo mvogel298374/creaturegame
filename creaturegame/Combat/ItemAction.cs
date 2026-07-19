@@ -19,6 +19,8 @@ public sealed class ItemAction : IBattleAction
 
     private readonly Item _item;
     private readonly int? _targetMoveSlot;
+    private readonly int? _targetPartySlot;
+    private readonly Party? _party;
     private readonly Bag _bag;
     private readonly IBattleEventEmitter? _emitter;
 
@@ -30,12 +32,16 @@ public sealed class ItemAction : IBattleAction
         Item item,
         int? targetMoveSlot,
         Bag bag,
-        IBattleEventEmitter? emitter = null
+        IBattleEventEmitter? emitter = null,
+        Party? party = null,
+        int? targetPartySlot = null
     )
     {
         Source = source;
         _item = item;
         _targetMoveSlot = targetMoveSlot;
+        _targetPartySlot = targetPartySlot;
+        _party = party;
         _bag = bag;
         _emitter = emitter;
         Priority = ItemPriority;
@@ -49,6 +55,8 @@ public sealed class ItemAction : IBattleAction
             User = Source,
             Item = _item,
             TargetMoveSlot = _targetMoveSlot,
+            Party = _party,
+            TargetPartySlot = _targetPartySlot,
             Emitter = _emitter,
         };
 
@@ -60,9 +68,17 @@ public sealed class ItemAction : IBattleAction
             return Task.CompletedTask;
         }
 
-        _emitter?.Emit(new ItemUsed(_item.Name ?? "", Source.Name));
+        _emitter?.Emit(new ItemUsed(_item.Name ?? "", AnnounceTargetName()));
         effect.Apply(ctx);
         _bag.Consume(_item.Id);
         return Task.CompletedTask;
     }
+
+    // Who "Used X on …" names: a party-targeting item (Revive) acts on the benched member, not the active
+    // creature, so name that member; every self-targeting item names Source. CanApply has already validated the
+    // slot when we get here, so the range check is just belt-and-suspenders.
+    private string AnnounceTargetName() =>
+        _party is { } party && _targetPartySlot is { } slot && slot >= 0 && slot < party.Count
+            ? party.Members[slot].Name
+            : Source.Name;
 }

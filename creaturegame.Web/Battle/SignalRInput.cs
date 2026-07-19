@@ -25,7 +25,8 @@ public sealed class SignalRInput : IBattleInput
 
     private sealed record MoveRequest(int Index) : TurnRequest;
 
-    private sealed record ItemRequest(Item Item, int? TargetMoveSlot) : TurnRequest;
+    private sealed record ItemRequest(Item Item, int? TargetMoveSlot, int? TargetPartySlot)
+        : TurnRequest;
 
     /// <summary>
     /// The player's whole-turn choice: FIGHT (a move) or ITEM (a bag item). Overrides the default
@@ -48,7 +49,11 @@ public sealed class SignalRInput : IBattleInput
 
         return request switch
         {
-            ItemRequest item => new ItemTurnChoice(item.Item, item.TargetMoveSlot),
+            ItemRequest item => new ItemTurnChoice(
+                item.Item,
+                item.TargetMoveSlot,
+                item.TargetPartySlot
+            ),
             MoveRequest move => new MoveTurnChoice(ResolveMove(context, move.Index)),
             _ => new MoveTurnChoice(ResolveMove(context, -1)),
         };
@@ -84,12 +89,13 @@ public sealed class SignalRInput : IBattleInput
         tcs?.TrySetResult(new MoveRequest(index));
     }
 
-    /// <summary>Completes the turn handshake with a bag-item choice (the resolved <see cref="Item"/> and,
-    /// for a single-move PP restore, the target move slot). Routed from <c>BattleHub.UseItem</c>.</summary>
-    public void SetItemChoice(Item item, int? targetMoveSlot)
+    /// <summary>Completes the turn handshake with a bag-item choice (the resolved <see cref="Item"/> plus, for a
+    /// single-move PP restore, the target move slot, and for a Revive, the fainted party-member slot). Routed from
+    /// <c>BattleHub.UseItem</c>.</summary>
+    public void SetItemChoice(Item item, int? targetMoveSlot, int? targetPartySlot = null)
     {
         var tcs = _turnTcs;
-        tcs?.TrySetResult(new ItemRequest(item, targetMoveSlot));
+        tcs?.TrySetResult(new ItemRequest(item, targetMoveSlot, targetPartySlot));
     }
 
     /// <summary>

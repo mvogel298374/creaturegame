@@ -456,7 +456,15 @@ public class Battle
 
         var choice = await _playerInput.ChooseTurnActionAsync(context);
         if (choice is ItemTurnChoice item && _playerBag is not null)
-            return new ItemAction(attacker, item.Item, item.TargetMoveSlot, _playerBag, _emitter);
+            return new ItemAction(
+                attacker,
+                item.Item,
+                item.TargetMoveSlot,
+                _playerBag,
+                _emitter,
+                _playerParty,
+                item.TargetPartySlot
+            );
 
         // FIGHT: the input's already-validated move. (A MoveTurnChoice carries it; the only other case —
         // an item choice with no bag wired — falls back to the first selectable move, never Struggle,

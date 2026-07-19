@@ -187,8 +187,9 @@ Each entry: **Decision · Why · Where it lives.**
   `DealDamageToTarget` through a context delegate, so the Substitute-soak / Bide / Counter-recording stays in
   one place. **Item effects** mirror the same shape: `CanApply` gates the announce + bag-consume (the Gen 1
   "won't have any effect" rule), `Apply` mutates state and emits events; their *amounts* are **data** read off
-  the `Item` row (never inlined), and deferred categories (Revive needs a party, Ball needs Catch) are simply
-  absent from the registry so `For` returns null.
+  the `Item` row (never inlined). Revive is the one party-targeting effect (it acts on a fainted bench member via
+  the context's `Party`/`TargetPartySlot`, not the active creature); the still-deferred Ball category (needs
+  Catch) is simply absent from the registry so `For` returns null.
 - **Where:** `Combat/LockInMechanics.cs`, `Combat/MoveEffects.cs`, `Combat/ItemEffects.cs`.
 
 ---

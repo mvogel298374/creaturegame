@@ -56,7 +56,8 @@ public class ItemActionBattleTests
         Bag bag,
         Creature player,
         Creature enemy,
-        CarriedStatus? entryStatus = null
+        CarriedStatus? entryStatus = null,
+        Party? party = null
     )
     {
         var emitter = new RecordingEmitter();
@@ -70,11 +71,21 @@ public class ItemActionBattleTests
             emitter: emitter,
             rng: new SeededRandomSource(1),
             playerEntryStatus: entryStatus,
-            playerBag: bag
+            playerBag: bag,
+            playerParty: party
         );
         await battle.StartFightAsync();
         return emitter;
     }
+
+    private static Item Revive() =>
+        new()
+        {
+            Id = 62,
+            Name = "revive",
+            Category = ItemCategory.Revive,
+            RevivePercent = 50,
+        };
 
     [Fact]
     public async Task UsingPotion_HealsConsumesAndAnnounces()
@@ -211,5 +222,71 @@ public class ItemActionBattleTests
         Assert.True(em.Of<ItemUseFailed>().Any());
         Assert.False(em.Of<ItemUsed>().Any());
         Assert.Equal(1, bag.Count(4)); // not consumed
+    }
+
+    [Fact]
+    public async Task UsingRevive_RestoresAFaintedBenchMemberAndConsumes()
+    {
+        // The player (lead) uses a Revive on turn 1 targeting a fainted bench member, then wins the fight.
+        var player = TestCreatures.Make("Player", hp: 200, speed: 200, attack: 999);
+        player.AddAttack(Tackle());
+        var enemy = TestCreatures.Make("Enemy", hp: 30, speed: 1, defense: 1);
+        enemy.AddAttack(Tackle());
+
+        var party = new Party(player);
+        var bench = TestCreatures.Make("Bench", hp: 200);
+        bench.Attributes.ReceiveDamage(200); // faint the bench member
+        party.Add(bench);
+
+        var bag = new Bag();
+        bag.Add(62, 1);
+
+        var em = await RunAsync(
+            new TurnChoiceInput(new ItemTurnChoice(Revive(), TargetPartySlot: 1)),
+            bag,
+            player,
+            enemy,
+            party: party
+        );
+
+        // The bench member is back (½ of 200), the active creature/lead is untouched, one revive consumed.
+        Assert.True(bench.IsAlive());
+        Assert.Equal(100, bench.Attributes.HP);
+        Assert.Equal(0, party.LeadIndex);
+        Assert.Same(player, party.Lead);
+        Assert.Equal(0, bag.Count(62));
+
+        var used = em.Of<ItemUsed>().Single();
+        Assert.Equal("revive", used.ItemName);
+        Assert.Equal("Bench", used.TargetName); // named the revived member, not the active creature
+        Assert.Equal("Bench", em.Of<Revived>().Single().CreatureName);
+        Assert.True(em.Of<PartyUpdated>().Any()); // the roster snapshot that repaints the bench bar
+    }
+
+    [Fact]
+    public async Task UsingRevive_OnANonFaintedMember_FailsWithoutConsuming()
+    {
+        var player = TestCreatures.Make("Player", hp: 200, speed: 200, attack: 999);
+        player.AddAttack(Tackle());
+        var enemy = TestCreatures.Make("Enemy", hp: 30, speed: 1, defense: 1);
+        enemy.AddAttack(Tackle());
+
+        var party = new Party(player);
+        party.Add(TestCreatures.Make("Bench", hp: 200)); // healthy — no valid revive target
+
+        var bag = new Bag();
+        bag.Add(62, 1);
+
+        var em = await RunAsync(
+            new TurnChoiceInput(new ItemTurnChoice(Revive(), TargetPartySlot: 1)),
+            bag,
+            player,
+            enemy,
+            party: party
+        );
+
+        Assert.True(em.Of<ItemUseFailed>().Any());
+        Assert.False(em.Of<Revived>().Any());
+        Assert.Equal(1, bag.Count(62)); // not consumed
     }
 }

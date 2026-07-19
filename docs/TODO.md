@@ -4,14 +4,15 @@
 > history of a finished item. **See also:** `CLAUDE.md` (setup/commands) · `AI_CONTEXT.md` (profiles) ·
 > `DESIGN_GUIDES.md` (mechanics) · `DEV_STANDARDS.md` (conventions).
 
-## Current state (2026-07-18)
+## Current state (2026-07-19)
 
 The Gen 1 battle engine is **feature-complete** (all 165 moves, XP & level-up, learnsets, AI move selection,
-EV / Stat-Exp gain, evolution, in-battle item system), and the roguelite run layer on top is playable end-to-end:
-the **Encounter Logic** biome-graph run (biome pick → randomised 4–6 nodes → Poké Center → next biome, per-run
-randomised map, depth-scaled foes), the **Run Economy** (gold + rewards), the **Reward Choice** modal (pick-1-of-3
-rarity rewards), the **level-aware XP curve + trainer bonus**, and the **Innate Party XP Share** (the living bench
-shares in every battle's XP/Stat-Exp and evolution alongside the active creature) are all done and archived
+EV / Stat-Exp gain, evolution, in-battle item system incl. **Revive/Max Revive**), and the roguelite run layer on
+top is playable end-to-end: the **Encounter Logic** biome-graph run (biome pick → randomised 4–6 nodes → Poké
+Center → next biome, per-run randomised map, depth-scaled foes), the **Run Economy** (gold + rewards), the
+**Reward Choice** modal (pick-1-of-3 rarity rewards), the **level-aware XP curve + trainer bonus**, the **Innate
+Party XP Share** (the living bench shares in every battle's XP/Stat-Exp and evolution alongside the active
+creature), and **Revive Items** (in-battle party revive, Boss-reward + rare-shop only) are all done and archived
 (→ `TODO_ARCHIVE.md`).
 
 **Next up, in priority order:**
@@ -281,8 +282,8 @@ in the Catch cluster below); voluntary in-battle switching (its own planned core
 [**In-Combat Switching**](#in-combat-switching--voluntary-in-battle-party-switching-planned-core-feature));
 `save.db`/`PlayerDbContext` persistence + cross-run meta-progression; the **Exp. Share / Exp. All item**
 (a held item that pays a *non-participant* — distinct from the innate party-wide XP share that shipped 2026-07-18,
-see *Switched-in creature is the active creature* below); Revive (needs a fainted-but-revivable party member —
-possible after Stage 3, not built here).
+see *Switched-in creature is the active creature* below). *(Revive, which needed a fainted-but-revivable party
+member, shipped 2026-07-19 on top of this stage's `Party` — see `TODO_ARCHIVE.md` → Revive Items.)*
 
 ---
 
@@ -409,8 +410,9 @@ Encounter Logic gate:
   it (web-layer `RewardCalculator` policy). So *item* acquisition is solved; **bag persistence** and **catch**
   (below) are the remaining, still-deferred pieces of this cluster.
 - **Poké Balls are imported data only** — mapped to `ItemCategory.Ball`, but `ItemEffects.For(Ball)` returns
-  null ⇒ `ItemUseFailed`. The frontend hides Ball & Revive via `bag.ts isUsableInBattle`. `CatchRate` is
-  already imported on `PokemonSpecies` ✓.
+  null ⇒ `ItemUseFailed`. The frontend hides Ball via `bag.ts isUsableInBattle` (Revive shipped 2026-07-19 and
+  is now conditionally shown — see `TODO_ARCHIVE.md` → Revive Items). `CatchRate` is already imported on
+  `PokemonSpecies` ✓.
 
 ### 1 — Item acquisition (the design gate) · ✅ DONE via Run Economy
 - [x] The item-acquisition model is the **Run Economy** (see archive): battle-win drops + Treasure/Mystery
@@ -432,10 +434,6 @@ Encounter Logic gate:
 - [ ] Unlocks the dormant **stone evolutions** (`Stone` trigger + `IEvolutionRules.StoneUsed` are built and
   waiting on a bag).
 - [ ] Phaser throw / shake / catch animation.
-
-> **Revive / Max Revive** (the only remaining in-scope item effect) is also blocked here — it needs a
-> fainted-but-revivable party member, which the single-creature chain doesn't have. `ItemEffects.For(Revive)`
-> stays null until Game Loop adds a party.
 
 ---
 

@@ -26,7 +26,8 @@ public class ItemEffectTests
         StageStat? boostStat = null,
         int? boostStages = null,
         bool boostsCrit = false,
-        bool setsMist = false
+        bool setsMist = false,
+        int? revivePercent = null
     ) =>
         new()
         {
@@ -44,6 +45,7 @@ public class ItemEffectTests
             StatBoostStages = boostStages,
             BoostsCrit = boostsCrit,
             SetsMist = setsMist,
+            RevivePercent = revivePercent,
         };
 
     private static Attack Move(string name, int id, int pp = 20) =>
@@ -106,12 +108,12 @@ public class ItemEffectTests
     [InlineData(ItemCategory.StatusCure)]
     [InlineData(ItemCategory.PpRestore)]
     [InlineData(ItemCategory.BattleStatBoost)]
+    [InlineData(ItemCategory.Revive)] // now targets a fainted party member
     public void Registry_HasEffectForInScopeCategories(ItemCategory category) =>
         Assert.NotNull(ItemEffects.For(category));
 
     [Theory]
     [InlineData(ItemCategory.Ball)] // catch — deferred
-    [InlineData(ItemCategory.Revive)] // needs a party — deferred
     [InlineData(ItemCategory.Other)]
     public void Registry_NoEffectForDeferredCategories(ItemCategory category) =>
         Assert.Null(ItemEffects.For(category));
@@ -396,4 +398,164 @@ public class ItemEffectTests
             CanApply(Item(55, "guard-spec", ItemCategory.BattleStatBoost, setsMist: true), c)
         );
     }
+
+    // ── Revive (targets a fainted PARTY member, not the active creature) ──────────────────────────
+
+    // Revive resolves against Party + TargetPartySlot rather than User, so it gets its own harness.
+    private static (Party, RecordingEmitter) ApplyRevive(Item item, Party party, int slot)
+    {
+        var emitter = new RecordingEmitter();
+        var effect = ItemEffects.For(item.Category)!;
+        var ctx = new ItemEffectContext
+        {
+            User = party.Lead,
+            Item = item,
+            Party = party,
+            TargetPartySlot = slot,
+            Emitter = emitter,
+        };
+        Assert.True(effect.CanApply(ctx));
+        effect.Apply(ctx);
+        return (party, emitter);
+    }
+
+    private static bool CanApplyRevive(Item item, Party? party, int? slot) =>
+        ItemEffects
+            .For(item.Category)!
+            .CanApply(
+                new ItemEffectContext
+                {
+                    User = party?.Lead ?? TestCreatures.Make(),
+                    Item = item,
+                    Party = party,
+                    TargetPartySlot = slot,
+                }
+            );
+
+    private static Item Revive50(int id = 62) =>
+        Item(id, "revive", ItemCategory.Revive, revivePercent: 50);
+
+    private static Item MaxRevive(int id = 63) =>
+        Item(id, "max-revive", ItemCategory.Revive, revivePercent: 100);
+
+    // Builds a party whose LEAD is a live starter and whose bench member is fainted (HP 0). The revive targets
+    // the bench member at slot 1, so the active creature (slot 0 / lead) is deliberately untouched.
+    private static Party PartyWithFaintedBench(int benchMaxHp = 200)
+    {
+        var party = new Party(TestCreatures.Make("Lead"));
+        var bench = TestCreatures.Make("Bench", hp: benchMaxHp);
+        bench.Attributes.ReceiveDamage(benchMaxHp); // faint it
+        party.Add(bench);
+        return party;
+    }
+
+    [Fact]
+    public void Revive_RestoresFaintedMemberToHalfMaxHp()
+    {
+        var party = PartyWithFaintedBench(benchMaxHp: 200);
+        var (p, em) = ApplyRevive(Revive50(), party, slot: 1);
+
+        var bench = p.Members[1];
+        Assert.True(bench.IsAlive());
+        Assert.Equal(100, bench.Attributes.HP); // ⌈200 · ½⌉
+        var ev = em.Of<Revived>().Single();
+        Assert.Equal("Bench", ev.CreatureName);
+        Assert.Equal(100, ev.HpAfter);
+    }
+
+    [Fact]
+    public void Revive_FloorsTheHalfFraction_LikeGen1AndRecover()
+    {
+        // Gen 1 (and this repo's Recover) truncates the ½: 41 max HP → ⌊20.5⌋ = 20, NOT 21 (a ceil convention).
+        // This MaxHP is chosen so floor and ceil genuinely disagree (a 200-HP pool wouldn't discriminate them).
+        var party = new Party(TestCreatures.Make("Lead"));
+        var bench = TestCreatures.Make("Bench", hp: 41);
+        bench.Attributes.ReceiveDamage(41);
+        party.Add(bench);
+
+        ApplyRevive(Revive50(), party, slot: 1);
+        Assert.Equal(20, party.Members[1].Attributes.HP); // ⌊41 · ½⌋
+    }
+
+    [Fact]
+    public void Revive_NeverComesBackBelowOne_OnATinyPool()
+    {
+        // ⌊1 · ½⌋ = 0, but Math.Max(1, …) keeps a revived member ≥ 1 HP.
+        var party = new Party(TestCreatures.Make("Lead"));
+        var bench = TestCreatures.Make("Bench", hp: 1);
+        bench.Attributes.ReceiveDamage(1);
+        party.Add(bench);
+
+        ApplyRevive(Revive50(), party, slot: 1);
+        Assert.Equal(1, party.Members[1].Attributes.HP);
+    }
+
+    [Fact]
+    public void Revive_BringsTheMemberBackStatusless()
+    {
+        // A member that fainted WHILE afflicted (the common way — burn/poison chip) comes back clean (Gen 1):
+        // both the transient battle status and any carried status are cleared, and the emitted party snapshot
+        // shows it statusless (not a revived-but-still-poisoned creature on the roster panel).
+        var party = new Party(TestCreatures.Make("Lead"));
+        var bench = TestCreatures.Make("Bench", hp: 200);
+        bench.Battle.Status = StatusCondition.BadPoison;
+        bench.Battle.ToxicCounter = 5;
+        bench.CarriedStatus = new CarriedStatus(StatusCondition.BadPoison, 0);
+        bench.Attributes.ReceiveDamage(200); // faint it while badly poisoned
+        party.Add(bench);
+
+        var (p, em) = ApplyRevive(Revive50(), party, slot: 1);
+
+        Assert.Equal(StatusCondition.None, p.Members[1].Battle.Status);
+        Assert.Equal(1, p.Members[1].Battle.ToxicCounter); // escalation reset to baseline
+        Assert.Null(p.Members[1].CarriedStatus); // won't re-apply on a later send-in
+        Assert.Equal(StatusCondition.None, em.Of<PartyUpdated>().Single().Members[1].Status);
+    }
+
+    [Fact]
+    public void MaxRevive_RestoresFaintedMemberToFullHp()
+    {
+        var party = PartyWithFaintedBench(benchMaxHp: 200);
+        var (p, _) = ApplyRevive(MaxRevive(), party, slot: 1);
+        Assert.Equal(200, p.Members[1].Attributes.HP);
+    }
+
+    [Fact]
+    public void Revive_LeavesTheRevivedMemberBenched()
+    {
+        var party = PartyWithFaintedBench();
+        ApplyRevive(Revive50(), party, slot: 1);
+        // Reviving does not switch it in — the lead is unchanged (a send-in is the separate forced-switch path).
+        Assert.Equal(0, party.LeadIndex);
+        Assert.Equal("Lead", party.Lead.Name);
+    }
+
+    [Fact]
+    public void Revive_EmitsAPartySnapshotSoTheBenchBarRepaints()
+    {
+        var party = PartyWithFaintedBench();
+        var (_, em) = ApplyRevive(Revive50(), party, slot: 1);
+        var snapshot = em.Of<PartyUpdated>().Single();
+        Assert.Equal(100, snapshot.Members[1].Hp); // the revived member's restored HP is on the wire
+    }
+
+    [Fact]
+    public void Revive_OnANonFaintedMember_HasNoEffect()
+    {
+        var party = new Party(TestCreatures.Make("Lead"));
+        party.Add(TestCreatures.Make("Bench")); // healthy
+        Assert.False(CanApplyRevive(Revive50(), party, slot: 1));
+    }
+
+    [Fact]
+    public void Revive_WithAnOutOfRangeSlot_HasNoEffect()
+    {
+        var party = PartyWithFaintedBench();
+        Assert.False(CanApplyRevive(Revive50(), party, slot: 5));
+        Assert.False(CanApplyRevive(Revive50(), party, slot: null));
+    }
+
+    [Fact]
+    public void Revive_WithNoParty_HasNoEffect() =>
+        Assert.False(CanApplyRevive(Revive50(), party: null, slot: 0));
 }

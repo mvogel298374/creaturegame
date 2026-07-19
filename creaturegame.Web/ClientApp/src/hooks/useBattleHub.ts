@@ -129,13 +129,17 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
 
   // Use a bag item this turn. Like chooseMove, using an item IS the turn action, so mark the turn chosen
   // (→ battling/animating, locks the menu) and fire the hub call. targetMoveSlot is the move slot (0–3) a
-  // single-move PP restore refills, null otherwise. The engine resolves a no-effect use (ItemUseFailed); the
-  // resulting ItemUsed / effect events drive the log + HP/status/PP updates, so nothing is logged here.
-  const useItem = useCallback((itemId: number, targetMoveSlot: number | null) => {
-    dispatch({ type: 'PLAYER_CHOSE' });
-    connRef.current?.invoke('UseItem', itemId, targetMoveSlot).catch(err =>
-      console.error('[SignalR] UseItem failed:', err));
-  }, []);
+  // single-move PP restore refills; targetPartySlot is the party-member index a Revive targets (a fainted
+  // benched member); both null otherwise. The engine resolves a no-effect use (ItemUseFailed); the resulting
+  // ItemUsed / effect events drive the log + HP/status/PP updates, so nothing is logged here.
+  const useItem = useCallback(
+    (itemId: number, targetMoveSlot: number | null, targetPartySlot: number | null = null) => {
+      dispatch({ type: 'PLAYER_CHOSE' });
+      connRef.current?.invoke('UseItem', itemId, targetMoveSlot, targetPartySlot).catch(err =>
+        console.error('[SignalR] UseItem failed:', err));
+    },
+    [],
+  );
 
   // The level-up stat panel stays up until the player does anything; BattleScreen calls this on any
   // action (open FIGHT / CHECK, pick a move, QUIT) to dismiss it.

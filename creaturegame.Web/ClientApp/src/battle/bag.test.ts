@@ -3,6 +3,7 @@ import {
   type BagItem,
   isUsableInBattle,
   needsMoveTarget,
+  needsPartyTarget,
   formatItemName,
   groupBagItems,
 } from './bag';
@@ -42,6 +43,19 @@ describe('needsMoveTarget', () => {
   });
 });
 
+describe('needsPartyTarget', () => {
+  it('is true only for a Revive (targets a fainted party member)', () => {
+    expect(needsPartyTarget({ category: 'Revive' })).toBe(true);
+  });
+
+  it('is false for every self-targeting category', () => {
+    expect(needsPartyTarget({ category: 'Healing' })).toBe(false);
+    expect(needsPartyTarget({ category: 'StatusCure' })).toBe(false);
+    expect(needsPartyTarget({ category: 'PpRestore' })).toBe(false);
+    expect(needsPartyTarget({ category: 'BattleStatBoost' })).toBe(false);
+  });
+});
+
 describe('formatItemName', () => {
   it('uppercases and de-hyphenates the slug', () => {
     expect(formatItemName('super-potion')).toBe('SUPER POTION');
@@ -68,6 +82,19 @@ describe('groupBagItems', () => {
     expect(groups.map(g => g.label)).toEqual(['HEALING', 'STATUS', 'PP RESTORE', 'BATTLE']);
     expect(groups.flatMap(g => g.items.map(i => i.name)))
       .toEqual(['potion', 'antidote', 'ether', 'x-attack']);
+  });
+
+  it('surfaces a usable Revive under its own REVIVE pocket, in order', () => {
+    // When a fainted member exists the server marks the Revive usableInBattle, so the menu shows it — between
+    // the STATUS and PP RESTORE pockets (CATEGORY_LABELS order).
+    const items: BagItem[] = [
+      item({ id: 1, name: 'potion', category: 'Healing' }),
+      item({ id: 2, name: 'max-revive', category: 'Revive', usableInBattle: true }),
+      item({ id: 3, name: 'ether', category: 'PpRestore' }),
+    ];
+    const groups = groupBagItems(items);
+    expect(groups.map(g => g.label)).toEqual(['HEALING', 'REVIVE', 'PP RESTORE']);
+    expect(groups.find(g => g.label === 'REVIVE')?.items.map(i => i.name)).toEqual(['max-revive']);
   });
 
   it('omits empty pockets and zero-quantity items', () => {

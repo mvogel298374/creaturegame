@@ -250,7 +250,12 @@ public sealed class GameSessionManager(
     /// completes the turn handshake. The engine's <c>ItemAction</c> does the has-in-bag + would-have-effect
     /// checks (a no-op use yields <c>ItemUseFailed</c> and the turn proceeds), so this only validates that the
     /// id is a real catalog item. An unknown id is ignored (a malformed client request).</summary>
-    public void SetItemChoice(string connectionId, int itemId, int? targetMoveSlot)
+    public void SetItemChoice(
+        string connectionId,
+        int itemId,
+        int? targetMoveSlot,
+        int? targetPartySlot
+    )
     {
         if (
             !_connToGame.TryGetValue(connectionId, out var gameId)
@@ -260,7 +265,7 @@ public sealed class GameSessionManager(
 
         if (battle.ItemsById.TryGetValue(itemId, out var item))
         {
-            battle.Input.SetItemChoice(item, targetMoveSlot);
+            battle.Input.SetItemChoice(item, targetMoveSlot, targetPartySlot);
         }
         else
         {
@@ -278,15 +283,19 @@ public sealed class GameSessionManager(
     {
         if (!_active.TryGetValue(gameId, out var battle) || battle.Bag is null)
             return null;
-        return ProjectBagView(battle.Bag, battle.ItemsById);
+        return ProjectBagView(battle.Bag, battle.ItemsById, battle.Party);
     }
 
     /// <summary>Projects the held bag (id → qty) plus the item catalog into the client's <see cref="BagItemView"/>
     /// list, ordered by id. Pure (no session state) so the wire projection — notably the
-    /// <see cref="BagItemView.UsableInBattle"/> flag — is unit-testable without standing up a live battle.</summary>
+    /// <see cref="BagItemView.UsableInBattle"/> flag — is unit-testable without standing up a live battle.
+    /// <para><paramref name="party"/> is needed only to gate <b>Revive</b>: unlike the self-targeting items, whose
+    /// usability is a fixed property of the category, a Revive is usable only when a <em>fainted</em> party member
+    /// exists to target — so the menu hides it (rather than offering a guaranteed no-op) when the roster is all up.</para></summary>
     internal static IReadOnlyList<BagItemView> ProjectBagView(
         Bag bag,
-        IReadOnlyDictionary<int, Item> itemsById
+        IReadOnlyDictionary<int, Item> itemsById,
+        Party? party = null
     ) =>
         bag
             .Entries.Where(e => e.Value > 0 && itemsById.ContainsKey(e.Key))
@@ -300,15 +309,26 @@ public sealed class GameSessionManager(
                     e.Value,
                     item.Description ?? "",
                     item.RestoresPpAllMoves,
-                    // Single source of truth for "does anything in battle": the engine's effect registry.
-                    // Ball/Revive/Other have no effect yet ⇒ null ⇒ the bag menu hides them, so this can't
-                    // drift out of lockstep with ItemEffects the way a client-side category list would.
-                    ItemEffects.For(item.Category)
-                        is not null
+                    UsableInBattle(item, party)
                 );
             })
             .OrderBy(v => v.Id)
             .ToList();
+
+    /// <summary>Whether using <paramref name="item"/> in battle now would do anything — the client filters the bag
+    /// menu on this instead of re-encoding the category→effect mapping. The base rule is the single source of truth
+    /// for "does anything in battle": the engine's <see cref="ItemEffects"/> registry (Ball/Other have no effect ⇒
+    /// hidden). <b>Revive is the one state-dependent category</b>: it has an effect, but only when a fainted party
+    /// member exists to target — so it stays hidden while the whole roster is up (mirrors <c>ReviveItemEffect.CanApply</c>,
+    /// which would otherwise refuse the use as a no-op).</summary>
+    internal static bool UsableInBattle(Item item, Party? party)
+    {
+        if (ItemEffects.For(item.Category) is null)
+            return false;
+        if (item.Category == ItemCategory.Revive)
+            return party is { } p && p.Members.Any(m => !m.IsAlive());
+        return true;
+    }
 
     /// <summary>Routes a level-up replace-move answer (slot 0–3, or null to decline) to the battle's input.</summary>
     public void SetForgetChoice(string connectionId, int? slotIndex)

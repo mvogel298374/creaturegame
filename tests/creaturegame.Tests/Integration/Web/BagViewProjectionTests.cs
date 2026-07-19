@@ -1,4 +1,6 @@
+using creaturegame.Creatures;
 using creaturegame.Items;
+using creaturegame.Tests.TestSupport;
 using creaturegame.Web.Battle;
 
 namespace creaturegame.Tests.Integration.Web;
@@ -48,16 +50,49 @@ public class BagViewProjectionTests
     [Fact]
     public void ProjectBagView_MarksItemsWithoutAnEngineEffectNotUsableInBattle()
     {
-        // Ball (catch — deferred) and Revive (needs a party) have no in-battle effect yet ⇒ UsableInBattle
-        // == false ⇒ the bag menu hides them rather than letting the player waste a turn.
-        var catalog = Catalog(MakeItem(1, ItemCategory.Ball), MakeItem(2, ItemCategory.Revive));
+        // Ball (catch — deferred) has no in-battle effect yet ⇒ UsableInBattle == false ⇒ the bag menu hides
+        // it rather than letting the player waste a turn.
+        var catalog = Catalog(MakeItem(1, ItemCategory.Ball));
         var bag = new Bag();
         bag.Add(1, 1);
-        bag.Add(2, 1);
 
         var view = GameSessionManager.ProjectBagView(bag, catalog);
 
         Assert.All(view, v => Assert.False(v.UsableInBattle, $"item {v.Id} ({v.Category})"));
+    }
+
+    [Fact]
+    public void ProjectBagView_MarksReviveUsableOnlyWhenAPartyMemberIsFainted()
+    {
+        // Revive is the one state-dependent category: it has an engine effect, but is only usable when a
+        // fainted member exists to target — so the menu hides it while the whole roster is up.
+        var catalog = Catalog(MakeItem(1, ItemCategory.Revive));
+        var bag = new Bag();
+        bag.Add(1, 1);
+
+        var healthyParty = new Party(TestCreatures.Make("Lead"));
+        healthyParty.Add(TestCreatures.Make("Bench")); // all up
+        var upView = GameSessionManager.ProjectBagView(bag, catalog, healthyParty);
+        Assert.False(upView.Single().UsableInBattle);
+
+        var faintedParty = new Party(TestCreatures.Make("Lead"));
+        var bench = TestCreatures.Make("Bench", hp: 100);
+        bench.Attributes.ReceiveDamage(100); // faint the bench member
+        faintedParty.Add(bench);
+        var downView = GameSessionManager.ProjectBagView(bag, catalog, faintedParty);
+        Assert.True(downView.Single().UsableInBattle);
+    }
+
+    [Fact]
+    public void ProjectBagView_ReviveNotUsableWithNoParty()
+    {
+        // No party wired (legacy single-creature battle) ⇒ no revive target ⇒ hidden.
+        var catalog = Catalog(MakeItem(1, ItemCategory.Revive));
+        var bag = new Bag();
+        bag.Add(1, 1);
+
+        var view = GameSessionManager.ProjectBagView(bag, catalog);
+        Assert.False(view.Single().UsableInBattle);
     }
 
     [Fact]

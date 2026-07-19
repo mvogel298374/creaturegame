@@ -1016,6 +1016,13 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
     case 'ItemUseFailed':
       return { steps: [w(120), d(log(`It won't have any effect!`))] };
 
+    case 'Revived': {
+      // A Revive/Max Revive brought a fainted BENCH member back — narrate it. The member isn't a nameplate, so
+      // its HP bar repaints off the PartyUpdated snapshot that follows (like the whole-party heal), not here.
+      const cName = payload.creatureName as string;
+      return { steps: [w(150), d(log(`${cName} was revived!`)), w(300)] };
+    }
+
     case 'MimicLearned': {
       const cName = payload.creatureName as string;
       const mName = payload.moveName as string;

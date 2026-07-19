@@ -18,6 +18,14 @@ public sealed class ItemEffectContext
     /// <summary>The move slot (0–3) a single-move PP restore targets (Ether). Null for whole-moveset/non-PP items.</summary>
     public int? TargetMoveSlot { get; init; }
 
+    /// <summary>The run party — needed only by the party-targeting items (Revive), which act on a benched member
+    /// rather than <see cref="User"/>. Null for the self-targeting items and for legacy single-creature battles.</summary>
+    public Party? Party { get; init; }
+
+    /// <summary>The <see cref="Party"/> member index a party-targeting item (Revive) acts on. Null for the
+    /// self-targeting items (heal / cure / PP / X-item), which always act on <see cref="User"/>.</summary>
+    public int? TargetPartySlot { get; init; }
+
     public IBattleEventEmitter? Emitter { get; init; }
 }
 
@@ -204,13 +212,65 @@ public sealed class BattleBoostItemEffect : IItemEffect
     }
 }
 
+/// <summary>
+/// Revive / Max Revive — restore a <b>fainted party member</b> to a fraction of its max HP (Gen 1: Revive
+/// ½, Max Revive full, off <see cref="Item.RevivePercent"/>). The first and only in-battle item that targets a
+/// <em>benched</em> creature rather than the active <see cref="ItemEffectContext.User"/>: it reads
+/// <see cref="ItemEffectContext.Party"/> + <see cref="ItemEffectContext.TargetPartySlot"/> and refuses — no
+/// announce, no consume (the Gen 1 "won't have any effect" rule) — unless that slot holds a fainted member. The
+/// member stays benched; reviving does not switch it in (a mid-battle send-in is the separate forced-switch path).
+/// </summary>
+public sealed class ReviveItemEffect : IItemEffect
+{
+    public ItemCategory Category => ItemCategory.Revive;
+
+    public bool CanApply(ItemEffectContext ctx) =>
+        Target(ctx) is { } target && !target.IsAlive() && (ctx.Item.RevivePercent ?? 0) > 0;
+
+    public void Apply(ItemEffectContext ctx)
+    {
+        var target = Target(ctx)!;
+        int pct = ctx.Item.RevivePercent ?? 0;
+        // Gen 1 fraction-HP math truncates (floor), like Recover/Soft-Boiled (HealEffect) — a Revive on 41 max
+        // HP gives 20, not 21. Math.Max(1, …) keeps a revived member ≥ 1 HP on a tiny pool (floor(1·½) = 0 → 1).
+        int restored = Math.Max(1, target.Attributes.MaxHP * pct / 100);
+        target.Attributes.HP = restored;
+
+        // A revived creature comes back statusless (Gen 1) — clear both the transient battle status and any
+        // persisted CarriedStatus (mirrors Creature.FullHeal, minus PP: Revive restores HP only). Without this
+        // the roster snapshot below repaints the just-revived member still afflicted, and a carried status would
+        // re-apply on its next send-in. A fainted member has no volatile per-battle state to wipe.
+        target.Battle.Status = StatusCondition.None;
+        target.Battle.SleepTurns = 0;
+        target.Battle.ToxicCounter = 1;
+        target.CarriedStatus = null;
+
+        ctx.Emitter?.Emit(new Revived(target.Name, restored, target.Attributes.HP));
+
+        // Repaint the roster panel with the benched member's restored HP + cleared status — the ItemUsed/Revived
+        // pair narrates the log, but the bench member isn't a nameplate, so its bar only updates off a party
+        // snapshot (the same vehicle RecoveryRunEvent uses for the whole-party heal).
+        if (ctx.Party is { } party)
+            ctx.Emitter?.Emit(new PartyUpdated(PartyProjection.Snapshot(party)));
+    }
+
+    // The fainted party member this revive targets: a wired party + an in-range slot. Null when unusable (no
+    // party, or a stale / out-of-range slot) — CanApply turns that into the no-effect refusal.
+    private static Creature? Target(ItemEffectContext ctx) =>
+        ctx.Party is { } party && ctx.TargetPartySlot is { } slot && slot >= 0 && slot < party.Count
+            ? party.Members[slot]
+            : null;
+}
+
 /// <summary>Registry of in-battle item effects, keyed by the item category that drives each.</summary>
 public static class ItemEffects
 {
     /// <summary>
-    /// Every in-battle item effect. Revive and Ball are intentionally absent: Revive needs a fainted
-    /// party member (no party yet) and Ball needs the catch mechanic (deferred, gated on Encounter
-    /// Logic) — <see cref="For"/> returns null for them, so <see cref="ItemAction"/> reports no effect.
+    /// Every in-battle item effect. Ball is intentionally absent: it needs the catch mechanic (deferred, gated
+    /// on Encounter Logic) — <see cref="For"/> returns null for it, so <see cref="ItemAction"/> reports no
+    /// effect. Revive now targets a fainted party member (the roster exists), so it is registered here; note its
+    /// usability still depends on run state (a fainted member must exist), which its <see cref="IItemEffect.CanApply"/>
+    /// checks per use rather than the static category presence this registry exposes.
     /// </summary>
     public static readonly IReadOnlyList<IItemEffect> All = new IItemEffect[]
     {
@@ -218,13 +278,14 @@ public static class ItemEffects
         new StatusCureItemEffect(),
         new PpRestoreItemEffect(),
         new BattleBoostItemEffect(),
+        new ReviveItemEffect(),
     };
 
     private static readonly IReadOnlyDictionary<ItemCategory, IItemEffect> ByCategory =
         All.ToDictionary(e => e.Category);
 
     /// <summary>The effect for <paramref name="category"/>, or null if items of that category have no
-    /// in-battle effect yet (Ball, Revive, Other).</summary>
+    /// in-battle effect yet (Ball, Other).</summary>
     public static IItemEffect? For(ItemCategory category) =>
         ByCategory.TryGetValue(category, out var effect) ? effect : null;
 }

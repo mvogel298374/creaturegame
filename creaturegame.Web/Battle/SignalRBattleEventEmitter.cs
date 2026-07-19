@@ -198,6 +198,15 @@ public sealed class SignalRBattleEventEmitter(
                 }
             ),
             ItemUseFailed e => ("ItemUseFailed", new { e.ItemName }),
+            Revived e => (
+                "Revived",
+                new
+                {
+                    e.CreatureName,
+                    e.HpRestored,
+                    e.HpAfter,
+                }
+            ),
             MoveUsed e => ("MoveUsed", new { e.AttackerName, e.MoveName }),
             MoveMissed e => ("MoveMissed", new { e.AttackerName, e.MoveName }),
             MoveHadNoEffect e => ("MoveHadNoEffect", new { e.TargetName, e.MoveName }),

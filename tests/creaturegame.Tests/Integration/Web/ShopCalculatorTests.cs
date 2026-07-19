@@ -69,6 +69,24 @@ public class ShopCalculatorTests
     }
 
     [Fact]
+    public void BuildStock_CanStockRevive()
+    {
+        // Unlike the reward roll (Boss-only), the shop draws Revive straight from the usable pool — the rare
+        // premium-stock acquisition channel. Over many visits of a small pool holding one, it surfaces.
+        var usable = RewardCalculator.UsableItems([
+            MakeItem(1, ItemCategory.Healing, 200),
+            MakeItem(2, ItemCategory.Revive, 1500),
+        ]);
+        var rng = new SeededRandomSource(19);
+        bool sawRevive = false;
+        for (int i = 0; i < 500 && !sawRevive; i++)
+            sawRevive = ShopCalculator
+                .BuildStock(depth: 3, usable, rng)
+                .Items.Any(it => it.ItemId == 2);
+        Assert.True(sawRevive, "the shop should be able to stock a Revive");
+    }
+
+    [Fact]
     public void BuildStock_EmptyPool_YieldsNoStock()
     {
         var offer = ShopCalculator.BuildStock(depth: 5, [], new SeededRandomSource(1));

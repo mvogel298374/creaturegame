@@ -8,6 +8,99 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Revive Items — in-battle party revive ✅ DONE (2026-07-19)
+
+Engine + web + frontend all shipped in one session; full suite green. Went through the full pre-finish gate
+sequence — the four **gate adjustments** (floor rounding, status-clear, Max Revive held out, Boss weight)
+are folded into the sections below and summarised at the end.
+
+**Intent.** Make **Revive** a real, extremely-rare Gen-1 item: on the player's turn, open BAG → REVIVE → pick a
+**fainted bench member**, and it returns to the bench at **½** max HP. The first item that targets a *benched*
+creature rather than the active one. Complements (does not replace) the post-boss Poké Center whole-party heal.
+(**Max Revive** — a Gen-2 item — is fully scaffolded but held out of obtainable loot; see the gate note.)
+
+**Scope decisions locked with the user (2026-07-19):**
+1. **In-battle, proactive.** Usable on the player's turn (active creature alive), targeting a fainted bench
+   member; the revived member returns at ½/full HP but **stays benched** (LeadIndex/active unchanged — Gen 1
+   Revive does not switch it in). **No last-stand rescue:** an all-fainted-at-once loss still fires (Gen 1
+   white-out) — the player must revive *before* the final KO.
+2. **Acquisition = Boss reward + rare shop stock.** Revives enter the loot pool but only Boss nodes can roll
+   them (the previously-dormant Boss category-weight lever from the *Reward Choice — pick-1-of-3 rarity rewards*
+   work below now makes them a prime Boss reward); other reward tiers (wild/elite/treasure/mystery) never
+   surface a revive. The shop may also stock them at their premium (Rare/Epic) price band.
+3. **Items.** Revive (→ 50% HP, Rare band) is live loot. Max Revive (→ 100% HP, Epic band) is a **Gen-2** item
+   (Red/Blue/Yellow shipped only Revive) — kept fully scaffolded (import + effect support) but **held out of every
+   obtainable channel** (reward + shop) until the multi-generation milestone, so the run stays Gen-1-authentic
+   (gate decision, 2026-07-19).
+
+**Acceptance condition.** Holding a Revive, with a fainted party member: on the player's turn BAG → REVIVE →
+pick that member brings it from 0 → ⌊MaxHP·pct⌋ HP (floored, ≥1), un-faints it, **and clears its status**;
+exactly one revive is consumed; the active creature and LeadIndex are unchanged. A revive with **no** fainted
+member (or a stale / out-of-range target) is refused via `ItemUseFailed` — nothing announced, nothing consumed
+(the Gen-1 "won't have any effect" menu rule). Revive is obtainable **only** from Boss rewards and (rarely) the shop.
+
+**Gen 1 source of truth.** Revive → ½ max HP (Gen 1 **truncates** the fraction, like Recover/Soft-Boiled), and a
+revived creature comes back **statusless**; only acts on a *fainted* party member; using it in battle takes the
+whole turn (already true of every `ItemAction`). HP only for the *restore*, but the status clear matters here
+because this engine's fainted members retain a stale `Battle.Status`/`CarriedStatus` (see the gate note).
+**Already imported:** `Item.RevivePercent` = 50 / 100 (`ItemMapper.cs`).
+
+**DoR — gen-variable surface & data boundary.** **No generation seam** — the ½/full amount is Gen-invariant
+item *data* (`RevivePercent`), and would be a data pin (not an `IBattleRules`/`ITypeChart` rule) if a future
+gen ever changed it. **No importer change, no migration** — the data row already exists; this was a pure
+engine + web + frontend change. Reward/shop eligibility is run-layer tuning (`RewardCalculator` /
+`ShopCalculator`), not data.
+
+**The one architectural wrinkle.** Every existing in-battle item self-targets the *active* creature
+(`ItemEffectContext.User`). Revive is the first to target a **benched** member, so the effect context and the
+item-use handshake gained a party-target index (distinct from the existing `TargetMoveSlot` for Ether).
+
+**Implementation:**
+- **Engine** — `Party? Party` + `int? TargetPartySlot` added to `ItemEffectContext`; `int? TargetPartySlot`
+  added to `ItemTurnChoice`; new `ReviveItemEffect : IItemEffect` (Category `Revive`) registered in
+  `ItemEffects.All` — `CanApply`: party wired, slot in range, that member is **fainted**, `RevivePercent > 0`;
+  `Apply`: sets HP to `Math.Max(1, MaxHP·pct/100)` (integer division = **floor**, matching Gen-1/`HealEffect`),
+  **clears the member's status** (`Battle.Status`/`SleepTurns`/`ToxicCounter`/`CarriedStatus`, mirroring
+  `Creature.FullHeal`), emits a new **`Revived`** event **and** a `PartyUpdated` snapshot (so the bench HP + clean
+  status show, mirroring `RecoveryRunEvent`). Party + slot threaded through `ItemAction` and
+  `Battle.BuildPlayerActionAsync` (`_playerParty` was already in scope).
+- **Web** — `BattleHub.UseItem` / `GameSessionManager.SetItemChoice` / `SignalRInput` gained `int? targetPartySlot`;
+  `ProjectBagView` takes the party so **Revive's `UsableInBattle` is gated on a fainted member existing**
+  (not the static category check the other items use); `RewardCalculator.EligibleCategories` adds `Revive`,
+  `RollItemOption` **excludes Revive unless tier == BossBattle** (shop keeps the full usable pool, so revives stay
+  Boss-reward-only + shop-only), `UsableItems` **holds out Max Revive** (name-matched) from every obtainable
+  channel, and `CategoryWeight(Revive, Boss)` is a deliberately-modest **1.0** (not up-weighted) so a Boss revive
+  is occasional, not near-guaranteed. This is also the item that finally makes the *Item System* archive entry's
+  "Ball & Revive hidden" note stale — only Ball stays unconditionally hidden now.
+- **Frontend** — `bag.ts`: `Revive` group in `CATEGORY_LABELS` + a `needsPartyTarget` helper; the bag menu shows a
+  **fainted-member picker** before firing `onUse`; `useBattleHub.useItem` + `BattleScreen` thread `targetPartySlot`;
+  the **`Revived`** event was added to the TS event types + log/render (the manual TS leg of the wire-field gap).
+
+**Coverage:** Revive on a fainted member → HP = ⌊MaxHP/2⌋ (floor, discriminated by an odd-HP case: 41 → 20) and
+`IsAlive()`; Max Revive → full HP; never below 1 on a tiny pool; a member revived while badly-poisoned comes back
+`Status.None` with `CarriedStatus` cleared and the snapshot showing it clean (`ItemEffectTests`). `CanApply`
+**false** on a non-fainted member, out-of-range slot, or null party — no announce/consume (`ItemEffectTests` +
+`ItemActionBattleTests` `ItemUseFailed`). Revived member **stays benched** — active creature & `LeadIndex`
+unchanged; one revive consumed; `Revived` + `PartyUpdated` emitted (`ItemActionBattleTests`). `ProjectBagView`:
+Revive `usableInBattle` true **only** when a bench member is fainted (`BagViewProjectionTests`). Boss nodes can
+roll a revive; non-boss reward nodes never do; shop can stock one; **Max Revive is held out** of the usable pool
+(`RewardCalculatorTests` / `ShopCalculatorTests`). `bag.ts`: the REVIVE group surfaces; `needsPartyTarget` true
+for Revive (`bag.test.ts`). `Revived` narrates in `timeline.test.ts`.
+
+**Gate adjustments (pre-finish review, 2026-07-19).** Four findings from `requirements-review` + `pr-review`, all
+adjudicated by the user: **(1)** HP restore floors the fraction (Gen-1 truncation), not ceil — matched to
+`HealEffect`; **(2)** a revived member is cleared of status/carried-status (this engine keeps a stale status on a
+fainted member, so a revive-while-poisoned would otherwise come back afflicted — the `pr-review` blocker); **(3)**
+Max Revive is a Gen-2 item, so it's scaffolded but held out of obtainable loot until multi-gen; **(4)** the Boss
+category-weight for Revive was dropped 4.0 → 1.0 to honour "extremely rare." (Two E2E specs — `reward-drop`,
+`shop` — were red at review time but verified **pre-existing on `master`**, unrelated to this feature.)
+
+**Dependencies (all already in place):** `Party`, `Bag`, and the forced-switch send-in path, all from
+*Encounter Logic — Phase 4* (still active in `TODO.md`; its Stages 1a–3 are archived further below under
+*Encounter Logic (roguelite run layer)*).
+
+---
+
 ## Move-menu strength cue + attack-grid polish (QoL) ✅ DONE (2026-07-18)
 
 `/plan`ned and built the same session. The FIGHT menu already surfaced name, PP, type badge, the STAB tag and

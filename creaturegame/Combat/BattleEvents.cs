@@ -284,9 +284,14 @@ public record ItemUsed(string ItemName, string TargetName) : BattleEvent;
 /// <summary>A PP-restore item refilled a move's PP. One per move restored (Elixir restores all four).</summary>
 public record PpRestored(string CreatureName, string MoveName, int PpAfter) : BattleEvent;
 
-/// <summary>An item selection had no effect (e.g. a Potion at full HP, an Antidote with no poison, a ball
-/// or revive in single-creature scope). Nothing is consumed. The Gen 1 "It won't have any effect!" line.</summary>
+/// <summary>An item selection had no effect (e.g. a Potion at full HP, an Antidote with no poison, or a Revive
+/// aimed at a member that isn't fainted). Nothing is consumed. The Gen 1 "It won't have any effect!" line.</summary>
 public record ItemUseFailed(string ItemName) : BattleEvent;
+
+/// <summary>A Revive / Max Revive restored a fainted party member from 0 to <paramref name="HpAfter"/> HP
+/// (<paramref name="HpRestored"/> gained). The member stays benched, so its bar isn't a nameplate — a
+/// <see cref="PartyUpdated"/> snapshot follows to repaint the roster panel.</summary>
+public record Revived(string CreatureName, int HpRestored, int HpAfter) : BattleEvent;
 
 // --- Status conditions ---
 public record StatusApplied(string TargetName, StatusCondition Status) : BattleEvent;

@@ -54,20 +54,32 @@ internal static class RewardCalculator
     private const double LowPpThreshold = 0.5; // a move at/under half PP counts as "low"
     private const string QuickHealLabel = "Quick Heal";
 
-    /// <summary>The categories a reward can hand out — mirrors <see cref="creaturegame.Combat.ItemEffects"/>'s
-    /// registry (the same set <c>bag.ts</c> filters on server-side): Ball/Revive have no in-battle effect yet,
-    /// so they're dead loot and never eligible here. <b>Revive is framework-ready</b> in the category bias below
-    /// (it would be a prime Boss reward) but stays out of this eligible set until it becomes usable.</summary>
+    /// <summary>The categories loot / shop stock can hand out — mirrors <see cref="creaturegame.Combat.ItemEffects"/>'s
+    /// registry: Ball has no in-battle effect yet, so it's dead loot and never eligible here. <b>Revive</b> is
+    /// eligible (it feeds the shop and the Boss category bias below), but the reward roll further restricts it to
+    /// Boss nodes only — see <see cref="RollItemOption"/>, so a wild/elite/treasure/mystery win never surfaces a
+    /// revive while the shop still stocks one.</summary>
     private static readonly ItemCategory[] EligibleCategories =
     [
         ItemCategory.Healing,
         ItemCategory.StatusCure,
         ItemCategory.PpRestore,
         ItemCategory.BattleStatBoost,
+        ItemCategory.Revive,
     ];
 
     public static IReadOnlyList<Item> UsableItems(IReadOnlyList<Item> allItems) =>
-        allItems.Where(i => EligibleCategories.Contains(i.Category)).ToList();
+        allItems
+            .Where(i => EligibleCategories.Contains(i.Category) && !IsHeldOutFutureGenItem(i))
+            .ToList();
+
+    /// <summary>Items that are imported + engine-supported but deliberately held OUT of every obtainable channel
+    /// (reward + shop) for now, so the run stays Gen-1-authentic. <b>Max Revive</b> is a Gen-2 item (Red/Blue/Yellow
+    /// shipped only Revive) — its data + <see cref="creaturegame.Combat.ReviveItemEffect"/> support are forward
+    /// scaffolding for the multi-generation milestone; until then it never drops or stocks. Remove this hold-out when
+    /// Gen 2 lands. (Revive — the authentic Gen-1 item — is unaffected.)</summary>
+    private static bool IsHeldOutFutureGenItem(Item item) =>
+        string.Equals(item.Name, "max-revive", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// The single entry point for the run's reward supplier: rolls the reward for the earning node and returns
@@ -189,7 +201,13 @@ internal static class RewardCalculator
         int? excludeId
     )
     {
-        var pool = excludeId is { } id ? usable.Where(i => i.Id != id).ToList() : usable.ToList();
+        var pool = usable
+            .Where(i => i.Id != excludeId)
+            // Revive is a Boss-reward-only drop (plus the shop, which draws from the pool directly, not through
+            // here) — so every non-Boss reward node filters it out. Its Boss category-weight (below) then makes it
+            // a prime Boss reward. This keeps "extremely rare" honest: only a Boss win can ever hand one out.
+            .Where(i => tier == RunNodeKind.BossBattle || i.Category != ItemCategory.Revive)
+            .ToList();
         if (pool.Count == 0)
             return null;
 
@@ -317,8 +335,9 @@ internal static class RewardCalculator
     }
 
     // A Boss (the premium node) up-weights replenishment and down-weights stat items; every other tier is
-    // uniform (weight 1). Revive is weighted like a top Boss reward so it slots straight in the moment it
-    // becomes usable — until then it's filtered out of the eligible pool upstream, so this arm is dormant.
+    // uniform (weight 1). Revive stays intentionally low (uniform 1.0, not up-weighted): it is pool-eligible only
+    // on Boss nodes (RollItemOption filters it everywhere else), so being Boss-only already makes it far rarer than
+    // items that drop everywhere — keeping "extremely rare" honest rather than a near-guaranteed Boss drop.
     private static double CategoryWeight(ItemCategory category, RunNodeKind tier)
     {
         if (tier != RunNodeKind.BossBattle)
@@ -327,7 +346,7 @@ internal static class RewardCalculator
         return category switch
         {
             ItemCategory.Healing => 4.0,
-            ItemCategory.Revive => 4.0, // dormant: filtered upstream until usable, then a prime Boss reward
+            ItemCategory.Revive => 1.0, // Boss-only already = rare; not up-weighted, so it's an occasional drop
             ItemCategory.PpRestore => 2.0,
             ItemCategory.BattleStatBoost => 0.5,
             _ => 1.0,

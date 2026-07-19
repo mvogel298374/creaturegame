@@ -29,6 +29,12 @@ export function needsMoveTarget(item: Pick<BagItem, 'category' | 'restoresPpAllM
   return item.category === 'PpRestore' && !item.restoresPpAllMoves;
 }
 
+// A Revive targets a fainted PARTY member (not the active creature), so the menu must ask which one before
+// using it — the party analogue of needsMoveTarget. Every other category acts on the active creature directly.
+export function needsPartyTarget(item: Pick<BagItem, 'category'>): boolean {
+  return item.category === 'Revive';
+}
+
 // Item names arrive as lowercase, hyphenated slugs ("super-potion", "x-attack"); the UI is uppercase
 // throughout, so display them "SUPER POTION", "X ATTACK" — the item analogue of formatMoveName.
 export function formatItemName(name: string): string {
@@ -41,6 +47,7 @@ export function formatItemName(name: string): string {
 export const CATEGORY_LABELS: ReadonlyArray<{ category: string; label: string }> = [
   { category: 'Healing', label: 'HEALING' },
   { category: 'StatusCure', label: 'STATUS' },
+  { category: 'Revive', label: 'REVIVE' },
   { category: 'PpRestore', label: 'PP RESTORE' },
   { category: 'BattleStatBoost', label: 'BATTLE' },
 ];

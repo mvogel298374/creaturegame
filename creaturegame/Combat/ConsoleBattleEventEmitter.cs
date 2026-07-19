@@ -310,6 +310,10 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                 Console.WriteLine($"{e.Name} fainted!");
                 break;
 
+            case Revived e:
+                Console.WriteLine($"{e.CreatureName} was revived! ({e.HpAfter} HP restored)");
+                break;
+
             case ExperienceGained e:
                 Console.WriteLine($"{e.CreatureName} gained {e.Amount} EXP. Points!");
                 break;

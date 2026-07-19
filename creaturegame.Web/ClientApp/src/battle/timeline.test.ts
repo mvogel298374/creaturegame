@@ -754,6 +754,11 @@ describe('expandEvent — items', () => {
     const { steps } = expandEvent('ItemUseFailed', { itemName: 'potion' }, CTX);
     expect(logLines(steps)).toEqual(["It won't have any effect!"]);
   });
+
+  it('narrates a Revive (the bench member\'s HP repaints off the PartyUpdated that follows)', () => {
+    const { steps } = expandEvent('Revived', { creatureName: 'BULBASAUR', hpRestored: 100, hpAfter: 100 }, CTX);
+    expect(logLines(steps)).toEqual(['BULBASAUR was revived!']);
+  });
 });
 
 describe('healSummary — Quick Heal reward card tag', () => {

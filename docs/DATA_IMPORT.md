@@ -202,6 +202,12 @@ knowledge**: `ItemMapper.Gen1BattleItemNames` is the curated allowlist of PokeAP
 **drives the fetch** — `ItemImport` requests exactly those `/item/{slug}` details, maps, and upserts.
 ("x-sp-atk" is the modern slug for Gen 1's single X Special; X Sp. Def didn't exist in Gen 1.)
 
+**One deliberate forward-looking exception: `max-revive`.** Max Revive is a **Gen-2** item (Red/Blue/Yellow
+shipped only Revive), yet it is kept in the allowlist as *scaffolding* for the multi-generation milestone — its
+data + `ReviveItemEffect` support are ready. To keep runs Gen-1-authentic in the meantime it is **held out of
+every obtainable channel** by `RewardCalculator.UsableItems` (so it never drops or stocks); remove that hold-out
+when Gen 2 lands. It is the lone non-Gen-1 slug here — every other entry is a genuine Gen 1 item.
+
 **Gen 1 gameplay numbers are a layer-2 override**, exactly like the moves importer. PokeAPI gives no
 machine-readable "this heals 20 HP" / "this cures poison," so `ItemMapper.ApplyGen1Gameplay` sets the
 well-defined Gen 1 facts by item name from an authority: `HealAmount`/`HealsAllHp`,

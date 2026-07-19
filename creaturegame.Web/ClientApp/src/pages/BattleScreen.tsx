@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { TypeBadge, typeColor } from '../components/TypeBadge';
 import { MapGlyphSprite, TypeChip, typeIconId, nodeIconId } from './mapGlyphs';
 import { BattleCanvas } from '../battle/BattleCanvas';
-import { useBattleHub, type LevelUpPanel, type DropToast } from '../hooks/useBattleHub';
+import { useBattleHub, type LevelUpPanel, type DropToast, type PartyMember } from '../hooks/useBattleHub';
 import { useEscapeKey } from '../hooks/useEscapeKey';
 import { type RegionBiome, type BiomeOption } from '../battle/timeline';
 import { regionEdgeKey, travelledEdgeKeys } from '../battle/regionMap';
@@ -13,7 +13,7 @@ import type { Species } from '../types/Species';
 import type { MoveInfo } from '../types/BattleEvents';
 import { formatMoveName } from '../utils/format';
 import { friendlyFetchError } from '../utils/fetchError';
-import { type BagItem, groupBagItems, needsMoveTarget, formatItemName } from '../battle/bag';
+import { type BagItem, groupBagItems, needsMoveTarget, needsPartyTarget, formatItemName } from '../battle/bag';
 import { PartyStrip } from '../components/PartyStrip';
 import { Modal } from '../components/modals/Modal';
 import { BattleEndedOverlay } from '../components/modals/BattleEndedOverlay';
@@ -89,9 +89,13 @@ export function BattleScreen() {
     setControlView('menu');
   };
 
-  const handleUseItem = (itemId: number, targetMoveSlot: number | null) => {
+  const handleUseItem = (
+    itemId: number,
+    targetMoveSlot: number | null,
+    targetPartySlot: number | null = null,
+  ) => {
     onAnyInput();
-    useItem(itemId, targetMoveSlot);
+    useItem(itemId, targetMoveSlot, targetPartySlot);
     setControlView('menu');
   };
 
@@ -210,6 +214,7 @@ export function BattleScreen() {
               gameId={gameId}
               gold={state.gold}
               moves={state.moves}
+              party={state.party}
               onUse={handleUseItem}
               onBack={() => setControlView('menu')}
             />
@@ -740,20 +745,65 @@ function MoveMenu({ moves, canChoose, onChoose, onBack }: {
   );
 }
 
+// Party-member pick for a Revive / Max Revive. Lists the roster; only a fainted member (hp ≤ 0) is a valid
+// target (a healthy one is disabled — reviving it would have no effect, so the engine refuses the use). The
+// bag menu only offers a Revive when at least one member is fainted, so this always has a live target.
+function ReviveTargetPicker({ item, party, onPick, onBack }: {
+  item: BagItem;
+  party: PartyMember[];
+  onPick: (slot: number) => void;
+  onBack: () => void;
+}) {
+  return (
+    <div className="move-menu">
+      <p className="bag-pp-prompt">Revive which party member? ({formatItemName(item.name)})</p>
+      <div className="bag-list">
+        {party.map((m, i) => {
+          const fainted = m.hp <= 0;
+          return (
+            <button
+              key={i}
+              className={`bag-item${fainted ? '' : ' move-btn--disabled'}`}
+              disabled={!fainted}
+              onClick={() => onPick(i)}
+            >
+              <img
+                className="bag-item-sprite"
+                src={`/sprites/front/${m.speciesId}.png`}
+                alt=""
+                aria-hidden="true"
+                draggable={false}
+                onError={e => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }}
+              />
+              <span className="bag-item-name">{m.name}</span>
+              <span className="bag-item-qty">Lv{m.level}</span>
+              <span className="bag-item-desc">{fainted ? 'FAINTED' : `${m.hp}/${m.maxHp} HP`}</span>
+            </button>
+          );
+        })}
+      </div>
+      <button className="btn-ghost action-back" onClick={onBack}>← BACK</button>
+    </div>
+  );
+}
+
 // The in-battle bag: fetched fresh each time it opens (quantities change as items are consumed), grouped by
 // pocket, with only battle-usable categories shown (see bag.ts). Picking an item uses it as the turn —
 // except a single-move PP restore (Ether), which first asks which move slot to refill via PpTargetPicker.
-function BagMenu({ gameId, gold, moves, onUse, onBack }: {
+function BagMenu({ gameId, gold, moves, party, onUse, onBack }: {
   gameId: string | null;
   gold: number;
   moves: MoveInfo[];
-  onUse: (itemId: number, targetMoveSlot: number | null) => void;
+  party: PartyMember[];
+  onUse: (itemId: number, targetMoveSlot: number | null, targetPartySlot: number | null) => void;
   onBack: () => void;
 }) {
   const [items, setItems] = useState<BagItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   // When set, we're picking the move slot for this single-move PP-restore item instead of the item list.
   const [ppTarget, setPpTarget] = useState<BagItem | null>(null);
+  // When set, we're picking which fainted party member to Revive instead of the item list.
+  const [reviveTarget, setReviveTarget] = useState<BagItem | null>(null);
 
   useEffect(() => {
     if (!gameId) { setError('No active game.'); return; }
@@ -767,7 +817,8 @@ function BagMenu({ gameId, gold, moves, onUse, onBack }: {
 
   const pick = (item: BagItem) => {
     if (needsMoveTarget(item)) setPpTarget(item);
-    else onUse(item.id, null);
+    else if (needsPartyTarget(item)) setReviveTarget(item);
+    else onUse(item.id, null, null);
   };
 
   if (ppTarget) {
@@ -775,8 +826,19 @@ function BagMenu({ gameId, gold, moves, onUse, onBack }: {
       <PpTargetPicker
         item={ppTarget}
         moves={moves}
-        onPick={slot => onUse(ppTarget.id, slot)}
+        onPick={slot => onUse(ppTarget.id, slot, null)}
         onBack={() => setPpTarget(null)}
+      />
+    );
+  }
+
+  if (reviveTarget) {
+    return (
+      <ReviveTargetPicker
+        item={reviveTarget}
+        party={party}
+        onPick={slot => onUse(reviveTarget.id, null, slot)}
+        onBack={() => setReviveTarget(null)}
       />
     );
   }
