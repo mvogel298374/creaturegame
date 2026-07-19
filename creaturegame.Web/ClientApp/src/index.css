@@ -17,17 +17,17 @@
   --clr-gold:          #ffd700;   /* logo, highlights */
 
   --clr-text:          #f0f0f0;
-  --clr-text-sub:      #aaaaaa;   /* subtitles, labels */
-  --clr-text-muted:    #555555;   /* placeholder copy */
+  --clr-text-sub:      #c4c4d2;   /* subtitles, labels — brightened for small-stat legibility */
+  --clr-text-muted:    #6a6a78;   /* placeholder copy — nudged up from #555 for contrast */
 
   --clr-border:        rgba(255, 255, 255, 0.10);
   --clr-grid:          rgba(255, 255, 255, 0.02);
 
   /* ── Typography ───────────────────────────────────── */
-  --font:              'Courier New', Courier, monospace;
+  --font:              'JetBrains Mono', 'Courier New', Courier, monospace;
 
-  --fs-xs:    0.65rem;
-  --fs-sm:    0.8rem;
+  --fs-xs:    0.72rem;   /* bumped from 0.65 — the small-stat size (level / HP / labels) */
+  --fs-sm:    0.84rem;   /* bumped from 0.8 */
   --fs-base:  1rem;
   --fs-lg:    1.25rem;
   --fs-xl:    1.75rem;

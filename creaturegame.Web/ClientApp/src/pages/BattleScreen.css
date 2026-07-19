@@ -87,6 +87,7 @@
   font-size: var(--fs-xs);
   color: var(--clr-text-sub);
   letter-spacing: 0;
+  font-weight: 600;
 }
 
 /* ── HP / XP bars ────────────────────────────── */
@@ -101,7 +102,8 @@
   font-size: var(--fs-xs);
   color: var(--clr-text-sub);
   letter-spacing: 0;
-  min-width: 14px;
+  min-width: 16px;
+  font-weight: 700;
 }
 
 .bar-track {
@@ -130,8 +132,9 @@
   font-size: var(--fs-xs);
   color: var(--clr-text);
   letter-spacing: 0;
-  min-width: 52px;
+  min-width: 58px;
   text-align: right;
+  font-weight: 600;
 }
 
 .hp-sep {
@@ -346,9 +349,10 @@
 }
 
 .move-pp {
-  font-size: 0.6rem;
+  font-size: 0.7rem;
   letter-spacing: 0;
   color: var(--clr-text-sub);
+  font-weight: 600;
 }
 
 .move-pp--low {
@@ -371,8 +375,8 @@
   position: absolute;
   top: 3px;
   right: 4px;
-  font-size: 0.5rem;
-  font-weight: bold;
+  font-size: 0.56rem;
+  font-weight: 700;
   letter-spacing: 0.05em;
   color: #2a2118;
   background: #f0c674;
@@ -573,8 +577,8 @@
 /* ── Status badge ────────────────────────────── */
 .status-badge {
   display: inline-block;
-  font-size: 0.55rem;
-  font-weight: bold;
+  font-size: 0.62rem;
+  font-weight: 700;
   letter-spacing: 1px;
   padding: 1px 5px;
   margin-top: 2px;
@@ -1817,9 +1821,10 @@
 }
 
 .party-chip-lvl {
-  font-size: 9px;
+  font-size: 11px;
   color: var(--clr-text);
-  letter-spacing: var(--ls-normal);
+  letter-spacing: 0.5px;
+  font-weight: 700;
 }
 
 .party-chip-hp {
@@ -1838,7 +1843,7 @@
 
 .party-chip-tag {
   margin-top: 2px;
-  font-size: 7px;
+  font-size: 8.5px;
   font-weight: 700;
   letter-spacing: 0.06em;
   color: var(--clr-sky);
