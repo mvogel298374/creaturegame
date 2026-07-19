@@ -305,6 +305,9 @@ public class AttackAction : IBattleAction
         )
         {
             _emitter?.Emit(new MoveHadNoEffect(Target.Name, move.Name ?? ""));
+            // An immune turn still counts toward the rampage lock and fires its end-of-lock
+            // self-confusion, exactly like the miss branch above (Thrash locked onto a Ghost).
+            lockIn?.OnTurnEnd(lockCtx!);
             return PreDamageGateResult.Halt;
         }
 

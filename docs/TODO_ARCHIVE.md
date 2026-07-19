@@ -31,6 +31,11 @@ Struggle-vs-Ghost no-recoil. Stale comment updated on
 `StabAndTypeEffectivenessContractTests.GhostMovesDealNoDamageToImmuneTypesInGen1`. Full .NET suite green:
 1364/1364.
 
+**Same-day follow-up (pr-review catch):** the new halt initially skipped the lock-in `OnTurnEnd` tick, so a
+Thrash locked onto a Ghost never resolved its rampage lock or fired the end-of-lock self-confusion (the miss
+branch ticks it; the immunity halt didn't). Fixed by mirroring the miss branch's tick inside the halt; pinned by
+`TypeImmunityContractTests.RampageLockedOntoImmuneTargetStillResolvesAndSelfConfuses`.
+
 ---
 
 ## Stat-cap message fidelity ✅ DONE (2026-07-19)
