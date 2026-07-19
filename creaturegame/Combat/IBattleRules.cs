@@ -338,7 +338,9 @@ public interface IBattleRules
     /// Ghost, Growl lowers a Ghost's Attack, sleep/Disable land regardless of type. Only Thunder Wave
     /// (Electric ⇒ Ground is immune) and Counter (reflects damage ⇒ Ghost takes none of its Fighting type)
     /// return true. Gen 2 makes status moves respect immunity generally ⇒ seam, not a hardcoded check.
-    /// Damaging moves are unaffected (they fold 0× into zero damage regardless).
+    /// Damaging moves are gated separately and unconditionally: a 0× damaging move halts with the same
+    /// "doesn't affect" announcement before its damage and secondary steps (gen-invariant, so it lives
+    /// inline in <c>AttackAction.ResolvePreDamageGates</c>, not on this seam).
     /// </para>
     /// <para>
     /// Implementations may key off the move's status/effect/type rather than a foe-direction flag — safe

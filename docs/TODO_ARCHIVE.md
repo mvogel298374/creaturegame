@@ -8,6 +8,31 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## 0× type immunity does not gate secondary effects ✅ DONE (2026-07-19)
+
+Filed from the 2026-07-19 repo-wide audit: the pre-damage immunity halt in `AttackAction` deliberately excluded
+`Standard`/`Drain` movers ("folds 0× into 0 damage"), so `TryApplyStatus` / `TryApplyStatEffect` /
+`TryApplyMoveEffect` still ran after an immune hit — concretely, **Body Slam vs a Ghost or Thunder vs a
+Ground-type dealt 0 damage yet could still paralyze** (30%/10%), Constrict could drop a Ghost's Speed, and
+`FlinchEffect` wasn't damage-gated either. The client also got a `DamageDealt(0)` event instead of a no-effect
+line for these hits.
+
+Fixed in `creaturegame/Combat/AttackAction.cs` `ResolvePreDamageGates`: the type-immunity halt now also covers
+damaging Standard/Drain movers (incl. Struggle), via a new `isDamagingMove` condition that excludes Crash-effect
+moves (Jump Kick's dedicated crash-on-immunity branch below still handles those) and leaves Self-Destruct's
+detonation path untouched. An immune hit now emits `MoveHadNoEffect` and halts — no `DamageDealt(0)`, no
+secondary status/stat-drop/flinch/recoil/trap. The halt is gen-invariant (Struggle going typeless in Gen 4 —
+it stays Normal through Gens 1–3 — rides the type chart, not this gate).
+
+New `tests/creaturegame.Tests/Integration/Gen1Attacks/TypeImmunityContractTests.cs` (8 tests), written per
+`GENERATION_SEAMS.md §5.0.1` against the quirk itself, not just the outcome: body-slam/thunder/lick
+no-paralysis, constrict no-stat-drop, bite no-flinch, take-down no-recoil, no-effect-instead-of-zero-damage,
+Struggle-vs-Ghost no-recoil. Stale comment updated on
+`StabAndTypeEffectivenessContractTests.GhostMovesDealNoDamageToImmuneTypesInGen1`. Full .NET suite green:
+1364/1364.
+
+---
+
 ## Stat-cap message fidelity ✅ DONE (2026-07-19)
 
 A stat move used at the ±6 stage cap used to emit a phantom `StatStageChanged` — the log narrated "X's ATTACK

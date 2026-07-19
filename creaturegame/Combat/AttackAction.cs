@@ -260,10 +260,14 @@ public class AttackAction : IBattleAction
             justThawed = true;
         }
 
-        // Gen 1: a target immune to the move's type takes nothing — including moves that bypass the normal
-        // calc (fixed / level-based / OHKO / Super Fang) and pure-status moves (Thunder Wave is Electric ⇒
-        // Ground is immune). Damaging Standard/Drain folds 0× into 0 damage, and Self-Destruct still
-        // detonates the user — both excluded here.
+        // Gen 1: a target immune to the move's type takes nothing — no damage AND no secondary. That
+        // includes the damaging categories: Body Slam can't paralyze a Ghost, Thunder can't paralyze a
+        // Ground-type, Constrict can't drop a Ghost's Speed, Take Down deals no recoil, and Struggle (Normal
+        // in Gen 1) whiffs a Ghost recoil-free. Halting here — instead of folding 0× into a 0-damage hit —
+        // is what keeps every post-damage step (TryApplyStatus / TryApplyStatEffect / TryApplyMoveEffect)
+        // immunity-safe through one gate. Two deliberate exclusions: Self-Destruct still detonates its user
+        // on an immune target (its branch owns the faint), and Crash movers (Jump Kick) fall through to the
+        // dedicated crash-on-immunity branch below.
         bool isPureStatusMove =
             category == DamageCategory.Standard && !usingStruggle && move.BaseDamage == 0;
         // Gen 1: a non-damaging move almost always IGNORES type immunity — Confuse Ray confuses a Normal-
@@ -272,6 +276,14 @@ public class AttackAction : IBattleAction
         // respect immunity) ⇒ on IBattleRules. (Self-targeting moves never check the foe's type; Leech Seed
         // vs Grass and "Poison can't be poisoned" have their own immunity via CanBeLeechSeeded/CanReceiveStatus.)
         bool pureStatusChecksImmunity = _rules.PureStatusMoveChecksTypeImmunity(move);
+        // A damaging Standard/Drain mover (or Struggle). Whether a 0× damaging move truly does nothing is
+        // gen-invariant (true in every generation); what varies by gen — e.g. Struggle going typeless in
+        // Gen 4 (it stays Normal through Gens 1–3) — is the move's TYPE, so the variability rides the type
+        // chart, not this gate.
+        bool isDamagingMove =
+            category is DamageCategory.Standard or DamageCategory.Drain
+            && (usingStruggle || move.BaseDamage > 0)
+            && move.Effect != MoveEffect.Crash;
         double typeImmunity = DamageCalculator.GetTypeEffectiveness(
             move.DamageType,
             Target.Type1,
@@ -282,6 +294,7 @@ public class AttackAction : IBattleAction
             typeImmunity == 0
             && (
                 (isPureStatusMove && pureStatusChecksImmunity)
+                || isDamagingMove
                 || category
                     is DamageCategory.Fixed
                         or DamageCategory.LevelBased
@@ -296,8 +309,8 @@ public class AttackAction : IBattleAction
         }
 
         // Gen 1: Jump Kick / Hi Jump Kick also crash on a type immunity (Fighting → Ghost 0×), not just an
-        // accuracy miss. They're Standard-category so they slip past the immunity block above (which excludes
-        // Standard) and would otherwise whiff harmlessly. Mirror the miss branch: announce no-effect, then crash.
+        // accuracy miss. Crash movers are explicitly excluded from the general immunity halt above so they
+        // reach this branch instead of whiffing harmlessly. Mirror the miss branch: announce no-effect, then crash.
         if (move.Effect == MoveEffect.Crash && typeImmunity == 0)
         {
             _emitter?.Emit(new MoveHadNoEffect(Target.Name, move.Name ?? ""));

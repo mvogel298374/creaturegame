@@ -519,6 +519,12 @@ tested through the `mitt` bridge (assert **event ordering**, never wall-clock du
   item-effect logic stays covered by `ItemEffectTests`, bag grouping by `bag.test.ts`).
 
 **Remaining (in priority order):**
+- [ ] **`reward-drop.spec.ts` is red — seed-31 drift** (found 2026-07-19, pre-existing): the spec pins seed 31
+  laying a **Treasure** as the first biome node, but the `.reward-modal` no longer appears — the node layout under
+  that seed has drifted (some earlier commit added/moved an RNG draw before node planning). Verified NOT caused by
+  the 2026-07-19 immunity-gate fix: it fails identically against a pre-fix backend, and the spec's failure point
+  (run start → first node) precedes any battle. *Fix:* walk seeds for a new Treasure-first seed (the documented
+  "seed ≠ determinism" remedy), or make the spec robust to node order (play until the first Treasure).
 - [x] **Stabilise inter-test E2E flakiness (a seed-determinism pass)** — DONE (2026-07-08). `startBattle` gained
   an optional `seed` param: when given it lands directly on `/select?e2e=1&seed=…` (the `reward-drop.spec`
   pattern; the level slider lives on that screen so a custom `level` still works), pinning the whole run — enemy,
@@ -642,6 +648,48 @@ Battles are fully playable now — docs won't describe a moving target.
 - [ ] *(low, watch — do not refactor speculatively)* **`AttackAction` still has three large methods**:
   `ResolveDamage` (145 lines), `ExecuteAsync` (140), `ResolvePreDamageGates` (112), despite the earlier split
   archived as (B). It is central and well-tested; revisit only if a change makes it hurt.
+- [ ] *(low)* **`Console.WriteLine` is the web layer's entire logging strategy** — no `ILogger<T>` anywhere
+  (`GameController`, `GameSessionManager`, the importer's catches). Fine for local dev; it's the one modern
+  ASP.NET convention the repo skips, and it will matter the first time something needs debugging on Fly.io
+  (structured levels, category filtering, log scraping). Filed from the 2026-07-19 audit's design review; do it
+  as a mechanical pass when a real debugging need first bites, not speculatively.
+- [ ] *(low, watch — do not refactor speculatively)* **`Battle`'s constructor is at 12 parameters** and heading
+  where `RunDirector`'s was before `RunDirectorOptions` (archived 2026-07-16). Apply the same precedent — a
+  `BattleOptions` record for the optional tail (rules/emitter/rng/bag/escapable/trainer/runRules/party) — the
+  next time a feature (likely **In-Combat Switching**) has to touch the signature anyway. Not worth a
+  standalone churn commit: every call site is a test or the run layer, and both are stable.
+
+### Repo-wide PR-audit findings — open (2026-07-19)
+
+Filed from a whole-repo `pr-review`-style audit (gen-seam architecture, central-method contracts, conventions,
+wire completeness). User-adjudicated 2026-07-19: the three checkboxes below are accepted as real work; ranked by
+severity. *(A fifth finding — a narrow `SignalRInput` cancel/prompt race that can leak an abandoned run task —
+was deliberately **not** filed: the user doesn't care about abandoned-run leakage while game state is this
+transient. Don't re-raise it until persistence/save-layer work makes run lifetime matter.)* *(The first finding
+— 0× type immunity not gating secondary effects — was FIXED 2026-07-19; see `TODO_ARCHIVE.md` → "0× type
+immunity does not gate secondary effects".)*
+
+- [ ] **Leech Seed drain borrows `PoisonDamageDenominator`** (`Battle.ApplyLeechSeedDrain`, `Battle.cs:576`).
+  Same 1/16 value in Gen 1, but it is a *distinct game rule* read off the wrong seam member — a later gen
+  changing one and not the other forces a split, and the member name misdocuments what the drain reads. Fix: a
+  dedicated `IBattleRules.LeechSeedDrainDenominator` (Gen 1 = 16) with the per-generation XML doc, read at the
+  drain site; pin with a test against the new member. *(Promoted from a minor audit note to a real bug by the
+  user, 2026-07-19.)*
+- [ ] **Paralysis Speed quartering is an inline gen-variable magic number** (`StatusResolver.EffectiveSpeed`,
+  `StatusResolver.cs:13` — `speed /= 4`). The divisor is gen-variable (Gen 7+ halves instead of quarters) and
+  `StatusResolver` is explicitly on §5.0's no-magic-number list ⇒ belongs on `IBattleRules` (e.g.
+  `ParalysisSpeedDivisor`) with the per-gen XML doc. *(The neighbouring 25% full-paralysis roll is
+  gen-invariant and correctly stays inline.)*
+- [ ] **Haze over-resets: it cures the user's own major status** (`HazeEffect`, `MoveEffects.cs:76` — full
+  `ResetBattleState()` on **both** sides). Gen 1 Haze resets both sides' stat stages + volatiles but cures only
+  the **opponent's** non-volatile status — here a paralyzed user can Haze itself healthy. The full reset also
+  reverts an active Transform/Mimic mid-battle; that half is *unverified* (Gen 1's volatile-clear scope is
+  murkier) — **check pokered's `HazeEffect` first**, then narrow the reset to the verified scope. Requirements
+  lane: run the fix past `requirements-review` with the pokered citation.
+- *(minor, convention — decide, don't just fix)* The three DB services (`PokemonService` / `AttackService` /
+  `ItemService`) contain no try/catch while `CLAUDE.md` mandates wrapped DB calls with logging; every live
+  caller wraps at its boundary instead (`GameController.Start`, the session task's global catch), so failures
+  do get logged. Either add the wraps or amend the convention to "wrapped at the call boundary".
 
 ### Known Gaps
 - Enemy encounter pool ignores game version — filter by `PokemonGameAvailability` once a version selector exists.
