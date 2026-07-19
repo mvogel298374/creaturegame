@@ -648,15 +648,7 @@ Battles are fully playable now — docs won't describe a moving target.
 - Enemy Pokémon do not evolve — wire into level-up when Game Loop is built.
 - **Endless-chain double-faint** — tested (2026-06-12): a mutual end-of-turn DoT double-faint counts as a loss,
   pinned by `BattleRunnerTests.Runner_DoubleFaintFromEndOfTurnPoison_CountsAsLoss_NotAWin`.
-- **Phantom stat-cap message** (low, cosmetic — filed 2026-07-19). A stat move used at the ±6 stage cap still
-  emits `StatStageChanged` (`AttackAction.TryApplyStatEffect` → `ApplyStageChange`, `AttackAction.cs:601`), so the
-  log narrates a phantom "X's ATTACK rose!" / "fell!" even though the stage was clamped and didn't move. The clamp
-  itself is correct (mechanically fine); only the text is wrong, and no cap-boundary test exists. **Gen 1 shows a
-  plain "Nothing happened!" at the cap** (verified: [Bulbapedia — Stat modifier](https://bulbapedia.bulbagarden.net/wiki/Stat_modifier)).
-  Fix: capture the pre-stage; if `ApplyStageChange` leaves it unchanged, suppress `StatStageChanged` and emit the
-  existing `ButNothingHappened` instead — first confirm whether a *secondary* stat drop at cap also says it in Gen 1.
-  **Do NOT add "won't rise/drop anymore!" (Gen 3–4) or "won't go any higher/lower!" (Gen 5+)** — those are later-gen
-  texts, wrong for a Gen 1 clone.
+- ~~**Phantom stat-cap message**~~ — **FIXED 2026-07-19** (see `TODO_ARCHIVE.md` → *Stat-cap message fidelity*).
 
 ---
 

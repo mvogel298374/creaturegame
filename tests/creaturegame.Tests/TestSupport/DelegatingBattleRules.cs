@@ -54,6 +54,8 @@ public abstract class DelegatingBattleRules : IBattleRules
     public virtual RedundantConfuseAnnouncement RedundantConfusionAnnouncement =>
         _inner.RedundantConfusionAnnouncement;
 
+    public virtual StatCapAnnouncement StatStageCapAnnouncement => _inner.StatStageCapAnnouncement;
+
     public virtual int CalculateStruggleRecoil(Creature s, int d) =>
         _inner.CalculateStruggleRecoil(s, d);
 

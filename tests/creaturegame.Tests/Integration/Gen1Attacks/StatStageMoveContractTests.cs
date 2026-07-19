@@ -152,4 +152,77 @@ public class StatStageMoveContractTests(MovesFixture moves) : Gen1MoveContract(m
         Assert.Equal(-1, change.Delta);
         Assert.Equal(-1, change.NewStage);
     }
+
+    // ── At the ±6 cap (Gen 1: "Nothing happened!" for a primary move, silent for a side effect) ──────────
+
+    [Fact]
+    public async Task PrimaryRaiseAtTheCap_SaysNothingHappened_NotAPhantomRise()
+    {
+        // A primary stat move on a stat that's already +6 doesn't move it — Gen 1 prints "Nothing happened!"
+        // and does NOT announce a rise. (Old bug: it emitted a phantom StatStageChanged → "rose!".)
+        var attacker = TestCreatures.Make("A");
+        attacker.Battle.Stages.RaiseAttack(6); // already capped
+        var result = await new MoveScenario().Attacker(attacker).Use(Move("swords-dance"));
+
+        Assert.Equal(6, result.Attacker.Battle.Stages.Attack); // unchanged
+        Assert.False(result.Has<StatStageChanged>(), "no phantom rose! at the cap");
+        Assert.True(
+            result.Has<ButNothingHappened>(),
+            "Gen 1 prints 'Nothing happened!' at the cap"
+        );
+    }
+
+    [Fact]
+    public async Task PrimaryDropAtTheCap_SaysNothingHappened_NotAPhantomFall()
+    {
+        var defender = TestCreatures.Make("Defender", hp: 500);
+        defender.Battle.Stages.RaiseAttack(-6); // already at the −6 floor
+        var result = await new MoveScenario().Defender(defender).Use(Move("growl"));
+
+        Assert.Equal(-6, result.Defender.Battle.Stages.Attack); // unchanged
+        Assert.False(result.Has<StatStageChanged>(), "no phantom fell! at the cap");
+        Assert.True(
+            result.Has<ButNothingHappened>(),
+            "Gen 1 prints 'Nothing happened!' at the cap"
+        );
+    }
+
+    [Fact]
+    public async Task SecondaryDropAtTheCap_FailsSilently_NoMessage()
+    {
+        // A side-effect stat drop riding a damaging move (Acid → −1 Defense) at the −6 floor: Gen 1 prints
+        // NOTHING (the damage line already showed) — unlike a primary move. So neither StatStageChanged nor
+        // ButNothingHappened, distinguishing the two cap paths (pokered: primary → text, side effect → ret nc).
+        var defender = TestCreatures.Make("Defender", hp: 500);
+        defender.Battle.Stages.RaiseDefense(-6);
+        var result = await new MoveScenario()
+            .Defender(defender)
+            .Rules(ForceSecondaryRules.Instance)
+            .Use(Move("acid"));
+
+        Assert.True(result.Has<DamageDealt>(), "Acid is a damaging move — the hit still lands");
+        Assert.Equal(-6, result.Defender.Battle.Stages.Defense); // unchanged
+        Assert.False(result.Has<StatStageChanged>(), "no phantom fell! at the cap");
+        Assert.False(
+            result.Has<ButNothingHappened>(),
+            "a side effect at the cap is silent in Gen 1"
+        );
+    }
+
+    [Fact]
+    public async Task RaiseThatStillMovesTheStage_NearTheCap_StillAnnounces()
+    {
+        // Regression guard: a +2 move at +5 clamps to +6 but DID move (by 1), so it still announces the rise
+        // (Gen 1 shows the move's own +2 "sharply" text regardless of the clamp). Only a true no-op is suppressed.
+        var attacker = TestCreatures.Make("A");
+        attacker.Battle.Stages.RaiseAttack(5);
+        var result = await new MoveScenario().Attacker(attacker).Use(Move("swords-dance"));
+
+        Assert.Equal(6, result.Attacker.Battle.Stages.Attack);
+        var change = result.First<StatStageChanged>();
+        Assert.NotNull(change);
+        Assert.Equal(2, change!.Delta); // the move's amount, not the clamped delta
+        Assert.Equal(6, change.NewStage);
+        Assert.False(result.Has<ButNothingHappened>());
+    }
 }

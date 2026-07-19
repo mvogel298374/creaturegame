@@ -36,6 +36,24 @@ public enum RedundantConfuseAnnouncement
     AlreadyConfused,
 }
 
+/// <summary>
+/// How a <i>primary</i> stat-stage move announces hitting a stat that is already at the ±6 cap (so it can't
+/// change further). The ±6 clamp itself is gen-agnostic — every generation caps there — so only the message
+/// differs, and it rides the seam (the sibling of <see cref="RedundantConfuseAnnouncement"/>).
+/// <para>Gen 1–2: <see cref="NothingHappened"/> — the generic "Nothing happened!" (<c>PrintNothingHappenedText</c>
+/// in pokered). Gen 3+: <see cref="WontChangeFurther"/> — names it ("… won't rise/drop anymore!"; Gen 5+
+/// "… won't go any higher/lower!"). A <i>secondary</i> stat drop on a damaging move fails <b>silently</b> in
+/// Gen 1 and never consults this.</para>
+/// </summary>
+public enum StatCapAnnouncement
+{
+    /// <summary>The generic "Nothing happened!" line. Gen 1–2.</summary>
+    NothingHappened,
+
+    /// <summary>A message naming the cap ("… won't rise anymore!"). Gen 3+.</summary>
+    WontChangeFurther,
+}
+
 public interface IBattleRules
 {
     /// <summary>
@@ -122,6 +140,14 @@ public interface IBattleRules
     /// ("But it failed!"). The counter is never re-rolled regardless (gen-agnostic); this only picks the message.
     /// </summary>
     RedundantConfuseAnnouncement RedundantConfusionAnnouncement { get; }
+
+    /// <summary>
+    /// How a PRIMARY stat move announces hitting a stat already at the ±6 cap — see
+    /// <see cref="StatCapAnnouncement"/>. Gen 1: <see cref="StatCapAnnouncement.NothingHappened"/> ("Nothing
+    /// happened!"). The ±6 clamp is gen-agnostic; this only picks the message. A secondary stat drop on a
+    /// damaging move stays silent regardless and never consults this.
+    /// </summary>
+    StatCapAnnouncement StatStageCapAnnouncement { get; }
 
     /// <summary>
     /// Returns the recoil damage dealt to a Struggle user.

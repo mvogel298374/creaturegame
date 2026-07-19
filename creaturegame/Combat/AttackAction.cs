@@ -628,8 +628,34 @@ public class AttackAction : IBattleAction
         if (!_rules.SecondaryHits(chance, _rng))
             return;
 
+        int before = affected.Battle.Stages.Of(se.Stat);
         int newStage = ApplyStageChange(affected, se.Stat, se.Delta);
-        _emitter?.Emit(new StatStageChanged(affected.Name, se.Stat.ToString(), se.Delta, newStage));
+
+        if (newStage != before)
+        {
+            _emitter?.Emit(
+                new StatStageChanged(affected.Name, se.Stat.ToString(), se.Delta, newStage)
+            );
+            return;
+        }
+
+        // The stage was already at the ±6 cap, so it didn't move — announcing the phantom "rose/fell" the old
+        // code emitted here was wrong. Gen 1 splits by move kind (pokered StatModifierUp/DownEffect): a PRIMARY
+        // stat move (a pure status move, BaseDamage 0 — Growl / Swords Dance / …) announces, while a SIDE-EFFECT
+        // stat drop riding a damaging move fails SILENTLY (early `ret nc` — the damage line already showed). The
+        // primary move's MESSAGE is gen-variable, so it rides the seam (sibling of RedundantConfusionAnnouncement):
+        // Gen 1 → "Nothing happened!"; the Gen-3+ "won't rise/drop anymore" line is a later gen's value. This
+        // mirrors the redundant-confusion path in MoveEffects (dedicated-move gate + switch on the rules enum).
+        if (attack.BaseDamage == 0)
+        {
+            BattleEvent? announcement = _rules.StatStageCapAnnouncement switch
+            {
+                StatCapAnnouncement.NothingHappened => new ButNothingHappened(affected.Name),
+                _ => null, // Gen 3+ names the cap ("won't rise/drop anymore!") — not modelled until that gen exists
+            };
+            if (announcement is not null)
+                _emitter?.Emit(announcement);
+        }
     }
 
     // Post-damage move effects (Haze, Counter, Reflect, Transform, Rest, Substitute …) live behind

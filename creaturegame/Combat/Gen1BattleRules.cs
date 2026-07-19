@@ -38,6 +38,10 @@ public sealed class Gen1BattleRules : IBattleRules
     public RedundantConfuseAnnouncement RedundantConfusionAnnouncement =>
         RedundantConfuseAnnouncement.FailedGeneric;
 
+    // Gen 1: a primary stat move on a stat already at the ±6 cap prints the generic "Nothing happened!"
+    // (PrintNothingHappenedText in pokered) — there is no "won't rise/drop anymore!" line until Gen 3.
+    public StatCapAnnouncement StatStageCapAnnouncement => StatCapAnnouncement.NothingHappened;
+
     // Gen 1–6: a confused creature hits itself 50% of the time.
     public int ConfusionSelfHitPercent => 50;
 

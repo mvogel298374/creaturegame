@@ -8,6 +8,32 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Stat-cap message fidelity ✅ DONE (2026-07-19)
+
+A stat move used at the ±6 stage cap used to emit a phantom `StatStageChanged` — the log narrated "X's ATTACK
+rose!" / "fell!" even though the stage was clamped and didn't move (the clamp itself was always correct; only the
+text was wrong). Fixed in `AttackAction.TryApplyStatEffect`: capture the pre-stage, and if `ApplyStageChange`
+leaves it unchanged, split by move kind exactly as Gen 1 does (verified against **pokered**
+`StatModifierUp/DownEffect` and [Bulbapedia — Stat modifier](https://bulbapedia.bulbagarden.net/wiki/Stat_modifier)):
+
+- **Primary stat move** (a pure status move, `BaseDamage == 0` — Growl / Swords Dance / …) → announce; the
+  message is **gen-variable, so it rides the seam**: new `IBattleRules.StatStageCapAnnouncement` (enum
+  `StatCapAnnouncement`), Gen 1 → `NothingHappened` → `ButNothingHappened` ("Nothing happened!"), Gen 3+ →
+  `WontChangeFurther` (the later-gen "won't rise/drop anymore!" line, not modelled yet). This is the sibling of
+  `RedundantConfusionAnnouncement`, and the call site mirrors its dedicated-move-gate + `switch`-on-enum pattern.
+- **Side-effect stat drop** on a damaging move (`BaseDamage > 0` — Acid / Aurora Beam / Psychic 2° …) → **silent**
+  (the damage line already showed; pokered's early `ret nc`) — the gen-invariant part, kept inline like the
+  secondary-confusion-is-silent case.
+- A change that *does* move the stage (e.g. a +2 move at +5 → +6) still announces, with the move's own amount.
+
+The Gen-3+/Gen-5+ "won't rise/go any higher" texts are **deliberately not** emitted — wrong generation; they're
+reserved as the `WontChangeFurther` seam value for when that gen exists. Covered by four `StatStageMoveContractTests`
+cap cases (primary raise/drop, secondary-silent, near-cap-still-announces). A manual GENERATION_SEAMS §5.0 check
+caught the message as an inline gen-variable leak and moved it to the seam. This replaces the *Phantom stat-cap
+message* Known Gap filed the same day.
+
+---
+
 ## Revive Items — in-battle party revive ✅ DONE (2026-07-19)
 
 Engine + web + frontend all shipped in one session; full suite green. Went through the full pre-finish gate
