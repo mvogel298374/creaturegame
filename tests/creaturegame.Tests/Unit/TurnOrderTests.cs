@@ -92,4 +92,28 @@ public class TurnOrderTests
 
         Assert.Equal(100, effective); // 100 × 4.0 / 4 = 100
     }
+
+    [Fact]
+    public void Paralysis_EffectiveSpeedReadsItsOwnSeamMemberNotAHardcodedFour()
+    {
+        // The quartering divisor is IBattleRules.ParalysisSpeedDivisor, not an inline "4" — a Gen 7+
+        // ruleset halves instead. Override only that member and assert EffectiveSpeed follows it.
+        var creature = new Creature("Pikachu") { Level = 50 };
+        creature.Battle.Status = StatusCondition.Paralysis;
+        creature.CalculateStats();
+        creature.Attributes.Speed = 100;
+
+        int effectiveSpeed = StatusResolver.EffectiveSpeed(
+            creature,
+            new ParalysisHalvesSpeedRules()
+        );
+
+        Assert.Equal(50, effectiveSpeed); // follows the overridden divisor (2), not the Gen 1 value (4)
+    }
+
+    /// <summary>Rules double with the paralysis Speed divisor at 2 (the Gen 7+ value) instead of Gen 1's 4.</summary>
+    private sealed class ParalysisHalvesSpeedRules : DelegatingBattleRules
+    {
+        public override int ParalysisSpeedDivisor => 2;
+    }
 }

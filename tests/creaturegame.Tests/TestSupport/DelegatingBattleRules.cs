@@ -62,6 +62,7 @@ public abstract class DelegatingBattleRules : IBattleRules
     public virtual int BurnDamageDenominator => _inner.BurnDamageDenominator;
     public virtual int PoisonDamageDenominator => _inner.PoisonDamageDenominator;
     public virtual int LeechSeedDrainDenominator => _inner.LeechSeedDrainDenominator;
+    public virtual int ParalysisSpeedDivisor => _inner.ParalysisSpeedDivisor;
 
     public virtual double BadPoisonDamageFraction(int toxicCounter) =>
         _inner.BadPoisonDamageFraction(toxicCounter);

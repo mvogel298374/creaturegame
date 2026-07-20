@@ -83,6 +83,9 @@ public sealed class Gen1BattleRules : IBattleRules
     // own member (Gen 2 raises the drain to 1/8 while Gen 1–5 Poison stays at 1/16).
     public int LeechSeedDrainDenominator => 16;
 
+    // Gen 1–6: Paralysis quarters a paralyzed creature's effective Speed for turn order. (Gen 7+ halves instead.)
+    public int ParalysisSpeedDivisor => 4;
+
     // Gen 1 Bad Poison (Toxic): counter/16 of max HP; no cap — counter increments each turn.
     public double BadPoisonDamageFraction(int toxicCounter) => toxicCounter / 16.0;
 

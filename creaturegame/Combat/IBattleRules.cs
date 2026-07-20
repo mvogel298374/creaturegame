@@ -175,6 +175,13 @@ public interface IBattleRules
     int LeechSeedDrainDenominator { get; }
 
     /// <summary>
+    /// Divisor applied to a paralyzed creature's effective Speed (after stat-stage multipliers) for
+    /// turn-order purposes — see <see cref="StatusResolver.EffectiveSpeed"/> (e.g. 4 → 1/4 Speed).
+    /// Gen 1–6: 4. Gen 7+: 2 (a rebalance, not a generation-invariant rule).
+    /// </summary>
+    int ParalysisSpeedDivisor { get; }
+
+    /// <summary>
     /// Returns the fraction of max HP dealt by Bad Poison (Toxic) on the given counter tick.
     /// Gen 1: counter/16 — escalates each turn with no cap (counter starts at 1, increments after damage).
     /// </summary>

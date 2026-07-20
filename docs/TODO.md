@@ -665,15 +665,11 @@ Filed from a whole-repo `pr-review`-style audit (gen-seam architecture, central-
 wire completeness). User-adjudicated 2026-07-19: the two checkboxes below are accepted as real work; ranked by
 severity. *(A fifth finding — a narrow `SignalRInput` cancel/prompt race that can leak an abandoned run task —
 was deliberately **not** filed: the user doesn't care about abandoned-run leakage while game state is this
-transient. Don't re-raise it until persistence/save-layer work makes run lifetime matter.)* *(Two findings are
+transient. Don't re-raise it until persistence/save-layer work makes run lifetime matter.)* *(Three findings are
 FIXED and archived — 2026-07-19: "0× type immunity does not gate secondary effects"; 2026-07-20: "Leech Seed
-drain borrows PoisonDamageDenominator" — see `TODO_ARCHIVE.md`.)*
+drain borrows PoisonDamageDenominator"; 2026-07-20: "Paralysis Speed quartering is an inline gen-variable magic
+number" — see `TODO_ARCHIVE.md`.)*
 
-- [ ] **Paralysis Speed quartering is an inline gen-variable magic number** (`StatusResolver.EffectiveSpeed`,
-  `StatusResolver.cs:13` — `speed /= 4`). The divisor is gen-variable (Gen 7+ halves instead of quarters) and
-  `StatusResolver` is explicitly on §5.0's no-magic-number list ⇒ belongs on `IBattleRules` (e.g.
-  `ParalysisSpeedDivisor`) with the per-gen XML doc. *(The neighbouring 25% full-paralysis roll is
-  gen-invariant and correctly stays inline.)*
 - [ ] **Haze over-resets: it cures the user's own major status** (`HazeEffect`, `MoveEffects.cs:76` — full
   `ResetBattleState()` on **both** sides). Gen 1 Haze resets both sides' stat stages + volatiles but cures only
   the **opponent's** non-volatile status — here a paralyzed user can Haze itself healthy. The full reset also

@@ -48,6 +48,26 @@ then reverted).
 
 ---
 
+## Paralysis Speed quartering is an inline gen-variable magic number ✅ DONE (2026-07-20)
+
+Filed from the 2026-07-19 repo-wide audit (ranked first by severity of the two open findings): the Paralysis
+Speed handicap in `StatusResolver.EffectiveSpeed` hardcoded `speed /= 4`. The divisor is gen-variable (Gen 1–6:
+quarter; Gen 7+: half) and `StatusResolver` is explicitly on `GENERATION_SEAMS.md` §5.0's no-magic-number list,
+so it belonged on `IBattleRules`, not inline.
+
+Fixed 2026-07-20: new seam member `IBattleRules.ParalysisSpeedDivisor` with the per-gen XML doc (Gen 1–6: 4;
+Gen 7+: 2), implemented as `Gen1BattleRules.ParalysisSpeedDivisor => 4`, pass-through added to the
+`DelegatingBattleRules` test double, and `StatusResolver.EffectiveSpeed` now reads the new member instead of the
+literal 4. Pinned by `TurnOrderTests.Paralysis_EffectiveSpeedReadsItsOwnSeamMemberNotAHardcodedFour` — a rules
+double overrides only the paralysis member to 2 (the Gen 7+ value) and asserts `EffectiveSpeed` follows it,
+proving the resolver no longer hardcodes 4. The two pre-existing quartering tests
+(`Paralysis_EffectiveSpeedIsQuartered`, `SpeedStage_StacksWithParalysisQuartering`) are untouched and still pass,
+confirming the extraction didn't change Gen 1 behavior. Mirrors the shipped `LeechSeedDrainDenominator` precedent
+(same commit shape, same audit). `requirements-review`: **MET** (confirmed Gen 1 quarters Speed under Paralysis
+and the Gen 7+ half claim against known mechanics; arithmetic unchanged). Full .NET suite green: 1367/1367.
+
+---
+
 ## Leech Seed drain borrows PoisonDamageDenominator ✅ DONE (2026-07-20)
 
 Filed from the 2026-07-19 repo-wide audit (promoted from a minor note to a real bug by the user): the end-of-turn

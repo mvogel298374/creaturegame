@@ -10,7 +10,7 @@ public static class StatusResolver
         double speed =
             creature.Attributes.Speed * r.GetStatMultiplier(creature.Battle.Stages.Speed);
         if (creature.Battle.Status == StatusCondition.Paralysis)
-            speed /= 4;
+            speed /= r.ParalysisSpeedDivisor;
         return (int)speed;
     }
 
