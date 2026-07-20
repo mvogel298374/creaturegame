@@ -11,7 +11,8 @@ namespace PokeApiConnector;
 /// </summary>
 public static class ItemSpriteDownloader
 {
-    public static async Task DownloadAllAsync()
+    // Returns the number of item sprites that failed to download.
+    public static async Task<int> DownloadAllAsync()
     {
         string root = FindSolutionRoot();
         string itemsDir = Path.Combine(root, "creaturegame.Web", "wwwroot", "sprites", "items");
@@ -54,6 +55,7 @@ public static class ItemSpriteDownloader
         Console.WriteLine(
             $"  Item sprites — {downloaded} downloaded, {skipped} already present, {failed} failed."
         );
+        return failed;
     }
 
     private static string FindSolutionRoot()

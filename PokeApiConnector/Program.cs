@@ -17,6 +17,40 @@ class Program
             return;
         }
 
+        // Re-download just the runtime sprite/cry assets — gitignored (not source files), so a clean CI
+        // checkout never has them (see docs/TODO.md's "sprites and cries missing on live" bug writeup).
+        // Sprites/cries need no local DB: they're pulled by species ID from static URLs. Item sprites do read
+        // items.db (already committed, pre-populated), so ensure its schema exists first.
+        // This is the one path a Docker build depends on for a correct image, so unlike the full import
+        // below (a human watching the console), a partial fetch must fail the build loudly instead of
+        // silently shipping an image with missing assets — the exact failure mode this stage exists to fix.
+        if (args.Length > 0 && args[0].Equals("assets", StringComparison.OrdinalIgnoreCase))
+        {
+            using (var itemsContext = new creaturegame.DB.ItemsDbContext())
+                itemsContext.EnsureDatabaseCreated();
+
+            Console.WriteLine("Downloading battle sprites...");
+            int failedSprites = await SpriteDownloader.DownloadAllAsync();
+
+            Console.WriteLine("\nDownloading item sprites...");
+            int failedItemSprites = await ItemSpriteDownloader.DownloadAllAsync();
+
+            Console.WriteLine("\nDownloading Pokémon cries (legacy 8-bit)...");
+            int failedCries = await CryDownloader.DownloadAllAsync();
+
+            int totalFailed = failedSprites + failedItemSprites + failedCries;
+            if (totalFailed > 0)
+            {
+                Console.WriteLine(
+                    $"\n{totalFailed} asset(s) failed to download — failing the build."
+                );
+                Environment.Exit(1);
+            }
+
+            Console.WriteLine("\nDone.");
+            return;
+        }
+
         if (args.Length > 0 && args[0].Equals("items", StringComparison.OrdinalIgnoreCase))
         {
             using (var itemsContext = new creaturegame.DB.ItemsDbContext())

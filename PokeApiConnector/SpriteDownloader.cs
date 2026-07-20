@@ -10,7 +10,8 @@ public static class SpriteDownloader
     private const string BackUrlTemplate =
         "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/back/{0}.png";
 
-    public static async Task DownloadAllAsync()
+    // Returns the number of sprites that failed to download.
+    public static async Task<int> DownloadAllAsync()
     {
         string root = FindSolutionRoot();
         string frontDir = Path.Combine(root, "creaturegame.Web", "wwwroot", "sprites", "front");
@@ -56,6 +57,7 @@ public static class SpriteDownloader
         Console.WriteLine(
             $"\r  Done — {downloaded} downloaded, {skipped} already present, {failed} failed.          "
         );
+        return failed;
     }
 
     private static async Task DownloadFile(HttpClient http, string url, string destPath)

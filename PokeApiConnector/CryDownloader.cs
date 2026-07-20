@@ -9,7 +9,8 @@ public static class CryDownloader
     private const string LegacyUrlTemplate =
         "https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/legacy/{0}.ogg";
 
-    public static async Task DownloadAllAsync()
+    // Returns the number of cries that failed to download.
+    public static async Task<int> DownloadAllAsync()
     {
         string root = FindSolutionRoot();
         string cryDir = Path.Combine(root, "creaturegame.Web", "wwwroot", "audio", "cries");
@@ -47,6 +48,7 @@ public static class CryDownloader
         Console.WriteLine(
             $"\r  Done — {downloaded} downloaded, {skipped} already present, {failed} failed.          "
         );
+        return failed;
     }
 
     private static async Task DownloadFile(HttpClient http, string url, string destPath)
