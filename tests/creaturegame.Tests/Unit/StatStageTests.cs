@@ -237,6 +237,130 @@ public class StatStageTests
     }
 
     [Fact]
+    public async Task Haze_CuresTheTargetsMajorStatusButNotTheUsersOwn()
+    {
+        // Gen 1's HazeEffect_ only clears wEnemyMonStatus (the target's status byte) — the user's own
+        // status is never touched (pokered engine/battle/move_effects/haze.asm).
+        var attacker = new Creature("Attacker") { Level = 50 };
+        attacker.CalculateStats();
+        attacker.Battle.Status = StatusCondition.Paralysis;
+
+        var defender = new Creature("Defender") { Level = 50 };
+        defender.CalculateStats();
+        defender.Battle.Status = StatusCondition.Burn;
+
+        var move = new Attack
+        {
+            Id = 1,
+            Name = "Haze",
+            BaseDamage = 0,
+            Accuracy = 100,
+            Effect = MoveEffect.Haze,
+        };
+        attacker.AddAttack(move);
+
+        var action = new AttackAction(
+            attacker,
+            defender,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            AlwaysHitRules.Instance,
+            ConsoleBattleEventEmitter.Instance
+        );
+        await action.ExecuteAsync();
+
+        Assert.Equal(StatusCondition.Paralysis, attacker.Battle.Status); // the user's own status survives
+        Assert.Equal(StatusCondition.None, defender.Battle.Status); // the target's is cured
+    }
+
+    [Fact]
+    public async Task Haze_DowngradesTheUsersOwnBadPoisonToRegularPoison()
+    {
+        // Gen 1's HazeEffect_ clears the "bad poison" bit for BOTH sides via CureVolatileStatuses, so a
+        // badly-poisoned user keeps Poison but loses the escalating Toxic counter — distinct from curing
+        // the status outright.
+        var attacker = new Creature("Attacker") { Level = 50 };
+        attacker.CalculateStats();
+        attacker.Battle.Status = StatusCondition.BadPoison;
+        attacker.Battle.ToxicCounter = 5;
+
+        var defender = new Creature("Defender") { Level = 50 };
+        defender.CalculateStats();
+
+        var move = new Attack
+        {
+            Id = 1,
+            Name = "Haze",
+            BaseDamage = 0,
+            Accuracy = 100,
+            Effect = MoveEffect.Haze,
+        };
+        attacker.AddAttack(move);
+
+        var action = new AttackAction(
+            attacker,
+            defender,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            AlwaysHitRules.Instance,
+            ConsoleBattleEventEmitter.Instance
+        );
+        await action.ExecuteAsync();
+
+        Assert.Equal(StatusCondition.Poison, attacker.Battle.Status);
+        Assert.Equal(1, attacker.Battle.ToxicCounter);
+    }
+
+    [Fact]
+    public void ResetForHaze_LeavesEverythingOutsideItsVerifiedClearListAlone()
+    {
+        // Gen 1's HazeEffect_ (pokered engine/battle/move_effects/haze.asm) touches only stat mods,
+        // Confused, Disable, Mist, Focus Energy, Leech Seed, Reflect/Light Screen, and the badly-poisoned
+        // bit. It never touches Substitute, Bide, Rampage, Rage, Binding/trap state, Recharge, two-turn
+        // charging, Flinch, Mirror Move's last-used memory, or Counter's damage memory — a wholesale
+        // `Battle = new BattleState()` would silently wipe all of these, which is the bug this pins.
+        var creature = new Creature("A") { Level = 50 };
+        creature.CalculateStats();
+        var rampageMove = new PokemonAttack(new Attack { Id = 99, Name = "Thrash" });
+
+        creature.Battle.SubstituteHp = 42;
+        creature.Battle.BideTurnsRemaining = 2;
+        creature.Battle.BideDamageAccumulated = 30;
+        creature.Battle.BideMove = rampageMove;
+        creature.Battle.RampageTurnsRemaining = 2;
+        creature.Battle.RampageMove = rampageMove;
+        creature.Battle.IsRaging = true;
+        creature.Battle.RageMove = rampageMove;
+        creature.Battle.BindingTurnsRemaining = 3;
+        creature.Battle.IsRecharging = true;
+        creature.Battle.IsTwoTurnCharging = true;
+        creature.Battle.ChargingMove = rampageMove;
+        creature.Battle.IsFlinched = true;
+        creature.Battle.LastMoveUsed = rampageMove.Base;
+        creature.Battle.LastDamageTaken = 17;
+        creature.Battle.LastDamageType = DamageType.Fire;
+
+        creature.ResetForHaze(preserveMajorStatus: true);
+
+        Assert.Equal(42, creature.Battle.SubstituteHp);
+        Assert.Equal(2, creature.Battle.BideTurnsRemaining);
+        Assert.Equal(30, creature.Battle.BideDamageAccumulated);
+        Assert.Same(rampageMove, creature.Battle.BideMove);
+        Assert.Equal(2, creature.Battle.RampageTurnsRemaining);
+        Assert.Same(rampageMove, creature.Battle.RampageMove);
+        Assert.True(creature.Battle.IsRaging);
+        Assert.Same(rampageMove, creature.Battle.RageMove);
+        Assert.Equal(3, creature.Battle.BindingTurnsRemaining);
+        Assert.True(creature.Battle.IsRecharging);
+        Assert.True(creature.Battle.IsTwoTurnCharging);
+        Assert.Same(rampageMove, creature.Battle.ChargingMove);
+        Assert.True(creature.Battle.IsFlinched);
+        Assert.Same(rampageMove.Base, creature.Battle.LastMoveUsed);
+        Assert.Equal(17, creature.Battle.LastDamageTaken);
+        Assert.Equal(DamageType.Fire, creature.Battle.LastDamageType);
+    }
+
+    [Fact]
     public async Task StatEffect_ZeroChance_NeverApplies()
     {
         var attacker = new Creature("Attacker") { Level = 50 };

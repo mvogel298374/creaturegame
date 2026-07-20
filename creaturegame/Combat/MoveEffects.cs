@@ -68,15 +68,20 @@ public interface IMoveEffect
     void Apply(MoveEffectContext ctx);
 }
 
-/// <summary>Haze: wipe both combatants' stat stages (and volatile state).</summary>
+/// <summary>
+/// Haze: wipe both combatants' stat stages and volatile state (confusion, Disable, Mist, Focus Energy,
+/// Leech Seed, Reflect/Light Screen), but cure the major status only on the <em>target</em> — the user's
+/// own status (and an active Transform/Mimic on either side) is left alone. See
+/// <see cref="Creature.ResetForHaze"/> for the pokered citation.
+/// </summary>
 public sealed class HazeEffect : IMoveEffect
 {
     public MoveEffect Effect => MoveEffect.Haze;
 
     public void Apply(MoveEffectContext ctx)
     {
-        ctx.Source.ResetBattleState();
-        ctx.Target.ResetBattleState();
+        ctx.Source.ResetForHaze(preserveMajorStatus: true);
+        ctx.Target.ResetForHaze(preserveMajorStatus: false);
         ctx.Emitter?.Emit(new HazeClearedStages());
     }
 }

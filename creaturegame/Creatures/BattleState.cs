@@ -26,6 +26,19 @@ public sealed class BattleState
     public bool IsFlinched { get; set; }
     public bool HasLeechSeed { get; set; }
 
+    // Haze: set when this creature was cured of Sleep or Freeze by a Haze user earlier THIS turn.
+    // Gen 1's HazeEffect_ marks the woken creature's already-chosen move invalid rather than letting
+    // it act immediately just because the status cleared mid-turn — so the forfeit still applies even
+    // though StatusResolver.CanAct's own Sleep/Freeze branch no longer has a status to check.
+    // Self-clearing like IsFlinched when a same-turn CanAct call actually consumes it (the Haze user
+    // was faster) — see Creature.ResetForHaze and StatusResolver.CanAct. NOT always same-turn, though:
+    // if the target was faster and had already resolved its own blocked Sleep/Freeze turn before Haze
+    // fires, this flag would otherwise sit unconsumed and wrongly block the target's NEXT turn too —
+    // Battle's turn loop defensively nulls it for both creatures at end-of-turn so a flag that outlives
+    // the turn it was set on can never leak forward (Gen 1's own invalidation write only ever matters
+    // for the turn it's issued on; the next turn's fresh move selection overwrites it unread).
+    public StatusCondition? HazeSuppressedStatus { get; set; }
+
     // Roar / Whirlwind: set on a creature when it is scared off (the move's target flees). The Battle loop
     // ends the encounter when either side has fled — no faint. Transient like the rest; the per-battle reset
     // clears it.
@@ -110,9 +123,12 @@ public sealed class BattleState
 
 /// <summary>
 /// The pre-mutation identity of a <see cref="Creature"/>, captured so Transform / Conversion can be
-/// undone at battle end (or on a mid-battle Haze reset). Holds the permanent fields those moves change
-/// — types, the four non-HP battle stats, SpeciesId, and the original moveset wrappers. HP/MaxHP and
-/// level are never copied by Transform, so they aren't snapshotted.
+/// undone at battle end (or the start of the creature's next battle — see
+/// <see cref="Creature.ResetBattleState"/>). A mid-battle Haze does NOT undo it: Gen 1's Haze explicitly
+/// keeps an active Transform's TRANSFORMED bit set (see <see cref="Creature.ResetForHaze"/>). Holds the
+/// permanent fields those moves change — types, the four non-HP battle stats, SpeciesId, and the
+/// original moveset wrappers. HP/MaxHP and level are never copied by Transform, so they aren't
+/// snapshotted.
 /// </summary>
 public sealed class IdentitySnapshot
 {

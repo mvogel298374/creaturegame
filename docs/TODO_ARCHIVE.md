@@ -8,6 +8,44 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Haze over-resets: it cures the user's own major status ✅ DONE (2026-07-20)
+
+Filed from the 2026-07-19 repo-wide audit: `HazeEffect` (`MoveEffects.cs:76`) called a full
+`Creature.ResetBattleState()` on **both** sides. Gen 1 Haze resets both sides' stat stages + volatiles but cures
+only the **opponent's** non-volatile status (per pokered's `engine/battle/move_effects/haze.asm`) — the
+wholesale reset let a paralyzed (or otherwise statused) user Haze itself healthy, which is not Gen 1 behavior.
+The original filing also flagged the reset's Transform/Mimic-reverting scope as unverified.
+
+**Fix, broader than the original one-liner once the pokered citation was run down:**
+- New `Creature.ResetForHaze(bool preserveMajorStatus)` — a narrow, field-by-field reset (**not** a wholesale
+  `Battle = new BattleState()`) that clears only what Gen 1 Haze actually clears: stat stages, Confused, Disable,
+  Mist, Focus Energy, Leech Seed, Reflect/Light Screen, and a Toxic→Poison downgrade. Substitute, Bide, Rampage,
+  Rage, Binding, Recharge, Charging, Flinch, `LastMoveUsed`, Counter-memory, and any active Transform/Mimic
+  identity are left completely untouched — resolving the original filing's "is Transform/Mimic reverted?"
+  question as **no**.
+- `HazeEffect.Apply` now calls `ResetForHaze(preserveMajorStatus: true)` on the user and `false` on the target —
+  only the target's major status is cured, never the user's own.
+- **Second-order fix caught along the way:** curing a target's Sleep/Freeze mid-turn must still forfeit that
+  target's already-chosen action for the same turn (a verified Gen 1 quirk). Implemented via a new
+  `BattleState.HazeSuppressedStatus` field, consumed once in `StatusResolver.CanAct`. `Battle.cs`'s turn loop
+  clears any unconsumed flag at end-of-turn — `requirements-review` caught that without this, the flag could leak
+  into the *next* turn and cause a bogus second forfeit when the target is faster than the Haze user; fixed and
+  regression-tested.
+- `docs/GEN_DIFFERENCES.md` → *Status Quirks* documents Haze's resolved Gen 1 scope.
+- Stale doc comments that had incorrectly described Haze as reverting Transform/Mimic were corrected in
+  `TransformContractTests.cs`, `MimicContractTests.cs`, `Creature.cs`, and `BattleState.cs`.
+
+Touched: `creaturegame/Creatures/Creature.cs`, `creaturegame/Creatures/BattleState.cs`,
+`creaturegame/Combat/StatusResolver.cs`, `creaturegame/Combat/MoveEffects.cs`, `creaturegame/Combat/Battle.cs`,
+`docs/GEN_DIFFERENCES.md`; tests in `StatStageTests.cs`, `StatusConditionTests.cs`,
+`UniqueMoveEffectContractTests.cs`, `TransformContractTests.cs`, `MimicContractTests.cs`.
+
+**Verification:** two rounds of `requirements-review` (citing pret/pokered's
+`engine/battle/move_effects/haze.asm`), both **MET** after the second-order end-of-turn-leak fix; full
+pre-finish gate sequence green — 1377/1377 .NET tests, Vitest, TypeScript, CSharpier.
+
+---
+
 ## BUG — sprites and cries missing on live (Fly) deploy ✅ DONE (2026-07-20)
 
 Filed 2026-07-20 as the highest-priority active bug — visible breakage on the deployed game (no sprites

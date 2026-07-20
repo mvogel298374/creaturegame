@@ -34,9 +34,11 @@ public class MimicContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     [Fact]
     public async Task ResettingBattleStateRevertsAMimickedMove()
     {
-        // Guards the Haze interaction: Haze calls ResetBattleState() mid-battle, which must revert the
-        // transient Mimic swap rather than orphan it — otherwise the copied move leaks into the
-        // permanent MoveSet (the reset throws away the bookkeeping that battle-end restore relies on).
+        // Guards the battle-boundary reset: Battle calls ResetBattleState() on both creatures when a new
+        // fight starts, which must revert the transient Mimic swap rather than orphan it — otherwise the
+        // copied move leaks into the permanent MoveSet (the reset throws away the bookkeeping that
+        // battle-end restore relies on). Haze does NOT do this mid-battle — see
+        // HazeDoesNotRevertAMimickedMove below; pokered's HazeEffect_ never touches the Mimic slot.
         var defender = TestCreatures.Make("D", hp: 500);
         defender.AddAttack(Move("tackle"));
 
@@ -45,6 +47,22 @@ public class MimicContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 
         result.Attacker.ResetBattleState();
         Assert.Equal("mimic", result.Move.Base.Name); // reverted by the reset, not orphaned
+    }
+
+    [Fact]
+    public async Task HazeDoesNotRevertAMimickedMove()
+    {
+        // Gen 1's HazeEffect_ resets stat mods and volatile statuses but never touches the Mimic move
+        // slot — unlike a battle-boundary ResetBattleState() (see the test above), a mid-battle Haze
+        // must leave an active Mimic swap alone.
+        var defender = TestCreatures.Make("D", hp: 500);
+        defender.AddAttack(Move("tackle"));
+
+        var result = await new MoveScenario().Defender(defender).Use(Move("mimic"));
+        Assert.Equal("tackle", result.Move.Base.Name); // swapped in
+
+        result.Attacker.ResetForHaze(preserveMajorStatus: true);
+        Assert.Equal("tackle", result.Move.Base.Name); // NOT reverted by Haze
     }
 
     [Fact]

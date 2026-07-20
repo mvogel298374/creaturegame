@@ -662,20 +662,15 @@ Battles are fully playable now — docs won't describe a moving target.
 ### Repo-wide PR-audit findings — open (2026-07-19)
 
 Filed from a whole-repo `pr-review`-style audit (gen-seam architecture, central-method contracts, conventions,
-wire completeness). User-adjudicated 2026-07-19: the two checkboxes below are accepted as real work; ranked by
-severity. *(A fifth finding — a narrow `SignalRInput` cancel/prompt race that can leak an abandoned run task —
-was deliberately **not** filed: the user doesn't care about abandoned-run leakage while game state is this
-transient. Don't re-raise it until persistence/save-layer work makes run lifetime matter.)* *(Three findings are
+wire completeness). User-adjudicated 2026-07-19: the checkbox below was accepted as real work, along with the
+now-archived findings noted below it. *(A fifth finding — a narrow `SignalRInput` cancel/prompt race that can
+leak an abandoned run task — was deliberately **not** filed: the user doesn't care about abandoned-run leakage
+while game state is this transient. Don't re-raise it until persistence/save-layer work makes run lifetime
+matter.)* *(Four findings are
 FIXED and archived — 2026-07-19: "0× type immunity does not gate secondary effects"; 2026-07-20: "Leech Seed
 drain borrows PoisonDamageDenominator"; 2026-07-20: "Paralysis Speed quartering is an inline gen-variable magic
-number" — see `TODO_ARCHIVE.md`.)*
+number"; 2026-07-20: "Haze over-resets: it cures the user's own major status" — see `TODO_ARCHIVE.md`.)*
 
-- [ ] **Haze over-resets: it cures the user's own major status** (`HazeEffect`, `MoveEffects.cs:76` — full
-  `ResetBattleState()` on **both** sides). Gen 1 Haze resets both sides' stat stages + volatiles but cures only
-  the **opponent's** non-volatile status — here a paralyzed user can Haze itself healthy. The full reset also
-  reverts an active Transform/Mimic mid-battle; that half is *unverified* (Gen 1's volatile-clear scope is
-  murkier) — **check pokered's `HazeEffect` first**, then narrow the reset to the verified scope. Requirements
-  lane: run the fix past `requirements-review` with the pokered citation.
 - *(minor, convention — decide, don't just fix)* The three DB services (`PokemonService` / `AttackService` /
   `ItemService`) contain no try/catch while `CLAUDE.md` mandates wrapped DB calls with logging; every live
   caller wraps at its boundary instead (`GameController.Start`, the session task's global catch), so failures

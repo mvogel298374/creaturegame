@@ -114,6 +114,13 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
 - **Toxic / Bad Poison**: escalating damage but switching in/out does not reset the counter
 - **Badge boosts**: your own Gym Badges passively boost corresponding stats in battle
 - PP is **not enforced for AI trainers** — opponents can use moves infinitely
+- **Haze**: resets both battlers' stat stages, Confusion, Disable, Mist, Focus Energy, Leech Seed,
+  Reflect, and Light Screen — but cures the non-volatile status (Sleep/Freeze/Burn/Paralysis/Poison)
+  only on the **target**, never the user's own; a self-inflicted Toxic still downgrades to a regular
+  Poison either way. An active Transform (or a Mimic'd move) is **not** reverted by Haze — only a
+  battle-boundary reset undoes those. If Haze cures a target's Sleep/Freeze, that target still
+  **forfeits its already-chosen action for that same turn** rather than getting to act immediately —
+  it's simply free again from the next turn on.
 
 #### No Systems (not yet introduced)
 - No held items

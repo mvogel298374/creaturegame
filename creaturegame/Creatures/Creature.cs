@@ -242,7 +242,9 @@ public class Creature
     /// Undoes a transient Mimic move-swap, putting the original move back in the slot. Safe to call
     /// when no Mimic is active. Lives here (not just at battle end) because Mimic mutates the permanent
     /// <see cref="MoveSet"/>, so any reset of the transient state must revert it first or the copied
-    /// move leaks — e.g. Haze resets battle state mid-fight.
+    /// move leaks — called by <see cref="ResetBattleState"/> at the start of a creature's next battle
+    /// (Haze does NOT trigger this — <see cref="ResetForHaze"/> deliberately leaves an active Mimic
+    /// swap alone; Gen 1's Haze never touches it).
     /// </summary>
     public void RestoreMimickedMove()
     {
@@ -281,7 +283,9 @@ public class Creature
     /// and moveset. Current HP/MaxHP are preserved (Transform never copied them). Safe to call when no
     /// mutation is active. Lives here (not just at battle end) for the same reason as the Mimic revert:
     /// the change is to the *permanent* Creature, so any reset of transient state must undo it first or
-    /// the copied identity leaks — e.g. Haze resets battle state mid-fight.
+    /// the copied identity leaks — called by <see cref="ResetBattleState"/> at the start of a creature's
+    /// next battle (Haze does NOT trigger this — <see cref="ResetForHaze"/> deliberately preserves an
+    /// active Transform; Gen 1's Haze explicitly keeps the TRANSFORMED bit set).
     /// </summary>
     public void RestoreOriginalIdentity()
     {
@@ -310,6 +314,59 @@ public class Creature
         RestoreMimickedMove();
         RestoreOriginalIdentity();
         Battle = new BattleState();
+    }
+
+    /// <summary>
+    /// Haze's own reset — a deliberately narrow, field-by-field clear, NOT a <see cref="ResetBattleState"/>
+    /// wholesale replace. Gen 1's <c>HazeEffect_</c> (pokered <c>engine/battle/move_effects/haze.asm</c>)
+    /// only ever touches: stat stages (both sides); the CONFUSED bit specifically (not the rest of that
+    /// status byte); Disable; Mist; Focus Energy; Leech Seed; Reflect/Light Screen; and the "badly
+    /// poisoned" bit (downgrades to a regular Poison, both sides — only the ToxicCounter escalation
+    /// stops, the Poison itself is never cured on the user's own side). Everything else on
+    /// <see cref="BattleState"/> — Substitute, Bide, Rampage/Thrash, Rage, Binding/trap victim state,
+    /// Recharge, two-turn charging, Flinch, Mirror Move's <c>LastMoveUsed</c>, Counter's damage memory,
+    /// and any Transform/Mimic identity swap — is left completely alone; a wholesale
+    /// <c>Battle = new BattleState()</c> here would silently wipe all of that (the same "full nuke, then
+    /// allow-list a few fields back" mistake this method exists to fix). When
+    /// <paramref name="preserveMajorStatus"/> is true the creature's own non-volatile status (and, for
+    /// Sleep, its remaining counter) survives too — Haze cures only the <em>target's</em> status, never
+    /// the user's own. Curing the target's Sleep/Freeze also sets <see cref="BattleState.HazeSuppressedStatus"/>,
+    /// so a faster Haze user still can't let the freshly-woken target act that same turn (pokered marks
+    /// the woken target's already-selected move invalid rather than letting it through).
+    /// </summary>
+    public void ResetForHaze(bool preserveMajorStatus)
+    {
+        Battle.Stages = new StatStages();
+        Battle.ConfusedTurns = 0;
+        Battle.DisabledMove = null;
+        Battle.DisableTurnsRemaining = 0;
+        Battle.HasMist = false;
+        Battle.HasFocusEnergy = false;
+        Battle.HasLeechSeed = false;
+        Battle.HasReflect = false;
+        Battle.HasLightScreen = false;
+
+        if (!preserveMajorStatus)
+        {
+            // The target's already-chosen action still forfeits this turn if Haze just woke it —
+            // Gen 1 doesn't let a freshly-cured Sleep/Freeze target act immediately (see
+            // BattleState.HazeSuppressedStatus and StatusResolver.CanAct).
+            if (Battle.Status is StatusCondition.Sleep or StatusCondition.Freeze)
+                Battle.HazeSuppressedStatus = Battle.Status;
+
+            Battle.Status = StatusCondition.None;
+            Battle.SleepTurns = 0;
+            Battle.ToxicCounter = 1;
+            return;
+        }
+
+        // Toxic still degrades to a regular Poison for the user too (pokered clears the "bad poison"
+        // bit for both sides) — only the ToxicCounter escalation stops, not the Poison itself.
+        if (Battle.Status == StatusCondition.BadPoison)
+        {
+            Battle.Status = StatusCondition.Poison;
+            Battle.ToxicCounter = 1;
+        }
     }
 
     /// <summary>

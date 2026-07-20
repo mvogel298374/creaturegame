@@ -8,8 +8,9 @@ namespace creaturegame.Tests.Integration.Gen1Attacks;
 /// <summary>
 /// Transform (Gen 1): the user becomes a copy of the target — its types, the four non-HP battle stats,
 /// current stat stages, SpeciesId and full moveset (each copied move at 5 PP, capped at the move's max).
-/// HP, MaxHP and level stay the user's. The change is undone when the battle ends (and on any mid-battle
-/// <see cref="Creature.ResetBattleState"/>, e.g. Haze), so it never leaks into the permanent Creature.
+/// HP, MaxHP and level stay the user's. The change is undone when the battle ends (and on the next battle
+/// boundary's <see cref="Creature.ResetBattleState"/>), so it never leaks into the permanent Creature.
+/// Haze does NOT revert it mid-battle — Gen 1's HazeEffect_ explicitly preserves the TRANSFORMED bit.
 /// </summary>
 [Collection(MovesCollection.Name)]
 public class TransformContractTests(MovesFixture moves) : Gen1MoveContract(moves)
@@ -112,9 +113,9 @@ public class TransformContractTests(MovesFixture moves) : Gen1MoveContract(moves
     [Fact]
     public async Task ResettingBattleStateRevertsATransform()
     {
-        // Guards the Haze interaction: ResetBattleState() must restore the original identity (types,
-        // stats, moveset) before swapping in a fresh BattleState, or the copied identity leaks into the
-        // permanent half of a reused Creature.
+        // Guards the battle-boundary reset: ResetBattleState() must restore the original identity
+        // (types, stats, moveset) before swapping in a fresh BattleState, or the copied identity leaks
+        // into the permanent half of a reused Creature.
         var attacker = TestCreatures.Make("A", type1: DamageType.Normal, attack: 50);
         attacker.AddAttack(Move("pound"));
         var target = TestCreatures.Make("B", type1: DamageType.Ghost, attack: 200);
@@ -135,6 +136,26 @@ public class TransformContractTests(MovesFixture moves) : Gen1MoveContract(moves
         // snapshot (restored here) is the original "pound" plus that "transform" slot — Tackle (copied
         // from the target) is gone.
         Assert.Equal(new[] { "pound", "transform" }, attacker.MoveSet.Select(m => m.Base.Name));
+    }
+
+    [Fact]
+    public async Task HazeDoesNotRevertATransform()
+    {
+        // Gen 1's HazeEffect_ resets stat mods and volatile statuses but explicitly preserves the
+        // TRANSFORMED bit — unlike a battle-boundary ResetBattleState() (see the test above), a
+        // mid-battle Haze must leave an active Transform alone.
+        var attacker = TestCreatures.Make("A", type1: DamageType.Normal, attack: 50);
+        attacker.AddAttack(Move("pound"));
+        var target = TestCreatures.Make("B", type1: DamageType.Ghost, attack: 200);
+        target.AddAttack(Move("tackle"));
+
+        await new MoveScenario().Attacker(attacker).Defender(target).Use(Move("transform"));
+        Assert.Equal(DamageType.Ghost, attacker.Type1); // transformed
+
+        attacker.ResetForHaze(preserveMajorStatus: true);
+
+        Assert.Equal(DamageType.Ghost, attacker.Type1); // NOT reverted by Haze
+        Assert.Equal(200, attacker.Attributes.Attack);
     }
 
     [Fact]

@@ -99,6 +99,72 @@ public class UniqueMoveEffectContractTests(MovesFixture moves) : Gen1MoveContrac
         Assert.True(result.Has<HazeClearedStages>());
     }
 
+    [Fact]
+    public async Task HazeCuringSleepStillForfeitsTheTargetsSameTurnAction()
+    {
+        // Gen 1: a Haze that cures a Sleep/Frozen target doesn't let it act the instant it wakes —
+        // the already-chosen move is still forfeited for that turn (pokered marks the move register
+        // invalid rather than re-checking status). Drives the real imported "haze" row through
+        // AttackAction (proving HazeEffect -> ResetForHaze sets the flag), then checks the production
+        // StatusResolver.CanAct gate the real Battle turn loop calls next for the other side's action.
+        var attacker = TestCreatures.Make("A");
+        var defender = TestCreatures.Make("D", hp: 500);
+        defender.Battle.Status = StatusCondition.Sleep;
+        defender.Battle.SleepTurns = 3;
+
+        var result = await new MoveScenario()
+            .Attacker(attacker)
+            .Defender(defender)
+            .Use(Move("haze"));
+
+        Assert.Equal(StatusCondition.None, result.Defender.Battle.Status); // Haze cured it
+        Assert.False(StatusResolver.CanAct(result.Defender)); // still forfeits this turn's action
+        Assert.True(StatusResolver.CanAct(result.Defender)); // free to act again next turn
+    }
+
+    [Fact]
+    public async Task HazeSuppressionDoesNotLeakIntoTheNextTurnWhenTheTargetIsFaster()
+    {
+        // Regression: when the TARGET is faster than the Haze user, the target already resolves its
+        // own legitimate blocked Sleep turn (CanAct's ordinary Sleep branch) before Haze fires later
+        // that same turn — so HazeSuppressedStatus gets set too late for this turn's own CanAct call
+        // to consume it. Gen 1's move-invalidation write is turn-scoped (the next turn's fresh move
+        // selection overwrites it, unread), so the target must be free to act NEXT turn, not forfeit a
+        // second turn it never should. Drives a full Battle turn loop, not just AttackAction/CanAct in
+        // isolation, since the bug is specifically about state surviving a turn boundary.
+        //
+        // StartFightAsync() calls ResetBattleState() on both creatures before turn 1, which would wipe
+        // a Sleep status set directly on either Creature beforehand — so the sleepy, faster creature is
+        // seeded via the `player` role's playerEntryStatus (the one path Battle applies AFTER its own
+        // reset), and the Haze user is the (slower) `enemy` role.
+        var sleepyAndFaster = TestCreatures.Make("Player", speed: 200);
+        sleepyAndFaster.AddAttack(Move("tackle"));
+
+        var hazeUser = TestCreatures.Make("Enemy", hp: 500, speed: 100);
+        hazeUser.AddAttack(Move("haze"));
+
+        var emitter = new RecordingEmitter();
+        var battle = new Battle(
+            sleepyAndFaster,
+            hazeUser,
+            Gen1TypeChart.Instance,
+            AutoSelectInput.Instance,
+            AutoSelectInput.Instance,
+            rules: AlwaysHitRules.Instance,
+            emitter: emitter,
+            playerEntryStatus: new CarriedStatus(StatusCondition.Sleep, 3)
+        );
+        await battle.StartFightAsync();
+
+        // Exactly one legitimate block (Player's own natural Sleep turn, turn 1) — never a second,
+        // bogus one from a HazeSuppressedStatus that leaked past the turn boundary.
+        int playerSleepBlocks = emitter
+            .Events.OfType<ActionBlocked>()
+            .Count(b => b.CreatureName == "Player" && b.Reason == StatusCondition.Sleep);
+        Assert.Equal(1, playerSleepBlocks);
+        Assert.Contains(emitter.Events, e => e is MoveUsed m && m.AttackerName == "Player");
+    }
+
     // Metronome (real imported row) calls a move from the pool; a single-move pool makes it deterministic.
     [Fact]
     public async Task MetronomeCallsAMoveFromThePool()

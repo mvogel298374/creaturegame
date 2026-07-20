@@ -32,6 +32,16 @@ public static class StatusResolver
             return false;
         }
 
+        // Haze: self-clearing flag set by a faster Haze user this turn that just cured this
+        // creature's Sleep/Freeze — Gen 1 still forfeits the already-chosen action rather than
+        // letting it act the instant it wakes (see BattleState.HazeSuppressedStatus).
+        if (creature.Battle.HazeSuppressedStatus is { } suppressedStatus)
+        {
+            creature.Battle.HazeSuppressedStatus = null;
+            emitter?.Emit(new ActionBlocked(creature.Name, suppressedStatus));
+            return false;
+        }
+
         // Binding: trapped by Wrap/Bind/Clamp/Fire Spin
         if (creature.Battle.BindingTurnsRemaining > 0)
         {

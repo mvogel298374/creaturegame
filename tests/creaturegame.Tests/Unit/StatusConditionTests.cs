@@ -293,6 +293,59 @@ public class StatusConditionTests
     }
 
     [Fact]
+    public void HazeSuppressedStatus_BlocksTheActionOnceThenClears()
+    {
+        // Gen 1: a Haze that cures a Sleep/Frozen target this same turn still forfeits that
+        // target's already-chosen move — it doesn't get to act just because the status cleared
+        // mid-turn. Self-clearing like Flinch: blocks exactly once.
+        var creature = new Creature("Drowzee") { Level = 50 };
+        creature.CalculateStats();
+        creature.Battle.HazeSuppressedStatus = StatusCondition.Sleep;
+
+        bool firstCanAct = StatusResolver.CanAct(creature);
+        Assert.False(firstCanAct);
+        Assert.Null(creature.Battle.HazeSuppressedStatus);
+
+        bool secondCanAct = StatusResolver.CanAct(creature);
+        Assert.True(secondCanAct);
+    }
+
+    [Fact]
+    public void ResetForHaze_CuringSleepOnTheTarget_StillForfeitsThatTurnsAction()
+    {
+        // End-to-end through the real trigger: ResetForHaze(preserveMajorStatus: false) is what
+        // HazeEffect calls on the target, so this pins the two pieces working together — the
+        // status is gone but CanAct still blocks once.
+        var target = new Creature("Drowzee") { Level = 50 };
+        target.CalculateStats();
+        target.Battle.Status = StatusCondition.Sleep;
+        target.Battle.SleepTurns = 3;
+
+        target.ResetForHaze(preserveMajorStatus: false);
+
+        Assert.Equal(StatusCondition.None, target.Battle.Status); // cured
+        Assert.False(StatusResolver.CanAct(target)); // but still forfeits this turn's action
+        Assert.True(StatusResolver.CanAct(target)); // free to act again next turn
+    }
+
+    [Fact]
+    public void ResetForHaze_CuringTheUsersOwnSleepIsNotPossible_SoNoSuppressionApplies()
+    {
+        // preserveMajorStatus: true is the user's own side — Haze never cures its own status, so
+        // there is nothing to suppress; a still-asleep user keeps blocking normally via Status,
+        // not via HazeSuppressedStatus.
+        var user = new Creature("Drowzee") { Level = 50 };
+        user.CalculateStats();
+        user.Battle.Status = StatusCondition.Sleep;
+        user.Battle.SleepTurns = 3;
+
+        user.ResetForHaze(preserveMajorStatus: true);
+
+        Assert.Equal(StatusCondition.Sleep, user.Battle.Status);
+        Assert.Null(user.Battle.HazeSuppressedStatus);
+    }
+
+    [Fact]
     public async Task Freeze_ThawsOnFireHitWithBurnEffect()
     {
         // Gen 1: Fire moves that can burn (e.g. Flamethrower) thaw a frozen target.

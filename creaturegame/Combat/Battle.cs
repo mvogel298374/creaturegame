@@ -199,6 +199,14 @@ public class Battle
                 await action.ExecuteAsync();
             }
 
+            // Haze: a suppression set THIS turn but never consumed (the target already acted before the
+            // Haze user this same turn, so ResetForHaze ran too late for this turn's own CanAct check)
+            // must not leak into next turn's CanAct. Gen 1's own move-invalidation write only ever
+            // matters for the turn it's issued on — the next turn's fresh move selection overwrites it
+            // before it's ever read again — so a flag still standing here is stale, not a pending block.
+            PlayerCreature.Battle.HazeSuppressedStatus = null;
+            EnemyCreature.Battle.HazeSuppressedStatus = null;
+
             // End-of-turn: binding, Burn, Poison
             StatusResolver.ApplyEndOfTurnDamage(PlayerCreature, _rules, _emitter);
             StatusResolver.ApplyEndOfTurnDamage(EnemyCreature, _rules, _emitter);
