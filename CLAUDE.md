@@ -182,5 +182,11 @@ PowerShell commands are auto-approved, but commands that are system-wide or far-
 - C# 13 / .NET 9; implicit usings and nullable reference types enabled.
 - Use primary constructors for DTOs and simple data structures (keep models EF-compatible).
 - Enable and handle `Nullable` for all API/DB response types (`int?`, `string?`).
-- Wrap API and DB calls in `try-catch` with console logging.
+- Wrap API and DB calls in `try-catch` with console logging **at the call boundary** (the controller
+  action / hub method / background session task that owns the operation) — not inside every internal
+  DB-service accessor. A thin EF pass-through (`PokemonService`/`AttackService`/`ItemService`) can't do
+  anything differently on failure than the boundary already does (log + a controlled error response), so
+  a per-accessor catch is noise, not defense. Amended 2026-07-20 after a repo-wide audit flagged the DB
+  services as inconsistent with the old blanket wording — see `docs/TODO_ARCHIVE.md` → "DB services skip
+  try/catch, boundary wrapping is the real convention".
 - Test method names state what they test — no `Test`/`test` prefix or suffix.

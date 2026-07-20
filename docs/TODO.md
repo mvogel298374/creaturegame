@@ -642,6 +642,17 @@ Battles are fully playable now — docs won't describe a moving target.
   server-side await, so dismissing one would strand the run; don't re-file "the modals should close on Escape".
   The pinned map is the one escapable overlay and calls `useEscapeKey` directly (it *is* the full-screen surface,
   so it can't share the wrapper's overlay+card DOM). CSS untouched.
+- *2026-07-20:* **DB services (`PokemonService`/`AttackService`/`ItemService`) skip try/catch** — **decided,
+  not a gap: the convention was wrong, not the code.** They're thin EF pass-throughs with no partial state to
+  clean up and nothing to do differently on failure; every real caller already wraps the whole operation at
+  its actual boundary (`GameController.Start`, `GameSessionManager`'s session task) and logs there. Amended
+  `CLAUDE.md` → *Coding Conventions* to "wrapped at the call boundary" instead of adding matching-but-inert
+  catch blocks three layers down. Don't re-file this as a DB-services gap. This was the last open item from
+  the 2026-07-19 repo-wide PR-audit; the other four findings are individually archived in `TODO_ARCHIVE.md`
+  ("0× type immunity does not gate secondary effects", "Leech Seed drain borrows PoisonDamageDenominator",
+  "Paralysis Speed quartering is an inline gen-variable magic number", "Haze over-resets") and a fifth
+  (`SignalRInput` cancel/prompt race) was deliberately never filed — waived by the user while game state
+  stays transient (memory `project_waived_cancel_race`).
 
 **Still open** (filed 2026-07-16 from a repo-wide structural review — ranked by cost-of-deferring, not size):
 
@@ -659,22 +670,10 @@ Battles are fully playable now — docs won't describe a moving target.
   next time a feature (likely **In-Combat Switching**) has to touch the signature anyway. Not worth a
   standalone churn commit: every call site is a test or the run layer, and both are stable.
 
-### Repo-wide PR-audit findings — open (2026-07-19)
-
-Filed from a whole-repo `pr-review`-style audit (gen-seam architecture, central-method contracts, conventions,
-wire completeness). User-adjudicated 2026-07-19: the checkbox below was accepted as real work, along with the
-now-archived findings noted below it. *(A fifth finding — a narrow `SignalRInput` cancel/prompt race that can
-leak an abandoned run task — was deliberately **not** filed: the user doesn't care about abandoned-run leakage
-while game state is this transient. Don't re-raise it until persistence/save-layer work makes run lifetime
-matter.)* *(Four findings are
-FIXED and archived — 2026-07-19: "0× type immunity does not gate secondary effects"; 2026-07-20: "Leech Seed
-drain borrows PoisonDamageDenominator"; 2026-07-20: "Paralysis Speed quartering is an inline gen-variable magic
-number"; 2026-07-20: "Haze over-resets: it cures the user's own major status" — see `TODO_ARCHIVE.md`.)*
-
-- *(minor, convention — decide, don't just fix)* The three DB services (`PokemonService` / `AttackService` /
-  `ItemService`) contain no try/catch while `CLAUDE.md` mandates wrapped DB calls with logging; every live
-  caller wraps at its boundary instead (`GameController.Start`, the session task's global catch), so failures
-  do get logged. Either add the wraps or amend the convention to "wrapped at the call boundary".
+*(The 2026-07-19 repo-wide PR-audit is now fully closed — all five findings resolved: four fixed & archived in
+`TODO_ARCHIVE.md`, the DB-services try/catch convention decided above, and the `SignalRInput` cancel/prompt race
+deliberately waived by the user (memory `project_waived_cancel_race`). Don't re-file "Repo-wide PR-audit
+findings" as an open section.)*
 
 ### Known Gaps
 - Enemy encounter pool ignores game version — filter by `PokemonGameAvailability` once a version selector exists.
