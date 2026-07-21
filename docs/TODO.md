@@ -42,7 +42,8 @@ for the closing record.)*
 Lower priority / opportunistic: E2E flakiness stabilisation (`status.spec.ts` **fixed 2026-07-15** — root cause
 was a spec asserting a transient badge, not an engine bug; see *Browser-Based UI Testing* for the seed-≠-determinism
 lesson it taught), Web UI polish (move-specific animations), Multi-Generation groundwork, User Documentation,
-**Settings Menu** (sound volume ✅ done 2026-07-21; difficulty→XP bonus remaining — see its own section below).
+**Settings Menu** (sound volume + difficulty→XP bonus both ✅ done — see its own section below; the
+difficulty dial's self-referential-scaling limitation is a known, user-waived follow-up, not open work).
 
 ---
 
@@ -504,8 +505,29 @@ slice; the items below are what it deliberately leaves out.
   `utils/settings.ts` (+ `settings.test.ts`), the shared `SettingsPanel`, `SettingsScreen.tsx` + `/settings`
   route, `SettingsModal.tsx`, gear-icon entry points on `TitleScreen` (nav) + `BattleScreen` (modal — see the
   trap above). Verified live in-browser (persistence across reload, in-battle modal, post-modal attack).
-- [ ] **Difficulty → XP bonus** — not started. `RunRules` Easy/Normal/Hard presets + `StartGameRequest`
-  threading through `GameSessionManager` + the `StarterSelection.tsx` segmented control, per the design above.
+  A follow-up gap surfaced independently the same day: Phaser's own `SoundManager` plays OGG cry files
+  through a pipeline separate from `AudioEngine`'s Web Audio graph, so the master-gain node never reached
+  it — fixed by scaling the cry's playback volume by `Audio.getMasterVolume()` in `BattleScene.ts`.
+- [x] **Difficulty → XP bonus** ✅ DONE (2026-07-22) — `Difficulty` enum (Easy/Normal/Hard) +
+  `RunTuningByDifficulty` presets in `GameSessionManager.cs` (Normal reproduces the old hardcoded `RunTuning`
+  exactly — verified byte-for-byte in `DifficultyTests.cs`, a true no-op), threaded via `StartGameRequest` →
+  `GameController.ParseDifficulty` (case-insensitive, falls back to Normal) → `RegisterSession` →
+  `PendingSession` → `AttachConnection`, plus the `StarterSelection.tsx` segmented control. Both `ParseDifficulty`
+  and the preset lookup (`GameSessionManager.RunRulesFor`) are `internal` specifically so `DifficultyTests.cs`
+  exercises the real code path, not a duplicate — a gap `requirements-review` caught (no test had touched
+  either). Verified end-to-end in-browser: HARD selected → POST body carries `"difficulty":"Hard"` → run
+  starts normally. 1388/1388 .NET (was 1377), 168/168 Vitest, TypeScript clean.
+  > **Known limitation, deliberately shipped as-is (user-waived 2026-07-22):** `requirements-review` found
+  > that wild-encounter strength is *self-referential* — `EncounterFactory.ScaleTargetBst` is
+  > `playerBst + depth×10` and `ScaleWildLevel` is a window on the player's *own current level*, both
+  > re-derived from the player's live progression every encounter. So a faster XP pace doesn't make any
+  > single fight easier in relative terms — the enemy always re-scales to match whatever level/BST the
+  > player currently sits at (and faster evolution can pull in higher-BST species sooner). The dial
+  > genuinely only changes *leveling pace*, not combat challenge, despite being labeled "Difficulty." This
+  > is exactly what was asked for (an XP-rate dial), so the mechanic ships under that label unchanged.
+  > **Flagged to flesh out later:** either rename to something honest ("Leveling Pace") or add a real
+  > difficulty-shaping axis independent of the self-referential scaling (e.g. a flat enemy level/BST offset
+  > that doesn't re-normalize to the player) — not scheduled, no target date.
 
 ---
 

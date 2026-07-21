@@ -120,8 +120,9 @@ Things that genuinely differ generation to generation, each a member on the inte
 > split (which divides one pool among only the creatures sent out) — it is a wider, always-on Exp-All-style grant,
 > a deliberate roguelite deviation, so it lives in **`RunRules`** and never touches `IBattleRules`. Property
 > default `0.0` (off — so `RunRules.Default`, every test, and any party-less `Battle` stay a pure no-op); the web
-> run sets **`0.5`** in `GameSessionManager.RunTuning` beside the XP-curve anchors. It only fires when a party is
-> threaded into `Battle`. Note the share is taken off the *curve-scaled* `activeAward` (the multiplier compounds
+> run picks one of three presets in `GameSessionManager.RunTuningByDifficulty` (Easy `0.75` / **Normal `0.5`** /
+> Hard `0.25`) per the player's Easy/Normal/Hard difficulty choice at run-start, beside the matching XP-curve
+> anchors. It only fires when a party is threaded into `Battle`. Note the share is taken off the *curve-scaled* `activeAward` (the multiplier compounds
 > into it), so a low-level bench member can jump several levels off one late-run win — an intended, generous
 > catch-up for underleveled drafts (user-confirmed keep-as-is, not the tamer pre-curve base-XP option). Fainted
 > exclusion is by current HP (`IsAlive()`), so an unhealed KO'd member is skipped too. Provisional, retune by

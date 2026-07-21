@@ -15,6 +15,7 @@ public class GameController(GameSessionManager sessionManager, EncounterFactory 
         try
         {
             int playerLevel = Math.Clamp(req.Level ?? 50, 5, 100);
+            var difficulty = ParseDifficulty(req.Difficulty);
 
             // One seed per run. The client may supply one (replay / deterministic E2E); otherwise we pick a
             // random one. Either way the whole run — player DVs/moves, every enemy's species/level/DVs/moves,
@@ -37,9 +38,12 @@ public class GameController(GameSessionManager sessionManager, EncounterFactory 
                 setup.Wallet,
                 setup.AllItems,
                 rng,
-                setup.PlayableBiomes
+                setup.PlayableBiomes,
+                difficulty
             );
-            Console.WriteLine($"[GameController] Started run {gameId} with seed {seed}.");
+            Console.WriteLine(
+                $"[GameController] Started run {gameId} with seed {seed}, difficulty {difficulty}."
+            );
             return Ok(new { gameId, seed });
         }
         catch (Exception ex)
@@ -48,6 +52,14 @@ public class GameController(GameSessionManager sessionManager, EncounterFactory 
             return StatusCode(500, new { error = "Failed to start game" });
         }
     }
+
+    /// <summary>Falls back to <see cref="Difficulty.Normal"/> on a missing/unrecognised value — never a dead
+    /// request over a client typo or a stale client sending nothing. <c>internal</c> (not private) so the
+    /// parsing/fallback behaviour is directly testable rather than only exercised through the full endpoint.</summary>
+    internal static Difficulty ParseDifficulty(string? value) =>
+        Enum.TryParse<Difficulty>(value, ignoreCase: true, out var parsed)
+            ? parsed
+            : Difficulty.Normal;
 
     /// <summary>
     /// On-demand snapshot of the run's live player creature for the in-battle overview (CHECK POKEMON):
@@ -99,4 +111,9 @@ public class GameController(GameSessionManager sessionManager, EncounterFactory 
     }
 }
 
-public record StartGameRequest(int SpeciesId, int? Level = null, int? Seed = null);
+public record StartGameRequest(
+    int SpeciesId,
+    int? Level = null,
+    int? Seed = null,
+    string? Difficulty = null
+);

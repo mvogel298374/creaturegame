@@ -204,6 +204,38 @@
   min-width: 2rem;
 }
 
+.difficulty-picker-label {
+  margin-left: var(--sp-md);
+}
+
+.difficulty-picker {
+  display: flex;
+  gap: 1px;
+  flex-shrink: 0;
+}
+
+.difficulty-btn {
+  padding: 0.3rem 0.75rem;
+  font-family: var(--font);
+  font-size: var(--fs-xs);
+  font-weight: bold;
+  letter-spacing: var(--ls-normal);
+  background: transparent;
+  color: var(--clr-text-muted);
+  border: 1px solid var(--clr-border);
+  transition: color var(--transition), border-color var(--transition), background var(--transition);
+}
+
+.difficulty-btn:hover {
+  color: var(--clr-text);
+}
+
+.difficulty-btn--selected {
+  color: var(--clr-text);
+  border-color: var(--clr-accent);
+  background: color-mix(in srgb, var(--clr-accent) 20%, transparent);
+}
+
 /* ── Footer ────────────────────────────────── */
 .select-footer {
   display: flex;

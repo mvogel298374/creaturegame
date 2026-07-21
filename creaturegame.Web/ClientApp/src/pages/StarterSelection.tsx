@@ -14,6 +14,9 @@ export function StarterSelection() {
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState<string | null>(null);
   const [levelChoice, setLevelChoice] = useState(50);
+  // Roguelite difficulty: a per-run choice (like Level/Seed), threaded once at game start into the backend's
+  // RunRules preset (docs/TODO.md — Settings Menu). Not a Settings-menu / localStorage concern.
+  const [difficultyChoice, setDifficultyChoice] = useState<'Easy' | 'Normal' | 'Hard'>('Normal');
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -36,9 +39,10 @@ export function StarterSelection() {
       // server's random seed.
       const seedParam = new URLSearchParams(window.location.search).get('seed');
       const seed = seedParam !== null && seedParam.trim() !== '' ? Number(seedParam) : NaN;
-      const body: { speciesId: number; level: number; seed?: number } = {
+      const body: { speciesId: number; level: number; seed?: number; difficulty: string } = {
         speciesId: selected.id,
         level: levelChoice,
+        difficulty: difficultyChoice,
       };
       if (Number.isInteger(seed)) body.seed = seed;
 
@@ -110,6 +114,22 @@ export function StarterSelection() {
           onChange={e => setLevelChoice(Number(e.target.value))}
         />
         <span className="level-picker-value">{levelChoice}</span>
+
+        <span className="level-picker-label difficulty-picker-label">DIFFICULTY</span>
+        <div className="difficulty-picker" role="radiogroup" aria-label="Difficulty">
+          {(['Easy', 'Normal', 'Hard'] as const).map(tier => (
+            <button
+              key={tier}
+              type="button"
+              role="radio"
+              aria-checked={difficultyChoice === tier}
+              className={`difficulty-btn ${difficultyChoice === tier ? 'difficulty-btn--selected' : ''}`}
+              onClick={() => setDifficultyChoice(tier)}
+            >
+              {tier.toUpperCase()}
+            </button>
+          ))}
+        </div>
       </div>
 
       <footer className={`select-footer ${selected ? 'select-footer--visible' : ''}`}>

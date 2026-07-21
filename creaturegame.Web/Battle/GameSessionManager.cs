@@ -25,22 +25,43 @@ public sealed class GameSessionManager(
     private static readonly TimeSpan ReconnectGrace = TimeSpan.FromSeconds(40);
 
     // Roguelite run-balance rules for the web run — the tunable "game rules" bag, separate from the Gen-1 seam
-    // (see RunRules). The XP curve is a soft level-aware ramp: ~1.5× at low levels (leveling is already brisk
-    // there under Gen-1's cheap early thresholds, so we barely nudge it — no sharp multi-level jumps) climbing
-    // to 4.5× near the cap (where the Gen-1 grind is glacial). Around the default level-50 start it lands ~3×
-    // (2.98×), so a biome (~4–6 encounters) advances the creature roughly 0.8–1.5 levels instead of a slow
-    // crawl. These two anchors are the dials (trivially exposable as sliders); provisional, expected to be
-    // retuned by playtesting. A deliberate, documented deviation from strict Gen-1 XP — see GENERATION_SEAMS.md
-    // — kept out of the Gen-1 seam (Battle scales the seam's result; the formula itself is untouched).
-    private static readonly RunRules RunTuning = new()
-    {
-        XpMultiplierEarly = 1.5,
-        XpMultiplierLate = 4.5,
-        // Innate party Exp-Share: each living bench member earns 50% of the lead's award off every win, so a
-        // drafted roster keeps pace and stays swappable between biomes. Provisional — expected to be retuned by
-        // playtesting (0 = off, 1 = full XP to all). A roguelite dial, kept out of the Gen-1 seam (see RunRules).
-        BenchXpShare = 0.5,
-    };
+    // (see RunRules). The XP curve is a soft level-aware ramp climbing from the early anchor (low levels are
+    // already brisk under Gen-1's cheap early thresholds, so it's barely nudged there — no sharp multi-level
+    // jumps) to the late anchor (where the Gen-1 grind is glacial). A deliberate, documented deviation from
+    // strict Gen-1 XP — see GENERATION_SEAMS.md — kept out of the Gen-1 seam (Battle scales the seam's result;
+    // the formula itself is untouched). Exposed to the player as the Easy/Normal/Hard difficulty choice at
+    // run-start (StarterSelection); Normal reproduces the numbers this run always used pre-difficulty-slider, so
+    // picking it is a true no-op. All three anchors are provisional, expected to be retuned by playtesting.
+    private static readonly IReadOnlyDictionary<Difficulty, RunRules> RunTuningByDifficulty =
+        new Dictionary<Difficulty, RunRules>
+        {
+            [Difficulty.Easy] = new RunRules
+            {
+                XpMultiplierEarly = 2.0,
+                XpMultiplierLate = 6.0,
+                BenchXpShare = 0.75,
+            },
+            // The original single hardcoded RunTuning: ~1.5× at low levels climbing to 4.5× near the level cap
+            // (lands ~3× around the default level-50 start, so a biome advances the creature roughly 0.8–1.5
+            // levels instead of a slow crawl), with a 50% innate bench Exp-Share so a drafted roster keeps pace.
+            [Difficulty.Normal] = new RunRules
+            {
+                XpMultiplierEarly = 1.5,
+                XpMultiplierLate = 4.5,
+                BenchXpShare = 0.5,
+            },
+            [Difficulty.Hard] = new RunRules
+            {
+                XpMultiplierEarly = 1.0,
+                XpMultiplierLate = 3.0,
+                BenchXpShare = 0.25,
+            },
+        };
+
+    /// <summary>The <see cref="RunRules"/> preset for a difficulty tier. <c>internal</c> (not private) so the
+    /// preset values themselves — and not just the surrounding wiring — are directly testable.</summary>
+    internal static RunRules RunRulesFor(Difficulty difficulty) =>
+        RunTuningByDifficulty[difficulty];
 
     public string RegisterSession(
         Creature player,
@@ -49,7 +70,8 @@ public sealed class GameSessionManager(
         Wallet wallet,
         IReadOnlyList<Item> allItems,
         IRandomSource rng,
-        IReadOnlyList<BiomeDefinition> playableBiomes
+        IReadOnlyList<BiomeDefinition> playableBiomes,
+        Difficulty difficulty = Difficulty.Normal
     )
     {
         var gameId = Guid.NewGuid().ToString("N");
@@ -61,6 +83,7 @@ public sealed class GameSessionManager(
             allItems,
             rng,
             playableBiomes,
+            difficulty,
             DateTimeOffset.UtcNow
         );
         EvictExpiredPendingSessions();
@@ -168,8 +191,9 @@ public sealed class GameSessionManager(
                 // A Shop only rolls into a biome when the player can afford the cheapest possible item — so a broke
                 // player (e.g. the opening node with a 0₽ wallet) never gets a dead, all-unaffordable shop.
                 MinShopBudget = ShopCalculator.MinItemPrice,
-                // Roguelite run-balance rules (the level-aware XP curve, boosted above pure Gen-1) — see RunTuning.
-                RunRules = RunTuning,
+                // Roguelite run-balance rules (the level-aware XP curve, boosted above pure Gen-1) — the preset
+                // matching the difficulty chosen at run-start (see RunRulesFor above).
+                RunRules = RunRulesFor(session.Difficulty),
                 // Party threading: the RunDirector plays the run over this same party instance (its Lead is the
                 // active player), so the party-hydrate endpoint and the roster panel read the live roster.
                 Party = battle.Party,
@@ -480,8 +504,21 @@ sealed record PendingSession(
     IReadOnlyList<Item> AllItems,
     IRandomSource Rng,
     IReadOnlyList<BiomeDefinition> PlayableBiomes,
+    Difficulty Difficulty,
     DateTimeOffset RegisteredAt
 );
+
+/// <summary>
+/// Roguelite difficulty tiers offered to the player at run-start (StarterSelection), each mapped to a preset
+/// <see cref="RunRules"/> (see <c>GameSessionManager.RunTuningByDifficulty</c>). A web-layer/session concept
+/// only — <see cref="RunRules"/> itself stays a generic tuning bag; this is just the named-preset lookup.
+/// </summary>
+public enum Difficulty
+{
+    Easy,
+    Normal,
+    Hard,
+}
 
 /// <summary>A bag entry for the client: the item plus how many the run is holding.</summary>
 /// <remarks><see cref="RestoresPpAllMoves"/> lets the bag menu tell a whole-moveset PP restore (Elixir/Max

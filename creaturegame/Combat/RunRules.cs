@@ -24,8 +24,9 @@ public sealed class RunRules
     /// each <em>living bench</em> member also earns from a win, so the whole roster keeps pace and stays swappable.
     /// The active creature is always paid in full — this only tops up the bench. <c>0.0</c> = off (only the active
     /// earns, legacy Gen-1-ish behaviour — the property <b>default</b>, so <see cref="Default"/> and every unopted
-    /// caller stay a pure no-op); <c>0.5</c> = each bench member earns half the lead's award (the live run's
-    /// <c>RunTuning</c> value); <c>1.0</c> = full XP to everyone. A run-balance dial, deliberately outside the
+    /// caller stay a pure no-op); the web run picks one of three difficulty presets in
+    /// <c>GameSessionManager.RunTuningByDifficulty</c> (Easy <c>0.75</c> / Normal <c>0.5</c> / Hard <c>0.25</c>);
+    /// <c>1.0</c> = full XP to everyone. A run-balance dial, deliberately outside the
     /// Gen-1 seam. Fainted members are excluded regardless (a fainted participant earns nothing, per Gen 1). Only
     /// fires when a party is threaded into <see cref="Battle"/>; direct single-creature callers pass no party, so
     /// it never applies there.
