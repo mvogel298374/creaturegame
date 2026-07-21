@@ -25,6 +25,7 @@ import { AcquisitionModal } from '../components/modals/AcquisitionModal';
 import { LeadChoiceModal } from '../components/modals/LeadChoiceModal';
 import { SwitchInModal } from '../components/modals/SwitchInModal';
 import { MoveReplacementModal } from '../components/modals/MoveReplacementModal';
+import { SettingsModal } from '../components/modals/SettingsModal';
 import { CreatureOverview } from './CreatureOverview';
 import './BattleScreen.css';
 
@@ -55,6 +56,8 @@ export function BattleScreen() {
   // Encounter-map overlay: pinned open by the MAP button, and briefly auto-peeked at each ladder change.
   const [mapPinned, setMapPinned] = useState(false);
   const [mapPeek, setMapPeek] = useState(false);
+  // Settings is a local modal, not a page nav — leaving the page would tear down the live SignalR connection.
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -114,6 +117,13 @@ export function BattleScreen() {
     <div className="battle-screen">
       <MapGlyphSprite />
       <div className="battle-field">
+        <button
+          className="settings-gear-btn settings-gear-btn--left"
+          onClick={() => setSettingsOpen(true)}
+          aria-label="Settings"
+        >
+          ⚙
+        </button>
         <div className="nameplate nameplate--enemy">
           <div className="nameplate-row">
             <span className="nameplate-name">{enemyName}</span>
@@ -265,6 +275,10 @@ export function BattleScreen() {
 
       {state.switchIn && (
         <SwitchInModal prompt={state.switchIn} onChoose={respondSwitchIn} />
+      )}
+
+      {settingsOpen && (
+        <SettingsModal onClose={() => setSettingsOpen(false)} />
       )}
 
       {state.phase === 'ended' && (

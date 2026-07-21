@@ -5,6 +5,13 @@ export function TitleScreen() {
   const nav = useNavigate();
   return (
     <div className="title-screen">
+      <button
+        className="settings-gear-btn"
+        onClick={() => nav('/settings')}
+        aria-label="Settings"
+      >
+        ⚙
+      </button>
       <div className="title-content">
         <div className="title-logo">CREATURE<span className="title-logo-accent">GAME</span></div>
         <div className="title-subtitle">GEN 1 BATTLE SIMULATOR</div>

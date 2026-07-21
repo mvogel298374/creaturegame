@@ -160,3 +160,25 @@ button {
   letter-spacing: var(--ls-normal);
   color: var(--clr-text-muted);
 }
+
+/* Settings gear — a small corner icon button, reused from the Title Screen and in-battle. */
+.settings-gear-btn {
+  position: absolute;
+  top: var(--sp-sm);
+  right: var(--sp-sm);
+  z-index: 6;
+  width: 2.2rem;
+  height: 2.2rem;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--clr-text);
+  background: rgba(13, 13, 26, 0.82);
+  border: 2px solid var(--clr-text);
+  border-radius: 50%;
+  transition: color var(--transition), border-color var(--transition), box-shadow var(--transition);
+}
+
+.settings-gear-btn:hover {
+  border-color: var(--clr-gold);
+  color: var(--clr-gold);
+}

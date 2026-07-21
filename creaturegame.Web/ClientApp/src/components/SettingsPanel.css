@@ -1,0 +1,26 @@
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-md);
+}
+
+.settings-label {
+  font-size: var(--fs-xs);
+  color: var(--clr-text-muted);
+  letter-spacing: var(--ls-wider);
+  white-space: nowrap;
+}
+
+.settings-slider {
+  flex: 1;
+  accent-color: var(--clr-accent);
+  cursor: pointer;
+}
+
+.settings-value {
+  font-size: var(--fs-sm);
+  font-weight: bold;
+  letter-spacing: var(--ls-tight);
+  min-width: 3rem;
+  text-align: right;
+}

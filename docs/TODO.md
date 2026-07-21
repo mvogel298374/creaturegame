@@ -41,7 +41,8 @@ for the closing record.)*
 
 Lower priority / opportunistic: E2E flakiness stabilisation (`status.spec.ts` **fixed 2026-07-15** — root cause
 was a spec asserting a transient badge, not an engine bug; see *Browser-Based UI Testing* for the seed-≠-determinism
-lesson it taught), Web UI polish (move-specific animations), Multi-Generation groundwork, User Documentation.
+lesson it taught), Web UI polish (move-specific animations), Multi-Generation groundwork, User Documentation,
+**Settings Menu** (sound volume ✅ done 2026-07-21; difficulty→XP bonus remaining — see its own section below).
 
 ---
 
@@ -458,6 +459,53 @@ slice; the items below are what it deliberately leaves out.
   + `IEvolutionRules.StoneUsed` are built and dormant.
 - [x] **Cross-encounter status persistence** — DONE (2026-06-10); major status carries across chain encounters,
   volatiles reset per battle. See `STATE_MODEL.md §2` and `TODO_ARCHIVE.md`.
+
+---
+
+## Settings Menu — sound volume + difficulty (XP bonus) controls
+
+**`/plan` done (2026-07-21).** Two independent slices, neither touches a generation seam.
+
+- **Sound volume.** `AudioEngine.ts` had no volume control at all — every sound hardcoded a literal gain
+  straight to `a.destination`. Added one persistent `masterGain` node every sound now routes through, plus
+  `setMasterVolume`/`getMasterVolume` (clamped 0–1). New `utils/settings.ts` persists to `localStorage`
+  (`creaturegame.settings`, `{ masterVolume }`, default `1.0` = unchanged historical behaviour); applied once
+  at boot in `main.tsx` before any sound plays — `setMasterVolume` only records a pending value until the
+  AudioContext actually exists (first sound played), so applying a persisted setting at load never trips the
+  browser's autoplay-policy warning pre-gesture. The actual controls live in a shared `SettingsPanel`
+  component with two chrome wrappers: a full-page `/settings` route (`SettingsScreen.tsx`) reached via a
+  `.settings-gear-btn` corner icon on `TitleScreen`, and a `SettingsModal` (in `components/modals/`, the
+  Modal component's first real use of its escapable `{ onEscape }` dismiss — nothing here parks a
+  server-side await, so closing costs nothing) reached via the same icon in-battle.
+  > **Real trap hit and fixed during build:** the in-battle icon originally did a page `nav('/settings')`
+  > like the Title Screen one. That unmounts `BattleScreen`, tearing down its live SignalR connection —
+  > `GameSessionManager.AttachConnection`'s reconnect path resumes the *transport* but never replays the
+  > accumulated battle state into a fresh component, so returning left the screen stuck on "Connecting…"
+  > (and intermittently crashed on a stale-state read). Fixed by keeping `BattleScreen` mounted and opening
+  > `SettingsModal` as local state instead — verified in-browser: settings opened and closed mid-battle,
+  > the same `RAZOR LEAF` attack still resolved correctly afterwards. The Title Screen's plain page nav is
+  > fine as-is (no live session to protect there).
+- **Difficulty → XP bonus.** `RunRules` (`creaturegame/Combat/RunRules.cs`) is already the sanctioned knob for
+  this — its own doc comment says it exists to be "trivially exposable as sliders," deliberately outside
+  `IBattleRules`/`ITypeChart`/`IStatCalculator`. Today it's one hardcoded `RunTuning` static in
+  `GameSessionManager.cs` (`XpMultiplierEarly=1.5, XpMultiplierLate=4.5, BenchXpShare=0.5`). Plan: three named
+  presets (Easy/Normal/Hard) — Normal = today's live numbers unchanged (a true no-op regression-wise) —
+  threaded exactly like `Level`/`Seed`: `StartGameRequest.Difficulty` → `GameController.Start` →
+  `RegisterSession` → `PendingSession` → `AttachConnection` picks the matching preset instead of the static.
+  Frontend: a 3-position segmented control (not a raw range input — 3 named tiers, not a continuum) next to
+  the existing Level slider on `StarterSelection.tsx`, default Normal, sent in the `/api/game/start` body.
+  **Per-run, not a global default** — matches how Level/Seed already work; no new persistence needed.
+- **DoR:** gen-variable surface is **none** for both (volume is pure presentation; difficulty only touches
+  `RunRules`, already documented as living outside every seam) — no importer/DB change, no `save.db` need
+  (volume is `localStorage`; difficulty is a per-run request param like Level/Seed). Independent of every
+  other in-flight feature.
+
+- [x] **Sound volume** ✅ DONE (2026-07-21) — `AudioEngine.ts` master-gain plumbing (+ `AudioEngine.test.ts`),
+  `utils/settings.ts` (+ `settings.test.ts`), the shared `SettingsPanel`, `SettingsScreen.tsx` + `/settings`
+  route, `SettingsModal.tsx`, gear-icon entry points on `TitleScreen` (nav) + `BattleScreen` (modal — see the
+  trap above). Verified live in-browser (persistence across reload, in-battle modal, post-modal attack).
+- [ ] **Difficulty → XP bonus** — not started. `RunRules` Easy/Normal/Hard presets + `StartGameRequest`
+  threading through `GameSessionManager` + the `StarterSelection.tsx` segmented control, per the design above.
 
 ---
 

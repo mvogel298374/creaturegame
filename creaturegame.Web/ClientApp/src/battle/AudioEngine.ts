@@ -6,10 +6,40 @@
  */
 
 let ctx: AudioContext | null = null;
+let masterGain: GainNode | null = null;
+// Applied to masterGain.gain once it exists; read by getMasterVolume() before then. Kept separate from the
+// gain node itself so setMasterVolume() never has to create the AudioContext (would trip the browser's
+// autoplay-policy warning before any sound has actually played, e.g. from a Settings screen applying a
+// persisted volume at app boot).
+let pendingVolume = 1;
 
 function ac(): AudioContext {
   if (!ctx) ctx = new AudioContext();
   return ctx;
+}
+
+// Single volume control point: every sound in this module routes through this one gain node instead of
+// straight to the destination, so a live slider adjusts sounds already mid-decay, not just ones started
+// after the change.
+function master(): GainNode {
+  const a = ac();
+  if (!masterGain) {
+    masterGain = a.createGain();
+    masterGain.gain.value = pendingVolume;
+    masterGain.connect(a.destination);
+  }
+  return masterGain;
+}
+
+/** Sets the master volume (0–1) for all AudioEngine output; clamped to that range. */
+export function setMasterVolume(v: number): void {
+  pendingVolume = Math.min(1, Math.max(0, v));
+  if (masterGain) masterGain.gain.value = pendingVolume;
+}
+
+/** Reads the current master volume (0–1); default 1 (unchanged from historical behaviour). */
+export function getMasterVolume(): number {
+  return pendingVolume;
 }
 
 // ── Primitive builder ─────────────────────────────────────────────────────────
@@ -30,7 +60,7 @@ function burst({ startFreq, endFreq, duration, volume = 0.35, type = 'square', d
   const osc  = a.createOscillator();
   const gain = a.createGain();
   osc.connect(gain);
-  gain.connect(a.destination);
+  gain.connect(master());
 
   osc.type = type;
   osc.frequency.setValueAtTime(startFreq, t);
@@ -55,7 +85,7 @@ export function playHit(): void {
   const oscGain = a.createGain();
   osc.type = 'sine';
   osc.connect(oscGain);
-  oscGain.connect(a.destination);
+  oscGain.connect(master());
   osc.frequency.setValueAtTime(200, t);
   osc.frequency.exponentialRampToValueAtTime(50, t + 0.08);
   oscGain.gain.setValueAtTime(0.55, t);
@@ -73,7 +103,7 @@ export function playHit(): void {
   const noiseGain = a.createGain();
   noise.buffer = buf;
   noise.connect(noiseGain);
-  noiseGain.connect(a.destination);
+  noiseGain.connect(master());
   noiseGain.gain.setValueAtTime(0.35, t);
   noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.03);
   noise.start(t);
@@ -88,7 +118,7 @@ export function playHitCrit(): void {
   const oscGain = a.createGain();
   osc.type = 'sine';
   osc.connect(oscGain);
-  oscGain.connect(a.destination);
+  oscGain.connect(master());
   osc.frequency.setValueAtTime(320, t);
   osc.frequency.exponentialRampToValueAtTime(80, t + 0.08);
   oscGain.gain.setValueAtTime(0.6, t);
@@ -108,7 +138,7 @@ export function playHitCrit(): void {
   const noiseGain = a.createGain();
   noise.buffer = buf;
   noise.connect(noiseGain);
-  noiseGain.connect(a.destination);
+  noiseGain.connect(master());
   noiseGain.gain.setValueAtTime(0.45, t);
   noiseGain.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
   noise.start(t);

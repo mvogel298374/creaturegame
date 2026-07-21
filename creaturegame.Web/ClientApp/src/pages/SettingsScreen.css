@@ -1,0 +1,31 @@
+.settings-screen {
+  align-items: stretch;
+  justify-content: flex-start;
+  position: relative;
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-md);
+  padding: var(--sp-md) var(--sp-lg);
+  z-index: 1;
+}
+
+.settings-header-spacer {
+  /* Balances the BACK button's width so the title stays visually centred. */
+  width: 88px;
+}
+
+.settings-body {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--sp-lg);
+  max-width: 480px;
+  width: 100%;
+  margin: var(--sp-xl) auto;
+  padding: 0 var(--sp-lg);
+  z-index: 1;
+}
