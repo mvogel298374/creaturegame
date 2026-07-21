@@ -110,7 +110,10 @@ export class BattleScene extends Phaser.Scene {
     const id = who === 'player' ? this.playerSpeciesId : this.enemySpeciesId;
     const key = this.cryKey(id);
     if (this.cache.audio.exists(key)) {
-      this.sound.play(key, { volume: 0.7, detune });
+      // Phaser's own SoundManager plays OGG cries — a separate pipeline from AudioEngine's Web Audio synth,
+      // so the master-volume slider (which only routes AudioEngine's own sounds) would otherwise never reach
+      // it. Scale explicitly by the same persisted setting so cries obey it too.
+      this.sound.play(key, { volume: 0.7 * Audio.getMasterVolume(), detune });
     } else {
       // No OGG for this species (importer not run, or load failed) — synth fallback, keyed to the live id.
       Audio.playCry(id);
