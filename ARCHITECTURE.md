@@ -141,6 +141,14 @@ Each entry: **Decision · Why · Where it lives.**
   reconnect grace survives a transient network drop without losing the run.
 - **Where:** `creaturegame.Web/Battle/GameSessionManager.cs`, `SignalRInput.cs`, `Hubs/BattleHub.cs`.
   **Run loop / event model → `GAME_LOOP.md`.**
+- **Hosting corollary (live bug, fixed 2026-07-23):** because session state is a `ConcurrentDictionary` in one
+  process — not a shared/external store — the Fly deployment must stay **single-machine**. `flyctl deploy`
+  defaults to `--ha=true`, which maintains 2 machines per process group for redundancy; with 2 machines, Fly's
+  proxy can route a plain REST call (e.g. `GET /api/game/{id}/player`, CHECK POKEMON) to the machine that never
+  saw that run's `/start` call, 404ing it — the live SignalR connection stays fine because it's pinned to one
+  machine for its whole lifetime, so only stateless follow-up requests were affected. Fixed by pinning
+  `--ha=false` in `.github/workflows/fly-deploy.yml`. This constraint stands until session state is
+  externalized into `save.db` (see `docs/TODO.md` → Known Gaps).
 
 ### 2.8 Frontend animation timeline (pure expand + driver, Phaser/React isolation)
 - **Decision:** backend events become UI in two stages — a **pure** `expandEvent` maps each event to immediate

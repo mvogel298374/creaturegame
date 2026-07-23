@@ -751,6 +751,12 @@ findings" as an open section.)*
 - **Endless-chain double-faint** — tested (2026-06-12): a mutual end-of-turn DoT double-faint counts as a loss,
   pinned by `BattleRunnerTests.Runner_DoubleFaintFromEndOfTurnPoison_CountsAsLoss_NotAWin`.
 - ~~**Phantom stat-cap message**~~ — **FIXED 2026-07-19** (see `TODO_ARCHIVE.md` → *Stat-cap message fidelity*).
+- **Fly deploy must stay single-machine** — `GameSessionManager` keeps run state in-process with no shared
+  store, so a 2nd machine 404s any plain REST call (e.g. CHECK POKEMON) that Fly's proxy routes to the machine
+  that never saw the run's `/start` call. `flyctl deploy` defaults to `--ha=true`, which recreates a 2nd
+  machine on every deploy; the workflow now pins `--ha=false` (fixed 2026-07-23, live bug). Don't remove that
+  flag or bump `min_machines_running`/scale count until session state is externalized (`save.db`). Full
+  write-up → `ARCHITECTURE.md` §2.7 (Web session lifecycle).
 
 ---
 
