@@ -17,6 +17,11 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: superfly/flyctl-actions/setup-flyctl@master
-      - run: flyctl deploy --remote-only
+      # --ha=false: GameSessionManager keeps run state in-process (no shared/external store yet), so a
+      # second machine is actively harmful — Fly's proxy can route a request to the machine that never
+      # saw the run's /start call, 404ing endpoints like GET /api/game/{id}/player. flyctl's default
+      # --ha=true recreates a 2nd machine on every deploy for redundancy; keep this single-machine until
+      # session state is externalized (see docs/TODO.md — Game Loop & Progression / save.db).
+      - run: flyctl deploy --remote-only --ha=false
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
