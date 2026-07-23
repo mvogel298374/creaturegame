@@ -8,6 +8,34 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## `reward-drop.spec.ts` red — misdiagnosed as seed-31 RNG drift ✅ DONE (2026-07-23)
+
+Filed 2026-07-19 as "seed-31 drift": the spec pinned seed 31 expecting CHARIZARD @ L50 to open the biome on a
+**Treasure** node (no battle needed before the reward modal). The original filing blamed an unspecified earlier
+commit for adding/moving an RNG draw ahead of node planning.
+
+**Actual root cause (not RNG drift):** `creaturegame/Combat/RunDirector.cs`'s `DefaultNodePlan` hardcodes
+`plan[0] = RunNodeKind.WildBattle` — a deliberate "soft opening" design rule ("the opening node of a biome is
+always a plain wild battle — never an Elite or an interaction node — so a biome can't greet the player with a
+difficulty spike or a non-combat slot on entry"). **No seed can ever land a Treasure first** under this rule.
+Confirmed live against the dev server: seeds 1–40 all open on a battle, never a Treasure. Exactly when this rule
+landed is unknown, but it predates the fix and made the seed-31 premise permanently false, not drifted.
+
+**Fix:** since a battle win funnels through the same `RewardGranted` → reward-choice modal as a Treasure/Mystery
+node (one drop-choice UI for every source, per `battleReducer.ts`), the spec now wins the first deterministic
+battle instead of relying on a Treasure node. New `WIN_FIRST_BATTLE_SEED = 1` (CHARIZARD @ L50 vs STARMIE, wins
+in ~4 turns via the default first-available-move auto-play). Seed 31 was tried first and rejected: under the new
+"first node is always a battle" rule it pits CHARIZARD against GENGAR, and CHARIZARD's default first move
+(SCRATCH, Normal) is a Gen 1 immunity match (0×) against Ghost, so the naive auto-play loop can't win it — hence
+seed 1, not seed 31 patched in place. Also updated the log-line assertion: a battle-win reward logs
+`"Found {N}G!"` (`rewardGrantedMsg` in `timeline.ts`), not the old Treasure-sourced `"The {source} held {N}G!"`
+text. Renamed the `describe` block: `'Run Economy reward choice (Treasure node)'` →
+`'Run Economy reward choice (battle-win drop)'`.
+
+Touched: `creaturegame.Web/ClientApp/e2e/reward-drop.spec.ts` only (test-only diff).
+
+---
+
 ## Haze over-resets: it cures the user's own major status ✅ DONE (2026-07-20)
 
 Filed from the 2026-07-19 repo-wide audit: `HazeEffect` (`MoveEffects.cs:76`) called a full

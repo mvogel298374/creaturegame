@@ -576,11 +576,10 @@ tested through the `mitt` bridge (assert **event ordering**, never wall-clock du
   > shifts every later roll and plays out a different run. A seeded spec is only deterministic if the driving loop
   > is **paced** — settle each turn (wait for the action menu to come back) before the next input. Otherwise write
   > the assertions not to care (retry/walk seeds). See `status.spec.ts` and `forced-switch.spec.ts`.
-- [x] **Run Economy reward-modal E2E** (`reward-modal.spec.ts`) — seed 31 / CHARIZARD @ L50 lays the first
-  biome node as a **Treasure**, so the modal fires right after the opening route pick (no battle to win). Asserts
-  the modal + title, a gold line (`+N₽`) + item line, the **gold HUD credit** (was `₽0`), and OK →
-  `acknowledgeReward` → modal closes + run continues into the next node. **Closes the known live-verification
-  gap** — the reward modal + gold credit are now observed in a browser, not just unit/integration.
+- [x] **Run Economy reward-modal E2E** — closed the known live-verification gap (reward modal + gold credit
+  observed in a browser, not just unit/integration). Superseded by the pick-1-of-3 `RewardChoiceModal` rework;
+  current spec is `reward-drop.spec.ts` — see `docs/TODO_ARCHIVE.md` → "Reward Choice — pick-1-of-3 rarity
+  rewards" (E2E note) for the accurate, current record.
 - [x] **E2E harness recovered from spec-rot** — the suite was fully red: **biome mode (Phase 3b-2)** added an
   opening route-choice modal that blocked before every battle (the `startBattle` helper didn't answer it), and
   the **Run Economy** starting bag stopped seeding `BattleStatBoost` items. Fixed `startBattle` to pick the
@@ -589,12 +588,6 @@ tested through the `mitt` bridge (assert **event ordering**, never wall-clock du
   item-effect logic stays covered by `ItemEffectTests`, bag grouping by `bag.test.ts`).
 
 **Remaining (in priority order):**
-- [ ] **`reward-drop.spec.ts` is red — seed-31 drift** (found 2026-07-19, pre-existing): the spec pins seed 31
-  laying a **Treasure** as the first biome node, but the `.reward-modal` no longer appears — the node layout under
-  that seed has drifted (some earlier commit added/moved an RNG draw before node planning). Verified NOT caused by
-  the 2026-07-19 immunity-gate fix: it fails identically against a pre-fix backend, and the spec's failure point
-  (run start → first node) precedes any battle. *Fix:* walk seeds for a new Treasure-first seed (the documented
-  "seed ≠ determinism" remedy), or make the spec robust to node order (play until the first Treasure).
 - [x] **Stabilise inter-test E2E flakiness (a seed-determinism pass)** — DONE (2026-07-08). `startBattle` gained
   an optional `seed` param: when given it lands directly on `/select?e2e=1&seed=…` (the `reward-drop.spec`
   pattern; the level slider lives on that screen so a custom `level` still works), pinning the whole run — enemy,

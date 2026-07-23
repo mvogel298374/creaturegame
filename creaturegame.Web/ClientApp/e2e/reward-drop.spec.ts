@@ -1,19 +1,29 @@
 import { test, expect } from '@playwright/test';
-import { fightButton } from './helpers';
+import { fightButton, chooseMove } from './helpers';
 
-// The Run Economy reward flow at a Treasure node, driven deterministically by a fixed seed. This closes the
-// known live-verification gap: the reward + wallet credit had unit/integration coverage but were never observed
-// in a browser (a DOM auto-player couldn't reliably win a battle to trigger a drop). Seeding sidesteps that —
-// seed 31 with CHARIZARD @ L50 lays the FIRST biome node as a Treasure, so the reward fires right after the
-// opening route pick, no battle required.
+// The Run Economy reward flow, driven deterministically by a fixed seed. This closes the known
+// live-verification gap: the reward + wallet credit had unit/integration coverage but were never observed in a
+// browser (a DOM auto-player couldn't reliably win a battle to trigger a drop).
 //
-// Every rolled reward now presents a BLOCKING pick-one-of-N choice modal (two rarity items or a gold bag); the
+// Originally this drove a Treasure node directly (no battle needed) — seed 31 used to lay one as the very
+// first biome node. That premise stopped being reachable once `RunDirector.DefaultNodePlan` was given its
+// "soft opening" rule: a biome's first node is now unconditionally `WildBattle` (never Treasure/Elite/an
+// interaction node), so the player is never greeted with a difficulty spike or a non-combat slot on entry
+// (see `RunDirector.cs` `DefaultNodePlan`). No seed can land a Treasure first anymore — that wasn't RNG
+// drift, it's a deliberate design rule. A battle win funnels through the SAME reward-choice modal as a
+// Treasure/Mystery node (`RewardGranted`, one drop hover for every source — see `battleReducer.ts`), so this
+// spec now wins the first (deterministic, seeded) battle instead: seed 1 with CHARIZARD @ L50 beats its first
+// wild encounter (STARMIE) in a handful of turns using only the default first-available-move pick.
+//
+// Every rolled reward presents a BLOCKING pick-one-of-N choice modal (two rarity items or a gold bag); the
 // player's pick is what releases the run loop. This spec picks the gold bag (a deterministic credit) and
 // verifies it lands in the BAG money box, the drop hover, and the loot log.
 //
-// If the reward-tuning (RewardCalculator) or node-weighting (RunDirector.PickInteriorNode) changes, this seed
-// may no longer land a Treasure first — re-discover a reward-first seed and update the constant below.
-const REWARD_FIRST_SEED = 31;
+// If combat balance changes (levels, base stats, move power) such that CHARIZARD @ L50 no longer wins its
+// first battle within MAX_TURNS using the default move pick, re-discover a seed that does and update the
+// constant below.
+const WIN_FIRST_BATTLE_SEED = 1;
+const MAX_TURNS = 15;
 
 async function startSeededRun(page: import('@playwright/test').Page, seed: number, species = 'CHARIZARD') {
   // Land directly on /select with the seed on the URL (react-router drops the query on nav from the title, so
@@ -23,14 +33,31 @@ async function startSeededRun(page: import('@playwright/test').Page, seed: numbe
   await page.locator('.select-search').fill(species);
   await page.locator('.species-card', { has: page.locator('.card-name', { hasText: new RegExp(`^${species}$`, 'i') }) }).click();
   await page.getByRole('button', { name: /CONFIRM/i }).click();
-  // Opening route choice (map-based) — click the first offered biome waypoint; its first node is the Treasure.
+  // Opening route choice (map-based) — click the first offered biome waypoint; its first node is always a
+  // plain wild battle (RunDirector's soft-opening rule).
   await page.locator('.region-node--offered').first().click({ timeout: 15_000 });
 }
 
-test.describe('Run Economy reward choice (Treasure node)', () => {
-  test('a Treasure node pops the pick-one-of-N choice modal; taking the gold bag credits the BAG and continues', async ({ page }) => {
+/** Attacks with the default (first-available) move each turn until the reward-choice modal appears — i.e.
+ * until the deterministic seeded battle is won. Deliberately does NOT use the generic play-loop helpers,
+ * which auto-dismiss the reward modal; this spec needs it left standing to assert against. */
+async function winFirstBattle(page: import('@playwright/test').Page): Promise<void> {
+  const modal = page.locator('.reward-modal');
+  for (let turn = 0; turn < MAX_TURNS; turn++) {
+    if (await modal.isVisible().catch(() => false)) return;
+    if (await fightButton(page).isEnabled().catch(() => false)) {
+      await chooseMove(page).catch(() => {});
+    }
+    await page.waitForTimeout(150);
+  }
+  await expect(modal).toBeVisible({ timeout: 5_000 });
+}
+
+test.describe('Run Economy reward choice (battle-win drop)', () => {
+  test('winning a battle pops the pick-one-of-N choice modal; taking the gold bag credits the BAG and continues', async ({ page }) => {
     test.setTimeout(60_000);
-    await startSeededRun(page, REWARD_FIRST_SEED);
+    await startSeededRun(page, WIN_FIRST_BATTLE_SEED);
+    await winFirstBattle(page);
 
     // The reward-choice modal blocks the run — it offers cards including the always-present gold bag.
     const modal = page.locator('.reward-modal');
@@ -39,7 +66,7 @@ test.describe('Run Economy reward choice (Treasure node)', () => {
     const goldCard = modal.locator('.reward-card--gold');
     await expect(goldCard).toBeVisible();
 
-    // Read the gold-bag amount off the card ("60₽") so we can assert it's exactly what gets credited.
+    // Read the gold-bag amount off the card ("30₽") so we can assert it's exactly what gets credited.
     const goldAmount = Number((await goldCard.locator('.reward-card-name').textContent())?.match(/(\d+)/)?.[1]);
     expect(goldAmount).toBeGreaterThan(0);
 
@@ -47,12 +74,14 @@ test.describe('Run Economy reward choice (Treasure node)', () => {
     await goldCard.click();
     await expect(modal).toHaveCount(0);
 
-    // The chosen reward is announced: the yellow loot line + the transient drop hover with its gold chip.
-    await expect(page.locator('.log-line--loot').filter({ hasText: new RegExp(`treasure held ${goldAmount}G`, 'i') }))
+    // The chosen reward is announced: the yellow loot line ("Found NG!" — battle-win drops read differently
+    // from a Treasure/Mystery node's "The treasure/mystery held..." — see `rewardGrantedMsg` in timeline.ts)
+    // + the transient drop hover with its gold chip.
+    await expect(page.locator('.log-line--loot').filter({ hasText: new RegExp(`Found ${goldAmount}G!`, 'i') }))
       .toBeVisible({ timeout: 15_000 });
     await expect(page.locator('.drop-hover .drop-chip--gold')).toBeVisible();
 
-    // The run flows on into the next node — a battle whose menu enables.
+    // The run flows on into the next encounter — a battle whose menu enables.
     await expect(fightButton(page)).toBeEnabled({ timeout: 20_000 });
 
     // The credited gold lives in the BAG money box — proving the pick was applied server-side and shown where
