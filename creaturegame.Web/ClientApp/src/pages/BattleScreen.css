@@ -1238,18 +1238,25 @@
    Map-local ink tokens deepen the ground below the app's own navy.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* ── Settings gear (opposite corner from MAP) ───────────────── */
-.settings-gear-btn--left {
-  left: var(--sp-sm);
-  right: auto;
-}
-
-/* ── MAP toggle button ─────────────────────────────────────── */
-.map-toggle-btn {
+/* ── Top-right corner controls: MAP, then Settings furthest into the corner ──
+   One flex row, one shared anchor — the buttons size themselves and can never
+   drift into each other or into the enemy nameplate/HP bar (top-left). */
+.battlefield-corner-controls {
   position: absolute;
   top: var(--sp-sm);
   right: var(--sp-sm);
   z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-sm);
+}
+.battlefield-corner-controls .map-toggle-btn,
+.battlefield-corner-controls .settings-gear-btn {
+  position: static;
+}
+
+/* ── MAP toggle button ─────────────────────────────────────── */
+.map-toggle-btn {
   font-family: var(--font);
   font-size: 0.72rem;
   font-weight: bold;

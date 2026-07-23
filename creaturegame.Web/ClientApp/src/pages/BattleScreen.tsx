@@ -117,13 +117,28 @@ export function BattleScreen() {
     <div className="battle-screen">
       <MapGlyphSprite />
       <div className="battle-field">
-        <button
-          className="settings-gear-btn settings-gear-btn--left"
-          onClick={() => setSettingsOpen(true)}
-          aria-label="Settings"
-        >
-          ⚙
-        </button>
+        {/* Top-right corner controls: MAP (when a run map exists), then the Settings gear furthest into the
+            corner. Grouped in one flex row on purpose — a shared anchor is what keeps them from crowding each
+            other or drifting onto the enemy nameplate/HP bar, which sits in the opposite (top-left) corner. */}
+        <div className="battlefield-corner-controls">
+          {state.regionBiomes.length > 0 && (
+            <button
+              className={`map-toggle-btn${mapPinned ? ' map-toggle-btn--on' : ''}`}
+              onClick={() => setMapPinned(o => !o)}
+              aria-pressed={mapPinned}
+              aria-label="Toggle route map"
+            >
+              MAP
+            </button>
+          )}
+          <button
+            className="settings-gear-btn"
+            onClick={() => setSettingsOpen(true)}
+            aria-label="Settings"
+          >
+            ⚙
+          </button>
+        </div>
         <div className="nameplate nameplate--enemy">
           <div className="nameplate-row">
             <span className="nameplate-name">{enemyName}</span>
@@ -162,31 +177,20 @@ export function BattleScreen() {
 
         {state.dropToast && <DropHover drop={state.dropToast} />}
 
-        {/* Encounter map (biome mode only — the legacy chain has no region graph). The MAP button pins it open; it
-            also auto-peeks at each ladder change. Presentation over the run — the route is fixed and logic-driven. */}
-        {state.regionBiomes.length > 0 && (
-          <>
-            <button
-              className={`map-toggle-btn${mapPinned ? ' map-toggle-btn--on' : ''}`}
-              onClick={() => setMapPinned(o => !o)}
-              aria-pressed={mapPinned}
-              aria-label="Toggle route map"
-            >
-              MAP
-            </button>
-            {(mapPinned || mapPeek) && (
-              <RunMapPanel
-                biomes={state.regionBiomes}
-                routePath={state.routePath}
-                currentId={state.currentBiomeId}
-                biomeName={state.mapBiomeName}
-                nodePlan={state.mapNodePlan}
-                pin={state.mapPin}
-                pinned={mapPinned}
-                onClose={() => setMapPinned(false)}
-              />
-            )}
-          </>
+        {/* Encounter map overlay (biome mode only — the legacy chain has no region graph). Pinned open by the MAP
+            button above; also auto-peeks at each ladder change. Presentation over the run — the route is fixed
+            and logic-driven. */}
+        {state.regionBiomes.length > 0 && (mapPinned || mapPeek) && (
+          <RunMapPanel
+            biomes={state.regionBiomes}
+            routePath={state.routePath}
+            currentId={state.currentBiomeId}
+            biomeName={state.mapBiomeName}
+            nodePlan={state.mapNodePlan}
+            pin={state.mapPin}
+            pinned={mapPinned}
+            onClose={() => setMapPinned(false)}
+          />
         )}
       </div>
 
