@@ -437,6 +437,18 @@ public sealed class GameSessionManager(
             battle.Input.SetSwitchInChoice(index);
     }
 
+    /// <summary>Routes a voluntary in-battle SWITCH (the chosen party-member index) to the battle's input, as a
+    /// whole-turn choice. The engine's <c>Battle.CanSwitchTo</c> validates the pick (in range / alive / not the
+    /// active member / not trapped) and falls back to FIGHT on an illegal one, so this only forwards.</summary>
+    public void SetSwitchChoice(string connectionId, int index)
+    {
+        if (
+            _connToGame.TryGetValue(connectionId, out var gameId)
+            && _active.TryGetValue(gameId, out var battle)
+        )
+            battle.Input.SetSwitchChoice(index);
+    }
+
     /// <summary>The run's current party roster (the same wire shape as the pushed <c>PartyUpdated</c> event), for
     /// the roster panel to hydrate on load / after a reconnect — parity with <see cref="GetBagContents"/> /
     /// <see cref="GetWallet"/>. A running battle's live party first, else the not-yet-started session's lone

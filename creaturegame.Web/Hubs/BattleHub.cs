@@ -150,6 +150,19 @@ public class BattleHub(GameSessionManager manager) : Hub<IBattleClient>
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Voluntarily switches the active creature out this turn for the party member at <paramref name="index"/>
+    /// (the in-battle SWITCH turn-action). Mirrors <see cref="ChooseMove"/> — fire-and-forget completion of the
+    /// turn handshake the battle loop is blocked on, as one of the whole-turn choices (FIGHT / ITEM / SWITCH). An
+    /// illegal pick (out of range / fainted / the active member / while trapped) falls back to FIGHT in the engine,
+    /// so a stale request never strands the turn.
+    /// </summary>
+    public Task ChooseSwitch(int index)
+    {
+        manager.SetSwitchChoice(Context.ConnectionId, index);
+        return Task.CompletedTask;
+    }
+
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
         // Start the reconnect grace window; the battle is abandoned only if the client

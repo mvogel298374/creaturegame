@@ -17,13 +17,12 @@ creature), and **Revive Items** (in-battle party revive, Boss-reward + rare-shop
 
 **Next up, in priority order:**
 1. **In-Combat Switching** — the voluntary, any-turn SWITCH turn-action (its own documented core feature below).
-   **Stage A (the engine core) is ✅ DONE (2026-07-24)** — `SwitchAction`, the enemy-retarget fix, the trap gate,
-   and the Struggle-menu fix all shipped and tested at the `Battle` level. **Remaining: Stage B (wire the SWITCH
-   turn choice through `SignalRInput`/`BattleHub`) and Stage C (frontend — the SWITCH button + dismissable picker +
-   `canSwitch`/`isTrapped` projection + the out-of-PP menu affordance).** Both are mechanical repeats of the
-   Acquisition/LeadChoice/forced-SwitchIn wire pattern (Sonnet). `requirements-review` already adjudicated the two
-   flagged domain claims (plus three further edges) for Stage A — all Gen-1-confirmed and covered by tests (see the
-   feature section below).
+   **Stages A (engine core, 2026-07-24) + B (wire, 2026-07-25) are ✅ DONE** — `SwitchAction`, the enemy-retarget
+   fix, the trap gate, and the Struggle-menu fix at the `Battle` level, plus the `ChooseSwitch` hub command wired
+   through `SignalRInput`/`GameSessionManager` to `SwitchTurnChoice`. **Remaining: Stage C (frontend — the SWITCH
+   button + dismissable picker + `canSwitch`/`isTrapped` projection on `TurnStarted` + the out-of-PP menu
+   affordance).** A mechanical repeat of the Acquisition/LeadChoice/forced-SwitchIn pattern (Sonnet).
+   `requirements-review` already adjudicated the flagged domain claims for Stage A (all Gen-1-confirmed, tested).
 2. **Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by the acquisition channels.
    *(Item acquisition itself is already done via the Run Economy; bag persistence + catch remain.)*
 3. **Game Loop & Progression** — save layer (`save.db`); party + between-biome lead + forced-switch are done.
@@ -344,9 +343,9 @@ domain check instead of inviting it. Two specific traps to recognise again:
 
 ---
 
-## In-Combat Switching — voluntary in-battle party switching *(in progress — Stage A shipped)*
+## In-Combat Switching — voluntary in-battle party switching *(in progress — Stages A + B shipped)*
 
-**Status: Stage A (engine core) ✅ DONE (2026-07-24); Stages B (wire) + C (frontend) remain.** `/plan` done
+**Status: Stage A (engine core) ✅ DONE (2026-07-24) + Stage B (wire) ✅ DONE (2026-07-25); Stage C (frontend) remains.** `/plan` done
 (2026-07-24). Confirmed a core feature (user, 2026-07-13) — a first-class "SWITCH" turn action so the player can
 swap the active creature **mid-battle**, like the mainline games. Distinct from — and much larger than — Phase 4's
 lead management:
@@ -457,10 +456,15 @@ Independent of `save.db`.
    `StruggleTurnChoice` immediately when out of PP — preserving today's auto-Struggle web behaviour exactly (no
    live regression). Stage C replaces that guard with a real out-of-PP menu affordance (Struggle button + reachable
    BAG/SWITCH).
-2. **Stage B — wire** (`SwitchRequest`/`ChooseSwitch`/`SwitchTurnChoice` mapping in `SignalRInput` + `BattleHub`)
-   and **Stage C — frontend** (the SWITCH button, the dismissable picker, the `canSwitch`/`isTrapped` projection on
-   `TurnStarted`, the out-of-PP menu affordance) are mechanical repeats of a pattern shipped three times already
-   (Acquisition, LeadChoice, forced SwitchIn) — Sonnet, back on the main session. **Still to do.**
+2. **Stage B — wire** ✅ **DONE (2026-07-25).** The voluntary SWITCH command now rides the existing one-per-turn
+   `ChooseTurnActionAsync`/`TurnRequest` handshake (no new `IBattleInput` method): `SignalRInput` gains a
+   `SwitchRequest(int Index)` mapped to `SwitchTurnChoice`, plus `SetSwitchChoice(int)`; `GameSessionManager.SetSwitchChoice`
+   routes it; `BattleHub.ChooseSwitch(int)` is the hub entry point. Covered by
+   `SignalRInputTests.SetSwitchChoice_YieldsASwitchChoiceForThatPartyIndex`. No new server→client event (Stage 3's
+   `CreatureSwitchedIn`/`PartyUpdated` are reused), so no new `WebEventContractTests` guard needed. **Stage C —
+   frontend** (the SWITCH button, the dismissable picker, the `canSwitch`/`isTrapped` projection on `TurnStarted`,
+   the out-of-PP menu affordance that replaces `SignalRInput`'s interim out-of-PP Struggle guard) is the last
+   piece — a mechanical repeat of the Acquisition/LeadChoice/forced-SwitchIn pattern (Sonnet). **Still to do.**
 3. `requirements-review` **adjudicated for Stage A (2026-07-24)** — it confirmed the Struggle-vs-full-menu and
    trapped-victim (only `BindingTurnsRemaining` blocks switching, not sleep/paralysis/confusion) claims as
    faithful Gen 1, and surfaced three further edges the user then ruled on: **(a) Toxic/Bad Poison downgrades to

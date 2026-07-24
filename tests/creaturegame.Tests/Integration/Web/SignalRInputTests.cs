@@ -92,6 +92,21 @@ public class SignalRInputTests
     }
 
     [Fact]
+    public async Task SetSwitchChoice_YieldsASwitchChoiceForThatPartyIndex()
+    {
+        // The in-battle SWITCH command (In-Combat Switching Stage B) rides the same one-per-turn handshake as
+        // FIGHT/ITEM: the hub's ChooseSwitch(index) completes it, mapped to a SwitchTurnChoice the engine validates.
+        var input = new SignalRInput();
+        var ctx = Context(WithMoves("tackle"), TestCreatures.Make("Enemy"));
+
+        var task = input.ChooseTurnActionAsync(ctx); // blocks on the handshake
+        input.SetSwitchChoice(2); // hub: ChooseSwitch(2)
+        var choice = await task;
+
+        Assert.Equal(2, Assert.IsType<SwitchTurnChoice>(choice).PartyIndex);
+    }
+
+    [Fact]
     public async Task ChooseMoveAsync_NeverReturnsAnItem()
     {
         // The move-only entry point (used for the interface contract) resolves a move even if it somehow

@@ -28,6 +28,8 @@ public sealed class SignalRInput : IBattleInput
     private sealed record ItemRequest(Item Item, int? TargetMoveSlot, int? TargetPartySlot)
         : TurnRequest;
 
+    private sealed record SwitchRequest(int Index) : TurnRequest;
+
     /// <summary>
     /// The player's whole-turn choice: FIGHT (a move) or ITEM (a bag item). Overrides the default
     /// (move-only) so the interactive player can use the bag; the hub completes the handshake via
@@ -61,6 +63,7 @@ public sealed class SignalRInput : IBattleInput
                 item.TargetMoveSlot,
                 item.TargetPartySlot
             ),
+            SwitchRequest sw => new SwitchTurnChoice(sw.Index),
             MoveRequest move => new MoveTurnChoice(ResolveMove(context, move.Index)),
             _ => new MoveTurnChoice(ResolveMove(context, -1)),
         };
@@ -103,6 +106,16 @@ public sealed class SignalRInput : IBattleInput
     {
         var tcs = _turnTcs;
         tcs?.TrySetResult(new ItemRequest(item, targetMoveSlot, targetPartySlot));
+    }
+
+    /// <summary>Completes the turn handshake with a voluntary SWITCH to the party member at <paramref name="index"/>
+    /// (the in-battle switch — In-Combat Switching). Routed from <c>BattleHub.ChooseSwitch</c>. The engine's
+    /// <c>Battle.CanSwitchTo</c> validates the pick (in range / alive / not the active member / not trapped) and
+    /// falls back to FIGHT on an illegal one, so a stale request never strands the turn.</summary>
+    public void SetSwitchChoice(int index)
+    {
+        var tcs = _turnTcs;
+        tcs?.TrySetResult(new SwitchRequest(index));
     }
 
     /// <summary>
