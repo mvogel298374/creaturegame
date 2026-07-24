@@ -31,6 +31,35 @@ public sealed class ScriptedInput(params string[] moveNames) : IBattleInput
         return this;
     }
 
+    // Per free-choice turn: a party index to SWITCH to, or null to FIGHT (draw that turn's move from the move
+    // script). When this plan is exhausted every turn is FIGHT, so a bare ScriptedInput never switches.
+    private readonly Queue<int?> _turnPlan = new();
+
+    /// <summary>Scripts the whole-turn choice for the coming free-choice turns: an index to voluntarily SWITCH to,
+    /// or <c>null</c> to FIGHT (drawing that turn's move from the move script). A SWITCH turn does not consume a
+    /// move-script entry. Used to drive the voluntary in-battle switch through <see cref="ChooseTurnActionAsync"/>.</summary>
+    public ScriptedInput TurnPlan(params int?[] plan)
+    {
+        foreach (var p in plan)
+            _turnPlan.Enqueue(p);
+        return this;
+    }
+
+    /// <summary>
+    /// The whole-turn choice. Consulted by <see cref="Battle"/> for the player side every free-choice turn (a true
+    /// lock-in bypasses it). Honours <see cref="TurnPlan"/> for a scripted SWITCH; otherwise FIGHT — and, exactly
+    /// like the interface default, returns Struggle without consuming a move when out of PP (so BAG/SWITCH stay the
+    /// reachable menu options an interactive player would see, while an automated script just Struggles).
+    /// </summary>
+    public async Task<TurnChoice> ChooseTurnActionAsync(TurnContext context)
+    {
+        if (_turnPlan.Count > 0 && _turnPlan.Dequeue() is int switchIndex)
+            return new SwitchTurnChoice(switchIndex);
+        if (!context.Attacker.CanSelectAnyMove)
+            return StruggleTurnChoice.Instance;
+        return new MoveTurnChoice(await ChooseMoveAsync(context));
+    }
+
     public Task<PokemonAttack> ChooseMoveAsync(TurnContext context)
     {
         string name = _script.Count > 0 ? _script.Dequeue() : _last ?? "";

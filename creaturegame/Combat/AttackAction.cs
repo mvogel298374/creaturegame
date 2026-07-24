@@ -6,7 +6,12 @@ namespace creaturegame.Combat;
 public class AttackAction : IBattleAction
 {
     public Creature Source { get; }
-    public Creature Target { get; }
+
+    // The foe this action strikes. Reassignable because a voluntary switch (In-Combat Switching) can resolve
+    // BEFORE the enemy's already-built move this turn: when the player switches, Battle repoints the enemy's
+    // queued action off the creature that left and onto the one that came in (see Retarget). Set only at
+    // construction and by Battle's post-switch retarget — never mid-execution.
+    public Creature Target { get; private set; }
     public int Priority { get; }
     private readonly ITypeChart _typeChart;
     private readonly IBattleRules _rules;
@@ -49,6 +54,14 @@ public class AttackAction : IBattleAction
         _battleEscapable = battleEscapable;
         Priority = selectedMove?.Base.Priority ?? 0;
     }
+
+    /// <summary>
+    /// Repoints this action at a new <paramref name="target"/>. Called by <see cref="Battle"/> on the enemy's
+    /// still-queued move right after the player's voluntary switch executes this turn — so a slower (or even
+    /// priority) enemy move lands on the creature that came in, not the one that just left the field. A no-op
+    /// for the switch's own turn ordering (the switch always resolves first), it only fixes the retarget.
+    /// </summary>
+    internal void Retarget(Creature target) => Target = target;
 
     public Task ExecuteAsync()
     {

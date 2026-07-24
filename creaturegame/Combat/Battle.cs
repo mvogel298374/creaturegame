@@ -188,7 +188,8 @@ public class Battle
                     continue;
                 // The dead-target and status (sleep/para/confusion) gates are attack-specific. An
                 // ItemAction has no foe target and isn't blocked by status — using an item is the turn —
-                // so it executes as long as its user is alive.
+                // so it executes as long as its user is alive. A SwitchAction likewise has no target and
+                // isn't gated by status (Gen 1: only trapping blocks a switch, checked at build time).
                 if (action is AttackAction attack)
                 {
                     if (!attack.Target.IsAlive())
@@ -197,6 +198,16 @@ public class Battle
                         continue;
                 }
                 await action.ExecuteAsync();
+
+                // A voluntary switch (which always sorts first) reassigned the active creature mid-turn. The
+                // enemy's action was built against the creature that just LEFT the field — repoint every
+                // still-queued attack at the one that came in, so a slower (or priority) enemy move this turn
+                // lands on the switch-in, not the benched creature. Only the enemy's action remains here (the
+                // enemy never switches), so this touches exactly it.
+                if (action is SwitchAction)
+                    foreach (var queued in turnQueue)
+                        if (queued is AttackAction toRetarget)
+                            toRetarget.Retarget(PlayerCreature);
             }
 
             // Haze: a suppression set THIS turn but never consumed (the target already acted before the
@@ -435,22 +446,25 @@ public class Battle
     }
 
     /// <summary>
-    /// Builds the player's action for the turn: a bag <see cref="ItemAction"/> if the player chose ITEM
-    /// (and a bag is wired), otherwise an <see cref="AttackAction"/>. Lock-in/Struggle take precedence —
-    /// the same pre-checks as <see cref="SelectMoveAsync"/> — and on those turns the bag isn't offered (a
-    /// locked-in creature can't open the menu), so the action is always a forced/Struggle attack.
+    /// Builds the player's action for the turn: a bag <see cref="ItemAction"/> (ITEM), a
+    /// <see cref="SwitchAction"/> (SWITCH), or an <see cref="AttackAction"/> (FIGHT / Struggle). A true lock-in
+    /// (two-turn charge, rampage, bide, rage, binding user) bypasses the menu entirely and force-repeats its move.
+    /// <para>Otherwise the whole-turn menu is offered — even out of PP, so BAG/SWITCH stay reachable (Gen 1). Only
+    /// <em>choosing FIGHT</em> with nothing selectable resolves to Struggle; an unhonourable ITEM (no bag) or an
+    /// illegal SWITCH (out of range / fainted / the active member / trapped) also falls through to FIGHT rather
+    /// than stranding the turn.</para>
     /// </summary>
     private async Task<IBattleAction> BuildPlayerActionAsync()
     {
         var attacker = PlayerCreature;
 
+        // A TRUE lock-in owns the whole turn — no menu at all. Struggle is NOT a lock-in: out of PP the menu
+        // still shows below (only a FIGHT with nothing selectable becomes Struggle), so it is not checked here.
         foreach (var mechanic in LockInMechanics.All)
         {
             if (mechanic.ForcedMove(attacker) is { } forced)
                 return NewPlayerAttack(forced);
         }
-        if (!attacker.CanSelectAnyMove)
-            return NewPlayerAttack(null); // Struggle
 
         var context = new TurnContext
         {
@@ -463,27 +477,54 @@ public class Battle
         };
 
         var choice = await _playerInput.ChooseTurnActionAsync(context);
-        if (choice is ItemTurnChoice item && _playerBag is not null)
-            return new ItemAction(
-                attacker,
-                item.Item,
-                item.TargetMoveSlot,
-                _playerBag,
-                _emitter,
-                _playerParty,
-                item.TargetPartySlot
-            );
+        switch (choice)
+        {
+            case ItemTurnChoice item when _playerBag is not null:
+                return new ItemAction(
+                    attacker,
+                    item.Item,
+                    item.TargetMoveSlot,
+                    _playerBag,
+                    _emitter,
+                    _playerParty,
+                    item.TargetPartySlot
+                );
 
-        // FIGHT: the input's already-validated move. (A MoveTurnChoice carries it; the only other case —
-        // an item choice with no bag wired — falls back to the first selectable move, never Struggle,
-        // since CanSelectAnyMove was true above.)
-        PokemonAttack? move = choice is MoveTurnChoice mv
-            ? mv.Move
-            : attacker.MoveSet.FirstOrDefault(m =>
-                m.PowerPointsCurrent > 0 && m != attacker.Battle.DisabledMove
-            );
-        return NewPlayerAttack(move);
+            case SwitchTurnChoice sw when CanSwitchTo(sw.PartyIndex):
+                return new SwitchAction(this, attacker, sw.PartyIndex);
+
+            case MoveTurnChoice mv when attacker.CanSelectAnyMove:
+                // FIGHT: the input's already-validated move.
+                return NewPlayerAttack(mv.Move);
+
+            default:
+                // FIGHT fallback for every remaining case — an explicit Struggle, an ITEM with no bag wired, an
+                // illegal SWITCH, or a MoveTurnChoice from an out-of-PP creature: pick the first selectable move,
+                // or null (Struggle) when nothing is selectable.
+                PokemonAttack? move = attacker.CanSelectAnyMove
+                    ? attacker.MoveSet.FirstOrDefault(m =>
+                        m.PowerPointsCurrent > 0 && m != attacker.Battle.DisabledMove
+                    )
+                    : null;
+                return NewPlayerAttack(move);
+        }
     }
+
+    /// <summary>
+    /// Whether the player may voluntarily switch to the party member at <paramref name="index"/> this turn. Legal
+    /// only when a party is wired, the active creature is <em>not trapped</em> by a partial-trap bind
+    /// (Wrap/Bind/Clamp/Fire Spin — the one thing that blocks switching in Gen 1; sleep / paralysis / confusion /
+    /// flinch do NOT), and the target slot is in range, alive, and not the already-active member. An illegal pick
+    /// falls back to FIGHT in <see cref="BuildPlayerActionAsync"/> — a server-side no-op backing the client's own
+    /// grey-out, so a malformed request never strands the turn.
+    /// </summary>
+    private bool CanSwitchTo(int index) =>
+        _playerParty is not null
+        && PlayerCreature.Battle.BindingTurnsRemaining == 0
+        && index >= 0
+        && index < _playerParty.Count
+        && index != _playerParty.LeadIndex
+        && _playerParty.Members[index].IsAlive();
 
     private AttackAction NewPlayerAttack(PokemonAttack? move) =>
         new(
@@ -511,11 +552,9 @@ public class Battle
         if (_playerParty is null || FirstLiveMemberIndex() < 0)
             return false;
 
-        // The outgoing (fainted) creature leaves the field. Undo any Mimic/Transform it copied this battle before
-        // it benches, so a transformed-then-fainted creature can't leak its copied moveset/stats into its
-        // permanent half (the end-of-battle restore only reaches the creature that's active then).
-        PlayerCreature.RestoreMimickedMove();
-        PlayerCreature.RestoreOriginalIdentity();
+        // The outgoing (fainted) creature leaves the field — revert any Mimic/Transform before the offer snapshot
+        // shows it and before it benches. No status is captured: it fainted, and a fainted member carries nothing.
+        RestoreOutgoing();
 
         _emitter?.Emit(
             new SwitchInOffered(PartyProjection.Snapshot(_playerParty), PlayerCreature.Name)
@@ -526,12 +565,47 @@ public class Battle
         if (index < 0 || index >= _playerParty.Count || !_playerParty.Members[index].IsAlive())
             index = FirstLiveMemberIndex();
 
-        _playerParty.SetLead(index);
+        BringInMember(index);
+        return true;
+    }
+
+    /// <summary>
+    /// The voluntary in-battle switch (In-Combat Switching): swap the active creature out for the benched member
+    /// at <paramref name="index"/>, mid-turn, at the cost of the turn. Unlike the forced faint-switch the outgoing
+    /// creature is still <em>alive</em>, so its major status is captured onto its own <see cref="Creature.CarriedStatus"/>
+    /// first (Gen 1 keeps status through a switch-out — so it re-enters ailed if it returns this battle, and it
+    /// benches ailed for the next one). Then the shared send-in machinery brings the replacement in. Called from
+    /// <see cref="SwitchAction"/> once the pick has been validated by <see cref="CanSwitchTo"/>.
+    /// </summary>
+    internal void PerformVoluntarySwitch(int index)
+    {
+        // The outgoing creature is still ALIVE, so its major status must survive the switch-out — Gen 1 keeps
+        // sleep/poison/burn/paralysis/freeze on a Pokémon that leaves the field. Capture it onto its own
+        // CarriedStatus (the same rule the run loop applies post-battle) so it re-enters ailed if it returns this
+        // battle, and benches ailed for the next. The forced path skips this — its outgoing creature has fainted.
+        PlayerCreature.CarriedStatus = CarriedStatus.Capture(_rules, PlayerCreature);
+        RestoreOutgoing();
+        BringInMember(index);
+    }
+
+    /// <summary>The outgoing creature leaves the field: undo any Mimic/Transform it copied this battle so a
+    /// transformed creature can't leak its copied moveset/stats onto the bench (the end-of-battle restore only
+    /// reaches whichever creature is active then). Shared by the forced and voluntary switch-out paths.</summary>
+    private void RestoreOutgoing()
+    {
+        PlayerCreature.RestoreMimickedMove();
+        PlayerCreature.RestoreOriginalIdentity();
+    }
+
+    /// <summary>Brings the party member at <paramref name="index"/> onto the field as the new active creature —
+    /// the shared tail of both switch paths. Reassigns <see cref="PlayerCreature"/> (and <c>RunState.Player</c> via
+    /// <see cref="Party.SetLead"/>), resets its volatiles, re-applies its OWN carried major status (each member
+    /// carries its own — nothing leaks from the creature that left), and emits the switch-in + roster snapshot.</summary>
+    private void BringInMember(int index)
+    {
+        _playerParty!.SetLead(index);
         PlayerCreature = _playerParty.Lead;
         PlayerCreature.ResetBattleState();
-        // The incoming creature enters on its OWN carried major status (Gen 1 keeps sleep/poison/burn/etc. on a
-        // benched creature) — the same entry-status application as a fresh battle's lead. Volatiles were just
-        // cleared by the reset; the previous creature's status can't leak (each member carries its own).
         ApplyEntryStatus(PlayerCreature.CarriedStatus);
 
         _emitter?.Emit(
@@ -545,7 +619,6 @@ public class Battle
             )
         );
         _emitter?.Emit(new PartyUpdated(PartyProjection.Snapshot(_playerParty)));
-        return true;
     }
 
     /// <summary>

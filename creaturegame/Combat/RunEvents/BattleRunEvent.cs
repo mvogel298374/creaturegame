@@ -260,15 +260,9 @@ internal sealed class BattleRunEvent(
     }
 
     // Major status carries into the next encounter; the generation decides what each status becomes out of
-    // battle (Gen 1 reverts Toxic to regular Poison) via IBattleRules.CarryStatusOutOfBattle. Volatile
-    // conditions (confusion, stat stages, …) live only in BattleState and are dropped by the per-battle reset
-    // — they are never captured here. The sleep counter carries so a sleeping creature keeps counting down.
-    private CarriedStatus? CaptureCarriedStatus(Creature c)
-    {
-        var status = (rules ?? Gen1BattleRules.Instance).CarryStatusOutOfBattle(c.Battle.Status);
-        if (status == StatusCondition.None)
-            return null;
-        int sleepTurns = status == StatusCondition.Sleep ? c.Battle.SleepTurns : 0;
-        return new CarriedStatus(status, sleepTurns);
-    }
+    // battle (Gen 1 reverts Toxic to regular Poison). Volatile conditions (confusion, stat stages, …) live only
+    // in BattleState and are dropped by the per-battle reset — they are never captured. Shares the single capture
+    // rule with Battle's voluntary switch-out (CarriedStatus.Capture).
+    private CarriedStatus? CaptureCarriedStatus(Creature c) =>
+        CarriedStatus.Capture(rules ?? Gen1BattleRules.Instance, c);
 }

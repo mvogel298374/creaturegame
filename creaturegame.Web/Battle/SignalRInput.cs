@@ -40,6 +40,13 @@ public sealed class SignalRInput : IBattleInput
         if (_cancelled)
             throw new OperationCanceledException("Battle input cancelled (client disconnected).");
 
+        // Out of PP, Battle now consults the menu (Gen 1 keeps BAG/SWITCH reachable) instead of auto-Struggling
+        // as it used to. The client has no out-of-PP menu affordance yet (In-Combat Switching Stage C), so resolve
+        // to Struggle immediately rather than block on a menu the player can't complete — preserving today's web
+        // behaviour exactly. Stage C replaces this with a real out-of-PP menu (Struggle button + SWITCH/BAG).
+        if (!context.Attacker.CanSelectAnyMove)
+            return StruggleTurnChoice.Instance;
+
         var tcs = new TaskCompletionSource<TurnRequest>(
             TaskCreationOptions.RunContinuationsAsynchronously
         );

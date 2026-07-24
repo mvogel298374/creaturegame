@@ -16,12 +16,14 @@ creature), and **Revive Items** (in-battle party revive, Boss-reward + rare-shop
 (→ `TODO_ARCHIVE.md`).
 
 **Next up, in priority order:**
-1. **In-Combat Switching** — the voluntary, any-turn SWITCH turn-action (its own documented core feature below),
-   now unblocked: Phase 4 **Stage 3 (forced-switch-on-faint) is DONE**, so `Battle` already holds the party and the
-   forced + voluntary send-in path exists, and the **Switched-in creature is the active creature** defect that used
-   to gate this on the participant split is resolved (evolution fixed, XP/Stat-Exp superseded by the **Innate
-   Party XP Share** — see `TODO_ARCHIVE.md`). `/plan` first; a good `opus-engineer` candidate (central `Battle` /
-   `AttackAction` turn-resolution change).
+1. **In-Combat Switching** — the voluntary, any-turn SWITCH turn-action (its own documented core feature below).
+   **Stage A (the engine core) is ✅ DONE (2026-07-24)** — `SwitchAction`, the enemy-retarget fix, the trap gate,
+   and the Struggle-menu fix all shipped and tested at the `Battle` level. **Remaining: Stage B (wire the SWITCH
+   turn choice through `SignalRInput`/`BattleHub`) and Stage C (frontend — the SWITCH button + dismissable picker +
+   `canSwitch`/`isTrapped` projection + the out-of-PP menu affordance).** Both are mechanical repeats of the
+   Acquisition/LeadChoice/forced-SwitchIn wire pattern (Sonnet). `requirements-review` already adjudicated the two
+   flagged domain claims (plus three further edges) for Stage A — all Gen-1-confirmed and covered by tests (see the
+   feature section below).
 2. **Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by the acquisition channels.
    *(Item acquisition itself is already done via the Run Economy; bag persistence + catch remain.)*
 3. **Game Loop & Progression** — save layer (`save.db`); party + between-biome lead + forced-switch are done.
@@ -342,52 +344,131 @@ domain check instead of inviting it. Two specific traps to recognise again:
 
 ---
 
-## In-Combat Switching — voluntary in-battle party switching *(planned core feature)*
+## In-Combat Switching — voluntary in-battle party switching *(in progress — Stage A shipped)*
 
-**Status: planned, not started.** Confirmed a core feature we *will* build (user, 2026-07-13) — a first-class
-"SWITCH" turn action so the player can swap the active creature **mid-battle**, like the mainline games. This is
-distinct from — and much larger than — Phase 4's lead management:
+**Status: Stage A (engine core) ✅ DONE (2026-07-24); Stages B (wire) + C (frontend) remain.** `/plan` done
+(2026-07-24). Confirmed a core feature (user, 2026-07-13) — a first-class "SWITCH" turn action so the player can
+swap the active creature **mid-battle**, like the mainline games. Distinct from — and much larger than — Phase 4's
+lead management:
 
 - **Stage 1d** (above) only picks the lead **between biomes**; no engine change.
 - **Stage 3** (above) only handles a **forced** switch when the lead faints.
-- **This feature** is the **voluntary, any-turn** switch: choose SWITCH instead of FIGHT/BAG/RUN, pick a benched
+- **This feature** is the **voluntary, any-turn** switch: choose SWITCH instead of FIGHT/BAG, pick a benched
   creature, and it comes in at the cost of your turn.
 
-**Why it's a central `Battle` change (the reason it's deferred, not incidental).** `Battle` is constructed with a
-*single* `player` creature and a *single* `enemy`; the whole engine (turn sorting, `AttackAction`, status ticks,
-the SignalR `TurnStarted`/turn events, `IBattleInput`) assumes one creature per side. Phase 4 Stage 1c deliberately
-kept it that way ("`Battle`, which only knows one creature, is untouched"). Voluntary switching breaks that
-assumption and is best built **on top of Stage 3's groundwork** (which is where `Battle` first holds the party).
+**The actual hard part, found during `/plan` (not in the original scope note below).** `AttackAction.Target` is a
+`Creature` reference captured **at construction time**, and `Battle.StartFightAsync` builds the enemy's
+`AttackAction` (`Target = PlayerCreature`) immediately after building the player's action — **before** the turn
+queue is sorted or executed. If the player's action this turn is a switch and it (correctly) resolves at higher
+priority than the enemy's move, `Battle.PlayerCreature` gets reassigned to the incoming creature, but the
+already-built `enemyAction.Target` still points at the **old, benched** creature object — the enemy would hit the
+Pokémon that just left the field, not the one that just came in. Nothing in the current test suite catches this
+because forced-switch (Stage 3) only reassigns `PlayerCreature` *after* both of a turn's actions have already
+executed, never mid-turn. **Fix:** the enemy-side target must resolve live off `Battle`'s current `PlayerCreature`
+rather than a value snapshotted at construction (e.g. an `internal Retarget(Creature)` `Battle` calls on any
+still-queued action right after a switch executes, or a `Func<Creature>` indirection for the enemy's `Target`).
+This is the one piece that's genuinely a central `Battle`/`AttackAction` turn-resolution change; everything else
+below is wiring a fourth `TurnChoice` through a pattern already shipped three times (Acquisition, LeadChoice,
+forced SwitchIn).
 
-**Scope when built:**
-- **Engine:** `Battle` takes the `Party` (or the benched creatures) for the player side; a new SWITCH
-  `TurnChoice` / `IBattleAction` resolved at **switch priority** — Gen 1 order: the swap happens *before* attacks,
-  and the incoming creature then takes the opponent's move that turn (switching **costs** your turn). Reset the
-  outgoing creature's transient `BattleState`; bring in the incoming creature's permanent half + carried major
-  status.
-- **Gen 1 fidelity (DoR #4):** switching **resets stat stages and volatile conditions** (confusion, Leech Seed,
-  Disable, substitute, two-turn/charge lock, etc.) but **keeps major status** (sleep/poison/burn/etc.) on the
-  creature; **partial-trapping moves (Wrap / Bind / Clamp / Fire Spin) trap the opponent and block its switch**
-  while active. No hazards (no Spikes in Gen 1), no abilities, no Pursuit, no Baton Pass — all post-Gen-1, so
-  *out* of scope by construction. Confirm against the type/rules seams (`GENERATION_SEAMS.md §5.0`) — switching
-  order/trap rules are generation-variable and belong on `IBattleRules`, not hardcoded in `Battle`.
-- **Events + wire:** new `CreatureSwitchedOut` / `CreatureSwitchedIn` battle events (+ `SignalRBattleEventEmitter`
-  projection + field-level `WebEventContractTests` guards — the recurring web-event field-projection gap); the
-  enemy AI may also switch (a later refinement — start with player-only).
-- **Frontend:** a SWITCH entry in the action menu → a party-select modal (reusing the `PartyStrip` / roster
-  panel), the sprite swap on the canvas, and the timeline arms for the new events.
-- **Interactions to get right:** a forced faint-switch (Stage 3) and a voluntary switch share the send-in path;
-  Struggle/lock-in and a trapped creature must correctly *disable* the SWITCH option; the turn is consumed even if
-  the incoming creature faints to the foe's move (a valid Gen 1 outcome).
+**Design:**
+- **Engine.** `SwitchTurnChoice(int PartyIndex) : TurnChoice` (sibling of `MoveTurnChoice`/`ItemTurnChoice`).
+  `SwitchAction : IBattleAction` at a priority above `ItemAction.ItemPriority` (6) — Gen 1 switching resolves
+  before even an item use, so it must always beat the enemy's move regardless of speed. Execution: restore any
+  Mimic/Transform on the outgoing creature, `party.SetLead(index)`, reassign `Battle.PlayerCreature`,
+  `ResetBattleState()`, re-apply the incoming creature's own `CarriedStatus` — this is `TrySwitchInAsync`'s
+  existing body, extracted so the forced and voluntary paths share one implementation. Plus the retarget fix
+  above. `BuildPlayerActionAsync` gains a third branch for `SwitchTurnChoice` alongside FIGHT/ITEM.
+- **Trap gate (new).** A creature with `Battle.BindingTurnsRemaining > 0` cannot execute a `SwitchAction` — that's
+  the entire point of Wrap/Bind/Clamp/Fire Spin. This is **not** the same gate as `StatusResolver.CanAct`: sleep,
+  paralysis, confusion, and flinch do **not** block switching in Gen 1, only trapping does — so it needs its own
+  small check, not a `CanAct` reuse. **Corrected pin:** this is *not* generation-variable (an earlier draft of
+  this plan said it belonged on `IBattleRules` — wrong; "trapped ⇒ can't switch" is invariant across every
+  generation, and `BindingTurnsRemaining` is an ordinary counter check, same class as `ItemAction.ItemPriority`
+  being judged gen-invariant in `GENERATION_SEAMS.md §5.0.2`). No new seam member.
+- **Struggle vs. true lock-in — two different rules, don't conflate them (a correction made during `/plan`):**
+  - **Struggle (all moves out of PP)** does **not** block BAG or SWITCH in Gen 1 — the full menu still shows;
+    only *choosing* FIGHT with nothing selectable resolves to Struggle. **This means today's code has a
+    pre-existing bug this feature's build will touch anyway:** `BuildPlayerActionAsync` currently returns
+    Struggle unconditionally without ever consulting `ChooseTurnActionAsync` when `!CanSelectAnyMove`, so BAG is
+    *already* silently unreachable out-of-PP. Fix as part of this work: still offer the turn choice; only FIGHT
+    (with no valid move) auto-resolves to Struggle.
+  - **True lock-in (Rampage/Thrash/Petal Dance, Bide, a two-turn charge, and the Gen-1-specific quirk where the
+    Wrap/Bind/Clamp/Fire Spin *user* is also forced to keep repeating it)** blocks everything, no menu at all —
+    this is correct as already shipped (`LockInMechanics.ForcedMove` bypasses `ChooseTurnActionAsync` entirely)
+    and needs no change; SWITCH is bypassed for free by the same early return.
+  - **Both are stated with high confidence but not certainty** (20-year-old cartridge internals) — flag for
+    `requirements-review` rather than trust this doc alone, per the "Switched-in creature" postmortem lesson
+    below about plan-asserted domain facts.
+- **Gen 1 fidelity (DoR #4), otherwise unchanged from the original scope note:** switching resets stat stages and
+  volatile conditions (confusion, Leech Seed, Disable, substitute, two-turn/charge lock, …) but **keeps major
+  status** on the creature (reuses Stage 3's `ResetBattleState()`/`CarriedStatus` machinery, zero new surface). No
+  hazards, no abilities, no Pursuit, no Baton Pass — all post-Gen-1, out of scope by construction.
+- **Events + wire.** No new `IBattleInput` method needed (unlike forced SwitchIn) — this rides the *existing*
+  `ChooseTurnActionAsync`/`TurnRequest` seam already carrying `MoveRequest`/`ItemRequest`: add a
+  `SwitchRequest(int Index)` case, a `ChooseSwitch(int)` hub method completing the same `_turnTcs`, mapped to
+  `SwitchTurnChoice`. `CreatureSwitchedIn`/`PartyUpdated` already exist from Stage 3 and are reused as-is; no new
+  `CreatureSwitchedOut` needed (the outgoing creature isn't fainting, but nothing currently reads an
+  out/in distinction the existing events don't already cover — confirm during implementation).
+- **Frontend.** A fourth `ActionMenu` button (SWITCH) opening a **dismissable** party picker (reusing
+  `PartyCard`/`SwitchInModal`'s grid, unlike the forced modal's `dismiss="blocking"`) — Back returns to the menu
+  with no turn spent; the *active* member is greyed out in addition to fainted ones. Needs a new `canSwitch`/
+  `isTrapped` signal projected onto `TurnStarted` (same precedent as `DisabledMove` on `MoveInfo`) so the client
+  can grey out SWITCH proactively while trapped, backed by a server-side no-op as defense in depth.
+- **Malformed/stale switch pick.** Unlike the forced switch (which must send someone in), a voluntary switch has
+  a safe fallback: treat an invalid index (fainted / out-of-range / the already-active slot) as if FIGHT had been
+  chosen with the default move, rather than stranding the turn. Needs a named test.
+- **Enemy AI switching** stays a later refinement — start player-only, per the original scope note.
 
-**Dependencies:** **Stage 3 (forced-switch-on-faint) is DONE (2026-07-15)** — `Battle` now holds the party
-(`playerParty`), the forced send-in path exists (`TrySwitchInAsync` → `SetLead` + reset + carried-status re-apply +
-`CreatureSwitchedIn`/`PartyUpdated`), and the client has a party-select send-in modal (`SwitchInModal`) + a
-`swapPlayerCreature` sprite swap. So this feature now just adds the **voluntary trigger**: a SWITCH `TurnChoice` /
-`IBattleAction` at switch priority (the swap resolves before attacks; the incoming creature then takes the foe's
-move that turn), the partial-trapping-blocks-switch rule (`IBattleRules`), the SWITCH action-menu entry, and later
-enemy-AI switching. Independent of `save.db`. **Effort:** still a central refactor of `Battle` / `AttackAction`
-turn resolution; a good candidate for the `opus-engineer` subagent and a dedicated `/plan` pass before implementation.
+**Gen-variable surface (DoR #3): none.** Switch-first turn order is gen-invariant (inline constant, same
+precedent as `ItemAction.ItemPriority`); the reset-volatiles-keep-status rule reuses Stage 3's existing mechanism;
+trapping-blocks-switch is ordinary engine logic. Zero new `IBattleRules`/`ITypeChart`/`IStatCalculator` members;
+zero importer/DB change.
+
+**The quirk to test (DoR #6):** above all, *a switch this turn followed by a slower enemy move must land on the
+incoming creature, not the one that just left* (the retarget bug made into an assertion) — the single test that
+proves the central fix works. Plus: trapped ⇒ can't switch; volatiles reset / major status persists on
+switch-out; switch always precedes the enemy's move regardless of speed/priority; the incoming creature can
+faint to the same turn's enemy hit with no recursive switch prompt (that's the *forced* path's job next turn);
+out-of-PP still reaches BAG/SWITCH (the Struggle-menu fix); true lock-in still blocks everything (regression,
+already covered).
+
+**Dependencies:** Stage 3 (forced-switch-on-faint, DONE 2026-07-15) — `Battle` already holds the party, the
+send-in path (`TrySwitchInAsync`) exists to extract from, and the client has the party-picker modal to fork from.
+Independent of `save.db`.
+
+**Staging + model choice, decided 2026-07-24:**
+1. **Stage A — the engine core** ✅ **DONE (2026-07-24, Opus).** Shipped: the **retarget fix** (`AttackAction.Target`
+   is now reassignable via an `internal Retarget`; after a voluntary switch resolves, `Battle` repoints the enemy's
+   still-queued action onto the creature that came in — proven by a slower-enemy and a +1-priority-enemy test);
+   **`SwitchAction : IBattleAction`** at `SwitchPriority = 7` (above `ItemAction.ItemPriority` 6, so a switch always
+   resolves first); the **trap gate** (`Battle.CanSwitchTo` refuses a switch while `BindingTurnsRemaining > 0` —
+   Wrap/Bind/Clamp/Fire Spin only; sleep/paralysis/confusion/flinch do **not** block switching); and the
+   **Struggle-menu fix** (`BuildPlayerActionAsync` now consults the whole-turn menu even out of PP, so BAG/SWITCH
+   stay reachable and only *choosing FIGHT* with nothing selectable resolves to Struggle). New `SwitchTurnChoice`
+   + `StruggleTurnChoice` turn choices; the default `IBattleInput.ChooseTurnActionAsync` returns
+   `StruggleTurnChoice` out of PP instead of throwing. The forced (Stage 3) and voluntary switch-out paths now
+   share one send-in implementation (`RestoreOutgoing` + `BringInMember`); the voluntary path additionally
+   **captures the outgoing creature's major status** onto its `CarriedStatus` (`CaptureOutgoingStatus`) so status
+   persists on switch-out (re-enters ailed; benches ailed) while volatiles reset — Gen 1 fidelity. Covered by
+   **`BattleVoluntarySwitchTests`** (retarget slower + priority, trap-refused, status-persists-volatiles-reset,
+   out-of-PP-reaches-SWITCH, illegal-pick→FIGHT incl. active-slot/out-of-range/fainted, true-lock-in-bypasses-menu,
+   incoming-faints→forced-path-takes-over). **Web-leg interim:** `SignalRInput.ChooseTurnActionAsync` returns
+   `StruggleTurnChoice` immediately when out of PP — preserving today's auto-Struggle web behaviour exactly (no
+   live regression). Stage C replaces that guard with a real out-of-PP menu affordance (Struggle button + reachable
+   BAG/SWITCH).
+2. **Stage B — wire** (`SwitchRequest`/`ChooseSwitch`/`SwitchTurnChoice` mapping in `SignalRInput` + `BattleHub`)
+   and **Stage C — frontend** (the SWITCH button, the dismissable picker, the `canSwitch`/`isTrapped` projection on
+   `TurnStarted`, the out-of-PP menu affordance) are mechanical repeats of a pattern shipped three times already
+   (Acquisition, LeadChoice, forced SwitchIn) — Sonnet, back on the main session. **Still to do.**
+3. `requirements-review` **adjudicated for Stage A (2026-07-24)** — it confirmed the Struggle-vs-full-menu and
+   trapped-victim (only `BindingTurnsRemaining` blocks switching, not sleep/paralysis/confusion) claims as
+   faithful Gen 1, and surfaced three further edges the user then ruled on: **(a) Toxic/Bad Poison downgrades to
+   regular Poison on a mid-battle switch-out** (code was right; the wrong `GEN_DIFFERENCES.md` line was corrected)
+   — Gen-1 accurate; **(b) Rage blocks switching** like every other lock-in (kept as-is, user's call); **(c)
+   switching out during a Hyper Beam recharge turn is allowed** (`CanSwitchTo` intentionally doesn't gate on
+   `IsRecharging`; documented in `GEN_DIFFERENCES.md`). All three are covered by named `BattleVoluntarySwitchTests`
+   cases, plus an affirmative sleep/paralysis/freeze-still-switches test. Nothing left owed for Stage A.
 
 ---
 

@@ -4,7 +4,9 @@ using creaturegame.Items;
 
 namespace creaturegame.Combat;
 
-/// <summary>What a side chose to do this turn: use a move (FIGHT) or use a bag item (ITEM).</summary>
+/// <summary>What a side chose to do this turn: use a move (FIGHT), use a bag item (ITEM), or swap the active
+/// creature for a benched one (SWITCH). Struggle is the system fallback when FIGHT is chosen with nothing
+/// selectable.</summary>
 public abstract record TurnChoice;
 
 /// <summary>FIGHT: the selected move for this turn.</summary>
@@ -18,6 +20,22 @@ public sealed record ItemTurnChoice(
     int? TargetMoveSlot = null,
     int? TargetPartySlot = null
 ) : TurnChoice;
+
+/// <summary>SWITCH: swap the active creature out for the benched party member at <paramref name="PartyIndex"/>
+/// (the voluntary in-battle switch — In-Combat Switching Stage A). <see cref="Battle"/> validates the pick
+/// (in range, alive, not the already-active member, and the active creature isn't trapped by a partial-trap
+/// bind); an illegal pick falls back to FIGHT rather than stranding the turn.</summary>
+public sealed record SwitchTurnChoice(int PartyIndex) : TurnChoice;
+
+/// <summary>FIGHT chosen with no selectable move — resolves to Struggle. Gen 1 shows the full menu even out of
+/// PP (BAG/SWITCH stay reachable); only <em>choosing FIGHT</em> with nothing usable Struggles. This is the
+/// whole-turn choice a non-interactive input returns when it is out of PP (it has no BAG/SWITCH to offer), so
+/// the default <see cref="IBattleInput.ChooseTurnActionAsync"/> never has to call <see cref="IBattleInput.ChooseMoveAsync"/>
+/// on a moveless creature.</summary>
+public sealed record StruggleTurnChoice : TurnChoice
+{
+    public static readonly StruggleTurnChoice Instance = new();
+}
 
 /// <summary>
 /// Abstracts move selection for one side of a battle.
@@ -36,14 +54,20 @@ public interface IBattleInput
     Task<PokemonAttack> ChooseMoveAsync(TurnContext context);
 
     /// <summary>
-    /// The player's whole-turn choice: FIGHT (a move) or ITEM (a bag item). Only consulted for a side that
-    /// can actually open the menu — <see cref="Battle"/> still resolves lock-in/Struggle first, and only the
-    /// player side has a bag. The default delegates to <see cref="ChooseMoveAsync"/> (FIGHT only), so AI /
-    /// automated inputs never need to know about items; only the interactive <c>SignalRInput</c> overrides
-    /// this to offer the bag.
+    /// The player's whole-turn choice: FIGHT (a move), ITEM (a bag item), or SWITCH (swap the active creature).
+    /// Only consulted for a side that can actually open the menu — <see cref="Battle"/> still resolves true
+    /// lock-in first, and only the player side has a bag / party. The default delegates to
+    /// <see cref="ChooseMoveAsync"/> (FIGHT only), so AI / automated inputs never need to know about items or
+    /// switching; only the interactive <c>SignalRInput</c> overrides this to offer the bag / SWITCH.
+    /// <para>Unlike <see cref="ChooseMoveAsync"/> this is now consulted even when the creature is out of PP (Gen 1
+    /// keeps the menu open so BAG/SWITCH stay reachable), so the default must NOT call <see cref="ChooseMoveAsync"/>
+    /// on a moveless creature (it would throw); it returns <see cref="StruggleTurnChoice"/> instead, which
+    /// <see cref="Battle"/> resolves to Struggle.</para>
     /// </summary>
     async Task<TurnChoice> ChooseTurnActionAsync(TurnContext context) =>
-        new MoveTurnChoice(await ChooseMoveAsync(context));
+        context.Attacker.CanSelectAnyMove
+            ? new MoveTurnChoice(await ChooseMoveAsync(context))
+            : StruggleTurnChoice.Instance;
 
     /// <summary>
     /// Asked when the creature levels into a new move but its four slots are full: return the slot index

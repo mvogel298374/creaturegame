@@ -106,12 +106,19 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
 - Considered overpowered; used competitively to completely shut down opponents
 
 #### Status Quirks
-- **Hyper Beam**: does NOT require a recharge turn if it KOs the target
+- **Hyper Beam**: does NOT require a recharge turn if it KOs the target; **switching out during the recharge
+  turn is legal** — the recharge is only spent if the creature stays in and FIGHTs (it's enforced inside
+  `AttackAction.ExecuteAsync`, not the turn menu), so a voluntary switch pre-empts it
 - **Focus Energy / Dire Hit**: bug causes it to **quarter** the crit rate instead of quadrupling it
 - **Sleep**: Pokémon wakes up before acting — but **cannot act** on the turn it wakes
 - **Burn**: halves the Attack stat; has no effect on Special (no Sp. Atk yet)
 - **Poison**: causes damage outside battle; Pokémon **can faint** from overworld Poison in Gen 1
-- **Toxic / Bad Poison**: escalating damage but switching in/out does not reset the counter
+- **Toxic / Bad Poison**: escalating damage in-battle, but **switching out resets the ramp and reverts it to
+  regular Poison** — the toxic escalation is a battle-only volatile in Gen 1, so leaving the field (a mid-battle
+  voluntary switch-out *or* the cross-encounter carry) downgrades it: `IBattleRules.CarryStatusOutOfBattle`
+  turns `BadPoison → Poison` and `ResetBattleState` clears the counter (`ToxicCounter` back to 1) on the way
+  back in. (Corrected 2026-07-24: the earlier "switching does not reset the counter" line was wrong for Gen 1
+  and already contradicted the Haze entry below.)
 - **Badge boosts**: your own Gym Badges passively boost corresponding stats in battle
 - PP is **not enforced for AI trainers** — opponents can use moves infinitely
 - **Haze**: resets both battlers' stat stages, Confusion, Disable, Mist, Focus Energy, Leech Seed,
