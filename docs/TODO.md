@@ -24,6 +24,11 @@ creature), **Revive Items** (in-battle party revive, Boss-reward + rare-shop onl
 stages (engine core / wire / frontend) shipped, including the out-of-PP menu affordance (BAG/SWITCH reachable at
 0 PP; Struggle only on a FIGHT choice). Full record archived in `TODO_ARCHIVE.md`.)*
 
+*(Raised by shipping it: **Participation XP — a creature that fought earns a full share** (2026-07-26) is now
+open — a creature switched out mid-battle is paid the flat bench share instead of a participant's. **Needs
+`/plan` first**: "equal XP" can mean a full award each (roguelite) or the Gen 1 even split among participants,
+and the two move the numbers opposite ways. See its section below.)*
+
 *(Small residual, not urgent: **sweep other end-of-battle effects that assume the starting lead** — see
 [**Switched-in creature is the active creature**](#switched-in-creature-is-the-active-creature--resolved) below.)*
 
@@ -327,8 +332,10 @@ domain check instead of inviting it. Two specific traps to recognise again:
   wasn't implemented yet, and a forced switch always leaves the outgoing lead fainted (excluded from any share
   anyway), so the only "switched-in" case then was simply the active creature, paid in full, same as before this
   change. **Now that In-Combat Switching has shipped (2026-07-25),** a creature switched out mid-battle while
-  still alive earns only the flat `BenchXpShare`, not a participation-weighted share — an intended divergence,
-  decided in advance, not a bug (see `TODO_ARCHIVE.md` → *Innate Party XP Share*). Full write-up →
+  still alive earns only the flat `BenchXpShare`. That was an intended divergence when it was decided — but the
+  case it was decided *about* couldn't happen yet, and **the user reversed it on 2026-07-26** now that it can:
+  a participant must not be paid less than the creature that happened to finish the fight. → see
+  **Participation XP — a creature that fought earns a full share** below. Full write-up of the share itself →
   `TODO_ARCHIVE.md` → *Innate Party XP Share*. *(The **Exp. Share / Exp. All item** — a held item that pays a
   non-participant — stays deferred; it's a separate feature from this innate, always-on party share.)*
 - [x] The invariant is now written into `docs/STATE_MODEL.md` (the party-wide end-of-battle effects section) as a
@@ -338,6 +345,55 @@ domain check instead of inviting it. Two specific traps to recognise again:
   loop, and carried status already reads `s.Player` (the finisher) — but nothing has specifically audited the
   *rest* of the post-battle path for a stray `player`/`levelBefore` reference. Small, cheap, not urgent; no known
   instance today.
+
+---
+
+## Participation XP — a creature that fought earns a full share  ⟵ OPEN (raised 2026-07-26)
+
+**The requirement, in the user's words:** *"a pokemon that was actively involved in a battle should receive equal
+xp to any other active pokemon."*
+
+This is the same principle as **Switched-in creature is the active creature** above, applied to the creature that
+switched *out*: taking the field is what makes you a participant, and participants are not ranked by who happened
+to be standing there when the enemy fainted.
+
+**Today's behaviour (the defect).** `Battle.ShareExperienceWithBenchAsync(activeAward)` pays whoever is
+`PlayerCreature` at battle end the **full** award (at the award site), and every *other* living member — including
+one that fought most of the battle and was switched out — the flat `floor(activeAward × RunRules.BenchXpShare)`.
+Participation is never recorded, so the engine currently cannot tell a creature that fought from one that sat on
+the bench all battle. At the shipped web difficulties (`BenchXpShare` 0.75 / 0.5 / 0.25) a switched-out
+participant loses 25–75% of its award purely for having been switched.
+
+**Target behaviour.** Every creature that took the field during the battle earns a full participant share; a
+creature that never entered keeps the innate bench share. Fainted members still earn nothing (Gen 1).
+
+**⚠️ Open design question — needs `/plan` before implementation.** "Equal to any other active creature" has two
+readings, and they move the numbers in opposite directions:
+- **(a) Each participant gets the full award** (roguelite-generous, matches the wording most directly). Nobody is
+  worse off than today; a 2-participant battle pays out more in total than a 1-participant one.
+- **(b) The award is split evenly among participants** (Gen 1-faithful — the cartridge divides XP between every
+  Pokémon that was sent out). Equal, but it *reduces* what the finisher earns today, so it's a nerf to the
+  current single-creature run and interacts with the level-aware XP curve + trainer bonus.
+
+Given the repo's "Gen 1 accuracy before extending" principle vs. the fact that the innate party share is already
+a deliberate roguelite divergence (wider and more generous than the literal participant split), this is a genuine
+fork the user should settle in `/plan`. **Do not pick one while implementing.**
+
+**Implementation sketch (once the fork is settled).**
+- **Participation flag.** A transient per-battle `bool` on `Creature.BattleState` (see `STATE_MODEL.md` — it is
+  battle-scoped state, cleared with the rest), set wherever a creature takes the field: the battle-start lead and
+  `Battle.BringInMember` (the shared tail of *both* switch paths, so forced and voluntary are covered by one
+  write). Must survive being switched out — it records "fought", not "is out".
+- **Award site.** `ShareExperienceWithBenchAsync` splits its loop three ways instead of two: participants (full
+  or split share per the fork), living non-participants (`BenchXpShare`), fainted (nothing). The active creature
+  is still paid at the award site — keep the "paid once" invariant explicit, it is the easy double-pay bug here.
+- **Stat-Exp.** Already granted in full to every living member and deliberately not fractionalised — leave it be;
+  this change is about the XP award only.
+- **Seam check.** Lives in `RunRules`, not `IBattleRules` — participation-vs-bench payout is roguelite tuning, not
+  a generation-variable rule. Run the `GENERATION_SEAMS.md` §5.0 checklist as part of the work.
+- **Tests.** A switched-out participant earns the same as the finisher; a never-deployed bench member still earns
+  only the bench share; a fainted participant earns nothing; the finisher isn't paid twice. `RunRules` with
+  `BenchXpShare = 0` still pays participants (the flag, not the share, gates it).
 
 ---
 

@@ -574,9 +574,14 @@ share anyway), so the only "switched-in" case that existed — the finisher — 
 in full, exactly as before this change. **The divergence became real once voluntary switching shipped, by
 design:** since **In-Combat Switching** (`TODO_ARCHIVE.md`, above), a creature that fought part of a battle and
 was then swapped out *while still alive* earns only the flat `BenchXpShare` — the same as a bench member that
-never entered — rather than a participation-weighted share. That is intended (the whole point of choosing the
-roguelite share over the Gen-1 participant split); **In-Combat Switching** treated it as a decision already made
-here, not something to re-open as a bug.
+never entered — rather than a participation-weighted share. **In-Combat Switching** treated that as a decision
+already made here, not a bug to re-open.
+
+> **Superseded 2026-07-26.** With voluntary switching actually shipped, the user reversed it: *"a pokemon that
+> was actively involved in a battle should receive equal xp to any other active pokemon."* The behaviour above is
+> still what the code does — it is now a **known defect**, not an intended divergence. → `TODO.md` →
+> **Participation XP — a creature that fought earns a full share** (open; needs `/plan` to settle full-award-each
+> vs. the Gen 1 even split before implementation).
 
 **Docs:** the deviation is written into `docs/GENERATION_SEAMS.md` (alongside the XP-curve deviation) and the
 party-wide XP/evolution invariant into `docs/STATE_MODEL.md` (the party-wide end-of-battle effects section) as a
