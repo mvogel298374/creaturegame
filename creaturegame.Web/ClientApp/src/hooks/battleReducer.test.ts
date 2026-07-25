@@ -160,6 +160,26 @@ describe('battleReducer — phase transitions', () => {
     expect(next.canSwitch).toBe(true); // the SWITCH button's enabled state rides this
   });
 
+  it('TURN_STARTED syncs the live HP onto the lead\'s party card, leaving the bench alone', () => {
+    // The party snapshot only refreshes on PartyUpdated, so without this the SWITCH picker would show the
+    // active creature at its pre-battle HP — the number you weigh when deciding whether to pull it out.
+    const s = ready({
+      phase: 'battling',
+      party: [
+        { speciesId: 6, name: 'CHARIZARD', level: 30, hp: 90, maxHp: 90, status: 'None', isLead: true },
+        { speciesId: 121, name: 'STARMIE', level: 6, hp: 23, maxHp: 23, status: 'None', isLead: false },
+      ],
+    });
+    const next = battleReducer(s, {
+      type: 'TURN_STARTED', turnNumber: 4,
+      playerHp: 41, playerMaxHp: 90, playerStatus: 'Poison', playerXpThisLevel: 0, playerXpToNextLevel: 100,
+      enemyHp: 50, enemyMaxHp: 50, enemyStatus: 'None', moves: [], canSwitch: true,
+    });
+
+    expect(next.party[0]).toMatchObject({ name: 'CHARIZARD', hp: 41, status: 'Poison' });
+    expect(next.party[1]).toMatchObject({ name: 'STARMIE', hp: 23, status: 'None' }); // bench untouched
+  });
+
   it('PLAYER_CHOSE locks into the battling/animating phase', () => {
     const next = battleReducer(ready({ phase: 'choosing' }), { type: 'PLAYER_CHOSE' });
     expect(next.phase).toBe('battling');

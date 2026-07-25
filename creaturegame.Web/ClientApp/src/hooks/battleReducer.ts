@@ -199,6 +199,14 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
         enemyStatus: action.enemyStatus,
         moves: action.moves,
         canSwitch: action.canSwitch,
+        // Keep the lead's roster card in step with the live HP/status. The party snapshot only refreshes on
+        // PartyUpdated (acquisition / send-in / item / recovery), so without this the SWITCH picker shows the
+        // active creature at its pre-battle HP — the one number you actually weigh when deciding to pull it out.
+        party: state.party.map(m =>
+          m.isLead
+            ? { ...m, hp: action.playerHp, maxHp: action.playerMaxHp, status: action.playerStatus }
+            : m
+        ),
       };
     case 'PLAYER_CHOSE':
       return { ...state, phase: 'battling', animating: true };

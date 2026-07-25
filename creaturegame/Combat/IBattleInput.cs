@@ -44,10 +44,12 @@ public sealed record StruggleTurnChoice : TurnChoice
 /// Implementations: AutoSelectInput (current default), ConsoleInput (Priority 7),
 /// RandomMoveInput / GreedyAIInput / WeightedAIInput (Priority 10).
 ///
-/// This interface is only called when a real choice exists. Struggle is a
-/// system-enforced fallback — when the creature has no selectable move
-/// (<see cref="Creatures.Creature.CanSelectAnyMove"/> is false: out of PP, or its only
-/// move is Disabled), Battle bypasses IBattleInput and passes null directly to AttackAction.
+/// <para><see cref="ChooseMoveAsync"/> is only called when a real move choice exists: with no selectable move
+/// (<see cref="Creatures.Creature.CanSelectAnyMove"/> false — out of PP, or the only move Disabled) Battle
+/// bypasses it and passes null to AttackAction, which Struggles.</para>
+/// <para><see cref="ChooseTurnActionAsync"/> does NOT work that way. Gen 1 keeps the whole menu open out of PP,
+/// so it is consulted even with nothing selectable — BAG and SWITCH stay reachable, and Struggle follows only
+/// from *choosing FIGHT*. The one thing that still bypasses the menu entirely is a true lock-in.</para>
 /// </summary>
 public interface IBattleInput
 {

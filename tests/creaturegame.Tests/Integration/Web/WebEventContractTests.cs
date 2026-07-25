@@ -917,6 +917,64 @@ public class WebEventContractTests
         return eventTypes;
     }
 
+    /// <summary>Cross-language tripwire for the one predicate the client duplicates from the engine:
+    /// <c>hasUsableMove</c> in <c>battle/moveMenu.ts</c> mirrors <see cref="Creature.CanSelectAnyMove"/>. They
+    /// decide the same thing on opposite sides of the wire — whether FIGHT opens the move list or spends the turn
+    /// as Struggle — so drift makes the client either auto-Struggle a usable turn or open a list whose every
+    /// click Struggles. Nothing else catches it: both sides compile and pass their own tests while disagreeing.
+    /// <para>This pins the CONDITIONS, not the syntax. If you add a clause to either side (a new lock-out like
+    /// Encore, say), add it to the other and extend this test — that is the point of the failure.</para></summary>
+    [Fact]
+    public void ClientHasUsableMove_MirrorsCanSelectAnyMove()
+    {
+        var ts = ReadClientSource("moveMenu.ts");
+        var cs = ReadEngineSource("Creatures", "Creature.cs");
+
+        // The engine predicate: PP left AND not the Disabled move.
+        Assert.Contains(
+            "MoveSet.Any(m => m.PowerPointsCurrent > 0 && m != Battle.DisabledMove)",
+            cs
+        );
+        // The client mirror, same two conditions in TS terms.
+        Assert.Contains("m.ppCurrent > 0", ts);
+        Assert.Contains("!m.disabled", ts);
+    }
+
+    // Read a ClientApp/src/battle/*.ts file via this test file's compile-time path.
+    private static string ReadClientSource(string fileName, [CallerFilePath] string thisFile = "")
+    {
+        var repoRoot = RepoRoot(thisFile);
+        var path = Path.Combine(
+            repoRoot,
+            "creaturegame.Web",
+            "ClientApp",
+            "src",
+            "battle",
+            fileName
+        );
+        Assert.True(
+            File.Exists(path),
+            $"Could not locate {fileName} at '{path}'. Expected it under creaturegame.Web/ClientApp/src/battle/."
+        );
+        return File.ReadAllText(path);
+    }
+
+    // Read a creaturegame/<dir>/<file>.cs engine source file via this test file's compile-time path.
+    private static string ReadEngineSource(
+        string dir,
+        string fileName,
+        [CallerFilePath] string thisFile = ""
+    )
+    {
+        var path = Path.Combine(RepoRoot(thisFile), "creaturegame", dir, fileName);
+        Assert.True(File.Exists(path), $"Could not locate {fileName} at '{path}'.");
+        return File.ReadAllText(path);
+    }
+
+    // .../tests/creaturegame.Tests/Integration/Web → repo root
+    private static string RepoRoot(string thisFile) =>
+        Path.GetFullPath(Path.Combine(Path.GetDirectoryName(thisFile)!, "..", "..", "..", ".."));
+
     // Read timeline.ts via this test file's compile-time path (repo-relative, like MovesFixture's db lookup).
     private static string ReadTimelineSource([CallerFilePath] string thisFile = "")
     {
