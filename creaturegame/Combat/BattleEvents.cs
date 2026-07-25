@@ -21,7 +21,11 @@ public record TurnStarted(
     int EnemyHp,
     int EnemyMaxHp,
     StatusCondition EnemyStatus,
-    IReadOnlyList<MoveInfo> PlayerMoves
+    IReadOnlyList<MoveInfo> PlayerMoves,
+    // Whether the player may voluntarily SWITCH this turn (In-Combat Switching): a party is wired, the active
+    // creature isn't locked in or trapped, and a live benched member exists. The client greys the SWITCH button
+    // when false. Independent of PP — Gen 1 lets you switch even with no usable move.
+    bool CanSwitch = false
 ) : BattleEvent;
 
 public record MoveInfo(

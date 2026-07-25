@@ -64,6 +64,7 @@ public sealed class SignalRBattleEventEmitter(
                         m.Effectiveness,
                         m.Power,
                     }),
+                    e.CanSwitch,
                 }
             ),
             TurnEnded => ("TurnEnded", new { }),

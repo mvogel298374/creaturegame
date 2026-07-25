@@ -87,6 +87,9 @@ export interface BattleState {
   enemySpeciesId: number;
   enemyLevel: number;
   moves: MoveInfo[];
+  // Whether a voluntary SWITCH is offered this turn (from TurnStarted; server-computed). Drives the SWITCH
+  // action button's enabled state. False between turns / when no party.
+  canSwitch: boolean;
   battlesWon: number;
   levelUp: LevelUpPanel | null;
   moveReplacement: MoveReplacementPrompt | null;
@@ -138,6 +141,7 @@ export const initialState: BattleState = {
   enemySpeciesId: 0,
   enemyLevel: 0,
   moves: [],
+  canSwitch: false,
   battlesWon: 0,
   levelUp: null,
   moveReplacement: null,
@@ -194,6 +198,7 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
         enemyMaxHp: action.enemyMaxHp,
         enemyStatus: action.enemyStatus,
         moves: action.moves,
+        canSwitch: action.canSwitch,
       };
     case 'PLAYER_CHOSE':
       return { ...state, phase: 'battling', animating: true };

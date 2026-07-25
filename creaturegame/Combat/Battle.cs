@@ -147,7 +147,8 @@ public class Battle
                             // moves have BaseDamage 0, so they carry no power and the UI shows no pill).
                             m.Base.BaseDamage
                         ))
-                        .ToList()
+                        .ToList(),
+                    CanSwitchThisTurn()
                 )
             );
 
@@ -525,6 +526,28 @@ public class Battle
         && index < _playerParty.Count
         && index != _playerParty.LeadIndex
         && _playerParty.Members[index].IsAlive();
+
+    /// <summary>
+    /// Whether the player may voluntarily switch <em>this turn</em> — the signal projected onto
+    /// <see cref="TurnStarted"/> so the client can grey the SWITCH button proactively. True when a party is wired,
+    /// the active creature isn't force-locked into a move (a true lock-in bypasses the whole menu), and some live
+    /// benched member is a legal target (<see cref="CanSwitchTo"/> — which already rules out a trapping bind).
+    /// Deliberately independent of PP: Gen 1 lets you switch even with no usable move.
+    /// </summary>
+    private bool CanSwitchThisTurn()
+    {
+        if (_playerParty is null)
+            return false;
+        // Same predicate the menu bypass uses (ILockInMechanic.IsLockedIn) rather than a second hand-rolled
+        // ForcedMove scan — if the two ever drifted apart, CanSwitch would advertise a switch the server then
+        // refuses, and the fallback would spend the turn on a FIGHT the player never picked.
+        if (LockInMechanics.All.Any(m => m.IsLockedIn(PlayerCreature)))
+            return false;
+        for (int i = 0; i < _playerParty.Count; i++)
+            if (CanSwitchTo(i))
+                return true;
+        return false;
+    }
 
     private AttackAction NewPlayerAttack(PokemonAttack? move) =>
         new(

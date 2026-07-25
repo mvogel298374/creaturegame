@@ -42,13 +42,6 @@ public sealed class SignalRInput : IBattleInput
         if (_cancelled)
             throw new OperationCanceledException("Battle input cancelled (client disconnected).");
 
-        // Out of PP, Battle now consults the menu (Gen 1 keeps BAG/SWITCH reachable) instead of auto-Struggling
-        // as it used to. The client has no out-of-PP menu affordance yet (In-Combat Switching Stage C), so resolve
-        // to Struggle immediately rather than block on a menu the player can't complete — preserving today's web
-        // behaviour exactly. Stage C replaces this with a real out-of-PP menu (Struggle button + SWITCH/BAG).
-        if (!context.Attacker.CanSelectAnyMove)
-            return StruggleTurnChoice.Instance;
-
         var tcs = new TaskCompletionSource<TurnRequest>(
             TaskCreationOptions.RunContinuationsAsynchronously
         );
@@ -56,6 +49,12 @@ public sealed class SignalRInput : IBattleInput
         var request = await tcs.Task; // throws OperationCanceledException if Cancel() ran
         _turnTcs = null;
 
+        // Gen 1 keeps the whole menu open out of PP: BAG and SWITCH are honoured even when no move is selectable
+        // (out of PP the client's FIGHT button sends a MoveRequest without opening the move list). Struggle is
+        // therefore a consequence of *choosing FIGHT* with nothing usable — never auto-resolved before the
+        // player chooses. The out-of-PP guard is scoped to MoveRequest for exactly that reason: a catch-all
+        // `_ when !CanSelectAnyMove` above these arms would swallow every FUTURE request type into Struggle
+        // (the deferred Catch cluster's ball throw being the next one), which is the bug this just fixed for BAG.
         return request switch
         {
             ItemRequest item => new ItemTurnChoice(
@@ -64,7 +63,13 @@ public sealed class SignalRInput : IBattleInput
                 item.TargetPartySlot
             ),
             SwitchRequest sw => new SwitchTurnChoice(sw.Index),
+            // FIGHT with no selectable move → Struggle; otherwise the chosen move.
+            MoveRequest when !context.Attacker.CanSelectAnyMove => StruggleTurnChoice.Instance,
             MoveRequest move => new MoveTurnChoice(ResolveMove(context, move.Index)),
+            // Unknown request type. The out-of-PP net stays LAST so it can never shadow a real arm: ResolveMove
+            // throws when nothing is selectable, so this is what keeps an unrecognised request from blowing up
+            // the turn at 0 PP.
+            _ when !context.Attacker.CanSelectAnyMove => StruggleTurnChoice.Instance,
             _ => new MoveTurnChoice(ResolveMove(context, -1)),
         };
     }

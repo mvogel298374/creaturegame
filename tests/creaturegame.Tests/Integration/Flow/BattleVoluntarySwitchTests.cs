@@ -398,6 +398,9 @@ public class BattleVoluntarySwitchTests
         Assert.Empty(recorder.Of<CreatureSwitchedIn>()); // the locked-in creature never switched
         // It kept thrashing across turns 1 and 2 (the menu — and thus SWITCH — was bypassed both times).
         Assert.True(recorder.Of<MoveUsed>().Count(m => m.MoveName == "thrash") >= 2);
+        // ...and the client is told so up front: turn 2 (mid-lock) advertises CanSwitch false, so the SWITCH
+        // button greys out instead of offering a switch the locked-in turn would silently ignore.
+        Assert.False(recorder.Of<TurnStarted>().ElementAt(1).CanSwitch);
     }
 
     [Theory]
@@ -465,6 +468,77 @@ public class BattleVoluntarySwitchTests
         Assert.Contains(recorder.Of<CreatureFainted>(), f => f.Name == "Frail");
         Assert.Single(recorder.Of<SwitchInOffered>()); // ONLY the forced prompt — the voluntary switch raised none
         Assert.Equal("Anchor", switchIns[1].Name); // the forced send-in took over
+    }
+
+    [Fact]
+    public async Task CanSwitch_IsAdvertisedOnTurnStart_EvenOutOfPP()
+    {
+        // The SWITCH button's enabled state rides TurnStarted.CanSwitch. Gen 1 lets you switch with no usable move,
+        // so an out-of-PP lead with a live bench still advertises CanSwitch true (the button stays enabled at 0 PP).
+        var lead = Fighter("Lead", hp: 300, attack: 40, defense: 100, speed: 200);
+        foreach (var m in lead.MoveSet)
+            m.PowerPointsCurrent = 0; // out of PP
+        var bench = Fighter("Bench", hp: 300, attack: 999, defense: 100, speed: 150);
+        var party = new Party(lead);
+        party.Add(bench);
+        var enemy = Fighter("Foe", hp: 20, attack: 1, defense: 100, speed: 100);
+
+        var input = new ScriptedInput("tackle").TurnPlan(1); // switch turn 1 (no PP needed to switch)
+        var recorder = new RecordingEmitter();
+        var battle = NewBattle(lead, enemy, input, "tackle", party, recorder);
+
+        await battle.StartFightAsync();
+
+        Assert.True(recorder.Of<TurnStarted>().First().CanSwitch);
+    }
+
+    [Fact]
+    public async Task CanSwitch_IsFalse_ForALoneStarter_WithNoBench()
+    {
+        // No benched member ⇒ nothing to switch to ⇒ the SWITCH button greys out (CanSwitch false).
+        var lead = Fighter("Lead", hp: 300, attack: 999, defense: 100, speed: 200);
+        var party = new Party(lead); // lone starter
+        var enemy = Fighter("Foe", hp: 20, attack: 1, defense: 100, speed: 100);
+
+        var recorder = new RecordingEmitter();
+        var battle = NewBattle(lead, enemy, new ScriptedInput("tackle"), "tackle", party, recorder);
+
+        await battle.StartFightAsync();
+
+        Assert.False(recorder.Of<TurnStarted>().First().CanSwitch);
+    }
+
+    [Fact]
+    public async Task CanSwitch_IsFalse_WhileTrappedByABind()
+    {
+        // A trapped lead can't switch, so the signal reflects it: turn 1 (pre-bind) advertises CanSwitch true, but
+        // turn 2 — after the enemy's bind lands — advertises false, so the client greys SWITCH while trapped.
+        var lead = Fighter("Lead", hp: 999, attack: 60, defense: 999, speed: 200);
+        var bench = Fighter("Bench", hp: 300, attack: 999, defense: 100, speed: 150);
+        var party = new Party(lead);
+        party.Add(bench);
+        var enemy = Fighter("Foe", hp: 40, attack: 1, defense: 100, speed: 100);
+        enemy.AddAttack(Wrap());
+
+        var input = new ScriptedInput("tackle"); // just fight; the enemy binds on turn 1
+        var recorder = new RecordingEmitter();
+        var battle = new Battle(
+            lead,
+            enemy,
+            Gen1TypeChart.Instance,
+            input,
+            new ScriptedInput("wrap"),
+            rules: new ScriptableRules().Deterministic().BindingTurns(3),
+            emitter: recorder,
+            rng: new SeededRandomSource(0),
+            playerParty: party
+        );
+
+        await battle.StartFightAsync();
+
+        var turns = recorder.Of<TurnStarted>().ToList();
+        Assert.True(turns[0].CanSwitch); // turn 1: a live bench, not yet trapped
+        Assert.False(turns[1].CanSwitch); // turn 2: trapped by the bind → can't switch
     }
 
     // A party-aware battle with deterministic rules; the enemy spams a single named move.

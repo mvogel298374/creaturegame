@@ -146,17 +146,18 @@ describe('battleReducer — phase transitions', () => {
     expect(next.enemyStatus).toBe('None');
   });
 
-  it('TURN_STARTED moves to the choosing phase and stops animating', () => {
-    const s = ready({ phase: 'battling', animating: true });
+  it('TURN_STARTED moves to the choosing phase, stops animating, and carries canSwitch', () => {
+    const s = ready({ phase: 'battling', animating: true, canSwitch: false });
     const next = battleReducer(s, {
       type: 'TURN_STARTED', turnNumber: 3,
       playerHp: 55, playerMaxHp: 100, playerStatus: 'None', playerXpThisLevel: 20, playerXpToNextLevel: 100,
-      enemyHp: 33, enemyMaxHp: 80, enemyStatus: 'Paralysis', moves: [],
+      enemyHp: 33, enemyMaxHp: 80, enemyStatus: 'Paralysis', moves: [], canSwitch: true,
     });
     expect(next.phase).toBe('choosing');
     expect(next.animating).toBe(false);
     expect(next.turnNumber).toBe(3);
     expect(next.enemyStatus).toBe('Paralysis');
+    expect(next.canSwitch).toBe(true); // the SWITCH button's enabled state rides this
   });
 
   it('PLAYER_CHOSE locks into the battling/animating phase', () => {

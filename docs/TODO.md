@@ -12,20 +12,17 @@ top is playable end-to-end: the **Encounter Logic** biome-graph run (biome pick 
 Center → next biome, per-run randomised map, depth-scaled foes), the **Run Economy** (gold + rewards), the
 **Reward Choice** modal (pick-1-of-3 rarity rewards), the **level-aware XP curve + trainer bonus**, the **Innate
 Party XP Share** (the living bench shares in every battle's XP/Stat-Exp and evolution alongside the active
-creature), and **Revive Items** (in-battle party revive, Boss-reward + rare-shop only) are all done and archived
-(→ `TODO_ARCHIVE.md`).
+creature), **Revive Items** (in-battle party revive, Boss-reward + rare-shop only), and **In-Combat Switching**
+(the voluntary, any-turn SWITCH turn-action) are all done and archived (→ `TODO_ARCHIVE.md`).
 
 **Next up, in priority order:**
-1. **In-Combat Switching** — the voluntary, any-turn SWITCH turn-action (its own documented core feature below).
-   **Stages A (engine core, 2026-07-24) + B (wire, 2026-07-25) are ✅ DONE** — `SwitchAction`, the enemy-retarget
-   fix, the trap gate, and the Struggle-menu fix at the `Battle` level, plus the `ChooseSwitch` hub command wired
-   through `SignalRInput`/`GameSessionManager` to `SwitchTurnChoice`. **Remaining: Stage C (frontend — the SWITCH
-   button + dismissable picker + `canSwitch`/`isTrapped` projection on `TurnStarted` + the out-of-PP menu
-   affordance).** A mechanical repeat of the Acquisition/LeadChoice/forced-SwitchIn pattern (Sonnet).
-   `requirements-review` already adjudicated the flagged domain claims for Stage A (all Gen-1-confirmed, tested).
-2. **Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by the acquisition channels.
+1. **Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by the acquisition channels.
    *(Item acquisition itself is already done via the Run Economy; bag persistence + catch remain.)*
-3. **Game Loop & Progression** — save layer (`save.db`); party + between-biome lead + forced-switch are done.
+2. **Game Loop & Progression** — save layer (`save.db`); party + between-biome lead + forced-switch are done.
+
+*(**In-Combat Switching** — the voluntary, any-turn SWITCH turn-action — is **✅ COMPLETE (2026-07-25)**, all three
+stages (engine core / wire / frontend) shipped, including the out-of-PP menu affordance (BAG/SWITCH reachable at
+0 PP; Struggle only on a FIGHT choice). Full record archived in `TODO_ARCHIVE.md`.)*
 
 *(Small residual, not urgent: **sweep other end-of-battle effects that assume the starting lead** — see
 [**Switched-in creature is the active creature**](#switched-in-creature-is-the-active-creature--resolved) below.)*
@@ -124,9 +121,8 @@ below (session plan mirrored here for durability; the ephemeral copy was `kind-c
   out-of-range no-op / status-no-leak both surgically and end-to-end through a declined Poké Center / lone-starter
   never-fires), `PartyTests` (`FullHeal` clears the carried ailment), `WebEventContractTests` field guards, and
   Vitest (reducer + timeline). *(Interim faint
-  handling through Stages 1–2 stands: the lead fainting still ends the run.)* Switching mid-fight is a **separate,
-  larger** feature — see
-  [**In-Combat Switching**](#in-combat-switching--voluntary-in-battle-party-switching-planned-core-feature) below.
+  handling through Stages 1–2 stands: the lead fainting still ends the run.)* Switching mid-fight was a
+  **separate, larger** feature — **In-Combat Switching**, shipped 2026-07-25 (full record in `TODO_ARCHIVE.md`).
 - [x] **Stage 2 — boss catch (post-win chance)** ✅ DONE (2026-07-14): after a **Boss** win, a small *n%* roll
   (`BossCatchCalculator.ShouldOffer`, 20%) → the **same** `AcquisitionOffered` with `source: "BossCatch"` and a
   single option = a fresh full-HP copy of the defeated boss's species at the boss's level (built by
@@ -187,9 +183,8 @@ below (session plan mirrored here for durability; the ephemeral copy was `kind-c
   **slot**, `Members[0]`, instead of `Party.Lead` — `SetLead` moves `LeadIndex` only and never reorders, so the
   slot assertion is exact where `Party.Lead` is now churned by the post-decline wipe's forced switches).
   *(`CreatureSwitchedIn` also carries a `Level` beyond the signature sketched below — `TurnStarted` carries no
-  level and the nameplate needs it.)* This is the Battle-holds-party groundwork the voluntary
-  [**In-Combat Switching**](#in-combat-switching--voluntary-in-battle-party-switching-planned-core-feature) feature
-  builds its SWITCH turn-action on.
+  level and the nameplate needs it.)* This is the Battle-holds-party groundwork the voluntary **In-Combat
+  Switching** feature (shipped 2026-07-25, archived in `TODO_ARCHIVE.md`) built its SWITCH turn-action on.
 
   **`/plan` (2026-07-14) — the design as built:** When the **active** creature faints and a bench member is
   still alive, the run **does not end**: the player **picks** the replacement from a forced (non-dismissable)
@@ -197,10 +192,10 @@ below (session plan mirrored here for durability; the ephemeral copy was `kind-c
   and it comes in against the **same (damaged) enemy**; the run ends only when the **whole party** is down.
   **This is where `Battle` first learns about the party** — it must hold the benched creatures so it can bring in
   the next one against the live enemy — and it is deliberately the *choose*-a-replacement path (not auto-send-next)
-  so it front-loads the in-battle party-select modal + `ChooseSwitchInAsync` prompt that the deferred
-  [**In-Combat Switching**](#in-combat-switching--voluntary-in-battle-party-switching-planned-core-feature) feature
-  reuses (forced + voluntary **share the send-in path**, so that later feature shrinks to "add the voluntary SWITCH
-  turn-action trigger + enemy-AI switching"). Voluntary in-battle switching + `save.db` stay beyond Phase 4.
+  so it front-loads the in-battle party-select modal + `ChooseSwitchInAsync` prompt that **In-Combat Switching**
+  reused (forced + voluntary **share the send-in path**, exactly as designed — that later feature shrank to "add
+  the voluntary SWITCH turn-action trigger", with enemy-AI switching still a later refinement). `save.db` stays
+  beyond Phase 4.
 
   **Design (the finalized `/plan`):**
   - **Engine — `Battle` holds the party (the central change).** Add an optional `Party? playerParty = null`
@@ -281,12 +276,12 @@ literal Gen-1 participant split, not a re-implementation of it); major status pe
 the carry model.
 
 **Out of scope this phase:** the in-battle Poké Ball throw + `BallItemEffect` + catch-rate-vs-HP formula (stays
-in the Catch cluster below); voluntary in-battle switching (its own planned core feature —
-[**In-Combat Switching**](#in-combat-switching--voluntary-in-battle-party-switching-planned-core-feature));
-`save.db`/`PlayerDbContext` persistence + cross-run meta-progression; the **Exp. Share / Exp. All item**
-(a held item that pays a *non-participant* — distinct from the innate party-wide XP share that shipped 2026-07-18,
-see *Switched-in creature is the active creature* below). *(Revive, which needed a fainted-but-revivable party
-member, shipped 2026-07-19 on top of this stage's `Party` — see `TODO_ARCHIVE.md` → Revive Items.)*
+in the Catch cluster below); `save.db`/`PlayerDbContext` persistence + cross-run meta-progression; the **Exp.
+Share / Exp. All item** (a held item that pays a *non-participant* — distinct from the innate party-wide XP share
+that shipped 2026-07-18, see *Switched-in creature is the active creature* below). *(Revive, which needed a
+fainted-but-revivable party member, shipped 2026-07-19 on top of this stage's `Party` — see `TODO_ARCHIVE.md` →
+Revive Items. Voluntary in-battle switching — its own planned core feature at the time — shipped 2026-07-25 as
+**In-Combat Switching**; see `TODO_ARCHIVE.md`.)*
 
 ---
 
@@ -298,8 +293,8 @@ XP, EVs, everything. Just like it would work in Gen 1 / generically in Pokémon.
 
 **There is no special case for a switched-in creature.** It is not a second-class participant, it does not "wait
 until its next clean win", and it is not excluded from any end-of-battle effect. Anything the starting lead would
-receive, a creature that took the field receives on the same terms. This governs the forced faint-switch (shipped)
-and the voluntary SWITCH action (planned) alike.
+receive, a creature that took the field receives on the same terms. This governs the forced faint-switch and the
+voluntary SWITCH action (both shipped — see **In-Combat Switching** in `TODO_ARCHIVE.md`) alike.
 
 ### Why this shipped wrong (keep this — it is the reason the gate is being tightened)
 Neither rule came from Gen 1 or from any design doc. Both were written *by the plan*, then implemented faithfully,
@@ -328,9 +323,12 @@ domain check instead of inviting it. Two specific traps to recognise again:
   earns `floor(activeAward × BenchXpShare)` XP + full Stat-Exp, running the same level-up + move-learn loop;
   fainted members earn nothing. This is wider and more generous than the literal participant split, and is kept
   out of `IBattleRules` in `RunRules`, alongside the existing XP-curve deviation (see `GENERATION_SEAMS.md`).
-  **No live conflict** with the requirement above: voluntary switching isn't implemented yet, and a forced switch
-  always leaves the outgoing lead fainted (excluded from any share anyway), so today's only "switched-in" case —
-  the finisher — is simply the active creature, paid in full, same as before this change. Full write-up →
+  **At the time this closed (2026-07-18), no live conflict** with the requirement above: voluntary switching
+  wasn't implemented yet, and a forced switch always leaves the outgoing lead fainted (excluded from any share
+  anyway), so the only "switched-in" case then was simply the active creature, paid in full, same as before this
+  change. **Now that In-Combat Switching has shipped (2026-07-25),** a creature switched out mid-battle while
+  still alive earns only the flat `BenchXpShare`, not a participation-weighted share — an intended divergence,
+  decided in advance, not a bug (see `TODO_ARCHIVE.md` → *Innate Party XP Share*). Full write-up →
   `TODO_ARCHIVE.md` → *Innate Party XP Share*. *(The **Exp. Share / Exp. All item** — a held item that pays a
   non-participant — stays deferred; it's a separate feature from this innate, always-on party share.)*
 - [x] The invariant is now written into `docs/STATE_MODEL.md` (the party-wide end-of-battle effects section) as a
@@ -340,139 +338,6 @@ domain check instead of inviting it. Two specific traps to recognise again:
   loop, and carried status already reads `s.Player` (the finisher) — but nothing has specifically audited the
   *rest* of the post-battle path for a stray `player`/`levelBefore` reference. Small, cheap, not urgent; no known
   instance today.
-
----
-
-## In-Combat Switching — voluntary in-battle party switching *(in progress — Stages A + B shipped)*
-
-**Status: Stage A (engine core) ✅ DONE (2026-07-24) + Stage B (wire) ✅ DONE (2026-07-25); Stage C (frontend) remains.** `/plan` done
-(2026-07-24). Confirmed a core feature (user, 2026-07-13) — a first-class "SWITCH" turn action so the player can
-swap the active creature **mid-battle**, like the mainline games. Distinct from — and much larger than — Phase 4's
-lead management:
-
-- **Stage 1d** (above) only picks the lead **between biomes**; no engine change.
-- **Stage 3** (above) only handles a **forced** switch when the lead faints.
-- **This feature** is the **voluntary, any-turn** switch: choose SWITCH instead of FIGHT/BAG, pick a benched
-  creature, and it comes in at the cost of your turn.
-
-**The actual hard part, found during `/plan` (not in the original scope note below).** `AttackAction.Target` is a
-`Creature` reference captured **at construction time**, and `Battle.StartFightAsync` builds the enemy's
-`AttackAction` (`Target = PlayerCreature`) immediately after building the player's action — **before** the turn
-queue is sorted or executed. If the player's action this turn is a switch and it (correctly) resolves at higher
-priority than the enemy's move, `Battle.PlayerCreature` gets reassigned to the incoming creature, but the
-already-built `enemyAction.Target` still points at the **old, benched** creature object — the enemy would hit the
-Pokémon that just left the field, not the one that just came in. Nothing in the current test suite catches this
-because forced-switch (Stage 3) only reassigns `PlayerCreature` *after* both of a turn's actions have already
-executed, never mid-turn. **Fix:** the enemy-side target must resolve live off `Battle`'s current `PlayerCreature`
-rather than a value snapshotted at construction (e.g. an `internal Retarget(Creature)` `Battle` calls on any
-still-queued action right after a switch executes, or a `Func<Creature>` indirection for the enemy's `Target`).
-This is the one piece that's genuinely a central `Battle`/`AttackAction` turn-resolution change; everything else
-below is wiring a fourth `TurnChoice` through a pattern already shipped three times (Acquisition, LeadChoice,
-forced SwitchIn).
-
-**Design:**
-- **Engine.** `SwitchTurnChoice(int PartyIndex) : TurnChoice` (sibling of `MoveTurnChoice`/`ItemTurnChoice`).
-  `SwitchAction : IBattleAction` at a priority above `ItemAction.ItemPriority` (6) — Gen 1 switching resolves
-  before even an item use, so it must always beat the enemy's move regardless of speed. Execution: restore any
-  Mimic/Transform on the outgoing creature, `party.SetLead(index)`, reassign `Battle.PlayerCreature`,
-  `ResetBattleState()`, re-apply the incoming creature's own `CarriedStatus` — this is `TrySwitchInAsync`'s
-  existing body, extracted so the forced and voluntary paths share one implementation. Plus the retarget fix
-  above. `BuildPlayerActionAsync` gains a third branch for `SwitchTurnChoice` alongside FIGHT/ITEM.
-- **Trap gate (new).** A creature with `Battle.BindingTurnsRemaining > 0` cannot execute a `SwitchAction` — that's
-  the entire point of Wrap/Bind/Clamp/Fire Spin. This is **not** the same gate as `StatusResolver.CanAct`: sleep,
-  paralysis, confusion, and flinch do **not** block switching in Gen 1, only trapping does — so it needs its own
-  small check, not a `CanAct` reuse. **Corrected pin:** this is *not* generation-variable (an earlier draft of
-  this plan said it belonged on `IBattleRules` — wrong; "trapped ⇒ can't switch" is invariant across every
-  generation, and `BindingTurnsRemaining` is an ordinary counter check, same class as `ItemAction.ItemPriority`
-  being judged gen-invariant in `GENERATION_SEAMS.md §5.0.2`). No new seam member.
-- **Struggle vs. true lock-in — two different rules, don't conflate them (a correction made during `/plan`):**
-  - **Struggle (all moves out of PP)** does **not** block BAG or SWITCH in Gen 1 — the full menu still shows;
-    only *choosing* FIGHT with nothing selectable resolves to Struggle. **This means today's code has a
-    pre-existing bug this feature's build will touch anyway:** `BuildPlayerActionAsync` currently returns
-    Struggle unconditionally without ever consulting `ChooseTurnActionAsync` when `!CanSelectAnyMove`, so BAG is
-    *already* silently unreachable out-of-PP. Fix as part of this work: still offer the turn choice; only FIGHT
-    (with no valid move) auto-resolves to Struggle.
-  - **True lock-in (Rampage/Thrash/Petal Dance, Bide, a two-turn charge, and the Gen-1-specific quirk where the
-    Wrap/Bind/Clamp/Fire Spin *user* is also forced to keep repeating it)** blocks everything, no menu at all —
-    this is correct as already shipped (`LockInMechanics.ForcedMove` bypasses `ChooseTurnActionAsync` entirely)
-    and needs no change; SWITCH is bypassed for free by the same early return.
-  - **Both are stated with high confidence but not certainty** (20-year-old cartridge internals) — flag for
-    `requirements-review` rather than trust this doc alone, per the "Switched-in creature" postmortem lesson
-    below about plan-asserted domain facts.
-- **Gen 1 fidelity (DoR #4), otherwise unchanged from the original scope note:** switching resets stat stages and
-  volatile conditions (confusion, Leech Seed, Disable, substitute, two-turn/charge lock, …) but **keeps major
-  status** on the creature (reuses Stage 3's `ResetBattleState()`/`CarriedStatus` machinery, zero new surface). No
-  hazards, no abilities, no Pursuit, no Baton Pass — all post-Gen-1, out of scope by construction.
-- **Events + wire.** No new `IBattleInput` method needed (unlike forced SwitchIn) — this rides the *existing*
-  `ChooseTurnActionAsync`/`TurnRequest` seam already carrying `MoveRequest`/`ItemRequest`: add a
-  `SwitchRequest(int Index)` case, a `ChooseSwitch(int)` hub method completing the same `_turnTcs`, mapped to
-  `SwitchTurnChoice`. `CreatureSwitchedIn`/`PartyUpdated` already exist from Stage 3 and are reused as-is; no new
-  `CreatureSwitchedOut` needed (the outgoing creature isn't fainting, but nothing currently reads an
-  out/in distinction the existing events don't already cover — confirm during implementation).
-- **Frontend.** A fourth `ActionMenu` button (SWITCH) opening a **dismissable** party picker (reusing
-  `PartyCard`/`SwitchInModal`'s grid, unlike the forced modal's `dismiss="blocking"`) — Back returns to the menu
-  with no turn spent; the *active* member is greyed out in addition to fainted ones. Needs a new `canSwitch`/
-  `isTrapped` signal projected onto `TurnStarted` (same precedent as `DisabledMove` on `MoveInfo`) so the client
-  can grey out SWITCH proactively while trapped, backed by a server-side no-op as defense in depth.
-- **Malformed/stale switch pick.** Unlike the forced switch (which must send someone in), a voluntary switch has
-  a safe fallback: treat an invalid index (fainted / out-of-range / the already-active slot) as if FIGHT had been
-  chosen with the default move, rather than stranding the turn. Needs a named test.
-- **Enemy AI switching** stays a later refinement — start player-only, per the original scope note.
-
-**Gen-variable surface (DoR #3): none.** Switch-first turn order is gen-invariant (inline constant, same
-precedent as `ItemAction.ItemPriority`); the reset-volatiles-keep-status rule reuses Stage 3's existing mechanism;
-trapping-blocks-switch is ordinary engine logic. Zero new `IBattleRules`/`ITypeChart`/`IStatCalculator` members;
-zero importer/DB change.
-
-**The quirk to test (DoR #6):** above all, *a switch this turn followed by a slower enemy move must land on the
-incoming creature, not the one that just left* (the retarget bug made into an assertion) — the single test that
-proves the central fix works. Plus: trapped ⇒ can't switch; volatiles reset / major status persists on
-switch-out; switch always precedes the enemy's move regardless of speed/priority; the incoming creature can
-faint to the same turn's enemy hit with no recursive switch prompt (that's the *forced* path's job next turn);
-out-of-PP still reaches BAG/SWITCH (the Struggle-menu fix); true lock-in still blocks everything (regression,
-already covered).
-
-**Dependencies:** Stage 3 (forced-switch-on-faint, DONE 2026-07-15) — `Battle` already holds the party, the
-send-in path (`TrySwitchInAsync`) exists to extract from, and the client has the party-picker modal to fork from.
-Independent of `save.db`.
-
-**Staging + model choice, decided 2026-07-24:**
-1. **Stage A — the engine core** ✅ **DONE (2026-07-24, Opus).** Shipped: the **retarget fix** (`AttackAction.Target`
-   is now reassignable via an `internal Retarget`; after a voluntary switch resolves, `Battle` repoints the enemy's
-   still-queued action onto the creature that came in — proven by a slower-enemy and a +1-priority-enemy test);
-   **`SwitchAction : IBattleAction`** at `SwitchPriority = 7` (above `ItemAction.ItemPriority` 6, so a switch always
-   resolves first); the **trap gate** (`Battle.CanSwitchTo` refuses a switch while `BindingTurnsRemaining > 0` —
-   Wrap/Bind/Clamp/Fire Spin only; sleep/paralysis/confusion/flinch do **not** block switching); and the
-   **Struggle-menu fix** (`BuildPlayerActionAsync` now consults the whole-turn menu even out of PP, so BAG/SWITCH
-   stay reachable and only *choosing FIGHT* with nothing selectable resolves to Struggle). New `SwitchTurnChoice`
-   + `StruggleTurnChoice` turn choices; the default `IBattleInput.ChooseTurnActionAsync` returns
-   `StruggleTurnChoice` out of PP instead of throwing. The forced (Stage 3) and voluntary switch-out paths now
-   share one send-in implementation (`RestoreOutgoing` + `BringInMember`); the voluntary path additionally
-   **captures the outgoing creature's major status** onto its `CarriedStatus` (`CaptureOutgoingStatus`) so status
-   persists on switch-out (re-enters ailed; benches ailed) while volatiles reset — Gen 1 fidelity. Covered by
-   **`BattleVoluntarySwitchTests`** (retarget slower + priority, trap-refused, status-persists-volatiles-reset,
-   out-of-PP-reaches-SWITCH, illegal-pick→FIGHT incl. active-slot/out-of-range/fainted, true-lock-in-bypasses-menu,
-   incoming-faints→forced-path-takes-over). **Web-leg interim:** `SignalRInput.ChooseTurnActionAsync` returns
-   `StruggleTurnChoice` immediately when out of PP — preserving today's auto-Struggle web behaviour exactly (no
-   live regression). Stage C replaces that guard with a real out-of-PP menu affordance (Struggle button + reachable
-   BAG/SWITCH).
-2. **Stage B — wire** ✅ **DONE (2026-07-25).** The voluntary SWITCH command now rides the existing one-per-turn
-   `ChooseTurnActionAsync`/`TurnRequest` handshake (no new `IBattleInput` method): `SignalRInput` gains a
-   `SwitchRequest(int Index)` mapped to `SwitchTurnChoice`, plus `SetSwitchChoice(int)`; `GameSessionManager.SetSwitchChoice`
-   routes it; `BattleHub.ChooseSwitch(int)` is the hub entry point. Covered by
-   `SignalRInputTests.SetSwitchChoice_YieldsASwitchChoiceForThatPartyIndex`. No new server→client event (Stage 3's
-   `CreatureSwitchedIn`/`PartyUpdated` are reused), so no new `WebEventContractTests` guard needed. **Stage C —
-   frontend** (the SWITCH button, the dismissable picker, the `canSwitch`/`isTrapped` projection on `TurnStarted`,
-   the out-of-PP menu affordance that replaces `SignalRInput`'s interim out-of-PP Struggle guard) is the last
-   piece — a mechanical repeat of the Acquisition/LeadChoice/forced-SwitchIn pattern (Sonnet). **Still to do.**
-3. `requirements-review` **adjudicated for Stage A (2026-07-24)** — it confirmed the Struggle-vs-full-menu and
-   trapped-victim (only `BindingTurnsRemaining` blocks switching, not sleep/paralysis/confusion) claims as
-   faithful Gen 1, and surfaced three further edges the user then ruled on: **(a) Toxic/Bad Poison downgrades to
-   regular Poison on a mid-battle switch-out** (code was right; the wrong `GEN_DIFFERENCES.md` line was corrected)
-   — Gen-1 accurate; **(b) Rage blocks switching** like every other lock-in (kept as-is, user's call); **(c)
-   switching out during a Hyper Beam recharge turn is allowed** (`CanSwitchTo` intentionally doesn't gate on
-   `IsRecharging`; documented in `GEN_DIFFERENCES.md`). All three are covered by named `BattleVoluntarySwitchTests`
-   cases, plus an affirmative sleep/paralysis/freeze-still-switches test. Nothing left owed for Stage A.
 
 ---
 
@@ -534,10 +399,9 @@ slice; the items below are what it deliberately leaves out.
   post-battle acquisition channels, the between-biome lead choice and the forced faint-switch all shipped in
   **Encounter Logic Phase 4** (Stages 1a–3 ✅, complete 2026-07-15). What remains here is only the **in-battle
   ball throw** as a third acquisition channel — see the Catch cluster above; it deposits into the existing `Party`.
-- [ ] **Voluntary in-battle switching** — a SWITCH turn action to swap the active creature mid-fight. Its own
-  documented core feature (planned, user-confirmed 2026-07-13): see
-  [**In-Combat Switching**](#in-combat-switching--voluntary-in-battle-party-switching-planned-core-feature).
-  **Now unblocked:** Phase 4 Stage 3 wired the party into `Battle` and built the shared send-in path.
+- [x] **Voluntary in-battle switching** — a SWITCH turn action to swap the active creature mid-fight. ✅ DONE
+  (2026-07-25) as **In-Combat Switching** (all three stages incl. the out-of-PP menu affordance); full record
+  archived in `TODO_ARCHIVE.md`.
 - [ ] Progressive difficulty beyond the current `targetBst = lead BST + depth × 10`; trainer encounters at
   milestones.
 - [ ] `PlayerSave` / `SavedCreature` models in `save.db`; auto-save after each battle; party-management UI.
@@ -815,8 +679,9 @@ Battles are fully playable now — docs won't describe a moving target.
 - [ ] *(low, watch — do not refactor speculatively)* **`Battle`'s constructor is at 12 parameters** and heading
   where `RunDirector`'s was before `RunDirectorOptions` (archived 2026-07-16). Apply the same precedent — a
   `BattleOptions` record for the optional tail (rules/emitter/rng/bag/escapable/trainer/runRules/party) — the
-  next time a feature (likely **In-Combat Switching**) has to touch the signature anyway. Not worth a
-  standalone churn commit: every call site is a test or the run layer, and both are stable.
+  next time a feature has to touch the signature anyway (**In-Combat Switching**, shipped 2026-07-25, reused the
+  existing `playerParty` param and didn't need to). Not worth a standalone churn commit: every call site is a test
+  or the run layer, and both are stable.
 
 *(The 2026-07-19 repo-wide PR-audit is now fully closed — all five findings resolved: four fixed & archived in
 `TODO_ARCHIVE.md`, the DB-services try/catch convention decided above, and the `SignalRInput` cancel/prompt race

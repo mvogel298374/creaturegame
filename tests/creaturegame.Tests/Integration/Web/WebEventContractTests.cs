@@ -498,6 +498,41 @@ public class WebEventContractTests
         Assert.True(root.GetProperty("IsPlayer").GetBoolean());
     }
 
+    /// <summary>Field-level guard for the <see cref="TurnStarted"/> projection: the SWITCH button's enabled
+    /// state rides <c>CanSwitch</c>, so a constant or negated projection would grey the button on exactly the
+    /// turns a switch IS legal (and offer it on the turns it isn't) — while the reflection contract test, which
+    /// probes with <c>false</c>, still passed. This pins both values round-tripping.</summary>
+    [Fact]
+    public void TurnStarted_Projection_CarriesCanSwitch()
+    {
+        static bool ProjectedCanSwitch(bool canSwitch)
+        {
+            var (type, payload) = SignalRBattleEventEmitter.MapEvent(
+                new TurnStarted(
+                    1,
+                    "PIKACHU",
+                    30,
+                    35,
+                    StatusCondition.None,
+                    0,
+                    100,
+                    "PIDGEY",
+                    20,
+                    24,
+                    StatusCondition.None,
+                    [],
+                    CanSwitch: canSwitch
+                )
+            );
+            Assert.Equal("TurnStarted", type);
+            using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+            return doc.RootElement.GetProperty("CanSwitch").GetBoolean();
+        }
+
+        Assert.True(ProjectedCanSwitch(true));
+        Assert.False(ProjectedCanSwitch(false));
+    }
+
     /// <summary>Projection guard for <see cref="RunNodeEntered"/>: the client titles the node from
     /// <c>Kind</c> (the reflection contract test instantiates it with an empty string, so this pins a real
     /// value round-trips).</summary>

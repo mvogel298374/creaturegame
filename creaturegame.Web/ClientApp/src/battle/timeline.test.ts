@@ -160,10 +160,16 @@ describe('expandEvent — control plane vs timeline', () => {
 
   it('TurnStarted flows through the timeline (queued), not immediately — so HP syncs after damage animates', () => {
     const { now, steps } = expandEvent('TurnStarted',
-      { turnNumber: 2, playerHp: 100, playerMaxHp: 150, playerStatus: 'None', enemyHp: 80, enemyMaxHp: 120, enemyStatus: 'None', moves: [] }, CTX);
+      { turnNumber: 2, playerHp: 100, playerMaxHp: 150, playerStatus: 'None', enemyHp: 80, enemyMaxHp: 120, enemyStatus: 'None', moves: [], canSwitch: true }, CTX);
     expect(now).toBeUndefined();
     expect(steps).toHaveLength(1);
-    expect(steps![0]).toMatchObject({ kind: 'dispatch', action: { type: 'TURN_STARTED', enemyHp: 80 } });
+    expect(steps![0]).toMatchObject({ kind: 'dispatch', action: { type: 'TURN_STARTED', enemyHp: 80, canSwitch: true } });
+  });
+
+  it('TurnStarted defaults canSwitch to false when the field is absent (pre-Stage-C / non-party battle)', () => {
+    const { steps } = expandEvent('TurnStarted',
+      { turnNumber: 1, playerHp: 100, playerMaxHp: 150, playerStatus: 'None', enemyHp: 80, enemyMaxHp: 120, enemyStatus: 'None', moves: [] }, CTX);
+    expect(steps![0]).toMatchObject({ kind: 'dispatch', action: { type: 'TURN_STARTED', canSwitch: false } });
   });
 
   it('BattleEnded with the player winning is a silent intermission beat that reverts the player sprite', () => {

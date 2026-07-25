@@ -107,6 +107,43 @@ public class SignalRInputTests
     }
 
     [Fact]
+    public async Task SetChoice_WhenOutOfPP_ResolvesToStruggle()
+    {
+        // Gen 1: choosing FIGHT with no usable move (all 0 PP) is Struggle — and it's driven by the FIGHT click,
+        // not auto-resolved before the player chooses. The hub's ChooseMove completes the handshake; the mapper
+        // yields a StruggleTurnChoice because nothing is selectable.
+        var input = new SignalRInput();
+        var attacker = WithMoves("tackle", "growl");
+        foreach (var m in attacker.MoveSet)
+            m.PowerPointsCurrent = 0; // out of PP everywhere
+        var ctx = Context(attacker, TestCreatures.Make("Enemy"));
+
+        var task = input.ChooseTurnActionAsync(ctx);
+        input.SetChoice(0); // hub: ChooseMove(0) — the STRUGGLE affordance sends a move index
+        var choice = await task;
+
+        Assert.IsType<StruggleTurnChoice>(choice);
+    }
+
+    [Fact]
+    public async Task SetSwitchChoice_WhenOutOfPP_IsStillHonoured()
+    {
+        // Gen 1 keeps the whole menu open out of PP: SWITCH (and BAG) are honoured even with no usable move — only
+        // *choosing FIGHT* Struggles. The switch handshake resolves to a SwitchTurnChoice, not Struggle.
+        var input = new SignalRInput();
+        var attacker = WithMoves("tackle");
+        foreach (var m in attacker.MoveSet)
+            m.PowerPointsCurrent = 0;
+        var ctx = Context(attacker, TestCreatures.Make("Enemy"));
+
+        var task = input.ChooseTurnActionAsync(ctx);
+        input.SetSwitchChoice(1); // hub: ChooseSwitch(1)
+        var choice = await task;
+
+        Assert.Equal(1, Assert.IsType<SwitchTurnChoice>(choice).PartyIndex);
+    }
+
+    [Fact]
     public async Task ChooseMoveAsync_NeverReturnsAnItem()
     {
         // The move-only entry point (used for the interface contract) resolves a move even if it somehow

@@ -117,6 +117,33 @@ Split into a React shell and a Phaser canvas region.
 - Clicking a move sends `ChooseMove` to the server and transitions back to resolving state
 - "← Back" returns to Action menu without sending a move
 
+**State 3 — Switch menu** (after clicking SWITCH; added by **In-Combat Switching**, 2026-07-25):
+```
+│  Switch to which creature?                               │
+│  [ Bulbasaur  Lv.50 · OUT ] [ Pidgey  Lv.48         ]    │
+│  [ Rattata    Lv.46 · FNT ] [ Onix    Lv.51         ]    │
+│  [ ← Back ]                                              │
+```
+- The in-battle party picker (`SwitchMenu` in `BattleScreen.tsx`), reached from the SWITCH action button.
+  **Dismissable** — "← Back" returns to the Action menu with **no turn spent**, unlike the forced
+  `SwitchInModal` that a faint raises.
+- The active lead (`· OUT`) and any fainted member (`· FNT`) are greyed and disabled; picking a live benched
+  member sends `ChooseSwitch(index)` and **spends the turn** (switching *is* the turn action).
+- Shares `PartyCard` with the between-biome `LeadChoiceModal` and the forced `SwitchInModal`.
+
+**Action-menu additions from In-Combat Switching.** The FIGHT|STATS sketch above is the *original* plan; the
+shipped menu carries more buttons (BAG and CHECK POKEMON shipped earlier and are documented with their own
+features). This stage added:
+- **SWITCH** → State 3. Enabled only when it's the player's turn **and** `TurnStarted.CanSwitch` is true — the
+  server-computed signal (a party is wired, the active creature isn't locked into a move, and a live benched
+  member is a legal target; see `Battle.CanSwitchThisTurn()`). Greyed otherwise, so an illegal switch is never
+  offered. Deliberately **independent of PP** — Gen 1 lets you switch with no usable move.
+- **Out-of-PP FIGHT → Struggle.** When no move is selectable (every move at 0 PP or Disabled), FIGHT does *not*
+  open State 2 — it spends the turn immediately as Struggle, matching Gen 1, which never shows a move list in
+  that case. BAG and SWITCH stay reachable at 0 PP; Struggle is a consequence of *choosing FIGHT*, never
+  auto-resolved before the player chooses. The client predicate (`hasUsableMove` in `battle/moveMenu.ts`)
+  mirrors the server's `Creature.CanSelectAnyMove`.
+
 **Responsibility split:**
 
 | Element | Owner | Reason |

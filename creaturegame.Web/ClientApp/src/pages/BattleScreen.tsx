@@ -24,6 +24,8 @@ import { ShopModal } from '../components/modals/ShopModal';
 import { AcquisitionModal } from '../components/modals/AcquisitionModal';
 import { LeadChoiceModal } from '../components/modals/LeadChoiceModal';
 import { SwitchInModal } from '../components/modals/SwitchInModal';
+import { PartyCard } from '../components/modals/PartyCard';
+import { hasUsableMove } from '../battle/moveMenu';
 import { MoveReplacementModal } from '../components/modals/MoveReplacementModal';
 import { SettingsModal } from '../components/modals/SettingsModal';
 import { CreatureOverview } from './CreatureOverview';
@@ -34,7 +36,7 @@ function estimateHp(baseHp: number): number {
   return Math.floor((baseHp * 2 * 50) / 100) + 60;
 }
 
-type ControlView = 'menu' | 'fight' | 'bag' | 'check';
+type ControlView = 'menu' | 'fight' | 'bag' | 'switch' | 'check';
 
 // How long a battle-drop hover stays on the field before auto-dismissing (kept in sync with the CSS
 // drop-toast animation duration). ~2.8s: long enough to read the loot, short enough not to stall the run.
@@ -51,7 +53,7 @@ export function BattleScreen() {
   const gameId: string | null = location.state?.gameId ?? null;
   const startLevel: number = location.state?.level ?? 50;
 
-  const { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, buyShopItem, leaveShop, respondAcquisition, chooseLead, respondSwitchIn, dismissDrop } = useBattleHub(gameId, startLevel);
+  const { state, chooseMove, chooseSwitch, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, buyShopItem, leaveShop, respondAcquisition, chooseLead, respondSwitchIn, dismissDrop } = useBattleHub(gameId, startLevel);
   const [controlView, setControlView] = useState<ControlView>('menu');
   // Encounter-map overlay: pinned open by the MAP button, and briefly auto-peeked at each ladder change.
   const [mapPinned, setMapPinned] = useState(false);
@@ -100,6 +102,25 @@ export function BattleScreen() {
     onAnyInput();
     useItem(itemId, targetMoveSlot, targetPartySlot);
     setControlView('menu');
+  };
+
+  const handleChooseSwitch = (index: number) => {
+    onAnyInput();
+    chooseSwitch(index);
+    setControlView('menu');
+  };
+
+  // FIGHT. Gen 1 shows no move list when nothing is selectable — it prints the "no moves left" beat and Struggles
+  // on the spot — so out of PP this spends the turn immediately instead of opening the submenu. Any move index
+  // resolves to Struggle server-side (SignalRInput) once no move is selectable, so slot 0 is as good as any.
+  // BAG and SWITCH are untouched by this: they stay reachable at 0 PP, and Struggle only ever follows a FIGHT.
+  const handleFight = () => {
+    if (!hasUsableMove(state.moves)) {
+      handleChooseMove(0);
+      return;
+    }
+    onAnyInput();
+    setControlView('fight');
   };
 
   // Fall back to estimated values until the first TurnStarted arrives
@@ -209,8 +230,10 @@ export function BattleScreen() {
             <ActionMenu
               playerName={playerName}
               canAct={state.phase === 'choosing' && !state.animating}
-              onFight={() => { onAnyInput(); setControlView('fight'); }}
+              canSwitch={state.canSwitch}
+              onFight={handleFight}
               onBag={() => { onAnyInput(); setControlView('bag'); }}
+              onSwitch={() => { onAnyInput(); setControlView('switch'); }}
               onCheck={() => { onAnyInput(); setControlView('check'); }}
               onBack={() => { onAnyInput(); nav('/'); }}
             />
@@ -230,6 +253,14 @@ export function BattleScreen() {
               moves={state.moves}
               party={state.party}
               onUse={handleUseItem}
+              onBack={() => setControlView('menu')}
+            />
+          )}
+          {controlView === 'switch' && (
+            <SwitchMenu
+              party={state.party}
+              canChoose={state.phase === 'choosing' && !state.animating && state.canSwitch}
+              onChoose={handleChooseSwitch}
               onBack={() => setControlView('menu')}
             />
           )}
@@ -654,16 +685,21 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function ActionMenu({ playerName, canAct, onFight, onBag, onCheck, onBack }: {
+function ActionMenu({ playerName, canAct, canSwitch, onFight, onBag, onSwitch, onCheck, onBack }: {
   playerName: string;
   canAct: boolean;
+  canSwitch: boolean;
   onFight: () => void;
   onBag: () => void;
+  onSwitch: () => void;
   onCheck: () => void;
   onBack: () => void;
 }) {
-  // FIGHT and BAG both spend the turn, so they're gated on it being the player's turn (canAct). CHECK
-  // POKEMON is read-only, so it's always available.
+  // FIGHT, BAG and SWITCH all spend the turn, so they're gated on it being the player's turn (canAct). SWITCH
+  // is additionally gated on canSwitch (server-computed: a party is wired, the active creature isn't locked-in or
+  // trapped, and a live benched member exists) so it greys out when a switch would be refused. CHECK POKEMON is
+  // read-only, so it's always available.
+  const canSwitchNow = canAct && canSwitch;
   return (
     <div className="action-menu">
       <p className="action-prompt">What will {playerName} do?</p>
@@ -682,11 +718,60 @@ function ActionMenu({ playerName, canAct, onFight, onBag, onCheck, onBack }: {
         >
           BAG
         </button>
+        <button
+          className={`action-btn ${!canSwitchNow ? 'action-btn--waiting' : ''}`}
+          onClick={onSwitch}
+          disabled={!canSwitchNow}
+          title={canAct && !canSwitch ? "Can't switch right now" : undefined}
+        >
+          SWITCH
+        </button>
         <button className="action-btn" onClick={onCheck}>
           CHECK POKEMON
         </button>
       </div>
       <button className="btn-ghost action-back" onClick={onBack}>← QUIT</button>
+    </div>
+  );
+}
+
+// The in-battle party picker (In-Combat Switching): the roster as selectable cards, reachable from the SWITCH
+// action button. Dismissable — BACK returns to the menu with no turn spent (unlike the forced SwitchInModal). The
+// active lead and any fainted member are greyed & disabled; picking a live benched member spends the turn to send
+// it in. Shares PartyCard with the between-biome LeadChoiceModal and the forced SwitchInModal.
+function SwitchMenu({ party, canChoose, onChoose, onBack }: {
+  party: PartyMember[];
+  canChoose: boolean;
+  onChoose: (index: number) => void;
+  onBack: () => void;
+}) {
+  return (
+    <div className="move-menu">
+      <p className="bag-pp-prompt">Switch to which creature?</p>
+      <div className="lead-grid">
+        {party.map((m, i) => {
+          const fainted = m.hp <= 0;
+          // Only a live, benched (non-lead) member is a valid switch target.
+          const disabled = !canChoose || fainted || m.isLead;
+          const note = m.isLead ? ' · OUT' : fainted ? ' · FNT' : undefined;
+          return (
+            <PartyCard
+              key={i}
+              member={m}
+              onClick={() => onChoose(i)}
+              disabled={disabled}
+              current={m.isLead}
+              // The active lead needs its own modifier, not just the aria flag: there's no `.lead-card:disabled`
+              // rule, so without it the card that's already out renders like a selectable bench card (and still
+              // lights on hover). Matches LeadChoiceModal.
+              modifier={m.isLead ? 'lead-card--current' : fainted ? 'lead-card--fainted' : undefined}
+              note={note}
+              title={m.isLead ? `${m.name} is already out` : fainted ? `${m.name} has fainted` : undefined}
+            />
+          );
+        })}
+      </div>
+      <button className="btn-ghost action-back" onClick={onBack}>← BACK</button>
     </div>
   );
 }
@@ -714,6 +799,8 @@ function MoveMenu({ moves, canChoose, onChoose, onBack }: {
   const slots = [...moves];
   while (slots.length < 4) slots.push({ name: '---', type: 'Normal', ppCurrent: 0, ppMax: 0 });
 
+  // No out-of-PP branch here on purpose: Gen 1 never shows a move list when nothing is selectable, so FIGHT
+  // spends the turn as Struggle before this menu ever opens (see handleFight / `hasUsableMove`).
   return (
     <div className="move-menu">
       <div className="move-grid">

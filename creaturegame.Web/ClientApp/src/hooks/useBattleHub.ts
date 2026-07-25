@@ -127,6 +127,17 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
       console.error('[SignalR] ChooseMove failed:', err));
   }, []);
 
+  // Voluntarily switch the active creature out this turn for the benched member at `index` (the in-battle SWITCH
+  // turn-action). Like chooseMove, switching IS the turn action, so mark the turn chosen (→ battling/animating,
+  // locks the menu) and fire the hub call. The engine validates the pick (in range / alive / not the active
+  // member / not trapped) and falls back to FIGHT on an illegal one; the resulting CreatureSwitchedIn +
+  // PartyUpdated events swap the sprite, retarget the nameplate, and refresh the roster panel.
+  const chooseSwitch = useCallback((index: number) => {
+    dispatch({ type: 'PLAYER_CHOSE' });
+    connRef.current?.invoke('ChooseSwitch', index).catch(err =>
+      console.error('[SignalR] ChooseSwitch failed:', err));
+  }, []);
+
   // Use a bag item this turn. Like chooseMove, using an item IS the turn action, so mark the turn chosen
   // (→ battling/animating, locks the menu) and fire the hub call. targetMoveSlot is the move slot (0–3) a
   // single-move PP restore refills; targetPartySlot is the party-member index a Revive targets (a fainted
@@ -232,5 +243,5 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
   // and calls this to auto-dismiss the toast after its on-screen beat.
   const dismissDrop = useCallback(() => dispatch({ type: 'HIDE_DROP' }), []);
 
-  return { state, chooseMove, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, buyShopItem, leaveShop, respondAcquisition, chooseLead, respondSwitchIn, dismissDrop };
+  return { state, chooseMove, chooseSwitch, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, buyShopItem, leaveShop, respondAcquisition, chooseLead, respondSwitchIn, dismissDrop };
 }

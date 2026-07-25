@@ -107,7 +107,7 @@ export interface ShopOfferItem {
 // View-state actions — consumed by the reducer in useBattleHub.
 export type Action =
   | { type: 'BATTLE_STARTED'; playerName: string; enemyName: string; enemySpeciesId: number; enemyLevel: number }
-  | { type: 'TURN_STARTED'; turnNumber: number; playerHp: number; playerMaxHp: number; playerStatus: string; playerXpThisLevel: number; playerXpToNextLevel: number; enemyHp: number; enemyMaxHp: number; enemyStatus: string; moves: MoveInfo[] }
+  | { type: 'TURN_STARTED'; turnNumber: number; playerHp: number; playerMaxHp: number; playerStatus: string; playerXpThisLevel: number; playerXpToNextLevel: number; enemyHp: number; enemyMaxHp: number; enemyStatus: string; moves: MoveInfo[]; canSwitch: boolean }
   | { type: 'TURN_ENDED' }
   | { type: 'PLAYER_CHOSE' }
   | { type: 'RUN_ENDED'; battlesWon: number; finalLevel: number }
@@ -386,6 +386,9 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
           enemyMaxHp: payload.enemyMaxHp as number,
           enemyStatus: payload.enemyStatus as string,
           moves: payload.moves as MoveInfo[],
+          // Whether a voluntary SWITCH is offered this turn (server-computed: party wired, not locked-in/trapped,
+          // a live benched target exists). Defaults false so a pre-Stage-C payload (or a non-party battle) hides it.
+          canSwitch: (payload.canSwitch as boolean | undefined) ?? false,
         })],
       };
 

@@ -94,12 +94,13 @@ Each entry: **Decision · Why · Where it lives.**
   **Run loop / event model → `GAME_LOOP.md`.**
 
 ### 2.4 Turn-action & input seams (`IBattleAction` + `IBattleInput`)
-- **Decision:** a turn is an `IBattleAction` (`Priority` + `ExecuteAsync`) — `AttackAction` (a move/Struggle)
-  and `ItemAction` (use a bag item), with switch / catch the future plug-ins. *What a combatant decides* is an
-  `IBattleInput`: `ChooseMoveAsync` picks a move, and the additive `ChooseTurnActionAsync` returns a
-  `TurnChoice` (FIGHT `MoveTurnChoice` / ITEM `ItemTurnChoice`). Its default just delegates to
-  `ChooseMoveAsync`, so `AutoSelectInput` / `RandomMoveInput` / the AI never need to know about items — only
-  the web's `SignalRInput` offers the bag.
+- **Decision:** a turn is an `IBattleAction` (`Priority` + `ExecuteAsync`) — `AttackAction` (a move/Struggle),
+  `ItemAction` (use a bag item), and `SwitchAction` (voluntary in-battle switch, `SwitchPriority = 7`, resolves
+  before any move or item regardless of speed), with catch the remaining future plug-in. *What a combatant
+  decides* is an `IBattleInput`: `ChooseMoveAsync` picks a move, and the additive `ChooseTurnActionAsync`
+  returns a `TurnChoice` (FIGHT `MoveTurnChoice` / ITEM `ItemTurnChoice` / SWITCH `SwitchTurnChoice`). Its
+  default just delegates to `ChooseMoveAsync`, so `AutoSelectInput` / `RandomMoveInput` / the AI never need to
+  know about items or switching — only the web's `SignalRInput` offers the bag/switch menu.
 - **Why:** decouples "what the combatant decides" from "how the turn executes," so new action types and new
   deciders drop in without touching `Battle`'s turn loop. The additive default-interface-method keeps every
   non-interactive input untouched when a player-only choice (item, recovery, evolution) is added.
