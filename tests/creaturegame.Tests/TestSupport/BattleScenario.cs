@@ -360,6 +360,7 @@ public sealed class BattleScenario
     private IBattleRules? _rules; // null → default rules sharing the run's seed (built in RunAsync)
     private int _seed;
     private int? _playerForgetSlot;
+    private int?[] _playerTurnPlan = []; // per free-choice turn: an index to SWITCH to, or null to FIGHT
     private bool _escapable = true; // wild battle by default; false = the Elite/Boss trainer analog
     private Party? _playerParty; // party-aware battle (forced switch-in + innate Exp-Share) when set
     private RunRules? _runRules; // roguelite run-tuning (XP curve, bench Exp-Share) when set
@@ -392,6 +393,15 @@ public sealed class BattleScenario
     public BattleScenario PlayerForgetsSlot(int? slot)
     {
         _playerForgetSlot = slot;
+        return this;
+    }
+
+    /// <summary>The player's whole-turn plan for the coming free-choice turns: a party index to voluntarily
+    /// SWITCH to, or null to FIGHT (drawing that turn's move from <see cref="PlayerUses"/>). Exhausted plan ⇒
+    /// every remaining turn is FIGHT, so an unset plan never switches. Requires a <see cref="Party"/>.</summary>
+    public BattleScenario PlayerTurnPlan(params int?[] plan)
+    {
+        _playerTurnPlan = plan;
         return this;
     }
 
@@ -448,7 +458,9 @@ public sealed class BattleScenario
             _player,
             _enemy,
             Gen1TypeChart.Instance,
-            new ScriptedInput(_playerScript).ForgetsSlot(_playerForgetSlot),
+            new ScriptedInput(_playerScript)
+                .ForgetsSlot(_playerForgetSlot)
+                .TurnPlan(_playerTurnPlan),
             new ScriptedInput(_enemyScript),
             rules: rules,
             emitter: emitter,

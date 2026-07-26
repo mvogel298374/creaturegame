@@ -8,6 +8,126 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Participation XP — a creature that fought earns a full share ✅ DONE (2026-07-27)
+
+**Shipped as the Gen 1 participation split.** `Battle` now tracks a per-battle participant set (`_participants`,
+written by the opening lead in `StartFightAsync` and by `BringInMember` — the shared tail of *both* the forced
+faint-switch and the voluntary SWITCH, so one write covers both). On a win the award is divided evenly among the
+**live** participants; a fainted participant earns nothing and is excluded from the divisor. New helpers
+`LiveParticipants()` / `PayOtherParticipantsAsync()` sit beside the reworked `ShareExperienceWithBenchAsync()`,
+which now skips participants and pays only never-deployed living members.
+
+**The division itself is on the generation seam** — `IBattleRules.SplitXpAmongParticipants(award, liveCount)`,
+implemented by `Gen1BattleRules` as `floor(award / liveCount)`. `Battle` only decides *who* participated (which is
+gen-invariant); *whether and how* the award divides is generation-variable, so it belongs behind the seam. Added
+after `requirements-review` raised the placement (user's call, 2026-07-27), rather than left as inline arithmetic.
+Pinned by `ExperienceAndLevelingTests.Gen1XpFormula_DividesTheAwardAmongLiveParticipants`.
+
+**The four forks, as settled in `/plan` (2026-07-27):**
+1. **Even split among live participants** (Gen 1-faithful) — *not* a full award each. `fullAward / N`.
+2. **The run XP curve is keyed once on the finisher's level**; the scaled award is then split, so every
+   participant earns the identical number.
+3. **The bench share formula is untouched** — still `floor(fullAward × BenchXpShare)`, off the full award.
+4. **Surfacing:** `ExperienceGained` gained an `OnBench` flag. A switched-out participant's award is logged but
+   does **not** move the on-field XP bar (`timeline.ts` gates `XP_GAIN` on it — the manual TS leg of the
+   web-event field-projection gap). A never-deployed member's share stays silent until it levels, as before.
+
+> ⚠️ **Known limitation, deliberately shipped as-is (user-decided 2026-07-27).** Decisions 1 + 3 take their
+> figures from different bases, so a creature that **never took the field** can out-earn one that fought:
+>
+> | Difficulty | Participant (of a 100 award, 2 live participants) | Bench (never fought) |
+> |:--|--:|--:|
+> | Easy (0.75) | 50 | **75** ← bench earns more |
+> | Normal (0.5) | 50 | **50** ← identical |
+> | Hard (0.25) | 50 | 25 |
+>
+> Re-basing the bench share off the split share was proposed and **declined** — the bench formula stays as it is.
+> Pinned by `PartyExpShareTests.BenchShareIsTakenOffTheFullAward_SoANonParticipantCanOutEarnAParticipant` so the
+> inversion is a decision on the record, not a regression someone "fixes" by accident. **Do not re-file this as a
+> bug.** If it is ever revisited, the fix is one line at the share site.
+
+**Edge closed at the `pr-review` gate — the mutual KO.** The enemy-faint check runs *before* the player-faint
+branch, so a finisher that dies on the same turn it wins (Self-Destruct/Explosion, Struggle recoil, or end-of-turn
+Burn/Poison/Leech — all resolved earlier in the turn) reaches the award site **already fainted**. The first cut
+re-admitted it via `LiveParticipants()`'s fallback insert and paid it at the award site unconditionally, so a
+fainted creature was counted in the divisor and paid a share — contradicting this feature's own rule — and its
+`ExperienceGained` went out with `OnBench: false`, filling the XP bar of a creature that had just fainted. Both
+sites are now gated on `IsAlive()`: the fainted finisher earns nothing, the award goes undivided to whoever fought
+and survived, and `liveParticipants` may legitimately be `0` (documented on the seam). Masked in the shipped web
+run — `BattleRunEvent` ends the run as a loss whenever the finisher is dead, discarding the XP — but live for
+direct `Battle` callers and the endless chain. Pinned by
+`PartyExpShareTests.MutualKo_FaintedFinisherEarnsNothingAndIsExcludedFromTheDivisor`.
+
+**Why participation is tracked on `Battle`, not `Creature.BattleState`** (the sketch below proposed the latter):
+`ResetBattleState()` only ever reaches the *active* creature and the enemy (`StartFightAsync`) or an incoming
+member (`BringInMember`) — a creature sitting on the bench is **never** reset, so a per-creature flag set in
+battle 1 would still read true in battle 2 and silently pay a participant's share to a creature that never took
+the field. A `Battle`-owned set is battle-scoped by construction (`BattleRunEvent` builds a fresh `Battle` per
+encounter). Guarded by `PartyExpShareTests.ParticipationDoesNotLeakIntoTheNextBattle`.
+
+**A wrong Gen-history comment was corrected on the way through.** `IBattleRules.CalculateXpAwarded`'s XML doc read
+*"Gen 5+: additionally divides the gain by the number of participants"* — backwards. The participant divisor `s`
+("the number of Pokémon that participated in the battle and have not fainted", Bulbapedia → *Experience*) is
+present **from Gen 1**, holds through Gen 5, and was **removed in Gen 6**. That stale comment caused
+`requirements-review` to report the whole feature as built on an inverted premise — i.e. it argued the even split
+was a Gen 5+ mechanic and that "full award each" was the Gen-1-faithful reading. Verified against Bulbapedia and
+corrected in `IBattleRules`, `GENERATION_SEAMS.md` (the gen-differences table) and here. **Don't restore the old
+wording** — it will re-trigger the same false finding.
+
+Docs updated: `STATE_MODEL.md` (the party-wide end-of-battle invariants — now a citable fact, not a plan claim),
+`GENERATION_SEAMS.md` (the new seam row + the innate-share paragraph), and the `RunRules.BenchXpShare` doc comment.
+
+<details><summary>Original write-up (raised 2026-07-26)</summary>
+
+**The requirement, in the user's words:** *"a pokemon that was actively involved in a battle should receive equal
+xp to any other active pokemon."*
+
+This is the same principle as `TODO.md` → **Switched-in creature is the active creature**, applied to the creature
+that switched *out*: taking the field is what makes you a participant, and participants are not ranked by who
+happened to be standing there when the enemy fainted.
+
+**Today's behaviour (the defect).** `Battle.ShareExperienceWithBenchAsync(activeAward)` pays whoever is
+`PlayerCreature` at battle end the **full** award (at the award site), and every *other* living member — including
+one that fought most of the battle and was switched out — the flat `floor(activeAward × RunRules.BenchXpShare)`.
+Participation is never recorded, so the engine currently cannot tell a creature that fought from one that sat on
+the bench all battle. At the shipped web difficulties (`BenchXpShare` 0.75 / 0.5 / 0.25) a switched-out
+participant loses 25–75% of its award purely for having been switched.
+
+**Target behaviour.** Every creature that took the field during the battle earns a full participant share; a
+creature that never entered keeps the innate bench share. Fainted members still earn nothing (Gen 1).
+
+**⚠️ Open design question — needs `/plan` before implementation.** "Equal to any other active creature" has two
+readings, and they move the numbers in opposite directions:
+- **(a) Each participant gets the full award** (roguelite-generous, matches the wording most directly). Nobody is
+  worse off than today; a 2-participant battle pays out more in total than a 1-participant one.
+- **(b) The award is split evenly among participants** (Gen 1-faithful — the cartridge divides XP between every
+  Pokémon that was sent out). Equal, but it *reduces* what the finisher earns today, so it's a nerf to the
+  current single-creature run and interacts with the level-aware XP curve + trainer bonus.
+
+Given the repo's "Gen 1 accuracy before extending" principle vs. the fact that the innate party share is already
+a deliberate roguelite divergence (wider and more generous than the literal participant split), this is a genuine
+fork the user should settle in `/plan`. **Do not pick one while implementing.**
+
+**Implementation sketch (once the fork is settled).**
+- **Participation flag.** A transient per-battle `bool` on `Creature.BattleState` (see `STATE_MODEL.md` — it is
+  battle-scoped state, cleared with the rest), set wherever a creature takes the field: the battle-start lead and
+  `Battle.BringInMember` (the shared tail of *both* switch paths, so forced and voluntary are covered by one
+  write). Must survive being switched out — it records "fought", not "is out".
+- **Award site.** `ShareExperienceWithBenchAsync` splits its loop three ways instead of two: participants (full
+  or split share per the fork), living non-participants (`BenchXpShare`), fainted (nothing). The active creature
+  is still paid at the award site — keep the "paid once" invariant explicit, it is the easy double-pay bug here.
+- **Stat-Exp.** Already granted in full to every living member and deliberately not fractionalised — leave it be;
+  this change is about the XP award only.
+- **Seam check.** Lives in `RunRules`, not `IBattleRules` — participation-vs-bench payout is roguelite tuning, not
+  a generation-variable rule. Run the `GENERATION_SEAMS.md` §5.0 checklist as part of the work.
+- **Tests.** A switched-out participant earns the same as the finisher; a never-deployed bench member still earns
+  only the bench share; a fainted participant earns nothing; the finisher isn't paid twice. `RunRules` with
+  `BenchXpShare = 0` still pays participants (the flag, not the share, gates it).
+
+</details>
+
+---
+
 ## Other between-encounter modal E2Es ✅ DONE (2026-07-26)
 
 Closed the last E2E gap in *Browser-Based UI Testing* (`TODO.md`): the between-encounter blocking modals other
@@ -667,11 +787,11 @@ was then swapped out *while still alive* earns only the flat `BenchXpShare` — 
 never entered — rather than a participation-weighted share. **In-Combat Switching** treated that as a decision
 already made here, not a bug to re-open.
 
-> **Superseded 2026-07-26.** With voluntary switching actually shipped, the user reversed it: *"a pokemon that
-> was actively involved in a battle should receive equal xp to any other active pokemon."* The behaviour above is
-> still what the code does — it is now a **known defect**, not an intended divergence. → `TODO.md` →
-> **Participation XP — a creature that fought earns a full share** (open; needs `/plan` to settle full-award-each
-> vs. the Gen 1 even split before implementation).
+> **Superseded 2026-07-26, resolved 2026-07-27.** With voluntary switching actually shipped, the user reversed it:
+> *"a pokemon that was actively involved in a battle should receive equal xp to any other active pokemon."* The
+> behaviour above was a known defect, not an intended divergence, until the Gen 1 participation split fixed it —
+> the award now divides evenly among live participants, and `BenchXpShare` pays only never-deployed members. See
+> **Participation XP — a creature that fought earns a full share**, above.
 
 **Docs:** the deviation is written into `docs/GENERATION_SEAMS.md` (alongside the XP-curve deviation) and the
 party-wide XP/evolution invariant into `docs/STATE_MODEL.md` (the party-wide end-of-battle effects section) as a

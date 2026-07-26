@@ -16,18 +16,26 @@ creature), **Revive Items** (in-battle party revive, Boss-reward + rare-shop onl
 (the voluntary, any-turn SWITCH turn-action) are all done and archived (→ `TODO_ARCHIVE.md`).
 
 **Next up, in priority order:**
-1. **Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by the acquisition channels.
+1. **Mutual KO ends the run even with a live bench** — a real defect raised by `pr-review` 2026-07-27: a
+   trade-kill loses the whole run while healthy creatures sit on the bench, contradicting the "run ends only
+   when the whole party is down" rule. **Needs `/plan`** (win vs. draw vs. keep-as-intentional). See its
+   section below.
+2. **Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by the acquisition channels.
    *(Item acquisition itself is already done via the Run Economy; bag persistence + catch remain.)*
-2. **Game Loop & Progression** — save layer (`save.db`); party + between-biome lead + forced-switch are done.
+3. **Game Loop & Progression** — save layer (`save.db`); party + between-biome lead + forced-switch are done.
+
+*(Also open, small and cosmetic: **party strip shows a stale level for the on-field creature** — found
+2026-07-27, own section below.)*
 
 *(**In-Combat Switching** — the voluntary, any-turn SWITCH turn-action — is **✅ COMPLETE (2026-07-25)**, all three
 stages (engine core / wire / frontend) shipped, including the out-of-PP menu affordance (BAG/SWITCH reachable at
 0 PP; Struggle only on a FIGHT choice). Full record archived in `TODO_ARCHIVE.md`.)*
 
-*(Raised by shipping it: **Participation XP — a creature that fought earns a full share** (2026-07-26) is now
-open — a creature switched out mid-battle is paid the flat bench share instead of a participant's. **Needs
-`/plan` first**: "equal XP" can mean a full award each (roguelite) or the Gen 1 even split among participants,
-and the two move the numbers opposite ways. See its section below.)*
+*(**Participation XP** — raised 2026-07-26 by shipping In-Combat Switching — is **✅ COMPLETE (2026-07-27)**:
+the win's XP is now split evenly among the live creatures that took the field, so a creature switched out
+mid-battle is no longer paid the flat bench share. The `/plan` fork was settled in favour of the Gen 1 even
+split; the resulting bench-share inversion is a user-accepted limitation, not open work. Full record in
+`TODO_ARCHIVE.md` → *Participation XP*.)*
 
 *(Small residual, not urgent: **sweep other end-of-battle effects that assume the starting lead** — see
 [**Switched-in creature is the active creature**](#switched-in-creature-is-the-active-creature--resolved) below.)*
@@ -334,12 +342,13 @@ domain check instead of inviting it. Two specific traps to recognise again:
   **At the time this closed (2026-07-18), no live conflict** with the requirement above: voluntary switching
   wasn't implemented yet, and a forced switch always leaves the outgoing lead fainted (excluded from any share
   anyway), so the only "switched-in" case then was simply the active creature, paid in full, same as before this
-  change. **Now that In-Combat Switching has shipped (2026-07-25),** a creature switched out mid-battle while
-  still alive earns only the flat `BenchXpShare`. That was an intended divergence when it was decided — but the
-  case it was decided *about* couldn't happen yet, and **the user reversed it on 2026-07-26** now that it can:
-  a participant must not be paid less than the creature that happened to finish the fight. → see
-  **Participation XP — a creature that fought earns a full share** below. Full write-up of the share itself →
-  `TODO_ARCHIVE.md` → *Innate Party XP Share*. *(The **Exp. Share / Exp. All item** — a held item that pays a
+  change. **Once In-Combat Switching shipped (2026-07-25),** a creature switched out mid-battle while still alive
+  earned only the flat `BenchXpShare` — an intended divergence when decided, but the case it was decided *about*
+  couldn't happen yet. **The user reversed it on 2026-07-26** now that it can: a participant must not be paid
+  less than the creature that happened to finish the fight. **Resolved 2026-07-27** by the Gen 1 participation
+  split — the award is divided evenly among the live creatures that took the field, and `BenchXpShare` now pays
+  only members that never fought. Full record → `TODO_ARCHIVE.md` → *Participation XP* (and *Innate Party XP
+  Share* for the share itself). *(The **Exp. Share / Exp. All item** — a held item that pays a
   non-participant — stays deferred; it's a separate feature from this innate, always-on party share.)*
 - [x] The invariant is now written into `docs/STATE_MODEL.md` (the party-wide end-of-battle effects section) as a
   documented fact, not a plan claim — future `requirements-review` runs can cite it directly.
@@ -348,55 +357,6 @@ domain check instead of inviting it. Two specific traps to recognise again:
   loop, and carried status already reads `s.Player` (the finisher) — but nothing has specifically audited the
   *rest* of the post-battle path for a stray `player`/`levelBefore` reference. Small, cheap, not urgent; no known
   instance today.
-
----
-
-## Participation XP — a creature that fought earns a full share  ⟵ OPEN (raised 2026-07-26)
-
-**The requirement, in the user's words:** *"a pokemon that was actively involved in a battle should receive equal
-xp to any other active pokemon."*
-
-This is the same principle as **Switched-in creature is the active creature** above, applied to the creature that
-switched *out*: taking the field is what makes you a participant, and participants are not ranked by who happened
-to be standing there when the enemy fainted.
-
-**Today's behaviour (the defect).** `Battle.ShareExperienceWithBenchAsync(activeAward)` pays whoever is
-`PlayerCreature` at battle end the **full** award (at the award site), and every *other* living member — including
-one that fought most of the battle and was switched out — the flat `floor(activeAward × RunRules.BenchXpShare)`.
-Participation is never recorded, so the engine currently cannot tell a creature that fought from one that sat on
-the bench all battle. At the shipped web difficulties (`BenchXpShare` 0.75 / 0.5 / 0.25) a switched-out
-participant loses 25–75% of its award purely for having been switched.
-
-**Target behaviour.** Every creature that took the field during the battle earns a full participant share; a
-creature that never entered keeps the innate bench share. Fainted members still earn nothing (Gen 1).
-
-**⚠️ Open design question — needs `/plan` before implementation.** "Equal to any other active creature" has two
-readings, and they move the numbers in opposite directions:
-- **(a) Each participant gets the full award** (roguelite-generous, matches the wording most directly). Nobody is
-  worse off than today; a 2-participant battle pays out more in total than a 1-participant one.
-- **(b) The award is split evenly among participants** (Gen 1-faithful — the cartridge divides XP between every
-  Pokémon that was sent out). Equal, but it *reduces* what the finisher earns today, so it's a nerf to the
-  current single-creature run and interacts with the level-aware XP curve + trainer bonus.
-
-Given the repo's "Gen 1 accuracy before extending" principle vs. the fact that the innate party share is already
-a deliberate roguelite divergence (wider and more generous than the literal participant split), this is a genuine
-fork the user should settle in `/plan`. **Do not pick one while implementing.**
-
-**Implementation sketch (once the fork is settled).**
-- **Participation flag.** A transient per-battle `bool` on `Creature.BattleState` (see `STATE_MODEL.md` — it is
-  battle-scoped state, cleared with the rest), set wherever a creature takes the field: the battle-start lead and
-  `Battle.BringInMember` (the shared tail of *both* switch paths, so forced and voluntary are covered by one
-  write). Must survive being switched out — it records "fought", not "is out".
-- **Award site.** `ShareExperienceWithBenchAsync` splits its loop three ways instead of two: participants (full
-  or split share per the fork), living non-participants (`BenchXpShare`), fainted (nothing). The active creature
-  is still paid at the award site — keep the "paid once" invariant explicit, it is the easy double-pay bug here.
-- **Stat-Exp.** Already granted in full to every living member and deliberately not fractionalised — leave it be;
-  this change is about the XP award only.
-- **Seam check.** Lives in `RunRules`, not `IBattleRules` — participation-vs-bench payout is roguelite tuning, not
-  a generation-variable rule. Run the `GENERATION_SEAMS.md` §5.0 checklist as part of the work.
-- **Tests.** A switched-out participant earns the same as the finisher; a never-deployed bench member still earns
-  only the bench share; a fainted participant earns nothing; the finisher isn't paid twice. `RunRules` with
-  `BenchXpShare = 0` still pays participants (the flag, not the share, gates it).
 
 ---
 
@@ -445,6 +405,52 @@ Encounter Logic gate:
 - [ ] Unlocks the dormant **stone evolutions** (`Stone` trigger + `IEvolutionRules.StoneUsed` are built and
   waiting on a bag).
 - [ ] Phaser throw / shake / catch animation.
+
+---
+
+## Mutual KO ends the run even with a live bench  ⟵ OPEN (found 2026-07-27, `pr-review`)
+
+**The defect.** When the active creature and the enemy faint on the same turn — Self-Destruct/Explosion,
+Struggle recoil, or end-of-turn Burn/Poison/Leech — the battle is a **win** (the enemy-faint check runs first,
+`Battle.cs`), but `BattleRunEvent` reads the post-battle `s.Player`, finds it dead, and **ends the run as a
+loss**. That contradicts the rule Encounter Logic Phase 4 Stage 3 established and that the forced faint-switch
+exists to enforce: *the run ends only when the **whole party** is down*. A player with five healthy creatures on
+the bench loses the run because their lead traded itself for the kill.
+
+Distinct from the forced faint-switch, which only fires while the **enemy is still alive**: here there is no
+enemy left to send anyone in against, so the switch path is correctly skipped — the bug is purely in what the
+run loop then concludes. Compare the already-settled `Runner_DoubleFaintFromEndOfTurnPoison_CountsAsLoss_NotAWin`
+pin, which encoded "double faint = loss" back when a run was a **single** creature; that premise is now stale
+for a party run and this is the same rule outliving the world it was written for.
+
+**Needs a domain call (`/plan`) before implementation** — it's a genuine fork:
+- **(a)** A mutual KO is a **win**: bank the reward/XP, then run the normal between-encounter flow, with the
+  next lead chosen from the survivors (the whole-party-down rule taken literally).
+- **(b)** A mutual KO is a **draw/loss for the encounter** but not the run: no reward, but the run continues
+  with a surviving member.
+- **(c)** Keep today's behaviour and make it *intentional* — but then the Stage 3 rule needs rewording, and the
+  fainted-participant XP work (2026-07-27) that made this visible stays dead code on this path.
+
+**Also revisit alongside it:** the participation split already handles the engine half correctly — a fainted
+finisher earns nothing and is excluded from the divisor, so a live switched-out participant takes the whole
+award (`PartyExpShareTests.MutualKo_FaintedFinisherEarnsNothingAndIsExcludedFromTheDivisor`). That XP is
+currently **discarded** by the run ending, which is exactly why the bug was invisible until now.
+
+---
+
+## Party strip shows a stale level for the on-field creature  ⟵ OPEN (found 2026-07-27, `pr-review`)
+
+**The defect.** The party panel is fed **only** by `PartyUpdated` snapshots (plus the connect-time `/party`
+hydrate), and `Battle` emits that snapshot after a win only when an **off-field** creature levelled. So when the
+*active* creature levels up and nobody else does, its row in the party strip keeps the old level until some
+later party-carrying event happens to refresh it. The nameplate/HUD are correct — they're driven by `LeveledUp`
+directly — so the inconsistency is strip-vs-nameplate, visible side by side.
+
+Pre-existing (it predates the participation split, which only hoisted the emit), cosmetic, and self-corrects at
+the next snapshot. *Fix:* also push a `PartyUpdated` when the on-field creature levelled — cheapest is to fold
+the active creature's `RunLevelUpLoopAsync` result into the same `offFieldLevelled` flag at the award site in
+`Battle.cs` and rename it. Needs a Vitest/engine case pinning that a lone active-creature level-up still emits
+a snapshot.
 
 ---
 

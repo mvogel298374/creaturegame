@@ -794,13 +794,17 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
     }
 
     case 'ExperienceGained': {
-      const cName  = payload.creatureName as string;
-      const amount = payload.amount as number;
+      const cName   = payload.creatureName as string;
+      const amount  = payload.amount as number;
+      // A participant that fought and was switched back out earns the same share as the finisher, but it is
+      // NOT the creature on the field — log its gain, and leave the on-field XP bar alone. Only the active
+      // creature drives that bar (mirrors LeveledUp.onBench).
+      const onBench = payload.onBench as boolean;
       // Fill the bar by the award, capped at the current level's max. If it tops out, the level-up
       // events that follow handle the reset + refill into the next level.
       return { steps: [
         d(log(`${cName} gained ${amount} EXP. Points!`)),
-        d({ type: 'XP_GAIN', amount }),
+        ...(onBench ? [] : [d({ type: 'XP_GAIN' as const, amount })]),
         w(800),
       ] };
     }

@@ -80,7 +80,8 @@ Things that genuinely differ generation to generation, each a member on the inte
 | **Freeze** | permanent until hit by a damaging Fire move that can burn | 20%/turn random thaw; any Fire move thaws |
 | **Burn/Poison damage** | 1/16 max HP per turn | 1/8 in Gen 6+ |
 | **Special stat** | one combined **Special** stat for both offense and defense | split into Sp. Atk / Sp. Def (Gen 2) |
-| **XP on faint** | wild `floor(baseExp × level / 7)`; **trainer-owned ×1.5** (Gen 1 already split wild vs trainer) | Gen 5+ divides among participants; the trainer ×1.5 persists |
+| **XP on faint** | wild `floor(baseExp × level / 7)`; **trainer-owned ×1.5** (Gen 1 already split wild vs trainer) | the trainer ×1.5 persists |
+| **XP participant divisor** | the award is divided among the Pokémon sent out that have **not** fainted (the formula's `s`) — `IBattleRules.SplitXpAmongParticipants` | same through Gen 5; **Gen 6 removed it** — every participant earns the full award, so a Gen 6 impl returns the award unchanged |
 
 > **Roguelite XP curve (not a seam change).** The Gen-1 *wild* formula above is preserved verbatim in
 > `Gen1BattleRules.CalculateXpAwarded`. On top of it, the run layer applies a **level-aware XP multiplier** —
@@ -113,20 +114,29 @@ Things that genuinely differ generation to generation, each a member on the inte
 > the 0.8–1.5-levels target. That's the intended "beefier boss reward" and part of the provisional tuning.
 
 > **Innate party XP share (not a seam change).** A second roguelite dial on the same `RunRules` bag:
-> `RunRules.BenchXpShare`. After a win the active creature is paid its full award (the Gen-1 seam result × the
-> XP-curve multiplier above, unchanged), then **every living bench member additionally earns `floor(activeAward ×
-> BenchXpShare)` XP + the defeated foe's full Stat-Exp**, and runs the same level-up / move-learn loop; fainted
-> members earn nothing. This keeps a drafted roster swappable between biomes. It is **not** the Gen-1 participant
-> split (which divides one pool among only the creatures sent out) — it is a wider, always-on Exp-All-style grant,
-> a deliberate roguelite deviation, so it lives in **`RunRules`** and never touches `IBattleRules`. Property
-> default `0.0` (off — so `RunRules.Default`, every test, and any party-less `Battle` stay a pure no-op); the web
-> run picks one of three presets in `GameSessionManager.RunTuningByDifficulty` (Easy `0.75` / **Normal `0.5`** /
-> Hard `0.25`) per the player's Easy/Normal/Hard difficulty choice at run-start, beside the matching XP-curve
-> anchors. It only fires when a party is threaded into `Battle`. Note the share is taken off the *curve-scaled* `activeAward` (the multiplier compounds
-> into it), so a low-level bench member can jump several levels off one late-run win — an intended, generous
-> catch-up for underleveled drafts (user-confirmed keep-as-is, not the tamer pre-curve base-XP option). Fainted
-> exclusion is by current HP (`IsAlive()`), so an unhealed KO'd member is skipped too. Provisional, retune by
-> playtest. Covered by `PartyExpShareTests` (incl. a both-dials curve × share case).
+> `RunRules.BenchXpShare`. The win award itself now follows the **Gen-1 participant split** (2026-07-27): every
+> creature that took the field this battle and is still alive splits `fullAward` evenly (the Gen-1 seam result ×
+> the XP-curve multiplier above, keyed once on the finisher's level, then divided) — a fainted participant earns
+> nothing and is excluded from the divisor. On top of that, `BenchXpShare` pays **every living member that never
+> took the field** an additional `floor(fullAward × BenchXpShare)` XP + the defeated foe's full Stat-Exp, and runs
+> the same level-up / move-learn loop; fainted members earn nothing. This keeps a drafted roster swappable between
+> biomes. The two halves sit on **opposite sides of the seam boundary, deliberately**: the participant split *is*
+> Gen-1-faithful **and generation-variable** (Gen 6 dropped it), so the division itself lives on the seam as
+> `IBattleRules.SplitXpAmongParticipants` — `Battle` only decides *who* participated, which is gen-invariant. The
+> bench layer on top is **not** Gen-1 at all (the cartridge never pays a creature that wasn't sent out) — it is a
+> wider, always-on Exp-All-style grant, a deliberate roguelite deviation, so it lives in **`RunRules`** and never
+> touches `IBattleRules`. Property default `0.0` (off — so
+> `RunRules.Default`, every test, and any party-less `Battle` stay a pure no-op); the web run picks one of three
+> presets in `GameSessionManager.RunTuningByDifficulty` (Easy `0.75` / **Normal `0.5`** / Hard `0.25`) per the
+> player's Easy/Normal/Hard difficulty choice at run-start, beside the matching XP-curve anchors. It only fires
+> when a party is threaded into `Battle`. Note the bench share is taken off the *curve-scaled* `fullAward` (the
+> multiplier compounds into it) while the participant split of that same award is divided among participants — so
+> at Normal/Easy a never-deployed bench member can earn the **same or more** than a creature that fought (a known,
+> user-accepted limitation, not a bug — see `docs/TODO_ARCHIVE.md` → *Participation XP*). The bench share still
+> lets a low-level bench member jump several levels off one late-run win — an intended, generous catch-up for
+> underleveled drafts (user-confirmed keep-as-is, not the tamer pre-curve base-XP option). Fainted exclusion is by
+> current HP (`IsAlive()`), so an unhealed KO'd member is skipped too. Provisional, retune by playtest. Covered by
+> `PartyExpShareTests` (incl. a both-dials curve × share case).
 
 The Special-stat split is a good illustration of the seam doing its job. Rather than the
 damage formula knowing about generations, `IBattleRules` exposes **`GetOffensiveStat`**

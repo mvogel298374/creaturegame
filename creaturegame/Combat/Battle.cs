@@ -28,6 +28,15 @@ public class Battle
     // the battle; null keeps the legacy single-creature behaviour (a faint ends the battle), so every direct
     // Battle caller (tests, the endless chain) is unchanged.
     private readonly Party? _playerParty;
+
+    // Every creature that took the field this battle — the Gen 1 "participant" set that a win's Exp is divided
+    // among. Battle-scoped BY CONSTRUCTION: BattleRunEvent builds a fresh Battle per encounter, so participation
+    // cannot leak between battles the way a flag on Creature.BattleState would — ResetBattleState() only ever
+    // reaches the ACTIVE creature and the enemy (StartFightAsync) or an incoming member (BringInMember), never a
+    // creature sitting on the bench, so a benched creature's flag would still read true in the next battle.
+    // Reference identity (Creature overrides neither Equals nor GetHashCode) — same as BattleRunEvent's preLevel.
+    private readonly HashSet<Creature> _participants = new();
+
     private int _turnNumber;
 
     /// <summary>
@@ -86,6 +95,11 @@ public class Battle
     {
         PlayerCreature.ResetBattleState();
         EnemyCreature.ResetBattleState();
+
+        // The opening lead takes the field, so it's a participant in this battle's Exp split (BringInMember
+        // records every later switch-in). With no party wired this stays a set of one, so the split below is a
+        // 1-way division = the full award — every direct single-creature Battle caller is unchanged.
+        _participants.Add(PlayerCreature);
 
         // A player carried over from a previous encounter in an endless run keeps its major status — Gen 1
         // persists status out of battle, but the per-battle reset above just cleared it, so re-apply.
@@ -252,39 +266,64 @@ public class Battle
                             0,
                             (int)Math.Round(baseXp * xpMult, MidpointRounding.AwayFromZero)
                         );
-                PlayerCreature.AddExperience(xp);
-                _emitter?.Emit(new ExperienceGained(PlayerCreature.Name, xp));
-                // Gen 1 Stat Exp: the win adds the defeated foe's base stats to the player's accumulated Stat
-                // Exp (capped per stat by the calculator). It's silent (no event) and only realizes into
-                // actual stats on the next CalculateStats — so award it BEFORE the level-up loop below, so a
-                // level gained this battle already reflects the new training.
-                // KNOWN DEFECT (TODO.md → "Switched-in creature is the active creature"): only the FINISHER is
-                // awarded here. Gen 1 divides Exp and Stat Exp among every creature that was SENT OUT and has not
-                // fainted, so this is right only by coincidence — a forced switch leaves the survivor as the sole
-                // eligible participant anyway. It will diverge as soon as voluntary switching lands with both
-                // creatures alive. Needs a per-battle participant set; do NOT read the old "only the lead earns
-                // XP / no Exp Share" note as intent — that pin was wrong and the user corrected it (2026-07-15).
-                PlayerCreature.GainStatExp(EnemyCreature);
-                // Move learning below mutates the PERMANENT MoveSet. If the player Transformed/Mimicked this
-                // battle, MoveSet currently holds the copied moveset and the end-of-battle restore would
-                // discard any learn — so revert the player's copied identity first. Learning (and the
-                // level-up's stat recompute) then act on the real moveset/stats. The restore is idempotent,
-                // so the unconditional one after the loop stays correct for the player-fainted/other paths.
-                PlayerCreature.RestoreMimickedMove();
-                PlayerCreature.RestoreOriginalIdentity();
-                // Drive level-ups one at a time so each event carries that level's resulting stats, the
-                // per-stat gains, and bar parameters (also the seam the deferred move-learning will use).
-                await RunLevelUpLoopAsync(PlayerCreature, onBench: false);
+                // Gen 1 participation split: the award is divided evenly among every creature that took the
+                // field this battle and is still standing — taking the field is what makes you a participant,
+                // and participants are not ranked by who happened to be there when the enemy fainted. A fainted
+                // participant earns nothing AND is excluded from the divisor, so a forced faint-switch is never
+                // penalised: the survivor is then the only live participant and takes the whole award, exactly
+                // as before this split existed. The split only bites when two creatures are alive at the end,
+                // i.e. after a voluntary SWITCH. The division itself is GEN-VARIABLE (Gen 6 dropped it, paying
+                // every participant in full), so it lives on the seam — Battle only decides WHO participated.
+                var participants = LiveParticipants();
+                int participantShare = _rules.SplitXpAmongParticipants(xp, participants.Count);
 
-                // Innate party Exp-Share (roguelite Exp-All, RunRules.BenchXpShare): after the active creature is
-                // paid in full above, every LIVING bench member earns a fraction of that same award + the full
-                // Stat-Exp, so a drafted roster keeps pace and stays swappable. Fainted members are excluded (a
-                // fainted participant earns nothing, per Gen 1). Deliberately a roguelite deviation from Gen 1's
-                // participant split — kept out of the seam; scales the seam's result only. Never fires for a direct
-                // single-creature Battle (no party threaded) or when the share is 0. Each bench level-up surfaces
-                // an attributed LeveledUp + move-learn prompt (same events/name as the active), so the player sees
-                // which creature levelled; bench XP itself is silent (no per-member log line) until it does.
-                await ShareExperienceWithBenchAsync(xp);
+                // Paid ONLY if it is still standing. A mutual KO (Self-Destruct, Struggle recoil, end-of-turn
+                // Burn/Poison/Leech — all resolved above, before this enemy-faint check) lands here with a
+                // fainted finisher, and a fainted participant earns nothing: the award then goes undivided to
+                // whichever creature fought and survived, or to nobody at all.
+                if (PlayerCreature.IsAlive())
+                {
+                    PlayerCreature.AddExperience(participantShare);
+                    _emitter?.Emit(new ExperienceGained(PlayerCreature.Name, participantShare));
+                    // Gen 1 Stat Exp: the win adds the defeated foe's base stats to the player's accumulated Stat
+                    // Exp (capped per stat by the calculator). It's silent (no event) and only realizes into
+                    // actual stats on the next CalculateStats — so award it BEFORE the level-up loop below, so a
+                    // level gained this battle already reflects the new training. Deliberately NOT fractionalised
+                    // by the participant split: every living member trains off a win in full (see the bench share).
+                    PlayerCreature.GainStatExp(EnemyCreature);
+                    // Move learning below mutates the PERMANENT MoveSet. If the player Transformed/Mimicked this
+                    // battle, MoveSet currently holds the copied moveset and the end-of-battle restore would
+                    // discard any learn — so revert the player's copied identity first. Learning (and the
+                    // level-up's stat recompute) then act on the real moveset/stats. The restore is idempotent,
+                    // so the unconditional one after the loop stays correct for the player-fainted/other paths.
+                    PlayerCreature.RestoreMimickedMove();
+                    PlayerCreature.RestoreOriginalIdentity();
+                    // Drive level-ups one at a time so each event carries that level's resulting stats, the
+                    // per-stat gains, and bar parameters (also the seam the deferred move-learning will use).
+                    await RunLevelUpLoopAsync(PlayerCreature, onBench: false);
+                }
+
+                // The OTHER live participants — creatures that fought and were switched back out — each earn the
+                // same share as the creature that finished the fight.
+                bool offFieldLevelled = await PayOtherParticipantsAsync(
+                    participants,
+                    participantShare
+                );
+
+                // Innate party Exp-Share (roguelite Exp-All, RunRules.BenchXpShare): every LIVING member that
+                // never took the field earns a fraction of the FULL award + the full Stat-Exp, so a drafted
+                // roster keeps pace and stays swappable. Fainted members are excluded (a fainted participant
+                // earns nothing, per Gen 1). Deliberately a roguelite deviation from Gen 1's participant split —
+                // kept out of the seam; scales the seam's result only. Never fires for a direct single-creature
+                // Battle (no party threaded) or when the share is 0.
+                offFieldLevelled |= await ShareExperienceWithBenchAsync(xp);
+
+                // The party strip is fed only by PartyUpdated snapshots (+ the connect-time /party hydrate), so
+                // without this an off-field creature's level/HP would read stale until some later party-carrying
+                // event. Pushed once, covering both loops above — the on-field creature's own level-up is
+                // already carried by its nameplate/HUD.
+                if (offFieldLevelled && _playerParty is not null)
+                    _emitter?.Emit(new PartyUpdated(PartyProjection.Snapshot(_playerParty)));
                 break;
             }
             if (!PlayerCreature.IsAlive())
@@ -332,24 +371,95 @@ public class Battle
     }
 
     /// <summary>
-    /// Innate party Exp-Share (roguelite Exp-All): pays each <em>living bench</em> member a fraction
-    /// (<see cref="RunRules.BenchXpShare"/>) of the active creature's XP award (<paramref name="activeAward"/>)
-    /// plus the full Stat-Exp, then runs its level-up + move-learn loop. The active creature was already paid in
-    /// full at the award site, so it is skipped here; a fainted member earns nothing (Gen 1). Each level emits an
-    /// attributed <see cref="LeveledUp"/> (carrying the member's name) so the player sees which creature levelled;
-    /// bench XP is otherwise silent. No-op without a party or with a zero share — so a direct single-creature
-    /// <see cref="Battle"/> is unaffected.
+    /// The creatures that took the field this battle and are still standing — the Gen 1 participant set a win's
+    /// Exp is divided among. Returned in <em>roster order</em> (not <see cref="HashSet{T}"/> order) so the award
+    /// events below are emitted deterministically. Fainted participants are excluded, which is what keeps a
+    /// forced faint-switch from costing the survivor anything.
+    /// <para>The on-field creature is <b>not</b> assumed alive: the enemy-faint check runs before the
+    /// player-faint branch, so a <b>mutual KO</b> (Self-Destruct, Struggle recoil, or end-of-turn Burn/Poison/
+    /// Leech) reaches the award site with a fainted finisher. It earns nothing and is not counted in the
+    /// divisor, same as any other fainted participant — so this list can legitimately be <b>empty</b> (a
+    /// single-creature mutual KO), and the award site must not pay the on-field creature unconditionally.</para>
     /// </summary>
-    private async Task ShareExperienceWithBenchAsync(int activeAward)
+    private List<Creature> LiveParticipants()
+    {
+        var live = new List<Creature>();
+        if (_playerParty is not null)
+        {
+            foreach (var member in _playerParty.Members)
+            {
+                if (_participants.Contains(member) && member.IsAlive())
+                    live.Add(member);
+            }
+        }
+
+        // Covers the party-less battle and a Battle wired with a party the active creature isn't a member of.
+        // Gated on IsAlive() so a mutual KO can't re-admit the fainted finisher the roster loop just excluded.
+        if (PlayerCreature.IsAlive() && !live.Contains(PlayerCreature))
+            live.Insert(0, PlayerCreature);
+
+        return live;
+    }
+
+    /// <summary>
+    /// Pays every live participant <em>other than</em> the active creature its equal share
+    /// (<paramref name="share"/>) of the win, plus the full Stat-Exp, then runs its level-up + move-learn loop.
+    /// These are creatures that fought and were switched back out — a participant is not paid less for not
+    /// having been the one standing there at the end. The active creature was already paid at the award site and
+    /// is skipped here: that is the "paid once" invariant, the easy double-pay bug on this path. The award is
+    /// surfaced with <c>OnBench: true</c> so the client logs the gain <em>without</em> moving the on-field
+    /// creature's XP bar. Returns whether any of them levelled.
+    /// </summary>
+    private async Task<bool> PayOtherParticipantsAsync(
+        IReadOnlyList<Creature> participants,
+        int share
+    )
+    {
+        bool anyLevelled = false;
+        foreach (var member in participants)
+        {
+            if (ReferenceEquals(member, PlayerCreature))
+                continue;
+
+            if (share > 0)
+                member.AddExperience(share);
+            _emitter?.Emit(new ExperienceGained(member.Name, share, OnBench: true));
+            // Stat-Exp is a coarse, capped accumulator — granted in full, never fractionalised by the split.
+            member.GainStatExp(EnemyCreature);
+
+            // Its Mimic/Transform identity was already restored by RestoreOutgoing() as it left the field, so
+            // the level-up loop below acts on the real moveset/stats (the active creature is restored inline at
+            // the award site for the same reason).
+            anyLevelled |= await RunLevelUpLoopAsync(member, onBench: true);
+        }
+
+        return anyLevelled;
+    }
+
+    /// <summary>
+    /// Innate party Exp-Share (roguelite Exp-All): pays each living member that <em>never took the field</em> a
+    /// fraction (<see cref="RunRules.BenchXpShare"/>) of the <em>full</em> award (<paramref name="fullAward"/> —
+    /// the undivided figure, not a participant's split share) plus the full Stat-Exp, then runs its level-up +
+    /// move-learn loop. Participants are paid their equal share elsewhere and are skipped here; a fainted member
+    /// earns nothing (Gen 1). Each level emits an attributed <see cref="LeveledUp"/> (carrying the member's name)
+    /// so the player sees which creature levelled; bench XP is otherwise silent. No-op without a party or with a
+    /// zero share — so a direct single-creature <see cref="Battle"/> is unaffected. Returns whether any bench
+    /// member levelled.
+    /// <para>Because the share is taken off the full award while participants split it, a creature that never
+    /// fought can earn as much as (Normal) or more than (Easy) one that did. That inversion is a known,
+    /// deliberately accepted balance property — see <c>docs/TODO.md</c> → <em>Participation XP</em>.</para>
+    /// </summary>
+    private async Task<bool> ShareExperienceWithBenchAsync(int fullAward)
     {
         if (_playerParty is null || _runRules.BenchXpShare <= 0)
-            return;
+            return false;
 
-        int share = (int)Math.Floor(activeAward * _runRules.BenchXpShare);
+        int share = (int)Math.Floor(fullAward * _runRules.BenchXpShare);
         bool anyLevelled = false;
         foreach (var member in _playerParty.Members)
         {
-            if (ReferenceEquals(member, PlayerCreature) || !member.IsAlive())
+            // Participants (the active creature included) are paid their equal split share, not this one.
+            if (_participants.Contains(member) || !member.IsAlive())
                 continue;
 
             if (share > 0)
@@ -363,18 +473,14 @@ public class Battle
             anyLevelled |= await RunLevelUpLoopAsync(member, onBench: true);
         }
 
-        // The bench members' level/stat changes are otherwise invisible: the party strip is fed only by
-        // PartyUpdated snapshots (+ the connect-time /party hydrate), so without this its levels/HP would read
-        // stale until some later party-carrying event. Push a fresh snapshot when any bench member levelled —
-        // the same projection TrySwitchInAsync emits — so the roster panel matches the level-up it just showed.
-        if (anyLevelled)
-            _emitter?.Emit(new PartyUpdated(PartyProjection.Snapshot(_playerParty)));
+        return anyLevelled;
     }
 
     /// <summary>
     /// Drives one creature's level-ups one at a time after an XP award: each crossed threshold emits a
     /// <see cref="LeveledUp"/> carrying that level's resulting stats + per-stat gains (and <paramref name="onBench"/>
-    /// so the client attributes a benched member's level-up without disturbing the active nameplate), then learns
+    /// so the client attributes an off-field creature's level-up — a switched-out participant or a never-deployed
+    /// bench member alike — without disturbing the active nameplate), then learns
     /// that level's moves before stepping on — so a multi-level award prompts in canonical Gen 1 order (one move,
     /// one level, at a time). Returns whether at least one level was gained.
     /// </summary>
@@ -630,6 +736,10 @@ public class Battle
         PlayerCreature = _playerParty.Lead;
         PlayerCreature.ResetBattleState();
         ApplyEntryStatus(PlayerCreature.CarriedStatus);
+        // It took the field, so it earns a participant's share of the win — even if it is later switched back
+        // out. This is the shared tail of BOTH switch paths (forced faint-switch and the voluntary SWITCH
+        // action), so one write records participation for both.
+        _participants.Add(PlayerCreature);
 
         _emitter?.Emit(
             new CreatureSwitchedIn(

@@ -433,10 +433,34 @@ public interface IBattleRules
     // ── Experience ─────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Returns XP awarded to the winner when an enemy faints.
+    /// Returns the <em>undivided</em> XP a defeated enemy is worth.
     /// Gen 1 formula: floor(a × BaseExperience × EnemyLevel / 7), where <paramref name="trainerOwned"/> sets
     /// a = 1.5 (the trainer bonus, which has existed since Gen 1) vs a = 1 for a wild foe.
-    /// Gen 5+: additionally divides the gain by the number of participants.
+    /// <para>The canonical formula also carries a divisor <c>s</c> — the number of Pokémon that participated in
+    /// the battle and have <em>not</em> fainted — which is <b>present from Gen 1</b> (it holds through Gen 5 and
+    /// was removed in <b>Gen 6</b>, where every participant earns the full amount). It is deliberately NOT
+    /// applied here: this method returns the enemy's full worth, and <see cref="Battle"/> owns the participant
+    /// split, because only the battle knows who took the field. See <c>docs/TODO_ARCHIVE.md</c> →
+    /// <em>Participation XP</em>.</para>
+    /// <para><b>Corrected 2026-07-27.</b> This comment previously read "Gen 5+: additionally divides the gain by
+    /// the number of participants", which had the history backwards — the division is a Gen 1–5 rule, not a
+    /// Gen 5+ addition. Don't restore that wording.</para>
     /// </summary>
     int CalculateXpAwarded(int baseExp, int enemyLevel, bool trainerOwned);
+
+    /// <summary>
+    /// Divides a win's XP <paramref name="award"/> among the creatures that took the field and are still
+    /// standing (<paramref name="liveParticipants"/>) — the canonical formula's <c>s</c> divisor.
+    /// <para><b>Gen 1–5:</b> <c>floor(award / liveParticipants)</c> — a Pokémon that was sent out and survived
+    /// gets an equal share, so switching costs XP. <b>Gen 6+:</b> the division was removed and every
+    /// participant earns the full <paramref name="award"/> — an implementation for a later generation returns
+    /// <paramref name="award"/> unchanged.</para>
+    /// <para>Fainted participants are excluded by the caller before this is reached (a fainted participant earns
+    /// nothing and is not counted in the divisor). <paramref name="liveParticipants"/> is therefore normally
+    /// ≥ 1, but can be <b>0</b> on a mutual KO where the sole participant fainted alongside the enemy — an
+    /// implementation must not divide by it blindly; nobody is paid in that case. The roguelite bench share
+    /// (<see cref="RunRules.BenchXpShare"/>) is layered on <em>outside</em> this seam — it is run balance, not a
+    /// generation rule.</para>
+    /// </summary>
+    int SplitXpAmongParticipants(int award, int liveParticipants);
 }

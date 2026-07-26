@@ -20,16 +20,20 @@ public sealed class RunRules
     public double XpMultiplierLate { get; init; } = 1.0;
 
     /// <summary>
-    /// Innate party Exp-Share (roguelite Exp-All): the fraction of the <em>active</em> creature's XP award that
-    /// each <em>living bench</em> member also earns from a win, so the whole roster keeps pace and stays swappable.
-    /// The active creature is always paid in full — this only tops up the bench. <c>0.0</c> = off (only the active
-    /// earns, legacy Gen-1-ish behaviour — the property <b>default</b>, so <see cref="Default"/> and every unopted
-    /// caller stay a pure no-op); the web run picks one of three difficulty presets in
-    /// <c>GameSessionManager.RunTuningByDifficulty</c> (Easy <c>0.75</c> / Normal <c>0.5</c> / Hard <c>0.25</c>);
-    /// <c>1.0</c> = full XP to everyone. A run-balance dial, deliberately outside the
-    /// Gen-1 seam. Fainted members are excluded regardless (a fainted participant earns nothing, per Gen 1). Only
-    /// fires when a party is threaded into <see cref="Battle"/>; direct single-creature callers pass no party, so
-    /// it never applies there.
+    /// Innate party Exp-Share (roguelite Exp-All): the fraction of a win's <em>full</em> XP award that each living
+    /// member which <em>never took the field</em> also earns, so the whole roster keeps pace and stays swappable.
+    /// <c>0.0</c> = off (only the creatures that fought earn — the property <b>default</b>, so
+    /// <see cref="Default"/> and every unopted caller stay a pure no-op); the web run picks one of three difficulty
+    /// presets in <c>GameSessionManager.RunTuningByDifficulty</c> (Easy <c>0.75</c> / Normal <c>0.5</c> / Hard
+    /// <c>0.25</c>); <c>1.0</c> = full XP to everyone. A run-balance dial, deliberately outside the Gen-1 seam.
+    /// Fainted members are excluded regardless (a fainted participant earns nothing, per Gen 1). Only fires when a
+    /// party is threaded into <see cref="Battle"/>; direct single-creature callers pass no party, so it never
+    /// applies there.
+    /// <para><b>Known, deliberately accepted limitation (user's call, 2026-07-27).</b> This share is taken off the
+    /// <em>full</em> award, while creatures that actually fought split that award evenly between them (the Gen 1
+    /// participation split). The two figures therefore come from different bases, so with two live participants a
+    /// creature that never fought earns the same as one that did at Normal, and <em>more</em> at Easy. Shipped as
+    /// a balance property, not an oversight — see <c>docs/TODO.md</c> → <em>Participation XP</em>.</para>
     /// </summary>
     public double BenchXpShare { get; init; } = 0.0;
 

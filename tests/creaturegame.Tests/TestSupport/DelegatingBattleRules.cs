@@ -128,6 +128,9 @@ public abstract class DelegatingBattleRules : IBattleRules
     public virtual int CalculateXpAwarded(int baseExp, int enemyLevel, bool trainerOwned) =>
         _inner.CalculateXpAwarded(baseExp, enemyLevel, trainerOwned);
 
+    public virtual int SplitXpAmongParticipants(int award, int liveParticipants) =>
+        _inner.SplitXpAmongParticipants(award, liveParticipants);
+
     public virtual int GetOffensiveStat(Creature a, AttackType t) => _inner.GetOffensiveStat(a, t);
 
     public virtual int GetDefensiveStat(Creature d, AttackType t) => _inner.GetDefensiveStat(d, t);

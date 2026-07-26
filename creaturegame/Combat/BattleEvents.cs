@@ -426,17 +426,24 @@ public record CreatureSwitchedIn(
     StatusCondition Status
 ) : BattleEvent;
 
-/// <summary>The amount of XP a creature earned from a win — emitted once, before any <see cref="LeveledUp"/>
-/// events, so the client can show the gain and begin filling the XP bar.</summary>
-public record ExperienceGained(string CreatureName, int Amount) : BattleEvent;
+/// <summary>The amount of XP a creature earned from a win — emitted once per earning creature, before that
+/// creature's <see cref="LeveledUp"/> events, so the client can show the gain and begin filling the XP bar.
+/// <para><paramref name="OnBench"/> marks an award earned by a creature that is not the one on the field — a
+/// participant that fought and was switched back out, which earns the same share as the finisher. The client
+/// must log the gain but must NOT move the active creature's XP bar for it; only the on-field creature drives
+/// that bar. (A member that never took the field earns the innate Exp-Share silently — no event at all — until
+/// it produces a <see cref="LeveledUp"/>.)</para></summary>
+public record ExperienceGained(string CreatureName, int Amount, bool OnBench = false) : BattleEvent;
 
 /// <summary>One level gained. Carries the new level's bar parameters (<paramref name="XpThisLevel"/> /
 /// <paramref name="XpToNextLevel"/>), the resulting stat totals (<paramref name="Stats"/>) and the per-stat
 /// gains from this level (<paramref name="StatGains"/>) so the client can refill the bar and show the Gen 1
 /// level-up stat panel. A multi-level award emits one of these per level, in order.
-/// <para><paramref name="OnBench"/> marks a level-up earned by a benched party member via the innate Exp-Share
-/// (not the on-field creature). The client shows the same attributed stat panel + fanfare for it, but must NOT
-/// move the active creature's nameplate level / XP bar — only the active lead drives those.</para></summary>
+/// <para><paramref name="OnBench"/> marks a level-up earned by a party member that is <em>not</em> the creature
+/// on the field — either a participant that fought and was switched back out (levelling off its equal share of
+/// the participation split) or a never-deployed member levelled by the innate Exp-Share. The client shows the
+/// same attributed stat panel + fanfare for it, but must NOT move the active creature's nameplate level / XP
+/// bar — only the on-field creature drives those.</para></summary>
 public record LeveledUp(
     string CreatureName,
     int NewLevel,

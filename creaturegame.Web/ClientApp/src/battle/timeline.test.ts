@@ -743,6 +743,18 @@ describe('expandEvent — run layer (recovery, run-end, XP)', () => {
     expect(logLines(steps)).toEqual(['MEWTWO gained 137 EXP. Points!']);
     expect(actions(steps)).toContainEqual({ type: 'XP_GAIN', amount: 137 });
   });
+
+  // A participant that fought and was switched back out earns the same share as the finisher, but it is not the
+  // creature on the field — its gain is logged, and the on-field XP bar must NOT move for it.
+  it('logs an off-field participant’s award without moving the on-field XP bar', () => {
+    const { steps } = expandEvent(
+      'ExperienceGained',
+      { creatureName: 'PIKACHU', amount: 137, onBench: true },
+      CTX,
+    );
+    expect(logLines(steps)).toEqual(['PIKACHU gained 137 EXP. Points!']);
+    expect(actions(steps)).not.toContainEqual({ type: 'XP_GAIN', amount: 137 });
+  });
 });
 
 describe('expandEvent — items', () => {

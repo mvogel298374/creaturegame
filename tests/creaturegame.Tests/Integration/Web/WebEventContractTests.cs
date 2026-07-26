@@ -498,6 +498,52 @@ public class WebEventContractTests
         Assert.True(root.GetProperty("IsPlayer").GetBoolean());
     }
 
+    /// <summary>Field-level guard for the <see cref="ExperienceGained"/> projection: <c>OnBench</c> decides
+    /// whether the client fills the <em>on-field</em> creature's XP bar. A switched-out participant earns the
+    /// same share as the finisher, so a constant or negated projection would fill the bar for the wrong creature
+    /// and freeze it for the right one — invisible to every engine test. The reflection contract test probes
+    /// bools with <c>false</c> only, so it cannot catch that; this pins both values round-tripping.</summary>
+    [Fact]
+    public void ExperienceGained_Projection_CarriesOnBench()
+    {
+        static bool ProjectedOnBench(bool onBench)
+        {
+            var (type, payload) = SignalRBattleEventEmitter.MapEvent(
+                new ExperienceGained("PIKACHU", 137, OnBench: onBench)
+            );
+            Assert.Equal("ExperienceGained", type);
+            using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+            Assert.Equal("PIKACHU", doc.RootElement.GetProperty("CreatureName").GetString());
+            Assert.Equal(137, doc.RootElement.GetProperty("Amount").GetInt32());
+            return doc.RootElement.GetProperty("OnBench").GetBoolean();
+        }
+
+        Assert.True(ProjectedOnBench(true));
+        Assert.False(ProjectedOnBench(false));
+    }
+
+    /// <summary>The same value-level guard for <see cref="LeveledUp"/>'s <c>OnBench</c>, which decides whether a
+    /// level-up moves the on-field creature's nameplate/level. Now load-bearing for a second population — a
+    /// switched-out <em>participant</em> levelling off its split share, not just a never-deployed bench member —
+    /// so a negated projection would bump the on-field nameplate to another creature's level.</summary>
+    [Fact]
+    public void LeveledUp_Projection_CarriesOnBench()
+    {
+        static bool ProjectedOnBench(bool onBench)
+        {
+            var stats = new StatBlock(100, 50, 40, 30, 20);
+            var (type, payload) = SignalRBattleEventEmitter.MapEvent(
+                new LeveledUp("PIKACHU", 12, 5, 60, stats, stats, OnBench: onBench)
+            );
+            Assert.Equal("LeveledUp", type);
+            using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+            return doc.RootElement.GetProperty("OnBench").GetBoolean();
+        }
+
+        Assert.True(ProjectedOnBench(true));
+        Assert.False(ProjectedOnBench(false));
+    }
+
     /// <summary>Field-level guard for the <see cref="TurnStarted"/> projection: the SWITCH button's enabled
     /// state rides <c>CanSwitch</c>, so a constant or negated projection would grey the button on exactly the
     /// turns a switch IS legal (and offer it on the turns it isn't) — while the reflection contract test, which

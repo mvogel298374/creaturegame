@@ -203,6 +203,21 @@ public class ExperienceAndLevelingTests
     }
 
     [Fact]
+    public void Gen1XpFormula_DividesTheAwardAmongLiveParticipants()
+    {
+        // The canonical formula's `s` divisor: Gen 1 splits a win's XP evenly between the Pokémon that were
+        // sent out and have not fainted (it holds through Gen 5; Gen 6 removed it, which is why this sits on
+        // the seam rather than inline in Battle). Floor division — a remainder is dropped, not distributed.
+        var rules = Gen1BattleRules.Instance;
+        Assert.Equal(857, rules.SplitXpAmongParticipants(857, 1)); // sole participant ⇒ undivided
+        Assert.Equal(428, rules.SplitXpAmongParticipants(857, 2)); // floor(857/2) — the odd XP is lost
+        Assert.Equal(285, rules.SplitXpAmongParticipants(857, 3));
+        // Defensive: a 0/negative count can't divide by zero (the award site never produces one — the winner
+        // is always a live participant — but the seam must not be a landmine for a future caller).
+        Assert.Equal(857, rules.SplitXpAmongParticipants(857, 0));
+    }
+
+    [Fact]
     public void XP_LevelUpTriggered_WhenThresholdReached()
     {
         // MediumFast growth rate: XP for level N = N³.

@@ -379,7 +379,15 @@ public sealed class SignalRBattleEventEmitter(
                     Status = e.Status.ToString(),
                 }
             ),
-            ExperienceGained e => ("ExperienceGained", new { e.CreatureName, e.Amount }),
+            ExperienceGained e => (
+                "ExperienceGained",
+                new
+                {
+                    e.CreatureName,
+                    e.Amount,
+                    e.OnBench,
+                }
+            ),
             LeveledUp e => (
                 "LeveledUp",
                 new

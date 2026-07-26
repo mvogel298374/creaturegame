@@ -250,4 +250,13 @@ public sealed class Gen1BattleRules : IBattleRules
     // §Gen I–IV (Exp = a·b·L/7) / pokered.
     public int CalculateXpAwarded(int baseExp, int enemyLevel, bool trainerOwned) =>
         (int)Math.Floor((trainerOwned ? 1.5 : 1.0) * baseExp * enemyLevel / 7);
+
+    // Gen 1 divides the award evenly among the Pokémon that were sent out and have not fainted (the formula's
+    // `s` divisor). That division holds through Gen 5 and was REMOVED in Gen 6, where every participant earns
+    // the full award — which is why this lives on the seam rather than inline in Battle. Source: Bulbapedia
+    // "Experience" §s ("the number of Pokémon that participated in the battle and have not fainted").
+    // Guards a 0/negative count so a caller that somehow reaches here with no live participant can't divide by
+    // zero; the award site already excludes fainted members and always has at least the winner.
+    public int SplitXpAmongParticipants(int award, int liveParticipants) =>
+        liveParticipants <= 1 ? award : award / liveParticipants;
 }

@@ -92,11 +92,25 @@ the whole party rather than only the creature that started the fight:
   that finished, or a bench member levelled by the XP share. `BattleRunEvent` snapshots each member's pre-battle
   level (`preLevel`) and evolves every one that levelled (active-first, then roster order); there is no
   starting-lead-only `levelBefore` gate.
-- **XP + Stat-Exp** are shared by the innate party XP share (`RunRules.BenchXpShare`): the active creature is paid
-  in full, then every **living** bench member additionally earns `floor(activeAward × BenchXpShare)` XP + the
-  foe's full Stat-Exp; fainted members earn nothing. This is a roguelite deviation (see `GENERATION_SEAMS.md`),
-  deliberately wider than the Gen-1 participant split. A bench level-up carries its own creature's name
-  (`LeveledUp.OnBench`) so it surfaces attributed, without disturbing the on-field creature's nameplate.
+- **XP** follows the **Gen 1 participation split** (2026-07-27): every creature that **took the field** this
+  battle and is still alive splits the award evenly — `fullAward / liveParticipantCount`. A creature that fought
+  and was switched back out earns exactly what the finisher earns; taking the field is what makes you a
+  participant, and participants are not ranked by who landed the last hit. A **fainted** participant earns nothing
+  **and is excluded from the divisor**, so a forced faint-switch leaves the survivor taking the whole award.
+  Participation is tracked per battle by `Battle` itself (a `_participants` set, written by the opening lead and by
+  `BringInMember` — the shared tail of both switch paths), deliberately **not** as a flag on `BattleState`:
+  `ResetBattleState()` never reaches a benched creature, so a per-creature flag would leak into the next battle.
+- **The innate party XP share** (`RunRules.BenchXpShare`) sits on top: every **living** member that *never* took
+  the field earns `floor(fullAward × BenchXpShare)` XP. **Stat-Exp** is never fractionalised by either rule — it is
+  granted in full to every living *participant* always, and to living non-participants only when the share is
+  switched on (a zero share skips the bench loop entirely, so they get neither XP nor Stat-Exp). Fainted members
+  earn nothing. This share is a roguelite deviation (see
+  `GENERATION_SEAMS.md`). A level-up earned off the field carries its own creature's name (`LeveledUp.OnBench`) so
+  it surfaces attributed, without disturbing the on-field creature's nameplate — as does a switched-out
+  participant's award (`ExperienceGained.OnBench`, which the client logs without moving the on-field XP bar).
+  > ⚠️ **Known, user-accepted limitation (2026-07-27):** the bench share is taken off the **full** award while
+  > participants split it, so with two live participants a creature that never fought earns the **same** as one
+  > that did at Normal (0.5) and **more** at Easy (0.75). Deliberate — see `docs/TODO_ARCHIVE.md` → *Participation XP*.
 
 These are documented invariants (not plan claims) that `requirements-review` can cite. The general rule — *no
 end-of-battle effect may silently assume the starting lead* — still has one open audit item (sweep the rest of the
