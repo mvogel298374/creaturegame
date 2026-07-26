@@ -8,6 +8,78 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Other between-encounter modal E2Es ✅ DONE (2026-07-26)
+
+Closed the last E2E gap in *Browser-Based UI Testing* (`TODO.md`): the between-encounter blocking modals other
+than the reward-choice (already covered by `reward-drop.spec.ts`) had no Playwright coverage. Four new specs,
+each asserting **both** answers and that the run flows on either way (every one of these parks a server-side
+await, so a stuck prompt strands the run):
+
+- `poke-center.spec.ts` (Heal / Skip) — the most expensive reach in the suite (a whole biome, 4–6 nodes ending
+  in the Boss, has to be won). Lead is **MEWTWO @ L50**, not for flavour: enemy strength is self-referential
+  (`EncounterFactory.ScaleTargetBst = playerBst + depth×10`), so raising the starting *level* buys nothing — the
+  foe re-scales to match. Raising the starting *BST* does, because the scaling saturates: at 680 the target runs
+  off the top of the Gen 1 roster and `PickByBst` can only return the closest (weaker) species it has. A
+  CHARIZARD @ L40 died on node 4 of 6 to a GYARADOS in a water-themed biome — needing ~5 wins in a row turns a
+  per-battle coin flip into a ~3% reach.
+- `move-replacement.spec.ts` (forget / decline, incl. the two-step confirm) — `learnset.spec.ts` had recorded
+  this modal as "not reliably reachable without the seed"; the seed plumbing closes it. Lead is **VICTREEBEL
+  @ L12**: one of only four Gen 1 species whose *fifth* level-up move lands below level 16 (four moves at level
+  1, a fifth at 13), so starting at 12 puts the prompt one level-up away, and its 490 BST means wins pay well.
+- `evolution.spec.ts` (Allow / Cancel — Gen 1 B-cancel) — lead is **CHARMANDER @ L15** (evolves at 16). Two
+  rejected leads made the selection rule explicit, and both plausible heuristics are wrong on their own:
+  **CATERPIE @ L5** (evolves at 7 — with WEEDLE the earliest in Gen 1) has 21 max HP and died on the biome's
+  Elite before the seventh level every run, so *"fewest levels to climb"* fails; **DRAGONAIR @ L54** (BST 350,
+  the sturdiest level-up evolver in the game) then won four battles and **gained no level at all** —
+  `Run over — 4 wins, reached level 54` — so *"highest BST"*, the lever `poke-center.spec.ts` correctly uses
+  for a whole-biome reach, fails too. XP required per level grows cubically with level while XP earned grows
+  only linearly with the (level-matched) enemy, so a high-level lead effectively never levels, and no level-up
+  means no evolution check. **A level-up-gated reach must be low-level to cross at all** — the same reason
+  `move-replacement.spec.ts` sits at L12.
+  The two answers run as two tests with **disjoint seed lists** (1–10 / 11–20). Merging them into one run was
+  tried first, because Gen 1's B-cancel re-offers at the next level-up and that would have made the re-offer
+  itself assertable; it is not reachable in practice, needing two level-ups in one run with the second taken
+  while carrying the form you just declined to upgrade. Across 24 seeded runs (12 CHARMANDER, 12 DRAGONAIR) not
+  one got there — the cancelled run kept dying to the biome Boss that came next, which is the cost of
+  cancelling working as designed, not a defect. Re-offer stays covered at the .NET layer.
+- `acquisition.spec.ts` (ADD / DECLINE on the themed draft) — the offer both switch specs were already clicking
+  through blind to grow the party past one, now asserted directly: ADD deposits into the party (the party strip
+  appears, which only renders above one member); DECLINE is a sequencing no-op that leaves the party alone and
+  the run flowing.
+
+**Shared driver:** the new `walkSeedsUntil` helper (`e2e/helpers.ts`) — walks a list of seeds (default
+`[1..8]`), replaying `startBattle` + clearing every between-node modal (draft/lead-choice/shop/reward) until a
+caller-supplied `reached(page)` predicate holds, an accompanying `isShowing(locator)` probe, and a
+`chooseBestMove` helper (picks the highest `power × type-effectiveness × STAB` move off the menu's own cues,
+`.move-pow`/`.move-eff`/`.move-stab`) — needed because these reaches are several battles deep and a
+first-available-move autoplayer (fine for a single-turn spec) reliably loses the run before the state under
+test exists. Extracted from the two copy-pasted seed-walk loops already in `forced-switch.spec.ts` /
+`voluntary-switch.spec.ts`, both reworked onto the shared driver in the same change. The loop body is also
+exported on its own as **`playCurrentRunUntil`** (same driver, no restart) so a spec can carry on with the run
+it already reached instead of paying for a second walk, and the draft answer is a policy —
+**`drafts: 'accept' | 'decline' | 'leave'`** — because the three cases are genuinely different: `accept` is the
+only way a party grows past one, `leave` is for the spec whose target *is* that modal, and `decline` keeps the
+run flowing while holding the party at one, which matters because *every* creature that levels is eligible for
+the level-up prompts — a drafted second creature can raise the very modal a spec is waiting on and fail its
+identity assertions.
+
+**A prompt raised by a level-up is answered on a *win*, so what follows it is the intermission — not another
+turn.** `move-replacement.spec.ts` first asserted that FIGHT re-enables straight after the answer and failed
+against a completely healthy run: the reward-choice modal was up and FIGHT was correctly `action-btn--waiting`.
+The right claim is that the between-encounter flow clears and the next battle becomes playable. (The same shape
+is why that spec now reads the moveset back through CHECK POKEMON a whole encounter later — it asserts the
+moveset *persisted*, not merely that the modal rendered.) One more DOM fact the first cut got wrong: a party
+chip carries its species name only in the sprite's `alt` and its own `title` — visibly it is a sprite, a level
+and a LEAD tag, so asserting on its rendered text reads back `"Lv31LEADLv21"`. See below (**In-Combat
+Switching** → 2026-07-26 addendum) for what `voluntary-switch.spec.ts` itself absorbed.
+
+**Note on `level` defaults:** `walkSeedsUntil` defaults to **level 30**, not the starter minimum — a level-5
+lone starter frequently wipes before the draft cadence comes round (an Elite's VAPOREON ended every one of
+eight seeded runs standalone at level 5), burning the whole seed list on runs that never reach the state under
+test. Specs that need the lead to *faint* (`forced-switch.spec.ts`) pass `level: 5` explicitly.
+
+---
+
 ## In-Combat Switching — voluntary in-battle party switching ✅ COMPLETE (2026-07-25)
 
 Confirmed a core feature by the user (2026-07-13) — a first-class "SWITCH" turn action so the player can swap the
@@ -156,6 +228,24 @@ Stage A; the fix was entirely the web leg + the interim gate.
 second click to confirm. Flagged as a Gen-1 divergence (the cartridge prints "no moves left" and Struggles
 immediately on FIGHT, never showing a move list) and **fixed on the user's ruling, 2026-07-25**: FIGHT now
 auto-submits, and the submenu's Struggle branch + its `.move-btn--struggle` CSS are gone.)*
+
+**Addendum (2026-07-26) — the rest of the UI contract.** Stage C's E2E left only the happy path
+(`voluntary-switch.spec.ts`: seeded run → draft accepted → SWITCH enabled → pick benched → "Go! X!" + nameplate
+retargets). Three more behaviours that distinguish the *voluntary* picker from Stage 3's forced modal are now
+pinned in the same spec: **SWITCH visible-but-disabled while the starter is alone** (`TurnStarted.CanSwitch`
+reaching the DOM, asserted on the very first turn — no seed walk needed, a party of one is the default state),
+**the creature already out rendering as a disabled `· OUT` card** (the forced modal has no such card, since the
+outgoing creature there has fainted — this is the render that tells the two pickers apart), and **BACK
+dismissing the picker with no turn spent** (a dismissable control-view, unlike the forced modal's
+`dismiss="blocking"`; no server prompt is parked on it). Folded into the one existing switch-through test rather
+than a second test: the suite runs `workers: 1`, so as two tests the seed walks were sequential and identical on
+paper, and the second exhausted all eight seeds where the first had already found one (the seed-≠-determinism
+drift this suite already documents, hit again — the fix was to stop needing a second walk, not to harden it).
+**Deliberate E2E gap, decided the same day:** the out-of-PP menu affordance above has no spec and isn't getting
+one — draining a full moveset takes tens of turns, PP refills at every Poké Center, and no low-level moveset is
+small enough to burn out reliably; it stays pinned by `SignalRInputTests`, `BattleVoluntarySwitchTests`, and
+Vitest `moveMenu.test.ts` alone. Recorded in `e2e/README.md` too. Revisit only if a backend test hook makes the
+state forceable.
 
 Touched (engine): `creaturegame/Combat/Battle.cs`, `AttackAction.cs`, `SwitchAction.cs` (new),
 `IBattleInput.cs` (`SwitchTurnChoice`/`StruggleTurnChoice` + the guarded default `ChooseTurnActionAsync`),
@@ -645,6 +735,42 @@ the persistent run screen). **Follow-up (deferred, user-approved 2026-07-11 — 
 replace the procedural type-colour+motif territories with **real painted per-biome scenery** (forest/cave/shore
 illustrations); needs an image-asset pipeline (store under `ClientApp/public`), with the current `.region-territory`
 layer as the drop-in seam. Low priority — the procedural look reads clearly on its own.
+
+---
+
+## Browser-Based UI Testing — seed plumbing, spec-rot recovery & the flakiness pass ✅ DONE (2026-07-05 → 2026-07-08)
+
+The four completed items from *Browser-Based UI Testing (Playwright)* in `TODO.md`, moved here 2026-07-26 so
+that section holds active work only. The **seed-≠-determinism** lesson these taught is standing guidance, not a
+finished task, so it stays in `TODO.md` (and in `e2e/README.md`) rather than being archived with them.
+
+**Seed plumbing (2026-07-05).** `StarterSelection` forwards an optional `?seed=<int>` URL param into the
+`/start` request (the backend already accepted `Seed`), so an E2E can pin a repeatable run. `?e2e=1` still sets
+test mode. react-router drops the query on nav from the title, so seeded specs land directly on
+`/select?seed=…`. This is the plumbing every later deep-state spec is built on.
+
+**Run Economy reward-modal E2E (2026-07-05).** Closed the known live-verification gap — the reward modal and
+the gold credit observed in a browser, not just at the unit/integration layer. Since superseded by the
+pick-1-of-3 `RewardChoiceModal` rework; the current spec is `reward-drop.spec.ts` and the accurate record lives
+in this file under **"Reward Choice — pick-1-of-3 rarity rewards"** (E2E note).
+
+**E2E harness recovered from spec-rot (2026-07-05).** The suite was fully red for two unrelated reasons:
+**biome mode (Phase 3b-2)** added an opening route-choice modal that blocked before every battle (the
+`startBattle` helper didn't answer it), and the **Run Economy** starting bag stopped seeding `BattleStatBoost`
+items. Fixed `startBattle` to pick the opening biome (`chooseBiomeIfPresent`); fixed `battle.spec` (the first
+log line is now the biome banner, not the VS line); removed the two `item-use` specs, since X ATTACK /
+GUARD SPEC are no longer battle-1 obtainable — the item-effect logic stays covered by `ItemEffectTests` and bag
+grouping by `bag.test.ts`.
+
+**Stabilise inter-test E2E flakiness — a seed-determinism pass (2026-07-08).** `startBattle` gained an optional
+`seed` param: when given it lands directly on `/select?e2e=1&seed=…` (the `reward-drop.spec` pattern; the level
+slider lives on that screen, so a custom `level` still works), pinning the whole run — enemy, DVs, moves, biome
+offer, every battle roll, AI choice. Converted the flaky coin-flip specs to seed 1: `battle-ui-cues` +
+`stat-stage` (seeded `startBattle`), `status` (same treatment), and `level-up` (both tests: the `reachLog`
+restart loop replaced with seeded `startBattle` + a new `playToLevelUp` helper that stops at the level-up line
+*without* dismissing the reward modal the test asserts). `reachLog` stayed for `battle`/`endless-chain`/
+`learnset` — not flaky, and their retry keeps them reliable. **Verified:** full `npm run test:e2e` green across
+3 consecutive runs, `retries: 0`, with the converted specs running in seconds instead of coin-flip minutes.
 
 ---
 

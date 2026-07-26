@@ -571,41 +571,20 @@ Stack: React 18 + TypeScript + SignalR + Phaser 3. (Canvas & core animations don
 Suite lives in `ClientApp/e2e/` (`npm run test:e2e`). Playwright drives the React DOM; the Phaser canvas is
 tested through the `mitt` bridge (assert **event ordering**, never wall-clock durations — the #1 flake source).
 
-**Done (2026-07-05):**
-- [x] **Seed plumbing** — `StarterSelection` forwards an optional `?seed=<int>` URL param into the `/start`
-  request (backend already accepted `Seed`), so an E2E can pin a repeatable run. `?e2e=1` still sets
-  test mode. react-router drops the query on nav from the title, so seeded specs land directly on `/select?seed=`.
-  > **A seed is not by itself determinism** (learned the hard way, 2026-07-15 — it flaked two specs). The seed
-  > fixes the *server's* RNG stream, but the **client's move sequence is what draws from it**: a spec that races
-  > (polling loops, `waitFor` timeouts, a swallowed click) submits moves on different turns under load, which
-  > shifts every later roll and plays out a different run. A seeded spec is only deterministic if the driving loop
-  > is **paced** — settle each turn (wait for the action menu to come back) before the next input. Otherwise write
-  > the assertions not to care (retry/walk seeds). See `status.spec.ts` and `forced-switch.spec.ts`.
-- [x] **Run Economy reward-modal E2E** — closed the known live-verification gap (reward modal + gold credit
-  observed in a browser, not just unit/integration). Superseded by the pick-1-of-3 `RewardChoiceModal` rework;
-  current spec is `reward-drop.spec.ts` — see `docs/TODO_ARCHIVE.md` → "Reward Choice — pick-1-of-3 rarity
-  rewards" (E2E note) for the accurate, current record.
-- [x] **E2E harness recovered from spec-rot** — the suite was fully red: **biome mode (Phase 3b-2)** added an
-  opening route-choice modal that blocked before every battle (the `startBattle` helper didn't answer it), and
-  the **Run Economy** starting bag stopped seeding `BattleStatBoost` items. Fixed `startBattle` to pick the
-  opening biome (`chooseBiomeIfPresent`); fixed `battle.spec` (the first log line is now the biome banner, not
-  the VS line); removed the two `item-use` specs (X ATTACK / GUARD SPEC aren't battle-1 obtainable anymore — the
-  item-effect logic stays covered by `ItemEffectTests`, bag grouping by `bag.test.ts`).
+> **A seed is not by itself determinism** (learned the hard way 2026-07-15, and again 2026-07-26). The seed
+> fixes the *server's* RNG stream, but the **client's move sequence is what draws from it**: a spec that races
+> (polling loops, `waitFor` timeouts, a swallowed click) submits moves on different turns under load, which
+> shifts every later roll and plays out a different run. A seeded spec is only deterministic if the driving loop
+> is **paced** — settle each turn (wait for the action menu to come back) before the next input. Otherwise write
+> the assertions not to care (retry / walk seeds). See `status.spec.ts`, `forced-switch.spec.ts`, and
+> `e2e/README.md`. This note is standing guidance, not a task — it outlives the items that taught it.
+
+**Done and archived** (→ `TODO_ARCHIVE.md`): seed plumbing, the Run Economy reward-modal E2E, the spec-rot
+recovery and the inter-test flakiness pass are all under *"Browser-Based UI Testing — seed plumbing, spec-rot
+recovery & the flakiness pass"*; the between-encounter modal E2Es under *"Other between-encounter modal E2Es"*;
+and the In-Combat Switching UI contract in the *"In-Combat Switching"* 2026-07-26 addendum.
 
 **Remaining (in priority order):**
-- [x] **Stabilise inter-test E2E flakiness (a seed-determinism pass)** — DONE (2026-07-08). `startBattle` gained
-  an optional `seed` param: when given it lands directly on `/select?e2e=1&seed=…` (the `reward-drop.spec`
-  pattern; the level slider lives on that screen so a custom `level` still works), pinning the whole run — enemy,
-  DVs, moves, biome offer, every battle roll, AI choice. Converted the flaky coin-flip specs to seed 1:
-  `battle-ui-cues` + `stat-stage` (seeded `startBattle`), `status` (was also flaky — same treatment), and
-  `level-up` (both tests: replaced the `reachLog` restart loop with seeded `startBattle` + a new `playToLevelUp`
-  helper that stops at the level-up line *without* dismissing the reward modal the test asserts). `reachLog`
-  stays for `battle`/`endless-chain`/`learnset` (not flaky; their retry keeps them reliable). **Verified:** full
-  `npm run test:e2e` green across 3 consecutive runs (21 passed each, `retries: 0`), and the converted specs run
-  in seconds instead of coin-flip minutes.
-- [ ] **Other between-encounter modal E2Es** — same seeded/blocking-modal shape as the reward modal, now
-  unblocked by the seed plumbing: Poké Center recovery Heal/Skip, move-replacement forget/decline, evolution
-  Allow/Cancel (Gen 1 B-cancel).
 - [ ] **CI step** (or `test.ps1 -StartStack`-adjacent) that boots backend + frontend, runs headless, tears down.
   **This is the root cause of the rot going unnoticed** — E2E isn't gated in CI and `test.ps1` skips it when the
   stack is down, so a red suite stayed invisible. Wiring E2E into the gate is what prevents a repeat.
@@ -613,6 +592,14 @@ tested through the `mitt` bridge (assert **event ordering**, never wall-clock du
   `.species-card`, `.move-btn`, `.log-line`, `.bar-fill`, `.nameplate--*`). Add testids only where a class
   proves brittle.
 - [ ] §8 visual-regression canvas snapshots — skipped (maintenance cost).
+- [ ] ⚠️ **Known defect (found 2026-07-26): the player nameplate doesn't follow an evolution until the next
+  battle starts.** `useBattleHub`'s `playerNameRef` is updated on `BattleStarted` and `CreatureSwitchedIn` but
+  has **no `CreatureEvolved` case**, so between encounters the log reads `CHARMANDER evolved into CHARMELEON!`
+  while the nameplate and the action prompt still say *"What will CHARMANDER do?"*. Self-corrects at the next
+  `BattleStarted`, so it's cosmetic and transient — but it is a visible inconsistency, and it's the **manual TS
+  client leg** of the web event-field projection gap (the C# wire-drop half is auto-guarded; this leg isn't).
+  Fix is a one-line ref update plus a Vitest case. Found while writing `evolution.spec.ts`, which is why that
+  spec reads the nameplate only after the run is playable again rather than straight after the morph.
 
 ## Frontend Unit Coverage (Vitest)
 

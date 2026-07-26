@@ -118,6 +118,56 @@ export async function chooseMove(page: Page, moveName?: string): Promise<string>
   return label;
 }
 
+/**
+ * Opens the FIGHT grid and picks the move most likely to actually win — highest `base power × type
+ * effectiveness × STAB`, read straight off the cues the menu already renders (`.move-pow`, `.move-eff`,
+ * `.move-stab`).
+ *
+ * `chooseMove`'s first-available pick is fine for a spec that just needs *a* turn to resolve, but it is a
+ * losing strategy for any spec that has to survive several battles: the first slot is usually the oldest and
+ * weakest move, and often a status move that deals no damage at all. That's not a theoretical concern — the
+ * deep-run specs were failing every seed on it (a level-40 CHARIZARD dutifully SCRATCHing a GYARADOS that was
+ * answering with SURF). Raising the starting level does **not** compensate, because wild encounters are
+ * self-referential: `ScaleTargetBst` is `playerBst + depth×10` and the level window keys off the player's own
+ * level, so the foe re-scales to whatever the player is. Playing better is the only lever there is.
+ */
+export async function chooseBestMove(page: Page): Promise<string> {
+  await fightButton(page).click();
+  const grid = page.locator('.move-grid');
+  await expect(grid.locator('.move-btn:not([disabled])').first()).toBeEnabled();
+
+  const scored = await grid.locator('.move-btn').evaluateAll(nodes =>
+    nodes.map((node, i) => {
+      const el = node as HTMLButtonElement;
+      const numberIn = (sel: string) => {
+        const raw = el.querySelector(sel)?.textContent?.replace('×', '').trim();
+        const n = raw ? Number.parseFloat(raw) : NaN;
+        return Number.isFinite(n) ? n : null;
+      };
+      return {
+        i,
+        disabled: el.disabled,
+        // No .move-pow means a status move (no base power) — score 0, so it's only ever the fallback.
+        power: numberIn('.move-pow') ?? 0,
+        // No .move-eff means neutral: the engine sends 1.0 for both 1× and non-damaging.
+        eff: numberIn('.move-eff') ?? 1,
+        stab: el.querySelector('.move-stab') !== null,
+      };
+    })
+  );
+
+  const usable = scored.filter(m => !m.disabled);
+  const best = usable.reduce(
+    (a, b) => (b.power * b.eff * (b.stab ? 1.5 : 1) > a.power * a.eff * (a.stab ? 1.5 : 1) ? b : a),
+    usable[0]
+  );
+
+  const chosen = grid.locator('.move-btn').nth(best.i);
+  const label = (await chosen.locator('.move-name').textContent())?.trim() ?? '';
+  await chosen.click();
+  return label;
+}
+
 export const logLines = (page: Page): Promise<string[]> =>
   page.locator('.log-line').allTextContents().then(xs => xs.map(s => s.trim()));
 
@@ -236,5 +286,123 @@ export async function reachLog(
   }
   throw new Error(`reachLog: never reached /${re.source}/ in ${attempts} runs`);
 }
+
+/**
+ * How the play loop answers a themed-draft offer:
+ * - `accept` — press ADD. The only way the party grows past one, so anything party-dependent needs it.
+ * - `decline` — press DECLINE. For a spec that must stay a party of one: the run still flows (the offer parks
+ *   a server-side await, so leaving it standing would stall the loop), but no second creature is ever added —
+ *   which matters because *every* creature that levels is eligible for the level-up prompts, so a drafted
+ *   creature can raise the very modal the spec is waiting for and fail its identity assertion.
+ * - `leave` — don't touch it. For a spec whose target IS this modal.
+ */
+export type DraftPolicy = 'accept' | 'decline' | 'leave';
+
+/** Options shared by the run-playing loop and the seed walker. */
+export type PlayOpts = {
+  maxTurns?: number;
+  drafts?: DraftPolicy;
+};
+
+/**
+ * Plays the run **already in progress** — answering the draft per `drafts`, keeping the current lead at a biome
+ * boundary, and clearing every between-node modal — until `reached(page)` holds, the run ends, or `maxTurns`
+ * elapses. Returns whether the state was reached.
+ *
+ * Split out from `walkSeedsUntil` so a spec can carry on with the *same* run after answering a prompt, instead
+ * of paying for a second seed walk. The evolution spec needs exactly that: Gen 1's B-cancel re-offers at the
+ * next level-up, so CANCEL and ALLOW can share one expensive reach.
+ */
+export async function playCurrentRunUntil(
+  page: Page,
+  reached: (page: Page) => Promise<boolean>,
+  opts: PlayOpts = {}
+): Promise<boolean> {
+  const { maxTurns = 400, drafts = 'accept' } = opts;
+
+  for (let i = 0; i < maxTurns; i++) {
+    if (await reached(page)) return true;
+
+    // Answer the draft per policy.
+    //
+    // A spec whose target IS this modal must pass `leave`, and not merely rely on the `reached` probe above
+    // winning the race: both probes run in the same iteration a few ms apart, so a modal that renders between
+    // them gets answered by the loop before the spec ever sees it. That is not hypothetical — it is exactly how
+    // the acquisition spec failed, with "VAPOREON joined the party!" in the log and no modal left to assert on.
+    const acquire = page.locator('.acquire-modal');
+    if (drafts !== 'leave' && (await acquire.isVisible().catch(() => false))) {
+      const answer =
+        drafts === 'accept'
+          ? acquire.locator('.action-btn--fight')
+          : acquire.getByRole('button', { name: 'DECLINE', exact: true });
+      await answer.click().catch(() => {});
+      continue;
+    }
+    // Keep the current lead at a biome boundary so the run keeps flowing.
+    const keepLead = page.locator('.lead-modal[aria-label="Choose your lead"] .lead-card--current');
+    if (await keepLead.isVisible().catch(() => false)) {
+      await keepLead.click().catch(() => {});
+      continue;
+    }
+    await leaveShopIfPresent(page);
+    await dismissRewardChoiceIfPresent(page);
+    await chooseBiomeIfPresent(page);
+
+    if ((await logLines(page)).some(l => /Run over/.test(l))) return false;
+    if (await fightButton(page).isEnabled().catch(() => false)) {
+      // Play to win, not just to take a turn — see `chooseBestMove`. These reaches are several battles deep,
+      // so a weak-move auto-player simply loses every run before the state under test exists.
+      await chooseBestMove(page).catch(() => {});
+    }
+    await page.waitForTimeout(80);
+  }
+  return reached(page);
+}
+
+/**
+ * Plays seeded runs until one reaches the state `reached(page)` describes; returns the seed that got there,
+ * or `null` if every run ended first.
+ *
+ * The shared driver behind every party-dependent spec. A party larger than one is several battles deep and
+ * gated on the themed-draft cadence × roll, so the target state can be lost on the way — and **a seed is not
+ * by itself determinism**: the seed fixes the *server's* RNG stream, but the client's move sequence is what
+ * draws from it, so under load the polling loop's clicks land on different turns and play out a different run
+ * (a lone pinned seed passed standalone and then lost its run at battle 2 inside the full suite). Walking a
+ * list of seeds is the `reachLog` retry idiom made cheap and repeatable rather than a fresh coin-flip.
+ *
+ * `level` defaults to 30 rather than the starter minimum on purpose: a level-5 lone starter frequently wipes
+ * before the draft cadence comes round (an Elite's Vaporeon ended every one of eight seeded runs on a
+ * standalone pass), which burns the whole seed list on runs that never reach the state under test. A higher
+ * lead survives the early nodes, so what the seeds actually vary is the draft cadence — the thing we're
+ * waiting on — not whether the run lives. Specs that need the lead to *faint* pass `level: 5` explicitly.
+ */
+export async function walkSeedsUntil(
+  page: Page,
+  reached: (page: Page) => Promise<boolean>,
+  opts: PlayOpts & {
+    seeds?: number[];
+    species?: string;
+    level?: number;
+  } = {}
+): Promise<number | null> {
+  const {
+    seeds = [1, 2, 3, 4, 5, 6, 7, 8],
+    species = 'CHARIZARD',
+    level = 30,
+    ...playOpts
+  } = opts;
+
+  for (const seed of seeds) {
+    await startBattle(page, species, level, seed);
+    if (await playCurrentRunUntil(page, reached, playOpts)) return seed;
+    // That run wiped (or never got there) — try the next seeded run.
+  }
+  return null;
+}
+
+/** True when the locator is on the page right now. The `reached` predicates are instantaneous probes, not
+ * waits — the seed-walk loop is what does the waiting. */
+export const isShowing = (locator: Locator): Promise<boolean> =>
+  locator.isVisible().catch(() => false);
 
 export type { BridgeEventWindow };
