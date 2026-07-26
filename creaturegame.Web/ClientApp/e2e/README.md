@@ -95,13 +95,40 @@ must be up.)
 
 ## Running
 
+**Preferred — `./e2e.ps1` from the repo root.** The suite is slow on purpose (serial, and the
+`walkSeedsUntil` specs play whole runs), so the script exists to let you run *less of it* and to show
+where the time went. It streams Playwright's live output as-is, then prints a summary parsed from the
+JSON report: per-file timings (slowest file first), the slowest individual tests, and each failure with
+its message and trace/video/screenshot paths.
+
+```powershell
+./e2e.ps1                            # whole suite + timing breakdown
+./e2e.ps1 -Spec battle.spec           # one file — tab-completes from e2e/*.spec.ts
+./e2e.ps1 -Spec battle                # ...bare name is a regex: also matches battle-ui-cues
+./e2e.ps1 -Grep "cadence"             # by test title
+./e2e.ps1 -Bail                       # stop at the first failure
+./e2e.ps1 -LastFailed                 # re-run only what failed last time
+./e2e.ps1 -Spec shop -Headed          # visible browser
+./e2e.ps1 -Ui                         # Playwright UI mode (watch/pick/inspect)
+./e2e.ps1 -Inspect -Spec shop         # Playwright Inspector, step through
+./e2e.ps1 -ListOnly                   # what matches, without running (needs no stack)
+./e2e.ps1 -Html                       # also write + open the HTML report
+./e2e.ps1 -StartStack                 # start/stop the .NET backend for the run
+```
+
+Without `-StartStack` the script refuses to run (exit 2) rather than letting 22 specs fail one by one
+against a dead backend. `-Workers N` overrides the single worker, but the suite is serial *because
+battles are stateful* — treat it as an experiment, not a supported mode.
+
+Raw equivalents, if you'd rather not go through the script:
+
 ```powershell
 cd creaturegame.Web/ClientApp
 npm run test:e2e          # headless, all specs
 npm run test:e2e:ui       # Playwright UI mode (watch/inspect)
 npx playwright test battle.spec.ts            # one file
 npx playwright test -g "cadence"              # by title
-npx playwright show-report                    # last HTML report
+npx playwright show-report                    # last HTML report (only if it was run with an html reporter)
 ```
 
 ### In the IDE

@@ -76,11 +76,16 @@ each is its own subagent so it can be invoked or edited independently:
    edits ride in the finishing commit and gate 5 (`pr-review`) checks docs/TODO. It edits docs only.
 2. **`format-gate`** (Subagent, `.claude/agents/format-gate.md`) — the CSharpier gate: `check`, auto-`format`
    + re-check if it fails → `FORMAT: PASS | REFORMATTED | FAIL`.
-3. **`test-runner`** (Subagent, `.claude/agents/test-runner.md`) — the suite via `.\test.ps1`, TEST SUMMARY
-   relayed verbatim, failing tests named → `TESTS: PASS | FAIL`.
+3. **`test-runner`** (Subagent, `.claude/agents/test-runner.md`) — the fast suites via `.\test.ps1 -Dotnet -Web`,
+   TEST SUMMARY relayed verbatim, failing tests named → `TESTS: PASS | FAIL`.
+   **E2E is NOT in the default scope and is not the agent's call, or yours — it is the user's.** ~4 minutes for
+   37 browser-driven tests, and the only suite with real flakes. The gate passes without it. If a change looks
+   like it warrants E2E, **recommend the narrowest command and let the user choose** (`.\e2e.ps1 -Spec <file>`);
+   do not brief the subagent to run it, and do not run it yourself, on your own initiative.
    **Caller's half of the contract — the main session must:**
-   - **State the scope in the invocation.** Name what changed (engine / frontend / both) and say whether E2E
-     must actually run (`-StartStack`) or may be skipped. An unscoped brief makes it run everything, ~3 min.
+   - **State the scope in the invocation.** Name what changed (engine / frontend / both). Say `-Dotnet` or
+     `-Web` when only one side moved; otherwise the default `-Dotnet -Web` stands. Only name E2E if the **user**
+     asked for it.
    - **Not delegate a single-test re-check.** Re-running one named spec or one `--filter` is faster inline
      than a subagent cold start: `npx playwright test <spec>.spec.ts` / `dotnet test … --filter "…~<Name>"`.
      Delegate when you want the *whole* suite; run it yourself when you want *one* test.
@@ -201,7 +206,7 @@ Any value other than `0`/`false` (or unset/empty) enables it.
 | `CLAUDE.md` | Session setup, architecture, build commands, model strategy — loaded automatically |
 | `agents/docs-cleanup.md` | Mandatory docs-hygiene gate — archives finished TODO items, clears stale framing (Subagent) |
 | `agents/format-gate.md` | CSharpier formatting gate (Subagent) |
-| `agents/test-runner.md` | Test-suite runner — scoped to the caller's brief, one run, no re-runs (Subagent) |
+| `agents/test-runner.md` | Test-suite runner — fast suites only (E2E opt-in), scoped to the brief, one run (Subagent) |
 | `agents/requirements-review.md` | Gen-1 / roguelite domain & requirements gate — hard to pipeline, soft to user (Subagent) |
 | `agents/pr-review.md` | Opus technical / PR review incl. seam architecture — checks `DEFINITION_OF_DONE.md` (Subagent) |
 | `DEFINITION_OF_READY.md` | DoR — the exit criteria of `/plan` |

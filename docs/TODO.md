@@ -44,7 +44,10 @@ for the closing record.)*
 
 Lower priority / opportunistic: E2E flakiness stabilisation (`status.spec.ts` **fixed 2026-07-15** — root cause
 was a spec asserting a transient badge, not an engine bug; see *Browser-Based UI Testing* for the seed-≠-determinism
-lesson it taught), Web UI polish (move-specific animations), Multi-Generation groundwork, User Documentation,
+lesson it taught. Still live: `endless-chain.spec.ts` *"a run ends when the player faints"* failed once in a full
+2026-07-26 suite run — no `Run over` log line after 1m10s — but passes in **7.3 s** run alone; consistent with the
+documented "a long run accumulates abandoned server-side runs" degradation, not a code defect), Web UI polish
+(move-specific animations), Multi-Generation groundwork, User Documentation,
 **Settings Menu** (sound volume + difficulty→XP bonus both ✅ done — see its own section below; the
 difficulty dial's self-referential-scaling limitation is a known, user-waived follow-up, not open work).
 
@@ -584,10 +587,18 @@ recovery and the inter-test flakiness pass are all under *"Browser-Based UI Test
 recovery & the flakiness pass"*; the between-encounter modal E2Es under *"Other between-encounter modal E2Es"*;
 and the In-Combat Switching UI contract in the *"In-Combat Switching"* 2026-07-26 addendum.
 
+> **E2E is deliberately out of the AI agent's pre-finish gate (2026-07-26, user's call).** The suite is ~4 min
+> for 37 browser-driven tests and is the only one with real flakes, so agents are *heavily disincentivized*:
+> `test-runner` runs `.\test.ps1 -Dotnet -Web` and reports that E2E did not run, may only **recommend** the
+> narrowest covering command, and never runs it on its own initiative — **only the user asks for an E2E run**.
+> Iteration tool is **`.\e2e.ps1`** at the repo root (`-Spec`/`-Grep`/`-Bail`/`-LastFailed`, per-file timings,
+> failure artefact paths). See `.claude/agents/test-runner.md` and `CLAUDE.md`.
+
 **Remaining (in priority order):**
-- [ ] **CI step** (or `test.ps1 -StartStack`-adjacent) that boots backend + frontend, runs headless, tears down.
-  **This is the root cause of the rot going unnoticed** — E2E isn't gated in CI and `test.ps1` skips it when the
-  stack is down, so a red suite stayed invisible. Wiring E2E into the gate is what prevents a repeat.
+- [ ] **CI step** that boots backend + frontend, runs headless, tears down. **Now the only automatic E2E
+  coverage there is** — and therefore more load-bearing than when it was written, not less: the local gate
+  never runs E2E (see the note above) and `test.ps1` skips it when the stack is down, so nothing catches a red
+  suite until someone asks for a run. CI is what makes "agents don't run E2E" safe rather than merely cheap.
 - [ ] `data-testid` attributes — **deferred**: specs lean on stable semantic classes (`.btn-new-game`,
   `.species-card`, `.move-btn`, `.log-line`, `.bar-fill`, `.nameplate--*`). Add testids only where a class
   proves brittle.

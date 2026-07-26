@@ -32,7 +32,8 @@ advisory and name the owner — don't turn your report into a requirements audit
 Verify these are green; if any is not, say so and return CHANGES-REQUESTED without a deep pass (the earlier
 gate runs first):
 - `format-gate`: CSharpier clean.
-- `test-runner`: full suite green.
+- `test-runner`: the fast suites green (.NET + typecheck + Vitest). **E2E is deliberately not part of this
+  gate** — do not treat "E2E not run" as a missing precondition, and do not run it yourself.
 - `requirements-review`: `REQUIREMENTS: MET` (or every discrepancy user-adjudicated).
 
 You may re-run the deterministic checks to confirm (`dotnet csharpier check .`, `dotnet test

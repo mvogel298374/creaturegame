@@ -53,6 +53,19 @@ To run **all** test suites at once (one summary, CI-friendly exit code) — .NET
 ```
 Playwright E2E needs the app running (`.\dev.ps1`); without `-StartStack` it's skipped with a notice when the backend isn't on `:5100`. Frontend-only test commands also work directly: `npm test` / `npm run test:e2e` in `creaturegame.Web/ClientApp`.
 
+The E2E suite is the slow one — it is serial by design (`workers: 1`, stateful battles) and several specs walk whole runs seed-by-seed. When you're working *on* E2E rather than just gating on it, use **`.\e2e.ps1`**, which runs a subset and reports per-file + per-test timings, the slowest tests, and full failure detail with trace/video paths (parsed from Playwright's JSON report, not scraped from its console tail):
+```powershell
+.\e2e.ps1                             # whole suite, with a timing breakdown
+.\e2e.ps1 -Spec battle.spec            # one file (tab-completes; bare 'battle' also matches battle-ui-cues)
+.\e2e.ps1 -Grep "cadence" -Bail        # by test title, stop at the first failure
+.\e2e.ps1 -LastFailed                  # re-run only what failed last time
+.\e2e.ps1 -Spec shop -Headed           # watch it in a real browser window
+.\e2e.ps1 -StartStack                  # start/stop the backend itself
+```
+`-Ui`, `-Inspect`, `-ListOnly`, and `-Html` cover the interactive/report modes.
+
+**E2E is opt-in for the AI agent — it must never run it on its own initiative.** ~4 minutes for 37 browser-driven tests, it needs the stack up, and it is the only suite with real flakes (the long `walkSeedsUntil` specs degrade as a run accumulates abandoned server-side state, so a full-suite failure there is often not a code defect). So the `test-runner` gate deliberately runs **`.\test.ps1 -Dotnet -Web`** and reports that E2E did not run; the agent may *recommend* the narrowest covering command (`.\e2e.ps1 -Spec <file>`) and then stop, and only the **user** asks for a run. Bare `.\test.ps1` is off-limits to the agent for the same reason — with no switches it quietly includes E2E whenever the dev stack is up.
+
 To run a single .NET test by name:
 ```powershell
 dotnet test tests/creaturegame.Tests --filter "FullyQualifiedName~<MethodName>"
@@ -65,7 +78,7 @@ dotnet csharpier format .    # format C# (do NOT hand-align)
 dotnet csharpier check .     # what the hook/CI runs
 git config core.hooksPath .githooks                         # once per clone — arms .githooks/pre-commit
 ```
-The `.githooks/pre-commit` hook runs `csharpier check` (always), the full .NET test suite (when `.cs` is staged), and the frontend typecheck `tsc --noEmit` (when `.ts`/`.tsx` is staged — Vitest strips types without checking them, so nothing else catches a type error), and **blocks the commit on failure**. When a feature is close to done, run the pre-finish gate sequence before proposing a commit — first the **`docs-cleanup`** subagent (the **mandatory, unskippable** docs-hygiene gate: archive the finished item to `TODO_ARCHIVE.md`, clear its stale framing; runs for **every** finished feature, no scope exception), then the **`format-gate`** subagent (CSharpier), the **`test-runner`** subagent (full suite), for battle/stat/move work the **`requirements-review`** subagent (Gen-1 / roguelite domain fidelity), and finally the **`pr-review`** subagent (Opus, technical DoD incl. generation-seam architecture, from `docs/DEFINITION_OF_DONE.md`). Each is a separate subagent so it can be invoked or edited on its own.
+The `.githooks/pre-commit` hook runs `csharpier check` (always), the full .NET test suite (when `.cs` is staged), and the frontend typecheck `tsc --noEmit` (when `.ts`/`.tsx` is staged — Vitest strips types without checking them, so nothing else catches a type error), and **blocks the commit on failure**. When a feature is close to done, run the pre-finish gate sequence before proposing a commit — first the **`docs-cleanup`** subagent (the **mandatory, unskippable** docs-hygiene gate: archive the finished item to `TODO_ARCHIVE.md`, clear its stale framing; runs for **every** finished feature, no scope exception), then the **`format-gate`** subagent (CSharpier), the **`test-runner`** subagent (the fast suites — .NET + typecheck + Vitest; **E2E is not in the gate**, see below), for battle/stat/move work the **`requirements-review`** subagent (Gen-1 / roguelite domain fidelity), and finally the **`pr-review`** subagent (Opus, technical DoD incl. generation-seam architecture, from `docs/DEFINITION_OF_DONE.md`). Each is a separate subagent so it can be invoked or edited on its own.
 
 **Both review gates are hard to the pipeline, soft to the user — only the user clears a finding, never a subagent or you.** That applies to a `pr-review` **CHANGES-REQUESTED** exactly as it does to a `requirements-review` discrepancy: report the findings + fix cost + your recommendation, then **stop and let the user decide** (fix / waive / defer). Never run a fix→re-review loop on your own initiative — apply the agreed fix and report your own verification; a second Opus pass to confirm a small fix is waste.
 
