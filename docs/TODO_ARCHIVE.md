@@ -8,6 +8,29 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Party strip shows a stale level for the on-field creature ✅ DONE (2026-07-27)
+
+**The defect (found by `pr-review` 2026-07-27, same day as Participation XP).** The party panel is fed **only**
+by `PartyUpdated` snapshots (plus the connect-time `/party` hydrate), and `Battle` emitted that snapshot after a
+win only when an **off-field** creature levelled. So when the *active* creature levels up and nobody else does,
+its row in the party strip kept the old level until some later party-carrying event happened to refresh it. The
+nameplate/HUD were correct — they're driven by `LeveledUp` directly — so the inconsistency was strip-vs-nameplate,
+visible side by side. Pre-existing (it predates the participation split, which only hoisted the emit), cosmetic,
+and self-corrected at the next snapshot.
+
+**Fix.** At the post-win award site in `Battle.cs`, the `offFieldLevelled` flag was renamed `anyLevelled` and now
+also folds in the **active** creature's own `RunLevelUpLoopAsync` result (previously only
+`PayOtherParticipantsAsync` + `ShareExperienceWithBenchAsync` fed it). So a win where only the on-field creature
+levels now also pushes a `PartyUpdated` snapshot, and the party strip no longer disagrees with the nameplate. The
+comment at the emit site explains why the on-field creature needs the snapshot too (its nameplate/HUD follow
+`LeveledUp` directly, its strip row does not).
+
+Pinned by `PartyExpShareTests.ActiveCreatureLevellingAlone_StillPushesAPartySnapshot` (lead at level 5 that levels
+off the win, high-level bench with `BenchXpShare = 0` so nothing off-field levels; asserts the only `LeveledUp`
+events are the active's, and that the last `PartyUpdated` snapshot carries the lead's new level).
+
+---
+
 ## Participation XP — a creature that fought earns a full share ✅ DONE (2026-07-27)
 
 **Shipped as the Gen 1 participation split.** `Battle` now tracks a per-battle participant set (`_participants`,

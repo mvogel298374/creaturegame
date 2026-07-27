@@ -24,9 +24,6 @@ creature), **Revive Items** (in-battle party revive, Boss-reward + rare-shop onl
    *(Item acquisition itself is already done via the Run Economy; bag persistence + catch remain.)*
 3. **Game Loop & Progression** — save layer (`save.db`); party + between-biome lead + forced-switch are done.
 
-*(Also open, small and cosmetic: **party strip shows a stale level for the on-field creature** — found
-2026-07-27, own section below.)*
-
 *(**In-Combat Switching** — the voluntary, any-turn SWITCH turn-action — is **✅ COMPLETE (2026-07-25)**, all three
 stages (engine core / wire / frontend) shipped, including the out-of-PP menu affordance (BAG/SWITCH reachable at
 0 PP; Struggle only on a FIGHT choice). Full record archived in `TODO_ARCHIVE.md`.)*
@@ -435,22 +432,6 @@ for a party run and this is the same rule outliving the world it was written for
 finisher earns nothing and is excluded from the divisor, so a live switched-out participant takes the whole
 award (`PartyExpShareTests.MutualKo_FaintedFinisherEarnsNothingAndIsExcludedFromTheDivisor`). That XP is
 currently **discarded** by the run ending, which is exactly why the bug was invisible until now.
-
----
-
-## Party strip shows a stale level for the on-field creature  ⟵ OPEN (found 2026-07-27, `pr-review`)
-
-**The defect.** The party panel is fed **only** by `PartyUpdated` snapshots (plus the connect-time `/party`
-hydrate), and `Battle` emits that snapshot after a win only when an **off-field** creature levelled. So when the
-*active* creature levels up and nobody else does, its row in the party strip keeps the old level until some
-later party-carrying event happens to refresh it. The nameplate/HUD are correct — they're driven by `LeveledUp`
-directly — so the inconsistency is strip-vs-nameplate, visible side by side.
-
-Pre-existing (it predates the participation split, which only hoisted the emit), cosmetic, and self-corrects at
-the next snapshot. *Fix:* also push a `PartyUpdated` when the on-field creature levelled — cheapest is to fold
-the active creature's `RunLevelUpLoopAsync` result into the same `offFieldLevelled` flag at the award site in
-`Battle.cs` and rename it. Needs a Vitest/engine case pinning that a lone active-creature level-up still emits
-a snapshot.
 
 ---
 

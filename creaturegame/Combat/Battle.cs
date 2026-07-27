@@ -277,6 +277,10 @@ public class Battle
                 var participants = LiveParticipants();
                 int participantShare = _rules.SplitXpAmongParticipants(xp, participants.Count);
 
+                // Set by ANY of the three award loops below (active / other participants / bench share) — it
+                // gates the one PartyUpdated snapshot that repaints the roster panel.
+                bool anyLevelled = false;
+
                 // Paid ONLY if it is still standing. A mutual KO (Self-Destruct, Struggle recoil, end-of-turn
                 // Burn/Poison/Leech — all resolved above, before this enemy-faint check) lands here with a
                 // fainted finisher, and a fainted participant earns nothing: the award then goes undivided to
@@ -300,15 +304,12 @@ public class Battle
                     PlayerCreature.RestoreOriginalIdentity();
                     // Drive level-ups one at a time so each event carries that level's resulting stats, the
                     // per-stat gains, and bar parameters (also the seam the deferred move-learning will use).
-                    await RunLevelUpLoopAsync(PlayerCreature, onBench: false);
+                    anyLevelled = await RunLevelUpLoopAsync(PlayerCreature, onBench: false);
                 }
 
                 // The OTHER live participants — creatures that fought and were switched back out — each earn the
                 // same share as the creature that finished the fight.
-                bool offFieldLevelled = await PayOtherParticipantsAsync(
-                    participants,
-                    participantShare
-                );
+                anyLevelled |= await PayOtherParticipantsAsync(participants, participantShare);
 
                 // Innate party Exp-Share (roguelite Exp-All, RunRules.BenchXpShare): every LIVING member that
                 // never took the field earns a fraction of the FULL award + the full Stat-Exp, so a drafted
@@ -316,13 +317,14 @@ public class Battle
                 // earns nothing, per Gen 1). Deliberately a roguelite deviation from Gen 1's participant split —
                 // kept out of the seam; scales the seam's result only. Never fires for a direct single-creature
                 // Battle (no party threaded) or when the share is 0.
-                offFieldLevelled |= await ShareExperienceWithBenchAsync(xp);
+                anyLevelled |= await ShareExperienceWithBenchAsync(xp);
 
                 // The party strip is fed only by PartyUpdated snapshots (+ the connect-time /party hydrate), so
-                // without this an off-field creature's level/HP would read stale until some later party-carrying
-                // event. Pushed once, covering both loops above — the on-field creature's own level-up is
-                // already carried by its nameplate/HUD.
-                if (offFieldLevelled && _playerParty is not null)
+                // without this a creature's level/HP would read stale in the strip until some later party-carrying
+                // event. Pushed once, covering all three loops above — INCLUDING the on-field creature's own
+                // level-up: its nameplate/HUD is driven by LeveledUp directly, but its party-strip row is not, so
+                // a lone active-creature level-up would otherwise leave the strip disagreeing with the nameplate.
+                if (anyLevelled && _playerParty is not null)
                     _emitter?.Emit(new PartyUpdated(PartyProjection.Snapshot(_playerParty)));
                 break;
             }

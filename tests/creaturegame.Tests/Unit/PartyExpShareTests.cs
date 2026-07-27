@@ -183,6 +183,52 @@ public class PartyExpShareTests
         Assert.True(rookieRow.Level > 5);
     }
 
+    // The ON-FIELD creature's own strip row is fed by the same snapshots — its nameplate/HUD follow LeveledUp
+    // directly, its strip row does not. So a win where ONLY the active creature levels must still push a
+    // PartyUpdated, or the strip shows a stale level right next to a correct nameplate.
+    [Fact]
+    public async Task ActiveCreatureLevellingAlone_StillPushesAPartySnapshot()
+    {
+        var lead = OneShotLead(level: 5); // low floor → the award crosses a threshold
+        lead.GrowthRate = GrowthRate.MediumFast;
+        lead.Experience = lead.CalculateExperienceForLevel(5);
+        var bench = Bench("Bench", level: 80); // high, and the share is off → nothing off-field levels
+        var party = new Party(lead);
+        party.Add(bench);
+
+        var result = await new BattleScenario()
+            .Party(party)
+            .Enemy(Foe())
+            .PlayerUses("Slam")
+            .EnemyUses("Poke")
+            .RunRules(new RunRules { BenchXpShare = 0.0 })
+            .Seed(1)
+            .RunAsync();
+
+        Assert.Equal("Lead", result.Winner);
+
+        // Only the on-field creature levelled…
+        var levelUps = result.All<LeveledUp>();
+        Assert.NotEmpty(levelUps);
+        Assert.All(
+            levelUps,
+            e =>
+            {
+                Assert.Equal("Lead", e.CreatureName);
+                Assert.False(e.OnBench, "the only level-up here is the active creature's");
+            }
+        );
+        Assert.True(lead.Level > 5, "the win should have levelled the on-field creature");
+        Assert.Equal(80, bench.Level); // untouched
+
+        // …and the roster panel is still refreshed, with the lead's row carrying the NEW level.
+        var snapshots = result.All<PartyUpdated>();
+        Assert.NotEmpty(snapshots);
+        var leadRow = snapshots[^1].Members.Single(m => m.Name == "Lead");
+        Assert.Equal(lead.Level, leadRow.Level);
+        Assert.True(leadRow.Level > 5);
+    }
+
     // The bench share is taken off the active's ALREADY-curve-scaled award (RunRules.XpMultiplier*), not the raw
     // Gen-1 base — the production config runs both dials at once (live: 1.5→4.5 curve × 0.5 share). Pin that the
     // bench earns floor(scaledAward × share), i.e. the multiplier compounds into the share as intended.
