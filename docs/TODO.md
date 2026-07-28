@@ -39,6 +39,12 @@ run even with a live bench*.)*
 *(Small residual, not urgent: **sweep other end-of-battle effects that assume the starting lead** — see
 [**Switched-in creature is the active creature**](#switched-in-creature-is-the-active-creature--resolved) below.)*
 
+*(**Evolution nameplate/action-prompt lag** — found 2026-07-26 — is **✅ COMPLETE (2026-07-28)**: the nameplate
+and `"What will X do?"` prompt now retarget on `CreatureEvolved`, same as `BattleStarted`/`LeadChanged`/
+`CreatureSwitchedIn`. Full record in `TODO_ARCHIVE.md` → *Evolution nameplate doesn't follow until the next
+battle starts*. Two follow-ups deliberately left open, not closed by that fix: the E2E coverage gap above, and
+**party strip shows a stale name after an on-field evolution**, own section below.)*
+
 *(**Phase 4 shipped in full** — the roster, both acquisition channels, between-biome lead swap, and
 forced-switch-on-faint. Stage 3's end-of-battle defect (wrong requirement pins in its own plan, not the domain)
 is now **resolved** (2026-07-18) — evolution fixed, XP/Stat-Exp superseded by the Innate Party XP Share; see
@@ -407,6 +413,24 @@ Encounter Logic gate:
 
 ---
 
+## Party strip shows a stale name after an on-field evolution  ⟵ OPEN (found 2026-07-28)
+
+**The defect.** The party panel is fed **only** by `PartyUpdated` snapshots (plus the connect-time `/party`
+hydrate). `TryEvolveAsync` in `BattleRunEvent.cs` renames the creature and emits `CreatureEvolved`, but pushes no
+`PartyUpdated` afterward — so the roster row keeps the pre-evolution species name until some later event happens
+to resync it (a reward/acquisition/lead-change snapshot). The nameplate/HUD are now correct (see `TODO_ARCHIVE.md`
+→ *Evolution nameplate doesn't follow until the next battle starts*, 2026-07-28) — driven directly by
+`CreatureEvolved` client-side — so the inconsistency is strip-vs-nameplate, visible side by side, same shape as
+the archived *Party strip shows a stale level for the on-field creature* (2026-07-27) but a different trigger
+(evolution, not level-up) and a different field (name, not level).
+
+Cosmetic, self-corrects at the next snapshot. *Fix:* push a `PartyUpdated` from `TryEvolveAsync` (or its caller)
+after a successful evolution, mirroring the `anyLevelled` fix's precedent. Needs an engine/integration test
+pinning that a solo on-field evolution still emits a snapshot (same shape as
+`PartyExpShareTests.ActiveCreatureLevellingAlone_StillPushesAPartySnapshot`).
+
+---
+
 ## Game Loop & Progression
 
 **Prerequisites:** Catch Mechanic, `PlayerDbContext` / `save.db`. Intentionally deferred until combat fidelity
@@ -544,7 +568,9 @@ tested through the `mitt` bridge (assert **event ordering**, never wall-clock du
 **Done and archived** (→ `TODO_ARCHIVE.md`): seed plumbing, the Run Economy reward-modal E2E, the spec-rot
 recovery and the inter-test flakiness pass are all under *"Browser-Based UI Testing — seed plumbing, spec-rot
 recovery & the flakiness pass"*; the between-encounter modal E2Es under *"Other between-encounter modal E2Es"*;
-and the In-Combat Switching UI contract in the *"In-Combat Switching"* 2026-07-26 addendum.
+the In-Combat Switching UI contract in the *"In-Combat Switching"* 2026-07-26 addendum; and the evolution
+nameplate/action-prompt lag under *"Evolution nameplate doesn't follow until the next battle starts"*
+(2026-07-28) — see the two known-still-open follow-ups (E2E coverage gap, party-strip staleness) below.
 
 > **E2E is deliberately out of the AI agent's pre-finish gate (2026-07-26, user's call).** The suite is ~4 min
 > for 37 browser-driven tests and is the only one with real flakes, so agents are *heavily disincentivized*:
@@ -562,14 +588,13 @@ and the In-Combat Switching UI contract in the *"In-Combat Switching"* 2026-07-2
   `.species-card`, `.move-btn`, `.log-line`, `.bar-fill`, `.nameplate--*`). Add testids only where a class
   proves brittle.
 - [ ] §8 visual-regression canvas snapshots — skipped (maintenance cost).
-- [ ] ⚠️ **Known defect (found 2026-07-26): the player nameplate doesn't follow an evolution until the next
-  battle starts.** `useBattleHub`'s `playerNameRef` is updated on `BattleStarted` and `CreatureSwitchedIn` but
-  has **no `CreatureEvolved` case**, so between encounters the log reads `CHARMANDER evolved into CHARMELEON!`
-  while the nameplate and the action prompt still say *"What will CHARMANDER do?"*. Self-corrects at the next
-  `BattleStarted`, so it's cosmetic and transient — but it is a visible inconsistency, and it's the **manual TS
-  client leg** of the web event-field projection gap (the C# wire-drop half is auto-guarded; this leg isn't).
-  Fix is a one-line ref update plus a Vitest case. Found while writing `evolution.spec.ts`, which is why that
-  spec reads the nameplate only after the run is playable again rather than straight after the morph.
+- [ ] *(low, regression-insurance only)* **`evolution.spec.ts` doesn't pin the nameplate-follows-evolution fix**
+  (see `TODO_ARCHIVE.md` → *Evolution nameplate doesn't follow until the next battle starts*, 2026-07-28). The
+  ALLOW case reads the nameplate only after `expectRunFlowsOn` (i.e. after the *next* `BattleStarted`), which
+  would pass whether or not the rename happens on `CreatureEvolved` itself — so it wouldn't catch a regression of
+  the fix. Add an assertion reading the nameplate immediately after the morph, before the next encounter starts.
+  Not done here: E2E is user-only per the repo's agent rules, and an added assertion wasn't verified by a
+  Playwright run.
 
 ## Frontend Unit Coverage (Vitest)
 
@@ -706,8 +731,10 @@ findings" as an open section.)*
 - Enemy Pokémon do not evolve — wire into level-up when Game Loop is built.
 - ~~**Endless-chain double-faint**~~ — **RESOLVED 2026-07-28**: a mutual end-of-turn DoT double-faint now counts
   as the player's win and promotes a survivor whenever the party has a live bench member; it only remains a loss
-  for a **lone** creature with nobody left to promote (`RunDirectorTests.Runner_DoubleFaintFromEndOfTurnPoison_CountsAsLoss_NotAWin`
-  — note the class, not the formerly-cited `BattleRunnerTests`, which doesn't exist in this repo). See
+  for a **lone** creature with nobody left to promote (`RunDirectorTests.Runner_DoubleFaintFromEndOfTurnPoison_EndsTheRun_ButStillCountsTheWin`
+  — note both the class and the name, neither of which matches the formerly-cited
+  `BattleRunnerTests.…_CountsAsLoss_NotAWin`: that class doesn't exist in this repo, and the test was renamed when
+  the win-tally decision flipped its `BattlesWon` pin 0 → 1). See
   `TODO_ARCHIVE.md` → *Mutual KO ends the run even with a live bench*.
 - ~~**Phantom stat-cap message**~~ — **FIXED 2026-07-19** (see `TODO_ARCHIVE.md` → *Stat-cap message fidelity*).
 - **Fly deploy must stay single-machine** — `GameSessionManager` keeps run state in-process with no shared

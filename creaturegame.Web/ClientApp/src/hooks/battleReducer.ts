@@ -321,6 +321,18 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
         playerStatus: member?.status ?? state.playerStatus,
       };
     }
+    case 'CREATURE_RENAMED': {
+      // An evolution renames the creature in place — nobody enters or leaves the field, so neither SWITCHED_IN nor
+      // LEAD_CHANGED fires and the nameplate + "What will X do?" prompt would keep the pre-evolution name until the
+      // next BATTLE_STARTED reset it.
+      //
+      // Guarded on the OLD name matching, because evolution is party-wide (the engine offers it to every member
+      // that levelled): a BENCH member's evolution must not rename the on-field creature. Same name-keying as
+      // UPDATE_HP/UPDATE_STATUS above — and it must compare the *from* name, since that is what the HUD still
+      // holds at this point.
+      if (action.fromName !== state.playerName) return state;
+      return { ...state, playerName: action.toName };
+    }
     case 'SHOW_LEAD_CHOICE':
       return { ...state, leadChoice: action.party };
     case 'HIDE_LEAD_CHOICE':

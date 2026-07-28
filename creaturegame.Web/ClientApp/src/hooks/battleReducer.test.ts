@@ -324,6 +324,27 @@ describe('battleReducer — party & acquisition (Phase 4 Stage 1c)', () => {
     expect(next.playerHp).toBe(30);
   });
 
+  // An evolution renames in place — nobody enters or leaves the field, so neither SWITCHED_IN nor LEAD_CHANGED
+  // fires. Without this the nameplate and the "What will X do?" prompt read the pre-evolution name until the next
+  // BATTLE_STARTED, i.e. "What will CHARMANDER do?" under a CHARMELEON sprite.
+  it('CREATURE_RENAMED renames the player when it is the on-field creature that evolved', () => {
+    const s = ready({ playerName: 'CHARMANDER' });
+
+    const next = battleReducer(s, { type: 'CREATURE_RENAMED', fromName: 'CHARMANDER', toName: 'CHARMELEON' });
+
+    expect(next.playerName).toBe('CHARMELEON');
+  });
+
+  // Evolution is party-wide, so this action also arrives for bench members. Renaming the HUD on one of those
+  // would put a benched creature's name on the on-field nameplate.
+  it('CREATURE_RENAMED leaves the player alone when a bench member evolved', () => {
+    const s = ready({ playerName: 'CHARMANDER' });
+
+    const next = battleReducer(s, { type: 'CREATURE_RENAMED', fromName: 'ODDISH', toName: 'GLOOM' });
+
+    expect(next.playerName).toBe('CHARMANDER');
+  });
+
   it('SHOW_ACQUISITION opens the offer; HIDE_ACQUISITION clears it', () => {
     const offer = {
       source: 'ThemedDraft', speciesId: 25, name: 'PIKACHU', level: 12, types: ['Electric'],

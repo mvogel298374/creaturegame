@@ -3,6 +3,7 @@ import * as signalR from '@microsoft/signalr';
 import { type Payload, expandEvent, useBattleTimeline } from '../battle/timeline';
 import { battleReducer, initialState } from './battleReducer';
 import { bossTrainerName } from '../battle/bossTrainer';
+import { nextPlayerName } from '../battle/playerIdentity';
 
 // The view-state shape + modal-prompt types live with the reducer now; re-export them so existing
 // consumers (BattleScreen) keep importing them from the hook.
@@ -52,20 +53,12 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
       .build();
 
     conn.on('OnBattleEvent', (eventType: string, payload: Payload) => {
+      // Retarget the player/enemy side split BEFORE the event expands, so the newly-named creature's own
+      // moves/damage are sided correctly in the very event that renamed it. The rule itself (which events change
+      // "who the player is", and the party-wide-evolution guard) lives in the pure helper.
+      playerNameRef.current = nextPlayerName(eventType, payload, playerNameRef.current);
       if (eventType === 'BattleStarted') {
-        playerNameRef.current = payload.playerName as string;
         encounterIndexRef.current += 1;
-      }
-      // A forced faint-switch changes which creature is "the player": retarget the side split immediately (at
-      // receive time, before later events expand) so the incoming creature's moves/damage are sided correctly.
-      if (eventType === 'CreatureSwitchedIn') {
-        playerNameRef.current = payload.name as string;
-      }
-      // A lead reassignment does the same OUT of battle (the between-biome swap, or the post-mutual-KO promotion),
-      // and emits no CreatureSwitchedIn because nobody takes the field — so retarget the side split here too, or
-      // the new lead's later moves/damage would be attributed to the enemy side.
-      if (eventType === 'LeadChanged') {
-        playerNameRef.current = payload.name as string;
       }
       // Track whether the active node is the Boss (its BattleStarted follows), so the trainer framing is
       // scoped to the boss fight only.

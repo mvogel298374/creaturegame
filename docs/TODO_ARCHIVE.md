@@ -8,6 +8,50 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Evolution nameplate doesn't follow until the next battle starts ✅ FIXED (2026-07-28)
+
+**The defect (found 2026-07-26, while writing `evolution.spec.ts`).** `useBattleHub`'s side-split ref and the
+reducer's `state.playerName` — the value `BattleScreen` renders in the nameplate and the `"What will X do?"`
+action prompt — were retargeted on `BattleStarted`, `CreatureSwitchedIn`, and `LeadChanged`, but not on
+`CreatureEvolved`. Between encounters the log read `CHARMANDER evolved into CHARMELEON!` while the nameplate
+and prompt still said "What will CHARMANDER do?" under the new CHARMELEON sprite. Self-corrected at the next
+`BattleStarted`, so cosmetic and transient, but a real, visible inconsistency — and the last unfixed leg of the
+recurring **web event field-projection gap**: `BattleStarted`/`CreatureSwitchedIn` were already handled,
+`LeadChanged` was fixed the same day in commit `b53f0ff`, and `CreatureEvolved` was the straggler.
+
+**Fix landed in two passes (both needed — the first alone did not close the visible symptom):**
+1. `battle/playerIdentity.ts` (new) — extracted the four-rule "which creature is the player" decision
+   (`BattleStarted`/`CreatureSwitchedIn`/`LeadChanged`/`CreatureEvolved`) out of `useBattleHub.ts` into a pure
+   `nextPlayerName` helper, and added the `CreatureEvolved` case for the **event side-split ref**
+   (`playerNameRef`, used by `expandEvent` to attribute later moves/damage to the player vs. the enemy side).
+   Guarded on the OLD name matching the current player — evolution is party-wide (`BattleRunEvent`'s
+   `EvolutionOrder` offers it to every member that levelled) — so an unguarded retarget would have handed player
+   identity, and therefore future move/damage attribution, to a bench creature. Covered by `playerIdentity.test.ts`
+   (6 cases, including the bench-evolution guard). This closed a real, separate hazard, but left the visible HUD
+   text (a different piece of state) still stale.
+2. `timeline.ts` / `battleReducer.ts` — the visible symptom needed a second, separate fix: a new
+   `CREATURE_RENAMED` action (carries both `fromName` and `toName`), dispatched in the `CreatureEvolved` timeline
+   case **after** `anim()` so the nameplate flips together with the sprite morph rather than before it; the
+   reducer's `CREATURE_RENAMED` case renames `state.playerName` only when `action.fromName === state.playerName`
+   (same bench-evolution guard, keyed on the *old* name since that's what the HUD still holds at that point).
+   Mirrors the existing `LEAD_CHANGED`/`SWITCHED_IN` reducer pattern — which is why `LeadChanged`/
+   `CreatureSwitchedIn` never had this gap in the first place. Covered by two new `battleReducer.test.ts` cases
+   (on-field rename / bench-evolution no-op) and an extended `timeline.test.ts` `CreatureEvolved` case asserting
+   the dispatch carries both names and lands after the morph index.
+
+**Verification:** full suite green — .NET 1430/1430, TypeScript clean, Vitest 187/187.
+
+**Known still-open, deliberately not touched by this fix (see `TODO.md`):**
+- `evolution.spec.ts` still reads the nameplate only after the run is playable again (i.e. after the *next*
+  `BattleStarted`), so it would not catch a regression of this exact fix. Not extended here — E2E is user-only
+  per the repo's agent rules, and an unverified assertion isn't worth adding blind.
+- The **party strip** has the same staleness on a different, engine-side leg: `TryEvolveAsync` in
+  `BattleRunEvent.cs` emits no `PartyUpdated` after an evolution, so the roster row keeps the pre-evolution name
+  until some later snapshot happens to resync it. Same family as commit `2880158` ("Party strip follows the
+  on-field creature's level-up") but a separate leg — no client-only fix can close it.
+
+---
+
 ## Mutual KO ends the run even with a live bench ✅ DONE (2026-07-28)
 
 **The defect (found 2026-07-27 by `pr-review`).** When the active creature and the enemy fainted on the same

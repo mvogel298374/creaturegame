@@ -169,6 +169,9 @@ export type Action =
   // player nameplate onto it. Carries only the name — the new lead's level/HP/status are read from the roster
   // snapshot, since a lead swap moves no one onto the field and so has no entry-state of its own to report.
   | { type: 'LEAD_CHANGED'; name: string }
+  // A creature was renamed in place by an evolution. Carries BOTH names so the reducer can check the old one
+  // against the current player — evolution is party-wide, so this also arrives for bench members.
+  | { type: 'CREATURE_RENAMED'; fromName: string; toName: string }
   // Run economy: set the gold total (RewardGranted carries the post-credit total) shown in the BAG money box.
   | { type: 'SET_GOLD'; gold: number }
   // Loot drop hover: a transient floating "you found …" toast (gold + items) shown over the field for a
@@ -926,6 +929,10 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
         w(200),
         emit({ type: 'playEvolutionAnimation', toSpeciesId }),
         anim(),
+        // Rename the HUD as the morph lands, so the nameplate and the "What will X do?" prompt flip together with
+        // the sprite instead of lagging to the next BattleStarted. The reducer decides whether this creature is
+        // the player (a bench member's evolution reaches here too).
+        d({ type: 'CREATURE_RENAMED', fromName, toName }),
         d(log(`${fromName} evolved into ${toName}!`)),
         w(600),
       ] };

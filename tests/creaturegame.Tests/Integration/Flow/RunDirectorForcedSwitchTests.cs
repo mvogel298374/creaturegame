@@ -264,7 +264,7 @@ public class RunDirectorForcedSwitchTests
         // Here the party has two members but the bench is already down, so the mutual KO takes the last creature
         // with it. PromoteSurvivorAsync must find nobody to promote, raise NO prompt (there is nothing to pick
         // from — a modal here would strand the run on an unanswerable blocking await), and let the run end.
-        // Distinct from Runner_DoubleFaintFromEndOfTurnPoison_CountsAsLoss_NotAWin, which is a LONE creature —
+        // Distinct from Runner_DoubleFaintFromEndOfTurnPoison_EndsTheRun_ButStillCountsTheWin, a LONE creature —
         // this pins the multi-member all-fainted-bench case, where the party is non-trivial but still wiped.
         var lead = Poisoner("Lead", maxHp: 160, hp: 5, speed: 100);
         var bench = Poisoner("Bench", maxHp: 300, hp: 300, speed: 150);

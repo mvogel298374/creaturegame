@@ -506,6 +506,18 @@ describe('expandEvent — control plane vs timeline', () => {
     );
     expect(animIdx).toBeGreaterThanOrEqual(0);
     expect(animIdx).toBeLessThan(confirmIdx);
+
+    // …and it renames the HUD, carrying BOTH names so the reducer can tell an on-field evolution from a bench
+    // one. Dispatched after the morph so the nameplate flips together with the sprite, not before it.
+    const renameIdx = (steps ?? []).findIndex(
+      s => s.kind === 'dispatch' && s.action.type === 'CREATURE_RENAMED',
+    );
+    expect(renameIdx).toBeGreaterThan(animIdx);
+    const rename = dispatched(steps).find(
+      (a): a is Extract<Action, { type: 'CREATURE_RENAMED' }> => a.type === 'CREATURE_RENAMED',
+    );
+    expect(rename?.fromName).toBe('CHARMANDER');
+    expect(rename?.toName).toBe('CHARMELEON');
   });
 
   it('LeveledUp announces the level, plays the fanfare, and shows the stat-gain panel (no auto-hide)', () => {
