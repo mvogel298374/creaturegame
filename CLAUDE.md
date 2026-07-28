@@ -21,6 +21,7 @@ them up front burns ~25k tokens before the work is even scoped; almost none of i
 | `docs/GAME_LOOP.md` | working on the **run/roguelite loop** — the game-loop ↔ event model (battle & heal as events), the logic-drives-sequence rule, and the target event abstraction. |
 | `docs/ENCOUNTER_DESIGN.md` | working on **encounters/acquisition** — the biome-graph run model, the `IEnemyArchetype` strength tiers, the type-themed pool, and the two gated acquisition channels (boss catch + themed draft). |
 | `docs/GENERATION_SEAMS.md` | adding a gen-variable rule or a new generation — the seams (`ITypeChart`, `IBattleRules`, `IStatCalculator`) + the §5.0 gen-agnostic checklist. |
+| `docs/GENERATION_PROFILE.md` | working on the **generation switch** — the profile that bundles seams + content + region + theme, the gen-invariant list (`RunRules` and the node kinds are *not* per-gen), and the `TestAltProfile` falsification rule. |
 | `docs/DATA_IMPORT.md` | changing imported data — the `PokeApiConnector` pipeline, import-vs-runtime boundary, PokeAPI→model mapping. |
 
 ## Commands

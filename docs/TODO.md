@@ -20,6 +20,12 @@ creature), **Revive Items** (in-battle party revive, Boss-reward + rare-shop onl
    *(Item acquisition itself is already done via the Run Economy; bag persistence + catch remain.)*
 2. **Game Loop & Progression** — save layer (`save.db`); party + between-biome lead + forced-switch are done.
 
+**Unsequenced (raised 2026-07-29, `/plan` in progress — needs slotting against the two above):**
+**Generation Profile** — make Gen 1 an explicit, swappable profile so a generation switch changes content, menus
+and look, not just battle math. Designed against Gen 1 alone; upward compatibility is the deliverable, no Gen 2
+content. **`/plan` DONE (2026-07-29), all five stages incl. the frontend** — full design in
+[`GENERATION_PROFILE.md`](GENERATION_PROFILE.md); task entry + staging below.
+
 *(**In-Combat Switching** — the voluntary, any-turn SWITCH turn-action — is **✅ COMPLETE (2026-07-25)**, all three
 stages (engine core / wire / frontend) shipped, including the out-of-PP menu affordance (BAG/SWITCH reachable at
 0 PP; Struggle only on a FIGHT choice). Full record archived in `TODO_ARCHIVE.md`.)*
@@ -619,6 +625,60 @@ UI Testing above), not RTL.
   TTL, and the run-loop `Task.Run` are covered by *neither* suite (they're entangled with `IHubContext` +
   `Task.Run` + wall-clock timers). Regression-insurance only: the reconnect behaviour is a settled/validated
   edge, not a suspected bug. Would need an injectable clock to unit-test the timing without real delays.
+
+---
+
+## Generation Profile — make Gen 1 an explicit, swappable profile  ⟵ OPEN, `/plan` DONE (2026-07-29)
+
+> **Full design: [`GENERATION_PROFILE.md`](GENERATION_PROFILE.md).** This entry is the task; that doc is the
+> design (staging detail, the boundary rule, the falsification harness, DoR coverage).
+
+**The goal.** A generation switch should change the game *completely* — content, region, menus and look, not just
+battle math. Today "generation" is a **battle-math axis only**: four seams injected where `Battle`/`Creature` are
+built. Everything else is Gen 1 **by assumption, not by seam**.
+
+**Designed against Gen 1 alone — no Gen 2 content is built here. Upward compatibility is the deliverable.**
+
+**Decisions locked with the user (2026-07-29):** (1) Gen 1 only, upward-compatible; (2) presentation is per-gen in
+both senses — reskin **and** menu structure; (3) the roguelite layer is **flavour-only** (same node kinds, same
+flow, same possibilities — this is what keeps `RunRules` gen-neutral); (4) one generation per run, chosen at run
+start, threaded like `Difficulty`; (5) skin = Gen 1's layout **grammar**, not its palette (authentic 4-colour DMG
+green rejected — it would discard the type-badge colours and the contrast tuning in `index.css`); (6) battle menu
+= Gen 1's **2×2 grid with today's four verbs** (literal `FIGHT`/`PKMN`/`ITEM`/`RUN` rejected — `RUN` is not a turn
+action in this engine, so it would mean adding a flee feature, contradicting decision 3).
+
+> ⚠️ **Ship-blocking risk: upward compatibility is unfalsifiable with one profile.** You cannot prove a seam is
+> generation-agnostic when only one implementation exists — exactly the trap `GENERATION_SEAMS.md §5.0.1`
+> documents (two leaks that passed review *and* tests). Mitigation: a **test-only `TestAltProfile`** giving every
+> seam a second implementation. It is **not Gen 2** and carries no fidelity claim. Each stage lands with its leg
+> of it; a stage without one has demonstrated nothing.
+
+- [ ] **Stage 1 — generation as a run parameter.** `GenerationProfile` record + registry; threaded
+  `StartGameRequest` → `GameController` → `RegisterSession` → `PendingSession` → `AttachConnection` → lookup,
+  mirroring `Difficulty` (2026-07-22) exactly. Parse + lookup `internal` so tests hit the real path. Gen 1 must
+  reproduce today **byte-for-byte**.
+- [ ] **Stage 2 — content scope.** Type roster real (Gen 1 = 15; `DamageType` keeps all 18 and stays gen-blind);
+  species/move/item filtering as **documented no-op stubs** per `GENERATION_SEAMS.md §5.0`. Schema work stays in
+  *Multi-Generation* below.
+- [ ] **Stage 3 — region, biomes, starters onto the profile.** Smaller than it looks: `Biomes.For(Region)` and the
+  `Region` enum already exist. Also moves the starter roster server-side. Backend-only.
+- [ ] **Stage 4 — presentation: theme + menu structure.** `/plan` **complete** — no longer provisional. Per-gen
+  override of the `:root` design tokens in `index.css`; `ActionMenu` restructured to the 2×2 grid with the layout
+  as profile data and the verb set fixed by the engine. **Scope widened by the user 2026-07-29: this stage
+  redesigns the WHOLE menu surface** — move select, CHECK POKEMON (`CreatureOverview.tsx`), BAG, party/switch, and
+  the 13 run prompts in `components/modals/` — with the 2×2 grid as the entry point, not the extent. Re-estimate
+  when greenlit. **Note this is a visible change to the game as it exists today**, not a no-op behind a flag.
+  Client learns the generation from route state **and** a server echo (a reconnect re-mounts with no route
+  state). Phaser/canvas + per-gen sprite & cry assets are **deferred**.
+- [ ] **Stage 5 — falsification harness.** Standing requirement, not a final stage: each stage ships its leg of
+  `TestAltProfile`.
+
+**Relationship to *Multi-Generation* below:** that section is the **content/schema** half (Special split, per-gen
+species/move tables, `GenerationIntroduced` filtering), still deferred to a Gen 2 sprint. This is the
+**axis/framework** half, doable now against Gen 1 alone. Neither subsumes the other.
+
+**Sequencing against the current backlog is NOT yet decided** — not slotted against *Item Acquisition · Bag
+Persistence · Catch* or *Game Loop & Progression*. Raise with the user.
 
 ---
 
