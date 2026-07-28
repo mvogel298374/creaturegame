@@ -61,6 +61,12 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
       if (eventType === 'CreatureSwitchedIn') {
         playerNameRef.current = payload.name as string;
       }
+      // A lead reassignment does the same OUT of battle (the between-biome swap, or the post-mutual-KO promotion),
+      // and emits no CreatureSwitchedIn because nobody takes the field — so retarget the side split here too, or
+      // the new lead's later moves/damage would be attributed to the enemy side.
+      if (eventType === 'LeadChanged') {
+        playerNameRef.current = payload.name as string;
+      }
       // Track whether the active node is the Boss (its BattleStarted follows), so the trainer framing is
       // scoped to the boss fight only.
       if (eventType === 'RunNodeEntered') {

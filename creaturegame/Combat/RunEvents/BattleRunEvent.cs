@@ -99,12 +99,25 @@ internal sealed class BattleRunEvent(
             return new FledOutcome(PlayerFled: active.Battle.HasFled);
         }
 
-        // The battle ends when one side faints. With a party, Battle keeps sending in survivors, so reaching here
-        // with a fainted active creature means the WHOLE party is down → the run is over (read by the director's
-        // while-loop); otherwise it is a win (whoever finished is the active creature).
-        if (!active.IsAlive())
+        // The battle ends when one side faints. With a party, Battle keeps sending in survivors on a LOSING faint,
+        // so reaching here with a fainted active creature normally means the WHOLE party is down → the run is over
+        // (read by the director's while-loop).
+        //
+        // The one exception is a MUTUAL KO — Self-Destruct/Explosion, Struggle recoil, or end-of-turn
+        // Burn/Poison/Leech taking both sides down on the same turn. Battle's enemy-faint check runs first, so
+        // that is a WIN (battle.PlayerWon) even though the finisher is fainted, and the forced faint-switch is
+        // correctly skipped — there is no enemy left to send anyone in against. The run must not end while the
+        // bench still holds a live creature (the Phase 4 Stage 3 rule: a run ends only when the WHOLE party is
+        // down), so the player PICKS who leads on and we take the win path below. Promoting here, before the
+        // reward/draft rolls, also keeps them reading a live lead (PlayerCondition / draft scaling).
+        // Counted here, ABOVE the guard, so a trade-kill that takes the last creature with it still shows in the
+        // run summary — under the mutual-KO ruling it IS a win, and the run ending doesn't unmake it. Keyed on
+        // PlayerWon rather than on reaching the win path, which is what keeps an ordinary loss from counting.
+        if (battle.PlayerWon)
+            s.BattlesWon++;
+
+        if (!active.IsAlive() && !(battle.PlayerWon && await PromoteSurvivorAsync(s, ctx, active)))
             return new BattleOutcome(false);
-        s.BattlesWon++;
         await GrantBattleRewardAsync(enemy, s, ctx);
 
         // Evolution check — Gen 1 attempts evolution on a level-up, so only for creatures that actually gained a
@@ -123,7 +136,14 @@ internal sealed class BattleRunEvent(
         // Default: the finisher's major status carries into its next encounter, stored ON the creature (the
         // multi-creature carry model — each party member keeps its own ailment while benched); a Poké Center heal
         // clears it. The generation decides the out-of-battle form (Gen 1 reverts Toxic to Poison).
-        active.CarriedStatus = CaptureCarriedStatus(active);
+        //
+        // Skipped when the finisher FAINTED — the mutual-KO path (its survivor is now the lead, but `active` is
+        // still the creature that actually fought, which is the one whose status this describes). A corpse has no
+        // ailment worth carrying: it cannot take the field again until something revives it, and every revive path
+        // clears CarriedStatus anyway. Guarded explicitly rather than left to write an inert value, so this does
+        // not silently depend on that invariant holding elsewhere.
+        if (active.IsAlive())
+            active.CarriedStatus = CaptureCarriedStatus(active);
 
         // Acquisition (ENCOUNTER_DESIGN.md §4): the last beat of a win, and at most one offer per win. A Boss win
         // routes to the boss-catch channel — a small chance to add the boss you just beat (Stage 2); every other
@@ -137,6 +157,43 @@ internal sealed class BattleRunEvent(
             await OfferDraftAsync(s, ctx);
 
         return new BattleOutcome(true);
+    }
+
+    /// <summary>
+    /// A mutual KO left the finisher fainted but the party still standing: the player <b>picks</b> who leads on,
+    /// and the run continues. Returns false when the whole party is down (a real wipe), which the caller reads as
+    /// the end of the run.
+    /// <para><b>Why the forced-switch prompt and not the between-biome lead choice</b> (user ruling 2026-07-28,
+    /// after <c>requirements-review</c> challenged an earlier silent auto-promotion): "your active creature
+    /// fainted, a bench member must take over" is exactly the forced faint-switch's situation, and its prompt is
+    /// already the right shape — non-dismissable, fainted members greyed out, titled with the name that just
+    /// dropped. The between-biome <c>LeadChoiceOffered</c> assumes a post-Poké-Center party where every member is
+    /// pickable, so its modal doesn't disable a downed one.</para>
+    /// <para>The <em>result</em>, though, is a lead reassignment rather than a send-in — nobody takes the field
+    /// here, so there is no entry status and no volatile reset (each member already carries its own status), and
+    /// no <c>CreatureSwitchedIn</c>. Hence <c>LeadChanged</c> + <c>PartyUpdated</c>, the out-of-battle lead-swap
+    /// wire. A stale / out-of-range / fainted pick is corrected to the first live member, mirroring
+    /// <c>Battle</c>'s own guard, so a malformed client can never promote a corpse and strand the run.</para>
+    /// </summary>
+    private static async Task<bool> PromoteSurvivorAsync(
+        RunState s,
+        RunContext ctx,
+        Creature fainted
+    )
+    {
+        var party = s.Party;
+        // Nobody left to promote ⇒ the whole party is down and the run really is over. Checked BEFORE the prompt:
+        // a modal with nothing to pick from would park a blocking await the player can never answer.
+        if (party.FirstLiveIndex() < 0)
+            return false;
+
+        ctx.Emitter?.Emit(new SwitchInOffered(PartyProjection.Snapshot(party), fainted.Name));
+        int index = await ctx.PlayerInput.ChooseSwitchInAsync(new SwitchInContext(party));
+
+        party.SetLead(party.CorrectSwitchInPick(index));
+        ctx.Emitter?.Emit(new LeadChanged(party.Lead.Name, party.Lead.SpeciesId));
+        ctx.Emitter?.Emit(new PartyUpdated(PartyProjection.Snapshot(party)));
+        return true;
     }
 
     // Rolls the themed draft for this win and, if the supplier offers a creature, raises the acquisition offer

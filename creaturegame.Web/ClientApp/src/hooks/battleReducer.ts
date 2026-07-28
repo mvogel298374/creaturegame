@@ -288,8 +288,39 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
       return { ...state, acquisition: action.offer };
     case 'HIDE_ACQUISITION':
       return { ...state, acquisition: null };
-    case 'PARTY_SET':
-      return { ...state, party: action.members };
+    case 'PARTY_SET': {
+      // Keep the player HUD in step with the lead's row. A lead swap emits LeadChanged followed by this snapshot,
+      // and the snapshot is the authority on the new lead's level/HP/status — LEAD_CHANGED below can only read the
+      // roster it already had. Guarded on the lead's name matching the current playerName (the same name-keying
+      // UPDATE_HP/CLEAR_STATUS use), so this only ever refreshes the creature the HUD is already describing and
+      // can never retarget onto a different one.
+      const lead = action.members.find(m => m.isLead);
+      if (!lead || lead.name !== state.playerName) return { ...state, party: action.members };
+      return {
+        ...state,
+        party: action.members,
+        playerLevel: lead.level,
+        playerHp: lead.hp,
+        playerMaxHp: lead.maxHp,
+        playerStatus: lead.status,
+      };
+    }
+    case 'LEAD_CHANGED': {
+      // The lead was reassigned out of battle, so no CreatureSwitchedIn will announce the new player identity.
+      // Retarget the nameplate immediately, filling level/HP/status from the roster we already hold; the
+      // PartyUpdated snapshot that follows re-syncs those from the authority. Without this the HUD keeps
+      // describing the outgoing creature — after a mutual KO, a corpse at 0 HP — name-keyed HP/status events for
+      // the new lead are dropped, and `Lv` never self-corrects because no later event carries a level.
+      const member = state.party.find(m => m.name === action.name);
+      return {
+        ...state,
+        playerName: action.name,
+        playerLevel: member?.level ?? state.playerLevel,
+        playerHp: member?.hp ?? state.playerHp,
+        playerMaxHp: member?.maxHp ?? state.playerMaxHp,
+        playerStatus: member?.status ?? state.playerStatus,
+      };
+    }
     case 'SHOW_LEAD_CHOICE':
       return { ...state, leadChoice: action.party };
     case 'HIDE_LEAD_CHOICE':

@@ -111,6 +111,15 @@ the whole party rather than only the creature that started the fight:
   > ⚠️ **Known, user-accepted limitation (2026-07-27):** the bench share is taken off the **full** award while
   > participants split it, so with two live participants a creature that never fought earns the **same** as one
   > that did at Normal (0.5) and **more** at Easy (0.75). Deliberate — see `docs/TODO_ARCHIVE.md` → *Participation XP*.
+- **A mutual KO is the player's win, not a loss (2026-07-28).** When the active creature and the enemy faint on
+  the same turn, the enemy-faint check runs first, so `Battle.PlayerWon` records the win independently of whether
+  the finisher itself survived it. There is no foe left to send anyone in against, so no mid-battle switch-in
+  fires — but post-battle `BattleRunEvent` still promotes a live bench member to lead (`PromoteSurvivorAsync`, a
+  forced pick reusing the switch-in prompt) before the reward/XP/draft rolls, so the whole win sequence — reward,
+  the Gen 1 participation split above, and the acquisition offer — applies exactly as it would for a survived win.
+  The fainted finisher itself earns nothing and is excluded from the participation divisor, so the survivor takes
+  the whole award. Only when the **whole party** is down (nobody to promote) does the run end, as a loss. See
+  `docs/TODO_ARCHIVE.md` → *Mutual KO ends the run even with a live bench*.
 
 These are documented invariants (not plan claims) that `requirements-review` can cite. The general rule — *no
 end-of-battle effect may silently assume the starting lead* — still has one open audit item (sweep the rest of the

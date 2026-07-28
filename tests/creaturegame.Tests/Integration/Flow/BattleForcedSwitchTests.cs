@@ -243,13 +243,15 @@ public class BattleForcedSwitchTests
     }
 
     [Fact]
-    public async Task DoubleFaint_WithALiveBenchMember_OffersNoSwitch_AndKeepsTheLossSemantics()
+    public async Task DoubleFaint_WithALiveBenchMember_OffersNoSwitch_ButStillCountsAsTheWin()
     {
         // The enemy-faint (win) check runs BEFORE the player-faint/switch check, so the forced switch only ever
-        // fires on the isolated path "enemy alive + active fainted". A simultaneous double faint must therefore
-        // keep its pre-Stage-3 semantics even now that a party is wired: no switch is offered (a mutual KO does
-        // not buy the run a free continue off the bench) and the battle still resolves as a loss. The existing
-        // double-faint regression runs on a null-party battle, which never reaches this branch at all.
+        // fires on the isolated path "enemy alive + active fainted". A simultaneous double faint therefore offers
+        // no switch even now that a party is wired — correctly, since there is no enemy left to send anyone in
+        // against. But it IS the player's win, and Battle records that on PlayerWon independently of who is
+        // standing; the run then continues off the live bench via BattleRunEvent's survivor promotion (pinned in
+        // RunDirectorForcedSwitchTests). The existing single-creature double-faint regression runs on a
+        // null-party battle and still ends the run — with nobody on the bench, there is nothing to promote.
         // maxHP 160 → poison tick = 10; HP 5 → the first tick is lethal to both. Both use a 0-damage poison
         // move, so the attack phase changes nothing and both are alive (poisoned) entering end-of-turn.
         var lead = Poisoner("Lead", maxHp: 160, hp: 5, speed: 100);
@@ -286,8 +288,19 @@ public class BattleForcedSwitchTests
         Assert.Empty(recorder.Of<CreatureSwitchedIn>());
         Assert.Same(lead, party.Lead);
 
-        // Unchanged loss semantics: the fainted player is not the winner despite the enemy also dropping.
-        Assert.Equal("Foe", recorder.Of<BattleEnded>().Last().WinnerName);
+        // A mutual KO is the player's WIN (2026-07-28 ruling): the enemy-faint check runs first, so the trade
+        // counts even though the finisher went down with it. The winner is keyed on Battle.PlayerWon, not on who
+        // is still standing — naming the (also fainted) enemy would tell the client it lost. Continuing the run
+        // off the live bench is the RUN layer's job (BattleRunEvent promotes a survivor); Battle itself still
+        // offers no switch here, which is what the assertions above pin.
+        Assert.True(battle.PlayerWon);
+        Assert.Equal("Lead", recorder.Of<BattleEnded>().Last().WinnerName);
+
+        // BOTH faints are announced. The win branch breaks out before the losing-faint branch (the only other
+        // CreatureFainted emitter), so the player's own faint has to be emitted here or the client never plays its
+        // faint animation — the creature would sit at an empty HP bar through the victory. Enemy first, matching
+        // the check order that makes the trade a win.
+        Assert.Equal(["Foe", "Lead"], recorder.Of<CreatureFainted>().Select(f => f.Name));
     }
 
     [Fact]

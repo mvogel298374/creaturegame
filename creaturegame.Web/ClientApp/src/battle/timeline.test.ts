@@ -870,6 +870,10 @@ describe('expandEvent — between-biome lead choice (Stage 1d)', () => {
     >;
     expect(swap.speciesId).toBe(9);
     expect(logLines(steps)).toEqual(['BLASTOISE is now your lead!']);
+    // …and retargets the player HUD: a lead swap moves nobody onto the field, so no CreatureSwitchedIn follows to
+    // do it. The reducer fills level/HP/status from the roster; only the name rides on the event.
+    const retarget = dispatchedOf(steps, 'LEAD_CHANGED')[0] as Extract<Action, { type: 'LEAD_CHANGED' }>;
+    expect(retarget.name).toBe('BLASTOISE');
   });
 });
 

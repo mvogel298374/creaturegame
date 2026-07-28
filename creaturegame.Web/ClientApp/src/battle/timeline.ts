@@ -165,6 +165,10 @@ export type Action =
   | { type: 'HIDE_SWITCH_IN' }
   // A replacement was sent in — retarget the player nameplate (name/level/HP/status) onto the incoming creature.
   | { type: 'SWITCHED_IN'; name: string; level: number; hp: number; maxHp: number; status: string }
+  // The lead was reassigned OUT of battle (the between-biome swap, or the post-mutual-KO promotion): retarget the
+  // player nameplate onto it. Carries only the name — the new lead's level/HP/status are read from the roster
+  // snapshot, since a lead swap moves no one onto the field and so has no entry-state of its own to report.
+  | { type: 'LEAD_CHANGED'; name: string }
   // Run economy: set the gold total (RewardGranted carries the post-credit total) shown in the BAG money box.
   | { type: 'SET_GOLD'; gold: number }
   // Loot drop hover: a transient floating "you found …" toast (gold + items) shown over the field for a
@@ -620,11 +624,17 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       // to re-flag the lead). Swap the player sprite to the new lead's species — like CreatureSwitchedIn, this is
       // a permanent creature change (swapPlayerCreature updates the *true* species too), so the next battle keeps
       // it rather than reverting to the old lead. Then narrate the swap.
+      // LEAD_CHANGED also retargets the player HUD onto the new lead. Necessary because a lead swap is the one way
+      // "who the player is" changes WITHOUT anyone taking the field, so no CreatureSwitchedIn announces it: without
+      // this the nameplate/HP bar keep describing the outgoing creature, name-keyed HP/status events for the new
+      // lead are dropped, and `Lv` never self-corrects (no later event carries a level). Visible after a mutual-KO
+      // promotion, where the outgoing lead is a corpse at 0 HP.
       const name = payload.name as string;
       const speciesId = payload.speciesId as number;
       return { steps: [
         w(150),
         emit({ type: 'swapPlayerCreature', speciesId }),
+        d({ type: 'LEAD_CHANGED', name }),
         d(log(`${name} is now your lead!`, 'event')),
         w(400),
       ] };

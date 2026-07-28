@@ -8,6 +8,91 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Mutual KO ends the run even with a live bench ✅ DONE (2026-07-28)
+
+**The defect (found 2026-07-27 by `pr-review`).** When the active creature and the enemy fainted on the same
+turn — Self-Destruct/Explosion, Struggle recoil, or end-of-turn Burn/Poison/Leech — the battle was a **win** (the
+enemy-faint check runs first in `Battle.cs`), but `BattleRunEvent` read the post-battle `s.Player`, found it dead,
+and **ended the run as a loss**. That contradicted the rule Encounter Logic Phase 4 Stage 3 established: *the run
+ends only when the **whole party** is down*. A player with five healthy creatures on the bench lost the run
+because their lead traded itself for the kill.
+
+**Resolution (2026-07-28) — the fork settled.** The `/plan` fork was: (a) a mutual KO is the player's **win**,
+banking the reward/XP and continuing with a surviving lead; (b) a draw/loss for the encounter but not the run
+(no reward, run continues); (c) keep today's behaviour and make it intentional. **The user picked (a).**
+
+**What shipped:**
+- `creaturegame/Combat/Battle.cs` — a new `public bool PlayerWon` property, set in the enemy-faint branch, so a
+  win is recorded independently of whether the finisher survived it. The end-of-battle `BattleEnded` winner name
+  is now keyed on `PlayerWon` instead of `PlayerCreature.IsAlive()` (the old expression named the also-fainted
+  enemy as the winner, telling the client the player LOST). The enemy-faint branch now also emits
+  `CreatureFainted` for the player when it went down too — otherwise the client never played the player-side
+  faint animation and its creature sat at an empty HP bar through the victory.
+- `creaturegame/Combat/RunEvents/BattleRunEvent.cs` — the `if (!active.IsAlive()) return new BattleOutcome(false);`
+  guard became `if (!active.IsAlive() && !(battle.PlayerWon && await PromoteSurvivorAsync(s, ctx, active)))`. The
+  new `PromoteSurvivorAsync` **prompts** the player for the next lead, reusing the forced-switch prompt
+  (`SwitchInOffered` + `IBattleInput.ChooseSwitchInAsync`) — "your active creature fainted, someone must take
+  over" is exactly that prompt's situation, and its modal already disables fainted members. The result is a
+  **lead reassignment, not a send-in**: it emits `LeadChanged` + `PartyUpdated` (no `CreatureSwitchedIn` — nobody
+  takes the field). A stale/out-of-range/fainted pick is corrected to the first standing member. Runs *before*
+  the reward/draft rolls, so those read a live lead. Returns `false` when the whole party is down, which still
+  ends the run as a loss. Also: the post-battle `active.CarriedStatus = CaptureCarriedStatus(active)` is now
+  skipped when the finisher fainted (previously inert only because every revive path happens to clear
+  `CarriedStatus` — a "right by coincidence" dependency the mutual-KO path would otherwise have exposed).
+- `creaturegame/Creatures/Party.cs` — `FirstLiveIndex()` and `CorrectSwitchInPick(int)`. Both prompts that pick a
+  creature by index now share them (`Battle`'s mid-battle forced faint-switch and the run loop's promotion), so
+  "never put a corpse on the field, and never strand the run on a bad pick" has one home instead of two verbatim
+  copies that could drift. `Battle.FirstLiveMemberIndex` is now a one-liner over it (it only adds the null-party
+  case, i.e. the legacy single-creature battle).
+- **Client (`useBattleHub.ts` / `battleReducer.ts` / `timeline.ts`)** — a lead swap is the one way "who the player
+  is" changes *without* anyone taking the field, so no `CreatureSwitchedIn` announces it, and `LeadChanged` only
+  swapped the sprite and logged a line. Left as-is the promoted survivor rendered under the corpse's name at an
+  empty HP bar for the whole post-battle stretch (reward modal, draft modal, and — for a Boss-node mutual KO — the
+  Poké Center → biome-choice run), name-keyed `UPDATE_HP`/`CLEAR_STATUS` for the new lead were **dropped** (so a
+  heal would log while the bar stayed at zero), and `Lv` never self-corrected, since no later event carries a
+  level. Fixed by a new `LEAD_CHANGED` action that retargets the player HUD (filling level/HP/status from the
+  roster it holds), a `PARTY_SET` re-sync from the lead row **guarded on the name already matching** so it can
+  refresh but never *retarget*, and `playerNameRef` updating on `LeadChanged` so the side split follows. No new
+  wire field: `PartyUpdated` already carries all five. **This also closes the same latent gap on the between-biome
+  `LeadChoiceEvent` path**, where it was masked (a Poké Center heal precedes it and a `BattleStarted` follows).
+  Found by `pr-review`, which correctly rejected the claim that no client change was needed.
+- Tests: `RunDirectorForcedSwitchTests.MutualKo_WithALiveBenchMember_CountsTheWin_AndPromptsForTheNextLeadInsteadOfEndingTheRun`
+  (which also pins the full win sequence and, via a capturing `RewardSupplier`, that the reward roll sees the
+  **promoted survivor** — the promotion-before-reward ordering is load-bearing, because a 0-HP `PlayerCondition`
+  maximises both the heal chance and its size in `RewardCalculator.TryRollHeal`),
+  `…MutualKo_WithNoStandingBenchMember_EndsTheRun_AndNeverRaisesThePrompt` (the whole-party-down case: no prompt is
+  raised, since a modal with nothing to pick would park an unanswerable blocking await),
+  `…MutualKo_APickNamingTheFaintedFinisher_IsCorrectedToTheFirstStandingMember`; three `battleReducer.test.ts`
+  cases for the HUD retarget / re-sync / never-retarget rules and a `timeline.test.ts` assertion for the new
+  dispatch;
+  `BattleForcedSwitchTests.DoubleFaint_WithALiveBenchMember_OffersNoSwitch_ButStillCountsAsTheWin` (renamed from
+  `…AndKeepsTheLossSemantics`, winner pin flipped "Foe"→"Lead", plus an ordered `["Foe","Lead"]` `CreatureFainted`
+  assertion); and `RunDirectorTests.Runner_DoubleFaintFromEndOfTurnPoison_EndsTheRun_ButStillCountsTheWin`
+  (renamed from `…CountsAsLoss_NotAWin`) — a **lone** creature still ends the run, since there is nobody to
+  promote, but its `BattlesWon` pin moved 0 → 1 with the win-tally decision below.
+
+**Settled alongside it (user, 2026-07-28) — record as decided, not open:**
+- A fainted finisher earns **zero** XP for the kill (excluded from the participation divisor) — confirmed as
+  matching the Gen 1 quirk. Pre-existing behaviour from commit `d4acd05` (Participation XP), unchanged here.
+- A mutual KO fires the **full** win sequence — the gold/item reward roll **and** the themed-draft/boss-catch
+  acquisition offer — not XP alone.
+- The next lead is a **player pick**, not a silent auto-promotion. The first implementation auto-promoted the first
+  standing member in roster order (justified by Gen 1's overworld default-to-slot-order); `requirements-review`
+  challenged it as a third, novel promotion mechanism that borrowed the vocabulary of an existing player-choice
+  feature while removing the choice, and the user chose the prompt.
+- A mutual KO that takes the **last** creature still **counts in the win tally** (`if (battle.PlayerWon)
+  s.BattlesWon++`, above the run-over guard — deliberately not the old unconditional `++`, which would have
+  credited ordinary losses). The run ends, but the win that ended it is not unmade. Raised during the gates and
+  settled with the user; `pr-review` agreed it was worth changing.
+
+**Superseded framing.** This closes the "masked in the shipped web run" caveat left in `TODO_ARCHIVE.md` →
+*Participation XP*: that entry's `IsAlive()` guards were live for direct `Battle` callers and the endless chain
+from 2026-07-27, but a mutual KO still discarded the correctly-computed XP by ending the run — now it doesn't,
+whenever a bench member survives. Docs updated: `GAME_LOOP.md` (the forced-switch-on-faint row), `STATE_MODEL.md`
+(the party-wide end-of-battle effects section).
+
+---
+
 ## Party strip shows a stale level for the on-field creature ✅ DONE (2026-07-27)
 
 **The defect (found by `pr-review` 2026-07-27, same day as Participation XP).** The party panel is fed **only**
@@ -76,9 +161,12 @@ re-admitted it via `LiveParticipants()`'s fallback insert and paid it at the awa
 fainted creature was counted in the divisor and paid a share — contradicting this feature's own rule — and its
 `ExperienceGained` went out with `OnBench: false`, filling the XP bar of a creature that had just fainted. Both
 sites are now gated on `IsAlive()`: the fainted finisher earns nothing, the award goes undivided to whoever fought
-and survived, and `liveParticipants` may legitimately be `0` (documented on the seam). Masked in the shipped web
-run — `BattleRunEvent` ends the run as a loss whenever the finisher is dead, discarding the XP — but live for
-direct `Battle` callers and the endless chain. Pinned by
+and survived, and `liveParticipants` may legitimately be `0` (documented on the seam). **At the time this shipped
+(2026-07-27), this was masked in the web run** — `BattleRunEvent` ended the run as a loss whenever the finisher
+was dead, discarding the correctly-computed XP — live only for direct `Battle` callers and the endless chain.
+**Un-masked 2026-07-28**: a mutual KO now counts as the player's win and promotes a surviving bench member instead
+of ending the run, so this divisor logic is live in the shipped web run too — see `TODO_ARCHIVE.md` → *Mutual KO
+ends the run even with a live bench*. Pinned by
 `PartyExpShareTests.MutualKo_FaintedFinisherEarnsNothingAndIsExcludedFromTheDivisor`.
 
 **Why participation is tracked on `Battle`, not `Creature.BattleState`** (the sketch below proposed the latter):

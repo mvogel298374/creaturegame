@@ -70,4 +70,29 @@ public sealed class Party
         if (index >= 0 && index < _members.Count)
             LeadIndex = index;
     }
+
+    /// <summary>The index of the first standing member, or -1 when the whole party is down (⇒ the run is over).
+    /// A fainted active creature reads dead here too, so on either faint path this returns a live member or -1.</summary>
+    public int FirstLiveIndex()
+    {
+        for (int i = 0; i < _members.Count; i++)
+        {
+            if (_members[i].IsAlive())
+                return i;
+        }
+        return -1;
+    }
+
+    /// <summary>
+    /// Corrects a switch-in / promotion pick to something safe: an out-of-range or <em>fainted</em> index becomes
+    /// <see cref="FirstLiveIndex"/>. Returns -1 only when the whole party is down.
+    /// <para>The single home for "never put a corpse on the field, and never strand the run on a bad pick". Both
+    /// prompts that pick a creature by index share it — <see cref="Combat.Battle"/>'s mid-battle forced faint-switch
+    /// and the run loop's post-mutual-KO promotion — because both answer over the wire, where a stale or malformed
+    /// client can send any int.</para>
+    /// </summary>
+    public int CorrectSwitchInPick(int index) =>
+        index >= 0 && index < _members.Count && _members[index].IsAlive()
+            ? index
+            : FirstLiveIndex();
 }

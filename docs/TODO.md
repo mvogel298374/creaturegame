@@ -16,13 +16,9 @@ creature), **Revive Items** (in-battle party revive, Boss-reward + rare-shop onl
 (the voluntary, any-turn SWITCH turn-action) are all done and archived (→ `TODO_ARCHIVE.md`).
 
 **Next up, in priority order:**
-1. **Mutual KO ends the run even with a live bench** — a real defect raised by `pr-review` 2026-07-27: a
-   trade-kill loses the whole run while healthy creatures sit on the bench, contradicting the "run ends only
-   when the whole party is down" rule. **Needs `/plan`** (win vs. draw vs. keep-as-intentional). See its
-   section below.
-2. **Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by the acquisition channels.
+1. **Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by the acquisition channels.
    *(Item acquisition itself is already done via the Run Economy; bag persistence + catch remain.)*
-3. **Game Loop & Progression** — save layer (`save.db`); party + between-biome lead + forced-switch are done.
+2. **Game Loop & Progression** — save layer (`save.db`); party + between-biome lead + forced-switch are done.
 
 *(**In-Combat Switching** — the voluntary, any-turn SWITCH turn-action — is **✅ COMPLETE (2026-07-25)**, all three
 stages (engine core / wire / frontend) shipped, including the out-of-PP menu affordance (BAG/SWITCH reachable at
@@ -33,6 +29,12 @@ the win's XP is now split evenly among the live creatures that took the field, s
 mid-battle is no longer paid the flat bench share. The `/plan` fork was settled in favour of the Gen 1 even
 split; the resulting bench-share inversion is a user-accepted limitation, not open work. Full record in
 `TODO_ARCHIVE.md` → *Participation XP*.)*
+
+*(**Mutual KO ends the run even with a live bench** — found 2026-07-27 by `pr-review` — is **✅ COMPLETE
+(2026-07-28)**: the user settled the fork in favour of counting a trade-kill as the player's win — `Battle`
+now tracks the win independently of the finisher's own survival (`PlayerWon`), and `BattleRunEvent` promotes a
+surviving bench member to lead instead of ending the run. Full record in `TODO_ARCHIVE.md` → *Mutual KO ends the
+run even with a live bench*.)*
 
 *(Small residual, not urgent: **sweep other end-of-battle effects that assume the starting lead** — see
 [**Switched-in creature is the active creature**](#switched-in-creature-is-the-active-creature--resolved) below.)*
@@ -405,36 +407,6 @@ Encounter Logic gate:
 
 ---
 
-## Mutual KO ends the run even with a live bench  ⟵ OPEN (found 2026-07-27, `pr-review`)
-
-**The defect.** When the active creature and the enemy faint on the same turn — Self-Destruct/Explosion,
-Struggle recoil, or end-of-turn Burn/Poison/Leech — the battle is a **win** (the enemy-faint check runs first,
-`Battle.cs`), but `BattleRunEvent` reads the post-battle `s.Player`, finds it dead, and **ends the run as a
-loss**. That contradicts the rule Encounter Logic Phase 4 Stage 3 established and that the forced faint-switch
-exists to enforce: *the run ends only when the **whole party** is down*. A player with five healthy creatures on
-the bench loses the run because their lead traded itself for the kill.
-
-Distinct from the forced faint-switch, which only fires while the **enemy is still alive**: here there is no
-enemy left to send anyone in against, so the switch path is correctly skipped — the bug is purely in what the
-run loop then concludes. Compare the already-settled `Runner_DoubleFaintFromEndOfTurnPoison_CountsAsLoss_NotAWin`
-pin, which encoded "double faint = loss" back when a run was a **single** creature; that premise is now stale
-for a party run and this is the same rule outliving the world it was written for.
-
-**Needs a domain call (`/plan`) before implementation** — it's a genuine fork:
-- **(a)** A mutual KO is a **win**: bank the reward/XP, then run the normal between-encounter flow, with the
-  next lead chosen from the survivors (the whole-party-down rule taken literally).
-- **(b)** A mutual KO is a **draw/loss for the encounter** but not the run: no reward, but the run continues
-  with a surviving member.
-- **(c)** Keep today's behaviour and make it *intentional* — but then the Stage 3 rule needs rewording, and the
-  fainted-participant XP work (2026-07-27) that made this visible stays dead code on this path.
-
-**Also revisit alongside it:** the participation split already handles the engine half correctly — a fainted
-finisher earns nothing and is excluded from the divisor, so a live switched-out participant takes the whole
-award (`PartyExpShareTests.MutualKo_FaintedFinisherEarnsNothingAndIsExcludedFromTheDivisor`). That XP is
-currently **discarded** by the run ending, which is exactly why the bug was invisible until now.
-
----
-
 ## Game Loop & Progression
 
 **Prerequisites:** Catch Mechanic, `PlayerDbContext` / `save.db`. Intentionally deferred until combat fidelity
@@ -732,8 +704,11 @@ findings" as an open section.)*
 ### Known Gaps
 - Enemy encounter pool ignores game version — filter by `PokemonGameAvailability` once a version selector exists.
 - Enemy Pokémon do not evolve — wire into level-up when Game Loop is built.
-- **Endless-chain double-faint** — tested (2026-06-12): a mutual end-of-turn DoT double-faint counts as a loss,
-  pinned by `BattleRunnerTests.Runner_DoubleFaintFromEndOfTurnPoison_CountsAsLoss_NotAWin`.
+- ~~**Endless-chain double-faint**~~ — **RESOLVED 2026-07-28**: a mutual end-of-turn DoT double-faint now counts
+  as the player's win and promotes a survivor whenever the party has a live bench member; it only remains a loss
+  for a **lone** creature with nobody left to promote (`RunDirectorTests.Runner_DoubleFaintFromEndOfTurnPoison_CountsAsLoss_NotAWin`
+  — note the class, not the formerly-cited `BattleRunnerTests`, which doesn't exist in this repo). See
+  `TODO_ARCHIVE.md` → *Mutual KO ends the run even with a live bench*.
 - ~~**Phantom stat-cap message**~~ — **FIXED 2026-07-19** (see `TODO_ARCHIVE.md` → *Stat-cap message fidelity*).
 - **Fly deploy must stay single-machine** — `GameSessionManager` keeps run state in-process with no shared
   store, so a 2nd machine 404s any plain REST call (e.g. CHECK POKEMON) that Fly's proxy routes to the machine

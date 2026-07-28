@@ -45,6 +45,15 @@ public class Battle
     /// </summary>
     public bool EndedInFlee { get; private set; }
 
+    /// <summary>
+    /// True if this battle ended with the enemy fainting — the player's win — <b>regardless of whether the
+    /// finisher survived it</b>. Deliberately not derivable from <c>PlayerCreature.IsAlive()</c>: on a
+    /// <b>mutual KO</b> (Self-Destruct, Struggle recoil, or end-of-turn Burn/Poison/Leech) both sides are down,
+    /// and the enemy-faint check below runs first, so the trade is a win even though the finisher is fainted.
+    /// The run loop reads this to tell a mutual KO apart from a real party wipe. False until then.
+    /// </summary>
+    public bool PlayerWon { get; private set; }
+
     public Battle(
         Creature player,
         Creature enemy,
@@ -248,7 +257,15 @@ public class Battle
 
             if (!EnemyCreature.IsAlive())
             {
+                PlayerWon = true;
                 _emitter?.Emit(new CreatureFainted(EnemyCreature.Name));
+                // A MUTUAL KO drops the player's creature on the same turn, and this branch breaks out before the
+                // losing-faint branch below (the only other CreatureFainted emitter) — so without this the client
+                // would never play the player-side faint animation/cry: its creature would just sit at an empty HP
+                // bar through the victory. Emitted after the enemy's, matching the check order that makes the
+                // trade a win. Cannot double-emit: the branch below is unreachable once we break here.
+                if (!PlayerCreature.IsAlive())
+                    _emitter?.Emit(new CreatureFainted(PlayerCreature.Name));
                 // Gen-1 base award (pure, from the seam), then the run's roguelite XP curve — a soft
                 // level-aware multiplier keyed on the winner's current level (RunRules, kept out of the seam).
                 // The emitted and applied amounts are the same scaled value, so the client's ExperienceGained
@@ -367,7 +384,10 @@ public class Battle
         // turns into a "challenger approaches" intermission / game-over) would mis-signal it, so skip it.
         if (!EndedInFlee)
         {
-            string winner = PlayerCreature.IsAlive() ? PlayerCreature.Name : EnemyCreature.Name;
+            // Keyed on PlayerWon, NOT on who is still standing: a mutual KO leaves the finisher fainted but is
+            // still the player's win, and naming the (also fainted) enemy would tell the client it lost — which
+            // is how it decides between the intermission beat and waiting for a game-over.
+            string winner = PlayerWon ? PlayerCreature.Name : EnemyCreature.Name;
             _emitter?.Emit(new BattleEnded(winner));
         }
     }
@@ -693,10 +713,8 @@ public class Battle
         int index = await _playerInput.ChooseSwitchInAsync(new SwitchInContext(_playerParty));
         // Never send in a fainted / out-of-range creature: correct a stale or malformed pick to the first live
         // member (the interface default already picks a live one, but the web hub can forward an arbitrary int).
-        if (index < 0 || index >= _playerParty.Count || !_playerParty.Members[index].IsAlive())
-            index = FirstLiveMemberIndex();
-
-        BringInMember(index);
+        // The rule lives on Party so this and the run loop's post-mutual-KO promotion can't drift apart.
+        BringInMember(_playerParty.CorrectSwitchInPick(index));
         return true;
     }
 
@@ -772,17 +790,10 @@ public class Battle
         }
     }
 
-    // The index of the first alive party member, or -1 if the whole party is down. The active (fainted) creature
-    // reads dead here too, so this only ever returns a benched live member (or -1 → the run is over).
-    private int FirstLiveMemberIndex()
-    {
-        if (_playerParty is null)
-            return -1;
-        for (int i = 0; i < _playerParty.Count; i++)
-            if (_playerParty.Members[i].IsAlive())
-                return i;
-        return -1;
-    }
+    // The index of the first alive party member, or -1 if there is no party or the whole party is down. The rule
+    // itself lives on Party (shared with the run loop's post-mutual-KO promotion); this only adds the null-party
+    // case, which is the legacy single-creature battle.
+    private int FirstLiveMemberIndex() => _playerParty?.FirstLiveIndex() ?? -1;
 
     private void ApplyLeechSeedDrain(Creature drained, Creature healed)
     {

@@ -278,6 +278,52 @@ describe('battleReducer — party & acquisition (Phase 4 Stage 1c)', () => {
     expect(next.party).toEqual(members);
   });
 
+  // A lead swap is the ONE way "who the player is" changes without anyone taking the field, so no SWITCHED_IN
+  // announces it. Without LEAD_CHANGED retargeting the HUD, the nameplate keeps describing the outgoing creature
+  // (after a mutual KO, a corpse at 0 HP), name-keyed HP/status events for the new lead are dropped, and the level
+  // NEVER self-corrects — no later event carries one.
+  it('LEAD_CHANGED retargets the player HUD onto the new lead from the roster it holds', () => {
+    const corpse = member({ speciesId: 4, name: 'CHARMANDER', level: 9, hp: 0, maxHp: 40 });
+    const survivor = member({ speciesId: 25, name: 'PIKACHU', level: 12, hp: 30, maxHp: 34, isLead: false });
+    const s = ready({
+      playerName: 'CHARMANDER', playerLevel: 9, playerHp: 0, playerMaxHp: 40,
+      party: [corpse, survivor],
+    });
+
+    const next = battleReducer(s, { type: 'LEAD_CHANGED', name: 'PIKACHU' });
+
+    expect(next.playerName).toBe('PIKACHU');
+    expect(next.playerLevel).toBe(12);
+    expect(next.playerHp).toBe(30);
+    expect(next.playerMaxHp).toBe(34);
+  });
+
+  // The snapshot that follows LeadChanged is the authority — LEAD_CHANGED can only read the roster it already had.
+  it('PARTY_SET re-syncs the HUD from the lead row once it names the current player', () => {
+    const s = ready({ playerName: 'PIKACHU', playerLevel: 12, playerHp: 30, playerMaxHp: 34 });
+    const members = [member({ name: 'PIKACHU', level: 13, hp: 34, maxHp: 40, isLead: true })];
+
+    const next = battleReducer(s, { type: 'PARTY_SET', members });
+
+    expect(next.playerLevel).toBe(13);
+    expect(next.playerHp).toBe(34);
+    expect(next.playerMaxHp).toBe(40);
+  });
+
+  // …but it must never RETARGET. A snapshot whose lead is someone else (a stale echo, or one arriving before the
+  // LeadChanged that promotes them) refreshes the roster only — hijacking the HUD here would show the wrong creature.
+  it('PARTY_SET leaves the HUD alone when the lead row is a different creature', () => {
+    const s = ready({ playerName: 'PIKACHU', playerLevel: 12, playerHp: 30, playerMaxHp: 34 });
+    const members = [member({ name: 'CHARMANDER', level: 9, hp: 0, maxHp: 40, isLead: true })];
+
+    const next = battleReducer(s, { type: 'PARTY_SET', members });
+
+    expect(next.party).toEqual(members);
+    expect(next.playerName).toBe('PIKACHU');
+    expect(next.playerLevel).toBe(12);
+    expect(next.playerHp).toBe(30);
+  });
+
   it('SHOW_ACQUISITION opens the offer; HIDE_ACQUISITION clears it', () => {
     const offer = {
       source: 'ThemedDraft', speciesId: 25, name: 'PIKACHU', level: 12, types: ['Electric'],

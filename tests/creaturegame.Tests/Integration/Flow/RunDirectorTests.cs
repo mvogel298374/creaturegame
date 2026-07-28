@@ -413,11 +413,13 @@ public class RunDirectorTests
     }
 
     // A mutual end-of-turn DoT faint: both creatures survive the (0-damage) poison-move turn but are now
-    // poisoned, then BOTH drop on the same end-of-turn poison tick. The enemy-faint branch is checked first
-    // (so XP is awarded), but the player is dead too — so the run ends as a LOSS and the would-be win is
-    // never counted. Pins the documented double-faint edge (TODO Known Gaps): it counts as a loss, full stop.
+    // poisoned, then BOTH drop on the same end-of-turn poison tick. The enemy-faint branch is checked first, so
+    // the trade IS the player's win (Battle.PlayerWon) and is counted — but this run has a LONE creature, so with
+    // nothing alive to promote the run still ends. The bench-backed case is the opposite (the run carries on) and
+    // is pinned separately in RunDirectorForcedSwitchTests: as of the 2026-07-28 ruling a mutual KO no longer ends
+    // a run that still has a standing creature.
     [Fact]
-    public async Task Runner_DoubleFaintFromEndOfTurnPoison_CountsAsLoss_NotAWin()
+    public async Task Runner_DoubleFaintFromEndOfTurnPoison_EndsTheRun_ButStillCountsTheWin()
     {
         // maxHP 160 → poison tick = 160/16 = 10; HP 5 → the first tick is lethal. Both use a 0-damage poison
         // move, so the attack phase changes nothing and both are alive (poisoned) entering end-of-turn.
@@ -447,9 +449,11 @@ public class RunDirectorTests
         Assert.False(enemy.IsAlive());
         Assert.Equal(2, recorder.Of<StatusDamage>().Count(d => d.Source == StatusCondition.Poison));
 
-        // The run ends as a loss: exactly one RunEnded, ZERO wins counted despite the enemy also fainting.
+        // The run ends — this creature was the whole party, so there is nobody to promote. But the trade-kill still
+        // COUNTS as a win in the summary (ruling 2026-07-28): a mutual KO is a win, and the run ending doesn't
+        // unmake the one that ended it.
         var runEnded = Assert.Single(recorder.Of<RunEnded>());
-        Assert.Equal(0, runEnded.BattlesWon);
+        Assert.Equal(1, runEnded.BattlesWon);
     }
 
     // An input that always cancels — stands in for a disconnected client (mirrors SignalRInput.Cancel()).
