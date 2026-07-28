@@ -161,8 +161,27 @@ Only **three** places in product code choose a generation. Everything else inher
 |:--|:--|:--|
 | `ITypeChart` | `GameSessionManager.cs:166` — `Gen1TypeChart.Instance` passed positionally into the `RunDirector` | read from the profile |
 | `IEvolutionRules` | `EncounterFactory.cs:421` — `Gen1EvolutionRules.Instance` hardcoded in `ResolvePlayerEvolutionAsync` | read from the profile |
-| `IStatCalculator` | `Creature.cs:404` — a **settable property defaulting** to `Gen1StatCalculator.Instance` | assign at the one construction site: `EncounterFactory.cs:492`, the *only* `new Creature(...)` in product code |
+| `IStatCalculator` | `EncounterFactory.cs:493` — `new Gen1StatCalculator(rng)`, **seeded per creature** so a fixed seed reproduces DVs. (`Creature.cs:404`'s property default is only the unseeded fallback.) | profile exposes a **factory**, not a singleton — Stage 1b |
 | `IBattleRules` | **nowhere in the web layer** — never passed; `Battle` falls back to `Gen1BattleRules.Instance` internally | thread explicitly from the profile |
+
+**A fifth site, found during Stage 1a:** `EncounterFactory.ActiveGeneration = 1` — a hardcoded `private const int`
+driving **six** learnset/evolution DB queries, plus a duplicate `PlayerOverviewDto.ActiveGeneration = 1`. Not a
+seam, but a **second source of truth for the generation**, and the most concrete "Gen 1 by assumption" in the
+repo. Folded into Stage 1b (see §4.5).
+
+### 4.5 Stage 1 is split — 1a (shipped) and 1b
+
+**1a** did the axis and the `GameSessionManager` composition point: the profile type, registry, run-parameter
+threading, and explicit reads of `TypeChart` / `BattleRules` / `EvolutionRules` / the AI.
+
+**1b** does `EncounterFactory` — the `IStatCalculator` thread *and* the `ActiveGeneration` constant. Kept
+together because they are one coherent chunk in one file (every `BuildCreature` caller sits directly beside an
+`ActiveGeneration` query), and split from 1a because it is ~39 call sites across 5 test files, which would have
+buried 1a's architecture in mechanical churn.
+
+> **The parameters 1b adds must be `required`, never defaulted.** A `GenerationProfile? profile = null` with a
+> `?? Gen1Profile.Instance` fallback would reintroduce §4.2's hazard at the very layer the feature is trying to
+> close it — and would do so while looking like the existing house style.
 
 ### 4.2 ⚠️ The central hazard: the null-coalescing default hides a missed thread
 

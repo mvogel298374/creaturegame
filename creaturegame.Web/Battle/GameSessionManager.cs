@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using creaturegame.Attacks;
 using creaturegame.Combat;
 using creaturegame.Creatures;
+using creaturegame.Generations;
 using creaturegame.Items;
 using creaturegame.Web.Hubs;
 using Microsoft.AspNetCore.SignalR;
@@ -63,6 +64,78 @@ public sealed class GameSessionManager(
     internal static RunRules RunRulesFor(Difficulty difficulty) =>
         RunTuningByDifficulty[difficulty];
 
+    /// <summary>The <see cref="GenerationProfile"/> for a generation. <c>internal</c> for the same reason as
+    /// <see cref="RunRulesFor"/> — so the lookup itself is exercised by tests rather than a duplicate of it.
+    /// A thin pass-through to the registry, kept here so the session layer has one named door to it.</summary>
+    internal static GenerationProfile ProfileFor(Generation generation) =>
+        GenerationProfiles.For(generation);
+
+    /// <summary>
+    /// Assembles the run's <see cref="RunDirectorOptions"/> — the run-scoped policy bag handed to the director.
+    /// </summary>
+    /// <remarks>
+    /// Extracted from <see cref="AttachConnection"/> so the seams a run is actually configured with are
+    /// <b>observable to a test</b>. That is not cosmetic: with everything inline, dropping
+    /// <c>Rules = profile.BattleRules</c> would leave the whole suite green, because the engine's
+    /// <c>?? Gen1BattleRules.Instance</c> fallback silently supplies the same answer Gen 1 expects
+    /// (<c>docs/GENERATION_PROFILE.md</c> §4.2). Pinning this method against a second profile is what turns
+    /// "the profile is threaded" from a claim into a test — see <c>GenerationProfileTests</c>.
+    /// <para><c>internal static</c> and dependency-free by design: everything it needs is a parameter, so a test
+    /// can call it without standing up a hub, a connection, or a running battle.</para>
+    /// </remarks>
+    internal static RunDirectorOptions BuildRunOptions(
+        PendingSession session,
+        GenerationProfile profile,
+        EncounterFactory encounters,
+        Party party,
+        IBattleEventEmitter? emitter
+    ) =>
+        new()
+        {
+            Emitter = emitter,
+            Rng = session.Rng,
+            // Previously left unset, so Battle fell back to Gen1BattleRules.Instance internally. Now passed
+            // explicitly. For Gen 1 this is the same singleton, so behaviour is unchanged — including the
+            // rules' own unseeded RNG, which is a settled/closed question and deliberately not reopened here.
+            Rules = profile.BattleRules,
+            // Between encounters, resolve any pending evolution against the DB (edges → IEvolutionRules →
+            // evolved species + learnset). The runner applies it; the data concern stays in the web layer.
+            CheckEvolution = p =>
+                encounters.ResolvePlayerEvolutionAsync(p, session.AllMoves, profile.EvolutionRules),
+            // The run's bag, threaded into every Battle's player side; consumed items stay gone across the chain.
+            PlayerBag = session.Bag,
+            // Biome mode: the run charts a route through this region's playable biomes (the map screen). A
+            // non-empty set flips the director from the legacy endless chain to biome traversal; the chosen
+            // biome themes each encounter. ENCOUNTER_DESIGN.md §7 Phase 3b-2.
+            PlayableBiomes = session.PlayableBiomes,
+            // Run Economy: the wallet battle wins and Treasure/Mystery credit, and the reward policy
+            // (drop rates / gold curve / item eligibility) closed over this run's item catalog. The client
+            // now answers the Treasure/Mystery reward ack (Phase C), so those nodes run at their full core
+            // distribution (no node-plan gate).
+            Wallet = session.Wallet,
+            RewardSupplier = EncounterFactory.BuildRewardSupplier(session.AllItems),
+            // Shop nodes spend the same wallet: run-scaled stock + prices closed over this run's item catalog.
+            ShopSupplier = EncounterFactory.BuildShopSupplier(session.AllItems),
+            // A Shop only rolls into a biome when the player can afford the cheapest possible item — so a broke
+            // player (e.g. the opening node with a 0₽ wallet) never gets a dead, all-unaffordable shop.
+            MinShopBudget = ShopCalculator.MinItemPrice,
+            // Roguelite run-balance rules (the level-aware XP curve, boosted above pure Gen-1) — the preset
+            // matching the difficulty chosen at run-start (see RunRulesFor above). Keyed to Difficulty, NOT to
+            // the generation: RunRules is deliberately not a generation seam (GENERATION_PROFILE.md §2.2).
+            RunRules = RunRulesFor(session.Difficulty),
+            // Party threading: the RunDirector plays the run over this same party instance (its Lead is the
+            // active player), so the party-hydrate endpoint and the roster panel read the live roster.
+            Party = party,
+            // Themed-draft acquisition (ENCOUNTER_DESIGN.md §4): rolled after every win, gated by cadence × n% ×
+            // the fought-only pool (DraftCalculator), building the offered creature from this run's move pool +
+            // DB. Deposits accepted creatures into the party above.
+            DraftSupplier = encounters.BuildDraftSupplier(session.AllMoves),
+            // Boss-catch acquisition (ENCOUNTER_DESIGN.md §4 Stage 2): rolled after a Boss win only, a small n%
+            // chance (BossCatchCalculator) to add the defeated boss — built as a fresh full-HP copy of its species
+            // at the boss's level. The win reward/XP is already applied, so the catch is pure upside.
+            BossCatchSupplier = encounters.BuildBossCatchSupplier(session.AllMoves),
+        };
+
     public string RegisterSession(
         Creature player,
         IReadOnlyList<Attack> allMoves,
@@ -71,7 +144,12 @@ public sealed class GameSessionManager(
         IReadOnlyList<Item> allItems,
         IRandomSource rng,
         IReadOnlyList<BiomeDefinition> playableBiomes,
-        Difficulty difficulty = Difficulty.Normal
+        // Both deliberately UN-defaulted. A defaulted run parameter here is the silent-fallback shape this
+        // feature exists to close (docs/GENERATION_PROFILE.md §4.2): a future entry point — resume-run, a dev
+        // endpoint, a test harness — that omitted the argument would compile, run, and quietly play Gen 1 on
+        // Normal. Costs nothing to require: there is exactly one caller (GameController.Start).
+        Difficulty difficulty,
+        Generation generation
     )
     {
         var gameId = Guid.NewGuid().ToString("N");
@@ -84,6 +162,7 @@ public sealed class GameSessionManager(
             rng,
             playableBiomes,
             difficulty,
+            generation,
             DateTimeOffset.UtcNow
         );
         EvictExpiredPendingSessions();
@@ -120,6 +199,10 @@ public sealed class GameSessionManager(
         // First connection: claim the pending session and start the battle loop.
         if (!_pending.TryRemove(gameId, out var session))
             return; // unknown or already-consumed gameId
+
+        // The run's generation, resolved once here and threaded into every seam consumer below. Chosen at run
+        // start (like Difficulty) and fixed for the whole run — one generation per run.
+        var profile = ProfileFor(session.Generation);
 
         var battle = new ActiveBattle
         {
@@ -163,49 +246,15 @@ public sealed class GameSessionManager(
                     // while presenting identically (ENCOUNTER_DESIGN.md §3.1).
                     archetype: EnemyArchetypes.For(tier, session.Rng)
                 ),
-            Gen1TypeChart.Instance,
+            // THE generation composition point (GENERATION_SEAMS.md §7, docs/GENERATION_PROFILE.md §4). Every
+            // seam below is read off the run's profile EXPLICITLY rather than left to the engine's
+            // `?? Gen1*.Instance` defaults — because a forgotten thread would not crash or fail a test, it
+            // would silently run Gen 1 (§4.2). Passing them all is what makes a second profile observable.
+            profile.TypeChart,
             battle.Input,
-            new AiBattleInput(new Gen1TrainerAi(rng: session.Rng)),
+            new AiBattleInput(profile.BuildAi(session.Rng)),
             movePool: session.AllMoves,
-            new RunDirectorOptions
-            {
-                Emitter = emitter,
-                Rng = session.Rng,
-                // Between encounters, resolve any pending evolution against the DB (edges → IEvolutionRules →
-                // evolved species + learnset). The runner applies it; the data concern stays in the web layer.
-                CheckEvolution = p => encounters.ResolvePlayerEvolutionAsync(p, session.AllMoves),
-                // The run's bag, threaded into every Battle's player side; consumed items stay gone across the chain.
-                PlayerBag = session.Bag,
-                // Biome mode: the run charts a route through this region's playable biomes (the map screen). A
-                // non-empty set flips the director from the legacy endless chain to biome traversal; the chosen
-                // biome themes each encounter. ENCOUNTER_DESIGN.md §7 Phase 3b-2.
-                PlayableBiomes = session.PlayableBiomes,
-                // Run Economy: the wallet battle wins and Treasure/Mystery credit, and the reward policy
-                // (drop rates / gold curve / item eligibility) closed over this run's item catalog. The client
-                // now answers the Treasure/Mystery reward ack (Phase C), so those nodes run at their full core
-                // distribution (no node-plan gate).
-                Wallet = session.Wallet,
-                RewardSupplier = EncounterFactory.BuildRewardSupplier(session.AllItems),
-                // Shop nodes spend the same wallet: run-scaled stock + prices closed over this run's item catalog.
-                ShopSupplier = EncounterFactory.BuildShopSupplier(session.AllItems),
-                // A Shop only rolls into a biome when the player can afford the cheapest possible item — so a broke
-                // player (e.g. the opening node with a 0₽ wallet) never gets a dead, all-unaffordable shop.
-                MinShopBudget = ShopCalculator.MinItemPrice,
-                // Roguelite run-balance rules (the level-aware XP curve, boosted above pure Gen-1) — the preset
-                // matching the difficulty chosen at run-start (see RunRulesFor above).
-                RunRules = RunRulesFor(session.Difficulty),
-                // Party threading: the RunDirector plays the run over this same party instance (its Lead is the
-                // active player), so the party-hydrate endpoint and the roster panel read the live roster.
-                Party = battle.Party,
-                // Themed-draft acquisition (ENCOUNTER_DESIGN.md §4): rolled after every win, gated by cadence × n% ×
-                // the fought-only pool (DraftCalculator), building the offered creature from this run's move pool +
-                // DB. Deposits accepted creatures into the party above.
-                DraftSupplier = encounters.BuildDraftSupplier(session.AllMoves),
-                // Boss-catch acquisition (ENCOUNTER_DESIGN.md §4 Stage 2): rolled after a Boss win only, a small n%
-                // chance (BossCatchCalculator) to add the defeated boss — built as a fresh full-HP copy of its species
-                // at the boss's level. The win reward/XP is already applied, so the catch is pure upside.
-                BossCatchSupplier = encounters.BuildBossCatchSupplier(session.AllMoves),
-            }
+            BuildRunOptions(session, profile, encounters, battle.Party, emitter)
         );
 
         _ = Task.Run(async () =>
@@ -517,6 +566,7 @@ sealed record PendingSession(
     IRandomSource Rng,
     IReadOnlyList<BiomeDefinition> PlayableBiomes,
     Difficulty Difficulty,
+    Generation Generation,
     DateTimeOffset RegisteredAt
 );
 

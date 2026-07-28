@@ -1,4 +1,5 @@
 using creaturegame.Combat;
+using creaturegame.Generations;
 using creaturegame.Web.Battle;
 using Microsoft.AspNetCore.Mvc;
 
@@ -16,6 +17,7 @@ public class GameController(GameSessionManager sessionManager, EncounterFactory 
         {
             int playerLevel = Math.Clamp(req.Level ?? 50, 5, 100);
             var difficulty = ParseDifficulty(req.Difficulty);
+            var generation = ParseGeneration(req.Generation);
 
             // One seed per run. The client may supply one (replay / deterministic E2E); otherwise we pick a
             // random one. Either way the whole run — player DVs/moves, every enemy's species/level/DVs/moves,
@@ -39,10 +41,11 @@ public class GameController(GameSessionManager sessionManager, EncounterFactory 
                 setup.AllItems,
                 rng,
                 setup.PlayableBiomes,
-                difficulty
+                difficulty,
+                generation
             );
             Console.WriteLine(
-                $"[GameController] Started run {gameId} with seed {seed}, difficulty {difficulty}."
+                $"[GameController] Started run {gameId} with seed {seed}, difficulty {difficulty}, generation {generation}."
             );
             return Ok(new { gameId, seed });
         }
@@ -60,6 +63,18 @@ public class GameController(GameSessionManager sessionManager, EncounterFactory 
         Enum.TryParse<Difficulty>(value, ignoreCase: true, out var parsed)
             ? parsed
             : Difficulty.Normal;
+
+    /// <summary>Falls back to <see cref="Generation.One"/> on a missing/unrecognised value — same contract as
+    /// <see cref="ParseDifficulty"/>, so a stale client that sends nothing still starts a Gen 1 run.
+    /// <c>internal</c> so the parse/fallback is directly testable.
+    /// <para>Also rejects a value that names a real enum member with <b>no registered profile</b>, so the
+    /// untrusted boundary can never hand <c>GenerationProfiles.For</c> something it would throw on — the parse
+    /// is what makes that method's throw an internal-wiring assertion rather than a 500 on user input.</para></summary>
+    internal static Generation ParseGeneration(string? value) =>
+        Enum.TryParse<Generation>(value, ignoreCase: true, out var parsed)
+        && GenerationProfiles.Registered.Contains(parsed)
+            ? parsed
+            : Generation.One;
 
     /// <summary>
     /// On-demand snapshot of the run's live player creature for the in-battle overview (CHECK POKEMON):
@@ -115,5 +130,6 @@ public record StartGameRequest(
     int SpeciesId,
     int? Level = null,
     int? Seed = null,
-    string? Difficulty = null
+    string? Difficulty = null,
+    string? Generation = null
 );

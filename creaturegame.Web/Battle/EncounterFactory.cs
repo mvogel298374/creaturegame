@@ -402,12 +402,16 @@ public sealed class EncounterFactory(
     /// evolution edges, runs the Gen 1 <see cref="IEvolutionRules"/> decision against the player's current
     /// level, and — if one fires — resolves the evolved species plus its learnset into an
     /// <see cref="EvolutionOutcome"/>. Returns null when nothing evolves, so the runner leaves the player as
-    /// is. The generation choice is made here at the composition layer (like <c>Gen1TypeChart.Instance</c> in
-    /// <see cref="GameSessionManager"/>), keeping the runner generation-agnostic.
+    /// is. The rules come from the run's <c>GenerationProfile</c> (resolved at the composition point in
+    /// <see cref="GameSessionManager"/>), keeping both this method and the runner generation-agnostic.
     /// </summary>
+    /// <param name="evolutionRules">The run's evolution seam. <b>Required, deliberately un-defaulted</b> — a
+    /// <c>?? Gen1EvolutionRules.Instance</c> fallback here would let a future generation silently evolve by Gen 1
+    /// rules with nothing failing (<c>docs/GENERATION_PROFILE.md</c> §4.2).</param>
     public async Task<EvolutionOutcome?> ResolvePlayerEvolutionAsync(
         Creature player,
-        IReadOnlyList<Attack> allMoves
+        IReadOnlyList<Attack> allMoves,
+        IEvolutionRules evolutionRules
     )
     {
         await using var pokemonCtx = await pokemonFactory.CreateDbContextAsync();
@@ -418,7 +422,7 @@ public sealed class EncounterFactory(
         if (edges.Count == 0)
             return null;
 
-        var result = Gen1EvolutionRules.Instance.CheckEvolution(
+        var result = evolutionRules.CheckEvolution(
             player,
             new EvolutionContext.LeveledTo(player.Level),
             edges

@@ -67,6 +67,9 @@ Each entry: **Decision · Why · Where it lives.**
   number?") decides whether a value goes on the seam or stays inline.
 - **Where:** `Combat/IBattleRules.cs` (+ `Gen1BattleRules`), `Combat/ITypeChart.cs` (+ `Gen1TypeChart`),
   `Creatures/IStatCalculator.cs` (+ `Gen1StatCalculator`). **Full contract + §5.0 checklist → `GENERATION_SEAMS.md`.**
+- **Which set is selected:** `Generations/GenerationProfile.cs` + the `GenerationProfiles` registry — the
+  composition point, chosen once per run and threaded from the web boundary like `Difficulty`. Extends the
+  generation beyond battle math to content, region and presentation → `GENERATION_PROFILE.md`.
 
 ### 2.2 Event-sourced engine + emitter pattern
 - **Decision:** the engine computes outcomes and **emits `BattleEvent` records**; it never writes to a

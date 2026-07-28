@@ -251,7 +251,13 @@ Each Gen 1 impl is stateless (or effectively so) and exposed as `.Instance`. Cal
 the interface as an optional constructor/parameter defaulting to that singleton:
 `rules ?? Gen1BattleRules.Instance`. This gives us the best of both — **zero ceremony for
 the common path** (everything is Gen 1 today, so you write nothing) and **full
-substitutability** for tests and future gens. It mirrors how `IRandomSource` and
+substitutability** for tests and future gens.
+
+> ⚠️ **The flip side, once a second generation exists.** That same default means a composition path which
+> *forgets* to thread a seam does not crash and does not fail a test — **it silently runs Gen 1**. The defaults
+> are still right for the library and its tests, but the **web composition root must pass every seam
+> explicitly**, and only a second profile can prove it did. See `GENERATION_PROFILE.md` §4.2 and its
+> `TestAltProfile` harness. It mirrors how `IRandomSource` and
 `BattleState` are wired; consistency across the codebase is deliberate.
 
 ### 4.4 Sparse data, explicit quirks
@@ -402,8 +408,11 @@ injected implementation. That's the seams working.
 
 - **Gen 2 sprint:** the first real exercise of these seams. The Special split and the DB
   schema work are scoped in `TODO.md` (Multi-Generation section).
-- **Generation selection:** today everything defaults to the Gen 1 singletons. When more
-  than one generation exists, a single composition point (where `Battle` and `Creature`
-  are built) will choose the implementation set — still no branching inside the engine.
+- **Generation selection — ✅ this composition point now exists (2026-07-29).** It is
+  `creaturegame/Generations/`: a `GenerationProfile` bundling the seams, a `GenerationProfiles`
+  registry, and the generation threaded as a per-run parameter into `GameSessionManager`.
+  The engine still never branches. Design + staging → `GENERATION_PROFILE.md`. **Note the
+  seams are only half of it** — that doc extends the model to content, region and
+  presentation, which the four interfaces here do not cover.
 - **Keep the seams honest:** if a future mechanic tempts you toward a generation check,
   that temptation is the design telling you to add an interface member instead.

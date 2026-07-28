@@ -1,6 +1,7 @@
 using creaturegame.Combat;
 using creaturegame.Creatures;
 using creaturegame.DB;
+using creaturegame.Generations;
 using creaturegame.Web.Battle;
 using Microsoft.EntityFrameworkCore;
 
@@ -35,7 +36,13 @@ public class EncounterEvolutionTests
             new SeededRandomSource(1)
         );
         Assert.NotNull(setup);
-        var outcome = await factory.ResolvePlayerEvolutionAsync(setup!.Player, setup.AllMoves);
+        // The rules now come from the run's generation profile rather than a hardcoded singleton, so the test
+        // states which generation it is asserting instead of inheriting it silently.
+        var outcome = await factory.ResolvePlayerEvolutionAsync(
+            setup!.Player,
+            setup.AllMoves,
+            Gen1Profile.Instance.EvolutionRules
+        );
         return new EvolutionOutcomeView(
             outcome?.NewForm.Id,
             outcome?.NewForm.Name,

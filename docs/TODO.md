@@ -653,10 +653,33 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
 > seam a second implementation. It is **not Gen 2** and carries no fidelity claim. Each stage lands with its leg
 > of it; a stage without one has demonstrated nothing.
 
-- [ ] **Stage 1 — generation as a run parameter.** `GenerationProfile` record + registry; threaded
-  `StartGameRequest` → `GameController` → `RegisterSession` → `PendingSession` → `AttachConnection` → lookup,
-  mirroring `Difficulty` (2026-07-22) exactly. Parse + lookup `internal` so tests hit the real path. Gen 1 must
-  reproduce today **byte-for-byte**.
+- [x] **Stage 1a — the axis + the `GameSessionManager` composition point** ✅ DONE (2026-07-29). New
+  `creaturegame/Generations/` namespace: `Generation` enum, `GenerationProfile` record (all-`required`
+  properties, so a new slice breaks every profile that omits it — a compile error as the reminder),
+  `Gen1Profile`, `GenerationProfiles` registry. Threaded `StartGameRequest.Generation` → `ParseGeneration` →
+  `RegisterSession` → `PendingSession` → `AttachConnection` → `ProfileFor`, mirroring `Difficulty`; parse +
+  lookup `internal` so tests hit the real path. `TypeChart`, `BattleRules` (previously never passed — `Battle`
+  fell back internally), `EvolutionRules` and the AI are now read off the profile **explicitly**. Registry
+  **throws** on an unregistered generation rather than serving Gen 1, with the boundary parse guaranteeing it
+  never sees untrusted input. Covered by `GenerationProfileTests` (14 cases) + `TestAltProfile`, Stage 1's
+  falsification leg.
+  - **AI decision (the §4.3 open question): the AI is on the profile.** `Gen1TrainerAi` is generation-*named*
+    but documents itself as a "generation-blind selection policy" whose Gen 1 leanings live in its evaluators —
+    so the whole construction is exposed as one `BuildAi` factory rather than pretending the policy class is
+    per-generation.
+- [ ] **Stage 1b — `EncounterFactory`'s generation-awareness.** The remaining seam thread plus the constant that
+  duplicates it, deliberately kept together because they are one coherent chunk in one file:
+  - `IStatCalculator` — `BuildCreature` does `new Gen1StatCalculator(rng)` (**seeded**, hence the profile
+    exposes a factory, not a singleton). Thread the profile through the 4 `BuildCreature` callers and the 4
+    public entry points.
+  - **`EncounterFactory.ActiveGeneration = 1`** — a hardcoded `private const int` driving **6** learnset /
+    evolution DB queries, plus a duplicate `PlayerOverviewDto.ActiveGeneration = 1`. Found 2026-07-29; it is the
+    most concrete "Gen 1 by assumption" in the repo and a second source of truth for the generation. Replace
+    with `profile.Generation`.
+  - Blast radius: ~39 call sites across 5 test files. Parameters must be **required, never defaulted** — a
+    `?? Gen1…` default would reintroduce the exact silent-fallback hazard the feature exists to remove.
+  - *(This absorbs what Stage 2 scoped as "where content filtering is asked for" — `ActiveGeneration` already
+    is that filter, so wiring it here is cheaper than inventing a parallel socket.)*
 - [ ] **Stage 2 — content scope.** Type roster real (Gen 1 = 15; `DamageType` keeps all 18 and stays gen-blind);
   species/move/item filtering as **documented no-op stubs** per `GENERATION_SEAMS.md §5.0`. Schema work stays in
   *Multi-Generation* below.
