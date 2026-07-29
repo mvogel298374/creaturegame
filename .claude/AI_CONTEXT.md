@@ -149,6 +149,33 @@ core.hooksPath .githooks`. Emergency bypass (avoid): `git commit --no-verify`.
 > the TS mirror of the `.cs` → tests rule. `tsconfig` covers `e2e/` as well as `src/`; keep it that way — the
 > e2e helpers are 240 lines of real TypeScript and were previously unchecked.
 
+### Verifying a test can actually fail (and the stale-build trap)
+
+A new test is only evidence if it **fails without the fix**. The habit is right: sabotage the product code,
+confirm red, restore, confirm green. But the restore step has a trap that turns the whole check into a lie.
+
+> **`Copy-Item` preserves the source file's `LastWriteTime`.** A `.cs` file restored from a backup therefore
+> looks *older* than the compiled DLL, MSBuild's incremental build skips recompiling it, and `dotnet test`
+> keeps executing the **sabotaged assembly** while the file on disk reads correct.
+
+**The symptom is not a build error — it is a convincing false finding.** Hit for real during Generation Profile
+Stage 1b (2026-07-29, `b2eca42`): a `PartyUpdated` event kept appearing at a point where the restored code
+provably could not emit one. That looked like a genuine unknown emitter in the run sequence, and it cost most of
+a session — a correct assertion was nearly deleted and "this can't be pinned" nearly reported to the user.
+Every result in that stretch was stale-DLL noise.
+
+Rules:
+- **Sabotage and restore with the Edit tool** (fresh mtime). If you use a shell copy, follow it with
+  `(Get-Item $p).LastWriteTime = Get-Date`.
+- Build with **`dotnet build --no-incremental`** before trusting either the red or the green half of the cycle.
+- **"The source says X but the test says not-X" is a build-freshness question first**, not a code mystery. One
+  forced rebuild settles it.
+- A tell worth recognising: sabotage that **fires on some tests but not others in the same run**. Code present
+  in the source cannot be selectively absent — that means two different assemblies, i.e. a stale build.
+- Note the contrast with the *other* direction (memory `feedback_hang_is_a_real_signal`): a hanging suite means
+  suspect your own new test, not the tooling. Here the test was innocent and the toolchain state was the bug.
+  Identify which case you're in instead of defaulting to either.
+
 ### CSharpier (formatter)
 Version-pinned local tool (`.config/dotnet-tools.json`); config `.csharpierrc.json`; EF migrations excluded
 (`.csharpierignore`). `dotnet tool restore` once per clone; `dotnet csharpier format .` to format, `… check
