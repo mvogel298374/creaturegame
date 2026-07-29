@@ -146,6 +146,49 @@ public class GenerationProfileTests
         Assert.Equal(GameSessionManager.RunRulesFor(Difficulty.Hard), underAlt.RunRules);
     }
 
+    /// <summary>
+    /// The run-start → session → REST-read chain: a generation chosen at <c>RegisterSession</c> must be the one
+    /// <see cref="GameSessionManager.GetGeneration"/> reports, because that is what stamps the CHECK POKEMON
+    /// overview's <c>generation</c> field (which the client gates INFO rows on).
+    /// </summary>
+    /// <remarks>
+    /// Exercises the <b>pending</b> leg, which needs no hub: <c>RegisterSession</c> never touches
+    /// <c>hubContext</c>, and the claimed leg copies the same value verbatim onto <c>ActiveBattle</c>. Uses a
+    /// generation with no registered profile on purpose — the session layer only <i>carries</i> the value, and
+    /// pinning it with <see cref="Generation.One"/> would pass even if the getter returned a hardcoded default.
+    /// </remarks>
+    [Fact]
+    public void GetGeneration_ReportsTheGenerationTheRunWasRegisteredWith()
+    {
+        var manager = new GameSessionManager(hubContext: null!, NoDbEncounterFactory());
+        var player = new Creature("TESTMON");
+
+        string gameId = manager.RegisterSession(
+            player,
+            [],
+            new Bag(),
+            new Wallet(),
+            [],
+            new SeededRandomSource(1),
+            [],
+            Difficulty.Normal,
+            (Generation)2
+        );
+
+        Assert.Equal((Generation)2, manager.GetGeneration(gameId));
+    }
+
+    [Fact]
+    public void GetGeneration_ReturnsNullForAnUnknownRun_RatherThanDefaultingToGen1()
+    {
+        // An unknown gameId is a 404, not a Gen 1 run — the same no-silent-fallback rule the registry follows
+        // (GENERATION_PROFILE.md §4.2). GameController.GetPlayer depends on this to 404 rather than serve a
+        // creature stamped with a generation nobody selected.
+        var manager = new GameSessionManager(hubContext: null!, NoDbEncounterFactory());
+
+        Assert.Null(manager.GetGeneration("no-such-game"));
+    }
+
     private static RunDirectorOptions BuildOptionsWith(
         GenerationProfile profile,
         Difficulty difficulty = Difficulty.Normal

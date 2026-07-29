@@ -127,11 +127,21 @@ internal sealed class BattleRunEvent(
         // its own pre-battle level captured above, active first (the creature the player just watched), then the
         // bench in roster order. A declined evolution re-offers at the next level-up; a creature added mid-battle
         // (a draft) isn't in the snapshot and is skipped.
+        bool anyEvolved = false;
         foreach (var member in EvolutionOrder(s.Party, active))
         {
             if (member.IsAlive() && preLevel.TryGetValue(member, out int lvl) && member.Level > lvl)
-                await TryEvolveAsync(member, ctx);
+                anyEvolved |= await TryEvolveAsync(member, ctx);
         }
+
+        // The party strip is fed only by PartyUpdated snapshots (+ the connect-time /party hydrate), and an
+        // evolution renames the creature. The nameplate/HUD retarget on CreatureEvolved directly, the strip row
+        // does not — so without this the roster keeps the PRE-evolution name until some unrelated later event
+        // happens to resync it, disagreeing with the nameplate right beside it. The win's own level-up snapshot
+        // (Battle) can't cover this: it is emitted before the evolution runs, so it carries the old name.
+        // Pushed once after the loop, coalescing a multi-creature batch into a single repaint.
+        if (anyEvolved)
+            ctx.Emitter?.Emit(new PartyUpdated(PartyProjection.Snapshot(s.Party)));
 
         // Default: the finisher's major status carries into its next encounter, stored ON the creature (the
         // multi-creature carry model — each party member keeps its own ailment while benched); a Poké Center heal
@@ -277,13 +287,14 @@ internal sealed class BattleRunEvent(
     // Offers, then applies, a pending evolution if the resolver reports one. The player can cancel (Gen 1
     // B-cancel) — the prompt blocks awaiting the decision; on cancel the creature is untouched and re-offered
     // at the next level-up. The from-identity is captured before EvolveTo (which overwrites name/species/stats)
-    // so the events carry both forms for the sprite morph.
-    private async Task TryEvolveAsync(Creature player, RunContext ctx)
+    // so the events carry both forms for the sprite morph. Returns true only when the creature actually changed
+    // form, which is what gates the caller's roster repaint (a cancel leaves the strip already correct).
+    private async Task<bool> TryEvolveAsync(Creature player, RunContext ctx)
     {
         if (checkEvolution is null)
-            return;
+            return false;
         if (await checkEvolution(player) is not { } evolution)
-            return;
+            return false;
 
         string fromName = player.Name;
         int fromSpeciesId = player.SpeciesId;
@@ -297,7 +308,7 @@ internal sealed class BattleRunEvent(
         if (!allow)
         {
             ctx.Emitter?.Emit(new EvolutionCancelled(fromName));
-            return;
+            return false;
         }
 
         player.EvolveTo(newForm);
@@ -314,6 +325,7 @@ internal sealed class BattleRunEvent(
             ctx.Emitter,
             ctx.PlayerInput
         );
+        return true;
     }
 
     // Major status carries into the next encounter; the generation decides what each status becomes out of

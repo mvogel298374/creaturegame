@@ -1,5 +1,6 @@
 using creaturegame.Attacks;
 using creaturegame.Creatures;
+using creaturegame.Generations;
 
 namespace creaturegame.Web.Battle;
 
@@ -33,10 +34,14 @@ public sealed record PlayerOverviewDto(
     string? TeraType = null
 )
 {
-    /// <summary>The app's single active generation. Becomes dynamic when the multi-generation sprint lands.</summary>
-    public const int ActiveGeneration = 1;
-
-    public static PlayerOverviewDto From(Creature c)
+    /// <summary>
+    /// Flattens the live creature for the overview panel, stamped with the <b>run's</b> generation.
+    /// </summary>
+    /// <param name="generation">The generation this run is being played under, read from the session. Previously
+    /// a <c>const int ActiveGeneration = 1</c> here — a second source of truth for the generation alongside
+    /// <see cref="EncounterFactory"/>'s, which would have kept reporting "1" to the client's field-gating no
+    /// matter what profile the run actually selected (Generation Profile Stage 1b).</param>
+    public static PlayerOverviewDto From(Creature c, Generation generation)
     {
         var a = c.Attributes;
         var stats = new List<StatRow>
@@ -60,7 +65,7 @@ public sealed record PlayerOverviewDto(
             c.XpThisLevel,
             c.XpToNextLevel,
             c.BaseHP + c.BaseAttack + c.BaseDefense + c.BaseSpecial + c.BaseSpeed,
-            ActiveGeneration,
+            (int)generation,
             stats,
             moves
         );

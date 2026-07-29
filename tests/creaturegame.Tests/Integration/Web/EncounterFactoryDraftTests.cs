@@ -1,5 +1,6 @@
 using creaturegame.Combat;
 using creaturegame.DB;
+using creaturegame.Generations;
 using creaturegame.Web.Battle;
 using Microsoft.EntityFrameworkCore;
 
@@ -40,11 +41,16 @@ public class EncounterFactoryDraftTests
     public async Task BuildDraftSupplier_OffersOnlyASpeciesFromTheFoughtPool()
     {
         var factory = BuildFactory();
-        var setup = await factory.CreatePlayerSetupAsync(Bulbasaur, 50, new SeededRandomSource(1));
+        var setup = await factory.CreatePlayerSetupAsync(
+            Bulbasaur,
+            50,
+            Gen1Profile.Instance,
+            new SeededRandomSource(1)
+        );
         Assert.NotNull(setup);
 
         int[] fought = [16, 19]; // Pidgey, Rattata — a two-species fought pool
-        var draft = factory.BuildDraftSupplier(setup!.AllMoves);
+        var draft = factory.BuildDraftSupplier(setup!.AllMoves, Gen1Profile.Instance);
         var offered = await draft(
             new DraftContext(
                 setup.Player,
@@ -67,10 +73,15 @@ public class EncounterFactoryDraftTests
     public async Task BuildDraftSupplier_EmptyFoughtPool_NeverOffers()
     {
         var factory = BuildFactory();
-        var setup = await factory.CreatePlayerSetupAsync(Bulbasaur, 50, new SeededRandomSource(1));
+        var setup = await factory.CreatePlayerSetupAsync(
+            Bulbasaur,
+            50,
+            Gen1Profile.Instance,
+            new SeededRandomSource(1)
+        );
         Assert.NotNull(setup);
 
-        var draft = factory.BuildDraftSupplier(setup!.AllMoves);
+        var draft = factory.BuildDraftSupplier(setup!.AllMoves, Gen1Profile.Instance);
         var offered = await draft(
             new DraftContext(
                 setup.Player,

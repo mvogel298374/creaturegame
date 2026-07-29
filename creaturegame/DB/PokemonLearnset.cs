@@ -24,7 +24,8 @@ public enum LearnMethod
 /// <para>
 /// <see cref="Generation"/> keeps generations separated in one table: every row is 1
 /// today; a future generation seeds its own rows and the runtime query filters by the
-/// active generation (see <c>EncounterFactory.ActiveGeneration</c>).
+/// run's generation, read off its <c>GenerationProfile</c> (see <c>EncounterFactory</c> —
+/// this is the sanctioned "generation as a data filter" read, not a behaviour branch).
 /// </para>
 /// </summary>
 public class PokemonLearnset

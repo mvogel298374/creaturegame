@@ -2,6 +2,7 @@ using creaturegame.Attacks;
 using creaturegame.Combat;
 using creaturegame.Creatures;
 using creaturegame.DB;
+using creaturegame.Generations;
 using creaturegame.Web.Battle;
 using Microsoft.EntityFrameworkCore;
 
@@ -30,7 +31,7 @@ public class RunSetupBiomeTests
     public async Task CreatePlayerSetup_DrawsASeededPerRunBiomeMap()
     {
         var setup = await BuildFactory()
-            .CreatePlayerSetupAsync(Bulbasaur, 50, new SeededRandomSource(1));
+            .CreatePlayerSetupAsync(Bulbasaur, 50, Gen1Profile.Instance, new SeededRandomSource(1));
 
         Assert.NotNull(setup);
         // The run map is a seeded subset of the playable set (ENCOUNTER_DESIGN.md §2.1) — RunBiomeMapSize biomes
@@ -49,9 +50,19 @@ public class RunSetupBiomeTests
     public async Task CreatePlayerSetup_BiomeMap_IsReproducibleFromSeed()
     {
         var a = await BuildFactory()
-            .CreatePlayerSetupAsync(Bulbasaur, 50, new SeededRandomSource(42));
+            .CreatePlayerSetupAsync(
+                Bulbasaur,
+                50,
+                Gen1Profile.Instance,
+                new SeededRandomSource(42)
+            );
         var b = await BuildFactory()
-            .CreatePlayerSetupAsync(Bulbasaur, 50, new SeededRandomSource(42));
+            .CreatePlayerSetupAsync(
+                Bulbasaur,
+                50,
+                Gen1Profile.Instance,
+                new SeededRandomSource(42)
+            );
 
         Assert.Equal(a!.PlayableBiomes.Select(x => x.Id), b!.PlayableBiomes.Select(x => x.Id)); // same seed ⇒ same map
     }
@@ -64,7 +75,12 @@ public class RunSetupBiomeTests
         // (default Medium tier), over many seeds. At player 25 the [50%,80%] band is [12,20] — the foe must
         // never fall below 12, so a single-digit level is impossible from this path.
         var factory = BuildFactory();
-        var setup = await factory.CreatePlayerSetupAsync(Bulbasaur, 25, new SeededRandomSource(1));
+        var setup = await factory.CreatePlayerSetupAsync(
+            Bulbasaur,
+            25,
+            Gen1Profile.Instance,
+            new SeededRandomSource(1)
+        );
 
         Assert.NotNull(setup);
         Assert.Equal(25, setup!.Player.Level); // the player genuinely is level 25 out of setup
@@ -74,6 +90,7 @@ public class RunSetupBiomeTests
             var enemy = await factory.CreateEnemyAsync(
                 setup.Player,
                 setup.AllMoves,
+                Gen1Profile.Instance,
                 new SeededRandomSource(seed),
                 depth: 0
             );
@@ -85,7 +102,7 @@ public class RunSetupBiomeTests
     public async Task CreatePlayerSetup_PlayableBiomes_OnlyContainNonEmptyThemes()
     {
         var setup = await BuildFactory()
-            .CreatePlayerSetupAsync(Bulbasaur, 50, new SeededRandomSource(2));
+            .CreatePlayerSetupAsync(Bulbasaur, 50, Gen1Profile.Instance, new SeededRandomSource(2));
 
         Assert.NotNull(setup);
         Assert.NotEmpty(setup!.PlayableBiomes);

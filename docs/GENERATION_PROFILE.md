@@ -153,31 +153,44 @@ StartGameRequest.Generation
   the gap `requirements-review` caught on `Difficulty` and the reason `ParseDifficulty`/`RunRulesFor` are
   `internal` today.
 
-### 4.1 Where the seams actually enter today (surveyed 2026-07-29)
+### 4.1 Where the seams enter (surveyed 2026-07-29 · **all four threaded as of Stage 1b**)
 
-Only **three** places in product code choose a generation. Everything else inherits by default:
+The survey below is kept as the historical record of *what was wrong*, because the pre-Stage-1 column is the
+evidence for why the feature was needed — every one of these was Gen 1 by construction, and none of them would
+have failed a test. All four are now read from the run's profile.
 
-| Seam | Where it enters today | Stage 1 change |
+| Seam | Where it entered **before** Stage 1 | Now |
 |:--|:--|:--|
-| `ITypeChart` | `GameSessionManager.cs:166` — `Gen1TypeChart.Instance` passed positionally into the `RunDirector` | read from the profile |
-| `IEvolutionRules` | `EncounterFactory.cs:421` — `Gen1EvolutionRules.Instance` hardcoded in `ResolvePlayerEvolutionAsync` | read from the profile |
-| `IStatCalculator` | `EncounterFactory.cs:493` — `new Gen1StatCalculator(rng)`, **seeded per creature** so a fixed seed reproduces DVs. (`Creature.cs:404`'s property default is only the unseeded fallback.) | profile exposes a **factory**, not a singleton — Stage 1b |
-| `IBattleRules` | **nowhere in the web layer** — never passed; `Battle` falls back to `Gen1BattleRules.Instance` internally | thread explicitly from the profile |
+| `ITypeChart` | `GameSessionManager.cs` — `Gen1TypeChart.Instance` passed positionally into the `RunDirector` | ✅ read from the profile (Stage 1a) |
+| `IEvolutionRules` | `EncounterFactory` — `Gen1EvolutionRules.Instance` hardcoded in `ResolvePlayerEvolutionAsync` | ✅ read from the profile (Stage 1a); Stage 1b then widened that method to take the **whole profile**, so the generation used to query edges can't disagree with the rules used to judge them |
+| `IStatCalculator` | `EncounterFactory.BuildCreature` — `new Gen1StatCalculator(rng)`, **seeded per creature** so a fixed seed reproduces DVs. (`Creature.StatCalculator`'s property default is only the unseeded fallback.) | ✅ `profile.BuildStatCalculator(rng)` (Stage 1b) — the profile exposes a **factory**, not a singleton, precisely so it can be seeded per run |
+| `IBattleRules` | **nowhere in the web layer** — never passed at all; `Battle` fell back to `Gen1BattleRules.Instance` internally. The sharpest case: dropping the thread again would leave the whole suite green | ✅ `BuildRunOptions` sets `Rules = profile.BattleRules` (Stage 1a) |
 
 **A fifth site, found during Stage 1a:** `EncounterFactory.ActiveGeneration = 1` — a hardcoded `private const int`
 driving **six** learnset/evolution DB queries, plus a duplicate `PlayerOverviewDto.ActiveGeneration = 1`. Not a
 seam, but a **second source of truth for the generation**, and the most concrete "Gen 1 by assumption" in the
-repo. Folded into Stage 1b (see §4.5).
+repo. Folded into Stage 1b (see §4.5) — both consts are **deleted** as of Stage 1b (2026-07-29); the queries now
+filter on `(int)profile.Generation` and `PlayerOverviewDto.From` stamps the run's real generation.
+
+**Still Gen 1 by assumption, deliberately:** the species / `PokemonGameAvailability` pool behind the wild-encounter
+selector and the biome map is *not* generation-filtered — `ComputePlayableBiomesAsync` and `CreateEnemyAsync` draw
+from the whole dex. That is **Stage 2's** content-scope work, not an oversight of Stage 1b, which scoped only the
+learnset/evolution reads.
 
 ### 4.5 Stage 1 is split — 1a (shipped) and 1b
 
 **1a** did the axis and the `GameSessionManager` composition point: the profile type, registry, run-parameter
 threading, and explicit reads of `TypeChart` / `BattleRules` / `EvolutionRules` / the AI.
 
-**1b** does `EncounterFactory` — the `IStatCalculator` thread *and* the `ActiveGeneration` constant. Kept
-together because they are one coherent chunk in one file (every `BuildCreature` caller sits directly beside an
-`ActiveGeneration` query), and split from 1a because it is ~39 call sites across 5 test files, which would have
-buried 1a's architecture in mechanical churn.
+**1b** ✅ **DONE (2026-07-29)** — `EncounterFactory`'s `IStatCalculator` thread *and* the `ActiveGeneration`
+constant. Kept together because they were one coherent chunk in one file (every `BuildCreature` caller sat
+directly beside an `ActiveGeneration` query), and split from 1a because it was ~39 call sites across 5 test
+files, which would have buried 1a's architecture in mechanical churn. `ResolvePlayerEvolutionAsync` was widened
+to take the whole `GenerationProfile` rather than a bare `IEvolutionRules` in the same pass, so the generation
+used to query evolution edges and the rules used to judge them can never disagree. Falsification leg:
+`TestAltProfile.BuildStatCalculator` now returns an `AltStatCalculator` stamping a sentinel DV of 99 on every
+stat (previously it returned a plain `Gen1StatCalculator`, which made it useless as a probe). Full write-up →
+`TODO.md` → *Generation Profile* → Stage 1b.
 
 > **The parameters 1b adds must be `required`, never defaulted.** A `GenerationProfile? profile = null` with a
 > `?? Gen1Profile.Instance` fallback would reintroduce §4.2's hazard at the very layer the feature is trying to

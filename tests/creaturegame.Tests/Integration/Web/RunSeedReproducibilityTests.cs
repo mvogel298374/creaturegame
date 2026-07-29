@@ -1,6 +1,7 @@
 using creaturegame.Combat;
 using creaturegame.Creatures;
 using creaturegame.DB;
+using creaturegame.Generations;
 using creaturegame.Web.Battle;
 using Microsoft.EntityFrameworkCore;
 
@@ -31,8 +32,18 @@ public class RunSeedReproducibilityTests
     {
         var factory = BuildFactory();
 
-        var a = await factory.CreatePlayerSetupAsync(Bulbasaur, 50, new SeededRandomSource(42));
-        var b = await factory.CreatePlayerSetupAsync(Bulbasaur, 50, new SeededRandomSource(42));
+        var a = await factory.CreatePlayerSetupAsync(
+            Bulbasaur,
+            50,
+            Gen1Profile.Instance,
+            new SeededRandomSource(42)
+        );
+        var b = await factory.CreatePlayerSetupAsync(
+            Bulbasaur,
+            50,
+            Gen1Profile.Instance,
+            new SeededRandomSource(42)
+        );
 
         Assert.NotNull(a);
         Assert.NotNull(b);
@@ -43,7 +54,7 @@ public class RunSeedReproducibilityTests
     public async Task CreatePlayerSetup_SeedsTheRunBagFromACuratedStartingLoadout()
     {
         var setup = await BuildFactory()
-            .CreatePlayerSetupAsync(Bulbasaur, 50, new SeededRandomSource(1));
+            .CreatePlayerSetupAsync(Bulbasaur, 50, Gen1Profile.Instance, new SeededRandomSource(1));
 
         Assert.NotNull(setup);
         Assert.NotEmpty(setup!.AllItems);
@@ -58,7 +69,7 @@ public class RunSeedReproducibilityTests
     public async Task CreatePlayerSetup_SeedsAnEmptyWallet()
     {
         var setup = await BuildFactory()
-            .CreatePlayerSetupAsync(Bulbasaur, 50, new SeededRandomSource(1));
+            .CreatePlayerSetupAsync(Bulbasaur, 50, Gen1Profile.Instance, new SeededRandomSource(1));
 
         Assert.NotNull(setup);
         Assert.Equal(0, setup!.Wallet.Balance);
@@ -69,17 +80,24 @@ public class RunSeedReproducibilityTests
     {
         var factory = BuildFactory();
         // A fixed player drives the enemy's BST/level scaling; build it once and reuse for both encounters.
-        var setup = await factory.CreatePlayerSetupAsync(Bulbasaur, 50, new SeededRandomSource(7));
+        var setup = await factory.CreatePlayerSetupAsync(
+            Bulbasaur,
+            50,
+            Gen1Profile.Instance,
+            new SeededRandomSource(7)
+        );
         Assert.NotNull(setup);
 
         var e1 = await factory.CreateEnemyAsync(
             setup!.Player,
             setup.AllMoves,
+            Gen1Profile.Instance,
             new SeededRandomSource(1234)
         );
         var e2 = await factory.CreateEnemyAsync(
             setup.Player,
             setup.AllMoves,
+            Gen1Profile.Instance,
             new SeededRandomSource(1234)
         );
 
@@ -92,12 +110,14 @@ public class RunSeedReproducibilityTests
         var d1 = await factory.CreateEnemyAsync(
             setup.Player,
             setup.AllMoves,
+            Gen1Profile.Instance,
             new SeededRandomSource(1234),
             depth: 5
         );
         var d2 = await factory.CreateEnemyAsync(
             setup.Player,
             setup.AllMoves,
+            Gen1Profile.Instance,
             new SeededRandomSource(1234),
             depth: 5
         );
@@ -114,7 +134,12 @@ public class RunSeedReproducibilityTests
         // surface — this would catch a regression that the determinism test alone (full-dex fallback stays
         // deterministic too) would not.
         var factory = BuildFactory();
-        var setup = await factory.CreatePlayerSetupAsync(Bulbasaur, 50, new SeededRandomSource(3));
+        var setup = await factory.CreatePlayerSetupAsync(
+            Bulbasaur,
+            50,
+            Gen1Profile.Instance,
+            new SeededRandomSource(3)
+        );
         Assert.NotNull(setup);
 
         await using var ctx = new PokemonDbContext();
@@ -131,6 +156,7 @@ public class RunSeedReproducibilityTests
             var enemy = await factory.CreateEnemyAsync(
                 setup!.Player,
                 setup.AllMoves,
+                Gen1Profile.Instance,
                 new SeededRandomSource(i)
             );
             Assert.Contains(enemy.SpeciesId, wild);
@@ -144,7 +170,12 @@ public class RunSeedReproducibilityTests
         // Optimal moveset deterministically, so it consumes a different stream than Medium. Each must still be
         // fully reproducible from a seed (the 2b stream-shift pin).
         var factory = BuildFactory();
-        var setup = await factory.CreatePlayerSetupAsync(Bulbasaur, 50, new SeededRandomSource(7));
+        var setup = await factory.CreatePlayerSetupAsync(
+            Bulbasaur,
+            50,
+            Gen1Profile.Instance,
+            new SeededRandomSource(7)
+        );
         Assert.NotNull(setup);
 
         foreach (
@@ -154,6 +185,7 @@ public class RunSeedReproducibilityTests
             var a = await factory.CreateEnemyAsync(
                 setup!.Player,
                 setup.AllMoves,
+                Gen1Profile.Instance,
                 new SeededRandomSource(55),
                 depth: 3,
                 archetype: tier
@@ -161,6 +193,7 @@ public class RunSeedReproducibilityTests
             var b = await factory.CreateEnemyAsync(
                 setup.Player,
                 setup.AllMoves,
+                Gen1Profile.Instance,
                 new SeededRandomSource(55),
                 depth: 3,
                 archetype: tier

@@ -3,6 +3,7 @@ using creaturegame.Combat;
 using creaturegame.Creatures;
 using creaturegame.DB;
 using creaturegame.Evolution;
+using creaturegame.Generations;
 using creaturegame.Items;
 using Microsoft.EntityFrameworkCore;
 using static creaturegame.Creatures.EncounterSelector;
@@ -21,9 +22,6 @@ public sealed class EncounterFactory(
     IDbContextFactory<ItemsDbContext> itemsFactory
 )
 {
-    // The single generation switch — learnset rows are tagged by generation and filtered by this.
-    private const int ActiveGeneration = 1;
-
     // How many biomes a single run's map draws from the region's playable set (ENCOUNTER_DESIGN.md §2.1):
     // a seeded connected subset, so runs traverse different slices of Kanto. Tuning lever — smaller = a more
     // distinct per-run "region", larger = richer route choice. The full set has 18; if it ever has fewer than
@@ -34,13 +32,17 @@ public sealed class EncounterFactory(
     /// Loads the move pool and builds the player creature with its canonical moveset. Returns null if the
     /// species id is unknown or the move database is empty.
     /// </summary>
+    /// <param name="profile">The run's generation profile. <b>Required, deliberately un-defaulted</b> — see the
+    /// note on <see cref="BuildCreature"/>.</param>
     public async Task<RunSetup?> CreatePlayerSetupAsync(
         int speciesId,
         int level,
+        GenerationProfile profile,
         IRandomSource? rng = null
     )
     {
         var source = rng ?? SystemRandomSource.Instance;
+        int gen = (int)profile.Generation;
         await using var pokemonCtx = await pokemonFactory.CreateDbContextAsync();
         var species = await pokemonCtx
             .Species.AsNoTracking()
@@ -56,9 +58,7 @@ public sealed class EncounterFactory(
         var learnsets = await pokemonCtx
             .Learnsets.AsNoTracking()
             .Where(l =>
-                l.Generation == ActiveGeneration
-                && l.SpeciesId == species.Id
-                && l.Method == LearnMethod.LevelUp
+                l.Generation == gen && l.SpeciesId == species.Id && l.Method == LearnMethod.LevelUp
             )
             .ToListAsync();
 
@@ -68,7 +68,8 @@ public sealed class EncounterFactory(
             allMoves,
             level,
             MoveSelectionStrategy.CanonicalLatest,
-            source
+            source,
+            profile
         );
         // Only the player levels up, so only the player carries a learnset (its moves resolved up-front and
         // consulted by the battle loop on each level gained). Persists with the creature across the chain.
@@ -163,13 +164,15 @@ public sealed class EncounterFactory(
     /// common case) — the acquisition-side mirror of <see cref="BuildRewardSupplier"/>.
     /// </summary>
     public Func<DraftContext, IRandomSource, Task<Creature?>> BuildDraftSupplier(
-        IReadOnlyList<Attack> allMoves
-    ) => (ctx, rng) => TryBuildDraftAsync(ctx, allMoves, rng);
+        IReadOnlyList<Attack> allMoves,
+        GenerationProfile profile
+    ) => (ctx, rng) => TryBuildDraftAsync(ctx, allMoves, rng, profile);
 
     private async Task<Creature?> TryBuildDraftAsync(
         DraftContext ctx,
         IReadOnlyList<Attack> allMoves,
-        IRandomSource rng
+        IRandomSource rng,
+        GenerationProfile profile
     )
     {
         // Policy gate first (no RNG unless a cadence win with a non-empty pool) — a non-offer win leaves the
@@ -203,12 +206,11 @@ public sealed class EncounterFactory(
             return null;
 
         int level = ScaleWildLevel(ctx.Lead.Level, ctx.Depth, rng);
+        int gen = (int)profile.Generation;
         var learnsets = await pokemonCtx
             .Learnsets.AsNoTracking()
             .Where(l =>
-                l.Generation == ActiveGeneration
-                && l.SpeciesId == species.Id
-                && l.Method == LearnMethod.LevelUp
+                l.Generation == gen && l.SpeciesId == species.Id && l.Method == LearnMethod.LevelUp
             )
             .ToListAsync();
 
@@ -218,7 +220,8 @@ public sealed class EncounterFactory(
             allMoves,
             level,
             MoveSelectionStrategy.CanonicalLatest,
-            rng
+            rng,
+            profile
         );
         // A drafted member may later become the lead (Stage 1d) and level up, so give it a learnset like the
         // starter — resolved up-front, consulted on each level gained.
@@ -235,13 +238,15 @@ public sealed class EncounterFactory(
     /// (common) no-catch roll — the boss channel's mirror of <see cref="BuildDraftSupplier"/>.
     /// </summary>
     public Func<BossCatchContext, IRandomSource, Task<Creature?>> BuildBossCatchSupplier(
-        IReadOnlyList<Attack> allMoves
-    ) => (ctx, rng) => TryBuildBossCatchAsync(ctx, allMoves, rng);
+        IReadOnlyList<Attack> allMoves,
+        GenerationProfile profile
+    ) => (ctx, rng) => TryBuildBossCatchAsync(ctx, allMoves, rng, profile);
 
     private async Task<Creature?> TryBuildBossCatchAsync(
         BossCatchContext ctx,
         IReadOnlyList<Attack> allMoves,
-        IRandomSource rng
+        IRandomSource rng,
+        GenerationProfile profile
     )
     {
         // Policy gate first (a single n% roll) — a Boss win that doesn't catch leaves the seeded run stream after
@@ -258,12 +263,11 @@ public sealed class EncounterFactory(
         if (species is null)
             return null;
 
+        int gen = (int)profile.Generation;
         var learnsets = await pokemonCtx
             .Learnsets.AsNoTracking()
             .Where(l =>
-                l.Generation == ActiveGeneration
-                && l.SpeciesId == species.Id
-                && l.Method == LearnMethod.LevelUp
+                l.Generation == gen && l.SpeciesId == species.Id && l.Method == LearnMethod.LevelUp
             )
             .ToListAsync();
 
@@ -278,6 +282,7 @@ public sealed class EncounterFactory(
             ctx.Boss.Level,
             MoveSelectionStrategy.CanonicalLatest,
             rng,
+            profile,
             DvQuality.Superb
         );
         // A caught boss may later become the lead (Stage 1d) and level up, so give it a learnset like the starter.
@@ -286,10 +291,15 @@ public sealed class EncounterFactory(
     }
 
     /// <summary>
-    /// The biomes for <paramref name="region"/> that can actually generate against the active generation's
-    /// wild-available species (legendaries/statics/gifts excluded — the same filter as
-    /// <see cref="CreateEnemyAsync"/>). Empty biomes never appear; if no availability data exists (a minimally
-    /// seeded DB) the full dex is the pool, mirroring the encounter fallback so the map never starves.
+    /// The biomes for <paramref name="region"/> that can actually generate against the wild-available species
+    /// (legendaries/statics/gifts excluded — the same filter as <see cref="CreateEnemyAsync"/>). Empty biomes
+    /// never appear; if no availability data exists (a minimally seeded DB) the full dex is the pool, mirroring
+    /// the encounter fallback so the map never starves.
+    /// <para><b>Not generation-scoped.</b> The species/availability pool is the whole dex regardless of the run's
+    /// generation — species-level content filtering is deliberately deferred to <b>Stage 2</b>
+    /// (<c>docs/GENERATION_PROFILE.md</c>, "content scope"). Stage 1b scoped only the learnset/evolution reads,
+    /// which is why this method takes no profile. Said explicitly because the previous wording claimed an
+    /// "active generation" filter that never existed here.</para>
     /// </summary>
     private static async Task<IReadOnlyList<BiomeDefinition>> ComputePlayableBiomesAsync(
         PokemonDbContext pokemonCtx,
@@ -324,9 +334,12 @@ public sealed class EncounterFactory(
     /// threaded by <see cref="creaturegame.Combat.RunDirector"/>; Phase 2d's enemy tier modulates the band
     /// further.</para>
     /// </summary>
+    /// <param name="profile">The run's generation profile. <b>Required, deliberately un-defaulted</b> — see the
+    /// note on <see cref="BuildCreature"/>.</param>
     public async Task<Creature> CreateEnemyAsync(
         Creature player,
         IReadOnlyList<Attack> allMoves,
+        GenerationProfile profile,
         IRandomSource? rng = null,
         BiomeDefinition? biome = null,
         int depth = 0,
@@ -376,10 +389,11 @@ public sealed class EncounterFactory(
             spec.Moves == MoveSelectionStrategy.TmEnhanced
                 ? new[] { LearnMethod.LevelUp, LearnMethod.Machine }
                 : new[] { LearnMethod.LevelUp };
+        int gen = (int)profile.Generation;
         var learnsets = await pokemonCtx
             .Learnsets.AsNoTracking()
             .Where(l =>
-                l.Generation == ActiveGeneration
+                l.Generation == gen
                 && l.SpeciesId == enemySpecies.Id
                 && allowedMethods.Contains(l.Method)
             )
@@ -392,6 +406,7 @@ public sealed class EncounterFactory(
             spec.Level,
             spec.Moves,
             source,
+            profile,
             spec.Dvs,
             spec.MoveCount
         );
@@ -402,27 +417,32 @@ public sealed class EncounterFactory(
     /// evolution edges, runs the Gen 1 <see cref="IEvolutionRules"/> decision against the player's current
     /// level, and — if one fires — resolves the evolved species plus its learnset into an
     /// <see cref="EvolutionOutcome"/>. Returns null when nothing evolves, so the runner leaves the player as
-    /// is. The rules come from the run's <c>GenerationProfile</c> (resolved at the composition point in
+    /// is. The rules come from the run's <see cref="GenerationProfile"/> (resolved at the composition point in
     /// <see cref="GameSessionManager"/>), keeping both this method and the runner generation-agnostic.
     /// </summary>
-    /// <param name="evolutionRules">The run's evolution seam. <b>Required, deliberately un-defaulted</b> — a
-    /// <c>?? Gen1EvolutionRules.Instance</c> fallback here would let a future generation silently evolve by Gen 1
-    /// rules with nothing failing (<c>docs/GENERATION_PROFILE.md</c> §4.2).</param>
+    /// <param name="profile">The run's generation profile, supplying <em>both</em> halves of the evolution
+    /// question: the <see cref="IEvolutionRules"/> seam that decides, and the generation whose evolution edges
+    /// are read. Taking the whole profile rather than the seam alone is deliberate — the generation used to
+    /// query and the rules used to judge can then never disagree.
+    /// <b>Required, deliberately un-defaulted</b> — a <c>?? Gen1EvolutionRules.Instance</c> fallback here would
+    /// let a future generation silently evolve by Gen 1 rules with nothing failing
+    /// (<c>docs/GENERATION_PROFILE.md</c> §4.2).</param>
     public async Task<EvolutionOutcome?> ResolvePlayerEvolutionAsync(
         Creature player,
         IReadOnlyList<Attack> allMoves,
-        IEvolutionRules evolutionRules
+        GenerationProfile profile
     )
     {
+        int gen = (int)profile.Generation;
         await using var pokemonCtx = await pokemonFactory.CreateDbContextAsync();
         var edges = await pokemonCtx
             .Evolutions.AsNoTracking()
-            .Where(e => e.Generation == ActiveGeneration && e.FromSpeciesId == player.SpeciesId)
+            .Where(e => e.Generation == gen && e.FromSpeciesId == player.SpeciesId)
             .ToListAsync();
         if (edges.Count == 0)
             return null;
 
-        var result = evolutionRules.CheckEvolution(
+        var result = profile.EvolutionRules.CheckEvolution(
             player,
             new EvolutionContext.LeveledTo(player.Level),
             edges
@@ -439,9 +459,7 @@ public sealed class EncounterFactory(
         var learnsets = await pokemonCtx
             .Learnsets.AsNoTracking()
             .Where(l =>
-                l.Generation == ActiveGeneration
-                && l.SpeciesId == newForm.Id
-                && l.Method == LearnMethod.LevelUp
+                l.Generation == gen && l.SpeciesId == newForm.Id && l.Method == LearnMethod.LevelUp
             )
             .ToListAsync();
 
@@ -479,6 +497,12 @@ public sealed class EncounterFactory(
         return rng.Next(min, max + 1); // Next's upper bound is exclusive → +1 makes max inclusive
     }
 
+    /// <param name="profile">The run's generation profile — the source of the <see cref="IStatCalculator"/> seam.
+    /// <b>Required, and deliberately not defaulted anywhere on this path.</b> A <c>?? Gen1…</c> fallback would
+    /// reintroduce exactly the hazard this feature exists to remove: a composition path that forgot to thread the
+    /// profile would still compile, still pass every test, and silently run Gen 1 stat math
+    /// (<c>docs/GENERATION_PROFILE.md</c> §4.2). Only a second profile can prove the thread is real — hence
+    /// <c>TestAltProfile</c>.</param>
     private static Creature BuildCreature(
         PokemonSpecies species,
         IReadOnlyList<PokemonLearnset> learnsets,
@@ -486,15 +510,18 @@ public sealed class EncounterFactory(
         int level,
         MoveSelectionStrategy strategy,
         IRandomSource rng,
+        GenerationProfile profile,
         DvQuality dvQuality = DvQuality.Average,
         int maxMoves = LearnsetMoveSelector.MaxMoves
     )
     {
         // Construction rolls DVs (the Creature ctor used the global-RNG default calculator); re-seat the
         // stat calculator on the run's seeded source and re-roll at the requested quality so a run with a fixed
-        // seed reproduces the same DVs. DV randomisation is a per-generation rule, so it stays behind IStatCalculator.
+        // seed reproduces the same DVs. DV randomisation is a per-generation rule, so it stays behind
+        // IStatCalculator — and the implementation comes from the run's profile, not a hardcoded Gen 1 one. The
+        // profile exposes a FACTORY rather than a singleton precisely so this call can seed it per run.
         var creature = new Creature(species.Name.ToUpper()) { Level = level };
-        creature.StatCalculator = new Gen1StatCalculator(rng);
+        creature.StatCalculator = profile.BuildStatCalculator(rng);
         creature.StatCalculator.RandomiseDvs(creature, dvQuality);
         creature.InitializeFromSpecies(species);
         creature.Experience = creature.CalculateExperienceForLevel(level);

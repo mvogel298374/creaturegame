@@ -8,6 +8,33 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Party strip shows a stale name after an on-field evolution ✅ DONE (2026-07-29)
+
+**The defect (found 2026-07-28).** The party panel is fed **only** by `PartyUpdated` snapshots (plus the
+connect-time `/party` hydrate). `TryEvolveAsync` in `BattleRunEvent.cs` renamed the creature and emitted
+`CreatureEvolved`, but pushed no `PartyUpdated` afterward — so the roster row kept the pre-evolution species name
+until some later event happened to resync it (a reward/acquisition/lead-change snapshot). The nameplate/HUD were
+already correct (see *Evolution nameplate doesn't follow until the next battle starts* below, 2026-07-28) —
+driven directly by `CreatureEvolved` client-side — so the inconsistency was strip-vs-nameplate, visible side by
+side: same family as *Party strip shows a stale level for the on-field creature* (2026-07-27) but a different
+trigger (evolution, not level-up) and a different field (name, not level).
+
+**Fix.** `BattleRunEvent.cs`: `TryEvolveAsync` now returns `Task<bool>` (true only on an actual morph; false on
+no-resolver / no-evolution / player cancel). The evolution loop accumulates `anyEvolved` across the party and
+pushes **one** `PartyUpdated` snapshot after the loop, coalescing a multi-creature evolution batch into a single
+repaint rather than one push per creature.
+
+**Key detail worth recording.** The win's own level-up snapshot (emitted inside `Battle`) could **not** cover
+this, because it fires **before** the evolution runs and therefore carries the pre-evolution name. Verified by
+temporarily disabling the new emit: the last snapshot read "CHARMANDER" while the nameplate read "CHARMELEON" —
+the exact reported defect.
+
+**Test.** `RunDirectorEvolutionTests.Runner_OnFieldEvolution_PushesAPartySnapshotCarryingTheNewName` — asserts the
+last `PartyUpdated` carries the new name/speciesId and is ordered after `CreatureEvolved`. Confirmed to fail
+without the fix.
+
+---
+
 ## Evolution nameplate doesn't follow until the next battle starts ✅ FIXED (2026-07-28)
 
 **The defect (found 2026-07-26, while writing `evolution.spec.ts`).** `useBattleHub`'s side-split ref and the
@@ -45,10 +72,12 @@ recurring **web event field-projection gap**: `BattleStarted`/`CreatureSwitchedI
 - `evolution.spec.ts` still reads the nameplate only after the run is playable again (i.e. after the *next*
   `BattleStarted`), so it would not catch a regression of this exact fix. Not extended here — E2E is user-only
   per the repo's agent rules, and an unverified assertion isn't worth adding blind.
-- The **party strip** has the same staleness on a different, engine-side leg: `TryEvolveAsync` in
-  `BattleRunEvent.cs` emits no `PartyUpdated` after an evolution, so the roster row keeps the pre-evolution name
-  until some later snapshot happens to resync it. Same family as commit `2880158` ("Party strip follows the
-  on-field creature's level-up") but a separate leg — no client-only fix can close it.
+
+**Closed the same family, one day later:** the **party strip** had the same staleness on a different,
+engine-side leg — `TryEvolveAsync` in `BattleRunEvent.cs` emitted no `PartyUpdated` after an evolution, so the
+roster row kept the pre-evolution name until some later snapshot happened to resync it. Same family as commit
+`2880158` ("Party strip follows the on-field creature's level-up") but a separate leg that no client-only fix
+could close. Fixed 2026-07-29 — see *Party strip shows a stale name after an on-field evolution* above.
 
 ---
 

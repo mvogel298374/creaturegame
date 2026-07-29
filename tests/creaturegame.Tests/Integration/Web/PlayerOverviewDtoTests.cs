@@ -1,5 +1,6 @@
 using creaturegame.Attacks;
 using creaturegame.Creatures;
+using creaturegame.Generations;
 using creaturegame.Tests.TestSupport;
 using creaturegame.Web.Battle;
 
@@ -46,7 +47,7 @@ public class PlayerOverviewDtoTests
     [Fact]
     public void From_MapsTheFiveGen1Stats_WithActualValueDvAndStatExp()
     {
-        var dto = PlayerOverviewDto.From(BuildCharizard());
+        var dto = PlayerOverviewDto.From(BuildCharizard(), Generation.One);
 
         Assert.Equal("CHARIZARD", dto.Name);
         Assert.Equal(50, dto.Level);
@@ -68,6 +69,24 @@ public class PlayerOverviewDtoTests
         Assert.Equal((130, 15, 12030), (spc.Value, spc.Dv, spc.StatExp));
     }
 
+    /// <summary>
+    /// The <c>generation</c> field is <b>behaviour-bearing on the client</b> — <c>CreatureOverview.tsx</c> gates
+    /// which INFO rows render on <c>d.generation &gt;= f.minGen</c> — and since Stage 1b it is projected from the
+    /// run rather than a <c>const … = 1</c>. So it needs one assertion with a value that is <i>not</i> Gen 1.
+    /// </summary>
+    /// <remarks>
+    /// Without this, every other assertion in this file passes <see cref="Generation.One"/> and expects 1, so
+    /// re-hardcoding <c>1</c> inside <c>From</c> would leave the whole suite green — precisely the silent-Gen-1
+    /// failure the Generation Profile feature exists to remove (<c>docs/GENERATION_PROFILE.md</c> §4.2). The cast
+    /// is to an unregistered enum value on purpose: this pins the projection alone, and asserts nothing about any
+    /// real generation existing.
+    /// </remarks>
+    [Fact]
+    public void From_StampsTheRunsGeneration_NotAHardcodedGen1()
+    {
+        Assert.Equal(2, PlayerOverviewDto.From(BuildCharizard(), (Generation)2).Generation);
+    }
+
     [Fact]
     public void From_DerivesMoveCategory_ByDamageAndGen1PhysicalSpecialSplit()
     {
@@ -76,7 +95,7 @@ public class PlayerOverviewDtoTests
         c.AddAttack(Move("flamethrower", DamageType.Fire, AttackType.Special, 95)); // damaging, Fire → Special
         c.AddAttack(Move("growl", DamageType.Normal, AttackType.Physical, 0)); // no power → Status
 
-        var moves = PlayerOverviewDto.From(c).Moves;
+        var moves = PlayerOverviewDto.From(c, Generation.One).Moves;
         string Category(string n) => moves.Single(m => m.Name == n).Category;
 
         Assert.Equal("Physical", Category("slash"));

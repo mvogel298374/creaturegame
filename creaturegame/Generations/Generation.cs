@@ -10,9 +10,9 @@ namespace creaturegame.Generations;
 /// invariant in <c>GENERATION_SEAMS.md §4.2</c>.</para>
 /// <para>Legitimate reads are: the registry lookup in <see cref="GenerationProfiles"/>, the request parse at the
 /// web boundary, and <b>using the value as a data filter</b> — e.g. selecting a generation's learnset or
-/// evolution rows from the database (Stage 1b replaces <c>EncounterFactory.ActiveGeneration</c> with exactly
-/// that). What is forbidden is branching on it to pick <i>behaviour</i>; asking the data layer for this
-/// generation's rows is not a branch.</para>
+/// evolution rows from the database, which is what <c>EncounterFactory</c> does with it (Stage 1b replaced its
+/// hardcoded <c>ActiveGeneration</c> const with exactly this read). What is forbidden is branching on it to pick
+/// <i>behaviour</i>; asking the data layer for this generation's rows is not a branch.</para>
 /// <para><b>Adding a generation:</b> add a member here, add a <c>GenN Profile</c> file beside
 /// <c>Gen1Profile.cs</c>, and add one line to <see cref="GenerationProfiles"/>. Nothing else should need to
 /// change — if it does, that is the signal a slice is missing from <see cref="GenerationProfile"/>.</para>

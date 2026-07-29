@@ -33,6 +33,11 @@ namespace creaturegame.Tests.Unit;
 /// </remarks>
 internal static class TestAltProfile
 {
+    /// <summary>The DV this profile's stat calculator stamps on every stat — the marker a test reads to prove a
+    /// creature was built with <b>this</b> profile's stat seam and not a leaked Gen 1 one. Deliberately outside
+    /// Gen 1's 0–15 DV range so the assertion cannot pass by coincidence. See <see cref="AltStatCalculator"/>.</summary>
+    public const int SentinelDv = 99;
+
     public static readonly GenerationProfile Instance = new()
     {
         // Reuses Generation.One as a label because the enum has no second member yet, and adding a fake one to
@@ -40,7 +45,7 @@ internal static class TestAltProfile
         Generation = Generation.One,
         TypeChart = new AltTypeChart(),
         BattleRules = new AltBattleRules(),
-        BuildStatCalculator = rng => new Gen1StatCalculator(rng),
+        BuildStatCalculator = rng => new AltStatCalculator(),
         EvolutionRules = new AltEvolutionRules(),
         BuildAi = rng => new Gen1TrainerAi(rng: rng),
     };
@@ -60,6 +65,37 @@ internal static class TestAltProfile
     private sealed class AltBattleRules : DelegatingBattleRules
     {
         public override int AccuracyRollBound => 100;
+    }
+
+    /// <summary>
+    /// Stat math that is <b>observably not Gen 1</b>: <see cref="RandomiseDvs"/> ignores its quality band and
+    /// stamps a fixed sentinel DV on every stat, and the two stat formulas return a constant.
+    /// </summary>
+    /// <remarks>
+    /// Stage 1b's falsification leg. Until that stage, this slot held <c>new Gen1StatCalculator(rng)</c> — which
+    /// made it useless as a probe: <c>EncounterFactory.BuildCreature</c> hardcoded its own
+    /// <c>new Gen1StatCalculator(rng)</c>, so threading the profile and forgetting to thread it produced
+    /// identical creatures. Sentinel DVs are what make the difference visible: Gen 1's Average band draws each of
+    /// the four independent DVs from 0–15 and derives HP from their low bits, so it cannot land on
+    /// <see cref="SentinelDv"/> across the board by chance in a seeded test. Deliberately <b>ignores the rng</b>
+    /// — determinism is the point, and it also proves the factory's argument isn't what makes it work.
+    /// </remarks>
+    private sealed class AltStatCalculator : IStatCalculator
+    {
+        public int CalculateHP(int baseStat, int dv, int statExp, int level) => 111;
+
+        public int CalculateOtherStat(int baseStat, int dv, int statExp, int level) => 22;
+
+        public void RandomiseDvs(Creature creature, DvQuality quality)
+        {
+            creature.DvHP = SentinelDv;
+            creature.DvAttack = SentinelDv;
+            creature.DvDefense = SentinelDv;
+            creature.DvSpecial = SentinelDv;
+            creature.DvSpeed = SentinelDv;
+        }
+
+        public void AwardStatExp(Creature victor, Creature defeated) { }
     }
 
     /// <summary>Never evolves anything — the simplest possible difference from Gen 1's real edge logic.</summary>

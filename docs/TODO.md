@@ -48,8 +48,10 @@ run even with a live bench*.)*
 *(**Evolution nameplate/action-prompt lag** — found 2026-07-26 — is **✅ COMPLETE (2026-07-28)**: the nameplate
 and `"What will X do?"` prompt now retarget on `CreatureEvolved`, same as `BattleStarted`/`LeadChanged`/
 `CreatureSwitchedIn`. Full record in `TODO_ARCHIVE.md` → *Evolution nameplate doesn't follow until the next
-battle starts*. Two follow-ups deliberately left open, not closed by that fix: the E2E coverage gap above, and
-**party strip shows a stale name after an on-field evolution**, own section below.)*
+battle starts*. Two follow-ups it left open are now both closed: the sibling **party strip shows a stale name
+after an on-field evolution** defect is **✅ COMPLETE (2026-07-29)** — see `TODO_ARCHIVE.md` → *Party strip shows
+a stale name after an on-field evolution*; only the regression-insurance E2E coverage gap remains, tracked under
+*Browser-Based UI Testing* below.)*
 
 *(**Phase 4 shipped in full** — the roster, both acquisition channels, between-biome lead swap, and
 forced-switch-on-faint. Stage 3's end-of-battle defect (wrong requirement pins in its own plan, not the domain)
@@ -419,24 +421,6 @@ Encounter Logic gate:
 
 ---
 
-## Party strip shows a stale name after an on-field evolution  ⟵ OPEN (found 2026-07-28)
-
-**The defect.** The party panel is fed **only** by `PartyUpdated` snapshots (plus the connect-time `/party`
-hydrate). `TryEvolveAsync` in `BattleRunEvent.cs` renames the creature and emits `CreatureEvolved`, but pushes no
-`PartyUpdated` afterward — so the roster row keeps the pre-evolution species name until some later event happens
-to resync it (a reward/acquisition/lead-change snapshot). The nameplate/HUD are now correct (see `TODO_ARCHIVE.md`
-→ *Evolution nameplate doesn't follow until the next battle starts*, 2026-07-28) — driven directly by
-`CreatureEvolved` client-side — so the inconsistency is strip-vs-nameplate, visible side by side, same shape as
-the archived *Party strip shows a stale level for the on-field creature* (2026-07-27) but a different trigger
-(evolution, not level-up) and a different field (name, not level).
-
-Cosmetic, self-corrects at the next snapshot. *Fix:* push a `PartyUpdated` from `TryEvolveAsync` (or its caller)
-after a successful evolution, mirroring the `anyLevelled` fix's precedent. Needs an engine/integration test
-pinning that a solo on-field evolution still emits a snapshot (same shape as
-`PartyExpShareTests.ActiveCreatureLevellingAlone_StillPushesAPartySnapshot`).
-
----
-
 ## Game Loop & Progression
 
 **Prerequisites:** Catch Mechanic, `PlayerDbContext` / `save.db`. Intentionally deferred until combat fidelity
@@ -574,9 +558,10 @@ tested through the `mitt` bridge (assert **event ordering**, never wall-clock du
 **Done and archived** (→ `TODO_ARCHIVE.md`): seed plumbing, the Run Economy reward-modal E2E, the spec-rot
 recovery and the inter-test flakiness pass are all under *"Browser-Based UI Testing — seed plumbing, spec-rot
 recovery & the flakiness pass"*; the between-encounter modal E2Es under *"Other between-encounter modal E2Es"*;
-the In-Combat Switching UI contract in the *"In-Combat Switching"* 2026-07-26 addendum; and the evolution
-nameplate/action-prompt lag under *"Evolution nameplate doesn't follow until the next battle starts"*
-(2026-07-28) — see the two known-still-open follow-ups (E2E coverage gap, party-strip staleness) below.
+the In-Combat Switching UI contract in the *"In-Combat Switching"* 2026-07-26 addendum; the evolution
+nameplate/action-prompt lag under *"Evolution nameplate doesn't follow until the next battle starts"* (2026-07-28);
+and its sibling *"Party strip shows a stale name after an on-field evolution"* (2026-07-29) — see the one
+known-still-open follow-up (the regression-insurance E2E coverage gap) below.
 
 > **E2E is deliberately out of the AI agent's pre-finish gate (2026-07-26, user's call).** The suite is ~4 min
 > for 37 browser-driven tests and is the only one with real flakes, so agents are *heavily disincentivized*:
@@ -667,19 +652,36 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
     but documents itself as a "generation-blind selection policy" whose Gen 1 leanings live in its evaluators —
     so the whole construction is exposed as one `BuildAi` factory rather than pretending the policy class is
     per-generation.
-- [ ] **Stage 1b — `EncounterFactory`'s generation-awareness.** The remaining seam thread plus the constant that
-  duplicates it, deliberately kept together because they are one coherent chunk in one file:
-  - `IStatCalculator` — `BuildCreature` does `new Gen1StatCalculator(rng)` (**seeded**, hence the profile
-    exposes a factory, not a singleton). Thread the profile through the 4 `BuildCreature` callers and the 4
-    public entry points.
-  - **`EncounterFactory.ActiveGeneration = 1`** — a hardcoded `private const int` driving **6** learnset /
-    evolution DB queries, plus a duplicate `PlayerOverviewDto.ActiveGeneration = 1`. Found 2026-07-29; it is the
-    most concrete "Gen 1 by assumption" in the repo and a second source of truth for the generation. Replace
-    with `profile.Generation`.
-  - Blast radius: ~39 call sites across 5 test files. Parameters must be **required, never defaulted** — a
-    `?? Gen1…` default would reintroduce the exact silent-fallback hazard the feature exists to remove.
-  - *(This absorbs what Stage 2 scoped as "where content filtering is asked for" — `ActiveGeneration` already
-    is that filter, so wiring it here is cheaper than inventing a parallel socket.)*
+- [x] **Stage 1b — `EncounterFactory`'s generation-awareness** ✅ DONE (2026-07-29). `IStatCalculator` threaded:
+  `EncounterFactory.BuildCreature` now calls `profile.BuildStatCalculator(rng)` instead of hardcoding
+  `new Gen1StatCalculator(rng)`. Profile passed to all 4 `BuildCreature` callers and threaded through the public
+  entry points `CreatePlayerSetupAsync`, `CreateEnemyAsync`, `BuildDraftSupplier`, `BuildBossCatchSupplier` — all
+  **required, never defaulted** (a `?? Gen1…` default would reintroduce the silent-fallback hazard the feature
+  exists to remove).
+  `EncounterFactory.ActiveGeneration` (the hardcoded `private const int = 1`) is **deleted**; its 6
+  learnset/evolution DB queries now filter on `(int)profile.Generation` — this was the repo's most concrete
+  "Gen 1 by assumption" and a second source of truth for the generation. `ResolvePlayerEvolutionAsync` now takes
+  the whole `GenerationProfile` instead of a bare `IEvolutionRules`, so the generation used to QUERY edges and
+  the rules used to JUDGE them can never disagree.
+  The duplicate `PlayerOverviewDto.ActiveGeneration = 1` const is also deleted: `From(Creature, Generation)` now
+  stamps the run's real generation, backed by a new `ActiveBattle.Generation` field (carried from the claimed
+  `PendingSession`) and `GameSessionManager.GetGeneration(gameId)`, which returns null (→ 404) rather than
+  defaulting to Gen 1 for an unknown run.
+  **Falsification leg (Stage 5's standing requirement):** `TestAltProfile.BuildStatCalculator` previously returned
+  `new Gen1StatCalculator(rng)`, making it useless as a probe — threading the profile and forgetting to thread it
+  produced identical creatures. It now returns an `AltStatCalculator` stamping a sentinel DV of 99 (outside Gen 1's
+  0–15 range) on every stat, exposed as `TestAltProfile.SentinelDv`.
+  Covered by `EncounterFactoryGenerationProfileTests` (8 tests: **all four** `BuildCreature` callers probed —
+  player, enemy, themed draft, boss catch — plus 2 data-filter probes over a
+  `Gen1Profile.Instance with { Generation = (Generation)2 }` profile the DB has no rows for, and 2 controls
+  proving the probes aren't vacuous); verified restoring both hardcodes fails exactly the probes while both
+  controls still pass. The two REST-side legs the encounter probes can't reach are pinned separately:
+  `PlayerOverviewDtoTests.From_StampsTheRunsGeneration_NotAHardcodedGen1` (the DTO's generation stamp, asserted
+  with a non-Gen-1 value so re-hardcoding `1` cannot stay green) and `GenerationProfileTests`'
+  `GetGeneration_*` pair (the `RegisterSession` → session → REST read chain, incl. null-not-Gen-1 for an
+  unknown run).
+  *(This absorbed what Stage 2 scoped as "where content filtering is asked for" — `ActiveGeneration` already
+  was that filter, so wiring it here was cheaper than inventing a parallel socket.)*
 - [ ] **Stage 2 — content scope.** Type roster real (Gen 1 = 15; `DamageType` keeps all 18 and stays gen-blind);
   species/move/item filtering as **documented no-op stubs** per `GENERATION_SEAMS.md §5.0`. Schema work stays in
   *Multi-Generation* below.

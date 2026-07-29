@@ -1,6 +1,7 @@
 using creaturegame.Combat;
 using creaturegame.Creatures;
 using creaturegame.DB;
+using creaturegame.Generations;
 using creaturegame.Web.Battle;
 using Microsoft.EntityFrameworkCore;
 
@@ -52,14 +53,19 @@ public class EncounterFactoryBossCatchTests
     public async Task BuildBossCatchSupplier_WhenRollPasses_BuildsAFullHpCopyOfTheBossSpecies()
     {
         var factory = BuildFactory();
-        var setup = await factory.CreatePlayerSetupAsync(Bulbasaur, 50, new SeededRandomSource(1));
+        var setup = await factory.CreatePlayerSetupAsync(
+            Bulbasaur,
+            50,
+            Gen1Profile.Instance,
+            new SeededRandomSource(1)
+        );
         Assert.NotNull(setup);
 
         // Stand in for the defeated boss: species Gyarados at level 42 (its actual HP is irrelevant — the catch
         // builds a fresh copy, so it must arrive at full HP regardless of the fainted battle instance).
         var boss = new Creature("GYARADOS") { Level = 42, SpeciesId = Gyarados };
 
-        var catcher = factory.BuildBossCatchSupplier(setup!.AllMoves);
+        var catcher = factory.BuildBossCatchSupplier(setup!.AllMoves, Gen1Profile.Instance);
         var offered = await catcher(new BossCatchContext(boss), new AlwaysZero());
 
         Assert.NotNull(offered);
@@ -73,12 +79,17 @@ public class EncounterFactoryBossCatchTests
     public async Task BuildBossCatchSupplier_WhenRollMisses_OffersNothing()
     {
         var factory = BuildFactory();
-        var setup = await factory.CreatePlayerSetupAsync(Bulbasaur, 50, new SeededRandomSource(1));
+        var setup = await factory.CreatePlayerSetupAsync(
+            Bulbasaur,
+            50,
+            Gen1Profile.Instance,
+            new SeededRandomSource(1)
+        );
         Assert.NotNull(setup);
 
         var boss = new Creature("GYARADOS") { Level = 42, SpeciesId = Gyarados };
 
-        var catcher = factory.BuildBossCatchSupplier(setup!.AllMoves);
+        var catcher = factory.BuildBossCatchSupplier(setup!.AllMoves, Gen1Profile.Instance);
         var offered = await catcher(new BossCatchContext(boss), new AlwaysHigh());
 
         Assert.Null(offered); // the n% roll missed → no catch, and no DB build attempted

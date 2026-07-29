@@ -126,6 +126,44 @@ public class RunDirectorEvolutionTests
         Assert.True(events.IndexOf(evolved) < events.IndexOf(learned));
     }
 
+    // The party strip is fed ONLY by PartyUpdated snapshots, while the nameplate/HUD retarget on CreatureEvolved
+    // directly — so an evolution must push a fresh snapshot or the roster row keeps the old name next to a
+    // correct nameplate. The win's own level-up snapshot doesn't cover it: that one is emitted inside Battle,
+    // BEFORE the evolution runs, so it still carries "CHARMANDER". Hence the assertion is on the LAST snapshot
+    // and on its ordering after the morph, not merely on one existing.
+    [Fact]
+    public async Task Runner_OnFieldEvolution_PushesAPartySnapshotCarryingTheNewName()
+    {
+        var player = Fighter("CHARMANDER", hp: 200, attack: 999, speed: 100, level: 5);
+        player.SpeciesId = 4;
+        var (_, outcome) = Charmeleon();
+
+        int checks = 0;
+        var recorder = new RecordingEmitter();
+        var runner = BuildRunner(
+            player,
+            new ScriptedInput("tackle"),
+            recorder,
+            _ => Task.FromResult<EvolutionOutcome?>(checks++ == 0 ? outcome : null)
+        );
+
+        await runner.RunAsync();
+
+        var evolved = Assert.Single(recorder.Of<CreatureEvolved>());
+
+        var snapshots = recorder.Of<PartyUpdated>().ToList();
+        Assert.NotEmpty(snapshots);
+        var row = Assert.Single(snapshots[^1].Members);
+        Assert.Equal("CHARMELEON", row.Name);
+        Assert.Equal(5, row.SpeciesId);
+
+        var events = recorder.Events.ToList();
+        Assert.True(
+            events.IndexOf(evolved) < events.LastIndexOf(snapshots[^1]),
+            "the roster repaint must follow the morph, or it carries the pre-evolution name"
+        );
+    }
+
     [Fact]
     public async Task Runner_OnLevelUp_Cancelled_LeavesCreatureUnchanged()
     {
@@ -148,6 +186,17 @@ public class RunDirectorEvolutionTests
         Assert.Single(recorder.Of<EvolutionOffered>());
         Assert.Single(recorder.Of<EvolutionCancelled>());
         Assert.Empty(recorder.Of<CreatureEvolved>());
+
+        // A B-cancel is NOT an evolution, so it must not push the roster repaint a real morph does — the specific
+        // quirk the `anyEvolved` gate exists to get right, and the one the positive test above cannot catch (it
+        // would stay green if the gate were widened to "an evolution was offered"). Scoped to events at or after
+        // the cancel: the win's own level-up already emitted a snapshot from Battle earlier in the run, so a bare
+        // Empty assertion would fail for a reason unrelated to evolution.
+        var events = recorder.Events.ToList();
+        Assert.DoesNotContain(
+            events.Skip(events.IndexOf(recorder.Of<EvolutionCancelled>().Single())),
+            e => e is PartyUpdated
+        );
 
         // Untouched: still Charmander, no evolution move learned.
         Assert.Equal(4, player.SpeciesId);

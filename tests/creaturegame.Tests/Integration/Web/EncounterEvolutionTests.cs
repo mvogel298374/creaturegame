@@ -33,6 +33,7 @@ public class EncounterEvolutionTests
         var setup = await factory.CreatePlayerSetupAsync(
             speciesId,
             level,
+            Gen1Profile.Instance,
             new SeededRandomSource(1)
         );
         Assert.NotNull(setup);
@@ -41,7 +42,7 @@ public class EncounterEvolutionTests
         var outcome = await factory.ResolvePlayerEvolutionAsync(
             setup!.Player,
             setup.AllMoves,
-            Gen1Profile.Instance.EvolutionRules
+            Gen1Profile.Instance
         );
         return new EvolutionOutcomeView(
             outcome?.NewForm.Id,

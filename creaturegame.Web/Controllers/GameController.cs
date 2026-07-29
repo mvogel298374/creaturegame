@@ -26,7 +26,14 @@ public class GameController(GameSessionManager sessionManager, EncounterFactory 
             int seed = req.Seed ?? Random.Shared.Next();
             var rng = new SeededRandomSource(seed);
 
-            var setup = await encounters.CreatePlayerSetupAsync(req.SpeciesId, playerLevel, rng);
+            // The run's profile, resolved here because the STARTER is built before a session exists — the same
+            // profile GameSessionManager resolves again from the stored Generation when the run is claimed.
+            var setup = await encounters.CreatePlayerSetupAsync(
+                req.SpeciesId,
+                playerLevel,
+                GameSessionManager.ProfileFor(generation),
+                rng
+            );
             if (setup == null)
                 return BadRequest(new { error = "Unknown species or empty move database" });
 
@@ -84,9 +91,10 @@ public class GameController(GameSessionManager sessionManager, EncounterFactory 
     public IActionResult GetPlayer(string gameId)
     {
         var player = sessionManager.GetPlayerCreature(gameId);
-        if (player is null)
+        var generation = sessionManager.GetGeneration(gameId);
+        if (player is null || generation is null)
             return NotFound(new { error = "No active game with that id" });
-        return Ok(PlayerOverviewDto.From(player));
+        return Ok(PlayerOverviewDto.From(player, generation.Value));
     }
 
     /// <summary>

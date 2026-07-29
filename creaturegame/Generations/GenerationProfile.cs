@@ -51,14 +51,13 @@ public sealed record GenerationProfile
     /// </summary>
     /// <remarks>
     /// A factory, not a singleton, because <b>DV randomisation must draw from the run's seeded RNG</b> — that is
-    /// what makes a seeded run reproduce the same DVs. <c>EncounterFactory.BuildCreature</c> already constructs
-    /// one per creature for exactly this reason; the singleton on
+    /// what makes a seeded run reproduce the same DVs. <c>EncounterFactory.BuildCreature</c> calls this once per
+    /// creature for exactly that reason; the singleton on
     /// <see cref="Creature.StatCalculator"/> is only the unseeded fallback for direct callers and tests.
-    /// <para><b>⚠️ Not yet consumed at the web composition point.</b> <c>EncounterFactory.BuildCreature</c> still
-    /// builds its own <c>new Gen1StatCalculator(rng)</c>, so a profile registered today would get Gen 1 stat
-    /// math regardless of what it supplies here. Threading it is Stage 1b
-    /// (<c>docs/GENERATION_PROFILE.md</c> §4.5) — stated explicitly so this reads as a documented gap rather
-    /// than a trap.</para>
+    /// <para><b>Consumed at the web composition point since Stage 1b</b> — <c>EncounterFactory.BuildCreature</c>
+    /// takes the run's profile and calls this, replacing the <c>new Gen1StatCalculator(rng)</c> it used to
+    /// hardcode. Pinned by <c>EncounterFactoryGenerationProfileTests</c>, which builds a creature under a profile
+    /// whose calculator stamps a DV outside Gen 1's range.</para>
     /// </remarks>
     public required Func<IRandomSource, IStatCalculator> BuildStatCalculator { get; init; }
 

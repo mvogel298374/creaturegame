@@ -101,7 +101,7 @@ public sealed class GameSessionManager(
             // Between encounters, resolve any pending evolution against the DB (edges → IEvolutionRules →
             // evolved species + learnset). The runner applies it; the data concern stays in the web layer.
             CheckEvolution = p =>
-                encounters.ResolvePlayerEvolutionAsync(p, session.AllMoves, profile.EvolutionRules),
+                encounters.ResolvePlayerEvolutionAsync(p, session.AllMoves, profile),
             // The run's bag, threaded into every Battle's player side; consumed items stay gone across the chain.
             PlayerBag = session.Bag,
             // Biome mode: the run charts a route through this region's playable biomes (the map screen). A
@@ -129,11 +129,11 @@ public sealed class GameSessionManager(
             // Themed-draft acquisition (ENCOUNTER_DESIGN.md §4): rolled after every win, gated by cadence × n% ×
             // the fought-only pool (DraftCalculator), building the offered creature from this run's move pool +
             // DB. Deposits accepted creatures into the party above.
-            DraftSupplier = encounters.BuildDraftSupplier(session.AllMoves),
+            DraftSupplier = encounters.BuildDraftSupplier(session.AllMoves, profile),
             // Boss-catch acquisition (ENCOUNTER_DESIGN.md §4 Stage 2): rolled after a Boss win only, a small n%
             // chance (BossCatchCalculator) to add the defeated boss — built as a fresh full-HP copy of its species
             // at the boss's level. The win reward/XP is already applied, so the catch is pure upside.
-            BossCatchSupplier = encounters.BuildBossCatchSupplier(session.AllMoves),
+            BossCatchSupplier = encounters.BuildBossCatchSupplier(session.AllMoves, profile),
         };
 
     public string RegisterSession(
@@ -215,6 +215,7 @@ public sealed class GameSessionManager(
             Bag = session.Bag,
             Wallet = session.Wallet,
             ItemsById = session.AllItems.ToDictionary(i => i.Id),
+            Generation = session.Generation,
         };
         _active[gameId] = battle;
         _connToGame[connectionId] = gameId;
@@ -237,6 +238,7 @@ public sealed class GameSessionManager(
                 encounters.CreateEnemyAsync(
                     p,
                     session.AllMoves,
+                    profile,
                     session.Rng,
                     biome: biome,
                     depth: depth,
@@ -299,6 +301,19 @@ public sealed class GameSessionManager(
             return ActiveCreature(battle.Party, battle.Player);
         if (_pending.TryGetValue(gameId, out var pending))
             return pending.Player;
+        return null;
+    }
+
+    /// <summary>The generation a run is being played under, or null if the gameId is unknown. Resolved in the
+    /// same active-then-pending order as <see cref="GetPlayerCreature"/>, so a caller that needs both gets a
+    /// consistent pair. Returns null rather than defaulting to <see cref="Generation.One"/> on purpose — an
+    /// unknown run is a 404, not a Gen 1 run (<c>docs/GENERATION_PROFILE.md</c> §4.2).</summary>
+    public Generation? GetGeneration(string gameId)
+    {
+        if (_active.TryGetValue(gameId, out var battle))
+            return battle.Generation;
+        if (_pending.TryGetValue(gameId, out var pending))
+            return pending.Generation;
         return null;
     }
 
@@ -619,6 +634,10 @@ sealed class ActiveBattle
     public Bag? Bag;
     public Wallet? Wallet;
     public IReadOnlyDictionary<int, Item> ItemsById = new Dictionary<int, Item>();
+
+    // The generation this run is played under — carried from the claimed PendingSession so on-demand REST reads
+    // (the CHECK POKEMON overview) report the RUN's generation instead of a hardcoded 1. Fixed for the whole run.
+    public Generation Generation;
 
     private readonly object _lock = new();
     private CancellationTokenSource? _abandonCts;
