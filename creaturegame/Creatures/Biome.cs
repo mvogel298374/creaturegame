@@ -48,7 +48,8 @@ public sealed record BiomeDefinition(
 /// The authored biome registry, grouped by <see cref="Region"/>. The Kanto roster (18 biomes) homes all 15
 /// Gen 1 types in 2–3 biomes each, with broad types (Poison, Water) confined to a few biomes to avoid flooding
 /// and thin types (Ice, Dragon, Ghost) paired with a carrier so no biome is razor-thin. Pool sizes are verified
-/// against <c>pokemon.db</c> in <c>ENCOUNTER_DESIGN.md §2.3</c>.
+/// against <c>pokemon.db</c> in <c>ENCOUNTER_DESIGN.md §2.3</c>; the "homes every type" half of that is checked
+/// by <see cref="UnhomedTypes"/>, against the generation's own roster rather than a fixed 15.
 /// </summary>
 public static class Biomes
 {
@@ -227,6 +228,42 @@ public static class Biomes
             Region.Kanto => Kanto,
             _ => [],
         };
+
+    /// <summary>Every type listed by any biome in the region — the types the region gives a home to.</summary>
+    public static IReadOnlySet<DamageType> HomedTypes(Region region) =>
+        For(region).SelectMany(b => b.Types).ToHashSet();
+
+    /// <summary>
+    /// The types in <paramref name="roster"/> that no biome in <paramref name="region"/> homes, in
+    /// <see cref="DamageType"/> order. Empty means the region covers its generation completely.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Why an unhomed type matters <i>today</i>.</b> A biome's theme <i>is</i> the encounter pool
+    /// (<see cref="BiomeDefinition.Contains"/>), and that pool is in turn the fought-only acquisition pool. So
+    /// under the current channel design a type with no biome is a type whose species can never be met, let alone
+    /// drafted — the region silently shrinks the generation. <c>ENCOUNTER_DESIGN.md §2.3</c> sized the Kanto
+    /// roster to home all 15 Gen 1 types for exactly this reason.</para>
+    ///
+    /// <para><b>⚠️ That is a consequence of today's acquisition channels, not a ruled law for all generations</b>
+    /// — an open design question, argued once in <c>ENCOUNTER_DESIGN.md §2.3</c> rather than restated here, so
+    /// that ruling it means editing one place and not two. Until it is ruled, treat this method as the check for
+    /// <b>regions that intend full coverage</b>, which is every region that exists.</para>
+    ///
+    /// <para><b>Why the roster is a parameter and not a constant.</b> Whatever coverage a region intends, it must
+    /// be judged against <i>its own</i> generation's roster: a 17-type generation's answer cannot be inherited
+    /// from Gen 1's 15. Passing <c>profile.TypeRoster</c> in is what makes the check follow the generation — the
+    /// same reason Stage 1b deleted <c>EncounterFactory.ActiveGeneration</c>. Pinned by <c>BiomeTests</c> against
+    /// both a real profile and the alternate one, which is the only way to observe that the roster is read at all
+    /// (<c>docs/GENERATION_PROFILE.md</c> §3).</para>
+    /// </remarks>
+    public static IReadOnlyList<DamageType> UnhomedTypes(
+        Region region,
+        IReadOnlySet<DamageType> roster
+    )
+    {
+        var homed = HomedTypes(region);
+        return roster.Where(t => !homed.Contains(t)).Order().ToList();
+    }
 
     /// <summary>
     /// The region's biomes that can actually generate against <paramref name="pool"/> — those with at least one

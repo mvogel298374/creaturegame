@@ -1,3 +1,4 @@
+using creaturegame.Attacks;
 using creaturegame.Combat;
 using creaturegame.Creatures;
 using creaturegame.Evolution;
@@ -25,8 +26,9 @@ namespace creaturegame.Generations;
 ///
 /// <para><b>Adding a slice (Stages 2–4).</b> New slices are added as <c>required</c> properties here, which
 /// deliberately breaks every profile that does not supply them — a compile error is the cheapest possible
-/// reminder that a new generation-variable surface exists. Planned: the type roster (Stage 2), region and
-/// starters (Stage 3), presentation theme (Stage 4).</para>
+/// reminder that a new generation-variable surface exists. <see cref="TypeRoster"/> landed that way in Stage 2a;
+/// still planned: the content-scope filters (Stage 2b), region and starters (Stage 3), presentation theme
+/// (Stage 4).</para>
 ///
 /// <para><b>Instances, not factories — mostly.</b> The four seams are stateless singletons by design
 /// (<c>GENERATION_SEAMS.md §4.3</c>), so they are held directly. <see cref="BuildAi"/> is the exception: the
@@ -40,6 +42,27 @@ public sealed record GenerationProfile
 
     /// <summary>The type-effectiveness matrix, including that generation's quirks and bugs.</summary>
     public required ITypeChart TypeChart { get; init; }
+
+    /// <summary>
+    /// Which types <b>exist</b> in this generation — Gen 1's 15, before Steel/Dark (Gen 2) and Fairy (Gen 6).
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Distinct from <see cref="TypeChart"/>, which answers a different question.</b> The chart says how
+    /// two types interact; this says which types are in play at all. Nothing derived that from anything before
+    /// Stage 2a — <see cref="DamageType"/> lists all 18 and stays deliberately generation-blind (it is a
+    /// vocabulary, not a claim about any one generation, exactly like the client's <c>TypeBadge</c> palette and
+    /// its boss-name pools), so "Gen 1 has 15 types" was a fact the codebase held only in a comment and a
+    /// hardcoded array in <c>BiomeTests</c>.</para>
+    ///
+    /// <para><b>What reads it.</b> The authored region content: a region has to home every type its generation
+    /// has, or species of the unhomed type can never be encountered (<c>ENCOUNTER_DESIGN.md §2.3</c> sized the
+    /// Kanto roster to home all 15 for exactly this reason). <see cref="Biomes.UnhomedTypes"/> is that check,
+    /// and it takes the roster as an argument rather than assuming 15 — which is the whole point, since a
+    /// 17-type generation must re-derive the invariant, not inherit Gen 1's answer.</para>
+    ///
+    /// <para><b>A set, not a list</b> — this is a membership question and the enum already fixes an order.</para>
+    /// </remarks>
+    public required IReadOnlySet<DamageType> TypeRoster { get; init; }
 
     /// <summary>All generation-variable battle math: crit formula, damage variance, stat-stage tables,
     /// accuracy scale, freeze/thaw, status-damage rates, stat selection, the XP formula.</summary>

@@ -28,8 +28,9 @@ namespace creaturegame.Tests.Unit;
 /// <para>That is <c>GENERATION_SEAMS.md §5.0.1</c>'s lesson at architecture scale: the two leaks recorded there
 /// passed review <i>and</i> tests, because no test exercised the generation-variable bit.</para>
 ///
-/// <para><b>Growing it:</b> each stage of the feature adds its slice here — Stage 2 a 17-type roster, Stage 3 a
-/// small fake region, Stage 4 a distinct theme id. Keep every value obviously synthetic.</para>
+/// <para><b>Growing it:</b> each stage of the feature adds its slice here — Stage 2a's 17-type roster is in
+/// (<see cref="AltTypes"/>); still to come are Stage 3's small fake region and Stage 4's distinct theme id. Keep
+/// every value obviously synthetic.</para>
 /// </remarks>
 internal static class TestAltProfile
 {
@@ -38,12 +39,33 @@ internal static class TestAltProfile
     /// Gen 1's 0–15 DV range so the assertion cannot pass by coincidence. See <see cref="AltStatCalculator"/>.</summary>
     public const int SentinelDv = 99;
 
+    /// <summary>
+    /// A 17-type roster: Gen 1's 15 plus Dark and Steel. Stage 2a's falsification leg.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>The two extras are what make it a probe.</b> No biome in the authored Kanto roster lists Dark or
+    /// Steel, so <see cref="Biomes.UnhomedTypes"/> must report exactly those two under this profile and nothing
+    /// under Gen 1. A check that re-hardcoded "the 15" instead of reading the roster would return empty in both
+    /// cases and fail here — which is the only way to observe that the roster is genuinely consulted.</para>
+    /// <para>Deliberately built <i>by adding to</i> Gen 1's set rather than re-listing 17 types by hand: the
+    /// probe is "this generation has types Gen 1 lacks", and spelling the whole list out again would let the two
+    /// rosters drift into an accidental difference that has nothing to do with what is being tested.</para>
+    /// <para>As everywhere in this file, the values make no fidelity claim — Gen 2 added Dark and Steel, but this
+    /// is not Gen 2 and nothing else here resembles it.</para>
+    /// <para>An expression-bodied property rather than a <c>static readonly</c> field for the same reason
+    /// <c>Gen1Profile.Gen1Types</c> is one: a field would be order-dependent against the <see cref="Instance"/>
+    /// that reads it. This file mirrors that file's shape on purpose.</para>
+    /// </remarks>
+    private static IReadOnlySet<DamageType> AltTypes =>
+        Gen1Profile.Instance.TypeRoster.Concat([DamageType.Dark, DamageType.Steel]).ToHashSet();
+
     public static readonly GenerationProfile Instance = new()
     {
         // Reuses Generation.One as a label because the enum has no second member yet, and adding a fake one to
         // the production enum to serve a test would be worse. Nothing reads this field to make a decision.
         Generation = Generation.One,
         TypeChart = new AltTypeChart(),
+        TypeRoster = AltTypes,
         BattleRules = new AltBattleRules(),
         BuildStatCalculator = rng => new AltStatCalculator(),
         EvolutionRules = new AltEvolutionRules(),

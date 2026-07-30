@@ -20,11 +20,12 @@ creature), **Revive Items** (in-battle party revive, Boss-reward + rare-shop onl
    *(Item acquisition itself is already done via the Run Economy; bag persistence + catch remain.)*
 2. **Game Loop & Progression** — save layer (`save.db`); party + between-biome lead + forced-switch are done.
 
-**Unsequenced (raised 2026-07-29, `/plan` in progress — needs slotting against the two above):**
+**Unsequenced (raised 2026-07-29, `/plan` done, implementation underway — needs slotting against the two above):**
 **Generation Profile** — make Gen 1 an explicit, swappable profile so a generation switch changes content, menus
 and look, not just battle math. Designed against Gen 1 alone; upward compatibility is the deliverable, no Gen 2
 content. **`/plan` DONE (2026-07-29), all five stages incl. the frontend** — full design in
-[`GENERATION_PROFILE.md`](GENERATION_PROFILE.md); task entry + staging below.
+[`GENERATION_PROFILE.md`](GENERATION_PROFILE.md). **Stages 1a, 1b, 2a shipped; 2b–5 open** — task entry + staging
+below.
 
 *(**In-Combat Switching** — the voluntary, any-turn SWITCH turn-action — is **✅ COMPLETE (2026-07-25)**, all three
 stages (engine core / wire / frontend) shipped, including the out-of-PP menu affordance (BAG/SWITCH reachable at
@@ -682,9 +683,40 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
   unknown run).
   *(This absorbed what Stage 2 scoped as "where content filtering is asked for" — `ActiveGeneration` already
   was that filter, so wiring it here was cheaper than inventing a parallel socket.)*
-- [ ] **Stage 2 — content scope.** Type roster real (Gen 1 = 15; `DamageType` keeps all 18 and stays gen-blind);
-  species/move/item filtering as **documented no-op stubs** per `GENERATION_SEAMS.md §5.0`. Schema work stays in
-  *Multi-Generation* below.
+- [x] **Stage 2a — the type roster** ✅ DONE (2026-07-30). `GenerationProfile.TypeRoster`
+  (`required IReadOnlySet<DamageType>`) states **which types exist in this generation**; `Gen1Profile` supplies
+  the 15 in `DamageType` declaration order, so diffing it against the enum shows exactly the three later
+  arrivals missing. `DamageType` itself keeps all 18 and stays gen-blind — it is a vocabulary, not a claim.
+  The consumer is the region-content invariant, promoted to production code: **`Biomes.UnhomedTypes(region,
+  roster)`** + `Biomes.HomedTypes(region)`. The roster is a **parameter, not a constant** — that is the upward
+  compatibility, since a 17-type generation must re-derive "every type is homed" rather than inherit Gen 1's
+  answer (`ENCOUNTER_DESIGN.md §2.3`). `BiomeTests`' own hardcoded 15-type array is **deleted** in favour of
+  `Gen1Profile.Instance.TypeRoster` — it was a second source of truth for the roster, the same hazard Stage 1b
+  removed with `EncounterFactory.ActiveGeneration`.
+  **Falsification leg:** `TestAltProfile.TypeRoster` = Gen 1's 15 **plus Dark and Steel**, built by adding to
+  Gen 1's set so the two can't drift apart for reasons unrelated to the probe. Kanto homes neither, so
+  `UnhomedTypes_IsMeasuredAgainstTheProfilesRoster_NotAFixedGen1List` pins that exactly `[Steel, Dark]` comes
+  back. **Verified by sabotage:** re-hardcoding Gen 1's roster inside `UnhomedTypes` fails that test alone while
+  the other 25 biome tests (incl. `Kanto_HomesEveryGen1Type`) stay green. Also
+  `Gen1Profile_RostersThe15Gen1Types_AndNoneOfTheLaterArrivals`, which names the three absences rather than only
+  counting to 15 (a count alone would survive swapping Fairy in for Ghost).
+  **Deliberately unchanged, and corrected mid-review:** the client has **three** per-type tables, and only
+  `TypeBadge.tsx` (18 colours) is a real gen-blind vocabulary. `bossTrainer.ts`'s `NAMES_BY_TYPE` and
+  `mapGlyphs.tsx`'s `TYPE_ICON` each hold **15** — a second and third copy of Gen 1's roster, i.e. the very hazard
+  this stage deleted from `BiomeTests`, still standing on the client. (`requirements-review` caught this; the
+  write-up had claimed all three "keep every type". The wrong claim is kept visible in `GENERATION_PROFILE.md`
+  §5(a) rather than deleted.) **Handed to Stage 4, not waived** (user, 2026-07-30): wiring them needs the client
+  to *hold* the roster, which needs §7.3's generation channel — Stage 4's own work. Both degrade gracefully today
+  (generic name / `t-Normal` glyph), so it is a single-source-of-truth fix, not a bug fix. Tracked in
+  `GENERATION_PROFILE.md` §7.2's scope note. **Honest scope:** no *runtime* decision reads the roster yet — the
+  encounter pool and biome map are gated on content, which is 2b and Stage 3; the invariant is enforced by a unit
+  test, not by anything a content author editing `Biomes.Kanto` would hit (user-accepted 2026-07-30).
+- [ ] **Stage 2b — species / move / item content filtering.** The remaining half of Stage 2: add the filter
+  accessors as **documented no-op stubs** per `GENERATION_SEAMS.md §5.0` (Gen 1 returns everything, the stub
+  shows the generic shape), so a later generation finds a socket instead of having to hunt every unfiltered
+  `ToListAsync()` by archaeology. Concrete target: the species / `PokemonGameAvailability` pool behind
+  `EncounterFactory.CreateEnemyAsync` and `ComputePlayableBiomesAsync`, which still draws from the whole dex.
+  Schema work (`GenerationIntroduced` columns, per-gen rows, filtered queries) stays in *Multi-Generation* below.
 - [ ] **Stage 3 — region, biomes, starters onto the profile.** Smaller than it looks: `Biomes.For(Region)` and the
   `Region` enum already exist. Also moves the starter roster server-side. Backend-only.
 - [ ] **Stage 4 — presentation: theme + menu structure.** `/plan` **complete** — no longer provisional. Per-gen

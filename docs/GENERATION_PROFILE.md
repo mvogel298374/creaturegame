@@ -174,8 +174,8 @@ filter on `(int)profile.Generation` and `PlayerOverviewDto.From` stamps the run'
 
 **Still Gen 1 by assumption, deliberately:** the species / `PokemonGameAvailability` pool behind the wild-encounter
 selector and the biome map is *not* generation-filtered — `ComputePlayableBiomesAsync` and `CreateEnemyAsync` draw
-from the whole dex. That is **Stage 2's** content-scope work, not an oversight of Stage 1b, which scoped only the
-learnset/evolution reads.
+from the whole dex. That is **Stage 2b's** content-scope work, not an oversight of Stage 1b (which scoped only the
+learnset/evolution reads) nor of Stage 2a (which scoped the type roster).
 
 ### 4.5 Stage 1 is split — 1a (shipped) and 1b
 
@@ -241,11 +241,44 @@ hardcoded ones; do the same for the profile).
 
 **Two halves, deliberately split:**
 
-**(a) The type roster — real work, do it now.** `DamageType` holds all 18 types and stays gen-blind (correct —
-the enum is a vocabulary, not a claim). What is missing is a statement of **which types exist in this
-generation**. Gen 1 = the 15. This matters concretely: `ENCOUNTER_DESIGN.md §2.3`'s Kanto roster is sized so
-that **all 15 Gen 1 types are homed**, an invariant a 17-type generation would re-derive. Put the roster on the
-profile and have the biome/type-badge/UI paths read it.
+**(a) The type roster — real work, do it now.** ✅ **DONE (2026-07-30, Stage 2a).** `DamageType` holds all 18
+types and stays gen-blind (correct — the enum is a vocabulary, not a claim). What was missing is a statement of
+**which types exist in this generation**. Gen 1 = the 15. This matters concretely: `ENCOUNTER_DESIGN.md §2.3`'s
+Kanto roster is sized so that **all 15 Gen 1 types are homed**, an invariant a 17-type generation would
+re-derive.
+
+**As built:** `GenerationProfile.TypeRoster` (`required IReadOnlySet<DamageType>`); `Gen1Profile` supplies the 15
+in `DamageType` declaration order, so a reader diffing it against the enum sees exactly three members missing.
+The consumer is the region-content invariant, now production code: **`Biomes.UnhomedTypes(region, roster)`**
+(plus `Biomes.HomedTypes(region)`), which takes the roster as an **argument** rather than assuming 15 — that
+parameter *is* the upward compatibility, since a later generation must re-derive the check, not inherit Gen 1's
+answer. `BiomeTests`' own hardcoded 15-type array is **deleted**; it now reads `Gen1Profile.Instance.TypeRoster`.
+That array was a second source of truth for the roster, the same species of hazard Stage 1b removed when it
+deleted `EncounterFactory.ActiveGeneration`.
+
+> **What deliberately did NOT change: the client's three per-type tables — and only one of them is a vocabulary.**
+> An earlier draft of this note claimed they all "keep every type"; `requirements-review` found that false, and it
+> is corrected here rather than quietly deleted, because the wrong version is the interesting part.
+>
+> | Table | Keys | What it actually is |
+> |:--|:--|:--|
+> | `components/TypeBadge.tsx` — `TYPE_COLORS` | **18** + grey fallback | a genuine vocabulary, gen-blind like `DamageType` |
+> | `battle/bossTrainer.ts` — `NAMES_BY_TYPE` | **15** + `GENERIC` fallback | a second copy of "Gen 1's roster" |
+> | `pages/mapGlyphs.tsx` — `TYPE_ICON` | **15** + `t-Normal` fallback | a third copy, and it says so: *"all 15 Gen 1 types"* |
+>
+> So two of the three are exactly the second-source-of-truth hazard Stage 2a deleted from `BiomeTests` — still
+> standing, on the client. (The repo already half-knew: `bossTrainer.test.ts` carries a `// no Gen-1 Steel pool`
+> comment.) They are **not** harmless-by-nature; they are harmless-for-now because each falls back gracefully, so
+> an unknown type degrades to a generic name / the Normal glyph rather than breaking.
+>
+> **Handed to Stage 4, deliberately, not waived (user's call, 2026-07-30).** Wiring them to the roster requires
+> the client to *have* the roster, and the mechanism for that — the client learning the run's generation over
+> route state **plus** a server echo — is precisely what §7.3 builds. Doing it here would duplicate that channel
+> before it exists. **§7.2's scope note lists both tables**, so this is a tracked handoff, not an archaeology dig.
+
+**Honest scope note:** nothing in the *runtime* decides anything from the roster yet — the wild-encounter pool
+and the biome map are gated on content, which is (b) and Stage 3. Stage 2a makes the roster a stated fact with a
+checked invariant and a substitutable value; it does not claim more.
 
 **(b) Species / move / item filtering — documented no-op stubs.** Per `GENERATION_SEAMS.md §5.0`:
 
@@ -261,7 +294,13 @@ work** and stay in `TODO.md` → *Multi-Generation*, explicitly sequenced after 
 > `ToListAsync()` by archaeology. `GENERATION_SEAMS.md` calls this "cheap now and removes a future archaeology
 > dig" — that judgement is already repo policy, not a new claim.
 
-**Falsification leg:** `TestAltProfile` reports 17 types and is observed by whatever consumes the roster.
+**Falsification leg:** ✅ shipped with 2a. `TestAltProfile.TypeRoster` is Gen 1's 15 **plus Dark and Steel** —
+built by adding to Gen 1's set rather than re-listing 17 by hand, so the two rosters can't drift into an
+accidental difference unrelated to the probe. Kanto homes neither extra, so
+`BiomeTests.UnhomedTypes_IsMeasuredAgainstTheProfilesRoster_NotAFixedGen1List` asserts exactly `[Steel, Dark]`
+comes back. **Verified by sabotage:** re-hardcoding Gen 1's roster inside `UnhomedTypes` fails that one test
+while all 25 other biome tests — `Kanto_HomesEveryGen1Type` included — stay green, which is the concrete
+demonstration that the Gen 1 case alone could never have caught it.
 
 ---
 
@@ -334,6 +373,16 @@ generation may re-arrange the menu, never re-populate it.
 >
 > This widens Stage 4 considerably. Re-estimate it when it is greenlit rather than treating the §7.2 sketch as
 > the full extent.
+
+> **Inherited from Stage 2a (2026-07-30): two client tables that hardcode Gen 1's 15-type roster.**
+> `battle/bossTrainer.ts`'s `NAMES_BY_TYPE` and `pages/mapGlyphs.tsx`'s `TYPE_ICON` each independently encode
+> "the 15", with no relationship to `GenerationProfile.TypeRoster` and no test tying them to it — the same
+> second-source-of-truth hazard Stage 2a removed from `BiomeTests`. They were left alone on purpose: fixing them
+> needs the client to hold the roster, which needs §7.3's generation channel, which is *this* stage.
+> **So when §7.3 lands, wire these two to it** — the roster is the natural payload to send alongside the theme.
+> Both currently degrade gracefully (a generic name / the `t-Normal` glyph), so this is a consistency and
+> single-source-of-truth fix, not a bug fix. See §5(a)'s table for the full survey, including the one table
+> (`TypeBadge.tsx`, 18 colours) that is a real vocabulary and should stay gen-blind.
 
 ### 7.3 Where the client learns the generation
 

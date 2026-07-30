@@ -1,3 +1,4 @@
+using creaturegame.Attacks;
 using creaturegame.Combat;
 using creaturegame.Creatures;
 using creaturegame.DB;
@@ -33,6 +34,63 @@ public class GenerationProfileTests
         Assert.Same(Gen1BattleRules.Instance, p.BattleRules);
         Assert.Same(Gen1EvolutionRules.Instance, p.EvolutionRules);
         Assert.Equal(Generation.One, p.Generation);
+    }
+
+    /// <summary>
+    /// The Gen 1 type roster as a domain fact: 15 types, and specifically <b>not</b> the three that arrived later.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately asserts the three absences by name rather than only the count of 15. A count alone would stay
+    /// green if someone swapped Fairy in for Ghost — the roster's job is to say <i>which</i> types exist, so that
+    /// is what gets pinned. <see cref="DamageType"/> itself is not asserted against: it spans every generation on
+    /// purpose and holding all 18 is correct.
+    /// </remarks>
+    [Fact]
+    public void Gen1Profile_RostersThe15Gen1Types_AndNoneOfTheLaterArrivals()
+    {
+        var roster = Gen1Profile.Instance.TypeRoster;
+
+        Assert.Equal(15, roster.Count);
+        Assert.DoesNotContain(DamageType.Steel, roster); // Gen 2
+        Assert.DoesNotContain(DamageType.Dark, roster); // Gen 2
+        Assert.DoesNotContain(DamageType.Fairy, roster); // Gen 6
+    }
+
+    /// <summary>
+    /// Every registered profile supplies every slice — no slice is null or empty.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>What this is and isn't for.</b> <c>required</c> plus a non-nullable type already makes an
+    /// <i>omitted</i> slice a compile error — the guarantee the feature rests on (<c>GENERATION_PROFILE.md</c>
+    /// §4.2) — and the obvious way to smuggle a null past it (initialising a slice from a <c>static readonly</c>
+    /// field declared <i>below</i> the profile, since static field initializers run in textual order) turns out to
+    /// be compile-caught too: it raises <c>CS8601</c>, which <c>TreatWarningsAsErrors</c> escalates to a build
+    /// error. That was measured, not assumed.
+    /// <para>So this is defence in depth, and its load-bearing half is the <i>emptiness</i> check below, which no
+    /// compiler can make: a slice can be present, non-null and still vacuous. A profile is a plain record any
+    /// caller can construct, so the runtime guard also covers slices reached by paths the initializer analysis
+    /// does not see.</para></para>
+    /// <para>Written to iterate <see cref="GenerationProfiles.Registered"/> and reflect over the record's
+    /// properties rather than naming today's six slices, so Stage 2b/3/4's additions are covered the moment they
+    /// are declared — no edit here, which is the only version of this test that stays true.</para>
+    /// </remarks>
+    [Fact]
+    public void EveryRegisteredProfile_SuppliesEverySlice()
+    {
+        foreach (var generation in GenerationProfiles.Registered)
+        {
+            var profile = GenerationProfiles.For(generation);
+
+            foreach (var slice in typeof(GenerationProfile).GetProperties())
+                Assert.True(
+                    slice.GetValue(profile) is not null,
+                    $"{generation}: slice '{slice.Name}' is null."
+                );
+
+            // A roster that exists but is empty is the same bug wearing a different hat — it would make
+            // Biomes.UnhomedTypes vacuously pass for every region.
+            Assert.NotEmpty(profile.TypeRoster);
+        }
     }
 
     [Fact]

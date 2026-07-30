@@ -111,6 +111,20 @@ These rules live on `EncounterSelector.PickByBst` (optional `biome` filter) + `B
 
 ### 2.3 Kanto roster (18 biomes, all 15 Gen 1 types homed)
 
+> **This invariant is code-checked, not just eyeballed from the table below** — `Biomes.HomedTypes(region)` /
+> `Biomes.UnhomedTypes(region, roster)` (`creaturegame/Creatures/Biome.cs`) take the generation's type roster as
+> a **parameter**, not a hardcoded 15, so a later generation's region must re-derive "every type is homed" rather
+> than inherit Gen 1's answer. The roster itself lives on `GenerationProfile.TypeRoster`
+> (see `GENERATION_PROFILE.md` §5(a), shipped as Stage 2a).
+>
+> **Open question, deliberately not settled (raised by `requirements-review` 2026-07-30):** full type coverage is
+> Kanto's *stated design intent*, and under today's acquisition channels an unhomed type would be unreachable
+> entirely — but **"every generation's region must home every type" has not been ruled** as a permanent
+> cross-generation commitment. It isn't self-evident either: this very section's pool is wild-availability-gated,
+> which already withholds 19 Gen 1 species, so a future generation making a whole type gift/static/boss-exclusive
+> is not obviously forbidden. Decide it when a second region is actually authored; until then the check applies to
+> regions that intend full coverage, which is every region that exists.
+
 Wild-pool sizes verified against `pokemon.db` (distinct Wild species per either-match theme):
 
 | # | Biome | Types | Pool | # | Biome | Types | Pool |

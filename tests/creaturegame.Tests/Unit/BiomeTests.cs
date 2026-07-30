@@ -2,30 +2,16 @@ using creaturegame.Attacks;
 using creaturegame.Combat;
 using creaturegame.Creatures;
 using creaturegame.DB;
+using creaturegame.Generations;
 
 namespace creaturegame.Tests.Unit;
 
 public class BiomeTests
 {
-    // The 15 types in play in Gen 1 (Steel/Dark/Fairy arrived later).
-    private static readonly DamageType[] Gen1Types =
-    [
-        DamageType.Normal,
-        DamageType.Fighting,
-        DamageType.Flying,
-        DamageType.Poison,
-        DamageType.Ground,
-        DamageType.Rock,
-        DamageType.Bug,
-        DamageType.Ghost,
-        DamageType.Fire,
-        DamageType.Water,
-        DamageType.Grass,
-        DamageType.Electric,
-        DamageType.Psychic,
-        DamageType.Ice,
-        DamageType.Dragon,
-    ];
+    // The generation's type roster, read from its profile rather than re-listed here. Until Stage 2a this file
+    // held its own hardcoded copy of the 15 — a second source of truth that would have gone stale silently the
+    // moment a profile disagreed with it.
+    private static readonly IReadOnlySet<DamageType> Gen1Types = Gen1Profile.Instance.TypeRoster;
 
     [Fact]
     public void Kanto_Has18Biomes()
@@ -52,9 +38,8 @@ public class BiomeTests
     [Fact]
     public void Kanto_HomesEveryGen1Type()
     {
-        var homed = Biomes.Kanto.SelectMany(b => b.Types).ToHashSet();
-        foreach (var t in Gen1Types)
-            Assert.Contains(t, homed);
+        // Every type the generation has must have somewhere to be encountered — ENCOUNTER_DESIGN.md §2.3.
+        Assert.Empty(Biomes.UnhomedTypes(Region.Kanto, Gen1Types));
     }
 
     [Fact]
@@ -62,7 +47,28 @@ public class BiomeTests
     {
         // Complement of HomesEveryGen1Type: a future biome edit can't smuggle in Steel/Dark/Fairy unnoticed
         // (the spread tests only iterate Gen1Types, so they wouldn't catch it).
-        Assert.All(Biomes.Kanto.SelectMany(b => b.Types), t => Assert.Contains(t, Gen1Types));
+        Assert.All(Biomes.HomedTypes(Region.Kanto), t => Assert.Contains(t, Gen1Types));
+    }
+
+    /// <summary>
+    /// Stage 2a's falsification leg (<c>docs/GENERATION_PROFILE.md</c> §3): the coverage check reads the
+    /// <b>profile's</b> roster, not a hardcoded 15.
+    /// </summary>
+    /// <remarks>
+    /// This is the assertion that would fail if someone re-inlined Gen 1's roster inside
+    /// <see cref="Biomes.UnhomedTypes"/> — the Gen 1 case above would stay green either way, because Gen 1 <i>is</i>
+    /// the hardcoded answer. Only a second roster can tell the two implementations apart, which is exactly why
+    /// <see cref="TestAltProfile"/> exists. It is <b>not</b> a claim that Kanto ought to home Dark and Steel:
+    /// the point is that a region is judged against its own generation's roster.
+    /// </remarks>
+    [Fact]
+    public void UnhomedTypes_IsMeasuredAgainstTheProfilesRoster_NotAFixedGen1List()
+    {
+        var unhomed = Biomes.UnhomedTypes(Region.Kanto, TestAltProfile.Instance.TypeRoster);
+
+        // Kanto is authored for 15 types, so under a 17-type generation it under-covers by exactly the two extras
+        // (in DamageType order — Steel is declared before Dark).
+        Assert.Equal(new[] { DamageType.Steel, DamageType.Dark }, unhomed);
     }
 
     [Fact]
