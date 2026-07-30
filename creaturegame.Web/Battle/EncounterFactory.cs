@@ -44,14 +44,23 @@ public sealed class EncounterFactory(
         var source = rng ?? SystemRandomSource.Instance;
         int gen = (int)profile.Generation;
         await using var pokemonCtx = await pokemonFactory.CreateDbContextAsync();
-        var species = await pokemonCtx
-            .Species.AsNoTracking()
+        // Every catalog read on this class's run path goes through profile.ContentScope (Stage 2b) — no direct
+        // .Species/.Moves/.Items query survives. That uniformity IS the deliverable: it is what stops a future
+        // generation having to find the unfiltered reads by archaeology. Gen 1's scope is an identity stub, so
+        // this is a no-op today (see IContentScope). A species outside the run's generation is simply unknown
+        // here, so an out-of-scope starter is rejected exactly like a nonexistent id.
+        var species = await profile
+            .ContentScope.Species(pokemonCtx.Species.AsNoTracking())
             .FirstOrDefaultAsync(s => s.Id == speciesId);
         if (species == null)
             return null;
 
         await using var movesCtx = await movesFactory.CreateDbContextAsync();
-        var allMoves = await movesCtx.Moves.AsNoTracking().ToListAsync();
+        // The run's whole move pool, loaded once and threaded everywhere — so scoping it here scopes every
+        // moveset the run will ever build (starter, wild, draft, boss catch).
+        var allMoves = await profile
+            .ContentScope.Moves(movesCtx.Moves.AsNoTracking())
+            .ToListAsync();
         if (allMoves.Count == 0)
             return null;
 
@@ -80,7 +89,11 @@ public sealed class EncounterFactory(
         // Treasure/Mystery) grows it from here. Held by the session and threaded into every Battle; consumed
         // items stay gone across the chain (the Poké Center refills HP/PP/status, not the bag).
         await using var itemsCtx = await itemsFactory.CreateDbContextAsync();
-        var allItems = await itemsCtx.Items.AsNoTracking().ToListAsync();
+        // Scoped like the move pool, and for the same reason: this one load backs the starting bag, the shop
+        // and every reward roll for the rest of the run.
+        var allItems = await profile
+            .ContentScope.Items(itemsCtx.Items.AsNoTracking())
+            .ToListAsync();
         var bag = BuildStartingBag(allItems);
 
         // The run's biome map: a seeded, connected random subset of the region's playable biomes (the ones that
@@ -89,7 +102,7 @@ public sealed class EncounterFactory(
         // is connected so the route never strands, and the same Wild filter CreateEnemyAsync applies, so every
         // offered biome is guaranteed an encounter (PickByBst can't starve on its themed pool). Same seed ⇒ same
         // map. Threaded into the RunDirector, which charts the route through it.
-        var playable = await ComputePlayableBiomesAsync(pokemonCtx, Region.Kanto);
+        var playable = await ComputePlayableBiomesAsync(pokemonCtx, Region.Kanto, profile);
         var runMap = Biomes.RandomConnectedMap(playable, RunBiomeMapSize, source);
 
         return new RunSetup(player, allMoves, bag, new Wallet(), allItems, runMap);
@@ -185,8 +198,8 @@ public sealed class EncounterFactory(
         // The fought-only pool: exactly the species faced in this biome (ENCOUNTER_DESIGN.md §4). The enemy
         // supplier never spawns the player's own species, so it can't leak in here.
         var foughtIds = ctx.FoughtSpecies.ToHashSet();
-        var pool = await pokemonCtx
-            .Species.AsNoTracking()
+        var pool = await profile
+            .ContentScope.Species(pokemonCtx.Species.AsNoTracking())
             .Where(s => foughtIds.Contains(s.Id))
             .ToListAsync();
         if (pool.Count == 0)
@@ -257,8 +270,8 @@ public sealed class EncounterFactory(
         await using var pokemonCtx = await pokemonFactory.CreateDbContextAsync();
         // The only candidate is the boss you just beat — look its species up by id and build a fresh full-HP copy
         // (the "catch" model: a party-ready specimen of that species, not the fainted battle instance).
-        var species = await pokemonCtx
-            .Species.AsNoTracking()
+        var species = await profile
+            .ContentScope.Species(pokemonCtx.Species.AsNoTracking())
             .FirstOrDefaultAsync(s => s.Id == ctx.Boss.SpeciesId);
         if (species is null)
             return null;
@@ -295,18 +308,21 @@ public sealed class EncounterFactory(
     /// (legendaries/statics/gifts excluded — the same filter as <see cref="CreateEnemyAsync"/>). Empty biomes
     /// never appear; if no availability data exists (a minimally seeded DB) the full dex is the pool, mirroring
     /// the encounter fallback so the map never starves.
-    /// <para><b>Not generation-scoped.</b> The species/availability pool is the whole dex regardless of the run's
-    /// generation — species-level content filtering is deliberately deferred to <b>Stage 2</b>
-    /// (<c>docs/GENERATION_PROFILE.md</c>, "content scope"). Stage 1b scoped only the learnset/evolution reads,
-    /// which is why this method takes no profile. Said explicitly because the previous wording claimed an
-    /// "active generation" filter that never existed here.</para>
+    /// <para><b>Generation-scoped since Stage 2b</b> (it was not before, and said so here). The species pool is
+    /// drawn through <see cref="IContentScope"/>, so a generation's map is built from the biomes <i>its own</i>
+    /// content can fill — a biome whose theme no in-generation species matches is not playable, exactly as an
+    /// empty biome already was not. <see cref="PokemonGameAvailability"/> needs no scope of its own: it is keyed
+    /// by species id and only ever intersected with the scoped pool below.</para>
     /// </summary>
     private static async Task<IReadOnlyList<BiomeDefinition>> ComputePlayableBiomesAsync(
         PokemonDbContext pokemonCtx,
-        Region region
+        Region region,
+        GenerationProfile profile
     )
     {
-        var allSpecies = await pokemonCtx.Species.AsNoTracking().ToListAsync();
+        var allSpecies = await profile
+            .ContentScope.Species(pokemonCtx.Species.AsNoTracking())
+            .ToListAsync();
         var wildSet = (
             await pokemonCtx
                 .GameAvailability.AsNoTracking()
@@ -372,8 +388,8 @@ public sealed class EncounterFactory(
             .ToListAsync();
         var wildSet = wildIds.ToHashSet();
 
-        var pool = await pokemonCtx
-            .Species.AsNoTracking()
+        var pool = await profile
+            .ContentScope.Species(pokemonCtx.Species.AsNoTracking())
             .Where(s => s.Id != player.SpeciesId)
             .ToListAsync();
         if (wildSet.Count > 0)
@@ -450,8 +466,12 @@ public sealed class EncounterFactory(
         if (result is null)
             return null;
 
-        var newForm = await pokemonCtx
-            .Species.AsNoTracking()
+        // Scoped like every other species read here, though the edges above are already generation-filtered, so
+        // an out-of-scope target should be unreachable. Kept uniform on purpose: "no unscoped catalog read in
+        // this file" is a rule a reviewer can check at a glance, where "scoped except where redundant" is a
+        // judgement call that has to be re-made every time — and the redundancy costs nothing.
+        var newForm = await profile
+            .ContentScope.Species(pokemonCtx.Species.AsNoTracking())
             .FirstOrDefaultAsync(s => s.Id == result.ToSpeciesId);
         if (newForm is null)
             return null;

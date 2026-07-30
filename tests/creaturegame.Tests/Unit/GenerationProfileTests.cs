@@ -57,6 +57,32 @@ public class GenerationProfileTests
     }
 
     /// <summary>
+    /// Gen 1's content scope is an <b>identity</b>: it hands every query straight back.
+    /// </summary>
+    /// <remarks>
+    /// <para>The Stage 2b half of the stage-invariant acceptance condition — a Gen 1 run must be byte-for-byte
+    /// what it was before the seam existed. Reference equality, not a row-count comparison, because that is the
+    /// strongest available statement: an identity function cannot filter, reorder or re-materialise anything, so
+    /// no behavioural difference can hide in it.</para>
+    /// <para>Deliberately paired with the call-site probes in <c>EncounterFactoryGenerationProfileTests</c>:
+    /// <i>this</i> says Gen 1's scope changes nothing, and those say the scope is nevertheless genuinely
+    /// consulted. Neither is sufficient alone — an identity that is never called and an identity that is called
+    /// look exactly the same from inside Gen 1 (<c>GENERATION_PROFILE.md</c> §4.2).</para>
+    /// </remarks>
+    [Fact]
+    public void Gen1ContentScope_ReturnsEveryQueryUntouched_SoGen1SeesTheContentItAlwaysDid()
+    {
+        var scope = Gen1Profile.Instance.ContentScope;
+        var species = Array.Empty<PokemonSpecies>().AsQueryable();
+        var moves = Array.Empty<Attack>().AsQueryable();
+        var items = Array.Empty<Item>().AsQueryable();
+
+        Assert.Same(species, scope.Species(species));
+        Assert.Same(moves, scope.Moves(moves));
+        Assert.Same(items, scope.Items(items));
+    }
+
+    /// <summary>
     /// Every registered profile supplies every slice — no slice is null or empty.
     /// </summary>
     /// <remarks>

@@ -59,7 +59,7 @@ deliverable.
 |:--|:--|:--|
 | Battle math | 4 seams, `Gen1*.Instance` defaults ✅ | selected by the profile; the seams themselves are unchanged |
 | **Type roster** — which types *exist* | ❌ none. `DamageType` holds all 18 (incl. Steel/Dark/Fairy); nothing states Gen 1 has **15** | on the profile |
-| **Content scope** — species/moves/items | ❌ none. Gen 1 only because the DBs hold only Gen 1 | a filter seam (documented no-op today) |
+| **Content scope** — species/moves/items | ❌ none. Gen 1 only because the DBs hold only Gen 1 | ✅ `IContentScope` on the profile (Stage 2b) — a filter seam, documented no-op for Gen 1 |
 | **Region + biome roster** | ⚠️ partial — `Biomes.For(Region)` exists; `Region` is an enum; `Biomes.Kanto` is the only roster | region selected by the profile |
 | **Starter roster** | ❌ hardcoded client-side | on the profile |
 | **Presentation theme** | ⚠️ `:root` design tokens exist in `index.css`, but no switch, and the palette is modern dark-blue/red | on the profile |
@@ -116,6 +116,7 @@ test is green, and the first real second generation discovers the whole thing le
 | Accuracy scale | 0–255, 1/256 miss bug | 0–100, no bug | the scale is read, not assumed |
 | Special stat | combined | split (Sp.Atk/Sp.Def) | `GetOffensiveStat`/`GetDefensiveStat` are actually routed through |
 | Type roster | 15 | 17 (adds Dark, Steel) | nothing hardcodes "15 types" |
+| Content scope | everything (identity) | only catalog ids ≤ 20 | every catalog read *asks* the scope — invisible under Gen 1's identity |
 | Region roster | Kanto | a 2-biome fake region | `Biomes.For` is the only door |
 | Theme + menu layout | Gen 1 grammar, 2×2 grid | a distinct token set + list layout | the theme is data, not CSS defaults |
 
@@ -172,10 +173,13 @@ seam, but a **second source of truth for the generation**, and the most concrete
 repo. Folded into Stage 1b (see §4.5) — both consts are **deleted** as of Stage 1b (2026-07-29); the queries now
 filter on `(int)profile.Generation` and `PlayerOverviewDto.From` stamps the run's real generation.
 
-**Still Gen 1 by assumption, deliberately:** the species / `PokemonGameAvailability` pool behind the wild-encounter
-selector and the biome map is *not* generation-filtered — `ComputePlayableBiomesAsync` and `CreateEnemyAsync` draw
-from the whole dex. That is **Stage 2b's** content-scope work, not an oversight of Stage 1b (which scoped only the
-learnset/evolution reads) nor of Stage 2a (which scoped the type roster).
+**A sixth site, closed by Stage 2b (2026-07-30):** the species / `PokemonGameAvailability` pool behind the
+wild-encounter selector and the biome map was *not* generation-filtered — `ComputePlayableBiomesAsync` and
+`CreateEnemyAsync` drew from the whole dex. That was never an oversight of Stage 1b (which scoped only the
+learnset/evolution reads) nor of Stage 2a (the type roster); it was Stage 2b's content-scope work, and every
+catalog read on the run path now goes through `profile.ContentScope` (§5(b)). The one species read still
+unscoped is `SpeciesController.GetAll`, the pre-run starter picker — handed to Stage 3, which is where a
+generation first exists to ask.
 
 ### 4.5 Stage 1 is split — 1a (shipped) and 1b
 
@@ -280,19 +284,63 @@ deleted `EncounterFactory.ActiveGeneration`.
 and the biome map are gated on content, which is (b) and Stage 3. Stage 2a makes the roster a stated fact with a
 checked invariant and a substitutable value; it does not claim more.
 
-**(b) Species / move / item filtering — documented no-op stubs.** Per `GENERATION_SEAMS.md §5.0`:
+**(b) Species / move / item filtering — documented no-op stubs.** ✅ **DONE (2026-07-30, Stage 2b).** Per
+`GENERATION_SEAMS.md §5.0`:
 
 > *"If 'yes' but you're not building Gen 2 yet: still add the seam member, implement the Gen 1 value, and — when
 > the data layout is what differs — make the Gen 1 implementation a documented stub that shows the generic
 > shape."*
 
-So: add the accessor, have Gen 1 return everything, and **document the generic shape**. The actual
-`GenerationIntroduced` columns and filtered queries (`GetSpeciesForGenerationAsync`, etc.) are **importer/schema
-work** and stay in `TODO.md` → *Multi-Generation*, explicitly sequenced after this.
+**As built:** `IContentScope` — three accessors (`Species`, `Moves`, `Items`), each `IQueryable<T> → IQueryable<T>`
+— on the profile as `GenerationProfile.ContentScope`. `Gen1ContentScope` is the documented stub: every accessor
+returns its query untouched, and its doc names the exact fix (`all.Where(x => x.GenerationIntroduced <= 1)`,
+`<=` not `==`) and the fact that it becomes **wrong** the day a second generation's rows are imported. The actual
+`GenerationIntroduced` columns and filtered queries are **importer/schema work** and stay in `TODO.md` →
+*Multi-Generation*, explicitly sequenced after this.
+
+**`IQueryable`, not a predicate — the choice that makes the stub more than a gesture.** A
+`Func<PokemonSpecies, bool>` would materialise the whole table before filtering and would have to be re-plumbed
+when the real filter lands. Composing onto the query means the eventual `Where` is translated to SQL by EF and
+the out-of-scope rows are never read. So the seam is already the right *shape*; only the implementation is
+outstanding.
+
+**All eight catalog reads in `EncounterFactory` go through it** — the starter lookup, the run's move pool, the
+run's item catalog, the biome map's species pool, the wild-encounter pool, the draft's fought pool, the
+boss-catch lookup and the evolved-form lookup. The rule enforced is *"no unscoped catalog read in this file"*,
+including the one read (the evolved form) where the scope is arguably redundant because the evolution edges are
+already generation-filtered: a rule a reviewer can check at a glance beats a judgement call that must be re-made
+per site, and the redundancy costs nothing.
+
+**The stub's premise had to be made true first.** `Gen1ContentScope`'s identity is justified by *"the catalogs
+hold one generation's content"* — and when the seam was written that was **false**: `items.db` held **Max
+Revive**, a Gen-2 item imported as forward scaffolding (`DATA_IMPORT.md` §4.5) and kept away from players by a
+name-matched hold-out in `RewardCalculator.UsableItems`. So the identity was "correct" only via a second,
+unrelated mechanism — the exact duplicated-source-of-truth hazard this feature keeps deleting.
+`requirements-review` caught it. **User's call (2026-07-30): fix the premise, not the wording** — the item was
+removed from the import roster and from `items.db`, and the hold-out deleted, so reward eligibility is
+categorical again. It returns through the per-generation item schema (`TODO.md` → *Multi-Generation* →
+*Per-generation ITEM data*, added for this). The rule it establishes is worth carrying forward: **the scaffolding
+a future generation needs is the schema, not a stray row** — a row that cannot say which generation it belongs to
+is indistinguishable from Gen 1 content to every consumer not specially taught otherwise.
+
+**What the scope deliberately does not cover, and why that is not an omission:** learnsets and evolution edges
+carry an explicit `Generation` column and Stage 1b already filters their six queries on it — they solved the
+problem this seam is a placeholder for. `PokemonGameAvailability` is keyed by species id and only ever
+intersected with the already-scoped species pool.
+
+**One consequence worth naming:** `ComputePlayableBiomesAsync` was explicitly *not* generation-scoped before
+(its own doc comment said so), and now is — so a generation gets **the biomes its own content can fill**, since
+a biome with no on-theme species in scope is not playable. That connects Stage 2a's roster invariant to a real
+runtime decision for the first time.
 
 > **Why stubs rather than nothing:** the alternative is that a future gen has to find every unfiltered
 > `ToListAsync()` by archaeology. `GENERATION_SEAMS.md` calls this "cheap now and removes a future archaeology
 > dig" — that judgement is already repo policy, not a new claim.
+
+> **Handed to Stage 3, not waived: `SpeciesController.GetAll`.** The starter picker serves the whole dex,
+> unscoped, and is the one species read on no run path at all — it answers *before* a run exists, so there is no
+> profile to ask. Scoping it needs the generation to be known at pick time, which is exactly what Stage 3's
+> server-authoritative starter roster establishes. Tracked in §6 rather than left for archaeology.
 
 **Falsification leg:** ✅ shipped with 2a. `TestAltProfile.TypeRoster` is Gen 1's 15 **plus Dark and Steel** —
 built by adding to Gen 1's set rather than re-listing 17 by hand, so the two rosters can't drift into an
@@ -301,6 +349,27 @@ accidental difference unrelated to the probe. Kanto homes neither extra, so
 comes back. **Verified by sabotage:** re-hardcoding Gen 1's roster inside `UnhomedTypes` fails that one test
 while all 25 other biome tests — `Kanto_HomesEveryGen1Type` included — stay green, which is the concrete
 demonstration that the Gen 1 case alone could never have caught it.
+
+**Falsification leg (b):** `TestAltProfile.ContentScope` admits only catalog ids ≤ 20 — species, moves and items
+alike. An id ceiling is nothing like a real generation's rule, which is the point: it cannot be mistaken for the
+`GenerationIntroduced` filter, while sharing its shape (a `Where` composed onto the query). **One probe per
+catalog read, not per method**, because Gen 1's scope is an *identity function* — a site that skipped it
+entirely behaves identically to one that uses it, so only a site-by-site probe can tell them apart. Each probe
+carries its own Gen 1 control, so none can pass by the read being broken for everyone.
+
+**Verified by sabotage, twice.** Reverting all eight sites to unscoped queries fails **exactly** the eight new
+probes while all eight Stage 1b probes stay green. Then reverting *only* `ComputePlayableBiomesAsync` fails
+**exactly one** test — proving the biome probe pins its own read rather than riding on the starter-species probe
+that shares its entry point.
+
+Two call sites needed a sharper instrument than the ceiling, and the reason is recorded because it is easy to
+re-derive wrongly: **the biome map** (ids 1–20 still cover enough Kanto themes to leave more than
+`RunBiomeMapSize` biomes playable, so the map comes back capped either way — measured, not assumed; narrowing to
+the first five species leaves seven) and **the evolved form** (every Gen 1 evolution line starting under id 20
+also ends under it). Both use a small predicate scope defined in the test file. A third interaction is worth
+knowing about for the next stage: adding the scope to `TestAltProfile` **broke a Stage 1b probe**, which caught
+a boss species (Gyarados, 130) that the new scope filters out — the probe was fixed to use an in-scope species,
+since the stat seam is what it tests. Expect each future slice to have this effect on the existing probes.
 
 ---
 
@@ -316,6 +385,13 @@ demonstration that the Gen 1 case alone could never have caught it.
 **Work:** put `Region` on the profile and have the run setup ask the profile instead of assuming Kanto; move the
 starter roster (currently hardcoded client-side in `StarterSelection.tsx`) onto the profile so it is
 server-authoritative and per-gen.
+
+> **Inherited from Stage 2b (2026-07-30): `SpeciesController.GetAll` serves the unscoped dex.** It is the only
+> species read that Stage 2b left alone, and for a structural reason — it answers *before* a run exists, so
+> there is no `GenerationProfile` to consult. It is also precisely the starter picker this stage makes
+> server-authoritative, so **wire it to the profile's roster/scope when that lands**. Harmless today (Gen 1 is
+> the whole dex), the same "correct only because the data has one generation in it" status as
+> `Gen1ContentScope` itself.
 
 **Backend-only.** Zero importer/DB change.
 

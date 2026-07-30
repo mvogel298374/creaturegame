@@ -68,18 +68,17 @@ internal static class RewardCalculator
         ItemCategory.Revive,
     ];
 
+    /// <summary>The obtainable subset of the run's item catalog: eligible categories, nothing else.
+    /// <para><b>No generation hold-out here, deliberately (2026-07-30).</b> This method used to name-match
+    /// <c>max-revive</c> out of the reward and shop channels — a Gen-2 item that the importer nonetheless
+    /// imported. Generation Profile Stage 2b made "which content belongs to this generation" a real seam
+    /// (<see cref="creaturegame.Generations.IContentScope"/>), and the item was dropped from the import roster
+    /// entirely, so the catalog this receives is already the run generation's content. A name-matched hold-out
+    /// on top of that would be a second source of truth for the same question — the hazard the whole feature
+    /// exists to remove. A future generation's items arrive through the scope, never through a special case
+    /// here.</para></summary>
     public static IReadOnlyList<Item> UsableItems(IReadOnlyList<Item> allItems) =>
-        allItems
-            .Where(i => EligibleCategories.Contains(i.Category) && !IsHeldOutFutureGenItem(i))
-            .ToList();
-
-    /// <summary>Items that are imported + engine-supported but deliberately held OUT of every obtainable channel
-    /// (reward + shop) for now, so the run stays Gen-1-authentic. <b>Max Revive</b> is a Gen-2 item (Red/Blue/Yellow
-    /// shipped only Revive) — its data + <see cref="creaturegame.Combat.ReviveItemEffect"/> support are forward
-    /// scaffolding for the multi-generation milestone; until then it never drops or stocks. Remove this hold-out when
-    /// Gen 2 lands. (Revive — the authentic Gen-1 item — is unaffected.)</summary>
-    private static bool IsHeldOutFutureGenItem(Item item) =>
-        string.Equals(item.Name, "max-revive", StringComparison.OrdinalIgnoreCase);
+        allItems.Where(i => EligibleCategories.Contains(i.Category)).ToList();
 
     /// <summary>
     /// The single entry point for the run's reward supplier: rolls the reward for the earning node and returns

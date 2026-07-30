@@ -52,21 +52,26 @@ public class RewardCalculatorTests
     }
 
     [Fact]
-    public void UsableItems_HoldsOutMaxRevive_ButKeepsRevive()
+    public void UsableItems_FiltersByCategoryAlone_NotByItemName()
     {
-        // Max Revive is a Gen-2 item — imported + effect-supported (scaffolding) but held out of every obtainable
-        // channel until multi-gen, so it never reaches a reward or the shop. The Gen-1 Revive is unaffected.
+        // This used to assert a name-matched hold-out on `max-revive`, a Gen-2 item the importer nonetheless
+        // imported. Generation Profile Stage 2b removed the cause rather than the symptom: the item is no longer
+        // imported and no longer in items.db, and "which content belongs to this generation" is now the content
+        // scope's question (IContentScope), asked once when the catalog is loaded. So eligibility here is purely
+        // categorical — a second, name-based notion of "not our generation" would be exactly the duplicated
+        // source of truth the generation feature keeps deleting.
         IReadOnlyList<Item> catalog =
         [
             MakeItem(1, ItemCategory.Healing, 200),
             MakeItem(62, ItemCategory.Revive, 2000, name: "revive"),
-            MakeItem(63, ItemCategory.Revive, 4000, name: "max-revive"),
+            // A same-category item whose name is unusual: it must still be eligible, because the name is not a
+            // filter. Pinned so a name-matched hold-out cannot quietly return.
+            MakeItem(63, ItemCategory.Revive, 4000, name: "some-future-revive"),
         ];
 
         var usable = RewardCalculator.UsableItems(catalog);
 
-        Assert.Contains(usable, i => i.Name == "revive");
-        Assert.DoesNotContain(usable, i => i.Name == "max-revive");
+        Assert.Equal(new[] { 1, 62, 63 }, usable.Select(i => i.Id).OrderBy(x => x).ToArray());
     }
 
     [Fact]

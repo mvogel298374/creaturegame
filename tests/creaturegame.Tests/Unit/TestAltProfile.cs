@@ -4,6 +4,7 @@ using creaturegame.Creatures;
 using creaturegame.DB;
 using creaturegame.Evolution;
 using creaturegame.Generations;
+using creaturegame.Items;
 using creaturegame.Tests.TestSupport;
 
 namespace creaturegame.Tests.Unit;
@@ -28,9 +29,10 @@ namespace creaturegame.Tests.Unit;
 /// <para>That is <c>GENERATION_SEAMS.md §5.0.1</c>'s lesson at architecture scale: the two leaks recorded there
 /// passed review <i>and</i> tests, because no test exercised the generation-variable bit.</para>
 ///
-/// <para><b>Growing it:</b> each stage of the feature adds its slice here — Stage 2a's 17-type roster is in
-/// (<see cref="AltTypes"/>); still to come are Stage 3's small fake region and Stage 4's distinct theme id. Keep
-/// every value obviously synthetic.</para>
+/// <para><b>Growing it:</b> each stage of the feature adds its slice here — Stage 2a's 17-type roster
+/// (<see cref="AltTypes"/>) and Stage 2b's restrictive content scope (<see cref="AltContentScope"/>) are in;
+/// still to come are Stage 3's small fake region and Stage 4's distinct theme id. Keep every value obviously
+/// synthetic.</para>
 /// </remarks>
 internal static class TestAltProfile
 {
@@ -66,11 +68,45 @@ internal static class TestAltProfile
         Generation = Generation.One,
         TypeChart = new AltTypeChart(),
         TypeRoster = AltTypes,
+        ContentScope = new AltContentScope(),
         BattleRules = new AltBattleRules(),
         BuildStatCalculator = rng => new AltStatCalculator(),
         EvolutionRules = new AltEvolutionRules(),
         BuildAi = rng => new Gen1TrainerAi(rng: rng),
     };
+
+    /// <summary>The highest catalog id <see cref="AltContentScope"/> admits. Arbitrary and meaningless — see that
+    /// class. Small enough that the restriction is observable everywhere content is drawn: species 1–20 leave most
+    /// of Kanto's type themes with nothing to fill them, so even the biome map changes shape.</summary>
+    public const int MaxContentId = 20;
+
+    /// <summary>
+    /// A content scope that admits only rows with <c>Id &lt;= <see cref="MaxContentId"/></c> — species, moves and
+    /// items alike. Stage 2b's falsification leg.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>An id ceiling is not how any real generation scopes its content</b>, and that is deliberate: this
+    /// probe must be impossible to mistake for the <c>GenerationIntroduced</c> filter
+    /// <see cref="Gen1ContentScope"/> documents. What it shares with the real thing is only the shape — a
+    /// <c>Where</c> composed onto the query, translated to SQL, never materialising the excluded rows.</para>
+    /// <para><b>Why it has to bite at every catalog, not one.</b> Gen 1's scope is an identity function, so a
+    /// call site that skipped the scope entirely would be indistinguishable from one that used it — the exact
+    /// silent-fallback shape of <c>GENERATION_PROFILE.md</c> §4.2, one layer out. A scope that visibly removes
+    /// rows makes each site's omission observable, which is why the probes assert per call site rather than
+    /// once.</para>
+    /// <para>One rule for all three catalogs so the probes read the same way everywhere; the three accessors are
+    /// otherwise independent, and a test that only exercised species would leave the other two unpinned.</para>
+    /// </remarks>
+    private sealed class AltContentScope : IContentScope
+    {
+        public IQueryable<PokemonSpecies> Species(IQueryable<PokemonSpecies> all) =>
+            all.Where(s => s.Id <= MaxContentId);
+
+        public IQueryable<Attack> Moves(IQueryable<Attack> all) =>
+            all.Where(m => m.Id <= MaxContentId);
+
+        public IQueryable<Item> Items(IQueryable<Item> all) => all.Where(i => i.Id <= MaxContentId);
+    }
 
     /// <summary>Flat 1.0 for everything — deliberately unlike Gen 1, whose chart is full of quirks. The
     /// Ghost→Psychic immunity becoming neutral is the specific difference the tests observe.</summary>

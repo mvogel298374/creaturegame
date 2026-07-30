@@ -435,8 +435,14 @@ public class ItemEffectTests
     private static Item Revive50(int id = 62) =>
         Item(id, "revive", ItemCategory.Revive, revivePercent: 50);
 
-    private static Item MaxRevive(int id = 63) =>
-        Item(id, "max-revive", ItemCategory.Revive, revivePercent: 100);
+    /// <summary>A synthetic 100%-revive item. No Gen 1 item has this value — the only full revive is Max Revive,
+    /// which is Gen 2 and is deliberately absent from the catalog (see
+    /// <c>ItemImportTests.Gen1BattleItemNames_ExcludesMaxRevive_TheItemsCatalogIsOneGenerationsContent</c>). It is
+    /// kept as a fixture because the point of the test below is that <c>ReviveItemEffect</c> is driven by
+    /// <c>RevivePercent</c> generically rather than hardcoding Gen 1's half — which is what lets a later
+    /// generation's full revive be pure data.</summary>
+    private static Item RevivePercent100(int id = 63) =>
+        Item(id, "test-full-revive", ItemCategory.Revive, revivePercent: 100);
 
     // Builds a party whose LEAD is a live starter and whose bench member is fainted (HP 0). The revive targets
     // the bench member at slot 1, so the active creature (slot 0 / lead) is deliberately untouched.
@@ -513,10 +519,10 @@ public class ItemEffectTests
     }
 
     [Fact]
-    public void MaxRevive_RestoresFaintedMemberToFullHp()
+    public void ReviveAtFullPercent_RestoresFaintedMemberToFullHp()
     {
         var party = PartyWithFaintedBench(benchMaxHp: 200);
-        var (p, _) = ApplyRevive(MaxRevive(), party, slot: 1);
+        var (p, _) = ApplyRevive(RevivePercent100(), party, slot: 1);
         Assert.Equal(200, p.Members[1].Attributes.HP);
     }
 

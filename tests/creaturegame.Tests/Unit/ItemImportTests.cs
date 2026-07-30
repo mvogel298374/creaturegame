@@ -166,13 +166,27 @@ public class ItemImportTests
         Assert.Null(item.CuredStatus);
     }
 
-    [Theory]
-    [InlineData("revive", 50)]
-    [InlineData("max-revive", 100)]
-    public void MapToItem_RevivePercents(string name, int percent)
+    [Fact]
+    public void MapToItem_Revive_RestoresHalfHp()
     {
-        var item = ItemMapper.MapToItem(PokeItem(name, "revival"));
-        Assert.Equal(percent, item.RevivePercent);
+        // A Fact, not a Theory: Revive is Gen 1's only revival item. This was a two-case Theory until Max Revive
+        // (Gen 2) was dropped from the roster — see the guard below.
+        var item = ItemMapper.MapToItem(PokeItem("revive", "revival"));
+        Assert.Equal(50, item.RevivePercent);
+    }
+
+    [Fact]
+    public void Gen1BattleItemNames_ExcludesMaxRevive_TheItemsCatalogIsOneGenerationsContent()
+    {
+        // Max Revive is Gen 2 (Red/Blue/Yellow shipped Revive alone). It used to be imported as forward
+        // scaffolding and then name-matched out of the reward and shop channels — two mechanisms for one
+        // question, and a catalog that quietly held another generation's content. Generation Profile Stage 2b
+        // made that question a seam (IContentScope), whose Gen 1 implementation is an identity function; that is
+        // only honest if the catalog really does hold one generation's content, so the item was dropped from the
+        // roster and from items.db. It returns via the per-generation item data in TODO.md -> Multi-Generation,
+        // not by being re-added here — hence this guard rather than a comment.
+        Assert.DoesNotContain("max-revive", ItemMapper.Gen1BattleItemNames);
+        Assert.Contains("revive", ItemMapper.Gen1BattleItemNames);
     }
 
     [Theory]

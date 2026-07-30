@@ -24,8 +24,8 @@ creature), **Revive Items** (in-battle party revive, Boss-reward + rare-shop onl
 **Generation Profile** — make Gen 1 an explicit, swappable profile so a generation switch changes content, menus
 and look, not just battle math. Designed against Gen 1 alone; upward compatibility is the deliverable, no Gen 2
 content. **`/plan` DONE (2026-07-29), all five stages incl. the frontend** — full design in
-[`GENERATION_PROFILE.md`](GENERATION_PROFILE.md). **Stages 1a, 1b, 2a shipped; 2b–5 open** — task entry + staging
-below.
+[`GENERATION_PROFILE.md`](GENERATION_PROFILE.md). **Stage 2 complete (1a, 1b, 2a, 2b shipped); 3–5 open** — task
+entry + staging below.
 
 *(**In-Combat Switching** — the voluntary, any-turn SWITCH turn-action — is **✅ COMPLETE (2026-07-25)**, all three
 stages (engine core / wire / frontend) shipped, including the out-of-PP menu affordance (BAG/SWITCH reachable at
@@ -711,12 +711,61 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
   `GENERATION_PROFILE.md` §7.2's scope note. **Honest scope:** no *runtime* decision reads the roster yet — the
   encounter pool and biome map are gated on content, which is 2b and Stage 3; the invariant is enforced by a unit
   test, not by anything a content author editing `Biomes.Kanto` would hit (user-accepted 2026-07-30).
-- [ ] **Stage 2b — species / move / item content filtering.** The remaining half of Stage 2: add the filter
-  accessors as **documented no-op stubs** per `GENERATION_SEAMS.md §5.0` (Gen 1 returns everything, the stub
-  shows the generic shape), so a later generation finds a socket instead of having to hunt every unfiltered
-  `ToListAsync()` by archaeology. Concrete target: the species / `PokemonGameAvailability` pool behind
-  `EncounterFactory.CreateEnemyAsync` and `ComputePlayableBiomesAsync`, which still draws from the whole dex.
-  Schema work (`GenerationIntroduced` columns, per-gen rows, filtered queries) stays in *Multi-Generation* below.
+- [x] **Stage 2b — species / move / item content filtering** ✅ DONE (2026-07-30). `IContentScope` —
+  `Species` / `Moves` / `Items`, each `IQueryable<T> → IQueryable<T>` — is now a profile slice
+  (`GenerationProfile.ContentScope`), with `Gen1ContentScope` as the **documented no-op stub** of
+  `GENERATION_SEAMS.md §5.0`: every accessor returns its query untouched. Its doc names the exact fix it is a
+  placeholder for (`all.Where(x => x.GenerationIntroduced <= 1)` — `<=`, not `==`) and states plainly that the
+  stub becomes **wrong** the day a second generation's rows are imported, so the schema work has one place to
+  land. Those columns and their import stay in *Multi-Generation* below.
+  **`IQueryable`, not a predicate:** a `Func<T,bool>` would materialise the whole table before filtering and
+  need re-plumbing later; composing onto the query means the eventual `Where` is translated to SQL by EF. The
+  seam is already the right shape — only the implementation is outstanding.
+  **All eight catalog reads in `EncounterFactory`** go through it: starter lookup, the run's move pool, the run's
+  item catalog, the biome map's species pool, the wild-encounter pool, the draft's fought pool, the boss-catch
+  lookup, the evolved-form lookup. The rule is *"no unscoped catalog read in this file"* — kept even for the
+  evolved-form read, where the scope is redundant (the edges are already generation-filtered), because a rule a
+  reviewer checks at a glance beats a per-site judgement call and the redundancy costs nothing. Learnsets and
+  evolution edges need no scope member (they carry a real `Generation` column, filtered since Stage 1b); nor does
+  `PokemonGameAvailability` (keyed by species id, only ever intersected with the scoped pool).
+  **A consequence, not just a socket:** `ComputePlayableBiomesAsync` was explicitly *not* generation-scoped
+  before — its doc comment said so — and now is, so a generation gets **the biomes its own content can fill**.
+  That is the first *runtime* decision to read content scope, and it answers Stage 2a's honest-scope caveat that
+  nothing yet did.
+  **Falsification leg:** `TestAltProfile.ContentScope` admits only ids ≤ 20 across all three catalogs — an id
+  ceiling being deliberately unlike any real generation's rule while sharing its shape. **One probe per catalog
+  read, not per method**, because Gen 1's scope is an *identity function*: a site that skipped it entirely is
+  indistinguishable from one that uses it, from inside Gen 1. Each probe carries its own Gen 1 control.
+  **Verified by sabotage twice:** unscoping all eight sites fails exactly the eight new probes while all eight
+  Stage 1b probes stay green; unscoping *only* `ComputePlayableBiomesAsync` fails exactly one, proving the biome
+  probe pins its own read and not the starter lookup that shares its entry point. Two sites needed a tighter
+  purpose-built scope than the ceiling and the reasons are recorded in `GENERATION_PROFILE.md` §5 (the biome map:
+  ids 1–20 still fill more than `RunBiomeMapSize` biomes — measured; the evolved form: every Gen 1 line starting
+  under id 20 also ends under it). Adding the slice also **broke a Stage 1b probe** whose boss species (Gyarados,
+  130) the new scope filters out — fixed to an in-scope species, and worth expecting from each future slice.
+  **Handed to Stage 3, not waived:** `SpeciesController.GetAll` still serves the unscoped dex. It is the one
+  species read on no run path — it answers *before* a run exists, so there is no profile to ask — and it is
+  exactly the starter picker Stage 3 makes server-authoritative. Ratified by the user 2026-07-30, along with the
+  decision to keep `ComputePlayableBiomesAsync` scoped (i.e. *"a biome no in-scope species can fill is not
+  playable"* is the intended cross-generation invariant, not an over-reach of a stubs-only stage).
+  **The stub's premise was false, and was fixed rather than reworded** (`requirements-review` finding, user's call
+  2026-07-30): `Gen1ContentScope`'s identity is justified by "the catalogs hold one generation's content", but
+  `items.db` held **Max Revive**, a Gen-2 item imported as forward scaffolding and kept from players by a
+  name-matched hold-out in `RewardCalculator.UsableItems` — so the seam was resting on a second, unrelated
+  mechanism. The item is now **out of the import roster and out of `items.db`**, and the hold-out is **deleted**;
+  eligibility there is categorical again, with a test pinning that no name-based filter returns. Max Revive comes
+  back through the per-generation item schema — see the new *Per-generation ITEM data* item under
+  *Multi-Generation* below, which is the scaffolding the user asked for in its place. Rule established: *the
+  scaffolding a future generation needs is the schema, not a stray row.*
+  **⚖️ WAIVED (user, 2026-07-30) — no test pins `items.db`'s actual contents.** `pr-review` raised it as a
+  blocker: `ItemImport` is upsert-only, so it never deletes a row for a slug dropped from the allowlist, and a
+  developer re-importing over a pre-2026-07-30 `items.db` would keep Max Revive in the catalog — where, with the
+  `RewardCalculator` hold-out now gone, it would actually drop and stock. The new guard asserts the C# roster,
+  not the table, so nothing in the suite would object. **Waived because production cannot ship it:** the
+  Dockerfile copies the committed `items.db`, which is clean (28 rows, `revive`/50 only). The proposed fix, if
+  this is ever revisited, is a live-db contract test asserting the `Items` name set equals
+  `ItemMapper.Gen1BattleItemNames` exactly (both 28), mirroring `PokemonEvolutionDataContractTests` — ~15 lines.
+  **Do not re-raise as a new finding.**
 - [ ] **Stage 3 — region, biomes, starters onto the profile.** Smaller than it looks: `Biomes.For(Region)` and the
   `Region` enum already exist. Also moves the starter roster server-side. Backend-only.
 - [ ] **Stage 4 — presentation: theme + menu structure.** `/plan` **complete** — no longer provisional. Per-gen
@@ -755,9 +804,35 @@ Deferred to the Gen 2 sprint. (The stat-selection abstraction — the only piece
   Gen 1" is the *G=1* case). Store one `Attack` row per `(moveId, generation)` (mirror the learnset model) or
   resolve on demand; make the layer-2 override table per-generation too. Keep mechanic/formula differences on
   the **seams**, never in per-gen move data.
-- [ ] **Generation filtering:** `Attack.GenerationIntroduced` + `PokemonSpecies.GenerationIntroduced` (set on
-  import); `EncounterSelector.PickByBst` / `BuildCreature` filter by `<= activeGeneration`;
-  `GetSpeciesForGenerationAsync(int)` / `GetMovesForGenerationAsync(int)` replace the unfiltered `ToListAsync()`.
+- [ ] **Generation filtering:** `Attack.GenerationIntroduced` + `PokemonSpecies.GenerationIntroduced` columns
+  (set on import). **The runtime socket already exists, this item is not** — `GenerationProfile.ContentScope`
+  (`IContentScope`, shipped Stage 2b, see *Generation Profile* above and `GENERATION_PROFILE.md` §5(b)) already
+  routes every catalog read in `EncounterFactory` (species, moves, items) through the profile, and
+  `Gen1ContentScope` is a **documented no-op stub** whose doc comment names the exact fix. So this item is just:
+  add the columns, then replace `Gen1ContentScope`'s identity pass-through with
+  `all.Where(x => x.GenerationIntroduced <= (int)profile.Generation)` (`<=`, not `==`) — no new call sites, no
+  new plumbing, no `GetSpeciesForGenerationAsync`/`GetMovesForGenerationAsync` methods to invent.
+- [ ] **Per-generation ITEM data — the third catalog, and the one with no schema at all.** The two bullets above
+  cover species and moves; items have neither a `GenerationIntroduced` column nor a per-gen table, and unlike the
+  other two PokeAPI gives **no** generation signal for items at all (`DATA_IMPORT.md` §4.5 — the Gen 1 roster is a
+  hand-curated allowlist, `ItemMapper.Gen1BattleItemNames`). So a second generation's items need: an
+  `Item.GenerationIntroduced` column set on import, a **per-generation allowlist** (the curated roster becomes one
+  roster per generation, since the API still cannot answer the membership question), and the
+  `Gen1ContentScope.Items` identity replaced by the same `<=` filter. Gameplay numbers that differ by generation
+  follow the moves' layer-2 pattern — a per-generation override table, not a second code path. **Note the layer-2
+  half is not optional:** PokeAPI supplies no revive percent / heal amount / cured status, so an item re-added to
+  an allowlist *without* its `ApplyGen1Gameplay`-equivalent override imports with those fields at zero — a
+  silently broken item, not a missing one. Max Revive's deleted `RevivePercent = 100` case is the concrete
+  example.
+  **Why this is its own item (raised by the user, 2026-07-30):** Max Revive used to be imported into `items.db` as
+  forward scaffolding for exactly this milestone, and was kept from players by a name-matched hold-out in
+  `RewardCalculator`. Stage 2b made content membership a real seam whose Gen 1 implementation is an *identity*, so
+  that stray Gen-2 row made the seam rest on a second, unrelated mechanism. It was **removed from the roster and
+  the database** rather than special-cased further, on the rule that *the scaffolding a future generation needs is
+  the schema, not a stray row* — a row that cannot say which generation it belongs to is indistinguishable from
+  Gen 1 content. **This item is where Max Revive comes back**, as data: `ReviveItemEffect` already reads
+  `RevivePercent` generically, so no engine change is involved. Pinned meanwhile by
+  `ItemImportTests.Gen1BattleItemNames_ExcludesMaxRevive_TheItemsCatalogIsOneGenerationsContent`.
 
 ---
 

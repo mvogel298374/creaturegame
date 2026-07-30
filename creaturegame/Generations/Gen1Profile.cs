@@ -69,6 +69,10 @@ public static class Gen1Profile
         Generation = Generation.One,
         TypeChart = Gen1TypeChart.Instance,
         TypeRoster = Gen1Types,
+        // Everything in the databases IS Gen 1's content — enforced by the importer's rosters, not assumed (see
+        // Gen1ContentScope, which records the one item that used to break this) — so this identity stub is
+        // correct, and it is where the real GenerationIntroduced filter goes the day that stops being true.
+        ContentScope = Gen1ContentScope.Instance,
         BattleRules = Gen1BattleRules.Instance,
         // Seeded per run — matches EncounterFactory.BuildCreature's existing `new Gen1StatCalculator(rng)`, so a
         // fixed seed keeps reproducing the same DVs.

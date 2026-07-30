@@ -46,9 +46,11 @@ public static class ItemMapper
         "awakening",
         "paralyze-heal",
         "full-heal",
-        // Revival
+        // Revival. Gen 1 shipped Revive only — Max Revive is Gen 2 and is deliberately NOT imported (2026-07-30):
+        // the catalogs hold one generation's content and nothing else, which is what lets
+        // Gen1ContentScope be an honest identity. It returns with the per-generation item data in
+        // TODO.md -> Multi-Generation, not by being re-added here.
         "revive",
-        "max-revive",
         // PP restore
         "ether",
         "max-ether",
@@ -143,11 +145,13 @@ public static class ItemMapper
                 break;
 
             // Revival
+            // Gen 1's only revival item. RevivePercent stays a general field (ReviveItemEffect reads it
+            // generically), so a later generation's Max Revive needs no engine change — but it does need a
+            // layer-2 override HERE: PokeAPI supplies no revive percent, so the deleted `case "max-revive":
+            // RevivePercent = 100` must come back alongside it, per-generation. Re-adding the slug to an
+            // allowlist alone yields RevivePercent = 0 — a silently broken item.
             case "revive":
                 item.RevivePercent = 50;
-                break;
-            case "max-revive":
-                item.RevivePercent = 100;
                 break;
 
             // PP restore. Ether/Elixir restore 10 PP; Max variants fully restore. Ether/Max Ether target

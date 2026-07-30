@@ -202,11 +202,24 @@ knowledge**: `ItemMapper.Gen1BattleItemNames` is the curated allowlist of PokeAP
 **drives the fetch** — `ItemImport` requests exactly those `/item/{slug}` details, maps, and upserts.
 ("x-sp-atk" is the modern slug for Gen 1's single X Special; X Sp. Def didn't exist in Gen 1.)
 
-**One deliberate forward-looking exception: `max-revive`.** Max Revive is a **Gen-2** item (Red/Blue/Yellow
-shipped only Revive), yet it is kept in the allowlist as *scaffolding* for the multi-generation milestone — its
-data + `ReviveItemEffect` support are ready. To keep runs Gen-1-authentic in the meantime it is **held out of
-every obtainable channel** by `RewardCalculator.UsableItems` (so it never drops or stocks); remove that hold-out
-when Gen 2 lands. It is the lone non-Gen-1 slug here — every other entry is a genuine Gen 1 item.
+**No exceptions: every slug here is a genuine Gen 1 item.** This was not always true, and the correction is worth
+recording. `max-revive` — a **Gen-2** item (Red/Blue/Yellow shipped only Revive) — used to sit in the allowlist as
+*forward scaffolding*, imported and engine-supported, and kept away from players by a **name-matched hold-out** in
+`RewardCalculator.UsableItems` so runs stayed Gen-1-authentic.
+
+**Removed 2026-07-30** (user's call, raised by `requirements-review` during Generation Profile Stage 2b): the item
+is out of the allowlist and out of `items.db`, and the hold-out is deleted with it. The reason is that Stage 2b
+made "which content belongs to this generation" a real seam — `IContentScope`, whose Gen 1 implementation is an
+**identity function**. That identity is only honest if the catalogs genuinely hold one generation's content, so a
+stray Gen-2 row plus a name-match elsewhere was two sources of truth for the same question, and the seam was
+resting on the wrong one. `ItemImportTests.Gen1BattleItemNames_ExcludesMaxRevive_TheItemsCatalogIsOneGenerationsContent`
+now pins it.
+
+> **The rule this establishes: never add another generation's row to a catalog "as scaffolding."** The scaffolding
+> a future generation needs is the **per-generation schema** (`TODO.md` → *Multi-Generation*), where a row can say
+> which generation it belongs to. Until that exists, a stray row is indistinguishable from Gen 1 content to every
+> consumer that isn't specially taught otherwise. `ReviveItemEffect` reading `RevivePercent` generically means Max
+> Revive returns as **pure data** when that schema lands — nothing in the engine has to change.
 
 **Gen 1 gameplay numbers are a layer-2 override**, exactly like the moves importer. PokeAPI gives no
 machine-readable "this heals 20 HP" / "this cures poison," so `ItemMapper.ApplyGen1Gameplay` sets the

@@ -89,12 +89,12 @@ describe('groupBagItems', () => {
     // the STATUS and PP RESTORE pockets (CATEGORY_LABELS order).
     const items: BagItem[] = [
       item({ id: 1, name: 'potion', category: 'Healing' }),
-      item({ id: 2, name: 'max-revive', category: 'Revive', usableInBattle: true }),
+      item({ id: 2, name: 'revive', category: 'Revive', usableInBattle: true }),
       item({ id: 3, name: 'ether', category: 'PpRestore' }),
     ];
     const groups = groupBagItems(items);
     expect(groups.map(g => g.label)).toEqual(['HEALING', 'REVIVE', 'PP RESTORE']);
-    expect(groups.find(g => g.label === 'REVIVE')?.items.map(i => i.name)).toEqual(['max-revive']);
+    expect(groups.find(g => g.label === 'REVIVE')?.items.map(i => i.name)).toEqual(['revive']);
   });
 
   it('omits empty pockets and zero-quantity items', () => {

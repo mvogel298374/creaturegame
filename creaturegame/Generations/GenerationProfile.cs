@@ -26,8 +26,8 @@ namespace creaturegame.Generations;
 ///
 /// <para><b>Adding a slice (Stages 2–4).</b> New slices are added as <c>required</c> properties here, which
 /// deliberately breaks every profile that does not supply them — a compile error is the cheapest possible
-/// reminder that a new generation-variable surface exists. <see cref="TypeRoster"/> landed that way in Stage 2a;
-/// still planned: the content-scope filters (Stage 2b), region and starters (Stage 3), presentation theme
+/// reminder that a new generation-variable surface exists. <see cref="TypeRoster"/> landed that way in Stage 2a
+/// and <see cref="ContentScope"/> in Stage 2b; still planned: region and starters (Stage 3), presentation theme
 /// (Stage 4).</para>
 ///
 /// <para><b>Instances, not factories — mostly.</b> The four seams are stateless singletons by design
@@ -63,6 +63,21 @@ public sealed record GenerationProfile
     /// <para><b>A set, not a list</b> — this is a membership question and the enum already fixes an order.</para>
     /// </remarks>
     public required IReadOnlySet<DamageType> TypeRoster { get; init; }
+
+    /// <summary>
+    /// Which <b>catalog content</b> — species, moves, items — this generation's runs may draw from.
+    /// </summary>
+    /// <remarks>
+    /// <para>The companion to <see cref="TypeRoster"/>, answering the other half of "what exists": the roster
+    /// says which <i>types</i> a generation has, this says which <i>rows</i>. Before Stage 2b nothing said
+    /// either — the run's content was Gen 1 solely because the databases hold nothing else, an assumption with
+    /// no expression in code at all.</para>
+    /// <para><b>A documented no-op for Gen 1</b>, deliberately: the <c>GenerationIntroduced</c> columns a real
+    /// filter needs are schema work still deferred to <c>TODO.md</c> → <i>Multi-Generation</i>. What this slice
+    /// buys now is that every catalog read on the run path <i>asks</i> — see <see cref="IContentScope"/> for the
+    /// full rationale and <see cref="Gen1ContentScope"/> for where the eventual filter lands.</para>
+    /// </remarks>
+    public required IContentScope ContentScope { get; init; }
 
     /// <summary>All generation-variable battle math: crit formula, damage variance, stat-stage tables,
     /// accuracy scale, freeze/thaw, status-damage rates, stat selection, the XP formula.</summary>
