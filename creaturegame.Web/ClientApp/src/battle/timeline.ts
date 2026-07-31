@@ -179,6 +179,9 @@ export type Action =
   // reward source now: a battle-win drop and a Treasure/Mystery node both use it (node acks are automatic).
   | { type: 'SHOW_DROP'; gold: number; itemNames: string[] }
   | { type: 'HIDE_DROP' }
+  // The run's presentation identity (generation id + type roster), echoed by the server on every hub
+  // attach — first connect and reconnect alike (docs/GENERATION_PROFILE.md §7.2).
+  | { type: 'RUN_PRESENTATION'; generation: string; typeRoster: string[] }
   // Region-map overlay (whole run): the playable biome graph, revealed once at run start.
   | { type: 'REGION_MAP_REVEALED'; biomes: RegionBiome[] }
   // Encounter-map ladder (current biome): title the biome (+ trace the route by id), reveal its seeded node
@@ -489,6 +492,17 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       const biomeName = payload.biomeName as string;
       return { steps: [d({ type: 'MAP_BIOME_ENTERED', biomeId, biomeName }), w(200), d(log(`Entered ${biomeName}!`)), w(300)] };
     }
+
+    case 'RunPresentationRevealed':
+      // The run's generation + type roster, echoed on every hub attach. Control-plane (`now`, not a step):
+      // theming must apply immediately, never queue behind whatever animation is mid-flight on a reconnect.
+      return {
+        now: [{
+          type: 'RUN_PRESENTATION',
+          generation: payload.generation as string,
+          typeRoster: (payload.typeRoster as string[]) ?? [],
+        }],
+      };
 
     case 'RegionMapRevealed': {
       // The playable region graph, sent once at run start — feed it to the region-map overlay (no battle-log line).

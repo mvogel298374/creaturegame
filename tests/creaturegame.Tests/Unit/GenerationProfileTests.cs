@@ -1,3 +1,4 @@
+using System.Text.Json;
 using creaturegame.Attacks;
 using creaturegame.Combat;
 using creaturegame.Creatures;
@@ -7,6 +8,8 @@ using creaturegame.Generations;
 using creaturegame.Items;
 using creaturegame.Web.Battle;
 using creaturegame.Web.Controllers;
+using creaturegame.Web.Hubs;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace creaturegame.Tests.Unit;
@@ -265,6 +268,94 @@ public class GenerationProfileTests
         Assert.Equal(GameSessionManager.RunRulesFor(Difficulty.Hard), underAlt.RunRules);
     }
 
+    // ── The presentation echo (Stage 4a) ──────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void BuildPresentationEvent_CarriesTheGenerationIdAndRosterAsWireStrings()
+    {
+        var evt = GameSessionManager.BuildPresentationEvent(Gen1Profile.Instance);
+
+        Assert.Equal("One", evt.Generation);
+        // Set comparison, not sequence: TypeRoster is a set and the wire order is not part of the contract —
+        // the client's consumers (asset-coverage checks, membership tests) are all order-blind.
+        Assert.Equal(
+            Gen1Profile.Instance.TypeRoster.Select(t => t.ToString()).ToHashSet(),
+            evt.TypeRoster.ToHashSet()
+        );
+    }
+
+    /// <summary>
+    /// The falsification leg: the echoed roster must observably come off the <em>profile</em>. Under Gen 1 a
+    /// hardcoded 15-name list and a real profile read produce identical wires forever — only a profile whose
+    /// roster differs (TestAltProfile adds Dark and Steel) can tell them apart (GENERATION_PROFILE.md §4.2).
+    /// </summary>
+    [Fact]
+    public void BuildPresentationEvent_RosterComesOffTheProfile_NotAHardcodedGen1List()
+    {
+        var evt = GameSessionManager.BuildPresentationEvent(TestAltProfile.Instance);
+
+        Assert.Equal(17, evt.TypeRoster.Count);
+        Assert.Contains("Dark", evt.TypeRoster);
+        Assert.Contains("Steel", evt.TypeRoster);
+    }
+
+    /// <summary>
+    /// The echo's <em>timing</em> claims, which the payload tests above can't see: on first attach the echo is
+    /// emitted to that connection <b>ahead of anything the run produces</b>, and a reconnect <b>re-echoes</b> it
+    /// to the new connection (route state is gone after a re-mount, so the echo is the client's only way back to
+    /// the run's theme — <c>GENERATION_PROFILE.md</c> §7.2's "required, not optional").
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Why this is race-free.</b> The first-attach echo is emitted <em>synchronously inside</em>
+    /// <c>AttachConnection</c>, before the run task is even scheduled, and the recording client records
+    /// synchronously — so "echo first" is a program-order fact, not a timing hope. The run task itself is parked
+    /// deterministically: the blocking DB factory stalls its very first database touch (the enemy build), so the
+    /// battle stays in the active set for the reconnect leg and the run emits nothing that could interleave.</para>
+    /// <para>The gate is released in <c>finally</c>, after which the factory throws — the parked task then dies
+    /// through the session's normal failure path instead of leaking a blocked thread past the test.</para>
+    /// </remarks>
+    [Fact]
+    public void AttachConnection_EchoesThePresentation_OnFirstAttach_AndAgainOnReconnect()
+    {
+        var hub = new RecordingHubContext();
+        using var dbGate = new ManualResetEventSlim(initialState: false);
+        var manager = new GameSessionManager(hub, BlockedEncounterFactory(dbGate));
+        var player = new Creature("TESTMON");
+
+        string gameId = manager.RegisterSession(
+            player,
+            [],
+            new Bag(),
+            new Wallet(),
+            [],
+            new SeededRandomSource(1),
+            [],
+            Difficulty.Normal,
+            Generation.One
+        );
+
+        try
+        {
+            manager.AttachConnection(gameId, "conn-1");
+
+            // First attach: the echo leads the connection's event stream and carries the run's profile.
+            var first = hub.EventsFor("conn-1")[0];
+            Assert.Equal("RunPresentationRevealed", first.Type);
+            using var payload = JsonDocument.Parse(JsonSerializer.Serialize(first.Payload));
+            Assert.Equal("One", payload.RootElement.GetProperty("Generation").GetString());
+            Assert.Equal(15, payload.RootElement.GetProperty("TypeRoster").GetArrayLength());
+
+            // Reconnect: the rebind branch re-echoes to the NEW connection (and doesn't re-send to the old one).
+            manager.AttachConnection(gameId, "conn-2");
+            Assert.Equal("RunPresentationRevealed", hub.EventsFor("conn-2")[0].Type);
+            Assert.Single(hub.EventsFor("conn-1"), e => e.Type == "RunPresentationRevealed");
+        }
+        finally
+        {
+            dbGate.Set();
+        }
+    }
+
     /// <summary>
     /// The run-start → session → REST-read chain: a generation chosen at <c>RegisterSession</c> must be the one
     /// <see cref="GameSessionManager.GetGeneration"/> reports, because that is what stamps the CHECK POKEMON
@@ -353,5 +444,104 @@ public class GenerationProfileTests
             throw new InvalidOperationException(
                 $"{typeof(TContext).Name} was created — BuildRunOptions is not supposed to touch the database."
             );
+    }
+
+    // ── AttachConnection echo harness ─────────────────────────────────────────────────────────────────
+
+    /// <summary>An <see cref="EncounterFactory"/> whose every DB touch parks on <paramref name="gate"/> — used
+    /// by the attach-echo test to stall the run task deterministically at its first database read (the enemy
+    /// build), so the battle stays active for the reconnect leg and the run emits nothing that could interleave
+    /// with the assertions. Once the gate is set the factory throws, letting the parked task die through the
+    /// session's normal failure path.</summary>
+    private static EncounterFactory BlockedEncounterFactory(ManualResetEventSlim gate) =>
+        new(
+            new BlockingDbContextFactory<PokemonDbContext>(gate),
+            new BlockingDbContextFactory<MovesDbContext>(gate),
+            new BlockingDbContextFactory<ItemsDbContext>(gate)
+        );
+
+    private sealed class BlockingDbContextFactory<TContext>(ManualResetEventSlim gate)
+        : IDbContextFactory<TContext>
+        where TContext : DbContext
+    {
+        public TContext CreateDbContext()
+        {
+            gate.Wait();
+            throw new InvalidOperationException(
+                "gate released — the parked run task ends here (post-assertion cleanup)."
+            );
+        }
+    }
+
+    /// <summary>A recording <c>IHubContext</c>: <c>Client(id)</c> hands back a client that appends every
+    /// <c>OnBattleEvent</c> to a per-connection list, synchronously — so emit order is observable in program
+    /// order. Only the member <c>SignalRBattleEventEmitter</c> uses is implemented; everything else throws.</summary>
+    private sealed class RecordingHubContext : IHubContext<BattleHub, IBattleClient>
+    {
+        private readonly object _lock = new();
+        private readonly Dictionary<string, List<(string Type, object Payload)>> _events = new();
+
+        public IReadOnlyList<(string Type, object Payload)> EventsFor(string connectionId)
+        {
+            lock (_lock)
+            {
+                return _events.TryGetValue(connectionId, out var list) ? list.ToList() : [];
+            }
+        }
+
+        private void Record(string connectionId, string type, object payload)
+        {
+            lock (_lock)
+            {
+                if (!_events.TryGetValue(connectionId, out var list))
+                    _events[connectionId] = list = [];
+                list.Add((type, payload));
+            }
+        }
+
+        public IHubClients<IBattleClient> Clients => new RecordingClients(this);
+
+        public IGroupManager Groups =>
+            throw new NotSupportedException("Groups are not used by the emitter.");
+
+        private sealed class RecordingClients(RecordingHubContext owner)
+            : IHubClients<IBattleClient>
+        {
+            public IBattleClient Client(string connectionId) =>
+                new RecordingClient(owner, connectionId);
+
+            public IBattleClient All => throw new NotSupportedException();
+
+            public IBattleClient AllExcept(IReadOnlyList<string> excludedConnectionIds) =>
+                throw new NotSupportedException();
+
+            public IBattleClient Clients(IReadOnlyList<string> connectionIds) =>
+                throw new NotSupportedException();
+
+            public IBattleClient Group(string groupName) => throw new NotSupportedException();
+
+            public IBattleClient GroupExcept(
+                string groupName,
+                IReadOnlyList<string> excludedConnectionIds
+            ) => throw new NotSupportedException();
+
+            public IBattleClient Groups(IReadOnlyList<string> groupNames) =>
+                throw new NotSupportedException();
+
+            public IBattleClient User(string userId) => throw new NotSupportedException();
+
+            public IBattleClient Users(IReadOnlyList<string> userIds) =>
+                throw new NotSupportedException();
+        }
+
+        private sealed class RecordingClient(RecordingHubContext owner, string connectionId)
+            : IBattleClient
+        {
+            public Task OnBattleEvent(string eventType, object payload)
+            {
+                owner.Record(connectionId, eventType, payload);
+                return Task.CompletedTask;
+            }
+        }
     }
 }

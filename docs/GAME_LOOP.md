@@ -149,6 +149,17 @@ biome mode. **`RunNodeEntered` semantics widened:** in biome mode it now fires f
 client filters `WildBattle` out of the text log, so the banner behaviour is unchanged. The legacy endless chain
 emits none of the three.
 
+**Session-layer events (2026-07-31, a third origin category).** `RunPresentationRevealed` (the run's generation
+id + type roster — Generation Profile Stage 4a, `GENERATION_PROFILE.md` §7.2) is emitted by
+**`GameSessionManager.AttachConnection`**, not by the loop: once ahead of the run task on first connect, and
+again on every reconnect rebind. That makes it the one `BattleEvent` outside §4's determinism guarantee — its
+*count* varies with connection drops, so "same seed ⇒ same event sequence" governs the **loop's** stream, not
+this connection-driven echo. That is the point, not a leak: it exists precisely because a reconnect re-mounts
+the client with no route state, so it must fire per *attach*, not per run decision. Rules for the category: a
+session-layer event must be **presentation-only** (no run-state mutation, no sequencing influence, nothing the
+loop's replay depends on) and **idempotent** (re-receiving it is always safe). Anything that fails either test
+belongs inside an `IRunEvent` instead.
+
 ---
 
 ## 6. Why formalize now — and the open questions

@@ -238,6 +238,14 @@ describe('battleReducer — encounter-map ladder', () => {
     expect(next.currentBiomeId).toBe('meadow-trail');
   });
 
+  it('RUN_PRESENTATION stores the echoed generation id and type roster', () => {
+    const next = battleReducer(ready(), {
+      type: 'RUN_PRESENTATION', generation: 'One', typeRoster: ['Normal', 'Fire', 'Water'],
+    });
+    expect(next.generation).toBe('One');
+    expect(next.typeRoster).toEqual(['Normal', 'Fire', 'Water']);
+  });
+
   it('REGION_MAP_REVEALED stores the playable biome graph for the overlay', () => {
     const biomes = [
       { id: 'a', name: 'Alpha', types: ['Fire'], neighbours: ['b'], x: 10, y: 20 },

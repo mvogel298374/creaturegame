@@ -7,6 +7,10 @@
 // fixed for the duration of a single biome visit. Themed by the biome's primary type; unknown/untyped
 // biomes fall back to a generic pool.
 
+// An ASSET INVENTORY, not a roster claim (Generation Profile Stage 4a): which types exist in a run comes
+// from the server's RunPresentationRevealed roster; this table only says which of them have a themed name
+// pool. A rostered type missing here degrades to the GENERIC pool, and presentation.ts's
+// missingTypeAssets check reports the gap against the delivered roster.
 const NAMES_BY_TYPE: Record<string, string[]> = {
   Normal: ['Whitney', 'Norman', 'Dax', 'Rhea', 'Cole', 'Perrin'],
   Fire: ['Blaine', 'Cinder', 'Ember', 'Ignatia', 'Pyra', 'Ashlin'],
@@ -26,6 +30,13 @@ const NAMES_BY_TYPE: Record<string, string[]> = {
 };
 
 const GENERIC = ['Blue', 'Trace', 'Silver', 'Vale', 'Rex', 'Nova'];
+
+// Whether a type has a themed boss-name pool — the inventory-membership question presentation.ts's
+// roster-coverage check asks. Separate from bossTrainerName so the check doesn't have to infer coverage
+// from the generic fallback behaviour.
+export function hasBossNamePool(type: string): boolean {
+  return type in NAMES_BY_TYPE;
+}
 
 // djb2 — a small, stable string hash. Deterministic across runs/machines (no locale/order surprises).
 function hashString(s: string): number {

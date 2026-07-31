@@ -12,11 +12,19 @@ export function nodeIconId(kind: string): string {
   return NODE_ICON[kind] ? `k-${NODE_ICON[kind]}` : 'k-question';
 }
 
-// Which types have a bespoke symbol (all 15 Gen 1 types). Value is unused — presence is the lookup.
+// Which types have a bespoke symbol. Value is unused — presence is the lookup. An ASSET INVENTORY, not a
+// roster claim (Generation Profile Stage 4a): which types exist in a run comes from the server's
+// RunPresentationRevealed roster; a rostered type missing here degrades to the Normal glyph, and
+// presentation.ts's missingTypeAssets check reports the gap against the delivered roster.
 const TYPE_ICON: Record<string, true> = {
   Normal: true, Fire: true, Water: true, Electric: true, Grass: true, Ice: true, Fighting: true,
   Poison: true, Ground: true, Flying: true, Psychic: true, Bug: true, Rock: true, Ghost: true, Dragon: true,
 };
+
+// The inventory-membership question presentation.ts's roster-coverage check asks (see TYPE_ICON's note).
+export function hasTypeIcon(type: string): boolean {
+  return type in TYPE_ICON;
+}
 
 const NODE_ICON: Record<string, string> = {
   WildBattle: 'sword', EliteBattle: 'star', BossBattle: 'skull', Shop: 'coin',

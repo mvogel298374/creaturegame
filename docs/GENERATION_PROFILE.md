@@ -300,6 +300,9 @@ deleted `EncounterFactory.ActiveGeneration`.
 > route state **plus** a server echo — is precisely what §7.2 (sub-stage 4a) builds. Doing it here would
 > duplicate that channel before it exists. **§7.2 names both tables as 4a's wiring work**, so this is a tracked
 > handoff, not an archaeology dig.
+>
+> **✅ Closed by Stage 4a (2026-07-31)** — both tables are now measured against the profile's roster over the
+> server echo; see §7.2.
 
 **Honest scope note:** nothing in the *runtime* decides anything from the roster yet — the wild-encounter pool
 and the biome map are gated on content, which is (b) and Stage 3. Stage 2a makes the roster a stated fact with a
@@ -487,7 +490,16 @@ joint mini-plan, never assumed. Every modal stays `'blocking'` by construction (
 await — see `TODO.md` → *Tech Debt*, the `<Modal>` refactor); a redesign may restyle and re-lay-out them but
 must not make one dismissable.
 
-### 7.2 Sub-stage 4a — the generation channel + the client presentation registry
+### 7.2 Sub-stage 4a — the generation channel + the client presentation registry ✅ DONE (2026-07-31)
+
+> **As built:** the echo carrier is a new session-layer event, **`RunPresentationRevealed(Generation,
+> TypeRoster)`** — emitted on *every* hub attach (first connect, ahead of the run task's events, and the
+> reconnect rebind branch), built by the pure `GameSessionManager.BuildPresentationEvent(profile)`. The client
+> half is `src/generations/presentation.ts` (registry + `applyGenerationTheme` + the roster-coverage check);
+> the two 15-type tables are re-framed as asset inventories measured against the delivered roster
+> (`hasBossNamePool` / `hasTypeIcon`). Falsification legs shipped server-side (TestAltProfile's 17-type roster
+> through `BuildPresentationEvent`) and client-side (alt-registry + alt-roster Vitest probes). Verified live
+> over the hub on both attach paths. Full record → `TODO.md` → *Generation Profile* → Stage 4a.
 
 The infrastructure everything else stands on. **Where the client learns the generation — two paths, and it
 needs both:**
@@ -620,7 +632,8 @@ deltas are escalated (§7.1), and anything touching the wire takes the field-gua
   assets is the same deferred asset question.
 - **The Kanto grid authoring draft** (canvas size, the 18 placements, the route paths) — produced and reviewed
   as part of 4c, not pre-authored here.
-- **The echo carrier** (which event/field the server echo rides) — a 4a implementation decision, see §7.2.
+- ~~**The echo carrier** (which event/field the server echo rides)~~ — decided in 4a: the dedicated
+  session-layer `RunPresentationRevealed` event (see §7.2's as-built note).
 
 ---
 

@@ -324,6 +324,16 @@ describe('expandEvent — control plane vs timeline', () => {
     expect(logLines(steps)).toEqual([]);
   });
 
+  it('RunPresentationRevealed is control-plane: generation + roster dispatch immediately, not as steps', () => {
+    const { now, steps } = expandEvent(
+      'RunPresentationRevealed', { generation: 'One', typeRoster: ['Normal', 'Fire'] }, CTX);
+    // `now`, not steps — the theme must apply at once on a reconnect, never queue behind a mid-flight animation.
+    expect(now).toEqual([
+      { type: 'RUN_PRESENTATION', generation: 'One', typeRoster: ['Normal', 'Fire'] },
+    ]);
+    expect(steps).toBeUndefined();
+  });
+
   it('RegionMapRevealed feeds the region-map overlay the playable biome graph (id/types/edges/coords)', () => {
     const { steps } = expandEvent('RegionMapRevealed', {
       biomes: [

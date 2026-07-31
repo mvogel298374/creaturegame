@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { TypeBadge, typeColor } from '../components/TypeBadge';
 import { MapGlyphSprite, TypeChip, typeIconId, nodeIconId } from './mapGlyphs';
+import { applyGenerationTheme, warnOnMissingTypeAssets } from '../generations/presentation';
 import { BattleCanvas } from '../battle/BattleCanvas';
 import { useBattleHub, type LevelUpPanel, type DropToast, type PartyMember } from '../hooks/useBattleHub';
 import { useEscapeKey } from '../hooks/useEscapeKey';
@@ -52,8 +53,27 @@ export function BattleScreen() {
   const playerSpecies: Species | null = location.state?.species ?? null;
   const gameId: string | null = location.state?.gameId ?? null;
   const startLevel: number = location.state?.level ?? 50;
+  // The generation the run was started with, from route state — the immediate half of the generation
+  // channel (GENERATION_PROFILE.md §7.2). The server echo (state.generation) is the authority and takes
+  // over below; route state only covers the gap until it arrives (and is absent after a reconnect).
+  const routeGeneration: string | null = location.state?.generation ?? null;
 
   const { state, chooseMove, chooseSwitch, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, buyShopItem, leaveShop, respondAcquisition, chooseLead, respondSwitchIn, dismissDrop } = useBattleHub(gameId, startLevel);
+
+  // Theme the document for the run's generation: echo first, route state until it arrives. applyGenerationTheme
+  // resolves an unknown/missing id to the default per the shared boundary contract (a stale value is a Gen 1 run).
+  useEffect(() => {
+    applyGenerationTheme(state.generation || routeGeneration);
+  }, [state.generation, routeGeneration]);
+  // On unmount the document returns to the default theme — pre-run screens start on the default (main.tsx's
+  // boot invariant), which must hold on in-SPA navigation out of a finished run, not just on a cold boot.
+  // A separate unmount-only effect so the reset doesn't churn on every echo/route-state change above.
+  useEffect(() => () => applyGenerationTheme(null), []);
+  // Check the delivered roster against the client's per-type asset inventories (boss names, map glyphs) —
+  // gaps degrade gracefully but should be visible, not silent (the Stage 2a handoff).
+  useEffect(() => {
+    if (state.typeRoster.length > 0) warnOnMissingTypeAssets(state.typeRoster);
+  }, [state.typeRoster]);
   const [controlView, setControlView] = useState<ControlView>('menu');
   // Encounter-map overlay: pinned open by the MAP button, and briefly auto-peeked at each ladder change.
   const [mapPinned, setMapPinned] = useState(false);

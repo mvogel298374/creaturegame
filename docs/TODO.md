@@ -710,7 +710,7 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
   this stage deleted from `BiomeTests`, still standing on the client. (`requirements-review` caught this; the
   write-up had claimed all three "keep every type". The wrong claim is kept visible in `GENERATION_PROFILE.md`
   §5(a) rather than deleted.) **Handed to Stage 4, not waived** (user, 2026-07-30): wiring them needs the client
-  to *hold* the roster, which needs §7.3's generation channel — Stage 4's own work. Both degrade gracefully today
+  to *hold* the roster, which needs §7.2's generation channel — Stage 4's own work. Both degrade gracefully today
   (generic name / `t-Normal` glyph), so it is a single-source-of-truth fix, not a bug fix. Tracked in
   `GENERATION_PROFILE.md` §7.2's scope note. **Honest scope:** no *runtime* decision reads the roster yet — the
   encounter pool and biome map are gated on content, which is 2b and Stage 3; the invariant is enforced by a unit
@@ -809,9 +809,51 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
   **jointly, one surface at a time**, not in one pass. Plus: the region map becomes a **rigid grid Town Map**
   (RBY-style — biome squares on an authored grid, authored orthogonal route cell-paths, blinking cursor),
   grid-for-all-generations with a per-gen map-presentation seam. Staged build:
-  - [ ] **4a — generation channel + client presentation registry:** route state + server echo (generation +
-    type roster payload), `src/generations/` registry, `data-generation` on the root, wire the two 15-type
-    client tables (`bossTrainer.ts`/`mapGlyphs.tsx`) to the roster; Vitest alt-presentation falsification leg.
+  - [x] **4a — generation channel + client presentation registry** ✅ DONE (2026-07-31). The echo carrier
+    (§7.6's open decision) is a new **`RunPresentationRevealed(Generation, TypeRoster)`** event emitted by the
+    **session layer** on *every* hub attach — first connect (leads the run's events, before the run task
+    starts) and the reconnect rebind branch alike — built by the pure
+    `GameSessionManager.BuildPresentationEvent(profile)` (internal, like `BuildRunOptions`, so the
+    roster-off-the-profile read is pinnable). Client: `src/generations/presentation.ts` — the registry
+    (`presentationFor`, boundary-contract fallback to Gen 1 mirroring `ParseGeneration`),
+    `applyGenerationTheme` (`data-generation` on the document root; default stamped at boot in `main.tsx`,
+    re-stamped by `BattleScreen` from echo-then-route-state), and the roster-coverage check
+    (`missingTypeAssets`/`warnOnMissingTypeAssets`). `StarterSelection` sends `generation` in the start body +
+    route state (constant `'One'` until the 4d+ picker). The two 15-type tables are re-framed as **asset
+    inventories, not roster claims** — `bossTrainer.hasBossNamePool` + `mapGlyphs.hasTypeIcon` feed the
+    coverage check, which measures them against the *delivered* roster (the Stage 2a handoff closed: the
+    roster is now single-sourced from the profile via the wire; a rostered type without assets degrades
+    gracefully and warns). Wire: `RunPresentation` timeline arm (**control-plane `now`**, so theming never
+    queues behind a mid-flight animation on reconnect) + `battleReducer` `generation`/`typeRoster` state +
+    the auto field guard. Falsification legs: `BuildPresentationEvent_RosterComesOffTheProfile` (TestAltProfile
+    → 17 incl. Dark/Steel), and Vitest's alt-registry + alt-roster probes (`presentation.test.ts` — registry
+    param proves the flow is data-driven; the 17-type roster surfaces exactly `[Dark, Steel]` as gaps).
+    **Verified live** (hub script, both paths): first attach leads with the echo (`One`, the 15), a
+    detach/re-attach re-echoes it; `data-generation="gen1"` present in the booted app.
+    **`requirements-review` (2026-07-31): 3 findings, adjudicated by the user — 2 fixed, 1 waived.**
+    (1) *Fixed:* `GAME_LOOP.md` §5 now documents the new **session-layer event category** this created —
+    `RunPresentationRevealed` is emitted per *attach* by `GameSessionManager`, outside the loop's
+    same-seed-same-sequence guarantee, with the category's rules (presentation-only + idempotent, else it
+    belongs in an `IRunEvent`). (2) *Fixed:* the echo's timing claims are now pinned by
+    `AttachConnection_EchoesThePresentation_OnFirstAttach_AndAgainOnReconnect` — a recording `IHubContext`
+    + a gate-blocked DB factory park the run task deterministically, asserting echo-leads-the-stream on
+    first attach and re-echo-to-the-new-connection (not the old) on reconnect; `AttachConnection`'s first
+    automated coverage. (3) **⚖️ WAIVED (user, 2026-07-31):** `StarterSelection` seeds the player's choice
+    from `presentation.ts`'s `DEFAULT_GENERATION` (the absent-data fallback constant) — conceptually two
+    roles in one constant, accepted as the interim placeholder; the 4d+ generation picker replaces the line
+    wholesale. Do not re-raise.
+    **`pr-review` (2026-07-31): CHANGES-REQUESTED → all three recommended fixes applied (user's call), now
+    PR-ready.** (1) the **registry-drift guard** — `WebEventContractTests.EveryRegisteredGeneration_
+    HasAClientPresentationEntry` asserts every `GenerationProfiles.Registered` member has an `id: '<Name>'`
+    entry in `presentation.ts` (without it, a future generation's runs would silently theme as Gen 1 with
+    every suite green — the generation-leg sibling of the timeline-arm guard); (2) **the theme un-stamps on
+    unmount** — `BattleScreen` resets `data-generation` to the default when leaving the run, so `main.tsx`'s
+    pre-run-screens-start-default invariant holds on in-SPA navigation, not just cold boot (invisible until
+    4b's per-gen CSS, cheap now); (3) **one emitter per run** — `ActiveBattle.Emitter` is set at claim and
+    the reconnect re-echo reuses it instead of constructing a second `SignalRBattleEventEmitter` (identical
+    today; diverges silently the moment the emitter gains state). Three advisories deferred (unguarded
+    test-only registry fallback; `as string` vs `?? []` asymmetry in the timeline arm; dual
+    generation encodings — REST numeric vs wire name — to consolidate when 4b/4d touches either).
   - [ ] **4b — the Gen 1 skin:** per-gen `:root` token override block (grammar not palette; TypeBadge colours
     + contrast tuning preserved); picker live-preview. **Visible change to the game as it exists today.**
   - [ ] **4c — the Town Map:** `BiomeDefinition` grid coords replace `MapX/MapY`, authored route cell-paths +

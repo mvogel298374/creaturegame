@@ -70,6 +70,14 @@ public sealed class GameSessionManager(
     internal static GenerationProfile ProfileFor(Generation generation) =>
         GenerationProfiles.For(generation);
 
+    /// <summary>Builds the presentation echo (<see cref="RunPresentationRevealed"/>) for a run's profile: the
+    /// generation id plus the profile's type roster, both as wire strings. Pure + <c>internal</c> like
+    /// <see cref="BuildRunOptions"/>, and for the same reason — the roster must observably come <em>off the
+    /// profile</em> (a hardcoded 15 would stay green under Gen 1 forever), so the test pins this against
+    /// a second profile.</summary>
+    internal static RunPresentationRevealed BuildPresentationEvent(GenerationProfile profile) =>
+        new(profile.Generation.ToString(), profile.TypeRoster.Select(t => t.ToString()).ToList());
+
     /// <summary>
     /// Assembles the run's <see cref="RunDirectorOptions"/> — the run-scoped policy bag handed to the director.
     /// </summary>
@@ -193,6 +201,11 @@ public sealed class GameSessionManager(
                 _connToGame.TryRemove(previous!, out _);
             existing.CurrentConnectionId = connectionId;
             _connToGame[connectionId] = gameId;
+            // Re-echo the run's presentation identity: the reconnected client re-mounts with no route state,
+            // and run events don't replay across a gap — without this the theme silently reverts to the
+            // default (GENERATION_PROFILE.md §7.2, the required server-echo half of the generation channel).
+            // Uses the run's one emitter (set at claim), which resolves the just-rebound connection per emit.
+            existing.Emitter?.Emit(BuildPresentationEvent(ProfileFor(existing.Generation)));
             return;
         }
 
@@ -220,8 +233,13 @@ public sealed class GameSessionManager(
         _active[gameId] = battle;
         _connToGame[connectionId] = gameId;
 
-        // Emitter resolves the current connection per-event, so output follows reconnects.
+        // Emitter resolves the current connection per-event, so output follows reconnects. Held on the
+        // battle so the reconnect branch above re-echoes through the same instance.
         var emitter = new SignalRBattleEventEmitter(hubContext, () => battle.CurrentConnectionId);
+        battle.Emitter = emitter;
+        // The presentation echo leads every run: emitted before the run task starts so the client can theme
+        // itself ahead of the first battle event (the reconnect branch above emits the same event).
+        emitter.Emit(BuildPresentationEvent(profile));
         // Endless chain: one persistent player, a fresh DB-built enemy per encounter. A single enemy input
         // is reused across encounters (the AI is stateless per turn — it scores from the live TurnContext).
         // The enemy now thinks with Gen1TrainerAi: an intelligent-but-fallible Gen 1 move selector (scores
@@ -638,6 +656,12 @@ sealed class ActiveBattle
     // The generation this run is played under — carried from the claimed PendingSession so on-demand REST reads
     // (the CHECK POKEMON overview) report the RUN's generation instead of a hardcoded 1. Fixed for the whole run.
     public Generation Generation;
+
+    // The run's ONE emitter, set at claim and reused everywhere the session layer emits (the reconnect
+    // re-echo included) — it resolves the current connection per event, so it needs no rebinding. Kept
+    // single on purpose: a second emitter per run behaves identically today but would silently diverge the
+    // moment the emitter gains any state (sequencing, buffering).
+    public IBattleEventEmitter? Emitter;
 
     private readonly object _lock = new();
     private CancellationTokenSource? _abandonCts;

@@ -123,6 +123,16 @@ public record RegionMapBiome(
     int MapY
 );
 
+/// <summary>The run's presentation identity: the generation it is played under (the profile id, e.g.
+/// <c>"One"</c>) and that generation's type roster (the <c>DamageType</c> names that exist in it). Emitted by the
+/// <em>session layer</em> on every hub attach — first connect and reconnect alike — not by the run loop: a
+/// reconnect re-mounts the client with no route state, so without this echo the theme would silently revert to
+/// the default (<c>docs/GENERATION_PROFILE.md</c> §7.2). The roster rides along so the client's per-type asset
+/// tables (boss-name pools, map glyphs) are measured against the run's actual roster instead of each encoding
+/// their own copy of "the 15" (the Stage 2a handoff).</summary>
+public record RunPresentationRevealed(string Generation, IReadOnlyList<string> TypeRoster)
+    : BattleEvent;
+
 /// <summary>A reward roll paid out gold and/or items — a battle win (inline, <paramref name="Source"/> =
 /// <c>"Battle"</c>) or a Treasure/Mystery node (<paramref name="Source"/> = the <c>RunNodeKind</c> name, which
 /// blocks on an ack so the client can raise a modal instead of an inline log line). <paramref name="GoldTotal"/>

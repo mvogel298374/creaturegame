@@ -127,6 +127,10 @@ public sealed class SignalRBattleEventEmitter(
                     }),
                 }
             ),
+            RunPresentationRevealed e => (
+                "RunPresentationRevealed",
+                new { e.Generation, e.TypeRoster }
+            ),
             RewardGranted e => (
                 "RewardGranted",
                 new

@@ -122,6 +122,12 @@ export interface BattleState {
   regionBiomes: RegionBiome[];
   routePath: string[];
   currentBiomeId: string;
+  // The run's presentation identity (Generation Profile Stage 4a), from the server's RunPresentationRevealed
+  // echo on every hub attach: the generation id ('' until the echo arrives — the view falls back to route
+  // state, then the default) and the generation's type roster (the authority the per-type asset tables are
+  // measured against; [] until known).
+  generation: string;
+  typeRoster: string[];
 }
 
 export const initialState: BattleState = {
@@ -164,6 +170,8 @@ export const initialState: BattleState = {
   regionBiomes: [],
   routePath: [],
   currentBiomeId: '',
+  generation: '',
+  typeRoster: [],
 };
 
 export function battleReducer(state: BattleState, action: Action): BattleState {
@@ -366,6 +374,9 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
       return { ...state, playerXp: Math.min(state.playerXp + action.amount, state.playerXpToNext) };
     case 'XP_SET':
       return { ...state, playerXp: action.value };
+    case 'RUN_PRESENTATION':
+      // The run's generation + type roster, echoed by the server on every hub attach (Stage 4a).
+      return { ...state, generation: action.generation, typeRoster: action.typeRoster };
     case 'REGION_MAP_REVEALED':
       // The playable biome graph, revealed once at run start — the region-map overlay draws its waypoints/edges.
       return { ...state, regionBiomes: action.biomes };

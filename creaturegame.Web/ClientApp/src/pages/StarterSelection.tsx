@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { TypeBadge } from '../components/TypeBadge';
 import type { Species } from '../types/Species';
 import { friendlyFetchError } from '../utils/fetchError';
+import { DEFAULT_GENERATION } from '../generations/presentation';
 import './StarterSelection.css';
 
 export function StarterSelection() {
@@ -17,6 +18,11 @@ export function StarterSelection() {
   // Roguelite difficulty: a per-run choice (like Level/Seed), threaded once at game start into the backend's
   // RunRules preset (docs/TODO.md — Settings Menu). Not a Settings-menu / localStorage concern.
   const [difficultyChoice, setDifficultyChoice] = useState<'Easy' | 'Normal' | 'Hard'>('Normal');
+  // The run's generation (Generation Profile Stage 4a). A constant until the generation picker lands
+  // (Stage 4d+, GENERATION_PROFILE.md §7.5 #8) — but the channel is live: sent in the start body (the
+  // server parses it with the same fallback contract as Difficulty) and carried in route state for the
+  // immediate theme, with the server echo as the authority thereafter.
+  const generationChoice = DEFAULT_GENERATION;
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -39,10 +45,11 @@ export function StarterSelection() {
       // server's random seed.
       const seedParam = new URLSearchParams(window.location.search).get('seed');
       const seed = seedParam !== null && seedParam.trim() !== '' ? Number(seedParam) : NaN;
-      const body: { speciesId: number; level: number; seed?: number; difficulty: string } = {
+      const body: { speciesId: number; level: number; seed?: number; difficulty: string; generation: string } = {
         speciesId: selected.id,
         level: levelChoice,
         difficulty: difficultyChoice,
+        generation: generationChoice,
       };
       if (Number.isInteger(seed)) body.seed = seed;
 
@@ -53,7 +60,7 @@ export function StarterSelection() {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const { gameId } = await res.json() as { gameId: string };
-      nav('/battle', { state: { species: selected, gameId, level: levelChoice } });
+      nav('/battle', { state: { species: selected, gameId, level: levelChoice, generation: generationChoice } });
     } catch (e) {
       setError(friendlyFetchError(e));
     }

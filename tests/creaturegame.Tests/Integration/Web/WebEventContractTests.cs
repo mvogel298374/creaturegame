@@ -5,6 +5,7 @@ using System.Text.Json;
 using creaturegame.Attacks;
 using creaturegame.Combat;
 using creaturegame.Creatures;
+using creaturegame.Generations;
 using creaturegame.Web.Battle;
 
 namespace creaturegame.Tests.Integration.Web;
@@ -984,6 +985,56 @@ public class WebEventContractTests
         // The client mirror, same two conditions in TS terms.
         Assert.Contains("m.ppCurrent > 0", ts);
         Assert.Contains("!m.disabled", ts);
+    }
+
+    /// <summary>Cross-language tripwire for the generation leg of the presentation channel (Generation Profile
+    /// Stage 4a): every generation registered server-side (<see cref="GenerationProfiles.Registered"/>) must
+    /// have an entry in the client presentation registry (<c>src/generations/presentation.ts</c>). Without one,
+    /// a new generation's runs resolve through the client's default arm and theme as Gen 1 — silently, with
+    /// every suite green, because the fallback is the deliberate boundary contract for <em>unknown</em> values
+    /// and cannot tell "stale client" from "forgotten entry". The <em>roster</em> leg is wire-tied (the echo
+    /// carries it); this pins the <em>generation</em> leg the same way the timeline-arm guard pins events.
+    /// <para>Matches <c>id: '&lt;Name&gt;'</c> — the registry entry's own id field — so a renamed or removed
+    /// entry fails, not just a missing one.</para></summary>
+    [Fact]
+    public void EveryRegisteredGeneration_HasAClientPresentationEntry()
+    {
+        var presentation = ReadClientAppSource("generations", "presentation.ts");
+
+        var missing = GenerationProfiles
+            .Registered.Select(g => g.ToString())
+            .Where(name => !presentation.Contains($"id: '{name}'"))
+            .OrderBy(name => name)
+            .ToList();
+
+        Assert.True(
+            missing.Count == 0,
+            "These server-registered generations have no entry in the client presentation registry "
+                + "(src/generations/presentation.ts PRESENTATIONS) — their runs would silently theme as the "
+                + $"default. Add an entry (id: '<Name>') for each:\n  {string.Join("\n  ", missing)}"
+        );
+    }
+
+    // Read a ClientApp/src/<dir>/<file> source file via this test file's compile-time path.
+    private static string ReadClientAppSource(
+        string dir,
+        string fileName,
+        [CallerFilePath] string thisFile = ""
+    )
+    {
+        var path = Path.Combine(
+            RepoRoot(thisFile),
+            "creaturegame.Web",
+            "ClientApp",
+            "src",
+            dir,
+            fileName
+        );
+        Assert.True(
+            File.Exists(path),
+            $"Could not locate {fileName} at '{path}'. Expected it under creaturegame.Web/ClientApp/src/{dir}/."
+        );
+        return File.ReadAllText(path);
     }
 
     // Read a ClientApp/src/battle/*.ts file via this test file's compile-time path.
