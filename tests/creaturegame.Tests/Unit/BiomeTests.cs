@@ -39,7 +39,18 @@ public class BiomeTests
     public void Kanto_HomesEveryGen1Type()
     {
         // Every type the generation has must have somewhere to be encountered — ENCOUNTER_DESIGN.md §2.3.
-        Assert.Empty(Biomes.UnhomedTypes(Region.Kanto, Gen1Types));
+        Assert.Empty(Biomes.UnhomedTypes(Biomes.Kanto, Gen1Types));
+    }
+
+    [Fact]
+    public void Gen1Profile_BiomeRosterHomesItsWholeTypeRoster()
+    {
+        // The same invariant, asserted profile-against-profile (Stage 3): whatever biome roster and type roster
+        // a generation declares, the one must home the other. For a future generation this is the check to copy;
+        // Kanto_HomesEveryGen1Type above is its Gen 1 concretisation over the raw registry.
+        Assert.Empty(
+            Biomes.UnhomedTypes(Gen1Profile.Instance.BiomeRoster, Gen1Profile.Instance.TypeRoster)
+        );
     }
 
     [Fact]
@@ -47,7 +58,7 @@ public class BiomeTests
     {
         // Complement of HomesEveryGen1Type: a future biome edit can't smuggle in Steel/Dark/Fairy unnoticed
         // (the spread tests only iterate Gen1Types, so they wouldn't catch it).
-        Assert.All(Biomes.HomedTypes(Region.Kanto), t => Assert.Contains(t, Gen1Types));
+        Assert.All(Biomes.HomedTypes(Biomes.Kanto), t => Assert.Contains(t, Gen1Types));
     }
 
     /// <summary>
@@ -64,7 +75,7 @@ public class BiomeTests
     [Fact]
     public void UnhomedTypes_IsMeasuredAgainstTheProfilesRoster_NotAFixedGen1List()
     {
-        var unhomed = Biomes.UnhomedTypes(Region.Kanto, TestAltProfile.Instance.TypeRoster);
+        var unhomed = Biomes.UnhomedTypes(Biomes.Kanto, TestAltProfile.Instance.TypeRoster);
 
         // Kanto is authored for 15 types, so under a 17-type generation it under-covers by exactly the two extras
         // (in DamageType order — Steel is declared before Dark).
@@ -132,7 +143,7 @@ public class BiomeTests
     {
         // A pool of one Bug species: only Bug-listing biomes are playable; the rest are excluded.
         var pool = new List<PokemonSpecies> { Species(1, DamageType.Bug, null) };
-        var playable = Biomes.Playable(Region.Kanto, pool);
+        var playable = Biomes.Playable(Biomes.Kanto, pool);
 
         Assert.NotEmpty(playable);
         Assert.All(playable, b => Assert.Contains(DamageType.Bug, b.Types));

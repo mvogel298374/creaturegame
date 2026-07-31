@@ -19,6 +19,12 @@ public static class GenerationProfiles
     private static readonly IReadOnlyDictionary<Generation, GenerationProfile> ByGeneration =
         new Dictionary<Generation, GenerationProfile> { [Generation.One] = Gen1Profile.Instance };
 
+    // Materialised once — Registered sits on the request path (every /start and dex read parses against it),
+    // and static field initializers run in textual order, so this must stay declared BELOW ByGeneration
+    // (the same order trap Gen1Profile.Gen1Types documents).
+    private static readonly IReadOnlyCollection<Generation> RegisteredGenerations =
+        ByGeneration.Keys.ToArray();
+
     /// <summary>The profile for <paramref name="generation"/>.</summary>
     /// <exception cref="ArgumentOutOfRangeException">The generation has no registered profile. Deliberately a
     /// throw rather than a silent fall back to Gen 1: a missing profile is a wiring bug, and quietly serving
@@ -35,5 +41,5 @@ public static class GenerationProfiles
             );
 
     /// <summary>Every registered generation, for tests and any UI that offers the choice.</summary>
-    public static IReadOnlyCollection<Generation> Registered => ByGeneration.Keys.ToArray();
+    public static IReadOnlyCollection<Generation> Registered => RegisteredGenerations;
 }

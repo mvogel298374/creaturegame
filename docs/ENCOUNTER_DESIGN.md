@@ -71,8 +71,13 @@ record BiomeDefinition   ( Id, Name, Region, Types[1..3], Neighbours[], MapX, Ma
    .HasAnyIn(pool)       => any on-theme species in pool
 static Biomes            // the registry — region ⇒ biome list
    .For(region)          -> BiomeDefinition[]                           // "Kanto OWNS these 18"
-   .Playable(region,pool)-> BiomeDefinition[]                           // For(region) minus empty biomes
+   .Playable(biomes,pool)-> BiomeDefinition[]                           // the given roster minus empty biomes
 ```
+
+*(`Playable` originally took a `Region` and resolved the roster itself; Generation Profile Stage 3 (2026-07-31)
+re-signatured it — and `HomedTypes`/`UnhomedTypes` — to take the biome roster directly, so playability is judged
+over whatever roster the run's profile supplies. `Biomes.For` remains the one door to the authored registry; the
+run path reads `profile.BiomeRoster`, which Gen 1 populates through it. See `GENERATION_PROFILE.md` §6.)*
 
 `Region` is an **enum** (not a record with an embedded list); the "a region owns its biome list" ownership is
 expressed by the `Biomes.For(region)` lookup. Biome *archetypes* (forest, cave, shore) recur across regions, but
@@ -111,11 +116,13 @@ These rules live on `EncounterSelector.PickByBst` (optional `biome` filter) + `B
 
 ### 2.3 Kanto roster (18 biomes, all 15 Gen 1 types homed)
 
-> **This invariant is code-checked, not just eyeballed from the table below** — `Biomes.HomedTypes(region)` /
-> `Biomes.UnhomedTypes(region, roster)` (`creaturegame/Creatures/Biome.cs`) take the generation's type roster as
+> **This invariant is code-checked, not just eyeballed from the table below** — `Biomes.HomedTypes(biomes)` /
+> `Biomes.UnhomedTypes(biomes, roster)` (`creaturegame/Creatures/Biome.cs`) take the generation's type roster as
 > a **parameter**, not a hardcoded 15, so a later generation's region must re-derive "every type is homed" rather
 > than inherit Gen 1's answer. The roster itself lives on `GenerationProfile.TypeRoster`
-> (see `GENERATION_PROFILE.md` §5(a), shipped as Stage 2a).
+> (see `GENERATION_PROFILE.md` §5(a), shipped as Stage 2a). **Since Stage 3** (`GENERATION_PROFILE.md` §6), both
+> methods take the profile's `BiomeRoster` (a biome list) rather than a `Region` — the signature shown here is the
+> as-built one, not the Stage-2a-era `(Region, roster)` shape.
 >
 > **Open question, deliberately not settled (raised by `requirements-review` 2026-07-30):** full type coverage is
 > Kanto's *stated design intent*, and under today's acquisition channels an unhomed type would be unreachable

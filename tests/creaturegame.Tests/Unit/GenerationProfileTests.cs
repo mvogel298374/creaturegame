@@ -114,8 +114,43 @@ public class GenerationProfileTests
                 );
 
             // A roster that exists but is empty is the same bug wearing a different hat — it would make
-            // Biomes.UnhomedTypes vacuously pass for every region.
+            // Biomes.UnhomedTypes vacuously pass for every region, and an empty biome roster would build a
+            // run with no map at all.
             Assert.NotEmpty(profile.TypeRoster);
+            Assert.NotEmpty(profile.BiomeRoster);
+        }
+    }
+
+    // ── Stage 3: the region slice ──────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Gen1Profile_IsSetInKanto_AndItsBiomeRosterIsTheKantoRegistry()
+    {
+        var p = Gen1Profile.Instance;
+
+        Assert.Equal(Region.Kanto, p.Region);
+        // Reference equality, like the singleton pins above: the roster IS the authored registry read through
+        // Biomes.For (the one door), so selecting Gen 1 cannot change which biomes exist.
+        Assert.Same(Biomes.Kanto, p.BiomeRoster);
+    }
+
+    /// <summary>
+    /// <see cref="GenerationProfile.Region"/> and <see cref="GenerationProfile.BiomeRoster"/> cannot drift: every
+    /// rostered biome carries the profile's own region tag.
+    /// </summary>
+    /// <remarks>
+    /// The region is kept as a named slice (identity/presentation, like <see cref="GenerationProfile.Generation"/>)
+    /// while the roster is the consumed content — two properties answering one question, which is exactly the
+    /// duplicated-source shape this feature keeps deleting elsewhere. This coherence pin is what makes the pair
+    /// safe to hold: a profile whose biomes disagree with its declared region fails here by name.
+    /// </remarks>
+    [Fact]
+    public void EveryRegisteredProfile_RostersOnlyBiomesOfItsOwnRegion()
+    {
+        foreach (var generation in GenerationProfiles.Registered)
+        {
+            var profile = GenerationProfiles.For(generation);
+            Assert.All(profile.BiomeRoster, b => Assert.Equal(profile.Region, b.Region));
         }
     }
 

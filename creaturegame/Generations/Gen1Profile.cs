@@ -73,6 +73,10 @@ public static class Gen1Profile
         // Gen1ContentScope, which records the one item that used to break this) — so this identity stub is
         // correct, and it is where the real GenerationIntroduced filter goes the day that stops being true.
         ContentScope = Gen1ContentScope.Instance,
+        Region = Region.Kanto,
+        // Through Biomes.For — the one door to the authored registry (GenerationProfile.BiomeRoster's rule).
+        // A new generation authors its own roster in Biomes and reads it out the same way.
+        BiomeRoster = Biomes.For(Region.Kanto),
         BattleRules = Gen1BattleRules.Instance,
         // Seeded per run — matches EncounterFactory.BuildCreature's existing `new Gen1StatCalculator(rng)`, so a
         // fixed seed keeps reproducing the same DVs.

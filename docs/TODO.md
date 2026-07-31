@@ -24,8 +24,9 @@ creature), **Revive Items** (in-battle party revive, Boss-reward + rare-shop onl
 **Generation Profile** — make Gen 1 an explicit, swappable profile so a generation switch changes content, menus
 and look, not just battle math. Designed against Gen 1 alone; upward compatibility is the deliverable, no Gen 2
 content. **`/plan` DONE (2026-07-29), all five stages incl. the frontend** — full design in
-[`GENERATION_PROFILE.md`](GENERATION_PROFILE.md). **Stage 2 complete (1a, 1b, 2a, 2b shipped); 3–5 open** — task
-entry + staging below.
+[`GENERATION_PROFILE.md`](GENERATION_PROFILE.md). **Stages 1–3 complete (1a, 1b, 2a, 2b, 3 shipped); Stage 4
+(presentation) open** — Stage 5 is the standing falsification rule, and every shipped stage has landed its leg —
+task entry + staging below.
 
 *(**In-Combat Switching** — the voluntary, any-turn SWITCH turn-action — is **✅ COMPLETE (2026-07-25)**, all three
 stages (engine core / wire / frontend) shipped, including the out-of-PP menu affordance (BAG/SWITCH reachable at
@@ -688,7 +689,9 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
   the 15 in `DamageType` declaration order, so diffing it against the enum shows exactly the three later
   arrivals missing. `DamageType` itself keeps all 18 and stays gen-blind — it is a vocabulary, not a claim.
   The consumer is the region-content invariant, promoted to production code: **`Biomes.UnhomedTypes(region,
-  roster)`** + `Biomes.HomedTypes(region)`. The roster is a **parameter, not a constant** — that is the upward
+  roster)`** + `Biomes.HomedTypes(region)` *(as-built note: Stage 3 re-signatured both to take a biome roster —
+  `UnhomedTypes(biomes, roster)` / `HomedTypes(biomes)` — see the Stage 3 entry)*. The roster is a **parameter,
+  not a constant** — that is the upward
   compatibility, since a 17-type generation must re-derive "every type is homed" rather than inherit Gen 1's
   answer (`ENCOUNTER_DESIGN.md §2.3`). `BiomeTests`' own hardcoded 15-type array is **deleted** in favour of
   `Gen1Profile.Instance.TypeRoster` — it was a second source of truth for the roster, the same hazard Stage 1b
@@ -766,8 +769,37 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
   this is ever revisited, is a live-db contract test asserting the `Items` name set equals
   `ItemMapper.Gen1BattleItemNames` exactly (both 28), mirroring `PokemonEvolutionDataContractTests` — ~15 lines.
   **Do not re-raise as a new finding.**
-- [ ] **Stage 3 — region, biomes, starters onto the profile.** Smaller than it looks: `Biomes.For(Region)` and the
-  `Region` enum already exist. Also moves the starter roster server-side. Backend-only.
+- [x] **Stage 3 — region, biomes, starters onto the profile** ✅ DONE (2026-07-31). Two new profile slices:
+  `GenerationProfile.Region` (**identity/presentation only, never branched on** — the `Generation` sibling, kept
+  for logging and Stage 4's client echo) and `GenerationProfile.BiomeRoster` (the consumed content;
+  `Gen1Profile` reads it through **`Biomes.For(Region.Kanto)` — still the one door** to the authored registry).
+  **The roster, not the enum, is the falsifiable slice** — `Region` has a single member, so only a substituted
+  biome *list* can prove the run setup asks the profile; a coherence test pins the pair can't drift (every
+  rostered biome carries the profile's region). `Biomes.HomedTypes`/`UnhomedTypes`/`Playable` now take a biome
+  roster instead of a `Region`, so the coverage invariant and playability filter run against whatever roster a
+  profile supplies; `EncounterFactory.ComputePlayableBiomesAsync` reads `profile.BiomeRoster` — deleting the
+  repo's **last hardcoded `Region.Kanto` outside the authored registry**.
+  **Starters: the design doc's premise was stale and is corrected, not implemented as written.** Nothing was
+  "hardcoded client-side" — `StarterSelection.tsx` has always fetched the full dex from `/api/species` and any
+  species is pickable (deliberate roguelite design, unchanged). What "server-authoritative starter roster"
+  actually meant here: `SpeciesController.GetAll` (Stage 2b's handed-off unscoped read — the one species read
+  that answers before a run exists) now takes `?generation=`, parses it with **the same boundary contract as
+  game start** (`GameController.ParseGeneration` — a stale client that sends nothing still gets the Gen 1 dex),
+  and serves the profile's `ContentScope`-scoped dex via a named `SpeciesSummaryDto` (wire-verified live:
+  byte-identical camelCase shape, 151 rows, `?generation=one` parses). So which starters are offerable is now
+  decided server-side by the profile — there is no curated per-gen starter subset, and introducing one would be
+  a *new design decision*, not part of this stage.
+  **Falsification legs, verified by sabotage twice:** `TestAltProfile.BiomeRoster` = a connected 2-biome fake
+  region (themes pickable from the probe's own constraints — fillable by wild species with ids ≤ 20) —
+  deliberately **below `RunBiomeMapSize`**, so the run-map probe simultaneously pins §6's watch note that a
+  roster thinner than the map cap yields itself rather than breaking map generation. Re-hardcoding Kanto in
+  `ComputePlayableBiomesAsync` fails exactly the new run-map probe (43 others green); unscoping the dex read
+  fails exactly the `DexFor` probe (18 others green). Zero importer/DB change; client untouched (Stage 4 sends
+  the generation when a picker exists).
+  **Riders (both filed 2026-07-31, both scheduled for "when Stage 3 touches the file"):** the 5-site learnset
+  query duplication collapsed into `EncounterFactory.LoadLearnsetsAsync` (one home for the generation-filtered
+  learnset read), and `GenerationProfiles.Registered` no longer allocates per call (materialised once,
+  declared below `ByGeneration` per the static-init order trap `Gen1Profile.Gen1Types` documents).
 - [ ] **Stage 4 — presentation: theme + menu structure.** `/plan` **complete** — no longer provisional. Per-gen
   override of the `:root` design tokens in `index.css`; `ActionMenu` restructured to the 2×2 grid with the layout
   as profile data and the verb set fixed by the engine. **Scope widened by the user 2026-07-29: this stage
@@ -912,6 +944,23 @@ Battles are fully playable now — docs won't describe a moving target.
   next time a feature has to touch the signature anyway (**In-Combat Switching**, shipped 2026-07-25, reused the
   existing `playerParty` param and didn't need to). Not worth a standalone churn commit: every call site is a test
   or the run layer, and both are stable.
+
+**Filed 2026-07-31 from a review pass over the Generation Profile Stage 1a–2b commits** (`e603478`…`fa952e4`;
+the threading discipline itself is sound — every seam explicit, no `?? Gen1…` default reintroduced, each stage
+carries its `TestAltProfile` leg). Two of the three closed the same day as Stage 3 riders (full write-ups in
+`TODO_ARCHIVE.md` → *Tech-Debt cleanups*): the **five-site learnset-query duplication** in `EncounterFactory`
+(→ one `LoadLearnsetsAsync` home) and the **per-call `GenerationProfiles.Registered` allocation** (→ materialised
+once). One remains:
+
+- [ ] *(low, watch — do not refactor speculatively)* **`EncounterFactory`'s profile threading is growing the same
+  way `Battle`'s constructor did.** `BuildCreature` is at 8 parameters; `profile` + `allMoves` (+ `rng`) travel
+  together through every public entry point and both supplier builders. Same precedent as the `Battle` item
+  above: the next time a feature has to *widen* these signatures anyway, consider a small run-scoped parameter
+  object (profile + move pool + rng — the things that are fixed per run) instead of a fourth parallel parameter.
+  **Stage 3 (2026-07-31) did not trip the trigger** — it added zero parameters (the region rides on the already-
+  threaded profile), so the watch stands for Stage 4 or whatever next touches the shape. The threading being
+  *explicit and required* is the feature's deliberate design (no defaults — see `GENERATION_PROFILE.md` §4.2);
+  a parameter object preserves that, it just stops the arity creep.
 
 *(The 2026-07-19 repo-wide PR-audit is now fully closed — all five findings resolved: four fixed & archived in
 `TODO_ARCHIVE.md`, the DB-services try/catch convention decided above, and the `SignalRInput` cancel/prompt race

@@ -42,7 +42,6 @@ public sealed class EncounterFactory(
     )
     {
         var source = rng ?? SystemRandomSource.Instance;
-        int gen = (int)profile.Generation;
         await using var pokemonCtx = await pokemonFactory.CreateDbContextAsync();
         // Every catalog read on this class's run path goes through profile.ContentScope (Stage 2b) — no direct
         // .Species/.Moves/.Items query survives. That uniformity IS the deliverable: it is what stops a future
@@ -64,12 +63,12 @@ public sealed class EncounterFactory(
         if (allMoves.Count == 0)
             return null;
 
-        var learnsets = await pokemonCtx
-            .Learnsets.AsNoTracking()
-            .Where(l =>
-                l.Generation == gen && l.SpeciesId == species.Id && l.Method == LearnMethod.LevelUp
-            )
-            .ToListAsync();
+        var learnsets = await LoadLearnsetsAsync(
+            pokemonCtx,
+            profile,
+            species.Id,
+            LearnMethod.LevelUp
+        );
 
         var player = BuildCreature(
             species,
@@ -98,11 +97,13 @@ public sealed class EncounterFactory(
 
         // The run's biome map: a seeded, connected random subset of the region's playable biomes (the ones that
         // can generate against the wild-available pool — empty biomes never appear, ENCOUNTER_DESIGN.md §2.2).
-        // Randomising *which* biomes appear makes each run traverse a different slice of Kanto (§2.1); the subset
-        // is connected so the route never strands, and the same Wild filter CreateEnemyAsync applies, so every
-        // offered biome is guaranteed an encounter (PickByBst can't starve on its themed pool). Same seed ⇒ same
-        // map. Threaded into the RunDirector, which charts the route through it.
-        var playable = await ComputePlayableBiomesAsync(pokemonCtx, Region.Kanto, profile);
+        // Randomising *which* biomes appear makes each run traverse a different slice of the region (§2.1); the
+        // subset is connected so the route never strands, and the same Wild filter CreateEnemyAsync applies, so
+        // every offered biome is guaranteed an encounter (PickByBst can't starve on its themed pool). Same seed ⇒
+        // same map. Threaded into the RunDirector, which charts the route through it. The region comes off the
+        // profile (Stage 3) — this used to hardcode Region.Kanto, the biome-layer sibling of the deleted
+        // ActiveGeneration const.
+        var playable = await ComputePlayableBiomesAsync(pokemonCtx, profile);
         var runMap = Biomes.RandomConnectedMap(playable, RunBiomeMapSize, source);
 
         return new RunSetup(player, allMoves, bag, new Wallet(), allItems, runMap);
@@ -219,13 +220,12 @@ public sealed class EncounterFactory(
             return null;
 
         int level = ScaleWildLevel(ctx.Lead.Level, ctx.Depth, rng);
-        int gen = (int)profile.Generation;
-        var learnsets = await pokemonCtx
-            .Learnsets.AsNoTracking()
-            .Where(l =>
-                l.Generation == gen && l.SpeciesId == species.Id && l.Method == LearnMethod.LevelUp
-            )
-            .ToListAsync();
+        var learnsets = await LoadLearnsetsAsync(
+            pokemonCtx,
+            profile,
+            species.Id,
+            LearnMethod.LevelUp
+        );
 
         var creature = BuildCreature(
             species,
@@ -276,13 +276,12 @@ public sealed class EncounterFactory(
         if (species is null)
             return null;
 
-        int gen = (int)profile.Generation;
-        var learnsets = await pokemonCtx
-            .Learnsets.AsNoTracking()
-            .Where(l =>
-                l.Generation == gen && l.SpeciesId == species.Id && l.Method == LearnMethod.LevelUp
-            )
-            .ToListAsync();
+        var learnsets = await LoadLearnsetsAsync(
+            pokemonCtx,
+            profile,
+            species.Id,
+            LearnMethod.LevelUp
+        );
 
         // Built at the boss's own level with its canonical latest moveset — the caught creature matches the boss
         // you fought in species and level (the biome's themed apex), unlike the draft which picks by BST band.
@@ -304,7 +303,7 @@ public sealed class EncounterFactory(
     }
 
     /// <summary>
-    /// The biomes for <paramref name="region"/> that can actually generate against the wild-available species
+    /// The biomes of the profile's region that can actually generate against the wild-available species
     /// (legendaries/statics/gifts excluded — the same filter as <see cref="CreateEnemyAsync"/>). Empty biomes
     /// never appear; if no availability data exists (a minimally seeded DB) the full dex is the pool, mirroring
     /// the encounter fallback so the map never starves.
@@ -313,10 +312,11 @@ public sealed class EncounterFactory(
     /// content can fill — a biome whose theme no in-generation species matches is not playable, exactly as an
     /// empty biome already was not. <see cref="PokemonGameAvailability"/> needs no scope of its own: it is keyed
     /// by species id and only ever intersected with the scoped pool below.</para>
+    /// <para><b>Region-scoped since Stage 3:</b> the biome set itself is <c>profile.BiomeRoster</c> — this method
+    /// held the repo's last hardcoded <c>Region.Kanto</c> outside the authored registry.</para>
     /// </summary>
     private static async Task<IReadOnlyList<BiomeDefinition>> ComputePlayableBiomesAsync(
         PokemonDbContext pokemonCtx,
-        Region region,
         GenerationProfile profile
     )
     {
@@ -334,7 +334,29 @@ public sealed class EncounterFactory(
 
         var wildPool =
             wildSet.Count > 0 ? allSpecies.Where(s => wildSet.Contains(s.Id)).ToList() : allSpecies;
-        return Biomes.Playable(region, wildPool);
+        return Biomes.Playable(profile.BiomeRoster, wildPool);
+    }
+
+    /// <summary>
+    /// The one home for the generation-filtered learnset read: the rows for <paramref name="speciesId"/> learned
+    /// by any of <paramref name="methods"/> in the profile's generation. Every learnset query in this class goes
+    /// through here — it was previously copy-pasted at five sites (each re-deriving the generation locally),
+    /// which is the same duplication hazard the profile work keeps deleting, one query at a time.
+    /// </summary>
+    private static Task<List<PokemonLearnset>> LoadLearnsetsAsync(
+        PokemonDbContext pokemonCtx,
+        GenerationProfile profile,
+        int speciesId,
+        params LearnMethod[] methods
+    )
+    {
+        int gen = (int)profile.Generation;
+        return pokemonCtx
+            .Learnsets.AsNoTracking()
+            .Where(l =>
+                l.Generation == gen && l.SpeciesId == speciesId && methods.Contains(l.Method)
+            )
+            .ToListAsync();
     }
 
     /// <summary>
@@ -405,15 +427,12 @@ public sealed class EncounterFactory(
             spec.Moves == MoveSelectionStrategy.TmEnhanced
                 ? new[] { LearnMethod.LevelUp, LearnMethod.Machine }
                 : new[] { LearnMethod.LevelUp };
-        int gen = (int)profile.Generation;
-        var learnsets = await pokemonCtx
-            .Learnsets.AsNoTracking()
-            .Where(l =>
-                l.Generation == gen
-                && l.SpeciesId == enemySpecies.Id
-                && allowedMethods.Contains(l.Method)
-            )
-            .ToListAsync();
+        var learnsets = await LoadLearnsetsAsync(
+            pokemonCtx,
+            profile,
+            enemySpecies.Id,
+            allowedMethods
+        );
 
         return BuildCreature(
             enemySpecies,
@@ -476,12 +495,12 @@ public sealed class EncounterFactory(
         if (newForm is null)
             return null;
 
-        var learnsets = await pokemonCtx
-            .Learnsets.AsNoTracking()
-            .Where(l =>
-                l.Generation == gen && l.SpeciesId == newForm.Id && l.Method == LearnMethod.LevelUp
-            )
-            .ToListAsync();
+        var learnsets = await LoadLearnsetsAsync(
+            pokemonCtx,
+            profile,
+            newForm.Id,
+            LearnMethod.LevelUp
+        );
 
         return new EvolutionOutcome(newForm, BuildLearnset(learnsets, allMoves));
     }

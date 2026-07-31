@@ -1686,6 +1686,26 @@ The ordered pass that followed the move-coverage completion. All six items done;
 
 ## Tech-Debt cleanups — DONE
 
+- **`EncounterFactory`'s learnset query was copy-pasted five times → one `LoadLearnsetsAsync` home
+  (2026-07-31).** Filed the same day from a review pass over the Generation Profile Stage 1a–2b commits: five
+  sites (player setup, draft, boss catch, enemy, evolved form) each opened with
+  `int gen = (int)profile.Generation;` and ran the same generation-filtered learnset query, differing only in
+  the species id and (on the enemy path) a learn-methods array. Pre-existing duplication — it looked the same
+  under the deleted `ActiveGeneration` const — that Stage 1b had grown by the per-site `gen` local. Collapsed
+  into a private `LoadLearnsetsAsync(PokemonDbContext, GenerationProfile, int speciesId, params LearnMethod[])`
+  helper (the single-method sites pass `LearnMethod.LevelUp`; the enemy path passes its array — EF translates
+  `methods.Contains(l.Method)` to SQL `IN`, the shape the enemy query already used). The only remaining `gen`
+  local sits in `ResolvePlayerEvolutionAsync`, which still needs it for the *evolutions-edge* query — a
+  different table, not a learnset read. Shipped as a rider on Generation Profile Stage 3, per the item's own
+  "when Stage 3 touches the file anyway" scheduling; behaviour-preserving, suite green before and after.
+
+- **`GenerationProfiles.Registered` allocated a fresh array per call (2026-07-31).** Same review pass, filed as
+  *(micro)*: the property did `ByGeneration.Keys.ToArray()` on every read, and it sits on the request path —
+  `ParseGeneration` calls `.Contains` on it for every `/start`, and (since Stage 3) for every starter-picker dex
+  read too. Materialised once into a `static readonly` field, declared **below** `ByGeneration` because static
+  field initializers run in textual order — the same order trap `Gen1Profile.Gen1Types` documents. Shipped as a
+  Stage 3 rider.
+
 - **csproj boilerplate → `Directory.Build.props` (2026-07-17).** All four projects copy-pasted the same three
   properties — `<TargetFramework>net9.0`, `<ImplicitUsings>enable`, `<Nullable>enable` — and there was no
   solution-wide place for build policy, so keeping them in sync was manual and nothing enforced the repo's

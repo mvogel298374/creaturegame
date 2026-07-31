@@ -26,9 +26,9 @@ namespace creaturegame.Generations;
 ///
 /// <para><b>Adding a slice (Stages 2–4).</b> New slices are added as <c>required</c> properties here, which
 /// deliberately breaks every profile that does not supply them — a compile error is the cheapest possible
-/// reminder that a new generation-variable surface exists. <see cref="TypeRoster"/> landed that way in Stage 2a
-/// and <see cref="ContentScope"/> in Stage 2b; still planned: region and starters (Stage 3), presentation theme
-/// (Stage 4).</para>
+/// reminder that a new generation-variable surface exists. <see cref="TypeRoster"/> landed that way in Stage 2a,
+/// <see cref="ContentScope"/> in Stage 2b, and <see cref="Region"/> + <see cref="BiomeRoster"/> in Stage 3;
+/// still planned: presentation theme (Stage 4).</para>
 ///
 /// <para><b>Instances, not factories — mostly.</b> The four seams are stateless singletons by design
 /// (<c>GENERATION_SEAMS.md §4.3</c>), so they are held directly. <see cref="BuildAi"/> is the exception: the
@@ -78,6 +78,39 @@ public sealed record GenerationProfile
     /// full rationale and <see cref="Gen1ContentScope"/> for where the eventual filter lands.</para>
     /// </remarks>
     public required IContentScope ContentScope { get; init; }
+
+    /// <summary>
+    /// The region this generation's runs are set in. <b>Identity and presentation only — never branch on it</b>,
+    /// exactly like <see cref="Generation"/>: the region's <i>content</i> is <see cref="BiomeRoster"/>, and that
+    /// is what the run setup consumes.
+    /// </summary>
+    /// <remarks>
+    /// Kept alongside the roster (rather than derived from the biomes' own <see cref="BiomeDefinition.Region"/>
+    /// tags) so the generation has one named answer to "where is this set" for logging and the Stage 4 client
+    /// echo. The two cannot drift: <c>GenerationProfileTests</c> pins that every rostered biome carries this
+    /// region.
+    /// </remarks>
+    public required Region Region { get; init; }
+
+    /// <summary>
+    /// The authored biome roster this generation's runs draw their map from — <see cref="Region"/>'s content.
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Why the roster and not just the enum.</b> Before Stage 3 the run setup called
+    /// <c>Biomes.For(Region.Kanto)</c> — a hardcoded region, the biome-layer sibling of the deleted
+    /// <c>EncounterFactory.ActiveGeneration</c>. Putting the <i>roster</i> on the profile (rather than only the
+    /// enum) is what makes the thread observable: <see cref="Region"/> has a single member today, so only a
+    /// substituted biome list can prove the run setup asks the profile — <c>TestAltProfile</c> supplies a tiny
+    /// fake roster for exactly that (<c>docs/GENERATION_PROFILE.md</c> §3, §6).</para>
+    /// <para><b><see cref="Biomes.For"/> stays the only door to the authored registry</b> — a real profile builds
+    /// its roster through it (see <c>Gen1Profile</c>); nothing else may reach into <see cref="Biomes.Kanto"/>
+    /// directly on a run path.</para>
+    /// <para><b>A thin roster is legal.</b> The run map is a connected subset of the roster's playable biomes,
+    /// capped at <c>EncounterFactory.RunBiomeMapSize</c>; a roster smaller than the cap simply yields itself
+    /// (<see cref="Biomes.RandomConnectedMap"/> returns everything when the count exceeds the pool) — pinned by
+    /// the alternate profile's two-biome roster, per §6's watch note.</para>
+    /// </remarks>
+    public required IReadOnlyList<BiomeDefinition> BiomeRoster { get; init; }
 
     /// <summary>All generation-variable battle math: crit formula, damage variance, stat-stage tables,
     /// accuracy scale, freeze/thaw, status-damage rates, stat selection, the XP formula.</summary>

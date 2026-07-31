@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using creaturegame.Attacks;
 using creaturegame.Combat;
+using creaturegame.Creatures;
 using creaturegame.DB;
 using creaturegame.Generations;
 using creaturegame.Items;
@@ -355,6 +356,40 @@ public class EncounterFactoryGenerationProfileTests
             $"expected a narrower map under the narrowed scope, got {alt.PlayableBiomes.Count}"
         );
         Assert.NotEmpty(alt.PlayableBiomes); // a map that starved would pass the line above for the wrong reason
+    }
+
+    // ── The region slice (Stage 3) ─────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task CreatePlayerSetup_BuildsTheRunMapFromTheProfilesBiomeRoster_NotTheKantoRegistry()
+    {
+        // Before Stage 3 this path called Biomes.For(Region.Kanto) — a hardcoded region the profile could not
+        // override, the biome-layer sibling of the deleted ActiveGeneration const. Only a substituted roster can
+        // observe the thread (the Region enum has a single member), which is what TestAltProfile's two fake
+        // biomes are for.
+        var alt = await BuildFactory()
+            .CreatePlayerSetupAsync(
+                Bulbasaur,
+                50,
+                TestAltProfile.Instance,
+                new SeededRandomSource(1)
+            );
+        var gen1 = await BuildFactory()
+            .CreatePlayerSetupAsync(Bulbasaur, 50, Gen1Profile.Instance, new SeededRandomSource(1));
+
+        Assert.NotNull(alt);
+        // The whole fake roster comes back: both biomes are fillable within the alt content scope (their themes
+        // were chosen for that), and a roster thinner than RunBiomeMapSize yields itself — §6's watch note that
+        // a tiny region must not break map generation, pinned here rather than assumed.
+        Assert.Equal(
+            new[] { "alt-meadow", "alt-thicket" },
+            alt!.PlayableBiomes.Select(b => b.Id).Order().ToArray()
+        );
+
+        // Control: the same call under Gen 1 still draws a full-size map from the authored Kanto registry.
+        Assert.NotNull(gen1);
+        Assert.Equal(EncounterFactory.RunBiomeMapSize, gen1!.PlayableBiomes.Count);
+        Assert.All(gen1.PlayableBiomes, b => Assert.Contains(b, Biomes.Kanto));
     }
 
     [Fact]

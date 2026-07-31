@@ -73,7 +73,10 @@ public class GameController(GameSessionManager sessionManager, EncounterFactory 
 
     /// <summary>Falls back to <see cref="Generation.One"/> on a missing/unrecognised value — same contract as
     /// <see cref="ParseDifficulty"/>, so a stale client that sends nothing still starts a Gen 1 run.
-    /// <c>internal</c> so the parse/fallback is directly testable.
+    /// <c>internal</c> so the parse/fallback is directly testable. Since Stage 3 this parse guards <b>both</b>
+    /// untrusted generation boundaries: game start here, and the starter-picker dex read
+    /// (<see cref="SpeciesController.GetAll"/>), which must interpret the value identically or the picker could
+    /// offer a dex the run then refuses.
     /// <para>Also rejects a value that names a real enum member with <b>no registered profile</b>, so the
     /// untrusted boundary can never hand <c>GenerationProfiles.For</c> something it would throw on — the parse
     /// is what makes that method's throw an internal-wiring assertion rather than a 500 on user input.</para></summary>

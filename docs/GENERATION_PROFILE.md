@@ -60,8 +60,8 @@ deliverable.
 | Battle math | 4 seams, `Gen1*.Instance` defaults ✅ | selected by the profile; the seams themselves are unchanged |
 | **Type roster** — which types *exist* | ❌ none. `DamageType` holds all 18 (incl. Steel/Dark/Fairy); nothing states Gen 1 has **15** | on the profile |
 | **Content scope** — species/moves/items | ❌ none. Gen 1 only because the DBs hold only Gen 1 | ✅ `IContentScope` on the profile (Stage 2b) — a filter seam, documented no-op for Gen 1 |
-| **Region + biome roster** | ⚠️ partial — `Biomes.For(Region)` exists; `Region` is an enum; `Biomes.Kanto` is the only roster | region selected by the profile |
-| **Starter roster** | ❌ hardcoded client-side | on the profile |
+| **Region + biome roster** | ⚠️ partial — `Biomes.For(Region)` exists; `Region` is an enum; `Biomes.Kanto` is the only roster | ✅ `Region` + `BiomeRoster` on the profile (Stage 3) — the run setup reads the roster, `Biomes.For` stays the one door |
+| **Starter roster** | ❌ ~~hardcoded client-side~~ *(stale premise — see §6: the picker fetched the whole dex from the unscoped `/api/species`)* | ✅ the profile's species scope, served server-authoritatively by `SpeciesController.GetAll(?generation=)` (Stage 3) |
 | **Presentation theme** | ⚠️ `:root` design tokens exist in `index.css`, but no switch, and the palette is modern dark-blue/red | on the profile |
 | **Menu structure** | ❌ no abstraction | on the profile |
 
@@ -178,8 +178,8 @@ wild-encounter selector and the biome map was *not* generation-filtered — `Com
 `CreateEnemyAsync` drew from the whole dex. That was never an oversight of Stage 1b (which scoped only the
 learnset/evolution reads) nor of Stage 2a (the type roster); it was Stage 2b's content-scope work, and every
 catalog read on the run path now goes through `profile.ContentScope` (§5(b)). The one species read still
-unscoped is `SpeciesController.GetAll`, the pre-run starter picker — handed to Stage 3, which is where a
-generation first exists to ask.
+unscoped at the time was `SpeciesController.GetAll`, the pre-run starter picker — handed to Stage 3, which is
+where a generation first exists to ask. **✅ Closed by Stage 3 (2026-07-31)** — see §6.
 
 ### 4.5 Stage 1 is split — 1a (shipped) and 1b
 
@@ -256,7 +256,9 @@ in `DamageType` declaration order, so a reader diffing it against the enum sees 
 The consumer is the region-content invariant, now production code: **`Biomes.UnhomedTypes(region, roster)`**
 (plus `Biomes.HomedTypes(region)`), which takes the roster as an **argument** rather than assuming 15 — that
 parameter *is* the upward compatibility, since a later generation must re-derive the check, not inherit Gen 1's
-answer. `BiomeTests`' own hardcoded 15-type array is **deleted**; it now reads `Gen1Profile.Instance.TypeRoster`.
+answer. *(As-built note: Stage 3 (2026-07-31) re-signatured both from `Region` to a biome-roster parameter —
+`UnhomedTypes(biomes, roster)` / `HomedTypes(biomes)` — so the check runs against the profile's `BiomeRoster`;
+see §6.)* `BiomeTests`' own hardcoded 15-type array is **deleted**; it now reads `Gen1Profile.Instance.TypeRoster`.
 That array was a second source of truth for the roster, the same species of hazard Stage 1b removed when it
 deleted `EncounterFactory.ActiveGeneration`.
 
@@ -341,6 +343,7 @@ runtime decision for the first time.
 > unscoped, and is the one species read on no run path at all — it answers *before* a run exists, so there is no
 > profile to ask. Scoping it needs the generation to be known at pick time, which is exactly what Stage 3's
 > server-authoritative starter roster establishes. Tracked in §6 rather than left for archaeology.
+> **✅ Closed by Stage 3 (2026-07-31)** — the request names the generation; see §6.
 
 **Falsification leg:** ✅ shipped with 2a. `TestAltProfile.TypeRoster` is Gen 1's 15 **plus Dark and Steel** —
 built by adding to Gen 1's set rather than re-listing 17 by hand, so the two rosters can't drift into an
@@ -373,31 +376,66 @@ since the stat seam is what it tests. Expect each future slice to have this effe
 
 ---
 
-## 6. Stage 3 — region, biomes, starters
+## 6. Stage 3 — region, biomes, starters ✅ DONE (2026-07-31)
 
 **Goal:** the region and starter set come from the profile.
 
-**Smaller than it looks** — the socket already exists. `creaturegame/Creatures/Biome.cs` has a `Region` enum, a
+**Smaller than it looks** — the socket already existed. `creaturegame/Creatures/Biome.cs` has a `Region` enum, a
 `BiomeDefinition` record, and **`Biomes.For(Region)`**. `ENCOUNTER_DESIGN.md §1` anticipated exactly this:
 
 > *"a new region is largely a new biome set, not new loop code."*
 
-**Work:** put `Region` on the profile and have the run setup ask the profile instead of assuming Kanto; move the
-starter roster (currently hardcoded client-side in `StarterSelection.tsx`) onto the profile so it is
-server-authoritative and per-gen.
+**As built — the region half.** Two slices, not one: `GenerationProfile.Region` (**identity/presentation only,
+never branched on** — the `Generation` sibling, kept for logging and §7.3's client echo) and
+`GenerationProfile.BiomeRoster` (the consumed content — `Gen1Profile` reads it through `Biomes.For(Region.Kanto)`,
+which **stays the only door** to the authored registry). The plan's literal text named only `Region`; the second
+slice was escalated by `requirements-review` and **ratified by the user (2026-07-31) as the pattern for future
+region-bearing slices: one identity enum + one falsifiable content list.** **The roster is the falsifiable slice, and that is why it
+exists:** the `Region` enum has a single member, so a profile carrying only the enum could never be told apart
+from a hardcoded Kanto — only a substituted biome *list* can observe the thread. The pair can't drift: a
+`GenerationProfileTests` coherence pin asserts every rostered biome carries the profile's region.
+`Biomes.HomedTypes`/`UnhomedTypes`/`Playable` were re-signatured from `Region` to a biome-roster parameter — a
+low-blast-radius change, though not uniformly so: `HomedTypes`/`UnhomedTypes`' callers were one-day-old test code
+(Stage 2a), while `Playable`'s sole caller is the month-old production `ComputePlayableBiomesAsync`, updated in
+the same diff — so the §5(a) coverage invariant and the playability filter run against
+whatever roster a profile supplies; `EncounterFactory.ComputePlayableBiomesAsync` now reads `profile.BiomeRoster`,
+deleting the repo's **last hardcoded `Region.Kanto` outside the authored registry** — the biome-layer sibling of
+Stage 1b's `ActiveGeneration` deletion.
 
-> **Inherited from Stage 2b (2026-07-30): `SpeciesController.GetAll` serves the unscoped dex.** It is the only
-> species read that Stage 2b left alone, and for a structural reason — it answers *before* a run exists, so
-> there is no `GenerationProfile` to consult. It is also precisely the starter picker this stage makes
-> server-authoritative, so **wire it to the profile's roster/scope when that lands**. Harmless today (Gen 1 is
-> the whole dex), the same "correct only because the data has one generation in it" status as
-> `Gen1ContentScope` itself.
+**As built — the starter half, and a premise correction.** This section previously claimed the starter roster was
+*"hardcoded client-side in `StarterSelection.tsx`"* — **that was stale**: the picker has always fetched the full
+dex from `/api/species` (the Stage 2b handoff below) and any species is pickable, which is the roguelite's
+deliberate design and is unchanged. What "server-authoritative starter roster" concretely meant, therefore, was
+scoping that endpoint: `SpeciesController.GetAll` now takes `?generation=`, parses it with **the same boundary
+contract as game start** (`GameController.ParseGeneration` — missing/unrecognised ⇒ Gen 1, so a stale client
+keeps seeing today's dex), resolves the profile, and serves its `ContentScope`-scoped dex through a named
+`SpeciesSummaryDto` (wire-verified live: byte-identical camelCase JSON, 151 rows, `?generation=one` parses).
+**There is no curated per-gen starter subset** — the starter roster *is* the generation's species scope; a
+curated trio would be a new design decision, not part of this stage. The wrong premise is kept visible here
+(same policy as §5(a)'s corrected claim) rather than silently rewritten. **Ratified by the user (2026-07-31,
+via `requirements-review` escalation):** "starter roster" means the whole dex scoped per generation — the
+roguelite's any-species-pickable design stands, and no curated-starters feature is planned; if one is ever
+wanted it is a new TODO item, not a reopening of this stage.
 
-**Backend-only.** Zero importer/DB change.
+> **The Stage 2b handoff is closed.** `SpeciesController.GetAll` was the one species read on no run path — it
+> answers *before* a run exists, so there was no profile to ask. The request naming the generation is what
+> resolves that structural gap, and the run-start starter lookup (already scoped since 2b) stays the enforcing
+> validator of the eventual pick.
 
-**Watch:** `Biomes.Playable` / `RandomConnectedMap` must keep working off whatever roster the profile supplies —
-including a small one. The fake region in `TestAltProfile` is deliberately tiny (2 biomes) to pin that a thin
-roster doesn't break map generation.
+**Backend-only, as designed.** Zero importer/DB change; the client is untouched — it sends no `generation` yet
+because no picker UI exists until Stage 4 (§7.3–7.4), and the fallback contract makes that a Gen 1 no-op.
+
+**Falsification legs (verified by sabotage, twice):** `TestAltProfile.BiomeRoster` is a connected two-biome fake
+region, its themes chosen from the probe's own constraints (fillable by wild-available species with ids ≤ 20, so
+the alt content scope can't starve the map for an unrelated reason) — and deliberately **thinner than
+`RunBiomeMapSize`**, so the run-map probe simultaneously pins the watch note below. Re-hardcoding Kanto inside
+`ComputePlayableBiomesAsync` fails exactly the new run-map probe while the 43 other biome/profile tests stay
+green; unscoping the dex read fails exactly the `DexFor` probe. Rider cleanups shipped alongside (the learnset
+query dedup, the `Registered` allocation) are archived in `TODO_ARCHIVE.md` → *Tech-Debt cleanups*.
+
+**Watch (now pinned, not aspirational):** `Biomes.Playable` / `RandomConnectedMap` keep working off whatever
+roster the profile supplies — a roster below the map cap yields itself as the whole run map
+(`RandomConnectedMap` returns everything when the count exceeds the pool), asserted by the two-biome probe.
 
 ---
 

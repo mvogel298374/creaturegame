@@ -229,13 +229,15 @@ public static class Biomes
             _ => [],
         };
 
-    /// <summary>Every type listed by any biome in the region — the types the region gives a home to.</summary>
-    public static IReadOnlySet<DamageType> HomedTypes(Region region) =>
-        For(region).SelectMany(b => b.Types).ToHashSet();
+    /// <summary>Every type listed by any biome in <paramref name="biomes"/> — the types that roster gives a
+    /// home to. Takes the roster (not a <see cref="Region"/>) so it measures whatever biome set the caller's
+    /// profile supplies — see <see cref="UnhomedTypes"/>.</summary>
+    public static IReadOnlySet<DamageType> HomedTypes(IReadOnlyList<BiomeDefinition> biomes) =>
+        biomes.SelectMany(b => b.Types).ToHashSet();
 
     /// <summary>
-    /// The types in <paramref name="roster"/> that no biome in <paramref name="region"/> homes, in
-    /// <see cref="DamageType"/> order. Empty means the region covers its generation completely.
+    /// The types in <paramref name="roster"/> that no biome in <paramref name="biomes"/> homes, in
+    /// <see cref="DamageType"/> order. Empty means the biome roster covers its generation completely.
     /// </summary>
     /// <remarks>
     /// <para><b>Why an unhomed type matters <i>today</i>.</b> A biome's theme <i>is</i> the encounter pool
@@ -249,31 +251,34 @@ public static class Biomes
     /// that ruling it means editing one place and not two. Until it is ruled, treat this method as the check for
     /// <b>regions that intend full coverage</b>, which is every region that exists.</para>
     ///
-    /// <para><b>Why the roster is a parameter and not a constant.</b> Whatever coverage a region intends, it must
-    /// be judged against <i>its own</i> generation's roster: a 17-type generation's answer cannot be inherited
-    /// from Gen 1's 15. Passing <c>profile.TypeRoster</c> in is what makes the check follow the generation — the
-    /// same reason Stage 1b deleted <c>EncounterFactory.ActiveGeneration</c>. Pinned by <c>BiomeTests</c> against
-    /// both a real profile and the alternate one, which is the only way to observe that the roster is read at all
+    /// <para><b>Why both sides are parameters and not constants.</b> Whatever coverage a region intends, it
+    /// must be judged against <i>its own</i> generation: a 17-type generation's answer cannot be inherited from
+    /// Gen 1's 15, and (since Stage 3) the biome set being judged is the profile's <c>BiomeRoster</c>, not a
+    /// region enum resolved internally. Passing <c>profile.BiomeRoster</c> + <c>profile.TypeRoster</c> in is
+    /// what makes the check follow the generation — the same reason Stage 1b deleted
+    /// <c>EncounterFactory.ActiveGeneration</c>. Pinned by <c>BiomeTests</c> against both a real profile and the
+    /// alternate one, which is the only way to observe that either argument is read at all
     /// (<c>docs/GENERATION_PROFILE.md</c> §3).</para>
     /// </remarks>
     public static IReadOnlyList<DamageType> UnhomedTypes(
-        Region region,
+        IReadOnlyList<BiomeDefinition> biomes,
         IReadOnlySet<DamageType> roster
     )
     {
-        var homed = HomedTypes(region);
+        var homed = HomedTypes(biomes);
         return roster.Where(t => !homed.Contains(t)).Order().ToList();
     }
 
     /// <summary>
-    /// The region's biomes that can actually generate against <paramref name="pool"/> — those with at least one
-    /// on-theme species. Empty biomes never generate (no off-theme fallback), so map generation draws only from
-    /// this set.
+    /// The biomes in <paramref name="biomes"/> that can actually generate against <paramref name="pool"/> —
+    /// those with at least one on-theme species. Empty biomes never generate (no off-theme fallback), so map
+    /// generation draws only from this set. Takes the roster rather than a <see cref="Region"/> (Stage 3) so
+    /// playability is judged over whatever biome set the run's profile supplies.
     /// </summary>
     public static IReadOnlyList<BiomeDefinition> Playable(
-        Region region,
+        IReadOnlyList<BiomeDefinition> biomes,
         IReadOnlyList<PokemonSpecies> pool
-    ) => For(region).Where(b => b.HasAnyIn(pool)).ToList();
+    ) => biomes.Where(b => b.HasAnyIn(pool)).ToList();
 
     /// <summary>
     /// A single run's biome map: a seeded, <strong>connected</strong> random subset of <paramref name="playable"/>
