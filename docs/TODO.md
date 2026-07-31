@@ -23,7 +23,8 @@ creature), **Revive Items** (in-battle party revive, Boss-reward + rare-shop onl
 **Unsequenced (raised 2026-07-29, `/plan` done, implementation underway — needs slotting against the two above):**
 **Generation Profile** — make Gen 1 an explicit, swappable profile so a generation switch changes content, menus
 and look, not just battle math. Designed against Gen 1 alone; upward compatibility is the deliverable, no Gen 2
-content. **`/plan` DONE (2026-07-29), all five stages incl. the frontend** — full design in
+content. **`/plan` DONE (2026-07-29; Stage 4 re-planned as v2 on 2026-07-31 — per-gen adaptation with the bones
+kept, jointly iterated per surface, plus the grid Town Map)** — full design in
 [`GENERATION_PROFILE.md`](GENERATION_PROFILE.md). **Stages 1–3 complete (1a, 1b, 2a, 2b, 3 shipped); Stage 4
 (presentation) open** — Stage 5 is the standing falsification rule, and every shipped stage has landed its leg —
 task entry + staging below.
@@ -800,14 +801,27 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
   query duplication collapsed into `EncounterFactory.LoadLearnsetsAsync` (one home for the generation-filtered
   learnset read), and `GenerationProfiles.Registered` no longer allocates per call (materialised once,
   declared below `ByGeneration` per the static-init order trap `Gen1Profile.Gen1Types` documents).
-- [ ] **Stage 4 — presentation: theme + menu structure.** `/plan` **complete** — no longer provisional. Per-gen
-  override of the `:root` design tokens in `index.css`; `ActionMenu` restructured to the 2×2 grid with the layout
-  as profile data and the verb set fixed by the engine. **Scope widened by the user 2026-07-29: this stage
-  redesigns the WHOLE menu surface** — move select, CHECK POKEMON (`CreatureOverview.tsx`), BAG, party/switch, and
-  the 13 run prompts in `components/modals/` — with the 2×2 grid as the entry point, not the extent. Re-estimate
-  when greenlit. **Note this is a visible change to the game as it exists today**, not a no-op behind a flag.
-  Client learns the generation from route state **and** a server echo (a reconnect re-mounts with no route
-  state). Phaser/canvas + per-gen sprite & cry assets are **deferred**.
+- [ ] **Stage 4 — presentation: per-generation UI + the Town Map.** `/plan` **v2 done (2026-07-31)** —
+  supersedes the 2026-07-29 sketch; full design in `GENERATION_PROFILE.md` §7 (decisions 7–9 in its §1). The
+  user's reframing: a **complete per-gen visual overhaul where the bones stay the same** — same usability, same
+  idea per surface, but each generation adapts each surface to its own idiom (surface-level functionality may
+  vary only as an explicitly ratified per-surface decision; the run layer stays invariant) — settled
+  **jointly, one surface at a time**, not in one pass. Plus: the region map becomes a **rigid grid Town Map**
+  (RBY-style — biome squares on an authored grid, authored orthogonal route cell-paths, blinking cursor),
+  grid-for-all-generations with a per-gen map-presentation seam. Staged build:
+  - [ ] **4a — generation channel + client presentation registry:** route state + server echo (generation +
+    type roster payload), `src/generations/` registry, `data-generation` on the root, wire the two 15-type
+    client tables (`bossTrainer.ts`/`mapGlyphs.tsx`) to the roster; Vitest alt-presentation falsification leg.
+  - [ ] **4b — the Gen 1 skin:** per-gen `:root` token override block (grammar not palette; TypeBadge colours
+    + contrast tuning preserved); picker live-preview. **Visible change to the game as it exists today.**
+  - [ ] **4c — the Town Map:** `BiomeDefinition` grid coords replace `MapX/MapY`, authored route cell-paths +
+    `BiomeTests` validity invariants, `RegionMapRevealed` wire update (+ field guards), client grid renderer
+    replacing the painterly `RegionMap` (interaction contracts unchanged; `travelledEdgeKeys` survives);
+    `TestAltProfile`'s fake region gets grid geometry. Kanto grid authoring draft reviewed in-stage.
+  - [ ] **4d+ — the surface catalog, jointly iterated** (each its own greenlit mini-plan): battle command menu
+    (settled — the 2×2 grid, verbs fixed), move select, battle HUD, CHECK POKEMON, BAG, party surfaces, run
+    prompts, Title/StarterSelection (incl. the generation picker), node ladder.
+  Phaser/canvas + per-gen sprite & cry assets stay **deferred** (`GENERATION_PROFILE.md` §7.6).
 - [ ] **Stage 5 — falsification harness.** Standing requirement, not a final stage: each stage ships its leg of
   `TestAltProfile`.
 

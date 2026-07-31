@@ -49,6 +49,23 @@ deliverable.
    (`TurnChoice` is Move/Item/Switch/Struggle — `escapable` governs *move*-driven flee only), so it would mean
    adding a player flee feature end-to-end, which contradicts decision 3.
 
+**Added 2026-07-31 (Stage 4 design v2 — see §7):**
+
+7. **Per-gen presentation = adaptation, not restructure.** Every UI surface keeps its *bones* — the same
+   general usability and idea — but each generation adapts each surface to its own idiom, and a generation
+   *may* adjust surface-level functionality where its idiom calls for it. That is a **new, explicitly ratified
+   decision per surface per generation**, not a standing licence: §2.3 still governs the run layer (which
+   choices/nodes/verbs exist may not vary).
+8. **Surface-by-surface joint iteration.** "Going over every detail in a short explainer will not be precise
+   enough" (user) — Stage 4 is a framework plus an ordered surface catalog (§7.5); each surface's per-gen
+   design is settled in a **joint mini-plan** when its turn comes. No surface is designed by fiat in this doc.
+   The battle command menu is already settled: decision 6's 2×2 grid stands.
+9. **The region map becomes a rigid tile grid** — authored grid geometry (server data), rendered as a classic
+   Gen 1 Town Map (squares on a grid, orthogonal routes). **The grid renderer is a shared toolkit for all
+   generations**, but the map-presentation seam is built so each generation can have a different map — using
+   all, some, or none of the shared tools; how far a given generation loosens the grid rules is decided within
+   *that* generation's map design. Gen 1 uses the strict grid.
+
 ---
 
 ## 2. What a `GenerationProfile` is
@@ -118,7 +135,8 @@ test is green, and the first real second generation discovers the whole thing le
 | Type roster | 15 | 17 (adds Dark, Steel) | nothing hardcodes "15 types" |
 | Content scope | everything (identity) | only catalog ids ≤ 20 | every catalog read *asks* the scope — invisible under Gen 1's identity |
 | Region roster | Kanto | a 2-biome fake region | `Biomes.For` is the only door |
-| Theme + menu layout | Gen 1 grammar, 2×2 grid | a distinct token set + list layout | the theme is data, not CSS defaults |
+| Theme + menu layout | Gen 1 grammar, 2×2 grid | a distinct token set + list layout *(client-side — the Vitest alt presentation, §7.2)* | the theme is data, not CSS defaults |
+| Map | strict grid Town Map over Kanto's authored geometry | a 2-biome fake region with grid coords + one route; an alt map skin (client-side) | geometry rides the profile's roster; the renderer is selected by the registry, not assumed |
 
 **Rules for it, so it can never be mistaken for real work:**
 - It lives in `tests/`, never in shippable code, and is **never registered** in the runtime profile registry.
@@ -279,8 +297,9 @@ deleted `EncounterFactory.ActiveGeneration`.
 >
 > **Handed to Stage 4, deliberately, not waived (user's call, 2026-07-30).** Wiring them to the roster requires
 > the client to *have* the roster, and the mechanism for that — the client learning the run's generation over
-> route state **plus** a server echo — is precisely what §7.3 builds. Doing it here would duplicate that channel
-> before it exists. **§7.2's scope note lists both tables**, so this is a tracked handoff, not an archaeology dig.
+> route state **plus** a server echo — is precisely what §7.2 (sub-stage 4a) builds. Doing it here would
+> duplicate that channel before it exists. **§7.2 names both tables as 4a's wiring work**, so this is a tracked
+> handoff, not an archaeology dig.
 
 **Honest scope note:** nothing in the *runtime* decides anything from the roster yet — the wild-encounter pool
 and the biome map are gated on content, which is (b) and Stage 3. Stage 2a makes the roster a stated fact with a
@@ -386,7 +405,7 @@ since the stat seam is what it tests. Expect each future slice to have this effe
 > *"a new region is largely a new biome set, not new loop code."*
 
 **As built — the region half.** Two slices, not one: `GenerationProfile.Region` (**identity/presentation only,
-never branched on** — the `Generation` sibling, kept for logging and §7.3's client echo) and
+never branched on** — the `Generation` sibling, kept for logging and §7.2's client echo) and
 `GenerationProfile.BiomeRoster` (the consumed content — `Gen1Profile` reads it through `Biomes.For(Region.Kanto)`,
 which **stays the only door** to the authored registry). The plan's literal text named only `Region`; the second
 slice was escalated by `requirements-review` and **ratified by the user (2026-07-31) as the pattern for future
@@ -423,7 +442,7 @@ wanted it is a new TODO item, not a reopening of this stage.
 > validator of the eventual pick.
 
 **Backend-only, as designed.** Zero importer/DB change; the client is untouched — it sends no `generation` yet
-because no picker UI exists until Stage 4 (§7.3–7.4), and the fallback contract makes that a Gen 1 no-op.
+because no picker UI exists until Stage 4 (§7.2–7.3), and the fallback contract makes that a Gen 1 no-op.
 
 **Falsification legs (verified by sabotage, twice):** `TestAltProfile.BiomeRoster` is a connected two-biome fake
 region, its themes chosen from the probe's own constraints (fillable by wild-available species with ids ≤ 20, so
@@ -439,88 +458,169 @@ roster the profile supplies — a roster below the map cap yields itself as the 
 
 ---
 
-## 7. Stage 4 — presentation: theme + menu structure
+## 7. Stage 4 — presentation: per-generation UI + the Town Map (design v2, 2026-07-31)
 
-> `/plan` **complete** (2026-07-29) — decisions 5 and 6 above. No longer provisional.
+> `/plan` v2 — decisions 5–9 above. **Supersedes the v1 sketch (2026-07-29)**, which scoped this as a one-shot
+> "Gen 1 grammar" restyle plus a whole-menu-surface redesign executed in a single pass. What v2 changes: the
+> per-surface designs are **not** settled here — they are settled jointly, one surface at a time (decision 8) —
+> and the region map redesign (the grid Town Map, decision 9) joins the stage. What v2 keeps: the theme-token
+> mechanism, the generation channel, the 2×2 battle command grid (decision 6), and the boundary rule.
 
-This is the largest new surface and the only stage with no existing precedent in the repo.
+This is the largest new surface and the only stage with no existing precedent in the repo. It is built as
+**three infrastructure sub-stages (4a–4c) plus an open-ended, jointly-iterated surface catalog (4d+)** — each
+sub-stage independently shippable and separately greenlit.
 
-### 7.1 Visual theme — Gen 1's grammar, not its palette
+### 7.1 The shape — bones invariant, per-gen adaptation, jointly iterated
+
+Decision 7 refines §2.3 rather than replacing it. Three tiers:
+
+| Tier | Rule | Example |
+|:--|:--|:--|
+| **Run layer** (choices, nodes, verbs, prompts) | invariant across generations — §2.3 unchanged | no gen gains a `RUN` verb or loses the Shop node |
+| **Surface bones** (what a screen is for, its general usability) | invariant — every gen has a battle menu, a bag view, a party view, a map | the bag lists items and uses one; that never varies |
+| **Surface idiom** (layout, chrome, and *surface-level functionality*) | **per-gen**, one ratified decision per surface per generation | Gen 1's battle menu is a 2×2 grid; a later gen's may differ |
+
+"Surface-level functionality may vary" (decision 7) is deliberately narrow: it admits things like a
+generation's overview screen exposing an extra per-gen stat panel — it does **not** admit new run
+possibilities. When a surface iteration proposes a functionality difference, that proposal is escalated in the
+joint mini-plan, never assumed. Every modal stays `'blocking'` by construction (each parks a server-side
+await — see `TODO.md` → *Tech Debt*, the `<Modal>` refactor); a redesign may restyle and re-lay-out them but
+must not make one dismissable.
+
+### 7.2 Sub-stage 4a — the generation channel + the client presentation registry
+
+The infrastructure everything else stands on. **Where the client learns the generation — two paths, and it
+needs both:**
+- **Immediate:** the client picked it, so it rides the existing route state — `StarterSelection.tsx` already
+  does `nav('/battle', { state: { species, gameId, level } })`; add `generation`.
+- **Authoritative:** the server must also echo it, or a **reconnect** re-mounts `BattleScreen` with no route
+  state and the theme silently reverts. This repo has been bitten by exactly this class of bug before — see the
+  Settings-modal trap in `TODO.md` (a page nav tore down the live SignalR connection). Treat the server echo as
+  required, not optional. *(Concrete carrier is a 4a implementation decision: candidates are a field on an
+  existing at-attach event or a small run-presentation event emitted on attach/re-attach, with the REST
+  fallback already in place — `PlayerOverviewDto` has stamped the run's generation since Stage 1b. Whichever
+  carrier, it takes the standard emitter projection + field-guard treatment.)*
+
+**The echo's payload is the generation id plus the profile's type roster.** The roster half closes the Stage 2a
+handoff: `battle/bossTrainer.ts`'s `NAMES_BY_TYPE` and `pages/mapGlyphs.tsx`'s `TYPE_ICON` each independently
+encode "the 15" (see §5(a)'s survey), the same second-source-of-truth hazard Stage 2a removed from `BiomeTests`.
+**4a wires both to the delivered roster.** Both currently degrade gracefully (a generic name / the `t-Normal`
+glyph), so this is a consistency fix, not a bug fix. `TypeBadge.tsx` (18 colours) is a real vocabulary and
+stays gen-blind.
+
+**The client presentation registry** — the client-side analogue of `GenerationProfiles`: a `src/generations/`
+module mapping generation id → a `GenerationPresentation` (theme selector, menu-layout descriptors as the
+surface catalog grows, map presentation per §7.4). The document root carries `data-generation`; CSS override
+blocks key off it. Components read the registry, never a hardcoded default.
+
+**Falsification leg (client-side):** `TestAltProfile` is C#-side and cannot probe the client, so 4a lands its
+analogue in Vitest — a test-only alt `GenerationPresentation` proving the theme attribute, the roster-driven
+tables, and (later) the menu descriptors are read from the registry, not baked in. Same rules as §3: never
+shipped, never named as a real generation.
+
+### 7.3 Sub-stage 4b — the Gen 1 skin: grammar, not palette
 
 The hook already exists: `src/index.css` declares a full design-token block under `:root` (`--clr-*`, `--font`,
 `--fs-*`, `--sp-*`, `--border-w`, `--radius`). Every screen reads them. Note `--radius: 0px` is already
 commented *"square = classic pixel-game feel"* — the intent is there; the palette is not.
 
 **Approach:** keep `:root` as the shared *structural* token set; add a per-generation override block selected by
-an attribute on the document root (the same mechanism the repo's own artifact guidance uses for theming). Gen 1
-supplies: hard 2px borders, square corners, blocky menu boxes, the classic HUD arrangement, and a palette that
-evokes RBY without collapsing to four greens.
+4a's `data-generation` attribute. Gen 1 supplies: hard 2px borders, square corners, blocky menu boxes, the
+classic HUD arrangement, and a palette that evokes RBY without collapsing to four greens.
 
 **Explicitly preserved** (this is why decision 5 rejected authentic DMG):
 - **Per-type badge colours** (`TypeBadge.css`) — they carry real information.
 - **The contrast tuning** in `index.css` — the comments record deliberate legibility work
   (*"brightened for small-stat legibility"*, *"nudged up from #555 for contrast"*). Do not regress it.
 
+**Theming the picker itself:** the generation is chosen *on* `StarterSelection`, so that screen cannot already
+be themed by the choice. Boot in the default profile's theme and let the picker **live-preview** on change —
+near-free with CSS custom properties, and it makes the choice legible before committing.
+
 > ⚠️ **This is a visible change to the game people already play**, not a no-op behind a flag. The current look is
 > modern dark-blue/red; after this it reads as Gen 1. That is the intent, but it should surprise nobody.
 
-### 7.2 Menu structure — the 2×2 command grid
+### 7.4 Sub-stage 4c — the Town Map: a rigid grid region map
 
-`ActionMenu` in `src/pages/BattleScreen.tsx` renders a flat button list of `FIGHT` / `BAG` / `SWITCH` /
-`CHECK POKEMON`. Gen 1's battle menu is a **2×2 command grid**. Restructure to the grid, keeping **exactly**
-today's four verbs and all their existing gating (`canAct`, `canSwitch`, the always-available read-only
-`CHECK`).
+Decision 9. The current region map (`RegionMap` in `BattleScreen.tsx`) is painterly: free-floating waypoints at
+authored percent coords (`BiomeDefinition.MapX/MapY`, 0–100), screen-blended type-colour territories, curved
+gradient edges. It becomes a **classic Gen 1 Town Map**: biome squares on a rigid tile grid, straight
+orthogonal routes, a blinking you-are-here cursor.
 
-**The layout is profile data, the verbs are not** — the profile supplies a layout descriptor
-(`grid2x2` | `list`); the action set is fixed by the engine. That is §2.3's boundary rule in code: a later
-generation may re-arrange the menu, never re-populate it.
+**Geometry is server data, authored per region; skin is client presentation, per generation.** That split is
+what makes "grid for all, loosenable per gen" coherent: every region authors grid geometry; each generation's
+map presentation decides how faithfully to render it.
 
-> **Scope note (user, 2026-07-29): Stage 4 covers the WHOLE menu surface, not just the battle command menu.**
-> When this stage is picked up, every menu gets the Gen 1 redesign — the move/attack select, **CHECK POKEMON**
-> (`src/pages/CreatureOverview.tsx`), the BAG, the party/switch screens, and the run prompts in
-> `src/components/modals/` (13 files behind the shared `<Modal>`). The 2×2 command grid is the *entry point* to
-> that redesign, not the whole of it.
->
-> Two things this does **not** change, per §2.3: which actions exist, and which prompts the run raises. Every
-> modal stays `'blocking'` by construction (each parks a server-side await — see `TODO.md` → *Tech Debt*, the
-> `<Modal>` refactor), so a redesign may restyle and re-lay-out them but must not make one dismissable.
->
-> This widens Stage 4 considerably. Re-estimate it when it is greenlit rather than treating the §7.2 sketch as
-> the full extent.
+**Server (authored geometry — `Biome.cs` registry work, zero importer/DB change):**
+- `BiomeDefinition.MapX/MapY` (free 0–100 percent) are **replaced** by integer grid-cell coords on an authored
+  region canvas (canvas dimensions are part of the region's authored data; the RBY Town Map's ~20×18 is the
+  reference scale, exact size a 4c authoring choice). The 18 Kanto biomes are re-authored onto the grid.
+- **Routes are authored cell paths, not derived lines** — each neighbour edge carries an orthogonal path of
+  grid cells from biome to biome, the way RBY routes are *things on the map*. Considered and rejected:
+  deriving L-shaped connectors client-side (no authoring cost, but overlaps/crossings are unavoidable in a
+  dense 18-node graph rendered per-run as an arbitrary 10-biome subset, and the result reads as a diagram, not
+  a map). Authored paths make the map an authored artifact exactly like the biome roster itself.
+- **Validity is code-checked, not eyeballed** (`BiomeTests`): every neighbour pair has exactly one route; each
+  path is contiguous and orthogonal; endpoints meet their biomes' cells; no cell is used by two biomes, or by
+  two routes, or by a route and a biome (except endpoints); everything fits the canvas.
+- **Wire:** `RegionMapRevealed`'s per-biome view carries the grid coords in place of `MapX/MapY`, plus the
+  route paths (filtered to the playable subset like `Neighbours` today, both endpoints in-subset). Canvas
+  dimensions ride the same event. Standard treatment: emitter projection + the generic field guard + a
+  value-level `WebEventContractTests` pin.
+- **`TestAltProfile` leg:** its two-biome fake region gets grid coords and one authored route, so the Stage 3
+  run-map probe keeps proving the geometry rides the profile's roster — and the validity tests run against the
+  alt region too, proving they check *any* authored region, not Kanto by name.
 
-> **Inherited from Stage 2a (2026-07-30): two client tables that hardcode Gen 1's 15-type roster.**
-> `battle/bossTrainer.ts`'s `NAMES_BY_TYPE` and `pages/mapGlyphs.tsx`'s `TYPE_ICON` each independently encode
-> "the 15", with no relationship to `GenerationProfile.TypeRoster` and no test tying them to it — the same
-> second-source-of-truth hazard Stage 2a removed from `BiomeTests`. They were left alone on purpose: fixing them
-> needs the client to hold the roster, which needs §7.3's generation channel, which is *this* stage.
-> **So when §7.3 lands, wire these two to it** — the roster is the natural payload to send alongside the theme.
-> Both currently degrade gracefully (a generic name / the `t-Normal` glyph), so this is a consistency and
-> single-source-of-truth fix, not a bug fix. See §5(a)'s table for the full survey, including the one table
-> (`TypeBadge.tsx`, 18 colours) that is a real vocabulary and should stay gen-blind.
+**Client (the shared grid toolkit + the per-gen seam):**
+- A grid renderer replaces the painterly `RegionMap`: biome = square tile (type colour + `mapGlyphs` icon),
+  routes = drawn cell paths, current biome = blinking cursor (the RBY town-map idiom), travelled routes
+  highlighted (`regionMap.ts`'s `travelledEdgeKeys` logic survives unchanged — edges are still biome-id
+  pairs), offered biomes flash as the selectable route picks.
+- **Interaction contracts are untouched:** `RouteChoiceMap` stays a blocking modal with the same focus
+  management and aria semantics; `RunMapPanel`'s pinned/peek behaviour, the Escape rule, and the node ladder
+  all stay. This is a presentation swap under stable bones (§7.1).
+- **The per-gen seam:** the registry's (§7.2) map-presentation slot selects renderer + skin. Gen 1 = the
+  strict grid. The painterly renderer is retired, not kept as a live alternative — but the toolkit (grid
+  geometry types, travelled-route logic, subset filtering) is shaped as importable pieces so a future
+  generation's map can use all, some, or none of it (decision 9). How far that generation loosens the grid is
+  decided in *its* map design, not pre-engineered here.
+- The in-biome **node ladder** (the Slay-the-Spire encounter path) is deliberately *not* part of 4c — it is a
+  separate surface in the catalog (§7.5), so its look is settled in its own joint iteration.
 
-### 7.3 Where the client learns the generation
+### 7.5 Sub-stage 4d+ — the surface catalog (joint iteration)
 
-Two paths, and it needs **both**:
-- **Immediate:** the client picked it, so it rides the existing route state — `StarterSelection.tsx` already does
-  `nav('/battle', { state: { species, gameId, level } })`; add `generation`.
-- **Authoritative:** the server must also echo it, or a **reconnect** re-mounts `BattleScreen` with no route
-  state and the theme silently reverts. This repo has been bitten by exactly this class of bug before — see the
-  Settings-modal trap in `TODO.md` (a page nav tore down the live SignalR connection). Treat the server echo as
-  required, not optional.
+Decision 8's process: each surface below gets a **short joint mini-plan** (sketch → ratify with the user →
+build → gates), one at a time, each separately greenlit. The catalog is ordered as a default; re-order freely
+at greenlight time.
 
-### 7.4 Theming the picker itself
+1. **Battle command menu** — *settled by decision 6*: Gen 1 = the 2×2 grid, today's four verbs, all existing
+   gating (`canAct`, `canSwitch`, the always-available read-only `CHECK`). The layout is presentation data
+   (registry descriptor, e.g. `grid2x2 | list`); the verb set is fixed by the engine — §2.3 in code: a later
+   generation may re-arrange the menu, never re-populate it.
+2. **Move select** (the FIGHT submenu — move list, PP/type readout).
+3. **Battle HUD** (nameplates, HP bars, status badges, the log).
+4. **CHECK POKEMON** (`src/pages/CreatureOverview.tsx`).
+5. **BAG** (the in-battle item menu).
+6. **Party surfaces** (`PartyStrip`, `SwitchInModal`, `LeadChoiceModal`).
+7. **Run prompts** (the remaining `components/modals/` — Acquisition, RewardChoice, Shop, MoveReplacement,
+   Evolution, …).
+8. **Title + StarterSelection** — including the **generation picker** itself (the run-start control that
+   drives everything above; live-preview per §7.3).
+9. **Node ladder / encounter path** (the in-biome view the Town Map hands off to).
 
-The generation is chosen *on* `StarterSelection`, so that screen cannot already be themed by the choice.
-**Proposal:** boot in the default profile's theme and let the picker **live-preview** on change — near-free with
-CSS custom properties, and it makes the choice legible before committing.
+Each iteration inherits the standing rules: bones invariant, blocking modals stay blocking, functionality
+deltas are escalated (§7.1), and anything touching the wire takes the field-guard treatment.
 
-### 7.5 Deferred / open
+### 7.6 Deferred / open
 
 - **Phaser scene theming** (`BattleCanvas`, `BattleScene`) — the canvas is themed independently of the CSS
   tokens. Sprite *sets* (Gen 1 RBY sprites vs modern artwork) are a per-gen **asset** question with an import
   cost; flagged, not scoped here.
 - **Cry audio** already routes through `Audio.getMasterVolume()` in `BattleScene.ts`; whether cries are per-gen
   assets is the same deferred asset question.
+- **The Kanto grid authoring draft** (canvas size, the 18 placements, the route paths) — produced and reviewed
+  as part of 4c, not pre-authored here.
+- **The echo carrier** (which event/field the server echo rides) — a 4a implementation decision, see §7.2.
 
 ---
 
@@ -537,7 +637,7 @@ an aspiration into a tested claim.
 | # | Item | Status |
 |:--|:--|:--|
 | 1 | **Captured + acceptance condition** | `TODO.md` → *Generation Profile*. **Acceptance:** a Gen 1 run is byte-for-byte identical to today; `TestAltProfile` demonstrably changes rules, content roster, region and chrome through the *same* code paths; **zero** `if (generation == …)` in the engine. |
-| 2 | **Design pass for anything significant** | ✅ Stage 4 `/plan` complete (decisions 5–6). Stages 1–3, 5 are plumbing/backend. |
+| 2 | **Design pass for anything significant** | ✅ Stage 4 `/plan` v2 complete (decisions 5–9, 2026-07-31): the framework (4a–4c) is Ready; the per-surface designs (4d+) are **deliberately provisional-pending-their-joint-mini-plan** — DoR #2's provisional mechanism, by design (decision 8), not an unchecked item. Stages 1–3, 5 are plumbing/backend. |
 | 3 | **Gen-variable surface named** | ✅ §2.1 (variable) and §2.2 (invariant), incl. the three surfaces with **no seam today**: type roster, content scope, starters. `RunRules` and node kinds confirmed **not** gen-variable. |
 | 4 | **Gen 1 source of truth** | `GENERATION_SEAMS.md` (seam catalogue + §2 domain table); `ENCOUNTER_DESIGN.md §2.3` (Kanto roster + the all-15-types invariant); `DESIGN_GUIDES.md` (Generation Architecture Principle). |
 | 5 | **Data vs runtime boundary** | Stages 1, 3, 4 = runtime/composition only, **zero importer or DB change**. Stage 2 = runtime *sockets* only; the schema work (`GenerationIntroduced`, per-gen rows) is **importer** work, deferred to *Multi-Generation*. |
@@ -550,7 +650,7 @@ an aspiration into a tested claim.
 
 - **Sequencing against the backlog is undecided** — not yet slotted against *Item Acquisition · Bag Persistence ·
   Catch* or *Game Loop & Progression*.
-- **Per-gen sprite/cry asset sets** — flagged in §7.5, not scoped.
+- **Per-gen sprite/cry asset sets** — flagged in §7.6, not scoped.
 - **The `Multi-Generation` schema work** stays deferred; this design gives it a socket, not an implementation.
 - **A second real generation** is explicitly *not* in scope. When one is built, the first thing it should do is
   delete `TestAltProfile`'s reason for existing — replace the probe with a real profile.
