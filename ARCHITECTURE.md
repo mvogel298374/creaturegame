@@ -261,6 +261,7 @@ Every doc in the repo and what it answers, in a line. This file (`ARCHITECTURE.m
 | `docs/GAME_LOOP.md` | The run/roguelite loop ↔ event model (battle & heal as events). |
 | `docs/ENCOUNTER_DESIGN.md` | The biome-graph run model, enemy strength tiers, themed pool, gated acquisition channels. |
 | `docs/DATA_IMPORT.md` | The PokeAPI import pipeline + the import-vs-runtime boundary and field mapping. |
+| `docs/SPRITE_PRESENTATION.md` | The creature sprite/cry asset pipeline (source, wire boundary, current Phaser tween/tint FX) + unratified presentation ideas on top of the existing genuine Gen 1 sprites. |
 | `docs/DESIGN_GUIDES.md` | Design reference: Gen-1 mechanics, type-balancing, move-import mapping. |
 | `docs/DEFINITION_OF_READY.md` | DoR — the exit criteria for a `/plan` pass (a plan isn't done until every item is covered). |
 | `docs/DEFINITION_OF_DONE.md` | DoD (technical) — the rubric the `pr-review` subagent checks at feature-finish. |

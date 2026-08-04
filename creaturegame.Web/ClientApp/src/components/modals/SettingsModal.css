@@ -38,3 +38,22 @@
   background: var(--clr-bg-deep);
   outline: none;
 }
+
+/* Kanto Sage: SettingsModal (the in-battle popup form of Settings) is a "basic view" too. */
+[data-generation="gen1"] .settings-modal {
+  background: var(--ks-fill);
+  color: var(--ks-ink);
+  border: 2px solid var(--ks-ink);
+}
+[data-generation="gen1"] .settings-modal-title {
+  color: var(--ks-ink);
+}
+[data-generation="gen1"] .settings-modal-close-btn {
+  background: var(--ks-fill);
+  border-color: var(--ks-ink);
+  color: var(--ks-ink);
+}
+[data-generation="gen1"] .settings-modal-close-btn:hover,
+[data-generation="gen1"] .settings-modal-close-btn:focus-visible {
+  background: var(--ks-fog);
+}

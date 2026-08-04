@@ -29,3 +29,12 @@
   padding: 0 var(--sp-lg);
   z-index: 1;
 }
+
+/* Kanto Sage: SettingsScreen is a "basic view" — no colours of its own beyond the shared .screen /
+   .btn-ghost / .settings-gear-btn / SettingsPanel chrome, all already reskinned. Just the page
+   background (this screen has no own background rule; it inherits body's, which the token-driven
+   surfaces above don't touch on purpose — see index.css). */
+[data-generation="gen1"] .settings-screen {
+  background: var(--ks-fog);
+  color: var(--ks-ink);
+}

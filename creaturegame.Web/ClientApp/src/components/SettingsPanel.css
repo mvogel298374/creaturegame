@@ -24,3 +24,13 @@
   min-width: 3rem;
   text-align: right;
 }
+
+[data-generation="gen1"] .settings-label {
+  color: var(--ks-dim);
+}
+[data-generation="gen1"] .settings-slider {
+  accent-color: var(--ks-ink);
+}
+[data-generation="gen1"] .settings-value {
+  color: var(--ks-ink);
+}

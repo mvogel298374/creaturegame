@@ -66,6 +66,14 @@ deliverable.
    all, some, or none of the shared tools; how far a given generation loosens the grid rules is decided within
    *that* generation's map design. Gen 1 uses the strict grid.
 
+**Added 2026-08-03 (Stage 4b's ratified token recipe — see §7.3):**
+
+10. **"Kanto Sage," a strict colour-budget palette.** Ink-on-neutral (`#15130F` on white boxes over a `#C9D0C5`
+    "Fog" field) everywhere, with colour spent on exactly four things: the HP bar (red `#D6362B`), the XP bar
+    (blue `#2F63AF`), type badges (unchanged), and sprite art. Double-line window chrome (the RBY dialogue-box
+    idiom) and an invert-block selection cursor, chosen over a single hairline frame and a blinking ▶ arrow.
+    Settled interactively (a live mockup, not a prose description) per decision 8's own reasoning.
+
 ---
 
 ## 2. What a `GenerationProfile` is
@@ -552,6 +560,94 @@ near-free with CSS custom properties, and it makes the choice legible before com
 > ⚠️ **This is a visible change to the game people already play**, not a no-op behind a flag. The current look is
 > modern dark-blue/red; after this it reads as Gen 1. That is the intent, but it should surprise nobody.
 
+**Ratified with the user (2026-08-03) — the token recipe, "Kanto Sage."** Sketched and iterated as an interactive
+mockup (three palettes × two frame styles × two cursor styles × four outer-tone variants, reskinning five real
+HUD chunks live — nameplates/HP/XP bars, the dialogue box, the 2×2 command grid, move-select) rather than
+described in prose, per decision 8's "not precise enough in a short explainer" call. This closed the *ratify*
+step of decision 8's sketch → ratify → build → gates sequence.
+
+**Built (2026-08-04).** The `[data-generation="gen1"]` token override block ships in two parts, both verified
+live end-to-end (Puppeteer through Title → StarterSelection → route choice → battle → CHECK POKEMON →
+Settings, resting *and* invert-block hover/focus states):
+- The five HUD chunks the mockup itself covered — nameplates, HP/XP bars, the battle log (double-line
+  dialogue-box chrome), the 2×2 command grid, and move-select.
+- Extended the same day, per the user's direction to apply the scheme to every "basic view/frame" rather than
+  just the battle HUD: Title Screen, StarterSelection, Settings (screen + in-battle modal + panel), CHECK
+  POKEMON, and the route-choice modal's outer frame (background/border/chrome — "biome select").
+
+Both parts use explicit per-selector overrides, not a blanket redefinition of the shared `--clr-*` tokens —
+those tokens are also read by the surfaces still deliberately dark (below), and a global flip either leaks
+into those or collides two now-identical tokens into invisible hover text (caught and fixed twice: `.btn`/
+`.btn-new-game`'s hover state, and two inherited-near-white-text bugs in CHECK POKEMON). The fix pattern used
+throughout: give each new root surface its own `color: ink`, so anything not individually patched still
+inherits correctly instead of silently keeping the old default.
+
+**Deliberately still dark** — each its own future catalog turn (§7.5), not a gap in this pass: BAG's item
+list, the run map's own node/territory/edge content and the full-screen pinned map, reward/shop/acquire/
+recovery/battle-end modals' literal thematic accent colours (tuned against the old dark background — a
+partial flip to a light box would have broken their contrast), the party strip, drop-toasts, the node ladder.
+
+**Follow-up same day: the battlefield backdrop.** `.battle-field`'s deep-navy/forest-green gradient (the
+Phaser canvas's backdrop, behind the creature sprites) was tuned against the old dark HUD and, once the
+surrounding chrome went ink-on-fog, read as the one leftover saturated surface fighting the sprites for
+attention instead of the sprites being the picture's colour. Muted to pale sky/ground tones from the same
+Fog family — sprite art (already one of the four budgeted colours) is now the thing that visibly pops.
+
+The picker-live-preview line below is moot until a second generation is registered — there's nothing to
+preview *between* yet.
+
+*What carries over unchanged* (confirmed already true of today's tokens, not a new decision): `--font` is already
+monospace (`'JetBrains Mono', 'Courier New', Courier, monospace`), `--radius` is already `0px`, `--border-w` is
+already `2px`. The gap was never "not blocky enough" — it was palette, border *boldness*, window chrome, and the
+selection convention.
+
+**A strict colour budget, not a repaint.** Every frame, label, and button surface is ink-on-neutral; colour is
+spent on exactly four things and nothing else:
+- **HP bar — red** `#D6362B`.
+- **XP bar — blue** `#2F63AF`.
+- **Type badges** — unchanged (`TypeBadge.tsx`'s existing 18-colour map; decision 5's preservation rule, confirmed
+  still correct).
+- **Sprite art** — the Phaser canvas creature itself; out of `index.css`'s scope but named here as one of the
+  budget's four sources, not an oversight.
+- *(Battle-log emphasis — e.g. "It's super effective!" — already has its own treatment in the running app; out of
+  scope for this token set, not a gap.)*
+
+**The neutrals:**
+| Token | Value | Role |
+|:--|:--|:--|
+| Ink | `#15130F` | borders, text — near-black, warm-tinted, not pure `#000` |
+| Box fill | `#FFFFFF` | interior of every boxed surface (nameplate, dialogue, menu button, move row) |
+| Outer field | `#C9D0C5` ("Fog") | the field behind the boxes — a muted sage-grey, picked over three alternatives (Stone `#D2CEC3`, Slate `#C7CBD2`, Ash `#B6B9BD`) specifically to keep the "Kanto Sage" identity without reading as tan/khaki (the first pass's `#DED8BC` — user's call, 2026-08-03: *"not a big fan of the tan"*) |
+| Dim text | `#57503F` | secondary labels — bar numbers, PP counts |
+
+**Window chrome — double-line frame.** The RBY dialogue-box idiom: an outer `2px solid` ink border, a `3px`
+inset ring of the fill colour, then a further `5px` inset ink ring — reads as a proper double frame rather than
+a single hairline. Applies to the outer screen shell and the dialogue/log box; command-grid buttons and move
+rows stay a plain bold (`3px`) single border, matching the real RBY split between the main window/textbox frame
+and simpler menu-cell borders.
+
+**Selection convention — invert block.** The selected command / move row swaps fill↔ink (solid ink background,
+fill-colour text) rather than a blinking ▶ arrow. Chosen over the arrow in the same sitting.
+
+**Not yet decided:** exact values for Cartridge Grey / Poké Center Red under this same colour-budget discipline
+(they still carry their earlier, more colourful draft values) — moot unless a later surface wants an alternate
+palette option; Kanto Sage is the one ratified for shipping. The mockup itself (an interactive HTML page, not
+committed to the repo) is not the source of truth going forward — this table is.
+
+**Clarified during the build (2026-08-04): the four-colour budget governs chrome, not gameplay signal.**
+Two cases came up that the ratified list didn't spell out:
+- **HP bar green/yellow/mid/high thresholds** — confirmed with the user to keep the existing green→yellow→red
+  shift as remaining HP drops; only the *low* endpoint is pinned to the recipe's `#D6362B`. Reading "HP bar —
+  red" as "the bar is flatly red" would have deleted a real gameplay cue, not just simplified decoration.
+- **Move-select's STAB corner tag, ×N effectiveness pill, power-tier pill, low-PP red** — left exactly as they
+  were; same reasoning as the HP thresholds, extended without a separate round-trip. The one visible casualty:
+  the STAB button's translucent gold left-border/background wash (tuned for the old dark panel) doesn't survive
+  on white — the button structure falls back to a slightly thicker ink edge, and the gold *corner tag* (unaffected)
+  still carries the actual signal.
+The general rule going forward: the budget applies to **decorative chrome** (frames, fills, button states); a
+colour that exists to tell the player something *in the moment* (health remaining, type matchup, low resources)
+is gameplay signal and sits outside it, the same as accessibility-motivated colour would.
+
 ### 7.4 Sub-stage 4c — the Town Map: a rigid grid region map
 
 Decision 9. The current region map (`RegionMap` in `BattleScreen.tsx`) is painterly: free-floating waypoints at
@@ -598,6 +694,13 @@ map presentation decides how faithfully to render it.
   decided in *its* map design, not pre-engineered here.
 - The in-biome **node ladder** (the Slay-the-Spire encounter path) is deliberately *not* part of 4c — it is a
   separate surface in the catalog (§7.5), so its look is settled in its own joint iteration.
+
+**Raised alongside 4b, not yet ratified (2026-08-03):** the "biome = square tile, full type-colour fill" sketch
+above predates 4b's colour-budget decision (§7.3 / §1 decision 10 — colour reserved for HP/XP bars, type
+badges, and sprite art, everything else ink-on-neutral). Worth revisiting *when 4c is actually designed*
+rather than pre-deciding here: an ink-outlined tile with colour reserved for the `mapGlyphs` type icon (not
+a full-tile colour wash) would extend the same budget to the map instead of introducing a second, looser
+colour rule. Flagged as a question for 4c's own joint mini-plan, not settled by this note.
 
 ### 7.5 Sub-stage 4d+ — the surface catalog (joint iteration)
 

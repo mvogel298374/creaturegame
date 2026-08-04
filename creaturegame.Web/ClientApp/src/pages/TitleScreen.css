@@ -86,3 +86,38 @@
   0%, 100% { opacity: 1; }
   50%       { opacity: 0; }
 }
+
+/* Kanto Sage: the title screen is a "basic view," reskinned in full (unlike the battle modals,
+   which keep their literal thematic accents for now). Losing the accent-red logo highlight is the
+   one visible trade — under the colour budget it isn't one of the four spent colours either. */
+[data-generation="gen1"] .title-screen {
+  background: var(--ks-fog);
+  color: var(--ks-ink);
+}
+[data-generation="gen1"] .title-screen::before {
+  background-image:
+    linear-gradient(rgba(21, 19, 15, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(21, 19, 15, 0.05) 1px, transparent 1px);
+}
+[data-generation="gen1"] .title-logo,
+[data-generation="gen1"] .title-logo-accent {
+  color: var(--ks-ink);
+  text-shadow: none;
+}
+[data-generation="gen1"] .title-subtitle {
+  color: var(--ks-dim);
+}
+[data-generation="gen1"] .btn-new-game {
+  background: var(--ks-fill);
+  color: var(--ks-ink);
+  border-color: var(--ks-ink);
+}
+[data-generation="gen1"] .btn-new-game:hover {
+  background: var(--ks-ink);
+  color: var(--ks-fill);
+  border-color: var(--ks-ink);
+  box-shadow: none;
+}
+[data-generation="gen1"] .title-footer {
+  color: var(--ks-dim);
+}

@@ -23,6 +23,7 @@ them up front burns ~25k tokens before the work is even scoped; almost none of i
 | `docs/GENERATION_SEAMS.md` | adding a gen-variable rule or a new generation — the seams (`ITypeChart`, `IBattleRules`, `IStatCalculator`) + the §5.0 gen-agnostic checklist. |
 | `docs/GENERATION_PROFILE.md` | working on the **generation switch** — the profile that bundles seams + content + region + theme, the gen-invariant list (`RunRules` and the node kinds are *not* per-gen), and the `TestAltProfile` falsification rule. |
 | `docs/DATA_IMPORT.md` | changing imported data — the `PokeApiConnector` pipeline, import-vs-runtime boundary, PokeAPI→model mapping. |
+| `docs/SPRITE_PRESENTATION.md` | touching creature-sprite/cry rendering or scoping a Phaser visual-FX pass — the current asset pipeline (source, wire convention, `BattleScene.ts`'s existing tween/tint FX) plus unratified presentation ideas for the existing genuine Gen 1 sprites. |
 
 ## Commands
 

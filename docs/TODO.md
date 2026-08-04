@@ -533,6 +533,27 @@ Stack: React 18 + TypeScript + SignalR + Phaser 3. (Canvas & core animations don
     gap** — see the memory + `WebEventContractTests`). Then a pure `moveAnimationFamily(type, category, slug)`
     map (unit-testable like `timeline.ts`), new per-family `BridgeCommand`s + `BattleScene` handlers, each still
     emitting `animationComplete` so the timeline's `awaitAnim` contract holds.
+  - **Raised 2026-08-03, worth doing in the same pass:** once `MoveUsed` carries `DamageType`, the hit-flash
+    tint and the battle log's "It's super effective!" emphasis colour (`docs/SPRITE_PRESENTATION.md` §3.3–3.5
+    covers the canvas-side FX ideas this pairs with) can read off **one shared type-colour source**
+    (`TypeBadge`'s palette) instead of two independently-chosen colours drifting apart over time.
+- [ ] **Text feel — typewriter log scroll + menu navigation blips.** Raised 2026-08-03 as a design-lead
+  suggestion; zero engine dependency, cheapest/most-authentic-per-effort item in this section. Two pieces:
+  (1) the battle log renders character-by-character (~15–20ms/char) instead of appearing all at once — the
+  classic Gen 1 text-scroll feel; (2) a cursor-move blip + a confirm blip on menu navigation (command grid,
+  move select, any list). Pure client polish, no wire change. Good candidate to pair with `docs/GENERATION_PROFILE.md`
+  §7.3's now-ratified "Kanto Sage" pass, since both land as one felt "this is Gen 1 now" moment rather than
+  two separate small changes.
+- [ ] **Sprite presentation FX — joint mini-plan not yet scheduled.** `docs/SPRITE_PRESENTATION.md` §3 sketches
+  8 unratified ideas on top of the existing genuine Gen 1 sprites (texture-filter audit, a grounding shadow,
+  crit shine, type-coloured impact particles, status tint, a screen-wipe transition, depth-of-field, a cleaner
+  evolution-flicker), ordered cheapest/safest first. Design lead's recommendation (2026-08-04): §3.1 (confirm
+  `pixelArt: true` in the `Phaser.Game` config) isn't really a mini-plan candidate — it's a one-line check, do
+  it standalone whenever picked up. §3.4 (type-coloured particles) should fold into the *Move-specific attack
+  animations* item above rather than be scoped separately — both are blocked on the same `DamageType`-on-
+  `MoveUsed` wire change. §3.2 (grounding shadow, tied to the Kanto Sage ink tone) is the strongest next
+  candidate for an actual joint sketch → ratify session — cheap, zero wire dependency, ties the canvas visibly
+  to the new HUD. Not started; next step is scheduling that session, not building anything yet.
 - [ ] *(small)* **Escape = B-cancel on the prompts that have a negative action.** Surfaced by the `<Modal>` refactor
   (2026-07-17) and deliberately left out of it — a refactor commit shouldn't carry a behaviour change. Today Escape
   does nothing on every run prompt, which is right for the four that are *required* choices (`RouteChoice`,
@@ -854,8 +875,28 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
     today; diverges silently the moment the emitter gains state). Three advisories deferred (unguarded
     test-only registry fallback; `as string` vs `?? []` asymmetry in the timeline arm; dual
     generation encodings — REST numeric vs wire name — to consolidate when 4b/4d touches either).
-  - [ ] **4b — the Gen 1 skin:** per-gen `:root` token override block (grammar not palette; TypeBadge colours
-    + contrast tuning preserved); picker live-preview. **Visible change to the game as it exists today.**
+  - [x] **4b — the Gen 1 skin (2026-08-04).** ✅ The `[data-generation="gen1"]` token override block ("Kanto
+    Sage" — `GENERATION_PROFILE.md` §7.3 / §1 decision 10) is built and verified live (Puppeteer, a full run
+    through Title → StarterSelection → route choice → battle → CHECK POKEMON → Settings).
+    - **The five ratified battle-HUD chunks** (the original mockup's scope): nameplates, HP/XP bars, the
+      battle log (dialogue box, double-line chrome), the 2×2 command grid, move-select — plain-bold-border
+      resting state and invert-block hover/focus, both confirmed. STAB/type/effectiveness/power-tier pills
+      stay their existing functional colours on purpose, same call as the HP high/mid thresholds — none of
+      those are decoration, so the four-colour budget doesn't apply to them.
+    - **Extended the same day, per the user's direction ("apply to all basic views/frames"):** Title Screen,
+      StarterSelection, Settings (screen + in-battle modal + panel), CHECK POKEMON, and the route-choice
+      modal's outer frame ("biome select") — reskinned in full, background through generic button chrome.
+      Two invisible-text bugs caught and fixed during verification (`.overview-title`, the INFO tab's field
+      values inheriting the old near-white default) — the fix pattern used throughout: give each new root
+      surface its own `color: ink` so anything not individually patched still inherits correctly, rather than
+      chasing every descendant selector by hand.
+    - **Deliberately NOT touched** — the "detailed" layer, left for each surface's own future catalog turn
+      (§7.5): BAG's item list, the run map's own node/territory/edge content and the full-screen pinned map,
+      reward/shop/acquire/recovery/battle-end modals' literal thematic accent colours (their backgrounds
+      stayed dark on purpose — those colours were tuned against the old dark background and a partial flip
+      would have broken contrast), the party strip, drop-toasts, the node ladder.
+    - The "picker live-preview" phrase from the original line is moot today — there's only one registered
+      generation, so there's nothing yet to pick between; revisit once a second generation exists.
   - [ ] **4c — the Town Map:** `BiomeDefinition` grid coords replace `MapX/MapY`, authored route cell-paths +
     `BiomeTests` validity invariants, `RegionMapRevealed` wire update (+ field guards), client grid renderer
     replacing the painterly `RegionMap` (interaction contracts unchanged; `travelledEdgeKeys` survives);

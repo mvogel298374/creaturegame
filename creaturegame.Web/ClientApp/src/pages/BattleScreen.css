@@ -6,6 +6,30 @@
   overflow: hidden;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   GEN 1 SKIN — "Kanto Sage" (Stage 4b, ratified 2026-08-03)
+   Scoped to the five HUD surfaces the ratified mockup covered: nameplates/HP/XP bars, the
+   battle log (dialogue box), the command grid, and move-select. Everything else in this file
+   (bag menu, run map, reward/shop modals, level-up/recovery/end panels) is a later catalog
+   turn (GENERATION_PROFILE.md §7.5) and is deliberately untouched here.
+   Functional colour cues (HP high/mid threshold, type-effectiveness, STAB, low-PP, power tier)
+   are kept as-is — same call as the HP-bar low endpoint below: they're gameplay signal, not
+   decoration, so they sit outside the four-colour budget rather than being flattened by it.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Outer screen shell — double-line ink frame wrapping the whole battle viewport. */
+[data-generation="gen1"] .battle-screen {
+  background: var(--ks-fog);
+  box-shadow:
+    inset 0 0 0 3px var(--ks-fill),
+    inset 0 0 0 8px var(--ks-ink);
+}
+
+[data-generation="gen1"] .battle-panel {
+  background: var(--ks-fog);
+  border-top: 2px solid var(--ks-ink);
+}
+
 /* ── Battlefield ─────────────────────────────── */
 .battle-field {
   flex: 0 0 65vh;
@@ -18,6 +42,21 @@
       #1a2e55 52%,
       #2a3d1a 52%,
       #1e2e12 100%
+    );
+}
+
+/* Kanto Sage: the deep navy/forest gradient above was tuned against the old dark HUD — sitting next
+   to the new ink-on-fog chrome it now reads as the one loud, saturated thing on screen. Muted,
+   desaturated sky/ground tones from the same Fog family let the sprites (the budget's actual
+   colour) be the thing that pops, rather than competing with an equally-saturated backdrop. */
+[data-generation="gen1"] .battle-field {
+  background:
+    linear-gradient(
+      to bottom,
+      #B7BFC4 0%,
+      #A9B3AE 52%,
+      #ABB79A 52%,
+      #9AA88C 100%
     );
 }
 
@@ -142,6 +181,25 @@
   margin: 0 1px;
 }
 
+/* Kanto Sage: nameplate + bars become an ink-on-white box. Green/yellow HP thresholds and the
+   XP-blue stay functional cues, not decoration — only the low-HP endpoint and the XP fill are
+   re-pointed at the recipe's exact swatches. */
+[data-generation="gen1"] .nameplate {
+  background: var(--ks-fill);
+  border: 3px solid var(--ks-ink);
+  color: var(--ks-ink);
+}
+[data-generation="gen1"] .nameplate-level { color: var(--ks-dim); }
+[data-generation="gen1"] .bar-label { color: var(--ks-dim); }
+[data-generation="gen1"] .bar-track {
+  background: var(--ks-fog);
+  border: 1px solid var(--ks-ink);
+}
+[data-generation="gen1"] .bar-fill--low { background: var(--ks-hp); }
+[data-generation="gen1"] .bar-fill--xp  { background: var(--ks-xp); }
+[data-generation="gen1"] .hp-numbers { color: var(--ks-ink); }
+[data-generation="gen1"] .hp-sep { color: var(--ks-dim); }
+
 /* ── Phaser canvas ───────────────────────────── */
 
 /* Fills the battle-field; pointer-events:none so HTML overlays stay clickable */
@@ -221,6 +279,22 @@
   font-weight: 600;
 }
 
+/* Kanto Sage: the dialogue/log box — the other double-line chrome surface alongside the outer
+   screen shell above. The super/weak/immune/loot/event line colours are untouched (functional
+   cues, same call as the HP threshold). */
+[data-generation="gen1"] .battle-log {
+  background: var(--ks-fill);
+  color: var(--ks-ink);
+  border: 2px solid var(--ks-ink);
+  border-right: none;
+  box-shadow:
+    inset 0 0 0 3px var(--ks-fill),
+    inset 0 0 0 8px var(--ks-ink);
+  padding: calc(var(--sp-sm) + 8px) calc(var(--sp-md) + 8px);
+}
+[data-generation="gen1"] .log-line { color: inherit; }
+[data-generation="gen1"] .log-line--muted { color: var(--ks-dim); }
+
 /* ── Battle controls (right half) ───────────── */
 .battle-controls {
   flex: 1;
@@ -289,6 +363,31 @@
   align-self: flex-start;
   margin-top: auto;
 }
+
+/* Kanto Sage: the 2×2 command grid — plain bold single border (not the double-line chrome, which
+   is reserved for the outer shell + dialogue box), invert-block selection instead of an accent
+   glow. FIGHT loses its red accent — under the colour budget every command reads the same, as in
+   the real RBY menu. */
+[data-generation="gen1"] .action-prompt { color: var(--ks-ink); }
+[data-generation="gen1"] .action-btn {
+  background: var(--ks-fill);
+  color: var(--ks-ink);
+  border: 3px solid var(--ks-ink);
+}
+[data-generation="gen1"] .action-btn:hover:not(:disabled),
+[data-generation="gen1"] .action-btn:focus-visible:not(:disabled) {
+  background: var(--ks-ink);
+  border-color: var(--ks-ink);
+  color: var(--ks-fill);
+  box-shadow: none;
+}
+[data-generation="gen1"] .action-btn--fight {
+  border-color: var(--ks-ink);
+  color: var(--ks-ink);
+}
+/* No separate :hover rule needed — the generic .action-btn:hover:not(:disabled) above already wins
+   here (its extra :not() pseudo-class outranks this selector's specificity) and lands on the same
+   ink-invert values. */
 
 /* ── Move menu ───────────────────────────────── */
 .move-menu {
@@ -359,6 +458,27 @@
   color: var(--clr-accent);
 }
 
+/* Kanto Sage: move-select's button chrome only — same plain-bold-border + invert-block treatment
+   as the command grid. STAB accent, the ×N effectiveness pill, the power-tier pill, and the
+   low-PP red stay as they are: functional in-battle signal, not decoration, so they sit outside
+   the four-colour budget (same reasoning as the HP threshold above). */
+[data-generation="gen1"] .move-btn {
+  background: var(--ks-fill);
+  color: var(--ks-ink);
+  border: 3px solid var(--ks-ink);
+}
+[data-generation="gen1"] .move-btn:hover:not(:disabled),
+[data-generation="gen1"] .move-btn:focus-visible:not(:disabled) {
+  background: var(--ks-ink);
+  border-color: var(--ks-ink);
+  color: var(--ks-fill);
+}
+[data-generation="gen1"] .move-pp { color: var(--ks-dim); }
+[data-generation="gen1"] .move-btn:hover:not(:disabled) .move-pp,
+[data-generation="gen1"] .move-btn:focus-visible:not(:disabled) .move-pp {
+  color: var(--ks-fill);
+}
+
 /* STAB (Same-Type Attack Bonus): a subtle gold left-edge accent + faint tint, plus a small corner tag.
    Damaging moves matching the player's type — flagged by the engine (MoveInfo.stab). */
 .move-btn--stab {
@@ -369,6 +489,18 @@
 
 .move-btn--stab:hover:not(:disabled) {
   background: rgba(240, 198, 116, 0.12);
+}
+
+/* Kanto Sage: the gold border-left/tint above is a translucent wash tuned for the old dark panel
+   — it would muddy on a white box and isn't one of the budget's four colours. The STAB *signal*
+   survives via the untouched gold corner tag below; here the button structure just gets a
+   thicker ink edge instead of fighting the cascade for a colour this skin doesn't spend. */
+[data-generation="gen1"] .move-btn--stab {
+  border-left-color: var(--ks-ink);
+  background: var(--ks-fill);
+}
+[data-generation="gen1"] .move-btn--stab:hover:not(:disabled) {
+  background: var(--ks-ink);
 }
 
 .move-stab {
@@ -1272,6 +1404,18 @@
 .map-toggle-btn:hover { border-color: var(--clr-gold); color: var(--clr-gold); }
 .map-toggle-btn--on   { border-color: var(--clr-gold); color: var(--clr-gold); box-shadow: 0 0 12px rgba(255, 215, 0, 0.4); }
 
+[data-generation="gen1"] .map-toggle-btn {
+  background: var(--ks-fill);
+  border-color: var(--ks-ink);
+  color: var(--ks-ink);
+}
+[data-generation="gen1"] .map-toggle-btn:hover,
+[data-generation="gen1"] .map-toggle-btn--on {
+  border-color: var(--ks-ink);
+  color: var(--ks-ink);
+  box-shadow: none;
+}
+
 /* ── Type chip (icon-in-frame — reads clearly as a type) ───── */
 .type-chip {
   display: inline-flex;
@@ -1778,6 +1922,26 @@
   color: var(--clr-text);
 }
 .route-choice-legend-name { color: var(--clr-gold); font-weight: 700; }
+
+/* Kanto Sage: the route-choice modal — "biome select" — is a basic view/frame like the others, so
+   its outer chrome (background, border, the double-line frame used for the other prominent
+   blocking surfaces) gets the same treatment. The region-map's own content — territory blooms,
+   node discs, edges — stays exactly as it is: that's the "detailed" layer, already flagged in §7.4
+   as its own future design pass (GENERATION_PROFILE.md), not a gap in this one. */
+[data-generation="gen1"] .route-choice-modal {
+  background: var(--ks-fill);
+  color: var(--ks-ink);
+  border: 2px solid var(--ks-ink);
+  box-shadow:
+    inset 0 0 0 3px var(--ks-fill),
+    inset 0 0 0 8px var(--ks-ink);
+}
+[data-generation="gen1"] .route-choice-modal .biome-title,
+[data-generation="gen1"] .route-choice-modal .biome-sub,
+[data-generation="gen1"] .route-choice-legend-item,
+[data-generation="gen1"] .route-choice-legend-name {
+  color: var(--ks-ink);
+}
 
 /* ── Responsive + reduced-motion ───────────────────────────── */
 @media (max-width: 720px) {

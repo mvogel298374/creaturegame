@@ -206,3 +206,71 @@
   color: var(--clr-text-muted);
   line-height: 1.4;
 }
+
+/* Kanto Sage: CHECK POKEMON is a basic view — this panel already sits on the reskinned
+   .battle-panel fog field, so only its own borders/text need patching, not a background. DV/EV
+   chips and the XP-bar blue stay as they are (functional/informational, same call as the HP
+   threshold and move-select's pills). */
+/* Root-level colour so any descendant text I haven't explicitly patched inherits ink instead of
+   the original near-white default (which is invisible on the new light background) — same
+   safety-net pattern as .select-screen in StarterSelection.css. Caught two real instances of this
+   during verification (.overview-title, the INFO tab's field values) before adding it. */
+[data-generation="gen1"] .overview-panel {
+  color: var(--ks-ink);
+}
+[data-generation="gen1"] .overview-header {
+  border-color: var(--ks-ink);
+}
+[data-generation="gen1"] .overview-sub {
+  color: var(--ks-dim);
+}
+[data-generation="gen1"] .overview-error {
+  color: var(--ks-hp);
+}
+[data-generation="gen1"] .overview-loading {
+  color: var(--ks-dim);
+}
+[data-generation="gen1"] .overview-tab {
+  border-color: var(--ks-ink);
+  color: var(--ks-dim);
+}
+[data-generation="gen1"] .overview-tab:hover {
+  border-color: var(--ks-ink);
+  color: var(--ks-ink);
+}
+[data-generation="gen1"] .overview-tab--active {
+  border-color: var(--ks-ink);
+  color: var(--ks-fill);
+  background: var(--ks-ink);
+}
+[data-generation="gen1"] .overview-field {
+  border-color: var(--ks-ink);
+}
+[data-generation="gen1"] .overview-field span:first-child {
+  color: var(--ks-dim);
+}
+[data-generation="gen1"] .overview-field span:last-child {
+  color: var(--ks-ink);
+}
+[data-generation="gen1"] .overview-stat-row {
+  border-bottom-color: rgba(21, 19, 15, 0.15);
+}
+[data-generation="gen1"] .overview-stat-name {
+  color: var(--ks-dim);
+}
+[data-generation="gen1"] .overview-stat-value {
+  color: var(--ks-ink);
+}
+[data-generation="gen1"] .overview-chip {
+  border-color: var(--ks-ink);
+  color: var(--ks-dim);
+}
+[data-generation="gen1"] .overview-move {
+  border-color: var(--ks-ink);
+}
+[data-generation="gen1"] .overview-move-meta {
+  color: var(--ks-dim);
+}
+[data-generation="gen1"] .overview-move-desc {
+  color: var(--ks-dim);
+}
