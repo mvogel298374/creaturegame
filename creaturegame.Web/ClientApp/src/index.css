@@ -73,6 +73,38 @@
   --ks-dim:  #57503F;   /* secondary labels — bar numbers, PP counts */
   --ks-hp:   #D6362B;   /* HP bar low-health endpoint */
   --ks-xp:   #2F63AF;   /* XP bar */
+
+  /* Ornamental detail pass (raised 2026-08-04, ratified 2026-08-05; sketch/ratify record:
+     docs/TODO.md → Generation Profile → Stage 4b follow-up). Two additions on top of the flat
+     4b skin, both pure CSS — no new asset files, no DOM change:
+     --ks-corners: a small ink staircase-notch glyph (4 tiny inline SVGs, one per corner
+       orientation) for the three double-line-frame surfaces. Applied via background-image,
+       inset 8px from each edge — clear of the frame's own inset box-shadow ring (which occupies
+       roughly the outer 2–10px band), since inset box-shadow paints on top of background and
+       would otherwise swallow a motif sitting under it. Reads as a glyph tucked just inside the
+       frame line rather than straddling it — the adaptation the plain-background-image technique
+       requires (a DOM-based ornament could straddle the border, but these three surfaces all use
+       `overflow: hidden|auto`, which would clip anything poking past the edge anyway).
+     --ks-grain: a handful of small low-alpha dots at irregular positions, tiled — texture for the
+       flat Fog field and white box interiors. Deliberately plain background-image too (not a
+       ::before/::after): a pseudo-element would be swept into a scrolling box's own scrolled
+       content (`.battle-log` and `.route-choice-modal` are both `overflow-y: auto`) and visibly
+       drift out of view as that box scrolls, where an element's own background never does. */
+  --ks-corners:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14'%3E%3Cpath d='M0 0H14V4.76H8.68V8.68H4.76V14H0Z' fill='%2315130F'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14'%3E%3Cpath d='M14 0H0V4.76H5.32V8.68H9.24V14H14Z' fill='%2315130F'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14'%3E%3Cpath d='M0 14H14V9.24H8.68V5.32H4.76V0H0Z' fill='%2315130F'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14'%3E%3Cpath d='M14 14H0V9.24H5.32V5.32H9.24V0H14Z' fill='%2315130F'/%3E%3C/svg%3E");
+  --ks-grain:
+    radial-gradient(circle at 11% 22%, rgba(21,19,15,0.2) 0 1.6px, transparent 1.6px),
+    radial-gradient(circle at 63% 9%,  rgba(21,19,15,0.2) 0 1.2px, transparent 1.2px),
+    radial-gradient(circle at 40% 46%, rgba(21,19,15,0.2) 0 1.9px, transparent 1.9px),
+    radial-gradient(circle at 83% 61%, rgba(21,19,15,0.2) 0 1.3px, transparent 1.3px),
+    radial-gradient(circle at 25% 78%, rgba(21,19,15,0.2) 0 1.7px, transparent 1.7px),
+    radial-gradient(circle at 6% 92%,  rgba(21,19,15,0.2) 0 1.1px, transparent 1.1px),
+    radial-gradient(circle at 94% 38%, rgba(21,19,15,0.2) 0 1.5px, transparent 1.5px),
+    radial-gradient(circle at 54% 88%, rgba(21,19,15,0.2) 0 1.2px, transparent 1.2px),
+    radial-gradient(circle at 74% 20%, rgba(21,19,15,0.2) 0 1.4px, transparent 1.4px);
 }
 
 /* Extended 2026-08-04: the base "basic view/frame" chrome — page background, the shared .btn /
@@ -85,6 +117,8 @@
    verbose — same trade already made for the battle HUD. */
 [data-generation="gen1"] body {
   background: var(--ks-fog);
+  background-image: var(--ks-grain);
+  background-size: 34px 34px;
 }
 [data-generation="gen1"] .screen-title {
   color: var(--ks-ink);
@@ -96,6 +130,8 @@
   background: var(--ks-fill);
   color: var(--ks-ink);
   border-color: var(--ks-ink);
+  background-image: var(--ks-grain);
+  background-size: 34px 34px;
 }
 [data-generation="gen1"] .btn:hover {
   background: var(--ks-ink);

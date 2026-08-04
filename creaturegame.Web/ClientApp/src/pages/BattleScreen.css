@@ -23,11 +23,23 @@
   box-shadow:
     inset 0 0 0 3px var(--ks-fill),
     inset 0 0 0 8px var(--ks-ink);
+  /* Ornamental detail pass — the Step Notch corner glyph; see index.css's --ks-corners doc
+     comment for why it's inset 8px (clear of the ring above) rather than straddling the edge. */
+  background-image: var(--ks-corners);
+  background-repeat: no-repeat;
+  background-position:
+    top 8px left 8px,
+    top 8px right 8px,
+    bottom 8px left 8px,
+    bottom 8px right 8px;
+  background-size: 14px 14px;
 }
 
 [data-generation="gen1"] .battle-panel {
   background: var(--ks-fog);
   border-top: 2px solid var(--ks-ink);
+  background-image: var(--ks-grain);
+  background-size: 34px 34px;
 }
 
 /* ── Battlefield ─────────────────────────────── */
@@ -188,6 +200,8 @@
   background: var(--ks-fill);
   border: 3px solid var(--ks-ink);
   color: var(--ks-ink);
+  background-image: var(--ks-grain);
+  background-size: 34px 34px;
 }
 [data-generation="gen1"] .nameplate-level { color: var(--ks-dim); }
 [data-generation="gen1"] .bar-label { color: var(--ks-dim); }
@@ -291,6 +305,17 @@
     inset 0 0 0 3px var(--ks-fill),
     inset 0 0 0 8px var(--ks-ink);
   padding: calc(var(--sp-sm) + 8px) calc(var(--sp-md) + 8px);
+  /* Ornamental detail pass — Step Notch, same recipe as .battle-screen above. A plain
+     background-image (not ::before/::after) on purpose: this box is overflow-y: auto, and a
+     pseudo-element would scroll away with the log text instead of staying pinned to the frame. */
+  background-image: var(--ks-corners);
+  background-repeat: no-repeat;
+  background-position:
+    top 8px left 8px,
+    top 8px right 8px,
+    bottom 8px left 8px,
+    bottom 8px right 8px;
+  background-size: 14px 14px;
 }
 [data-generation="gen1"] .log-line { color: inherit; }
 [data-generation="gen1"] .log-line--muted { color: var(--ks-dim); }
@@ -373,6 +398,8 @@
   background: var(--ks-fill);
   color: var(--ks-ink);
   border: 3px solid var(--ks-ink);
+  background-image: var(--ks-grain);
+  background-size: 34px 34px;
 }
 [data-generation="gen1"] .action-btn:hover:not(:disabled),
 [data-generation="gen1"] .action-btn:focus-visible:not(:disabled) {
@@ -466,6 +493,8 @@
   background: var(--ks-fill);
   color: var(--ks-ink);
   border: 3px solid var(--ks-ink);
+  background-image: var(--ks-grain);
+  background-size: 34px 34px;
 }
 [data-generation="gen1"] .move-btn:hover:not(:disabled),
 [data-generation="gen1"] .move-btn:focus-visible:not(:disabled) {
@@ -498,6 +527,8 @@
 [data-generation="gen1"] .move-btn--stab {
   border-left-color: var(--ks-ink);
   background: var(--ks-fill);
+  background-image: var(--ks-grain);
+  background-size: 34px 34px;
 }
 [data-generation="gen1"] .move-btn--stab:hover:not(:disabled) {
   background: var(--ks-ink);
@@ -1935,6 +1966,19 @@
   box-shadow:
     inset 0 0 0 3px var(--ks-fill),
     inset 0 0 0 8px var(--ks-ink);
+  /* Ornamental detail pass — Step Notch, same recipe as .battle-screen/.battle-log. This modal
+     also scrolls (overflow-y: auto), same reasoning for staying a background-image. Pre-existing
+     note: the modal's border-radius (12px, set unconditionally above, no gen1 override) is a gap
+     from Stage 4b, not introduced here — the square motif may touch that curve; not fixed in this
+     pass. */
+  background-image: var(--ks-corners);
+  background-repeat: no-repeat;
+  background-position:
+    top 8px left 8px,
+    top 8px right 8px,
+    bottom 8px left 8px,
+    bottom 8px right 8px;
+  background-size: 14px 14px;
 }
 [data-generation="gen1"] .route-choice-modal .biome-title,
 [data-generation="gen1"] .route-choice-modal .biome-sub,

@@ -897,19 +897,45 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
       would have broken contrast), the party strip, drop-toasts, the node ladder.
     - The "picker live-preview" phrase from the original line is moot today — there's only one registered
       generation, so there's nothing yet to pick between; revisit once a second generation exists.
-  - [ ] **Kanto Sage — ornamental detail pass (raised 2026-08-04, not yet scoped).** The shipped skin (4b) is
-    deliberately flat and restrained — ink-on-neutral, no texture, no ornament, discipline was the whole point.
-    User wants a follow-up layer on top of it, not a repaint: small graphical accents, understated but
-    noticeable. Two concrete directions named, neither designed yet:
-    - **Corner artifacts on the double-line window chrome** — the outer battle-field shell, the dialogue/log
-      box, the route-choice modal (§7.3's three double-line-frame surfaces) each get some small motif in their
-      corners rather than a plain right-angle. No specific glyph/shape agreed.
-    - **A bit of texture in the monochrome fields** — the flat Fog page background and white box interiors
-      (Title, StarterSelection, the battle HUD's fog field, etc.) get a subtle grain/pattern instead of a pure
-      flat fill. Explicitly *subtle* — the point is texture you notice on a second look, not a busy surface.
-    Needs its own sketch → ratify session before building (decision 8's process — §7.3's own mockup is the
-    precedent: this was settled with a live interactive mockup, not prose, and that's the right approach here
-    too). Not scoped to specific files/surfaces yet beyond "wherever 4b already shipped the base look."
+  - [x] **Kanto Sage — ornamental detail pass** ✅ DONE (2026-08-05, raised 2026-08-04). The shipped skin (4b)
+    was deliberately flat and restrained — ink-on-neutral, no texture, no ornament. This added one small layer
+    on top, not a repaint: a corner glyph on the double-line window chrome, plus a subtle grain texture on the
+    flat fields. Sketched and ratified as a live interactive mockup (decision 8's process, same as 4b's own
+    mockup) offering 4 corner-motif candidates (Step Notch / Filled Pip / Cross Tick / Bracket Hook) and 4
+    field-texture candidates (Ordered Dither / Diagonal Hatch / Grain / Stipple) side by side against the real
+    frame recipe. **Ratified: Step Notch + Grain.**
+    - **Corner artifacts** — `.battle-screen`, `.battle-log`, `.route-choice-modal` (§7.3's three double-line-
+      frame surfaces) each get a small ink staircase-notch glyph near each corner, via a new `--ks-corners`
+      token (four tiny inline-SVG data URIs, one per orientation) in `index.css`. **Built inset 8px from the
+      edge, not straddling the border like the mockup** — the frame's own inset box-shadow ring (`inset 0 0 0
+      3px fill, inset 0 0 0 8px ink`) paints *on top of* the background, so a motif flush at the corner would
+      sit mostly underneath it and barely show; inset 8px clears the ring instead. A DOM-based ornament could
+      have straddled the border the way the mockup did, but all three surfaces are `overflow: hidden` or
+      `overflow-y: auto`, which would clip anything poking past the edge anyway — background-image was the
+      right call independent of the ring issue.
+    - **Field texture** — a new `--ks-grain` token (9 low-alpha `radial-gradient` dots, tiled 34px) on `body`
+      (the Fog field), `.btn` (shared chrome across Title/StarterSelection/Settings), and the battle HUD's own
+      white boxes (`.battle-panel`, `.nameplate`, `.action-btn`, `.move-btn`/`.move-btn--stab`). **Deliberately
+      plain `background-image` on both additions, never `::before`/`::after`:** `.battle-log` and
+      `.route-choice-modal` are `overflow-y: auto`, and a pseudo-element there would be swept into the box's
+      own scrolled content and visibly drift out of view as it scrolls — a box's own background never does,
+      regardless of how far its content is scrolled.
+    - **Real trap hit and fixed during the sketch, not the build:** the first mockup pass generated the
+      dither/grain/stipple textures on a `<canvas>` via JS at load and injected the result as a data-URI
+      `background-image`; only the diagonal hatch was plain CSS. The user could see the hatch faintly but none
+      of the other three — the canvas-drawing script was silently failing in the hosted artifact context
+      before paint. Rewritten as pure static CSS gradients (a checkerboard for dither, layered
+      `radial-gradient`s for grain/stipple) with zero JS/canvas dependency, which is also why the *shipped*
+      `--ks-grain` token is a plain gradient list rather than a generated asset.
+    - **Deliberately out of scope this pass:** StarterSelection's own bespoke white boxes, Settings'
+      panels/modal, and CHECK POKEMON — grain landed on the shared `.btn` chrome and the battle HUD only, not
+      every individual white-box selector those files declare. Left for whenever those surfaces get their own
+      catalog turn (§7.5), same as 4b's own "detailed layer" carve-outs. `.route-choice-modal`'s unconditional
+      `border-radius: 12px` (no gen1 override) is a pre-existing Stage 4b gap, not introduced here — the square
+      corner motif may touch that curve; not fixed in this pass.
+    - Verified live in-browser by the user. Puppeteer was used only during the sketch/ratify mockup phase (and
+      to diagnose the canvas-rendering trap above); dropped for the actual app build and the final visual
+      check per the user's mid-session call that it was burning too many tokens for this kind of iteration.
   - [ ] **4c — the Town Map:** `BiomeDefinition` grid coords replace `MapX/MapY`, authored route cell-paths +
     `BiomeTests` validity invariants, `RegionMapRevealed` wire update (+ field guards), client grid renderer
     replacing the painterly `RegionMap` (interaction contracts unchanged; `travelledEdgeKeys` survives);
