@@ -141,7 +141,7 @@ changed since 3a — new kinds drop in by branching `chooseNextEvent` (today: `R
 biome's seeded `RunNodeKind` plan).
 
 **Encounter-map reveal events (2026-07-10, presentation-only).** Two additive `BattleEvent`s let the client draw
-the run as a Slay-the-Spire-style map without changing any sequencing (`docs/TODO.md` → *Encounter Map*):
+the run as a Slay-the-Spire-style map without changing any sequencing (`docs/TODO_ARCHIVE.md` → *Encounter Map*):
 `RegionMapRevealed` (the whole playable biome graph + neighbour edges, emitted once at run start) and
 `BiomeNodePlanRevealed` (the seeded `RunNodeKind` ladder, emitted when a biome is entered). Both are gated to
 biome mode. **`RunNodeEntered` semantics widened:** in biome mode it now fires for **every** node *including

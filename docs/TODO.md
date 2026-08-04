@@ -16,18 +16,17 @@ creature), **Revive Items** (in-battle party revive, Boss-reward + rare-shop onl
 (the voluntary, any-turn SWITCH turn-action) are all done and archived (→ `TODO_ARCHIVE.md`).
 
 **Next up, in priority order:**
-1. **Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by the acquisition channels.
+1. **Generation Profile** — make Gen 1 an explicit, swappable profile so a generation switch changes content,
+   menus and look, not just battle math. Designed against Gen 1 alone; upward compatibility is the deliverable,
+   no Gen 2 content. **`/plan` DONE (2026-07-29; Stage 4 re-planned as v2 on 2026-07-31 — per-gen adaptation
+   with the bones kept, jointly iterated per surface, plus the grid Town Map)** — full design in
+   [`GENERATION_PROFILE.md`](GENERATION_PROFILE.md). **Stages 1–3 complete (1a, 1b, 2a, 2b, 3 shipped); Stage 4
+   (presentation) in progress — 4a/4b shipped, the Kanto Sage ornamental-detail follow-up + 4c + 4d+ open** —
+   Stage 5 is the standing falsification rule, and every shipped stage has landed its leg — task entry + staging
+   below. **Sequenced ahead of the two items below (2026-08-04, user's call).**
+2. **Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by the acquisition channels.
    *(Item acquisition itself is already done via the Run Economy; bag persistence + catch remain.)*
-2. **Game Loop & Progression** — save layer (`save.db`); party + between-biome lead + forced-switch are done.
-
-**Unsequenced (raised 2026-07-29, `/plan` done, implementation underway — needs slotting against the two above):**
-**Generation Profile** — make Gen 1 an explicit, swappable profile so a generation switch changes content, menus
-and look, not just battle math. Designed against Gen 1 alone; upward compatibility is the deliverable, no Gen 2
-content. **`/plan` DONE (2026-07-29; Stage 4 re-planned as v2 on 2026-07-31 — per-gen adaptation with the bones
-kept, jointly iterated per surface, plus the grid Town Map)** — full design in
-[`GENERATION_PROFILE.md`](GENERATION_PROFILE.md). **Stages 1–3 complete (1a, 1b, 2a, 2b, 3 shipped); Stage 4
-(presentation) open** — Stage 5 is the standing falsification rule, and every shipped stage has landed its leg —
-task entry + staging below.
+3. **Game Loop & Progression** — save layer (`save.db`); party + between-biome lead + forced-switch are done.
 
 *(**In-Combat Switching** — the voluntary, any-turn SWITCH turn-action — is **✅ COMPLETE (2026-07-25)**, all three
 stages (engine core / wire / frontend) shipped, including the out-of-PP menu affordance (BAG/SWITCH reachable at
@@ -376,10 +375,11 @@ domain check instead of inviting it. Two specific traps to recognise again:
 
 ---
 
-## Item Acquisition · Bag Persistence · Catch  ⟵ deferred cluster, gated on Encounter Logic
+## Item Acquisition · Bag Persistence · Catch  ⟵ item acquisition DONE via Run Economy; bag persistence + catch remain
 
-**One interlocked cluster, deliberately deferred together** — each depends on the previous and on the
-Encounter Logic gate:
+**One interlocked cluster, deliberately deferred together** — each depended on the previous and on the
+Encounter Logic gate, which has since shipped (Encounter Logic Phase 4, archived) and cleared item acquisition
+itself (via the Run Economy, below). Bag persistence and catch are what remain open:
 - **Acquisition** can't be designed until the encounter / eligibility model exists (drop rates are meaningless
   against an undefined distribution).
 - **Bag persistence** is meaningless until acquisition defines *what's* in the bag and *when* it's earned.
@@ -897,6 +897,19 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
       would have broken contrast), the party strip, drop-toasts, the node ladder.
     - The "picker live-preview" phrase from the original line is moot today — there's only one registered
       generation, so there's nothing yet to pick between; revisit once a second generation exists.
+  - [ ] **Kanto Sage — ornamental detail pass (raised 2026-08-04, not yet scoped).** The shipped skin (4b) is
+    deliberately flat and restrained — ink-on-neutral, no texture, no ornament, discipline was the whole point.
+    User wants a follow-up layer on top of it, not a repaint: small graphical accents, understated but
+    noticeable. Two concrete directions named, neither designed yet:
+    - **Corner artifacts on the double-line window chrome** — the outer battle-field shell, the dialogue/log
+      box, the route-choice modal (§7.3's three double-line-frame surfaces) each get some small motif in their
+      corners rather than a plain right-angle. No specific glyph/shape agreed.
+    - **A bit of texture in the monochrome fields** — the flat Fog page background and white box interiors
+      (Title, StarterSelection, the battle HUD's fog field, etc.) get a subtle grain/pattern instead of a pure
+      flat fill. Explicitly *subtle* — the point is texture you notice on a second look, not a busy surface.
+    Needs its own sketch → ratify session before building (decision 8's process — §7.3's own mockup is the
+    precedent: this was settled with a live interactive mockup, not prose, and that's the right approach here
+    too). Not scoped to specific files/surfaces yet beyond "wherever 4b already shipped the base look."
   - [ ] **4c — the Town Map:** `BiomeDefinition` grid coords replace `MapX/MapY`, authored route cell-paths +
     `BiomeTests` validity invariants, `RegionMapRevealed` wire update (+ field guards), client grid renderer
     replacing the painterly `RegionMap` (interaction contracts unchanged; `travelledEdgeKeys` survives);
@@ -912,8 +925,9 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
 species/move tables, `GenerationIntroduced` filtering), still deferred to a Gen 2 sprint. This is the
 **axis/framework** half, doable now against Gen 1 alone. Neither subsumes the other.
 
-**Sequencing against the current backlog is NOT yet decided** — not slotted against *Item Acquisition · Bag
-Persistence · Catch* or *Game Loop & Progression*. Raise with the user.
+**Sequencing against the current backlog: resolved (2026-08-04) — Generation Profile is next**, ahead of both
+*Item Acquisition · Bag Persistence · Catch* and *Game Loop & Progression* (see the priority list at the top of
+this file).
 
 ---
 
