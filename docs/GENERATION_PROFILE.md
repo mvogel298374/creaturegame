@@ -74,6 +74,32 @@ deliverable.
     idiom) and an invert-block selection cursor, chosen over a single hairline frame and a blinking ▶ arrow.
     Settled interactively (a live mockup, not a prose description) per decision 8's own reasoning.
 
+**Added 2026-08-05 (caught mid-sketch on Stage 4c's Town Map — see §7.4):**
+
+11. **No smooth/organic/modern curves — but a curve used as a fixed, recognizable symbol is fine.** Gen 1's
+    visual language is strictly rectilinear and grid-aligned for anything *shaped by hand* — hard corners,
+    straight edges, blocky forms built from a tile grid. This governs every surface, including ones whose
+    *subject* is naturally organic — a coastline, a body of water, foliage: a first Town Map sketch drew the
+    coastline as a smoothed bezier blob and water as a continuous curved wave-line texture, and both were
+    **wrong per this grammar**, rebuilt as a rectilinear (stepped, grid-aligned) coastline and a flat water
+    tone (user's call, 2026-08-05: *"no smooth organic shapes! ... all graphical things for gen1 are purely
+    made through simple graphics, including water"*).
+    >
+    > **Refined the next day (2026-08-06) — the rule targets organic/modern smoothness, not curvature
+    > itself:** *"we aren't against ALL curves, just nothing modern, organic or non symbolic."* A curve is
+    > fine when it **is** the symbol — a small, fixed, iconographic mark instantly read as one thing, the
+    > same way Gen 1 itself draws a Poké Ball as a circle or a status icon as a simple glyph. What stays
+    > forbidden is a curve doing *shape* work: a smoothed silhouette (an organic coastline), a soft modern
+    > chrome corner, a gradient or flowing texture standing in for a material. Applied to the Town Map: the
+    > water went from a continuous wave-*texture* (forbidden — a curve shaping a surface) to a uniform flat
+    > tone sparsely broken up by small `~`-style wave *glyphs* (fine — each one a discrete, repeated,
+    > instantly-legible symbol, exactly like `mapGlyphs.tsx`'s existing type icons).
+    >
+    Treat this as a standing constraint on every future surface in the §7.5 catalog, not a one-off fix to the
+    map: if a design reaches for a curve, ask whether it is *one small fixed symbol* (allowed) or a
+    *silhouette/texture/chrome* being smoothed (not allowed) — that distinction, not "curve vs. no curve," is
+    the actual rule.
+
 ---
 
 ## 2. What a `GenerationProfile` is
@@ -653,7 +679,8 @@ is gameplay signal and sits outside it, the same as accessibility-motivated colo
 Decision 9. The current region map (`RegionMap` in `BattleScreen.tsx`) is painterly: free-floating waypoints at
 authored percent coords (`BiomeDefinition.MapX/MapY`, 0–100), screen-blended type-colour territories, curved
 gradient edges. It becomes a **classic Gen 1 Town Map**: biome squares on a rigid tile grid, straight
-orthogonal routes, a blinking you-are-here cursor.
+orthogonal routes, a bouncing you-are-here cursor (ratified below, superseding the earlier "blinking"
+placeholder language).
 
 **Geometry is server data, authored per region; skin is client presentation, per generation.** That split is
 what makes "grid for all, loosenable per gen" coherent: every region authors grid geometry; each generation's
@@ -680,10 +707,11 @@ map presentation decides how faithfully to render it.
   alt region too, proving they check *any* authored region, not Kanto by name.
 
 **Client (the shared grid toolkit + the per-gen seam):**
-- A grid renderer replaces the painterly `RegionMap`: biome = square tile (type colour + `mapGlyphs` icon),
-  routes = drawn cell paths, current biome = blinking cursor (the RBY town-map idiom), travelled routes
-  highlighted (`regionMap.ts`'s `travelledEdgeKeys` logic survives unchanged — edges are still biome-id
-  pairs), offered biomes flash as the selectable route picks.
+- A grid renderer replaces the painterly `RegionMap`: biome = square tile (ink-outline, colour spent only on
+  the tile's type glyph(s) — see the sketch-iteration note below), routes = drawn cell paths, current biome =
+  a bouncing-chevron cursor (the RBY town-map idiom), travelled routes highlighted
+  (`regionMap.ts`'s `travelledEdgeKeys` logic survives unchanged — edges are still biome-id pairs), offered
+  biomes flash as the selectable route picks.
 - **Interaction contracts are untouched:** `RouteChoiceMap` stays a blocking modal with the same focus
   management and aria semantics; `RunMapPanel`'s pinned/peek behaviour, the Escape rule, and the node ladder
   all stay. This is a presentation swap under stable bones (§7.1).
@@ -695,12 +723,78 @@ map presentation decides how faithfully to render it.
 - The in-biome **node ladder** (the Slay-the-Spire encounter path) is deliberately *not* part of 4c — it is a
   separate surface in the catalog (§7.5), so its look is settled in its own joint iteration.
 
-**Raised alongside 4b, not yet ratified (2026-08-03):** the "biome = square tile, full type-colour fill" sketch
-above predates 4b's colour-budget decision (§7.3 / §1 decision 10 — colour reserved for HP/XP bars, type
-badges, and sprite art, everything else ink-on-neutral). Worth revisiting *when 4c is actually designed*
-rather than pre-deciding here: an ink-outlined tile with colour reserved for the `mapGlyphs` type icon (not
-a full-tile colour wash) would extend the same budget to the map instead of introducing a second, looser
-colour rule. Flagged as a question for 4c's own joint mini-plan, not settled by this note.
+**Sketch → ratify record (2026-08-05), decision 8's process applied to 4c.** The colour-budget question raised
+alongside 4b — "biome = square tile, full type-colour fill" predates decision 10's colour budget (§7.3 /
+§1 decision 10 — colour reserved for HP/XP bars, type badges, and sprite art, everything else ink-on-neutral)
+— is now resolved, along with several more choices, via an interactive HTML sketch (same "live mockup, not
+prose" approach as 4b's Kanto Sage ratification) drawn over the real `Biome.cs` registry:
+
+- **Tile colour: ink-outline, not a full-tile wash.** Settles that question in favour of the budget-
+  preserving option — the tile is a plain ink-bordered white square; colour is spent only on the type
+  glyph(s) inside it, matching decision 10's discipline instead of introducing a second, looser rule.
+- **Tile glyph = the biome's full type list, not just its primary type.** Each of a biome's types gets its
+  own small icon in its own colour, laid out in a row inside the tile. Two biomes that merely share a
+  primary type (e.g. Granite Cliffs' Rock/Flying/Fighting vs. Crystal Cavern's Rock/Ground) no longer read
+  identically. Still drawn from the same 15-icon `mapGlyphs` vocabulary — not bespoke art per biome name.
+- **Route line: dotted for untravelled, a thick solid ink line for travelled.** No longer an open style
+  question — both states are one rule, not a per-generation toggle.
+- **Cursor: a bouncing chevron**, not a blinking ring — supersedes the "blinking cursor" placeholder
+  language used when 4c was first scoped (now corrected above).
+- **Hover reveals name + type(s) via a status caption**, not a floating per-tile label — a caption band
+  below the map updates to whatever biome is hovered/focused, reverting to the current biome on
+  mouseleave/blur. Floating labels were rejected because RBY-density tile spacing makes them collide.
+- **Per-run map is a small "island" (5–10 biomes), not the whole registry at once.** The run already caps
+  its playable subgraph today (`EncounterFactory.RunBiomeMapSize`, currently a flat `10`); this narrows that
+  to a random 5–10 and reframes it as a self-contained island the player sails away from, rather than one
+  sprawling continent view of all 18 biomes. Small, well-scoped follow-up to the existing constant + subgraph
+  picker, not a new subsystem.
+- **Islands are connected by a Boss-gated, non-forced transition — a run-flow rule, not a style question.**
+  Beating an island's Boss unlocks sailing to the next island, but doesn't eject the player — the rest of
+  the current island stays explorable afterward at their own pace, so today's "revisit the same subgraph
+  forever on a dead end" fallback (§ the `BiomeChoiceEvent` doc comment) gets a real endpoint instead of
+  looping in place. **Open implementation detail, not blocking the presentation work above:** whether "the
+  island's Boss" is the existing per-biome `BossBattle` ladder node (already the toughest node, already used
+  for the post-win catch chance) elevated to also gate the island, or a distinguished single capstone
+  encounter — a `RunDirector`/`EncounterFactory` question for whoever picks up that slice of the build.
+- **The island is drawn as an actual landmass, water, and small terrain features, per decision 11.** A first
+  pass drew the coastline as a smoothed bezier blob and water as a continuous curved wave-line texture; both
+  were wrong per decision 11 (added by this same iteration). The **coastline** is a stepped, grid-aligned
+  orthogonal polygon (corner and mid-edge notches for character, every segment horizontal or vertical, never
+  a curve) — that half of the rule is a flat "no curves" ban, no exception. The **water** went through two
+  passes: first a straight-edged pixel-checker dither (technically rectilinear, but read as a busy modern
+  texture, not a Gen 1 material), then — after decision 11's same-day refinement (curves are fine *as a fixed
+  symbol*, not as shape/texture) — a **uniform flat tone broken up by a handful of small `~`-style wave
+  glyphs**, sparse and scattered like the land features rather than tiled edge-to-edge, each one a discrete
+  repeated symbol exactly like a `mapGlyphs.tsx` type icon. Plus a handful of small tree/rock motifs (plain
+  triangles and straight-edged polygons) scattered in the gaps between nodes. Still flat ink-on-neutral —
+  shape and a few small symbols do the "water vs. land" distinction, not a new colour.
+
+**Sketch revised again (2026-08-06) — the type glyph is dropped, and the grid structure is now locked.**
+Two more rounds on the same interactive sketch, past the record above:
+- **The per-biome type glyph is gone.** On reflection it wasn't earning its complexity — the hover caption
+  already carries a town's name and type(s), so the map surface itself no longer needs to encode type at
+  all. A town is now a plain pixel house: hollow (outline only) if unvisited, solid ink if visited or
+  current — a legibility mark, not decoration.
+- **Land and water became real *tiled textures* instead of a flat tone.** Land got a sparse dot grain (the
+  same technique as the shipped Kanto Sage paper-grain); water got a denser pixel-checker dither — distinct
+  materials at a glance, still built from flat ink-on-neutral shapes (rectangles), no new colour.
+- **The grid structure itself is now locked down (user's call, 2026-08-06): one biome per grid cell,
+  authored orthogonal routes, identity-on-hover.** Future passes on this sub-stage don't revisit that
+  structure — only its surface treatment.
+
+**Next for this sub-stage (flagged 2026-08-06, not yet started): replace the sketch's procedural SVG/CSS
+textures with real graphic assets.** Everything drawn so far — the dot-grain land, the checker-dither water,
+the drawn pixel-house town marker, the tree/rock motifs — is code-drawn (patterns and paths), a stand-in for
+layout and rendering-style decisions, not final art. The user wants **actual authored graphics** (tile/sprite
+art) for the map before or as part of the real client build. Open, not yet decided: the art source (hand-
+authored fresh vs. an existing asset pack), the format (raster tiles vs. vector), and whether it rides the
+same import path as the creature sprites (`docs/SPRITE_PRESENTATION.md`) or is its own pipeline. Whoever picks
+this up next should treat it as its own short sketch → ratify step (decision 8's process), same as everything
+else in this sub-stage.
+
+**Still open for 4c's build:** exact final grid dimensions and the collision-checked route authoring pass
+(`BiomeTests`) for whichever biomes end up in a real island; map-scale (comfortable vs. compact) has no
+ratified answer yet either. Both are presentation-only, unblocked by anything above.
 
 ### 7.5 Sub-stage 4d+ — the surface catalog (joint iteration)
 

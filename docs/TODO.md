@@ -940,6 +940,14 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
     `BiomeTests` validity invariants, `RegionMapRevealed` wire update (+ field guards), client grid renderer
     replacing the painterly `RegionMap` (interaction contracts unchanged; `travelledEdgeKeys` survives);
     `TestAltProfile`'s fake region gets grid geometry. Kanto grid authoring draft reviewed in-stage.
+    **The grid structure itself is locked (2026-08-06)** — one biome per grid cell, authored orthogonal
+    routes, identity-on-hover — from a multi-round sketch → ratify pass; see `GENERATION_PROFILE.md` §7.4's
+    sketch-ratify record for the full history (route/cursor style, the Boss-gated island size, decision 11's
+    "no organic curves" rule). **Next up for this sub-stage (user's call, 2026-08-06): swap the sketch's
+    procedural SVG/CSS textures (the dot-grain land, the checker-dither water, the drawn pixel-house town
+    marker) for real graphic assets** — authored tile/sprite art, not code-drawn shapes — before or as part of
+    the actual client build. Not started; no asset pipeline decision made yet (art source, format, whether it
+    rides the existing sprite-import path or is hand-authored fresh).
   - [ ] **4d+ — the surface catalog, jointly iterated** (each its own greenlit mini-plan): battle command menu
     (settled — the 2×2 grid, verbs fixed), move select, battle HUD, CHECK POKEMON, BAG, party surfaces, run
     prompts, Title/StarterSelection (incl. the generation picker), node ladder.
