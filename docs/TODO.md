@@ -936,22 +936,52 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
     - Verified live in-browser by the user. Puppeteer was used only during the sketch/ratify mockup phase (and
       to diagnose the canvas-rendering trap above); dropped for the actual app build and the final visual
       check per the user's mid-session call that it was burning too many tokens for this kind of iteration.
-  - [ ] **4c — the Town Map:** `BiomeDefinition` grid coords replace `MapX/MapY`, authored route cell-paths +
-    `BiomeTests` validity invariants, `RegionMapRevealed` wire update (+ field guards), client grid renderer
-    replacing the painterly `RegionMap` (interaction contracts unchanged; `travelledEdgeKeys` survives);
-    `TestAltProfile`'s fake region gets grid geometry. Kanto grid authoring draft reviewed in-stage.
-    **The grid structure itself is locked (2026-08-06)** — one biome per grid cell, authored orthogonal
-    routes, identity-on-hover — from a multi-round sketch → ratify pass; see `GENERATION_PROFILE.md` §7.4's
+  - [ ] **4c — the Town Map:** `BiomeDefinition` grid coords replace `MapX/MapY`, `RegionMapRevealed` wire
+    update (+ field guards), client grid renderer replacing the painterly `RegionMap` (interaction contracts
+    unchanged; `travelledEdgeKeys` survives); `TestAltProfile`'s fake region gets grid geometry.
+    **The grid structure itself is locked (2026-08-06)** — one biome per grid cell, orthogonal routes,
+    identity-on-hover — from a multi-round sketch → ratify pass; see `GENERATION_PROFILE.md` §7.4's
     sketch-ratify record for the full history (route/cursor style, the Boss-gated island size, decision 11's
-    "no organic curves" rule). **Next up for this sub-stage (user's call, 2026-08-06): swap the sketch's
-    procedural SVG/CSS textures (the dot-grain land, the checker-dither water, the drawn pixel-house town
-    marker) for real graphic assets** — authored tile/sprite art, not code-drawn shapes — before or as part of
-    the actual client build. **In progress (started 2026-08-17):** art source picked (Kenney's "Monochrome
-    RPG," CC0, vendored static asset — not the sprite-import path) and the recolour pipeline settled (4-colour
-    palette swap onto the existing `--ks-*` tokens); two rounds of sketch → ratify on the specific tile picks,
-    see `GENERATION_PROFILE.md` §7.4 for the full record incl. decision 12 (visually verify every tile pick
-    against the real source before use — the standing rule this pass established). Not yet built into the
-    real client.
+    "no organic curves" rule). Tile art is also locked (2026-08-18) — Kenney's "Monochrome RPG" (CC0), vendored
+    static asset, 4-colour recolour onto the existing `--ks-*` tokens; see §7.4 decision 12 (visually verify
+    every tile pick against the real source before use — the standing rule that pass established) and the
+    locked tile-pick list.
+    **Layout is procedurally generated per run, not hand-authored (revised 2026-08-18, user's call)** —
+    supersedes the original "authored Kanto grid" plan; see §7.4's revision note for the full rationale
+    (a fresh sparse per-run island is a smaller problem than laying out the whole dense 18-biome registry, so
+    full procedural generation is back in scope where it was rejected before). **In progress, backend first:**
+    1. [x] **`IslandLayoutGenerator`** ✅ DONE (2026-08-18) — pure, deterministic (seeded from the run's own
+       `IRandomSource`, no separate seed), takes the run's already-chosen biome subgraph (from the existing
+       `Biomes.RandomConnectedMap`, untouched) and produces grid coords + orthogonal collision-free routes.
+       Two-phase: a fast primary BFS placement + a real local-backtracking router (undo-and-swap the most
+       recently committed edge when one gets stuck, rather than restarting with a different global order);
+       a fallback placement (exhaustive ring search, provably can't itself fail to find a free cell) retried
+       across a few spacing levels and reshuffled attempts when primary doesn't pan out. Fuzz-tested
+       (`IslandLayoutGeneratorTests`) against the real `Biomes.Kanto` registry across sizes 2–12 × 15 seeds
+       (pre-commit-hook-fast, ~2s) for the validity invariants (no overlaps, axis-aligned only, every edge
+       routed, fallback itself valid, reproducible from seed). **Three real bugs found and fixed during
+       build, not just tuning** — kept as design notes in the source since they're the reason the final
+       shape looks the way it does: (1) a ring-search that always scanned from the same corner silently
+       recreated the exact diagonal-clustering pathology it replaced, on any open BFS-chain placement; (2) a
+       routing search margin that was a fixed constant instead of scaling with the placement's own spread,
+       so a genuinely sparse/planar graph could still fail to route once nodes were spread out; (3) greedy
+       sequential routing with no backtracking is inherently order-dependent — trying several static global
+       orderings worked but didn't scale, real local backtracking did. No wire/DB/client touched — pure unit
+       tests, no database.
+    2. [ ] Wire into `RunDirector`/`RunState` (computed once at map-selection time, cached for the run's
+       lifetime). **Next up — concrete anchors for a fresh session:** `RunDirector` already holds
+       `_playableBiomes` (an `IReadOnlyList<BiomeDefinition>`, set from `RunDirectorOptions.PlayableBiomes`,
+       itself threaded from `EncounterFactory.CreatePlayerSetupAsync`'s `RunSetup.PlayableBiomes` —
+       `Biomes.RandomConnectedMap`'s output, unchanged) and projects it into `RegionMapRevealed` today via
+       `BuildRegionMap()`. Call `IslandLayoutGenerator.Generate(_playableBiomes, rng)` there (or nearby),
+       using the **same shared `IRandomSource`** `RunDirector` already carries (threaded from
+       `RunDirectorOptions.Rng`, itself the one seeded instance created once in `GameController.Start` and
+       reused for the whole run — never construct a fresh `SeededRandomSource` here, that would break the
+       same-seed-same-sequence guarantee). Compute the `IslandLayout` exactly **once** (the RNG draws are
+       part of the run's one deterministic sequence — recomputing later would shift every later draw) and
+       cache it as a field, ready for step 3 to read when building the wire payload.
+    3. [ ] `RegionMapRevealed` wire update + field guards + the `TestAltProfile` leg.
+    4. [ ] Client grid renderer, wired to the locked tile art.
   - [ ] **4d+ — the surface catalog, jointly iterated** (each its own greenlit mini-plan): battle command menu
     (settled — the 2×2 grid, verbs fixed), move select, battle HUD, CHECK POKEMON, BAG, party surfaces, run
     prompts, Title/StarterSelection (incl. the generation picker), node ladder.

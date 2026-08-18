@@ -682,29 +682,62 @@ gradient edges. It becomes a **classic Gen 1 Town Map**: biome squares on a rigi
 orthogonal routes, a bouncing you-are-here cursor (ratified below, superseding the earlier "blinking"
 placeholder language).
 
-**Geometry is server data, authored per region; skin is client presentation, per generation.** That split is
-what makes "grid for all, loosenable per gen" coherent: every region authors grid geometry; each generation's
-map presentation decides how faithfully to render it.
+**Revised 2026-08-18 (user's call) — geometry is procedurally generated per run, not authored.** The
+paragraph below and the original server bullets superseded it: every run gets a freshly-generated Kanto-*styled*
+island (grid aesthetic, orthogonal routes, the locked tile art), not a subset of one fixed, hand-placed
+18-biome Kanto layout. **What this does *not* change:** which 18 biomes exist, their types/theming, and the
+existing per-run *subgraph selection* (`EncounterFactory`'s random 5–10 biome pick + its adjacency edges) —
+that graph-selection logic is untouched. What's new is a purely geometric layer on top of it: taking that
+already-chosen graph (nodes + edges) and laying it out on a grid with collision-free orthogonal routes. The
+original rejection of derived routing (below, kept for the record) was scoped to laying out the full,
+dense 18-node registry at once; generating a fresh *sparse* 5–10 node island per run is a different, smaller
+problem, which is why it's back on the table.
 
-**Server (authored geometry — `Biome.cs` registry work, zero importer/DB change):**
-- `BiomeDefinition.MapX/MapY` (free 0–100 percent) are **replaced** by integer grid-cell coords on an authored
-  region canvas (canvas dimensions are part of the region's authored data; the RBY Town Map's ~20×18 is the
-  reference scale, exact size a 4c authoring choice). The 18 Kanto biomes are re-authored onto the grid.
-- **Routes are authored cell paths, not derived lines** — each neighbour edge carries an orthogonal path of
-  grid cells from biome to biome, the way RBY routes are *things on the map*. Considered and rejected:
-  deriving L-shaped connectors client-side (no authoring cost, but overlaps/crossings are unavoidable in a
-  dense 18-node graph rendered per-run as an arbitrary 10-biome subset, and the result reads as a diagram, not
-  a map). Authored paths make the map an authored artifact exactly like the biome roster itself.
-- **Validity is code-checked, not eyeballed** (`BiomeTests`): every neighbour pair has exactly one route; each
-  path is contiguous and orthogonal; endpoints meet their biomes' cells; no cell is used by two biomes, or by
-  two routes, or by a route and a biome (except endpoints); everything fits the canvas.
-- **Wire:** `RegionMapRevealed`'s per-biome view carries the grid coords in place of `MapX/MapY`, plus the
-  route paths (filtered to the playable subset like `Neighbours` today, both endpoints in-subset). Canvas
-  dimensions ride the same event. Standard treatment: emitter projection + the generic field guard + a
-  value-level `WebEventContractTests` pin.
-- **`TestAltProfile` leg:** its two-biome fake region gets grid coords and one authored route, so the Stage 3
-  run-map probe keeps proving the geometry rides the profile's roster — and the validity tests run against the
-  alt region too, proving they check *any* authored region, not Kanto by name.
+~~**Geometry is server data, authored per region; skin is client presentation, per generation.** That split is
+what makes "grid for all, loosenable per gen" coherent: every region authors grid geometry; each generation's
+map presentation decides how faithfully to render it.~~ *(superseded above — geometry is generated, not
+authored; the per-generation skin split still holds.)*
+
+**Server — procedural generation (`IslandLayoutGenerator`, zero importer/DB change):**
+- A new pure, deterministic component consumes the run's already-selected biome subgraph (biome ids + adjacency
+  edges — `EncounterFactory`'s existing selection, untouched) plus the run's seed, and produces grid
+  coordinates for each biome and an orthogonal cell-path for each edge. `BiomeDefinition.MapX/MapY` (free
+  0–100 percent) are retired; nothing about biome *identity* moves into this component — it's purely geometric.
+- **Two-phase algorithm:** (1) *placement* — walk the graph from its start node, placing each biome near its
+  already-placed neighbour(s) via constrained random placement (seeded), rejecting any cell that collides or
+  leaves no room for a route; (2) *routing* — for each graph edge, carve an orthogonal Manhattan path between
+  the two biome cells via grid pathfinding, treating every other occupied cell (other biomes, other routes) as
+  an obstacle. Straight segments only, never a curve (decision 11 still governs the *rendering* rule; this
+  algorithm enforces it structurally rather than by hand-authoring).
+- **Bounded retry + a guaranteed-safe fallback:** if placement or routing fails within a retry budget, back off
+  to a deterministic "spine" layout (one biome per depth-row, straight connectors) so no seed can ever produce
+  a broken or unrenderable map.
+- **Determinism:** seeded from the run's own seed, same convention as every other per-run RNG draw — same
+  seed ⇒ same island, every time. Computed once at map-selection time and cached on `RunState` for the run's
+  lifetime (not recomputed per view), so the layout never jitters mid-run.
+- **Validity is code-checked, not eyeballed** (`IslandLayoutGeneratorTests`, fuzzed across hundreds of
+  seeds/graph shapes, the property-testing analogue of what `BiomeTests` did for authored data): no two biomes
+  share a cell; no route overlaps another route or a foreign biome cell; every route touches only its own two
+  endpoints; every route segment is axis-aligned; the canvas bounds are respected; every input edge gets a
+  path (nothing silently dropped); the fallback path is itself exercised and valid.
+- **Wire:** `RegionMapRevealed`'s per-biome view carries the generated grid coords in place of `MapX/MapY`,
+  plus the generated route paths. Canvas dimensions ride the same event. Standard treatment: emitter
+  projection + the generic field guard + a value-level `WebEventContractTests` pin.
+- **`TestAltProfile` leg:** its two-biome fake region exercises the generator on the minimal case too, so the
+  Stage 3 run-map probe keeps proving the geometry rides the profile's roster — generated, not hand-placed,
+  for *any* region, not Kanto by name.
+
+<details><summary>Original rejection of derived routing (2026-07-31, kept for the record — see the revision
+note above for why it no longer applies at this scope)</summary>
+
+Considered and rejected at the time: deriving L-shaped connectors client-side (no authoring cost, but
+overlaps/crossings are unavoidable in a dense 18-node graph rendered per-run as an arbitrary 10-biome subset,
+and the result reads as a diagram, not a map). Authored paths make the map an authored artifact exactly like
+the biome roster itself. — Superseded 2026-08-18: a fresh, sparse per-run island is a smaller problem than
+laying out the full dense registry, so full procedural generation (with fuzz-tested validity + a guaranteed
+fallback) is back in scope.
+
+</details>
 
 **Client (the shared grid toolkit + the per-gen seam):**
 - A grid renderer replaces the painterly `RegionMap`: biome = square tile (ink-outline, colour spent only on
@@ -844,9 +877,13 @@ specific to the Kenney pack:
 - Adding *further* scatter/prop variety later is fine (decision 12 still governs how any new pick gets
   verified) — swapping out any of the picks above, or reviving the roof+wall composite idea, is not.
 
-**Still open for 4c's build:** exact final grid dimensions and the collision-checked route authoring pass
-(`BiomeTests`) for whichever biomes end up in a real island; map-scale (comfortable vs. compact) has no
-ratified answer yet either. Both are presentation-only, unblocked by anything above.
+**Still open for 4c's build:** exact canvas sizing formula (how generously `IslandLayoutGenerator` pads the
+grid relative to biome count — comfortable vs. compact has no ratified answer yet, to be tuned during
+build/playtest) and the retry-budget/fallback-trigger tuning. Both are algorithm-internal, unblocked by
+anything above. **Implementation staging (backend first, agreed 2026-08-18):** (1) `IslandLayoutGenerator` +
+its fuzz-test suite, fully isolated from wire/DB/client; (2) wire it into `RunDirector`/`RunState`, computed
+once at map-selection time and cached for the run's lifetime; (3) `RegionMapRevealed` wire update + field
+guards + the `TestAltProfile` leg; (4) the client grid renderer, wired to the locked tile art (§ above).
 
 ### 7.5 Sub-stage 4d+ — the surface catalog (joint iteration)
 
