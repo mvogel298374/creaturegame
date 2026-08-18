@@ -34,6 +34,7 @@ public sealed class RunDirector
     private readonly int _maxEventsPerBiome;
     private readonly bool _biomeModeActive;
     private readonly IReadOnlyList<BiomeDefinition> _playableBiomes;
+    private IslandLayout? _islandLayout;
     private readonly Wallet? _wallet;
     private readonly int _minShopBudget;
     private readonly Func<int, IRandomSource, IReadOnlyList<RunNodeKind>> _nodePlanFactory;
@@ -132,6 +133,12 @@ public sealed class RunDirector
     /// controlled run. Not part of the public surface; production code never reads it from outside.</summary>
     internal RunState State => _state;
 
+    /// <summary>The Town Map layout for this run's playable biome subgraph — computed once, at run start, from
+    /// the same shared <see cref="IRandomSource"/> the rest of the run draws from (<c>docs/TODO.md</c> Stage 4c
+    /// step 2). Null outside biome mode. Exposed <c>internal</c> as a test seam today; the wire payload
+    /// (<see cref="RegionMapRevealed"/>) starts reading it in step 3.</summary>
+    internal IslandLayout? IslandLayout => _islandLayout;
+
     public async Task RunAsync()
     {
         var ctx = new RunContext(_state, _emitter, _playerInput, _rng);
@@ -140,7 +147,19 @@ public sealed class RunDirector
         // presentation signal — the run's route is still charted one BiomeChoice at a time). Neighbours are
         // filtered to the playable subset so the client never references a biome it wasn't sent.
         if (_biomeModeActive)
+        {
+            // The Town Map grid layout (Stage 4c): computed exactly once, here, at map-selection time — the
+            // playable biome subgraph is already fixed (RandomConnectedMap ran before this director was even
+            // constructed), so this is the earliest point the run's own RNG sequence can lay it out. Draws
+            // from the same shared _rng every other per-run roll uses, so it's part of the one deterministic
+            // same-seed-same-sequence stream (GAME_LOOP.md) — recomputing later would shift every later draw,
+            // so it is cached on _islandLayout for the rest of the run's lifetime rather than rebuilt per call.
+            _islandLayout = IslandLayoutGenerator.Generate(
+                _playableBiomes,
+                _rng ?? SystemRandomSource.Instance
+            );
             _emitter?.Emit(BuildRegionMap());
+        }
 
         while (_state.Player.IsAlive())
         {

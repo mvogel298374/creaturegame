@@ -968,19 +968,35 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
        sequential routing with no backtracking is inherently order-dependent — trying several static global
        orderings worked but didn't scale, real local backtracking did. No wire/DB/client touched — pure unit
        tests, no database.
-    2. [ ] Wire into `RunDirector`/`RunState` (computed once at map-selection time, cached for the run's
-       lifetime). **Next up — concrete anchors for a fresh session:** `RunDirector` already holds
-       `_playableBiomes` (an `IReadOnlyList<BiomeDefinition>`, set from `RunDirectorOptions.PlayableBiomes`,
-       itself threaded from `EncounterFactory.CreatePlayerSetupAsync`'s `RunSetup.PlayableBiomes` —
-       `Biomes.RandomConnectedMap`'s output, unchanged) and projects it into `RegionMapRevealed` today via
-       `BuildRegionMap()`. Call `IslandLayoutGenerator.Generate(_playableBiomes, rng)` there (or nearby),
-       using the **same shared `IRandomSource`** `RunDirector` already carries (threaded from
-       `RunDirectorOptions.Rng`, itself the one seeded instance created once in `GameController.Start` and
-       reused for the whole run — never construct a fresh `SeededRandomSource` here, that would break the
-       same-seed-same-sequence guarantee). Compute the `IslandLayout` exactly **once** (the RNG draws are
-       part of the run's one deterministic sequence — recomputing later would shift every later draw) and
-       cache it as a field, ready for step 3 to read when building the wire payload.
-    3. [ ] `RegionMapRevealed` wire update + field guards + the `TestAltProfile` leg.
+    2. [x] **Wire into `RunDirector`** ✅ DONE (2026-08-18) — computed exactly once, at biome-mode run start
+       (right where `RunAsync` already emits `BuildRegionMap()`), via
+       `IslandLayoutGenerator.Generate(_playableBiomes, _rng ?? SystemRandomSource.Instance)` — the same shared
+       `IRandomSource` every other per-run roll draws from, never a fresh one — and cached on a new
+       `_islandLayout` field (+ an `internal IslandLayout?` test seam) for step 3 to read when it builds the
+       wire payload. Covered by `RunDirectorIslandLayoutTests` (matches a bare `Generate` call off the same
+       seed; caches the whole playable set even when the run only ever visits one biome; stays `null` outside
+       biome mode).
+       **Real gap found and fixed, not just wired:** the full test suite turned up 4 failures in
+       `RunDirectorBiomeTests` — they hand `RunDirector` the **un-sampled, full 18-biome `Biomes.Kanto`
+       registry** as `PlayableBiomes` directly (to test the 3-of-N route-offer sample, nothing to do with the
+       grid), which is bigger than `IslandLayoutGenerator`'s fuzz-validated range (sizes 2–12, matched to
+       `EncounterFactory.RunBiomeMapSize` = 10, the only real caller's actual ceiling). On the full registry —
+       whose several 3-cycles (e.g. meadow-trail↔whispering-woods↔bramble-thicket) add "cross" edges a
+       spanning-tree-shaped layout doesn't have to fight — the generator isn't just occasionally unlucky: one
+       seed exhausted every fallback level and threw, and even the seeds that *succeeded* took 40–49 seconds
+       each. **User's call (2026-08-18):** fix the tests to match how `RunDirector` is actually ever called in
+       production — `Biomes.RandomConnectedMap(Biomes.Kanto, EncounterFactory.RunBiomeMapSize, source)` off a
+       single shared source (mirroring `EncounterFactory.CreatePlayerSetupAsync`), same as every real caller —
+       rather than hardening the generator for a size no real run produces. All 4 tests pass fast (~1s total)
+       against the sampled subset; full suite green (1492/1492, 3s). **Follow-up, not blocking:** if a future
+       generation's biome roster grows past ~12, or `RunBiomeMapSize` is ever raised, `IslandLayoutGenerator`
+       will need hardening for that range first — the scale cliff is real, just currently unreachable from any
+       actual caller. Not scheduled; revisit if either precondition changes.
+    3. [ ] `RegionMapRevealed` wire update + field guards + the `TestAltProfile` leg. **Next up:** read
+       `RunDirector`'s new `_islandLayout` (step 2) in `BuildRegionMap()` and project it onto the wire payload
+       (grid `Width`/`Height`, per-biome `GridPoint`, per-edge `IslandRoute` cell paths) in place of the old
+       authored `MapX`/`MapY`; add the corresponding `WebEventContractTests` field guards and `TestAltProfile`'s
+       fake region needs grid geometry too (see the stage's opening note).
     4. [ ] Client grid renderer, wired to the locked tile art.
   - [ ] **4d+ — the surface catalog, jointly iterated** (each its own greenlit mini-plan): battle command menu
     (settled — the 2×2 grid, verbs fixed), move select, battle HUD, CHECK POKEMON, BAG, party surfaces, run

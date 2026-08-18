@@ -2,6 +2,7 @@ using creaturegame.Attacks;
 using creaturegame.Combat;
 using creaturegame.Creatures;
 using creaturegame.Tests.TestSupport;
+using creaturegame.Web.Battle;
 
 namespace creaturegame.Tests.Integration.Flow;
 
@@ -192,7 +193,7 @@ public class RunDirectorBiomeTests
         var same = await CaptureOpeningRoute(seed: 12345);
 
         Assert.Equal(first, same); // same seed → same offered biomes, same order
-        Assert.Equal(3, first.Count); // sampled down to the option count, from the 18-biome Kanto set
+        Assert.Equal(3, first.Count); // sampled down to the option count, from the run's playable subset
     }
 
     // The opening route choice must always hand the starter at least one favourable lane — a biome whose theme
@@ -226,7 +227,12 @@ public class RunDirectorBiomeTests
     }
 
     // Runs until the player faints on the first encounter, so only the opening route choice is recorded; returns
-    // the offered biome ids in order. Uses the real Kanto roster so the sample is a meaningful 3-of-18 draw.
+    // the offered biome ids in order. Samples the playable set down from the full Kanto roster via
+    // Biomes.RandomConnectedMap — the same way EncounterFactory (the only real caller) ever builds it — off a
+    // single shared source, so the sample is a meaningful 3-of-<= RunBiomeMapSize draw, not 3-of-18: the full,
+    // un-sampled 18-biome registry is bigger than IslandLayoutGenerator's validated range (Stage 4c step 2 found
+    // this the hard way — the full registry's several 3-cycles make routing it directly slow/unreliable, a gap
+    // tracked in TODO.md rather than exercised here).
     private static async Task<List<string>> CaptureOpeningRoute(int seed)
     {
         var player = Fighter("Player", hp: 200, attack: 1, speed: 1, level: 50); // slow & weak: loses at once
@@ -242,6 +248,7 @@ public class RunDirectorBiomeTests
             return Task.FromResult(enemy);
         };
         var input = new BiomeScriptedInput([], "tackle"); // no script → takes the first offered each time
+        var source = new SeededRandomSource(seed);
         var runner = new RunDirector(
             player,
             supplier,
@@ -253,8 +260,12 @@ public class RunDirectorBiomeTests
             {
                 Emitter = new RecordingEmitter(),
                 Rules = new ScriptableRules().Deterministic(),
-                Rng = new SeededRandomSource(seed),
-                PlayableBiomes = Biomes.Kanto,
+                Rng = source,
+                PlayableBiomes = Biomes.RandomConnectedMap(
+                    Biomes.Kanto,
+                    EncounterFactory.RunBiomeMapSize,
+                    source
+                ),
                 MinEventsPerBiome = 3,
                 MaxEventsPerBiome = 3,
                 NodePlanFactory = AllWildPlan,
@@ -297,6 +308,7 @@ public class RunDirectorBiomeTests
         );
 
         var input = new BiomeScriptedInput([], "tackle");
+        var source = new SeededRandomSource(seed);
         var runner = new RunDirector(
             player,
             (_, _, _, _) =>
@@ -309,8 +321,14 @@ public class RunDirectorBiomeTests
             {
                 Emitter = new RecordingEmitter(),
                 Rules = new ScriptableRules().Deterministic(),
-                Rng = new SeededRandomSource(seed),
-                PlayableBiomes = Biomes.Kanto,
+                Rng = source,
+                // Sampled down like CaptureOpeningRoute (and the real EncounterFactory caller) — see its comment
+                // for why the full 18-biome registry isn't handed to RunDirector directly here.
+                PlayableBiomes = Biomes.RandomConnectedMap(
+                    Biomes.Kanto,
+                    EncounterFactory.RunBiomeMapSize,
+                    source
+                ),
                 MinEventsPerBiome = 3,
                 MaxEventsPerBiome = 3,
                 NodePlanFactory = AllWildPlan,
