@@ -1,13 +1,22 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { TypeBadge, typeColor } from '../components/TypeBadge';
-import { MapGlyphSprite, TypeChip, typeIconId, nodeIconId } from './mapGlyphs';
+import { TypeBadge } from '../components/TypeBadge';
+import { MapGlyphSprite, TypeChip, nodeIconId } from './mapGlyphs';
 import { applyGenerationTheme, warnOnMissingTypeAssets } from '../generations/presentation';
 import { BattleCanvas } from '../battle/BattleCanvas';
 import { useBattleHub, type LevelUpPanel, type DropToast, type PartyMember } from '../hooks/useBattleHub';
 import { useEscapeKey } from '../hooks/useEscapeKey';
-import { type RegionBiome, type BiomeOption } from '../battle/timeline';
+import { type RegionBiome, type RegionRoute, type BiomeOption } from '../battle/timeline';
 import { regionEdgeKey, travelledEdgeKeys } from '../battle/regionMap';
+import {
+  coreLandCells,
+  dilateLand,
+  coastSides,
+  scatterFor,
+  parseCellKey,
+  biomeCaptionStatus,
+  TOWN_MAP_DILATION,
+} from '../battle/townMapLayout';
 import { powerPill } from '../battle/movePower';
 import { bossTrainerName } from '../battle/bossTrainer';
 import type { Species } from '../types/Species';
@@ -223,7 +232,10 @@ export function BattleScreen() {
             and logic-driven. */}
         {state.regionBiomes.length > 0 && (mapPinned || mapPeek) && (
           <RunMapPanel
+            width={state.regionWidth}
+            height={state.regionHeight}
             biomes={state.regionBiomes}
+            routes={state.regionRoutes}
             routePath={state.routePath}
             currentId={state.currentBiomeId}
             biomeName={state.mapBiomeName}
@@ -304,7 +316,10 @@ export function BattleScreen() {
 
       {state.biomeChoice && (
         <RouteChoiceMap
+          width={state.regionWidth}
+          height={state.regionHeight}
           biomes={state.regionBiomes}
+          routes={state.regionRoutes}
           routePath={state.routePath}
           currentId={state.currentBiomeId}
           options={state.biomeChoice.options}
@@ -401,102 +416,134 @@ function NodeLadder({ nodePlan, pin, bossSub }: { nodePlan: string[]; pin: numbe
   );
 }
 
-// The region-map graph: the run's playable biomes as waypoints at their authored 2-D coords, wired by their
-// (playable-subset) neighbour edges, with the travelled route highlighted and the current biome marked. When
-// `onChoose` is supplied, the biomes in `offeredIds` become clickable route picks (the map-based route choice);
-// otherwise it's a read-only overview. A presentation view — the offered set is decided server-side.
-function RegionMap({ biomes, routePath, currentId, offeredIds, onChoose }: {
+// The Town Map grid: the run's playable biomes laid out on the procedurally-generated grid (Stage 4c), each a
+// square tile with a town marker — hollow/shuttered (#109) if unvisited/offered, solid/open-door (#110) if
+// visited or current — a bouncing chevron over the current one, dotted routes for untravelled edges and a
+// thick solid line for travelled ones (the wire's own per-edge cell path, not re-derived here), and a synthesized
+// landmass (see TOWN_MAP_DILATION) with a coastline and sparse scatter terrain around the sparse server data so
+// it reads as an island, not a bare path over open water. When `onChoose` is supplied, the biomes in
+// `offeredIds` become clickable route picks (the map-based route choice); otherwise it's a read-only overview.
+// Hovering/focusing a town updates the caption band below the map — there are no floating per-tile labels.
+function TownMapGrid({ width, height, biomes, routes, routePath, currentId, offeredIds, onChoose }: {
+  width: number;
+  height: number;
   biomes: RegionBiome[];
+  routes: RegionRoute[];
   routePath: string[];
   currentId: string;
   offeredIds: ReadonlySet<string>;
   onChoose?: (id: string) => void;
 }) {
-  const byId = new Map(biomes.map(b => [b.id, b]));
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+
+  // The land/dilation derivation only depends on the wire data (biomes/routes/width/height), never on
+  // hover state — memoized so hovering a town doesn't re-run the dilation BFS on every mouseenter/mouseleave.
+  // Kept above the early-return guard below (rules of hooks: every hook must run on every render).
+  const { core, land } = useMemo(() => {
+    const c = coreLandCells(biomes, routes); // exactly what the server generated — biome + route cells
+    return { core: c, land: dilateLand(c, width, height, TOWN_MAP_DILATION) }; // synthesized fuller landmass
+  }, [biomes, routes, width, height]);
+
+  // Legacy chain / not-yet-revealed guard — no grid to draw.
+  if (width <= 0 || height <= 0 || biomes.length === 0) return null;
+
   const visited = new Set(routePath); // node-visited membership
   const travelled = travelledEdgeKeys(routePath); // edges actually walked (consecutive hops, not "both visited")
-  // Undirected edges, de-duped by drawing each pair once (id order) — both endpoints must be in the sent subset.
-  const edges: Array<{ a: RegionBiome; b: RegionBiome }> = [];
-  for (const b of biomes)
-    for (const nid of b.neighbours) {
-      const n = byId.get(nid);
-      if (n && b.id < n.id) edges.push({ a: b, b: n });
-    }
-  const primary = (b: RegionBiome) => b.types[0] ?? 'Normal';
+  const cellPct = 100 / width, rowPct = 100 / height;
+
+  const hovered = biomes.find(b => b.id === hoveredId) ?? biomes.find(b => b.id === currentId) ?? null;
+  const hoveredIsCurrent = hovered?.id === currentId;
+  const hoveredIsOffered = hovered ? offeredIds.has(hovered.id) : false;
+  const hoveredIsVisited = hovered ? visited.has(hovered.id) : false;
+
   return (
-    <div className="region-map">
-      {/* Territory layer: each biome glows in its type colour (background imagery), watermarked with its
-          primary-type icon. screen-blended so neighbours bleed into one painterly overworld. */}
-      <div className="region-terr" aria-hidden="true">
-        {biomes.map(b => (
-          <span
-            key={b.id}
-            className="region-territory"
-            style={{ left: `${b.x}%`, top: `${b.y}%`, '--c': typeColor(primary(b)) } as CSSProperties}
-          >
-            <svg className="region-territory-motif" viewBox="0 0 24 24"><use href={`#${typeIconId(primary(b))}`} /></svg>
-          </span>
-        ))}
-      </div>
-      {/* Edge layer: a path per neighbour link, its gradient blending the two biomes' type colours. */}
-      <svg className="region-map-edges" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-        <defs>
-          {edges.map(({ a, b }, i) => (
-            <linearGradient key={i} id={`edge-grad-${i}`} gradientUnits="userSpaceOnUse" x1={a.x} y1={a.y} x2={b.x} y2={b.y}>
-              <stop offset="0" stopColor={typeColor(primary(a))} />
-              <stop offset="1" stopColor={typeColor(primary(b))} />
-            </linearGradient>
-          ))}
-        </defs>
-        {edges.map(({ a, b }, i) => {
-          const isTravelled = travelled.has(regionEdgeKey(a.id, b.id));
-          // Gentle perpendicular bow so links read as drawn paths, not a stiff mesh.
-          const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-          const dx = b.x - a.x, dy = b.y - a.y, len = Math.hypot(dx, dy) || 1;
-          const cx = mx + (-dy / len) * 5, cy = my + (dx / len) * 5;
+    <div className="town-map">
+      <div className="town-map-stage" style={{ aspectRatio: `${width} / ${height}` }}>
+        {/* Land layer: every server-generated (biome/route) cell plus the synthesized dilation ring around it,
+            each its own tile so the coastline trim can be placed per-cell against whatever's actually adjacent. */}
+        {[...land].map(key => {
+          const { x, y } = parseCellKey(key);
+          const sides = coastSides(land, x, y);
+          const scatter = core.has(key) ? null : scatterFor(x, y); // never decorate a biome/route cell itself
           return (
-            <path
-              key={i}
-              d={`M${a.x} ${a.y} Q${cx} ${cy} ${b.x} ${b.y}`}
-              stroke={isTravelled ? undefined : `url(#edge-grad-${i})`}
-              className={`region-edge${isTravelled ? ' region-edge--travelled' : ''}`}
-            />
+            <div
+              key={key}
+              className="town-map-cell"
+              style={{ left: `${x * cellPct}%`, top: `${y * rowPct}%`, width: `${cellPct}%`, height: `${rowPct}%` }}
+              aria-hidden="true"
+            >
+              {sides.map(s => <span key={s} className={`town-map-coast town-map-coast--${s}`} />)}
+              {scatter && <span className={`town-map-scatter town-map-scatter--${scatter}`} />}
+            </div>
           );
         })}
-      </svg>
-      {biomes.map(b => {
-        const isCurrent = b.id === currentId;
-        const isOffered = offeredIds.has(b.id);
-        const choosable = isOffered && !!onChoose;
-        const cls = [
-          'region-node',
-          isCurrent ? 'region-node--current' : '',
-          visited.has(b.id) && !isCurrent ? 'region-node--visited' : '',
-          isOffered ? 'region-node--offered' : '',
-        ].filter(Boolean).join(' ');
-        return (
-          <button
-            key={b.id}
-            type="button"
-            className={cls}
-            style={{ left: `${b.x}%`, top: `${b.y}%`, '--node-clr': typeColor(primary(b)) } as CSSProperties}
-            disabled={!choosable}
-            onClick={choosable ? () => onChoose!(b.id) : undefined}
-            aria-current={isCurrent ? 'location' : undefined}
-            aria-label={`${b.name}${isCurrent ? ' (current)' : ''}${choosable ? ' — choose this route' : ''}`}
-          >
-            {isCurrent && <span className="region-node-flag" aria-hidden="true">You are here</span>}
-            {choosable && <span className="region-node-flag region-node-flag--pick" aria-hidden="true">Choose</span>}
-            <span className="region-node-disc" aria-hidden="true">
-              <svg viewBox="0 0 24 24"><use href={`#${typeIconId(primary(b))}`} /></svg>
+        {/* Route layer: the wire's own per-edge cell path (never re-derived client-side) — a thick solid line
+            for a travelled edge, a dotted line otherwise. Drawn under the town markers (below), over the land. */}
+        <svg className="town-map-routes" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" aria-hidden="true">
+          {routes.map((r, i) => {
+            const isTravelled = travelled.has(regionEdgeKey(r.fromBiomeId, r.toBiomeId));
+            const points = r.cells.map(c => `${c.x + 0.5},${c.y + 0.5}`).join(' ');
+            return (
+              <polyline
+                key={i}
+                points={points}
+                className={`town-map-route${isTravelled ? ' town-map-route--travelled' : ' town-map-route--untravelled'}`}
+              />
+            );
+          })}
+        </svg>
+        {/* Town layer: one marker per biome, on top of the land/route layers. */}
+        {biomes.map(b => {
+          const isCurrent = b.id === currentId;
+          const isOffered = offeredIds.has(b.id);
+          const choosable = isOffered && !!onChoose;
+          const isVisited = visited.has(b.id);
+          const open = isVisited || isCurrent; // open-door marker once ever visited or currently standing here
+          return (
+            <button
+              key={b.id}
+              type="button"
+              className={[
+                'town-map-town',
+                choosable ? 'town-map-town--offered' : '',
+                isCurrent ? 'town-map-town--current' : '',
+              ].filter(Boolean).join(' ')}
+              style={{ left: `${b.x * cellPct}%`, top: `${b.y * rowPct}%`, width: `${cellPct}%`, height: `${rowPct}%` }}
+              // In choice mode (onChoose set) only an offered town is a keyboard tab-stop, matching what's
+              // clickable. In the read-only overview (onChoose undefined) every town is reachable so a
+              // keyboard-only user can read every biome's name via focus — there's nothing to click either way.
+              tabIndex={onChoose ? (choosable ? 0 : -1) : 0}
+              onClick={choosable ? () => onChoose!(b.id) : undefined}
+              onMouseEnter={() => setHoveredId(b.id)}
+              onMouseLeave={() => setHoveredId(null)}
+              onFocus={() => setHoveredId(b.id)}
+              onBlur={() => setHoveredId(null)}
+              aria-current={isCurrent ? 'location' : undefined}
+              // Only meaningful in choice mode — a non-offered town there is a real (focusable, inert-on-click)
+              // control an AT user could otherwise mistake for actionable; the read-only overview has no
+              // actionable towns at all, so aria-disabled would be noise there.
+              aria-disabled={onChoose ? !choosable : undefined}
+              aria-label={`${b.name}${isCurrent ? ' (current)' : ''}${choosable ? ' — choose this route' : ''}`}
+            >
+              <span className={`town-map-marker${open ? ' town-map-marker--open' : ' town-map-marker--shut'}`} />
+              {isCurrent && <span className="town-map-cursor" aria-hidden="true" />}
+              {choosable && <span className="town-map-pick-flag" aria-hidden="true">Choose</span>}
+            </button>
+          );
+        })}
+      </div>
+      {/* Caption band: the only place a biome's name/status/type(s) show — defaults to the current biome,
+          updates on hover/focus of any town. */}
+      <div className="town-map-caption">
+        {hovered ? (
+          <>
+            <b>{hovered.name}</b> — {biomeCaptionStatus(hoveredIsCurrent, hoveredIsVisited, hoveredIsOffered)}
+            <span className="town-map-caption-chips" aria-hidden="true">
+              {hovered.types.map(t => <TypeChip key={t} type={t} />)}
             </span>
-            <span className="region-node-label">{b.name}</span>
-            <span className="region-node-chips" aria-hidden="true">
-              {b.types.map(t => <TypeChip key={t} type={t} />)}
-            </span>
-          </button>
-        );
-      })}
+          </>
+        ) : 'Hover or focus a town to see its name.'}
+      </div>
     </div>
   );
 }
@@ -504,8 +551,11 @@ function RegionMap({ biomes, routePath, currentId, offeredIds, onChoose }: {
 // The pinned/peeked route-map overlay: the whole-run region graph plus, when a biome is active, its node ladder.
 // Toggled by the MAP button and auto-peeked at each ladder change. Read-only (no route pick here — that happens
 // in the RouteChoiceMap when the run offers a choice).
-function RunMapPanel({ biomes, routePath, currentId, biomeName, nodePlan, pin, pinned, onClose }: {
+function RunMapPanel({ width, height, biomes, routes, routePath, currentId, biomeName, nodePlan, pin, pinned, onClose }: {
+  width: number;
+  height: number;
   biomes: RegionBiome[];
+  routes: RegionRoute[];
   routePath: string[];
   currentId: string;
   biomeName: string;
@@ -555,7 +605,15 @@ function RunMapPanel({ biomes, routePath, currentId, biomeName, nodePlan, pin, p
       </div>
       <div className="map-stage">
         <div className="map-overworld">
-          <RegionMap biomes={biomes} routePath={routePath} currentId={currentId} offeredIds={EMPTY_ID_SET} />
+          <TownMapGrid
+            width={width}
+            height={height}
+            biomes={biomes}
+            routes={routes}
+            routePath={routePath}
+            currentId={currentId}
+            offeredIds={EMPTY_ID_SET}
+          />
         </div>
         {nodePlan.length > 0 && (
           <aside className="map-ladder-panel">
@@ -568,7 +626,7 @@ function RunMapPanel({ biomes, routePath, currentId, biomeName, nodePlan, pin, p
       <div className="map-legend" aria-hidden="true">
         <span className="map-legend-key"><span className="map-legend-swatch map-legend-swatch--here" />You are here</span>
         <span className="map-legend-key"><span className="map-legend-swatch map-legend-swatch--travelled" />Travelled</span>
-        <span className="map-legend-key map-legend-note">Territory colour = biome type</span>
+        <span className="map-legend-key map-legend-note">Marker: solid = visited, hollow = unvisited</span>
       </div>
     </div>
   );
@@ -577,8 +635,11 @@ function RunMapPanel({ biomes, routePath, currentId, biomeName, nodePlan, pin, p
 // The map-based route choice (replaces the old biome-card modal): a blocking, prominent region map where the
 // offered biomes glow as clickable waypoints. Clicking one charts the route (the backend is blocked awaiting it).
 // The run always offers at least one option, so there is no empty/decline state — it's a required choice.
-function RouteChoiceMap({ biomes, routePath, currentId, options, onChoose }: {
+function RouteChoiceMap({ width, height, biomes, routes, routePath, currentId, options, onChoose }: {
+  width: number;
+  height: number;
   biomes: RegionBiome[];
+  routes: RegionRoute[];
   routePath: string[];
   currentId: string;
   options: BiomeOption[];
@@ -589,13 +650,22 @@ function RouteChoiceMap({ biomes, routePath, currentId, options, onChoose }: {
   // lands on an actionable route pick (not stranded on the backdrop) and can Tab between the offered biomes.
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    ref.current?.querySelector<HTMLButtonElement>('.region-node--offered')?.focus();
+    ref.current?.querySelector<HTMLButtonElement>('.town-map-town--offered')?.focus();
   }, []);
   return (
     <Modal label="Choose your route" dismiss="blocking" card="route-choice-modal" cardRef={ref}>
       <p className="biome-title">Choose your route</p>
       <p className="biome-sub">Click a highlighted biome to chart your path.</p>
-      <RegionMap biomes={biomes} routePath={routePath} currentId={currentId} offeredIds={offeredIds} onChoose={onChoose} />
+      <TownMapGrid
+        width={width}
+        height={height}
+        biomes={biomes}
+        routes={routes}
+        routePath={routePath}
+        currentId={currentId}
+        offeredIds={offeredIds}
+        onChoose={onChoose}
+      />
       <div className="route-choice-legend">
         {options.map(o => (
           <span key={o.id} className="route-choice-legend-item">

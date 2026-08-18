@@ -246,13 +246,22 @@ describe('battleReducer — encounter-map ladder', () => {
     expect(next.typeRoster).toEqual(['Normal', 'Fire', 'Water']);
   });
 
-  it('REGION_MAP_REVEALED stores the playable biome graph for the overlay', () => {
+  it('REGION_MAP_REVEALED stores the grid canvas, biome graph, and route paths for the overlay', () => {
     const biomes = [
-      { id: 'a', name: 'Alpha', types: ['Fire'], neighbours: ['b'], x: 10, y: 20 },
-      { id: 'b', name: 'Beta', types: ['Water'], neighbours: ['a'], x: 30, y: 40 },
+      { id: 'a', name: 'Alpha', types: ['Fire'], neighbours: ['b'], x: 1, y: 2 },
+      { id: 'b', name: 'Beta', types: ['Water'], neighbours: ['a'], x: 3, y: 4 },
     ];
-    const next = battleReducer(ready(), { type: 'REGION_MAP_REVEALED', biomes });
+    const routes = [
+      { fromBiomeId: 'a', toBiomeId: 'b', cells: [{ x: 1, y: 2 }, { x: 3, y: 4 }] },
+    ];
+    const next = battleReducer(
+      ready(),
+      { type: 'REGION_MAP_REVEALED', width: 8, height: 6, biomes, routes },
+    );
+    expect(next.regionWidth).toBe(8);
+    expect(next.regionHeight).toBe(6);
     expect(next.regionBiomes).toEqual(biomes);
+    expect(next.regionRoutes).toEqual(routes);
   });
 
   it('MAP_PLAN_REVEALED sets the node plan and resets the pin to −1 (no node entered yet)', () => {

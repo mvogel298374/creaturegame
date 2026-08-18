@@ -33,9 +33,18 @@ export interface StatBlock { maxHp: number; attack: number; defense: number; spe
 // One biome offered on the map screen: stable id, display name, and 1–3 theme types (for the card's badges).
 export interface BiomeOption { id: string; name: string; types: string[] }
 
-// One biome node on the region-map overlay: id, name, type theme, the playable-subset neighbour ids (edges to
-// draw), and its authored 2-D map position (0–100 each, y down). Matches RegionMapRevealed's wire projection.
+// One biome node on the Town Map: id, name, type theme, the playable-subset neighbour ids (edges to draw), and
+// its procedurally laid-out grid cell (Stage 4c — supersedes the old authored 0–100 percent mapX/mapY). Matches
+// RegionMapRevealed's wire projection.
 export interface RegionBiome { id: string; name: string; types: string[]; neighbours: string[]; x: number; y: number }
+
+// One grid cell along a route's collision-free orthogonal path (IslandLayoutGenerator's output, ridden verbatim
+// onto the wire — GridPoint).
+export interface RegionRouteCell { x: number; y: number }
+
+// One edge's realized path on the grid: the two biome ids it connects and the full cell-by-cell corridor
+// between them (including both endpoints), straight orthogonal segments only (decision 11 — never a curve).
+export interface RegionRoute { fromBiomeId: string; toBiomeId: string; cells: RegionRouteCell[] }
 
 // A rolled item's value tier (rarer = more expensive); drives the reward-card accent colour.
 export type RewardRarity = 'Common' | 'Uncommon' | 'Rare' | 'Epic';
@@ -182,8 +191,9 @@ export type Action =
   // The run's presentation identity (generation id + type roster), echoed by the server on every hub
   // attach — first connect and reconnect alike (docs/GENERATION_PROFILE.md §7.2).
   | { type: 'RUN_PRESENTATION'; generation: string; typeRoster: string[] }
-  // Region-map overlay (whole run): the playable biome graph, revealed once at run start.
-  | { type: 'REGION_MAP_REVEALED'; biomes: RegionBiome[] }
+  // Town Map (whole run): the playable biome graph laid out on the procedurally-generated grid, revealed once
+  // at run start (Stage 4c) — grid canvas size, each biome's cell, and each edge's collision-free route path.
+  | { type: 'REGION_MAP_REVEALED'; width: number; height: number; biomes: RegionBiome[]; routes: RegionRoute[] }
   // Encounter-map ladder (current biome): title the biome (+ trace the route by id), reveal its seeded node
   // plan, and advance the pin one node at a time. A presentation view over the run — the sequence stays
   // logic-driven (one MAP_NODE_ENTERED per RunNodeEntered, incl. the wild nodes that carry no banner).
@@ -505,16 +515,34 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       };
 
     case 'RegionMapRevealed': {
-      // The playable region graph, sent once at run start — feed it to the region-map overlay (no battle-log line).
+      // The Town Map grid, sent once at run start — feed it to the map overlay (no battle-log line).
       const biomes: RegionBiome[] = ((payload.biomes as Array<Record<string, unknown>>) ?? []).map(b => ({
         id: b.id as string,
         name: b.name as string,
         types: (b.types as string[]) ?? [],
         neighbours: (b.neighbours as string[]) ?? [],
-        x: b.mapX as number,
-        y: b.mapY as number,
+        x: b.x as number,
+        y: b.y as number,
       }));
-      return { steps: [d({ type: 'REGION_MAP_REVEALED', biomes })] };
+      const routes: RegionRoute[] = ((payload.routes as Array<Record<string, unknown>>) ?? []).map(r => ({
+        fromBiomeId: r.fromBiomeId as string,
+        toBiomeId: r.toBiomeId as string,
+        cells: ((r.cells as Array<Record<string, unknown>>) ?? []).map(c => ({
+          x: c.x as number,
+          y: c.y as number,
+        })),
+      }));
+      return {
+        steps: [
+          d({
+            type: 'REGION_MAP_REVEALED',
+            width: (payload.width as number) ?? 0,
+            height: (payload.height as number) ?? 0,
+            biomes,
+            routes,
+          }),
+        ],
+      };
     }
 
     case 'BiomeNodePlanRevealed':

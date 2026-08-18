@@ -66,7 +66,7 @@ JSON static file later if designers need to edit without a rebuild.)
 
 ```
 enum Region              { Kanto, … }                                   // a content-grouping axis (= the multi-gen axis)
-record BiomeDefinition   ( Id, Name, Region, Types[1..3], Neighbours[], MapX, MapY ) // Neighbours TRAVERSED in Phase 3; MapX/MapY = authored region-map coords (Encounter Map) — PLANNED REPLACEMENT: integer grid-cell coords + authored route cell-paths (the Town Map, GENERATION_PROFILE.md §7.4, not yet built)
+record BiomeDefinition   ( Id, Name, Region, Types[1..3], Neighbours[], MapX, MapY ) // Neighbours TRAVERSED in Phase 3; MapX/MapY are now vestigial — the Town Map (GENERATION_PROFILE.md §7.4, shipped 2026-08-18) replaced them with a per-run PROCEDURALLY GENERATED grid layout (IslandLayoutGenerator), not authored route cell-paths as originally planned; RegionMapRevealed no longer reads MapX/MapY at all
    .Contains(species)    => Type1 ∈ Types || Type2 ∈ Types              // either-type match
    .HasAnyIn(pool)       => any on-theme species in pool
 static Biomes            // the registry — region ⇒ biome list

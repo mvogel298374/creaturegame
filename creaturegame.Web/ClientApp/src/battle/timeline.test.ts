@@ -334,18 +334,31 @@ describe('expandEvent — control plane vs timeline', () => {
     expect(steps).toBeUndefined();
   });
 
-  it('RegionMapRevealed feeds the region-map overlay the playable biome graph (id/types/edges/coords)', () => {
+  it('RegionMapRevealed feeds the Town Map overlay the grid canvas, biome graph, and route paths', () => {
     const { steps } = expandEvent('RegionMapRevealed', {
+      width: 8,
+      height: 6,
       biomes: [
-        { id: 'a', name: 'Alpha', types: ['Fire'], neighbours: ['b'], mapX: 10, mapY: 20 },
-        { id: 'b', name: 'Beta', types: ['Water'], neighbours: ['a'], mapX: 30, mapY: 40 },
+        { id: 'a', name: 'Alpha', types: ['Fire'], neighbours: ['b'], x: 1, y: 2 },
+        { id: 'b', name: 'Beta', types: ['Water'], neighbours: ['a'], x: 3, y: 4 },
+      ],
+      routes: [
+        { fromBiomeId: 'a', toBiomeId: 'b', cells: [{ x: 1, y: 2 }, { x: 2, y: 2 }, { x: 3, y: 2 }, { x: 3, y: 4 }] },
       ],
     }, CTX);
     expect(dispatched(steps)).toEqual([
-      { type: 'REGION_MAP_REVEALED', biomes: [
-        { id: 'a', name: 'Alpha', types: ['Fire'], neighbours: ['b'], x: 10, y: 20 },
-        { id: 'b', name: 'Beta', types: ['Water'], neighbours: ['a'], x: 30, y: 40 },
-      ] },
+      {
+        type: 'REGION_MAP_REVEALED',
+        width: 8,
+        height: 6,
+        biomes: [
+          { id: 'a', name: 'Alpha', types: ['Fire'], neighbours: ['b'], x: 1, y: 2 },
+          { id: 'b', name: 'Beta', types: ['Water'], neighbours: ['a'], x: 3, y: 4 },
+        ],
+        routes: [
+          { fromBiomeId: 'a', toBiomeId: 'b', cells: [{ x: 1, y: 2 }, { x: 2, y: 2 }, { x: 3, y: 2 }, { x: 3, y: 4 }] },
+        ],
+      },
     ]);
     expect(logLines(steps)).toEqual([]);
   });

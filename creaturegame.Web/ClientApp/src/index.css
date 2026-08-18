@@ -105,6 +105,37 @@
     radial-gradient(circle at 94% 38%, rgba(21,19,15,0.2) 0 1.5px, transparent 1.5px),
     radial-gradient(circle at 54% 88%, rgba(21,19,15,0.2) 0 1.2px, transparent 1.2px),
     radial-gradient(circle at 74% 20%, rgba(21,19,15,0.2) 0 1.4px, transparent 1.4px);
+
+  /* Town Map (Stage 4c step 4, GENERATION_PROFILE.md §7.4): --ks-grain-water is the same dot recipe as
+     --ks-grain, tones inverted (light dots, for contrast on the darker water fill) — used for the water
+     cells alongside --ks-grain for land. Every --ks-tm-* image below is a 16×16 tile lifted verbatim from
+     Kenney's "Monochrome RPG" (kenney.nl/assets/monochrome-rpg, CC0), recoloured by a straight 1:1 swap of
+     the pack's own 4-colour source ramp (white/#B0B0B0/black/#545454) onto this file's --ks-fill/--ks-fog/
+     --ks-ink/--ks-dim — confirmed byte-exact against the downloaded source sheet (decision 12's standing
+     verify-before-use rule), not redrawn. Tile indices (the pack's own row-major numbering, 17 cols):
+     trees #14/#15/#16, rock cluster #30, boulder #105, signpost #67, town marker #109 (shuttered —
+     unvisited/offered) and #110 (open door — visited/current), coastline edge trim #2 (4 pre-rotated
+     copies, one per side). No flower — tile #27 turned out to be an unusable fragment, discarded rather
+     than replaced (see docs/GENERATION_PROFILE.md §7.4's "tile pick set is locked" record). */
+  --ks-grain-water:
+    radial-gradient(circle at 11% 22%, rgba(255,255,255,0.55) 0 1.6px, transparent 1.6px),
+    radial-gradient(circle at 63% 9%,  rgba(255,255,255,0.55) 0 1.2px, transparent 1.2px),
+    radial-gradient(circle at 40% 46%, rgba(255,255,255,0.55) 0 1.9px, transparent 1.9px),
+    radial-gradient(circle at 83% 61%, rgba(255,255,255,0.55) 0 1.3px, transparent 1.3px),
+    radial-gradient(circle at 25% 78%, rgba(255,255,255,0.55) 0 1.7px, transparent 1.7px),
+    radial-gradient(circle at 6% 92%,  rgba(255,255,255,0.55) 0 1.1px, transparent 1.1px);
+  --ks-tm-tree-a: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAA30lEQVR4nGP8////fwY0ICYiwIANvHrzAVPwPxIQFeYH4/AA+//oACQGk0cGDMiasWnEZRCKAaJEasZmCAPMAFIBTA8TKMCcbA0YSAUgPeDAFhXm/3/ywlEwJhbA1IP0siCbeuriMTBtpm+F1VaYPDJgBJkCck5RQxtJXuhrqGLYd/gCAwsocYD8UkRaEIA1g/QyIZtIiu0wwAiOS7Tki81LMCdjJOv/OOIYOWGhpz5kAHcBDMBcgp5xcInDwwAZbNm7DcVLIDZIDBsApwPk+AX538fZC5HS0MSQ1YLSCwCzJYtfpUPm1AAAAABJRU5ErkJggg==");
+  --ks-tm-tree-b: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAzElEQVR4nGP8////fwYKAAs2QTERAayKX735gCn4Hw2ICvP/Dw+wRxcGi4Hk0AEDumZCAF0NE7KznWwNCPoZpAbFi/+RTD554SgY4wIweWRXsGCz5dTFY2DaTN8KhY8NMCFz+hqqMAxC14yuhgk5ivYdvoChAF0zSA1ydDKiJyTkAIIFKkgTskUo4D8R0YUecMiAEd0FyK6A2YbOxxoGDGhgy95tKHysyRifAT7OXrikUABKOoBFGch2UIjDnA4KTOTohKUPEMAaBqQAABX5LKOSTyYFAAAAAElFTkSuQmCC");
+  --ks-tm-tree-c: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAxklEQVR4nGP8////fwYcQExEAEy/evMBlxIGFnyat+zdBmfjMoSJgULAhMt2J1sDOB/EhnmHaBesWH8AK5voMAABM30rBkKACZfzT108BhcDsXF5gxE9GpFDHx34OHthxAYTumZ8cQ6SQ3cFC7l+h4P/UCAqzP//5IWjYIwLwORBamGAERYGsMAramjDa2FfQxXDvsMX4F5lRA5EmP+wGQTTCAsLGMCIBXSDQACbRowwQAfI/kRmowOUWEBOPMgJBz1hIccSAO/cxySc2DL6AAAAAElFTkSuQmCC");
+  --ks-tm-rock: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAA8ElEQVR4nKWSPQrCQBCFE0mv4M81tLIQRNBOLOy8h6VVKktPI3baiEKs4jXEwhuMvJW3zq7ZJOCDJTu7O39fJhYRif5Qg5tep1W4tG73q/M1EhHptpuyWk7EF85wp5XlF8eOQs5lQX4CZF5UP2NZgMTvb9gfOfZiNreMtB7P1xfiLt04oLTzdDwwj/XCmQ0oCiLK5arLJuIBDDrxsg6bRPe1Px4sA5YYYkPF5lcoB8KBjV7X6bZwAsHtdM4/EBEV2QmHznigAfvOSBazgpBYGQJCcNSVGoiEFYKmB8kfKgMRgNAGQemZYHZdiQZb2UKV3vT7oieVHJUJAAAAAElFTkSuQmCC");
+  --ks-tm-boulder: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAYUlEQVR4nGP8////fwYGBoZTF48xkALM9K3ANBOyZpggMRphgPHkhaNgF5ADQIYxMVAImIauAWbIsUAJYCLVVvRoZKLI+qGZDswoDQP0TMeEbCIxmQldLdgFMA6pWRqkBwDHOBxrhZY9IAAAAABJRU5ErkJggg==");
+  --ks-tm-signpost: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAlUlEQVR4nGP8////fwYKABMDhYAFl4SYiAAK/9WbD1jVMcK8gK4BBJxsDcD0vsMXMORgBrKgayhqaMNQXITE7muoQjGQEdkFW/ZuYyAG+Dh7YXcBsi3YADbXsRCrEBdgGXAXMBFjMz41jJSmAwaQAdiAqDD//5MXjoIxiI0LUC8vnLp4DMP5oAQDY6PLm+lboYYBuQAALqt8FCLqfQ4AAAAASUVORK5CYII=");
+  --ks-tm-town-open: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAqUlEQVR4nGP8////fwYKABOxCk9dPAbG6ICRUhewIHPERASI0vTqzQcE5z8UiArz/ycWIKtlQTc9ItCBoaihDavNfQ1VDCvWH8AeBmIiAmCnYQsoZGCmbwVXC4+FUwQ04QNMMFPJBSy4JNANxenK/3hiASSGS/zkhaNgNgO6ASAJmCQyQBbHG40MhJyMBpjQ0zgornEBZDmYPgwXoCcUQnKMIP8Q5VYcAADQBuMlPQ/f1QAAAABJRU5ErkJggg==");
+  --ks-tm-town-shut: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAmklEQVR4nGP8////fwYKABOIOHXxGBiTAxgpdQELuoCYiABeDa/efEAV+I8ERIX5/xMC6GoYYV4A2QwzHVd4mOlbwV0Jd8l/NJNPXjiK03aYHLIrmBgoBEyUGsCCTRBXGPQ1VDGsWH8ArgYcJv+JiIHwAHswxhYGjOixgC9FwlxA1VhgwWYjMfkCpgYjEGGJhVjACHIOSTrQAADi4yBc5z6F8gAAAABJRU5ErkJggg==");
+  --ks-tm-coast-top: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAfklEQVR4nGMUFeb/z0ABYDx54ShlBvz/D9F/6uIxFIPM9K0Ykfm45BlhBpALmNAFQDah24buChT5////Y2BQuGATxybHSBUvnMLmNGLBfyKcjQ8zUj0WkAExXmLCJUFseDDh04SeGpHVwNWixzExgYmshqREhA0TVAAzEJfBAE2IMNcyOG/dAAAAAElFTkSuQmCC");
+  --ks-tm-coast-bottom: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAgklEQVR4nGP4//8/Azo+eeHof2QaH2YgpACbwciYiQEKTl089p+BCICh7j8RTkYWR1fDCPYHETaa6VsxYpNnIsbZuDSDACMhFxACTORoQgnI/yREI7YAZ6SqF07hSQu45JiQFYBCm1RDGCn1Agsu09HjHpc8Iyg0KXEBo6gwP0UGAADOxvt8NSbTFwAAAABJRU5ErkJggg==");
+  --ks-tm-coast-left: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAjElEQVR4nGMQFeb/f/LC0f////9nIAczMZAITl089h+Zz4Quga4AHZjpWzEiq2EipACbC0BqcBpwCk0BNguwegEG8GlGB2CXitI7FtBdwMRAgmL0wAV5l4lYA2BhgxFDotAwgIUDMpvsMDAjEBPI3mHCpxlbgoKJwdWhewEdE/IO3nRATFjgjQViUiUAt6cn8xM3EBAAAAAASUVORK5CYII=");
+  --ks-tm-coast-right: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAhUlEQVR4nGP4//8/Azn45IWj/0WF+f8zMRAApy4e+49PnomQZjN9K0Z8hjIhC6LbBtJMlAtOQRVhsw1ZDJthLLg04nM2CviPFrIgTHYsmEFdQsjfKOAkkTbidIEZEf7HB5hIci62dGBGgguwWcZESAGyHDbLUFIiPtfgTJXoIUtRbiQnRgDJBvwf7TQEGAAAAABJRU5ErkJggg==");
 }
 
 /* Extended 2026-08-04: the base "basic view/frame" chrome — page background, the shared .btn /

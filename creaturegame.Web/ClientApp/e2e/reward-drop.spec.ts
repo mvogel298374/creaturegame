@@ -35,7 +35,7 @@ async function startSeededRun(page: import('@playwright/test').Page, seed: numbe
   await page.getByRole('button', { name: /CONFIRM/i }).click();
   // Opening route choice (map-based) — click the first offered biome waypoint; its first node is always a
   // plain wild battle (RunDirector's soft-opening rule).
-  await page.locator('.region-node--offered').first().click({ timeout: 15_000 });
+  await page.locator('.town-map-town--offered').first().click({ timeout: 15_000 });
 }
 
 /** Attacks with the default (first-available) move each turn until the reward-choice modal appears — i.e.

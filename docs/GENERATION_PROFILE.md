@@ -674,7 +674,7 @@ The general rule going forward: the budget applies to **decorative chrome** (fra
 colour that exists to tell the player something *in the moment* (health remaining, type matchup, low resources)
 is gameplay signal and sits outside it, the same as accessibility-motivated colour would.
 
-### 7.4 Sub-stage 4c — the Town Map: a rigid grid region map
+### 7.4 Sub-stage 4c — the Town Map: a rigid grid region map ✅ DONE (2026-08-18)
 
 Decision 9. The current region map (`RegionMap` in `BattleScreen.tsx`) is painterly: free-floating waypoints at
 authored percent coords (`BiomeDefinition.MapX/MapY`, 0–100), screen-blended type-colour territories, curved
@@ -877,13 +877,21 @@ specific to the Kenney pack:
 - Adding *further* scatter/prop variety later is fine (decision 12 still governs how any new pick gets
   verified) — swapping out any of the picks above, or reviving the roof+wall composite idea, is not.
 
-**Still open for 4c's build:** exact canvas sizing formula (how generously `IslandLayoutGenerator` pads the
-grid relative to biome count — comfortable vs. compact has no ratified answer yet, to be tuned during
-build/playtest) and the retry-budget/fallback-trigger tuning. Both are algorithm-internal, unblocked by
-anything above. **Implementation staging (backend first, agreed 2026-08-18):** (1) `IslandLayoutGenerator` +
-its fuzz-test suite, fully isolated from wire/DB/client; (2) wire it into `RunDirector`/`RunState`, computed
-once at map-selection time and cached for the run's lifetime; (3) `RegionMapRevealed` wire update + field
-guards + the `TestAltProfile` leg; (4) the client grid renderer, wired to the locked tile art (§ above).
+**Build staged backend-first (agreed 2026-08-18), all four steps shipped the same day** — full record in
+`docs/TODO.md`'s "4c — the Town Map" entry: (1) `IslandLayoutGenerator` + its fuzz-test suite, fully isolated
+from wire/DB/client; (2) wired into `RunDirector`/`RunState` (computed once at map-selection time, cached on
+`RunState.IslandLayout` — moved there from an initial `RunDirector` field after a `requirements-review`
+finding, for forward-compatibility with a future save layer and multiple-islands-per-run); (3)
+`RegionMapRevealed` wire update + field guards + the `TestAltProfile` leg; (4) the client grid renderer, wired
+to the locked tile art — including a real algorithm gap found and closed along the way (the sparse
+server-generated graph needed a client-side landmass synthesis pass — `townMapLayout.ts`'s dilation — to read
+as an island rather than a bare path over water; see the TODO entry for the full account).
+
+**Left open, not blocking anything shipped:** the exact canvas-padding formula (how generously
+`IslandLayoutGenerator`'s primary placement spaces biomes out, vs. the client's own dilation radius) and the
+retry-budget/fallback-trigger tuning are both still just-reasonable defaults, not playtested/tuned values —
+revisit if a real run's map reads too cramped or too sparse. `IslandLayoutGenerator`'s known scale cliff past
+~12 biomes (found during step 2, logged in `docs/TODO.md`) is also still open, unreached by any real caller.
 
 ### 7.5 Sub-stage 4d+ — the surface catalog (joint iteration)
 

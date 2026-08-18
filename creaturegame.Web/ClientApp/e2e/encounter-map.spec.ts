@@ -31,9 +31,9 @@ test.describe('Encounter map (region graph + route choice)', () => {
     await expect(page.locator('.biome-card')).toHaveCount(0); // the old card modal is gone
 
     // A graph of waypoints wired by edges, with at least one glowing, clickable offered biome.
-    await expect(choice.locator('.region-node')).not.toHaveCount(0);
-    await expect(choice.locator('.region-edge')).not.toHaveCount(0);
-    const offered = choice.locator('.region-node--offered');
+    await expect(choice.locator('.town-map-town')).not.toHaveCount(0);
+    await expect(choice.locator('.town-map-route')).not.toHaveCount(0);
+    const offered = choice.locator('.town-map-town--offered');
     await expect(offered.first()).toBeVisible();
     // A11y: the choice focuses the first offered waypoint on open, so a keyboard user lands on an actionable pick.
     await expect(offered.first()).toBeFocused();
@@ -43,7 +43,7 @@ test.describe('Encounter map (region graph + route choice)', () => {
     await offered.first().click();
     await expect(choice).toHaveCount(0);
     await page.locator('.map-toggle-btn').click();
-    await expect(page.locator('.encounter-map .region-node--current')).toHaveCount(1);
+    await expect(page.locator('.encounter-map .town-map-town--current')).toHaveCount(1);
   });
 });
 

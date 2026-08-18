@@ -21,7 +21,7 @@ const TYPE_COLORS: Record<string, { bg: string; text: string }> = {
   Fairy:    { bg: '#ec8fe6', text: '#fff' },
 };
 
-// The background colour for a type — shared with non-badge consumers (e.g. the region-map waypoints) so type
+// The background colour for a type — shared with non-badge consumers (e.g. TypeChip, mapGlyphs.tsx) so type
 // colouring stays defined in one place. Falls back to a neutral grey for an unknown type.
 export function typeColor(type: string): string {
   return (TYPE_COLORS[type] ?? { bg: '#888' }).bg;

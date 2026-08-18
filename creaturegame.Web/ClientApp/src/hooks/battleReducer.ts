@@ -2,7 +2,7 @@
 // it's unit-testable without React, SignalR, or a DOM (this module has only type imports, no runtime deps).
 // The hook owns the effects (the SignalR connection, the timeline driver); this owns the state transitions.
 import type { MoveInfo } from '../types/BattleEvents';
-import type { Action, StatBlock, LogEntry, BiomeOption, RegionBiome, RewardOption, ShopOfferItem, PartyMember, AcquisitionOffer } from '../battle/timeline';
+import type { Action, StatBlock, LogEntry, BiomeOption, RegionBiome, RegionRoute, RewardOption, ShopOfferItem, PartyMember, AcquisitionOffer } from '../battle/timeline';
 
 export interface LevelUpPanel {
   creatureName: string;
@@ -115,11 +115,14 @@ export interface BattleState {
   mapBiomeName: string;
   mapNodePlan: string[];
   mapPin: number;
-  // Region-map overlay (whole run): the playable biome graph (revealed once at run start), the biome ids in the
-  // order entered — *with repeats on a re-visit* so consecutive pairs are the actual hops walked (the travelled
-  // route; node-visited membership is the set of these) — and the id of the current biome. Empty in the legacy
-  // chain (no map).
+  // Town Map (whole run): the playable biome graph laid out on the procedurally-generated grid (revealed once
+  // at run start — Stage 4c), the biome ids in the order entered — *with repeats on a re-visit* so consecutive
+  // pairs are the actual hops walked (the travelled route; node-visited membership is the set of these) — and
+  // the id of the current biome. Empty/zero in the legacy chain (no map).
+  regionWidth: number;
+  regionHeight: number;
   regionBiomes: RegionBiome[];
+  regionRoutes: RegionRoute[];
   routePath: string[];
   currentBiomeId: string;
   // The run's presentation identity (Generation Profile Stage 4a), from the server's RunPresentationRevealed
@@ -167,7 +170,10 @@ export const initialState: BattleState = {
   mapBiomeName: '',
   mapNodePlan: [],
   mapPin: -1,
+  regionWidth: 0,
+  regionHeight: 0,
   regionBiomes: [],
+  regionRoutes: [],
   routePath: [],
   currentBiomeId: '',
   generation: '',
@@ -378,8 +384,14 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
       // The run's generation + type roster, echoed by the server on every hub attach (Stage 4a).
       return { ...state, generation: action.generation, typeRoster: action.typeRoster };
     case 'REGION_MAP_REVEALED':
-      // The playable biome graph, revealed once at run start — the region-map overlay draws its waypoints/edges.
-      return { ...state, regionBiomes: action.biomes };
+      // The Town Map grid, revealed once at run start — the map overlay draws its tiles/routes from this.
+      return {
+        ...state,
+        regionWidth: action.width,
+        regionHeight: action.height,
+        regionBiomes: action.biomes,
+        regionRoutes: action.routes,
+      };
     case 'MAP_BIOME_ENTERED':
       // Entered a biome — title the ladder, clear the previous plan until this biome's is revealed, mark it
       // current, and append it to the route path (with repeats, so consecutive pairs are the hops actually walked

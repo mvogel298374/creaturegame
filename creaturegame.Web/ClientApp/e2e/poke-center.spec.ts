@@ -42,7 +42,7 @@ async function reachPokeCenter(page: Page): Promise<string> {
  * await the modal was parked on. */
 async function expectRunFlowsOn(page: Page): Promise<void> {
   const leadChoice = page.locator('.lead-modal[aria-label="Choose your lead"] .lead-card--current');
-  const nextRoute = page.locator('.region-node--offered').first();
+  const nextRoute = page.locator('.town-map-town--offered').first();
 
   await expect
     .poll(async () => (await isShowing(leadChoice)) || (await isShowing(nextRoute)), { timeout: 45_000 })

@@ -21,7 +21,8 @@ creature), **Revive Items** (in-battle party revive, Boss-reward + rare-shop onl
    no Gen 2 content. **`/plan` DONE (2026-07-29; Stage 4 re-planned as v2 on 2026-07-31 — per-gen adaptation
    with the bones kept, jointly iterated per surface, plus the grid Town Map)** — full design in
    [`GENERATION_PROFILE.md`](GENERATION_PROFILE.md). **Stages 1–3 complete (1a, 1b, 2a, 2b, 3 shipped); Stage 4
-   (presentation) in progress — 4a/4b shipped, the Kanto Sage ornamental-detail follow-up + 4c + 4d+ open** —
+   (presentation) in progress — 4a/4b shipped (incl. the Kanto Sage ornamental-detail follow-up), 4c (the Town
+   Map) shipped 2026-08-18; 4d+ open** —
    Stage 5 is the standing falsification rule, and every shipped stage has landed its leg — task entry + staging
    below. **Sequenced ahead of the two items below (2026-08-04, user's call).**
 2. **Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by the acquisition channels.
@@ -936,9 +937,9 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
     - Verified live in-browser by the user. Puppeteer was used only during the sketch/ratify mockup phase (and
       to diagnose the canvas-rendering trap above); dropped for the actual app build and the final visual
       check per the user's mid-session call that it was burning too many tokens for this kind of iteration.
-  - [ ] **4c — the Town Map:** `BiomeDefinition` grid coords replace `MapX/MapY`, `RegionMapRevealed` wire
-    update (+ field guards), client grid renderer replacing the painterly `RegionMap` (interaction contracts
-    unchanged; `travelledEdgeKeys` survives); `TestAltProfile`'s fake region gets grid geometry.
+  - [x] **4c — the Town Map** ✅ DONE (2026-08-18): `RegionMapRevealed` wire update (+ field guards), client
+    grid renderer replacing the painterly `RegionMap` (interaction contracts unchanged; `travelledEdgeKeys`
+    survives); `TestAltProfile`'s fake region gets grid geometry.
     **The grid structure itself is locked (2026-08-06)** — one biome per grid cell, orthogonal routes,
     identity-on-hover — from a multi-round sketch → ratify pass; see `GENERATION_PROFILE.md` §7.4's
     sketch-ratify record for the full history (route/cursor style, the Boss-gated island size, decision 11's
@@ -949,7 +950,8 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
     **Layout is procedurally generated per run, not hand-authored (revised 2026-08-18, user's call)** —
     supersedes the original "authored Kanto grid" plan; see §7.4's revision note for the full rationale
     (a fresh sparse per-run island is a smaller problem than laying out the whole dense 18-biome registry, so
-    full procedural generation is back in scope where it was rejected before). **In progress, backend first:**
+    full procedural generation is back in scope where it was rejected before). **Built backend-first, all four
+    steps shipped 2026-08-18:**
     1. [x] **`IslandLayoutGenerator`** ✅ DONE (2026-08-18) — pure, deterministic (seeded from the run's own
        `IRandomSource`, no separate seed), takes the run's already-chosen biome subgraph (from the existing
        `Biomes.RandomConnectedMap`, untouched) and produces grid coords + orthogonal collision-free routes.
@@ -1022,22 +1024,73 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
        `RunDirector` → `IslandLayoutGenerator` → `BuildRegionMap` → `RegionMapRevealed` pipeline and asserts
        genuine grid geometry, proving the Town Map is generation-agnostic rather than hardcoded to Kanto's
        shape. Full suite green (1493/1493 .NET, `tsc` clean, 199/199 Vitest).
-       **Known, deliberate interim breakage (user's call, 2026-08-18):** the live client (`BattleScreen.tsx`'s
-       inline painterly region-map component) still reads the old `mapX`/`mapY` wire fields directly
-       (`left: ${b.x}%`, curved SVG edges, …) — those no longer exist on the wire, so the dev app's Town Map
-       screen renders garbage positions until step 4 replaces it with the real grid renderer. Nothing is
-       deployed (RC-gated), so this is invisible to any real audience; flagged rather than silently shipped.
-       `BiomeDefinition.MapX`/`MapY` (the old authored per-biome coords) are now unread by anything and are
-       left in place rather than removed in this step — vestigial, not wired to the Town Map any more; a
-       natural cleanup to bundle with step 4, when the client component that was their only remaining
-       reader-adjacent code gets replaced wholesale (not removed here to keep this diff to the wire only).
-    4. [ ] Client grid renderer, wired to the locked tile art. **Next up:** `timeline.ts` needs updating first
-       — its `RegionBiome` interface and `RegionMapRevealed` case arm still parse the old `mapX`/`mapY` field
-       names off the wire — then replace `BattleScreen.tsx`'s inline painterly region-map component (the
-       `left: ${b.x}%` / curved-SVG-edge block) with the locked grid renderer (§7.4 decision 12's tile picks),
-       reading the new `Width`/`Height`/`X`/`Y`/`Routes` shape. Once the client reads the new shape, consider
-       removing the now-vestigial `BiomeDefinition.MapX`/`MapY` (see step 3's note) and update `BiomeTests.cs`'s
-       pinning test accordingly.
+       **The interim client breakage this step deliberately left open was resolved the same day — see step 4.**
+    4. [x] **Client grid renderer, wired to the locked tile art** ✅ DONE (2026-08-18) — the real Kenney art,
+       recovered byte-verified from the `Town Map — tileset ratification sketch` mockup artifact (decision 12
+       re-confirmed against the freshly re-downloaded source sheet, not trusted from memory) rather than
+       re-picked from scratch: three tree species (#14/#15/#16), a rock cluster (#30), a boulder (#105), a
+       signpost (#67), the town marker (#109 shuttered/unvisited, #110 open-door/visited-or-current), and the
+       coastline edge trim (#2, 4 pre-rotated copies) — all vendored as `--ks-tm-*` data-URI custom properties
+       in `index.css` (the same inline-asset convention as `--ks-corners`/`--ks-grain`, not separate files),
+       plus a new `--ks-grain-water` (the existing grain recipe, tones inverted). Land/water themselves are
+       **not** tileset art — they reuse the app's own `--ks-grain` procedural texture (free, already proven).
+       `timeline.ts`'s `RegionBiome`/new `RegionRoute`/`RegionRouteCell` types + the `RegionMapRevealed` case
+       arm, and `battleReducer.ts`'s state, now carry the grid shape (`regionWidth`/`regionHeight`/
+       `regionRoutes` alongside `regionBiomes`) instead of the old percent coords.
+       **A real algorithm/design gap found and resolved before the render work, not papered over:**
+       `IslandLayoutGenerator` (step 1) only ever produces a *sparse* graph — a cell per biome plus a thin
+       one-cell corridor per route, nothing else — but decision 11 calls for an actual landmass with a
+       coastline and scattered terrain, not a bare path over open water. Visualized several real generated
+       layouts before building anything (`Biomes.RandomConnectedMap` → `IslandLayoutGenerator.Generate` on
+       real seeds) and confirmed the gap is real — e.g. a 10-biome island left genuine blank gaps inside its
+       own bounding box. **User's call:** synthesize the fuller landmass **client-side at render time** (an
+       8-directional dilation of the sparse core by `TOWN_MAP_DILATION` = 1 cell, tunable), not in the backend
+       — zero wire/DB change, stays inside step 4's own scope. New pure module `townMapLayout.ts`
+       (`coreLandCells`/`dilateLand`/`coastSides`/`scatterFor`, 14 Vitest cases) does the derivation; the
+       component only renders.
+       **A real bug found via manual verification, not just code review:** offered/choosable towns used the
+       HTML `disabled` attribute to block clicking on non-offered ones — but a `disabled` button suppresses
+       `mouseenter`/`focus` in every browser, so hovering *any* non-offered town silently did nothing,
+       breaking the ratified "hover or focus any tile to see its name" behaviour. Caught live in the running
+       dev app (Puppeteer), not by a test. Fixed with `tabIndex={choosable ? 0 : -1}` instead of `disabled`
+       (mouse hover always fires; only actionable towns are keyboard-tab-stops; `onClick` was already
+       conditionally undefined on a non-offered town, so removing `disabled` doesn't make it clickable).
+       **Verified live** (Puppeteer, `.\dev.ps1`, full flow): the grid renders — land/water grain, coastline
+       trim on every land/water boundary, scatter props, dotted untravelled / solid travelled routes, the
+       shuttered→open-door marker transition on entering a biome, the bouncing chevron over the current
+       biome, the hover/focus caption (defaulting to the current biome, updating on hover of *any* town, own
+       bug above included) — across the pinned full-screen `RunMapPanel` and the blocking `RouteChoiceMap`
+       modal, and at a narrow (480px) viewport with no overflow (the grid's percentage/aspect-ratio-based
+       sizing needed no responsive breakpoint, unlike the old fixed-rem waypoint discs it replaced).
+       **Left for the eventual `BiomeDefinition.MapX`/`MapY` cleanup, not done here:** removing those now
+       fully-vestigial fields and updating `BiomeTests.cs`'s pinning test — a real but small, low-priority
+       tidy-up (§7.4 already flagged it in step 3's note); not scheduled.
+       **`pr-review` (2026-08-18): CHANGES-REQUESTED → both blockers + all 7 recommended fixes applied
+       (user's call), now PR-ready.** Blockers: (1) the E2E suite's DOM contract was renamed out from under
+       it — `.region-node`/`.region-node--offered`/`.region-node--current`/`.region-edge` no longer exist;
+       fixed across `e2e/helpers.ts` + 3 spec files to the new `.town-map-town`/`.town-map-town--offered`/
+       `.town-map-route` classes, plus a new dedicated `town-map-town--current` class (parity with the old
+       markup, not just an `aria-current` query) — **not run** (E2E is user-only per policy; recommend
+       `.\e2e.ps1 -Spec encounter-map` to confirm). (2) the hover/focus caption was near-unreadable in the
+       pinned full-screen Run Map — its `--ks-dim`/`--ks-ink` tokens are parchment-surface colours, but that
+       panel's own ground is still the old dark "deep-night" theme (deliberately unskinned, a 4d+ catalog
+       item); confirmed empirically (`getComputedStyle` + a fresh screenshot showed genuine dark-on-dark, not
+       a false positive) and fixed with a `.map-overworld`-scoped light-on-dark override. Recommended fixes:
+       a real logic bug where `biomeCaptionStatus` mislabelled an already-visited-but-still-offered biome as
+       "offered, unvisited" on nearly every route choice after the first (every neighbour stays offered with
+       no visited filter — `BiomeChoiceEvent.PickOptions`) — fixed the priority order and moved the helper
+       into `townMapLayout.ts` with 5 new pinned cases; the read-only `RunMapPanel` made every town
+       `tabIndex={-1}` so a keyboard user couldn't reach any biome name — fixed to `tabIndex={onChoose ?
+       (choosable ? 0 : -1) : 0}`; non-offered towns in the choice modal had no `aria-disabled`; the map
+       legend still showed gold swatches for the new black-ink map; the route-choice modal's height-capped
+       stage sizing had the *same* "100%/100% background-size stretches non-square cells" defect class the
+       grain-tile fix was written to avoid, just reached via `width:100%` + independent `max-height` fighting
+       each other — fixed to bound both dimensions via `max-width`/`max-height` with neither force-set; a
+       missing `prefers-reduced-motion` guard on the marker hover-scale transition; and an unmemoized
+       land/dilation recompute on every hover (`useMemo`, kept above the early-return per rules of hooks).
+       Full suite re-verified green after all fixes (1493/1493 .NET, `tsc` clean, 218/218 Vitest — the prior
+       213 + 5 new `biomeCaptionStatus` cases); the caption/legend fix re-verified live via Puppeteer
+       (`getComputedStyle` before/after + screenshots).
   - [ ] **4d+ — the surface catalog, jointly iterated** (each its own greenlit mini-plan): battle command menu
     (settled — the 2×2 grid, verbs fixed), move select, battle HUD, CHECK POKEMON, BAG, party surfaces, run
     prompts, Title/StarterSelection (incl. the generation picker), node ladder.
