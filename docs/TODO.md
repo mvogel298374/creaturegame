@@ -946,8 +946,12 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
     "no organic curves" rule). **Next up for this sub-stage (user's call, 2026-08-06): swap the sketch's
     procedural SVG/CSS textures (the dot-grain land, the checker-dither water, the drawn pixel-house town
     marker) for real graphic assets** — authored tile/sprite art, not code-drawn shapes — before or as part of
-    the actual client build. Not started; no asset pipeline decision made yet (art source, format, whether it
-    rides the existing sprite-import path or is hand-authored fresh).
+    the actual client build. **In progress (started 2026-08-17):** art source picked (Kenney's "Monochrome
+    RPG," CC0, vendored static asset — not the sprite-import path) and the recolour pipeline settled (4-colour
+    palette swap onto the existing `--ks-*` tokens); two rounds of sketch → ratify on the specific tile picks,
+    see `GENERATION_PROFILE.md` §7.4 for the full record incl. decision 12 (visually verify every tile pick
+    against the real source before use — the standing rule this pass established). Not yet built into the
+    real client.
   - [ ] **4d+ — the surface catalog, jointly iterated** (each its own greenlit mini-plan): battle command menu
     (settled — the 2×2 grid, verbs fixed), move select, battle HUD, CHECK POKEMON, BAG, party surfaces, run
     prompts, Title/StarterSelection (incl. the generation picker), node ladder.

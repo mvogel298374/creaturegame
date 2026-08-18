@@ -782,15 +782,67 @@ Two more rounds on the same interactive sketch, past the record above:
   authored orthogonal routes, identity-on-hover.** Future passes on this sub-stage don't revisit that
   structure — only its surface treatment.
 
-**Next for this sub-stage (flagged 2026-08-06, not yet started): replace the sketch's procedural SVG/CSS
-textures with real graphic assets.** Everything drawn so far — the dot-grain land, the checker-dither water,
-the drawn pixel-house town marker, the tree/rock motifs — is code-drawn (patterns and paths), a stand-in for
-layout and rendering-style decisions, not final art. The user wants **actual authored graphics** (tile/sprite
-art) for the map before or as part of the real client build. Open, not yet decided: the art source (hand-
-authored fresh vs. an existing asset pack), the format (raster tiles vs. vector), and whether it rides the
-same import path as the creature sprites (`docs/SPRITE_PRESENTATION.md`) or is its own pipeline. Whoever picks
-this up next should treat it as its own short sketch → ratify step (decision 8's process), same as everything
-else in this sub-stage.
+**Real-graphics pass started (2026-08-17 → 2026-08-18) — art source picked, recolour pipeline settled, two
+rounds of correction.** Replacing the sketch's procedural SVG/CSS textures with real graphic assets, per the
+2026-08-06 flag above:
+- **Art source: [Kenney's "Monochrome RPG"](https://kenney.nl/assets/monochrome-rpg)** (also mirrored on
+  OpenGameArt), CC0, 16×16 raster tiles, one coherent set by one artist — no attribution required. Pipeline:
+  vendored as a static asset checked into the repo, not fetched at import time (fixed hand-picked vocabulary
+  tied to authored region geometry, not the species roster `PokeApiConnector` already handles).
+- **Recolour recipe: a straight 4-colour palette swap onto this project's existing tokens** — the pack's
+  source ramp (white / light-grey `#B0B0B0` / black / mid-grey `#545454`) maps 1:1 onto
+  `--ks-fill`/`--ks-fog`/`--ks-ink`/`--ks-dim`. Fill stays fully opaque on every discrete object (they only
+  ever sit on the white land base — see the "punched hole" trap below).
+- **Take 4 (2026-08-17) shipped two picks that were never actually checked against the real sheet** — both
+  caught and fixed same-session, in take 5 (2026-08-18):
+  - The **flower** scatter accent (tile #27) turned out to be a lone fragment, not a complete icon — it
+    doesn't even pair cleanly with its neighbouring tile in the sheet. **Discarded, not replaced** (the pack
+    does contain a genuine two-tile flower, #28 stacked on #46, but that's a 16×32 prop — a different
+    footprint from a single scatter tile — so it's left out rather than folded in unannounced).
+  - The **town marker** was a fabricated composite — roof tile #50 hand-stitched onto wall tile #110 — that,
+    once actually rendered, doesn't read as a building at all (the "wall" tile is an unrelated interior
+    window fragment). Fixed by using **#109 and #110 directly: two complete, standalone alternate finishes
+    of one building-front icon** (shuttered window vs. open doorway) already in the pack — no compositing,
+    just picking one index or the other. Mapped onto the existing visited/unvisited semantics: open door =
+    visited, shuttered = unvisited/offered.
+  - Both mistakes had the same root cause: picking a tile by remembered/assumed index instead of opening the
+    actual sheet. See decision 12 below — this is now a standing rule, not a one-off fix.
+  - Two more scatter props added while fixing this — a boulder (#105) and a signpost (#67), both verified
+    standalone — for variety in the cells the flower used to occupy.
+  - A separate, unrelated slip in the same take-5 rebuild: hand-retyping the file corrupted one character in
+    the (unchanged) coastline edge-trim tile's base64, silently breaking the top shoreline segment. Caught by
+    the user visually (**"the top line of the upper edge of the island has been lost"**) and confirmed by a
+    byte-level diff against the last known-good artifact. Lesson folded into decision 12: after any hand-edit
+    of an artifact that carries embedded binary (base64) data, diff the payloads against the previous version
+    before calling it done — don't rely on eyeballing the rendered page alone.
+
+**Decision 12 (2026-08-18): visually verify every tile/sprite pick against the real source before use.**
+Standing rule for this sub-stage and every future asset-selection pass (mockup or shipped build alike) — not
+specific to the Kenney pack:
+- Before using a specific index/coordinate from an asset sheet, **download the actual source and render the
+  specific tile(s) in question** — don't select from memory, from an assumed grid layout, or from a prior
+  session's recollection of what an index contains.
+- If an asset is meant to be a **composite of multiple tiles** (stacked, tiled, or otherwise combined),
+  **render the actual composite** before adopting it — a plausible-sounding pairing (e.g. "a roof tile
+  plus a wall tile below it") can fail to compose into anything coherent, and the only way to know is to look.
+- When hand-editing a file that embeds binary data (base64 images), **diff the encoded payloads against the
+  previous good version** before republishing — a single mistyped character corrupts silently (the image
+  just fails to decode/render) with no error at edit time.
+- Applies to every future Stage 4c/4d+ sketch pass, and to any other surface that pulls tile/sprite art from
+  an external pack.
+
+**This tile pick set is locked (user's call, 2026-08-18)** — same treatment as the grid structure lock on
+2026-08-06: future passes on this sub-stage don't revisit these specific choices, only extend them.
+- **Art source:** Kenney "Monochrome RPG" (CC0), vendored as a static asset — not the creature-sprite import
+  path.
+- **Recolour recipe:** the 4-colour palette swap onto `--ks-fill`/`--ks-fog`/`--ks-ink`/`--ks-dim`, verified
+  byte-exact against the shipped tree sprite.
+- **Scatter set:** three tree species (#14/#15/#16), a rock cluster (#30), a boulder (#105), a signpost
+  (#67) — no flower; #27 is discarded, not replaced.
+- **Town marker:** tiles #109 (shuttered — unvisited/offered) and #110 (open door — visited/current), used
+  as complete standalone icons, no compositing.
+- Adding *further* scatter/prop variety later is fine (decision 12 still governs how any new pick gets
+  verified) — swapping out any of the picks above, or reviving the roof+wall composite idea, is not.
 
 **Still open for 4c's build:** exact final grid dimensions and the collision-checked route authoring pass
 (`BiomeTests`) for whichever biomes end up in a real island; map-scale (comfortable vs. compact) has no
