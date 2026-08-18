@@ -1091,6 +1091,38 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
        Full suite re-verified green after all fixes (1493/1493 .NET, `tsc` clean, 218/218 Vitest — the prior
        213 + 5 new `biomeCaptionStatus` cases); the caption/legend fix re-verified live via Puppeteer
        (`getComputedStyle` before/after + screenshots).
+       **Manual bugfixing pass (2026-08-19), same day, playing the actual shipped feature.** Five more real
+       findings, each verified live via Puppeteer against the exact seed that exposed it (not just reasoned
+       about statically) — full design rationale for each in `GENERATION_PROFILE.md` §7.4's own record of this
+       pass; summary here:
+       1. **Stage sizing/centring was genuinely broken, not a Firefox-only quirk** — an `aspect-ratio` box with
+          both dimensions `auto`, sized as a flex item, doesn't reliably resolve in any engine (one real seed
+          collapsed the stage to ~8px). Fixed with a definite computed width (`min(100%, 62vh × ratio)` via new
+          `--tm-w`/`--tm-h` CSS custom properties `TownMapGrid` sets inline) instead of leaving both dimensions
+          to the browser's own aspect-ratio auto-sizing.
+       2. **Exterior water margin** — the server's own canvas margin (`IslandLayoutGenerator.Margin`, 1 cell) is
+          measured against the sparse core, but the client's own dilation (step 4's original build) already
+          grows that core outward first, so the rendered land could reach the canvas edge with no visible
+          margin left at all. New `TOWN_MAP_RENDER_PADDING` (1 cell) adds render-only breathing room,
+          independent of that interaction — wire `Width`/`Height`/positions never change.
+       3. **A jagged coastline** — new `JAGGED_EDGE_SKIP_ODDS` (deterministic 1-in-6 thinning), applied only to
+          cells `dilateLand` is *adding* (the dilation ring), never to a core cell already present — the
+          uniform-fixed-radius dilation read as one smooth rounded-rectangle outline; a user ask, not a defect.
+       4. **Interior water pockets — a real bug, found while fixing #2/#3, not requested.** The sparse graph can
+          leave a gap wider than the dilation radius between two nearby-but-unconnected path segments (the
+          server's own node spacing is wider than one dilation step), fully surrounded by land once dilation
+          finishes — a small lake in the middle of the island. New `fillInteriorPockets` (a border-seeded
+          4-directional flood fill; whatever water it never reaches gets converted to land) closes it.
+       5. **A random Japanese-sounding island name** — new `islandName`, two-part compounds from real short
+          Japanese words common in actual place-name compounds (Fuji+yama, Yoko+hama, Kuro+kawa, …), romanized,
+          "Island" appended (e.g. "Asagawa Island"). Deterministic from the run's sorted biome-id set (no
+          server seed threaded to the client, same reasoning as `scatterFor`) — stable for the whole run.
+          Shown in `RouteChoiceMap`'s intro line and `RunMapPanel`'s pinned topbar.
+
+       All five in `townMapLayout.ts` (now `dilateLand` + `fillInteriorPockets` + `islandName`, 33 Vitest cases
+       total) except #1, which is CSS/component-only. Full suite re-verified green after every fix (232/232
+       Vitest, `tsc` clean); #1/#4 re-verified against the exact seed that exposed them, not just re-tested in
+       general.
   - [ ] **4d+ — the surface catalog, jointly iterated** (each its own greenlit mini-plan): battle command menu
     (settled — the 2×2 grid, verbs fixed), move select, battle HUD, CHECK POKEMON, BAG, party surfaces, run
     prompts, Title/StarterSelection (incl. the generation picker), node ladder.

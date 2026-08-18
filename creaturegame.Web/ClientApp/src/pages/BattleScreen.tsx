@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { TypeBadge } from '../components/TypeBadge';
 import { MapGlyphSprite, TypeChip, nodeIconId } from './mapGlyphs';
@@ -11,11 +11,14 @@ import { regionEdgeKey, travelledEdgeKeys } from '../battle/regionMap';
 import {
   coreLandCells,
   dilateLand,
+  fillInteriorPockets,
   coastSides,
   scatterFor,
   parseCellKey,
   biomeCaptionStatus,
+  islandName,
   TOWN_MAP_DILATION,
+  TOWN_MAP_RENDER_PADDING,
 } from '../battle/townMapLayout';
 import { powerPill } from '../battle/movePower';
 import { bossTrainerName } from '../battle/bossTrainer';
@@ -441,7 +444,12 @@ function TownMapGrid({ width, height, biomes, routes, routePath, currentId, offe
   // Kept above the early-return guard below (rules of hooks: every hook must run on every render).
   const { core, land } = useMemo(() => {
     const c = coreLandCells(biomes, routes); // exactly what the server generated — biome + route cells
-    return { core: c, land: dilateLand(c, width, height, TOWN_MAP_DILATION) }; // synthesized fuller landmass
+    const dilated = dilateLand(c, width, height, TOWN_MAP_DILATION); // synthesized fuller landmass
+    // The sparse graph can leave a gap wider than TOWN_MAP_DILATION between two nearby-but-unconnected path
+    // segments (the server's own node spacing is wider than the dilation radius), which dilation alone can
+    // enclose without bridging — a small lake in the middle of the island. The user explicitly never wants
+    // interior water (2026-08-19), so this closes any such pocket after dilation runs.
+    return { core: c, land: fillInteriorPockets(dilated, width, height) };
   }, [biomes, routes, width, height]);
 
   // Legacy chain / not-yet-revealed guard — no grid to draw.
@@ -449,7 +457,12 @@ function TownMapGrid({ width, height, biomes, routes, routePath, currentId, offe
 
   const visited = new Set(routePath); // node-visited membership
   const travelled = travelledEdgeKeys(routePath); // edges actually walked (consecutive hops, not "both visited")
-  const cellPct = 100 / width, rowPct = 100 / height;
+  // The rendered canvas is padded by TOWN_MAP_RENDER_PADDING on every side (guaranteed-visible exterior water
+  // — see that constant's own doc) — every wire coordinate below is shifted by PAD before being placed, but
+  // the wire's own Width/Height/positions are never touched; this is presentation only.
+  const PAD = TOWN_MAP_RENDER_PADDING;
+  const canvasWidth = width + PAD * 2, canvasHeight = height + PAD * 2;
+  const cellPct = 100 / canvasWidth, rowPct = 100 / canvasHeight;
 
   const hovered = biomes.find(b => b.id === hoveredId) ?? biomes.find(b => b.id === currentId) ?? null;
   const hoveredIsCurrent = hovered?.id === currentId;
@@ -458,7 +471,13 @@ function TownMapGrid({ width, height, biomes, routes, routePath, currentId, offe
 
   return (
     <div className="town-map">
-      <div className="town-map-stage" style={{ aspectRatio: `${width} / ${height}` }}>
+      <div
+        className="town-map-stage"
+        // --tm-w/--tm-h ride along as custom properties (not just the aspectRatio shorthand) so a host CSS
+        // context that needs to cap the stage by *height* (route-choice-modal, below) can compute a definite
+        // width from them via calc()/min() — see that rule's own comment for why a definite width matters.
+        style={{ aspectRatio: `${canvasWidth} / ${canvasHeight}`, '--tm-w': canvasWidth, '--tm-h': canvasHeight } as CSSProperties}
+      >
         {/* Land layer: every server-generated (biome/route) cell plus the synthesized dilation ring around it,
             each its own tile so the coastline trim can be placed per-cell against whatever's actually adjacent. */}
         {[...land].map(key => {
@@ -469,7 +488,12 @@ function TownMapGrid({ width, height, biomes, routes, routePath, currentId, offe
             <div
               key={key}
               className="town-map-cell"
-              style={{ left: `${x * cellPct}%`, top: `${y * rowPct}%`, width: `${cellPct}%`, height: `${rowPct}%` }}
+              style={{
+                left: `${(x + PAD) * cellPct}%`,
+                top: `${(y + PAD) * rowPct}%`,
+                width: `${cellPct}%`,
+                height: `${rowPct}%`,
+              }}
               aria-hidden="true"
             >
               {sides.map(s => <span key={s} className={`town-map-coast town-map-coast--${s}`} />)}
@@ -479,10 +503,10 @@ function TownMapGrid({ width, height, biomes, routes, routePath, currentId, offe
         })}
         {/* Route layer: the wire's own per-edge cell path (never re-derived client-side) — a thick solid line
             for a travelled edge, a dotted line otherwise. Drawn under the town markers (below), over the land. */}
-        <svg className="town-map-routes" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" aria-hidden="true">
+        <svg className="town-map-routes" viewBox={`0 0 ${canvasWidth} ${canvasHeight}`} preserveAspectRatio="none" aria-hidden="true">
           {routes.map((r, i) => {
             const isTravelled = travelled.has(regionEdgeKey(r.fromBiomeId, r.toBiomeId));
-            const points = r.cells.map(c => `${c.x + 0.5},${c.y + 0.5}`).join(' ');
+            const points = r.cells.map(c => `${c.x + PAD + 0.5},${c.y + PAD + 0.5}`).join(' ');
             return (
               <polyline
                 key={i}
@@ -508,7 +532,12 @@ function TownMapGrid({ width, height, biomes, routes, routePath, currentId, offe
                 choosable ? 'town-map-town--offered' : '',
                 isCurrent ? 'town-map-town--current' : '',
               ].filter(Boolean).join(' ')}
-              style={{ left: `${b.x * cellPct}%`, top: `${b.y * rowPct}%`, width: `${cellPct}%`, height: `${rowPct}%` }}
+              style={{
+                left: `${(b.x + PAD) * cellPct}%`,
+                top: `${(b.y + PAD) * rowPct}%`,
+                width: `${cellPct}%`,
+                height: `${rowPct}%`,
+              }}
               // In choice mode (onChoose set) only an offered town is a keyboard tab-stop, matching what's
               // clickable. In the read-only overview (onChoose undefined) every town is reachable so a
               // keyboard-only user can read every biome's name via focus — there's nothing to click either way.
@@ -574,6 +603,10 @@ function RunMapPanel({ width, height, biomes, routes, routePath, currentId, biom
   const primaryType = biomes.find(b => b.id === currentId)?.types[0];
   const bossSub = `Trainer ${bossTrainerName(currentId, primaryType, nodePlan)}`;
 
+  // A flavour name for the run's island — deterministic from the biome id set (no server seed threaded to the
+  // client), so it's stable across re-renders/reconnects for the same run. See townMapLayout.ts's islandName.
+  const island = islandName(biomes.map(b => b.id));
+
   // Compact corner peek (auto-shown at each ladder change): the current biome's ladder only — the full graph
   // belongs to the pinned full-screen view, so the peek stays small and unobtrusive.
   if (!pinned) {
@@ -599,6 +632,7 @@ function RunMapPanel({ width, height, biomes, routes, routePath, currentId, biom
       <div className="map-topbar">
         <div className="map-brand">
           <h2 className="map-title">Run Map</h2>
+          <span className="encounter-map-biome">{island}</span>
           <span className="encounter-map-biome">{biomeName || 'Region map'}</span>
         </div>
         <button className="encounter-map-close" onClick={onClose} aria-label="Close map">×</button>
@@ -652,10 +686,11 @@ function RouteChoiceMap({ width, height, biomes, routes, routePath, currentId, o
   useEffect(() => {
     ref.current?.querySelector<HTMLButtonElement>('.town-map-town--offered')?.focus();
   }, []);
+  const island = islandName(biomes.map(b => b.id));
   return (
     <Modal label="Choose your route" dismiss="blocking" card="route-choice-modal" cardRef={ref}>
       <p className="biome-title">Choose your route</p>
-      <p className="biome-sub">Click a highlighted biome to chart your path.</p>
+      <p className="biome-sub">You've landed on <b>{island}</b> — click a highlighted biome to chart your path.</p>
       <TownMapGrid
         width={width}
         height={height}

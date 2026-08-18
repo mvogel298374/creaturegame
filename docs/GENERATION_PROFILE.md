@@ -893,6 +893,28 @@ retry-budget/fallback-trigger tuning are both still just-reasonable defaults, no
 revisit if a real run's map reads too cramped or too sparse. `IslandLayoutGenerator`'s known scale cliff past
 ~12 biomes (found during step 2, logged in `docs/TODO.md`) is also still open, unreached by any real caller.
 
+**Manual bugfixing pass (2026-08-19), same day the client renderer shipped.** Playing the actual built feature
+surfaced real gaps a code review alone wouldn't have — full record in `docs/TODO.md`'s 4c entry:
+- **The stage's sizing/centring was genuinely broken**, not a Firefox quirk as first suspected — an
+  `aspect-ratio` box with both dimensions `auto`, sized as a flex item, doesn't resolve reliably in any engine;
+  one real seed collapsed to an ~8px box. Fixed by always giving the browser a definite width instead
+  (`min(100%, 62vh × ratio)`, computed via CSS custom properties the component sets inline).
+- **Exterior water margin** — `TOWN_MAP_RENDER_PADDING` (1 cell), a client-only render pad independent of
+  `IslandLayoutGenerator.Margin`, which dilation was fully consuming (the server's margin is measured against
+  the sparse core, but the client's own dilation already grows that core outward before rendering).
+- **A jagged coastline** — `JAGGED_EDGE_SKIP_ODDS` in `townMapLayout.ts`, deterministic 1-in-6 thinning applied
+  only to the dilation *ring*, never the sparse core itself, so texture can never open an interior hole.
+- **Interior water pockets — a real bug, not requested but found while fixing the above two.** The sparse
+  graph can leave a gap wider than the dilation radius between two nearby-but-unconnected path segments (the
+  server's own node spacing is wider than one dilation step), which then reads as a small lake in the middle
+  of the island once fully surrounded. Closed with `fillInteriorPockets` — a border-seeded flood fill that
+  converts any water cell unreachable from the canvas edge into land.
+- **A random Japanese-sounding island name** (`islandName` in `townMapLayout.ts`) — two-part compounds built
+  from real short Japanese words common in actual place-name compounds (Fuji+yama, Yoko+hama, Kuro+kawa, …),
+  romanized, with "Island" appended (e.g. "Asagawa Island"). Deterministic from the run's sorted biome-id set
+  (no server seed threaded to the client, same reasoning as `scatterFor`), so the name is stable for the whole
+  run. Shown in `RouteChoiceMap`'s intro line and `RunMapPanel`'s pinned topbar.
+
 ### 7.5 Sub-stage 4d+ — the surface catalog (joint iteration)
 
 Decision 8's process: each surface below gets a **short joint mini-plan** (sketch → ratify with the user →
