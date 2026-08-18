@@ -992,12 +992,40 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
        generation's biome roster grows past ~12, or `RunBiomeMapSize` is ever raised, `IslandLayoutGenerator`
        will need hardening for that range first — the scale cliff is real, just currently unreachable from any
        actual caller. Not scheduled; revisit if either precondition changes.
-    3. [ ] `RegionMapRevealed` wire update + field guards + the `TestAltProfile` leg. **Next up:** read
-       `RunDirector`'s new `_islandLayout` (step 2) in `BuildRegionMap()` and project it onto the wire payload
-       (grid `Width`/`Height`, per-biome `GridPoint`, per-edge `IslandRoute` cell paths) in place of the old
-       authored `MapX`/`MapY`; add the corresponding `WebEventContractTests` field guards and `TestAltProfile`'s
-       fake region needs grid geometry too (see the stage's opening note).
-    4. [ ] Client grid renderer, wired to the locked tile art.
+    3. [x] **`RegionMapRevealed` wire update** ✅ DONE (2026-08-18) — `RegionMapRevealed` now carries `Width`/
+       `Height` (the grid canvas) and `Routes` (`IslandRoute`, reused as-is from `IslandLayoutGenerator` rather
+       than duplicated into a wire-only type); `RegionMapBiome.MapX`/`MapY` (authored 0–100) are replaced by
+       `X`/`Y` (the procedurally laid-out grid cell). `RunDirector.BuildRegionMap()` reads `_islandLayout`
+       (step 2, guaranteed non-null — it's only ever called immediately after `_islandLayout` is computed) instead
+       of the old authored `BiomeDefinition.MapX/MapY`. `SignalRBattleEventEmitter`'s projection updated to
+       match. Covered by: the mechanical reflection guard (`EveryBattleEventProjectsAllOfItsFields`, no changes
+       needed — it already probes list-typed fields with a real nested instance, so it caught the shape
+       automatically); the hand-pinned value-level wire test, renamed and rewritten for the new fields
+       (`RegionMapRevealed_Projection_CarriesBiomeSubFieldsGridCoordsAndRoutes` — grid `Width`/`Height`, a
+       biome's `X`/`Y`, and a route's cell path survive in order); `RunDirectorNodeTests`' existing emission
+       test extended to assert the *real* `BuildRegionMap()` output (in-bounds grid positions, a real route) not
+       just the record shape; and the Stage 5 falsification leg
+       (`RunDirectorIslandLayoutTests.BiomeMode_RegionMapRevealed_LaysOutRealGridGeometry_ForAnyProfilesBiomeRoster`)
+       — runs `TestAltProfile`'s two-biome fake region (deliberately not Kanto-shaped) through the real
+       `RunDirector` → `IslandLayoutGenerator` → `BuildRegionMap` → `RegionMapRevealed` pipeline and asserts
+       genuine grid geometry, proving the Town Map is generation-agnostic rather than hardcoded to Kanto's
+       shape. Full suite green (1493/1493 .NET, `tsc` clean, 199/199 Vitest).
+       **Known, deliberate interim breakage (user's call, 2026-08-18):** the live client (`BattleScreen.tsx`'s
+       inline painterly region-map component) still reads the old `mapX`/`mapY` wire fields directly
+       (`left: ${b.x}%`, curved SVG edges, …) — those no longer exist on the wire, so the dev app's Town Map
+       screen renders garbage positions until step 4 replaces it with the real grid renderer. Nothing is
+       deployed (RC-gated), so this is invisible to any real audience; flagged rather than silently shipped.
+       `BiomeDefinition.MapX`/`MapY` (the old authored per-biome coords) are now unread by anything and are
+       left in place rather than removed in this step — vestigial, not wired to the Town Map any more; a
+       natural cleanup to bundle with step 4, when the client component that was their only remaining
+       reader-adjacent code gets replaced wholesale (not removed here to keep this diff to the wire only).
+    4. [ ] Client grid renderer, wired to the locked tile art. **Next up:** `timeline.ts` needs updating first
+       — its `RegionBiome` interface and `RegionMapRevealed` case arm still parse the old `mapX`/`mapY` field
+       names off the wire — then replace `BattleScreen.tsx`'s inline painterly region-map component (the
+       `left: ${b.x}%` / curved-SVG-edge block) with the locked grid renderer (§7.4 decision 12's tile picks),
+       reading the new `Width`/`Height`/`X`/`Y`/`Routes` shape. Once the client reads the new shape, consider
+       removing the now-vestigial `BiomeDefinition.MapX`/`MapY` (see step 3's note) and update `BiomeTests.cs`'s
+       pinning test accordingly.
   - [ ] **4d+ — the surface catalog, jointly iterated** (each its own greenlit mini-plan): battle command menu
     (settled — the 2×2 grid, verbs fixed), move select, battle HUD, CHECK POKEMON, BAG, party surfaces, run
     prompts, Title/StarterSelection (incl. the generation picker), node ladder.

@@ -2,14 +2,16 @@ using creaturegame.Attacks;
 using creaturegame.Combat;
 using creaturegame.Creatures;
 using creaturegame.Tests.TestSupport;
+using creaturegame.Tests.Unit;
 
 namespace creaturegame.Tests.Integration.Flow;
 
 /// <summary>
-/// Stage 4c step 2 (`docs/TODO.md`) — the Town Map's <see cref="IslandLayout"/> gets wired into
+/// Stage 4c steps 2–3 (`docs/TODO.md`) — the Town Map's <see cref="IslandLayout"/> gets wired into
 /// <see cref="RunDirector"/>: computed exactly once, at run start (map-selection time), from the same shared
 /// <see cref="IRandomSource"/> every other per-run roll draws from — never a fresh RNG, and never recomputed
-/// per biome. The wire payload (<see cref="RegionMapRevealed"/>) does not read it yet — that lands in step 3.
+/// per biome — then projected onto the <see cref="RegionMapRevealed"/> wire payload (step 3; the value-level
+/// wire-shape pin itself lives in <c>WebEventContractTests</c>).
 /// </summary>
 public class RunDirectorIslandLayoutTests
 {
@@ -77,6 +79,37 @@ public class RunDirectorIslandLayoutTests
     }
 
     [Fact]
+    public async Task BiomeMode_RegionMapRevealed_LaysOutRealGridGeometry_ForAnyProfilesBiomeRoster()
+    {
+        // Stage 5 falsification leg (GENERATION_PROFILE.md §3): the Town Map must be driven by whatever
+        // BiomeRoster a profile supplies, not hardcoded against Kanto's shape. TestAltProfile's two-biome fake
+        // region is deliberately not Kanto data, so laying it out cleanly on the real wire event — grid bounds,
+        // both biomes placed in-bounds, a real route between them — is the only way to observe the pipeline
+        // (RunDirector → IslandLayoutGenerator → BuildRegionMap → RegionMapRevealed) is generation-agnostic.
+        var altBiomes = TestAltProfile.Instance.BiomeRoster;
+        var recorder = new RecordingEmitter();
+        var runner = BuildRunner(altBiomes, new SeededRandomSource(0), recorder);
+
+        await runner.RunAsync();
+
+        var map = Assert.Single(recorder.Of<RegionMapRevealed>());
+        Assert.True(map.Width > 0 && map.Height > 0);
+        Assert.Equal(
+            altBiomes.Select(b => b.Id).OrderBy(id => id, StringComparer.Ordinal),
+            map.Biomes.Select(b => b.Id).OrderBy(id => id, StringComparer.Ordinal)
+        );
+        Assert.All(
+            map.Biomes,
+            b => Assert.True(b.X >= 0 && b.X < map.Width && b.Y >= 0 && b.Y < map.Height)
+        );
+        var route = Assert.Single(map.Routes); // the two alt biomes are neighbours → exactly one edge/route
+        Assert.Equal(
+            altBiomes.Select(b => b.Id).ToHashSet(),
+            new HashSet<string> { route.FromBiomeId, route.ToBiomeId }
+        );
+    }
+
+    [Fact]
     public async Task LegacyChain_NeverComputesAnIslandLayout()
     {
         // No PlayableBiomes supplied → biome mode never activates, so there's no Town Map to lay out.
@@ -103,7 +136,8 @@ public class RunDirectorIslandLayoutTests
 
     private static RunDirector BuildRunner(
         IReadOnlyList<BiomeDefinition> playable,
-        IRandomSource rng
+        IRandomSource rng,
+        RecordingEmitter? emitter = null
     )
     {
         var player = Fighter("Player", hp: 10, attack: 1, speed: 1, level: 50);
@@ -128,7 +162,7 @@ public class RunDirectorIslandLayoutTests
             movePool: Array.Empty<Attack>(),
             new RunDirectorOptions
             {
-                Emitter = new RecordingEmitter(),
+                Emitter = emitter ?? new RecordingEmitter(),
                 Rules = new ScriptableRules().Deterministic(),
                 Rng = rng,
                 PlayableBiomes = playable,

@@ -104,23 +104,33 @@ public record RunNodeEntered(string Kind) : BattleEvent;
 public record BiomeNodePlanRevealed(IReadOnlyList<string> NodeKinds) : BattleEvent;
 
 /// <summary>Emitted once at the start of a biome-mode run: the whole playable biome subset (the seeded 10-of-18)
-/// so the client can draw the region as a node-link map. Each <see cref="RegionMapBiome"/> carries its id, name,
-/// type theme, and the ids of its playable neighbours (the graph edges) — the client wires the overworld map and
-/// traces the route through it as <see cref="BiomeEntered"/> events arrive. Static for the run (same seed ⇒ same
-/// map); the legacy endless chain never emits it.</summary>
-public record RegionMapRevealed(IReadOnlyList<RegionMapBiome> Biomes) : BattleEvent;
+/// laid out on the Town Map's rigid grid (<c>docs/TODO.md</c> Stage 4c) so the client can draw it. Each
+/// <see cref="RegionMapBiome"/> carries its id, name, type theme, the ids of its playable neighbours (the graph
+/// edges), and its grid cell — the client wires the overworld map and traces the route through it as
+/// <see cref="BiomeEntered"/> events arrive. <see cref="Routes"/> is the collision-free, cell-by-cell orthogonal
+/// path per edge (<see cref="IslandLayoutGenerator"/>'s output), so the client draws the actual corridor between
+/// two biomes' cells rather than a straight line; <see cref="Width"/>/<see cref="Height"/> size the grid canvas.
+/// Static for the run (same seed ⇒ same map, same layout — <see cref="RunDirector"/> computes it once at run
+/// start); the legacy endless chain never emits it.</summary>
+public record RegionMapRevealed(
+    int Width,
+    int Height,
+    IReadOnlyList<RegionMapBiome> Biomes,
+    IReadOnlyList<IslandRoute> Routes
+) : BattleEvent;
 
 /// <summary>One biome node on the region map: stable id, display name, type theme (for the waypoint colour), the
-/// ids of its neighbours <em>within the playable subset</em> (edges to draw), and its authored 2-D map position
-/// (<see cref="MapX"/> / <see cref="MapY"/>, 0–100 each, y down). Neighbours outside the subset are filtered out
+/// ids of its neighbours <em>within the playable subset</em> (edges to draw), and its procedurally laid-out grid
+/// cell (<see cref="X"/> / <see cref="Y"/> — supersedes the old authored 0–100 <c>MapX</c>/<c>MapY</c>, which the
+/// per-run <see cref="IslandLayoutGenerator"/> layout replaced). Neighbours outside the subset are filtered out
 /// server-side so the client never references a biome it wasn't sent.</summary>
 public record RegionMapBiome(
     string Id,
     string Name,
     IReadOnlyList<DamageType> Types,
     IReadOnlyList<string> Neighbours,
-    int MapX,
-    int MapY
+    int X,
+    int Y
 );
 
 /// <summary>The run's presentation identity: the generation it is played under (the profile id, e.g.

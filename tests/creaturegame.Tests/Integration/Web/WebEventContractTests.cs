@@ -612,37 +612,69 @@ public class WebEventContractTests
     }
 
     /// <summary>Value-level guard for the <see cref="RegionMapRevealed"/> projection: each
-    /// <see cref="RegionMapBiome"/> is hand-mapped.
-    /// <see cref="EveryBattleEventProjectsAllOfItsFields"/> proves the id/name/type-badge/edge fields are
-    /// present; this pins their values — notably that the neighbour-id <em>edges</em> survive as a list, which
-    /// is what makes the map a graph rather than a scatter of nodes.</summary>
+    /// <see cref="RegionMapBiome"/> and <see cref="IslandRoute"/> is hand-mapped.
+    /// <see cref="EveryBattleEventProjectsAllOfItsFields"/> proves the id/name/type-badge/edge/grid/route fields
+    /// are present; this pins their values — notably that the neighbour-id <em>edges</em> survive as a list
+    /// (what makes the map a graph rather than a scatter of nodes) and that a route's cell path survives in
+    /// order (what makes it a corridor rather than just a from/to pair).</summary>
     [Fact]
-    public void RegionMapRevealed_Projection_CarriesBiomeSubFieldsAndEdges()
+    public void RegionMapRevealed_Projection_CarriesBiomeSubFieldsGridCoordsAndRoutes()
     {
-        var evt = new RegionMapRevealed([
-            new RegionMapBiome(
-                "phantom-marsh",
-                "Phantom Marsh",
-                [DamageType.Ghost, DamageType.Poison],
-                ["mire-swamp", "haunted-spire"],
-                MapX: 54,
-                MapY: 84
-            ),
-        ]);
+        var evt = new RegionMapRevealed(
+            Width: 12,
+            Height: 9,
+            Biomes:
+            [
+                new RegionMapBiome(
+                    "phantom-marsh",
+                    "Phantom Marsh",
+                    [DamageType.Ghost, DamageType.Poison],
+                    ["mire-swamp", "haunted-spire"],
+                    X: 5,
+                    Y: 4
+                ),
+            ],
+            Routes:
+            [
+                new IslandRoute("phantom-marsh", "mire-swamp", [new(5, 4), new(5, 3), new(4, 3)]),
+            ]
+        );
 
         var (type, payload) = SignalRBattleEventEmitter.MapEvent(evt);
         using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
-        var biome = doc.RootElement.GetProperty("Biomes")[0];
+        var root = doc.RootElement;
+        var biome = root.GetProperty("Biomes")[0];
+        var route = root.GetProperty("Routes")[0];
 
         Assert.Equal("RegionMapRevealed", type);
+        Assert.Equal(12, root.GetProperty("Width").GetInt32());
+        Assert.Equal(9, root.GetProperty("Height").GetInt32());
         Assert.Equal("phantom-marsh", biome.GetProperty("Id").GetString());
         Assert.Equal("Phantom Marsh", biome.GetProperty("Name").GetString());
         Assert.Equal("Ghost", biome.GetProperty("Types")[0].GetString());
         Assert.Equal("mire-swamp", biome.GetProperty("Neighbours")[0].GetString());
         Assert.Equal("haunted-spire", biome.GetProperty("Neighbours")[1].GetString());
-        // The authored map coords ride the wire too (the region-map overlay positions waypoints from them).
-        Assert.Equal(54, biome.GetProperty("MapX").GetInt32());
-        Assert.Equal(84, biome.GetProperty("MapY").GetInt32());
+        // The procedurally laid-out grid cell rides the wire too (the grid renderer positions the biome tile
+        // from it) — supersedes the old authored 0–100 MapX/MapY.
+        Assert.Equal(5, biome.GetProperty("X").GetInt32());
+        Assert.Equal(4, biome.GetProperty("Y").GetInt32());
+        // The route's cell-by-cell path survives, in order — what lets the client draw the actual corridor.
+        Assert.Equal("phantom-marsh", route.GetProperty("FromBiomeId").GetString());
+        Assert.Equal("mire-swamp", route.GetProperty("ToBiomeId").GetString());
+        var cells = route.GetProperty("Cells");
+        Assert.Equal(3, cells.GetArrayLength());
+        Assert.Equal(
+            (5, 4),
+            (cells[0].GetProperty("X").GetInt32(), cells[0].GetProperty("Y").GetInt32())
+        );
+        Assert.Equal(
+            (5, 3),
+            (cells[1].GetProperty("X").GetInt32(), cells[1].GetProperty("Y").GetInt32())
+        );
+        Assert.Equal(
+            (4, 3),
+            (cells[2].GetProperty("X").GetInt32(), cells[2].GetProperty("Y").GetInt32())
+        );
     }
 
     /// <summary>Field-level guard for the <see cref="RewardGranted"/> projection: the client reads the source,

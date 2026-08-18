@@ -282,23 +282,34 @@ public sealed class RunDirector
         }
     }
 
-    // Projects the playable biome subset into the region-map payload the client draws: each biome with its type
-    // theme and the ids of its neighbours that are *also* in the playable subset (the graph edges). Filtering
-    // neighbours to the subset means the client never gets an edge to a biome it wasn't sent.
+    // Projects the playable biome subset onto the Town Map grid the client draws: each biome with its type theme,
+    // the ids of its neighbours that are *also* in the playable subset (the graph edges), and its cell from the
+    // procedurally-generated _islandLayout (Stage 4c step 2) — never the old authored BiomeDefinition.MapX/MapY.
+    // Filtering neighbours to the subset means the client never gets an edge to a biome it wasn't sent. Only
+    // called from RunAsync's biome-mode arm, immediately after _islandLayout is computed, so it is always set
+    // (never recomputed here — that would draw a second, different layout from the same rng).
     private RegionMapRevealed BuildRegionMap()
     {
+        var layout = _islandLayout!;
         var playableIds = _playableBiomes.Select(b => b.Id).ToHashSet();
         return new RegionMapRevealed(
+            layout.Width,
+            layout.Height,
             _playableBiomes
-                .Select(b => new RegionMapBiome(
-                    b.Id,
-                    b.Name,
-                    b.Types,
-                    b.Neighbours.Where(playableIds.Contains).ToList(),
-                    b.MapX,
-                    b.MapY
-                ))
-                .ToList()
+                .Select(b =>
+                {
+                    var pos = layout.Positions[b.Id];
+                    return new RegionMapBiome(
+                        b.Id,
+                        b.Name,
+                        b.Types,
+                        b.Neighbours.Where(playableIds.Contains).ToList(),
+                        pos.X,
+                        pos.Y
+                    );
+                })
+                .ToList(),
+            layout.Routes
         );
     }
 

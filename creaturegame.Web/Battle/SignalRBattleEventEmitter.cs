@@ -116,14 +116,22 @@ public sealed class SignalRBattleEventEmitter(
                 "RegionMapRevealed",
                 new
                 {
+                    e.Width,
+                    e.Height,
                     Biomes = e.Biomes.Select(b => new
                     {
                         b.Id,
                         b.Name,
                         Types = b.Types.Select(t => t.ToString()),
                         b.Neighbours,
-                        b.MapX,
-                        b.MapY,
+                        b.X,
+                        b.Y,
+                    }),
+                    Routes = e.Routes.Select(r => new
+                    {
+                        r.FromBiomeId,
+                        r.ToBiomeId,
+                        Cells = r.Cells.Select(c => new { c.X, c.Y }),
                     }),
                 }
             ),

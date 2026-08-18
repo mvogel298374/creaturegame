@@ -478,6 +478,20 @@ public class RunDirectorNodeTests
         Assert.Equal(new[] { "b" }, byId["a"].Neighbours.ToArray()); // "x" isn't playable → filtered out
         Assert.Equal(new[] { "a" }, byId["b"].Neighbours.ToArray());
 
+        // The Town Map grid (Stage 4c): a real IslandLayoutGenerator canvas, positions in bounds, and a route
+        // connecting the one edge — proves BuildRegionMap reads the cached _islandLayout, not a stub.
+        Assert.True(map.Width > 0 && map.Height > 0);
+        Assert.All(
+            map.Biomes,
+            m => Assert.True(m.X >= 0 && m.X < map.Width && m.Y >= 0 && m.Y < map.Height)
+        );
+        var route = Assert.Single(map.Routes);
+        Assert.Equal(
+            new HashSet<string> { "a", "b" },
+            new HashSet<string> { route.FromBiomeId, route.ToBiomeId }
+        );
+        Assert.True(route.Cells.Count >= 2); // at least the two endpoints
+
         // Fires at run start, before any route choice is offered.
         int mapIdx = recorder.Events.ToList().FindIndex(e => e is RegionMapRevealed);
         int firstChoiceIdx = recorder.Events.ToList().FindIndex(e => e is BiomeChoiceOffered);
