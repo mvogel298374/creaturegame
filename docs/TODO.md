@@ -968,14 +968,26 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
        sequential routing with no backtracking is inherently order-dependent — trying several static global
        orderings worked but didn't scale, real local backtracking did. No wire/DB/client touched — pure unit
        tests, no database.
-    2. [x] **Wire into `RunDirector`** ✅ DONE (2026-08-18) — computed exactly once, at biome-mode run start
-       (right where `RunAsync` already emits `BuildRegionMap()`), via
+    2. [x] **Wire into `RunDirector`** ✅ DONE (2026-08-18) — computed exactly once per island, at biome-mode run
+       start (right where `RunAsync` already emits `BuildRegionMap()`), via
        `IslandLayoutGenerator.Generate(_playableBiomes, _rng ?? SystemRandomSource.Instance)` — the same shared
-       `IRandomSource` every other per-run roll draws from, never a fresh one — and cached on a new
-       `_islandLayout` field (+ an `internal IslandLayout?` test seam) for step 3 to read when it builds the
-       wire payload. Covered by `RunDirectorIslandLayoutTests` (matches a bare `Generate` call off the same
-       seed; caches the whole playable set even when the run only ever visits one biome; stays `null` outside
-       biome mode).
+       `IRandomSource` every other per-run roll draws from, never a fresh one — and cached on
+       `RunState.IslandLayout` (a settable property, like `CurrentBiome`; `RunDirector` exposes a forwarding
+       `internal IslandLayout?` test seam) for step 3 to read when it builds the wire payload. Covered by
+       `RunDirectorIslandLayoutTests` (matches a bare `Generate` call off the same seed; caches the whole
+       playable set even when the run only ever visits one biome; stays `null` outside biome mode).
+       **`requirements-review` (2026-08-18) caught it living on the wrong object at first** — it originally
+       lived on a private `RunDirector` field, but §7.4's ratified plan says "cached on `RunState`," and
+       `RunDirector` owns non-serializable collaborators (DB-backed suppliers, the emitter) that make it the
+       wrong home regardless of the doc: the **user's framing settled it** — a save/resume layer would snapshot
+       `RunState`, not `RunDirector`, and a future **multiple-islands-per-run** feature (confirmed as a
+       "definite" future feature) would need to *reassign* the layout at an island boundary exactly the way
+       `CurrentBiome` is already reassigned at a biome boundary — both are `RunState`-shaped needs. Moved;
+       `RunState`'s class doc gained a note explaining why this presentation-ish field rides along despite
+       `chooseNextEvent` never reading it (precedented by `BattlesWon`/`RunDepth`, which already double as
+       run-summary data). Zero doc changes needed — `GENERATION_PROFILE.md` §7.4 already said `RunState`; the
+       code just didn't match it yet. Full suite re-verified green after the move (1493/1493, unchanged — the
+       `RunDirector` forwarding property kept every existing test compiling untouched).
        **Real gap found and fixed, not just wired:** the full test suite turned up 4 failures in
        `RunDirectorBiomeTests` — they hand `RunDirector` the **un-sampled, full 18-biome `Biomes.Kanto`
        registry** as `PlayableBiomes` directly (to test the 3-of-N route-offer sample, nothing to do with the
@@ -995,10 +1007,10 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
     3. [x] **`RegionMapRevealed` wire update** ✅ DONE (2026-08-18) — `RegionMapRevealed` now carries `Width`/
        `Height` (the grid canvas) and `Routes` (`IslandRoute`, reused as-is from `IslandLayoutGenerator` rather
        than duplicated into a wire-only type); `RegionMapBiome.MapX`/`MapY` (authored 0–100) are replaced by
-       `X`/`Y` (the procedurally laid-out grid cell). `RunDirector.BuildRegionMap()` reads `_islandLayout`
-       (step 2, guaranteed non-null — it's only ever called immediately after `_islandLayout` is computed) instead
-       of the old authored `BiomeDefinition.MapX/MapY`. `SignalRBattleEventEmitter`'s projection updated to
-       match. Covered by: the mechanical reflection guard (`EveryBattleEventProjectsAllOfItsFields`, no changes
+       `X`/`Y` (the procedurally laid-out grid cell). `RunDirector.BuildRegionMap()` reads `_state.IslandLayout`
+       (step 2, guaranteed non-null — it's only ever called immediately after `_state.IslandLayout` is computed)
+       instead of the old authored `BiomeDefinition.MapX/MapY`. `SignalRBattleEventEmitter`'s projection updated
+       to match. Covered by: the mechanical reflection guard (`EveryBattleEventProjectsAllOfItsFields`, no changes
        needed — it already probes list-typed fields with a real nested instance, so it caught the shape
        automatically); the hand-pinned value-level wire test, renamed and rewritten for the new fields
        (`RegionMapRevealed_Projection_CarriesBiomeSubFieldsGridCoordsAndRoutes` — grid `Width`/`Height`, a

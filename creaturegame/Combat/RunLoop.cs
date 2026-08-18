@@ -32,10 +32,16 @@ public enum EncounterTier
 }
 
 /// <summary>
-/// The run's logic state — the <em>only</em> thing <c>chooseNextEvent</c> reads to decide what happens next
+/// The run's logic state — the primary thing <c>chooseNextEvent</c> reads to decide what happens next
 /// (<c>GAME_LOOP.md §3/§4</c>). It is mutated by an event's <see cref="Outcome"/> (via the director's apply
 /// step) and by the events themselves; never by player input directly — the player only changes an event's
 /// outcome, which then feeds back here. Deterministic given <c>(state, rng)</c>.
+/// <para>Not <em>exclusively</em> sequencing input, though — like <see cref="BattlesWon"/>/<see cref="RunDepth"/>
+/// (which double as run-summary data), <see cref="IslandLayout"/> rides along here for a reason beyond
+/// <c>chooseNextEvent</c>: it is the natural home for state a future save/resume layer would need to snapshot,
+/// and for per-phase state a future feature (multiple islands per run) would reassign the same way
+/// <see cref="CurrentBiome"/> already gets reassigned at a biome boundary — neither of which <c>RunDirector</c>,
+/// which owns non-serializable collaborators (DB-backed suppliers, the emitter), is a sensible home for.</para>
 /// </summary>
 public sealed class RunState
 {
@@ -125,6 +131,18 @@ public sealed class RunState
     /// boundary, ahead of the <c>BiomeChoiceEvent</c>. Never set at run start (the party is the lone starter).
     /// </summary>
     public bool LeadChoicePending { get; set; }
+
+    /// <summary>
+    /// The Town Map's realized grid layout for the <em>current island</em> (<c>docs/TODO.md</c> Stage 4c) — the
+    /// playable biome subgraph laid out onto a grid by <see cref="IslandLayoutGenerator"/>. Computed once per
+    /// island, at map-selection time, from the run's own shared <see cref="IRandomSource"/> (recomputing later
+    /// would shift every later RNG draw — <c>GAME_LOOP.md</c>'s same-seed-same-sequence rule). Null outside
+    /// biome mode. Today set exactly once (there is only ever one island); a future multiple-islands feature
+    /// would reassign it at an island boundary the same way <see cref="CurrentBiome"/> is reassigned at a biome
+    /// boundary — which is why this lives here rather than as a <c>RunDirector</c>-owned field, alongside this
+    /// class's own note on why presentation state that outlives a single read still belongs on <c>RunState</c>.
+    /// </summary>
+    public IslandLayout? IslandLayout { get; set; }
 }
 
 /// <summary>

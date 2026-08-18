@@ -34,7 +34,6 @@ public sealed class RunDirector
     private readonly int _maxEventsPerBiome;
     private readonly bool _biomeModeActive;
     private readonly IReadOnlyList<BiomeDefinition> _playableBiomes;
-    private IslandLayout? _islandLayout;
     private readonly Wallet? _wallet;
     private readonly int _minShopBudget;
     private readonly Func<int, IRandomSource, IReadOnlyList<RunNodeKind>> _nodePlanFactory;
@@ -133,11 +132,10 @@ public sealed class RunDirector
     /// controlled run. Not part of the public surface; production code never reads it from outside.</summary>
     internal RunState State => _state;
 
-    /// <summary>The Town Map layout for this run's playable biome subgraph — computed once, at run start, from
-    /// the same shared <see cref="IRandomSource"/> the rest of the run draws from (<c>docs/TODO.md</c> Stage 4c
-    /// step 2). Null outside biome mode. Exposed <c>internal</c> as a test seam today; the wire payload
-    /// (<see cref="RegionMapRevealed"/>) starts reading it in step 3.</summary>
-    internal IslandLayout? IslandLayout => _islandLayout;
+    /// <summary>Convenience forwarding to <see cref="RunState.IslandLayout"/> (the actual owner — see its own
+    /// doc for why it lives there and not here) — exposed <c>internal</c> as a test seam, like <see cref="State"/>.
+    /// </summary>
+    internal IslandLayout? IslandLayout => _state.IslandLayout;
 
     public async Task RunAsync()
     {
@@ -148,13 +146,14 @@ public sealed class RunDirector
         // filtered to the playable subset so the client never references a biome it wasn't sent.
         if (_biomeModeActive)
         {
-            // The Town Map grid layout (Stage 4c): computed exactly once, here, at map-selection time — the
-            // playable biome subgraph is already fixed (RandomConnectedMap ran before this director was even
-            // constructed), so this is the earliest point the run's own RNG sequence can lay it out. Draws
+            // The Town Map grid layout (Stage 4c): computed exactly once per island, here, at map-selection time
+            // — the playable biome subgraph is already fixed (RandomConnectedMap ran before this director was
+            // even constructed), so this is the earliest point the run's own RNG sequence can lay it out. Draws
             // from the same shared _rng every other per-run roll uses, so it's part of the one deterministic
-            // same-seed-same-sequence stream (GAME_LOOP.md) — recomputing later would shift every later draw,
-            // so it is cached on _islandLayout for the rest of the run's lifetime rather than rebuilt per call.
-            _islandLayout = IslandLayoutGenerator.Generate(
+            // same-seed-same-sequence stream (GAME_LOOP.md) — recomputing later would shift every later draw, so
+            // it is cached on _state.IslandLayout (not recomputed per call) — see that property's own doc for why
+            // it lives on RunState rather than a RunDirector field.
+            _state.IslandLayout = IslandLayoutGenerator.Generate(
                 _playableBiomes,
                 _rng ?? SystemRandomSource.Instance
             );
@@ -284,13 +283,14 @@ public sealed class RunDirector
 
     // Projects the playable biome subset onto the Town Map grid the client draws: each biome with its type theme,
     // the ids of its neighbours that are *also* in the playable subset (the graph edges), and its cell from the
-    // procedurally-generated _islandLayout (Stage 4c step 2) — never the old authored BiomeDefinition.MapX/MapY.
-    // Filtering neighbours to the subset means the client never gets an edge to a biome it wasn't sent. Only
-    // called from RunAsync's biome-mode arm, immediately after _islandLayout is computed, so it is always set
-    // (never recomputed here — that would draw a second, different layout from the same rng).
+    // procedurally-generated RunState.IslandLayout (Stage 4c step 2) — never the old authored
+    // BiomeDefinition.MapX/MapY. Filtering neighbours to the subset means the client never gets an edge to a
+    // biome it wasn't sent. Only called from RunAsync's biome-mode arm, immediately after _state.IslandLayout is
+    // computed, so it is always set (never recomputed here — that would draw a second, different layout from the
+    // same rng).
     private RegionMapRevealed BuildRegionMap()
     {
-        var layout = _islandLayout!;
+        var layout = _state.IslandLayout!;
         var playableIds = _playableBiomes.Select(b => b.Id).ToHashSet();
         return new RegionMapRevealed(
             layout.Width,
