@@ -642,7 +642,7 @@ spent on exactly four things and nothing else:
 | Token | Value | Role |
 |:--|:--|:--|
 | Ink | `#15130F` | borders, text — near-black, warm-tinted, not pure `#000` |
-| Box fill | `#FFFFFF` | interior of every boxed surface (nameplate, dialogue, menu button, move row) |
+| Box fill | `#E8E4D6` | interior of every boxed surface (nameplate, dialogue, menu button, move row) — darkened from pure `#FFFFFF` (2026-08-22, user's call: the stark white nameplate box clashed against the saturated HP-bar colours sitting right next to it in battle) |
 | Outer field | `#C9D0C5` ("Fog") | the field behind the boxes — a muted sage-grey, picked over three alternatives (Stone `#D2CEC3`, Slate `#C7CBD2`, Ash `#B6B9BD`) specifically to keep the "Kanto Sage" identity without reading as tan/khaki (the first pass's `#DED8BC` — user's call, 2026-08-03: *"not a big fan of the tan"*) |
 | Dim text | `#57503F` | secondary labels — bar numbers, PP counts |
 

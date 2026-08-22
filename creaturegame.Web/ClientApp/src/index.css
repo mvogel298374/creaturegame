@@ -68,7 +68,9 @@
    on the tokens above until then. */
 [data-generation="gen1"] {
   --ks-ink:  #15130F;   /* borders, text — near-black, warm-tinted */
-  --ks-fill: #FFFFFF;   /* interior of every boxed surface */
+  --ks-fill: #E8E4D6;   /* interior of every boxed surface — warm off-white, darkened 2026-08-22
+                            from pure #FFFFFF: stark white clashed against the saturated HP-bar
+                            colours sitting right next to it in the nameplate box */
   --ks-fog:  #C9D0C5;   /* the field behind the boxes */
   --ks-dim:  #57503F;   /* secondary labels — bar numbers, PP counts */
   --ks-hp:   #D6362B;   /* HP bar low-health endpoint */
