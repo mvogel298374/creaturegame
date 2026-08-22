@@ -1125,7 +1125,21 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
        general.
   - [ ] **4d+ — the surface catalog, jointly iterated** (each its own greenlit mini-plan): battle command menu
     (settled — the 2×2 grid, verbs fixed), move select, battle HUD, CHECK POKEMON, BAG, party surfaces, run
-    prompts, Title/StarterSelection (incl. the generation picker), node ladder.
+    prompts, Title/StarterSelection (incl. the generation picker), node ladder, **the level-up modal and the
+    reward modal** (both still the old pre-Kanto-Sage look, flagged 2026-08-23 — user-reported while playing,
+    not yet its own mini-plan).
+  - [x] **⚠️ BAG readability regression** ✅ DONE (2026-08-23) — `.bag-item`/`.bag-pp-prompt`/`.bag-gold*`
+    (`BattleScreen.css`) only ever inherited the global dark-theme `--clr-text` (near-white) on a transparent
+    background, unreadable against the light Kanto Sage `--ks-fog` panel ground they now sit on. Same failure
+    mode as the Town Map caption bug fixed 2026-08-18 (parchment-surface tokens vs. an unskinned dark ground,
+    just inverted). Fixed with `[data-generation="gen1"]` override rules for `.bag-item` (+ hover/focus-visible
+    invert), `.bag-item-qty`/`.bag-item-desc`/`.bag-group-label`, `.bag-empty`, `.bag-pp-prompt`, and the
+    `.bag-gold`/`.bag-gold-label`/`.bag-gold-coin`/`.bag-gold-amount` money box — the same ink-on-fill /
+    invert-block pattern already used for `.action-btn`/`.move-btn`. `ReviveTargetPicker` reuses the same
+    `.bag-item*` classes so it's covered automatically; `PpTargetPicker` already reused `.move-btn` and needed
+    no change. Verified live via Puppeteer (screenshot before/after + hover state) in an actual battle's BAG
+    menu — reads correctly, hover-inverts cleanly. CSS-only, no test changes. **The rest of the 4d+ BAG
+    mini-plan (a full skin pass beyond this legibility fix) is still open** — see the surface catalog above.
   Phaser/canvas + per-gen sprite & cry assets stay **deferred** (`GENERATION_PROFILE.md` §7.6).
 - [ ] **Stage 5 — falsification harness.** Standing requirement, not a final stage: each stage ships its leg of
   `TestAltProfile`.

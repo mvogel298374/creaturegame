@@ -731,6 +731,45 @@
   color: var(--clr-text);
 }
 
+/* Kanto Sage: BAG's items get the same plain-bold-border + invert-block treatment as the command
+   grid / move-select (same tokens, same reasoning) — brought forward from the 4d+ catalog ahead of
+   its sibling surfaces because it was a live readability regression, not just cosmetic staleness
+   (docs/TODO.md, flagged 2026-08-23): `.bag-item` only ever inherited `--clr-text` (near-white) on a
+   transparent background, which was fine against the old dark panel but reads as near-invisible now
+   that `.battle-panel` sits on the light `--ks-fog` ground. `ReviveTargetPicker` reuses the same
+   `.bag-item*` classes, so it's covered by the same rules; `PpTargetPicker` already reuses `.move-btn`
+   and needed no change. */
+[data-generation="gen1"] .bag-item {
+  background: var(--ks-fill);
+  color: var(--ks-ink);
+  border: 3px solid var(--ks-ink);
+  background-image: var(--ks-grain);
+  background-size: 34px 34px;
+}
+[data-generation="gen1"] .bag-item:hover:not(:disabled),
+[data-generation="gen1"] .bag-item:focus-visible:not(:disabled) {
+  background: var(--ks-ink);
+  border-color: var(--ks-ink);
+  color: var(--ks-fill);
+}
+[data-generation="gen1"] .bag-item-qty,
+[data-generation="gen1"] .bag-item-desc,
+[data-generation="gen1"] .bag-group-label {
+  color: var(--ks-dim);
+}
+[data-generation="gen1"] .bag-item:hover:not(:disabled) .bag-item-qty,
+[data-generation="gen1"] .bag-item:hover:not(:disabled) .bag-item-desc,
+[data-generation="gen1"] .bag-item:focus-visible:not(:disabled) .bag-item-qty,
+[data-generation="gen1"] .bag-item:focus-visible:not(:disabled) .bag-item-desc {
+  color: var(--ks-fill);
+}
+[data-generation="gen1"] .bag-empty {
+  color: var(--ks-dim);
+}
+[data-generation="gen1"] .bag-pp-prompt {
+  color: var(--ks-ink);
+}
+
 /* ── Action btn waiting state ────────────────── */
 .action-btn--waiting {
   opacity: 0.4;
@@ -1302,6 +1341,26 @@
 .bag-gold-amount {
   color: var(--clr-text);
   font-size: var(--fs-base);
+}
+
+/* Kanto Sage: same readability fix as the item rows above — the box's own dark translucent backing
+   plate and gold trim were tuned for the old dark panel and read poorly against the light --ks-fog
+   ground (the coin glow in particular all but disappears on a light background). Ink-on-fill, same
+   as every other boxed surface in this skin; the coin loses its glow rather than gaining an
+   unbudgeted new colour. */
+[data-generation="gen1"] .bag-gold {
+  background: var(--ks-fill);
+  border-color: var(--ks-ink);
+}
+[data-generation="gen1"] .bag-gold-label {
+  color: var(--ks-dim);
+}
+[data-generation="gen1"] .bag-gold-coin {
+  color: var(--ks-ink);
+  text-shadow: none;
+}
+[data-generation="gen1"] .bag-gold-amount {
+  color: var(--ks-ink);
 }
 
 /* ── Loot drop hover (transient reward popup) ── */
