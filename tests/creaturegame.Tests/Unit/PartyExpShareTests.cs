@@ -17,9 +17,10 @@ namespace creaturegame.Tests.Unit;
 /// in <see cref="RunRules"/>, not the Gen-1 seam; it never fires for a party-less <see cref="Battle"/>.</para>
 /// <para>Because the two are based on different figures, a non-participant can out-earn a participant at the
 /// Easy/Normal presets — a known, user-accepted limitation, pinned by a test below.</para>
-/// <para>XP is silent for a never-deployed member until it produces a level-up, which surfaces attributed
-/// (<c>LeveledUp.OnBench</c>); a switched-out participant's award is logged (<c>ExperienceGained.OnBench</c>)
-/// without moving the on-field creature's XP bar.</para>
+/// <para>Every off-field award is logged (<c>ExperienceGained.OnBench</c>) by the recipient's name, without
+/// moving the on-field creature's XP bar — a never-deployed member's innate bench share and a switched-out
+/// participant's split share are announced the same way. A level-up additionally surfaces attributed
+/// (<c>LeveledUp.OnBench</c>).</para>
 /// </summary>
 public class PartyExpShareTests
 {
@@ -97,12 +98,17 @@ public class PartyExpShareTests
 
         Assert.Equal("Lead", result.Winner);
 
-        // Exactly one ExperienceGained — the lead's. Bench XP is silent (no per-member log line).
+        // One ExperienceGained for the lead, and one for the living bench member (attributed, OnBench) — the
+        // fainted bench member gets none, so the text log names every party member that actually gained XP.
         var xpEvents = result.All<ExperienceGained>();
-        Assert.Single(xpEvents);
+        Assert.Equal(2, xpEvents.Count);
         Assert.Equal("Lead", xpEvents[0].CreatureName);
+        Assert.False(xpEvents[0].OnBench);
         int award = xpEvents[0].Amount;
         Assert.True(award > 0);
+        Assert.Equal("Alive", xpEvents[1].CreatureName);
+        Assert.True(xpEvents[1].OnBench);
+        Assert.Equal((int)Math.Floor(award * 0.5), xpEvents[1].Amount);
 
         // Lead: full award. Living bench: floor(award × 0.5). Fainted bench: nothing.
         Assert.Equal(award, lead.Experience - leadXpBefore);
@@ -138,6 +144,38 @@ public class PartyExpShareTests
         Assert.Equal("Lead", result.Winner);
         Assert.Equal(benchXpBefore, bench.Experience); // no XP
         Assert.Equal(0, bench.ExpHP); // no Stat-Exp
+    }
+
+    // A NONZERO share that still floors to 0 XP (a tiny fraction of the award — not reachable with real Gen-1
+    // base-exp values, but pinned so it can't regress) must not emit a "gained 0 EXP." log line: the emit is
+    // gated by the same `share > 0` check as the XP grant itself, so Stat-Exp-only training stays silent.
+    [Fact]
+    public async Task BenchShareThatFloorsToZero_EmitsNoAwardLine()
+    {
+        var lead = OneShotLead();
+        var bench = Bench("Bench");
+        var party = new Party(lead);
+        party.Add(bench);
+
+        int benchXpBefore = bench.Experience;
+        int benchExpHpBefore = bench.ExpHP;
+
+        var result = await new BattleScenario()
+            .Party(party)
+            .Enemy(Foe())
+            .PlayerUses("Slam")
+            .EnemyUses("Poke")
+            .RunRules(new RunRules { BenchXpShare = 0.0001 }) // nonzero, but floor(award × share) = 0
+            .Seed(1)
+            .RunAsync();
+
+        Assert.Equal("Lead", result.Winner);
+        Assert.Equal(benchXpBefore, bench.Experience); // floored to 0 → no XP granted
+        Assert.Equal(benchExpHpBefore + 10, bench.ExpHP); // Stat-Exp is still unconditional
+
+        // Only the lead's award is announced — no "Bench gained 0 EXP." artifact.
+        var xpEvents = result.All<ExperienceGained>();
+        Assert.Equal("Lead", Assert.Single(xpEvents).CreatureName);
     }
 
     // A bench member the share pushes over a level threshold levels up like any other creature, and the event is
@@ -262,10 +300,14 @@ public class PartyExpShareTests
         Assert.Equal("Lead", result.Winner);
 
         int baseXp = Gen1BattleRules.Instance.CalculateXpAwarded(200, 30, trainerOwned: false);
-        int award = result.All<ExperienceGained>().Single().Amount;
+        var xpEvents = result.All<ExperienceGained>();
+        int award = xpEvents.Single(e => e.CreatureName == "Lead").Amount;
         Assert.Equal(baseXp * 2, award); // the run XP curve applied to the lead's award
-        // …and the bench share is floor(that scaled award × 0.5), not floor(baseXp × 0.5).
+        // …and the bench share is floor(that scaled award × 0.5), not floor(baseXp × 0.5) — logged the same way.
         Assert.Equal((int)Math.Floor(award * 0.5), bench.Experience - benchXpBefore);
+        var benchEvent = xpEvents.Single(e => e.CreatureName == "Bench");
+        Assert.True(benchEvent.OnBench);
+        Assert.Equal(bench.Experience - benchXpBefore, benchEvent.Amount);
     }
 
     // ---- Participation XP (2026-07-27): every creature that took the field splits the award evenly ----
@@ -337,15 +379,22 @@ public class PartyExpShareTests
         Assert.Equal((int)Math.Floor(fullAward * 0.5), rester.Experience - resterBefore);
 
         // Exactly one award event per participant (nobody is paid twice — the easy double-pay bug here, since
-        // the active creature appears both at the award site and in the participant set). The finisher's drives
-        // the on-field XP bar; the switched-out participant's is flagged so the client logs it WITHOUT moving
-        // that bar. A never-deployed member stays silent, as before.
+        // the active creature appears both at the award site and in the participant set), plus one for the
+        // never-deployed bench member's innate share. The finisher's drives the on-field XP bar; both the
+        // switched-out participant's and the bench member's are flagged so the client logs them WITHOUT moving
+        // that bar.
         var xpEvents = result.All<ExperienceGained>();
-        Assert.Equal(2, xpEvents.Count);
-        Assert.Equal(new[] { "Sub", "Lead" }, xpEvents.Select(e => e.CreatureName).ToArray());
+        Assert.Equal(3, xpEvents.Count);
+        Assert.Equal(
+            new[] { "Sub", "Lead", "Rester" },
+            xpEvents.Select(e => e.CreatureName).ToArray()
+        );
         Assert.False(xpEvents[0].OnBench);
         Assert.True(xpEvents[1].OnBench);
-        Assert.All(xpEvents, e => Assert.Equal(share, e.Amount));
+        Assert.True(xpEvents[2].OnBench);
+        Assert.Equal(share, xpEvents[0].Amount);
+        Assert.Equal(share, xpEvents[1].Amount);
+        Assert.Equal((int)Math.Floor(fullAward * 0.5), xpEvents[2].Amount); // bench share, off the full award
     }
 
     // A switched-out participant is paid through a different path than the innate bench share, so its level-up

@@ -333,7 +333,8 @@ public class Battle
                 // roster keeps pace and stays swappable. Fainted members are excluded (a fainted participant
                 // earns nothing, per Gen 1). Deliberately a roguelite deviation from Gen 1's participant split —
                 // kept out of the seam; scales the seam's result only. Never fires for a direct single-creature
-                // Battle (no party threaded) or when the share is 0.
+                // Battle (no party threaded) or when the share is 0. Each member's award is logged (attributed,
+                // OnBench) same as a switched-out participant's, so the text log covers the whole party.
                 anyLevelled |= await ShareExperienceWithBenchAsync(xp);
 
                 // The party strip is fed only by PartyUpdated snapshots (+ the connect-time /party hydrate), so
@@ -463,10 +464,11 @@ public class Battle
     /// fraction (<see cref="RunRules.BenchXpShare"/>) of the <em>full</em> award (<paramref name="fullAward"/> —
     /// the undivided figure, not a participant's split share) plus the full Stat-Exp, then runs its level-up +
     /// move-learn loop. Participants are paid their equal share elsewhere and are skipped here; a fainted member
-    /// earns nothing (Gen 1). Each level emits an attributed <see cref="LeveledUp"/> (carrying the member's name)
-    /// so the player sees which creature levelled; bench XP is otherwise silent. No-op without a party or with a
-    /// zero share — so a direct single-creature <see cref="Battle"/> is unaffected. Returns whether any bench
-    /// member levelled.
+    /// earns nothing (Gen 1). Each award is announced via an <see cref="ExperienceGained"/> flagged
+    /// <c>OnBench: true</c> (same convention as a switched-out participant's) so the text log names every
+    /// creature that gained XP, without moving the on-field XP bar; each level additionally emits an attributed
+    /// <see cref="LeveledUp"/> (carrying the member's name). No-op without a party or with a zero share — so a
+    /// direct single-creature <see cref="Battle"/> is unaffected. Returns whether any bench member levelled.
     /// <para>Because the share is taken off the full award while participants split it, a creature that never
     /// fought can earn as much as (Normal) or more than (Easy) one that did. That inversion is a known,
     /// deliberately accepted balance property — see <c>docs/TODO.md</c> → <em>Participation XP</em>.</para>
@@ -485,7 +487,15 @@ public class Battle
                 continue;
 
             if (share > 0)
+            {
                 member.AddExperience(share);
+                // Announced the same way as a switched-out participant's award (OnBench: true) — the client logs
+                // it without moving the on-field XP bar, so the text log names every party member that gained
+                // XP, not just whoever was on the field. Skipped entirely when the share floors to 0 (a tiny
+                // fullAward at a high BenchXpShare — not reachable with real Gen-1 base-exp values, but a "gained
+                // 0 EXP" line would be a visible artifact if it ever were) so Stat-Exp-only training stays silent.
+                _emitter?.Emit(new ExperienceGained(member.Name, share, OnBench: true));
+            }
             // Stat-Exp is a coarse, capped accumulator — granted in full to each living member, not fractionalised
             // (and unconditionally: a member still trains off a win even when the fractional XP floors to 0).
             member.GainStatExp(EnemyCreature);

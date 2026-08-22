@@ -211,7 +211,8 @@ Pinned by `ExperienceAndLevelingTests.Gen1XpFormula_DividesTheAwardAmongLivePart
 3. **The bench share formula is untouched** — still `floor(fullAward × BenchXpShare)`, off the full award.
 4. **Surfacing:** `ExperienceGained` gained an `OnBench` flag. A switched-out participant's award is logged but
    does **not** move the on-field XP bar (`timeline.ts` gates `XP_GAIN` on it — the manual TS leg of the
-   web-event field-projection gap). A never-deployed member's share stays silent until it levels, as before.
+   web-event field-projection gap). A never-deployed member's share was originally left silent until it leveled;
+   fixed 2026-08-23 to also emit an attributed `OnBench: true` award — see `Innate Party XP Share`, below.
 
 > ⚠️ **Known limitation, deliberately shipped as-is (user-decided 2026-07-27).** Decisions 1 + 3 take their
 > figures from different bases, so a creature that **never took the field** can out-earn one that fought:
@@ -941,7 +942,14 @@ that defect (evolution fixed, XP/Stat-Exp superseded, one small residual sweep s
   `ShareExperienceWithBenchAsync(int activeAward)` pays every **living** bench member
   `floor(activeAward × RunRules.BenchXpShare)` XP + full Stat-Exp, then runs the same level-up + move-learn loop
   used for the active creature. No-op without a party or with a zero share (a direct single-creature `Battle` is
-  provably unaffected). Bench XP itself is silent (no per-member `ExperienceGained`) until it produces a level-up.
+  provably unaffected).
+
+> **Bugfix, 2026-08-23.** Bench XP was silent (no per-member `ExperienceGained`) until it produced a level-up, so
+> the battle text log never named a bench member that gained XP without also levelling. `Battle.cs` now emits an
+> attributed `ExperienceGained(member.Name, share, OnBench: true)` per living bench member — same convention as a
+> switched-out participant's award (`Participation XP`, above) — so the log names every party member that gained
+> XP this battle, not just whoever was on the field. `LeveledUp` attribution is unchanged. See
+> `tests/creaturegame.Tests/Unit/PartyExpShareTests.cs` and `docs/STATE_MODEL.md`.
 - `Combat/BattleEvents.cs` — `LeveledUp` gained a trailing `bool OnBench = false` so the client can tell a
   bench level-up from the active creature's and render an attributed panel without moving the active nameplate.
 - `Combat/RunEvents/BattleRunEvent.cs` — replaced the single starting-lead `levelBefore` local +

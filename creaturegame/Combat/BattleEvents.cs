@@ -448,11 +448,12 @@ public record CreatureSwitchedIn(
 
 /// <summary>The amount of XP a creature earned from a win — emitted once per earning creature, before that
 /// creature's <see cref="LeveledUp"/> events, so the client can show the gain and begin filling the XP bar.
-/// <para><paramref name="OnBench"/> marks an award earned by a creature that is not the one on the field — a
-/// participant that fought and was switched back out, which earns the same share as the finisher. The client
-/// must log the gain but must NOT move the active creature's XP bar for it; only the on-field creature drives
-/// that bar. (A member that never took the field earns the innate Exp-Share silently — no event at all — until
-/// it produces a <see cref="LeveledUp"/>.)</para></summary>
+/// <para><paramref name="OnBench"/> marks an award earned by a creature that is not the one on the field — either
+/// a participant that fought and was switched back out (earning the same share as the finisher), or a
+/// never-deployed member paid the innate party Exp-Share (<see cref="RunRules.BenchXpShare"/>). Both are
+/// announced this way so the text log names every party member that gained XP, not just the one on the field.
+/// The client must log the gain but must NOT move the active creature's XP bar for it; only the on-field
+/// creature drives that bar.</para></summary>
 public record ExperienceGained(string CreatureName, int Amount, bool OnBench = false) : BattleEvent;
 
 /// <summary>One level gained. Carries the new level's bar parameters (<paramref name="XpThisLevel"/> /

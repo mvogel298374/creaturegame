@@ -106,8 +106,11 @@ the whole party rather than only the creature that started the fight:
   switched on (a zero share skips the bench loop entirely, so they get neither XP nor Stat-Exp). Fainted members
   earn nothing. This share is a roguelite deviation (see
   `GENERATION_SEAMS.md`). A level-up earned off the field carries its own creature's name (`LeveledUp.OnBench`) so
-  it surfaces attributed, without disturbing the on-field creature's nameplate — as does a switched-out
-  participant's award (`ExperienceGained.OnBench`, which the client logs without moving the on-field XP bar).
+  it surfaces attributed, without disturbing the on-field creature's nameplate — as does every off-field award,
+  whether a switched-out participant's split share or a bench member's innate share (`ExperienceGained.OnBench`,
+  which the client logs by name without moving the on-field XP bar) — so the text log names every party member
+  that gained XP this battle, not just whoever was on the field (2026-08-23; previously the bench share was
+  awarded silently, with no per-member log line until it produced a level-up).
   > ⚠️ **Known, user-accepted limitation (2026-07-27):** the bench share is taken off the **full** award while
   > participants split it, so with two live participants a creature that never fought earns the **same** as one
   > that did at Normal (0.5) and **more** at Easy (0.75). Deliberate — see `docs/TODO_ARCHIVE.md` → *Participation XP*.
