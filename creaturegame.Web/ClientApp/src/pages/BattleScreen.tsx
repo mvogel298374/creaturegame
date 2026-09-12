@@ -701,14 +701,6 @@ function RouteChoiceMap({ width, height, biomes, routes, routePath, currentId, o
         offeredIds={offeredIds}
         onChoose={onChoose}
       />
-      <div className="route-choice-legend">
-        {options.map(o => (
-          <span key={o.id} className="route-choice-legend-item">
-            <span className="route-choice-legend-name">{o.name}</span>
-            {o.types.map(t => <TypeChip key={t} type={t} />)}
-          </span>
-        ))}
-      </div>
     </Modal>
   );
 }

@@ -8,6 +8,26 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Route-choice bottom legend duplicates the map hover, with no click affordance ✅ DONE (2026-09-12)
+
+**Raised and fixed same day (2026-09-12).** In `RouteChoiceMap` (`BattleScreen.tsx`), the map's per-town
+hover/focus already drove a caption band (`.town-map-caption` inside `TownMapGrid`) showing the hovered biome's
+name + status + type chips. Below the map, a separate static `.route-choice-legend` row listed the same info
+(name + type chips) for all three offered biomes, but it was inert — not clickable, not focusable, just a
+redundant echo.
+
+**Fix.** Deleted the `.route-choice-legend` div block from `RouteChoiceMap` in
+`creaturegame.Web/ClientApp/src/pages/BattleScreen.tsx` — the map hover caption is now the sole source of choice
+info. Removed the now-dead CSS from `BattleScreen.css`: the `.route-choice-legend` /
+`.route-choice-legend-item` / `.route-choice-legend-name` rule blocks, and trimmed the Kanto Sage
+`[data-generation="gen1"]` ink-color override selector list down to just `.route-choice-modal .biome-title,
+.route-choice-modal .biome-sub` (dropping the two legend selectors). Pure UI deletion — no wire/state/engine
+change, no generation seam.
+
+**Verified.** `tsc --noEmit` clean; full fast suite green (.NET 1494/1494, TypeScript clean, Vitest 232/232).
+
+---
+
 ## Party strip shows a stale name after an on-field evolution ✅ DONE (2026-07-29)
 
 **The defect (found 2026-07-28).** The party panel is fed **only** by `PartyUpdated` snapshots (plus the

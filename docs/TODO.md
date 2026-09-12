@@ -15,19 +15,40 @@ Party XP Share** (the living bench shares in every battle's XP/Stat-Exp and evol
 creature), **Revive Items** (in-battle party revive, Boss-reward + rare-shop only), and **In-Combat Switching**
 (the voluntary, any-turn SWITCH turn-action) are all done and archived (→ `TODO_ARCHIVE.md`).
 
-**Next up, in priority order:**
-1. **Generation Profile** — make Gen 1 an explicit, swappable profile so a generation switch changes content,
-   menus and look, not just battle math. Designed against Gen 1 alone; upward compatibility is the deliverable,
-   no Gen 2 content. **`/plan` DONE (2026-07-29; Stage 4 re-planned as v2 on 2026-07-31 — per-gen adaptation
-   with the bones kept, jointly iterated per surface, plus the grid Town Map)** — full design in
-   [`GENERATION_PROFILE.md`](GENERATION_PROFILE.md). **Stages 1–3 complete (1a, 1b, 2a, 2b, 3 shipped); Stage 4
-   (presentation) in progress — 4a/4b shipped (incl. the Kanto Sage ornamental-detail follow-up), 4c (the Town
-   Map) shipped 2026-08-18; 4d+ open** —
-   Stage 5 is the standing falsification rule, and every shipped stage has landed its leg — task entry + staging
-   below. **Sequenced ahead of the two items below (2026-08-04, user's call).**
-2. **Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by the acquisition channels.
-   *(Item acquisition itself is already done via the Run Economy; bag persistence + catch remain.)*
-3. **Game Loop & Progression** — save layer (`save.db`); party + between-biome lead + forced-switch are done.
+**Next up — tiered 2026-09-12 after a full pass over every open item in this file.** Tiers are ordering, not
+strict sequence — 0/1 are quick/parallel-track and don't block anything below them; 2 is a standing
+user-sequenced commitment (2026-08-04) that stays ahead of 4/5 regardless.
+
+- **Tier 0 — trivial, zero-risk, any time:** the Town Map scatter-tile white-background fix (→ *Generation
+  Profile* Stage 4d+). (The route-choice bottom-legend deletion, the other Tier 0 item, shipped 2026-09-12 —
+  see `TODO_ARCHIVE.md`.)
+- **Tier 1 — the two joint code-analysis sessions raised 2026-09-12, settle before further battle/encounter
+  tuning:** the poison-tick-vs-same-turn-faint ordering question, and the Fearow level-11-at-player-23 formula
+  check (both → *Known Gaps*).
+- **Tier 2 — Generation Profile Stage 4d+** (the jointly-iterated surface catalog) — make Gen 1 an explicit,
+  swappable profile so a generation switch changes content, menus and look, not just battle math. **`/plan`
+  DONE (2026-07-29; Stage 4 re-planned as v2 on 2026-07-31)** — full design in
+  [`GENERATION_PROFILE.md`](GENERATION_PROFILE.md). **Stages 1–3 complete; Stage 4: 4a/4b/4c shipped, 4d+
+  open** (Stage 5 is the standing falsification rule) — task entry + staging below. **Sequenced ahead of Tiers
+  4–5 (2026-08-04, user's call).**
+- **Tier 3 — scoped, no blockers, good next features:** the CHECK POKEMON party-member picker (→ *Web UI —
+  Polish*), Creature Naming/nickname on acquisition (its own section), and refresh/reconnect-safe session
+  handling — **lightweight option only** (persist `gameId` to `localStorage`; the heavy `save.db` option lives
+  in Tier 5) (→ *Game Loop & Progression*).
+- **Tier 4 — Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by the acquisition
+  channels. Bag-scope decision (per-run vs. meta-progression) first, then `BallItemEffect`/catch
+  formula/animation. *(Item acquisition itself is already done via the Run Economy; bag persistence + catch
+  remain.)*
+- **Tier 5 — Game Loop & Progression** — progressive difficulty (good pairing point for the evolution-stage/
+  encounter-level design question also raised 2026-09-12), the `PlayerSave`/`save.db` layer (+ the heavy
+  session-handling option), Stone evolutions (waits on Catch above). Party + between-biome lead + forced-switch
+  are done.
+- **Tier 6 — opportunistic polish + test-infra loose ends:** Web UI Polish (move-specific animations, text
+  feel, sprite FX joint sketch, Escape=B-cancel, `ConsoleInput`), the small *switched-in end-of-battle sweep*
+  residual, and the test-infra items below (CI E2E step, `data-testid`, visual-regression, the
+  `evolution.spec.ts` gap, `GameSessionManager` connection-lifecycle coverage).
+- **Tier 7 — reference/housekeeping, no urgency:** Multi-Generation Data Model & Schema, User Documentation,
+  and the "watch, don't refactor speculatively" Tech Debt items.
 
 *(**In-Combat Switching** — the voluntary, any-turn SWITCH turn-action — is **✅ COMPLETE (2026-07-25)**, all three
 stages (engine core / wire / frontend) shipped, including the out-of-PP menu affordance (BAG/SWITCH reachable at
@@ -66,14 +87,16 @@ for the closing record.)*
 **Encounter Map** route overlay and the **Difficulty easing** tuning pass are all done and archived
 (→ `TODO_ARCHIVE.md`).)*
 
-Lower priority / opportunistic: E2E flakiness stabilisation (`status.spec.ts` **fixed 2026-07-15** — root cause
-was a spec asserting a transient badge, not an engine bug; see *Browser-Based UI Testing* for the seed-≠-determinism
-lesson it taught. Still live: `endless-chain.spec.ts` *"a run ends when the player faints"* failed once in a full
-2026-07-26 suite run — no `Run over` log line after 1m10s — but passes in **7.3 s** run alone; consistent with the
-documented "a long run accumulates abandoned server-side runs" degradation, not a code defect), Web UI polish
-(move-specific animations), Multi-Generation groundwork, User Documentation,
-**Settings Menu** (sound volume + difficulty→XP bonus both ✅ done — see its own section below; the
-difficulty dial's self-referential-scaling limitation is a known, user-waived follow-up, not open work).
+**E2E flakiness note** (kept for the lesson, not as open work): `status.spec.ts` **fixed 2026-07-15** — root
+cause was a spec asserting a transient badge, not an engine bug; see *Browser-Based UI Testing* for the
+seed-≠-determinism lesson it taught. Still live: `endless-chain.spec.ts` *"a run ends when the player faints"*
+failed once in a full 2026-07-26 suite run — no `Run over` log line after 1m10s — but passes in **7.3 s** run
+alone; consistent with the documented "a long run accumulates abandoned server-side runs" degradation, not a
+code defect. (Web UI polish, Multi-Generation groundwork, User Documentation, and test-infra items are Tiers
+6–7 above, not repeated here.)
+
+**Settings Menu** — sound volume + difficulty→XP bonus both ✅ done, see its own section below; the difficulty
+dial's self-referential-scaling limitation is a known, user-waived follow-up, not open work.
 
 ---
 
@@ -425,6 +448,35 @@ itself (via the Run Economy, below). Bag persistence and catch are what remain o
 
 ---
 
+## Creature Naming — nickname on acquisition (session-scoped)  ⟵ NOT STARTED, raised 2026-09-12
+
+**The ask, in the user's words:** *"a feature for all pokemon acquisition paths where we can give the pokemon a
+name (within the session context)."* Session-scoped is explicit — this is not asking for `save.db` persistence
+(there is none yet; see **Game Loop** below), just the ability to set a display name for the run's lifetime,
+the way Gen 1 asks "Do you want to give a nickname to X?" whenever a Pokémon joins the party.
+
+**Current state, checked in code:** `Creature.Name` (`creaturegame/Creatures/Creature.cs`) is a plain settable
+`string`, populated from the species name (uppercase) at creation — there is no separate `Nickname` field, and
+`Name` is what every surface already displays (nameplates, battle log, party strip). Confirmed **no code
+anywhere looks up a creature by `Name`** as an identity key (no `.Name ==` / `Find`/`FirstOrDefault` matches in
+the engine) — every internal reference is by slot/reference/`SpeciesId`, so setting `Name` to an arbitrary
+player-chosen string at creation time shouldn't collide with anything downstream. That makes this look like a
+presentation-layer + one-touchpoint-per-path feature, not a data-model change — but not yet verified end-to-end.
+
+**The acquisition paths this needs to cover** (three distinct places a `Creature` enters the party, all in
+`EncounterFactory`/the acquisition wire — see **Encounter Logic — Phase 4** above for the full mechanics):
+1. **Starter selection** (`StarterSelection.tsx` → `POST /api/game/start`) — the run's very first party member.
+2. **Themed draft accept** (`AcquisitionModal`, `source: "Draft"`) — `RunDirector`'s post-win draft offer.
+3. **Boss catch accept** (`AcquisitionModal`, `source: "BossCatch"`) — the post-Boss-win catch offer.
+
+**Not yet planned in detail** — open questions for a real `/plan` pass, not answered here: where the name-entry
+UI lives on each of the three flows (a text field added to the existing modals/screen vs. a new confirmation
+step), whether it's optional-with-species-name-default (matches Gen 1's decline-to-nickname behaviour) or
+required, validation/length limits, and whether the wire needs a new field on the acquisition-accept
+payload/`CreatureAcquired` event or can be set client-side before the accept call. No `/plan` done yet.
+
+---
+
 ## Game Loop & Progression
 
 **Prerequisites:** Catch Mechanic, `PlayerDbContext` / `save.db`. Intentionally deferred until combat fidelity
@@ -441,6 +493,26 @@ slice; the items below are what it deliberately leaves out.
 - [ ] Progressive difficulty beyond the current `targetBst = lead BST + depth × 10`; trainer encounters at
   milestones.
 - [ ] `PlayerSave` / `SavedCreature` models in `save.db`; auto-save after each battle; party-management UI.
+- [ ] **Refresh/reconnect-safe session handling — a browser refresh currently loses the run.** Raised 2026-09-12:
+  *"I do want some kind of session handling so users can refresh / continue safely."* Checked what exists today
+  (`ARCHITECTURE.md` §2.7): the server side already has real reconnect infrastructure — a dropped SignalR
+  connection gets a 40s grace window (`GameSessionManager.ReconnectGrace`) before the run is abandoned, and the
+  emitter re-resolves the *current* connection per event so output follows a reconnect, with gold/party
+  rehydrated on `onreconnected`. But that machinery only helps a **transient network drop while the SPA stays
+  mounted** — the client never persists `gameId` anywhere durable. `BattleScreen` reads it from
+  `location.state?.gameId` (react-router navigation state, set once by `StarterSelection`'s `nav('/battle', {
+  state: {...} })`) and nothing else — a hard refresh, a closed/reopened tab, or a pasted/bookmarked `/battle`
+  URL wipes that state, so the client has no `gameId` to reattach with even though the server might still be
+  sitting inside its 40s grace window (or, past that, the run is simply abandoned server-side — the already-waived
+  `SignalRInput` cancel-race finding, memory `project_waived_cancel_race`, was waived specifically *"until a
+  save/persistence layer exists,"* which this bumps into). **Not designed here — two different scopes to pick
+  between in a real `/plan`, not assumed:** (a) a lightweight fix — persist `gameId` (+ maybe a short-lived resume
+  token) to `localStorage` on `/battle` entry, and have `BattleScreen` fall back to it when `location.state` is
+  empty, re-attaching the existing SignalR session within the current grace window — cheap, no DB, but only
+  survives a refresh/reopen while the server-side run is still alive (bounded by however long an abandoned
+  session is kept, today 40s–2min); or (b) the heavier `PlayerSave`/`save.db` layer above, which would make a run
+  resumable even after the server itself restarts/redeploys. These aren't mutually exclusive but are very
+  different scopes of work — worth deciding which one (or both, staged) before planning either.
 - [ ] **Stone evolutions** — the only remaining evolution piece, gated on the bag (Catch). The `Stone` trigger
   + `IEvolutionRules.StoneUsed` are built and dormant.
 - [x] **Cross-encounter status persistence** — DONE (2026-06-10); major status carries across chain encounters,
@@ -564,6 +636,23 @@ Stack: React 18 + TypeScript + SignalR + Phaser 3. (Canvas & core animations don
   already supports it; the escapable branch of `ModalDismiss` currently has no caller. Needs Vitest coverage and a
   `requirements-review` pass on the B-cancel claim (per the *plan-asserted domain facts are claims* lesson).
 - [ ] `ConsoleInput : IBattleInput` — numbered move menu for terminal play (low priority).
+- [ ] **CHECK POKEMON has no party-member picker — shows only the active creature.** Raised 2026-09-12 by the
+  user. Confirmed by reading the code (not yet started, no existing TODO item covered it): `CreatureOverview.tsx`
+  fetches exactly one endpoint, `GET /api/game/{gameId}/player`, with no slot/index parameter and no UI to choose
+  a bench member — it renders whatever comes back. That endpoint's backing call,
+  `GameSessionManager.GetPlayerCreature` → `ActiveCreature(battle.Party, battle.Player)`, is hardcoded to resolve
+  **the active/lead creature only**; there's no per-slot read path today. **What's already there to build on:**
+  the party roster is already wired for other surfaces — `GET /api/game/{gameId}/party` +
+  `PartyUpdated`/`PartyStrip` return a lightweight per-member summary (species, name, level, HP, status, isLead)
+  used by the party strip and the SWITCH menu — but that summary is **not** enough for CHECK POKEMON's
+  INFO/STATS/MOVES tabs, which need the full `PlayerOverviewDto` (actual stats, DVs, Stat-Exp, XP, full move
+  data) that today is only ever built from the active creature. *Two-piece gap:*
+  1. **Backend:** a way to fetch `PlayerOverviewDto` for an arbitrary party slot (incl. a fainted/benched
+     member), not just the active one — e.g. `GET /{gameId}/player/{slot}` or a slot query param, reading
+     `battle.Party.Members[index]` directly instead of always routing through `ActiveCreature`.
+  2. **Frontend:** `CreatureOverview` needs a party-member picker (reusing `PartyStrip`-style selection, the same
+     pattern `SwitchMenu` already uses to list party members) that drives which slot it requests.
+  Not yet planned in detail (no `/plan` session, no DoR pass) — this is the status write-up only, not a design.
 
 ---
 
@@ -1140,6 +1229,22 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
     no change. Verified live via Puppeteer (screenshot before/after + hover state) in an actual battle's BAG
     menu — reads correctly, hover-inverts cleanly. CSS-only, no test changes. **The rest of the 4d+ BAG
     mini-plan (a full skin pass beyond this legibility fix) is still open** — see the surface catalog above.
+  - [ ] *(bugfix)* **Town Map scatter tiles (tree/rock/boulder/signpost) carry an opaque white background instead
+    of the ground's grain/fill.** Raised 2026-09-12 by the user: on the Town Map grid, the `.town-map-scatter`
+    tiles (trees, mushroom-like rock cluster, boulder, signpost — the vendored Kenney "Monochrome RPG" sprites,
+    `--ks-tm-tree-a/b/c`/`--ks-tm-rock`/`--ks-tm-boulder`/`--ks-tm-signpost` in `index.css`) sit on plain white,
+    while the surrounding `.town-map-cell` ground uses the darker, spotted `--ks-fill` + `--ks-grain` texture —
+    so every scatter tile reads as a white square with an icon on it, not blended into the island. **Root cause
+    verified, not assumed:** decoded the `--ks-tm-tree-a` base64 PNG — it's fully opaque (alpha 255 everywhere)
+    with `(255,255,255)` white corner pixels, i.e. the recolour/export step baked in an opaque white background
+    instead of keeping it transparent, unlike the coastline (`--ks-tm-coast-*`) and town-marker
+    (`--ks-tm-town-open/shut`) sprites, which presumably need checking too but weren't the ones the user flagged.
+    *Fix direction (not yet planned in detail):* either (a) re-export the scatter sprites with a transparent
+    background so `.town-map-scatter`'s `background-image` shows the cell's own `--ks-fill`/`--ks-grain` through
+    it (matches the coastline-trim approach, `background-size: contain` already in place), or (b) if Kenney's
+    source tiles are opaque by design, matte them against `--ks-fill` at export time instead of white. Per the
+    `feedback_verify_sprites_before_use` memory, verify against the real re-downloaded Kenney sheet before
+    re-exporting — don't hand-edit the existing base64. Small, CSS/asset-only; no wire/engine change.
   Phaser/canvas + per-gen sprite & cry assets stay **deferred** (`GENERATION_PROFILE.md` §7.6).
 - [ ] **Stage 5 — falsification harness.** Standing requirement, not a final stage: each stage ships its leg of
   `TestAltProfile`.
@@ -1302,6 +1407,82 @@ deliberately waived by the user (memory `project_waived_cancel_race`). Don't re-
 findings" as an open section.)*
 
 ### Known Gaps
+- **Wild encounter level far below the player's — user hit it live (2026-09-12), contradicts a prior "not
+  possible" call.** Reported: a level-23 lead ran into a level-11 wild Fearow. Per the user, this exact question
+  has been examined together multiple times before with the conclusion that it can't happen — that conclusion
+  needs to be re-checked against what's actually live, not re-asserted. **Flagged for a joint code-analysis
+  session, not fixed or explained away here.** One data point already gathered (to save re-deriving it live):
+  `EncounterFactory.ScaleWildLevel(playerLevel, depth, rng)` bands the roll to
+  `[playerLevel × (0.5 + lift), playerLevel × (0.8 + lift)]` where `lift = min(depth × 0.02, 0.40)` — at low
+  `depth` (lift ≈ 0) a level-23 player already gives a base band of roughly **[11, 18]** *before* any archetype
+  offset, and the **Weak** archetype (`EnemyArchetype.cs`) additionally subtracts 3 from that roll
+  (`Math.Max(2, ScaleWildLevel(...) - 3)`) — so a roll anywhere from 14–18 in the base band lands a Weak-tier
+  enemy at 11–15. On the formula alone, level 11 at player level 23 is arithmetically reachable at shallow depth,
+  which is in tension with "not possible." Open questions for the joint session, not yet answered: (1) is this
+  the actual code path that produced the reported Fearow (which node kind / archetype tier / depth was it), (2)
+  is a band this wide (down to 50% of player level before any tier offset) actually the *intended* design or a
+  regression from what was designed, (3) does the depth the player was actually at match what `lift` implies, and
+  (4) was the earlier "not possible" conclusion checked against this same code, or against a different/older
+  version of the scaling formula. **Do not assume the formula above is "the bug" or "not the bug" until that
+  session happens** — it's a lead, not a diagnosis.
+- **Possible bug: poison-tick timing vs. a same-turn faint — needs checking against the real Gen 1 engine.**
+  Reported 2026-09-12 from this battle log:
+  ```
+  VENOMOTH used POISON POWDER!
+  RATICATE was poisoned!
+  RATICATE is hurt by Poison!
+  RATICATE used QUICK ATTACK!
+  VENOMOTH took 17 damage!
+  RATICATE is hurt by Poison!
+  VENOMOTH fainted!
+  ```
+  Two distinct questions, neither answered yet — **not fixed or explained away here, just written down with what
+  the code actually does today** so the two of us can check it against real Gen 1 together:
+  1. **Does poison tick on the turn it's applied?** The pasted excerpt alone doesn't establish whether the first
+     "RATICATE is hurt by Poison!" is the *same* turn as Poison Powder (with Raticate's own action for that turn
+     not shown) or the very next turn — need the full log with turn boundaries to settle this half.
+  2. **Does end-of-turn residual still fire for the survivor on the turn the opponent faints?** This half **is**
+     pinned down in code, and looks like a real discrepancy pending Gen-1 confirmation: `Battle.cs`'s turn loop
+     runs `StatusResolver.ApplyEndOfTurnDamage(PlayerCreature, …)` then `…(EnemyCreature, …)` **unconditionally**
+     right after both queued actions execute, and only *afterward* checks `!EnemyCreature.IsAlive()` to emit
+     `CreatureFainted`/end the battle. `ApplyEndOfTurnDamage` itself early-returns for a creature that's already
+     fainted (so Venomoth, dead from Quick Attack, correctly takes no residual) — but it does **not** early-return
+     just because the *opponent* died this turn, so Raticate's poison tick still fires and is emitted **before**
+     "VENOMOTH fainted!" even though Quick Attack already dropped Venomoth to 0 HP earlier in the same turn. In
+     other words: today, a KO from a direct hit does not cut the turn short — the surviving side's own end-of-turn
+     residual (poison/burn/binding tick, Leech Seed drain — anything in that same block) still resolves before the
+     win is recognized. Whether real Gen 1 also lets the turn's residual phase complete once a KO already
+     happened mid-turn, or ends the turn (and battle) immediately on the KO and skips it, is the actual question
+     to verify — not assumed either way here.
+- **A level-25 acquired Exeggcutor reportedly had only 2 moves — Hypnosis and "Bind"?** Raised 2026-09-12.
+  Checked against the real `pokemon.db`/`moves.db` data (not assumed): Exeggcutor's Gen 1 level-up learnset is
+  exactly **Hypnosis (level 1), Barrage (level 1), Stomp (level 28)** — nothing else, at any level, by level-up.
+  So **the 2-move count itself is correct and expected**: at level 25, Stomp (needs 28) isn't unlocked yet, so
+  `CanonicalLatest` (level-up only, up to 4 moves) has only Hypnosis + Barrage available — this matches the "only
+  two moves" half of the report exactly. **The "Bind" half doesn't check out, though:** Bind (move id 20) is a
+  real, distinct move in `moves.db`, but it appears **nowhere** in Exeggcutor's *or* pre-evolution Exeggcute's
+  learnset (level-up or machine) — there's no code path that should ever attach Bind to an Exeggcutor. Two
+  possibilities, neither confirmed: (a) the user misremembered/misread the move name in the moment (Barrage is an
+  uncommon move name, easy to blank on) and the game actually showed Barrage, which would mean **no bug at all**;
+  or (b) the game genuinely displayed Bind, which would be a real move-selection defect worth a proper repro.
+  **Not investigated further here** — next time this comes up, check the actual in-game move list (a screenshot
+  or the CHECK POKEMON MOVES tab) rather than relying on memory of the name.
+- **Wild/draft selection has no evolution-stage or natural-minimum-level awareness.** Raised 2026-09-12 after the
+  user met that level-25 Exeggcutor and asked why, given Exeggcutor doesn't even have a level-based evolution
+  (it's a Leaf Stone evolution from Exeggcute — so "before its evolution level" doesn't literally apply, but the
+  underlying surprise is real). Checked: `PokemonGameAvailability` legitimately marks Exeggcutor `Wild` in the
+  imported data (matches the real games — Cerulean Cave), so the species pick itself isn't wrong data. The actual
+  cause is architectural: `EncounterFactory.PickByBst`/`ScaleWildLevel` select **purely by BST band relative to
+  the player's level and run depth** — there is no per-area/per-level encounter table at all (`ENCOUNTER_DESIGN.md`
+  confirms this is deliberate: BST+depth band replaces Gen 1's real location tables), and nothing considers a
+  species' evolution stage or the level Gen 1's actual tables ever pair it with. So a fully-evolved, high-BST
+  species can surface at whatever level the BST band happens to produce, including levels far below where the
+  original games would ever place it (Cerulean Cave is a late/post-game area; this system has no notion of
+  "late-game area"). **Not designed or fixed here — flagging the gap.** Open question for a real design pass: is
+  this worth a stage-aware weighting/floor (e.g. bias the BST-band pick against un-evolved-vs-evolved mismatch,
+  or fold in each species' real minimum game-data encounter level as a soft floor), or is "no per-species level
+  gating, BST is the only lever" an accepted tradeoff of the roguelite's simplified encounter model. No `/plan`
+  done.
 - Enemy encounter pool ignores game version — filter by `PokemonGameAvailability` once a version selector exists.
 - Enemy Pokémon do not evolve — wire into level-up when Game Loop is built.
 - ~~**Endless-chain double-faint**~~ — **RESOLVED 2026-07-28**: a mutual end-of-turn DoT double-faint now counts

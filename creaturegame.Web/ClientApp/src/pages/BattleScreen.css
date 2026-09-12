@@ -2045,23 +2045,6 @@
      aspect-ratio the ordinary, reliable way — cells stay square either way this resolves. */
   width: min(100%, calc(62vh * var(--tm-w) / var(--tm-h)));
 }
-.route-choice-legend {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--sp-md);
-  margin-top: var(--sp-md);
-}
-.route-choice-legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-xs);
-  font-family: var(--font);
-  font-size: 0.72rem;
-  color: var(--clr-text);
-}
-.route-choice-legend-name { color: var(--clr-gold); font-weight: 700; }
-
 /* Kanto Sage: the route-choice modal — "biome select" — is a basic view/frame like the others, so
    its outer chrome (background, border, the double-line frame used for the other prominent
    blocking surfaces) gets the same treatment. The map's own content — once deferred here as the
@@ -2089,9 +2072,7 @@
   background-size: 14px 14px;
 }
 [data-generation="gen1"] .route-choice-modal .biome-title,
-[data-generation="gen1"] .route-choice-modal .biome-sub,
-[data-generation="gen1"] .route-choice-legend-item,
-[data-generation="gen1"] .route-choice-legend-name {
+[data-generation="gen1"] .route-choice-modal .biome-sub {
   color: var(--ks-ink);
 }
 
