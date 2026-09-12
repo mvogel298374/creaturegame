@@ -19,9 +19,8 @@ creature), **Revive Items** (in-battle party revive, Boss-reward + rare-shop onl
 strict sequence — 0/1 are quick/parallel-track and don't block anything below them; 2 is a standing
 user-sequenced commitment (2026-08-04) that stays ahead of 4/5 regardless.
 
-- **Tier 0 — trivial, zero-risk, any time:** the Town Map scatter-tile white-background fix (→ *Generation
-  Profile* Stage 4d+). (The route-choice bottom-legend deletion, the other Tier 0 item, shipped 2026-09-12 —
-  see `TODO_ARCHIVE.md`.)
+- **Tier 0 cleared (2026-09-12).** Both trivial zero-risk items — the route-choice bottom-legend deletion and
+  the Town Map scatter-tile + town-marker white-background fix — shipped same day; see `TODO_ARCHIVE.md`.
 - **Tier 1 — the two joint code-analysis sessions raised 2026-09-12, settle before further battle/encounter
   tuning:** the poison-tick-vs-same-turn-faint ordering question, and the Fearow level-11-at-player-23 formula
   check (both → *Known Gaps*).
@@ -1229,22 +1228,6 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
     no change. Verified live via Puppeteer (screenshot before/after + hover state) in an actual battle's BAG
     menu — reads correctly, hover-inverts cleanly. CSS-only, no test changes. **The rest of the 4d+ BAG
     mini-plan (a full skin pass beyond this legibility fix) is still open** — see the surface catalog above.
-  - [ ] *(bugfix)* **Town Map scatter tiles (tree/rock/boulder/signpost) carry an opaque white background instead
-    of the ground's grain/fill.** Raised 2026-09-12 by the user: on the Town Map grid, the `.town-map-scatter`
-    tiles (trees, mushroom-like rock cluster, boulder, signpost — the vendored Kenney "Monochrome RPG" sprites,
-    `--ks-tm-tree-a/b/c`/`--ks-tm-rock`/`--ks-tm-boulder`/`--ks-tm-signpost` in `index.css`) sit on plain white,
-    while the surrounding `.town-map-cell` ground uses the darker, spotted `--ks-fill` + `--ks-grain` texture —
-    so every scatter tile reads as a white square with an icon on it, not blended into the island. **Root cause
-    verified, not assumed:** decoded the `--ks-tm-tree-a` base64 PNG — it's fully opaque (alpha 255 everywhere)
-    with `(255,255,255)` white corner pixels, i.e. the recolour/export step baked in an opaque white background
-    instead of keeping it transparent, unlike the coastline (`--ks-tm-coast-*`) and town-marker
-    (`--ks-tm-town-open/shut`) sprites, which presumably need checking too but weren't the ones the user flagged.
-    *Fix direction (not yet planned in detail):* either (a) re-export the scatter sprites with a transparent
-    background so `.town-map-scatter`'s `background-image` shows the cell's own `--ks-fill`/`--ks-grain` through
-    it (matches the coastline-trim approach, `background-size: contain` already in place), or (b) if Kenney's
-    source tiles are opaque by design, matte them against `--ks-fill` at export time instead of white. Per the
-    `feedback_verify_sprites_before_use` memory, verify against the real re-downloaded Kenney sheet before
-    re-exporting — don't hand-edit the existing base64. Small, CSS/asset-only; no wire/engine change.
   Phaser/canvas + per-gen sprite & cry assets stay **deferred** (`GENERATION_PROFILE.md` §7.6).
 - [ ] **Stage 5 — falsification harness.** Standing requirement, not a final stage: each stage ships its leg of
   `TestAltProfile`.

@@ -8,6 +8,53 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Town Map scatter tiles and town markers carried an opaque white background instead of the ground's grain/fill ✅ DONE (2026-09-12)
+
+**Raised 2026-09-12 by the user, in two passes same day.** On the Town Map grid, the `.town-map-scatter` tiles
+(trees, mushroom-like rock cluster, boulder, signpost — the vendored Kenney "Monochrome RPG" sprites,
+`--ks-tm-tree-a/b/c`/`--ks-tm-rock`/`--ks-tm-boulder`/`--ks-tm-signpost` in `index.css`) sat on plain white,
+while the surrounding `.town-map-cell` ground used the darker, spotted `--ks-fill` + `--ks-grain` texture — so
+every scatter tile read as a white square with an icon on it, not blended into the island. The first pass fixed
+the six scatter sprites and flagged the town-marker sprites (`--ks-tm-town-open/shut` — the town/door icons the
+player clicks to enter a node) as an unchecked "presumably need checking too" follow-up; the user asked for that
+follow-up same day, and it turned out to have the identical root cause and fix.
+
+**Root cause, verified not assumed, and pinned down further than the initial report.** Decoding the
+`--ks-tm-tree-a` base64 PNG showed it fully opaque (alpha 255 everywhere) with `(255,255,255)` white corner
+pixels. Re-downloading the real Kenney "Monochrome RPG" source zip fresh from kenney.nl (per the
+`feedback_verify_sprites_before_use` memory — not from memory/assumption) and diffing byte-for-byte confirmed
+the six embedded scatter sprites (`--ks-tm-tree-a/b/c`, `--ks-tm-rock`, `--ks-tm-boulder`, `--ks-tm-signpost`)
+are exact recolors of the documented tile picks (#14/#15/#16/#30/#105/#67 — see `GENERATION_PROFILE.md`
+decision 12) — every non-white pixel matches exactly, so this was **not** a mis-picked tile. The actual cause:
+`--ks-fill` used to be literal `#FFFFFF` and the sprites were recolor-exported against that (byte-exact at the
+time). `--ks-fill` was later darkened to `#E8E4D6` (commit "Darken Kanto Sage box fill to fix HP-bar clash") but
+the sprite PNGs were never re-baked, so they still carried the stale literal-white opaque pixels. The coastline
+(`--ks-tm-coast-*`) sprites were already confirmed fine in earlier work (proper alpha transparency). The
+follow-up pass re-ran the same byte-for-byte check against the town-marker sprites and confirmed
+`--ks-tm-town-open` and `--ks-tm-town-shut` are exact recolors of tiles #110 (open door) and #109 (shuttered) —
+matching `GENERATION_PROFILE.md`'s documented pick exactly — so this was the same issue, not a new root cause.
+
+**Fix.** For each of the eight sprites (six scatter + two town markers), every pixel that was exactly
+`(255,255,255,255)` was set to alpha 0 (transparent); every other pixel (the already-correctly-recolored ink/dim/
+fog linework) was left byte-for-byte unchanged — letting the sprite's `background-image` show the cell's own
+`--ks-fill`/`--ks-grain` through it, matching the coastline-trim approach (`background-size: contain` already in
+place). Only file touched across both passes: `creaturegame.Web/ClientApp/src/index.css` (eight base64 data-URI
+values swapped total — six then two — nothing else).
+
+**Verified.** Both passes re-decoded the edited `index.css` and diffed every pixel of the fixed sprites against
+the pre-fix versions — non-white pixels unchanged, white pixels now transparent, for all 16×16 pixels × 8
+sprites total. The six-sprite pass was also verified live in-browser (Puppeteer, `.\dev.ps1` stack): started a
+run, reached the route-choice Town Map, and confirmed every scatter prop (trees, rock clusters, boulder,
+signposts) now blends into the grainy land texture with no white squares. The two-sprite town-marker follow-up
+was **not** confirmed live in-browser — the Puppeteer MCP server had disconnected mid-session — so it was
+verified instead via a composited before/after render (sprite drawn over the `--ks-fill` background color),
+which showed the same white-square-to-blended-background pattern as the first pass; this is a real
+methodological difference from the first half's live confirmation, not an equivalent check, and is recorded
+here rather than glossed over. Full fast suite green after both passes (.NET 1494/1494, TypeScript clean,
+Vitest 232/232).
+
+---
+
 ## Route-choice bottom legend duplicates the map hover, with no click affordance ✅ DONE (2026-09-12)
 
 **Raised and fixed same day (2026-09-12).** In `RouteChoiceMap` (`BattleScreen.tsx`), the map's per-town
