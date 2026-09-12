@@ -177,6 +177,10 @@ public sealed class Gen1BattleRules : IBattleRules
     // force a switch instead, so a Gen 2 ruleset returns false and the effect runs its force-switch path.)
     public bool ForceFleeFailsVsTrainer => true;
 
+    // Gen 1: a faint during the action phase ends the turn there and then, skipping the rest of the
+    // end-of-turn phase for both sides (Smogon RBY Mechanics Guide). Gen 2+ removed this.
+    public bool FaintEndsTurnImmediately => true;
+
     // Gen 1: Toxic reverts to regular Poison out of battle (the escalating counter is volatile); every
     // other major status carries unchanged.
     public StatusCondition CarryStatusOutOfBattle(StatusCondition status) =>

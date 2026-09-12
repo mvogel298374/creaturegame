@@ -532,17 +532,24 @@ public class PartyExpShareTests
     }
 
     // MUTUAL KO: the enemy-faint check runs BEFORE the player-faint branch, so a finisher that dies on the same
-    // turn it wins (here end-of-turn Burn; Self-Destruct and Struggle recoil reach the same place) arrives at the
-    // award site already fainted. It is a fainted participant like any other — it earns nothing and is not
-    // counted in the divisor, so the creature that fought and survived takes the award UNDIVIDED. Without the
-    // IsAlive() guards this paid the corpse a half share and told the client to fill its XP bar.
+    // turn it wins (here Recoil, applied within the winning move's own execution — Self-Destruct and Struggle
+    // recoil reach the same place) arrives at the award site already fainted. It is a fainted participant like
+    // any other — it earns nothing and is not counted in the divisor, so the creature that fought and survived
+    // takes the award UNDIVIDED. Without the IsAlive() guards this paid the corpse a half share and told the
+    // client to fill its XP bar.
+    // (Previously built with end-of-turn Burn instead of Recoil — corrected 2026-09-12 alongside the Battle.cs
+    // fix for the real Gen 1 rule "if a Pokémon faints, the turn ends there and then": once a KO happens during
+    // the action-execution phase, the end-of-turn residual phase no longer runs at all, so a finisher can't be
+    // burned to death by its OWN status after already winning the fight that same turn. Recoil still reaches
+    // the same "finisher fainted on the winning turn" case because it resolves inside the move's own execution,
+    // before that end-of-turn phase is even reached — same as Self-Destruct/Struggle in the real games.)
     [Fact]
     public async Task MutualKo_FaintedFinisherEarnsNothingAndIsExcludedFromTheDivisor()
     {
         var survivor = Striker("Survivor", "Slam"); // fights turn 1, switches out, still standing at the end
         var doomed = Striker("Doomed", "Bash");
-        doomed.Attributes.HP = 30; // Burn chips maxHP/16 = 25 per turn → dead at the end of turn 2
-        doomed.CarriedStatus = new CarriedStatus(StatusCondition.Burn, 0);
+        doomed.MoveSet[0].Base.Effect = MoveEffect.Recoil; // same mechanism as Take Down/Double-Edge
+        doomed.Attributes.HP = 30; // recoil (¼ of Doomed's huge hit) comfortably exceeds this
 
         var party = new Party(survivor);
         party.Add(doomed);
@@ -553,8 +560,8 @@ public class PartyExpShareTests
         var result = await new BattleScenario()
             .Party(party)
             .Enemy(Foe())
-            .PlayerTurnPlan(1) // turn 1: SWITCH — Survivor fought, Doomed comes in burned
-            .PlayerUses("Bash") // turn 2: Doomed wins the fight and burns to death the same turn
+            .PlayerTurnPlan(1) // turn 1: SWITCH — Survivor fought, Doomed comes in
+            .PlayerUses("Bash") // turn 2: Doomed wins the fight and recoils to death the same turn
             .EnemyUses("Poke")
             .RunRules(new RunRules { BenchXpShare = 0.5 })
             .Seed(1)

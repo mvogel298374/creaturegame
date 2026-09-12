@@ -48,9 +48,14 @@ public class Battle
     /// <summary>
     /// True if this battle ended with the enemy fainting — the player's win — <b>regardless of whether the
     /// finisher survived it</b>. Deliberately not derivable from <c>PlayerCreature.IsAlive()</c>: on a
-    /// <b>mutual KO</b> (Self-Destruct, Struggle recoil, or end-of-turn Burn/Poison/Leech) both sides are down,
-    /// and the enemy-faint check below runs first, so the trade is a win even though the finisher is fainted.
-    /// The run loop reads this to tell a mutual KO apart from a real party wipe. False until then.
+    /// <b>mutual KO</b> (Self-Destruct, Struggle recoil — a same-action effect, resolved before the
+    /// end-of-turn phase — or a shared end-of-turn Burn/Poison/Leech tick that finishes off BOTH sides on a
+    /// turn neither one already fainted from a direct hit) both sides are down, and the enemy-faint check
+    /// below runs first, so the trade is a win even though the finisher is fainted. (A direct-hit KO can no
+    /// longer be finished off by the winner's OWN residual that same turn — see
+    /// <see cref="IBattleRules.FaintEndsTurnImmediately"/> — so that narrower case the tests used to cover
+    /// with end-of-turn Burn now uses Recoil instead; see <c>PartyExpShareTests.MutualKo_…</c>.) The run loop
+    /// reads this to tell a mutual KO apart from a real party wipe. False until then.
     /// </summary>
     public bool PlayerWon { get; private set; }
 
@@ -242,13 +247,32 @@ public class Battle
             PlayerCreature.Battle.HazeSuppressedStatus = null;
             EnemyCreature.Battle.HazeSuppressedStatus = null;
 
-            // End-of-turn: binding, Burn, Poison
-            StatusResolver.ApplyEndOfTurnDamage(PlayerCreature, _rules, _emitter);
-            StatusResolver.ApplyEndOfTurnDamage(EnemyCreature, _rules, _emitter);
+            // Counters like Disable's lock and a binding trap always tick down, even on a turn a faint ends
+            // early below — Gen 1 decrements these during the turn regardless of who's still standing at the
+            // end of it (unlike the residual phase right after, which the seam below skips outright).
+            StatusResolver.TickTurnCounters(PlayerCreature, _emitter);
+            StatusResolver.TickTurnCounters(EnemyCreature, _emitter);
 
-            // End-of-turn: Leech Seed drain (must see both creatures, so handled here not in StatusResolver)
-            ApplyLeechSeedDrain(PlayerCreature, EnemyCreature);
-            ApplyLeechSeedDrain(EnemyCreature, PlayerCreature);
+            // IBattleRules.FaintEndsTurnImmediately (Gen 1: true) — "If a Pokémon faints, the turn ends there
+            // and then" (Smogon RBY Mechanics Guide): a faint from a direct hit in the action loop above skips
+            // the ENTIRE residual phase, not just the fainted creature's own damage. Confirmed 2026-09-12
+            // against a reported log where the surviving side's poison tick still fired (and was still logged)
+            // on the same turn its own Quick Attack KO'd the opponent — real Gen 1 does not let that tick
+            // happen; the turn is simply over. Only run residual damage / Leech Seed when both sides are still
+            // standing after the action loop, or when the ruleset doesn't have this quirk at all (Gen 2+).
+            if (
+                !_rules.FaintEndsTurnImmediately
+                || (PlayerCreature.IsAlive() && EnemyCreature.IsAlive())
+            )
+            {
+                // End-of-turn: Burn, Poison
+                StatusResolver.ApplyEndOfTurnDamage(PlayerCreature, _rules, _emitter);
+                StatusResolver.ApplyEndOfTurnDamage(EnemyCreature, _rules, _emitter);
+
+                // End-of-turn: Leech Seed drain (must see both creatures, so handled here not in StatusResolver)
+                ApplyLeechSeedDrain(PlayerCreature, EnemyCreature);
+                ApplyLeechSeedDrain(EnemyCreature, PlayerCreature);
+            }
 
             // Snapshot the flee BEFORE the faint branches: a forced switch-in `continue`s past the flee gate
             // below, so without this a foe already scared off (Roar/Whirlwind) would get a free turn against the

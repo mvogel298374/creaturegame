@@ -358,6 +358,133 @@ public class BattleForcedSwitchTests
     }
 
     [Fact]
+    public async Task EnemyRechargeMoveThatFaintsTheLead_DoesNotAlsoSkipItsNextTurnAgainstTheSwitchIn()
+    {
+        // Companion regression (requirements-review, 2026-09-13): AttackAction previously set IsRecharging
+        // whenever the move dealt ANY damage, even a KO — but Gen 1 waives the recharge on a KO
+        // (docs/GEN_DIFFERENCES.md "Status Quirks"). Reachable specifically through the forced-switch path:
+        // EnemyCreature is never reset mid-battle (only the player's active creature is, on a switch-in), so
+        // a stale IsRecharging flag from the KO hit would otherwise carry over and wrongly skip the enemy's
+        // very next turn — against the newcomer, who never even took part in the hit that supposedly earned it.
+        var lead = Fighter("Lead", hp: 10, attack: 1, defense: 1, speed: 50);
+        var bench = Fighter("Bench", hp: 300, attack: 999, defense: 100, speed: 150);
+        var party = new Party(lead);
+        party.Add(bench);
+        var enemy = Fighter("Foe", hp: 500, attack: 999, defense: 100, speed: 200);
+        enemy.AddAttack(
+            new Attack
+            {
+                Id = 47, // distinct from Fighter's tackle (id 0) — AddAttack dedupes on Id
+                Name = "hyper beam",
+                BaseDamage = 150,
+                Accuracy = 100,
+                AttackType = AttackType.Special,
+                Effect = MoveEffect.Recharge,
+                PowerPointsMax = 5,
+            }
+        );
+
+        // The enemy (fastest) hyper-beams every turn — first the lead (a KO, so no recharge should follow).
+        // Its second hit (against the switch-in) needn't also be lethal: whether or not THAT hit earns a
+        // legitimate recharge for the turn after is a separate, correct case — this test only pins the one
+        // transition the bug was in, straight from the KO-ing turn to the very next one.
+        var input = new ScriptedInput("tackle").PicksSwitchIn(1);
+        var recorder = new RecordingEmitter();
+        var battle = new Battle(
+            lead,
+            enemy,
+            Gen1TypeChart.Instance,
+            input,
+            new ScriptedInput("hyper beam"),
+            rules: new ScriptableRules().Deterministic(),
+            emitter: recorder,
+            rng: new SeededRandomSource(0),
+            playerParty: party
+        );
+
+        await battle.StartFightAsync();
+
+        Assert.Contains(recorder.Of<CreatureFainted>(), f => f.Name == "Lead");
+        var events = recorder.Events.ToList();
+        int switchInIdx = events.FindIndex(e => e is CreatureSwitchedIn);
+        Assert.True(switchInIdx >= 0, "the forced switch must have fired");
+
+        // The very next thing the enemy does, in the turn right after the switch-in, is attack — not
+        // recharge — even though the hit that fainted Lead also dealt damage.
+        int nextFoeActionIdx = events.FindIndex(
+            switchInIdx + 1,
+            e =>
+                (e is MoveUsed m && m.AttackerName == "Foe")
+                || (e is Recharging r && r.CreatureName == "Foe")
+        );
+        Assert.True(nextFoeActionIdx >= 0, "the enemy must act again after the switch-in");
+        Assert.IsType<MoveUsed>(events[nextFoeActionIdx]);
+    }
+
+    [Fact]
+    public async Task ActiveFaints_SameTurnItPoisonsTheEnemy_SkipsTheEnemysOwnResidualThatTurn()
+    {
+        // The other half of the compound guard (Battle.cs's FaintEndsTurnImmediately check) — this side's
+        // sibling regression is BattleIntegrationTests.Battle_EndOfTurnResidualSkipped_…, which covers the
+        // battle-ENDS branch (the player's own KO skips its own residual). This covers the battle-CONTINUES
+        // branch: the player's active creature faints, so the SURVIVOR's (the enemy's) own just-inflicted
+        // residual must also be skipped that turn — exercised through the forced-switch path, which keeps
+        // this same Battle/EnemyCreature instance alive across the switch rather than resetting it.
+        var lead = Fighter("Lead", hp: 10, attack: 1, defense: 1, speed: 200);
+        lead.AddAttack(
+            new Attack
+            {
+                Id = 46, // distinct from Fighter's tackle (id 0) — AddAttack dedupes on Id
+                Name = "poison sting",
+                BaseDamage = 0,
+                Accuracy = 100,
+                StatusEffect = StatusCondition.Poison,
+                EffectChance = 100,
+                PowerPointsMax = 99,
+            }
+        );
+        var bench = Fighter("Bench", hp: 300, attack: 999, defense: 100, speed: 150);
+        var party = new Party(lead);
+        party.Add(bench);
+        var enemy = Fighter("Foe", hp: 500, attack: 999, defense: 1, speed: 100);
+
+        // Lead (faster) poisons the enemy the SAME turn the enemy's own counter-attack faints Lead — so the
+        // just-applied poison never gets a chance to tick, this turn or any later one on this same
+        // EnemyCreature, because the turn already ended when Lead fainted. "tackle" covers Bench's turns
+        // after the switch (both Fighters know it; only Lead knows "poison sting").
+        var input = new ScriptedInput("poison sting", "tackle").PicksSwitchIn(1);
+        var recorder = new RecordingEmitter();
+        var battle = new Battle(
+            lead,
+            enemy,
+            Gen1TypeChart.Instance,
+            input,
+            new ScriptedInput("tackle"),
+            rules: new ScriptableRules().Deterministic(),
+            emitter: recorder,
+            rng: new SeededRandomSource(0),
+            playerParty: party
+        );
+
+        await battle.StartFightAsync();
+
+        // The status landed (confirms this isn't a no-op scenario) and the run continued via the forced
+        // switch — the switch-in itself proves the enemy was still standing right after the faint turn
+        // (Bench's own "tackle" finishes it off in a later turn, so it needn't still be alive by the end).
+        Assert.Contains(
+            recorder.Of<StatusApplied>(),
+            s => s is { TargetName: "Foe", Status: StatusCondition.Poison }
+        );
+        Assert.Single(recorder.Of<CreatureSwitchedIn>());
+
+        // No poison tick for the enemy at all on the faint turn — the turn it was inflicted ended before the
+        // residual phase ran. (Leech Seed rides the same guarded block; asserting no drain of any kind here
+        // pins the sibling half of it too, since none was planted for this scenario to legitimately produce.)
+        Assert.DoesNotContain(recorder.Of<StatusDamage>(), s => s.TargetName == "Foe");
+        Assert.Empty(recorder.Of<LeechSeedDamage>());
+    }
+
+    [Fact]
     public async Task ActiveFaints_OnTheSameTurnAFoeFled_EndsTheBattle_WithoutSwitchingOrGivingTheFoeAFreeTurn()
     {
         // Roar/Whirlwind scares the foe off the field. If the active creature then faints to end-of-turn poison

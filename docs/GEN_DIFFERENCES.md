@@ -106,7 +106,17 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
 - Considered overpowered; used competitively to completely shut down opponents
 
 #### Status Quirks
-- **Hyper Beam**: does NOT require a recharge turn if it KOs the target; **switching out during the recharge
+- **A faint mid-turn ends the turn there and then** (Smogon RBY Mechanics Guide): if either side faints during
+  that turn's move execution, the rest of the turn's residual phase — Burn/Poison/Bad Poison damage and Leech
+  Seed drain, for **both** sides, not just the fainted one — is skipped outright, not merely withheld from the
+  fainted creature. `IBattleRules.FaintEndsTurnImmediately` (engine: `creaturegame/Combat/IBattleRules.cs`);
+  Gen 2 removed this (residual effects like Burn/Leftovers resolve for the survivor regardless). The
+  Disable-lock and binding-trap countdowns are the one exception — Gen 1 ticks those every turn regardless of
+  a faint (`StatusResolver.TickTurnCounters`), so they're gen-invariant and always run. Confirmed 2026-09-13
+  from a reported log where a poisoned attacker's own tick still fired the same turn its own hit KO'd the
+  opponent (`docs/TODO_ARCHIVE.md` → "End-of-turn residual fired even after a same-turn faint").
+- **Hyper Beam**: does NOT require a recharge turn if it KOs the target — the sibling half of the same faint
+  rule above, and read off the same `FaintEndsTurnImmediately` member; **switching out during the recharge
   turn is legal** — the recharge is only spent if the creature stays in and FIGHTs (it's enforced inside
   `AttackAction.ExecuteAsync`, not the turn menu), so a voluntary switch pre-empts it
 - **Focus Energy / Dire Hit**: bug causes it to **quarter** the crit rate instead of quadrupling it

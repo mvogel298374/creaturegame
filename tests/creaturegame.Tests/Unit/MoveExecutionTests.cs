@@ -348,6 +348,11 @@ public class MoveExecutionTests
 
         var defender = new Creature("Defender") { Level = 50 };
         defender.CalculateStats();
+        // Tanky enough to survive turn 1's hit — Gen 1 waives the recharge on a KO (IBattleRules.
+        // FaintEndsTurnImmediately), so this test's actual subject (the recharge lock itself) needs the
+        // defender alive afterward, same as RechargeContractTests' hp: 99999 defenders.
+        defender.Attributes.MaxHP = 9999;
+        defender.Attributes.HP = 9999;
 
         var hyperBeam = new Attack
         {

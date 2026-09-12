@@ -109,16 +109,19 @@ public static class StatusResolver
         return true;
     }
 
-    public static void ApplyEndOfTurnDamage(
-        Creature creature,
-        IBattleRules? rules = null,
-        IBattleEventEmitter? emitter = null
-    )
+    /// <summary>
+    /// Ticks the Disable and binding (Wrap/Bind/Clamp/Fire Spin) countdowns — split out from
+    /// <see cref="ApplyEndOfTurnDamage"/> (<c>pr-review</c>, 2026-09-13) because these are NOT part of
+    /// the "turn ends there and then" faint rule (<see cref="IBattleRules.FaintEndsTurnImmediately"/>):
+    /// Gen 1 decrements them regardless of whether either side fainted this turn, unlike the residual
+    /// status-damage phase, which that rule skips outright. <see cref="Battle"/> calls this
+    /// unconditionally, every turn, for both creatures; <see cref="ApplyEndOfTurnDamage"/> is the part
+    /// gated behind the faint check.
+    /// </summary>
+    public static void TickTurnCounters(Creature creature, IBattleEventEmitter? emitter = null)
     {
         if (!creature.IsAlive())
             return;
-
-        var battleRules = rules ?? Gen1BattleRules.Instance;
 
         // Disable countdown — tick down each turn and re-enable the move when the lock expires.
         if (creature.Battle.DisableTurnsRemaining > 0)
@@ -136,6 +139,18 @@ public static class StatusResolver
         // residual chip — the damage is the binder's move re-hitting each turn (the attack path), not here.
         if (creature.Battle.BindingTurnsRemaining > 0)
             creature.Battle.BindingTurnsRemaining--;
+    }
+
+    public static void ApplyEndOfTurnDamage(
+        Creature creature,
+        IBattleRules? rules = null,
+        IBattleEventEmitter? emitter = null
+    )
+    {
+        if (!creature.IsAlive())
+            return;
+
+        var battleRules = rules ?? Gen1BattleRules.Instance;
 
         // Status damage
         int damage = 0;

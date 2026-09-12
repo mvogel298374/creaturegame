@@ -8,6 +8,90 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## End-of-turn residual (poison/burn/Leech Seed) fired even after a same-turn faint ✅ DONE (2026-09-13)
+
+**Raised 2026-09-12** from this battle log (a Tier 1 item, one of two joint code-analysis questions flagged that
+day):
+```
+VENOMOTH used POISON POWDER!
+RATICATE was poisoned!
+RATICATE is hurt by Poison!
+RATICATE used QUICK ATTACK!
+VENOMOTH took 17 damage!
+RATICATE is hurt by Poison!
+VENOMOTH fainted!
+```
+Two distinct questions were logged, unanswered at the time:
+1. **Does poison tick on the turn it's applied?** — confirmed **correct as-is, not a bug**. Gen 1's own rule is
+   that a status applied this turn already ticks at this turn's end-of-turn phase; no code change needed for
+   this half.
+2. **Does end-of-turn residual still fire for the survivor on the turn the opponent faints from a direct hit?**
+   — confirmed a **real bug**. `Battle.cs`'s turn loop ran `StatusResolver.ApplyEndOfTurnDamage` for both
+   creatures, plus `ApplyLeechSeedDrain` both directions, **unconditionally** right after the action-execution
+   loop, regardless of whether either side had already fainted that same turn from a direct hit. Per Smogon's
+   RBY Mechanics Guide: *"If a Pokémon faints, the turn ends there and then. Therefore, any end-of-turn
+   effects... are skipped."* Once either side faints during the turn's actions, the **entire** end-of-turn
+   phase is skipped, not just the fainted creature's own residual — so in the reported log, Raticate's second
+   poison tick should never have fired once Quick Attack had already dropped Venomoth to 0 HP that same turn.
+
+**Fix.** Wrapped the end-of-turn residual block in `Battle.cs`'s turn loop (`ApplyEndOfTurnDamage` for both
+sides + `ApplyLeechSeedDrain` both directions) in `if (PlayerCreature.IsAlive() && EnemyCreature.IsAlive())`.
+
+**Test fallout.** `tests/creaturegame.Tests/Unit/PartyExpShareTests.cs`'s
+`MutualKo_FaintedFinisherEarnsNothingAndIsExcludedFromTheDivisor` had built its "finisher faints on the winning
+turn" scenario using end-of-turn Burn — no longer reachable after the fix (correctly, since Gen 1 doesn't allow
+it). Switched the scenario to Recoil (a same-action effect, like Take Down/Double-Edge, that resolves inside the
+move's own execution, before the end-of-turn phase), which still exercises the same code path.
+
+**New regression test.** `Battle_EndOfTurnResidualSkipped_WhenOwnAttackFaintsTheOpponentThatTurn`
+(`tests/creaturegame.Tests/Integration/BattleIntegrationTests.cs`). Verified by sabotage: temporarily reverted
+the `IsAlive()` guard, confirmed the test failed, restored the fix, confirmed it passed. Full .NET suite green.
+
+**The fix grew after `requirements-review` and `pr-review` (2026-09-13) — three follow-on changes, same root
+rule:**
+
+1. **A second real bug, found while reviewing the first fix: Hyper Beam's recharge flag ignored a KO.**
+   `AttackAction.cs` set `Source.Battle.IsRecharging = true` whenever the move dealt any damage — including a
+   hit that KO'd the target — contradicting the rule `docs/GEN_DIFFERENCES.md` already documented ("Hyper Beam
+   does NOT require a recharge turn if it KOs the target") and the exact same "a faint ends things there and
+   then" principle as the residual fix above. Reachable specifically through the forced-switch path:
+   `EnemyCreature` is never reset mid-battle (only the player's active creature is, on a switch-in), so a stale
+   `IsRecharging` flag set by a KO hit would carry over and wrongly skip the enemy's very next turn — against
+   the newcomer, who took no part in the hit that supposedly earned the recharge. Fixed by additionally gating
+   the flag-set on the target still being alive. **New regression test:**
+   `BattleForcedSwitchTests.EnemyRechargeMoveThatFaintsTheLead_DoesNotAlsoSkipItsNextTurnAgainstTheSwitchIn`.
+2. **Architecture fix (`pr-review` blocker): the rule is now a named seam member, not a bare conditional.**
+   Both the residual guard in `Battle.cs` and the Hyper Beam recharge check in `AttackAction.cs` independently
+   encoded "a faint ends the turn" as an inline check — duplicated generation-variable logic with no single
+   source of truth. Extracted to `IBattleRules.FaintEndsTurnImmediately` (`Gen1BattleRules.Instance`: `true`;
+   Gen 2 removed this rule, per `docs/GEN_DIFFERENCES.md`); both call sites now read the same member, and
+   `DelegatingBattleRules` (test double) delegates it.
+3. **Architecture fix (`pr-review` blocker): the guard had over-reached into the Disable-lock and
+   binding-trap countdowns.** Those counters are *not* part of the faint-ends-turn rule — Gen 1 ticks them down
+   every turn regardless of a mid-turn faint, unlike the residual-damage half, which the rule does skip. Split
+   `StatusResolver.ApplyEndOfTurnDamage` into two methods: the new `StatusResolver.TickTurnCounters` (Disable +
+   binding countdown only), called unconditionally every turn for both creatures, and the original
+   `ApplyEndOfTurnDamage` (status damage only), which stays behind the `FaintEndsTurnImmediately` guard.
+4. **Two more regression tests (`pr-review`'s recommended coverage).**
+   `BattleForcedSwitchTests.ActiveFaints_SameTurnItPoisonsTheEnemy_SkipsTheEnemysOwnResidualThatTurn` covers the
+   battle-**CONTINUES** branch (a forced switch-in) — the surviving enemy's own just-inflicted poison must also
+   be skipped that turn, and the same assertion pins the Leech Seed sibling of the same guarded block. This
+   closes the gap `pr-review` flagged where only the battle-**ENDS** branch (this entry's original regression
+   test, above) had coverage.
+
+**Docs.** `docs/GEN_DIFFERENCES.md` → "Status Quirks" now states the general faint-ends-turn rule, cross-
+references the Hyper Beam corollary, and notes the Disable/binding-counter exception. `Battle.cs`'s `PlayerWon`
+XML doc comment was also corrected (an advisory `pr-review` finding, not a code bug) — it used to describe a
+direct-hit KO as finishable by the winner's own end-of-turn residual that same turn, which is no longer true
+after this fix.
+
+**One question deliberately left open, not fixed here** — see `TODO.md` → *Known Gaps* → "Does Gen 1's
+faint-ends-the-turn rule also cover a faint caused BY the residual phase itself, not just a direct hit?"
+
+**Verified.** Full .NET suite green, including the three new regression tests added in the follow-on work.
+
+---
+
 ## Town Map scatter tiles and town markers carried an opaque white background instead of the ground's grain/fill ✅ DONE (2026-09-12)
 
 **Raised 2026-09-12 by the user, in two passes same day.** On the Town Map grid, the `.town-map-scatter` tiles

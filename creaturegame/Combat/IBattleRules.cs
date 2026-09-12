@@ -463,4 +463,24 @@ public interface IBattleRules
     /// generation rule.</para>
     /// </summary>
     int SplitXpAmongParticipants(int award, int liveParticipants);
+
+    /// <summary>
+    /// Whether a creature fainting during a turn's action-execution phase ends the turn immediately,
+    /// skipping the rest of that turn's residual phase — status damage (Burn/Poison/Bad Poison, plus
+    /// the toxic-counter escalation it carries) and Leech Seed drain — for <b>both</b> sides, not just
+    /// the fainted creature's own. Two other places consult this same member for the sibling half of
+    /// the same real-games rule: <see cref="Battle"/>'s turn loop (the residual phase above), and
+    /// <c>AttackAction.ExecuteAsync</c>'s Hyper Beam handling (a hit that faints its target needs no
+    /// recharge turn when this is true). <b>Not</b> covered: the Disable-lock and binding-trap
+    /// countdowns (<see cref="StatusResolver.TickTurnCounters"/>) — Gen 1 decrements those every turn
+    /// regardless of a faint, so they're gen-invariant and always run unconditionally.
+    /// <para><b>Gen 1: true</b> — "If a Pokémon faints, the turn ends there and then" (Smogon RBY
+    /// Mechanics Guide). <b>Gen 2: false</b> for both halves — end-of-turn effects (Burn, Leftovers,
+    /// etc.) still resolve for the surviving side after a mid-turn KO, and Hyper Beam requires its
+    /// recharge turn even after KOing the target (<c>docs/GEN_DIFFERENCES.md</c> "Move and Mechanic
+    /// Fixes"). Either way, the fainted side's own effects are skipped by
+    /// <see cref="StatusResolver.ApplyEndOfTurnDamage"/>'s own <c>IsAlive()</c> guard, which needs no
+    /// seam.</para>
+    /// </summary>
+    bool FaintEndsTurnImmediately { get; }
 }

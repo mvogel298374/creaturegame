@@ -190,8 +190,21 @@ public class AttackAction : IBattleAction
             _emitter?.Emit(new RecoilDamage(Source.Name, recoil, Source.Attributes.HP));
         }
 
-        // Recharge next turn (Hyper Beam): only set when the move actually dealt damage
-        if (!usingStruggle && attackToUse.Effect == MoveEffect.Recharge && damage > 0)
+        // Recharge next turn (Hyper Beam): only set when the move actually dealt damage. Gen 1 additionally
+        // waives the recharge on a KO — Smogon's RBY Mechanics Guide groups this with the end-of-turn
+        // residual skip as the SAME "a faint ends things there and then" rule as
+        // IBattleRules.FaintEndsTurnImmediately — while Gen 2 explicitly reversed just this half
+        // (docs/GEN_DIFFERENCES.md "Move and Mechanic Fixes": "Hyper Beam: now requires recharge even after
+        // KOing a target"), so this reads the seam rather than hardcoding a hidden Gen-1 assumption. Found
+        // 2026-09-13: without the KO check, a forced switch-in (which reuses the same EnemyCreature instance,
+        // never reset mid-battle) could inherit a stale IsRecharging flag from a KO hit and wrongly skip the
+        // enemy's next turn against the newcomer.
+        if (
+            !usingStruggle
+            && attackToUse.Effect == MoveEffect.Recharge
+            && damage > 0
+            && (!_rules.FaintEndsTurnImmediately || Target.IsAlive())
+        )
             Source.Battle.IsRecharging = true;
 
         if (!justThawed)

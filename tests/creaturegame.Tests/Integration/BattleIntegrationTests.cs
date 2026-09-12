@@ -153,6 +153,62 @@ public class BattleIntegrationTests
     }
 
     [Fact]
+    public async Task Battle_EndOfTurnResidualSkipped_WhenOwnAttackFaintsTheOpponentThatTurn()
+    {
+        // Gen 1: "if a Pokémon faints, the turn ends there and then" (Smogon RBY Mechanics Guide) — the
+        // ENTIRE end-of-turn phase (poison, burn, Leech Seed, …) is skipped once either side faints during
+        // that turn's actions, not just for the side that fainted. Regression for a reported log where a
+        // poisoned attacker's own KO hit still let its poison tick — and log — before the win was recognized.
+        var player = new Creature("Player") { Level = 50 };
+        player.CalculateStats();
+        player.Attributes.Attack = 999;
+        player.Attributes.Speed = 200;
+        player.AddAttack(
+            new Attack
+            {
+                Name = "Slam",
+                BaseDamage = 100,
+                Accuracy = 100,
+                AttackType = AttackType.Physical,
+            }
+        );
+
+        var enemy = new Creature("Enemy") { Level = 50 };
+        enemy.CalculateStats();
+        enemy.Attributes.HP = 1;
+        enemy.Attributes.MaxHP = 1;
+        enemy.Attributes.Speed = 1;
+        enemy.AddAttack(
+            new Attack
+            {
+                Name = "Tackle",
+                BaseDamage = 40,
+                Accuracy = 100,
+                AttackType = AttackType.Physical,
+            }
+        );
+
+        int playerHpBefore = player.Attributes.HP;
+        var emitter = new RecordingEmitter();
+        var battle = new Battle(
+            player,
+            enemy,
+            new Gen1TypeChart(),
+            AutoSelectInput.Instance,
+            AutoSelectInput.Instance,
+            emitter: emitter,
+            // Already poisoned entering the turn — the faster player one-shots the enemy this same turn.
+            playerEntryStatus: new CarriedStatus(StatusCondition.Poison, 0)
+        );
+        await battle.StartFightAsync();
+
+        Assert.False(enemy.IsAlive());
+        Assert.True(player.IsAlive());
+        Assert.Equal(playerHpBefore, player.Attributes.HP); // no poison tick on the winning turn
+        Assert.Empty(emitter.Of<StatusDamage>());
+    }
+
+    [Fact]
     public async Task Battle_UsesStruggle_WhenPPExhausted()
     {
         // Player has a 0-damage move with 1 PP — does no damage so enemy survives turn 1.

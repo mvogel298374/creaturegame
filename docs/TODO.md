@@ -21,9 +21,10 @@ user-sequenced commitment (2026-08-04) that stays ahead of 4/5 regardless.
 
 - **Tier 0 cleared (2026-09-12).** Both trivial zero-risk items — the route-choice bottom-legend deletion and
   the Town Map scatter-tile + town-marker white-background fix — shipped same day; see `TODO_ARCHIVE.md`.
-- **Tier 1 — the two joint code-analysis sessions raised 2026-09-12, settle before further battle/encounter
-  tuning:** the poison-tick-vs-same-turn-faint ordering question, and the Fearow level-11-at-player-23 formula
-  check (both → *Known Gaps*).
+- **Tier 1 — half cleared (2026-09-13).** The poison-tick-vs-same-turn-faint item is now **fully resolved** —
+  both the original end-of-turn-residual bug and the Hyper Beam recharge-on-KO companion bug it led to finding
+  during review are fixed (see `TODO_ARCHIVE.md`). Still open, settle before further battle/encounter tuning:
+  the Fearow level-11-at-player-23 formula check (→ *Known Gaps*).
 - **Tier 2 — Generation Profile Stage 4d+** (the jointly-iterated surface catalog) — make Gen 1 an explicit,
   swappable profile so a generation switch changes content, menus and look, not just battle math. **`/plan`
   DONE (2026-07-29; Stage 4 re-planned as v2 on 2026-07-31)** — full design in
@@ -1408,35 +1409,27 @@ findings" as an open section.)*
   (4) was the earlier "not possible" conclusion checked against this same code, or against a different/older
   version of the scaling formula. **Do not assume the formula above is "the bug" or "not the bug" until that
   session happens** — it's a lead, not a diagnosis.
-- **Possible bug: poison-tick timing vs. a same-turn faint — needs checking against the real Gen 1 engine.**
-  Reported 2026-09-12 from this battle log:
-  ```
-  VENOMOTH used POISON POWDER!
-  RATICATE was poisoned!
-  RATICATE is hurt by Poison!
-  RATICATE used QUICK ATTACK!
-  VENOMOTH took 17 damage!
-  RATICATE is hurt by Poison!
-  VENOMOTH fainted!
-  ```
-  Two distinct questions, neither answered yet — **not fixed or explained away here, just written down with what
-  the code actually does today** so the two of us can check it against real Gen 1 together:
-  1. **Does poison tick on the turn it's applied?** The pasted excerpt alone doesn't establish whether the first
-     "RATICATE is hurt by Poison!" is the *same* turn as Poison Powder (with Raticate's own action for that turn
-     not shown) or the very next turn — need the full log with turn boundaries to settle this half.
-  2. **Does end-of-turn residual still fire for the survivor on the turn the opponent faints?** This half **is**
-     pinned down in code, and looks like a real discrepancy pending Gen-1 confirmation: `Battle.cs`'s turn loop
-     runs `StatusResolver.ApplyEndOfTurnDamage(PlayerCreature, …)` then `…(EnemyCreature, …)` **unconditionally**
-     right after both queued actions execute, and only *afterward* checks `!EnemyCreature.IsAlive()` to emit
-     `CreatureFainted`/end the battle. `ApplyEndOfTurnDamage` itself early-returns for a creature that's already
-     fainted (so Venomoth, dead from Quick Attack, correctly takes no residual) — but it does **not** early-return
-     just because the *opponent* died this turn, so Raticate's poison tick still fires and is emitted **before**
-     "VENOMOTH fainted!" even though Quick Attack already dropped Venomoth to 0 HP earlier in the same turn. In
-     other words: today, a KO from a direct hit does not cut the turn short — the surviving side's own end-of-turn
-     residual (poison/burn/binding tick, Leech Seed drain — anything in that same block) still resolves before the
-     win is recognized. Whether real Gen 1 also lets the turn's residual phase complete once a KO already
-     happened mid-turn, or ends the turn (and battle) immediately on the KO and skips it, is the actual question
-     to verify — not assumed either way here.
+- ~~**Possible bug: poison-tick timing vs. a same-turn faint**~~ — **RESOLVED 2026-09-13**: poison ticking the
+  turn it's applied is correct Gen-1 behaviour (not a bug); end-of-turn residual (poison/burn/Leech Seed) still
+  firing for the survivor after either side had already fainted from a direct hit that same turn **was** a real
+  bug, now fixed — `Battle.cs`'s end-of-turn residual block is gated on both creatures still being alive via the
+  new `IBattleRules.FaintEndsTurnImmediately` seam. Review of that fix (`requirements-review`/`pr-review`,
+  2026-09-13) also found and fixed a companion bug on the same rule: Hyper Beam's recharge flag was being set
+  even on a KO hit, contradicting the Hyper-Beam-no-recharge-on-KO rule already documented in
+  `GEN_DIFFERENCES.md`, and reachable via forced-switch (the enemy's stale recharge flag could wrongly skip its
+  next turn against the newcomer). See `TODO_ARCHIVE.md` → *End-of-turn residual (poison/burn/Leech Seed) fired
+  even after a same-turn faint* for the full write-up (both bugs, the seam refactor, and the counter-tick
+  split). **One narrower question from this same investigation is still open** — see the next entry below.
+- **Open: does Gen 1's faint-ends-the-turn rule also cover a faint caused BY the residual phase itself, not
+  just a direct hit?** Raised 2026-09-13 by `requirements-review`, during the fix above — deliberately deferred,
+  not fixed, pending Gen-1-accurate confirmation in a future session. `Battle.cs`'s guarded residual block
+  (immediately after the `FaintEndsTurnImmediately` check) calls `StatusResolver.ApplyEndOfTurnDamage` for
+  `PlayerCreature` and then, unconditionally, for `EnemyCreature` — but if the **first** call's own residual
+  damage faints that creature, the second call still runs for the other side today. Whether Gen 1's "the turn
+  ends there and then" rule also applies when the faint is caused by the residual tick itself (as opposed to a
+  direct hit earlier in the same turn, which is what the fix above already covers) is unconfirmed. Needs
+  checking against a Gen-1-accurate source before either changing the code or closing this out as correct
+  as-is.
 - **A level-25 acquired Exeggcutor reportedly had only 2 moves — Hypnosis and "Bind"?** Raised 2026-09-12.
   Checked against the real `pokemon.db`/`moves.db` data (not assumed): Exeggcutor's Gen 1 level-up learnset is
   exactly **Hypnosis (level 1), Barrage (level 1), Stomp (level 28)** — nothing else, at any level, by level-up.
