@@ -37,7 +37,7 @@ updated **in the same commit**, with the comment cut to a short pointer. This is
 `TODO.md` already gets (doc update rides in the finishing commit, never a follow-up), extended from task
 tracking to design rationale generally.
 
-This exists because a repo-wide audit (`TODO.md` → *Comment Condensation Pass*) found the failure mode this
+This exists because a repo-wide audit (`TODO_ARCHIVE.md` → *Comment Condensation Pass*) found the failure mode this
 prevents, repeatedly: a real design decision — a tuning formula, a "why this and not that," a trap worth
 remembering — got made and explained inline while implementing, because that's the path of least resistance
 mid-`/dev`, and then existed **only** in that comment. Once that's the pattern the comment has to keep
