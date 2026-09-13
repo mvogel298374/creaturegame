@@ -399,12 +399,13 @@ public class WebEventContractTests
     }
 
     /// <summary>Field-level guard for the <see cref="CreatureEvolved"/> projection: the client needs both
-    /// names and both species ids (from → to) to render the morph. The reflection contract test only checks
-    /// the event is mapped, not that every field survives the hand-written projection — this pins them.</summary>
+    /// names, both species ids (from → to), and the evolved species' own name to render the morph and the
+    /// one-time announcement. The reflection contract test only checks the event is mapped, not that every
+    /// field survives the hand-written projection — this pins them.</summary>
     [Fact]
-    public void CreatureEvolved_Projection_CarriesBothFormsAndSpeciesIds()
+    public void CreatureEvolved_Projection_CarriesBothFormsSpeciesIdsAndTheSpeciesName()
     {
-        var evt = new CreatureEvolved("CHARMANDER", "CHARMELEON", 4, 5);
+        var evt = new CreatureEvolved("CHARMANDER", "CHARMELEON", 4, 5, "CHARMELEON");
 
         var (type, payload) = SignalRBattleEventEmitter.MapEvent(evt);
         using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
@@ -415,6 +416,24 @@ public class WebEventContractTests
         Assert.Equal("CHARMELEON", root.GetProperty("ToName").GetString());
         Assert.Equal(4, root.GetProperty("FromSpeciesId").GetInt32());
         Assert.Equal(5, root.GetProperty("ToSpeciesId").GetInt32());
+        Assert.Equal("CHARMELEON", root.GetProperty("ToSpeciesName").GetString());
+    }
+
+    /// <summary>The quirk a same-value case would hide: for a nicknamed creature, <see cref="CreatureEvolved.ToName"/>
+    /// (the live display name) and <see cref="CreatureEvolved.ToSpeciesName"/> (the evolved species' own name)
+    /// diverge — the announcement must use the latter or it reads "SPROUT evolved into SPROUT!" (found by
+    /// `pr-review`, 2026-09-14; docs/TODO.md — Creature Naming).</summary>
+    [Fact]
+    public void CreatureEvolved_Projection_DistinguishesANicknameFromTheEvolvedSpeciesName()
+    {
+        var evt = new CreatureEvolved("Sprout", "Sprout", 1, 2, "IVYSAUR");
+
+        var (_, payload) = SignalRBattleEventEmitter.MapEvent(evt);
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+        var root = doc.RootElement;
+
+        Assert.Equal("Sprout", root.GetProperty("ToName").GetString()); // the nickname, kept
+        Assert.Equal("IVYSAUR", root.GetProperty("ToSpeciesName").GetString()); // what it evolved into
     }
 
     /// <summary>Field-level guard for the <see cref="EvolutionOffered"/> projection: the cancel modal needs

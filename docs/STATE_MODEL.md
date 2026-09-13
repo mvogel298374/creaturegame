@@ -16,7 +16,7 @@ A `Creature` holds two kinds of state:
 
 | Kind | Examples | Lives where | Survives a battle? |
 |:-----|:---------|:------------|:-------------------|
-| **Permanent** | name, level, base stats, DVs, Stat Exp, XP, current HP | directly on `Creature` | yes — this is what a save file will persist |
+| **Permanent** | name (may be a player nickname), species name, level, base stats, DVs, Stat Exp, XP, current HP | directly on `Creature` | yes — this is what a save file will persist |
 | **Transient** | status condition, stat stages, sleep/confusion counters, charging flags | `Creature.Battle` (a `BattleState`) | no — wiped at the start of every fight |
 
 The transient half is a separate object, `BattleState`, held as `Creature.Battle`.

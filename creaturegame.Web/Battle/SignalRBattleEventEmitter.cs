@@ -430,6 +430,7 @@ public sealed class SignalRBattleEventEmitter(
                     e.ToName,
                     e.FromSpeciesId,
                     e.ToSpeciesId,
+                    e.ToSpeciesName,
                 }
             ),
             MoveLearned e => ("MoveLearned", new { e.CreatureName, e.MoveName }),

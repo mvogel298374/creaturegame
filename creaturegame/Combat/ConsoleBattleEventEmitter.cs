@@ -323,7 +323,7 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                 break;
 
             case CreatureEvolved e:
-                Console.WriteLine($"{e.FromName} evolved into {e.ToName}!");
+                Console.WriteLine($"{e.FromName} evolved into {e.ToSpeciesName}!");
                 break;
 
             case MoveLearned e:

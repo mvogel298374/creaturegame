@@ -2157,6 +2157,67 @@
   color: var(--clr-sky);
 }
 
+/* ── Nickname modal (starter pick / draft / boss catch, after accept) ── */
+.nickname-modal {
+  min-width: 260px;
+  max-width: 92%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--clr-bg-deep);
+  border: 2px solid #a888ff;
+  border-radius: 4px;
+  padding: var(--sp-md) var(--sp-lg);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6), 0 0 24px rgba(168, 136, 255, 0.25);
+}
+
+.nickname-title {
+  font-size: var(--fs-base);
+  font-weight: 700;
+  letter-spacing: var(--ls-normal);
+  color: #c4aaff;
+  text-align: center;
+}
+
+.nickname-sub {
+  font-size: var(--fs-sm);
+  color: var(--clr-text-muted);
+  text-align: center;
+  margin-bottom: var(--sp-sm);
+}
+
+.nickname-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: var(--sp-md);
+  font-family: var(--font);
+  font-size: var(--fs-sm);
+  letter-spacing: var(--ls-tight);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--clr-text);
+  border: 1px solid var(--clr-border);
+  outline: none;
+  text-align: center;
+  text-transform: uppercase; /* visual only — Gen 1's real keyboard was uppercase-only; NicknameRules.Normalize
+                                 is the actual enforcement, this just previews it while typing */
+  transition: border-color var(--transition);
+}
+
+.nickname-input:focus {
+  border-color: var(--clr-accent);
+}
+
+.nickname-input::placeholder {
+  color: var(--clr-text-muted);
+}
+
+.nickname-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-md);
+  width: 100%;
+}
+
 /* ── Acquisition offer modal (themed draft / boss catch) ──────────────
    Reuses the recovery modal shape with a violet accent (a "join the party" beat, distinct from the green heal
    and gold reward). Includes the full-party swap picker. */

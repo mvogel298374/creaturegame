@@ -33,9 +33,9 @@ user-sequenced commitment (2026-08-04) that stays ahead of 4/5 regardless.
   open** (Stage 5 is the standing falsification rule) — task entry + staging below. **Sequenced ahead of Tiers
   4–5 (2026-08-04, user's call).**
 - **Tier 3 — scoped, no blockers, good next features:** the CHECK POKEMON party-member picker (→ *Web UI —
-  Polish*), Creature Naming/nickname on acquisition (its own section), and refresh/reconnect-safe session
-  handling — **lightweight option only** (persist `gameId` to `localStorage`; the heavy `save.db` option lives
-  in Tier 5) (→ *Game Loop & Progression*).
+  Polish*), Creature Naming/nickname on acquisition (its own section — **Stage A shipped 2026-09-14**, Stage B
+  (draft/boss-catch accept) open), and refresh/reconnect-safe session handling — **lightweight option only**
+  (persist `gameId` to `localStorage`; the heavy `save.db` option lives in Tier 5) (→ *Game Loop & Progression*).
 - **Tier 4 — Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by the acquisition
   channels. Bag-scope decision (per-run vs. meta-progression) first, then `BallItemEffect`/catch
   formula/animation. *(Item acquisition itself is already done via the Run Economy; bag persistence + catch
@@ -449,7 +449,7 @@ itself (via the Run Economy, below). Bag persistence and catch are what remain o
 
 ---
 
-## Creature Naming — nickname on acquisition (session-scoped)  ⟵ NOT STARTED, raised 2026-09-12
+## Creature Naming — nickname on acquisition (session-scoped)  ⟵ `/plan` DONE (2026-09-13)
 
 **The ask, in the user's words:** *"a feature for all pokemon acquisition paths where we can give the pokemon a
 name (within the session context)."* Session-scoped is explicit — this is not asking for `save.db` persistence
@@ -457,24 +457,174 @@ name (within the session context)."* Session-scoped is explicit — this is not 
 the way Gen 1 asks "Do you want to give a nickname to X?" whenever a Pokémon joins the party.
 
 **Current state, checked in code:** `Creature.Name` (`creaturegame/Creatures/Creature.cs`) is a plain settable
-`string`, populated from the species name (uppercase) at creation — there is no separate `Nickname` field, and
-`Name` is what every surface already displays (nameplates, battle log, party strip). Confirmed **no code
-anywhere looks up a creature by `Name`** as an identity key (no `.Name ==` / `Find`/`FirstOrDefault` matches in
-the engine) — every internal reference is by slot/reference/`SpeciesId`, so setting `Name` to an arbitrary
-player-chosen string at creation time shouldn't collide with anything downstream. That makes this look like a
-presentation-layer + one-touchpoint-per-path feature, not a data-model change — but not yet verified end-to-end.
+`string`, populated from the species name (uppercase) at creation (`EncounterFactory.BuildCreature`, the single
+builder shared by the starter, the themed-draft supplier, and the boss-catch supplier — `new
+Creature(species.Name.ToUpper())`) — there is no separate `Nickname` field, and `Name` is what every surface
+already displays (nameplates, battle log, party strip). Confirmed **no code anywhere looks up a creature by
+`Name`** as an identity key (no `.Name ==` / `Find`/`FirstOrDefault` matches in the engine) — every internal
+reference is by slot/reference/`SpeciesId`, so setting `Name` to an arbitrary player-chosen string at creation
+time doesn't collide with anything downstream. Confirmed the wire already carries `Name` end-to-end with **zero
+schema change needed**: `BattleStarted.PlayerName` and the acquisition events (`CreatureAcquired`,
+`PartyUpdated`'s `PartyProjection.Snapshot`) all echo the live `Creature.Name` field, so setting it *before* the
+creature is registered/deposited is sufficient — this is a presentation + wiring feature, not a data-model or
+event-schema change.
 
-**The acquisition paths this needs to cover** (three distinct places a `Creature` enters the party, all in
-`EncounterFactory`/the acquisition wire — see **Encounter Logic — Phase 4** above for the full mechanics):
-1. **Starter selection** (`StarterSelection.tsx` → `POST /api/game/start`) — the run's very first party member.
-2. **Themed draft accept** (`AcquisitionModal`, `source: "Draft"`) — `RunDirector`'s post-win draft offer.
-3. **Boss catch accept** (`AcquisitionModal`, `source: "BossCatch"`) — the post-Boss-win catch offer.
+**Scope decisions (this `/plan` pass):**
+- **Optional, with species-name default** — matches Gen 1's Y/N decline behaviour exactly; a blank/whitespace
+  nickname is not an error, it's "declined," and the creature keeps the name `BuildCreature` already gave it.
+- **Max length 10, silently truncated (not rejected).** **Gen 1 source of truth:** Red/Blue's nickname entry
+  caps at 10 characters (the in-game keyboard has no more slots) — cited as this feature's DoR #4 authority.
+  *(Gen 6+ later raised the cap to 12; noted here as a theoretical future generation difference, not
+  implemented — kept as a plain constant for now, the same call already made for party size 6 and draft
+  cadence in Encounter Logic Phase 4: run/UI-layer tuning, not a seam. `GENERATION_PROFILE.md`'s surface
+  catalog, Tier 2, is the natural home if a later generation's own limit is ever modeled.)* An over-length
+  input truncates rather than errors, matching this repo's existing fallback-not-reject convention
+  (`GameController.ParseDifficulty`/`ParseGeneration`).
+- **Gen-variable surface (DoR #3): none.** Pure presentation + one shared engine-side helper; no
+  `IBattleRules`/`ITypeChart`/`IStatCalculator` touched.
+- **Data vs runtime boundary (DoR #5):** a new shared helper in the **core** `creaturegame` lib (needed by
+  both `creaturegame.Web`'s `GameController` and the core lib's `AcquisitionResolution`), plus wiring at the
+  three acquisition touchpoints. Zero importer/DB change; session-scoped only — no `save.db`.
 
-**Not yet planned in detail** — open questions for a real `/plan` pass, not answered here: where the name-entry
-UI lives on each of the three flows (a text field added to the existing modals/screen vs. a new confirmation
-step), whether it's optional-with-species-name-default (matches Gen 1's decline-to-nickname behaviour) or
-required, validation/length limits, and whether the wire needs a new field on the acquisition-accept
-payload/`CreatureAcquired` event or can be set client-side before the accept call. No `/plan` done yet.
+**Two gaps found asking the user to confirm the plan (2026-09-14), folded in before implementation:**
+1. **Species name must stay visible in CHECK POKEMON once `Name` can be a nickname.** `PlayerOverviewDto` /
+   `CreatureOverview.tsx` today show only `Creature.Name` — nothing else on the creature records the species'
+   own display name, so nicknaming would silently make the species name unrecoverable on that screen.
+2. **Evolution currently clobbers the display name unconditionally** (`Creature.Evolve`:
+   `Name = newForm.Name.ToUpper()`, no condition) — a latent bug that only matters once `Name` can hold a
+   player nickname: today it's a no-op (a pre-nickname creature's `Name` already *is* its species name, so
+   overwriting it with the new species name is invisible), but the instant nicknames ship this would erase a
+   nickname on the creature's very next level-up. Gen 1 preserves nicknames through evolution — this must ship
+   in the same change or nicknames break on first use.
+3. **The nickname entry must be its own cancelable step, not just an inline field** — matching Gen 1's own
+   "Do you want to give a nickname to X?" prompt, which can be back-cancelled without losing the Pokémon/undoing
+   the accept.
+
+**One shared fix underlies #1 and #2 — `Creature.SpeciesName`:** a new field holding the species' own display
+name, independent of `Name` (which may now be a nickname). `Creature(string name)` sets **both** `Name` and
+`SpeciesName` to the same value at construction — every existing caller/test is unaffected, since nothing
+diverges the two until a nickname is applied. `Evolve(newForm)` becomes: `if (Name == SpeciesName) Name =
+newForm.Name.ToUpper();` (only the *display* name is still the default — safe to advance it) **then**
+`SpeciesName = newForm.Name.ToUpper();` (always advances) — so an un-nicknamed creature evolves exactly as
+today, and a nicknamed one keeps its nickname across the evolve.
+
+**Design — the shared rule, the naming-step component, and three touchpoints:**
+- **`creaturegame/Creatures/NicknameRules.cs`** (new, core lib) — `public const int MaxLength = 10;` and
+  `public static string Normalize(string? raw, string fallback)`: trims, falls back to `fallback` (the
+  creature's existing species-derived `Name`) on null/blank/whitespace-only, else truncates to `MaxLength`.
+  Pure function, directly unit-testable (`NicknameRulesTests`: blank/null/whitespace → fallback; exact-length
+  kept; over-length truncated; surrounding whitespace trimmed before the length check).
+- **`PlayerOverviewDto` gains `SpeciesName`** (from `c.SpeciesName`); `PlayerOverview.ts` mirrors it;
+  `CreatureOverview.tsx`'s header shows it next to the nickname **only when it differs from `Name`** (an
+  un-nicknamed creature's header is pixel-identical to today — `data.name === data.speciesName` there).
+- **`components/modals/NicknameModal.tsx`** (new, shared by Stages A and B) — a text input (`maxLength=10`,
+  mirroring `NicknameRules.MaxLength`; placeholder = the species default name) with **OK** and **CANCEL**
+  buttons, plus Escape-to-cancel (`dismiss={{ onEscape }}` — the Modal component's escapable mode is exactly
+  right here: this step only ever runs *after* the accept/confirm decision and *before* the network call, so
+  it draws only state the client already has and leaving it costs nothing, same reasoning as the existing
+  Settings modal). Cancel/Escape and OK-with-blank-text both resolve to "no nickname" (the caller applies
+  `NicknameRules.Normalize` either way); it's a single callback, `onDone: (nickname: string | null) => void`.
+- [x] **Stage A — Starter selection + shared groundwork** ✅ DONE (2026-09-14): `Creature.SpeciesName` +
+  the `EvolveTo` nickname-preservation fix, `NicknameRules` (core lib), `PlayerOverviewDto`/`PlayerOverview.ts`/
+  `CreatureOverview.tsx`'s species-name display, the shared `NicknameModal` component, and the starter path
+  itself. Covered by `NicknameRulesTests`, two new `EvolveToTests` cases (nickname preserved / default still
+  advances), two new `PlayerOverviewDtoTests` cases (species name mirrors an un-nicknamed `Name`; reported
+  separately from a nicknamed one), and `GameControllerNicknameTests` (the real `Start` wiring line against the
+  live DB) — `.\test.ps1 -Dotnet -Web` green, no regressions. No Vitest component coverage added: this repo's
+  Vitest suite is pure-logic `.ts` tests only (no
+  React Testing Library / jsdom is installed for `.tsx` component tests) — verified instead live in-browser
+  (Puppeteer): nickname entered → OK → battle nameplate and CHECK POKEMON both show it; CHECK POKEMON also
+  shows the species name alongside it; CANCEL discards the typed nickname and the run still starts normally
+  with the species-default name (not aborted). **Stage B (draft/boss-catch accept) still open.**
+  **`requirements-review` (2026-09-14) found 3 discrepancies, user-adjudicated:** (1) **fixed** —
+  `NicknameRules.Normalize` now uppercases every nickname (`NicknameRulesTests` extended); Gen 1's real
+  nickname-entry screen offered uppercase letters only (no lowercase keyboard until Gen 2), so a mixed-case
+  nickname was impossible in the actual games — `NicknameModal`'s input also previews this visually
+  (`text-transform: uppercase`, cosmetic only; `Normalize` is the real enforcement). (2) **fixed** — this
+  section's own "Out of scope" bullet below wrongly claimed the CHECK POKEMON species-name display "matches
+  Gen 1"; corrected to call it what it is, a modern QoL addition (Gen 1 has no screen where a nickname and
+  species name appear together at all). (3) **fixed** — feasible and cheap (this repo already has a live-DB
+  `EncounterFactory`/`GameSessionManager` test pattern, `SpeciesControllerTests`/`EncounterFactoryDraftTests`),
+  so added `GameControllerNicknameTests` rather than waiving: exercises the real `GameController.Start` wiring
+  line against the live `pokemon.db`, asserting a supplied nickname is applied (uppercased) and a
+  null/blank/whitespace one falls back to the species default.
+  Verified as sound by the same review, no change needed: the 10-character cap, the blank-input decline
+  behaviour, and the `Name == SpeciesName` evolution check (which mirrors the real games' own "nickname it the
+  same to freeze the name through evolution" mechanic) are all Gen-1-faithful as designed.
+  **`pr-review` (2026-09-14) then found 1 stale-gate blocker + 1 real defect, both fixed:** (1) the format
+  gate's PASS was stale (`GameControllerNicknameTests.cs` landed after it ran) — re-ran `csharpier format .`,
+  clean. (2) **the evolution announcement repeated a nickname instead of naming the species** — `CreatureEvolved`
+  carried only `ToName` (the creature's live display name, which the Stage A fix now preserves as a nickname
+  through evolution), so a nicknamed creature's "X evolved into Y!" log line read "SPROUT evolved into SPROUT!"
+  — reachable immediately since the *starter* can be nicknamed and evolve mid-run, and it directly contradicted
+  `PRODUCT_SPEC.md`'s new "a nickname survives evolution" claim. Fixed per the user's framing ("show the evolved
+  name once, but otherwise the game should use the nickname"): `CreatureEvolved` gained a `ToSpeciesName` field
+  (the evolved species' own name, sourced from the identity already computed pre-evolution in
+  `BattleRunEvent.TryEvolveAsync`); the one-time announcement (`ConsoleBattleEventEmitter`, `timeline.ts`'s log
+  line) now reads `ToSpeciesName`, while `ToName` keeps driving `CREATURE_RENAMED`/identity retargeting (the
+  live nickname) everywhere else, unchanged. New/updated coverage: two `WebEventContractTests` cases (the field
+  projects; a nicknamed case where `ToName`/`ToSpeciesName` diverge), a `RunDirectorEvolutionTests` nicknamed-
+  player case, and two `timeline.test.ts` cases (the existing un-nicknamed case plus a new nicknamed one).
+  **3 further RECOMMENDED cleanups also taken:** `STATE_MODEL.md`'s permanent-fields row now lists both name
+  fields; this write-up's hardcoded test-count tally is gone (repo convention is not to keep those in docs); and
+  `StarterSelection.tsx`'s POST-body construction (including the nickname-presence and seed-parsing rules) is
+  now a pure `utils/startGameRequest.ts` module with its own Vitest coverage — closing DoR #6's promised
+  "Vitest coverage for StarterSelection's request body" without needing a component-test harness this repo
+  doesn't have. `.\test.ps1 -Dotnet -Web` green throughout (no regressions); `csharpier check` clean.
+  Original design below, reference — Stage A:
+- **Stage A — Starter selection.** `StartGameRequest` gains `string? Nickname`. `GameController.Start` calls
+  `setup.Player.Name = NicknameRules.Normalize(req.Nickname, setup.Player.Name);` **before** `RegisterSession`,
+  so `BattleStarted.PlayerName` already reflects it with no event change. Frontend: `StarterSelection.tsx`'s
+  CONFIRM button now opens `NicknameModal` (client-side only, no request yet) instead of POSTing immediately;
+  `onDone` fires the existing `confirm()` POST with `nickname: nickname?.trim() || undefined` added to the body.
+- **Stage B — Themed draft / boss catch accept (shared plumbing — both channels reuse `AcquisitionResolution`).**
+  - `AcquisitionDecision` gains `string? Nickname = null`; `Add()`/`Replace(slot)` become
+    `Add(string? nickname = null)` / `Replace(slot, string? nickname = null)`.
+  - `BattleHub.RespondAcquisition` gains a third param: `RespondAcquisition(bool accept, int? replaceSlot,
+    string? nickname)` → `SignalRInput.SetAcquisitionDecision` unchanged internally (just carries the fuller
+    record) → `AcquisitionContext`/`ChooseAcquisitionAsync` unchanged (the decision object already flows
+    through).
+  - `AcquisitionResolution.OfferAndDepositAsync`: right after `decision.Accept` is confirmed (both the
+    party-has-room branch and the full-party-replace branch), before `party.Add`/`party.Replace` and before
+    emitting `CreatureAcquired`/`PartyUpdated`, apply
+    `offered.Name = NicknameRules.Normalize(decision.Nickname, offered.Name);` — so both emitted events already
+    carry the chosen name (no event schema change, same reasoning as Stage A).
+  - Frontend: `AcquisitionModal.tsx`'s exit points (the direct ADD on an open slot, and the swap-confirm YES)
+    no longer call `onRespond` immediately — they open `NicknameModal` first (storing the pending
+    `replaceSlot`), and *its* `onDone` is what finally calls `onRespond(true, pendingSlot, nickname)`. The
+    offer/swap/confirm-release phases stay `dismiss="blocking"` exactly as today (a real server await);
+    only the new nickname phase is escapable, and escaping it still completes the accept (with no nickname),
+    never re-opens the swap picker or declines the offer. `useBattleHub.ts`'s `respondAcquisition` forwards
+    the third argument to the hub call.
+- **No Stage C** — both acquisition channels (`ThemedDraft`/`BossCatch`) share Stage B's plumbing entirely
+  (`AcquisitionResolution` is channel-agnostic already); there is nothing boss-catch-specific to add.
+
+**DoR #6 — quirks the tests must assert:** blank/whitespace/cancelled nickname on every path ⇒ species-default
+name unchanged (the Gen 1 decline case); an over-length nickname is truncated to 10 chars, never
+rejected/errored; a nickname set on the *starter* has no effect on a later draft/boss-catch offer's default
+(each new creature still defaults to its own species name — nicknames never leak across acquisitions); the
+full-party swap path honours the nickname exactly like the open-slot path (same `Normalize` call site, both
+branches); **a nicknamed creature keeps its nickname across `Evolve` while an un-nicknamed one still adopts the
+new species name** (the `Name == SpeciesName` branch, both directions); `CreatureOverview` shows the species
+name only when it differs from the nickname. Covered by `NicknameRulesTests` (the pure helper), `Creature`
+evolution tests extended with a nicknamed-vs-default case, a `GameController`/session test asserting the
+starter's `Name`/`SpeciesName` reflect a supplied nickname and fall back on blank, `RunDirectorAcquisitionTests`
+additions for both the open-slot and full-party-swap accept paths, `PlayerOverviewDtoTests` for the new field,
+and Vitest coverage for `StarterSelection`'s request body, `NicknameModal`'s OK/Cancel/Escape behavior, and
+`AcquisitionModal`'s forwarded nickname across both its exit paths.
+
+**DoR #7 — dependencies:** none; builds on the already-shipped `Party`/acquisition wire (Encounter Logic Phase
+4) by extending `StartGameRequest`/`AcquisitionDecision`/`BattleHub.RespondAcquisition`/`Creature`, not
+replacing them.
+
+**Out of scope:** any persistence beyond the session (no `save.db`), profanity/validation filtering (no
+in-game text-entry keyboard is being modeled, and this is single-player with no shared/visible naming), showing
+the species name anywhere besides CHECK POKEMON (nameplate/party strip/log stay nickname-only — a **modern QoL
+choice**, not a Gen-1-parity claim: caught by `requirements-review` 2026-09-14 — Gen 1 has no screen where a
+nickname and species name appear together at all; that pairing is a later-generation, Gen 3+/6+ Summary-screen
+convention. Keeping the battle UI nickname-only is still the right call — it avoids cluttering the nameplate —
+it just isn't "matching Gen 1," it's this project's own presentation choice), and renaming an already-acquired
+party member after the fact (this feature is nickname-**on-acquisition** only, per the ask).
 
 ---
 

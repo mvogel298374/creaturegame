@@ -54,6 +54,19 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - Design detail → `GENERATION_SEAMS.md` (`RunRules` / XP curve). History → `TODO_ARCHIVE.md` → *Difficulty →
   XP bonus*.
 
+### Starter nicknaming
+- After confirming a starter (`StarterSelection`), the player is prompted to enter a nickname (max 10
+  characters, silently truncated if longer); leaving it blank or cancelling declines and keeps the species
+  name, matching Gen 1's Y/N nickname prompt.
+- CHECK POKEMON shows the species name alongside the nickname whenever the two differ; the battle nameplate,
+  party strip, and log show the nickname only — except the one-time evolution announcement, which always names
+  the newly-evolved species (e.g. "SPROUT evolved into IVYSAUR!"), never a repeated nickname.
+- A nickname survives evolution; a creature still on its species-default name adopts the new species name on
+  evolving as before.
+- Draft and boss-catch acquisition do not yet offer a nickname prompt (Stage B of this feature, still open).
+- Design detail / plan → `docs/TODO.md` → *Creature Naming — nickname on acquisition*. History → not yet
+  archived — the write-up stays in `TODO.md` (marked done in place) until Stage B ships.
+
 *(rest of this domain not yet populated)*
 
 ## 2. Battle system

@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TypeBadge } from '../components/TypeBadge';
+import { NicknameModal } from '../components/modals/NicknameModal';
 import type { Species } from '../types/Species';
 import { friendlyFetchError } from '../utils/fetchError';
+import { buildStartGameRequest } from '../utils/startGameRequest';
 import { DEFAULT_GENERATION } from '../generations/presentation';
 import './StarterSelection.css';
 
@@ -15,6 +17,8 @@ export function StarterSelection() {
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState<string | null>(null);
   const [levelChoice, setLevelChoice] = useState(50);
+  // The nickname step opens after CONFIRM, before the request fires — see NicknameModal.
+  const [naming, setNaming] = useState(false);
   // Roguelite difficulty: a per-run choice (like Level/Seed), threaded once at game start into the backend's
   // RunRules preset (docs/TODO.md — Settings Menu). Not a Settings-menu / localStorage concern.
   const [difficultyChoice, setDifficultyChoice] = useState<'Easy' | 'Normal' | 'Hard'>('Normal');
@@ -37,21 +41,17 @@ export function StarterSelection() {
     setFiltered(q ? species.filter(s => s.name.toLowerCase().includes(q)) : species);
   }, [search, species]);
 
-  const confirm = async () => {
+  const confirm = async (nickname: string | null) => {
     if (!selected) return;
     try {
-      // An optional ?seed=<int> in the URL forces the run's seed (deterministic replay / E2E); the backend
-      // otherwise picks a random one. Only a finite integer is forwarded — anything else falls through to the
-      // server's random seed.
-      const seedParam = new URLSearchParams(window.location.search).get('seed');
-      const seed = seedParam !== null && seedParam.trim() !== '' ? Number(seedParam) : NaN;
-      const body: { speciesId: number; level: number; seed?: number; difficulty: string; generation: string } = {
+      const body = buildStartGameRequest({
         speciesId: selected.id,
         level: levelChoice,
         difficulty: difficultyChoice,
         generation: generationChoice,
-      };
-      if (Number.isInteger(seed)) body.seed = seed;
+        nickname,
+        seedParam: new URLSearchParams(window.location.search).get('seed'),
+      });
 
       const res = await fetch('/api/game/start', {
         method: 'POST',
@@ -62,6 +62,7 @@ export function StarterSelection() {
       const { gameId } = await res.json() as { gameId: string };
       nav('/battle', { state: { species: selected, gameId, level: levelChoice, generation: generationChoice } });
     } catch (e) {
+      setNaming(false);
       setError(friendlyFetchError(e));
     }
   };
@@ -150,10 +151,14 @@ export function StarterSelection() {
               </div>
               <span className="footer-bst">BST {selected.baseStatTotal}</span>
             </div>
-            <button className="btn" onClick={confirm}>CONFIRM →</button>
+            <button className="btn" onClick={() => setNaming(true)}>CONFIRM →</button>
           </>
         )}
       </footer>
+
+      {naming && selected && (
+        <NicknameModal speciesName={selected.name.toUpperCase()} onDone={confirm} />
+      )}
     </div>
   );
 }

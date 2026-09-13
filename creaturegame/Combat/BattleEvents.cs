@@ -491,9 +491,20 @@ public record EvolutionCancelled(string CreatureName) : BattleEvent;
 /// <paramref name="FromSpeciesId"/>/<paramref name="ToSpeciesId"/> so the client can morph the sprite
 /// (old → silhouette → new) — the same id-driven approach as <see cref="TransformedInto"/>. Emitted in the
 /// run loop after a win's level-ups resolve, before any evolution move-learning. Followed by the evolved
-/// form's <see cref="MoveLearned"/> events, if any.</summary>
-public record CreatureEvolved(string FromName, string ToName, int FromSpeciesId, int ToSpeciesId)
-    : BattleEvent;
+/// form's <see cref="MoveLearned"/> events, if any.
+/// <para><paramref name="ToName"/> is the creature's live display name <b>after</b> <c>EvolveTo</c> — a
+/// nickname survives evolution (docs/TODO.md — Creature Naming), so it is <b>not</b> necessarily the evolved
+/// species' own name, and other client state (identity retargeting) keys off it deliberately.
+/// <paramref name="ToSpeciesName"/> is the evolved species' own name regardless of nickname — the one-time
+/// "X evolved into Y!" announcement uses it, so a nicknamed creature still names the species it became instead
+/// of repeating its own nickname (found by `pr-review`, 2026-09-14).</para></summary>
+public record CreatureEvolved(
+    string FromName,
+    string ToName,
+    int FromSpeciesId,
+    int ToSpeciesId,
+    string ToSpeciesName
+) : BattleEvent;
 
 // --- Learnset (level-up move learning) ---
 /// <summary>The creature learned a new move — either into a free slot, or after a replacement. Drives the

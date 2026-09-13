@@ -109,4 +109,29 @@ public class EvolveToTests
         Assert.Equal(xpBefore, c.Experience);
         Assert.Equal(movesBefore, c.MoveSet.Select(m => m.Base.Id).ToArray());
     }
+
+    // docs/TODO.md — Creature Naming: a nickname must survive evolution (Gen 1 preserves it); an un-nicknamed
+    // creature must keep advancing its display name to the new species, exactly as before this feature existed.
+    [Fact]
+    public void EvolveTo_AdvancesTheDisplayName_WhenNoNicknameWasSet()
+    {
+        var c = BuildBulbasaur(20); // Name == SpeciesName == "BULBASAUR" — never nicknamed
+
+        c.EvolveTo(Ivysaur);
+
+        Assert.Equal("IVYSAUR", c.Name);
+        Assert.Equal("IVYSAUR", c.SpeciesName);
+    }
+
+    [Fact]
+    public void EvolveTo_PreservesANickname_ButStillAdvancesSpeciesName()
+    {
+        var c = BuildBulbasaur(20);
+        c.Name = "Sprout"; // diverges Name from SpeciesName — a player nickname
+
+        c.EvolveTo(Ivysaur);
+
+        Assert.Equal("Sprout", c.Name); // kept, matching Gen 1
+        Assert.Equal("IVYSAUR", c.SpeciesName); // the species identity still advances
+    }
 }

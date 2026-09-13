@@ -28,6 +28,9 @@ export function CreatureOverview({ gameId, onBack }: { gameId: string | null; on
       <div className="overview-header">
         <button className="btn-ghost" onClick={onBack}>← BACK</button>
         {data && <span className="overview-title">{data.name}</span>}
+        {data && data.speciesName !== data.name && (
+          <span className="overview-species-name">({data.speciesName})</span>
+        )}
         {data && <span className="overview-sub">Lv{data.level} · #{String(data.speciesId).padStart(3, '0')}</span>}
       </div>
 

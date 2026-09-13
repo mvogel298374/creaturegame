@@ -6,6 +6,15 @@ namespace creaturegame.Creatures;
 public class Creature
 {
     public string Name { get; set; } = string.Empty;
+
+    /// <summary>The species' own display name (e.g. "PIKACHU"), independent of <see cref="Name"/> — which may
+    /// now be a player-chosen nickname (<see cref="NicknameRules"/>). Set to the same value as <see cref="Name"/>
+    /// at construction, so every caller that never nicknames a creature sees no behavior change; advanced by
+    /// <see cref="EvolveTo"/> to the new form's name. Two consumers: the CHECK POKEMON overview shows it
+    /// alongside a nickname, and <see cref="EvolveTo"/> uses <c>Name == SpeciesName</c> to tell "still the
+    /// species default" from "a nickname to preserve."</summary>
+    public string SpeciesName { get; set; } = string.Empty;
+
     public int Level { get; set; } = 1;
     public Attributes Attributes { get; set; } = new Attributes();
 
@@ -369,6 +378,7 @@ public class Creature
         : this()
     {
         Name = name;
+        SpeciesName = name;
     }
 
     public void InitializeFromSpecies(DB.PokemonSpecies species)
@@ -398,10 +408,17 @@ public class Creature
     /// run loop assigns the new <see cref="Learnset"/> and drives the same auto-learn / replacement prompt as
     /// a level-up). The name is upper-cased to match how creatures are named at construction.
     /// </para>
+    /// <para>
+    /// <see cref="Name"/> only advances if it was still the species default (<c>Name == SpeciesName</c>) — a
+    /// player nickname (<see cref="NicknameRules"/>) is preserved across evolution, matching Gen 1.
+    /// <see cref="SpeciesName"/> itself always advances.
+    /// </para>
     /// </summary>
     public void EvolveTo(DB.PokemonSpecies newForm)
     {
-        Name = newForm.Name.ToUpper();
+        if (Name == SpeciesName)
+            Name = newForm.Name.ToUpper();
+        SpeciesName = newForm.Name.ToUpper();
         InitializeFromSpecies(newForm);
     }
 

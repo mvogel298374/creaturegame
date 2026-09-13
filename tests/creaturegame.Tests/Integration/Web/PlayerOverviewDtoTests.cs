@@ -50,6 +50,7 @@ public class PlayerOverviewDtoTests
         var dto = PlayerOverviewDto.From(BuildCharizard(), Generation.One);
 
         Assert.Equal("CHARIZARD", dto.Name);
+        Assert.Equal("CHARIZARD", dto.SpeciesName); // un-nicknamed — Name and SpeciesName still match
         Assert.Equal(50, dto.Level);
         Assert.Equal("Fire", dto.Type1);
         Assert.Equal("Flying", dto.Type2);
@@ -85,6 +86,18 @@ public class PlayerOverviewDtoTests
     public void From_StampsTheRunsGeneration_NotAHardcodedGen1()
     {
         Assert.Equal(2, PlayerOverviewDto.From(BuildCharizard(), (Generation)2).Generation);
+    }
+
+    [Fact]
+    public void From_ReportsSpeciesNameSeparately_WhenNameIsANickname()
+    {
+        var c = BuildCharizard();
+        c.Name = "Reggie"; // a player nickname — diverges from SpeciesName
+
+        var dto = PlayerOverviewDto.From(c, Generation.One);
+
+        Assert.Equal("Reggie", dto.Name);
+        Assert.Equal("CHARIZARD", dto.SpeciesName);
     }
 
     [Fact]

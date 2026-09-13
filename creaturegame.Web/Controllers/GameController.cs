@@ -1,4 +1,5 @@
 using creaturegame.Combat;
+using creaturegame.Creatures;
 using creaturegame.Generations;
 using creaturegame.Web.Battle;
 using Microsoft.AspNetCore.Mvc;
@@ -34,6 +35,11 @@ public class GameController(GameSessionManager sessionManager, EncounterFactory 
             );
             if (setup == null)
                 return BadRequest(new { error = "Unknown species or empty move database" });
+
+            // Applied before the session exists so BattleStarted.PlayerName already reflects it — no event
+            // schema change needed (docs/TODO.md — Creature Naming). A blank/whitespace/missing nickname keeps
+            // the species-derived default BuildCreature already gave setup.Player.
+            setup.Player.Name = NicknameRules.Normalize(req.Nickname, setup.Player.Name);
 
             // The session holds the persistent player, the shared move pool, the run's bag + item catalog, and
             // the run's seeded RNG; each encounter's enemy is built by the run loop via the EncounterFactory
@@ -140,5 +146,6 @@ public record StartGameRequest(
     int? Level = null,
     int? Seed = null,
     string? Difficulty = null,
-    string? Generation = null
+    string? Generation = null,
+    string? Nickname = null
 );

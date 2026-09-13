@@ -934,9 +934,14 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
     // sprite), then confirm. The morph swaps front+back to the evolved species in the scene.
     case 'CreatureEvolved': {
       // Reached only after the player allowed the offer, so the "is evolving!" line already played there.
-      const fromName    = payload.fromName as string;
-      const toName      = payload.toName as string;
-      const toSpeciesId = payload.toSpeciesId as number;
+      const fromName      = payload.fromName as string;
+      const toName        = payload.toName as string; // the live display name post-evolution — a nickname
+                                                        // survives evolution, so this is NOT necessarily the
+                                                        // evolved species' own name (docs/TODO.md — Creature
+                                                        // Naming). Used for identity retargeting only.
+      const toSpeciesId   = payload.toSpeciesId as number;
+      const toSpeciesName = payload.toSpeciesName as string; // the evolved species' own name, regardless of
+                                                              // nickname — the one-time announcement uses this.
       return { steps: [
         w(200),
         emit({ type: 'playEvolutionAnimation', toSpeciesId }),
@@ -945,7 +950,7 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
         // the sprite instead of lagging to the next BattleStarted. The reducer decides whether this creature is
         // the player (a bench member's evolution reaches here too).
         d({ type: 'CREATURE_RENAMED', fromName, toName }),
-        d(log(`${fromName} evolved into ${toName}!`)),
+        d(log(`${fromName} evolved into ${toSpeciesName}!`)),
         w(600),
       ] };
     }

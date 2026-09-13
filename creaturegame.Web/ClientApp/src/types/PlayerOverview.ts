@@ -20,6 +20,7 @@ export interface MoveRow {
 
 export interface PlayerOverview {
   name: string;
+  speciesName: string; // the species' own name, independent of a nickname (may equal `name`)
   speciesId: number;
   level: number;
   type1: string;

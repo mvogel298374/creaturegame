@@ -270,7 +270,7 @@ internal sealed class BattleRunEvent(
         player.Learnset = evolution.NewLearnset;
 
         ctx.Emitter?.Emit(
-            new CreatureEvolved(fromName, player.Name, fromSpeciesId, player.SpeciesId)
+            new CreatureEvolved(fromName, player.Name, fromSpeciesId, player.SpeciesId, toName)
         );
 
         // Evolution grants no moves itself, but the evolved form may learn one at the current level.

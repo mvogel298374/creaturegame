@@ -126,6 +126,37 @@ public class RunDirectorEvolutionTests
         Assert.True(events.IndexOf(evolved) < events.IndexOf(learned));
     }
 
+    // docs/TODO.md — Creature Naming: a nicknamed creature keeps its nickname through evolution (Creature.EvolveTo),
+    // so CreatureEvolved.ToName ("Sprout") and .ToSpeciesName ("CHARMELEON") must diverge — the announcement needs
+    // the species name, not the nickname repeated back. Found by `pr-review`, 2026-09-14.
+    [Fact]
+    public async Task Runner_OnEvolution_CarriesTheSpeciesNameSeparately_WhenThePlayerIsNicknamed()
+    {
+        var player = Fighter("CHARMANDER", hp: 200, attack: 999, speed: 100, level: 5);
+        player.SpeciesId = 4;
+        player.Name = "Sprout"; // diverges from SpeciesName ("CHARMANDER") — a player nickname
+        var (_, outcome) = Charmeleon();
+
+        int checks = 0;
+        var recorder = new RecordingEmitter();
+        var runner = BuildRunner(
+            player,
+            new ScriptedInput("tackle"),
+            recorder,
+            _ => Task.FromResult<EvolutionOutcome?>(checks++ == 0 ? outcome : null)
+        );
+
+        await runner.RunAsync();
+
+        var evolved = Assert.Single(recorder.Of<CreatureEvolved>());
+        Assert.Equal("Sprout", evolved.ToName); // the nickname is kept
+        Assert.Equal("CHARMELEON", evolved.ToSpeciesName); // what it evolved into
+
+        // The creature itself keeps the nickname; only its species identity advanced.
+        Assert.Equal("Sprout", player.Name);
+        Assert.Equal("CHARMELEON", player.SpeciesName);
+    }
+
     // The party strip is fed ONLY by PartyUpdated snapshots, while the nameplate/HUD retarget on CreatureEvolved
     // directly — so an evolution must push a fresh snapshot or the roster row keeps the old name next to a
     // correct nameplate. The win's own level-up snapshot doesn't cover it: that one is emitted inside Battle,

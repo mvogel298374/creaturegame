@@ -512,7 +512,7 @@ describe('expandEvent — control plane vs timeline', () => {
 
   it('CreatureEvolved plays the morph and waits for it before the confirm line (no duplicate "evolving" line)', () => {
     const { steps } = expandEvent('CreatureEvolved', {
-      fromName: 'CHARMANDER', toName: 'CHARMELEON', fromSpeciesId: 4, toSpeciesId: 5,
+      fromName: 'CHARMANDER', toName: 'CHARMELEON', fromSpeciesId: 4, toSpeciesId: 5, toSpeciesName: 'CHARMELEON',
     }, CTX);
 
     // The "is evolving!" line plays in the offer, not here — this arm only confirms.
@@ -541,6 +541,23 @@ describe('expandEvent — control plane vs timeline', () => {
     );
     expect(rename?.fromName).toBe('CHARMANDER');
     expect(rename?.toName).toBe('CHARMELEON');
+  });
+
+  // docs/TODO.md — Creature Naming: a nicknamed creature's ToName (kept as the nickname) and ToSpeciesName (the
+  // evolved species) diverge — the log line must use the latter, or a nicknamed creature reads "SPROUT evolved
+  // into SPROUT!". Found by `pr-review`, 2026-09-14.
+  it('CreatureEvolved announces the species name, not a repeated nickname', () => {
+    const { steps } = expandEvent('CreatureEvolved', {
+      fromName: 'Sprout', toName: 'Sprout', fromSpeciesId: 1, toSpeciesId: 2, toSpeciesName: 'IVYSAUR',
+    }, CTX);
+
+    expect(logLines(steps)).toEqual(['Sprout evolved into IVYSAUR!']);
+
+    // The HUD rename still carries the live nickname, not the species name.
+    const rename = dispatched(steps).find(
+      (a): a is Extract<Action, { type: 'CREATURE_RENAMED' }> => a.type === 'CREATURE_RENAMED',
+    );
+    expect(rename?.toName).toBe('Sprout');
   });
 
   it('LeveledUp announces the level, plays the fanfare, and shows the stat-gain panel (no auto-hide)', () => {

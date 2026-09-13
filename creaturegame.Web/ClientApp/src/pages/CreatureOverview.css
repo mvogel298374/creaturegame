@@ -20,6 +20,11 @@
   letter-spacing: var(--ls-tight);
 }
 
+.overview-species-name {
+  font-size: var(--fs-sm);
+  color: var(--clr-text-sub);
+}
+
 .overview-sub {
   margin-left: auto;
   font-size: var(--fs-sm);
@@ -221,6 +226,7 @@
 [data-generation="gen1"] .overview-header {
   border-color: var(--ks-ink);
 }
+[data-generation="gen1"] .overview-species-name,
 [data-generation="gen1"] .overview-sub {
   color: var(--ks-dim);
 }

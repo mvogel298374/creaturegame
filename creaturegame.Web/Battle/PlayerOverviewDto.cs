@@ -12,6 +12,7 @@ namespace creaturegame.Web.Battle;
 /// </summary>
 public sealed record PlayerOverviewDto(
     string Name,
+    string SpeciesName,
     int SpeciesId,
     int Level,
     string Type1,
@@ -55,6 +56,7 @@ public sealed record PlayerOverviewDto(
         var moves = c.MoveSet.Select(m => MoveRow.From(m.Base, m.PowerPointsCurrent)).ToList();
         return new PlayerOverviewDto(
             c.Name,
+            c.SpeciesName,
             c.SpeciesId,
             c.Level,
             (c.Type1 ?? DamageType.Normal).ToString(),
