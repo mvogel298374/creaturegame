@@ -11,10 +11,8 @@ public sealed class SignalRBattleEventEmitter(
 {
     public void Emit(BattleEvent evt)
     {
-        // Resolved per-emit so events follow the player across a reconnect (the
-        // connectionId changes). If currently disconnected, the event is dropped —
-        // a turn-based battle is normally blocked on player input during a gap, so
-        // little is missed, and the reconnected client resumes from the next event.
+        // Resolved per-emit so events follow a reconnect. Dropping while disconnected is safe by design, not
+        // a bug — see ARCHITECTURE.md §2.7 / GAME_LOOP.md §6 item 3.
         var connectionId = currentConnectionId();
         if (string.IsNullOrEmpty(connectionId))
             return;
@@ -449,10 +447,8 @@ public sealed class SignalRBattleEventEmitter(
             _ => ("Unknown", new { }),
         };
 
-    // Projects one reward-choice option to the wire: a discriminated "kind" plus the fields the modal card
-    // needs. An item carries its id/name/rarity (rarity colours the card); a gold bag carries its amount; a
-    // quick heal carries what it will restore (HP/status/PP + label). Every arm carries the *same* flat field
-    // set (same names + order = one anonymous type) so the TypeScript client reads one shape and branches on Kind.
+    // Projects one reward-choice option to the wire: a discriminated "kind" plus every arm's fields flattened
+    // into the *same* shape (one anonymous type), so the TypeScript client reads one shape and branches on Kind.
     private static object ProjectRewardOption(RewardOption option) =>
         option switch
         {
@@ -506,9 +502,8 @@ public sealed class SignalRBattleEventEmitter(
             },
         };
 
-    // Projects one shop stock item to the wire shape the client's shop modal reads (id + name + price + rarity
-    // colour). Mirrors ProjectRewardOption's field-level projection — the recurring web event field-projection
-    // gap (a new ShopOfferItem field is invisible on the wire until it's added here).
+    // Field-level projection gap: a new ShopOfferItem field is invisible on the wire until it's added here
+    // (TODO.md — the recurring web-event field-projection gap).
     private static object ProjectShopItem(ShopOfferItem item) =>
         new
         {
@@ -518,12 +513,8 @@ public sealed class SignalRBattleEventEmitter(
             Rarity = item.Rarity.ToString(),
         };
 
-    // Projects one party member to the wire shape the client's roster panel + acquisition swap picker read
-    // (species id for the sprite, name/level/HP, status string, lead flag). Shared by the AcquisitionOffered and
-    // PartyUpdated projections — same field-level guard concern (a new PartyMemberInfo field is invisible on the
-    // wire until it's added here).
-    // internal (not private) so the on-demand party-hydrate endpoint (GameSessionManager.GetParty) serves the
-    // *exact same* wire shape as the pushed PartyUpdated / AcquisitionOffered events — no pull-vs-push drift.
+    // Shared by AcquisitionOffered/PartyUpdated (same field-projection-gap concern as ProjectShopItem).
+    // internal (not private) so GameSessionManager.GetParty's pulled snapshot matches the pushed events exactly.
     internal static object ProjectPartyMember(PartyMemberInfo m) =>
         new
         {

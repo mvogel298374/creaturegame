@@ -1,11 +1,7 @@
-// The client-side analogue of the server's GenerationProfiles registry (Generation Profile Stage 4a —
-// docs/GENERATION_PROFILE.md §7.2): maps the run's generation id (the wire string from
-// RunPresentationRevealed, e.g. 'One') to its presentation. Components read this registry, never a
-// hardcoded default, so a later generation's chrome is a registry entry — not an edit hunt.
-//
-// The generation reaches the client on two paths, and both are needed (§7.2): route state (the client
-// picked it at run start) for the immediate theme, and the server echo (RunPresentationRevealed, emitted
-// on every hub attach) as the authority — a reconnect re-mounts BattleScreen with no route state.
+// The client-side analogue of the server's GenerationProfiles registry (GENERATION_PROFILE.md §7.2): maps the
+// run's generation id (the wire string from RunPresentationRevealed, e.g. 'One') to its presentation.
+// Components read this registry, never a hardcoded default, so a later generation's chrome is a registry
+// entry — not an edit hunt. (§7.2 covers why the client needs both route state AND the server echo.)
 
 import { hasBossNamePool } from '../battle/bossTrainer';
 import { hasTypeIcon } from '../pages/mapGlyphs';
@@ -47,12 +43,9 @@ export function applyGenerationTheme(
   root.setAttribute('data-generation', presentationFor(id, registry).theme);
 }
 
-/** The rostered types the client has no bespoke assets for, measured against the roster the server
- *  delivered (RunPresentationRevealed.typeRoster) — the single source of truth for "which types exist
- *  this run". The per-type tables themselves (boss-name pools, map glyphs) are asset inventories, not
- *  roster claims: each degrades gracefully for a type it lacks (generic name / the Normal glyph), and
- *  this check is what keeps "inventory covers the roster" an observed fact rather than three parallel
- *  hand-maintained copies of "the 15" (the Stage 2a handoff, GENERATION_PROFILE.md §5(a)). */
+/** The rostered types the client has no bespoke assets for, measured against the delivered roster — the
+ *  single source of truth for "which types exist this run" (GENERATION_PROFILE.md §7.2/§5(a)). Each asset
+ *  table degrades gracefully for a type it lacks (generic name / the Normal glyph). */
 export function missingTypeAssets(typeRoster: readonly string[]): {
   icons: string[];
   bossNames: string[];

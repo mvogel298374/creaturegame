@@ -21,18 +21,13 @@ public sealed class GameSessionManager(
     // Pending sessions never claimed (client never connected) are evicted after this TTL.
     private static readonly TimeSpan PendingSessionTtl = TimeSpan.FromMinutes(2);
 
-    // After a disconnect we wait this long for the client to reconnect before abandoning
-    // the battle — covers the JS client's automatic-reconnect policy (gives up ~30 s).
+    // Reconnect grace after a disconnect, before the battle is abandoned — covers the JS client's automatic-
+    // reconnect policy (gives up ~30s). Mechanism → ARCHITECTURE.md §2.7.
     private static readonly TimeSpan ReconnectGrace = TimeSpan.FromSeconds(40);
 
-    // Roguelite run-balance rules for the web run — the tunable "game rules" bag, separate from the Gen-1 seam
-    // (see RunRules). The XP curve is a soft level-aware ramp climbing from the early anchor (low levels are
-    // already brisk under Gen-1's cheap early thresholds, so it's barely nudged there — no sharp multi-level
-    // jumps) to the late anchor (where the Gen-1 grind is glacial). A deliberate, documented deviation from
-    // strict Gen-1 XP — see GENERATION_SEAMS.md — kept out of the Gen-1 seam (Battle scales the seam's result;
-    // the formula itself is untouched). Exposed to the player as the Easy/Normal/Hard difficulty choice at
-    // run-start (StarterSelection); Normal reproduces the numbers this run always used pre-difficulty-slider, so
-    // picking it is a true no-op. All three anchors are provisional, expected to be retuned by playtesting.
+    // The Easy/Normal/Hard RunRules presets — a roguelite dial bag kept out of the Gen-1 IBattleRules seam.
+    // Normal reproduces the pre-difficulty-slider numbers exactly (a true no-op). Full rationale + the curve's
+    // anchors → GENERATION_SEAMS.md (RunRules / XP curve / Innate Party XP Share).
     private static readonly IReadOnlyDictionary<Difficulty, RunRules> RunTuningByDifficulty =
         new Dictionary<Difficulty, RunRules>
         {
@@ -42,9 +37,6 @@ public sealed class GameSessionManager(
                 XpMultiplierLate = 6.0,
                 BenchXpShare = 0.75,
             },
-            // The original single hardcoded RunTuning: ~1.5× at low levels climbing to 4.5× near the level cap
-            // (lands ~3× around the default level-50 start, so a biome advances the creature roughly 0.8–1.5
-            // levels instead of a slow crawl), with a 50% innate bench Exp-Share so a drafted roster keeps pace.
             [Difficulty.Normal] = new RunRules
             {
                 XpMultiplierEarly = 1.5,
@@ -78,18 +70,15 @@ public sealed class GameSessionManager(
     internal static RunPresentationRevealed BuildPresentationEvent(GenerationProfile profile) =>
         new(profile.Generation.ToString(), profile.TypeRoster.Select(t => t.ToString()).ToList());
 
-    /// <summary>
-    /// Assembles the run's <see cref="RunDirectorOptions"/> — the run-scoped policy bag handed to the director.
-    /// </summary>
+    /// <summary>Assembles the run's <see cref="RunDirectorOptions"/> — the run-scoped policy bag handed to the
+    /// director.</summary>
     /// <remarks>
-    /// Extracted from <see cref="AttachConnection"/> so the seams a run is actually configured with are
-    /// <b>observable to a test</b>. That is not cosmetic: with everything inline, dropping
-    /// <c>Rules = profile.BattleRules</c> would leave the whole suite green, because the engine's
-    /// <c>?? Gen1BattleRules.Instance</c> fallback silently supplies the same answer Gen 1 expects
-    /// (<c>docs/GENERATION_PROFILE.md</c> §4.2). Pinning this method against a second profile is what turns
-    /// "the profile is threaded" from a claim into a test — see <c>GenerationProfileTests</c>.
-    /// <para><c>internal static</c> and dependency-free by design: everything it needs is a parameter, so a test
-    /// can call it without standing up a hub, a connection, or a running battle.</para>
+    /// Extracted from <see cref="AttachConnection"/> so the seams a run is configured with are <b>observable to
+    /// a test</b>: with everything inline, dropping <c>Rules = profile.BattleRules</c> would leave the suite
+    /// green because of the engine's silent fallback (<c>docs/GENERATION_PROFILE.md</c> §4.2) — pinning this
+    /// method against a second profile turns "the profile is threaded" from a claim into a test
+    /// (<c>GenerationProfileTests</c>). <c>internal static</c> and dependency-free by design: everything it
+    /// needs is a parameter, so a test can call it without standing up a hub, a connection, or a battle.
     /// </remarks>
     internal static RunDirectorOptions BuildRunOptions(
         PendingSession session,
@@ -102,45 +91,21 @@ public sealed class GameSessionManager(
         {
             Emitter = emitter,
             Rng = session.Rng,
-            // Previously left unset, so Battle fell back to Gen1BattleRules.Instance internally. Now passed
-            // explicitly. For Gen 1 this is the same singleton, so behaviour is unchanged — including the
-            // rules' own unseeded RNG, which is a settled/closed question and deliberately not reopened here.
             Rules = profile.BattleRules,
-            // Between encounters, resolve any pending evolution against the DB (edges → IEvolutionRules →
-            // evolved species + learnset). The runner applies it; the data concern stays in the web layer.
             CheckEvolution = p =>
                 encounters.ResolvePlayerEvolutionAsync(p, session.AllMoves, profile),
-            // The run's bag, threaded into every Battle's player side; consumed items stay gone across the chain.
             PlayerBag = session.Bag,
-            // Biome mode: the run charts a route through this region's playable biomes (the map screen). A
-            // non-empty set flips the director from the legacy endless chain to biome traversal; the chosen
-            // biome themes each encounter. ENCOUNTER_DESIGN.md §7 Phase 3b-2.
+            // Non-empty ⇒ biome traversal instead of the legacy endless chain — ENCOUNTER_DESIGN.md §7 Phase 3b-2.
             PlayableBiomes = session.PlayableBiomes,
-            // Run Economy: the wallet battle wins and Treasure/Mystery credit, and the reward policy
-            // (drop rates / gold curve / item eligibility) closed over this run's item catalog. The client
-            // now answers the Treasure/Mystery reward ack (Phase C), so those nodes run at their full core
-            // distribution (no node-plan gate).
             Wallet = session.Wallet,
             RewardSupplier = EncounterFactory.BuildRewardSupplier(session.AllItems),
-            // Shop nodes spend the same wallet: run-scaled stock + prices closed over this run's item catalog.
             ShopSupplier = EncounterFactory.BuildShopSupplier(session.AllItems),
-            // A Shop only rolls into a biome when the player can afford the cheapest possible item — so a broke
-            // player (e.g. the opening node with a 0₽ wallet) never gets a dead, all-unaffordable shop.
+            // Gates a Shop node on affordability, so a broke player never gets a dead all-unaffordable shop.
             MinShopBudget = ShopCalculator.MinItemPrice,
-            // Roguelite run-balance rules (the level-aware XP curve, boosted above pure Gen-1) — the preset
-            // matching the difficulty chosen at run-start (see RunRulesFor above). Keyed to Difficulty, NOT to
-            // the generation: RunRules is deliberately not a generation seam (GENERATION_PROFILE.md §2.2).
+            // Keyed to Difficulty, not generation — RunRules is deliberately not a seam (GENERATION_PROFILE.md §2.2).
             RunRules = RunRulesFor(session.Difficulty),
-            // Party threading: the RunDirector plays the run over this same party instance (its Lead is the
-            // active player), so the party-hydrate endpoint and the roster panel read the live roster.
             Party = party,
-            // Themed-draft acquisition (ENCOUNTER_DESIGN.md §4): rolled after every win, gated by cadence × n% ×
-            // the fought-only pool (DraftCalculator), building the offered creature from this run's move pool +
-            // DB. Deposits accepted creatures into the party above.
             DraftSupplier = encounters.BuildDraftSupplier(session.AllMoves, profile),
-            // Boss-catch acquisition (ENCOUNTER_DESIGN.md §4 Stage 2): rolled after a Boss win only, a small n%
-            // chance (BossCatchCalculator) to add the defeated boss — built as a fresh full-HP copy of its species
-            // at the boss's level. The win reward/XP is already applied, so the catch is pure upside.
             BossCatchSupplier = encounters.BuildBossCatchSupplier(session.AllMoves, profile),
         };
 
@@ -201,10 +166,7 @@ public sealed class GameSessionManager(
                 _connToGame.TryRemove(previous!, out _);
             existing.CurrentConnectionId = connectionId;
             _connToGame[connectionId] = gameId;
-            // Re-echo the run's presentation identity: the reconnected client re-mounts with no route state,
-            // and run events don't replay across a gap — without this the theme silently reverts to the
-            // default (GENERATION_PROFILE.md §7.2, the required server-echo half of the generation channel).
-            // Uses the run's one emitter (set at claim), which resolves the just-rebound connection per emit.
+            // Re-echo the presentation identity on every reconnect — GAME_LOOP.md §5 "session-layer events".
             existing.Emitter?.Emit(BuildPresentationEvent(ProfileFor(existing.Generation)));
             return;
         }
@@ -213,17 +175,15 @@ public sealed class GameSessionManager(
         if (!_pending.TryRemove(gameId, out var session))
             return; // unknown or already-consumed gameId
 
-        // The run's generation, resolved once here and threaded into every seam consumer below. Chosen at run
-        // start (like Difficulty) and fixed for the whole run — one generation per run.
+        // Resolved once and threaded into every seam consumer below; fixed for the whole run.
         var profile = ProfileFor(session.Generation);
 
         var battle = new ActiveBattle
         {
             CurrentConnectionId = connectionId,
             Player = session.Player,
-            // The run's party — its Lead is the persistent player. The session owns this single instance so the
-            // party-hydrate endpoint (GetParty) and the RunDirector's RunState read the same roster; the themed
-            // draft (below) deposits acquired creatures into it.
+            // The session owns this single Party instance so the party-hydrate endpoint and the RunDirector's
+            // RunState read the same roster.
             Party = new Party(session.Player),
             Bag = session.Bag,
             Wallet = session.Wallet,
@@ -233,23 +193,14 @@ public sealed class GameSessionManager(
         _active[gameId] = battle;
         _connToGame[connectionId] = gameId;
 
-        // Emitter resolves the current connection per-event, so output follows reconnects. Held on the
-        // battle so the reconnect branch above re-echoes through the same instance.
+        // Held on the battle so the reconnect branch above re-echoes through the same instance (ARCHITECTURE.md
+        // §2.7); emitted here first so the client can theme itself ahead of the first battle event.
         var emitter = new SignalRBattleEventEmitter(hubContext, () => battle.CurrentConnectionId);
         battle.Emitter = emitter;
-        // The presentation echo leads every run: emitted before the run task starts so the client can theme
-        // itself ahead of the first battle event (the reconnect branch above emits the same event).
         emitter.Emit(BuildPresentationEvent(profile));
-        // Endless chain: one persistent player, a fresh DB-built enemy per encounter. A single enemy input
-        // is reused across encounters (the AI is stateless per turn — it scores from the live TurnContext).
-        // The enemy now thinks with Gen1TrainerAi: an intelligent-but-fallible Gen 1 move selector (scores
-        // moves, then picks probabilistically so it usually plays the strong move but keeps some RBY
-        // bad-decision flavour) instead of the old uniform-random RandomMoveInput.
-        //
-        // The run's single seeded RNG threads through every nondeterministic step — enemy construction
-        // (species/level/DVs/moves), the battle rolls, and the AI's probabilistic move pick — so the whole
-        // run replays from its seed (held as session.Rng). It's safe to share one instance: the run is single-threaded and
-        // draws sequentially on this task.
+        // Gen1TrainerAi (an intelligent-but-fallible Gen 1 move selector, TODO_ARCHIVE.md) drives the enemy; a
+        // single instance is safe to share/reuse across encounters — the run is single-threaded. The seeded
+        // session.Rng threads through every nondeterministic step (ARCHITECTURE.md §2.10).
         var runner = new RunDirector(
             session.Player,
             (p, depth, biome, tier) =>
@@ -260,16 +211,11 @@ public sealed class GameSessionManager(
                     session.Rng,
                     biome: biome,
                     depth: depth,
-                    // Node-derived tier (3c-1): the director passes a generation-agnostic EncounterTier per
-                    // node; the web layer maps it to a concrete archetype (Elite→Strong, Boss→Boss). A plain
-                    // Normal wild encounter rolls Weak vs Medium on the run RNG so wild fights vary in strength
-                    // while presenting identically (ENCOUNTER_DESIGN.md §3.1).
+                    // Web-layer half of the node-tier intent/mapping split — ENCOUNTER_DESIGN.md §3.1.
                     archetype: EnemyArchetypes.For(tier, session.Rng)
                 ),
-            // THE generation composition point (GENERATION_SEAMS.md §7, docs/GENERATION_PROFILE.md §4). Every
-            // seam below is read off the run's profile EXPLICITLY rather than left to the engine's
-            // `?? Gen1*.Instance` defaults — because a forgotten thread would not crash or fail a test, it
-            // would silently run Gen 1 (§4.2). Passing them all is what makes a second profile observable.
+            // THE generation composition point (GENERATION_SEAMS.md §7, GENERATION_PROFILE.md §4) — every seam
+            // below is read explicitly off the run's profile, never left to an engine default.
             profile.TypeChart,
             battle.Input,
             new AiBattleInput(profile.BuildAi(session.Rng)),
@@ -637,30 +583,23 @@ sealed class ActiveBattle
     public SignalRInput Input { get; } = new();
     public volatile string? CurrentConnectionId;
 
-    // The run's STARTER, captured at claim and never reassigned — a fallback for the on-demand overview snapshot
-    // when no party is wired. It is NOT necessarily the creature now on the field: read the active one through
-    // GameSessionManager.ActiveCreature, which prefers the party's live Lead.
+    // The run's STARTER, captured at claim — a fallback for the overview snapshot when no party is wired. NOT
+    // necessarily the creature on the field: read that through GameSessionManager.ActiveCreature.
     public Creature? Player;
 
-    // The run's party (up to six). The same instance the RunDirector's RunState plays over, so the party-hydrate
-    // endpoint reads the live roster — and its Lead is the creature actually on the field (the between-biome lead
-    // swap and the forced faint-switch both move it). Set when the session is claimed; never reassigned.
+    // The same instance RunDirector's RunState plays over, so the party-hydrate endpoint reads the live roster.
     public Party? Party;
 
-    // The run's bag (threaded into every Battle), wallet (credited by reward rolls), and the item catalog
-    // used to resolve a UseItem and render the bag. Set when the session is claimed; never reassigned.
     public Bag? Bag;
     public Wallet? Wallet;
     public IReadOnlyDictionary<int, Item> ItemsById = new Dictionary<int, Item>();
 
-    // The generation this run is played under — carried from the claimed PendingSession so on-demand REST reads
-    // (the CHECK POKEMON overview) report the RUN's generation instead of a hardcoded 1. Fixed for the whole run.
+    // Carried from the claimed PendingSession so on-demand REST reads report the run's generation, not a
+    // hardcoded 1. Fixed for the whole run.
     public Generation Generation;
 
-    // The run's ONE emitter, set at claim and reused everywhere the session layer emits (the reconnect
-    // re-echo included) — it resolves the current connection per event, so it needs no rebinding. Kept
-    // single on purpose: a second emitter per run behaves identically today but would silently diverge the
-    // moment the emitter gains any state (sequencing, buffering).
+    // The run's ONE emitter (resolves the current connection per event, so it needs no rebinding on reconnect).
+    // Kept single on purpose: a second emitter would silently diverge the moment it gains any state.
     public IBattleEventEmitter? Emitter;
 
     private readonly object _lock = new();

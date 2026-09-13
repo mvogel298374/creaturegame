@@ -19,15 +19,13 @@ public class GameController(GameSessionManager sessionManager, EncounterFactory 
             var difficulty = ParseDifficulty(req.Difficulty);
             var generation = ParseGeneration(req.Generation);
 
-            // One seed per run. The client may supply one (replay / deterministic E2E); otherwise we pick a
-            // random one. Either way the whole run — player DVs/moves, every enemy's species/level/DVs/moves,
-            // the battle rolls, and the AI's choices — flows from this single seeded source, so the run is
-            // reproducible by its seed. Random.Shared here only *chooses* a seed; no run draw is unseeded.
+            // One seed per run — threads the whole run (ARCHITECTURE.md §2.10). Random.Shared here only
+            // *chooses* a seed when the client didn't supply one; no run draw itself is unseeded.
             int seed = req.Seed ?? Random.Shared.Next();
             var rng = new SeededRandomSource(seed);
 
-            // The run's profile, resolved here because the STARTER is built before a session exists — the same
-            // profile GameSessionManager resolves again from the stored Generation when the run is claimed.
+            // Resolved here because the STARTER is built before a session exists; GameSessionManager resolves
+            // the same profile again from the stored Generation when the run is claimed.
             var setup = await encounters.CreatePlayerSetupAsync(
                 req.SpeciesId,
                 playerLevel,

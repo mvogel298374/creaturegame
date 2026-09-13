@@ -362,6 +362,45 @@ the interaction kinds are reachable bones awaiting behaviour:**
 | Mystery / Event | interaction-event | ✅ **Run Economy → Reward Choice** — `RewardRunEvent`: rolls a wildcard reward (sometimes nothing), else offers a **pick-one-of-N** (`RewardChoiceOffered` → `ChooseRewardAsync`) — one item or the gold bag |
 | Treasure / Reward | interaction-event | ✅ **Run Economy → Reward Choice** — `RewardRunEvent`: always rewards; offers a **pick-one-of-N** (two rarity-rolled items or a larger gold bag) — the player takes one, never both |
 
+### 5.1 Reward roll mechanics — rarity, gold, category bias, Quick Heal  *(web-layer, `RewardCalculator.cs`)*
+
+The reward policy behind every roll above (win drop, Boss, Treasure, Mystery) is one class, run-layer tuning
+like `ScaleWildLevel` — pure and unit-tested on **shape**, never exact numbers (every constant here is a
+provisional playtest knob):
+
+- **Gate per source.** Wild/Elite win: 85% chance of anything (`BattleDropChance`), else nothing. Boss: always
+  rewards, no gate. Treasure: always rewards (no foe to scale off — run depth stands in for level,
+  `5 + depth × 2`). Mystery: 70% chance of anything (`MysteryRewardChance`), else nothing — the wildcard's
+  built-in downside.
+- **Item value is a two-step roll.** First a `RewardRarity` (Common/Uncommon/Rare/Epic) off a per-tier weight
+  table lifted by run depth (Epic grows fastest, capped so a late Wild node still isn't all-Epic — `P(Rare or
+  Epic)` never decreases with depth); Boss's table skews hardest toward Rare/Epic. Then an item is drawn from
+  that rarity's **cost band** (`RarityOf`: ≤400 Common, ≤1200 Uncommon, ≤2500 Rare, else Epic — cheap sustain
+  like Potion sits at Common, premium restores like Full Restore/Elixir at Epic), falling back to the whole
+  usable pool if the rolled band is empty.
+- **Category bias (Boss only).** Within the drawn band, a Boss up-weights replenishment — Healing ×4, PpRestore
+  ×2, BattleStatBoost ×0.5, Revive ×1 (deliberately *not* up-weighted: Revive is pool-eligible only on Boss
+  nodes at all, so being Boss-only already makes it rare without a second multiplier) — so a Boss reward leans
+  max-heals/strong potions. Every other tier picks uniformly within the band.
+- **The gold bag** scales with the *better* of the two offered item rarities (passing up a strong item pays
+  more): `base(tier) × level × skew / 10 × 2 × rarityFactor` — i.e. `base × level × skew × 0.2 × rarityFactor`
+  — where `skew = 0.5 + min(u₁,u₂) × 2.5` (two uniforms, low-biased — "a low amount almost always, a high
+  amount rare") and `rarityFactor` runs 1.0 (Common) → 1.75 (Epic). Tier bases: Wild 4, Elite 8, Boss 16,
+  Treasure 30, Mystery 15 — Gen 1 trainer prize money is roughly
+  `base × level`, scaled up here.
+- **Quick Heal** can replace the second item slot: gated on the creature having *some* need (missing HP,
+  status, or a move under 50% PP — never offered as a dead option), its chance is a base 10% floor lifted by up
+  to 70% as HP approaches empty, +35% if statused, +15% if any move is low on PP (capped at 90% — never a
+  certainty). When it fires it restores a random 50–100% slice of the missing HP plus every applicable
+  component, so the amount varies but always helps. **Never offered on Boss nodes** — their item reward is
+  already elevated, and the biome's free full-heal Poké Center caps it right after, so a heal there is
+  redundant.
+- **The obtainable item subset** is simply the run's item catalog filtered to five eligible categories
+  (Healing, StatusCure, PpRestore, BattleStatBoost, Revive) — Ball has no in-battle effect so it's dead loot.
+  No generation hold-out on top of that filter: an earlier `max-revive` name-match hold-out was deleted when
+  `IContentScope` made "which content belongs to this generation" a real seam, so a stray out-of-generation row
+  is now caught at the catalog, not re-filtered here (`DATA_IMPORT.md` §4.5).
+
 Each node is an **`IRunEvent` returning a typed `Outcome`** (the target abstraction in `GAME_LOOP.md §3`). The
 **biome's seeded node plan is walked by `chooseNextEvent` / `EventForNode`** — the *single* owner of sequence —
 so nodes drop in without the loop body changing. `BattleRunner` has graduated into the **`RunDirector`** that

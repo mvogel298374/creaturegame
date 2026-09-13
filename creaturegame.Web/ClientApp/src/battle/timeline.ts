@@ -4,18 +4,11 @@ import { bridge } from './PhaserBridge';
 import { formatMoveName } from '../utils/format';
 import { E2E } from '../testEnv';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// The battle log is driven by a stream of backend events. Each event expands —
-// via the PURE `expandEvent` function below — into:
-//   • `now`   : reducer actions dispatched immediately (control plane: phase,
-//               turn start/end, the winner flip), and
-//   • `steps` : an ordered timeline of primitive instructions (dispatch a view
-//               change, fire a Phaser command, wait, or await an animation),
-//               played one at a time by the driver (`useBattleTimeline`).
-// Keeping the sequencing/timing/text in a pure function makes it unit-testable
-// without a browser or a wall clock, and confines all timers/bridge access to
-// the small driver — the part that used to be a tangle of async closures.
-// ─────────────────────────────────────────────────────────────────────────────
+// Pure expand (`expandEvent`, below) + driver (`useBattleTimeline`) — design rationale in ARCHITECTURE.md §2.8.
+// Recurring pattern below: a "*Offered" event that raises a blocking modal means the backend is now blocked
+// server-side awaiting the player's answer, so the timeline just idles once the modal-open step plays — no
+// polling, no timeout. Called out per-case only where a case deviates from this (e.g. an iterative modal that
+// stays open across multiple answers, like Shop).
 
 export type Payload = Record<string, unknown>;
 type Side = 'player' | 'enemy';
@@ -351,11 +344,9 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       const pName = payload.playerName as string;
       const eName = payload.enemyName as string;
       const enemySpeciesId = payload.enemySpeciesId as number;
-      // Queued, NOT immediate. In the endless chain the next encounter's BattleStarted arrives the instant
-      // the backend finishes the previous battle — if applied immediately it jumps ahead of the still-
-      // draining damage/faint/XP steps (the "KINGLER VS ARBOK" line landing mid-attack). Routing it through
-      // the queue syncs the new enemy only after the previous battle's animation has played. (At run start
-      // the queue is empty, so the first BattleStarted still applies at once.)
+      // Queued, not immediate — the classic "KINGLER VS ARBOK lands mid-attack" bug otherwise (ARCHITECTURE.md
+      // §2.8: events that would race the animation are queued). At run start the queue is empty, so this still
+      // applies at once.
       const started: Action = {
         type: 'BATTLE_STARTED',
         playerName: pName,
@@ -387,12 +378,7 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
     }
 
     case 'TurnStarted':
-      // Queued, NOT immediate. The next turn's TurnStarted arrives over the network
-      // the instant the backend resolves the turn — if applied immediately it slams
-      // the HP bars to their end-of-turn values before the damage has animated. Routing
-      // it through the timeline means HP/status/moves sync only after the queued damage
-      // steps have played, so the bar drains incrementally in step with the animation.
-      // (At battle start the queue is empty, so the first TurnStarted still applies at once.)
+      // Queued (ARCHITECTURE.md §2.8) — otherwise HP snaps to end-of-turn before the damage animates.
       return {
         steps: [d({
           type: 'TURN_STARTED',
@@ -444,9 +430,7 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
     }
 
     case 'RecoveryOffered': {
-      // Roguelite Poké Center step in the game loop: announce it and raise the heal modal. The backend is now
-      // blocked awaiting the player's Heal/Skip press (RespondRecovery), so the timeline idles here — exactly
-      // like MoveReplacementRequired — until the modal resolves.
+      // Roguelite Poké Center step in the game loop: announce it and raise the heal modal.
       const cName      = payload.creatureName as string;
       const speciesId  = payload.speciesId as number;
       const battlesWon = payload.battlesWon as number;
@@ -483,8 +467,6 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
     }
 
     // ── Biome / route map (between biomes) ─────────────────────────────────────
-    // The route choice raises a blocking map modal: the backend is now blocked awaiting the player's pick
-    // (ChooseBiome), so the timeline idles here — exactly like RecoveryOffered — until the modal resolves.
     // Queued (not immediate) so it follows any in-flight recovery animation cleanly.
     case 'BiomeChoiceOffered': {
       const options: BiomeOption[] = ((payload.options as Array<Record<string, unknown>>) ?? []).map(o => ({
@@ -550,10 +532,8 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       return { steps: [d({ type: 'MAP_PLAN_REVEALED', nodeKinds: (payload.nodeKinds as string[]) ?? [] })] };
 
     case 'RewardChoiceOffered': {
-      // A rolled reward is offered as a pick-one-of-N (two rarity-rolled items or a larger gold bag). Parse the
-      // options off the wire and raise the choice modal; the run blocks server-side until ChooseReward answers
-      // (the same blocking-modal shape as the biome route choice). The chosen option is applied + announced by
-      // a following RewardGranted (the drop hover), so this arm only shows the picker.
+      // A pick-one-of-N (two rarity-rolled items or a gold bag). This arm only shows the picker — the chosen
+      // option is applied + announced by a following RewardGranted (the drop hover).
       const rcSource = payload.source as string;
       const options: RewardOption[] = ((payload.options as Array<Record<string, unknown>>) ?? []).map(o => ({
         kind: o.kind as 'item' | 'gold' | 'heal',
@@ -591,10 +571,9 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
     }
 
     case 'ShopOffered': {
-      // A Shop node opened: parse the stock off the wire and raise the buy modal. The run blocks server-side
-      // until LeaveShop (the same blocking-modal shape as the reward/biome choice), but the shop is iterative —
-      // the modal stays open across purchases (each BuyShopItem echoes a ShopItemPurchased), so no HIDE step
-      // here; the player's Leave closes it (optimistically in useBattleHub).
+      // Deviates from the blocking-modal norm above: it's iterative — the modal stays open across purchases
+      // (each BuyShopItem echoes a ShopItemPurchased), so no HIDE step here; the player's Leave closes it
+      // (optimistically in useBattleHub).
       const shopItems: ShopOfferItem[] = ((payload.items as Array<Record<string, unknown>>) ?? []).map(o => ({
         itemId: (o.itemId as number) ?? 0,
         itemName: (o.itemName as string) ?? '',
@@ -619,9 +598,8 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
     }
 
     case 'AcquisitionOffered': {
-      // A themed draft (or boss catch) offers a creature to add to the party. Parse it off the wire and raise the
-      // blocking offer modal; the run waits server-side until RespondAcquisition answers (same blocking-modal
-      // shape as the reward/biome choice). Queued (not immediate) so it follows any in-flight win animation.
+      // A themed draft (or boss catch) offers a creature to add to the party. Queued (not immediate) so it
+      // follows any in-flight win animation.
       const party = parsePartyMembers(payload.party);
       const offer: AcquisitionOffer = {
         source: payload.source as string,
@@ -660,19 +638,14 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       return { steps: [d({ type: 'PARTY_SET', members: parsePartyMembers(payload.members) })] };
 
     case 'LeadChoiceOffered':
-      // A between-biome lead choice (Stage 1d): raise the blocking lead-select modal over the current roster. The
-      // run waits server-side until ChooseLead answers (same blocking-modal shape as the reward/biome/acquire).
+      // A between-biome lead choice (Stage 1d): raise the lead-select modal over the current roster.
       return { steps: [w(200), d({ type: 'SHOW_LEAD_CHOICE', party: parsePartyMembers(payload.party) })] };
 
     case 'LeadChanged': {
-      // The lead was reassigned (the modal already closed on the player's press; a PartyUpdated snapshot follows
-      // to re-flag the lead). Swap the player sprite to the new lead's species — like CreatureSwitchedIn, this is
-      // a permanent creature change (swapPlayerCreature updates the *true* species too), so the next battle keeps
-      // it rather than reverting to the old lead. Then narrate the swap.
-      // LEAD_CHANGED also retargets the player HUD onto the new lead. Necessary because a lead swap is the one way
-      // "who the player is" changes WITHOUT anyone taking the field, so no CreatureSwitchedIn announces it: without
-      // this the nameplate/HP bar keep describing the outgoing creature, name-keyed HP/status events for the new
-      // lead are dropped, and `Lv` never self-corrects (no later event carries a level). Visible after a mutual-KO
+      // A lead swap is the one way "who the player is" changes WITHOUT anyone taking the field — no
+      // CreatureSwitchedIn announces it — so LEAD_CHANGED must itself retarget the player HUD onto the new
+      // lead: without it the nameplate/HP bar keep describing the outgoing creature and `Lv` never self-
+      // corrects. Swaps the sprite too (a permanent change, like CreatureSwitchedIn). Visible after a mutual-KO
       // promotion, where the outgoing lead is a corpse at 0 HP.
       const name = payload.name as string;
       const speciesId = payload.speciesId as number;
@@ -686,9 +659,8 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
     }
 
     case 'SwitchInOffered': {
-      // The active creature fainted but the bench has a live member — raise the forced (non-dismissable) switch-in
-      // modal. The battle blocks server-side until RespondSwitchIn answers, so the timeline idles here (like the
-      // other blocking prompts) until the player picks. Queued so it follows the faint animation cleanly.
+      // The active creature fainted but the bench has a live member — a forced (non-dismissable) switch-in
+      // modal. Queued so it follows the faint animation cleanly.
       const party = parsePartyMembers(payload.party);
       const faintedName = payload.faintedName as string;
       return { steps: [w(200), d({ type: 'SHOW_SWITCH_IN', party, faintedName })] };
@@ -912,8 +884,7 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
     }
 
     case 'MoveReplacementRequired': {
-      // Four slots full — announce, then raise the replace-move modal. The backend is now blocked awaiting
-      // the player's ForgetMove answer, so the timeline naturally idles here until the modal resolves.
+      // Four slots full — announce, then raise the replace-move modal.
       const cName        = payload.creatureName as string;
       const newMoveName  = payload.newMoveName as string;
       const currentMoves = payload.currentMoves as string[];
@@ -940,9 +911,7 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
     }
 
     // ── Evolution (between encounters) ─────────────────────────────────────────
-    // The offer raises a blocking Allow/Cancel modal — the backend is now waiting on RespondEvolution, so
-    // the timeline idles here (like RecoveryOffered) until the player answers. Allow → CreatureEvolved
-    // (morph); Cancel → EvolutionCancelled (log).
+    // Allow → CreatureEvolved (morph); Cancel → EvolutionCancelled (log).
     case 'EvolutionOffered': {
       const fromName      = payload.fromName as string;
       const toName        = payload.toName as string;

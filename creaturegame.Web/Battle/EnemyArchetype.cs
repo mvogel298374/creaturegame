@@ -20,11 +20,9 @@ public sealed record EnemyTierSpec(
 );
 
 /// <summary>
-/// A strength tier that composes an enemy's levers from the run context. Implementations (Weak / Medium /
-/// Strong / Boss) each decide what tools they pull; the depth baseline lives in
-/// <see cref="EncounterFactory.ScaleTargetBst"/> / <see cref="EncounterFactory.ScaleWildLevel"/> and each tier
-/// shifts it. Pure (DB-free) so tiers are unit-testable; <see cref="EncounterFactory"/> builds the creature
-/// from the returned <see cref="EnemyTierSpec"/>. Tier <em>selection</em> per encounter is Phase 3.
+/// A strength tier that composes an enemy's levers from the run context (Weak/Medium/Strong/Boss). Pure
+/// (DB-free) so tiers are unit-testable; <see cref="EncounterFactory"/> builds the creature from the returned
+/// <see cref="EnemyTierSpec"/>. Full design (the four levers, tier selection) → <c>ENCOUNTER_DESIGN.md §3</c>.
 /// </summary>
 public interface IEnemyArchetype
 {
@@ -38,16 +36,11 @@ public static class EnemyArchetypes
     public static readonly IEnemyArchetype Medium = new MediumArchetype();
     public static readonly IEnemyArchetype Strong = new StrongArchetype();
     public static readonly IEnemyArchetype Boss = new BossArchetype();
-
-    /// <summary>The tier used when an encounter doesn't specify one (reproduces the pre-tier behaviour).</summary>
     public static readonly IEnemyArchetype Default = Medium;
 
-    /// <summary>
-    /// Maps the core's generation-agnostic <see cref="EncounterTier"/> intent (which node the run director is
-    /// running) to a concrete archetype — the web-layer half of the intent/mapping split
-    /// (<c>ENCOUNTER_DESIGN.md §3.1</c>). Normal ≈ a plain wild encounter (Medium); Elite/Boss climb. Weak is
-    /// not currently selected by a node kind.
-    /// </summary>
+    /// <summary>Maps the core's <see cref="EncounterTier"/> intent to a concrete archetype (the web-layer half
+    /// of the intent/mapping split, <c>ENCOUNTER_DESIGN.md §3.1</c>). Deterministic — see the RNG-aware
+    /// overload for the live-run mapping.</summary>
     public static IEnemyArchetype For(EncounterTier tier) =>
         tier switch
         {
@@ -56,19 +49,11 @@ public static class EnemyArchetypes
             _ => Medium,
         };
 
-    /// <summary>How often a plain (Normal-tier) wild encounter draws the <see cref="Weak"/> tier instead of
-    /// <see cref="Medium"/>. Roughly half — weak and normal wild fights are meant to occur about equally, and
-    /// the two are <em>undifferentiated to the player</em> (same node kind, tier, banner, and encounter-map
-    /// reveal — only the built enemy's levers differ). Run-layer difficulty tuning, provisional.</summary>
+    // How often a Normal wild encounter draws Weak instead of Medium — see ENCOUNTER_DESIGN.md §3.1.
     private const double WeakWildChance = 0.5;
 
-    /// <summary>
-    /// The RNG-aware mapping used in a live run: identical to <see cref="For(EncounterTier)"/> for Elite/Boss,
-    /// but a Normal wild encounter rolls <see cref="Weak"/> vs <see cref="Medium"/> (~<see cref="WeakWildChance"/>)
-    /// so wild fights vary in strength while presenting identically (<c>ENCOUNTER_DESIGN.md §3.1</c>). The roll
-    /// rides the run's single seeded RNG, so it stays reproducible per seed. The no-RNG overload keeps the
-    /// deterministic Normal→Medium mapping for callers/tests that assert the plain intent.
-    /// </summary>
+    /// <summary>The mapping used in a live run: identical to <see cref="For(EncounterTier)"/> for Elite/Boss,
+    /// but Normal rolls Weak vs Medium on the run's seeded RNG (<c>ENCOUNTER_DESIGN.md §3.1</c>).</summary>
     public static IEnemyArchetype For(EncounterTier tier, IRandomSource rng) =>
         tier switch
         {
@@ -78,9 +63,8 @@ public static class EnemyArchetypes
         };
 }
 
-// The depth baseline (EncounterFactory.ScaleTargetBst / ScaleWildLevel) is the Medium tier; the others shift
-// it. Offsets are run-layer tuning, not Gen 1 mechanics. Boss is a deliberate placeholder — a stronger Strong;
-// its distinctive ceiling design is revisited in a later phase (ENCOUNTER_DESIGN.md §3.7).
+// Offsets from the Medium/depth baseline are run-layer tuning, not Gen 1 mechanics. Boss is a deliberate
+// placeholder — its distinctive ceiling design is revisited later (ENCOUNTER_DESIGN.md §3.7).
 
 internal sealed class WeakArchetype : IEnemyArchetype
 {

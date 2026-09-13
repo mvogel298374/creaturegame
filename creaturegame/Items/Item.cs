@@ -6,7 +6,8 @@ namespace creaturegame.Items;
 /// <summary>
 /// A Gen 1 battle-usable item (Poké Balls, healing, status cures, revives, PP restore, X-items).
 /// Imported from PokeAPI by <c>ItemImport</c> into <c>items.db</c>; the runtime reads it via
-/// <c>ItemService</c>. This is data only — the bag / use-in-battle layer is not built yet.
+/// <c>ItemService</c>. This is the data row — the in-battle effect lives on the
+/// <see cref="creaturegame.Combat.IItemEffect"/> registry, keyed by <see cref="Category"/>.
 /// </summary>
 public class Item
 {
@@ -26,12 +27,8 @@ public class Item
     /// <summary>PokeAPI default sprite URL (sprite download into wwwroot is deferred to UI time).</summary>
     public string? SpriteUrl { get; set; }
 
-    // ── Gen 1 gameplay numbers (layer-2 override block in ItemImport) ─────────────────────────────
-    // PokeAPI's structured data doesn't model what an item *does* in Gen 1, so these well-defined
-    // Gen 1 facts are filled from an authority at map time (the moves-importer layer-2 pattern).
-    // Null/false means "not applicable to this item". Catch-rate multipliers for Poké Balls are
-    // deliberately NOT stored here — Gen 1 capture math is a battle-rule/formula concern that belongs
-    // with the (deferred) Catch mechanic, not the item data row.
+    // ── Gen 1 gameplay numbers (layer-2 override in ItemImport, DATA_IMPORT.md §4.5) ────────────────
+    // Null/false means "not applicable to this item".
 
     /// <summary>Fixed HP restored (Potion 20, Super Potion 50, Hyper Potion 200). Null if not a fixed HP heal.</summary>
     public int? HealAmount { get; set; }

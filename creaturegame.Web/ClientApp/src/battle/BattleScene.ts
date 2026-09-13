@@ -45,9 +45,7 @@ export class BattleScene extends Phaser.Scene {
     this.load.image('player', `/sprites/back/${this.playerSpeciesId}.png`);
     this.load.image('enemy', `/sprites/front/${this.enemySpeciesId}.png`);
 
-    // Attempt to load OGG cries, keyed by species id so each creature gets its own (the chain swaps enemies,
-    // and the player can evolve/Transform). If a file doesn't exist yet (importer not run) the load silently
-    // fails, exists() stays false, and playCry falls back to the Web Audio synth.
+    // A missing OGG fails silently; playCry falls back to the synth (SPRITE_PRESENTATION.md §1.6).
     this.queueCry(this.playerSpeciesId);
     this.queueCry(this.enemySpeciesId);
   }
@@ -78,8 +76,7 @@ export class BattleScene extends Phaser.Scene {
     const playerRestX = W * 0.28;
     const playerRestY = H * 0.65;
 
-    // Scale sprites to a fixed proportion of canvas height — caps large Pokémon
-    // Gen 1 sprites are 96×96 px source
+    // Scaled off 96×96 source sprites, capped so large species don't overrun the canvas (SPRITE_PRESENTATION.md §1.3).
     const enemyScale  = Math.min(2.5, (H * 0.22) / 96);
     const playerScale = Math.min(3.0, (H * 0.28) / 96);
 
@@ -98,8 +95,8 @@ export class BattleScene extends Phaser.Scene {
     bridge.on('swapPlayerCreature', this.onSwapPlayer);
     bridge.on('playEvolutionAnimation', this.onEvolve);
 
-    // Remove our bridge listeners when this scene is torn down so they can't
-    // fire on a destroyed scene (which throws and freezes the battle queue).
+    // A bridge listener firing on a destroyed scene throws and freezes the battle queue — teardown() removes
+    // them on both events so a leftover listener can't hit that.
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.teardown, this);
     this.events.once(Phaser.Scenes.Events.DESTROY, this.teardown, this);
 
@@ -110,13 +107,10 @@ export class BattleScene extends Phaser.Scene {
     const id = who === 'player' ? this.playerSpeciesId : this.enemySpeciesId;
     const key = this.cryKey(id);
     if (this.cache.audio.exists(key)) {
-      // Phaser's own SoundManager plays OGG cries — a separate pipeline from AudioEngine's Web Audio synth,
-      // so the master-volume slider (which only routes AudioEngine's own sounds) would otherwise never reach
-      // it. Scale explicitly by the same persisted setting so cries obey it too.
+      // Scaled explicitly by the master volume — a separate pipeline from AudioEngine (SPRITE_PRESENTATION.md §1.6).
       this.sound.play(key, { volume: 0.7 * Audio.getMasterVolume(), detune });
     } else {
-      // No OGG for this species (importer not run, or load failed) — synth fallback, keyed to the live id.
-      Audio.playCry(id);
+      Audio.playCry(id); // synth fallback
     }
   }
 
@@ -220,10 +214,7 @@ export class BattleScene extends Phaser.Scene {
     });
   }
 
-  // Hit reaction: a quick horizontal jolt on the sprite that just took damage. Fire-and-forget (not awaited
-  // by the timeline — it overlaps the hit sound + HP drain), and it only touches x, so it runs alongside the
-  // idle bob (which tweens y) without conflict. The jolt is directional — away from the attacker (player on
-  // the left flinches left, enemy on the right flinches right) — and snaps back to the rest x on completion.
+  // Fire-and-forget hit jolt, directional (away from the attacker); x-only so it doesn't fight the y idle bob.
   private shakeSprite(side: 'player' | 'enemy') {
     const sprite = side === 'player' ? this.playerSprite : this.enemySprite;
     const originX = sprite.x;
@@ -239,9 +230,7 @@ export class BattleScene extends Phaser.Scene {
     });
   }
 
-  // A new wild enemy for the next encounter: load its sprite (if not cached), reset the slot the previous
-  // enemy fainted out of (alpha/position), then slide the newcomer in and resume the idle bob. The player
-  // sprite and the canvas persist across the whole run — only the enemy is swapped.
+  // A new wild enemy for the next encounter — load on demand + slide in (SPRITE_PRESENTATION.md §1.3).
   private spawnEnemy(enemySpeciesId: number) {
     this.enemySpeciesId = enemySpeciesId;
     const spriteKey = `enemy-${enemySpeciesId}`;
@@ -287,9 +276,8 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
-  // Transform (Ditto/Mew): morph a side's sprite to the copied species in place — no slide-in. The player
-  // shows the back sprite, the enemy the front sprite (same viewing angle as its own species). The tracked
-  // speciesId is updated so the synth cry matches. Loads the sprite on demand, mirroring spawnEnemy.
+  // Transform (Ditto/Mew): morph in place, no slide-in — temporary, so only playerSpeciesId updates, not
+  // playerTrueSpeciesId (SPRITE_PRESENTATION.md §1.3 "True-species tracking").
   private transformSprite(side: 'player' | 'enemy', speciesId: number) {
     const dir = side === 'player' ? 'back' : 'front';
     const key = `${dir}-${speciesId}`;
@@ -323,11 +311,8 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
-  // Evolution (permanent): morph the player into the evolved species with the classic Gen 1 white-silhouette
-  // flicker — alternate the old/new shapes as solid white fills, then settle on the evolved sprite in full
-  // colour. Updates BOTH the current and the *true* species (evolution is permanent, unlike Transform), so a
-  // later battle's resetPlayerSprite reverts to the evolved form, not the pre-evolution one. Awaited by the
-  // timeline: emits animationComplete when the morph settles. Loads the back sprite on demand, like spawnEnemy.
+  // Evolution (permanent): classic Gen 1 white-silhouette flicker, then settles on the evolved sprite —
+  // updates both tracked species ids (SPRITE_PRESENTATION.md §1.3). Awaited by the timeline.
   private playEvolutionAnimation(toSpeciesId: number) {
     const newKey = `back-${toSpeciesId}`;
     const sprite = this.playerSprite;
@@ -369,11 +354,9 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
-  // Forced faint-switch (Stage 3): the active creature fainted (its faint animation already played, so the sprite
-  // is dropped + faded) and a bench member is sent in — slide the incoming species' back sprite in from the left,
-  // mirroring spawnEnemy for the player side. Updates BOTH the current and the *true* species (the switch is a
-  // real creature change, like an evolution — so a later win's resetPlayerSprite reverts to THIS creature, not the
-  // fainted one). Loads the back sprite on demand. Fire-and-forget: the timeline paces the beat with its own waits.
+  // Forced faint-switch / voluntary switch: slides the incoming species' back sprite in, mirroring spawnEnemy
+  // for the player side. A real creature change like evolution — updates both tracked species ids
+  // (SPRITE_PRESENTATION.md §1.3). Fire-and-forget: the timeline paces the beat with its own waits.
   private swapPlayerCreature(speciesId: number) {
     this.playerSpeciesId = speciesId;
     this.playerTrueSpeciesId = speciesId;
@@ -419,10 +402,7 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
-  // Revert the player sprite to its true species after a battle (Transform is undone at battle end). The base
-  // 'player' texture is the species loaded in preload; once the player has evolved, its true species differs
-  // from that, so revert to the evolved back sprite (loaded by the evolution morph) instead — otherwise a win
-  // after evolving would snap the sprite back to the pre-evolution form. A no-op when no Transform ran.
+  // Reverts to the true species at battle end — key choice explained in SPRITE_PRESENTATION.md §1.3.
   private resetPlayerSprite() {
     this.playerSpeciesId = this.playerTrueSpeciesId;
     const key =

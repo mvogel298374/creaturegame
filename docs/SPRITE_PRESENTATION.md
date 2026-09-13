@@ -110,6 +110,18 @@ reverts to *this* creature, not the one that fainted.
 **`resetPlayerSprite`**: at battle end, reverts to the true (pre-Transform) species — a plain texture swap,
 no tween.
 
+**True-species tracking — three ids, because Transform is temporary but evolution/switch are permanent.**
+`BattleScene` tracks `playerSpeciesId` (what's on screen *right now*, for cry/texture lookups),
+`playerTrueSpeciesId` (the creature's real identity), and `initialPlayerSpeciesId` (whatever loaded under the
+cached `'player'` texture key at mount). Transform's `transformSprite` updates only `playerSpeciesId` — it's a
+copy effect, undone at battle end — so `resetPlayerSprite` reverting to `playerTrueSpeciesId` erases it.
+Evolution and a forced faint-switch are real creature changes, so both `playEvolutionAnimation` and
+`swapPlayerCreature` update `playerSpeciesId` **and** `playerTrueSpeciesId` — a later win's `resetPlayerSprite`
+then reverts to *that* creature, not the one that fainted or the pre-evolution form. `resetPlayerSprite`'s key
+choice follows from this: if `playerTrueSpeciesId` still equals `initialPlayerSpeciesId` (no permanent change
+this battle) it reuses the cached `'player'` texture; otherwise it uses the per-species `back-{id}` key already
+loaded by whichever permanent-change animation ran.
+
 **Species → texture-key convention**: `player`/`enemy` for the initial pair, `{front|back}-{speciesId}` for
 everything loaded afterward. No central lookup table — each call site builds the key inline.
 **Fallback/placeholder handling: none.** There is no default/missing-sprite texture, and a failed image load
@@ -146,6 +158,11 @@ Cries follow the identical import-time/no-DB-field/ID-convention pattern as spri
 `BattleScene.ts` loads `cry-{speciesId}` and plays it on arrival; if the OGG is missing, `playCry()` falls
 back to `AudioEngine.playCry(id)`, a Web Audio square-oscillator synth. **This is the only fallback that
 exists anywhere in the sprite/audio system** — creature sprites themselves have no visual equivalent (§1.3).
+
+**Volume-routing gotcha:** Phaser's own `SoundManager` plays the OGG cries — a separate pipeline from
+`AudioEngine`'s Web Audio synth, so the master-volume slider (which only routes `AudioEngine`'s own sounds)
+would otherwise never reach them. `playCry()` scales the OGG play call explicitly by the same persisted
+setting so cries obey the slider too; a new OGG-playing call site that skips this would silently ignore it.
 
 **A second correction, same session as §0's:** the same conversation that assumed the sprites were
 placeholder art also described cry audio as "the same deferred bucket as sprites, but cheaper," implying a

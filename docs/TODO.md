@@ -1303,7 +1303,7 @@ Battles are fully playable now — docs won't describe a moving target.
 
 ---
 
-## Comment Condensation Pass — deep cut + extract to docs  ⟵ IN PROGRESS, started 2026-09-13
+## Comment Condensation Pass — deep cut + extract to docs  ✅ DONE, 2026-09-13 (all 6 batches)
 
 **Raised by the user (2026-09-13):** the codebase's comments were mostly deliberate design-rationale prose
 (a survey found genuine restate-the-obvious filler only in `PokeApiConnector` and a few frontend leaf files),
@@ -1336,17 +1336,79 @@ the next (not a single giant sweep).
   split, mutual-KO/`PlayerWon` semantics, and the `RunRules`-is-not-a-seam distinction. Two genuinely new,
   previously-undocumented sections added to `STATE_MODEL.md` §2: Haze's narrow field-by-field reset (vs. a full
   `BattleState` wipe) and why Mimic/Transform identity reverts before any reset, not just at battle end.
-- [ ] **Batch 3 — `creaturegame.Web/Battle/`** — `EncounterFactory.cs`, `EnemyArchetype.cs`,
-  `GameSessionManager.cs`, `RewardCalculator.cs`, `Hubs/BattleHub.cs`, `SignalRBattleEventEmitter.cs`.
-  Extraction targets: `ENCOUNTER_DESIGN.md`, `GAME_LOOP.md`, `ARCHITECTURE.md`.
-- [ ] **Batch 4 — frontend** `src/battle/`, `src/hooks/`, `src/components/` — `BattleScreen.tsx`,
-  `useBattleHub.ts`, `battleReducer.ts`, `timeline.ts`, `BattleScene.ts`, the modal components. Extraction
-  targets: `SPRITE_PRESENTATION.md`, `GENERATION_PROFILE.md`, `ARCHITECTURE.md`.
-- [ ] **Batch 5 — mop-up** — remaining `.cs` (`Evolution/`, `Items/` beyond `ItemEffects.cs`, `DB/` services,
-  `Controllers/`) and the remaining frontend leaf/config files the original survey flagged as dense-but-tiny
-  (`moveMenu.ts`, `playerIdentity.ts`, `presentation.ts`, etc.).
-- [ ] **Batch 6 — tests** — light touch expected; the original survey found tests already comment-light.
-  Likely a quick "no change needed" report rather than a real batch.
+- [x] **Batch 3 — `creaturegame.Web/Battle/`** (`EncounterFactory.cs`, `EnemyArchetype.cs`,
+  `GameSessionManager.cs`, `RewardCalculator.cs`, `Hubs/BattleHub.cs`, `SignalRBattleEventEmitter.cs`) ✅ DONE
+  (2026-09-13), independently audited. Mostly pointer-condensation onto `ENCOUNTER_DESIGN.md`,
+  `GENERATION_PROFILE.md`, and `GAME_LOOP.md`/`ARCHITECTURE.md` (both already covered the reconnect/session-
+  lifecycle and RNG-threading material in full, so `GameSessionManager`/`SignalRBattleEventEmitter`/`BattleHub`
+  condensed to pointers with almost no fresh extraction there). One genuinely new section added:
+  `ENCOUNTER_DESIGN.md` §5.1 "Reward roll mechanics" — the `RewardCalculator.cs` rarity-band/gold-formula/
+  category-bias/Quick-Heal design that had no doc home before. `BattleHub.cs` got a structural condensation, not
+  just pointer-cutting: one canonical class-level doc replaced ~12 near-identical "mirrors X — fire-and-forget…"
+  method docs. Caught and fixed one stale doc claim along the way (`EncounterFactory.CreateEnemyAsync`'s XML doc
+  said `depth` was the run's `battlesWon`; Phase 3c-2 replaced that proxy with biome-position `RunState.RunDepth`
+  months ago and the doc never caught up). The independent audit caught two real misses from the first pass,
+  both fixed: §5.1's gold-bag formula was transcribed missing a `/10` divisor (a 10× error — `base × level ×
+  skew × 0.2 × rarityFactor`, not `× 2`); and `BattleHub.cs`'s new class-doc promised "exact fallback noted per
+  method where it isn't the obvious first option" but `BuyShopItem`/`RespondAcquisition`/`ChooseLead`/
+  `ChooseSwitch` had lost exactly those non-first-option fallback notes — restored.
+- [x] **Batch 4 — frontend** (`BattleScreen.tsx`, `useBattleHub.ts`, `battleReducer.ts`, `timeline.ts`,
+  `BattleScene.ts`, the 9 modal components) ✅ DONE (2026-09-13), independently audited. **Not a uniform
+  deep-cut like Batches 1-3** — `battleReducer.ts` and all 9 modals were reviewed and left unchanged, judged
+  already appropriately minimal (short, non-duplicated, code-adjacent). Large stretches of `timeline.ts` and
+  `BattleScreen.tsx` were deliberately left mostly intact too: this is where the frontend's real sequencing/UI
+  trap-knowledge concentrates (blocking-modal semantics per event, queued-vs-immediate ordering, true-species
+  tracking) with no pre-existing doc home, unlike the backend batches where `ENCOUNTER_DESIGN.md`/
+  `GENERATION_PROFILE.md`/`GAME_LOOP.md` already covered most of it — cutting it for its own sake would have
+  been a real loss, not a cleanup. What *did* condense: `ARCHITECTURE.md` §2.8-duplicate rationale (the
+  queued-events pattern, stated once there already); the repeated "backend blocks server-side, timeline idles
+  here" note restated near-verbatim across ~8 `expandEvent` switch-cases, now stated once canonically with
+  per-case deviations (Shop's iterative non-hide) called out explicitly; and the same repeated-boilerplate
+  pattern in `useBattleHub.ts`'s ~10 modal-answer callbacks (`dispatch(HIDE_X)` + hub invoke), condensed the
+  same way `BattleHub.cs` was in Batch 3. New doc content: `SPRITE_PRESENTATION.md` §1.3 gained a "True-species
+  tracking" subsection (the three tracked ids — `playerSpeciesId`/`playerTrueSpeciesId`/`initialPlayerSpeciesId`
+  — and why Transform updates only the first while evolution/switch update both) and §1.6 gained a
+  "Volume-routing gotcha" note (Phaser's `SoundManager` bypasses the master-volume slider unless scaled
+  explicitly) — both previously undocumented. Caught one real bug along the way (not a doc-staleness fix this
+  time): `BattleScreen.tsx`'s `NodeLadder` had the same explanatory comment written twice back-to-back, a
+  leftover from a prior edit — deleted the duplicate. The independent audit caught two real misses, both fixed:
+  `BattleScene.ts`'s listener-teardown comment lost the specific consequence it was warning about (a bridge
+  listener firing on a destroyed scene throws and *freezes the battle queue* — distinct from, and cut alongside,
+  the HMR-leak rationale that correctly survived) — restored as its own line; and `timeline.ts`'s
+  `MoveReplacementRequired` case still carried the old verbatim "backend blocks / timeline idles here"
+  restatement the rest of the file's cases had already been trimmed of once the canonical note went in —
+  trimmed to match.
+- [x] **Batch 5 — mop-up** (`Evolution/`, `Items/`, `DB/` services, `Controllers/`, and the frontend leaves
+  `moveMenu.ts`/`playerIdentity.ts`/`presentation.ts`/`movePower.ts`/`regionMap.ts`/`bag.ts`/`bossTrainer.ts`/
+  `townMapLayout.ts`) ✅ DONE (2026-09-13). Lightest-touch batch yet — most of this code turned out to already
+  be either a seam's own canonical doc (`Evolution/`'s XML docs *are* the source `GENERATION_SEAMS.md`'s
+  one-line table row points at, not a duplicate of it — left untouched) or small pure-helper modules whose
+  density is earned (`townMapLayout.ts`'s tuning constants carry dated user-feedback rationale
+  `GENERATION_PROFILE.md` §7.4 explicitly leaves to this file, not to itself). Three genuine issues found and
+  fixed: (1) **two stale doc claims** — `Item.cs` and `ItemService.cs` both still said "the bag / use-in-battle
+  layer is not built yet," long since untrue (`Bag`, `ItemAction`, the `IItemEffect` registry all shipped);
+  updated to point at the real registry. (2) **restate-the-obvious filler** — every method on `AttackService.cs`
+  had a doc comment that added nothing beyond the method name (`UpsertAttackAsync`: "Adds a new attack to the
+  database or updates it if it already exists by ID."); deleted. (3) **dead code, flagged not removed** —
+  while touching `AttackService.cs`, found `GetRandomAttackAsync`/`GiveDefaultMoveAsync`/`GiveRandomMoveAsync`
+  have zero callers anywhere in the repo, including tests (pre-date `LearnsetMoveSelector`-based move
+  assignment) — left a one-line flag in the file rather than deleting, since this is a comment-only pass; a
+  follow-up tech-debt item to actually remove them belongs in a real cleanup pass, not buried in this one.
+  `presentation.ts` had two passages duplicating `GENERATION_PROFILE.md` §7.2/§5(a) near-verbatim (the
+  two-path generation-reveal explanation, the type-asset-inventory rationale) — condensed to pointers.
+  `GameController.Start`'s seed/profile comments condensed onto `ARCHITECTURE.md` §2.10. Full .NET suite +
+  Vitest + tsc green throughout.
+- [x] **Batch 6 — tests** ✅ DONE (2026-09-13). Confirmed light as predicted: sampled the highest comment-
+  density files in both suites (`WebEventContractTests.cs`, `GenerationProfileTests.cs`, and the outlier
+  `TestAltProfile.cs` at ~52% comment lines) plus comment-density ratios across the whole tree (~11% both
+  suites, unremarkable). Verdict: test comments are almost entirely per-test/per-probe rationale ("why this
+  specific assertion, why this specific fake value") that is inherently test-local, not duplicated design prose
+  — the same shape as a good test name, just longer. One real exception found and fixed: `TestAltProfile.cs`'s
+  class-level `<remarks>` (the "why a falsification harness has to exist" narrative) substantially restated
+  `GENERATION_PROFILE.md` §3, which documents the same methodology more completely (incl. the full
+  slice-by-slice table) — condensed to a pointer; the per-member remarks (why *this* fake value, specifically)
+  stayed, since those aren't in the doc. No other file warranted a change. **This closes the multi-batch
+  Comment Condensation Pass — see the section intro above for the full record across all 6 batches.**
 
 Each batch stops for review before the next; "continue" was given per-batch, not as blanket approval for the
 whole list.

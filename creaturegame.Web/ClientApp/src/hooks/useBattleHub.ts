@@ -126,22 +126,20 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
       console.error('[SignalR] ChooseMove failed:', err));
   }, []);
 
-  // Voluntarily switch the active creature out this turn for the benched member at `index` (the in-battle SWITCH
-  // turn-action). Like chooseMove, switching IS the turn action, so mark the turn chosen (→ battling/animating,
-  // locks the menu) and fire the hub call. The engine validates the pick (in range / alive / not the active
-  // member / not trapped) and falls back to FIGHT on an illegal one; the resulting CreatureSwitchedIn +
-  // PartyUpdated events swap the sprite, retarget the nameplate, and refresh the roster panel.
+  // Below: the whole-turn choices (switching/items are turn actions too, like chooseMove) and every modal
+  // answer follow one shape — dispatch the local HIDE/PLAYER_CHOSE action immediately (the backend is blocked
+  // awaiting it, or the turn is locked), then invoke the hub method; the resulting server events drive the log
+  // + sprite + panel refresh. Deviations (shop's iterative non-hide, purely-local dismissals) are called out
+  // per callback below.
+
   const chooseSwitch = useCallback((index: number) => {
     dispatch({ type: 'PLAYER_CHOSE' });
     connRef.current?.invoke('ChooseSwitch', index).catch(err =>
       console.error('[SignalR] ChooseSwitch failed:', err));
   }, []);
 
-  // Use a bag item this turn. Like chooseMove, using an item IS the turn action, so mark the turn chosen
-  // (→ battling/animating, locks the menu) and fire the hub call. targetMoveSlot is the move slot (0–3) a
-  // single-move PP restore refills; targetPartySlot is the party-member index a Revive targets (a fainted
-  // benched member); both null otherwise. The engine resolves a no-effect use (ItemUseFailed); the resulting
-  // ItemUsed / effect events drive the log + HP/status/PP updates, so nothing is logged here.
+  // targetMoveSlot: the move slot (0–3) a single-move PP restore refills. targetPartySlot: the party-member
+  // index a Revive targets (a fainted benched member). Both null otherwise.
   const useItem = useCallback(
     (itemId: number, targetMoveSlot: number | null, targetPartySlot: number | null = null) => {
       dispatch({ type: 'PLAYER_CHOSE' });
@@ -155,17 +153,12 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
   // action (open FIGHT / CHECK, pick a move, QUIT) to dismiss it.
   const dismissLevelUp = useCallback(() => dispatch({ type: 'HIDE_LEVEL_UP' }), []);
 
-  // Answer the level-up replace-move prompt: slot 0–3 to forget, or null to decline. Hide the modal at once
-  // (the backend is blocked on this answer); the resulting MoveForgotten/MoveLearned/MoveLearnDeclined events
-  // drive the log lines, so nothing is logged locally here.
   const forgetMove = useCallback((slot: number | null) => {
     dispatch({ type: 'HIDE_MOVE_REPLACEMENT' });
     connRef.current?.invoke('ForgetMove', slot).catch(err =>
       console.error('[SignalR] ForgetMove failed:', err));
   }, []);
 
-  // Answer the evolution prompt: true to allow, false to cancel (Gen 1 B-cancel). Hide the modal at once (the
-  // backend is blocked on this answer); the resulting evolution events drive the log + sprite/stat refresh.
   const respondEvolution = useCallback((allow: boolean) => {
     dispatch({ type: 'HIDE_EVOLUTION_PROMPT' });
     connRef.current?.invoke('RespondEvolution', allow).catch(err =>
@@ -178,68 +171,51 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
       console.error('[SignalR] RespondRecovery failed:', err));
   }, []);
 
-  // Answer the map-screen route choice: the chosen biome id. Hide the modal at once (the backend is blocked
-  // awaiting the pick); the resulting BiomeEntered event titles the next leg in the log.
   const chooseBiome = useCallback((biomeId: string) => {
     dispatch({ type: 'HIDE_BIOME_CHOICE' });
     connRef.current?.invoke('ChooseBiome', biomeId).catch(err =>
       console.error('[SignalR] ChooseBiome failed:', err));
   }, []);
 
-  // Answer the reward-choice modal: the chosen option index (an item or the gold bag). Hide the modal at once
-  // (the backend is blocked awaiting the pick); the resulting RewardGranted event bumps the gold HUD, logs the
-  // loot line, and raises the drop hover for the chosen reward.
   const chooseReward = useCallback((index: number) => {
     dispatch({ type: 'HIDE_REWARD_CHOICE' });
     connRef.current?.invoke('ChooseReward', index).catch(err =>
       console.error('[SignalR] ChooseReward failed:', err));
   }, []);
 
-  // Buy a shop stock item by index. Unlike the one-shot prompts, the shop is iterative — the modal stays open
-  // (do NOT hide it), and the resulting ShopItemPurchased event updates the balance + gold HUD and logs the buy.
-  // An unaffordable/stale index is a no-op server-side, so the run just re-prompts.
+  // Deviates from the shape above: the shop is iterative, so the modal stays open (do NOT hide it) across buys.
   const buyShopItem = useCallback((index: number) => {
     connRef.current?.invoke('BuyShopItem', index).catch(err =>
       console.error('[SignalR] BuyShopItem failed:', err));
   }, []);
 
-  // Leave the shop. Close the modal at once (optimistic — the backend advances to the next node, whose banner
-  // confirms the move); the run loop is blocked awaiting this Leave.
   const leaveShop = useCallback(() => {
     dispatch({ type: 'HIDE_SHOP' });
     connRef.current?.invoke('LeaveShop').catch(err =>
       console.error('[SignalR] LeaveShop failed:', err));
   }, []);
 
-  // Answer an acquisition offer: accept (optionally naming a member slot to swap out when the party is full) or
-  // decline. Hide the modal at once (the backend is blocked awaiting the answer); the resulting CreatureAcquired
-  // /AcquisitionDeclined + PartyUpdated events drive the log line and refresh the roster panel.
+  // replaceSlot: the member slot to swap out when accepting with a full party; null otherwise.
   const respondAcquisition = useCallback((accept: boolean, replaceSlot: number | null) => {
     dispatch({ type: 'HIDE_ACQUISITION' });
     connRef.current?.invoke('RespondAcquisition', accept, replaceSlot).catch(err =>
       console.error('[SignalR] RespondAcquisition failed:', err));
   }, []);
 
-  // Answer the between-biome lead choice: the chosen party-member index (the current lead index = keep, a no-op).
-  // Hide the modal at once (the backend is blocked awaiting the pick); the resulting LeadChanged + PartyUpdated
-  // events narrate the swap and re-flag the lead in the roster panel.
   const chooseLead = useCallback((index: number) => {
     dispatch({ type: 'HIDE_LEAD_CHOICE' });
     connRef.current?.invoke('ChooseLead', index).catch(err =>
       console.error('[SignalR] ChooseLead failed:', err));
   }, []);
 
-  // Answer the forced faint-switch: the chosen live party-member index to send in. Hide the modal at once (the
-  // battle is blocked awaiting it); the resulting CreatureSwitchedIn + PartyUpdated events swap the sprite,
-  // retarget the nameplate, and refresh the roster panel. A stale/fainted index is corrected server-side.
   const respondSwitchIn = useCallback((index: number) => {
     dispatch({ type: 'HIDE_SWITCH_IN' });
     connRef.current?.invoke('RespondSwitchIn', index).catch(err =>
       console.error('[SignalR] RespondSwitchIn failed:', err));
   }, []);
 
-  // Clear the transient loot hover. Purely local (nothing server-side blocks on it) — the view runs a timer
-  // and calls this to auto-dismiss the toast after its on-screen beat.
+  // Purely local (nothing server-side blocks on it) — the view runs a timer and calls this to auto-dismiss the
+  // toast after its on-screen beat.
   const dismissDrop = useCallback(() => dispatch({ type: 'HIDE_DROP' }), []);
 
   return { state, chooseMove, chooseSwitch, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, buyShopItem, leaveShop, respondAcquisition, chooseLead, respondSwitchIn, dismissDrop };

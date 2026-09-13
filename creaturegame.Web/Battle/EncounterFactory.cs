@@ -22,10 +22,7 @@ public sealed class EncounterFactory(
     IDbContextFactory<ItemsDbContext> itemsFactory
 )
 {
-    // How many biomes a single run's map draws from the region's playable set (ENCOUNTER_DESIGN.md §2.1):
-    // a seeded connected subset, so runs traverse different slices of Kanto. Tuning lever — smaller = a more
-    // distinct per-run "region", larger = richer route choice. The full set has 18; if it ever has fewer than
-    // this, the whole set is used.
+    // Biome-map draw size (tuning lever) — see ENCOUNTER_DESIGN.md §2.1.
     public const int RunBiomeMapSize = 10;
 
     /// <summary>
@@ -43,11 +40,8 @@ public sealed class EncounterFactory(
     {
         var source = rng ?? SystemRandomSource.Instance;
         await using var pokemonCtx = await pokemonFactory.CreateDbContextAsync();
-        // Every catalog read on this class's run path goes through profile.ContentScope (Stage 2b) — no direct
-        // .Species/.Moves/.Items query survives. That uniformity IS the deliverable: it is what stops a future
-        // generation having to find the unfiltered reads by archaeology. Gen 1's scope is an identity stub, so
-        // this is a no-op today (see IContentScope). A species outside the run's generation is simply unknown
-        // here, so an out-of-scope starter is rejected exactly like a nonexistent id.
+        // Scoped via profile.ContentScope — every catalog read in this class goes through it, see
+        // GENERATION_PROFILE.md §5(b). An out-of-scope starter is rejected like a nonexistent id.
         var species = await profile
             .ContentScope.Species(pokemonCtx.Species.AsNoTracking())
             .FirstOrDefaultAsync(s => s.Id == speciesId);
@@ -55,8 +49,7 @@ public sealed class EncounterFactory(
             return null;
 
         await using var movesCtx = await movesFactory.CreateDbContextAsync();
-        // The run's whole move pool, loaded once and threaded everywhere — so scoping it here scopes every
-        // moveset the run will ever build (starter, wild, draft, boss catch).
+        // Loaded once and threaded everywhere, so scoping it here scopes every moveset the run ever builds.
         var allMoves = await profile
             .ContentScope.Moves(movesCtx.Moves.AsNoTracking())
             .ToListAsync();
@@ -83,26 +76,16 @@ public sealed class EncounterFactory(
         // consulted by the battle loop on each level gained). Persists with the creature across the chain.
         player.Learnset = BuildLearnset(learnsets, allMoves);
 
-        // Seed the run's starting bag from the item catalog — a curated modest loadout (not the whole
-        // catalog), gated so a lucky early haul can't trivialise a run; the run economy (battle drops,
-        // Treasure/Mystery) grows it from here. Held by the session and threaded into every Battle; consumed
-        // items stay gone across the chain (the Poké Center refills HP/PP/status, not the bag).
+        // Seed the run's starting bag; the run economy (battle drops, Treasure/Mystery) grows it from here —
+        // consumed items stay gone across the chain (the Poké Center refills HP/PP/status, not the bag).
         await using var itemsCtx = await itemsFactory.CreateDbContextAsync();
-        // Scoped like the move pool, and for the same reason: this one load backs the starting bag, the shop
-        // and every reward roll for the rest of the run.
         var allItems = await profile
             .ContentScope.Items(itemsCtx.Items.AsNoTracking())
             .ToListAsync();
         var bag = BuildStartingBag(allItems);
 
-        // The run's biome map: a seeded, connected random subset of the region's playable biomes (the ones that
-        // can generate against the wild-available pool — empty biomes never appear, ENCOUNTER_DESIGN.md §2.2).
-        // Randomising *which* biomes appear makes each run traverse a different slice of the region (§2.1); the
-        // subset is connected so the route never strands, and the same Wild filter CreateEnemyAsync applies, so
-        // every offered biome is guaranteed an encounter (PickByBst can't starve on its themed pool). Same seed ⇒
-        // same map. Threaded into the RunDirector, which charts the route through it. The region comes off the
-        // profile (Stage 3) — this used to hardcode Region.Kanto, the biome-layer sibling of the deleted
-        // ActiveGeneration const.
+        // The run's biome map: a seeded connected subset of the region's playable biomes — ENCOUNTER_DESIGN.md
+        // §2.1/§2.2. Same seed ⇒ same map.
         var playable = await ComputePlayableBiomesAsync(pokemonCtx, profile);
         var runMap = Biomes.RandomConnectedMap(playable, RunBiomeMapSize, source);
 
@@ -139,13 +122,8 @@ public sealed class EncounterFactory(
             bag.Add(item.Id, quantity);
     }
 
-    /// <summary>
-    /// Builds the run's reward supplier: the injected <c>Func&lt;RewardContext, IRandomSource, RewardChoice&gt;</c>
-    /// <see cref="RunDirector"/> rolls after a battle win and on Treasure/Mystery nodes. Closes over the
-    /// catalog's usable-item subset once per run; <see cref="RewardCalculator.RollRewardChoice"/> dispatches by
-    /// node kind (drop rates / rarity curve / gold curve / item eligibility — run-layer tuning, not a battle
-    /// seam).
-    /// </summary>
+    /// <summary>The run's reward supplier for <see cref="RunDirector"/> (battle win / Treasure / Mystery). Reward
+    /// roll mechanics (drop rates, rarity, gold, category bias) → <c>ENCOUNTER_DESIGN.md §5.1</c>.</summary>
     internal static Func<RewardContext, IRandomSource, RewardChoice> BuildRewardSupplier(
         IReadOnlyList<Item> allItems
     )
@@ -154,12 +132,8 @@ public sealed class EncounterFactory(
         return (ctx, rng) => RewardCalculator.RollRewardChoice(ctx, usable, rng);
     }
 
-    /// <summary>
-    /// Builds the run's shop supplier: the injected <c>Func&lt;ShopStockContext, IRandomSource, ShopOffer&gt;</c>
-    /// <see cref="RunDirector"/> rolls when a Shop node opens. Closes over the same usable-item subset as the
-    /// reward supplier once per run; <see cref="ShopCalculator.BuildStock"/> rolls the per-visit stock and its
-    /// run-scaled prices (spend-side run-layer tuning, not a battle seam — the mirror of the reward supplier).
-    /// </summary>
+    /// <summary>The run's shop supplier for <see cref="RunDirector"/> (Shop node stock/prices) — mirrors
+    /// <see cref="BuildRewardSupplier"/>. See <c>GAME_LOOP.md §5</c> Shop row.</summary>
     internal static Func<ShopStockContext, IRandomSource, ShopOffer> BuildShopSupplier(
         IReadOnlyList<Item> allItems
     )
@@ -168,15 +142,8 @@ public sealed class EncounterFactory(
         return (ctx, rng) => ShopCalculator.BuildStock(ctx.Depth, usable, rng);
     }
 
-    /// <summary>
-    /// Builds the run's themed-draft supplier: the injected
-    /// <c>Func&lt;DraftContext, IRandomSource, Task&lt;Creature?&gt;&gt;</c> <see cref="RunDirector"/> rolls after
-    /// every win. The policy gate (cadence × n% × non-empty fought pool) is <see cref="DraftCalculator"/>; when it
-    /// fires, a creature is built here from the <em>fought-only</em> pool (the guardrail — never an un-fought
-    /// species), scaled to the lead's BST/level and run depth like a wild encounter, with its best natural
-    /// moveset + a learnset (so it can level up if it later becomes the lead). Returns null on any gate miss (the
-    /// common case) — the acquisition-side mirror of <see cref="BuildRewardSupplier"/>.
-    /// </summary>
+    /// <summary>The run's themed-draft supplier for <see cref="RunDirector"/> — the acquisition-side mirror of
+    /// <see cref="BuildRewardSupplier"/>. Gate + fought-only guardrail → <c>ENCOUNTER_DESIGN.md §4</c>.</summary>
     public Func<DraftContext, IRandomSource, Task<Creature?>> BuildDraftSupplier(
         IReadOnlyList<Attack> allMoves,
         GenerationProfile profile
@@ -189,15 +156,14 @@ public sealed class EncounterFactory(
         GenerationProfile profile
     )
     {
-        // Policy gate first (no RNG unless a cadence win with a non-empty pool) — a non-offer win leaves the
-        // seeded run stream untouched.
+        // Gate first — no RNG unless it fires, so a non-offer win leaves the seeded run stream untouched.
         if (!DraftCalculator.ShouldOffer(ctx.BattlesWon, ctx.FoughtSpecies, rng))
             return null;
 
         await using var pokemonCtx = await pokemonFactory.CreateDbContextAsync();
 
-        // The fought-only pool: exactly the species faced in this biome (ENCOUNTER_DESIGN.md §4). The enemy
-        // supplier never spawns the player's own species, so it can't leak in here.
+        // The fought-only pool (ENCOUNTER_DESIGN.md §4); the enemy supplier never spawns the player's own
+        // species, so it can't leak in here.
         var foughtIds = ctx.FoughtSpecies.ToHashSet();
         var pool = await profile
             .ContentScope.Species(pokemonCtx.Species.AsNoTracking())
@@ -213,8 +179,8 @@ public sealed class EncounterFactory(
             + ctx.Lead.BaseSpecial
             + ctx.Lead.BaseSpeed;
 
-        // Bias toward a fought species near the lead's depth-scaled BST band (same target as a wild encounter);
-        // the pool is already biome-themed, so no further biome filter. Level rides the same depth band.
+        // Biased to the lead's depth-scaled BST band, like a wild encounter; the pool is already biome-themed
+        // so no further biome filter.
         var species = PickByBst(pool, ScaleTargetBst(leadBst, ctx.Depth), rng, biome: null);
         if (species is null)
             return null;
@@ -236,20 +202,13 @@ public sealed class EncounterFactory(
             rng,
             profile
         );
-        // A drafted member may later become the lead (Stage 1d) and level up, so give it a learnset like the
-        // starter — resolved up-front, consulted on each level gained.
+        // May later become the lead (Stage 1d) and level up, so give it a learnset like the starter.
         creature.Learnset = BuildLearnset(learnsets, allMoves);
         return creature;
     }
 
-    /// <summary>
-    /// Builds the run's boss-catch supplier: the injected
-    /// <c>Func&lt;BossCatchContext, IRandomSource, Task&lt;Creature?&gt;&gt;</c> <see cref="RunDirector"/> rolls
-    /// after a Boss win. The policy gate (a small n% catch chance) is <see cref="BossCatchCalculator"/>; when it
-    /// fires, a fresh party-ready copy of the defeated boss's species is built here at the boss's level, with its
-    /// best natural moveset + a learnset (so it can level up if it later becomes the lead). Returns null on the
-    /// (common) no-catch roll — the boss channel's mirror of <see cref="BuildDraftSupplier"/>.
-    /// </summary>
+    /// <summary>The run's boss-catch supplier for <see cref="RunDirector"/> — the boss channel's mirror of
+    /// <see cref="BuildDraftSupplier"/>. Gate + caught-boss strength → <c>ENCOUNTER_DESIGN.md §4</c>.</summary>
     public Func<BossCatchContext, IRandomSource, Task<Creature?>> BuildBossCatchSupplier(
         IReadOnlyList<Attack> allMoves,
         GenerationProfile profile
@@ -262,14 +221,13 @@ public sealed class EncounterFactory(
         GenerationProfile profile
     )
     {
-        // Policy gate first (a single n% roll) — a Boss win that doesn't catch leaves the seeded run stream after
-        // just this roll, and a non-catch never touches the DB.
+        // Gate first — a non-catch never touches the DB.
         if (!BossCatchCalculator.ShouldOffer(rng))
             return null;
 
         await using var pokemonCtx = await pokemonFactory.CreateDbContextAsync();
-        // The only candidate is the boss you just beat — look its species up by id and build a fresh full-HP copy
-        // (the "catch" model: a party-ready specimen of that species, not the fainted battle instance).
+        // The only candidate is the boss just beaten — a fresh full-HP copy of its species, not the fainted
+        // battle instance.
         var species = await profile
             .ContentScope.Species(pokemonCtx.Species.AsNoTracking())
             .FirstOrDefaultAsync(s => s.Id == ctx.Boss.SpeciesId);
@@ -283,10 +241,8 @@ public sealed class EncounterFactory(
             LearnMethod.LevelUp
         );
 
-        // Built at the boss's own level with its canonical latest moveset — the caught creature matches the boss
-        // you fought in species and level (the biome's themed apex), unlike the draft which picks by BST band.
-        // Rolled at Superb DV quality (each value a 50% shot at the 12–15 top band): a strong, earned pickup that
-        // reflects beating the boss, without handing the player the boss's own Perfect-DV / all-pool-move build.
+        // Matches the boss's own species/level at Superb DV quality — a strong pickup, but deliberately not the
+        // boss's own Perfect-DV/Optimal-move build (ENCOUNTER_DESIGN.md §4).
         var creature = BuildCreature(
             species,
             learnsets,
@@ -297,23 +253,16 @@ public sealed class EncounterFactory(
             profile,
             DvQuality.Superb
         );
-        // A caught boss may later become the lead (Stage 1d) and level up, so give it a learnset like the starter.
+        // May later become the lead (Stage 1d) and level up, so give it a learnset like the starter.
         creature.Learnset = BuildLearnset(learnsets, allMoves);
         return creature;
     }
 
     /// <summary>
-    /// The biomes of the profile's region that can actually generate against the wild-available species
-    /// (legendaries/statics/gifts excluded — the same filter as <see cref="CreateEnemyAsync"/>). Empty biomes
-    /// never appear; if no availability data exists (a minimally seeded DB) the full dex is the pool, mirroring
-    /// the encounter fallback so the map never starves.
-    /// <para><b>Generation-scoped since Stage 2b</b> (it was not before, and said so here). The species pool is
-    /// drawn through <see cref="IContentScope"/>, so a generation's map is built from the biomes <i>its own</i>
-    /// content can fill — a biome whose theme no in-generation species matches is not playable, exactly as an
-    /// empty biome already was not. <see cref="PokemonGameAvailability"/> needs no scope of its own: it is keyed
-    /// by species id and only ever intersected with the scoped pool below.</para>
-    /// <para><b>Region-scoped since Stage 3:</b> the biome set itself is <c>profile.BiomeRoster</c> — this method
-    /// held the repo's last hardcoded <c>Region.Kanto</c> outside the authored registry.</para>
+    /// The profile's biomes that can actually generate against the wild-available, generation-scoped species
+    /// pool (same filter as <see cref="CreateEnemyAsync"/>); empty biomes never appear. Falls back to the full
+    /// dex when no availability data exists, so the map never starves. Region/generation-scoping history →
+    /// <c>GENERATION_PROFILE.md</c> §5(b)/§6.
     /// </summary>
     private static async Task<IReadOnlyList<BiomeDefinition>> ComputePlayableBiomesAsync(
         PokemonDbContext pokemonCtx,
@@ -360,17 +309,10 @@ public sealed class EncounterFactory(
     }
 
     /// <summary>
-    /// Builds a fresh wild enemy scaled to the player and the run's <paramref name="depth"/>, excluding the
-    /// player's own species, reusing the run's already-loaded move pool. The enemy gets a semi-random "smart"
-    /// moveset so encounters vary. Both the target BST (<see cref="ScaleTargetBst"/>) and the level band
-    /// (<see cref="ScaleWildLevel"/>) climb with depth: at depth 0 the foe sits a step under the player (the
-    /// original behaviour); deeper foes target stronger species and higher levels.
-    /// <para>The pool is restricted to <em>wild-available</em> species (excludes legendaries/statics/gifts).
-    /// When <paramref name="biome"/> is supplied the pool is further filtered to that biome's type theme
-    /// (<see cref="EncounterSelector.PickByBst"/>); it is null until Phase 3's biome graph selects one per
-    /// encounter (see <c>ENCOUNTER_DESIGN.md §2</c>). <paramref name="depth"/> is the run's <c>battlesWon</c>,
-    /// threaded by <see cref="creaturegame.Combat.RunDirector"/>; Phase 2d's enemy tier modulates the band
-    /// further.</para>
+    /// Builds a fresh wild enemy scaled to the player and the run's <paramref name="depth"/> (nodes traversed —
+    /// <c>RunState.RunDepth</c>, threaded by <see cref="creaturegame.Combat.RunDirector"/>), excluding the
+    /// player's own species. Filtered to wild-available species, further to <paramref name="biome"/>'s type
+    /// theme when supplied. Depth/tier bands and levers → <c>ENCOUNTER_DESIGN.md §3</c>.
     /// </summary>
     /// <param name="profile">The run's generation profile. <b>Required, deliberately un-defaulted</b> — see the
     /// note on <see cref="BuildCreature"/>.</param>
@@ -448,20 +390,13 @@ public sealed class EncounterFactory(
     }
 
     /// <summary>
-    /// The evolution data/DB seam for the run loop (<see cref="RunDirector"/>). Loads the player species'
-    /// evolution edges, runs the Gen 1 <see cref="IEvolutionRules"/> decision against the player's current
-    /// level, and — if one fires — resolves the evolved species plus its learnset into an
-    /// <see cref="EvolutionOutcome"/>. Returns null when nothing evolves, so the runner leaves the player as
-    /// is. The rules come from the run's <see cref="GenerationProfile"/> (resolved at the composition point in
-    /// <see cref="GameSessionManager"/>), keeping both this method and the runner generation-agnostic.
+    /// The evolution data/DB seam for the run loop (<see cref="RunDirector"/>): loads the player species'
+    /// evolution edges, runs <see cref="IEvolutionRules"/> against the player's current level, and resolves a
+    /// fired evolution's species + learnset into an <see cref="EvolutionOutcome"/> (null if nothing evolves).
     /// </summary>
-    /// <param name="profile">The run's generation profile, supplying <em>both</em> halves of the evolution
-    /// question: the <see cref="IEvolutionRules"/> seam that decides, and the generation whose evolution edges
-    /// are read. Taking the whole profile rather than the seam alone is deliberate — the generation used to
-    /// query and the rules used to judge can then never disagree.
-    /// <b>Required, deliberately un-defaulted</b> — a <c>?? Gen1EvolutionRules.Instance</c> fallback here would
-    /// let a future generation silently evolve by Gen 1 rules with nothing failing
-    /// (<c>docs/GENERATION_PROFILE.md</c> §4.2).</param>
+    /// <param name="profile">Supplies both halves of the question — the rules seam and the generation whose
+    /// edges are read — so they can never disagree. <b>Required, deliberately un-defaulted</b>, same reason as
+    /// <see cref="BuildCreature"/>'s note (<c>docs/GENERATION_PROFILE.md</c> §4.2).</param>
     public async Task<EvolutionOutcome?> ResolvePlayerEvolutionAsync(
         Creature player,
         IReadOnlyList<Attack> allMoves,
@@ -485,10 +420,8 @@ public sealed class EncounterFactory(
         if (result is null)
             return null;
 
-        // Scoped like every other species read here, though the edges above are already generation-filtered, so
-        // an out-of-scope target should be unreachable. Kept uniform on purpose: "no unscoped catalog read in
-        // this file" is a rule a reviewer can check at a glance, where "scoped except where redundant" is a
-        // judgement call that has to be re-made every time — and the redundancy costs nothing.
+        // Scoped like every other species read here (GENERATION_PROFILE.md §5(b)) though redundant — the edges
+        // above are already generation-filtered; uniformity costs nothing and beats a per-site judgement call.
         var newForm = await profile
             .ContentScope.Species(pokemonCtx.Species.AsNoTracking())
             .FirstOrDefaultAsync(s => s.Id == result.ToSpeciesId);
@@ -505,29 +438,17 @@ public sealed class EncounterFactory(
         return new EvolutionOutcome(newForm, BuildLearnset(learnsets, allMoves));
     }
 
-    // Depth-scaling tuning (run-layer roguelite knobs, not Gen 1 mechanics — see ScaleWildLevel's note).
-    private const int BstGainPerDepth = 10; // each step deeper raises the target BST by this (the TODO curve)
-    private const double LevelLiftPerDepth = 0.02; // each step lifts the level band's fractions by this
-    private const double MaxLevelLift = 0.40; // …capped here, so the band tops out around [90%, 120%] of player
+    // Depth-scaling tuning (run-layer roguelite knobs, not Gen 1 mechanics — formula + worked example →
+    // ENCOUNTER_DESIGN.md §3.2/§3.3).
+    private const int BstGainPerDepth = 10;
+    private const double LevelLiftPerDepth = 0.02;
+    private const double MaxLevelLift = 0.40;
 
-    /// <summary>
-    /// The depth-scaled BST the encounter aims for: the player's BST plus <c>depth × <see cref="BstGainPerDepth"/></c>.
-    /// At depth 0 it is exactly the player's BST (the old behaviour); deeper encounters target progressively
-    /// stronger species. <see cref="PickByBst"/> bands around this and the pool naturally caps it (no species
-    /// exceeds the highest BST available). A run-layer tuning choice, not a battle seam. <c>internal</c> for tests.
-    /// </summary>
+    /// <summary>The depth-scaled BST target for <see cref="PickByBst"/>. <c>internal</c> for tests.</summary>
     internal static int ScaleTargetBst(int playerBst, int depth) =>
         playerBst + Math.Max(0, depth) * BstGainPerDepth;
 
-    /// <summary>
-    /// Picks a wild encounter's level as a roguelite difficulty band that climbs with <paramref name="depth"/>:
-    /// uniformly within a [min%, max%] window of the player's current level (floored, never below 2). At depth 0
-    /// the window is [50%, 80%] (the original behaviour — foes a step under the player); each step deeper lifts
-    /// both ends by <see cref="LevelLiftPerDepth"/>, capped at <see cref="MaxLevelLift"/> (≈ [90%, 120%]), so
-    /// deep foes reach and then exceed the player's level. A run-layer tuning choice, not a Gen 1 mechanic
-    /// (Gen 1 wild levels come from per-area encounter tables), so it lives here, not behind a battle seam.
-    /// <c>internal</c> for direct unit testing.
-    /// </summary>
+    /// <summary>The depth-scaled wild-encounter level band. <c>internal</c> for direct unit testing.</summary>
     internal static int ScaleWildLevel(int playerLevel, int depth, IRandomSource rng)
     {
         double lift = Math.Min(Math.Max(0, depth) * LevelLiftPerDepth, MaxLevelLift);
@@ -536,12 +457,10 @@ public sealed class EncounterFactory(
         return rng.Next(min, max + 1); // Next's upper bound is exclusive → +1 makes max inclusive
     }
 
-    /// <param name="profile">The run's generation profile — the source of the <see cref="IStatCalculator"/> seam.
-    /// <b>Required, and deliberately not defaulted anywhere on this path.</b> A <c>?? Gen1…</c> fallback would
-    /// reintroduce exactly the hazard this feature exists to remove: a composition path that forgot to thread the
-    /// profile would still compile, still pass every test, and silently run Gen 1 stat math
-    /// (<c>docs/GENERATION_PROFILE.md</c> §4.2). Only a second profile can prove the thread is real — hence
-    /// <c>TestAltProfile</c>.</param>
+    /// <param name="profile">The run's generation profile — source of the <see cref="IStatCalculator"/> seam.
+    /// <b>Required, deliberately un-defaulted</b>, everywhere on this path: a <c>?? Gen1…</c> fallback would let
+    /// a forgotten thread compile, pass every test, and silently run Gen 1 stat math
+    /// (<c>docs/GENERATION_PROFILE.md</c> §4.2).</param>
     private static Creature BuildCreature(
         PokemonSpecies species,
         IReadOnlyList<PokemonLearnset> learnsets,
@@ -554,11 +473,9 @@ public sealed class EncounterFactory(
         int maxMoves = LearnsetMoveSelector.MaxMoves
     )
     {
-        // Construction rolls DVs (the Creature ctor used the global-RNG default calculator); re-seat the
-        // stat calculator on the run's seeded source and re-roll at the requested quality so a run with a fixed
-        // seed reproduces the same DVs. DV randomisation is a per-generation rule, so it stays behind
-        // IStatCalculator — and the implementation comes from the run's profile, not a hardcoded Gen 1 one. The
-        // profile exposes a FACTORY rather than a singleton precisely so this call can seed it per run.
+        // Re-seat the stat calculator on the run's seeded source and re-roll DVs at the requested quality, so a
+        // fixed seed reproduces them (GENERATION_PROFILE.md — the profile exposes a factory, not a singleton,
+        // precisely so it can be seeded per run).
         var creature = new Creature(species.Name.ToUpper()) { Level = level };
         creature.StatCalculator = profile.BuildStatCalculator(rng);
         creature.StatCalculator.RandomiseDvs(creature, dvQuality);

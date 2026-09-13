@@ -11,28 +11,14 @@ namespace creaturegame.Tests.Unit;
 
 /// <summary>
 /// A deliberately fake second <see cref="GenerationProfile"/> — the falsification harness from
-/// <c>docs/GENERATION_PROFILE.md</c> §3.
+/// <c>docs/GENERATION_PROFILE.md</c> §3 (the unfalsifiability problem it exists to solve, and the full
+/// slice-by-slice table of what each falsification leg below proves, are documented there — not repeated here).
 /// </summary>
 /// <remarks>
-/// <para><b>⚠️ THIS IS NOT GEN 2, AND IT MAKES NO FIDELITY CLAIM.</b> Its values are chosen to be <i>different
+/// <b>⚠️ THIS IS NOT GEN 2, AND IT MAKES NO FIDELITY CLAIM.</b> Its values are chosen to be <i>different
 /// from Gen 1</i>, not to be correct for any real generation. Do not cite it as a reference for anything, do not
 /// grow it into a real profile, and never register it in <see cref="GenerationProfiles"/>. When a real second
-/// generation is built, the correct move is to <b>delete this file</b>, not to promote it.</para>
-///
-/// <para><b>Why it has to exist.</b> Every seam consumer in the engine defaults with <c>?? Gen1*.Instance</c>
-/// (nine such fallbacks, plus <see cref="Creature.StatCalculator"/>'s property default). With only one profile
-/// in the codebase, a composition path that <i>forgets</i> to thread the profile is indistinguishable from one
-/// that threads it correctly — both produce Gen 1, and every test stays green. A second profile is the only
-/// context in which "we got Gen 1" is a <i>wrong</i> answer, and therefore the only thing that can detect a
-/// silent fallback.</para>
-///
-/// <para>That is <c>GENERATION_SEAMS.md §5.0.1</c>'s lesson at architecture scale: the two leaks recorded there
-/// passed review <i>and</i> tests, because no test exercised the generation-variable bit.</para>
-///
-/// <para><b>Growing it:</b> each stage of the feature adds its slice here — Stage 2a's 17-type roster
-/// (<see cref="AltTypes"/>), Stage 2b's restrictive content scope (<see cref="AltContentScope"/>) and Stage 3's
-/// two-biome fake region (<see cref="AltBiomes"/>) are in; still to come is Stage 4's distinct theme id. Keep
-/// every value obviously synthetic.</para>
+/// generation is built, the correct move is to <b>delete this file</b>, not to promote it.
 /// </remarks>
 internal static class TestAltProfile
 {

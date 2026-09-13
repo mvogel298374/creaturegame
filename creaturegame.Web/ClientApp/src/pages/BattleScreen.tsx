@@ -65,9 +65,8 @@ export function BattleScreen() {
   const playerSpecies: Species | null = location.state?.species ?? null;
   const gameId: string | null = location.state?.gameId ?? null;
   const startLevel: number = location.state?.level ?? 50;
-  // The generation the run was started with, from route state — the immediate half of the generation
-  // channel (GENERATION_PROFILE.md §7.2). The server echo (state.generation) is the authority and takes
-  // over below; route state only covers the gap until it arrives (and is absent after a reconnect).
+  // Immediate half of the generation channel (GENERATION_PROFILE.md §7.2) — the server echo below is the
+  // authority and takes over once it arrives.
   const routeGeneration: string | null = location.state?.generation ?? null;
 
   const { state, chooseMove, chooseSwitch, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, buyShopItem, leaveShop, respondAcquisition, chooseLead, respondSwitchIn, dismissDrop } = useBattleHub(gameId, startLevel);
@@ -384,14 +383,10 @@ const LADDER_NODE_META: Record<string, { label: string; sub: string }> = {
   Rest:        { label: 'Poké Center',  sub: 'Rest & heal' },
 };
 
-// The encounter-map ladder (Phase 2): the current biome's route drawn as a vertical Slay-the-Spire-style path —
-// one node per revealed RunNodeKind (the Boss its apex), capped by a synthesized Poké Center 'Rest' (which isn't
-// a plan node — see ENCOUNTER_DESIGN.md §5). The pin marks the node in progress; earlier nodes read as done,
-// later as upcoming. CSS column-reverse puts node 0 at the bottom so the player climbs upward to the apex.
-// The current biome's route drawn as a vertical Slay-the-Spire-style ladder — one node per revealed RunNodeKind
-// (the Boss its apex), capped by a synthesized Poké Center 'Rest' (not a plan node — see ENCOUNTER_DESIGN.md §5).
-// The pin marks the node in progress; earlier nodes read done, later upcoming. CSS column-reverse puts node 0 at
-// the bottom so the player climbs upward to the apex. Presentation only — the route is fixed and logic-driven.
+// The encounter-map ladder: the current biome's route as a vertical Slay-the-Spire-style path — one node per
+// revealed RunNodeKind (the Boss its apex), capped by a synthesized Poké Center 'Rest' (not a plan node — see
+// ENCOUNTER_DESIGN.md §5). The pin marks the node in progress; earlier nodes read done, later upcoming. CSS
+// column-reverse puts node 0 at the bottom so the player climbs upward to the apex. Presentation only.
 function NodeLadder({ nodePlan, pin, bossSub }: { nodePlan: string[]; pin: number; bossSub?: string }) {
   const nodes = [...nodePlan, 'Rest'];
   return (
