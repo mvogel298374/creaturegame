@@ -216,14 +216,61 @@ genuinely tougher than "Medium @ depth 1." **Phase 3c-2 ✅** replaced the origi
 scales by how deep into the run/biome it sits; the Boss apex (last node) scales hardest. In the legacy chain
 (battles only) `RunDepth == battlesWon`, so that path is unchanged.
 
-### 3.3 The four levers
+### 3.3 The level-band formula (exact) — and why it reads the *live* level, not the run's starting level
+
+*(Added 2026-09-13, from a joint investigation of a live report — see `TODO.md` → *Known Gaps* → "Wild
+encounter level far below the player's" for the raw incident and the questions that prompted this writeup.)*
+
+`EncounterFactory.ScaleWildLevel(playerLevel, depth, rng)` is the whole formula; each tier (§3.4) just shifts
+its output by a flat offset afterward. Read literally:
+
+```
+lift = min(depth × 0.02, 0.40)                       // depth-lift, caps at +40 pts after 20 nodes
+min  = floor(playerLevel × (0.5 + lift))             // floor of the roll window
+max  = floor(playerLevel × (0.8 + lift))             // ceiling of the roll window (inclusive)
+level = uniform_int(min, max)                        // the run's seeded RNG, reproducible per seed
+level = max(2, level + tierOffset)                   // tier offset: Weak −3, Medium +0, Strong +3, Boss +6
+```
+
+At `depth = 0` (the start of a biome, or the legacy endless chain's first fight) `lift = 0`, so the **raw band
+before any tier offset is [50%, 80%] of the player's level** — foes a full step under the player is the
+*designed* depth-0 baseline, not a bug (`ScaleWildLevel`'s own doc comment: "at depth 0 … the original
+behaviour — foes a step under the player"). The **Weak** tier then subtracts 3 more.
+
+**Worked example — the reported case.** A level-23 lead, shallow depth (`lift ≈ 0`):
+
+| Step | Value |
+|:--|:--|
+| Raw band (before tier offset) | `[floor(23×0.5), floor(23×0.8)]` = **[11, 18]** |
+| Weak tier (`-3`, floored at 2) | roll 14 → **11**; roll 18 → **15**; i.e. Weak's *effective* band is **[8, 15]** |
+| Medium tier (`+0`) | **[11, 18]** unchanged |
+
+A level-11 Weak-tier wild Fearow at a level-23 lead is exactly this formula landing at its own floor (roll = 14
+of the raw [11,18] band, then −3). **Nothing here is a bug or a stale/mismatched depth read** — it is the
+formula executing exactly as written, at the low end of a deliberately wide low-depth band.
+
+**The important, previously-unverified fact: `playerLevel` is the lead's *live, current* level at the moment of
+each new encounter — never a value frozen at run start.** `BattleRunEvent.RunAsync` reads `s.Player` (the
+current lead, `RunState.Player`) fresh at the top of *every* battle node and passes its `.Level` straight into
+the enemy supplier → `CreateEnemyAsync` → `ScaleWildLevel`. `Creature.Level` is a plain mutable property that
+`LevelUp()` increments **on the same instance** the run has carried since it was created (or since the last
+lead swap) — the lead object is never replaced or re-fetched from a snapshot. So as the lead gains levels from
+battle XP, the *absolute* width of the depth-0 band grows with it: a level-10 lead's Weak floor is 5×0.5-3⇒2,
+but a level-23 lead's Weak floor is 11. **This directly falsifies any earlier "wild level can't fall far below
+the player's" call** — it can, and by design, the gap widens as the lead grows within a biome faster than
+`depth`'s lift (+2%/node, capping at +40 pts) can close it. Whether a band this wide is the *desired* tuning —
+as opposed to too aggressive now that leads reach level 23 well within a single biome — is a design-tuning
+question, separate from this section's job of documenting the mechanism as it actually runs; see `TODO.md` for
+that open call.
+
+### 3.4 The four levers
 
 | Lever | Lands on | Weak → Boss |
 |:--|:--|:--|
 | **BST** | `PickByBst`'s explicit `targetBst` | tier multiplies the depth-scaled target (band width fixed in `PickByBst`) |
-| **Level** | `ScaleWildLevel(depth)` | tier applies a flat level offset to the rolled band value |
+| **Level** | `ScaleWildLevel(depth)` — formula in §3.3 | tier applies a flat level offset to the rolled band value |
 | **DVs** | **`DvQuality{Poor,Average,High,Perfect}` on `IStatCalculator.RandomiseDvs`** | Poor 0–7 → Average 0–15 → High 8–15 → Perfect 15 |
-| **Moveset** | `MoveSelectionStrategy` (see §3.4) + move count | Base → TmEnhanced → Optimal |
+| **Moveset** | `MoveSelectionStrategy` (see §3.5) + move count | Base → TmEnhanced → Optimal |
 
 **DV lever — seam-clean.** `DvQuality` is *intent*; the Gen 1 mapping (Poor 0–7, Average 0–15, High 8–15,
 Perfect 15, HP DV still derived from the four stat DVs' low bits) lives inside `Gen1StatCalculator`. Gen 3 (IVs 0–31) maps the
@@ -231,7 +278,7 @@ same intents differently. **Quality is always explicit** — the no-arg `Randomi
 construction passes `Average` (still randomized within range, so same-tier creatures aren't clones; only Perfect
 is deterministic).
 
-### 3.4 Moveset levels (3-tier quality axis)  *(✅ implemented — `LearnsetMoveSelector`)*
+### 3.5 Moveset levels (3-tier quality axis)  *(✅ implemented — `LearnsetMoveSelector`)*
 
 Two new `MoveSelectionStrategy` values (`TmEnhanced`, `Optimal`) — deterministic top-N by a shared `MoveScore`
 (power × STAB). **No level gate** — the strong/optimal
@@ -241,10 +288,10 @@ punch above its level (intended).
 | Level | Pool | Notes |
 |:--|:--|:--|
 | **Base** | species **level-up** learnset | current `CanonicalLatest` (player) / `WeightedSmart` (enemy) — unchanged |
-| **TmEnhanced** | level-up **+ TM/HM-legal** same-type strong moves | needs real TM/HM data (§3.5) |
+| **TmEnhanced** | level-up **+ TM/HM-legal** same-type strong moves | needs real TM/HM data (§3.6) |
 | **Optimal** | **any** move, best for the creature's types + coverage | the min-maxed boss-grade set |
 
-### 3.5 Sub-task: import real TM/HM learnability *(gates TmEnhanced)*  *(✅ done — incl. re-import)*
+### 3.6 Sub-task: import real TM/HM learnability *(gates TmEnhanced)*  *(✅ done — incl. re-import)*
 
 `LearnsetMapper` originally kept **only** `move_learn_method == "level-up"`. Now it also keeps **machine**
 (TM/HM) rows, tagged by a new `LearnMethod` field on `PokemonLearnset` (EF migration `AddLearnsetMethod`,
@@ -255,7 +302,7 @@ existing rows default `LevelUp`). A full `PokeApiConnector` re-import has been r
   player setup, evolution, and `MoveLearning` on level-up — filters `LearnMethod == LevelUp` so TM rows can't
   leak into level-up learning. `CreateEnemyAsync` includes Machine rows **only** for the `TmEnhanced` tier.
 
-### 3.6 Deferred (flagged)
+### 3.7 Deferred (flagged)
 
 - **Stat-Exp lever** — enemies use natural-gain-only for now; pre-seeding trained Stat-Exp is a later tuning lever.
 - **Boss ceiling** — Boss's distinctive design (out-classing the player: can exceed player level, perfect DVs,

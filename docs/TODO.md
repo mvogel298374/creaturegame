@@ -21,10 +21,11 @@ user-sequenced commitment (2026-08-04) that stays ahead of 4/5 regardless.
 
 - **Tier 0 cleared (2026-09-12).** Both trivial zero-risk items — the route-choice bottom-legend deletion and
   the Town Map scatter-tile + town-marker white-background fix — shipped same day; see `TODO_ARCHIVE.md`.
-- **Tier 1 — half cleared (2026-09-13).** The poison-tick-vs-same-turn-faint item is now **fully resolved** —
-  both the original end-of-turn-residual bug and the Hyper Beam recharge-on-KO companion bug it led to finding
-  during review are fixed (see `TODO_ARCHIVE.md`). Still open, settle before further battle/encounter tuning:
-  the Fearow level-11-at-player-23 formula check (→ *Known Gaps*).
+- **Tier 1 — fully cleared (2026-09-13).** The poison-tick-vs-same-turn-faint item is **fully resolved** — both
+  the original end-of-turn-residual bug and the Hyper Beam recharge-on-KO companion bug it led to finding during
+  review are fixed (see `TODO_ARCHIVE.md`). The Fearow level-11-at-player-23 report is **investigated and
+  documented** (`ENCOUNTER_DESIGN.md` §3.3) — confirmed working as coded, not a bug; only a design-tuning
+  question (is the band too wide now?) remains open for the user (→ *Known Gaps*), which doesn't block anything.
 - **Tier 2 — Generation Profile Stage 4d+** (the jointly-iterated surface catalog) — make Gen 1 an explicit,
   swappable profile so a generation switch changes content, menus and look, not just battle math. **`/plan`
   DONE (2026-07-29; Stage 4 re-planned as v2 on 2026-07-31)** — full design in
@@ -1391,24 +1392,20 @@ deliberately waived by the user (memory `project_waived_cancel_race`). Don't re-
 findings" as an open section.)*
 
 ### Known Gaps
-- **Wild encounter level far below the player's — user hit it live (2026-09-12), contradicts a prior "not
-  possible" call.** Reported: a level-23 lead ran into a level-11 wild Fearow. Per the user, this exact question
-  has been examined together multiple times before with the conclusion that it can't happen — that conclusion
-  needs to be re-checked against what's actually live, not re-asserted. **Flagged for a joint code-analysis
-  session, not fixed or explained away here.** One data point already gathered (to save re-deriving it live):
-  `EncounterFactory.ScaleWildLevel(playerLevel, depth, rng)` bands the roll to
-  `[playerLevel × (0.5 + lift), playerLevel × (0.8 + lift)]` where `lift = min(depth × 0.02, 0.40)` — at low
-  `depth` (lift ≈ 0) a level-23 player already gives a base band of roughly **[11, 18]** *before* any archetype
-  offset, and the **Weak** archetype (`EnemyArchetype.cs`) additionally subtracts 3 from that roll
-  (`Math.Max(2, ScaleWildLevel(...) - 3)`) — so a roll anywhere from 14–18 in the base band lands a Weak-tier
-  enemy at 11–15. On the formula alone, level 11 at player level 23 is arithmetically reachable at shallow depth,
-  which is in tension with "not possible." Open questions for the joint session, not yet answered: (1) is this
-  the actual code path that produced the reported Fearow (which node kind / archetype tier / depth was it), (2)
-  is a band this wide (down to 50% of player level before any tier offset) actually the *intended* design or a
-  regression from what was designed, (3) does the depth the player was actually at match what `lift` implies, and
-  (4) was the earlier "not possible" conclusion checked against this same code, or against a different/older
-  version of the scaling formula. **Do not assume the formula above is "the bug" or "not the bug" until that
-  session happens** — it's a lead, not a diagnosis.
+- **Wild encounter level far below the player's — MECHANISM CONFIRMED + DOCUMENTED (2026-09-13); design-intent
+  question still open.** Reported (2026-09-12): a level-23 lead ran into a level-11 wild Fearow, contradicting a
+  prior "not possible" call. The joint code-analysis session happened — full formula, worked example, and the
+  key fact it turned up are now written up in **`ENCOUNTER_DESIGN.md` §3.3**: `ScaleWildLevel` reads the lead's
+  **live, current** level at the moment of each encounter (never the level chosen at run start — that was the
+  user's working hypothesis, and it's wrong; `BattleRunEvent` re-reads `s.Player.Level` off the same mutable
+  `Creature` instance every node), and at shallow depth the raw band is a deliberate **[50%, 80%] of that live
+  level** *before* any archetype offset, with Weak subtracting 3 more. A level-23 lead landing an 11 is that
+  formula hitting its own documented floor — **not a bug, not a stale depth read, not a mismatch with an older
+  formula version.** This closes questions (1)/(3)/(4) from the original entry outright, and narrows (2) to the
+  one thing left unanswered: **is a band this wide — down to 50% of the lead's *live* level, which only gets
+  more extreme as the lead outlevels a shallow biome — the tuning we actually want, now that leads reach the
+  20s well inside a single biome?** That's a design call for the user, not a code defect; no code changed by
+  this pass, only the writeup.
 - ~~**Possible bug: poison-tick timing vs. a same-turn faint**~~ — **RESOLVED 2026-09-13**: poison ticking the
   turn it's applied is correct Gen-1 behaviour (not a bug); end-of-turn residual (poison/burn/Leech Seed) still
   firing for the survivor after either side had already fainted from a direct hit that same turn **was** a real

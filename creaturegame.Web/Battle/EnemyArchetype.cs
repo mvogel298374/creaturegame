@@ -80,7 +80,7 @@ public static class EnemyArchetypes
 
 // The depth baseline (EncounterFactory.ScaleTargetBst / ScaleWildLevel) is the Medium tier; the others shift
 // it. Offsets are run-layer tuning, not Gen 1 mechanics. Boss is a deliberate placeholder — a stronger Strong;
-// its distinctive ceiling design is revisited in a later phase (ENCOUNTER_DESIGN.md §3.6).
+// its distinctive ceiling design is revisited in a later phase (ENCOUNTER_DESIGN.md §3.7).
 
 internal sealed class WeakArchetype : IEnemyArchetype
 {
