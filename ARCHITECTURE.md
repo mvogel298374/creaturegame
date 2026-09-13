@@ -271,4 +271,5 @@ Every doc in the repo and what it answers, in a line. This file (`ARCHITECTURE.m
 | `docs/FRONTEND_PLAN.md` | Frontend plan: React + SignalR + Phaser structure and intent. |
 | `docs/TODO.md` | The authoritative active task list (finished work → `docs/TODO_ARCHIVE.md`). |
 | `docs/TODO_ARCHIVE.md` | History of completed tasks, batches, and resolved tech debt. |
+| `docs/PRODUCT_SPEC.md` | Current-state feature spec — what the game does *today* (present tense, no rationale, no history); grows one entry per finished player-visible feature. |
 | `.claude/AI_CONTEXT.md` | Agent profiles (`/plan` `/dev` …) + the tooling/automation reference. |

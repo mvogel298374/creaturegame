@@ -71,9 +71,11 @@ each is its own subagent so it can be invoked or edited independently:
    its stale framing (Next-up ordering, blocked-on/gated-on notes, ⚠️ banners, dangling refs), and — the
    load-bearing check — **verifies a finished write-up's full record is in the archive before any summary of it
    is dropped** (the Shop-node trap: an archive that said "still live in TODO.md" and described the pre-ship
-   state). → `DOCS: CLEAN | UPDATED`. **No scope exception** — it runs for *every* finished feature (every one
-   changes what TODO.md should say), unlike gates 4–5 below which are scoped. Runs **first**, because its doc
-   edits ride in the finishing commit and gate 5 (`pr-review`) checks docs/TODO. It edits docs only.
+   state). It also adds/updates the current-state entry in `docs/PRODUCT_SPEC.md` for a player-visible feature
+   (present-tense "what does the game do today," no rationale — that's a design doc's job). → `DOCS: CLEAN |
+   UPDATED`. **No scope exception** — it runs for *every* finished feature (every one changes what TODO.md
+   should say), unlike gates 4–5 below which are scoped. Runs **first**, because its doc edits ride in the
+   finishing commit and gate 5 (`pr-review`) checks docs/TODO/PRODUCT_SPEC. It edits docs only.
 2. **`format-gate`** (Subagent, `.claude/agents/format-gate.md`) — the CSharpier gate: `check`, auto-`format`
    + re-check if it fails → `FORMAT: PASS | REFORMATTED | FAIL`.
 3. **`test-runner`** (Subagent, `.claude/agents/test-runner.md`) — the fast suites via `.\test.ps1 -Dotnet -Web`,
@@ -104,7 +106,8 @@ each is its own subagent so it can be invoked or edited independently:
    blocks progress to done/commit and no subagent may clear it; only the **user** adjudicates (fix or waive).
 5. **`pr-review`** (Subagent, `.claude/agents/pr-review.md`, **Opus**) — the technical capstone, run **after**
    1–4 are green. Reviews the diff against the technical Definition of Done (`docs/DEFINITION_OF_DONE.md`) —
-   generation-seam architecture, code quality, integration completeness, test adequacy, docs/TODO → `PR-READY
+   generation-seam architecture, code quality, integration completeness, test adequacy, docs/TODO/PRODUCT_SPEC,
+   and design-rationale placement (§G — no comment is the *only* place a design decision lives) → `PR-READY
    | CHANGES-REQUESTED`. Technical quality only; domain fidelity is `requirements-review`'s. It treats
    docs-cleanup/format/tests/requirements as preconditions.
 
@@ -239,6 +242,7 @@ Any value other than `0`/`false` (or unset/empty) enables it.
 | `DEFINITION_OF_READY.md` | DoR — the exit criteria of `/plan` |
 | `DEFINITION_OF_DONE.md` | DoD (technical) — the rubric `pr-review` checks |
 | `TODO.md` | Authoritative active task list (done work → `TODO_ARCHIVE.md`) |
+| `PRODUCT_SPEC.md` | Current-state feature spec — what the game does today (grows per finished feature) |
 | `DESIGN_GUIDES.md` | Gen 1 mechanics & design constraints (`/plan`) |
 | `DEV_STANDARDS.md` | .NET/EF coding conventions (`/dev`) |
 </content>

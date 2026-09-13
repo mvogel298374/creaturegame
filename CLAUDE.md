@@ -12,6 +12,7 @@ them up front burns ~25k tokens before the work is even scoped; almost none of i
 |:-----|:--------------|
 | `ARCHITECTURE.md` | you need the **why** behind a design decision, the system map, or the full doc catalog (its §5 indexes every doc in the repo). The decision-log entry point. |
 | `docs/TODO.md` | starting or finishing any task — it's the **authoritative** active task list. Always update it when a task completes. (Finished work is in `docs/TODO_ARCHIVE.md`; read that only to recover the history of a done item.) |
+| `docs/PRODUCT_SPEC.md` | you need to know **what the game currently does** (not why, not its history) — the current-state feature spec, updated per finished player-visible feature by the same `docs-cleanup` gate that updates `TODO.md`. |
 | `.claude/AI_CONTEXT.md` | you need a slash-command/profile definition (`/plan`, `/dev`, `/sync`, `/test`) or the **Tooling & Automation** reference (the pre-finish gate sequence — `docs-cleanup`, `format-gate`, `test-runner`, `requirements-review`, `pr-review` — the pre-commit hook, CSharpier, MCP servers). |
 | `docs/DESIGN_GUIDES.md` | doing `/plan` (design) work — Gen 1 mechanics, type-balancing, move-import mapping. |
 | `docs/DEFINITION_OF_READY.md` | doing `/plan` — the DoR checklist that is `/plan`'s exit criteria (a plan isn't done until every item is covered). |
@@ -152,18 +153,22 @@ profile→model mapping and how to brief the subagent so its cold start stays ch
 
 The target is a **true Gen 1 Pokémon battle clone** with future layers inspired by roguelikes, autobattlers, and the Pokémon Infinite Fusion mod. Preserve Gen 1 accuracy (mechanics, quirks, formulas) before extending. See `DESIGN_GUIDES.md` for type-balancing and move-import mapping rules.
 
-## TODO State
+## TODO & Product Spec State
 
 `docs/TODO.md` is the **authoritative** prioritised task list; finished work lives in `docs/TODO_ARCHIVE.md`.
+`docs/PRODUCT_SPEC.md` is the **current-state** feature spec — "what does the game do today," present tense,
+no rationale, no history (those live in `ARCHITECTURE.md`/the design docs, and `TODO_ARCHIVE.md`, respectively).
 
-**Updating `docs/TODO.md` is part of the commit that finishes the work — not a follow-up.** Stage the doc edit
-in the *same* commit as the code, before proposing the commit for approval. A diff that completes an item while
-`TODO.md` still lists it as open is an incomplete diff.
+**Updating `docs/TODO.md`, and `docs/PRODUCT_SPEC.md` for a player-visible feature, is part of the commit that
+finishes the work — not a follow-up.** Stage the doc edits in the *same* commit as the code, before proposing
+the commit for approval. A diff that completes an item while `TODO.md` still lists it as open, or ships
+player-visible behavior `PRODUCT_SPEC.md` doesn't yet describe, is an incomplete diff.
 
 **This cleanup is not optional and not ad hoc — it is enforced by the mandatory `docs-cleanup` subagent, the
 first step of the pre-finish gate sequence.** After *every* finished feature or closed task, that subagent runs
-(no scope exception) and performs the reconciliation below; the main session stages its edits into the finishing
-commit. See `.claude/agents/docs-cleanup.md`.
+(no scope exception) and performs the reconciliation below (plus the `PRODUCT_SPEC.md` entry when the feature
+is player-visible); the main session stages its edits into the finishing commit. See
+`.claude/agents/docs-cleanup.md`.
 
 When an item is done, all of the following, not just the first:
 - Mark it ✅ DONE with the date, or move the whole write-up to `docs/TODO_ARCHIVE.md` — a finished feature or a
@@ -175,6 +180,17 @@ When an item is done, all of the following, not just the first:
   a stale placeholder. (Real trap: a "Run Economy" summary pointed to an archive section that said the Shop-node
   follow-up was *"still live in TODO.md"* and described its pre-ship state, so the record lived only in TODO.md;
   dropping the summary would have destroyed it. Relocate + fix the archive's stale framing instead.)
+- If the feature is player-visible, add or update its `PRODUCT_SPEC.md` entry (current-behavior bullets + a
+  pointer to the design doc and the archive section) — see that file's own header for the exact format.
+
+## Design Rationale Placement
+
+**A code comment is never the only place a design decision lives.** If a comment explains *why* something is
+built a certain way — a tuning rationale, a policy/algorithm design, a "used to do X, changed because Y" — that
+belongs in a design doc (`ARCHITECTURE.md` or the relevant per-domain doc), written in the **same commit**, with
+the comment cut to a pointer. Full rule + what a comment *may* still say on its own → `DEV_STANDARDS.md` →
+**Design Rationale Placement**. This is enforced at `pr-review` (`DEFINITION_OF_DONE.md` §G) but is meant to be
+a live authoring habit, not a defect caught after the fact — extend the doc as the decision happens.
 
 ## Permissions
 

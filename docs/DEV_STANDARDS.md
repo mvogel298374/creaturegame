@@ -27,6 +27,41 @@ Guidelines for all `/dev` actions in this project.
     debt compounds invisibly until a generation switch forces it all at once). That file is the source of
     truth; this is the summary.
 
+## Design Rationale Placement (comments vs. docs)
+
+**A code comment may never be the first or only place a design decision is explained.** If a comment states
+*why* something is built a certain way — not just what the adjacent code does — that reasoning belongs in a
+design doc (`ARCHITECTURE.md` or the relevant per-domain doc: `ENCOUNTER_DESIGN.md`, `GAME_LOOP.md`,
+`GENERATION_SEAMS.md`, `GENERATION_PROFILE.md`, `STATE_MODEL.md`, `SPRITE_PRESENTATION.md`, …), written or
+updated **in the same commit**, with the comment cut to a short pointer. This is the same discipline
+`TODO.md` already gets (doc update rides in the finishing commit, never a follow-up), extended from task
+tracking to design rationale generally.
+
+This exists because a repo-wide audit (`TODO.md` → *Comment Condensation Pass*) found the failure mode this
+prevents, repeatedly: a real design decision — a tuning formula, a "why this and not that," a trap worth
+remembering — got made and explained inline while implementing, because that's the path of least resistance
+mid-`/dev`, and then existed **only** in that comment. Once that's the pattern the comment has to keep
+growing, because it's carrying weight a doc should be carrying.
+
+**What a comment MAY still say**, with no doc detour needed:
+- What the adjacent code does, when that isn't obvious from reading it (a non-obvious control-flow reason, a
+  parameter's meaning, a one-line pointer to the seam/doc that owns the "why").
+- A short, genuinely local aside that would be actively unhelpful in a doc — a one-off gotcha tied to *this
+  exact line* with no broader design content (e.g. "Next's upper bound is exclusive → +1 makes max
+  inclusive").
+- The seam's **own** canonical XML doc (an `IBattleRules`/`IEvolutionRules`/etc. implementation explaining its
+  own per-generation behavior) — that IS the canonical location the docs point *at*, not a duplicate of one.
+
+**What must go to a doc first:** a tuning constant with a rationale, a policy/algorithm design (a formula, a
+weighting scheme, a state machine), a historical "used to do X, changed because Y," or anything a *different*
+file would also need to know to stay consistent. If you're not sure which bucket a comment falls in, ask: "if
+this were deleted, could someone reconstruct the reasoning from the docs?" If no, it doesn't belong only in
+the comment.
+
+**Checked at `pr-review`** (`DEFINITION_OF_DONE.md` §G) for any diff that reaches that gate; for everything
+else, this is a live authoring discipline — extend the plan/doc as the decision happens, don't defer it as
+cleanup for later.
+
 ## Coding Conventions
 *   **Primary Constructors**: Use them for DTOs and simple data structures when possible (though keep models EF-compatible).
 *   **Nullability**: Ensure `Nullable` is enabled and handled for API responses (`int?`, `string?`).
@@ -73,6 +108,7 @@ commit time. All are documented in `AI_CONTEXT.md` → **Tooling & Automation**.
 |:-----|:-----|
 | `CLAUDE.md` | Session setup, architecture overview, build commands — loaded automatically each session |
 | `TODO.md` | Authoritative task list; update it when any task completes |
+| `PRODUCT_SPEC.md` | Current-state feature spec ("what does the game do today") — grows one entry per finished feature, same discipline as `TODO.md` |
 | `AI_CONTEXT.md` | Agent profiles and slash-command definitions |
 | `DESIGN_GUIDES.md` | Gen 1 mechanics and design constraints (design counterpart to this file) |
 | `STATE_MODEL.md` | Deep-dive: `Creature` permanent/transient state split (`BattleState`) — patterns + Gen 1 domain logic |
