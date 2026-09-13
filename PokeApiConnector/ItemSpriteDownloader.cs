@@ -3,11 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace PokeApiConnector;
 
-/// <summary>
-/// Downloads the battle-item sprites into <c>wwwroot/sprites/items/{id}.png</c>, mirroring
-/// <see cref="SpriteDownloader"/> for creatures. The source URL is the PokeAPI default sprite already
-/// stored on each <c>Item</c> row (<c>SpriteUrl</c>) by the item import, so this reads from <c>items.db</c>
-/// rather than re-fetching item data. Idempotent: an already-present file is skipped, so re-running is cheap.
+/// <summary>Downloads battle-item sprites into <c>wwwroot/sprites/items/{id}.png</c> (DATA_IMPORT.md §4.4).
 /// </summary>
 public static class ItemSpriteDownloader
 {

@@ -25,9 +25,10 @@ dotnet run --project PokeApiConnector
 | It populates | With |
 |:-------------|:-----|
 | `moves.db` (`MovesDbContext`) | Gen 1 moves → `Attack` rows |
-| `pokemon.db` (`PokemonDbContext`) | Gen 1 species → `PokemonSpecies` rows + `PokemonGameAvailability` rows |
+| `pokemon.db` (`PokemonDbContext`) | Gen 1 species → `PokemonSpecies` rows + `PokemonGameAvailability` + `PokemonLearnset` + `PokemonEvolution` rows |
 | `items.db` (`ItemsDbContext`) | Gen 1 battle-usable items → `Item` rows |
 | `creaturegame.Web/wwwroot/sprites/{front,back}/{id}.png` | Battle sprites |
+| `creaturegame.Web/wwwroot/sprites/items/{id}.png` | Item sprites |
 | `creaturegame.Web/wwwroot/audio/cries/{id}.ogg` | Legacy 8-bit cries |
 
 **Re-running is safe** — every step is idempotent (DB upserts by ID; asset downloads
@@ -61,25 +62,31 @@ the model (with a migration) and re-run — **never add a runtime PokeAPI call.*
 
 ## 3. The pipeline (`Program.cs`)
 
-Six sequential steps:
+Nine sequential steps:
 
 1. **Ensure databases** — `EnsureDatabaseCreated()` on all contexts runs EF migrations
    (`Database.Migrate()`), creating/updating `moves.db`, `pokemon.db` and `items.db`.
 2. **Import moves** — `MoveImport.FetchMovesByGeneration(1)`.
-3. **Import species** — `PokemonImport.FetchPokemonByGeneration(1)`.
-4. **Import evolutions** — `EvolutionImport.ImportAllAsync()`.
+3. **Import species** — `PokemonImport.FetchPokemonByGeneration(1)` (learnsets ride along per species — §4.6).
+4. **Import evolutions** — `EvolutionImport.ImportAllAsync()` (§4.7).
 5. **Import items** — `ItemImport.ImportGen1BattleItemsAsync()` (see §4.5).
 6. **Seed game availability** — `GameAvailabilitySeeder.SeedGen1Async()`.
 7. **Download sprites** — `SpriteDownloader.DownloadAllAsync()`.
-8. **Download cries** — `CryDownloader.DownloadAllAsync()`.
+8. **Download item sprites** — `ItemSpriteDownloader.DownloadAllAsync()` (§4.4).
+9. **Download cries** — `CryDownloader.DownloadAllAsync()`.
 
 Steps 2 and 3 follow the same **index-then-detail** shape: hit the *generation* endpoint
 (`/generation/1/`) to get the list of move/species URLs, then fetch each entity's detail
 endpoint and map it. Items can't use that shape — there is no `/generation/{n}` item list — so
 step 5 fetches a hand-curated roster by slug instead (§4.5).
 
-Individual stages can be re-run without the full network-heavy import: `run --project
-PokeApiConnector -- evolutions` and `-- items` each run just that idempotent stage.
+**Three stages can be re-run standalone**, each idempotent, without the full network-heavy import:
+`-- evolutions`, `-- items` (also re-downloads item sprites), and `-- assets` (sprites + item sprites +
+cries only — no DB import). `-- assets` exists specifically for the Docker image build: sprite/cry
+files are gitignored runtime assets, never checked in, so a clean container checkout has none — and
+unlike the full interactive import (a human watching the console), a build step must **fail loudly**
+on a partial fetch rather than silently ship an image with missing art, so `-- assets` exits nonzero
+if any asset failed to download.
 
 ---
 
@@ -110,9 +117,10 @@ and it *superseded* an earlier hardcoded type-correction switch.
 type`. Where a Gen 1 fact falls outside those — a secondary's *target stat*, an ailment, priority,
 or a whole-effect rewrite — add a **small, explicitly-commented override** after the mapping,
 sourced from an authority (Bulbapedia / a Gen 1 disassembly), never from PokeAPI's current data.
-Today the list is exactly one: **Acid** (Gen 1 lowers the target's *Defense* at 33%; PokeAPI's
-structured data says Sp. Def at 10% and its `past_values` is empty). Keep this list short — see
-the layered strategy and its limits in §5.5.
+`MoveImport.ApplyGen1Corrections` is that list — each `case` is one verified Gen-1-vs-modern fact,
+commented inline with both values (Acid's Defense-not-Sp.-Def fix, at 33% vs. today's 10%, was the
+first). The switch itself is the record; don't duplicate its entries here — see the layered
+strategy and its limits in §5.5.
 
 The remaining Gen 1 logic lives in the categorisation:
 
@@ -130,17 +138,58 @@ The remaining Gen 1 logic lives in the categorisation:
   - 120/153 Self-Destruct/Explosion → `SelfDestruct`
   - 69/101 Seismic Toss/Night Shade → `LevelBased`
   - 162 Super Fang → `SuperFang`
+  - 149 Psywave → `Psywave` (variable: random `1..floor(1.5×level)`)
   - 49 Sonic Boom → `Fixed` (20), 82 Dragon Rage → `Fixed` (40)
-- **`DrainPercent`** ← `meta.drain` for drain moves (default 50%).
+- **`DrainPercent`** ← `meta.drain` for drain moves (default 50%; Mega Drain/Absorb/Leech Life).
 - **`NeverMisses`** — Swift (ID 129) bypasses the accuracy roll.
 - **Stat-stage effects** ← first `stat_changes` entry → `StatEffectStat/Delta/Target/
   Chance` (Swords Dance, Growl, …). Pure status moves always land (chance 100); secondary
   effects on damaging moves use the **Gen-1-resolved** `EffectChance`. (At runtime the engine
   reads that chance through `IBattleRules.GetSecondaryEffectChance`, not the column directly —
   see `GENERATION_SEAMS.md`.)
-- **Special `MoveEffect`** by name: Haze, Leech Seed, Hyper Beam (Recharge), binding
-  moves (Wrap/Bind/Clamp/Fire Spin), two-turn moves (Fly/Dig/Solar Beam/Razor Wind/
-  Sky Attack), Metronome, and flinch (from `meta.flinch_chance`).
+- **Special `MoveEffect`** by name (full catalog just below), plus the two meta-based fallbacks
+  that only apply when no name matched: confusion (from `meta.ailment.name`) and flinch (from
+  `meta.flinch_chance`).
+
+#### Special move effects — the full catalog (`Gen1MoveEffects` in `MoveImport.cs`)
+
+| Effect | Moves | Mechanic |
+|:--|:--|:--|
+| `Haze` | Haze | Resets every stat stage on the field |
+| `LeechSeed` | Leech Seed | Drains HP to the user each turn |
+| `Recharge` | Hyper Beam | Must recharge (skip a turn) after landing — never after a KO hit |
+| `Binding` | Wrap, Bind, Clamp, Fire Spin | Damages + traps the target 2–5 turns |
+| `TwoTurn` | Fly, Dig, Solar Beam, Razor Wind, Sky Attack, Skull Bash | Two-turn charge; Gen 1 Skull Bash does **not** raise Defense on the charge turn (that's a Gen 2 addition) — a plain charge like the rest |
+| `Metronome` | Metronome | Calls a random move |
+| `MultiHit` (variable) | Double Slap, Comet Punch, Fury Attack, Pin Missile, Barrage, Fury Swipes, Spike Cannon | 2–5 strikes, count rolled at runtime by the gen rules |
+| `MultiHit` (fixed ×2) | Double Kick, Twineedle, Bonemerang | Always exactly 2 strikes — `MultiHitCount = 2` is set in `MapToAttack`, not the dictionary |
+| `Crash` | Jump Kick, Hi Jump Kick | A miss deals crash damage to the user |
+| `Recoil` | Take Down, Double-Edge, Submission | User takes back a fraction of the damage dealt |
+| `Counter` | Counter | Returns 2× the Normal/Fighting physical damage last taken (priority −5) |
+| `Rage` | Rage | Locks the user in, raises Attack each time it's hit |
+| `Heal` | Recover, Soft-Boiled | Restore half the user's max HP |
+| `Mimic` | Mimic | Copies a random move from the target for the rest of the battle |
+| `Reflect`/`LightScreen` | Reflect, Light Screen | Double the user's Defense/Special vs. the matching damage type |
+| `FocusEnergy` | Focus Energy | Gen 1's bugged crit modifier (`Gen1BattleRules.GetCritChance`) |
+| `Bide` | Bide | Stores damage for 2–3 turns, then unleashes 2× |
+| `MirrorMove` | Mirror Move | Re-executes the opponent's last move |
+| `Rampage` | Thrash, Petal Dance | Locks in 2–3 turns, then self-confuses |
+| `PayDay` | Pay Day | Scatters money on hit |
+| `Mist` | Mist | Shields the user's stats from being lowered |
+| `Disable` | Disable | Locks one of the target's moves (enforced at move-selection time) |
+| `DreamEater` | Dream Eater | Drains HP, but only works on a sleeping target — the drain heal itself rides on `DamageCategory.Drain` (set from `meta`); this flag adds the sleep gate |
+| `Splash` | Splash | Does nothing — engine emits "But nothing happened!" |
+| `Rest` | Rest | Fully heals + cures status, then forces a fixed-length sleep |
+| `Substitute` | Substitute | Spends HP to raise a decoy that soaks hits |
+| `Transform`/`Conversion` | Transform, Conversion | Transform copies the target's species/types/stats/stages/moveset (reverted at battle end); Conversion copies just the target's types onto the user |
+| `ForceFlee` | Roar, Whirlwind | Ends a WILD battle (target flees); fails in Elite/Boss — non-escapable, the Gen 1 trainer-battle rule |
+
+**Ordering matters in the mapping.** The name→effect lookup above runs *before* the two meta-based
+fallbacks, so a rampage move maps to `Rampage` rather than falling into the `Confuse` fallback its
+`ailment` metadata would otherwise trigger. Confusion itself isn't a `StatusCondition` — it's a
+separate per-battle counter — so it's modelled as a `MoveEffect` instead, gated by `EffectChance`
+(secondary confusion on a damaging move, e.g. Psybeam 10%) or always-on when null (a pure confusion
+move like Supersonic).
 
 ### 4.2 Species (`PokemonImport` → `PokemonSpecies`)
 Each species needs **two** PokeAPI endpoints, because the data is split:
@@ -176,12 +225,14 @@ cleanly express Gen 1 per-version obtainability. It encodes:
 It clears and re-seeds cleanly each run (`ExecuteDeleteAsync` then bulk insert of all 151
 × 3 versions minus exclusions).
 
-### 4.4 Sprites & cries (`SpriteDownloader`, `CryDownloader`)
+### 4.4 Sprites & cries (`SpriteDownloader`, `CryDownloader`, `ItemSpriteDownloader`)
 Pull PNGs (front/back) and OGG cries for IDs 1–151 into `wwwroot`, located by walking up
 to the solution root. Both are **idempotent**: a file that already exists is skipped, so
 re-runs only fetch what's missing. The frontend's Phaser canvas serves these as static
 files (front for the enemy, back for the player); cries fall back to a Web Audio synth if
-an OGG is missing.
+an OGG is missing. `ItemSpriteDownloader` follows the same idempotent pattern for item art, but
+reads its source URL from each `Item.SpriteUrl` already stored by the item import (§4.5) rather
+than a fixed ID template — no extra fetch needed.
 
 ---
 
@@ -237,6 +288,32 @@ it's left uncorrected — revisit with a curated cost table only if an economy i
 The split mirrors `EvolutionImport`/`EvolutionMapper`: `ItemImport` does network + DB; `ItemMapper`
 holds the pure, unit-tested mapping and the Gen 1 roster.
 
+### 4.6 Learnsets (`LearnsetMapper` → `PokemonImport.ImportLearnset`)
+Each species' `/pokemon/{id}` response already lists every move it can learn, across every game and
+method — no extra API call needed. `LearnsetMapper.ExtractGen1Learnset` filters that down to the
+`red-blue` version group and two methods: `level-up` (tagged `LearnMethod.LevelUp`, lowest level kept
+if a move repeats) and `machine` (TM/HM, tagged `LearnMethod.Machine`, `LearnLevel = 0`). A move
+learnable both ways is kept as level-up only — it's already in that pool, so the machine tag would add
+nothing. `PokemonImport.ImportLearnset` persists the result idempotently: clears this species' Gen 1
+rows, then re-inserts — the same clear-then-reinsert pattern as `GameAvailabilitySeeder` and
+`EvolutionImport` below.
+
+### 4.7 Evolutions (`EvolutionMapper` → `EvolutionImport`)
+Each Gen 1 species' family shares one `/evolution-chain` resource; `EvolutionImport` collects every
+species' chain URL, fetches each *unique* chain once, and hands it to `EvolutionMapper` to flatten
+into faithful Gen 1 edges — idempotent (clears this generation's rows, then re-inserts).
+
+**The Gen 1 filter.** A chain can span every generation the games have added since, so an edge
+survives only when both species are in the Gen 1 dex (1–151) **and** its trigger is something Gen 1
+actually had, with no later-generation condition riding along:
+- `level-up` with a `min_level` and **no** `min_happiness` / `time_of_day` / `held_item` — those three
+  mean the edge reuses the level-up trigger for a Gen 2+ evolution (Eevee → Espeon is `level-up`
+  gated by happiness, not a Gen 1 evolution).
+- `use-item` with one of the five Gen 1 stones (Fire/Water/Thunder/Leaf/Moon).
+- `trade` with **no** held item (a held-item trade, e.g. Onix → Steelix, is a Gen 2 addition). The
+  trigger is stored faithfully as `Trade` — converting it to the roguelite's "trade → level 37" is the
+  runtime seam's job, not the importer's.
+
 ---
 
 ## 5. Patterns & practices — and *why*
@@ -263,11 +340,12 @@ one-shot tool run occasionally it's not worth batching — simplicity and obviou
 logging win.
 
 ### 5.4 Encode what the API can't express — explicitly and with comments
-Two places do this: move categorisation special-cased by **ID** (§4.1) and game
-availability curated by **hand** (§4.3). The practice: when the source data lacks the
-structure you need, encode the domain knowledge directly, **comment every magic value**
-with what it represents (`// 120/153 Self-Destruct/Explosion`), and keep it all in the
-importer so the runtime model stays clean. The comments are the spec.
+Three places do this: move categorisation special-cased by **ID** (§4.1), game
+availability curated by **hand** (§4.3), and the item roster curated by **hand** (§4.5) —
+PokeAPI gives no Gen 1 signal for items at all. The practice: when the source data lacks
+the structure you need, encode the domain knowledge directly, **comment every magic
+value** with what it represents (`// 120/153 Self-Destruct/Explosion`), and keep it all in
+the importer so the runtime model stays clean. The comments are the spec.
 
 ### 5.5 Historical correctness at import time (`past_types` / `past_values`)
 Importing *Gen 1* values rather than today's is a deliberate correctness step: the importer's
@@ -284,8 +362,8 @@ Strict-clone fidelity is decided here, once, rather than patched in the engine.
    the overwhelming majority of moves.
 2. **A targeted, commented override in the importer** — *only* for a Gen 1 fact the historical
    fields **can't express** (a secondary's target stat, an ailment, priority, a mechanic). Verify
-   it against an authority (Bulbapedia / the pret/pokered disassembly) and keep the list short.
-   Acid is the sole current entry.
+   it against an authority (Bulbapedia / the pret/pokered disassembly) and keep each entry commented
+   with both the Gen 1 and modern value — see `MoveImport.ApplyGen1Corrections` for the current list.
 3. **The runtime seams** (`IBattleRules` / `ITypeChart` / `IStatCalculator`) — for anything that
    is a *formula or mechanic* difference rather than stored move/species **data**. Mechanic
    differences never belong in the importer; data differences never belong in the engine.

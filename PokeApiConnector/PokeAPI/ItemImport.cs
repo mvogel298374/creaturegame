@@ -5,12 +5,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace PokeApiConnector.PokeAPI;
 
-/// <summary>
-/// Imports the Gen 1 battle-usable items into items.db. Network + DB only — the Gen 1 roster and the
-/// pure mapping live in <see cref="ItemMapper"/>. PokeAPI has no Gen 1 membership signal for items, so
-/// we fetch the hand-curated <see cref="ItemMapper.Gen1BattleItemNames"/> directly by slug. Idempotent
-/// (upsert by Id; resilient per record).
-/// </summary>
+/// <summary>Imports the Gen 1 battle-usable items into items.db (DATA_IMPORT.md §4.5). Network + DB
+/// only — the roster and mapping live in <see cref="ItemMapper"/>.</summary>
 public class ItemImport
 {
     private static readonly JsonSerializerOptions JsonOpts = new()

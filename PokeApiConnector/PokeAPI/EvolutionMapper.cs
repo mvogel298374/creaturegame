@@ -11,21 +11,8 @@ public readonly record struct MappedEvolutionEdge(
     int? StoneItemId
 );
 
-/// <summary>
-/// Turns a PokeAPI <c>/evolution-chain</c> tree into our Gen 1 evolution edges. This is the single
-/// place the Gen 1 decision lives (mirrors <see cref="LearnsetMapper"/> and
-/// <c>PokemonImport.Gen1TypeSlots</c>): the chain spans every generation, so we keep only edges that
-/// were actually Gen 1 evolutions and store the trigger faithfully (Trade stays Trade — the
-/// roguelite's "trade → level 37" conversion is the seam's job, not the importer's).
-/// <para><b>Gen 1 filter</b> — an edge is kept only when:</para>
-/// <list type="bullet">
-/// <item>both species are in the Gen 1 dex (ids 1–151); and</item>
-/// <item>the trigger is one Gen 1 actually had, with no later-gen condition attached:
-///   <c>level-up</c> with a <c>min_level</c> and no happiness/time/held-item (those reuse the
-///   level-up trigger for Gen 2+ evolutions like Eevee→Espeon); <c>use-item</c> with one of the five
-///   Gen 1 stones; or <c>trade</c> with no held item (held-item trade is Gen 2).</item>
-/// </list>
-/// </summary>
+/// <summary>Turns a PokeAPI <c>/evolution-chain</c> tree into our Gen 1 evolution edges — the Gen 1
+/// filter itself is DATA_IMPORT.md §4.7.</summary>
 public static class EvolutionMapper
 {
     private const int MaxGen1SpeciesId = 151;
@@ -62,7 +49,6 @@ public static class EvolutionMapper
             int toId = ParseTrailingId(child.Species?.Url);
             if (IsGen1Species(fromId) && IsGen1Species(toId))
             {
-                // A node can list several ways it evolves; keep the first that is a valid Gen 1 edge.
                 foreach (var detail in child.EvolutionDetails ?? [])
                 {
                     if (TryMap(fromId, toId, detail, out var edge))
@@ -88,7 +74,6 @@ public static class EvolutionMapper
         switch (detail.Trigger?.Name)
         {
             case LevelUpTrigger:
-                // Reject Gen 2+ evolutions that reuse the level-up trigger via a non-level condition.
                 if (
                     detail.MinLevel is not int level
                     || detail.MinHappiness != null
@@ -112,7 +97,6 @@ public static class EvolutionMapper
                 return true;
 
             case TradeTrigger:
-                // Held-item trade (Onix→Steelix etc.) is a Gen 2 addition.
                 if (detail.HeldItem != null)
                     return false;
                 edge = new MappedEvolutionEdge(fromId, toId, EvolutionTrigger.Trade, null, null);

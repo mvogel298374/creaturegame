@@ -26,14 +26,9 @@ public class PokemonImport
             if (genResponse?.pokemon_species != null)
             {
                 using var context = new PokemonDbContext();
-                // Filter to only Gen 1 pokemon (IDs 1-151) because the generation endpoint returns all species associated,
-                // but some might be from later gens if they have a relationship?
-                // Actually for Gen 1 it should be 1-151.
 
                 foreach (var speciesResource in genResponse.pokemon_species)
                 {
-                    // The species URL is like https://pokeapi.co/api/v2/pokemon-species/1/
-                    // We need the pokemon data which is at https://pokeapi.co/api/v2/pokemon/1/
                     if (speciesResource.url == null)
                         continue;
                     string pokemonUrl = speciesResource.url.Replace("pokemon-species", "pokemon");
@@ -56,7 +51,6 @@ public class PokemonImport
     {
         try
         {
-            // Fetch Pokemon Data
             HttpResponseMessage response = await PokeApiHttp.Client.GetAsync(url);
             response.EnsureSuccessStatusCode();
             string json = await response.Content.ReadAsStringAsync();
@@ -65,7 +59,6 @@ public class PokemonImport
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
             );
 
-            // Fetch Species Data for Growth Rate
             HttpResponseMessage speciesResponse = await PokeApiHttp.Client.GetAsync(speciesUrl);
             speciesResponse.EnsureSuccessStatusCode();
             string speciesJson = await speciesResponse.Content.ReadAsStringAsync();
@@ -76,7 +69,6 @@ public class PokemonImport
 
             if (pokeData != null && speciesData != null)
             {
-                // We only want Gen 1 (1-151)
                 if (pokeData.Id > 151)
                     return;
 
@@ -109,13 +101,9 @@ public class PokemonImport
         }
     }
 
-    // Gen 1 is the only generation we import today; the column keeps the table multi-gen ready.
-    private const int Gen1 = 1;
+    private const int Gen1 = 1; // Learnsets is already keyed by Generation — TODO.md → Multi-Generation
 
-    // Persist the species' Gen 1 learnset — level-up moves plus TM/HM (machine) rows, each tagged by
-    // LearnMethod. Idempotent: clears this species' Gen 1 rows then re-inserts, so re-running the importer
-    // converges (same pattern as the game-availability seeder). The (MoveId, LearnLevel, Method) data comes
-    // straight off the already-fetched /pokemon response — no extra API call.
+    /// <summary>Persists the species' Gen 1 learnset (DATA_IMPORT.md §4.6).</summary>
     private static async Task ImportLearnset(PokeApiPokemon pokeData, PokemonDbContext context)
     {
         var entries = LearnsetMapper.ExtractGen1Learnset(pokeData);
@@ -160,7 +148,7 @@ public class PokemonImport
                 pokeData.Stats?.FirstOrDefault(s => s.Stat?.Name == "defense")?.BaseStat ?? 0,
             BaseSpecial =
                 pokeData.Stats?.FirstOrDefault(s => s.Stat?.Name == "special-attack")?.BaseStat
-                ?? 0, // In Gen 1 Special Attack and Defense were one "Special" stat
+                ?? 0, // Gen 1's one Special stat — deliberately special-attack, not an average (DATA_IMPORT.md §4.2)
             BaseSpeed = pokeData.Stats?.FirstOrDefault(s => s.Stat?.Name == "speed")?.BaseStat ?? 0,
             GrowthRate = MapGrowthRate(speciesData.GrowthRate?.Name),
             CatchRate = speciesData.CaptureRate,
@@ -171,10 +159,6 @@ public class PokemonImport
                 .Replace("\n", " "),
         };
 
-        // Types — prefer Gen 1-era types from past_types if available.
-        // PokeAPI returns current types; past_types records what changed and when.
-        // Each past_types entry means "these types were in effect up to and including
-        // this generation". We pick the earliest entry covering Gen 1 (gen i–v).
         var gen1TypeSlots = Gen1TypeSlots(pokeData);
 
         if (gen1TypeSlots?.Count > 0)
@@ -194,9 +178,7 @@ public class PokemonImport
         return species;
     }
 
-    // Generations that predate Gen 6 (when Fairy type was added and Steel/Dark lost
-    // some interactions). An entry in past_types with one of these names means the
-    // listed types were the ones in use during Gen 1.
+    // Pre-Gen-6 generation names — an entry here means the listed types were Gen 1's (DATA_IMPORT.md §4.2).
     private static readonly HashSet<string> PreGen6 =
     [
         "generation-i",
@@ -217,8 +199,6 @@ public class PokemonImport
 
     private static List<PokemonTypeSlot>? Gen1TypeSlots(PokeApiPokemon pokeData)
     {
-        // If past_types has any pre-Gen-6 entry, that is the Gen 1 type. Pick the
-        // entry with the lowest generation number (earliest historical record).
         var historical = pokeData
             .PastTypes?.Where(pt =>
                 pt.Generation?.Name != null && PreGen6.Contains(pt.Generation.Name)

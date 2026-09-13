@@ -41,8 +41,7 @@ public class EvolutionDetail
     [JsonPropertyName("item")]
     public NamedApiResource? Item { get; set; }
 
-    // Later-generation conditions we use to reject non-Gen-1 evolutions that reuse the level-up
-    // trigger (e.g. Eevee → Espeon is "level-up" gated by happiness, not a Gen 1 evolution).
+    // Non-Gen-1 level-up conditions (DATA_IMPORT.md §4.7).
     [JsonPropertyName("min_happiness")]
     public int? MinHappiness { get; set; }
 

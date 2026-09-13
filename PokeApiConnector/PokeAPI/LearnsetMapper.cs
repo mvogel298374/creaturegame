@@ -2,43 +2,22 @@ namespace PokeApiConnector.PokeAPI;
 
 using creaturegame.DB;
 
-/// <summary>
-/// Turns a PokeAPI <c>/pokemon/{id}</c> response into our Gen 1 learnset.
-/// <para>
-/// This is the single place the Gen 1 decision lives (mirrors
-/// <c>PokemonImport.Gen1TypeSlots</c> and <c>GameAvailabilitySeeder</c>): PokeAPI returns
-/// every move across every game and learn method, so we keep only entries whose
-/// <c>version_group</c> is <c>red-blue</c>, by two learn methods — <c>level-up</c> (tagged
-/// <see cref="LearnMethod.LevelUp"/>) and <c>machine</c> (TM/HM, tagged <see cref="LearnMethod.Machine"/>).
-/// A move learnable both ways is kept as level-up (it's already in the level-up pool). The comment is the
-/// spec — change it here, not in the runtime model.
-/// </para>
-/// </summary>
+/// <summary>Turns a PokeAPI <c>/pokemon/{id}</c> response into our Gen 1 learnset (DATA_IMPORT.md §4.6).</summary>
 public static class LearnsetMapper
 {
     private const string Gen1VersionGroup = "red-blue";
     private const string LevelUpMethod = "level-up";
     private const string MachineMethod = "machine";
+    private const int MaxGen1MoveId = 165; // guards against a stray later-gen move id
 
-    // Gen 1 has 165 moves; our moves.db is keyed by the PokeAPI move id (1–165). Guard
-    // against a stray later-gen move id sneaking in via an unexpected version-group entry.
-    private const int MaxGen1MoveId = 165;
-
-    /// <summary>
-    /// Extracts the Gen 1 (red-blue) learnset as (MoveId, LearnLevel, Method) rows: every level-up move (lowest
-    /// level kept) plus every TM/HM (machine) move the species can learn. One row per move — a move that is both
-    /// level-up and machine is emitted as <see cref="LearnMethod.LevelUp"/> (machine adds nothing to its pool
-    /// membership). Machine rows carry <c>LearnLevel = 0</c>. Ordered by method (level-up first), then level,
-    /// then move id for stable persistence.
-    /// </summary>
+    /// <summary>Extracts the Gen 1 (red-blue) learnset as (MoveId, LearnLevel, Method) rows, ordered by
+    /// method then level then move id for stable persistence.</summary>
     public static IReadOnlyList<(
         int MoveId,
         int LearnLevel,
         LearnMethod Method
     )> ExtractGen1Learnset(PokeApiPokemon pokemon)
     {
-        // A move can have several version_group_details; keep the lowest Gen 1 level-up level, and note any
-        // move learnable by machine (TM/HM).
         var lowestLevelByMove = new Dictionary<int, int>();
         var machineMoves = new HashSet<int>();
 
@@ -72,7 +51,6 @@ public static class LearnsetMapper
         var levelUp = lowestLevelByMove.Select(kv =>
             (MoveId: kv.Key, LearnLevel: kv.Value, Method: LearnMethod.LevelUp)
         );
-        // Machine moves the species can't also learn by level-up — those are already covered above.
         var machine = machineMoves
             .Where(id => !lowestLevelByMove.ContainsKey(id))
             .Select(id => (MoveId: id, LearnLevel: 0, Method: LearnMethod.Machine));

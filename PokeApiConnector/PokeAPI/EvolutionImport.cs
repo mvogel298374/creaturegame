@@ -4,19 +4,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace PokeApiConnector.PokeAPI;
 
-/// <summary>
-/// Imports the Gen 1 evolution edges into <c>pokemon.db</c>'s <c>PokemonEvolution</c> table.
-/// Self-contained and re-runnable: it clears this generation's rows then re-inserts, so re-running
-/// converges (same idempotent pattern as the learnset import and the availability seeder).
-/// <para>
-/// Each Gen 1 species' family shares one <c>/evolution-chain</c> resource, so we look up each
-/// species' chain url, fetch each <i>unique</i> chain once, and let <see cref="EvolutionMapper"/>
-/// flatten it into faithful Gen 1 edges.
-/// </para>
-/// </summary>
+/// <summary>Imports the Gen 1 evolution edges into <c>pokemon.db</c> (DATA_IMPORT.md §4.7).</summary>
 public static class EvolutionImport
 {
-    private const int Gen1 = 1;
+    private const int Gen1 = 1; // Evolutions is already keyed by Generation — TODO.md → Multi-Generation
     private const int MaxGen1SpeciesId = 151;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -73,7 +64,6 @@ public static class EvolutionImport
         }
     }
 
-    // Each species points at its family's evolution chain; dedupe so each chain is fetched once.
     private static async Task<HashSet<string>> CollectChainUrlsAsync()
     {
         var urls = new HashSet<string>();

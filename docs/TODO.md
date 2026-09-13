@@ -1303,6 +1303,56 @@ Battles are fully playable now — docs won't describe a moving target.
 
 ---
 
+## Comment Condensation Pass — deep cut + extract to docs  ⟵ IN PROGRESS, started 2026-09-13
+
+**Raised by the user (2026-09-13):** the codebase's comments were mostly deliberate design-rationale prose
+(a survey found genuine restate-the-obvious filler only in `PokeApiConnector` and a few frontend leaf files),
+but since every comment here was written by this session with no external-API audience, the user's call was to
+**deep-cut anyway — but pull anything genuinely useful into `docs/*.md` first**, so the code shrinks to
+near-minimal and the docs carry the record. Full method (the 3-outcome rule: delete / migrate-then-cut / keep
+minimally, plus the extraction-target table) is in the session's plan file; the short version is: before
+condensing any comment, check whether the fact is already on a seam member's own XML doc (e.g.
+`IBattleRules.FaintEndsTurnImmediately` — this codebase's own established "one canonical explanation, pointers
+everywhere else" convention) or in `STATE_MODEL.md`/`GENERATION_SEAMS.md`/`ENCOUNTER_DESIGN.md`/
+`DATA_IMPORT.md`/`TODO_ARCHIVE.md`; migrate first if not, then cut to a short pointer. Each batch is verified
+(build + CSharpier + full `.NET` suite) and independently audited by a second agent for lost seam/trap content
+and doc duplication/staleness before moving on — staged deliberately, one batch reviewed and approved before
+the next (not a single giant sweep).
+
+**Progress:**
+- [x] **Batch 1 — `PokeApiConnector/`** (~20 files) ✅ DONE (2026-09-13). Extracted into `DATA_IMPORT.md`: new
+  §4.6 Learnsets, §4.7 Evolutions (previously undocumented), the full `Gen1MoveEffects` special-move-effects
+  catalog folded into §4.1, a missing Psywave entry, the `-- assets` CLI stage. Also caught and fixed stale doc
+  claims found along the way (a "the corrections list is exactly one: Acid" line that no longer matched the
+  ~14-entry `ApplyGen1Corrections` switch; a miscounted pipeline-step list; a missing item-sprite step/table
+  row). One real miss from the first pass, caught by the user and fixed: two "this DB column is already
+  multi-gen-ready" signposts (`PokemonImport`/`MoveImport`) were deleted with no replacement — restored as
+  short pointers to this section, and a matching one added to `EvolutionImport` for consistency.
+- [x] **Batch 2 — core engine** (`Battle.cs`, `AttackAction.cs`, `DamageCalculator.cs`, `RunDirector.cs`,
+  `RunEvents/BattleRunEvent.cs` + `LeadChoiceEvent.cs`; the four smaller `RunEvents/` files were already lean,
+  left as-is) ✅ DONE (2026-09-13), independent audit launched (result pending at time of writing — check its
+  conversation for the verdict before treating this fully closed). Almost entirely pointer-condensation, not
+  fresh extraction: `STATE_MODEL.md` §2 and `GENERATION_SEAMS.md` already fully covered the participant-XP
+  split, mutual-KO/`PlayerWon` semantics, and the `RunRules`-is-not-a-seam distinction. Two genuinely new,
+  previously-undocumented sections added to `STATE_MODEL.md` §2: Haze's narrow field-by-field reset (vs. a full
+  `BattleState` wipe) and why Mimic/Transform identity reverts before any reset, not just at battle end.
+- [ ] **Batch 3 — `creaturegame.Web/Battle/`** — `EncounterFactory.cs`, `EnemyArchetype.cs`,
+  `GameSessionManager.cs`, `RewardCalculator.cs`, `Hubs/BattleHub.cs`, `SignalRBattleEventEmitter.cs`.
+  Extraction targets: `ENCOUNTER_DESIGN.md`, `GAME_LOOP.md`, `ARCHITECTURE.md`.
+- [ ] **Batch 4 — frontend** `src/battle/`, `src/hooks/`, `src/components/` — `BattleScreen.tsx`,
+  `useBattleHub.ts`, `battleReducer.ts`, `timeline.ts`, `BattleScene.ts`, the modal components. Extraction
+  targets: `SPRITE_PRESENTATION.md`, `GENERATION_PROFILE.md`, `ARCHITECTURE.md`.
+- [ ] **Batch 5 — mop-up** — remaining `.cs` (`Evolution/`, `Items/` beyond `ItemEffects.cs`, `DB/` services,
+  `Controllers/`) and the remaining frontend leaf/config files the original survey flagged as dense-but-tiny
+  (`moveMenu.ts`, `playerIdentity.ts`, `presentation.ts`, etc.).
+- [ ] **Batch 6 — tests** — light touch expected; the original survey found tests already comment-light.
+  Likely a quick "no change needed" report rather than a real batch.
+
+Each batch stops for review before the next; "continue" was given per-batch, not as blanket approval for the
+whole list.
+
+---
+
 ## Tech Debt / Cleanup
 
 **Done & archived** — full write-ups in [`TODO_ARCHIVE.md`](TODO_ARCHIVE.md) → *Tech-Debt cleanups*:

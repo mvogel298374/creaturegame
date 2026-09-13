@@ -85,6 +85,27 @@ run loop — it's simply always current on the object across battles — whereas
 captured after each win and re-applied as the next fight's entry status by the `RunDirector` (so the generation
 can transform it out of battle, e.g. Gen 1 Toxic → Poison).
 
+**Haze is a narrower reset than a battle-end wipe (`Creature.ResetForHaze`).** Gen 1's `HazeEffect_`
+(pokered `engine/battle/move_effects/haze.asm`) only ever touches a specific field list — stat stages (both
+sides); the CONFUSED bit; Disable; Mist; Focus Energy; Leech Seed; Reflect/Light Screen; and the
+"badly poisoned" bit (downgrades to regular Poison, both sides — only the escalation stops, the Poison itself
+is never cured on the user's own side). Everything else on `BattleState` — Substitute, Bide, Rampage/Thrash,
+Rage, binding, Recharge, two-turn charging, Flinch, `LastMoveUsed`, Counter's damage memory, and any
+Transform/Mimic identity swap — is left alone; a wholesale `Battle = new BattleState()` here would silently
+wipe all of that (the "full nuke, then allow-list a few fields back" mistake this narrow method exists to
+avoid). `preserveMajorStatus` (true for the *user's own* side, false for the *target's*) gates whether the
+creature's non-volatile status survives — Haze cures only the target's status, never the user's own. Curing
+the target's Sleep/Freeze also sets `BattleState.HazeSuppressedStatus`, so a faster Haze user still can't let
+the freshly-woken target act that same turn (pokered marks the woken target's already-selected move invalid
+rather than letting it through) — see `StatusResolver.CanAct`.
+
+**Mimic/Transform identity reverts before any reset, not just at battle end (`RestoreMimickedMove` /
+`RestoreOriginalIdentity`).** Both mutate the *permanent* half of `Creature` (`MoveSet`, types, stats,
+`SpeciesId`) rather than `BattleState`, so a battle-start `ResetBattleState()` calls them first — otherwise a
+copied moveset or borrowed identity from a previous fight would leak into the next one. Haze deliberately does
+**not** trigger either: Gen 1's Haze never touches an active Mimic swap or a Transformed creature's copied
+identity, so `ResetForHaze` leaves both alone.
+
 **End-of-battle effects are party-wide, not lead-only (invariant, 2026-07-18).** A switched-in creature *is* the
 active creature — there is no second-class participant (user ruling 2026-07-15). Two end-of-battle effects act on
 the whole party rather than only the creature that started the fight:

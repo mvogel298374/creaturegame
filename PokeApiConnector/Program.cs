@@ -6,7 +6,6 @@ class Program
 {
     static async Task Main(string[] args)
     {
-        // Re-run a single stage without the full (network-heavy) import. Each stage is idempotent.
         if (args.Length > 0 && args[0].Equals("evolutions", StringComparison.OrdinalIgnoreCase))
         {
             using (var pokemonContext = new creaturegame.DB.PokemonDbContext())
@@ -17,13 +16,7 @@ class Program
             return;
         }
 
-        // Re-download just the runtime sprite/cry assets — gitignored (not source files), so a clean CI
-        // checkout never has them (see docs/TODO.md's "sprites and cries missing on live" bug writeup).
-        // Sprites/cries need no local DB: they're pulled by species ID from static URLs. Item sprites do read
-        // items.db (already committed, pre-populated), so ensure its schema exists first.
-        // This is the one path a Docker build depends on for a correct image, so unlike the full import
-        // below (a human watching the console), a partial fetch must fail the build loudly instead of
-        // silently shipping an image with missing assets — the exact failure mode this stage exists to fix.
+        // DATA_IMPORT.md §3 — the Docker-build asset stage; fails loudly on a partial fetch.
         if (args.Length > 0 && args[0].Equals("assets", StringComparison.OrdinalIgnoreCase))
         {
             using (var itemsContext = new creaturegame.DB.ItemsDbContext())

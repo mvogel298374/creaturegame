@@ -147,11 +147,7 @@ public static class GameAvailabilitySeeder
     public static async Task SeedGen1Async()
     {
         using var context = new PokemonDbContext();
-
-        // Apply pending migrations first
         context.EnsureDatabaseCreated();
-
-        // Clear all existing availability rows and re-seed cleanly
         await context.GameAvailability.ExecuteDeleteAsync();
 
         var rows = new List<PokemonGameAvailability>();

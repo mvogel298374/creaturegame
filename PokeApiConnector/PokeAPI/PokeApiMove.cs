@@ -43,9 +43,7 @@ public class PokeApiMove
     [JsonPropertyName("meta")]
     public MoveMeta? Meta { get; set; }
 
-    // Historical values for generations before the move was changed. Each entry's version_group
-    // is the group in which the value changed to its *next* value, so the recorded value was in
-    // effect in all *earlier* generations — including Gen 1. PokeAPI lists them oldest-first.
+    // Earliest entry = the Gen 1 value; PokeAPI lists them oldest-first (DATA_IMPORT.md §4.1).
     [JsonPropertyName("past_values")]
     public List<MovePastValue>? PastValues { get; set; }
 }

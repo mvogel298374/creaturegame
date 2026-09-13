@@ -223,12 +223,8 @@ public class Creature
     public int ExpSpecial { get; set; } = 0;
     public int ExpSpeed { get; set; } = 0;
 
-    // ── Transient per-battle state ───────────────────────────────────────────
-    // Owned by BattleState; reset by assigning a fresh instance (see ResetBattleState).
-    // Access every per-battle field through this property (creature.Battle.X) — there is
-    // deliberately no delegating facade on Creature, so a NEW per-battle field can only be
-    // added to BattleState, never accidentally onto Creature. That is what makes a forgotten
-    // reset structurally impossible.
+    // Owned by BattleState; reset by assigning a fresh instance — no delegating facade, by design
+    // (STATE_MODEL.md §3/§4.2/§4.3).
     public BattleState Battle { get; set; } = new();
 
     /// <summary>
@@ -238,14 +234,8 @@ public class Creature
     public bool CanSelectAnyMove =>
         MoveSet.Any(m => m.PowerPointsCurrent > 0 && m != Battle.DisabledMove);
 
-    /// <summary>
-    /// Undoes a transient Mimic move-swap, putting the original move back in the slot. Safe to call
-    /// when no Mimic is active. Lives here (not just at battle end) because Mimic mutates the permanent
-    /// <see cref="MoveSet"/>, so any reset of the transient state must revert it first or the copied
-    /// move leaks — called by <see cref="ResetBattleState"/> at the start of a creature's next battle
-    /// (Haze does NOT trigger this — <see cref="ResetForHaze"/> deliberately leaves an active Mimic
-    /// swap alone; Gen 1's Haze never touches it).
-    /// </summary>
+    /// <summary>Undoes a transient Mimic move-swap. Safe to call when no Mimic is active. Reverts before
+    /// any reset, not just at battle end — STATE_MODEL.md §2.</summary>
     public void RestoreMimickedMove()
     {
         if (Battle.MimicWrapper is null || Battle.MimicOriginalBase is null)
@@ -278,15 +268,9 @@ public class Creature
         };
     }
 
-    /// <summary>
-    /// Undoes a Transform / Conversion identity change, restoring the original types, stats, SpeciesId,
-    /// and moveset. Current HP/MaxHP are preserved (Transform never copied them). Safe to call when no
-    /// mutation is active. Lives here (not just at battle end) for the same reason as the Mimic revert:
-    /// the change is to the *permanent* Creature, so any reset of transient state must undo it first or
-    /// the copied identity leaks — called by <see cref="ResetBattleState"/> at the start of a creature's
-    /// next battle (Haze does NOT trigger this — <see cref="ResetForHaze"/> deliberately preserves an
-    /// active Transform; Gen 1's Haze explicitly keeps the TRANSFORMED bit set).
-    /// </summary>
+    /// <summary>Undoes a Transform/Conversion identity change. Current HP/MaxHP are preserved. Safe to
+    /// call when no mutation is active. Reverts before any reset, not just at battle end —
+    /// STATE_MODEL.md §2.</summary>
     public void RestoreOriginalIdentity()
     {
         if (Battle.OriginalIdentity is not { } snap)
@@ -316,24 +300,10 @@ public class Creature
         Battle = new BattleState();
     }
 
-    /// <summary>
-    /// Haze's own reset — a deliberately narrow, field-by-field clear, NOT a <see cref="ResetBattleState"/>
-    /// wholesale replace. Gen 1's <c>HazeEffect_</c> (pokered <c>engine/battle/move_effects/haze.asm</c>)
-    /// only ever touches: stat stages (both sides); the CONFUSED bit specifically (not the rest of that
-    /// status byte); Disable; Mist; Focus Energy; Leech Seed; Reflect/Light Screen; and the "badly
-    /// poisoned" bit (downgrades to a regular Poison, both sides — only the ToxicCounter escalation
-    /// stops, the Poison itself is never cured on the user's own side). Everything else on
-    /// <see cref="BattleState"/> — Substitute, Bide, Rampage/Thrash, Rage, Binding/trap victim state,
-    /// Recharge, two-turn charging, Flinch, Mirror Move's <c>LastMoveUsed</c>, Counter's damage memory,
-    /// and any Transform/Mimic identity swap — is left completely alone; a wholesale
-    /// <c>Battle = new BattleState()</c> here would silently wipe all of that (the same "full nuke, then
-    /// allow-list a few fields back" mistake this method exists to fix). When
-    /// <paramref name="preserveMajorStatus"/> is true the creature's own non-volatile status (and, for
-    /// Sleep, its remaining counter) survives too — Haze cures only the <em>target's</em> status, never
-    /// the user's own. Curing the target's Sleep/Freeze also sets <see cref="BattleState.HazeSuppressedStatus"/>,
-    /// so a faster Haze user still can't let the freshly-woken target act that same turn (pokered marks
-    /// the woken target's already-selected move invalid rather than letting it through).
-    /// </summary>
+    /// <summary>Haze's own reset — a deliberately narrow, field-by-field clear, NOT a
+    /// <see cref="ResetBattleState"/> wholesale replace. Full field list + Gen 1 rationale:
+    /// STATE_MODEL.md §2. <paramref name="preserveMajorStatus"/> is true for the user's own side, false for
+    /// the target's (Haze cures only the target's status).</summary>
     public void ResetForHaze(bool preserveMajorStatus)
     {
         Battle.Stages = new StatStages();
@@ -348,9 +318,7 @@ public class Creature
 
         if (!preserveMajorStatus)
         {
-            // The target's already-chosen action still forfeits this turn if Haze just woke it —
-            // Gen 1 doesn't let a freshly-cured Sleep/Freeze target act immediately (see
-            // BattleState.HazeSuppressedStatus and StatusResolver.CanAct).
+            // A freshly-cured Sleep/Freeze target still can't act this turn — StatusResolver.CanAct.
             if (Battle.Status is StatusCondition.Sleep or StatusCondition.Freeze)
                 Battle.HazeSuppressedStatus = Battle.Status;
 
@@ -369,25 +337,13 @@ public class Creature
         }
     }
 
-    /// <summary>
-    /// This creature's major status <em>out of battle</em> — the multi-creature carry model (<c>STATE_MODEL.md
-    /// §2</c>). Permanent half: unlike the transient <see cref="Battle"/> status (wiped by
-    /// <see cref="ResetBattleState"/> every fight), this persists with the creature across encounters and while
-    /// benched, so each party member keeps its own ailment until cured. The run loop captures it after a battle
-    /// (via <see cref="IBattleRules.CarryStatusOutOfBattle"/> — Gen 1 reverts Toxic → Poison out of battle) and
-    /// re-applies it as the next fight's entry status; <see cref="FullHeal"/> (the Poké Center) clears it. Null =
-    /// no carried status. Belongs on the persistent side of the eventual <c>save.db</c> boundary.
+    /// <summary>This creature's major status out of battle — the multi-creature carry model
+    /// (STATE_MODEL.md §2). Permanent half, unlike the transient <see cref="Battle"/> status. Null = none.
     /// </summary>
     public CarriedStatus? CarriedStatus { get; set; }
 
-    /// <summary>
-    /// Restores the creature to full fighting condition — HP to max, every move's PP to its maximum, and
-    /// any major status cleared. This is the Gen 1 Poké Center heal (HP + PP + status, unconditional and
-    /// free), and it is generation-invariant: every generation's Center does exactly this, so it is ordinary
-    /// engine logic, not a generation seam. Volatile per-battle state (confusion, stat stages, …) is owned by
-    /// <see cref="BattleState"/> and wiped by the per-battle reset, so it isn't touched here; only the major
-    /// status that *persists* out of battle is cleared (the Toxic counter is returned to its baseline too).
-    /// </summary>
+    /// <summary>The Gen 1 Poké Center heal (HP + PP + status, unconditional, free) — generation-invariant, so
+    /// ordinary engine logic, not a seam.</summary>
     public void FullHeal()
     {
         Attributes.HP = Attributes.MaxHP;
@@ -396,9 +352,7 @@ public class Creature
         Battle.Status = StatusCondition.None;
         Battle.SleepTurns = 0;
         Battle.ToxicCounter = 1;
-        // Clear the persisted out-of-battle status too — a Poké Center heals the ailment a benched member was
-        // carrying (multi-creature carry model), not just the in-battle state.
-        CarriedStatus = null;
+        CarriedStatus = null; // clears the persisted out-of-battle status too — STATE_MODEL.md §2
     }
 
     public IStatCalculator StatCalculator { get; set; } = Gen1StatCalculator.Instance;

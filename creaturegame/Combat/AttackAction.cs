@@ -7,10 +7,7 @@ public class AttackAction : IBattleAction
 {
     public Creature Source { get; }
 
-    // The foe this action strikes. Reassignable because a voluntary switch (In-Combat Switching) can resolve
-    // BEFORE the enemy's already-built move this turn: when the player switches, Battle repoints the enemy's
-    // queued action off the creature that left and onto the one that came in (see Retarget). Set only at
-    // construction and by Battle's post-switch retarget — never mid-execution.
+    // Reassignable by Battle's post-switch retarget (see Retarget below); never mid-execution otherwise.
     public Creature Target { get; private set; }
     public int Priority { get; }
     private readonly ITypeChart _typeChart;
@@ -190,15 +187,9 @@ public class AttackAction : IBattleAction
             _emitter?.Emit(new RecoilDamage(Source.Name, recoil, Source.Attributes.HP));
         }
 
-        // Recharge next turn (Hyper Beam): only set when the move actually dealt damage. Gen 1 additionally
-        // waives the recharge on a KO — Smogon's RBY Mechanics Guide groups this with the end-of-turn
-        // residual skip as the SAME "a faint ends things there and then" rule as
-        // IBattleRules.FaintEndsTurnImmediately — while Gen 2 explicitly reversed just this half
-        // (docs/GEN_DIFFERENCES.md "Move and Mechanic Fixes": "Hyper Beam: now requires recharge even after
-        // KOing a target"), so this reads the seam rather than hardcoding a hidden Gen-1 assumption. Found
-        // 2026-09-13: without the KO check, a forced switch-in (which reuses the same EnemyCreature instance,
-        // never reset mid-battle) could inherit a stale IsRecharging flag from a KO hit and wrongly skip the
-        // enemy's next turn against the newcomer.
+        // Recharge (Hyper Beam) only when damage landed AND not a KO — IBattleRules.FaintEndsTurnImmediately;
+        // TODO_ARCHIVE.md → "End-of-turn residual … fired even after a same-turn faint" for why the KO check
+        // matters (a forced switch-in reuses the same EnemyCreature instance, never reset mid-battle).
         if (
             !usingStruggle
             && attackToUse.Effect == MoveEffect.Recharge
@@ -240,8 +231,7 @@ public class AttackAction : IBattleAction
         LockInContext? lockCtx
     )
     {
-        // OHKO *fails* (not misses) by the gen's success rule — Gen 1: fails if the target out-speeds the
-        // user (the level check is Gen 2+). Gen-variable ⇒ on the seam. Independent of the accuracy roll.
+        // OHKO *fails* (not misses) by IBattleRules.OneHitKoSucceeds — independent of the accuracy roll.
         if (category == DamageCategory.OHKO && !_rules.OneHitKoSucceeds(Source, Target))
         {
             _emitter?.Emit(new MoveMissed(Source.Name, move.Name ?? ""));
@@ -286,26 +276,21 @@ public class AttackAction : IBattleAction
             justThawed = true;
         }
 
-        // Gen 1: a target immune to the move's type takes nothing — no damage AND no secondary. That
-        // includes the damaging categories: Body Slam can't paralyze a Ghost, Thunder can't paralyze a
-        // Ground-type, Constrict can't drop a Ghost's Speed, Take Down deals no recoil, and Struggle (Normal
-        // in Gen 1) whiffs a Ghost recoil-free. Halting here — instead of folding 0× into a 0-damage hit —
-        // is what keeps every post-damage step (TryApplyStatus / TryApplyStatEffect / TryApplyMoveEffect)
-        // immunity-safe through one gate. Two deliberate exclusions: Self-Destruct still detonates its user
-        // on an immune target (its branch owns the faint), and Crash movers (Jump Kick) fall through to the
+        // A target immune to the move's type takes nothing — no damage AND no secondary (Body Slam can't
+        // paralyze a Ghost, Thunder can't paralyze Ground, Take Down deals no recoil, …). Halting here —
+        // instead of folding 0× into a 0-damage hit — keeps every post-damage step immunity-safe through one
+        // gate. Two exclusions: Self-Destruct still detonates its user, and Crash movers fall through to the
         // dedicated crash-on-immunity branch below.
         bool isPureStatusMove =
             category == DamageCategory.Standard && !usingStruggle && move.BaseDamage == 0;
-        // Gen 1: a non-damaging move almost always IGNORES type immunity — Confuse Ray confuses a Normal-
-        // type, Glare paralyses a Ghost, Growl / sleep / Disable land regardless of matchup. Only Thunder
-        // Wave and Counter still consult the chart, and which do is gen-variable (Gen 2 makes status moves
-        // respect immunity) ⇒ on IBattleRules. (Self-targeting moves never check the foe's type; Leech Seed
-        // vs Grass and "Poison can't be poisoned" have their own immunity via CanBeLeechSeeded/CanReceiveStatus.)
+        // IBattleRules.PureStatusMoveChecksTypeImmunity — a non-damaging move almost always ignores type
+        // immunity; only a few (Thunder Wave, Counter) consult it, and that set is gen-variable. (Self-targeting
+        // moves never check the foe's type; Leech Seed/Poison have their own immunity via
+        // CanBeLeechSeeded/CanReceiveStatus, not this gate.)
         bool pureStatusChecksImmunity = _rules.PureStatusMoveChecksTypeImmunity(move);
-        // A damaging Standard/Drain mover (or Struggle). Whether a 0× damaging move truly does nothing is
-        // gen-invariant (true in every generation); what varies by gen — e.g. Struggle going typeless in
-        // Gen 4 (it stays Normal through Gens 1–3) — is the move's TYPE, so the variability rides the type
-        // chart, not this gate.
+        // Whether a 0× damaging move does nothing is gen-invariant (true every generation) — the move's
+        // TYPE is what's gen-variable (e.g. Struggle going typeless in Gen 4), so that variability rides the
+        // type chart, not this gate; hence this stays inline rather than on IBattleRules.
         bool isDamagingMove =
             category is DamageCategory.Standard or DamageCategory.Drain
             && (usingStruggle || move.BaseDamage > 0)
@@ -468,9 +453,8 @@ public class AttackAction : IBattleAction
 
             case DamageCategory.SelfDestruct:
             {
-                // Gen 1: the target's Defense is halved before the calc, making Explosion/Self-Destruct much
-                // stronger. The divisor is gen-variable (gone in Gen 5+) ⇒ from the seam, passed into the
-                // calculator — no longer mutate-and-restore the creature's real stats.
+                // IBattleRules.SelfDestructDefenseDivisor, passed into the calculator — not a
+                // mutate-and-restore of the creature's real stats.
                 double eff = DamageCalculator.GetTypeEffectiveness(
                     move.DamageType,
                     Target.Type1,
@@ -502,9 +486,7 @@ public class AttackAction : IBattleAction
                 break;
 
             case DamageCategory.Psywave:
-                // Gen 1: a random 1..floor(1.5×level), ignoring Attack/Defense, type effectiveness,
-                // STAB and crits. The magnitude is gen-variable, so it comes from the rules seam.
-                damage = _rules.RollPsywaveDamage(Source, _rng);
+                damage = _rules.RollPsywaveDamage(Source, _rng); // IBattleRules.RollPsywaveDamage
                 DealDamageToTarget(damage, 1.0, false, move.DamageType);
                 break;
         }
@@ -663,9 +645,7 @@ public class AttackAction : IBattleAction
             return;
         }
 
-        // Chance comes from the rules seam (Gen 1 reads the move's single chance column for every
-        // secondary kind) rather than the StatEffectChance column directly — keeps the call site
-        // generation-agnostic, like the status/flinch/confuse secondaries.
+        // IBattleRules.GetSecondaryEffectChance, not the StatEffectChance column directly (GENERATION_SEAMS.md).
         int chance = _rules.GetSecondaryEffectChance(attack, SecondaryEffectKind.StatStage);
         if (!_rules.SecondaryHits(chance, _rng))
             return;
@@ -681,19 +661,15 @@ public class AttackAction : IBattleAction
             return;
         }
 
-        // The stage was already at the ±6 cap, so it didn't move — announcing the phantom "rose/fell" the old
-        // code emitted here was wrong. Gen 1 splits by move kind (pokered StatModifierUp/DownEffect): a PRIMARY
-        // stat move (a pure status move, BaseDamage 0 — Growl / Swords Dance / …) announces, while a SIDE-EFFECT
-        // stat drop riding a damaging move fails SILENTLY (early `ret nc` — the damage line already showed). The
-        // primary move's MESSAGE is gen-variable, so it rides the seam (sibling of RedundantConfusionAnnouncement):
-        // Gen 1 → "Nothing happened!"; the Gen-3+ "won't rise/drop anymore" line is a later gen's value. This
+        // The stage was already at the ±6 cap, so it didn't move. Only a PRIMARY stat move announces this
+        // (IBattleRules.StatStageCapAnnouncement); a side-effect stat drop on a damaging move stays silent —
         // mirrors the redundant-confusion path in MoveEffects (dedicated-move gate + switch on the rules enum).
         if (attack.BaseDamage == 0)
         {
             BattleEvent? announcement = _rules.StatStageCapAnnouncement switch
             {
                 StatCapAnnouncement.NothingHappened => new ButNothingHappened(affected.Name),
-                _ => null, // Gen 3+ names the cap ("won't rise/drop anymore!") — not modelled until that gen exists
+                _ => null,
             };
             if (announcement is not null)
                 _emitter?.Emit(announcement);

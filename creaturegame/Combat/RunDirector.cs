@@ -4,25 +4,11 @@ using creaturegame.Items;
 
 namespace creaturegame.Combat;
 
-/// <summary>
-/// Drives a run as a logic-sequenced chain of events (<c>GAME_LOOP.md §3</c>): <see cref="ChooseNextEvent"/>
-/// picks the next <see cref="IRunEvent"/> purely from <see cref="RunState"/>, the event resolves to an
-/// <see cref="Outcome"/>, and the outcome feeds back into run state. It is the <em>single owner of sequence</em>
-/// — the player only changes an event's outcome, never the order — so new node kinds (shop / treasure /
-/// mystery / elite / boss) drop in by branching <see cref="ChooseNextEvent"/>, with the loop body untouched.
-///
-/// Today the chain is the endless run: a wild <see cref="Battle"/> per encounter (one persistent player whose
-/// permanent half — HP, PP, XP, Level — carries across; each battle resets the transient half at its start,
-/// canonical Gen 1), with a Poké Center pause after every <see cref="RunDirectorOptions.HealEveryNBattles"/>-th
-/// win. When the player faints the run ends and a single <see cref="RunEnded"/> carries the summary.
-///
-/// Core stays generation- and data-agnostic via injected seams: <paramref name="enemySupplier"/> builds the
-/// scaled foe (the DB concern lives in the web layer), and the rest of the injected policy —
-/// <see cref="RunDirectorOptions.CheckEvolution"/>, the reward / shop / acquisition suppliers, the biome set —
-/// arrives on <see cref="RunDirectorOptions"/>; omit it entirely for the plain chain. (Renamed from
-/// <c>BattleRunner</c>: the run loop graduates into the <c>RunDirector</c> that <c>GAME_LOOP.md §6 Q1</c>
-/// anticipated.)
-/// </summary>
+/// <summary>Drives a run as a logic-sequenced chain of events — the target abstraction in
+/// <c>GAME_LOOP.md §3/§4</c>: <see cref="ChooseNextEvent"/> picks the next <see cref="IRunEvent"/> purely
+/// from <see cref="RunState"/>, the event resolves to an <see cref="Outcome"/>, and the outcome feeds back
+/// into run state. Core stays generation/data-agnostic via injected seams (<paramref name="enemySupplier"/>,
+/// <see cref="RunDirectorOptions"/>); omitting options entirely runs the legacy endless chain.</summary>
 public sealed class RunDirector
 {
     private readonly RunState _state;
@@ -146,13 +132,8 @@ public sealed class RunDirector
         // filtered to the playable subset so the client never references a biome it wasn't sent.
         if (_biomeModeActive)
         {
-            // The Town Map grid layout (Stage 4c): computed exactly once per island, here, at map-selection time
-            // — the playable biome subgraph is already fixed (RandomConnectedMap ran before this director was
-            // even constructed), so this is the earliest point the run's own RNG sequence can lay it out. Draws
-            // from the same shared _rng every other per-run roll uses, so it's part of the one deterministic
-            // same-seed-same-sequence stream (GAME_LOOP.md) — recomputing later would shift every later draw, so
-            // it is cached on _state.IslandLayout (not recomputed per call) — see that property's own doc for why
-            // it lives on RunState rather than a RunDirector field.
+            // Computed exactly once per island, here — the earliest point the run's shared RNG sequence can lay
+            // it out — and cached on _state.IslandLayout (never recomputed; that would shift every later draw).
             _state.IslandLayout = IslandLayoutGenerator.Generate(
                 _playableBiomes,
                 _rng ?? SystemRandomSource.Instance
@@ -341,19 +322,14 @@ public sealed class RunDirector
             return [RunNodeKind.BossBattle];
 
         var plan = new RunNodeKind[length];
-        // The opening node of a biome is always a plain wild battle — never an Elite or an interaction node —
-        // so a biome can't greet the player with a difficulty spike or a non-combat slot on entry.
-        plan[0] = RunNodeKind.WildBattle;
+        plan[0] = RunNodeKind.WildBattle; // opening node is always a soft wild battle (ENCOUNTER_DESIGN.md §7)
         for (int i = 1; i < length - 1; i++)
             plan[i] = PickInteriorNode(rng);
         plan[length - 1] = RunNodeKind.BossBattle;
         return plan;
     }
 
-    // Interior-node weights (sum 100). Battle-heavy — the run is a battle game, so most slots are encounters and
-    // Elites are the intra-biome step-up before the Boss. The interaction nodes (shop/treasure/mystery) stay a
-    // minority of slots so they punctuate rather than dilute the combat; Treasure (a player-positive reward)
-    // leads them, Mystery (the wildcard) trails. Independent roll per slot (the chosen 3c-2 model).
+    // Interior-node weights (sum 100), independent roll per slot — battle-heavy tuning, ENCOUNTER_DESIGN.md §7.
     private static RunNodeKind PickInteriorNode(IRandomSource rng) =>
         rng.Next(100) switch
         {

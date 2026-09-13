@@ -4,27 +4,11 @@ using creaturegame.Items;
 
 namespace PokeApiConnector.PokeAPI;
 
-/// <summary>
-/// Turns a PokeAPI <c>/item</c> detail into our <see cref="Item"/>, and owns the Gen 1 item roster.
-/// <para>Unlike moves/species, PokeAPI gives NO reliable Gen 1 membership signal for items — an item's
-/// <c>game_indices</c> and <c>flavor_text_entries</c> both only reach back to Gen 3 (Poké Ball has no
-/// Gen 1 entry). So — exactly as <c>GameAvailabilitySeeder</c> curates species obtainability the API
-/// can't express (DATA_IMPORT.md §4.3/§5.4) — the Gen 1 battle-item roster is encoded here as
-/// hand-verified domain knowledge in <see cref="Gen1BattleItemNames"/>, which also drives what the
-/// importer fetches.</para>
-/// <para>The well-defined Gen 1 gameplay numbers PokeAPI can't express (heal amount, cured status, …)
-/// are filled in <see cref="ApplyGen1Gameplay"/> from an authority — the move importer's layer-2
-/// strategy (DATA_IMPORT.md §4.1/§5.5). Poké Ball catch-rate multipliers are deliberately NOT modelled
-/// here: Gen 1 capture is a battle formula that belongs with the (deferred) Catch mechanic.</para>
-/// </summary>
+/// <summary>Turns a PokeAPI <c>/item</c> detail into our <see cref="Item"/>, and owns the Gen 1 item
+/// roster (DATA_IMPORT.md §4.5).</summary>
 public static class ItemMapper
 {
-    /// <summary>
-    /// The Gen 1 battle-usable items, as PokeAPI item slugs. Hand-curated because the API has no Gen 1
-    /// membership signal for items. Excludes evolution stones, vitamins, Rare Candy, key items, TMs and
-    /// berries — see TODO "Item System — Data Import". ("x-sp-atk" is the modern slug for Gen 1's X
-    /// Special; X Sp. Def did not exist in Gen 1.)
-    /// </summary>
+    /// <summary>The Gen 1 battle-usable items, as PokeAPI item slugs (DATA_IMPORT.md §4.5).</summary>
     public static readonly IReadOnlySet<string> Gen1BattleItemNames = new HashSet<string>
     {
         // Poké Balls
@@ -46,10 +30,7 @@ public static class ItemMapper
         "awakening",
         "paralyze-heal",
         "full-heal",
-        // Revival. Gen 1 shipped Revive only — Max Revive is Gen 2 and is deliberately NOT imported (2026-07-30):
-        // the catalogs hold one generation's content and nothing else, which is what lets
-        // Gen1ContentScope be an honest identity. It returns with the per-generation item data in
-        // TODO.md -> Multi-Generation, not by being re-added here.
+        // Revival — Gen 1 shipped Revive only; Max Revive is Gen 2, deliberately excluded (DATA_IMPORT.md §4.5)
         "revive",
         // PP restore
         "ether",
@@ -98,10 +79,7 @@ public static class ItemMapper
             _ => ItemCategory.Other,
         };
 
-    // ── Gen 1 gameplay numbers (layer 2: facts PokeAPI's structured data can't express) ───────────
-    // PokeAPI gives no machine-readable "this heals 20 HP" / "this cures poison", so the well-defined
-    // Gen 1 numbers are set here by item name from an authority (Bulbapedia). Keep it verified and
-    // commented — the same layered strategy the move importer uses.
+    /// <summary>Gen 1 gameplay numbers PokeAPI can't express, by item name (DATA_IMPORT.md §4.5).</summary>
     private static void ApplyGen1Gameplay(Item item)
     {
         switch (item.Name)
@@ -119,7 +97,7 @@ public static class ItemMapper
             case "max-potion":
                 item.HealsAllHp = true;
                 break;
-            case "full-restore": // restores all HP and cures all status
+            case "full-restore":
                 item.HealsAllHp = true;
                 item.CuresAllStatus = true;
                 break;
@@ -140,22 +118,15 @@ public static class ItemMapper
             case "paralyze-heal":
                 item.CuredStatus = StatusCondition.Paralysis;
                 break;
-            case "full-heal": // cures all status
+            case "full-heal":
                 item.CuresAllStatus = true;
                 break;
 
-            // Revival
-            // Gen 1's only revival item. RevivePercent stays a general field (ReviveItemEffect reads it
-            // generically), so a later generation's Max Revive needs no engine change — but it does need a
-            // layer-2 override HERE: PokeAPI supplies no revive percent, so the deleted `case "max-revive":
-            // RevivePercent = 100` must come back alongside it, per-generation. Re-adding the slug to an
-            // allowlist alone yields RevivePercent = 0 — a silently broken item.
             case "revive":
                 item.RevivePercent = 50;
                 break;
 
-            // PP restore. Ether/Elixir restore 10 PP; Max variants fully restore. Ether/Max Ether target
-            // ONE move; Elixir/Max Elixir restore EVERY move (RestoresPpAllMoves).
+            // PP restore — Ether/Max Ether target one move; Elixir/Max Elixir restore every move.
             case "ether":
                 item.PpRestoreAmount = 10;
                 break;
@@ -193,9 +164,6 @@ public static class ItemMapper
                 item.StatBoostStat = StageStat.Accuracy;
                 item.StatBoostStages = 1;
                 break;
-            // dire-hit and guard-spec are battle-usable boosters whose effect isn't a stat-stage change:
-            // Dire Hit raises crit (Gen 1: the Focus Energy state); Guard Spec. sets Mist (blocks foe stat
-            // drops). Flagged here so the BattleStatBoost item effect can mirror the Focus Energy / Mist moves.
             case "dire-hit":
                 item.BoostsCrit = true;
                 break;

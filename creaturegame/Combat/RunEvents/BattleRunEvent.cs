@@ -46,19 +46,12 @@ internal sealed class BattleRunEvent(
         if (tier != EncounterTier.Normal || s.CurrentBiome is not null)
             ctx.Emitter?.Emit(new RunNodeEntered(nodeKind));
 
-        // RunDepth is the progression depth — 0 for the first node, climbing per node traversed (wins +
-        // interaction visits; = BattlesWon in the legacy chain). The supplier scales the next foe (BST band,
-        // level) to it, themes it to the current biome (null in the legacy chain), and maps this node's
-        // EncounterTier to an archetype; see EncounterFactory.CreateEnemyAsync.
+        // The supplier scales the next foe to RunDepth/biome/tier — see EncounterFactory.CreateEnemyAsync.
         var enemy = await enemySupplier(player, s.RunDepth, s.CurrentBiome, tier);
-        // Remember every species faced in this biome — the "fought-only" pool the themed draft may offer from
-        // (ENCOUNTER_DESIGN.md §4). Recorded on encounter (win, loss, or flee all count as "faced"); the set is
-        // cleared when the next biome is entered. Empty in the legacy chain (no biome), so no draft can fire.
+        // The fought-only pool the themed draft offers from (ENCOUNTER_DESIGN.md §4); cleared on biome change.
         s.FoughtSpeciesInBiome.Add(enemy.SpeciesId);
-        // Snapshot every party member's pre-battle level (keyed by reference) so the post-win evolution check can
-        // fire for ANY creature that levelled this battle — the active lead, a forced switch-in that finished, or a
-        // bench member raised by the innate Exp-Share — each compared against its own starting level, not a single
-        // local that only describes the creature that started the fight.
+        // Per-member pre-battle level snapshot (keyed by reference — Creature overrides neither Equals nor
+        // GetHashCode) so the post-win evolution check fires for ANY creature that levelled — STATE_MODEL.md §2.
         var preLevel = s.Party.Members.ToDictionary(m => m, m => m.Level);
         var battle = new Battle(
             player,
@@ -99,20 +92,9 @@ internal sealed class BattleRunEvent(
             return new FledOutcome(PlayerFled: active.Battle.HasFled);
         }
 
-        // The battle ends when one side faints. With a party, Battle keeps sending in survivors on a LOSING faint,
-        // so reaching here with a fainted active creature normally means the WHOLE party is down → the run is over
-        // (read by the director's while-loop).
-        //
-        // The one exception is a MUTUAL KO — Self-Destruct/Explosion, Struggle recoil, or end-of-turn
-        // Burn/Poison/Leech taking both sides down on the same turn. Battle's enemy-faint check runs first, so
-        // that is a WIN (battle.PlayerWon) even though the finisher is fainted, and the forced faint-switch is
-        // correctly skipped — there is no enemy left to send anyone in against. The run must not end while the
-        // bench still holds a live creature (the Phase 4 Stage 3 rule: a run ends only when the WHOLE party is
-        // down), so the player PICKS who leads on and we take the win path below. Promoting here, before the
-        // reward/draft rolls, also keeps them reading a live lead (PlayerCondition / draft scaling).
-        // Counted here, ABOVE the guard, so a trade-kill that takes the last creature with it still shows in the
-        // run summary — under the mutual-KO ruling it IS a win, and the run ending doesn't unmake it. Keyed on
-        // PlayerWon rather than on reaching the win path, which is what keeps an ordinary loss from counting.
+        // A fainted active creature normally means the whole party is down. The exception is a mutual KO
+        // (battle.PlayerWon true despite the finisher fainting) — TODO_ARCHIVE.md → "Mutual KO ends the run
+        // even with a live bench". Counted here, above the guard, so a trade-kill still shows in the run summary.
         if (battle.PlayerWon)
             s.BattlesWon++;
 
@@ -120,13 +102,8 @@ internal sealed class BattleRunEvent(
             return new BattleOutcome(false);
         await GrantBattleRewardAsync(enemy, s, ctx);
 
-        // Evolution check — Gen 1 attempts evolution on a level-up, so only for creatures that actually gained a
-        // level this battle. Every such creature evolves on the same terms — the active lead, a forced switch-in
-        // that finished, or a bench member raised by the innate Exp-Share (user ruling 2026-07-15: a switched-in
-        // creature IS the active creature; there is no second-class participant). Each member is compared against
-        // its own pre-battle level captured above, active first (the creature the player just watched), then the
-        // bench in roster order. A declined evolution re-offers at the next level-up; a creature added mid-battle
-        // (a draft) isn't in the snapshot and is skipped.
+        // Every creature that levelled this battle evolves on the same terms (STATE_MODEL.md §2) — active
+        // first, then the bench in roster order. A creature added mid-battle (a draft) isn't in the snapshot.
         bool anyEvolved = false;
         foreach (var member in EvolutionOrder(s.Party, active))
         {
@@ -143,24 +120,13 @@ internal sealed class BattleRunEvent(
         if (anyEvolved)
             ctx.Emitter?.Emit(new PartyUpdated(PartyProjection.Snapshot(s.Party)));
 
-        // Default: the finisher's major status carries into its next encounter, stored ON the creature (the
-        // multi-creature carry model — each party member keeps its own ailment while benched); a Poké Center heal
-        // clears it. The generation decides the out-of-battle form (Gen 1 reverts Toxic to Poison).
-        //
-        // Skipped when the finisher FAINTED — the mutual-KO path (its survivor is now the lead, but `active` is
-        // still the creature that actually fought, which is the one whose status this describes). A corpse has no
-        // ailment worth carrying: it cannot take the field again until something revives it, and every revive path
-        // clears CarriedStatus anyway. Guarded explicitly rather than left to write an inert value, so this does
-        // not silently depend on that invariant holding elsewhere.
+        // Skipped when the finisher fainted (the mutual-KO path) — a corpse has no ailment worth carrying, and
+        // every revive path clears CarriedStatus anyway. Guarded explicitly rather than relying on that.
         if (active.IsAlive())
             active.CarriedStatus = CaptureCarriedStatus(active);
 
-        // Acquisition (ENCOUNTER_DESIGN.md §4): the last beat of a win, and at most one offer per win. A Boss win
-        // routes to the boss-catch channel — a small chance to add the boss you just beat (Stage 2); every other
-        // win routes to the themed draft — cadence × n% × the fought-only pool (Stage 1c). Both raise the same
-        // reusable blocking AcquisitionOffered (only the source + how the offered creature is chosen differ); each
-        // supplier owns its whole policy and returns a built creature only when it fires, else null (the common
-        // case). A headless / AI input declines by default, so neither channel stalls the chain or builds a party.
+        // At most one acquisition offer per win, routed by tier (ENCOUNTER_DESIGN.md §4) — Boss catches, every
+        // other win themed-drafts. XP/reward is already applied, so the catch is pure upside.
         if (tier == EncounterTier.Boss)
             await OfferBossCatchAsync(enemy, s, ctx);
         else
@@ -169,22 +135,11 @@ internal sealed class BattleRunEvent(
         return new BattleOutcome(true);
     }
 
-    /// <summary>
-    /// A mutual KO left the finisher fainted but the party still standing: the player <b>picks</b> who leads on,
-    /// and the run continues. Returns false when the whole party is down (a real wipe), which the caller reads as
-    /// the end of the run.
-    /// <para><b>Why the forced-switch prompt and not the between-biome lead choice</b> (user ruling 2026-07-28,
-    /// after <c>requirements-review</c> challenged an earlier silent auto-promotion): "your active creature
-    /// fainted, a bench member must take over" is exactly the forced faint-switch's situation, and its prompt is
-    /// already the right shape — non-dismissable, fainted members greyed out, titled with the name that just
-    /// dropped. The between-biome <c>LeadChoiceOffered</c> assumes a post-Poké-Center party where every member is
-    /// pickable, so its modal doesn't disable a downed one.</para>
-    /// <para>The <em>result</em>, though, is a lead reassignment rather than a send-in — nobody takes the field
-    /// here, so there is no entry status and no volatile reset (each member already carries its own status), and
-    /// no <c>CreatureSwitchedIn</c>. Hence <c>LeadChanged</c> + <c>PartyUpdated</c>, the out-of-battle lead-swap
-    /// wire. A stale / out-of-range / fainted pick is corrected to the first live member, mirroring
-    /// <c>Battle</c>'s own guard, so a malformed client can never promote a corpse and strand the run.</para>
-    /// </summary>
+    /// <summary>A mutual KO left the finisher fainted but the party still standing: the player picks who leads
+    /// on (reusing the forced-switch prompt — its modal already disables fainted members), and the run
+    /// continues. A lead reassignment, not a send-in: no entry status, no <c>CreatureSwitchedIn</c>. Returns
+    /// false when the whole party is down. Full rationale: TODO_ARCHIVE.md → "Mutual KO ends the run even with
+    /// a live bench".</summary>
     private static async Task<bool> PromoteSurvivorAsync(
         RunState s,
         RunContext ctx,

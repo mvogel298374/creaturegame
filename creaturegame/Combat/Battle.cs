@@ -6,8 +6,7 @@ namespace creaturegame.Combat;
 
 public class Battle
 {
-    // The active player creature. Reassignable because a forced faint-switch (Phase 4 Stage 3) can bring in a
-    // bench member mid-battle when this one faints — every turn-loop read below follows the active creature.
+    // Reassignable — a forced or voluntary switch brings in a bench member mid-battle (STATE_MODEL.md §2).
     private Creature PlayerCreature { get; set; }
     private Creature EnemyCreature { get; }
     private readonly ITypeChart _typeChart;
@@ -23,40 +22,22 @@ public class Battle
     private readonly bool _trainerBattle;
     private readonly RunRules _runRules;
 
-    // The player's party, threaded from the run loop when the battle is party-aware (Phase 4 Stage 3). When set,
-    // a faint of the active creature that leaves a live bench member triggers a forced switch-in instead of ending
-    // the battle; null keeps the legacy single-creature behaviour (a faint ends the battle), so every direct
-    // Battle caller (tests, the endless chain) is unchanged.
+    // Null keeps the legacy single-creature behaviour (a faint ends the battle) for every direct Battle caller.
     private readonly Party? _playerParty;
 
-    // Every creature that took the field this battle — the Gen 1 "participant" set that a win's Exp is divided
-    // among. Battle-scoped BY CONSTRUCTION: BattleRunEvent builds a fresh Battle per encounter, so participation
-    // cannot leak between battles the way a flag on Creature.BattleState would — ResetBattleState() only ever
-    // reaches the ACTIVE creature and the enemy (StartFightAsync) or an incoming member (BringInMember), never a
-    // creature sitting on the bench, so a benched creature's flag would still read true in the next battle.
-    // Reference identity (Creature overrides neither Equals nor GetHashCode) — same as BattleRunEvent's preLevel.
+    // The Gen 1 participant set a win's XP is divided among (STATE_MODEL.md §2). Reference identity is safe:
+    // Creature overrides neither Equals nor GetHashCode.
     private readonly HashSet<Creature> _participants = new();
 
     private int _turnNumber;
 
-    /// <summary>
-    /// True if this battle ended because a side fled (Roar/Whirlwind in a wild battle) rather than fainting.
-    /// The run loop reads it to advance the encounter without a win/loss or XP. False until then.
-    /// </summary>
+    /// <summary>True on a Roar/Whirlwind flee (wild only) rather than a faint — the run loop advances the
+    /// encounter without a win/loss or XP.</summary>
     public bool EndedInFlee { get; private set; }
 
-    /// <summary>
-    /// True if this battle ended with the enemy fainting — the player's win — <b>regardless of whether the
-    /// finisher survived it</b>. Deliberately not derivable from <c>PlayerCreature.IsAlive()</c>: on a
-    /// <b>mutual KO</b> (Self-Destruct, Struggle recoil — a same-action effect, resolved before the
-    /// end-of-turn phase — or a shared end-of-turn Burn/Poison/Leech tick that finishes off BOTH sides on a
-    /// turn neither one already fainted from a direct hit) both sides are down, and the enemy-faint check
-    /// below runs first, so the trade is a win even though the finisher is fainted. (A direct-hit KO can no
-    /// longer be finished off by the winner's OWN residual that same turn — see
-    /// <see cref="IBattleRules.FaintEndsTurnImmediately"/> — so that narrower case the tests used to cover
-    /// with end-of-turn Burn now uses Recoil instead; see <c>PartyExpShareTests.MutualKo_…</c>.) The run loop
-    /// reads this to tell a mutual KO apart from a real party wipe. False until then.
-    /// </summary>
+    /// <summary>True on the player's win, independent of whether the finisher itself survived it (a mutual
+    /// KO) — the enemy-faint check runs first. STATE_MODEL.md §2 / TODO_ARCHIVE.md → "Mutual KO ends the run
+    /// even with a live bench".</summary>
     public bool PlayerWon { get; private set; }
 
     public Battle(
@@ -72,19 +53,11 @@ public class Battle
         CarriedStatus? playerEntryStatus = null,
         Bag? playerBag = null,
         bool escapable = true,
-        // True when the defeated foe is trainer-owned (the Elite/Boss "trainer-analog" tiers) — the run layer
-        // supplies this fact and the Gen-1 seam applies the trainer ×1.5 XP bonus. False (default) = a wild foe,
-        // so every direct Battle caller stays on pure wild XP.
+        // Trainer-owned foe (Elite/Boss) → the Gen-1 seam's ×1.5 XP bonus. Default false = wild.
         bool trainerBattle = false,
-        // Roguelite run-balance rules applied on top of the Gen-1 seam (see the XP award site in the turn loop).
-        // NOT a generation seam: the Gen-1 formula stays pure in IBattleRules.CalculateXpAwarded; RunRules only
-        // scales its result so the run layer can tune levelling pace without touching Gen-1 fidelity. Null →
-        // RunRules.Default (a 1.0 no-op), so every direct Battle caller (tests, the legacy chain) is unchanged.
+        // Roguelite dial on top of the Gen-1 seam, NOT a seam itself — GENERATION_SEAMS.md. Default is a no-op.
         RunRules? runRules = null,
-        // The player's party (Phase 4 Stage 3, forced-switch-on-faint). When supplied, `player` must be its
-        // current Lead; a faint of the active creature that leaves a live bench member sends in a replacement
-        // against the same enemy instead of ending the battle. Null (the default) = the legacy single-creature
-        // battle (a faint ends it), so every existing Battle caller is unchanged.
+        // Forced-switch-on-faint when supplied; `player` must be its current Lead. Null = legacy single-creature.
         Party? playerParty = null
     )
     {
@@ -110,15 +83,7 @@ public class Battle
         PlayerCreature.ResetBattleState();
         EnemyCreature.ResetBattleState();
 
-        // The opening lead takes the field, so it's a participant in this battle's Exp split (BringInMember
-        // records every later switch-in). With no party wired this stays a set of one, so the split below is a
-        // 1-way division = the full award — every direct single-creature Battle caller is unchanged.
         _participants.Add(PlayerCreature);
-
-        // A player carried over from a previous encounter in an endless run keeps its major status — Gen 1
-        // persists status out of battle, but the per-battle reset above just cleared it, so re-apply.
-        // Volatiles (confusion, stat stages, …) are deliberately NOT carried. Enemies are always freshly
-        // built, so they never carry anything.
         ApplyEntryStatus(_playerEntryStatus);
 
         _emitter?.Emit(
@@ -239,27 +204,18 @@ public class Battle
                             toRetarget.Retarget(PlayerCreature);
             }
 
-            // Haze: a suppression set THIS turn but never consumed (the target already acted before the
-            // Haze user this same turn, so ResetForHaze ran too late for this turn's own CanAct check)
-            // must not leak into next turn's CanAct. Gen 1's own move-invalidation write only ever
-            // matters for the turn it's issued on — the next turn's fresh move selection overwrites it
-            // before it's ever read again — so a flag still standing here is stale, not a pending block.
+            // A suppression set but never consumed this turn is stale, not a pending block (next turn's move
+            // selection overwrites it before it's read again) — must not leak into next turn's CanAct.
             PlayerCreature.Battle.HazeSuppressedStatus = null;
             EnemyCreature.Battle.HazeSuppressedStatus = null;
 
-            // Counters like Disable's lock and a binding trap always tick down, even on a turn a faint ends
-            // early below — Gen 1 decrements these during the turn regardless of who's still standing at the
-            // end of it (unlike the residual phase right after, which the seam below skips outright).
+            // Disable/binding countdowns always tick, even on a turn a faint ends early below — unlike the
+            // residual phase, these are NOT part of IBattleRules.FaintEndsTurnImmediately.
             StatusResolver.TickTurnCounters(PlayerCreature, _emitter);
             StatusResolver.TickTurnCounters(EnemyCreature, _emitter);
 
-            // IBattleRules.FaintEndsTurnImmediately (Gen 1: true) — "If a Pokémon faints, the turn ends there
-            // and then" (Smogon RBY Mechanics Guide): a faint from a direct hit in the action loop above skips
-            // the ENTIRE residual phase, not just the fainted creature's own damage. Confirmed 2026-09-12
-            // against a reported log where the surviving side's poison tick still fired (and was still logged)
-            // on the same turn its own Quick Attack KO'd the opponent — real Gen 1 does not let that tick
-            // happen; the turn is simply over. Only run residual damage / Leech Seed when both sides are still
-            // standing after the action loop, or when the ruleset doesn't have this quirk at all (Gen 2+).
+            // IBattleRules.FaintEndsTurnImmediately — TODO_ARCHIVE.md → "End-of-turn residual … fired even
+            // after a same-turn faint" for the incident this guards against.
             if (
                 !_rules.FaintEndsTurnImmediately
                 || (PlayerCreature.IsAlive() && EnemyCreature.IsAlive())
@@ -290,10 +246,7 @@ public class Battle
                 // trade a win. Cannot double-emit: the branch below is unreachable once we break here.
                 if (!PlayerCreature.IsAlive())
                     _emitter?.Emit(new CreatureFainted(PlayerCreature.Name));
-                // Gen-1 base award (pure, from the seam), then the run's roguelite XP curve — a soft
-                // level-aware multiplier keyed on the winner's current level (RunRules, kept out of the seam).
-                // The emitted and applied amounts are the same scaled value, so the client's ExperienceGained
-                // matches the bar fill.
+                // Gen-1 base award, then the roguelite XP curve on top (GENERATION_SEAMS.md).
                 int baseXp = _rules.CalculateXpAwarded(
                     EnemyCreature.SpeciesBaseExperience,
                     EnemyCreature.Level,
@@ -307,65 +260,30 @@ public class Battle
                             0,
                             (int)Math.Round(baseXp * xpMult, MidpointRounding.AwayFromZero)
                         );
-                // Gen 1 participation split: the award is divided evenly among every creature that took the
-                // field this battle and is still standing — taking the field is what makes you a participant,
-                // and participants are not ranked by who happened to be there when the enemy fainted. A fainted
-                // participant earns nothing AND is excluded from the divisor, so a forced faint-switch is never
-                // penalised: the survivor is then the only live participant and takes the whole award, exactly
-                // as before this split existed. The split only bites when two creatures are alive at the end,
-                // i.e. after a voluntary SWITCH. The division itself is GEN-VARIABLE (Gen 6 dropped it, paying
-                // every participant in full), so it lives on the seam — Battle only decides WHO participated.
+                // Gen 1 participation split (STATE_MODEL.md §2) — Battle only decides WHO participated; the
+                // division itself is gen-variable and lives on the seam.
                 var participants = LiveParticipants();
                 int participantShare = _rules.SplitXpAmongParticipants(xp, participants.Count);
 
-                // Set by ANY of the three award loops below (active / other participants / bench share) — it
-                // gates the one PartyUpdated snapshot that repaints the roster panel.
-                bool anyLevelled = false;
+                bool anyLevelled = false; // gates the one PartyUpdated snapshot below
 
-                // Paid ONLY if it is still standing. A mutual KO (Self-Destruct, Struggle recoil, end-of-turn
-                // Burn/Poison/Leech — all resolved above, before this enemy-faint check) lands here with a
-                // fainted finisher, and a fainted participant earns nothing: the award then goes undivided to
-                // whichever creature fought and survived, or to nobody at all.
                 if (PlayerCreature.IsAlive())
                 {
                     PlayerCreature.AddExperience(participantShare);
                     _emitter?.Emit(new ExperienceGained(PlayerCreature.Name, participantShare));
-                    // Gen 1 Stat Exp: the win adds the defeated foe's base stats to the player's accumulated Stat
-                    // Exp (capped per stat by the calculator). It's silent (no event) and only realizes into
-                    // actual stats on the next CalculateStats — so award it BEFORE the level-up loop below, so a
-                    // level gained this battle already reflects the new training. Deliberately NOT fractionalised
-                    // by the participant split: every living member trains off a win in full (see the bench share).
+                    // Award Stat-Exp before the level-up loop so a level gained this battle already reflects it.
                     PlayerCreature.GainStatExp(EnemyCreature);
-                    // Move learning below mutates the PERMANENT MoveSet. If the player Transformed/Mimicked this
-                    // battle, MoveSet currently holds the copied moveset and the end-of-battle restore would
-                    // discard any learn — so revert the player's copied identity first. Learning (and the
-                    // level-up's stat recompute) then act on the real moveset/stats. The restore is idempotent,
-                    // so the unconditional one after the loop stays correct for the player-fainted/other paths.
+                    // Revert a Transform/Mimic copy before learning mutates the PERMANENT MoveSet.
                     PlayerCreature.RestoreMimickedMove();
                     PlayerCreature.RestoreOriginalIdentity();
-                    // Drive level-ups one at a time so each event carries that level's resulting stats, the
-                    // per-stat gains, and bar parameters (also the seam the deferred move-learning will use).
                     anyLevelled = await RunLevelUpLoopAsync(PlayerCreature, onBench: false);
                 }
 
-                // The OTHER live participants — creatures that fought and were switched back out — each earn the
-                // same share as the creature that finished the fight.
                 anyLevelled |= await PayOtherParticipantsAsync(participants, participantShare);
+                anyLevelled |= await ShareExperienceWithBenchAsync(xp); // innate bench share — STATE_MODEL.md §2
 
-                // Innate party Exp-Share (roguelite Exp-All, RunRules.BenchXpShare): every LIVING member that
-                // never took the field earns a fraction of the FULL award + the full Stat-Exp, so a drafted
-                // roster keeps pace and stays swappable. Fainted members are excluded (a fainted participant
-                // earns nothing, per Gen 1). Deliberately a roguelite deviation from Gen 1's participant split —
-                // kept out of the seam; scales the seam's result only. Never fires for a direct single-creature
-                // Battle (no party threaded) or when the share is 0. Each member's award is logged (attributed,
-                // OnBench) same as a switched-out participant's, so the text log covers the whole party.
-                anyLevelled |= await ShareExperienceWithBenchAsync(xp);
-
-                // The party strip is fed only by PartyUpdated snapshots (+ the connect-time /party hydrate), so
-                // without this a creature's level/HP would read stale in the strip until some later party-carrying
-                // event. Pushed once, covering all three loops above — INCLUDING the on-field creature's own
-                // level-up: its nameplate/HUD is driven by LeveledUp directly, but its party-strip row is not, so
-                // a lone active-creature level-up would otherwise leave the strip disagreeing with the nameplate.
+                // Covers all three award loops above, including the on-field creature's own level-up: its
+                // nameplate is driven by LeveledUp directly, but its party-strip row is not.
                 if (anyLevelled && _playerParty is not null)
                     _emitter?.Emit(new PartyUpdated(PartyProjection.Snapshot(_playerParty)));
                 break;
@@ -373,11 +291,8 @@ public class Battle
             if (!PlayerCreature.IsAlive())
             {
                 _emitter?.Emit(new CreatureFainted(PlayerCreature.Name));
-                // Forced switch-on-faint (Phase 4 Stage 3): if the party still has a live bench member, send one
-                // in against the same enemy and keep fighting; the run ends only when the whole party is down.
-                // A single-creature battle (no party wired, or no live member left) falls through to the break.
-                // Not when a side fled this turn, though: there's no longer a foe on the field to send anyone in
-                // against, so the flee gate below owns the ending (the switch would otherwise skip past it).
+                // Not when a side fled this turn — no foe left to send anyone in against, so the flee gate
+                // below owns the ending instead.
                 if (!fledThisTurn && await TrySwitchInAsync())
                     continue;
                 break;
@@ -417,17 +332,8 @@ public class Battle
         }
     }
 
-    /// <summary>
-    /// The creatures that took the field this battle and are still standing — the Gen 1 participant set a win's
-    /// Exp is divided among. Returned in <em>roster order</em> (not <see cref="HashSet{T}"/> order) so the award
-    /// events below are emitted deterministically. Fainted participants are excluded, which is what keeps a
-    /// forced faint-switch from costing the survivor anything.
-    /// <para>The on-field creature is <b>not</b> assumed alive: the enemy-faint check runs before the
-    /// player-faint branch, so a <b>mutual KO</b> (Self-Destruct, Struggle recoil, or end-of-turn Burn/Poison/
-    /// Leech) reaches the award site with a fainted finisher. It earns nothing and is not counted in the
-    /// divisor, same as any other fainted participant — so this list can legitimately be <b>empty</b> (a
-    /// single-creature mutual KO), and the award site must not pay the on-field creature unconditionally.</para>
-    /// </summary>
+    /// <summary>The Gen 1 participant set a win's XP is divided among (STATE_MODEL.md §2), in roster order for
+    /// deterministic award events. Can legitimately be empty (a single-creature mutual KO).</summary>
     private List<Creature> LiveParticipants()
     {
         var live = new List<Creature>();
@@ -440,23 +346,16 @@ public class Battle
             }
         }
 
-        // Covers the party-less battle and a Battle wired with a party the active creature isn't a member of.
-        // Gated on IsAlive() so a mutual KO can't re-admit the fainted finisher the roster loop just excluded.
+        // Covers the party-less battle; IsAlive() keeps a mutual KO's fainted finisher excluded.
         if (PlayerCreature.IsAlive() && !live.Contains(PlayerCreature))
             live.Insert(0, PlayerCreature);
 
         return live;
     }
 
-    /// <summary>
-    /// Pays every live participant <em>other than</em> the active creature its equal share
-    /// (<paramref name="share"/>) of the win, plus the full Stat-Exp, then runs its level-up + move-learn loop.
-    /// These are creatures that fought and were switched back out — a participant is not paid less for not
-    /// having been the one standing there at the end. The active creature was already paid at the award site and
-    /// is skipped here: that is the "paid once" invariant, the easy double-pay bug on this path. The award is
-    /// surfaced with <c>OnBench: true</c> so the client logs the gain <em>without</em> moving the on-field
-    /// creature's XP bar. Returns whether any of them levelled.
-    /// </summary>
+    /// <summary>Pays every live participant other than the active creature its equal <paramref name="share"/>
+    /// (STATE_MODEL.md §2) — skips the active creature, already paid at the award site (the "paid once"
+    /// invariant). Returns whether any of them levelled.</summary>
     private async Task<bool> PayOtherParticipantsAsync(
         IReadOnlyList<Creature> participants,
         int share
@@ -471,32 +370,18 @@ public class Battle
             if (share > 0)
                 member.AddExperience(share);
             _emitter?.Emit(new ExperienceGained(member.Name, share, OnBench: true));
-            // Stat-Exp is a coarse, capped accumulator — granted in full, never fractionalised by the split.
             member.GainStatExp(EnemyCreature);
 
-            // Its Mimic/Transform identity was already restored by RestoreOutgoing() as it left the field, so
-            // the level-up loop below acts on the real moveset/stats (the active creature is restored inline at
-            // the award site for the same reason).
+            // Its Mimic/Transform identity was already restored by RestoreOutgoing() as it left the field.
             anyLevelled |= await RunLevelUpLoopAsync(member, onBench: true);
         }
 
         return anyLevelled;
     }
 
-    /// <summary>
-    /// Innate party Exp-Share (roguelite Exp-All): pays each living member that <em>never took the field</em> a
-    /// fraction (<see cref="RunRules.BenchXpShare"/>) of the <em>full</em> award (<paramref name="fullAward"/> —
-    /// the undivided figure, not a participant's split share) plus the full Stat-Exp, then runs its level-up +
-    /// move-learn loop. Participants are paid their equal share elsewhere and are skipped here; a fainted member
-    /// earns nothing (Gen 1). Each award is announced via an <see cref="ExperienceGained"/> flagged
-    /// <c>OnBench: true</c> (same convention as a switched-out participant's) so the text log names every
-    /// creature that gained XP, without moving the on-field XP bar; each level additionally emits an attributed
-    /// <see cref="LeveledUp"/> (carrying the member's name). No-op without a party or with a zero share — so a
-    /// direct single-creature <see cref="Battle"/> is unaffected. Returns whether any bench member levelled.
-    /// <para>Because the share is taken off the full award while participants split it, a creature that never
-    /// fought can earn as much as (Normal) or more than (Easy) one that did. That inversion is a known,
-    /// deliberately accepted balance property — see <c>docs/TODO.md</c> → <em>Participation XP</em>.</para>
-    /// </summary>
+    /// <summary>Innate party Exp-Share: pays each living non-participant a fraction of the FULL award
+    /// (<see cref="RunRules.BenchXpShare"/>) — STATE_MODEL.md §2, incl. the known bench-vs-participant balance
+    /// inversion. No-op without a party or with a zero share. Returns whether any bench member levelled.</summary>
     private async Task<bool> ShareExperienceWithBenchAsync(int fullAward)
     {
         if (_playerParty is null || _runRules.BenchXpShare <= 0)
@@ -506,40 +391,24 @@ public class Battle
         bool anyLevelled = false;
         foreach (var member in _playerParty.Members)
         {
-            // Participants (the active creature included) are paid their equal split share, not this one.
             if (_participants.Contains(member) || !member.IsAlive())
                 continue;
 
+            // Skipped when share floors to 0 so Stat-Exp-only training stays silent (no "gained 0 EXP" line).
             if (share > 0)
             {
                 member.AddExperience(share);
-                // Announced the same way as a switched-out participant's award (OnBench: true) — the client logs
-                // it without moving the on-field XP bar, so the text log names every party member that gained
-                // XP, not just whoever was on the field. Skipped entirely when the share floors to 0 (a tiny
-                // fullAward at a high BenchXpShare — not reachable with real Gen-1 base-exp values, but a "gained
-                // 0 EXP" line would be a visible artifact if it ever were) so Stat-Exp-only training stays silent.
                 _emitter?.Emit(new ExperienceGained(member.Name, share, OnBench: true));
             }
-            // Stat-Exp is a coarse, capped accumulator — granted in full to each living member, not fractionalised
-            // (and unconditionally: a member still trains off a win even when the fractional XP floors to 0).
             member.GainStatExp(EnemyCreature);
-
-            // Same level-up loop as the active creature (flagged OnBench so the client attributes it without
-            // moving the active nameplate), so the surfacing is identical.
             anyLevelled |= await RunLevelUpLoopAsync(member, onBench: true);
         }
 
         return anyLevelled;
     }
 
-    /// <summary>
-    /// Drives one creature's level-ups one at a time after an XP award: each crossed threshold emits a
-    /// <see cref="LeveledUp"/> carrying that level's resulting stats + per-stat gains (and <paramref name="onBench"/>
-    /// so the client attributes an off-field creature's level-up — a switched-out participant or a never-deployed
-    /// bench member alike — without disturbing the active nameplate), then learns
-    /// that level's moves before stepping on — so a multi-level award prompts in canonical Gen 1 order (one move,
-    /// one level, at a time). Returns whether at least one level was gained.
-    /// </summary>
+    /// <summary>Drives one creature's level-ups one at a time, learning that level's moves before stepping on —
+    /// canonical Gen 1 order for a multi-level award. Returns whether at least one level was gained.</summary>
     private async Task<bool> RunLevelUpLoopAsync(Creature creature, bool onBench)
     {
         bool levelled = false;
@@ -571,16 +440,11 @@ public class Battle
         return levelled;
     }
 
-    /// <summary>
-    /// Resolves which move a combatant uses this turn. Lock-in mechanics bypass <see cref="IBattleInput"/>:
-    /// a two-turn move on its release turn, a rampage (Thrash) while locked in, Bide while committed,
-    /// and Rage once used all auto-repeat. Otherwise the input chooses — unless no move is selectable
-    /// (out of PP, or the only
-    /// option is Disabled), in which case <c>null</c> tells <see cref="AttackAction"/> to Struggle.
-    /// The lock branches are checked before <see cref="Creature.CanSelectAnyMove"/>, so a Rage move that
-    /// gets Disabled is still force-used (Gen 1's Rage/Disable interaction is nuanced — a documented
-    /// simplification, not enforced).
-    /// </summary>
+    /// <summary>Resolves which move a combatant uses. Lock-in mechanics (two-turn release, rampage, Bide,
+    /// Rage) bypass <see cref="IBattleInput"/> and auto-repeat, checked before
+    /// <see cref="Creature.CanSelectAnyMove"/> so a Disabled Rage move is still force-used (a known,
+    /// unenforced simplification of Gen 1's Rage/Disable nuance). Otherwise the input chooses, or
+    /// <c>null</c> for Struggle when nothing is selectable.</summary>
     private async Task<PokemonAttack?> SelectMoveAsync(
         Creature attacker,
         Creature defender,
@@ -608,15 +472,10 @@ public class Battle
         );
     }
 
-    /// <summary>
-    /// Builds the player's action for the turn: a bag <see cref="ItemAction"/> (ITEM), a
-    /// <see cref="SwitchAction"/> (SWITCH), or an <see cref="AttackAction"/> (FIGHT / Struggle). A true lock-in
-    /// (two-turn charge, rampage, bide, rage, binding user) bypasses the menu entirely and force-repeats its move.
-    /// <para>Otherwise the whole-turn menu is offered — even out of PP, so BAG/SWITCH stay reachable (Gen 1). Only
-    /// <em>choosing FIGHT</em> with nothing selectable resolves to Struggle; an unhonourable ITEM (no bag) or an
-    /// illegal SWITCH (out of range / fainted / the active member / trapped) also falls through to FIGHT rather
-    /// than stranding the turn.</para>
-    /// </summary>
+    /// <summary>Builds the player's action: ITEM/SWITCH/FIGHT. A true lock-in bypasses the menu entirely. The
+    /// whole-turn menu is otherwise offered even out of PP (BAG/SWITCH stay reachable — Gen 1); an illegal
+    /// ITEM/SWITCH pick falls through to FIGHT (Struggle if nothing is selectable) rather than stranding the
+    /// turn.</summary>
     private async Task<IBattleAction> BuildPlayerActionAsync()
     {
         var attacker = PlayerCreature;
@@ -673,14 +532,9 @@ public class Battle
         }
     }
 
-    /// <summary>
-    /// Whether the player may voluntarily switch to the party member at <paramref name="index"/> this turn. Legal
-    /// only when a party is wired, the active creature is <em>not trapped</em> by a partial-trap bind
-    /// (Wrap/Bind/Clamp/Fire Spin — the one thing that blocks switching in Gen 1; sleep / paralysis / confusion /
-    /// flinch do NOT), and the target slot is in range, alive, and not the already-active member. An illegal pick
-    /// falls back to FIGHT in <see cref="BuildPlayerActionAsync"/> — a server-side no-op backing the client's own
-    /// grey-out, so a malformed request never strands the turn.
-    /// </summary>
+    /// <summary>Legal to switch to <paramref name="index"/> this turn: a party is wired, the active creature
+    /// isn't trapped by a partial-trap bind (the one thing that blocks switching in Gen 1 — status does not),
+    /// and the target is in range, alive, and not already active.</summary>
     private bool CanSwitchTo(int index) =>
         _playerParty is not null
         && PlayerCreature.Battle.BindingTurnsRemaining == 0
@@ -689,20 +543,14 @@ public class Battle
         && index != _playerParty.LeadIndex
         && _playerParty.Members[index].IsAlive();
 
-    /// <summary>
-    /// Whether the player may voluntarily switch <em>this turn</em> — the signal projected onto
-    /// <see cref="TurnStarted"/> so the client can grey the SWITCH button proactively. True when a party is wired,
-    /// the active creature isn't force-locked into a move (a true lock-in bypasses the whole menu), and some live
-    /// benched member is a legal target (<see cref="CanSwitchTo"/> — which already rules out a trapping bind).
-    /// Deliberately independent of PP: Gen 1 lets you switch even with no usable move.
-    /// </summary>
+    /// <summary>Projected onto <see cref="TurnStarted"/> so the client can grey the SWITCH button proactively —
+    /// independent of PP (Gen 1 allows switching with no usable move).</summary>
     private bool CanSwitchThisTurn()
     {
         if (_playerParty is null)
             return false;
-        // Same predicate the menu bypass uses (ILockInMechanic.IsLockedIn) rather than a second hand-rolled
-        // ForcedMove scan — if the two ever drifted apart, CanSwitch would advertise a switch the server then
-        // refuses, and the fallback would spend the turn on a FIGHT the player never picked.
+        // Same predicate the menu bypass uses, so the two can't drift apart and advertise a switch the server
+        // then refuses.
         if (LockInMechanics.All.Any(m => m.IsLockedIn(PlayerCreature)))
             return false;
         for (int i = 0; i < _playerParty.Count; i++)
@@ -724,48 +572,33 @@ public class Battle
             _escapable
         );
 
-    /// <summary>
-    /// The forced faint-switch (Phase 4 Stage 3). Called after the active player creature has fainted: if the
-    /// party is wired and still holds a live bench member, ask the player which one to send in against the same
-    /// enemy, bring it in, and return true so the turn loop continues. Returns false — the battle ends as a loss —
-    /// when there's no party or every member is down (a single-creature battle always returns false, its legacy
-    /// behaviour). The replacement does <em>not</em> act the turn it enters (this turn already resolved) and the
-    /// enemy is untouched — canonical Gen 1.
-    /// </summary>
+    /// <summary>The forced faint-switch: if a live bench member remains, ask the player which to send in and
+    /// continue the turn loop; false (battle ends as a loss) when there's none. The replacement does not act
+    /// the turn it enters — canonical Gen 1.</summary>
     private async Task<bool> TrySwitchInAsync()
     {
         if (_playerParty is null || FirstLiveMemberIndex() < 0)
             return false;
 
-        // The outgoing (fainted) creature leaves the field — revert any Mimic/Transform before the offer snapshot
-        // shows it and before it benches. No status is captured: it fainted, and a fainted member carries nothing.
+        // No status captured: it fainted, and a fainted member carries nothing.
         RestoreOutgoing();
 
         _emitter?.Emit(
             new SwitchInOffered(PartyProjection.Snapshot(_playerParty), PlayerCreature.Name)
         );
         int index = await _playerInput.ChooseSwitchInAsync(new SwitchInContext(_playerParty));
-        // Never send in a fainted / out-of-range creature: correct a stale or malformed pick to the first live
-        // member (the interface default already picks a live one, but the web hub can forward an arbitrary int).
-        // The rule lives on Party so this and the run loop's post-mutual-KO promotion can't drift apart.
+        // Never send in a fainted/out-of-range creature — the rule lives on Party so this and the run loop's
+        // post-mutual-KO promotion can't drift apart.
         BringInMember(_playerParty.CorrectSwitchInPick(index));
         return true;
     }
 
-    /// <summary>
-    /// The voluntary in-battle switch (In-Combat Switching): swap the active creature out for the benched member
-    /// at <paramref name="index"/>, mid-turn, at the cost of the turn. Unlike the forced faint-switch the outgoing
-    /// creature is still <em>alive</em>, so its major status is captured onto its own <see cref="Creature.CarriedStatus"/>
-    /// first (Gen 1 keeps status through a switch-out — so it re-enters ailed if it returns this battle, and it
-    /// benches ailed for the next one). Then the shared send-in machinery brings the replacement in. Called from
-    /// <see cref="SwitchAction"/> once the pick has been validated by <see cref="CanSwitchTo"/>.
+    /// <summary>The voluntary in-battle switch. Unlike the forced path the outgoing creature is still alive, so
+    /// its major status is captured onto its own <see cref="Creature.CarriedStatus"/> first (Gen 1 keeps status
+    /// through a switch-out). Called from <see cref="SwitchAction"/> once validated by <see cref="CanSwitchTo"/>.
     /// </summary>
     internal void PerformVoluntarySwitch(int index)
     {
-        // The outgoing creature is still ALIVE, so its major status must survive the switch-out — Gen 1 keeps
-        // sleep/poison/burn/paralysis/freeze on a Pokémon that leaves the field. Capture it onto its own
-        // CarriedStatus (the same rule the run loop applies post-battle) so it re-enters ailed if it returns this
-        // battle, and benches ailed for the next. The forced path skips this — its outgoing creature has fainted.
         PlayerCreature.CarriedStatus = CarriedStatus.Capture(_rules, PlayerCreature);
         RestoreOutgoing();
         BringInMember(index);
@@ -780,19 +613,15 @@ public class Battle
         PlayerCreature.RestoreOriginalIdentity();
     }
 
-    /// <summary>Brings the party member at <paramref name="index"/> onto the field as the new active creature —
-    /// the shared tail of both switch paths. Reassigns <see cref="PlayerCreature"/> (and <c>RunState.Player</c> via
-    /// <see cref="Party.SetLead"/>), resets its volatiles, re-applies its OWN carried major status (each member
-    /// carries its own — nothing leaks from the creature that left), and emits the switch-in + roster snapshot.</summary>
+    /// <summary>Brings the party member at <paramref name="index"/> onto the field — the shared tail of both
+    /// switch paths. Resets volatiles, re-applies its OWN carried status (nothing leaks from the creature that
+    /// left), and records participation.</summary>
     private void BringInMember(int index)
     {
         _playerParty!.SetLead(index);
         PlayerCreature = _playerParty.Lead;
         PlayerCreature.ResetBattleState();
         ApplyEntryStatus(PlayerCreature.CarriedStatus);
-        // It took the field, so it earns a participant's share of the win — even if it is later switched back
-        // out. This is the shared tail of BOTH switch paths (forced faint-switch and the voluntary SWITCH
-        // action), so one write records participation for both.
         _participants.Add(PlayerCreature);
 
         _emitter?.Emit(
@@ -824,9 +653,6 @@ public class Battle
         }
     }
 
-    // The index of the first alive party member, or -1 if there is no party or the whole party is down. The rule
-    // itself lives on Party (shared with the run loop's post-mutual-KO promotion); this only adds the null-party
-    // case, which is the legacy single-creature battle.
     private int FirstLiveMemberIndex() => _playerParty?.FirstLiveIndex() ?? -1;
 
     private void ApplyLeechSeedDrain(Creature drained, Creature healed)

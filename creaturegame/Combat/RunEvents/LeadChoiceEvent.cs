@@ -28,11 +28,7 @@ internal sealed class LeadChoiceEvent : IRunEvent
         // stale / out-of-range pick leaves the roster untouched and emits nothing (a pure no-op).
         if (index >= 0 && index < party.Count && index != party.LeadIndex)
         {
-            party.SetLead(index);
-            // No status reconciliation needed: under the multi-creature carry model each creature carries its own
-            // out-of-battle status (Creature.CarriedStatus), so the incoming lead enters on its own status and the
-            // outgoing lead keeps its ailment while benched. The next battle sources playerEntryStatus from the
-            // new lead directly, so the previous lead's status can never leak onto the switch-in.
+            party.SetLead(index); // no status reconciliation needed — see the class doc above
             ctx.Emitter?.Emit(new LeadChanged(party.Lead.Name, party.Lead.SpeciesId));
             ctx.Emitter?.Emit(new PartyUpdated(PartyProjection.Snapshot(party)));
         }

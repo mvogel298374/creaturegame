@@ -92,8 +92,7 @@ public static class DamageCalculator
         int screenDefenseMultiplier
     )
     {
-        // Stat selection is delegated to rules — Gen 1 uses Special for both special offence
-        // and defence; Gen 2+ will return SpAtk / SpDef respectively.
+        // IBattleRules.GetOffensiveStat/GetDefensiveStat.
         int attackStat = rules.GetOffensiveStat(attacker, move.AttackType);
         int defenseStat = rules.GetDefensiveStat(defender, move.AttackType);
 
@@ -126,9 +125,7 @@ public static class DamageCalculator
                 attackStat /= 2;
         }
 
-        // Guard against zero defense (edge case with very low stats + negative stages).
-        // defenseDivisor carries gen-variable move quirks (Self-Destruct/Explosion halve Defense)
-        // so the divisor stays on IBattleRules instead of being hardcoded at the call site.
+        // Guard against zero defense; defenseDivisor is the seam's Self-Destruct/Explosion Defense-halving.
         defenseStat = Math.Max(1, defenseStat / defenseDivisor);
         attackStat = Math.Max(1, attackStat);
 

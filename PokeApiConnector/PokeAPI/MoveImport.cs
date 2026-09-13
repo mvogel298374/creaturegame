@@ -88,8 +88,6 @@ public class MoveImport
         }
     }
 
-    // PokeAPI move IDs for the handful of moves whose Gen 1 damage behaviour isn't expressible via
-    // meta.category. Named so the special-case branches in ApplyDamageCategory read as intent, not magic.
     private const int SelfDestructId = 120;
     private const int ExplosionId = 153;
     private const int SeismicTossId = 69;
@@ -98,15 +96,10 @@ public class MoveImport
     private const int PsywaveId = 149;
     private const int SonicBoomId = 49;
     private const int DragonRageId = 82;
-    private const int SwiftId = 129; // never-miss: bypasses the accuracy roll entirely
+    private const int SwiftId = 129; // never-miss
 
-    /// <summary>
-    /// Maps a PokeAPI move to a Gen-1-correct <see cref="Attack"/>, in focused stages: resolve the base
-    /// stats from <c>past_values</c>, classify the damage category, layer on the data-derived effects,
-    /// then apply the hand-verified Gen 1 corrections. Order matters — corrections run last so they win
-    /// over the mappings above. Public (a pure DTO→model function, no network/DB) so it's unit-testable
-    /// directly, like <c>EvolutionMapper</c>/<c>ItemMapper</c>.
-    /// </summary>
+    /// <summary>Maps a PokeAPI move to a Gen-1-correct <see cref="Attack"/> (DATA_IMPORT.md §4.1). Order
+    /// matters — corrections run last so they win over the mappings before them.</summary>
     public static Attack MapToAttack(PokeApiMove pokeMove)
     {
         Attack attack = BuildGen1Attack(pokeMove);
@@ -117,20 +110,11 @@ public class MoveImport
         return attack;
     }
 
-    /// <summary>
-    /// Concern 1 — resolve the move's Gen 1 numbers from PokeAPI <c>past_values</c> and build the core
-    /// <see cref="Attack"/> (power/accuracy/pp/type/category, the type-derived physical/special split,
-    /// and the secondary status from the ailment).
-    /// </summary>
+    /// <summary>Base stats + type/category resolved from <c>past_values</c> (DATA_IMPORT.md §4.1). One
+    /// row per move today; a future generation adds a row per (move, generation) — TODO.md →
+    /// Multi-Generation.</summary>
     private static Attack BuildGen1Attack(PokeApiMove pokeMove)
     {
-        // PokeAPI returns each move's MODERN stats; Gen 1 often differed (special moves stronger,
-        // Blizzard 90% accurate, several moves a different type — Bite/Gust/Karate Chop/Sand Attack were
-        // Normal). The history lives in `past_values`: each entry's value held in every generation *before*
-        // its version_group, so the EARLIEST recorded value is the Gen 1 one. Resolving power / accuracy /
-        // pp / effect_chance / type from it keeps every downstream decision (STAB, type chart, the
-        // type-derived physical/special split, damage) Gen-1-correct — one data-driven source, no per-move
-        // hardcoding. (A future multi-gen importer would store one row per generation; today it's Gen 1 only.)
         var pasts = pokeMove.PastValues ?? new List<MovePastValue>();
         int gen1Power =
             pasts.Select(p => p.Power).FirstOrDefault(v => v != null) ?? pokeMove.Power ?? 0;
@@ -165,24 +149,18 @@ public class MoveImport
         }
         else
         {
-            attack.DamageType = DamageType.Normal; // Default
+            attack.DamageType = DamageType.Normal;
         }
 
-        // Gen 1: a damaging move's physical/special split is decided by its TYPE, not the
-        // move. PokeAPI's damage_class is the Gen 4+ per-move split (e.g. it calls Fire
-        // Punch "physical" and Hyper Beam "special"), which is wrong for Gen 1 — so for any
-        // move that deals damage we derive the category from DamageType. Status moves
-        // (damage_class "status") stay Undefined.
+        // Gen 1: category derives from the move's type, not PokeAPI's damage_class (DATA_IMPORT.md §4.1).
         attack.AttackType = pokeMove.DamageClass?.Name?.ToLower() switch
         {
             "physical" or "special" => Gen1DamageCategory(attack.DamageType),
             _ => AttackType.Undefined,
         };
 
-        // PokeAPI reports a target's *status condition* here, not the move's special mechanic — so
-        // Toxic comes through as plain "poison" (the badly-poison escalation is a move effect, not a
-        // distinct ailment). Toxic → BadPoison is restored in the layer-2 override block below; no Gen 1
-        // move emits a "bad-poison" ailment, so there's no arm for it here.
+        // Toxic → BadPoison is restored in the layer-2 corrections below; PokeAPI reports it as plain
+        // "poison" here.
         attack.StatusEffect = pokeMove.Meta?.Ailment?.Name switch
         {
             "paralysis" => StatusCondition.Paralysis,
@@ -201,14 +179,9 @@ public class MoveImport
         return attack;
     }
 
-    /// <summary>
-    /// Concern 2a — the damage category: PokeAPI's <c>meta.category</c>, plus the moves it can't classify,
-    /// identified by their named move IDs (Self-Destruct, Seismic Toss, Super Fang, …). Also sets the
-    /// drain percentage and the never-miss flag.
-    /// </summary>
+    /// <summary>Damage category, drain %, and never-miss (DATA_IMPORT.md §4.1).</summary>
     private static void ApplyDamageCategory(Attack attack, PokeApiMove pokeMove)
     {
-        // Damage category — derived from meta.category and specific move IDs
         attack.DamageCategory = pokeMove.Meta?.Category?.Name switch
         {
             "damage-heal" => DamageCategory.Drain,
@@ -216,27 +189,25 @@ public class MoveImport
             _ => DamageCategory.Standard,
         };
 
-        // Moves that PokeAPI doesn't classify via meta.category — identify by their named IDs.
         if (pokeMove.Id is SelfDestructId or ExplosionId)
             attack.DamageCategory = DamageCategory.SelfDestruct;
         else if (pokeMove.Id is SeismicTossId or NightShadeId)
             attack.DamageCategory = DamageCategory.LevelBased;
         else if (pokeMove.Id == SuperFangId)
             attack.DamageCategory = DamageCategory.SuperFang;
-        else if (pokeMove.Id == PsywaveId) // variable damage: random 1..floor(1.5×level)
+        else if (pokeMove.Id == PsywaveId)
             attack.DamageCategory = DamageCategory.Psywave;
-        else if (pokeMove.Id == SonicBoomId) // fixed 20 damage
+        else if (pokeMove.Id == SonicBoomId)
         {
             attack.DamageCategory = DamageCategory.Fixed;
             attack.FixedDamageValue = 20;
         }
-        else if (pokeMove.Id == DragonRageId) // fixed 40 damage
+        else if (pokeMove.Id == DragonRageId)
         {
             attack.DamageCategory = DamageCategory.Fixed;
             attack.FixedDamageValue = 40;
         }
 
-        // Drain percentage (default 50; Mega Drain / Absorb / Leech Life all drain 50%)
         if (attack.DamageCategory == DamageCategory.Drain && pokeMove.Meta?.Drain > 0)
             attack.DrainPercent = pokeMove.Meta.Drain;
 
@@ -244,10 +215,9 @@ public class MoveImport
             attack.NeverMisses = true;
     }
 
-    /// <summary>Concern 2b — the move's stat-stage effect (Gen 1 moves carry at most one).</summary>
+    /// <summary>The move's stat-stage effect (Gen 1 moves carry at most one).</summary>
     private static void ApplyStatStageEffect(Attack attack, PokeApiMove pokeMove)
     {
-        // Stat-stage effect — take the first entry (Gen 1 moves have at most one)
         var statChange = pokeMove.StatChanges?.FirstOrDefault();
         if (statChange?.Stat?.Name != null)
         {
@@ -267,51 +237,32 @@ public class MoveImport
                 attack.StatEffectDelta = statChange.Change;
                 attack.StatEffectTarget =
                     pokeMove.Target?.Name == "user" ? StageTarget.Self : StageTarget.Foe;
-                // Pure stat moves always succeed; secondary effects on damaging moves use the
-                // (Gen-1-resolved) effect chance.
                 attack.StatEffectChance =
                     attack.BaseDamage > 0 ? (attack.EffectChance ?? 100) : 100;
             }
         }
     }
 
-    /// <summary>
-    /// Concern 2c — special move effects: the name → <see cref="MoveEffect"/> map (<see cref="Gen1MoveEffects"/>)
-    /// plus the meta-based confusion/flinch fallbacks and the fixed multi-hit counts.
-    /// </summary>
+    /// <summary>Special move effects — name lookup (DATA_IMPORT.md §4.1 catalog), then the
+    /// confusion/flinch fallbacks. Name lookup wins so Thrash/Petal Dance map to Rampage.</summary>
     private static void ApplySpecialEffects(Attack attack, PokeApiMove pokeMove)
     {
-        // Special move effects. Most are a fixed name → MoveEffect mapping (see Gen1MoveEffects); the
-        // two meta-based fallbacks below only apply when no name matched. That ordering preserves the
-        // Gen 1 rule that a rampage move (Thrash / Petal Dance) maps to Rampage rather than to its
-        // self-confusion ailment — the name lookup wins over the confusion-ailment fallback.
         if (
             pokeMove.Name is { } moveName
             && Gen1MoveEffects.TryGetValue(moveName, out var namedEffect)
         )
             attack.Effect = namedEffect;
-        // Confusion isn't a StatusCondition (it's a separate per-battle counter), so it's modelled as a
-        // move effect. EffectChance (already set) gates the secondary confusion on damaging moves
-        // (Psybeam 10%); pure confusion moves (Supersonic, Confuse Ray) have none ⇒ AttackAction
-        // treats null as always-confuse.
         else if (pokeMove.Meta?.Ailment?.Name == "confusion")
             attack.Effect = MoveEffect.Confuse;
         else if (pokeMove.Meta?.FlinchChance > 0)
             attack.Effect = MoveEffect.Flinch;
 
-        // Fixed-count multi-hit — the strike count is stable move data (always 2), not a gen rule, so
-        // it rides alongside the MoveEffect.MultiHit set via the map above. Twineedle also carries its
-        // own 20% poison secondary (set from the ailment); Bonemerang joins here in its coverage batch.
         if (pokeMove.Name is "double-kick" or "twineedle" or "bonemerang")
             attack.MultiHitCount = 2;
     }
 
-    /// <summary>
-    /// Concern 3 — layer-2 Gen 1 secondary-effect corrections: facts PokeAPI can't express (it reports
-    /// each move's MODERN secondary chance/target and almost never backfills <c>past_values</c> for them),
-    /// applied here from an authority (Bulbapedia). Keep the list short, verified, and commented — see
-    /// DATA_IMPORT.md §4.1/§5.5. Runs last so it wins over the stat-change and effect mapping above.
-    /// </summary>
+    /// <summary>Layer-2 hand-verified Gen 1 corrections PokeAPI can't express (DATA_IMPORT.md §4.1/§5.5).
+    /// Runs last so it wins over the mapping above.</summary>
     private static void ApplyGen1Corrections(Attack attack, PokeApiMove pokeMove)
     {
         switch (pokeMove.Name)
@@ -378,22 +329,16 @@ public class MoveImport
         }
     }
 
-    // Gen 1 special move mechanics keyed by PokeAPI move name. These are behaviours PokeAPI's
-    // meta/ailment data can't express, so they're mapped explicitly here (effects derivable from
-    // data — secondary status, stat changes — stay inline in MapToAttack). A few entries need extra
-    // per-move data beyond the effect (e.g. fixed multi-hit count); that's set in MapToAttack.
+    // Gen 1 special move mechanics keyed by PokeAPI move name — full catalog in DATA_IMPORT.md §4.1.
     private static readonly Dictionary<string, MoveEffect> Gen1MoveEffects = new()
     {
         ["haze"] = MoveEffect.Haze,
         ["leech-seed"] = MoveEffect.LeechSeed,
         ["hyper-beam"] = MoveEffect.Recharge,
-        // Binding — damages + traps the target for 2–5 turns.
         ["wrap"] = MoveEffect.Binding,
         ["bind"] = MoveEffect.Binding,
         ["clamp"] = MoveEffect.Binding,
         ["fire-spin"] = MoveEffect.Binding,
-        // Two-turn charge moves. Gen 1 Skull Bash is a plain charge — it does NOT raise Defense on the
-        // charge turn (that boost was added in Gen 2), so it maps to plain TwoTurn like the others.
         ["fly"] = MoveEffect.TwoTurn,
         ["dig"] = MoveEffect.TwoTurn,
         ["solar-beam"] = MoveEffect.TwoTurn,
@@ -401,7 +346,6 @@ public class MoveImport
         ["sky-attack"] = MoveEffect.TwoTurn,
         ["skull-bash"] = MoveEffect.TwoTurn,
         ["metronome"] = MoveEffect.Metronome,
-        // Variable multi-hit (2–5 strikes; count drawn from the gen rules at runtime).
         ["double-slap"] = MoveEffect.MultiHit,
         ["comet-punch"] = MoveEffect.MultiHit,
         ["fury-attack"] = MoveEffect.MultiHit,
@@ -409,69 +353,40 @@ public class MoveImport
         ["barrage"] = MoveEffect.MultiHit,
         ["fury-swipes"] = MoveEffect.MultiHit,
         ["spike-cannon"] = MoveEffect.MultiHit,
-        // Fixed-count multi-hit (always 2 — MultiHitCount is set in MapToAttack).
-        ["double-kick"] = MoveEffect.MultiHit,
-        ["twineedle"] = MoveEffect.MultiHit,
-        // Gen 1: a missed Jump Kick / Hi Jump Kick deals crash damage to the user.
+        ["double-kick"] = MoveEffect.MultiHit, // fixed ×2 — MultiHitCount set in MapToAttack
+        ["twineedle"] = MoveEffect.MultiHit, // fixed ×2 — MultiHitCount set in MapToAttack
         ["jump-kick"] = MoveEffect.Crash,
         ["high-jump-kick"] = MoveEffect.Crash,
-        // Recoil — the user takes back a fraction of the damage dealt.
         ["take-down"] = MoveEffect.Recoil,
         ["double-edge"] = MoveEffect.Recoil,
         ["submission"] = MoveEffect.Recoil,
-        // Counter returns 2× the (Normal/Fighting) physical damage the user last took (priority −5).
         ["counter"] = MoveEffect.Counter,
-        // Rage locks the user in and raises Attack each time it is hit (enforced in the engine).
         ["rage"] = MoveEffect.Rage,
-        // Recover / Soft-Boiled restore half the user's max HP (the heal fraction is a battle rule).
         ["recover"] = MoveEffect.Heal,
         ["soft-boiled"] = MoveEffect.Heal,
-        // Mimic copies a random move from the target for the rest of the battle.
         ["mimic"] = MoveEffect.Mimic,
-        // Reflect / Light Screen double the user's Defense / Special vs the matching damage.
         ["reflect"] = MoveEffect.Reflect,
         ["light-screen"] = MoveEffect.LightScreen,
-        // Focus Energy: Gen 1's bugged crit modifier (applied in Gen1BattleRules.GetCritChance).
         ["focus-energy"] = MoveEffect.FocusEnergy,
-        // Bide stores damage for 2–3 turns then unleashes 2× (multi-turn lock-in in the engine).
         ["bide"] = MoveEffect.Bide,
-        // Mirror Move re-executes the opponent's last move (engine reads the foe's last-used move).
         ["mirror-move"] = MoveEffect.MirrorMove,
-        // Rampage — lock in for 2–3 turns, then self-confuse. Mapped here so the name lookup wins over
-        // the confusion-ailment fallback in MapToAttack. Petal Dance joins in its batch.
         ["thrash"] = MoveEffect.Rampage,
         ["petal-dance"] = MoveEffect.Rampage,
         ["pay-day"] = MoveEffect.PayDay,
-        // Mist shrouds the user so the opponent can't lower its stats.
         ["mist"] = MoveEffect.Mist,
-        // Disable locks one of the target's moves (enforced at move-selection time).
         ["disable"] = MoveEffect.Disable,
-        // Dream Eater drains HP but only works on a sleeping target (enforced in the engine). The 50%
-        // drain heal rides on its DamageCategory.Drain (set from meta); this flag adds the sleep gate.
         ["dream-eater"] = MoveEffect.DreamEater,
-        // Splash does nothing by design — the engine emits the Gen 1 "But nothing happened!" line.
         ["splash"] = MoveEffect.Splash,
-        // Rest fully heals + cures status, then forces a fixed-length sleep (engine reads RestSleepTurns).
         ["rest"] = MoveEffect.Rest,
-        // Bonemerang strikes exactly twice (fixed-count multi-hit, like double-kick/twineedle); the
-        // strike count is stable move data set in MultiHitCount below, not a 2–5 roll.
-        ["bonemerang"] = MoveEffect.MultiHit,
-        // Substitute spends HP to raise a decoy that soaks the foe's hits (engine handles the HP cost,
-        // damage absorption, and status/stat shielding).
+        ["bonemerang"] = MoveEffect.MultiHit, // fixed ×2 — MultiHitCount set in MapToAttack
         ["substitute"] = MoveEffect.Substitute,
-        // Transform copies the target's species/types/stats/stages/moveset (engine handles the copy and
-        // the battle-end revert). Conversion copies the target's types onto the user (Gen 1 mechanic).
         ["transform"] = MoveEffect.Transform,
         ["conversion"] = MoveEffect.Conversion,
-        // Roar / Whirlwind end a WILD battle — the target flees (engine handles the flee + run advance; the
-        // run layer marks Elite/Boss non-escapable so the move fails there, the Gen 1 trainer-battle rule).
         ["roar"] = MoveEffect.ForceFlee,
         ["whirlwind"] = MoveEffect.ForceFlee,
     };
 
-    // Gen 1 physical types: Normal, Fighting, Flying, Poison, Ground, Rock, Bug, Ghost.
-    // Every other (damaging) type — Fire, Water, Grass, Electric, Psychic, Ice, Dragon —
-    // is Special. (Steel/Dark/Fairy don't exist in Gen 1.)
+    // DATA_IMPORT.md §4.1 — Gen 1's physical/special split by type.
     private static readonly HashSet<DamageType> Gen1PhysicalTypes =
     [
         DamageType.Normal,

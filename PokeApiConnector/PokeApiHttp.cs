@@ -1,14 +1,7 @@
 namespace PokeApiConnector;
 
-/// <summary>
-/// One process-wide <see cref="HttpClient"/> for the whole import run. Each Fetch*/Download* method used to
-/// new-up (and dispose) its own client — and <c>FetchMoveDataByUrl</c>/<c>FetchPokemonDataByUrl</c> did so
-/// once per move/species, ~165× inside a loop. That's the socket-exhaustion antipattern: a disposed client
-/// leaves its socket in TIME_WAIT, and under a tight loop that can run the machine out of ephemeral ports
-/// (a transient <see cref="System.Net.Sockets.SocketException"/>). <see cref="HttpClient"/> is thread-safe
-/// and built to be shared and long-lived, so one static instance serves every request. It carries the
-/// raw.githubusercontent-friendly User-Agent the sprite/cry downloaders need, and is deliberately never
-/// disposed — it lives for the lifetime of this one-shot tool.
+/// <summary>One process-wide, deliberately never-disposed <see cref="HttpClient"/> for the whole import
+/// run — avoids the per-request-`new HttpClient()` socket-exhaustion antipattern (DATA_IMPORT.md §6).
 /// </summary>
 internal static class PokeApiHttp
 {
