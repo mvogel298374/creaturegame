@@ -42,6 +42,73 @@ public class RunDirectorAcquisitionTests
     }
 
     [Fact]
+    public async Task ThemedDraft_AcceptedWithANickname_AppliesItBeforeDeposit()
+    {
+        // Creature Naming Stage B, open-slot path: the nickname is normalized (trimmed, uppercased, capped) and
+        // applied to the offered creature before it's deposited, so both CreatureAcquired and PartyUpdated
+        // already carry the chosen name.
+        var input = new ScriptedInput("tackle").AcceptsAcquisition("sparky");
+        var (runner, recorder) = BuildDraftRun(endAfterWins: 1, input, offersDraft: true);
+
+        await runner.RunAsync();
+
+        var acquired = Assert.Single(recorder.Of<CreatureAcquired>());
+        Assert.Equal("SPARKY", acquired.Name);
+        Assert.Contains(runner.State.Party.Members, m => m.Name == "SPARKY");
+        Assert.Equal("SPARKY", recorder.Of<PartyUpdated>().Last().Members.Last().Name);
+        // SpeciesName must stay the species default (only Name is a nickname) — the CHECK POKEMON overview and
+        // Evolve's nickname-preservation check (Name == SpeciesName) both depend on the two staying distinct.
+        Assert.Equal("Draftee", runner.State.Party.Members.Last().SpeciesName);
+    }
+
+    [Fact]
+    public async Task ThemedDraft_AcceptedWithABlankNickname_KeepsTheSpeciesDefaultName()
+    {
+        // The Gen 1 "decline the nickname" case: blank/whitespace normalizes to the offered creature's own
+        // species-derived default name (unchanged), not an empty or null name.
+        var input = new ScriptedInput("tackle").AcceptsAcquisition("   ");
+        var (runner, recorder) = BuildDraftRun(endAfterWins: 1, input, offersDraft: true);
+
+        await runner.RunAsync();
+
+        var acquired = Assert.Single(recorder.Of<CreatureAcquired>());
+        Assert.Equal("Draftee", acquired.Name);
+    }
+
+    [Fact]
+    public async Task ThemedDraft_PartyFull_AcceptSwapWithANickname_AppliesItBeforeDeposit()
+    {
+        // Creature Naming Stage B, full-party-swap path: same normalize-then-deposit ordering as the open-slot
+        // path, exercised through the swap branch specifically.
+        var lead = Fighter("Lead", hp: 300, attack: 999, speed: 100, level: 50);
+        var party = new Party(lead);
+        for (int i = 2; i <= Party.MaxSize; i++)
+        {
+            var m = Fighter($"Member{i}", hp: 100, attack: 10, speed: 10, level: 30);
+            m.SpeciesId = i;
+            party.Add(m);
+        }
+
+        var input = new ScriptedInput("tackle").AcceptsAcquisitionReplacing(
+            1,
+            "a-very-long-nickname"
+        );
+        var (runner, recorder) = BuildDraftRun(
+            endAfterWins: 1,
+            input,
+            offersDraft: true,
+            party: party,
+            player: lead
+        );
+
+        await runner.RunAsync();
+
+        var acquired = Assert.Single(recorder.Of<CreatureAcquired>());
+        Assert.Equal("A-VERY-LON", acquired.Name); // truncated to NicknameRules.MaxLength (10)
+        Assert.Equal("A-VERY-LON", runner.State.Party.Members[1].Name);
+    }
+
+    [Fact]
     public async Task ThemedDraft_Declined_IsASequencingNoOp()
     {
         // A decline must add only its own AcquisitionOffered + AcquisitionDeclined events — nothing else about the

@@ -61,6 +61,10 @@ internal static class AcquisitionResolution
                 ctx.Emitter?.Emit(new AcquisitionDeclined(offered.Name));
                 return;
             }
+            // Creature Naming Stage B: apply the nickname (falling back to the species default on a
+            // blank/cancelled step) before the deposit, so both events below already carry the chosen name —
+            // same call site pattern as the starter path (GameController.Start).
+            offered.Name = NicknameRules.Normalize(decision.Nickname, offered.Name);
             string replacedName = party.Members[slot].Name;
             party.Replace(slot, offered);
             ctx.Emitter?.Emit(
@@ -69,6 +73,7 @@ internal static class AcquisitionResolution
         }
         else
         {
+            offered.Name = NicknameRules.Normalize(decision.Nickname, offered.Name);
             party.Add(offered);
             ctx.Emitter?.Emit(new CreatureAcquired(offered.Name, offered.SpeciesId, false, null));
         }

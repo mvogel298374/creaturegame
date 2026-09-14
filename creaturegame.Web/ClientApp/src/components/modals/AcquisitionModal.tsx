@@ -2,19 +2,37 @@ import { useState } from 'react';
 import type { AcquisitionPrompt } from '../../hooks/useBattleHub';
 import { TypeBadge } from '../TypeBadge';
 import { Modal } from './Modal';
+import { NicknameModal } from './NicknameModal';
 
 // Acquisition offer (themed draft / boss catch): a blocking modal to add the offered creature to the party.
 // With room, it's a simple ACCEPT / DECLINE. When the party is full, ACCEPT opens a "release which member?"
 // step over the benched members (the lead is excluded — a mid-biome lead change is Stage 1d) with a two-step
-// confirm so no creature is released on a single misclick. That one flow answers RespondAcquisition, which the
-// run loop is blocked on.
+// confirm so no creature is released on a single misclick. Either accept path then opens the nickname step
+// (Creature Naming Stage B) before finally answering RespondAcquisition, which the run loop is blocked on —
+// same "nickname is its own cancelable step after the decision" shape as the starter path (StarterSelection).
 export function AcquisitionModal({ prompt, onRespond }: {
   prompt: AcquisitionPrompt;
-  onRespond: (accept: boolean, replaceSlot: number | null) => void;
+  onRespond: (accept: boolean, replaceSlot: number | null, nickname: string | null) => void;
 }) {
-  // null → the offer; 'swap' → picking a member to release (full party); { slot } → confirming that release.
-  const [phase, setPhase] = useState<'offer' | 'swap' | { slot: number }>('offer');
+  // null → the offer; 'swap' → picking a member to release (full party); { slot } → confirming that release;
+  // 'naming' → the nickname step, the final one before onRespond fires.
+  const [phase, setPhase] = useState<'offer' | 'swap' | { slot: number } | 'naming'>('offer');
+  // The slot to swap (full-party accept) or null (open-slot accept) — captured when entering 'naming' so it
+  // survives to the final onRespond call.
+  const [pendingSlot, setPendingSlot] = useState<number | null>(null);
   const label = prompt.source === 'BossCatch' ? 'Catch!' : 'A creature wants to join!';
+
+  // The nickname step — only the escapable phase here (it runs after the accept is already decided and before
+  // the network call, so leaving it costs nothing; Escape/blank text both mean "no nickname", same as the
+  // starter path).
+  if (phase === 'naming') {
+    return (
+      <NicknameModal
+        speciesName={prompt.name}
+        onDone={nickname => onRespond(true, pendingSlot, nickname)}
+      />
+    );
+  }
 
   // Full-party release confirm.
   if (typeof phase === 'object') {
@@ -23,7 +41,10 @@ export function AcquisitionModal({ prompt, onRespond }: {
       <Modal label="Confirm release" dismiss="blocking" card="acquire-modal">
         <p className="acquire-question">Release {releasing.name} to make room for {prompt.name}?</p>
         <div className="acquire-buttons">
-          <button className="action-btn action-btn--fight" onClick={() => onRespond(true, phase.slot)}>YES</button>
+          <button
+            className="action-btn action-btn--fight"
+            onClick={() => { setPendingSlot(phase.slot); setPhase('naming'); }}
+          >YES</button>
           <button className="action-btn" onClick={() => setPhase('swap')}>NO</button>
         </div>
       </Modal>
@@ -82,11 +103,15 @@ export function AcquisitionModal({ prompt, onRespond }: {
       <div className="acquire-buttons">
         <button
           className="action-btn action-btn--fight"
-          onClick={() => (prompt.partyFull ? setPhase('swap') : onRespond(true, null))}
+          onClick={() => {
+            if (prompt.partyFull) { setPhase('swap'); return; }
+            setPendingSlot(null);
+            setPhase('naming');
+          }}
         >
           {prompt.partyFull ? 'ADD (SWAP)' : 'ADD'}
         </button>
-        <button className="action-btn" onClick={() => onRespond(false, null)}>DECLINE</button>
+        <button className="action-btn" onClick={() => onRespond(false, null, null)}>DECLINE</button>
       </div>
     </Modal>
   );

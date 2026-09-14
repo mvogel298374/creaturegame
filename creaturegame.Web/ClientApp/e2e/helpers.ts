@@ -46,6 +46,11 @@ export async function startBattle(
   await card.click();
   await page.getByRole('button', { name: /CONFIRM/i }).click();
 
+  // CONFIRM opens the starter's own nickname step (Creature Naming Stage A) before the request fires — clear
+  // it with the species-default name so the run starts the same as before that feature shipped.
+  await page.locator('.nickname-modal').waitFor({ state: 'visible', timeout: 10_000 });
+  await answerNicknameIfPresent(page);
+
   // Biome mode: the run opens on the map-based route choice — click the first offered biome waypoint — before
   // the first battle. It arrives a beat after CONFIRM (connect + emit), so wait for it. Then the entry
   // animation plays and the action menu enables for the first turn — unless the first node is a reward node
@@ -56,6 +61,20 @@ export async function startBattle(
     await dismissRewardChoiceIfPresent(page);
     expect(await fightButton(page).isEnabled().catch(() => false)).toBe(true);
   }).toPass({ timeout: 20_000 });
+}
+
+/** Answers a nickname step if one is up by taking the OK button with a blank input — the species-default name,
+ * same as declining the nickname. It gates every acquisition accept (starter pick, themed draft, boss catch —
+ * Creature Naming Stages A/B), so both `startBattle` (the starter's own step, right after CONFIRM) and the play
+ * loop (the ADD/swap-confirm step, opened by the loop's own click) clear it to keep the run flowing. Returns
+ * whether it acted. */
+export async function answerNicknameIfPresent(page: Page): Promise<boolean> {
+  const naming = page.locator('.nickname-modal');
+  if (await naming.isVisible().catch(() => false)) {
+    await naming.getByRole('button', { name: 'OK', exact: true }).click().catch(() => {});
+    return true;
+  }
+  return false;
 }
 
 /** Answers a route-choice map if one is up (clicks the first offered biome waypoint). Returns whether it acted.
@@ -338,6 +357,9 @@ export async function playCurrentRunUntil(
       await answer.click().catch(() => {});
       continue;
     }
+    // An ADD just clicked above opens the acquisition's own nickname step next turn of the loop (Creature
+    // Naming Stage B) — same species-default clear as the starter's.
+    if (await answerNicknameIfPresent(page)) continue;
     // Keep the current lead at a biome boundary so the run keeps flowing.
     const keepLead = page.locator('.lead-modal[aria-label="Choose your lead"] .lead-card--current');
     if (await keepLead.isVisible().catch(() => false)) {

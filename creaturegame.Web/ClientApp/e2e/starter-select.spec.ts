@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { answerNicknameIfPresent } from './helpers';
 
 // Mirrors §2 of the UI checklist — starter selection.
 test.describe('Starter selection', () => {
@@ -25,13 +26,17 @@ test.describe('Starter selection', () => {
     await expect(slider).toHaveAttribute('max', '100');
   });
 
-  test('selecting a starter shows the confirm footer and CONFIRM enters battle', async ({ page }) => {
+  test('selecting a starter shows the confirm footer and CONFIRM opens the nickname step, then battle', async ({ page }) => {
     await page.locator('.species-card', { hasText: 'CHARIZARD' }).click();
 
     const confirm = page.getByRole('button', { name: /CONFIRM/i });
     await expect(confirm).toBeVisible();
 
     await confirm.click();
+    // CONFIRM opens the starter's own nickname step (Creature Naming Stage A) before the request fires — OK
+    // with no input keeps the species-default name, same as declining it.
+    await expect(page.locator('.nickname-modal')).toBeVisible({ timeout: 10_000 });
+    await answerNicknameIfPresent(page);
     // Battle screen: the action menu appears once entry finishes.
     await expect(page.getByRole('button', { name: /^FIGHT/i })).toBeVisible({ timeout: 15_000 });
   });

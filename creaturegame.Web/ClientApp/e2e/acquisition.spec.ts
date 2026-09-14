@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { fightButton, isShowing, logLines, walkSeedsUntil } from './helpers';
+import { answerNicknameIfPresent, fightButton, isShowing, logLines, walkSeedsUntil } from './helpers';
 
 /**
  * The acquisition offer (themed draft), end-to-end. Both switching specs *click through* this modal to grow the
@@ -9,6 +9,10 @@ import { fightButton, isShowing, logLines, walkSeedsUntil } from './helpers';
  * Two answers, two runs: ADD deposits into the party (the strip appears — it only renders above one member),
  * DECLINE is a sequencing no-op that leaves the party alone and the run flowing. The offer is gated on the draft
  * cadence × a web-policy roll, hence the seed walk.
+ *
+ * ADD opens its own nickname step first (Creature Naming Stage B) — one run clears it with the species-default
+ * name (the common "ADD deposits" case, matching every other spec's `drafts: 'accept'` policy), a second types
+ * a nickname and asserts it, not the species name, is what reaches the party chip.
  */
 const acquireModal = (page: Page) => page.locator('.acquire-modal');
 const partyChips = (page: Page) => page.locator('.party-strip .party-chip');
@@ -38,6 +42,11 @@ test.describe('Acquisition offer (themed draft)', () => {
     const offered = await reachDraftOffer(page);
 
     await acquireModal(page).getByRole('button', { name: 'ADD', exact: true }).click();
+    // The nickname step (Creature Naming Stage B) — OK with no input keeps the species-default name. Wait for
+    // it explicitly rather than trusting answerNicknameIfPresent's instantaneous probe alone: right after the
+    // click it can lose the race with React's re-render and silently no-op.
+    await expect(page.locator('.nickname-modal')).toBeVisible();
+    await answerNicknameIfPresent(page);
 
     await expect(acquireModal(page)).toBeHidden();
     // The roster is now two, so the strip appears — with the offered creature on it.
@@ -51,6 +60,23 @@ test.describe('Acquisition offer (themed draft)', () => {
 
     await expect(fightButton(page)).toBeEnabled({ timeout: 30_000 });
     expect((await logLines(page)).some(l => /Run over/.test(l))).toBe(false);
+  });
+
+  test('ADD with a nickname carries it onto the party chip, not the species name', async ({ page }) => {
+    test.setTimeout(5 * 60_000);
+    const offered = await reachDraftOffer(page);
+
+    await acquireModal(page).getByRole('button', { name: 'ADD', exact: true }).click();
+    const naming = page.locator('.nickname-modal');
+    await expect(naming).toBeVisible();
+    await naming.locator('.nickname-input').fill('nicky');
+    await naming.getByRole('button', { name: 'OK', exact: true }).click();
+
+    await expect(partyChips(page)).toHaveCount(2, { timeout: 15_000 });
+    // Normalize uppercases — the chip's alt is the nickname, and the species name (asserted above for the
+    // no-nickname case) is nowhere on this chip.
+    await expect(page.locator('.party-strip .party-chip img[alt="NICKY"]')).toHaveCount(1);
+    await expect(page.locator(`.party-strip .party-chip img[alt="${offered}"]`)).toHaveCount(0);
   });
 
   test('DECLINE leaves the party alone and the run flows on', async ({ page }) => {

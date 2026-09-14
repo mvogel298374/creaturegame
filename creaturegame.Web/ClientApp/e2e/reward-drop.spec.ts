@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { fightButton, chooseMove } from './helpers';
+import { answerNicknameIfPresent, fightButton, chooseMove } from './helpers';
 
 // The Run Economy reward flow, driven deterministically by a fixed seed. This closes the known
 // live-verification gap: the reward + wallet credit had unit/integration coverage but were never observed in a
@@ -33,6 +33,10 @@ async function startSeededRun(page: import('@playwright/test').Page, seed: numbe
   await page.locator('.select-search').fill(species);
   await page.locator('.species-card', { has: page.locator('.card-name', { hasText: new RegExp(`^${species}$`, 'i') }) }).click();
   await page.getByRole('button', { name: /CONFIRM/i }).click();
+  // CONFIRM opens the starter's own nickname step (Creature Naming Stage A) before the request fires — clear
+  // it with the species-default name so the run proceeds to the route choice below.
+  await page.locator('.nickname-modal').waitFor({ state: 'visible', timeout: 10_000 });
+  await answerNicknameIfPresent(page);
   // Opening route choice (map-based) — click the first offered biome waypoint; its first node is always a
   // plain wild battle (RunDirector's soft-opening rule).
   await page.locator('.town-map-town--offered').first().click({ timeout: 15_000 });

@@ -213,15 +213,19 @@ public sealed record SwitchInContext(Party Party);
 /// unchanged); accept with a null <see cref="ReplaceSlot"/> = add to a party with room; accept with a
 /// <see cref="ReplaceSlot"/> index = add by swapping out that member (the full-party path). An accept the roster
 /// can't honour (full party with no valid slot) is treated as a decline downstream, so a stale pick never
-/// strands the run.</summary>
-public sealed record AcquisitionDecision(bool Accept, int? ReplaceSlot)
+/// strands the run. <see cref="Nickname"/> is the raw, unnormalized text from the acquisition's nickname step
+/// (Creature Naming Stage B) — null/blank on a decline, cancel, or skipped step; <see cref="Creatures.NicknameRules.Normalize"/>
+/// is applied downstream, same as the starter path.</summary>
+public sealed record AcquisitionDecision(bool Accept, int? ReplaceSlot, string? Nickname = null)
 {
     /// <summary>Decline the offer — leave the roster as-is (the default for automated / AI inputs).</summary>
     public static readonly AcquisitionDecision Decline = new(false, null);
 
-    /// <summary>Accept into an open party slot.</summary>
-    public static AcquisitionDecision Add() => new(true, null);
+    /// <summary>Accept into an open party slot, optionally naming the creature.</summary>
+    public static AcquisitionDecision Add(string? nickname = null) => new(true, null, nickname);
 
-    /// <summary>Accept by replacing the member at <paramref name="slot"/> (the full-party swap path).</summary>
-    public static AcquisitionDecision Replace(int slot) => new(true, slot);
+    /// <summary>Accept by replacing the member at <paramref name="slot"/> (the full-party swap path), optionally
+    /// naming the creature.</summary>
+    public static AcquisitionDecision Replace(int slot, string? nickname = null) =>
+        new(true, slot, nickname);
 }

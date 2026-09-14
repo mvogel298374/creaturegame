@@ -135,18 +135,20 @@ public sealed class ScriptedInput(params string[] moveNames) : IBattleInput
     private AcquisitionDecision _acquisitionDecision = AcquisitionDecision.Decline;
 
     /// <summary>Makes this input accept an acquisition offer into an open party slot (default is to decline, same
-    /// as the interface default). Returned by <see cref="ChooseAcquisitionAsync"/>.</summary>
-    public ScriptedInput AcceptsAcquisition()
+    /// as the interface default), optionally naming the creature (Creature Naming Stage B). Returned by
+    /// <see cref="ChooseAcquisitionAsync"/>.</summary>
+    public ScriptedInput AcceptsAcquisition(string? nickname = null)
     {
-        _acquisitionDecision = AcquisitionDecision.Add();
+        _acquisitionDecision = AcquisitionDecision.Add(nickname);
         return this;
     }
 
     /// <summary>Makes this input accept an acquisition by swapping out the member at <paramref name="slot"/> (the
-    /// full-party path). Returned by <see cref="ChooseAcquisitionAsync"/>.</summary>
-    public ScriptedInput AcceptsAcquisitionReplacing(int slot)
+    /// full-party path), optionally naming the creature (Creature Naming Stage B). Returned by
+    /// <see cref="ChooseAcquisitionAsync"/>.</summary>
+    public ScriptedInput AcceptsAcquisitionReplacing(int slot, string? nickname = null)
     {
-        _acquisitionDecision = AcquisitionDecision.Replace(slot);
+        _acquisitionDecision = AcquisitionDecision.Replace(slot, nickname);
         return this;
     }
 

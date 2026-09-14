@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { startBattle, playToNextEncounter } from './helpers';
+import { answerNicknameIfPresent, startBattle, playToNextEncounter } from './helpers';
 
 // The encounter-map ladder (Phase 2): once a biome is entered, its seeded node plan is drawn as a vertical
 // Slay-the-Spire-style ladder — one node per RunNodeKind (Boss the apex), capped by a client-synthesized Poké
@@ -18,6 +18,10 @@ async function gotoOpeningRouteChoice(page: import('@playwright/test').Page, see
   await page.locator('.select-search').fill(species);
   await page.locator('.species-card', { has: page.locator('.card-name', { hasText: new RegExp(`^${species}$`, 'i') }) }).click();
   await page.getByRole('button', { name: /CONFIRM/i }).click();
+  // CONFIRM opens the starter's own nickname step (Creature Naming Stage A) before the request fires — clear
+  // it with the species-default name so the run proceeds to the route choice this helper reaches for.
+  await page.locator('.nickname-modal').waitFor({ state: 'visible', timeout: 10_000 });
+  await answerNicknameIfPresent(page);
 }
 
 test.describe('Encounter map (region graph + route choice)', () => {
@@ -61,8 +65,11 @@ test.describe('Encounter map (route ladder)', () => {
     const ladder = page.locator('.encounter-map');
     await expect(ladder).toBeVisible();
 
-    // The biome is titled, and the ladder has the structural invariants of every biome route:
-    await expect(ladder.locator('.encounter-map-biome')).not.toBeEmpty();
+    // The biome is titled, and the ladder has the structural invariants of every biome route. The pinned
+    // full-screen view reuses .encounter-map-biome for two spans (BattleScreen.tsx) — the run's flavour island
+    // name first, then the biome name — so target the second (the biome) rather than assume just one.
+    await expect(ladder.locator('.encounter-map-biome')).toHaveCount(2);
+    await expect(ladder.locator('.encounter-map-biome').last()).not.toBeEmpty();
     await expect(ladder.locator('.ladder-node')).not.toHaveCount(0);
     await expect(ladder.locator('.ladder-node--bossbattle')).toHaveCount(1); // the single Boss apex
     // The Boss apex names a themed gate-boss trainer (bossTrainer.ts), not the behind-the-curtain "Region gate".

@@ -195,10 +195,12 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
       console.error('[SignalR] LeaveShop failed:', err));
   }, []);
 
-  // replaceSlot: the member slot to swap out when accepting with a full party; null otherwise.
-  const respondAcquisition = useCallback((accept: boolean, replaceSlot: number | null) => {
+  // replaceSlot: the member slot to swap out when accepting with a full party; null otherwise. nickname: the
+  // raw text from the acquisition's nickname step (Creature Naming Stage B); null on a decline or a
+  // skipped/cancelled step — the server normalizes it, same as the starter path.
+  const respondAcquisition = useCallback((accept: boolean, replaceSlot: number | null, nickname: string | null = null) => {
     dispatch({ type: 'HIDE_ACQUISITION' });
-    connRef.current?.invoke('RespondAcquisition', accept, replaceSlot).catch(err =>
+    connRef.current?.invoke('RespondAcquisition', accept, replaceSlot, nickname).catch(err =>
       console.error('[SignalR] RespondAcquisition failed:', err));
   }, []);
 

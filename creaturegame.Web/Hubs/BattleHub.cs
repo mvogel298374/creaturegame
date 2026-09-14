@@ -93,12 +93,14 @@ public class BattleHub(GameSessionManager manager) : Hub<IBattleClient>
     /// <summary>Answers an acquisition offer (themed draft / boss catch): <paramref name="accept"/> false =
     /// decline; true with a null <paramref name="replaceSlot"/> = add to the party; true with a slot index =
     /// add by swapping out that member. A decline / unhonourable accept is a no-op (the roster is left
-    /// unchanged).</summary>
-    public Task RespondAcquisition(bool accept, int? replaceSlot)
+    /// unchanged). <paramref name="nickname"/> is the raw client text from the acquisition's nickname step
+    /// (Creature Naming Stage B) — null on decline or a skipped/cancelled step; normalized downstream the same
+    /// way as the starter path.</summary>
+    public Task RespondAcquisition(bool accept, int? replaceSlot, string? nickname)
     {
         manager.SetAcquisitionDecision(
             Context.ConnectionId,
-            new creaturegame.Combat.AcquisitionDecision(accept, replaceSlot)
+            new creaturegame.Combat.AcquisitionDecision(accept, replaceSlot, nickname)
         );
         return Task.CompletedTask;
     }
