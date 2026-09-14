@@ -17,8 +17,12 @@ public class BattleHub(GameSessionManager manager) : Hub<IBattleClient>
         // Same gameId on a later connection = a reconnect; AttachConnection handles both
         // the first-connect (start the battle) and reconnect (rebind) cases.
         var gameId = Context.GetHttpContext()?.Request.Query["gameId"].ToString();
-        if (!string.IsNullOrEmpty(gameId))
-            manager.AttachConnection(gameId, Context.ConnectionId);
+        if (string.IsNullOrEmpty(gameId) || !manager.AttachConnection(gameId, Context.ConnectionId))
+            // Unknown/expired gameId (a stale resume attempt, or no gameId at all) — reject the connection
+            // outright rather than leaving the client attached to nothing. Before this, AttachConnection's
+            // no-op here left conn.start() resolve successfully with no battle ever bound, so the client sat
+            // on "Connecting…" forever with no error — ARCHITECTURE.md §2.7.
+            throw new HubException("Unknown or expired game session.");
         await base.OnConnectedAsync();
     }
 

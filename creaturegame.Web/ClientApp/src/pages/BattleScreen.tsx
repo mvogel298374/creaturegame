@@ -27,6 +27,7 @@ import type { MoveInfo } from '../types/BattleEvents';
 import { formatMoveName } from '../utils/format';
 import { friendlyFetchError } from '../utils/fetchError';
 import { type BagItem, groupBagItems, needsMoveTarget, needsPartyTarget, formatItemName } from '../battle/bag';
+import { loadActiveGame, clearActiveGame } from '../utils/activeGame';
 import { PartyStrip } from '../components/PartyStrip';
 import { Modal } from '../components/modals/Modal';
 import { BattleEndedOverlay } from '../components/modals/BattleEndedOverlay';
@@ -62,12 +63,17 @@ const MAP_PEEK_MS = 2600;
 export function BattleScreen() {
   const location = useLocation();
   const nav = useNavigate();
-  const playerSpecies: Species | null = location.state?.species ?? null;
-  const gameId: string | null = location.state?.gameId ?? null;
-  const startLevel: number = location.state?.level ?? 50;
+  // Session Resume (ARCHITECTURE.md §2.7): a real nav() here (from StarterSelection or TitleScreen's Continue button)
+  // always populates location.state — a genuinely empty state means the page loaded with no router history at
+  // all (a hard refresh, a closed/reopened tab, a bookmarked /battle URL), the one case that needs the
+  // localStorage fallback. Read once — a fresh navigation elsewhere mid-session must not fall back mid-battle.
+  const fallback = useMemo(() => (location.state ? null : loadActiveGame()), [location.state]);
+  const playerSpecies: Species | null = location.state?.species ?? fallback?.species ?? null;
+  const gameId: string | null = location.state?.gameId ?? fallback?.gameId ?? null;
+  const startLevel: number = location.state?.level ?? fallback?.level ?? 50;
   // Immediate half of the generation channel (GENERATION_PROFILE.md §7.2) — the server echo below is the
   // authority and takes over once it arrives.
-  const routeGeneration: string | null = location.state?.generation ?? null;
+  const routeGeneration: string | null = location.state?.generation ?? fallback?.generation ?? null;
 
   const { state, chooseMove, chooseSwitch, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, buyShopItem, leaveShop, respondAcquisition, chooseLead, respondSwitchIn, dismissDrop } = useBattleHub(gameId, startLevel);
 
@@ -115,6 +121,12 @@ export function BattleScreen() {
     const t = window.setTimeout(() => setMapPeek(false), MAP_PEEK_MS);
     return () => window.clearTimeout(t);
   }, [state.mapPin, state.mapNodePlan]);
+
+  // Session Resume: a finished run has nothing left to resume back into — clear the persisted entry so
+  // TitleScreen stops offering Continue for it and a stray reload doesn't try to reattach to a dead battle.
+  useEffect(() => {
+    if (state.phase === 'ended') clearActiveGame();
+  }, [state.phase]);
 
   // The level-up panel stays up until the player does anything — clear it on the first interaction.
   const onAnyInput = () => { if (state.levelUp) dismissLevelUp(); };
@@ -269,7 +281,7 @@ export function BattleScreen() {
               onBag={() => { onAnyInput(); setControlView('bag'); }}
               onSwitch={() => { onAnyInput(); setControlView('switch'); }}
               onCheck={() => { onAnyInput(); setControlView('check'); }}
-              onBack={() => { onAnyInput(); nav('/'); }}
+              onBack={() => { onAnyInput(); clearActiveGame(); nav('/'); }}
             />
           )}
           {controlView === 'fight' && (

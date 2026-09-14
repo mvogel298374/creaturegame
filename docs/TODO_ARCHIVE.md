@@ -8,6 +8,119 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Session Resume — refresh/reopen-safe `gameId` persistence ✅ COMPLETE (2026-09-14)
+
+**The gap, raised 2026-09-12, scoped to Tier 3 (lightweight only) on 2026-09-12:** `BattleScreen` only ever read
+`gameId` from react-router nav state (`location.state?.gameId`, set once by `StarterSelection`'s
+`nav('/battle', {state:{...}})`) — a hard refresh, closed/reopened tab, or pasted/bookmarked `/battle` URL wiped
+that state even though the server's reconnect infrastructure (`ARCHITECTURE.md` §2.7: 40s `ReconnectGrace` after
+a dropped connection, per-event connection re-resolution, gold/party rehydrated on `onreconnected`) might still
+have the run alive. The heavier `PlayerSave`/`save.db`-backed resume (survives a server restart/redeploy, not
+just a client refresh) stays deferred to Tier 5, unaffected by this.
+
+`/plan` done 2026-09-14 — gen-variable surface: none (pure web-session plumbing, no `IBattleRules`/`ITypeChart`/
+`IStatCalculator` touched, no importer/DB change, no `save.db` need, matching the Settings Menu precedent for
+"when a feature doesn't need persistence infra"). Shipped and manually verified in-browser 2026-09-14. All five
+planned pieces landed, plus two additional real bugs found and fixed live during manual verification — not in
+the original plan.
+
+**A second gap found during the `/plan` itself, fixed as a prerequisite:** if a client attached with an unknown
+or already-expired `gameId` (the realistic case for a stale/late resume attempt), `GameSessionManager
+.AttachConnection` used to no-op — no active battle, no pending session, nothing thrown. The SignalR connection
+itself still succeeded, so the client's `conn.start().then(...)` resolved and the UI sat on "Connecting…"
+forever with no error, no timeout, no way out but a manual reload. A resume feature that can attempt a stale
+`gameId` needed this fixed first, independent of the persistence work itself — see piece 4 below.
+
+**Shipped — the five planned pieces:**
+1. **Persist on run start.** `ClientApp/src/utils/activeGame.ts` (+ `activeGame.test.ts`, mirrors the existing
+   `utils/settings.ts` `localStorage` pattern): `saveActiveGame({gameId, species, level, generation})` (stamps
+   `savedAt`), `loadActiveGame()`, `clearActiveGame()`. Key: `creaturegame.activeGame`.
+   `StarterSelection.confirm()` calls `saveActiveGame` right before its existing
+   `nav('/battle', {state:{...}})` — same shape, so the persisted entry and the nav-state shape never drift
+   apart.
+2. **`BattleScreen` falls back when nav state is empty.** When `location.state` itself is absent (the direct
+   refresh/reopen/bookmark case), all four fields (`gameId`/`species`/`level`/`generation`) are read from the
+   persisted entry instead of just `gameId` — so the pre-first-server-event render (species sprite, HP estimate,
+   generation theme) works, not just the SignalR reattach.
+3. **Title Screen "Continue" affordance.** `TitleScreen` reads `loadActiveGame()` on mount; if an entry exists,
+   renders a `▶ CONTINUE — {species.name} (Lv {level})` button that calls `nav('/battle', {state:
+   loadActiveGame()})` — the *same* nav-state shape `StarterSelection` produces, so `BattleScreen` needs no
+   "was this a Continue click" branch.
+4. **Fix the silent-hang bug.** `GameSessionManager.AttachConnection` now returns `bool` (attached vs.
+   unknown/expired `gameId`, both existing early-return paths). `BattleHub.OnConnectedAsync` throws
+   `HubException` when it returns `false` — turns the infinite "Connecting…" hang into a normal, catchable
+   connection failure.
+5. **Failed-resume UX.** `useBattleHub.ts`'s guarded `bounceForFailedConnection` (both its `conn.start().catch(...)`
+   and, per bug 7 below, `conn.onclose(...)`) calls `clearActiveGame()` and navigates to `/` with
+   `state:{notice: "Couldn't connect to the run — it may have expired."}`; `TitleScreen` renders
+   `location.state?.notice` if present. `clearActiveGame()` is also called when a run ends normally
+   (`state.phase === 'ended'`) and when the player hits QUIT — an explicitly-quit or -finished run doesn't offer
+   to "Continue" back into it.
+
+**Two additional real bugs found and fixed during manual in-browser verification — not in the original plan:**
+6. **Full-remount reconnect deadlock.** A hard refresh restarts the client's React state at `initialState`, and
+   the state-establishing events (below) each fire exactly once, so a reconnect after a refresh reattached the
+   transport but left the UI stuck on "Connecting…" forever (a real deadlock, verified live). Fixed by having
+   `SignalRBattleEventEmitter` (web layer) cache the last such event in each of three lifetimes as it passes
+   through, and exposing `ReplayLastKnownState()`, which `GameSessionManager.ReEstablishClient` calls from the
+   reconnect branch. `ActiveBattle.Emitter` was retyped from `IBattleEventEmitter?` to the concrete
+   `SignalRBattleEventEmitter?` (the only construction site) so the reconnect branch can call it.
+7. **`HubException` fires too late to reject `conn.start()`.** A `HubException` thrown from `OnConnectedAsync`
+   closes the connection *after* the transport handshake completes, so `conn.start()` in `useBattleHub.ts`
+   **resolves** rather than rejects — the existing `.catch()` never fired, so the client still hung silently on
+   a truly-expired resume attempt (verified live: waited out the 40s `ReconnectGrace`, confirmed the hang, then
+   fixed it). Fixed by adding a `conn.onclose(...)` handler alongside the existing `.catch()`, both funneling
+   through one guarded `bounceForFailedConnection` helper — guarded by a `torndown` flag so an intentional
+   teardown (QUIT, battle end, unmount, React StrictMode's dev-only double-invoke) never bounces a player who
+   already left on purpose. The StrictMode false-positive was also found and fixed live during this same pass.
+
+**`pr-review` round (CHANGES-REQUESTED, both addressed before commit):**
+- **The replay cache was incomplete.** Bug 6 above shipped covering only `BattleStarted`/`TurnStarted` — but
+  `RegionMapRevealed` (once per run), `BiomeEntered`, and `BiomeNodePlanRevealed` (once per biome) are *also*
+  state-establishing and were never replayed, so after any successful resume the Encounter Map overlay stayed
+  empty and boss-trainer framing degraded to generic for the rest of the run. Extended the same cache to all
+  five events, across three lifetimes: run-scoped (`RegionMapRevealed`, set once, never cleared), biome-scoped
+  (`BiomeEntered`/`BiomeNodePlanRevealed`, replaced each new biome, *not* cleared by `BattleEnded`/`RunEnded` —
+  the current biome persists across and after its battles), battle-scoped (unchanged from bug 6). Replay order:
+  presentation echo → map → biome → node plan → battle → turn.
+- **Design-rationale placement.** The session-model change (reject-on-unknown-`gameId`, the replay cache, the
+  client's persisted-resume + bounce policy) had no design-doc entry — 8 code comments pointed at this archive
+  section instead, which the repo's own rule (`DEV_STANDARDS.md` → Design Rationale Placement) treats as the
+  same defect as no comment at all. Added the "Session resume corollary" to `ARCHITECTURE.md` §2.7 and trimmed
+  all 8 comments to point at it.
+- **Recommended fixes also applied:** (1) a real thread-safety bug — `ReplayLastKnownState` runs on the SignalR
+  hub thread while `Emit` runs on the run's background task thread, both reading/writing the cache fields with
+  no barrier, and the replay's own re-entry into `Emit`'s cache-update logic could wipe a concurrently-live
+  event — fixed by splitting `Emit` into cache-update + a private `Send` (the actual dispatch), with
+  `ReplayLastKnownState` calling `Send` directly (bypassing the cache-update entirely) and the cache fields
+  marked `volatile`; (2) the reconnect branch's two-call sequence (echo + replay) had no dedicated test — pulled
+  into `GameSessionManager.ReEstablishClient` and pinned against a primed emitter; (3) the original
+  `AttachConnection` true-return test had a real race (its `NoDbEncounterFactory`-backed run task could fault
+  and remove itself from the active set before the reconnect assertion ran) — fixed by switching it to the
+  deterministic gated factory, now shared as `TestSupport/BlockedEncounterFactory.cs` (promoted from a duplicate
+  inline in `GenerationProfileTests.cs`, pure dedup).
+
+**Tests:** `SessionResumeTests.cs` (11 facts — `AttachConnection` bool-return coverage, the five-event
+replay/cache-lifetime coverage, and the `ReEstablishClient` order pin). `RecordingHubContext`,
+`NoDbEncounterFactory`, and `BlockedEncounterFactory` were extracted from `GenerationProfileTests.cs` into
+`tests/creaturegame.Tests/TestSupport/` for reuse (pure dedup, no behavior change there). `activeGame.test.ts`
+(round-trip save/load/clear; `loadActiveGame()` returns `null` on an empty/corrupt store).
+
+**Manually verified in-browser (Puppeteer):** fresh run has no Continue button; hard refresh mid-battle
+reattaches with full interactivity (enemy sprite/name/level/HP, player HP, move list with STAB/effectiveness, a
+real attack resolves server-side); Continue button from Title Screen works within the grace window; after the
+40s reconnect grace genuinely expires, Continue now cleanly bounces to Title with the "Couldn't connect to the
+run — it may have expired." notice instead of hanging.
+
+**Known, deliberately out-of-scope gap — not a defect in what shipped:** the replay cache only covers a
+reconnect *during an active run/biome/battle*. A refresh while a between-node blocking prompt is open (route
+choice, shop, reward-choice, recovery, acquisition, lead-choice, switch-in) is **not** covered — those events
+aren't cached/replayed, so that case is unchanged from before this feature (still hangs on "Connecting…", no
+worse than pre-existing, just not newly fixed by this pass). Tracked as a named follow-up in `TODO.md` →
+*Known Gaps*.
+
+---
+
 ## Creature Naming — nickname on acquisition (session-scoped) ✅ COMPLETE (2026-09-14, Stages A + B)
 
 **The ask, in the user's words:** *"a feature for all pokemon acquisition paths where we can give the pokemon a

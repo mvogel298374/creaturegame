@@ -70,6 +70,28 @@ public sealed class GameSessionManager(
     internal static RunPresentationRevealed BuildPresentationEvent(GenerationProfile profile) =>
         new(profile.Generation.ToString(), profile.TypeRoster.Select(t => t.ToString()).ToList());
 
+    /// <summary>Everything a reconnecting client needs re-sent to it, in order: the presentation echo (theme —
+    /// GENERATION_PROFILE.md §7.2) first, then whatever state-establishing events the emitter has cached
+    /// (SignalRBattleEventEmitter.ReplayLastKnownState — map/biome/battle/turn, each only if that slice is
+    /// currently live). Extracted from <see cref="AttachConnection"/>'s reconnect branch for the same reason as
+    /// <see cref="BuildRunOptions"/>: pulled out, the two-call sequence is <b>observable to a test</b> — inlined,
+    /// deleting either call (or reordering them) would stay green under every scenario a normal run-through
+    /// exercises, since the theme rarely matters for correctness and the replay is silent when its cache is
+    /// empty. <c>internal static</c> and dependency-free by design, like its siblings above.</summary>
+    internal static void ReEstablishClient(
+        SignalRBattleEventEmitter? emitter,
+        GenerationProfile profile
+    )
+    {
+        // Re-echo the presentation identity on every reconnect — GAME_LOOP.md §5 "session-layer events".
+        emitter?.Emit(BuildPresentationEvent(profile));
+        // A reconnect that follows a transient network drop needs nothing more — the client's React state never
+        // unmounted, so it already has the current run on screen. A reconnect that follows a full SPA remount
+        // (a refresh) does need this: its state restarted at 'connecting', with no way out short of the
+        // state-establishing events replaying — see ARCHITECTURE.md §2.7.
+        emitter?.ReplayLastKnownState();
+    }
+
     /// <summary>Assembles the run's <see cref="RunDirectorOptions"/> — the run-scoped policy bag handed to the
     /// director.</summary>
     /// <remarks>
@@ -154,8 +176,13 @@ public sealed class GameSessionManager(
     /// Called on every hub connection. The first connection for a gameId starts the battle;
     /// a later connection for an already-running gameId is a reconnect — it rebinds the
     /// battle to the new connection (events and input follow) and cancels any pending abandon.
+    /// Returns whether the connection actually attached to something — <c>false</c> for a
+    /// <paramref name="gameId"/> that is neither active nor pending (unknown, or past the
+    /// pending-session TTL / reconnect grace). <see cref="Hubs.BattleHub"/> rejects the connection
+    /// on <c>false</c> rather than leaving the caller attached to nothing — see ARCHITECTURE.md §2.7
+    /// for why a silent no-op here was a real client-side hang.
     /// </summary>
-    public void AttachConnection(string gameId, string connectionId)
+    public bool AttachConnection(string gameId, string connectionId)
     {
         // Reconnect: an existing battle just needs to be repointed at the new connection.
         if (_active.TryGetValue(gameId, out var existing))
@@ -166,14 +193,13 @@ public sealed class GameSessionManager(
                 _connToGame.TryRemove(previous!, out _);
             existing.CurrentConnectionId = connectionId;
             _connToGame[connectionId] = gameId;
-            // Re-echo the presentation identity on every reconnect — GAME_LOOP.md §5 "session-layer events".
-            existing.Emitter?.Emit(BuildPresentationEvent(ProfileFor(existing.Generation)));
-            return;
+            ReEstablishClient(existing.Emitter, ProfileFor(existing.Generation));
+            return true;
         }
 
         // First connection: claim the pending session and start the battle loop.
         if (!_pending.TryRemove(gameId, out var session))
-            return; // unknown or already-consumed gameId
+            return false; // unknown or already-consumed gameId
 
         // Resolved once and threaded into every seam consumer below; fixed for the whole run.
         var profile = ProfileFor(session.Generation);
@@ -249,6 +275,8 @@ public sealed class GameSessionManager(
                     _connToGame.TryRemove(battle.CurrentConnectionId!, out _);
             }
         });
+
+        return true;
     }
 
     /// <summary>
@@ -599,8 +627,12 @@ sealed class ActiveBattle
     public Generation Generation;
 
     // The run's ONE emitter (resolves the current connection per event, so it needs no rebinding on reconnect).
-    // Kept single on purpose: a second emitter would silently diverge the moment it gains any state.
-    public IBattleEventEmitter? Emitter;
+    // Kept single on purpose: a second emitter would silently diverge the moment it gains any state. Typed
+    // concretely (not IBattleEventEmitter) so the reconnect branch can call the web-layer-only
+    // ReplayLastKnownState (ARCHITECTURE.md §2.7) — GameSessionManager is the one place that constructs and
+    // reads this field, so there's no abstraction to preserve here (the interface still exists for the engine's
+    // own consumers, e.g. AttackAction, which never see this type).
+    public SignalRBattleEventEmitter? Emitter;
 
     private readonly object _lock = new();
     private CancellationTokenSource? _abandonCts;

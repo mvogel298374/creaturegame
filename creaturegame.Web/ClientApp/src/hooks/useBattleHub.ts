@@ -1,9 +1,11 @@
 import { useEffect, useRef, useReducer, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import * as signalR from '@microsoft/signalr';
 import { type Payload, expandEvent, useBattleTimeline } from '../battle/timeline';
 import { battleReducer, initialState } from './battleReducer';
 import { bossTrainerName } from '../battle/bossTrainer';
 import { nextPlayerName } from '../battle/playerIdentity';
+import { clearActiveGame } from '../utils/activeGame';
 
 // The view-state shape + modal-prompt types live with the reducer now; re-export them so existing
 // consumers (BattleScreen) keep importing them from the hook.
@@ -25,6 +27,7 @@ export type { PartyMember } from '../battle/timeline';
 export function useBattleHub(gameId: string | null, initialLevel = 50) {
   const [state, dispatch] = useReducer(battleReducer, { ...initialState, playerLevel: initialLevel });
   const connRef = useRef<signalR.HubConnection | null>(null);
+  const nav = useNavigate();
 
   // Player name drives the player/enemy side split inside expandEvent.
   const playerNameRef = useRef('');
@@ -46,6 +49,12 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
 
   useEffect(() => {
     if (!gameId) return;
+    // Guards the connect-failure handler below against React.StrictMode's dev-only double-invoke: it mounts
+    // this effect, tears it down, then mounts it again, all before the throwaway first connection's start()
+    // has resolved — so that connection's stop()-induced rejection must not fire the resume-failed bounce (it
+    // raced the real, second connection that goes on to succeed). Nothing to guard before this diff, since the
+    // old handler only logged; only the new nav()-on-failure side effect below needs it.
+    let torndown = false;
 
     const conn = new signalR.HubConnectionBuilder()
       .withUrl(`/hubs/battle?gameId=${gameId}`)
@@ -108,13 +117,35 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
         .catch(() => { /* keep the current panel value */ });
     };
 
+    // Shared by both failure paths below — see each call site for which case it covers. Guarded by `torndown`
+    // (see that flag's own comment) so an intentional teardown (QUIT, battle end, unmount, React StrictMode's
+    // dev-only double-invoke) never bounces the player who's already left on purpose.
+    const bounceForFailedConnection = (err: unknown) => {
+      console.error('[SignalR] Connection failed:', err);
+      if (torndown) return;
+      // BattleHub now rejects the connection outright when the server no longer knows this gameId (expired
+      // resume attempt, or any other connect failure) instead of leaving it silently attached to nothing —
+      // see GameSessionManager.AttachConnection / ARCHITECTURE.md §2.7. Bounce to Title with a notice rather
+      // than leaving the UI stuck on "Connecting…" forever.
+      clearActiveGame();
+      nav('/', { state: { notice: "Couldn't connect to the run — it may have expired." } });
+    };
+
     conn.onreconnected(() => { hydrateGold(); hydrateParty(); });
+    // A HubException thrown from BattleHub.OnConnectedAsync (the unknown/expired-gameId rejection) closes the
+    // connection AFTER the transport handshake completes — so conn.start() below RESOLVES, not rejects, and
+    // only onclose ever sees the failure. The .catch() still matters for a failure before any transport
+    // connects at all (e.g. the server unreachable); onclose also catches automatic-reconnect finally giving
+    // up on a connection that HAD been live. Both funnel through the same guarded bounce — real-world gap
+    // found and fixed during this feature's manual verification — ARCHITECTURE.md §2.7.
+    conn.onclose(err => bounceForFailedConnection(err));
     conn.start()
       .then(() => { hydrateGold(); hydrateParty(); })
-      .catch(err => console.error('[SignalR] Connection failed:', err));
+      .catch(bounceForFailedConnection);
     connRef.current = conn;
 
     return () => {
+      torndown = true;
       conn.stop();
       connRef.current = null;
     };

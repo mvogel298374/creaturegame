@@ -9,16 +9,94 @@ public sealed class SignalRBattleEventEmitter(
     Func<string?> currentConnectionId
 ) : IBattleEventEmitter
 {
+    // The "state-establishing" events, cached as they pass through — everything a client that lost all
+    // in-memory state (a full SPA remount, not just a transport drop) needs to know what's on screen right now.
+    // Each otherwise fires exactly once, to whichever connection was current at the time, so a reconnecting
+    // client would otherwise be stuck with no way to reach its current phase — see ReplayLastKnownState /
+    // GameSessionManager.ReEstablishClient / ARCHITECTURE.md §2.7. Cached HERE rather than reconstructed by the
+    // session layer because this is the one place each is already fully assembled (e.g. TurnStarted's live
+    // STAB/effectiveness/CanSwitch) — reconstructing an equivalent elsewhere would risk drifting from the
+    // engine's real logic. `volatile`: Emit runs on the run's background task thread while ReplayLastKnownState
+    // runs on the SignalR hub thread (a reconnect can land concurrently with a live Emit).
+    //
+    // Three different lifetimes:
+    //  - Run-scoped (RegionMapRevealed): set at most once per run, never cleared.
+    //  - Biome-scoped (BiomeEntered, BiomeNodePlanRevealed): replaced by the next biome's; NOT cleared by
+    //    BattleEnded/RunEnded — the current biome persists across and after the battles fought in it.
+    //  - Battle-scoped (BattleStarted, TurnStarted): cleared on BattleEnded/RunEnded — see that case below.
+    private volatile RegionMapRevealed? _lastRegionMap;
+    private volatile BiomeEntered? _lastBiomeEntered;
+    private volatile BiomeNodePlanRevealed? _lastBiomeNodePlan;
+    private volatile BattleStarted? _lastBattleStarted;
+    private volatile TurnStarted? _lastTurnStarted;
+
     public void Emit(BattleEvent evt)
     {
-        // Resolved per-emit so events follow a reconnect. Dropping while disconnected is safe by design, not
-        // a bug — see ARCHITECTURE.md §2.7 / GAME_LOOP.md §6 item 3.
+        switch (evt)
+        {
+            case RegionMapRevealed map:
+                _lastRegionMap = map;
+                break;
+            case BiomeEntered entered:
+                _lastBiomeEntered = entered;
+                _lastBiomeNodePlan = null; // the new biome's node plan hasn't rolled yet
+                break;
+            case BiomeNodePlanRevealed plan:
+                _lastBiomeNodePlan = plan;
+                break;
+            case BattleStarted started:
+                _lastBattleStarted = started;
+                _lastTurnStarted = null; // the new battle hasn't reached its first turn yet
+                break;
+            case TurnStarted turn:
+                _lastTurnStarted = turn;
+                break;
+            case BattleEnded or RunEnded:
+                // No battle is live between encounters (a route/shop/reward/recovery/etc. prompt is a separate,
+                // not-yet-replayed event category — ARCHITECTURE.md §2.7's noted follow-up gap). Replaying a
+                // just-finished battle's stale state into one of those would be actively wrong, not just
+                // incomplete, so only the battle-scoped half of the cache clears — the run/biome-scoped half
+                // stays valid (it's still the actual current map/biome).
+                _lastBattleStarted = null;
+                _lastTurnStarted = null;
+                break;
+        }
+
+        Send(evt);
+    }
+
+    // The actual per-connection dispatch — resolved per-call so events follow a reconnect. Dropping while
+    // disconnected is safe by design, not a bug — see ARCHITECTURE.md §2.7. Split out from Emit so
+    // ReplayLastKnownState can dispatch a cached event directly without re-entering Emit's cache-update switch
+    // above — which would otherwise, e.g., see the replayed BattleStarted and wipe the very TurnStarted the
+    // same replay is about to send next.
+    private void Send(BattleEvent evt)
+    {
         var connectionId = currentConnectionId();
         if (string.IsNullOrEmpty(connectionId))
             return;
 
         var (type, payload) = MapEvent(evt);
         _ = hubContext.Clients.Client(connectionId).OnBattleEvent(type, payload);
+    }
+
+    /// <summary>Re-sends every cached state-establishing event, in the order it would naturally occur, to
+    /// whatever connection is current right now — each a no-op while its slice of the cache is empty (e.g. the
+    /// battle-scoped pair between encounters, or the whole cache in the legacy endless chain, which never emits
+    /// the biome/map events at all). See the cache fields' own doc for the lifetimes and what this deliberately
+    /// doesn't yet cover.</summary>
+    public void ReplayLastKnownState()
+    {
+        if (_lastRegionMap is { } map)
+            Send(map);
+        if (_lastBiomeEntered is { } entered)
+            Send(entered);
+        if (_lastBiomeNodePlan is { } plan)
+            Send(plan);
+        if (_lastBattleStarted is { } started)
+            Send(started);
+        if (_lastTurnStarted is { } turn)
+            Send(turn);
     }
 
     // internal for the web event-contract test (reflection-checks every BattleEvent maps to a

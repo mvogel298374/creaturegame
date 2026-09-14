@@ -86,4 +86,22 @@ the linked design doc instead — pull it there and leave only the pointer here.
 *(not yet populated)*
 
 ## 7. Web / session layer
-*(not yet populated)*
+
+### Session resume (refresh/reopen survival)
+- Refreshing, closing/reopening the tab, or reloading a bookmarked `/battle` URL during a run does not lose it:
+  the client persists the active run's `gameId`/species/level/generation to `localStorage` on run start, and
+  the page reattaches to the same server-side run on reload.
+- The Title Screen shows a `▶ CONTINUE — {species} (Lv {level})` button whenever a persisted run exists,
+  alongside NEW GAME.
+- A reconnect during an active run restores full interactivity within the server's 40-second reconnect grace
+  window — battle state (enemy/player sprite, HP, move list) when mid-fight, plus the Town Map overlay and the
+  current biome's encounter ladder, each re-sent from whatever the server still has live.
+- If the run can no longer be resumed (grace window expired, or the server no longer knows the `gameId`), the
+  player is bounced to the Title Screen with a "Couldn't connect to the run — it may have expired." notice,
+  instead of hanging on "Connecting…".
+- A run's persisted entry is cleared when the run ends normally or the player quits — neither offers a stale
+  Continue afterward.
+- **Not covered:** a refresh while a between-node prompt (route choice, shop, reward, recovery, acquisition,
+  lead choice, switch-in) is open, rather than during an active battle, still hangs on reconnect.
+- Design detail → `ARCHITECTURE.md` §2.7 (Web session lifecycle). History → `TODO_ARCHIVE.md` → *Session Resume
+  — refresh/reopen-safe `gameId` persistence*.

@@ -6,10 +6,9 @@ using creaturegame.DB;
 using creaturegame.Evolution;
 using creaturegame.Generations;
 using creaturegame.Items;
+using creaturegame.Tests.TestSupport;
 using creaturegame.Web.Battle;
 using creaturegame.Web.Controllers;
-using creaturegame.Web.Hubs;
-using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 
 namespace creaturegame.Tests.Unit;
@@ -319,7 +318,7 @@ public class GenerationProfileTests
     {
         var hub = new RecordingHubContext();
         using var dbGate = new ManualResetEventSlim(initialState: false);
-        var manager = new GameSessionManager(hub, BlockedEncounterFactory(dbGate));
+        var manager = new GameSessionManager(hub, BlockedEncounterFactory.Create(dbGate));
         var player = new Creature("TESTMON");
 
         string gameId = manager.RegisterSession(
@@ -370,7 +369,7 @@ public class GenerationProfileTests
     [Fact]
     public void GetGeneration_ReportsTheGenerationTheRunWasRegisteredWith()
     {
-        var manager = new GameSessionManager(hubContext: null!, NoDbEncounterFactory());
+        var manager = new GameSessionManager(hubContext: null!, NoDbEncounterFactory.Create());
         var player = new Creature("TESTMON");
 
         string gameId = manager.RegisterSession(
@@ -394,7 +393,7 @@ public class GenerationProfileTests
         // An unknown gameId is a 404, not a Gen 1 run — the same no-silent-fallback rule the registry follows
         // (GENERATION_PROFILE.md §4.2). GameController.GetPlayer depends on this to 404 rather than serve a
         // creature stamped with a generation nobody selected.
-        var manager = new GameSessionManager(hubContext: null!, NoDbEncounterFactory());
+        var manager = new GameSessionManager(hubContext: null!, NoDbEncounterFactory.Create());
 
         Assert.Null(manager.GetGeneration("no-such-game"));
     }
@@ -420,128 +419,9 @@ public class GenerationProfileTests
         return GameSessionManager.BuildRunOptions(
             session,
             profile,
-            NoDbEncounterFactory(),
+            NoDbEncounterFactory.Create(),
             new Party(player),
             emitter: null
         );
-    }
-
-    /// <summary>An <see cref="EncounterFactory"/> whose DB factories throw if touched. Safe here because
-    /// <c>BuildRunOptions</c> only <i>closes over</i> it — the draft/boss-catch suppliers are lambdas that reach
-    /// the database when a run invokes them, which this test never does. Keeps the test DB-free and honest about
-    /// why.</summary>
-    private static EncounterFactory NoDbEncounterFactory() =>
-        new(
-            new UnusedDbContextFactory<PokemonDbContext>(),
-            new UnusedDbContextFactory<MovesDbContext>(),
-            new UnusedDbContextFactory<ItemsDbContext>()
-        );
-
-    private sealed class UnusedDbContextFactory<TContext> : IDbContextFactory<TContext>
-        where TContext : DbContext
-    {
-        public TContext CreateDbContext() =>
-            throw new InvalidOperationException(
-                $"{typeof(TContext).Name} was created — BuildRunOptions is not supposed to touch the database."
-            );
-    }
-
-    // ── AttachConnection echo harness ─────────────────────────────────────────────────────────────────
-
-    /// <summary>An <see cref="EncounterFactory"/> whose every DB touch parks on <paramref name="gate"/> — used
-    /// by the attach-echo test to stall the run task deterministically at its first database read (the enemy
-    /// build), so the battle stays active for the reconnect leg and the run emits nothing that could interleave
-    /// with the assertions. Once the gate is set the factory throws, letting the parked task die through the
-    /// session's normal failure path.</summary>
-    private static EncounterFactory BlockedEncounterFactory(ManualResetEventSlim gate) =>
-        new(
-            new BlockingDbContextFactory<PokemonDbContext>(gate),
-            new BlockingDbContextFactory<MovesDbContext>(gate),
-            new BlockingDbContextFactory<ItemsDbContext>(gate)
-        );
-
-    private sealed class BlockingDbContextFactory<TContext>(ManualResetEventSlim gate)
-        : IDbContextFactory<TContext>
-        where TContext : DbContext
-    {
-        public TContext CreateDbContext()
-        {
-            gate.Wait();
-            throw new InvalidOperationException(
-                "gate released — the parked run task ends here (post-assertion cleanup)."
-            );
-        }
-    }
-
-    /// <summary>A recording <c>IHubContext</c>: <c>Client(id)</c> hands back a client that appends every
-    /// <c>OnBattleEvent</c> to a per-connection list, synchronously — so emit order is observable in program
-    /// order. Only the member <c>SignalRBattleEventEmitter</c> uses is implemented; everything else throws.</summary>
-    private sealed class RecordingHubContext : IHubContext<BattleHub, IBattleClient>
-    {
-        private readonly object _lock = new();
-        private readonly Dictionary<string, List<(string Type, object Payload)>> _events = new();
-
-        public IReadOnlyList<(string Type, object Payload)> EventsFor(string connectionId)
-        {
-            lock (_lock)
-            {
-                return _events.TryGetValue(connectionId, out var list) ? list.ToList() : [];
-            }
-        }
-
-        private void Record(string connectionId, string type, object payload)
-        {
-            lock (_lock)
-            {
-                if (!_events.TryGetValue(connectionId, out var list))
-                    _events[connectionId] = list = [];
-                list.Add((type, payload));
-            }
-        }
-
-        public IHubClients<IBattleClient> Clients => new RecordingClients(this);
-
-        public IGroupManager Groups =>
-            throw new NotSupportedException("Groups are not used by the emitter.");
-
-        private sealed class RecordingClients(RecordingHubContext owner)
-            : IHubClients<IBattleClient>
-        {
-            public IBattleClient Client(string connectionId) =>
-                new RecordingClient(owner, connectionId);
-
-            public IBattleClient All => throw new NotSupportedException();
-
-            public IBattleClient AllExcept(IReadOnlyList<string> excludedConnectionIds) =>
-                throw new NotSupportedException();
-
-            public IBattleClient Clients(IReadOnlyList<string> connectionIds) =>
-                throw new NotSupportedException();
-
-            public IBattleClient Group(string groupName) => throw new NotSupportedException();
-
-            public IBattleClient GroupExcept(
-                string groupName,
-                IReadOnlyList<string> excludedConnectionIds
-            ) => throw new NotSupportedException();
-
-            public IBattleClient Groups(IReadOnlyList<string> groupNames) =>
-                throw new NotSupportedException();
-
-            public IBattleClient User(string userId) => throw new NotSupportedException();
-
-            public IBattleClient Users(IReadOnlyList<string> userIds) =>
-                throw new NotSupportedException();
-        }
-
-        private sealed class RecordingClient(RecordingHubContext owner, string connectionId)
-            : IBattleClient
-        {
-            public Task OnBattleEvent(string eventType, object payload)
-            {
-                owner.Record(connectionId, eventType, payload);
-                return Task.CompletedTask;
-            }
-        }
     }
 }

@@ -153,6 +153,43 @@ Each entry: **Decision · Why · Where it lives.**
   machine for its whole lifetime, so only stateless follow-up requests were affected. Fixed by pinning
   `--ha=false` in `.github/workflows/fly-deploy.yml`. This constraint stands until session state is
   externalized into `save.db` (see `docs/TODO.md` → Known Gaps).
+- **Session resume corollary (2026-09-14):** the mechanism above only survives a *transient network drop while
+  the SPA stays mounted* — the reconnecting client's React state was never lost, so a re-resolved connection is
+  all it needs. A **full SPA remount** (a hard refresh, a closed/reopened tab, a bookmarked `/battle` URL) is a
+  different case: the client has no `gameId` to reattach with unless it persisted one, and even once reattached
+  its view state restarts at `initialState` with no live battle events queued to move it forward. Three additions
+  close that gap, all client-scoped (no `save.db`, no server persistence beyond the existing in-memory run):
+  - **Client-side `gameId` persistence.** `ClientApp/src/utils/activeGame.ts` persists `{gameId, species, level,
+    generation}` to `localStorage` on run start. `BattleScreen` falls back to it when react-router nav state is
+    empty (the remount case); `TitleScreen` offers a **Continue** button from it. Browser-local only, like
+    `utils/settings.ts` — bounded by however long the server keeps the run alive (below), not a durability
+    guarantee.
+  - **Reject, don't silently attach, an unknown/expired `gameId`.** `GameSessionManager.AttachConnection` now
+    returns whether it actually attached to something; `BattleHub.OnConnectedAsync` throws `HubException` on
+    `false` instead of leaving the connection bound to nothing. Because that exception fires *after* the
+    transport handshake completes, the client's `conn.start()` promise **resolves**, not rejects — so the
+    client (`useBattleHub.ts`) also registers `conn.onclose(...)`, the actual signal for this case (and for
+    automatic-reconnect finally giving up on a connection that *had* been live). Both funnel through one
+    guarded bounce (clear the persisted entry, route to Title with a notice) — guarded by a per-effect
+    `torndown` flag so an intentional teardown (QUIT, run end, unmount, React StrictMode's dev-only
+    double-invoke of this same effect) never fires it.
+  - **Replay the state-establishing events a full remount lost.** `SignalRBattleEventEmitter` caches the most
+    recent event in each of three lifetimes as they pass through — run-scoped (`RegionMapRevealed`, set once,
+    never cleared), biome-scoped (`BiomeEntered`/`BiomeNodePlanRevealed`, replaced each new biome), and
+    battle-scoped (`BattleStarted`/`TurnStarted`, cleared on `BattleEnded`/`RunEnded` so a between-encounter
+    reconnect doesn't replay a just-finished fight) — each of which otherwise fires exactly once, to whichever
+    connection was current at the time. `GameSessionManager.ReEstablishClient` (the reconnect branch's two-call
+    sequence, pulled out so it's independently testable) re-echoes the presentation event then calls
+    `ReplayLastKnownState()`, re-sending whatever's cached to the connection that's now current. **Known gap:**
+    a between-node blocking prompt (route choice, shop, reward-choice, recovery, acquisition, lead-choice,
+    switch-in) has no cached "currently open" event of its own yet, so a remount mid-prompt still has nothing to
+    reattach to (unchanged from before this — not a regression, just not yet covered; see `docs/TODO.md` →
+    Known Gaps).
+  - **Where:** `ClientApp/src/utils/activeGame.ts`, `pages/StarterSelection.tsx`, `pages/BattleScreen.tsx`,
+    `pages/TitleScreen.tsx`, `hooks/useBattleHub.ts`; `creaturegame.Web/Battle/GameSessionManager.cs`
+    (`AttachConnection`, `ReEstablishClient`), `SignalRBattleEventEmitter.cs`, `Hubs/BattleHub.cs`. Full
+    feature history (including two real bugs found live during manual verification — the remount deadlock this
+    replay closes, and the `onclose` gap above) → `docs/TODO_ARCHIVE.md` → "Session Resume".
 
 ### 2.8 Frontend animation timeline (pure expand + driver, Phaser/React isolation)
 - **Decision:** backend events become UI in two stages — a **pure** `expandEvent` maps each event to immediate

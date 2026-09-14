@@ -73,6 +73,38 @@
   transform: translateY(2px);
 }
 
+/* Session Resume: same shape as btn-new-game but filled from the start, so it reads as the primary action
+   when a resumable run exists (it sits above NEW GAME in DOM order). */
+.btn-continue {
+  margin-top: var(--sp-md);
+  padding: 0.85rem 2.2rem;
+  font-size: clamp(0.85rem, 2.2vw, var(--fs-md));
+  letter-spacing: var(--ls-wide);
+  background: var(--clr-accent);
+  color: var(--clr-text);
+  border: var(--border-w) solid var(--clr-accent);
+  box-shadow: 0 0 16px var(--clr-accent-glow);
+  transition: filter var(--transition);
+}
+
+.btn-continue:hover {
+  filter: brightness(1.1);
+}
+
+.btn-continue:active {
+  transform: translateY(2px);
+}
+
+.title-notice {
+  max-width: 32rem;
+  padding: var(--sp-sm) var(--sp-md);
+  font-size: var(--fs-sm);
+  color: var(--clr-text-muted);
+  border: 1px solid var(--clr-grid);
+  border-radius: var(--radius-sm, 4px);
+  text-align: center;
+}
+
 .title-footer {
   position: absolute;
   bottom: var(--sp-lg);
@@ -120,4 +152,18 @@
 }
 [data-generation="gen1"] .title-footer {
   color: var(--ks-dim);
+}
+[data-generation="gen1"] .btn-continue {
+  background: var(--ks-ink);
+  color: var(--ks-fill);
+  border-color: var(--ks-ink);
+  box-shadow: none;
+}
+[data-generation="gen1"] .btn-continue:hover {
+  filter: none;
+  opacity: 0.85;
+}
+[data-generation="gen1"] .title-notice {
+  color: var(--ks-dim);
+  border-color: var(--ks-ink);
 }

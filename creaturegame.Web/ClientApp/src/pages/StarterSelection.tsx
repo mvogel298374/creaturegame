@@ -5,6 +5,7 @@ import { NicknameModal } from '../components/modals/NicknameModal';
 import type { Species } from '../types/Species';
 import { friendlyFetchError } from '../utils/fetchError';
 import { buildStartGameRequest } from '../utils/startGameRequest';
+import { saveActiveGame } from '../utils/activeGame';
 import { DEFAULT_GENERATION } from '../generations/presentation';
 import './StarterSelection.css';
 
@@ -60,6 +61,9 @@ export function StarterSelection() {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const { gameId } = await res.json() as { gameId: string };
+      // Persisted for the lightweight resume feature (Session Resume) — BattleScreen falls back to this on a
+      // refresh/reopen with no nav state, and TitleScreen offers it as a Continue option.
+      saveActiveGame({ gameId, species: selected, level: levelChoice, generation: generationChoice });
       nav('/battle', { state: { species: selected, gameId, level: levelChoice, generation: generationChoice } });
     } catch (e) {
       setNaming(false);

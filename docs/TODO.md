@@ -34,9 +34,10 @@ user-sequenced commitment (2026-08-04) that stays ahead of 4/5 regardless.
   open** (Stage 5 is the standing falsification rule) — task entry + staging below. **Sequenced ahead of Tiers
   4–5 (2026-08-04, user's call).**
 - **Tier 3 — scoped, no blockers, good next features:** the CHECK POKEMON party-member picker (→ *Web UI —
-  Polish*) and refresh/reconnect-safe session handling — **lightweight option only** (persist `gameId` to
-  `localStorage`; the heavy `save.db` option lives in Tier 5) (→ *Game Loop & Progression*). Creature Naming/
-  nickname on acquisition **shipped complete 2026-09-14** (Stages A + B) — see `TODO_ARCHIVE.md`.
+  Polish*) is the remaining item. Refresh/reconnect-safe session handling (the lightweight `gameId`-persistence
+  option; the heavy `save.db` option stays Tier 5) **shipped complete 2026-09-14** as **Session Resume** — see
+  `TODO_ARCHIVE.md`. Creature Naming/nickname on acquisition **shipped complete 2026-09-14** (Stages A + B) —
+  see `TODO_ARCHIVE.md`.
 - **Tier 4 — Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by the acquisition
   channels. Bag-scope decision (per-run vs. meta-progression) first, then `BallItemEffect`/catch
   formula/animation. *(Item acquisition itself is already done via the Run Economy; bag persistence + catch
@@ -473,30 +474,29 @@ slice; the items below are what it deliberately leaves out.
 - [ ] Progressive difficulty beyond the current `targetBst = lead BST + depth × 10`; trainer encounters at
   milestones.
 - [ ] `PlayerSave` / `SavedCreature` models in `save.db`; auto-save after each battle; party-management UI.
-- [ ] **Refresh/reconnect-safe session handling — a browser refresh currently loses the run.** Raised 2026-09-12:
-  *"I do want some kind of session handling so users can refresh / continue safely."* Checked what exists today
-  (`ARCHITECTURE.md` §2.7): the server side already has real reconnect infrastructure — a dropped SignalR
-  connection gets a 40s grace window (`GameSessionManager.ReconnectGrace`) before the run is abandoned, and the
-  emitter re-resolves the *current* connection per event so output follows a reconnect, with gold/party
-  rehydrated on `onreconnected`. But that machinery only helps a **transient network drop while the SPA stays
-  mounted** — the client never persists `gameId` anywhere durable. `BattleScreen` reads it from
-  `location.state?.gameId` (react-router navigation state, set once by `StarterSelection`'s `nav('/battle', {
-  state: {...} })`) and nothing else — a hard refresh, a closed/reopened tab, or a pasted/bookmarked `/battle`
-  URL wipes that state, so the client has no `gameId` to reattach with even though the server might still be
-  sitting inside its 40s grace window (or, past that, the run is simply abandoned server-side — the already-waived
-  `SignalRInput` cancel-race finding, memory `project_waived_cancel_race`, was waived specifically *"until a
-  save/persistence layer exists,"* which this bumps into). **Not designed here — two different scopes to pick
-  between in a real `/plan`, not assumed:** (a) a lightweight fix — persist `gameId` (+ maybe a short-lived resume
-  token) to `localStorage` on `/battle` entry, and have `BattleScreen` fall back to it when `location.state` is
-  empty, re-attaching the existing SignalR session within the current grace window — cheap, no DB, but only
-  survives a refresh/reopen while the server-side run is still alive (bounded by however long an abandoned
-  session is kept, today 40s–2min); or (b) the heavier `PlayerSave`/`save.db` layer above, which would make a run
-  resumable even after the server itself restarts/redeploys. These aren't mutually exclusive but are very
-  different scopes of work — worth deciding which one (or both, staged) before planning either.
+- [x] **Refresh/reconnect-safe session handling** — the lightweight `gameId`-persistence option. ✅ DONE
+  (2026-09-14) as **Session Resume**; full record archived in `TODO_ARCHIVE.md`. The heavier `PlayerSave`/
+  `save.db` option (survives a server restart/redeploy, not just a client refresh) stays deferred to Tier 5.
 - [ ] **Stone evolutions** — the only remaining evolution piece, gated on the bag (Catch). The `Stone` trigger
   + `IEvolutionRules.StoneUsed` are built and dormant.
 - [x] **Cross-encounter status persistence** — DONE (2026-06-10); major status carries across chain encounters,
   volatiles reset per battle. See `STATE_MODEL.md §2` and `TODO_ARCHIVE.md`.
+
+---
+
+*(**Session Resume — refresh/reopen-safe `gameId` persistence** — is **✅ COMPLETE (2026-09-14)**: all five
+planned pieces shipped (persisted `activeGame` localStorage entry, `BattleScreen` nav-state fallback, the Title
+Screen CONTINUE button, the `AttachConnection`/`HubException` silent-hang fix, and failed-resume UX), plus two
+further real bugs found and fixed live during manual in-browser verification — a full-remount reconnect deadlock
+(fixed via `SignalRBattleEventEmitter` caching + replaying the state-establishing events) and a
+`HubException`-fires-too-late-to-reject-`conn.start()` bug (fixed via a `conn.onclose` handler). A `pr-review`
+pass then caught the replay cache only covering `BattleStarted`/`TurnStarted` — extended to the run-scoped
+`RegionMapRevealed` and biome-scoped `BiomeEntered`/`BiomeNodePlanRevealed` too, plus a design-doc gap
+(`ARCHITECTURE.md` §2.7's new "Session resume corollary") and three recommended fixes (a real thread-safety bug
+in the cache, a test pin for the reconnect wiring, a flaky-test fix). One deliberately out-of-scope gap remains,
+not a defect in what shipped: a refresh while a between-node blocking prompt (not an active run/biome/battle) is
+open still hangs, unchanged from before this feature — tracked under *Known Gaps* below. Full record in
+`TODO_ARCHIVE.md` → *Session Resume — refresh/reopen-safe `gameId` persistence*.)*
 
 ---
 
@@ -700,10 +700,14 @@ component-gating gap (the Run Economy reward modal) is closed by a **seeded Play
 UI Testing above), not RTL.
 
 **Open (opt-in, low urgency):**
-- [ ] **`GameSessionManager` connection lifecycle** — reconnect rebind, abandon grace, pending-session eviction
-  TTL, and the run-loop `Task.Run` are covered by *neither* suite (they're entangled with `IHubContext` +
-  `Task.Run` + wall-clock timers). Regression-insurance only: the reconnect behaviour is a settled/validated
-  edge, not a suspected bug. Would need an injectable clock to unit-test the timing without real delays.
+- [ ] **`GameSessionManager` connection lifecycle** — abandon grace, pending-session eviction TTL, and the
+  run-loop `Task.Run` are still covered by *neither* suite (entangled with `IHubContext` + `Task.Run` +
+  wall-clock timers; would need an injectable clock to unit-test the timing without real delays). **Narrower
+  than it used to be:** the unknown/expired-`gameId` reconnect-rebind slice now *is* covered
+  (`SessionResumeTests.cs`, shipped with **Session Resume**, `TODO_ARCHIVE.md`) — and that pass found two real
+  bugs in it (the `AttachConnection` silent hang, a `HubException`-fires-too-late-to-reject-`conn.start()` bug),
+  so "the reconnect behaviour is a settled/validated edge, not a suspected bug" no longer holds for that slice.
+  What remains open here is specifically the wall-clock-timer slice (abandon grace, eviction TTL).
 
 ---
 
@@ -1371,6 +1375,13 @@ deliberately waived by the user (memory `project_waived_cancel_race`). Don't re-
 findings" as an open section.)*
 
 ### Known Gaps
+- **Session Resume doesn't cover a reconnect during a between-node blocking prompt.** Found 2026-09-14 while
+  shipping **Session Resume** (`TODO_ARCHIVE.md`): the fix for the full-remount reconnect deadlock replays only
+  the last `BattleStarted`/`TurnStarted`, so a refresh reattaches cleanly mid-battle but a refresh while a
+  route-choice, shop, reward-choice, recovery, acquisition, lead-choice, or switch-in prompt is open still hangs
+  on "Connecting…" — unchanged from before this feature, not a regression it introduced. Deliberately
+  out-of-scope for the lightweight Tier-3 resume feature; would need each blocking-prompt event cached/replayed
+  the same way, or folded into the heavier `save.db`-backed resume (Tier 5).
 - **Wild encounter level far below the player's — MECHANISM CONFIRMED + DOCUMENTED (2026-09-13); design-intent
   question still open.** Reported (2026-09-12): a level-23 lead ran into a level-11 wild Fearow, contradicting a
   prior "not possible" call. The joint code-analysis session happened — full formula, worked example, and the
