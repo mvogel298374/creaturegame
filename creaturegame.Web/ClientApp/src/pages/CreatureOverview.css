@@ -31,6 +31,15 @@
   color: var(--clr-text-sub);
 }
 
+/* Party-member picker: reuses the shared .lead-grid/.lead-card cards (BattleScreen.css) — same component and
+   look as SwitchMenu/LeadChoiceModal/SwitchInModal, just no disabled state (a fainted/benched member is exactly
+   what CHECK POKEMON is for looking at). Hidden with a single member — nothing to pick between. */
+.overview-picker.lead-grid {
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  padding-bottom: var(--sp-xs);
+  border-bottom: 1px solid var(--clr-border);
+}
+
 .overview-error { color: var(--clr-accent); padding: var(--sp-md); font-size: var(--fs-sm); }
 .overview-loading { color: var(--clr-text-muted); padding: var(--sp-md); font-size: var(--fs-sm); }
 
@@ -223,7 +232,8 @@
 [data-generation="gen1"] .overview-panel {
   color: var(--ks-ink);
 }
-[data-generation="gen1"] .overview-header {
+[data-generation="gen1"] .overview-header,
+[data-generation="gen1"] .overview-picker.lead-grid {
   border-color: var(--ks-ink);
 }
 [data-generation="gen1"] .overview-species-name,

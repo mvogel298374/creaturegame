@@ -311,7 +311,7 @@ export function BattleScreen() {
             />
           )}
           {controlView === 'check' && (
-            <CreatureOverview gameId={gameId} onBack={() => setControlView('menu')} />
+            <CreatureOverview gameId={gameId} party={state.party} onBack={() => setControlView('menu')} />
           )}
         </div>
       </div>

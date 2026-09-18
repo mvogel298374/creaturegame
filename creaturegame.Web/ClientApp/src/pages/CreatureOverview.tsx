@@ -1,14 +1,25 @@
 import { useEffect, useState } from 'react';
 import { TypeBadge } from '../components/TypeBadge';
+import { PartyCard } from '../components/modals/PartyCard';
 import { formatMoveName } from '../utils/format';
 import { friendlyFetchError } from '../utils/fetchError';
+import { defaultOverviewSlot, showOverviewPicker, overviewSlotUrl } from '../battle/overviewPicker';
 import type { PlayerOverview, StatRow, MoveRow } from '../types/PlayerOverview';
+import type { PartyMember } from '../hooks/useBattleHub';
 import './CreatureOverview.css';
 
 type Tab = 'info' | 'stats' | 'moves';
 
-/** The in-battle CHECK POKEMON overview: tabbed INFO / STATS / MOVES, fed by GET /api/game/{gameId}/player. */
-export function CreatureOverview({ gameId, onBack }: { gameId: string | null; onBack: () => void }) {
+/** The in-battle CHECK POKEMON overview: a party-member picker over tabbed INFO / STATS / MOVES, fed by
+ * GET /api/game/{gameId}/player/{slot}. Any slot is choosable — fainted/benched included — unlike SWITCH,
+ * which is picking a battle action, not just looking. Picker rules (default slot / when to show / which
+ * endpoint) live in ../battle/overviewPicker.ts so Vitest can pin them directly. */
+export function CreatureOverview({ gameId, party, onBack }: {
+  gameId: string | null;
+  party: PartyMember[];
+  onBack: () => void;
+}) {
+  const [slot, setSlot]   = useState(() => defaultOverviewSlot(party));
   const [data, setData]   = useState<PlayerOverview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab]     = useState<Tab>('stats');
@@ -16,12 +27,16 @@ export function CreatureOverview({ gameId, onBack }: { gameId: string | null; on
   useEffect(() => {
     if (!gameId) { setError('No active game.'); return; }
     let live = true;
-    fetch(`/api/game/${gameId}/player`)
+    setData(null);
+    setError(null);
+    fetch(overviewSlotUrl(gameId, party, slot))
       .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
       .then((d: PlayerOverview) => { if (live) setData(d); })
       .catch(e => { if (live) setError(friendlyFetchError(e)); });
     return () => { live = false; };
-  }, [gameId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- party only affects the URL when empty (resume
+    // fallback); re-fetching on every HP/status tick of the whole party would be wasteful and isn't needed.
+  }, [gameId, slot]);
 
   return (
     <div className="overview-panel">
@@ -33,6 +48,21 @@ export function CreatureOverview({ gameId, onBack }: { gameId: string | null; on
         )}
         {data && <span className="overview-sub">Lv{data.level} · #{String(data.speciesId).padStart(3, '0')}</span>}
       </div>
+
+      {showOverviewPicker(party) && (
+        <div className="overview-picker lead-grid">
+          {party.map((m, i) => (
+            <PartyCard
+              key={i}
+              member={m}
+              onClick={() => setSlot(i)}
+              current={i === slot}
+              modifier={i === slot ? 'lead-card--current' : undefined}
+              note={m.isLead ? ' · LEAD' : m.hp <= 0 ? ' · FNT' : undefined}
+            />
+          ))}
+        </div>
+      )}
 
       {error && <p className="overview-error">{error}</p>}
       {!error && !data && <p className="overview-loading">Loading…</p>}

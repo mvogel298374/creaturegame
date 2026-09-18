@@ -33,11 +33,11 @@ user-sequenced commitment (2026-08-04) that stays ahead of 4/5 regardless.
   [`GENERATION_PROFILE.md`](GENERATION_PROFILE.md). **Stages 1–3 complete; Stage 4: 4a/4b/4c shipped, 4d+
   open** (Stage 5 is the standing falsification rule) — task entry + staging below. **Sequenced ahead of Tiers
   4–5 (2026-08-04, user's call).**
-- **Tier 3 — scoped, no blockers, good next features:** the CHECK POKEMON party-member picker (→ *Web UI —
-  Polish*) is the remaining item. Refresh/reconnect-safe session handling (the lightweight `gameId`-persistence
-  option; the heavy `save.db` option stays Tier 5) **shipped complete 2026-09-14** as **Session Resume** — see
-  `TODO_ARCHIVE.md`. Creature Naming/nickname on acquisition **shipped complete 2026-09-14** (Stages A + B) —
-  see `TODO_ARCHIVE.md`.
+- **Tier 3 — fully shipped (2026-09-16).** All three items are done, full records in `TODO_ARCHIVE.md`: the
+  CHECK POKEMON party-member picker **shipped complete 2026-09-16**; refresh/reconnect-safe session handling
+  (the lightweight `gameId`-persistence option; the heavy `save.db` option stays Tier 5) shipped complete
+  2026-09-14 as **Session Resume**; Creature Naming/nickname on acquisition shipped complete 2026-09-14
+  (Stages A + B).
 - **Tier 4 — Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by the acquisition
   channels. Bag-scope decision (per-run vs. meta-progression) first, then `BallItemEffect`/catch
   formula/animation. *(Item acquisition itself is already done via the Run Economy; bag persistence + catch
@@ -616,23 +616,6 @@ Stack: React 18 + TypeScript + SignalR + Phaser 3. (Canvas & core animations don
   already supports it; the escapable branch of `ModalDismiss` currently has no caller. Needs Vitest coverage and a
   `requirements-review` pass on the B-cancel claim (per the *plan-asserted domain facts are claims* lesson).
 - [ ] `ConsoleInput : IBattleInput` — numbered move menu for terminal play (low priority).
-- [ ] **CHECK POKEMON has no party-member picker — shows only the active creature.** Raised 2026-09-12 by the
-  user. Confirmed by reading the code (not yet started, no existing TODO item covered it): `CreatureOverview.tsx`
-  fetches exactly one endpoint, `GET /api/game/{gameId}/player`, with no slot/index parameter and no UI to choose
-  a bench member — it renders whatever comes back. That endpoint's backing call,
-  `GameSessionManager.GetPlayerCreature` → `ActiveCreature(battle.Party, battle.Player)`, is hardcoded to resolve
-  **the active/lead creature only**; there's no per-slot read path today. **What's already there to build on:**
-  the party roster is already wired for other surfaces — `GET /api/game/{gameId}/party` +
-  `PartyUpdated`/`PartyStrip` return a lightweight per-member summary (species, name, level, HP, status, isLead)
-  used by the party strip and the SWITCH menu — but that summary is **not** enough for CHECK POKEMON's
-  INFO/STATS/MOVES tabs, which need the full `PlayerOverviewDto` (actual stats, DVs, Stat-Exp, XP, full move
-  data) that today is only ever built from the active creature. *Two-piece gap:*
-  1. **Backend:** a way to fetch `PlayerOverviewDto` for an arbitrary party slot (incl. a fainted/benched
-     member), not just the active one — e.g. `GET /{gameId}/player/{slot}` or a slot query param, reading
-     `battle.Party.Members[index]` directly instead of always routing through `ActiveCreature`.
-  2. **Frontend:** `CreatureOverview` needs a party-member picker (reusing `PartyStrip`-style selection, the same
-     pattern `SwitchMenu` already uses to list party members) that drives which slot it requests.
-  Not yet planned in detail (no `/plan` session, no DoR pass) — this is the status write-up only, not a design.
 
 ---
 

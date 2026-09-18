@@ -71,7 +71,15 @@ the linked design doc instead — pull it there and leave only the pointer here.
 *(rest of this domain not yet populated)*
 
 ## 2. Battle system
-*(not yet populated)*
+
+### CHECK POKEMON party-member picker
+- Whenever the party has more than one member, CHECK POKEMON shows a picker row of party cards above the
+  INFO/STATS/MOVES panel; selecting a card loads and displays that slot's full sheet, including a fainted or
+  benched member — not just the active/lead creature.
+- With exactly one party member, no picker renders and CHECK POKEMON shows that sole creature's sheet directly,
+  as before this feature.
+- The picker reuses the same party-card component the SWITCH menu and the lead/switch-in prompts already render.
+- Design detail / plan → `docs/TODO_ARCHIVE.md` → *CHECK POKEMON party-member picker*. History → same section.
 
 ## 3. Encounters, biomes & acquisition
 *(not yet populated)*

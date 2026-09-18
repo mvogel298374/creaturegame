@@ -296,6 +296,26 @@ public sealed class GameSessionManager(
         return null;
     }
 
+    /// <summary>The creature at an arbitrary party slot — the CHECK POKEMON party-member picker (docs/TODO.md).
+    /// Unlike <see cref="GetPlayerCreature(string)"/> this doesn't resolve to the active lead; it reads whichever
+    /// slot the client asked for, fainted/benched included, so the picker can show any party member's sheet.
+    /// Null on an unknown game or an out-of-range slot.</summary>
+    public Creature? GetPlayerCreature(string gameId, int slot)
+    {
+        if (_active.TryGetValue(gameId, out var battle) && battle.Player is not null)
+            return PartyMemberAt(battle.Party, battle.Player, slot);
+        if (_pending.TryGetValue(gameId, out var pending))
+            return PartyMemberAt(null, pending.Player, slot);
+        return null;
+    }
+
+    /// <summary>The live <see cref="Party"/> instance behind an active battle — a test-only seam so a scenario
+    /// can be grown to multiple members (<c>party.Add(...)</c>) without running the full acquisition flow.
+    /// <c>internal</c> for the same reason as <see cref="RunRulesFor"/>: directly testable rather than only
+    /// exercised through the full endpoint. Null for an unknown or not-yet-active game.</summary>
+    internal Party? ActivePartyFor(string gameId) =>
+        _active.TryGetValue(gameId, out var battle) ? battle.Party : null;
+
     /// <summary>The generation a run is being played under, or null if the gameId is unknown. Resolved in the
     /// same active-then-pending order as <see cref="GetPlayerCreature"/>, so a caller that needs both gets a
     /// consistent pair. Returns null rather than defaulting to <see cref="Generation.One"/> on purpose — an
@@ -316,6 +336,14 @@ public sealed class GameSessionManager(
     /// <c>ProjectBagView</c> is).</summary>
     internal static Creature? ActiveCreature(Party? party, Creature? starter) =>
         party?.Lead ?? starter;
+
+    /// <summary>The rule behind <see cref="GetPlayerCreature(string, int)"/>: with no party wired, only slot 0
+    /// (the starter) exists; with a party, any in-range index is valid regardless of lead/fainted state. Pure +
+    /// internal so it's unit-testable on its own, same precedent as <see cref="ActiveCreature"/>.</summary>
+    internal static Creature? PartyMemberAt(Party? party, Creature? starter, int slot) =>
+        party is not null
+            ? (slot >= 0 && slot < party.Members.Count ? party.Members[slot] : null)
+            : (slot == 0 ? starter : null);
 
     public void SetMoveChoice(string connectionId, int moveIndex)
     {

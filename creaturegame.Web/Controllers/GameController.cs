@@ -105,6 +105,20 @@ public class GameController(GameSessionManager sessionManager, EncounterFactory 
     }
 
     /// <summary>
+    /// Same as <see cref="GetPlayer"/> but for an arbitrary party slot — the CHECK POKEMON party-member picker
+    /// (docs/TODO.md). Fainted/benched members included; 404 on an unknown game or an out-of-range slot.
+    /// </summary>
+    [HttpGet("{gameId}/player/{slot:int}")]
+    public IActionResult GetPlayerSlot(string gameId, int slot)
+    {
+        var player = sessionManager.GetPlayerCreature(gameId, slot);
+        var generation = sessionManager.GetGeneration(gameId);
+        if (player is null || generation is null)
+            return NotFound(new { error = "No active game with that id, or invalid party slot" });
+        return Ok(PlayerOverviewDto.From(player, generation.Value));
+    }
+
+    /// <summary>
     /// The run's current bag contents (held quantity joined with item data) for the in-battle bag menu.
     /// Reads the live session bag; 404 if the game is unknown or not yet started.
     /// </summary>

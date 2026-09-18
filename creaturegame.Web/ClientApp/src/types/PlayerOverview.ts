@@ -1,5 +1,5 @@
-// Snapshot of the live player creature for the CHECK POKEMON overview — mirrors PlayerOverviewDto on the
-// backend (GET /api/game/{gameId}/player). Gen 1 model: five stats with a single Special.
+// Snapshot of a party member for the CHECK POKEMON overview — mirrors PlayerOverviewDto on the
+// backend (GET /api/game/{gameId}/player/{slot}). Gen 1 model: five stats with a single Special.
 export interface StatRow {
   label: string;   // HP / ATK / DEF / SPC / SPD
   value: number;   // actual computed stat (for HP, the max)

@@ -76,7 +76,7 @@ async function expectRunFlowsOn(page: Page): Promise<void> {
   expect((await logLines(page)).some(l => /Run over/.test(l))).toBe(false);
 }
 
-/** The server's own view of the moveset (GET /api/game/{id}/player), read through the CHECK POKEMON panel —
+/** The server's own view of the moveset (GET /api/game/{id}/player/{slot}), read through the CHECK POKEMON panel —
  * so the assertion is against persisted state, not the modal we just clicked. Called once the run is back in a
  * battle, both because the panel is a battle-screen control and because reading it a whole encounter later is
  * a stronger claim: the moveset persisted, it wasn't just rendered. */

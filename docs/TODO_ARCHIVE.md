@@ -8,6 +8,51 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## CHECK POKEMON party-member picker ✅ COMPLETE (2026-09-16)
+
+**The gap, raised 2026-09-12 by the user, scoped to Tier 3:** `CreatureOverview.tsx` fetched exactly one
+endpoint, `GET /api/game/{gameId}/player`, with no slot/index parameter and no UI to choose a bench member — it
+rendered whatever came back. That endpoint's backing call, `GameSessionManager.GetPlayerCreature` →
+`ActiveCreature(battle.Party, battle.Player)`, was hardcoded to resolve **the active/lead creature only**; there
+was no per-slot read path. The party roster was already wired for other surfaces (`GET /api/game/{gameId}/party`
++ `PartyUpdated`/`PartyStrip` return a lightweight per-member summary used by the party strip and the SWITCH
+menu), but that summary wasn't enough for CHECK POKEMON's INFO/STATS/MOVES tabs, which need the full
+`PlayerOverviewDto` (actual stats, DVs, Stat-Exp, XP, full move data) — until this feature, only ever built from
+the active creature.
+
+**Shipped 2026-09-16, both pieces of the gap:**
+1. **Backend:** `GameSessionManager.PartyMemberAt` — a pure resolution rule mirroring the existing
+   `ActiveCreature` pattern — plus a `GetPlayerCreature(gameId, slot)` overload and an internal test-only seam
+   `ActivePartyFor(gameId)`. New endpoint `GET api/game/{gameId}/player/{slot}` (`GameController.GetPlayerSlot`)
+   reads an arbitrary party slot, fainted/benched included, 404 on unknown game or out-of-range slot. The
+   existing no-slot `/player` endpoint is untouched.
+2. **Frontend:** `CreatureOverview.tsx` now takes a `party: PartyMember[]` prop, tracks a selected slot
+   (default: the lead), fetches from the new slotted endpoint, and renders a picker row of `PartyCard`s (reusing
+   the same shared component `SwitchMenu`/`LeadChoiceModal`/`SwitchInModal` already use — no disabled states,
+   since fainted/benched members are exactly what this view is for) whenever there's more than one party member.
+   `BattleScreen.tsx` passes `party={state.party}` through at the call site. Minor CSS addition in
+   `CreatureOverview.css` for the picker container plus a Kanto Sage gen1-skin border-color patch consistent
+   with the header's existing pattern.
+
+**Tests:** `PartySlotResolutionTests.cs` (pure `PartyMemberAt` rule: valid slot, out-of-range,
+pending-session-slot-0-only, a fainted member returned, lead-tracking across a switch), `PlayerSlotEndpointTests.cs`
+(end-to-end `GameController.GetPlayerSlot` coverage against a genuine multi-member party wired into an active
+battle — each slot returns its own member's sheet, a fainted bench member is still returned, 404 on out-of-range
+slot, 404 on unknown game id, and that its slot ordering matches `GetParty`'s projection ordinal-for-ordinal), and
+`overviewPicker.test.ts` (the frontend picker rules pulled into a pure helper — `pr-review` 2026-09-18 flagged the
+backend integration tests as the only coverage of a feature whose whole reason to exist is client-side picking;
+`defaultOverviewSlot`/`showOverviewPicker`/`overviewSlotUrl` now pin the default-slot fallback, the show/hide
+gate, and the resume-safe URL fallback directly).
+
+**Manually verified in-browser:** single-member CHECK POKEMON regression-verified against the new endpoint (the
+picker correctly stays hidden with only one party member). Multi-member picker *rendering* itself was **not**
+verified live in-browser (three attempts to reach a 2-member party via real gameplay were lost to RNG crits at
+the boss fight) — that gap is narrowed to rendering only now that `overviewPicker.test.ts` pins the picker's
+decision logic; a live multi-member playtest remains open, unblocking follow-up work if a rendering-level defect
+ever surfaces there.
+
+---
+
 ## Session Resume — refresh/reopen-safe `gameId` persistence ✅ COMPLETE (2026-09-14)
 
 **The gap, raised 2026-09-12, scoped to Tier 3 (lightweight only) on 2026-09-12:** `BattleScreen` only ever read
