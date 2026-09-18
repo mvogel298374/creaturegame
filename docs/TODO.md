@@ -38,6 +38,11 @@ user-sequenced commitment (2026-08-04) that stays ahead of 4/5 regardless.
   (the lightweight `gameId`-persistence option; the heavy `save.db` option stays Tier 5) shipped complete
   2026-09-14 as **Session Resume**; Creature Naming/nickname on acquisition shipped complete 2026-09-14
   (Stages A + B).
+- **Tier 3b — In-Battle Item Party-Targeting — shipped complete (2026-09-18).** Healing/StatusCure/PpRestore
+  items can now target any living party member from the bag, matching Revive's existing fainted-only
+  party-target screen. **BattleStatBoost (X-items/Guard Spec/Dire Hit) is explicitly excluded** — Gen 1 has
+  no per-party-member stat-stage storage, so that category still always targets the active creature only,
+  with no party-selection screen. Full record in `TODO_ARCHIVE.md`.
 - **Tier 4 — Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by the acquisition
   channels. Bag-scope decision (per-run vs. meta-progression) first, then `BallItemEffect`/catch
   formula/animation. *(Item acquisition itself is already done via the Run Economy; bag persistence + catch

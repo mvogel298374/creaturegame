@@ -169,8 +169,9 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
       console.error('[SignalR] ChooseSwitch failed:', err));
   }, []);
 
-  // targetMoveSlot: the move slot (0–3) a single-move PP restore refills. targetPartySlot: the party-member
-  // index a Revive targets (a fainted benched member). Both null otherwise.
+  // targetMoveSlot: the move slot (0–3) a single-move PP restore refills. targetPartySlot: the party member
+  // Healing/StatusCure/PpRestore/Revive act on (any living member, or a fainted one for Revive). Both null to
+  // act on the active creature — always true for a BattleStatBoost item, which has no party-target scope.
   const useItem = useCallback(
     (itemId: number, targetMoveSlot: number | null, targetPartySlot: number | null = null) => {
       dispatch({ type: 'PLAYER_CHOSE' });

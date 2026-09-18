@@ -225,6 +225,75 @@ public class ItemActionBattleTests
     }
 
     [Fact]
+    public async Task UsingPotion_OnTheActiveCreature_EmitsNoPartySnapshot()
+    {
+        // The active creature's own nameplate already reflects its state without a snapshot — a party IS
+        // wired here (unlike UsingPotion_HealsConsumesAndAnnounces), so this specifically pins that the
+        // ItemAction.ExecuteAsync guard skips the emit for a same-creature use, not just a party-less one.
+        var player = TestCreatures.Make("Player", hp: 200, speed: 200, attack: 999);
+        player.AddAttack(Tackle());
+        player.Attributes.ReceiveDamage(80); // HP 120
+        var enemy = TestCreatures.Make("Enemy", hp: 30, speed: 1, defense: 1);
+        enemy.AddAttack(Tackle());
+
+        var party = new Party(player);
+        party.Add(TestCreatures.Make("Bench", hp: 200));
+
+        var bag = new Bag();
+        bag.Add(17, 1);
+
+        var em = await RunAsync(
+            new TurnChoiceInput(new ItemTurnChoice(Potion())),
+            bag,
+            player,
+            enemy,
+            party: party
+        );
+
+        Assert.True(em.Of<Healed>().Any());
+        Assert.False(em.Of<PartyUpdated>().Any());
+    }
+
+    [Fact]
+    public async Task UsingPotion_OnABenchMember_HealsThatMemberNotTheActiveOne()
+    {
+        // A non-Revive category (Potion) targeting a party member other than the active creature — the
+        // fidelity fix's whole point, driven through a real Battle end to end. (The pure-effect equivalent,
+        // ItemEffectTests.Potion_OnBenchMember_HealsThatMemberNotTheActiveOne, confirms the active creature's
+        // own HP is untouched without the confound of the enemy's own same-turn attack landing on it here.)
+        var player = TestCreatures.Make("Player", hp: 200, speed: 200, attack: 999);
+        player.AddAttack(Tackle());
+        var enemy = TestCreatures.Make("Enemy", hp: 30, speed: 1, defense: 1);
+        enemy.AddAttack(Tackle());
+
+        var party = new Party(player);
+        var bench = TestCreatures.Make("Bench", hp: 200);
+        bench.Attributes.ReceiveDamage(80); // Bench HP 120
+        party.Add(bench);
+
+        var bag = new Bag();
+        bag.Add(17, 1);
+
+        var em = await RunAsync(
+            new TurnChoiceInput(new ItemTurnChoice(Potion(), TargetPartySlot: 1)),
+            bag,
+            player,
+            enemy,
+            party: party
+        );
+
+        Assert.Equal(140, bench.Attributes.HP); // bench member healed (+20)
+        Assert.Equal(0, bag.Count(17));
+
+        var used = em.Of<ItemUsed>().Single();
+        Assert.Equal("Bench", used.TargetName); // named the treated member, not the active creature
+
+        // A benched member isn't a nameplate, so its HP bar only ever updates off a party snapshot — without
+        // this, the roster panel would keep showing the bench member's pre-heal HP indefinitely.
+        Assert.Equal(140, em.Of<PartyUpdated>().Single().Members[1].Hp);
+    }
+
+    [Fact]
     public async Task UsingRevive_RestoresAFaintedBenchMemberAndConsumes()
     {
         // The player (lead) uses a Revive on turn 1 targeting a fainted bench member, then wins the fight.
@@ -235,6 +304,7 @@ public class ItemActionBattleTests
 
         var party = new Party(player);
         var bench = TestCreatures.Make("Bench", hp: 200);
+        bench.Battle.Status = StatusCondition.BadPoison; // fainted while afflicted — Revive should clean it
         bench.Attributes.ReceiveDamage(200); // faint the bench member
         party.Add(bench);
 
@@ -260,7 +330,12 @@ public class ItemActionBattleTests
         Assert.Equal("revive", used.ItemName);
         Assert.Equal("Bench", used.TargetName); // named the revived member, not the active creature
         Assert.Equal("Bench", em.Of<Revived>().Single().CreatureName);
-        Assert.True(em.Of<PartyUpdated>().Any()); // the roster snapshot that repaints the bench bar
+
+        // The roster snapshot (emitted by ItemAction, not the effect itself, so every party-targeting
+        // category gets it uniformly) repaints the bench bar with the restored HP and cleared status.
+        var snapshot = em.Of<PartyUpdated>().Single();
+        Assert.Equal(100, snapshot.Members[1].Hp);
+        Assert.Equal(StatusCondition.None, snapshot.Members[1].Status);
     }
 
     [Fact]

@@ -33,8 +33,10 @@ public class BattleHub(GameSessionManager manager) : Hub<IBattleClient>
     }
 
     /// <summary>Uses a bag item this turn. <paramref name="targetMoveSlot"/> (0–3) is a single-move PP
-    /// restore's target and <paramref name="targetPartySlot"/> a Revive's fainted-member target; both null for
-    /// the ordinary self-targeting items. A no-effect use resolves as <c>ItemUseFailed</c> in the engine.
+    /// restore's target and <paramref name="targetPartySlot"/> the party member Healing/StatusCure/PpRestore/
+    /// Revive act on (any living member, or fainted for Revive); both null to act on the active creature
+    /// (always true for a BattleStatBoost item — it has no party-target scope). A no-effect use resolves as
+    /// <c>ItemUseFailed</c> in the engine.
     /// </summary>
     public Task UseItem(int itemId, int? targetMoveSlot, int? targetPartySlot)
     {

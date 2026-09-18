@@ -6,9 +6,9 @@ namespace creaturegame.Combat;
 
 /// <summary>
 /// Everything an item effect needs to act on the creature the item is used on, without reaching into
-/// <see cref="ItemAction"/>. Effects read the item's (Gen-1) data, mutate the user's battle/permanent
-/// state, and emit their own events. In-battle items are self-targeting in this scope (heal, cure, PP,
-/// X-item), so there is no foe here.
+/// <see cref="ItemAction"/>. Effects read the item's (Gen-1) data, mutate the target's battle/permanent
+/// state, and emit their own events. In-battle items only ever act on the user's own party, so there is no
+/// foe here.
 /// </summary>
 public sealed class ItemEffectContext
 {
@@ -18,15 +18,30 @@ public sealed class ItemEffectContext
     /// <summary>The move slot (0–3) a single-move PP restore targets (Ether). Null for whole-moveset/non-PP items.</summary>
     public int? TargetMoveSlot { get; init; }
 
-    /// <summary>The run party — needed only by the party-targeting items (Revive), which act on a benched member
-    /// rather than <see cref="User"/>. Null for the self-targeting items and for legacy single-creature battles.</summary>
+    /// <summary>The run party — needed to resolve <see cref="TargetPartySlot"/> into a party member. Null for
+    /// legacy single-creature battles (no party wired), in which case every use falls back to <see cref="User"/>
+    /// via <see cref="ResolvedTarget"/>.</summary>
     public Party? Party { get; init; }
 
-    /// <summary>The <see cref="Party"/> member index a party-targeting item (Revive) acts on. Null for the
-    /// self-targeting items (heal / cure / PP / X-item), which always act on <see cref="User"/>.</summary>
+    /// <summary>The <see cref="Party"/> member index this use targets — any living member for Healing /
+    /// StatusCure / PpRestore, or a fainted member for Revive. Null to act on <see cref="User"/> (the default:
+    /// no party wired, or the player didn't need to pick). Never set for BattleStatBoost — see
+    /// <see cref="BattleBoostItemEffect"/>, which always reads <see cref="User"/> directly instead of
+    /// <see cref="ResolvedTarget"/>: Gen 1 has no party-member slot for a stat stage, so that category has no
+    /// party-target scope to resolve.</summary>
     public int? TargetPartySlot { get; init; }
 
     public IBattleEventEmitter? Emitter { get; init; }
+
+    /// <summary>The creature this use actually acts on: the <see cref="Party"/> member at
+    /// <see cref="TargetPartySlot"/> when one is given and in range, else <see cref="User"/>. Read by every
+    /// category except <see cref="BattleBoostItemEffect"/> (see <see cref="TargetPartySlot"/>) — including
+    /// Revive, whose <see cref="ReviveItemEffect.CanApply"/> requires the resolved creature to be fainted
+    /// (never true for the <see cref="User"/> fallback, since a creature mid-turn is always alive).</summary>
+    public Creature ResolvedTarget =>
+        Party is { } party && TargetPartySlot is { } slot && slot >= 0 && slot < party.Count
+            ? party.Members[slot]
+            : User;
 }
 
 /// <summary>
@@ -54,33 +69,34 @@ public sealed class HealingItemEffect : IItemEffect
     public ItemCategory Category => ItemCategory.Healing;
 
     public bool CanApply(ItemEffectContext ctx) =>
-        ctx.User.IsAlive()
+        ctx.ResolvedTarget.IsAlive()
         && (ctx.Item.HealsAllHp || ctx.Item.HealAmount is > 0)
-        && ctx.User.Attributes.HP < ctx.User.Attributes.MaxHP;
+        && ctx.ResolvedTarget.Attributes.HP < ctx.ResolvedTarget.Attributes.MaxHP;
 
     public void Apply(ItemEffectContext ctx)
     {
-        int before = ctx.User.Attributes.HP;
+        var target = ctx.ResolvedTarget;
+        int before = target.Attributes.HP;
         int amount = ctx.Item.HealsAllHp
-            ? ctx.User.Attributes.MaxHP - before
+            ? target.Attributes.MaxHP - before
             : ctx.Item.HealAmount ?? 0;
-        ctx.User.Attributes.ReceiveHealing(amount); // caps at MaxHP
+        target.Attributes.ReceiveHealing(amount); // caps at MaxHP
         ctx.Emitter?.Emit(
-            new Healed(ctx.User.Name, ctx.User.Attributes.HP - before, ctx.User.Attributes.HP)
+            new Healed(target.Name, target.Attributes.HP - before, target.Attributes.HP)
         );
 
         // Full Restore also cures any major status (Gen 1). Confusion is volatile and not cured by items.
-        if (ctx.Item.CuresAllStatus && ctx.User.Battle.Status != StatusCondition.None)
-            ClearStatus(ctx.User, ctx.Emitter);
+        if (ctx.Item.CuresAllStatus && target.Battle.Status != StatusCondition.None)
+            ClearStatus(target, ctx.Emitter);
     }
 
-    internal static void ClearStatus(Creature user, IBattleEventEmitter? emitter)
+    internal static void ClearStatus(Creature target, IBattleEventEmitter? emitter)
     {
-        var was = user.Battle.Status;
-        user.Battle.Status = StatusCondition.None;
-        user.Battle.SleepTurns = 0;
-        user.Battle.ToxicCounter = 1; // reset Gen 1 Toxic escalation baseline
-        emitter?.Emit(new StatusCleared(user.Name, was));
+        var was = target.Battle.Status;
+        target.Battle.Status = StatusCondition.None;
+        target.Battle.SleepTurns = 0;
+        target.Battle.ToxicCounter = 1; // reset Gen 1 Toxic escalation baseline
+        emitter?.Emit(new StatusCleared(target.Name, was));
     }
 }
 
@@ -91,7 +107,8 @@ public sealed class StatusCureItemEffect : IItemEffect
 
     public bool CanApply(ItemEffectContext ctx)
     {
-        if (!ctx.User.IsAlive() || ctx.User.Battle.Status == StatusCondition.None)
+        var target = ctx.ResolvedTarget;
+        if (!target.IsAlive() || target.Battle.Status == StatusCondition.None)
             return false;
         if (ctx.Item.CuresAllStatus)
             return true;
@@ -99,16 +116,16 @@ public sealed class StatusCureItemEffect : IItemEffect
         // Antidote (cures Poison) also clears BadPoison.
         return ctx.Item.CuredStatus is { } cure
             && (
-                ctx.User.Battle.Status == cure
+                target.Battle.Status == cure
                 || (
                     cure == StatusCondition.Poison
-                    && ctx.User.Battle.Status == StatusCondition.BadPoison
+                    && target.Battle.Status == StatusCondition.BadPoison
                 )
             );
     }
 
     public void Apply(ItemEffectContext ctx) =>
-        HealingItemEffect.ClearStatus(ctx.User, ctx.Emitter);
+        HealingItemEffect.ClearStatus(ctx.ResolvedTarget, ctx.Emitter);
 }
 
 /// <summary>Ether / Max Ether (one move) and Elixir / Max Elixir (all moves) — restore PP.</summary>
@@ -118,33 +135,34 @@ public sealed class PpRestoreItemEffect : IItemEffect
 
     public bool CanApply(ItemEffectContext ctx)
     {
-        if (!ctx.User.IsAlive() || ctx.User.MoveSet.Count == 0)
+        var target = ctx.ResolvedTarget;
+        if (!target.IsAlive() || target.MoveSet.Count == 0)
             return false;
         if (ctx.Item.RestoresPpAllMoves)
-            return ctx.User.MoveSet.Any(m => m.PowerPointsCurrent < m.Base.PowerPointsMax);
+            return target.MoveSet.Any(m => m.PowerPointsCurrent < m.Base.PowerPointsMax);
 
         // Single-move: a valid target slot that isn't already full.
         return ctx.TargetMoveSlot is { } slot
             && slot >= 0
-            && slot < ctx.User.MoveSet.Count
-            && ctx.User.MoveSet[slot].PowerPointsCurrent
-                < ctx.User.MoveSet[slot].Base.PowerPointsMax;
+            && slot < target.MoveSet.Count
+            && target.MoveSet[slot].PowerPointsCurrent < target.MoveSet[slot].Base.PowerPointsMax;
     }
 
     public void Apply(ItemEffectContext ctx)
     {
+        var target = ctx.ResolvedTarget;
         if (ctx.Item.RestoresPpAllMoves)
         {
-            foreach (var move in ctx.User.MoveSet)
-                RestoreMove(ctx, move);
+            foreach (var move in target.MoveSet)
+                RestoreMove(ctx, target, move);
         }
         else if (ctx.TargetMoveSlot is { } slot)
         {
-            RestoreMove(ctx, ctx.User.MoveSet[slot]);
+            RestoreMove(ctx, target, target.MoveSet[slot]);
         }
     }
 
-    private static void RestoreMove(ItemEffectContext ctx, PokemonAttack move)
+    private static void RestoreMove(ItemEffectContext ctx, Creature target, PokemonAttack move)
     {
         if (move.PowerPointsCurrent >= move.Base.PowerPointsMax)
             return;
@@ -155,7 +173,7 @@ public sealed class PpRestoreItemEffect : IItemEffect
                 move.PowerPointsCurrent + (ctx.Item.PpRestoreAmount ?? 0)
             );
         ctx.Emitter?.Emit(
-            new PpRestored(ctx.User.Name, move.Base.Name ?? "", move.PowerPointsCurrent)
+            new PpRestored(target.Name, move.Base.Name ?? "", move.PowerPointsCurrent)
         );
     }
 }
@@ -172,6 +190,11 @@ public sealed class BattleBoostItemEffect : IItemEffect
 {
     public ItemCategory Category => ItemCategory.BattleStatBoost;
 
+    // Always acts on ctx.User, never ctx.ResolvedTarget: unlike the other four categories, this one has no
+    // real party-target scope to close. Gen 1 stores stat stages (and the Focus Energy / Mist volatiles) only
+    // for the currently active battler — there is no slot for a benched Pokémon's stage — so the real games
+    // never show the "use it on which POKÉMON?" screen for X-items/Guard Spec/Dire Hit at all; they apply
+    // straight to the active creature. See GENERATION_SEAMS.md §5.0.2.
     public bool CanApply(ItemEffectContext ctx)
     {
         if (!ctx.User.IsAlive())
@@ -214,22 +237,22 @@ public sealed class BattleBoostItemEffect : IItemEffect
 
 /// <summary>
 /// Revive / Max Revive — restore a <b>fainted party member</b> to a fraction of its max HP (Gen 1: Revive
-/// ½, Max Revive full, off <see cref="Item.RevivePercent"/>). The first and only in-battle item that targets a
-/// <em>benched</em> creature rather than the active <see cref="ItemEffectContext.User"/>: it reads
-/// <see cref="ItemEffectContext.Party"/> + <see cref="ItemEffectContext.TargetPartySlot"/> and refuses — no
-/// announce, no consume (the Gen 1 "won't have any effect" rule) — unless that slot holds a fainted member. The
-/// member stays benched; reviving does not switch it in (a mid-battle send-in is the separate forced-switch path).
+/// ½, Max Revive full, off <see cref="Item.RevivePercent"/>). Every category resolves its target via
+/// <see cref="ItemEffectContext.ResolvedTarget"/>; Revive is the one category that requires that target to be
+/// <em>fainted</em> rather than alive, so it refuses — no announce, no consume (the Gen 1 "won't have any
+/// effect" rule) — unless the picked party member is down. The member stays benched; reviving does not switch
+/// it in (a mid-battle send-in is the separate forced-switch path).
 /// </summary>
 public sealed class ReviveItemEffect : IItemEffect
 {
     public ItemCategory Category => ItemCategory.Revive;
 
     public bool CanApply(ItemEffectContext ctx) =>
-        Target(ctx) is { } target && !target.IsAlive() && (ctx.Item.RevivePercent ?? 0) > 0;
+        !ctx.ResolvedTarget.IsAlive() && (ctx.Item.RevivePercent ?? 0) > 0;
 
     public void Apply(ItemEffectContext ctx)
     {
-        var target = Target(ctx)!;
+        var target = ctx.ResolvedTarget;
         int pct = ctx.Item.RevivePercent ?? 0;
         // Gen 1 fraction-HP math truncates (floor), like Recover/Soft-Boiled (HealEffect) — a Revive on 41 max
         // HP gives 20, not 21. Math.Max(1, …) keeps a revived member ≥ 1 HP on a tiny pool (floor(1·½) = 0 → 1).
@@ -247,19 +270,10 @@ public sealed class ReviveItemEffect : IItemEffect
 
         ctx.Emitter?.Emit(new Revived(target.Name, restored, target.Attributes.HP));
 
-        // Repaint the roster panel with the benched member's restored HP + cleared status — the ItemUsed/Revived
-        // pair narrates the log, but the bench member isn't a nameplate, so its bar only updates off a party
-        // snapshot (the same vehicle RecoveryRunEvent uses for the whole-party heal).
-        if (ctx.Party is { } party)
-            ctx.Emitter?.Emit(new PartyUpdated(PartyProjection.Snapshot(party)));
+        // The roster-panel repaint (PartyUpdated) is emitted centrally by ItemAction for any use that
+        // touched a non-active member — see its ExecuteAsync — so every category gets it uniformly, not
+        // just Revive.
     }
-
-    // The fainted party member this revive targets: a wired party + an in-range slot. Null when unusable (no
-    // party, or a stale / out-of-range slot) — CanApply turns that into the no-effect refusal.
-    private static Creature? Target(ItemEffectContext ctx) =>
-        ctx.Party is { } party && ctx.TargetPartySlot is { } slot && slot >= 0 && slot < party.Count
-            ? party.Members[slot]
-            : null;
 }
 
 /// <summary>Registry of in-battle item effects, keyed by the item category that drives each.</summary>

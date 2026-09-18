@@ -4,7 +4,8 @@ using creaturegame.Items;
 namespace creaturegame.Combat;
 
 /// <summary>
-/// A turn spent using a bag item on the user's own creature. The item analogue of
+/// A turn spent using a bag item on a member of the user's own party — the active creature by default, or
+/// another party member via <c>targetPartySlot</c>. The item analogue of
 /// <see cref="AttackAction"/>: it resolves the effect via <see cref="ItemEffects"/>, and on a successful
 /// use announces it (<see cref="ItemUsed"/>), runs the effect, and consumes one from the <see cref="Bag"/>.
 /// <para>Gen 1: using an item takes the whole turn and resolves <b>before</b> either side's move — so its
@@ -68,17 +69,19 @@ public sealed class ItemAction : IBattleAction
             return Task.CompletedTask;
         }
 
-        _emitter?.Emit(new ItemUsed(_item.Name ?? "", AnnounceTargetName()));
+        _emitter?.Emit(new ItemUsed(_item.Name ?? "", ctx.ResolvedTarget.Name));
         effect.Apply(ctx);
         _bag.Consume(_item.Id);
+
+        // Re-sync the roster panel whenever this use touched a BENCHED member (any category — Healing,
+        // StatusCure, PpRestore, Revive; BattleStatBoost never resolves to a non-Source target so never
+        // triggers this). The log narrates via ItemUsed + the effect's own event, but a benched member isn't
+        // a nameplate, so its HP/status bar only ever updates off a party snapshot (the same vehicle
+        // RecoveryRunEvent uses for the whole-party heal). The active creature's own nameplate already
+        // reflects its state without a snapshot, so skip it when nothing benched changed.
+        if (_party is { } party && !ReferenceEquals(ctx.ResolvedTarget, Source))
+            _emitter?.Emit(new PartyUpdated(PartyProjection.Snapshot(party)));
+
         return Task.CompletedTask;
     }
-
-    // Who "Used X on …" names: a party-targeting item (Revive) acts on the benched member, not the active
-    // creature, so name that member; every self-targeting item names Source. CanApply has already validated the
-    // slot when we get here, so the range check is just belt-and-suspenders.
-    private string AnnounceTargetName() =>
-        _party is { } party && _targetPartySlot is { } slot && slot >= 0 && slot < party.Count
-            ? party.Members[slot].Name
-            : Source.Name;
 }

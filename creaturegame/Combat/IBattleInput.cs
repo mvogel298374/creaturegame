@@ -13,8 +13,9 @@ public abstract record TurnChoice;
 public sealed record MoveTurnChoice(PokemonAttack Move) : TurnChoice;
 
 /// <summary>ITEM: use a bag item. <paramref name="TargetMoveSlot"/> is the move slot (0–3) a single-move PP
-/// restore targets; <paramref name="TargetPartySlot"/> is the party-member index a Revive targets (a fainted
-/// benched member). Both null for the ordinary self-targeting items (they act on the active creature).</summary>
+/// restore targets; <paramref name="TargetPartySlot"/> is the party-member index Healing/StatusCure/PpRestore/
+/// Revive act on — any living member, or a fainted one for Revive. Both null to act on the active creature
+/// (BattleStatBoost always does — see <see cref="ItemEffects.BattleBoostItemEffect"/>).</summary>
 public sealed record ItemTurnChoice(
     Item Item,
     int? TargetMoveSlot = null,

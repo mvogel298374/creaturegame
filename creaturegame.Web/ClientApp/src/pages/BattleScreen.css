@@ -736,7 +736,7 @@
    its sibling surfaces because it was a live readability regression, not just cosmetic staleness
    (docs/TODO.md, flagged 2026-08-23): `.bag-item` only ever inherited `--clr-text` (near-white) on a
    transparent background, which was fine against the old dark panel but reads as near-invisible now
-   that `.battle-panel` sits on the light `--ks-fog` ground. `ReviveTargetPicker` reuses the same
+   that `.battle-panel` sits on the light `--ks-fog` ground. `PartyTargetPicker` reuses the same
    `.bag-item*` classes, so it's covered by the same rules; `PpTargetPicker` already reuses `.move-btn`
    and needed no change. */
 [data-generation="gen1"] .bag-item {

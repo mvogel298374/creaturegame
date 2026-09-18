@@ -85,6 +85,60 @@ public class ItemEffectTests
                 }
             );
 
+    // Drives an effect against a specific PARTY member instead of the active creature (`User` stays the lead,
+    // matching how `ItemAction` always builds the context — the party pick is `TargetPartySlot`, not `User`).
+    // Shared across every category now that party-targeting isn't Revive-only.
+    private static (Party, RecordingEmitter) ApplyToPartyMember(
+        Item item,
+        Party party,
+        int targetSlot,
+        int? moveSlot = null
+    )
+    {
+        var emitter = new RecordingEmitter();
+        var effect = ItemEffects.For(item.Category)!;
+        var ctx = new ItemEffectContext
+        {
+            User = party.Lead,
+            Item = item,
+            Party = party,
+            TargetPartySlot = targetSlot,
+            TargetMoveSlot = moveSlot,
+            Emitter = emitter,
+        };
+        Assert.True(effect.CanApply(ctx));
+        effect.Apply(ctx);
+        return (party, emitter);
+    }
+
+    private static bool CanApplyToPartyMember(
+        Item item,
+        Party party,
+        int targetSlot,
+        int? moveSlot = null
+    ) =>
+        ItemEffects
+            .For(item.Category)!
+            .CanApply(
+                new ItemEffectContext
+                {
+                    User = party.Lead,
+                    Item = item,
+                    Party = party,
+                    TargetPartySlot = targetSlot,
+                    TargetMoveSlot = moveSlot,
+                }
+            );
+
+    // A lead + one living bench member, both full HP/healthy — the fixture for "does this category actually
+    // act on the picked member, not the active one" tests.
+    private static Party PartyWithLivingBench(int leadHp = 200, int benchHp = 200)
+    {
+        var party = new Party(TestCreatures.Make("Lead", hp: leadHp));
+        party.Add(TestCreatures.Make("Bench", hp: benchHp));
+        return party;
+    }
+
     // ── Bag ─────────────────────────────────────────────────────────────────────────────────────
 
     [Fact]
@@ -174,6 +228,36 @@ public class ItemEffectTests
         Assert.Equal(StatusCondition.Poison, em.Of<StatusCleared>().Single().WasStatus);
     }
 
+    [Fact]
+    public void Potion_OnBenchMember_HealsThatMemberNotTheActiveOne()
+    {
+        var party = PartyWithLivingBench(leadHp: 200, benchHp: 200);
+        party.Members[1].Attributes.ReceiveDamage(80); // bench HP 120; lead stays full
+        var (p, em) = ApplyToPartyMember(
+            Item(17, "potion", ItemCategory.Healing, heal: 20),
+            party,
+            targetSlot: 1
+        );
+
+        Assert.Equal(140, p.Members[1].Attributes.HP); // bench healed
+        Assert.Equal(200, p.Lead.Attributes.HP); // active creature untouched
+        Assert.Equal("Bench", em.Of<Healed>().Single().CreatureName);
+    }
+
+    [Fact]
+    public void Potion_OnFaintedBenchMember_HasNoEffect()
+    {
+        var party = PartyWithLivingBench();
+        party.Members[1].Attributes.ReceiveDamage(200); // faint it
+        Assert.False(
+            CanApplyToPartyMember(
+                Item(17, "potion", ItemCategory.Healing, heal: 20),
+                party,
+                targetSlot: 1
+            )
+        );
+    }
+
     // ── Status cures ────────────────────────────────────────────────────────────────────────────
 
     [Fact]
@@ -246,6 +330,37 @@ public class ItemEffectTests
         Assert.False(CanApply(Item(27, "full-heal", ItemCategory.StatusCure, curesAll: true), c));
     }
 
+    [Fact]
+    public void Antidote_OnBenchMember_CuresThatMembersStatusNotTheActiveOnes()
+    {
+        var party = PartyWithLivingBench();
+        party.Lead.Battle.Status = StatusCondition.Poison;
+        party.Members[1].Battle.Status = StatusCondition.Poison;
+        var (p, _) = ApplyToPartyMember(
+            Item(18, "antidote", ItemCategory.StatusCure, cured: StatusCondition.Poison),
+            party,
+            targetSlot: 1
+        );
+
+        Assert.Equal(StatusCondition.None, p.Members[1].Battle.Status); // cured
+        Assert.Equal(StatusCondition.Poison, p.Lead.Battle.Status); // active creature untouched
+    }
+
+    [Fact]
+    public void Antidote_OnFaintedBenchMember_HasNoEffect()
+    {
+        var party = PartyWithLivingBench();
+        party.Members[1].Battle.Status = StatusCondition.Poison;
+        party.Members[1].Attributes.ReceiveDamage(200); // faint it
+        Assert.False(
+            CanApplyToPartyMember(
+                Item(18, "antidote", ItemCategory.StatusCure, cured: StatusCondition.Poison),
+                party,
+                targetSlot: 1
+            )
+        );
+    }
+
     // ── PP restore ──────────────────────────────────────────────────────────────────────────────
 
     [Fact]
@@ -270,6 +385,44 @@ public class ItemEffectTests
         var c = TestCreatures.Make();
         c.AddAttack(Move("tackle", 1, pp: 35)); // full
         Assert.False(CanApply(Item(38, "ether", ItemCategory.PpRestore, pp: 10), c, slot: 0));
+    }
+
+    [Fact]
+    public void Ether_OnBenchMember_RestoresThatMembersMoveNotTheActiveOnes()
+    {
+        var party = PartyWithLivingBench();
+        party.Lead.AddAttack(Move("tackle", 1, pp: 35));
+        party.Lead.MoveSet[0].PowerPointsCurrent = 5;
+        party.Members[1].AddAttack(Move("ember", 2, pp: 25));
+        party.Members[1].MoveSet[0].PowerPointsCurrent = 5;
+
+        var (p, em) = ApplyToPartyMember(
+            Item(38, "ether", ItemCategory.PpRestore, pp: 10),
+            party,
+            targetSlot: 1,
+            moveSlot: 0
+        );
+
+        Assert.Equal(15, p.Members[1].MoveSet[0].PowerPointsCurrent); // bench move restored (+10)
+        Assert.Equal(5, p.Lead.MoveSet[0].PowerPointsCurrent); // active creature's move untouched
+        Assert.Equal("ember", em.Of<PpRestored>().Single().MoveName);
+    }
+
+    [Fact]
+    public void Ether_OnFaintedBenchMember_HasNoEffect()
+    {
+        var party = PartyWithLivingBench();
+        party.Members[1].AddAttack(Move("ember", 2, pp: 25));
+        party.Members[1].MoveSet[0].PowerPointsCurrent = 5;
+        party.Members[1].Attributes.ReceiveDamage(200); // faint it
+        Assert.False(
+            CanApplyToPartyMember(
+                Item(38, "ether", ItemCategory.PpRestore, pp: 10),
+                party,
+                targetSlot: 1,
+                moveSlot: 0
+            )
+        );
     }
 
     [Fact]
@@ -399,6 +552,28 @@ public class ItemEffectTests
         );
     }
 
+    [Fact]
+    public void XAttack_IgnoresAnyPartyTargetSlot_AlwaysBoostsTheActiveCreature()
+    {
+        // Unlike Healing/StatusCure/PpRestore, BattleStatBoost has no real party-target scope to honor: Gen 1
+        // stores stat stages only for the currently active battler, so even if a TargetPartySlot is somehow
+        // supplied (e.g. a stale/malformed client request), the effect must still resolve against ctx.User,
+        // never ctx.ResolvedTarget — a benched member's stage must NOT move.
+        var party = PartyWithLivingBench();
+        var item = Item(
+            57,
+            "x-attack",
+            ItemCategory.BattleStatBoost,
+            boostStat: StageStat.Attack,
+            boostStages: 1
+        );
+        var (p, em) = ApplyToPartyMember(item, party, targetSlot: 1);
+
+        Assert.Equal(1, p.Lead.Battle.Stages.Attack); // active creature boosted regardless of the party pick
+        Assert.Equal(0, p.Members[1].Battle.Stages.Attack); // bench member untouched
+        Assert.Equal("Lead", em.Of<StatStageChanged>().Single().CreatureName);
+    }
+
     // ── Revive (targets a fainted PARTY member, not the active creature) ──────────────────────────
 
     // Revive resolves against Party + TargetPartySlot rather than User, so it gets its own harness.
@@ -500,8 +675,10 @@ public class ItemEffectTests
     public void Revive_BringsTheMemberBackStatusless()
     {
         // A member that fainted WHILE afflicted (the common way — burn/poison chip) comes back clean (Gen 1):
-        // both the transient battle status and any carried status are cleared, and the emitted party snapshot
-        // shows it statusless (not a revived-but-still-poisoned creature on the roster panel).
+        // both the transient battle status and any carried status are cleared. (The emitted roster snapshot
+        // showing this clean state is covered at the ItemAction/Battle level, not here — see
+        // ItemActionBattleTests.UsingRevive_RestoresAFaintedBenchMemberAndConsumes — since PartyUpdated is now
+        // emitted centrally by ItemAction for any party-targeting use, not by the effect itself.)
         var party = new Party(TestCreatures.Make("Lead"));
         var bench = TestCreatures.Make("Bench", hp: 200);
         bench.Battle.Status = StatusCondition.BadPoison;
@@ -510,12 +687,11 @@ public class ItemEffectTests
         bench.Attributes.ReceiveDamage(200); // faint it while badly poisoned
         party.Add(bench);
 
-        var (p, em) = ApplyRevive(Revive50(), party, slot: 1);
+        var (p, _) = ApplyRevive(Revive50(), party, slot: 1);
 
         Assert.Equal(StatusCondition.None, p.Members[1].Battle.Status);
         Assert.Equal(1, p.Members[1].Battle.ToxicCounter); // escalation reset to baseline
         Assert.Null(p.Members[1].CarriedStatus); // won't re-apply on a later send-in
-        Assert.Equal(StatusCondition.None, em.Of<PartyUpdated>().Single().Members[1].Status);
     }
 
     [Fact]
@@ -534,15 +710,6 @@ public class ItemEffectTests
         // Reviving does not switch it in — the lead is unchanged (a send-in is the separate forced-switch path).
         Assert.Equal(0, party.LeadIndex);
         Assert.Equal("Lead", party.Lead.Name);
-    }
-
-    [Fact]
-    public void Revive_EmitsAPartySnapshotSoTheBenchBarRepaints()
-    {
-        var party = PartyWithFaintedBench();
-        var (_, em) = ApplyRevive(Revive50(), party, slot: 1);
-        var snapshot = em.Of<PartyUpdated>().Single();
-        Assert.Equal(100, snapshot.Members[1].Hp); // the revived member's restored HP is on the wire
     }
 
     [Fact]

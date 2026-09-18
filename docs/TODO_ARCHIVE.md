@@ -8,6 +8,103 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## In-Battle Item Party-Targeting — items other than Revive can target any living party member ✅ DONE (2026-09-18)
+
+**The gap.** Real Gen 1 shows a full party-selection screen ("Use item on which POKÉMON?") for items that
+act on **persistent per-Pokémon data** — Potion/Full Restore, the status cures, Ether/Elixir, and
+Revive/Max Revive — letting the player target **any living party member** (Revive: any **fainted** one), not
+only the one currently on the field. `HealingItemEffect`, `StatusCureItemEffect`, and `PpRestoreItemEffect`
+hardcoded `ItemEffectContext.User` (the active creature); only `ReviveItemEffect` already worked this way.
+`/plan` done 2026-09-18 — checked against `GENERATION_SEAMS.md` §5.0 and confirmed **gen-invariant** (§5.0.2
+records the judgment), so this shipped as a pure engine/web/frontend fix, no seam member, no importer/DB
+change.
+
+**Scope correction mid-implementation (2026-09-18): BattleStatBoost is explicitly EXCLUDED.** The plan
+originally locked in "all four categories, including BattleStatBoost" on the premise that an X-item used on
+a benched member is Gen-1-legal but merely wasted (stat stages reset to 0 on that member's next switch-in),
+so the fix should let the pick happen rather than special-case it out. That premise was implemented, then
+caught as wrong by `requirements-review` *before* commit: Gen 1 stores stat stages (and the Focus Energy /
+Mist volatiles) only for the currently active battler — there is no per-party-member slot for a stat stage at
+all — so the real games never show the party-selection screen for X-items/Guard Spec/Dire Hit; they apply
+immediately to whoever's on the field. Letting the player pick a bench target for these would have shipped a
+mechanic the cartridge doesn't have, not closed a fidelity gap. The fix was reverted for this one category
+before the commit that follows this archive entry — see `GENERATION_SEAMS.md` §5.0.2 for the corrected,
+final judgment. **Lesson for future item-effect work:** "every non-Ball item" is not a safe generalization —
+check whether the underlying data the item touches is per-Pokémon-persistent (party-targetable) or
+battle-session-only (active-creature-only) before assuming a category follows the group.
+
+**Shipped 2026-09-18 (final, corrected scope):**
+1. **Engine (`Combat/ItemEffects.cs`, `ItemAction.cs`).** Added `ItemEffectContext.ResolvedTarget`, a shared
+   target-resolution property that resolves `Party`/`TargetPartySlot` to a party member, falling back to
+   `User`. `HealingItemEffect`, `StatusCureItemEffect`, `PpRestoreItemEffect` now all read `ctx.ResolvedTarget`
+   instead of hardcoding `ctx.User`, each requiring the resolved target to be **alive**.
+   `PpRestoreItemEffect`'s `TargetMoveSlot` indexes into the *resolved target's* own moveset (Ether on a
+   benched member reads that member's own PP, not the active creature's). `ReviveItemEffect` was refactored
+   onto the same `ResolvedTarget` property (unifying its previously-separate target-resolution logic) without
+   changing its behavior — it still requires the resolved target to be **fainted**. `BattleBoostItemEffect`
+   deliberately keeps reading `ctx.User` directly (never `ResolvedTarget`) — the one category with no
+   party-target scope to close. `ItemAction.AnnounceTargetName` was replaced by reading
+   `ctx.ResolvedTarget.Name` directly (dedup).
+2. **Web.** No wiring change needed — `TargetPartySlot` was already threaded generically end-to-end from
+   `ItemTurnChoice` through `Battle`/`ItemAction`/`BattleHub`/`SignalRInput`, built for Revive but never gated
+   to it.
+3. **Frontend (`battle/bag.ts`, `pages/BattleScreen.tsx`).** `needsPartyTarget(item)` now returns true for
+   every category **except BattleStatBoost**; `partyTargetMode(item)` returns `'fainted' | 'living'` (Revive
+   vs. everything else) for the categories that do need a pick. `ReviveTargetPicker` was generalized into
+   `PartyTargetPicker`, parameterized by mode and disabling ineligible members. `BagMenu`'s `pick()` shows the
+   party picker only when `needsPartyTarget` is true — an X-item still goes straight to `onUse(item.id, null,
+   null)`, unchanged from before this feature. For Ether/Elixir (`needsMoveTarget`), picking a party member
+   then shows the existing `PpTargetPicker` scoped to that member's own moveset — fetching it via
+   `GET /api/game/{gameId}/player/{slot}` (reusing the CHECK POKEMON per-slot endpoint, `overviewSlotUrl`
+   helper, 2026-09-16) when the picked member isn't the active creature.
+
+**Tests:** `Unit/ItemEffectTests.cs` — bench-target + fainted-target-refusal cases for Healing/StatusCure/
+PpRestore, plus one regression test (`XAttack_IgnoresAnyPartyTargetSlot_AlwaysBoostsTheActiveCreature`)
+pinning that `BattleBoostItemEffect` ignores any supplied `TargetPartySlot` and always resolves `ctx.User`.
+One new full-`Battle` integration case in `Integration/ItemActionBattleTests.cs`
+(`UsingPotion_OnABenchMember_HealsThatMemberNotTheActiveOne`). `bag.test.ts` updated for the corrected
+`needsPartyTarget`/`partyTargetMode` split (plus new coverage for `moveSourceForPartyPick`, see below). Full
+suite green: 1544 .NET tests, 259 Vitest tests, clean `tsc --noEmit`, clean CSharpier.
+
+**Manually verified in-browser:** bag → Potion → party picker appears listing the party → picking the (only,
+full-HP) member correctly refuses ("It won't have any effect!"), and after taking damage, using it again
+correctly heals and announces "Used POTION on BULBASAUR!". The bench-target case specifically was not
+live-verified (would have required grinding to a second party member in a fresh run) — covered by the
+engine/integration tests above instead.
+
+**Design-doc updates:** `GENERATION_SEAMS.md` §5.0.2 records the corrected gen-invariance judgment (split by
+category, X-items excluded); `ARCHITECTURE.md` §2.11 and `PRODUCT_SPEC.md` §5 describe the final shipped
+state.
+
+**Gate adjustments (`pr-review`, 2026-09-18, CHANGES-REQUESTED → both blockers fixed):**
+1. **Missing `PartyUpdated` on the three new categories.** `ReviveItemEffect` alone emitted the roster-panel
+   repaint after a bench-targeting use; Healing/StatusCure/PpRestore took the bench-targeting *capability*
+   without inheriting that hook, so a bench heal/cure/PP-restore would have left the party strip stale until
+   an unrelated later snapshot. Fixed by moving the emit out of `ReviveItemEffect.Apply` and into
+   `ItemAction.ExecuteAsync` — `if (_party is { } party && !ReferenceEquals(ctx.ResolvedTarget, Source))` —
+   so every category gets it uniformly off one hook, and the active-creature case (no snapshot needed) is a
+   single shared guard rather than four per-effect judgment calls. `UsingRevive_RestoresAFaintedBenchMemberAndConsumes`
+   was strengthened to assert the snapshot's HP *and* cleared status; `UsingPotion_OnABenchMember_...` gained
+   the same HP assertion; a new `UsingPotion_OnTheActiveCreature_EmitsNoPartySnapshot` pins the negative case.
+   Two now-redundant unit-level assertions in `ItemEffectTests.cs` (which drive the effect directly, bypassing
+   `ItemAction`) were removed since the effect no longer owns this emit.
+2. **Stale `TargetPartySlot` contract docs.** `IBattleInput.ItemTurnChoice`, `BattleHub.UseItem`, and
+   `useBattleHub.useItem`'s doc comments still described the parameter as Revive-only after this feature
+   broadened it; corrected on all three wire legs, plus a stale "self-targeting items" phrase in
+   `GameSessionManager.ProjectBagView`'s doc comment.
+
+Also addressed from the same review (non-blocking): an overstated `PartyTargetPicker` comment (eligibility is
+alive/fainted only, not full precondition-awareness); a 4th copy of the X-item rationale in `bag.ts` trimmed
+to a `GENERATION_SEAMS.md` §5.0.2 pointer; a `GENERATION_SEAMS.md` XP-tuning pointer corrected to name
+*Reward Visibility & XP Pacing* (where the multiplier anchors actually live) alongside *Participation XP*; a
+stale `ReviveTargetPicker` name in a `BattleScreen.css` comment; `ClearStatus`'s parameter renamed
+`user`→`target`; and the `handlePartyPick` `!gameId` guard (unreachable in practice) now surfaces
+`moveFetchError` instead of silently returning. The bundled, unrelated `GENERATION_SEAMS.md` prose-condensation
+pass from earlier in the same session was reviewed and kept in this commit (`pr-review` verified no content
+was lost — it survives in `STATE_MODEL.md` / `TODO_ARCHIVE.md`).
+
+---
+
 ## CHECK POKEMON party-member picker ✅ COMPLETE (2026-09-16)
 
 **The gap, raised 2026-09-12 by the user, scoped to Tier 3:** `CreatureOverview.tsx` fetched exactly one

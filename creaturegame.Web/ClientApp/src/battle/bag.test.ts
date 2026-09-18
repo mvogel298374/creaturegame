@@ -4,9 +4,25 @@ import {
   isUsableInBattle,
   needsMoveTarget,
   needsPartyTarget,
+  partyTargetMode,
+  moveSourceForPartyPick,
   formatItemName,
   groupBagItems,
 } from './bag';
+import type { PartyMember } from './timeline';
+
+function member(overrides: Partial<PartyMember> = {}): PartyMember {
+  return {
+    speciesId: 1,
+    name: 'MON',
+    level: 5,
+    hp: 10,
+    maxHp: 10,
+    status: 'None',
+    isLead: false,
+    ...overrides,
+  };
+}
 
 const item = (over: Partial<BagItem> = {}): BagItem => ({
   id: 1,
@@ -44,15 +60,42 @@ describe('needsMoveTarget', () => {
 });
 
 describe('needsPartyTarget', () => {
-  it('is true only for a Revive (targets a fainted party member)', () => {
+  it('is true for every category except BattleStatBoost', () => {
+    expect(needsPartyTarget({ category: 'Healing' })).toBe(true);
+    expect(needsPartyTarget({ category: 'StatusCure' })).toBe(true);
+    expect(needsPartyTarget({ category: 'PpRestore' })).toBe(true);
     expect(needsPartyTarget({ category: 'Revive' })).toBe(true);
   });
 
-  it('is false for every self-targeting category', () => {
-    expect(needsPartyTarget({ category: 'Healing' })).toBe(false);
-    expect(needsPartyTarget({ category: 'StatusCure' })).toBe(false);
-    expect(needsPartyTarget({ category: 'PpRestore' })).toBe(false);
+  it('is false for BattleStatBoost (Gen 1 has no per-member stat-stage slot)', () => {
     expect(needsPartyTarget({ category: 'BattleStatBoost' })).toBe(false);
+  });
+});
+
+describe('partyTargetMode', () => {
+  it('is "fainted" only for Revive', () => {
+    expect(partyTargetMode({ category: 'Revive' })).toBe('fainted');
+  });
+
+  it('is "living" for every other category', () => {
+    expect(partyTargetMode({ category: 'Healing' })).toBe('living');
+    expect(partyTargetMode({ category: 'StatusCure' })).toBe('living');
+    expect(partyTargetMode({ category: 'PpRestore' })).toBe('living');
+  });
+});
+
+describe('moveSourceForPartyPick', () => {
+  it('reuses the already-loaded moveset when the pick IS the active creature', () => {
+    const party = [member({ name: 'BENCH' }), member({ name: 'LEAD', isLead: true })];
+    expect(moveSourceForPartyPick('game-1', party, 1)).toEqual({ kind: 'inline' });
+  });
+
+  it('fetches that member\'s own overview when the pick is a bench member', () => {
+    const party = [member({ name: 'BENCH' }), member({ name: 'LEAD', isLead: true })];
+    expect(moveSourceForPartyPick('game-1', party, 0)).toEqual({
+      kind: 'fetch',
+      url: '/api/game/game-1/player/0',
+    });
   });
 });
 

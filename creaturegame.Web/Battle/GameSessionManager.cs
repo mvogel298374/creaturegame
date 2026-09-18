@@ -397,9 +397,10 @@ public sealed class GameSessionManager(
     /// <summary>Projects the held bag (id → qty) plus the item catalog into the client's <see cref="BagItemView"/>
     /// list, ordered by id. Pure (no session state) so the wire projection — notably the
     /// <see cref="BagItemView.UsableInBattle"/> flag — is unit-testable without standing up a live battle.
-    /// <para><paramref name="party"/> is needed only to gate <b>Revive</b>: unlike the self-targeting items, whose
-    /// usability is a fixed property of the category, a Revive is usable only when a <em>fainted</em> party member
-    /// exists to target — so the menu hides it (rather than offering a guaranteed no-op) when the roster is all up.</para></summary>
+    /// <para><paramref name="party"/> is needed only to gate <b>Revive</b>: every other category's usability is a
+    /// fixed property of the category regardless of party state, but a Revive is usable only when a
+    /// <em>fainted</em> party member exists to target — so the menu hides it (rather than offering a
+    /// guaranteed no-op) when the roster is all up.</para></summary>
     internal static IReadOnlyList<BagItemView> ProjectBagView(
         Bag bag,
         IReadOnlyDictionary<int, Item> itemsById,

@@ -2,6 +2,9 @@
 // A BagItem mirrors the backend BagItemView (GET /api/game/{gameId}/bag); `category` is the
 // ItemCategory enum name as a string.
 
+import type { PartyMember } from './timeline';
+import { overviewSlotUrl } from './overviewPicker';
+
 export interface BagItem {
   id: number;
   name: string;
@@ -29,10 +32,35 @@ export function needsMoveTarget(item: Pick<BagItem, 'category' | 'restoresPpAllM
   return item.category === 'PpRestore' && !item.restoresPpAllMoves;
 }
 
-// A Revive targets a fainted PARTY member (not the active creature), so the menu must ask which one before
-// using it — the party analogue of needsMoveTarget. Every other category acts on the active creature directly.
+// Whether picking this item asks which party member to use it on — the real games' "Use item on which
+// POKÉMON?" screen. True for every category except BattleStatBoost (X-items/Guard Spec/Dire Hit always apply
+// to the active creature — Gen 1 has no per-party-member stat-stage storage). Ball/Other never reach the bag
+// menu (usableInBattle is false). Why the split → GENERATION_SEAMS.md §5.0.2.
 export function needsPartyTarget(item: Pick<BagItem, 'category'>): boolean {
-  return item.category === 'Revive';
+  return item.category !== 'BattleStatBoost';
+}
+
+// Which party members are valid picks when needsPartyTarget is true: Revive/Max Revive need a FAINTED one;
+// every other category needs a LIVING one (the inverse).
+export function partyTargetMode(item: Pick<BagItem, 'category'>): 'fainted' | 'living' {
+  return item.category === 'Revive' ? 'fainted' : 'living';
+}
+
+// For a single-move PP restore (Ether/Max Ether) once a party member is picked: where to read THEIR moveset
+// from. The bag menu only ever loads the active creature's moves up front, so picking the active creature can
+// reuse that; picking anyone else needs a fresh fetch of their own moveset. Pure so Vitest can pin the
+// branching without a DOM harness (the same reason overviewSlotUrl in overviewPicker.ts is pure).
+export type MoveSource = { kind: 'inline' } | { kind: 'fetch'; url: string };
+
+export function moveSourceForPartyPick(
+  gameId: string,
+  party: PartyMember[],
+  partySlot: number
+): MoveSource {
+  const activeSlot = party.findIndex(m => m.isLead);
+  return partySlot === activeSlot
+    ? { kind: 'inline' }
+    : { kind: 'fetch', url: overviewSlotUrl(gameId, party, partySlot) };
 }
 
 // Item names arrive as lowercase, hyphenated slugs ("super-potion", "x-attack"); the UI is uppercase

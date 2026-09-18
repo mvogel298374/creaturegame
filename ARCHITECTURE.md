@@ -236,9 +236,14 @@ Each entry: **Decision · Why · Where it lives.**
   `DealDamageToTarget` through a context delegate, so the Substitute-soak / Bide / Counter-recording stays in
   one place. **Item effects** mirror the same shape: `CanApply` gates the announce + bag-consume (the Gen 1
   "won't have any effect" rule), `Apply` mutates state and emits events; their *amounts* are **data** read off
-  the `Item` row (never inlined). Revive is the one party-targeting effect (it acts on a fainted bench member via
-  the context's `Party`/`TargetPartySlot`, not the active creature); the still-deferred Ball category (needs
-  Catch) is simply absent from the registry so `For` returns null.
+  the `Item` row (never inlined). Four of the five categories resolve their target via
+  `ItemEffectContext.ResolvedTarget` (the context's `Party`/`TargetPartySlot`, falling back to the active
+  creature) — Healing/StatusCure/PpRestore for any *living* party member, Revive for a *fainted* one — since
+  they act on persistent per-Pokémon data (HP, status, PP, or a faint) that exists whether or not that member
+  is on the field. `BattleBoostItemEffect` (X-items, Guard Spec, Dire Hit) is the deliberate exception,
+  reading `ctx.User` directly: Gen 1 has no per-party-member slot for a stat stage, so that category never
+  targets anyone but the active creature. See `GENERATION_SEAMS.md` §5.0.2. The still-deferred Ball category
+  (needs Catch) is simply absent from the registry so `For` returns null.
 - **Where:** `Combat/LockInMechanics.cs`, `Combat/MoveEffects.cs`, `Combat/ItemEffects.cs`.
 
 ---

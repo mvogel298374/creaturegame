@@ -26,7 +26,8 @@ import type { Species } from '../types/Species';
 import type { MoveInfo } from '../types/BattleEvents';
 import { formatMoveName } from '../utils/format';
 import { friendlyFetchError } from '../utils/fetchError';
-import { type BagItem, groupBagItems, needsMoveTarget, needsPartyTarget, formatItemName } from '../battle/bag';
+import { type BagItem, groupBagItems, needsMoveTarget, needsPartyTarget, partyTargetMode, moveSourceForPartyPick, formatItemName } from '../battle/bag';
+import type { PlayerOverview } from '../types/PlayerOverview';
 import { loadActiveGame, clearActiveGame } from '../utils/activeGame';
 import { PartyStrip } from '../components/PartyStrip';
 import { Modal } from '../components/modals/Modal';
@@ -974,26 +975,31 @@ function MoveMenu({ moves, canChoose, onChoose, onBack }: {
   );
 }
 
-// Party-member pick for a Revive / Max Revive. Lists the roster; only a fainted member (hp ≤ 0) is a valid
-// target (a healthy one is disabled — reviving it would have no effect, so the engine refuses the use). The
-// bag menu only offers a Revive when at least one member is fainted, so this always has a live target.
-function ReviveTargetPicker({ item, party, onPick, onBack }: {
+// Party-member pick for any battle item — the party analogue of the real games' "Use item on which POKÉMON?"
+// screen. `mode` decides which members are valid: Revive/Max Revive need a FAINTED one; every other category
+// needs a LIVING one (the inverse) — this is only the alive/fainted split, not full eligibility: a full-HP
+// member is still offered for a Potion (and every other living/fainted member) and only refused server-side
+// ("It won't have any effect!") after picking, since the client doesn't know each item's specific precondition.
+function PartyTargetPicker({ item, party, mode, onPick, onBack }: {
   item: BagItem;
   party: PartyMember[];
+  mode: 'fainted' | 'living';
   onPick: (slot: number) => void;
   onBack: () => void;
 }) {
+  const verb = mode === 'fainted' ? 'Revive' : 'Use';
   return (
     <div className="move-menu">
-      <p className="bag-pp-prompt">Revive which party member? ({formatItemName(item.name)})</p>
+      <p className="bag-pp-prompt">{verb} on which party member? ({formatItemName(item.name)})</p>
       <div className="bag-list">
         {party.map((m, i) => {
           const fainted = m.hp <= 0;
+          const eligible = mode === 'fainted' ? fainted : !fainted;
           return (
             <button
               key={i}
-              className={`bag-item${fainted ? '' : ' move-btn--disabled'}`}
-              disabled={!fainted}
+              className={`bag-item${eligible ? '' : ' move-btn--disabled'}`}
+              disabled={!eligible}
               onClick={() => onPick(i)}
             >
               <img
@@ -1017,8 +1023,9 @@ function ReviveTargetPicker({ item, party, onPick, onBack }: {
 }
 
 // The in-battle bag: fetched fresh each time it opens (quantities change as items are consumed), grouped by
-// pocket, with only battle-usable categories shown (see bag.ts). Picking an item uses it as the turn —
-// except a single-move PP restore (Ether), which first asks which move slot to refill via PpTargetPicker.
+// pocket, with only battle-usable categories shown (see bag.ts). Picking an item always asks which party
+// member it targets (PartyTargetPicker) before it's used as the turn; a single-move PP restore (Ether) then
+// asks a second question — which of that member's moves to refill (PpTargetPicker).
 function BagMenu({ gameId, gold, moves, party, onUse, onBack }: {
   gameId: string | null;
   gold: number;
@@ -1029,10 +1036,14 @@ function BagMenu({ gameId, gold, moves, party, onUse, onBack }: {
 }) {
   const [items, setItems] = useState<BagItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  // When set, we're picking the move slot for this single-move PP-restore item instead of the item list.
-  const [ppTarget, setPpTarget] = useState<BagItem | null>(null);
-  // When set, we're picking which fainted party member to Revive instead of the item list.
-  const [reviveTarget, setReviveTarget] = useState<BagItem | null>(null);
+  // When set, we're picking which party member to use the item on instead of the item list — every category
+  // except BattleStatBoost (see needsPartyTarget/partyTargetMode).
+  const [partyTarget, setPartyTarget] = useState<BagItem | null>(null);
+  // When set, the party member is chosen and we're picking which of THEIR moves to refill (Ether/Max Ether
+  // only) — `moves` is that member's own moveset (the already-loaded active-creature prop, or fetched fresh
+  // for a bench pick, since the bag menu only ever loads the active creature's moves up front).
+  const [ppTarget, setPpTarget] = useState<{ item: BagItem; partySlot: number; moves: MoveInfo[] } | null>(null);
+  const [moveFetchError, setMoveFetchError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!gameId) { setError('No active game.'); return; }
@@ -1045,29 +1056,53 @@ function BagMenu({ gameId, gold, moves, party, onUse, onBack }: {
   }, [gameId]);
 
   const pick = (item: BagItem) => {
-    if (needsMoveTarget(item)) setPpTarget(item);
-    else if (needsPartyTarget(item)) setReviveTarget(item);
-    else onUse(item.id, null, null);
+    if (needsPartyTarget(item)) setPartyTarget(item);
+    else onUse(item.id, null, null); // BattleStatBoost: always the active creature, no picker
   };
+
+  const handlePartyPick = (item: BagItem, partySlot: number) => {
+    setPartyTarget(null);
+    if (!needsMoveTarget(item)) { onUse(item.id, null, partySlot); return; }
+    // Unreachable in practice — the bag/party lists above only ever render once `gameId` resolved the initial
+    // fetch — but surface it rather than silently dropping the pick if it somehow is null.
+    if (!gameId) { setMoveFetchError('No active game.'); return; }
+
+    const source = moveSourceForPartyPick(gameId, party, partySlot);
+    if (source.kind === 'inline') { setPpTarget({ item, partySlot, moves }); return; }
+    fetch(source.url)
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+      .then((d: PlayerOverview) => setPpTarget({ item, partySlot, moves: d.moves }))
+      .catch(e => setMoveFetchError(friendlyFetchError(e)));
+  };
+
+  if (moveFetchError) {
+    return (
+      <div className="move-menu">
+        <p className="bag-error">{moveFetchError}</p>
+        <button className="btn-ghost action-back" onClick={() => setMoveFetchError(null)}>← BACK</button>
+      </div>
+    );
+  }
 
   if (ppTarget) {
     return (
       <PpTargetPicker
-        item={ppTarget}
-        moves={moves}
-        onPick={slot => onUse(ppTarget.id, slot, null)}
+        item={ppTarget.item}
+        moves={ppTarget.moves}
+        onPick={slot => onUse(ppTarget.item.id, slot, ppTarget.partySlot)}
         onBack={() => setPpTarget(null)}
       />
     );
   }
 
-  if (reviveTarget) {
+  if (partyTarget) {
     return (
-      <ReviveTargetPicker
-        item={reviveTarget}
+      <PartyTargetPicker
+        item={partyTarget}
         party={party}
-        onPick={slot => onUse(reviveTarget.id, null, slot)}
-        onBack={() => setReviveTarget(null)}
+        mode={partyTargetMode(partyTarget)}
+        onPick={slot => handlePartyPick(partyTarget, slot)}
+        onBack={() => setPartyTarget(null)}
       />
     );
   }

@@ -29,8 +29,7 @@ implementations you swap in.**
 These are the **battle-and-progression** seams. `IEvolutionRules` is a progression seam (consulted between
 battles by `BattleRunner`, not in the damage path), but it follows the identical pattern — interface +
 `Gen1*.Instance` default, faithful data on `PokemonEvolution`, the gen/mode rule on the seam. A new generation
-implements all four; the engine and loop never change. (Older sections below that say "the three seams" predate
-it — the count is four.)
+implements all four; the engine and loop never change.
 
 > **Not a generation seam, but related:** `IRandomSource` (see `STATE_MODEL.md` / the
 > RNG section of `TODO.md`) controls *randomness*, not generation. It's orthogonal —
@@ -83,60 +82,15 @@ Things that genuinely differ generation to generation, each a member on the inte
 | **XP on faint** | wild `floor(baseExp × level / 7)`; **trainer-owned ×1.5** (Gen 1 already split wild vs trainer) | the trainer ×1.5 persists |
 | **XP participant divisor** | the award is divided among the Pokémon sent out that have **not** fainted (the formula's `s`) — `IBattleRules.SplitXpAmongParticipants` | same through Gen 5; **Gen 6 removed it** — every participant earns the full award, so a Gen 6 impl returns the award unchanged |
 
-> **Roguelite XP curve (not a seam change).** The Gen-1 *wild* formula above is preserved verbatim in
-> `Gen1BattleRules.CalculateXpAwarded`. On top of it, the run layer applies a **level-aware XP multiplier** —
-> `RunRules.XpMultiplierForLevel(winnerLevel)` threaded `GameSessionManager → RunDirector → BattleRunEvent →
-> Battle` and applied to the seam's result at faint time. This is deliberate roguelite pacing, **not** a
-> generation rule: it lives in **`RunRules`** — a separate "game-balance dials" bag, explicitly *not* part of
-> `IBattleRules` (which stays a faithful Gen-1 impl) — and is a no-op (`RunRules.Default`, 1.0 at every level)
-> everywhere except the web run. The web run passes a soft, **linear-by-level** ramp between two anchors
-> (`XpMultiplierEarly = 1.5` at level 1 → `XpMultiplierLate = 4.5` at level 100): low levels — already fast
-> under Gen-1's cheap early thresholds — get only a light nudge (no sharp multi-level jumps), while the glacial
-> high-level grind gets the bigger lift, landing ~3× (2.98×) around the default level-50 start. The **design
-> target** (from the reward brief) is that a biome (~4–6 encounters) advances the creature roughly **0.8–1.5
-> levels** rather than the slow Gen-1 crawl, and — because it's level-aware — that it stays in that ballpark
-> across the picker's whole 5–100 start range. That levels-per-biome figure is a *tuning goal validated by
-> playtest*, not a pinned invariant (it also rides on species base-XP and `EncounterFactory.ScaleWildLevel`);
-> `RunRulesTests` pins the curve's *shape* (anchors/monotonicity/clamp), not the pacing outcome. The two anchors
-> are the tuning dials (trivially exposable as sliders); provisional, retune by playtest.
->
-> The Gen-1 trainer bonus **is** modelled: Elite/Boss nodes are "trainer-analog" tiers, so `CalculateXpAwarded`
-> applies the Gen-1 trainer **×1.5** for them (`trainerOwned = true`) — a wild battle gets none. This lives in
-> the **seam** (it's genuine Gen-1 formula math, `a = 1.5`), separate from the roguelite `RunRules` curve which
-> then scales the result; the run layer only supplies the *tier → trainer-owned* fact. So a Boss win pays
-> `floor(1.5 × baseExp × level / 7)` × the level's `RunRules` multiplier.
->
-> Two scoping notes: (1) "trainer-analog" here borrows only the Gen-1 *flee-block* and *XP-bonus* consequences
-> of trainer ownership — **not** its catch-blocking one; the Boss stays catchable by design (`ENCOUNTER_DESIGN.md`
-> Phase 4 catch channel). (2) Because Boss caps every biome and Elite is a common interior tier — both already
-> higher-level than Wild, so already the biggest base-XP contributors — the ×1.5 *stacks* on top of the
-> `RunRules` curve, pushing a typical biome (a Wild/Elite/Boss mix) to the **upper end of (or a touch above)**
-> the 0.8–1.5-levels target. That's the intended "beefier boss reward" and part of the provisional tuning.
-
-> **Innate party XP share (not a seam change).** A second roguelite dial on the same `RunRules` bag:
-> `RunRules.BenchXpShare`. The win award itself now follows the **Gen-1 participant split** (2026-07-27): every
-> creature that took the field this battle and is still alive splits `fullAward` evenly (the Gen-1 seam result ×
-> the XP-curve multiplier above, keyed once on the finisher's level, then divided) — a fainted participant earns
-> nothing and is excluded from the divisor. On top of that, `BenchXpShare` pays **every living member that never
-> took the field** an additional `floor(fullAward × BenchXpShare)` XP + the defeated foe's full Stat-Exp, and runs
-> the same level-up / move-learn loop; fainted members earn nothing. This keeps a drafted roster swappable between
-> biomes. The two halves sit on **opposite sides of the seam boundary, deliberately**: the participant split *is*
-> Gen-1-faithful **and generation-variable** (Gen 6 dropped it), so the division itself lives on the seam as
-> `IBattleRules.SplitXpAmongParticipants` — `Battle` only decides *who* participated, which is gen-invariant. The
-> bench layer on top is **not** Gen-1 at all (the cartridge never pays a creature that wasn't sent out) — it is a
-> wider, always-on Exp-All-style grant, a deliberate roguelite deviation, so it lives in **`RunRules`** and never
-> touches `IBattleRules`. Property default `0.0` (off — so
-> `RunRules.Default`, every test, and any party-less `Battle` stay a pure no-op); the web run picks one of three
-> presets in `GameSessionManager.RunTuningByDifficulty` (Easy `0.75` / **Normal `0.5`** / Hard `0.25`) per the
-> player's Easy/Normal/Hard difficulty choice at run-start, beside the matching XP-curve anchors. It only fires
-> when a party is threaded into `Battle`. Note the bench share is taken off the *curve-scaled* `fullAward` (the
-> multiplier compounds into it) while the participant split of that same award is divided among participants — so
-> at Normal/Easy a never-deployed bench member can earn the **same or more** than a creature that fought (a known,
-> user-accepted limitation, not a bug — see `docs/TODO_ARCHIVE.md` → *Participation XP*). The bench share still
-> lets a low-level bench member jump several levels off one late-run win — an intended, generous catch-up for
-> underleveled drafts (user-confirmed keep-as-is, not the tamer pre-curve base-XP option). Fainted exclusion is by
-> current HP (`IsAlive()`), so an unhealed KO'd member is skipped too. Provisional, retune by playtest. Covered by
-> `PartyExpShareTests` (incl. a both-dials curve × share case).
+> **Roguelite XP tuning (not a seam change).** `RunRules` is a separate game-balance-dials bag, not part of
+> `IBattleRules`. Two dials sit on it: a level-aware **XP multiplier** and a **bench XP share** paid to living
+> members who never took the field. Both are no-ops by default (`RunRules.Default`) and only active on the web
+> run. The Gen-1 **participant split** (dividing the win award among creatures that fought) stays on the seam
+> as `IBattleRules.SplitXpAmongParticipants` since Gen 6 dropped it — `Battle` only decides *who* participated,
+> which is gen-invariant. The bench share is layered on top of that split result and is not a Gen-1 mechanic at
+> all (no cartridge pays a creature that wasn't sent out). Full tuning values and rationale → `STATE_MODEL.md`;
+> `docs/TODO_ARCHIVE.md` → *Reward Visibility & XP Pacing* (the multiplier anchors and pacing target) and →
+> *Participation XP* (the participant-split decision).
 
 The Special-stat split is a good illustration of the seam doing its job. Rather than the
 damage formula knowing about generations, `IBattleRules` exposes **`GetOffensiveStat`**
@@ -321,42 +275,36 @@ This is cheap now and removes a future archaeology dig.
 
 ### 5.0.1 Leaks we've actually shipped (so you recognise the shape)
 
-The checklist above is abstract; these are real leaks that passed review and tests, sat in the
-codebase, and were only caught in a later seam audit. **Both involve a move that exists in every
-generation — which is exactly why the gen-variable rule inside it slipped past.** When you add a
-damage-category branch, assume its success/modifier logic is one of these in disguise:
+A damage-category branch on a move that exists in every generation is the highest-risk spot — the
+gen-variable rule inside it slips past because the move itself looks gen-invariant. Two shipped
+examples: **OHKO success** was inline as `Source.Level < Target.Level` (the Gen 2+ rule, wrongly
+labeled "Gen 1" — real Gen 1 fails on a **Speed** comparison), and **Self-Destruct's Defense-halving**
+mutated `Target.Attributes.Defense` in place instead of passing a `defenseDivisor` into
+`DamageCalculator`. Both are now `IBattleRules` members (`OneHitKoSucceeds`,
+`SelfDestructDefenseDivisor`). The shared lesson: **test the quirk, not just the outcome** — a test
+that only asserts "the target faints" will keep a leak green forever.
 
-- **One-hit KO success (OHKO).** The branch read `if (Source.Level < Target.Level)` and a comment
-  *claimed* it was "the Gen 1 rule." It is not — that's the **Gen 2+** rule. Gen 1 OHKO moves fail
-  when the **target out-speeds the user** (a Speed comparison). So the leak was *also a fidelity bug*:
-  inline gen-knowledge tends to be copied from a modern source and is wrong for Gen 1. Fix:
-  `IBattleRules.OneHitKoSucceeds(user, target)`.
-- **Self-Destruct / Explosion Defense-halving.** The branch did
-  `Target.Attributes.Defense = Target.Attributes.Defense / 2;` … calc … then restored it. Two leaks
-  in one: a **game-rule magic number** (`/2`, dropped in Gen 5+) *and* **mutating the creature's real
-  stats** to fake a modifier (fragile, and meaningless once Special splits). Fix:
-  `IBattleRules.SelfDestructDefenseDivisor` passed into `DamageCalculator(..., defenseDivisor:)` —
-  the calculator applies the modifier; nobody mutates `Attributes`.
-
-**The tell both share:** the test only asserted the *outcome* ("the target faints", "it deals full
-HP"), never the *quirk* ("damage is higher because Defense was halved", "it fails on Speed, not
-level"). A test that doesn't exercise the gen-variable bit will keep a leak green forever. When you
-add one of these, **write the assertion against the quirk itself.**
-
-### 5.0.2 Item effects — data vs seam (and a deferred gen-variable point)
-The in-battle item effects (`IItemEffect` / `ItemEffects`, see `ARCHITECTURE.md` §2.11) clear the
-checklist by keeping their **numbers in data, not on a seam**: a Potion's 20 HP, an X-item's +1 stage,
-Ether's +10 PP all live on the `Item` row (Gen-1 values set at import in `ItemMapper.ApplyGen1Gameplay`),
-read generically by the effect — so they're the data-layer's job (like a move's power), not an
-`IBattleRules` member. Two seam judgments worth recording:
-- **`ItemAction.ItemPriority` (items resolve before moves)** is an inline constant, not a rules member —
-  judged generation-invariant (item-first holds across mainline gens; it's turn-order, not battle math).
-  If a later gen ever changes item turn-order, move it to `IBattleRules`.
-- **⚠️ Deferred gen-variable rule (the §5.0.1 shape, caught not shipped):** in **Gen 1 no item cures
-  confusion** (it's volatile, cleared only by switching) — the cure effects deliberately never touch
-  `ConfusedTurns`. But **Gen 2+ Full Heal / Full Restore *do* cure confusion.** This is currently a
-  documented *absence* (Gen-1-correct), not a seam. When Gen 2 lands, this becomes an `IBattleRules`
-  decision (e.g. "does a status-cure item also clear confusion") — don't re-implement it inline.
+### 5.0.2 Item effects — data vs seam
+In-battle item effects (`IItemEffect` / `ItemEffects`, see `ARCHITECTURE.md` §2.11) keep their **numbers
+in data, not on a seam**: a Potion's 20 HP, an X-item's +1 stage, Ether's +10 PP all live on the `Item`
+row, read generically by the effect. Seam judgments on record:
+- **`ItemAction.ItemPriority`** (items resolve before moves) is an inline constant — gen-invariant across
+  mainline games, so not a rules member unless a future gen changes item turn-order.
+- **Confusion cure is gen-variable, not yet modeled.** Gen 1 items never cure confusion (only switching
+  does); Gen 2+ Full Heal/Full Restore do. Currently a documented Gen-1-correct absence; becomes an
+  `IBattleRules` decision when Gen 2 lands.
+- **Item target scope is gen-invariant, NOT a seam — but it splits by category, not uniformly.** Healing,
+  StatusCure, PpRestore, and Revive act on *persistent* per-Pokémon data (current HP, status, PP, or a
+  faint) that exists for every party member regardless of who's active, so the real games show a full
+  party-selection screen for these — any *living* member, except Revive/Max Revive which need a *fainted*
+  one — unchanged since Gen 1. **BattleStatBoost is the exception, not a fifth member of that group:** Gen 1
+  stores stat stages (and the Focus Energy / Mist volatiles) only for the currently active battler, so
+  X-items/Guard Spec/Dire Hit never show a party screen at all — they apply immediately to whoever's on the
+  field. (A first pass at this fidelity fix wrongly generalized X-items into the party-target group too;
+  `requirements-review` caught it before it shipped — see `docs/TODO_ARCHIVE.md` → *In-Battle Item
+  Party-Targeting*.) `HealingItemEffect`/`StatusCureItemEffect`/`PpRestoreItemEffect`/`ReviveItemEffect` all
+  resolve their target via `ItemEffectContext.ResolvedTarget`; `BattleBoostItemEffect` deliberately reads
+  `ctx.User` directly instead.
 
 ### Adding a new *rule* that varies by generation
 1. Ask the decision question: **"Is this the same in every generation?"** If yes, it's
@@ -371,8 +319,8 @@ read generically by the effect — so they're the data-layer's job (like a move'
    touching `Random.Shared`.
 
 ### Adding a whole new generation (e.g. Gen 2)
-Implement the three interfaces — `Gen2TypeChart`, `Gen2BattleRules`, `Gen2StatCalculator`
-— and select them where battles/creatures are constructed. The engine itself does not
+Implement all four interfaces — `Gen2TypeChart`, `Gen2BattleRules`, `Gen2StatCalculator`,
+`Gen2EvolutionRules` — and select them where battles/creatures are constructed. The engine itself does not
 change. Expect the bulk of Gen 2 to be: the Special stat split (touches
 `IStatCalculator`, `Attributes`, and `GetOffensiveStat`/`GetDefensiveStat`), the
 stage-based crit formula, the corrected type chart, and the `0–100` accuracy scale. See
