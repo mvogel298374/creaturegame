@@ -47,10 +47,11 @@ user-sequenced commitment (2026-08-04) that stays ahead of 4/5 regardless.
   channels. Bag-scope decision (per-run vs. meta-progression) first, then `BallItemEffect`/catch
   formula/animation. *(Item acquisition itself is already done via the Run Economy; bag persistence + catch
   remain.)*
-- **Tier 5 — Game Loop & Progression** — progressive difficulty (good pairing point for the evolution-stage/
-  encounter-level design question also raised 2026-09-12), the `PlayerSave`/`save.db` layer (+ the heavy
-  session-handling option), Stone evolutions (waits on Catch above). Party + between-biome lead + forced-switch
-  are done.
+- **Tier 5 — Game Loop & Progression** — progressive difficulty (good pairing point for the remaining
+  stone-evolution encounter-level design question, narrowed 2026-09-18 — see *Known Gaps* — after the
+  level/trade-gated half shipped as **Species selection respects each species' evolution-chain floor**), the
+  `PlayerSave`/`save.db` layer (+ the heavy session-handling option), Stone evolutions (waits on Catch above).
+  Party + between-biome lead + forced-switch are done.
 - **Tier 6 — opportunistic polish + test-infra loose ends:** Web UI Polish (move-specific animations, text
   feel, sprite FX joint sketch, Escape=B-cancel, `ConsoleInput`), the small *switched-in end-of-battle sweep*
   residual, and the test-infra items below (CI E2E step, `data-testid`, visual-regression, the
@@ -1418,22 +1419,25 @@ findings" as an open section.)*
   or (b) the game genuinely displayed Bind, which would be a real move-selection defect worth a proper repro.
   **Not investigated further here** — next time this comes up, check the actual in-game move list (a screenshot
   or the CHECK POKEMON MOVES tab) rather than relying on memory of the name.
-- **Wild/draft selection has no evolution-stage or natural-minimum-level awareness.** Raised 2026-09-12 after the
-  user met that level-25 Exeggcutor and asked why, given Exeggcutor doesn't even have a level-based evolution
-  (it's a Leaf Stone evolution from Exeggcute — so "before its evolution level" doesn't literally apply, but the
-  underlying surprise is real). Checked: `PokemonGameAvailability` legitimately marks Exeggcutor `Wild` in the
-  imported data (matches the real games — Cerulean Cave), so the species pick itself isn't wrong data. The actual
-  cause is architectural: `EncounterFactory.PickByBst`/`ScaleWildLevel` select **purely by BST band relative to
-  the player's level and run depth** — there is no per-area/per-level encounter table at all (`ENCOUNTER_DESIGN.md`
-  confirms this is deliberate: BST+depth band replaces Gen 1's real location tables), and nothing considers a
-  species' evolution stage or the level Gen 1's actual tables ever pair it with. So a fully-evolved, high-BST
-  species can surface at whatever level the BST band happens to produce, including levels far below where the
-  original games would ever place it (Cerulean Cave is a late/post-game area; this system has no notion of
-  "late-game area"). **Not designed or fixed here — flagging the gap.** Open question for a real design pass: is
-  this worth a stage-aware weighting/floor (e.g. bias the BST-band pick against un-evolved-vs-evolved mismatch,
-  or fold in each species' real minimum game-data encounter level as a soft floor), or is "no per-species level
-  gating, BST is the only lever" an accepted tradeoff of the roguelite's simplified encounter model. No `/plan`
-  done.
+- **Wild/draft selection has no evolution-stage or natural-minimum-level awareness — PARTIALLY FIXED
+  (2026-09-18).** Raised 2026-09-12 after the user met a level-25 Exeggcutor and asked why, given Exeggcutor
+  doesn't even have a level-based evolution (it's a Leaf Stone evolution from Exeggcute — so "before its
+  evolution level" doesn't literally apply, but the underlying surprise is real). **The level/trade-gated half
+  of this gap is now fixed:** `EvolutionMinLevel.Compute` (`ENCOUNTER_DESIGN.md` §3.8) walks each species' Gen 1
+  evolution chain and floors it at the level a `Level`-trigger edge requires (or the trade-evolution stand-in
+  level for a `Trade` edge), and `EncounterFactory` filters the species pool by that floor — against the
+  player's rolled level — before `PickByBst` runs, in both `CreateEnemyAsync` (wild/Elite/Boss) and
+  `TryBuildDraftAsync`. A level-20 Charizard (needs 36) can no longer spawn. **What's still open:** a
+  `Stone`-trigger edge adds **no** floor by design (a stone can legitimately be used at any level in real
+  Gen 1, so a wild stone-evolved species can be any level there too) — so the original Exeggcutor report
+  itself is *not* covered by this fix and remains exactly the gap it always was. The broader design question
+  also stands: `PickByBst`/`ScaleWildLevel` still select purely by BST band with no per-area/per-level
+  encounter table at all (`ENCOUNTER_DESIGN.md` confirms this is deliberate), so a stone-evolved, high-BST
+  species can still surface far below where the original games would ever place it (Cerulean Cave is a
+  late/post-game area; this system has no notion of "late-game area"). Open question for a real design pass:
+  is this worth a stage-aware weighting for stone evolutions too (e.g. fold in each species' real minimum
+  game-data encounter level as a soft floor), or is "no stone-evolution level gating, BST is the only lever"
+  an accepted tradeoff of the roguelite's simplified encounter model. No `/plan` done on the remaining piece.
 - Enemy encounter pool ignores game version — filter by `PokemonGameAvailability` once a version selector exists.
 - Enemy Pokémon do not evolve — wire into level-up when Game Loop is built.
 - ~~**Endless-chain double-faint**~~ — **RESOLVED 2026-07-28**: a mutual end-of-turn DoT double-faint now counts

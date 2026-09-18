@@ -179,13 +179,22 @@ public sealed class EncounterFactory(
             + ctx.Lead.BaseSpecial
             + ctx.Lead.BaseSpeed;
 
+        // Level is resolved before the species pick (unlike a plain wild encounter's incidental ordering)
+        // so it can gate the pool below — a drafted creature must be as reachable-at-this-level as a wild one.
+        // fallback: false — a draft pick becomes a permanent party member, so if the fought-only pool (already
+        // narrow by design) has nothing reachable at this level, the offer is declined rather than handing back
+        // an under-leveled evolved species (ENCOUNTER_DESIGN.md §3.8).
+        int level = ScaleWildLevel(ctx.Lead.Level, ctx.Depth, rng);
+        pool = await FilterByMinLevelAsync(pokemonCtx, pool, level, profile, fallback: false);
+        if (pool.Count == 0)
+            return null;
+
         // Biased to the lead's depth-scaled BST band, like a wild encounter; the pool is already biome-themed
         // so no further biome filter.
         var species = PickByBst(pool, ScaleTargetBst(leadBst, ctx.Depth), rng, biome: null);
         if (species is null)
             return null;
 
-        int level = ScaleWildLevel(ctx.Lead.Level, ctx.Depth, rng);
         var learnsets = await LoadLearnsetsAsync(
             pokemonCtx,
             profile,
@@ -287,6 +296,51 @@ public sealed class EncounterFactory(
     }
 
     /// <summary>
+    /// The pure core of the min-level filter — no DB, so the two fallback behaviors are unit-testable without
+    /// one. The species from <paramref name="pool"/> whose evolution-chain floor (<see cref="EvolutionMinLevel"/>)
+    /// is at or below <paramref name="level"/> — no wild/draft encounter may hand out a post-evolution species
+    /// below the level it takes to reach that form (ENCOUNTER_DESIGN.md §3.8).
+    /// <para>
+    /// When <paramref name="fallback"/> is true and nothing survives, returns the unfiltered <paramref
+    /// name="pool"/> instead — used only by the wild/Elite/Boss path, whose caller has already narrowed
+    /// <paramref name="pool"/> to the current biome's theme, so the fallback can never cross back into an
+    /// off-theme species (mirrors <see cref="EncounterSelector.PickByBst"/>'s own theme-preserving fallback).
+    /// The draft path passes <c>fallback: false</c>: a drafted creature becomes a permanent party member, so
+    /// an empty result there must decline the offer, never silently hand back an under-leveled species.
+    /// </para>
+    /// </summary>
+    internal static List<PokemonSpecies> FilterByMinLevel(
+        List<PokemonSpecies> pool,
+        int level,
+        IReadOnlyList<PokemonEvolution> edges,
+        IEvolutionRules rules,
+        bool fallback
+    )
+    {
+        var eligible = pool.Where(s => EvolutionMinLevel.Compute(s.Id, edges, rules) <= level)
+            .ToList();
+        if (eligible.Count > 0)
+            return eligible;
+        return fallback ? pool : eligible;
+    }
+
+    private static async Task<List<PokemonSpecies>> FilterByMinLevelAsync(
+        PokemonDbContext pokemonCtx,
+        List<PokemonSpecies> pool,
+        int level,
+        GenerationProfile profile,
+        bool fallback = true
+    )
+    {
+        int gen = (int)profile.Generation;
+        var edges = await pokemonCtx
+            .Evolutions.AsNoTracking()
+            .Where(e => e.Generation == gen)
+            .ToListAsync();
+        return FilterByMinLevel(pool, level, edges, profile.EvolutionRules, fallback);
+    }
+
+    /// <summary>
     /// The one home for the generation-filtered learnset read: the rows for <paramref name="speciesId"/> learned
     /// by any of <paramref name="methods"/> in the profile's generation. Every learnset query in this class goes
     /// through here — it was previously copy-pasted at five sites (each re-deriving the generation locally),
@@ -358,6 +412,14 @@ public sealed class EncounterFactory(
             .ToListAsync();
         if (wildSet.Count > 0)
             pool = pool.Where(s => wildSet.Contains(s.Id)).ToList();
+
+        // Theme first, then the level floor: PickByBst's own "never break theme" fallback only ever sees a
+        // themed pool, so the level filter's fallback (FilterByMinLevelAsync, fallback: true) must stay inside
+        // that same theme too, rather than reverting to the whole (potentially off-theme) dex if the themed +
+        // eligible slice comes up empty (ENCOUNTER_DESIGN.md §3.8).
+        if (biome is not null)
+            pool = pool.Where(biome.Contains).ToList();
+        pool = await FilterByMinLevelAsync(pokemonCtx, pool, spec.Level, profile);
 
         var enemySpecies =
             PickByBst(pool, spec.TargetBst, source, biome)

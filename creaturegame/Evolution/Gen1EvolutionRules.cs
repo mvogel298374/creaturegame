@@ -64,4 +64,13 @@ public sealed class Gen1EvolutionRules : IEvolutionRules
 
             _ => false,
         };
+
+    /// <inheritdoc/>
+    public int MinLevelFor(PokemonEvolution edge) =>
+        edge.Trigger switch
+        {
+            EvolutionTrigger.Level => edge.LevelThreshold ?? 0,
+            EvolutionTrigger.Trade => TradeEvolutionLevel,
+            _ => 0, // Stone: no level requirement in real Gen 1 (usable at any level)
+        };
 }

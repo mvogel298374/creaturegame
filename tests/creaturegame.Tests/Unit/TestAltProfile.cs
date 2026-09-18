@@ -190,5 +190,16 @@ internal static class TestAltProfile
             EvolutionContext context,
             IReadOnlyList<PokemonEvolution> edges
         ) => null;
+
+        // Deliberately different from Gen 1 (which floors a Trade edge at 37) — a distinct value here is
+        // itself a falsification leg: any caller still reaching into Gen1EvolutionRules directly would show
+        // up as a test failure rather than silently matching by coincidence.
+        public int MinLevelFor(PokemonEvolution edge) =>
+            edge.Trigger switch
+            {
+                EvolutionTrigger.Level => edge.LevelThreshold ?? 0,
+                EvolutionTrigger.Trade => 99,
+                _ => 0,
+            };
     }
 }

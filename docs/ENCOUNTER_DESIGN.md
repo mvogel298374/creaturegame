@@ -311,6 +311,68 @@ existing rows default `LevelUp`). A full `PokeApiConnector` re-import has been r
 - **Tier *selection*** — which tier per encounter is **Phase 3** (node types pick it). `CreateEnemyAsync` gains
   an optional `IEnemyArchetype` (default Medium ≈ today at depth 0), the same seam pattern as the biome param.
 
+### 3.8 Species selection respects each species' evolution-chain floor  *(✅ implemented, 2026-09-18)*
+
+*(Raised by a live question: "should evolved Pokémon only ever be encountered at the level they could
+actually reach that form?" — §3.4's BST lever and §3.3's level formula are resolved from completely
+independent inputs (BST band vs. player level/depth), so nothing previously stopped them from disagreeing —
+e.g. a depth-scaled BST target landing on Charizard while the level formula, off the *player's* level, hands
+back something below 36 (the level Charmeleon actually becomes Charizard).*
+
+**Fix: filter the species pool by a per-species minimum level before `PickByBst` runs**, rather than bumping
+a picked species' level up afterward — that would let one unlucky species pick spike an encounter's level
+well past the depth curve. `EvolutionMinLevel.Compute(speciesId, edges, rules)` walks `PokemonEvolution` back
+to each species' root, taking the highest floor any edge along the chain imposes (each edge's floor already
+implies its predecessor's, so it's a max, never a sum) — iteratively, with a visited-set guard so a self-edge
+or cycle in imported data ends the walk instead of overflowing the stack. A species with no incoming edge (a
+base form) floors at `0`.
+
+**The per-trigger interpretation is a seam, not a hardcoded rule.** `EvolutionMinLevel` only walks whatever
+edges it's given and asks the injected `IEvolutionRules.MinLevelFor(edge)` what floor *that one edge* imposes
+— it never references `Gen1EvolutionRules` directly, matching the discipline `IEvolutionRules.CheckEvolution`
+already documents ("the *interpretation* … lives here"). `Gen1EvolutionRules.MinLevelFor` returns: a **`Level`**
+edge's own `LevelThreshold`; a **`Trade`** edge's floor at `TradeEvolutionLevel` (37) — this roguelite's
+no-trading stand-in already treats trade evolutions as a level-37 floor, so encounters honor the same rule; a
+**`Stone`** edge's floor at `0` — a stone can be used at any level in real Gen 1 (a wild Vileplume can
+legitimately be level 5), so it adds no floor of its own. A future generation with different trigger semantics
+(or new triggers — happiness, time-of-day, held-item) supplies its own `IEvolutionRules` implementation; this
+walk needs no edit (originally shipped hardcoding `Gen1EvolutionRules.TradeEvolutionLevel` directly, caught and
+fixed the same day by `pr-review` — the exact leak shape `TestAltProfile` exists to catch).
+
+Applied in `EncounterFactory.FilterByMinLevelAsync`, called from both `CreateEnemyAsync` (wild/Elite/Boss)
+and `TryBuildDraftAsync` (the draft reorders to resolve `level` before the species pick, so it can gate the
+pool), both passing `profile.EvolutionRules`. Boss-catch needs no change — it copies the defeated boss's own
+species *and* level, so a mismatch is structurally impossible.
+
+**Two fallback nuances, added after a `requirements-review` pass (2026-09-18) found the naive fallback could
+quietly reintroduce the bug it fixes:**
+
+- **Wild/Elite/Boss (`fallback: true`, the default): filter by biome *before* the level floor, not after.**
+  `PickByBst`'s own "never break theme" fallback (§2.2 rule 3) only ever sees an already-themed pool, so if
+  the level filter's own emptiness check ran over the *whole* dex (pre-biome), a themed-and-eligible slice
+  could be empty — collapsing to *zero* candidates — while the filter itself still thought it had plenty of
+  (off-theme) fallback material, and `PickByBst` would return `null` and `CreateEnemyAsync` would throw. Every
+  Kanto biome today happens to keep a floor-0 species in its themed pool, so this couldn't yet fire in
+  practice, but it wasn't guaranteed by anything — a future biome/roster edit could crash a live encounter.
+  Fixed by filtering `pool` to the biome's theme first, so the level filter's fallback (reverting to the
+  unfiltered pool when nothing survives) can only ever fall back *within* that theme, matching `PickByBst`'s
+  own invariant instead of racing past it.
+  **Accepted residual: theme still wins over the floor in the doubly-degenerate case.** If a biome's themed
+  pool has *zero* species clearing the level floor, `FilterByMinLevelAsync`'s `fallback: true` path reverts to
+  the full themed pool, ignoring the floor — so the evolution-floor invariant this feature exists for can, in
+  that one case, still lose to theme continuity. This is a deliberate choice (re-confirmed in the
+  `requirements-review` pass), not an oversight: it cannot currently fire (verified against all 18 Kanto
+  biomes' rosters at today's level curve), and widening the search off-theme instead was judged not worth the
+  added complexity for a case with no live repro. If a future biome/roster change makes this reachable, revisit
+  the precedence call then rather than pre-solving it now.
+- **Draft (`fallback: false`): decline the offer instead of falling back.** The draft's fought-only pool
+  (§4) resets near-empty at every biome entry, and an Elite-tier catch early in a fresh biome is ordinary — so
+  it's a routine occurrence, not a rare edge case, for the next draft roll's level to land below every fought
+  species' floor. Unlike a one-off wild battle, a drafted pick becomes a **permanent party member**, so
+  reverting to the unfiltered pool there would silently hand back the exact under-leveled evolved species this
+  feature exists to prevent. `TryBuildDraftAsync` passes `fallback: false` and returns `null` (no offer this
+  round) when nothing survives, the same shape as every other gate miss in this section.
+
 ---
 
 ## 4. Acquisition — two gated channels, fought-only

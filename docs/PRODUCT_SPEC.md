@@ -82,7 +82,16 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - Design detail / plan → `docs/TODO_ARCHIVE.md` → *CHECK POKEMON party-member picker*. History → same section.
 
 ## 3. Encounters, biomes & acquisition
-*(not yet populated)*
+
+### Evolution-chain level floor on species selection
+- A wild, Elite, Boss, or themed-draft encounter never offers an already-evolved species below the level it
+  takes to reach that form — e.g. a Charizard cannot appear below level 36 (the level Charmeleon evolves at).
+- A trade-evolved species (no in-run trading exists) uses this roguelite's trade-evolution stand-in level as
+  its floor instead.
+- A stone-evolved species (e.g. Exeggcutor) has **no** level floor from this rule — a stone can be used at any
+  level in Gen 1, so a stone-evolved species can still appear at a low level.
+- Design detail → `ENCOUNTER_DESIGN.md` §3.8. History → `TODO_ARCHIVE.md` → *Species selection respects each
+  species' evolution-chain floor*.
 
 ## 4. Progression (XP, leveling, evolution)
 *(not yet populated)*

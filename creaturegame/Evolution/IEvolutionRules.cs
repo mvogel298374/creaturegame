@@ -35,4 +35,17 @@ public interface IEvolutionRules
         EvolutionContext context,
         IReadOnlyList<PokemonEvolution> edges
     );
+
+    /// <summary>
+    /// The floor <paramref name="edge"/> alone imposes on <see cref="PokemonEvolution.ToSpeciesId"/> — this
+    /// generation's interpretation of what level that edge's trigger requires, independent of the rest of the
+    /// chain (<see cref="EvolutionMinLevel"/> walks the chain and combines each edge's own floor with its
+    /// predecessor's). Drives the encounter-generation invariant that a wild/draft creature can never be a
+    /// post-evolution species below the level it takes to reach that form (<c>ENCOUNTER_DESIGN.md §3.8</c>).
+    /// Gen 1: a <see cref="EvolutionTrigger.Level"/> edge returns its own threshold; a
+    /// <see cref="EvolutionTrigger.Trade"/> edge returns this roguelite's trade-to-level stand-in
+    /// (<see cref="Gen1EvolutionRules.TradeEvolutionLevel"/>); a <see cref="EvolutionTrigger.Stone"/> edge
+    /// returns 0 — a stone can be used at any level in real Gen 1, so it imposes no floor of its own.
+    /// </summary>
+    int MinLevelFor(PokemonEvolution edge);
 }

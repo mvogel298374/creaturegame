@@ -8,6 +8,72 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Species selection respects each species' evolution-chain floor ✅ DONE (2026-09-18)
+
+**The gap.** Wild/draft encounters could spawn an already-evolved species below the level it could ever
+legitimately reach that form — e.g. a level-20 Charizard, when Charmeleon only becomes Charizard at level 36.
+Surfaced from a live question ("should evolved Pokémon only ever be encountered at the level they could
+actually reach that form?"), not a pre-existing `TODO.md` backlog item. `EncounterFactory.PickByBst`'s BST-band
+target and `ScaleWildLevel`'s level roll are resolved from completely independent inputs (BST vs. player
+level/depth), so nothing previously stopped them disagreeing this way.
+
+**Fix.** New `EvolutionMinLevel.Compute(speciesId, edges, rules)` (`creaturegame/Evolution/EvolutionMinLevel.cs`)
+walks `PokemonEvolution` back to each species' root (iteratively, with a visited-set cycle guard) and takes
+the highest floor any edge along the chain imposes. The per-trigger interpretation is a seam, not hardcoded
+here: it asks the injected `IEvolutionRules.MinLevelFor(edge)` for each edge's own floor.
+`Gen1EvolutionRules.MinLevelFor` returns a `Level`-trigger edge's own threshold; a `Trade`-trigger edge's floor
+at `TradeEvolutionLevel` (this roguelite's no-trading stand-in already treats trade evolutions as a level-37
+floor, so encounters now honor the same rule); `0` for a `Stone`-trigger edge (a stone can be used at any level
+in real Gen 1, so it adds no floor of its own). A base form (no incoming edge) floors at 0.
+
+`EncounterFactory.FilterByMinLevelAsync` applies this **before** `PickByBst` runs — filtering the species pool
+down to what's reachable at the rolled level, rather than bumping a picked species' level up afterward (which
+would let one unlucky species pick spike an encounter's level past the depth curve). Wired into both
+`CreateEnemyAsync` (wild/Elite/Boss) and `TryBuildDraftAsync` (the draft reorders to resolve `level` before the
+species pick, so it can gate the pool). Boss-catch needs no change — it copies the defeated boss's own species
+*and* level, so a mismatch is structurally impossible.
+
+**Two fallback bugs found by `requirements-review` and fixed the same day (still 2026-09-18):** the initial
+cut used one unconditional "fall back to the unfiltered pool if nothing survives" rule for every caller, which
+turned out to reintroduce the exact bug it fixed in two spots — (1) `CreateEnemyAsync` ran the level filter
+*before* `PickByBst`'s biome-theme filter, so its emptiness check could pass against the whole (off-theme) dex
+even when the themed-and-eligible slice was empty, racing past `PickByBst`'s own "never break theme"
+invariant; fixed by filtering to the biome first. (2) `TryBuildDraftAsync`'s fought-only pool resets near-empty
+at every biome entry, so a post-Elite-catch draft roll landing below the catch's floor was a routine
+occurrence, not an edge case — and since a draft pick becomes a **permanent party member**, falling back to
+the unfiltered pool there would silently hand back the exact under-leveled species this feature exists to
+prevent; fixed by passing `fallback: false` and declining the offer instead. See `ENCOUNTER_DESIGN.md` §3.8
+for the full writeup of both.
+
+**Scope note — this does not close the broader "Exeggcutor" gap.** A Stone-evolved species (e.g. Exeggcutor,
+a Leaf Stone evolution) gets no floor by design, so a stone-evolved species can still surface far below where
+the original games would place it. That remains open — see `TODO.md` → *Known Gaps* → "Wild/draft selection
+has no evolution-stage or natural-minimum-level awareness."
+
+**Seam fix (same day, `pr-review`).** The first cut of `EvolutionMinLevel.Compute` referenced
+`Gen1EvolutionRules.TradeEvolutionLevel` directly instead of going through the generation seam — a Gen-2 run
+would have kept Gen 1 trade semantics silently. Fixed by adding `IEvolutionRules.MinLevelFor(edge)` (Gen 1's
+implementation carries the Level/Trade/Stone logic above); `Compute` now takes an `IEvolutionRules` and only
+walks edges, never branching on trigger itself. Also converted the walk from recursion to an iterative loop
+with a visited-set cycle guard (a self-edge/cycle in imported data would otherwise `StackOverflowException`
+the host process, not fail cleanly).
+
+**Tests.** Full fast suite green after the fix and its two follow-up passes (.NET 1564/1564, Vitest 259/259).
+`EvolutionMinLevelTests` (13 cases) pins the min-level math against the spot-checked Gen 1 chains
+(Weedle→Kakuna→Beedrill, Charmander→Charmeleon→Charizard, the four Trade lines, Vulpix→Ninetales,
+Poliwag→Poliwhirl→Poliwrath, a malformed cyclic-edge case) and proves `Compute` actually consults the injected
+`IEvolutionRules` rather than a hardcoded Gen 1 reference. `EncounterFactoryFilterByMinLevelTests` (new, 3
+cases) pins the pure filter's two fallback behaviors DB-free. `EncounterFactoryMinLevelTests` asserts the pool
+exclusion actually happens against the live DB: no `CreateEnemyAsync` result falls below its species' floor
+across many seeds, with no biome and across all 18 Kanto biomes — though this is an empirical check against
+today's roster, not a structural guarantee (see the accepted residual in `ENCOUNTER_DESIGN.md` §3.8).
+`EncounterFactoryDraftTests` (extended) asserts a draft whose only fought species is below its floor at the
+rolled level declines instead of offering it.
+
+Design write-up: `ENCOUNTER_DESIGN.md` §3.8.
+
+---
+
 ## In-Battle Item Party-Targeting — items other than Revive can target any living party member ✅ DONE (2026-09-18)
 
 **The gap.** Real Gen 1 shows a full party-selection screen ("Use item on which POKÉMON?") for items that
