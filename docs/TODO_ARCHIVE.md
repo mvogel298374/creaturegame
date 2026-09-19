@@ -8,6 +8,120 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Level-25 Exeggcutor "with only Hypnosis and Bind" — ✅ CLOSED, NO DEFECT (2026-09-20)
+
+**Decision (user, 2026-09-20):** a fluke — a misread of the move list, not a bug. No code changed. (Moved here from
+`TODO.md` → *Known Gaps*.) The distinct **stone-evolution encounter-level gap** the same sighting prompted is a
+separate, still-open entry in `TODO.md` → *Known Gaps* ("Wild/draft selection has no evolution-stage or
+natural-minimum-level awareness").
+
+**Original report and investigation (raised 2026-09-12).** A level-25 acquired Exeggcutor reportedly had only 2
+moves — Hypnosis and "Bind". Checked against the real `pokemon.db`/`moves.db` data (not assumed): Exeggcutor's Gen 1
+level-up learnset is exactly **Hypnosis (level 1), Barrage (level 1), Stomp (level 28)** — nothing else, at any
+level, by level-up. So **the 2-move count itself is correct and expected**: at level 25, Stomp (needs 28) isn't
+unlocked yet, so `CanonicalLatest` (level-up only, up to 4 moves) has only Hypnosis + Barrage available. **The "Bind"
+half didn't check out:** Bind (move id 20) is a real, distinct move in `moves.db`, but it appears **nowhere** in
+Exeggcutor's *or* pre-evolution Exeggcute's learnset (level-up or machine) — no code path attaches Bind to an
+Exeggcutor. The two candidate explanations were (a) the user misread the move name (Barrage is an uncommon name) and
+the game showed Barrage — no bug — or (b) the game genuinely displayed Bind — a real move-selection defect. The user
+settled it as (a) on 2026-09-20.
+
+---
+
+## Wild encounter level far below the player's — ✅ ACCEPTED AS-IS (2026-09-20)
+
+**Decision (user, 2026-09-20):** keep the `[50%, 80%]`-of-live-level band as tuned. The mechanism is documented in
+`ENCOUNTER_DESIGN.md` §3.3; the band is accepted tuning, not an open design question. No code changed.
+
+**Original report and investigation (moved here from `TODO.md` → *Known Gaps*, 2026-09-20).** Reported
+(2026-09-12): a level-23 lead ran into a level-11 wild Fearow, contradicting a prior "not possible" call. The joint
+code-analysis session happened (2026-09-13) — full formula, worked example, and the key fact it turned up are
+written up in **`ENCOUNTER_DESIGN.md` §3.3**: `ScaleWildLevel` reads the lead's **live, current** level at the
+moment of each encounter (never the level chosen at run start — that was the user's working hypothesis, and it's
+wrong; `BattleRunEvent` re-reads `s.Player.Level` off the same mutable `Creature` instance every node), and at
+shallow depth the raw band is a deliberate **[50%, 80%] of that live level** *before* any archetype offset, with
+Weak subtracting 3 more. A level-23 lead landing an 11 is that formula hitting its own documented floor — **not a
+bug, not a stale depth read, not a mismatch with an older formula version.** This closed questions (1)/(3)/(4) from
+the original entry outright and narrowed (2) to the one thing left unanswered: *is a band this wide — down to 50%
+of the lead's live level, which only gets more extreme as the lead outlevels a shallow biome — the tuning we
+actually want, now that leads reach the 20s well inside a single biome?* The user's answer (2026-09-20): yes, keep it.
+
+---
+
+## Switched-in creature is the active creature ✅ COMPLETE (2026-09-20; core resolved 2026-07-18)
+
+*(Moved here from `TODO.md` 2026-09-20 when its last open residual — the end-of-battle sweep — closed. Text below is
+the former `TODO.md` section, kept as the closing record; only the sweep bullet and the accepted-limitation note at
+the end are new.)*
+
+**The requirement, in the user's words:** *"A switched-in Pokémon is for all intents and purposes the active
+Pokémon, therefore all effects that happen at the end of battle happen to it as well. So it can evolve, it shares
+XP, EVs, everything. Just like it would work in Gen 1 / generically in Pokémon."*
+
+**There is no special case for a switched-in creature.** It is not a second-class participant, it does not "wait
+until its next clean win", and it is not excluded from any end-of-battle effect. Anything the starting lead would
+receive, a creature that took the field receives on the same terms. This governs the forced faint-switch and the
+voluntary SWITCH action (both shipped — see **In-Combat Switching** below) alike.
+
+### Why this shipped wrong (kept — it is the reason the gate was tightened)
+Neither rule came from Gen 1 or from any design doc. Both were written *by the plan*, then implemented faithfully,
+and `requirements-review` returned **MET** because the code matched the plan. The plan even pre-argued the point
+(*"i.e. **not** a deviation, and the participant-split Exp remains the documented deferral"*), which suppressed the
+domain check instead of inviting it. Two specific traps to recognise again:
+- **An implementation convenience written up as design.** The evolution gate existed only because one `levelBefore`
+  local belonged to the creature that *started* the battle, so a switched-in finisher "couldn't be compared against
+  it". That was a five-line fix, not a design position.
+- **A rule that was right by coincidence.** "Finisher earns the XP" happened to match Gen 1 only because the
+  outgoing lead had fainted and a fainted participant earns nothing anyway — so it was never tested against the
+  real rule, and it would have silently diverged the moment voluntary switching lands with both creatures alive.
+
+→ `requirements-review` now escalates by default and treats plan-asserted domain facts as claims to verify
+(`.claude/agents/requirements-review.md`, "Escalate by default" + the recurring-discrepancy log).
+
+### How it closed (2026-07-18 — Innate Party XP Share)
+- [x] **Evolution now applies to any creature that levelled this battle**, switched-in or not. `BattleRunEvent`
+  takes a **per-party pre-battle level snapshot** (`preLevel`, per member) instead of the single starting-lead
+  `levelBefore` local, and a new `EvolutionOrder` helper evolves every creature that levelled — active, forced
+  switch-in, or bench — active-first then roster order. The `ReferenceEquals(active, player)` gate is gone.
+- [x] **XP / Stat-Exp is SUPERSEDED, not literally "Gen 1 participation".** The user's ruling asked for the Gen 1
+  participant split (one pool divided among the creatures sent out); the design session instead chose a
+  deliberate **roguelite deviation** — the **Innate Party XP Share** (`RunRules.BenchXpShare`, live `0.5` in the
+  web run): the active creature is paid in full (unchanged), then every **living** bench member additionally
+  earns `floor(activeAward × BenchXpShare)` XP + full Stat-Exp, running the same level-up + move-learn loop;
+  fainted members earn nothing. This is wider and more generous than the literal participant split, and is kept
+  out of `IBattleRules` in `RunRules`, alongside the existing XP-curve deviation (see `GENERATION_SEAMS.md`).
+  **At the time this closed (2026-07-18), no live conflict** with the requirement above: voluntary switching
+  wasn't implemented yet, and a forced switch always leaves the outgoing lead fainted (excluded from any share
+  anyway), so the only "switched-in" case then was simply the active creature, paid in full, same as before this
+  change. **Once In-Combat Switching shipped (2026-07-25),** a creature switched out mid-battle while still alive
+  earned only the flat `BenchXpShare` — an intended divergence when decided, but the case it was decided *about*
+  couldn't happen yet. **The user reversed it on 2026-07-26** now that it can: a participant must not be paid
+  less than the creature that happened to finish the fight. **Resolved 2026-07-27** by the Gen 1 participation
+  split — the award is divided evenly among the live creatures that took the field, and `BenchXpShare` now pays
+  only members that never fought. Full record → *Participation XP* (and *Innate Party XP Share* for the share
+  itself), below. *(The **Exp. Share / Exp. All item** — a held item that pays a non-participant — stays deferred;
+  it's a separate feature from this innate, always-on party share.)*
+- [x] The invariant is written into `docs/STATE_MODEL.md` (the party-wide end-of-battle effects section) as a
+  documented fact, not a plan claim — future `requirements-review` runs can cite it directly.
+- [x] **Residual sweep — CLOSED 2026-09-20: no stray starting-lead references.** Read-only audit (no code changed)
+  of `BattleRunEvent`'s post-battle path, `Battle.cs`'s end-of-battle and switch paths, and the web layer's
+  `battle.Player` reads (`GameSessionManager` `ActiveCreature` / `PartyMemberAt`). Findings: in `BattleRunEvent`
+  the local `player` (the starting lead) is used **only pre-fight** (foe level scaling, entry status); everything
+  post-battle reads `s.Player` / `active`. `Battle` restores Transform/Mimic as each creature leaves
+  (`RestoreOutgoing`), captures carried status on a voluntary switch-out, and pays XP to the active creature, the
+  participants, and the bench separately. Move-learning rides the per-member evolution loop; carried status reads
+  `s.Player` (the finisher).
+
+### Accepted limitation (user decision 2026-09-20) — XP multiplier is the finisher's, for everyone
+`Battle.cs` (~line 255) computes the level-based XP multiplier (`RunRules.XpMultiplierForLevel`) from the
+**finisher's** level (`PlayerCreature.Level` at win time) and applies it to the **whole XP pool**, so other
+participants and the bench are paid on the finisher's multiplier rather than their own. For the bench this is by
+design (documented as `floor(activeAward × BenchXpShare)`); for a participant switched out while the finisher is
+far higher level it is less clearly deliberate. **The user chose to keep it as is** — an observation, not a defect,
+and not open work. The current-state note lives in `STATE_MODEL.md` (party-wide end-of-battle effects section).
+
+---
+
 ## Species selection respects each species' evolution-chain floor ✅ DONE (2026-09-18)
 
 **The gap.** Wild/draft encounters could spawn an already-evolved species below the level it could ever
@@ -650,6 +764,8 @@ Two distinct questions were logged, unanswered at the time:
    that a status applied this turn already ticks at this turn's end-of-turn phase; no code change needed for
    this half.
 2. **Does end-of-turn residual still fire for the survivor on the turn the opponent faints from a direct hit?**
+   *(Framing note, 2026-09-20: "end-of-turn phase" here is the engine's model, not Gen 1's — Gen 1 ticks each
+   creature right after its own action; see the closing note at the bottom of this section.)*
    — confirmed a **real bug**. `Battle.cs`'s turn loop ran `StatusResolver.ApplyEndOfTurnDamage` for both
    creatures, plus `ApplyLeechSeedDrain` both directions, **unconditionally** right after the action-execution
    loop, regardless of whether either side had already fainted that same turn from a direct hit. Per Smogon's
@@ -709,8 +825,19 @@ XML doc comment was also corrected (an advisory `pr-review` finding, not a code 
 direct-hit KO as finishable by the winner's own end-of-turn residual that same turn, which is no longer true
 after this fix.
 
-**One question deliberately left open, not fixed here** — see `TODO.md` → *Known Gaps* → "Does Gen 1's
-faint-ends-the-turn rule also cover a faint caused BY the residual phase itself, not just a direct hit?"
+**One question deliberately left open, not fixed here** — "does Gen 1's faint-ends-the-turn rule also cover a faint
+caused BY the residual phase itself, not just a direct hit?" (raised 2026-09-13 by `requirements-review`; the
+second `ApplyEndOfTurnDamage` call still ran after the first faint). **ANSWERED 2026-09-20 — and the answer is
+larger than the question.** Reading pret/pokered `engine/battle/core.asm` (`MainInBattleLoop`, lines 413-468)
+shows Gen 1 has **no end-of-turn residual phase at all**: `HandlePoisonBurnLeechSeed` keys off `hWhoseTurn`, so
+each creature takes its **own** poison/burn/Leech Seed tick **immediately after its own action** (A acts → A's own
+tick → if A fainted, jump to A's faint handler and B never acts; else B acts → B's own tick → B's faint handler).
+So a residual-caused double-faint is impossible in Gen 1, the faster creature's tick lands *before* the slower one
+acts, and the slower creature doesn't act if the faster one dies to its own tick. The engine's two-actions-then-
+both-ticks turn shape differs on all three counts; the 2026-09-13 fix above only covers a faint from a direct hit
+(and is consistent with the real order — a direct-hit KO precedes the not-yet-run ticks). Now tracked as an open,
+unplanned item in `TODO.md` → *Known Gaps* ("Gen 1 has no end-of-turn residual phase"); the rationale is in
+`GEN_DIFFERENCES.md` → Status Quirks.
 
 **Verified.** Full .NET suite green, including the three new regression tests added in the follow-on work.
 
@@ -1042,7 +1169,7 @@ Docs updated: `STATE_MODEL.md` (the party-wide end-of-battle invariants — now 
 **The requirement, in the user's words:** *"a pokemon that was actively involved in a battle should receive equal
 xp to any other active pokemon."*
 
-This is the same principle as `TODO.md` → **Switched-in creature is the active creature**, applied to the creature
+This is the same principle as *Switched-in creature is the active creature* (above in this file), applied to the creature
 that switched *out*: taking the field is what makes you a participant, and participants are not ranked by who
 happened to be standing there when the enemy fainted.
 
@@ -1692,10 +1819,10 @@ as non-blocking visual iteration.
 ## Innate Party XP Share (roguelite Exp-All) ✅ DONE (2026-07-18)
 
 `/plan`ned and built the same session. Closes the XP/Stat-Exp half of the **Switched-in creature is the active
-creature** open defect (TODO.md, user ruling 2026-07-15) — not by implementing Gen 1's participant split, but by
+creature** open defect (then in TODO.md, user ruling 2026-07-15) — not by implementing Gen 1's participant split, but by
 **superseding** it with a deliberate roguelite deviation the user chose instead. The defect's *evolution* half was
-fixed in the same change. See `TODO.md` → *Switched-in creature is the active creature* for the closing record of
-that defect (evolution fixed, XP/Stat-Exp superseded, one small residual sweep still open there).
+fixed in the same change. See *Switched-in creature is the active creature* (top of this file) for the closing
+record of that defect (evolution fixed, XP/Stat-Exp superseded, residual sweep closed 2026-09-20).
 
 **Design decisions locked with the user this session:**
 - **Split model = active full + bench a share**, not Gen 1's participant split and not a flat full-to-all. New

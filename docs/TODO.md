@@ -24,9 +24,11 @@ user-sequenced commitment (2026-08-04) that stays ahead of 4/5 regardless.
   the Town Map scatter-tile + town-marker white-background fix — shipped same day; see `TODO_ARCHIVE.md`.
 - **Tier 1 — fully cleared (2026-09-13).** The poison-tick-vs-same-turn-faint item is **fully resolved** — both
   the original end-of-turn-residual bug and the Hyper Beam recharge-on-KO companion bug it led to finding during
-  review are fixed (see `TODO_ARCHIVE.md`). The Fearow level-11-at-player-23 report is **investigated and
-  documented** (`ENCOUNTER_DESIGN.md` §3.3) — confirmed working as coded, not a bug; only a design-tuning
-  question (is the band too wide now?) remains open for the user (→ *Known Gaps*), which doesn't block anything.
+  review are fixed (see `TODO_ARCHIVE.md`). The Fearow level-11-at-player-23 report is **closed** — investigated
+  and documented (`ENCOUNTER_DESIGN.md` §3.3), confirmed working as coded, and the `[50%, 80%]`-of-live-level
+  band was **accepted as-is by the user (2026-09-20)**; see `TODO_ARCHIVE.md` → *Wild encounter level far below
+  the player's*. *(A follow-on finding — Gen 1 has no end-of-turn residual phase, so `Battle`'s turn shape
+  differs — surfaced 2026-09-20 and is tracked, **unscheduled**, in *Known Gaps*; it does not reopen this tier.)*
 - **Tier 2 — Generation Profile Stage 4d+** (the jointly-iterated surface catalog) — make Gen 1 an explicit,
   swappable profile so a generation switch changes content, menus and look, not just battle math. **`/plan`
   DONE (2026-07-29; Stage 4 re-planned as v2 on 2026-07-31)** — full design in
@@ -53,8 +55,7 @@ user-sequenced commitment (2026-08-04) that stays ahead of 4/5 regardless.
   `PlayerSave`/`save.db` layer (+ the heavy session-handling option), Stone evolutions (waits on Catch above).
   Party + between-biome lead + forced-switch are done.
 - **Tier 6 — opportunistic polish + test-infra loose ends:** Web UI Polish (move-specific animations, text
-  feel, sprite FX joint sketch, Escape=B-cancel, `ConsoleInput`), the small *switched-in end-of-battle sweep*
-  residual, and the test-infra items below (CI E2E step, `data-testid`, visual-regression, the
+  feel, sprite FX joint sketch, Escape=B-cancel, `ConsoleInput`), and the test-infra items below (CI E2E step, `data-testid`, visual-regression, the
   `evolution.spec.ts` gap, `GameSessionManager` connection-lifecycle coverage).
 - **Tier 7 — reference/housekeeping, no urgency:** Multi-Generation Data Model & Schema, User Documentation,
   and the "watch, don't refactor speculatively" Tech Debt items.
@@ -75,8 +76,9 @@ now tracks the win independently of the finisher's own survival (`PlayerWon`), a
 surviving bench member to lead instead of ending the run. Full record in `TODO_ARCHIVE.md` → *Mutual KO ends the
 run even with a live bench*.)*
 
-*(Small residual, not urgent: **sweep other end-of-battle effects that assume the starting lead** — see
-[**Switched-in creature is the active creature**](#switched-in-creature-is-the-active-creature--resolved) below.)*
+*(**Switched-in creature is the active creature** — the end-of-battle-effects-are-party-wide requirement — is
+**✅ COMPLETE (2026-09-20)**: the last residual, a sweep of the post-battle path for stray starting-lead
+references, found none. Full record in `TODO_ARCHIVE.md` → *Switched-in creature is the active creature*.)*
 
 *(**Evolution nameplate/action-prompt lag** — found 2026-07-26 — is **✅ COMPLETE (2026-07-28)**: the nameplate
 and `"What will X do?"` prompt now retarget on `CreatureEvolved`, same as `BattleStarted`/`LeadChanged`/
@@ -89,8 +91,7 @@ a stale name after an on-field evolution*; only the regression-insurance E2E cov
 *(**Phase 4 shipped in full** — the roster, both acquisition channels, between-biome lead swap, and
 forced-switch-on-faint. Stage 3's end-of-battle defect (wrong requirement pins in its own plan, not the domain)
 is now **resolved** (2026-07-18) — evolution fixed, XP/Stat-Exp superseded by the Innate Party XP Share; see
-[**Switched-in creature is the active creature**](#switched-in-creature-is-the-active-creature--resolved) below
-for the closing record.)*
+`TODO_ARCHIVE.md` → *Switched-in creature is the active creature* for the closing record.)*
 
 *(The **Run Economy** — gold, rewards, the transient bag, and the spend-gold **Shop node** — plus the
 **Encounter Map** route overlay and the **Difficulty easing** tuning pass are all done and archived
@@ -212,9 +213,8 @@ below (session plan mirrored here for durability; the ephemeral copy was `kind-c
   finisher that levelled up did not evolve), and XP/Stat-Exp went to the finisher alone. Both came from wrong pins
   in this plan, not from the domain. Evolution is fixed (per-member pre-battle-level snapshot); XP/Stat-Exp
   participation is superseded by the **Innate Party XP Share**, a deliberate roguelite deviation from the Gen-1
-  participant split. See
-  [**Switched-in creature is the active creature**](#switched-in-creature-is-the-active-creature--resolved) for
-  the closing record.
+  participant split. See `TODO_ARCHIVE.md` → *Switched-in creature is the active creature* for the closing
+  record.
 
   **Two edges closed during the pre-finish gates (2026-07-15):** (1) **flee + faint on the same turn** — a
   switch-in `continue`s past the end-of-turn flee gate, so a foe already scared off by Roar/Whirlwind would have
@@ -313,9 +313,8 @@ below (session plan mirrored here for durability; the ephemeral copy was `kind-c
     > ⚠️ **This bullet previously pinned two rules that were WRONG** — "XP/Stat-Exp to the finisher only … the DoR's
     > *only the lead earns XP (no Exp Share)* … **not** a deviation" and an evolution gate. Both were invented by
     > this plan, not by the domain, and `requirements-review` returned MET because the code faithfully matched the
-    > plan. Corrected by the user 2026-07-15, **resolved 2026-07-18** → see
-    > [**Switched-in creature is the active creature**](#switched-in-creature-is-the-active-creature--resolved)
-    > below. Kept visible rather than silently deleted: the wrong pin is why the defect shipped.
+    > plan. Corrected by the user 2026-07-15, **resolved 2026-07-18** → see `TODO_ARCHIVE.md` →
+    > *Switched-in creature is the active creature*. Kept visible rather than silently deleted: the wrong pin is why the defect shipped.
   - **DoR #6 — tests must assert:** (Battle) active faints + live bench ⇒ chosen member sent in, **enemy state
     preserved**, loop continues; active faints + no live bench ⇒ loss; incoming `BattleState` reset + its own
     `CarriedStatus` applied (**status-no-leak** from the outgoing); incoming **doesn't act** its entry turn;
@@ -334,7 +333,7 @@ over SignalR (field guard, not just the type-map test); lead-swap reassigns the 
 whole-party heal ✅ done; (Stage 2) boss-catch chance + boss into party while win XP/reward still applied;
 (Stage 3) forced-switch when the bench has a live creature vs. run-loss when it doesn't. **DoR #4 (Gen-1 truth):**
 party size 6; **every creature that levelled shares in evolution, and the whole living party shares in XP/Stat-Exp**
-(see *Switched-in creature is the active creature*, resolved 2026-07-18 — the earlier "only the lead earns XP (no
+(see `TODO_ARCHIVE.md` → *Switched-in creature is the active creature*, resolved 2026-07-18 — the earlier "only the lead earns XP (no
 Exp Share)" pin was wrong; the eventual fix was the **Innate Party XP Share**, a deliberate deviation from the
 literal Gen-1 participant split, not a re-implementation of it); major status persists on benched creatures per
 the carry model.
@@ -342,69 +341,10 @@ the carry model.
 **Out of scope this phase:** the in-battle Poké Ball throw + `BallItemEffect` + catch-rate-vs-HP formula (stays
 in the Catch cluster below); `save.db`/`PlayerDbContext` persistence + cross-run meta-progression; the **Exp.
 Share / Exp. All item** (a held item that pays a *non-participant* — distinct from the innate party-wide XP share
-that shipped 2026-07-18, see *Switched-in creature is the active creature* below). *(Revive, which needed a
+that shipped 2026-07-18, see `TODO_ARCHIVE.md` → *Switched-in creature is the active creature*). *(Revive, which needed a
 fainted-but-revivable party member, shipped 2026-07-19 on top of this stage's `Party` — see `TODO_ARCHIVE.md` →
 Revive Items. Voluntary in-battle switching — its own planned core feature at the time — shipped 2026-07-25 as
 **In-Combat Switching**; see `TODO_ARCHIVE.md`.)*
-
----
-
-## Switched-in creature is the active creature  ⟵ RESOLVED (2026-07-18) — one small residual open
-
-**The requirement, in the user's words:** *"A switched-in Pokémon is for all intents and purposes the active
-Pokémon, therefore all effects that happen at the end of battle happen to it as well. So it can evolve, it shares
-XP, EVs, everything. Just like it would work in Gen 1 / generically in Pokémon."*
-
-**There is no special case for a switched-in creature.** It is not a second-class participant, it does not "wait
-until its next clean win", and it is not excluded from any end-of-battle effect. Anything the starting lead would
-receive, a creature that took the field receives on the same terms. This governs the forced faint-switch and the
-voluntary SWITCH action (both shipped — see **In-Combat Switching** in `TODO_ARCHIVE.md`) alike.
-
-### Why this shipped wrong (keep this — it is the reason the gate is being tightened)
-Neither rule came from Gen 1 or from any design doc. Both were written *by the plan*, then implemented faithfully,
-and `requirements-review` returned **MET** because the code matched the plan. The plan even pre-argued the point
-(*"i.e. **not** a deviation, and the participant-split Exp remains the documented deferral"*), which suppressed the
-domain check instead of inviting it. Two specific traps to recognise again:
-- **An implementation convenience written up as design.** The evolution gate existed only because one `levelBefore`
-  local belonged to the creature that *started* the battle, so a switched-in finisher "couldn't be compared against
-  it". That was a five-line fix, not a design position.
-- **A rule that was right by coincidence.** "Finisher earns the XP" happened to match Gen 1 only because the
-  outgoing lead had fainted and a fainted participant earns nothing anyway — so it was never tested against the
-  real rule, and it would have silently diverged the moment voluntary switching lands with both creatures alive.
-
-→ `requirements-review` now escalates by default and treats plan-asserted domain facts as claims to verify
-(`.claude/agents/requirements-review.md`, "Escalate by default" + the recurring-discrepancy log).
-
-### How it closed (2026-07-18 — Innate Party XP Share)
-- [x] **Evolution now applies to any creature that levelled this battle**, switched-in or not. `BattleRunEvent`
-  takes a **per-party pre-battle level snapshot** (`preLevel`, per member) instead of the single starting-lead
-  `levelBefore` local, and a new `EvolutionOrder` helper evolves every creature that levelled — active, forced
-  switch-in, or bench — active-first then roster order. The `ReferenceEquals(active, player)` gate is gone.
-- [x] **XP / Stat-Exp is SUPERSEDED, not literally "Gen 1 participation".** The user's ruling asked for the Gen 1
-  participant split (one pool divided among the creatures sent out); the design session instead chose a
-  deliberate **roguelite deviation** — the **Innate Party XP Share** (`RunRules.BenchXpShare`, live `0.5` in the
-  web run): the active creature is paid in full (unchanged), then every **living** bench member additionally
-  earns `floor(activeAward × BenchXpShare)` XP + full Stat-Exp, running the same level-up + move-learn loop;
-  fainted members earn nothing. This is wider and more generous than the literal participant split, and is kept
-  out of `IBattleRules` in `RunRules`, alongside the existing XP-curve deviation (see `GENERATION_SEAMS.md`).
-  **At the time this closed (2026-07-18), no live conflict** with the requirement above: voluntary switching
-  wasn't implemented yet, and a forced switch always leaves the outgoing lead fainted (excluded from any share
-  anyway), so the only "switched-in" case then was simply the active creature, paid in full, same as before this
-  change. **Once In-Combat Switching shipped (2026-07-25),** a creature switched out mid-battle while still alive
-  earned only the flat `BenchXpShare` — an intended divergence when decided, but the case it was decided *about*
-  couldn't happen yet. **The user reversed it on 2026-07-26** now that it can: a participant must not be paid
-  less than the creature that happened to finish the fight. **Resolved 2026-07-27** by the Gen 1 participation
-  split — the award is divided evenly among the live creatures that took the field, and `BenchXpShare` now pays
-  only members that never fought. Full record → `TODO_ARCHIVE.md` → *Participation XP* (and *Innate Party XP
-  Share* for the share itself). *(The **Exp. Share / Exp. All item** — a held item that pays a
-  non-participant — stays deferred; it's a separate feature from this innate, always-on party share.)*
-- [x] The invariant is now written into `docs/STATE_MODEL.md` (the party-wide end-of-battle effects section) as a
-  documented fact, not a plan claim — future `requirements-review` runs can cite it directly.
-- [ ] **Residual: sweep other end-of-battle effects that assume the starting lead.** The rule is general;
-  evolution and XP/Stat-Exp are now confirmed party-wide, move-learning already rides the per-member evolution
-  loop, and carried status already reads `s.Player` (the finisher) — but nothing has specifically audited the
-  *rest* of the post-battle path for a stray `player`/`levelBefore` reference. Small, cheap, not urgent; no known
-  instance today.
 
 ---
 
@@ -1371,20 +1311,6 @@ findings" as an open section.)*
   on "Connecting…" — unchanged from before this feature, not a regression it introduced. Deliberately
   out-of-scope for the lightweight Tier-3 resume feature; would need each blocking-prompt event cached/replayed
   the same way, or folded into the heavier `save.db`-backed resume (Tier 5).
-- **Wild encounter level far below the player's — MECHANISM CONFIRMED + DOCUMENTED (2026-09-13); design-intent
-  question still open.** Reported (2026-09-12): a level-23 lead ran into a level-11 wild Fearow, contradicting a
-  prior "not possible" call. The joint code-analysis session happened — full formula, worked example, and the
-  key fact it turned up are now written up in **`ENCOUNTER_DESIGN.md` §3.3**: `ScaleWildLevel` reads the lead's
-  **live, current** level at the moment of each encounter (never the level chosen at run start — that was the
-  user's working hypothesis, and it's wrong; `BattleRunEvent` re-reads `s.Player.Level` off the same mutable
-  `Creature` instance every node), and at shallow depth the raw band is a deliberate **[50%, 80%] of that live
-  level** *before* any archetype offset, with Weak subtracting 3 more. A level-23 lead landing an 11 is that
-  formula hitting its own documented floor — **not a bug, not a stale depth read, not a mismatch with an older
-  formula version.** This closes questions (1)/(3)/(4) from the original entry outright, and narrows (2) to the
-  one thing left unanswered: **is a band this wide — down to 50% of the lead's *live* level, which only gets
-  more extreme as the lead outlevels a shallow biome — the tuning we actually want, now that leads reach the
-  20s well inside a single biome?** That's a design call for the user, not a code defect; no code changed by
-  this pass, only the writeup.
 - ~~**Possible bug: poison-tick timing vs. a same-turn faint**~~ — **RESOLVED 2026-09-13**: poison ticking the
   turn it's applied is correct Gen-1 behaviour (not a bug); end-of-turn residual (poison/burn/Leech Seed) still
   firing for the survivor after either side had already fainted from a direct hit that same turn **was** a real
@@ -1395,30 +1321,30 @@ findings" as an open section.)*
   `GEN_DIFFERENCES.md`, and reachable via forced-switch (the enemy's stale recharge flag could wrongly skip its
   next turn against the newcomer). See `TODO_ARCHIVE.md` → *End-of-turn residual (poison/burn/Leech Seed) fired
   even after a same-turn faint* for the full write-up (both bugs, the seam refactor, and the counter-tick
-  split). **One narrower question from this same investigation is still open** — see the next entry below.
-- **Open: does Gen 1's faint-ends-the-turn rule also cover a faint caused BY the residual phase itself, not
-  just a direct hit?** Raised 2026-09-13 by `requirements-review`, during the fix above — deliberately deferred,
-  not fixed, pending Gen-1-accurate confirmation in a future session. `Battle.cs`'s guarded residual block
-  (immediately after the `FaintEndsTurnImmediately` check) calls `StatusResolver.ApplyEndOfTurnDamage` for
-  `PlayerCreature` and then, unconditionally, for `EnemyCreature` — but if the **first** call's own residual
-  damage faints that creature, the second call still runs for the other side today. Whether Gen 1's "the turn
-  ends there and then" rule also applies when the faint is caused by the residual tick itself (as opposed to a
-  direct hit earlier in the same turn, which is what the fix above already covers) is unconfirmed. Needs
-  checking against a Gen-1-accurate source before either changing the code or closing this out as correct
-  as-is.
-- **A level-25 acquired Exeggcutor reportedly had only 2 moves — Hypnosis and "Bind"?** Raised 2026-09-12.
-  Checked against the real `pokemon.db`/`moves.db` data (not assumed): Exeggcutor's Gen 1 level-up learnset is
-  exactly **Hypnosis (level 1), Barrage (level 1), Stomp (level 28)** — nothing else, at any level, by level-up.
-  So **the 2-move count itself is correct and expected**: at level 25, Stomp (needs 28) isn't unlocked yet, so
-  `CanonicalLatest` (level-up only, up to 4 moves) has only Hypnosis + Barrage available — this matches the "only
-  two moves" half of the report exactly. **The "Bind" half doesn't check out, though:** Bind (move id 20) is a
-  real, distinct move in `moves.db`, but it appears **nowhere** in Exeggcutor's *or* pre-evolution Exeggcute's
-  learnset (level-up or machine) — there's no code path that should ever attach Bind to an Exeggcutor. Two
-  possibilities, neither confirmed: (a) the user misremembered/misread the move name in the moment (Barrage is an
-  uncommon move name, easy to blank on) and the game actually showed Barrage, which would mean **no bug at all**;
-  or (b) the game genuinely displayed Bind, which would be a real move-selection defect worth a proper repro.
-  **Not investigated further here** — next time this comes up, check the actual in-game move list (a screenshot
-  or the CHECK POKEMON MOVES tab) rather than relying on memory of the name.
+  split). **The one narrower question from this same investigation was answered 2026-09-20 and turned into a
+  larger, still-open item** — see the next entry below.
+- **Open, unplanned — Gen 1 has NO end-of-turn residual phase; each creature ticks its own poison/burn/Leech
+  Seed right after its own action, so our turn shape is wrong.** Found 2026-09-20 while answering the question
+  `requirements-review` raised 2026-09-13 ("does the faint-ends-the-turn rule cover a faint caused by the residual
+  tick itself?"; history → `TODO_ARCHIVE.md` → *End-of-turn residual … fired even after a same-turn faint*).
+  Verified against the Gen 1 source (pret/pokered `engine/battle/core.asm`, `MainInBattleLoop` lines 413-468,
+  raw file read 2026-09-20): `HandlePoisonBurnLeechSeed` uses `hWhoseTurn`, so the order is **A acts → A's own
+  residual → if A fainted, jump to A's faint handler (B never acts) → else B acts → B's own residual → if B
+  fainted, B's faint handler.** `Battle.cs` (~lines 179-231) instead runs both actions, then `TickTurnCounters`,
+  then both creatures' residuals at end of turn (gated by `IBattleRules.FaintEndsTurnImmediately` only when both
+  are alive). Three discrepancies: **(a)** the slower creature acts even when the faster one would have died to
+  its own tick first; **(b)** the faster creature's tick lands after the slower one's attack instead of before
+  it; **(c)** a residual-caused double-faint is impossible in Gen 1 (the first faint jumps to the handler) but our
+  engine can produce it — the second `ApplyEndOfTurnDamage`/`ApplyLeechSeedDrain` still runs after the first
+  faints something. The 2026-09-13 `FaintEndsTurnImmediately` fix only covers a faint from a direct hit.
+  `RunDirectorTests.Runner_DoubleFaintFromEndOfTurnPoison_EndsTheRun_ButStillCountsTheWin` pins a path Gen 1
+  cannot produce (the 2026-07-28 mutual-KO ruling still stands for genuine trades like Explosion — it would need
+  a different scenario, not a different ruling). This is a real generation difference (Gen 2+ moved residual to
+  a true end-of-turn phase), so the fix belongs **behind an `IBattleRules` seam alongside
+  `FaintEndsTurnImmediately`** — design rationale in `GEN_DIFFERENCES.md` → Status Quirks, seam row in
+  `GENERATION_SEAMS.md` §2. It rewrites `Battle`'s central turn loop: needs a `/plan`, `opus-engineer`
+  implementation, and both review gates. **Not yet decided when to plan it — unscheduled, deliberately not
+  placed in the tier list.**
 - **Wild/draft selection has no evolution-stage or natural-minimum-level awareness — PARTIALLY FIXED
   (2026-09-18).** Raised 2026-09-12 after the user met a level-25 Exeggcutor and asked why, given Exeggcutor
   doesn't even have a level-based evolution (it's a Leaf Stone evolution from Exeggcute — so "before its
@@ -1430,7 +1356,8 @@ findings" as an open section.)*
   `TryBuildDraftAsync`. A level-20 Charizard (needs 36) can no longer spawn. **What's still open:** a
   `Stone`-trigger edge adds **no** floor by design (a stone can legitimately be used at any level in real
   Gen 1, so a wild stone-evolved species can be any level there too) — so the original Exeggcutor report
-  itself is *not* covered by this fix and remains exactly the gap it always was. The broader design question
+  itself is *not* covered by this fix and remains exactly the gap it always was. (The same sighting's "only 2
+  moves, one being Bind" report was a misread — closed no-defect 2026-09-20, `TODO_ARCHIVE.md`.) The broader design question
   also stands: `PickByBst`/`ScaleWildLevel` still select purely by BST band with no per-area/per-level
   encounter table at all (`ENCOUNTER_DESIGN.md` confirms this is deliberate), so a stone-evolved, high-BST
   species can still surface far below where the original games would ever place it (Cerulean Cave is a

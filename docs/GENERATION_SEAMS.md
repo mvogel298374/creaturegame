@@ -78,6 +78,7 @@ Things that genuinely differ generation to generation, each a member on the inte
 | **Accuracy scale** | internal `0–255`; a roll of 255 always misses — the **1/256 miss bug** (even 100%-accurate moves whiff ~0.4% of the time) | `0–100`, no bug |
 | **Freeze** | permanent until hit by a damaging Fire move that can burn | 20%/turn random thaw; any Fire move thaws |
 | **Burn/Poison damage** | 1/16 max HP per turn | 1/8 in Gen 6+ |
+| **Residual (status tick) timing** | **no end-of-turn phase** — each creature's Burn/Poison/Leech Seed tick fires right after *its own* action, and a faint jumps straight to the faint handler (so a residual double-faint can't happen). Partly modelled today: `FaintEndsTurnImmediately` covers only the direct-hit-faint case. **Seam candidate, not yet built** — `TODO.md` → Known Gaps; rationale → `GEN_DIFFERENCES.md` → Status Quirks | true end-of-turn phase after both actions (Gen 2+) |
 | **Special stat** | one combined **Special** stat for both offense and defense | split into Sp. Atk / Sp. Def (Gen 2) |
 | **XP on faint** | wild `floor(baseExp × level / 7)`; **trainer-owned ×1.5** (Gen 1 already split wild vs trainer) | the trainer ×1.5 persists |
 | **XP participant divisor** | the award is divided among the Pokémon sent out that have **not** fainted (the formula's `s`) — `IBattleRules.SplitXpAmongParticipants` | same through Gen 5; **Gen 6 removed it** — every participant earns the full award, so a Gen 6 impl returns the award unchanged |

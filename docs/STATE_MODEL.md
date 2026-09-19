@@ -135,6 +135,13 @@ the whole party rather than only the creature that started the fight:
   > ⚠️ **Known, user-accepted limitation (2026-07-27):** the bench share is taken off the **full** award while
   > participants split it, so with two live participants a creature that never fought earns the **same** as one
   > that did at Normal (0.5) and **more** at Easy (0.75). Deliberate — see `docs/TODO_ARCHIVE.md` → *Participation XP*.
+  >
+  > **Known, user-accepted limitation (2026-09-20):** the level-based XP multiplier
+  > (`RunRules.XpMultiplierForLevel`) is computed once from the **finisher's** level at win time
+  > (`Battle.cs`, `PlayerCreature.Level`) and applied to the whole XP pool, so every other participant and the
+  > bench share are paid on the finisher's multiplier, not their own. By design for the bench (`floor(activeAward ×
+  > BenchXpShare)`); for a switched-out participant it is a side effect of the single pool, kept as is. See
+  > `docs/TODO_ARCHIVE.md` → *Switched-in creature is the active creature*.
 - **A mutual KO is the player's win, not a loss (2026-07-28).** When the active creature and the enemy faint on
   the same turn, the enemy-faint check runs first, so `Battle.PlayerWon` records the win independently of whether
   the finisher itself survived it. There is no foe left to send anyone in against, so no mid-battle switch-in
@@ -146,8 +153,11 @@ the whole party rather than only the creature that started the fight:
   `docs/TODO_ARCHIVE.md` → *Mutual KO ends the run even with a live bench*.
 
 These are documented invariants (not plan claims) that `requirements-review` can cite. The general rule — *no
-end-of-battle effect may silently assume the starting lead* — still has one open audit item (sweep the rest of the
-post-battle path for stray `player`/`levelBefore` reads; see `TODO.md`).
+end-of-battle effect may silently assume the starting lead* — was audited across the post-battle path on
+2026-09-20 with no stray `player`/`levelBefore` reads found: in `BattleRunEvent` the starting-lead `player` is used
+only pre-fight (foe scaling, entry status) and everything post-battle reads `s.Player`/`active`; `Battle` restores
+Transform/Mimic as each creature leaves and captures carried status on a voluntary switch-out (see
+`docs/TODO_ARCHIVE.md` → *Switched-in creature is the active creature*).
 
 ---
 

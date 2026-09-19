@@ -218,8 +218,8 @@ scales by how deep into the run/biome it sits; the Boss apex (last node) scales 
 
 ### 3.3 The level-band formula (exact) — and why it reads the *live* level, not the run's starting level
 
-*(Added 2026-09-13, from a joint investigation of a live report — see `TODO.md` → *Known Gaps* → "Wild
-encounter level far below the player's" for the raw incident and the questions that prompted this writeup.)*
+*(Added 2026-09-13, from a joint investigation of a live report — see `TODO_ARCHIVE.md` → *Wild encounter level
+far below the player's* for the raw incident and the questions that prompted this writeup.)*
 
 `EncounterFactory.ScaleWildLevel(playerLevel, depth, rng)` is the whole formula; each tier (§3.4) just shifts
 its output by a flat offset afterward. Read literally:
@@ -260,8 +260,8 @@ but a level-23 lead's Weak floor is 11. **This directly falsifies any earlier "w
 the player's" call** — it can, and by design, the gap widens as the lead grows within a biome faster than
 `depth`'s lift (+2%/node, capping at +40 pts) can close it. Whether a band this wide is the *desired* tuning —
 as opposed to too aggressive now that leads reach level 23 well within a single biome — is a design-tuning
-question, separate from this section's job of documenting the mechanism as it actually runs; see `TODO.md` for
-that open call.
+question, separate from this section's job of documenting the mechanism as it actually runs. **Accepted as-is by
+the user (2026-09-20):** the `[50%, 80%]`-of-live-level band stays as tuned.
 
 ### 3.4 The four levers
 

@@ -106,15 +106,26 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
 - Considered overpowered; used competitively to completely shut down opponents
 
 #### Status Quirks
-- **A faint mid-turn ends the turn there and then** (Smogon RBY Mechanics Guide): if either side faints during
-  that turn's move execution, the rest of the turn's residual phase — Burn/Poison/Bad Poison damage and Leech
-  Seed drain, for **both** sides, not just the fainted one — is skipped outright, not merely withheld from the
-  fainted creature. `IBattleRules.FaintEndsTurnImmediately` (engine: `creaturegame/Combat/IBattleRules.cs`);
-  Gen 2 removed this (residual effects like Burn/Leftovers resolve for the survivor regardless). The
-  Disable-lock and binding-trap countdowns are the one exception — Gen 1 ticks those every turn regardless of
-  a faint (`StatusResolver.TickTurnCounters`), so they're gen-invariant and always run. Confirmed 2026-09-13
-  from a reported log where a poisoned attacker's own tick still fired the same turn its own hit KO'd the
-  opponent (`docs/TODO_ARCHIVE.md` → "End-of-turn residual fired even after a same-turn faint").
+- **Gen 1 has NO end-of-turn residual phase — each creature takes its own Burn/Poison/Bad Poison/Leech Seed
+  tick immediately after its own action** (verified 2026-09-20 against pret/pokered `engine/battle/core.asm`,
+  `MainInBattleLoop` lines 413-468; `HandlePoisonBurnLeechSeed` keys off `hWhoseTurn`). The real order is:
+  **A acts → A's own residual → if A fainted, jump to A's faint handler (B never acts) → else B acts → B's own
+  residual → if B fainted, B's faint handler.** Consequences: (1) the faster creature's tick lands *before* the
+  slower one acts; (2) if the faster creature dies to its own tick, the slower one never acts that turn;
+  (3) a residual-caused double-faint is impossible (the first faint jumps to the handler); (4) a faint from a
+  direct hit ends the turn because the not-yet-run ticks never happen — the Smogon RBY Mechanics Guide's "if a
+  Pokémon faints, the turn ends there and then; end-of-turn effects are skipped" is the same behavior described
+  as if it were a phase. Gen 2+ moved residual to a true end-of-turn phase after both actions (residual effects
+  like Burn/Leftovers resolve for the survivor regardless of a faint).
+  **Engine status (as of 2026-09-20): partly modelled.** `IBattleRules.FaintEndsTurnImmediately`
+  (`creaturegame/Combat/IBattleRules.cs`) covers only fact (4): `Battle` still runs both actions, then both
+  creatures' residuals at end of turn (skipped if anyone fainted from a direct hit), so facts (1)–(3) are
+  **not** yet modelled — tracked as an open, unplanned item, `docs/TODO.md` → Known Gaps ("Gen 1 has NO
+  end-of-turn residual phase"). The fix belongs behind an `IBattleRules` seam alongside
+  `FaintEndsTurnImmediately`. The Disable-lock and binding-trap countdowns are the one exception to all of
+  this — Gen 1 ticks those every turn regardless of a faint (`StatusResolver.TickTurnCounters`), so they're
+  gen-invariant and always run. History of the direct-hit fix (reported log, 2026-09-13):
+  `docs/TODO_ARCHIVE.md` → "End-of-turn residual fired even after a same-turn faint".
 - **Hyper Beam**: does NOT require a recharge turn if it KOs the target — the sibling half of the same faint
   rule above, and read off the same `FaintEndsTurnImmediately` member; **switching out during the recharge
   turn is legal** — the recharge is only spent if the creature stays in and FIGHTs (it's enforced inside
