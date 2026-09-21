@@ -1127,9 +1127,21 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
        general.
   - [ ] **4d+ — the surface catalog, jointly iterated** (each its own greenlit mini-plan): battle command menu
     (settled — the 2×2 grid, verbs fixed), move select, battle HUD, CHECK POKEMON, BAG, party surfaces, run
-    prompts, Title/StarterSelection (incl. the generation picker), node ladder, **the level-up modal and the
-    reward modal** (both still the old pre-Kanto-Sage look, flagged 2026-08-23 — user-reported while playing,
-    not yet its own mini-plan).
+    prompts, Title/StarterSelection (incl. the generation picker), node ladder, **the reward modal** (still the
+    old pre-Kanto-Sage look, flagged 2026-08-23 — user-reported while playing, not yet its own mini-plan). *(The
+    level-up stat panel, the other half of that flag, shipped 2026-09-22 — see the open follow-ups below; full
+    record in `TODO_ARCHIVE.md` → *Generation Profile 4d+ · Level-up stat panel — Kanto Sage skin*.)*
+  - [ ] **4d+ · Level-up stat panel — open follow-ups** (the skin itself ✅ shipped 2026-09-22, archived):
+    - **Flagged, not decided — a domain claim for `requirements-review`, not asserted here:** whether Gen 1's real
+      level-up box lists HP at all (recollection: four rows, ATTACK/DEFENSE/SPEED/SPECIAL) and whether it shows
+      gains first, then totals on a keypress. Today's panel shows five rows with gain + total together; left as-is
+      because changing it is a behaviour change, not a skin — would be its own item if wanted.
+    - **Follow-up, now partial (2026-09-22):** `.levelup-panel` and `.nickname-modal` share ONE double-frame rule (a
+      selector list under `[data-generation="gen1"]`). Still open: `.battle-screen` and `.battle-log` carry their
+      own copies of the recipe, and the reward modal (when its mini-plan is written) should join the shared
+      selector rather than copy it again.
+    - **E2E not run:** `level-up.spec.ts` (incl. the column-spacing geometry test) is opt-in / user-run —
+      recommend `.\e2e.ps1 -Spec level-up`. The panel's geometry was verified live via Puppeteer instead.
   - [x] **⚠️ BAG readability regression** ✅ DONE (2026-08-23) — `.bag-item`/`.bag-pp-prompt`/`.bag-gold*`
     (`BattleScreen.css`) only ever inherited the global dark-theme `--clr-text` (near-white) on a transparent
     background, unreadable against the light Kanto Sage `--ks-fog` panel ground they now sit on. Same failure

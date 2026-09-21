@@ -9,9 +9,11 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    GEN 1 SKIN — "Kanto Sage" (Stage 4b, ratified 2026-08-03)
    Scoped to the five HUD surfaces the ratified mockup covered: nameplates/HP/XP bars, the
-   battle log (dialogue box), the command grid, and move-select. Everything else in this file
-   (bag menu, run map, reward/shop modals, level-up/recovery/end panels) is a later catalog
-   turn (GENERATION_PROFILE.md §7.5) and is deliberately untouched here.
+   battle log (dialogue box), the command grid, and move-select. Later catalog turns
+   (GENERATION_PROFILE.md §7.5) have since skinned the level-up panel and the nickname modal (the two
+   share one frame rule — see the level-up block below) and given the bag menu its legibility fix;
+   the rest of this file (run map, reward/shop modals,
+   recovery/end panels, the bag's full pass) is still deliberately untouched.
    Functional colour cues (HP high/mid threshold, type-effectiveness, STAB, low-PP, power tier)
    are kept as-is — same call as the HP-bar low endpoint below: they're gameplay signal, not
    decoration, so they sit outside the four-colour budget rather than being flattened by it.
@@ -840,6 +842,47 @@
 .levelup-stat  { text-align: left;  padding-right: var(--sp-lg); letter-spacing: 1px; }
 .levelup-gain  { text-align: right; padding-right: var(--sp-lg); color: #44cc44; font-weight: 700; }
 .levelup-total { text-align: right; color: var(--clr-text); opacity: 0.85; }
+
+/* Kanto Sage skin (GENERATION_PROFILE.md §7.3; plan: TODO.md → 4d+ level-up panel). Skin only — the base
+   rules above stay as the no-profile fallback, and the .levelup-stat/gain/total classes, column padding
+   (guarded by level-up.spec.ts) and position are untouched. Frame = the .battle-log double-line recipe.
+   The nickname modal shares this one frame rule (selector list) instead of copying it — its own
+   title/input/padding overrides sit beside its base rules further down. */
+[data-generation="gen1"] .levelup-panel,
+[data-generation="gen1"] .nickname-modal {
+  background-color: var(--ks-fill);
+  color: var(--ks-ink); /* own ink so anything not patched below inherits correctly, not the old near-white */
+  border: 2px solid var(--ks-ink);
+  border-radius: 0;
+  box-shadow:
+    inset 0 0 0 3px var(--ks-fill),
+    inset 0 0 0 8px var(--ks-ink);
+  padding: calc(var(--sp-sm) + 8px) calc(var(--sp-md) + 8px);
+  background-image: var(--ks-corners);
+  background-repeat: no-repeat;
+  background-position:
+    top 8px left 8px,
+    top 8px right 8px,
+    bottom 8px left 8px,
+    bottom 8px right 8px;
+  background-size: 14px 14px;
+}
+/* LEVEL UP! on its own line, the "NAME · Lv N" sub-line dim beneath it. Flex re-flow of the same spans. */
+[data-generation="gen1"] .levelup-title {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0 0.5ch;
+  color: var(--ks-ink);
+}
+[data-generation="gen1"] .levelup-head { order: -1; flex-basis: 100%; text-align: center; }
+[data-generation="gen1"] .levelup-name,
+[data-generation="gen1"] .levelup-sep,
+[data-generation="gen1"] .levelup-lv { color: var(--ks-dim); font-weight: 400; letter-spacing: 0; }
+[data-generation="gen1"] .levelup-sep--tail { display: none; }
+[data-generation="gen1"] .levelup-table { color: var(--ks-ink); }
+[data-generation="gen1"] .levelup-gain { color: var(--ks-ink); }
+[data-generation="gen1"] .levelup-total { color: var(--ks-dim); opacity: 1; }
 
 /* ── Move-replacement modal (level-up move learning) ── */
 .modal-overlay {
@@ -2217,6 +2260,26 @@
   gap: var(--sp-md);
   width: 100%;
 }
+
+/* Kanto Sage skin. The frame itself comes from the shared rule up with .levelup-panel (fill, double-line ring,
+   step-notch corners, no glow/radius); this block re-states only what that frame doesn't cover. The card keeps
+   its own roomier padding (+8px for the frame's ink ring), and OK/CANCEL are .action-btn — already skinned,
+   including the invert-on-hover, so they need nothing here. */
+[data-generation="gen1"] .nickname-modal {
+  padding: calc(var(--sp-md) + 8px) calc(var(--sp-lg) + 8px);
+}
+[data-generation="gen1"] .nickname-title { color: var(--ks-ink); }
+[data-generation="gen1"] .nickname-sub   { color: var(--ks-dim); }
+[data-generation="gen1"] .nickname-input {
+  background: var(--ks-fog);
+  color: var(--ks-ink);
+  border: 2px solid var(--ks-ink);
+}
+[data-generation="gen1"] .nickname-input:focus {
+  border-color: var(--ks-ink);
+  box-shadow: inset 0 0 0 2px var(--ks-ink); /* thickened ring — the focus cue, since border colour can't change */
+}
+[data-generation="gen1"] .nickname-input::placeholder { color: var(--ks-dim); }
 
 /* ── Acquisition offer modal (themed draft / boss catch) ──────────────
    Reuses the recovery modal shape with a violet accent (a "join the party" beat, distinct from the green heal

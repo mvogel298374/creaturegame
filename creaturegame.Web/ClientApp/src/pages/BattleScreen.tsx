@@ -781,7 +781,15 @@ function LevelUpStatPanel({ panel }: { panel: LevelUpPanel }) {
   ];
   return (
     <div className="levelup-panel" role="status" aria-label={`${panel.creatureName} reached level ${panel.level}`}>
-      <div className="levelup-title">{panel.creatureName} · LEVEL UP! · Lv {panel.level}</div>
+      {/* One line in the base look ("NAME · LEVEL UP! · Lv N"); the spans let a generation skin re-flow it
+          (Kanto Sage puts LEVEL UP! on its own line above the name) without changing the text. */}
+      <div className="levelup-title">
+        <span className="levelup-name">{panel.creatureName}</span>
+        <span className="levelup-sep"> · </span>
+        <span className="levelup-head">LEVEL UP!</span>
+        <span className="levelup-sep levelup-sep--tail"> · </span>
+        <span className="levelup-lv">Lv {panel.level}</span>
+      </div>
       <table className="levelup-table">
         <tbody>
           {rows.map(([label, gain, total]) => (

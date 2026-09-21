@@ -115,7 +115,20 @@ the linked design doc instead — pull it there and leave only the pointer here.
   other than Revive can target any living party member*.
 
 ## 6. Generation & presentation
-*(not yet populated)*
+
+### Level-up stat panel (Gen 1 "Kanto Sage" skin)
+- Under the Gen 1 profile, the level-up stat panel (shown on a level-up, bottom-right above the battle menu,
+  until the player's next input) renders as an ink-on-fill box with the same double-line frame as the battle
+  log: square corners, no drop shadow, `--ks-*` palette colours only.
+- The title reads `LEVEL UP!` on its own line, with the creature's `NAME · Lv N` in a dim sub-line beneath it.
+- Each stat row shows the gain in bold ink (`+N`) and the new total in the dim tone; the panel's content,
+  position and dismissal are the same as with no generation skin.
+- With no generation profile applied, the panel keeps its original dark look.
+- The NICKNAME modal (starter pick and acquisition) wears the same double-line frame under the Gen 1 profile:
+  ink title, dim sub-line, text input on the fog tone with an ink border and a thickened focus ring; OK / CANCEL
+  use the skinned action buttons. With no profile applied it keeps its original dark card.
+- Design detail → `GENERATION_PROFILE.md` §7.3.  History → `TODO_ARCHIVE.md` → *Generation Profile 4d+ ·
+  Level-up stat panel — Kanto Sage skin*.
 
 ## 7. Web / session layer
 

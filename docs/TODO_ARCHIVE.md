@@ -8,6 +8,77 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Generation Profile 4d+ · Level-up stat panel — Kanto Sage skin ✅ COMPLETE (2026-09-22)
+
+*(Moved here from `TODO.md` → Generation Profile → Stage 4d+. Two follow-ups stay live there: the Gen-1
+level-up-box-contents domain question and the shared double-frame recipe — see the end of this section.)*
+
+**Scope: skin only, no behaviour change.** `LevelUpStatPanel` (`BattleScreen.tsx`, `.levelup-*` in
+`BattleScreen.css`) is a non-blocking corner panel (bottom-right above the menu, persists until the next input,
+also raised for bench Exp-Share level-ups with the creature named). Before this it had **no
+`[data-generation="gen1"]` override** — a dark navy box, sky-blue title, `#44cc44` gains, 4px radius and soft drop
+shadow sitting on the light Fog field (the level-up half of the "level-up modal and reward modal" surfaces flagged
+2026-08-23, user-reported while playing).
+
+**Design (interactive mockup reviewed with the user 2026-09-22; scratch file, not committed):** one
+`[data-generation="gen1"] .levelup-*` override block. Frame = the `.battle-log` double-line recipe (2px ink border +
+3px fill ring + 5px ink ring, `--ks-corners` step-notches, radius 0, no drop shadow) on `--ks-fill`; title splits to
+`LEVEL UP!` (ink) over a dim `NAME · Lv N` sub-line (**the literal `LEVEL UP!` text stays** — `level-up.spec.ts`
+asserts it); **gain = bold ink (user's call)** — the `#44cc44` green is outside the four-colour budget and only
+~1.65:1 on `--ks-fill`; blue would read as an XP cue; total = `--ks-dim`. Unchanged: class names
+(`.levelup-stat/gain/total`), column padding, the 160ms `levelup-pop`, position, z-index (7, above the party strip),
+persist-until-input, and the **base dark rules** (the fallback for a profile with no override).
+
+**As built:**
+- `BattleScreen.tsx` — the title `<div className="levelup-title">` now wraps its pieces in spans
+  (`levelup-name`, `levelup-sep`, `levelup-head`, `levelup-sep--tail`, `levelup-lv`); `textContent` is identical
+  ("NAME · LEVEL UP! · Lv N"), so the base look and `level-up.spec.ts` are unaffected. The spans let the skin re-flow
+  the line.
+- `BattleScreen.css` — new `[data-generation="gen1"] .levelup-*` block after the base rules (~844): root gets its own
+  `color: var(--ks-ink)` (DoR #6b — inherited-colour trap), the double frame + corner notches, a flex re-flow of
+  the title (`.levelup-head` `order: -1; flex-basis: 100%` puts LEVEL UP! on its own line, `.levelup-sep--tail`
+  hidden), name/sep/Lv dim and un-bolded, `.levelup-gain` ink (bold retained from the base rule), `.levelup-total`
+  `--ks-dim` at full opacity. **No `td` padding shorthand** (DoR #6a — this exact panel was bitten before; the
+  column-spacing geometry is untouched).
+- **DoR:** #3 gen-variable = presentation only, scoped under `[data-generation]`, no seam touched; content/timing/
+  persistence gen-invariant. #4 source of truth = `GENERATION_PROFILE.md` §7.3. #5 CSS + span markup only — no
+  importer/engine/wire/DB. #7 no dependencies.
+
+**Verified live (2026-09-22, Puppeteer, real battle — seed 1, CHARIZARD Lv5, `playToLevelUp`):** under
+`data-generation="gen1"` — ink-on-fill, double-line frame, radius 0, no shadow, bold-ink gains, dim totals, LEVEL UP!
+on its own line; the column-spacing geometry (gap 32px, padding 32px) still satisfies `level-up.spec.ts`'s "column
+spacing" assertion; with `data-generation` removed, every computed style equals the original base dark rules
+(fallback preserved).
+
+**Add-on, same commit (2026-09-22) — NICKNAME modal skinned with the same recipe.** The user asked for
+`.nickname-modal` (`components/modals/NicknameModal.tsx`, used by `StarterSelection` and `AcquisitionModal`) to get the
+exact same modal CSS. **CSS only, no TSX change.**
+- **Shared selector, not a copy:** `.nickname-modal` was added to the level-up frame rule as a selector list
+  (`[data-generation="gen1"] .levelup-panel, [data-generation="gen1"] .nickname-modal`) — ONE shared double-line-frame
+  rule for the two surfaces. This partly does the "share the recipe instead of copying a 4th time" follow-up for these
+  two; `.battle-screen` / `.battle-log` still carry their own copies.
+- A small block beside the nickname base rules: padding kept roomier (+8px to clear the ring), title in ink, sub-line
+  `--ks-dim`, input on `--ks-fog` with a 2px ink border and a thickened inset-ring focus cue, dim placeholder.
+  OK / CANCEL are `.action-btn` — already skinned, unchanged.
+- **Verified live (Puppeteer, starter-select screen, seed 1, CHARIZARD):** computed styles match the level-up frame;
+  the focus ring confirmed with real page focus; with `data-generation` removed, every value equals the original
+  purple dark card (fallback preserved).
+- **Not run:** E2E (opt-in; the nickname flow is exercised by `helpers.startBattle` in every spec). Fast tests were
+  green before this CSS-only add-on and were not re-run (CSS cannot affect them).
+
+**Not run (level-up panel):** the E2E `level-up.spec.ts` (opt-in, user-run — recommended `.\e2e.ps1 -Spec level-up`).
+The bench-attributed variant was not separately screenshotted (same component/markup path). `pr-review` skipped
+(CSS/markup-only diff).
+
+**Left open (both remain live in `TODO.md` → 4d+):** (1) the Gen-1 level-up-box-contents domain claim — whether the
+real box lists HP at all (recollection: four rows ATTACK/DEFENSE/SPEED/SPECIAL) and whether it shows gains first,
+then totals on a keypress; today's five-row gain+total panel was left as-is (behaviour change, not a skin), for
+`requirements-review`/a separate item; (2) promote the double-frame recipe to a shared token/selector — **now
+partial:** level-up panel + nickname modal share one rule; `.battle-screen` / `.battle-log` copies and the reward
+modal remain.
+
+---
+
 ## Level-25 Exeggcutor "with only Hypnosis and Bind" — ✅ CLOSED, NO DEFECT (2026-09-20)
 
 **Decision (user, 2026-09-20):** a fluke — a misread of the move list, not a bug. No code changed. (Moved here from
