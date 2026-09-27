@@ -4,98 +4,50 @@
 > history of a finished item. **See also:** `CLAUDE.md` (setup/commands) · `AI_CONTEXT.md` (profiles) ·
 > `DESIGN_GUIDES.md` (mechanics) · `DEV_STANDARDS.md` (conventions).
 
-## Current state (2026-07-19)
+## Current state (2026-09-27)
 
 The Gen 1 battle engine is **feature-complete** (all 165 moves, XP & level-up, learnsets, AI move selection,
-EV / Stat-Exp gain, evolution, in-battle item system incl. **Revive/Max Revive**), and the roguelite run layer on
-top is playable end-to-end: the **Encounter Logic** biome-graph run (biome pick → randomised 4–6 nodes → Poké
-Center → next biome, per-run randomised map, depth-scaled foes), the **Run Economy** (gold + rewards), the
-**Reward Choice** modal (pick-1-of-3 rarity rewards), the **level-aware XP curve + trainer bonus**, the **Innate
-Party XP Share** (the living bench shares in every battle's XP/Stat-Exp and evolution alongside the active
-creature), **Revive Items** (in-battle party revive, Boss-reward + rare-shop only), **In-Combat Switching**
-(the voluntary, any-turn SWITCH turn-action), and **Creature Naming** (a cancelable nickname step on every
-acquisition path — starter, themed draft, boss catch) are all done and archived (→ `TODO_ARCHIVE.md`).
+EV / Stat-Exp gain, evolution, in-battle item system incl. **Revive/Max Revive** and full party-targeting for
+Healing/StatusCure/PpRestore/Revive), and the roguelite run layer on top is playable end-to-end: the
+**Encounter Logic** biome-graph run (biome pick → randomised 4–6 nodes → Poké Center → next biome, per-run
+randomised **Town Map**, depth-scaled foes), the full **roster** (party of 6, both post-battle acquisition
+channels — themed draft + boss catch, between-biome lead choice, forced faint-switch, and the voluntary
+**In-Combat Switching**), the **Run Economy** (gold + rewards + the spend-gold **Shop node**), the **Reward
+Choice** modal, the **level-aware XP curve + trainer bonus + Innate Party XP Share**, **Creature Naming** (a
+cancelable nickname on every acquisition path), **Session Resume** (refresh/reopen-safe `gameId` persistence),
+the **CHECK POKEMON party-member picker**, the **Settings Menu** (sound volume + a three-tier difficulty/XP-pace
+dial), and **Generation Profile** Stages 1–4c (the generation axis, content scoping, and the Kanto
+Sage-skinned Town Map) are all done and archived (→ `TODO_ARCHIVE.md`).
 
-**Next up — tiered 2026-09-12 after a full pass over every open item in this file.** Tiers are ordering, not
-strict sequence — 0/1 are quick/parallel-track and don't block anything below them; 2 is a standing
-user-sequenced commitment (2026-08-04) that stays ahead of 4/5 regardless.
+**Next up — tiered, restructured 2026-09-27 after a full pass over every open item in this file** (the
+2026-09-12 tiering's Tiers 0/1/3/3b are now fully shipped and archived, and are folded out of the list below —
+see `TODO_ARCHIVE.md` for their full records). Tiers are ordering, not strict sequence: Tier 1 is a standing
+user-sequenced commitment (2026-08-04) that stays ahead of Tiers 2–3 regardless; the rest is priority, not a
+hard dependency chain.
 
-- **Tier 0 cleared (2026-09-12).** Both trivial zero-risk items — the route-choice bottom-legend deletion and
-  the Town Map scatter-tile + town-marker white-background fix — shipped same day; see `TODO_ARCHIVE.md`.
-- **Tier 1 — fully cleared (2026-09-13).** The poison-tick-vs-same-turn-faint item is **fully resolved** — both
-  the original end-of-turn-residual bug and the Hyper Beam recharge-on-KO companion bug it led to finding during
-  review are fixed (see `TODO_ARCHIVE.md`). The Fearow level-11-at-player-23 report is **closed** — investigated
-  and documented (`ENCOUNTER_DESIGN.md` §3.3), confirmed working as coded, and the `[50%, 80%]`-of-live-level
-  band was **accepted as-is by the user (2026-09-20)**; see `TODO_ARCHIVE.md` → *Wild encounter level far below
-  the player's*. *(A follow-on finding — Gen 1 has no end-of-turn residual phase, so `Battle`'s turn shape
-  differs — surfaced 2026-09-20 and is tracked, **unscheduled**, in *Known Gaps*; it does not reopen this tier.)*
-- **Tier 2 — Generation Profile Stage 4d+** (the jointly-iterated surface catalog) — make Gen 1 an explicit,
+- **Tier 1 — Generation Profile Stage 4d+** (the jointly-iterated surface catalog) — make Gen 1 an explicit,
   swappable profile so a generation switch changes content, menus and look, not just battle math. **`/plan`
   DONE (2026-07-29; Stage 4 re-planned as v2 on 2026-07-31)** — full design in
   [`GENERATION_PROFILE.md`](GENERATION_PROFILE.md). **Stages 1–3 complete; Stage 4: 4a/4b/4c shipped, 4d+
   open** (Stage 5 is the standing falsification rule) — task entry + staging below. **Sequenced ahead of Tiers
-  4–5 (2026-08-04, user's call).**
-- **Tier 3 — fully shipped (2026-09-16).** All three items are done, full records in `TODO_ARCHIVE.md`: the
-  CHECK POKEMON party-member picker **shipped complete 2026-09-16**; refresh/reconnect-safe session handling
-  (the lightweight `gameId`-persistence option; the heavy `save.db` option stays Tier 5) shipped complete
-  2026-09-14 as **Session Resume**; Creature Naming/nickname on acquisition shipped complete 2026-09-14
-  (Stages A + B).
-- **Tier 3b — In-Battle Item Party-Targeting — shipped complete (2026-09-18).** Healing/StatusCure/PpRestore
-  items can now target any living party member from the bag, matching Revive's existing fainted-only
-  party-target screen. **BattleStatBoost (X-items/Guard Spec/Dire Hit) is explicitly excluded** — Gen 1 has
-  no per-party-member stat-stage storage, so that category still always targets the active creature only,
-  with no party-selection screen. Full record in `TODO_ARCHIVE.md`.
-- **Tier 4 — Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by the acquisition
+  2–3 (2026-08-04, user's call).**
+- **Tier 2 — Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by the acquisition
   channels. Bag-scope decision (per-run vs. meta-progression) first, then `BallItemEffect`/catch
   formula/animation. *(Item acquisition itself is already done via the Run Economy; bag persistence + catch
   remain.)*
-- **Tier 5 — Game Loop & Progression** — progressive difficulty (good pairing point for the remaining
-  stone-evolution encounter-level design question, narrowed 2026-09-18 — see *Known Gaps* — after the
-  level/trade-gated half shipped as **Species selection respects each species' evolution-chain floor**), the
-  `PlayerSave`/`save.db` layer (+ the heavy session-handling option), Stone evolutions (waits on Catch above).
-  Party + between-biome lead + forced-switch are done.
-- **Tier 6 — opportunistic polish + test-infra loose ends:** Web UI Polish (move-specific animations, text
+- **Tier 3 — Game Loop & Progression** — progressive difficulty (good pairing point for the remaining
+  stone-evolution encounter-level design question — see *Known Gaps* — now that the level/trade-gated half has
+  shipped as **Species selection respects each species' evolution-chain floor**), the `PlayerSave`/`save.db`
+  layer (+ the heavier session-persistence option beyond the lightweight **Session Resume** already shipped),
+  Stone evolutions (waits on Catch above). Party + between-biome lead + forced-switch are done.
+- **Tier 4 — opportunistic polish + test-infra loose ends:** Web UI Polish (move-specific animations, text
   feel, sprite FX joint sketch, Escape=B-cancel, `ConsoleInput`), and the test-infra items below (CI E2E step, `data-testid`, visual-regression, the
   `evolution.spec.ts` gap, `GameSessionManager` connection-lifecycle coverage).
-- **Tier 7 — reference/housekeeping, no urgency:** Multi-Generation Data Model & Schema, User Documentation,
+- **Tier 5 — reference/housekeeping, no urgency:** Multi-Generation Data Model & Schema, User Documentation,
   and the "watch, don't refactor speculatively" Tech Debt items.
 
-*(**In-Combat Switching** — the voluntary, any-turn SWITCH turn-action — is **✅ COMPLETE (2026-07-25)**, all three
-stages (engine core / wire / frontend) shipped, including the out-of-PP menu affordance (BAG/SWITCH reachable at
-0 PP; Struggle only on a FIGHT choice). Full record archived in `TODO_ARCHIVE.md`.)*
-
-*(**Participation XP** — raised 2026-07-26 by shipping In-Combat Switching — is **✅ COMPLETE (2026-07-27)**:
-the win's XP is now split evenly among the live creatures that took the field, so a creature switched out
-mid-battle is no longer paid the flat bench share. The `/plan` fork was settled in favour of the Gen 1 even
-split; the resulting bench-share inversion is a user-accepted limitation, not open work. Full record in
-`TODO_ARCHIVE.md` → *Participation XP*.)*
-
-*(**Mutual KO ends the run even with a live bench** — found 2026-07-27 by `pr-review` — is **✅ COMPLETE
-(2026-07-28)**: the user settled the fork in favour of counting a trade-kill as the player's win — `Battle`
-now tracks the win independently of the finisher's own survival (`PlayerWon`), and `BattleRunEvent` promotes a
-surviving bench member to lead instead of ending the run. Full record in `TODO_ARCHIVE.md` → *Mutual KO ends the
-run even with a live bench*.)*
-
-*(**Switched-in creature is the active creature** — the end-of-battle-effects-are-party-wide requirement — is
-**✅ COMPLETE (2026-09-20)**: the last residual, a sweep of the post-battle path for stray starting-lead
-references, found none. Full record in `TODO_ARCHIVE.md` → *Switched-in creature is the active creature*.)*
-
-*(**Evolution nameplate/action-prompt lag** — found 2026-07-26 — is **✅ COMPLETE (2026-07-28)**: the nameplate
-and `"What will X do?"` prompt now retarget on `CreatureEvolved`, same as `BattleStarted`/`LeadChanged`/
-`CreatureSwitchedIn`. Full record in `TODO_ARCHIVE.md` → *Evolution nameplate doesn't follow until the next
-battle starts*. Two follow-ups it left open are now both closed: the sibling **party strip shows a stale name
-after an on-field evolution** defect is **✅ COMPLETE (2026-07-29)** — see `TODO_ARCHIVE.md` → *Party strip shows
-a stale name after an on-field evolution*; only the regression-insurance E2E coverage gap remains, tracked under
-*Browser-Based UI Testing* below.)*
-
-*(**Phase 4 shipped in full** — the roster, both acquisition channels, between-biome lead swap, and
-forced-switch-on-faint. Stage 3's end-of-battle defect (wrong requirement pins in its own plan, not the domain)
-is now **resolved** (2026-07-18) — evolution fixed, XP/Stat-Exp superseded by the Innate Party XP Share; see
-`TODO_ARCHIVE.md` → *Switched-in creature is the active creature* for the closing record.)*
-
-*(The **Run Economy** — gold, rewards, the transient bag, and the spend-gold **Shop node** — plus the
-**Encounter Map** route overlay and the **Difficulty easing** tuning pass are all done and archived
-(→ `TODO_ARCHIVE.md`).)*
+**Open, unplanned, not placed in the tier list above:** Gen 1 has no end-of-turn residual phase — `Battle`'s
+turn shape differs from the real games' (see *Known Gaps* below). Needs a `/plan` before it can be tiered.
 
 **E2E flakiness note** (kept for the lesson, not as open work): `status.spec.ts` **fixed 2026-07-15** — root
 cause was a spec asserting a transient badge, not an engine bug; see *Browser-Based UI Testing* for the
@@ -103,248 +55,11 @@ seed-≠-determinism lesson it taught. Still live: `endless-chain.spec.ts` *"a r
 failed once in a full 2026-07-26 suite run — no `Run over` log line after 1m10s — but passes in **7.3 s** run
 alone; consistent with the documented "a long run accumulates abandoned server-side runs" degradation, not a
 code defect. (Web UI polish, Multi-Generation groundwork, User Documentation, and test-infra items are Tiers
-6–7 above, not repeated here.)
+4–5 above, not repeated here.)
 
-**Settings Menu** — sound volume + difficulty→XP bonus both ✅ done, see its own section below; the difficulty
-dial's self-referential-scaling limitation is a known, user-waived follow-up, not open work.
-
----
-
-## Encounter Logic — Phase 4 ✅ COMPLETE (2026-07-15)
-
-Phases 1–3 (biome model + type-filtered pool, `IEnemyArchetype` tiers + depth bands, `RunDirector` event model
-+ live biome-graph map + tuned Boss-capped node curve) are **done and archived**, along with the four follow-on
-refinements — per-run biome-map randomisation, randomised 4–6 route length, Roar/Whirlwind→`ForceFlee`, and the
-opening-route favourable-matchup guarantee. Full per-phase record (design, pins, seam reviews) in
-[`TODO_ARCHIVE.md`](TODO_ARCHIVE.md) → *Encounter Logic*.
-
-**Phase 4 — Acquisition & the Roster** (the remaining `ENCOUNTER_DESIGN.md §4` piece, and the bridge into the
-*Item Acquisition · Bag Persistence · Catch* cluster below). **`/plan` done** (2026-07-12) — the full design
-below (session plan mirrored here for durability; the ephemeral copy was `kind-cooking-moler.md`).
-
-**Scope decisions locked with the user (2026-07-12):**
-1. **Proper roster** — a real party (up to 6, the Gen 1 ceiling), lead management, party UI. Not a minimal
-   collectible, not a single-slot swap.
-2. **Draft first, then catch** — ship the cheaper themed-draft channel first, the boss catch second.
-3. **Boss catch = a small post-win chance, NOT an in-battle ball throw.** "Beat the boss → small chance at a
-   catch event." The boss is defeated first (you keep the win XP/reward), then a small-% offer to add it. This
-   makes **both** channels post-battle acquisition offers reusing the reward-modal pattern — the in-battle Poké
-   Ball mechanic (`BallItemEffect`, catch-rate-vs-HP formula) is **out of scope** and stays deferred in the Catch
-   cluster below.
-
-**Architecture (what we reuse).** Two new run-layer primitives + one reusable offer:
-- **A `Party` container** threaded like `Bag`/`Wallet` (single instance: `EncounterFactory` → `RunSetup` →
-  `PendingSession` → `ActiveBattle.Party` → `RunState.Party`; GC'd on run end). `RunState.Player` stays "the
-  current **lead**" so `Battle` (which only knows one creature) is untouched.
-- **Fought-species tracking** — `RunState.FoughtSpeciesInBiome` (HashSet), populated per encounter in
-  `BattleRunEvent`, reset per biome in `RunDirector.Apply`.
-- **One reusable "acquisition offer"** — a new blocking prompt mirroring the **Reward Choice** wire end-to-end
-  (the ~13-leg path: `RunLoop` option records → `BattleEvents` `AcquisitionOffered`/`CreatureAcquired` →
-  `IBattleInput.ChooseAcquisitionAsync` → `SignalRInput` TCS + `Cancel()` → `RunDirector` emit/await/deposit →
-  `SignalRBattleEventEmitter` projection + `ProjectCreatureOption` → `BattleHub` → `GameSessionManager` route →
-  field-level `WebEventContractTests` guard → `timeline.ts`/`battleReducer.ts`/`useBattleHub.ts`/`BattleScreen`
-  modal). Both channels emit the *same* offer; only the *source* + how the offered creature is chosen differ.
-- **Gen-variable surface (DoR #3): none.** Party size 6, draft cadence, and the *n%* rates are run-layer tuning
-  (web-layer policy like `RewardCalculator`), NOT battle seams. Zero importer/DB change; transient (no `save.db`).
-
-**Staged build (each increment independently shippable + greenlit separately):**
-- [x] **Stage 1a/1b — roster foundation** ✅ DONE (2026-07-12, commit `4c2b9b2`): the `Party` container
-  (`creaturegame/Creatures/Party.cs` — `MaxSize` 6, `Lead`/`Add`/`IsFull`/`Replace`/`SetLead`), `RunState.Party`
-  (`Player` = the lead) + per-biome `FoughtSpeciesInBiome` tracking, and whole-party Poké Center recovery.
-  `RunDirector` owns the party internally for now (session threading lands with 1c's UI). Backend-only, no
-  wire/UI; covered by `PartyTests` + a `RunDirector` fought-accumulate/reset test. **Known deferral to 1c:**
-  whole-party heal is state-correct but only the lead's `PlayerRecovered` is emitted — the bench heal surfaces on
-  the wire with the `PartyUpdated` snapshot the panel needs (user-approved deferral).
-- [x] **Stage 1c — themed draft, end-to-end** ✅ DONE (2026-07-13): a post-win offer in `BattleRunEvent`
-  (`OfferDraftAsync`, after `GrantBattleRewardAsync`/evolution/status-capture), gated by cadence (every 3rd win)
-  × a 55% web-policy roll × non-empty fought pool (`DraftCalculator.ShouldOffer` — no RNG drawn on a non-cadence
-  win). The offered creature is built web-side by the injected `draftSupplier` (`EncounterFactory.BuildDraftSupplier`
-  → `BuildCreature` + `PickByBst` over the pool **intersected to `FoughtSpeciesInBiome`** — the fought-only
-  guardrail), scaled to lead/depth. Full acquisition-offer wire (`AcquisitionOffered`/`CreatureAcquired`/
-  `AcquisitionDeclined`/`PartyUpdated` + `IBattleInput.ChooseAcquisitionAsync` + `SignalRInput` TCS +
-  `AcquisitionResolution.OfferAndDepositAsync` + emitter projections & field-level `WebEventContractTests` guards +
-  `BattleHub.RespondAcquisition` + `GameController` `GET /party` hydrate + `timeline`/`battleReducer`/`useBattleHub`
-  + `BattleScreen` `PartyStrip` + `AcquisitionModal`). Deposit into `Party` (party-full ⇒ swap-out picker; a
-  server-side guard refuses swapping the **lead** — that's Stage 1d). The session owns the single `Party`
-  (`GameSessionManager` → `ActiveBattle.Party` → `RunState.Party`). **Stage 1a/1b deferral closed:** the
-  whole-party Poké Center heal now emits a `PartyUpdated` snapshot so benched members' restored HP reaches the
-  panel. Covered by `RunDirectorAcquisitionTests` (accept/decline-no-op/full-swap/lead-guard), `DraftCalculatorTests`
-  (cadence/empty-pool/roll boundary), `EncounterFactoryDraftTests` (fought-only build over the live DB),
-  `WebEventContractTests` field guards, and Vitest (reducer + timeline).
-- [x] **Stage 1d — lead-swap between biomes** ✅ DONE (2026-07-13) *(between-biome only — NOT in-combat)*: a
-  `ChooseLeadAsync` prompt at the biome boundary (after the Poké Center, before the next `BiomeChoiceEvent`), gated
-  on `Party.Count > 1` via a one-shot `RunState.LeadChoicePending` flag (set on the Poké Center outcome, cleared by
-  the `LeadChoiceEvent`) — reassigns `Party.Lead` (⇒ `RunState.Player`) for the next biome. Lead swaps need no
-  status reconciliation because this same stage **implemented the multi-creature carry model**: major out-of-battle
-  status now lives per-creature on `Creature.CarriedStatus` (replacing the old single-slot `RunState.CarriedStatus`),
-  so each benched member keeps its own ailment and the previous lead's status can never leak onto the switch-in
-  (`STATE_MODEL.md §2`; captured by `RunDirector`, cleared by `Creature.FullHeal` = the Poké Center). New `LeadChoiceOffered`/`LeadChanged` events + the full
-  wire (`IBattleInput.ChooseLeadAsync` + `SignalRInput` TCS + `GameSessionManager.SetLeadChoice` +
-  `BattleHub.ChooseLead` + emitter projections & field guards + `timeline`/`battleReducer`/`useBattleHub` +
-  `BattleScreen` `LeadChoiceModal`). Touches **nothing** in the battle engine (`Battle` still sees one creature per
-  side). Covered by `RunDirectorLeadChoiceTests` (reassigns-active-creature / boundary order / keep-current no-op /
-  out-of-range no-op / status-no-leak both surgically and end-to-end through a declined Poké Center / lone-starter
-  never-fires), `PartyTests` (`FullHeal` clears the carried ailment), `WebEventContractTests` field guards, and
-  Vitest (reducer + timeline). *(Interim faint
-  handling through Stages 1–2 stands: the lead fainting still ends the run.)* Switching mid-fight was a
-  **separate, larger** feature — **In-Combat Switching**, shipped 2026-07-25 (full record in `TODO_ARCHIVE.md`).
-- [x] **Stage 2 — boss catch (post-win chance)** ✅ DONE (2026-07-14): after a **Boss** win, a small *n%* roll
-  (`BossCatchCalculator.ShouldOffer`, 20%) → the **same** `AcquisitionOffered` with `source: "BossCatch"` and a
-  single option = a fresh full-HP copy of the defeated boss's species at the boss's level (built by
-  `EncounterFactory.BuildBossCatchSupplier`, with a learnset so it can level up if it later leads) → into the
-  `Party`. Backend-only — reuses all of 1c's offer + roster wire end-to-end (`AcquisitionResolution.OfferAndDepositAsync`,
-  the `AcquisitionOffered`/`CreatureAcquired`/`AcquisitionDeclined`/`PartyUpdated` events, the SignalR projection +
-  field guards, and the `AcquisitionModal`, which already renders the `BossCatch` source as "Catch!"). Threaded like
-  the draft supplier (`RunDirector` → `BattleRunEvent` → `GameSessionManager`). **One acquisition offer per win,
-  routed by tier:** a Boss win boss-catches, every other win themed-drafts (never both). The win reward/XP is
-  already applied, so the catch is pure upside. Covered by `RunDirectorAcquisitionTests` (accept/decline-no-op/
-  no-supplier/channel-distinctness), `BossCatchCalculatorTests` (roll boundary), and `EncounterFactoryBossCatchTests`
-  (full-HP boss-species copy over the live DB / roll-miss offers nothing).
-- [x] **Stage 3 — forced-switch-on-faint** ✅ DONE (2026-07-15) — the battle-seam party upgrade; `Battle` now holds
-  the party and, on the active creature's faint with a live bench member, blocks on a forced (non-dismissable)
-  switch-in modal → sends the chosen survivor in against the **same** enemy → continues; the run ends only when the
-  **whole party** is down. New `SwitchInOffered`/`CreatureSwitchedIn` events + `ChooseSwitchInAsync` input seam
-  (default = first live member) + `SignalRInput` TCS + `BattleHub.RespondSwitchIn` + emitter projections & field
-  guards + `timeline`/`battleReducer`/`useBattleHub` (`playerNameRef` retarget on switch-in) + `BattleScreen`
-  `SwitchInModal` + a `swapPlayerCreature` Phaser command (slide the incoming back-sprite in; new *true* species so
-  a later win's `resetPlayerSprite` keeps it). `BattleRunEvent` re-reads `s.Player` post-battle so win/loss and carried
-  status act on the **finisher**. No generation seam (gen-invariant); zero importer/DB change.
-  **Known defect, resolved 2026-07-18** — evolution used to be gated to the no-switch case (a switched-in
-  finisher that levelled up did not evolve), and XP/Stat-Exp went to the finisher alone. Both came from wrong pins
-  in this plan, not from the domain. Evolution is fixed (per-member pre-battle-level snapshot); XP/Stat-Exp
-  participation is superseded by the **Innate Party XP Share**, a deliberate roguelite deviation from the Gen-1
-  participant split. See `TODO_ARCHIVE.md` → *Switched-in creature is the active creature* for the closing
-  record.
-
-  **Two edges closed during the pre-finish gates (2026-07-15):** (1) **flee + faint on the same turn** — a
-  switch-in `continue`s past the end-of-turn flee gate, so a foe already scared off by Roar/Whirlwind would have
-  got a free turn against the incoming creature. The flee is now snapshotted *before* the faint branches and the
-  switch is gated on it (`!fledThisTurn && await TrySwitchInAsync()`): a fled foe means there's nobody to send
-  anyone in against, so the documented "a faint takes precedence (a KO is a real result)" ordering stands and the
-  battle ends as a loss (user-decided 2026-07-15). (2) **the CHECK POKEMON panel read the wrong creature** —
-  `ActiveBattle.Player` is captured at session claim and never reassigned, so `GET /api/game/{id}/player` showed
-  the *fainted* starter's sheet after a switch. Now resolved live through the new pure
-  `GameSessionManager.ActiveCreature(party, starter)` (= `party?.Lead ?? starter`, the `GetParty` precedent).
-  *(This debt predated Stage 3 — Stage 1d's between-biome swap already staled the read — but Stage 3 opened the
-  common mid-battle path into it; one fix closes both.)* The duplicated entry-status rule was also folded into a
-  single `Battle.ApplyEntryStatus` used by both the opening lead and the send-in.
-
-  Covered by `BattleForcedSwitchTests`
-  (switch/enemy-state-preserved / no-live-bench = loss / legacy single-creature / carried-status-no-leak /
-  stale-pick fallback incl. negative + out-of-range / party-wired **double-faint offers no switch** / incoming
-  **neither acts nor takes end-of-turn DoT** on its entry turn / **flee + faint** ends without a switch or a free
-  turn), `BattleForcedSwitchIdentityTests` (a **Transform**ed creature that faints into a switch is restored *as it
-  leaves* — the end-of-battle restore can't reach a benched creature; driven through the real moves DB),
-  `RunDirectorForcedSwitchTests` (run continues past a lead faint + `RunState.Player` tracks
-  the finisher / whole-party wipe ends the run), `ActiveCreatureResolutionTests` (the panel follows the lead across
-  a switch), `WebEventContractTests` field guards, Vitest (reducer +
-  timeline), and **E2E `forced-switch.spec.ts`** (seeded run → draft accepted → lead faints → forced modal with the
-  fainted member disabled → pick → "Go! X!", nameplate retargets, battle continues — the DoR's opportunistic E2E,
-  now actually covered). **The five Stage 1d / acquisition lead-identity tests that encoded the interim "lead faint ends the
-  run" model were updated to Stage-3 reality** — four in `RunDirectorLeadChoiceTests` (assert the lead-choice
-  effect via the battler record, not the post-wipe final lead) and `RunDirectorAcquisitionTests`'
-  `ThemedDraft_PartyFull_AcceptTargetingTheLead_IsRefusedAsADecline` (asserts the refused swap on the lead's
-  **slot**, `Members[0]`, instead of `Party.Lead` — `SetLead` moves `LeadIndex` only and never reorders, so the
-  slot assertion is exact where `Party.Lead` is now churned by the post-decline wipe's forced switches).
-  *(`CreatureSwitchedIn` also carries a `Level` beyond the signature sketched below — `TurnStarted` carries no
-  level and the nameplate needs it.)* This is the Battle-holds-party groundwork the voluntary **In-Combat
-  Switching** feature (shipped 2026-07-25, archived in `TODO_ARCHIVE.md`) built its SWITCH turn-action on.
-
-  **`/plan` (2026-07-14) — the design as built:** When the **active** creature faints and a bench member is
-  still alive, the run **does not end**: the player **picks** the replacement from a forced (non-dismissable)
-  party-select modal — "player chooses", the faithful Gen-1 forced-switch, decided with the user 2026-07-14 —
-  and it comes in against the **same (damaged) enemy**; the run ends only when the **whole party** is down.
-  **This is where `Battle` first learns about the party** — it must hold the benched creatures so it can bring in
-  the next one against the live enemy — and it is deliberately the *choose*-a-replacement path (not auto-send-next)
-  so it front-loads the in-battle party-select modal + `ChooseSwitchInAsync` prompt that **In-Combat Switching**
-  reused (forced + voluntary **share the send-in path**, exactly as designed — that later feature shrank to "add
-  the voluntary SWITCH turn-action trigger", with enemy-AI switching still a later refinement). `save.db` stays
-  beyond Phase 4.
-
-  **Design (the finalized `/plan`):**
-  - **Engine — `Battle` holds the party (the central change).** Add an optional `Party? playerParty = null`
-    constructor param (threaded from `BattleRunEvent` as `s.Party`); null keeps the legacy **single-creature**
-    behaviour (break-on-faint) so every direct `Battle` caller (tests, the endless chain) is untouched. Make the
-    today-readonly `PlayerCreature` a **reassignable** field (the active creature). The faint check already sits at
-    the clean **end-of-turn** boundary (after both actions + end-of-turn DoT/Leech), and the **enemy-faint (win)
-    check runs first** — so the forced switch only fires on the *isolated* new path **enemy alive + active creature
-    fainted**, leaving the existing **double-faint** semantics (`BattleRunnerTests.Runner_DoubleFaint…`) intact. On
-    that path: emit `CreatureFainted` (already fires) → if `playerParty` has a live bench member, restore the
-    outgoing creature's Mimic/Transform identity *before it leaves* (so a transformed-then-fainted mon can't leak
-    its copied moveset/stats), block on `ChooseSwitchInAsync`, then bring the chosen member in and **`continue`** the
-    turn loop against the same enemy; if **no** bench member is alive, `break` as today (loss). Bringing a member in
-    = `party.SetLead(index)` (⇒ `RunState.Player` and the director's `while (Player.IsAlive())` guard "just work") +
-    reassign `PlayerCreature` + `ResetBattleState()` + re-apply **that creature's own** `CarriedStatus` (same as the
-    battle-start entry-status path) + emit `CreatureSwitchedIn` + `PartyUpdated`. The replacement **does not act**
-    the turn it enters (the turn already resolved) and takes **no** end-of-turn DoT that turn (freshly reset) —
-    canonical Gen 1; it acts normally next turn, and the enemy gets **no** free hit.
-  - **Input seam.** `IBattleInput.ChooseSwitchInAsync(SwitchInContext) -> int` (index of the chosen live member),
-    with a **default** that returns the first live bench member — so `AutoSelectInput` / the AI / headless tests
-    never stall and never send in a fainted mon. `SignalRInput` adds the TCS handshake (mirrors the mid-battle
-    `ChooseMoveToForgetAsync` and the `ChooseAcquisitionAsync`/`ChooseLeadAsync` prompts); `Cancel()` faults it on
-    disconnect. Called from **inside `Battle`** via `_playerInput` (like the move/forget prompts), not from a
-    `RunEvent`. A stale / out-of-range / **dead** pick falls back to the first live member (never strands, never
-    sends in a fainted creature).
-  - **Events + wire (mind the recurring web-event field-projection gap — memory `web_event_field_projection_gap`):**
-    two new `BattleEvent`s, each needing its `SignalRBattleEventEmitter` projection **and** a field-level
-    `WebEventContractTests` guard — `SwitchInOffered(PartyMemberView[] party, string faintedName)` (client raises the
-    forced modal; reuses `PartyProjection.Snapshot`) and `CreatureSwitchedIn(name, speciesId, hp, maxHp, status)`
-    (client swaps the canvas sprite + nameplate and logs "… was sent out!"), plus the existing `PartyUpdated`
-    snapshot. Named `CreatureSwitchedIn` to align with In-Combat Switching's planned `CreatureSwitchedOut/In` (the
-    "switched out" here **is** the `CreatureFainted` already emitted). `BattleHub.RespondSwitchIn(int)` completes the
-    TCS; `GameSessionManager` routes it.
-  - **Frontend — provisional-pending-refinement (flag per `feedback_plan_durability_and_iteration`).** Shape:
-    `timeline.ts` arms `SwitchInOffered` (raise modal / pause) + `CreatureSwitchedIn` (sprite-swap + nameplate + log)
-    + `PartyUpdated`; `battleReducer.ts` sets a forced-switch-pending flag (gates the modal) and updates the active
-    nameplate/sprite/HP on switch-in; `useBattleHub.ts` adds `respondSwitchIn(index)`; a new **forced (non-closable)**
-    `SwitchInModal` reuses `PartyStrip`/`AcquisitionModal` styling — live members selectable, fainted greyed &
-    disabled; a Phaser `BridgeCommand` swaps the player sprite to the new species. Finalize the exact component split
-    at implementation time.
-  - **DoR #3 — gen-variable surface: none.** Forced faint-switch (a fainted mon is replaced; no free hit; no
-    turn-order or partial-trap question — those are *voluntary*-switch concerns owned by In-Combat Switching) is
-    generation-invariant. No `IBattleRules`/`ITypeChart`/`IStatCalculator` touched; satisfies `GENERATION_SEAMS.md`
-    §5.0 trivially. Zero importer/DB change; transient (no `save.db`).
-  - **DoR #4 — Gen-1 truth:** incoming resets **volatiles** (stat stages, confusion, Leech Seed, binding, …) but
-    **keeps its own major status** (the carry model — status can't leak from the outgoing mon); replacement doesn't
-    act the entry turn; enemy keeps its HP/status/stages. Post-win, `BattleRunEvent` captures `CarriedStatus` on
-    `s.Player` = the (possibly switched-in) finisher; the fainted member stays at 0 HP on the bench until the next
-    Poké Center `FullHeal` — and the Poké Center caps each biome **before** the between-biome lead choice, so a
-    fainted member is always healed before it can be re-picked as lead.
-    > ⚠️ **This bullet previously pinned two rules that were WRONG** — "XP/Stat-Exp to the finisher only … the DoR's
-    > *only the lead earns XP (no Exp Share)* … **not** a deviation" and an evolution gate. Both were invented by
-    > this plan, not by the domain, and `requirements-review` returned MET because the code faithfully matched the
-    > plan. Corrected by the user 2026-07-15, **resolved 2026-07-18** → see `TODO_ARCHIVE.md` →
-    > *Switched-in creature is the active creature*. Kept visible rather than silently deleted: the wrong pin is why the defect shipped.
-  - **DoR #6 — tests must assert:** (Battle) active faints + live bench ⇒ chosen member sent in, **enemy state
-    preserved**, loop continues; active faints + no live bench ⇒ loss; incoming `BattleState` reset + its own
-    `CarriedStatus` applied (**status-no-leak** from the outgoing); incoming **doesn't act** its entry turn;
-    stale/out-of-range/**dead** pick ⇒ fallback to first live member; **double-faint semantics unchanged**. (Director)
-    run continues past a lead faint with a live bench and **ends when the whole party is down**; `RunState.Player`
-    tracks the switched-in creature; post-win capture on the finisher. (Wire) `SwitchInOffered` + `CreatureSwitchedIn`
-    **field-level** projection guards. (Vitest) reducer switch-in transition + timeline arms. (E2E, opportunistic) a
-    seeded run: lead faints → forced modal → pick a replacement → battle continues.
-  - **DoR #7 — dependencies:** builds directly on Stages 1a–2 (the `Party`, carry model, and acquisition/lead wire
-    precedents). Independent of `save.db`. It is the prerequisite for **In-Combat Switching** (Battle-holds-party).
-
-**DoR #6 — quirks the tests must assert:** fought-only guardrail (never offer an un-fought species; set resets on
-biome change ✅ done); cadence + **never a dead offer** when the fought pool is empty; roster cap 6 + party-full
-swap; **decline is a sequencing no-op** (`RunDirector` order test); each new offer event **field-level** projects
-over SignalR (field guard, not just the type-map test); lead-swap reassigns the active creature deterministically;
-whole-party heal ✅ done; (Stage 2) boss-catch chance + boss into party while win XP/reward still applied;
-(Stage 3) forced-switch when the bench has a live creature vs. run-loss when it doesn't. **DoR #4 (Gen-1 truth):**
-party size 6; **every creature that levelled shares in evolution, and the whole living party shares in XP/Stat-Exp**
-(see `TODO_ARCHIVE.md` → *Switched-in creature is the active creature*, resolved 2026-07-18 — the earlier "only the lead earns XP (no
-Exp Share)" pin was wrong; the eventual fix was the **Innate Party XP Share**, a deliberate deviation from the
-literal Gen-1 participant split, not a re-implementation of it); major status persists on benched creatures per
-the carry model.
-
-**Out of scope this phase:** the in-battle Poké Ball throw + `BallItemEffect` + catch-rate-vs-HP formula (stays
-in the Catch cluster below); `save.db`/`PlayerDbContext` persistence + cross-run meta-progression; the **Exp.
-Share / Exp. All item** (a held item that pays a *non-participant* — distinct from the innate party-wide XP share
-that shipped 2026-07-18, see `TODO_ARCHIVE.md` → *Switched-in creature is the active creature*). *(Revive, which needed a
-fainted-but-revivable party member, shipped 2026-07-19 on top of this stage's `Party` — see `TODO_ARCHIVE.md` →
-Revive Items. Voluntary in-battle switching — its own planned core feature at the time — shipped 2026-07-25 as
-**In-Combat Switching**; see `TODO_ARCHIVE.md`.)*
+**Settings Menu** — sound volume + difficulty→XP bonus, both shipped and archived (→ `TODO_ARCHIVE.md` →
+*Settings Menu — sound volume + difficulty (XP bonus) controls*); the difficulty dial's self-referential-scaling
+limitation is a known, user-waived follow-up, not open work.
 
 ---
 
@@ -377,7 +92,9 @@ itself (via the Run Economy, below). Bag persistence and catch are what remain o
 ### 1 — Item acquisition (the design gate) · ✅ DONE via Run Economy
 - [x] The item-acquisition model is the **Run Economy** (see archive): battle-win drops + Treasure/Mystery
   rewards, gated by the web-layer `RewardCalculator` (skewed rates so a lucky early haul can't trivialise a run),
-  replacing the fixed loadout. *(A between-encounter **Shop** — spending gold — is the remaining follow-up.)*
+  replacing the fixed loadout. The between-encounter **Shop node** (spending gold) also shipped and is archived
+  (→ `TODO_ARCHIVE.md` → *Run Economy — gold, item rewards, transient bag & Treasure/Mystery nodes*, "Shop node"
+  follow-up). Nothing remains open under this heading.
 
 ### 2 — Bag persistence · once acquisition defines what a bag holds
 - [ ] Persist the `Bag` to `save.db` / `PlayerDbContext` (rides on the broader save layer — see **Game Loop**).
@@ -397,13 +114,6 @@ itself (via the Run Economy, below). Bag persistence and catch are what remain o
 
 ---
 
-*(**Creature Naming — nickname on acquisition (session-scoped)** — is **✅ COMPLETE (2026-09-14)**: every
-acquisition path (starter, themed draft, boss catch) now offers a cancelable nickname step, session-scoped,
-10-char cap with silent truncation, preserved across evolution. Full record in `TODO_ARCHIVE.md` → *Creature
-Naming — nickname on acquisition (session-scoped)*.)*
-
----
-
 ## Game Loop & Progression
 
 **Prerequisites:** Catch Mechanic, `PlayerDbContext` / `save.db`. Intentionally deferred until combat fidelity
@@ -412,8 +122,9 @@ slice; the items below are what it deliberately leaves out.
 
 - [ ] Catch → Pokémon added to party (up to 6). **The roster half is done** — the `Party` container, both
   post-battle acquisition channels, the between-biome lead choice and the forced faint-switch all shipped in
-  **Encounter Logic Phase 4** (Stages 1a–3 ✅, complete 2026-07-15). What remains here is only the **in-battle
-  ball throw** as a third acquisition channel — see the Catch cluster above; it deposits into the existing `Party`.
+  **Encounter Logic Phase 4** (Stages 1a–3 ✅, complete 2026-07-15; full record archived in `TODO_ARCHIVE.md`).
+  What remains here is only the **in-battle ball throw** as a third acquisition channel — see the Catch cluster
+  above; it deposits into the existing `Party`.
 - [x] **Voluntary in-battle switching** — a SWITCH turn action to swap the active creature mid-fight. ✅ DONE
   (2026-07-25) as **In-Combat Switching** (all three stages incl. the out-of-PP menu affordance); full record
   archived in `TODO_ARCHIVE.md`.
@@ -422,95 +133,12 @@ slice; the items below are what it deliberately leaves out.
 - [ ] `PlayerSave` / `SavedCreature` models in `save.db`; auto-save after each battle; party-management UI.
 - [x] **Refresh/reconnect-safe session handling** — the lightweight `gameId`-persistence option. ✅ DONE
   (2026-09-14) as **Session Resume**; full record archived in `TODO_ARCHIVE.md`. The heavier `PlayerSave`/
-  `save.db` option (survives a server restart/redeploy, not just a client refresh) stays deferred to Tier 5.
+  `save.db` option (survives a server restart/redeploy, not just a client refresh) stays deferred to Tier 3
+  (this section).
 - [ ] **Stone evolutions** — the only remaining evolution piece, gated on the bag (Catch). The `Stone` trigger
   + `IEvolutionRules.StoneUsed` are built and dormant.
 - [x] **Cross-encounter status persistence** — DONE (2026-06-10); major status carries across chain encounters,
   volatiles reset per battle. See `STATE_MODEL.md §2` and `TODO_ARCHIVE.md`.
-
----
-
-*(**Session Resume — refresh/reopen-safe `gameId` persistence** — is **✅ COMPLETE (2026-09-14)**: all five
-planned pieces shipped (persisted `activeGame` localStorage entry, `BattleScreen` nav-state fallback, the Title
-Screen CONTINUE button, the `AttachConnection`/`HubException` silent-hang fix, and failed-resume UX), plus two
-further real bugs found and fixed live during manual in-browser verification — a full-remount reconnect deadlock
-(fixed via `SignalRBattleEventEmitter` caching + replaying the state-establishing events) and a
-`HubException`-fires-too-late-to-reject-`conn.start()` bug (fixed via a `conn.onclose` handler). A `pr-review`
-pass then caught the replay cache only covering `BattleStarted`/`TurnStarted` — extended to the run-scoped
-`RegionMapRevealed` and biome-scoped `BiomeEntered`/`BiomeNodePlanRevealed` too, plus a design-doc gap
-(`ARCHITECTURE.md` §2.7's new "Session resume corollary") and three recommended fixes (a real thread-safety bug
-in the cache, a test pin for the reconnect wiring, a flaky-test fix). One deliberately out-of-scope gap remains,
-not a defect in what shipped: a refresh while a between-node blocking prompt (not an active run/biome/battle) is
-open still hangs, unchanged from before this feature — tracked under *Known Gaps* below. Full record in
-`TODO_ARCHIVE.md` → *Session Resume — refresh/reopen-safe `gameId` persistence*.)*
-
----
-
-## Settings Menu — sound volume + difficulty (XP bonus) controls
-
-**`/plan` done (2026-07-21).** Two independent slices, neither touches a generation seam.
-
-- **Sound volume.** `AudioEngine.ts` had no volume control at all — every sound hardcoded a literal gain
-  straight to `a.destination`. Added one persistent `masterGain` node every sound now routes through, plus
-  `setMasterVolume`/`getMasterVolume` (clamped 0–1). New `utils/settings.ts` persists to `localStorage`
-  (`creaturegame.settings`, `{ masterVolume }`, default `1.0` = unchanged historical behaviour); applied once
-  at boot in `main.tsx` before any sound plays — `setMasterVolume` only records a pending value until the
-  AudioContext actually exists (first sound played), so applying a persisted setting at load never trips the
-  browser's autoplay-policy warning pre-gesture. The actual controls live in a shared `SettingsPanel`
-  component with two chrome wrappers: a full-page `/settings` route (`SettingsScreen.tsx`) reached via a
-  `.settings-gear-btn` corner icon on `TitleScreen`, and a `SettingsModal` (in `components/modals/`, the
-  Modal component's first real use of its escapable `{ onEscape }` dismiss — nothing here parks a
-  server-side await, so closing costs nothing) reached via the same icon in-battle.
-  > **Real trap hit and fixed during build:** the in-battle icon originally did a page `nav('/settings')`
-  > like the Title Screen one. That unmounts `BattleScreen`, tearing down its live SignalR connection —
-  > `GameSessionManager.AttachConnection`'s reconnect path resumes the *transport* but never replays the
-  > accumulated battle state into a fresh component, so returning left the screen stuck on "Connecting…"
-  > (and intermittently crashed on a stale-state read). Fixed by keeping `BattleScreen` mounted and opening
-  > `SettingsModal` as local state instead — verified in-browser: settings opened and closed mid-battle,
-  > the same `RAZOR LEAF` attack still resolved correctly afterwards. The Title Screen's plain page nav is
-  > fine as-is (no live session to protect there).
-- **Difficulty → XP bonus.** `RunRules` (`creaturegame/Combat/RunRules.cs`) is already the sanctioned knob for
-  this — its own doc comment says it exists to be "trivially exposable as sliders," deliberately outside
-  `IBattleRules`/`ITypeChart`/`IStatCalculator`. Today it's one hardcoded `RunTuning` static in
-  `GameSessionManager.cs` (`XpMultiplierEarly=1.5, XpMultiplierLate=4.5, BenchXpShare=0.5`). Plan: three named
-  presets (Easy/Normal/Hard) — Normal = today's live numbers unchanged (a true no-op regression-wise) —
-  threaded exactly like `Level`/`Seed`: `StartGameRequest.Difficulty` → `GameController.Start` →
-  `RegisterSession` → `PendingSession` → `AttachConnection` picks the matching preset instead of the static.
-  Frontend: a 3-position segmented control (not a raw range input — 3 named tiers, not a continuum) next to
-  the existing Level slider on `StarterSelection.tsx`, default Normal, sent in the `/api/game/start` body.
-  **Per-run, not a global default** — matches how Level/Seed already work; no new persistence needed.
-- **DoR:** gen-variable surface is **none** for both (volume is pure presentation; difficulty only touches
-  `RunRules`, already documented as living outside every seam) — no importer/DB change, no `save.db` need
-  (volume is `localStorage`; difficulty is a per-run request param like Level/Seed). Independent of every
-  other in-flight feature.
-
-- [x] **Sound volume** ✅ DONE (2026-07-21) — `AudioEngine.ts` master-gain plumbing (+ `AudioEngine.test.ts`),
-  `utils/settings.ts` (+ `settings.test.ts`), the shared `SettingsPanel`, `SettingsScreen.tsx` + `/settings`
-  route, `SettingsModal.tsx`, gear-icon entry points on `TitleScreen` (nav) + `BattleScreen` (modal — see the
-  trap above). Verified live in-browser (persistence across reload, in-battle modal, post-modal attack).
-  A follow-up gap surfaced independently the same day: Phaser's own `SoundManager` plays OGG cry files
-  through a pipeline separate from `AudioEngine`'s Web Audio graph, so the master-gain node never reached
-  it — fixed by scaling the cry's playback volume by `Audio.getMasterVolume()` in `BattleScene.ts`.
-- [x] **Difficulty → XP bonus** ✅ DONE (2026-07-22) — `Difficulty` enum (Easy/Normal/Hard) +
-  `RunTuningByDifficulty` presets in `GameSessionManager.cs` (Normal reproduces the old hardcoded `RunTuning`
-  exactly — verified byte-for-byte in `DifficultyTests.cs`, a true no-op), threaded via `StartGameRequest` →
-  `GameController.ParseDifficulty` (case-insensitive, falls back to Normal) → `RegisterSession` →
-  `PendingSession` → `AttachConnection`, plus the `StarterSelection.tsx` segmented control. Both `ParseDifficulty`
-  and the preset lookup (`GameSessionManager.RunRulesFor`) are `internal` specifically so `DifficultyTests.cs`
-  exercises the real code path, not a duplicate — a gap `requirements-review` caught (no test had touched
-  either). Verified end-to-end in-browser: HARD selected → POST body carries `"difficulty":"Hard"` → run
-  starts normally. 1388/1388 .NET (was 1377), 168/168 Vitest, TypeScript clean.
-  > **Known limitation, deliberately shipped as-is (user-waived 2026-07-22):** `requirements-review` found
-  > that wild-encounter strength is *self-referential* — `EncounterFactory.ScaleTargetBst` is
-  > `playerBst + depth×10` and `ScaleWildLevel` is a window on the player's *own current level*, both
-  > re-derived from the player's live progression every encounter. So a faster XP pace doesn't make any
-  > single fight easier in relative terms — the enemy always re-scales to match whatever level/BST the
-  > player currently sits at (and faster evolution can pull in higher-BST species sooner). The dial
-  > genuinely only changes *leveling pace*, not combat challenge, despite being labeled "Difficulty." This
-  > is exactly what was asked for (an XP-rate dial), so the mechanic ships under that label unchanged.
-  > **Flagged to flesh out later:** either rename to something honest ("Leveling Pace") or add a real
-  > difficulty-shaping axis independent of the self-referential scaling (e.g. a flat enemy level/BST offset
-  > that doesn't re-normalize to the player) — not scheduled, no target date.
 
 ---
 
@@ -1321,8 +949,8 @@ findings" as an open section.)*
   the last `BattleStarted`/`TurnStarted`, so a refresh reattaches cleanly mid-battle but a refresh while a
   route-choice, shop, reward-choice, recovery, acquisition, lead-choice, or switch-in prompt is open still hangs
   on "Connecting…" — unchanged from before this feature, not a regression it introduced. Deliberately
-  out-of-scope for the lightweight Tier-3 resume feature; would need each blocking-prompt event cached/replayed
-  the same way, or folded into the heavier `save.db`-backed resume (Tier 5).
+  out-of-scope for the lightweight Session Resume feature; would need each blocking-prompt event cached/replayed
+  the same way, or folded into the heavier `save.db`-backed resume (Tier 3 — Game Loop & Progression).
 - ~~**Possible bug: poison-tick timing vs. a same-turn faint**~~ — **RESOLVED 2026-09-13**: poison ticking the
   turn it's applied is correct Gen-1 behaviour (not a bug); end-of-turn residual (poison/burn/Leech Seed) still
   firing for the survivor after either side had already fainted from a direct hit that same turn **was** a real

@@ -406,7 +406,8 @@ biome — already on-theme, and impossible to roll something far outside the ban
   `TODO.md`, and the dormant **stone evolutions** (a bag-gated acquisition consumer).
 
 > **Status (2026-07-14):** both channels are **shipped** — themed draft (Phase 4 Stage 1c) and boss catch
-> (Phase 4 Stage 2). Full per-stage record in `TODO.md` → *Encounter Logic Phase 4*.
+> (Phase 4 Stage 2). Full per-stage record in `TODO_ARCHIVE.md` → *Encounter Logic — Phase 4 — Acquisition &
+> the Roster*.
 
 ---
 
