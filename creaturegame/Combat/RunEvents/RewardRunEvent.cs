@@ -25,7 +25,8 @@ internal sealed class RewardRunEvent(
                 kind,
                 EnemyLevel: 0,
                 ctx.State.RunDepth,
-                PlayerCondition.From(ctx.State.Player)
+                PlayerCondition.From(ctx.State.Player),
+                ctx.State.Party
             ),
             ctx.Rng ?? SystemRandomSource.Instance
         );

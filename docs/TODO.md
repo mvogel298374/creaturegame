@@ -4,7 +4,7 @@
 > history of a finished item. **See also:** `CLAUDE.md` (setup/commands) · `AI_CONTEXT.md` (profiles) ·
 > `DESIGN_GUIDES.md` (mechanics) · `DEV_STANDARDS.md` (conventions).
 
-## Current state (2026-09-27)
+## Current state (2026-09-28)
 
 The Gen 1 battle engine is **feature-complete** (all 165 moves, XP & level-up, learnsets, AI move selection,
 EV / Stat-Exp gain, evolution, in-battle item system incl. **Revive/Max Revive** and full party-targeting for
@@ -13,11 +13,12 @@ Healing/StatusCure/PpRestore/Revive), and the roguelite run layer on top is play
 randomised **Town Map**, depth-scaled foes), the full **roster** (party of 6, both post-battle acquisition
 channels — themed draft + boss catch, between-biome lead choice, forced faint-switch, and the voluntary
 **In-Combat Switching**), the **Run Economy** (gold + rewards + the spend-gold **Shop node**), the **Reward
-Choice** modal, the **level-aware XP curve + trainer bonus + Innate Party XP Share**, **Creature Naming** (a
-cancelable nickname on every acquisition path), **Session Resume** (refresh/reopen-safe `gameId` persistence),
-the **CHECK POKEMON party-member picker**, the **Settings Menu** (sound volume + a three-tier difficulty/XP-pace
-dial), and **Generation Profile** Stages 1–4c (the generation axis, content scoping, and the Kanto
-Sage-skinned Town Map) are all done and archived (→ `TODO_ARCHIVE.md`).
+Choice** modal (now including **TM/HM — Move-Teach Rewards**, a second move-acquisition channel offering a
+legal TM move as a reward-card pick — no HMs), the **level-aware XP curve + trainer bonus + Innate Party XP Share**,
+**Creature Naming** (a cancelable nickname on every acquisition path), **Session Resume** (refresh/reopen-safe
+`gameId` persistence), the **CHECK POKEMON party-member picker**, the **Settings Menu** (sound volume + a
+three-tier difficulty/XP-pace dial), and **Generation Profile** Stages 1–4c (the generation axis, content
+scoping, and the Kanto Sage-skinned Town Map) are all done and archived (→ `TODO_ARCHIVE.md`).
 
 **Next up — tiered, restructured 2026-09-27 after a full pass over every open item in this file** (the
 2026-09-12 tiering's Tiers 0/1/3/3b are now fully shipped and archived, and are folded out of the list below —
@@ -951,45 +952,13 @@ findings" as an open section.)*
   on "Connecting…" — unchanged from before this feature, not a regression it introduced. Deliberately
   out-of-scope for the lightweight Session Resume feature; would need each blocking-prompt event cached/replayed
   the same way, or folded into the heavier `save.db`-backed resume (Tier 3 — Game Loop & Progression).
-- **Player-facing TM/HM items don't exist at all — a real Gen 1 mechanic with zero coverage. Found/written up
-  2026-09-27** while designing the Boss-moveset legality fix (now shipped — `TODO_ARCHIVE.md` → *Boss/Strong
-  "Optimal" moveset could hand a species moves it could never legally learn*; that fix reuses TM/HM *data*,
-  which is what surfaced how little of the actual TM/HM *feature* exists). Gen 1 TM/HM **learnability data** is
-  imported and used, but only to compute **enemy** movesets — `LearnMethod.Machine` rows feed the
-  `TmEnhanced`/`Optimal` enemy tiers (`ENCOUNTER_DESIGN.md` §3.6). There is no equivalent for the **player**;
-  the feature is fully unbuilt, not partially built:
-  - `ItemImport`/`ItemMapper` (`DATA_IMPORT.md` §4.5) **deliberately excludes** TMs from `items.db` — the
-    curated roster is "Gen 1 **battle-usable** items only" (Balls, healing, status cures, revives, PP restore,
-    X-items). A TM isn't used *in* battle, so it was scoped out for the same reason as evolution
-    stones/vitamins/Rare Candy/key items/berries — a real decision, not an oversight.
-  - `ItemCategory` (`creaturegame/Items/ItemCategory.cs`) has no `Tm` member and `ItemEffects` has no
-    corresponding `IItemEffect` — even if a TM row existed in `items.db` there's nothing to resolve it to.
-  - `MoveLearning.cs` (the level-up learn/replace flow shared by `Battle` and `RunDirector`) only ever calls
-    `Creature.MovesLearnedAtLevel` (a level-up lookup). There is no "teach an arbitrary legal move outside
-    battle" entry point anywhere — which is what using a TM fundamentally is.
-  Net: no TODO.md entry, no `/plan`, no design-doc section (`DESIGN_GUIDES.md` has no TM/HM material at all)
-  existed for this before now.
-  **Why it matters:** in real Gen 1, TMs are a core acquisition/build-crafting loop — buy or find a TM, teach
-  it to any species that can legally learn it, permanently expand what a run's party can do. Right now the
-  roguelite's only move-acquisition path for the player is natural level-up + evolution movesets, a materially
-  smaller design space than the source game, and a gap in the "true Gen 1 clone" principle (`CLAUDE.md` →
-  Design Principles) the same way the Boss-moveset bug was.
-  **Sizing (scoped, not a committed design — needs its own `/plan`):**
-  1. **Import** — TM/HM rows + which move each teaches (PokeAPI's `/machine/{id}` mapping; the id↔move link is
-     already latent in `LearnsetMapper`'s Machine-row logic, which currently only records *that* a species can
-     learn a machine move, not surfacing which physical TM item teaches it as a standalone catalog entry).
-  2. **Effect** — a new `ItemCategory.Tm` (or similar) + `IItemEffect` that opens the same move-replacement
-     prompt `MoveLearning` already has UI for, but from **outside battle** — a new bag-menu entry point, not a
-     battle turn action (today's `ItemEffects`/`ItemAction` are battle-scoped only).
-  3. **Legality** — reuse the species' `LearnMethod.Machine` learnset rows, the exact pool `TmEnhanced`/
-     `Optimal` already query, so a TM can never offer a move the target species can't legally learn.
-  4. **Scarcity/reusability** — Gen 1 TMs are **single-use**, consumed on teach (`GEN_DIFFERENCES.md`: "TMs
-     now have infinite uses" is a **Gen 4+** change, so Gen 1 fidelity means consuming the item). This ties
-     directly to Tier 2's still-undecided bag-persistence question (per-run vs. meta-progression) — TM
-     scarcity can't be designed until that lands.
-  5. **UI** — a bag surface to hold/select a TM and target a party member, which also waits on Tier 2.
-  Placed here rather than tiered: real design work (`/plan`) is needed before this can be sized into a tier,
-  and it's gated on Tier 2's bag-persistence decision regardless.
+- ~~**Player-facing TM/HM items don't exist at all**~~ — **SHIPPED 2026-09-28** as **TM/HM — Move-Teach
+  Rewards**: a reward-choice move-teach card (substituting an item-reward slot, not a bag item) + an
+  ABLE/NOT-ABLE "teach to a Pokémon?" party-target picker (a roguelite QoL improvement over real Gen 1, which
+  only tells you afterward — not a literal reproduction), reusing the existing forget-a-move flow. The
+  reward-choice design that emerged with the user dropped the item/bag/`ItemCategory` scope this write-up
+  originally assumed entirely — no physical TM item exists, so Tier 2 bag persistence was never a dependency.
+  Full record → `TODO_ARCHIVE.md` → *TM/HM — Move-Teach Rewards*.
 - ~~**Possible bug: poison-tick timing vs. a same-turn faint**~~ — **RESOLVED 2026-09-13**: poison ticking the
   turn it's applied is correct Gen-1 behaviour (not a bug); end-of-turn residual (poison/burn/Leech Seed) still
   firing for the survivor after either side had already fainted from a direct hit that same turn **was** a real

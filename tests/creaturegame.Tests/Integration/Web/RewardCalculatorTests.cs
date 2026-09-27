@@ -1,4 +1,6 @@
+using creaturegame.Attacks;
 using creaturegame.Combat;
+using creaturegame.Creatures;
 using creaturegame.Items;
 using creaturegame.Web.Battle;
 
@@ -504,6 +506,256 @@ public class RewardCalculatorTests
                 rng
             );
             Assert.Empty(choice.Options.OfType<HealRewardOption>());
+        }
+    }
+
+    // --- Move-teach (TM/HM — Move-Teach Rewards) -------------------------------------------------------------
+
+    private static Attack MakeMove(int id, string name, DamageType type, int power = 40) =>
+        new()
+        {
+            Id = id,
+            Name = name,
+            DamageType = type,
+            BaseDamage = power,
+            Accuracy = 100,
+            PowerPointsMax = 15,
+        };
+
+    private static Creature MakeMember(string name, int speciesId, DamageType type1) =>
+        new(name)
+        {
+            SpeciesId = speciesId,
+            Type1 = type1,
+            Level = 20,
+        };
+
+    [Fact]
+    public void RollMoveTeachOption_ReturnsNull_WhenTheDictionaryIsEmpty()
+    {
+        var party = new Party(MakeMember("CHARMANDER", 4, DamageType.Fire));
+        var moves = new[] { MakeMove(7, "Flamethrower", DamageType.Fire, 95) };
+
+        var option = RewardCalculator.RollMoveTeachOption(
+            party,
+            moves,
+            new Dictionary<int, IReadOnlyList<int>>(),
+            new SeededRandomSource(1)
+        );
+
+        Assert.Null(option);
+    }
+
+    [Fact]
+    public void RollMoveTeachOption_NeverOffersAMove_WithNoMachineRowForTheSpecies()
+    {
+        // The legality dictionary carries a real move for a DIFFERENT species (id 5) than the one in the party
+        // (id 4) — the quirk this pins: a species' own Gen 1 Machine learnset is the only door in, so no
+        // candidate is ever built from another species' legality leaking across.
+        var party = new Party(MakeMember("CHARMANDER", 4, DamageType.Fire));
+        var moves = new[] { MakeMove(7, "Flamethrower", DamageType.Fire, 95) };
+        var machineMoves = new Dictionary<int, IReadOnlyList<int>> { [5] = [7] };
+
+        var option = RewardCalculator.RollMoveTeachOption(
+            party,
+            moves,
+            machineMoves,
+            new SeededRandomSource(1)
+        );
+
+        Assert.Null(option);
+    }
+
+    [Fact]
+    public void RollMoveTeachOption_ExcludesAMemberThatAlreadyKnowsTheMove()
+    {
+        var member = MakeMember("CHARMANDER", 4, DamageType.Fire);
+        var move = MakeMove(7, "Flamethrower", DamageType.Fire, 95);
+        member.AddAttack(move); // already knows it — legal, but not a fresh teach
+        var party = new Party(member);
+        var machineMoves = new Dictionary<int, IReadOnlyList<int>> { [4] = [7] };
+
+        var option = RewardCalculator.RollMoveTeachOption(
+            party,
+            [move],
+            machineMoves,
+            new SeededRandomSource(1)
+        );
+
+        Assert.Null(option); // the only member in range is already-knows, so no candidate at all
+    }
+
+    [Fact]
+    public void RollMoveTeachOption_TrustsWhateverLegalityDictionaryItsGiven_HmExclusionIsUpstream()
+    {
+        // The HM exclusion moved to EncounterFactory.LoadMachineLearnsetsAsync (off GenerationProfile.HmMoveIds
+        // — see EncounterFactoryGenerationProfileTests for that falsification leg), so RollMoveTeachOption no
+        // longer filters by move id itself — it trusts the dictionary it's handed. This documents that contract
+        // rather than re-testing an exclusion that no longer lives here: a dictionary entry (even Surf, a real
+        // Gen 1 HM) is offered exactly as given.
+        var squirtle = MakeMember("SQUIRTLE", 7, DamageType.Water);
+        var party = new Party(squirtle);
+        var surf = MakeMove(57, "Surf", DamageType.Water, 90);
+        var machineMoves = new Dictionary<int, IReadOnlyList<int>> { [7] = [57] };
+
+        var option = RewardCalculator.RollMoveTeachOption(
+            party,
+            [surf],
+            machineMoves,
+            new SeededRandomSource(1)
+        );
+
+        Assert.NotNull(option);
+        Assert.Equal(surf.Id, option!.Move.Id);
+    }
+
+    [Fact]
+    public void RollMoveTeachOption_MarksOnlyTheEligibleMembersSlotAble()
+    {
+        // Slot 0 (Charmander) can legally learn Flamethrower and doesn't know it yet — ABLE. Slot 1 (Bulbasaur)
+        // has no Machine row for it at all — NOT ABLE, a different reason than "already knows it" but the same
+        // false verdict.
+        var charmander = MakeMember("CHARMANDER", 4, DamageType.Fire);
+        var bulbasaur = MakeMember("BULBASAUR", 1, DamageType.Grass);
+        var party = new Party(charmander);
+        party.Add(bulbasaur);
+        var move = MakeMove(7, "Flamethrower", DamageType.Fire, 95);
+        var machineMoves = new Dictionary<int, IReadOnlyList<int>> { [4] = [7] };
+
+        var option = RewardCalculator.RollMoveTeachOption(
+            party,
+            [move],
+            machineMoves,
+            new SeededRandomSource(1)
+        );
+
+        Assert.NotNull(option);
+        Assert.Equal(move.Id, option!.Move.Id);
+        Assert.True(option.AbleBySlot[0]);
+        Assert.False(option.AbleBySlot[1]);
+    }
+
+    // --- Gold-rarity scaling for a move-teach pick (requirements-review, 2026-09-28) ------------------------
+
+    [Fact]
+    public void ResolveBestRarity_TreatsMoveTeachAsRare_WhenNoItemSurvives()
+    {
+        var move = MakeMove(7, "Flamethrower", DamageType.Fire, 95);
+        var options = new List<RewardOption> { new MoveTeachRewardOption(move, [true]) };
+
+        Assert.Equal(RewardRarity.Rare, RewardCalculator.ResolveBestRarity(options));
+    }
+
+    [Fact]
+    public void ResolveBestRarity_AnEpicItemStillBeatsAMoveTeachsRareFloor()
+    {
+        var move = MakeMove(7, "Flamethrower", DamageType.Fire, 95);
+        var options = new List<RewardOption>
+        {
+            new MoveTeachRewardOption(move, [true]),
+            new ItemRewardOption(1, "Full Restore", RewardRarity.Epic),
+        };
+
+        Assert.Equal(RewardRarity.Epic, RewardCalculator.ResolveBestRarity(options));
+    }
+
+    [Fact]
+    public void ResolveBestRarity_FallsBackToCommon_WhenNothingRolled()
+    {
+        Assert.Equal(RewardRarity.Common, RewardCalculator.ResolveBestRarity([]));
+        Assert.Equal(
+            RewardRarity.Common,
+            RewardCalculator.ResolveBestRarity([new GoldRewardOption(10)])
+        );
+    }
+
+    // --- Boss Revive-slot protection (requirements-review, 2026-09-28) ---------------------------------------
+
+    [Fact]
+    public void RollRewardChoice_OnBoss_MoveTeachNeverDisplacesTheFirstItemSlot()
+    {
+        // The first Boss item slot is the one Revive can occupy; move-teach must always land in the second slot
+        // instead, so a Boss roll's Revive odds are the same whether or not move-teach fires this time.
+        var party = new Party(MakeMember("CHARMANDER", 4, DamageType.Fire));
+        var moves = new[] { MakeMove(7, "Flamethrower", DamageType.Fire, 95) };
+        var machineMoves = new Dictionary<int, IReadOnlyList<int>> { [4] = [7] };
+        var usable = RewardCalculator.UsableItems(FullCatalog());
+        bool sawMoveTeach = false;
+
+        for (int seed = 0; seed < 200; seed++)
+        {
+            var choice = RewardCalculator.RollRewardChoice(
+                new RewardContext(RunNodeKind.BossBattle, EnemyLevel: 40, Depth: 2, Party: party),
+                usable,
+                new SeededRandomSource(seed),
+                moves,
+                machineMoves
+            );
+            int moveTeachIndex = choice.Options.ToList().FindIndex(o => o is MoveTeachRewardOption);
+            if (moveTeachIndex < 0)
+                continue; // didn't fire this seed
+
+            sawMoveTeach = true;
+            Assert.NotEqual(0, moveTeachIndex); // never the first (Revive-eligible) slot
+        }
+
+        // At least one of 200 Boss seeds must have hit the 35% move-teach chance with this always-eligible
+        // party, or the test would be vacuously true.
+        Assert.True(sawMoveTeach);
+    }
+
+    [Fact]
+    public void RollRewardChoice_OffBoss_MoveTeachAlwaysSitsAtIndexZeroWhenItFires()
+    {
+        // The Boss slot rule above is Boss-only — every other tier is Revive-ineligible regardless
+        // (RollItemOption's own Boss-only gate), so move-teach keeps substituting the first slot there.
+        var party = new Party(MakeMember("CHARMANDER", 4, DamageType.Fire));
+        var moves = new[] { MakeMove(7, "Flamethrower", DamageType.Fire, 95) };
+        var machineMoves = new Dictionary<int, IReadOnlyList<int>> { [4] = [7] };
+        var usable = RewardCalculator.UsableItems(FullCatalog());
+        bool sawMoveTeach = false;
+
+        for (int seed = 0; seed < 200; seed++)
+        {
+            var choice = RewardCalculator.RollRewardChoice(
+                new RewardContext(RunNodeKind.Treasure, EnemyLevel: 0, Depth: 2, Party: party),
+                usable,
+                new SeededRandomSource(seed),
+                moves,
+                machineMoves
+            );
+            int moveTeachIndex = choice.Options.ToList().FindIndex(o => o is MoveTeachRewardOption);
+            if (moveTeachIndex < 0)
+                continue;
+
+            sawMoveTeach = true;
+            Assert.Equal(0, moveTeachIndex);
+        }
+
+        Assert.True(sawMoveTeach);
+    }
+
+    [Fact]
+    public void RollRewardChoice_WithNoEligibleMoveTeachCandidate_AlwaysFallsBackToAnOrdinaryItemRoll()
+    {
+        // An empty party/legality pairing must never roll a move-teach — it should behave exactly as if the
+        // party parameter had been omitted entirely (the existing null-Party tests above).
+        var party = new Party(MakeMember("CATERPIE", 10, DamageType.Bug)); // no Machine learnset at all
+        var moves = new[] { MakeMove(7, "Flamethrower", DamageType.Fire, 95) };
+        var machineMoves = new Dictionary<int, IReadOnlyList<int>>(); // nothing legal for anyone
+        var usable = RewardCalculator.UsableItems(FullCatalog());
+
+        for (int seed = 0; seed < 50; seed++)
+        {
+            var choice = RewardCalculator.RollRewardChoice(
+                new RewardContext(RunNodeKind.BossBattle, EnemyLevel: 40, Depth: 2, Party: party),
+                usable,
+                new SeededRandomSource(seed),
+                moves,
+                machineMoves
+            );
+            Assert.Empty(choice.Options.OfType<MoveTeachRewardOption>());
+            Assert.Contains(choice.Options, o => o is ItemRewardOption); // the first slot still rolled an item
         }
     }
 }

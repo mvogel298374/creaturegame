@@ -14,6 +14,7 @@ public sealed class SignalRInput : IBattleInput
     private volatile TaskCompletionSource<bool>? _evolutionTcs;
     private volatile TaskCompletionSource<string>? _biomeTcs;
     private volatile TaskCompletionSource<int>? _rewardChoiceTcs;
+    private volatile TaskCompletionSource<int?>? _moveTeachTargetTcs;
     private volatile TaskCompletionSource<ShopAction>? _shopTcs;
     private volatile TaskCompletionSource<AcquisitionDecision>? _acquisitionTcs;
     private volatile TaskCompletionSource<int>? _leadTcs;
@@ -254,6 +255,34 @@ public sealed class SignalRInput : IBattleInput
     }
 
     /// <summary>
+    /// Awaits the player's move-teach target pick: the party-member slot (an index into
+    /// <see cref="MoveTeachTargetContext.Party"/>) to learn the move, or <c>null</c> to decline. Same TCS
+    /// handshake as the other prompts (the hub's <c>RespondMoveTeachTarget</c> completes it via
+    /// <see cref="SetMoveTeachTargetChoice"/>); the <see cref="_cancelled"/> guard makes a disconnect throw
+    /// rather than hang the run on the picker. An ineligible / out-of-range slot is tolerated downstream — the
+    /// run loop's <c>RewardResolution</c> treats it as a no-op decline.
+    /// </summary>
+    public async Task<int?> ChooseMoveTeachTargetAsync(MoveTeachTargetContext context)
+    {
+        if (_cancelled)
+            throw new OperationCanceledException("Battle input cancelled (client disconnected).");
+
+        var tcs = new TaskCompletionSource<int?>(
+            TaskCreationOptions.RunContinuationsAsynchronously
+        );
+        _moveTeachTargetTcs = tcs;
+        var slot = await tcs.Task; // throws OperationCanceledException if Cancel() ran
+        _moveTeachTargetTcs = null;
+        return slot;
+    }
+
+    public void SetMoveTeachTargetChoice(int? slot)
+    {
+        var tcs = _moveTeachTargetTcs;
+        tcs?.TrySetResult(slot);
+    }
+
+    /// <summary>
     /// Awaits the player's next shop choice: buy a stock item or leave. Same TCS handshake as the other prompts
     /// (the hub's <c>BuyShopItem</c>/<c>LeaveShop</c> complete it via <see cref="SetShopAction"/>); the shop node
     /// loops on this, so it is awaited once per buy/leave. The <see cref="_cancelled"/> guard makes a disconnect
@@ -370,6 +399,7 @@ public sealed class SignalRInput : IBattleInput
         _evolutionTcs?.TrySetCanceled();
         _biomeTcs?.TrySetCanceled();
         _rewardChoiceTcs?.TrySetCanceled();
+        _moveTeachTargetTcs?.TrySetCanceled();
         _shopTcs?.TrySetCanceled();
         _acquisitionTcs?.TrySetCanceled();
         _leadTcs?.TrySetCanceled();

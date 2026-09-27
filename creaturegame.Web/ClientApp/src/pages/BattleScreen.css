@@ -1232,6 +1232,14 @@
 .reward-card--heal:hover,
 .reward-card--heal:focus-visible { box-shadow: 0 0 14px rgba(110, 224, 127, 0.5); }
 
+/* The move-teach option (TM/HM — Move-Teach Rewards) — sky-accented (a build-crafting pick, not loot). */
+.reward-card--move-teach { border-color: var(--clr-sky); }
+.reward-card--move-teach .reward-card-icon,
+.reward-card--move-teach .reward-card-name { color: var(--clr-sky); }
+.reward-card--move-teach:hover,
+.reward-card--move-teach:focus-visible { box-shadow: 0 0 14px rgba(77, 144, 213, 0.5); }
+.reward-card--move-teach .type-badge { margin: 2px 0; }
+
 /* Shop node — a spend-gold buy modal. Iterative (stays open across purchases), so it lists stock as rows with a
    per-item Buy button rather than the reward modal's one-shot cards. Gold-accented like the reward modal. */
 .shop-modal {

@@ -418,9 +418,9 @@ describe('expandEvent — control plane vs timeline', () => {
       type: 'SHOW_REWARD_CHOICE',
       source: 'Battle',
       options: [
-        { kind: 'item', itemId: 25, itemName: 'hyper-potion', rarity: 'Rare', gold: 0, hpRestore: 0, cureStatus: false, restoreLowPp: false, label: null },
-        { kind: 'item', itemId: 42, itemName: 'antidote', rarity: 'Common', gold: 0, hpRestore: 0, cureStatus: false, restoreLowPp: false, label: null },
-        { kind: 'gold', itemId: 0, itemName: null, rarity: null, gold: 60, hpRestore: 0, cureStatus: false, restoreLowPp: false, label: null },
+        { kind: 'item', itemId: 25, itemName: 'hyper-potion', rarity: 'Rare', gold: 0, hpRestore: 0, cureStatus: false, restoreLowPp: false, label: null, moveName: null, power: 0, accuracy: 0, damageType: null, attackType: null, pp: 0 },
+        { kind: 'item', itemId: 42, itemName: 'antidote', rarity: 'Common', gold: 0, hpRestore: 0, cureStatus: false, restoreLowPp: false, label: null, moveName: null, power: 0, accuracy: 0, damageType: null, attackType: null, pp: 0 },
+        { kind: 'gold', itemId: 0, itemName: null, rarity: null, gold: 60, hpRestore: 0, cureStatus: false, restoreLowPp: false, label: null, moveName: null, power: 0, accuracy: 0, damageType: null, attackType: null, pp: 0 },
       ],
     });
   });
@@ -438,8 +438,27 @@ describe('expandEvent — control plane vs timeline', () => {
       type: 'SHOW_REWARD_CHOICE',
       source: 'Battle',
       options: [
-        { kind: 'heal', itemId: 0, itemName: null, rarity: null, gold: 0, hpRestore: 24, cureStatus: true, restoreLowPp: false, label: 'Quick Heal' },
-        { kind: 'gold', itemId: 0, itemName: null, rarity: null, gold: 60, hpRestore: 0, cureStatus: false, restoreLowPp: false, label: null },
+        { kind: 'heal', itemId: 0, itemName: null, rarity: null, gold: 0, hpRestore: 24, cureStatus: true, restoreLowPp: false, label: 'Quick Heal', moveName: null, power: 0, accuracy: 0, damageType: null, attackType: null, pp: 0 },
+        { kind: 'gold', itemId: 0, itemName: null, rarity: null, gold: 60, hpRestore: 0, cureStatus: false, restoreLowPp: false, label: null, moveName: null, power: 0, accuracy: 0, damageType: null, attackType: null, pp: 0 },
+      ],
+    });
+  });
+
+  it('RewardChoiceOffered parses a move-teach option (kind "moveTeach") with its move stats off the wire', () => {
+    const { steps } = expandEvent('RewardChoiceOffered', {
+      source: 'Battle',
+      options: [
+        { kind: 'moveTeach', itemId: 0, itemName: null, rarity: null, gold: 0, hpRestore: 0, cureStatus: false, restoreLowPp: false, label: null, moveName: 'hyper-beam', power: 150, accuracy: 90, damageType: 'Normal', attackType: 'Special', pp: 5 },
+        { kind: 'gold', itemId: 0, itemName: null, rarity: null, gold: 60 },
+      ],
+    }, CTX);
+    const actions = dispatched(steps);
+    expect(actions).toContainEqual({
+      type: 'SHOW_REWARD_CHOICE',
+      source: 'Battle',
+      options: [
+        { kind: 'moveTeach', itemId: 0, itemName: null, rarity: null, gold: 0, hpRestore: 0, cureStatus: false, restoreLowPp: false, label: null, moveName: 'hyper-beam', power: 150, accuracy: 90, damageType: 'Normal', attackType: 'Special', pp: 5 },
+        { kind: 'gold', itemId: 0, itemName: null, rarity: null, gold: 60, hpRestore: 0, cureStatus: false, restoreLowPp: false, label: null, moveName: null, power: 0, accuracy: 0, damageType: null, attackType: null, pp: 0 },
       ],
     });
   });
@@ -626,6 +645,31 @@ describe('expandEvent — level-up move learning', () => {
     const action = show!.action as Extract<Action, { type: 'SHOW_MOVE_REPLACEMENT' }>;
     expect(action.newMoveName).toBe('ember');
     expect(action.currentMoves).toEqual(['tackle', 'growl', 'tail-whip', 'scratch']);
+  });
+
+  it('MoveTeachTargetRequired raises the teach-target picker with the move stats and candidate ability list', () => {
+    const { steps } = expandEvent('MoveTeachTargetRequired', {
+      moveName: 'Hyper Beam',
+      power: 150,
+      accuracy: 90,
+      damageType: 'Normal',
+      attackType: 'Special',
+      pp: 5,
+      candidates: [
+        { speciesId: 6, name: 'CHARIZARD', level: 36, hp: 90, maxHp: 100, status: 'None', able: true },
+        { speciesId: 1, name: 'BULBASAUR', level: 20, hp: 60, maxHp: 60, status: 'None', able: false },
+      ],
+    }, CTX);
+    const show = (steps ?? []).find(
+      (s): s is Extract<Step, { kind: 'dispatch' }> => s.kind === 'dispatch' && s.action.type === 'SHOW_MOVE_TEACH_TARGET');
+    expect(show).toBeDefined();
+    const action = show!.action as Extract<Action, { type: 'SHOW_MOVE_TEACH_TARGET' }>;
+    expect(action.moveName).toBe('Hyper Beam');
+    expect(action.power).toBe(150);
+    expect(action.candidates).toEqual([
+      { speciesId: 6, name: 'CHARIZARD', level: 36, hp: 90, maxHp: 100, status: 'None', able: true },
+      { speciesId: 1, name: 'BULBASAUR', level: 20, hp: 60, maxHp: 60, status: 'None', able: false },
+    ]);
   });
 
   it('MoveForgotten and MoveLearnDeclined read the canonical Gen 1 lines', () => {

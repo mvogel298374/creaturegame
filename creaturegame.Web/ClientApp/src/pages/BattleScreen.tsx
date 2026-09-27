@@ -35,6 +35,7 @@ import { BattleEndedOverlay } from '../components/modals/BattleEndedOverlay';
 import { RecoveryModal } from '../components/modals/RecoveryModal';
 import { EvolutionPromptModal } from '../components/modals/EvolutionPromptModal';
 import { RewardChoiceModal } from '../components/modals/RewardChoiceModal';
+import { MoveTeachTargetModal } from '../components/modals/MoveTeachTargetModal';
 import { ShopModal } from '../components/modals/ShopModal';
 import { AcquisitionModal } from '../components/modals/AcquisitionModal';
 import { LeadChoiceModal } from '../components/modals/LeadChoiceModal';
@@ -76,7 +77,7 @@ export function BattleScreen() {
   // authority and takes over once it arrives.
   const routeGeneration: string | null = location.state?.generation ?? fallback?.generation ?? null;
 
-  const { state, chooseMove, chooseSwitch, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, buyShopItem, leaveShop, respondAcquisition, chooseLead, respondSwitchIn, dismissDrop } = useBattleHub(gameId, startLevel);
+  const { state, chooseMove, chooseSwitch, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, respondMoveTeachTarget, buyShopItem, leaveShop, respondAcquisition, chooseLead, respondSwitchIn, dismissDrop } = useBattleHub(gameId, startLevel);
 
   // Theme the document for the run's generation: echo first, route state until it arrives. applyGenerationTheme
   // resolves an unknown/missing id to the default per the shared boundary contract (a stale value is a Gen 1 run).
@@ -344,6 +345,10 @@ export function BattleScreen() {
 
       {state.rewardChoice && (
         <RewardChoiceModal prompt={state.rewardChoice} onChoose={chooseReward} />
+      )}
+
+      {state.moveTeachTarget && (
+        <MoveTeachTargetModal prompt={state.moveTeachTarget} onChoose={respondMoveTeachTarget} />
       )}
 
       {state.shop && (

@@ -99,6 +99,11 @@ internal static class TestAltProfile
         BuildStatCalculator = rng => new AltStatCalculator(),
         EvolutionRules = new AltEvolutionRules(),
         BuildAi = rng => new Gen1TrainerAi(rng: rng),
+        // Empty, deliberately unlike Gen 1's five — the falsification leg for
+        // GenerationProfile.HmMoveIds/EncounterFactory.LoadMachineLearnsetsAsync: a move Gen 1 excludes as an HM
+        // (e.g. Cut, id 15) must be admitted under this profile if the exclusion genuinely reads the profile
+        // rather than a re-hardcoded Gen 1 list.
+        HmMoveIds = new HashSet<int>(),
     };
 
     /// <summary>The highest catalog id <see cref="AltContentScope"/> admits. Arbitrary and meaningless — see that

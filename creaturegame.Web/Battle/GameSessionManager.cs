@@ -120,7 +120,11 @@ public sealed class GameSessionManager(
             // Non-empty ⇒ biome traversal instead of the legacy endless chain — ENCOUNTER_DESIGN.md §7 Phase 3b-2.
             PlayableBiomes = session.PlayableBiomes,
             Wallet = session.Wallet,
-            RewardSupplier = EncounterFactory.BuildRewardSupplier(session.AllItems),
+            RewardSupplier = EncounterFactory.BuildRewardSupplier(
+                session.AllItems,
+                session.AllMoves,
+                session.MachineMovesBySpecies
+            ),
             ShopSupplier = EncounterFactory.BuildShopSupplier(session.AllItems),
             // Gates a Shop node on affordability, so a broke player never gets a dead all-unaffordable shop.
             MinShopBudget = ShopCalculator.MinItemPrice,
@@ -144,7 +148,8 @@ public sealed class GameSessionManager(
         // endpoint, a test harness — that omitted the argument would compile, run, and quietly play Gen 1 on
         // Normal. Costs nothing to require: there is exactly one caller (GameController.Start).
         Difficulty difficulty,
-        Generation generation
+        Generation generation,
+        IReadOnlyDictionary<int, IReadOnlyList<int>> machineMovesBySpecies
     )
     {
         var gameId = Guid.NewGuid().ToString("N");
@@ -158,7 +163,8 @@ public sealed class GameSessionManager(
             playableBiomes,
             difficulty,
             generation,
-            DateTimeOffset.UtcNow
+            DateTimeOffset.UtcNow,
+            machineMovesBySpecies
         );
         EvictExpiredPendingSessions();
         return gameId;
@@ -479,6 +485,17 @@ public sealed class GameSessionManager(
             battle.Input.SetRewardChoice(index);
     }
 
+    /// <summary>Routes a move-teach target answer (a party-member slot, or null to decline) to the battle's
+    /// input (TM/HM — Move-Teach Rewards, <c>docs/TODO_ARCHIVE.md</c>).</summary>
+    public void SetMoveTeachTargetChoice(string connectionId, int? slotIndex)
+    {
+        if (
+            _connToGame.TryGetValue(connectionId, out var gameId)
+            && _active.TryGetValue(gameId, out var battle)
+        )
+            battle.Input.SetMoveTeachTargetChoice(slotIndex);
+    }
+
     /// <summary>Routes a shop buy/leave choice to the battle's input (the shop node loops on these).</summary>
     public void SetShopAction(string connectionId, ShopAction action)
     {
@@ -603,7 +620,8 @@ sealed record PendingSession(
     IReadOnlyList<BiomeDefinition> PlayableBiomes,
     Difficulty Difficulty,
     Generation Generation,
-    DateTimeOffset RegisteredAt
+    DateTimeOffset RegisteredAt,
+    IReadOnlyDictionary<int, IReadOnlyList<int>> MachineMovesBySpecies
 );
 
 /// <summary>

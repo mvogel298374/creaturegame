@@ -195,8 +195,11 @@ public static class LearnsetMoveSelector
     }
 
     // Selection-time desirability of a move for a creature of these types: power (or a flat score for
-    // fixed-damage / status moves) with a same-type nudge. Shared by the weighted and best-N selectors.
-    private static double MoveScore(Attack move, DamageType type1, DamageType? type2)
+    // fixed-damage / status moves) with a same-type nudge. Shared by the weighted and best-N selectors, and by
+    // the web-layer move-teach reward roll (RewardCalculator), which is why it's public rather than private —
+    // the same "how good is this move for this typing" heuristic, reused outside this class rather than
+    // re-derived.
+    public static double MoveScore(Attack move, DamageType type1, DamageType? type2)
     {
         if (!IsDamaging(move))
             return StatusMoveScore;

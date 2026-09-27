@@ -463,6 +463,26 @@ provisional playtest knob):
   component, so the amount varies but always helps. **Never offered on Boss nodes** — their item reward is
   already elevated, and the biome's free full-heal Poké Center caps it right after, so a heal there is
   redundant.
+- **Move-teach can substitute an item slot** — the sibling substitution to Quick Heal above, added by
+  **TM/HM — Move-Teach Rewards** (`TODO_ARCHIVE.md`): gated first on the party (fainted members included — Gen 1
+  allows teaching a TM to a fainted Pokémon) holding at least one legal (real, TM-only Machine-learnset — HMs are
+  excluded per `GenerationProfile.HmMoveIds`), not-already-known move, then a per-tier chance (Wild/Elite 5%,
+  Treasure/Mystery 20%, Boss 35%) rolls whether it replaces an item roll this time; no eligible candidate
+  anywhere in the party always falls back to the ordinary item roll. **Which slot it takes depends on the tier:**
+  off-Boss it substitutes the *first* item slot, same as before; **on Boss it substitutes the *second* slot
+  instead**, so the first slot's own item roll — the one that can carry the Boss-only Revive — is never at risk
+  regardless of whether move-teach fires. A move-teach pick also counts as `RewardRarity.Rare` for the
+  accompanying gold bag's rarity scaling (`RewardCalculator.ResolveBestRarity`) — it has no `Item`/`Cost` to
+  classify by the normal rarity bands, and flooring it to Common would silently tax the gold bag purely as an
+  accounting side effect of which reward kind won the roll. The offered move is picked across the whole party
+  (not per-member), weighted by `LearnsetMoveSelector.MoveScore`'s best-fit learner, then resolved to *who*
+  actually learns it via a separate ABLE/NOT-ABLE party-target picker once the card is chosen — no bag, no
+  `Item` row, unlike every other reward kind on this list. **Roll-time, not pick-time:** the ABLE/NOT-ABLE
+  verdict per party member is decided when the card is rolled (`MoveTeachRewardOption.AbleBySlot`), not when the
+  player picks it — safe only because nothing else can change the party between a reward being offered and
+  chosen (the run is blocked on the pick either way, and the reward roll always precedes any evolution/draft
+  offer within the same win — see `BattleRunEvent.GrantBattleRewardAsync`). A future reorder of that sequence
+  would need to re-examine this assumption.
 - **The obtainable item subset** is simply the run's item catalog filtered to five eligible categories
   (Healing, StatusCure, PpRestore, BattleStatBoost, Revive) — Ball has no in-battle effect so it's dead loot.
   No generation hold-out on top of that filter: an earlier `max-revive` name-match hold-out was deleted when

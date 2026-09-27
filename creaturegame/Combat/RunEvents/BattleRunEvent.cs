@@ -213,7 +213,8 @@ internal sealed class BattleRunEvent(
                 NodeKindForTier(tier),
                 enemy.Level,
                 s.RunDepth,
-                PlayerCondition.From(s.Player)
+                PlayerCondition.From(s.Player),
+                s.Party
             ),
             ctx.Rng ?? SystemRandomSource.Instance
         );

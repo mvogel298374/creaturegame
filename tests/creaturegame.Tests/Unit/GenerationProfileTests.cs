@@ -330,7 +330,8 @@ public class GenerationProfileTests
             new SeededRandomSource(1),
             [],
             Difficulty.Normal,
-            Generation.One
+            Generation.One,
+            new Dictionary<int, IReadOnlyList<int>>()
         );
 
         try
@@ -381,7 +382,8 @@ public class GenerationProfileTests
             new SeededRandomSource(1),
             [],
             Difficulty.Normal,
-            (Generation)2
+            (Generation)2,
+            new Dictionary<int, IReadOnlyList<int>>()
         );
 
         Assert.Equal((Generation)2, manager.GetGeneration(gameId));
@@ -414,7 +416,8 @@ public class GenerationProfileTests
             [],
             difficulty,
             Generation.One,
-            DateTimeOffset.UtcNow
+            DateTimeOffset.UtcNow,
+            new Dictionary<int, IReadOnlyList<int>>()
         );
         return GameSessionManager.BuildRunOptions(
             session,

@@ -35,7 +35,8 @@ internal static class RewardResolution
 
         int gold = 0;
         var itemNames = new List<string>();
-        switch (choice.Options[index])
+        var picked = choice.Options[index];
+        switch (picked)
         {
             case GoldRewardOption g:
                 gold = g.Gold;
@@ -49,9 +50,74 @@ internal static class RewardResolution
                 ApplyHeal(heal, ctx.State.Player, ctx.Emitter);
                 itemNames.Add(heal.Label);
                 break;
+            case MoveTeachRewardOption teach:
+                itemNames.Add(teach.Move.Name ?? "");
+                break;
         }
 
         ctx.Emitter?.Emit(new RewardGranted(source, gold, wallet?.Balance ?? gold, itemNames));
+
+        // The move-teach target picker runs AFTER the "you got X" announcement above — you're handed the move
+        // first, then decide who learns it, same beat as finding a TM then opening the party menu.
+        if (picked is MoveTeachRewardOption teachOption)
+            await ApplyMoveTeachAsync(teachOption, ctx);
+    }
+
+    // Raises the "teach to a Pokémon?" screen (every current member, ABLE/NOT ABLE per
+    // MoveTeachRewardOption.AbleBySlot — see ENCOUNTER_DESIGN.md §5.1 for why this is a QoL improvement over
+    // real Gen 1, not a reproduction of it) and, if the player picks an able member, runs it through the shared
+    // MoveLearning teach flow (free-slot auto-learn, or the forget-a-move prompt on a full moveset).
+    private static async Task ApplyMoveTeachAsync(MoveTeachRewardOption teach, RunContext ctx)
+    {
+        var party = ctx.State.Party;
+        var snapshot = PartyProjection.Snapshot(party);
+        var candidates = snapshot
+            .Select(
+                (m, i) =>
+                    new MoveTeachCandidateInfo(
+                        m.SpeciesId,
+                        m.Name,
+                        m.Level,
+                        m.Hp,
+                        m.MaxHp,
+                        m.Status,
+                        i < teach.AbleBySlot.Count && teach.AbleBySlot[i]
+                    )
+            )
+            .ToList();
+
+        ctx.Emitter?.Emit(
+            new MoveTeachTargetRequired(
+                teach.Move.Name ?? "",
+                teach.Move.BaseDamage,
+                teach.Move.Accuracy,
+                teach.Move.DamageType,
+                teach.Move.AttackType,
+                teach.Move.PowerPointsMax,
+                candidates
+            )
+        );
+
+        int? slot = await ctx.PlayerInput.ChooseMoveTeachTargetAsync(
+            new MoveTeachTargetContext(teach.Move, party, teach.AbleBySlot)
+        );
+
+        // An ineligible / stale / out-of-range pick is a no-op — nothing is taught, same as an explicit
+        // decline. The reward is still granted (the RewardGranted above already fired); only the teach itself
+        // is skipped.
+        if (
+            slot is int s
+            && s >= 0
+            && s < party.Count
+            && s < teach.AbleBySlot.Count
+            && teach.AbleBySlot[s]
+        )
+            await MoveLearning.TeachMoveAsync(
+                party.Members[s],
+                teach.Move,
+                ctx.Emitter,
+                ctx.PlayerInput
+            );
     }
 
     // Applies a pre-resolved quick-heal to the player's creature on the spot — but only the components the option

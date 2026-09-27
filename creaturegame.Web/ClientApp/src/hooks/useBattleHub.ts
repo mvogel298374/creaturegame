@@ -17,6 +17,7 @@ export type {
   EvolutionPrompt,
   BiomeChoicePrompt,
   RewardChoicePrompt,
+  MoveTeachTargetPrompt,
   ShopPrompt,
   AcquisitionPrompt,
   SwitchInPrompt,
@@ -215,6 +216,12 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
       console.error('[SignalR] ChooseReward failed:', err));
   }, []);
 
+  const respondMoveTeachTarget = useCallback((slot: number | null) => {
+    dispatch({ type: 'HIDE_MOVE_TEACH_TARGET' });
+    connRef.current?.invoke('RespondMoveTeachTarget', slot).catch(err =>
+      console.error('[SignalR] RespondMoveTeachTarget failed:', err));
+  }, []);
+
   // Deviates from the shape above: the shop is iterative, so the modal stays open (do NOT hide it) across buys.
   const buyShopItem = useCallback((index: number) => {
     connRef.current?.invoke('BuyShopItem', index).catch(err =>
@@ -252,5 +259,5 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
   // toast after its on-screen beat.
   const dismissDrop = useCallback(() => dispatch({ type: 'HIDE_DROP' }), []);
 
-  return { state, chooseMove, chooseSwitch, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, buyShopItem, leaveShop, respondAcquisition, chooseLead, respondSwitchIn, dismissDrop };
+  return { state, chooseMove, chooseSwitch, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, respondMoveTeachTarget, buyShopItem, leaveShop, respondAcquisition, chooseLead, respondSwitchIn, dismissDrop };
 }

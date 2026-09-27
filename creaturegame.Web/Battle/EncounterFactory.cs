@@ -89,7 +89,21 @@ public sealed class EncounterFactory(
         var playable = await ComputePlayableBiomesAsync(pokemonCtx, profile);
         var runMap = Biomes.RandomConnectedMap(playable, RunBiomeMapSize, source);
 
-        return new RunSetup(player, allMoves, bag, new Wallet(), allItems, runMap);
+        // Whole-dex Machine legality for the move-teach reward roll (TM/HM — Move-Teach Rewards) — loaded once
+        // here, off the same open pokemonCtx, rather than per-reward-roll: a draft/boss-catch pick later in the
+        // run can bring in any content-scoped species, so the reward policy needs every species' legality up
+        // front, not just the starter's.
+        var machineMovesBySpecies = await LoadMachineLearnsetsAsync(pokemonCtx, profile);
+
+        return new RunSetup(
+            player,
+            allMoves,
+            bag,
+            new Wallet(),
+            allItems,
+            runMap,
+            machineMovesBySpecies
+        );
     }
 
     /// <summary>
@@ -123,13 +137,18 @@ public sealed class EncounterFactory(
     }
 
     /// <summary>The run's reward supplier for <see cref="RunDirector"/> (battle win / Treasure / Mystery). Reward
-    /// roll mechanics (drop rates, rarity, gold, category bias) → <c>ENCOUNTER_DESIGN.md §5.1</c>.</summary>
+    /// roll mechanics (drop rates, rarity, gold, category bias) → <c>ENCOUNTER_DESIGN.md §5.1</c>.
+    /// <paramref name="allMoves"/>/<paramref name="machineMovesBySpecies"/> feed the move-teach roll (TM/HM —
+    /// Move-Teach Rewards, <c>docs/TODO_ARCHIVE.md</c>).</summary>
     internal static Func<RewardContext, IRandomSource, RewardChoice> BuildRewardSupplier(
-        IReadOnlyList<Item> allItems
+        IReadOnlyList<Item> allItems,
+        IReadOnlyList<Attack> allMoves,
+        IReadOnlyDictionary<int, IReadOnlyList<int>> machineMovesBySpecies
     )
     {
         var usable = RewardCalculator.UsableItems(allItems);
-        return (ctx, rng) => RewardCalculator.RollRewardChoice(ctx, usable, rng);
+        return (ctx, rng) =>
+            RewardCalculator.RollRewardChoice(ctx, usable, rng, allMoves, machineMovesBySpecies);
     }
 
     /// <summary>The run's shop supplier for <see cref="RunDirector"/> (Shop node stock/prices) — mirrors
@@ -362,6 +381,45 @@ public sealed class EncounterFactory(
             .ToListAsync();
     }
 
+    /// <summary>Every content-scoped species' Gen 1 <em>TM</em>-legal Machine learnset, as species id → the move
+    /// ids it can legally learn that way — the move-teach reward roll's whole-dex legality source (TM/HM —
+    /// Move-Teach Rewards, <c>docs/TODO_ARCHIVE.md</c>). Reads the same <see cref="LearnMethod.Machine"/> rows
+    /// <see cref="LearnsetMoveSelector.TmEnhanced"/>/<see cref="LearnsetMoveSelector.Optimal"/> already query,
+    /// just for the whole dex instead of one species — <b>minus <see cref="GenerationProfile.HmMoveIds"/></b>:
+    /// PokeAPI's "machine" learn method doesn't separate TM from HM, so the returned dictionary is the one place
+    /// that split is enforced, off the profile rather than a hardcoded list (a later generation's own HM roster
+    /// differs — see the profile member's remarks). Scoped through <c>profile.ContentScope.Species</c> first
+    /// (<c>GENERATION_PROFILE.md</c> §5(b)) so an out-of-scope species can never surface a legal move.</summary>
+    private static async Task<
+        IReadOnlyDictionary<int, IReadOnlyList<int>>
+    > LoadMachineLearnsetsAsync(PokemonDbContext pokemonCtx, GenerationProfile profile)
+    {
+        int gen = (int)profile.Generation;
+        var speciesIds = await profile
+            .ContentScope.Species(pokemonCtx.Species.AsNoTracking())
+            .Select(s => s.Id)
+            .ToListAsync();
+        var rows = await pokemonCtx
+            .Learnsets.AsNoTracking()
+            .Where(l =>
+                l.Generation == gen
+                && l.Method == LearnMethod.Machine
+                && speciesIds.Contains(l.SpeciesId)
+            )
+            .ToListAsync();
+
+        return rows.GroupBy(l => l.SpeciesId)
+            .ToDictionary(
+                g => g.Key,
+                g =>
+                    (IReadOnlyList<int>)
+                        g.Select(l => l.MoveId)
+                            .Distinct()
+                            .Where(id => !profile.HmMoveIds.Contains(id))
+                            .ToList()
+            );
+    }
+
     /// <summary>
     /// Builds a fresh wild enemy scaled to the player and the run's <paramref name="depth"/> (nodes traversed —
     /// <c>RunState.RunDepth</c>, threaded by <see cref="creaturegame.Combat.RunDirector"/>), excluding the
@@ -584,13 +642,17 @@ public sealed class EncounterFactory(
 
 /// <summary>The starting state of a run: the built player, the shared move pool the chain reuses, the run's
 /// starting <see cref="Bag"/> and <see cref="Wallet"/> (both transient — lost on death, no save layer yet),
-/// the item catalog (id → <see cref="Item"/>) used to resolve item uses and render the bag, and the run's
-/// <see cref="PlayableBiomes"/> map (the region's non-empty biomes the RunDirector charts a route through).</summary>
+/// the item catalog (id → <see cref="Item"/>) used to resolve item uses and render the bag, the run's
+/// <see cref="PlayableBiomes"/> map (the region's non-empty biomes the RunDirector charts a route through), and
+/// <see cref="MachineMovesBySpecies"/> — every content-scoped species' Gen 1 TM/HM-legal move ids (TM/HM —
+/// Move-Teach Rewards, <c>docs/TODO_ARCHIVE.md</c>), loaded once for the whole dex up front since a later draft/boss-
+/// catch acquisition can bring in any species, not just the starter.</summary>
 public sealed record RunSetup(
     Creature Player,
     IReadOnlyList<Attack> AllMoves,
     Bag Bag,
     Wallet Wallet,
     IReadOnlyList<Item> AllItems,
-    IReadOnlyList<BiomeDefinition> PlayableBiomes
+    IReadOnlyList<BiomeDefinition> PlayableBiomes,
+    IReadOnlyDictionary<int, IReadOnlyList<int>> MachineMovesBySpecies
 );

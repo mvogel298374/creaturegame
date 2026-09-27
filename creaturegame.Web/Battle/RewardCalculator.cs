@@ -1,4 +1,6 @@
+using creaturegame.Attacks;
 using creaturegame.Combat;
+using creaturegame.Creatures;
 using creaturegame.Items;
 
 namespace creaturegame.Web.Battle;
@@ -53,13 +55,21 @@ internal static class RewardCalculator
     /// the pick-one-of-N <see cref="RewardChoice"/> (or <see cref="RewardChoice.None"/> when nothing rolled).
     /// Dispatches by <see cref="RewardContext.Source"/> — a wild/elite win is gated by the drop chance, a Boss is
     /// guaranteed, a Treasure is a guaranteed chest, a Mystery is the wildcard.
+    /// <paramref name="allMoves"/>/<paramref name="machineMovesBySpecies"/> feed the move-teach roll (TM/HM —
+    /// Move-Teach Rewards, <c>docs/TODO_ARCHIVE.md</c>); both default to empty so an existing caller that doesn't pass
+    /// them (tests, mainly) simply never rolls one — <see cref="RewardContext.Party"/> being null does the same.
     /// </summary>
     public static RewardChoice RollRewardChoice(
         RewardContext ctx,
         IReadOnlyList<Item> usableItems,
-        IRandomSource rng
+        IRandomSource rng,
+        IReadOnlyList<Attack>? allMoves = null,
+        IReadOnlyDictionary<int, IReadOnlyList<int>>? machineMovesBySpecies = null
     )
     {
+        var moves = allMoves ?? [];
+        var machineMoves = machineMovesBySpecies ?? new Dictionary<int, IReadOnlyList<int>>();
+
         switch (ctx.Source)
         {
             case RunNodeKind.BossBattle:
@@ -70,6 +80,9 @@ internal static class RewardCalculator
                     ctx.Depth,
                     usableItems,
                     ctx.Condition,
+                    ctx.Party,
+                    moves,
+                    machineMoves,
                     rng
                 );
 
@@ -81,6 +94,9 @@ internal static class RewardCalculator
                     ctx.Depth,
                     usableItems,
                     ctx.Condition,
+                    ctx.Party,
+                    moves,
+                    machineMoves,
                     rng
                 );
 
@@ -93,6 +109,9 @@ internal static class RewardCalculator
                     ctx.Depth,
                     usableItems,
                     ctx.Condition,
+                    ctx.Party,
+                    moves,
+                    machineMoves,
                     rng
                 );
 
@@ -105,6 +124,9 @@ internal static class RewardCalculator
                     ctx.Depth,
                     usableItems,
                     ctx.Condition,
+                    ctx.Party,
+                    moves,
+                    machineMoves,
                     rng
                 );
         }
@@ -118,36 +140,168 @@ internal static class RewardCalculator
         int depth,
         IReadOnlyList<Item> usable,
         PlayerCondition? condition,
+        Party? party,
+        IReadOnlyList<Attack> allMoves,
+        IReadOnlyDictionary<int, IReadOnlyList<int>> machineMovesBySpecies,
         IRandomSource rng
     )
     {
         var options = new List<RewardOption>();
-        var first = RollItemOption(usable, tier, depth, rng, excludeId: null);
-        if (first is not null)
-            options.Add(first);
+
+        // A move-teach can substitute an item slot (§5.1's sibling rule to Quick Heal below) — rare on a battle
+        // win, more common in a reward node, most common on Boss. Gated on the party actually holding an
+        // eligible candidate, so an empty pool (no party, or nothing left to teach) always falls back to the
+        // ordinary item roll.
+        var moveTeach =
+            party is not null && rng.NextDouble() < MoveTeachChanceFor(tier)
+                ? RollMoveTeachOption(party, allMoves, machineMovesBySpecies, rng)
+                : null;
+
+        // On Boss, move-teach takes the SECOND slot instead of the first (requirements-review, 2026-09-28): the
+        // first slot's own item roll is the one that can carry the Boss-only Revive, and Boss already has the
+        // highest move-teach chance (35%) — letting move-teach displace slot 1 there would silently roughly
+        // halve Revive's already-scarce odds on the exact node it's gated to. Every other tier is
+        // Revive-ineligible regardless (RollItemOption's own Boss-only gate), so the slot doesn't matter there
+        // — move-teach keeps substituting the first slot as before.
+        bool moveTeachTakesFirstSlot = moveTeach is not null && tier != RunNodeKind.BossBattle;
+
+        ItemRewardOption? firstItem = null;
+        if (moveTeachTakesFirstSlot)
+        {
+            options.Add(moveTeach!);
+        }
+        else
+        {
+            firstItem = RollItemOption(usable, tier, depth, rng, excludeId: null);
+            if (firstItem is not null)
+                options.Add(firstItem);
+        }
 
         // Quick Heal can take the second item slot instead (§5.1); exempt on Boss (redundant next to the
-        // post-Boss Poké Center).
+        // post-Boss Poké Center) — which is also exactly where a Boss-rolled move-teach lands instead, below.
         var heal = tier == RunNodeKind.BossBattle ? null : TryRollHeal(condition, rng);
         if (heal is not null)
         {
             options.Add(heal);
         }
+        else if (moveTeach is not null && !moveTeachTakesFirstSlot)
+        {
+            options.Add(moveTeach); // Boss: move-teach's own slot (heal is always null on Boss, so this is safe)
+        }
         else
         {
-            var second = RollItemOption(usable, tier, depth, rng, excludeId: first?.ItemId);
+            var second = RollItemOption(usable, tier, depth, rng, excludeId: firstItem?.ItemId);
             if (second is not null)
                 options.Add(second);
         }
 
-        var bestRarity = options
-            .OfType<ItemRewardOption>()
-            .Select(o => o.Rarity)
-            .DefaultIfEmpty(RewardRarity.Common)
-            .Max();
+        var bestRarity = ResolveBestRarity(options);
         options.Add(new GoldRewardOption(RollGoldBag(GoldBaseFor(tier), level, bestRarity, rng)));
 
         return new RewardChoice(options);
+    }
+
+    /// <summary>The rarity that scales the gold bag: an <see cref="ItemRewardOption"/> by its own rolled
+    /// rarity; a <see cref="MoveTeachRewardOption"/> counts as <see cref="RewardRarity.Rare"/>
+    /// (requirements-review, 2026-09-28) — it has no <c>Item</c>/<c>Cost</c> of its own to classify by
+    /// <see cref="RarityOf"/>, and letting it silently floor the roll to <see cref="RewardRarity.Common"/> would
+    /// tax the accompanying gold bag by up to ~43% purely as an accounting side effect of which reward kind won
+    /// the substitution roll, never an intended balance lever. Nothing rolled → Common (unchanged). <c>internal</c>
+    /// for direct unit testing.</summary>
+    internal static RewardRarity ResolveBestRarity(IReadOnlyList<RewardOption> options)
+    {
+        var itemRarities = options.OfType<ItemRewardOption>().Select(o => o.Rarity);
+        var moveTeachRarities = options
+            .OfType<MoveTeachRewardOption>()
+            .Select(_ => RewardRarity.Rare);
+        return itemRarities.Concat(moveTeachRarities).DefaultIfEmpty(RewardRarity.Common).Max();
+    }
+
+    // --- Move-teach (TM/HM — Move-Teach Rewards) -------------------------------------------------------------
+
+    // Substitution chance per node — starting values (docs/TODO_ARCHIVE.md "TM/HM — Move-Teach Rewards"),
+    // provisional/tunable like every other constant in this file. Wild/Elite stays a rare bonus on an already
+    // drop-gated win; Treasure/Mystery is the "reward node" case; Boss (guaranteed reward already) goes highest.
+    private static double MoveTeachChanceFor(RunNodeKind tier) =>
+        tier switch
+        {
+            RunNodeKind.BossBattle => 0.35,
+            RunNodeKind.Treasure or RunNodeKind.Mystery => 0.20,
+            _ => 0.05, // WildBattle / EliteBattle
+        };
+
+    /// <summary>Rolls a move-teach candidate: a move at least one party member (fainted or not — Gen 1 allows
+    /// teaching a TM to a fainted Pokémon) could legally learn (a real, TM-only Machine row for its species —
+    /// <paramref name="machineMovesBySpecies"/> already excludes HMs, per its own generation's roster, at the
+    /// <c>EncounterFactory.LoadMachineLearnsetsAsync</c> load site) and doesn't already know, weighted by
+    /// <see cref="LearnsetMoveSelector.MoveScore"/> (the best-fit member's score, so a move that's a great pick
+    /// for <em>someone</em> in the party competes fairly against one that's mediocre for everyone). Null when
+    /// nothing in the party has an eligible candidate. <c>internal</c> for direct unit testing.</summary>
+    internal static MoveTeachRewardOption? RollMoveTeachOption(
+        Party party,
+        IReadOnlyList<Attack> allMoves,
+        IReadOnlyDictionary<int, IReadOnlyList<int>> machineMovesBySpecies,
+        IRandomSource rng
+    )
+    {
+        if (allMoves.Count == 0 || machineMovesBySpecies.Count == 0)
+            return null;
+
+        var movesById = allMoves.ToDictionary(m => m.Id);
+        // A SortedSet, not a HashSet: keeps the weighted-pick order (below) independent of hash iteration order,
+        // so a seeded roll is reproducible by move id rather than by incidental bucket layout.
+        var candidateMoveIds = new SortedSet<int>();
+        foreach (var member in party.Members)
+            if (machineMovesBySpecies.TryGetValue(member.SpeciesId, out var legal))
+                foreach (var moveId in legal)
+                    candidateMoveIds.Add(moveId);
+
+        var weighted = new List<(Attack Move, bool[] AbleBySlot, double Weight)>();
+        foreach (var moveId in candidateMoveIds)
+        {
+            if (!movesById.TryGetValue(moveId, out var move))
+                continue;
+
+            var ableBySlot = new bool[party.Count];
+            double bestScore = 0;
+            for (int i = 0; i < party.Count; i++)
+            {
+                var member = party.Members[i];
+                bool legal =
+                    machineMovesBySpecies.TryGetValue(member.SpeciesId, out var legalIds)
+                    && legalIds.Contains(moveId);
+                bool alreadyKnown = member.MoveSet.Any(m => m.Base.Id == moveId);
+                ableBySlot[i] = legal && !alreadyKnown;
+                if (!ableBySlot[i])
+                    continue;
+
+                double score = LearnsetMoveSelector.MoveScore(
+                    move,
+                    member.Type1 ?? DamageType.Normal,
+                    member.Type2
+                );
+                if (score > bestScore)
+                    bestScore = score;
+            }
+
+            if (bestScore > 0)
+                weighted.Add((move, ableBySlot, bestScore));
+        }
+
+        if (weighted.Count == 0)
+            return null;
+
+        double total = weighted.Sum(w => w.Weight);
+        double roll = rng.NextDouble() * total;
+        double acc = 0;
+        foreach (var w in weighted)
+        {
+            acc += w.Weight;
+            if (roll < acc)
+                return new MoveTeachRewardOption(w.Move, w.AbleBySlot);
+        }
+        var last = weighted[^1]; // floating-point guard — roll == total
+        return new MoveTeachRewardOption(last.Move, last.AbleBySlot);
     }
 
     // Rolls one item option (§5.1); falls back to the whole usable pool if the rolled rarity band is empty, so

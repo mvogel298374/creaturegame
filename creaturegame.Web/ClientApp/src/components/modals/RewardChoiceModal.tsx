@@ -1,6 +1,8 @@
 import type { RewardChoicePrompt } from '../../hooks/useBattleHub';
 import { healSummary } from '../../battle/timeline';
 import { formatItemName } from '../../battle/bag';
+import { formatMoveName } from '../../utils/format';
+import { TypeBadge } from '../TypeBadge';
 import { Modal } from './Modal';
 
 // Reward choice: a pick-one-of-N shown after a rolled reward — two rarity-coloured item cards and a gold bag.
@@ -24,7 +26,9 @@ export function RewardChoiceModal({ prompt, onChoose }: {
                 ? 'reward-card reward-card--gold'
                 : option.kind === 'heal'
                   ? 'reward-card reward-card--heal'
-                  : `reward-card reward-card--item reward-card--${(option.rarity ?? 'Common').toLowerCase()}`
+                  : option.kind === 'moveTeach'
+                    ? 'reward-card reward-card--move-teach'
+                    : `reward-card reward-card--item reward-card--${(option.rarity ?? 'Common').toLowerCase()}`
             }
             onClick={() => onChoose(i)}
           >
@@ -39,6 +43,15 @@ export function RewardChoiceModal({ prompt, onChoose }: {
                 <span className="reward-card-icon" aria-hidden="true">✚</span>
                 <span className="reward-card-name">{option.label ?? 'Quick Heal'}</span>
                 <span className="reward-card-tag">{healSummary(option)}</span>
+              </>
+            ) : option.kind === 'moveTeach' ? (
+              <>
+                <span className="reward-card-icon" aria-hidden="true">✎</span>
+                <span className="reward-card-name">{formatMoveName(option.moveName ?? '')}</span>
+                {option.damageType && <TypeBadge type={option.damageType} />}
+                <span className="reward-card-tag">
+                  {option.power > 0 ? `PWR ${option.power} · ` : ''}ACC {option.accuracy} · PP {option.pp}
+                </span>
               </>
             ) : (
               <>

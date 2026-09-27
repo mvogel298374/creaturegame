@@ -115,6 +115,7 @@ deliverable.
 | **Starter roster** | ❌ ~~hardcoded client-side~~ *(stale premise — see §6: the picker fetched the whole dex from the unscoped `/api/species`)* | ✅ the profile's species scope, served server-authoritatively by `SpeciesController.GetAll(?generation=)` (Stage 3) |
 | **Presentation theme** | ⚠️ `:root` design tokens exist in `index.css`, but no switch, and the palette is modern dark-blue/red | on the profile |
 | **Menu structure** | ❌ no abstraction | on the profile |
+| **HM move ids** — which Machine-learnset moves are HMs (TM/HM — Move-Teach Rewards, `TODO_ARCHIVE.md`) | ❌ none until `requirements-review` caught it hardcoded as a `RewardCalculator` constant | ✅ `GenerationProfile.HmMoveIds` — `EncounterFactory.LoadMachineLearnsetsAsync` filters the whole-dex Machine learnset through it before the move-teach reward roll ever sees it |
 
 ### 2.2 What the profile is **not** — the gen-invariant list
 

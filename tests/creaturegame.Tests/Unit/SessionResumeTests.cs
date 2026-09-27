@@ -52,7 +52,8 @@ public class SessionResumeTests
             new SeededRandomSource(1),
             [],
             Difficulty.Normal,
-            Generation.One
+            Generation.One,
+            new Dictionary<int, IReadOnlyList<int>>()
         );
 
         try

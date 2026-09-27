@@ -38,6 +38,11 @@ public class Creature
     };
     internal Attack Struggle => _struggle;
 
+    /// <summary>Adds <paramref name="attack"/> to a free slot (max 4). Returns <c>false</c> for either of two
+    /// different reasons — the moveset is full, <em>or</em> this move is already known — and does not
+    /// distinguish them. Callers that route a <c>false</c> into a "moveset full, forget one?" prompt
+    /// (<see cref="Combat.MoveLearning.TeachMoveAsync"/>) must pre-filter an already-known move themselves;
+    /// this method won't catch that case for them.</summary>
     public bool AddAttack(Attack attack)
     {
         if (MoveSet.Count < 4 && !MoveSet.Any(m => m.Base.Id == attack.Id))

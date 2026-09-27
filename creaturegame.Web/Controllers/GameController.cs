@@ -53,7 +53,8 @@ public class GameController(GameSessionManager sessionManager, EncounterFactory 
                 rng,
                 setup.PlayableBiomes,
                 difficulty,
-                generation
+                generation,
+                setup.MachineMovesBySpecies
             );
             Console.WriteLine(
                 $"[GameController] Started run {gameId} with seed {seed}, difficulty {difficulty}, generation {generation}."

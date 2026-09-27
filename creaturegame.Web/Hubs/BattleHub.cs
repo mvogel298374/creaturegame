@@ -73,10 +73,18 @@ public class BattleHub(GameSessionManager manager) : Hub<IBattleClient>
         return Task.CompletedTask;
     }
 
-    /// <summary>Answers a reward-choice modal with the chosen option (item or gold bag).</summary>
+    /// <summary>Answers a reward-choice modal with the chosen option (item, gold bag, or a move teach).</summary>
     public Task ChooseReward(int index)
     {
         manager.SetRewardChoice(Context.ConnectionId, index);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Answers a move-teach target picker (a picked <c>MoveTeachRewardOption</c>) with the party-member
+    /// slot to learn the move, or null to decline (TM/HM — Move-Teach Rewards, <c>docs/TODO_ARCHIVE.md</c>).</summary>
+    public Task RespondMoveTeachTarget(int? slotIndex)
+    {
+        manager.SetMoveTeachTargetChoice(Context.ConnectionId, slotIndex);
         return Task.CompletedTask;
     }
 

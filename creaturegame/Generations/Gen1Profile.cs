@@ -63,6 +63,12 @@ public static class Gen1Profile
             DamageType.Dragon,
         };
 
+    /// <summary>Gen 1's five HMs, by their real move id — Cut/Fly/Surf/Strength/Flash. Hand-verified domain
+    /// knowledge, the same pattern <c>DATA_IMPORT.md</c> uses everywhere PokeAPI can't express a Gen 1 fact
+    /// (<c>ItemMapper.Gen1BattleItemNames</c>, <c>MoveImport.ApplyGen1Corrections</c>) — PokeAPI's own "machine"
+    /// learn method doesn't separate TM from HM, so this list is the only place that distinction is recorded.</summary>
+    private static IReadOnlySet<int> Gen1HmMoveIds => new HashSet<int> { 15, 19, 57, 70, 148 };
+
     /// <summary>The Gen 1 profile. Stateless and shared, like the seam singletons it composes.</summary>
     public static readonly GenerationProfile Instance = new()
     {
@@ -85,5 +91,6 @@ public static class Gen1Profile
         // Matches the web layer's existing construction exactly: the brain takes the run's seeded RNG and
         // otherwise keeps its defaults (CompositeEvaluator.CreateDefault, intelligence 0.7).
         BuildAi = rng => new Gen1TrainerAi(rng: rng),
+        HmMoveIds = Gen1HmMoveIds,
     };
 }

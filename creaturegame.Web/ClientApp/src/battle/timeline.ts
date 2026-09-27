@@ -46,7 +46,7 @@ export type RewardRarity = 'Common' | 'Uncommon' | 'Rare' | 'Epic';
 // an item (kind 'item', with id/name/rarity), a gold bag (kind 'gold', with an amount), or a smart quick heal
 // (kind 'heal', carrying what it will restore). The other fields are zero/null for the branch that doesn't use them.
 export interface RewardOption {
-  kind: 'item' | 'gold' | 'heal';
+  kind: 'item' | 'gold' | 'heal' | 'moveTeach';
   itemId: number;
   itemName: string | null;
   rarity: RewardRarity | null;
@@ -55,6 +55,25 @@ export interface RewardOption {
   cureStatus: boolean;
   restoreLowPp: boolean;
   label: string | null;
+  // 'moveTeach' only — the move on offer (TM/HM — Move-Teach Rewards). Null/0 on every other kind.
+  moveName: string | null;
+  power: number;
+  accuracy: number;
+  damageType: string | null;
+  attackType: string | null;
+  pp: number;
+}
+
+// One party member's row in the move-teach target picker (Gen 1's real "teach to a Pokémon?" screen) — the
+// same fields as PartyMember plus whether this member can learn the offered move.
+export interface MoveTeachCandidate {
+  speciesId: number;
+  name: string;
+  level: number;
+  hp: number;
+  maxHp: number;
+  status: string;
+  able: boolean;
 }
 
 // A terse tag describing what a Quick Heal option will restore (only the components it actually carries), e.g.
@@ -143,6 +162,21 @@ export type Action =
   // hidden by the player's pick. Blocks the run server-side until ChooseReward(index) answers.
   | { type: 'SHOW_REWARD_CHOICE'; source: string; options: RewardOption[] }
   | { type: 'HIDE_REWARD_CHOICE' }
+  // Move-teach target picker (TM/HM — Move-Teach Rewards): a "teach to a Pokémon?" screen shown after a picked
+  // moveTeach reward — every party member, ABLE/NOT ABLE per member up front (a roguelite QoL improvement over
+  // real Gen 1, which only tells you afterward — see docs/ENCOUNTER_DESIGN.md §5.1). Hidden by the player's
+  // pick (or decline). Blocks the run server-side until RespondMoveTeachTarget(slot | null) answers.
+  | {
+      type: 'SHOW_MOVE_TEACH_TARGET';
+      moveName: string;
+      power: number;
+      accuracy: number;
+      damageType: string;
+      attackType: string;
+      pp: number;
+      candidates: MoveTeachCandidate[];
+    }
+  | { type: 'HIDE_MOVE_TEACH_TARGET' }
   // Shop node — a spend-gold buy modal that stays open across purchases, then hidden by the player's Leave.
   // Blocks the run server-side until LeaveShop; each buy sends BuyShopItem(index) and echoes SHOP_PURCHASED.
   | { type: 'SHOW_SHOP'; items: ShopOfferItem[]; balance: number }
@@ -536,7 +570,7 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       // option is applied + announced by a following RewardGranted (the drop hover).
       const rcSource = payload.source as string;
       const options: RewardOption[] = ((payload.options as Array<Record<string, unknown>>) ?? []).map(o => ({
-        kind: o.kind as 'item' | 'gold' | 'heal',
+        kind: o.kind as 'item' | 'gold' | 'heal' | 'moveTeach',
         itemId: (o.itemId as number) ?? 0,
         itemName: (o.itemName as string | null) ?? null,
         rarity: (o.rarity as RewardRarity | null) ?? null,
@@ -545,6 +579,12 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
         cureStatus: (o.cureStatus as boolean) ?? false,
         restoreLowPp: (o.restoreLowPp as boolean) ?? false,
         label: (o.label as string | null) ?? null,
+        moveName: (o.moveName as string | null) ?? null,
+        power: (o.power as number) ?? 0,
+        accuracy: (o.accuracy as number) ?? 0,
+        damageType: (o.damageType as string | null) ?? null,
+        attackType: (o.attackType as string | null) ?? null,
+        pp: (o.pp as number) ?? 0,
       }));
       return { steps: [w(200), d({ type: 'SHOW_REWARD_CHOICE', source: rcSource, options })] };
     }
@@ -902,6 +942,34 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       const cName = payload.creatureName as string;
       const mName = payload.moveName as string;
       return { steps: [w(150), d(log(`${cName} forgot ${formatMoveName(mName)}!`)), w(400)] };
+    }
+
+    case 'MoveTeachTargetRequired': {
+      // A picked moveTeach reward is ready — raise the "teach to a Pokémon?" screen.
+      const candidates: MoveTeachCandidate[] = (
+        (payload.candidates as Array<Record<string, unknown>>) ?? []
+      ).map(c => ({
+        speciesId: (c.speciesId as number) ?? 0,
+        name: (c.name as string) ?? '',
+        level: (c.level as number) ?? 0,
+        hp: (c.hp as number) ?? 0,
+        maxHp: (c.maxHp as number) ?? 0,
+        status: (c.status as string) ?? 'None',
+        able: (c.able as boolean) ?? false,
+      }));
+      return { steps: [
+        w(200),
+        d({
+          type: 'SHOW_MOVE_TEACH_TARGET',
+          moveName: payload.moveName as string,
+          power: payload.power as number,
+          accuracy: payload.accuracy as number,
+          damageType: payload.damageType as string,
+          attackType: payload.attackType as string,
+          pp: payload.pp as number,
+          candidates,
+        }),
+      ] };
     }
 
     case 'MoveLearnDeclined': {

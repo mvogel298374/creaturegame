@@ -528,3 +528,38 @@ public record MoveForgotten(string CreatureName, string MoveName) : BattleEvent;
 /// <summary>The player declined to learn the offered move (kept the current four). Drives the
 /// "{NAME} did not learn {MOVE}." line.</summary>
 public record MoveLearnDeclined(string CreatureName, string MoveName) : BattleEvent;
+
+// --- TM/HM (move-teach rewards) ---
+/// <summary>A picked <see cref="MoveTeachRewardOption"/> is ready to be assigned: the move's display stats (so
+/// the client can show them alongside the picker, not just on the reward card that preceded this) and a "teach
+/// to a Pokémon?" screen — every current party member, each flagged <see cref="MoveTeachCandidateInfo.Able"/>
+/// up front (a roguelite QoL improvement over real Gen 1, which only tells you afterward — see
+/// `ENCOUNTER_DESIGN.md` §5.1). A blocking event: the run awaits the player's pick via
+/// <see cref="IBattleInput.ChooseMoveTeachTargetAsync"/>
+/// before continuing. Followed by the same <see cref="MoveLearned"/> / <see cref="MoveReplacementRequired"/> /
+/// <see cref="MoveForgotten"/> / <see cref="MoveLearnDeclined"/> events a level-up learn already emits — the
+/// forget-a-move flow is shared, not duplicated.</summary>
+public record MoveTeachTargetRequired(
+    string MoveName,
+    int Power,
+    int Accuracy,
+    DamageType DamageType,
+    AttackType AttackType,
+    int Pp,
+    IReadOnlyList<MoveTeachCandidateInfo> Candidates
+) : BattleEvent;
+
+/// <summary>One party member's legality for a move-teach offer — the client's ABLE/NOT ABLE row. Mirrors
+/// <see cref="PartyMemberInfo"/> (species/name/level/HP/status for the card) plus <see cref="Able"/>, which
+/// <see cref="MoveTeachRewardOption.AbleBySlot"/> already decided at roll time (species' real Machine learnset
+/// + not already known) — this event just carries that verdict alongside the live roster snapshot so the
+/// picker never has to ask twice.</summary>
+public record MoveTeachCandidateInfo(
+    int SpeciesId,
+    string Name,
+    int Level,
+    int Hp,
+    int MaxHp,
+    StatusCondition Status,
+    bool Able
+);

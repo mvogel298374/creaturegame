@@ -265,6 +265,15 @@ public class WebEventContractTests
         // says PlayerMoves because it sits beside the Enemy* fields. Pinned field-by-field by the
         // TurnStarted_MoveProjection_* tests below.
         [(nameof(TurnStarted), nameof(TurnStarted.PlayerMoves))] = "Moves",
+        // MoveTeachRewardOption's Move is deliberately decomposed, not renamed — ProjectRewardOption flattens
+        // it into MoveName/Power/Accuracy/DamageType/AttackType/Pp (the same flat-shape convention every other
+        // RewardOption kind already uses, so the client reads one shape and branches on Kind) rather than
+        // nesting the whole Attack. Pinned field-by-field by RewardChoiceOffered_Projection_CarriesMoveTeachOptionFields.
+        [(nameof(MoveTeachRewardOption), nameof(MoveTeachRewardOption.Move))] = null,
+        // AbleBySlot is deliberately withheld from the reward-card projection — it's the raw per-slot array the
+        // roll used internally; the picker screen gets the richer, already-zipped-with-the-roster equivalent
+        // (MoveTeachCandidateInfo.Able) on the separate MoveTeachTargetRequired event instead.
+        [(nameof(MoveTeachRewardOption), nameof(MoveTeachRewardOption.AbleBySlot))] = null,
     };
 
     // A record's own data properties. Records emit their compiler-generated EqualityContract as protected, so
@@ -478,6 +487,86 @@ public class WebEventContractTests
         Assert.Equal("Phantom Marsh", option.GetProperty("Name").GetString());
         Assert.Equal("Ghost", option.GetProperty("Types")[0].GetString());
         Assert.Equal("Poison", option.GetProperty("Types")[1].GetString());
+    }
+
+    /// <summary>Value-level guard for the <see cref="MoveTeachRewardOption"/> arm of
+    /// <see cref="RewardChoiceOffered"/>'s projection (TM/HM — Move-Teach Rewards, <c>docs/TODO_ARCHIVE.md</c>): the
+    /// registered <see cref="ProjectionExceptions"/> entries prove <c>Move</c>/<c>AbleBySlot</c> are
+    /// deliberately absent under their own names; this pins that the move's stats survive under the flat
+    /// <c>MoveName</c>/<c>Power</c>/<c>Accuracy</c>/<c>DamageType</c>/<c>AttackType</c>/<c>Pp</c> shape every
+    /// other reward-card kind already uses.</summary>
+    [Fact]
+    public void RewardChoiceOffered_Projection_CarriesMoveTeachOptionFields()
+    {
+        var move = new Attack
+        {
+            Id = 15,
+            Name = "hyper-beam",
+            BaseDamage = 150,
+            Accuracy = 90,
+            DamageType = DamageType.Normal,
+            AttackType = AttackType.Special,
+            PowerPointsMax = 5,
+        };
+        var evt = new RewardChoiceOffered(
+            "Battle",
+            [new MoveTeachRewardOption(move, [true, false])]
+        );
+
+        var (type, payload) = SignalRBattleEventEmitter.MapEvent(evt);
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+        var option = doc.RootElement.GetProperty("Options")[0];
+
+        Assert.Equal("RewardChoiceOffered", type);
+        Assert.Equal("moveTeach", option.GetProperty("Kind").GetString());
+        Assert.Equal("hyper-beam", option.GetProperty("MoveName").GetString());
+        Assert.Equal(150, option.GetProperty("Power").GetInt32());
+        Assert.Equal(90, option.GetProperty("Accuracy").GetInt32());
+        Assert.Equal("Normal", option.GetProperty("DamageType").GetString());
+        Assert.Equal("Special", option.GetProperty("AttackType").GetString());
+        Assert.Equal(5, option.GetProperty("Pp").GetInt32());
+    }
+
+    /// <summary>Value-level guard for <see cref="MoveTeachTargetRequired"/>'s own projection (TM/HM —
+    /// Move-Teach Rewards): the move's display stats and each candidate's ABLE/NOT ABLE verdict survive —
+    /// specifically that a NOT ABLE member (species has no Machine row, or already knows the move) projects
+    /// <c>Able: false</c> rather than being silently dropped or defaulted true.</summary>
+    [Fact]
+    public void MoveTeachTargetRequired_Projection_CarriesMoveStatsAndCandidateAbility()
+    {
+        var evt = new MoveTeachTargetRequired(
+            "Hyper Beam",
+            150,
+            90,
+            DamageType.Normal,
+            AttackType.Special,
+            5,
+            [
+                new MoveTeachCandidateInfo(6, "CHARIZARD", 36, 90, 100, StatusCondition.None, true),
+                new MoveTeachCandidateInfo(
+                    1,
+                    "BULBASAUR",
+                    20,
+                    60,
+                    60,
+                    StatusCondition.Poison,
+                    false
+                ),
+            ]
+        );
+
+        var (type, payload) = SignalRBattleEventEmitter.MapEvent(evt);
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+        var root = doc.RootElement;
+        var candidates = root.GetProperty("Candidates");
+
+        Assert.Equal("MoveTeachTargetRequired", type);
+        Assert.Equal("Hyper Beam", root.GetProperty("MoveName").GetString());
+        Assert.Equal(150, root.GetProperty("Power").GetInt32());
+        Assert.True(candidates[0].GetProperty("Able").GetBoolean());
+        Assert.Equal("CHARIZARD", candidates[0].GetProperty("Name").GetString());
+        Assert.False(candidates[1].GetProperty("Able").GetBoolean());
+        Assert.Equal("Poison", candidates[1].GetProperty("Status").GetString());
     }
 
     /// <summary>Same projection guard for <see cref="BiomeEntered"/> — the client titles/themes the next leg

@@ -8,6 +8,183 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## TM/HM — Move-Teach Rewards ✅ SHIPPED (2026-09-28)
+
+*(Moved here from `TODO.md` → *TM/HM — Move-Teach Rewards*. `/plan` and full `/dev` implementation both landed
+2026-09-28, same session.)*
+
+**The goal.** A second move-acquisition channel beyond level-up + evolution: occasionally, as a battle-win drop
+or a reward-node pick, the player is offered a **move a current party member could legally learn** (Gen 1's real
+TM/HM learnset, already imported), shown with its stats, and picking it teaches that move on the spot.
+
+**Decisions locked with the user (2026-09-28), as built:**
+1. **Delivery is reward-choice, not an inventory item.** No Bag entry, no `ItemCategory.Tm`, no `IItemEffect`,
+   no out-of-battle UI surface. A move-teach is one more `RewardOption` kind (`MoveTeachRewardOption`) in the
+   existing pick-one-of-N `RewardChoice` flow (`RewardChoiceModal`, `RewardCalculator`). Picking the card teaches
+   the move immediately — nothing is carried in a bag, so the Tier 2 bag-persistence question was never a
+   dependency.
+2. **TMs only, no HMs.** Gen 1's 5 HMs exist to gate field interactions this engine's route-graph overworld has
+   no equivalent of — out of scope, unforced.
+3. **Rarity — substitution chance, provisional/tunable like every other `RewardCalculator` constant:** a
+   move-teach offer substitutes the **first** item-reward slot (mirrors how `TryRollHeal` already substitutes
+   the second), gated first on "does any live party member have an eligible legal-and-unknown Machine move" — no
+   candidate anywhere in the party always falls back to a normal item roll. **Shipped rates**
+   (`RewardCalculator.MoveTeachChanceFor`): WildBattle/EliteBattle **5%**, Treasure/Mystery **20%**, BossBattle
+   **35%**.
+4. **Legality reuses the exact Machine-row data `TmEnhanced`/`Optimal` already query** — no new import, no new
+   `items.db` table, no TM-number↔move catalog. `PokemonLearnset.Method == LearnMethod.Machine` rows are the
+   sole legality gate. Cosmetic real Gen 1 TM numbering was flagged as a nice-to-have and **not built**.
+5. **Target selection is a "Teach [move] to a Pokémon?" screen, not a bound card — a roguelite QoL improvement,
+   not a literal Gen 1 reproduction.** The reward card offers the move alone; picking it opens a party-list
+   prompt — every live member marked **ABLE**/**NOT ABLE** up front (per that member's own Machine-row legality
+   + whether it already knows the move). **Corrected during `requirements-review` (2026-09-28):** real Gen 1
+   doesn't pre-flag legality — it lets you pick any party member and only tells you *afterward*, via a "But,
+   {POKÉMON} can't learn {move}." message, if it can't learn it. Showing ABLE/NOT ABLE before selection is a
+   deliberate UX improvement over the source games, not a fidelity claim; the write-up originally overstated
+   this as "a real Gen 1 screen," which was wrong and is corrected here rather than silently fixed. Only an ABLE
+   row is selectable; picking one runs the existing move-replacement flow (free-slot auto-learn, or the
+   `MoveReplacementRequired` forget-a-move prompt) exactly as it does for a level-up learn. **Built as reusable
+   infrastructure** — the ABLE/NOT ABLE picker + its legality query are generic, not wired one-off to this reward
+   path alone (`MoveTeachTargetModal`/`ChooseMoveTeachTargetAsync`/`MoveLearning.TeachMoveAsync`).
+
+**Superseded scope.** The original 2026-09-27 Known-Gaps sizing assumed a physical bag item (`ItemImport` work, a
+new `ItemCategory.Tm` + `IItemEffect`, single-use-vs-infinite scarcity gated on bag persistence). None of that
+was needed under the reward-choice design — the whole item/effect/bag/scarcity layer drops out because there is
+no item to hold.
+
+**Gen 1 fidelity note.** The *moves offered* are Gen-1-authentic (real TM/HM-learnable moves per species, gated
+by the same Machine data the enemy AI already trusts). The *delivery mechanism* — a roguelite reward-choice card
+instead of a held, reusable bag item — is a deliberate adaptation, the same class of choice as the existing
+Draft/Boss-catch/Reward-Choice systems layered on top of Gen 1 combat fidelity.
+
+**Gen-variable surface: none new.** `PokemonLearnset.Generation` + `IContentScope` already gate Machine rows by
+generation — no new `IBattleRules`/seam member was needed.
+
+**As built:**
+- **Backend:** `RunLoop.cs` — `MoveTeachRewardOption(Attack Move, bool[] AbleBySlot) : RewardOption` and
+  `RewardContext.Party` (the live party snapshot a reward roll needs to see). `IBattleInput
+  .ChooseMoveTeachTargetAsync` (default auto-picks the first able member; only the interactive web input blocks
+  on a real choice). `BattleEvents.cs` — `MoveTeachTargetRequired` (move stats + per-member `Candidates`) and
+  `MoveTeachCandidateInfo` (species/name/level/HP/status + `Able`). `MoveLearning.TeachMoveAsync` — a new
+  single-move entry point extracted alongside `LearnMovesForLevelAsync`, sharing the same
+  `MoveLearned`/`MoveForgotten`/`MoveLearnDeclined` events and the forget-a-move prompt. `RewardResolution.cs` —
+  after `RewardGranted` fires, a `MoveTeachRewardOption` pick raises `MoveTeachTargetRequired`, awaits
+  `ChooseMoveTeachTargetAsync`, and an in-range ABLE slot runs `MoveLearning.TeachMoveAsync`; an ineligible/
+  stale/declined pick is a no-op (reward already granted, only the teach is skipped).
+  `RewardCalculator.RollMoveTeachOption` (web layer, `internal` for direct testing) builds the candidate pool
+  from the whole party's Machine-legal-and-unknown moves, weighted by `LearnsetMoveSelector.MoveScore` (made
+  `public` for this) using each move's *best-fit* party member's score. `EncounterFactory
+  .LoadMachineLearnsetsAsync` loads every content-scoped species' Machine learnset **once per run** (species id
+  → legal move ids) — needed up front since a later draft/boss-catch pick can bring in any species, not just the
+  starter — carried on the new `RunSetup.MachineMovesBySpecies` / `PendingSession.MachineMovesBySpecies` and
+  threaded through `GameSessionManager`/`GameController`. `SignalRInput.SetMoveTeachTargetChoice` +
+  `BattleHub`/`SignalRBattleEventEmitter` wiring complete the web round-trip.
+- **Frontend:** `RewardChoiceModal.tsx` — a `moveTeach` reward card (move name, `TypeBadge`, PWR/ACC/PP line).
+  New `MoveTeachTargetModal.tsx` — the ABLE/NOT-ABLE party-list "Teach {move}?" screen, reusing `PartyCard`
+  (disabled + "· Unable" note on a NOT ABLE member) and a "Don't teach" decline button. `timeline.ts`/
+  `battleReducer.ts`/`useBattleHub.ts` carry the new `moveTeach` option kind and the `MoveTeachTargetRequired`
+  prompt; `BattleScreen.tsx` renders the new modal.
+- **Tests:** `RewardCalculatorTests` — 4 new cases on `RollMoveTeachOption` (empty legality dict → null; a
+  legality row for a different species never leaks in; a member who already knows the move yields no candidate
+  for that member; a mixed-party roll marks only the eligible slot ABLE, pinning the two distinct NOT-ABLE
+  reasons — no Machine row vs. already-known — land on the same `false` verdict without collapsing into one
+  check). `WebEventContractTests` — 2 new `ProjectionExceptions` entries (`MoveTeachRewardOption.Move`/
+  `.AbleBySlot`, deliberately absent under their own names) + 2 value-level projection tests
+  (`RewardChoiceOffered_Projection_CarriesMoveTeachOptionFields`,
+  `MoveTeachTargetRequired_Projection_CarriesMoveStatsAndCandidateAbility` — the latter pins a NOT ABLE
+  candidate projects `Able: false` rather than being dropped or defaulted true). `timeline.test.ts` — 1 new case
+  for the `moveTeach` timeline arm. Full suite green: 1573 .NET, 259 Vitest, `tsc` clean.
+
+**`requirements-review` (2026-09-28): 5 findings, all resolved (3 fixed outright, 2 adjudicated by the user).**
+1. **Fixed — real bug:** PokeAPI's `move_learn_method == "machine"` (→ `LearnMethod.Machine`) does **not**
+   distinguish TM from HM, so a species' genuine Machine row for an HM (verified live: Squirtle→Surf,
+   Charmander→Strength, both species→Cut) was leaking into the move-teach pool — directly contradicting locked
+   decision #2 above. Fixed with a hand-verified exclusion list, the same domain-knowledge-in-code pattern
+   `DATA_IMPORT.md` uses everywhere PokeAPI can't express a Gen 1 fact: `RewardCalculator.Gen1HmMoveIds =
+   [15, 19, 57, 70, 148]` (Cut/Fly/Surf/Strength/Flash), filtered out of the candidate pool before scoring.
+   Pinned by `RollMoveTeachOption_NeverOffersAnHm_EvenWhenTheSpeciesHasARealMachineRowForIt`.
+2. **Fixed — real test-coverage gap:** the apply path (`RewardResolution.ApplyMoveTeachAsync` →
+   `MoveLearning.TeachMoveAsync` → `IBattleInput.ChooseMoveTeachTargetAsync`) had zero coverage — only the roll
+   (`RollMoveTeachOption`) and the wire projection were tested. New `MoveTeachRewardTests.cs` (core project,
+   mirrors `QuickHealRewardTests.cs`'s end-to-end-through-`RewardResolution` shape): auto-learn into a free
+   slot; the full-moveset forget-a-move prompt; and — the specific Gen 1 quirk flagged — a **fainted** party
+   member is still a fully valid, selectable teach target (nothing in the path gates on `Creature.IsAlive`).
+3. **Fixed — overstated fidelity claim:** decision #5's "a real Gen 1 ... screen" framing was wrong. Real Gen 1
+   doesn't pre-flag ABLE/NOT ABLE — it lets you pick any member and only tells you *afterward* if it can't
+   learn the move. Corrected in both this entry (decision #5, above) and `PRODUCT_SPEC.md` to name the
+   ABLE/NOT-ABLE upfront picker as a deliberate roguelite QoL improvement, not a reproduction.
+4. **Fixed — user's call: give move-teach a fixed rarity for gold scaling.** A move-teach substituting the
+   first item slot meant `BuildChoice`'s `bestRarity` (which scales the accompanying gold bag) only ever saw
+   surviving `ItemRewardOption`s — so whenever move-teach fired, the gold bag silently priced at the `Common`
+   floor instead of whatever rarity the substituted item slot would have rolled (up to ~43% less gold, worst on
+   Boss). Fixed by extracting the rarity resolution into `RewardCalculator.ResolveBestRarity` (now directly
+   unit-testable without an RNG) and having it count a `MoveTeachRewardOption` as `RewardRarity.Rare` — it has
+   no `Item`/`Cost` of its own to classify by `RarityOf`, and Rare reflects that it's a build-crafting pick, not
+   a throwaway. Pinned by 3 new `ResolveBestRarity_*` tests (treats move-teach as Rare when no item survives;
+   an Epic item still outranks it; falls back to Common when nothing rolled).
+5. **Fixed — user's call: protect Boss's Revive odds.** The same substitution measurably cut the Boss-only
+   Revive item's effective drop rate on the exact node (Boss, 35% substitution chance) where it's already the
+   sole channel for that item — both item slots could roll Revive before, and move-teach displacing the first
+   removed one of the two shots. Fixed: on Boss nodes only, move-teach now substitutes the **second** item slot
+   instead of the first, so the first slot's own item roll — the one Revive can occupy — is never at risk,
+   regardless of whether move-teach fires that visit. Every other tier is Revive-ineligible anyway (`RollItemOption`'s
+   own Boss-only gate), so the slot ordering doesn't matter there — move-teach still substitutes the first slot
+   off-Boss. Pinned by `RollRewardChoice_OnBoss_MoveTeachNeverDisplacesTheFirstItemSlot` (200 seeds, asserts the
+   invariant on every seed that actually rolled a move-teach, and that at least one did — not vacuously true).
+
+**`pr-review` (2026-09-28): CHANGES-REQUESTED → all 3 blockers fixed, most RECOMMENDED items also applied.**
+1. **Fixed — a real seam-architecture leak.** `RewardCalculator.Gen1HmMoveIds` (the fix for
+   `requirements-review` finding #1 above) was itself a Gen 1 content hardcode in web-layer runtime code — a
+   later generation's HM roster differs (Gen 2 adds Waterfall/Whirlpool), so under a second profile it would
+   have silently mis-classified those moves as TMs with every test green, exactly the "silently runs Gen 1"
+   hazard `GenerationProfile.cs`'s own class doc warns about, and it directly contradicted this entry's own
+   "Gen-variable surface: none new" claim. Fixed by promoting it to a real profile slice:
+   `GenerationProfile.HmMoveIds` (required, so every profile must supply one), `Gen1Profile`'s real five ids,
+   `TestAltProfile`'s deliberately-empty set as the falsification leg. The exclusion moved into
+   `EncounterFactory.LoadMachineLearnsetsAsync` (the dictionary it returns is TM-only by construction now), and
+   `RewardCalculator.RollMoveTeachOption` no longer filters by move id at all — it trusts whatever legality
+   dictionary it's handed. Pinned by 2 new `EncounterFactoryGenerationProfileTests` (the HM exclusion reads
+   `profile.HmMoveIds`, not a hardcoded list — verified against the real DB, Squirtle→Surf; and the read is
+   content-scoped like every other catalog read in the file). `GENERATION_PROFILE.md` §2.1 gained a row for the
+   new slice.
+2. **Fixed — the missing falsification legs above** were this finding; folded into item 1 rather than listed
+   twice (a new catalog read with no `TestAltProfile` probe is a ship-blocking gap in this codebase's own
+   convention, `GENERATION_PROFILE.md` §5(b)/§8).
+3. **Fixed — stale/inaccurate docs.** `ENCOUNTER_DESIGN.md` §5.1 now states the Boss second-slot rule, the
+   Rare-for-gold rule, and the roll-time `AbleBySlot` constraint (with its actual dependency named — the reward
+   roll must precede any evolution/draft offer within the same win, per `BattleRunEvent
+   .GrantBattleRewardAsync`); the `RunLoop.cs` comment that used to be the sole record of that reasoning is now
+   a pointer. "Live party member" (wrong — a fainted member is a valid target) corrected in `PRODUCT_SPEC.md`
+   and the `RollMoveTeachOption` XML doc.
+4. **Fixed — RECOMMENDED, the untested defensive path.** `RewardResolution.ApplyMoveTeachAsync`'s guard against
+   a stale/tampered client pick (a NOT-ABLE slot, an out-of-range slot, or an explicit decline) had no coverage.
+   New `ScriptedInput.TeachesSlot` + 4 `MoveTeachRewardTests` cases (decline still grants the reward but teaches
+   nothing; a NOT-ABLE pick is a no-op; an out-of-range pick is a no-op; a `MoveTeachTargetRequired`'s
+   `Candidates[i].Able` matches the roll's `AbleBySlot` exactly).
+5. **Fixed — RECOMMENDED, two more `RewardCalculator` invariants.** New seeded-loop tests: off-Boss, move-teach
+   always sits at index 0 when it fires (the Boss rule's inverse case); a party/legality pairing with no
+   eligible candidate never rolls a move-teach and always leaves an item in the first slot (the "always falls
+   back" claim, previously asserted only in prose).
+6. **Fixed — RECOMMENDED, the leftover "real Gen 1" phrasing** (`requirements-review` finding #3 corrected the
+   claim in the archive/spec but missed several code comments): swept `BattleEvents.cs`, `IBattleInput.cs`,
+   `RewardResolution.cs`, `timeline.ts` (×2), and this file's own decision #5 above to point at
+   `ENCOUNTER_DESIGN.md` §5.1's corrected framing instead of re-asserting "a real Gen 1 screen."
+7. **Fixed — RECOMMENDED, stale `docs/TODO.md` pointers.** Every inline `<c>docs/TODO.md</c>` reference to this
+   feature (`RunLoop.cs`, `RewardCalculator.cs` ×2, `EncounterFactory.cs` ×2, `GameSessionManager.cs`,
+   `BattleHub.cs`, `WebEventContractTests.cs`) now points at `docs/TODO_ARCHIVE.md`, since the feature is
+   archived, not active. `TODO.md`'s own *Known Gaps* pointer entry also had the "real Gen 1 ABLE/NOT-ABLE"
+   phrasing, corrected there too.
+8. **Fixed — RECOMMENDED, one more Vitest case.** No test parsed a `kind: 'moveTeach'` option's actual move
+   fields (only the null-defaulted fields on other kinds were exercised); added one to `timeline.test.ts`.
+9. **Deferred — advisory-level, not fixed:** a `TestAltProfile`-style wiring test for `RewardContext.Party`
+   itself (proving `BattleRunEvent`/`RewardRunEvent` thread the run's real party, not a stale/default one) and a
+   `battleReducer.test.ts` SHOW/HIDE pair test for `MOVE_TEACH_TARGET`. Both are real gaps of the same
+   "nullable-default could silently disable the feature" shape this codebase watches for, but lower-urgency than
+   the fixed items — left for whenever this file is next touched, not scheduled.
+   Full suite green after all fixes: 1589 .NET, 261 Vitest, `tsc` clean, CSharpier clean.
+
+---
+
 ## Boss/Strong "Optimal" moveset could hand a species moves it could never legally learn ✅ FIXED (2026-09-27)
 
 *(Moved here from `TODO.md` → *Known Gaps*; the design was decided and written up 2026-09-27, then implemented

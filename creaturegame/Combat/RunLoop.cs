@@ -1,3 +1,4 @@
+using creaturegame.Attacks;
 using creaturegame.Creatures;
 
 namespace creaturegame.Combat;
@@ -182,6 +183,15 @@ public sealed record ItemRewardOption(int ItemId, string ItemName, RewardRarity 
 /// item is useful).</summary>
 public sealed record GoldRewardOption(int Gold) : RewardOption;
 
+/// <summary>A move-teach option (TM/HM — Move-Teach Rewards, <c>docs/TODO_ARCHIVE.md</c>): the move itself,
+/// resolved by the web-layer reward policy exactly like every other option's amounts, so the core never touches
+/// the move catalog. <see cref="AbleBySlot"/> is a per-<see cref="Creatures.Party.Members"/>-slot legality flag,
+/// precomputed at roll time — a slot is <c>true</c> only when that member can legally learn <see cref="Move"/>
+/// and doesn't already know it. Full rationale (why roll-time is safe, the Boss slot rule, the gold-rarity
+/// treatment) → <c>ENCOUNTER_DESIGN.md</c> §5.1.</summary>
+public sealed record MoveTeachRewardOption(Attack Move, IReadOnlyList<bool> AbleBySlot)
+    : RewardOption;
+
 /// <summary>A "quick heal" option — a potion-style heal applied on the spot to the player's creature, restoring
 /// only the components that currently apply. The magnitude/components are pre-resolved by the web-layer reward
 /// policy (like the other options' amounts), so the core applies them deterministically. Offered
@@ -211,12 +221,15 @@ public sealed record RewardChoice(IReadOnlyList<RewardOption> Options)
 /// <summary>What a reward roll needs to know about the moment it fires, handed to the injected reward supplier
 /// (same pattern as the enemy supplier). <see cref="Source"/> is the node kind that earned the reward — battle
 /// wins carry the beaten foe's <see cref="EnemyLevel"/> (0 for Treasure/Mystery, which have no foe) — letting
-/// one supplier delegate dispatch to the right web-layer roll (battle vs Treasure vs Mystery) by node kind.</summary>
+/// one supplier delegate dispatch to the right web-layer roll (battle vs Treasure vs Mystery) by node kind.
+/// <see cref="Party"/> is null when a caller doesn't supply it (e.g. tests), in which case the policy simply
+/// never offers a <see cref="MoveTeachRewardOption"/> — same null-means-skip shape as <see cref="Condition"/>.</summary>
 public sealed record RewardContext(
     RunNodeKind Source,
     int EnemyLevel,
     int Depth,
-    PlayerCondition? Condition = null
+    PlayerCondition? Condition = null,
+    Party? Party = null
 );
 
 /// <summary>A lightweight, generation-agnostic snapshot of the player creature's current condition, handed to

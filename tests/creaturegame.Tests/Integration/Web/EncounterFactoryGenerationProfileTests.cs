@@ -538,6 +538,74 @@ public class EncounterFactoryGenerationProfileTests
         );
     }
 
+    // ── The whole-dex Machine learnset read (TM/HM — Move-Teach Rewards) ───────────────────────────────────
+    // A ninth catalog read, added after the table above: EncounterFactory.LoadMachineLearnsetsAsync, the
+    // move-teach reward roll's legality source. Two probes, mirroring the content-scope section's own shape —
+    // one per concern the read has to get right off the profile rather than a hardcoded source.
+
+    private const int Squirtle = 7;
+    private const int Surf = 57; // a real Gen 1 HM (Squirtle genuinely has a Machine row for it)
+
+    // Pikachu (out of TestAltProfile's ≤20 content scope) is already declared above.
+
+    [Fact]
+    public async Task CreatePlayerSetup_MachineLearnsets_ExcludeHmsPerTheProfile_NotAHardcodedGen1List()
+    {
+        // Gen 1 excludes Surf via its own profile.HmMoveIds even though Squirtle's Machine row for it is real
+        // data. TestAltProfile's HmMoveIds is deliberately empty — if the exclusion were still a hardcoded Gen 1
+        // list (the bug pr-review caught) rather than genuinely reading the profile, Surf would stay excluded
+        // under the alt profile too and this assertion would fail.
+        var factory = BuildFactory();
+        var gen1 = await factory.CreatePlayerSetupAsync(
+            Squirtle,
+            50,
+            Gen1Profile.Instance,
+            new SeededRandomSource(1)
+        );
+        var alt = await factory.CreatePlayerSetupAsync(
+            Squirtle,
+            50,
+            TestAltProfile.Instance,
+            new SeededRandomSource(1)
+        );
+        Assert.NotNull(gen1);
+        Assert.NotNull(alt);
+
+        Assert.DoesNotContain(
+            Surf,
+            gen1!.MachineMovesBySpecies.GetValueOrDefault(Squirtle, Array.Empty<int>())
+        );
+        Assert.Contains(
+            Surf,
+            alt!.MachineMovesBySpecies.GetValueOrDefault(Squirtle, Array.Empty<int>())
+        );
+    }
+
+    [Fact]
+    public async Task CreatePlayerSetup_MachineLearnsets_AreScopedToContent_NotTheWholeDex()
+    {
+        // Pikachu (a real Gen 1 TM-learner) sits outside TestAltProfile's id-20 ceiling, so its whole species
+        // entry must be absent from the alt profile's dictionary — present under Gen 1, the control.
+        var factory = BuildFactory();
+        var gen1 = await factory.CreatePlayerSetupAsync(
+            Squirtle,
+            50,
+            Gen1Profile.Instance,
+            new SeededRandomSource(1)
+        );
+        var alt = await factory.CreatePlayerSetupAsync(
+            Squirtle,
+            50,
+            TestAltProfile.Instance,
+            new SeededRandomSource(1)
+        );
+        Assert.NotNull(gen1);
+        Assert.NotNull(alt);
+
+        Assert.DoesNotContain(Pikachu, alt!.MachineMovesBySpecies.Keys);
+        Assert.Contains(Pikachu, gen1!.MachineMovesBySpecies.Keys);
+    }
+
     /// <summary>A content scope that narrows species by an arbitrary predicate and passes moves and items
     /// through — the sharp instrument for the two call sites <see cref="TestAltProfile"/>'s blunt id ceiling
     /// cannot probe: the biome map (which needs a scope tight enough to leave fewer biomes than the map's cap)

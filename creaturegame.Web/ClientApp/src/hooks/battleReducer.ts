@@ -2,7 +2,7 @@
 // it's unit-testable without React, SignalR, or a DOM (this module has only type imports, no runtime deps).
 // The hook owns the effects (the SignalR connection, the timeline driver); this owns the state transitions.
 import type { MoveInfo } from '../types/BattleEvents';
-import type { Action, StatBlock, LogEntry, BiomeOption, RegionBiome, RegionRoute, RewardOption, ShopOfferItem, PartyMember, AcquisitionOffer } from '../battle/timeline';
+import type { Action, StatBlock, LogEntry, BiomeOption, RegionBiome, RegionRoute, RewardOption, ShopOfferItem, PartyMember, AcquisitionOffer, MoveTeachCandidate } from '../battle/timeline';
 
 export interface LevelUpPanel {
   creatureName: string;
@@ -47,6 +47,19 @@ export interface RewardChoicePrompt {
 export interface ShopPrompt {
   items: ShopOfferItem[];
   balance: number;
+}
+
+// The move-teach target picker (TM/HM — Move-Teach Rewards): the move on offer (display stats) + every current
+// party member flagged ABLE/NOT ABLE. A blocking modal — the run waits server-side until the player picks an
+// able member or declines (RespondMoveTeachTarget).
+export interface MoveTeachTargetPrompt {
+  moveName: string;
+  power: number;
+  accuracy: number;
+  damageType: string;
+  attackType: string;
+  pp: number;
+  candidates: MoveTeachCandidate[];
 }
 
 // An acquisition offer (themed draft / boss catch): the offered creature + the current party (for the swap-out
@@ -97,6 +110,7 @@ export interface BattleState {
   evolution: EvolutionPrompt | null;
   biomeChoice: BiomeChoicePrompt | null;
   rewardChoice: RewardChoicePrompt | null;
+  moveTeachTarget: MoveTeachTargetPrompt | null;
   shop: ShopPrompt | null;
   acquisition: AcquisitionPrompt | null;
   // Between-biome lead choice (Stage 1d): the roster to pick the next biome's lead from (the active one flagged),
@@ -158,6 +172,7 @@ export const initialState: BattleState = {
   evolution: null,
   biomeChoice: null,
   rewardChoice: null,
+  moveTeachTarget: null,
   shop: null,
   acquisition: null,
   leadChoice: null,
@@ -286,6 +301,21 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
       return { ...state, rewardChoice: { source: action.source, options: action.options } };
     case 'HIDE_REWARD_CHOICE':
       return { ...state, rewardChoice: null };
+    case 'SHOW_MOVE_TEACH_TARGET':
+      return {
+        ...state,
+        moveTeachTarget: {
+          moveName: action.moveName,
+          power: action.power,
+          accuracy: action.accuracy,
+          damageType: action.damageType,
+          attackType: action.attackType,
+          pp: action.pp,
+          candidates: action.candidates,
+        },
+      };
+    case 'HIDE_MOVE_TEACH_TARGET':
+      return { ...state, moveTeachTarget: null };
     case 'SHOW_SHOP':
       return { ...state, shop: { items: action.items, balance: action.balance }, gold: action.balance };
     case 'SHOP_PURCHASED':

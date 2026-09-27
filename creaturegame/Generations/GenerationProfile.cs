@@ -136,6 +136,21 @@ public sealed record GenerationProfile
     public required IEvolutionRules EvolutionRules { get; init; }
 
     /// <summary>
+    /// This generation's HM move ids — content the move-teach reward roll must exclude (TM/HM — Move-Teach
+    /// Rewards, <c>docs/TODO_ARCHIVE.md</c>: TMs only, no HMs).
+    /// </summary>
+    /// <remarks>
+    /// <para><b>Why this is a profile slice and not a runtime constant.</b> PokeAPI's <c>move_learn_method ==
+    /// "machine"</c> (→ <c>LearnMethod.Machine</c>) does not distinguish TM from HM, and which move ids
+    /// are HMs is itself generation-variable (Gen 2 adds Waterfall/Whirlpool, Gen 3 adds Rock Smash/Dive) — so
+    /// hardcoding Gen 1's five ids directly in the web-layer reward code would have been exactly the "silently
+    /// runs Gen 1" hazard this type exists to close (see the class remarks above), the moment a second
+    /// generation's profile reused that code. <c>EncounterFactory.LoadMachineLearnsetsAsync</c> reads this to
+    /// filter the whole-dex Machine learnset before it ever reaches <c>RewardCalculator</c>.</para>
+    /// </remarks>
+    public required IReadOnlySet<int> HmMoveIds { get; init; }
+
+    /// <summary>
     /// Builds the enemy brain for a run, closing over that run's seeded RNG so its choices replay under the seed.
     /// </summary>
     /// <remarks>

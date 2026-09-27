@@ -44,7 +44,8 @@ public class PlayerSlotEndpointTests
             new SeededRandomSource(1),
             [],
             Difficulty.Normal,
-            Generation.One
+            Generation.One,
+            new Dictionary<int, IReadOnlyList<int>>()
         );
         Assert.True(manager.AttachConnection(gameId, "conn-1")); // claims it: pending -> active
         return gameId;

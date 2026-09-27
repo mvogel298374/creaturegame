@@ -523,6 +523,19 @@ public sealed class SignalRBattleEventEmitter(
             ),
             MoveForgotten e => ("MoveForgotten", new { e.CreatureName, e.MoveName }),
             MoveLearnDeclined e => ("MoveLearnDeclined", new { e.CreatureName, e.MoveName }),
+            MoveTeachTargetRequired e => (
+                "MoveTeachTargetRequired",
+                new
+                {
+                    e.MoveName,
+                    e.Power,
+                    e.Accuracy,
+                    DamageType = e.DamageType.ToString(),
+                    AttackType = e.AttackType.ToString(),
+                    e.Pp,
+                    Candidates = e.Candidates.Select(ProjectMoveTeachCandidate),
+                }
+            ),
             _ => ("Unknown", new { }),
         };
 
@@ -567,6 +580,24 @@ public sealed class SignalRBattleEventEmitter(
                 h.RestoreLowPp,
                 Label = (string?)h.Label,
             },
+            MoveTeachRewardOption t => new
+            {
+                Kind = "moveTeach",
+                ItemId = 0,
+                ItemName = (string?)null,
+                Rarity = (string?)null,
+                Gold = 0,
+                HpRestore = 0,
+                CureStatus = false,
+                RestoreLowPp = false,
+                Label = (string?)null,
+                MoveName = (string?)t.Move.Name,
+                Power = t.Move.BaseDamage,
+                Accuracy = t.Move.Accuracy,
+                DamageType = (string?)t.Move.DamageType.ToString(),
+                AttackType = (string?)t.Move.AttackType.ToString(),
+                Pp = t.Move.PowerPointsMax,
+            },
             _ => new
             {
                 Kind = "unknown",
@@ -579,6 +610,20 @@ public sealed class SignalRBattleEventEmitter(
                 RestoreLowPp = false,
                 Label = (string?)null,
             },
+        };
+
+    // Field-level projection gap: a new MoveTeachCandidateInfo field is invisible on the wire until it's added
+    // here (TODO.md — the recurring web-event field-projection gap).
+    private static object ProjectMoveTeachCandidate(MoveTeachCandidateInfo c) =>
+        new
+        {
+            c.SpeciesId,
+            c.Name,
+            c.Level,
+            c.Hp,
+            c.MaxHp,
+            Status = c.Status.ToString(),
+            c.Able,
         };
 
     // Field-level projection gap: a new ShopOfferItem field is invisible on the wire until it's added here

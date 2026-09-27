@@ -122,6 +122,24 @@ the linked design doc instead — pull it there and leave only the pointer here.
   exception), `ARCHITECTURE.md` §2.11. History → `TODO_ARCHIVE.md` → *In-Battle Item Party-Targeting — items
   other than Revive can target any living party member*.
 
+### TM/HM — Move-Teach Rewards
+- A reward-choice card can offer a **move a party member could legally learn** (a real Gen 1 TM-learnable move
+  for that species — fainted members are eligible too, matching Gen 1's own TM-use rule) instead of an item —
+  shown with its type, power, accuracy and PP. No physical TM item exists; there is nothing to hold in the bag.
+- The substitution chance depends on the reward's source: 5% on a Wild/Elite battle win, 20% on a Treasure/
+  Mystery node, 35% on a Boss win — always falling back to a normal item reward when no party member has an
+  eligible, not-already-known move. On a Boss win the move-teach card always occupies the *second* item slot
+  (never the first, which is the one that can carry the Boss-only Revive) and counts as Rare for the gold bag's
+  rarity scaling.
+- Picking the card opens a "Teach {move} to a Pokémon?" screen listing every current party member, each marked
+  ABLE or NOT ABLE up front. **This is a roguelite QoL improvement, not a literal Gen 1 reproduction** — the real
+  games let you pick any party member and only tell you *afterward* if it can't learn the move; showing legality
+  before selection is a deliberate deviation, not a fidelity claim. Only an ABLE member is selectable. Choosing
+  one runs the same forget-a-move flow a level-up learn uses on a full moveset; declining the screen still keeps
+  the reward pick itself, just skips the teach.
+- Gen 1's 5 HMs are not offered — only TM-learnable moves.
+- Design detail → `ENCOUNTER_DESIGN.md` §5.1. History → `TODO_ARCHIVE.md` → *TM/HM — Move-Teach Rewards*.
+
 ## 6. Generation & presentation
 
 ### Level-up stat panel (Gen 1 "Kanto Sage" skin)

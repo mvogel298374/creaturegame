@@ -119,6 +119,26 @@ public interface IBattleInput
     Task<int> ChooseRewardAsync(RewardChoiceContext context) => Task.FromResult(0);
 
     /// <summary>
+    /// Asked when the player picks a <see cref="MoveTeachRewardOption"/> reward: which party member (an index
+    /// into <see cref="MoveTeachTargetContext.Party"/>) learns <see cref="MoveTeachTargetContext.Move"/>, or
+    /// <c>null</c> to decline (a "teach to a Pokémon?" screen — every member shown, only an
+    /// <see cref="MoveTeachTargetContext.AbleBySlot"/>-true one selectable; showing ABLE/NOT ABLE up front is a
+    /// roguelite QoL improvement, not a literal Gen 1 reproduction — see `ENCOUNTER_DESIGN.md` §5.1). Blocks the
+    /// run until the player
+    /// answers. Only the interactive player input is ever consulted; the default auto-picks the first able
+    /// member (declining only if somehow none are), so automated / AI inputs never stall on the prompt — only
+    /// the web <see cref="SignalRInput"/> blocks awaiting a real choice. An ineligible / out-of-range pick is a
+    /// no-op downstream (<c>RewardResolution</c>) — nothing is taught, same as an explicit decline.
+    /// </summary>
+    Task<int?> ChooseMoveTeachTargetAsync(MoveTeachTargetContext context)
+    {
+        for (int i = 0; i < context.AbleBySlot.Count; i++)
+            if (context.AbleBySlot[i])
+                return Task.FromResult<int?>(i);
+        return Task.FromResult<int?>(null);
+    }
+
+    /// <summary>
     /// Asked whenever an acquisition is offered (the themed draft after a win; later the boss catch): return an
     /// <see cref="AcquisitionDecision"/> — decline, add to the party, or (when the party is full) add by
     /// replacing a chosen member. Blocks the run until the player answers. Only the interactive player input is
@@ -189,6 +209,16 @@ public sealed record EvolutionPromptContext(Creature Player, int ToSpeciesId, st
 /// <c>RunNodeKind</c> name) and the options on offer (two rarity-rolled items and a gold bag by default). An
 /// input picks one by index.</summary>
 public sealed record RewardChoiceContext(string Source, IReadOnlyList<RewardOption> Options);
+
+/// <summary>Context for a move-teach target decision (a picked <see cref="MoveTeachRewardOption"/>): the move
+/// on offer, the current <see cref="Creatures.Party"/> to pick a learner from, and a per-
+/// <see cref="Creatures.Party.Members"/>-slot legality flag (mirrors <see cref="MoveTeachRewardOption.AbleBySlot"/>
+/// exactly — same array, same order). An input returns the chosen member's index, or null to decline.</summary>
+public sealed record MoveTeachTargetContext(
+    Attack Move,
+    Party Party,
+    IReadOnlyList<bool> AbleBySlot
+);
 
 /// <summary>Context for a shop buy/leave decision: the stock on offer this visit and the player's current
 /// <see cref="Balance"/> in ₽ (so an input can gate its choice on affordability — the default just leaves).</summary>

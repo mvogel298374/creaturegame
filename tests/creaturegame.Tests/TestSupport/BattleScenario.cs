@@ -19,6 +19,8 @@ public sealed class ScriptedInput(params string[] moveNames) : IBattleInput
     private int? _forgetSlot;
     private bool _acceptRecovery = true;
     private int _rewardPick;
+    private bool _teachTargetScripted;
+    private int? _teachTargetSlot;
 
     /// <summary>
     /// The fixed answer to a level-up replace-move prompt: a slot index (0–3) to forget, or <c>null</c> to
@@ -76,6 +78,31 @@ public sealed class ScriptedInput(params string[] moveNames) : IBattleInput
 
     public Task<int?> ChooseMoveToForgetAsync(MoveReplacementContext context) =>
         Task.FromResult(_forgetSlot);
+
+    /// <summary>
+    /// The fixed answer to a move-teach target picker: a party slot index (any value, including a NOT-ABLE or
+    /// out-of-range one — <c>RewardResolution</c> must tolerate a bad pick), or <c>null</c> to decline. Unset by
+    /// default, in which case <see cref="ChooseMoveTeachTargetAsync"/> falls back to the interface default
+    /// (auto-pick the first able slot) so an un-configured input never blocks. Returned by
+    /// <see cref="ChooseMoveTeachTargetAsync"/>.
+    /// </summary>
+    public ScriptedInput TeachesSlot(int? slot)
+    {
+        _teachTargetScripted = true;
+        _teachTargetSlot = slot;
+        return this;
+    }
+
+    public Task<int?> ChooseMoveTeachTargetAsync(MoveTeachTargetContext context)
+    {
+        if (_teachTargetScripted)
+            return Task.FromResult(_teachTargetSlot);
+
+        for (int i = 0; i < context.AbleBySlot.Count; i++)
+            if (context.AbleBySlot[i])
+                return Task.FromResult<int?>(i);
+        return Task.FromResult<int?>(null);
+    }
 
     /// <summary>Makes this input skip the between-encounter Poké Center recovery (default is to accept, same as
     /// the interface default). Returned by <see cref="ConfirmRecoveryAsync"/>.</summary>
