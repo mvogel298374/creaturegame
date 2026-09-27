@@ -20,16 +20,19 @@ public enum MoveSelectionStrategy
     TmEnhanced,
 
     /// <summary>
-    /// The strongest moves for the creature's types from the <em>entire</em> move pool, ignoring legality and
-    /// level — a min-maxed, boss-grade set. Deterministic top-N by score. The Boss tier.
+    /// The strongest <em>species-legal</em> moves (level-up + TM/HM) for the creature's types, ignoring learn
+    /// level — the same legal pool as <see cref="TmEnhanced"/> (a species' real ceiling has only one legitimate
+    /// answer), never a move the species couldn't actually learn. Deterministic top-N by score. The Boss tier;
+    /// Boss's edge over Strong lives entirely in the other <c>EnemyTierSpec</c> levers (DVs/level/BST), not a
+    /// wider move pool — see <c>ENCOUNTER_DESIGN.md</c> §3.5.
     /// </summary>
     Optimal,
 }
 
 /// <summary>
-/// Picks a creature's starting moveset from its learnset (or, for the strong tiers, a wider pool).
-/// Generation-agnostic: it consumes learnset rows that the caller has already filtered to the active
-/// generation and learn method, so there is no generation branching here.
+/// Picks a creature's starting moveset from its learnset (or, for the strong tiers, the species-legal
+/// level-up + TM/HM pool the caller supplies). Generation-agnostic: it consumes learnset rows that the caller
+/// has already filtered to the active generation and learn method, so there is no generation branching here.
 /// <para>
 /// RNG is taken through <see cref="IRandomSource"/> (defaulting to the shared source), the same seam used
 /// across the engine — a <see cref="SeededRandomSource"/> makes <see cref="MoveSelectionStrategy.WeightedSmart"/>
@@ -65,11 +68,10 @@ public static class LearnsetMoveSelector
         int maxMoves = MaxMoves
     )
     {
-        // The strong tiers ignore learn level and pick the best moves by score, deterministically.
-        if (strategy == MoveSelectionStrategy.Optimal)
-            return SelectBest(movesById.Values, type1, type2, maxMoves); // any move
-
-        if (strategy == MoveSelectionStrategy.TmEnhanced)
+        // The strong tiers ignore learn level and pick the best moves by score, deterministically, from the
+        // species-legal pool — Optimal and TmEnhanced share this pool (never a move the species can't learn);
+        // Boss's edge over Strong lives in the other EnemyTierSpec levers, not a wider move pool.
+        if (strategy is MoveSelectionStrategy.Optimal or MoveSelectionStrategy.TmEnhanced)
         {
             // Species-legal pool: every learnset row the caller supplied (level-up + TM/HM), resolved to a move.
             var legal = learnset
@@ -133,7 +135,7 @@ public static class LearnsetMoveSelector
     ) => candidates.Take(maxMoves).OrderBy(c => c.LearnLevel).Select(c => c.Move).ToList();
 
     // The strongest N moves for the creature's types, deterministic (ties broken by move id). No RNG, no level
-    // gate — used by the TmEnhanced/Optimal tiers over their respective (legal / full) pools.
+    // gate — used by the TmEnhanced/Optimal tiers over the same species-legal pool.
     private static IReadOnlyList<Attack> SelectBest(
         IEnumerable<Attack> moves,
         DamageType type1,

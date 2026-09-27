@@ -289,7 +289,7 @@ punch above its level (intended).
 |:--|:--|:--|
 | **Base** | species **level-up** learnset | current `CanonicalLatest` (player) / `WeightedSmart` (enemy) — unchanged |
 | **TmEnhanced** | level-up **+ TM/HM-legal** same-type strong moves | needs real TM/HM data (§3.6) |
-| **Optimal** | **any** move, best for the creature's types + coverage | the min-maxed boss-grade set |
+| **Optimal** | the **same species-legal pool as TmEnhanced** (level-up + TM/HM), scored the same way | the boss-grade tier — computes an identical moveset to TmEnhanced for a given species; Boss stays stronger via the DV/level/BST levers, not the moveset (fixed 2026-09-27, `TODO_ARCHIVE.md` → *Boss/Strong "Optimal" moveset could hand a species moves it could never legally learn*) |
 
 ### 3.6 Sub-task: import real TM/HM learnability *(gates TmEnhanced)*  *(✅ done — incl. re-import)*
 
@@ -300,14 +300,19 @@ existing rows default `LevelUp`). A full `PokeApiConnector` re-import has been r
 989 level-up rows. Pinned by `LearnsetImportTests` (mapper) + `MigrationTests` (column + round-trip).
 - ⚠️ **Integration hazard (two places change together):** every *level-up* path — base moveset selection,
   player setup, evolution, and `MoveLearning` on level-up — filters `LearnMethod == LevelUp` so TM rows can't
-  leak into level-up learning. `CreateEnemyAsync` includes Machine rows **only** for the `TmEnhanced` tier.
+  leak into level-up learning. `CreateEnemyAsync` includes Machine rows for both the `TmEnhanced` **and**
+  `Optimal` tiers (not `Base`) — see §3.5's table note on why `Optimal` also needs them now.
 
 ### 3.7 Deferred (flagged)
 
 - **Stat-Exp lever** — enemies use natural-gain-only for now; pre-seeding trained Stat-Exp is a later tuning lever.
 - **Boss ceiling** — Boss's distinctive design (out-classing the player: can exceed player level, perfect DVs,
-  optimal coverage, BST above band) is **revisited in a later phase**; Phase 2 ships Boss as a modest bump over
-  Strong.
+  BST above band) is **revisited in a later phase**; Phase 2 ships Boss as a modest bump over Strong. **Not
+  included:** a distinctive *moveset* edge — §3.5's legality fix (2026-09-27) settled that `Optimal` and
+  `TmEnhanced` share one legal pool and must compute the identical moveset for a species, so Boss's ceiling
+  lives entirely in the other three levers. A coverage-aware `Optimal` algorithm was considered and declined
+  as part of that fix (`TODO_ARCHIVE.md`); reopening it would be a new design call, not a continuation of this
+  deferred item.
 - **Tier *selection*** — which tier per encounter is **Phase 3** (node types pick it). `CreateEnemyAsync` gains
   an optional `IEnemyArchetype` (default Medium ≈ today at depth 0), the same seam pattern as the biome param.
 
@@ -396,7 +401,7 @@ biome — already on-theme, and impossible to roll something far outside the ban
 - **Caught-boss strength** — a caught boss is a fresh party-ready copy of that species at the boss's own level,
   built at **`DvQuality.Superb`** (each DV a 50% chance at the 80–100% band, else an ordinary roll) with a legal
   canonical moveset. It's a strong, earned pickup — notably above an ordinary catch — but deliberately **not** the
-  boss's own `Perfect`-DV / all-pool (`Optimal`) build, so the player doesn't get a min-maxed clone of the
+  boss's own `Perfect`-DV / `Optimal`-moveset build, so the player doesn't get a min-maxed clone of the
   encounter they beat.
 - The in-battle Poké Ball throw (the Gen 1 catch-rate-vs-HP formula) is deliberately **out of scope** and stays
   deferred in `TODO.md` → *Catch / Poké Ball effect*. Note authentic Gen 1 forbids catching a **Trainer's**

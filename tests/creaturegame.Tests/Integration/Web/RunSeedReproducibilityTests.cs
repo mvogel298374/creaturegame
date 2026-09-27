@@ -1,3 +1,4 @@
+using creaturegame.Attacks;
 using creaturegame.Combat;
 using creaturegame.Creatures;
 using creaturegame.DB;
@@ -206,6 +207,62 @@ public class RunSeedReproducibilityTests
             // Weak caps at 3, the others at 4. Catches a regression where the cap is dropped on the way through.
             int cap = tier == EnemyArchetypes.Weak ? 3 : 4;
             Assert.InRange(a.MoveSet.Count, 1, cap);
+        }
+    }
+
+    [Fact]
+    public async Task Boss_MovesetMatchesTmEnhancedOnTheSameLegalPool()
+    {
+        // The regression this guards: MoveSelectionStrategy.Optimal used to rank the *entire* move pool with
+        // no legality filter (e.g. a Boss Scyther could roll Hydro Pump). Fixed 2026-09-27 — Optimal now shares
+        // TmEnhanced's species-legal pool (ENCOUNTER_DESIGN.md §3.5), so the two must compute the identical
+        // moveset for a species. Recompute TmEnhanced's expected set independently against the live DB's real
+        // learnset rows and assert an *exact* match — not just "every move happens to be legal" — so a
+        // regression in which learn methods CreateEnemyAsync loads for Optimal (EncounterFactory.cs's
+        // allowedMethods, ENCOUNTER_DESIGN.md §3.6's "two places change together" hazard) is actually caught,
+        // not silently tolerated by a weaker "is it legal" check.
+        var factory = BuildFactory();
+        var setup = await factory.CreatePlayerSetupAsync(
+            Bulbasaur,
+            50,
+            Gen1Profile.Instance,
+            new SeededRandomSource(11)
+        );
+        Assert.NotNull(setup);
+
+        await using var ctx = new PokemonDbContext();
+        var movesById = setup!.AllMoves.ToDictionary(m => m.Id);
+
+        for (int i = 0; i < 30; i++)
+        {
+            var boss = await factory.CreateEnemyAsync(
+                setup.Player,
+                setup.AllMoves,
+                Gen1Profile.Instance,
+                new SeededRandomSource(i),
+                depth: i % 6,
+                archetype: EnemyArchetypes.Boss
+            );
+
+            var learnset = ctx
+                .Learnsets.AsNoTracking()
+                .Where(l =>
+                    l.SpeciesId == boss.SpeciesId
+                    && l.Generation == 1
+                    && (l.Method == LearnMethod.LevelUp || l.Method == LearnMethod.Machine)
+                )
+                .ToList();
+
+            var expected = LearnsetMoveSelector.Select(
+                MoveSelectionStrategy.TmEnhanced,
+                learnset,
+                movesById,
+                boss.Level,
+                boss.Type1 ?? DamageType.Normal,
+                boss.Type2
+            );
+
+            Assert.Equal(expected.Select(m => m.Id), boss.MoveSet.Select(m => m.Base.Id));
         }
     }
 

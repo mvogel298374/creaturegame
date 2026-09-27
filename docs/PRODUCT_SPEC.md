@@ -93,6 +93,14 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - Design detail → `ENCOUNTER_DESIGN.md` §3.8. History → `TODO_ARCHIVE.md` → *Species selection respects each
   species' evolution-chain floor*.
 
+### Boss/Strong-tier enemy movesets are species-legal
+- A Boss- or Strong-tier enemy's moveset is always drawn from moves that species could legally know (its
+  level-up learnset plus any TM/HM it can legally learn) — it can never carry a move outside that pool.
+- Boss and Strong compute the identical moveset for a given species; Boss's edge over Strong comes entirely
+  from its higher DVs, level, and BST, not from a wider move pool.
+- Design detail → `ENCOUNTER_DESIGN.md` §3.5. History → `TODO_ARCHIVE.md` → *Boss/Strong "Optimal" moveset
+  could hand a species moves it could never legally learn*.
+
 ## 4. Progression (XP, leveling, evolution)
 *(not yet populated)*
 

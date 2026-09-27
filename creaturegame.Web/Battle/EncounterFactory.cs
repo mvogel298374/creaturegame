@@ -425,12 +425,13 @@ public sealed class EncounterFactory(
             PickByBst(pool, spec.TargetBst, source, biome)
             ?? throw new InvalidOperationException("No species available to build an encounter.");
 
-        // The TmEnhanced tier draws from level-up AND TM/HM (Machine) moves; base tiers use level-up only and
-        // Optimal ranks the whole move pool, so neither needs Machine rows. Include them only when used.
-        var allowedMethods =
-            spec.Moves == MoveSelectionStrategy.TmEnhanced
-                ? new[] { LearnMethod.LevelUp, LearnMethod.Machine }
-                : new[] { LearnMethod.LevelUp };
+        // TmEnhanced and Optimal both draw from level-up AND TM/HM (Machine) moves — the species-legal pool
+        // Optimal now shares with TmEnhanced (ENCOUNTER_DESIGN.md §3.5); base tiers use level-up only.
+        var allowedMethods = spec.Moves
+            is MoveSelectionStrategy.TmEnhanced
+                or MoveSelectionStrategy.Optimal
+            ? new[] { LearnMethod.LevelUp, LearnMethod.Machine }
+            : new[] { LearnMethod.LevelUp };
         var learnsets = await LoadLearnsetsAsync(
             pokemonCtx,
             profile,

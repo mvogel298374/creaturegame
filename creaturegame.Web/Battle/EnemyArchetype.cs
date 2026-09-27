@@ -63,8 +63,10 @@ public static class EnemyArchetypes
         };
 }
 
-// Offsets from the Medium/depth baseline are run-layer tuning, not Gen 1 mechanics. Boss is a deliberate
-// placeholder — its distinctive ceiling design is revisited later (ENCOUNTER_DESIGN.md §3.7).
+// Offsets from the Medium/depth baseline are run-layer tuning, not Gen 1 mechanics. Boss's DVs/level/BST are
+// a deliberate placeholder — its distinctive ceiling on those three levers is revisited later
+// (ENCOUNTER_DESIGN.md §3.7). Its moveset lever is NOT part of that deferral: Optimal is pinned to the same
+// species-legal pool as Strong's TmEnhanced (settled 2026-09-27, ENCOUNTER_DESIGN.md §3.5).
 
 internal sealed class WeakArchetype : IEnemyArchetype
 {
@@ -109,7 +111,7 @@ internal sealed class BossArchetype : IEnemyArchetype
             TargetBst: (int)(EncounterFactory.ScaleTargetBst(c.PlayerBst, c.Depth) * 1.20),
             Level: EncounterFactory.ScaleWildLevel(c.PlayerLevel, c.Depth, c.Rng) + 6,
             Dvs: DvQuality.Perfect,
-            Moves: MoveSelectionStrategy.Optimal, // best of any move
+            Moves: MoveSelectionStrategy.Optimal, // species-legal pool, same as Strong — see LearnsetMoveSelector.Optimal
             MoveCount: 4
         );
 }

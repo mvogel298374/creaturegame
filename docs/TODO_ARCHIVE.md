@@ -8,6 +8,55 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Boss/Strong "Optimal" moveset could hand a species moves it could never legally learn ✅ FIXED (2026-09-27)
+
+*(Moved here from `TODO.md` → *Known Gaps*; the design was decided and written up 2026-09-27, then implemented
+and tested the same day.)*
+
+**The bug.** `MoveSelectionStrategy.Optimal` (the Boss tier) picked its top-N moves from the *entire* DB move
+pool (`LearnsetMoveSelector.cs`'s `Select()`, `SelectBest(movesById.Values, ...)`), with zero learnability
+filter — e.g. a wild Boss Scyther could roll Hydro Pump. This was the *documented* intent
+(`ENCOUNTER_DESIGN.md` §3.5's table said "**any** move… ignoring legality"), not a regression — the design
+itself let bosses "cheat" past Gen 1 legality, contradicting the "true Gen 1 clone" principle (`CLAUDE.md` →
+Design Principles) and the Strong tier's own already-correct behaviour (`TmEnhanced` only draws from the
+species' real learnset rows).
+
+**Decided design (user's call).** `Optimal` is redefined to mean "the best moveset the species could
+*legitimately* have," not "the best moveset in the abstract" — it draws from the same legal pool as
+`TmEnhanced` (level-up + TM/HM `Machine` rows), never a move outside it. Since neither strategy is level-gated
+and both are deterministic top-N by the same `MoveScore`, **Boss and Strong now compute the identical moveset
+for a given species** — there's only one legitimate "best legal kit," so nothing is lost by them agreeing. Boss
+stays distinctly stronger than Strong entirely through the other three `EnemyTierSpec` levers, which already
+exceed Strong's: Perfect DVs (vs. High), level +6 (vs. +3), BST ×1.20 (vs. ×1.10) — see `EnemyArchetype.cs`'s
+`BossArchetype`/`StrongArchetype`. Considered and declined: giving `Optimal` its own coverage-aware algorithm
+(e.g. preferring a complementary coverage move over a second same-type move) instead of reusing `TmEnhanced`'s
+plain top-N-by-score — rejected as unneeded complexity for what was asked.
+
+**As built:**
+- `LearnsetMoveSelector.cs` — `Select()`'s `Optimal` branch now shares `TmEnhanced`'s species-legal pool
+  (`if (strategy is MoveSelectionStrategy.Optimal or MoveSelectionStrategy.TmEnhanced)` over the caller-supplied
+  `learnset` rows), instead of `SelectBest(movesById.Values, ...)` over the whole DB. `MoveSelectionStrategy
+  .Optimal`'s XML doc rewritten to match (no longer says "the entire move pool, ignoring legality").
+- `EncounterFactory.cs` (~428-433) — `allowedMethods` now loads `LearnMethod.Machine` rows for `Optimal` too,
+  not just `TmEnhanced` (previously `Optimal` didn't even fetch TM/HM data, which didn't matter while the
+  selector ignored the learnset entirely for that strategy).
+- `ENCOUNTER_DESIGN.md` §3.5's table + §3.6's integration-hazard note updated to match (Optimal no longer
+  documented as "any move, ignoring legality").
+- **Tests:** `LearnsetMoveSelectorTests` — `Learnset_Optimal_PicksHighestScoreMovesFromAllMoves_IgnoringLearnsetAndLevel`
+  rewritten into `Learnset_Optimal_PicksBestSpeciesLegalMoves_IgnoringLevel_ExcludingIllegal` (asserts legality,
+  mirroring the `TmEnhanced` test); added `Learnset_Optimal_AndTmEnhanced_AgreeOnTheSameSpecies` (pins the two
+  tiers now compute identical results); fixed `Learnset_MaxMoves_CapsTheMovesetSize` (needed a matching
+  learnset since `Optimal` no longer ignores it). `RunSeedReproducibilityTests` —
+  `Boss_MovesetMatchesTmEnhancedOnTheSameLegalPool` added: builds 30 Boss enemies across seeds against the
+  live DB, independently recomputes each species' expected `TmEnhanced` moveset from its real `Learnsets`
+  rows (`Generation == 1`, `LevelUp`/`Machine` only), and asserts an *exact* match — catches not just an
+  illegal move but a regression in which learn methods `EncounterFactory.CreateEnemyAsync` loads for
+  `Optimal` (the §3.6 "two places change together" hazard), which a weaker "is it legal" check would miss.
+  `LearnsetMoveSelector.cs`'s class summary + `SelectBest` comment also updated (caught by `pr-review`) —
+  neither described Optimal as ranking a "wider"/"full" pool anymore. Full .NET suite green (1567 passed).
+
+---
+
 ## Generation Profile 4d+ · Level-up stat panel — Kanto Sage skin ✅ COMPLETE (2026-09-22)
 
 *(Moved here from `TODO.md` → Generation Profile → Stage 4d+. Two follow-ups stay live there: the Gen-1
