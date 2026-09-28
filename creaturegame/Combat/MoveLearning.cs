@@ -39,7 +39,7 @@ internal static class MoveLearning
     {
         if (learner.AddAttack(move))
         {
-            emitter?.Emit(new MoveLearned(learner.Name, move.Name ?? ""));
+            emitter?.Emit(new MoveLearned(learner.Name, learner.Id, move.Name ?? ""));
             return;
         }
 
@@ -47,6 +47,7 @@ internal static class MoveLearning
         emitter?.Emit(
             new MoveReplacementRequired(
                 learner.Name,
+                learner.Id,
                 move.Name ?? "",
                 learner.MoveSet.Select(m => m.Base.Name ?? "").ToList()
             )
@@ -58,13 +59,13 @@ internal static class MoveLearning
         {
             string forgotten = learner.MoveSet[s].Base.Name ?? "";
             learner.ReplaceMove(s, move);
-            emitter?.Emit(new MoveForgotten(learner.Name, forgotten));
-            emitter?.Emit(new MoveLearned(learner.Name, move.Name ?? ""));
+            emitter?.Emit(new MoveForgotten(learner.Name, learner.Id, forgotten));
+            emitter?.Emit(new MoveLearned(learner.Name, learner.Id, move.Name ?? ""));
         }
         else
         {
             // null / out of range → declined: the moveset is unchanged.
-            emitter?.Emit(new MoveLearnDeclined(learner.Name, move.Name ?? ""));
+            emitter?.Emit(new MoveLearnDeclined(learner.Name, learner.Id, move.Name ?? ""));
         }
     }
 }

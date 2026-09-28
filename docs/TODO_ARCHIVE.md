@@ -8,6 +8,165 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Creature Identity — id-keyed events ✅ COMPLETE (2026-09-29, all 4 stages)
+
+*(Moved here from `TODO.md` → *Creature Identity — id-keyed events*, Tier 1.5. Planned 2026-09-28, built in four
+stages 2026-09-28/29. The write-up below is the plan-time text with per-stage outcomes; "the interim stop-gap" and
+"the client still routes by name until Stage 3" describe the world **before** Stage 3. Note the stop-gap (an
+`"Enemy <NAME>"` rename in `Battle.StartFightAsync`) lived only in the uncommitted working tree during development
+and was removed in Stage 3 — **it never reached a commit**, so no released build ever had it. Current design →
+`ARCHITECTURE.md` §2.2, "Creatures are identified by id".)*
+
+**Caveats carried forward:** a bare `Battle` outside `RunDirector` has `0/0` ids (see Stage 3). E2E status is in
+the post-review addendum below.
+
+**Problem.** Every creature-referencing `BattleEvent` carries a display *name* (`AttackerName`, `TargetName`,
+`CreatureName`, …), and the client decides which side an event lands on by comparing that name to the player's
+(`timeline.ts` `side()`, `battleReducer.ts` `UPDATE_HP`/`UPDATE_STATUS`/`CLEAR_STATUS`/`LEAD_CHANGED`/
+`CREATURE_RENAMED`). The engine is fine — it routes by object reference (`AttackAction.Source/Target`,
+`_participants`) — so this is purely a wire/client defect. **Bug that surfaced it (2026-09-28):** a wild PIDGEY vs
+the player's un-nicknamed PIDGEY sent the enemy's hit FX onto the player's sprite. **Interim stop-gap (working
+tree only, never committed — removed in Stage 3):** `Battle.StartFightAsync` renamed a colliding enemy to
+`"Enemy <NAME>"` for the fight. It covered enemy-vs-party only. **Not covered (likely, unverified — Stage 0 proves or disproves):** two same-named
+*party* members (a drafted twin, or two nicknamed alike) — a Potion on a benched twin would move the *lead's* HP
+bar (`UPDATE_HP` matches `playerName`), and `LEAD_CHANGED` / `CREATURE_RENAMED` `find` the first name match.
+`Creature Naming` (archive) made collisions likelier and its plan recorded "no code looks up a creature by
+`Name`" — true of the engine, false of the client.
+
+**Decision (user, 2026-09-28): identity, not a stop-gap.** Names stay for *display text*; ids do all *routing*.
+
+### Design
+- **`Creature.Id : int`** — the individual's identity, **stable across evolution, Transform/Mimic and nickname
+  changes** (it is the creature, not the species: `SpeciesId`/`Name` both legitimately change; `Id` never does).
+  `0` = unassigned.
+- **Minted by a per-run `CreatureIdSource`** (monotonic counter owned by the run, threaded to
+  `EncounterFactory.BuildCreature` — the single builder for starter / draft / boss catch / wild enemies). **Not
+  `Guid.NewGuid()`:** the run promises same-seed → same event sequence (`GAME_LOOP.md` §5); a random id would
+  break it. A counter created in the deterministic order the run already builds creatures keeps it. **Not a
+  process-global counter** either (concurrent games + test order would leak into wire values).
+- **Events keep the name field (display) and gain an `…Id` sibling (routing)** — additive, so the log text
+  path is untouched. `BattleStarted`/`TurnStarted` carry `PlayerId`/`EnemyId`; every other creature event carries
+  the id of the creature it names. Party wire types (`PartyMemberDto`, `PartyUpdated`, `LeadChanged`,
+  `CreatureSwitchedIn`, acquisition events) carry ids, so two same-named members are distinguishable.
+- **Client:** `ExpandContext.playerName` → `playerId`; `side(id)`; reducer holds `playerId`/`enemyId` and matches
+  `UPDATE_*` by id; `PartyMember.id`; `LEAD_CHANGED`/`CREATURE_RENAMED` find by id. Names only ever reach
+  `LOG`/nameplate text.
+- **Inbound stays slot-keyed** (`UseItem`, `RespondAcquisition`, `ForgetMove`, switch) — already unambiguous;
+  do not migrate it. Revisit only if slots stop being stable (e.g. a PC box).
+- **Retire the stop-gap** in the same stage that makes the client id-routed (delete the rename + its tests →
+  replace with id probes), so the workaround doesn't outlive its reason.
+
+### Staging (each stage independently shippable; stop for greenlight between them)
+- [x] **Stage 0 — prove the gap** ✅ DONE (2026-09-28, tests only, no product change). **The party half is a
+  real bug, not latent.** Two legs: (a) engine/wire —
+  `ItemActionBattleTests.UsingPotion_OnABenchTwin_…` shows `ItemEffects` heals the right member by reference but
+  emits `Healed` named identically to the lead's (a characterization test; Stage 2 replaces its assertion with
+  "the two ids differ"); (b) client — two `it.fails` reducer cases in `battleReducer.test.ts` assert the correct
+  behaviour and are verified to fail on their real assertions: a benched twin's heal moves the **lead's** HP bar
+  (`UPDATE_HP`), and a benched twin's evolution renames the **on-field** creature (`CREATURE_RENAMED`). Stage 3
+  turns red on them by design — that is the cue to drop the `.fails` and pass ids. **Not tested, by design:**
+  `LEAD_CHANGED`'s first-name-match `find` — the correct answer isn't expressible without an id in the action,
+  so it is covered by Stage 3's id probes instead.
+- [x] **Stage 1 — engine identity** ✅ DONE (2026-09-28, no wire change). `Creature.Id` (`internal set`, 0 =
+  unassigned), `CreatureIdSource` (counter from 1, `Assign` is idempotent, `HighWater` for the future save
+  layer), owned by **`RunState.Ids`**. **Deviation from the plan as drafted:** minting is in the core
+  `RunDirector`/`RunState`, *not* `EncounterFactory.BuildCreature` — the factory is a singleton shared across
+  runs, so it cannot own per-run state, and threading a source through its four public entry points would have
+  been churn for nothing. `RunState`'s constructor identifies the starting party (starter = id 1);
+  `RunDirector` wraps the enemy, draft and boss-catch suppliers so every creature entering the run is
+  identified at the one place all three pass through. Tests: `CreatureIdSourceTests` (unique/monotonic/
+  idempotent/per-run-scoped, survives nickname + identity snapshot-restore), `EvolveToTests` (id survives
+  evolution), `CreatureIdentityRunTests` (a real run with a same-named wild twin *and* a same-named drafted twin:
+  all ids unique and non-zero, entry order, same seed ⇒ same ids). **Verified by sabotage:** bypassing the foe
+  wrapper fails exactly the two foe probes (both foes `Id 0`); the same-seed test was strengthened to assert
+  non-zero, since two runs of zeros would otherwise pass vacuously.
+- [x] **Stage 2 — wire** ✅ DONE (2026-09-29; server side only — the client still routes by name until Stage 3).
+  ~60 event records + `PartyMemberInfo`/`MoveTeachCandidateInfo` gained an `int …Id` sibling beside each
+  creature-naming string (`TargetName`→`TargetId`, `Name`→`Id`, …), **required and un-defaulted** so the compiler
+  flags every construction site (146 sites; a forgotten id can't compile, let alone default to 0 silently).
+  Names stay for display text. Shapes worth knowing for Stage 3: `EvolutionOffered`/`CreatureEvolved` carry **one
+  `CreatureId`** (from/to are the same creature, so no `FromId`/`ToId`); `TransformedInto` carries both
+  `CreatureId` and `TargetId`; `CreatureAcquired.ReplacedId` is `int?` (null on an open-slot deposit);
+  `BattleEnded.WinnerId`, `RunEnded.FinalCreatureId`, `SwitchInOffered.FaintedId`. `MapEvent` and both nested
+  projections (`ProjectPartyMember`, `ProjectMoveTeachCandidate`) project them, so the party-hydrate REST snapshot
+  carries ids too. Wire field names are the camelCase of the record's (`targetId`, `creatureId`, `id`).
+  **Two new generic guards in `WebEventContractTests`:** `EveryCreatureNameOnTheWireHasAnIdSibling` (reflects over
+  every event *and* nested payload record; any `…Name` string not in the `NonCreatureNameProperties` allowlist or
+  the `NonCreaturePayloadTypes` set — `RegionMapBiome`, `BiomeOption`, `MoveInfo` — must have an int sibling, so a
+  future event can't ship name-only) and `EveryCreatureIdProjectsUnderItsOwnNameWithItsOwnValue` (gives each id a
+  distinct sentinel and asserts it arrives under its own name — catches a crossed wire the presence-only field
+  guard can't). **Verified by sabotage:** `EnemyId = e.PlayerId` in the `BattleStarted` arm fails exactly the value
+  guard (`sent 1003, arrived as 1001`); un-allowlisting `ScreenName` fails exactly the sibling guard. Engine-level:
+  `SameNameBattleTests.SameNamedCombatants_EveryEventIdentifiesItsCreatureById` (real `Battle`, ids only — stays
+  valid when Stage 3 removes the rename) and the Stage 0 characterization test is **replaced** by
+  `UsingPotion_OnABenchTwin_…CarryingTheTwinsIdNotTheLeads`. Console emitter unchanged (text).
+  *Mechanics note:* the call-site edit was a regex over `new <Event>(<expr>.Name` → `…, <expr>.Id` (98 sites) plus
+  16 hand edits the compiler enumerated; every regex case's first argument was a `Creature`, checked, because an
+  `Attack` also has `.Name`/`.Id` and would have compiled silently.
+- [x] **Stage 3 — client routing** ✅ DONE (2026-09-29). `ExpandContext.playerName` → `playerId`; `side(id)`;
+  reducer state gains `playerId`/`enemyId` (names kept for display) and `UPDATE_HP`/`UPDATE_STATUS`/
+  `CLEAR_STATUS`/`LEAD_CHANGED`/`CREATURE_RENAMED`/`SWITCHED_IN`/`PARTY_SET` all key on ids; `PartyMember` and
+  `MoveTeachCandidate` carry `id`; `nextPlayerName` → `nextPlayerId`. **A simplification, not just a port:**
+  `CreatureEvolved` no longer touches player identity at all (the id is stable across the rename), so the old
+  "guard on the from-name" special case is gone. `Battle.StartFightAsync`'s interim `"Enemy X"` rename (never
+  committed) is **deleted** (names now stay identical on the wire; `SameNameBattleTests` rewritten to assert that). **The two Stage 0
+  `it.fails` cases are now ordinary passing tests**, alongside new same-name cases: wild-vs-player HP/status,
+  lead-vs-benched-twin heal, twin evolution (both directions), `LEAD_CHANGED` onto the promoted twin (not the
+  first row with that name), `PARTY_SET` not hijacked by a same-named lead, and the whole `expandEvent` side
+  family (shake, lunge, faint, Transform, status, win/loss). **`routing.test.ts`** is the "no name-routing"
+  guard: it scans `timeline.ts`/`battleReducer.ts`/`playerIdentity.ts` (comments stripped) for any equality
+  against a `*Name`, with a self-test that the pattern still matches the old shapes so it can't go vacuous —
+  **verified by sabotage** (a reintroduced `=== state.playerName` fails exactly the reducer's assertion). Needed a
+  two-line `src/raw-imports.d.ts` for Vite's `?raw` import. **Verified live:** a real run over SignalR shows
+  camelCase ids on the wire (`playerId`/`enemyId`, `attackerId` → `targetId`) and the enemy's hit carrying the
+  *player's* id. **Not verified in a browser** — the reported same-name fight itself wasn't reproduced end to end
+  (E2E is user-opt-in): the engine (`SameNamedCombatants_…`) and client (`same-named combatants…`) halves are each
+  pinned, and the live probe pins the seam between them.
+  **Known limit, by design:** a bare `Battle` outside `RunDirector` (i.e. tests) has `0/0` combatants — ids are
+  assigned by `RunDirector`, which is the only production entry.
+- [x] **Post-review addendum (2026-09-29).** `pr-review` returned CHANGES-REQUESTED (one blocker + four small
+  items), all resolved: the value guard now walks **nested** records (`PartyMemberInfo.Id`,
+  `MoveTeachCandidateInfo.Id` — sabotage-verified: mapping `Id = SpeciesId` fails five nested paths); the boss-catch
+  id wrapper is pinned by `BossCatch_WhenOffered_AndAccepted…` (bypassing it fails exactly that test); doc pointers
+  repointed to `ARCHITECTURE.md` §2.2; `routing.test.ts` also scans `useBattleHub.ts` and catches loose `==`/`!=`
+  (its header lists what it still can't: `.includes(name)`, `switch (name)`, name-keyed `Map`s); `STATE_MODEL.md`
+  notes that a save layer must persist `RunState.Ids.HighWater`. **Resume follow-up (a `pr-review` advisory,
+  pre-existing under name routing):** the reconnect replay re-sends the *cached* `BattleStarted` (the encounter's
+  original lead) plus the latest `TurnStarted`, so a refresh after a mid-battle switch-in left the client believing
+  the outgoing creature was fighting. `TurnStarted` now restates identity — `nextPlayerId` handles it and the
+  `TURN_STARTED` action re-asserts `playerId`/`enemyId`/names — so the next turn prompt self-corrects (tests
+  simulate the stale-replay sequence). **Possibly still open, unrelated to ids and NOT verified:** the *player sprite's
+  species* after such a refresh — `TurnStarted` carries no species id, so nothing on this path re-derives it; whether
+  the remounted scene shows the wrong species was not checked.
+
+### DoR coverage
+1. **Acceptance:** with a same-named player/enemy, a same-named benched twin, and a nickname equal to the enemy's
+   species, every damage/HP/status/faint/switch effect lands on the correct sprite and HUD row; the reflection
+   guard fails if a creature event lacks an id; no name-based routing remains client-side.
+2. **Design pass:** this plan; central-method impact is limited to `BuildCreature` + `Battle`'s event emission
+   (adds ids, changes no battle math). No frontend *visual* design — provisional flag not needed.
+3. **Gen-variable surface:** **none — identity is gen-invariant** (litmus: Gen 2 changes no id semantics). It is
+   an enabler for later-gen shapes (doubles need >1 creature per side, which name→side routing cannot express).
+   No `IBattleRules` member; `TestAltProfile` needs no new slice (state this in the Stage 1 PR).
+4. **Gen 1 source of truth:** N/A — infrastructure, not a mechanic. Nothing to assert against the cartridge.
+5. **Data vs runtime:** runtime + wire + client only. **No importer/DB change.** (Future save layer persists
+   `Id` and the source's high-water mark.)
+6. **Quirk to test:** the collision cases in (1), incl. the **falsification** requirement — verify by sabotage
+   (route one arm by name again → exactly its probe fails, others stay green).
+7. **Dependencies:** none blocking. Should land **before** Catch (`CaptureAttempted(TargetName, …)` would
+   otherwise ship name-keyed) and before `PlayerSave`/`SavedCreature`. `Fusion` (design-guide inspiration) would
+   mint a *new* id for the fused creature and retire both parents' — decide when planned, not now.
+
+### Risks / open questions
+- **Test churn:** many tests assert `AttackerName == "Player"`. Names stay on events, so they keep passing;
+  only routing tests change. Tests constructing `new Creature("X")` get `Id 0` — the guard must treat 0 as
+  "unassigned" and tests that exercise routing assign ids explicitly.
+- **Wire size:** one int per creature reference — negligible.
+- **Session Resume:** ids survive a client refresh (server holds the run). A *server restart* is the save
+  layer's problem (persist the counter with the creature ids).
+
+---
+
 ## TM/HM — Move-Teach Rewards ✅ SHIPPED (2026-09-28)
 
 *(Moved here from `TODO.md` → *TM/HM — Move-Teach Rewards*. `/plan` and full `/dev` implementation both landed
@@ -755,7 +914,8 @@ plain settable `string`, populated from the species name (uppercase) at creation
 the single builder shared by the starter, the themed-draft supplier, and the boss-catch supplier — `new
 Creature(species.Name.ToUpper())`) — no separate `Nickname` field, and `Name` is what every surface already
 displays (nameplates, battle log, party strip). Confirmed no code anywhere looks up a creature by `Name` as an
-identity key (no `.Name ==` / `Find`/`FirstOrDefault` matches in the engine) — every internal reference is by
+identity key (no `.Name ==` / `Find`/`FirstOrDefault` matches in the engine; *2026-09-29 note: true of the engine,
+but the web client did key on names — fixed by *Creature Identity — id-keyed events*, above*) — every internal reference is by
 slot/reference/`SpeciesId`, so setting `Name` to an arbitrary player-chosen string at creation time doesn't
 collide with anything downstream. Confirmed the wire already carried `Name` end-to-end with **zero schema change
 needed**: `BattleStarted.PlayerName` and the acquisition events (`CreatureAcquired`, `PartyUpdated`'s

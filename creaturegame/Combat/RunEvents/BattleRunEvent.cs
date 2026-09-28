@@ -152,11 +152,13 @@ internal sealed class BattleRunEvent(
         if (party.FirstLiveIndex() < 0)
             return false;
 
-        ctx.Emitter?.Emit(new SwitchInOffered(PartyProjection.Snapshot(party), fainted.Name));
+        ctx.Emitter?.Emit(
+            new SwitchInOffered(PartyProjection.Snapshot(party), fainted.Name, fainted.Id)
+        );
         int index = await ctx.PlayerInput.ChooseSwitchInAsync(new SwitchInContext(party));
 
         party.SetLead(party.CorrectSwitchInPick(index));
-        ctx.Emitter?.Emit(new LeadChanged(party.Lead.Name, party.Lead.SpeciesId));
+        ctx.Emitter?.Emit(new LeadChanged(party.Lead.Name, party.Lead.Id, party.Lead.SpeciesId));
         ctx.Emitter?.Emit(new PartyUpdated(PartyProjection.Snapshot(party)));
         return true;
     }
@@ -257,13 +259,15 @@ internal sealed class BattleRunEvent(
         var newForm = evolution.NewForm;
         string toName = newForm.Name.ToUpper(); // matches how EvolveTo names the creature
 
-        ctx.Emitter?.Emit(new EvolutionOffered(fromName, toName, fromSpeciesId, newForm.Id));
+        ctx.Emitter?.Emit(
+            new EvolutionOffered(fromName, toName, player.Id, fromSpeciesId, newForm.Id)
+        );
         bool allow = await ctx.PlayerInput.ConfirmEvolutionAsync(
             new EvolutionPromptContext(player, newForm.Id, toName)
         );
         if (!allow)
         {
-            ctx.Emitter?.Emit(new EvolutionCancelled(fromName));
+            ctx.Emitter?.Emit(new EvolutionCancelled(fromName, player.Id));
             return false;
         }
 
@@ -271,7 +275,14 @@ internal sealed class BattleRunEvent(
         player.Learnset = evolution.NewLearnset;
 
         ctx.Emitter?.Emit(
-            new CreatureEvolved(fromName, player.Name, fromSpeciesId, player.SpeciesId, toName)
+            new CreatureEvolved(
+                fromName,
+                player.Name,
+                player.Id,
+                fromSpeciesId,
+                player.SpeciesId,
+                toName
+            )
         );
 
         // Evolution grants no moves itself, but the evolved form may learn one at the current level.

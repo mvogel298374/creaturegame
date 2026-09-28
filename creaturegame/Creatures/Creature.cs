@@ -5,6 +5,12 @@ namespace creaturegame.Creatures;
 
 public class Creature
 {
+    /// <summary>This individual's identity within its run — what event routing keys on, where <see cref="Name"/>
+    /// (a display string that two creatures can share) cannot. Stable for the creature's whole life: evolution,
+    /// Transform/Mimic and nicknaming all change species/name/moves but never this. <c>0</c> = unassigned; minted
+    /// by the run's <see cref="CreatureIdSource"/> when the creature enters the run (<c>RunDirector</c>).</summary>
+    public int Id { get; internal set; }
+
     public string Name { get; set; } = string.Empty;
 
     /// <summary>The species' own display name (e.g. "PIKACHU"), independent of <see cref="Name"/> — which may

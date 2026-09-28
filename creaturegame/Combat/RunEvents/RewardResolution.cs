@@ -77,6 +77,7 @@ internal static class RewardResolution
                     new MoveTeachCandidateInfo(
                         m.SpeciesId,
                         m.Name,
+                        m.Id,
                         m.Level,
                         m.Hp,
                         m.MaxHp,
@@ -137,7 +138,12 @@ internal static class RewardResolution
             int before = player.Attributes.HP;
             player.Attributes.ReceiveHealing(heal.HpRestore); // caps at MaxHP
             emitter?.Emit(
-                new Healed(player.Name, player.Attributes.HP - before, player.Attributes.HP)
+                new Healed(
+                    player.Name,
+                    player.Id,
+                    player.Attributes.HP - before,
+                    player.Attributes.HP
+                )
             );
         }
 
@@ -152,7 +158,12 @@ internal static class RewardResolution
                 {
                     move.PowerPointsCurrent = move.Base.PowerPointsMax;
                     emitter?.Emit(
-                        new PpRestored(player.Name, move.Base.Name ?? "", move.PowerPointsCurrent)
+                        new PpRestored(
+                            player.Name,
+                            player.Id,
+                            move.Base.Name ?? "",
+                            move.PowerPointsCurrent
+                        )
                     );
                 }
             }

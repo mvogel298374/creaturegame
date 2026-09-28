@@ -26,6 +26,7 @@ internal static class AcquisitionResolution
                 source,
                 offered.SpeciesId,
                 offered.Name,
+                offered.Id,
                 offered.Level,
                 offered.Types,
                 offered.Attributes.MaxHP,
@@ -40,7 +41,7 @@ internal static class AcquisitionResolution
 
         if (!decision.Accept)
         {
-            ctx.Emitter?.Emit(new AcquisitionDeclined(offered.Name));
+            ctx.Emitter?.Emit(new AcquisitionDeclined(offered.Name, offered.Id));
             return;
         }
 
@@ -58,24 +59,33 @@ internal static class AcquisitionResolution
                 || slot == party.LeadIndex
             )
             {
-                ctx.Emitter?.Emit(new AcquisitionDeclined(offered.Name));
+                ctx.Emitter?.Emit(new AcquisitionDeclined(offered.Name, offered.Id));
                 return;
             }
             // Creature Naming Stage B: apply the nickname (falling back to the species default on a
             // blank/cancelled step) before the deposit, so both events below already carry the chosen name —
             // same call site pattern as the starter path (GameController.Start).
             offered.Name = NicknameRules.Normalize(decision.Nickname, offered.Name);
-            string replacedName = party.Members[slot].Name;
+            var replaced = party.Members[slot];
             party.Replace(slot, offered);
             ctx.Emitter?.Emit(
-                new CreatureAcquired(offered.Name, offered.SpeciesId, true, replacedName)
+                new CreatureAcquired(
+                    offered.Name,
+                    offered.Id,
+                    offered.SpeciesId,
+                    true,
+                    replaced.Name,
+                    replaced.Id
+                )
             );
         }
         else
         {
             offered.Name = NicknameRules.Normalize(decision.Nickname, offered.Name);
             party.Add(offered);
-            ctx.Emitter?.Emit(new CreatureAcquired(offered.Name, offered.SpeciesId, false, null));
+            ctx.Emitter?.Emit(
+                new CreatureAcquired(offered.Name, offered.Id, offered.SpeciesId, false, null, null)
+            );
         }
 
         ctx.Emitter?.Emit(new PartyUpdated(PartyProjection.Snapshot(party)));

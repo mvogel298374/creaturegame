@@ -118,6 +118,248 @@ public class WebEventContractTests
         );
     }
 
+    // ── Creature Identity (ARCHITECTURE.md §2.2; history in docs/TODO_ARCHIVE.md → "Creature Identity", Stage 2) ────────────────────────────────────────
+    // The wire routes by creature id; the *Name fields are display text only. Two guards keep that true.
+
+    // A property named "…Name" that is NOT a creature: a move/item/biome/screen/species label. Anything else that
+    // ends in "Name" is assumed to name a creature and must carry an id (see EveryCreatureNameOnTheWire…), so a
+    // new such property fails until it either gets an id or is added here with a decision.
+    private static readonly HashSet<string> NonCreatureNameProperties = new(StringComparer.Ordinal)
+    {
+        "MoveName",
+        "NewMoveName",
+        "ItemName",
+        "BiomeName",
+        "ScreenName",
+        "ToSpeciesName",
+    };
+
+    // One creature named twice — before and after a rename (evolution) — shares a single id rather than a
+    // FromId/ToId pair that would always be equal.
+    private static readonly Dictionary<(string Event, string Property), string> SharedIdSibling =
+        new()
+        {
+            [(nameof(CreatureEvolved), nameof(CreatureEvolved.FromName))] = nameof(
+                CreatureEvolved.CreatureId
+            ),
+            [(nameof(CreatureEvolved), nameof(CreatureEvolved.ToName))] = nameof(
+                CreatureEvolved.CreatureId
+            ),
+            [(nameof(EvolutionOffered), nameof(EvolutionOffered.FromName))] = nameof(
+                EvolutionOffered.CreatureId
+            ),
+            [(nameof(EvolutionOffered), nameof(EvolutionOffered.ToName))] = nameof(
+                EvolutionOffered.CreatureId
+            ),
+        };
+
+    // Payload records in the events' namespace whose "Name" is a biome or a move, not a creature.
+    private static readonly HashSet<Type> NonCreaturePayloadTypes =
+    [
+        typeof(RegionMapBiome),
+        typeof(BiomeOption),
+        typeof(MoveInfo),
+    ];
+
+    // Every event plus the payload records nested inside them that can name a creature (PartyMemberInfo,
+    // MoveTeachCandidateInfo, …) — found by walking the same probe types the projection guard uses.
+    private static List<Type> CreatureBearingTypes()
+    {
+        var found = new List<Type>();
+        void Visit(Type t)
+        {
+            if (
+                t.Namespace != typeof(BattleEvent).Namespace
+                || NonCreaturePayloadTypes.Contains(t)
+                || found.Contains(t)
+            )
+                return;
+            found.Add(t);
+            foreach (var prop in EventProperties(t))
+            {
+                foreach (var nested in ProbeElementTypes(prop.PropertyType))
+                    Visit(nested);
+                if (ProbeType(prop.PropertyType) is { } single)
+                    Visit(single);
+            }
+        }
+        foreach (var e in ConcreteBattleEventTypes())
+            Visit(e);
+        return found;
+    }
+
+    // (type, the string property naming a creature, the id property that must sit beside it).
+    private static IEnumerable<(
+        Type Type,
+        PropertyInfo NameProp,
+        string IdName
+    )> CreatureNameProperties() =>
+        CreatureBearingTypes()
+            .SelectMany(t =>
+                EventProperties(t)
+                    .Where(p =>
+                        p.PropertyType == typeof(string)
+                        && p.Name.EndsWith("Name", StringComparison.Ordinal)
+                        && !NonCreatureNameProperties.Contains(p.Name)
+                    )
+                    .Select(p =>
+                        (
+                            t,
+                            p,
+                            SharedIdSibling.TryGetValue((t.Name, p.Name), out var shared)
+                                ? shared
+                                : p.Name[..^"Name".Length] + "Id"
+                        )
+                    )
+            );
+
+    /// <summary>
+    /// <b>The no-name-only guard.</b> Every property that names a creature — on any event or nested payload
+    /// record — must have an <c>int</c> id sibling (<c>TargetName</c> → <c>TargetId</c>, <c>Name</c> →
+    /// <c>Id</c>). Without it a new event could ship name-only and re-open the same-name routing bug the client
+    /// had (two creatures called PIDGEY are indistinguishable by name). A property that merely ends in "Name"
+    /// but isn't a creature goes in <see cref="NonCreatureNameProperties"/>.
+    /// </summary>
+    [Fact]
+    public void EveryCreatureNameOnTheWireHasAnIdSibling()
+    {
+        var problems = new List<string>();
+        foreach (var (type, nameProp, idName) in CreatureNameProperties())
+        {
+            var idProp = type.GetProperty(idName);
+            if (
+                idProp is null
+                || (idProp.PropertyType != typeof(int) && idProp.PropertyType != typeof(int?))
+            )
+                problems.Add($"{type.Name}.{nameProp.Name}: no int {idName} beside it.");
+        }
+
+        Assert.True(
+            problems.Count == 0,
+            "These creature-naming properties carry no id, so the client can only route them by display name "
+                + "(ambiguous for same-named creatures). Add the id — or, if the property isn't a creature, add "
+                + $"it to NonCreatureNameProperties:\n  {string.Join("\n  ", problems)}"
+        );
+    }
+
+    /// <summary>
+    /// The value-level counterpart: presence isn't correctness. Each creature id is given a distinct sentinel and
+    /// must arrive on the wire <em>under its own name with its own value</em> — which catches a crossed wire
+    /// (<c>TargetId = e.PlayerId</c>, or a projection that drops <c>ReplacedId</c> into <c>Id</c>) that the field
+    /// guard, which only asks "is the property there", cannot see. Walks nested payload records too
+    /// (<c>PartyMemberInfo.Id</c>, <c>MoveTeachCandidateInfo.Id</c>): those ids are what the client keeps its roster
+    /// and lead tracking on, and they are projected by their own hand-written <c>Select</c>s.
+    /// </summary>
+    [Fact]
+    public void EveryCreatureIdProjectsUnderItsOwnNameWithItsOwnValue()
+    {
+        var problems = new List<string>();
+        var creatureIds = CreatureNameProperties().ToLookup(c => c.Type, c => c.IdName);
+
+        // Builds an instance whose every creature-id parameter — on the record itself and on every nested record
+        // in its collections — holds a distinct sentinel, recording where each one must land on the wire.
+        object Build(
+            Type type,
+            int depth,
+            List<object> path,
+            List<(List<object> Path, int Value)> expected,
+            int[] counter
+        )
+        {
+            var idNames = creatureIds[type].ToHashSet(StringComparer.Ordinal);
+            var ctor = type.GetConstructors()
+                .OrderByDescending(c => c.GetParameters().Length)
+                .First();
+            var args = ctor.GetParameters()
+                .Select(p =>
+                {
+                    if (idNames.Contains(p.Name!))
+                    {
+                        int value = counter[0]++; // distinct per id, so a swap is visible
+                        expected.Add(([.. path, p.Name!], value));
+                        return Convert.ChangeType(
+                            value,
+                            Nullable.GetUnderlyingType(p.ParameterType) ?? p.ParameterType
+                        );
+                    }
+
+                    var elements = ProbeElementTypes(p.ParameterType);
+                    if (elements.Count == 0 || depth >= MaxProbeDepth)
+                        return DefaultArg(p.ParameterType, depth);
+
+                    var list = (IList)
+                        Activator.CreateInstance(
+                            typeof(List<>).MakeGenericType(p.ParameterType.GetGenericArguments()[0])
+                        )!;
+                    string wireName =
+                        ProjectionExceptions.TryGetValue((type.Name, p.Name!), out var renamed)
+                        && renamed is not null
+                            ? renamed
+                            : p.Name!;
+                    for (int i = 0; i < elements.Count; i++)
+                        list.Add(
+                            Build(elements[i], depth + 1, [.. path, wireName, i], expected, counter)
+                        );
+                    return list;
+                })
+                .ToArray();
+            return ctor.Invoke(args);
+        }
+
+        var counter = new[] { 1000 };
+        foreach (var eventType in ConcreteBattleEventTypes())
+        {
+            var expected = new List<(List<object> Path, int Value)>();
+            var evt = (BattleEvent)Build(eventType, 0, [], expected, counter);
+            if (expected.Count == 0)
+                continue;
+
+            var (_, payload) = SignalRBattleEventEmitter.MapEvent(evt);
+            using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+            foreach (var (path, value) in expected)
+            {
+                string where =
+                    $"{eventType.Name}.{string.Join(".", path.Select(s => s is int i ? $"[{i}]" : s))}";
+                var current = doc.RootElement;
+                bool found = true;
+                foreach (var segment in path)
+                {
+                    if (segment is int index)
+                    {
+                        if (
+                            current.ValueKind != JsonValueKind.Array
+                            || index >= current.GetArrayLength()
+                        )
+                        {
+                            found = false;
+                            break;
+                        }
+                        current = current[index];
+                    }
+                    else if (
+                        current.ValueKind != JsonValueKind.Object
+                        || !current.TryGetProperty((string)segment, out current)
+                    )
+                    {
+                        found = false;
+                        break;
+                    }
+                }
+
+                if (!found)
+                    problems.Add($"{where}: not on the wire.");
+                else if (current.GetInt32() != value)
+                    problems.Add($"{where}: sent {value}, arrived as {current.GetInt32()}.");
+            }
+        }
+
+        Assert.True(
+            problems.Count == 0,
+            "A creature id was projected under the wrong name or with another field's value:\n  "
+                + string.Join("\n  ", problems)
+        );
+    }
+
     /// <summary>
     /// Asserts every property of <paramref name="recordType"/> appears on its projected <paramref name="payload"/>
     /// object, then recurses through nested payload records (a <c>MoveInfo</c> in <c>TurnStarted.PlayerMoves</c>, a
@@ -302,12 +544,14 @@ public class WebEventContractTests
         var evt = new TurnStarted(
             1,
             "PLAYER",
+            1,
             100,
             100,
             StatusCondition.None,
             0,
             100,
             "ENEMY",
+            2,
             80,
             80,
             StatusCondition.None,
@@ -342,12 +586,14 @@ public class WebEventContractTests
         var evt = new TurnStarted(
             1,
             "PLAYER",
+            1,
             100,
             100,
             StatusCondition.None,
             0,
             100,
             "ENEMY",
+            2,
             80,
             80,
             StatusCondition.None,
@@ -384,12 +630,14 @@ public class WebEventContractTests
         var evt = new TurnStarted(
             1,
             "PLAYER",
+            1,
             100,
             100,
             StatusCondition.None,
             0,
             100,
             "ENEMY",
+            2,
             80,
             80,
             StatusCondition.None,
@@ -414,7 +662,7 @@ public class WebEventContractTests
     [Fact]
     public void CreatureEvolved_Projection_CarriesBothFormsSpeciesIdsAndTheSpeciesName()
     {
-        var evt = new CreatureEvolved("CHARMANDER", "CHARMELEON", 4, 5, "CHARMELEON");
+        var evt = new CreatureEvolved("CHARMANDER", "CHARMELEON", 7, 4, 5, "CHARMELEON");
 
         var (type, payload) = SignalRBattleEventEmitter.MapEvent(evt);
         using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
@@ -435,7 +683,7 @@ public class WebEventContractTests
     [Fact]
     public void CreatureEvolved_Projection_DistinguishesANicknameFromTheEvolvedSpeciesName()
     {
-        var evt = new CreatureEvolved("Sprout", "Sprout", 1, 2, "IVYSAUR");
+        var evt = new CreatureEvolved("Sprout", "Sprout", 7, 1, 2, "IVYSAUR");
 
         var (_, payload) = SignalRBattleEventEmitter.MapEvent(evt);
         using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
@@ -450,7 +698,7 @@ public class WebEventContractTests
     [Fact]
     public void EvolutionOffered_Projection_CarriesBothFormsAndSpeciesIds()
     {
-        var evt = new EvolutionOffered("CHARMANDER", "CHARMELEON", 4, 5);
+        var evt = new EvolutionOffered("CHARMANDER", "CHARMELEON", 7, 4, 5);
 
         var (type, payload) = SignalRBattleEventEmitter.MapEvent(evt);
         using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
@@ -542,10 +790,20 @@ public class WebEventContractTests
             AttackType.Special,
             5,
             [
-                new MoveTeachCandidateInfo(6, "CHARIZARD", 36, 90, 100, StatusCondition.None, true),
+                new MoveTeachCandidateInfo(
+                    6,
+                    "CHARIZARD",
+                    106,
+                    36,
+                    90,
+                    100,
+                    StatusCondition.None,
+                    true
+                ),
                 new MoveTeachCandidateInfo(
                     1,
                     "BULBASAUR",
+                    101,
                     20,
                     60,
                     60,
@@ -597,7 +855,7 @@ public class WebEventContractTests
     public void CreatureFled_Projection_CarriesNameAndIsPlayer()
     {
         var (type, payload) = SignalRBattleEventEmitter.MapEvent(
-            new CreatureFled("PIDGEY", IsPlayer: true)
+            new CreatureFled("PIDGEY", 5, IsPlayer: true)
         );
         using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
         var root = doc.RootElement;
@@ -618,7 +876,7 @@ public class WebEventContractTests
         static bool ProjectedOnBench(bool onBench)
         {
             var (type, payload) = SignalRBattleEventEmitter.MapEvent(
-                new ExperienceGained("PIKACHU", 137, OnBench: onBench)
+                new ExperienceGained("PIKACHU", 3, 137, OnBench: onBench)
             );
             Assert.Equal("ExperienceGained", type);
             using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
@@ -642,7 +900,7 @@ public class WebEventContractTests
         {
             var stats = new StatBlock(100, 50, 40, 30, 20);
             var (type, payload) = SignalRBattleEventEmitter.MapEvent(
-                new LeveledUp("PIKACHU", 12, 5, 60, stats, stats, OnBench: onBench)
+                new LeveledUp("PIKACHU", 3, 12, 5, 60, stats, stats, OnBench: onBench)
             );
             Assert.Equal("LeveledUp", type);
             using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
@@ -666,12 +924,14 @@ public class WebEventContractTests
                 new TurnStarted(
                     1,
                     "PIKACHU",
+                    1,
                     30,
                     35,
                     StatusCondition.None,
                     0,
                     100,
                     "PIDGEY",
+                    2,
                     20,
                     24,
                     StatusCondition.None,
@@ -912,6 +1172,7 @@ public class WebEventContractTests
             "ThemedDraft",
             SpeciesId: 25,
             Name: "PIKACHU",
+            Id: 9,
             Level: 12,
             Types: [DamageType.Electric],
             MaxHp: 34,
@@ -921,6 +1182,7 @@ public class WebEventContractTests
                 new PartyMemberInfo(
                     4,
                     "CHARMANDER",
+                    104,
                     14,
                     20,
                     40,
@@ -961,8 +1223,26 @@ public class WebEventContractTests
     public void PartyUpdated_Projection_CarriesMemberSubFields()
     {
         var evt = new PartyUpdated([
-            new PartyMemberInfo(6, "CHARIZARD", 36, 100, 120, StatusCondition.None, IsLead: true),
-            new PartyMemberInfo(9, "BLASTOISE", 34, 0, 110, StatusCondition.None, IsLead: false),
+            new PartyMemberInfo(
+                6,
+                "CHARIZARD",
+                106,
+                36,
+                100,
+                120,
+                StatusCondition.None,
+                IsLead: true
+            ),
+            new PartyMemberInfo(
+                9,
+                "BLASTOISE",
+                109,
+                34,
+                0,
+                110,
+                StatusCondition.None,
+                IsLead: false
+            ),
         ]);
 
         var (type, payload) = SignalRBattleEventEmitter.MapEvent(evt);
@@ -983,7 +1263,14 @@ public class WebEventContractTests
     public void CreatureAcquired_Projection_CarriesNameSpeciesReplacedAndReplacedName()
     {
         var (type, payload) = SignalRBattleEventEmitter.MapEvent(
-            new CreatureAcquired("PIKACHU", 25, Replaced: true, ReplacedName: "RATTATA")
+            new CreatureAcquired(
+                "PIKACHU",
+                9,
+                25,
+                Replaced: true,
+                ReplacedName: "RATTATA",
+                ReplacedId: 4
+            )
         );
         using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
         var root = doc.RootElement;
@@ -1002,8 +1289,26 @@ public class WebEventContractTests
     public void LeadChoiceOffered_Projection_CarriesPartyMemberSubFields()
     {
         var evt = new LeadChoiceOffered([
-            new PartyMemberInfo(6, "CHARIZARD", 36, 100, 120, StatusCondition.None, IsLead: true),
-            new PartyMemberInfo(9, "BLASTOISE", 34, 80, 110, StatusCondition.Poison, IsLead: false),
+            new PartyMemberInfo(
+                6,
+                "CHARIZARD",
+                106,
+                36,
+                100,
+                120,
+                StatusCondition.None,
+                IsLead: true
+            ),
+            new PartyMemberInfo(
+                9,
+                "BLASTOISE",
+                109,
+                34,
+                80,
+                110,
+                StatusCondition.Poison,
+                IsLead: false
+            ),
         ]);
 
         var (type, payload) = SignalRBattleEventEmitter.MapEvent(evt);
@@ -1023,7 +1328,9 @@ public class WebEventContractTests
     [Fact]
     public void LeadChanged_Projection_CarriesNameAndSpeciesId()
     {
-        var (type, payload) = SignalRBattleEventEmitter.MapEvent(new LeadChanged("BLASTOISE", 9));
+        var (type, payload) = SignalRBattleEventEmitter.MapEvent(
+            new LeadChanged("BLASTOISE", 2, 9)
+        );
         using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
         var root = doc.RootElement;
 
@@ -1042,10 +1349,20 @@ public class WebEventContractTests
     {
         var evt = new SwitchInOffered(
             [
-                new PartyMemberInfo(6, "CHARIZARD", 40, 0, 130, StatusCondition.None, IsLead: true),
+                new PartyMemberInfo(
+                    6,
+                    "CHARIZARD",
+                    106,
+                    40,
+                    0,
+                    130,
+                    StatusCondition.None,
+                    IsLead: true
+                ),
                 new PartyMemberInfo(
                     9,
                     "BLASTOISE",
+                    109,
                     38,
                     90,
                     120,
@@ -1053,7 +1370,8 @@ public class WebEventContractTests
                     IsLead: false
                 ),
             ],
-            FaintedName: "CHARIZARD"
+            FaintedName: "CHARIZARD",
+            FaintedId: 1
         );
 
         var (type, payload) = SignalRBattleEventEmitter.MapEvent(evt);
@@ -1078,7 +1396,7 @@ public class WebEventContractTests
     public void CreatureSwitchedIn_Projection_CarriesNameSpeciesLevelHpAndStatus()
     {
         var (type, payload) = SignalRBattleEventEmitter.MapEvent(
-            new CreatureSwitchedIn("BLASTOISE", 9, 38, 90, 120, StatusCondition.Poison)
+            new CreatureSwitchedIn("BLASTOISE", 2, 9, 38, 90, 120, StatusCondition.Poison)
         );
         using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
         var root = doc.RootElement;

@@ -41,6 +41,7 @@ export function MoveTeachTargetModal({ prompt, onChoose }: {
               key={i}
               member={{
                 speciesId: c.speciesId,
+                id: c.id,
                 name: c.name,
                 level: c.level,
                 hp: c.hp,

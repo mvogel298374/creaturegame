@@ -89,7 +89,9 @@ public class Battle
         _emitter?.Emit(
             new BattleStarted(
                 PlayerCreature.Name,
+                PlayerCreature.Id,
                 EnemyCreature.Name,
+                EnemyCreature.Id,
                 EnemyCreature.SpeciesId,
                 EnemyCreature.Level
             )
@@ -103,12 +105,14 @@ public class Battle
                 new TurnStarted(
                     _turnNumber,
                     PlayerCreature.Name,
+                    PlayerCreature.Id,
                     PlayerCreature.Attributes.HP,
                     PlayerCreature.Attributes.MaxHP,
                     PlayerCreature.Battle.Status,
                     PlayerCreature.XpThisLevel,
                     PlayerCreature.XpToNextLevel,
                     EnemyCreature.Name,
+                    EnemyCreature.Id,
                     EnemyCreature.Attributes.HP,
                     EnemyCreature.Attributes.MaxHP,
                     EnemyCreature.Battle.Status,
@@ -238,14 +242,14 @@ public class Battle
             if (!EnemyCreature.IsAlive())
             {
                 PlayerWon = true;
-                _emitter?.Emit(new CreatureFainted(EnemyCreature.Name));
+                _emitter?.Emit(new CreatureFainted(EnemyCreature.Name, EnemyCreature.Id));
                 // A MUTUAL KO drops the player's creature on the same turn, and this branch breaks out before the
                 // losing-faint branch below (the only other CreatureFainted emitter) — so without this the client
                 // would never play the player-side faint animation/cry: its creature would just sit at an empty HP
                 // bar through the victory. Emitted after the enemy's, matching the check order that makes the
                 // trade a win. Cannot double-emit: the branch below is unreachable once we break here.
                 if (!PlayerCreature.IsAlive())
-                    _emitter?.Emit(new CreatureFainted(PlayerCreature.Name));
+                    _emitter?.Emit(new CreatureFainted(PlayerCreature.Name, PlayerCreature.Id));
                 // Gen-1 base award, then the roguelite XP curve on top (GENERATION_SEAMS.md).
                 int baseXp = _rules.CalculateXpAwarded(
                     EnemyCreature.SpeciesBaseExperience,
@@ -270,7 +274,13 @@ public class Battle
                 if (PlayerCreature.IsAlive())
                 {
                     PlayerCreature.AddExperience(participantShare);
-                    _emitter?.Emit(new ExperienceGained(PlayerCreature.Name, participantShare));
+                    _emitter?.Emit(
+                        new ExperienceGained(
+                            PlayerCreature.Name,
+                            PlayerCreature.Id,
+                            participantShare
+                        )
+                    );
                     // Award Stat-Exp before the level-up loop so a level gained this battle already reflects it.
                     PlayerCreature.GainStatExp(EnemyCreature);
                     // Revert a Transform/Mimic copy before learning mutates the PERMANENT MoveSet.
@@ -290,7 +300,7 @@ public class Battle
             }
             if (!PlayerCreature.IsAlive())
             {
-                _emitter?.Emit(new CreatureFainted(PlayerCreature.Name));
+                _emitter?.Emit(new CreatureFainted(PlayerCreature.Name, PlayerCreature.Id));
                 // Not when a side fled this turn — no foe left to send anyone in against, so the flee gate
                 // below owns the ending instead.
                 if (!fledThisTurn && await TrySwitchInAsync())
@@ -304,7 +314,7 @@ public class Battle
             if (PlayerCreature.Battle.HasFled || EnemyCreature.Battle.HasFled)
             {
                 var fled = PlayerCreature.Battle.HasFled ? PlayerCreature : EnemyCreature;
-                _emitter?.Emit(new CreatureFled(fled.Name, fled == PlayerCreature));
+                _emitter?.Emit(new CreatureFled(fled.Name, fled.Id, fled == PlayerCreature));
                 EndedInFlee = true;
                 break;
             }
@@ -327,8 +337,8 @@ public class Battle
             // Keyed on PlayerWon, NOT on who is still standing: a mutual KO leaves the finisher fainted but is
             // still the player's win, and naming the (also fainted) enemy would tell the client it lost — which
             // is how it decides between the intermission beat and waiting for a game-over.
-            string winner = PlayerWon ? PlayerCreature.Name : EnemyCreature.Name;
-            _emitter?.Emit(new BattleEnded(winner));
+            var winner = PlayerWon ? PlayerCreature : EnemyCreature;
+            _emitter?.Emit(new BattleEnded(winner.Name, winner.Id));
         }
     }
 
@@ -369,7 +379,7 @@ public class Battle
 
             if (share > 0)
                 member.AddExperience(share);
-            _emitter?.Emit(new ExperienceGained(member.Name, share, OnBench: true));
+            _emitter?.Emit(new ExperienceGained(member.Name, member.Id, share, OnBench: true));
             member.GainStatExp(EnemyCreature);
 
             // Its Mimic/Transform identity was already restored by RestoreOutgoing() as it left the field.
@@ -398,7 +408,7 @@ public class Battle
             if (share > 0)
             {
                 member.AddExperience(share);
-                _emitter?.Emit(new ExperienceGained(member.Name, share, OnBench: true));
+                _emitter?.Emit(new ExperienceGained(member.Name, member.Id, share, OnBench: true));
             }
             member.GainStatExp(EnemyCreature);
             anyLevelled |= await RunLevelUpLoopAsync(member, onBench: true);
@@ -422,6 +432,7 @@ public class Battle
             _emitter?.Emit(
                 new LeveledUp(
                     creature.Name,
+                    creature.Id,
                     creature.Level,
                     creature.XpThisLevel,
                     creature.XpToNextLevel,
@@ -584,7 +595,11 @@ public class Battle
         RestoreOutgoing();
 
         _emitter?.Emit(
-            new SwitchInOffered(PartyProjection.Snapshot(_playerParty), PlayerCreature.Name)
+            new SwitchInOffered(
+                PartyProjection.Snapshot(_playerParty),
+                PlayerCreature.Name,
+                PlayerCreature.Id
+            )
         );
         int index = await _playerInput.ChooseSwitchInAsync(new SwitchInContext(_playerParty));
         // Never send in a fainted/out-of-range creature — the rule lives on Party so this and the run loop's
@@ -627,6 +642,7 @@ public class Battle
         _emitter?.Emit(
             new CreatureSwitchedIn(
                 PlayerCreature.Name,
+                PlayerCreature.Id,
                 PlayerCreature.SpeciesId,
                 PlayerCreature.Level,
                 PlayerCreature.Attributes.HP,
@@ -662,12 +678,16 @@ public class Battle
 
         int damage = Math.Max(1, drained.Attributes.MaxHP / _rules.LeechSeedDrainDenominator);
         drained.Attributes.ReceiveDamage(damage);
-        _emitter?.Emit(new LeechSeedDamage(drained.Name, damage, drained.Attributes.HP));
+        _emitter?.Emit(
+            new LeechSeedDamage(drained.Name, drained.Id, damage, drained.Attributes.HP)
+        );
 
         if (healed.IsAlive())
         {
             healed.Attributes.ReceiveHealing(damage);
-            _emitter?.Emit(new LeechSeedHealed(healed.Name, damage, healed.Attributes.HP));
+            _emitter?.Emit(
+                new LeechSeedHealed(healed.Name, healed.Id, damage, healed.Attributes.HP)
+            );
         }
     }
 }

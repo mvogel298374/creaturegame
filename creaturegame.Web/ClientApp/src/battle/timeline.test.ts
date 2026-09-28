@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { expandEvent, healSummary, type Step, type Action } from './timeline';
 
-const CTX = { playerName: 'MEWTWO' };
+// Ids used throughout: the player (MEWTWO) is 1; whoever it fights is 2.
+const CTX = { playerId: 1 };
 
 // ── helpers to read a timeline without caring about the exact wait/emit shape ──
 const logLines = (steps: Step[] = []): string[] =>
@@ -28,12 +29,12 @@ const emits = (steps: Step[] = []) =>
 
 describe('expandEvent — move-name formatting', () => {
   it('formats the slug in "used" lines', () => {
-    const { steps } = expandEvent('MoveUsed', { attackerName: 'MEWTWO', moveName: 'fury-attack' }, CTX);
+    const { steps } = expandEvent('MoveUsed', { attackerName: 'MEWTWO', attackerId: 1, moveName: 'fury-attack' }, CTX);
     expect(logLines(steps)).toEqual(['MEWTWO used FURY ATTACK!']);
   });
 
   it('announces the move first, then beats, then plays the lunge (Gen 1 order)', () => {
-    const { steps } = expandEvent('MoveUsed', { attackerName: 'MEWTWO', moveName: 'tackle' }, CTX);
+    const { steps } = expandEvent('MoveUsed', { attackerName: 'MEWTWO', attackerId: 1, moveName: 'tackle' }, CTX);
     // dispatch(LOG "used") → wait → emit(lunge) → awaitAnim — text must precede animation.
     expect(kinds(steps)).toEqual(['dispatch', 'wait', 'emit', 'awaitAnim']);
   });
@@ -66,7 +67,7 @@ describe('expandEvent — move-name formatting', () => {
 describe('expandEvent — DamageDealt', () => {
   it('immunity reads the Gen 1 line, with no hit sound and no damage number', () => {
     const { steps } = expandEvent('DamageDealt',
-      { targetName: 'ARTICUNO', damage: 0, typeEffectiveness: 0, hpAfter: 100, isCrit: false }, CTX);
+      { targetName: 'ARTICUNO', targetId: 2, damage: 0, typeEffectiveness: 0, hpAfter: 100, isCrit: false }, CTX);
     expect(logLines(steps)).toEqual(["It doesn't affect ARTICUNO..."]);
     expect(steps!.some(s => s.kind === 'emit')).toBe(false);          // no playHitSound
     expect(logLines(steps)[0]).not.toContain('damage');
@@ -74,19 +75,19 @@ describe('expandEvent — DamageDealt', () => {
 
   it('appends crit + effectiveness suffixes in order', () => {
     const { steps } = expandEvent('DamageDealt',
-      { targetName: 'ARTICUNO', damage: 42, typeEffectiveness: 2, hpAfter: 58, isCrit: true }, CTX);
+      { targetName: 'ARTICUNO', targetId: 2, damage: 42, typeEffectiveness: 2, hpAfter: 58, isCrit: true }, CTX);
     expect(logLines(steps)).toEqual(["ARTICUNO took 42 damage! A critical hit! It's super effective!"]);
   });
 
   it('uses "not very effective" for resisted hits', () => {
     const { steps } = expandEvent('DamageDealt',
-      { targetName: 'ARTICUNO', damage: 10, typeEffectiveness: 0.5, hpAfter: 90, isCrit: false }, CTX);
+      { targetName: 'ARTICUNO', targetId: 2, damage: 10, typeEffectiveness: 0.5, hpAfter: 90, isCrit: false }, CTX);
     expect(logLines(steps)).toEqual(["ARTICUNO took 10 damage! It's not very effective..."]);
   });
 
   it('tags damage lines with a colour tone by effectiveness (super/weak/immune, none for neutral)', () => {
     const at = (eff: number) => logTones(expandEvent('DamageDealt',
-      { targetName: 'ARTICUNO', damage: 10, typeEffectiveness: eff, hpAfter: 90, isCrit: false }, CTX).steps);
+      { targetName: 'ARTICUNO', targetId: 2, damage: 10, typeEffectiveness: eff, hpAfter: 90, isCrit: false }, CTX).steps);
     expect(at(2)).toEqual(['super']);
     expect(at(0.5)).toEqual(['weak']);
     expect(at(0)).toEqual(['immune']);
@@ -95,17 +96,17 @@ describe('expandEvent — DamageDealt', () => {
 
   it('emits the hit sound + damage shake and updates HP before the log line', () => {
     const { steps } = expandEvent('DamageDealt',
-      { targetName: 'ARTICUNO', damage: 20, typeEffectiveness: 1, hpAfter: 80, isCrit: false }, CTX);
+      { targetName: 'ARTICUNO', targetId: 2, damage: 20, typeEffectiveness: 1, hpAfter: 80, isCrit: false }, CTX);
     expect(kinds(steps)).toEqual(['emit', 'emit', 'dispatch', 'wait', 'dispatch', 'wait']);
   });
 
   it('shakes the struck sprite (enemy side here), and not on an immune no-hit', () => {
     const hit = expandEvent('DamageDealt',
-      { targetName: 'ARTICUNO', damage: 20, typeEffectiveness: 1, hpAfter: 80, isCrit: false }, CTX);
+      { targetName: 'ARTICUNO', targetId: 2, damage: 20, typeEffectiveness: 1, hpAfter: 80, isCrit: false }, CTX);
     expect(emits(hit.steps)).toContainEqual({ type: 'playDamageShake', side: 'enemy' });
 
     const immune = expandEvent('DamageDealt',
-      { targetName: 'ARTICUNO', damage: 0, typeEffectiveness: 0, hpAfter: 100, isCrit: false }, CTX);
+      { targetName: 'ARTICUNO', targetId: 2, damage: 0, typeEffectiveness: 0, hpAfter: 100, isCrit: false }, CTX);
     expect(emits(immune.steps).some(c => c.type === 'playDamageShake')).toBe(false);
   });
 });
@@ -133,8 +134,8 @@ describe('expandEvent — stat stages', () => {
 describe('expandEvent — control plane vs timeline', () => {
   it('the first BattleStarted is queued (not immediate) with the VS log — the scene plays its own entry', () => {
     const { now, steps } = expandEvent('BattleStarted',
-      { playerName: 'MEWTWO', enemyName: 'ARTICUNO', enemySpeciesId: 144, enemyLevel: 50 },
-      { playerName: 'MEWTWO', encounterIndex: 1 });
+      { playerName: 'MEWTWO', playerId: 1, enemyName: 'ARTICUNO', enemyId: 2, enemySpeciesId: 144, enemyLevel: 50 },
+      { playerId: 1, encounterIndex: 1 });
     // Queued so it never jumps ahead of a draining animation queue; no spawnEnemy on the first encounter.
     expect(now).toBeUndefined();
     const dispatched = (steps ?? [])
@@ -146,8 +147,8 @@ describe('expandEvent — control plane vs timeline', () => {
 
   it('a chained BattleStarted (2nd+ encounter) announces the new challenger and emits a spawnEnemy command', () => {
     const { now, steps } = expandEvent('BattleStarted',
-      { playerName: 'MEWTWO', enemyName: 'ARBOK', enemySpeciesId: 24, enemyLevel: 52 },
-      { playerName: 'MEWTWO', encounterIndex: 2 });
+      { playerName: 'MEWTWO', playerId: 1, enemyName: 'ARBOK', enemyId: 2, enemySpeciesId: 24, enemyLevel: 52 },
+      { playerId: 1, encounterIndex: 2 });
     expect(now).toBeUndefined();
     // The challenger line lives HERE now (not on the previous BattleEnded), so it can't precede an
     // unresolved between-battle instance like the Poké Center recovery. It comes before the VS line.
@@ -176,14 +177,14 @@ describe('expandEvent — control plane vs timeline', () => {
     // Endless chain: a player win is not the end — the next BattleStarted resumes play. It logs NOTHING here
     // (so a between-battle instance like the Poké Center recovery is never preceded by "a new challenger"),
     // but it does revert the player sprite in case it Transformed this battle.
-    const { now, steps } = expandEvent('BattleEnded', { winnerName: 'MEWTWO' }, CTX);
+    const { now, steps } = expandEvent('BattleEnded', { winnerName: 'MEWTWO', winnerId: 1 }, CTX);
     expect(now).toBeUndefined();
     expect(logLines(steps)).toEqual([]);
     expect(emits(steps)).toContainEqual({ type: 'resetPlayerSprite' });
   });
 
   it('BattleEnded with the player losing does nothing (RunEnded drives the game over)', () => {
-    expect(expandEvent('BattleEnded', { winnerName: 'GENGAR' }, CTX)).toEqual({});
+    expect(expandEvent('BattleEnded', { winnerName: 'GENGAR', winnerId: 2 }, CTX)).toEqual({});
   });
 
   it('CreatureFled (foe scared off) logs the wild flee and resets the player sprite', () => {
@@ -233,14 +234,14 @@ describe('expandEvent — control plane vs timeline', () => {
 
   it('PlayerRecovered logs the Poké Center heal, refills HP to full, and clears the status badge', () => {
     const { now, steps } = expandEvent(
-      'PlayerRecovered', { creatureName: 'MEWTWO', hpAfter: 150 }, CTX);
+      'PlayerRecovered', { creatureName: 'MEWTWO', creatureId: 1, hpAfter: 150 }, CTX);
     expect(now).toBeUndefined();
     expect(logLines(steps)).toEqual(['MEWTWO was fully healed!']);
     const dispatched = (steps ?? [])
       .filter((s): s is Extract<Step, { kind: 'dispatch' }> => s.kind === 'dispatch')
       .map(s => s.action);
-    expect(dispatched).toContainEqual({ type: 'UPDATE_HP', name: 'MEWTWO', hp: 150 });
-    expect(dispatched).toContainEqual({ type: 'CLEAR_STATUS', name: 'MEWTWO' });
+    expect(dispatched).toContainEqual({ type: 'UPDATE_HP', id: 1, hp: 150 });
+    expect(dispatched).toContainEqual({ type: 'CLEAR_STATUS', id: 1 });
   });
 
   it('RecoveryDeclined logs the keep-going line', () => {
@@ -304,14 +305,14 @@ describe('expandEvent — control plane vs timeline', () => {
 
   it('a Boss node names its trainer in the banner, titled by the picked biome, when one is known', () => {
     const { steps } = expandEvent('RunNodeEntered', { kind: 'BossBattle' },
-      { playerName: 'P', bossTrainerName: 'Misty', isBossBattle: true, biomeName: 'Cerulean Cove' });
+      { playerId: 1, bossTrainerName: 'Misty', isBossBattle: true, biomeName: 'Cerulean Cove' });
     expect(logLines(steps)).toEqual(['Cerulean Cove boss Trainer Misty looms ahead!']);
   });
 
   it('a Boss BattleStarted frames the fight as a trainer battle (named challenger + possessive VS line)', () => {
     const { steps } = expandEvent('BattleStarted',
-      { playerName: 'BULBASAUR', enemyName: 'ONIX', enemySpeciesId: 95, enemyLevel: 30 },
-      { playerName: 'BULBASAUR', encounterIndex: 2, bossTrainerName: 'Misty', isBossBattle: true });
+      { playerName: 'BULBASAUR', playerId: 1, enemyName: 'ONIX', enemyId: 2, enemySpeciesId: 95, enemyLevel: 30 },
+      { playerId: 1, encounterIndex: 2, bossTrainerName: 'Misty', isBossBattle: true });
     expect(logLines(steps)).toEqual(['Trainer Misty wants to battle!', "BULBASAUR VS Trainer Misty's ONIX"]);
   });
 
@@ -513,7 +514,7 @@ describe('expandEvent — control plane vs timeline', () => {
 
   it('EvolutionOffered announces it and raises the Allow/Cancel modal (queued, blocking)', () => {
     const { steps } = expandEvent('EvolutionOffered', {
-      fromName: 'MACHOKE', toName: 'MACHAMP', fromSpeciesId: 67, toSpeciesId: 68,
+      fromName: 'MACHOKE', toName: 'MACHAMP', creatureId: 7, fromSpeciesId: 67, toSpeciesId: 68,
     }, CTX);
     expect(logLines(steps)).toEqual(['What? MACHOKE is evolving!']);
     const dispatched = (steps ?? [])
@@ -531,7 +532,7 @@ describe('expandEvent — control plane vs timeline', () => {
 
   it('CreatureEvolved plays the morph and waits for it before the confirm line (no duplicate "evolving" line)', () => {
     const { steps } = expandEvent('CreatureEvolved', {
-      fromName: 'CHARMANDER', toName: 'CHARMELEON', fromSpeciesId: 4, toSpeciesId: 5, toSpeciesName: 'CHARMELEON',
+      fromName: 'CHARMANDER', toName: 'CHARMELEON', creatureId: 7, fromSpeciesId: 4, toSpeciesId: 5, toSpeciesName: 'CHARMELEON',
     }, CTX);
 
     // The "is evolving!" line plays in the offer, not here — this arm only confirms.
@@ -558,7 +559,7 @@ describe('expandEvent — control plane vs timeline', () => {
     const rename = dispatched(steps).find(
       (a): a is Extract<Action, { type: 'CREATURE_RENAMED' }> => a.type === 'CREATURE_RENAMED',
     );
-    expect(rename?.fromName).toBe('CHARMANDER');
+    expect(rename?.id).toBe(7); // keyed by the creature's id, which is stable across the rename
     expect(rename?.toName).toBe('CHARMELEON');
   });
 
@@ -567,7 +568,7 @@ describe('expandEvent — control plane vs timeline', () => {
   // into SPROUT!". Found by `pr-review`, 2026-09-14.
   it('CreatureEvolved announces the species name, not a repeated nickname', () => {
     const { steps } = expandEvent('CreatureEvolved', {
-      fromName: 'Sprout', toName: 'Sprout', fromSpeciesId: 1, toSpeciesId: 2, toSpeciesName: 'IVYSAUR',
+      fromName: 'Sprout', toName: 'Sprout', creatureId: 7, fromSpeciesId: 1, toSpeciesId: 2, toSpeciesName: 'IVYSAUR',
     }, CTX);
 
     expect(logLines(steps)).toEqual(['Sprout evolved into IVYSAUR!']);
@@ -656,8 +657,8 @@ describe('expandEvent — level-up move learning', () => {
       attackType: 'Special',
       pp: 5,
       candidates: [
-        { speciesId: 6, name: 'CHARIZARD', level: 36, hp: 90, maxHp: 100, status: 'None', able: true },
-        { speciesId: 1, name: 'BULBASAUR', level: 20, hp: 60, maxHp: 60, status: 'None', able: false },
+        { speciesId: 6, id: 11, name: 'CHARIZARD', level: 36, hp: 90, maxHp: 100, status: 'None', able: true },
+        { speciesId: 1, id: 12, name: 'BULBASAUR', level: 20, hp: 60, maxHp: 60, status: 'None', able: false },
       ],
     }, CTX);
     const show = (steps ?? []).find(
@@ -667,8 +668,8 @@ describe('expandEvent — level-up move learning', () => {
     expect(action.moveName).toBe('Hyper Beam');
     expect(action.power).toBe(150);
     expect(action.candidates).toEqual([
-      { speciesId: 6, name: 'CHARIZARD', level: 36, hp: 90, maxHp: 100, status: 'None', able: true },
-      { speciesId: 1, name: 'BULBASAUR', level: 20, hp: 60, maxHp: 60, status: 'None', able: false },
+      { speciesId: 6, id: 11, name: 'CHARIZARD', level: 36, hp: 90, maxHp: 100, status: 'None', able: true },
+      { speciesId: 1, id: 12, name: 'BULBASAUR', level: 20, hp: 60, maxHp: 60, status: 'None', able: false },
     ]);
   });
 
@@ -682,9 +683,9 @@ describe('expandEvent — level-up move learning', () => {
 
 describe('expandEvent — crash / flinch / multi-hit', () => {
   it('CrashDamage updates the user HP before logging the Gen 1 crash line', () => {
-    const { steps } = expandEvent('CrashDamage', { sourceName: 'HITMONLEE', damage: 1, hpAfter: 119 }, CTX);
+    const { steps } = expandEvent('CrashDamage', { sourceName: 'HITMONLEE', sourceId: 3, damage: 1, hpAfter: 119 }, CTX);
     expect(kinds(steps)).toEqual(['dispatch', 'wait', 'dispatch']);
-    expect(steps![0]).toMatchObject({ kind: 'dispatch', action: { type: 'UPDATE_HP', name: 'HITMONLEE', hp: 119 } });
+    expect(steps![0]).toMatchObject({ kind: 'dispatch', action: { type: 'UPDATE_HP', id: 3, hp: 119 } });
     expect(logLines(steps)).toEqual(['HITMONLEE kept going and crashed!']);
   });
 
@@ -724,8 +725,8 @@ describe('expandEvent — Mist', () => {
 
 describe('expandEvent — Heal & Mimic', () => {
   it('Healed updates HP before the regained-health line', () => {
-    const { steps } = expandEvent('Healed', { creatureName: 'CHANSEY', healAmount: 100, hpAfter: 150 }, CTX);
-    expect(steps![0]).toMatchObject({ kind: 'dispatch', action: { type: 'UPDATE_HP', name: 'CHANSEY', hp: 150 } });
+    const { steps } = expandEvent('Healed', { creatureName: 'CHANSEY', creatureId: 4, healAmount: 100, hpAfter: 150 }, CTX);
+    expect(steps![0]).toMatchObject({ kind: 'dispatch', action: { type: 'UPDATE_HP', id: 4, hp: 150 } });
     expect(logLines(steps)).toEqual(['CHANSEY regained health!']);
   });
   it('MimicLearned formats the copied move name', () => {
@@ -735,13 +736,13 @@ describe('expandEvent — Heal & Mimic', () => {
   it('TransformedInto names both creatures and morphs the transforming side to the copied species', () => {
     // DITTO is the enemy here (player is MEWTWO) → the enemy front sprite morphs to species 25 (Pikachu).
     const { steps } = expandEvent('TransformedInto',
-      { creatureName: 'DITTO', targetName: 'PIKACHU', intoSpeciesId: 25 }, CTX);
+      { creatureName: 'DITTO', creatureId: 2, targetName: 'PIKACHU', targetId: 5, intoSpeciesId: 25 }, CTX);
     expect(logLines(steps)).toEqual(['DITTO transformed into PIKACHU!']);
     expect(emits(steps)).toContainEqual({ type: 'transformSprite', side: 'enemy', speciesId: 25 });
   });
   it('TransformedInto morphs the player back sprite when the player transforms', () => {
     const { steps } = expandEvent('TransformedInto',
-      { creatureName: 'MEWTWO', targetName: 'DITTO', intoSpeciesId: 132 }, CTX);
+      { creatureName: 'MEWTWO', creatureId: 1, targetName: 'DITTO', targetId: 2, intoSpeciesId: 132 }, CTX);
     expect(emits(steps)).toContainEqual({ type: 'transformSprite', side: 'player', speciesId: 132 });
   });
   it('ConvertedType reports the new type', () => {
@@ -777,8 +778,8 @@ describe('expandEvent — confusion & coins', () => {
       .toEqual(['MEWTWO is confused!']);
   });
   it('ConfusionDamage updates HP before the self-hit line', () => {
-    const { steps } = expandEvent('ConfusionDamage', { creatureName: 'MEWTWO', damage: 12, hpAfter: 88 }, CTX);
-    expect(steps![0]).toMatchObject({ kind: 'dispatch', action: { type: 'UPDATE_HP', name: 'MEWTWO', hp: 88 } });
+    const { steps } = expandEvent('ConfusionDamage', { creatureName: 'MEWTWO', creatureId: 1, damage: 12, hpAfter: 88 }, CTX);
+    expect(steps![0]).toMatchObject({ kind: 'dispatch', action: { type: 'UPDATE_HP', id: 1, hp: 88 } });
     expect(logLines(steps)).toEqual(['MEWTWO hurt itself in confusion!']);
   });
   it('ConfusionCleared announces snapping out', () => {
@@ -791,14 +792,14 @@ describe('expandEvent — confusion & coins', () => {
   });
 });
 
-describe('expandEvent — faint side resolves against the player name', () => {
+describe('expandEvent — faint side resolves against the player id', () => {
   it('player faint targets the player sprite', () => {
-    const { steps } = expandEvent('CreatureFainted', { name: 'MEWTWO' }, CTX);
+    const { steps } = expandEvent('CreatureFainted', { name: 'MEWTWO', id: 1 }, CTX);
     const emit = steps!.find(s => s.kind === 'emit') as Extract<Step, { kind: 'emit' }>;
     expect(emit.command).toEqual({ type: 'playFaintAnimation', side: 'player' });
   });
   it('enemy faint targets the enemy sprite', () => {
-    const { steps } = expandEvent('CreatureFainted', { name: 'ARTICUNO' }, CTX);
+    const { steps } = expandEvent('CreatureFainted', { name: 'ARTICUNO', id: 2 }, CTX);
     const emit = steps!.find(s => s.kind === 'emit') as Extract<Step, { kind: 'emit' }>;
     expect(emit.command).toEqual({ type: 'playFaintAnimation', side: 'enemy' });
   });
@@ -817,10 +818,10 @@ describe('expandEvent — run layer (recovery, run-end, XP)', () => {
   });
 
   it('fills HP and clears any status when the heal is accepted (PlayerRecovered)', () => {
-    const { steps } = expandEvent('PlayerRecovered', { creatureName: 'MEWTWO', hpAfter: 226 }, CTX);
+    const { steps } = expandEvent('PlayerRecovered', { creatureName: 'MEWTWO', creatureId: 1, hpAfter: 226 }, CTX);
     expect(logLines(steps)).toEqual(['MEWTWO was fully healed!']);
-    expect(actions(steps)).toContainEqual({ type: 'UPDATE_HP', name: 'MEWTWO', hp: 226 });
-    expect(actions(steps)).toContainEqual({ type: 'CLEAR_STATUS', name: 'MEWTWO' });
+    expect(actions(steps)).toContainEqual({ type: 'UPDATE_HP', id: 1, hp: 226 });
+    expect(actions(steps)).toContainEqual({ type: 'CLEAR_STATUS', id: 1 });
   });
 
   it('announces the run summary and flips to game-over on RunEnded (plural wins)', () => {
@@ -1002,5 +1003,72 @@ describe('expandEvent — forced faint-switch (Stage 3)', () => {
     const set = dispatchedOf(steps, 'SWITCHED_IN')[0] as Extract<Action, { type: 'SWITCHED_IN' }>;
     expect(set).toMatchObject({ name: 'BLASTOISE', level: 34, hp: 90, maxHp: 110, status: 'Poison' });
     expect(logLines(steps)).toEqual(['Go! BLASTOISE!']);
+  });
+});
+
+// Creature Identity (ARCHITECTURE.md §2.2). The player's PIDGEY (id 1) against a wild PIDGEY (id 2): every name in these
+// payloads is identical, so only the id can say whose hit / faint / transform / HP this is. Before id routing the
+// enemy's hits animated on the player's sprite and its HP/status landed on the player's bar.
+describe('expandEvent — same-named combatants are told apart by id', () => {
+  const PIDGEY_CTX = { playerId: 1 };
+  const shakeSide = (targetId: number) =>
+    (emits(expandEvent('DamageDealt',
+      { targetName: 'PIDGEY', targetId, damage: 5, typeEffectiveness: 1, hpAfter: 20, isCrit: false }, PIDGEY_CTX).steps)
+      .find(c => c.type === 'playDamageShake') as { side: string }).side;
+
+  it('a hit on the wild PIDGEY jolts the enemy sprite; a hit on yours jolts the player sprite', () => {
+    expect(shakeSide(2)).toBe('enemy');
+    expect(shakeSide(1)).toBe('player');
+  });
+
+  it('the wild PIDGEY\'s HP update targets the enemy id, not the player\'s', () => {
+    const { steps } = expandEvent('DamageDealt',
+      { targetName: 'PIDGEY', targetId: 2, damage: 5, typeEffectiveness: 1, hpAfter: 20, isCrit: false }, PIDGEY_CTX);
+    expect(dispatched(steps)).toContainEqual({ type: 'UPDATE_HP', id: 2, hp: 20 });
+    expect(dispatched(steps)).not.toContainEqual({ type: 'UPDATE_HP', id: 1, hp: 20 });
+  });
+
+  it('the lunge runs from the attacker\'s side toward the other, whichever PIDGEY attacked', () => {
+    const lunge = (attackerId: number) =>
+      emits(expandEvent('MoveUsed', { attackerName: 'PIDGEY', attackerId, moveName: 'tackle' }, PIDGEY_CTX).steps)
+        .find(c => c.type === 'playMoveAnimation');
+    expect(lunge(1)).toEqual({ type: 'playMoveAnimation', attackerSide: 'player', targetSide: 'enemy' });
+    expect(lunge(2)).toEqual({ type: 'playMoveAnimation', attackerSide: 'enemy', targetSide: 'player' });
+  });
+
+  it('a faint animates the sprite of the PIDGEY that fainted', () => {
+    const faint = (id: number) =>
+      emits(expandEvent('CreatureFainted', { name: 'PIDGEY', id }, PIDGEY_CTX).steps)
+        .find(c => c.type === 'playFaintAnimation');
+    expect(faint(2)).toEqual({ type: 'playFaintAnimation', side: 'enemy' });
+    expect(faint(1)).toEqual({ type: 'playFaintAnimation', side: 'player' });
+  });
+
+  it('a Transform morphs the sprite of the PIDGEY that transformed', () => {
+    const morph = (creatureId: number) =>
+      emits(expandEvent('TransformedInto',
+        { creatureName: 'PIDGEY', creatureId, targetName: 'PIDGEY', targetId: 3 - creatureId, intoSpeciesId: 25 }, PIDGEY_CTX).steps)
+        .find(c => c.type === 'transformSprite');
+    expect(morph(2)).toEqual({ type: 'transformSprite', side: 'enemy', speciesId: 25 });
+    expect(morph(1)).toEqual({ type: 'transformSprite', side: 'player', speciesId: 25 });
+  });
+
+  it('status and status-clear updates carry the id of the PIDGEY they hit', () => {
+    const applied = expandEvent('StatusApplied', { targetName: 'PIDGEY', targetId: 2, status: 'Burn' }, PIDGEY_CTX);
+    expect(dispatched(applied.steps)).toContainEqual({ type: 'UPDATE_STATUS', id: 2, status: 'Burn' });
+    const cleared = expandEvent('StatusCleared', { creatureName: 'PIDGEY', creatureId: 2, wasStatus: 'Burn' }, PIDGEY_CTX);
+    expect(dispatched(cleared.steps)).toContainEqual({ type: 'CLEAR_STATUS', id: 2 });
+  });
+
+  it('BattleEnded is a win only when the winner is the player\'s PIDGEY, not merely a PIDGEY', () => {
+    expect(expandEvent('BattleEnded', { winnerName: 'PIDGEY', winnerId: 1 }, PIDGEY_CTX).steps).toBeDefined();
+    expect(expandEvent('BattleEnded', { winnerName: 'PIDGEY', winnerId: 2 }, PIDGEY_CTX)).toEqual({});
+  });
+
+  it('a bench twin\'s evolution renames by the twin\'s id, not the lead\'s', () => {
+    const { steps } = expandEvent('CreatureEvolved', {
+      fromName: 'PIDGEY', toName: 'PIDGEOTTO', creatureId: 8, fromSpeciesId: 16, toSpeciesId: 17, toSpeciesName: 'PIDGEOTTO',
+    }, PIDGEY_CTX);
+    expect(dispatched(steps)).toContainEqual({ type: 'CREATURE_RENAMED', id: 8, toName: 'PIDGEOTTO' });
   });
 });

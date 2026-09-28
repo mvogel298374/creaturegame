@@ -81,12 +81,14 @@ public class SessionResumeTests
         new(
             turnNumber,
             "Player",
+            1,
             80,
             100,
             StatusCondition.None,
             0,
             100,
             "Enemy",
+            2,
             40,
             50,
             StatusCondition.None,
@@ -121,7 +123,7 @@ public class SessionResumeTests
         emitter.Emit(Region());
         emitter.Emit(Biome("phantom-marsh"));
         emitter.Emit(NodePlan());
-        emitter.Emit(new BattleStarted("Player", "Enemy", 1, 5));
+        emitter.Emit(new BattleStarted("Player", 1, "Enemy", 2, 1, 5));
         emitter.Emit(Turn(1));
         current = "conn-2"; // the reconnect: a new connection is now current
 
@@ -151,9 +153,9 @@ public class SessionResumeTests
         var hub = new RecordingHubContext();
         var emitter = new SignalRBattleEventEmitter(hub, () => "conn-1");
 
-        emitter.Emit(new BattleStarted("Player", "Enemy One", 1, 5));
+        emitter.Emit(new BattleStarted("Player", 1, "Enemy One", 2, 1, 5));
         emitter.Emit(Turn(1));
-        emitter.Emit(new BattleStarted("Player", "Enemy Two", 2, 6)); // next encounter starts; no TurnStarted yet
+        emitter.Emit(new BattleStarted("Player", 1, "Enemy Two", 3, 2, 6)); // next encounter starts; no TurnStarted yet
 
         emitter.ReplayLastKnownState();
 
@@ -175,9 +177,9 @@ public class SessionResumeTests
         emitter.Emit(Region());
         emitter.Emit(Biome("phantom-marsh"));
         emitter.Emit(NodePlan());
-        emitter.Emit(new BattleStarted("Player", "Enemy", 1, 5));
+        emitter.Emit(new BattleStarted("Player", 1, "Enemy", 2, 1, 5));
         emitter.Emit(Turn(1));
-        emitter.Emit(new BattleEnded("Player"));
+        emitter.Emit(new BattleEnded("Player", 1));
         int beforeReplay = hub.EventsFor("conn-1").Count;
 
         emitter.ReplayLastKnownState();
@@ -221,8 +223,8 @@ public class SessionResumeTests
 
         emitter.Emit(Region());
         emitter.Emit(Biome("whispering-woods"));
-        emitter.Emit(new BattleStarted("Player", "Enemy", 1, 5));
-        emitter.Emit(new BattleEnded("Player"));
+        emitter.Emit(new BattleStarted("Player", 1, "Enemy", 2, 1, 5));
+        emitter.Emit(new BattleEnded("Player", 1));
         emitter.Emit(Biome("phantom-marsh"));
         int beforeReplay = hub.EventsFor("conn-1").Count;
 
@@ -247,7 +249,7 @@ public class SessionResumeTests
         emitter.Emit(Region());
         emitter.Emit(Biome("phantom-marsh"));
         emitter.Emit(NodePlan());
-        emitter.Emit(new BattleStarted("Player", "Enemy", 1, 5));
+        emitter.Emit(new BattleStarted("Player", 1, "Enemy", 2, 1, 5));
         emitter.Emit(Turn(1));
         int beforeReEstablish = hub.EventsFor("conn-1").Count;
 

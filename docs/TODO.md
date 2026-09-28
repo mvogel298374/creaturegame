@@ -4,7 +4,7 @@
 > history of a finished item. **See also:** `CLAUDE.md` (setup/commands) · `AI_CONTEXT.md` (profiles) ·
 > `DESIGN_GUIDES.md` (mechanics) · `DEV_STANDARDS.md` (conventions).
 
-## Current state (2026-09-28)
+## Current state (2026-09-29)
 
 The Gen 1 battle engine is **feature-complete** (all 165 moves, XP & level-up, learnsets, AI move selection,
 EV / Stat-Exp gain, evolution, in-battle item system incl. **Revive/Max Revive** and full party-targeting for
@@ -15,7 +15,8 @@ channels — themed draft + boss catch, between-biome lead choice, forced faint-
 **In-Combat Switching**), the **Run Economy** (gold + rewards + the spend-gold **Shop node**), the **Reward
 Choice** modal (now including **TM/HM — Move-Teach Rewards**, a second move-acquisition channel offering a
 legal TM move as a reward-card pick — no HMs), the **level-aware XP curve + trainer bonus + Innate Party XP Share**,
-**Creature Naming** (a cancelable nickname on every acquisition path), **Session Resume** (refresh/reopen-safe
+**Creature Naming** (a cancelable nickname on every acquisition path), **Creature Identity** (per-run creature
+ids; the event wire and client route by id, not display name), **Session Resume** (refresh/reopen-safe
 `gameId` persistence), the **CHECK POKEMON party-member picker**, the **Settings Menu** (sound volume + a
 three-tier difficulty/XP-pace dial), and **Generation Profile** Stages 1–4c (the generation axis, content
 scoping, and the Kanto Sage-skinned Town Map) are all done and archived (→ `TODO_ARCHIVE.md`).
@@ -107,7 +108,8 @@ itself (via the Run Economy, below). Bag persistence and catch are what remain o
   with a "catching" state/outcome.
 - [ ] Gen 1 formula: `floor((MaxHP × 3 − HP × 2) × CatchRate / (MaxHP × 3))` vs a 0–255 roll (per-ball modifier
   lives in the formula, not the `Item` row).
-- [ ] `CaptureAttempted(string TargetName, bool Caught)` event; `BattleEnded` variant `reason: "Caught"`.
+- [ ] `CaptureAttempted(string TargetName, int TargetId, bool Caught)` event (carries the creature id like every
+  other creature event — `WebEventContractTests` requires it); `BattleEnded` variant `reason: "Caught"`.
 - [ ] Caught creature → party (needs party / switching — see **Game Loop**); closes the acquisition loop.
 - [ ] Unlocks the dormant **stone evolutions** (`Stone` trigger + `IEvolutionRules.StoneUsed` are built and
   waiting on a bag).
@@ -155,7 +157,7 @@ Stack: React 18 + TypeScript + SignalR + Phaser 3. (Canvas & core animations don
     attacker→target, no lunge) · *status/self-buff* (glow/pulse on user, no lunge) · *two-turn/charge* (charge
     glow turn 1, release burst turn 2) · *multi-hit/flurry* (repeat a jab in step with `MultiHitCompleted`).
     Cheap layered win: tint the flash/shake by the move's **type colour** (reuse the `TypeBadge` palette).
-  - **Plumbing (the real work, mind the seam):** `MoveUsed` carries only `(AttackerName, MoveName)` — the client
+  - **Plumbing (the real work, mind the seam):** `MoveUsed` carries only `(AttackerName, AttackerId, MoveName)` — the client
     can't see the *enemy's* move type/category. Project `DamageType` + `AttackType` onto `MoveUsed` + its
     `SignalRBattleEventEmitter` mapping with the field-level guard (the recurring **web event field-projection
     gap** — see the memory + `WebEventContractTests`). Then a pure `moveAnimationFamily(type, category, slug)`

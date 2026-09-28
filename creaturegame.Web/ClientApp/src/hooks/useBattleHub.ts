@@ -4,7 +4,7 @@ import * as signalR from '@microsoft/signalr';
 import { type Payload, expandEvent, useBattleTimeline } from '../battle/timeline';
 import { battleReducer, initialState } from './battleReducer';
 import { bossTrainerName } from '../battle/bossTrainer';
-import { nextPlayerName } from '../battle/playerIdentity';
+import { nextPlayerId } from '../battle/playerIdentity';
 import { clearActiveGame } from '../utils/activeGame';
 
 // The view-state shape + modal-prompt types live with the reducer now; re-export them so existing
@@ -30,8 +30,8 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
   const connRef = useRef<signalR.HubConnection | null>(null);
   const nav = useNavigate();
 
-  // Player name drives the player/enemy side split inside expandEvent.
-  const playerNameRef = useRef('');
+  // The player creature's id drives the player/enemy side split inside expandEvent.
+  const playerIdRef = useRef(0);
   // Counts BattleStarted events so expandEvent can tell the first encounter (scene entry animation) from a
   // chained one (slide a new enemy sprite into the running scene).
   const encounterIndexRef = useRef(0);
@@ -65,8 +65,8 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
     conn.on('OnBattleEvent', (eventType: string, payload: Payload) => {
       // Retarget the player/enemy side split BEFORE the event expands, so the newly-named creature's own
       // moves/damage are sided correctly in the very event that renamed it. The rule itself (which events change
-      // "who the player is", and the party-wide-evolution guard) lives in the pure helper.
-      playerNameRef.current = nextPlayerName(eventType, payload, playerNameRef.current);
+      // "who the player is") lives in the pure helper.
+      playerIdRef.current = nextPlayerId(eventType, payload, playerIdRef.current);
       if (eventType === 'BattleStarted') {
         encounterIndexRef.current += 1;
       }
@@ -83,7 +83,7 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
       const bossName = bossTrainerName(s.currentBiomeId, primaryType, s.mapNodePlan);
 
       const { now, steps } = expandEvent(eventType, payload, {
-        playerName: playerNameRef.current,
+        playerId: playerIdRef.current,
         encounterIndex: encounterIndexRef.current,
         bossTrainerName: bossName,
         isBossBattle: bossNodeActiveRef.current,

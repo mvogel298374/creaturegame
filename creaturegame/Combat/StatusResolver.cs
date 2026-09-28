@@ -28,7 +28,7 @@ public static class StatusResolver
         if (creature.Battle.IsFlinched)
         {
             creature.Battle.IsFlinched = false;
-            emitter?.Emit(new FlinchBlocked(creature.Name));
+            emitter?.Emit(new FlinchBlocked(creature.Name, creature.Id));
             return false;
         }
 
@@ -38,14 +38,14 @@ public static class StatusResolver
         if (creature.Battle.HazeSuppressedStatus is { } suppressedStatus)
         {
             creature.Battle.HazeSuppressedStatus = null;
-            emitter?.Emit(new ActionBlocked(creature.Name, suppressedStatus));
+            emitter?.Emit(new ActionBlocked(creature.Name, creature.Id, suppressedStatus));
             return false;
         }
 
         // Binding: trapped by Wrap/Bind/Clamp/Fire Spin
         if (creature.Battle.BindingTurnsRemaining > 0)
         {
-            emitter?.Emit(new BindingBlocked(creature.Name));
+            emitter?.Emit(new BindingBlocked(creature.Name, creature.Id));
             return false;
         }
 
@@ -56,11 +56,11 @@ public static class StatusResolver
             {
                 creature.Battle.SleepTurns = 0;
                 creature.Battle.Status = StatusCondition.None;
-                emitter?.Emit(new StatusCleared(creature.Name, StatusCondition.Sleep));
+                emitter?.Emit(new StatusCleared(creature.Name, creature.Id, StatusCondition.Sleep));
             }
             else
             {
-                emitter?.Emit(new ActionBlocked(creature.Name, StatusCondition.Sleep));
+                emitter?.Emit(new ActionBlocked(creature.Name, creature.Id, StatusCondition.Sleep));
             }
             return false;
         }
@@ -73,26 +73,28 @@ public static class StatusResolver
             )
             {
                 creature.Battle.Status = StatusCondition.None;
-                emitter?.Emit(new StatusCleared(creature.Name, StatusCondition.Freeze));
+                emitter?.Emit(
+                    new StatusCleared(creature.Name, creature.Id, StatusCondition.Freeze)
+                );
                 return true;
             }
-            emitter?.Emit(new ActionBlocked(creature.Name, StatusCondition.Freeze));
+            emitter?.Emit(new ActionBlocked(creature.Name, creature.Id, StatusCondition.Freeze));
             return false;
         }
 
         if (creature.Battle.Status == StatusCondition.Paralysis && random.Next(4) == 0)
         {
-            emitter?.Emit(new ActionBlocked(creature.Name, StatusCondition.Paralysis));
+            emitter?.Emit(new ActionBlocked(creature.Name, creature.Id, StatusCondition.Paralysis));
             return false;
         }
 
         if (creature.Battle.ConfusedTurns > 0)
         {
-            emitter?.Emit(new ConfusionMessage(creature.Name));
+            emitter?.Emit(new ConfusionMessage(creature.Name, creature.Id));
             creature.Battle.ConfusedTurns--;
             if (creature.Battle.ConfusedTurns == 0)
             {
-                emitter?.Emit(new ConfusionCleared(creature.Name));
+                emitter?.Emit(new ConfusionCleared(creature.Name, creature.Id));
                 return true;
             }
             if (random.Next(100) < battleRules.ConfusionSelfHitPercent)
@@ -100,7 +102,12 @@ public static class StatusResolver
                 int selfDamage = DamageCalculator.CalculateConfusionDamage(creature, battleRules);
                 creature.Attributes.ReceiveDamage(selfDamage);
                 emitter?.Emit(
-                    new ConfusionDamage(creature.Name, selfDamage, creature.Attributes.HP)
+                    new ConfusionDamage(
+                        creature.Name,
+                        creature.Id,
+                        selfDamage,
+                        creature.Attributes.HP
+                    )
                 );
                 return false;
             }
@@ -131,7 +138,7 @@ public static class StatusResolver
             {
                 string reEnabled = creature.Battle.DisabledMove.Base.Name ?? "";
                 creature.Battle.DisabledMove = null;
-                emitter?.Emit(new MoveReEnabled(creature.Name, reEnabled));
+                emitter?.Emit(new MoveReEnabled(creature.Name, creature.Id, reEnabled));
             }
         }
 
@@ -183,7 +190,9 @@ public static class StatusResolver
         if (damage > 0)
         {
             creature.Attributes.ReceiveDamage(damage);
-            emitter?.Emit(new StatusDamage(creature.Name, damage, source, creature.Attributes.HP));
+            emitter?.Emit(
+                new StatusDamage(creature.Name, creature.Id, damage, source, creature.Attributes.HP)
+            );
         }
     }
 }

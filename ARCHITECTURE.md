@@ -82,6 +82,20 @@ Each entry: **Decision · Why · Where it lives.**
   SignalR leg by `EveryBattleEventMapsToItsOwnNamedClientEvent` (nothing maps to `"Unknown"`), and the TS leg
   by `EveryBattleEventHasATimelineArm` (every event has a `case` in `expandEvent`, so none falls through
   `default: {}`).
+- **Creatures are identified by id, never by display name.** Two creatures can share a name (a wild PIDGEY
+  against your PIDGEY; a drafted twin on the bench; two nicknamed alike), so a name can't say *which* creature an
+  event is about — and the client used to route sprite FX / HP / status by comparing names, landing the enemy's
+  hits on the player's sprite. Every `Creature` now carries an `Id`, minted per run by `RunState.Ids`
+  (`CreatureIdSource`: a counter, not a Guid — the run promises same-seed → same event sequence) at the one place
+  every run creature passes through (`RunDirector`: the starting party + the enemy / draft / boss-catch suppliers).
+  It is stable across evolution, Transform and nicknaming. Every creature-referencing event carries an `…Id`
+  beside its name (name = display text only), and the client (`timeline.ts` `side()`, `battleReducer.ts`,
+  `playerIdentity.ts`) routes on the id. **Guards:** `WebEventContractTests` fails the build if any
+  creature-naming property lacks an id sibling (`EveryCreatureNameOnTheWireHasAnIdSibling`) or projects one under
+  the wrong name/value; a Vitest source guard fails if routing ever compares against a display name again.
+  Inbound calls stay slot-keyed (already unambiguous). Full design + history → `docs/TODO_ARCHIVE.md` →
+  *Creature Identity*. An unassigned id is `0`: only `RunDirector`-built runs assign ids, so a bare `Battle` in a
+  test has `0/0` combatants — fine for engine assertions, but not something the client could route.
 - **Where:** `Combat/BattleEvents.cs`, `Combat/IBattleEventEmitter.cs`, `creaturegame.Web/Battle/SignalRBattleEventEmitter.cs`,
   `ClientApp/src/battle/timeline.ts`.
 

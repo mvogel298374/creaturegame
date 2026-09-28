@@ -265,6 +265,15 @@ public class RunDirectorAcquisitionTests
         Assert.Equal("Boss", acquired.Name);
         Assert.Equal(2, runner.State.Party.Count);
         Assert.Contains(runner.State.Party.Members, m => m.Name == "Boss");
+
+        // Creature Identity: a caught boss is a NEW individual — identified by RunDirector's boss-catch wrapper (the
+        // supplier itself never assigns ids), distinct from the starter, and the events agree with the party.
+        var starter = runner.State.Party.Members[0];
+        var caught = runner.State.Party.Members.Single(m => m.Name == "Boss");
+        Assert.NotEqual(0, caught.Id);
+        Assert.NotEqual(starter.Id, caught.Id);
+        Assert.Equal(caught.Id, offer.Id);
+        Assert.Equal(caught.Id, acquired.Id);
     }
 
     [Fact]

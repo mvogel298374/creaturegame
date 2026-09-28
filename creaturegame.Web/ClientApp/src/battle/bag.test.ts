@@ -14,6 +14,7 @@ import type { PartyMember } from './timeline';
 function member(overrides: Partial<PartyMember> = {}): PartyMember {
   return {
     speciesId: 1,
+    id: 1,
     name: 'MON',
     level: 5,
     hp: 10,

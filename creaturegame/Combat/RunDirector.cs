@@ -71,9 +71,29 @@ public sealed class RunDirector
         // The three battle nodes differ only by the EncounterTier they hand the supplier (which the web layer
         // maps to an IEnemyArchetype): WildBattle ≈ today's Medium, Elite/Boss climb. Same collaborators
         // otherwise. Elite/Boss also emit a node banner before the fight.
+        // Every creature that enters the run — foe, drafted, boss-caught — is identified here, at the one point
+        // all three suppliers pass through, so the DB-backed factory stays run-agnostic (Creature Identity,
+        // ARCHITECTURE.md §2.2). The starter/party were identified when RunState was built above.
+        var ids = _state.Ids;
+        Func<
+            Creature,
+            int,
+            BiomeDefinition?,
+            EncounterTier,
+            Task<Creature>
+        > identifiedEnemySupplier = async (p, depth, biome, tier) =>
+            ids.Assign(await enemySupplier(p, depth, biome, tier));
+        var draftSupplier = o.DraftSupplier is { } draft
+            ? async (DraftContext ctx, IRandomSource rng) => Identified(ids, await draft(ctx, rng))
+            : (Func<DraftContext, IRandomSource, Task<Creature?>>?)null;
+        var bossCatchSupplier = o.BossCatchSupplier is { } bossCatch
+            ? async (BossCatchContext ctx, IRandomSource rng) =>
+                Identified(ids, await bossCatch(ctx, rng))
+            : (Func<BossCatchContext, IRandomSource, Task<Creature?>>?)null;
+
         BattleRunEvent Battle(EncounterTier tier) =>
             new(
-                enemySupplier,
+                identifiedEnemySupplier,
                 tier,
                 typeChart,
                 enemyInput,
@@ -84,8 +104,8 @@ public sealed class RunDirector
                 o.Wallet,
                 rewardSupplier,
                 o.RunRules,
-                o.DraftSupplier,
-                o.BossCatchSupplier
+                draftSupplier,
+                bossCatchSupplier
             );
         _battleEvent = Battle(EncounterTier.Normal);
         _eliteEvent = Battle(EncounterTier.Elite);
@@ -112,6 +132,10 @@ public sealed class RunDirector
             rewardSupplier
         );
     }
+
+    // A supplier may decline (null) — pass that through untouched.
+    private static Creature? Identified(CreatureIdSource ids, Creature? creature) =>
+        creature is null ? null : ids.Assign(creature);
 
     /// <summary>The live run state — exposed <c>internal</c> as a test seam so a test can assert run-state
     /// invariants (e.g. the fought-only pool accumulating per biome and resetting on a biome change) after a
@@ -148,7 +172,14 @@ public sealed class RunDirector
             Apply(_state, outcome);
         }
 
-        _emitter?.Emit(new RunEnded(_state.BattlesWon, _state.Player.Level, _state.Player.Name));
+        _emitter?.Emit(
+            new RunEnded(
+                _state.BattlesWon,
+                _state.Player.Level,
+                _state.Player.Name,
+                _state.Player.Id
+            )
+        );
     }
 
     /// <summary>

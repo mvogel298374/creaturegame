@@ -29,7 +29,9 @@ internal sealed class LeadChoiceEvent : IRunEvent
         if (index >= 0 && index < party.Count && index != party.LeadIndex)
         {
             party.SetLead(index); // no status reconciliation needed — see the class doc above
-            ctx.Emitter?.Emit(new LeadChanged(party.Lead.Name, party.Lead.SpeciesId));
+            ctx.Emitter?.Emit(
+                new LeadChanged(party.Lead.Name, party.Lead.Id, party.Lead.SpeciesId)
+            );
             ctx.Emitter?.Emit(new PartyUpdated(PartyProjection.Snapshot(party)));
         }
 

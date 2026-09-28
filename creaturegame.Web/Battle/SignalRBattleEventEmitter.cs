@@ -109,7 +109,9 @@ public sealed class SignalRBattleEventEmitter(
                 new
                 {
                     e.PlayerName,
+                    e.PlayerId,
                     e.EnemyName,
+                    e.EnemyId,
                     e.EnemySpeciesId,
                     e.EnemyLevel,
                 }
@@ -120,12 +122,14 @@ public sealed class SignalRBattleEventEmitter(
                 {
                     e.TurnNumber,
                     e.PlayerName,
+                    e.PlayerId,
                     e.PlayerHp,
                     e.PlayerMaxHp,
                     PlayerStatus = e.PlayerStatus.ToString(),
                     e.PlayerXpThisLevel,
                     e.PlayerXpToNextLevel,
                     e.EnemyName,
+                    e.EnemyId,
                     e.EnemyHp,
                     e.EnemyMaxHp,
                     EnemyStatus = e.EnemyStatus.ToString(),
@@ -144,7 +148,7 @@ public sealed class SignalRBattleEventEmitter(
                 }
             ),
             TurnEnded => ("TurnEnded", new { }),
-            BattleEnded e => ("BattleEnded", new { e.WinnerName }),
+            BattleEnded e => ("BattleEnded", new { e.WinnerName, e.WinnerId }),
             RunEnded e => (
                 "RunEnded",
                 new
@@ -152,6 +156,7 @@ public sealed class SignalRBattleEventEmitter(
                     e.BattlesWon,
                     e.FinalLevel,
                     e.FinalCreatureName,
+                    e.FinalCreatureId,
                 }
             ),
             RecoveryOffered e => (
@@ -159,12 +164,21 @@ public sealed class SignalRBattleEventEmitter(
                 new
                 {
                     e.CreatureName,
+                    e.CreatureId,
                     e.SpeciesId,
                     e.BattlesWon,
                 }
             ),
-            PlayerRecovered e => ("PlayerRecovered", new { e.CreatureName, e.HpAfter }),
-            RecoveryDeclined e => ("RecoveryDeclined", new { e.CreatureName }),
+            PlayerRecovered e => (
+                "PlayerRecovered",
+                new
+                {
+                    e.CreatureName,
+                    e.CreatureId,
+                    e.HpAfter,
+                }
+            ),
+            RecoveryDeclined e => ("RecoveryDeclined", new { e.CreatureName, e.CreatureId }),
             BiomeChoiceOffered e => (
                 "BiomeChoiceOffered",
                 new
@@ -249,6 +263,7 @@ public sealed class SignalRBattleEventEmitter(
                     e.Source,
                     e.SpeciesId,
                     e.Name,
+                    e.Id,
                     e.Level,
                     Types = e.Types.Select(t => t.ToString()),
                     e.MaxHp,
@@ -261,12 +276,14 @@ public sealed class SignalRBattleEventEmitter(
                 new
                 {
                     e.Name,
+                    e.Id,
                     e.SpeciesId,
                     e.Replaced,
                     e.ReplacedName,
+                    e.ReplacedId,
                 }
             ),
-            AcquisitionDeclined e => ("AcquisitionDeclined", new { e.Name }),
+            AcquisitionDeclined e => ("AcquisitionDeclined", new { e.Name, e.Id }),
             PartyUpdated e => (
                 "PartyUpdated",
                 new { Members = e.Members.Select(ProjectPartyMember) }
@@ -275,13 +292,30 @@ public sealed class SignalRBattleEventEmitter(
                 "LeadChoiceOffered",
                 new { Party = e.Party.Select(ProjectPartyMember) }
             ),
-            LeadChanged e => ("LeadChanged", new { e.Name, e.SpeciesId }),
-            ItemUsed e => ("ItemUsed", new { e.ItemName, e.TargetName }),
+            LeadChanged e => (
+                "LeadChanged",
+                new
+                {
+                    e.Name,
+                    e.Id,
+                    e.SpeciesId,
+                }
+            ),
+            ItemUsed e => (
+                "ItemUsed",
+                new
+                {
+                    e.ItemName,
+                    e.TargetName,
+                    e.TargetId,
+                }
+            ),
             PpRestored e => (
                 "PpRestored",
                 new
                 {
                     e.CreatureName,
+                    e.CreatureId,
                     e.MoveName,
                     e.PpAfter,
                 }
@@ -292,26 +326,65 @@ public sealed class SignalRBattleEventEmitter(
                 new
                 {
                     e.CreatureName,
+                    e.CreatureId,
                     e.HpRestored,
                     e.HpAfter,
                 }
             ),
-            MoveUsed e => ("MoveUsed", new { e.AttackerName, e.MoveName }),
-            MoveMissed e => ("MoveMissed", new { e.AttackerName, e.MoveName }),
-            MoveHadNoEffect e => ("MoveHadNoEffect", new { e.TargetName, e.MoveName }),
-            AlreadyAsleep e => ("AlreadyAsleep", new { e.TargetName }),
-            ButNothingHappened e => ("ButNothingHappened", new { e.CreatureName }),
-            SubstitutePutUp e => ("SubstitutePutUp", new { e.CreatureName, e.SubstituteHp }),
+            MoveUsed e => (
+                "MoveUsed",
+                new
+                {
+                    e.AttackerName,
+                    e.AttackerId,
+                    e.MoveName,
+                }
+            ),
+            MoveMissed e => (
+                "MoveMissed",
+                new
+                {
+                    e.AttackerName,
+                    e.AttackerId,
+                    e.MoveName,
+                }
+            ),
+            MoveHadNoEffect e => (
+                "MoveHadNoEffect",
+                new
+                {
+                    e.TargetName,
+                    e.TargetId,
+                    e.MoveName,
+                }
+            ),
+            AlreadyAsleep e => ("AlreadyAsleep", new { e.TargetName, e.TargetId }),
+            ButNothingHappened e => ("ButNothingHappened", new { e.CreatureName, e.CreatureId }),
+            SubstitutePutUp e => (
+                "SubstitutePutUp",
+                new
+                {
+                    e.CreatureName,
+                    e.CreatureId,
+                    e.SubstituteHp,
+                }
+            ),
             SubstituteAbsorbedHit e => (
                 "SubstituteAbsorbedHit",
-                new { e.CreatureName, e.SubstituteHpAfter }
+                new
+                {
+                    e.CreatureName,
+                    e.CreatureId,
+                    e.SubstituteHpAfter,
+                }
             ),
-            SubstituteFaded e => ("SubstituteFaded", new { e.CreatureName }),
+            SubstituteFaded e => ("SubstituteFaded", new { e.CreatureName, e.CreatureId }),
             DamageDealt e => (
                 "DamageDealt",
                 new
                 {
                     e.TargetName,
+                    e.TargetId,
                     e.Damage,
                     e.TypeEffectiveness,
                     e.HpAfter,
@@ -324,6 +397,7 @@ public sealed class SignalRBattleEventEmitter(
                 new
                 {
                     e.SourceName,
+                    e.SourceId,
                     e.Damage,
                     e.HpAfter,
                 }
@@ -333,25 +407,56 @@ public sealed class SignalRBattleEventEmitter(
                 new
                 {
                     e.SourceName,
+                    e.SourceId,
                     e.Damage,
                     e.HpAfter,
                 }
             ),
-            MoveDisabled e => ("MoveDisabled", new { e.TargetName, e.MoveName }),
-            MoveReEnabled e => ("MoveReEnabled", new { e.CreatureName, e.MoveName }),
-            MistApplied e => ("MistApplied", new { e.CreatureName }),
-            StatDropBlocked e => ("StatDropBlocked", new { e.CreatureName }),
+            MoveDisabled e => (
+                "MoveDisabled",
+                new
+                {
+                    e.TargetName,
+                    e.TargetId,
+                    e.MoveName,
+                }
+            ),
+            MoveReEnabled e => (
+                "MoveReEnabled",
+                new
+                {
+                    e.CreatureName,
+                    e.CreatureId,
+                    e.MoveName,
+                }
+            ),
+            MistApplied e => ("MistApplied", new { e.CreatureName, e.CreatureId }),
+            StatDropBlocked e => ("StatDropBlocked", new { e.CreatureName, e.CreatureId }),
             MultiHitCompleted e => ("MultiHitCompleted", new { e.Hits }),
-            CoinsScattered e => ("CoinsScattered", new { e.SourceName, e.Amount }),
+            CoinsScattered e => (
+                "CoinsScattered",
+                new
+                {
+                    e.SourceName,
+                    e.SourceId,
+                    e.Amount,
+                }
+            ),
             StatusApplied e => (
                 "StatusApplied",
-                new { e.TargetName, Status = e.Status.ToString() }
+                new
+                {
+                    e.TargetName,
+                    e.TargetId,
+                    Status = e.Status.ToString(),
+                }
             ),
             StatusDamage e => (
                 "StatusDamage",
                 new
                 {
                     e.TargetName,
+                    e.TargetId,
                     e.Damage,
                     Source = e.Source.ToString(),
                     e.HpAfter,
@@ -359,31 +464,43 @@ public sealed class SignalRBattleEventEmitter(
             ),
             StatusCleared e => (
                 "StatusCleared",
-                new { e.CreatureName, WasStatus = e.WasStatus.ToString() }
+                new
+                {
+                    e.CreatureName,
+                    e.CreatureId,
+                    WasStatus = e.WasStatus.ToString(),
+                }
             ),
             ActionBlocked e => (
                 "ActionBlocked",
-                new { e.CreatureName, Reason = e.Reason.ToString() }
+                new
+                {
+                    e.CreatureName,
+                    e.CreatureId,
+                    Reason = e.Reason.ToString(),
+                }
             ),
-            ConfusionStarted e => ("ConfusionStarted", new { e.TargetName }),
-            ConfusionAlready e => ("ConfusionAlready", new { e.TargetName }),
+            ConfusionStarted e => ("ConfusionStarted", new { e.TargetName, e.TargetId }),
+            ConfusionAlready e => ("ConfusionAlready", new { e.TargetName, e.TargetId }),
             MoveFailed => ("MoveFailed", new { }),
-            ConfusionMessage e => ("ConfusionMessage", new { e.CreatureName }),
+            ConfusionMessage e => ("ConfusionMessage", new { e.CreatureName, e.CreatureId }),
             ConfusionDamage e => (
                 "ConfusionDamage",
                 new
                 {
                     e.CreatureName,
+                    e.CreatureId,
                     e.Damage,
                     e.HpAfter,
                 }
             ),
-            ConfusionCleared e => ("ConfusionCleared", new { e.CreatureName }),
+            ConfusionCleared e => ("ConfusionCleared", new { e.CreatureName, e.CreatureId }),
             StatStageChanged e => (
                 "StatStageChanged",
                 new
                 {
                     e.CreatureName,
+                    e.CreatureId,
                     e.Stat,
                     e.Delta,
                     e.NewStage,
@@ -395,6 +512,7 @@ public sealed class SignalRBattleEventEmitter(
                 new
                 {
                     e.SourceName,
+                    e.SourceId,
                     e.HealAmount,
                     e.HpAfter,
                 }
@@ -404,33 +522,58 @@ public sealed class SignalRBattleEventEmitter(
                 new
                 {
                     e.CreatureName,
+                    e.CreatureId,
                     e.HealAmount,
                     e.HpAfter,
                 }
             ),
-            MimicLearned e => ("MimicLearned", new { e.CreatureName, e.MoveName }),
+            MimicLearned e => (
+                "MimicLearned",
+                new
+                {
+                    e.CreatureName,
+                    e.CreatureId,
+                    e.MoveName,
+                }
+            ),
             TransformedInto e => (
                 "TransformedInto",
                 new
                 {
                     e.CreatureName,
+                    e.CreatureId,
                     e.TargetName,
+                    e.TargetId,
                     e.IntoSpeciesId,
                 }
             ),
             ConvertedType e => (
                 "ConvertedType",
-                new { e.CreatureName, NewType = e.NewType.ToString() }
+                new
+                {
+                    e.CreatureName,
+                    e.CreatureId,
+                    NewType = e.NewType.ToString(),
+                }
             ),
-            ScreenApplied e => ("ScreenApplied", new { e.CreatureName, e.ScreenName }),
-            FocusEnergyApplied e => ("FocusEnergyApplied", new { e.CreatureName }),
-            BideStoring e => ("BideStoring", new { e.CreatureName }),
-            LeechSeedApplied e => ("LeechSeedApplied", new { e.TargetName }),
+            ScreenApplied e => (
+                "ScreenApplied",
+                new
+                {
+                    e.CreatureName,
+                    e.CreatureId,
+                    e.ScreenName,
+                }
+            ),
+            FocusEnergyApplied e => ("FocusEnergyApplied", new { e.CreatureName, e.CreatureId }),
+            BideStoring e => ("BideStoring", new { e.CreatureName, e.CreatureId }),
+            LeechSeedApplied e => ("LeechSeedApplied", new { e.TargetName, e.TargetId }),
             LeechSeedDamage e => (
                 "LeechSeedDamage",
                 new
                 {
                     e.DrainedName,
+                    e.DrainedId,
                     e.Damage,
                     e.HpAfter,
                 }
@@ -440,26 +583,57 @@ public sealed class SignalRBattleEventEmitter(
                 new
                 {
                     e.HealedName,
+                    e.HealedId,
                     e.Amount,
                     e.HpAfter,
                 }
             ),
-            Recharging e => ("Recharging", new { e.CreatureName }),
-            BindingStarted e => ("BindingStarted", new { e.TargetName, e.MoveName }),
-            BindingBlocked e => ("BindingBlocked", new { e.CreatureName }),
-            FlinchBlocked e => ("FlinchBlocked", new { e.CreatureName }),
-            ChargingUp e => ("ChargingUp", new { e.CreatureName, e.MoveName }),
-            CreatureFainted e => ("CreatureFainted", new { e.Name }),
-            CreatureFled e => ("CreatureFled", new { e.Name, e.IsPlayer }),
+            Recharging e => ("Recharging", new { e.CreatureName, e.CreatureId }),
+            BindingStarted e => (
+                "BindingStarted",
+                new
+                {
+                    e.TargetName,
+                    e.TargetId,
+                    e.MoveName,
+                }
+            ),
+            BindingBlocked e => ("BindingBlocked", new { e.CreatureName, e.CreatureId }),
+            FlinchBlocked e => ("FlinchBlocked", new { e.CreatureName, e.CreatureId }),
+            ChargingUp e => (
+                "ChargingUp",
+                new
+                {
+                    e.CreatureName,
+                    e.CreatureId,
+                    e.MoveName,
+                }
+            ),
+            CreatureFainted e => ("CreatureFainted", new { e.Name, e.Id }),
+            CreatureFled e => (
+                "CreatureFled",
+                new
+                {
+                    e.Name,
+                    e.Id,
+                    e.IsPlayer,
+                }
+            ),
             SwitchInOffered e => (
                 "SwitchInOffered",
-                new { Party = e.Party.Select(ProjectPartyMember), e.FaintedName }
+                new
+                {
+                    Party = e.Party.Select(ProjectPartyMember),
+                    e.FaintedName,
+                    e.FaintedId,
+                }
             ),
             CreatureSwitchedIn e => (
                 "CreatureSwitchedIn",
                 new
                 {
                     e.Name,
+                    e.Id,
                     e.SpeciesId,
                     e.Level,
                     e.Hp,
@@ -472,6 +646,7 @@ public sealed class SignalRBattleEventEmitter(
                 new
                 {
                     e.CreatureName,
+                    e.CreatureId,
                     e.Amount,
                     e.OnBench,
                 }
@@ -481,6 +656,7 @@ public sealed class SignalRBattleEventEmitter(
                 new
                 {
                     e.CreatureName,
+                    e.CreatureId,
                     e.NewLevel,
                     e.XpThisLevel,
                     e.XpToNextLevel,
@@ -494,35 +670,62 @@ public sealed class SignalRBattleEventEmitter(
                 new
                 {
                     e.FromName,
+                    e.CreatureId,
                     e.ToName,
                     e.FromSpeciesId,
                     e.ToSpeciesId,
                 }
             ),
-            EvolutionCancelled e => ("EvolutionCancelled", new { e.CreatureName }),
+            EvolutionCancelled e => ("EvolutionCancelled", new { e.CreatureName, e.CreatureId }),
             CreatureEvolved e => (
                 "CreatureEvolved",
                 new
                 {
                     e.FromName,
+                    e.CreatureId,
                     e.ToName,
                     e.FromSpeciesId,
                     e.ToSpeciesId,
                     e.ToSpeciesName,
                 }
             ),
-            MoveLearned e => ("MoveLearned", new { e.CreatureName, e.MoveName }),
+            MoveLearned e => (
+                "MoveLearned",
+                new
+                {
+                    e.CreatureName,
+                    e.CreatureId,
+                    e.MoveName,
+                }
+            ),
             MoveReplacementRequired e => (
                 "MoveReplacementRequired",
                 new
                 {
                     e.CreatureName,
+                    e.CreatureId,
                     e.NewMoveName,
                     e.CurrentMoves,
                 }
             ),
-            MoveForgotten e => ("MoveForgotten", new { e.CreatureName, e.MoveName }),
-            MoveLearnDeclined e => ("MoveLearnDeclined", new { e.CreatureName, e.MoveName }),
+            MoveForgotten e => (
+                "MoveForgotten",
+                new
+                {
+                    e.CreatureName,
+                    e.CreatureId,
+                    e.MoveName,
+                }
+            ),
+            MoveLearnDeclined e => (
+                "MoveLearnDeclined",
+                new
+                {
+                    e.CreatureName,
+                    e.CreatureId,
+                    e.MoveName,
+                }
+            ),
             MoveTeachTargetRequired e => (
                 "MoveTeachTargetRequired",
                 new
@@ -619,6 +822,7 @@ public sealed class SignalRBattleEventEmitter(
         {
             c.SpeciesId,
             c.Name,
+            c.Id,
             c.Level,
             c.Hp,
             c.MaxHp,
@@ -644,6 +848,7 @@ public sealed class SignalRBattleEventEmitter(
         {
             m.SpeciesId,
             m.Name,
+            m.Id,
             m.Level,
             m.Hp,
             m.MaxHp,

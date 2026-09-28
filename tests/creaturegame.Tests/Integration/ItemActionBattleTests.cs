@@ -294,6 +294,43 @@ public class ItemActionBattleTests
     }
 
     [Fact]
+    public async Task UsingPotion_OnABenchTwin_EmitsHealedAndItemUsedCarryingTheTwinsIdNotTheLeads()
+    {
+        // Creature Identity (ARCHITECTURE.md §2.2). Stage 0 pinned the ambiguity: the engine heals the right member (by
+        // reference) but the events named it by display name only, so for a same-named benched twin they were
+        // indistinguishable from events about the lead and the client moved the LEAD's HP bar. Stage 2 adds the
+        // creature id to the events; the names are still identical, the ids are what tell them apart.
+        var ids = new CreatureIdSource();
+        var player = ids.Assign(TestCreatures.Make("Twin", hp: 200, speed: 200, attack: 999));
+        player.AddAttack(Tackle());
+        var enemy = ids.Assign(TestCreatures.Make("Enemy", hp: 30, speed: 1, defense: 1));
+        enemy.AddAttack(Tackle());
+
+        var party = new Party(player);
+        var bench = ids.Assign(TestCreatures.Make("Twin", hp: 200));
+        bench.Attributes.ReceiveDamage(80);
+        party.Add(bench);
+
+        var bag = new Bag();
+        bag.Add(17, 1);
+
+        var em = await RunAsync(
+            new TurnChoiceInput(new ItemTurnChoice(Potion(), TargetPartySlot: 1)),
+            bag,
+            player,
+            enemy,
+            party: party
+        );
+
+        Assert.Equal(140, bench.Attributes.HP); // the engine healed the twin, not the lead
+        var healed = em.Of<Healed>().Single();
+        Assert.Equal(player.Name, healed.CreatureName); // the display names still collide...
+        Assert.Equal(bench.Id, healed.CreatureId); // ...but the id names the twin that was actually healed
+        Assert.NotEqual(player.Id, healed.CreatureId);
+        Assert.Equal(bench.Id, em.Of<ItemUsed>().Single().TargetId);
+    }
+
+    [Fact]
     public async Task UsingRevive_RestoresAFaintedBenchMemberAndConsumes()
     {
         // The player (lead) uses a Revive on turn 1 targeting a fainted bench member, then wins the fight.

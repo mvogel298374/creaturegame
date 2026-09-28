@@ -6,18 +6,26 @@ namespace creaturegame.Combat;
 public abstract record BattleEvent;
 
 // --- Battle lifecycle ---
-public record BattleStarted(string PlayerName, string EnemyName, int EnemySpeciesId, int EnemyLevel)
-    : BattleEvent;
+public record BattleStarted(
+    string PlayerName,
+    int PlayerId,
+    string EnemyName,
+    int EnemyId,
+    int EnemySpeciesId,
+    int EnemyLevel
+) : BattleEvent;
 
 public record TurnStarted(
     int TurnNumber,
     string PlayerName,
+    int PlayerId,
     int PlayerHp,
     int PlayerMaxHp,
     StatusCondition PlayerStatus,
     int PlayerXpThisLevel,
     int PlayerXpToNextLevel,
     string EnemyName,
+    int EnemyId,
     int EnemyHp,
     int EnemyMaxHp,
     StatusCondition EnemyStatus,
@@ -53,26 +61,32 @@ public record MoveInfo(
 
 public record TurnEnded : BattleEvent;
 
-public record BattleEnded(string WinnerName) : BattleEvent;
+public record BattleEnded(string WinnerName, int WinnerId) : BattleEvent;
 
 /// <summary>The endless battle chain ended — the player's creature fainted. Carries the run summary for
 /// the game-over screen. Emitted once, after the final <see cref="BattleEnded"/>.</summary>
-public record RunEnded(int BattlesWon, int FinalLevel, string FinalCreatureName) : BattleEvent;
+public record RunEnded(
+    int BattlesWon,
+    int FinalLevel,
+    string FinalCreatureName,
+    int FinalCreatureId
+) : BattleEvent;
 
 /// <summary>A roguelite "Poké Center" recovery is offered between encounters (after a set number of wins).
 /// A blocking event: the run loop awaits the player's accept/skip decision via
 /// <see cref="IBattleInput.ConfirmRecoveryAsync"/> before continuing, so the client raises the heal modal here.
 /// Carries the species id so the modal can show the creature's sprite.</summary>
-public record RecoveryOffered(string CreatureName, int SpeciesId, int BattlesWon) : BattleEvent;
+public record RecoveryOffered(string CreatureName, int CreatureId, int SpeciesId, int BattlesWon)
+    : BattleEvent;
 
 /// <summary>The player accepted a Poké Center recovery and the creature was fully restored (HP, PP, and
 /// status). Carries the post-heal HP so the client can fill the bar. Emitted between encounters, never inside
 /// a battle.</summary>
-public record PlayerRecovered(string CreatureName, int HpAfter) : BattleEvent;
+public record PlayerRecovered(string CreatureName, int CreatureId, int HpAfter) : BattleEvent;
 
 /// <summary>The player declined the offered Poké Center recovery (kept current HP/PP/status). Drives the
 /// "decided to keep going" line.</summary>
-public record RecoveryDeclined(string CreatureName) : BattleEvent;
+public record RecoveryDeclined(string CreatureName, int CreatureId) : BattleEvent;
 
 /// <summary>A between-biome route choice is offered: the candidate biomes (the current biome's playable
 /// neighbours, or the run's opening set) the player picks the next leg from. A blocking event — the run loop
@@ -183,6 +197,7 @@ public record AcquisitionOffered(
     string Source,
     int SpeciesId,
     string Name,
+    int Id,
     int Level,
     IReadOnlyList<DamageType> Types,
     int MaxHp,
@@ -196,6 +211,7 @@ public record AcquisitionOffered(
 public record PartyMemberInfo(
     int SpeciesId,
     string Name,
+    int Id,
     int Level,
     int Hp,
     int MaxHp,
@@ -220,6 +236,7 @@ public static class PartyProjection
                 new PartyMemberInfo(
                     c.SpeciesId,
                     c.Name,
+                    c.Id,
                     c.Level,
                     c.Attributes.HP,
                     c.Attributes.MaxHP,
@@ -235,12 +252,18 @@ public static class PartyProjection
 /// <summary>The offered creature was added to the party (accepted). <paramref name="Replaced"/> is true when it
 /// took a full party's slot (<paramref name="ReplacedName"/> = the released member); false when it filled an
 /// empty slot. Followed by a <see cref="PartyUpdated"/> snapshot.</summary>
-public record CreatureAcquired(string Name, int SpeciesId, bool Replaced, string? ReplacedName)
-    : BattleEvent;
+public record CreatureAcquired(
+    string Name,
+    int Id,
+    int SpeciesId,
+    bool Replaced,
+    string? ReplacedName,
+    int? ReplacedId
+) : BattleEvent;
 
 /// <summary>The player declined an acquisition offer — the roster is unchanged and the run advances (a decline
 /// is a pure sequencing no-op). Drives the "left it in the wild" line.</summary>
-public record AcquisitionDeclined(string Name) : BattleEvent;
+public record AcquisitionDeclined(string Name, int Id) : BattleEvent;
 
 /// <summary>The party roster changed — the full member snapshot the client's party panel re-renders from.
 /// Emitted after an acquisition deposit; also the vehicle for surfacing a whole-party Poké Center heal (benched
@@ -259,34 +282,36 @@ public record LeadChoiceOffered(IReadOnlyList<PartyMemberInfo> Party) : BattleEv
 /// <summary>The party's lead was reassigned (the between-biome lead choice picked a different member). The named
 /// creature is now the active <c>RunState.Player</c> for the next biome. Followed by a <see cref="PartyUpdated"/>
 /// snapshot (with the new lead flagged). Not emitted when the player keeps the current lead (a no-op).</summary>
-public record LeadChanged(string Name, int SpeciesId) : BattleEvent;
+public record LeadChanged(string Name, int Id, int SpeciesId) : BattleEvent;
 
 // --- Move actions ---
-public record MoveUsed(string AttackerName, string MoveName) : BattleEvent;
+public record MoveUsed(string AttackerName, int AttackerId, string MoveName) : BattleEvent;
 
-public record MoveMissed(string AttackerName, string MoveName) : BattleEvent;
+public record MoveMissed(string AttackerName, int AttackerId, string MoveName) : BattleEvent;
 
 /// <summary>The move hit but the target is immune (type-based) so nothing happened — "It doesn't affect …".</summary>
-public record MoveHadNoEffect(string TargetName, string MoveName) : BattleEvent;
+public record MoveHadNoEffect(string TargetName, int TargetId, string MoveName) : BattleEvent;
 
 /// <summary>A sleep move hit a target that is already asleep — Gen 1's distinct "… is already asleep!"
 /// (AlreadyAsleepText), as opposed to the generic "It doesn't affect …" every other already-statused case uses.</summary>
-public record AlreadyAsleep(string TargetName) : BattleEvent;
+public record AlreadyAsleep(string TargetName, int TargetId) : BattleEvent;
 
 /// <summary>A move with no effect by design (Splash) resolved — the Gen 1 "But nothing happened!" line.</summary>
-public record ButNothingHappened(string CreatureName) : BattleEvent;
+public record ButNothingHappened(string CreatureName, int CreatureId) : BattleEvent;
 
 /// <summary>The user spent HP to put up a Substitute decoy with <paramref name="SubstituteHp"/> HP.</summary>
-public record SubstitutePutUp(string CreatureName, int SubstituteHp) : BattleEvent;
+public record SubstitutePutUp(string CreatureName, int CreatureId, int SubstituteHp) : BattleEvent;
 
 /// <summary>An incoming hit was soaked by the creature's Substitute (the user took no damage).</summary>
-public record SubstituteAbsorbedHit(string CreatureName, int SubstituteHpAfter) : BattleEvent;
+public record SubstituteAbsorbedHit(string CreatureName, int CreatureId, int SubstituteHpAfter)
+    : BattleEvent;
 
 /// <summary>The Substitute ran out of HP and broke — the user is exposed again.</summary>
-public record SubstituteFaded(string CreatureName) : BattleEvent;
+public record SubstituteFaded(string CreatureName, int CreatureId) : BattleEvent;
 
 public record DamageDealt(
     string TargetName,
+    int TargetId,
     int Damage,
     double TypeEffectiveness,
     int HpAfter,
@@ -294,19 +319,20 @@ public record DamageDealt(
     bool IsCrit = false
 ) : BattleEvent;
 
-public record RecoilDamage(string SourceName, int Damage, int HpAfter) : BattleEvent;
+public record RecoilDamage(string SourceName, int SourceId, int Damage, int HpAfter) : BattleEvent;
 
 public record MultiHitCompleted(int Hits) : BattleEvent;
 
-public record CoinsScattered(string SourceName, int Amount) : BattleEvent;
+public record CoinsScattered(string SourceName, int SourceId, int Amount) : BattleEvent;
 
 // --- Items (using a bag item in battle) ---
 /// <summary>A bag item was used on a creature this turn (e.g. "Used POTION on PIKACHU"). Emitted before
 /// the item's effect events (Healed / StatusCleared / StatStageChanged / PpRestored).</summary>
-public record ItemUsed(string ItemName, string TargetName) : BattleEvent;
+public record ItemUsed(string ItemName, string TargetName, int TargetId) : BattleEvent;
 
 /// <summary>A PP-restore item refilled a move's PP. One per move restored (Elixir restores all four).</summary>
-public record PpRestored(string CreatureName, string MoveName, int PpAfter) : BattleEvent;
+public record PpRestored(string CreatureName, int CreatureId, string MoveName, int PpAfter)
+    : BattleEvent;
 
 /// <summary>An item selection had no effect (e.g. a Potion at full HP, an Antidote with no poison, or a Revive
 /// aimed at a member that isn't fainted). Nothing is consumed. The Gen 1 "It won't have any effect!" line.</summary>
@@ -315,111 +341,134 @@ public record ItemUseFailed(string ItemName) : BattleEvent;
 /// <summary>A Revive / Max Revive restored a fainted party member from 0 to <paramref name="HpAfter"/> HP
 /// (<paramref name="HpRestored"/> gained). The member stays benched, so its bar isn't a nameplate — a
 /// <see cref="PartyUpdated"/> snapshot follows to repaint the roster panel.</summary>
-public record Revived(string CreatureName, int HpRestored, int HpAfter) : BattleEvent;
-
-// --- Status conditions ---
-public record StatusApplied(string TargetName, StatusCondition Status) : BattleEvent;
-
-public record StatusDamage(string TargetName, int Damage, StatusCondition Source, int HpAfter)
+public record Revived(string CreatureName, int CreatureId, int HpRestored, int HpAfter)
     : BattleEvent;
 
-public record StatusCleared(string CreatureName, StatusCondition WasStatus) : BattleEvent;
+// --- Status conditions ---
+public record StatusApplied(string TargetName, int TargetId, StatusCondition Status) : BattleEvent;
 
-public record ActionBlocked(string CreatureName, StatusCondition Reason) : BattleEvent;
+public record StatusDamage(
+    string TargetName,
+    int TargetId,
+    int Damage,
+    StatusCondition Source,
+    int HpAfter
+) : BattleEvent;
+
+public record StatusCleared(string CreatureName, int CreatureId, StatusCondition WasStatus)
+    : BattleEvent;
+
+public record ActionBlocked(string CreatureName, int CreatureId, StatusCondition Reason)
+    : BattleEvent;
 
 // --- Confusion (pseudo-status — separate from StatusCondition enum) ---
-public record ConfusionStarted(string TargetName) : BattleEvent;
+public record ConfusionStarted(string TargetName, int TargetId) : BattleEvent;
 
 // A dedicated confusion move that hits an already-confused target, when the ruleset names the redundancy
 // ("… is already confused!") — the Gen 3+ arm of IBattleRules.RedundantConfusionAnnouncement. Gen 1 instead
 // emits the generic MoveFailed ("But it failed!"); neither ever re-rolls the confusion counter.
-public record ConfusionAlready(string TargetName) : BattleEvent;
+public record ConfusionAlready(string TargetName, int TargetId) : BattleEvent;
 
 // The generic "But it failed!" line (pokered ConditionalPrintButItFailed) — Gen 1's message for a dedicated
 // confusion move (Confuse Ray / Supersonic) that fails on an already-confused target.
 public record MoveFailed : BattleEvent;
 
-public record ConfusionMessage(string CreatureName) : BattleEvent;
+public record ConfusionMessage(string CreatureName, int CreatureId) : BattleEvent;
 
-public record ConfusionDamage(string CreatureName, int Damage, int HpAfter) : BattleEvent;
+public record ConfusionDamage(string CreatureName, int CreatureId, int Damage, int HpAfter)
+    : BattleEvent;
 
-public record ConfusionCleared(string CreatureName) : BattleEvent;
+public record ConfusionCleared(string CreatureName, int CreatureId) : BattleEvent;
 
 // --- Stat stages ---
-public record StatStageChanged(string CreatureName, string Stat, int Delta, int NewStage)
-    : BattleEvent;
+public record StatStageChanged(
+    string CreatureName,
+    int CreatureId,
+    string Stat,
+    int Delta,
+    int NewStage
+) : BattleEvent;
 
 public record HazeClearedStages : BattleEvent;
 
 // --- Drain / healing ---
-public record DrainHealed(string SourceName, int HealAmount, int HpAfter) : BattleEvent;
+public record DrainHealed(string SourceName, int SourceId, int HealAmount, int HpAfter)
+    : BattleEvent;
 
 /// <summary>A self-heal move (Recover, Soft-Boiled) restored HP to the user.</summary>
-public record Healed(string CreatureName, int HealAmount, int HpAfter) : BattleEvent;
+public record Healed(string CreatureName, int CreatureId, int HealAmount, int HpAfter)
+    : BattleEvent;
 
 // --- Mimic (the move) ---
-public record MimicLearned(string CreatureName, string MoveName) : BattleEvent;
+public record MimicLearned(string CreatureName, int CreatureId, string MoveName) : BattleEvent;
 
 // --- Transform / Conversion (identity & type mutation) ---
 /// <summary>The user copied the target's species, types, stats and moveset (Transform). <paramref name="IntoSpeciesId"/>
 /// is the species the user became — the client morphs the transforming side's sprite to it.</summary>
-public record TransformedInto(string CreatureName, string TargetName, int IntoSpeciesId)
-    : BattleEvent;
+public record TransformedInto(
+    string CreatureName,
+    int CreatureId,
+    string TargetName,
+    int TargetId,
+    int IntoSpeciesId
+) : BattleEvent;
 
 /// <summary>The user changed its type — Gen 1 Conversion copies the foe's primary type.</summary>
-public record ConvertedType(string CreatureName, DamageType NewType) : BattleEvent;
+public record ConvertedType(string CreatureName, int CreatureId, DamageType NewType) : BattleEvent;
 
 // --- Reflect / Light Screen ---
-public record ScreenApplied(string CreatureName, string ScreenName) : BattleEvent;
+public record ScreenApplied(string CreatureName, int CreatureId, string ScreenName) : BattleEvent;
 
 // --- Focus Energy ---
-public record FocusEnergyApplied(string CreatureName) : BattleEvent;
+public record FocusEnergyApplied(string CreatureName, int CreatureId) : BattleEvent;
 
 // --- Bide ---
-public record BideStoring(string CreatureName) : BattleEvent;
+public record BideStoring(string CreatureName, int CreatureId) : BattleEvent;
 
 // --- Leech Seed ---
-public record LeechSeedApplied(string TargetName) : BattleEvent;
+public record LeechSeedApplied(string TargetName, int TargetId) : BattleEvent;
 
-public record LeechSeedDamage(string DrainedName, int Damage, int HpAfter) : BattleEvent;
+public record LeechSeedDamage(string DrainedName, int DrainedId, int Damage, int HpAfter)
+    : BattleEvent;
 
-public record LeechSeedHealed(string HealedName, int Amount, int HpAfter) : BattleEvent;
+public record LeechSeedHealed(string HealedName, int HealedId, int Amount, int HpAfter)
+    : BattleEvent;
 
 // --- Recharge (Hyper Beam) ---
-public record Recharging(string CreatureName) : BattleEvent;
+public record Recharging(string CreatureName, int CreatureId) : BattleEvent;
 
 // --- Binding (Wrap, Bind, Clamp, Fire Spin) ---
-public record BindingStarted(string TargetName, string MoveName) : BattleEvent;
+public record BindingStarted(string TargetName, int TargetId, string MoveName) : BattleEvent;
 
-public record BindingBlocked(string CreatureName) : BattleEvent;
+public record BindingBlocked(string CreatureName, int CreatureId) : BattleEvent;
 
 // --- Flinch ---
-public record FlinchBlocked(string CreatureName) : BattleEvent;
+public record FlinchBlocked(string CreatureName, int CreatureId) : BattleEvent;
 
 // --- Two-turn moves (Fly, Dig, SolarBeam…) ---
-public record ChargingUp(string CreatureName, string MoveName) : BattleEvent;
+public record ChargingUp(string CreatureName, int CreatureId, string MoveName) : BattleEvent;
 
 // --- Crash damage (Jump Kick / Hi Jump Kick miss) ---
-public record CrashDamage(string SourceName, int Damage, int HpAfter) : BattleEvent;
+public record CrashDamage(string SourceName, int SourceId, int Damage, int HpAfter) : BattleEvent;
 
 // --- Disable (the move) ---
-public record MoveDisabled(string TargetName, string MoveName) : BattleEvent;
+public record MoveDisabled(string TargetName, int TargetId, string MoveName) : BattleEvent;
 
-public record MoveReEnabled(string CreatureName, string MoveName) : BattleEvent;
+public record MoveReEnabled(string CreatureName, int CreatureId, string MoveName) : BattleEvent;
 
 // --- Mist (the move) ---
-public record MistApplied(string CreatureName) : BattleEvent;
+public record MistApplied(string CreatureName, int CreatureId) : BattleEvent;
 
-public record StatDropBlocked(string CreatureName) : BattleEvent;
+public record StatDropBlocked(string CreatureName, int CreatureId) : BattleEvent;
 
 // --- Creature ---
-public record CreatureFainted(string Name) : BattleEvent;
+public record CreatureFainted(string Name, int Id) : BattleEvent;
 
 /// <summary>A creature was scared off by Roar/Whirlwind and fled — the wild battle ends with no faint
 /// (Gen 1). <see cref="IsPlayer"/> distinguishes the player being blown away from the wild foe fleeing, so
 /// the client can word it ("… was blown away!" vs "The wild … fled!"). Emitted instead of
 /// <see cref="BattleEnded"/>; the run loop advances the encounter as neither a win nor a loss.</summary>
-public record CreatureFled(string Name, bool IsPlayer) : BattleEvent;
+public record CreatureFled(string Name, int Id, bool IsPlayer) : BattleEvent;
 
 // --- Forced switch on faint (Encounter Logic Phase 4 Stage 3) ---
 /// <summary>The player's active creature fainted <em>but the party still has a live bench member</em>, so the run
@@ -428,8 +477,11 @@ public record CreatureFled(string Name, bool IsPlayer) : BattleEvent;
 /// the forced (non-dismissable) switch-in modal here. Carries the current roster snapshot (the members to pick
 /// from — the fainted one reads HP 0 and is not a valid target) and the <paramref name="FaintedName"/> that just
 /// dropped. This is a <em>forced</em> faint-switch; voluntary in-battle switching is a separate, later feature.</summary>
-public record SwitchInOffered(IReadOnlyList<PartyMemberInfo> Party, string FaintedName)
-    : BattleEvent;
+public record SwitchInOffered(
+    IReadOnlyList<PartyMemberInfo> Party,
+    string FaintedName,
+    int FaintedId
+) : BattleEvent;
 
 /// <summary>A replacement creature was sent in after the active one fainted (the forced faint-switch). It battles
 /// the same enemy from the next turn. Carries the incoming creature's <paramref name="SpeciesId"/> (the client
@@ -439,6 +491,7 @@ public record SwitchInOffered(IReadOnlyList<PartyMemberInfo> Party, string Faint
 /// active creature flagged and the fainted member at HP 0).</summary>
 public record CreatureSwitchedIn(
     string Name,
+    int Id,
     int SpeciesId,
     int Level,
     int Hp,
@@ -454,7 +507,12 @@ public record CreatureSwitchedIn(
 /// announced this way so the text log names every party member that gained XP, not just the one on the field.
 /// The client must log the gain but must NOT move the active creature's XP bar for it; only the on-field
 /// creature drives that bar.</para></summary>
-public record ExperienceGained(string CreatureName, int Amount, bool OnBench = false) : BattleEvent;
+public record ExperienceGained(
+    string CreatureName,
+    int CreatureId,
+    int Amount,
+    bool OnBench = false
+) : BattleEvent;
 
 /// <summary>One level gained. Carries the new level's bar parameters (<paramref name="XpThisLevel"/> /
 /// <paramref name="XpToNextLevel"/>), the resulting stat totals (<paramref name="Stats"/>) and the per-stat
@@ -467,6 +525,7 @@ public record ExperienceGained(string CreatureName, int Amount, bool OnBench = f
 /// bar — only the on-field creature drives those.</para></summary>
 public record LeveledUp(
     string CreatureName,
+    int CreatureId,
     int NewLevel,
     int XpThisLevel,
     int XpToNextLevel,
@@ -480,12 +539,17 @@ public record LeveledUp(
 /// <see cref="IBattleInput.ConfirmEvolutionAsync"/> before continuing, so the client raises the evolution
 /// modal here. Carries both names + the from/to species ids so the modal can show the creature and what it
 /// would become. On allow, <see cref="CreatureEvolved"/> follows; on cancel, <see cref="EvolutionCancelled"/>.</summary>
-public record EvolutionOffered(string FromName, string ToName, int FromSpeciesId, int ToSpeciesId)
-    : BattleEvent;
+public record EvolutionOffered(
+    string FromName,
+    string ToName,
+    int CreatureId,
+    int FromSpeciesId,
+    int ToSpeciesId
+) : BattleEvent;
 
 /// <summary>The player declined an offered evolution (Gen 1 B-cancel). The creature keeps its current form;
 /// it will be offered again at the next level-up while still eligible. Drives the "stopped evolving" line.</summary>
-public record EvolutionCancelled(string CreatureName) : BattleEvent;
+public record EvolutionCancelled(string CreatureName, int CreatureId) : BattleEvent;
 
 /// <summary>The player's creature evolved between encounters. Carries both the old and new names plus the
 /// <paramref name="FromSpeciesId"/>/<paramref name="ToSpeciesId"/> so the client can morph the sprite
@@ -501,6 +565,7 @@ public record EvolutionCancelled(string CreatureName) : BattleEvent;
 public record CreatureEvolved(
     string FromName,
     string ToName,
+    int CreatureId,
     int FromSpeciesId,
     int ToSpeciesId,
     string ToSpeciesName
@@ -509,7 +574,7 @@ public record CreatureEvolved(
 // --- Learnset (level-up move learning) ---
 /// <summary>The creature learned a new move — either into a free slot, or after a replacement. Drives the
 /// canonical "{NAME} learned {MOVE}!" line.</summary>
-public record MoveLearned(string CreatureName, string MoveName) : BattleEvent;
+public record MoveLearned(string CreatureName, int CreatureId, string MoveName) : BattleEvent;
 
 /// <summary>The creature levelled into a move but its four slots are full, so the player must choose a move to
 /// forget (or decline). A blocking event: the battle loop awaits the player's decision via
@@ -517,17 +582,18 @@ public record MoveLearned(string CreatureName, string MoveName) : BattleEvent;
 /// UI can present the choice.</summary>
 public record MoveReplacementRequired(
     string CreatureName,
+    int CreatureId,
     string NewMoveName,
     IReadOnlyList<string> CurrentMoves
 ) : BattleEvent;
 
 /// <summary>A move was forgotten to make room for a new one — emitted just before the paired
 /// <see cref="MoveLearned"/>. Drives the "{NAME} forgot {MOVE}!" line.</summary>
-public record MoveForgotten(string CreatureName, string MoveName) : BattleEvent;
+public record MoveForgotten(string CreatureName, int CreatureId, string MoveName) : BattleEvent;
 
 /// <summary>The player declined to learn the offered move (kept the current four). Drives the
 /// "{NAME} did not learn {MOVE}." line.</summary>
-public record MoveLearnDeclined(string CreatureName, string MoveName) : BattleEvent;
+public record MoveLearnDeclined(string CreatureName, int CreatureId, string MoveName) : BattleEvent;
 
 // --- TM/HM (move-teach rewards) ---
 /// <summary>A picked <see cref="MoveTeachRewardOption"/> is ready to be assigned: the move's display stats (so
@@ -557,6 +623,7 @@ public record MoveTeachTargetRequired(
 public record MoveTeachCandidateInfo(
     int SpeciesId,
     string Name,
+    int Id,
     int Level,
     int Hp,
     int MaxHp,

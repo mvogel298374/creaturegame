@@ -57,6 +57,18 @@ public class EvolveToTests
     }
 
     [Fact]
+    public void EvolveTo_KeepsTheCreaturesId_ItIsTheIndividualNotTheSpecies()
+    {
+        // Creature Identity: species and name both change on evolution; the id — what events route on — must not.
+        var c = new CreatureIdSource().Assign(BuildBulbasaur(20));
+        int id = c.Id;
+
+        c.EvolveTo(Ivysaur);
+
+        Assert.Equal(id, c.Id);
+    }
+
+    [Fact]
     public void EvolveTo_AdoptsNewSpeciesIdentityAndStats()
     {
         var c = BuildBulbasaur(20);

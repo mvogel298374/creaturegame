@@ -87,6 +87,9 @@ export interface BattleState {
   phase: 'connecting' | 'waiting' | 'choosing' | 'battling' | 'ended';
   animating: boolean;
   playerName: string;
+  // The on-field creatures' identities. HP/status routing keys on these, never on the names above (two creatures
+  // can share a display name — ARCHITECTURE.md §2.2). 0 = nobody yet.
+  playerId: number;
   playerHp: number;
   playerMaxHp: number;
   playerStatus: string;
@@ -94,6 +97,7 @@ export interface BattleState {
   playerXp: number;
   playerXpToNext: number;
   enemyName: string;
+  enemyId: number;
   enemyHp: number;
   enemyMaxHp: number;
   enemyStatus: string;
@@ -151,6 +155,7 @@ export const initialState: BattleState = {
   phase: 'connecting',
   animating: false,
   playerName: '',
+  playerId: 0,
   playerHp: 0,
   playerMaxHp: 1,
   playerStatus: 'None',
@@ -158,6 +163,7 @@ export const initialState: BattleState = {
   playerXp: 0,
   playerXpToNext: 100,
   enemyName: '',
+  enemyId: 0,
   enemyHp: 0,
   enemyMaxHp: 1,
   enemyStatus: 'None',
@@ -205,7 +211,9 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
         ...state,
         phase: 'waiting',
         playerName: action.playerName,
+        playerId: action.playerId,
         enemyName: action.enemyName,
+        enemyId: action.enemyId,
         enemySpeciesId: action.enemySpeciesId,
         enemyLevel: action.enemyLevel,
         enemyHp: 1,
@@ -218,6 +226,12 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
         phase: 'choosing',
         animating: false,
         turnNumber: action.turnNumber,
+        // Identity is re-asserted every turn from the server's own view of the field, so a client that missed (or
+        // replayed a stale) BattleStarted / CreatureSwitchedIn is corrected by the very next turn prompt.
+        playerName: action.playerName,
+        playerId: action.playerId,
+        enemyName: action.enemyName,
+        enemyId: action.enemyId,
         playerHp: action.playerHp,
         playerMaxHp: action.playerMaxHp,
         playerStatus: action.playerStatus,
@@ -247,16 +261,16 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
     case 'LOG':
       return { ...state, log: [...state.log, { message: action.message, tone: action.tone }] };
     case 'UPDATE_HP':
-      if (action.name === state.playerName) return { ...state, playerHp: action.hp };
-      if (action.name === state.enemyName)  return { ...state, enemyHp: action.hp };
+      if (action.id === state.playerId) return { ...state, playerHp: action.hp };
+      if (action.id === state.enemyId)  return { ...state, enemyHp: action.hp };
       return state;
     case 'UPDATE_STATUS':
-      if (action.name === state.playerName) return { ...state, playerStatus: action.status };
-      if (action.name === state.enemyName)  return { ...state, enemyStatus: action.status };
+      if (action.id === state.playerId) return { ...state, playerStatus: action.status };
+      if (action.id === state.enemyId)  return { ...state, enemyStatus: action.status };
       return state;
     case 'CLEAR_STATUS':
-      if (action.name === state.playerName) return { ...state, playerStatus: 'None' };
-      if (action.name === state.enemyName)  return { ...state, enemyStatus: 'None' };
+      if (action.id === state.playerId) return { ...state, playerStatus: 'None' };
+      if (action.id === state.enemyId)  return { ...state, enemyStatus: 'None' };
       return state;
     case 'LEVELED_UP':
       // Tick the level and reset the bar onto the new level's scale (refilled by a following XP_SET).
@@ -335,11 +349,11 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
     case 'PARTY_SET': {
       // Keep the player HUD in step with the lead's row. A lead swap emits LeadChanged followed by this snapshot,
       // and the snapshot is the authority on the new lead's level/HP/status — LEAD_CHANGED below can only read the
-      // roster it already had. Guarded on the lead's name matching the current playerName (the same name-keying
+      // roster it already had. Guarded on the lead's id matching the current playerId (the same id-keying
       // UPDATE_HP/CLEAR_STATUS use), so this only ever refreshes the creature the HUD is already describing and
-      // can never retarget onto a different one.
+      // can never retarget onto a different one — including a same-named twin.
       const lead = action.members.find(m => m.isLead);
-      if (!lead || lead.name !== state.playerName) return { ...state, party: action.members };
+      if (!lead || lead.id !== state.playerId) return { ...state, party: action.members };
       return {
         ...state,
         party: action.members,
@@ -353,11 +367,12 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
       // The lead was reassigned out of battle, so no CreatureSwitchedIn will announce the new player identity.
       // Retarget the nameplate immediately, filling level/HP/status from the roster we already hold; the
       // PartyUpdated snapshot that follows re-syncs those from the authority. Without this the HUD keeps
-      // describing the outgoing creature — after a mutual KO, a corpse at 0 HP — name-keyed HP/status events for
-      // the new lead are dropped, and `Lv` never self-corrects because no later event carries a level.
-      const member = state.party.find(m => m.name === action.name);
+      // describing the outgoing creature — after a mutual KO, a corpse at 0 HP — HP/status events for the new
+      // lead are dropped, and `Lv` never self-corrects because no later event carries a level.
+      const member = state.party.find(m => m.id === action.id);
       return {
         ...state,
+        playerId: action.id,
         playerName: action.name,
         playerLevel: member?.level ?? state.playerLevel,
         playerHp: member?.hp ?? state.playerHp,
@@ -370,11 +385,10 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
       // LEAD_CHANGED fires and the nameplate + "What will X do?" prompt would keep the pre-evolution name until the
       // next BATTLE_STARTED reset it.
       //
-      // Guarded on the OLD name matching, because evolution is party-wide (the engine offers it to every member
-      // that levelled): a BENCH member's evolution must not rename the on-field creature. Same name-keying as
-      // UPDATE_HP/UPDATE_STATUS above — and it must compare the *from* name, since that is what the HUD still
-      // holds at this point.
-      if (action.fromName !== state.playerName) return state;
+      // Guarded on the id, because evolution is party-wide (the engine offers it to every member that levelled):
+      // a BENCH member's evolution must not rename the on-field creature — even one that shares its name. The id
+      // is stable across the rename, so unlike a name it needs no "compare the from-name" care.
+      if (action.id !== state.playerId) return state;
       return { ...state, playerName: action.toName };
     }
     case 'SHOW_LEAD_CHOICE':
@@ -390,6 +404,7 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
       // refresh on the next TurnStarted (which carries no level, hence Level rides on the switch-in event).
       return {
         ...state,
+        playerId: action.id,
         playerName: action.name,
         playerLevel: action.level,
         playerHp: action.hp,

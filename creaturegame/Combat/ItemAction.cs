@@ -69,7 +69,9 @@ public sealed class ItemAction : IBattleAction
             return Task.CompletedTask;
         }
 
-        _emitter?.Emit(new ItemUsed(_item.Name ?? "", ctx.ResolvedTarget.Name));
+        _emitter?.Emit(
+            new ItemUsed(_item.Name ?? "", ctx.ResolvedTarget.Name, ctx.ResolvedTarget.Id)
+        );
         effect.Apply(ctx);
         _bag.Consume(_item.Id);
 

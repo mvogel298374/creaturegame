@@ -81,6 +81,18 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - The picker reuses the same party-card component the SWITCH menu and the lead/switch-in prompts already render.
 - Design detail / plan → `docs/TODO_ARCHIVE.md` → *CHECK POKEMON party-member picker*. History → same section.
 
+### Same-named creatures stay distinct in battle
+- When two creatures share a display name (a wild creature vs. the player's same-species creature, a drafted
+  twin on the bench, two nicknamed alike), every hit, HP change, status, faint, heal and evolution lands on the
+  correct sprite and party row — a wild creature never takes the player's sprite's damage or HP, and healing or
+  evolving a benched twin never moves the lead's HP bar or renames the on-field creature.
+- Names are shown exactly as they are, so the same name can appear on both sides of a fight; a name is display
+  text only and is never what decides which creature something applies to.
+- After a page refresh mid-battle (including after a switch-in), the next turn prompt re-establishes which
+  creature is on the field, so its attacks, HP and status keep landing on the correct side.
+- Design detail → `ARCHITECTURE.md` §2.2 ("Creatures are identified by id").  History → `TODO_ARCHIVE.md` →
+  *Creature Identity — id-keyed events*.
+
 ## 3. Encounters, biomes & acquisition
 
 ### Evolution-chain level floor on species selection

@@ -68,6 +68,7 @@ export interface RewardOption {
 // same fields as PartyMember plus whether this member can learn the offered move.
 export interface MoveTeachCandidate {
   speciesId: number;
+  id: number;
   name: string;
   level: number;
   hp: number;
@@ -95,6 +96,9 @@ export function healSummary(
 // /party hydrate endpoint.
 export interface PartyMember {
   speciesId: number;
+  // The creature's identity (stable across evolution/nickname) — what routing and the roster key on. `name` is
+  // display text only; two members can share it.
+  id: number;
   name: string;
   level: number;
   hp: number;
@@ -127,15 +131,15 @@ export interface ShopOfferItem {
 
 // View-state actions — consumed by the reducer in useBattleHub.
 export type Action =
-  | { type: 'BATTLE_STARTED'; playerName: string; enemyName: string; enemySpeciesId: number; enemyLevel: number }
-  | { type: 'TURN_STARTED'; turnNumber: number; playerHp: number; playerMaxHp: number; playerStatus: string; playerXpThisLevel: number; playerXpToNextLevel: number; enemyHp: number; enemyMaxHp: number; enemyStatus: string; moves: MoveInfo[]; canSwitch: boolean }
+  | { type: 'BATTLE_STARTED'; playerName: string; playerId: number; enemyName: string; enemyId: number; enemySpeciesId: number; enemyLevel: number }
+  | { type: 'TURN_STARTED'; turnNumber: number; playerName: string; playerId: number; enemyName: string; enemyId: number; playerHp: number; playerMaxHp: number; playerStatus: string; playerXpThisLevel: number; playerXpToNextLevel: number; enemyHp: number; enemyMaxHp: number; enemyStatus: string; moves: MoveInfo[]; canSwitch: boolean }
   | { type: 'TURN_ENDED' }
   | { type: 'PLAYER_CHOSE' }
   | { type: 'RUN_ENDED'; battlesWon: number; finalLevel: number }
   | { type: 'LOG'; message: string; tone?: LogTone }
-  | { type: 'UPDATE_HP'; name: string; hp: number }
-  | { type: 'UPDATE_STATUS'; name: string; status: string }
-  | { type: 'CLEAR_STATUS'; name: string }
+  | { type: 'UPDATE_HP'; id: number; hp: number }
+  | { type: 'UPDATE_STATUS'; id: number; status: string }
+  | { type: 'CLEAR_STATUS'; id: number }
   | { type: 'LEVELED_UP'; newLevel: number; xpToNextLevel: number }
   // The Gen 1 level-up stat panel: per-stat gains + the new totals. Shown then hidden by the timeline.
   | { type: 'SHOW_LEVEL_UP'; creatureName: string; level: number; gains: StatBlock; totals: StatBlock }
@@ -200,14 +204,15 @@ export type Action =
   | { type: 'SHOW_SWITCH_IN'; party: PartyMember[]; faintedName: string }
   | { type: 'HIDE_SWITCH_IN' }
   // A replacement was sent in — retarget the player nameplate (name/level/HP/status) onto the incoming creature.
-  | { type: 'SWITCHED_IN'; name: string; level: number; hp: number; maxHp: number; status: string }
+  | { type: 'SWITCHED_IN'; id: number; name: string; level: number; hp: number; maxHp: number; status: string }
   // The lead was reassigned OUT of battle (the between-biome swap, or the post-mutual-KO promotion): retarget the
   // player nameplate onto it. Carries only the name — the new lead's level/HP/status are read from the roster
   // snapshot, since a lead swap moves no one onto the field and so has no entry-state of its own to report.
-  | { type: 'LEAD_CHANGED'; name: string }
-  // A creature was renamed in place by an evolution. Carries BOTH names so the reducer can check the old one
-  // against the current player — evolution is party-wide, so this also arrives for bench members.
-  | { type: 'CREATURE_RENAMED'; fromName: string; toName: string }
+  | { type: 'LEAD_CHANGED'; id: number; name: string }
+  // A creature was renamed in place by an evolution. Keyed by the creature's id (stable across the rename), so
+  // the reducer renames the on-field creature only when it IS the one that evolved — evolution is party-wide, so
+  // this also arrives for bench members, including a bench member that shares the lead's name.
+  | { type: 'CREATURE_RENAMED'; id: number; toName: string }
   // Run economy: set the gold total (RewardGranted carries the post-credit total) shown in the BAG money box.
   | { type: 'SET_GOLD'; gold: number }
   // Loot drop hover: a transient floating "you found …" toast (gold + items) shown over the field for a
@@ -257,7 +262,9 @@ export interface Expansion {
 }
 
 export interface ExpandContext {
-  playerName: string;
+  // The id of the creature on the player's side right now. Every side decision below keys on this, never on a
+  // display name — two creatures can share a name (ARCHITECTURE.md §2.2).
+  playerId: number;
   // 1 for the first battle of the run, 2+ for each chained encounter. Drives whether BattleStarted is the
   // scene's initial entry (handled by create()) or a mid-run enemy swap (slide in a new sprite). Optional
   // for tests; treated as the first encounter when absent.
@@ -334,6 +341,7 @@ function rewardGrantedMsg(source: string, gold: number, itemNames: string[]): st
 function parsePartyMembers(raw: unknown): PartyMember[] {
   return ((raw as Array<Record<string, unknown>>) ?? []).map(m => ({
     speciesId: m.speciesId as number,
+    id: m.id as number,
     name: m.name as string,
     level: m.level as number,
     hp: m.hp as number,
@@ -370,7 +378,7 @@ function chargingMsg(name: string, slug: string): string {
  * No timers, no bridge, no dispatch — entirely testable in isolation.
  */
 export function expandEvent(eventType: string, payload: Payload, ctx: ExpandContext): Expansion {
-  const side = (name: string): Side => (name === ctx.playerName ? 'player' : 'enemy');
+  const side = (id: number): Side => (id === ctx.playerId ? 'player' : 'enemy');
 
   switch (eventType) {
     // ── Control plane ──────────────────────────────────────────────────────────
@@ -384,7 +392,9 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       const started: Action = {
         type: 'BATTLE_STARTED',
         playerName: pName,
+        playerId: payload.playerId as number,
         enemyName: eName,
+        enemyId: payload.enemyId as number,
         enemySpeciesId,
         enemyLevel: payload.enemyLevel as number,
       };
@@ -417,6 +427,12 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
         steps: [d({
           type: 'TURN_STARTED',
           turnNumber: payload.turnNumber as number,
+          // Who is on the field RIGHT NOW, from the authority — re-syncs identity after a reconnect replay, whose
+          // cached BattleStarted still names the ORIGINAL lead even if a switch-in has happened since.
+          playerName: payload.playerName as string,
+          playerId: payload.playerId as number,
+          enemyName: payload.enemyName as string,
+          enemyId: payload.enemyId as number,
           playerHp: payload.playerHp as number,
           playerMaxHp: payload.playerMaxHp as number,
           playerStatus: payload.playerStatus as string,
@@ -440,8 +456,7 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       // "new challenger" announcement now belongs to the NEXT encounter's BattleStarted (so it never precedes
       // an interleaved Poké Center recovery the run loop hasn't resolved yet). A loss is followed by RunEnded,
       // which drives the game-over screen, so there's nothing to do here.
-      const winner = payload.winnerName as string;
-      if (side(winner) === 'player') {
+      if (side(payload.winnerId as number) === 'player') {
         // Revert the player sprite in case it Transformed this battle (Transform is undone at battle end;
         // the enemy sprite self-corrects via the next encounter's spawnEnemy, the player's does not).
         return { steps: [emit({ type: 'resetPlayerSprite' }), w(300)] };
@@ -484,12 +499,13 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       // The player accepted the heal: fully restored (HP/PP/status). Fill the bar back to full and clear any
       // lingering status badge, with the Gen 1 heal line. (The modal already closed on the player's press.)
       const cName   = payload.creatureName as string;
+      const cId     = payload.creatureId as number;
       const hpAfter = payload.hpAfter as number;
       return { steps: [
         w(300),
         d(log(`${cName} was fully healed!`)),
-        d({ type: 'UPDATE_HP', name: cName, hp: hpAfter }),
-        d({ type: 'CLEAR_STATUS', name: cName }),
+        d({ type: 'UPDATE_HP', id: cId, hp: hpAfter }),
+        d({ type: 'CLEAR_STATUS', id: cId }),
         w(500),
       ] };
     }
@@ -688,11 +704,12 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       // corrects. Swaps the sprite too (a permanent change, like CreatureSwitchedIn). Visible after a mutual-KO
       // promotion, where the outgoing lead is a corpse at 0 HP.
       const name = payload.name as string;
+      const id = payload.id as number;
       const speciesId = payload.speciesId as number;
       return { steps: [
         w(150),
         emit({ type: 'swapPlayerCreature', speciesId }),
-        d({ type: 'LEAD_CHANGED', name }),
+        d({ type: 'LEAD_CHANGED', id, name }),
         d(log(`${name} is now your lead!`, 'event')),
         w(400),
       ] };
@@ -711,6 +728,7 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       // incoming species, retarget the nameplate onto it, and narrate the send-in. It battles the same enemy from
       // the next turn (which refreshes the XP bar + moves). The PartyUpdated snapshot that follows re-flags the lead.
       const name = payload.name as string;
+      const id = payload.id as number;
       const speciesId = payload.speciesId as number;
       const level = payload.level as number;
       const hp = payload.hp as number;
@@ -719,7 +737,7 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       return { steps: [
         w(200),
         emit({ type: 'swapPlayerCreature', speciesId }),
-        d({ type: 'SWITCHED_IN', name, level, hp, maxHp, status }),
+        d({ type: 'SWITCHED_IN', id, name, level, hp, maxHp, status }),
         d(log(`Go! ${name}!`, 'event')),
         w(400),
       ] };
@@ -740,7 +758,7 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
     case 'MoveUsed': {
       const attacker = payload.attackerName as string;
       const moveName = payload.moveName as string;
-      const attackerSide = side(attacker);
+      const attackerSide = side(payload.attackerId as number);
       const targetSide: Side = attackerSide === 'player' ? 'enemy' : 'player';
       // Gen 1 cadence: announce the move FIRST, brief beat, THEN the lunge. The
       // hit sound + incremental HP drain follow in the DamageDealt event, so the
@@ -793,6 +811,7 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
 
     case 'DamageDealt': {
       const targetName = payload.targetName as string;
+      const targetId   = payload.targetId as number;
       const hpAfter    = payload.hpAfter as number;
       const isCrit     = payload.isCrit as boolean;
       const eff        = payload.typeEffectiveness as number;
@@ -812,8 +831,8 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
 
       return { steps: [
         emit({ type: 'playHitSound', isCrit }),
-        emit({ type: 'playDamageShake', side: side(targetName) }), // hit reaction: jolt the struck sprite
-        d({ type: 'UPDATE_HP', name: targetName, hp: hpAfter }),
+        emit({ type: 'playDamageShake', side: side(targetId) }), // hit reaction: jolt the struck sprite
+        d({ type: 'UPDATE_HP', id: targetId, hp: hpAfter }),
         w(650),
         d(log(msg, tone)),
         w(800),   // breathing room between the two attackers' sequences
@@ -823,13 +842,13 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
     case 'RecoilDamage': {
       const srcName = payload.sourceName as string;
       const hpAfter = payload.hpAfter as number;
-      return { steps: [d({ type: 'UPDATE_HP', name: srcName, hp: hpAfter }), w(400), d(log(`${srcName} is hit by recoil!`))] };
+      return { steps: [d({ type: 'UPDATE_HP', id: payload.sourceId as number, hp: hpAfter }), w(400), d(log(`${srcName} is hit by recoil!`))] };
     }
 
     case 'CrashDamage': {
       const srcName = payload.sourceName as string;
       const hpAfter = payload.hpAfter as number;
-      return { steps: [d({ type: 'UPDATE_HP', name: srcName, hp: hpAfter }), w(400), d(log(`${srcName} kept going and crashed!`))] };
+      return { steps: [d({ type: 'UPDATE_HP', id: payload.sourceId as number, hp: hpAfter }), w(400), d(log(`${srcName} kept going and crashed!`))] };
     }
 
     case 'MultiHitCompleted': {
@@ -843,7 +862,7 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
     case 'CreatureFainted': {
       const faintedName = payload.name as string;
       return { steps: [
-        emit({ type: 'playFaintAnimation', side: side(faintedName) }),
+        emit({ type: 'playFaintAnimation', side: side(payload.id as number) }),
         anim(),
         w(200),
         d(log(`${faintedName} fainted!`)),
@@ -950,6 +969,7 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
         (payload.candidates as Array<Record<string, unknown>>) ?? []
       ).map(c => ({
         speciesId: (c.speciesId as number) ?? 0,
+        id: (c.id as number) ?? 0,
         name: (c.name as string) ?? '',
         level: (c.level as number) ?? 0,
         hp: (c.hp as number) ?? 0,
@@ -1017,7 +1037,7 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
         // Rename the HUD as the morph lands, so the nameplate and the "What will X do?" prompt flip together with
         // the sprite instead of lagging to the next BattleStarted. The reducer decides whether this creature is
         // the player (a bench member's evolution reaches here too).
-        d({ type: 'CREATURE_RENAMED', fromName, toName }),
+        d({ type: 'CREATURE_RENAMED', id: payload.creatureId as number, toName }),
         d(log(`${fromName} evolved into ${toSpeciesName}!`)),
         w(600),
       ] };
@@ -1027,7 +1047,7 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       const tName  = payload.targetName as string;
       const status = payload.status as string;
       return { steps: [
-        d({ type: 'UPDATE_STATUS', name: tName, status }),
+        d({ type: 'UPDATE_STATUS', id: payload.targetId as number, status }),
         emit({ type: 'playStatusSound' }),
         w(300),
         d(log(statusAppliedMsg(tName, status))),
@@ -1038,13 +1058,13 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       const tName  = payload.targetName as string;
       const hpAftr = payload.hpAfter as number;
       const src    = payload.source === 'BadPoison' ? 'toxic poison' : payload.source as string;
-      return { steps: [d({ type: 'UPDATE_HP', name: tName, hp: hpAftr }), w(400), d(log(`${tName} is hurt by ${src}!`))] };
+      return { steps: [d({ type: 'UPDATE_HP', id: payload.targetId as number, hp: hpAftr }), w(400), d(log(`${tName} is hurt by ${src}!`))] };
     }
 
     case 'StatusCleared': {
       const cName     = payload.creatureName as string;
       const wasStatus = payload.wasStatus as string;
-      return { steps: [d({ type: 'CLEAR_STATUS', name: cName }), w(120), d(log(statusClearedMsg(cName, wasStatus)))] };
+      return { steps: [d({ type: 'CLEAR_STATUS', id: payload.creatureId as number }), w(120), d(log(statusClearedMsg(cName, wasStatus)))] };
     }
 
     case 'ActionBlocked': {
@@ -1075,7 +1095,7 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
     case 'ConfusionDamage': {
       const cName  = payload.creatureName as string;
       const hpAftr = payload.hpAfter as number;
-      return { steps: [d({ type: 'UPDATE_HP', name: cName, hp: hpAftr }), w(400), d(log(`${cName} hurt itself in confusion!`))] };
+      return { steps: [d({ type: 'UPDATE_HP', id: payload.creatureId as number, hp: hpAftr }), w(400), d(log(`${cName} hurt itself in confusion!`))] };
     }
 
     case 'ConfusionCleared': {
@@ -1099,13 +1119,13 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       const srcName    = payload.sourceName as string;
       const hpAftr     = payload.hpAfter as number;
       const healAmount = payload.healAmount as number;
-      return { steps: [d({ type: 'UPDATE_HP', name: srcName, hp: hpAftr }), w(300), d(log(`${srcName} restored ${healAmount} HP!`))] };
+      return { steps: [d({ type: 'UPDATE_HP', id: payload.sourceId as number, hp: hpAftr }), w(300), d(log(`${srcName} restored ${healAmount} HP!`))] };
     }
 
     case 'Healed': {
       const cName  = payload.creatureName as string;
       const hpAftr = payload.hpAfter as number;
-      return { steps: [d({ type: 'UPDATE_HP', name: cName, hp: hpAftr }), w(300), d(log(`${cName} regained health!`))] };
+      return { steps: [d({ type: 'UPDATE_HP', id: payload.creatureId as number, hp: hpAftr }), w(300), d(log(`${cName} regained health!`))] };
     }
 
     // --- Items (using a bag item in battle). The HP/status/PP result rides on the effect events that
@@ -1146,7 +1166,7 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       // enemy → front sprite; the scene resolves the directory from the side).
       return { steps: [
         w(300),
-        emit({ type: 'transformSprite', side: side(cName), speciesId: intoSpeciesId }),
+        emit({ type: 'transformSprite', side: side(payload.creatureId as number), speciesId: intoSpeciesId }),
         d(log(`${cName} transformed into ${tName}!`)),
         w(500),
       ] };
@@ -1182,13 +1202,12 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
     case 'LeechSeedDamage': {
       const dName  = payload.drainedName as string;
       const hpAftr = payload.hpAfter as number;
-      return { steps: [d({ type: 'UPDATE_HP', name: dName, hp: hpAftr }), w(400), d(log(`${dName}'s health was sapped by Leech Seed!`))] };
+      return { steps: [d({ type: 'UPDATE_HP', id: payload.drainedId as number, hp: hpAftr }), w(400), d(log(`${dName}'s health was sapped by Leech Seed!`))] };
     }
 
     case 'LeechSeedHealed': {
-      const hName  = payload.healedName as string;
       const hpAftr = payload.hpAfter as number;
-      return { steps: [d({ type: 'UPDATE_HP', name: hName, hp: hpAftr })] };
+      return { steps: [d({ type: 'UPDATE_HP', id: payload.healedId as number, hp: hpAftr })] };
     }
 
     case 'Recharging': {

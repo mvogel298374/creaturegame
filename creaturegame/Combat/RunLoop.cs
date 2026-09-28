@@ -53,10 +53,19 @@ public sealed class RunState
     /// </summary>
     public Party Party { get; }
 
-    /// <summary>Constructs a run around an existing <paramref name="party"/> (its lead is the active creature).</summary>
+    /// <summary>The run's creature-id counter (<c>ARCHITECTURE.md</c> §2.2). Owned here, not
+    /// on the DB-backed factory, because ids are per-run state a save layer must snapshot (<see
+    /// cref="CreatureIdSource.HighWater"/>). <see cref="RunDirector"/> mints for every creature that later enters
+    /// the run (foes, drafts, boss catches).</summary>
+    public CreatureIdSource Ids { get; } = new();
+
+    /// <summary>Constructs a run around an existing <paramref name="party"/> (its lead is the active creature).
+    /// The party's current members are identified here, in roster order, so the starter is always id 1.</summary>
     public RunState(Party party)
     {
         Party = party;
+        foreach (var member in party.Members)
+            Ids.Assign(member);
     }
 
     /// <summary>Convenience: start a run with a single-creature party seeded from the <paramref name="player"/>

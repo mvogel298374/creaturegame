@@ -16,7 +16,7 @@ A `Creature` holds two kinds of state:
 
 | Kind | Examples | Lives where | Survives a battle? |
 |:-----|:---------|:------------|:-------------------|
-| **Permanent** | name (may be a player nickname), species name, level, base stats, DVs, Stat Exp, XP, current HP | directly on `Creature` | yes — this is what a save file will persist |
+| **Permanent** | `Id` (the individual's per-run identity — stable across evolution, Transform and nicknaming; `0` = unassigned), name (may be a player nickname), species name, level, base stats, DVs, Stat Exp, XP, current HP | directly on `Creature` | yes — this is what a save file will persist |
 | **Transient** | status condition, stat stages, sleep/confusion counters, charging flags | `Creature.Battle` (a `BattleState`) | no — wiped at the start of every fight |
 
 The transient half is a separate object, `BattleState`, held as `Creature.Battle`.
@@ -279,6 +279,13 @@ system**. When `save.db` arrives, serialization becomes "persist the `Creature`,
 `Battle`." The boundary you see here *is* the serialization boundary. (And per the
 nuance in section 2, that boundary is the natural place to later promote major
 `Status` to persistent.)
+
+**`Creature.Id` needs its counter saved with it.** Ids are minted per run by
+`RunState.Ids` (`CreatureIdSource`, a monotonic counter — see `ARCHITECTURE.md` §2.2). A
+save layer must persist each creature's `Id` **and** `RunState.Ids.HighWater`; otherwise
+a resumed run restarts the counter at 1 and mints ids that collide with creatures already
+in the party — reintroducing the same-identity ambiguity the ids exist to remove. Restore
+by seeding the source to the saved high-water mark before any new creature enters the run.
 
 ### 4.5 Behavior-preserving refactor discipline
 A refactor must not change behavior. The safety net is the test suite: we ran the full

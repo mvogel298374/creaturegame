@@ -82,7 +82,7 @@ public sealed class HealingItemEffect : IItemEffect
             : ctx.Item.HealAmount ?? 0;
         target.Attributes.ReceiveHealing(amount); // caps at MaxHP
         ctx.Emitter?.Emit(
-            new Healed(target.Name, target.Attributes.HP - before, target.Attributes.HP)
+            new Healed(target.Name, target.Id, target.Attributes.HP - before, target.Attributes.HP)
         );
 
         // Full Restore also cures any major status (Gen 1). Confusion is volatile and not cured by items.
@@ -96,7 +96,7 @@ public sealed class HealingItemEffect : IItemEffect
         target.Battle.Status = StatusCondition.None;
         target.Battle.SleepTurns = 0;
         target.Battle.ToxicCounter = 1; // reset Gen 1 Toxic escalation baseline
-        emitter?.Emit(new StatusCleared(target.Name, was));
+        emitter?.Emit(new StatusCleared(target.Name, target.Id, was));
     }
 }
 
@@ -173,7 +173,7 @@ public sealed class PpRestoreItemEffect : IItemEffect
                 move.PowerPointsCurrent + (ctx.Item.PpRestoreAmount ?? 0)
             );
         ctx.Emitter?.Emit(
-            new PpRestored(target.Name, move.Base.Name ?? "", move.PowerPointsCurrent)
+            new PpRestored(target.Name, target.Id, move.Base.Name ?? "", move.PowerPointsCurrent)
         );
     }
 }
@@ -217,21 +217,23 @@ public sealed class BattleBoostItemEffect : IItemEffect
         if (ctx.Item.BoostsCrit)
         {
             ctx.User.Battle.HasFocusEnergy = true;
-            ctx.Emitter?.Emit(new FocusEnergyApplied(ctx.User.Name));
+            ctx.Emitter?.Emit(new FocusEnergyApplied(ctx.User.Name, ctx.User.Id));
             return;
         }
 
         if (ctx.Item.SetsMist)
         {
             ctx.User.Battle.HasMist = true;
-            ctx.Emitter?.Emit(new MistApplied(ctx.User.Name));
+            ctx.Emitter?.Emit(new MistApplied(ctx.User.Name, ctx.User.Id));
             return;
         }
 
         var stat = ctx.Item.StatBoostStat!.Value;
         int delta = ctx.Item.StatBoostStages ?? 0;
         int newStage = ctx.User.Battle.Stages.Raise(stat, delta);
-        ctx.Emitter?.Emit(new StatStageChanged(ctx.User.Name, stat.ToString(), delta, newStage));
+        ctx.Emitter?.Emit(
+            new StatStageChanged(ctx.User.Name, ctx.User.Id, stat.ToString(), delta, newStage)
+        );
     }
 }
 
@@ -268,7 +270,7 @@ public sealed class ReviveItemEffect : IItemEffect
         target.Battle.ToxicCounter = 1;
         target.CarriedStatus = null;
 
-        ctx.Emitter?.Emit(new Revived(target.Name, restored, target.Attributes.HP));
+        ctx.Emitter?.Emit(new Revived(target.Name, target.Id, restored, target.Attributes.HP));
 
         // The roster-panel repaint (PartyUpdated) is emitted centrally by ItemAction for any use that
         // touched a non-active member — see its ExecuteAsync — so every category gets it uniformly, not

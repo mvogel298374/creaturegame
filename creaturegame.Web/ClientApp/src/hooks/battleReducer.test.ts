@@ -2,12 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { battleReducer, initialState, type BattleState } from './battleReducer';
 import type { Action } from '../battle/timeline';
 
-// A mid-battle state with both sides named, so the name-routed actions (UPDATE_HP/STATUS/CLEAR_STATUS)
-// have a player and an enemy to resolve against.
+// A mid-battle state with both sides identified, so the id-routed actions (UPDATE_HP/STATUS/CLEAR_STATUS)
+// have a player (id 1) and an enemy (id 2) to resolve against. Names are display text only.
 const ready = (over: Partial<BattleState> = {}): BattleState => ({
   ...initialState,
   playerName: 'PIKACHU',
+  playerId: 1,
   enemyName: 'RATTATA',
+  enemyId: 2,
   playerHp: 100,
   playerMaxHp: 100,
   enemyHp: 80,
@@ -15,29 +17,108 @@ const ready = (over: Partial<BattleState> = {}): BattleState => ({
   ...over,
 });
 
-describe('battleReducer — name-routed updates', () => {
-  it('routes UPDATE_HP to the matching side by name', () => {
+describe('battleReducer — id-routed updates', () => {
+  it('routes UPDATE_HP to the matching side by creature id', () => {
     const s = ready();
-    expect(battleReducer(s, { type: 'UPDATE_HP', name: 'PIKACHU', hp: 42 }).playerHp).toBe(42);
-    expect(battleReducer(s, { type: 'UPDATE_HP', name: 'RATTATA', hp: 7 }).enemyHp).toBe(7);
+    expect(battleReducer(s, { type: 'UPDATE_HP', id: 1, hp: 42 }).playerHp).toBe(42);
+    expect(battleReducer(s, { type: 'UPDATE_HP', id: 2, hp: 7 }).enemyHp).toBe(7);
   });
 
   it('is a no-op (same reference) when the HP target matches neither side', () => {
-    // The endless chain reuses one reducer across encounters; a late event from a *previous* foe (a name
+    // The endless chain reuses one reducer across encounters; a late event from a *previous* foe (an id
     // that's now neither side) must not bleed onto the current enemy's bar. E2E can't force this race.
     const s = ready();
-    const next = battleReducer(s, { type: 'UPDATE_HP', name: 'PIDGEY', hp: 0 });
+    const next = battleReducer(s, { type: 'UPDATE_HP', id: 99, hp: 0 });
     expect(next).toBe(s);
   });
 
-  it('routes and clears status by name, and no-ops on an unknown name', () => {
+  it('routes and clears status by id, and no-ops on an unknown id', () => {
     const s = ready({ playerStatus: 'None', enemyStatus: 'Sleep' });
-    expect(battleReducer(s, { type: 'UPDATE_STATUS', name: 'PIKACHU', status: 'Burn' }).playerStatus).toBe('Burn');
-    expect(battleReducer(s, { type: 'CLEAR_STATUS', name: 'RATTATA' }).enemyStatus).toBe('None');
-    expect(battleReducer(s, { type: 'UPDATE_STATUS', name: 'GHOST', status: 'Burn' })).toBe(s);
+    expect(battleReducer(s, { type: 'UPDATE_STATUS', id: 1, status: 'Burn' }).playerStatus).toBe('Burn');
+    expect(battleReducer(s, { type: 'CLEAR_STATUS', id: 2 }).enemyStatus).toBe('None');
+    expect(battleReducer(s, { type: 'UPDATE_STATUS', id: 99, status: 'Burn' })).toBe(s);
   });
 });
 
+// Creature Identity (ARCHITECTURE.md §2.2). Two creatures can share a display name — a wild PIDGEY
+// against your PIDGEY, or the lead and a benched twin (a drafted duplicate, or two nicknamed alike). The reducer
+// used to route by name, so each of these landed on the wrong creature; Stage 0 pinned the twin cases as
+// `it.fails`, and Stage 3 (id routing) turned them into ordinary passing tests. Names below are deliberately
+// identical everywhere — only the ids differ.
+describe('battleReducer — same-named creatures', () => {
+  const member = (over: Partial<BattleState['party'][number]>): BattleState['party'][number] => ({
+    speciesId: 16,
+    id: 4,
+    name: 'PIDGEY',
+    level: 5,
+    hp: 30,
+    maxHp: 30,
+    status: 'None',
+    isLead: false,
+    ...over,
+  });
+  // The lead (id 4) and a benched twin (id 8), both "PIDGEY".
+  const twins = (): BattleState =>
+    ready({
+      playerName: 'PIDGEY',
+      playerId: 4,
+      playerHp: 10,
+      playerMaxHp: 30,
+      party: [member({ isLead: true, hp: 10 }), member({ id: 8, hp: 5 })],
+    });
+
+  it('a heal on a benched twin does not move the lead\'s HP bar', () => {
+    // ItemEffects emits Healed for a bench target (pinned engine-side by
+    // ItemActionBattleTests.UsingPotion_OnABenchTwin_…); it carries the twin's id, which is neither side's.
+    const s = twins();
+    const next = battleReducer(s, { type: 'UPDATE_HP', id: 8, hp: 25 });
+    expect(next).toBe(s);
+    expect(next.playerHp).toBe(10);
+  });
+
+  it('a heal on the lead itself still moves the lead\'s HP bar (the twin fix did not break the real case)', () => {
+    expect(battleReducer(twins(), { type: 'UPDATE_HP', id: 4, hp: 25 }).playerHp).toBe(25);
+  });
+
+  it('a benched twin evolving does not rename the on-field creature', () => {
+    // BattleRunEvent offers evolution to every member that levelled; CREATURE_RENAMED used to be guarded only on
+    // the OLD name matching the lead's, which a same-named bench member also satisfied.
+    const next = battleReducer(twins(), { type: 'CREATURE_RENAMED', id: 8, toName: 'PIDGEOTTO' });
+    expect(next.playerName).toBe('PIDGEY');
+  });
+
+  it('the on-field creature evolving does rename it, even with a same-named twin on the bench', () => {
+    expect(battleReducer(twins(), { type: 'CREATURE_RENAMED', id: 4, toName: 'PIDGEOTTO' }).playerName).toBe('PIDGEOTTO');
+  });
+
+  it('a wild creature sharing the player\'s name gets its own HP and status, not the player\'s', () => {
+    // The original bug: your PIDGEY vs a wild PIDGEY — the enemy's damage and status landed on the player's bar.
+    const s = ready({ playerName: 'PIDGEY', playerId: 1, enemyName: 'PIDGEY', enemyId: 2 });
+    const hit = battleReducer(s, { type: 'UPDATE_HP', id: 2, hp: 3 });
+    expect(hit.enemyHp).toBe(3);
+    expect(hit.playerHp).toBe(100);
+    const burned = battleReducer(s, { type: 'UPDATE_STATUS', id: 2, status: 'Burn' });
+    expect(burned.enemyStatus).toBe('Burn');
+    expect(burned.playerStatus).toBe('None');
+  });
+
+  it('LEAD_CHANGED retargets onto the twin that was promoted, not the first roster row with that name', () => {
+    // Old lead (id 4, HP 10) is row 0; the promoted twin (id 8, HP 5) is row 1. A name lookup finds row 0 and
+    // silently keeps the HUD on the outgoing creature.
+    const next = battleReducer(twins(), { type: 'LEAD_CHANGED', id: 8, name: 'PIDGEY' });
+    expect(next.playerId).toBe(8);
+    expect(next.playerHp).toBe(5);
+  });
+
+  it('PARTY_SET only re-syncs the HUD from the lead row when that row IS the current player (by id)', () => {
+    const s = twins();
+    // The snapshot's lead is the twin (id 8): same name as the HUD's creature, but not the same creature.
+    const members = [member({ hp: 10 }), member({ id: 8, isLead: true, hp: 99 })];
+    const next = battleReducer(s, { type: 'PARTY_SET', members });
+    expect(next.party).toEqual(members);
+    expect(next.playerHp).toBe(10); // not hijacked onto the twin's 99
+  });
+});
 describe('battleReducer — XP bar math', () => {
   it('XP_GAIN adds onto the current fill', () => {
     const s = ready({ playerXp: 10, playerXpToNext: 100 });
@@ -137,10 +218,12 @@ describe('battleReducer — phase transitions', () => {
     // (enemyHp/enemyMaxHp = 1), not the old empty bar, until the next TURN_STARTED fills real values.
     const s = ready({ enemyHp: 0, enemyStatus: 'Poison' });
     const next = battleReducer(s, {
-      type: 'BATTLE_STARTED', playerName: 'PIKACHU', enemyName: 'PIDGEY', enemySpeciesId: 16, enemyLevel: 8,
+      type: 'BATTLE_STARTED', playerName: 'PIKACHU', playerId: 5, enemyName: 'PIDGEY', enemyId: 6, enemySpeciesId: 16, enemyLevel: 8,
     });
     expect(next.phase).toBe('waiting');
     expect(next.enemyName).toBe('PIDGEY');
+    expect(next.playerId).toBe(5);
+    expect(next.enemyId).toBe(6); // the new foe's identity replaces the previous one's
     expect(next.enemyHp).toBe(1);
     expect(next.enemyMaxHp).toBe(1);
     expect(next.enemyStatus).toBe('None');
@@ -150,6 +233,7 @@ describe('battleReducer — phase transitions', () => {
     const s = ready({ phase: 'battling', animating: true, canSwitch: false });
     const next = battleReducer(s, {
       type: 'TURN_STARTED', turnNumber: 3,
+      playerName: 'PIKACHU', playerId: 1, enemyName: 'RATTATA', enemyId: 2,
       playerHp: 55, playerMaxHp: 100, playerStatus: 'None', playerXpThisLevel: 20, playerXpToNextLevel: 100,
       enemyHp: 33, enemyMaxHp: 80, enemyStatus: 'Paralysis', moves: [], canSwitch: true,
     });
@@ -160,18 +244,43 @@ describe('battleReducer — phase transitions', () => {
     expect(next.canSwitch).toBe(true); // the SWITCH button's enabled state rides this
   });
 
+  // The reconnect replay re-sends only the CACHED BattleStarted (which names the run's original lead for this
+  // encounter) plus the latest TurnStarted. After a mid-battle switch-in and a page refresh the client therefore
+  // first believes the ORIGINAL lead is fighting; the turn prompt that follows must put identity back on the
+  // creature that actually is, or its HP/status updates are dropped and its nameplate names the wrong creature.
+  it('TURN_STARTED re-asserts who is on the field, correcting a stale BattleStarted replay', () => {
+    const afterStaleReplay = battleReducer(ready({ phase: 'connecting' }), {
+      type: 'BATTLE_STARTED', playerName: 'CHARMANDER', playerId: 4, enemyName: 'PIDGEY', enemyId: 6,
+      enemySpeciesId: 16, enemyLevel: 8,
+    });
+    expect(afterStaleReplay.playerId).toBe(4); // the replayed BattleStarted names the original lead
+
+    const next = battleReducer(afterStaleReplay, {
+      type: 'TURN_STARTED', turnNumber: 5,
+      playerName: 'SQUIRTLE', playerId: 9, enemyName: 'PIDGEY', enemyId: 6, // …but SQUIRTLE was switched in
+      playerHp: 30, playerMaxHp: 44, playerStatus: 'None', playerXpThisLevel: 0, playerXpToNextLevel: 100,
+      enemyHp: 20, enemyMaxHp: 24, enemyStatus: 'None', moves: [], canSwitch: true,
+    });
+
+    expect(next.playerId).toBe(9);
+    expect(next.playerName).toBe('SQUIRTLE');
+    // …and from here on the switched-in creature's own updates route to the player's side again.
+    expect(battleReducer(next, { type: 'UPDATE_HP', id: 9, hp: 12 }).playerHp).toBe(12);
+  });
+
   it('TURN_STARTED syncs the live HP onto the lead\'s party card, leaving the bench alone', () => {
     // The party snapshot only refreshes on PartyUpdated, so without this the SWITCH picker would show the
     // active creature at its pre-battle HP — the number you weigh when deciding whether to pull it out.
     const s = ready({
       phase: 'battling',
       party: [
-        { speciesId: 6, name: 'CHARIZARD', level: 30, hp: 90, maxHp: 90, status: 'None', isLead: true },
-        { speciesId: 121, name: 'STARMIE', level: 6, hp: 23, maxHp: 23, status: 'None', isLead: false },
+        { speciesId: 6, id: 6, name: 'CHARIZARD', level: 30, hp: 90, maxHp: 90, status: 'None', isLead: true },
+        { speciesId: 121, id: 121, name: 'STARMIE', level: 6, hp: 23, maxHp: 23, status: 'None', isLead: false },
       ],
     });
     const next = battleReducer(s, {
       type: 'TURN_STARTED', turnNumber: 4,
+      playerName: 'CHARIZARD', playerId: 6, enemyName: 'RATTATA', enemyId: 2,
       playerHp: 41, playerMaxHp: 90, playerStatus: 'Poison', playerXpThisLevel: 0, playerXpToNextLevel: 100,
       enemyHp: 50, enemyMaxHp: 50, enemyStatus: 'None', moves: [], canSwitch: true,
     });
@@ -213,7 +322,7 @@ describe('battleReducer — misc', () => {
   it('does not mutate the input state', () => {
     const s = ready({ playerHp: 100 });
     const snapshot = JSON.stringify(s);
-    battleReducer(s, { type: 'UPDATE_HP', name: 'PIKACHU', hp: 1 });
+    battleReducer(s, { type: 'UPDATE_HP', id: 1, hp: 1 });
     expect(JSON.stringify(s)).toBe(snapshot);
   });
 });
@@ -286,11 +395,11 @@ describe('battleReducer — encounter-map ladder', () => {
 
 describe('battleReducer — party & acquisition (Phase 4 Stage 1c)', () => {
   const member = (over: Partial<import('../battle/timeline').PartyMember> = {}) => ({
-    speciesId: 25, name: 'PIKACHU', level: 12, hp: 30, maxHp: 34, status: 'None', isLead: true, ...over,
+    speciesId: 25, id: 1, name: 'PIKACHU', level: 12, hp: 30, maxHp: 34, status: 'None', isLead: true, ...over,
   });
 
   it('PARTY_SET replaces the roster snapshot', () => {
-    const members = [member(), member({ speciesId: 4, name: 'CHARMANDER', isLead: false })];
+    const members = [member(), member({ speciesId: 4, id: 4, name: 'CHARMANDER', isLead: false })];
     const next = battleReducer(ready(), { type: 'PARTY_SET', members });
     expect(next.party).toEqual(members);
   });
@@ -300,16 +409,17 @@ describe('battleReducer — party & acquisition (Phase 4 Stage 1c)', () => {
   // (after a mutual KO, a corpse at 0 HP), name-keyed HP/status events for the new lead are dropped, and the level
   // NEVER self-corrects — no later event carries one.
   it('LEAD_CHANGED retargets the player HUD onto the new lead from the roster it holds', () => {
-    const corpse = member({ speciesId: 4, name: 'CHARMANDER', level: 9, hp: 0, maxHp: 40 });
-    const survivor = member({ speciesId: 25, name: 'PIKACHU', level: 12, hp: 30, maxHp: 34, isLead: false });
+    const corpse = member({ speciesId: 4, id: 4, name: 'CHARMANDER', level: 9, hp: 0, maxHp: 40 });
+    const survivor = member({ speciesId: 25, id: 1, name: 'PIKACHU', level: 12, hp: 30, maxHp: 34, isLead: false });
     const s = ready({
-      playerName: 'CHARMANDER', playerLevel: 9, playerHp: 0, playerMaxHp: 40,
+      playerName: 'CHARMANDER', playerId: 4, playerLevel: 9, playerHp: 0, playerMaxHp: 40,
       party: [corpse, survivor],
     });
 
-    const next = battleReducer(s, { type: 'LEAD_CHANGED', name: 'PIKACHU' });
+    const next = battleReducer(s, { type: 'LEAD_CHANGED', id: 1, name: 'PIKACHU' });
 
     expect(next.playerName).toBe('PIKACHU');
+    expect(next.playerId).toBe(1);
     expect(next.playerLevel).toBe(12);
     expect(next.playerHp).toBe(30);
     expect(next.playerMaxHp).toBe(34);
@@ -331,7 +441,7 @@ describe('battleReducer — party & acquisition (Phase 4 Stage 1c)', () => {
   // LeadChanged that promotes them) refreshes the roster only — hijacking the HUD here would show the wrong creature.
   it('PARTY_SET leaves the HUD alone when the lead row is a different creature', () => {
     const s = ready({ playerName: 'PIKACHU', playerLevel: 12, playerHp: 30, playerMaxHp: 34 });
-    const members = [member({ name: 'CHARMANDER', level: 9, hp: 0, maxHp: 40, isLead: true })];
+    const members = [member({ id: 4, name: 'CHARMANDER', level: 9, hp: 0, maxHp: 40, isLead: true })];
 
     const next = battleReducer(s, { type: 'PARTY_SET', members });
 
@@ -345,9 +455,9 @@ describe('battleReducer — party & acquisition (Phase 4 Stage 1c)', () => {
   // fires. Without this the nameplate and the "What will X do?" prompt read the pre-evolution name until the next
   // BATTLE_STARTED, i.e. "What will CHARMANDER do?" under a CHARMELEON sprite.
   it('CREATURE_RENAMED renames the player when it is the on-field creature that evolved', () => {
-    const s = ready({ playerName: 'CHARMANDER' });
+    const s = ready({ playerName: 'CHARMANDER', playerId: 4 });
 
-    const next = battleReducer(s, { type: 'CREATURE_RENAMED', fromName: 'CHARMANDER', toName: 'CHARMELEON' });
+    const next = battleReducer(s, { type: 'CREATURE_RENAMED', id: 4, toName: 'CHARMELEON' });
 
     expect(next.playerName).toBe('CHARMELEON');
   });
@@ -355,9 +465,9 @@ describe('battleReducer — party & acquisition (Phase 4 Stage 1c)', () => {
   // Evolution is party-wide, so this action also arrives for bench members. Renaming the HUD on one of those
   // would put a benched creature's name on the on-field nameplate.
   it('CREATURE_RENAMED leaves the player alone when a bench member evolved', () => {
-    const s = ready({ playerName: 'CHARMANDER' });
+    const s = ready({ playerName: 'CHARMANDER', playerId: 4 });
 
-    const next = battleReducer(s, { type: 'CREATURE_RENAMED', fromName: 'ODDISH', toName: 'GLOOM' });
+    const next = battleReducer(s, { type: 'CREATURE_RENAMED', id: 9, toName: 'GLOOM' });
 
     expect(next.playerName).toBe('CHARMANDER');
   });
@@ -375,11 +485,11 @@ describe('battleReducer — party & acquisition (Phase 4 Stage 1c)', () => {
 
 describe('battleReducer — between-biome lead choice (Stage 1d)', () => {
   const member = (over: Partial<import('../battle/timeline').PartyMember> = {}) => ({
-    speciesId: 6, name: 'CHARIZARD', level: 36, hp: 100, maxHp: 120, status: 'None', isLead: true, ...over,
+    speciesId: 6, id: 6, name: 'CHARIZARD', level: 36, hp: 100, maxHp: 120, status: 'None', isLead: true, ...over,
   });
 
   it('SHOW_LEAD_CHOICE opens the picker with the roster; HIDE_LEAD_CHOICE clears it', () => {
-    const party = [member(), member({ speciesId: 9, name: 'BLASTOISE', isLead: false })];
+    const party = [member(), member({ speciesId: 9, id: 9, name: 'BLASTOISE', isLead: false })];
     const shown = battleReducer(ready(), { type: 'SHOW_LEAD_CHOICE', party });
     expect(shown.leadChoice).toEqual(party);
     expect(battleReducer(shown, { type: 'HIDE_LEAD_CHOICE' }).leadChoice).toBeNull();
@@ -388,13 +498,13 @@ describe('battleReducer — between-biome lead choice (Stage 1d)', () => {
 
 describe('battleReducer — forced faint-switch (Stage 3)', () => {
   const member = (over: Partial<import('../battle/timeline').PartyMember> = {}) => ({
-    speciesId: 6, name: 'CHARIZARD', level: 36, hp: 100, maxHp: 120, status: 'None', isLead: true, ...over,
+    speciesId: 6, id: 6, name: 'CHARIZARD', level: 36, hp: 100, maxHp: 120, status: 'None', isLead: true, ...over,
   });
 
   it('SHOW_SWITCH_IN opens the picker with the roster + fainted name; HIDE_SWITCH_IN clears it', () => {
     const party = [
       member({ hp: 0 }), // the fainted lead — the modal disables it
-      member({ speciesId: 9, name: 'BLASTOISE', isLead: false }),
+      member({ speciesId: 9, id: 9, name: 'BLASTOISE', isLead: false }),
     ];
     const shown = battleReducer(ready(), { type: 'SHOW_SWITCH_IN', party, faintedName: 'CHARIZARD' });
     expect(shown.switchIn).toEqual({ party, faintedName: 'CHARIZARD' });
@@ -404,9 +514,10 @@ describe('battleReducer — forced faint-switch (Stage 3)', () => {
   it('SWITCHED_IN retargets the player nameplate (name/level/HP/status) onto the incoming creature', () => {
     // The nameplate tracked the fainted lead; the send-in must move it onto the new creature — including its
     // level, which no TurnStarted carries (so a dropped level would freeze the nameplate on the old creature).
-    const s = ready({ playerName: 'CHARIZARD', playerLevel: 36, playerHp: 0, playerMaxHp: 120, playerStatus: 'None' });
-    const next = battleReducer(s, { type: 'SWITCHED_IN', name: 'BLASTOISE', level: 34, hp: 90, maxHp: 110, status: 'Poison' });
+    const s = ready({ playerName: 'CHARIZARD', playerId: 6, playerLevel: 36, playerHp: 0, playerMaxHp: 120, playerStatus: 'None' });
+    const next = battleReducer(s, { type: 'SWITCHED_IN', id: 9, name: 'BLASTOISE', level: 34, hp: 90, maxHp: 110, status: 'Poison' });
     expect(next.playerName).toBe('BLASTOISE');
+    expect(next.playerId).toBe(9);
     expect(next.playerLevel).toBe(34);
     expect(next.playerHp).toBe(90);
     expect(next.playerMaxHp).toBe(110);

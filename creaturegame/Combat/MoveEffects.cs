@@ -115,11 +115,13 @@ public sealed class LeechSeedEffect : IMoveEffect
         // blocks it everywhere.) This engine targets English RBY, so the seed takes hold here —
         // do not "consistency-fix" this to match the other sub-shielded effects.
         if (ctx.Target.IsAlive() && !ctx.Rules.CanBeLeechSeeded(ctx.Target))
-            ctx.Emitter?.Emit(new MoveHadNoEffect(ctx.Target.Name, ctx.Attack.Name ?? "")); // Grass-types are immune
+            ctx.Emitter?.Emit(
+                new MoveHadNoEffect(ctx.Target.Name, ctx.Target.Id, ctx.Attack.Name ?? "")
+            ); // Grass-types are immune
         else if (!ctx.Target.Battle.HasLeechSeed && ctx.Target.IsAlive())
         {
             ctx.Target.Battle.HasLeechSeed = true;
-            ctx.Emitter?.Emit(new LeechSeedApplied(ctx.Target.Name));
+            ctx.Emitter?.Emit(new LeechSeedApplied(ctx.Target.Name, ctx.Target.Id));
         }
     }
 }
@@ -140,7 +142,9 @@ public sealed class BindingEffect : IMoveEffect
             ctx.Target.Battle.BindingTurnsRemaining = ctx.Rules.RollBindingTurns();
             ctx.Source.Battle.BindingMove = ctx.SelectedMove;
             ctx.Source.Battle.BindingTarget = ctx.Target;
-            ctx.Emitter?.Emit(new BindingStarted(ctx.Target.Name, ctx.Attack.Name ?? ""));
+            ctx.Emitter?.Emit(
+                new BindingStarted(ctx.Target.Name, ctx.Target.Id, ctx.Attack.Name ?? "")
+            );
         }
     }
 }
@@ -154,7 +158,11 @@ public sealed class PayDayEffect : IMoveEffect
     {
         // Coins are collected after the battle — no economy yet, so the event is the whole mechanic.
         ctx.Emitter?.Emit(
-            new CoinsScattered(ctx.Source.Name, ctx.Rules.PayDayCoinMultiplier * ctx.Source.Level)
+            new CoinsScattered(
+                ctx.Source.Name,
+                ctx.Source.Id,
+                ctx.Rules.PayDayCoinMultiplier * ctx.Source.Level
+            )
         );
     }
 }
@@ -170,7 +178,9 @@ public sealed class RecoilEffect : IMoveEffect
         {
             int recoil = ctx.Rules.CalculateRecoilDamage(ctx.Damage);
             ctx.Source.Attributes.ReceiveDamage(recoil);
-            ctx.Emitter?.Emit(new RecoilDamage(ctx.Source.Name, recoil, ctx.Source.Attributes.HP));
+            ctx.Emitter?.Emit(
+                new RecoilDamage(ctx.Source.Name, ctx.Source.Id, recoil, ctx.Source.Attributes.HP)
+            );
         }
     }
 }
@@ -195,7 +205,9 @@ public sealed class DisableEffect : IMoveEffect
                 var locked = disableable[ctx.Rng.Next(disableable.Count)];
                 ctx.Target.Battle.DisabledMove = locked;
                 ctx.Target.Battle.DisableTurnsRemaining = ctx.Rules.RollDisableTurns();
-                ctx.Emitter?.Emit(new MoveDisabled(ctx.Target.Name, locked.Base.Name ?? ""));
+                ctx.Emitter?.Emit(
+                    new MoveDisabled(ctx.Target.Name, ctx.Target.Id, locked.Base.Name ?? "")
+                );
             }
         }
     }
@@ -227,7 +239,9 @@ public sealed class CounterEffect : IMoveEffect
         }
         else
         {
-            ctx.Emitter?.Emit(new MoveMissed(ctx.Source.Name, ctx.Attack.Name ?? ""));
+            ctx.Emitter?.Emit(
+                new MoveMissed(ctx.Source.Name, ctx.Source.Id, ctx.Attack.Name ?? "")
+            );
         }
     }
 }
@@ -243,7 +257,7 @@ public sealed class MistEffect : IMoveEffect
         if (!ctx.Source.Battle.HasMist)
         {
             ctx.Source.Battle.HasMist = true;
-            ctx.Emitter?.Emit(new MistApplied(ctx.Source.Name));
+            ctx.Emitter?.Emit(new MistApplied(ctx.Source.Name, ctx.Source.Id));
         }
     }
 }
@@ -258,7 +272,7 @@ public sealed class ReflectEffect : IMoveEffect
         if (!ctx.Source.Battle.HasReflect)
         {
             ctx.Source.Battle.HasReflect = true;
-            ctx.Emitter?.Emit(new ScreenApplied(ctx.Source.Name, "Reflect"));
+            ctx.Emitter?.Emit(new ScreenApplied(ctx.Source.Name, ctx.Source.Id, "Reflect"));
         }
     }
 }
@@ -273,7 +287,7 @@ public sealed class LightScreenEffect : IMoveEffect
         if (!ctx.Source.Battle.HasLightScreen)
         {
             ctx.Source.Battle.HasLightScreen = true;
-            ctx.Emitter?.Emit(new ScreenApplied(ctx.Source.Name, "Light Screen"));
+            ctx.Emitter?.Emit(new ScreenApplied(ctx.Source.Name, ctx.Source.Id, "Light Screen"));
         }
     }
 }
@@ -289,7 +303,7 @@ public sealed class FocusEnergyEffect : IMoveEffect
         if (!ctx.Source.Battle.HasFocusEnergy)
         {
             ctx.Source.Battle.HasFocusEnergy = true;
-            ctx.Emitter?.Emit(new FocusEnergyApplied(ctx.Source.Name));
+            ctx.Emitter?.Emit(new FocusEnergyApplied(ctx.Source.Name, ctx.Source.Id));
         }
     }
 }
@@ -314,6 +328,7 @@ public sealed class HealEffect : IMoveEffect
             ctx.Emitter?.Emit(
                 new Healed(
                     ctx.Source.Name,
+                    ctx.Source.Id,
                     ctx.Source.Attributes.HP - hpBefore,
                     ctx.Source.Attributes.HP
                 )
@@ -349,7 +364,9 @@ public sealed class MimicEffect : IMoveEffect
                 ctx.Source.Battle.MimicWrapper = ctx.SelectedMove;
                 ctx.Source.Battle.MimicOriginalBase = ctx.SelectedMove.Base;
                 ctx.SelectedMove.Base = chosen;
-                ctx.Emitter?.Emit(new MimicLearned(ctx.Source.Name, chosen.Name ?? ""));
+                ctx.Emitter?.Emit(
+                    new MimicLearned(ctx.Source.Name, ctx.Source.Id, chosen.Name ?? "")
+                );
             }
         }
     }
@@ -388,7 +405,13 @@ public sealed class TransformEffect : IMoveEffect
                 })
             );
             ctx.Emitter?.Emit(
-                new TransformedInto(ctx.Source.Name, ctx.Target.Name, ctx.Target.SpeciesId)
+                new TransformedInto(
+                    ctx.Source.Name,
+                    ctx.Source.Id,
+                    ctx.Target.Name,
+                    ctx.Target.Id,
+                    ctx.Target.SpeciesId
+                )
             );
         }
     }
@@ -411,7 +434,11 @@ public sealed class ConversionEffect : IMoveEffect
             ctx.Source.Type1 = ctx.Target.Type1;
             ctx.Source.Type2 = ctx.Target.Type2;
             ctx.Emitter?.Emit(
-                new ConvertedType(ctx.Source.Name, ctx.Source.Type1 ?? DamageType.Normal)
+                new ConvertedType(
+                    ctx.Source.Name,
+                    ctx.Source.Id,
+                    ctx.Source.Type1 ?? DamageType.Normal
+                )
             );
         }
     }
@@ -430,7 +457,9 @@ public sealed class RestEffect : IMoveEffect
         // MoveHadNoEffect. Self-targeting ⇒ the foe-immunity guard never blocks it.
         if (ctx.Source.Attributes.HP >= ctx.Source.Attributes.MaxHP)
         {
-            ctx.Emitter?.Emit(new MoveMissed(ctx.Source.Name, ctx.Attack.Name ?? ""));
+            ctx.Emitter?.Emit(
+                new MoveMissed(ctx.Source.Name, ctx.Source.Id, ctx.Attack.Name ?? "")
+            );
             return;
         }
         int restored = ctx.Source.Attributes.MaxHP - ctx.Source.Attributes.HP;
@@ -438,8 +467,10 @@ public sealed class RestEffect : IMoveEffect
         // Sleep overwrites any prior major status (Gen 1 allows only one) — Rest's documented cure.
         ctx.Source.Battle.Status = StatusCondition.Sleep;
         ctx.Source.Battle.SleepTurns = ctx.Rules.RestSleepTurns;
-        ctx.Emitter?.Emit(new Healed(ctx.Source.Name, restored, ctx.Source.Attributes.HP));
-        ctx.Emitter?.Emit(new StatusApplied(ctx.Source.Name, StatusCondition.Sleep));
+        ctx.Emitter?.Emit(
+            new Healed(ctx.Source.Name, ctx.Source.Id, restored, ctx.Source.Attributes.HP)
+        );
+        ctx.Emitter?.Emit(new StatusApplied(ctx.Source.Name, ctx.Source.Id, StatusCondition.Sleep));
     }
 }
 
@@ -457,18 +488,24 @@ public sealed class SubstituteEffect : IMoveEffect
         // seam. Self-targeting ⇒ the foe-immunity guard never blocks it.
         if (ctx.Source.Battle.SubstituteHp > 0)
         {
-            ctx.Emitter?.Emit(new MoveMissed(ctx.Source.Name, ctx.Attack.Name ?? ""));
+            ctx.Emitter?.Emit(
+                new MoveMissed(ctx.Source.Name, ctx.Source.Id, ctx.Attack.Name ?? "")
+            );
             return;
         }
         int cost = ctx.Source.Attributes.MaxHP / 4;
         if (ctx.Source.Attributes.HP <= cost)
         {
-            ctx.Emitter?.Emit(new MoveMissed(ctx.Source.Name, ctx.Attack.Name ?? ""));
+            ctx.Emitter?.Emit(
+                new MoveMissed(ctx.Source.Name, ctx.Source.Id, ctx.Attack.Name ?? "")
+            );
             return;
         }
         ctx.Source.Attributes.ReceiveDamage(cost);
         ctx.Source.Battle.SubstituteHp = cost + 1;
-        ctx.Emitter?.Emit(new SubstitutePutUp(ctx.Source.Name, ctx.Source.Battle.SubstituteHp));
+        ctx.Emitter?.Emit(
+            new SubstitutePutUp(ctx.Source.Name, ctx.Source.Id, ctx.Source.Battle.SubstituteHp)
+        );
     }
 }
 
@@ -480,7 +517,7 @@ public sealed class SplashEffect : IMoveEffect
     public void Apply(MoveEffectContext ctx)
     {
         // No-op by design; invariant across generations, so it stays inline rather than on the seam.
-        ctx.Emitter?.Emit(new ButNothingHappened(ctx.Source.Name));
+        ctx.Emitter?.Emit(new ButNothingHappened(ctx.Source.Name, ctx.Source.Id));
     }
 }
 
@@ -500,7 +537,9 @@ public sealed class ForceFleeEffect : IMoveEffect
         {
             if (ctx.Rules.ForceFleeFailsVsTrainer)
             {
-                ctx.Emitter?.Emit(new MoveHadNoEffect(ctx.Target.Name, ctx.Attack.Name ?? ""));
+                ctx.Emitter?.Emit(
+                    new MoveHadNoEffect(ctx.Target.Name, ctx.Target.Id, ctx.Attack.Name ?? "")
+                );
                 return;
             }
             // Gen 2+ force-switch path goes here when a Gen 2 ruleset lands; unreachable today (Gen 1 fails).
@@ -539,7 +578,8 @@ public sealed class ConfuseEffect : IMoveEffect
                 BattleEvent announcement = ctx.Rules.RedundantConfusionAnnouncement switch
                 {
                     RedundantConfuseAnnouncement.AlreadyConfused => new ConfusionAlready(
-                        ctx.Target.Name
+                        ctx.Target.Name,
+                        ctx.Target.Id
                     ),
                     _ => new MoveFailed(), // FailedGeneric (Gen 1): "But it failed!"
                 };
@@ -552,7 +592,7 @@ public sealed class ConfuseEffect : IMoveEffect
         if (ctx.Rules.SecondaryHits(chance, ctx.Rng))
         {
             ctx.Target.Battle.ConfusedTurns = ctx.Rules.RollConfusionTurns();
-            ctx.Emitter?.Emit(new ConfusionStarted(ctx.Target.Name));
+            ctx.Emitter?.Emit(new ConfusionStarted(ctx.Target.Name, ctx.Target.Id));
         }
     }
 }

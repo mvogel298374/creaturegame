@@ -69,7 +69,7 @@ public class AttackAction : IBattleAction
         if (Source.Battle.IsRecharging)
         {
             Source.Battle.IsRecharging = false;
-            _emitter?.Emit(new Recharging(Source.Name));
+            _emitter?.Emit(new Recharging(Source.Name, Source.Id));
             return Task.CompletedTask;
         }
 
@@ -101,7 +101,7 @@ public class AttackAction : IBattleAction
         if (lockIn is not null && lockIn.OnCommit(lockCtx!).Flow == LockInFlow.Halt)
             return Task.CompletedTask;
 
-        _emitter?.Emit(new MoveUsed(Source.Name, attackToUse.Name ?? ""));
+        _emitter?.Emit(new MoveUsed(Source.Name, Source.Id, attackToUse.Name ?? ""));
 
         // Remember the move actually used so the foe's Mirror Move can copy it. Metronome / Mirror Move
         // don't record themselves — the move they *call* does — so neither is ever the foe's LastMoveUsed
@@ -153,7 +153,7 @@ public class AttackAction : IBattleAction
             var last = Target.Battle.LastMoveUsed;
             if (last != null && last.Name != "struggle")
                 return ExecuteInner(last);
-            _emitter?.Emit(new MoveMissed(Source.Name, attackToUse.Name ?? ""));
+            _emitter?.Emit(new MoveMissed(Source.Name, Source.Id, attackToUse.Name ?? ""));
             return Task.CompletedTask;
         }
 
@@ -184,7 +184,7 @@ public class AttackAction : IBattleAction
         {
             int recoil = _rules.CalculateStruggleRecoil(Source, damage);
             Source.Attributes.ReceiveDamage(recoil);
-            _emitter?.Emit(new RecoilDamage(Source.Name, recoil, Source.Attributes.HP));
+            _emitter?.Emit(new RecoilDamage(Source.Name, Source.Id, recoil, Source.Attributes.HP));
         }
 
         // Recharge (Hyper Beam) only when damage landed AND not a KO — IBattleRules.FaintEndsTurnImmediately;
@@ -234,7 +234,7 @@ public class AttackAction : IBattleAction
         // OHKO *fails* (not misses) by IBattleRules.OneHitKoSucceeds — independent of the accuracy roll.
         if (category == DamageCategory.OHKO && !_rules.OneHitKoSucceeds(Source, Target))
         {
-            _emitter?.Emit(new MoveMissed(Source.Name, move.Name ?? ""));
+            _emitter?.Emit(new MoveMissed(Source.Name, Source.Id, move.Name ?? ""));
             return PreDamageGateResult.Halt;
         }
 
@@ -248,7 +248,7 @@ public class AttackAction : IBattleAction
             );
             if (_rng.Next(_rules.AccuracyRollBound) >= threshold)
             {
-                _emitter?.Emit(new MoveMissed(Source.Name, move.Name ?? ""));
+                _emitter?.Emit(new MoveMissed(Source.Name, Source.Id, move.Name ?? ""));
 
                 // Gen 1: Self-Destruct user faints even on miss
                 if (category == DamageCategory.SelfDestruct)
@@ -259,7 +259,9 @@ public class AttackAction : IBattleAction
                 {
                     int crash = _rules.CalculateCrashDamage(Source);
                     Source.Attributes.ReceiveDamage(crash);
-                    _emitter?.Emit(new CrashDamage(Source.Name, crash, Source.Attributes.HP));
+                    _emitter?.Emit(
+                        new CrashDamage(Source.Name, Source.Id, crash, Source.Attributes.HP)
+                    );
                 }
 
                 lockIn?.OnTurnEnd(lockCtx!); // a missed turn still counts toward the rampage lock
@@ -272,7 +274,7 @@ public class AttackAction : IBattleAction
         if (Target.Battle.Status == StatusCondition.Freeze && _rules.CanThawFrozenTarget(move))
         {
             Target.Battle.Status = StatusCondition.None;
-            _emitter?.Emit(new StatusCleared(Target.Name, StatusCondition.Freeze));
+            _emitter?.Emit(new StatusCleared(Target.Name, Target.Id, StatusCondition.Freeze));
             justThawed = true;
         }
 
@@ -315,7 +317,7 @@ public class AttackAction : IBattleAction
             )
         )
         {
-            _emitter?.Emit(new MoveHadNoEffect(Target.Name, move.Name ?? ""));
+            _emitter?.Emit(new MoveHadNoEffect(Target.Name, Target.Id, move.Name ?? ""));
             // An immune turn still counts toward the rampage lock and fires its end-of-lock
             // self-confusion, exactly like the miss branch above (Thrash locked onto a Ghost).
             lockIn?.OnTurnEnd(lockCtx!);
@@ -327,10 +329,10 @@ public class AttackAction : IBattleAction
         // reach this branch instead of whiffing harmlessly. Mirror the miss branch: announce no-effect, then crash.
         if (move.Effect == MoveEffect.Crash && typeImmunity == 0)
         {
-            _emitter?.Emit(new MoveHadNoEffect(Target.Name, move.Name ?? ""));
+            _emitter?.Emit(new MoveHadNoEffect(Target.Name, Target.Id, move.Name ?? ""));
             int crash = _rules.CalculateCrashDamage(Source);
             Source.Attributes.ReceiveDamage(crash);
-            _emitter?.Emit(new CrashDamage(Source.Name, crash, Source.Attributes.HP));
+            _emitter?.Emit(new CrashDamage(Source.Name, Source.Id, crash, Source.Attributes.HP));
             return PreDamageGateResult.Halt;
         }
 
@@ -340,7 +342,7 @@ public class AttackAction : IBattleAction
         // Counter with no damage to return — so it reuses MoveMissed, not the type-based MoveHadNoEffect.
         if (move.Effect == MoveEffect.DreamEater && Target.Battle.Status != StatusCondition.Sleep)
         {
-            _emitter?.Emit(new MoveMissed(Source.Name, move.Name ?? ""));
+            _emitter?.Emit(new MoveMissed(Source.Name, Source.Id, move.Name ?? ""));
             return PreDamageGateResult.Halt;
         }
 
@@ -417,6 +419,7 @@ public class AttackAction : IBattleAction
                         _emitter?.Emit(
                             new StatStageChanged(
                                 Target.Name,
+                                Target.Id,
                                 StageStat.Attack.ToString(),
                                 _rules.RageAttackStagesPerHit,
                                 newStage
@@ -428,7 +431,9 @@ public class AttackAction : IBattleAction
                     {
                         int heal = Math.Max(1, damage * move.DrainPercent / 100);
                         Source.Attributes.ReceiveHealing(heal);
-                        _emitter?.Emit(new DrainHealed(Source.Name, heal, Source.Attributes.HP));
+                        _emitter?.Emit(
+                            new DrainHealed(Source.Name, Source.Id, heal, Source.Attributes.HP)
+                        );
                     }
                 }
                 break;
@@ -536,9 +541,11 @@ public class AttackAction : IBattleAction
         {
             Target.Battle.SubstituteHp = Math.Max(0, Target.Battle.SubstituteHp - dmg);
             if (Target.Battle.SubstituteHp == 0)
-                _emitter?.Emit(new SubstituteFaded(Target.Name));
+                _emitter?.Emit(new SubstituteFaded(Target.Name, Target.Id));
             else
-                _emitter?.Emit(new SubstituteAbsorbedHit(Target.Name, Target.Battle.SubstituteHp));
+                _emitter?.Emit(
+                    new SubstituteAbsorbedHit(Target.Name, Target.Id, Target.Battle.SubstituteHp)
+                );
             return false;
         }
 
@@ -556,6 +563,7 @@ public class AttackAction : IBattleAction
         _emitter?.Emit(
             new DamageDealt(
                 Target.Name,
+                Target.Id,
                 dmg,
                 effectiveness,
                 Target.Attributes.HP,
@@ -588,9 +596,9 @@ public class AttackAction : IBattleAction
                     attack.StatusEffect == StatusCondition.Sleep
                     && Target.Battle.Status == StatusCondition.Sleep
                 )
-                    _emitter?.Emit(new AlreadyAsleep(Target.Name));
+                    _emitter?.Emit(new AlreadyAsleep(Target.Name, Target.Id));
                 else
-                    _emitter?.Emit(new MoveHadNoEffect(Target.Name, attack.Name ?? ""));
+                    _emitter?.Emit(new MoveHadNoEffect(Target.Name, Target.Id, attack.Name ?? ""));
             }
             return;
         }
@@ -606,7 +614,7 @@ public class AttackAction : IBattleAction
         if (!_rules.CanReceiveStatus(Target, attack.StatusEffect, attack.DamageType))
         {
             if (attack.BaseDamage == 0)
-                _emitter?.Emit(new MoveHadNoEffect(Target.Name, attack.Name ?? ""));
+                _emitter?.Emit(new MoveHadNoEffect(Target.Name, Target.Id, attack.Name ?? ""));
             return;
         }
 
@@ -619,7 +627,7 @@ public class AttackAction : IBattleAction
         if (attack.StatusEffect == StatusCondition.Sleep)
             Target.Battle.SleepTurns = _rules.RollSleepTurns();
 
-        _emitter?.Emit(new StatusApplied(Target.Name, attack.StatusEffect));
+        _emitter?.Emit(new StatusApplied(Target.Name, Target.Id, attack.StatusEffect));
     }
 
     private void TryApplyStatEffect(Attack attack)
@@ -641,7 +649,7 @@ public class AttackAction : IBattleAction
         // (and any raise) are unaffected.
         if (se.Target == StageTarget.Foe && se.Delta < 0 && affected.Battle.HasMist)
         {
-            _emitter?.Emit(new StatDropBlocked(affected.Name));
+            _emitter?.Emit(new StatDropBlocked(affected.Name, affected.Id));
             return;
         }
 
@@ -656,7 +664,13 @@ public class AttackAction : IBattleAction
         if (newStage != before)
         {
             _emitter?.Emit(
-                new StatStageChanged(affected.Name, se.Stat.ToString(), se.Delta, newStage)
+                new StatStageChanged(
+                    affected.Name,
+                    affected.Id,
+                    se.Stat.ToString(),
+                    se.Delta,
+                    newStage
+                )
             );
             return;
         }
@@ -668,7 +682,10 @@ public class AttackAction : IBattleAction
         {
             BattleEvent? announcement = _rules.StatStageCapAnnouncement switch
             {
-                StatCapAnnouncement.NothingHappened => new ButNothingHappened(affected.Name),
+                StatCapAnnouncement.NothingHappened => new ButNothingHappened(
+                    affected.Name,
+                    affected.Id
+                ),
                 _ => null,
             };
             if (announcement is not null)

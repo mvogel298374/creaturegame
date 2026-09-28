@@ -101,7 +101,7 @@ public sealed class TwoTurnMechanic : ILockInMechanic
             // Charge turn: wind up and defer the strike to next turn.
             ctx.Source.Battle.IsTwoTurnCharging = true;
             ctx.Source.Battle.ChargingMove = ctx.Move;
-            ctx.Emitter?.Emit(new ChargingUp(ctx.Source.Name, ctx.MoveName));
+            ctx.Emitter?.Emit(new ChargingUp(ctx.Source.Name, ctx.Source.Id, ctx.MoveName));
             return LockInResult.Halt;
         }
 
@@ -139,7 +139,7 @@ public sealed class RampageMechanic : ILockInMechanic
         if (ctx.Source.IsAlive() && ctx.Source.Battle.ConfusedTurns == 0)
         {
             ctx.Source.Battle.ConfusedTurns = ctx.Rules.RollConfusionTurns();
-            ctx.Emitter?.Emit(new ConfusionStarted(ctx.Source.Name));
+            ctx.Emitter?.Emit(new ConfusionStarted(ctx.Source.Name, ctx.Source.Id));
         }
     }
 }
@@ -181,7 +181,7 @@ public sealed class BideMechanic : ILockInMechanic
         ctx.Source.Battle.BideTurnsRemaining--;
         if (ctx.Source.Battle.BideTurnsRemaining > 0)
         {
-            ctx.Emitter?.Emit(new BideStoring(ctx.Source.Name));
+            ctx.Emitter?.Emit(new BideStoring(ctx.Source.Name, ctx.Source.Id));
             return LockInResult.Halt;
         }
         return LockInResult.Proceed; // committed turns done — release this turn
@@ -197,7 +197,7 @@ public sealed class BideMechanic : ILockInMechanic
         if (unleashed > 0 && ctx.Target.IsAlive())
             return LockInResult.Unleash(unleashed);
 
-        ctx.Emitter?.Emit(new MoveMissed(ctx.Source.Name, ctx.MoveName));
+        ctx.Emitter?.Emit(new MoveMissed(ctx.Source.Name, ctx.Source.Id, ctx.MoveName));
         return LockInResult.Halt;
     }
 }

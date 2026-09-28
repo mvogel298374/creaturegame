@@ -13,7 +13,9 @@ internal sealed class RecoveryRunEvent : IRunEvent
         var s = ctx.State;
         var player = s.Player;
 
-        ctx.Emitter?.Emit(new RecoveryOffered(player.Name, player.SpeciesId, s.BattlesWon));
+        ctx.Emitter?.Emit(
+            new RecoveryOffered(player.Name, player.Id, player.SpeciesId, s.BattlesWon)
+        );
         bool accept = await ctx.PlayerInput.ConfirmRecoveryAsync(
             new RecoveryContext(player, s.BattlesWon)
         );
@@ -24,7 +26,7 @@ internal sealed class RecoveryRunEvent : IRunEvent
             // member's own persisted CarriedStatus (the multi-creature carry model), so nothing carries onward.
             foreach (var member in s.Party.Members)
                 member.FullHeal();
-            ctx.Emitter?.Emit(new PlayerRecovered(player.Name, player.Attributes.HP));
+            ctx.Emitter?.Emit(new PlayerRecovered(player.Name, player.Id, player.Attributes.HP));
             // The lead-only PlayerRecovered above can't carry the bench's restored HP — so push a fresh party
             // snapshot too (the 1a/1b deferral: whole-party heal is state-correct, this makes the benched
             // members' heal visible on the wire for the party panel). A no-op-looking single-member party still
@@ -33,7 +35,7 @@ internal sealed class RecoveryRunEvent : IRunEvent
         }
         else
         {
-            ctx.Emitter?.Emit(new RecoveryDeclined(player.Name));
+            ctx.Emitter?.Emit(new RecoveryDeclined(player.Name, player.Id));
         }
 
         return new RecoveryOutcome(accept);
