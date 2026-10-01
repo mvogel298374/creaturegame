@@ -37,3 +37,10 @@
   grid-template-columns: 1fr 1fr;
   gap: var(--sp-md);
 }
+
+/* Kanto Sage skin. Frame + roomier padding come from the shared rules in ModalFrame.css; this re-states only
+   the text. The move buttons are .move-btn, "Don't learn" is .btn-ghost, YES/NO are .action-btn — all already
+   skinned, so they need nothing here. The --corner overlay anchoring is unchanged. */
+[data-generation="gen1"] .move-replace-title    { color: var(--ks-ink); }
+[data-generation="gen1"] .move-replace-sub      { color: var(--ks-dim); }
+[data-generation="gen1"] .move-replace-question { color: var(--ks-ink); }

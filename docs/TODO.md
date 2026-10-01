@@ -758,22 +758,17 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
        general.
   - [ ] **4d+ — the surface catalog, jointly iterated** (each its own greenlit mini-plan): battle command menu
     (settled — the 2×2 grid, verbs fixed), move select, battle HUD, CHECK POKEMON, BAG, party surfaces, run
-    run prompts (evolution + Poké Center modals ✅ skinned 2026-10-01; the remaining modals are tiered below),
-    Title/StarterSelection (incl. the generation picker), node ladder. *(The level-up stat panel shipped
-    2026-09-22, and the nickname / evolution / Poké Center modals followed — see the open follow-ups below; full
-    record in `TODO_ARCHIVE.md` → *Generation Profile 4d+ · Level-up stat panel — Kanto Sage skin*.)*
+    run prompts (evolution, Poké Center, move-replacement modals and the GAME OVER card ✅ skinned 2026-10-01; the
+    remaining modals are tiered below), Title/StarterSelection (incl. the generation picker), node ladder.
+    *(The level-up stat panel shipped 2026-09-22, and the nickname / evolution / Poké Center / move-replacement /
+    game-over surfaces followed — see the open follow-ups below; full record in `TODO_ARCHIVE.md` → *Generation
+    Profile 4d+ · Level-up stat panel — Kanto Sage skin*.)*
 
     **Remaining modals — ordering by assessment (2026-10-01; an assessment, not yet greenlit — each stays its own
-    mini-plan awaiting user greenlight).** Modal CSS now lives one-file-per-modal in
+    mini-plan awaiting user greenlight).** Former Tier 1 (move-replacement + game-over) ✅ done 2026-10-01,
+    archived. Modal CSS now lives one-file-per-modal in
     `components/modals/` (segmentation ✅ done 2026-10-01, see `TODO_ARCHIVE.md` → *Frontend tech debt — segment
     `BattleScreen.css`*); the shared frame rule is `ModalFrame.css`.
-    - **Tier 1 — basic migration, same recipe as Evolution/Poké Center** (add the card class to both
-      `ModalFrame.css` selector lists + a few ink-colour overrides in its own sheet):
-      - `MoveReplacementModal` (`.move-replace-modal`; its `.move-btn` and `.action-btn` are already skinned). Only
-        caveat: its overlay is the `--corner` variant, so check the roomier padding fits the bottom-right anchor.
-      - `BattleEndedOverlay` (`.battle-end-modal`; structurally trivial — table + 2 buttons). Carries ONE design
-        decision: its title/border are deliberately RED as a game-over signal — keep a red accent on the light
-        ground, or go ink-only? Its heavier `.battle-end-overlay` backdrop is independent of the card skin.
     - **Tier 2 — recipe plus a little:** `AcquisitionModal` (`.acquire-modal` — same skeleton as recovery + a
       type-badge row + the party-swap picker). Needs `.acquire-swap-btn` ink-on-fill + invert-on-hover like
       `.bag-item`, and the violet accent dropped. Embeds `NicknameModal`, which is already done.
@@ -793,8 +788,8 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
       level-up box lists HP at all (recollection: four rows, ATTACK/DEFENSE/SPEED/SPECIAL) and whether it shows
       gains first, then totals on a keypress. Today's panel shows five rows with gain + total together; left as-is
       because changing it is a behaviour change, not a skin — would be its own item if wanted.
-    - **Follow-up, mostly done (2026-10-01):** `.levelup-panel`, `.nickname-modal` and `.recovery-modal` (evolution
-      + Poké Center) share ONE double-frame rule (a selector list under `[data-generation="gen1"]`, now in
+    - **Follow-up, mostly done (2026-10-01):** `.levelup-panel`, `.nickname-modal`, `.recovery-modal` (evolution
+      + Poké Center), `.move-replace-modal` and `.battle-end-modal` (game over) share ONE double-frame rule (a selector list under `[data-generation="gen1"]`, now in
       `components/modals/ModalFrame.css`). Still open: `.battle-screen` and `.battle-log` carry their own copies of
       the recipe, and `.acquire-modal` and the reward modal (when their mini-plans are written) should join the
       shared selector in `ModalFrame.css` (both lists) rather than copy it again.

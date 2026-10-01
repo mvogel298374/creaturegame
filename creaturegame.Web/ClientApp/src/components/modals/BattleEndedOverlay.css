@@ -60,7 +60,10 @@
   margin-bottom: var(--sp-md);
 }
 
-.battle-end-stats td { padding: 2px 0; }
+/* Vertical padding only — the `padding: 2px 0` shorthand also set padding-right:0, which (more specific than
+   .battle-end-stat below) silently killed the label/value gap, rendering "FINAL LEVELLv14". Same trap as
+   .levelup-table td in pages/BattleScreen.css. */
+.battle-end-stats td { padding-top: 2px; padding-bottom: 2px; }
 .battle-end-stat  { text-align: left;  padding-right: var(--sp-lg); letter-spacing: 1px; opacity: 0.8; }
 .battle-end-value { text-align: right; font-weight: 700; color: var(--clr-sky); }
 
@@ -70,3 +73,13 @@
   gap: var(--sp-md);
   width: 100%;
 }
+
+/* Kanto Sage skin. Frame + roomier padding come from the shared rules in ModalFrame.css. Ink-only by decision
+   (2026-10-01): the red border/glow/title were the dark skin's game-over signal; under the colour budget the
+   card reads like every other modal and the greyed faint sprite carries the "it's over" beat. The heavier
+   .battle-end-overlay backdrop is independent of the card and unchanged. PLAY AGAIN/QUIT are .action-btn,
+   already skinned. */
+[data-generation="gen1"] .battle-end-title { color: var(--ks-ink); }
+[data-generation="gen1"] .battle-end-sub   { color: var(--ks-dim); }
+[data-generation="gen1"] .battle-end-stats { color: var(--ks-ink); }
+[data-generation="gen1"] .battle-end-value { color: var(--ks-ink); }

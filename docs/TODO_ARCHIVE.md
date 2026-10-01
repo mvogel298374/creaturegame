@@ -438,7 +438,7 @@ plain top-N-by-score — rejected as unneeded complexity for what was asked.
 
 *(Moved here from `TODO.md` → Generation Profile → Stage 4d+. Two follow-ups stay live there: the Gen-1
 level-up-box-contents domain question and the shared double-frame recipe — see the end of this section. Add-ons
-for the nickname modal (2026-09-22) and the evolution + Poké Center modals (2026-10-01) are recorded below.)*
+for the nickname modal (2026-09-22) and the evolution + Poké Center modals and the move-replacement + game-over cards (both 2026-10-01) are recorded below.)*
 
 **Scope: skin only, no behaviour change.** `LevelUpStatPanel` (`BattleScreen.tsx`, `.levelup-*` in
 `BattleScreen.css`) is a non-blocking corner panel (bottom-right above the menu, persists until the next input,
@@ -508,12 +508,37 @@ render through the one `.recovery-modal` card (`EvolutionPromptModal.tsx`, `Reco
   mini-plan), the reward modal, the shop.
 - **Verified live (Puppeteer, injected markup + screenshot, 2026-10-01).** No tests run (CSS-only); E2E not run.
 
+**Add-on #3 (2026-10-01) — "Tier 1" of the remaining-modals ordering: MOVE-REPLACEMENT prompt + GAME OVER card
+skinned (`components/modals/`).** Same recipe: the card class is added to BOTH selector lists in
+`ModalFrame.css` (the double-frame rule + the roomier-padding override) and a few ink-colour overrides go in the
+modal's own sheet. **CSS only, no TSX change.**
+- **`MoveReplacementModal` (`.move-replace-modal`):** added to both `ModalFrame.css` lists;
+  `MoveReplacementModal.css` gets gen1 ink title / dim sub / ink question. Its `.move-btn`, `.btn-ghost`
+  ("Don't learn") and `.action-btn` (YES/NO) were already skinned; the `--corner` overlay anchoring is unchanged
+  (the roomier padding fits the bottom-right anchor). Verified live (Puppeteer screenshot of the choose step, real
+  markup incl. `.move-name` and `.btn-ghost.action-back`, in the `--corner` overlay). The confirm step
+  (question + YES/NO) was not separately screenshotted.
+- **`BattleEndedOverlay` (`.battle-end-modal`, the GAME OVER card):** added to both `ModalFrame.css` lists;
+  `BattleEndedOverlay.css` gets gen1 ink title / dim sub / ink stats + values. **Design decision (user,
+  2026-10-01): INK-ONLY — no red accent.** The red border / glow / title were the dark skin's game-over signal;
+  dropped under the four-colour budget, and the greyed faint sprite carries the beat. The heavier
+  `.battle-end-overlay` backdrop is unchanged and independent of the card skin. With no profile applied the
+  original dark card (red game-over included) is kept. Verified live (Puppeteer screenshot).
+- **Pre-existing bug fixed while there (a base-rule change, not skin-only, in `BattleEndedOverlay.css`):**
+  `.battle-end-stats td { padding: 2px 0 }` out-specified `.battle-end-stat`'s `padding-right`, so label and value
+  touched ("FINAL LEVELLv14") in BOTH skins (computed `padding-right` was 0px on the default dark skin). Now
+  vertical-padding-only — the same trap/fix as `.levelup-table td`. Verified before/after by screenshot. No test
+  covers the game-over table geometry.
+- **Verification:** `tsc` clean, Vitest 283/283; live Puppeteer checks above. **Not run:** Playwright E2E
+  (opt-in, user-run), `pr-review` (skipped — CSS only), and no computed-style A/B (that was for the pure-move
+  `BattleScreen.css` split).
+
 **Left open (live in `TODO.md` → 4d+):** (1) the Gen-1 level-up-box-contents domain claim — whether the
 real box lists HP at all (recollection: four rows ATTACK/DEFENSE/SPEED/SPECIAL) and whether it shows gains first,
 then totals on a keypress; today's five-row gain+total panel was left as-is (behaviour change, not a skin), for
 `requirements-review`/a separate item; (2) promote the double-frame recipe to a shared token/selector — **now
-mostly done:** level-up panel + nickname modal + recovery modal share one rule; `.battle-screen` / `.battle-log`
-copies, `.acquire-modal`, and the reward modal remain.
+mostly done:** level-up panel + nickname + recovery + move-replacement + game-over card share one rule;
+`.battle-screen` / `.battle-log` copies, `.acquire-modal`, and the reward modal remain.
 
 ---
 

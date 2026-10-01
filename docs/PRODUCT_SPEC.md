@@ -168,6 +168,10 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - The EVOLUTION prompt and the POKÉ CENTER (recovery) modal wear the same double-line frame under the Gen 1
   profile, with ink title, sub-line and sprite glow; their buttons use the skinned action buttons. With no
   profile applied they keep their original dark card.
+- The MOVE-REPLACEMENT prompt (learning a move with a full moveset) and the GAME OVER card wear the same
+  double-line frame under the Gen 1 profile, with ink title, dim sub-line and ink text. GAME OVER is ink-only
+  (no red accent; the greyed faint sprite carries the beat). With no profile applied they keep their original
+  dark cards, including the red game-over styling.
 - Design detail → `GENERATION_PROFILE.md` §7.3.  History → `TODO_ARCHIVE.md` → *Generation Profile 4d+ ·
   Level-up stat panel — Kanto Sage skin*.
 
