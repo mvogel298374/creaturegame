@@ -757,23 +757,19 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
        Vitest, `tsc` clean); #1/#4 re-verified against the exact seed that exposed them, not just re-tested in
        general.
   - [ ] **4d+ — the surface catalog, jointly iterated** (each its own greenlit mini-plan): battle command menu
-    (settled — the 2×2 grid, verbs fixed), move select, battle HUD, CHECK POKEMON, BAG, party surfaces, run
-    run prompts (evolution, Poké Center, move-replacement, acquisition offer, reward pick and shop modals and the
-    GAME OVER card ✅ skinned 2026-10-01; the one remaining modal family is Tier 3 below), Title/StarterSelection (incl. the generation picker), node ladder.
+    (settled — the 2×2 grid, verbs fixed), move select, battle HUD, CHECK POKEMON (the main overview; its party
+    picker ✅ skinned 2026-10-01), BAG, party surfaces (the `PartyStrip` chips `.party-chip*`; the SWITCH menu cards
+    ✅ skinned 2026-10-01), Title/StarterSelection (incl. the generation picker), node ladder. *(All run-prompt
+    modals ✅ skinned 2026-10-01: evolution, Poké Center, move-replacement, acquisition offer, reward pick, shop,
+    GAME OVER, and the roster-picker family — lead choice, forced switch-in, TM-teach target.)*
     *(The level-up stat panel shipped 2026-09-22, and the nickname / evolution / Poké Center / move-replacement /
     game-over / acquisition surfaces followed — see the open follow-ups below; full record in `TODO_ARCHIVE.md` → *Generation
     Profile 4d+ · Level-up stat panel — Kanto Sage skin*.)*
 
-    **Remaining modals (2026-10-01; an assessment, not yet greenlit — stays its own mini-plan awaiting user
-    greenlight).** Former Tier 1 (move-replacement + game-over), Tier 2 (acquisition offer + swap picker) and
-    Tier 4 (reward pick + shop) ✅ done 2026-10-01, archived. Modal CSS now lives one-file-per-modal in
-    `components/modals/` (segmentation ✅ done 2026-10-01, see `TODO_ARCHIVE.md` → *Frontend tech debt — segment
-    `BattleScreen.css`*); the shared frame rule is `ModalFrame.css`.
-    - **Tier 3 — one skin, three modals + two non-modal surfaces:** the `RosterPicker.css` `.lead-*` family —
-      `LeadChoiceModal`, `SwitchInModal`, `MoveTeachTargetModal` share `.lead-modal` / `.lead-card`, and
-      `.lead-card` is ALSO rendered by CHECK POKEMON (`BattleScreen.tsx`) and `CreatureOverview` (which has its own
-      overrides in `CreatureOverview.css`), so skinning it changes those too. Do as one mini-plan with those
-      surfaces in view; has `--current` / `--fainted` states to keep legible.
+    **Modals: none remain open (2026-10-01).** Every modal family is skinned and archived (Tiers 1-4, incl. the
+    roster picker + SWITCH menu + CHECK POKEMON party cards). Modal CSS lives one-file-per-modal in
+    `components/modals/` (see `TODO_ARCHIVE.md` → *Frontend tech debt — segment `BattleScreen.css`*); the shared
+    frame rule is `ModalFrame.css`.
     - **Open wart (unfiled):** `Modal.tsx` still imports `pages/BattleScreen.css` for the shared button chrome
       (`.action-btn`, `.move-btn`); inverting that fully means extracting that chrome into its own sheet.
   - [ ] **4d+ · Level-up stat panel — open follow-ups** (the skin itself ✅ shipped 2026-09-22, archived):
@@ -782,8 +778,8 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
       gains first, then totals on a keypress. Today's panel shows five rows with gain + total together; left as-is
       because changing it is a behaviour change, not a skin — would be its own item if wanted.
     - **Follow-up, mostly done (2026-10-01):** `.levelup-panel`, `.nickname-modal`, `.recovery-modal` (evolution
-      + Poké Center), `.move-replace-modal`, `.battle-end-modal` (game over), `.acquire-modal`, `.reward-modal` and
-      `.shop-modal` share ONE double-frame rule (a selector list under `[data-generation="gen1"]`, now in
+      + Poké Center), `.move-replace-modal`, `.battle-end-modal` (game over), `.acquire-modal`, `.reward-modal`,
+      `.shop-modal` and `.lead-modal` share ONE double-frame rule (a selector list under `[data-generation="gen1"]`, now in
       `components/modals/ModalFrame.css`). Still open: `.battle-screen` and `.battle-log` carry their own copies of
       the recipe.
     - **E2E not run:** `level-up.spec.ts` (incl. the column-spacing geometry test) is opt-in / user-run —

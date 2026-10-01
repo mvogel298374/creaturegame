@@ -582,12 +582,49 @@ borders, gold bag, Quick Heal and move-teach accents) and tuned for the dark gro
   **Not run:** Vitest (CSS only), Playwright E2E (opt-in, user-run — recommend `.\e2e.ps1 -Spec shop` plus the spec
   that drives the reward pick), `pr-review` (skipped — CSS only).
 
+**Add-on #6 (2026-10-01) — "Tier 3" of the remaining-modals ordering, the last open modal family: the ROSTER
+PICKER (`.lead-*`, `components/modals/RosterPicker.css`) skinned in one pass.** Greenlit by the user ("yes, start on
+the roster picker"). **CSS only, no TSX change.** One `.lead-card` skin covers five surfaces: the three modals
+`LeadChoiceModal`, `SwitchInModal`, `MoveTeachTargetModal` (all `.lead-modal`) **and** the two non-modal surfaces
+that render `PartyCard` / `.lead-card` on the light `.battle-panel` — the in-battle SWITCH menu (`SwitchMenu` in
+`BattleScreen.tsx`) and CHECK POKEMON's party picker (`CreatureOverview.tsx`, which has its own grid override in
+`CreatureOverview.css`).
+- **Frame:** `.lead-modal` added to BOTH `ModalFrame.css` lists (double-frame rule + roomier padding). Gen1 rules in
+  `RosterPicker.css`: ink title / dim sub-line; `.lead-modal` `min-width` 360px.
+- **`.lead-card`** takes the BAG `.bag-item` recipe: 3px ink border + grain, invert-block on hover/focus (guarded
+  with `:not(:disabled)`), the sky accent dropped to ink; the level line is dim and flips with the invert.
+- **HP read** reuses the nameplate bar recipe (fog track + 1px ink border, 6px tall, low endpoint `--ks-hp`). The
+  green/yellow thresholds are kept as gameplay signal, scoped to `.lead-card-hp-fill` so the separate party-strip
+  chips are untouched.
+- **States:** fainted keeps its base greyed look with an ink hover border; disabled-but-not-fainted-not-current
+  (e.g. the TM '· Unable') dims to 0.55 with no invert.
+- **Design call (assistant, inside the existing recipe, not escalated — revisitable):** the CURRENT lead is marked by
+  the dialogue frame's INNER INK RING (inset 2px fill + 4px ink), NOT a permanent invert, because hover/selection
+  already mean "invert block" in this skin and an inverted current card would read the same as a hovered one. The
+  '· current' / '· OUT' word stays. The disabled current lead (SWITCH menu '· OUT') is deliberately not dimmed.
+- **`CreatureOverview.css`:** the gen1 grid minimum widened 72px → 96px so a 10-char nickname fits the
+  thicker-bordered card (measured: 88px borderline, 96px no overflow).
+- **One small non-skin fix (base rule, ALL skins):** `.lead-modal .action-back { margin-top: var(--sp-md) }` — the
+  move-teach modal's "Don't teach…" ghost button sat flush against the card grid (`action-back`'s `margin-top:auto`
+  resolves to 0 in a content-height modal); measured gap now 15px. Pre-existing, made obvious by the 3px borders.
+- **Deliberately untouched:** the `PartyStrip` chips (`.party-chip*`); `TypeBadge` pills. With no profile applied
+  the original dark sky-accented cards are kept.
+- **Verified live (Puppeteer, real markup):** lead-choice modal (6 cards, current ring, a 10-char name, low/mid/high
+  HP, hover invert); move-teach modal (TypeBadge sub-line, '· Unable' card stays dim and does not invert on hover,
+  fainted-but-able card stays normal as the component intends, the decline-button gap); the in-battle SWITCH menu
+  (current lead ringed + not dimmed, hovered member inverts, fainted greyed); CHECK POKEMON picker with
+  `CreatureOverview.css` loaded (all names fit at 96px, current ring, hover). `tsc` clean; Vitest 283/283.
+  **Not verified:** `SwitchInModal` rendered on its own (same `.lead-modal` + the fainted card already verified in
+  the SWITCH menu); the no-profile (dark) skin not re-screenshotted (gen1 rules are attribute-scoped; only the
+  `action-back` gap rule touches all skins). **Not run:** Playwright E2E (opt-in, user-run — recommend the specs
+  that drive in-combat switching, the forced switch-in and CHECK POKEMON); `pr-review` (skipped — CSS only).
+
 **Left open (live in `TODO.md` → 4d+):** (1) the Gen-1 level-up-box-contents domain claim — whether the
 real box lists HP at all (recollection: four rows ATTACK/DEFENSE/SPEED/SPECIAL) and whether it shows gains first,
 then totals on a keypress; today's five-row gain+total panel was left as-is (behaviour change, not a skin), for
 `requirements-review`/a separate item; (2) promote the double-frame recipe to a shared token/selector — **now
-mostly done:** level-up panel + nickname + recovery + move-replacement + game-over + acquisition + reward + shop
-card share one rule; only the `.battle-screen` / `.battle-log` copies remain.
+mostly done:** level-up panel + nickname + recovery + move-replacement + game-over + acquisition + reward + shop +
+roster picker (`.lead-modal`) card share one rule; only the `.battle-screen` / `.battle-log` copies remain.
 
 ---
 

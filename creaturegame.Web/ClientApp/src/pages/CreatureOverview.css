@@ -236,6 +236,12 @@
 [data-generation="gen1"] .overview-picker.lead-grid {
   border-color: var(--ks-ink);
 }
+/* The Kanto Sage .lead-card (components/modals/RosterPicker.css) has 3px borders, so a 10-character nickname
+   needs ~96px (80px of text + 8px padding + 6px border); the base 72px minimum would let the name overflow its
+   card in a narrow panel. */
+[data-generation="gen1"] .overview-picker.lead-grid {
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+}
 [data-generation="gen1"] .overview-species-name,
 [data-generation="gen1"] .overview-sub {
   color: var(--ks-dim);

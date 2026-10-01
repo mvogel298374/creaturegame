@@ -941,7 +941,7 @@ at greenlight time.
 3. **Battle HUD** (nameplates, HP bars, status badges, the log).
 4. **CHECK POKEMON** (`src/pages/CreatureOverview.tsx`).
 5. **BAG** (the in-battle item menu).
-6. **Party surfaces** (`PartyStrip`, `SwitchInModal`, `LeadChoiceModal`).
+6. **Party surfaces** (`PartyStrip`; `SwitchInModal` / `LeadChoiceModal` / the SWITCH menu cards ✅ skinned 2026-10-01).
 7. **Run prompts** (the remaining `components/modals/` — Acquisition, RewardChoice, Shop, MoveReplacement,
    Evolution, …).
 8. **Title + StarterSelection** — including the **generation picker** itself (the run-start control that

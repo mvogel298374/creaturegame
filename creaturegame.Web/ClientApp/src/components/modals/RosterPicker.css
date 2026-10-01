@@ -70,3 +70,63 @@
 }
 
 .lead-card-hp-fill { height: 100%; border-radius: 2px; }
+
+/* Kanto Sage skin (docs/TODO.md → 4d+ modal catalog, Tier 3). ONE skin for everything that renders .lead-*:
+   the three modals (frame + roomier padding from the shared rules in ModalFrame.css) AND the two non-modal
+   surfaces that reuse .lead-card — the in-battle SWITCH menu and CHECK POKEMON's picker, both on the light
+   .battle-panel ground (CreatureOverview.css only adds a grid override on top).
+   Cards are the BAG-item recipe: 3px ink border + grain, invert-block on hover/focus. The sky accent (a route/
+   planning beat in the dark skin) drops to ink. The current lead is marked by the dialogue frame's inner ink
+   ring, NOT a permanent invert — hover/selection already mean "invert block" here, so an inverted current card
+   would read the same as a hovered one; the "· current"/"· OUT" word in the level line stays too. The HP read
+   reuses the nameplate bar recipe (fog track + 1px ink border; low endpoint = --ks-hp) and keeps the
+   green/yellow thresholds (gameplay signal, same call as the nameplate). */
+[data-generation="gen1"] .lead-title { color: var(--ks-ink); }
+[data-generation="gen1"] .lead-sub   { color: var(--ks-dim); }
+/* Wide enough that three columns still fit a 10-character nickname in the roomier ring-framed card. */
+[data-generation="gen1"] .lead-modal { min-width: 360px; }
+
+[data-generation="gen1"] .lead-card {
+  background: var(--ks-fill);
+  background-image: var(--ks-grain);
+  background-size: 34px 34px;
+  color: var(--ks-ink);
+  border: 3px solid var(--ks-ink);
+  border-radius: 0;
+  box-shadow: none;
+}
+[data-generation="gen1"] .lead-card:hover:not(:disabled),
+[data-generation="gen1"] .lead-card:focus-visible:not(:disabled) {
+  background: var(--ks-ink);
+  color: var(--ks-fill);
+  border-color: var(--ks-ink);
+}
+[data-generation="gen1"] .lead-card-lvl { color: var(--ks-dim); }
+[data-generation="gen1"] .lead-card:hover:not(:disabled) .lead-card-lvl,
+[data-generation="gen1"] .lead-card:focus-visible:not(:disabled) .lead-card-lvl { color: var(--ks-fill); }
+
+/* The lead that's already out / current: inner ring. Not dimmed even when disabled (SWITCH menu's "· OUT"). */
+[data-generation="gen1"] .lead-card--current {
+  box-shadow: inset 0 0 0 2px var(--ks-fill), inset 0 0 0 4px var(--ks-ink);
+}
+/* Unpickable but not fainted (e.g. TM "· Unable"): dim, and no hover invert (guarded above). Fainted keeps its
+   own greyed look from the base rule; its hover border must stay ink, not the base's translucent white. */
+[data-generation="gen1"] .lead-card:disabled:not(.lead-card--current):not(.lead-card--fainted) {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+[data-generation="gen1"] .lead-card--fainted:hover { border-color: var(--ks-ink); }
+
+[data-generation="gen1"] .lead-card-hp {
+  height: 6px;
+  background: var(--ks-fog);
+  border: 1px solid var(--ks-ink);
+  border-radius: 0;
+}
+[data-generation="gen1"] .lead-card-hp-fill { border-radius: 0; }
+[data-generation="gen1"] .lead-card-hp-fill.party-chip-hp-fill--low { background: var(--ks-hp); }
+
+/* The modal's "Don't teach …" ghost button sat flush against the card grid: .action-back's `margin-top: auto`
+   resolves to 0 in a modal that is only as tall as its content, so there was no gap in ANY skin (the Kanto Sage
+   3px card borders just made it obvious). Give it the same gap the grid has above its title block. */
+.lead-modal .action-back { margin-top: var(--sp-md); }

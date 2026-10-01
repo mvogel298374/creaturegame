@@ -183,6 +183,12 @@ the linked design doc instead — pull it there and leave only the pointer here.
   rarity word (Common grey, Uncommon green, Rare blue, Epic purple) — the one colour exception; every other
   accent (gold bag, Quick Heal, move-teach, card/row borders) is ink. With no profile applied they keep their
   original dark gold-accented cards with rarity-coloured borders.
+- The roster pickers — the LEAD choice, the forced SWITCH-IN, and the TM-teach target modal, plus the in-battle
+  SWITCH menu and CHECK POKEMON's party picker — render party members as cards. Under the Gen 1 profile the modals
+  wear the same double-line frame; the cards are ink-bordered with a grain texture and invert on hover/focus. The
+  current lead carries an inner ink ring (with its "current"/"OUT" word), fainted members are greyed, and a member
+  who can't be chosen (e.g. TM "Unable") is dimmed and does not invert. The HP bar keeps its green/yellow/red
+  thresholds. With no profile applied they keep their original dark sky-accented cards.
 - Design detail → `GENERATION_PROFILE.md` §7.3.  History → `TODO_ARCHIVE.md` → *Generation Profile 4d+ ·
   Level-up stat panel — Kanto Sage skin*.
 
