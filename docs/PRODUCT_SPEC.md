@@ -165,6 +165,9 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - The NICKNAME modal (starter pick and acquisition) wears the same double-line frame under the Gen 1 profile:
   ink title, dim sub-line, text input on the fog tone with an ink border and a thickened focus ring; OK / CANCEL
   use the skinned action buttons. With no profile applied it keeps its original dark card.
+- The EVOLUTION prompt and the POKÉ CENTER (recovery) modal wear the same double-line frame under the Gen 1
+  profile, with ink title, sub-line and sprite glow; their buttons use the skinned action buttons. With no
+  profile applied they keep their original dark card.
 - Design detail → `GENERATION_PROFILE.md` §7.3.  History → `TODO_ARCHIVE.md` → *Generation Profile 4d+ ·
   Level-up stat panel — Kanto Sage skin*.
 

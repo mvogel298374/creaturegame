@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { MoveReplacementPrompt } from '../../hooks/useBattleHub';
 import { formatMoveName } from '../../utils/format';
 import { Modal } from './Modal';
+import './MoveReplacementModal.css';
 
 // Level-up move learning: the four slots are full, so the player chooses one to forget for the new move —
 // or declines. Two steps with a confirmation so a move is never deleted on a single misclick.

@@ -6,6 +6,7 @@ import { friendlyFetchError } from '../utils/fetchError';
 import { defaultOverviewSlot, showOverviewPicker, overviewSlotUrl } from '../battle/overviewPicker';
 import type { PlayerOverview, StatRow, MoveRow } from '../types/PlayerOverview';
 import type { PartyMember } from '../hooks/useBattleHub';
+import '../components/modals/RosterPicker.css';
 import './CreatureOverview.css';
 
 type Tab = 'info' | 'stats' | 'moves';

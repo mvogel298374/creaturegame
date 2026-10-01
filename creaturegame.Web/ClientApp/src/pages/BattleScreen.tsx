@@ -45,6 +45,7 @@ import { hasUsableMove } from '../battle/moveMenu';
 import { MoveReplacementModal } from '../components/modals/MoveReplacementModal';
 import { SettingsModal } from '../components/modals/SettingsModal';
 import { CreatureOverview } from './CreatureOverview';
+import '../components/modals/RosterPicker.css';
 import './BattleScreen.css';
 
 // Gen 1 HP estimate at level 50, no DVs/EVs — used until first TurnStarted arrives

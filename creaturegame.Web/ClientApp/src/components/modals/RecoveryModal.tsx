@@ -1,5 +1,6 @@
 import type { RecoveryPrompt } from '../../hooks/useBattleHub';
 import { Modal } from './Modal';
+import './RecoveryCard.css';
 
 // Roguelite Poké Center: a between-encounter heal step. Shows the player's creature with a heal glow and
 // offers a single Heal / Skip press — that one input both decides the heal and continues the chain (the

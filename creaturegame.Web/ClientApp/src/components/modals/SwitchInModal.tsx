@@ -1,6 +1,7 @@
 import type { SwitchInPrompt } from '../../hooks/useBattleHub';
 import { Modal } from './Modal';
 import { PartyCard } from './PartyCard';
+import './RosterPicker.css';
 
 // Forced faint-switch (Stage 3): the active creature fainted but the bench has a live member, so the player MUST
 // send in a replacement — a blocking, non-dismissable modal (no decline/close) over the roster. Only live members

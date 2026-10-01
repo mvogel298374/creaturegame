@@ -1,5 +1,6 @@
 import type { EvolutionPrompt } from '../../hooks/useBattleHub';
 import { Modal } from './Modal';
+import './RecoveryCard.css';
 
 // Evolution offer: a between-encounter Allow / Cancel step (Gen 1 B-cancel). Shows the current creature with
 // an evolution glow; one press both answers the prompt and continues the run (the backend is blocked awaiting

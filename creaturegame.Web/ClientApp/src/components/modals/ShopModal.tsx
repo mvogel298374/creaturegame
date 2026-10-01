@@ -1,6 +1,7 @@
 import type { ShopPrompt } from '../../hooks/useBattleHub';
 import { formatItemName } from '../../battle/bag';
 import { Modal } from './Modal';
+import './ShopModal.css';
 
 // Shop node: a spend-gold buy modal. Unlike the one-shot reward pick, the shop is iterative — it stays open
 // across purchases, each Buy sends BuyShopItem(index) and the balance updates live (Buy disables when the item

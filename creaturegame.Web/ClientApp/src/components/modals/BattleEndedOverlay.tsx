@@ -1,4 +1,5 @@
 import { Modal } from './Modal';
+import './BattleEndedOverlay.css';
 
 // Run-scoped game-over screen for the Endless Battle Chain: shown once the player's creature faints and the
 // run ends (driven by the terminal RunEnded event → phase 'ended'). Not a per-battle overlay — a win is just

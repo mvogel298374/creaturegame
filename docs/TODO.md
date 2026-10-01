@@ -758,19 +758,46 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
        general.
   - [ ] **4d+ — the surface catalog, jointly iterated** (each its own greenlit mini-plan): battle command menu
     (settled — the 2×2 grid, verbs fixed), move select, battle HUD, CHECK POKEMON, BAG, party surfaces, run
-    prompts, Title/StarterSelection (incl. the generation picker), node ladder, **the reward modal** (still the
-    old pre-Kanto-Sage look, flagged 2026-08-23 — user-reported while playing, not yet its own mini-plan). *(The
-    level-up stat panel, the other half of that flag, shipped 2026-09-22 — see the open follow-ups below; full
+    run prompts (evolution + Poké Center modals ✅ skinned 2026-10-01; the remaining modals are tiered below),
+    Title/StarterSelection (incl. the generation picker), node ladder. *(The level-up stat panel shipped
+    2026-09-22, and the nickname / evolution / Poké Center modals followed — see the open follow-ups below; full
     record in `TODO_ARCHIVE.md` → *Generation Profile 4d+ · Level-up stat panel — Kanto Sage skin*.)*
+
+    **Remaining modals — ordering by assessment (2026-10-01; an assessment, not yet greenlit — each stays its own
+    mini-plan awaiting user greenlight).** Modal CSS now lives one-file-per-modal in
+    `components/modals/` (segmentation ✅ done 2026-10-01, see `TODO_ARCHIVE.md` → *Frontend tech debt — segment
+    `BattleScreen.css`*); the shared frame rule is `ModalFrame.css`.
+    - **Tier 1 — basic migration, same recipe as Evolution/Poké Center** (add the card class to both
+      `ModalFrame.css` selector lists + a few ink-colour overrides in its own sheet):
+      - `MoveReplacementModal` (`.move-replace-modal`; its `.move-btn` and `.action-btn` are already skinned). Only
+        caveat: its overlay is the `--corner` variant, so check the roomier padding fits the bottom-right anchor.
+      - `BattleEndedOverlay` (`.battle-end-modal`; structurally trivial — table + 2 buttons). Carries ONE design
+        decision: its title/border are deliberately RED as a game-over signal — keep a red accent on the light
+        ground, or go ink-only? Its heavier `.battle-end-overlay` backdrop is independent of the card skin.
+    - **Tier 2 — recipe plus a little:** `AcquisitionModal` (`.acquire-modal` — same skeleton as recovery + a
+      type-badge row + the party-swap picker). Needs `.acquire-swap-btn` ink-on-fill + invert-on-hover like
+      `.bag-item`, and the violet accent dropped. Embeds `NicknameModal`, which is already done.
+    - **Tier 3 — one skin, three modals + two non-modal surfaces:** the `RosterPicker.css` `.lead-*` family —
+      `LeadChoiceModal`, `SwitchInModal`, `MoveTeachTargetModal` share `.lead-modal` / `.lead-card`, and
+      `.lead-card` is ALSO rendered by CHECK POKEMON (`BattleScreen.tsx`) and `CreatureOverview` (which has its own
+      overrides in `CreatureOverview.css`), so skinning it changes those too. Do as one mini-plan with those
+      surfaces in view; has `--current` / `--fainted` states to keep legible.
+    - **Tier 4 — NOT basic, own design decisions:** `RewardChoiceModal` (the user-flagged 2026-08-23 reward modal,
+      still the old pre-Kanto-Sage look; 7 rarity/kind-coloured card variants whose colours are semantic and were
+      tuned for the dark ground — needs a ratified light-ground rarity palette) and `ShopModal` (gold accent +
+      rarity left-borders + disabled/Buy button states; same palette decision, ideally the same pass as Reward).
+    - **Open wart (unfiled):** `Modal.tsx` still imports `pages/BattleScreen.css` for the shared button chrome
+      (`.action-btn`, `.move-btn`); inverting that fully means extracting that chrome into its own sheet.
   - [ ] **4d+ · Level-up stat panel — open follow-ups** (the skin itself ✅ shipped 2026-09-22, archived):
     - **Flagged, not decided — a domain claim for `requirements-review`, not asserted here:** whether Gen 1's real
       level-up box lists HP at all (recollection: four rows, ATTACK/DEFENSE/SPEED/SPECIAL) and whether it shows
       gains first, then totals on a keypress. Today's panel shows five rows with gain + total together; left as-is
       because changing it is a behaviour change, not a skin — would be its own item if wanted.
-    - **Follow-up, now partial (2026-09-22):** `.levelup-panel` and `.nickname-modal` share ONE double-frame rule (a
-      selector list under `[data-generation="gen1"]`). Still open: `.battle-screen` and `.battle-log` carry their
-      own copies of the recipe, and the reward modal (when its mini-plan is written) should join the shared
-      selector rather than copy it again.
+    - **Follow-up, mostly done (2026-10-01):** `.levelup-panel`, `.nickname-modal` and `.recovery-modal` (evolution
+      + Poké Center) share ONE double-frame rule (a selector list under `[data-generation="gen1"]`, now in
+      `components/modals/ModalFrame.css`). Still open: `.battle-screen` and `.battle-log` carry their own copies of
+      the recipe, and `.acquire-modal` and the reward modal (when their mini-plans are written) should join the
+      shared selector in `ModalFrame.css` (both lists) rather than copy it again.
     - **E2E not run:** `level-up.spec.ts` (incl. the column-spacing geometry test) is opt-in / user-run —
       recommend `.\e2e.ps1 -Spec level-up`. The panel's geometry was verified live via Puppeteer instead.
   - [x] **⚠️ BAG readability regression** ✅ DONE (2026-08-23) — `.bag-item`/`.bag-pp-prompt`/`.bag-gold*`

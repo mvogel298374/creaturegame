@@ -4,6 +4,7 @@ import { formatItemName } from '../../battle/bag';
 import { formatMoveName } from '../../utils/format';
 import { TypeBadge } from '../TypeBadge';
 import { Modal } from './Modal';
+import './RewardChoiceModal.css';
 
 // Reward choice: a pick-one-of-N shown after a rolled reward — two rarity-coloured item cards and a gold bag.
 // One click picks that option (the backend is blocked awaiting the pick) and the chosen reward is then applied

@@ -1,5 +1,6 @@
 import type { PartyMember } from '../../hooks/useBattleHub';
 import { hpPercent, hpState } from '../../utils/hp';
+import './RosterPicker.css';
 
 // One selectable party member in a roster picker — the sprite, name, level and an HP read. Shared by the
 // between-biome LeadChoiceModal and the mid-battle SwitchInModal, which offer the same roster for different

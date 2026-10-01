@@ -1,6 +1,7 @@
 import type { PartyMember } from '../../hooks/useBattleHub';
 import { Modal } from './Modal';
 import { PartyCard } from './PartyCard';
+import './RosterPicker.css';
 
 // Between-biome lead choice (Stage 1d): a blocking pick of which party member leads into the next biome. Shown
 // at the biome boundary (after the Poké Center) when the party has more than one creature. Clicking a member

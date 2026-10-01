@@ -1,6 +1,8 @@
 import type { ReactNode, RefObject } from 'react';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
 import '../../pages/BattleScreen.css';
+import './Modal.css';
+import './ModalFrame.css';
 
 // Whether this overlay can be dismissed without answering it.
 //

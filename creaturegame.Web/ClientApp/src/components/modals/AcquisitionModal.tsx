@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { AcquisitionPrompt } from '../../hooks/useBattleHub';
 import { TypeBadge } from '../TypeBadge';
 import { Modal } from './Modal';
+import './AcquisitionModal.css';
 import { NicknameModal } from './NicknameModal';
 
 // Acquisition offer (themed draft / boss catch): a blocking modal to add the offered creature to the party.

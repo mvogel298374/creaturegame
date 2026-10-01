@@ -3,6 +3,7 @@ import { formatMoveName } from '../../utils/format';
 import { TypeBadge } from '../TypeBadge';
 import { Modal } from './Modal';
 import { PartyCard } from './PartyCard';
+import './RosterPicker.css';
 
 // TM/HM — Move-Teach Rewards: a "teach {move} to a Pokémon?" screen raised after the player picks a moveTeach
 // reward card. A deliberate roguelite QoL improvement over the source games, NOT a literal Gen 1 reproduction —

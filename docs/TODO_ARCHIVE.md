@@ -8,6 +8,47 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Frontend tech debt — segment `BattleScreen.css` ✅ DONE (2026-10-01)
+
+*(Moved here from `TODO.md` → Generation Profile → Stage 4d+. A pure-move refactor; no player-visible change.)*
+
+**Problem.** `pages/BattleScreen.css` was 2,479 lines / 34 sections with ~30 recent commits touching it, held ~12
+modals' CSS inside a *page* stylesheet, `Modal.tsx` imported it from `pages/` (component→page dependency inverted),
+and skinning one modal took 3 edits ~1,400 lines apart.
+
+**What shipped (CSS + import lines only; no component logic).** `BattleScreen.css` 2,479 → 1,741 lines. Modal CSS
+moved **verbatim** into `creaturegame.Web/ClientApp/src/components/modals/`:
+- `Modal.css` — backdrop `.modal-overlay` + its `--corner` variant + the `modal-fade` / `modal-rise` keyframes.
+- `ModalFrame.css` — the shared Kanto Sage double-frame rule + the roomier-padding rule. Imported by `Modal.tsx`, so
+  it loads before every modal sheet. **A new simple modal joins by adding its card class to BOTH selector lists.**
+- `MoveReplacementModal.css`, `BattleEndedOverlay.css`, `RewardChoiceModal.css`, `ShopModal.css`,
+  `NicknameModal.css`, `AcquisitionModal.css`.
+- `RecoveryCard.css` — Evolution + Poké Center share `.recovery-modal`.
+- `RosterPicker.css` — the `.lead-*` family: `LeadChoiceModal`, `SwitchInModal`, `MoveTeachTargetModal`,
+  `PartyCard`, plus CHECK POKEMON (`BattleScreen.tsx`) and `CreatureOverview`, which import it explicitly.
+Each modal `.tsx` imports its own sheet right after `import { Modal }`.
+
+**Deliberately left in `BattleScreen.css`:** the level-up panel's base + title/table skin (not a modal; its frame
+rule lives in `ModalFrame.css`), the route-choice modal (interleaved with the Town Map family and the shared
+reduced-motion block), the `levelup-pop` keyframes (used by both `.modal-overlay` and `.levelup-panel`),
+biome-title/sub, the `.bag-gold` box, drop-hover.
+
+**Known remaining wart:** `Modal.tsx` still imports `../../pages/BattleScreen.css` (the modals' buttons/tokens —
+`.action-btn`, `.move-btn` — live there), so the component→page dependency is only partly inverted. Fixing it means
+extracting shared button chrome — its own item (not yet filed).
+
+**Verification.** (1) Line-multiset proof: all 2,255 non-blank original lines present exactly once across old + new
+files; the only non-verbatim edits are comment/header text (stale "up with `.levelup-panel`" pointers →
+`ModalFrame.css`, file header comments, one pointer comment left in `BattleScreen.css`). (2) Computed-style A/B in a
+real browser (Puppeteer against the dev server): 306 element/theme measurements across 9 modal markups ×
+{gen1, no profile}, hashed per element, old monolith vs new split — 0 mismatches; baseline confirmed genuine
+(monolith loaded, new sheets blank). (3) `tsc` clean, Vitest 283/283, `vite build` OK.
+**Not run:** Playwright E2E (opt-in, user-run — recommend `.\e2e.ps1 -Spec level-up`); `pr-review` skipped on
+purpose (CSS/imports only). The A/B used hand-built markup mirroring each component's nesting, not live gameplay, so
+a modal whose real markup has a class the snippet lacked is not covered.
+
+---
+
 ## Creature Identity — id-keyed events ✅ COMPLETE (2026-09-29, all 4 stages)
 
 *(Moved here from `TODO.md` → *Creature Identity — id-keyed events*, Tier 1.5. Planned 2026-09-28, built in four
@@ -396,7 +437,8 @@ plain top-N-by-score — rejected as unneeded complexity for what was asked.
 ## Generation Profile 4d+ · Level-up stat panel — Kanto Sage skin ✅ COMPLETE (2026-09-22)
 
 *(Moved here from `TODO.md` → Generation Profile → Stage 4d+. Two follow-ups stay live there: the Gen-1
-level-up-box-contents domain question and the shared double-frame recipe — see the end of this section.)*
+level-up-box-contents domain question and the shared double-frame recipe — see the end of this section. Add-ons
+for the nickname modal (2026-09-22) and the evolution + Poké Center modals (2026-10-01) are recorded below.)*
 
 **Scope: skin only, no behaviour change.** `LevelUpStatPanel` (`BattleScreen.tsx`, `.levelup-*` in
 `BattleScreen.css`) is a non-blocking corner panel (bottom-right above the menu, persists until the next input,
@@ -455,12 +497,23 @@ exact same modal CSS. **CSS only, no TSX change.**
 The bench-attributed variant was not separately screenshotted (same component/markup path). `pr-review` skipped
 (CSS/markup-only diff).
 
-**Left open (both remain live in `TODO.md` → 4d+):** (1) the Gen-1 level-up-box-contents domain claim — whether the
+**Add-on #2 (2026-10-01) — EVOLUTION prompt + POKÉ CENTER (recovery) modals skinned with the same recipe.** Both
+render through the one `.recovery-modal` card (`EvolutionPromptModal.tsx`, `RecoveryModal.tsx`). **CSS only
+(`BattleScreen.css`), no TSX change.**
+- **Shared selector again:** `.recovery-modal` joined the Kanto Sage double-frame selector list (now level-up panel +
+  nickname modal + recovery modal) and the nickname modal's roomier-padding override (clears the ring).
+- A small `[data-generation="gen1"]` block restyles `.recovery-title` / `.recovery-sub` / `.recovery-glow` /
+  `.recovery-sprite` to ink. Buttons are already-skinned `.action-btn`s, unchanged.
+- **Deliberately not touched:** `.acquire-modal` (carries the party-swap picker and a violet accent — needs its own
+  mini-plan), the reward modal, the shop.
+- **Verified live (Puppeteer, injected markup + screenshot, 2026-10-01).** No tests run (CSS-only); E2E not run.
+
+**Left open (live in `TODO.md` → 4d+):** (1) the Gen-1 level-up-box-contents domain claim — whether the
 real box lists HP at all (recollection: four rows ATTACK/DEFENSE/SPEED/SPECIAL) and whether it shows gains first,
 then totals on a keypress; today's five-row gain+total panel was left as-is (behaviour change, not a skin), for
 `requirements-review`/a separate item; (2) promote the double-frame recipe to a shared token/selector — **now
-partial:** level-up panel + nickname modal share one rule; `.battle-screen` / `.battle-log` copies and the reward
-modal remain.
+mostly done:** level-up panel + nickname modal + recovery modal share one rule; `.battle-screen` / `.battle-log`
+copies, `.acquire-modal`, and the reward modal remain.
 
 ---
 

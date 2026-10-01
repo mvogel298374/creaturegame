@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Modal } from './Modal';
+import './NicknameModal.css';
 
 // Nickname max length mirrors the backend's NicknameRules.MaxLength (creaturegame/Creatures/NicknameRules.cs)
 // — Gen 1's own nickname-entry cap (Red/Blue).
