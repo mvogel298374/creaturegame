@@ -177,6 +177,12 @@ the linked design doc instead — pull it there and leave only the pointer here.
   question, no violet accent. The swap buttons are ink-bordered and invert on hover/focus; the lead (who can't be
   released) is dimmed. Type badges keep their own colours. With no profile applied it keeps its original violet
   card.
+- The REWARD pick (pick-1-of-3 after a win / Treasure / Mystery) and the SHOP wear the same double-line frame
+  under the Gen 1 profile: ink title and sub-line, ink-on-fill cards/rows with a grain texture, and ink-bordered
+  buttons that invert on hover/focus (a disabled Buy dims). Rarity shows as a coloured tag chip carrying the
+  rarity word (Common grey, Uncommon green, Rare blue, Epic purple) — the one colour exception; every other
+  accent (gold bag, Quick Heal, move-teach, card/row borders) is ink. With no profile applied they keep their
+  original dark gold-accented cards with rarity-coloured borders.
 - Design detail → `GENERATION_PROFILE.md` §7.3.  History → `TODO_ARCHIVE.md` → *Generation Profile 4d+ ·
   Level-up stat panel — Kanto Sage skin*.
 

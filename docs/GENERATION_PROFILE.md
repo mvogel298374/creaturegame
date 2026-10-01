@@ -671,6 +671,17 @@ Two cases came up that the ratified list didn't spell out:
   the STAB button's translucent gold left-border/background wash (tuned for the old dark panel) doesn't survive
   on white — the button structure falls back to a slightly thicker ink edge, and the gold *corner tag* (unaffected)
   still carries the actual signal.
+- **Item rarity (ratified 2026-10-01, user's call, from a three-way mockup — ink ladder / rarity-as-signal /
+  hybrid): rarity is gameplay signal, so it is exempt.** It tells the player what a pick is worth at the moment of
+  choosing, same family as the STAB tag and effectiveness pill. The exemption is deliberately *narrow*: only the
+  rarity **tag chip** on the reward cards and shop rows carries colour (`--ks-rarity-common/uncommon/rare/epic`,
+  `index.css` — the four old dark-skin hues retuned to hold white text on the light ground); the cards and rows
+  themselves stay ink-on-fill with grain and invert-on-hover, and every other per-kind accent (gold bag, Quick
+  Heal, move-teach, the card/row borders) drops to ink. The rarity *word* stays on every chip, so nothing is
+  colour-only. The rejected alternative — an ink-only "ladder" where rarity is how much chrome a card has (inner
+  ring, corner notches, inverted tag) — would have needed no exception; it was passed over because shape reads
+  slower than hue at a pick-one-of-N moment. Reuses the same palette for both modals so they can't drift.
+  The loot-drop popup is a separate surface (own gold/green chips, floats over the canvas) and is not covered.
 The general rule going forward: the budget applies to **decorative chrome** (frames, fills, button states); a
 colour that exists to tell the player something *in the moment* (health remaining, type matchup, low resources)
 is gameplay signal and sits outside it, the same as accessibility-motivated colour would.

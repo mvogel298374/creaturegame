@@ -113,3 +113,53 @@
   background: var(--clr-bg-deep);
   outline: none;
 }
+
+/* Kanto Sage skin (rarity ratified 2026-10-01 — see --ks-rarity-* in index.css). Frame + roomier padding come
+   from the shared rules in ModalFrame.css. Rows take the ink-on-fill + grain recipe; the rarity LEFT-BORDER
+   tint is dropped (the whole border is ink) and the rarity moves to the same coloured tag chip the reward
+   cards use, so one palette covers both modals. Buy/Leave are ink-on-fill with invert-block on hover/focus;
+   a disabled Buy (can't afford) just dims. */
+[data-generation="gen1"] .shop-title   { color: var(--ks-ink); }
+[data-generation="gen1"] .shop-sub     { color: var(--ks-dim); }
+[data-generation="gen1"] .shop-balance { color: var(--ks-ink); }
+[data-generation="gen1"] .shop-item {
+  background: var(--ks-fill);
+  background-image: var(--ks-grain);
+  background-size: 34px 34px;
+  color: var(--ks-ink);
+  border: 3px solid var(--ks-ink);
+  border-radius: 0;
+}
+[data-generation="gen1"] .shop-item .shop-item-tag { opacity: 1; color: var(--ks-dim); }
+[data-generation="gen1"] .shop-item--common .shop-item-tag,
+[data-generation="gen1"] .shop-item--uncommon .shop-item-tag,
+[data-generation="gen1"] .shop-item--rare .shop-item-tag,
+[data-generation="gen1"] .shop-item--epic .shop-item-tag {
+  color: #fff;
+  font-weight: 700;
+  padding: 1px 6px;
+}
+[data-generation="gen1"] .shop-item--common .shop-item-tag   { background: var(--ks-rarity-common); }
+[data-generation="gen1"] .shop-item--uncommon .shop-item-tag { background: var(--ks-rarity-uncommon); }
+[data-generation="gen1"] .shop-item--rare .shop-item-tag     { background: var(--ks-rarity-rare); }
+[data-generation="gen1"] .shop-item--epic .shop-item-tag     { background: var(--ks-rarity-epic); }
+[data-generation="gen1"] .shop-buy-btn,
+[data-generation="gen1"] .shop-leave-btn {
+  background: var(--ks-fill);
+  color: var(--ks-ink);
+  border: 3px solid var(--ks-ink);
+  border-radius: 0;
+}
+[data-generation="gen1"] .shop-buy-btn:hover:not(:disabled),
+[data-generation="gen1"] .shop-buy-btn:focus-visible:not(:disabled),
+[data-generation="gen1"] .shop-leave-btn:hover,
+[data-generation="gen1"] .shop-leave-btn:focus-visible {
+  background: var(--ks-ink);
+  color: var(--ks-fill);
+  transform: none;
+  box-shadow: none;
+}
+[data-generation="gen1"] .shop-buy-btn:disabled {
+  color: var(--ks-dim);
+  border-color: var(--ks-dim);
+}

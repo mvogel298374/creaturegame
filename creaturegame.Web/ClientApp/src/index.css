@@ -75,6 +75,14 @@
   --ks-dim:  #57503F;   /* secondary labels — bar numbers, PP counts */
   --ks-hp:   #D6362B;   /* HP bar low-health endpoint */
   --ks-xp:   #2F63AF;   /* XP bar */
+  /* Item rarity chips (reward + shop modals). A deliberate exception to the four-colour budget, ratified
+     2026-10-01: rarity is gameplay signal (it tells you what a pick is worth in the moment), not chrome. The
+     hues are the old dark-skin rarity colours retuned to hold white text on the light ground; only the TAG
+     chip carries colour — the cards and rows stay ink-on-fill. See docs/GENERATION_PROFILE.md §7.3. */
+  --ks-rarity-common:   #636760;
+  --ks-rarity-uncommon: #2d7a38;
+  --ks-rarity-rare:     #2F63AF;
+  --ks-rarity-epic:     #7a3fa3;
 
   /* Ornamental detail pass (raised 2026-08-04, ratified 2026-08-05; sketch/ratify record:
      docs/TODO.md → Generation Profile → Stage 4b follow-up). Two additions on top of the flat

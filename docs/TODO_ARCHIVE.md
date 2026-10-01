@@ -553,12 +553,41 @@ change.**
   card + `.acquire-question` + `.action-btn` as already-verified pieces); no `tsc`/Vitest (CSS only); Playwright
   E2E not run (opt-in, user-run); `pr-review` skipped (CSS only).
 
+**Add-on #5 (2026-10-01) — "Tier 4" of the remaining-modals ordering: REWARD pick (`RewardChoiceModal`,
+`.reward-modal`, the surface the user flagged 2026-08-23 as "still the old pre-Kanto-Sage look") and SHOP
+(`ShopModal`, `.shop-modal`) skinned in one pass (`components/modals/`).** **CSS only, no TSX change.** Unlike
+Tiers 1-2 this needed a design decision first: both surfaces' colours were semantic (rarity-tinted card/row
+borders, gold bag, Quick Heal and move-teach accents) and tuned for the dark ground.
+- **Decision (user, 2026-10-01), from a three-way live mockup:** (A) *ink ladder* — rarity expressed in ink only
+  (how much chrome a card has); (B) *rarity as gameplay signal* — a coloured rarity tag chip; (C) ladder plus two
+  chips. The assistant recommended A; **the user chose B.** Ruling: rarity is gameplay signal (it tells the player
+  what a pick is worth at the moment of choosing) and is exempt from the four-colour budget, **narrowly — ONLY the
+  rarity tag chip carries colour**; cards/rows stay ink-on-fill; every other per-kind accent (gold bag, Quick Heal,
+  move-teach, card/row border tints) drops to ink; the rarity word stays on every chip, so nothing is colour-only.
+  The ruling itself is recorded in `GENERATION_PROFILE.md` §7.3 → *Clarified during the build* → "Item rarity".
+- **Tokens** (`index.css`): `--ks-rarity-common` `#636760`, `--ks-rarity-uncommon` `#2d7a38`, `--ks-rarity-rare`
+  `#2F63AF`, `--ks-rarity-epic` `#7a3fa3` — the old dark-ground hues retuned so white chip text holds on them.
+- **Frame:** `.reward-modal` and `.shop-modal` added to BOTH `ModalFrame.css` lists (double-frame rule + roomier
+  padding). `RewardChoiceModal.css` / `ShopModal.css` get gen1 ink title / dim sub.
+- **Reward cards** take the BAG `.bag-item` recipe: 3px ink border + grain, invert-block on hover/focus, no lift,
+  no glow; the rarity chips are coloured and stay coloured through the invert.
+- **Shop rows:** ink-on-fill + grain, the rarity left-border tint dropped, same chips. Buy / Leave are ink-on-fill
+  with invert on hover; a disabled (unaffordable) Buy dims.
+- **Deliberately untouched:** `TypeBadge` on the move-teach card; the loot-drop popup (`.drop-hover` /
+  `.drop-chip` — its own gold/green chips floating over the canvas on a dark pill, a separate surface). With no
+  profile applied both modals keep their original dark gold-accented look with rarity-coloured borders.
+- **Verified live (Puppeteer, real markup):** reward pick with all four rarities + gold + Quick Heal + move-teach
+  and a hovered Rare card (invert, blue chip holds); shop with a hovered Buy and an unaffordable disabled Epic item
+  (dims; first shot taken mid pop-in animation, retaken settled — not a defect); `tsc` clean; `vite build` OK.
+  **Not run:** Vitest (CSS only), Playwright E2E (opt-in, user-run — recommend `.\e2e.ps1 -Spec shop` plus the spec
+  that drives the reward pick), `pr-review` (skipped — CSS only).
+
 **Left open (live in `TODO.md` → 4d+):** (1) the Gen-1 level-up-box-contents domain claim — whether the
 real box lists HP at all (recollection: four rows ATTACK/DEFENSE/SPEED/SPECIAL) and whether it shows gains first,
 then totals on a keypress; today's five-row gain+total panel was left as-is (behaviour change, not a skin), for
 `requirements-review`/a separate item; (2) promote the double-frame recipe to a shared token/selector — **now
-mostly done:** level-up panel + nickname + recovery + move-replacement + game-over + acquisition card share one
-rule; `.battle-screen` / `.battle-log` copies and the reward modal remain.
+mostly done:** level-up panel + nickname + recovery + move-replacement + game-over + acquisition + reward + shop
+card share one rule; only the `.battle-screen` / `.battle-log` copies remain.
 
 ---
 

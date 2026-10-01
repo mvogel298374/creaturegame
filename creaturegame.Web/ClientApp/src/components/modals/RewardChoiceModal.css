@@ -108,3 +108,53 @@
 .reward-card--move-teach:hover,
 .reward-card--move-teach:focus-visible { box-shadow: 0 0 14px rgba(77, 144, 213, 0.5); }
 .reward-card--move-teach .type-badge { margin: 2px 0; }
+
+/* Kanto Sage skin (rarity ratified 2026-10-01 — see --ks-rarity-* in index.css). Frame + roomier padding come
+   from the shared rules in ModalFrame.css. Cards are the BAG-item recipe: 3px ink border + grain, invert-block
+   on hover/focus (no lift, no glow — the glow was the dark skin's selection cue). Every per-kind accent
+   (gold / heal / move-teach / rarity borders) drops to ink; the ONLY colour left is the rarity chip on the tag
+   line, which stays coloured through the hover invert. Gold/heal/move-teach tags stay plain ink-dim text. */
+[data-generation="gen1"] .reward-title { color: var(--ks-ink); }
+[data-generation="gen1"] .reward-sub   { color: var(--ks-dim); }
+[data-generation="gen1"] .reward-card {
+  background: var(--ks-fill);
+  background-image: var(--ks-grain);
+  background-size: 34px 34px;
+  color: var(--ks-ink);
+  border: 3px solid var(--ks-ink);
+  border-radius: 0;
+  box-shadow: none;
+}
+[data-generation="gen1"] .reward-card:hover,
+[data-generation="gen1"] .reward-card:focus-visible {
+  background: var(--ks-ink);
+  color: var(--ks-fill);
+  transform: none;
+  box-shadow: none;
+}
+[data-generation="gen1"] .reward-card .reward-card-icon,
+[data-generation="gen1"] .reward-card .reward-card-name { color: inherit; }
+[data-generation="gen1"] .reward-card .reward-card-tag { color: var(--ks-dim); opacity: 1; }
+[data-generation="gen1"] .reward-card:hover .reward-card-tag,
+[data-generation="gen1"] .reward-card:focus-visible .reward-card-tag { color: var(--ks-fill); }
+/* The rarity chip: filled pill, white text, same on rest and on the inverted hover. */
+[data-generation="gen1"] .reward-card--common .reward-card-tag,
+[data-generation="gen1"] .reward-card--uncommon .reward-card-tag,
+[data-generation="gen1"] .reward-card--rare .reward-card-tag,
+[data-generation="gen1"] .reward-card--epic .reward-card-tag {
+  color: #fff;
+  font-weight: 700;
+  padding: 1px 6px;
+}
+[data-generation="gen1"] .reward-card--common .reward-card-tag   { background: var(--ks-rarity-common); }
+[data-generation="gen1"] .reward-card--uncommon .reward-card-tag { background: var(--ks-rarity-uncommon); }
+[data-generation="gen1"] .reward-card--rare .reward-card-tag     { background: var(--ks-rarity-rare); }
+[data-generation="gen1"] .reward-card--epic .reward-card-tag     { background: var(--ks-rarity-epic); }
+[data-generation="gen1"] .reward-card--common:hover .reward-card-tag,
+[data-generation="gen1"] .reward-card--uncommon:hover .reward-card-tag,
+[data-generation="gen1"] .reward-card--rare:hover .reward-card-tag,
+[data-generation="gen1"] .reward-card--epic:hover .reward-card-tag,
+[data-generation="gen1"] .reward-card--common:focus-visible .reward-card-tag,
+[data-generation="gen1"] .reward-card--uncommon:focus-visible .reward-card-tag,
+[data-generation="gen1"] .reward-card--rare:focus-visible .reward-card-tag,
+[data-generation="gen1"] .reward-card--epic:focus-visible .reward-card-tag { color: #fff; }
