@@ -1266,11 +1266,12 @@
   max-width: 640px;
   margin: 0 auto;
 }
-/* The pinned Run Map's ground is the old dark "deep-night" theme (.encounter-map--pinned, still deliberately
-   unskinned — a separate 4d+ catalog turn), not the Kanto Sage parchment .town-map-stage sits on inside the
-   route-choice modal. The caption's --ks-dim/--ks-ink tokens are tuned for a white surface and read as
-   near-invisible dark-on-dark here — this is the *only* place a biome's name shows now (the old always-visible
-   waypoint label is gone), so host-scoped light-on-dark colours instead of the Kanto Sage ones. */
+/* In the NO-PROFILE skin the pinned Run Map's ground is the old dark "deep-night" theme (.encounter-map--pinned),
+   not the Kanto Sage parchment .town-map-stage sits on inside the route-choice modal. The caption's
+   --ks-dim/--ks-ink tokens are tuned for a white surface and read as near-invisible dark-on-dark there — this is
+   the *only* place a biome's name shows now (the old always-visible waypoint label is gone), so host-scoped
+   light-on-dark colours instead of the Kanto Sage ones. Under Gen 1 the pinned ground IS the Kanto Sage fill
+   (the "encounter overlay" block below the ladder rules), which hands the caption its own tokens back. */
 .map-overworld .town-map-caption {
   color: var(--clr-text-sub);
   border-top-color: rgba(255, 255, 255, 0.25);
@@ -1592,6 +1593,124 @@
 .ladder-node--bossbattle .ladder-icon { border-color: var(--clr-accent); color: var(--clr-accent); }
 .ladder-node--bossbattle.ladder-node--current .ladder-icon { box-shadow: 0 0 16px var(--clr-accent-glow); }
 .ladder-node--rest .ladder-icon { border-color: #ff8fa3; color: #ff8fa3; }
+
+/* ── Kanto Sage: the encounter overlay (docs/TODO.md → 4d+ catalog; GENERATION_PROFILE.md §7.3) ──────────────
+   Two surfaces share the .encounter-map class: the compact corner PEEK (the ladder in a small card) and the PINNED
+   full-screen map (top bar / Town Map / ladder panel / legend). Everything is ink-on-fill: the pinned map is a
+   framed full-screen window — the same double-line frame, corner notches and grain as .battle-screen and the
+   route-choice map, so the one map reads as the same screen in both hosts; the peek is a plain boxed card like
+   the nameplates. The dark "deep-night" ground, gold titling, surveyor grid and vignette stay for the no-profile
+   skin only. Ladder node kinds are INK-ONLY by decision (2026-10-01): the glyph (skull/heart/sword/star) plus the
+   label and sub-label already carry the kind, so Boss red and Poké Center pink are dropped under the colour
+   budget; the current node is an invert block (+ the ◄ marker), matching the menu selection convention. */
+[data-generation="gen1"] .encounter-map {
+  background-color: var(--ks-fill);
+  background-image: var(--ks-grain);
+  background-size: 34px 34px;
+  color: var(--ks-ink);
+  border: 3px solid var(--ks-ink);
+  border-radius: 0;
+  box-shadow: none;
+  scrollbar-color: var(--ks-ink) transparent;
+}
+[data-generation="gen1"] .encounter-map-head { border-bottom-color: var(--ks-ink); }
+[data-generation="gen1"] .encounter-map-biome { color: var(--ks-ink); }
+
+/* Pinned: framed full-screen window (frame recipe as .battle-screen; notches inset 8px clear of the ring). */
+[data-generation="gen1"] .encounter-map--pinned {
+  background-color: var(--ks-fill);
+  background-image: var(--ks-corners);
+  background-size: 14px 14px;
+  background-repeat: no-repeat;
+  background-position: top 8px left 8px, top 8px right 8px, bottom 8px left 8px, bottom 8px right 8px;
+  border: 2px solid var(--ks-ink);
+  box-shadow:
+    inset 0 0 0 3px var(--ks-fill),
+    inset 0 0 0 8px var(--ks-ink);
+  /* Clear the ring (2px border + the 8px inset ring) so the top bar / legend / ladder rules sit INSIDE the
+     frame instead of running across its double line at the edges. */
+  padding: 10px;
+}
+/* The dark skin's surveyor grid becomes the shared grain; its vignette is dropped. */
+[data-generation="gen1"] .encounter-map--pinned::before {
+  background-image: var(--ks-grain);
+  background-size: 34px 34px;
+  mask-image: none;
+}
+[data-generation="gen1"] .encounter-map--pinned::after { box-shadow: none; }
+
+[data-generation="gen1"] .map-topbar { border-bottom: 3px solid var(--ks-ink); background: none; }
+[data-generation="gen1"] .map-title { color: var(--ks-ink); text-shadow: none; }
+[data-generation="gen1"] .map-brand .encounter-map-biome { color: var(--ks-dim); }
+[data-generation="gen1"] .map-brand .encounter-map-biome:last-child { color: var(--ks-ink); }
+[data-generation="gen1"] .encounter-map-close {
+  background: var(--ks-fill);
+  color: var(--ks-ink);
+  border: 2px solid var(--ks-ink);
+  border-radius: 0;
+}
+[data-generation="gen1"] .encounter-map-close:hover,
+[data-generation="gen1"] .encounter-map-close:focus-visible {
+  background: var(--ks-ink);
+  color: var(--ks-fill);
+  border-color: var(--ks-ink);
+}
+
+/* The Town Map's caption sits on the fill now, so it takes its own Kanto Sage tokens back (the host-scoped
+   light-on-dark override above is for the no-profile skin's dark ground only). */
+[data-generation="gen1"] .map-overworld .town-map-caption { color: var(--ks-dim); border-top-color: var(--ks-ink); }
+[data-generation="gen1"] .map-overworld .town-map-caption b { color: var(--ks-ink); }
+
+[data-generation="gen1"] .map-ladder-panel {
+  background: none;
+  border-left: 3px solid var(--ks-ink);
+  scrollbar-color: var(--ks-ink) transparent;
+}
+[data-generation="gen1"] .map-ladder-head { color: var(--ks-dim); }
+[data-generation="gen1"] .map-ladder-biome { color: var(--ks-ink); }
+
+[data-generation="gen1"] .map-legend {
+  background: none;
+  border-top: 3px solid var(--ks-ink);
+  color: var(--ks-dim);
+}
+[data-generation="gen1"] .map-legend-note { color: var(--ks-dim); }
+[data-generation="gen1"] .map-legend-swatch--here { border-top-color: var(--ks-ink); }
+[data-generation="gen1"] .map-legend-swatch--travelled { background: var(--ks-ink); }
+
+/* The ladder: ink-on-fill tiles (the BAG/menu-cell recipe), connector spine in ink, current = invert block. */
+[data-generation="gen1"] .ladder-node { color: var(--ks-ink); }
+[data-generation="gen1"] .ladder-sub { color: var(--ks-dim); }
+[data-generation="gen1"] .ladder-node:not(:last-child)::before { background: var(--ks-dim); }
+[data-generation="gen1"] .ladder-node--done:not(:last-child)::before,
+[data-generation="gen1"] .ladder-node--current:not(:last-child)::before { background: var(--ks-ink); }
+[data-generation="gen1"] .ladder-node .ladder-icon {
+  background: var(--ks-fill);
+  background-image: var(--ks-grain);
+  background-size: 34px 34px;
+  color: var(--ks-ink);
+  border: 3px solid var(--ks-ink);
+  border-radius: 0;
+  box-shadow: none;
+}
+[data-generation="gen1"] .ladder-node--current .ladder-icon,
+[data-generation="gen1"] .ladder-node--bossbattle.ladder-node--current .ladder-icon {
+  background: var(--ks-ink);
+  color: var(--ks-fill);
+  border-color: var(--ks-ink);
+  box-shadow: none;
+}
+[data-generation="gen1"] .ladder-node--current .ladder-label { color: var(--ks-ink); }
+[data-generation="gen1"] .ladder-here { color: var(--ks-ink); }
+
+/* Type chips (Town Map caption, both hosts): the pill is ink-on-fill; the type-coloured icon frame stays — a
+   type colour is one of the budget's four colour sources. */
+[data-generation="gen1"] .type-chip {
+  background: var(--ks-fill);
+  border: 2px solid var(--ks-ink);
+  border-radius: 0;
+}
+[data-generation="gen1"] .type-chip-name { color: var(--ks-ink); text-shadow: none; }
 
 /* ── Map-based route choice (prominent, blocking) ──────────── */
 .route-choice-modal {

@@ -706,8 +706,8 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
        markup, not just an `aria-current` query) — **not run** (E2E is user-only per policy; recommend
        `.\e2e.ps1 -Spec encounter-map` to confirm). (2) the hover/focus caption was near-unreadable in the
        pinned full-screen Run Map — its `--ks-dim`/`--ks-ink` tokens are parchment-surface colours, but that
-       panel's own ground is still the old dark "deep-night" theme (deliberately unskinned, a 4d+ catalog
-       item); confirmed empirically (`getComputedStyle` + a fresh screenshot showed genuine dark-on-dark, not
+       panel's own ground was still the old dark "deep-night" theme (then deliberately unskinned; skinned
+       2026-10-01); confirmed empirically (`getComputedStyle` + a fresh screenshot showed genuine dark-on-dark, not
        a false positive) and fixed with a `.map-overworld`-scoped light-on-dark override. Recommended fixes:
        a real logic bug where `biomeCaptionStatus` mislabelled an already-visited-but-still-offered biome as
        "offered, unvisited" on nearly every route choice after the first (every neighbour stays offered with
@@ -759,7 +759,8 @@ action in this engine, so it would mean adding a flee feature, contradicting dec
   - [ ] **4d+ — the surface catalog, jointly iterated** (each its own greenlit mini-plan): battle command menu
     (settled — the 2×2 grid, verbs fixed), move select, battle HUD, CHECK POKEMON (the main overview; its party
     picker ✅ skinned 2026-10-01), BAG, party surfaces (the `PartyStrip` chips `.party-chip*`; the SWITCH menu cards
-    ✅ skinned 2026-10-01), Title/StarterSelection (incl. the generation picker), node ladder. *(All run-prompt
+    ✅ skinned 2026-10-01), Title/StarterSelection (incl. the generation picker). *(The encounter overlay — peek, pinned Run Map, node ladder,
+    type chips — ✅ DONE 2026-10-01. All run-prompt
     modals ✅ skinned 2026-10-01: evolution, Poké Center, move-replacement, acquisition offer, reward pick, shop,
     GAME OVER, and the roster-picker family — lead choice, forced switch-in, TM-teach target.)*
     *(The level-up stat panel shipped 2026-09-22, and the nickname / evolution / Poké Center / move-replacement /

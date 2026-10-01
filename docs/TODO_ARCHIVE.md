@@ -619,6 +619,47 @@ that render `PartyCard` / `.lead-card` on the light `.battle-panel` — the in-b
   `action-back` gap rule touches all skins). **Not run:** Playwright E2E (opt-in, user-run — recommend the specs
   that drive in-combat switching, the forced switch-in and CHECK POKEMON); `pr-review` (skipped — CSS only).
 
+**Add-on #7 (2026-10-01) — the ENCOUNTER OVERLAY + NODE LADDER skinned.** Raised by the user ("the encounter
+overlay is still old style"). **CSS only, one file** (`pages/BattleScreen.css`): one cohesive `[data-generation="gen1"]`
+block right after the ladder base rules. Surfaces: (1) the compact corner PEEK (`.encounter-map`, the ladder in a
+small card, auto-shown at ladder changes); (2) the PINNED full-screen Run Map (`.encounter-map--pinned`: top bar with
+RUN MAP title + island/biome names + close ×, the Town Map in the middle, the "Encounter Path" ladder panel, the
+legend bar); (3) the NODE LADDER (`.ladder-*`) in both; (4) the shared `.type-chip` pills in the Town Map caption
+(also shown in the `RouteChoiceMap` host).
+- **Pinned = a framed full-screen window:** fill ground, 2px border + the double-line inset ring + corner notches,
+  `padding: 10px` so the top-bar/legend/ladder rules sit inside the ring; the dark skin's surveyor grid becomes the
+  shared `--ks-grain`, the vignette is dropped. Same frame as `.battle-screen` and the route-choice map, so one map
+  reads as the same screen in both hosts.
+- **Peek = plain boxed card** (fill + grain + 3px ink border, like the nameplates).
+- **Chrome:** top bar / title / biome names / legend / ladder panel to ink/dim with 3px ink rules; close × =
+  ink-on-fill with invert hover. The Town Map caption takes its `--ks` tokens back (the old host-scoped
+  light-on-dark `.map-overworld` override is kept for the no-profile dark ground only).
+- **Ladder tiles:** ink-on-fill + grain, 3px, square (the menu-cell recipe); ink connector spine; done dimmed
+  (existing opacity); CURRENT = invert block + the existing ◄ marker.
+- **Type chips:** fill pill + 2px ink border, ink name; the type-coloured icon frame stays (type colour is a budget
+  source).
+- **Decision (user, via a 3-option question):** node-kind colours are INK-ONLY — Boss red and Poké Center pink are
+  DROPPED; the glyph (skull/heart/sword/star) + label + sub-label ("Boss — Trainer …") already carry the kind, and the
+  current node is the invert block. Rejected: keep Boss red as a narrow threat signal; keep both accents. Assistant's
+  framing of the difference from item rarity (which the user ruled a gameplay signal, Add-on #5): rarity had no glyph
+  and its chip only carried the word, whereas node kinds have distinct glyphs. (Framing is the assistant's, not
+  something the user said.) A chrome decision inside the existing colour budget, not a new exception.
+- **Design call (assistant, not escalated — revisitable):** the composition — a framed window rather than flat
+  full-screen panels.
+- **Closes the earlier "deliberately unskinned" note:** the 2026-08-18 `pr-review` fix (caption near-unreadable on the
+  pinned map's dark ground) scoped a light-on-dark override because the pinned panel was left dark pending its own
+  catalog turn; this is that turn.
+- **Verified live (Puppeteer, real run — New Game → Charmander → route pick → first battle → MAP):** the pinned map
+  before/after (before: navy ground, gold titling, dark ladder tiles, near-unreadable caption); the padding fix (rules
+  inside the frame); the settled peek on the real ladder markup (current node inverted + ◄); the no-profile peek
+  unchanged (computed styles: dark `rgba(8,8,18,.92)`, 8px radius, gold-dim icon borders vs Gen 1's fill/3px
+  ink/0 radius); `tsc` clean. **Not verified:** any ladder state other than "first node current" — done-node dimming,
+  a Boss-current or Rest tile, a long Boss sub-label wrapping (only the base rules cover them); the no-profile PINNED
+  map (only the peek's computed styles compared); the route-choice host of the type chips (same `TypeChip` component
+  as the pinned caption). Pre-existing, untouched: the peek overlaps the player nameplate in a ~700px-tall window.
+  **Not run:** Playwright E2E (opt-in, user-run — recommend `.\e2e.ps1 -Spec encounter-map`), Vitest (CSS only),
+  `pr-review` (skipped — CSS only).
+
 **Left open (live in `TODO.md` → 4d+):** (1) the Gen-1 level-up-box-contents domain claim — whether the
 real box lists HP at all (recollection: four rows ATTACK/DEFENSE/SPEED/SPECIAL) and whether it shows gains first,
 then totals on a keypress; today's five-row gain+total panel was left as-is (behaviour change, not a skin), for

@@ -766,7 +766,7 @@ fallback) is back in scope.
   generation's map can use all, some, or none of it (decision 9). How far that generation loosens the grid is
   decided in *its* map design, not pre-engineered here.
 - The in-biome **node ladder** (the Slay-the-Spire encounter path) is deliberately *not* part of 4c — it is a
-  separate surface in the catalog (§7.5), so its look is settled in its own joint iteration.
+  separate surface in the catalog (§7.5), so its look is settled in its own joint iteration (done 2026-10-01).
 
 **Sketch → ratify record (2026-08-05), decision 8's process applied to 4c.** The colour-budget question raised
 alongside 4b — "biome = square tile, full type-colour fill" predates decision 10's colour budget (§7.3 /
@@ -946,7 +946,8 @@ at greenlight time.
    Evolution, …).
 8. **Title + StarterSelection** — including the **generation picker** itself (the run-start control that
    drives everything above; live-preview per §7.3).
-9. **Node ladder / encounter path** (the in-biome view the Town Map hands off to).
+9. **Node ladder / encounter path** (the in-biome view the Town Map hands off to) — ✅ skinned 2026-10-01, with
+   the peek and the pinned Run Map (node-kind colours ink-only).
 
 Each iteration inherits the standing rules: bones invariant, blocking modals stay blocking, functionality
 deltas are escalated (§7.1), and anything touching the wire takes the field-guard treatment.

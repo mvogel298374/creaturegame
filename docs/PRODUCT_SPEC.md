@@ -189,6 +189,14 @@ the linked design doc instead — pull it there and leave only the pointer here.
   current lead carries an inner ink ring (with its "current"/"OUT" word), fainted members are greyed, and a member
   who can't be chosen (e.g. TM "Unable") is dimmed and does not invert. The HP bar keeps its green/yellow/red
   thresholds. With no profile applied they keep their original dark sky-accented cards.
+- The ENCOUNTER overlay — the compact corner peek, the pinned full-screen Run Map (RUN MAP title, island/biome
+  names, close ×, Town Map, "Encounter Path" ladder, legend) and the node ladder — wears the Gen 1 profile as a
+  framed full-screen window (double-line frame, grain ground; the peek is a plain boxed card). Ladder tiles are
+  ink-bordered squares with a grain texture; completed nodes are dimmed; the current node is an inverted block
+  with the ◄ marker. Node kinds are told apart by glyph and label only — no red
+  Boss or pink Poké Center accent. The type pills in the Town Map caption are light with an ink border; their
+  icon frames keep the type colour. With no profile applied the overlay keeps its original dark deep-night map
+  with gold, red and pink accents.
 - Design detail → `GENERATION_PROFILE.md` §7.3.  History → `TODO_ARCHIVE.md` → *Generation Profile 4d+ ·
   Level-up stat panel — Kanto Sage skin*.
 
