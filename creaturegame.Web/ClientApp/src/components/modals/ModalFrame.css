@@ -6,14 +6,15 @@
    rules (pages/BattleScreen.css for the level-up panel, each modal's own sheet) stay as the no-profile
    fallback, and the .levelup-stat/gain/total classes, column padding (guarded by level-up.spec.ts) and
    position are untouched. Frame = the .battle-log double-line recipe.
-   The level-up panel, nickname modal, recovery modal (Evolution + Poké Center), move-replacement modal and
-   game-over card share this one frame rule
+   The level-up panel, nickname modal, recovery modal (Evolution + Poké Center), move-replacement modal,
+   game-over card and acquisition offer share this one frame rule
    (selector list) instead of copying it — each surface's own title/input overrides sit in its own sheet. */
 [data-generation="gen1"] .levelup-panel,
 [data-generation="gen1"] .nickname-modal,
 [data-generation="gen1"] .recovery-modal,
 [data-generation="gen1"] .move-replace-modal,
-[data-generation="gen1"] .battle-end-modal {
+[data-generation="gen1"] .battle-end-modal,
+[data-generation="gen1"] .acquire-modal {
   background-color: var(--ks-fill);
   color: var(--ks-ink); /* own ink so anything not patched below inherits correctly, not the old near-white */
   border: 2px solid var(--ks-ink);
@@ -36,6 +37,7 @@
 [data-generation="gen1"] .nickname-modal,
 [data-generation="gen1"] .recovery-modal,
 [data-generation="gen1"] .move-replace-modal,
-[data-generation="gen1"] .battle-end-modal {
+[data-generation="gen1"] .battle-end-modal,
+[data-generation="gen1"] .acquire-modal {
   padding: calc(var(--sp-md) + 8px) calc(var(--sp-lg) + 8px);
 }

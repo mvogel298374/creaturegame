@@ -533,12 +533,32 @@ modal's own sheet. **CSS only, no TSX change.**
   (opt-in, user-run), `pr-review` (skipped — CSS only), and no computed-style A/B (that was for the pure-move
   `BattleScreen.css` split).
 
+**Add-on #4 (2026-10-01) — "Tier 2" of the remaining-modals ordering: ACQUISITION offer (`AcquisitionModal`,
+`.acquire-modal`) skinned, incl. its party-swap picker and release-confirm step (`components/modals/`).** Same
+frame + an existing recipe (the BAG `.bag-item` one), so no separate plan/mockup was needed. **CSS only, no TSX
+change.**
+- `.acquire-modal` added to BOTH `ModalFrame.css` lists (double-frame rule + roomier padding).
+  `AcquisitionModal.css` gets gen1 ink title / dim sub / ink question.
+- **Violet accent dropped to ink** under the four-colour budget (same call as the recovery card's green): the glow
+  becomes the same soft ink halo and the sprite loses its coloured drop-shadow.
+- **`.acquire-swap-btn`** (the "release which member" buttons) takes the `.bag-item` recipe — 3px ink border + grain,
+  invert-block on hover/focus with the `.acquire-swap-lvl` line flipping with it; disabled (the lead, who can't be
+  released) simply dims.
+- **Deliberately untouched:** the `TypeBadge` pills (semantic, inline-coloured, already shown unskinned on the other
+  Kanto Sage screens; an ELECTRIC pill checked legible on the light card); ADD / DECLINE / YES / NO are
+  `.action-btn` and "← BACK" is `.btn-ghost`, both already skinned; the embedded `NicknameModal` was already done.
+  With no profile applied the original violet card is kept.
+- **Verified live (Puppeteer, real markup):** the offer step (with a real ELECTRIC badge) and the swap picker incl.
+  hover-invert and the disabled lead. **Not checked:** the release-confirm step not separately screenshotted (same
+  card + `.acquire-question` + `.action-btn` as already-verified pieces); no `tsc`/Vitest (CSS only); Playwright
+  E2E not run (opt-in, user-run); `pr-review` skipped (CSS only).
+
 **Left open (live in `TODO.md` → 4d+):** (1) the Gen-1 level-up-box-contents domain claim — whether the
 real box lists HP at all (recollection: four rows ATTACK/DEFENSE/SPEED/SPECIAL) and whether it shows gains first,
 then totals on a keypress; today's five-row gain+total panel was left as-is (behaviour change, not a skin), for
 `requirements-review`/a separate item; (2) promote the double-frame recipe to a shared token/selector — **now
-mostly done:** level-up panel + nickname + recovery + move-replacement + game-over card share one rule;
-`.battle-screen` / `.battle-log` copies, `.acquire-modal`, and the reward modal remain.
+mostly done:** level-up panel + nickname + recovery + move-replacement + game-over + acquisition card share one
+rule; `.battle-screen` / `.battle-log` copies and the reward modal remain.
 
 ---
 

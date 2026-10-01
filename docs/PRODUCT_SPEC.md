@@ -172,6 +172,11 @@ the linked design doc instead — pull it there and leave only the pointer here.
   double-line frame under the Gen 1 profile, with ink title, dim sub-line and ink text. GAME OVER is ink-only
   (no red accent; the greyed faint sprite carries the beat). With no profile applied they keep their original
   dark cards, including the red game-over styling.
+- The ACQUISITION offer (themed draft / boss catch), including its "release which member" party-swap picker and
+  release confirmation, wears the same double-line frame under the Gen 1 profile: ink title, dim sub-line, ink
+  question, no violet accent. The swap buttons are ink-bordered and invert on hover/focus; the lead (who can't be
+  released) is dimmed. Type badges keep their own colours. With no profile applied it keeps its original violet
+  card.
 - Design detail → `GENERATION_PROFILE.md` §7.3.  History → `TODO_ARCHIVE.md` → *Generation Profile 4d+ ·
   Level-up stat panel — Kanto Sage skin*.
 

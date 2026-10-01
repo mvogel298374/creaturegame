@@ -101,3 +101,39 @@
 @media (prefers-reduced-motion: reduce) {
   .acquire-glow, .acquire-sprite { animation: none; }
 }
+
+/* Kanto Sage skin. Frame + roomier padding come from the shared rules in ModalFrame.css; this re-states the
+   text, the glow, and the party-swap picker. The violet accent (a "join the party" beat, distinct from heal/
+   gold in the dark skin) becomes ink under the colour budget — same call as the recovery card's green. The
+   type badges are deliberately untouched: they're semantic, inline-coloured pills already shown unskinned on
+   the other Kanto Sage screens. ADD/DECLINE/YES/NO are .action-btn and "← BACK" is .btn-ghost, already
+   skinned. */
+[data-generation="gen1"] .acquire-title    { color: var(--ks-ink); }
+[data-generation="gen1"] .acquire-sub      { color: var(--ks-dim); }
+[data-generation="gen1"] .acquire-question { color: var(--ks-ink); }
+[data-generation="gen1"] .acquire-glow {
+  background: radial-gradient(circle, color-mix(in srgb, var(--ks-ink) 28%, transparent) 0%, transparent 70%);
+}
+[data-generation="gen1"] .acquire-sprite { filter: none; }
+
+/* The swap picker's member buttons take the BAG item recipe (pages/BattleScreen.css .bag-item): plain bold ink
+   border + grain, invert-block on hover/focus, the level line flipping with it. A disabled button (the lead,
+   who can't be released here) just dims, as .bag-item does. */
+[data-generation="gen1"] .acquire-swap-btn {
+  background: var(--ks-fill);
+  color: var(--ks-ink);
+  border: 3px solid var(--ks-ink);
+  background-image: var(--ks-grain);
+  background-size: 34px 34px;
+}
+[data-generation="gen1"] .acquire-swap-btn:hover:not(:disabled),
+[data-generation="gen1"] .acquire-swap-btn:focus-visible:not(:disabled) {
+  background: var(--ks-ink);
+  border-color: var(--ks-ink);
+  color: var(--ks-fill);
+}
+[data-generation="gen1"] .acquire-swap-lvl { color: var(--ks-dim); }
+[data-generation="gen1"] .acquire-swap-btn:hover:not(:disabled) .acquire-swap-lvl,
+[data-generation="gen1"] .acquire-swap-btn:focus-visible:not(:disabled) .acquire-swap-lvl {
+  color: var(--ks-fill);
+}
