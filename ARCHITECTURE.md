@@ -199,6 +199,25 @@ Each entry: **Decision · Why · Where it lives.**
     switch-in) has no cached "currently open" event of its own yet, so a remount mid-prompt still has nothing to
     reattach to (unchanged from before this — not a regression, just not yet covered; see `docs/TODO.md` →
     Known Gaps).
+  - **A modal answer must not be lost in transit, and the shop is the one prompt whose answers can overlap.**
+    Every blocking prompt parks the run on a `SignalRInput` handshake that the hub's answer completes, and an
+    answer arriving with no handshake pending is dropped (right for a stray double-click on a one-shot prompt).
+    Two real holes, both fixed with the smallest mechanism rather than a prompt-id protocol (every prompt
+    event, hub method and client callback would change, and it still wouldn't re-open prompts after a refresh):
+    (1) **Client:** the answer used to hide the modal and *then* call `invoke`, which SignalR rejects while the
+    connection is reconnecting — the answer was lost, the modal was gone, and the server stayed parked on a
+    prompt the player could no longer see. `hooks/answerPrompt.ts` (`submitPromptAnswer`) still hides at once
+    but dispatches `RESTORE_PROMPT` if the send rejects, so the player can answer again; the reducer restores
+    only into an *empty* slot, so a newer prompt of the same kind that arrived meanwhile is never overwritten.
+    Turn answers (move/switch/item) need no restore — the reconnect replay re-sends the cached `TurnStarted`.
+    (2) **Server:** the shop loop awaits once per buy/leave, so a BUY and a LEAVE reaching the server back to
+    back could land in the gap between one handshake completing and the next starting; LEAVE was dropped and
+    the loop waited forever on a modal the client had already closed. `SignalRInput.SetShopAction` therefore
+    parks such an answer in a small lock-guarded backlog that the next `ChooseShopActionAsync` serves in
+    arrival order. The backlog accepts answers only while a shop is open (from its first prompt until a LEAVE
+    is consumed, or `Cancel`) and is cleared on LEAVE, so a stray click on the closing modal can never leak into
+    the *next* shop's first prompt. The one-shot handshakes keep drop-when-nothing-pending: queueing there
+    would let a stale answer be consumed by an unrelated later prompt of the same type.
   - **Where:** `ClientApp/src/utils/activeGame.ts`, `pages/StarterSelection.tsx`, `pages/BattleScreen.tsx`,
     `pages/TitleScreen.tsx`, `hooks/useBattleHub.ts`; `creaturegame.Web/Battle/GameSessionManager.cs`
     (`AttachConnection`, `ReEstablishClient`), `SignalRBattleEventEmitter.cs`, `Hubs/BattleHub.cs`. Full

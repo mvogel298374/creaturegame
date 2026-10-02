@@ -15,7 +15,14 @@ public sealed class SignalRInput : IBattleInput
     private volatile TaskCompletionSource<string>? _biomeTcs;
     private volatile TaskCompletionSource<int>? _rewardChoiceTcs;
     private volatile TaskCompletionSource<int?>? _moveTeachTargetTcs;
+
+    // The shop is the one iterative prompt (buy, buy, …, leave), so unlike the one-shot handshakes its answers
+    // can arrive in the gap between one ChooseShopActionAsync completing and the next starting. Those park in a
+    // backlog instead of being dropped — see SetShopAction. All three fields share _shopLock.
+    private readonly object _shopLock = new();
+    private readonly Queue<ShopAction> _shopBacklog = new();
     private volatile TaskCompletionSource<ShopAction>? _shopTcs;
+    private bool _shopOpen;
     private volatile TaskCompletionSource<AcquisitionDecision>? _acquisitionTcs;
     private volatile TaskCompletionSource<int>? _leadTcs;
     private volatile TaskCompletionSource<int>? _switchInTcs;
@@ -294,19 +301,56 @@ public sealed class SignalRInput : IBattleInput
         if (_cancelled)
             throw new OperationCanceledException("Battle input cancelled (client disconnected).");
 
-        var tcs = new TaskCompletionSource<ShopAction>(
-            TaskCreationOptions.RunContinuationsAsynchronously
-        );
-        _shopTcs = tcs;
+        TaskCompletionSource<ShopAction> tcs;
+        lock (_shopLock)
+        {
+            _shopOpen = true;
+            // An answer that landed between prompts (BUY then LEAVE reaching the server back to back) is served
+            // first, in arrival order.
+            if (_shopBacklog.TryDequeue(out var queued))
+            {
+                CloseShopIfLeaving(queued);
+                return queued;
+            }
+            tcs = new TaskCompletionSource<ShopAction>(
+                TaskCreationOptions.RunContinuationsAsynchronously
+            );
+            _shopTcs = tcs;
+        }
+
         var action = await tcs.Task; // throws OperationCanceledException if Cancel() ran
-        _shopTcs = null;
+        lock (_shopLock)
+        {
+            _shopTcs = null;
+            CloseShopIfLeaving(action);
+        }
         return action;
     }
 
+    // Leaving ends the shop: later answers (a stray click on the closing modal) are dropped, not carried into
+    // the NEXT shop's first prompt. Caller holds _shopLock.
+    private void CloseShopIfLeaving(ShopAction action)
+    {
+        if (action is not LeaveShop)
+            return;
+        _shopOpen = false;
+        _shopBacklog.Clear();
+    }
+
+    /// <summary>Completes the pending shop prompt, or — when the previous answer has already completed it and the
+    /// shop loop hasn't re-prompted yet — parks the answer so the loop consumes it next. Dropped only when no
+    /// shop is open at all (it ended, or hasn't started).</summary>
     public void SetShopAction(ShopAction action)
     {
-        var tcs = _shopTcs;
-        tcs?.TrySetResult(action);
+        lock (_shopLock)
+        {
+            // TrySetResult fails when the pending TCS was already completed by the previous answer but its
+            // continuation hasn't cleared _shopTcs yet — exactly the gap a back-to-back BUY/LEAVE lands in.
+            if (_shopTcs is { } tcs && tcs.TrySetResult(action))
+                return;
+            if (_shopOpen)
+                _shopBacklog.Enqueue(action);
+        }
     }
 
     /// <summary>
@@ -400,7 +444,12 @@ public sealed class SignalRInput : IBattleInput
         _biomeTcs?.TrySetCanceled();
         _rewardChoiceTcs?.TrySetCanceled();
         _moveTeachTargetTcs?.TrySetCanceled();
-        _shopTcs?.TrySetCanceled();
+        lock (_shopLock)
+        {
+            _shopTcs?.TrySetCanceled();
+            _shopOpen = false;
+            _shopBacklog.Clear();
+        }
         _acquisitionTcs?.TrySetCanceled();
         _leadTcs?.TrySetCanceled();
         _switchInTcs?.TrySetCanceled();

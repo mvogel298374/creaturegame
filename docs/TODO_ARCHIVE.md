@@ -8,6 +8,36 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Repo-sweep R1 — lost modal answers soft-lock the run (parts a + b) ✅ DONE (2026-10-02)
+
+Found by the 2026-10-02 repo-wide code review sweep (R1 "players get stuck or lose control"; the sweep's remaining
+items are still open in `TODO.md`). One root cause, three reports: an answer to a blocking prompt could be lost in
+transit. **Parts (a) and (b) are fixed; part (c) is not** (see below).
+
+**(a) Server — shop BUY then LEAVE dropped the LEAVE.** Every `SignalRInput.Set*` completed only a
+currently-pending handshake, so a shop answer landing between two prompts was discarded; a BUY followed immediately
+by a LEAVE left the server looping in the shop. **Fix:** `SignalRInput.SetShopAction` / `ChooseShopActionAsync` now
+keep a lock-guarded shop-action backlog — open from the first shop prompt until a LEAVE is consumed or `Cancel`,
+cleared on LEAVE — so back-to-back answers are consumed in order. **Tests:** 5 new `SignalRInputTests`, each bounded
+with a 5 s `WaitAsync` so a regression fails instead of hanging; sabotage-verified.
+
+**(b) Client — modals hid before `invoke` resolved.** Every blocking-modal answer in `useBattleHub` hid its modal
+immediately, so an answer rejected during the reconnect window left the player with no modal and no way to answer.
+**Fix:** new `hooks/answerPrompt.ts` (`submitPromptAnswer`) plus a `RESTORE_PROMPT` reducer action / `PromptKey` type —
+the modal still hides at once, but re-opens if the hub invoke is rejected (restoring only into an empty slot).
+**Tests:** 6 new Vitest tests (`answerPrompt.test.ts`); sabotage-verified.
+
+**Decision (user, 2026-10-02):** the targeted fix (backlog + re-open-on-rejection) was chosen over a prompt-id/ack
+protocol or a client-only restore. Design rationale → `ARCHITECTURE.md` §2.7 ("A modal answer must not be lost in
+transit…"). Files: `creaturegame.Web/Battle/SignalRInput.cs`, `ClientApp/src/hooks/{answerPrompt.ts,battleReducer.ts,
+useBattleHub.ts}`, `ClientApp/src/battle/timeline.ts`.
+
+**Part (c) — still open:** the server's reconnect replay (`SignalRBattleEventEmitter`) doesn't re-open an *open*
+prompt after a refresh. This is the already-documented Known Gap in `TODO.md` → *Known Gaps* ("Session Resume doesn't
+cover a reconnect during a between-node blocking prompt"); it was not duplicated as a new item.
+
+---
+
 ## Repo-sweep R1 — curing a status didn't clear `CarriedStatus` ✅ DONE (2026-10-02)
 
 Found by the 2026-10-02 repo-wide code review sweep (R1 "Engine"; the sweep's remaining items are still open in

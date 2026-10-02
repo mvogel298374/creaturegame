@@ -211,4 +211,84 @@ public class SignalRInputTests
 
         await Assert.ThrowsAsync<TaskCanceledException>(async () => await task);
     }
+
+    // ── Shop: the one iterative prompt — answers can land between two prompts ───────────────────────
+
+    private static readonly ShopContext EmptyShop = new([], 0);
+
+    // A dropped answer means the handshake never completes — bound the wait so that regression FAILS the test
+    // (TimeoutException) instead of hanging the whole suite.
+    private static Task<T> Within<T>(Task<T> task) => task.WaitAsync(TimeSpan.FromSeconds(5));
+
+    [Fact]
+    public async Task ShopActions_BuyThenLeaveArrivingBackToBack_AreBothConsumedInOrder()
+    {
+        // The reported soft-lock: BUY completes the pending prompt, and LEAVE arrives before the shop loop has
+        // re-prompted. Both used to be handled by "complete whatever is pending", so LEAVE was dropped and the
+        // loop then waited forever on a modal the client had already closed.
+        var input = new SignalRInput();
+
+        var first = input.ChooseShopActionAsync(EmptyShop);
+        input.SetShopAction(new BuyShopItem(0));
+        input.SetShopAction(LeaveShop.Instance); // lands before the next ChooseShopActionAsync
+
+        Assert.Equal(new BuyShopItem(0), await Within(first));
+        var second = input.ChooseShopActionAsync(EmptyShop);
+        Assert.True(second.IsCompleted); // served from the backlog, not parked on a new handshake
+        Assert.Same(LeaveShop.Instance, await Within(second));
+    }
+
+    [Fact]
+    public async Task ShopActions_TwoQuickBuys_AreBothDelivered()
+    {
+        var input = new SignalRInput();
+
+        var first = input.ChooseShopActionAsync(EmptyShop);
+        input.SetShopAction(new BuyShopItem(0));
+        input.SetShopAction(new BuyShopItem(1));
+
+        Assert.Equal(new BuyShopItem(0), await Within(first));
+        Assert.Equal(new BuyShopItem(1), await Within(input.ChooseShopActionAsync(EmptyShop)));
+    }
+
+    [Fact]
+    public async Task ShopActions_AfterLeave_AStrayAnswerIsDroppedNotCarriedIntoTheNextShop()
+    {
+        var input = new SignalRInput();
+
+        var first = input.ChooseShopActionAsync(EmptyShop);
+        input.SetShopAction(LeaveShop.Instance);
+        await Within(first);
+        input.SetShopAction(new BuyShopItem(0)); // a click on the closing modal — the shop is over
+
+        var nextShopsFirstPrompt = input.ChooseShopActionAsync(EmptyShop);
+
+        Assert.False(nextShopsFirstPrompt.IsCompleted); // waits for a real answer; nothing leaked in
+    }
+
+    [Fact]
+    public void ShopActions_WithNoShopOpen_AreDropped()
+    {
+        var input = new SignalRInput();
+
+        input.SetShopAction(new BuyShopItem(0)); // never prompted — no shop is open
+
+        Assert.False(input.ChooseShopActionAsync(EmptyShop).IsCompleted);
+    }
+
+    [Fact]
+    public async Task Cancel_MidShop_MakesTheNextShopPromptThrowInsteadOfServingTheBacklog()
+    {
+        var input = new SignalRInput();
+
+        var first = input.ChooseShopActionAsync(EmptyShop);
+        input.SetShopAction(new BuyShopItem(0));
+        input.SetShopAction(new BuyShopItem(1)); // backlogged
+        await Within(first);
+        input.Cancel(); // client disconnected mid-shop
+
+        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+            await input.ChooseShopActionAsync(EmptyShop)
+        );
+    }
 }

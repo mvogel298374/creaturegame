@@ -4,6 +4,20 @@
 import type { MoveInfo } from '../types/BattleEvents';
 import type { Action, StatBlock, LogEntry, BiomeOption, RegionBiome, RegionRoute, RewardOption, ShopOfferItem, PartyMember, AcquisitionOffer, MoveTeachCandidate } from '../battle/timeline';
 
+// The blocking prompts: each parks a server-side await until the player answers, so each can be restored if its
+// answer is lost in transit (RESTORE_PROMPT).
+export type PromptKey =
+  | 'moveReplacement'
+  | 'recovery'
+  | 'evolution'
+  | 'biomeChoice'
+  | 'rewardChoice'
+  | 'moveTeachTarget'
+  | 'shop'
+  | 'acquisition'
+  | 'leadChoice'
+  | 'switchIn';
+
 export interface LevelUpPanel {
   creatureName: string;
   level: number;
@@ -399,6 +413,9 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
       return { ...state, switchIn: { party: action.party, faintedName: action.faintedName } };
     case 'HIDE_SWITCH_IN':
       return { ...state, switchIn: null };
+    case 'RESTORE_PROMPT':
+      // Only into an empty slot: if a newer prompt of the same kind arrived meanwhile, that one is the live one.
+      return state[action.key] ? state : { ...state, [action.key]: action.value };
     case 'SWITCHED_IN':
       // Retarget the player nameplate onto the incoming creature (name/level/HP/status). The XP bar + move menu
       // refresh on the next TurnStarted (which carries no level, hence Level rides on the switch-in event).

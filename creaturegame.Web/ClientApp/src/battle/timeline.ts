@@ -3,6 +3,7 @@ import type { MoveInfo } from '../types/BattleEvents';
 import { bridge } from './PhaserBridge';
 import { formatMoveName, formatDamageRange } from '../utils/format';
 import { E2E } from '../testEnv';
+import type { BattleState, PromptKey } from '../hooks/battleReducer';
 
 // Pure expand (`expandEvent`, below) + driver (`useBattleTimeline`) — design rationale in ARCHITECTURE.md §2.8.
 // Recurring pattern below: a "*Offered" event that raises a blocking modal means the backend is now blocked
@@ -203,6 +204,9 @@ export type Action =
   // The battle waits server-side until RespondSwitchIn answers.
   | { type: 'SHOW_SWITCH_IN'; party: PartyMember[]; faintedName: string }
   | { type: 'HIDE_SWITCH_IN' }
+  // Re-opens a blocking prompt whose answer never reached the server (the hub call was rejected while the
+  // connection was down) — see hooks/answerPrompt.ts. Only fills an EMPTY slot, so a newer prompt wins.
+  | { type: 'RESTORE_PROMPT'; key: PromptKey; value: NonNullable<BattleState[PromptKey]> }
   // A replacement was sent in — retarget the player nameplate (name/level/HP/status) onto the incoming creature.
   | { type: 'SWITCHED_IN'; id: number; name: string; level: number; hp: number; maxHp: number; status: string }
   // The lead was reassigned OUT of battle (the between-biome swap, or the post-mutual-KO promotion): retarget the

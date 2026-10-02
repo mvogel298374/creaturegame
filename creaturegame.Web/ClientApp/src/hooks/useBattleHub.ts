@@ -6,6 +6,9 @@ import { battleReducer, initialState } from './battleReducer';
 import { bossTrainerName } from '../battle/bossTrainer';
 import { nextPlayerId } from '../battle/playerIdentity';
 import { clearActiveGame } from '../utils/activeGame';
+import { submitPromptAnswer } from './answerPrompt';
+import type { Action } from '../battle/timeline';
+import type { PromptKey } from './battleReducer';
 
 // The view-state shape + modal-prompt types live with the reducer now; re-export them so existing
 // consumers (BattleScreen) keep importing them from the hook.
@@ -158,9 +161,10 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
       console.error('[SignalR] ChooseMove failed:', err));
   }, []);
 
-  // Below: the whole-turn choices (switching/items are turn actions too, like chooseMove) and every modal
-  // answer follow one shape — dispatch the local HIDE/PLAYER_CHOSE action immediately (the backend is blocked
-  // awaiting it, or the turn is locked), then invoke the hub method; the resulting server events drive the log
+  // Below: the whole-turn choices (switching/items are turn actions too, like chooseMove) dispatch PLAYER_CHOSE
+  // immediately (the turn is locked), then invoke the hub method; a lost turn answer needs no restore because the
+  // reconnect replay re-sends the cached TurnStarted. Every blocking-modal answer instead goes through
+  // `answerPrompt` below (hide at once, restore on a rejected send). The resulting server events drive the log
   // + sprite + panel refresh. Deviations (shop's iterative non-hide, purely-local dismissals) are called out
   // per callback below.
 
@@ -186,41 +190,44 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
   // action (open FIGHT / CHECK, pick a move, QUIT) to dismiss it.
   const dismissLevelUp = useCallback(() => dispatch({ type: 'HIDE_LEVEL_UP' }), []);
 
+  // Every blocking-prompt answer below goes through this: hide the modal at once, send, and RESTORE the modal if
+  // the send is rejected (the reconnect window) — see answerPrompt.ts. `key` names the prompt slot to restore.
+  const answerPrompt = useCallback(
+    (key: PromptKey, hide: Action, method: string, ...args: unknown[]) =>
+      submitPromptAnswer({
+        key,
+        prompt: stateRef.current[key],
+        hide,
+        method,
+        dispatch,
+        invoke: () => connRef.current?.invoke(method, ...args),
+      }),
+    [],
+  );
+
   const forgetMove = useCallback((slot: number | null) => {
-    dispatch({ type: 'HIDE_MOVE_REPLACEMENT' });
-    connRef.current?.invoke('ForgetMove', slot).catch(err =>
-      console.error('[SignalR] ForgetMove failed:', err));
-  }, []);
+    answerPrompt('moveReplacement', { type: 'HIDE_MOVE_REPLACEMENT' }, 'ForgetMove', slot);
+  }, [answerPrompt]);
 
   const respondEvolution = useCallback((allow: boolean) => {
-    dispatch({ type: 'HIDE_EVOLUTION_PROMPT' });
-    connRef.current?.invoke('RespondEvolution', allow).catch(err =>
-      console.error('[SignalR] RespondEvolution failed:', err));
-  }, []);
+    answerPrompt('evolution', { type: 'HIDE_EVOLUTION_PROMPT' }, 'RespondEvolution', allow);
+  }, [answerPrompt]);
 
   const respondRecovery = useCallback((accept: boolean) => {
-    dispatch({ type: 'HIDE_RECOVERY' });
-    connRef.current?.invoke('RespondRecovery', accept).catch(err =>
-      console.error('[SignalR] RespondRecovery failed:', err));
-  }, []);
+    answerPrompt('recovery', { type: 'HIDE_RECOVERY' }, 'RespondRecovery', accept);
+  }, [answerPrompt]);
 
   const chooseBiome = useCallback((biomeId: string) => {
-    dispatch({ type: 'HIDE_BIOME_CHOICE' });
-    connRef.current?.invoke('ChooseBiome', biomeId).catch(err =>
-      console.error('[SignalR] ChooseBiome failed:', err));
-  }, []);
+    answerPrompt('biomeChoice', { type: 'HIDE_BIOME_CHOICE' }, 'ChooseBiome', biomeId);
+  }, [answerPrompt]);
 
   const chooseReward = useCallback((index: number) => {
-    dispatch({ type: 'HIDE_REWARD_CHOICE' });
-    connRef.current?.invoke('ChooseReward', index).catch(err =>
-      console.error('[SignalR] ChooseReward failed:', err));
-  }, []);
+    answerPrompt('rewardChoice', { type: 'HIDE_REWARD_CHOICE' }, 'ChooseReward', index);
+  }, [answerPrompt]);
 
   const respondMoveTeachTarget = useCallback((slot: number | null) => {
-    dispatch({ type: 'HIDE_MOVE_TEACH_TARGET' });
-    connRef.current?.invoke('RespondMoveTeachTarget', slot).catch(err =>
-      console.error('[SignalR] RespondMoveTeachTarget failed:', err));
-  }, []);
+    answerPrompt('moveTeachTarget', { type: 'HIDE_MOVE_TEACH_TARGET' }, 'RespondMoveTeachTarget', slot);
+  }, [answerPrompt]);
 
   // Deviates from the shape above: the shop is iterative, so the modal stays open (do NOT hide it) across buys.
   const buyShopItem = useCallback((index: number) => {
@@ -229,31 +236,23 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
   }, []);
 
   const leaveShop = useCallback(() => {
-    dispatch({ type: 'HIDE_SHOP' });
-    connRef.current?.invoke('LeaveShop').catch(err =>
-      console.error('[SignalR] LeaveShop failed:', err));
-  }, []);
+    answerPrompt('shop', { type: 'HIDE_SHOP' }, 'LeaveShop');
+  }, [answerPrompt]);
 
   // replaceSlot: the member slot to swap out when accepting with a full party; null otherwise. nickname: the
   // raw text from the acquisition's nickname step (Creature Naming Stage B); null on a decline or a
   // skipped/cancelled step — the server normalizes it, same as the starter path.
   const respondAcquisition = useCallback((accept: boolean, replaceSlot: number | null, nickname: string | null = null) => {
-    dispatch({ type: 'HIDE_ACQUISITION' });
-    connRef.current?.invoke('RespondAcquisition', accept, replaceSlot, nickname).catch(err =>
-      console.error('[SignalR] RespondAcquisition failed:', err));
-  }, []);
+    answerPrompt('acquisition', { type: 'HIDE_ACQUISITION' }, 'RespondAcquisition', accept, replaceSlot, nickname);
+  }, [answerPrompt]);
 
   const chooseLead = useCallback((index: number) => {
-    dispatch({ type: 'HIDE_LEAD_CHOICE' });
-    connRef.current?.invoke('ChooseLead', index).catch(err =>
-      console.error('[SignalR] ChooseLead failed:', err));
-  }, []);
+    answerPrompt('leadChoice', { type: 'HIDE_LEAD_CHOICE' }, 'ChooseLead', index);
+  }, [answerPrompt]);
 
   const respondSwitchIn = useCallback((index: number) => {
-    dispatch({ type: 'HIDE_SWITCH_IN' });
-    connRef.current?.invoke('RespondSwitchIn', index).catch(err =>
-      console.error('[SignalR] RespondSwitchIn failed:', err));
-  }, []);
+    answerPrompt('switchIn', { type: 'HIDE_SWITCH_IN' }, 'RespondSwitchIn', index);
+  }, [answerPrompt]);
 
   // Purely local (nothing server-side blocks on it) — the view runs a timer and calls this to auto-dismiss the
   // toast after its on-screen beat.
