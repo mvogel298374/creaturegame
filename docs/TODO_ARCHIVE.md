@@ -8,9 +8,15 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
-## Repo-sweep R2 — two latent 1/256-miss test flakes ✅ DONE (2026-10-02)
+## Repo-sweep R2 — two latent 1/256-miss test flakes + a vacuous resume assertion ✅ DONE (2026-10-02)
 
-Found by the 2026-10-02 repo-wide code review sweep (R2 "Test flakes"; the sweep's remaining items are still open
+**Vacuous assertion (also R2, fixed 2026-10-02):** `SessionResumeTests.cs` →
+`ReplayLastKnownState_ResendsEveryCachedEvent_InItsNaturalOrder_ToWhicheverConnectionIsNowCurrent` compared
+`(string, object)` tuples by reference against a fresh-per-send payload, so the "conn-1 got nothing new" check could
+never match. Replaced with a count check: conn-1's event count captured before the replay must be unchanged after
+it. Test-only, not player-visible.
+
+**Flakes:** found by the 2026-10-02 repo-wide code review sweep (R2 "Test flakes"; the sweep's remaining items are still open
 in `TODO.md`). `BattleIntegrationTests.cs` — `Battle_SlowerCreature_ActionSkipped_WhenKilledFirst` and
 `Battle_EndOfTurnResidualSkipped_WhenOwnAttackFaintsTheOpponentThatTurn` — ran unseeded Gen 1 rules, so the Gen 1
 1/256 always-miss (≈0.4% per test per run) could let the enemy act / let the poison tick and fail the assertion.

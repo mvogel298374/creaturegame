@@ -126,6 +126,7 @@ public class SessionResumeTests
         emitter.Emit(new BattleStarted("Player", 1, "Enemy", 2, 1, 5));
         emitter.Emit(Turn(1));
         current = "conn-2"; // the reconnect: a new connection is now current
+        int oldConnectionEventCount = hub.EventsFor("conn-1").Count();
 
         emitter.ReplayLastKnownState();
 
@@ -141,8 +142,9 @@ public class SessionResumeTests
             replayed.Select(e => e.Type)
         );
         // Never re-sent to the old connection — matches how a live event follows a reconnect (ARCHITECTURE.md
-        // §2.7), not just the replay.
-        Assert.All(replayed, e => Assert.DoesNotContain(hub.EventsFor("conn-1"), old => old == e));
+        // §2.7), not just the replay. Count-based: each send maps a fresh payload object, so comparing the
+        // replayed (type, payload) tuples against conn-1's would never match even if the replay leaked.
+        Assert.Equal(oldConnectionEventCount, hub.EventsFor("conn-1").Count());
     }
 
     [Fact]

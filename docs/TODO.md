@@ -968,8 +968,6 @@ Fixing a data/engine item usually also means updating the test that currently pi
 - **Public endpoint exhaustion** — `POST /api/game/start` unauthenticated, no rate limit, no cap on concurrent
   runs/connections, no idle timeout, no `fly.toml` health check or concurrency block (single 1 GB VM).
   Unmeasured; also no security headers/`UseForwardedHeaders` (low impact: no auth/cookies).
-- **Vacuous assertion**: `SessionResumeTests.cs:145` compares event payloads by reference so it can never match — assert conn-1's event
-  count is unchanged instead.
 - **Test gap: `GameSessionManager` connection-routed methods** — `SetItemChoice` unknown-id fallback
   (`:441-448`), `DetachConnection` stale-connection guard (`:657-667`), `ScheduleAbandon`/`CancelAbandon`
   (`:748-774`) (reachable without SignalR; overlaps the existing Tier-4 connection-lifecycle item and covers the
