@@ -8,6 +8,7 @@ export interface StartGameRequestBody {
   generation: string;
   seed?: number;
   nickname?: string;
+  forceDraft?: boolean;
 }
 
 export function buildStartGameRequest(params: {
@@ -17,6 +18,10 @@ export function buildStartGameRequest(params: {
   generation: string;
   nickname: string | null;
   seedParam: string | null;
+  // The optional ?forceDraft=1 URL flag (E2E only): asks the server to skip the themed-draft cadence so a run
+  // reaches a party of two without a seed walk. A request, not a grant — the server honours it only under Dev
+  // Mode (ARCHITECTURE.md §2.7), so it is inert against a production backend.
+  forceDraftParam?: string | null;
 }): StartGameRequestBody {
   const body: StartGameRequestBody = {
     speciesId: params.speciesId,
@@ -36,6 +41,9 @@ export function buildStartGameRequest(params: {
   // A cancelled/blank nickname omits the key entirely — the server's own NicknameRules.Normalize falls back
   // to the species-default name either way, so there is nothing to send.
   if (params.nickname) body.nickname = params.nickname;
+
+  // Only the exact value "1" opts in; absent (the normal case) omits the key entirely.
+  if (params.forceDraftParam === '1') body.forceDraft = true;
 
   return body;
 }

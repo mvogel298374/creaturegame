@@ -60,7 +60,9 @@ cause was a spec asserting a transient badge, not an engine bug; see *Browser-Ba
 seed-≠-determinism lesson it taught. Still live: `endless-chain.spec.ts` *"a run ends when the player faints"*
 failed once in a full 2026-07-26 suite run — no `Run over` log line after 1m10s — but passes in **7.3 s** run
 alone; consistent with the documented "a long run accumulates abandoned server-side runs" degradation, not a
-code defect. (Web UI polish, Multi-Generation groundwork, User Documentation, and test-infra items are Tiers
+code defect. `voluntary-switch.spec.ts` was failing standalone until 2026-10-02 (draft gate + seed drift after
+`0eb0d53`); fixed with a Dev-Mode `forceDraft` — only its ~3 min runtime remains open (*Browser-Based UI Testing*).
+(Web UI polish, Multi-Generation groundwork, User Documentation, and test-infra items are Tiers
 4–5 above, not repeated here.)
 
 **Settings Menu** — sound volume + difficulty→XP bonus, both shipped and archived (→ `TODO_ARCHIVE.md` →
@@ -222,7 +224,9 @@ tested through the `mitt` bridge (assert **event ordering**, never wall-clock du
 > (polling loops, `waitFor` timeouts, a swallowed click) submits moves on different turns under load, which
 > shifts every later roll and plays out a different run. A seeded spec is only deterministic if the driving loop
 > is **paced** — settle each turn (wait for the action menu to come back) before the next input. Otherwise write
-> the assertions not to care (retry / walk seeds). See `status.spec.ts`, `forced-switch.spec.ts`, and
+> the assertions not to care (retry / walk seeds) — or, where the thing needed is a gated offer, bypass the gate
+> under Dev Mode (`voluntary-switch.spec.ts` uses `forceDraft` instead of walking seeds for a draft, 2026-10-02; other
+> specs still walk seeds). See `status.spec.ts`, `forced-switch.spec.ts`, and
 > `e2e/README.md`. This note is standing guidance, not a task — it outlives the items that taught it.
 
 **Done and archived** (→ `TODO_ARCHIVE.md`): seed plumbing, the Run Economy reward-modal E2E, the spec-rot
@@ -241,6 +245,10 @@ known-still-open follow-up (the regression-insurance E2E coverage gap) below.
 > failure artefact paths). See `.claude/agents/test-runner.md` and `CLAUDE.md`.
 
 **Remaining (in priority order):**
+- [ ] *(small)* **`voluntary-switch.spec.ts` is still slow (~3.0 min standalone).** Its seed walk now forces a themed
+  draft via the Dev-Mode `forceDraft` (archived → *E2E `voluntary-switch.spec.ts` failing standalone*), yet it still
+  burns several seeds before reaching a switchable turn. Investigate why seeds 1–3 fail even with the draft forced
+  (e.g. battle-one losses), or give the walk a faster-fail path.
 - [ ] **CI step** that boots backend + frontend, runs headless, tears down. **Now the only automatic E2E
   coverage there is** — and therefore more load-bearing than when it was written, not less: the local gate
   never runs E2E (see the note above) and `test.ps1` skips it when the stack is down, so nothing catches a red

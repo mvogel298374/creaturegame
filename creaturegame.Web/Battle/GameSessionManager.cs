@@ -132,7 +132,11 @@ public sealed class GameSessionManager(
             // Keyed to Difficulty, not generation — RunRules is deliberately not a seam (GENERATION_PROFILE.md §2.2).
             RunRules = RunRulesFor(session.Difficulty),
             Party = party,
-            DraftSupplier = encounters.BuildDraftSupplier(session.AllMoves, profile),
+            DraftSupplier = encounters.BuildDraftSupplier(
+                session.AllMoves,
+                profile,
+                forceOffer: session.ForceDraft
+            ),
             BossCatchSupplier = encounters.BuildBossCatchSupplier(session.AllMoves, profile),
         };
 
@@ -150,7 +154,10 @@ public sealed class GameSessionManager(
         // Normal. Costs nothing to require: there is exactly one caller (GameController.Start).
         Difficulty difficulty,
         Generation generation,
-        IReadOnlyDictionary<int, IReadOnlyList<int>> machineMovesBySpecies
+        IReadOnlyDictionary<int, IReadOnlyList<int>> machineMovesBySpecies,
+        // A request to skip the themed-draft cadence + roll so a run reaches a party of two deterministically.
+        // Honoured ONLY when the server's Dev Mode is on — the client can ask, never grant (ARCHITECTURE.md §2.7).
+        bool forceDraft = false
     )
     {
         var gameId = Guid.NewGuid().ToString("N");
@@ -165,11 +172,17 @@ public sealed class GameSessionManager(
             difficulty,
             generation,
             DateTimeOffset.UtcNow,
-            machineMovesBySpecies
+            machineMovesBySpecies,
+            ForceDraft: forceDraft && devMode?.Enabled == true
         );
         EvictExpiredPendingSessions();
         return gameId;
     }
+
+    /// <summary>Whether a registered-but-not-yet-started run will have its draft gate forced — a test seam for
+    /// the Dev Mode gate on <c>forceDraft</c>, like <see cref="ActivePartyFor"/>.</summary>
+    internal bool IsDraftForced(string gameId) =>
+        _pending.TryGetValue(gameId, out var pending) && pending.ForceDraft;
 
     private void EvictExpiredPendingSessions()
     {
@@ -678,7 +691,8 @@ sealed record PendingSession(
     Difficulty Difficulty,
     Generation Generation,
     DateTimeOffset RegisteredAt,
-    IReadOnlyDictionary<int, IReadOnlyList<int>> MachineMovesBySpecies
+    IReadOnlyDictionary<int, IReadOnlyList<int>> MachineMovesBySpecies,
+    bool ForceDraft = false
 );
 
 /// <summary>

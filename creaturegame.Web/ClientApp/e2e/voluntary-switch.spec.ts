@@ -42,7 +42,14 @@ test.describe('In-combat switching', () => {
   test('the SWITCH picker dismisses without spending a turn, then swaps the active creature', async ({ page }) => {
     test.setTimeout(5 * 60_000);
 
-    const seed = await walkSeedsUntil(page, canSwitchNow);
+    // The draft is normally gated on every 3rd win × a 55% roll, so a Lv30 lead often died before one landed and
+    // the whole seed list came up empty (it exhausted 8, then 16 seeds, standalone). `forceDraft` has the server
+    // offer one on the FIRST win instead — honoured only under Dev Mode, hence the precondition — so what's left
+    // to vary is just "does the lead win battle one", which a few seeds cover.
+    const dev = await page.request.get('/api/dev/status');
+    expect((await dev.json()).enabled, 'forceDraft needs the backend in Dev Mode (dev.ps1 / Development)').toBe(true);
+
+    const seed = await walkSeedsUntil(page, canSwitchNow, { seeds: [1, 2, 3, 4], forceDraft: true });
     expect(seed, 'no seeded run reached a switchable turn').not.toBeNull();
 
     const nameBefore = await page.locator('.nameplate--player .nameplate-name').textContent();

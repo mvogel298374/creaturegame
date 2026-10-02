@@ -22,11 +22,18 @@ export async function startBattle(
   page: Page,
   species = 'CHARIZARD',
   level?: number,
-  seed?: number
+  seed?: number,
+  opts: { forceDraft?: boolean } = {}
 ): Promise<void> {
+  // `forceDraft` asks the server to offer a themed draft on the first win instead of the every-3rd-win × 55%
+  // gate — so a spec that needs a party of two doesn't depend on a seed walk. The server honours it only under
+  // Dev Mode (ARCHITECTURE.md §2.7). It rides the query string, so like the seed it needs the /select entry.
+  if (opts.forceDraft && seed === undefined)
+    throw new Error('startBattle: forceDraft needs a seed (it is carried on the /select query string)');
+
   // ?e2e=1 puts the app in test mode (bridge recording + collapsed animation delays).
   if (seed !== undefined) {
-    await page.goto(`/select?e2e=1&seed=${seed}`);
+    await page.goto(`/select?e2e=1&seed=${seed}${opts.forceDraft ? '&forceDraft=1' : ''}`);
     await page.locator('.species-card').first().waitFor({ state: 'visible', timeout: 10_000 });
   } else {
     await page.goto('/?e2e=1');
@@ -405,17 +412,21 @@ export async function walkSeedsUntil(
     seeds?: number[];
     species?: string;
     level?: number;
+    /** Offer a draft on the first win (Dev Mode only) — see `startBattle`. Removes the cadence × roll gate from
+     * the variance, leaving only "does the lead win battle one", which a short seed list covers. */
+    forceDraft?: boolean;
   } = {}
 ): Promise<number | null> {
   const {
     seeds = [1, 2, 3, 4, 5, 6, 7, 8],
     species = 'CHARIZARD',
     level = 30,
+    forceDraft = false,
     ...playOpts
   } = opts;
 
   for (const seed of seeds) {
-    await startBattle(page, species, level, seed);
+    await startBattle(page, species, level, seed, { forceDraft });
     if (await playCurrentRunUntil(page, reached, playOpts)) return seed;
     // That run wiped (or never got there) — try the next seeded run.
   }

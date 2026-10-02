@@ -218,6 +218,21 @@ Each entry: **Decision · Why · Where it lives.**
     is consumed, or `Cancel`) and is cleared on LEAVE, so a stray click on the closing modal can never leak into
     the *next* shop's first prompt. The one-shot handshakes keep drop-when-nothing-pending: queueing there
     would let a stale answer be consumed by an unrelated later prompt of the same type.
+  - **E2E reaches a party of two by a Dev-Mode `forceDraft`, not by a seed walk.** A themed draft is the only way
+    the party grows past one, and it is gated on every 3rd win × a 55% roll (`DraftCalculator`). A spec that needs
+    a switchable turn (`voluntary-switch.spec.ts`) therefore walked seeds hoping one survived to win 3 and rolled
+    the offer — and, since a seed fixes only the server's RNG stream while the client's click timing draws from
+    it, a run that wiped after two wins (a Lv30 lead against a boss's critical hit) never saw a draft at all; the
+    walk exhausted 8, then 16, seeds standalone. `StartGameRequest.ForceDraft` (client: `?forceDraft=1` on the
+    seeded `/select` URL) makes `EncounterFactory.BuildDraftSupplier(forceOffer: true)` skip the cadence + roll,
+    so the offer fires on the first win and the only variance left is whether the lead wins battle one. It is a
+    *request, not a grant*: `GameSessionManager.RegisterSession` stores `forceDraft && devMode.Enabled`, so
+    against a production backend (Dev Mode off — the Dockerfile's `Production`, no `DevMode__Enabled`) the flag is
+    inert, the same server-side gate every other dev endpoint uses; `e2e.ps1`/`test.ps1 -StartStack` set
+    `DevMode__Enabled` explicitly and the spec asserts `/api/dev/status` first so a non-dev backend fails with a
+    clear message instead of an unexplained seed-walk exhaustion. The fought-species pool guardrail still applies
+    (an empty pool never yields a dead offer). Rejected alternative: a dev endpoint that adds a party member to a
+    live run — the run loop mints creature ids (`CreatureIdSource`), so an out-of-band add would bypass id minting.
   - **Where:** `ClientApp/src/utils/activeGame.ts`, `pages/StarterSelection.tsx`, `pages/BattleScreen.tsx`,
     `pages/TitleScreen.tsx`, `hooks/useBattleHub.ts`; `creaturegame.Web/Battle/GameSessionManager.cs`
     (`AttachConnection`, `ReEstablishClient`), `SignalRBattleEventEmitter.cs`, `Hubs/BattleHub.cs`. Full

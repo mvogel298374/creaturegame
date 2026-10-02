@@ -177,6 +177,9 @@ try {
   if (-not $ListOnly -and -not (Test-Backend)) {
     if ($StartStack) {
       Write-Host "Starting backend on :5100 for the E2E run..." -ForegroundColor DarkCyan
+      # E2E specs rely on Dev Mode (e.g. ?forceDraft=1, honoured only server-side under it) — set it explicitly
+      # rather than lean on the launch profile happening to be Development.
+      $env:DevMode__Enabled = 'true'
       $backend = Start-Process $dotnetExe -ArgumentList 'run', '--project', (Join-Path $root 'creaturegame.Web') -PassThru -WindowStyle Hidden
       $startedBackend = $true
       $deadline = (Get-Date).AddSeconds(90)

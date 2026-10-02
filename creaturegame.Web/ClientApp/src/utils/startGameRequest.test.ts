@@ -36,6 +36,19 @@ describe('buildStartGameRequest', () => {
     },
   );
 
+  it('asks for a forced draft only on the exact URL flag "1"', () => {
+    const body = buildStartGameRequest({ ...base, nickname: null, seedParam: null, forceDraftParam: '1' });
+    expect(body.forceDraft).toBe(true);
+  });
+
+  it.each([undefined, null, '', '0', 'true', '2'])(
+    'omits forceDraft for an absent or non-"1" flag (%j)',
+    forceDraftParam => {
+      const body = buildStartGameRequest({ ...base, nickname: null, seedParam: null, forceDraftParam });
+      expect(body).not.toHaveProperty('forceDraft');
+    },
+  );
+
   it('always carries speciesId/level/difficulty/generation', () => {
     const body = buildStartGameRequest({ ...base, nickname: null, seedParam: null });
     expect(body).toMatchObject(base);

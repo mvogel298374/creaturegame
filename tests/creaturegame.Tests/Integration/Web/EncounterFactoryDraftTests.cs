@@ -184,6 +184,66 @@ public class EncounterFactoryDraftTests
 
         Assert.Null(offered);
     }
+
+    [Fact]
+    public async Task BuildDraftSupplier_ForceOffer_OffersOnANonCadenceWin_WhereTheDefaultGateDeclines()
+    {
+        var factory = BuildFactory();
+        var setup = await factory.CreatePlayerSetupAsync(
+            Bulbasaur,
+            50,
+            Gen1Profile.Instance,
+            new SeededRandomSource(1)
+        );
+        Assert.NotNull(setup);
+
+        int[] fought = [16, 19];
+        var context = new DraftContext(
+            setup!.Player,
+            Depth: 3,
+            Biome: null,
+            FoughtSpecies: fought,
+            BattlesWon: 1 // not a cadence win — the first win of a run
+        );
+
+        var gated = await factory.BuildDraftSupplier(setup.AllMoves, Gen1Profile.Instance)(
+            context,
+            new AlwaysZero()
+        );
+        var forced = await factory.BuildDraftSupplier(
+            setup.AllMoves,
+            Gen1Profile.Instance,
+            forceOffer: true
+        )(context, new AlwaysZero());
+
+        Assert.Null(gated); // the cadence blocks it
+        Assert.NotNull(forced); // the Dev-Mode override skips the cadence + roll...
+        Assert.Contains(forced!.SpeciesId, fought); // ...but the fought-only guardrail still holds
+    }
+
+    [Fact]
+    public async Task BuildDraftSupplier_ForceOffer_StillNeverOffersFromAnEmptyFoughtPool()
+    {
+        var factory = BuildFactory();
+        var setup = await factory.CreatePlayerSetupAsync(
+            Bulbasaur,
+            50,
+            Gen1Profile.Instance,
+            new SeededRandomSource(1)
+        );
+        Assert.NotNull(setup);
+
+        var offered = await factory.BuildDraftSupplier(
+            setup!.AllMoves,
+            Gen1Profile.Instance,
+            forceOffer: true
+        )(
+            new DraftContext(setup.Player, Depth: 3, Biome: null, FoughtSpecies: [], BattlesWon: 1),
+            new AlwaysZero()
+        );
+
+        Assert.Null(offered); // forcing the gate never produces a dead offer
+    }
 }
 
 /// <summary>Test factory over the live SQLite DBs (mirrors the production composition). File-scoped so it lives

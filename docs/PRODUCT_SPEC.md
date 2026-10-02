@@ -226,6 +226,8 @@ the linked design doc instead — pull it there and leave only the pointer here.
   and measured against the current foe; fixed/level-based moves show one number, OHKO = foe's HP, Super Fang =
   half the foe's HP; status moves show none. Menu ranges come from `GET /api/dev/{gameId}/damage-ranges`;
   with dev off the server never sends them.
+- Test support: with dev mode enabled server-side, a seeded start with `?forceDraft=1` makes every win offer a
+  themed draft (cadence and roll skipped; the fought-pool limit still applies). Ignored when dev mode is off.
 - Design detail / rationale → `TODO_ARCHIVE.md` → *Dev Mode* (no separate design doc).  History → same entry.
 
 ### Session resume (refresh/reopen survival)

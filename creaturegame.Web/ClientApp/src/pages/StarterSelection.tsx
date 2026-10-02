@@ -45,13 +45,15 @@ export function StarterSelection() {
   const confirm = async (nickname: string | null) => {
     if (!selected) return;
     try {
+      const query = new URLSearchParams(window.location.search);
       const body = buildStartGameRequest({
         speciesId: selected.id,
         level: levelChoice,
         difficulty: difficultyChoice,
         generation: generationChoice,
         nickname,
-        seedParam: new URLSearchParams(window.location.search).get('seed'),
+        seedParam: query.get('seed'),
+        forceDraftParam: query.get('forceDraft'),
       });
 
       const res = await fetch('/api/game/start', {

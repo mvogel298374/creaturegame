@@ -8,6 +8,33 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## E2E `voluntary-switch.spec.ts` failing standalone — Dev-Mode `forceDraft` ✅ DONE (2026-10-02)
+
+**Symptom:** the last E2E (test 38 of 38) failed standalone — `walkSeedsUntil` exhausted all 8, then all 16, seeds
+without ever reaching a switchable turn (a party of two).
+
+**Root cause:** a party of two needs a themed draft, which is gated on every 3rd win × a 55% roll
+(`DraftCalculator`), and a Lv30 lead often dies after 2 wins to the first gate boss's crit. Commit `0eb0d53`
+("Level-gate Strong/Boss movesets") also changed encounter generation, so what each seed plays drifted — the
+seed walk that used to land a draft no longer did. (Another instance of the "seed is not determinism" lesson in
+`TODO.md` → *Browser-Based UI Testing*.)
+
+**Fix:** a Dev-Mode-gated `forceDraft`. Client `?forceDraft=1` on the seeded `/select` URL
+(`utils/startGameRequest.ts`) → `StartGameRequest.ForceDraft` → `GameSessionManager.RegisterSession(forceDraft)`
+stores `forceDraft && devMode.Enabled` → `EncounterFactory.BuildDraftSupplier(forceOffer)` skips the cadence + roll
+(the fought-pool guardrail is kept). E2E helpers `startBattle`/`walkSeedsUntil` gained a `forceDraft` option; the
+spec walks seeds `[1,2,3,4]` with `forceDraft` and asserts `/api/dev/status` is enabled first; `e2e.ps1` and
+`test.ps1 -StartStack` set `DevMode__Enabled=true` explicitly. Rationale → `ARCHITECTURE.md` §2.7 ("E2E reaches a
+party of two by a Dev-Mode forceDraft"). Files: `GameController.cs`, `GameSessionManager.cs`, `EncounterFactory.cs`,
+`StarterSelection.tsx`, `startGameRequest.ts`, `e2e/helpers.ts`, `e2e/voluntary-switch.spec.ts`, `e2e.ps1`,
+`test.ps1`. Tests: `DevModeTests` (3 gate cases), `EncounterFactoryDraftTests` (2 force-offer cases),
+`startGameRequest.test.ts`. Verified: spec passes standalone (2/2).
+
+**Open follow-up (live in `TODO.md` → *Browser-Based UI Testing*):** the spec still takes ~3.0 min — it burns several
+seeds before forcing lands a switchable turn.
+
+---
+
 ## Repo-sweep R1 — lost modal answers soft-lock the run (parts a + b) ✅ DONE (2026-10-02)
 
 Found by the 2026-10-02 repo-wide code review sweep (R1 "players get stuck or lose control"; the sweep's remaining

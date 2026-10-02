@@ -54,7 +54,8 @@ public class GameController(GameSessionManager sessionManager, EncounterFactory 
                 setup.PlayableBiomes,
                 difficulty,
                 generation,
-                setup.MachineMovesBySpecies
+                setup.MachineMovesBySpecies,
+                forceDraft: req.ForceDraft == true // the manager honours it only under Dev Mode
             );
             Console.WriteLine(
                 $"[GameController] Started run {gameId} with seed {seed}, difficulty {difficulty}, generation {generation}."
@@ -162,5 +163,6 @@ public record StartGameRequest(
     int? Seed = null,
     string? Difficulty = null,
     string? Generation = null,
-    string? Nickname = null
+    string? Nickname = null,
+    bool? ForceDraft = null
 );

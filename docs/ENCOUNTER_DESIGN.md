@@ -442,6 +442,8 @@ biome — already on-theme, and impossible to roll something far outside the ban
 
 - ***n%* values are tunable placeholders.** Concrete rates are an implementation/tuning concern, not this
   design pass — they get set against the real curve. (Shipped values: boss catch 20%, themed draft cadence-3 × 55%.)
+  A Dev-Mode-only `forceDraft` start flag skips the draft's cadence + roll for E2E (fought-pool guardrail kept) —
+  see `ARCHITECTURE.md` §2.7.
 - **Both channels are post-battle offers**, not in-battle catches — they reuse the reward-modal wire end-to-end
   (the `AcquisitionOffered` event with `source` `"BossCatch"` / `"ThemedDraft"`, resolved by
   `AcquisitionResolution`). Boss catch is the biome-apex pickup; the themed draft is the recurring biome-themed

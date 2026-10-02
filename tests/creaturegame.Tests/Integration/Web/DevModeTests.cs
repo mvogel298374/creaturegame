@@ -65,6 +65,68 @@ public class DevModeTests
         return gameId;
     }
 
+    [Theory]
+    [InlineData(true, true, true)] // asked + Dev Mode on → forced
+    [InlineData(true, false, false)] // asked, Dev Mode off → ignored: the client can ask, never grant
+    [InlineData(false, true, false)] // not asked → never forced, even under Dev Mode
+    public void ForceDraftIsHonouredOnlyWhenAskedAndDevModeIsOn(
+        bool asked,
+        bool devModeOn,
+        bool expectedForced
+    )
+    {
+        var gate = new ManualResetEventSlim(initialState: false);
+        var manager = new GameSessionManager(
+            new RecordingHubContext(),
+            BlockedEncounterFactory.Create(gate),
+            new DevModeOptions(devModeOn)
+        );
+
+        string gameId = manager.RegisterSession(
+            TestCreatures.Make("STARTMON"),
+            [],
+            new Bag(),
+            new Wallet(),
+            [],
+            new SeededRandomSource(1),
+            [],
+            Difficulty.Normal,
+            Generation.One,
+            new Dictionary<int, IReadOnlyList<int>>(),
+            forceDraft: asked
+        );
+
+        Assert.Equal(expectedForced, manager.IsDraftForced(gameId));
+    }
+
+    [Fact]
+    public void ForceDraftIsIgnoredWhenTheManagerHasNoDevModeOptionsAtAll()
+    {
+        // The production composition root always supplies them, but a manager built without (tests, tools) must
+        // fail closed rather than treat "no options" as "allowed".
+        var gate = new ManualResetEventSlim(initialState: false);
+        var manager = new GameSessionManager(
+            new RecordingHubContext(),
+            BlockedEncounterFactory.Create(gate)
+        );
+
+        string gameId = manager.RegisterSession(
+            TestCreatures.Make("STARTMON"),
+            [],
+            new Bag(),
+            new Wallet(),
+            [],
+            new SeededRandomSource(1),
+            [],
+            Difficulty.Normal,
+            Generation.One,
+            new Dictionary<int, IReadOnlyList<int>>(),
+            forceDraft: true
+        );
+
+        Assert.False(manager.IsDraftForced(gameId));
+    }
+
     [Fact]
     public void EnemyEndpointIs404WhenDevModeIsOff_EvenForARealEnemy()
     {

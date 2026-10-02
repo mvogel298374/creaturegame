@@ -162,21 +162,26 @@ public sealed class EncounterFactory(
     }
 
     /// <summary>The run's themed-draft supplier for <see cref="RunDirector"/> — the acquisition-side mirror of
-    /// <see cref="BuildRewardSupplier"/>. Gate + fought-only guardrail → <c>ENCOUNTER_DESIGN.md §4</c>.</summary>
+    /// <see cref="BuildRewardSupplier"/>. Gate + fought-only guardrail → <c>ENCOUNTER_DESIGN.md §4</c>.
+    /// <paramref name="forceOffer"/> is the Dev-Mode-only E2E override (<c>ARCHITECTURE.md §2.7</c>): it skips the
+    /// cadence + n% gate so a test reaches a party of two without a seed walk; the fought-only pool guardrail
+    /// below still applies.</summary>
     public Func<DraftContext, IRandomSource, Task<Creature?>> BuildDraftSupplier(
         IReadOnlyList<Attack> allMoves,
-        GenerationProfile profile
-    ) => (ctx, rng) => TryBuildDraftAsync(ctx, allMoves, rng, profile);
+        GenerationProfile profile,
+        bool forceOffer = false
+    ) => (ctx, rng) => TryBuildDraftAsync(ctx, allMoves, rng, profile, forceOffer);
 
     private async Task<Creature?> TryBuildDraftAsync(
         DraftContext ctx,
         IReadOnlyList<Attack> allMoves,
         IRandomSource rng,
-        GenerationProfile profile
+        GenerationProfile profile,
+        bool forceOffer
     )
     {
         // Gate first — no RNG unless it fires, so a non-offer win leaves the seeded run stream untouched.
-        if (!DraftCalculator.ShouldOffer(ctx.BattlesWon, ctx.FoughtSpecies, rng))
+        if (!forceOffer && !DraftCalculator.ShouldOffer(ctx.BattlesWon, ctx.FoughtSpecies, rng))
             return null;
 
         await using var pokemonCtx = await pokemonFactory.CreateDbContextAsync();
