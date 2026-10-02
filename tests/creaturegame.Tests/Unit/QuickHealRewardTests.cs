@@ -71,6 +71,28 @@ public class QuickHealRewardTests
     }
 
     [Fact]
+    public void ApplyHeal_CureStatus_AlsoClearsTheCarriedStatus_SoTheNextBattleDoesNotStartAfflicted()
+    {
+        // A treasure/mystery heal lands between battles, where the lead's status lives in the persisted
+        // CarriedStatus that the next BattleRunEvent re-applies as the opening entry status.
+        var creature = Wounded();
+        creature.CarriedStatus = new CarriedStatus(StatusCondition.Poison, 0); // Gen 1 carries Toxic out as Poison
+
+        RewardResolution.ApplyHeal(
+            new HealRewardOption(
+                HpRestore: 0,
+                CureStatus: true,
+                RestoreLowPp: false,
+                Label: "Quick Heal"
+            ),
+            creature,
+            new RecordingEmitter()
+        );
+
+        Assert.Null(creature.CarriedStatus);
+    }
+
+    [Fact]
     public void ApplyHeal_HpNeverExceedsMissing_AndCapsAtMax()
     {
         var creature = Wounded();

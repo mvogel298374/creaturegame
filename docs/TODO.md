@@ -919,9 +919,6 @@ Fixing a data/engine item usually also means updating the test that currently pi
 - **Engine: flinch from a slower attacker carries into the next turn** (`MoveEffects.cs:96-100`,
   `StatusResolver.cs:28-33`, `Battle.cs:211-214`) — clear `IsFlinched` at end of turn; Substitute should also
   block flinch. No test covers a slower flincher.
-- **Engine: curing a status doesn't clear `CarriedStatus`** (`ItemEffects.cs:93-100,127`,
-  `RewardResolution.cs:150`) — an Antidote on a bench member, or a cure at a Treasure/Mystery node, is undone
-  on the next send-in/battle start. `ReviveItemEffect` already clears it; `ClearStatus` should too.
 - **Data: species base stats are modern, not Gen 1** (`PokemonImport.cs:144-152`) — `BaseSpecial` taken from
   Sp. Atk (Chansey 35 vs 105, Tentacruel 80/120, Gyarados 60/100, Articuno 95/125, Golduck 95/80, …) and the
   Gen 6/7 buffs never undone (Pikachu Def 40/30, Beedrill Atk 90/80, Dugtrio Atk 100/80, Farfetch'd Atk 90/65,
@@ -968,6 +965,13 @@ Fixing a data/engine item usually also means updating the test that currently pi
 - **Public endpoint exhaustion** — `POST /api/game/start` unauthenticated, no rate limit, no cap on concurrent
   runs/connections, no idle timeout, no `fly.toml` health check or concurrency block (single 1 GB VM).
   Unmeasured; also no security headers/`UseForwardedHeaders` (low impact: no auth/cookies).
+- **Full Restore refuses a full-HP creature that has a status** (`ItemEffects.cs:71-74`
+  `HealingItemEffect.CanApply` requires HP < max) — found by the requirements-review of the `CarriedStatus` cure
+  fix (2026-10-02), deferred by the user as its own item. In Gen 1, Full Restore at full HP with a major status
+  cures it and consumes the item (**verify against pokered first**); fix = let `CanApply` pass when
+  `CuresAllStatus` and a status is present, and skip the zero-amount `Healed` event in `Apply`. Same cure-path
+  family as the archived `CarriedStatus` fix. Related aside: `Creature.FullHeal` and `ReviveItemEffect` duplicate
+  `ClearStatus`'s reset instead of routing through it (consolidation optional).
 - **Test gap: `GameSessionManager` connection-routed methods** — `SetItemChoice` unknown-id fallback
   (`:441-448`), `DetachConnection` stale-connection guard (`:657-667`), `ScheduleAbandon`/`CancelAbandon`
   (`:748-774`) (reachable without SignalR; overlaps the existing Tier-4 connection-lifecycle item and covers the

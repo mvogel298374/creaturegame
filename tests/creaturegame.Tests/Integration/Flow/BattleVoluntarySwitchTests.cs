@@ -1,6 +1,7 @@
 using creaturegame.Attacks;
 using creaturegame.Combat;
 using creaturegame.Creatures;
+using creaturegame.Items;
 using creaturegame.Tests.TestSupport;
 
 namespace creaturegame.Tests.Integration.Flow;
@@ -153,6 +154,48 @@ public class BattleVoluntarySwitchTests
             s => s.CreatureName == "Lead" && s.Stat == nameof(StageStat.Attack) && s.NewStage == 2
         );
         Assert.Equal(0, lead.Battle.Stages.Attack);
+    }
+
+    [Fact]
+    public async Task VoluntarySwitch_ToABenchMemberCuredByAnAntidote_EntersHealthy()
+    {
+        // Regression: curing a benched member only reset Battle.Status, leaving its CarriedStatus set — and the
+        // switch-in re-applies CarriedStatus, so the "cured" member walked back in poisoned.
+        var lead = Fighter("Lead", hp: 300, attack: 40, defense: 100, speed: 200);
+        var bench = Fighter("Bench", hp: 300, attack: 999, defense: 100, speed: 150);
+        bench.Battle.Status = StatusCondition.Poison;
+        bench.CarriedStatus = new CarriedStatus(StatusCondition.Poison, 0);
+        var party = new Party(lead);
+        party.Add(bench);
+
+        var antidote = new Item
+        {
+            Id = 18,
+            Name = "antidote",
+            Category = ItemCategory.StatusCure,
+            CuredStatus = StatusCondition.Poison,
+        };
+        var effect = ItemEffects.For(antidote.Category)!;
+        var ctx = new ItemEffectContext
+        {
+            User = lead,
+            Item = antidote,
+            Party = party,
+            TargetPartySlot = 1,
+        };
+        Assert.True(effect.CanApply(ctx));
+        effect.Apply(ctx);
+
+        var enemy = Fighter("Foe", hp: 500, attack: 40, defense: 100, speed: 100);
+        var input = new ScriptedInput("tackle").TurnPlan(1); // turn 1: SWITCH to the cured bench member
+        var recorder = new RecordingEmitter();
+        var battle = NewBattle(lead, enemy, input, "tackle", party, recorder);
+
+        await battle.StartFightAsync();
+
+        var switchIn = recorder.Of<CreatureSwitchedIn>().First();
+        Assert.Equal("Bench", switchIn.Name);
+        Assert.Equal(StatusCondition.None, switchIn.Status);
     }
 
     [Fact]

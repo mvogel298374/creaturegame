@@ -85,6 +85,15 @@ run loop — it's simply always current on the object across battles — whereas
 captured after each win and re-applied as the next fight's entry status by the `RunDirector` (so the generation
 can transform it out of battle, e.g. Gen 1 Toxic → Poison).
 
+**Curing a status clears both halves.** A switched-out or between-battle creature holds its ailment in *both*
+`Battle.Status` and `CarriedStatus`, and the next send-in / opening lead re-applies `CarriedStatus` — so every
+cure path (`HealingItemEffect.ClearStatus` for Antidote-line / Full Heal / Full Restore items and the quick-heal
+reward, `Creature.FullHeal`, Revive) must null it too, or the "cured" creature re-enters afflicted. The shared
+`ClearStatus` does this in one place; a new cure path should route through it rather than touching
+`Battle.Status` alone. The cure guards (`CanApply`, the reward's `CureStatus` check) test `Battle.Status` only,
+so they rely on the invariant that a creature's ailment is never in `CarriedStatus` alone — every capture and
+cure above maintains it, and a new path that breaks it would leave that creature uncurable.
+
 **Haze is a narrower reset than a battle-end wipe (`Creature.ResetForHaze`).** Gen 1's `HazeEffect_`
 (pokered `engine/battle/move_effects/haze.asm`) only ever touches a specific field list — stat stages (both
 sides); the CONFUSED bit; Disable; Mist; Focus Energy; Leech Seed; Reflect/Light Screen; and the

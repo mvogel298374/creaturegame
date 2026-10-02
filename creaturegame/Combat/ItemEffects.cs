@@ -96,6 +96,9 @@ public sealed class HealingItemEffect : IItemEffect
         target.Battle.Status = StatusCondition.None;
         target.Battle.SleepTurns = 0;
         target.Battle.ToxicCounter = 1; // reset Gen 1 Toxic escalation baseline
+        // The persisted half too (STATE_MODEL.md §2, as Creature.FullHeal / Revive do): a benched member's switch-in
+        // and the next battle's opening lead both re-apply CarriedStatus, so leaving it set resurrects the ailment.
+        target.CarriedStatus = null;
         emitter?.Emit(new StatusCleared(target.Name, target.Id, was));
     }
 }

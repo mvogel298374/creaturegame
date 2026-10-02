@@ -8,6 +8,26 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Repo-sweep R1 — curing a status didn't clear `CarriedStatus` ✅ DONE (2026-10-02)
+
+Found by the 2026-10-02 repo-wide code review sweep (R1 "Engine"; the sweep's remaining items are still open in
+`TODO.md`). **Bug:** `HealingItemEffect.ClearStatus` (`ItemEffects.cs`) cleared only the battle-half status
+(`Battle.Status`/`SleepTurns`/`ToxicCounter`), not the permanent-half `Creature.CarriedStatus` that the engine
+re-applies on the next entry. Two live scenarios: (1) an **Antidote-line / Full Heal / Full Restore item used on a
+bench member** — the cure was undone the moment that member next switched in (`Battle.BringInMember` re-applies
+`CarriedStatus`); (2) the **Treasure/Mystery-node quick-heal on the lead** (`RewardResolution.ApplyHeal`, which
+goes through the same `ClearStatus`) — the lead re-opened the next battle afflicted again (`BattleRunEvent`
+re-applies the lead's `CarriedStatus` at the opening). `ReviveItemEffect` already cleared it; `ClearStatus` did not.
+
+**Fix:** `ClearStatus` now also nulls `Creature.CarriedStatus`, so every cure path (status-cure items, Full Restore,
+the quick-heal reward) clears both halves. `STATE_MODEL.md` §2 gained a "Curing a status clears both halves"
+paragraph. **Tests (sabotage-verified red without the fix):** `ItemEffectTests` ×2 (cure items clear
+`CarriedStatus`), `QuickHealRewardTests` ×1 (quick-heal on the lead), `BattleVoluntarySwitchTests` ×1
+(end-to-end through a real voluntary switch: cured bench member enters clean). Player-visible: a cured creature no
+longer re-enters afflicted.
+
+---
+
 ## Repo-sweep R2 — two latent 1/256-miss test flakes + a vacuous resume assertion ✅ DONE (2026-10-02)
 
 **Vacuous assertion (also R2, fixed 2026-10-02):** `SessionResumeTests.cs` →

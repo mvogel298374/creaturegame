@@ -347,6 +347,42 @@ public class ItemEffectTests
     }
 
     [Fact]
+    public void Antidote_OnBenchMember_AlsoClearsItsCarriedStatus_SoTheAilmentCannotReApplyOnSwitchIn()
+    {
+        // A switched-out member holds its ailment in BOTH Battle.Status and the persisted CarriedStatus; the
+        // switch-in re-applies CarriedStatus, so curing only the former resurrects the poison.
+        var party = PartyWithLivingBench();
+        party.Members[1].Battle.Status = StatusCondition.Poison;
+        party.Members[1].CarriedStatus = new CarriedStatus(StatusCondition.Poison, 0);
+        party.Lead.CarriedStatus = new CarriedStatus(StatusCondition.Paralysis, 0);
+
+        var (p, _) = ApplyToPartyMember(
+            Item(18, "antidote", ItemCategory.StatusCure, cured: StatusCondition.Poison),
+            party,
+            targetSlot: 1
+        );
+
+        Assert.Null(p.Members[1].CarriedStatus);
+        Assert.Equal(StatusCondition.Paralysis, p.Lead.CarriedStatus?.Status); // other members untouched
+    }
+
+    [Fact]
+    public void FullRestore_AlsoClearsTheCarriedStatus()
+    {
+        var c = TestCreatures.Make(hp: 200);
+        c.Attributes.ReceiveDamage(100);
+        c.Battle.Status = StatusCondition.Poison;
+        c.CarriedStatus = new CarriedStatus(StatusCondition.Poison, 0); // Gen 1 carries Toxic out as Poison
+
+        var (user, _) = Apply(
+            Item(23, "full-restore", ItemCategory.Healing, healsAll: true, curesAll: true),
+            c
+        );
+
+        Assert.Null(user.CarriedStatus);
+    }
+
+    [Fact]
     public void Antidote_OnFaintedBenchMember_HasNoEffect()
     {
         var party = PartyWithLivingBench();
