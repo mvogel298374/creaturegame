@@ -1,0 +1,25 @@
+/* Dev Mode enemy overview card — same plate as the Settings modal (the other read-only, escapable popup),
+   sized for the tabbed INFO / STATS / MOVES sheet and scrolling if the viewport is short. */
+.enemy-overview-modal {
+  width: min(520px, 94%);
+  max-height: 90%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  padding: var(--sp-sm);
+  background: var(--clr-bg-deep);
+  color: var(--clr-text);
+  border: 2px solid var(--clr-text);
+  border-radius: 4px;
+}
+
+/* The panel's height:100% is for the in-field CHECK POKEMON slot; in a shrink-wrapped card it must size to content. */
+.enemy-overview-modal .overview-panel {
+  height: auto;
+}
+
+[data-generation="gen1"] .enemy-overview-modal {
+  background: var(--ks-fill);
+  color: var(--ks-ink);
+  border: 2px solid var(--ks-ink);
+}
