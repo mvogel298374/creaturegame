@@ -38,8 +38,8 @@ hard dependency chain.
   formula/animation. *(Item acquisition itself is already done via the Run Economy; bag persistence + catch
   remain.)*
 - **Tier 3 — Game Loop & Progression** — progressive difficulty (good pairing point for the remaining
-  stone-evolution encounter-level design question — see *Known Gaps* — now that the level/trade-gated half has
-  shipped as **Species selection respects each species' evolution-chain floor**), the `PlayerSave`/`save.db`
+  per-area encounter-table question — see *Known Gaps* — now that evolved forms, stone lines included, are
+  level-floored via **Species selection respects each species' evolution-chain floor**), the `PlayerSave`/`save.db`
   layer (+ the heavier session-persistence option beyond the lightweight **Session Resume** already shipped),
   Stone evolutions (waits on Catch above). Party + between-biome lead + forced-switch are done.
 - **Tier 4 — opportunistic polish + test-infra loose ends:** Web UI Polish (move-specific animations, text
@@ -1007,26 +1007,19 @@ findings" as an open section.)*
   `GENERATION_SEAMS.md` §2. It rewrites `Battle`'s central turn loop: needs a `/plan`, `opus-engineer`
   implementation, and both review gates. **Not yet decided when to plan it — unscheduled, deliberately not
   placed in the tier list.**
-- **Wild/draft selection has no evolution-stage or natural-minimum-level awareness — PARTIALLY FIXED
-  (2026-09-18).** Raised 2026-09-12 after the user met a level-25 Exeggcutor and asked why, given Exeggcutor
-  doesn't even have a level-based evolution (it's a Leaf Stone evolution from Exeggcute — so "before its
-  evolution level" doesn't literally apply, but the underlying surprise is real). **The level/trade-gated half
-  of this gap is now fixed:** `EvolutionMinLevel.Compute` (`ENCOUNTER_DESIGN.md` §3.8) walks each species' Gen 1
-  evolution chain and floors it at the level a `Level`-trigger edge requires (or the trade-evolution stand-in
-  level for a `Trade` edge), and `EncounterFactory` filters the species pool by that floor — against the
-  player's rolled level — before `PickByBst` runs, in both `CreateEnemyAsync` (wild/Elite/Boss) and
-  `TryBuildDraftAsync`. A level-20 Charizard (needs 36) can no longer spawn. **What's still open:** a
-  `Stone`-trigger edge adds **no** floor by design (a stone can legitimately be used at any level in real
-  Gen 1, so a wild stone-evolved species can be any level there too) — so the original Exeggcutor report
-  itself is *not* covered by this fix and remains exactly the gap it always was. (The same sighting's "only 2
-  moves, one being Bind" report was a misread — closed no-defect 2026-09-20, `TODO_ARCHIVE.md`.) The broader design question
-  also stands: `PickByBst`/`ScaleWildLevel` still select purely by BST band with no per-area/per-level
-  encounter table at all (`ENCOUNTER_DESIGN.md` confirms this is deliberate), so a stone-evolved, high-BST
-  species can still surface far below where the original games would ever place it (Cerulean Cave is a
-  late/post-game area; this system has no notion of "late-game area"). Open question for a real design pass:
-  is this worth a stage-aware weighting for stone evolutions too (e.g. fold in each species' real minimum
-  game-data encounter level as a soft floor), or is "no stone-evolution level gating, BST is the only lever"
-  an accepted tradeoff of the roguelite's simplified encounter model. No `/plan` done on the remaining piece.
+- **Wild/draft selection has no per-area or natural-minimum-level awareness — evolution floors DONE, the broader
+  question open.** Raised 2026-09-12 after the user met a level-25 Exeggcutor. The evolution-stage half is fixed:
+  `EvolutionMinLevel.Compute` (`ENCOUNTER_DESIGN.md` §3.8) floors every evolved species at the level its chain
+  requires — a `Level` edge's threshold, the trade-evolution stand-in (37), and, since 2026-10-02, a flat
+  **`StoneEvolutionLevel` (30)** for a `Stone` edge — and `EncounterFactory` filters the pool by it before
+  `PickByBst` (wild/Elite/Boss and draft); full record in `TODO_ARCHIVE.md` (*Species selection respects each
+  species' evolution-chain floor*; *Level-Gated Strong/Boss Movesets* for the stone floor). **What's still open:**
+  `PickByBst`/`ScaleWildLevel` select purely by BST band with no per-area/per-level encounter table (`ENCOUNTER_DESIGN.md`
+  confirms this is deliberate), so a high-BST species can still surface far below where the original games would place
+  it (Cerulean Cave is a late/post-game area; this system has no notion of "late-game area"). Open question for a
+  real design pass: is a per-species real-game minimum encounter level worth folding in as a soft floor, or is "BST is
+  the only lever beyond the evolution floor" an accepted tradeoff of the roguelite's simplified encounter model. No
+  `/plan` done on this remaining piece.
 - Enemy encounter pool ignores game version — filter by `PokemonGameAvailability` once a version selector exists.
 - Enemy Pokémon do not evolve — wire into level-up when Game Loop is built.
 - ~~**Endless-chain double-faint**~~ — **RESOLVED 2026-07-28**: a mutual end-of-turn DoT double-faint now counts

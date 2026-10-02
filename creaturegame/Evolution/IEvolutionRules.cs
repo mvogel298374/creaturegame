@@ -45,7 +45,8 @@ public interface IEvolutionRules
     /// Gen 1: a <see cref="EvolutionTrigger.Level"/> edge returns its own threshold; a
     /// <see cref="EvolutionTrigger.Trade"/> edge returns this roguelite's trade-to-level stand-in
     /// (<see cref="Gen1EvolutionRules.TradeEvolutionLevel"/>); a <see cref="EvolutionTrigger.Stone"/> edge
-    /// returns 0 — a stone can be used at any level in real Gen 1, so it imposes no floor of its own.
+    /// returns <see cref="Gen1EvolutionRules.StoneEvolutionLevel"/> — an encounter-only floor, since real Gen 1 puts
+    /// no level requirement on a stone (<c>ENCOUNTER_DESIGN.md §3.8</c>).
     /// </summary>
     int MinLevelFor(PokemonEvolution edge);
 }

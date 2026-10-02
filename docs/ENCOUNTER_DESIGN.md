@@ -281,15 +281,56 @@ is deterministic).
 ### 3.5 Moveset levels (3-tier quality axis)  *(✅ implemented — `LearnsetMoveSelector`)*
 
 Two new `MoveSelectionStrategy` values (`TmEnhanced`, `Optimal`) — deterministic top-N by a shared `MoveScore`
-(power × STAB). **No level gate** — the strong/optimal
-pools always pick the best moves for the creature's types; *level only drives stats*, so a boss-grade enemy can
-punch above its level (intended).
+(power × STAB), drawn from the **species-legal *and level-legal*** pool (rule below). A boss-grade enemy still
+punches above its level through stats and DVs, but never through a move it couldn't plausibly own yet.
 
 | Level | Pool | Notes |
 |:--|:--|:--|
-| **Base** | species **level-up** learnset | current `CanonicalLatest` (player) / `WeightedSmart` (enemy) — unchanged |
-| **TmEnhanced** | level-up **+ TM/HM-legal** same-type strong moves | needs real TM/HM data (§3.6) |
-| **Optimal** | the **same species-legal pool as TmEnhanced** (level-up + TM/HM), scored the same way | the boss-grade tier — computes an identical moveset to TmEnhanced for a given species; Boss stays stronger via the DV/level/BST levers, not the moveset (fixed 2026-09-27, `TODO_ARCHIVE.md` → *Boss/Strong "Optimal" moveset could hand a species moves it could never legally learn*) |
+| **Base** | species **level-up** learnset, `LearnLevel <= level` | current `CanonicalLatest` (player) / `WeightedSmart` (enemy) — unchanged |
+| **TmEnhanced** | level-up **+ TM/HM-legal** same-type strong moves, level-gated | needs real TM/HM data (§3.6) |
+| **Optimal** | the **same species- and level-legal pool as TmEnhanced** (level-up + TM/HM), scored the same way | the boss-grade tier — computes an identical moveset to TmEnhanced for a given species; Boss stays stronger via the DV/level/BST levers, not the moveset (fixed 2026-09-27, `TODO_ARCHIVE.md` → *Boss/Strong "Optimal" moveset could hand a species moves it could never legally learn*) |
+
+**Level legality (2026-10-02).** These tiers used to ignore learn level entirely ("level only drives stats"), so
+an L10 Elite Psyduck could open with Hydro Pump — a level-up row at 52 that the strong pool never checked. A move
+is now legal for a creature at level L when:
+
+1. the species learns it by **level-up** → `LearnLevel <= L` (the species' own row wins; no extra data), or
+2. the species learns it **only by TM/HM** → `L >= Attack.MinLevel`, the move's curated floor.
+
+Implemented in `LearnsetMoveSelector.IsLevelLegal`; the floor is passed in as `machineFloor` — a **required**
+parameter on `SelectWithFallback` (pass `null` explicitly for "no floor", which leaves Machine rows ungated), so a
+Strong/Boss caller can't forget it and silently lose the gate. `EncounterFactory.BuildCreature` supplies
+`EncounterFactory.MachineFloorOrThrow`, which throws on a TM/HM move with no `MinLevel` (below).
+
+- **Why `MinLevel` is a curated table, not "the lowest level the move appears at in a wild Pokémon".** That was
+  the first idea and the data refutes it: Gyarados has Hydro Pump as a *level-1* row, so a global minimum is 1 and
+  gates nothing; ~half the TM moves have no level-up row on any species; and where one exists it is a poor proxy
+  for a TM (Body Slam → 25, Mega Punch → 20). A TM is a *progression* item, so its floor is when a player can first
+  own it: the typical party level at its earliest Red/Blue source (Mt. Moon 12 … Viridian Gym 47). One table over
+  all 55 TM/HM moves (`PokeApiConnector/PokeAPI/MoveMinLevels.cs`, data → `DATA_IMPORT.md` §4.1.1); null for every
+  non-machine move, which `MinLevel` is never read for.
+- **No "gate came up empty" fallback.** An empty gated pool would fall through to `SelectWithFallback`'s random
+  moves, bypassing the gate — but it can't happen for a real species: every species has a level-1 level-up row,
+  legal at any level (pinned by `StrongTierMoveLevelGateTests.EverySpecies_HasALevelOneLevelUpMove_…`). A level-up
+  fallback would be dead code, since any level-up row legal at L already passes the gate.
+- **A missing floor fails loudly.** `EncounterFactory.MachineFloorOrThrow` is `m.MinLevel ?? throw`, evaluated only
+  for TM/HM-learned moves, so a stale `moves.db` (never run through `-- move-levels`) throws instead of silently
+  leaving the move ungated. Covered by `EncounterFactoryMachineFloorTests`, including through the real selector.
+- **Level-1 power moves are not a data bug.** A few species carry high-power level-1 level-up rows — Gyarados'
+  Hydro Pump is genuine Gen 1 (Bite/Dragon Rage/Hydro Pump/Leer at level 1), as are the legendary and evolved-form
+  starting kits (Nidoking Thrash, Arcanine Take Down, Dugtrio Earthquake…). They are legal at any level *for that
+  species*, which is why the evolution floor (§3.8) and the keeping of legendaries out of the wild pool matter:
+  they are what keep those species from appearing at level 5.
+- **Floors are verified, with one reviewer concern rejected.** Body Slam (S.S. Anne) and Dream Eater (Viridian
+  City, after Giovanni) were checked against several sources; Psychic/Mimic stay at 40 — Mr. Psychic's and
+  Copycat's houses in Saffron don't require clearing Silph Co. The values are pinned by
+  `MoveMappingTests.CuratedFloors_PinKnownRedBlueSources`.
+- ⚠️ **Two places change together:** a test that independently recomputes a strong tier's expected moveset
+  (`Boss_MovesetMatchesTmEnhanced…`) must pass the same `machineFloor` as the factory, or its oracle drifts — which
+  is why the policy is a named method (`EncounterFactory.MachineFloorOrThrow`) that both use, not a lambda each.
+  End-to-end pin: `StrongTierMoveLevelGateTests` (no Strong/Boss enemy holds a move before its legality level).
+- **Fidelity caveat.** The floors approximate party level at each TM's earliest source, not a Gen 1 rule — a
+  tuning table, to be adjusted by play, not a canon claim.
 
 ### 3.6 Sub-task: import real TM/HM learnability *(gates TmEnhanced)*  *(✅ done — incl. re-import)*
 
@@ -338,8 +379,13 @@ edges it's given and asks the injected `IEvolutionRules.MinLevelFor(edge)` what 
 already documents ("the *interpretation* … lives here"). `Gen1EvolutionRules.MinLevelFor` returns: a **`Level`**
 edge's own `LevelThreshold`; a **`Trade`** edge's floor at `TradeEvolutionLevel` (37) — this roguelite's
 no-trading stand-in already treats trade evolutions as a level-37 floor, so encounters honor the same rule; a
-**`Stone`** edge's floor at `0` — a stone can be used at any level in real Gen 1 (a wild Vileplume can
-legitimately be level 5), so it adds no floor of its own. A future generation with different trigger semantics
+**`Stone`** edge's floor at `StoneEvolutionLevel` (30) — a stone can be used at any level in real Gen 1 (a wild
+Vileplume can legitimately be level 5), but this roguelite's rule is that **a player never fights an evolved form
+before it could plausibly exist**, and a stone line has no level to anchor that to. *(Changed 2026-10-02: this was
+`0` until the Level-Gated Strong/Boss Movesets review — stone-evolved forms such as Nidoking/Arcanine/Poliwrath carry
+level-1 power moves in their learnsets, so a floor-0 stone line could be fought at level 5 holding Thrash or
+Earthquake.)* 30 is a flat tuning constant like the trade stand-in, not a canonical value; it shapes encounters
+only, never when an evolution fires (stones are still dormant, §3.8's `CheckEvolution` is unchanged). A future generation with different trigger semantics
 (or new triggers — happiness, time-of-day, held-item) supplies its own `IEvolutionRules` implementation; this
 walk needs no edit (originally shipped hardcoding `Gen1EvolutionRules.TradeEvolutionLevel` directly, caught and
 fixed the same day by `pr-review` — the exact leak shape `TestAltProfile` exists to catch).
@@ -362,14 +408,17 @@ quietly reintroduce the bug it fixes:**
   Fixed by filtering `pool` to the biome's theme first, so the level filter's fallback (reverting to the
   unfiltered pool when nothing survives) can only ever fall back *within* that theme, matching `PickByBst`'s
   own invariant instead of racing past it.
-  **Accepted residual: theme still wins over the floor in the doubly-degenerate case.** If a biome's themed
-  pool has *zero* species clearing the level floor, `FilterByMinLevelAsync`'s `fallback: true` path reverts to
-  the full themed pool, ignoring the floor — so the evolution-floor invariant this feature exists for can, in
-  that one case, still lose to theme continuity. This is a deliberate choice (re-confirmed in the
-  `requirements-review` pass), not an oversight: it cannot currently fire (verified against all 18 Kanto
-  biomes' rosters at today's level curve), and widening the search off-theme instead was judged not worth the
-  added complexity for a case with no live repro. If a future biome/roster change makes this reachable, revisit
-  the precedence call then rather than pre-solving it now.
+  **Doubly-degenerate case: theme still wins over the floor, but only by the minimum.** If a biome's themed
+  pool has *zero* species clearing the level floor, `FilterByMinLevel`'s `fallback: true` path returns the themed
+  species with the **lowest** floor (every tie) — the least premature form — rather than the whole themed pool.
+  *(Changed 2026-10-02: it used to return the whole themed pool, so one under-leveled evolved form could be
+  picked at random from it, against the "never fight an evolved form before it can evolve" rule.)* The floor can
+  still lose to theme continuity in that one case, and it cannot currently fire (verified against all 18 Kanto
+  biomes' rosters at today's level curve), so widening the search off-theme remains declined; if a future
+  biome/roster change makes it reachable, revisit the precedence call then.
+- **Legendaries/statics are not in scope here, deliberately:** `Static`/`Gift`/`Trade`/`Event`/`GameCorner`
+  species are excluded from the wild pool (§2), so no encounter can currently produce one. If a legendary
+  encounter is ever added it needs its own floor — the evolution-chain floor above gives a base-form legendary 0.
 - **Draft (`fallback: false`): decline the offer instead of falling back.** The draft's fought-only pool
   (§4) resets near-empty at every biome entry, and an Elite-tier catch early in a fresh biome is ordinary — so
   it's a routine occurrence, not a rare edge case, for the next draft roll's level to land below every fought

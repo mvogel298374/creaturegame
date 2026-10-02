@@ -8,6 +8,94 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Level-Gated Strong/Boss Movesets ✅ DONE (2026-10-02)
+
+*(Moved here from `TODO.md` → *Level-Gated Strong/Boss Movesets*; the full record, including the review follow-ups
+and the user-adjudicated waivers, lives here. Planned and implemented 2026-10-02.)*
+
+**Bug:** an L10 Elite Psyduck could open with Hydro Pump. `LearnsetMoveSelector.Select` skipped the learn-level
+check for `TmEnhanced` (Strong) and `Optimal` (Boss) (`LearnsetMoveSelector.cs`, the `Optimal or TmEnhanced`
+branch), and `EncounterFactory.CreateEnemyAsync` fed those tiers every level-up row plus every Machine row.
+Psyduck's Hydro Pump is a level-up row at 52, ignored. Base tiers already honored `LearnLevel <= level`. (Follow-on to
+*Boss/Strong "Optimal" moveset could hand a species moves it could never legally learn*, 2026-09-27, which made the
+pool species-legal but left it level-ungated.)
+
+**Why not "global min level the move appears at":** `PokemonLearnset` has Gyarados learning Hydro Pump at level 1 (a
+starting move), so the global minimum is 1 and gates nothing. 18 of the 55 TM-learnable moves have no level-up row on
+any species, so they'd have no floor at all. `PokemonGameAvailability` carries no encounter levels either
+(Wild/Static/etc. per version only).
+
+**Legality rule (decided 2026-10-02):** a move is legal for a creature at level L if
+1. the species learns it by **level-up** → only if `LearnLevel <= L` (the species' own row wins; no new data), or
+2. the species learns it **only by TM/HM** → only if `L >= Attack.MinLevel`.
+
+`Attack.MinLevel` (new nullable column, `moves.db`) is a **hand-curated floor for every TM/HM move** (all 55), keyed
+by when the TM is obtainable in Red/Blue (`PokeApiConnector/PokeAPI/MoveMinLevels.cs`; source: pokemondb.net Red/Blue
+TM + HM tables; a TM with several sources takes the earliest). Null for every non-machine move.
+*Changed from the original plan (2026-10-02):* the plan derived a level-up minimum for TMs that other species also
+level-up learn, and curated only the 18 TM-only moves. Data showed the level-up minimum is a poor proxy for a TM (Body
+Slam → 25, Mega Punch → 20, ~half the TMs have none) and `MinLevel` is only ever read for Machine rows, so one curated
+table over all 55 is simpler and more accurate. No power-curve fallback was needed.
+
+**As built:**
+- **Selector** — the `TmEnhanced`/`Optimal` branch of `LearnsetMoveSelector.Select` gates level-up rows on
+  `LearnLevel <= level` and Machine rows on a `machineFloor` (`Func<Attack,int>?`). It is a **required** parameter on
+  `SelectWithFallback` (pass `null` explicitly for "no floor", which leaves Machine rows ungated — required so a
+  future Strong/Boss caller can't forget it, a `pr-review` advisory). `EncounterFactory` passes
+  `MachineFloorOrThrow`, which **throws** on a TM/HM move with no `MinLevel` (a stale `moves.db`) rather than passing
+  it ungated; it is a named method so the Boss-oracle test uses the factory's exact policy. Tests: `LearnsetMoveSelectorTests` (Psyduck-style level-up gate, Machine floor, rewritten
+  strong-tier legality cases).
+- **Empty-gate fallback — resolved, no code change.** The worry was `SelectWithFallback`'s *random* fallback bypassing
+  the gate when the gated pool is empty. A fallback to the level-up pick is dead code: any level-up row legal at the
+  level already passes the strong-tier gate, so it could never add a move. The gate can only empty if a species has no
+  level-1 level-up row, and every species has one (data check 2026-10-02), so the random fallback stays the "importer
+  not run" last resort only. Invariant pinned by `StrongTierMoveLevelGateTests.EverySpecies_HasALevelOneLevelUpMove_…`.
+- **Data** — `Attack.MinLevel` + `AddMoveMinLevel` migration; the curated table (`MoveMinLevels`), set by
+  `MoveImport.MapToAttack` on a full import (so `Moves.Update` can't wipe it), plus an offline
+  `dotnet run --project PokeApiConnector -- move-levels` that re-applies it to an existing `moves.db` without the
+  network — used to update the committed `moves.db` (55 moves). `EncounterFactory.BuildCreature` passes the floor.
+  Tests: `MoveMappingTests` (mapper), `StrongTierMoveLevelGateTests` (live-DB pin: every Machine-learned move has a
+  floor and no other move does; Strong/Boss enemies never hold a move before its legality level over 60 seeds each),
+  and `Boss_MovesetMatchesTmEnhanced…` now recomputes with the floor.
+  **Gotcha:** the dev stack/MCP keeps `moves.db` open in WAL mode, so an edit can sit in `moves.db-wal` and leave the
+  committed file unchanged — run `PRAGMA wal_checkpoint(TRUNCATE)` (done here) before committing a `.db`. Floors are
+  an approximation of party level at each TM's earliest source; `requirements-review` should sanity-check the table.
+- **Tests** — the planned test list is covered by the three suites above (Psyduck L10-vs-L52 gate, TM floor
+  below/at/above, move-less guard via the level-1 invariant pin, `MinLevel` mapper + live-DB pins, rewritten
+  `LearnsetMoveSelectorTests` strong-tier cases).
+- **Docs** — `ENCOUNTER_DESIGN.md` §3.5 rewritten (level-legality rule, why a curated table rather than a derived
+  minimum, why no empty-gate fallback, the two-places-change-together hazard); `DATA_IMPORT.md` §4.1.1 (the table,
+  `move-levels` command, pins), §3 standalone-stage list, §6 WAL gotcha; `LearnsetMoveSelector` enum docs and
+  `Attack.MinLevel` comment cut to pointers.
+
+**Review follow-ups (all gates ran 2026-10-02; `requirements-review` raised 7 items, `pr-review` requested 3 docs fixes
++ 2 recommended + 1 advisory — all applied; `pr-review` was not re-run, per the repo's no-fix-loop rule):**
+- **Stone-evolved encounter floor (user's direction).** `Gen1EvolutionRules.StoneEvolutionLevel = 30` makes a stone
+  edge floor encounters at 30 (via `IEvolutionRules.MinLevelFor`; it never changes when an evolution fires). Previously
+  `0`, so a stone-evolved form carrying level-1 power moves (Nidoking Thrash, Arcanine Take Down…) could be fought at
+  level 5. A flat tuning constant like `TradeEvolutionLevel`, not a canonical value. `ENCOUNTER_DESIGN.md` §3.8 +
+  `PRODUCT_SPEC.md` §3 updated; tests in `EvolutionMinLevelTests` / `Gen1EvolutionRulesTests`.
+- **`FilterByMinLevel` fallback (user's direction).** The wild/Elite/Boss `fallback: true` path now returns the themed
+  species with the *lowest* floor (every tie) instead of the whole themed pool. Cannot fire against today's Kanto
+  rosters. Tests in `EncounterFactoryFilterByMinLevelTests`.
+- **Floor policy.** A Machine move with no `MinLevel` throws (`MachineFloorOrThrow`); `machineFloor` is required on
+  `SelectWithFallback`; `MoveMappingTests.CuratedFloors_PinKnownRedBlueSources` pins seven anchor floors; the
+  level-1-row invariant pin moved to `StrongTierMoveLevelGateTests`; `EncounterFactoryMachineFloorTests` covers the
+  throw (including through the real selector). Floors verified: Body Slam (S.S. Anne) and Dream Eater (Viridian City,
+  after Giovanni) against several sources; Psychic/Mimic stay at 40 (Saffron's Mr. Psychic/Copycat need no Silph).
+- **Adjudicated by the user:** *accepted* — a species' own level-up row beats a TM (`LearnsetMapper` keeps a move that
+  is both as level-up only; matches Gen 1), `MinLevel` rides the planned per-`(moveId, generation)` `Attack` split (no
+  generation key now), floors as an approximate tuning table against this game's level curve, a gated pool that holds
+  only weak moves; *waived* — Gyarados' level-1 Hydro Pump (genuine Gen 1: Bite/Dragon Rage/Hydro Pump/Leer at level 1);
+  *confirmed* — Boss has no moveset edge over Strong (it never did after the 2026-09-27 legality fix); a Boss punches
+  above through a higher level (stats/DVs/BST), or later other levers such as a party, never a wider or ungated pool.
+- **Not run / open observations:** E2E was not run (opt-in) — seed-walking specs (`walkSeedsUntil`) may land on
+  different species below level 30 now that stone forms are filtered; recommend `.\e2e.ps1 -Spec <spec>` if a spec
+  flakes. Drafts decline more often below level 30 in biomes whose fought pool is mostly stone-evolved forms (a
+  consequence of the tuning call, not a defect).
+
+---
+
 ## Frontend tech debt — segment `BattleScreen.css` ✅ DONE (2026-10-01)
 
 *(Moved here from `TODO.md` → Generation Profile → Stage 4d+. A pure-move refactor; no player-visible change.)*

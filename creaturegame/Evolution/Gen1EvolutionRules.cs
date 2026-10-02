@@ -29,6 +29,15 @@ public sealed class Gen1EvolutionRules : IEvolutionRules
     /// </summary>
     public const int TradeEvolutionLevel = 37;
 
+    /// <summary>
+    /// The lowest level a stone-evolved form may be <em>encountered</em> at: stone lines have no level
+    /// requirement in real Gen 1, but no stone can be used yet and a player must not fight an evolved form before
+    /// it could plausibly exist. A game-mode tuning constant (like <see cref="TradeEvolutionLevel"/>), not a
+    /// canonical value — rationale → <c>ENCOUNTER_DESIGN.md</c> §3.8. Affects encounter floors only, never when
+    /// an evolution fires.
+    /// </summary>
+    public const int StoneEvolutionLevel = 30;
+
     public EvolutionResult? CheckEvolution(
         Creature creature,
         EvolutionContext context,
@@ -71,6 +80,7 @@ public sealed class Gen1EvolutionRules : IEvolutionRules
         {
             EvolutionTrigger.Level => edge.LevelThreshold ?? 0,
             EvolutionTrigger.Trade => TradeEvolutionLevel,
-            _ => 0, // Stone: no level requirement in real Gen 1 (usable at any level)
+            EvolutionTrigger.Stone => StoneEvolutionLevel,
+            _ => 0,
         };
 }

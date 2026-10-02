@@ -106,23 +106,38 @@ public class EvolutionMinLevelTests
     }
 
     [Fact]
-    public void StoneEdge_AddsNoFloorOfItsOwn()
+    public void StoneEdge_FloorsAtTheStoneEvolutionLevel()
     {
-        // Vulpix(37) → Ninetales(38) via Fire Stone: real Gen 1 places no level requirement on a stone
-        // evolution, so a wild Ninetales can legitimately be any level.
+        // Vulpix(37) → Ninetales(38) via Fire Stone: real Gen 1 has no level requirement, but an evolved form
+        // is never encountered before the roguelite's StoneEvolutionLevel (ENCOUNTER_DESIGN.md §3.8).
         var edges = new[] { Stone(37, 38, 82) };
 
-        Assert.Equal(0, EvolutionMinLevel.Compute(38, edges, Gen1Rules));
+        Assert.Equal(
+            Gen1EvolutionRules.StoneEvolutionLevel,
+            EvolutionMinLevel.Compute(38, edges, Gen1Rules)
+        );
     }
 
     [Fact]
-    public void StoneEdge_StillInheritsItsPredecessorsFloor()
+    public void StoneEdge_StillInheritsItsPredecessorsFloor_WhenHigher()
     {
-        // Poliwag(60) →@25 Poliwhirl(61) → Poliwrath(62) via Water Stone: the stone itself adds nothing, but
-        // Poliwrath still can't be below the level it took to become Poliwhirl in the first place.
+        // The chain floor is a max: a predecessor edge above the stone floor wins.
+        int high = Gen1EvolutionRules.StoneEvolutionLevel + 10;
+        var edges = new[] { Level(60, 61, high), Stone(61, 62, 84) };
+
+        Assert.Equal(high, EvolutionMinLevel.Compute(62, edges, Gen1Rules));
+    }
+
+    [Fact]
+    public void StoneEdge_PredecessorBelowTheStoneFloor_FloorsAtTheStoneLevel()
+    {
+        // Poliwag(60) →@25 Poliwhirl(61) → Poliwrath(62) via Water Stone: 25 < the stone floor, so the stone wins.
         var edges = new[] { Level(60, 61, 25), Stone(61, 62, 84) };
 
-        Assert.Equal(25, EvolutionMinLevel.Compute(62, edges, Gen1Rules));
+        Assert.Equal(
+            Gen1EvolutionRules.StoneEvolutionLevel,
+            EvolutionMinLevel.Compute(62, edges, Gen1Rules)
+        );
     }
 
     [Fact]

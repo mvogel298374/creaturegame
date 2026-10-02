@@ -259,7 +259,8 @@ public class RunSeedReproducibilityTests
                 movesById,
                 boss.Level,
                 boss.Type1 ?? DamageType.Normal,
-                boss.Type2
+                boss.Type2,
+                machineFloor: EncounterFactory.MachineFloorOrThrow
             );
 
             Assert.Equal(expected.Select(m => m.Id), boss.MoveSet.Select(m => m.Base.Id));

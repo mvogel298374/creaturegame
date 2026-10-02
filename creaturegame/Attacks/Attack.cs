@@ -58,6 +58,11 @@ public class Attack
     // The fixed count is stable move data, so it lives here rather than in the gen rules.
     public int? MultiHitCount { get; set; }
 
+    // Earliest level a TM/HM-taught copy of this move is plausible on an enemy (the Strong/Boss tiers'
+    // Machine-row floor — see LearnsetMoveSelector). Null = no floor (not a TM/HM move). Curated import data;
+    // design + table source → docs/ENCOUNTER_DESIGN.md §3.5, docs/DATA_IMPORT.md.
+    public int? MinLevel { get; set; }
+
     public Attack() { }
 
     public Attack(string name, string description)

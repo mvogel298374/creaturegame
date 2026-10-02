@@ -13,16 +13,16 @@ public enum MoveSelectionStrategy
     WeightedSmart,
 
     /// <summary>
-    /// The strongest <em>species-legal</em> moves (level-up + TM/HM), ignoring learn level — a foe that has
-    /// been "taught" its best legal options. Drawn from the learnset rows the caller supplies (which must
-    /// include Machine rows); deterministic top-N by score. The Strong tier.
+    /// The strongest <em>species- and level-legal</em> moves (level-up + TM/HM) — a foe that has been "taught"
+    /// its best legal options. Drawn from the learnset rows the caller supplies (which must include Machine
+    /// rows); deterministic top-N by score. The Strong tier.
     /// </summary>
     TmEnhanced,
 
     /// <summary>
-    /// The strongest <em>species-legal</em> moves (level-up + TM/HM) for the creature's types, ignoring learn
-    /// level — the same legal pool as <see cref="TmEnhanced"/> (a species' real ceiling has only one legitimate
-    /// answer), never a move the species couldn't actually learn. Deterministic top-N by score. The Boss tier;
+    /// The strongest <em>species- and level-legal</em> moves (level-up + TM/HM) for the creature's types — the
+    /// same legal pool as <see cref="TmEnhanced"/> (a species' real ceiling has only one legitimate answer),
+    /// never a move the species couldn't actually learn at this level. Deterministic top-N by score. The Boss tier;
     /// Boss's edge over Strong lives entirely in the other <c>EnemyTierSpec</c> levers (DVs/level/BST), not a
     /// wider move pool — see <c>ENCOUNTER_DESIGN.md</c> §3.5.
     /// </summary>
@@ -65,17 +65,21 @@ public static class LearnsetMoveSelector
         DamageType type1,
         DamageType? type2,
         IRandomSource? rng = null,
-        int maxMoves = MaxMoves
+        int maxMoves = MaxMoves,
+        Func<Attack, int>? machineFloor = null
     )
     {
-        // The strong tiers ignore learn level and pick the best moves by score, deterministically, from the
-        // species-legal pool — Optimal and TmEnhanced share this pool (never a move the species can't learn);
-        // Boss's edge over Strong lives in the other EnemyTierSpec levers, not a wider move pool.
+        // The strong tiers pick the best moves by score, deterministically, from the species-legal pool that is
+        // also level-legal at this level (see IsLevelLegal) — Optimal and TmEnhanced share this pool (never a
+        // move the species can't learn); Boss's edge over Strong lives in the other EnemyTierSpec levers, not a
+        // wider move pool.
         if (strategy is MoveSelectionStrategy.Optimal or MoveSelectionStrategy.TmEnhanced)
         {
-            // Species-legal pool: every learnset row the caller supplied (level-up + TM/HM), resolved to a move.
             var legal = learnset
-                .Where(l => movesById.ContainsKey(l.MoveId))
+                .Where(l =>
+                    movesById.ContainsKey(l.MoveId)
+                    && IsLevelLegal(l, movesById, level, machineFloor)
+                )
                 .Select(l => movesById[l.MoveId]);
             return SelectBest(legal, type1, type2, maxMoves);
         }
@@ -107,6 +111,11 @@ public static class LearnsetMoveSelector
     /// <see cref="Select"/>, and — if the species has no usable learnset entries (e.g. the
     /// importer hasn't been run) — falls back to <paramref name="maxMoves"/> random moves so a creature is
     /// never shipped move-less. Keeps the "what moves does a creature get" policy in one place.
+    /// <para>
+    /// <paramref name="machineFloor"/> is <b>required</b> (pass <c>null</c> explicitly for "no floor"): a caller
+    /// building a Strong/Boss creature that simply forgot it would otherwise compile and silently lose the level
+    /// gate (the same reasoning as <c>BuildCreature</c>'s un-defaulted <c>profile</c>).
+    /// </para>
     /// </summary>
     public static IReadOnlyList<Attack> SelectWithFallback(
         MoveSelectionStrategy strategy,
@@ -115,18 +124,43 @@ public static class LearnsetMoveSelector
         int level,
         DamageType type1,
         DamageType? type2,
+        Func<Attack, int>? machineFloor,
         IRandomSource? rng = null,
         int maxMoves = MaxMoves
     )
     {
         var source = rng ?? SystemRandomSource.Instance;
         var movesById = allMoves.ToDictionary(m => m.Id);
-        var moves = Select(strategy, learnset, movesById, level, type1, type2, source, maxMoves);
+        var moves = Select(
+            strategy,
+            learnset,
+            movesById,
+            level,
+            type1,
+            type2,
+            source,
+            maxMoves,
+            machineFloor
+        );
         if (moves.Count > 0)
             return moves;
 
         return allMoves.OrderBy(_ => source.Next(int.MaxValue)).Take(maxMoves).ToList();
     }
+
+    // Level legality for the strong tiers' pool. A level-up row is legal only once the creature has reached its
+    // learn level; a Machine (TM/HM) row has no learn level, so it is legal once the creature reaches the move's
+    // floor. A null machineFloor means no floor data is wired yet, so Machine rows stay ungated. Rationale →
+    // docs/ENCOUNTER_DESIGN.md §3.5.
+    private static bool IsLevelLegal(
+        PokemonLearnset row,
+        IReadOnlyDictionary<int, Attack> movesById,
+        int level,
+        Func<Attack, int>? machineFloor
+    ) =>
+        row.Method == LearnMethod.Machine
+            ? machineFloor is null || level >= machineFloor(movesById[row.MoveId])
+            : row.LearnLevel <= level;
 
     // The N moves with the highest learn level (candidates are already sorted that way).
     private static IReadOnlyList<Attack> SelectCanonicalLatest(

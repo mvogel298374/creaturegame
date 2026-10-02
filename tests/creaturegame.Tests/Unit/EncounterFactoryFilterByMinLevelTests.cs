@@ -44,10 +44,11 @@ public class EncounterFactoryFilterByMinLevelTests
     }
 
     [Fact]
-    public void NoneEligible_FallbackTrue_ReturnsTheFullUnfilteredPool()
+    public void NoneEligible_FallbackTrue_ReturnsOnlyTheLowestFloorSpecies()
     {
-        // Every species needs a higher level than the roll — the wild/Elite/Boss path prefers staying
-        // on-theme (the caller has already narrowed `pool` to the biome) over enforcing the floor.
+        // Every species needs a higher level than the roll — the wild/Elite/Boss path stays on-theme (the caller
+        // has already narrowed `pool` to the biome) but hands back only the least premature form (floor 7),
+        // never the whole pool and its higher-floor evolution (floor 10).
         var pool = new List<PokemonSpecies> { Species(2), Species(3) };
         var edges = new[] { Level(1, 2, 7), Level(2, 3, 10) };
 
@@ -59,7 +60,32 @@ public class EncounterFactoryFilterByMinLevelTests
             fallback: true
         );
 
-        Assert.Equal([2, 3], result.Select(s => s.Id));
+        Assert.Equal([2], result.Select(s => s.Id));
+    }
+
+    [Fact]
+    public void NoneEligible_FallbackTrue_KeepsEverySpeciesTiedAtTheLowestFloor()
+    {
+        var pool = new List<PokemonSpecies> { Species(2), Species(5), Species(3) };
+        var edges = new[] { Level(1, 2, 7), Level(4, 5, 7), Level(2, 3, 10) };
+
+        var result = EncounterFactory.FilterByMinLevel(
+            pool,
+            level: 1,
+            edges,
+            Rules,
+            fallback: true
+        );
+
+        Assert.Equal([2, 5], result.Select(s => s.Id));
+    }
+
+    [Fact]
+    public void EmptyPool_FallbackTrue_ReturnsEmpty()
+    {
+        var result = EncounterFactory.FilterByMinLevel([], level: 5, [], Rules, fallback: true);
+
+        Assert.Empty(result);
     }
 
     [Fact]

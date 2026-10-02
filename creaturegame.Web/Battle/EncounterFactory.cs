@@ -320,10 +320,12 @@ public sealed class EncounterFactory(
     /// is at or below <paramref name="level"/> — no wild/draft encounter may hand out a post-evolution species
     /// below the level it takes to reach that form (ENCOUNTER_DESIGN.md §3.8).
     /// <para>
-    /// When <paramref name="fallback"/> is true and nothing survives, returns the unfiltered <paramref
-    /// name="pool"/> instead — used only by the wild/Elite/Boss path, whose caller has already narrowed
-    /// <paramref name="pool"/> to the current biome's theme, so the fallback can never cross back into an
-    /// off-theme species (mirrors <see cref="EncounterSelector.PickByBst"/>'s own theme-preserving fallback).
+    /// When <paramref name="fallback"/> is true and nothing survives, returns the species of <paramref
+    /// name="pool"/> with the <em>lowest</em> floor (every tie) — the least premature form, not the whole pool —
+    /// used only by the wild/Elite/Boss path, whose caller has already narrowed <paramref name="pool"/> to the
+    /// current biome's theme, so the fallback can never cross back into an off-theme species (mirrors <see
+    /// cref="EncounterSelector.PickByBst"/>'s own theme-preserving fallback). Why not the whole pool →
+    /// <c>ENCOUNTER_DESIGN.md</c> §3.8.
     /// The draft path passes <c>fallback: false</c>: a drafted creature becomes a permanent party member, so
     /// an empty result there must decline the offer, never silently hand back an under-leveled species.
     /// </para>
@@ -336,11 +338,16 @@ public sealed class EncounterFactory(
         bool fallback
     )
     {
-        var eligible = pool.Where(s => EvolutionMinLevel.Compute(s.Id, edges, rules) <= level)
+        var floors = pool.Select(s =>
+                (Species: s, Floor: EvolutionMinLevel.Compute(s.Id, edges, rules))
+            )
             .ToList();
-        if (eligible.Count > 0)
+        var eligible = floors.Where(f => f.Floor <= level).Select(f => f.Species).ToList();
+        if (eligible.Count > 0 || !fallback || floors.Count == 0)
             return eligible;
-        return fallback ? pool : eligible;
+
+        int lowest = floors.Min(f => f.Floor);
+        return floors.Where(f => f.Floor == lowest).Select(f => f.Species).ToList();
     }
 
     private static async Task<List<PokemonSpecies>> FilterByMinLevelAsync(
@@ -611,6 +618,7 @@ public sealed class EncounterFactory(
             level,
             species.Type1,
             species.Type2,
+            MachineFloorOrThrow,
             rng,
             maxMoves
         );
@@ -619,6 +627,18 @@ public sealed class EncounterFactory(
             creature.AddAttack(move);
         return creature;
     }
+
+    /// <summary>
+    /// The Strong/Boss tiers' TM/HM level floor (<see cref="Attack.MinLevel"/>). The selector calls it only for
+    /// TM/HM-learned moves, and such a move with no floor means a stale <c>moves.db</c> — so it fails loudly rather
+    /// than silently leaving the move ungated (<c>ENCOUNTER_DESIGN.md</c> §3.5). A named method so the tests that
+    /// recompute a strong tier's expected moveset use exactly the factory's policy.
+    /// </summary>
+    internal static int MachineFloorOrThrow(Attack move) =>
+        move.MinLevel
+        ?? throw new InvalidOperationException(
+            $"TM/HM move '{move.Name}' has no MinLevel — run: dotnet run --project PokeApiConnector -- move-levels"
+        );
 
     /// <summary>
     /// Resolves a species' learnset rows (already filtered to the species + active generation) into the

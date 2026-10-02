@@ -85,6 +85,14 @@ public class Gen1EvolutionRulesTests
     }
 
     [Fact]
+    public void StoneEdge_HasAnEncounterFloorButNeverFiresOnLevelUp()
+    {
+        // The encounter floor (MinLevelFor) is separate from when an evolution fires (CheckEvolution).
+        Assert.Equal(30, Gen1EvolutionRules.StoneEvolutionLevel); // pin the documented constant
+        Assert.Equal(Gen1EvolutionRules.StoneEvolutionLevel, Rules.MinLevelFor(Stone(25, 26, 83)));
+    }
+
+    [Fact]
     public void StoneEdge_IsDormantOnLevelUp()
     {
         // No bag yet: a level-up never triggers a stone evolution, however high the level.

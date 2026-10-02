@@ -37,6 +37,15 @@ public class LearnsetMoveSelectorTests
             Generation = 1,
         };
 
+    private static PokemonLearnset MachineEntry(int moveId) =>
+        new()
+        {
+            MoveId = moveId,
+            LearnLevel = 0,
+            Method = LearnMethod.Machine,
+            Generation = 1,
+        };
+
     private static IReadOnlyDictionary<int, Attack> Dict(params Attack[] moves) =>
         moves.ToDictionary(m => m.Id);
 
@@ -297,7 +306,8 @@ public class LearnsetMoveSelectorTests
             level: 50,
             DamageType.Normal,
             null,
-            new SeededRandomSource(1)
+            machineFloor: null,
+            rng: new SeededRandomSource(1)
         );
 
         Assert.Equal(4, result.Count);
@@ -307,58 +317,124 @@ public class LearnsetMoveSelectorTests
     // --- Optimal / TmEnhanced (strong tiers) --------------------------------
 
     [Fact]
-    public void Learnset_Optimal_PicksBestSpeciesLegalMoves_IgnoringLevel_ExcludingIllegal()
+    public void Learnset_Optimal_PicksBestLegalMoves_ExcludingNotYetLearnedAndUnlearnable()
     {
-        // Optimal ranks the species-legal pool (level-up + TM/HM rows the caller supplies), ignoring level —
-        // exactly like TmEnhanced — but never a move the species can't actually learn (a Boss must never
-        // "cheat" past its real Gen 1 learnset, e.g. a Scyther can never roll Hydro Pump).
+        // Optimal ranks the species- and level-legal pool: a level-up row only counts once the creature has
+        // reached its learn level, and a move the species can't learn never appears (a Scyther can never roll
+        // Hydro Pump; an L5 Bulbasaur can't yet have a move it learns at 48).
         var moves = Dict(
             Move(1, "Tackle", 40, DamageType.Normal),
-            Move(2, "Vine Whip", 45, DamageType.Grass), // learned far above the creature's level
+            Move(2, "Vine Whip", 45, DamageType.Grass), // learned at 48, above the creature's level
             Move(3, "Razor Leaf", 55, DamageType.Grass), // a TM/HM (machine) move
             Move(9, "Hydro Pump", 110, DamageType.Water) // in the pool but NOT in the learnset → illegal
         );
-        var learnset = new[] { Entry(1, 1), Entry(2, 48), Entry(3, 0) };
+        var learnset = new[] { Entry(1, 1), Entry(2, 48), MachineEntry(3) };
 
         var result = LearnsetMoveSelector.Select(
             MoveSelectionStrategy.Optimal,
             learnset,
             moves,
-            level: 5, // below Vine Whip's learn level, but Optimal ignores level
+            level: 5,
             DamageType.Grass,
             null
         );
 
-        // Grass STAB: Vine Whip 67.5, Razor Leaf 82.5, Tackle 40 — all legal; Hydro Pump excluded (not learnable).
-        Assert.Equal(new[] { 3, 2, 1 }, result.Select(m => m.Id).ToArray());
-        Assert.DoesNotContain(result, m => m.Id == 9);
+        // Razor Leaf (machine, no floor wired) 82.5 and Tackle 40; Vine Whip is gated by level, Hydro Pump unlearnable.
+        Assert.Equal(new[] { 3, 1 }, result.Select(m => m.Id).ToArray());
     }
 
     [Fact]
-    public void Learnset_TmEnhanced_PicksBestSpeciesLegalMoves_IgnoringLevel_ExcludingIllegal()
+    public void Learnset_TmEnhanced_PicksBestLegalMoves_ExcludingNotYetLearnedAndUnlearnable()
     {
-        // TmEnhanced ranks the species-legal pool (level-up + TM/HM rows the caller supplies), ignoring level,
-        // but never a move the species can't learn.
         var moves = Dict(
             Move(1, "Tackle", 40, DamageType.Normal),
-            Move(2, "Solar Beam", 120, DamageType.Grass), // legal but learned far above the creature's level
+            Move(2, "Solar Beam", 120, DamageType.Grass), // learned at 48, above the creature's level
             Move(3, "Razor Leaf", 55, DamageType.Grass), // a TM/HM (machine) move
             Move(9, "Hydro Pump", 110, DamageType.Water) // in the pool but NOT in the learnset → illegal
         );
-        var learnset = new[] { Entry(1, 1), Entry(2, 48), Entry(3, 0) };
+        var learnset = new[] { Entry(1, 1), Entry(2, 48), MachineEntry(3) };
 
         var result = LearnsetMoveSelector.Select(
             MoveSelectionStrategy.TmEnhanced,
             learnset,
             moves,
-            level: 10, // below Solar Beam's learn level, but TmEnhanced ignores level
+            level: 10,
             DamageType.Grass,
             null
         );
 
-        // Grass STAB: Solar 180, Razor 82.5, Tackle 40 — all legal; Hydro Pump excluded (not learnable).
-        Assert.Equal(new[] { 2, 3, 1 }, result.Select(m => m.Id).ToArray());
-        Assert.DoesNotContain(result, m => m.Id == 9);
+        Assert.Equal(new[] { 3, 1 }, result.Select(m => m.Id).ToArray());
+    }
+
+    [Theory]
+    [InlineData(MoveSelectionStrategy.TmEnhanced)]
+    [InlineData(MoveSelectionStrategy.Optimal)]
+    public void Learnset_StrongTiers_LevelUpMove_BecomesLegalAtItsLearnLevel(
+        MoveSelectionStrategy strategy
+    )
+    {
+        // The Psyduck regression: Hydro Pump is a level-up row at 52, so an L10 Psyduck must not roll it but an
+        // L52 one may.
+        var moves = Dict(
+            Move(1, "Scratch", 40, DamageType.Normal),
+            Move(56, "Hydro Pump", 120, DamageType.Water)
+        );
+        var learnset = new[] { Entry(1, 1), Entry(56, 52) };
+
+        var atTen = LearnsetMoveSelector.Select(
+            strategy,
+            learnset,
+            moves,
+            10,
+            DamageType.Water,
+            null
+        );
+        var atFiftyTwo = LearnsetMoveSelector.Select(
+            strategy,
+            learnset,
+            moves,
+            52,
+            DamageType.Water,
+            null
+        );
+
+        Assert.DoesNotContain(atTen, m => m.Id == 56);
+        Assert.Contains(atFiftyTwo, m => m.Id == 56);
+    }
+
+    [Theory]
+    [InlineData(MoveSelectionStrategy.TmEnhanced)]
+    [InlineData(MoveSelectionStrategy.Optimal)]
+    public void Learnset_StrongTiers_MachineMove_RespectsItsFloor(MoveSelectionStrategy strategy)
+    {
+        var moves = Dict(
+            Move(1, "Tackle", 40, DamageType.Normal),
+            Move(3, "Earthquake", 100, DamageType.Ground)
+        );
+        var learnset = new[] { Entry(1, 1), MachineEntry(3) };
+        int Floor(Attack m) => m.Id == 3 ? 40 : 0;
+
+        var below = LearnsetMoveSelector.Select(
+            strategy,
+            learnset,
+            moves,
+            39,
+            DamageType.Normal,
+            null,
+            machineFloor: Floor
+        );
+        var atFloor = LearnsetMoveSelector.Select(
+            strategy,
+            learnset,
+            moves,
+            40,
+            DamageType.Normal,
+            null,
+            machineFloor: Floor
+        );
+
+        Assert.DoesNotContain(below, m => m.Id == 3);
+        Assert.Contains(atFloor, m => m.Id == 3);
     }
 
     [Fact]
@@ -437,7 +513,8 @@ public class LearnsetMoveSelectorTests
             level: 50,
             DamageType.Grass,
             null,
-            new SeededRandomSource(1)
+            machineFloor: null,
+            rng: new SeededRandomSource(1)
         );
 
         Assert.Equal(new[] { 1, 2 }, result.Select(m => m.Id).OrderBy(x => x).ToArray());

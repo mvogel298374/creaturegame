@@ -16,6 +16,16 @@ class Program
             return;
         }
 
+        // Offline: re-apply the curated TM/HM floors (Attack.MinLevel) to the existing moves.db — no network.
+        if (args.Length > 0 && args[0].Equals("move-levels", StringComparison.OrdinalIgnoreCase))
+        {
+            using var moveContext = new creaturegame.DB.MovesDbContext();
+            moveContext.EnsureDatabaseCreated();
+            int applied = await MoveMinLevels.ApplyToDatabaseAsync(moveContext);
+            Console.WriteLine($"Applied MinLevel floors to {applied} moves.");
+            return;
+        }
+
         // DATA_IMPORT.md §3 — the Docker-build asset stage; fails loudly on a partial fetch.
         if (args.Length > 0 && args[0].Equals("assets", StringComparison.OrdinalIgnoreCase))
         {

@@ -100,8 +100,10 @@ the linked design doc instead — pull it there and leave only the pointer here.
   takes to reach that form — e.g. a Charizard cannot appear below level 36 (the level Charmeleon evolves at).
 - A trade-evolved species (no in-run trading exists) uses this roguelite's trade-evolution stand-in level as
   its floor instead.
-- A stone-evolved species (e.g. Exeggcutor) has **no** level floor from this rule — a stone can be used at any
-  level in Gen 1, so a stone-evolved species can still appear at a low level.
+- A stone-evolved species (e.g. Exeggcutor) has a floor of level 30 (or its pre-evolution's floor, if higher) —
+  real Gen 1 puts no level on a stone, but a player never fights an evolved form before it could plausibly exist.
+- If a biome's themed pool has no species at or below the rolled level, the encounter uses the themed species
+  with the lowest floor, never an arbitrary evolved form from the pool.
 - Design detail → `ENCOUNTER_DESIGN.md` §3.8. History → `TODO_ARCHIVE.md` → *Species selection respects each
   species' evolution-chain floor*.
 
@@ -110,8 +112,13 @@ the linked design doc instead — pull it there and leave only the pointer here.
   level-up learnset plus any TM/HM it can legally learn) — it can never carry a move outside that pool.
 - Boss and Strong compute the identical moveset for a given species; Boss's edge over Strong comes entirely
   from its higher DVs, level, and BST, not from a wider move pool.
-- Design detail → `ENCOUNTER_DESIGN.md` §3.5. History → `TODO_ARCHIVE.md` → *Boss/Strong "Optimal" moveset
-  could hand a species moves it could never legally learn*.
+- A Boss- or Strong-tier enemy never holds a move above its level: a level-up move is allowed only at or above the
+  level that species learns it (an L10 Psyduck cannot roll Hydro Pump, learned at 52).
+- A move the species learns only by TM/HM is allowed only at or above that move's fixed per-move level floor (the
+  earliest level the TM is obtainable in Red/Blue); all 55 TM/HM moves carry a floor.
+- Design detail → `ENCOUNTER_DESIGN.md` §3.5, `DATA_IMPORT.md` §4.1.1. History → `TODO_ARCHIVE.md` → *Boss/Strong
+  "Optimal" moveset could hand a species moves it could never legally learn* and *Level-Gated Strong/Boss Movesets —
+  implementation*.
 
 ## 4. Progression (XP, leveling, evolution)
 *(not yet populated)*

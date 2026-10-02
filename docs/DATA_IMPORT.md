@@ -80,8 +80,9 @@ Steps 2 and 3 follow the same **index-then-detail** shape: hit the *generation* 
 endpoint and map it. Items can't use that shape — there is no `/generation/{n}` item list — so
 step 5 fetches a hand-curated roster by slug instead (§4.5).
 
-**Three stages can be re-run standalone**, each idempotent, without the full network-heavy import:
-`-- evolutions`, `-- items` (also re-downloads item sprites), and `-- assets` (sprites + item sprites +
+**Four stages can be re-run standalone**, each idempotent, without the full network-heavy import:
+`-- evolutions`, `-- items` (also re-downloads item sprites), `-- move-levels` (re-applies the curated TM/HM
+`Attack.MinLevel` floors to the existing `moves.db`, offline — §4.1.1), and `-- assets` (sprites + item sprites +
 cries only — no DB import). `-- assets` exists specifically for the Docker image build: sprite/cry
 files are gitignored runtime assets, never checked in, so a clean container checkout has none — and
 unlike the full interactive import (a human watching the console), a build step must **fail loudly**
@@ -190,6 +191,26 @@ fallbacks, so a rampage move maps to `Rampage` rather than falling into the `Con
 separate per-battle counter — so it's modelled as a `MoveEffect` instead, gated by `EffectChance`
 (secondary confusion on a damaging move, e.g. Psybeam 10%) or always-on when null (a pure confusion
 move like Supersonic).
+
+#### 4.1.1 TM/HM level floors (`MoveMinLevels` → `Attack.MinLevel`)
+
+`Attack.MinLevel` (nullable, `moves.db`; migration `AddMoveMinLevel`) is the earliest level an enemy may hold a
+move **learned by TM/HM** — the Strong/Boss tiers' Machine-row gate (design + why it's a curated table rather than
+derived from learnsets → `ENCOUNTER_DESIGN.md` §3.5). It is **hand-curated**, like `GameAvailabilitySeeder`:
+PokeAPI doesn't say where a TM is obtainable. `MoveMinLevels.Floors` maps all 55 Gen 1 TM/HM moves (TM01–50,
+HM01–05) by PokeAPI move name to the typical party level at the TM's earliest Red/Blue source (a TM with several
+sources, e.g. Mt. Moon / Celadon Department Store, takes the earliest). Locations are from pokemondb.net's Red/Blue
+TM and HM tables. Every non-machine move is null.
+
+- **Set in the mapper.** `MoveImport.MapToAttack` assigns `MinLevel = MoveMinLevels.For(name)`, so a full import
+  can't wipe it (`Moves.Update` replaces the whole row) and it is unit-testable without a database.
+- **Offline re-apply:** `dotnet run --project PokeApiConnector -- move-levels` clears every `MinLevel` then applies
+  the table to the existing `moves.db` — no network. Use it after editing the table, or to backfill a `moves.db`
+  imported before the column existed.
+- **Pins:** `MoveMappingTests` (mapper) and `StrongTierMoveLevelGateTests` (live DB: every move any species learns
+  by TM/HM has a floor, no other move does).
+- **Adding a generation's TMs** means a new table keyed the same way; the column rides the per-`(moveId,
+  generation)` `Attack` split planned under Multi-Generation in `TODO.md`.
 
 ### 4.2 Species (`PokemonImport` → `PokemonSpecies`)
 Each species needs **two** PokeAPI endpoints, because the data is split:
@@ -408,6 +429,10 @@ next run, rather than aborting the whole import.
   to copy into the web host.
 - **Hardcoded Gen 1.** Move/species ranges and mappings assume Gen 1; generalising to
   other generations is future work (see the Multi-Generation section of `TODO.md`).
+- **A `.db` edit can sit in the WAL.** SQLite runs these databases in WAL mode, and a running dev stack (or a
+  sqlite MCP connection) keeps them open, so an importer write can land in `moves.db-wal` and leave the
+  checked-in `moves.db` byte-identical — git shows no change. Before committing a regenerated `.db`, stop whatever
+  holds it or run `PRAGMA wal_checkpoint(TRUNCATE)`, then confirm `git status` lists the file as modified.
 - **Direct `new MovesDbContext()` / `new PokemonDbContext()`.** Acceptable for a CLI tool
   (parameterless ctor + hardcoded path in `OnConfiguring`). The *web host* deliberately
   does **not** do this — it uses `IDbContextFactory` DI (see `Program.cs` of

@@ -37,6 +37,29 @@ public class MoveMappingTests
             DamageClass = Named(damageClass),
         };
 
+    [Theory]
+    [InlineData("water-gun", 12)] // TM12, Mt. Moon
+    [InlineData("body-slam", 22)] // TM08, S.S. Anne
+    [InlineData("thunderbolt", 24)] // TM24, Vermilion Gym
+    [InlineData("hyper-beam", 30)] // TM15, Celadon Game Corner
+    [InlineData("fissure", 47)] // TM27, Viridian Gym
+    [InlineData("dream-eater", 47)] // TM42, Viridian City (after Giovanni)
+    [InlineData("flash", 12)] // HM05, Route 2 aide
+    public void CuratedFloors_PinKnownRedBlueSources(string name, int floor)
+    {
+        // Anchors the table's *values* (the live-DB pin only proves a floor exists), so a mis-keyed or
+        // re-tiered entry trips a test. Sources: pokemondb.net Red/Blue TM + HM tables.
+        Assert.Equal(floor, MoveMinLevels.For(name));
+    }
+
+    [Fact]
+    public void TmHmMove_GetsItsCuratedMinLevelFloor_AndOtherMovesGetNone()
+    {
+        Assert.Equal(42, MoveImport.MapToAttack(Move(name: "earthquake")).MinLevel); // TM26, Silph Co.
+        Assert.Equal(22, MoveImport.MapToAttack(Move(name: "cut")).MinLevel); // HM01, S.S. Anne
+        Assert.Null(MoveImport.MapToAttack(Move(name: "hydro-pump")).MinLevel); // level-up only
+    }
+
     [Fact]
     public void PastValues_EarliestEntry_SuppliesGen1PowerAndAccuracy()
     {

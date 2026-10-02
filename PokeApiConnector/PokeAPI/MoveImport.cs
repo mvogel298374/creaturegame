@@ -107,6 +107,7 @@ public class MoveImport
         ApplyStatStageEffect(attack, pokeMove);
         ApplySpecialEffects(attack, pokeMove);
         ApplyGen1Corrections(attack, pokeMove);
+        attack.MinLevel = MoveMinLevels.For(pokeMove.Name);
         return attack;
     }
 
