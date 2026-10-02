@@ -17,7 +17,7 @@
   for the run and stopped afterwards; Playwright starts/stops Vite itself).
 
 .EXAMPLE
-  .\test.ps1                   # all suites (E2E skipped if the stack isn't up)
+  .\test.ps1                   # all suites (E2E skipped unless the backend is already up, or -StartStack)
 .EXAMPLE
   .\test.ps1 -Dotnet           # only .NET unit tests
 .EXAMPLE
@@ -30,6 +30,12 @@ param(
   [switch]$E2E,
   [switch]$StartStack
 )
+
+# Playwright/npm/dotnet write UTF-8 (› ✓ ✘ …), but PowerShell decodes native-command output with the console's
+# OEM code page, so on Windows those show as mojibake ("ÔÇ║", "Ô£ô"). Decode as UTF-8 for the run and put the
+# caller's encoding back at the end — it's process-wide, and this script runs in the caller's own session.
+$prevOutputEncoding = [Console]::OutputEncoding
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 
 $root      = $PSScriptRoot
 $clientApp = Join-Path $root 'creaturegame.Web\ClientApp'
@@ -118,7 +124,7 @@ if ($E2E -or $runAll) {
 
     if (-not (Test-Backend)) {
       Write-Host "`n=== E2E (Playwright) — SKIPPED ===" -ForegroundColor Yellow
-      Write-Host "  Backend not reachable on :5100. Start it with .\dev.ps1 (or pass -StartStack)." -ForegroundColor Yellow
+      Write-Host "  Backend not running. Pass -StartStack." -ForegroundColor Yellow
       $results['Playwright E2E'] = New-Result -Status 'SKIPPED'
     } else {
       Write-Host "`n=== E2E (Playwright) ===" -ForegroundColor Cyan
@@ -173,4 +179,5 @@ Write-Host ("  Total: {0} passed, {1} failed, {2} skipped" -f $grandPass, $grand
   -ForegroundColor ($(if ($anyFail) { 'Red' } else { 'Green' }))
 Write-Host "==============================================" -ForegroundColor Cyan
 
+[Console]::OutputEncoding = $prevOutputEncoding
 if ($anyFail) { exit 1 } else { exit 0 }
