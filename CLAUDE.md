@@ -67,7 +67,7 @@ The E2E suite is the slow one — it is serial by design (`workers: 1`, stateful
 ```
 `-Ui`, `-Inspect`, `-ListOnly`, and `-Html` cover the interactive/report modes.
 
-**E2E is opt-in for the AI agent — it must never run it on its own initiative.** ~4 minutes for 37 browser-driven tests, it needs the stack up, and it is the only suite with real flakes (the long `walkSeedsUntil` specs degrade as a run accumulates abandoned server-side state, so a full-suite failure there is often not a code defect). So the `test-runner` gate deliberately runs **`.\test.ps1 -Dotnet -Web`** and reports that E2E did not run; the agent may *recommend* the narrowest covering command (`.\e2e.ps1 -Spec <file>`) and then stop, and only the **user** asks for a run. Bare `.\test.ps1` is off-limits to the agent for the same reason — with no switches it quietly includes E2E whenever the dev stack is up.
+**E2E is opt-in for the AI agent — it must never run it on its own initiative.** ~4 minutes for 38 browser-driven tests, it needs the stack up, and it is the only suite with real flakes (the long `walkSeedsUntil` specs degrade as a run accumulates abandoned server-side state, so a full-suite failure there is often not a code defect). So the `test-runner` gate deliberately runs **`.\test.ps1 -Dotnet -Web`** and reports that E2E did not run; the agent may *recommend* the narrowest covering command (`.\e2e.ps1 -Spec <file>`) and then stop, and only the **user** asks for a run. Bare `.\test.ps1` is off-limits to the agent for the same reason — with no switches it quietly includes E2E whenever the dev stack is up.
 
 To run a single .NET test by name:
 ```powershell

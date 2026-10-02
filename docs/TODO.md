@@ -238,7 +238,7 @@ and its sibling *"Party strip shows a stale name after an on-field evolution"* (
 known-still-open follow-up (the regression-insurance E2E coverage gap) below.
 
 > **E2E is deliberately out of the AI agent's pre-finish gate (2026-07-26, user's call).** The suite is ~4 min
-> for 37 browser-driven tests and is the only one with real flakes, so agents are *heavily disincentivized*:
+> for 38 browser-driven tests and is the only one with real flakes, so agents are *heavily disincentivized*:
 > `test-runner` runs `.\test.ps1 -Dotnet -Web` and reports that E2E did not run, may only **recommend** the
 > narrowest covering command, and never runs it on its own initiative — **only the user asks for an E2E run**.
 > Iteration tool is **`.\e2e.ps1`** at the repo root (`-Spec`/`-Grep`/`-Bail`/`-LastFailed`, per-file timings,
@@ -966,9 +966,8 @@ about 20–30 min; 5 as a rename; leave 7–9 unless they bite).
    resets and `ChooseShopActionAsync` throws at its cancelled check before reaching the backlog. Rename it to
    say "cancel throws even with a non-empty backlog" and mark the `_shopOpen = false; _shopBacklog.Clear()`
    lines as housekeeping — or drop them (one-line edit).
-6. **Fix the `PRODUCT_SPEC.md` wording** (the Session-resume bullet, ~line 245): "if the server rejects it" is
-   inaccurate — the rejection comes from the client's own SignalR library during a reconnect. Also confirm the
-   behaviour change is intended: rapid repeated shop BUY clicks are now all honoured where some were dropped.
+6. **Confirm the behaviour change is intended:** rapid repeated shop BUY clicks are now all honoured where some
+   were dropped. (The `PRODUCT_SPEC.md` Session-resume wording half of this item was fixed 2026-10-02.)
 7. *Advisory —* a restored shop uses the balance from the LEAVE click (`battleReducer.ts` `RESTORE_PROMPT`); a
    `SHOP_PURCHASED` landing between the click and the restore leaves `shop.balance` stale vs. `gold`. Cosmetic
    (the server rechecks every buy); a fix would apply `state.gold` to `balance` when restoring the shop.

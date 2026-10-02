@@ -244,8 +244,8 @@ the linked design doc instead — pull it there and leave only the pointer here.
   instead of hanging on "Connecting…".
 - A run's persisted entry is cleared when the run ends normally or the player quits — neither offers a stale
   Continue afterward.
-- A modal answer sent during a reconnect window is not lost: if the server rejects it, the modal re-opens; a quick
-  shop BUY then LEAVE are both honoured, in order.
+- A modal answer sent during a reconnect window is not lost: if the client's connection rejects the send, the
+  modal re-opens; a quick shop BUY then LEAVE are both honoured, in order.
 - **Not covered:** a refresh while a between-node prompt (route choice, shop, reward, recovery, acquisition,
   lead choice, switch-in) is open, rather than during an active battle, still hangs on reconnect.
 - Design detail → `ARCHITECTURE.md` §2.7 (Web session lifecycle). History → `TODO_ARCHIVE.md` → *Session Resume
