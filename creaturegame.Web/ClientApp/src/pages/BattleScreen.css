@@ -1876,3 +1876,18 @@
   cursor: pointer;
   pointer-events: auto;
 }
+
+/* Dev Mode damage range (low–high vs the current foe) — an in-flow line under the move's meta row so it can
+   never collide with the absolute STAB tag / effectiveness pill. */
+.move-dmg {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--clr-text-sub);
+}
+.move-dmg::before {
+  content: 'DMG ';
+  font-weight: 600;
+  opacity: 0.7;
+}

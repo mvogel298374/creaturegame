@@ -22,6 +22,14 @@ export function overviewSlotUrl(gameId: string, party: PartyMember[], slot: numb
   return party.length === 0 ? `/api/game/${gameId}/player` : `/api/game/${gameId}/player/${slot}`;
 }
 
+// Dev Mode: per-move low–high damage vs the current foe, parallel to the creature's moveset. `side` 'enemy' =
+// the foe's own moves (vs your active creature); `slot` picks a party member (omitted = the active lead).
+export function damageRangesUrl(gameId: string, side: 'player' | 'enemy', slot?: number): string {
+  const q = new URLSearchParams({ side });
+  if (side === 'player' && slot !== undefined) q.set('slot', String(slot));
+  return `/api/dev/${gameId}/damage-ranges?${q}`;
+}
+
 // Dev Mode's foe sheet — a dev-gated server route (docs/TODO.md — Dev Mode); 404s when the server flag is off.
 export function enemyOverviewUrl(gameId: string): string {
   return `/api/dev/${gameId}/enemy`;

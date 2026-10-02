@@ -1,7 +1,7 @@
 import { useCallback, useRef } from 'react';
 import type { MoveInfo } from '../types/BattleEvents';
 import { bridge } from './PhaserBridge';
-import { formatMoveName } from '../utils/format';
+import { formatMoveName, formatDamageRange } from '../utils/format';
 import { E2E } from '../testEnv';
 
 // Pure expand (`expandEvent`, below) + driver (`useBattleTimeline`) — design rationale in ARCHITECTURE.md §2.8.
@@ -822,7 +822,10 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
         return { steps: [w(650), d(log(`It doesn't affect ${targetName}...`, 'immune')), w(800)] };
       }
 
-      let msg = `${targetName} took ${damage} damage!`;
+      // Dev Mode: the engine's non-crit low–high for this hit rides on the event (withheld by the server unless
+      // dev is on), printed right behind the actual damage — "took 37 damage (32–38)!".
+      const range = formatDamageRange(payload.minDamage as number | null | undefined, payload.maxDamage as number | null | undefined);
+      let msg = `${targetName} took ${damage} damage${range ? ` (${range})` : ''}!`;
       if (isCrit) msg += ' A critical hit!';
       // Tint the line by type effectiveness: super-effective green, not-very-effective grey.
       const tone: LogTone | undefined = eff > 1 ? 'super' : eff < 1 ? 'weak' : undefined;

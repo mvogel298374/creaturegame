@@ -198,7 +198,7 @@ Stack: React 18 + TypeScript + SignalR + Phaser 3. (Canvas & core animations don
 
 ## Dev Mode — open follow-ups
 
-The server-gated Dev Mode switch and the enemy-creature overview are **done and archived** (→ `TODO_ARCHIVE.md`
+The server-gated Dev Mode switch, the enemy-creature overview and the damage-roll ranges are **done and archived** (→ `TODO_ARCHIVE.md`
 → *Dev Mode*). Open:
 - [ ] *(small)* **Stat stages in the enemy overview.** `PlayerOverviewDto` carries no stat stages, so the dev
   enemy sheet omits them. Add the stages to the DTO (or a dev-only extension) and render them in

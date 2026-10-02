@@ -296,3 +296,13 @@
 [data-generation="gen1"] .overview-move-desc {
   color: var(--ks-dim);
 }
+
+/* Dev Mode damage range on a move row (vs the current foe). */
+.overview-move-dmg {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--clr-text);
+}
+[data-generation="gen1"] .overview-move-dmg {
+  color: var(--ks-ink);
+}

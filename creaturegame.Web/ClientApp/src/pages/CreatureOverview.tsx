@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { TypeBadge } from '../components/TypeBadge';
 import { PartyCard } from '../components/modals/PartyCard';
-import { formatMoveName } from '../utils/format';
+import { formatMoveName, formatDamageRange } from '../utils/format';
+import { useDamageRanges, type DamageRange } from '../hooks/useDamageRanges';
 import { friendlyFetchError } from '../utils/fetchError';
 import { defaultOverviewSlot, showOverviewPicker, overviewSlotUrl, enemyOverviewUrl } from '../battle/overviewPicker';
 import type { PlayerOverview, StatRow, MoveRow } from '../types/PlayerOverview';
@@ -27,6 +28,9 @@ export function CreatureOverview({ gameId, party, onBack, enemy = false }: {
   const [data, setData]   = useState<PlayerOverview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab]     = useState<Tab>('stats');
+  // Dev Mode: each move's low–high vs the current foe (the foe's own moves vs your lead, in `enemy` mode).
+  // An empty party falls back to the active lead, same as the overview endpoint itself.
+  const ranges = useDamageRanges(gameId, enemy ? 'enemy' : 'player', enemy || party.length === 0 ? undefined : slot);
 
   useEffect(() => {
     if (!gameId) { setError('No active game.'); return; }
@@ -87,7 +91,7 @@ export function CreatureOverview({ gameId, party, onBack, enemy = false }: {
           <div className="overview-body">
             {tab === 'info' && <InfoTab d={data} hideXp={enemy} />}
             {tab === 'stats' && <StatsTab stats={data.stats} hp={data.hp} maxHp={data.maxHp} />}
-            {tab === 'moves' && <MovesTab moves={data.moves} />}
+            {tab === 'moves' && <MovesTab moves={data.moves} ranges={ranges} />}
           </div>
         </>
       )}
@@ -165,7 +169,7 @@ function StatsTab({ stats, hp, maxHp }: { stats: StatRow[]; hp: number; maxHp: n
   );
 }
 
-function MovesTab({ moves }: { moves: MoveRow[] }) {
+function MovesTab({ moves, ranges }: { moves: MoveRow[]; ranges: DamageRange[] | null }) {
   if (moves.length === 0) return <p className="overview-loading">No moves.</p>;
   return (
     <div className="overview-moves">
@@ -180,6 +184,10 @@ function MovesTab({ moves }: { moves: MoveRow[] }) {
             <span>PWR {m.power > 0 ? m.power : '—'}</span>
             <span>ACC {m.accuracy > 0 ? m.accuracy : '—'}</span>
             <span>PP {m.ppCurrent}/{m.ppMax}</span>
+            {(() => {
+              const dmg = formatDamageRange(ranges?.[i]?.min, ranges?.[i]?.max);
+              return dmg && <span className="overview-move-dmg">DMG {dmg}</span>;
+            })()}
           </div>
           {m.description && <p className="overview-move-desc">{m.description}</p>}
         </div>

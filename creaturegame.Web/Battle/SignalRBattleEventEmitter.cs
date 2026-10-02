@@ -6,7 +6,8 @@ namespace creaturegame.Web.Battle;
 
 public sealed class SignalRBattleEventEmitter(
     IHubContext<BattleHub, IBattleClient> hubContext,
-    Func<string?> currentConnectionId
+    Func<string?> currentConnectionId,
+    bool includeDamageRange = false
 ) : IBattleEventEmitter
 {
     // The "state-establishing" events, cached as they pass through — everything a client that lost all
@@ -75,6 +76,11 @@ public sealed class SignalRBattleEventEmitter(
         var connectionId = currentConnectionId();
         if (string.IsNullOrEmpty(connectionId))
             return;
+
+        // Dev Mode's damage range is withheld here — the one choke point every outgoing event (live or replayed)
+        // passes — unless the server flag is on, so a production client never receives it.
+        if (!includeDamageRange && evt is DamageDealt { MinDamage: not null } dealt)
+            evt = dealt with { MinDamage = null, MaxDamage = null };
 
         var (type, payload) = MapEvent(evt);
         _ = hubContext.Clients.Client(connectionId).OnBattleEvent(type, payload);
@@ -390,6 +396,8 @@ public sealed class SignalRBattleEventEmitter(
                     e.HpAfter,
                     e.HpMax,
                     e.IsCrit,
+                    e.MinDamage,
+                    e.MaxDamage,
                 }
             ),
             RecoilDamage e => (

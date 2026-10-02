@@ -1,4 +1,7 @@
+using System.Text.Json;
+using creaturegame.Attacks;
 using creaturegame.Combat;
+using creaturegame.Creatures;
 using creaturegame.Generations;
 using creaturegame.Items;
 using creaturegame.Tests.TestSupport;
@@ -98,6 +101,127 @@ public class DevModeTests
             );
             Assert.Equal("FOE", dto.Name);
             Assert.Equal(77, dto.MaxHp);
+        }
+        finally
+        {
+            gate.Set();
+        }
+    }
+
+    // ── Damage ranges (docs/TODO.md — Dev Mode damage ranges) ──────────────────────────────────────────────
+
+    private static Attack Strike() =>
+        new()
+        {
+            Name = "Strike",
+            BaseDamage = 60,
+            Accuracy = 100,
+            AttackType = AttackType.Physical,
+            DamageType = DamageType.Normal,
+        };
+
+    [Fact]
+    public async Task DamageDealtCarriesARangeThatBracketsTheActualHit()
+    {
+        var attacker = TestCreatures.Make("A", attack: 120);
+        var defender = TestCreatures.Make("D", defense: 80, hp: 5000);
+        var emitter = new RecordingEmitter();
+
+        await new AttackAction(
+            attacker,
+            defender,
+            new PokemonAttack(Strike()),
+            new Gen1TypeChart(),
+            new NoVarianceNoCritHitRules(),
+            emitter
+        ).ExecuteAsync();
+
+        var hit = Assert.Single(emitter.Of<DamageDealt>());
+        Assert.NotNull(hit.MinDamage);
+        Assert.NotNull(hit.MaxDamage);
+        Assert.InRange(hit.Damage, hit.MinDamage!.Value, hit.MaxDamage!.Value);
+    }
+
+    private static JsonElement DamageDealtPayload(RecordingHubContext hub)
+    {
+        var (_, payload) = Assert.Single(hub.EventsFor("conn-1"), e => e.Type == "DamageDealt");
+        return JsonDocument.Parse(JsonSerializer.Serialize(payload)).RootElement;
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void TheEmitterWithholdsTheRangeUnlessDevModeIsOn(bool devOn)
+    {
+        var hub = new RecordingHubContext();
+        var emitter = new SignalRBattleEventEmitter(hub, () => "conn-1", includeDamageRange: devOn);
+
+        emitter.Emit(new DamageDealt("D", 1, 30, 1.0, 70, 100, false, 25, 35));
+
+        var payload = DamageDealtPayload(hub);
+        Assert.Equal(30, payload.GetProperty("Damage").GetInt32());
+        Assert.Equal(
+            devOn ? 25 : (int?)null,
+            payload.GetProperty("MinDamage").ValueKind == JsonValueKind.Null
+                ? null
+                : payload.GetProperty("MinDamage").GetInt32()
+        );
+        Assert.Equal(devOn, payload.GetProperty("MaxDamage").ValueKind != JsonValueKind.Null);
+    }
+
+    [Fact]
+    public void DamageRangesEndpointIs404WhenOff_AndParallelsTheMovesetWhenOn()
+    {
+        var manager = NewManager(out var gate);
+        try
+        {
+            var starter = TestCreatures.Make("STARTMON", attack: 100);
+            var strike = Strike();
+            strike.Id = 1;
+            starter.AddAttack(strike);
+            starter.AddAttack(
+                new Attack
+                {
+                    Id = 2,
+                    Name = "Growl",
+                    BaseDamage = 0,
+                }
+            );
+            string gameId = manager.RegisterSession(
+                starter,
+                [],
+                new Bag(),
+                new Wallet(),
+                [],
+                new SeededRandomSource(1),
+                [],
+                Difficulty.Normal,
+                Generation.One,
+                new Dictionary<int, IReadOnlyList<int>>()
+            );
+            Assert.True(manager.AttachConnection(gameId, "conn-1"));
+            manager.RecordEnemy(gameId, TestCreatures.Make("FOE", hp: 200));
+
+            Assert.IsType<NotFoundResult>(
+                new DevController(new DevModeOptions(false), manager).GetDamageRanges(
+                    gameId,
+                    null,
+                    null
+                )
+            );
+
+            var on = new DevController(new DevModeOptions(true), manager);
+            var ok = Assert.IsType<OkObjectResult>(on.GetDamageRanges(gameId, "player", null));
+            var ranges = JsonDocument
+                .Parse(JsonSerializer.Serialize(ok.Value))
+                .RootElement.GetProperty("ranges");
+            Assert.Equal(2, ranges.GetArrayLength());
+            Assert.True(
+                ranges[0].GetProperty("min").GetInt32() <= ranges[0].GetProperty("max").GetInt32()
+            );
+            Assert.Equal(JsonValueKind.Null, ranges[1].ValueKind); // Growl: no damage to show
+
+            Assert.IsType<NotFoundObjectResult>(on.GetDamageRanges("nope", "player", null));
         }
         finally
         {

@@ -24,7 +24,7 @@ import { powerPill } from '../battle/movePower';
 import { bossTrainerName } from '../battle/bossTrainer';
 import type { Species } from '../types/Species';
 import type { MoveInfo } from '../types/BattleEvents';
-import { formatMoveName } from '../utils/format';
+import { formatMoveName, formatDamageRange } from '../utils/format';
 import { friendlyFetchError } from '../utils/fetchError';
 import { type BagItem, groupBagItems, needsMoveTarget, needsPartyTarget, partyTargetMode, moveSourceForPartyPick, formatItemName } from '../battle/bag';
 import type { PlayerOverview } from '../types/PlayerOverview';
@@ -46,6 +46,7 @@ import { MoveReplacementModal } from '../components/modals/MoveReplacementModal'
 import { SettingsModal } from '../components/modals/SettingsModal';
 import { EnemyOverviewModal } from '../components/modals/EnemyOverviewModal';
 import { useDevMode } from '../hooks/useDevMode';
+import { useDamageRanges } from '../hooks/useDamageRanges';
 import { CreatureOverview } from './CreatureOverview';
 import '../components/modals/RosterPicker.css';
 import './BattleScreen.css';
@@ -305,6 +306,7 @@ export function BattleScreen() {
           )}
           {controlView === 'fight' && (
             <MoveMenu
+              gameId={gameId}
               moves={state.moves}
               canChoose={state.phase === 'choosing' && !state.animating}
               onChoose={handleChooseMove}
@@ -949,7 +951,8 @@ function effectivenessPill(eff: number | undefined): { label: string; cls: strin
   }
 }
 
-function MoveMenu({ moves, canChoose, onChoose, onBack }: {
+function MoveMenu({ gameId, moves, canChoose, onChoose, onBack }: {
+  gameId: string | null;
   moves: MoveInfo[];
   canChoose: boolean;
   onChoose: (index: number) => void;
@@ -957,6 +960,8 @@ function MoveMenu({ moves, canChoose, onChoose, onBack }: {
 }) {
   const slots = [...moves];
   while (slots.length < 4) slots.push({ name: '---', type: 'Normal', ppCurrent: 0, ppMax: 0 });
+  // Dev Mode: low–high damage vs the current foe, parallel to `moves` (null when dev is off).
+  const ranges = useDamageRanges(gameId, 'player');
 
   // No out-of-PP branch here on purpose: Gen 1 never shows a move list when nothing is selectable, so FIGHT
   // spends the turn as Struggle before this menu ever opens (see handleFight / `hasUsableMove`).
@@ -994,6 +999,10 @@ function MoveMenu({ moves, canChoose, onChoose, onBack }: {
                   )}
                 </span>
               )}
+              {(() => {
+                const dmg = isEmpty ? null : formatDamageRange(ranges?.[i]?.min, ranges?.[i]?.max);
+                return dmg && <span className="move-dmg" aria-label={`damage ${dmg}`}>{dmg}</span>;
+              })()}
               {isStab && <span className="move-stab" aria-label="STAB">STAB</span>}
               {eff && (
                 <span className={`move-eff ${eff.cls}`} aria-label={`effectiveness ${eff.label}`}>

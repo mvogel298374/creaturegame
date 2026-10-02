@@ -94,6 +94,18 @@ describe('expandEvent — DamageDealt', () => {
     expect(at(1)).toEqual([undefined]); // neutral hit — default line colour
   });
 
+  it('Dev Mode: prints the low–high range in brackets right behind the actual damage, before the suffixes', () => {
+    const { steps } = expandEvent('DamageDealt',
+      { targetName: 'ARTICUNO', targetId: 2, damage: 37, typeEffectiveness: 2, hpAfter: 58, isCrit: false, minDamage: 32, maxDamage: 38 }, CTX);
+    expect(logLines(steps)).toEqual(["ARTICUNO took 37 damage (32–38)! It's super effective!"]);
+  });
+
+  it('prints no range when the server withheld it (dev off)', () => {
+    const { steps } = expandEvent('DamageDealt',
+      { targetName: 'ARTICUNO', targetId: 2, damage: 37, typeEffectiveness: 1, hpAfter: 58, isCrit: false, minDamage: null, maxDamage: null }, CTX);
+    expect(logLines(steps)).toEqual(['ARTICUNO took 37 damage!']);
+  });
+
   it('emits the hit sound + damage shake and updates HP before the log line', () => {
     const { steps } = expandEvent('DamageDealt',
       { targetName: 'ARTICUNO', targetId: 2, damage: 20, typeEffectiveness: 1, hpAfter: 80, isCrit: false }, CTX);

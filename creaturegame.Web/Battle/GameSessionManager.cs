@@ -11,7 +11,8 @@ namespace creaturegame.Web.Battle;
 
 public sealed class GameSessionManager(
     IHubContext<BattleHub, IBattleClient> hubContext,
-    EncounterFactory encounters
+    EncounterFactory encounters,
+    DevModeOptions? devMode = null
 )
 {
     private readonly ConcurrentDictionary<string, PendingSession> _pending = new(); // gameId → registered, not yet started
@@ -227,7 +228,11 @@ public sealed class GameSessionManager(
 
         // Held on the battle so the reconnect branch above re-echoes through the same instance (ARCHITECTURE.md
         // §2.7); emitted here first so the client can theme itself ahead of the first battle event.
-        var emitter = new SignalRBattleEventEmitter(hubContext, () => battle.CurrentConnectionId);
+        var emitter = new SignalRBattleEventEmitter(
+            hubContext,
+            () => battle.CurrentConnectionId,
+            includeDamageRange: devMode?.Enabled ?? false
+        );
         battle.Emitter = emitter;
         emitter.Emit(BuildPresentationEvent(profile));
         // Gen1TrainerAi (an intelligent-but-fallible Gen 1 move selector, TODO_ARCHIVE.md) drives the enemy; a
@@ -311,6 +316,40 @@ public sealed class GameSessionManager(
     /// not-yet-active game, or before the first encounter has been created.</summary>
     public Creature? GetEnemyCreature(string gameId) =>
         _active.TryGetValue(gameId, out var battle) ? battle.Enemy : null;
+
+    /// <summary>Dev Mode: the low–high damage (non-crit) of each move in an attacker's moveset, parallel to its
+    /// <c>MoveSet</c> order, measured against the <b>current foe</b> (or, for the foe's own moves, against the
+    /// active player creature). <paramref name="enemySide"/> picks the foe's moveset; otherwise the player
+    /// creature at <paramref name="slot"/> (null = the active lead — what the fight menu shows). A benched slot
+    /// is measured as if sent in against the current foe. Null when the game or either combatant is unknown.
+    /// Display-only read of live state, same no-lock reasoning as <see cref="GetPlayerCreature(string)"/>.</summary>
+    public IReadOnlyList<DamageRange?>? GetDamageRanges(string gameId, bool enemySide, int? slot)
+    {
+        var generation = GetGeneration(gameId);
+        var enemy = GetEnemyCreature(gameId);
+        var lead = GetPlayerCreature(gameId);
+        if (generation is null || enemy is null || lead is null)
+            return null;
+        var attacker =
+            enemySide ? enemy
+            : slot is { } s ? GetPlayerCreature(gameId, s)
+            : lead;
+        var defender = enemySide ? lead : enemy;
+        if (attacker is null)
+            return null;
+        var profile = ProfileFor(generation.Value);
+        return attacker
+            .MoveSet.Select(m =>
+                DamageCalculator.EstimateRange(
+                    attacker,
+                    defender,
+                    m.Base,
+                    profile.TypeChart,
+                    profile.BattleRules
+                )
+            )
+            .ToList();
+    }
 
     /// <summary>Test-only seam: records a foe on an active battle without running an encounter (the run task is
     /// parked in tests), the same write the RunDirector's enemy supplier makes.</summary>

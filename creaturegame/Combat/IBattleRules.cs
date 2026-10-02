@@ -122,6 +122,12 @@ public interface IBattleRules
     double RollDamageVariance();
 
     /// <summary>
+    /// The inclusive bounds <see cref="RollDamageVariance"/> draws between — the single source for both the roll
+    /// and the Dev Mode damage-range display, so the two can't disagree. Gen 1: 217/255 – 255/255.
+    /// </summary>
+    (double Min, double Max) DamageVarianceRange { get; }
+
+    /// <summary>
     /// Returns the number of turns the target will sleep (drawn randomly each time Sleep is applied).
     /// Gen 1: 1–7. Gen 2+: 2–5.
     /// </summary>
@@ -324,6 +330,10 @@ public interface IBattleRules
     /// so it lives on the seam rather than inline in the attack resolver.)
     /// </summary>
     int RollPsywaveDamage(Creature source, IRandomSource rng);
+
+    /// <summary>The inclusive bounds <see cref="RollPsywaveDamage"/> draws within (Gen 1: 1 – floor(1.5 × level)),
+    /// the single source for the roll and the Dev Mode damage-range display.</summary>
+    (int Min, int Max) PsywaveDamageRange(Creature source);
 
     /// <summary>
     /// The fixed number of turns a Rest user sleeps (Rest heals to full and forces sleep for exactly

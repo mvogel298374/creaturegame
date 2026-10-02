@@ -47,6 +47,8 @@ public abstract class DelegatingBattleRules : IBattleRules
 
     public virtual double RollDamageVariance() => _inner.RollDamageVariance();
 
+    public virtual (double Min, double Max) DamageVarianceRange => _inner.DamageVarianceRange;
+
     public virtual int RollSleepTurns() => _inner.RollSleepTurns();
 
     public virtual int RollConfusionTurns() => _inner.RollConfusionTurns();
@@ -110,6 +112,9 @@ public abstract class DelegatingBattleRules : IBattleRules
     public virtual int RollPsywaveDamage(Creature s, IRandomSource rng) =>
         _inner.RollPsywaveDamage(s, rng);
 
+    public virtual (int Min, int Max) PsywaveDamageRange(Creature s) =>
+        _inner.PsywaveDamageRange(s);
+
     public virtual int RestSleepTurns => _inner.RestSleepTurns;
 
     public virtual bool CanReceiveStatus(Creature t, StatusCondition s, DamageType mt) =>
@@ -154,6 +159,8 @@ public sealed class AlwaysCritRules : DelegatingBattleRules
 
     public override double RollDamageVariance() => 1.0;
 
+    public override (double Min, double Max) DamageVarianceRange => (1.0, 1.0);
+
     public override double GetCritChance(Creature a, Attack m) => 1.0;
 }
 
@@ -175,6 +182,8 @@ public sealed class NoVarianceNoCritHitRules : DelegatingBattleRules
     public override double GetCritChance(Creature a, Attack m) => 0.0;
 
     public override double RollDamageVariance() => 1.0;
+
+    public override (double Min, double Max) DamageVarianceRange => (1.0, 1.0);
 }
 
 /// <summary>Always hits, no crit, and forces any secondary effect to land (chance 100).

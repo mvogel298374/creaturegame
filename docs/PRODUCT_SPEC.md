@@ -217,6 +217,12 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - With dev mode on, clicking/tapping the enemy nameplate in battle opens a read-only CHECK POKEMON sheet for the
   foe (species, level, HP, stats, DVs, Stat-Exp, status, moves + PP; no party picker, no Exp rows, no stat
   stages) via `GET /api/dev/{gameId}/enemy` (404 if no enemy is active yet).
+- With dev mode on, damage ranges are shown: the combat log prints `took 37 damage (32–38)!` (an exact amount
+  prints one number), each fight-menu move button has a DMG line, and every CHECK POKEMON move row (player and
+  dev enemy sheets) has a DMG entry. Ranges are non-crit (a crit's actual damage can exceed the printed range)
+  and measured against the current foe; fixed/level-based moves show one number, OHKO = foe's HP, Super Fang =
+  half the foe's HP; status moves show none. Menu ranges come from `GET /api/dev/{gameId}/damage-ranges`;
+  with dev off the server never sends them.
 - Design detail / rationale → `TODO_ARCHIVE.md` → *Dev Mode* (no separate design doc).  History → same entry.
 
 ### Session resume (refresh/reopen survival)

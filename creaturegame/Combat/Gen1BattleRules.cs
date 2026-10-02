@@ -24,7 +24,13 @@ public sealed class Gen1BattleRules : IBattleRules
     public int FreezeRandomThawPercent => 0;
 
     // Gen 1 damage roll: uniform integer in [217, 255], divided by 255.
-    public double RollDamageVariance() => _rng.Next(217, 256) / 255.0;
+    private const int VarianceMinRoll = 217;
+    private const int VarianceMaxRoll = 255;
+
+    public double RollDamageVariance() => _rng.Next(VarianceMinRoll, VarianceMaxRoll + 1) / 255.0;
+
+    public (double Min, double Max) DamageVarianceRange =>
+        (VarianceMinRoll / 255.0, VarianceMaxRoll / 255.0);
 
     // Gen 1 sleep lasts 1–7 turns.
     public int RollSleepTurns() => _rng.Next(1, 8);
@@ -135,8 +141,14 @@ public sealed class Gen1BattleRules : IBattleRules
     public int BideDamageMultiplier => 2;
 
     // Gen 1: Psywave deals a random 1..floor(1.5 × level), ignoring stats/type/STAB/crits.
-    public int RollPsywaveDamage(Creature source, IRandomSource rng) =>
-        rng.Next(1, Math.Max(1, source.Level * 3 / 2) + 1);
+    public int RollPsywaveDamage(Creature source, IRandomSource rng)
+    {
+        var (min, max) = PsywaveDamageRange(source);
+        return rng.Next(min, max + 1);
+    }
+
+    public (int Min, int Max) PsywaveDamageRange(Creature source) =>
+        (1, Math.Max(1, source.Level * 3 / 2));
 
     // Gen 1: Rest forces the user asleep for exactly 2 turns (then it wakes and acts).
     public int RestSleepTurns => 2;

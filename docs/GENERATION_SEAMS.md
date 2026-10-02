@@ -151,8 +151,13 @@ the default, and it takes an optional `IRandomSource` so its random rolls are se
 
 ```csharp
 public Gen1BattleRules(IRandomSource? rng = null) => _rng = rng ?? SystemRandomSource.Instance;
-public double RollDamageVariance() => _rng.Next(217, 256) / 255.0;   // Gen 1 spread
+public double RollDamageVariance() => _rng.Next(VarianceMinRoll, VarianceMaxRoll + 1) / 255.0;   // 217–255
+public (double Min, double Max) DamageVarianceRange => (VarianceMinRoll / 255.0, VarianceMaxRoll / 255.0);
 ```
+
+The roll and its range read the same constants, so the dev damage-range display
+(`DamageCalculator.EstimateRange`) can never disagree with the real roll. `Psywave` follows
+the same pattern: `RollPsywaveDamage` and `PsywaveDamageRange(source)` share one helper.
 
 ### How the engine consumes them
 The seams are passed *in*, never reached for globally. `Battle` receives an
@@ -346,7 +351,7 @@ A level-50 creature uses a Special move into a Psychic-type target:
    stat for both sides (Gen 1) — a `Gen2BattleRules` would return Sp. Atk / Sp. Def here.
 4. **`ITypeChart.GetMultiplier`** supplies the type multiplier, preserving Gen 1 quirks
    (so e.g. a Bug move into Psychic returns the Gen 1 `2.0×`).
-5. **`IBattleRules.RollDamageVariance`** applies the Gen 1 `217–255/255` spread.
+5. **`IBattleRules.RollDamageVariance`** applies the Gen 1 `217–255/255` spread (its bounds are exposed as `DamageVarianceRange`).
 
 Five generation-variable decisions, zero generation checks — each resolved by the
 injected implementation. That's the seams working.

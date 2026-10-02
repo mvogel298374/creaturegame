@@ -8,7 +8,7 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
-## Dev Mode — server-gated debug switch + enemy overview ✅ DONE (2026-10-02)
+## Dev Mode — server-gated debug switch + enemy overview + damage-roll ranges ✅ DONE (2026-10-02)
 
 *(Moved here from `TODO.md` → *Dev Mode*; planned and implemented 2026-10-02. Open follow-ups — enemy stat
 stages, further dev actions — stay in `TODO.md` → *Dev Mode — open follow-ups*.)*
@@ -38,6 +38,32 @@ which wraps `CreatureOverview` in `enemy` mode (no party picker, no Exp rows).
 *Deviations from the plan:* the endpoint is under `/api/dev/` (not `/api/game/`); the trigger is click/tap on the
 nameplate, not hover (works on touch); stat stages are **not** shown (`PlayerOverviewDto` has none) — open
 follow-up in `TODO.md`.
+
+**Item 3 — damage-roll ranges (low–high):** show each attack's min–max damage in the combat log, the fight menu
+and CHECK POKEMON (player sheet and dev enemy sheet), all dev-gated.
+- **Single source of truth = the real formula.** `DamageCalculator.EstimateRange` reuses `ComputeDamage` with the
+  variance pinned to the rules' bounds — no second copy of the formula. `DamageCalculator.ScreenMultiplier` is
+  shared with `AttackAction` so Reflect/Light Screen agree.
+- **Seam (gen-agnostic DoD):** `IBattleRules.DamageVarianceRange` and `IBattleRules.PsywaveDamageRange(source)`
+  added; `Gen1BattleRules` reads both its roll (`RollDamageVariance`, `RollPsywaveDamage`) and its range from the
+  same constants/helper (217–255/255; Psywave 1..floor(1.5 x level)), so range and roll cannot disagree.
+- **Per category:** Standard/Drain/SelfDestruct → min–max; Fixed/LevelBased → exact; OHKO → target's current HP;
+  SuperFang → half the target's current HP; Psywave → from the seam; status/other (incl. Counter/Bide) → none
+  (null). Multi-hit is per hit. Immune (0x) → 0.
+- **Decisions ratified 2026-10-02:** NO crit ranges anywhere — every range is non-crit, so a crit hit's actual
+  damage can exceed its printed range; and ranges are always measured against the **current** foe (enemy side =
+  the foe's moves vs the active player creature; benched slots measured as if sent in).
+- **Combat log — computed engine-side, stripped at the web emitter.** `DamageDealt` gains nullable
+  `MinDamage`/`MaxDamage` stamped by `AttackAction` (`_hitRange`). The engine is gate-ignorant;
+  `SignalRBattleEventEmitter(includeDamageRange)` withholds them unless `DevModeOptions.Enabled`
+  (`GameSessionManager` takes an optional `DevModeOptions`). Client: `took 37 damage (32–38)!`
+  (`formatDamageRange`; an exact amount prints one number).
+- **Menus / CHECK POKEMON:** `GET /api/dev/{gameId}/damage-ranges?side=player|enemy&slot=n` (404 when dev off).
+  Client hook `useDamageRanges`; a DMG line on each fight-menu move button and a DMG entry on every CHECK POKEMON
+  move row, including the dev enemy sheet.
+- **Tests:** `DamageRangeTests` (min <= every rolled damage <= max across seeds, per category, stages/Burn/screens,
+  seam), `DevModeTests` (endpoint 404/200, emitter strips fields when off), Vitest `formatDamageRange`/timeline.
+  Not automated: the fight-menu / CHECK POKEMON rendering (no DOM harness).
 
 **Tests:** C# — `DevModeTests` (flag default/override, endpoints 404 off / 200 on); Vitest — settings round-trip
 (`devMode` default/validation) and `enemyOverviewUrl`. The Settings toggle's hidden-when-server-disabled

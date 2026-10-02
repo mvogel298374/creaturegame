@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { defaultOverviewSlot, showOverviewPicker, overviewSlotUrl, enemyOverviewUrl } from './overviewPicker';
+import { defaultOverviewSlot, showOverviewPicker, overviewSlotUrl, enemyOverviewUrl, damageRangesUrl } from './overviewPicker';
 import type { PartyMember } from './timeline';
 
 function member(overrides: Partial<PartyMember> = {}): PartyMember {
@@ -60,5 +60,13 @@ describe('overviewSlotUrl', () => {
 describe('enemyOverviewUrl', () => {
   it('targets the dev-gated enemy route, not the player routes', () => {
     expect(enemyOverviewUrl('abc')).toBe('/api/dev/abc/enemy');
+  });
+});
+
+describe('damageRangesUrl', () => {
+  it('asks for the active lead by default and a slot only for the player side', () => {
+    expect(damageRangesUrl('g', 'player')).toBe('/api/dev/g/damage-ranges?side=player');
+    expect(damageRangesUrl('g', 'player', 2)).toBe('/api/dev/g/damage-ranges?side=player&slot=2');
+    expect(damageRangesUrl('g', 'enemy', 2)).toBe('/api/dev/g/damage-ranges?side=enemy');
   });
 });

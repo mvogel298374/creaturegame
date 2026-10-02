@@ -3,8 +3,95 @@ using creaturegame.Creatures;
 
 namespace creaturegame.Combat;
 
+/// <summary>An inclusive low–high damage range (equal bounds = an exact amount).</summary>
+public readonly record struct DamageRange(int Min, int Max)
+{
+    public static DamageRange Exact(int amount) => new(amount, amount);
+}
+
 public static class DamageCalculator
 {
+    /// <summary>Reflect (physical) / Light Screen (special) double the defender's defensive stat while up (a crit
+    /// ignores it, handled inside the formula). The one place this is decided — the live attack and the Dev Mode
+    /// range estimate both read it.</summary>
+    public static int ScreenMultiplier(Creature defender, Attack move, IBattleRules rules) =>
+        (move.AttackType == AttackType.Physical && defender.Battle.HasReflect)
+        || (move.AttackType == AttackType.Special && defender.Battle.HasLightScreen)
+            ? rules.ScreenDefenseMultiplier
+            : 1;
+
+    /// <summary>
+    /// The low–high damage a move can deal right now (Dev Mode display), or null when there's no damage to show
+    /// (a status move, or a category that depends on the damage taken). <b>Non-crit by design.</b> Runs the live
+    /// formula with the variance pinned to <see cref="IBattleRules.DamageVarianceRange"/>'s bounds, so it can't
+    /// drift from the real roll. Fixed/LevelBased are exact; OHKO is the target's current HP, SuperFang half of
+    /// it; Psywave comes off the rules seam.
+    /// </summary>
+    public static DamageRange? EstimateRange(
+        Creature attacker,
+        Creature defender,
+        Attack move,
+        ITypeChart typeChart,
+        IBattleRules rules
+    )
+    {
+        switch (move.DamageCategory)
+        {
+            case DamageCategory.Fixed:
+                return DamageRange.Exact(move.FixedDamageValue ?? 1);
+            case DamageCategory.LevelBased:
+                return DamageRange.Exact(CalculateLevelBasedDamage(attacker));
+            case DamageCategory.OHKO:
+                return DamageRange.Exact(defender.Attributes.HP);
+            case DamageCategory.SuperFang:
+                return DamageRange.Exact(CalculateSuperFangDamage(defender));
+            case DamageCategory.Psywave:
+            {
+                var (min, max) = rules.PsywaveDamageRange(attacker);
+                return new DamageRange(min, max);
+            }
+            case DamageCategory.Standard:
+            case DamageCategory.Drain:
+            case DamageCategory.SelfDestruct:
+            {
+                if (move.BaseDamage <= 0)
+                    return null;
+                int divisor =
+                    move.DamageCategory == DamageCategory.SelfDestruct
+                        ? rules.SelfDestructDefenseDivisor
+                        : 1;
+                int screen = ScreenMultiplier(defender, move, rules);
+                var (lo, hi) = rules.DamageVarianceRange;
+                return new DamageRange(
+                    ComputeDamage(
+                        attacker,
+                        defender,
+                        move,
+                        typeChart,
+                        rules,
+                        false,
+                        lo,
+                        divisor,
+                        screen
+                    ),
+                    ComputeDamage(
+                        attacker,
+                        defender,
+                        move,
+                        typeChart,
+                        rules,
+                        false,
+                        hi,
+                        divisor,
+                        screen
+                    )
+                );
+            }
+            default:
+                return null;
+        }
+    }
+
     /// <summary>
     /// Calculates damage, rolls for a critical hit, and sets <paramref name="isCrit"/>.
     /// Stat stages and generation-specific rules are delegated to <paramref name="rules"/>.

@@ -316,7 +316,11 @@ public record DamageDealt(
     double TypeEffectiveness,
     int HpAfter,
     int HpMax,
-    bool IsCrit = false
+    bool IsCrit = false,
+    // Dev Mode: the move's non-crit low–high for this hit (DamageCalculator.EstimateRange). Always filled by the
+    // engine; the web emitter drops it unless the server's Dev Mode flag is on, so prod clients never see it.
+    int? MinDamage = null,
+    int? MaxDamage = null
 ) : BattleEvent;
 
 public record RecoilDamage(string SourceName, int SourceId, int Damage, int HpAfter) : BattleEvent;

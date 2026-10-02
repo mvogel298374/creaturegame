@@ -171,11 +171,7 @@ public class AttackAction : IBattleAction
 
         // Reflect (physical) / Light Screen (special) double the defender's defensive stat while up
         // (ignored on a crit); computed once and passed into every damage call.
-        int screenMult =
-            (attackToUse.AttackType == AttackType.Physical && Target.Battle.HasReflect)
-            || (attackToUse.AttackType == AttackType.Special && Target.Battle.HasLightScreen)
-                ? _rules.ScreenDefenseMultiplier
-                : 1;
+        int screenMult = DamageCalculator.ScreenMultiplier(Target, attackToUse, _rules);
 
         int damage = ResolveDamage(attackToUse, category, usingStruggle, screenMult);
 
@@ -362,6 +358,10 @@ public class AttackAction : IBattleAction
         int damage = 0;
         bool isCrit = false;
 
+        // Snapshot before any damage lands (OHKO / Super Fang read the target's current HP) — rides on this
+        // attack's DamageDealt events as the Dev Mode range (see _hitRange).
+        _hitRange = DamageCalculator.EstimateRange(Source, Target, move, _typeChart, _rules);
+
         switch (category)
         {
             case DamageCategory.Standard:
@@ -530,6 +530,11 @@ public class AttackAction : IBattleAction
     // <paramref name="counterableType"/> is the move's type when the hit is recordable for the target's
     // Counter (read back as 2× the last Normal/Fighting damage). Recorded centrally here, gated on real
     // damage, so every damaging category is counterable through one path; callers that must not be (Bide) pass null.
+    // The current attack's non-crit damage range, stamped onto its DamageDealt events (Dev Mode combat log).
+    // Set once at the top of ResolveDamage; a field rather than a parameter so every DealDamageToTarget call
+    // site (one per damage category) carries it without a signature change.
+    private DamageRange? _hitRange;
+
     private bool DealDamageToTarget(
         int dmg,
         double effectiveness,
@@ -568,7 +573,9 @@ public class AttackAction : IBattleAction
                 effectiveness,
                 Target.Attributes.HP,
                 Target.Attributes.MaxHP,
-                isCrit
+                isCrit,
+                _hitRange?.Min,
+                _hitRange?.Max
             )
         );
         return true;
