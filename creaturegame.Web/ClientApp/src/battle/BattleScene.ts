@@ -29,6 +29,12 @@ export class BattleScene extends Phaser.Scene {
   private onResetPlayerSprite = () => this.resetPlayerSprite();
   private onSwapPlayer = (e: { speciesId: number }) => this.swapPlayerCreature(e.speciesId);
   private onEvolve = (e: { toSpeciesId: number }) => this.playEvolutionAnimation(e.toSpeciesId);
+  private onResize = () => this.relayout();
+
+  // True only while a sprite sits idle at its rest spot — a browser resize re-lays out resting sprites only,
+  // so it never fights an in-flight slide-in/lunge/faint tween.
+  private playerRested = false;
+  private enemyRested = false;
 
   constructor() {
     super({ key: 'BattleScene' });
@@ -65,23 +71,16 @@ export class BattleScene extends Phaser.Scene {
 
   create() {
     const W = this.scale.width;
-    const H = this.scale.height;
 
     // E2E: run all tweens and timers (entry slide, the 1.8s cry pause, lunges,
     // faint) much faster so battles play through quickly under test.
     if (E2E) { this.tweens.timeScale = 8; this.time.timeScale = 8; }
 
-    const enemyRestX = W * 0.68;
-    const enemyRestY = H * 0.30;
-    const playerRestX = W * 0.28;
-    const playerRestY = H * 0.65;
-
-    // Scaled off 96×96 source sprites, capped so large species don't overrun the canvas (SPRITE_PRESENTATION.md §1.3).
-    const enemyScale  = Math.min(2.5, (H * 0.22) / 96);
-    const playerScale = Math.min(3.0, (H * 0.28) / 96);
+    const { enemyRestX, enemyRestY, playerRestX, playerRestY, enemyScale, playerScale } = this.layout();
 
     this.enemySprite = this.add.image(W + 120, enemyRestY, 'enemy').setScale(enemyScale);
     this.playerSprite = this.add.image(-120, playerRestY, 'player').setScale(playerScale);
+    this.scale.on(Phaser.Scale.Events.RESIZE, this.onResize);
 
     bridge.on('playMoveAnimation', this.onMoveAnim);
     bridge.on('playFaintAnimation', this.onFaintAnim);
@@ -103,6 +102,52 @@ export class BattleScene extends Phaser.Scene {
     this.playEntryAnimation(enemyRestX, playerRestX);
   }
 
+  // Rest spots + sprite scales for the current canvas size. Scaled off 96×96 source sprites, capped so large
+  // species don't overrun the canvas (SPRITE_PRESENTATION.md §1.3).
+  private layout() {
+    const W = this.scale.width;
+    const H = this.scale.height;
+    return {
+      enemyRestX: W * 0.68,
+      enemyRestY: H * 0.3,
+      playerRestX: W * 0.28,
+      playerRestY: H * 0.65,
+      enemyScale: Math.min(2.5, (H * 0.22) / 96),
+      playerScale: Math.min(3.0, (H * 0.28) / 96),
+    };
+  }
+
+  // Canvas resized (the Phaser RESIZE scale mode): rescale every sprite and re-seat any that are at rest.
+  // Idle bobs are relative tweens that remember their start y, so they're restarted from the new rest spot.
+  private relayout() {
+    if (!this.playerSprite || !this.enemySprite) return;
+    const l = this.layout();
+    this.enemySprite.setScale(l.enemyScale);
+    this.playerSprite.setScale(l.playerScale);
+    if (this.enemyRested) {
+      this.enemyIdleTween?.stop();
+      this.enemySprite.setPosition(l.enemyRestX, l.enemyRestY);
+      this.enemyIdleTween = this.bob(this.enemySprite);
+    }
+    if (this.playerRested) {
+      this.playerIdleTween?.stop();
+      this.playerSprite.setPosition(l.playerRestX, l.playerRestY);
+      this.playerIdleTween = this.bob(this.playerSprite);
+    }
+  }
+
+  private bob(sprite: Phaser.GameObjects.Image, delay = 0) {
+    return this.tweens.add({
+      targets: sprite,
+      y: `-=5`,
+      yoyo: true,
+      repeat: -1,
+      duration: 700,
+      ease: 'Sine.easeInOut',
+      delay,
+    });
+  }
+
   private playCry(who: 'player' | 'enemy', detune = 0) {
     const id = who === 'player' ? this.playerSpeciesId : this.enemySpeciesId;
     const key = this.cryKey(id);
@@ -122,6 +167,7 @@ export class BattleScene extends Phaser.Scene {
       ease: 'Cubic.easeOut',
       onComplete: () => {
         this.playCry('enemy');
+        this.enemyRested = true;
         // Pause after enemy cry before player enters
         this.time.delayedCall(1800, () => {
           this.tweens.add({
@@ -131,6 +177,7 @@ export class BattleScene extends Phaser.Scene {
             ease: 'Cubic.easeOut',
             onComplete: () => {
               this.playCry('player');
+              this.playerRested = true;
               this.startIdleTweens();
               bridge.emit('entryComplete', undefined);
             },
@@ -141,24 +188,8 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private startIdleTweens() {
-    this.enemyIdleTween = this.tweens.add({
-      targets: this.enemySprite,
-      y: `-=5`,
-      yoyo: true,
-      repeat: -1,
-      duration: 700,
-      ease: 'Sine.easeInOut',
-    });
-
-    this.playerIdleTween = this.tweens.add({
-      targets: this.playerSprite,
-      y: `-=5`,
-      yoyo: true,
-      repeat: -1,
-      duration: 700,
-      ease: 'Sine.easeInOut',
-      delay: 200,
-    });
+    this.enemyIdleTween = this.bob(this.enemySprite);
+    this.playerIdleTween = this.bob(this.playerSprite, 200);
   }
 
   private playMoveAnimation(attackerSide: 'player' | 'enemy', targetSide: 'player' | 'enemy') {
@@ -199,6 +230,8 @@ export class BattleScene extends Phaser.Scene {
     const idle   = side === 'player' ? this.playerIdleTween : this.enemyIdleTween;
 
     idle?.pause();
+    if (side === 'player') this.playerRested = false;
+    else this.enemyRested = false;
     // Play cry at lower pitch (–600 cents = one octave down) for the faint
     this.playCry(side, -600);
 
@@ -237,13 +270,13 @@ export class BattleScene extends Phaser.Scene {
 
     const reveal = () => {
       const W = this.scale.width;
-      const H = this.scale.height;
-      const enemyRestX = W * 0.68;
-      const enemyRestY = H * 0.3;
+      const { enemyRestX, enemyRestY, enemyScale } = this.layout();
 
       this.enemyIdleTween?.stop();
+      this.enemySprite.setScale(enemyScale);
       this.enemySprite.setTexture(spriteKey);
       this.enemySprite.setAlpha(1).setPosition(W + 120, enemyRestY);
+      this.enemyRested = false;
 
       this.tweens.add({
         targets: this.enemySprite,
@@ -252,14 +285,8 @@ export class BattleScene extends Phaser.Scene {
         ease: 'Cubic.easeOut',
         onComplete: () => {
           this.playCry('enemy');
-          this.enemyIdleTween = this.tweens.add({
-            targets: this.enemySprite,
-            y: `-=5`,
-            yoyo: true,
-            repeat: -1,
-            duration: 700,
-            ease: 'Sine.easeInOut',
-          });
+          this.enemyRested = true;
+          this.enemyIdleTween = this.bob(this.enemySprite);
         },
       });
     };
@@ -363,12 +390,11 @@ export class BattleScene extends Phaser.Scene {
     const key = `back-${speciesId}`;
 
     const reveal = () => {
-      const W = this.scale.width;
-      const H = this.scale.height;
-      const playerRestX = W * 0.28;
-      const playerRestY = H * 0.65;
+      const { playerRestX, playerRestY, playerScale } = this.layout();
 
       this.playerIdleTween?.stop();
+      this.playerSprite.setScale(playerScale);
+      this.playerRested = false;
       this.playerSprite.setTexture(key);
       this.playerSprite.setAlpha(1).setPosition(-120, playerRestY);
 
@@ -379,14 +405,8 @@ export class BattleScene extends Phaser.Scene {
         ease: 'Cubic.easeOut',
         onComplete: () => {
           this.playCry('player');
-          this.playerIdleTween = this.tweens.add({
-            targets: this.playerSprite,
-            y: `-=5`,
-            yoyo: true,
-            repeat: -1,
-            duration: 700,
-            ease: 'Sine.easeInOut',
-          });
+          this.playerRested = true;
+          this.playerIdleTween = this.bob(this.playerSprite);
         },
       });
     };
@@ -413,6 +433,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private teardown() {
+    this.scale.off(Phaser.Scale.Events.RESIZE, this.onResize);
     bridge.off('playMoveAnimation', this.onMoveAnim);
     bridge.off('playFaintAnimation', this.onFaintAnim);
     bridge.off('playDamageShake', this.onDamageShake);
