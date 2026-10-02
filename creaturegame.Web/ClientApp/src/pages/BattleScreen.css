@@ -1858,3 +1858,15 @@
 
 
 
+
+/* Dev Mode badge — sits in the shared top-right corner row so it can't crowd the MAP/gear buttons. */
+.dev-badge {
+  align-self: center;
+  padding: 0.1rem 0.4rem;
+  font-size: var(--fs-xs);
+  font-weight: bold;
+  letter-spacing: var(--ls-wider);
+  color: #fff;
+  background: #b3261e;
+  border-radius: 3px;
+}

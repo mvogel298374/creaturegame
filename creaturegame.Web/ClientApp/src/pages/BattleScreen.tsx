@@ -44,6 +44,7 @@ import { PartyCard } from '../components/modals/PartyCard';
 import { hasUsableMove } from '../battle/moveMenu';
 import { MoveReplacementModal } from '../components/modals/MoveReplacementModal';
 import { SettingsModal } from '../components/modals/SettingsModal';
+import { useDevMode } from '../hooks/useDevMode';
 import { CreatureOverview } from './CreatureOverview';
 import '../components/modals/RosterPicker.css';
 import './BattleScreen.css';
@@ -100,6 +101,7 @@ export function BattleScreen() {
   const [mapPeek, setMapPeek] = useState(false);
   // Settings is a local modal, not a page nav — leaving the page would tear down the live SignalR connection.
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const { enabled: devModeOn } = useDevMode();
   const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -188,6 +190,7 @@ export function BattleScreen() {
             corner. Grouped in one flex row on purpose — a shared anchor is what keeps them from crowding each
             other or drifting onto the enemy nameplate/HP bar, which sits in the opposite (top-left) corner. */}
         <div className="battlefield-corner-controls">
+          {devModeOn && <span className="dev-badge" title="Dev mode is on">DEV</span>}
           {state.regionBiomes.length > 0 && (
             <button
               className={`map-toggle-btn${mapPinned ? ' map-toggle-btn--on' : ''}`}

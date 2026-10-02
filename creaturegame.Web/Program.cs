@@ -12,6 +12,12 @@ builder
     .AddJsonProtocol(opts =>
         opts.PayloadSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     );
+builder.Services.AddSingleton(
+    DevModeOptions.Resolve(
+        builder.Configuration.GetValue<bool?>("DevMode:Enabled"),
+        builder.Environment.IsDevelopment()
+    )
+);
 builder.Services.AddSingleton<EncounterFactory>();
 builder.Services.AddSingleton<GameSessionManager>();
 

@@ -196,6 +196,38 @@ Stack: React 18 + TypeScript + SignalR + Phaser 3. (Canvas & core animations don
 
 ---
 
+## Dev Mode — server-gated debug switch for deep runs  ⟵ OPEN, planned 2026-10-02
+
+**Why:** the user wants to play deep runs and inspect what the game is doing. First feature: an enemy-creature
+overview (the CHECK POKEMON sheet, for the *foe*). The switch is **server-gated** so the deployed Fly app can
+never leak enemy stats or expose debug actions, whatever a client sets in localStorage.
+
+**Design (ratified 2026-10-02):**
+- **Server flag is the authority.** New `DevModeOptions` (config key `DevMode:Enabled`); default
+  `builder.Environment.IsDevelopment()` — `dev.ps1` already launches with `ASPNETCORE_ENVIRONMENT=Development`,
+  Fly runs Production, so prod is off with no extra config. An env var (`DevMode__Enabled`) overrides either way.
+- **Client toggle is a second, per-viewer layer.** `GET /api/dev/status` → `{ enabled }`; the Settings panel
+  shows the "Dev mode" toggle **only when the server says enabled**, persisted as `devMode: boolean` (default
+  off) in `utils/settings.ts`. A small "DEV" badge shows in the HUD while it's on.
+- **Every dev endpoint re-checks the server flag** (404 when disabled) — hiding the toggle is UX, not security.
+- **Dev actions hang off one gate.** Future dev features (skip to node, spawn chosen enemy, grant items/gold,
+  set level) add endpoints behind the same check; none are scoped yet.
+
+**Item 1 — flag + toggle:** ✅ DONE (2026-10-02). `DevModeOptions` + DI registration + `DevController`
+`GET /api/dev/status`; `Settings.devMode` + `useDevMode` hook; toggle in `SettingsPanel` (shown only when the
+server enables); HUD DEV badge. Dev endpoints for later items go in `DevController` behind the same flag (404 off).
+**Item 2 — enemy overview (still open):** `GET /api/game/{gameId}/enemy` (dev-gated) reusing `PlayerOverviewDto.From`
+(species, level, HP, stats, DVs, Stat-Exp, status, stat stages, moves + PP) over a new
+`GameSessionManager.GetEnemyCreature(gameId)` (display-only read, same no-lock reasoning as
+`GetPlayerCreature`). Client: with dev mode on, hovering/tapping the enemy sprite/HP bar opens a read-only
+CHECK-POKEMON-style panel (reuse `CreatureOverview`). **Frontend look is provisional pending `/plan`** (where
+the hover target is, hover-vs-tap on touch).
+**Tests:** C# — flag default per environment + override, endpoints 404 when off / 200 when on; Vitest —
+settings round-trip, toggle hidden when the server reports disabled. `docs/PRODUCT_SPEC.md` entry when item 2
+ships (dev-only, so note it as such).
+
+---
+
 ## Browser-Based UI Testing (Playwright)
 
 Suite lives in `ClientApp/e2e/` (`npm run test:e2e`). Playwright drives the React DOM; the Phaser canvas is

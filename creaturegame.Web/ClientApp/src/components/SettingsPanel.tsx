@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { loadSettings, saveSettings } from '../utils/settings';
 import { setMasterVolume } from '../battle/AudioEngine';
+import { useDevMode } from '../hooks/useDevMode';
 import './SettingsPanel.css';
 
 // The settings content itself, shared between the full-page /settings route (reached from the Title Screen)
@@ -8,11 +9,19 @@ import './SettingsPanel.css';
 // what's actually being edited.
 export function SettingsPanel() {
   const [volume, setVolume] = useState(() => loadSettings().masterVolume);
+  const [devMode, setDevMode] = useState(() => loadSettings().devMode);
+  // The toggle only exists when the server permits Dev Mode — on the deployed app it never renders.
+  const { available: devAvailable } = useDevMode();
 
   const onVolumeChange = (v: number) => {
     setVolume(v);
     setMasterVolume(v);
-    saveSettings({ masterVolume: v });
+    saveSettings({ ...loadSettings(), masterVolume: v });
+  };
+
+  const onDevModeChange = (on: boolean) => {
+    setDevMode(on);
+    saveSettings({ ...loadSettings(), devMode: on });
   };
 
   return (
@@ -31,6 +40,17 @@ export function SettingsPanel() {
         />
         <span className="settings-value">{Math.round(volume * 100)}%</span>
       </div>
+      {devAvailable && (
+        <div className="settings-row">
+          <span className="settings-label">DEV MODE</span>
+          <input
+            type="checkbox"
+            checked={devMode}
+            onChange={e => onDevModeChange(e.target.checked)}
+            aria-label="Dev mode"
+          />
+        </div>
+      )}
     </div>
   );
 }
