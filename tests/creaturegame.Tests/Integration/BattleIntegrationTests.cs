@@ -139,12 +139,15 @@ public class BattleIntegrationTests
         );
 
         int playerHpBefore = player.Attributes.HP;
+        // Deterministic rules + seeded RNG: removes the Gen-1 1/256 miss, which would let the enemy act.
         var battle = new Battle(
             player,
             enemy,
             new Gen1TypeChart(),
             AutoSelectInput.Instance,
-            AutoSelectInput.Instance
+            AutoSelectInput.Instance,
+            rules: AlwaysHitRules.Instance,
+            rng: new SeededRandomSource(0)
         );
         await battle.StartFightAsync();
 
@@ -198,7 +201,10 @@ public class BattleIntegrationTests
             AutoSelectInput.Instance,
             emitter: emitter,
             // Already poisoned entering the turn — the faster player one-shots the enemy this same turn.
-            playerEntryStatus: new CarriedStatus(StatusCondition.Poison, 0)
+            playerEntryStatus: new CarriedStatus(StatusCondition.Poison, 0),
+            // No 1/256 miss: a miss would leave the enemy alive and let the poison tick.
+            rules: AlwaysHitRules.Instance,
+            rng: new SeededRandomSource(0)
         );
         await battle.StartFightAsync();
 

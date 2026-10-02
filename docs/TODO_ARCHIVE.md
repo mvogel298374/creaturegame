@@ -8,6 +8,17 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Repo-sweep R2 — two latent 1/256-miss test flakes ✅ DONE (2026-10-02)
+
+Found by the 2026-10-02 repo-wide code review sweep (R2 "Test flakes"; the sweep's remaining items are still open
+in `TODO.md`). `BattleIntegrationTests.cs` — `Battle_SlowerCreature_ActionSkipped_WhenKilledFirst` and
+`Battle_EndOfTurnResidualSkipped_WhenOwnAttackFaintsTheOpponentThatTurn` — ran unseeded Gen 1 rules, so the Gen 1
+1/256 always-miss (≈0.4% per test per run) could let the enemy act / let the poison tick and fail the assertion.
+Fix (test-only): both now construct `Battle` with `rules: AlwaysHitRules.Instance` and
+`rng: new SeededRandomSource(0)`, matching the existing deterministic tests. No product change, not player-visible.
+
+---
+
 ## Dev Mode — server-gated debug switch + enemy overview + damage-roll ranges ✅ DONE (2026-10-02)
 
 *(Moved here from `TODO.md` → *Dev Mode*; planned and implemented 2026-10-02. Open follow-ups — enemy stat

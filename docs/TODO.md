@@ -48,6 +48,10 @@ hard dependency chain.
 - **Tier 5 — reference/housekeeping, no urgency:** Multi-Generation Data Model & Schema, User Documentation,
   and the "watch, don't refactor speculatively" Tech Debt items.
 
+**Repo-wide code review sweep (2026-10-02) — findings awaiting adjudication**, tiered **R1–R4** in
+*Repo-Wide Code Review Sweep* below (R1 = players get stuck or lose control, R2 = correctness/fidelity/safety,
+R3 = robustness/UX/a11y, R4 = hygiene/nits). Separate from Tiers 1–5; the user places each item.
+
 **Open, unplanned, not placed in the tier list above:** Gen 1 has no end-of-turn residual phase — `Battle`'s
 turn shape differs from the real games' (see *Known Gaps* below). Needs a `/plan` before it can be tiered.
 
@@ -879,6 +883,174 @@ Battles are fully playable now — docs won't describe a moving target.
 - [ ] Expand `README.md` — architecture decisions (two-DB model, `IBattleRules` pattern, how to add a move
   effect / a generation).
 - [ ] `GEN_DIFFERENCES.md` (written) — adapt into a player-facing "what makes Gen 1 different" explainer.
+
+---
+
+## Repo-Wide Code Review Sweep (2026-10-02) ⟵ OPEN, nothing adjudicated yet
+
+Six read-only Opus reviewers, one per slice (core engine · ASP.NET/SignalR backend · importer + data layer ·
+React/Phaser frontend · tests · infra/security). **Every item below is an unadjudicated finding** — the user
+decides fix / waive / defer per item; nothing here is approved work. Items already waived/closed elsewhere
+(SignalRInput cancel race, reconnect event-replay *absence*, rules-RNG seeding, items.db pin) were excluded.
+**Gen 1 claims were quoted from the reviewers' memory of pokered, not fetched — verify each against
+`GEN_DIFFERENCES.md` / pokered before changing the engine or data** (see the *challenge gen fidelity* rule).
+Fixing a data/engine item usually also means updating the test that currently pins the wrong value.
+
+### R1 — players get stuck or lose control (fix first)
+
+- **Lost answers soft-lock the run** (three reports, one root cause). (a) `SignalRInput.cs:300-310` — every
+  `Set*` completes only a currently-pending handshake, so an answer landing between prompts is dropped (shop
+  BUY then LEAVE back-to-back strands the server in the shop loop); (b) `useBattleHub.ts:189-256` — modals hide
+  locally *before* `invoke` resolves, so an answer sent during the reconnect window is rejected and the modal
+  never returns; (c) the replay (`SignalRBattleEventEmitter.cs:94-106`) doesn't re-open prompts. Fix shape:
+  prompt id/ack + hide-on-resolve (or re-show on rejection).
+- **Reconnect replay mishandled at both ends.** Server: a flee (`CreatureFled`, no `BattleEnded`) leaves the
+  cached `BattleStarted`/`TurnStarted` alive (`SignalRBattleEventEmitter.cs:55-63`), so a later reconnect revives
+  a finished battle with a dead move menu; replay fires on *every* reconnect (`GameSessionManager.cs:82-94`).
+  Client: a replayed `BattleStarted` bumps `encounterIndexRef` (spurious "A new challenger approaches!", enemy
+  re-slides, HP flashes 1/1) and a replayed `MAP_BIOME_ENTERED` duplicates `routePath` and leaves `mapPin` wrong
+  (`useBattleHub.ts:70-72`, `battleReducer.ts:440-454`, `timeline.ts:407-421`). Also: the 40 s grace is shorter
+  than the client's 0/2/10/30 s retry schedule (last attempt ≈42 s), so outages >~12 s can't be recovered.
+- **A faulted run task never tells the client** (`GameSessionManager.cs:281-290`) — catch-all logs + removes the
+  session but sends no `RunEnded`/error and doesn't close the socket; the UI sits on its last screen forever.
+- **Pinned map hides blocking prompts** — `.encounter-map--pinned` z-index 60 vs `.modal-overlay` 10
+  (`BattleScreen.css:1172`, `Modal.css:4`); `RouteChoiceMap` also pulls focus to a covered town (Enter picks an
+  unseen route).
+- **Engine: flinch from a slower attacker carries into the next turn** (`MoveEffects.cs:96-100`,
+  `StatusResolver.cs:28-33`, `Battle.cs:211-214`) — clear `IsFlinched` at end of turn; Substitute should also
+  block flinch. No test covers a slower flincher.
+- **Engine: curing a status doesn't clear `CarriedStatus`** (`ItemEffects.cs:93-100,127`,
+  `RewardResolution.cs:150`) — an Antidote on a bench member, or a cure at a Treasure/Mystery node, is undone
+  on the next send-in/battle start. `ReviveItemEffect` already clears it; `ClearStatus` should too.
+- **Data: species base stats are modern, not Gen 1** (`PokemonImport.cs:144-152`) — `BaseSpecial` taken from
+  Sp. Atk (Chansey 35 vs 105, Tentacruel 80/120, Gyarados 60/100, Articuno 95/125, Golduck 95/80, …) and the
+  Gen 6/7 buffs never undone (Pikachu Def 40/30, Beedrill Atk 90/80, Dugtrio Atk 100/80, Farfetch'd Atk 90/65,
+  …). Fix: a curated 151-row Gen 1 base-stat table (pokered `base_stats`) applied over the import.
+  `DATA_IMPORT.md` §4.2 presents the Sp. Atk choice as correct and needs correcting with it.
+- **Data: `BaseExperience` is the modern value** (`PokemonImport.cs:155`, feeds `Gen1BattleRules.cs:263`) —
+  Chansey 395/255, Mew 270/64, Magikarp 40/20, Pikachu 112/82.
+
+### R2 — correctness, fidelity and safety (next)
+
+- **Gen 1 fidelity — damage/accuracy core** (verify first): `DamageCalculator.cs:219-223` skips the `2L/5` and
+  `/50` floors `GEN_DIFFERENCES.md` documents (~24% high at L12); `Gen1BattleRules.cs:213-219` uses the
+  3-based accuracy/evasion table (Gen 1 uses the standard table); crit multiplier should be ≈(2L+5)/(L+5), not
+  flat 2× (`:258`); multi-hit re-rolls crit/variance per hit and continues past a broken Substitute
+  (`AttackAction.cs:379-404`); recoil/drain/Struggle use full calculated damage, not HP actually lost
+  (`AttackAction.cs:402,430-437`); Ice can freeze Ice / Electric can paralyse Electric (`Gen1BattleRules.cs:161`);
+  Fly/Dig not untargetable on the charge turn (not listed as a known gap).
+- **Engine: trap persists after the trapper faints** (`StatusResolver.cs:46-50`); **recharge turn can be lost
+  twice** (`Battle.cs:195` runs `CanAct` before `AttackAction.cs:69`'s recharge check) and the `CanAct` order
+  differs from Gen 1 (sleep → freeze → trapped → flinch → recharge → confusion → paralysis); full paralysis and
+  confusion self-hits don't cancel Thrash/Bide/charge/trap.
+- **Data: Psychic Special-drop chance is 10%, Gen 1 is 33%** — no `psychic` case in `MoveImport.cs:267-330`;
+  `SecondaryEffectContractTests.cs:22` pins the wrong value. **X Accuracy imported as +1 accuracy stage**
+  (`ItemMapper.cs:163`, pinned by `ItemImportTests.cs:229`); Gen 1 skips the accuracy check entirely (the
+  OHKO quirk).
+- **Importer: offline/failed run wipes evolutions and exits 0** (`EvolutionImport.cs:24` deletes before fetch,
+  swallows errors); no retry/429/timeout anywhere; `Program.cs:111` always prints "Import Complete!". A failed
+  `SaveChangesAsync` poisons the shared DbContext for the rest of the run (`MoveImport.cs:29/82`,
+  `PokemonImport.cs`, `ItemImport.cs`); learnset delete+insert isn't transactional.
+- **Player species always taken from the starter** (`BattleScreen.tsx:77,237,400`, `activeGame.ts`) — game-over
+  shows the starter's sprite with the final creature's name after evolution/lead change; after a refresh Phaser
+  draws the starter for the whole battle. Needs the player species id on the replayed `BattleStarted` (server
+  change); Continue button also shows the starter's name/level.
+- **CI/deploy hardening** — `fly-deploy.yml` runs no tests before `flyctl deploy`; `setup-flyctl@master` is an
+  unpinned moving branch and there is no `permissions:` block; tags can point at any commit. **Container runs as
+  root** (`Dockerfile:44-52`; use `USER $APP_UID` after checking SQLite write needs).
+- **Dev scripts**: `-StartStack` leaves the backend running (`test.ps1:119/148`, `e2e.ps1:180/357` kill only the
+  `dotnet run` parent); `stop-dev.ps1:103` kills *anything* on :5173 (another project's Vite); `e2e.ps1:218`
+  `-f` binds as a second `-ForegroundColor` and crashes the failure path; `test.ps1 -E2E -StartStack` exits 0
+  when the backend never starts.
+- **Pre-commit hook gaps** (`.githooks/pre-commit`): hardcoded dotnet path (`:11`); checks the working tree not
+  the staged snapshot (`:14,22`); skips deletes/renames and `.csproj`/`Directory.Build.props`/`package.json`/
+  `tsconfig.json`/`*.db`-only commits (`:20,33`).
+- **Public endpoint exhaustion** — `POST /api/game/start` unauthenticated, no rate limit, no cap on concurrent
+  runs/connections, no idle timeout, no `fly.toml` health check or concurrency block (single 1 GB VM).
+  Unmeasured; also no security headers/`UseForwardedHeaders` (low impact: no auth/cookies).
+- **Vacuous assertion**: `SessionResumeTests.cs:145` compares event payloads by reference so it can never match — assert conn-1's event
+  count is unchanged instead.
+- **Test gap: `GameSessionManager` connection-routed methods** — `SetItemChoice` unknown-id fallback
+  (`:441-448`), `DetachConnection` stale-connection guard (`:657-667`), `ScheduleAbandon`/`CancelAbandon`
+  (`:748-774`) (reachable without SignalR; overlaps the existing Tier-4 connection-lifecycle item and covers the
+  paths behind R1).
+
+### R3 — robustness, UX and accessibility
+
+- **Modal accessibility**: `Modal.tsx:35-44` has `aria-modal` but no focus trap/initial focus/inert background —
+  Tab still reaches QUIT (abandons the run, no confirmation); battle log has no `role="log"`/`aria-live`.
+- **Double-submit creates two runs** (`StarterSelection.tsx:45-72`, `NicknameModal.tsx:32,38`); **`/battle` with
+  no saved game shows "Connecting…" forever** (`BattleScreen.tsx:78`, `useBattleHub.ts:52`).
+- **Level-up panel covers the player nameplate** — same `bottom/right` anchor as `.player-corner` at higher
+  z-index (`BattleScreen.css:800` vs `:114`); the independent-absolute-position pattern the UI no-crowding rule
+  warns against.
+- **Battle log unbounded** (`battleReducer.ts:262`, `BattleScreen.tsx:286`) and the whole `BattleScreen`
+  re-renders on every dispatch.
+- **Phaser**: resize mid-attack leaves sprites at the old x (`BattleScene.ts:122-137` vs lunge/shake never
+  clearing `*Rested`); `entryComplete` is emitted but unheard, so FIGHT unlocks ≈2.6 s before sprites arrive.
+- **Backend session edges**: half-started run leaves a broken registered session (`GameSessionManager.cs:226`);
+  `Party.Members` enumerated off-thread (`:501` `UsableInBattle`, also `Party` hands out its live `List`) can 500
+  `GET /bag`; abandon timer can still cancel a just-reconnected run (`:755-763`); second tab on the same
+  `gameId` silently takes over (`:195-205`); unknown `/api/*` returns `index.html` 200 (`Program.cs:57`).
+- **Engine smaller Gen 1 gaps** (verify each): confusion self-damage applies variance and ignores stages/Burn
+  (`DamageCalculator.cs:264`); binding duration uniform 2–5 vs 3/8-3/8-1/8-1/8; Stat Exp `/4` unfloored + sqrt
+  floored not ceiled (`Gen1StatCalculator.cs:20`); Psywave max one too high (`Gen1BattleRules.cs:150`); Mist
+  message before the chance roll and Mist shouldn't block secondary drops (`AttackAction.cs:657`); Leech Seed
+  ignores Toxic counter (`Battle.cs:674`); Fire move thaws via a Substitute hit (`AttackAction.cs:270`); trainer
+  XP 1.5× rounding (`:267`); post-Transform crit speed; Substitute at exactly the HP cost should succeed
+  (`MoveEffects.cs:497`).
+- **Importer/data lows**: `MoveImport.cs:175` overwrites the Gen-1-resolved `EffectChance` with today's ailment
+  chance; dev server can read stale data (Web csproj copies `*.db` only, never `-wal`; `DbPathHelper.cs:18`
+  prefers the bin copy); item `Cost` is modern and now drives reward rarity/starting bag (five cures tie at 200,
+  starter pair picked by row order; `DATA_IMPORT.md` §4.5's "no shop" rationale is stale); Yellow exclusion list
+  wrongly drops the Sandshrew/Vulpix/Oddish/Mankey/Growlithe/Bellsprout lines (no gameplay effect).
+- **Seam leak / AI / validation**: `DamageCalculator.cs:189-198` uses Special stages directly, bypassing
+  `GetOffensiveStat`/`GetDefensiveStat` (a Gen 2 Special split would need a change here); AI evaluators overvalue
+  10% secondary status and Thunder Wave vs Ground (`MoveEvaluators.cs:153-177`); `Battle.cs:529-531` trusts a
+  `MoveTurnChoice` (no PP/Disable check; only `SignalRInput.ResolveMove` validates); latent `Biome.cs:301`
+  crash if a future profile's playable set is disconnected.
+- **Open question (documented, but Gen 1 differs)**: after Roar/Whirlwind the scared-off foe still acts
+  (`Battle.cs:311-313`), which can end the run via a faint with a healthy bench (`GAME_LOOP.md:135`); Gen 1 ends
+  the battle immediately.
+
+### R4 — hygiene, dependencies and nits
+
+- **Dependency advisories**: `npm audit` 15 (1 critical `vitest` 2.1.0 — dev-only, not exposed by `vitest run`;
+  6 high incl. `vite`/`esbuild`/`@playwright/test`; shipped to players: only `react-router-dom` 6.30.3
+  moderate) — `npm audit fix` clears most; `SQLitePCLRaw.lib.e_sqlite3` 2.1.10 High (GHSA-2m69-gcr7-jv3q) via
+  EF Core Sqlite 9.0.6, low practical risk, invisible in builds.
+- **Test hygiene**: `shop.spec.ts:22` zero-count assertion can't fail (`startBattle` closes the shop first);
+  `encounter-map.spec.ts:94` ignores `playToNextEncounter`'s result; `DevModeTests.cs:124` never exercises
+  `MinDamage`; `cadence.spec.ts` can pass trivially; `SignalRInputTests` handshake tests have no timeout;
+  `WebEventContractTests.cs:77` greps all of `timeline.ts` for `case 'Name'` (can be fooled by node-kind labels);
+  ~33 `new Battle(...)` calls with no `rng:`; 10 duplicated `Fighter(...)` helpers + duplicated seeded-start
+  preamble + duplicated `fakeLocalStorage`; `MovesFixture.cs:48` "fresh copy" is a shared cached instance;
+  `TestAltProfile` belongs in `TestSupport/`; two no-assertion "must not throw" tests.
+- **Frontend nits**: `/party` JSON dispatched `as never` (`useBattleHub.ts:116`); `"unknown"` reward kind renders
+  a blank card (`RewardChoiceModal.tsx:32`); `SpeciesCard` Enter-only (no Space); `TypeBadge` ≈2:1 contrast on
+  light types; `SettingsScreen` `nav(-1)`; title-screen notice reappears on reload; dead code
+  (`PhaserBridge` `enterBattle`/`entryComplete`, `AudioEngine.playTick`/`playFaintCry`, two `eslint-disable`s).
+- **Stale comments/docs**: `timeline.ts:613-617` ("auto-acks"), `:330-332` (gold HUD "later pass"), `bag.ts:18-20`
+  (Revive "no effect yet"), `battle-ui-cues.spec.ts:9-12`, `BattleIntegrationTests.cs:250` (`Console.ReadKey`),
+  `Wallet.cs:25`, `AttackService.cs:48` (cites TODO.md, lives only in the archive), `Gen1TypeChart.cs:10,127`
+  (Bug→Poison became 0.5×, not 1×), `GameSessionManager.cs:25-27` ("gives up ~30 s").
+- **Script/Docker polish**: `dev.ps1:30-31` apostrophe-in-path; `dev.ps1:16` doesn't clean exited-server window
+  shells; `build-release.ps1:200` leaves cwd changed; `Dockerfile:25-28` `COPY . .` re-downloads every sprite on
+  any source change, base images tag- not digest-pinned; `GameController.cs:66` logs only `ex.Message`;
+  `SignalRBattleEventEmitter.cs:86` discards the send task; client-chosen run `Seed` (product decision, not a
+  bug).
+- **Speculative, unverified** (verify before filing as real): `waitForBridge` resolving early on a slow
+  evolution-sprite load; timeline queue not cleared on unmount (leftover steps into a new run); corner map
+  preview covering the player corner on long node paths; boss framing lost after refresh; Sludge poison chance
+  possibly 40%; `AttackService.GetRandomAttackAsync` `Skip` without `OrderBy` (no callers); Substitute vs
+  sleep/paralysis status moves and Disable 1–8 turns; untested types `RunLoop`/`RewardRunEvent`/
+  `AcquisitionResolution`/`CompositeEvaluator`/`MoveEvaluators` (likely covered indirectly — run coverage).
+
+**Clean (checked, no findings):** Dev Mode gating (server flag; ranges stripped at the emitter's single send
+point), client-supplied index/id bounds checks, CORS, event wire projection + REST DTOs, XSS (`dangerouslySetInnerHTML`/
+`innerHTML`/`eval` absent), SignalR + Phaser listener cleanup, secrets in tracked files/history, EF schema vs
+snapshots vs live dbs, runtime queries (no N+1), Gen 1 type chart and XP curves, HP DV derivation, island layout
+generation.
 
 ---
 
