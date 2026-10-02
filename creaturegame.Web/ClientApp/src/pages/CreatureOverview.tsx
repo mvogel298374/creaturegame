@@ -3,7 +3,7 @@ import { TypeBadge } from '../components/TypeBadge';
 import { PartyCard } from '../components/modals/PartyCard';
 import { formatMoveName } from '../utils/format';
 import { friendlyFetchError } from '../utils/fetchError';
-import { defaultOverviewSlot, showOverviewPicker, overviewSlotUrl } from '../battle/overviewPicker';
+import { defaultOverviewSlot, showOverviewPicker, overviewSlotUrl, enemyOverviewUrl } from '../battle/overviewPicker';
 import type { PlayerOverview, StatRow, MoveRow } from '../types/PlayerOverview';
 import type { PartyMember } from '../hooks/useBattleHub';
 import '../components/modals/RosterPicker.css';
@@ -15,10 +15,13 @@ type Tab = 'info' | 'stats' | 'moves';
  * GET /api/game/{gameId}/player/{slot}. Any slot is choosable — fainted/benched included — unlike SWITCH,
  * which is picking a battle action, not just looking. Picker rules (default slot / when to show / which
  * endpoint) live in ../battle/overviewPicker.ts so Vitest can pin them directly. */
-export function CreatureOverview({ gameId, party, onBack }: {
+export function CreatureOverview({ gameId, party, onBack, enemy = false }: {
   gameId: string | null;
   party: PartyMember[];
   onBack: () => void;
+  /** Dev Mode: show the current foe (GET /api/dev/{gameId}/enemy) instead of a party member — no picker,
+   * and no Exp rows (an enemy earns none). */
+  enemy?: boolean;
 }) {
   const [slot, setSlot]   = useState(() => defaultOverviewSlot(party));
   const [data, setData]   = useState<PlayerOverview | null>(null);
@@ -30,7 +33,7 @@ export function CreatureOverview({ gameId, party, onBack }: {
     let live = true;
     setData(null);
     setError(null);
-    fetch(overviewSlotUrl(gameId, party, slot))
+    fetch(enemy ? enemyOverviewUrl(gameId) : overviewSlotUrl(gameId, party, slot))
       .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
       .then((d: PlayerOverview) => { if (live) setData(d); })
       .catch(e => { if (live) setError(friendlyFetchError(e)); });
@@ -50,7 +53,7 @@ export function CreatureOverview({ gameId, party, onBack }: {
         {data && <span className="overview-sub">Lv{data.level} · #{String(data.speciesId).padStart(3, '0')}</span>}
       </div>
 
-      {showOverviewPicker(party) && (
+      {!enemy && showOverviewPicker(party) && (
         <div className="overview-picker lead-grid">
           {party.map((m, i) => (
             <PartyCard
@@ -82,7 +85,7 @@ export function CreatureOverview({ gameId, party, onBack }: {
             ))}
           </div>
           <div className="overview-body">
-            {tab === 'info' && <InfoTab d={data} />}
+            {tab === 'info' && <InfoTab d={data} hideXp={enemy} />}
             {tab === 'stats' && <StatsTab stats={data.stats} hp={data.hp} maxHp={data.maxHp} />}
             {tab === 'moves' && <MovesTab moves={data.moves} />}
           </div>
@@ -101,7 +104,7 @@ const GEN_FIELDS: Array<{ label: string; minGen: number; get: (d: PlayerOverview
   { label: 'Tera Type', minGen: 9, get: d => d.teraType },
 ];
 
-function InfoTab({ d }: { d: PlayerOverview }) {
+function InfoTab({ d, hideXp }: { d: PlayerOverview; hideXp: boolean }) {
   const xpPct = Math.min(100, (d.xpThisLevel / Math.max(1, d.xpToNextLevel)) * 100);
   const genFields = GEN_FIELDS.filter(f => d.generation >= f.minGen);
   return (
@@ -116,8 +119,12 @@ function InfoTab({ d }: { d: PlayerOverview }) {
       <div className="overview-fields">
         <div className="overview-field"><span>Status</span><span>{d.status === 'None' ? 'OK' : d.status}</span></div>
         <div className="overview-field"><span>HP</span><span>{d.hp} / {d.maxHp}</span></div>
-        <div className="overview-field"><span>Exp. Points</span><span>{d.xpThisLevel} / {d.xpToNextLevel}</span></div>
-        <div className="overview-xp-track"><div className="overview-xp-bar" style={{ width: `${xpPct}%` }} /></div>
+        {!hideXp && (
+          <>
+            <div className="overview-field"><span>Exp. Points</span><span>{d.xpThisLevel} / {d.xpToNextLevel}</span></div>
+            <div className="overview-xp-track"><div className="overview-xp-bar" style={{ width: `${xpPct}%` }} /></div>
+          </>
+        )}
         <div className="overview-field"><span>Base Stat Total</span><span>{d.baseStatTotal}</span></div>
         {genFields.map(f => (
           <div className="overview-field" key={f.label}><span>{f.label}</span><span>{f.get(d) ?? '—'}</span></div>

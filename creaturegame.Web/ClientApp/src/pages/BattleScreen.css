@@ -1870,3 +1870,9 @@
   background: #b3261e;
   border-radius: 3px;
 }
+
+/* Dev Mode: the enemy nameplate becomes a click/tap target for the enemy overview. */
+.nameplate--inspectable {
+  cursor: pointer;
+  pointer-events: auto;
+}

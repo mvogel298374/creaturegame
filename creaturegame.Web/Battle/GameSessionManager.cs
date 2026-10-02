@@ -235,8 +235,9 @@ public sealed class GameSessionManager(
         // session.Rng threads through every nondeterministic step (ARCHITECTURE.md §2.10).
         var runner = new RunDirector(
             session.Player,
-            (p, depth, biome, tier) =>
-                encounters.CreateEnemyAsync(
+            async (p, depth, biome, tier) =>
+            {
+                var enemy = await encounters.CreateEnemyAsync(
                     p,
                     session.AllMoves,
                     profile,
@@ -245,7 +246,10 @@ public sealed class GameSessionManager(
                     depth: depth,
                     // Web-layer half of the node-tier intent/mapping split — ENCOUNTER_DESIGN.md §3.1.
                     archetype: EnemyArchetypes.For(tier, session.Rng)
-                ),
+                );
+                battle.Enemy = enemy; // for the Dev Mode enemy overview (GetEnemyCreature)
+                return enemy;
+            },
             // THE generation composition point (GENERATION_SEAMS.md §7, GENERATION_PROFILE.md §4) — every seam
             // below is read explicitly off the run's profile, never left to an engine default.
             profile.TypeChart,
@@ -300,6 +304,20 @@ public sealed class GameSessionManager(
         if (_pending.TryGetValue(gameId, out var pending))
             return pending.Player;
         return null;
+    }
+
+    /// <summary>The foe of the run's current (or most recent) encounter, for the Dev Mode enemy overview.
+    /// Same display-only, no-lock read as <see cref="GetPlayerCreature(string)"/>. Null for an unknown or
+    /// not-yet-active game, or before the first encounter has been created.</summary>
+    public Creature? GetEnemyCreature(string gameId) =>
+        _active.TryGetValue(gameId, out var battle) ? battle.Enemy : null;
+
+    /// <summary>Test-only seam: records a foe on an active battle without running an encounter (the run task is
+    /// parked in tests), the same write the RunDirector's enemy supplier makes.</summary>
+    internal void RecordEnemy(string gameId, Creature enemy)
+    {
+        if (_active.TryGetValue(gameId, out var battle))
+            battle.Enemy = enemy;
     }
 
     /// <summary>The creature at an arbitrary party slot — the CHECK POKEMON party-member picker (docs/TODO.md).
@@ -661,6 +679,9 @@ sealed class ActiveBattle
     // The run's STARTER, captured at claim — a fallback for the overview snapshot when no party is wired. NOT
     // necessarily the creature on the field: read that through GameSessionManager.ActiveCreature.
     public Creature? Player;
+
+    // The current encounter's foe, recorded by the RunDirector's enemy supplier — Dev Mode's enemy overview.
+    public volatile Creature? Enemy;
 
     // The same instance RunDirector's RunState plays over, so the party-hydrate endpoint reads the live roster.
     public Party? Party;

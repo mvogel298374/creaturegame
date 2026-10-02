@@ -21,3 +21,8 @@ export function showOverviewPicker(party: PartyMember[]): boolean {
 export function overviewSlotUrl(gameId: string, party: PartyMember[], slot: number): string {
   return party.length === 0 ? `/api/game/${gameId}/player` : `/api/game/${gameId}/player/${slot}`;
 }
+
+// Dev Mode's foe sheet — a dev-gated server route (docs/TODO.md — Dev Mode); 404s when the server flag is off.
+export function enemyOverviewUrl(gameId: string): string {
+  return `/api/dev/${gameId}/enemy`;
+}

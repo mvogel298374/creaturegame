@@ -44,6 +44,7 @@ import { PartyCard } from '../components/modals/PartyCard';
 import { hasUsableMove } from '../battle/moveMenu';
 import { MoveReplacementModal } from '../components/modals/MoveReplacementModal';
 import { SettingsModal } from '../components/modals/SettingsModal';
+import { EnemyOverviewModal } from '../components/modals/EnemyOverviewModal';
 import { useDevMode } from '../hooks/useDevMode';
 import { CreatureOverview } from './CreatureOverview';
 import '../components/modals/RosterPicker.css';
@@ -102,6 +103,7 @@ export function BattleScreen() {
   // Settings is a local modal, not a page nav — leaving the page would tear down the live SignalR connection.
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { enabled: devModeOn } = useDevMode();
+  const [enemyOverviewOpen, setEnemyOverviewOpen] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -209,7 +211,18 @@ export function BattleScreen() {
             ⚙
           </button>
         </div>
-        <div className="nameplate nameplate--enemy">
+        <div
+          className={`nameplate nameplate--enemy${devModeOn ? ' nameplate--inspectable' : ''}`}
+          {...(devModeOn && {
+            role: 'button',
+            tabIndex: 0,
+            title: 'Dev mode: inspect enemy',
+            onClick: () => setEnemyOverviewOpen(true),
+            onKeyDown: (e: React.KeyboardEvent) => {
+              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEnemyOverviewOpen(true); }
+            },
+          })}
+        >
           <div className="nameplate-row">
             <span className="nameplate-name">{enemyName}</span>
             <span className="nameplate-level">Lv{enemyLevel}</span>
@@ -369,6 +382,10 @@ export function BattleScreen() {
 
       {state.switchIn && (
         <SwitchInModal prompt={state.switchIn} onChoose={respondSwitchIn} />
+      )}
+
+      {devModeOn && enemyOverviewOpen && (
+        <EnemyOverviewModal gameId={gameId} onClose={() => setEnemyOverviewOpen(false)} />
       )}
 
       {settingsOpen && (

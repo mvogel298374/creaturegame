@@ -8,6 +8,43 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Dev Mode — server-gated debug switch + enemy overview ✅ DONE (2026-10-02)
+
+*(Moved here from `TODO.md` → *Dev Mode*; planned and implemented 2026-10-02. Open follow-ups — enemy stat
+stages, further dev actions — stay in `TODO.md` → *Dev Mode — open follow-ups*.)*
+
+**Why:** the user wants to play deep runs and inspect what the game is doing. First feature: an enemy-creature
+overview (the CHECK POKEMON sheet, for the *foe*). The switch is **server-gated** so the deployed Fly app can
+never leak enemy stats or expose debug actions, whatever a client sets in localStorage.
+
+**Design (ratified 2026-10-02):**
+- **Server flag is the authority.** `DevModeOptions` (config key `DevMode:Enabled`); default
+  `builder.Environment.IsDevelopment()` — `dev.ps1` launches with `ASPNETCORE_ENVIRONMENT=Development`, Fly runs
+  Production, so prod is off with no extra config. An env var (`DevMode__Enabled`) overrides either way.
+- **Client toggle is a second, per-viewer layer.** `GET /api/dev/status` → `{ enabled }`; the Settings panel
+  shows the "Dev mode" toggle **only when the server says enabled**, persisted as `devMode: boolean` (default
+  off) in `utils/settings.ts`. A small "DEV" badge shows in the HUD while it's on.
+- **Every dev endpoint re-checks the server flag** (404 when disabled) — hiding the toggle is UX, not security.
+- **Dev actions hang off one gate** (`DevController`).
+
+**Item 1 — flag + toggle (ec000a6):** `DevModeOptions` + DI registration + `DevController` `GET /api/dev/status`;
+`Settings.devMode` + `useDevMode` hook; toggle in `SettingsPanel`; HUD DEV badge.
+
+**Item 2 — enemy overview:** `GET /api/dev/{gameId}/enemy` in `DevController` (404 when the server flag is off or
+the run has no enemy yet), reusing `PlayerOverviewDto` over `GameSessionManager.GetEnemyCreature(gameId)`
+(`ActiveBattle.Enemy`, recorded by the `RunDirector` enemy supplier; display-only read, same no-lock reasoning as
+`GetPlayerCreature`). Client: with dev mode on, clicking/tapping the enemy nameplate opens `EnemyOverviewModal`,
+which wraps `CreatureOverview` in `enemy` mode (no party picker, no Exp rows).
+*Deviations from the plan:* the endpoint is under `/api/dev/` (not `/api/game/`); the trigger is click/tap on the
+nameplate, not hover (works on touch); stat stages are **not** shown (`PlayerOverviewDto` has none) — open
+follow-up in `TODO.md`.
+
+**Tests:** C# — `DevModeTests` (flag default/override, endpoints 404 off / 200 on); Vitest — settings round-trip
+(`devMode` default/validation) and `enemyOverviewUrl`. The Settings toggle's hidden-when-server-disabled
+rendering and the nameplate click → modal flow have no automated test (no DOM harness; verified by reading only).
+
+---
+
 ## Level-Gated Strong/Boss Movesets ✅ DONE (2026-10-02)
 
 *(Moved here from `TODO.md` → *Level-Gated Strong/Boss Movesets*; the full record, including the review follow-ups

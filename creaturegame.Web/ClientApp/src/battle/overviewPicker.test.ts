@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { defaultOverviewSlot, showOverviewPicker, overviewSlotUrl } from './overviewPicker';
+import { defaultOverviewSlot, showOverviewPicker, overviewSlotUrl, enemyOverviewUrl } from './overviewPicker';
 import type { PartyMember } from './timeline';
 
 function member(overrides: Partial<PartyMember> = {}): PartyMember {
@@ -54,5 +54,11 @@ describe('overviewSlotUrl', () => {
   // (a resume gap) must not be read as "show slot 0" — that could show a benched creature's private sheet.
   it('falls back to the lead-resolving no-slot endpoint when the party view is empty', () => {
     expect(overviewSlotUrl('game-1', [], 0)).toBe('/api/game/game-1/player');
+  });
+});
+
+describe('enemyOverviewUrl', () => {
+  it('targets the dev-gated enemy route, not the player routes', () => {
+    expect(enemyOverviewUrl('abc')).toBe('/api/dev/abc/enemy');
   });
 });

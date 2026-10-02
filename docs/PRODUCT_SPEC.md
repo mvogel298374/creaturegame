@@ -209,6 +209,16 @@ the linked design doc instead — pull it there and leave only the pointer here.
 
 ## 7. Web / session layer
 
+### Dev Mode (dev-only — off in production)
+- The server flag `DevMode:Enabled` (env `DevMode__Enabled`) gates all dev features; it defaults on in the
+  Development environment and off in Production. Every dev endpoint returns 404 when it is off.
+- `GET /api/dev/status` reports `{ enabled }`; the Settings panel shows a "Dev mode" toggle only when the server
+  reports enabled. The choice persists per browser (default off), and a "DEV" badge shows in the HUD while on.
+- With dev mode on, clicking/tapping the enemy nameplate in battle opens a read-only CHECK POKEMON sheet for the
+  foe (species, level, HP, stats, DVs, Stat-Exp, status, moves + PP; no party picker, no Exp rows, no stat
+  stages) via `GET /api/dev/{gameId}/enemy` (404 if no enemy is active yet).
+- Design detail / rationale → `TODO_ARCHIVE.md` → *Dev Mode* (no separate design doc).  History → same entry.
+
 ### Session resume (refresh/reopen survival)
 - Refreshing, closing/reopening the tab, or reloading a bookmarked `/battle` URL during a run does not lose it:
   the client persists the active run's `gameId`/species/level/generation to `localStorage` on run start, and
