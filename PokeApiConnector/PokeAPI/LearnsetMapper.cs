@@ -2,34 +2,34 @@ namespace PokeApiConnector.PokeAPI;
 
 using creaturegame.DB;
 
-/// <summary>Turns a PokeAPI <c>/pokemon/{id}</c> response into our Gen 1 learnset (DATA_IMPORT.md §4.6).</summary>
+/// <summary>Turns a PokeAPI <c>/pokemon/{id}</c> response into a generation's learnset (DATA_IMPORT.md §4.6). Which
+/// version group and move-id range belong to the generation comes from <see cref="GenerationImportScope"/>.</summary>
 public static class LearnsetMapper
 {
-    private const string Gen1VersionGroup = "red-blue";
     private const string LevelUpMethod = "level-up";
     private const string MachineMethod = "machine";
-    private const int MaxGen1MoveId = 165; // guards against a stray later-gen move id
 
-    /// <summary>Extracts the Gen 1 (red-blue) learnset as (MoveId, LearnLevel, Method) rows, ordered by
-    /// method then level then move id for stable persistence.</summary>
-    public static IReadOnlyList<(
-        int MoveId,
-        int LearnLevel,
-        LearnMethod Method
-    )> ExtractGen1Learnset(PokeApiPokemon pokemon)
+    /// <summary>Extracts the given generation's learnset as (MoveId, LearnLevel, Method) rows, ordered by
+    /// method then level then move id for stable persistence. Throws for a generation with no
+    /// <see cref="GenerationImportScope"/>.</summary>
+    public static IReadOnlyList<(int MoveId, int LearnLevel, LearnMethod Method)> ExtractLearnset(
+        PokeApiPokemon pokemon,
+        int generation
+    )
     {
+        var scope = GenerationImportScope.For(generation);
         var lowestLevelByMove = new Dictionary<int, int>();
         var machineMoves = new HashSet<int>();
 
         foreach (var entry in pokemon.Moves ?? [])
         {
             int moveId = ParseMoveId(entry.Move?.Url);
-            if (moveId is <= 0 or > MaxGen1MoveId)
+            if (moveId <= 0 || moveId > scope.MaxMoveId)
                 continue;
 
             foreach (var detail in entry.VersionGroupDetails ?? [])
             {
-                if (detail.VersionGroup?.Name != Gen1VersionGroup)
+                if (detail.VersionGroup?.Name != scope.LearnsetVersionGroup)
                     continue;
 
                 switch (detail.MoveLearnMethod?.Name)

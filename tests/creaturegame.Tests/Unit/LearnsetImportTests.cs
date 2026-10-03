@@ -32,7 +32,7 @@ public class LearnsetImportTests
         };
 
     [Fact]
-    public void ExtractGen1Learnset_KeepsRedBlueLevelUpAndMachine_ExcludesOtherVersionGroups()
+    public void ExtractLearnset_KeepsRedBlueLevelUpAndMachine_ExcludesOtherVersionGroups()
     {
         var pokemon = new PokeApiPokemon
         {
@@ -47,7 +47,7 @@ public class LearnsetImportTests
             ],
         };
 
-        var result = LearnsetMapper.ExtractGen1Learnset(pokemon);
+        var result = LearnsetMapper.ExtractLearnset(pokemon, 1);
 
         Assert.Equal(3, result.Count);
         Assert.Contains((33, 1, LearnMethod.LevelUp), result);
@@ -56,7 +56,7 @@ public class LearnsetImportTests
     }
 
     [Fact]
-    public void ExtractGen1Learnset_KeepsLowestLevelWhenMoveRepeats()
+    public void ExtractLearnset_KeepsLowestLevelWhenMoveRepeats()
     {
         var pokemon = new PokeApiPokemon
         {
@@ -64,13 +64,13 @@ public class LearnsetImportTests
             Moves = [MoveEntry(33, (7, "level-up", "red-blue"), (1, "level-up", "red-blue"))],
         };
 
-        var result = LearnsetMapper.ExtractGen1Learnset(pokemon);
+        var result = LearnsetMapper.ExtractLearnset(pokemon, 1);
 
         Assert.Equal((33, 1, LearnMethod.LevelUp), Assert.Single(result));
     }
 
     [Fact]
-    public void ExtractGen1Learnset_MoveLearnableBothWays_KeptAsLevelUp()
+    public void ExtractLearnset_MoveLearnableBothWays_KeptAsLevelUp()
     {
         // A move that is both a level-up move and a TM is already in the level-up pool, so it is emitted once,
         // as LevelUp — never duplicated as a separate Machine row.
@@ -80,13 +80,13 @@ public class LearnsetImportTests
             Moves = [MoveEntry(34, (20, "level-up", "red-blue"), (0, "machine", "red-blue"))],
         };
 
-        var result = LearnsetMapper.ExtractGen1Learnset(pokemon);
+        var result = LearnsetMapper.ExtractLearnset(pokemon, 1);
 
         Assert.Equal((34, 20, LearnMethod.LevelUp), Assert.Single(result));
     }
 
     [Fact]
-    public void ExtractGen1Learnset_SkipsMovesOutsideGen1IdRange()
+    public void ExtractLearnset_SkipsMovesOutsideGen1IdRange()
     {
         var pokemon = new PokeApiPokemon
         {
@@ -99,13 +99,13 @@ public class LearnsetImportTests
             ],
         };
 
-        var result = LearnsetMapper.ExtractGen1Learnset(pokemon);
+        var result = LearnsetMapper.ExtractLearnset(pokemon, 1);
 
         Assert.Equal((33, 1, LearnMethod.LevelUp), Assert.Single(result));
     }
 
     [Fact]
-    public void ExtractGen1Learnset_OrdersLevelUpBeforeMachine_ThenByLevelThenId()
+    public void ExtractLearnset_OrdersLevelUpBeforeMachine_ThenByLevelThenId()
     {
         var pokemon = new PokeApiPokemon
         {
@@ -119,7 +119,7 @@ public class LearnsetImportTests
             ],
         };
 
-        var result = LearnsetMapper.ExtractGen1Learnset(pokemon);
+        var result = LearnsetMapper.ExtractLearnset(pokemon, 1);
 
         Assert.Equal(
             [
@@ -133,11 +133,22 @@ public class LearnsetImportTests
     }
 
     [Fact]
-    public void ExtractGen1Learnset_HandlesNullMovesArray()
+    public void ExtractLearnset_HandlesNullMovesArray()
     {
-        var result = LearnsetMapper.ExtractGen1Learnset(
-            new PokeApiPokemon { Id = 1, Moves = null }
-        );
+        var result = LearnsetMapper.ExtractLearnset(new PokeApiPokemon { Id = 1, Moves = null }, 1);
         Assert.Empty(result);
+    }
+
+    [Fact]
+    public void ExtractLearnset_ForAGenerationWithoutAnImportScope_Throws_InsteadOfReadingGen1()
+    {
+        // A red-blue move must NOT come back as generation 2's learnset — the version group is scope data, not a constant.
+        var pokemon = new PokeApiPokemon
+        {
+            Id = 1,
+            Moves = [MoveEntry(22, (7, "level-up", "red-blue"))],
+        };
+
+        Assert.Throws<NotSupportedException>(() => LearnsetMapper.ExtractLearnset(pokemon, 2));
     }
 }

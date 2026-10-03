@@ -68,6 +68,10 @@ A reference doc covering every major system across all main-series generations �
 
 #### Stats
 - Special Attack and Special Defense are a single combined **Special** stat
+- The Gen 1 base Special is its own value, **not** the modern Sp. Atk (Gyarados Special 100 vs modern Sp. Atk 60 /
+  Sp. Def 100; Chansey 105 vs Sp. Atk 35); many Gen 1 base stats, all base-experience yields and one catch rate (Raticate 90) also differ
+  from today's (later-generation buffs, e.g. Pikachu Def 30, Beedrill Atk 80). The importer resolves stats from
+  `past_stats` and base experience / catch rate from pokered-sourced tables — `DATA_IMPORT.md` §4.2
 - Critical hit chance based on base Speed: `floor(BaseSpeed / 2) / 256`
 - High-crit moves: `min(floor(BaseSpeed / 2) × 8, 255) / 256`
 - Critical hits ignore all stat stages (both attacker's and defender's)

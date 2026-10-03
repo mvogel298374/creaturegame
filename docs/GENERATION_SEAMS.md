@@ -332,6 +332,24 @@ change. Expect the bulk of Gen 2 to be: the Special stat split (touches
 stage-based crit formula, the corrected type chart, and the `0–100` accuracy scale. See
 the multi-generation roadmap in `TODO.md`.
 
+**What a new generation must also supply on the *data* side** (import-time, not a seam — the engine reads the
+result from the DB; rationale → `ARCHITECTURE.md` §2.6, mapping → `DATA_IMPORT.md` §4.2):
+- a **`past_stats` resolution target** — `SpeciesStatResolver.BaseStatsAsOf(pokeData, generation)` already takes
+  the generation as a parameter; the new generation just passes its number;
+- a **`GenerationImportScope` entry** — `GenerationImportScope.For(generation)` throws `NotSupportedException`
+  for anything but Gen 1; it holds the learnset version group, max move id and max species id the importer reads;
+- a **base-experience table and a catch-rate table** — `SpeciesBaseExperience.For(generation, speciesId)` and
+  `SpeciesCatchRate.For(generation, speciesId)` throw `NotSupportedException` for a generation with no table, so a
+  missing table fails the import loudly instead of importing modern values (PokeAPI has no history for either);
+- for **Gen 2**, the Special split needs **two stat columns** (a model change; `SingleSpecialAsOf` throws for
+  generation != 1 until then) — the `GetOffensiveStat`/`GetDefensiveStat` seam is where the engine picks between
+  them (the Special-model decision is part of adding the generation);
+- the remaining importer Gen-1-isms (types, moves, evolutions, game availability, `Program.cs`) are still to be
+  generation-scoped — `TODO.md` → *R1c*.
+
+The species base-stat / base-experience fix (2026-10-03) touched none of the four seams and passes the §5.0
+checklist: no new engine constants, no direct stat reads, no generation checks in the engine.
+
 ### Where generation logic must **not** go
 Not in `DamageCalculator`, `AttackAction`, `StatusResolver`, or `Battle` as a conditional.
 Not as a `Generation` enum check anywhere in the engine. Those files read the *current*

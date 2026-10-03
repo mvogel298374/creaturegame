@@ -93,6 +93,17 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - Design detail → `ARCHITECTURE.md` §2.2 ("Creatures are identified by id").  History → `TODO_ARCHIVE.md` →
   *Creature Identity — id-keyed events*.
 
+### Gen 1 species base stats and base experience
+- Every species' base HP/Attack/Defense/Speed and its single Special match the original Gen 1 games (Red/Blue
+  `base_stats`), not the modern values: e.g. Chansey Special 105, Gyarados Special 100, Pikachu Defense 30.
+- Special is one stat, used for both attacking and defending; it is not the modern Sp. Atk.
+- The XP a defeated species yields uses its Gen 1 base experience (e.g. Venusaur 208, Chansey 255, Magikarp 20).
+- Base-stat totals shown for species (e.g. the starter picker) and used to place enemies in encounter strength
+  bands are the Gen 1 totals (Venusaur 425).
+- Species catch rate is the Gen 1 value (e.g. Raticate 90).
+- Design detail → `DATA_IMPORT.md` §4.2, `ARCHITECTURE.md` §2.6.  History → `TODO_ARCHIVE.md` → *Repo-sweep R1 —
+  species base stats and BaseExperience were modern, not Gen 1*.
+
 ## 3. Encounters, biomes & acquisition
 
 ### Evolution-chain level floor on species selection

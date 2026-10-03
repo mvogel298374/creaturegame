@@ -8,45 +8,51 @@ namespace PokeApiConnector.PokeAPI;
 
 public class PokemonImport
 {
-    public static async Task FetchPokemonByGeneration(int generation)
+    /// <summary>Imports a generation's species. Returns the PokeAPI urls of the species that failed to import (so the
+    /// caller can fail the run), and lets an unsupported generation or an unreachable generation list throw — a
+    /// blanket catch here once turned both into "0 imported, exit 0" (DATA_IMPORT.md §4.2).</summary>
+    public static async Task<IReadOnlyList<string>> FetchPokemonByGeneration(int generation)
     {
+        // First, before any I/O: an unsupported generation must throw, not import with Gen 1's numbers.
+        var scope = GenerationImportScope.For(generation);
+        var failed = new List<string>();
         string url = $"https://pokeapi.co/api/v2/generation/{generation}/";
 
-        try
+        HttpResponseMessage response = await PokeApiHttp.Client.GetAsync(url);
+        response.EnsureSuccessStatusCode();
+
+        string json = await response.Content.ReadAsStringAsync();
+        var genResponse = JsonSerializer.Deserialize<Gen1Response>(
+            json,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+        );
+
+        if (genResponse?.pokemon_species != null)
         {
-            HttpResponseMessage response = await PokeApiHttp.Client.GetAsync(url);
-            response.EnsureSuccessStatusCode();
+            using var context = new PokemonDbContext();
 
-            string json = await response.Content.ReadAsStringAsync();
-            var genResponse = JsonSerializer.Deserialize<Gen1Response>(
-                json,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
-            );
-
-            if (genResponse?.pokemon_species != null)
+            foreach (var speciesResource in genResponse.pokemon_species)
             {
-                using var context = new PokemonDbContext();
-
-                foreach (var speciesResource in genResponse.pokemon_species)
-                {
-                    if (speciesResource.url == null)
-                        continue;
-                    string pokemonUrl = speciesResource.url.Replace("pokemon-species", "pokemon");
-                    string speciesUrl = speciesResource.url;
-                    await FetchPokemonDataByUrl(pokemonUrl, speciesUrl, context);
-                }
+                if (speciesResource.url == null)
+                    continue;
+                string pokemonUrl = speciesResource.url.Replace("pokemon-species", "pokemon");
+                string speciesUrl = speciesResource.url;
+                if (!await FetchPokemonDataByUrl(pokemonUrl, speciesUrl, context, scope))
+                    failed.Add(pokemonUrl);
             }
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error fetching pokemon by generation: {ex.Message}");
-        }
+
+        return failed;
     }
 
-    private static async Task FetchPokemonDataByUrl(
+    /// <summary>Imports one species; false when it failed (logged, and counted by the caller). A species-level
+    /// failure — a network error, a missing stat — leaves that species' old row in place, which is exactly why the
+    /// caller must surface the count rather than let the run look clean.</summary>
+    private static async Task<bool> FetchPokemonDataByUrl(
         string url,
         string speciesUrl,
-        PokemonDbContext context
+        PokemonDbContext context,
+        GenerationImportScope scope
     )
     {
         try
@@ -67,49 +73,57 @@ public class PokemonImport
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
             );
 
-            if (pokeData != null && speciesData != null)
+            if (pokeData is null || speciesData is null)
             {
-                if (pokeData.Id > 151)
-                    return;
-
-                PokemonSpecies species = MapToSpecies(pokeData, speciesData);
-
-                var existing = await context
-                    .Species.AsNoTracking()
-                    .FirstOrDefaultAsync(s => s.Id == species.Id);
-                if (existing == null)
-                {
-                    context.Species.Add(species);
-                    Console.WriteLine($"Imported New Pokemon: {species.Name} (ID: {species.Id})");
-                }
-                else
-                {
-                    context.Species.Update(species);
-                    Console.WriteLine(
-                        $"Updated Existing Pokemon: {species.Name} (ID: {species.Id})"
-                    );
-                }
-
-                await context.SaveChangesAsync();
-
-                await ImportLearnset(pokeData, context);
+                Console.WriteLine($"No usable data returned for {url} (or its species).");
+                return false;
             }
+
+            if (pokeData.Id > scope.MaxSpeciesId)
+                return true; // a later generation's species in PokeAPI's cumulative list — not a failure
+
+            PokemonSpecies species = MapToSpecies(pokeData, speciesData, scope.Generation);
+
+            var existing = await context
+                .Species.AsNoTracking()
+                .FirstOrDefaultAsync(s => s.Id == species.Id);
+            if (existing == null)
+            {
+                context.Species.Add(species);
+                Console.WriteLine($"Imported New Pokemon: {species.Name} (ID: {species.Id})");
+            }
+            else
+            {
+                context.Species.Update(species);
+                Console.WriteLine($"Updated Existing Pokemon: {species.Name} (ID: {species.Id})");
+            }
+
+            await context.SaveChangesAsync();
+
+            await ImportLearnset(pokeData, context, scope.Generation);
+
+            return true;
         }
-        catch (Exception ex)
+        // A generation misconfiguration (no curated table / no scope) is not a per-species failure: let it throw.
+        catch (Exception ex) when (ex is not NotSupportedException)
         {
             Console.WriteLine($"Error fetching pokemon data from {url}: {ex.Message}");
+            return false;
         }
     }
 
-    private const int Gen1 = 1; // Learnsets is already keyed by Generation — TODO.md → Multi-Generation
-
-    /// <summary>Persists the species' Gen 1 learnset (DATA_IMPORT.md §4.6).</summary>
-    private static async Task ImportLearnset(PokeApiPokemon pokeData, PokemonDbContext context)
+    /// <summary>Persists the species' learnset for <paramref name="generation"/> (DATA_IMPORT.md §4.6) — the rows are
+    /// keyed by <c>Generation</c>, so a later generation's import sits beside Gen 1's, never over it.</summary>
+    private static async Task ImportLearnset(
+        PokeApiPokemon pokeData,
+        PokemonDbContext context,
+        int generation
+    )
     {
-        var entries = LearnsetMapper.ExtractGen1Learnset(pokeData);
+        var entries = LearnsetMapper.ExtractLearnset(pokeData, generation);
 
         await context
-            .Learnsets.Where(l => l.SpeciesId == pokeData.Id && l.Generation == Gen1)
+            .Learnsets.Where(l => l.SpeciesId == pokeData.Id && l.Generation == generation)
             .ExecuteDeleteAsync();
 
         if (entries.Count == 0)
@@ -122,7 +136,7 @@ public class PokemonImport
                 MoveId = e.MoveId,
                 LearnLevel = e.LearnLevel,
                 Method = e.Method,
-                Generation = Gen1,
+                Generation = generation,
             })
         );
         await context.SaveChangesAsync();
@@ -132,27 +146,30 @@ public class PokemonImport
         );
     }
 
-    private static PokemonSpecies MapToSpecies(
+    /// <summary>Maps PokeAPI's two responses to a <see cref="PokemonSpecies"/> as it was in
+    /// <paramref name="generation"/>. Public for the same reason as the other mappers: so a test can drive the real
+    /// wiring from DTO to column.</summary>
+    public static PokemonSpecies MapToSpecies(
         PokeApiPokemon pokeData,
-        PokeApiPokemonSpecies speciesData
+        PokeApiPokemonSpecies speciesData,
+        int generation
     )
     {
+        // Stats as they were in the target generation, not PokeAPI's current ones (DATA_IMPORT.md §4.2).
+        var stats = SpeciesStatResolver.BaseStatsAsOf(pokeData, generation);
+
         var species = new PokemonSpecies
         {
             Id = pokeData.Id,
             Name = pokeData.Name ?? string.Empty,
-            BaseHP = pokeData.Stats?.FirstOrDefault(s => s.Stat?.Name == "hp")?.BaseStat ?? 0,
-            BaseAttack =
-                pokeData.Stats?.FirstOrDefault(s => s.Stat?.Name == "attack")?.BaseStat ?? 0,
-            BaseDefense =
-                pokeData.Stats?.FirstOrDefault(s => s.Stat?.Name == "defense")?.BaseStat ?? 0,
-            BaseSpecial =
-                pokeData.Stats?.FirstOrDefault(s => s.Stat?.Name == "special-attack")?.BaseStat
-                ?? 0, // Gen 1's one Special stat — deliberately special-attack, not an average (DATA_IMPORT.md §4.2)
-            BaseSpeed = pokeData.Stats?.FirstOrDefault(s => s.Stat?.Name == "speed")?.BaseStat ?? 0,
+            BaseHP = Require(stats, "hp", pokeData.Name),
+            BaseAttack = Require(stats, "attack", pokeData.Name),
+            BaseDefense = Require(stats, "defense", pokeData.Name),
+            BaseSpecial = SingleSpecialAsOf(stats, generation, pokeData.Name),
+            BaseSpeed = Require(stats, "speed", pokeData.Name),
             GrowthRate = MapGrowthRate(speciesData.GrowthRate?.Name),
-            CatchRate = speciesData.CaptureRate,
-            BaseExperience = pokeData.BaseExperience ?? 0,
+            CatchRate = SpeciesCatchRate.For(generation, pokeData.Id),
+            BaseExperience = SpeciesBaseExperience.For(generation, pokeData.Id),
             PokedexEntry = speciesData
                 .FlavorTextEntries?.FirstOrDefault(f => f.Language?.Name == "en")
                 ?.FlavorText?.Replace("\f", " ")
@@ -177,6 +194,31 @@ public class PokemonImport
 
         return species;
     }
+
+    // A stat PokeAPI doesn't report is an import failure, never a silent 0 that would ship as a base stat.
+    private static int Require(Dictionary<string, int> stats, string stat, string? name) =>
+        stats.TryGetValue(stat, out var value)
+            ? value
+            : throw new InvalidOperationException($"{name}: PokeAPI reports no '{stat}' stat.");
+
+    /// <summary>The value for <c>PokemonSpecies.BaseSpecial</c>. The model has one Special column, which is exactly
+    /// Gen 1's shape: PokeAPI carries it as the <c>special</c> stat of the <c>generation-i</c> <c>past_stats</c> entry
+    /// (not Sp. Atk, which is a different number for most species — DATA_IMPORT.md §4.2). The Gen 2 Special split is a
+    /// model change (two columns), so a later generation fails here rather than getting a wrong single value.</summary>
+    private static int SingleSpecialAsOf(
+        Dictionary<string, int> stats,
+        int generation,
+        string? name
+    ) =>
+        generation == 1
+            ? stats.TryGetValue("special", out var special)
+                ? special
+                : throw new InvalidOperationException(
+                    $"{name}: PokeAPI has no Gen 1 'special' stat in past_stats."
+                )
+            : throw new NotSupportedException(
+                $"Generation {generation} splits Special into two stats; the species model has one Special column."
+            );
 
     // Pre-Gen-6 generation names — an entry here means the listed types were Gen 1's (DATA_IMPORT.md §4.2).
     private static readonly HashSet<string> PreGen6 =

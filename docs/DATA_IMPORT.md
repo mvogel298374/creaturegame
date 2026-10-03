@@ -80,8 +80,8 @@ Steps 2 and 3 follow the same **index-then-detail** shape: hit the *generation* 
 endpoint and map it. Items can't use that shape — there is no `/generation/{n}` item list — so
 step 5 fetches a hand-curated roster by slug instead (§4.5).
 
-**Four stages can be re-run standalone**, each idempotent, without the full network-heavy import:
-`-- evolutions`, `-- items` (also re-downloads item sprites), `-- move-levels` (re-applies the curated TM/HM
+**Five stages can be re-run standalone**, each idempotent, without the full network-heavy import:
+`-- species` (species only — §4.2), `-- evolutions`, `-- items` (also re-downloads item sprites), `-- move-levels` (re-applies the curated TM/HM
 `Attack.MinLevel` floors to the existing `moves.db`, offline — §4.1.1), and `-- assets` (sprites + item sprites +
 cries only — no DB import). `-- assets` exists specifically for the Docker image build: sprite/cry
 files are gitignored runtime assets, never checked in, so a clean container checkout has none — and
@@ -215,22 +215,58 @@ TM and HM tables. Every non-machine move is null.
 ### 4.2 Species (`PokemonImport` → `PokemonSpecies`)
 Each species needs **two** PokeAPI endpoints, because the data is split:
 
-- `GET /pokemon/{id}` → stats, types, base experience.
-- `GET /pokemon-species/{id}` → growth rate, capture rate, Pokédex flavor text.
+- `GET /pokemon/{id}` → stats, types (base experience is NOT taken from here — curated, below).
+- `GET /pokemon-species/{id}` → growth rate, Pokédex flavor text (capture rate is NOT taken from here — curated).
 
-`MapToSpecies` combines them. Gen 1 specifics:
+`MapToSpecies` (public, unit-tested in `SpeciesMappingTests`) combines them. Gen 1 specifics:
 
-- **Hard cap at 151** — the generation endpoint can include relations, so we skip
-  `Id > 151`.
-- **Stats** are pulled by name from the stats array. Crucially, **`BaseSpecial` ←
-  `special-attack`**: Gen 1 had a *single* Special stat, so we deliberately take
-  special-attack as the combined value (the engine's `GetOffensiveStat`/`GetDefensiveStat`
-  both read it — see `GENERATION_SEAMS.md`).
+- **Per-generation scope.** `GenerationImportScope.For(generation)` (a record; throws `NotSupportedException` for
+  anything but 1) holds `LearnsetVersionGroup` ("red-blue"), `MaxMoveId` (165) and `MaxSpeciesId` (151).
+  `FetchPokemonByGeneration` resolves it **first**, before any I/O.
+- **Hard cap at the scope's `MaxSpeciesId` (151)** — the generation endpoint can include relations, so we skip
+  `Id > MaxSpeciesId`.
+- **Fails loudly, not silently.** An unsupported generation throws before any request. There is no blanket catch
+  around the generation fetch: `FetchPokemonDataByUrl` returns bool and catches everything except
+  `NotSupportedException`, and `FetchPokemonByGeneration` returns the list of failed species urls.
+  `Program.cs` `ReportFailedSpecies` lists them and exits non-zero (for the `species` command, and at the end of
+  the full run after the other stages have run), so a transient HTTP error never leaves a stale row unnoticed.
+  A missing hp/attack/defense/speed stat is a failure too: `Require(...)` throws `InvalidOperationException`
+  (same rule as Special) rather than defaulting to 0. So are a `past_stats` entry whose generation name the
+  resolver cannot place (it throws instead of dropping the entry and importing the wrong stats) and a null
+  PokeAPI response for a species (counted as failed, not as imported).
+- **Stats resolve *as of a generation* via `past_stats`.** PokeAPI returns *current* base stats; `past_stats`
+  records the older values. `SpeciesStatResolver.BaseStatsAsOf(pokeData, generation)` layers every entry tagged
+  `>= generation` from newest to oldest so the closest wins (an entry tagged generation X lists the stats that
+  applied up to and including X). This undoes the Gen 6/7 stat buffs (Pikachu Def, Beedrill Atk, …).
+  `generation` is a parameter threaded from `FetchPokemonByGeneration` into `MapToSpecies`; nothing is hard-coded
+  to Gen 1.
+- **`BaseSpecial` is the Gen 1 `special` stat, NOT Sp. Atk.** Gen 1 had a *single* Special stat, and it is **not**
+  the modern Sp. Atk (Gyarados Special 100 vs modern Sp. Atk 60 / Sp. Def 100; Chansey 105 vs Sp. Atk 35). PokeAPI
+  carries it as `special` in the generation-i `past_stats` entry (present for all 151); `SingleSpecialAsOf` reads
+  it and throws `NotSupportedException` for any generation != 1, because Gen 2's Special split needs two columns
+  (a model change, not an import tweak). The engine's `GetOffensiveStat`/`GetDefensiveStat` both read the one
+  column (see `GENERATION_SEAMS.md`). *(An earlier version of this section called a Sp. Atk import deliberate and
+  correct — it was wrong, and imported 57 species with the wrong stats.)*
+- **`BaseExperience` is a curated table, not an import.** PokeAPI has no history for it (it only serves modern
+  values). Gen 1 values live in `PokeApiConnector/Generation_1/Gen1BaseExperience.cs`, sourced from the
+  `db N ; base exp` line of every pret/pokered `data/pokemon/base_stats/*.asm` (fetched 2026-10-03), and reached
+  through `SpeciesBaseExperience.For(generation, speciesId)`. **A generation with no table throws
+  `NotSupportedException`** rather than silently importing the modern value — add the table first.
+- **Verified against primary source:** resolving Gen 1 `past_stats` reproduces pokered's hp/atk/def/spd/spc for
+  all 151, and the curated base-exp matches pokered for all 151. Pinned by `Gen1SpeciesDataContractTests`
+  (live `pokemon.db` vs an independent snapshot, `TestSupport/PokeredGen1Species.cs`).
+- **`CatchRate` is a curated table too.** `PokeApiConnector/Generation_1/Gen1CatchRate.cs`, same provenance as
+  `Gen1BaseExperience` (pokered `db N ; catch rate`, fetched 2026-10-03), reached through
+  `SpeciesCatchRate.For(generation, speciesId)`, which throws `NotSupportedException` for an uncurated generation.
+  PokeAPI's `capture_rate` is no longer read (only Raticate differed: 127 vs 90).
+- **Species-only re-import:** `dotnet run --project PokeApiConnector -- species` imports species only and leaves
+  moves, items and evolutions alone. The committed `pokemon.db` equals what this command produces.
 - **Types via `past_types`** — PokeAPI returns *current* types; `past_types` records what
   changed and when. `Gen1TypeSlots` picks the earliest pre-Gen-6 historical entry if one
   exists, otherwise the current types. This is how a Pokémon whose typing changed in a
-  later generation is imported with its **Gen 1 typing**, not today's.
-- **Growth rate / catch rate / Pokédex entry** mapped from the species endpoint (flavor
+  later generation is imported with its **Gen 1 typing**, not today's. (Not yet parameterised by generation —
+  see `TODO.md` → *R1c*.)
+- **Growth rate / Pokédex entry** mapped from the species endpoint (flavor
   text has its form-feed/newline control chars stripped).
 
 ### 4.3 Game availability (`GameAvailabilitySeeder`)
@@ -311,12 +347,13 @@ holds the pure, unit-tested mapping and the Gen 1 roster.
 
 ### 4.6 Learnsets (`LearnsetMapper` → `PokemonImport.ImportLearnset`)
 Each species' `/pokemon/{id}` response already lists every move it can learn, across every game and
-method — no extra API call needed. `LearnsetMapper.ExtractGen1Learnset` filters that down to the
-`red-blue` version group and two methods: `level-up` (tagged `LearnMethod.LevelUp`, lowest level kept
+method — no extra API call needed. `LearnsetMapper.ExtractLearnset(pokemon, generation)` filters that down to the
+generation's `GenerationImportScope` version group (`red-blue` for Gen 1; moves capped at `MaxMoveId`, 165) and two
+methods: `level-up` (tagged `LearnMethod.LevelUp`, lowest level kept
 if a move repeats) and `machine` (TM/HM, tagged `LearnMethod.Machine`, `LearnLevel = 0`). A move
 learnable both ways is kept as level-up only — it's already in that pool, so the machine tag would add
-nothing. `PokemonImport.ImportLearnset` persists the result idempotently: clears this species' Gen 1
-rows, then re-inserts — the same clear-then-reinsert pattern as `GameAvailabilitySeeder` and
+nothing. `PokemonImport.ImportLearnset(…, generation)` persists the result idempotently: clears this species'
+rows for that generation, then re-inserts — the same clear-then-reinsert pattern as `GameAvailabilitySeeder` and
 `EvolutionImport` below.
 
 ### 4.7 Evolutions (`EvolutionMapper` → `EvolutionImport`)
@@ -361,9 +398,10 @@ one-shot tool run occasionally it's not worth batching — simplicity and obviou
 logging win.
 
 ### 5.4 Encode what the API can't express — explicitly and with comments
-Three places do this: move categorisation special-cased by **ID** (§4.1), game
-availability curated by **hand** (§4.3), and the item roster curated by **hand** (§4.5) —
-PokeAPI gives no Gen 1 signal for items at all. The practice: when the source data lacks
+Five places do this: move categorisation special-cased by **ID** (§4.1), game
+availability curated by **hand** (§4.3), the item roster curated by **hand** (§4.5) —
+PokeAPI gives no Gen 1 signal for items at all — and species base experience and catch rate, both curated from
+pokered (§4.2) because PokeAPI keeps no history for either. The practice: when the source data lacks
 the structure you need, encode the domain knowledge directly, **comment every magic
 value** with what it represents (`// 120/153 Self-Destruct/Explosion`), and keep it all in
 the importer so the runtime model stays clean. The comments are the spec.

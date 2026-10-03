@@ -25,6 +25,9 @@ public class PokeApiPokemon
     [JsonPropertyName("past_types")]
     public List<PastTypeEntry>? PastTypes { get; set; }
 
+    [JsonPropertyName("past_stats")]
+    public List<PastStatEntry>? PastStats { get; set; }
+
     [JsonPropertyName("moves")]
     public List<PokeApiMoveEntry>? Moves { get; set; }
 }
@@ -57,6 +60,17 @@ public class PastTypeEntry
 
     [JsonPropertyName("types")]
     public List<PokemonTypeSlot>? Types { get; set; }
+}
+
+/// <summary>One <c>past_stats</c> entry: the stats that applied up to and including <see cref="Generation"/> —
+/// only the stats that differ from the next-newer values are listed.</summary>
+public class PastStatEntry
+{
+    [JsonPropertyName("generation")]
+    public GenerationResource? Generation { get; set; }
+
+    [JsonPropertyName("stats")]
+    public List<PokemonStat>? Stats { get; set; }
 }
 
 public class GenerationResource

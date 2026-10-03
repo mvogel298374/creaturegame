@@ -844,8 +844,9 @@ Deferred to the Gen 2 sprint. (The stat-selection abstraction — the only piece
 - [ ] **`PokemonSpecies` per-generation schema:** separate timeless identity (`Id`, `Name`, `CatchRate`,
   `BaseExperience`, `PokedexEntry`, `GrowthRate`) from a new `PokemonSpeciesGenData` table (`SpeciesId`,
   `Generation`, types, base stats; Gen 3+ adds abilities). Importer stores one row per species per generation;
-  engine queries by active generation. *(PokeAPI has no `past_stats` — Gen 1 stat corrections need a
-  corrections table or separate source.)*
+  engine queries by active generation. *(Base stats resolve from PokeAPI's `past_stats`; `BaseExperience` and
+  `CatchRate` have no history and come from curated per-generation tables — `DATA_IMPORT.md` §4.2. The remaining
+  importer Gen-1-isms are listed under R1c.)*
 - [ ] **Move per-generation data:** a generalisation, not a rewrite — resolve a field for gen *G* as the
   earliest `past_values` entry whose version-group generation is **> G**, else the current value ("earliest =
   Gen 1" is the *G=1* case). Store one `Attack` row per `(moveId, generation)` (mirror the learnset model) or
@@ -918,13 +919,36 @@ Fixing a data/engine item usually also means updating the test that currently pi
   The server replaying on every reconnect is an accepted design (it can't tell blip from refresh), not a bug.
 - **Test gap: the `RunFaulted` path** (fix archived, same entry) — nothing pins `SendRunFaulted`, the
   `GameSessionManager` catch-all call, or `useBattleHub`'s `RunFaulted` handler.
-- **Data: species base stats are modern, not Gen 1** (`PokemonImport.cs:144-152`) — `BaseSpecial` taken from
-  Sp. Atk (Chansey 35 vs 105, Tentacruel 80/120, Gyarados 60/100, Articuno 95/125, Golduck 95/80, …) and the
-  Gen 6/7 buffs never undone (Pikachu Def 40/30, Beedrill Atk 90/80, Dugtrio Atk 100/80, Farfetch'd Atk 90/65,
-  …). Fix: a curated 151-row Gen 1 base-stat table (pokered `base_stats`) applied over the import.
-  `DATA_IMPORT.md` §4.2 presents the Sp. Atk choice as correct and needs correcting with it.
-- **Data: `BaseExperience` is the modern value** (`PokemonImport.cs:155`, feeds `Gen1BattleRules.cs:263`) —
-  Chansey 395/255, Mew 270/64, Magikarp 40/20, Pikachu 112/82.
+### R1c — follow-ups from the species base-stat / base-experience fix (2026-10-03)
+
+The fix itself is archived (`TODO_ARCHIVE.md` → *Repo-sweep R1 — species base stats and BaseExperience were
+modern, not Gen 1*). Open items it surfaced — none approved work until the user places them.
+
+- **Balance / E2E flag: every species' BST changed.** BST feeds `EncounterSelector.Bst` / `PickByBst`, the
+  strength tiers and `ScaleTargetBst`, so enemy pool bands shift and the starter picker's BST display changed
+  (e.g. Venusaur now 425). Seeded E2E specs that walk by seed (e.g. seed 1 / BULBASAUR in `encounter-map.spec`)
+  may land on different encounters. **E2E was NOT run** (user-only opt-in) — recommend `.\e2e.ps1` for the
+  seed-dependent specs, and a look at whether the tier BST bands need re-tuning against the Gen 1 numbers.
+- **Importer: other Gen-1-isms remain outside species stats/learnsets** (filed 2026-10-03, not approved work;
+  inventory from a grep of `PokeApiConnector` for `Gen1`/`151`/`165`/`red-blue`/`generation-i`). All of these are
+  fine while Gen 1 is the only generation; each must be generation-scoped (preferably by reading
+  `GenerationImportScope`, which already holds the dex/move-id ceilings and learnset version group) when a second
+  generation is actually planned — see *Multi-Generation* below.
+  - **Species:** `PokemonImport.Gen1TypeSlots` + its `PreGen6`/`GenOrder` tables (types = earliest pre-Gen-6
+    `past_types` entry, not parameterised by generation); `SingleSpecialAsOf`'s `generation == 1` branch is
+    intentional (the Gen 2 Special split is a model change); the generation-list DTO is named `Gen1Response`
+    (`Generation_1/`) though `FetchPokemonByGeneration` / `FetchMovesByGeneration` both use it for any generation.
+  - **Moves:** `MoveImport` — `BuildGen1Attack` (`past_values` resolution), `ApplyGen1Corrections`, the
+    `Gen1MoveEffects` map, and **`Gen1PhysicalTypes` / `Gen1DamageCategory` (the Gen 1 type-based physical/special
+    split — a rule living in the importer, which Gen 2+ changes per move)**; `MoveMinLevels` (curated TM/HM floors).
+  - **Evolutions:** `EvolutionImport` (`Gen1`, `MaxGen1SpeciesId` consts) and `EvolutionMapper` (`MaxGen1SpeciesId`,
+    `Gen1Stones`, `ExtractGen1Edges`).
+  - **Items:** `ItemImport.ImportGen1BattleItemsAsync` / `ItemMapper.Gen1BattleItemNames` (a hand-curated roster)
+    and `ItemMapper.ApplyGen1Gameplay`.
+  - **Availability + assets:** `GameAvailabilitySeeder` (`SeedGen1Async`, the 1–151 loop, the Red/Blue/Yellow
+    exclusion and availability-type tables); `SpriteDownloader` / `CryDownloader` (`LastId = 151`).
+  - **Entry point:** `Program.cs` passes `1` to `FetchPokemonByGeneration` / `FetchMovesByGeneration` and calls the
+    `Gen1`-named stages directly.
 
 ### R1b — follow-ups from the lost-answer fix's `pr-review` (2026-10-02, verdict PR-READY)
 

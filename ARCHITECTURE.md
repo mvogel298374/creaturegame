@@ -149,6 +149,13 @@ Each entry: **Decision · Why · Where it lives.**
 - **Why:** the data layer answers "what are this move's Gen-1 numbers"; the seam answers "how does the engine
   apply them." Keeping corrections out of the engine preserves the gen-agnostic rule (2.1).
 - **Where:** `PokeApiConnector/PokeAPI/MoveImport.cs`. **Full mapping → `DATA_IMPORT.md` §4.1/§5.5.**
+- **Same rule for species data:** base stats are resolved *as of a generation* from PokeAPI's `past_stats`
+  (`SpeciesStatResolver`) and base experience comes from a curated per-generation table
+  (`SpeciesBaseExperience`, pokered-sourced; throws for a generation with no table); catch rate likewise
+  (`SpeciesCatchRate`). The importer's generation-dependent limits live in `GenerationImportScope`, and a failed
+  species or unsupported generation fails the run (non-zero exit). All are keyed by a generation
+  **parameter**; the engine reads the single `BaseSpecial` column through the unchanged `IBattleRules`
+  offensive/defensive-stat seam. **Full mapping → `DATA_IMPORT.md` §4.2.**
 
 ### 2.7 Web session lifecycle (SignalR + reconnect grace + blocking input)
 - **Decision:** a run is a server-side `BattleRunner` task per `gameId`, owned by `GameSessionManager`. Player

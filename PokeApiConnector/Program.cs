@@ -16,6 +16,18 @@ class Program
             return;
         }
 
+        // Species only (stats, base experience, types, learnsets) — leaves moves/items/evolutions untouched.
+        if (args.Length > 0 && args[0].Equals("species", StringComparison.OrdinalIgnoreCase))
+        {
+            using (var pokemonContext = new creaturegame.DB.PokemonDbContext())
+                pokemonContext.EnsureDatabaseCreated();
+            Console.WriteLine("Importing Gen 1 species only...");
+            var failedSpecies = await PokemonImport.FetchPokemonByGeneration(1);
+            ReportFailedSpecies(failedSpecies);
+            Console.WriteLine("\nDone.");
+            return;
+        }
+
         // Offline: re-apply the curated TM/HM floors (Attack.MinLevel) to the existing moves.db — no network.
         if (args.Length > 0 && args[0].Equals("move-levels", StringComparison.OrdinalIgnoreCase))
         {
@@ -88,7 +100,7 @@ class Program
         await MoveImport.FetchMovesByGeneration(1);
 
         Console.WriteLine("\nImporting Gen 1 Pokemon Species...");
-        await PokemonImport.FetchPokemonByGeneration(1);
+        var failedSpeciesInFullRun = await PokemonImport.FetchPokemonByGeneration(1);
 
         Console.WriteLine("\nImporting Gen 1 evolutions...");
         await EvolutionImport.ImportAllAsync();
@@ -108,6 +120,22 @@ class Program
         Console.WriteLine("\nDownloading Pokémon cries (legacy 8-bit)...");
         await CryDownloader.DownloadAllAsync();
 
+        // Last, so every other stage still runs — but a run that dropped species must not look clean.
+        ReportFailedSpecies(failedSpeciesInFullRun);
         Console.WriteLine("\nImport Complete!");
+    }
+
+    // A failed species keeps its OLD row (possibly stale, possibly modern), so the failure has to be loud: list it and
+    // exit non-zero, the same stance as the 'assets' stage's partial-fetch failure above.
+    private static void ReportFailedSpecies(IReadOnlyList<string> failed)
+    {
+        if (failed.Count == 0)
+            return;
+        Console.WriteLine(
+            $"\n{failed.Count} species failed to import (their existing rows were left as-is):"
+        );
+        foreach (var url in failed)
+            Console.WriteLine($"  {url}");
+        Environment.Exit(1);
     }
 }

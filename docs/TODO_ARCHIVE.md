@@ -8,6 +8,79 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Repo-sweep R1 — species base stats and BaseExperience were modern, not Gen 1 ✅ DONE (2026-10-03)
+
+Two R1 findings from the 2026-10-02 repo-wide review, fixed together (importer + data only; no engine or seam
+interface change).
+
+**The defects (as filed).**
+- *Base stats modern:* `BaseSpecial` was taken from Sp. Atk (Chansey 35 vs Gen 1 Special 105, Tentacruel 80/120,
+  Gyarados 60/100, Articuno 95/125, Golduck 95/80, …) and the Gen 6/7 stat buffs were never undone (Pikachu Def
+  40/30, Beedrill Atk 90/80, Dugtrio Atk 100/80, Farfetch'd Atk 90/65, …). The old import was wrong for 57 species.
+- *BaseExperience modern* (`PokemonImport.cs`, feeds `Gen1BattleRules` XP yield): Chansey 395/255, Mew 270/64,
+  Magikarp 40/20, Pikachu 112/82. Differed from pokered for 145 of 148 name-matched species.
+
+**The fix.**
+- Base stats now resolve *as of a generation* from PokeAPI's `past_stats`: new `PastStats` DTO on
+  `PokeApiPokemon`; `SpeciesStatResolver.BaseStatsAsOf(pokeData, generation)` (an entry tagged generation X lists
+  stats that applied up to and including X; entries >= target are layered newest->oldest so the closest wins).
+  Gen 1's single Special is the `special` stat of the generation-i entry (present for all 151).
+  `PokemonImport.MapToSpecies` takes the `generation` param threaded from `FetchPokemonByGeneration`;
+  `SingleSpecialAsOf` throws `NotSupportedException` for generation != 1 (the Gen 2 Special split needs two
+  columns = a model change).
+- BaseExperience has no PokeAPI history, so Gen 1 values are the curated table
+  `PokeApiConnector/Generation_1/Gen1BaseExperience.cs` (source: the `db N ; base exp` line of every pret/pokered
+  `data/pokemon/base_stats/*.asm`, fetched 2026-10-03), reached through `SpeciesBaseExperience.For(generation,
+  speciesId)`, which throws `NotSupportedException` for a generation with no table rather than silently importing
+  the modern value.
+- CatchRate is likewise a curated table, `PokeApiConnector/Generation_1/Gen1CatchRate.cs` (pokered `db N ; catch
+  rate`, fetched 2026-10-03), reached through `SpeciesCatchRate.For(generation, speciesId)` (throws
+  `NotSupportedException` for an uncurated generation). It no longer comes from PokeAPI's `capture_rate`; only
+  Raticate differed (127 -> 90).
+- **Fail loudly, for real.** `PokemonImport.FetchPokemonByGeneration` resolves `GenerationImportScope.For(generation)`
+  first (throws `NotSupportedException` for an unsupported generation before any I/O), has no blanket catch around
+  the generation fetch, and returns the list of failed species urls; `FetchPokemonDataByUrl` returns bool and
+  catches everything except `NotSupportedException`. `Program.cs` `ReportFailedSpecies` lists failures and exits
+  non-zero (both the `species` command and the end of the full run, after the other stages ran). A missing
+  hp/attack/defense/speed stat is a failure too (`Require(...)` throws `InvalidOperationException`, like the
+  Special rule) instead of `GetValueOrDefault` silently yielding 0.
+- **Learnset import respects the generation.** New `GenerationImportScope` record (`For(generation)` throws
+  `NotSupportedException` for anything but 1) holds `LearnsetVersionGroup` ("red-blue"), `MaxMoveId` (165) and
+  `MaxSpeciesId` (151). `LearnsetMapper.ExtractLearnset(pokemon, generation)` and `ImportLearnset(…, generation)`
+  read it (was a hard-coded `Gen1` const / `ExtractGen1Learnset`); the dex cap reads `scope.MaxSpeciesId`.
+- New importer command `dotnet run --project PokeApiConnector -- species` (species only; leaves moves, items and
+  evolutions alone).
+- `pokemon.db` is a genuinely fresh `-- species` import (taken rather than hand-patched), so the committed DB
+  equals what the importer produces. `PokemonSpecies` changed in the five stat/exp columns + `CatchRate`
+  (Raticate) + 14 `PokedexEntry` texts (PokeAPI's first English flavor text drifted upstream; this also fixes
+  Charizard #6's corrupted character) — the 14 text changes are an accepted, intentional part of the commit.
+  Learnset / evolution / game-availability tables are identical in content (learnset autoincrement ids reshuffled
+  by the importer's delete+insert — expected).
+- Design placement: `DATA_IMPORT.md` §4.2/§4.6 (past_stats resolution, curated base-exp and catch-rate,
+  fail-loudly rule, generation scope, `species` command; the old "BaseSpecial <- special-attack is correct" claim
+  was wrong and is corrected), `ARCHITECTURE.md` §2.6, `GENERATION_SEAMS.md` ("Adding a whole new generation" —
+  data-side checklist), `GEN_DIFFERENCES.md`.
+
+**Verification (primary source).** Fetched all 151 pret/pokered base_stats files + PokeAPI `/pokemon/1..151`.
+Resolving `past_stats` for Gen 1 reproduces pokered's hp/atk/def/spd/spc exactly for all 151 (3 names differ only by
+filename: nidoranf/nidoranm/mrmime). All 151 BaseExperience values now match pokered. §5.0 generation-agnostic
+checklist: no seam touched, no new engine constants, no direct stat reads, no gen checks in the engine.
+
+**Tests.** `Unit/SpeciesStatResolverTests` (incl. a falsification test: generation 1 vs 6 resolve differently, so
+nothing is hard-coded to Gen 1); `Unit/SpeciesBaseExperienceTests` (incl. fails-loudly for an uncurated
+generation); `Integration/Gen1SpeciesDataContractTests` pins the live `pokemon.db` against
+`TestSupport/PokeredGen1Species.cs`, an independent 151-row pokered snapshot (now incl. CatchRate) — verified to
+FAIL against the old DB (e.g. Venusaur exp 236 vs 208) and pass on the new one. No pre-existing test pinned the old
+values. `Unit/SpeciesMappingTests` pins the DTO -> `PokemonSpecies` wiring via the public
+`PokemonImport.MapToSpecies` (missing stat/Special throws, unsupported generation throws,
+`FetchPokemonByGeneration(2)` throws offline, Raticate catch rate); sabotage-verified (mapper reading Sp.Atk again
+fails the mapping tests). `LearnsetImportTests` call `ExtractLearnset(…, 1)` plus an unsupported-generation test.
+
+**Not done / open (→ `TODO.md` R1c).** BST shift vs encounter tiers and seed-dependent E2E specs (E2E not run);
+the remaining Gen-1-isms in the importer outside species/learnsets.
+
+---
+
 ## Repo-sweep R1 — reconnect replay mishandled (server flee-cache + 60 s grace, client dedupe) ✅ DONE (2026-10-03)
 
 Found by the 2026-10-02 repo-wide code review sweep. Original finding: a flee (`CreatureFled`, no `BattleEnded`)
