@@ -22,9 +22,10 @@ public sealed class GameSessionManager(
     // Pending sessions never claimed (client never connected) are evicted after this TTL.
     private static readonly TimeSpan PendingSessionTtl = TimeSpan.FromMinutes(2);
 
-    // Reconnect grace after a disconnect, before the battle is abandoned — covers the JS client's automatic-
-    // reconnect policy (gives up ~30s). Mechanism → ARCHITECTURE.md §2.7.
-    private static readonly TimeSpan ReconnectGrace = TimeSpan.FromSeconds(40);
+    // Reconnect grace after a disconnect, before the battle is abandoned — must outlast the JS client's automatic-
+    // reconnect schedule (0/2/10/30 s, so its last attempt fires ~42 s after the drop). Mechanism and the
+    // sizing rationale → ARCHITECTURE.md §2.7.
+    private static readonly TimeSpan ReconnectGrace = TimeSpan.FromSeconds(60);
 
     // The Easy/Normal/Hard RunRules presets — a roguelite dial bag kept out of the Gen-1 IBattleRules seam.
     // Normal reproduces the pre-difficulty-slider numbers exactly (a true no-op). Full rationale + the curve's

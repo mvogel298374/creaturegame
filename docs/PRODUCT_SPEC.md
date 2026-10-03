@@ -236,9 +236,13 @@ the linked design doc instead — pull it there and leave only the pointer here.
   the page reattaches to the same server-side run on reload.
 - The Title Screen shows a `▶ CONTINUE — {species} (Lv {level})` button whenever a persisted run exists,
   alongside NEW GAME.
-- A reconnect during an active run restores full interactivity within the server's 40-second reconnect grace
+- A reconnect during an active run restores full interactivity within the server's 60-second reconnect grace
   window — battle state (enemy/player sprite, HP, move list) when mid-fight, plus the Town Map overlay and the
   current biome's encounter ladder, each re-sent from whatever the server still has live.
+- The server re-sends its live state on every (re)connect, including a brief network blip with the page intact; the
+  client ignores the repeat, so a blip shows no second "A new challenger approaches!" line, no enemy re-slide, and
+  no duplicated route path or moved map pin.
+- A battle the player fled is not revived by a later reconnect (no stale move menu).
 - If the run can no longer be resumed (grace window expired, or the server no longer knows the `gameId`), the
   player is bounced to the Title Screen with a "Couldn't connect to the run — it may have expired." notice,
   instead of hanging on "Connecting…".

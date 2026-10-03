@@ -72,7 +72,7 @@ units. This section is deliberately candid so the gap is visible.
   a `TaskCompletionSource` a hub method completes; `Cancel()` faults them on disconnect.
 - **RNG:** `IRandomSource` (threaded through the engine; **partial** — see §6).
 - **Session / transport:** the run is keyed by **`gameId`**; reconnect rebinds the live run to the new
-  connection with a 40 s grace (Architecture Review #1). This is the "continue after disconnection" id.
+  connection with a 60 s grace (Architecture Review #1). This is the "continue after disconnection" id.
 
 ---
 

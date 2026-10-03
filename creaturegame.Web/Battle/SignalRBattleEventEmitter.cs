@@ -24,7 +24,8 @@ public sealed class SignalRBattleEventEmitter(
     //  - Run-scoped (RegionMapRevealed): set at most once per run, never cleared.
     //  - Biome-scoped (BiomeEntered, BiomeNodePlanRevealed): replaced by the next biome's; NOT cleared by
     //    BattleEnded/RunEnded — the current biome persists across and after the battles fought in it.
-    //  - Battle-scoped (BattleStarted, TurnStarted): cleared on BattleEnded/RunEnded — see that case below.
+    //  - Battle-scoped (BattleStarted, TurnStarted): cleared on BattleEnded/RunEnded — or CreatureFled, which ends a
+    //    fled battle WITHOUT a BattleEnded — see that case below.
     private volatile RegionMapRevealed? _lastRegionMap;
     private volatile BiomeEntered? _lastBiomeEntered;
     private volatile BiomeNodePlanRevealed? _lastBiomeNodePlan;
@@ -52,7 +53,7 @@ public sealed class SignalRBattleEventEmitter(
             case TurnStarted turn:
                 _lastTurnStarted = turn;
                 break;
-            case BattleEnded or RunEnded:
+            case BattleEnded or RunEnded or CreatureFled:
                 // No battle is live between encounters (a route/shop/reward/recovery/etc. prompt is a separate,
                 // not-yet-replayed event category — ARCHITECTURE.md §2.7's noted follow-up gap). Replaying a
                 // just-finished battle's stale state into one of those would be actively wrong, not just

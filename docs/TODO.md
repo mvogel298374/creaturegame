@@ -911,13 +911,11 @@ Fixing a data/engine item usually also means updating the test that currently pi
   answer lost during the reconnect window are fixed (`TODO_ARCHIVE.md` → *Repo-sweep R1 — lost modal answers…*).
   (c) the replay doesn't re-open an open prompt after a refresh — tracked as the existing Known Gap, see *Known
   Gaps* → "Session Resume doesn't cover a reconnect during a between-node blocking prompt".
-- **Reconnect replay mishandled at both ends.** Server: a flee (`CreatureFled`, no `BattleEnded`) leaves the
-  cached `BattleStarted`/`TurnStarted` alive (`SignalRBattleEventEmitter.cs:55-63`), so a later reconnect revives
-  a finished battle with a dead move menu; replay fires on *every* reconnect (`GameSessionManager.cs:82-94`).
-  Client: a replayed `BattleStarted` bumps `encounterIndexRef` (spurious "A new challenger approaches!", enemy
-  re-slides, HP flashes 1/1) and a replayed `MAP_BIOME_ENTERED` duplicates `routePath` and leaves `mapPin` wrong
-  (`useBattleHub.ts:70-72`, `battleReducer.ts:440-454`, `timeline.ts:407-421`). Also: the 40 s grace is shorter
-  than the client's 0/2/10/30 s retry schedule (last attempt ≈42 s), so outages >~12 s can't be recovered.
+- **Reconnect replay — verification gaps only.** Fixed (flee clears the replay cache, grace 60 s, client replay
+  dedupe; `TODO_ARCHIVE.md` → *Repo-sweep R1 — reconnect replay mishandled…*). Remaining: (a) no browser/E2E check
+  of replay-after-blip; (b) the `useBattleHub` wiring of `replayDedupe` is untested (only the pure helper is);
+  (c) the 60 s grace rests on SignalR's documented 0/2/10/30 s default schedule, not a measured browser run.
+  The server replaying on every reconnect is an accepted design (it can't tell blip from refresh), not a bug.
 - **Pinned map: `RouteChoiceMap` still pulls focus to a covered town** (Enter picks an unseen route). The
   z-index half (prompts hidden under the pinned map) is fixed — `TODO_ARCHIVE.md` → *Repo-sweep R1/R2/R3 — five
   small fixes*.

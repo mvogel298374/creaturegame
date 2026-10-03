@@ -7,6 +7,7 @@ import { bossTrainerName } from '../battle/bossTrainer';
 import { nextPlayerId } from '../battle/playerIdentity';
 import { clearActiveGame } from '../utils/activeGame';
 import { submitPromptAnswer } from './answerPrompt';
+import { isReplayOfKnownState, afterAcceptedEvent, type ReplayView } from '../battle/replayDedupe';
 import type { Action } from '../battle/timeline';
 import type { PromptKey } from './battleReducer';
 
@@ -47,12 +48,16 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
   // True while the just-entered route node is the Boss, so only the boss fight gets the trainer framing.
   // Set on RunNodeEntered (BossBattle → true, any other node → false), read by its following BattleStarted.
   const bossNodeActiveRef = useRef(false);
+  // Arrival-order trackers for replayDedupe.ts (state lags arrival behind the animation queue). Reset with the
+  // connection effect below, since a new gameId is a new run.
+  const replayTrackerRef = useRef<Omit<ReplayView, 'enemyId'>>({ arrivedBiomeId: null, planBiomeId: null });
 
   // The animation timeline: backend events expand into steps it plays in order.
   const enqueueSteps = useBattleTimeline(dispatch);
 
   useEffect(() => {
     if (!gameId) return;
+    replayTrackerRef.current = { arrivedBiomeId: null, planBiomeId: null };
     // Guards the connect-failure handler below against React.StrictMode's dev-only double-invoke: it mounts
     // this effect, tears it down, then mounts it again, all before the throwaway first connection's start()
     // has resolved — so that connection's stop()-induced rejection must not fire the resume-failed bounce (it
@@ -72,6 +77,12 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
         nav('/', { state: { notice: 'The run hit an unexpected server error and ended.' } });
         return;
       }
+      // The server replays its cached state on every (re)connect; after a transport blip our state is already
+      // current, and re-applying a replayed BattleStarted/BiomeEntered/NodePlan would corrupt it — see replayDedupe.ts.
+      const replayView: ReplayView = { ...replayTrackerRef.current, enemyId: stateRef.current.enemyId };
+      if (isReplayOfKnownState(eventType, payload, replayView)) return;
+      const { arrivedBiomeId, planBiomeId } = afterAcceptedEvent(eventType, payload, replayView);
+      replayTrackerRef.current = { arrivedBiomeId, planBiomeId };
       // Retarget the player/enemy side split BEFORE the event expands, so the newly-named creature's own
       // moves/damage are sided correctly in the very event that renamed it. The rule itself (which events change
       // "who the player is") lives in the pure helper.

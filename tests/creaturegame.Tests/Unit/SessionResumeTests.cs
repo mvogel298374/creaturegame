@@ -167,6 +167,26 @@ public class SessionResumeTests
     }
 
     [Fact]
+    public void ReplayLastKnownState_ClearsTheBattlePair_AfterCreatureFled_WhichEndsABattleWithoutBattleEnded()
+    {
+        // A flee emits CreatureFled and no BattleEnded; a stale cached pair would revive the finished battle on a
+        // reconnect, with a move menu nothing server-side is waiting on.
+        var hub = new RecordingHubContext();
+        var emitter = new SignalRBattleEventEmitter(hub, () => "conn-1");
+
+        emitter.Emit(Biome("phantom-marsh"));
+        emitter.Emit(new BattleStarted("Player", 1, "Enemy", 2, 1, 5));
+        emitter.Emit(Turn(1));
+        emitter.Emit(new CreatureFled("Player", 1, true));
+        int before = hub.EventsFor("conn-1").Count();
+
+        emitter.ReplayLastKnownState();
+
+        var replayed = hub.EventsFor("conn-1").Skip(before).Select(e => e.Type);
+        Assert.Equal(["BiomeEntered"], replayed); // the biome survives; the dead battle does not
+    }
+
+    [Fact]
     public void ReplayLastKnownState_ClearsTheBattlePair_ButNotTheMapOrBiome_AfterBattleEnded()
     {
         // Between encounters (a route/shop/reward/etc. prompt — not yet covered by this replay, a named gap in

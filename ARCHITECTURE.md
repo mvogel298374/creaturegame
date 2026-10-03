@@ -228,6 +228,18 @@ Each entry: **Decision · Why · Where it lives.**
     connection first; `useBattleHub` clears the active game and bounces to Title with a notice (same exit as a
     failed resume). It deliberately bypasses the event model: never cached, so never replayed, and the server does
     not close the socket.
+  - **The reconnect replay is idempotent on the client, and its server cache clears on a flee.** The server
+    replays on *every* (re)connect because it cannot tell a refresh (fresh client state — needs the replay) from a
+    transport blip (state intact — the replay is harmful: a second `BattleStarted` bumps the encounter index, a
+    second `BiomeEntered`/`BiomeNodePlanRevealed` duplicates the route path and resets the pin). So the *client*
+    decides: `battle/replayDedupe.ts` skips a `BattleStarted` whose `enemyId` is already on screen (creature ids are
+    unique per instance) and a `BiomeEntered`/plan for a biome it already accepted. The biome/plan check reads
+    *arrival-order* refs, not reducer state, because state lags arrival behind the animation queue (§2.8) and a
+    genuine plan can land while the previous biome's is still in state. `TurnStarted` is never skipped — re-applying
+    it is the designed self-correction. Server side, `CreatureFled` clears the battle-scoped cache like
+    `BattleEnded` (a flee emits no `BattleEnded`, so the finished battle used to be revived with a dead move
+    menu). `ReconnectGrace` is 60 s, sized to outlast the client's `withAutomaticReconnect()` default schedule
+    (0/2/10/30 s → last attempt ≈42 s after the drop), which the old 40 s did not.
   - **E2E reaches a party of two by a Dev-Mode `forceDraft`, not by a seed walk.** A themed draft is the only way
     the party grows past one, and it is gated on every 3rd win × a 55% roll (`DraftCalculator`). A spec that needs
     a switchable turn (`voluntary-switch.spec.ts`) therefore walked seeds hoping one survived to win 3 and rolled

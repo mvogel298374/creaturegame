@@ -8,6 +8,36 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Repo-sweep R1 — reconnect replay mishandled (server flee-cache + 60 s grace, client dedupe) ✅ DONE (2026-10-03)
+
+Found by the 2026-10-02 repo-wide code review sweep. Original finding: a flee (`CreatureFled`, no `BattleEnded`)
+left the cached `BattleStarted`/`TurnStarted` alive so a later reconnect revived a finished battle with a dead
+move menu; replay fires on every reconnect; a replayed `BattleStarted` bumped `encounterIndexRef` (spurious "A new
+challenger approaches!", enemy re-slide, HP flashes 1/1); a replayed `MAP_BIOME_ENTERED` duplicated `routePath` and
+left `mapPin` wrong; and the 40 s grace was shorter than the client's 0/2/10/30 s retry schedule (last attempt
+≈42 s).
+
+1. **Server — flee clears the replay cache.** `SignalRBattleEventEmitter` clears the battle-scoped cache on
+   `CreatureFled` exactly as on `BattleEnded`. **Test:** new case in `SessionResumeTests`.
+2. **Server — `ReconnectGrace` 40 s → 60 s** (`GameSessionManager`), sized to outlast the 0/2/10/30 s schedule.
+3. **Client — idempotent replay.** New pure helper `battle/replayDedupe.ts` (+ `replayDedupe.test.ts`), wired into
+   `useBattleHub`'s `OnBattleEvent` handler: skips a `BattleStarted` whose `enemyId` is already on screen, and a
+   `BiomeEntered`/`BiomeNodePlanRevealed` for a biome already accepted (checked against arrival-order refs, not
+   reducer state, which lags behind the animation queue). `TurnStarted` is deliberately never skipped (re-applying
+   it is the designed self-correction).
+
+**Not done (open in `TODO.md`):** no browser/E2E verification of replay-after-blip; the hook wiring is untested
+(only the pure helper is); the 60 s grace rests on SignalR's documented default schedule, not a browser measurement.
+**Accepted design, not a bug:** the server still replays on *every* reconnect because it cannot tell a refresh
+(needs the replay) from a blip (state intact); the client tolerates the repeat instead.
+
+Files: `creaturegame.Web/Battle/{GameSessionManager,SignalRBattleEventEmitter}.cs`,
+`ClientApp/src/{battle/replayDedupe.ts,battle/replayDedupe.test.ts,hooks/useBattleHub.ts}`,
+`tests/creaturegame.Tests/Unit/SessionResumeTests.cs`. Design note → `ARCHITECTURE.md` §2.7 ("The reconnect replay
+is idempotent on the client…"). Player-visible → `PRODUCT_SPEC.md` → Session resume.
+
+---
+
 ## Repo-sweep R1/R2/R3 — five small fixes (modal z-index, slower-flincher, RunFaulted, level-up panel, e2e.ps1 crash) ✅ DONE (2026-10-03)
 
 Found by the 2026-10-02 repo-wide code review sweep; the sweep's remaining items (and the unfixed remainders of
