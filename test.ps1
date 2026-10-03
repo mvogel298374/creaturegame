@@ -22,13 +22,18 @@
   .\test.ps1 -Dotnet           # only .NET unit tests
 .EXAMPLE
   .\test.ps1 -E2E -StartStack  # only Playwright, starting/stopping the backend itself
+.EXAMPLE
+  .\test.ps1 -Filter AbandonTimerTests   # only .NET tests whose name contains it (implies -Dotnet)
+.EXAMPLE
+  .\test.ps1 -Dotnet -Filter "FullyQualifiedName~Bag&Category=Unit"   # a full dotnet --filter expression, passed as-is
 #>
 [CmdletBinding()]
 param(
   [switch]$Dotnet,
   [switch]$Web,
   [switch]$E2E,
-  [switch]$StartStack
+  [switch]$StartStack,
+  [string]$Filter
 )
 
 # Playwright/npm/dotnet write UTF-8 (› ✓ ✘ …), but PowerShell decodes native-command output with the console's
@@ -43,8 +48,19 @@ $dotnetExe = if ($env:DOTNET_EXE) { $env:DOTNET_EXE }
              elseif (Test-Path "$env:USERPROFILE\.dotnet\dotnet.exe") { "$env:USERPROFILE\.dotnet\dotnet.exe" }
              else { 'dotnet' }
 
+# -Filter alone means "this subset of the .NET suite", never "everything"; with -Web/-E2E only it is ignored.
+if ($Filter -and -not ($Dotnet -or $Web -or $E2E)) { $Dotnet = $true }
+if ($Filter -and -not $Dotnet) { Write-Host "Note: -Filter applies to the .NET suite only; ignored." -ForegroundColor Yellow }
+
 # No specific suite requested → run everything.
 $runAll = -not ($Dotnet -or $Web -or $E2E)
+
+# A bare word is a name match; anything carrying a dotnet filter operator is passed through untouched.
+$dotnetFilterArgs = @()
+if ($Filter) {
+  $expr = if ($Filter -match '[=~!|&()]') { $Filter } else { "FullyQualifiedName~$Filter" }
+  $dotnetFilterArgs = @('--filter', $expr)
+}
 $results = [ordered]@{}
 
 function Test-Backend {
@@ -68,7 +84,7 @@ function Strip-Ansi([object[]]$lines) {
 # ── .NET unit tests ──────────────────────────────────────────────────────────
 if ($Dotnet -or $runAll) {
   Write-Host "`n=== .NET unit tests (xUnit) ===" -ForegroundColor Cyan
-  & $dotnetExe test (Join-Path $root 'tests\creaturegame.Tests') --nologo 2>&1 | Tee-Object -Variable raw
+  & $dotnetExe test (Join-Path $root 'tests\creaturegame.Tests') --nologo @dotnetFilterArgs 2>&1 | Tee-Object -Variable raw
   $ok = ($LASTEXITCODE -eq 0)
   $lines = Strip-Ansi $raw; $text = ($lines -join "`n")
   $passed = $failed = $skipped = $total = 0
@@ -76,7 +92,10 @@ if ($Dotnet -or $runAll) {
     $failed = [int]$Matches[1]; $passed = [int]$Matches[2]; $skipped = [int]$Matches[3]; $total = [int]$Matches[4]
   }
   $names = @($lines | ForEach-Object { if ($_ -match '^\s*Failed\s+(.+?)\s+\[') { $Matches[1] } })
-  $results['.NET (xUnit)'] = New-Result -Status ($ok ? 'PASS' : 'FAIL') -Passed $passed -Failed $failed -Skipped $skipped -Total $total -FailedNames $names
+  # dotnet exits 0 when a filter matches nothing; that must not read as a pass.
+  $noMatch = ($Filter -and $total -eq 0)
+  $results['.NET (xUnit)'] = New-Result -Status (($ok -and -not $noMatch) ? 'PASS' : 'FAIL') -Passed $passed -Failed $failed -Skipped $skipped -Total $total -FailedNames $names `
+    -Detail ($noMatch ? "0/0 - filter '$Filter' matched no tests" : $null)
 }
 
 # ── Frontend typecheck (tsc) ─────────────────────────────────────────────────

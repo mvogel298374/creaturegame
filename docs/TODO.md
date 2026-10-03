@@ -38,18 +38,17 @@
 | # | Item | Cost | Ready? (DoR) | Why this slot / what it unblocks |
 |:-:|:-----|:----:|:-------------|:---------------------------------|
 | 1 | **Three data/engine fixes, verified at pokered first** — Full Restore on a statused full-HP creature; Psychic's Special-drop chance; X Accuracy (§3.2) | S ×3 | ✗ per fix: Gen 1 source not yet fetched; quirk to test and data-vs-runtime boundary not stated | Small, localised, each pinned by a test that currently encodes the wrong value. |
-| 2 | **`test.ps1 -Filter`** — one sanctioned path for single-test runs (§7.1) | S | ✅ all seven DoR items answered in §7.1 | Tiny and fully specified; ends the raw `dotnet test --filter` workaround in `CLAUDE.md` so every test run reports the same `TEST SUMMARY`. |
-| 3 | **Dev-script and pre-commit-hook gaps** (§7.1) | S–M | ✗ no per-script acceptance conditions | Protects every later commit and test run; the hook has blind spots (`.csproj`, `*.db`, deletes). |
-| 4 | **R1b items 6–9** (§2) | S | ⚠️ 6 is a decision; 7–9 need a one-line acceptance each | Item 6 needs only your yes/no; 7–9 are one-liners. |
-| 5 | **Verification pass over the unverified findings** (§3, §5, §7) | S–M | ✗ no scope or output format (batch size; what "confirmed" means) | Cheap read-only agents in batches; turns ~45 "reviewer's reading" items into confirmed work or discards. Opens up everything below it. |
-| 6 | **Server test gaps — `GameSessionManager` lifecycle + the `RunFaulted` path** (§6) | M | ⚠️ needs the injectable-clock design | Unblocks the R1d tests and closes a long-open Tier-4 item. |
-| 7 | **Importer hardening** (§3.2) | M | ✗ no design (retry policy, transaction boundaries) or acceptance | Failure no longer wipes evolutions or exits 0; unblocks CI/Docker imports and the multi-generation importer work. |
-| 8 | **R1d-a — replay an open blocking prompt** (§2) | M | ⚠️ designed, but provisional-pending-`/plan` and needs your three decisions (§8) | The only reconnect item that strands a run; highest player value. |
-| 9 | **CI E2E step** (§6) | M | ✗ no design (runner, stack boot, caching) or acceptance | The only automatic E2E coverage; makes "agents don't run E2E" safe, and unblocks checking the BST/balance flag and the reconnect spec. |
-| 10 | **R1d-d, R1d-c** — refresh-state snapshot + sprite; second-tab policy (§2) | M each | ⚠️ provisional-pending-`/plan`; (c) needs your policy call | Both extend (a)'s replay work. |
-| 11 | **Gen 1 fidelity — the damage/accuracy core** (§3.1) | L | ✗ needs the Gen 1 source per claim, the seam surface, and the quirks to pin | Verify-first; large blast radius (it touches every damage number). |
-| 12 | **End-of-turn residual phase** (§4.2) | L | ✗ needs a `/plan` | A `/plan`, `opus-engineer`, and both review gates; rewrites `Battle`'s turn loop. |
-| 13 | **Features** — Catch, `save.db`, progressive difficulty, Generation Profile 4d+, … (§4) | L | ✗ each needs a `/plan` | Catch and stone evolutions are unblocked by the bag-scope ruling (`ARCHITECTURE.md` §2.12); `save.db` is declined for now. |
+| 2 | **Dev-script and pre-commit-hook gaps** (§7.1) | S–M | ✗ no per-script acceptance conditions | Protects every later commit and test run; the hook has blind spots (`.csproj`, `*.db`, deletes). |
+| 3 | **R1b items 6–9** (§2) | S | ⚠️ 6 is a decision; 7–9 need a one-line acceptance each | Item 6 needs only your yes/no; 7–9 are one-liners. |
+| 4 | **Verification pass over the unverified findings** (§3, §5, §7) | S–M | ✗ no scope or output format (batch size; what "confirmed" means) | Cheap read-only agents in batches; turns ~45 "reviewer's reading" items into confirmed work or discards. Opens up everything below it. |
+| 5 | **Server test gaps — `GameSessionManager` lifecycle + the `RunFaulted` path** (§6) | M | ⚠️ needs the injectable-clock design | Unblocks the R1d tests and closes a long-open Tier-4 item. |
+| 6 | **Importer hardening** (§3.2) | M | ✗ no design (retry policy, transaction boundaries) or acceptance | Failure no longer wipes evolutions or exits 0; unblocks CI/Docker imports and the multi-generation importer work. |
+| 7 | **R1d-a — replay an open blocking prompt** (§2) | M | ⚠️ designed, but provisional-pending-`/plan` and needs your three decisions (§8) | The only reconnect item that strands a run; highest player value. |
+| 8 | **CI E2E step** (§6) | M | ✗ no design (runner, stack boot, caching) or acceptance | The only automatic E2E coverage; makes "agents don't run E2E" safe, and unblocks checking the BST/balance flag and the reconnect spec. |
+| 9 | **R1d-d, R1d-c** — refresh-state snapshot + sprite; second-tab policy (§2) | M each | ⚠️ provisional-pending-`/plan`; (c) needs your policy call | Both extend (a)'s replay work. |
+| 10 | **Gen 1 fidelity — the damage/accuracy core** (§3.1) | L | ✗ needs the Gen 1 source per claim, the seam surface, and the quirks to pin | Verify-first; large blast radius (it touches every damage number). |
+| 11 | **End-of-turn residual phase** (§4.2) | L | ✗ needs a `/plan` | A `/plan`, `opus-engineer`, and both review gates; rewrites `Battle`'s turn loop. |
+| 12 | **Features** — Catch, `save.db`, progressive difficulty, Generation Profile 4d+, … (§4) | L | ✗ each needs a `/plan` | Catch and stone evolutions are unblocked by the bag-scope ruling (`ARCHITECTURE.md` §2.12); `save.db` is declined for now. |
 
 ---
 
@@ -397,16 +396,6 @@ The stat-selection abstraction is done. Open:
 - **CI/deploy hardening:** `fly-deploy.yml` runs no tests before `flyctl deploy`; `setup-flyctl@master` is an
   unpinned moving branch and there is no `permissions:` block; tags can point at any commit. **The container runs as
   root** (`Dockerfile:44-52`; use `USER $APP_UID` after checking SQLite write needs).
-- **`test.ps1 -Filter` (S).** `test.ps1` has no way to run a subset of the .NET suite, so `CLAUDE.md` documents a raw
-  `dotnet test --filter` that bypasses its `TEST SUMMARY`; the rule is that every test run goes through `test.ps1`.
-  **Acceptance:** `.\test.ps1 -Dotnet -Filter AbandonTimerTests` runs only the matching tests and prints the normal
-  summary block with the filtered counts; with no `-Filter` the behaviour is unchanged; `CLAUDE.md`'s single-test
-  command points at it. **Design:** a `[string]$Filter` parameter passed to the .NET `dotnet test` call as
-  `--filter`; `-Filter` with `-Web`/`-E2E` only is ignored with a one-line notice. **Gen-variable surface:** none.
-  **Gen 1 source:** N/A (tooling). **Data vs runtime:** neither — a dev script. **Quirk to test:** a filter that
-  matches nothing must not read as a pass (`dotnet test` exits 0 on zero matches; the summary should report
-  `0/0`). **Dependencies:** none. (The pre-commit hook's own direct `dotnet test` call is the separate hook-gaps item
-  below.)
 - **Dev scripts:** `-StartStack` leaves the backend running (`test.ps1:119/148`, `e2e.ps1:180/357` kill only the
   `dotnet run` parent); `stop-dev.ps1:103` kills *anything* on :5173 (another project's Vite); `test.ps1 -E2E
   -StartStack` exits 0 when the backend never starts.

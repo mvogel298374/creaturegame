@@ -8,6 +8,38 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## `test.ps1 -Filter` — one sanctioned path for single-test runs ✅ DONE (2026-10-04)
+
+**Was** `TODO.md` §1 row 2 / §7.1 "`test.ps1 -Filter` (S)". Dev-script change; no player-visible behavior, so no
+`PRODUCT_SPEC.md` entry.
+
+**Why.** `test.ps1` could not run a subset of the .NET suite, so `CLAUDE.md` documented a raw `dotnet test --filter`
+that bypassed its `TEST SUMMARY`; the rule is that every test run goes through `test.ps1`.
+
+**Acceptance.** `.\test.ps1 -Filter AbandonTimerTests` runs only the matching tests and prints the normal summary
+block with the filtered counts; with no `-Filter` the behaviour is unchanged; `CLAUDE.md`'s single-test command
+points at it. Gen-variable surface: none. Gen 1 source: N/A (tooling). Data vs runtime: neither. Dependencies: none.
+
+**What shipped** (differs slightly from the drafted entry).
+- New `[string]$Filter` parameter on `test.ps1`. A bare word becomes `FullyQualifiedName~<word>`; any value
+  containing `=~!|&()` is passed to `dotnet test --filter` as-is.
+- `-Filter` with no suite switch implies `-Dotnet` only, so it can never trigger the "run everything incl. E2E"
+  default. With only `-Web`/`-E2E` given, it is ignored with a notice.
+- A filter that matches nothing reports `FAIL '0/0 - filter matched no tests'` and exits 1 (the draft said a `0/0`
+  report; `dotnet test` itself exits 0 on zero matches, which must not read as a pass).
+- `CLAUDE.md`'s "run a subset by name" command is now `.\test.ps1 -Filter <ClassOrMethodName>`; the raw
+  `dotnet test --filter` mentions in `.claude/AI_CONTEXT.md` and `.claude/agents/test-runner.md` were retargeted.
+
+**Verification.** Run directly: `-Filter AbandonTimerTests` gave PASS 3/3; `-Filter NoSuchTestAnywhere` gave FAIL 0/0,
+exit 1.
+
+**Gates.** `format-gate` N/A (no `.cs`); `test-runner` replaced by the direct verification above; `pr-review` and
+`requirements-review` N/A (dev script).
+
+**Not covered.** The pre-commit hook's own direct `dotnet test` call remains in the "Pre-commit hook gaps" item.
+
+---
+
 ## R1d-b — the abandon-timer race ✅ DONE (2026-10-03)
 
 **Was** `TODO.md` §1 row 2 / §2 "R1d-b", designed in `RECONNECT_RESILIENCE.md` (section removed from that doc once

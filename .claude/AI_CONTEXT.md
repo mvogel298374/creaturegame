@@ -85,7 +85,7 @@ each is its own subagent so it can be invoked or edited independently:
      `-Web` when only one side moved; otherwise the default `-Dotnet -Web` stands. Only name E2E if the **user**
      asked for it.
    - **Not delegate a single-test re-check.** Re-running one named spec or one `--filter` is faster inline
-     than a subagent cold start: `npx playwright test <spec>.spec.ts` / `dotnet test … --filter "…~<Name>"`.
+     than a subagent cold start: `npx playwright test <spec>.spec.ts` / `.\test.ps1 -Filter <Name>`.
      Delegate when you want the *whole* suite; run it yourself when you want *one* test.
    - **Accept one green run.** Don't ask for a re-run to confirm a pass or probe flakiness unless the user
      asked — and never queue back-to-back stability runs.
@@ -201,7 +201,7 @@ on the `CG_BATTLE_LOG` env var. To watch a test narrate, set the flag and filter
 using the emitter narrates while it's on, so an unfiltered run is a wall of text):
 ```powershell
 $env:CG_BATTLE_LOG = "1"
-dotnet test tests/creaturegame.Tests --filter "FullyQualifiedName~Substitute"
+.\test.ps1 -Filter Substitute
 $env:CG_BATTLE_LOG = $null   # turn it back off
 ```
 Any value other than `0`/`false` (or unset/empty) enables it.

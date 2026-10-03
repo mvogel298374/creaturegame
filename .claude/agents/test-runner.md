@@ -39,7 +39,7 @@ the dev stack happens to be up — a 4-minute run nobody asked for. Always pass 
 
 Single-test re-checks — strongly preferred when the caller names a specific failure:
 ```powershell
-dotnet test tests/creaturegame.Tests --filter "FullyQualifiedName~<MethodName>"
+.\test.ps1 -Filter <ClassOrMethodName>      # .NET only; a filter matching nothing reports FAIL 0/0
 cd creaturegame.Web/ClientApp; npx playwright test <spec>.spec.ts     # needs the stack up
 cd creaturegame.Web/ClientApp; npx vitest run <path>
 ```
