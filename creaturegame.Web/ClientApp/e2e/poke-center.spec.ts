@@ -23,6 +23,7 @@ async function reachPokeCenter(page: Page): Promise<string> {
   const seed = await walkSeedsUntil(page, p => isShowing(recoveryModal(p)), {
     species: 'MEWTWO',
     level: 50,
+    pokeCenter: 'leave',
   });
   expect(seed, 'no seeded run cleared a biome to reach the Poké Center').not.toBeNull();
 

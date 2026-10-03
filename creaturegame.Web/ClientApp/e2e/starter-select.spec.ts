@@ -16,7 +16,7 @@ test.describe('Starter selection', () => {
     await expect(charizard.locator('img')).toBeVisible();
     await expect(charizard).toContainText('FIRE');
     await expect(charizard).toContainText('FLYING');   // Gen 1 typing via past_types
-    await expect(charizard).toContainText('449');      // BST
+    await expect(charizard).toContainText('425');      // BST
   });
 
   test('level slider defaults to 50 and is adjustable', async ({ page }) => {

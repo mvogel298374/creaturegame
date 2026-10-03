@@ -8,6 +8,30 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## E2E repairs after the species-data import — Phase 1 ⏳ IMPLEMENTED (2026-10-04), awaiting the user's E2E confirmation
+
+**Was** `TODO.md` §1 row 6 / §6 "E2E repairs after the species-data import", phase 1. **Not verified by an E2E
+run** (E2E is user-only); the item stays open in `TODO.md` for phase 2 and for this confirmation. Test-only; no
+player-visible behavior, so no `PRODUCT_SPEC.md` entry.
+
+**Context.** A 2026-10-04 full-suite user run went 34/38; the failures follow the species-data import (real Gen 1
+base stats and base experience). Causes traced from screenshots, specs and helpers; trace/video not opened.
+
+**What shipped.**
+- `e2e/starter-select.spec.ts`: Charizard BST pin 449 -> 425 (real Gen 1: 78+84+78+100+85).
+- `e2e/helpers.ts`: new exported `answerPokeCenterIfPresent` (clicks HEAL on
+  `.recovery-modal[aria-label="Poké Center recovery"]`); `playCurrentRunUntil` calls it by default, beside
+  `leaveShopIfPresent`/`dismissRewardChoiceIfPresent`. New `PlayOpts.pokeCenter?: 'heal' | 'leave'` (default `'heal'`).
+- `e2e/poke-center.spec.ts`: passes `pokeCenter: 'leave'` to its `walkSeedsUntil`, because its target is that modal
+  (same auto-answer race as `drafts: 'leave'`). A design addition beyond the original TODO text.
+
+**To confirm (user runs):** `.\e2e.ps1 -Spec starter-select`, `evolution`, `poke-center`.
+
+**Gates.** `format-gate` N/A (no `.cs`); `test-runner` `.\test.ps1 -Web` PASS (tsc clean, Vitest 310/310);
+`pr-review` skipped (test-only); `requirements-review` N/A.
+
+---
+
 ## `test.ps1 -Filter` — one sanctioned path for single-test runs ✅ DONE (2026-10-04)
 
 **Was** `TODO.md` §1 row 2 / §7.1 "`test.ps1 -Filter` (S)". Dev-script change; no player-visible behavior, so no

@@ -34,6 +34,8 @@ on a few patterns instead of a seed:
   grows only linearly with the level-matched enemy, so DRAGONAIR @ L54 won four battles and gained *no level at
   all*. A level-up reach must be low-level to cross at all (`evolution` CHARMANDER @ L15, `move-replacement`
   VICTREEBEL @ L12).
+- **Choose the Poké Center policy** → `pokeCenter: 'heal' | 'leave'` on either loop (default `heal`, via
+  `answerPokeCenterIfPresent`). `leave` is for the spec whose target *is* the recovery modal (`poke-center`).
 - **Choose the draft policy** → `drafts: 'accept' | 'decline' | 'leave'` on either loop. `accept` is the only
   way a party grows past one; `decline` keeps the run flowing while staying a party of one (which matters more
   than it looks — *every* creature that levels is eligible for the level-up prompts, so a drafted creature can
@@ -154,7 +156,7 @@ npx playwright show-report                    # last HTML report (only if it was
   IDE gutter-detection reliable.
 - `helpers.ts` is a small page-object layer (`startBattle`, `chooseMove`, `logLines`,
   `hpWidth`, `bridgeEvents`, `playToEnd`, `walkSeedsUntil`, `playCurrentRunUntil`, `chooseBestMove`,
-  `isShowing`) so specs read as intent.
+  `answerPokeCenterIfPresent`, `isShowing`) so specs read as intent.
 - Selectors lean on stable semantic classes already in the app (`.btn-new-game`,
   `.species-card`, `.move-btn`, `.log-line`, `.bar-fill`, `.nameplate--*`).
 

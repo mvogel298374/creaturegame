@@ -108,6 +108,16 @@ export async function leaveShopIfPresent(page: Page): Promise<boolean> {
   return false;
 }
 
+/** Answers the Poké Center prompt if one is up (HEAL keeps a deep run alive). Returns whether it acted. */
+export async function answerPokeCenterIfPresent(page: Page): Promise<boolean> {
+  const modal = page.locator('.recovery-modal[aria-label="Poké Center recovery"]');
+  if (await modal.isVisible().catch(() => false)) {
+    await modal.getByRole('button', { name: 'HEAL', exact: true }).click().catch(() => {});
+    return true;
+  }
+  return false;
+}
+
 /** Answers a reward-choice modal if one is up by taking the gold bag (always offered, so a deterministic
  * pick). Every rolled reward — a battle win, a Treasure/Mystery node — now blocks on this pick-one-of-N until
  * answered, so the play loop and startBattle both clear it to keep the run flowing. Returns whether it acted. */
@@ -328,6 +338,8 @@ export type DraftPolicy = 'accept' | 'decline' | 'leave';
 export type PlayOpts = {
   maxTurns?: number;
   drafts?: DraftPolicy;
+  /** `leave` for a spec whose target IS the Poké Center prompt; otherwise the loop answers it (HEAL). */
+  pokeCenter?: 'heal' | 'leave';
 };
 
 /**
@@ -344,7 +356,7 @@ export async function playCurrentRunUntil(
   reached: (page: Page) => Promise<boolean>,
   opts: PlayOpts = {}
 ): Promise<boolean> {
-  const { maxTurns = 400, drafts = 'accept' } = opts;
+  const { maxTurns = 400, drafts = 'accept', pokeCenter = 'heal' } = opts;
 
   for (let i = 0; i < maxTurns; i++) {
     if (await reached(page)) return true;
@@ -373,6 +385,7 @@ export async function playCurrentRunUntil(
       await keepLead.click().catch(() => {});
       continue;
     }
+    if (pokeCenter !== 'leave' && (await answerPokeCenterIfPresent(page))) continue;
     await leaveShopIfPresent(page);
     await dismissRewardChoiceIfPresent(page);
     await chooseBiomeIfPresent(page);
