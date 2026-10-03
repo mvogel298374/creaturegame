@@ -39,7 +39,7 @@
 |:-:|:-----|:----:|:-------------|:---------------------------------|
 | 1 | **Three data/engine fixes, verified at pokered first** — Full Restore on a statused full-HP creature; Psychic's Special-drop chance; X Accuracy (§3.2) | S ×3 | ✗ per fix: Gen 1 source not yet fetched; quirk to test and data-vs-runtime boundary not stated | Small, localised, each pinned by a test that currently encodes the wrong value. |
 | 2 | **Dev-script and pre-commit-hook gaps** (§7.1) | S–M | ✗ no per-script acceptance conditions | Protects every later commit and test run; the hook has blind spots (`.csproj`, `*.db`, deletes). |
-| 3 | **R1b items 6–9** (§2) | S | ⚠️ 6 is a decision; 7–9 need a one-line acceptance each | Item 6 needs only your yes/no; 7–9 are one-liners. |
+| 3 | **R1b items 7–9** (§2) | S | ⚠️ 7–9 each need a one-line acceptance condition | Three small advisories; no decision left, just the acceptance one-liners. |
 | 4 | **Verification pass over the unverified findings** (§3, §5, §7) | S–M | ✗ no scope or output format (batch size; what "confirmed" means) | Cheap read-only agents in batches; turns ~45 "reviewer's reading" items into confirmed work or discards. Opens up everything below it. |
 | 5 | **Server test gaps — `GameSessionManager` lifecycle + the `RunFaulted` path** (§6) | M | ⚠️ needs the injectable-clock design | Unblocks the R1d tests and closes a long-open Tier-4 item. |
 | 6 | **E2E repairs after the species-data import** — phase 2 remaining (§6) | S–M | ✅ all seven DoR items answered in §6; phase 2 is sequenced after the BST tier-band decision (§8) | Phase 1 is implemented (archived) but still needs the user's `starter-select`/`evolution`/`poke-center` E2E run. Phase 2 re-finds seeds and is only worth doing once. |
@@ -81,10 +81,8 @@ design** (it cannot tell a refresh from a blip), not a bug.
 - **`RunFaulted` server-half test gap** — nothing pins `SendRunFaulted` or the `GameSessionManager` catch-all call
   (the client handler's mapping is covered by R1d-c's `transportNotices` extraction).
 
-### R1b — follow-ups from the lost-answer fix's `pr-review` (items 6–9; 1–5 are archived)
+### R1b — follow-ups from the lost-answer fix's `pr-review` (items 7–9; 1–6 are archived, numbers kept)
 
-6. **Confirm the behaviour change is intended:** rapid repeated shop BUY clicks are now all honoured where some
-   were dropped. **Needs your yes/no.**
 7. *Advisory* — a restored shop uses the balance from the LEAVE click (`battleReducer.ts` `RESTORE_PROMPT`); a
    `SHOP_PURCHASED` landing between the click and the restore leaves `shop.balance` stale vs. `gold`. Cosmetic;
    fix = apply `state.gold` to `balance` when restoring the shop.
@@ -481,7 +479,6 @@ coverage).
 
 | Decision | Recommendation | Unblocks |
 |:---------|:---------------|:---------|
-| **R1b item 6** — are all rapid shop BUY clicks now honoured, as intended? | Yes (a dropped click was the bug) | closes R1b |
 | **Second-tab policy** (R1d-c) | Last tab wins + notify the displaced tab; never clear `activeGame` | R1d-c |
 | **Transport notices outside the event model** (`SessionTakenOver`, `RunMapSnapshot`, like `RunFaulted`) | Accept | R1d-c, R1d-d |
 | **`PlayerSpeciesId` on `BattleStarted`** (a wire-contract change; the C# wire-drop half is auto-guarded, the TS half is manual) | Accept | R1d-d, the post-evolution sprite |

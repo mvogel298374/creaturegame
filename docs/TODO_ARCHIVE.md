@@ -1180,10 +1180,13 @@ useBattleHub.ts}`, `ClientApp/src/battle/timeline.ts`.
 prompt after a refresh. This is the already-documented Known Gap in `TODO.md` → *Known Gaps* ("Session Resume doesn't
 cover a reconnect during a between-node blocking prompt"); it was not duplicated as a new item.
 
-### R1b follow-ups 1–5 from this fix's `pr-review` (verdict PR-READY) ✅ DONE (2026-10-03)
+### R1b follow-ups 1–5 from this fix's `pr-review` (verdict PR-READY) ✅ DONE (2026-10-03); item 6 ruled ✅ (2026-10-04)
 
-The cheap, no-behaviour-change follow-ups the review recommended. Items 6–9 of that list (confirm rapid shop BUY
-clicks all being honoured is intended; three advisories) remain open in `TODO.md` → *R1b*, keeping their numbers.
+The cheap, no-behaviour-change follow-ups the review recommended. Items 7–9 of that list (three advisories) remain
+open in `TODO.md` → *R1b*, keeping their numbers.
+
+**Item 6 — ruled by the user, 2026-10-04: intended.** Rapid repeated shop BUY clicks are now all honoured where
+some were previously dropped; the dropped click was the bug. No code change.
 
 1. **Test the branch the fix exists for.** All five original shop tests sent the second answer *before* awaiting
    `first`, so they only hit the "pending TCS already completed" path. Added
