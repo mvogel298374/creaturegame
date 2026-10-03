@@ -93,7 +93,10 @@ public sealed class FlinchEffect : IMoveEffect
 
     public void Apply(MoveEffectContext ctx)
     {
-        if (ctx.Target.IsAlive())
+        // A Substitute shields the target from flinch — pokered's FlinchSideEffect opens with CheckTargetSubstitute
+        // and returns if one is up. The hit that BREAKS the decoy shields too: the snapshot is taken at impact,
+        // matching AttackSubstitute zeroing the attacker's move effect on a break.
+        if (ctx.Target.IsAlive() && !ctx.TargetShieldedBySubstitute)
         {
             int chance = ctx.Rules.GetSecondaryEffectChance(ctx.Attack, SecondaryEffectKind.Flinch);
             if (ctx.Rules.SecondaryHits(chance, ctx.Rng))

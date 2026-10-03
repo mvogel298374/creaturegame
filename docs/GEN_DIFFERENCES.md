@@ -149,6 +149,17 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
   battle-boundary reset undoes those. If Haze cures a target's Sleep/Freeze, that target still
   **forfeits its already-chosen action for that same turn** rather than getting to act immediately —
   it's simply free again from the next turn on.
+- **Substitute shields its holder from flinch** — including on the hit that *breaks* the decoy (verified
+  2026-10-03 against pret/pokered master). `engine/battle/effects.asm` `FlinchSideEffect:` opens with
+  `call CheckTargetSubstitute` / `ret nz` (tests `HAS_SUBSTITUTE_UP` on the target's `wBattleStatus2`), so a
+  hit on a creature behind a decoy never flinches it. On the breaking hit, `engine/battle/core.asm`
+  `AttackSubstitute` clears `HAS_SUBSTITUTE_UP` and then `.nullifyEffect` zeroes the attacker's
+  `wPlayerMoveEffect`/`wEnemyMoveEffect`, so no secondary effect (flinch included) runs on that hit either.
+  Not generation-variable (Gen 2+ also block it), so there is no `IBattleRules` seam. Engine: `FlinchEffect`
+  (`creaturegame/Combat/MoveEffects.cs`) is gated on `!ctx.TargetShieldedBySubstitute`, which reads the
+  `AttackAction` impact-time snapshot (`_targetShieldedAtImpact`) that already covers the breaking hit. Pinned by
+  `FlinchContractTests.SubstituteShieldsTheTargetFromFlinch` (decoy survives / decoy breaks). History:
+  `docs/TODO_ARCHIVE.md` → "Repo-sweep R1/R2/R3 — five small fixes", item 2.
 
 #### No Systems (not yet introduced)
 - No held items

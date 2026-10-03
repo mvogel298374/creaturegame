@@ -53,6 +53,24 @@ public class FlinchContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         Assert.False(result.Defender.Battle.IsFlinched);
     }
 
+    [Theory]
+    [InlineData(200)] // the decoy survives the hit
+    [InlineData(1)] // the hit breaks the decoy — Gen 1 still spends the whole move effect on the sub
+    public async Task SubstituteShieldsTheTargetFromFlinch(int substituteHp)
+    {
+        // pokered FlinchSideEffect: CheckTargetSubstitute / ret nz; AttackSubstitute also zeroes the move's effect
+        // when the decoy breaks. ForceSecondaryRules makes the 10-30% roll land, so only the shield can stop it.
+        var defender = TestCreatures.Make("Defender", hp: 500);
+        defender.Battle.SubstituteHp = substituteHp;
+
+        var result = await new MoveScenario()
+            .Rules(ForceSecondaryRules.Instance)
+            .Defender(defender)
+            .Use(Move("stomp"));
+
+        Assert.False(result.Defender.Battle.IsFlinched);
+    }
+
     [Fact]
     public async Task FasterFlincherMakesTargetLoseItsTurn()
     {

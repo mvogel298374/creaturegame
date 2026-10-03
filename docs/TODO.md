@@ -916,8 +916,6 @@ Fixing a data/engine item usually also means updating the test that currently pi
   of replay-after-blip; (b) the `useBattleHub` wiring of `replayDedupe` is untested (only the pure helper is);
   (c) the 60 s grace rests on SignalR's documented 0/2/10/30 s default schedule, not a measured browser run.
   The server replaying on every reconnect is an accepted design (it can't tell blip from refresh), not a bug.
-- **Engine: Substitute should also block flinch** (`MoveEffects.cs:96-100`). The slower-attacker carry-over half
-  is fixed (same archive entry).
 - **Test gap: the `RunFaulted` path** (fix archived, same entry) — nothing pins `SendRunFaulted`, the
   `GameSessionManager` catch-all call, or `useBattleHub`'s `RunFaulted` handler.
 - **Data: species base stats are modern, not Gen 1** (`PokemonImport.cs:144-152`) — `BaseSpecial` taken from

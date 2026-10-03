@@ -41,7 +41,7 @@ is idempotent on the client…"). Player-visible → `PRODUCT_SPEC.md` → Sessi
 ## Repo-sweep R1/R2/R3 — five small fixes (modal z-index, slower-flincher, RunFaulted, level-up panel, e2e.ps1 crash) ✅ DONE (2026-10-03)
 
 Found by the 2026-10-02 repo-wide code review sweep; the sweep's remaining items (and the unfixed remainders of
-items 2 and 5 below) are still open in `TODO.md`.
+items 3 and 5 below) are still open in `TODO.md`.
 
 1. **R1 — pinned map hid blocking prompts.** `.modal-overlay` z-index raised 10 → 70
    (`components/modals/Modal.css`) so every blocking prompt sits above the pinned Run Map (`.encounter-map--pinned`,
@@ -58,7 +58,16 @@ items 2 and 5 below) are still open in `TODO.md`.
 2. **R1 — flinch from a slower attacker carried into the next turn.** `Battle.cs` now clears `IsFlinched` on both
    creatures at end of turn (beside the `HazeSuppressedStatus` reset), so a flinch set after the target already
    acted is no longer consumed by its next turn. **Test:** `FlinchContractTests.SlowerFlincherDoesNotCostTargetItsNextTurn`.
-   **Not done:** Substitute should also block flinch — remains open in `TODO.md`.
+   **Substitute blocks flinch — also done (2026-10-03).** `FlinchEffect` (`MoveEffects.cs`) is now gated on
+   `!ctx.TargetShieldedBySubstitute`. Verified against the primary source (pret/pokered master, fetched
+   2026-10-03, not memory): `engine/battle/effects.asm` `FlinchSideEffect:` begins `call CheckTargetSubstitute` /
+   `ret nz` (tests `HAS_SUBSTITUTE_UP` on the target's `wBattleStatus2`); `engine/battle/core.asm`
+   `AttackSubstitute` (~lines 4849-4900) clears `HAS_SUBSTITUTE_UP` when the decoy breaks and then
+   `.nullifyEffect` zeroes the attacker's move effect, so no side effect runs on the breaking hit either — this
+   matches the pre-existing `_targetShieldedAtImpact` snapshot in `AttackAction`. Not generation-variable (Gen 2+
+   block it too), so no `IBattleRules` seam. **Tests:** `FlinchContractTests.SubstituteShieldsTheTargetFromFlinch`
+   (Theory, 200 / 1 = decoy survives / decoy breaks), both cases verified to FAIL with the gate removed. Rationale
+   lives in `GEN_DIFFERENCES.md` → Status Quirks.
 3. **R1 — a faulted run task never told the client.** `GameSessionManager`'s run-task catch-all now calls the new
    `SignalRBattleEventEmitter.SendRunFaulted()`, which sends a transport-level `RunFaulted` message on
    `OnBattleEvent` (not a `BattleEvent`; never cached, so never replayed). `useBattleHub.ts` handles it like a
