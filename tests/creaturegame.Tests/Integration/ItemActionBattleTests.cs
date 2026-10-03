@@ -199,6 +199,62 @@ public class ItemActionBattleTests
         Assert.Equal(0, bag.Count(56)); // consumed
     }
 
+    private static Item FullRestore() =>
+        new()
+        {
+            Id = 23,
+            Name = "full-restore",
+            Category = ItemCategory.Healing,
+            HealsAllHp = true,
+            CuresAllStatus = true,
+        };
+
+    [Fact]
+    public async Task UsingFullRestore_AtFullHpWithAStatus_CuresAndConsumes()
+    {
+        var player = TestCreatures.Make("Player", hp: 200, speed: 200);
+        player.AddAttack(Tackle());
+        var enemy = TestCreatures.Make("Enemy", hp: 60, speed: 1);
+        enemy.AddAttack(Tackle());
+        var bag = new Bag();
+        bag.Add(23, 1);
+
+        var em = await RunAsync(
+            new TurnChoiceInput(new ItemTurnChoice(FullRestore())),
+            bag,
+            player,
+            enemy,
+            entryStatus: new CarriedStatus(StatusCondition.Paralysis, 0)
+        );
+
+        Assert.Equal("full-restore", em.Of<ItemUsed>().First().ItemName);
+        Assert.Equal(StatusCondition.Paralysis, em.Of<StatusCleared>().First().WasStatus);
+        Assert.False(em.Of<Healed>().Any());
+        Assert.Equal(0, bag.Count(23));
+    }
+
+    [Fact]
+    public async Task UsingFullRestore_AtFullHpWithNoStatus_FailsWithoutConsuming()
+    {
+        var player = TestCreatures.Make("Player", hp: 200, speed: 200);
+        player.AddAttack(Tackle());
+        var enemy = TestCreatures.Make("Enemy", hp: 60, speed: 1);
+        enemy.AddAttack(Tackle());
+        var bag = new Bag();
+        bag.Add(23, 1);
+
+        var em = await RunAsync(
+            new TurnChoiceInput(new ItemTurnChoice(FullRestore())),
+            bag,
+            player,
+            enemy
+        );
+
+        Assert.True(em.Of<ItemUseFailed>().Any());
+        Assert.False(em.Of<ItemUsed>().Any());
+        Assert.Equal(1, bag.Count(23));
+    }
+
     [Fact]
     public async Task UnusableItem_FailsWithoutConsuming()
     {

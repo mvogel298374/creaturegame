@@ -37,7 +37,7 @@
 
 | # | Item | Cost | Ready? (DoR) | Why this slot / what it unblocks |
 |:-:|:-----|:----:|:-------------|:---------------------------------|
-| 1 | **Three data/engine fixes, verified at pokered first** — Full Restore on a statused full-HP creature; Psychic's Special-drop chance; X Accuracy (§3.2) | S ×3 | ✗ per fix: Gen 1 source not yet fetched; quirk to test and data-vs-runtime boundary not stated | Small, localised, each pinned by a test that currently encodes the wrong value. |
+| 1 | **X Accuracy** (§3.2) | M | ⚠️ held — needs-plan, design proposed in §3.2, awaiting your confirmation | Touches `AttackAction` and the `IBattleRules` seam; verified at pokered. |
 | 2 | **Dev-script and pre-commit-hook gaps** (§7.1) | S–M | ✗ no per-script acceptance conditions | Protects every later commit and test run; the hook has blind spots (`.csproj`, `*.db`, deletes). |
 | 3 | **R1b items 7–9** (§2) | S | ⚠️ 7–9 each need a one-line acceptance condition | Three small advisories; no decision left, just the acceptance one-liners. |
 | 4 | **Verification pass over the unverified findings** (§3, §5, §7) | S–M | ✗ no scope or output format (batch size; what "confirmed" means) | Cheap read-only agents in batches; turns ~45 "reviewer's reading" items into confirmed work or discards. Opens up everything below it. |
@@ -129,13 +129,18 @@ data/engine item usually also means updating the test that pins the wrong value.
 
 ### 3.2 Data and importer
 
-- **Psychic's Special-drop chance is 10%; Gen 1 is 33%** — no `psychic` case in `MoveImport.cs:267-330`;
-  `SecondaryEffectContractTests.cs:22` pins the wrong value. **X Accuracy** is imported as +1 accuracy stage
-  (`ItemMapper.cs:163`, pinned by `ItemImportTests.cs:229`); Gen 1 skips the accuracy check entirely (the OHKO
-  quirk). **Full Restore refuses a full-HP creature that has a status** (`ItemEffects.cs:71-74` `CanApply` requires
-  HP < max); Gen 1 cures it and consumes the item — fix = let `CanApply` pass when `CuresAllStatus` and a status is
-  present, and skip the zero-amount `Healed` event. (Aside: `Creature.FullHeal` and `ReviveItemEffect` duplicate
-  `ClearStatus`'s reset instead of routing through it.)
+X Accuracy **verified against pret/pokered 2026-10-04**. (Aside: `Creature.FullHeal` and `ReviveItemEffect` duplicate
+`ClearStatus`'s reset instead of routing through it.)
+
+- **X Accuracy (M, held — needs-plan).** Imported as +1 accuracy stage (`ItemMapper.cs:163`, pinned by
+  `ItemImportTests.cs:229`); Gen 1 `MoveHitTest` returns at once when the user has `USING_X_ACCURACY` ("always hit
+  regardless of accuracy/evasion") — after the Dream Eater, Swift, Dig/Fly and **Mist** checks (so it beats none of
+  them) and without the random roll (so no 1/256 miss). **Proposed design (awaiting confirmation):** keep the item
+  row (Gen 2+ really is a +1 stage); a new `IBattleRules` member says whether X Accuracy bypasses the accuracy
+  check, `BattleState` gains a per-battle flag cleared with `HasMist`/`HasFocusEnergy`, `BattleBoostItemEffect` sets
+  it (narrated like Dire Hit) instead of raising the stage, and `AttackAction.ResolvePreDamageGates` skips the
+  accuracy roll when set. Central-method + seam change ⇒ `/plan`, `opus-engineer`, `requirements-review` and
+  `pr-review`. The alternative is a new `Item` flag (migration + `items.db` re-import).
 - **Importer hardening (M):** a failed/offline run wipes evolutions and exits 0 (`EvolutionImport.cs:24` deletes
   before fetching and swallows errors); no retry/429/timeout anywhere; `Program.cs:111` always prints "Import
   Complete!"; a failed `SaveChangesAsync` poisons the shared DbContext for the rest of the run (`MoveImport.cs:29/82`,

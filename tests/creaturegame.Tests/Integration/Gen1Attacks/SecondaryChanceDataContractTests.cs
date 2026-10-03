@@ -20,6 +20,7 @@ public class SecondaryChanceDataContractTests(MovesFixture moves) : Gen1MoveCont
     [InlineData("low-kick", 30)] // Gen 1 flinch 30% (modern: weight-based, none)
     [InlineData("poison-sting", 20)] // Gen 1 poison 20% (modern 30%)
     [InlineData("acid", 33)] // acid overrides EffectChance too (33%), not just StatEffectChance
+    [InlineData("psychic", 33)]
     public void EffectChanceMatchesGen1(string move, int chance) =>
         Assert.Equal(chance, Move(move).EffectChance);
 
@@ -28,6 +29,7 @@ public class SecondaryChanceDataContractTests(MovesFixture moves) : Gen1MoveCont
     [InlineData("acid", 33)] // Gen 1 −1 Defense 33% (modern −1 Sp.Def 10%)
     [InlineData("aurora-beam", 33)] // Gen 1 −1 Attack 33% (modern 10%)
     [InlineData("bubble-beam", 33)] // Gen 1 −1 Speed 33% (modern 10%)
+    [InlineData("psychic", 33)]
     public void StatEffectChanceMatchesGen1(string move, int chance) =>
         Assert.Equal(chance, Move(move).StatEffectChance);
 

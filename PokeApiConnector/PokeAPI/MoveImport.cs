@@ -277,6 +277,7 @@ public class MoveImport
             case "bubble-beam": // Gen 1: 33% to lower Speed (modern: 10%)
             case "bubble": // Gen 1: 33% to lower Speed (modern: 10%; past_values lacks the chance)
             case "constrict": // Gen 1: 33% to lower Speed (modern: 10%)
+            case "psychic":
                 attack.StatEffectChance = 33;
                 attack.EffectChance = 33;
                 break;

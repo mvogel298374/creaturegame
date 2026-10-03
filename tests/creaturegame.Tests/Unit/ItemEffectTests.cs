@@ -229,6 +229,96 @@ public class ItemEffectTests
     }
 
     [Fact]
+    public void FullRestore_AtFullHpWithAStatus_CuresItWithoutAHealedEvent()
+    {
+        var c = TestCreatures.Make(hp: 200);
+        c.Battle.Status = StatusCondition.Paralysis;
+        var item = Item(23, "full-restore", ItemCategory.Healing, healsAll: true, curesAll: true);
+
+        var (user, em) = Apply(item, c);
+
+        Assert.Equal(StatusCondition.None, user.Battle.Status);
+        Assert.Equal(StatusCondition.Paralysis, em.Of<StatusCleared>().Single().WasStatus);
+        Assert.False(em.Of<Healed>().Any());
+    }
+
+    [Fact]
+    public void FullRestore_AtFullHpWithNoStatus_HasNoEffect() =>
+        Assert.False(
+            CanApply(
+                Item(23, "full-restore", ItemCategory.Healing, healsAll: true, curesAll: true),
+                TestCreatures.Make(hp: 200)
+            )
+        );
+
+    [Fact]
+    public void Potion_AtFullHpWithAStatus_HasNoEffect()
+    {
+        var c = TestCreatures.Make(hp: 200);
+        c.Battle.Status = StatusCondition.Poison;
+        Assert.False(CanApply(Item(17, "potion", ItemCategory.Healing, heal: 20), c));
+    }
+
+    [Fact]
+    public void FullRestore_AtFullHpWithOnlyConfusion_HasNoEffect()
+    {
+        var c = TestCreatures.Make(hp: 200);
+        c.Battle.ConfusedTurns = 3;
+        Assert.False(
+            CanApply(
+                Item(23, "full-restore", ItemCategory.Healing, healsAll: true, curesAll: true),
+                c
+            )
+        );
+    }
+
+    [Fact]
+    public void FullRestore_OnAFaintedCreatureWithAStatus_HasNoEffect()
+    {
+        var c = TestCreatures.Make(hp: 200);
+        c.Attributes.ReceiveDamage(200);
+        c.Battle.Status = StatusCondition.Poison;
+        Assert.False(
+            CanApply(
+                Item(23, "full-restore", ItemCategory.Healing, healsAll: true, curesAll: true),
+                c
+            )
+        );
+    }
+
+    [Fact]
+    public void FullRestore_AtFullHp_ResetsTheToxicCounter()
+    {
+        var c = TestCreatures.Make(hp: 200);
+        c.Battle.Status = StatusCondition.BadPoison;
+        c.Battle.ToxicCounter = 4;
+
+        var (user, _) = Apply(
+            Item(23, "full-restore", ItemCategory.Healing, healsAll: true, curesAll: true),
+            c
+        );
+
+        Assert.Equal(StatusCondition.None, user.Battle.Status);
+        Assert.Equal(1, user.Battle.ToxicCounter);
+    }
+
+    [Fact]
+    public void FullRestore_AtFullHp_ClearsTheSleepCounter()
+    {
+        var c = TestCreatures.Make(hp: 200);
+        c.Battle.Status = StatusCondition.Sleep;
+        c.Battle.SleepTurns = 3;
+
+        var (user, _) = Apply(
+            Item(23, "full-restore", ItemCategory.Healing, healsAll: true, curesAll: true),
+            c
+        );
+
+        Assert.Equal(StatusCondition.None, user.Battle.Status);
+        Assert.Equal(0, user.Battle.SleepTurns);
+    }
+
+    [Fact]
     public void Potion_OnBenchMember_HealsThatMemberNotTheActiveOne()
     {
         var party = PartyWithLivingBench(leadHp: 200, benchHp: 200);

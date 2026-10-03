@@ -145,6 +145,9 @@ the linked design doc instead — pull it there and leave only the pointer here.
   nothing to cure) refuses with "It won't have any effect!" — no item consumed, no announce.
 - Ether/Elixir on a benched member reads and restores PP against *that member's own* moveset, not the active
   creature's.
+- Full Restore on a full-HP creature with a major status (burn, freeze, paralysis, poison, sleep) cures the status
+  and is consumed, with no HP-gain line; with no status it is refused and not consumed. A Potion at full HP is
+  refused even when the target has a status. Confusion alone does not count as a status to cure.
 - A cured status stays cured: a creature healed of its status (status-cure item, Full Restore, or the
   Treasure/Mystery quick-heal) does not re-enter afflicted on its next switch-in or the next battle's opening.
 - **X-item stat boosts (X Attack etc., Guard Spec., Dire Hit) do NOT show this screen** and always apply to
@@ -153,7 +156,8 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - Design detail → `GENERATION_SEAMS.md` §5.0.2 (gen-invariance judgment, including why X-items are the
   exception), `ARCHITECTURE.md` §2.11, `STATE_MODEL.md` §2 (status cure clears both halves). History →
   `TODO_ARCHIVE.md` → *In-Battle Item Party-Targeting — items other than Revive can target any living party
-  member*; *Repo-sweep R1 — curing a status didn't clear `CarriedStatus`*.
+  member*; *Repo-sweep R1 — curing a status didn't clear `CarriedStatus`*; *Psychic's Special-drop chance + Full Restore on a
+  statused full-HP creature*.
 
 ### TM/HM — Move-Teach Rewards
 - A reward-choice card can offer a **move a party member could legally learn** (a real Gen 1 TM-learnable move

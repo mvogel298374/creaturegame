@@ -19,7 +19,7 @@ public class SecondaryEffectContractTests(MovesFixture moves) : Gen1MoveContract
     [InlineData("acid", "Defense")]
     [InlineData("bubble-beam", "Speed")]
     [InlineData("aurora-beam", "Attack")]
-    [InlineData("psychic", "Special")] // 10% to lower the foe's (combined) Special in Gen 1
+    [InlineData("psychic", "Special")]
     [InlineData("constrict", "Speed")] // Gen 1: 33% to lower the foe's Speed
     [InlineData("bubble", "Speed")] // Gen 1: 33% to lower the foe's Speed
     public async Task LowersTheFoesStatAsASecondaryEffectOnHit(string moveName, string stat)

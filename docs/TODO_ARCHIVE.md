@@ -8,6 +8,47 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Psychic's Special-drop chance + Full Restore on a statused full-HP creature ✅ DONE (2026-10-04)
+
+**Was** `TODO.md` §1 row 1 / §3.2 items (a) and (b) of "Three data/engine fixes". The third item, X Accuracy, stays
+open in `TODO.md` (held, needs-plan). Both fixes verified at pret/pokered 2026-10-04. Player-visible (Full Restore) →
+`PRODUCT_SPEC.md` §5 *In-battle item party-targeting*.
+
+**(a) Psychic's Special-drop chance (S).** `moves.db` carried 10 in `EffectChance` and `StatEffectChance`; Gen 1 is
+33% (`engine/battle/effects.asm` `StatModifierDownEffect`: `cp 33 percent + 1`; `data/moves/moves.asm`
+`PSYCHIC_M, SPECIAL_DOWN_SIDE_EFFECT, 90, PSYCHIC_TYPE, 100, 10`, the only move with that effect).
+- **Acceptance:** Psychic's imported row carries 33/33 and a re-import cannot restore 10.
+- **Shipped:** `"psychic"` joins the 33% group in `MoveImport.ApplyGen1Corrections` (as `acid`); the `moves.db` Psychic
+  row `EffectChance`/`StatEffectChance` 10 -> 33 (verified row-by-row vs HEAD: one row changed; the WAL was
+  checkpointed into `moves.db` first, since the Web csproj copies `*.db` only).
+- **Tests:** `MoveMappingTests.Layer2Correction_Psychic_SpecialDropChanceIs33`; `("psychic", 33)` rows in both
+  `SecondaryChanceDataContractTests` theories; the wrong `// 10%` comment in `SecondaryEffectContractTests` removed.
+- Gen-variable surface: none (move data, resolved at import — `ARCHITECTURE.md` §2.6). Data vs runtime: importer +
+  `moves.db`, no engine change. `DATA_IMPORT.md` deliberately does not list individual corrections (its policy: the
+  switch itself is the record).
+
+**(b) Full Restore on a full-HP creature with a status (S).** `HealingItemEffect.CanApply` required HP < max, so it
+refused. Gen 1 `ItemUseMedicine` (`engine/items/item_effects.asm`) at full HP turns FULL_RESTORE into FULL_HEAL when a
+status is present (cures it, item consumed) and refuses only when there is none.
+- **Acceptance:** full HP + status -> status cured, item consumed, no zero-amount `Healed` event; full HP and no
+  status -> still refused, not consumed.
+- **Shipped:** `ItemEffects.cs` `HealingItemEffect.CanApply`/`Apply` plus private `CuresStatus`: at full HP with a
+  major status a `CuresAllStatus` item cures it and is consumed with no `Healed` event. Confusion-only and fainted
+  targets stay refused; Potion at full HP with a status stays refused. Gen-variable surface: none identified
+  (`GENERATION_SEAMS.md` §5.0.2 note added). Data vs runtime: runtime only (the item row was correct).
+- **Tests:** `ItemEffectTests` (cure with no `Healed`; no-status refused; Potion at full HP with status refused;
+  confusion-only; fainted with status; Toxic counter reset; Sleep counter cleared); `ItemActionBattleTests`
+  `UsingFullRestore_*` (consumed / not consumed); `timeline.test.ts` "narrates a status-only Full Restore".
+- **Open aside (not done):** `Creature.FullHeal` and `ReviveItemEffect` duplicate `ClearStatus`'s reset instead of
+  routing through it (kept in `TODO.md`).
+
+**Gates.** `format-gate` PASS; `test-runner` .NET + tsc + Vitest green; `requirements-review` 4 discrepancies, all
+fixed at user direction (confusion-only test, counter/fainted tests, docs, Healed-omission narration confirmed intended
++ Vitest case); `pr-review` CHANGES-REQUESTED on 5 comment-budget lines, all deleted at user direction (no second
+pass).
+
+---
+
 ## E2E repairs after the species-data import — Phase 1 ⏳ IMPLEMENTED (2026-10-04), awaiting the user's E2E confirmation
 
 **Was** `TODO.md` §1 row 6 / §6 "E2E repairs after the species-data import", phase 1. **Not verified by an E2E

@@ -298,6 +298,11 @@ row, read generically by the effect. Seam judgments on record:
 - **Confusion cure is gen-variable, not yet modeled.** Gen 1 items never cure confusion (only switching
   does); Gen 2+ Full Heal/Full Restore do. Currently a documented Gen-1-correct absence; becomes an
   `IBattleRules` decision when Gen 2 lands.
+- **Full Restore at full HP.** Gen 1 `ItemUseMedicine` turns FULL_RESTORE into FULL_HEAL when the target is at
+  full HP and has a major status — the status is cured and the item consumed, with no HP-gain event; with no status
+  it is refused. Confusion (volatile) alone never counts. The rule is item-data-driven in
+  `HealingItemEffect.CanApply` and is not expected to vary by generation; only the confusion cure does (decision
+  above).
 - **Item target scope is gen-invariant, NOT a seam — but it splits by category, not uniformly.** Healing,
   StatusCure, PpRestore, and Revive act on *persistent* per-Pokémon data (current HP, status, PP, or a
   faint) that exists for every party member regardless of who's active, so the real games show a full

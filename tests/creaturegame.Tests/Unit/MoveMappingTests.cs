@@ -205,6 +205,22 @@ public class MoveMappingTests
     }
 
     [Fact]
+    public void Layer2Correction_Psychic_SpecialDropChanceIs33()
+    {
+        var move = Move(name: "psychic", power: 90, type: "psychic", damageClass: "special");
+        move.EffectChance = 10;
+        move.StatChanges = [new() { Change = -1, Stat = Named("special-defense") }];
+
+        var attack = MoveImport.MapToAttack(move);
+
+        Assert.Equal(StageStat.Special, attack.StatEffectStat);
+        Assert.Equal(-1, attack.StatEffectDelta);
+        Assert.Equal(StageTarget.Foe, attack.StatEffectTarget);
+        Assert.Equal(33, attack.StatEffectChance);
+        Assert.Equal(33, attack.EffectChance);
+    }
+
+    [Fact]
     public void Layer2Correction_Toxic_PromotedToBadPoison()
     {
         // PokeAPI reports Toxic's ailment as plain "poison"; the correction promotes it to BadPoison.

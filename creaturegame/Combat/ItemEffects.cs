@@ -68,10 +68,16 @@ public sealed class HealingItemEffect : IItemEffect
 {
     public ItemCategory Category => ItemCategory.Healing;
 
-    public bool CanApply(ItemEffectContext ctx) =>
-        ctx.ResolvedTarget.IsAlive()
-        && (ctx.Item.HealsAllHp || ctx.Item.HealAmount is > 0)
-        && ctx.ResolvedTarget.Attributes.HP < ctx.ResolvedTarget.Attributes.MaxHP;
+    public bool CanApply(ItemEffectContext ctx)
+    {
+        var target = ctx.ResolvedTarget;
+        if (!target.IsAlive())
+            return false;
+        bool healsHp =
+            (ctx.Item.HealsAllHp || ctx.Item.HealAmount is > 0)
+            && target.Attributes.HP < target.Attributes.MaxHP;
+        return healsHp || CuresStatus(ctx.Item, target);
+    }
 
     public void Apply(ItemEffectContext ctx)
     {
@@ -81,14 +87,16 @@ public sealed class HealingItemEffect : IItemEffect
             ? target.Attributes.MaxHP - before
             : ctx.Item.HealAmount ?? 0;
         target.Attributes.ReceiveHealing(amount); // caps at MaxHP
-        ctx.Emitter?.Emit(
-            new Healed(target.Name, target.Id, target.Attributes.HP - before, target.Attributes.HP)
-        );
+        int healed = target.Attributes.HP - before;
+        if (healed > 0)
+            ctx.Emitter?.Emit(new Healed(target.Name, target.Id, healed, target.Attributes.HP));
 
-        // Full Restore also cures any major status (Gen 1). Confusion is volatile and not cured by items.
-        if (ctx.Item.CuresAllStatus && target.Battle.Status != StatusCondition.None)
+        if (CuresStatus(ctx.Item, target))
             ClearStatus(target, ctx.Emitter);
     }
+
+    private static bool CuresStatus(Item item, Creature target) =>
+        item.CuresAllStatus && target.Battle.Status != StatusCondition.None;
 
     internal static void ClearStatus(Creature target, IBattleEventEmitter? emitter)
     {

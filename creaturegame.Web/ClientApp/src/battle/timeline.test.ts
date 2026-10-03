@@ -872,6 +872,19 @@ describe('expandEvent — items', () => {
     expect(logLines(steps)).toEqual(['Used SUPER POTION on MEWTWO!']);
   });
 
+  it('narrates a status-only Full Restore as the use plus the cure, with no "regained health!" line', () => {
+    const used = expandEvent('ItemUsed', { itemName: 'full-restore', targetName: 'MEWTWO' }, CTX);
+    const cleared = expandEvent(
+      'StatusCleared',
+      { creatureName: 'MEWTWO', creatureId: 7, wasStatus: 'Paralysis' },
+      CTX,
+    );
+    expect(logLines([...(used.steps ?? []), ...(cleared.steps ?? [])])).toEqual([
+      'Used FULL RESTORE on MEWTWO!',
+      'MEWTWO was cured of paralysis!',
+    ]);
+  });
+
   it('narrates a PP restore with the formatted move name', () => {
     const { steps } = expandEvent('PpRestored', { creatureName: 'MEWTWO', moveName: 'ice-beam', ppAfter: 24 }, CTX);
     expect(logLines(steps)).toEqual(["MEWTWO's ICE BEAM PP was restored!"]);
