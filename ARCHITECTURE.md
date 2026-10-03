@@ -138,7 +138,7 @@ Each entry: **Decision · Why · Where it lives.**
 - **Why:** the split follows the natural object boundaries of the domain and is **extensible** — items proved
   the pattern: a new unique object domain gets its own database + context rather than being bolted onto an
   existing one, so each domain versions and imports independently. (Player save state will likewise be its own
-  `save.db` / `PlayerDbContext` when it lands.)
+  `save.db` / `PlayerDbContext` if and when it lands — currently deferred, §2.12.)
 - **Where:** `DB/MovesDbContext.cs`, `DB/PokemonDbContext.cs`, `DB/ItemsDbContext.cs` (one file per context),
   `DB/Migrations/{Moves,Pokemon,Items}`.
 
@@ -173,7 +173,7 @@ Each entry: **Decision · Why · Where it lives.**
   saw that run's `/start` call, 404ing it — the live SignalR connection stays fine because it's pinned to one
   machine for its whole lifetime, so only stateless follow-up requests were affected. Fixed by pinning
   `--ha=false` in `.github/workflows/fly-deploy.yml`. This constraint stands until session state is
-  externalized into `save.db` (see `docs/TODO.md` §4.2).
+  externalized into `save.db` (deferred by decision — §2.12; `docs/TODO.md` §4.2).
 - **Session resume corollary (2026-09-14):** the mechanism above only survives a *transient network drop while
   the SPA stays mounted* — the reconnecting client's React state was never lost, so a re-resolved connection is
   all it needs. A **full SPA remount** (a hard refresh, a closed/reopened tab, a bookmarked `/battle` URL) is a
@@ -322,6 +322,25 @@ Each entry: **Decision · Why · Where it lives.**
   targets anyone but the active creature. See `GENERATION_SEAMS.md` §5.0.2. The still-deferred Ball category
   (needs Catch) is simply absent from the registry so `For` returns null.
 - **Where:** `Combat/LockInMechanics.cs`, `Combat/MoveEffects.cs`, `Combat/ItemEffects.cs`.
+
+### 2.12 Run-state scope (per-run now, a meta layer later) and no server-restart saves
+- **Decision (user, 2026-10-03):** everything a run accumulates — the `Bag`, the `Wallet`, the party (including any
+  creature caught mid-run) — is **per-run**: built fresh by `EncounterFactory` at run start and gone when the run
+  ends. Nothing carries into the next run. **Eventually** the game gets a roguelite *meta layer* on top — unlocks
+  that outlive a single run — as a separate profile tier beside the run state (not a change to it). That layer is
+  a stated direction only: it is **not planned or designed**, and needs its own `/plan` when it is picked up.
+- **No server-restart persistence during development (user, 2026-10-03):** a run does not survive a server restart
+  or redeploy, and building `save.db` / `PlayerDbContext` to make it do so is declined for the current phase. The
+  only resilience is the existing client-side session resume (a refresh while the server process lives).
+- **Why:** per-run keeps the roguelite loop honest — each run starts from the deliberately light starting bag the
+  economy is tuned against, with no snowballing from hoarded items. It is also the cheapest path: no persistence
+  layer is needed to ship Catch or stone evolutions.
+- **Consequences:** Catch and stone evolutions are not gated on a persistence layer; a caught creature joins the
+  in-memory `Party` and is lost with the run; the single-machine Fly constraint (2.7) stands. When `save.db` is
+  eventually built it will be two tiers — a mid-run snapshot and a cross-run profile — and the profile tier is
+  where the meta unlocks would live.
+- **Where:** `EncounterFactory.BuildStartingBag` / `RunSetup`; `STATE_MODEL.md` (the `Bag`/`Creature` persistence
+  boundary).
 
 ---
 

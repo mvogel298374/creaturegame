@@ -366,8 +366,9 @@ Player's creature uses **Body Slam** (10% chance to paralyze) into an enemy alre
 - **Player inventory (`Bag`):** the item-use battle layer adds a `Bag` (item-id → qty,
   `creaturegame/Items/Bag.cs`) — this is **run/player-level state, not creature state**, so it lives
   *outside* this model (it's passed into `Battle` for the player side, not held on `Creature`). It is
-  **transient today** (no `save.db` yet), but it belongs on the *persistent* side of the eventual save
-  boundary, alongside `Creature` — when the save system lands, a run persists its party **and** its bag.
+  **transient and per-run** (`ARCHITECTURE.md` §2.12: built at run start, gone at run end, no `save.db` during
+  development). It sits on the *run* side of any eventual save boundary, alongside `Creature` — if a mid-run
+  snapshot is ever built, it persists the party **and** the bag; a cross-run meta layer would be a separate tier.
 - **Facade removal — done.** The delegating properties have been deleted and all call
   sites migrated to `creature.Battle.X`, so new transient fields can *only* be added to
   `BattleState`. No behavior change (see section 4.3).

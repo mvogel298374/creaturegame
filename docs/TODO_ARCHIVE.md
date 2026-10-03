@@ -8,6 +8,22 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Bag scope decision — per-run; meta layer later; no server-restart saves ✅ DECIDED (2026-10-03)
+
+**Was** `TODO.md` §1 #1 / §8 "Bag scope" (*per-run vs. meta-progression*), which gated bag persistence, `save.db`,
+Catch and stone evolutions. Decision record (the why, consequences, code pointers) lives in `ARCHITECTURE.md` §2.12.
+
+**Rulings (user)**
+- The `Bag`, `Wallet` and party are **per-run**: built fresh at run start, gone when the run ends.
+- A roguelite **meta-unlock layer** is the eventual direction; **unplanned** (needs its own `/plan`).
+- **No server-restart-surviving saves** (`save.db` / `PlayerSave`) during the development phase — declined and parked
+  (design kept in `TODO.md` §4.2); only the client-side session resume exists.
+
+**Effect:** Catch and stone evolutions are no longer gated on persistence. Doc-only; no player-visible change, so no
+`PRODUCT_SPEC.md` entry.
+
+---
+
 ## Process gates hardening — DoR hard gate + docs-cleanup last + hook stamp ✅ DONE (2026-10-03)
 
 **Why.** A 2026-10-03 audit of `TODO.md` showed the Definition of Ready and `docs-cleanup` had not been upheld:

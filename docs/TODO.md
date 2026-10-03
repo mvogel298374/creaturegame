@@ -37,20 +37,19 @@
 
 | # | Item | Cost | Ready? (DoR) | Why this slot / what it unblocks |
 |:-:|:-----|:----:|:-------------|:---------------------------------|
-| 1 | **Decide the bag scope** — per-run vs. meta-progression (§4.1) | decision | n/a — a decision | Costs a conversation; unblocks bag persistence, `save.db`, Catch and stone evolutions. |
-| 2 | **Three data/engine fixes, verified at pokered first** — Full Restore on a statused full-HP creature; Psychic's Special-drop chance; X Accuracy (§3.2) | S ×3 | ✗ per fix: Gen 1 source not yet fetched; quirk to test and data-vs-runtime boundary not stated | Small, localised, each pinned by a test that currently encodes the wrong value. |
-| 3 | **R1d-b — the abandon-timer race** (§2) | S | ✅ acceptance, quirk, dependencies in `RECONNECT_RESILIENCE.md`; no gen-variable surface | ~5 lines + a deterministic test; makes R1d-a safe to add. |
-| 4 | **Dev-script and pre-commit-hook gaps** (§7.1) | S–M | ✗ no per-script acceptance conditions | Protects every later commit and test run; the hook has blind spots (`.csproj`, `*.db`, deletes). |
-| 5 | **R1b items 6–9** (§2) | S | ⚠️ 6 is a decision; 7–9 need a one-line acceptance each | Item 6 needs only your yes/no; 7–9 are one-liners. |
-| 6 | **Verification pass over the unverified findings** (§3, §5, §7) | S–M | ✗ no scope or output format (batch size; what "confirmed" means) | Cheap read-only agents in batches; turns ~45 "reviewer's reading" items into confirmed work or discards. Opens up everything below it. |
-| 7 | **Server test gaps — `GameSessionManager` lifecycle + the `RunFaulted` path** (§6) | M | ⚠️ needs the injectable-clock design | Unblocks the R1d tests and closes a long-open Tier-4 item. |
-| 8 | **Importer hardening** (§3.2) | M | ✗ no design (retry policy, transaction boundaries) or acceptance | Failure no longer wipes evolutions or exits 0; unblocks CI/Docker imports and the multi-generation importer work. |
-| 9 | **R1d-a — replay an open blocking prompt** (§2) | M | ⚠️ designed, but provisional-pending-`/plan` and needs your three decisions (§8) | The only reconnect item that strands a run; highest player value. |
-| 10 | **CI E2E step** (§6) | M | ✗ no design (runner, stack boot, caching) or acceptance | The only automatic E2E coverage; makes "agents don't run E2E" safe, and unblocks checking the BST/balance flag and the reconnect spec. |
-| 11 | **R1d-d, R1d-c** — refresh-state snapshot + sprite; second-tab policy (§2) | M each | ⚠️ provisional-pending-`/plan`; (c) needs your policy call | Both extend (a)'s replay work. |
-| 12 | **Gen 1 fidelity — the damage/accuracy core** (§3.1) | L | ✗ needs the Gen 1 source per claim, the seam surface, and the quirks to pin | Verify-first; large blast radius (it touches every damage number). |
-| 13 | **End-of-turn residual phase** (§4.2) | L | ✗ needs a `/plan` | A `/plan`, `opus-engineer`, and both review gates; rewrites `Battle`'s turn loop. |
-| 14 | **Features** — Catch, `save.db`, progressive difficulty, Generation Profile 4d+, … (§4) | L | ✗ each needs a `/plan` | After #1 resolves what the bag scope blocks. |
+| 1 | **Three data/engine fixes, verified at pokered first** — Full Restore on a statused full-HP creature; Psychic's Special-drop chance; X Accuracy (§3.2) | S ×3 | ✗ per fix: Gen 1 source not yet fetched; quirk to test and data-vs-runtime boundary not stated | Small, localised, each pinned by a test that currently encodes the wrong value. |
+| 2 | **R1d-b — the abandon-timer race** (§2) | S | ✅ acceptance, quirk, dependencies in `RECONNECT_RESILIENCE.md`; no gen-variable surface | ~5 lines + a deterministic test; makes R1d-a safe to add. |
+| 3 | **Dev-script and pre-commit-hook gaps** (§7.1) | S–M | ✗ no per-script acceptance conditions | Protects every later commit and test run; the hook has blind spots (`.csproj`, `*.db`, deletes). |
+| 4 | **R1b items 6–9** (§2) | S | ⚠️ 6 is a decision; 7–9 need a one-line acceptance each | Item 6 needs only your yes/no; 7–9 are one-liners. |
+| 5 | **Verification pass over the unverified findings** (§3, §5, §7) | S–M | ✗ no scope or output format (batch size; what "confirmed" means) | Cheap read-only agents in batches; turns ~45 "reviewer's reading" items into confirmed work or discards. Opens up everything below it. |
+| 6 | **Server test gaps — `GameSessionManager` lifecycle + the `RunFaulted` path** (§6) | M | ⚠️ needs the injectable-clock design | Unblocks the R1d tests and closes a long-open Tier-4 item. |
+| 7 | **Importer hardening** (§3.2) | M | ✗ no design (retry policy, transaction boundaries) or acceptance | Failure no longer wipes evolutions or exits 0; unblocks CI/Docker imports and the multi-generation importer work. |
+| 8 | **R1d-a — replay an open blocking prompt** (§2) | M | ⚠️ designed, but provisional-pending-`/plan` and needs your three decisions (§8) | The only reconnect item that strands a run; highest player value. |
+| 9 | **CI E2E step** (§6) | M | ✗ no design (runner, stack boot, caching) or acceptance | The only automatic E2E coverage; makes "agents don't run E2E" safe, and unblocks checking the BST/balance flag and the reconnect spec. |
+| 10 | **R1d-d, R1d-c** — refresh-state snapshot + sprite; second-tab policy (§2) | M each | ⚠️ provisional-pending-`/plan`; (c) needs your policy call | Both extend (a)'s replay work. |
+| 11 | **Gen 1 fidelity — the damage/accuracy core** (§3.1) | L | ✗ needs the Gen 1 source per claim, the seam surface, and the quirks to pin | Verify-first; large blast radius (it touches every damage number). |
+| 12 | **End-of-turn residual phase** (§4.2) | L | ✗ needs a `/plan` | A `/plan`, `opus-engineer`, and both review gates; rewrites `Battle`'s turn loop. |
+| 13 | **Features** — Catch, `save.db`, progressive difficulty, Generation Profile 4d+, … (§4) | L | ✗ each needs a `/plan` | Catch and stone evolutions are unblocked by the bag-scope ruling (`ARCHITECTURE.md` §2.12); `save.db` is declined for now. |
 
 ---
 
@@ -173,27 +172,30 @@ Everything kept; nothing waived.
 
 ### 4.1 Item acquisition · bag persistence · catch
 
-Item acquisition itself is done (the Run Economy). Open: the three pieces below, in dependency order.
+Item acquisition itself is done (the Run Economy). **Bag scope is decided: per-run** (`ARCHITECTURE.md` §2.12) — the
+bag, wallet and party reset when a run ends; a roguelite meta-unlock layer is the eventual direction but unplanned.
+Open: the two pieces below.
 Poké Balls are imported data only (`ItemEffects.For(Ball)` returns null ⇒ `ItemUseFailed`; the frontend hides them
 via `bag.ts`), and `CatchRate` is imported and now Gen 1-correct. "Catch" is likely a misnomer: treat it as one
 channel of a broader acquisition layer.
 
-- [ ] **Bag scope + persistence** *(needs-decision first — §1 #1)*. Persist `Bag` to `save.db`/`PlayerDbContext`
-  (rides on the save layer below); decide per-run (lost on death) vs. meta-progression (carries across runs).
-- [ ] **Catch / Poké Ball effect.** `BallItemEffect : IItemEffect` for `ItemCategory.Ball`, registered in
+- [ ] **Catch / Poké Ball effect** *(needs-plan; not gated on persistence — a caught creature joins the in-memory
+  `Party` and is lost with the run).* `BallItemEffect : IItemEffect` for `ItemCategory.Ball`, registered in
   `ItemEffects.All`, with a "catching" state/outcome in `Battle`. Gen 1 formula:
   `floor((MaxHP × 3 − HP × 2) × CatchRate / (MaxHP × 3))` vs. a 0–255 roll (per-ball modifier lives in the formula,
   not the `Item` row). Event `CaptureAttempted(string TargetName, int TargetId, bool Caught)` (carries the creature
   id — `WebEventContractTests` requires it); a `BattleEnded` variant `reason: "Caught"`. A caught creature goes into
   the existing `Party`. Phaser throw/shake/catch animation.
-- [ ] **Stone evolutions** — the `Stone` trigger and `IEvolutionRules.StoneUsed` are built and dormant, gated on the
-  bag/Catch. (A flat `StoneEvolutionLevel` of 30 floors stone-evolved species in wild/draft selection.)
+- [ ] **Stone evolutions** — the `Stone` trigger and `IEvolutionRules.StoneUsed` are built and dormant, waiting only
+  on stones becoming obtainable as items (per-run bag; no persistence needed). (A flat `StoneEvolutionLevel` of 30 floors stone-evolved species in wild/draft selection.)
 
 ### 4.2 Run loop and progression
 
-- [ ] **`PlayerSave`/`SavedCreature` in `save.db`** — auto-save after each battle, party-management UI; the heavier
-  persistence beyond the lightweight Session Resume (survives a server restart/redeploy, not just a client
-  refresh). **Fly deploys must stay single-machine until session state is externalised here:**
+- [ ] **`PlayerSave`/`SavedCreature` in `save.db`** — **DECLINED for the development phase (user, 2026-10-03):
+  no server-restart-surviving saves** (`ARCHITECTURE.md` §2.12); kept here only as the parked design. Auto-save after
+  each battle, party-management UI; the heavier persistence beyond the lightweight Session Resume (survives a
+  server restart/redeploy, not just a client refresh). When revisited it is two tiers — a mid-run snapshot and a
+  cross-run profile for the roguelite meta unlocks (unplanned). **Fly deploys must stay single-machine until session state is externalised here:**
   `GameSessionManager` is in-process, so a second machine 404s any REST call routed to the machine that never saw
   `/start`; the workflow pins `flyctl deploy --ha=false` — don't remove it or raise `min_machines_running`
   (`ARCHITECTURE.md` §2.7).
@@ -466,14 +468,13 @@ coverage).
 
 | Decision | Recommendation | Unblocks |
 |:---------|:---------------|:---------|
-| **Bag scope** — per-run vs. meta-progression | Per-run for now; revisit when `save.db` exists | §4.1 bag persistence, Catch, stone evolutions |
 | **R1b item 6** — are all rapid shop BUY clicks now honoured, as intended? | Yes (a dropped click was the bug) | closes R1b |
 | **Second-tab policy** (R1d-c) | Last tab wins + notify the displaced tab; never clear `activeGame` | R1d-c |
 | **Transport notices outside the event model** (`SessionTakenOver`, `RunMapSnapshot`, like `RunFaulted`) | Accept | R1d-c, R1d-d |
 | **`PlayerSpeciesId` on `BattleStarted`** (a wire-contract change; the C# wire-drop half is auto-guarded, the TS half is manual) | Accept | R1d-d, the post-evolution sprite |
 | **Roar/Whirlwind** — end the battle immediately like Gen 1? | Verify at pokered, then fix | §3.1 |
 | **BST tier bands** after the base-stat fix | Run the seed-walk E2E first, then decide | §3.2 balance flag |
-| **When to `/plan` the end-of-turn residual phase** | After the cheap fidelity fixes (§1 #2) land | §4.2 |
+| **When to `/plan` the end-of-turn residual phase** | After the cheap fidelity fixes (§1 #1) land | §4.2 |
 | **Per-area encounter floor** — soft floor or accepted tradeoff? | Accept the tradeoff unless playtests show a problem | §4.2 |
 
 ---
