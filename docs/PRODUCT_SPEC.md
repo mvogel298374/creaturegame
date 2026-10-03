@@ -165,8 +165,8 @@ the linked design doc instead — pull it there and leave only the pointer here.
 ## 6. Generation & presentation
 
 ### Level-up stat panel (Gen 1 "Kanto Sage" skin)
-- Under the Gen 1 profile, the level-up stat panel (shown on a level-up, bottom-right above the battle menu,
-  until the player's next input) renders as an ink-on-fill box with the same double-line frame as the battle
+- Under the Gen 1 profile, the level-up stat panel (shown on a level-up, bottom-right, stacked above the party
+  strip and player nameplate without covering them, until the player's next input) renders as an ink-on-fill box with the same double-line frame as the battle
   log: square corners, no drop shadow, `--ks-*` palette colours only.
 - The title reads `LEVEL UP!` on its own line, with the creature's `NAME · Lv N` in a dim sub-line beneath it.
 - Each stat row shows the gain in bold ink (`+N`) and the new total in the dim tone; the panel's content,
@@ -242,6 +242,9 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - If the run can no longer be resumed (grace window expired, or the server no longer knows the `gameId`), the
   player is bounced to the Title Screen with a "Couldn't connect to the run — it may have expired." notice,
   instead of hanging on "Connecting…".
+- If the server-side run crashes mid-run, the client is told: it clears the persisted run and bounces to the Title
+  Screen with a "The run hit an unexpected server error and ended." notice, instead of sitting on its last screen.
+- Blocking prompts (reward, shop, acquisition, etc.) render above the pinned Run Map, so the map never hides one.
 - A run's persisted entry is cleared when the run ends normally or the player quits — neither offers a stale
   Continue afterward.
 - A modal answer sent during a reconnect window is not lost: if the client's connection rejects the send, the

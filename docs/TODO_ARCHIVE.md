@@ -8,6 +8,40 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Repo-sweep R1/R2/R3 — five small fixes (modal z-index, slower-flincher, RunFaulted, level-up panel, e2e.ps1 crash) ✅ DONE (2026-10-03)
+
+Found by the 2026-10-02 repo-wide code review sweep; the sweep's remaining items (and the unfixed remainders of
+items 1, 2 and 5 below) are still open in `TODO.md`.
+
+1. **R1 — pinned map hid blocking prompts (z-index half only).** `.modal-overlay` z-index raised 10 → 70
+   (`components/modals/Modal.css`) so every blocking prompt sits above the pinned Run Map (`.encounter-map--pinned`,
+   z 60). **Not fixed:** `RouteChoiceMap` still pulls focus to a town covered by the pinned map (Enter picks an
+   unseen route) — remains open in `TODO.md`.
+2. **R1 — flinch from a slower attacker carried into the next turn.** `Battle.cs` now clears `IsFlinched` on both
+   creatures at end of turn (beside the `HazeSuppressedStatus` reset), so a flinch set after the target already
+   acted is no longer consumed by its next turn. **Test:** `FlinchContractTests.SlowerFlincherDoesNotCostTargetItsNextTurn`.
+   **Not done:** Substitute should also block flinch — remains open in `TODO.md`.
+3. **R1 — a faulted run task never told the client.** `GameSessionManager`'s run-task catch-all now calls the new
+   `SignalRBattleEventEmitter.SendRunFaulted()`, which sends a transport-level `RunFaulted` message on
+   `OnBattleEvent` (not a `BattleEvent`; never cached, so never replayed). `useBattleHub.ts` handles it like a
+   failed resume: clears the persisted active game and navigates to the Title Screen with the notice "The run hit
+   an unexpected server error and ended." The server does not close the socket. **No test covers this path** (the
+   emitter send, the catch-all call, and the client handler are all unpinned) — a remaining gap, noted in `TODO.md`.
+4. **R3 — level-up panel covered the player nameplate.** `LevelUpStatPanel` is now the first child of
+   `.player-corner` (BattleScreen.tsx), so it stacks in-flow above the party strip and nameplate; the
+   independent `bottom/right` anchor and z-index were removed from `.levelup-panel` (`BattleScreen.css`).
+5. **R2 dev scripts — `e2e.ps1` failure path crashed.** The "No JSON report was written" line passed `-f` args
+   to `Write-Host` as a second `-ForegroundColor`; the format expression is now parenthesised. The other dev-script
+   bullets (`-StartStack` leaving the backend running, `stop-dev.ps1` killing :5173, `test.ps1 -E2E -StartStack`
+   exiting 0 when the backend never starts) remain open in `TODO.md`.
+
+Files: `creaturegame/Combat/Battle.cs`, `creaturegame.Web/Battle/{GameSessionManager,SignalRBattleEventEmitter}.cs`,
+`ClientApp/src/{hooks/useBattleHub.ts,pages/BattleScreen.tsx,pages/BattleScreen.css,components/modals/Modal.css}`,
+`e2e.ps1`, `tests/creaturegame.Tests/Integration/Gen1Attacks/FlinchContractTests.cs`. Design note → `ARCHITECTURE.md`
+§2.7 ("A crashed run is reported by a transport-level `RunFaulted`…").
+
+---
+
 ## E2E `voluntary-switch.spec.ts` failing standalone — Dev-Mode `forceDraft` ✅ DONE (2026-10-02)
 
 **Symptom:** the last E2E (test 38 of 38) failed standalone — `walkSeedsUntil` exhausted all 8, then all 16, seeds

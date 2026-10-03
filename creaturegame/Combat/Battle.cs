@@ -213,6 +213,11 @@ public class Battle
             PlayerCreature.Battle.HazeSuppressedStatus = null;
             EnemyCreature.Battle.HazeSuppressedStatus = null;
 
+            // Same for flinch: set by a SLOWER attacker (after the target already acted) it was never consumed
+            // this turn, and must not make the target forfeit its next turn's action.
+            PlayerCreature.Battle.IsFlinched = false;
+            EnemyCreature.Battle.IsFlinched = false;
+
             // Disable/binding countdowns always tick, even on a turn a faint ends early below — unlike the
             // residual phase, these are NOT part of IBattleRules.FaintEndsTurnImmediately.
             StatusResolver.TickTurnCounters(PlayerCreature, _emitter);

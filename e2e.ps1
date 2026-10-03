@@ -218,7 +218,7 @@ try {
   if (-not (Test-Path $jsonPath)) {
     Write-Host ""
     Write-Host "  No JSON report was written — Playwright likely failed before running any test." -ForegroundColor Yellow
-    Write-Host "  See the output above. (Wall clock: {0})" -f (Format-Duration $sw.Elapsed.TotalMilliseconds) -ForegroundColor Yellow
+    Write-Host ("  See the output above. (Wall clock: {0})" -f (Format-Duration $sw.Elapsed.TotalMilliseconds)) -ForegroundColor Yellow
     exit $exitCode
   }
 

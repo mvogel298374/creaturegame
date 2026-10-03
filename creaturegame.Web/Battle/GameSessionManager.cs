@@ -294,6 +294,8 @@ public sealed class GameSessionManager(
             catch (Exception ex)
             {
                 Console.WriteLine($"[GameSessionManager] Run {gameId} failed: {ex}");
+                // The session is removed below, so tell the client now — otherwise it waits on a dead run forever.
+                emitter.SendRunFaulted();
             }
             finally
             {

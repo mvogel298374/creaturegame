@@ -918,14 +918,13 @@ Fixing a data/engine item usually also means updating the test that currently pi
   re-slides, HP flashes 1/1) and a replayed `MAP_BIOME_ENTERED` duplicates `routePath` and leaves `mapPin` wrong
   (`useBattleHub.ts:70-72`, `battleReducer.ts:440-454`, `timeline.ts:407-421`). Also: the 40 s grace is shorter
   than the client's 0/2/10/30 s retry schedule (last attempt ≈42 s), so outages >~12 s can't be recovered.
-- **A faulted run task never tells the client** (`GameSessionManager.cs:281-290`) — catch-all logs + removes the
-  session but sends no `RunEnded`/error and doesn't close the socket; the UI sits on its last screen forever.
-- **Pinned map hides blocking prompts** — `.encounter-map--pinned` z-index 60 vs `.modal-overlay` 10
-  (`BattleScreen.css:1172`, `Modal.css:4`); `RouteChoiceMap` also pulls focus to a covered town (Enter picks an
-  unseen route).
-- **Engine: flinch from a slower attacker carries into the next turn** (`MoveEffects.cs:96-100`,
-  `StatusResolver.cs:28-33`, `Battle.cs:211-214`) — clear `IsFlinched` at end of turn; Substitute should also
-  block flinch. No test covers a slower flincher.
+- **Pinned map: `RouteChoiceMap` still pulls focus to a covered town** (Enter picks an unseen route). The
+  z-index half (prompts hidden under the pinned map) is fixed — `TODO_ARCHIVE.md` → *Repo-sweep R1/R2/R3 — five
+  small fixes*.
+- **Engine: Substitute should also block flinch** (`MoveEffects.cs:96-100`). The slower-attacker carry-over half
+  is fixed (same archive entry).
+- **Test gap: the `RunFaulted` path** (fix archived, same entry) — nothing pins `SendRunFaulted`, the
+  `GameSessionManager` catch-all call, or `useBattleHub`'s `RunFaulted` handler.
 - **Data: species base stats are modern, not Gen 1** (`PokemonImport.cs:144-152`) — `BaseSpecial` taken from
   Sp. Atk (Chansey 35 vs 105, Tentacruel 80/120, Gyarados 60/100, Articuno 95/125, Golduck 95/80, …) and the
   Gen 6/7 buffs never undone (Pikachu Def 40/30, Beedrill Atk 90/80, Dugtrio Atk 100/80, Farfetch'd Atk 90/65,
@@ -1007,9 +1006,9 @@ about 20–30 min; 5 as a rename; leave 7–9 unless they bite).
   unpinned moving branch and there is no `permissions:` block; tags can point at any commit. **Container runs as
   root** (`Dockerfile:44-52`; use `USER $APP_UID` after checking SQLite write needs).
 - **Dev scripts**: `-StartStack` leaves the backend running (`test.ps1:119/148`, `e2e.ps1:180/357` kill only the
-  `dotnet run` parent); `stop-dev.ps1:103` kills *anything* on :5173 (another project's Vite); `e2e.ps1:218`
-  `-f` binds as a second `-ForegroundColor` and crashes the failure path; `test.ps1 -E2E -StartStack` exits 0
-  when the backend never starts.
+  `dotnet run` parent); `stop-dev.ps1:103` kills *anything* on :5173 (another project's Vite); `test.ps1 -E2E
+  -StartStack` exits 0 when the backend never starts. (The `e2e.ps1` `-f` second-`-ForegroundColor` crash is
+  fixed — archived.)
 - **Pre-commit hook gaps** (`.githooks/pre-commit`): hardcoded dotnet path (`:11`); checks the working tree not
   the staged snapshot (`:14,22`); skips deletes/renames and `.csproj`/`Directory.Build.props`/`package.json`/
   `tsconfig.json`/`*.db`-only commits (`:20,33`).
@@ -1034,9 +1033,6 @@ about 20–30 min; 5 as a rename; leave 7–9 unless they bite).
   Tab still reaches QUIT (abandons the run, no confirmation); battle log has no `role="log"`/`aria-live`.
 - **Double-submit creates two runs** (`StarterSelection.tsx:45-72`, `NicknameModal.tsx:32,38`); **`/battle` with
   no saved game shows "Connecting…" forever** (`BattleScreen.tsx:78`, `useBattleHub.ts:52`).
-- **Level-up panel covers the player nameplate** — same `bottom/right` anchor as `.player-corner` at higher
-  z-index (`BattleScreen.css:800` vs `:114`); the independent-absolute-position pattern the UI no-crowding rule
-  warns against.
 - **Battle log unbounded** (`battleReducer.ts:262`, `BattleScreen.tsx:286`) and the whole `BattleScreen`
   re-renders on every dispatch.
 - **Phaser**: resize mid-attack leaves sprites at the old x (`BattleScene.ts:122-137` vs lunge/shake never

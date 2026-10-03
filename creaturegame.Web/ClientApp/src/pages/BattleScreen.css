@@ -795,13 +795,9 @@
 .status-badge--paralysis { background: #f3d23b; color: #333; }
 .status-badge--freeze    { background: #74cec0; color: #fff; }
 /* ── Level-up stat panel (Gen 1 box) ─────────────── */
-/* Sits at the bottom-right of the battle field — i.e. right-aligned directly above the battle menu —
-   and stays until the player's next input (see BattleScreen onAnyInput). */
+/* First child of .player-corner's flex column, so it stacks above the party strip and nameplate instead of
+   covering them; stays until the player's next input (see BattleScreen onAnyInput). */
 .levelup-panel {
-  position: absolute;
-  bottom: var(--sp-md);
-  right: var(--sp-md);
-  z-index: 7; /* above the party strip (z 6) — the modal reads on top of it, see PartyStrip */
   background: var(--clr-bg-deep);
   border: 2px solid var(--clr-text);
   border-radius: 4px;

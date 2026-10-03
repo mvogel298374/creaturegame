@@ -91,4 +91,39 @@ public class FlinchContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         Assert.False(enemy.IsAlive());
         Assert.True(player.IsAlive());
     }
+
+    [Fact]
+    public async Task SlowerFlincherDoesNotCostTargetItsNextTurn()
+    {
+        // The enemy outspeeds and acts first, so the player's (slower) Stomp flinches it AFTER its action. The
+        // flag must not survive into turn 2 — the enemy should still get a move off every turn.
+        var player = TestCreatures.Make("Player", hp: 300, attack: 80, speed: 1);
+        player.AddAttack(Move("stomp"));
+
+        var enemy = TestCreatures.Make("Enemy", hp: 300, defense: 100, speed: 200);
+        enemy.AddAttack(
+            new Attack
+            {
+                Name = "Tackle",
+                BaseDamage = 40,
+                Accuracy = 100,
+                AttackType = AttackType.Physical,
+            }
+        );
+
+        var emitter = new RecordingEmitter();
+        var battle = new Battle(
+            player,
+            enemy,
+            Gen1TypeChart.Instance,
+            AutoSelectInput.Instance,
+            AutoSelectInput.Instance,
+            rules: ForceSecondaryRules.Instance,
+            emitter: emitter
+        );
+        await battle.StartFightAsync();
+
+        Assert.DoesNotContain(emitter.Events, e => e is FlinchBlocked);
+        Assert.True(emitter.Events.Count(e => e is MoveUsed m && m.AttackerName == "Enemy") >= 2);
+    }
 }

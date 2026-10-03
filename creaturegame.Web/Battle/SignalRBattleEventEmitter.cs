@@ -86,6 +86,17 @@ public sealed class SignalRBattleEventEmitter(
         _ = hubContext.Clients.Client(connectionId).OnBattleEvent(type, payload);
     }
 
+    /// <summary>Tells the current connection its run task crashed, so the client can leave instead of sitting on
+    /// its last screen. A transport-level notice, not a <see cref="BattleEvent"/> — it never enters the replay
+    /// cache and has no event-model counterpart.</summary>
+    public void SendRunFaulted()
+    {
+        var connectionId = currentConnectionId();
+        if (string.IsNullOrEmpty(connectionId))
+            return;
+        _ = hubContext.Clients.Client(connectionId).OnBattleEvent("RunFaulted", new { });
+    }
+
     /// <summary>Re-sends every cached state-establishing event, in the order it would naturally occur, to
     /// whatever connection is current right now — each a no-op while its slice of the cache is empty (e.g. the
     /// battle-scoped pair between encounters, or the whole cache in the legacy endless chain, which never emits

@@ -242,6 +242,8 @@ export function BattleScreen() {
         {/* Bottom-right corner stack: the party roster sits directly ABOVE the player's nameplate/HP bar, so the
             two never overlap at any window scale (a flex column auto-adjusts to the nameplate's height). */}
         <div className="player-corner">
+          {/* Level-up box: in-flow at the top of the stack so it grows upward and never covers the nameplate. */}
+          {state.levelUp && <LevelUpStatPanel panel={state.levelUp} />}
           {/* Party roster strip — the run's owned creatures (shown once the party grows past the lone starter via a
               themed draft). The lead is flagged; benched members show a compact HP read. Single non-wrapping row so
               its footprint stays constant at a max of 6 chips. */}
@@ -256,8 +258,6 @@ export function BattleScreen() {
             <XpBar xp={state.playerXp} xpToNext={state.playerXpToNext} />
           </div>
         </div>
-
-        {state.levelUp && <LevelUpStatPanel panel={state.levelUp} />}
 
         {state.dropToast && <DropHover drop={state.dropToast} />}
 

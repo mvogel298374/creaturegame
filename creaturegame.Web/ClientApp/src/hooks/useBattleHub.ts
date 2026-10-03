@@ -66,6 +66,12 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
       .build();
 
     conn.on('OnBattleEvent', (eventType: string, payload: Payload) => {
+      // Server-side run crash (GameSessionManager's catch-all): the session is gone, so leave like a failed resume.
+      if (eventType === 'RunFaulted') {
+        clearActiveGame();
+        nav('/', { state: { notice: 'The run hit an unexpected server error and ended.' } });
+        return;
+      }
       // Retarget the player/enemy side split BEFORE the event expands, so the newly-named creature's own
       // moves/damage are sided correctly in the very event that renamed it. The rule itself (which events change
       // "who the player is") lives in the pure helper.

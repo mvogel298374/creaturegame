@@ -4,7 +4,8 @@
 .modal-overlay {
   position: absolute;
   inset: 0;
-  z-index: 10;
+  /* Above the pinned Run Map (.encounter-map--pinned, z-index 60) — a blocking prompt must never sit hidden under it. */
+  z-index: 70;
   display: flex;
   align-items: center;
   justify-content: center;
