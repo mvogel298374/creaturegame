@@ -1,0 +1,3 @@
+#!/bin/sh
+# A docs-cleanup stamp covers exactly one commit: consume it, so the next commit needs a fresh run.
+rm -f "$(git rev-parse --git-dir)/docs-cleanup.stamp"

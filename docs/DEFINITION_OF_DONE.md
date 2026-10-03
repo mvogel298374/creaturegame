@@ -66,8 +66,10 @@ hard gate to the pipeline but soft to the user: only the user waives a requireme
 - Any documented model the change alters is updated (`STATE_MODEL`, `GAME_LOOP`, `ENCOUNTER_DESIGN`,
   `GENERATION_SEAMS`, `DATA_IMPORT`, …).
 - `TODO.md` updated (task → done / archive) and `PRODUCT_SPEC.md` gains/updates its entry for a finished,
-  player-visible feature — both produced by the mandatory `docs-cleanup` gate (step 1 of the pre-finish
-  sequence) and must already be staged in the finishing commit by the time `pr-review` runs.
+  player-visible feature — both produced by the mandatory `docs-cleanup` gate, which runs **last** (after
+  `pr-review`) against the final state. Nothing is done, and no commit is proposed, until it has reported and its
+  edits are staged; the pre-commit hook enforces this with a stamp. `pr-review` does not review those docs —
+  `docs-cleanup` owns them.
 - Commit message proposed; commit only on explicit user approval.
 
 **G. Comment budget and design-rationale placement** (`DEV_STANDARDS.md` → *Design Rationale Placement*)

@@ -21,27 +21,36 @@
   against the repo's own docs or comments — both have been wrong (see §9).
 - **Comment budget:** new code carries no comments beyond one short line; logic documentation goes in markdown
   (`CLAUDE.md` → *Design Rationale Placement*).
+- **Gate 1 — nothing is implemented until its entry is Ready** (`CLAUDE.md` → *Process gates*,
+  `DEFINITION_OF_READY.md`). The **Ready?** column in §1 is the standing audit: ✅ every DoR item is answered; ⚠️
+  designed but provisional or awaiting your decision; ✗ missing items (named). **A greenlight is only valid on ✅.**
+  If you say "go" on a ⚠️ or ✗ row, the assistant will answer with the gap list instead of code, and ask you to
+  decide or confirm the drafted text.
+- **An entry must answer** (one line each for an S-size item): *intent + acceptance condition · design status ·
+  gen-variable surface · Gen 1 source of truth · data vs runtime · the quirk the tests assert · dependencies*.
+- **Gate 2 — nothing is done until `docs-cleanup` has run last.** A finished item is removed from this file (its
+  record moves to the archive) by that agent, not by hand; the pre-commit hook blocks a commit without its stamp.
 
 ---
 
 ## 1. Now / next — ranked by cost-to-benefit and unblocking value
 
-| # | Item | Cost | Why this slot / what it unblocks |
-|:-:|:-----|:----:|:---------------------------------|
-| 1 | **Decide the bag scope** — per-run vs. meta-progression (§4.1) | decision | Costs a conversation; unblocks bag persistence, `save.db`, Catch and stone evolutions. |
-| 2 | **Three data/engine fixes, verified at pokered first** — Full Restore on a statused full-HP creature; Psychic's Special-drop chance; X Accuracy (§3.2) | S ×3 | Small, localised, each pinned by a test that currently encodes the wrong value. |
-| 3 | **R1d-b — the abandon-timer race** (§2) | S | ~5 lines + a deterministic test; makes R1d-a safe to add. |
-| 4 | **Dev-script and pre-commit-hook gaps** (§7.1) | S–M | Protects every later commit and test run; the hook currently has blind spots (`.csproj`, `*.db`, deletes). |
-| 5 | **R1b items 6–9** (§2) | S | Item 6 needs only your yes/no; 7–9 are one-liners. |
-| 6 | **Verification pass over the unverified findings** (§3, §5, §7) | S–M | Cheap read-only agents in batches; turns ~45 "reviewer's reading" items into confirmed work or discards. Opens up everything below it. |
-| 7 | **Server test gaps — `GameSessionManager` lifecycle + the `RunFaulted` path** (§6) | M | Needs an injectable clock; unblocks the R1d tests and closes a long-open Tier-4 item. |
-| 8 | **Importer hardening** (§3.2) | M | Failure no longer wipes evolutions or exits 0; unblocks CI/Docker imports and the multi-generation importer work. |
-| 9 | **R1d-a — replay an open blocking prompt** (§2) | M | The only reconnect item that strands a run; highest player value. Needs your OK on the three design points in `RECONNECT_RESILIENCE.md`. |
-| 10 | **CI E2E step** (§6) | M | The only automatic E2E coverage; makes "agents don't run E2E" safe, and unblocks checking the BST/balance flag and the reconnect spec. |
-| 11 | **R1d-d, R1d-c** — refresh-state snapshot + sprite; second-tab policy (§2) | M each | Both extend (a)'s replay work; (c) needs your policy call. |
-| 12 | **Gen 1 fidelity — the damage/accuracy core** (§3.1) | L | Verify-first; large blast radius (it touches every damage number). |
-| 13 | **End-of-turn residual phase** (§4.2) | L | A `/plan`, `opus-engineer`, and both review gates; rewrites `Battle`'s turn loop. |
-| 14 | **Features** — Catch, `save.db`, progressive difficulty, Generation Profile 4d+, … (§4) | L | After #1 resolves what the bag scope blocks. |
+| # | Item | Cost | Ready? (DoR) | Why this slot / what it unblocks |
+|:-:|:-----|:----:|:-------------|:---------------------------------|
+| 1 | **Decide the bag scope** — per-run vs. meta-progression (§4.1) | decision | n/a — a decision | Costs a conversation; unblocks bag persistence, `save.db`, Catch and stone evolutions. |
+| 2 | **Three data/engine fixes, verified at pokered first** — Full Restore on a statused full-HP creature; Psychic's Special-drop chance; X Accuracy (§3.2) | S ×3 | ✗ per fix: Gen 1 source not yet fetched; quirk to test and data-vs-runtime boundary not stated | Small, localised, each pinned by a test that currently encodes the wrong value. |
+| 3 | **R1d-b — the abandon-timer race** (§2) | S | ✅ acceptance, quirk, dependencies in `RECONNECT_RESILIENCE.md`; no gen-variable surface | ~5 lines + a deterministic test; makes R1d-a safe to add. |
+| 4 | **Dev-script and pre-commit-hook gaps** (§7.1) | S–M | ✗ no per-script acceptance conditions | Protects every later commit and test run; the hook has blind spots (`.csproj`, `*.db`, deletes). |
+| 5 | **R1b items 6–9** (§2) | S | ⚠️ 6 is a decision; 7–9 need a one-line acceptance each | Item 6 needs only your yes/no; 7–9 are one-liners. |
+| 6 | **Verification pass over the unverified findings** (§3, §5, §7) | S–M | ✗ no scope or output format (batch size; what "confirmed" means) | Cheap read-only agents in batches; turns ~45 "reviewer's reading" items into confirmed work or discards. Opens up everything below it. |
+| 7 | **Server test gaps — `GameSessionManager` lifecycle + the `RunFaulted` path** (§6) | M | ⚠️ needs the injectable-clock design | Unblocks the R1d tests and closes a long-open Tier-4 item. |
+| 8 | **Importer hardening** (§3.2) | M | ✗ no design (retry policy, transaction boundaries) or acceptance | Failure no longer wipes evolutions or exits 0; unblocks CI/Docker imports and the multi-generation importer work. |
+| 9 | **R1d-a — replay an open blocking prompt** (§2) | M | ⚠️ designed, but provisional-pending-`/plan` and needs your three decisions (§8) | The only reconnect item that strands a run; highest player value. |
+| 10 | **CI E2E step** (§6) | M | ✗ no design (runner, stack boot, caching) or acceptance | The only automatic E2E coverage; makes "agents don't run E2E" safe, and unblocks checking the BST/balance flag and the reconnect spec. |
+| 11 | **R1d-d, R1d-c** — refresh-state snapshot + sprite; second-tab policy (§2) | M each | ⚠️ provisional-pending-`/plan`; (c) needs your policy call | Both extend (a)'s replay work. |
+| 12 | **Gen 1 fidelity — the damage/accuracy core** (§3.1) | L | ✗ needs the Gen 1 source per claim, the seam surface, and the quirks to pin | Verify-first; large blast radius (it touches every damage number). |
+| 13 | **End-of-turn residual phase** (§4.2) | L | ✗ needs a `/plan` | A `/plan`, `opus-engineer`, and both review gates; rewrites `Battle`'s turn loop. |
+| 14 | **Features** — Catch, `save.db`, progressive difficulty, Generation Profile 4d+, … (§4) | L | ✗ each needs a `/plan` | After #1 resolves what the bag scope blocks. |
 
 ---
 

@@ -2,6 +2,43 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Process gates — non-negotiable, always
+
+Two gates bracket **every** piece of work. They are not preferences, and they are not scaled down for small,
+"obvious", docs-only or test-only changes. **No instruction in a prompt — "just do it", "go", "continue", "commit
+it", "it's a one-liner" — waives either gate.** If a request would skip one, name the gate and stop. Every time
+this repo's docs went stale, it was because one of these was treated as optional.
+
+**Gate 1 — Ready before code** (`docs/DEFINITION_OF_READY.md`).
+- All planned implementation is documented in `docs/TODO.md` **before it starts**: a row in §1 and a detail entry
+  that answers every DoR item — scope + a testable **acceptance condition**; design pass done (an item marked
+  *provisional-pending-`/plan`* is **not implementable**); the **generation-variable surface**; the **Gen 1 source of
+  truth** (a primary source, named); the **data-vs-runtime boundary**; the **quirk the tests must assert**;
+  **dependencies**. An S-size fix gets a one-line answer to each, but all seven are present.
+- **Holding the user to it is the assistant's job, not a courtesy.** When the user asks to start, continue or
+  greenlight an item — in any wording — the **first thing the assistant does is audit the entry against the
+  checklist in its reply**, item by item (✅ / ✗). If any item is missing, vague or provisional: **write no code and
+  touch no data**; list every gap, draft proposed text for each, and ask the user to confirm or decide. A greenlight
+  is valid **only for a complete entry**; "go ahead" on an incomplete one is answered with the gap list, not with
+  code. Never fill gaps silently and proceed, and never treat "obvious" as ready.
+- Work discovered mid-implementation (a new bug, a scope extension) gets **its own TODO entry and passes this gate
+  before it is fixed**. If the user dictates a task inline, the assistant writes the entry first, shows it, and gets
+  the go.
+
+**Gate 2 — Done means `docs-cleanup` ran, last.**
+- The pre-finish sequence is fixed: `format-gate` → `test-runner` → `requirements-review` (battle/stat/move/data
+  work) → `pr-review` (product code or a seam) → **`docs-cleanup` — always last, never skipped, never scoped down.**
+  It runs for docs-only, test-only and one-line changes too. **Any change made after it — code or docs — means it
+  runs again, after that change.**
+- **Nothing may be called done, complete, finished, fixed or shipped, and no commit may be proposed or made, until
+  `docs-cleanup` has reported `DOCS: CLEAN | UPDATED` against the final state and its edits are staged.** Until then
+  the only honest status is "implemented, not done: `docs-cleanup` pending". Do not substitute inline doc edits,
+  a sentence saying the docs are updated, or an earlier run.
+- **It is mechanically enforced.** `docs-cleanup`'s last act is to write a stamp (`.githooks/stamp-docs-cleanup.sh`);
+  the pre-commit hook blocks any commit with no stamp, or with any staged file modified after it. **Never create,
+  copy, touch or fake the stamp, and never use `--no-verify` or `DOCS_CLEANUP_BYPASS`** — those belong to the human,
+  for emergencies only.
+
 ## Key Files — read on demand, by trigger
 
 **This file (`CLAUDE.md`) is the only always-on primer.** The rest below are reference docs: read one
@@ -13,9 +50,9 @@ them up front burns ~25k tokens before the work is even scoped; almost none of i
 | `ARCHITECTURE.md` | you need the **why** behind a design decision, the system map, or the full doc catalog (its §5 indexes every doc in the repo). The decision-log entry point. |
 | `docs/TODO.md` | starting or finishing any task — it's the **authoritative** active task list. Always update it when a task completes. (Finished work is in `docs/TODO_ARCHIVE.md`; read that only to recover the history of a done item.) |
 | `docs/PRODUCT_SPEC.md` | you need to know **what the game currently does** (not why, not its history) — the current-state feature spec, updated per finished player-visible feature by the same `docs-cleanup` gate that updates `TODO.md`. |
-| `.claude/AI_CONTEXT.md` | you need a slash-command/profile definition (`/plan`, `/dev`, `/sync`, `/test`) or the **Tooling & Automation** reference (the pre-finish gate sequence — `docs-cleanup`, `format-gate`, `test-runner`, `requirements-review`, `pr-review` — the pre-commit hook, CSharpier, MCP servers). |
+| `.claude/AI_CONTEXT.md` | you need a slash-command/profile definition (`/plan`, `/dev`, `/sync`, `/test`) or the **Tooling & Automation** reference (the pre-finish gate sequence — `format-gate`, `test-runner`, `requirements-review`, `pr-review`, then **`docs-cleanup` always last** — the pre-commit hook, CSharpier, MCP servers). |
 | `docs/DESIGN_GUIDES.md` | doing `/plan` (design) work — Gen 1 mechanics, type-balancing, move-import mapping. |
-| `docs/DEFINITION_OF_READY.md` | doing `/plan` — the DoR checklist that is `/plan`'s exit criteria (a plan isn't done until every item is covered). |
+| `docs/DEFINITION_OF_READY.md` | doing `/plan` **and before starting ANY implementation (Gate 1)** — the DoR checklist; a plan isn't done, and code can't start, until every item is covered. |
 | `docs/DEV_STANDARDS.md` | doing `/dev` (implementation) work — .NET/EF coding conventions and architecture rules. |
 | `docs/DEFINITION_OF_DONE.md` | finishing a feature — the technical DoD the `pr-review` subagent checks. |
 | `docs/STATE_MODEL.md` | touching battle state — the `Creature` permanent/transient split (`BattleState`). |
@@ -82,7 +119,7 @@ dotnet csharpier format .    # format C# (do NOT hand-align)
 dotnet csharpier check .     # what the hook/CI runs
 git config core.hooksPath .githooks                         # once per clone — arms .githooks/pre-commit
 ```
-The `.githooks/pre-commit` hook runs `csharpier check` (always), the full .NET test suite (when `.cs` is staged), and the frontend typecheck `tsc --noEmit` (when `.ts`/`.tsx` is staged — Vitest strips types without checking them, so nothing else catches a type error), and **blocks the commit on failure**. When a feature is close to done, run the pre-finish gate sequence before proposing a commit — first the **`docs-cleanup`** subagent (the **mandatory, unskippable** docs-hygiene gate: archive the finished item to `TODO_ARCHIVE.md`, clear its stale framing; runs for **every** finished feature, no scope exception), then the **`format-gate`** subagent (CSharpier), the **`test-runner`** subagent (the fast suites — .NET + typecheck + Vitest; **E2E is not in the gate**, see below), for battle/stat/move work the **`requirements-review`** subagent (Gen-1 / roguelite domain fidelity), and finally the **`pr-review`** subagent (Opus, technical DoD incl. generation-seam architecture, from `docs/DEFINITION_OF_DONE.md`). Each is a separate subagent so it can be invoked or edited on its own.
+The `.githooks/pre-commit` hook runs `csharpier check` (always), the full .NET test suite (when `.cs` is staged), and the frontend typecheck `tsc --noEmit` (when `.ts`/`.tsx` is staged — Vitest strips types without checking them, so nothing else catches a type error), and the **`docs-cleanup` stamp check** (see *Process gates* above), and **blocks the commit on failure**. When a feature is close to done, run the pre-finish gate sequence before proposing a commit, **in this fixed order**: the **`format-gate`** subagent (CSharpier), the **`test-runner`** subagent (the fast suites — .NET + typecheck + Vitest; **E2E is not in the gate**, see below), for battle/stat/move work the **`requirements-review`** subagent (Gen-1 / roguelite domain fidelity), the **`pr-review`** subagent (Opus, technical DoD incl. generation-seam architecture, from `docs/DEFINITION_OF_DONE.md`; product code or a seam only), and **always last** the **`docs-cleanup`** subagent (the **mandatory, unskippable** docs-hygiene gate: archive the finished item to `TODO_ARCHIVE.md`, clear its stale framing; runs for **every** change with no scope exception, and again after any later change; the hook blocks a commit without its fresh stamp). Each is a separate subagent so it can be invoked or edited on its own.
 
 **Both review gates are hard to the pipeline, soft to the user — only the user clears a finding, never a subagent or you.** That applies to a `pr-review` **CHANGES-REQUESTED** exactly as it does to a `requirements-review` discrepancy: report the findings + fix cost + your recommendation, then **stop and let the user decide** (fix / waive / defer). Never run a fix→re-review loop on your own initiative — apply the agreed fix and report your own verification; a second Opus pass to confirm a small fix is waste.
 
@@ -166,7 +203,7 @@ the commit for approval. A diff that completes an item while `TODO.md` still lis
 player-visible behavior `PRODUCT_SPEC.md` doesn't yet describe, is an incomplete diff.
 
 **This cleanup is not optional and not ad hoc — it is enforced by the mandatory `docs-cleanup` subagent, the
-first step of the pre-finish gate sequence.** After *every* finished feature or closed task, that subagent runs
+*last* step of the pre-finish gate sequence (Gate 2).** After *every* finished feature or closed task, that subagent runs
 (no scope exception) and performs the reconciliation below (plus the `PRODUCT_SPEC.md` entry when the feature
 is player-visible); the main session stages its edits into the finishing commit. See
 `.claude/agents/docs-cleanup.md`.
@@ -215,7 +252,7 @@ a live authoring habit, not a defect caught after the fact — extend the doc as
 ## Permissions
 
 - **File edits and creation are always allowed** — make changes to existing files or create new ones without asking for confirmation first.
-- **Git commits require explicit approval** — stage changes and propose a commit message, but do not run `git commit` until the user confirms. **Before proposing, check that the staged set includes the `docs/TODO.md` cleanup** for whatever the commit finishes (see **TODO State**). **Once a commit is approved, always push it to `origin`** (`master`) as part of the same step — no separate confirmation is needed for the push; approving the commit approves the push. **After the push, ask whether that commit should be a release candidate** (see **Deployment** below) — every finished commit gets this prompt.
+- **Git commits require explicit approval** — stage changes and propose a commit message, but do not run `git commit` until the user confirms. **A commit may be proposed only after `docs-cleanup` has run last against the final state** (Gate 2 — the hook enforces it with a stamp; never forge it or bypass). **Before proposing, check that the staged set includes the `docs/TODO.md` cleanup** for whatever the commit finishes (see **TODO State**). **Once a commit is approved, always push it to `origin`** (`master`) as part of the same step — no separate confirmation is needed for the push; approving the commit approves the push. **After the push, ask whether that commit should be a release candidate** (see **Deployment** below) — every finished commit gets this prompt.
 - **Deployment is gated behind release-candidate tags** — the `Fly Deploy` GitHub Action (`.github/workflows/fly-deploy.yml`) deploys to Fly.io **only on tags matching `v*-rc*`**; pushing to `master` never deploys. A commit ships by being *pinned as a release candidate*: tag it and push the tag. So after each approved commit+push, **ask the user: "Should this commit be a release candidate (deploy), or not?"**
   - **Yes →** create the next RC tag on that commit and push it, which fires the deploy: `git tag v<X.Y.Z>-rc.<N> <sha>` then `git push origin v<X.Y.Z>-rc.<N>`. Pick the next number by looking at existing tags (`git tag --list 'v*-rc*'`); if unsure of the version, propose one and confirm.
   - **No →** stop. The code is on `master` but intentionally undeployed; it waits for a later RC tag.

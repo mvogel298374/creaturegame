@@ -11,6 +11,9 @@ Architectural and conceptual design *before* implementation. Knowledge base: `DE
 **Definition of done for a `/plan` pass:** every item in `docs/DEFINITION_OF_READY.md` is covered —
 established before planning or resolved during it. Do not exit `/plan` (or hand off to `/dev`) with an
 unchecked DoR item; the plan isn't done until the feature is *Ready*. (That file is the checklist; run it.)
+**Gate 1 applies to `/dev` too:** no implementation starts on a `TODO.md` entry that is not DoR-complete. The first
+act on any "start / continue / go" is to audit the entry against the checklist in the reply and, on any gap, write
+no code and list the gaps (`CLAUDE.md` → *Process gates*).
 
 ### `/dev` — Senior .NET Core Software Engineer
 Clean, testable, EF-optimized C# 13 / .NET 9; PokeAPI integration. Knowledge base: `DEV_STANDARDS.md`.
@@ -20,8 +23,9 @@ Clean, testable, EF-optimized C# 13 / .NET 9; PokeAPI integration. Knowledge bas
 follow-up cleanup. (That file is the source of truth for the rule; don't restate it, run it.) **Comment budget:**
 default no comment, at most one short line; logic documentation goes in markdown in the same commit (`CLAUDE.md` →
 *Design Rationale Placement*) — never copy a neighbouring file's comment density. **When the
-feature is close to done, run the pre-finish gate sequence** (`docs-cleanup`, `format-gate`, `test-runner`,
-`requirements-review`, `pr-review`) before proposing a commit — see Tooling & Automation.
+feature is close to done, run the pre-finish gate sequence** (`format-gate`, `test-runner`, `requirements-review`,
+`pr-review`, and **`docs-cleanup` always last**) before proposing a commit — nothing is "done" until `docs-cleanup`
+has run against the final state (`CLAUDE.md` → *Process gates*).
 
 ## Action Commands
 
@@ -64,23 +68,13 @@ green yet is wrong. These tools catch that class **before commit**. The gates ar
 deterministic shell hook (format + tests) and LLM reasoning a shell can't do.
 
 ### Pre-finish gate sequence
-When a feature is close to done, the main session runs these **separable** gates before proposing a commit —
+When a feature is close to done, the main session runs these **separable** gates before proposing a commit, **in this
+fixed order, `docs-cleanup` always last** —
 each is its own subagent so it can be invoked or edited independently:
 
-1. **`docs-cleanup`** (Subagent, `.claude/agents/docs-cleanup.md`, Sonnet) — **the mandatory, unskippable
-   docs-hygiene gate.** After *any* finished feature/task, before the commit, it reconciles `docs/TODO.md`
-   against reality: archives the finished write-up to `TODO_ARCHIVE.md` (TODO.md is active work only), clears
-   its stale framing (Next-up ordering, blocked-on/gated-on notes, ⚠️ banners, dangling refs), and — the
-   load-bearing check — **verifies a finished write-up's full record is in the archive before any summary of it
-   is dropped** (the Shop-node trap: an archive that said "still live in TODO.md" and described the pre-ship
-   state). It also adds/updates the current-state entry in `docs/PRODUCT_SPEC.md` for a player-visible feature
-   (present-tense "what does the game do today," no rationale — that's a design doc's job). → `DOCS: CLEAN |
-   UPDATED`. **No scope exception** — it runs for *every* finished feature (every one changes what TODO.md
-   should say), unlike gates 4–5 below which are scoped. Runs **first**, because its doc edits ride in the
-   finishing commit and gate 5 (`pr-review`) checks docs/TODO/PRODUCT_SPEC. It edits docs only.
-2. **`format-gate`** (Subagent, `.claude/agents/format-gate.md`) — the CSharpier gate: `check`, auto-`format`
+1. **`format-gate`** (Subagent, `.claude/agents/format-gate.md`) — the CSharpier gate: `check`, auto-`format`
    + re-check if it fails → `FORMAT: PASS | REFORMATTED | FAIL`.
-3. **`test-runner`** (Subagent, `.claude/agents/test-runner.md`) — the fast suites via `.\test.ps1 -Dotnet -Web`,
+2. **`test-runner`** (Subagent, `.claude/agents/test-runner.md`) — the fast suites via `.\test.ps1 -Dotnet -Web`,
    TEST SUMMARY relayed verbatim, failing tests named → `TESTS: PASS | FAIL`.
    **E2E is NOT in the default scope and is not the agent's call, or yours — it is the user's.** ~4 minutes for
    37 browser-driven tests, and the only suite with real flakes. The gate passes without it. If a change looks
@@ -101,17 +95,17 @@ each is its own subagent so it can be invoked or edited independently:
      and the *spec* being wrong (both `reward-drop.spec.ts` and `voluntary-switch.spec.ts` were exactly this).
    - **Never let it run in the background and stop.** If it returns without a summary, the run was orphaned;
      tell it to poll in an until-loop inside one turn rather than re-running from scratch.
-4. **`requirements-review`** (Subagent, `.claude/agents/requirements-review.md`, Sonnet) — the domain gate,
+3. **`requirements-review`** (Subagent, `.claude/agents/requirements-review.md`, Sonnet) — the domain gate,
    for battle/stat/move work. A Pokémon-Gen-1 + roguelite expert that challenges the implementation against
    the DoR-finalized plan, the internal docs, and its own knowledge, and flags undocumented behavior →
    `REQUIREMENTS: MET | DISCREPANCIES`. **Hard gate to the pipeline, soft gate to the user:** a discrepancy
    blocks progress to done/commit and no subagent may clear it; only the **user** adjudicates (fix or waive).
-5. **`pr-review`** (Subagent, `.claude/agents/pr-review.md`, **Opus**) — the technical capstone, run **after**
-   1–4 are green. Reviews the diff against the technical Definition of Done (`docs/DEFINITION_OF_DONE.md`) —
-   generation-seam architecture, code quality, integration completeness, test adequacy, docs/TODO/PRODUCT_SPEC,
+4. **`pr-review`** (Subagent, `.claude/agents/pr-review.md`, **Opus**) — the technical capstone, run **after**
+   1–3 are green. Reviews the diff against the technical Definition of Done (`docs/DEFINITION_OF_DONE.md`) —
+   generation-seam architecture, code quality, integration completeness, test adequacy, the comment budget,
    and design-rationale placement (§G — no comment is the *only* place a design decision lives) → `PR-READY
    | CHANGES-REQUESTED`. Technical quality only; domain fidelity is `requirements-review`'s. It treats
-   docs-cleanup/format/tests/requirements as preconditions.
+   format/tests/requirements as preconditions (docs-cleanup runs after it).
 
    **Scope — it is Opus and costs real money (~80–100k tokens a run), so it is not automatic.** Run it when the
    diff touches **product code** (engine, web layer, importer) or a generation seam. A **test-only or docs-only
@@ -127,10 +121,22 @@ each is its own subagent so it can be invoked or edited independently:
    This mirrors `requirements-review`: **hard gate to the pipeline, soft gate to the user.** The user
    adjudicates both lanes; the difference is only which kind of finding each raises.
 
-The four *review* gates (2–5) run and report; they don't fix or commit — and **neither a `requirements-review`
+5. **`docs-cleanup`** (Subagent, `.claude/agents/docs-cleanup.md`, Sonnet) — **the mandatory, unskippable docs-hygiene
+   gate, and always the LAST gate.** For *every* change — docs-only, test-only and one-line fixes included — it
+   runs after the review gates, against the final state. It reconciles `docs/TODO.md` against reality: archives the
+   finished write-up to `TODO_ARCHIVE.md` (TODO.md is active work only), clears its stale framing (its §1 ranking
+   row, blocked-on/gated-on notes, ⚠️ banners, dangling refs), and — the load-bearing check — **verifies a finished
+   write-up's full record is in the archive before any summary of it is dropped** (the Shop-node trap: an archive
+   that said "still live in TODO.md" and described the pre-ship state). It also adds/updates the current-state entry
+   in `docs/PRODUCT_SPEC.md` for a player-visible feature, audits that the item's `TODO.md` entry met the DoR
+   (reporting a `GATE-1 BREACH` if not), and finally writes the stamp. → `DOCS: CLEAN | UPDATED`. It edits docs only.
+   **Any change after it — code or docs — means it runs again.** Nothing is called done, and no commit is proposed,
+   until it has reported; the pre-commit hook blocks a commit with no stamp or with any staged file newer than it.
+
+The four *review* gates (1–4) run and report; they don't fix or commit — and **neither a `requirements-review`
 discrepancy nor a `pr-review` CHANGES-REQUESTED is cleared by a subagent: only the user adjudicates.**
-`docs-cleanup` (1) is the one *action* gate: it edits the task docs so the finishing commit carries them, then
-reports. None of the five commits. The `.githooks/pre-commit` hook still runs CSharpier + tests as the
+`docs-cleanup` (5) is the one *action* gate, and the last: it edits the task docs so the finishing commit carries
+them, writes the stamp, then reports. None of the five commits. The `.githooks/pre-commit` hook still runs CSharpier + tests as the
 deterministic backstop at commit time.
 
 > **Why the escalation rule exists** (2026-07-16): a test-only diff drew two Opus `pr-review` runs (~185k

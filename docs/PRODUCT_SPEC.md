@@ -28,7 +28,7 @@ three readers can trust it without cross-checking the code.
 ## How this doc grows
 
 This is **not** a manual chore layered on top of `docs/TODO.md`'s discipline — it rides the same rail. The
-`docs-cleanup` gate (the mandatory step-1 of the pre-finish sequence, `.claude/agents/docs-cleanup.md`) adds or
+`docs-cleanup` gate (the mandatory, always-last step of the pre-finish sequence, `.claude/agents/docs-cleanup.md`) adds or
 updates this file's entry for the finished feature in the **same pass** it archives the `TODO.md` write-up, and
 that edit is staged into the same finishing commit. Nobody schedules a separate "update PRODUCT_SPEC.md" task.
 

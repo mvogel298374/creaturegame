@@ -10,6 +10,30 @@
 
 DOTNET="C:/Users/USER/.dotnet/dotnet.exe"
 
+# Gate 2 (CLAUDE.md > Process gates): docs-cleanup must have run LAST. Its final act writes the stamp; a staged
+# file modified after the stamp means something changed since, so it must run again. Human-only bypass:
+# DOCS_CLEANUP_BYPASS=1. The AI assistant must never set it or forge the stamp.
+GIT_DIR=$(git rev-parse --git-dir)
+STAMP="$GIT_DIR/docs-cleanup.stamp"
+if [ -n "$DOCS_CLEANUP_BYPASS" ]; then
+  echo "[pre-commit] WARNING: docs-cleanup gate bypassed (DOCS_CLEANUP_BYPASS)." >&2
+elif [ -f "$GIT_DIR/MERGE_HEAD" ]; then
+  echo "[pre-commit] Merge commit - docs-cleanup gate skipped."
+elif [ ! -f "$STAMP" ]; then
+  echo "[pre-commit] BLOCKED: docs-cleanup has not run (no stamp). It is the mandatory LAST gate for every change." >&2
+  exit 1
+else
+  STALE=$(git diff --cached --name-only --diff-filter=ACMR | while IFS= read -r f; do
+    [ "$f" -nt "$STAMP" ] && echo "  $f"
+  done)
+  if [ -n "$STALE" ]; then
+    echo "[pre-commit] BLOCKED: staged files changed after docs-cleanup ran - run it again:" >&2
+    echo "$STALE" >&2
+    exit 1
+  fi
+  echo "[pre-commit] docs-cleanup stamp is current."
+fi
+
 echo "[pre-commit] CSharpier format check..."
 if ! "$DOTNET" csharpier check . ; then
   echo "[pre-commit] BLOCKED: code is not CSharpier-formatted. Run: dotnet csharpier format ." >&2

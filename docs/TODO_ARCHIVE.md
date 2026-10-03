@@ -8,6 +8,43 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Process gates hardening — DoR hard gate + docs-cleanup last + hook stamp ✅ DONE (2026-10-03)
+
+**Why.** A 2026-10-03 audit of `TODO.md` showed the Definition of Ready and `docs-cleanup` had not been upheld:
+resolved items were still open, code comments and `GEN_DIFFERENCES.md` stated wrong Gen 2 type-chart facts, and
+designs (the R1d reconnect designs) sat inside the TODO. The user directed that both gates become non-negotiable and
+mechanically checked. Process tooling only — no player-visible behavior, so no `PRODUCT_SPEC.md` entry.
+
+**What changed**
+- `CLAUDE.md` — new top-level **Process gates** section. **Gate 1 — Ready before code:** no implementation starts on
+  a `TODO.md` entry that is not DoR-complete; the assistant audits the entry against the DoR in its reply and, if
+  gaps exist, refuses and lists them. **Gate 2 — Done means `docs-cleanup` ran, last.**
+- **Gate order (fixed):** `format-gate` → `test-runner` → `requirements-review` (battle/stat/move work) →
+  `pr-review` (product code or a seam) → **`docs-cleanup` always last**. It was step 1; moved last so it reports
+  against the final tree. Any later change (code or docs) re-runs it. Updated in `CLAUDE.md`,
+  `.claude/AI_CONTEXT.md` (list reordered and renumbered), `docs/DEFINITION_OF_DONE.md`,
+  `.claude/agents/pr-review.md`, `.claude/agents/docs-cleanup.md`, and `docs/PRODUCT_SPEC.md`'s "How this doc grows".
+- `docs/DEFINITION_OF_READY.md` — new **Enforcement — no code before Ready** section.
+- `docs/TODO.md` — Gate-1/Gate-2 bullets, an entry template, and a **Ready?** (DoR audit) column on the §1 table.
+- `.claude/agents/docs-cleanup.md` — gained the **Gate-1 audit** (report a `GATE-1 BREACH` for an item whose entry
+  lacked DoR fields or did not exist) and the stamp as its last act.
+
+**Mechanical enforcement.** `.githooks/stamp-docs-cleanup.sh` writes `.git/docs-cleanup.stamp`; it is run as
+`docs-cleanup`'s last tool call. `.githooks/pre-commit` blocks a commit if there is no stamp, or if any staged file
+is newer than it. `.githooks/post-commit` consumes (deletes) the stamp so every commit needs a fresh one.
+`DOCS_CLEANUP_BYPASS` exists but is human-only (the hook warns and passes). Tested with five scenarios: no stamp →
+blocked; fresh stamp → passes; staged file touched after the stamp → blocked; bypass → warns and passes;
+post-commit removes the stamp. All behaved correctly.
+
+**Honest breaches committed before the rule existed (same session, 2026-10-03)**
+- This work itself had no prior `TODO.md` entry — implemented directly on the user's conversational instruction.
+- The R1d reconnect designs were written, and the species base-stat / `BaseExperience` fix (`9b4a7e9`) was
+  implemented, without DoR-complete entries (the species fix had a TODO bullet but lacked the DoR fields).
+- Commits `2aa3f08` and `be2bac7` were made without a `docs-cleanup` run (the user instructed the commit
+  explicitly; the batch was itself a docs reorganisation).
+
+---
+
 ## TODO.md rehaul — finished records moved out of the live list ✅ DONE (2026-10-03)
 
 Everything below was **copied verbatim** from `TODO.md` when it was rebuilt as an active-work-only file

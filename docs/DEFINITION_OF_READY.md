@@ -8,6 +8,21 @@ until the feature is Ready.
 Read this when doing `/plan` work. The design knowledge itself lives in `DESIGN_GUIDES.md`; this file is the
 checklist that says a plan is complete.
 
+## Enforcement — no code before Ready (Gate 1)
+
+DoR is not only `/plan`'s exit criteria; it is a **hard gate in front of every implementation**, small ones
+included. Every planned item lives in `docs/TODO.md` (a row in §1 plus a detail entry) and answers all seven
+items below **before** any code, data change or importer run starts. Minimal entry for an S-size fix — one line
+each, all seven present: *intent + acceptance · design status · gen-variable surface · Gen 1 source · data vs
+runtime · quirk to test · dependencies*.
+
+**The assistant holds the user to this.** When asked to start, continue or greenlight an item (in any wording,
+including "just do it"), the assistant's first act is to audit the entry against this checklist in its reply, item
+by item (✅ / ✗). Any gap — missing, vague, or *provisional-pending-`/plan`* — means **no code**: it lists the gaps,
+drafts proposed text, and asks the user to confirm or decide. A greenlight is valid only for a complete entry.
+Work discovered mid-implementation gets its own entry and passes the gate before it is fixed. `docs-cleanup`
+reports any finished item whose entry lacked a DoR field as a Gate-1 breach.
+
 ## A feature is Ready when…
 
 1. **Captured in `TODO.md`** with scoped intent and an explicit acceptance condition (what "working" means
