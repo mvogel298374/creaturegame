@@ -6,10 +6,8 @@ import { startBattle, fightButton } from './helpers';
 // SignalR projection was fixed. The engine/projection logic is pinned by MoveInfoStabTests +
 // WebEventContractTests; here we only assert the cue reaches the DOM in a real battle.
 //
-// NOTE: the parallel effectiveness-colour cue (log-line--super/weak/immune) is intentionally NOT E2E-tested.
-// The enemy type is RNG, so reaching a non-neutral hit deterministically isn't possible without a seeded run
-// the UI can't request, making the test slow + flaky. Its tone logic is unit-tested (timeline.test.ts), and
-// it renders via the identical state→className mechanism this STAB spec proves reaches the DOM.
+// The effectiveness-colour cue (log-line--super/weak/immune) is not E2E-tested; its tone logic is unit-tested
+// in timeline.test.ts.
 
 test.describe('Move-menu STAB highlight', () => {
   test('flags the player’s same-type damaging move, not off-type moves', async ({ page }) => {

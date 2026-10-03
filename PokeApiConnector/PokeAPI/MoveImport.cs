@@ -111,9 +111,7 @@ public class MoveImport
         return attack;
     }
 
-    /// <summary>Base stats + type/category resolved from <c>past_values</c> (DATA_IMPORT.md §4.1). One
-    /// row per move today; a future generation adds a row per (move, generation) — TODO.md →
-    /// Multi-Generation.</summary>
+    /// <summary>Base stats + type/category resolved from <c>past_values</c> (DATA_IMPORT.md §4.1).</summary>
     private static Attack BuildGen1Attack(PokeApiMove pokeMove)
     {
         var pasts = pokeMove.PastValues ?? new List<MovePastValue>();

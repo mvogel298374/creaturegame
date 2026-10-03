@@ -17,7 +17,9 @@ Clean, testable, EF-optimized C# 13 / .NET 9; PokeAPI integration. Knowledge bas
 **Definition of done (battle/stat/move work):** clear the generation-agnostic checklist in
 `GENERATION_SEAMS.md §5.0` *as part of the feature* — no inline gen-variable magic numbers, no direct
 `Attributes.Attack/Special/Defense` reads in damage math, everything gen-variable behind the seams. Not a
-follow-up cleanup. (That file is the source of truth for the rule; don't restate it, run it.) **When the
+follow-up cleanup. (That file is the source of truth for the rule; don't restate it, run it.) **Comment budget:**
+default no comment, at most one short line; logic documentation goes in markdown in the same commit (`CLAUDE.md` →
+*Design Rationale Placement*) — never copy a neighbouring file's comment density. **When the
 feature is close to done, run the pre-finish gate sequence** (`docs-cleanup`, `format-gate`, `test-runner`,
 `requirements-review`, `pr-review`) before proposing a commit — see Tooling & Automation.
 

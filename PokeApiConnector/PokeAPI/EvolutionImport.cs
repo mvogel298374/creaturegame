@@ -7,7 +7,7 @@ namespace PokeApiConnector.PokeAPI;
 /// <summary>Imports the Gen 1 evolution edges into <c>pokemon.db</c> (DATA_IMPORT.md §4.7).</summary>
 public static class EvolutionImport
 {
-    private const int Gen1 = 1; // Evolutions is already keyed by Generation — TODO.md → Multi-Generation
+    private const int Gen1 = 1;
     private const int MaxGen1SpeciesId = 151;
 
     private static readonly JsonSerializerOptions JsonOptions = new()

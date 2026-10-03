@@ -27,7 +27,7 @@ correctly, and hand back a tight summary.
    takes damage" must run in *every* branch (or via one shared helper), not just the Standard path.
 4. **Match the surrounding code** — primary constructors for DTOs, nullable handling, async DB with
    `AsNoTracking()`, test names that state what they test (no `Test` prefix/suffix), no hand-aligned
-   columns (CSharpier owns whitespace).
+   columns (CSharpier owns whitespace). **Not its comment density**: see the comment budget (rule 8).
 5. **Test the quirk, not just the outcome.** Assert "damage doubled because Defense was halved" / "fails
    on Speed, not level" — not merely "the target faints." Any importer data value Gen 1 differs from modern
    on needs a pin in `SecondaryChanceDataContractTests` in the same change.
@@ -36,6 +36,13 @@ correctly, and hand back a tight summary.
 7. **Data changes go through the importer, not the DB.** `moves.db`/`pokemon.db` are gitignored; the
    `PokeApiConnector` mapping is the committed artifact. Edit the importer; note that a re-run + MCP verify
    is needed (the delegating session runs it).
+
+8. **Comment budget.** The codebase is comment-heavy; do not copy it. Default is **no comment**; at most one short line
+   (a non-obvious fact about that exact line, or a pointer to the owning doc). No multi-line blocks, no
+   multi-paragraph XML docs, no narration, no history, no TODO references, no restated Gen 1 facts. Put any
+   algorithm / formula / rationale / lifecycle explanation in the relevant markdown design doc in the same change
+   and return it in your summary so the main session can stage it. (`DEV_STANDARDS.md` → *Design Rationale
+   Placement*.)
 
 ## Scope
 

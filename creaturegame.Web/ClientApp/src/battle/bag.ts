@@ -14,11 +14,8 @@ export interface BagItem {
   // True for a whole-moveset PP restore (Elixir / Max Elixir). Single-move restores (Ether / Max Ether)
   // are false and need a move-slot pick before use.
   restoresPpAllMoves: boolean;
-  // Whether using the item in battle now would do anything — the server's verdict, computed from the
-  // engine's ItemEffects registry (BagItemView.UsableInBattle). Ball (catch — gated on Encounter Logic)
-  // and Revive (needs a party) have no effect yet, so they arrive false and the menu hides them rather
-  // than letting the player burn a turn on a guaranteed no-op. Read this flag; don't re-derive usability
-  // from `category` here — that mapping lives in the backend and only the backend.
+  // The server's verdict on whether the item does anything in battle (BagItemView.UsableInBattle). Read this
+  // flag; don't re-derive usability from `category` — that mapping lives only in the backend.
   usableInBattle: boolean;
 }
 

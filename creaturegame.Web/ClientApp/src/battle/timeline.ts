@@ -332,9 +332,7 @@ function runNodeBannerMsg(kind: string, bossName?: string, biomeName?: string): 
   }
 }
 
-// Log line for a reward payout (battle drop or Treasure/Mystery node). A real gold HUD / reward modal is a
-// later, separately-planned pass (Run Economy Phase C) — for now this just narrates what was granted so the
-// event isn't silently dropped.
+// Log line for a reward payout (battle drop or Treasure/Mystery node).
 function rewardGrantedMsg(source: string, gold: number, itemNames: string[]): string {
   const parts = [gold > 0 ? `${gold}G` : null, ...itemNames].filter((p): p is string => p !== null);
   const reward = parts.length > 0 ? parts.join(', ') : 'nothing this time';
@@ -615,11 +613,8 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       const gold = payload.gold as number;
       const goldTotal = payload.goldTotal as number;
       const itemNames = (payload.itemNames as string[]) ?? [];
-      // Every reward is inline now — a battle-win drop AND a Treasure/Mystery node use the SAME vanishing drop
-      // hover (no blocking OK modal). Bump the running total, log a yellow loot line, and (only when something
-      // actually dropped) raise the transient hover; the view auto-dismisses it, so no HIDE step — it must not
-      // block the run. Node rewards still block server-side on an ack, but useBattleHub auto-acks them so the
-      // run flows straight on, exactly like a battle drop.
+      // A granted reward: bump the gold total, log a loot line, and raise the transient drop hover (the view
+      // auto-dismisses it, so there is no HIDE step).
       const steps: Step[] = [
         w(200),
         d({ type: 'SET_GOLD', gold: goldTotal }),

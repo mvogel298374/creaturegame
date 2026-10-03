@@ -45,9 +45,7 @@ public class AttackService
             .FirstOrDefaultAsync(m => m.Name != null && m.Name.ToLower() == name.ToLower());
     }
 
-    // NB: GetRandomAttackAsync/GiveDefaultMoveAsync/GiveRandomMoveAsync below have no callers anywhere in the
-    // repo (incl. tests) — pre-date LearnsetMoveSelector-based move assignment. Left in place (comment-only
-    // pass; flagged in TODO.md rather than deleted here).
+    // GetRandomAttackAsync/GiveDefaultMoveAsync/GiveRandomMoveAsync below have no callers (dead code).
 
     public async Task<Attack?> GetRandomAttackAsync(IRandomSource? rng = null)
     {

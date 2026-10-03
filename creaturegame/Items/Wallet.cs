@@ -21,8 +21,7 @@ public sealed class Wallet
         _balance += amount;
     }
 
-    /// <summary>Spends <paramref name="amount"/> if affordable; returns false (no change) otherwise.
-    /// Not consumed by anything yet — the future Shop's spend path (mirrors <see cref="Bag.Consume"/>).</summary>
+    /// <summary>Spends <paramref name="amount"/> if affordable; returns false (no change) otherwise.</summary>
     public bool TrySpend(int amount)
     {
         if (amount <= 0 || _balance < amount)

@@ -444,10 +444,7 @@ public class PartyExpShareTests
         Assert.Equal(rookie.Level, snapshot.Members.Single(m => m.Name == "Rookie").Level);
     }
 
-    // KNOWN, DELIBERATELY ACCEPTED LIMITATION (user's call, 2026-07-27): participants split the award while the
-    // innate bench share is still taken off the FULL award, so a creature that never fought can out-earn one
-    // that did — equal at Normal (0.5), strictly more at Easy (0.75). Pinned here so the inversion is a decision
-    // on the record rather than a regression someone "fixes" by accident. See docs/TODO.md → Participation XP.
+    // Accepted limitation, pinned on purpose: see STATE_MODEL.md (the innate party XP share).
     [Fact]
     public async Task BenchShareIsTakenOffTheFullAward_SoANonParticipantCanOutEarnAParticipant()
     {

@@ -253,7 +253,6 @@ public class BattleIntegrationTests
             }
         );
 
-        // Battle skips Console.ReadKey() when Console.IsInputRedirected (test context).
         var battle = new Battle(
             player,
             enemy,

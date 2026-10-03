@@ -3,14 +3,9 @@
 namespace creaturegame.Combat;
 
 /// <summary>
-/// Gen 1 (RBY) type effectiveness chart.
-/// Notable Gen 1 quirks preserved:
-///   - Ghost → Psychic = 0x (bug: should be 2x, but was 0x in RBY)
-///   - Poison → Bug     = 2x (changed to 0.5x in Gen 2+)
-///   - Bug   → Poison   = 2x (changed to 1x in Gen 2+)
-///   - Bug   → Psychic  = 2x (changed to 1x in Gen 2+)
-///   - Ice   → Fire     = 1x (changed to 0.5x in Gen 2+)
-///   - No Dark, Steel, or Fairy types exist in Gen 1.
+/// Gen 1 (RBY) type effectiveness chart, matching pret/pokered data/types/type_matchups.asm. The quirks it
+/// preserves (Ghost → Psychic = 0x, Poison ↔ Bug, Ice → Fire = 1x) and how later generations differ are in
+/// docs/GEN_DIFFERENCES.md → Type Chart Quirks.
 /// </summary>
 public class Gen1TypeChart : ITypeChart
 {
@@ -69,7 +64,6 @@ public class Gen1TypeChart : ITypeChart
             [DamageType.Ground] = 2.0,
             [DamageType.Flying] = 2.0,
             [DamageType.Dragon] = 2.0,
-            // Gen 1 quirk: Ice → Fire = 1.0 (not 0.5 as in Gen 2+)
         },
         [DamageType.Fighting] = new()
         {
@@ -87,7 +81,7 @@ public class Gen1TypeChart : ITypeChart
             [DamageType.Grass] = 2.0,
             [DamageType.Poison] = 0.5,
             [DamageType.Ground] = 0.5,
-            [DamageType.Bug] = 2.0, // Gen 1 quirk: 2x (nerfed to 0.5x in Gen 2+)
+            [DamageType.Bug] = 2.0, // Gen 1 quirk
             [DamageType.Rock] = 0.5,
             [DamageType.Ghost] = 0.5,
         },
@@ -122,9 +116,9 @@ public class Gen1TypeChart : ITypeChart
             [DamageType.Grass] = 2.0,
             [DamageType.Fighting] = 0.5,
             [DamageType.Flying] = 0.5,
-            [DamageType.Psychic] = 2.0, // Gen 1 quirk: 2x (changed to 1x in Gen 2+)
+            [DamageType.Psychic] = 2.0,
             [DamageType.Ghost] = 0.5,
-            [DamageType.Poison] = 2.0, // Gen 1 quirk: 2x (changed to 1x in Gen 2+)
+            [DamageType.Poison] = 2.0, // Gen 1 quirk
         },
         [DamageType.Rock] = new()
         {

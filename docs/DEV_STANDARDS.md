@@ -29,6 +29,16 @@ Guidelines for all `/dev` actions in this project.
 
 ## Design Rationale Placement (comments vs. docs)
 
+**The comment budget.** The codebase is comment-heavy and that is a defect being reduced — do **not** copy the
+density of the file you are in. **Default: no comment.** At most **one short line** tied to that exact line (a unit,
+a trap, a protocol quirk) or a one-line pointer to the owning doc. **Never** a multi-line block, a multi-paragraph
+XML doc, a narration of what the code does, a history note ("used to…"), a TODO/ticket reference, or a restatement
+of a Gen 1 fact or generation difference (`GEN_DIFFERENCES.md` owns those; an inline copy goes stale and has been
+wrong). Public-API XML docs are one summary line. Anything that is logic documentation — an algorithm, a formula,
+a tuning rationale, a state machine, a lifecycle or protocol, a decision or a rejected alternative — goes in a
+markdown design doc in the same commit, with at most a pointer in the code. When you edit a file, delete the
+comments your change makes stale and add none "to match".
+
 **A code comment may never be the first or only place a design decision is explained.** If a comment states
 *why* something is built a certain way — not just what the adjacent code does — that reasoning belongs in a
 design doc (`ARCHITECTURE.md` or the relevant per-domain doc: `ENCOUNTER_DESIGN.md`, `GAME_LOOP.md`,
@@ -43,14 +53,13 @@ remembering — got made and explained inline while implementing, because that's
 mid-`/dev`, and then existed **only** in that comment. Once that's the pattern the comment has to keep
 growing, because it's carrying weight a doc should be carrying.
 
-**What a comment MAY still say**, with no doc detour needed:
-- What the adjacent code does, when that isn't obvious from reading it (a non-obvious control-flow reason, a
-  parameter's meaning, a one-line pointer to the seam/doc that owns the "why").
-- A short, genuinely local aside that would be actively unhelpful in a doc — a one-off gotcha tied to *this
-  exact line* with no broader design content (e.g. "Next's upper bound is exclusive → +1 makes max
+**What a comment MAY still say**, with no doc detour needed — each **one line**:
+- A non-obvious fact about that exact line (a parameter's unit, a control-flow trap), or a pointer to the
+  seam/doc that owns the "why".
+- A genuinely local gotcha with no broader design content (e.g. "Next's upper bound is exclusive → +1 makes max
   inclusive").
-- The seam's **own** canonical XML doc (an `IBattleRules`/`IEvolutionRules`/etc. implementation explaining its
-  own per-generation behavior) — that IS the canonical location the docs point *at*, not a duplicate of one.
+- A seam member's per-generation XML doc, kept to a line or two; the explanation of how generations differ
+  lives in `GENERATION_SEAMS.md` / `GEN_DIFFERENCES.md`, not here.
 
 **What must go to a doc first:** a tuning constant with a rationale, a policy/algorithm design (a formula, a
 weighting scheme, a state machine), a historical "used to do X, changed because Y," or anything a *different*

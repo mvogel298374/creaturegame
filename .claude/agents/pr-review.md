@@ -87,6 +87,10 @@ Litmus for anything ambiguous: "when we build Gen 2, will this value/layout chan
 - **Docs & process** — documented models updated when changed; `TODO.md` **and** `PRODUCT_SPEC.md` updated for
   a finished, player-visible feature (both produced upstream by the mandatory `docs-cleanup` gate — verify
   they're present in the diff, don't re-derive them); commit proposed not made.
+- **Comment budget** (`DEFINITION_OF_DONE.md` §G) — the diff adds no multi-line comment block or multi-paragraph XML
+  doc, and no comment narrates the code, records history, cites a TODO, or restates a Gen 1 fact / generation
+  difference. More than a one-line pointer or one-line local gotcha → `CHANGES-REQUESTED`; "it matches the
+  surrounding file" is not a defence. Logic documentation belongs in markdown, in the same commit.
 - **Design-rationale placement** (`DEFINITION_OF_DONE.md` §G, `DEV_STANDARDS.md`) — no comment in the diff is
   the *only* place a design decision/tuning rationale/"why this and not that" lives. A comment stating *why*,
   not just what, needs a doc home (`ARCHITECTURE.md` or the relevant per-domain doc) with the comment cut to a

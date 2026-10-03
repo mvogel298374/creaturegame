@@ -70,7 +70,11 @@ hard gate to the pipeline but soft to the user: only the user waives a requireme
   sequence) and must already be staged in the finishing commit by the time `pr-review` runs.
 - Commit message proposed; commit only on explicit user approval.
 
-**G. Design-rationale placement** (`DEV_STANDARDS.md` → *Design Rationale Placement*)
+**G. Comment budget and design-rationale placement** (`DEV_STANDARDS.md` → *Design Rationale Placement*)
+- **Comment budget:** the diff adds no multi-line comment block and no multi-paragraph XML doc; no comment narrates
+  what the code does, records history, cites a TODO/ticket, or restates a Gen 1 fact or generation difference.
+  Anything beyond a one-line pointer or a one-line local gotcha is `CHANGES-REQUESTED`. Matching a neighbouring
+  file's comment density is not a defence.
 - No comment in the diff is the *only* place a design decision, tuning rationale, or "why this and not that"
   lives. A comment stating *why* (not just what) — a formula's rationale, a policy/algorithm design, a
   historical "used to do X, changed because Y" — has a home in a design doc, with the comment cut to a

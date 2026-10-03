@@ -22,6 +22,7 @@ them up front burns ~25k tokens before the work is even scoped; almost none of i
 | `docs/GAME_LOOP.md` | working on the **run/roguelite loop** — the game-loop ↔ event model (battle & heal as events), the logic-drives-sequence rule, and the target event abstraction. |
 | `docs/ENCOUNTER_DESIGN.md` | working on **encounters/acquisition** — the biome-graph run model, the `IEnemyArchetype` strength tiers, the type-themed pool, and the two gated acquisition channels (boss catch + themed draft). |
 | `docs/GENERATION_SEAMS.md` | adding a gen-variable rule or a new generation — the seams (`ITypeChart`, `IBattleRules`, `IStatCalculator`) + the §5.0 gen-agnostic checklist. |
+| `docs/RECONNECT_RESILIENCE.md` | working on **reconnect/refresh behaviour** — the emitter's replay cache, open-prompt replay, the abandon timer, multi-tab policy; the provisional designs and their test plan. |
 | `docs/GENERATION_PROFILE.md` | working on the **generation switch** — the profile that bundles seams + content + region + theme, the gen-invariant list (`RunRules` and the node kinds are *not* per-gen), and the `TestAltProfile` falsification rule. |
 | `docs/DATA_IMPORT.md` | changing imported data — the `PokeApiConnector` pipeline, import-vs-runtime boundary, PokeAPI→model mapping. |
 | `docs/SPRITE_PRESENTATION.md` | touching creature-sprite/cry rendering or scoping a Phaser visual-FX pass — the current asset pipeline (source, wire convention, `BattleScene.ts`'s existing tween/tint FX) plus unratified presentation ideas for the existing genuine Gen 1 sprites. |
@@ -184,6 +185,25 @@ When an item is done, all of the following, not just the first:
   pointer to the design doc and the archive section) — see that file's own header for the exact format.
 
 ## Design Rationale Placement
+
+**The comment budget — read this before writing any code.** This codebase is comment-heavy, and that is a defect
+being reduced, not a style to match. **Do not imitate the surrounding comment density**: new and edited code follows
+this rule even inside a file full of long comments.
+
+- **Default: write no comment.** Name things so the code reads on its own.
+- **Allowed: one short line** (never a block) stating a non-obvious fact tied to that exact line — a unit, a trap,
+  a protocol quirk — or a one-line pointer to the doc that owns the reasoning (`// see docs/X.md §Y`).
+- **Not allowed:** multi-line comment blocks or multi-paragraph XML docs; narrating what the code does; history
+  ("used to…", "changed because…"); ticket or TODO references; restating a Gen 1 fact or a generation difference
+  (those live in `GEN_DIFFERENCES.md` — a code comment that restates them goes stale, and has been wrong before).
+  Public-API XML docs are one summary line; a seam member's per-generation doc stays to a line or two and points
+  at `GENERATION_SEAMS.md`.
+- **Logic documentation lives in markdown.** Any algorithm, formula, tuning rationale, state machine,
+  lifecycle/protocol, decision record or rejected alternative goes in the relevant design doc (`ARCHITECTURE.md`
+  or the per-domain doc), **written in the same commit** as the code. The code gets at most the one-line pointer.
+- **Editing a file:** delete any comment your change makes stale; do not add comments to "match" its neighbours.
+- **Enforced** at `pr-review` (`DEFINITION_OF_DONE.md` §G): a comment-heavy diff is `CHANGES-REQUESTED`. Full rule
+  → `DEV_STANDARDS.md` → **Design Rationale Placement**.
 
 **A code comment is never the only place a design decision lives.** If a comment explains *why* something is
 built a certain way — a tuning rationale, a policy/algorithm design, a "used to do X, changed because Y" — that

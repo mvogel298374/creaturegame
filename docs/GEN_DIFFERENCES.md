@@ -29,7 +29,7 @@ A reference doc covering every major system across all main-series generations �
 |:-----------|:-----:|:--------|
 | I | **15** | No Steel, Dark, or Fairy |
 | II | **17** | **+ Steel** (immune to Poison; resists 11 types), **+ Dark** (immune to Psychic; resists Ghost/Dark) |
-| II | 17 | Ghost → Psychic fixed from 0× to **2×**; Poison→Bug and Bug→Poison both changed from 2× to ½× |
+| II | 17 | Ghost → Psychic fixed from 0× to **2×**; Poison→Bug dropped from 2× to **1×**; Bug→Poison dropped from 2× to **½×**; Ice→Fire rose from 1× to **½×** |
 | VI | **18** | **+ Fairy** (immune to Dragon; resists Fighting/Bug/Dark; weak to Steel/Poison). Steel loses Ghost and Dark resistances (both become 1×) |
 | IX | 18 | No new types. Hail weather condition renamed/reworked into **Snow** |
 
@@ -97,9 +97,11 @@ Where A = Attack (or Special), D = Defense (or Special), with no Sp. Atk/Sp. Def
 
 #### Type Chart Quirks (Gen 1 only)
 - **Ghost → Psychic = 0×** (programming bug; intended 2×)
-- **Poison → Bug = 2×** (later reversed)
-- **Bug → Poison = 2×** (later reversed)
-- **Ice → Fire = 1×** (neutral in Gen 1; stays this way through future gens on the Ice side)
+- **Poison → Bug = 2×** (Gen 2+: 1×)
+- **Bug → Poison = 2×** (Gen 2+: ½×)
+- **Ice → Fire = 1×** (Gen 2+: ½×)
+- Verified 2026-10-03 against pret/pokered and pret/pokecrystal `data/types/type_matchups.asm`. Bug → Psychic is 2× in
+  both generations, so it is not a quirk.
 - No Steel, Dark, or Fairy types
 
 #### Binding / Trapping Moves
@@ -124,7 +126,7 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
   **Engine status (as of 2026-09-20): partly modelled.** `IBattleRules.FaintEndsTurnImmediately`
   (`creaturegame/Combat/IBattleRules.cs`) covers only fact (4): `Battle` still runs both actions, then both
   creatures' residuals at end of turn (skipped if anyone fainted from a direct hit), so facts (1)–(3) are
-  **not** yet modelled — tracked as an open, unplanned item, `docs/TODO.md` → Known Gaps ("Gen 1 has NO
+  **not** yet modelled — tracked as an open, unplanned item, `docs/TODO.md` §4.2 ("Gen 1 has no
   end-of-turn residual phase"). The fix belongs behind an `IBattleRules` seam alongside
   `FaintEndsTurnImmediately`. The Disable-lock and binding-trap countdowns are the one exception to all of
   this — Gen 1 ticks those every turn regardless of a faint (`StatusResolver.TickTurnCounters`), so they're
@@ -191,8 +193,9 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
 
 #### Type Chart Fixes
 - Ghost → Psychic corrected to **2×** (fixing the Gen 1 bug)
-- Poison → Bug: 2× → **½×**
+- Poison → Bug: 2× → **1×** (the interaction is removed)
 - Bug → Poison: 2× → **½×**
+- Ice → Fire: 1× → **½×**
 - Steel and Dark types added with full interaction tables
 
 #### Move and Mechanic Fixes
