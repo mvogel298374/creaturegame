@@ -8,6 +8,32 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## R1d-b — the abandon-timer race ✅ DONE (2026-10-03)
+
+**Was** `TODO.md` §1 row 2 / §2 "R1d-b", designed in `RECONNECT_RESILIENCE.md` (section removed from that doc once
+shipped). Web-layer reliability fix; no player-visible behavior change, so no `PRODUCT_SPEC.md` entry.
+
+**What was wrong.** `ActiveBattle.ScheduleAbandon`'s continuation tested task state (`t.IsCanceled`), not whether
+*that* timer was still the current one. If the grace delay completed at the instant a reconnect called
+`CancelAbandon()`, the continuation was already scheduled and called `Input.Cancel()` on a live run, killing the
+run on a successful reconnect.
+
+**Acceptance.** A timer whose grace elapsed after it was cancelled or replaced never cancels the input.
+
+**What changed.** `creaturegame.Web/Battle/GameSessionManager.cs`: `ScheduleAbandon` returns the armed
+`CancellationTokenSource`; its continuation calls `OnGraceElapsed(cts)`, which, under `_lock`, acts only if `cts` is
+still the current `_abandonCts` (reference-equal) and not cancelled, then nulls the field and calls `Input.Cancel()`
+inside the lock (`Cancel` completes TCSs with `RunContinuationsAsynchronously`, so no re-entrancy). `CancelAbandon`
+already nulls the field, which makes the reference check work.
+
+**Tests.** `tests/creaturegame.Tests/Integration/Web/AbandonTimerTests.cs`, deterministic (no sleeps): the current
+timer cancels the input; a reconnect-cancelled timer does not; a replaced timer does not.
+
+**Gates.** `format-gate` pass; `test-runner` and `pr-review` skipped by the user (tests run manually);
+`requirements-review` not applicable.
+
+---
+
 ## Bag scope decision — per-run; meta layer later; no server-restart saves ✅ DECIDED (2026-10-03)
 
 **Was** `TODO.md` §1 #1 / §8 "Bag scope" (*per-run vs. meta-progression*), which gated bag persistence, `save.db`,

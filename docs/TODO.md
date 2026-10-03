@@ -38,7 +38,7 @@
 | # | Item | Cost | Ready? (DoR) | Why this slot / what it unblocks |
 |:-:|:-----|:----:|:-------------|:---------------------------------|
 | 1 | **Three data/engine fixes, verified at pokered first** — Full Restore on a statused full-HP creature; Psychic's Special-drop chance; X Accuracy (§3.2) | S ×3 | ✗ per fix: Gen 1 source not yet fetched; quirk to test and data-vs-runtime boundary not stated | Small, localised, each pinned by a test that currently encodes the wrong value. |
-| 2 | **R1d-b — the abandon-timer race** (§2) | S | ✅ acceptance, quirk, dependencies in `RECONNECT_RESILIENCE.md`; no gen-variable surface | ~5 lines + a deterministic test; makes R1d-a safe to add. |
+| 2 | **`test.ps1 -Filter`** — one sanctioned path for single-test runs (§7.1) | S | ✅ all seven DoR items answered in §7.1 | Tiny and fully specified; ends the raw `dotnet test --filter` workaround in `CLAUDE.md` so every test run reports the same `TEST SUMMARY`. |
 | 3 | **Dev-script and pre-commit-hook gaps** (§7.1) | S–M | ✗ no per-script acceptance conditions | Protects every later commit and test run; the hook has blind spots (`.csproj`, `*.db`, deletes). |
 | 4 | **R1b items 6–9** (§2) | S | ⚠️ 6 is a decision; 7–9 need a one-line acceptance each | Item 6 needs only your yes/no; 7–9 are one-liners. |
 | 5 | **Verification pass over the unverified findings** (§3, §5, §7) | S–M | ✗ no scope or output format (batch size; what "confirmed" means) | Cheap read-only agents in batches; turns ~45 "reviewer's reading" items into confirmed work or discards. Opens up everything below it. |
@@ -56,7 +56,7 @@
 ## 2. Reliability — reconnect (designed in [`RECONNECT_RESILIENCE.md`](RECONNECT_RESILIENCE.md), provisional-pending-`/plan`)
 
 Verified in code 2026-10-03. Fixed and archived already: the flee stale-cache, the 60 s grace, the client replay
-dedupe, lost modal answers, and the `RunFaulted` notice. The server replaying on every reconnect is an **accepted
+dedupe, lost modal answers, the `RunFaulted` notice, and the abandon-timer race (R1d-b). The server replaying on every reconnect is an **accepted
 design** (it cannot tell a refresh from a blip), not a bug.
 
 - **R1d-a — an open blocking prompt is not replayed (strands the run).** Ten prompts park the run on a
@@ -65,9 +65,6 @@ design** (it cannot tell a refresh from a blip), not a bug.
   with any of the ten prompts open → the modal reappears and is answerable and the run continues; an answered
   prompt never reappears; a replayed shop shows the current balance. **Design:** the emitter caches the open
   prompt and replays it last; cleared by one `PromptAnswered` hook. **Needs-decision:** design points in the doc.
-- **R1d-b — the abandon timer can cancel a just-reconnected run (S).** The timer continuation tests task state,
-  not whether it is still the current timer. **Acceptance:** a timer whose grace elapsed after it was cancelled or
-  replaced never cancels the input; tested deterministically via `OnGraceElapsed(oldCts)`.
 - **R1d-c — a second tab on the same `gameId` silently takes over.** **Needs-decision:** the recommended policy is
   last tab wins, with the displaced tab told via a `SessionTakenOver` notice that must **not** clear `activeGame`
   (it is shared `localStorage`). **Acceptance:** second tab → first tab shows the notice and returns to Title; the
@@ -370,9 +367,9 @@ The stat-selection abstraction is done. Open:
   `test.ps1` skips it when the stack is down, so nothing catches a red suite until someone asks for a run.
 - [ ] **`GameSessionManager` connection lifecycle** (M) — abandon grace, pending-session eviction TTL and the
   run-loop `Task.Run` are covered by neither suite (entangled with `IHubContext` + `Task.Run` + wall-clock timers;
-  needs an injectable clock). Also untested: `SetItemChoice`'s unknown-id fallback (`:441-448`), `DetachConnection`'s
-  stale-connection guard (`:657-667`) and `ScheduleAbandon`/`CancelAbandon` (`:748-774`) — reachable without
-  SignalR, and the paths behind §2.
+  needs an injectable clock). Also untested: `SetItemChoice`'s unknown-id fallback (`:457-464`), `DetachConnection`'s
+  stale-connection guard (`:679-680`) — reachable without SignalR, and the paths behind §2.
+  (`ActiveBattle.ScheduleAbandon`/`OnGraceElapsed`/`CancelAbandon`, `:765-796`, are now covered by `AbandonTimerTests`.)
 - [ ] *(small)* **`voluntary-switch.spec.ts` is still slow (~3 min standalone).** Its seed walk forces a themed draft
   via `forceDraft` yet still burns several seeds before reaching a switchable turn; investigate why seeds 1–3 fail
   even with the draft forced (e.g. battle-one losses) or give the walk a faster-fail path.
@@ -400,6 +397,16 @@ The stat-selection abstraction is done. Open:
 - **CI/deploy hardening:** `fly-deploy.yml` runs no tests before `flyctl deploy`; `setup-flyctl@master` is an
   unpinned moving branch and there is no `permissions:` block; tags can point at any commit. **The container runs as
   root** (`Dockerfile:44-52`; use `USER $APP_UID` after checking SQLite write needs).
+- **`test.ps1 -Filter` (S).** `test.ps1` has no way to run a subset of the .NET suite, so `CLAUDE.md` documents a raw
+  `dotnet test --filter` that bypasses its `TEST SUMMARY`; the rule is that every test run goes through `test.ps1`.
+  **Acceptance:** `.\test.ps1 -Dotnet -Filter AbandonTimerTests` runs only the matching tests and prints the normal
+  summary block with the filtered counts; with no `-Filter` the behaviour is unchanged; `CLAUDE.md`'s single-test
+  command points at it. **Design:** a `[string]$Filter` parameter passed to the .NET `dotnet test` call as
+  `--filter`; `-Filter` with `-Web`/`-E2E` only is ignored with a one-line notice. **Gen-variable surface:** none.
+  **Gen 1 source:** N/A (tooling). **Data vs runtime:** neither — a dev script. **Quirk to test:** a filter that
+  matches nothing must not read as a pass (`dotnet test` exits 0 on zero matches; the summary should report
+  `0/0`). **Dependencies:** none. (The pre-commit hook's own direct `dotnet test` call is the separate hook-gaps item
+  below.)
 - **Dev scripts:** `-StartStack` leaves the backend running (`test.ps1:119/148`, `e2e.ps1:180/357` kill only the
   `dotnet run` parent); `stop-dev.ps1:103` kills *anything* on :5173 (another project's Vite); `test.ps1 -E2E
   -StartStack` exits 0 when the backend never starts.

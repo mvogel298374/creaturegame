@@ -5,7 +5,7 @@
 > (DoR #2). The task entries and acceptance conditions live in `TODO.md` → *Reliability — reconnect*; this is
 > the design behind them. Already fixed and archived: the flee stale-cache, the 60 s grace, the client replay
 > dedupe (`TODO_ARCHIVE.md` → *Repo-sweep R1 — reconnect replay mishandled…*), lost modal answers
-> (*…lost modal answers…*), and the `RunFaulted` notice (*…five small fixes*).
+> (*…lost modal answers…*), the `RunFaulted` notice (*…five small fixes*), and the abandon-timer race (*R1d-b*).
 >
 > **Read it when:** touching `SignalRBattleEventEmitter`, `GameSessionManager.AttachConnection`/`DetachConnection`,
 > `SignalRInput`, or the client's `useBattleHub` replay handling. See also `ARCHITECTURE.md` §2.7 (the session
@@ -17,11 +17,12 @@
 `BiomeNodePlanRevealed`, `BattleStarted`, `TurnStarted` — and `GameSessionManager.ReEstablishClient` replays them
 (after the presentation echo) on **every** (re)connect. While no connection is current, `Send` drops events by
 design. The client skips a replay it already holds (`battle/replayDedupe.ts`, arrival-order refs). Reconnect also
-calls `CancelAbandon()`, so a reconnected run has no timer left to rescue it.
+calls `CancelAbandon()`, so a reconnected run has no timer left to rescue it; a timer that already fired is
+ignored unless it is still the current one (`OnGraceElapsed`).
 
-**Ordering.** (a) first — it is the only item that strands a run. (b) rides with it (same file, ~5 lines). (d) next
+**Ordering.** (a) first — it is the only item that strands a run. (d) next
 (it shares (a)'s replay touch-points, and the sprite fix shares a `BattleStarted` change). (c) after the policy
-question is answered. The cross-cutting test plan at the end covers all four plus the verification gaps.
+question is answered. The cross-cutting test plan at the end covers a, c and d plus the verification gaps.
 
 ## R1d-a. A refresh — or a blip — while a blocking prompt is open strands the run
 
@@ -62,22 +63,6 @@ question is answered. The cross-cutting test plan at the end covers all four plu
 - **Falsifiable guard (so an 11th prompt can't be forgotten).** A reflection test: every private `volatile
   TaskCompletionSource<…>` field on `SignalRInput` other than the turn handshake has a `PromptEvent` subclass, and
   the emitter's replay includes each — adding a blocking prompt without a cached event fails it.
-
-## R1d-b. The abandon timer can still cancel a run that just reconnected
-
-- **What is wrong (verified).** `ActiveBattle.ScheduleAbandon`'s continuation tests `t.IsCanceled` (task state), not
-  whether *this* timer is still the current one. If the grace delay completes at the instant a reconnect calls
-  `CancelAbandon()`, the continuation is already scheduled and calls `Input.Cancel()` on a live run. Narrow window,
-  real consequence (the player's run dies on a successful reconnect).
-- **Acceptance.** A timer whose grace has elapsed *after* it was cancelled/replaced never cancels the input.
-- **Design.** Pull the continuation body into `OnGraceElapsed(CancellationTokenSource cts)`: under `_lock`, return
-  unless `ReferenceEquals(_abandonCts, cts) && !cts.IsCancellationRequested`; then null the field and call
-  `Input.Cancel()` **inside** the lock (`Cancel` completes TCSs with `RunContinuationsAsynchronously`, so no
-  re-entrancy into `_lock`). `CancelAbandon` already nulls the field, which is what makes the reference check work.
-- **Quirk to test, deterministically:** call `CancelAbandon()` and *then* `OnGraceElapsed(oldCts)` — simulating the
-  continuation that was already queued — and assert the input is **not** cancelled; and the plain case (no
-  reconnect) still cancels. No sleeps, no race-hunting.
-- **DoR.** Gen-variable: none. Runtime/web only. Dependencies: none.
 
 ## R1d-c. A second tab on the same `gameId` silently takes over — **needs a policy decision**
 
@@ -134,11 +119,11 @@ question is answered. The cross-cutting test plan at the end covers all four plu
   refresh restores all three; the pin matches; a refresh mid-boss keeps the framing. Dependencies: none, but it is
   sequenced after (a) because both extend `ReplayLastKnownState` and its tests.
 
-## Test plan (covers a–d and the open verification gaps)
+## Test plan (covers a, c, d and the open verification gaps)
 
 - **Unit (C#, `SessionResumeTests` style):** open prompt cached/replayed last and in order; replaced by the next
   prompt; cleared via `PromptAnswered`, `RunEnded`, `CreatureFled`; shop balance follows `ShopItemPurchased`; the
-  reflection guard above; `OnGraceElapsed` as in (b); `AttachConnection` twice → `SessionTakenOver` to the previous
+  reflection guard above; `AttachConnection` twice → `SessionTakenOver` to the previous
   connection and the replay to the new; snapshot contents after N biomes/nodes.
 - **Unit (Vitest):** `transportNotices` mapping (incl. the `clearActiveGame: false` case); `expandEvent` for a
   replayed prompt; the snapshot step applies **after** a replayed `BiomeEntered` (the timing hazard) and is

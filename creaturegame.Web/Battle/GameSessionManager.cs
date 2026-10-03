@@ -762,7 +762,7 @@ sealed class ActiveBattle
     private CancellationTokenSource? _abandonCts;
 
     /// <summary>Arm a timer that abandons the battle after <paramref name="grace"/> unless a reconnect cancels it.</summary>
-    public void ScheduleAbandon(TimeSpan grace)
+    public CancellationTokenSource ScheduleAbandon(TimeSpan grace)
     {
         lock (_lock)
         {
@@ -770,14 +770,19 @@ sealed class ActiveBattle
             var cts = new CancellationTokenSource();
             _abandonCts = cts;
             _ = Task.Delay(grace, cts.Token)
-                .ContinueWith(
-                    t =>
-                    {
-                        if (!t.IsCanceled)
-                            Input.Cancel(); // grace expired → unblock the battle loop
-                    },
-                    TaskScheduler.Default
-                );
+                .ContinueWith(_ => OnGraceElapsed(cts), TaskScheduler.Default);
+            return cts;
+        }
+    }
+
+    public void OnGraceElapsed(CancellationTokenSource cts)
+    {
+        lock (_lock)
+        {
+            if (!ReferenceEquals(_abandonCts, cts) || cts.IsCancellationRequested)
+                return;
+            _abandonCts = null;
+            Input.Cancel();
         }
     }
 
