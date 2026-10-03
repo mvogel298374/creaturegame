@@ -97,6 +97,37 @@ useBattleHub.ts}`, `ClientApp/src/battle/timeline.ts`.
 prompt after a refresh. This is the already-documented Known Gap in `TODO.md` → *Known Gaps* ("Session Resume doesn't
 cover a reconnect during a between-node blocking prompt"); it was not duplicated as a new item.
 
+### R1b follow-ups 1–5 from this fix's `pr-review` (verdict PR-READY) ✅ DONE (2026-10-03)
+
+The cheap, no-behaviour-change follow-ups the review recommended. Items 6–9 of that list (confirm rapid shop BUY
+clicks all being honoured is intended; three advisories) remain open in `TODO.md` → *R1b*, keeping their numbers.
+
+1. **Test the branch the fix exists for.** All five original shop tests sent the second answer *before* awaiting
+   `first`, so they only hit the "pending TCS already completed" path. Added
+   `SignalRInputTests.ShopActions_LeaveArrivingAfterBuyWasConsumed_IsServedByTheNextPrompt` (send BUY, await the
+   first prompt so it is cleared, send LEAVE, assert the next `ChooseShopActionAsync` is already completed with
+   LEAVE — the "no prompt pending, shop open" branch).
+2. **Test that serving a queued LEAVE clears the backlog.** Added
+   `SignalRInputTests.ShopActions_ServingAQueuedLeave_ClearsTheRestOfTheBacklog` (BUY, LEAVE, stray BUY all sent
+   before awaiting; first = BUY, second = LEAVE, a third prompt is not completed).
+3. **`RESTORE_PROMPT`'s `key` is now tied to its `value` by type.** The `RESTORE_PROMPT` action in `timeline.ts` is
+   a mapped type over `PromptKey`; `submitPromptAnswer` / `PromptAnswer` / `answerPrompt` are generic over
+   `K extends PromptKey`. One `as Action` cast remains inside the generic `submitPromptAnswer` (TypeScript can't
+   narrow the mapped union through a generic `K`). Verified a mismatched key/value in a concrete literal no longer
+   compiles. Types only.
+4. **Documented the accepted "rejected-after-sent" trade-off** in `ARCHITECTURE.md` §2.7 ("Accepted trade-off"
+   paragraph): SignalR also rejects an already-sent call when the connection closes before the reply, so the
+   server may have consumed the answer while the client re-opens a modal that is no longer live. Accepted because
+   it is mostly harmless (a one-shot answer is dropped; a shop BUY is dropped because the shop is closed); a
+   prompt-id protocol would cover it.
+5. **`Cancel_MidShop_…` now pins what it pins.** Renamed `Cancel_WithANonEmptyShopBacklog_StillMakesTheNextShopPromptThrow`
+   with an explanatory comment (it passes regardless of backlog clearing, because `_cancelled` never resets and
+   `ChooseShopActionAsync` throws at its cancelled check first); `SignalRInput.Cancel`'s
+   `_shopOpen = false; _shopBacklog.Clear()` lines are marked as housekeeping.
+
+Files: `tests/creaturegame.Tests/Integration/Web/SignalRInputTests.cs`, `creaturegame.Web/Battle/SignalRInput.cs`,
+`ClientApp/src/{battle/timeline.ts,hooks/answerPrompt.ts,hooks/useBattleHub.ts}`, `ARCHITECTURE.md`.
+
 ---
 
 ## Repo-sweep R1 — curing a status didn't clear `CarriedStatus` ✅ DONE (2026-10-02)

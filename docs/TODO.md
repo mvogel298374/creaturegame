@@ -936,43 +936,18 @@ Fixing a data/engine item usually also means updating the test that currently pi
 ### R1b — follow-ups from the lost-answer fix's `pr-review` (2026-10-02, verdict PR-READY)
 
 The fix itself (archived: `TODO_ARCHIVE.md` → *Repo-sweep R1 — lost modal answers…*) passed `pr-review` with no
-blocking findings; these are the cheap, no-behaviour-change follow-ups it recommended, **in priority order**.
-All are unadjudicated — the user decides fix / waive / defer per item (recommendation: 1–4 and 6 together,
-about 20–30 min; 5 as a rename; leave 7–9 unless they bite).
+blocking findings. Its cheap follow-ups 1–5 (two backlog tests, the type-tied `RESTORE_PROMPT`, the ARCHITECTURE
+§2.7 trade-off note, the `Cancel_…` test rename) are done and archived in that same entry. Items 6–9 below keep
+their original numbers and are unadjudicated — the user decides fix / waive / defer per item.
 
-1. **Test the branch the fix actually exists for** (`SignalRInputTests.cs`, shop section). All five shop tests
-   send the second answer *before* awaiting `first`, so they only hit the "pending TCS already completed" path.
-   Add `ShopActions_LeaveArrivingAfterBuyWasConsumed_IsServedByTheNextPrompt`: start a prompt, send BUY,
-   `await Within(first)` (the prompt is now cleared), send LEAVE, assert the next `ChooseShopActionAsync` is
-   already completed with LEAVE (~10 lines) — the "no prompt pending, shop open" branch the
-   `SignalRInput.cs` comment describes only in words.
-2. **Test that serving a queued LEAVE clears the backlog** (`SignalRInputTests.cs`; `CloseShopIfLeaving` at
-   `SignalRInput.cs:312`). Start a prompt, send BUY, LEAVE, then a stray BUY, all before awaiting; assert `first`
-   = BUY, the second prompt = LEAVE, and a third prompt is **not** completed (~12 lines).
-3. **Tie `RESTORE_PROMPT`'s `key` to its `value` by type** (`timeline.ts` Action union, `answerPrompt.ts`,
-   `battleReducer.ts`). Today `value` is the union of every prompt type and the reducer's computed-key spread is
-   unchecked, so `{ key: 'rewardChoice', value: <a shop prompt> }` compiles. Build the action from a mapped type
-   (`{ [K in PromptKey]: { type: 'RESTORE_PROMPT'; key: K; value: NonNullable<BattleState[K]> } }[PromptKey]`) and
-   make `PromptAnswer`/`submitPromptAnswer` generic over `K extends PromptKey` (~10 lines, types only).
-4. **Document the accepted "rejected-after-sent" trade-off** (`ARCHITECTURE.md` §2.7, the *modal answer must not be
-   lost* bullet; one sentence). The rationale assumes a rejected call means the server never got the answer, but
-   SignalR also rejects a call already sent when the connection closes before the reply: the server consumed it
-   and the client re-opens a modal that is no longer live. Mostly harmless (a one-shot answer to it is dropped; a
-   shop BUY is dropped because the shop is closed) — but it is the exact case a prompt-id protocol would have
-   covered, so record that it was accepted and why.
-5. **Make `Cancel_MidShop_…` pin what it actually pins** (`SignalRInputTests.cs:281-293`,
-   `SignalRInput.cs` `Cancel`). It passes even if `Cancel` doesn't clear the backlog, because `_cancelled` never
-   resets and `ChooseShopActionAsync` throws at its cancelled check before reaching the backlog. Rename it to
-   say "cancel throws even with a non-empty backlog" and mark the `_shopOpen = false; _shopBacklog.Clear()`
-   lines as housekeeping — or drop them (one-line edit).
 6. **Confirm the behaviour change is intended:** rapid repeated shop BUY clicks are now all honoured where some
    were dropped. (The `PRODUCT_SPEC.md` Session-resume wording half of this item was fixed 2026-10-02.)
 7. *Advisory —* a restored shop uses the balance from the LEAVE click (`battleReducer.ts` `RESTORE_PROMPT`); a
    `SHOP_PURCHASED` landing between the click and the restore leaves `shop.balance` stale vs. `gold`. Cosmetic
    (the server rechecks every buy); a fix would apply `state.gold` to `balance` when restoring the shop.
 8. *Advisory —* nothing tests that each of the ten `answerPrompt` callbacks in `useBattleHub.ts:193-255` pairs the
-   right slot, hide action and hub method (the callbacks they replaced weren't tested either; item 3 catches a
-   slot/value mismatch but not a wrong hide action).
+   right slot, hide action and hub method (the callbacks they replaced weren't tested either; the archived item 3
+   now catches a slot/value mismatch at compile time but not a wrong hide action).
 9. *Advisory —* `SignalRInput.cs:334` ends the shop only on LEAVE (`action is not LeaveShop`), while
    `ShopRunEvent` ends on any non-BUY answer. With only BUY and LEAVE today they agree; if a third `ShopAction`
    is ever added, `action is not BuyShopItem` would keep them in step.

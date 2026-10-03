@@ -218,6 +218,11 @@ Each entry: **Decision · Why · Where it lives.**
     is consumed, or `Cancel`) and is cleared on LEAVE, so a stray click on the closing modal can never leak into
     the *next* shop's first prompt. The one-shot handshakes keep drop-when-nothing-pending: queueing there
     would let a stale answer be consumed by an unrelated later prompt of the same type.
+    **Accepted trade-off:** the restore assumes a rejected `invoke` means the server never got the answer, but
+    SignalR also rejects a call that was already sent when the connection closes before the reply. Then the
+    server consumed the answer and the client re-opens a modal that is no longer live. This is mostly harmless
+    (a one-shot answer to it is dropped; a shop BUY is dropped because the shop is closed), but it is exactly
+    the case a prompt-id protocol would have covered — it was accepted for the same cost reason as above.
   - **A crashed run is reported by a transport-level `RunFaulted`, not a `BattleEvent`.** `GameSessionManager`'s
     run-task catch-all removes the session, so `SignalRBattleEventEmitter.SendRunFaulted()` tells the current
     connection first; `useBattleHub` clears the active game and bounces to Title with a notice (same exit as a

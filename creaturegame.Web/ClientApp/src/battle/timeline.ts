@@ -206,7 +206,8 @@ export type Action =
   | { type: 'HIDE_SWITCH_IN' }
   // Re-opens a blocking prompt whose answer never reached the server (the hub call was rejected while the
   // connection was down) — see hooks/answerPrompt.ts. Only fills an EMPTY slot, so a newer prompt wins.
-  | { type: 'RESTORE_PROMPT'; key: PromptKey; value: NonNullable<BattleState[PromptKey]> }
+  // key and value are tied per prompt, so a shop prompt can't be restored into the rewardChoice slot.
+  | { [K in PromptKey]: { type: 'RESTORE_PROMPT'; key: K; value: NonNullable<BattleState[K]> } }[PromptKey]
   // A replacement was sent in — retarget the player nameplate (name/level/HP/status) onto the incoming creature.
   | { type: 'SWITCHED_IN'; id: number; name: string; level: number; hp: number; maxHp: number; status: string }
   // The lead was reassigned OUT of battle (the between-biome swap, or the post-mutual-KO promotion): retarget the

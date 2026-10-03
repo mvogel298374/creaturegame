@@ -447,6 +447,7 @@ public sealed class SignalRInput : IBattleInput
         lock (_shopLock)
         {
             _shopTcs?.TrySetCanceled();
+            // Housekeeping: _cancelled already makes every later prompt throw before it reaches the backlog.
             _shopOpen = false;
             _shopBacklog.Clear();
         }

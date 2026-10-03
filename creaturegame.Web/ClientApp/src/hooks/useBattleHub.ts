@@ -199,7 +199,7 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
   // Every blocking-prompt answer below goes through this: hide the modal at once, send, and RESTORE the modal if
   // the send is rejected (the reconnect window) — see answerPrompt.ts. `key` names the prompt slot to restore.
   const answerPrompt = useCallback(
-    (key: PromptKey, hide: Action, method: string, ...args: unknown[]) =>
+    <K extends PromptKey>(key: K, hide: Action, method: string, ...args: unknown[]) =>
       submitPromptAnswer({
         key,
         prompt: stateRef.current[key],

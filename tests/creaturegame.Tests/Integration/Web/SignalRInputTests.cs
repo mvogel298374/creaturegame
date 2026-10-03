@@ -277,8 +277,42 @@ public class SignalRInputTests
     }
 
     [Fact]
-    public async Task Cancel_MidShop_MakesTheNextShopPromptThrowInsteadOfServingTheBacklog()
+    public async Task ShopActions_LeaveArrivingAfterBuyWasConsumed_IsServedByTheNextPrompt()
     {
+        // The branch the soft-lock fix exists for: the BUY has been fully consumed (the prompt is cleared) and the
+        // shop loop hasn't re-prompted yet when LEAVE lands — no pending TCS, shop still open.
+        var input = new SignalRInput();
+
+        var first = input.ChooseShopActionAsync(EmptyShop);
+        input.SetShopAction(new BuyShopItem(0));
+        await Within(first);
+        input.SetShopAction(LeaveShop.Instance);
+
+        var second = input.ChooseShopActionAsync(EmptyShop);
+        Assert.True(second.IsCompleted);
+        Assert.Same(LeaveShop.Instance, await Within(second));
+    }
+
+    [Fact]
+    public async Task ShopActions_ServingAQueuedLeave_ClearsTheRestOfTheBacklog()
+    {
+        var input = new SignalRInput();
+
+        var first = input.ChooseShopActionAsync(EmptyShop);
+        input.SetShopAction(new BuyShopItem(0));
+        input.SetShopAction(LeaveShop.Instance);
+        input.SetShopAction(new BuyShopItem(1)); // a stray click after LEAVE
+
+        Assert.Equal(new BuyShopItem(0), await Within(first));
+        Assert.Same(LeaveShop.Instance, await Within(input.ChooseShopActionAsync(EmptyShop)));
+        Assert.False(input.ChooseShopActionAsync(EmptyShop).IsCompleted); // the stray BUY did not survive
+    }
+
+    [Fact]
+    public async Task Cancel_WithANonEmptyShopBacklog_StillMakesTheNextShopPromptThrow()
+    {
+        // Pins only the cancelled check at the top of ChooseShopActionAsync (Cancel's backlog clearing is
+        // housekeeping, not what makes this throw).
         var input = new SignalRInput();
 
         var first = input.ChooseShopActionAsync(EmptyShop);
