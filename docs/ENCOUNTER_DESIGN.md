@@ -41,7 +41,7 @@ A run is **not** the current flat endless chain. It plays out across a **graph o
   neighbour sample (a starter with no super-effective coverage, e.g. pure Normal, falls back to the sample).
 - **Regional origin** — every biome belongs to an overarching region: **Kanto** first (matches the Gen 1
   focus), Johto/etc. later. A run is seeded within a region. This "origin" axis lines up with the
-  **multi-generation roadmap** (`TODO.md` → *Multi-Generation*): a new region is largely a new biome set, not
+  **multi-generation roadmap** (`TODO.md` §4.4): a new region is largely a new biome set, not
   new loop code.
 
 The biome theme is the **cascade root** that ties the whole layer together:
@@ -104,7 +104,7 @@ deferred (only if the subset draw alone doesn't give enough variety).
    `PokemonGameAvailability` (`EncounterFactory.CreateEnemyAsync`) — excludes legendaries, statics, gifts, and
    fossils (19 of 151 in Gen 1), the canonical lucky-spike hazard. *Resilience:* if no availability rows exist
    (a minimally-seeded DB) the filter falls back to the full dex so the selector never starves. (Version-specific
-   Red/Blue/Yellow filtering stays deferred — see `TODO.md` *Known Gaps*.)
+   Red/Blue/Yellow filtering stays deferred — see `TODO.md` §4.2.)
 3. **Empty biomes never generate.** A biome whose Wild pool is empty for the active generation is **excluded at
    map-generation time** (`Biomes.Playable` returns only non-empty biomes) — it simply isn't placed. Within a
    *valid* biome, if the target-BST band finds no candidate, the band **widens in-theme** to the nearest-BST
@@ -455,7 +455,7 @@ biome — already on-theme, and impossible to roll something far outside the ban
   boss's own `Perfect`-DV / `Optimal`-moveset build, so the player doesn't get a min-maxed clone of the
   encounter they beat.
 - The in-battle Poké Ball throw (the Gen 1 catch-rate-vs-HP formula) is deliberately **out of scope** and stays
-  deferred in `TODO.md` → *Catch / Poké Ball effect*. Note authentic Gen 1 forbids catching a **Trainer's**
+  deferred in `TODO.md` §4.1 (*Catch / Poké Ball effect*). Note authentic Gen 1 forbids catching a **Trainer's**
   Pokémon at all, and Boss/Elite are modelled as trainer-analog tiers (they carry the trainer XP bonus) — so this
   post-win boss-catch offer is an **intentional roguelite liberty**, not the Gen 1 catch rule.
 - This is the design that **unblocks** the deferred *Item Acquisition · Bag Persistence · Catch* cluster in

@@ -31,8 +31,7 @@ battles by `BattleRunner`, not in the damage path), but it follows the identical
 `Gen1*.Instance` default, faithful data on `PokemonEvolution`, the gen/mode rule on the seam. A new generation
 implements all four; the engine and loop never change.
 
-> **Not a generation seam, but related:** `IRandomSource` (see `STATE_MODEL.md` / the
-> RNG section of `TODO.md`) controls *randomness*, not generation. It's orthogonal —
+> **Not a generation seam, but related:** `IRandomSource` (see `STATE_MODEL.md`) controls *randomness*, not generation. It's orthogonal —
 > `Gen1BattleRules` takes an `IRandomSource` so its rolls can be seeded, but the *rules*
 > and the *RNG* are independent concerns behind independent seams.
 
@@ -330,7 +329,7 @@ Implement all four interfaces — `Gen2TypeChart`, `Gen2BattleRules`, `Gen2StatC
 change. Expect the bulk of Gen 2 to be: the Special stat split (touches
 `IStatCalculator`, `Attributes`, and `GetOffensiveStat`/`GetDefensiveStat`), the
 stage-based crit formula, the corrected type chart, and the `0–100` accuracy scale. See
-the multi-generation roadmap in `TODO.md`.
+the multi-generation roadmap in `TODO.md` §4.4.
 
 **What a new generation must also supply on the *data* side** (import-time, not a seam — the engine reads the
 result from the DB; rationale → `ARCHITECTURE.md` §2.6, mapping → `DATA_IMPORT.md` §4.2):
@@ -345,7 +344,7 @@ result from the DB; rationale → `ARCHITECTURE.md` §2.6, mapping → `DATA_IMP
   generation != 1 until then) — the `GetOffensiveStat`/`GetDefensiveStat` seam is where the engine picks between
   them (the Special-model decision is part of adding the generation);
 - the remaining importer Gen-1-isms (types, moves, evolutions, game availability, `Program.cs`) are still to be
-  generation-scoped — `TODO.md` → *R1c*.
+  generation-scoped — `TODO.md` §4.4.
 
 The species base-stat / base-experience fix (2026-10-03) touched none of the four seams and passes the §5.0
 checklist: no new engine constants, no direct stat reads, no generation checks in the engine.
@@ -379,7 +378,7 @@ injected implementation. That's the seams working.
 ## 7. Future direction
 
 - **Gen 2 sprint:** the first real exercise of these seams. The Special split and the DB
-  schema work are scoped in `TODO.md` (Multi-Generation section).
+  schema work are scoped in `TODO.md` §4.4.
 - **Generation selection — ✅ this composition point now exists (2026-07-29).** It is
   `creaturegame/Generations/`: a `GenerationProfile` bundling the seams, a `GenerationProfiles`
   registry, and the generation threaded as a per-run parameter into `GameSessionManager`.

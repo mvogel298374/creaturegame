@@ -8,6 +8,834 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## TODO.md rehaul — finished records moved out of the live list ✅ DONE (2026-10-03)
+
+Everything below was **copied verbatim** from `TODO.md` when it was rebuilt as an active-work-only file
+(the rule: *finished work lives here, not in the TODO*). Nothing was summarised or edited; the blocks keep
+their original wording, including section-relative phrases such as "below" and "above". Open items that
+sat inside these sections were carried into the new `TODO.md`. Headings inside each block are shown as
+they were.
+
+### 1. The old header narrative: "Current state (2026-09-29)", the Tier 1–5 list and the notes under it
+
+````markdown
+## Current state (2026-09-29)
+
+The Gen 1 battle engine is **feature-complete** (all 165 moves, XP & level-up, learnsets, AI move selection,
+EV / Stat-Exp gain, evolution, in-battle item system incl. **Revive/Max Revive** and full party-targeting for
+Healing/StatusCure/PpRestore/Revive), and the roguelite run layer on top is playable end-to-end: the
+**Encounter Logic** biome-graph run (biome pick → randomised 4–6 nodes → Poké Center → next biome, per-run
+randomised **Town Map**, depth-scaled foes), the full **roster** (party of 6, both post-battle acquisition
+channels — themed draft + boss catch, between-biome lead choice, forced faint-switch, and the voluntary
+**In-Combat Switching**), the **Run Economy** (gold + rewards + the spend-gold **Shop node**), the **Reward
+Choice** modal (now including **TM/HM — Move-Teach Rewards**, a second move-acquisition channel offering a
+legal TM move as a reward-card pick — no HMs), the **level-aware XP curve + trainer bonus + Innate Party XP Share**,
+**Creature Naming** (a cancelable nickname on every acquisition path), **Creature Identity** (per-run creature
+ids; the event wire and client route by id, not display name), **Session Resume** (refresh/reopen-safe
+`gameId` persistence), the **CHECK POKEMON party-member picker**, the **Settings Menu** (sound volume + a
+three-tier difficulty/XP-pace dial), and **Generation Profile** Stages 1–4c (the generation axis, content
+scoping, and the Kanto Sage-skinned Town Map) are all done and archived (→ `TODO_ARCHIVE.md`).
+
+**Next up — tiered, restructured 2026-09-27 after a full pass over every open item in this file** (the
+2026-09-12 tiering's Tiers 0/1/3/3b are now fully shipped and archived, and are folded out of the list below —
+see `TODO_ARCHIVE.md` for their full records). Tiers are ordering, not strict sequence: Tier 1 is a standing
+user-sequenced commitment (2026-08-04) that stays ahead of Tiers 2–3 regardless; the rest is priority, not a
+hard dependency chain.
+
+- **Tier 1 — Generation Profile Stage 4d+** (the jointly-iterated surface catalog) — make Gen 1 an explicit,
+  swappable profile so a generation switch changes content, menus and look, not just battle math. **`/plan`
+  DONE (2026-07-29; Stage 4 re-planned as v2 on 2026-07-31)** — full design in
+  [`GENERATION_PROFILE.md`](GENERATION_PROFILE.md). **Stages 1–3 complete; Stage 4: 4a/4b/4c shipped, 4d+
+  open** (Stage 5 is the standing falsification rule) — task entry + staging below. **Sequenced ahead of Tiers
+  2–3 (2026-08-04, user's call).**
+- **Tier 2 — Item Acquisition · Bag Persistence · Catch** — the deferred cluster, unblocked by the acquisition
+  channels. Bag-scope decision (per-run vs. meta-progression) first, then `BallItemEffect`/catch
+  formula/animation. *(Item acquisition itself is already done via the Run Economy; bag persistence + catch
+  remain.)*
+- **Tier 3 — Game Loop & Progression** — progressive difficulty (good pairing point for the remaining
+  per-area encounter-table question — see *Known Gaps* — now that evolved forms, stone lines included, are
+  level-floored via **Species selection respects each species' evolution-chain floor**), the `PlayerSave`/`save.db`
+  layer (+ the heavier session-persistence option beyond the lightweight **Session Resume** already shipped),
+  Stone evolutions (waits on Catch above). Party + between-biome lead + forced-switch are done.
+- **Tier 4 — opportunistic polish + test-infra loose ends:** Web UI Polish (move-specific animations, text
+  feel, sprite FX joint sketch, Escape=B-cancel, `ConsoleInput`), and the test-infra items below (CI E2E step, `data-testid`, visual-regression, the
+  `evolution.spec.ts` gap, `GameSessionManager` connection-lifecycle coverage).
+- **Tier 5 — reference/housekeeping, no urgency:** Multi-Generation Data Model & Schema, User Documentation,
+  and the "watch, don't refactor speculatively" Tech Debt items.
+
+**Repo-wide code review sweep (2026-10-02) — findings awaiting adjudication**, tiered **R1–R4** in
+*Repo-Wide Code Review Sweep* below (R1 = players get stuck or lose control, R2 = correctness/fidelity/safety,
+R3 = robustness/UX/a11y, R4 = hygiene/nits). Separate from Tiers 1–5; the user places each item.
+
+**Open, unplanned, not placed in the tier list above:** Gen 1 has no end-of-turn residual phase — `Battle`'s
+turn shape differs from the real games' (see *Known Gaps* below). Needs a `/plan` before it can be tiered.
+
+**E2E flakiness note** (kept for the lesson, not as open work): `status.spec.ts` **fixed 2026-07-15** — root
+cause was a spec asserting a transient badge, not an engine bug; see *Browser-Based UI Testing* for the
+seed-≠-determinism lesson it taught. Still live: `endless-chain.spec.ts` *"a run ends when the player faints"*
+failed once in a full 2026-07-26 suite run — no `Run over` log line after 1m10s — but passes in **7.3 s** run
+alone; consistent with the documented "a long run accumulates abandoned server-side runs" degradation, not a
+code defect. `voluntary-switch.spec.ts` was failing standalone until 2026-10-02 (draft gate + seed drift after
+`0eb0d53`); fixed with a Dev-Mode `forceDraft` — only its ~3 min runtime remains open (*Browser-Based UI Testing*).
+(Web UI polish, Multi-Generation groundwork, User Documentation, and test-infra items are Tiers
+4–5 above, not repeated here.)
+
+**Settings Menu** — sound volume + difficulty→XP bonus, both shipped and archived (→ `TODO_ARCHIVE.md` →
+*Settings Menu — sound volume + difficulty (XP bonus) controls*); the difficulty dial's self-referential-scaling
+limitation is a known, user-waived follow-up, not open work.
+````
+
+### 2. Item Acquisition · Bag Persistence · Catch — the intro, "built vs. stubbed" and the DONE item-acquisition gate
+
+````markdown
+## Item Acquisition · Bag Persistence · Catch  ⟵ item acquisition DONE via Run Economy; bag persistence + catch remain
+
+**One interlocked cluster, deliberately deferred together** — each depended on the previous and on the
+Encounter Logic gate, which has since shipped (Encounter Logic Phase 4, archived) and cleared item acquisition
+itself (via the Run Economy, below). Bag persistence and catch are what remain open:
+- **Acquisition** can't be designed until the encounter / eligibility model exists (drop rates are meaningless
+  against an undefined distribution).
+- **Bag persistence** is meaningless until acquisition defines *what's* in the bag and *when* it's earned.
+- **Catch** is just one acquisition channel, and a random high-BST catch is the canonical balance hazard.
+
+> **"Catch" is likely a misnomer.** The player may receive Pokémon several ways — in-battle capture,
+> post-battle rewards, gifts/offers, picking from a curated set. Treat this as a broader **acquisition** layer
+> when designed; in-battle "catch" is one channel, not the whole feature.
+
+### Current state — built vs. stubbed (code anchors)
+- **Bag is transient** — `Items/Bag.cs` is in-memory `id → qty`, reseeded every run, never saved. Per-run:
+  consumed items stay gone; the Poké Center refills HP/PP/status, not the bag.
+- **Item acquisition (the item side) is now DONE** — the **Run Economy** replaced the old ×20 test loadout:
+  `EncounterFactory.BuildStartingBag` seeds a curated modest start and battle-win + Treasure/Mystery drops grow
+  it (web-layer `RewardCalculator` policy). So *item* acquisition is solved; **bag persistence** and **catch**
+  (below) are the remaining, still-deferred pieces of this cluster.
+- **Poké Balls are imported data only** — mapped to `ItemCategory.Ball`, but `ItemEffects.For(Ball)` returns
+  null ⇒ `ItemUseFailed`. The frontend hides Ball via `bag.ts isUsableInBattle` (Revive shipped 2026-07-19 and
+  is now conditionally shown — see `TODO_ARCHIVE.md` → Revive Items). `CatchRate` is already imported on
+  `PokemonSpecies` ✓.
+
+### 1 — Item acquisition (the design gate) · ✅ DONE via Run Economy
+- [x] The item-acquisition model is the **Run Economy** (see archive): battle-win drops + Treasure/Mystery
+  rewards, gated by the web-layer `RewardCalculator` (skewed rates so a lucky early haul can't trivialise a run),
+  replacing the fixed loadout. The between-encounter **Shop node** (spending gold) also shipped and is archived
+  (→ `TODO_ARCHIVE.md` → *Run Economy — gold, item rewards, transient bag & Treasure/Mystery nodes*, "Shop node"
+  follow-up). Nothing remains open under this heading.
+````
+
+### 3. Game Loop & Progression — the finished bullets and the section preamble
+
+````markdown
+## Game Loop & Progression
+
+**Prerequisites:** Catch Mechanic, `PlayerDbContext` / `save.db`. Intentionally deferred until combat fidelity
+is fully ironed out (the battle sim is the foundation). The **Endless Battle Chain** (done) is the first minimal
+slice; the items below are what it deliberately leaves out.
+````
+
+### 4. Game Loop & Progression — voluntary switching (done)
+
+````markdown
+- [x] **Voluntary in-battle switching** — a SWITCH turn action to swap the active creature mid-fight. ✅ DONE
+  (2026-07-25) as **In-Combat Switching** (all three stages incl. the out-of-PP menu affordance); full record
+  archived in `TODO_ARCHIVE.md`.
+````
+
+### 5. Game Loop & Progression — refresh/reconnect-safe session handling (done)
+
+````markdown
+- [x] **Refresh/reconnect-safe session handling** — the lightweight `gameId`-persistence option. ✅ DONE
+  (2026-09-14) as **Session Resume**; full record archived in `TODO_ARCHIVE.md`. The heavier `PlayerSave`/
+  `save.db` option (survives a server restart/redeploy, not just a client refresh) stays deferred to Tier 3
+  (this section).
+````
+
+### 6. Game Loop & Progression — cross-encounter status persistence (done)
+
+````markdown
+- [x] **Cross-encounter status persistence** — DONE (2026-06-10); major status carries across chain encounters,
+  volatiles reset per battle. See `STATE_MODEL.md §2` and `TODO_ARCHIVE.md`.
+````
+
+### 7. Generation Profile — the goal, the locked decisions, and Stages 1a–4c (incl. the Kanto Sage ornament pass and all four Town Map steps)
+
+````markdown
+## Generation Profile — make Gen 1 an explicit, swappable profile  ⟵ OPEN, `/plan` DONE (2026-07-29)
+
+> **Full design: [`GENERATION_PROFILE.md`](GENERATION_PROFILE.md).** This entry is the task; that doc is the
+> design (staging detail, the boundary rule, the falsification harness, DoR coverage).
+
+**The goal.** A generation switch should change the game *completely* — content, region, menus and look, not just
+battle math. Today "generation" is a **battle-math axis only**: four seams injected where `Battle`/`Creature` are
+built. Everything else is Gen 1 **by assumption, not by seam**.
+
+**Designed against Gen 1 alone — no Gen 2 content is built here. Upward compatibility is the deliverable.**
+
+**Decisions locked with the user (2026-07-29):** (1) Gen 1 only, upward-compatible; (2) presentation is per-gen in
+both senses — reskin **and** menu structure; (3) the roguelite layer is **flavour-only** (same node kinds, same
+flow, same possibilities — this is what keeps `RunRules` gen-neutral); (4) one generation per run, chosen at run
+start, threaded like `Difficulty`; (5) skin = Gen 1's layout **grammar**, not its palette (authentic 4-colour DMG
+green rejected — it would discard the type-badge colours and the contrast tuning in `index.css`); (6) battle menu
+= Gen 1's **2×2 grid with today's four verbs** (literal `FIGHT`/`PKMN`/`ITEM`/`RUN` rejected — `RUN` is not a turn
+action in this engine, so it would mean adding a flee feature, contradicting decision 3).
+
+> ⚠️ **Ship-blocking risk: upward compatibility is unfalsifiable with one profile.** You cannot prove a seam is
+> generation-agnostic when only one implementation exists — exactly the trap `GENERATION_SEAMS.md §5.0.1`
+> documents (two leaks that passed review *and* tests). Mitigation: a **test-only `TestAltProfile`** giving every
+> seam a second implementation. It is **not Gen 2** and carries no fidelity claim. Each stage lands with its leg
+> of it; a stage without one has demonstrated nothing.
+
+- [x] **Stage 1a — the axis + the `GameSessionManager` composition point** ✅ DONE (2026-07-29). New
+  `creaturegame/Generations/` namespace: `Generation` enum, `GenerationProfile` record (all-`required`
+  properties, so a new slice breaks every profile that omits it — a compile error as the reminder),
+  `Gen1Profile`, `GenerationProfiles` registry. Threaded `StartGameRequest.Generation` → `ParseGeneration` →
+  `RegisterSession` → `PendingSession` → `AttachConnection` → `ProfileFor`, mirroring `Difficulty`; parse +
+  lookup `internal` so tests hit the real path. `TypeChart`, `BattleRules` (previously never passed — `Battle`
+  fell back internally), `EvolutionRules` and the AI are now read off the profile **explicitly**. Registry
+  **throws** on an unregistered generation rather than serving Gen 1, with the boundary parse guaranteeing it
+  never sees untrusted input. Covered by `GenerationProfileTests` (14 cases) + `TestAltProfile`, Stage 1's
+  falsification leg.
+  - **AI decision (the §4.3 open question): the AI is on the profile.** `Gen1TrainerAi` is generation-*named*
+    but documents itself as a "generation-blind selection policy" whose Gen 1 leanings live in its evaluators —
+    so the whole construction is exposed as one `BuildAi` factory rather than pretending the policy class is
+    per-generation.
+- [x] **Stage 1b — `EncounterFactory`'s generation-awareness** ✅ DONE (2026-07-29). `IStatCalculator` threaded:
+  `EncounterFactory.BuildCreature` now calls `profile.BuildStatCalculator(rng)` instead of hardcoding
+  `new Gen1StatCalculator(rng)`. Profile passed to all 4 `BuildCreature` callers and threaded through the public
+  entry points `CreatePlayerSetupAsync`, `CreateEnemyAsync`, `BuildDraftSupplier`, `BuildBossCatchSupplier` — all
+  **required, never defaulted** (a `?? Gen1…` default would reintroduce the silent-fallback hazard the feature
+  exists to remove).
+  `EncounterFactory.ActiveGeneration` (the hardcoded `private const int = 1`) is **deleted**; its 6
+  learnset/evolution DB queries now filter on `(int)profile.Generation` — this was the repo's most concrete
+  "Gen 1 by assumption" and a second source of truth for the generation. `ResolvePlayerEvolutionAsync` now takes
+  the whole `GenerationProfile` instead of a bare `IEvolutionRules`, so the generation used to QUERY edges and
+  the rules used to JUDGE them can never disagree.
+  The duplicate `PlayerOverviewDto.ActiveGeneration = 1` const is also deleted: `From(Creature, Generation)` now
+  stamps the run's real generation, backed by a new `ActiveBattle.Generation` field (carried from the claimed
+  `PendingSession`) and `GameSessionManager.GetGeneration(gameId)`, which returns null (→ 404) rather than
+  defaulting to Gen 1 for an unknown run.
+  **Falsification leg (Stage 5's standing requirement):** `TestAltProfile.BuildStatCalculator` previously returned
+  `new Gen1StatCalculator(rng)`, making it useless as a probe — threading the profile and forgetting to thread it
+  produced identical creatures. It now returns an `AltStatCalculator` stamping a sentinel DV of 99 (outside Gen 1's
+  0–15 range) on every stat, exposed as `TestAltProfile.SentinelDv`.
+  Covered by `EncounterFactoryGenerationProfileTests` (8 tests: **all four** `BuildCreature` callers probed —
+  player, enemy, themed draft, boss catch — plus 2 data-filter probes over a
+  `Gen1Profile.Instance with { Generation = (Generation)2 }` profile the DB has no rows for, and 2 controls
+  proving the probes aren't vacuous); verified restoring both hardcodes fails exactly the probes while both
+  controls still pass. The two REST-side legs the encounter probes can't reach are pinned separately:
+  `PlayerOverviewDtoTests.From_StampsTheRunsGeneration_NotAHardcodedGen1` (the DTO's generation stamp, asserted
+  with a non-Gen-1 value so re-hardcoding `1` cannot stay green) and `GenerationProfileTests`'
+  `GetGeneration_*` pair (the `RegisterSession` → session → REST read chain, incl. null-not-Gen-1 for an
+  unknown run).
+  *(This absorbed what Stage 2 scoped as "where content filtering is asked for" — `ActiveGeneration` already
+  was that filter, so wiring it here was cheaper than inventing a parallel socket.)*
+- [x] **Stage 2a — the type roster** ✅ DONE (2026-07-30). `GenerationProfile.TypeRoster`
+  (`required IReadOnlySet<DamageType>`) states **which types exist in this generation**; `Gen1Profile` supplies
+  the 15 in `DamageType` declaration order, so diffing it against the enum shows exactly the three later
+  arrivals missing. `DamageType` itself keeps all 18 and stays gen-blind — it is a vocabulary, not a claim.
+  The consumer is the region-content invariant, promoted to production code: **`Biomes.UnhomedTypes(region,
+  roster)`** + `Biomes.HomedTypes(region)` *(as-built note: Stage 3 re-signatured both to take a biome roster —
+  `UnhomedTypes(biomes, roster)` / `HomedTypes(biomes)` — see the Stage 3 entry)*. The roster is a **parameter,
+  not a constant** — that is the upward
+  compatibility, since a 17-type generation must re-derive "every type is homed" rather than inherit Gen 1's
+  answer (`ENCOUNTER_DESIGN.md §2.3`). `BiomeTests`' own hardcoded 15-type array is **deleted** in favour of
+  `Gen1Profile.Instance.TypeRoster` — it was a second source of truth for the roster, the same hazard Stage 1b
+  removed with `EncounterFactory.ActiveGeneration`.
+  **Falsification leg:** `TestAltProfile.TypeRoster` = Gen 1's 15 **plus Dark and Steel**, built by adding to
+  Gen 1's set so the two can't drift apart for reasons unrelated to the probe. Kanto homes neither, so
+  `UnhomedTypes_IsMeasuredAgainstTheProfilesRoster_NotAFixedGen1List` pins that exactly `[Steel, Dark]` comes
+  back. **Verified by sabotage:** re-hardcoding Gen 1's roster inside `UnhomedTypes` fails that test alone while
+  the other 25 biome tests (incl. `Kanto_HomesEveryGen1Type`) stay green. Also
+  `Gen1Profile_RostersThe15Gen1Types_AndNoneOfTheLaterArrivals`, which names the three absences rather than only
+  counting to 15 (a count alone would survive swapping Fairy in for Ghost).
+  **Deliberately unchanged, and corrected mid-review:** the client has **three** per-type tables, and only
+  `TypeBadge.tsx` (18 colours) is a real gen-blind vocabulary. `bossTrainer.ts`'s `NAMES_BY_TYPE` and
+  `mapGlyphs.tsx`'s `TYPE_ICON` each hold **15** — a second and third copy of Gen 1's roster, i.e. the very hazard
+  this stage deleted from `BiomeTests`, still standing on the client. (`requirements-review` caught this; the
+  write-up had claimed all three "keep every type". The wrong claim is kept visible in `GENERATION_PROFILE.md`
+  §5(a) rather than deleted.) **Handed to Stage 4, not waived** (user, 2026-07-30): wiring them needs the client
+  to *hold* the roster, which needs §7.2's generation channel — Stage 4's own work. Both degrade gracefully today
+  (generic name / `t-Normal` glyph), so it is a single-source-of-truth fix, not a bug fix. Tracked in
+  `GENERATION_PROFILE.md` §7.2's scope note. **Honest scope:** no *runtime* decision reads the roster yet — the
+  encounter pool and biome map are gated on content, which is 2b and Stage 3; the invariant is enforced by a unit
+  test, not by anything a content author editing `Biomes.Kanto` would hit (user-accepted 2026-07-30).
+- [x] **Stage 2b — species / move / item content filtering** ✅ DONE (2026-07-30). `IContentScope` —
+  `Species` / `Moves` / `Items`, each `IQueryable<T> → IQueryable<T>` — is now a profile slice
+  (`GenerationProfile.ContentScope`), with `Gen1ContentScope` as the **documented no-op stub** of
+  `GENERATION_SEAMS.md §5.0`: every accessor returns its query untouched. Its doc names the exact fix it is a
+  placeholder for (`all.Where(x => x.GenerationIntroduced <= 1)` — `<=`, not `==`) and states plainly that the
+  stub becomes **wrong** the day a second generation's rows are imported, so the schema work has one place to
+  land. Those columns and their import stay in *Multi-Generation* below.
+  **`IQueryable`, not a predicate:** a `Func<T,bool>` would materialise the whole table before filtering and
+  need re-plumbing later; composing onto the query means the eventual `Where` is translated to SQL by EF. The
+  seam is already the right shape — only the implementation is outstanding.
+  **All eight catalog reads in `EncounterFactory`** go through it: starter lookup, the run's move pool, the run's
+  item catalog, the biome map's species pool, the wild-encounter pool, the draft's fought pool, the boss-catch
+  lookup, the evolved-form lookup. The rule is *"no unscoped catalog read in this file"* — kept even for the
+  evolved-form read, where the scope is redundant (the edges are already generation-filtered), because a rule a
+  reviewer checks at a glance beats a per-site judgement call and the redundancy costs nothing. Learnsets and
+  evolution edges need no scope member (they carry a real `Generation` column, filtered since Stage 1b); nor does
+  `PokemonGameAvailability` (keyed by species id, only ever intersected with the scoped pool).
+  **A consequence, not just a socket:** `ComputePlayableBiomesAsync` was explicitly *not* generation-scoped
+  before — its doc comment said so — and now is, so a generation gets **the biomes its own content can fill**.
+  That is the first *runtime* decision to read content scope, and it answers Stage 2a's honest-scope caveat that
+  nothing yet did.
+  **Falsification leg:** `TestAltProfile.ContentScope` admits only ids ≤ 20 across all three catalogs — an id
+  ceiling being deliberately unlike any real generation's rule while sharing its shape. **One probe per catalog
+  read, not per method**, because Gen 1's scope is an *identity function*: a site that skipped it entirely is
+  indistinguishable from one that uses it, from inside Gen 1. Each probe carries its own Gen 1 control.
+  **Verified by sabotage twice:** unscoping all eight sites fails exactly the eight new probes while all eight
+  Stage 1b probes stay green; unscoping *only* `ComputePlayableBiomesAsync` fails exactly one, proving the biome
+  probe pins its own read and not the starter lookup that shares its entry point. Two sites needed a tighter
+  purpose-built scope than the ceiling and the reasons are recorded in `GENERATION_PROFILE.md` §5 (the biome map:
+  ids 1–20 still fill more than `RunBiomeMapSize` biomes — measured; the evolved form: every Gen 1 line starting
+  under id 20 also ends under it). Adding the slice also **broke a Stage 1b probe** whose boss species (Gyarados,
+  130) the new scope filters out — fixed to an in-scope species, and worth expecting from each future slice.
+  **Handed to Stage 3, not waived:** `SpeciesController.GetAll` still serves the unscoped dex. It is the one
+  species read on no run path — it answers *before* a run exists, so there is no profile to ask — and it is
+  exactly the starter picker Stage 3 makes server-authoritative. Ratified by the user 2026-07-30, along with the
+  decision to keep `ComputePlayableBiomesAsync` scoped (i.e. *"a biome no in-scope species can fill is not
+  playable"* is the intended cross-generation invariant, not an over-reach of a stubs-only stage).
+  **The stub's premise was false, and was fixed rather than reworded** (`requirements-review` finding, user's call
+  2026-07-30): `Gen1ContentScope`'s identity is justified by "the catalogs hold one generation's content", but
+  `items.db` held **Max Revive**, a Gen-2 item imported as forward scaffolding and kept from players by a
+  name-matched hold-out in `RewardCalculator.UsableItems` — so the seam was resting on a second, unrelated
+  mechanism. The item is now **out of the import roster and out of `items.db`**, and the hold-out is **deleted**;
+  eligibility there is categorical again, with a test pinning that no name-based filter returns. Max Revive comes
+  back through the per-generation item schema — see the new *Per-generation ITEM data* item under
+  *Multi-Generation* below, which is the scaffolding the user asked for in its place. Rule established: *the
+  scaffolding a future generation needs is the schema, not a stray row.*
+  **⚖️ WAIVED (user, 2026-07-30) — no test pins `items.db`'s actual contents.** `pr-review` raised it as a
+  blocker: `ItemImport` is upsert-only, so it never deletes a row for a slug dropped from the allowlist, and a
+  developer re-importing over a pre-2026-07-30 `items.db` would keep Max Revive in the catalog — where, with the
+  `RewardCalculator` hold-out now gone, it would actually drop and stock. The new guard asserts the C# roster,
+  not the table, so nothing in the suite would object. **Waived because production cannot ship it:** the
+  Dockerfile copies the committed `items.db`, which is clean (28 rows, `revive`/50 only). The proposed fix, if
+  this is ever revisited, is a live-db contract test asserting the `Items` name set equals
+  `ItemMapper.Gen1BattleItemNames` exactly (both 28), mirroring `PokemonEvolutionDataContractTests` — ~15 lines.
+  **Do not re-raise as a new finding.**
+- [x] **Stage 3 — region, biomes, starters onto the profile** ✅ DONE (2026-07-31). Two new profile slices:
+  `GenerationProfile.Region` (**identity/presentation only, never branched on** — the `Generation` sibling, kept
+  for logging and Stage 4's client echo) and `GenerationProfile.BiomeRoster` (the consumed content;
+  `Gen1Profile` reads it through **`Biomes.For(Region.Kanto)` — still the one door** to the authored registry).
+  **The roster, not the enum, is the falsifiable slice** — `Region` has a single member, so only a substituted
+  biome *list* can prove the run setup asks the profile; a coherence test pins the pair can't drift (every
+  rostered biome carries the profile's region). `Biomes.HomedTypes`/`UnhomedTypes`/`Playable` now take a biome
+  roster instead of a `Region`, so the coverage invariant and playability filter run against whatever roster a
+  profile supplies; `EncounterFactory.ComputePlayableBiomesAsync` reads `profile.BiomeRoster` — deleting the
+  repo's **last hardcoded `Region.Kanto` outside the authored registry**.
+  **Starters: the design doc's premise was stale and is corrected, not implemented as written.** Nothing was
+  "hardcoded client-side" — `StarterSelection.tsx` has always fetched the full dex from `/api/species` and any
+  species is pickable (deliberate roguelite design, unchanged). What "server-authoritative starter roster"
+  actually meant here: `SpeciesController.GetAll` (Stage 2b's handed-off unscoped read — the one species read
+  that answers before a run exists) now takes `?generation=`, parses it with **the same boundary contract as
+  game start** (`GameController.ParseGeneration` — a stale client that sends nothing still gets the Gen 1 dex),
+  and serves the profile's `ContentScope`-scoped dex via a named `SpeciesSummaryDto` (wire-verified live:
+  byte-identical camelCase shape, 151 rows, `?generation=one` parses). So which starters are offerable is now
+  decided server-side by the profile — there is no curated per-gen starter subset, and introducing one would be
+  a *new design decision*, not part of this stage.
+  **Falsification legs, verified by sabotage twice:** `TestAltProfile.BiomeRoster` = a connected 2-biome fake
+  region (themes pickable from the probe's own constraints — fillable by wild species with ids ≤ 20) —
+  deliberately **below `RunBiomeMapSize`**, so the run-map probe simultaneously pins §6's watch note that a
+  roster thinner than the map cap yields itself rather than breaking map generation. Re-hardcoding Kanto in
+  `ComputePlayableBiomesAsync` fails exactly the new run-map probe (43 others green); unscoping the dex read
+  fails exactly the `DexFor` probe (18 others green). Zero importer/DB change; client untouched (Stage 4 sends
+  the generation when a picker exists).
+  **Riders (both filed 2026-07-31, both scheduled for "when Stage 3 touches the file"):** the 5-site learnset
+  query duplication collapsed into `EncounterFactory.LoadLearnsetsAsync` (one home for the generation-filtered
+  learnset read), and `GenerationProfiles.Registered` no longer allocates per call (materialised once,
+  declared below `ByGeneration` per the static-init order trap `Gen1Profile.Gen1Types` documents).
+- [ ] **Stage 4 — presentation: per-generation UI + the Town Map.** `/plan` **v2 done (2026-07-31)** —
+  supersedes the 2026-07-29 sketch; full design in `GENERATION_PROFILE.md` §7 (decisions 7–9 in its §1). The
+  user's reframing: a **complete per-gen visual overhaul where the bones stay the same** — same usability, same
+  idea per surface, but each generation adapts each surface to its own idiom (surface-level functionality may
+  vary only as an explicitly ratified per-surface decision; the run layer stays invariant) — settled
+  **jointly, one surface at a time**, not in one pass. Plus: the region map becomes a **rigid grid Town Map**
+  (RBY-style — biome squares on an authored grid, authored orthogonal route cell-paths, blinking cursor),
+  grid-for-all-generations with a per-gen map-presentation seam. Staged build:
+  - [x] **4a — generation channel + client presentation registry** ✅ DONE (2026-07-31). The echo carrier
+    (§7.6's open decision) is a new **`RunPresentationRevealed(Generation, TypeRoster)`** event emitted by the
+    **session layer** on *every* hub attach — first connect (leads the run's events, before the run task
+    starts) and the reconnect rebind branch alike — built by the pure
+    `GameSessionManager.BuildPresentationEvent(profile)` (internal, like `BuildRunOptions`, so the
+    roster-off-the-profile read is pinnable). Client: `src/generations/presentation.ts` — the registry
+    (`presentationFor`, boundary-contract fallback to Gen 1 mirroring `ParseGeneration`),
+    `applyGenerationTheme` (`data-generation` on the document root; default stamped at boot in `main.tsx`,
+    re-stamped by `BattleScreen` from echo-then-route-state), and the roster-coverage check
+    (`missingTypeAssets`/`warnOnMissingTypeAssets`). `StarterSelection` sends `generation` in the start body +
+    route state (constant `'One'` until the 4d+ picker). The two 15-type tables are re-framed as **asset
+    inventories, not roster claims** — `bossTrainer.hasBossNamePool` + `mapGlyphs.hasTypeIcon` feed the
+    coverage check, which measures them against the *delivered* roster (the Stage 2a handoff closed: the
+    roster is now single-sourced from the profile via the wire; a rostered type without assets degrades
+    gracefully and warns). Wire: `RunPresentation` timeline arm (**control-plane `now`**, so theming never
+    queues behind a mid-flight animation on reconnect) + `battleReducer` `generation`/`typeRoster` state +
+    the auto field guard. Falsification legs: `BuildPresentationEvent_RosterComesOffTheProfile` (TestAltProfile
+    → 17 incl. Dark/Steel), and Vitest's alt-registry + alt-roster probes (`presentation.test.ts` — registry
+    param proves the flow is data-driven; the 17-type roster surfaces exactly `[Dark, Steel]` as gaps).
+    **Verified live** (hub script, both paths): first attach leads with the echo (`One`, the 15), a
+    detach/re-attach re-echoes it; `data-generation="gen1"` present in the booted app.
+    **`requirements-review` (2026-07-31): 3 findings, adjudicated by the user — 2 fixed, 1 waived.**
+    (1) *Fixed:* `GAME_LOOP.md` §5 now documents the new **session-layer event category** this created —
+    `RunPresentationRevealed` is emitted per *attach* by `GameSessionManager`, outside the loop's
+    same-seed-same-sequence guarantee, with the category's rules (presentation-only + idempotent, else it
+    belongs in an `IRunEvent`). (2) *Fixed:* the echo's timing claims are now pinned by
+    `AttachConnection_EchoesThePresentation_OnFirstAttach_AndAgainOnReconnect` — a recording `IHubContext`
+    + a gate-blocked DB factory park the run task deterministically, asserting echo-leads-the-stream on
+    first attach and re-echo-to-the-new-connection (not the old) on reconnect; `AttachConnection`'s first
+    automated coverage. (3) **⚖️ WAIVED (user, 2026-07-31):** `StarterSelection` seeds the player's choice
+    from `presentation.ts`'s `DEFAULT_GENERATION` (the absent-data fallback constant) — conceptually two
+    roles in one constant, accepted as the interim placeholder; the 4d+ generation picker replaces the line
+    wholesale. Do not re-raise.
+    **`pr-review` (2026-07-31): CHANGES-REQUESTED → all three recommended fixes applied (user's call), now
+    PR-ready.** (1) the **registry-drift guard** — `WebEventContractTests.EveryRegisteredGeneration_
+    HasAClientPresentationEntry` asserts every `GenerationProfiles.Registered` member has an `id: '<Name>'`
+    entry in `presentation.ts` (without it, a future generation's runs would silently theme as Gen 1 with
+    every suite green — the generation-leg sibling of the timeline-arm guard); (2) **the theme un-stamps on
+    unmount** — `BattleScreen` resets `data-generation` to the default when leaving the run, so `main.tsx`'s
+    pre-run-screens-start-default invariant holds on in-SPA navigation, not just cold boot (invisible until
+    4b's per-gen CSS, cheap now); (3) **one emitter per run** — `ActiveBattle.Emitter` is set at claim and
+    the reconnect re-echo reuses it instead of constructing a second `SignalRBattleEventEmitter` (identical
+    today; diverges silently the moment the emitter gains state). Three advisories deferred (unguarded
+    test-only registry fallback; `as string` vs `?? []` asymmetry in the timeline arm; dual
+    generation encodings — REST numeric vs wire name — to consolidate when 4b/4d touches either).
+  - [x] **4b — the Gen 1 skin (2026-08-04).** ✅ The `[data-generation="gen1"]` token override block ("Kanto
+    Sage" — `GENERATION_PROFILE.md` §7.3 / §1 decision 10) is built and verified live (Puppeteer, a full run
+    through Title → StarterSelection → route choice → battle → CHECK POKEMON → Settings).
+    - **The five ratified battle-HUD chunks** (the original mockup's scope): nameplates, HP/XP bars, the
+      battle log (dialogue box, double-line chrome), the 2×2 command grid, move-select — plain-bold-border
+      resting state and invert-block hover/focus, both confirmed. STAB/type/effectiveness/power-tier pills
+      stay their existing functional colours on purpose, same call as the HP high/mid thresholds — none of
+      those are decoration, so the four-colour budget doesn't apply to them.
+    - **Extended the same day, per the user's direction ("apply to all basic views/frames"):** Title Screen,
+      StarterSelection, Settings (screen + in-battle modal + panel), CHECK POKEMON, and the route-choice
+      modal's outer frame ("biome select") — reskinned in full, background through generic button chrome.
+      Two invisible-text bugs caught and fixed during verification (`.overview-title`, the INFO tab's field
+      values inheriting the old near-white default) — the fix pattern used throughout: give each new root
+      surface its own `color: ink` so anything not individually patched still inherits correctly, rather than
+      chasing every descendant selector by hand.
+    - **Deliberately NOT touched** — the "detailed" layer, left for each surface's own future catalog turn
+      (§7.5): BAG's item list, the run map's own node/territory/edge content and the full-screen pinned map,
+      reward/shop/acquire/recovery/battle-end modals' literal thematic accent colours (their backgrounds
+      stayed dark on purpose — those colours were tuned against the old dark background and a partial flip
+      would have broken contrast), the party strip, drop-toasts, the node ladder.
+    - The "picker live-preview" phrase from the original line is moot today — there's only one registered
+      generation, so there's nothing yet to pick between; revisit once a second generation exists.
+  - [x] **Kanto Sage — ornamental detail pass** ✅ DONE (2026-08-05, raised 2026-08-04). The shipped skin (4b)
+    was deliberately flat and restrained — ink-on-neutral, no texture, no ornament. This added one small layer
+    on top, not a repaint: a corner glyph on the double-line window chrome, plus a subtle grain texture on the
+    flat fields. Sketched and ratified as a live interactive mockup (decision 8's process, same as 4b's own
+    mockup) offering 4 corner-motif candidates (Step Notch / Filled Pip / Cross Tick / Bracket Hook) and 4
+    field-texture candidates (Ordered Dither / Diagonal Hatch / Grain / Stipple) side by side against the real
+    frame recipe. **Ratified: Step Notch + Grain.**
+    - **Corner artifacts** — `.battle-screen`, `.battle-log`, `.route-choice-modal` (§7.3's three double-line-
+      frame surfaces) each get a small ink staircase-notch glyph near each corner, via a new `--ks-corners`
+      token (four tiny inline-SVG data URIs, one per orientation) in `index.css`. **Built inset 8px from the
+      edge, not straddling the border like the mockup** — the frame's own inset box-shadow ring (`inset 0 0 0
+      3px fill, inset 0 0 0 8px ink`) paints *on top of* the background, so a motif flush at the corner would
+      sit mostly underneath it and barely show; inset 8px clears the ring instead. A DOM-based ornament could
+      have straddled the border the way the mockup did, but all three surfaces are `overflow: hidden` or
+      `overflow-y: auto`, which would clip anything poking past the edge anyway — background-image was the
+      right call independent of the ring issue.
+    - **Field texture** — a new `--ks-grain` token (9 low-alpha `radial-gradient` dots, tiled 34px) on `body`
+      (the Fog field), `.btn` (shared chrome across Title/StarterSelection/Settings), and the battle HUD's own
+      white boxes (`.battle-panel`, `.nameplate`, `.action-btn`, `.move-btn`/`.move-btn--stab`). **Deliberately
+      plain `background-image` on both additions, never `::before`/`::after`:** `.battle-log` and
+      `.route-choice-modal` are `overflow-y: auto`, and a pseudo-element there would be swept into the box's
+      own scrolled content and visibly drift out of view as it scrolls — a box's own background never does,
+      regardless of how far its content is scrolled.
+    - **Real trap hit and fixed during the sketch, not the build:** the first mockup pass generated the
+      dither/grain/stipple textures on a `<canvas>` via JS at load and injected the result as a data-URI
+      `background-image`; only the diagonal hatch was plain CSS. The user could see the hatch faintly but none
+      of the other three — the canvas-drawing script was silently failing in the hosted artifact context
+      before paint. Rewritten as pure static CSS gradients (a checkerboard for dither, layered
+      `radial-gradient`s for grain/stipple) with zero JS/canvas dependency, which is also why the *shipped*
+      `--ks-grain` token is a plain gradient list rather than a generated asset.
+    - **Deliberately out of scope this pass:** StarterSelection's own bespoke white boxes, Settings'
+      panels/modal, and CHECK POKEMON — grain landed on the shared `.btn` chrome and the battle HUD only, not
+      every individual white-box selector those files declare. Left for whenever those surfaces get their own
+      catalog turn (§7.5), same as 4b's own "detailed layer" carve-outs. `.route-choice-modal`'s unconditional
+      `border-radius: 12px` (no gen1 override) is a pre-existing Stage 4b gap, not introduced here — the square
+      corner motif may touch that curve; not fixed in this pass.
+    - Verified live in-browser by the user. Puppeteer was used only during the sketch/ratify mockup phase (and
+      to diagnose the canvas-rendering trap above); dropped for the actual app build and the final visual
+      check per the user's mid-session call that it was burning too many tokens for this kind of iteration.
+  - [x] **4c — the Town Map** ✅ DONE (2026-08-18): `RegionMapRevealed` wire update (+ field guards), client
+    grid renderer replacing the painterly `RegionMap` (interaction contracts unchanged; `travelledEdgeKeys`
+    survives); `TestAltProfile`'s fake region gets grid geometry.
+    **The grid structure itself is locked (2026-08-06)** — one biome per grid cell, orthogonal routes,
+    identity-on-hover — from a multi-round sketch → ratify pass; see `GENERATION_PROFILE.md` §7.4's
+    sketch-ratify record for the full history (route/cursor style, the Boss-gated island size, decision 11's
+    "no organic curves" rule). Tile art is also locked (2026-08-18) — Kenney's "Monochrome RPG" (CC0), vendored
+    static asset, 4-colour recolour onto the existing `--ks-*` tokens; see §7.4 decision 12 (visually verify
+    every tile pick against the real source before use — the standing rule that pass established) and the
+    locked tile-pick list.
+    **Layout is procedurally generated per run, not hand-authored (revised 2026-08-18, user's call)** —
+    supersedes the original "authored Kanto grid" plan; see §7.4's revision note for the full rationale
+    (a fresh sparse per-run island is a smaller problem than laying out the whole dense 18-biome registry, so
+    full procedural generation is back in scope where it was rejected before). **Built backend-first, all four
+    steps shipped 2026-08-18:**
+    1. [x] **`IslandLayoutGenerator`** ✅ DONE (2026-08-18) — pure, deterministic (seeded from the run's own
+       `IRandomSource`, no separate seed), takes the run's already-chosen biome subgraph (from the existing
+       `Biomes.RandomConnectedMap`, untouched) and produces grid coords + orthogonal collision-free routes.
+       Two-phase: a fast primary BFS placement + a real local-backtracking router (undo-and-swap the most
+       recently committed edge when one gets stuck, rather than restarting with a different global order);
+       a fallback placement (exhaustive ring search, provably can't itself fail to find a free cell) retried
+       across a few spacing levels and reshuffled attempts when primary doesn't pan out. Fuzz-tested
+       (`IslandLayoutGeneratorTests`) against the real `Biomes.Kanto` registry across sizes 2–12 × 15 seeds
+       (pre-commit-hook-fast, ~2s) for the validity invariants (no overlaps, axis-aligned only, every edge
+       routed, fallback itself valid, reproducible from seed). **Three real bugs found and fixed during
+       build, not just tuning** — kept as design notes in the source since they're the reason the final
+       shape looks the way it does: (1) a ring-search that always scanned from the same corner silently
+       recreated the exact diagonal-clustering pathology it replaced, on any open BFS-chain placement; (2) a
+       routing search margin that was a fixed constant instead of scaling with the placement's own spread,
+       so a genuinely sparse/planar graph could still fail to route once nodes were spread out; (3) greedy
+       sequential routing with no backtracking is inherently order-dependent — trying several static global
+       orderings worked but didn't scale, real local backtracking did. No wire/DB/client touched — pure unit
+       tests, no database.
+    2. [x] **Wire into `RunDirector`** ✅ DONE (2026-08-18) — computed exactly once per island, at biome-mode run
+       start (right where `RunAsync` already emits `BuildRegionMap()`), via
+       `IslandLayoutGenerator.Generate(_playableBiomes, _rng ?? SystemRandomSource.Instance)` — the same shared
+       `IRandomSource` every other per-run roll draws from, never a fresh one — and cached on
+       `RunState.IslandLayout` (a settable property, like `CurrentBiome`; `RunDirector` exposes a forwarding
+       `internal IslandLayout?` test seam) for step 3 to read when it builds the wire payload. Covered by
+       `RunDirectorIslandLayoutTests` (matches a bare `Generate` call off the same seed; caches the whole
+       playable set even when the run only ever visits one biome; stays `null` outside biome mode).
+       **`requirements-review` (2026-08-18) caught it living on the wrong object at first** — it originally
+       lived on a private `RunDirector` field, but §7.4's ratified plan says "cached on `RunState`," and
+       `RunDirector` owns non-serializable collaborators (DB-backed suppliers, the emitter) that make it the
+       wrong home regardless of the doc: the **user's framing settled it** — a save/resume layer would snapshot
+       `RunState`, not `RunDirector`, and a future **multiple-islands-per-run** feature (confirmed as a
+       "definite" future feature) would need to *reassign* the layout at an island boundary exactly the way
+       `CurrentBiome` is already reassigned at a biome boundary — both are `RunState`-shaped needs. Moved;
+       `RunState`'s class doc gained a note explaining why this presentation-ish field rides along despite
+       `chooseNextEvent` never reading it (precedented by `BattlesWon`/`RunDepth`, which already double as
+       run-summary data). Zero doc changes needed — `GENERATION_PROFILE.md` §7.4 already said `RunState`; the
+       code just didn't match it yet. Full suite re-verified green after the move (1493/1493, unchanged — the
+       `RunDirector` forwarding property kept every existing test compiling untouched).
+       **Real gap found and fixed, not just wired:** the full test suite turned up 4 failures in
+       `RunDirectorBiomeTests` — they hand `RunDirector` the **un-sampled, full 18-biome `Biomes.Kanto`
+       registry** as `PlayableBiomes` directly (to test the 3-of-N route-offer sample, nothing to do with the
+       grid), which is bigger than `IslandLayoutGenerator`'s fuzz-validated range (sizes 2–12, matched to
+       `EncounterFactory.RunBiomeMapSize` = 10, the only real caller's actual ceiling). On the full registry —
+       whose several 3-cycles (e.g. meadow-trail↔whispering-woods↔bramble-thicket) add "cross" edges a
+       spanning-tree-shaped layout doesn't have to fight — the generator isn't just occasionally unlucky: one
+       seed exhausted every fallback level and threw, and even the seeds that *succeeded* took 40–49 seconds
+       each. **User's call (2026-08-18):** fix the tests to match how `RunDirector` is actually ever called in
+       production — `Biomes.RandomConnectedMap(Biomes.Kanto, EncounterFactory.RunBiomeMapSize, source)` off a
+       single shared source (mirroring `EncounterFactory.CreatePlayerSetupAsync`), same as every real caller —
+       rather than hardening the generator for a size no real run produces. All 4 tests pass fast (~1s total)
+       against the sampled subset; full suite green (1492/1492, 3s). **Follow-up, not blocking:** if a future
+       generation's biome roster grows past ~12, or `RunBiomeMapSize` is ever raised, `IslandLayoutGenerator`
+       will need hardening for that range first — the scale cliff is real, just currently unreachable from any
+       actual caller. Not scheduled; revisit if either precondition changes.
+    3. [x] **`RegionMapRevealed` wire update** ✅ DONE (2026-08-18) — `RegionMapRevealed` now carries `Width`/
+       `Height` (the grid canvas) and `Routes` (`IslandRoute`, reused as-is from `IslandLayoutGenerator` rather
+       than duplicated into a wire-only type); `RegionMapBiome.MapX`/`MapY` (authored 0–100) are replaced by
+       `X`/`Y` (the procedurally laid-out grid cell). `RunDirector.BuildRegionMap()` reads `_state.IslandLayout`
+       (step 2, guaranteed non-null — it's only ever called immediately after `_state.IslandLayout` is computed)
+       instead of the old authored `BiomeDefinition.MapX/MapY`. `SignalRBattleEventEmitter`'s projection updated
+       to match. Covered by: the mechanical reflection guard (`EveryBattleEventProjectsAllOfItsFields`, no changes
+       needed — it already probes list-typed fields with a real nested instance, so it caught the shape
+       automatically); the hand-pinned value-level wire test, renamed and rewritten for the new fields
+       (`RegionMapRevealed_Projection_CarriesBiomeSubFieldsGridCoordsAndRoutes` — grid `Width`/`Height`, a
+       biome's `X`/`Y`, and a route's cell path survive in order); `RunDirectorNodeTests`' existing emission
+       test extended to assert the *real* `BuildRegionMap()` output (in-bounds grid positions, a real route) not
+       just the record shape; and the Stage 5 falsification leg
+       (`RunDirectorIslandLayoutTests.BiomeMode_RegionMapRevealed_LaysOutRealGridGeometry_ForAnyProfilesBiomeRoster`)
+       — runs `TestAltProfile`'s two-biome fake region (deliberately not Kanto-shaped) through the real
+       `RunDirector` → `IslandLayoutGenerator` → `BuildRegionMap` → `RegionMapRevealed` pipeline and asserts
+       genuine grid geometry, proving the Town Map is generation-agnostic rather than hardcoded to Kanto's
+       shape. Full suite green (1493/1493 .NET, `tsc` clean, 199/199 Vitest).
+       **The interim client breakage this step deliberately left open was resolved the same day — see step 4.**
+    4. [x] **Client grid renderer, wired to the locked tile art** ✅ DONE (2026-08-18) — the real Kenney art,
+       recovered byte-verified from the `Town Map — tileset ratification sketch` mockup artifact (decision 12
+       re-confirmed against the freshly re-downloaded source sheet, not trusted from memory) rather than
+       re-picked from scratch: three tree species (#14/#15/#16), a rock cluster (#30), a boulder (#105), a
+       signpost (#67), the town marker (#109 shuttered/unvisited, #110 open-door/visited-or-current), and the
+       coastline edge trim (#2, 4 pre-rotated copies) — all vendored as `--ks-tm-*` data-URI custom properties
+       in `index.css` (the same inline-asset convention as `--ks-corners`/`--ks-grain`, not separate files),
+       plus a new `--ks-grain-water` (the existing grain recipe, tones inverted). Land/water themselves are
+       **not** tileset art — they reuse the app's own `--ks-grain` procedural texture (free, already proven).
+       `timeline.ts`'s `RegionBiome`/new `RegionRoute`/`RegionRouteCell` types + the `RegionMapRevealed` case
+       arm, and `battleReducer.ts`'s state, now carry the grid shape (`regionWidth`/`regionHeight`/
+       `regionRoutes` alongside `regionBiomes`) instead of the old percent coords.
+       **A real algorithm/design gap found and resolved before the render work, not papered over:**
+       `IslandLayoutGenerator` (step 1) only ever produces a *sparse* graph — a cell per biome plus a thin
+       one-cell corridor per route, nothing else — but decision 11 calls for an actual landmass with a
+       coastline and scattered terrain, not a bare path over open water. Visualized several real generated
+       layouts before building anything (`Biomes.RandomConnectedMap` → `IslandLayoutGenerator.Generate` on
+       real seeds) and confirmed the gap is real — e.g. a 10-biome island left genuine blank gaps inside its
+       own bounding box. **User's call:** synthesize the fuller landmass **client-side at render time** (an
+       8-directional dilation of the sparse core by `TOWN_MAP_DILATION` = 1 cell, tunable), not in the backend
+       — zero wire/DB change, stays inside step 4's own scope. New pure module `townMapLayout.ts`
+       (`coreLandCells`/`dilateLand`/`coastSides`/`scatterFor`, 14 Vitest cases) does the derivation; the
+       component only renders.
+       **A real bug found via manual verification, not just code review:** offered/choosable towns used the
+       HTML `disabled` attribute to block clicking on non-offered ones — but a `disabled` button suppresses
+       `mouseenter`/`focus` in every browser, so hovering *any* non-offered town silently did nothing,
+       breaking the ratified "hover or focus any tile to see its name" behaviour. Caught live in the running
+       dev app (Puppeteer), not by a test. Fixed with `tabIndex={choosable ? 0 : -1}` instead of `disabled`
+       (mouse hover always fires; only actionable towns are keyboard-tab-stops; `onClick` was already
+       conditionally undefined on a non-offered town, so removing `disabled` doesn't make it clickable).
+       **Verified live** (Puppeteer, `.\dev.ps1`, full flow): the grid renders — land/water grain, coastline
+       trim on every land/water boundary, scatter props, dotted untravelled / solid travelled routes, the
+       shuttered→open-door marker transition on entering a biome, the bouncing chevron over the current
+       biome, the hover/focus caption (defaulting to the current biome, updating on hover of *any* town, own
+       bug above included) — across the pinned full-screen `RunMapPanel` and the blocking `RouteChoiceMap`
+       modal, and at a narrow (480px) viewport with no overflow (the grid's percentage/aspect-ratio-based
+       sizing needed no responsive breakpoint, unlike the old fixed-rem waypoint discs it replaced).
+       **Left for the eventual `BiomeDefinition.MapX`/`MapY` cleanup, not done here:** removing those now
+       fully-vestigial fields and updating `BiomeTests.cs`'s pinning test — a real but small, low-priority
+       tidy-up (§7.4 already flagged it in step 3's note); not scheduled.
+       **`pr-review` (2026-08-18): CHANGES-REQUESTED → both blockers + all 7 recommended fixes applied
+       (user's call), now PR-ready.** Blockers: (1) the E2E suite's DOM contract was renamed out from under
+       it — `.region-node`/`.region-node--offered`/`.region-node--current`/`.region-edge` no longer exist;
+       fixed across `e2e/helpers.ts` + 3 spec files to the new `.town-map-town`/`.town-map-town--offered`/
+       `.town-map-route` classes, plus a new dedicated `town-map-town--current` class (parity with the old
+       markup, not just an `aria-current` query) — **not run** (E2E is user-only per policy; recommend
+       `.\e2e.ps1 -Spec encounter-map` to confirm). (2) the hover/focus caption was near-unreadable in the
+       pinned full-screen Run Map — its `--ks-dim`/`--ks-ink` tokens are parchment-surface colours, but that
+       panel's own ground was still the old dark "deep-night" theme (then deliberately unskinned; skinned
+       2026-10-01); confirmed empirically (`getComputedStyle` + a fresh screenshot showed genuine dark-on-dark, not
+       a false positive) and fixed with a `.map-overworld`-scoped light-on-dark override. Recommended fixes:
+       a real logic bug where `biomeCaptionStatus` mislabelled an already-visited-but-still-offered biome as
+       "offered, unvisited" on nearly every route choice after the first (every neighbour stays offered with
+       no visited filter — `BiomeChoiceEvent.PickOptions`) — fixed the priority order and moved the helper
+       into `townMapLayout.ts` with 5 new pinned cases; the read-only `RunMapPanel` made every town
+       `tabIndex={-1}` so a keyboard user couldn't reach any biome name — fixed to `tabIndex={onChoose ?
+       (choosable ? 0 : -1) : 0}`; non-offered towns in the choice modal had no `aria-disabled`; the map
+       legend still showed gold swatches for the new black-ink map; the route-choice modal's height-capped
+       stage sizing had the *same* "100%/100% background-size stretches non-square cells" defect class the
+       grain-tile fix was written to avoid, just reached via `width:100%` + independent `max-height` fighting
+       each other — fixed to bound both dimensions via `max-width`/`max-height` with neither force-set; a
+       missing `prefers-reduced-motion` guard on the marker hover-scale transition; and an unmemoized
+       land/dilation recompute on every hover (`useMemo`, kept above the early-return per rules of hooks).
+       Full suite re-verified green after all fixes (1493/1493 .NET, `tsc` clean, 218/218 Vitest — the prior
+       213 + 5 new `biomeCaptionStatus` cases); the caption/legend fix re-verified live via Puppeteer
+       (`getComputedStyle` before/after + screenshots).
+       **Manual bugfixing pass (2026-08-19), same day, playing the actual shipped feature.** Five more real
+       findings, each verified live via Puppeteer against the exact seed that exposed it (not just reasoned
+       about statically) — full design rationale for each in `GENERATION_PROFILE.md` §7.4's own record of this
+       pass; summary here:
+       1. **Stage sizing/centring was genuinely broken, not a Firefox-only quirk** — an `aspect-ratio` box with
+          both dimensions `auto`, sized as a flex item, doesn't reliably resolve in any engine (one real seed
+          collapsed the stage to ~8px). Fixed with a definite computed width (`min(100%, 62vh × ratio)` via new
+          `--tm-w`/`--tm-h` CSS custom properties `TownMapGrid` sets inline) instead of leaving both dimensions
+          to the browser's own aspect-ratio auto-sizing.
+       2. **Exterior water margin** — the server's own canvas margin (`IslandLayoutGenerator.Margin`, 1 cell) is
+          measured against the sparse core, but the client's own dilation (step 4's original build) already
+          grows that core outward first, so the rendered land could reach the canvas edge with no visible
+          margin left at all. New `TOWN_MAP_RENDER_PADDING` (1 cell) adds render-only breathing room,
+          independent of that interaction — wire `Width`/`Height`/positions never change.
+       3. **A jagged coastline** — new `JAGGED_EDGE_SKIP_ODDS` (deterministic 1-in-6 thinning), applied only to
+          cells `dilateLand` is *adding* (the dilation ring), never to a core cell already present — the
+          uniform-fixed-radius dilation read as one smooth rounded-rectangle outline; a user ask, not a defect.
+       4. **Interior water pockets — a real bug, found while fixing #2/#3, not requested.** The sparse graph can
+          leave a gap wider than the dilation radius between two nearby-but-unconnected path segments (the
+          server's own node spacing is wider than one dilation step), fully surrounded by land once dilation
+          finishes — a small lake in the middle of the island. New `fillInteriorPockets` (a border-seeded
+          4-directional flood fill; whatever water it never reaches gets converted to land) closes it.
+       5. **A random Japanese-sounding island name** — new `islandName`, two-part compounds from real short
+          Japanese words common in actual place-name compounds (Fuji+yama, Yoko+hama, Kuro+kawa, …), romanized,
+          "Island" appended (e.g. "Asagawa Island"). Deterministic from the run's sorted biome-id set (no
+          server seed threaded to the client, same reasoning as `scatterFor`) — stable for the whole run.
+          Shown in `RouteChoiceMap`'s intro line and `RunMapPanel`'s pinned topbar.
+
+       All five in `townMapLayout.ts` (now `dilateLand` + `fillInteriorPockets` + `islandName`, 33 Vitest cases
+       total) except #1, which is CSS/component-only. Full suite re-verified green after every fix (232/232
+       Vitest, `tsc` clean); #1/#4 re-verified against the exact seed that exposed them, not just re-tested in
+       general.
+````
+
+### 8. Generation Profile — the BAG readability regression (done 2026-08-23)
+
+````markdown
+  - [x] **⚠️ BAG readability regression** ✅ DONE (2026-08-23) — `.bag-item`/`.bag-pp-prompt`/`.bag-gold*`
+    (`BattleScreen.css`) only ever inherited the global dark-theme `--clr-text` (near-white) on a transparent
+    background, unreadable against the light Kanto Sage `--ks-fog` panel ground they now sit on. Same failure
+    mode as the Town Map caption bug fixed 2026-08-18 (parchment-surface tokens vs. an unskinned dark ground,
+    just inverted). Fixed with `[data-generation="gen1"]` override rules for `.bag-item` (+ hover/focus-visible
+    invert), `.bag-item-qty`/`.bag-item-desc`/`.bag-group-label`, `.bag-empty`, `.bag-pp-prompt`, and the
+    `.bag-gold`/`.bag-gold-label`/`.bag-gold-coin`/`.bag-gold-amount` money box — the same ink-on-fill /
+    invert-block pattern already used for `.action-btn`/`.move-btn`. `ReviveTargetPicker` reuses the same
+    `.bag-item*` classes so it's covered automatically; `PpTargetPicker` already reused `.move-btn` and needed
+    no change. Verified live via Puppeteer (screenshot before/after + hover state) in an actual battle's BAG
+    menu — reads correctly, hover-inverts cleanly. CSS-only, no test changes. **The rest of the 4d+ BAG
+    mini-plan (a full skin pass beyond this legibility fix) is still open** — see the surface catalog above.
+````
+
+### 9. Browser-Based UI Testing — the "Done and archived" index
+
+````markdown
+**Done and archived** (→ `TODO_ARCHIVE.md`): seed plumbing, the Run Economy reward-modal E2E, the spec-rot
+recovery and the inter-test flakiness pass are all under *"Browser-Based UI Testing — seed plumbing, spec-rot
+recovery & the flakiness pass"*; the between-encounter modal E2Es under *"Other between-encounter modal E2Es"*;
+the In-Combat Switching UI contract in the *"In-Combat Switching"* 2026-07-26 addendum; the evolution
+nameplate/action-prompt lag under *"Evolution nameplate doesn't follow until the next battle starts"* (2026-07-28);
+and its sibling *"Party strip shows a stale name after an on-field evolution"* (2026-07-29) — see the one
+known-still-open follow-up (the regression-insurance E2E coverage gap) below.
+````
+
+### 10. Frontend Unit Coverage — the 2026-07-05 "Done" paragraph
+
+````markdown
+**Done (2026-07-05):** extracted the pure `battleReducer` out of `useBattleHub` (`hooks/battleReducer.ts`,
+type-only imports → zero runtime deps) and added `battleReducer.test.ts` — the edge transitions a live
+playthrough can't deterministically force (name-mismatch HP/status no-ops, `XP_GAIN` clamp, the level-up→
+move-replacement supersede, the `BATTLE_STARTED` enemy-nameplate reset, biome-choice which has no E2E spec).
+Plus `format`/`fetchError` unit tests (the backend-unreachable path is invisible to E2E). 84 → 107 Vitest tests.
+````
+
+### 11. Tech Debt / Cleanup — the "Done & archived" index
+
+````markdown
+**Done & archived** — full write-ups in [`TODO_ARCHIVE.md`](TODO_ARCHIVE.md) → *Tech-Debt cleanups*:
+
+- *2026-06-20 → 22 code-review + Architecture Review #7 pass:* (A) `MoveSet` cross-thread mutation →
+  lock-free copy-on-write; (B) `AttackAction.ExecuteAsync` split into `ResolveDamage` +
+  `ResolvePreDamageGates`; (C) repo-wide comment-density pass; (D) minor comment/dead-field batch; the
+  **RNG seam** (CLOSED — do not re-file the `AlwaysHit`/`AlwaysCrit` shim idea, the
+  unseeded-web-composition-root, or "Roll\* ignores the battle seed"); and Architecture Review #7
+  (`SecondaryHits` seam dedup, `MoveImport.MapToAttack` split + `MoveMappingTests`).
+- *2026-07-04:* `bag.ts` re-encoded the engine's effect registry → backend-projected `UsableInBattle`.
+- *2026-07-16:* **event wire contract guarded by name but not by field** → the generic
+  `EveryBattleEventProjectsAllOfItsFields` (nested records + union variants). Don't re-file "add a
+  field-level guard per event" — presence is now automatic; a one-off test is only for *values/semantics*.
+- *2026-07-16:* **TypeScript typechecked by no gate** → `tsc --noEmit` in the pre-commit hook (on staged
+  `.ts`/`.tsx`) + a `TypeScript` row in `test.ps1`; `tsconfig` now covers `e2e/` as well as `src/`
+  (**keep it that way**).
+- *2026-07-16:* **`RunDirector`'s 25-parameter constructor** → a `RunDirectorOptions` record (commit `7875d64`).
+- *2026-07-17:* **No ESLint/Prettier in `ClientApp/`** — **decided, not deferred: the frontend stays
+  deliberately un-linted and un-formatted** (user ruling). The typecheck (`tsc`) is the only frontend gate.
+  Don't re-file this as tech debt; the rule now lives in `DEV_STANDARDS.md` → *Coding Conventions*.
+- *2026-07-17:* **`RunDirector.cs` was 1058 lines holding 9 types** → the 6 `IRunEvent` classes + 2 resolution
+  helpers split one-per-file into `Combat/RunEvents/` (which keeps `namespace creaturegame.Combat`, per the
+  `Combat/Ai/` precedent); the `PlayerAttackTypes`/`CreatureTypes` duplication collapsed into `Creature.Types`.
+  **`RunLoop.cs`'s ~28 types are fine** — a cohesive vocabulary file; don't let a type-count metric split it.
+- *2026-07-17:* **`Creature/` and `Creatures/` both declared `namespace creaturegame.Creatures`** → the 9 files
+  merged into `Creatures/`; the `Creature/` directory is gone. Pure file move (`git mv`), no code changed.
+- *2026-07-17:* **csproj boilerplate copy-pasted across all four projects** → a root `Directory.Build.props`
+  carrying the shared `TargetFramework`/`ImplicitUsings`/`Nullable` **plus `TreatWarningsAsErrors`** (verified
+  clean first, so a new warning now fails the build). Closes the *No `Directory.Build.props`* debt below.
+- *2026-07-17:* **`BattleScreen.tsx` was 1317 lines with 13 hand-rolled modal overlays** → a shared `<Modal>` with
+  an explicit **`dismiss`** prop (`'blocking'` vs `{ onEscape }`) + the escape rule in one `useEscapeKey` hook; the
+  8 prompts + `BattleEndedOverlay` lifted into `components/modals/`. **`BattleScreen.tsx` is now 842 lines with zero
+  hand-rolled overlays.** Every run prompt is `'blocking'` **by construction, not by taste** — each parks a
+  server-side await, so dismissing one would strand the run; don't re-file "the modals should close on Escape".
+  The pinned map is the one escapable overlay and calls `useEscapeKey` directly (it *is* the full-screen surface,
+  so it can't share the wrapper's overlay+card DOM). CSS untouched.
+- *2026-07-20:* **DB services (`PokemonService`/`AttackService`/`ItemService`) skip try/catch** — **decided,
+  not a gap: the convention was wrong, not the code.** They're thin EF pass-throughs with no partial state to
+  clean up and nothing to do differently on failure; every real caller already wraps the whole operation at
+  its actual boundary (`GameController.Start`, `GameSessionManager`'s session task) and logs there. Amended
+  `CLAUDE.md` → *Coding Conventions* to "wrapped at the call boundary" instead of adding matching-but-inert
+  catch blocks three layers down. Don't re-file this as a DB-services gap. This was the last open item from
+  the 2026-07-19 repo-wide PR-audit; the other four findings are individually archived in `TODO_ARCHIVE.md`
+  ("0× type immunity does not gate secondary effects", "Leech Seed drain borrows PoisonDamageDenominator",
+  "Paralysis Speed quartering is an inline gen-variable magic number", "Haze over-resets") and a fifth
+  (`SignalRInput` cancel/prompt race) was deliberately never filed — waived by the user while game state
+  stays transient (memory `project_waived_cancel_race`).
+````
+
+### 12. Tech Debt / Cleanup — the 2026-07-31 review-pass note (its one remaining item is carried in the new TODO)
+
+````markdown
+**Filed 2026-07-31 from a review pass over the Generation Profile Stage 1a–2b commits** (`e603478`…`fa952e4`;
+the threading discipline itself is sound — every seam explicit, no `?? Gen1…` default reintroduced, each stage
+carries its `TestAltProfile` leg). Two of the three closed the same day as Stage 3 riders (full write-ups in
+`TODO_ARCHIVE.md` → *Tech-Debt cleanups*): the **five-site learnset-query duplication** in `EncounterFactory`
+(→ one `LoadLearnsetsAsync` home) and the **per-call `GenerationProfiles.Registered` allocation** (→ materialised
+once). One remains:
+````
+
+### 13. Tech Debt / Cleanup — the closed 2026-07-19 PR-audit note
+
+````markdown
+*(The 2026-07-19 repo-wide PR-audit is now fully closed — all five findings resolved: four fixed & archived in
+`TODO_ARCHIVE.md`, the DB-services try/catch convention decided above, and the `SignalRInput` cancel/prompt race
+deliberately waived by the user (memory `project_waived_cancel_race`). Don't re-file "Repo-wide PR-audit
+findings" as an open section.)*
+````
+
+### 14. Known Gaps — the TM/HM and poison-tick items (both resolved)
+
+````markdown
+- ~~**Player-facing TM/HM items don't exist at all**~~ — **SHIPPED 2026-09-28** as **TM/HM — Move-Teach
+  Rewards**: a reward-choice move-teach card (substituting an item-reward slot, not a bag item) + an
+  ABLE/NOT-ABLE "teach to a Pokémon?" party-target picker (a roguelite QoL improvement over real Gen 1, which
+  only tells you afterward — not a literal reproduction), reusing the existing forget-a-move flow. The
+  reward-choice design that emerged with the user dropped the item/bag/`ItemCategory` scope this write-up
+  originally assumed entirely — no physical TM item exists, so Tier 2 bag persistence was never a dependency.
+  Full record → `TODO_ARCHIVE.md` → *TM/HM — Move-Teach Rewards*.
+- ~~**Possible bug: poison-tick timing vs. a same-turn faint**~~ — **RESOLVED 2026-09-13**: poison ticking the
+  turn it's applied is correct Gen-1 behaviour (not a bug); end-of-turn residual (poison/burn/Leech Seed) still
+  firing for the survivor after either side had already fainted from a direct hit that same turn **was** a real
+  bug, now fixed — `Battle.cs`'s end-of-turn residual block is gated on both creatures still being alive via the
+  new `IBattleRules.FaintEndsTurnImmediately` seam. Review of that fix (`requirements-review`/`pr-review`,
+  2026-09-13) also found and fixed a companion bug on the same rule: Hyper Beam's recharge flag was being set
+  even on a KO hit, contradicting the Hyper-Beam-no-recharge-on-KO rule already documented in
+  `GEN_DIFFERENCES.md`, and reachable via forced-switch (the enemy's stale recharge flag could wrongly skip its
+  next turn against the newcomer). See `TODO_ARCHIVE.md` → *End-of-turn residual (poison/burn/Leech Seed) fired
+  even after a same-turn faint* for the full write-up (both bugs, the seam refactor, and the counter-tick
+  split). **The one narrower question from this same investigation was answered 2026-09-20 and turned into a
+  larger, still-open item** — see the next entry below.
+````
+
+### 15. Known Gaps — the endless-chain double-faint and phantom stat-cap items (both resolved)
+
+````markdown
+- ~~**Endless-chain double-faint**~~ — **RESOLVED 2026-07-28**: a mutual end-of-turn DoT double-faint now counts
+  as the player's win and promotes a survivor whenever the party has a live bench member; it only remains a loss
+  for a **lone** creature with nobody left to promote (`RunDirectorTests.Runner_DoubleFaintFromEndOfTurnPoison_EndsTheRun_ButStillCountsTheWin`
+  — note both the class and the name, neither of which matches the formerly-cited
+  `BattleRunnerTests.…_CountsAsLoss_NotAWin`: that class doesn't exist in this repo, and the test was renamed when
+  the win-tally decision flipped its `BattlesWon` pin 0 → 1). See
+  `TODO_ARCHIVE.md` → *Mutual KO ends the run even with a live bench*.
+- ~~**Phantom stat-cap message**~~ — **FIXED 2026-07-19** (see `TODO_ARCHIVE.md` → *Stat-cap message fidelity*).
+````
+
+### 16. Repo-Wide Code Review Sweep — the intro and the "Clean (checked, no findings)" record
+
+````markdown
+## Repo-Wide Code Review Sweep (2026-10-02) ⟵ OPEN, adjudicated one item at a time (fixed items → archive)
+
+Six read-only Opus reviewers, one per slice (core engine · ASP.NET/SignalR backend · importer + data layer ·
+React/Phaser frontend · tests · infra/security). **Every item still listed below is an unadjudicated finding** —
+the user decides fix / waive / defer per item; nothing here is approved work until they say so (fixed items move
+to `TODO_ARCHIVE.md`). Items already waived/closed elsewhere
+(SignalRInput cancel race, reconnect event-replay *absence*, rules-RNG seeding, items.db pin) were excluded.
+**Gen 1 claims were quoted from the reviewers' memory of pokered, not fetched — verify each against
+`GEN_DIFFERENCES.md` / pokered before changing the engine or data** (see the *challenge gen fidelity* rule).
+Fixing a data/engine item usually also means updating the test that currently pins the wrong value.
+````
+
+### 17. Repo-Wide Code Review Sweep — "Clean (checked, no findings)"
+
+````markdown
+**Clean (checked, no findings):** Dev Mode gating (server flag; ranges stripped at the emitter's single send
+point), client-supplied index/id bounds checks, CORS, event wire projection + REST DTOs, XSS (`dangerouslySetInnerHTML`/
+`innerHTML`/`eval` absent), SignalR + Phaser listener cleanup, secrets in tracked files/history, EF schema vs
+snapshots vs live dbs, runtime queries (no N+1), Gen 1 type chart and XP curves, HP DV derivation, island layout
+generation.
+````
+
+### 18. Database Architecture (reference) — covered by `ARCHITECTURE.md` §2.5
+
+````markdown
+## Database Architecture (reference)
+
+**Two-database model:**
+- `pokemon.db` / `PokemonDbContext` — species, base stats, types, growth/catch rates, learnsets, game
+  availability, evolution chains.
+- `moves.db` / `MovesDbContext` — moves, damage type, accuracy, PP, stat/status effects.
+- `items.db` / `ItemsDbContext` — battle-usable items (Gen 1 roster + gameplay numbers).
+
+**Where new tables go:** Pokémon-world data (egg groups, …) → `pokemon.db`; move-world data → `moves.db`; item
+data → `items.db`; player save state (party, caught Pokémon, bag) → `save.db` / `PlayerDbContext` (deferred
+until Catch).
+````
+
+---
+
 ## Repo-sweep R1 — species base stats and BaseExperience were modern, not Gen 1 ✅ DONE (2026-10-03)
 
 Two R1 findings from the 2026-10-02 repo-wide review, fixed together (importer + data only; no engine or seam

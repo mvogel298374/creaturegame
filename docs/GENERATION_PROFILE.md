@@ -6,7 +6,7 @@
 >
 > **See also:** `GENERATION_SEAMS.md` (the four battle seams + the §5.0 gen-agnostic checklist — read it first;
 > this doc extends its model outward), `ENCOUNTER_DESIGN.md` (the biome/region layer this plugs into),
-> `DEFINITION_OF_READY.md` (the DoR this design closes), `docs/TODO.md` → *Generation Profile* (the task entry).
+> `DEFINITION_OF_READY.md` (the DoR this design closes), `docs/TODO.md` §4.3 (the open work; the finished stages are in the archive).
 
 ---
 
@@ -33,8 +33,7 @@ deliverable.
 
 ## 1. Decisions locked with the user (2026-07-29)
 
-1. **Design against Gen 1 alone.** No Gen 2 content. The Gen-2 *content/schema* work stays in `TODO.md` →
-   *Multi-Generation*.
+1. **Design against Gen 1 alone.** No Gen 2 content. The Gen-2 *content/schema* work stays in `TODO.md` §4.4.
 2. **Presentation is per-gen in both senses** — visual reskin **and** menu structure.
 3. **The roguelite layer is FLAVOUR-ONLY.** Same node kinds, same run flow, same possibilities. Only *content*
    and *look* are generation-specific. This is what keeps **`RunRules` gen-neutral**, as
@@ -247,7 +246,7 @@ to take the whole `GenerationProfile` rather than a bare `IEvolutionRules` in th
 used to query evolution edges and the rules used to judge them can never disagree. Falsification leg:
 `TestAltProfile.BuildStatCalculator` now returns an `AltStatCalculator` stamping a sentinel DV of 99 on every
 stat (previously it returned a plain `Gen1StatCalculator`, which made it useless as a probe). Full write-up →
-`TODO.md` → *Generation Profile* → Stage 1b.
+`TODO_ARCHIVE.md` → *TODO.md rehaul* (the Generation Profile block), Stage 1b.
 
 > **The parameters 1b adds must be `required`, never defaulted.** A `GenerationProfile? profile = null` with a
 > `?? Gen1Profile.Instance` fallback would reintroduce §4.2's hazard at the very layer the feature is trying to
@@ -354,8 +353,8 @@ checked invariant and a substitutable value; it does not claim more.
 — on the profile as `GenerationProfile.ContentScope`. `Gen1ContentScope` is the documented stub: every accessor
 returns its query untouched, and its doc names the exact fix (`all.Where(x => x.GenerationIntroduced <= 1)`,
 `<=` not `==`) and the fact that it becomes **wrong** the day a second generation's rows are imported. The actual
-`GenerationIntroduced` columns and filtered queries are **importer/schema work** and stay in `TODO.md` →
-*Multi-Generation*, explicitly sequenced after this.
+`GenerationIntroduced` columns and filtered queries are **importer/schema work** and stay in `TODO.md`
+§4.4, explicitly sequenced after this.
 
 **`IQueryable`, not a predicate — the choice that makes the stub more than a gesture.** A
 `Func<PokemonSpecies, bool>` would materialise the whole table before filtering and would have to be re-plumbed
@@ -377,7 +376,7 @@ name-matched hold-out in `RewardCalculator.UsableItems`. So the identity was "co
 unrelated mechanism — the exact duplicated-source-of-truth hazard this feature keeps deleting.
 `requirements-review` caught it. **User's call (2026-07-30): fix the premise, not the wording** — the item was
 removed from the import roster and from `items.db`, and the hold-out deleted, so reward eligibility is
-categorical again. It returns through the per-generation item schema (`TODO.md` → *Multi-Generation* →
+categorical again. It returns through the per-generation item schema (`TODO.md` §4.4,
 *Per-generation ITEM data*, added for this). The rule it establishes is worth carrying forward: **the scaffolding
 a future generation needs is the schema, not a stray row** — a row that cannot say which generation it belongs to
 is indistinguishable from Gen 1 content to every consumer not specially taught otherwise.
@@ -522,7 +521,7 @@ Decision 7 refines §2.3 rather than replacing it. Three tiers:
 generation's overview screen exposing an extra per-gen stat panel — it does **not** admit new run
 possibilities. When a surface iteration proposes a functionality difference, that proposal is escalated in the
 joint mini-plan, never assumed. Every modal stays `'blocking'` by construction (each parks a server-side
-await — see `TODO.md` → *Tech Debt*, the `<Modal>` refactor); a redesign may restyle and re-lay-out them but
+await — see `TODO.md` §9, and the `<Modal>` refactor in `TODO_ARCHIVE.md`); a redesign may restyle and re-lay-out them but
 must not make one dismissable.
 
 ### 7.2 Sub-stage 4a — the generation channel + the client presentation registry ✅ DONE (2026-07-31)
@@ -534,7 +533,7 @@ must not make one dismissable.
 > the two 15-type tables are re-framed as asset inventories measured against the delivered roster
 > (`hasBossNamePool` / `hasTypeIcon`). Falsification legs shipped server-side (TestAltProfile's 17-type roster
 > through `BuildPresentationEvent`) and client-side (alt-registry + alt-roster Vitest probes). Verified live
-> over the hub on both attach paths. Full record → `TODO.md` → *Generation Profile* → Stage 4a.
+> over the hub on both attach paths. Full record → `TODO_ARCHIVE.md` → *TODO.md rehaul* (the Generation Profile block), Stage 4a.
 
 The infrastructure everything else stands on. **Where the client learns the generation — two paths, and it
 needs both:**
@@ -978,7 +977,7 @@ an aspiration into a tested claim.
 
 | # | Item | Status |
 |:--|:--|:--|
-| 1 | **Captured + acceptance condition** | `TODO.md` → *Generation Profile*. **Acceptance:** a Gen 1 run is byte-for-byte identical to today; `TestAltProfile` demonstrably changes rules, content roster, region and chrome through the *same* code paths; **zero** `if (generation == …)` in the engine. |
+| 1 | **Captured + acceptance condition** | `TODO.md` §4.3. **Acceptance:** a Gen 1 run is byte-for-byte identical to today; `TestAltProfile` demonstrably changes rules, content roster, region and chrome through the *same* code paths; **zero** `if (generation == …)` in the engine. |
 | 2 | **Design pass for anything significant** | ✅ Stage 4 `/plan` v2 complete (decisions 5–9, 2026-07-31): the framework (4a–4c) is Ready; the per-surface designs (4d+) are **deliberately provisional-pending-their-joint-mini-plan** — DoR #2's provisional mechanism, by design (decision 8), not an unchecked item. Stages 1–3, 5 are plumbing/backend. |
 | 3 | **Gen-variable surface named** | ✅ §2.1 (variable) and §2.2 (invariant), incl. the three surfaces with **no seam today**: type roster, content scope, starters. `RunRules` and node kinds confirmed **not** gen-variable. |
 | 4 | **Gen 1 source of truth** | `GENERATION_SEAMS.md` (seam catalogue + §2 domain table); `ENCOUNTER_DESIGN.md §2.3` (Kanto roster + the all-15-types invariant); `DESIGN_GUIDES.md` (Generation Architecture Principle). |

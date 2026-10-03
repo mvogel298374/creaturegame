@@ -41,8 +41,10 @@ From `DEV_STANDARDS.md` → **Design Rationale Placement** and `docs/PRODUCT_SPE
 ## Steps
 Work through all of these — do not stop at the first.
 
-1. **Locate the finished item** in `docs/TODO.md` (the section, its "Next up" ordering entry, and every place
-   the intro / "Current state" refers to it).
+1. **Locate the finished item** in `docs/TODO.md`. The file is organised as: §1 the ranked **Now / next** table, then
+   §2–§8 the same items grouped by area (reliability, correctness, features, UX, test/CI, infra/tech debt, open
+   decisions), and §9 **Settled — do not re-raise**. Find the item's row in §1 **and** its detail entry, and every
+   cross-reference to it (including the numbered `§` pointers other docs use).
 
 2. **Archive it.** Move the finished write-up into `docs/TODO_ARCHIVE.md` (newest-first placement, matching the
    file's convention), marked `✅ DONE`/`✅ COMPLETE (YYYY-MM-DD)`. Preserve the substance — the archive doubles
@@ -58,9 +60,10 @@ Work through all of these — do not stop at the first.
    the archive's stale framing**, don't drop.
 
 4. **Clear the stale framing** around the item — everything that now describes a world that no longer exists:
-   the "Next up" priority ordering, `blocked on X` / `gated on Y` notes, `⚠️ known defect` banners, "see below"
-   pointers, and any dependency prose that the finished work invalidated. Update the intro / **Current state**
-   summary and the priority list to the new reality.
+   its row in the §1 ranking (drop the row; if it unblocked other items, say so on theirs), `blocked on X` /
+   `gated on Y` notes, `⚠️ known defect` banners, "see below" pointers, and any dependency prose that the finished
+   work invalidated. A ruling or waiver the work produced goes in §9 *Settled*, not in the archive alone. Keep
+   `TODO.md` free of finished history and design essays — design belongs in the design docs.
 
 5. **Fix dangling references** — the finished section may be linked from elsewhere:
    - In `TODO.md`/`TODO_ARCHIVE.md`: anchor links (`](#…)`), `see below`/`see above`, `*Section*` refs.

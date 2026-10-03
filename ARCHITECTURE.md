@@ -173,7 +173,7 @@ Each entry: **Decision · Why · Where it lives.**
   saw that run's `/start` call, 404ing it — the live SignalR connection stays fine because it's pinned to one
   machine for its whole lifetime, so only stateless follow-up requests were affected. Fixed by pinning
   `--ha=false` in `.github/workflows/fly-deploy.yml`. This constraint stands until session state is
-  externalized into `save.db` (see `docs/TODO.md` → Known Gaps).
+  externalized into `save.db` (see `docs/TODO.md` §4.2).
 - **Session resume corollary (2026-09-14):** the mechanism above only survives a *transient network drop while
   the SPA stays mounted* — the reconnecting client's React state was never lost, so a re-resolved connection is
   all it needs. A **full SPA remount** (a hard refresh, a closed/reopened tab, a bookmarked `/battle` URL) is a
@@ -204,8 +204,8 @@ Each entry: **Decision · Why · Where it lives.**
     `ReplayLastKnownState()`, re-sending whatever's cached to the connection that's now current. **Known gap:**
     a between-node blocking prompt (route choice, shop, reward-choice, recovery, acquisition, lead-choice,
     switch-in) has no cached "currently open" event of its own yet, so a remount mid-prompt still has nothing to
-    reattach to (unchanged from before this — not a regression, just not yet covered; see `docs/TODO.md` →
-    Known Gaps).
+    reattach to (unchanged from before this — not a regression, just not yet covered; designed in
+    `docs/RECONNECT_RESILIENCE.md` R1d-a).
   - **A modal answer must not be lost in transit, and the shop is the one prompt whose answers can overlap.**
     Every blocking prompt parks the run on a `SignalRInput` handshake that the hub's answer completes, and an
     answer arriving with no handshake pending is dropped (right for a stray double-click on a one-shot prompt).
@@ -375,6 +375,7 @@ Every doc in the repo and what it answers, in a line. This file (`ARCHITECTURE.m
 | `CLAUDE.md` | Always-on primer: setup, commands, architecture overview, the read-on-demand trigger table (repo root). |
 | `ARCHITECTURE.md` | **This file** — the decision log (the *why*) + system map (repo root). |
 | `docs/GENERATION_SEAMS.md` | The seam contract + the §5.0 gen-agnostic definition-of-done checklist (the real gate). |
+| `docs/RECONNECT_RESILIENCE.md` | The remaining reconnect work, designed (provisional): replaying an open blocking prompt, the abandon-timer race, the second-tab policy, and the refresh-state snapshot — plus the shared test plan. |
 | `docs/GENERATION_PROFILE.md` | The generation as a *product-wide* axis (content, region, menus, look) — the composition point `GENERATION_SEAMS.md §7` anticipated, and why a fake second profile is ship-blocking. |
 | `docs/STATE_MODEL.md` | The `Creature` permanent/transient split (`BattleState`). |
 | `docs/GAME_LOOP.md` | The run/roguelite loop ↔ event model (battle & heal as events). |

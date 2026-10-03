@@ -4,7 +4,7 @@
 > pass on top of the existing sprites.
 > **See also:** `GENERATION_PROFILE.md` §7.6 (defers a *second generation's* sprite/cry asset set — a
 > different question from this doc, which is entirely about the one Gen 1 set that already ships today);
-> `TODO.md` → *Web UI — Polish* → move-specific attack animations (the animation-family work several ideas
+> `TODO.md` §4.5, move-specific attack animations (the animation-family work several ideas
 > below plug into); `GENERATION_PROFILE.md` §7.3 / §1 decision 10 (the ratified "Kanto Sage" HUD palette —
 > referenced below for colour choices that should match it).
 
@@ -214,7 +214,7 @@ almost for free — no new sprite art, just a different FX call gated on the exi
 engine already reports.
 
 ### 3.4 Type-coloured impact particles
-Ties directly into the TODO'd move-animation-family work (`TODO.md` → Web UI Polish): once `MoveUsed` carries
+Ties directly into the TODO'd move-animation-family work (`TODO.md` §4.5): once `MoveUsed` carries
 `DamageType` (already flagged as the blocker for that item), a small `ParticleEmitter` burst tinted to the
 move's type colour — the same `TypeBadge` palette already used for the type badges — on contact would give
 each type family a distinct hit signature. Physical-contact moves get a solid puff; projectile/special moves

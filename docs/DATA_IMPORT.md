@@ -210,7 +210,7 @@ TM and HM tables. Every non-machine move is null.
 - **Pins:** `MoveMappingTests` (mapper) and `StrongTierMoveLevelGateTests` (live DB: every move any species learns
   by TM/HM has a floor, no other move does).
 - **Adding a generation's TMs** means a new table keyed the same way; the column rides the per-`(moveId,
-  generation)` `Attack` split planned under Multi-Generation in `TODO.md`.
+  generation)` `Attack` split planned in `TODO.md` §4.4.
 
 ### 4.2 Species (`PokemonImport` → `PokemonSpecies`)
 Each species needs **two** PokeAPI endpoints, because the data is split:
@@ -265,7 +265,7 @@ Each species needs **two** PokeAPI endpoints, because the data is split:
   changed and when. `Gen1TypeSlots` picks the earliest pre-Gen-6 historical entry if one
   exists, otherwise the current types. This is how a Pokémon whose typing changed in a
   later generation is imported with its **Gen 1 typing**, not today's. (Not yet parameterised by generation —
-  see `TODO.md` → *R1c*.)
+  see `TODO.md` §4.4.)
 - **Growth rate / Pokédex entry** mapped from the species endpoint (flavor
   text has its form-feed/newline control chars stripped).
 
@@ -324,7 +324,7 @@ resting on the wrong one. `ItemImportTests.Gen1BattleItemNames_ExcludesMaxRevive
 now pins it.
 
 > **The rule this establishes: never add another generation's row to a catalog "as scaffolding."** The scaffolding
-> a future generation needs is the **per-generation schema** (`TODO.md` → *Multi-Generation*), where a row can say
+> a future generation needs is the **per-generation schema** (`TODO.md` §4.4), where a row can say
 > which generation it belongs to. Until that exists, a stray row is indistinguishable from Gen 1 content to every
 > consumer that isn't specially taught otherwise. `ReviveItemEffect` reading `RevivePercent` generically means Max
 > Revive returns as **pure data** when that schema lands — nothing in the engine has to change.
@@ -466,7 +466,7 @@ next run, rather than aborting the whole import.
 - **Per-record `SaveChanges`.** Many round-trips; fine for a one-shot tool, not a pattern
   to copy into the web host.
 - **Hardcoded Gen 1.** Move/species ranges and mappings assume Gen 1; generalising to
-  other generations is future work (see the Multi-Generation section of `TODO.md`).
+  other generations is future work (see `TODO.md` §4.4).
 - **A `.db` edit can sit in the WAL.** SQLite runs these databases in WAL mode, and a running dev stack (or a
   sqlite MCP connection) keeps them open, so an importer write can land in `moves.db-wal` and leave the
   checked-in `moves.db` byte-identical — git shows no change. Before committing a regenerated `.db`, stop whatever
