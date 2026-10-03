@@ -916,9 +916,6 @@ Fixing a data/engine item usually also means updating the test that currently pi
   of replay-after-blip; (b) the `useBattleHub` wiring of `replayDedupe` is untested (only the pure helper is);
   (c) the 60 s grace rests on SignalR's documented 0/2/10/30 s default schedule, not a measured browser run.
   The server replaying on every reconnect is an accepted design (it can't tell blip from refresh), not a bug.
-- **Pinned map: `RouteChoiceMap` still pulls focus to a covered town** (Enter picks an unseen route). The
-  z-index half (prompts hidden under the pinned map) is fixed — `TODO_ARCHIVE.md` → *Repo-sweep R1/R2/R3 — five
-  small fixes*.
 - **Engine: Substitute should also block flinch** (`MoveEffects.cs:96-100`). The slower-attacker carry-over half
   is fixed (same archive entry).
 - **Test gap: the `RunFaulted` path** (fix archived, same entry) — nothing pins `SendRunFaulted`, the
@@ -1004,6 +1001,10 @@ their original numbers and are unadjudicated — the user decides fix / waive / 
 
 - **Modal accessibility**: `Modal.tsx:35-44` has `aria-modal` but no focus trap/initial focus/inert background —
   Tab still reaches QUIT (abandons the run, no confirmation); battle log has no `role="log"`/`aria-live`.
+  Observed in a browser (2026-10-03, route-choice modal open over the pinned map): Tab leaves the modal after the
+  offered towns — focus goes to `<body>`, then the MAP toggle, the settings gear, then the pinned map *behind* the
+  modal (its close button, then its towns). Not checked: what Enter does on those behind-the-modal towns (probably
+  inert). Keyboard-only; the fix is the focus trap/inert already listed here.
 - **Double-submit creates two runs** (`StarterSelection.tsx:45-72`, `NicknameModal.tsx:32,38`); **`/battle` with
   no saved game shows "Connecting…" forever** (`BattleScreen.tsx:78`, `useBattleHub.ts:52`).
 - **Battle log unbounded** (`battleReducer.ts:262`, `BattleScreen.tsx:286`) and the whole `BattleScreen`

@@ -41,12 +41,20 @@ is idempotent on the client…"). Player-visible → `PRODUCT_SPEC.md` → Sessi
 ## Repo-sweep R1/R2/R3 — five small fixes (modal z-index, slower-flincher, RunFaulted, level-up panel, e2e.ps1 crash) ✅ DONE (2026-10-03)
 
 Found by the 2026-10-02 repo-wide code review sweep; the sweep's remaining items (and the unfixed remainders of
-items 1, 2 and 5 below) are still open in `TODO.md`.
+items 2 and 5 below) are still open in `TODO.md`.
 
-1. **R1 — pinned map hid blocking prompts (z-index half only).** `.modal-overlay` z-index raised 10 → 70
+1. **R1 — pinned map hid blocking prompts.** `.modal-overlay` z-index raised 10 → 70
    (`components/modals/Modal.css`) so every blocking prompt sits above the pinned Run Map (`.encounter-map--pinned`,
-   z 60). **Not fixed:** `RouteChoiceMap` still pulls focus to a town covered by the pinned map (Enter picks an
-   unseen route) — remains open in `TODO.md`.
+   z 60).
+   **`RouteChoiceMap` focus — closed, browser-verified (2026-10-03).** The suspected "focus pulled to a covered
+   town" was never a separate defect: the focus-pull landed on a town hidden under the pinned map, and raising the
+   modal above it makes the focused town the visible one. Playwright, seeded run (seed=1/BULBASAUR), pinned map
+   forced open via DOM click on `.map-toggle-btn` while the route-choice modal was up: overlay z 70 vs map z 60;
+   the first offered town (`.town-map-town--offered`) is `document.activeElement` and a hit-test at its centre
+   lands inside `.route-choice-modal`; screenshot shows the card fully above the map. The residual keyboard issue
+   (Tab escaping the modal) is the open R3 "Modal accessibility" item in `TODO.md`. Also: a Playwright run on the
+   non-E2E path (title → VENUSAUR → nickname) rendered fine with no page errors; an earlier blank `#root` in
+   headless Puppeteer did not reproduce and is unexplained (not filed as a bug).
 2. **R1 — flinch from a slower attacker carried into the next turn.** `Battle.cs` now clears `IsFlinched` on both
    creatures at end of turn (beside the `HazeSuppressedStatus` reset), so a flinch set after the target already
    acted is no longer consumed by its next turn. **Test:** `FlinchContractTests.SlowerFlincherDoesNotCostTargetItsNextTurn`.
