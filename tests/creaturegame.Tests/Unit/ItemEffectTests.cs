@@ -57,7 +57,12 @@ public class ItemEffectTests
             BaseDamage = 40,
         };
 
-    private static (Creature, RecordingEmitter) Apply(Item item, Creature user, int? slot = null)
+    private static (Creature, RecordingEmitter) Apply(
+        Item item,
+        Creature user,
+        int? slot = null,
+        IBattleRules? rules = null
+    )
     {
         var emitter = new RecordingEmitter();
         var effect = ItemEffects.For(item.Category)!;
@@ -67,6 +72,7 @@ public class ItemEffectTests
             Item = item,
             TargetMoveSlot = slot,
             Emitter = emitter,
+            Rules = rules ?? Gen1BattleRules.Instance,
         };
         Assert.True(effect.CanApply(ctx));
         effect.Apply(ctx);
@@ -81,9 +87,19 @@ public class ItemEffectTests
                 {
                     User = user,
                     Item = item,
+                    Rules = Gen1BattleRules.Instance,
                     TargetMoveSlot = slot,
                 }
             );
+
+    private static Item XAccuracy() =>
+        Item(
+            61,
+            "x-accuracy",
+            ItemCategory.BattleStatBoost,
+            boostStat: StageStat.Accuracy,
+            boostStages: 1
+        );
 
     // Drives an effect against a specific PARTY member instead of the active creature (`User` stays the lead,
     // matching how `ItemAction` always builds the context — the party pick is `TargetPartySlot`, not `User`).
@@ -101,6 +117,7 @@ public class ItemEffectTests
         {
             User = party.Lead,
             Item = item,
+            Rules = Gen1BattleRules.Instance,
             Party = party,
             TargetPartySlot = targetSlot,
             TargetMoveSlot = moveSlot,
@@ -124,6 +141,7 @@ public class ItemEffectTests
                 {
                     User = party.Lead,
                     Item = item,
+                    Rules = Gen1BattleRules.Instance,
                     Party = party,
                     TargetPartySlot = targetSlot,
                     TargetMoveSlot = moveSlot,
@@ -679,6 +697,48 @@ public class ItemEffectTests
     }
 
     [Fact]
+    public void XAccuracy_UnderGen1Rules_SetsTheBypassFlagInsteadOfRaisingTheStage()
+    {
+        var (user, em) = Apply(XAccuracy(), TestCreatures.Make());
+
+        Assert.True(user.Battle.UsingXAccuracy);
+        Assert.Equal(0, user.Battle.Stages.Accuracy);
+        Assert.Empty(em.Of<StatStageChanged>());
+    }
+
+    [Fact]
+    public void XAccuracy_UnderGen1Rules_WhenAlreadySet_StillApplies()
+    {
+        var c = TestCreatures.Make();
+        c.Battle.UsingXAccuracy = true;
+        Assert.True(CanApply(XAccuracy(), c));
+    }
+
+    [Fact]
+    public void XAccuracy_UnderRulesWithoutTheBypass_RaisesTheAccuracyStage()
+    {
+        var (user, em) = Apply(
+            XAccuracy(),
+            TestCreatures.Make(),
+            rules: TestAltProfile.Instance.BattleRules
+        );
+
+        Assert.False(user.Battle.UsingXAccuracy);
+        Assert.Equal(1, user.Battle.Stages.Accuracy);
+        Assert.Equal("Accuracy", em.Of<StatStageChanged>().Single().Stat);
+    }
+
+    [Fact]
+    public void XAccuracyFlag_ClearsOnThePerBattleReset()
+    {
+        var (user, _) = Apply(XAccuracy(), TestCreatures.Make());
+
+        user.ResetBattleState();
+
+        Assert.False(user.Battle.UsingXAccuracy);
+    }
+
+    [Fact]
     public void XAttack_IgnoresAnyPartyTargetSlot_AlwaysBoostsTheActiveCreature()
     {
         // Unlike Healing/StatusCure/PpRestore, BattleStatBoost has no real party-target scope to honor: Gen 1
@@ -711,6 +771,7 @@ public class ItemEffectTests
         {
             User = party.Lead,
             Item = item,
+            Rules = Gen1BattleRules.Instance,
             Party = party,
             TargetPartySlot = slot,
             Emitter = emitter,
@@ -728,6 +789,7 @@ public class ItemEffectTests
                 {
                     User = party?.Lead ?? TestCreatures.Make(),
                     Item = item,
+                    Rules = Gen1BattleRules.Instance,
                     Party = party,
                     TargetPartySlot = slot,
                 }

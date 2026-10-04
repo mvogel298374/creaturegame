@@ -8,10 +8,62 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## X Accuracy — Gen 1 "skip the accuracy check" flag ✅ DONE (2026-10-04)
+
+**Was** `TODO.md` §1 row 1 / §3.2 "X Accuracy (M)", the third item of "Three data/engine fixes". Design approved by the
+user 2026-10-04. Player-visible -> `PRODUCT_SPEC.md` §5 *In-battle item party-targeting*. The unverified side findings
+(gate order, Dire Hit/Guard Spec second use, item descriptions) stay open in `TODO.md` §3.2 "Gen 1 gate-order and Dire
+Hit/Guard Spec gaps".
+
+**Problem.** X Accuracy was imported as a +1 accuracy stage (the Gen 3+ shape). Gen 1 `MoveHitTest` (pret/pokered
+`engine/battle/core.asm`) returns at once when the user has `USING_X_ACCURACY` ("always hit regardless of
+accuracy/evasion") — after the Dream Eater, Swift, Dig/Fly and **Mist** checks, and without the random roll (so no 1/256
+miss).
+
+**Acceptance (as shipped).** With the Gen 1 rules, using X Accuracy sets a per-battle flag (item consumed, including a
+second use). While set, the creature's moves skip the accuracy roll with no RNG draw — a hit on a roll that would miss,
+even at +6 foe Evasion — and a failed OHKO speed check is not rescued; Mist still blocks a stat drop; the flag clears on
+the per-battle reset (including a switch-out/switch-in) and with Haze on both sides. Under rules that do not bypass (the
+alt-profile double) X Accuracy raises accuracy one stage as before.
+
+**Design corrections found at source (the TODO draft was wrong on all three).**
+1. *Bypass vs. stage:* Gen 1-2 skip the accuracy check (pokecrystal `BattleCommand_CheckHit`); Gen 3+ is a +1 stage
+   (pokeemerald `ItemUseInBattle_StatIncrease`). Hence a rules-seam member, not a data change.
+2. *A second use is consumed* in Gen 1 (pokered `ItemUseXAccuracy` has no refusal). The "won't have any effect" refusal is
+   Gen 2 — a separate, still-unmodeled seam member.
+3. *No narration of its own:* a dedicated `XAccuracyApplied` event was designed, then deliberately removed — `ItemUsed` is
+   the whole narration; no active-effect indicator (user decision).
+
+**Shipped.**
+- `IBattleRules.XAccuracyBypassesAccuracyCheck` (Gen 1 true; `TestAltProfile` false; `DelegatingBattleRules` passes
+  through). `BattleState.UsingXAccuracy`, cleared by the per-battle reset and by Haze on both sides.
+- `ItemEffectContext.Rules` and `ItemAction`'s `rules` parameter are now **required** (the silent Gen 1 default was removed
+  at `requirements-review`'s request). `BattleBoostItemEffect` sets the flag instead of raising the stage when the rules
+  bypass.
+- `AttackAction.ResolvePreDamageGates` skips the threshold and RNG draw when the flag is set; the OHKO speed gate runs
+  first, so it is not rescued. This engine has no untargetable Dig/Fly turn — a recorded gap (`TODO.md` §3.1).
+- Data: the x-accuracy row is otherwise unchanged (+1 accuracy stage) but `ItemMapper.ApplyGen1Gameplay` overrides its
+  `Description` to "Your moves skip the accuracy check for the rest of the battle."; `items.db`'s one row updated to match
+  (verified row-by-row vs HEAD: 28 rows, one changed, Description only; WAL checkpointed). `DATA_IMPORT.md` records the
+  exception. Gen-variable surface: the bypass itself and (unmodeled) the Gen 2 second-use refusal — `GENERATION_SEAMS.md`
+  §2 row + §5.0.2, `GENERATION_PROFILE.md` §3, `STATE_MODEL.md`, `GEN_DIFFERENCES.md`.
+- **Tests:** `XAccuracyContractTests` (10) incl. `XAccuracyMakesAFasterOhkoUserLandThroughMaxedEvasion`;
+  `ItemEffectTests`, `ItemActionBattleTests`, `BattleForcedSwitchTests`, `UniqueMoveEffectContractTests` additions;
+  `ItemImportTests` description pin.
+- **Sources verified:** pret/pokered `engine/battle/core.asm` `MoveHitTest`, `engine/items/item_effects.asm`
+  `ItemUseXAccuracy`, `haze.asm` `HazeEffect_`/`CureVolatileStatuses`; pokecrystal `BattleCommand_CheckHit`; pokeemerald
+  `ItemUseInBattle_StatIncrease`.
+
+**Gates.** `format-gate` PASS (311 files); `test-runner` .NET 1742/1742, tsc clean, Vitest 311/311;
+`requirements-review` 7 discrepancies, all fixed at user direction; `pr-review` CHANGES-REQUESTED on 3 comment-budget
+items, all fixed at user direction (comment-only; no second pass).
+
+---
+
 ## Psychic's Special-drop chance + Full Restore on a statused full-HP creature ✅ DONE (2026-10-04)
 
-**Was** `TODO.md` §1 row 1 / §3.2 items (a) and (b) of "Three data/engine fixes". The third item, X Accuracy, stays
-open in `TODO.md` (held, needs-plan). Both fixes verified at pret/pokered 2026-10-04. Player-visible (Full Restore) →
+**Was** `TODO.md` §1 row 1 / §3.2 items (a) and (b) of "Three data/engine fixes". The third item, X Accuracy, shipped
+separately (see the X Accuracy section above). Both fixes verified at pret/pokered 2026-10-04. Player-visible (Full Restore) →
 `PRODUCT_SPEC.md` §5 *In-battle item party-targeting*.
 
 **(a) Psychic's Special-drop chance (S).** `moves.db` carried 10 in `EffectChance` and `StatEffectChance`; Gen 1 is

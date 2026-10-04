@@ -338,6 +338,8 @@ changes, so they're imported as data-only rows; their effect is deferred to the 
 
 **Deliberately NOT modelled here:** Poké Ball catch-rate multipliers — Gen 1 capture is a battle
 *formula*, which belongs with the (deferred) Catch mechanic on the seam side, not in the item data row.
+`Description` is PokeAPI's English short effect as-is, with one override: X Accuracy's text describes the Gen 3+
+stage boost, so `ItemMapper.ApplyGen1Gameplay` replaces it with the Gen 1 bypass wording.
 **Caveat:** `cost` is PokeAPI's *current* price (taken as-is, like move `Priority`/`Description`); a few
 Gen 1 prices differ (Antidote was ¥100, not ¥200). Cost isn't battle-relevant and there's no shop, so
 it's left uncorrected — revisit with a curated cost table only if an economy is ever added.

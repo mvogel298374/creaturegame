@@ -33,6 +33,8 @@ public sealed class ItemEffectContext
 
     public IBattleEventEmitter? Emitter { get; init; }
 
+    public required IBattleRules Rules { get; init; }
+
     /// <summary>The creature this use actually acts on: the <see cref="Party"/> member at
     /// <see cref="TargetPartySlot"/> when one is given and in range, else <see cref="User"/>. Read by every
     /// category except <see cref="BattleBoostItemEffect"/> (see <see cref="TargetPartySlot"/>) — including
@@ -191,7 +193,8 @@ public sealed class PpRestoreItemEffect : IItemEffect
 
 /// <summary>
 /// The in-battle "booster" items, all <see cref="ItemCategory.BattleStatBoost"/>, dispatched by item data:
-/// the X-items (X Attack/Defense/Speed/Special/Accuracy) raise a stat stage; <b>Dire Hit</b> raises crit (Gen
+/// the X-items raise a stat stage (X Accuracy instead sets <c>UsingXAccuracy</c> when
+/// <see cref="IBattleRules.XAccuracyBypassesAccuracyCheck"/>); <b>Dire Hit</b> raises crit (Gen
 /// 1: the Focus Energy state — and its famous ÷4 bug, applied in <c>Gen1BattleRules.GetCritChance</c>); and
 /// <b>Guard Spec.</b> sets Mist (blocks foe stat drops). Dire Hit / Guard Spec reuse the Focus Energy / Mist
 /// volatiles and events so they narrate and wire exactly like the matching moves. (One effect per category —
@@ -216,6 +219,8 @@ public sealed class BattleBoostItemEffect : IItemEffect
             return !ctx.User.Battle.HasFocusEnergy;
         if (ctx.Item.SetsMist)
             return !ctx.User.Battle.HasMist;
+        if (SetsXAccuracyFlag(ctx))
+            return true;
 
         // X-item: a stat boost that would actually move the stage (not already capped at +6).
         return ctx.Item.StatBoostStat is { } stat
@@ -239,6 +244,12 @@ public sealed class BattleBoostItemEffect : IItemEffect
             return;
         }
 
+        if (SetsXAccuracyFlag(ctx))
+        {
+            ctx.User.Battle.UsingXAccuracy = true;
+            return;
+        }
+
         var stat = ctx.Item.StatBoostStat!.Value;
         int delta = ctx.Item.StatBoostStages ?? 0;
         int newStage = ctx.User.Battle.Stages.Raise(stat, delta);
@@ -246,6 +257,9 @@ public sealed class BattleBoostItemEffect : IItemEffect
             new StatStageChanged(ctx.User.Name, ctx.User.Id, stat.ToString(), delta, newStage)
         );
     }
+
+    private static bool SetsXAccuracyFlag(ItemEffectContext ctx) =>
+        ctx.Item.StatBoostStat == StageStat.Accuracy && ctx.Rules.XAccuracyBypassesAccuracyCheck;
 }
 
 /// <summary>

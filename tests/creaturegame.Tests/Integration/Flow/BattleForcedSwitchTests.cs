@@ -172,6 +172,33 @@ public class BattleForcedSwitchTests
     }
 
     [Fact]
+    public async Task SwitchIn_ClearsAStaleXAccuracyFlagOnTheIncomingMember()
+    {
+        var lead = Fighter("Lead", hp: 10, attack: 100, defense: 100, speed: 200);
+        var bench = Fighter("Bench", hp: 300, attack: 999, defense: 100, speed: 150);
+        bench.Battle.UsingXAccuracy = true;
+        var party = new Party(lead);
+        party.Add(bench);
+        var enemy = Fighter("Foe", hp: 500, attack: 999, defense: 100, speed: 100);
+
+        var battle = new Battle(
+            lead,
+            enemy,
+            Gen1TypeChart.Instance,
+            new ScriptedInput("tackle").PicksSwitchIn(1),
+            new ScriptedInput("tackle"),
+            rules: new ScriptableRules().Deterministic(),
+            emitter: new RecordingEmitter(),
+            rng: new SeededRandomSource(0),
+            playerParty: party
+        );
+
+        await battle.StartFightAsync();
+
+        Assert.False(bench.Battle.UsingXAccuracy);
+    }
+
+    [Fact]
     public async Task ForcedSwitch_StaleOrFaintedPick_FallsBackToTheFirstLiveMember()
     {
         // A malformed / stale index (a fainted slot, or out of range) must never send in a downed creature: Battle

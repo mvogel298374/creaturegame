@@ -332,6 +332,7 @@ public class Creature
         Battle.DisableTurnsRemaining = 0;
         Battle.HasMist = false;
         Battle.HasFocusEnergy = false;
+        Battle.UsingXAccuracy = false;
         Battle.HasLeechSeed = false;
         Battle.HasReflect = false;
         Battle.HasLightScreen = false;

@@ -223,6 +223,10 @@ public interface IBattleRules
     /// </summary>
     int AccuracyRollBound { get; }
 
+    /// <summary>Whether X Accuracy sets a skip-the-accuracy-check flag instead of raising the accuracy stage.
+    /// Gen 1–2: true. Gen 3+: false (+1 stage, the item row's data). See GENERATION_SEAMS.md §2.</summary>
+    bool XAccuracyBypassesAccuracyCheck { get; }
+
     /// <summary>
     /// Returns the number of turns a binding move traps the target.
     /// Gen 1: 2–5 turns.

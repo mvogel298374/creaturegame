@@ -235,6 +235,15 @@ public class ItemImportTests
     }
 
     [Fact]
+    public void MapToItem_XAccuracy_DescribesTheAccuracyBypassNotAStageBoost()
+    {
+        var item = ItemMapper.MapToItem(PokeItem("x-accuracy", "stat-boosts"));
+
+        Assert.Contains("accuracy check", item.Description);
+        Assert.DoesNotContain("stage", item.Description);
+    }
+
+    [Fact]
     public void MapToItem_DireHit_BoostsCrit()
     {
         // Dire Hit raises crit (Gen 1 Focus Energy state); it's a booster, not a stat-stage change.

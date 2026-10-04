@@ -146,14 +146,13 @@ internal static class TestAltProfile
         public double GetMultiplier(DamageType attackType, DamageType defenderType) => 1.0;
     }
 
-    /// <summary>Delegates every rule to Gen 1 except one — reusing <see cref="DelegatingBattleRules"/>, the base
-    /// that exists so a new <c>IBattleRules</c> member is a one-line change rather than an edit to every shim.
-    /// <para>The varied member is the accuracy roll bound: Gen 1's internal 0–255 scale (with its 1/256 miss bug)
-    /// versus a 0–100 one. That is the real Gen 2+ change, which makes it a realistic probe — but it is chosen
-    /// because it is <i>observably different</i>, not as a claim about any generation.</para></summary>
+    /// <summary>Delegates every rule to Gen 1 except the accuracy roll bound and the X Accuracy bypass — see
+    /// <c>GENERATION_PROFILE.md</c> §3 for what each varied member proves.</summary>
     private sealed class AltBattleRules : DelegatingBattleRules
     {
         public override int AccuracyRollBound => 100;
+
+        public override bool XAccuracyBypassesAccuracyCheck => false;
     }
 
     /// <summary>

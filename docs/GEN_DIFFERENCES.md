@@ -81,6 +81,7 @@ A reference doc covering every major system across all main-series generations �
 - Internal scale: **0–255** (not 0–100)
 - **1/256 miss bug**: any move — including 100% accuracy — misses if the RNG rolls 255, because the check is `roll < threshold` and 255 can never be less than 255
 - Accuracy/Evasion stage multipliers use a different formula than Gen 2+
+- **X Accuracy** sets a flag (pokered `USING_X_ACCURACY`) that makes `MoveHitTest` return before the roll: the user's moves ignore accuracy and evasion and dodge the 1/256 miss. It is checked *after* Dream Eater, Swift, Dig/Fly and Mist, and the OHKO speed check is separate, so a faster X Accuracy user's OHKO always lands. Haze clears it on both sides, and so does switching out (it is a volatile bit). Using it a second time is consumed, not refused; Gen 2 adds the "won't have any effect" refusal. Gen 2 keeps the flag (`SUBSTATUS_X_ACCURACY`); Gen 3+ makes it a +1 accuracy stage
 
 #### Move Category (Physical vs Special)
 - Determined by **type**, not by individual move:
@@ -267,6 +268,7 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
 - **No day/night in Ruby/Sapphire** (time-based mechanics absent; restored in Emerald partially)
 - **Save incompatibility**: Gen 3 is completely incompatible with Gen 1–2 (new data format)
 - Physical/Special split still **type-based** (not per-move yet)
+- **X Accuracy** becomes a +1 accuracy stage (pokeemerald `ItemUseInBattle_StatIncrease`); Gen 1–2 skipped the accuracy check instead
 
 ---
 

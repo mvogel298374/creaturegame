@@ -24,6 +24,7 @@ public sealed class ItemAction : IBattleAction
     private readonly Party? _party;
     private readonly Bag _bag;
     private readonly IBattleEventEmitter? _emitter;
+    private readonly IBattleRules _rules;
 
     /// <summary>Above any move priority (Quick Attack is +1) so an item resolves first in Battle's queue.</summary>
     public const int ItemPriority = 6;
@@ -33,12 +34,14 @@ public sealed class ItemAction : IBattleAction
         Item item,
         int? targetMoveSlot,
         Bag bag,
+        IBattleRules rules,
         IBattleEventEmitter? emitter = null,
         Party? party = null,
         int? targetPartySlot = null
     )
     {
         Source = source;
+        _rules = rules;
         _item = item;
         _targetMoveSlot = targetMoveSlot;
         _targetPartySlot = targetPartySlot;
@@ -59,6 +62,7 @@ public sealed class ItemAction : IBattleAction
             Party = _party,
             TargetPartySlot = _targetPartySlot,
             Emitter = _emitter,
+            Rules = _rules,
         };
 
         // Refuse a use that wouldn't do anything (no effect for the category, or the precondition isn't

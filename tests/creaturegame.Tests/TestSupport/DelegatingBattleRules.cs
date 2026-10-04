@@ -79,6 +79,8 @@ public abstract class DelegatingBattleRules : IBattleRules
 
     public virtual int AccuracyRollBound => _inner.AccuracyRollBound;
 
+    public virtual bool XAccuracyBypassesAccuracyCheck => _inner.XAccuracyBypassesAccuracyCheck;
+
     public virtual double GetCritChance(Creature a, Attack m) => _inner.GetCritChance(a, m);
 
     public virtual double CritMultiplier => _inner.CritMultiplier;

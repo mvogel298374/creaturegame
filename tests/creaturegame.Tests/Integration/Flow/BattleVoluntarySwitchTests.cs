@@ -180,6 +180,7 @@ public class BattleVoluntarySwitchTests
         {
             User = lead,
             Item = antidote,
+            Rules = Gen1BattleRules.Instance,
             Party = party,
             TargetPartySlot = 1,
         };

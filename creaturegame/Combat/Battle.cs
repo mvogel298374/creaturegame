@@ -523,6 +523,7 @@ public class Battle
                     item.Item,
                     item.TargetMoveSlot,
                     _playerBag,
+                    _rules,
                     _emitter,
                     _playerParty,
                     item.TargetPartySlot

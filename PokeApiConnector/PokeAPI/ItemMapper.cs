@@ -163,6 +163,7 @@ public static class ItemMapper
             case "x-accuracy":
                 item.StatBoostStat = StageStat.Accuracy;
                 item.StatBoostStages = 1;
+                item.Description = "Your moves skip the accuracy check for the rest of the battle.";
                 break;
             case "dire-hit":
                 item.BoostsCrit = true;

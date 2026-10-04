@@ -69,8 +69,9 @@ the forced faint-switch (Phase 4 Stage 3) a mid-battle switch-in can finish inst
 `s.Player` post-battle and captures onto whoever actually ended the fight. So a
 poisoned creature **does** stay poisoned between encounters — *and* a benched party member keeps its ailment while
 it sits out (each member has its own slot). A Poké Center heal (`Creature.FullHeal`) clears it per member.
-Volatiles (confusion, Leech Seed, stat stages, binding, flinch, recharge, two-turn) are never captured — they die
-with the per-battle reset, exactly as Gen 1 requires.
+Volatiles (confusion, Leech Seed, stat stages, Mist, Focus Energy, X Accuracy, binding, flinch, recharge, two-turn)
+are never captured — they die with the per-battle reset, exactly as Gen 1 requires, so a creature that switches out
+and back in has lost them.
 
 Because status lives per-creature, a **between-biome lead swap** (Encounter Logic Phase 4 Stage 1d) needs no
 status reconciliation: the outgoing lead keeps its own status on the bench, the switch-in enters on its own, and
@@ -96,7 +97,7 @@ cure above maintains it, and a new path that breaks it would leave that creature
 
 **Haze is a narrower reset than a battle-end wipe (`Creature.ResetForHaze`).** Gen 1's `HazeEffect_`
 (pokered `engine/battle/move_effects/haze.asm`) only ever touches a specific field list — stat stages (both
-sides); the CONFUSED bit; Disable; Mist; Focus Energy; Leech Seed; Reflect/Light Screen; and the
+sides); the CONFUSED bit; Disable; Mist; Focus Energy; X Accuracy; Leech Seed; Reflect/Light Screen; and the
 "badly poisoned" bit (downgrades to regular Poison, both sides — only the escalation stops, the Poison itself
 is never cured on the user's own side). Everything else on `BattleState` — Substitute, Bide, Rampage/Thrash,
 Rage, binding, Recharge, two-turn charging, Flinch, `LastMoveUsed`, Counter's damage memory, and any

@@ -153,11 +153,15 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - **X-item stat boosts (X Attack etc., Guard Spec., Dire Hit) do NOT show this screen** and always apply to
   the creature currently on the field — Gen 1 has no per-party-member storage for a stat stage, so there is
   no benched target to pick.
+- **X Accuracy** makes the user's moves skip the accuracy check for the rest of the battle (they always hit, with no
+  1/256 miss) — it is not a +1 accuracy stage, and the bag text says so. It does not rescue a failed one-hit-KO speed
+  check, and Mist still blocks stat drops. Haze, and switching the user out, clear it. A second use is still
+  consumed. Using it shows only the normal "used" line; no indicator stays on screen.
 - Design detail → `GENERATION_SEAMS.md` §5.0.2 (gen-invariance judgment, including why X-items are the
   exception), `ARCHITECTURE.md` §2.11, `STATE_MODEL.md` §2 (status cure clears both halves). History →
   `TODO_ARCHIVE.md` → *In-Battle Item Party-Targeting — items other than Revive can target any living party
   member*; *Repo-sweep R1 — curing a status didn't clear `CarriedStatus`*; *Psychic's Special-drop chance + Full Restore on a
-  statused full-HP creature*.
+  statused full-HP creature*; *X Accuracy — Gen 1 "skip the accuracy check" flag*.
 
 ### TM/HM — Move-Teach Rewards
 - A reward-choice card can offer a **move a party member could legally learn** (a real Gen 1 TM-learnable move

@@ -231,6 +231,8 @@ public sealed class Gen1BattleRules : IBattleRules
     // Gen 1: roll 0-255; roll >= threshold → miss. Roll 255 always misses for 100%-acc moves.
     public int AccuracyRollBound => 256;
 
+    public bool XAccuracyBypassesAccuracyCheck => true;
+
     // ── Stat selection ─────────────────────────────────────────────────────────
 
     // Gen 1: Physical moves use Attack/Defense; Special moves use the combined Special stat.

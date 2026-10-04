@@ -87,6 +87,9 @@ public sealed class BattleState
     // Focus Energy: set while the user is "focused" (Gen 1 quarters its crit rate — the famous bug).
     public bool HasFocusEnergy { get; set; }
 
+    // X Accuracy under IBattleRules.XAccuracyBypassesAccuracyCheck: this creature's moves skip the accuracy roll.
+    public bool UsingXAccuracy { get; set; }
+
     // Bide: turns left committed (storing then releasing); the damage absorbed while committed; and
     // the move to auto-repeat while locked in (mirrors the rampage lock pattern).
     public int BideTurnsRemaining { get; set; }

@@ -100,6 +100,23 @@ public class UniqueMoveEffectContractTests(MovesFixture moves) : Gen1MoveContrac
     }
 
     [Fact]
+    public async Task HazeClearsXAccuracyOnBothBattlers()
+    {
+        var attacker = TestCreatures.Make("A");
+        attacker.Battle.UsingXAccuracy = true;
+        var defender = TestCreatures.Make("D", hp: 500);
+        defender.Battle.UsingXAccuracy = true;
+
+        var result = await new MoveScenario()
+            .Attacker(attacker)
+            .Defender(defender)
+            .Use(Move("haze"));
+
+        Assert.False(result.Attacker.Battle.UsingXAccuracy);
+        Assert.False(result.Defender.Battle.UsingXAccuracy);
+    }
+
+    [Fact]
     public async Task HazeCuringSleepStillForfeitsTheTargetsSameTurnAction()
     {
         // Gen 1: a Haze that cures a Sleep/Frozen target doesn't let it act the instant it wakes —

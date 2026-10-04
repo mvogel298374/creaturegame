@@ -234,8 +234,11 @@ public class AttackAction : IBattleAction
             return PreDamageGateResult.Halt;
         }
 
-        // Accuracy check — Struggle and NeverMisses moves always hit
-        if (!usingStruggle && !move.NeverMisses)
+        bool skipsAccuracyRoll =
+            usingStruggle
+            || move.NeverMisses
+            || (_rules.XAccuracyBypassesAccuracyCheck && Source.Battle.UsingXAccuracy);
+        if (!skipsAccuracyRoll)
         {
             int threshold = _rules.GetHitThreshold(
                 move.Accuracy,

@@ -37,19 +37,18 @@
 
 | # | Item | Cost | Ready? (DoR) | Why this slot / what it unblocks |
 |:-:|:-----|:----:|:-------------|:---------------------------------|
-| 1 | **X Accuracy** (§3.2) | M | ⚠️ held — needs-plan, design proposed in §3.2, awaiting your confirmation | Touches `AttackAction` and the `IBattleRules` seam; verified at pokered. |
-| 2 | **Dev-script and pre-commit-hook gaps** (§7.1) | S–M | ✗ no per-script acceptance conditions | Protects every later commit and test run; the hook has blind spots (`.csproj`, `*.db`, deletes). |
-| 3 | **R1b items 7–9** (§2) | S | ⚠️ 7–9 each need a one-line acceptance condition | Three small advisories; no decision left, just the acceptance one-liners. |
-| 4 | **Verification pass over the unverified findings** (§3, §5, §7) | S–M | ✗ no scope or output format (batch size; what "confirmed" means) | Cheap read-only agents in batches; turns ~45 "reviewer's reading" items into confirmed work or discards. Opens up everything below it. |
-| 5 | **Server test gaps — `GameSessionManager` lifecycle + the `RunFaulted` path** (§6) | M | ⚠️ needs the injectable-clock design | Unblocks the R1d tests and closes a long-open Tier-4 item. |
-| 6 | **E2E repairs after the species-data import** — phase 2 remaining (§6) | S–M | ✅ all seven DoR items answered in §6; phase 2 is sequenced after the BST tier-band decision (§8) | Phase 1 is implemented (archived) but still needs the user's `starter-select`/`evolution`/`poke-center` E2E run. Phase 2 re-finds seeds and is only worth doing once. |
-| 7 | **Importer hardening** (§3.2) | M | ✗ no design (retry policy, transaction boundaries) or acceptance | Failure no longer wipes evolutions or exits 0; unblocks CI/Docker imports and the multi-generation importer work. |
-| 8 | **R1d-a — replay an open blocking prompt** (§2) | M | ⚠️ designed, but provisional-pending-`/plan` and needs your three decisions (§8) | The only reconnect item that strands a run; highest player value. |
-| 9 | **CI E2E step** (§6) | M | ✗ no design (runner, stack boot, caching) or acceptance | The only automatic E2E coverage; makes "agents don't run E2E" safe, and unblocks checking the BST/balance flag and the reconnect spec. |
-| 10 | **R1d-d, R1d-c** — refresh-state snapshot + sprite; second-tab policy (§2) | M each | ⚠️ provisional-pending-`/plan`; (c) needs your policy call | Both extend (a)'s replay work. |
-| 11 | **Gen 1 fidelity — the damage/accuracy core** (§3.1) | L | ✗ needs the Gen 1 source per claim, the seam surface, and the quirks to pin | Verify-first; large blast radius (it touches every damage number). |
-| 12 | **End-of-turn residual phase** (§4.2) | L | ✗ needs a `/plan` | A `/plan`, `opus-engineer`, and both review gates; rewrites `Battle`'s turn loop. |
-| 13 | **Features** — Catch, `save.db`, progressive difficulty, Generation Profile 4d+, … (§4) | L | ✗ each needs a `/plan` | Catch and stone evolutions are unblocked by the bag-scope ruling (`ARCHITECTURE.md` §2.12); `save.db` is declined for now. |
+| 1 | **Dev-script and pre-commit-hook gaps** (§7.1) | S–M | ✗ no per-script acceptance conditions | Protects every later commit and test run; the hook has blind spots (`.csproj`, `*.db`, deletes). |
+| 2 | **R1b items 7–9** (§2) | S | ⚠️ 7–9 each need a one-line acceptance condition | Three small advisories; no decision left, just the acceptance one-liners. |
+| 3 | **Verification pass over the unverified findings** (§3, §5, §7) | S–M | ✗ no scope or output format (batch size; what "confirmed" means) | Cheap read-only agents in batches; turns ~45 "reviewer's reading" items into confirmed work or discards. Opens up everything below it. |
+| 4 | **Server test gaps — `GameSessionManager` lifecycle + the `RunFaulted` path** (§6) | M | ⚠️ needs the injectable-clock design | Unblocks the R1d tests and closes a long-open Tier-4 item. |
+| 5 | **E2E repairs after the species-data import** — phase 2 remaining (§6) | S–M | ✅ all seven DoR items answered in §6; phase 2 is sequenced after the BST tier-band decision (§8) | Phase 1 is implemented (archived) but still needs the user's `starter-select`/`evolution`/`poke-center` E2E run. Phase 2 re-finds seeds and is only worth doing once. |
+| 6 | **Importer hardening** (§3.2) | M | ✗ no design (retry policy, transaction boundaries) or acceptance | Failure no longer wipes evolutions or exits 0; unblocks CI/Docker imports and the multi-generation importer work. |
+| 7 | **R1d-a — replay an open blocking prompt** (§2) | M | ⚠️ designed, but provisional-pending-`/plan` and needs your three decisions (§8) | The only reconnect item that strands a run; highest player value. |
+| 8 | **CI E2E step** (§6) | M | ✗ no design (runner, stack boot, caching) or acceptance | The only automatic E2E coverage; makes "agents don't run E2E" safe, and unblocks checking the BST/balance flag and the reconnect spec. |
+| 9 | **R1d-d, R1d-c** — refresh-state snapshot + sprite; second-tab policy (§2) | M each | ⚠️ provisional-pending-`/plan`; (c) needs your policy call | Both extend (a)'s replay work. |
+| 10 | **Gen 1 fidelity — the damage/accuracy core** (§3.1) | L | ✗ needs the Gen 1 source per claim, the seam surface, and the quirks to pin | Verify-first; large blast radius (it touches every damage number). |
+| 11 | **End-of-turn residual phase** (§4.2) | L | ✗ needs a `/plan` | A `/plan`, `opus-engineer`, and both review gates; rewrites `Battle`'s turn loop. |
+| 12 | **Features** — Catch, `save.db`, progressive difficulty, Generation Profile 4d+, … (§4) | L | ✗ each needs a `/plan` | Catch and stone evolutions are unblocked by the bag-scope ruling (`ARCHITECTURE.md` §2.12); `save.db` is declined for now. |
 
 ---
 
@@ -129,18 +128,17 @@ data/engine item usually also means updating the test that pins the wrong value.
 
 ### 3.2 Data and importer
 
-X Accuracy **verified against pret/pokered 2026-10-04**. (Aside: `Creature.FullHeal` and `ReviveItemEffect` duplicate
+(Aside: `Creature.FullHeal` and `ReviveItemEffect` duplicate
 `ClearStatus`'s reset instead of routing through it.)
 
-- **X Accuracy (M, held — needs-plan).** Imported as +1 accuracy stage (`ItemMapper.cs:163`, pinned by
-  `ItemImportTests.cs:229`); Gen 1 `MoveHitTest` returns at once when the user has `USING_X_ACCURACY` ("always hit
-  regardless of accuracy/evasion") — after the Dream Eater, Swift, Dig/Fly and **Mist** checks (so it beats none of
-  them) and without the random roll (so no 1/256 miss). **Proposed design (awaiting confirmation):** keep the item
-  row (Gen 2+ really is a +1 stage); a new `IBattleRules` member says whether X Accuracy bypasses the accuracy
-  check, `BattleState` gains a per-battle flag cleared with `HasMist`/`HasFocusEnergy`, `BattleBoostItemEffect` sets
-  it (narrated like Dire Hit) instead of raising the stage, and `AttackAction.ResolvePreDamageGates` skips the
-  accuracy roll when set. Central-method + seam change ⇒ `/plan`, `opus-engineer`, `requirements-review` and
-  `pr-review`. The alternative is a new `Item` flag (migration + `items.db` re-import).
+- **Gen 1 gate-order and Dire Hit/Guard Spec gaps (found during X Accuracy; unverified beyond that review).**
+  `MoveHitTest` fails Dream Eater on an awake target and runs the OHKO speed check *after* the roll draw; ours do
+  both before the roll, so the rng draw order differs when X Accuracy is not in use. pokered's `ItemUseDireHit` does
+  not refuse a second use either (Guard Spec unchecked), while ours does. Verify at pokered before changing.
+  Dependency: `XAccuracyContractTests.XAccuracyMakesAFasterOhkoUserLandThroughMaxedEvasion` holds only because our
+  OHKO speed check runs before the roll — keep it as the regression guard if the gate order is changed. Also:
+  item descriptions are PokeAPI's modern text as-is (only X Accuracy's is overridden), so Dire Hit / Guard Spec and
+  the X-items still describe the modern effects — unverified, check before a descriptions pass.
 - **Importer hardening (M):** a failed/offline run wipes evolutions and exits 0 (`EvolutionImport.cs:24` deletes
   before fetching and swallows errors); no retry/429/timeout anywhere; `Program.cs:111` always prints "Import
   Complete!"; a failed `SaveChangesAsync` poisons the shared DbContext for the rest of the run (`MoveImport.cs:29/82`,
@@ -489,7 +487,7 @@ coverage).
 | **`PlayerSpeciesId` on `BattleStarted`** (a wire-contract change; the C# wire-drop half is auto-guarded, the TS half is manual) | Accept | R1d-d, the post-evolution sprite |
 | **Roar/Whirlwind** — end the battle immediately like Gen 1? | Verify at pokered, then fix | §3.1 |
 | **BST tier bands** after the base-stat fix | Run the seed-walk E2E first, then decide (E2E repair phase 2 follows the decision) | §3.2 balance flag; §6 E2E repairs |
-| **When to `/plan` the end-of-turn residual phase** | After the cheap fidelity fixes (§1 #1) land | §4.2 |
+| **When to `/plan` the end-of-turn residual phase** | The cheap fidelity fixes have landed (archived) — ready to `/plan` once greenlit | §4.2 |
 | **Per-area encounter floor** — soft floor or accepted tradeoff? | Accept the tradeoff unless playtests show a problem | §4.2 |
 
 ---

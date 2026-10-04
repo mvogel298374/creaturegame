@@ -165,6 +165,7 @@ test is green, and the first real second generation discovers the whole thing le
 | Slice | Gen 1 | `TestAltProfile` | What it proves |
 |:--|:--|:--|:--|
 | Accuracy scale | 0–255, 1/256 miss bug | 0–100, no bug | the scale is read, not assumed |
+| X Accuracy | skips the accuracy roll | +1 accuracy stage | the item and the hit test ask `XAccuracyBypassesAccuracyCheck`, not the item id |
 | Special stat | combined | split (Sp.Atk/Sp.Def) | `GetOffensiveStat`/`GetDefensiveStat` are actually routed through |
 | Type roster | 15 | 17 (adds Dark, Steel) | nothing hardcodes "15 types" |
 | Content scope | everything (identity) | only catalog ids ≤ 20 | every catalog read *asks* the scope — invisible under Gen 1's identity |

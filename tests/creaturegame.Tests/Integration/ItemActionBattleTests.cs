@@ -3,6 +3,7 @@ using creaturegame.Combat;
 using creaturegame.Creatures;
 using creaturegame.Items;
 using creaturegame.Tests.TestSupport;
+using creaturegame.Tests.Unit;
 
 namespace creaturegame.Tests.Integration;
 
@@ -57,7 +58,8 @@ public class ItemActionBattleTests
         Creature player,
         Creature enemy,
         CarriedStatus? entryStatus = null,
-        Party? party = null
+        Party? party = null,
+        IBattleRules? rules = null
     )
     {
         var emitter = new RecordingEmitter();
@@ -67,7 +69,7 @@ public class ItemActionBattleTests
             Gen1TypeChart.Instance,
             playerInput,
             new ScriptedInput("tackle"),
-            rules: new ScriptableRules(new SeededRandomSource(1)).Deterministic(),
+            rules: rules ?? new ScriptableRules(new SeededRandomSource(1)).Deterministic(),
             emitter: emitter,
             rng: new SeededRandomSource(1),
             playerEntryStatus: entryStatus,
@@ -197,6 +199,94 @@ public class ItemActionBattleTests
         Assert.True(player.Battle.HasFocusEnergy);
         Assert.Equal("Player", em.Of<FocusEnergyApplied>().Single().CreatureName);
         Assert.Equal(0, bag.Count(56)); // consumed
+    }
+
+    private static Item XAccuracy() =>
+        new()
+        {
+            Id = 61,
+            Name = "x-accuracy",
+            Category = ItemCategory.BattleStatBoost,
+            StatBoostStat = StageStat.Accuracy,
+            StatBoostStages = 1,
+        };
+
+    [Fact]
+    public async Task UsingXAccuracy_SetsTheBypassFlag_AndASecondUseIsConsumedToo()
+    {
+        var player = TestCreatures.Make("Player", hp: 200, speed: 200);
+        player.AddAttack(Tackle());
+        var enemy = TestCreatures.Make("Enemy", hp: 60, speed: 1);
+        enemy.AddAttack(Tackle());
+        var bag = new Bag();
+        bag.Add(61, 2);
+
+        var em = await RunAsync(
+            new TurnChoiceInput(new ItemTurnChoice(XAccuracy()), new ItemTurnChoice(XAccuracy())),
+            bag,
+            player,
+            enemy
+        );
+
+        Assert.True(player.Battle.UsingXAccuracy);
+        Assert.Equal(0, player.Battle.Stages.Accuracy);
+        Assert.Equal(2, em.Of<ItemUsed>().Count());
+        Assert.Empty(em.Of<ItemUseFailed>());
+        Assert.Equal(0, bag.Count(61));
+    }
+
+    [Fact]
+    public async Task UsingXAccuracy_UnderRulesWithoutTheBypass_RaisesAccuracyThroughTheBattlesRules()
+    {
+        var player = TestCreatures.Make("Player", hp: 200, speed: 200);
+        player.AddAttack(Tackle());
+        var enemy = TestCreatures.Make("Enemy", hp: 60, speed: 1);
+        enemy.AddAttack(Tackle());
+        var bag = new Bag();
+        bag.Add(61, 1);
+
+        await RunAsync(
+            new TurnChoiceInput(new ItemTurnChoice(XAccuracy())),
+            bag,
+            player,
+            enemy,
+            rules: TestAltProfile.Instance.BattleRules
+        );
+
+        Assert.False(player.Battle.UsingXAccuracy);
+        Assert.Equal(1, player.Battle.Stages.Accuracy);
+        Assert.Equal(0, bag.Count(61));
+    }
+
+    [Fact]
+    public async Task XAccuracyIsLostWhenTheUserSwitchesOutAndBackIn()
+    {
+        var lead = TestCreatures.Make("Lead", hp: 200, speed: 200);
+        lead.AddAttack(Tackle());
+        var bench = TestCreatures.Make("Bench", hp: 200, speed: 100);
+        bench.AddAttack(Tackle());
+        var party = new Party(lead);
+        party.Add(bench);
+        var enemy = TestCreatures.Make("Enemy", hp: 60, speed: 1);
+        enemy.AddAttack(Tackle());
+        var bag = new Bag();
+        bag.Add(61, 1);
+
+        var em = await RunAsync(
+            new TurnChoiceInput(
+                new ItemTurnChoice(XAccuracy()),
+                new SwitchTurnChoice(1),
+                new SwitchTurnChoice(0)
+            ),
+            bag,
+            lead,
+            enemy,
+            party: party
+        );
+
+        Assert.Single(em.Of<ItemUsed>());
+        Assert.Equal(2, em.Of<CreatureSwitchedIn>().Count());
+        Assert.False(lead.Battle.UsingXAccuracy);
     }
 
     private static Item FullRestore() =>

@@ -75,6 +75,7 @@ Things that genuinely differ generation to generation, each a member on the inte
 | **Sleep duration** | 1–7 turns | 2–5 turns |
 | **Binding (Wrap etc.)** | 2–5 turns, locks the victim out | reworked later |
 | **Accuracy scale** | internal `0–255`; a roll of 255 always misses — the **1/256 miss bug** (even 100%-accurate moves whiff ~0.4% of the time) | `0–100`, no bug |
+| **X Accuracy** (`XAccuracyBypassesAccuracyCheck`) | sets `BattleState.UsingXAccuracy`: the user's moves skip the accuracy roll (no RNG draw), but not the OHKO speed check or Mist; Haze and a switch-out clear it; a second use is consumed | Gen 2 same bypass (a substatus flag) — the bool covers only the bypass; Gen 2's refusal of a second use is a separate member, not yet modeled; Gen 3+ a +1 accuracy stage — the imported item row's data |
 | **Freeze** | permanent until hit by a damaging Fire move that can burn | 20%/turn random thaw; any Fire move thaws |
 | **Burn/Poison damage** | 1/16 max HP per turn | 1/8 in Gen 6+ |
 | **Residual (status tick) timing** | **no end-of-turn phase** — each creature's Burn/Poison/Leech Seed tick fires right after *its own* action, and a faint jumps straight to the faint handler (so a residual double-faint can't happen). Partly modelled today: `FaintEndsTurnImmediately` covers only the direct-hit-faint case. **Seam candidate, not yet built** — `TODO.md` → Known Gaps; rationale → `GEN_DIFFERENCES.md` → Status Quirks | true end-of-turn phase after both actions (Gen 2+) |
@@ -303,6 +304,12 @@ row, read generically by the effect. Seam judgments on record:
   it is refused. Confusion (volatile) alone never counts. The rule is item-data-driven in
   `HealingItemEffect.CanApply` and is not expected to vary by generation; only the confusion cure does (decision
   above).
+- **X Accuracy is the one item whose *kind* of effect is gen-variable.** The row keeps the Gen 3+ shape (+1
+  accuracy stage); `BattleBoostItemEffect` asks `IBattleRules.XAccuracyBypassesAccuracyCheck` (reached via
+  `ItemEffectContext.Rules`) and, when true, sets the bypass flag instead, with no event of its own (Gen 1 prints
+  only the "used" line, which `ItemUsed` already narrates). Gen 1 consumes a second use while the flag is set; the
+  Gen 2 "won't have any effect" refusal is a gen-variable absence, not yet modeled. `TestAltProfile` returns
+  false, so the stage path stays covered.
 - **Item target scope is gen-invariant, NOT a seam — but it splits by category, not uniformly.** Healing,
   StatusCure, PpRestore, and Revive act on *persistent* per-Pokémon data (current HP, status, PP, or a
   faint) that exists for every party member regardless of who's active, so the real games show a full
