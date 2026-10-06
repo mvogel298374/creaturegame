@@ -41,14 +41,13 @@
 | 2 | **R1b items 7–9** (§2) | S | ⚠️ 7–9 each need a one-line acceptance condition | Three small advisories; no decision left, just the acceptance one-liners. |
 | 3 | **Verification pass over the unverified findings** (§3, §5, §7) | S–M | ✗ no scope or output format (batch size; what "confirmed" means) | Cheap read-only agents in batches; turns ~45 "reviewer's reading" items into confirmed work or discards. Opens up everything below it. |
 | 4 | **Server test gaps — `GameSessionManager` lifecycle + the `RunFaulted` path** (§6) | M | ⚠️ needs the injectable-clock design | Unblocks the R1d tests and closes a long-open Tier-4 item. |
-| 5 | **E2E repairs after the species-data import** — phase 2 remaining (§6) | S–M | ✅ all seven DoR items answered in §6; phase 2 is sequenced after the BST tier-band decision (§8) | Phase 1 is implemented (archived) but still needs the user's `starter-select`/`evolution`/`poke-center` E2E run. Phase 2 re-finds seeds and is only worth doing once. |
-| 6 | **Importer hardening** (§3.2) | M | ✗ no design (retry policy, transaction boundaries) or acceptance | Failure no longer wipes evolutions or exits 0; unblocks CI/Docker imports and the multi-generation importer work. |
-| 7 | **R1d-a — replay an open blocking prompt** (§2) | M | ⚠️ designed, but provisional-pending-`/plan` and needs your three decisions (§8) | The only reconnect item that strands a run; highest player value. |
-| 8 | **CI E2E step** (§6) | M | ✗ no design (runner, stack boot, caching) or acceptance | The only automatic E2E coverage; makes "agents don't run E2E" safe, and unblocks checking the BST/balance flag and the reconnect spec. |
-| 9 | **R1d-d, R1d-c** — refresh-state snapshot + sprite; second-tab policy (§2) | M each | ⚠️ provisional-pending-`/plan`; (c) needs your policy call | Both extend (a)'s replay work. |
-| 10 | **Gen 1 fidelity — the damage/accuracy core** (§3.1) | L | ✗ needs the Gen 1 source per claim, the seam surface, and the quirks to pin | Verify-first; large blast radius (it touches every damage number). |
-| 11 | **End-of-turn residual phase** (§4.2) | L | ✗ needs a `/plan` | A `/plan`, `opus-engineer`, and both review gates; rewrites `Battle`'s turn loop. |
-| 12 | **Features** — Catch, `save.db`, progressive difficulty, Generation Profile 4d+, … (§4) | L | ✗ each needs a `/plan` | Catch and stone evolutions are unblocked by the bag-scope ruling (`ARCHITECTURE.md` §2.12); `save.db` is declined for now. |
+| 5 | **Importer hardening** (§3.2) | M | ✗ no design (retry policy, transaction boundaries) or acceptance | Failure no longer wipes evolutions or exits 0; unblocks CI/Docker imports and the multi-generation importer work. |
+| 6 | **R1d-a — replay an open blocking prompt** (§2) | M | ⚠️ designed, but provisional-pending-`/plan` and needs your three decisions (§8) | The only reconnect item that strands a run; highest player value. |
+| 7 | **CI E2E step** (§6) | M | ✗ no design (runner, stack boot, caching) or acceptance | The only automatic E2E coverage; makes "agents don't run E2E" safe, and unblocks checking the BST/balance flag and the reconnect spec. |
+| 8 | **R1d-d, R1d-c** — refresh-state snapshot + sprite; second-tab policy (§2) | M each | ⚠️ provisional-pending-`/plan`; (c) needs your policy call | Both extend (a)'s replay work. |
+| 9 | **Gen 1 fidelity — the damage/accuracy core** (§3.1) | L | ✗ needs the Gen 1 source per claim, the seam surface, and the quirks to pin | Verify-first; large blast radius (it touches every damage number). |
+| 10 | **End-of-turn residual phase** (§4.2) | L | ✗ needs a `/plan` | A `/plan`, `opus-engineer`, and both review gates; rewrites `Battle`'s turn loop. |
+| 11 | **Features** — Catch, `save.db`, progressive difficulty, Generation Profile 4d+, … (§4) | L | ✗ each needs a `/plan` | Catch and stone evolutions are unblocked by the bag-scope ruling (`ARCHITECTURE.md` §2.12); `save.db` is declined for now. |
 
 ---
 
@@ -153,8 +152,8 @@ data/engine item usually also means updating the test that pins the wrong value.
   strength tiers (×0.85/1.10/1.20) and `ScaleTargetBst`, so enemy pool bands shift and the starter picker's BST
   display changed (e.g. Venusaur 425); base experience also dropped sharply for some species (Chansey 395→255,
   Mew 270→64). The tier offsets were tuned against modern numbers. Seeded E2E specs may land on different
-  encounters; **E2E was not run** (user-only) — recommend `.\e2e.ps1 -Spec encounter-map` and a look at whether the
-  tier bands need retuning. Retuning is a separate decision. **Needs-decision.**
+  encounters. **Decided 2026-10-06 (user): keep the current tier bands, no retune** — the full E2E run that day was
+  36/38 with no failure attributable to the bands; reopen only if playtests show difficulty spikes or lulls (§9).
 
 ### 3.3 Backend session edges (unverified)
 
@@ -363,22 +362,6 @@ The stat-selection abstraction is done. Open:
   the narrowest `.\e2e.ps1 -Spec <file>`.
 
 **Open:**
-- [ ] **E2E repairs after the species-data import (S–M, phase 2 remaining).** A 2026-10-04 user run of the full
-  suite went 34/38; the four failures follow the species-data import (real Gen 1 base stats and base experience)
-  and none looks like an engine defect (traced from screenshots, specs and helpers; trace/video not opened).
-  **Acceptance:** `.\e2e.ps1 -Spec starter-select`, `evolution`, `reward-drop` and `forced-switch` each pass when
-  the user runs them. **Design:** test-only.
-  - *Phase 1: implemented 2026-10-04 (record in `TODO_ARCHIVE.md`), **awaiting the user's E2E run** of
-    `.\e2e.ps1 -Spec starter-select`, `evolution`, `poke-center` to confirm — not verified by E2E.*
-  - *Phase 2 (sequenced after the BST tier-band decision, §8 — retuning reshuffles seeded encounters again).*
-    `reward-drop.spec.ts` seed 1 no longer rolls a drop on its first win, so no reward modal appears (a fresh seed
-    must be found per the spec's own comment, or the drop forced if Dev Mode offers a way); `forced-switch.spec.ts`
-    still seed-walks to a party of two from level 5 — try Dev Mode `forceDraft` as `2e62229` did for the other
-    specs. Both causes are hypotheses until their traces are read.
-  **Gen-variable surface:** none. **Gen 1 source:** pokered base stats (Charizard 78/84/78/100/85). **Data vs
-  runtime:** neither — spec/helper code only, no importer or engine change. **Quirk the tests assert:** the species
-  card shows the real Gen 1 BST, not the modern one. **Dependencies:** phase 2 after the BST tier-band decision;
-  the user runs every E2E confirmation.
 - [ ] **CI E2E step** (M) that boots backend + frontend, runs headless, tears down. Now the only automatic E2E
   coverage there is, and so more load-bearing than when it was written: the local gate never runs E2E and
   `test.ps1` skips it when the stack is down, so nothing catches a red suite until someone asks for a run.
@@ -486,7 +469,6 @@ coverage).
 | **Transport notices outside the event model** (`SessionTakenOver`, `RunMapSnapshot`, like `RunFaulted`) | Accept | R1d-c, R1d-d |
 | **`PlayerSpeciesId` on `BattleStarted`** (a wire-contract change; the C# wire-drop half is auto-guarded, the TS half is manual) | Accept | R1d-d, the post-evolution sprite |
 | **Roar/Whirlwind** — end the battle immediately like Gen 1? | Verify at pokered, then fix | §3.1 |
-| **BST tier bands** after the base-stat fix | Run the seed-walk E2E first, then decide (E2E repair phase 2 follows the decision) | §3.2 balance flag; §6 E2E repairs |
 | **When to `/plan` the end-of-turn residual phase** | The cheap fidelity fixes have landed (archived) — ready to `/plan` once greenlit | §4.2 |
 | **Per-area encounter floor** — soft floor or accepted tradeoff? | Accept the tradeoff unless playtests show a problem | §4.2 |
 
@@ -509,6 +491,8 @@ coverage).
 - **Every run prompt is `'blocking'` by construction** — each parks a server-side await, so dismissing one would
   strand the run; don't re-file "the modals should close on Escape". (The Escape-as-B-cancel item in §4.5 covers only
   the four prompts that have a negative answer.)
+- **BST tier bands stay as they are** (user ruling 2026-10-06): the tier multipliers and `K` were tuned on modern
+  base stats and are not retuned after the real-Gen-1 import — no measured problem. Reopen only on a playtest report.
 - **`RunLoop.cs`'s ~28 types are fine** — a cohesive vocabulary file; don't split it on a type-count metric.
 - **WAIVED (user):** the `SignalRInput` cancel/prompt race (abandoned-run task leak) — until a save/persistence
   layer exists; no pinning test for `items.db`'s contents (production ships the committed clean db);

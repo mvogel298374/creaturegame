@@ -390,7 +390,7 @@ export async function playCurrentRunUntil(
     await dismissRewardChoiceIfPresent(page);
     await chooseBiomeIfPresent(page);
 
-    if ((await logLines(page)).some(l => /Run over/.test(l))) return false;
+    if ((await logLines(page)).some(l => /Run over/.test(l))) return reached(page);
     if (await fightButton(page).isEnabled().catch(() => false)) {
       // Play to win, not just to take a turn — see `chooseBestMove`. These reaches are several battles deep,
       // so a weak-move auto-player simply loses every run before the state under test exists.

@@ -12,17 +12,16 @@ import { answerNicknameIfPresent, fightButton, chooseMove } from './helpers';
 // (see `RunDirector.cs` `DefaultNodePlan`). No seed can land a Treasure first anymore — that wasn't RNG
 // drift, it's a deliberate design rule. A battle win funnels through the SAME reward-choice modal as a
 // Treasure/Mystery node (`RewardGranted`, one drop hover for every source — see `battleReducer.ts`), so this
-// spec now wins the first (deterministic, seeded) battle instead: seed 1 with CHARIZARD @ L50 beats its first
-// wild encounter (STARMIE) in a handful of turns using only the default first-available-move pick.
+// spec now wins the first (seeded) battle instead: CHARIZARD @ L50 beats its first wild encounter in a handful
+// of turns using only the default first-available-move pick.
 //
 // Every rolled reward presents a BLOCKING pick-one-of-N choice modal (two rarity items or a gold bag); the
 // player's pick is what releases the run loop. This spec picks the gold bag (a deterministic credit) and
 // verifies it lands in the BAG money box, the drop hover, and the loot log.
 //
-// If combat balance changes (levels, base stats, move power) such that CHARIZARD @ L50 no longer wins its
-// first battle within MAX_TURNS using the default move pick, re-discover a seed that does and update the
-// constant below.
-const WIN_FIRST_BATTLE_SEED = 1;
+// A battle win rolls a drop only 85% of the time, so a single pinned seed can land the miss; the spec walks
+// SEEDS until one pops the modal. Add seeds if the whole list ever comes up empty.
+const SEEDS = [1, 2, 3, 4, 5, 6];
 const MAX_TURNS = 15;
 
 async function startSeededRun(page: import('@playwright/test').Page, seed: number, species = 'CHARIZARD') {
@@ -42,26 +41,30 @@ async function startSeededRun(page: import('@playwright/test').Page, seed: numbe
   await page.locator('.town-map-town--offered').first().click({ timeout: 15_000 });
 }
 
-/** Attacks with the default (first-available) move each turn until the reward-choice modal appears — i.e.
- * until the deterministic seeded battle is won. Deliberately does NOT use the generic play-loop helpers,
- * which auto-dismiss the reward modal; this spec needs it left standing to assert against. */
-async function winFirstBattle(page: import('@playwright/test').Page): Promise<void> {
+/** Attacks with the default (first-available) move each turn until the reward-choice modal appears, returning
+ * whether it did. Deliberately does NOT use the generic play-loop helpers, which auto-dismiss the reward modal;
+ * this spec needs it left standing to assert against. */
+async function winFirstBattle(page: import('@playwright/test').Page): Promise<boolean> {
   const modal = page.locator('.reward-modal');
   for (let turn = 0; turn < MAX_TURNS; turn++) {
-    if (await modal.isVisible().catch(() => false)) return;
+    if (await modal.isVisible().catch(() => false)) return true;
     if (await fightButton(page).isEnabled().catch(() => false)) {
       await chooseMove(page).catch(() => {});
     }
     await page.waitForTimeout(150);
   }
-  await expect(modal).toBeVisible({ timeout: 5_000 });
+  return modal.isVisible().catch(() => false);
 }
 
 test.describe('Run Economy reward choice (battle-win drop)', () => {
   test('winning a battle pops the pick-one-of-N choice modal; taking the gold bag credits the BAG and continues', async ({ page }) => {
-    test.setTimeout(60_000);
-    await startSeededRun(page, WIN_FIRST_BATTLE_SEED);
-    await winFirstBattle(page);
+    test.setTimeout(120_000);
+    let dropped = false;
+    for (const seed of SEEDS) {
+      await startSeededRun(page, seed);
+      if ((dropped = await winFirstBattle(page))) break;
+    }
+    expect(dropped, 'no seeded first battle popped the reward modal').toBe(true);
 
     // The reward-choice modal blocks the run — it offers cards including the always-present gold bag.
     const modal = page.locator('.reward-modal');

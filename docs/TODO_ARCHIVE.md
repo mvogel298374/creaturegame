@@ -101,11 +101,32 @@ pass).
 
 ---
 
-## E2E repairs after the species-data import — Phase 1 ⏳ IMPLEMENTED (2026-10-04), awaiting the user's E2E confirmation
+## E2E repairs after the species-data import ✅ COMPLETE (2026-10-06)
 
-**Was** `TODO.md` §1 row 6 / §6 "E2E repairs after the species-data import", phase 1. **Not verified by an E2E
-run** (E2E is user-only); the item stays open in `TODO.md` for phase 2 and for this confirmation. Test-only; no
+**Was** `TODO.md` §1 row 5 / §6 "E2E repairs after the species-data import" (S). Phase 1 implemented 2026-10-04 and
+confirmed by the user's 2026-10-06 full-suite run (36/38); phase 2 (the two remaining failures, below) implemented and
+confirmed green by the user 2026-10-06 (`.\e2e.ps1 -Spec evolution` and `-Spec reward-drop` pass). Test-only; no
 player-visible behavior, so no `PRODUCT_SPEC.md` entry.
+
+**Phase 2 — the two remaining failures (traced from failure screenshots, specs and `helpers.ts`; trace zips not
+unpacked).**
+- **`evolution.spec.ts` ALLOW — a helper race, not the species data.** The screenshot showed the evolved CHARMELEON
+  killed by a Boss PINSIR with `Run over — 3 wins` in the log, which `expectRunFlowsOn` counts as the run continuing.
+  But `playCurrentRunUntil` re-read the log mid-iteration (`helpers.ts:393`) and returned `false` on "Run over" without
+  re-asking the caller's `reached` predicate, so a run ending between the loop's two checks reported a stall.
+  **Fix:** that line returns `reached(page)` instead of `false`; callers whose predicate ignores "Run over" still get
+  `false`.
+- **`reward-drop.spec.ts` — seed 1 no longer rolled a drop.** The screenshot showed `BATTLES WON 1` and the run dead in
+  battle 2 with no reward modal; `BattleDropChance` is 0.85 (`RewardCalculator.cs:24`), so seed 1 landed the 15%.
+  **Fix:** the spec walks a short seed list (1-6) until the reward modal appears, as its own comment prescribed — no Dev
+  Mode drop-forcing flag (product code for a test-only problem).
+- **Acceptance:** `.\e2e.ps1 -Spec evolution` and `-Spec reward-drop` pass when the user runs them — met 2026-10-06.
+  Design: test-only. Gen-variable surface: none. Gen 1 source: pokered base stats (the 85% drop rate is run-layer
+  tuning, not Gen 1). Data vs runtime: neither (spec/helper code only). Quirk asserted: a run ending ("Run over") after
+  an answered evolution offer is the run flowing on, and the evolved form is the active creature. Dependencies: none
+  (the BST tier-band decision settled 2026-10-06, `TODO.md` §9).
+
+**Phase 1 record.**
 
 **Context.** A 2026-10-04 full-suite user run went 34/38; the failures follow the species-data import (real Gen 1
 base stats and base experience). Causes traced from screenshots, specs and helpers; trace/video not opened.
@@ -118,7 +139,9 @@ base stats and base experience). Causes traced from screenshots, specs and helpe
 - `e2e/poke-center.spec.ts`: passes `pokeCenter: 'leave'` to its `walkSeedsUntil`, because its target is that modal
   (same auto-answer race as `drafts: 'leave'`). A design addition beyond the original TODO text.
 
-**To confirm (user runs):** `.\e2e.ps1 -Spec starter-select`, `evolution`, `poke-center`.
+**Confirmed (user run, 2026-10-06, 36/38):** `starter-select`, `poke-center` pass. `forced-switch` (originally a
+phase-2 suspect, seed-walking to a party of two) also passes with no change. `evolution` failed for a different,
+helper-side reason (phase 2, above).
 
 **Gates.** `format-gate` N/A (no `.cs`); `test-runner` `.\test.ps1 -Web` PASS (tsc clean, Vitest 310/310);
 `pr-review` skipped (test-only); `requirements-review` N/A.
