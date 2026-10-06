@@ -36,13 +36,33 @@ while ($cur -and $protected.Add([int]$cur)) {
     $cur = ($all | Where-Object ProcessId -eq $cur).ParentProcessId
 }
 
-# Roots to tear down: (1) port listeners, (2) repo-scoped -NoExit wrapper shells.
+$rootEsc = [regex]::Escape($root)
+$byId = @{}
+foreach ($p in $all) { $byId[[int]$p.ProcessId] = $p }
+
+# A listener is ours if it or an ancestor (never the caller's own chain) has a command line under this repo.
+function Test-OwnedByRepo([int]$id) {
+    $visited = [System.Collections.Generic.HashSet[int]]::new()
+    while ($id -and $visited.Add($id) -and $byId.ContainsKey($id) -and -not $protected.Contains($id)) {
+        if ($byId[$id].CommandLine -match $rootEsc) { return $true }
+        $id = [int]$byId[$id].ParentProcessId
+    }
+    return $false
+}
+
+function Write-Foreign([int]$port, [int]$id) {
+    $name = $byId.ContainsKey($id) ? $byId[$id].Name : '?'
+    Write-Info "  left alone: port $port is held by PID $id ($name), which is not from this repo."
+}
+
+# Roots to tear down: (1) this repo's port listeners, (2) repo-scoped -NoExit wrapper shells.
 $roots = [System.Collections.Generic.HashSet[int]]::new()
 foreach ($port in $ports) {
     Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
-        ForEach-Object { [void]$roots.Add([int]$_.OwningProcess) }
+        Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object {
+            if (Test-OwnedByRepo $_) { [void]$roots.Add([int]$_) } else { Write-Foreign $port $_ }
+        }
 }
-$rootEsc = [regex]::Escape($root)
 $all | Where-Object {
     $_.Name -eq 'pwsh.exe' -and $_.CommandLine -and
     $_.CommandLine -match '-NoExit' -and $_.CommandLine -match $rootEsc
@@ -70,7 +90,7 @@ while ($queue.Count) {
 }
 
 if ($order.Count -eq 0) {
-    Write-Info "Dev stack: nothing running (ports $($ports -join '/') already clear)."
+    Write-Info "Dev stack: nothing of this repo's running."
     return $false
 }
 
@@ -84,12 +104,14 @@ foreach ($id in $order) {
 # ports a few times and kill any straggler listener + its subtree.
 for ($try = 0; $try -lt 3; $try++) {
     Start-Sleep -Milliseconds 300
+    $byId = @{}
+    Get-CimInstance Win32_Process | ForEach-Object { $byId[[int]$_.ProcessId] = $_ }
     $stragglers = @()
     foreach ($port in $ports) {
         $stragglers += Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
             Select-Object -ExpandProperty OwningProcess
     }
-    $stragglers = $stragglers | Sort-Object -Unique | Where-Object { -not $protected.Contains([int]$_) }
+    $stragglers = $stragglers | Sort-Object -Unique | Where-Object { Test-OwnedByRepo $_ }
     if (-not $stragglers) { break }
     foreach ($id in $stragglers) {
         Stop-Process -Id $id -Force -ErrorAction SilentlyContinue

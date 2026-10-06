@@ -58,3 +58,6 @@ creaturegame.Web/ClientApp/.playwright/
 
 # Claude Code scheduled-task lock (runtime state, not source)
 .claude/scheduled_tasks.lock
+
+# dev.ps1 server logs (reset on every start)
+.dev/

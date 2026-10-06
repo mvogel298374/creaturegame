@@ -8,6 +8,48 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## `dev.ps1` readiness + logs and `stop-dev.ps1` ownership ✅ DONE (2026-10-06)
+
+**Was** `TODO.md` §7.1 "`dev.ps1` readiness + logs and `stop-dev.ps1` ownership (S–M)", part of §1 row 1. Tooling only;
+not player-visible. The other §7.1 bullets (`-StartStack` leak, `test.ps1 -E2E -StartStack` exit 0, pre-commit hook gaps,
+CI/deploy, Script/Docker polish) stay open in `TODO.md`.
+
+**Problem.** `dev.ps1` waited only on Vite, so it reported "Ready" and opened the browser while the backend was still
+compiling; it exited 0 even on timeout; the servers' output lived only in the `-NoExit` windows; the self-clean ran only
+when a port was busy, so empty wrapper windows left by a crashed server piled up; and `stop-dev.ps1` killed *any*
+listener on :5100/:5173 (another project's Vite included).
+
+**Scope (as shipped).**
+- (a) `dev.ps1` also polls `GET /api/dev/status` (200 in Development), names which side did not respond, exits 0 on
+  ready / 1 on timeout; `-TimeoutSeconds` (default 60).
+- (b) Both servers tee output to `.dev/backend.log` and `.dev/frontend.log` (git-ignored, truncated each start); the
+  paths are printed on timeout.
+- (c) `dev.ps1` always runs `stop-dev.ps1` (the port-busy precondition is gone).
+- (d) `stop-dev.ps1` kills a port listener, in the first pass and the straggler pass, only if its own or an ancestor's
+  command line has a path under the repo root (never the caller's own chain); a foreign holder is left running and named
+  as "left alone". The straggler pass refreshes its process snapshot. When clear it says nothing of this repo's is running.
+- (e) After the self-clean, `dev.ps1` re-checks both ports and, if a non-repo process still holds one, exits 1 naming
+  the port, PID and process (otherwise Vite auto-bumps to :5174 and the readiness wait passes against the foreign server).
+- Docs: `CLAUDE.md` `dev.ps1` paragraph (exit code, logs) and `.gitignore` (`.dev/`).
+
+**Tee-Object tradeoff (measured 2026-10-06).** The output and the Ctrl+R / `h + enter` hints survive, but colour is lost
+(output is no longer a TTY; accepted). Emoji/box characters garble unless each wrapper first sets
+`[Console]::OutputEncoding = [Text.Encoding]::UTF8` (verified to fix both the log and the window). The Ctrl+R keypress
+itself was not exercised.
+
+**Acceptance (five scenarios, run by hand by the assistant, all passing 2026-10-06; the scripts have no harness).**
+(1) `.\dev.ps1 -NoBrowser` returns only once `/api/dev/status` and :5173 both respond, exits 0, both log files exist with
+startup output. (2) `.\dev.ps1 -TimeoutSeconds 1` exits 1, names the side(s) not yet up, prints the log paths. (3) With
+both servers killed but their `-NoExit` windows left open, `.\dev.ps1` closes those windows. (4) With a foreign listener
+on :5173, `.\stop-dev.ps1` leaves it running and says so, and `.\dev.ps1` exits 1 naming :5173 and the PID without
+starting anything. (5) `.\stop-dev.ps1` still stops the whole repo stack (servers + wrappers) and returns `$true`
+(`$false` when already clear).
+
+**Gate-1 note.** The entry carried scope, acceptance, design, gen surface (none), Gen 1 source (n/a), data-vs-runtime
+(neither), quirk (none; scenarios instead) and dependencies. No breach.
+
+---
+
 ## X Accuracy — Gen 1 "skip the accuracy check" flag ✅ DONE (2026-10-04)
 
 **Was** `TODO.md` §1 row 1 / §3.2 "X Accuracy (M)", the third item of "Three data/engine fixes". Design approved by the

@@ -37,7 +37,7 @@
 
 | # | Item | Cost | Ready? (DoR) | Why this slot / what it unblocks |
 |:-:|:-----|:----:|:-------------|:---------------------------------|
-| 1 | **Dev-script and pre-commit-hook gaps** (§7.1) | S–M | ✗ no per-script acceptance conditions | Protects every later commit and test run; the hook has blind spots (`.csproj`, `*.db`, deletes). |
+| 1 | **Dev-script and pre-commit-hook gaps** (§7.1) | S–M | ✗ no per-script acceptance conditions (the `dev.ps1`/`stop-dev.ps1` part is done) | Remaining: `-StartStack` backend leak, `test.ps1 -E2E -StartStack` exit 0, and the hook's blind spots (`.csproj`, `*.db`, deletes). Protects every later commit and test run. |
 | 2 | **Verification pass over the unverified findings** (§3, §5, §7) | S–M | ✗ no scope or output format (batch size; what "confirmed" means) | Cheap read-only agents in batches; turns ~45 "reviewer's reading" items into confirmed work or discards. Opens up everything below it. |
 | 3 | **Server test gaps — `GameSessionManager` lifecycle + the `RunFaulted` path** (§6) | M | ⚠️ needs the injectable-clock design | Unblocks the R1d tests and closes a long-open Tier-4 item. |
 | 4 | **Importer hardening** (§3.2) | M | ✗ no design (retry policy, transaction boundaries) or acceptance | Failure no longer wipes evolutions or exits 0; unblocks CI/Docker imports and the multi-generation importer work. |
@@ -297,8 +297,12 @@ The stat-selection abstraction is done. Open:
 - [ ] `ConsoleInput : IBattleInput` — a numbered move menu for terminal play (low priority).
 - [ ] *(small)* **Stat stages in the dev enemy overview** — `PlayerOverviewDto` carries none; add them to the DTO (or
   a dev-only extension) and render in `CreatureOverview` `enemy` mode.
-- [ ] *(unscoped ideas)* More dev actions behind the same `DevController` gate (404 when the flag is off): skip to
-  node, spawn a chosen enemy, grant items/gold, set level. None planned.
+- [ ] **Dev Mode — next features (shell, not ready: needs a `/plan` and a full DoR entry).** More dev actions behind
+  the same `DevController` gate (404 when the flag is off; `forceDraft` is the existing test-support precedent).
+  Candidates, unranked: force the first enemy's species/encounter (removes the seed walks behind the slow
+  `voluntary-switch`/`poke-center` specs); set level or force an evolution; force a battle-win drop; grant gold/items;
+  skip to node. **Acceptance / design / gen surface / Gen 1 source / data-vs-runtime / quirk / dependencies:** to be
+  filled in. Current behaviour → `PRODUCT_SPEC.md` → *Dev Mode*.
 - [ ] `data-testid` attributes — deferred; specs lean on stable semantic classes. Add only where a class proves
   brittle.
 - [ ] §8 visual-regression canvas snapshots — skipped for maintenance cost.
@@ -387,16 +391,14 @@ The stat-selection abstraction is done. Open:
   unpinned moving branch and there is no `permissions:` block; tags can point at any commit. **The container runs as
   root** (`Dockerfile:44-52`; use `USER $APP_UID` after checking SQLite write needs).
 - **Dev scripts:** `-StartStack` leaves the backend running (`test.ps1:119/148`, `e2e.ps1:180/357` kill only the
-  `dotnet run` parent); `stop-dev.ps1:103` kills *anything* on :5173 (another project's Vite); `test.ps1 -E2E
-  -StartStack` exits 0 when the backend never starts.
+  `dotnet run` parent); `test.ps1 -E2E -StartStack` exits 0 when the backend never starts.
 - **Pre-commit hook gaps** (`.githooks/pre-commit`): hardcoded dotnet path (`:11`); checks the working tree, not the
   staged snapshot (`:14,22`); skips deletes/renames and `.csproj`/`Directory.Build.props`/`package.json`/
   `tsconfig.json`/`*.db`-only commits (`:20,33`).
 - **Public endpoint exhaustion:** `POST /api/game/start` is unauthenticated with no rate limit, no cap on concurrent
   runs/connections, no idle timeout, no `fly.toml` health check or concurrency block (single 1 GB VM). Unmeasured;
   also no security headers/`UseForwardedHeaders` (low impact: no auth/cookies).
-- **Script/Docker polish:** `dev.ps1:30-31` apostrophe-in-path; `dev.ps1:16` doesn't clean exited-server window
-  shells; `build-release.ps1:200` leaves cwd changed; `Dockerfile:25-28` `COPY . .` re-downloads every sprite on any
+- **Script/Docker polish:** `dev.ps1:53-54` apostrophe-in-path (the `-Command` strings single-quote `$root`/`$dotnet`); `build-release.ps1:200` leaves cwd changed; `Dockerfile:25-28` `COPY . .` re-downloads every sprite on any
   source change and base images are tag- not digest-pinned; `GameController.cs:66` logs only `ex.Message`;
   `SignalRBattleEventEmitter.cs:86` discards the send task; the client-chosen run `Seed` (a product decision, not a
   bug).
