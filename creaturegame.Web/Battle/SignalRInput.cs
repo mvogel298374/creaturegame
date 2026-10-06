@@ -331,7 +331,7 @@ public sealed class SignalRInput : IBattleInput
     // the NEXT shop's first prompt. Caller holds _shopLock.
     private void CloseShopIfLeaving(ShopAction action)
     {
-        if (action is not LeaveShop)
+        if (action is BuyShopItem)
             return;
         _shopOpen = false;
         _shopBacklog.Clear();

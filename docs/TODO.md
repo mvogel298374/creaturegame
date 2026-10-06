@@ -38,16 +38,15 @@
 | # | Item | Cost | Ready? (DoR) | Why this slot / what it unblocks |
 |:-:|:-----|:----:|:-------------|:---------------------------------|
 | 1 | **Dev-script and pre-commit-hook gaps** (§7.1) | S–M | ✗ no per-script acceptance conditions | Protects every later commit and test run; the hook has blind spots (`.csproj`, `*.db`, deletes). |
-| 2 | **R1b items 7–9** (§2) | S | ⚠️ 7–9 each need a one-line acceptance condition | Three small advisories; no decision left, just the acceptance one-liners. |
-| 3 | **Verification pass over the unverified findings** (§3, §5, §7) | S–M | ✗ no scope or output format (batch size; what "confirmed" means) | Cheap read-only agents in batches; turns ~45 "reviewer's reading" items into confirmed work or discards. Opens up everything below it. |
-| 4 | **Server test gaps — `GameSessionManager` lifecycle + the `RunFaulted` path** (§6) | M | ⚠️ needs the injectable-clock design | Unblocks the R1d tests and closes a long-open Tier-4 item. |
-| 5 | **Importer hardening** (§3.2) | M | ✗ no design (retry policy, transaction boundaries) or acceptance | Failure no longer wipes evolutions or exits 0; unblocks CI/Docker imports and the multi-generation importer work. |
-| 6 | **R1d-a — replay an open blocking prompt** (§2) | M | ⚠️ designed, but provisional-pending-`/plan` and needs your three decisions (§8) | The only reconnect item that strands a run; highest player value. |
-| 7 | **CI E2E step** (§6) | M | ✗ no design (runner, stack boot, caching) or acceptance | The only automatic E2E coverage; makes "agents don't run E2E" safe, and unblocks checking the BST/balance flag and the reconnect spec. |
-| 8 | **R1d-d, R1d-c** — refresh-state snapshot + sprite; second-tab policy (§2) | M each | ⚠️ provisional-pending-`/plan`; (c) needs your policy call | Both extend (a)'s replay work. |
-| 9 | **Gen 1 fidelity — the damage/accuracy core** (§3.1) | L | ✗ needs the Gen 1 source per claim, the seam surface, and the quirks to pin | Verify-first; large blast radius (it touches every damage number). |
-| 10 | **End-of-turn residual phase** (§4.2) | L | ✗ needs a `/plan` | A `/plan`, `opus-engineer`, and both review gates; rewrites `Battle`'s turn loop. |
-| 11 | **Features** — Catch, `save.db`, progressive difficulty, Generation Profile 4d+, … (§4) | L | ✗ each needs a `/plan` | Catch and stone evolutions are unblocked by the bag-scope ruling (`ARCHITECTURE.md` §2.12); `save.db` is declined for now. |
+| 2 | **Verification pass over the unverified findings** (§3, §5, §7) | S–M | ✗ no scope or output format (batch size; what "confirmed" means) | Cheap read-only agents in batches; turns ~45 "reviewer's reading" items into confirmed work or discards. Opens up everything below it. |
+| 3 | **Server test gaps — `GameSessionManager` lifecycle + the `RunFaulted` path** (§6) | M | ⚠️ needs the injectable-clock design | Unblocks the R1d tests and closes a long-open Tier-4 item. |
+| 4 | **Importer hardening** (§3.2) | M | ✗ no design (retry policy, transaction boundaries) or acceptance | Failure no longer wipes evolutions or exits 0; unblocks CI/Docker imports and the multi-generation importer work. |
+| 5 | **R1d-a — replay an open blocking prompt** (§2) | M | ⚠️ designed, but provisional-pending-`/plan` and needs your three decisions (§8) | The only reconnect item that strands a run; highest player value. |
+| 6 | **CI E2E step** (§6) | M | ✗ no design (runner, stack boot, caching) or acceptance | The only automatic E2E coverage; makes "agents don't run E2E" safe, and unblocks checking the BST/balance flag and the reconnect spec. |
+| 7 | **R1d-d, R1d-c** — refresh-state snapshot + sprite; second-tab policy (§2) | M each | ⚠️ provisional-pending-`/plan`; (c) needs your policy call | Both extend (a)'s replay work. |
+| 8 | **Gen 1 fidelity — the damage/accuracy core** (§3.1) | L | ✗ needs the Gen 1 source per claim, the seam surface, and the quirks to pin | Verify-first; large blast radius (it touches every damage number). |
+| 9 | **End-of-turn residual phase** (§4.2) | L | ✗ needs a `/plan` | A `/plan`, `opus-engineer`, and both review gates; rewrites `Battle`'s turn loop. |
+| 10 | **Features** — Catch, `save.db`, progressive difficulty, Generation Profile 4d+, … (§4) | L | ✗ each needs a `/plan` | Catch and stone evolutions are unblocked by the bag-scope ruling (`ARCHITECTURE.md` §2.12); `save.db` is declined for now. |
 
 ---
 
@@ -78,16 +77,6 @@ design** (it cannot tell a refresh from a blip), not a bug.
   grace rests on SignalR's documented 0/2/10/30 s schedule, not a measured run.
 - **`RunFaulted` server-half test gap** — nothing pins `SendRunFaulted` or the `GameSessionManager` catch-all call
   (the client handler's mapping is covered by R1d-c's `transportNotices` extraction).
-
-### R1b — follow-ups from the lost-answer fix's `pr-review` (items 7–9; 1–6 are archived, numbers kept)
-
-7. *Advisory* — a restored shop uses the balance from the LEAVE click (`battleReducer.ts` `RESTORE_PROMPT`); a
-   `SHOP_PURCHASED` landing between the click and the restore leaves `shop.balance` stale vs. `gold`. Cosmetic;
-   fix = apply `state.gold` to `balance` when restoring the shop.
-8. *Advisory* — nothing tests that each of the ten `answerPrompt` callbacks in `useBattleHub.ts:193-255` pairs the right
-   slot, hide action and hub method (the type-tying catches a slot/value mismatch, not a wrong hide action).
-9. *Advisory* — `SignalRInput.cs:334` ends the shop only on LEAVE (`action is not LeaveShop`) while `ShopRunEvent` ends
-   on any non-BUY answer; they agree today. If a third `ShopAction` is added, use `action is not BuyShopItem`.
 
 ---
 

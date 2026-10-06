@@ -413,9 +413,12 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
       return { ...state, switchIn: { party: action.party, faintedName: action.faintedName } };
     case 'HIDE_SWITCH_IN':
       return { ...state, switchIn: null };
-    case 'RESTORE_PROMPT':
+    case 'RESTORE_PROMPT': {
       // Only into an empty slot: if a newer prompt of the same kind arrived meanwhile, that one is the live one.
-      return state[action.key] ? state : { ...state, [action.key]: action.value };
+      if (state[action.key]) return state;
+      const value = action.key === 'shop' ? { ...action.value, balance: state.gold } : action.value;
+      return { ...state, [action.key]: value };
+    }
     case 'SWITCHED_IN':
       // Retarget the player nameplate onto the incoming creature (name/level/HP/status). The XP bar + move menu
       // refresh on the next TurnStarted (which carries no level, hence Level rides on the switch-in event).

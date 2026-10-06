@@ -7,8 +7,8 @@ import { bossTrainerName } from '../battle/bossTrainer';
 import { nextPlayerId } from '../battle/playerIdentity';
 import { clearActiveGame } from '../utils/activeGame';
 import { submitPromptAnswer } from './answerPrompt';
+import { PROMPT_ANSWERS, type PromptRoute } from './promptAnswers';
 import { isReplayOfKnownState, afterAcceptedEvent, type ReplayView } from '../battle/replayDedupe';
-import type { Action } from '../battle/timeline';
 import type { PromptKey } from './battleReducer';
 
 // The view-state shape + modal-prompt types live with the reducer now; re-export them so existing
@@ -208,9 +208,9 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
   const dismissLevelUp = useCallback(() => dispatch({ type: 'HIDE_LEVEL_UP' }), []);
 
   // Every blocking-prompt answer below goes through this: hide the modal at once, send, and RESTORE the modal if
-  // the send is rejected (the reconnect window) — see answerPrompt.ts. `key` names the prompt slot to restore.
+  // the send is rejected (the reconnect window) — see answerPrompt.ts. The route (slot, hide, method) is in promptAnswers.ts.
   const answerPrompt = useCallback(
-    <K extends PromptKey>(key: K, hide: Action, method: string, ...args: unknown[]) =>
+    <K extends PromptKey>({ key, hide, method }: PromptRoute<K>, ...args: unknown[]) =>
       submitPromptAnswer({
         key,
         prompt: stateRef.current[key],
@@ -223,27 +223,27 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
   );
 
   const forgetMove = useCallback((slot: number | null) => {
-    answerPrompt('moveReplacement', { type: 'HIDE_MOVE_REPLACEMENT' }, 'ForgetMove', slot);
+    answerPrompt(PROMPT_ANSWERS.forgetMove, slot);
   }, [answerPrompt]);
 
   const respondEvolution = useCallback((allow: boolean) => {
-    answerPrompt('evolution', { type: 'HIDE_EVOLUTION_PROMPT' }, 'RespondEvolution', allow);
+    answerPrompt(PROMPT_ANSWERS.respondEvolution, allow);
   }, [answerPrompt]);
 
   const respondRecovery = useCallback((accept: boolean) => {
-    answerPrompt('recovery', { type: 'HIDE_RECOVERY' }, 'RespondRecovery', accept);
+    answerPrompt(PROMPT_ANSWERS.respondRecovery, accept);
   }, [answerPrompt]);
 
   const chooseBiome = useCallback((biomeId: string) => {
-    answerPrompt('biomeChoice', { type: 'HIDE_BIOME_CHOICE' }, 'ChooseBiome', biomeId);
+    answerPrompt(PROMPT_ANSWERS.chooseBiome, biomeId);
   }, [answerPrompt]);
 
   const chooseReward = useCallback((index: number) => {
-    answerPrompt('rewardChoice', { type: 'HIDE_REWARD_CHOICE' }, 'ChooseReward', index);
+    answerPrompt(PROMPT_ANSWERS.chooseReward, index);
   }, [answerPrompt]);
 
   const respondMoveTeachTarget = useCallback((slot: number | null) => {
-    answerPrompt('moveTeachTarget', { type: 'HIDE_MOVE_TEACH_TARGET' }, 'RespondMoveTeachTarget', slot);
+    answerPrompt(PROMPT_ANSWERS.respondMoveTeachTarget, slot);
   }, [answerPrompt]);
 
   // Deviates from the shape above: the shop is iterative, so the modal stays open (do NOT hide it) across buys.
@@ -253,22 +253,22 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
   }, []);
 
   const leaveShop = useCallback(() => {
-    answerPrompt('shop', { type: 'HIDE_SHOP' }, 'LeaveShop');
+    answerPrompt(PROMPT_ANSWERS.leaveShop);
   }, [answerPrompt]);
 
   // replaceSlot: the member slot to swap out when accepting with a full party; null otherwise. nickname: the
   // raw text from the acquisition's nickname step (Creature Naming Stage B); null on a decline or a
   // skipped/cancelled step — the server normalizes it, same as the starter path.
   const respondAcquisition = useCallback((accept: boolean, replaceSlot: number | null, nickname: string | null = null) => {
-    answerPrompt('acquisition', { type: 'HIDE_ACQUISITION' }, 'RespondAcquisition', accept, replaceSlot, nickname);
+    answerPrompt(PROMPT_ANSWERS.respondAcquisition, accept, replaceSlot, nickname);
   }, [answerPrompt]);
 
   const chooseLead = useCallback((index: number) => {
-    answerPrompt('leadChoice', { type: 'HIDE_LEAD_CHOICE' }, 'ChooseLead', index);
+    answerPrompt(PROMPT_ANSWERS.chooseLead, index);
   }, [answerPrompt]);
 
   const respondSwitchIn = useCallback((index: number) => {
-    answerPrompt('switchIn', { type: 'HIDE_SWITCH_IN' }, 'RespondSwitchIn', index);
+    answerPrompt(PROMPT_ANSWERS.respondSwitchIn, index);
   }, [answerPrompt]);
 
   // Purely local (nothing server-side blocks on it) — the view runs a timer and calls this to auto-dismiss the

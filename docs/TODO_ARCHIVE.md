@@ -1296,10 +1296,29 @@ useBattleHub.ts}`, `ClientApp/src/battle/timeline.ts`.
 prompt after a refresh. This is the already-documented Known Gap in `TODO.md` → *Known Gaps* ("Session Resume doesn't
 cover a reconnect during a between-node blocking prompt"); it was not duplicated as a new item.
 
-### R1b follow-ups 1–5 from this fix's `pr-review` (verdict PR-READY) ✅ DONE (2026-10-03); item 6 ruled ✅ (2026-10-04)
+### R1b follow-ups 1–5 from this fix's `pr-review` (verdict PR-READY) ✅ DONE (2026-10-03); item 6 ruled ✅ (2026-10-04); items 7–9 ✅ DONE (2026-10-06)
 
-The cheap, no-behaviour-change follow-ups the review recommended. Items 7–9 of that list (three advisories) remain
-open in `TODO.md` → *R1b*, keeping their numbers.
+The cheap, no-behaviour-change follow-ups the review recommended (nine in all; numbers kept).
+
+**Items 7–9 — three advisories, all S, run-layer, runtime-only, no Gen 1 surface (✅ DONE 2026-10-06).** Not
+player-visible beyond a cosmetic balance fix; no `PRODUCT_SPEC.md` entry.
+
+7. **Restored shop shows the current balance.** `battleReducer.ts` `RESTORE_PROMPT` used the balance captured at the
+   LEAVE click, so a `SHOP_PURCHASED` landing between the click and the restore left `shop.balance` stale vs. `gold`.
+   Now applies `state.gold` to `shop.balance` when restoring the shop. Pinned by a new `battleReducer.test.ts` case
+   (`SHOW_SHOP`(100) → `HIDE_SHOP` → `SHOP_PURCHASED`(70) → `RESTORE_PROMPT` with the stale value → balance 70).
+8. **The ten `answerPrompt` routes are a tested table.** Extracted into `hooks/promptAnswers.ts` (`PROMPT_ANSWERS`:
+   key, hide action, hub method); `useBattleHub.ts` reads from it. `hooks/promptAnswers.test.ts` pins each entry and
+   runs each hide action through the real reducer. **Fallback taken:** the agreed acceptance was "drive each callback
+   with a fake hub connection, fallback = extract a pure table"; the fallback was used because the repo has no
+   `@testing-library`/jsdom/`renderHook` and the hook builds its connection internally. **Known residual gap:**
+   nothing asserts that each `useBattleHub` callback picks the right table entry (a swapped key in a callback would
+   pass); closing it needs a hook-test harness or injectable connection.
+9. **`CloseShopIfLeaving` closes on any non-BUY answer.** `SignalRInput.cs` now returns on `action is BuyShopItem`
+   (previously `action is not LeaveShop` ended the shop only on LEAVE), matching `ShopRunEvent`. No new test:
+   `SignalRInputTests` already pin buy-leaves-open / leave-closes.
+
+Gates: format-gate PASS, test-runner 2066/2066 (E2E not run); `pr-review` skipped by user decision.
 
 **Item 6 — ruled by the user, 2026-10-04: intended.** Rapid repeated shop BUY clicks are now all honoured where
 some were previously dropped; the dropped click was the bug. No code change.

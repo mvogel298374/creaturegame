@@ -210,6 +210,15 @@ describe('battleReducer — shop', () => {
     const shop = battleReducer(ready(), { type: 'SHOW_SHOP', items: stock, balance: 50 });
     expect(battleReducer(shop, { type: 'HIDE_SHOP' }).shop).toBeNull();
   });
+
+  it('RESTORE_PROMPT for the shop uses the live gold, not the balance from the LEAVE click', () => {
+    const open = battleReducer(ready(), { type: 'SHOW_SHOP', items: stock, balance: 100 });
+    const staleShop = open.shop!;
+    const left = battleReducer(open, { type: 'HIDE_SHOP' });
+    const lateBuy = battleReducer(left, { type: 'SHOP_PURCHASED', itemName: 'potion', price: 30, balance: 70 });
+    const restored = battleReducer(lateBuy, { type: 'RESTORE_PROMPT', key: 'shop', value: staleShop });
+    expect(restored.shop).toEqual({ items: stock, balance: 70 });
+  });
 });
 
 describe('battleReducer — phase transitions', () => {
