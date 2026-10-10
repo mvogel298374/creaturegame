@@ -40,7 +40,7 @@
 | 1 | **`-StartStack` backend leak** (§7.1 Part A) | S | ✗ parked: leak not reproduced (2026-10-10); un-park condition in §7.1 | Parts B and C are done. Not actionable until the user reproduces it; §1 #3 and #6 do not wait on it. |
 | 2 | **Verification pass over the unverified findings** (§7.6) | S per slice | ✅ (2026-10-10) — 15 tiny slices (V1–V5 done; V6 next); each verifies first, then fixes only S-size, non-central, no-decision findings under a mini-DoR; greenlight and commit each | Turns "reviewer's reading" items into evidenced verdicts or discards. Opens up everything below it. |
 | 3 | **Server test gaps — `GameSessionManager` lifecycle + the `RunFaulted` path** (§6) | M | ⚠️ needs the injectable-clock design | Unblocks the R1d tests and closes a long-open Tier-4 item. |
-| 4 | **Importer hardening** (§3.2) | M | ✅ (2026-10-11) — steps #4a–#4e in §3.2; #4a–#4c done (2026-10-11), #4d next | Failure no longer wipes evolutions or exits 0 (exit code fixed by #4a; evolution wipe by #4b); unblocks CI/Docker imports and the multi-generation importer work. |
+| 4 | **Importer hardening** (§3.2) | M | ✅ (2026-10-11) — steps #4a–#4e in §3.2; #4a–#4d done (2026-10-11), #4e next | Failure no longer wipes evolutions or exits 0 (exit code fixed by #4a; evolution wipe by #4b); unblocks CI/Docker imports and the multi-generation importer work. |
 | 5 | **R1d-a — replay an open blocking prompt** (§2) | M | ⚠️ designed, but provisional-pending-`/plan` and needs your three decisions (§8) | The only reconnect item that strands a run; highest player value. |
 | 6 | **CI E2E step** (§6) | M | ✗ no design (runner, stack boot, caching) or acceptance | The only automatic E2E coverage; makes "agents don't run E2E" safe, and unblocks checking the BST/balance flag and the reconnect spec. |
 | 7 | **R1d-d, R1d-c** — refresh-state snapshot + sprite; second-tab policy (§2) | M each | ⚠️ provisional-pending-`/plan`; (c) needs your policy call | Both extend (a)'s replay work. |
@@ -139,9 +139,9 @@ data/engine item usually also means updating the test that pins the wrong value.
     (`ItemImport.cs:19,57`) and species (`PokemonImport.cs:32,101`) each reuse one context; a failed
     `SaveChangesAsync` leaves its entity tracked, so every later save retries it and fails. Silent for moves and
     items; loud for species (each lands on the failed list, exit 1).
-  - **Learnset delete + insert isn't transactional** — *read-confirmed*: `PokemonImport.cs:125-127` commits the
-    delete immediately and the insert saves at `:142`, so a failed insert leaves the species with no learnset. Loud,
-    since the species is reported failed.
+  - **Learnset delete + insert isn't transactional** — *read-confirmed*, now **fixed by #4d (2026-10-11)**: the
+    delete and insert run in one transaction, so a failed insert keeps the previous learnset (the species is still
+    reported failed).
   - **Not fixed in-slice:** each fix is small, but none is testable today: every import builds its own context
     internally (`new …DbContext()`) and calls the static `HttpClient`, so a test needs an injectable context and
     HTTP handler first. That seam, plus the retry/429 policy, is design work → this entry (§1 #4).
@@ -158,9 +158,8 @@ data/engine item usually also means updating the test that pins the wrong value.
       Importer hardening — step #4b".
     - **#4c — one failed save no longer poisons the rest.** ✅ DONE (2026-10-11) — record in `TODO_ARCHIVE.md` →
       "§1 #4 Importer hardening — step #4c".
-    - **#4d — the learnset swap is one transaction.** Delete and insert a species' learnset inside a single
-      transaction. *Quirk:* the delete commits immediately today. *Test:* a trigger fails one species' learnset
-      insert → its old learnset rows are still there and the species is reported failed.
+    - **#4d — the learnset swap is one transaction.** ✅ DONE (2026-10-11) — record in `TODO_ARCHIVE.md` → "§1 #4
+      Importer hardening — step #4d".
     - **#4e — retry on rate limits and transient failures** (*decision 4*). *Test:* a handler that answers 429
       (with `Retry-After`) or 503 twice then 200 → the fetch succeeds; four failures → reported as failed; delays
       injected so the test doesn't sleep.
@@ -171,7 +170,13 @@ data/engine item usually also means updating the test that pins the wrong value.
       `Retry-After` when sent, else 1 s / 2 s / 4 s (recommended numbers).
     - **Candidate, not yet DoR'd (found in #4a review):** an empty-but-parseable generation list (moves/items)
       still reports clean — decide whether it should count as a failure before adding it to a step.
-    - **Dependencies:** #4a done, so the seam exists; #4b, #4c done; #4d–#4e in any order. **Gates:**
+    - **Candidate, not yet DoR'd (S, found in #4d review; user asked to file it 2026-10-11):** make a species row
+      and its learnset save as one unit. Today `FetchPokemonDataByUrl` saves the species row on its own, then
+      `ImportLearnset` swaps the learnset in a separate transaction, so a failed learnset leaves the new stats
+      beside the old learnset until a re-run (`DATA_IMPORT.md` §4.6; the species is reported failed). Likely fix:
+      open the transaction in `FetchPokemonDataByUrl` around both saves. Needs its mini-DoR (acceptance: a failed
+      learnset leaves the species row unchanged too; test: the #4d trigger test also asserts the old stats).
+    - **Dependencies:** #4a done, so the seam exists; #4b–#4d done; #4e remains. **Gates:**
       `requirements-review` not applicable (no data values change); `pr-review` per-step judgement.
 - **Importer/data lows:** `MoveImport.cs:175` overwrites the Gen-1-resolved `EffectChance` with today's ailment
   chance; the dev server can read stale data (Web csproj copies `*.db` only, never `-wal`; `DbPathHelper.cs:18`

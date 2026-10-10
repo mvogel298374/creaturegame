@@ -355,8 +355,12 @@ methods: `level-up` (tagged `LearnMethod.LevelUp`, lowest level kept
 if a move repeats) and `machine` (TM/HM, tagged `LearnMethod.Machine`, `LearnLevel = 0`). A move
 learnable both ways is kept as level-up only — it's already in that pool, so the machine tag would add
 nothing. `PokemonImport.ImportLearnset(…, generation)` persists the result idempotently: clears this species'
-rows for that generation, then re-inserts — the same clear-then-reinsert pattern as `GameAvailabilitySeeder`
-(`EvolutionImport` below is stricter: all-or-nothing, §4.7).
+rows for that generation, then re-inserts, with the delete and the insert in **one transaction**. A failed
+insert therefore rolls the delete back and the species keeps its previous learnset, instead of being left with
+none; the species is still reported as failed (§5.6). The species row itself is saved before the learnset
+transaction opens, so after such a failure it already carries the new stats beside the old learnset, until a
+re-run brings both in line. (`EvolutionImport` below is stricter again: it replaces
+nothing unless every fetch succeeded, §4.7.)
 
 ### 4.7 Evolutions (`EvolutionMapper` → `EvolutionImport`)
 Each Gen 1 species' family shares one `/evolution-chain` resource; `EvolutionImport` collects every

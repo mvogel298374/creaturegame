@@ -8,6 +8,40 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §1 #4 Importer hardening — step #4d (the learnset swap is one transaction) ✅ DONE (2026-10-11)
+
+Step 4 of 5 of `TODO.md` §1 #4 (#4e remains open there). Importer only; gen-invariant; no data value, engine or web
+change; not player-visible.
+
+**Was** (verified at `56e9ab6`, §7.6 V5): `ImportLearnset` committed the learnset delete immediately and saved the insert
+afterwards, so a failed insert left the species with no learnset (loud: the species was reported failed).
+
+**Delivered**
+- `ImportLearnset` wraps `ExecuteDelete` + `AddRange` + `SaveChanges` + `Commit` in one
+  `await using` transaction; a failed insert rolls the delete back and the species is reported failed, keeping its
+  previous learnset. The empty-entries early return was removed (same end state).
+- `docs/DATA_IMPORT.md` §4.6: the transaction; a failed insert keeps the previous learnset and the species is reported;
+  the species row is saved before the learnset transaction, so after such a failure it carries new stats beside the old
+  learnset until a re-run.
+- Tests (`tests/creaturegame.Tests/Integration/Importer/LearnsetImportSafetyTests.cs`, 2): two species, a trigger
+  refuses species 1's learnset insert -> species 1 reported, its old learnset kept, species 2's learnset written; a
+  clean import replaces the learnset.
+- Sabotage-verified: HEAD (no transaction) -> test 1 fails; `var` instead of `await using` (no rollback) -> test 1
+  fails (species 2 also fails); restored -> importer tests 17/17.
+
+**Review:** pr-review PR-READY (0 changes requested; 1 recommendation, the two-species test, applied). Gates: format
+PASS; test-runner PASS (E2E not run); requirements-review n/a.
+
+**Open advisories:**
+- (a) The species row is saved outside the learnset transaction, so a learnset failure leaves new stats beside the old
+  learnset until a re-run. Filed 2026-10-11 as a candidate (S, not yet DoR'd) in `TODO.md` §3.2 -> "Importer
+  hardening" (make a species row and its learnset save as one unit).
+- (b) The empty-entries path has no test (behaviour unchanged).
+- (c) The `PokeApiPokemon` stat-block fixture is duplicated in 3 test files; an optional TestSupport builder
+  (pre-existing debt).
+
+---
+
 ## §1 #4 Importer hardening — step #4c (one failed save no longer poisons the rest) ✅ DONE (2026-10-11)
 
 Step 3 of 5 of `TODO.md` §1 #4 (#4d, #4e remain open there). Importer only; gen-invariant; no data value, engine or

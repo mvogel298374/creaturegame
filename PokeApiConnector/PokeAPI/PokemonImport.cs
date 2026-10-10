@@ -129,12 +129,11 @@ public class PokemonImport
     {
         var entries = LearnsetMapper.ExtractLearnset(pokeData, generation);
 
+        // One transaction, so a failed insert rolls the delete back (DATA_IMPORT.md §4.6).
+        await using var transaction = await context.Database.BeginTransactionAsync();
         await context
             .Learnsets.Where(l => l.SpeciesId == pokeData.Id && l.Generation == generation)
             .ExecuteDeleteAsync();
-
-        if (entries.Count == 0)
-            return;
 
         context.Learnsets.AddRange(
             entries.Select(e => new PokemonLearnset
@@ -147,6 +146,7 @@ public class PokemonImport
             })
         );
         await context.SaveChangesAsync();
+        await transaction.CommitAsync();
         int levelUp = entries.Count(e => e.Method == LearnMethod.LevelUp);
         Console.WriteLine(
             $"  Learnset: {levelUp} level-up + {entries.Count - levelUp} TM/HM Gen 1 moves for ID {pokeData.Id}"
