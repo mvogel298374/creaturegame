@@ -25,10 +25,6 @@ public static class EvolutionImport
         var failed = new List<string>();
         try
         {
-            using var context = (createContext ?? (() => new PokemonDbContext()))();
-
-            await context.Evolutions.Where(e => e.Generation == Gen1).ExecuteDeleteAsync();
-
             var chainUrls = await CollectChainUrlsAsync(http, failed);
             var seen = new HashSet<(int From, int To)>();
             var rows = new List<PokemonEvolution>();
@@ -61,8 +57,21 @@ public static class EvolutionImport
                 }
             }
 
+            // see DATA_IMPORT.md §4.7 — a partial fetch keeps the existing edges rather than replacing them
+            if (failed.Count > 0)
+            {
+                Console.WriteLine(
+                    $"  Evolutions: {failed.Count} fetch(es) failed — existing edges left unchanged."
+                );
+                return failed;
+            }
+
+            using var context = (createContext ?? (() => new PokemonDbContext()))();
+            await using var transaction = await context.Database.BeginTransactionAsync();
+            await context.Evolutions.Where(e => e.Generation == Gen1).ExecuteDeleteAsync();
             context.Evolutions.AddRange(rows);
             await context.SaveChangesAsync();
+            await transaction.CommitAsync();
             Console.WriteLine(
                 $"  Evolutions: {rows.Count} Gen 1 edges from {chainUrls.Count} chains."
             );
@@ -91,8 +100,13 @@ public static class EvolutionImport
                 response.EnsureSuccessStatusCode();
                 string json = await response.Content.ReadAsStringAsync();
                 var species = JsonSerializer.Deserialize<PokeApiPokemonSpecies>(json, JsonOptions);
-                if (species?.EvolutionChain?.Url is string url)
-                    urls.Add(url);
+                if (species?.EvolutionChain?.Url is not string url)
+                {
+                    Console.WriteLine($"  Evolution: no chain url for species {id}.");
+                    failed.Add(speciesUrl);
+                    continue;
+                }
+                urls.Add(url);
             }
             catch (Exception ex)
             {

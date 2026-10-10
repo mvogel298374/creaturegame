@@ -8,6 +8,36 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §1 #4 Importer hardening — step #4b (evolutions never wipe on a bad fetch) ✅ DONE (2026-10-11)
+
+Step 2 of 5 of `TODO.md` §1 #4 (#4c–#4e remain open there). Importer only; gen-invariant; no data value, engine or
+web change; not player-visible. Decision 2 (keep the old table and fail) taken as recommended.
+
+**Was** (verified at `56e9ab6`, §7.6 V5; left by #4a): `EvolutionImport` deleted all Gen 1 edges before fetching and
+skipped every per-species and per-chain fetch failure, so an offline run committed an empty table and a partial one
+silently dropped edges.
+
+**Delivered**
+- `EvolutionImport` fetches every species and chain first; if any fetch failed the table is left untouched and the
+  failures are reported (exit 1). Otherwise delete + insert run in one transaction (a failed insert rolls the delete back).
+- Amendment (pr-review finding, user ruling): a species answering with a `null` body or no `evolution_chain.url` also
+  counts as a failed fetch (every Gen 1 species has a chain in PokeAPI); previously it was silently skipped.
+- `docs/DATA_IMPORT.md` §4.7 "All-or-nothing" paragraph; §4.6 learnset note points at it.
+- Tests (`tests/creaturegame.Tests/Integration/Importer/EvolutionImportSafetyTests.cs`, 5): all-fail keeps rows; one
+  species failing keeps rows + exactly that url; a species answering null keeps rows + exactly that url; clean fetch
+  replaces rows; insert-rejecting trigger -> "aborted" reported + old rows kept.
+- Removed #4a's `Evolutions_AnAbortedImport_IsReported` from `ImportFailureReportingTests` (path unreachable now; the
+  trigger test covers "aborted" more strictly).
+- Sabotage-verified: against the #4a (delete-first) code the 3 failure-path tests fail; against the old silent-skip
+  line the null-species test fails.
+
+**Review:** pr-review CHANGES-REQUESTED (1: null/no-chain species silently skipped -> fixed in-slice by user ruling,
+verified by sabotage, not re-reviewed per the no-review-loop rule). Advisories applied: DATA_IMPORT.md §4.7 paragraph
+trimmed to current state; learnset-note pointer to the All-or-nothing rule. Gates: format PASS; test-runner PASS
+(E2E not run); requirements-review n/a.
+
+---
+
 ## §1 #4 Importer hardening — step #4a (the seam and the exit code) ✅ DONE (2026-10-11)
 
 Step 1 of 5 of `TODO.md` §1 #4 (#4b–#4e remain open there). Importer only; gen-invariant; no data value, engine or

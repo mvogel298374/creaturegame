@@ -355,13 +355,20 @@ methods: `level-up` (tagged `LearnMethod.LevelUp`, lowest level kept
 if a move repeats) and `machine` (TM/HM, tagged `LearnMethod.Machine`, `LearnLevel = 0`). A move
 learnable both ways is kept as level-up only — it's already in that pool, so the machine tag would add
 nothing. `PokemonImport.ImportLearnset(…, generation)` persists the result idempotently: clears this species'
-rows for that generation, then re-inserts — the same clear-then-reinsert pattern as `GameAvailabilitySeeder` and
-`EvolutionImport` below.
+rows for that generation, then re-inserts — the same clear-then-reinsert pattern as `GameAvailabilitySeeder`
+(`EvolutionImport` below is stricter: all-or-nothing, §4.7).
 
 ### 4.7 Evolutions (`EvolutionMapper` → `EvolutionImport`)
 Each Gen 1 species' family shares one `/evolution-chain` resource; `EvolutionImport` collects every
 species' chain URL, fetches each *unique* chain once, and hands it to `EvolutionMapper` to flatten
-into faithful Gen 1 edges — idempotent (clears this generation's rows, then re-inserts).
+into faithful Gen 1 edges — idempotent (replaces this generation's rows as a set; see *All-or-nothing* below).
+
+**All-or-nothing.** Every species and chain is fetched **before** the table is touched. If any fetch failed,
+the existing edges are left exactly as they were and the failures are reported (exit 1, §5.6). A species
+that answers with a null body or no `evolution_chain.url` counts as a failed fetch (every Gen 1 species has a
+chain). Only a fully clean fetch replaces the rows, and the delete and insert run in **one transaction**, so a
+failed insert rolls the delete back too. Evolutions are replaced as a set rather than upserted per record,
+which is why they get this rule and per-record "fail a record, not the run" (§5.6) doesn't apply.
 
 **The Gen 1 filter.** A chain can span every generation the games have added since, so an edge
 survives only when both species are in the Gen 1 dex (1–151) **and** its trigger is something Gen 1

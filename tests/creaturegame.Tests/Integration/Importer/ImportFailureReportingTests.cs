@@ -69,19 +69,6 @@ public class ImportFailureReportingTests : IDisposable
     }
 
     [Fact]
-    public async Task Evolutions_AnAbortedImport_IsReported()
-    {
-        var http = new FakePokeApiHandler().Client();
-
-        var failed = await EvolutionImport.ImportAllAsync(
-            http,
-            () => throw new InvalidOperationException("db down")
-        );
-
-        Assert.Contains(failed, f => f.StartsWith("evolution import aborted"));
-    }
-
-    [Fact]
     public async Task Moves_AnUnreachableGenerationList_IsReported()
     {
         var http = new FakePokeApiHandler().Client();
