@@ -38,9 +38,9 @@
 | # | Item | Cost | Ready? (DoR) | Why this slot / what it unblocks |
 |:-:|:-----|:----:|:-------------|:---------------------------------|
 | 1 | **`-StartStack` backend leak** (§7.1 Part A) | S | ✗ parked: leak not reproduced (2026-10-10); un-park condition in §7.1 | Parts B and C are done. Not actionable until the user reproduces it; §1 #3 and #6 do not wait on it. |
-| 2 | **Verification pass over the unverified findings** (§7.6) | S per slice | ✅ (2026-10-10) — 15 tiny slices (V1–V4 done; V5 next); each verifies first, then fixes only S-size, non-central, no-decision findings under a mini-DoR; greenlight and commit each | Turns "reviewer's reading" items into evidenced verdicts or discards. Opens up everything below it. |
+| 2 | **Verification pass over the unverified findings** (§7.6) | S per slice | ✅ (2026-10-10) — 15 tiny slices (V1–V5 done; V6 next); each verifies first, then fixes only S-size, non-central, no-decision findings under a mini-DoR; greenlight and commit each | Turns "reviewer's reading" items into evidenced verdicts or discards. Opens up everything below it. |
 | 3 | **Server test gaps — `GameSessionManager` lifecycle + the `RunFaulted` path** (§6) | M | ⚠️ needs the injectable-clock design | Unblocks the R1d tests and closes a long-open Tier-4 item. |
-| 4 | **Importer hardening** (§3.2) | M | ✗ no design (retry policy, transaction boundaries) or acceptance | Failure no longer wipes evolutions or exits 0; unblocks CI/Docker imports and the multi-generation importer work. |
+| 4 | **Importer hardening** (§3.2) | M | ✗ claims verified (§7.6 V5, 2026-10-11); DoR next — needs the injectable-context/HTTP seam, retry/429 policy and transaction boundaries designed, plus acceptance | Failure no longer wipes evolutions or exits 0; unblocks CI/Docker imports and the multi-generation importer work. |
 | 5 | **R1d-a — replay an open blocking prompt** (§2) | M | ⚠️ designed, but provisional-pending-`/plan` and needs your three decisions (§8) | The only reconnect item that strands a run; highest player value. |
 | 6 | **CI E2E step** (§6) | M | ✗ no design (runner, stack boot, caching) or acceptance | The only automatic E2E coverage; makes "agents don't run E2E" safe, and unblocks checking the BST/balance flag and the reconnect spec. |
 | 7 | **R1d-d, R1d-c** — refresh-state snapshot + sprite; second-tab policy (§2) | M each | ⚠️ provisional-pending-`/plan`; (c) needs your policy call | Both extend (a)'s replay work. |
@@ -127,11 +127,27 @@ data/engine item usually also means updating the test that pins the wrong value.
   OHKO speed check runs before the roll — keep it as the regression guard if the gate order is changed. Also:
   item descriptions are PokeAPI's modern text as-is (only X Accuracy's is overridden), so Dire Hit / Guard Spec and
   the X-items still describe the modern effects — unverified, check before a descriptions pass.
-- **Importer hardening (M):** a failed/offline run wipes evolutions and exits 0 (`EvolutionImport.cs:24` deletes
-  before fetching and swallows errors); no retry/429/timeout anywhere; `Program.cs:111` always prints "Import
-  Complete!"; a failed `SaveChangesAsync` poisons the shared DbContext for the rest of the run (`MoveImport.cs:29/82`,
-  `ItemImport.cs`); learnset delete+insert isn't transactional. (The species importer now fails loudly and exits
-  non-zero — archived.)
+- **Importer hardening (M) — verified 2026-10-11 at `56e9ab6` (§7.6 V5):**
+  - **A failed or offline run wipes evolutions and exits 0** — *read-confirmed*: `EvolutionImport.cs:24` deletes all
+    Gen 1 edges before fetching; every per-species and per-chain fetch failure is caught and skipped (`:82-87`,
+    `:102-106`), so an offline run commits an empty table, and a partial one silently drops edges; the outer catch
+    (`:61-64`) logs only the message and nothing reaches the exit code.
+  - **No retry or 429 handling** — *read-confirmed*: one shared `HttpClient` (`PokeApiHttp.cs`) with no handler,
+    retry or rate-limit logic. **"No timeout"** — *refuted*: `HttpClient`'s 100 s default applies.
+  - **"Import Complete!" always prints** — *partly refuted*: a species failure exits 1 before it
+    (`Program.cs:124,139`). Still true for every other stage: move, evolution, item and sprite failures never reach
+    the exit code (the full run ignores the downloaders' failure counts, `:115-121`), so the run prints "Import
+    Complete!" and exits 0.
+  - **A failed save poisons the shared DbContext** — *read-confirmed*: moves (`MoveImport.cs:29,82`), items
+    (`ItemImport.cs:19,57`) and species (`PokemonImport.cs:32,101`) each reuse one context; a failed
+    `SaveChangesAsync` leaves its entity tracked, so every later save retries it and fails. Silent for moves and
+    items; loud for species (each lands on the failed list, exit 1).
+  - **Learnset delete + insert isn't transactional** — *read-confirmed*: `PokemonImport.cs:125-127` commits the
+    delete immediately and the insert saves at `:142`, so a failed insert leaves the species with no learnset. Loud,
+    since the species is reported failed.
+  - **Not fixed in-slice:** each fix is small, but none is testable today: every import builds its own context
+    internally (`new …DbContext()`) and calls the static `HttpClient`, so a test needs an injectable context and
+    HTTP handler first. That seam, plus the retry/429 policy, is design work → this entry (§1 #4).
 - **Importer/data lows:** `MoveImport.cs:175` overwrites the Gen-1-resolved `EffectChance` with today's ailment
   chance; the dev server can read stale data (Web csproj copies `*.db` only, never `-wal`; `DbPathHelper.cs:18`
   prefers the bin copy); item `Cost` is modern and now drives reward rarity and the starting bag (five cures tie at
@@ -516,7 +532,7 @@ a decision (Roar/Whirlwind, the BST bands).
 | V2 | Verify ✅ and fix ✅ 2026-10-11 — record in `TODO_ARCHIVE.md` → "§7.6 V2 — CI/deploy hardening" (end-to-end proof pending the next RC deploy) | — | — |
 | V3 | Verify ✅ and fix ✅ 2026-10-11 — record in `TODO_ARCHIVE.md` → "§7.6 V3 — public endpoints"; limits + idle timeout → the low-priority abuse-protection entry in §7.1; forwarded headers + exhaustion → §9 (Fly-side health check is off by default, `FLY_HEALTH_CHECK` repo variable; observable on an RC deploy only once switched on) | — | — |
 | V4 | Verify ✅ and fix ✅ 2026-10-11 — record in `TODO_ARCHIVE.md` → "§7.6 V4 — scripts and logging"; Dockerfile items → §9 | — | — |
-| V5 | Importer hardening: evolution wipe, no retry, "Import Complete!", poisoned DbContext, learnset transaction (§3.2) | Code | No importer run against PokeAPI |
+| V5 | Verify ✅ 2026-10-11 (verdicts in §3.2 "Importer hardening": 4 read-confirmed, 1 refuted, 1 partly refuted). No in-slice fixes — all need a test seam → §1 #4 | — | — |
 | V6 | Importer/data lows: `EffectChance` overwrite, stale `-wal`, modern item `Cost`, Yellow exclusion (§3.2) | Code + db query | Gen 1 values via pokered |
 | V7 | Gate order (Dream Eater, OHKO speed) and Dire Hit / Guard Spec reuse (§3.2) | pokered + code | Gen 1 source per claim |
 | V8 | Turn-order/status edges: trap after trapper faints, double recharge, `CanAct` order, para/confusion cancel (§3.1) | pokered + code; scratch test | Gen 1 source per claim |
