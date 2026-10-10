@@ -11,6 +11,9 @@ namespace creaturegame.Tests.TestSupport;
 /// because <c>AttachConnection</c>'s successful-attach path emits synchronously.</summary>
 public sealed class RecordingHubContext : IHubContext<BattleHub, IBattleClient>
 {
+    /// <summary>When set, every send is still recorded but returns a task faulted with this exception.</summary>
+    public Exception? FailSendsWith { get; init; }
+
     private readonly object _lock = new();
     private readonly Dictionary<string, List<(string Type, object Payload)>> _events = new();
 
@@ -72,7 +75,7 @@ public sealed class RecordingHubContext : IHubContext<BattleHub, IBattleClient>
         public Task OnBattleEvent(string eventType, object payload)
         {
             owner.Record(connectionId, eventType, payload);
-            return Task.CompletedTask;
+            return owner.FailSendsWith is { } ex ? Task.FromException(ex) : Task.CompletedTask;
         }
     }
 }

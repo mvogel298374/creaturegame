@@ -8,6 +8,63 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §7.6 V4 — scripts and logging: verified and fixed ✅ DONE (2026-10-11)
+
+**Was** `TODO.md` §7.1 "Script/Docker polish" (verified at `4be7bbd`) and the §7.6 V4 slice with its fix-phase
+mini-DoRs. All four fixes S; dev scripts + web layer; gen-invariant; no data, engine or importer change; not
+player-visible (ops/dev only, so no `PRODUCT_SPEC.md` entry).
+
+**Verdicts.**
+- **`dev.ps1` breaks on an apostrophe in the repo path** — *reproduced*: `:53-54` single-quote `$dotnet`, `$root` and
+  the log paths inside the `-Command` strings; with `O'Brien` in the path the built command gives
+  `--project 'C:\Users\O'` and swallows the rest, including the `| Tee-Object` pipe, into one string. → V4-a.
+- **`build-release.ps1` leaves the caller's cwd changed** — *reproduced* (a script's `Set-Location` persists in the
+  calling session). The line is `:37` (`Set-Location $repoRoot`, never restored), not `:200` as first filed; the
+  closing hint's relative path silently relied on it. → V4-b.
+- **`Dockerfile` re-downloads every sprite on any source change; base images tag-pinned, not digest-pinned** —
+  *read-confirmed* (`COPY . .` at `:27` before the download at `:28`; `node:22-alpine`, `sdk:9.0.200`, `aspnet:9.0`).
+  Accepted (user ruling 2026-10-11) → `TODO.md` §9.
+- **Start failures log only `ex.Message`** — *read-confirmed*: `GameController.cs:67`, `SpeciesController.cs:37`; the
+  run loop already logs the full exception (`GameSessionManager.cs:299`). → V4-c.
+- **The emitter discards the send task** — *read-confirmed*: `SignalRBattleEventEmitter.cs:87` and `:98`, so a failed
+  send was never observed or logged. Whether un-awaited sends can reorder is *unverified* (not claimed by the
+  finding). → V4-d.
+- The client-chosen run `Seed` stays a product decision, not a bug (one line left in `TODO.md` §7.1).
+
+**V4-a — `dev.ps1` quotes paths safely.** *Acceptance:* every path interpolated into the two `-Command` strings is
+escaped, so a repo path containing `'` yields whole `--project`, `Set-Location` and `-FilePath` arguments; the normal
+path still starts the stack. *Fix:* a `Quote` helper using
+`[System.Management.Automation.Language.CodeGeneration]::EscapeSingleQuotedStringContent` (pr-review recommended it
+over `-replace "'", "''"` because PowerShell also treats curly quotes U+2018/2019/201A/201B as string delimiters).
+*Verified:* AST parse of the built commands with `O'Brien`, `O’Brien` and `O‘Brien` paths — all arguments whole, no
+parse errors; `.\dev.ps1 -NoBrowser` reached ready, exit 0 (stack stopped after).
+
+**V4-b — `build-release.ps1` restores the caller's location.** *Acceptance:* after the script ends (success or thrown
+failure) the caller is back where it started; the closing hint prints an absolute path. *Fix:* `Push-Location
+$repoRoot` with the body in `try`/`finally { Pop-Location }` (cwd is still needed for `global.json` SDK resolution);
+the hint prints an absolute dll path. *Verified:* from `%TEMP%`, cwd restored after a successful `-SkipFrontend`
+publish and after a forced failure (`-OutputDir 'bad<>dir'` threw "dotnet publish failed").
+
+**V4-c — the two request boundaries log the full exception.** `GameController.Start` and `SpeciesController.GetAll`
+log `{ex}` (type, message, stack); responses unchanged. *Test:* none — a one-token change matching existing code (user
+ruling 2026-10-11; `Console` capture is unsafe under xUnit's parallel runs, and a logging seam would outweigh the fix).
+
+**V4-d — failed event sends are logged.** *Acceptance:* when a send's task faults, the emitter logs it once, with the
+event type; successful sends are unchanged and `Emit` stays synchronous. *Fix (as built):* optional constructor
+parameter `Action<string, Exception>? onSendFailed` (event type + exception; default `Console.WriteLine`) on
+`SignalRBattleEventEmitter`; `Send` and `SendRunFaulted` go through `Dispatch`, which attaches a
+`ContinueWith(…, OnlyOnFaulted)`. The mini-DoR had specified `Action<Exception>`; the built signature also carries the
+event type. *Tests:* `EmitterSendFailureTests` (3) + `RecordingHubContext.FailSendsWith`.
+
+**Gates (2026-10-11).** format-gate PASS; test-runner PASS (.NET, tsc, Vitest green; E2E not run);
+requirements-review n/a; pr-review PR-READY (0 changes requested; 1 recommended — curly quotes — applied).
+Advisories, no action: (1) in-process SignalR likely drops sends to a gone connection rather than faulting, so V4-d is
+defence-in-depth and should not spam on disconnect (unverified belief); (2) an exception thrown by the callback
+itself would be unobserved; (3) `build-release`'s closing hint prints paths unquoted, so a path with spaces does not
+paste as a command (cosmetic).
+
+---
+
 ## §7.6 V3 — public endpoints: verified and fixed ✅ DONE (2026-10-11)
 
 **Was** `TODO.md` §7.1 "Public endpoint exhaustion" (verified at `b1017ba`) and the §7.6 V3 slice with its fix-phase

@@ -34,7 +34,7 @@ public class SpeciesController(IDbContextFactory<PokemonDbContext> pokemonFactor
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[SpeciesController] GetAll failed: {ex.Message}");
+            Console.WriteLine($"[SpeciesController] GetAll failed: {ex}");
             return StatusCode(500, new { error = "Failed to load species" });
         }
     }

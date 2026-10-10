@@ -7,9 +7,12 @@ namespace creaturegame.Web.Battle;
 public sealed class SignalRBattleEventEmitter(
     IHubContext<BattleHub, IBattleClient> hubContext,
     Func<string?> currentConnectionId,
-    bool includeDamageRange = false
+    bool includeDamageRange = false,
+    Action<string, Exception>? onSendFailed = null
 ) : IBattleEventEmitter
 {
+    private readonly Action<string, Exception> _onSendFailed = onSendFailed ?? LogSendFailure;
+
     // The "state-establishing" events, cached as they pass through — everything a client that lost all
     // in-memory state (a full SPA remount, not just a transport drop) needs to know what's on screen right now.
     // Each otherwise fires exactly once, to whichever connection was current at the time, so a reconnecting
@@ -84,8 +87,22 @@ public sealed class SignalRBattleEventEmitter(
             evt = dealt with { MinDamage = null, MaxDamage = null };
 
         var (type, payload) = MapEvent(evt);
-        _ = hubContext.Clients.Client(connectionId).OnBattleEvent(type, payload);
+        Dispatch(connectionId, type, payload);
     }
+
+    private void Dispatch(string connectionId, string type, object payload) =>
+        _ = hubContext
+            .Clients.Client(connectionId)
+            .OnBattleEvent(type, payload)
+            .ContinueWith(
+                t => _onSendFailed(type, t.Exception!.GetBaseException()),
+                CancellationToken.None,
+                TaskContinuationOptions.OnlyOnFaulted,
+                TaskScheduler.Default
+            );
+
+    private static void LogSendFailure(string type, Exception ex) =>
+        Console.WriteLine($"[SignalRBattleEventEmitter] Send of {type} failed: {ex}");
 
     /// <summary>Tells the current connection its run task crashed, so the client can leave instead of sitting on
     /// its last screen. A transport-level notice, not a <see cref="BattleEvent"/> — it never enters the replay
@@ -95,7 +112,7 @@ public sealed class SignalRBattleEventEmitter(
         var connectionId = currentConnectionId();
         if (string.IsNullOrEmpty(connectionId))
             return;
-        _ = hubContext.Clients.Client(connectionId).OnBattleEvent("RunFaulted", new { });
+        Dispatch(connectionId, "RunFaulted", new { });
     }
 
     /// <summary>Re-sends every cached state-establishing event, in the order it would naturally occur, to

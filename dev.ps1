@@ -49,9 +49,10 @@ $logDir      = Join-Path $root '.dev'
 $backendLog  = Join-Path $logDir 'backend.log'
 $frontendLog = Join-Path $logDir 'frontend.log'
 New-Item -ItemType Directory -Force $logDir | Out-Null
+function Quote([string]$s) { "'" + [System.Management.Automation.Language.CodeGeneration]::EscapeSingleQuotedStringContent($s) + "'" }
 $utf8        = "[Console]::OutputEncoding = [Text.Encoding]::UTF8; "
-$backendCmd  = $utf8 + "`$env:ASPNETCORE_ENVIRONMENT='Development'; `$env:ASPNETCORE_URLS='http://localhost:5100'; `$env:DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER='1'; & '$dotnet' watch run --no-launch-profile --project '$root\creaturegame.Web' 2>&1 | Tee-Object -FilePath '$backendLog'"
-$frontendCmd = $utf8 + "Set-Location '$root\creaturegame.Web\ClientApp'; npm run dev 2>&1 | Tee-Object -FilePath '$frontendLog'"
+$backendCmd  = $utf8 + "`$env:ASPNETCORE_ENVIRONMENT='Development'; `$env:ASPNETCORE_URLS='http://localhost:5100'; `$env:DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER='1'; & $(Quote $dotnet) watch run --no-launch-profile --project $(Quote "$root\creaturegame.Web") 2>&1 | Tee-Object -FilePath $(Quote $backendLog)"
+$frontendCmd = $utf8 + "Set-Location $(Quote "$root\creaturegame.Web\ClientApp"); npm run dev 2>&1 | Tee-Object -FilePath $(Quote $frontendLog)"
 
 Start-Process pwsh -ArgumentList "-NoExit", "-Command", $backendCmd
 Start-Process pwsh -ArgumentList "-NoExit", "-Command", $frontendCmd

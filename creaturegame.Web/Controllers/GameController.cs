@@ -64,7 +64,7 @@ public class GameController(GameSessionManager sessionManager, EncounterFactory 
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[GameController] Start failed: {ex.Message}");
+            Console.WriteLine($"[GameController] Start failed: {ex}");
             return StatusCode(500, new { error = "Failed to start game" });
         }
     }
