@@ -54,6 +54,7 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 app.MapControllers();
 app.MapHub<BattleHub>("/hubs/battle");
+app.Map("/api/{**rest}", () => Results.NotFound());
 app.MapFallbackToFile("index.html");
 
 app.Run();

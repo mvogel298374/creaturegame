@@ -74,6 +74,33 @@ public class PartyTests
     }
 
     [Fact]
+    public void Members_EnumeratingWhileTheRosterChanges_DoesNotThrow()
+    {
+        var party = new Party(Wounded("Lead"));
+        party.Add(Wounded("Bench"));
+
+        foreach (var _ in party.Members)
+            party.Add(Wounded("Caught"));
+        foreach (var _ in party.Members)
+            party.Replace(0, Wounded("Swapped"));
+    }
+
+    [Fact]
+    public void Members_AHeldReference_IsASnapshotThatRosterChangesDoNotAlter()
+    {
+        var lead = Wounded("Lead");
+        var party = new Party(lead);
+        var held = party.Members;
+
+        var caught = Wounded("Caught");
+        party.Add(caught);
+        party.Replace(0, Wounded("Swapped"));
+
+        Assert.Equal([lead], held);
+        Assert.Equal(2, party.Count);
+    }
+
+    [Fact]
     public void SetLead_ChangesTheActiveMember_AndRunStatePlayerFollowsIt()
     {
         var lead = Wounded("Lead");

@@ -67,6 +67,30 @@ public class SessionResumeTests
         }
     }
 
+    [Fact]
+    public void AttachConnection_ASetupThrow_LeavesNoActiveSessionBehind()
+    {
+        // A null hub makes the first-attach presentation emit throw mid-setup.
+        var manager = new GameSessionManager(hubContext: null!, NoDbEncounterFactory.Create());
+        string gameId = manager.RegisterSession(
+            Player(),
+            [],
+            new Bag(),
+            new Wallet(),
+            [],
+            new SeededRandomSource(1),
+            [],
+            Difficulty.Normal,
+            Generation.One,
+            new Dictionary<int, IReadOnlyList<int>>()
+        );
+
+        Assert.ThrowsAny<Exception>(() => manager.AttachConnection(gameId, "conn-1"));
+
+        Assert.Null(manager.GetPlayerCreature(gameId));
+        Assert.False(manager.AttachConnection(gameId, "conn-2"));
+    }
+
     // ── SignalRBattleEventEmitter.ReplayLastKnownState ────────────────────────────────────────────────────
     //
     // The other half of Session Resume: a reconnect that follows a full SPA remount (a refresh) needs the

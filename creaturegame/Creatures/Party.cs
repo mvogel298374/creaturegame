@@ -17,13 +17,14 @@ public sealed class Party
     /// <summary>The Gen 1 party ceiling — a trainer carries at most six.</summary>
     public const int MaxSize = 6;
 
-    private readonly List<Creature> _members = [];
+    // Copy-on-write — see ARCHITECTURE.md §2.7 "Live-state reads".
+    private List<Creature> _members;
 
     /// <summary>Starts a party with its <paramref name="lead"/> (the run's starter) as the sole, active member.</summary>
     public Party(Creature lead)
     {
         ArgumentNullException.ThrowIfNull(lead);
-        _members.Add(lead);
+        _members = [lead];
         LeadIndex = 0;
     }
 
@@ -49,7 +50,7 @@ public sealed class Party
         ArgumentNullException.ThrowIfNull(creature);
         if (IsFull)
             return false;
-        _members.Add(creature);
+        _members = [.. _members, creature];
         return true;
     }
 
@@ -60,7 +61,7 @@ public sealed class Party
     {
         ArgumentNullException.ThrowIfNull(creature);
         if (index >= 0 && index < _members.Count)
-            _members[index] = creature;
+            _members = [.. _members.Take(index), creature, .. _members.Skip(index + 1)];
     }
 
     /// <summary>Makes the member at <paramref name="index"/> the active <see cref="Lead"/> — the between-biome

@@ -38,7 +38,7 @@
 | # | Item | Cost | Ready? (DoR) | Why this slot / what it unblocks |
 |:-:|:-----|:----:|:-------------|:---------------------------------|
 | 1 | **`-StartStack` backend leak** (§7.1 Part A) | S | ✗ parked: leak not reproduced (2026-10-10); un-park condition in §7.1 | Parts B and C are done. Not actionable until the user reproduces it; §1 #3 and #6 do not wait on it. |
-| 2 | **Verification pass over the unverified findings** (§3, §5, §7) | S–M | ✗ no scope or output format (batch size; what "confirmed" means) | Cheap read-only agents in batches; turns ~45 "reviewer's reading" items into confirmed work or discards. Opens up everything below it. |
+| 2 | **Verification pass over the unverified findings** (§7.6) | S per slice | ✅ (2026-10-10) — 15 tiny slices (V1 done, V2 next); each verifies first, then fixes only S-size, non-central, no-decision findings under a mini-DoR; greenlight and commit each | Turns "reviewer's reading" items into evidenced verdicts or discards. Opens up everything below it. |
 | 3 | **Server test gaps — `GameSessionManager` lifecycle + the `RunFaulted` path** (§6) | M | ⚠️ needs the injectable-clock design | Unblocks the R1d tests and closes a long-open Tier-4 item. |
 | 4 | **Importer hardening** (§3.2) | M | ✗ no design (retry policy, transaction boundaries) or acceptance | Failure no longer wipes evolutions or exits 0; unblocks CI/Docker imports and the multi-generation importer work. |
 | 5 | **R1d-a — replay an open blocking prompt** (§2) | M | ⚠️ designed, but provisional-pending-`/plan` and needs your three decisions (§8) | The only reconnect item that strands a run; highest player value. |
@@ -143,12 +143,6 @@ data/engine item usually also means updating the test that pins the wrong value.
   Mew 270→64). The tier offsets were tuned against modern numbers. Seeded E2E specs may land on different
   encounters. **Decided 2026-10-06 (user): keep the current tier bands, no retune** — the full E2E run that day was
   36/38 with no failure attributable to the bands; reopen only if playtests show difficulty spikes or lulls (§9).
-
-### 3.3 Backend session edges (unverified)
-
-A half-started run leaves a broken registered session (`GameSessionManager.cs:226`); `Party.Members` is enumerated
-off-thread (`:501` `UsableInBattle`; `Party` also hands out its live `List`) and can 500 `GET /bag`; an unknown
-`/api/*` returns `index.html` 200 (`Program.cs:57`).
 
 ---
 
@@ -458,6 +452,72 @@ steps into a new run); the corner map preview covering the player corner on long
 possibly 40%; Substitute vs sleep/paralysis status moves and Disable's 1–8 turns; untested types `RunLoop`,
 `RewardRunEvent`, `AcquisitionResolution`, `CompositeEvaluator`, `MoveEvaluators` (likely covered indirectly — run
 coverage).
+
+### 7.6 Verification pass over the unverified findings (§1 #2, Ready ✅ 2026-10-10)
+
+Done as **tiny slices, verify then fix** (user rulings 2026-10-10): each slice verifies its claims, then fixes the
+confirmed ones in the same slice, one greenlight and one commit per slice.
+
+**Two phases per slice:**
+1. **Verify** (read-only): every claim gets a verdict tag and evidence (below).
+2. **Fix** — only for a confirmed finding that is **S-size and touches no central method** (`AttackAction`,
+   `Battle`, `DamageCalculator`) and needs no user decision. Before any code, the slice writes a **mini-DoR per
+   fix** (acceptance · quirk the test asserts · gen-variable surface · any slice-specific line) and gets the
+   greenlight (Gate 1). Anything larger, central or needing a decision gets its own TODO entry instead and stays
+   open.
+
+**Shared DoR (every slice):**
+- **Acceptance (verify):** every claim in the slice carries a verdict tag and its evidence, and none is left
+  *unverified*. The main session re-checks every **refuted** verdict and at least one **confirmed** verdict.
+- **Acceptance (fix):** per the fix's mini-DoR, with a test that fails before and passes after (or a recorded
+  manual reproduction where the mini-DoR says so).
+- **Design:** no `/plan` needed (a process item).
+- **Gen-variable surface:** none for the pass itself. Each engine verdict states whether its eventual fix is
+  gen-variable (a seam) or gen-invariant.
+- **Gen 1 source:** `pret/pokered`. `GEN_DIFFERENCES.md` and code comments are never accepted as evidence.
+- **Data vs runtime:** verify is neither (reproductions run in a throwaway scratch clone, never committed); a fix
+  states its own boundary in its mini-DoR.
+- **Quirk to guard:** a reading is not a reproduction. **read-confirmed** stays distinct from **reproduced** or
+  **source-confirmed** (§1 #1 Part A was marked "verified" by reading and did not reproduce).
+- **Dependencies:** none. **Gates:** verify-only slice → `docs-cleanup` only. A slice with fixes → the full
+  sequence (`format-gate` → `test-runner` → `requirements-review` for battle/stat/move work → `pr-review` for
+  product code → `docs-cleanup`). `pr-review` is recommended per slice by its size; the user decides each time
+  (user ruling 2026-10-10).
+
+**Verdict tags:**
+
+| Tag | Meaning |
+|:--|:--|
+| **reproduced** | Shown by running something (a throwaway test or script in a scratch clone). |
+| **source-confirmed** | A Gen 1 claim matched against a cited pokered file:line, plus our code file:line. |
+| **read-confirmed** | Code path traced, file:line at a named commit, nothing run. The weakest tag. |
+| **refuted** | Wrong, with evidence. Removed from TODO, one line added to §9. |
+| **needs-runtime** | Needs a browser, E2E or Fly run. Stays in TODO with the tag, handed to the user. |
+
+**Write-back:** results go inline in the claim's own section, with refreshed line numbers and a cost if it changed.
+
+**Out of scope:** the §3.1 damage/accuracy core (§1 #8), the §7.4 Gen 2+ audit (its own item), and items awaiting
+a decision (Roar/Whirlwind, the BST bands).
+
+**Slices** (the extra DoR line, where one applies, is in the last column):
+
+| # | Claims (section) | Evidence route | Slice-specific DoR |
+|:-:|:--|:--|:--|
+| V1 | Verify ✅ and fix ✅ 2026-10-10 — record in `TODO_ARCHIVE.md` → "§7.6 V1 — backend session edges" | — | — |
+| V2 | CI/deploy: no tests before deploy, `setup-flyctl@master`, no `permissions:`, any-commit tags, root container (§7.1) | Config read | — |
+| V3 | Public endpoint: no rate limit / caps / idle timeout / health check / security headers (§7.1) | Config read | Exhaustion itself stays *needs-runtime* |
+| V4 | Script/Docker polish: `dev.ps1` apostrophe, `build-release.ps1` cwd, `Dockerfile` layering + tags, `GameController` log, emitter discarded task (§7.1) | Code; scratch run for the scripts | — |
+| V5 | Importer hardening: evolution wipe, no retry, "Import Complete!", poisoned DbContext, learnset transaction (§3.2) | Code | No importer run against PokeAPI |
+| V6 | Importer/data lows: `EffectChance` overwrite, stale `-wal`, modern item `Cost`, Yellow exclusion (§3.2) | Code + db query | Gen 1 values via pokered |
+| V7 | Gate order (Dream Eater, OHKO speed) and Dire Hit / Guard Spec reuse (§3.2) | pokered + code | Gen 1 source per claim |
+| V8 | Turn-order/status edges: trap after trapper faints, double recharge, `CanAct` order, para/confusion cancel (§3.1) | pokered + code; scratch test | Gen 1 source per claim |
+| V9 | Smaller gaps I: confusion self-damage, binding duration, Stat Exp rounding, Psywave max (§3.1) | pokered + code | Gen 1 source per claim |
+| V10 | Smaller gaps II: Mist, Leech Seed + Toxic, Fire thaw via Substitute, trainer XP rounding, post-Transform crit, Substitute at exact HP (§3.1) | pokered + code | Gen 1 source per claim |
+| V11 | Seam leak (Special stages), AI evaluator weights, unvalidated `MoveTurnChoice`, latent `Biome.cs` crash (§3.1) | Code | — |
+| V12 | Frontend: double-submit, `/battle` "Connecting…" forever, unbounded battle log (§5) | Code | Browser-only parts → *needs-runtime* |
+| V13 | Frontend: Phaser resize, unheard `entryComplete`, frontend nits (§5) | Code | Browser-only parts → *needs-runtime* |
+| V14 | Test hygiene (§6) | Code; scratch test run | — |
+| V15 | Speculative list (§7.5) | Code; coverage run | — |
 
 ---
 

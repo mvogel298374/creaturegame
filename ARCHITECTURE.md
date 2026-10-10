@@ -174,6 +174,12 @@ Each entry: **Decision · Why · Where it lives.**
   machine for its whole lifetime, so only stateless follow-up requests were affected. Fixed by pinning
   `--ha=false` in `.github/workflows/fly-deploy.yml`. This constraint stands until session state is
   externalized into `save.db` (deferred by decision — §2.12; `docs/TODO.md` §4.2).
+- **Live-state reads corollary (2026-10-10):** REST endpoints (`/player`, `/bag`, `/party`) read run state on a
+  request thread, without a lock, while the run loop writes it. Each collection they enumerate is therefore
+  safe against a concurrent write: `Bag` is a `ConcurrentDictionary`, and `Creature.MoveSet` and `Party.Members`
+  are copy-on-write (a mutation builds a new list and swings the reference, so a reader keeps the snapshot it
+  took). A read may be one tick stale, but never throws "Collection was modified". A new run-state collection
+  that an endpoint reads must follow the same rule.
 - **Session resume corollary (2026-09-14):** the mechanism above only survives a *transient network drop while
   the SPA stays mounted* — the reconnecting client's React state was never lost, so a re-resolved connection is
   all it needs. A **full SPA remount** (a hard refresh, a closed/reopened tab, a bookmarked `/battle` URL) is a

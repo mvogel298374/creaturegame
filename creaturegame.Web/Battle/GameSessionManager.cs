@@ -237,8 +237,6 @@ public sealed class GameSessionManager(
             ItemsById = session.AllItems.ToDictionary(i => i.Id),
             Generation = session.Generation,
         };
-        _active[gameId] = battle;
-        _connToGame[connectionId] = gameId;
 
         // Held on the battle so the reconnect branch above re-echoes through the same instance (ARCHITECTURE.md
         // §2.7); emitted here first so the client can theme itself ahead of the first battle event.
@@ -278,6 +276,10 @@ public sealed class GameSessionManager(
             BuildRunOptions(session, profile, encounters, battle.Party, emitter)
         );
 
+        // Registered only once setup can no longer throw, so a failed setup leaves nothing to reconnect to.
+        _active[gameId] = battle;
+        _connToGame[connectionId] = gameId;
+
         _ = Task.Run(async () =>
         {
             try
@@ -313,10 +315,7 @@ public sealed class GameSessionManager(
     /// <summary>
     /// The live player <see cref="Creature"/> for a game, for the on-demand overview snapshot (CHECK POKEMON).
     /// Checks the running battle first, then a not-yet-started pending session; null if the game is unknown.
-    /// A display-only read of live state — no lock. The battle thread mutates concurrently, but the two
-    /// fields this read enumerates are both safe against that: MoveSet is copy-on-write (mutations swing the
-    /// reference, see Creature.MoveSet) and Bag is a ConcurrentDictionary. Worst case the snapshot is one tick
-    /// stale; it never throws "Collection was modified".
+    /// Display-only, no-lock read — see ARCHITECTURE.md §2.7 "Live-state reads corollary".
     /// </summary>
     public Creature? GetPlayerCreature(string gameId)
     {

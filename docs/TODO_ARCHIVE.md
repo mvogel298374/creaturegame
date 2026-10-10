@@ -8,6 +8,48 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §7.6 V1 — backend session edges: verified and fixed ✅ DONE (2026-10-10)
+
+**Was** `TODO.md` §3.3 (three findings verified at `71d306e`) and the §7.6 V1 slice with its fix-phase mini-DoRs.
+All S, web layer + `Party`; gen-invariant; no data or importer change; not player-visible (API/robustness only, so
+no `PRODUCT_SPEC.md` entry).
+
+**V1-a — unknown `/api/*` returned `index.html` 200 (*reproduced*).** `MapFallbackToFile("index.html")` had no
+`/api` exclusion; `GET /api/doesNotExist` and `GET /api/game/abc/nope` answered `200 text/html` against a local
+backend. *Acceptance:* unknown `/api/*` → 404; known `/api` routes unchanged; client routes such as `/battle` still
+get `index.html`. *Fix:* `Program.cs` maps `/api/{**rest}` → 404 ahead of the SPA fallback. *Verification (manual,
+user ruling: no web-host test harness exists):* `/api/doesNotExist` and `/api/game/abc/nope` 404 (were 200
+text/html); `/api/Species` 200 JSON; `/api/game/abc/bag` 404 JSON from the controller; `POST /api/game/start {}` →
+400; `/battle` and `/` → 200 text/html. Side effect noted by pr-review: a route-constraint miss or wrong-method
+request under `/api` now 404s (was 200 `index.html`; it was never a 405).
+
+**V1-b — `GET /bag` could 500 on a concurrent roster change (*read-confirmed*).** `ProjectBagView` →
+`UsableInBattle` enumerated `party.Members.Any(...)` on the request thread while the run loop wrote the same
+`List<Creature>` (`Add`, indexer set both bump the list version, so enumeration throws "Collection was modified";
+`GetBag` has no catch, so a 500). Reached only with a Revive in the bag and a request overlapping an acquisition or
+replacement; `Bag` itself is safe (`ConcurrentDictionary`). *Acceptance:* enumerating `Members` during `Add`/`Replace`
+never throws and a held `Members` reference doesn't change under the reader. *Fix:* `Party._members` is
+copy-on-write (each mutation swings the reference; the `Creature.MoveSet` precedent); rationale in
+`ARCHITECTURE.md` §2.7 ("Live-state reads corollary"); the `GetPlayerCreature` XML doc was cut to a one-line pointer
+there. *Tests (red before, green after):* `PartyTests.Members_EnumeratingWhileTheRosterChanges_DoesNotThrow`,
+`PartyTests.Members_AHeldReference_IsASnapshotThatRosterChangesDoNotAlter`. *Open advisory (user's call):*
+`Party.Members` hands out the underlying `List` as `IReadOnlyList`, so a caller could cast back and mutate; no
+caller does.
+
+**V1-c — a half-started run could leave a dead active session (*read-confirmed*, latent, no known trigger).**
+`AttachConnection` registered the run in `_active` before building the emitter, presentation event and
+`RunDirector`; the cleanup `finally` lived only inside the later `Task.Run`. A setup throw left `_active[gameId]`
+with no loop, and a reconnect then took the reconnect branch and attached to nothing. *Acceptance:* a setup throw
+leaves no `_active` / `_connToGame` entry and a later `AttachConnection(gameId, …)` returns false. *Fix:*
+`GameSessionManager.AttachConnection` registers in `_active` / `_connToGame` only after setup, just before
+`Task.Run`. *Test (red before, green after):*
+`SessionResumeTests.AttachConnection_ASetupThrow_LeavesNoActiveSessionBehind`.
+
+**Gates (2026-10-10).** format-gate PASS; test-runner PASS (.NET 1745/1745, tsc clean, Vitest 324/324; E2E not run);
+requirements-review n/a; pr-review PR-READY (1 recommended cleanup applied, 3 advisories, no action).
+
+---
+
 ## Pre-commit hook triggers miss `.csproj`/`.props`/`global.json`/`*.db`, deletes and renames ✅ DONE (2026-10-10)
 
 **Was** `TODO.md` §7.1 "Dev-script and pre-commit-hook gaps", Part C (§1 row 1). Tooling only; not player-visible.
