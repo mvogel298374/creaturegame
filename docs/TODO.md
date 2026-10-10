@@ -38,7 +38,7 @@
 | # | Item | Cost | Ready? (DoR) | Why this slot / what it unblocks |
 |:-:|:-----|:----:|:-------------|:---------------------------------|
 | 1 | **`-StartStack` backend leak** (§7.1 Part A) | S | ✗ parked: leak not reproduced (2026-10-10); un-park condition in §7.1 | Parts B and C are done. Not actionable until the user reproduces it; §1 #3 and #6 do not wait on it. |
-| 2 | **Verification pass over the unverified findings** (§7.6) | S per slice | ✅ (2026-10-10) — 15 tiny slices (V1 done, V2 next); each verifies first, then fixes only S-size, non-central, no-decision findings under a mini-DoR; greenlight and commit each | Turns "reviewer's reading" items into evidenced verdicts or discards. Opens up everything below it. |
+| 2 | **Verification pass over the unverified findings** (§7.6) | S per slice | ✅ (2026-10-10) — 15 tiny slices (V1, V2 done; V3 next); each verifies first, then fixes only S-size, non-central, no-decision findings under a mini-DoR; greenlight and commit each | Turns "reviewer's reading" items into evidenced verdicts or discards. Opens up everything below it. |
 | 3 | **Server test gaps — `GameSessionManager` lifecycle + the `RunFaulted` path** (§6) | M | ⚠️ needs the injectable-clock design | Unblocks the R1d tests and closes a long-open Tier-4 item. |
 | 4 | **Importer hardening** (§3.2) | M | ✗ no design (retry policy, transaction boundaries) or acceptance | Failure no longer wipes evolutions or exits 0; unblocks CI/Docker imports and the multi-generation importer work. |
 | 5 | **R1d-a — replay an open blocking prompt** (§2) | M | ⚠️ designed, but provisional-pending-`/plan` and needs your three decisions (§8) | The only reconnect item that strands a run; highest player value. |
@@ -381,9 +381,13 @@ The stat-selection abstraction is done. Open:
 
 ### 7.1 Infra, CI/deploy and scripts (unverified)
 
-- **CI/deploy hardening:** `fly-deploy.yml` runs no tests before `flyctl deploy`; `setup-flyctl@master` is an
-  unpinned moving branch and there is no `permissions:` block; tags can point at any commit. **The container runs as
-  root** (`Dockerfile:44-52`; use `USER $APP_UID` after checking SQLite write needs).
+- **Run the fast suites before deploying (M, low priority — user ruling 2026-10-11).** *Verified (§7.6 V2):*
+  `fly-deploy.yml` goes checkout → setup-flyctl → `flyctl deploy`, and it is the repo's only workflow, so no suite
+  ever runs on GitHub; an RC tag on a red commit deploys anyway, and the local pre-commit hook is the only net.
+  **Not Ready:** needs a design pass for which suites (the `test-runner` gate set: .NET + `tsc` + Vitest), the CI
+  .NET (SDK 9.0.200 pin) and Node setup, `needs:` ordering ahead of the deploy job, and how it shares setup with
+  §1 #6 (CI E2E step). Acceptance and test approach to be written then; the result is only observable on an RC
+  deploy or a non-deploying trigger added for the purpose.
 - **Dev-script and pre-commit-hook gaps — §1 #1, only Part A remains (parked).** B and C are done (see
   `TODO_ARCHIVE.md`). Tooling only: no `/plan` needed; gen-variable surface none; no importer, engine or `*.db` change;
   no dependencies. Verification is **manual reproduction** (nothing in xUnit covers these scripts); no Pester/shell
@@ -504,7 +508,7 @@ a decision (Roar/Whirlwind, the BST bands).
 | # | Claims (section) | Evidence route | Slice-specific DoR |
 |:-:|:--|:--|:--|
 | V1 | Verify ✅ and fix ✅ 2026-10-10 — record in `TODO_ARCHIVE.md` → "§7.6 V1 — backend session edges" | — | — |
-| V2 | CI/deploy: no tests before deploy, `setup-flyctl@master`, no `permissions:`, any-commit tags, root container (§7.1) | Config read | — |
+| V2 | Verify ✅ and fix ✅ 2026-10-11 — record in `TODO_ARCHIVE.md` → "§7.6 V2 — CI/deploy hardening" (end-to-end proof pending the next RC deploy) | — | — |
 | V3 | Public endpoint: no rate limit / caps / idle timeout / health check / security headers (§7.1) | Config read | Exhaustion itself stays *needs-runtime* |
 | V4 | Script/Docker polish: `dev.ps1` apostrophe, `build-release.ps1` cwd, `Dockerfile` layering + tags, `GameController` log, emitter discarded task (§7.1) | Code; scratch run for the scripts | — |
 | V5 | Importer hardening: evolution wipe, no retry, "Import Complete!", poisoned DbContext, learnset transaction (§3.2) | Code | No importer run against PokeAPI |
@@ -536,6 +540,10 @@ a decision (Roar/Whirlwind, the BST bands).
 
 ## 9. Settled — do not re-raise
 
+- **RC tags may point at any commit** — accepted policy (user ruling 2026-10-11, §7.6 V2): the deploy trigger
+  matches the tag name only; no on-`master` check (`CLAUDE.md` → Deployment).
+- **The production container runs as root** — accepted (user ruling 2026-10-11, §7.6 V2): the runtime stage keeps
+  the `aspnet` image's default user; don't re-file `USER $APP_UID`.
 - **Replay on every reconnect** is the accepted design (the server can't tell a blip from a refresh); the client
   tolerates it (`replayDedupe`).
 - **RNG seam closed:** don't re-file the `AlwaysHit`/`AlwaysCrit` shim idea, the unseeded web composition root, or

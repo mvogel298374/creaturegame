@@ -8,6 +8,39 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §7.6 V2 — CI/deploy hardening: verified and fixed ✅ DONE (2026-10-11)
+
+**Was** `TODO.md` §7.1 "CI/deploy hardening" (five claims verified at `4886bb5`, all *read-confirmed*) and the §7.6 V2
+slice with its fix-phase mini-DoRs. Both fixes S, `.github/workflows/fly-deploy.yml` only; gen-invariant; no data,
+engine or importer change; not player-visible (CI/deploy only, so no `PRODUCT_SPEC.md` entry).
+
+**Verdicts (all read-confirmed).**
+- `setup-flyctl@master` is an unpinned moving branch (`fly-deploy.yml:19`) → fixed (V2-a).
+- No `permissions:` block anywhere in the file; the job uses no `GITHUB_TOKEN`, so the default grant was unused
+  surface → fixed (V2-b).
+- No tests run before `flyctl deploy` (checkout → setup-flyctl → deploy; the repo's only workflow) → its own
+  low-priority, not-Ready entry in `TODO.md` §7.1 ("Run the fast suites before deploying"; user ruling 2026-10-11).
+- RC tags may point at any commit; the container runs as root → accepted policies (user ruling 2026-10-11), recorded
+  in `TODO.md` §9 Settled.
+
+**V2-a — pin `setup-flyctl` to an immutable commit.** *Acceptance:* the step reads
+`superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6`, and that SHA is the repo's `1.6`
+tag (checked via the GitHub API 2026-10-11; also what `v1` points to). *Quirk:* `@master` re-resolves on every run, so
+an upstream push changes the deploy without a commit here.
+
+**V2-b — least-privilege token.** *Acceptance:* a top-level `permissions: contents: read`, the minimum
+`actions/checkout` needs; nothing else changes. *Quirk:* with no block, the job gets the repo's default `GITHUB_TOKEN`
+grant even though no step uses it.
+
+**Verification.** No local YAML parser, actionlint, `gh` or Docker; structure checked by reading the file (top-level
+keys aligned, 2-space nesting). **Pending, not verified:** end-to-end proof is the next RC deploy (user-triggered) —
+the log should show the pinned ref and a successful checkout + deploy.
+
+**Gates (2026-10-11).** format-gate PASS; test-runner PASS (`.\test.ps1 -Dotnet -Web` green; E2E not run);
+requirements-review n/a; pr-review skipped (YAML-only; user said continue).
+
+---
+
 ## §7.6 V1 — backend session edges: verified and fixed ✅ DONE (2026-10-10)
 
 **Was** `TODO.md` §3.3 (three findings verified at `71d306e`) and the §7.6 V1 slice with its fix-phase mini-DoRs.

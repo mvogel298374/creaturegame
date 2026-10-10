@@ -9,6 +9,8 @@ on:
     # Plain pushes to master no longer deploy.
     tags:
       - 'v*-rc*'
+permissions:
+  contents: read
 jobs:
   deploy:
     name: Deploy app
@@ -16,7 +18,7 @@ jobs:
     concurrency: deploy-group    # optional: ensure only one action runs at a time
     steps:
       - uses: actions/checkout@v5
-      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
       # --ha=false: GameSessionManager keeps run state in-process (no shared/external store yet), so a
       # second machine is actively harmful — Fly's proxy can route a request to the machine that never
       # saw the run's /start call, 404ing endpoints like GET /api/game/{id}/player. flyctl's default
