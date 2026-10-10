@@ -9,50 +9,60 @@ namespace PokeApiConnector.PokeAPI;
 
 public class MoveImport
 {
-    public static async Task FetchMovesByGeneration(int generation)
+    /// <summary>Imports a generation's moves; returns the urls that failed (empty when clean).</summary>
+    public static async Task<IReadOnlyList<string>> FetchMovesByGeneration(
+        int generation,
+        HttpClient? http = null,
+        Func<MovesDbContext>? createContext = null
+    )
     {
+        http ??= PokeApiHttp.Client;
+        var failed = new List<string>();
         string url = $"https://pokeapi.co/api/v2/generation/{generation}/";
 
+        Gen1Response? genResponse;
         try
         {
-            HttpResponseMessage response = await PokeApiHttp.Client.GetAsync(url);
+            HttpResponseMessage response = await http.GetAsync(url);
             response.EnsureSuccessStatusCode();
 
             string json = await response.Content.ReadAsStringAsync();
-            var genResponse = JsonSerializer.Deserialize<Gen1Response>(
+            genResponse = JsonSerializer.Deserialize<Gen1Response>(
                 json,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
             );
-
-            if (genResponse?.moves != null)
-            {
-                using var context = new MovesDbContext();
-                foreach (var moveResource in genResponse.moves)
-                {
-                    if (moveResource.url == null)
-                        continue;
-                    await FetchMoveDataByUrl(moveResource.url, context);
-                }
-            }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error fetching moves by generation: {ex.Message}");
+            failed.Add(url);
+            return failed;
         }
+
+        if (genResponse?.moves != null)
+        {
+            using var context = (createContext ?? (() => new MovesDbContext()))();
+            foreach (var moveResource in genResponse.moves)
+            {
+                if (moveResource.url == null)
+                    continue;
+                if (!await FetchMoveDataByUrl(moveResource.url, context, http))
+                    failed.Add(moveResource.url);
+            }
+        }
+
+        return failed;
     }
 
-    public static async Task FetchMoveData(int moveId)
-    {
-        string url = $"https://pokeapi.co/api/v2/move/{moveId}/";
-        using var context = new MovesDbContext();
-        await FetchMoveDataByUrl(url, context);
-    }
-
-    private static async Task FetchMoveDataByUrl(string url, MovesDbContext context)
+    private static async Task<bool> FetchMoveDataByUrl(
+        string url,
+        MovesDbContext context,
+        HttpClient http
+    )
     {
         try
         {
-            HttpResponseMessage response = await PokeApiHttp.Client.GetAsync(url);
+            HttpResponseMessage response = await http.GetAsync(url);
             response.EnsureSuccessStatusCode();
 
             string json = await response.Content.ReadAsStringAsync();
@@ -61,30 +71,35 @@ public class MoveImport
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
             );
 
-            if (pokeMove != null)
+            if (pokeMove == null)
             {
-                Attack attack = MapToAttack(pokeMove);
-
-                var existingMove = await context
-                    .Moves.AsNoTracking()
-                    .FirstOrDefaultAsync(m => m.Id == attack.Id);
-                if (existingMove == null)
-                {
-                    context.Moves.Add(attack);
-                    Console.WriteLine($"Imported New Move: {attack.Name} (ID: {attack.Id})");
-                }
-                else
-                {
-                    context.Moves.Update(attack);
-                    Console.WriteLine($"Updated Existing Move: {attack.Name} (ID: {attack.Id})");
-                }
-
-                await context.SaveChangesAsync();
+                Console.WriteLine($"No usable move data returned for {url}.");
+                return false;
             }
+
+            Attack attack = MapToAttack(pokeMove);
+
+            var existingMove = await context
+                .Moves.AsNoTracking()
+                .FirstOrDefaultAsync(m => m.Id == attack.Id);
+            if (existingMove == null)
+            {
+                context.Moves.Add(attack);
+                Console.WriteLine($"Imported New Move: {attack.Name} (ID: {attack.Id})");
+            }
+            else
+            {
+                context.Moves.Update(attack);
+                Console.WriteLine($"Updated Existing Move: {attack.Name} (ID: {attack.Id})");
+            }
+
+            await context.SaveChangesAsync();
+            return true;
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error fetching move data from {url}: {ex.Message}");
+            return false;
         }
     }
 

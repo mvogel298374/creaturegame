@@ -1,19 +1,31 @@
-﻿namespace PokeApiConnector;
+namespace PokeApiConnector;
 
 using PokeApiConnector.PokeAPI;
 
 class Program
 {
-    static async Task Main(string[] args)
+    static async Task<int> Main(string[] args)
+    {
+        try
+        {
+            return await RunAsync(args);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"\nImport ABORTED - later stages did not run: {ex}");
+            return 1;
+        }
+    }
+
+    private static async Task<int> RunAsync(string[] args)
     {
         if (args.Length > 0 && args[0].Equals("evolutions", StringComparison.OrdinalIgnoreCase))
         {
             using (var pokemonContext = new creaturegame.DB.PokemonDbContext())
                 pokemonContext.EnsureDatabaseCreated();
             Console.WriteLine("Importing Gen 1 evolutions only...");
-            await EvolutionImport.ImportAllAsync();
-            Console.WriteLine("\nDone.");
-            return;
+            var evolutions = await EvolutionImport.ImportAllAsync();
+            return ImportOutcome.Report([new("Evolutions", evolutions)], "Done.");
         }
 
         // Species only (stats, base experience, types, learnsets) — leaves moves/items/evolutions untouched.
@@ -22,10 +34,8 @@ class Program
             using (var pokemonContext = new creaturegame.DB.PokemonDbContext())
                 pokemonContext.EnsureDatabaseCreated();
             Console.WriteLine("Importing Gen 1 species only...");
-            var failedSpecies = await PokemonImport.FetchPokemonByGeneration(1);
-            ReportFailedSpecies(failedSpecies);
-            Console.WriteLine("\nDone.");
-            return;
+            var species = await PokemonImport.FetchPokemonByGeneration(1);
+            return ImportOutcome.Report([new("Species", species)], "Done.");
         }
 
         // Offline: re-apply the curated TM/HM floors (Attack.MinLevel) to the existing moves.db — no network.
@@ -35,7 +45,7 @@ class Program
             moveContext.EnsureDatabaseCreated();
             int applied = await MoveMinLevels.ApplyToDatabaseAsync(moveContext);
             Console.WriteLine($"Applied MinLevel floors to {applied} moves.");
-            return;
+            return 0;
         }
 
         // DATA_IMPORT.md §3 — the Docker-build asset stage; fails loudly on a partial fetch.
@@ -53,17 +63,14 @@ class Program
             Console.WriteLine("\nDownloading Pokémon cries (legacy 8-bit)...");
             int failedCries = await CryDownloader.DownloadAllAsync();
 
-            int totalFailed = failedSprites + failedItemSprites + failedCries;
-            if (totalFailed > 0)
-            {
-                Console.WriteLine(
-                    $"\n{totalFailed} asset(s) failed to download — failing the build."
-                );
-                Environment.Exit(1);
-            }
-
-            Console.WriteLine("\nDone.");
-            return;
+            return ImportOutcome.Report(
+                [
+                    StageResult.FromCount("Battle sprites", failedSprites),
+                    StageResult.FromCount("Item sprites", failedItemSprites),
+                    StageResult.FromCount("Cries", failedCries),
+                ],
+                "Done."
+            );
         }
 
         if (args.Length > 0 && args[0].Equals("items", StringComparison.OrdinalIgnoreCase))
@@ -71,11 +78,13 @@ class Program
             using (var itemsContext = new creaturegame.DB.ItemsDbContext())
                 itemsContext.EnsureDatabaseCreated();
             Console.WriteLine("Importing Gen 1 battle items only...");
-            await ItemImport.ImportGen1BattleItemsAsync();
+            var items = await ItemImport.ImportGen1BattleItemsAsync();
             Console.WriteLine("\nDownloading item sprites...");
-            await ItemSpriteDownloader.DownloadAllAsync();
-            Console.WriteLine("\nDone.");
-            return;
+            int failedItemSprites = await ItemSpriteDownloader.DownloadAllAsync();
+            return ImportOutcome.Report(
+                [new("Items", items), StageResult.FromCount("Item sprites", failedItemSprites)],
+                "Done."
+            );
         }
 
         using (var moveContext = new creaturegame.DB.MovesDbContext())
@@ -96,46 +105,37 @@ class Program
             itemsContext.EnsureDatabaseCreated();
         }
 
+        // A record failure doesn't stop later stages; a thrown exception aborts the run (see Main).
+        var stages = new List<StageResult>();
+
         Console.WriteLine("Importing Gen 1 Moves...");
-        await MoveImport.FetchMovesByGeneration(1);
+        stages.Add(new("Moves", await MoveImport.FetchMovesByGeneration(1)));
 
         Console.WriteLine("\nImporting Gen 1 Pokemon Species...");
-        var failedSpeciesInFullRun = await PokemonImport.FetchPokemonByGeneration(1);
+        stages.Add(new("Species", await PokemonImport.FetchPokemonByGeneration(1)));
 
         Console.WriteLine("\nImporting Gen 1 evolutions...");
-        await EvolutionImport.ImportAllAsync();
+        stages.Add(new("Evolutions", await EvolutionImport.ImportAllAsync()));
 
         Console.WriteLine("\nImporting Gen 1 battle items...");
-        await ItemImport.ImportGen1BattleItemsAsync();
+        stages.Add(new("Items", await ItemImport.ImportGen1BattleItemsAsync()));
 
         Console.WriteLine("\nSeeding Gen 1 game availability...");
         await GameAvailabilitySeeder.SeedGen1Async();
 
         Console.WriteLine("\nDownloading battle sprites...");
-        await SpriteDownloader.DownloadAllAsync();
+        stages.Add(
+            StageResult.FromCount("Battle sprites", await SpriteDownloader.DownloadAllAsync())
+        );
 
         Console.WriteLine("\nDownloading item sprites...");
-        await ItemSpriteDownloader.DownloadAllAsync();
+        stages.Add(
+            StageResult.FromCount("Item sprites", await ItemSpriteDownloader.DownloadAllAsync())
+        );
 
         Console.WriteLine("\nDownloading Pokémon cries (legacy 8-bit)...");
-        await CryDownloader.DownloadAllAsync();
+        stages.Add(StageResult.FromCount("Cries", await CryDownloader.DownloadAllAsync()));
 
-        // Last, so every other stage still runs — but a run that dropped species must not look clean.
-        ReportFailedSpecies(failedSpeciesInFullRun);
-        Console.WriteLine("\nImport Complete!");
-    }
-
-    // A failed species keeps its OLD row (possibly stale, possibly modern), so the failure has to be loud: list it and
-    // exit non-zero, the same stance as the 'assets' stage's partial-fetch failure above.
-    private static void ReportFailedSpecies(IReadOnlyList<string> failed)
-    {
-        if (failed.Count == 0)
-            return;
-        Console.WriteLine(
-            $"\n{failed.Count} species failed to import (their existing rows were left as-is):"
-        );
-        foreach (var url in failed)
-            Console.WriteLine($"  {url}");
-        Environment.Exit(1);
+        return ImportOutcome.Report(stages, "Import Complete!");
     }
 }

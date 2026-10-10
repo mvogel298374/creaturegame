@@ -40,7 +40,7 @@
 | 1 | **`-StartStack` backend leak** (§7.1 Part A) | S | ✗ parked: leak not reproduced (2026-10-10); un-park condition in §7.1 | Parts B and C are done. Not actionable until the user reproduces it; §1 #3 and #6 do not wait on it. |
 | 2 | **Verification pass over the unverified findings** (§7.6) | S per slice | ✅ (2026-10-10) — 15 tiny slices (V1–V5 done; V6 next); each verifies first, then fixes only S-size, non-central, no-decision findings under a mini-DoR; greenlight and commit each | Turns "reviewer's reading" items into evidenced verdicts or discards. Opens up everything below it. |
 | 3 | **Server test gaps — `GameSessionManager` lifecycle + the `RunFaulted` path** (§6) | M | ⚠️ needs the injectable-clock design | Unblocks the R1d tests and closes a long-open Tier-4 item. |
-| 4 | **Importer hardening** (§3.2) | M | ✗ claims verified (§7.6 V5, 2026-10-11); DoR next — needs the injectable-context/HTTP seam, retry/429 policy and transaction boundaries designed, plus acceptance | Failure no longer wipes evolutions or exits 0; unblocks CI/Docker imports and the multi-generation importer work. |
+| 4 | **Importer hardening** (§3.2) | M | ✅ (2026-10-11) — steps #4a–#4e in §3.2; #4a done (2026-10-11), #4b next | Failure no longer wipes evolutions or exits 0 (exit code fixed by #4a; evolution wipe is #4b); unblocks CI/Docker imports and the multi-generation importer work. |
 | 5 | **R1d-a — replay an open blocking prompt** (§2) | M | ⚠️ designed, but provisional-pending-`/plan` and needs your three decisions (§8) | The only reconnect item that strands a run; highest player value. |
 | 6 | **CI E2E step** (§6) | M | ✗ no design (runner, stack boot, caching) or acceptance | The only automatic E2E coverage; makes "agents don't run E2E" safe, and unblocks checking the BST/balance flag and the reconnect spec. |
 | 7 | **R1d-d, R1d-c** — refresh-state snapshot + sprite; second-tab policy (§2) | M each | ⚠️ provisional-pending-`/plan`; (c) needs your policy call | Both extend (a)'s replay work. |
@@ -128,16 +128,14 @@ data/engine item usually also means updating the test that pins the wrong value.
   item descriptions are PokeAPI's modern text as-is (only X Accuracy's is overridden), so Dire Hit / Guard Spec and
   the X-items still describe the modern effects — unverified, check before a descriptions pass.
 - **Importer hardening (M) — verified 2026-10-11 at `56e9ab6` (§7.6 V5):**
-  - **A failed or offline run wipes evolutions and exits 0** — *read-confirmed*: `EvolutionImport.cs:24` deletes all
-    Gen 1 edges before fetching; every per-species and per-chain fetch failure is caught and skipped (`:82-87`,
-    `:102-106`), so an offline run commits an empty table, and a partial one silently drops edges; the outer catch
-    (`:61-64`) logs only the message and nothing reaches the exit code.
+  - **A failed or offline run wipes evolutions and exits 0** — *read-confirmed*: `EvolutionImport` deletes all
+    Gen 1 edges before fetching and skips every per-species and per-chain fetch failure, so an offline run commits
+    an empty table and a partial one silently drops edges. The exit-0 half is **fixed by #4a** (failures are
+    reported, exit 1); the wipe remains → #4b.
   - **No retry or 429 handling** — *read-confirmed*: one shared `HttpClient` (`PokeApiHttp.cs`) with no handler,
     retry or rate-limit logic. **"No timeout"** — *refuted*: `HttpClient`'s 100 s default applies.
-  - **"Import Complete!" always prints** — *partly refuted*: a species failure exits 1 before it
-    (`Program.cs:124,139`). Still true for every other stage: move, evolution, item and sprite failures never reach
-    the exit code (the full run ignores the downloaders' failure counts, `:115-121`), so the run prints "Import
-    Complete!" and exits 0.
+  - **"Import Complete!" always prints** — *partly refuted*, then **fixed by #4a (2026-10-11)**: every stage's
+    failures now reach the exit code and the banner prints only on a clean run.
   - **A failed save poisons the shared DbContext** — *read-confirmed*: moves (`MoveImport.cs:29,82`), items
     (`ItemImport.cs:19,57`) and species (`PokemonImport.cs:32,101`) each reuse one context; a failed
     `SaveChangesAsync` leaves its entity tracked, so every later save retries it and fails. Silent for moves and
@@ -148,6 +146,39 @@ data/engine item usually also means updating the test that pins the wrong value.
   - **Not fixed in-slice:** each fix is small, but none is testable today: every import builds its own context
     internally (`new …DbContext()`) and calls the static `HttpClient`, so a test needs an injectable context and
     HTTP handler first. That seam, plus the retry/429 policy, is design work → this entry (§1 #4).
+  - **DoR (2026-10-11) — Ready ✅; five steps, one greenlight and one commit each.** Decisions 1–4 below taken as
+    recommended (user ruling 2026-10-11).
+    Shared answers: gen-variable surface none (import plumbing; `GenerationImportScope` and every mapper unchanged);
+    Gen 1 source n/a (no data value changes); data vs runtime: importer only, the committed `*.db` files are not
+    re-imported or changed; no engine or web change. Tests run the real import methods against temp-file SQLite
+    (the `MigrationTests` pattern) and a fake `HttpMessageHandler` that maps URLs to canned JSON or failures; a
+    save failure is provoked with a SQLite `RAISE(ABORT)` trigger on one row. No test touches PokeAPI.
+    - **#4a — the seam and the exit code.** ✅ DONE (2026-10-11) — record in `TODO_ARCHIVE.md` → "§1 #4 Importer
+      hardening — step #4a".
+    - **#4b — evolutions never wipe on a bad fetch.** Fetch every species and chain first; if any fetch failed,
+      leave the table untouched and report the failure (*decision 2*); otherwise delete and insert in **one
+      transaction**. *Quirk:* the delete runs before any fetch today. *Test:* seeded rows + an all-failing handler →
+      rows unchanged, failure reported; a healthy handler → rows replaced; a trigger failing the insert → old rows
+      still there.
+    - **#4c — one failed save no longer poisons the rest.** After a failed `SaveChangesAsync`, clear the change
+      tracker before the next record (*decision 3*). *Quirk:* the failed entity stays tracked and every later save
+      retries it. *Test:* a trigger fails one move's insert → that move is reported, the moves after it still
+      import; same for items and species.
+    - **#4d — the learnset swap is one transaction.** Delete and insert a species' learnset inside a single
+      transaction. *Quirk:* the delete commits immediately today. *Test:* a trigger fails one species' learnset
+      insert → its old learnset rows are still there and the species is reported failed.
+    - **#4e — retry on rate limits and transient failures** (*decision 4*). *Test:* a handler that answers 429
+      (with `Retry-After`) or 503 twice then 200 → the fetch succeeds; four failures → reported as failed; delays
+      injected so the test doesn't sleep.
+    - **Decisions:** (1) seam shape — optional parameters with today's defaults (recommended; smallest change) vs. a
+      small `ImportServices` object; (2) partial evolution fetch — keep the old table and fail (recommended) vs.
+      write the edges that did fetch; (3) poisoned context — `ChangeTracker.Clear()` after a failure (recommended)
+      vs. a fresh context per record; (4) retry policy — up to 3 retries on 429, 5xx and network errors, waiting
+      `Retry-After` when sent, else 1 s / 2 s / 4 s (recommended numbers).
+    - **Candidate, not yet DoR'd (found in #4a review):** an empty-but-parseable generation list (moves/items)
+      still reports clean — decide whether it should count as a failure before adding it to a step.
+    - **Dependencies:** #4a done, so the seam exists; #4b–#4e in any order. **Gates:**
+      `requirements-review` not applicable (no data values change); `pr-review` per-step judgement.
 - **Importer/data lows:** `MoveImport.cs:175` overwrites the Gen-1-resolved `EffectChance` with today's ailment
   chance; the dev server can read stale data (Web csproj copies `*.db` only, never `-wal`; `DbPathHelper.cs:18`
   prefers the bin copy); item `Cost` is modern and now drives reward rarity and the starting bag (five cures tie at
@@ -379,6 +410,15 @@ The stat-selection abstraction is done. Open:
 - [ ] *(low)* **`evolution.spec.ts` doesn't pin the nameplate-follows-evolution fix** — its ALLOW case reads the
   nameplate only after the *next* `BattleStarted`, so it would pass without the fix. Add an assertion right after the
   morph. Not verified by a Playwright run (E2E is user-only).
+- **Flake: process-wide `SqliteConnection.ClearAllPools()` in test `Dispose` (S, found 2026-10-11).** The pre-commit
+  run for importer #4a failed twice in web tests (`EncounterFactoryMinLevelTests`,
+  `EncounterFactoryGenerationProfileTests`) with `SQLite Error 5: unable to delete/modify user-function due to active
+  statements`, thrown while a pooled connection was returned — four following runs passed. Likely cause: four test
+  classes clear **every** SQLite pool from `Dispose` (`ItemsDbServiceTests.cs:185`, `StatusConditionIntegrationTests.cs:130`,
+  `MigrationTests.cs:340`, `LearnsetIntegrationTests.cs:244`) while xUnit runs other classes in parallel. The new
+  `TempImportDatabases` avoids it with `Pooling=False` instead; the same switch is the likely fix for those four.
+  **Not Ready:** needs its mini-DoR (acceptance: no `ClearAllPools` outside a non-parallel collection; test: N
+  consecutive suite runs green) and a reproduction to confirm the cause.
 - **Flake watch:** `endless-chain.spec.ts` *"a run ends when the player faints"* failed once in a full 2026-07-26 run
   (no `Run over` line after 1m10s) but passes in 7.3 s alone — consistent with the documented "a long run
   accumulates abandoned server-side runs" degradation, not a code defect.

@@ -11,14 +11,19 @@ public class PokemonImport
     /// <summary>Imports a generation's species. Returns the PokeAPI urls of the species that failed to import (so the
     /// caller can fail the run), and lets an unsupported generation or an unreachable generation list throw — a
     /// blanket catch here once turned both into "0 imported, exit 0" (DATA_IMPORT.md §4.2).</summary>
-    public static async Task<IReadOnlyList<string>> FetchPokemonByGeneration(int generation)
+    public static async Task<IReadOnlyList<string>> FetchPokemonByGeneration(
+        int generation,
+        HttpClient? http = null,
+        Func<PokemonDbContext>? createContext = null
+    )
     {
         // First, before any I/O: an unsupported generation must throw, not import with Gen 1's numbers.
         var scope = GenerationImportScope.For(generation);
+        http ??= PokeApiHttp.Client;
         var failed = new List<string>();
         string url = $"https://pokeapi.co/api/v2/generation/{generation}/";
 
-        HttpResponseMessage response = await PokeApiHttp.Client.GetAsync(url);
+        HttpResponseMessage response = await http.GetAsync(url);
         response.EnsureSuccessStatusCode();
 
         string json = await response.Content.ReadAsStringAsync();
@@ -29,7 +34,7 @@ public class PokemonImport
 
         if (genResponse?.pokemon_species != null)
         {
-            using var context = new PokemonDbContext();
+            using var context = (createContext ?? (() => new PokemonDbContext()))();
 
             foreach (var speciesResource in genResponse.pokemon_species)
             {
@@ -37,7 +42,7 @@ public class PokemonImport
                     continue;
                 string pokemonUrl = speciesResource.url.Replace("pokemon-species", "pokemon");
                 string speciesUrl = speciesResource.url;
-                if (!await FetchPokemonDataByUrl(pokemonUrl, speciesUrl, context, scope))
+                if (!await FetchPokemonDataByUrl(pokemonUrl, speciesUrl, context, scope, http))
                     failed.Add(pokemonUrl);
             }
         }
@@ -52,12 +57,13 @@ public class PokemonImport
         string url,
         string speciesUrl,
         PokemonDbContext context,
-        GenerationImportScope scope
+        GenerationImportScope scope,
+        HttpClient http
     )
     {
         try
         {
-            HttpResponseMessage response = await PokeApiHttp.Client.GetAsync(url);
+            HttpResponseMessage response = await http.GetAsync(url);
             response.EnsureSuccessStatusCode();
             string json = await response.Content.ReadAsStringAsync();
             PokeApiPokemon? pokeData = JsonSerializer.Deserialize<PokeApiPokemon>(
@@ -65,7 +71,7 @@ public class PokemonImport
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
             );
 
-            HttpResponseMessage speciesResponse = await PokeApiHttp.Client.GetAsync(speciesUrl);
+            HttpResponseMessage speciesResponse = await http.GetAsync(speciesUrl);
             speciesResponse.EnsureSuccessStatusCode();
             string speciesJson = await speciesResponse.Content.ReadAsStringAsync();
             PokeApiPokemonSpecies? speciesData = JsonSerializer.Deserialize<PokeApiPokemonSpecies>(

@@ -14,25 +14,43 @@ public class ItemImport
         PropertyNameCaseInsensitive = true,
     };
 
-    public static async Task ImportGen1BattleItemsAsync()
+    /// <summary>Imports the Gen 1 battle-item roster; returns the urls that failed (empty when clean).</summary>
+    public static async Task<IReadOnlyList<string>> ImportGen1BattleItemsAsync(
+        HttpClient? http = null,
+        Func<ItemsDbContext>? createContext = null
+    )
     {
-        using var context = new ItemsDbContext();
+        http ??= PokeApiHttp.Client;
+        var failed = new List<string>();
+        using var context = (createContext ?? (() => new ItemsDbContext()))();
         foreach (var name in ItemMapper.Gen1BattleItemNames)
-            await FetchAndUpsertItem(name, context);
+        {
+            string url = $"https://pokeapi.co/api/v2/item/{name}/";
+            if (!await FetchAndUpsertItem(url, name, context, http))
+                failed.Add(url);
+        }
+        return failed;
     }
 
-    private static async Task FetchAndUpsertItem(string itemName, ItemsDbContext context)
+    private static async Task<bool> FetchAndUpsertItem(
+        string url,
+        string itemName,
+        ItemsDbContext context,
+        HttpClient http
+    )
     {
-        string url = $"https://pokeapi.co/api/v2/item/{itemName}/";
         try
         {
-            HttpResponseMessage response = await PokeApiHttp.Client.GetAsync(url);
+            HttpResponseMessage response = await http.GetAsync(url);
             response.EnsureSuccessStatusCode();
 
             string json = await response.Content.ReadAsStringAsync();
             PokeApiItem? pokeItem = JsonSerializer.Deserialize<PokeApiItem>(json, JsonOpts);
             if (pokeItem == null)
-                return;
+            {
+                Console.WriteLine($"No usable item data returned for '{itemName}'.");
+                return false;
+            }
 
             Item item = ItemMapper.MapToItem(pokeItem);
 
@@ -55,10 +73,12 @@ public class ItemImport
             }
 
             await context.SaveChangesAsync();
+            return true;
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error fetching item '{itemName}' from {url}: {ex.Message}");
+            return false;
         }
     }
 }

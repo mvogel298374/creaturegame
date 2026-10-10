@@ -228,8 +228,8 @@ Each species needs **two** PokeAPI endpoints, because the data is split:
 - **Fails loudly, not silently.** An unsupported generation throws before any request. There is no blanket catch
   around the generation fetch: `FetchPokemonDataByUrl` returns bool and catches everything except
   `NotSupportedException`, and `FetchPokemonByGeneration` returns the list of failed species urls.
-  `Program.cs` `ReportFailedSpecies` lists them and exits non-zero (for the `species` command, and at the end of
-  the full run after the other stages have run), so a transient HTTP error never leaves a stale row unnoticed.
+  The run's exit contract (§5.6) lists them and exits non-zero, so a transient HTTP error never leaves a stale
+  row unnoticed.
   A missing hp/attack/defense/speed stat is a failure too: `Require(...)` throws `InvalidOperationException`
   (same rule as Special) rather than defaulting to 0. So are a `past_stats` entry whose generation name the
   resolver cannot place (it throws instead of dropping the entry and importing the wrong stats) and a null
@@ -448,6 +448,20 @@ Every fetch is wrapped in try/catch with `EnsureSuccessStatusCode`, and a failur
 move/species logs and continues. A flaky network drops a few rows you can recover on the
 next run, rather than aborting the whole import.
 
+**…but never a quiet run (2026-10-11).** Continuing is not the same as succeeding. Every stage — moves,
+species, evolutions, items, and the three downloaders — returns what failed (urls, or a count), and every
+entry point hands those to `ImportOutcome.Report` (`StageResult` per stage). It lists each stage's failures
+and returns exit code **0 only when every stage was clean**; otherwise it prints `Import FAILED` and the
+process exits 1. "Import Complete!" / "Done." is printed only on a clean run. This is what lets a script or
+a Docker build trust the exit code. (Before, only species failures reached it.) A failure that *throws*
+instead of being returned — an unsupported generation, or an unreachable species generation list (§4.2) —
+aborts the run: `Main`'s catch-all logs it, the later stages don't run, and the exit code is 1.
+
+**Test seam.** Each import takes an optional `HttpClient` and context factory (`Func<…DbContext>`),
+defaulting to `PokeApiHttp.Client` and `new …DbContext()`. Tests pass a canned-response handler
+(`FakePokeApiHandler`) and migrated temp-file SQLite databases (`TempImportDatabases`), so the real import
+code runs with no network and without touching the committed `.db` files.
+
 ---
 
 ## 6. Known limitations / gotchas (be honest about these)
@@ -474,7 +488,8 @@ next run, rather than aborting the whole import.
   checked-in `moves.db` byte-identical — git shows no change. Before committing a regenerated `.db`, stop whatever
   holds it or run `PRAGMA wal_checkpoint(TRUNCATE)`, then confirm `git status` lists the file as modified.
 - **Direct `new MovesDbContext()` / `new PokemonDbContext()`.** Acceptable for a CLI tool
-  (parameterless ctor + hardcoded path in `OnConfiguring`). The *web host* deliberately
+  (parameterless ctor + hardcoded path in `OnConfiguring`); it is the default of each import's optional
+  context factory, which tests override (§5.6). The *web host* deliberately
   does **not** do this — it uses `IDbContextFactory` DI (see `Program.cs` of
   `creaturegame.Web`). Don't copy the CLI pattern into the server.
 

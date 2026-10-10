@@ -15,23 +15,32 @@ public static class EvolutionImport
         PropertyNameCaseInsensitive = true,
     };
 
-    public static async Task ImportAllAsync()
+    /// <summary>Imports the Gen 1 evolution edges; returns the urls (or errors) that failed (empty when clean).</summary>
+    public static async Task<IReadOnlyList<string>> ImportAllAsync(
+        HttpClient? http = null,
+        Func<PokemonDbContext>? createContext = null
+    )
     {
+        http ??= PokeApiHttp.Client;
+        var failed = new List<string>();
         try
         {
-            using var context = new PokemonDbContext();
+            using var context = (createContext ?? (() => new PokemonDbContext()))();
 
             await context.Evolutions.Where(e => e.Generation == Gen1).ExecuteDeleteAsync();
 
-            var chainUrls = await CollectChainUrlsAsync();
+            var chainUrls = await CollectChainUrlsAsync(http, failed);
             var seen = new HashSet<(int From, int To)>();
             var rows = new List<PokemonEvolution>();
 
             foreach (var chainUrl in chainUrls)
             {
-                var chain = await FetchChainAsync(chainUrl);
+                var chain = await FetchChainAsync(chainUrl, http);
                 if (chain == null)
+                {
+                    failed.Add(chainUrl);
                     continue;
+                }
 
                 foreach (var edge in EvolutionMapper.ExtractGen1Edges(chain))
                 {
@@ -61,10 +70,16 @@ public static class EvolutionImport
         catch (Exception ex)
         {
             Console.WriteLine($"Error importing evolutions: {ex.Message}");
+            failed.Add($"evolution import aborted: {ex.Message}");
         }
+
+        return failed;
     }
 
-    private static async Task<HashSet<string>> CollectChainUrlsAsync()
+    private static async Task<HashSet<string>> CollectChainUrlsAsync(
+        HttpClient http,
+        List<string> failed
+    )
     {
         var urls = new HashSet<string>();
         for (int id = 1; id <= MaxGen1SpeciesId; id++)
@@ -72,7 +87,7 @@ public static class EvolutionImport
             string speciesUrl = $"https://pokeapi.co/api/v2/pokemon-species/{id}/";
             try
             {
-                var response = await PokeApiHttp.Client.GetAsync(speciesUrl);
+                var response = await http.GetAsync(speciesUrl);
                 response.EnsureSuccessStatusCode();
                 string json = await response.Content.ReadAsStringAsync();
                 var species = JsonSerializer.Deserialize<PokeApiPokemonSpecies>(json, JsonOptions);
@@ -84,17 +99,21 @@ public static class EvolutionImport
                 Console.WriteLine(
                     $"  Evolution: failed to read chain url for species {id}: {ex.Message}"
                 );
+                failed.Add(speciesUrl);
             }
         }
 
         return urls;
     }
 
-    private static async Task<PokeApiEvolutionChain?> FetchChainAsync(string chainUrl)
+    private static async Task<PokeApiEvolutionChain?> FetchChainAsync(
+        string chainUrl,
+        HttpClient http
+    )
     {
         try
         {
-            var response = await PokeApiHttp.Client.GetAsync(chainUrl);
+            var response = await http.GetAsync(chainUrl);
             response.EnsureSuccessStatusCode();
             string json = await response.Content.ReadAsStringAsync();
             return JsonSerializer.Deserialize<PokeApiEvolutionChain>(json, JsonOptions);

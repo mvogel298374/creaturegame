@@ -8,6 +8,39 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §1 #4 Importer hardening — step #4a (the seam and the exit code) ✅ DONE (2026-10-11)
+
+Step 1 of 5 of `TODO.md` §1 #4 (#4b–#4e remain open there). Importer only; gen-invariant; no data value, engine or
+web change; not player-visible. Decision 1 (optional parameters with today's defaults) taken as recommended.
+
+**Was** (verified at `56e9ab6`, §7.6 V5): every import built its own `new …DbContext()` and used the static
+`PokeApiHttp.Client`, so nothing was testable; only species failures reached the exit code; "Import Complete!"
+printed for any move, evolution, item or sprite failure; moves/items treated a null DTO and a failed generation
+list as silent skips; a dead `MoveImport.FetchMoveData(int)` existed.
+
+**Delivered**
+- Each import (moves, species, evolutions, items) takes an optional `HttpClient` and DbContext factory, defaulting
+  to `PokeApiHttp.Client` and `new …DbContext()`; each returns its failures.
+- `PokeApiConnector/ImportOutcome.cs`: `Report` / `ExitCode`. `Program.Main` returns the exit code — 0 only when
+  every stage (moves, species, evolutions, items, the 3 downloaders) is clean; "Import Complete!"/"Done." prints
+  only on a clean run; an exception is caught at `Main`, logged, exit 1, later stages skipped.
+- Moves/items: a null DTO and a failed generation list are reported failures. Dead `FetchMoveData(int)` removed.
+- Evolution delete-before-fetch deliberately unchanged (that is #4b).
+- `docs/DATA_IMPORT.md` §5.6: exit contract, test seam, abort rule.
+- Tests (`tests/creaturegame.Tests/Integration/Importer/ImportFailureReportingTests.cs`, 8; helpers
+  `TestSupport/FakePokeApiHandler.cs`, `TempImportDatabases.cs`: GUID temp-file SQLite, `Pooling=False`, no
+  `ClearAllPools()`): failed move, null body, unreachable generation list, items, evolution failed fetches and
+  aborted run, species, pure `ExitCode`.
+- Pre-commit finding (2026-10-11): the hook's .NET run intermittently failed two unrelated web tests with
+  `SQLite Error 5` during pool return; the helper's process-wide `ClearAllPools()` in parallel `Dispose` was the
+  likely cause, so it was dropped for `Pooling=False`. The four older test classes that still call it are tracked
+  in `TODO.md` §6.
+
+**Review:** pr-review PR-READY; 3 recommendations applied. Advisories not acted on: an empty-but-parseable
+generation list still reports clean; no per-command wiring test for `Program`; `Program.cs` lost its UTF-8 BOM.
+
+---
+
 ## §7.6 V4 — scripts and logging: verified and fixed ✅ DONE (2026-10-11)
 
 **Was** `TODO.md` §7.1 "Script/Docker polish" (verified at `4be7bbd`) and the §7.6 V4 slice with its fix-phase
