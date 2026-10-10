@@ -37,7 +37,7 @@
 
 | # | Item | Cost | Ready? (DoR) | Why this slot / what it unblocks |
 |:-:|:-----|:----:|:-------------|:---------------------------------|
-| 1 | **Dev-script and pre-commit-hook gaps** (§7.1) | S–M | ✗ no per-script acceptance conditions (the `dev.ps1`/`stop-dev.ps1` part is done) | Remaining: `-StartStack` backend leak, `test.ps1 -E2E -StartStack` exit 0, and the hook's blind spots (`.csproj`, `*.db`, deletes). Protects every later commit and test run. |
+| 1 | **Dev-script and pre-commit-hook gaps** (§7.1) | S–M | ✅ for C (2026-10-10; part in §7.1); A parked (leak not reproduced); B done | Remaining: the hook's trigger blind spots (`.csproj`, `*.db`, deletes). Protects every later commit and test run. |
 | 2 | **Verification pass over the unverified findings** (§3, §5, §7) | S–M | ✗ no scope or output format (batch size; what "confirmed" means) | Cheap read-only agents in batches; turns ~45 "reviewer's reading" items into confirmed work or discards. Opens up everything below it. |
 | 3 | **Server test gaps — `GameSessionManager` lifecycle + the `RunFaulted` path** (§6) | M | ⚠️ needs the injectable-clock design | Unblocks the R1d tests and closes a long-open Tier-4 item. |
 | 4 | **Importer hardening** (§3.2) | M | ✗ no design (retry policy, transaction boundaries) or acceptance | Failure no longer wipes evolutions or exits 0; unblocks CI/Docker imports and the multi-generation importer work. |
@@ -390,11 +390,27 @@ The stat-selection abstraction is done. Open:
 - **CI/deploy hardening:** `fly-deploy.yml` runs no tests before `flyctl deploy`; `setup-flyctl@master` is an
   unpinned moving branch and there is no `permissions:` block; tags can point at any commit. **The container runs as
   root** (`Dockerfile:44-52`; use `USER $APP_UID` after checking SQLite write needs).
-- **Dev scripts:** `-StartStack` leaves the backend running (`test.ps1:119/148`, `e2e.ps1:180/357` kill only the
-  `dotnet run` parent); `test.ps1 -E2E -StartStack` exits 0 when the backend never starts.
-- **Pre-commit hook gaps** (`.githooks/pre-commit`): hardcoded dotnet path (`:11`); checks the working tree, not the
-  staged snapshot (`:14,22`); skips deletes/renames and `.csproj`/`Directory.Build.props`/`package.json`/
-  `tsconfig.json`/`*.db`-only commits (`:20,33`).
+- **Dev-script and pre-commit-hook gaps — §1 #1, Ready ✅ (2026-10-10).** S–M, three independently shippable parts
+  (C is next, one greenlight and one commit; A is parked; B is done — see `TODO_ARCHIVE.md`). Tooling only: no `/plan` needed; gen-variable surface none; Gen 1
+  source n/a (the source of truth is the observed behaviour of git `--diff-filter` and PowerShell process
+  semantics); no importer, engine or `*.db` change; no dependencies. Verification is **manual reproduction** (nothing
+  in xUnit covers these scripts); no Pester/shell harness (user ruling 2026-10-10). Land before §1 #3 and #6, which
+  both rely on `-StartStack` and the test scripts.
+  - **A — `-StartStack` backend leak** (`test.ps1:139,166-169`, `e2e.ps1:183,358-360`). *Not reproduced
+    (2026-10-10) — parked, not Ready.* The reviewer's reading was that `Start-Process dotnet run` returns the wrapper
+    and the `finally` kills only that PID. Starting the backend exactly as the scripts do and killing it with
+    `Stop-Process` on the returned PID released `:5100` and left no `creaturegame.Web` process. Only the start/kill
+    mechanism was tested; no `-StartStack` E2E run (user-only). **To un-park:** the user runs `.\e2e.ps1 -Spec <small>
+    -StartStack` (also on a failing run and on Ctrl-C) and `Get-NetTCPConnection -LocalPort 5100` still shows a
+    listener afterward. Then re-draft the acceptance condition against that observed case.
+  - **C — hook triggers** (`.githooks/pre-commit:44,57`). *Verified.* **Acceptance:** the .NET suite runs when any
+    staged path, deletes and renames included, matches `\.(cs|csproj|props)$`, `global.json` or `\.db$`; the
+    typecheck runs on `\.tsx?$`, `package(-lock)?\.json` or `tsconfig*.json`; docs-only commits still skip both.
+    **Quirk:** `--diff-filter=ACM` drops D and R. **Test:** in a scratch clone, stage a `.csproj`-only change, a
+    `.cs` delete and a docs-only change, and check which gates run.
+- **Pre-commit hook — deferred from the item above (user ruling 2026-10-10; each needs its own entry before work):**
+  the hook checks the working tree, not the staged snapshot (`:14,22`; fix needs `git stash --keep-index` or a temp
+  worktree, **M**, riskier); hardcoded dotnet path (`:11`; portability only).
 - **Public endpoint exhaustion:** `POST /api/game/start` is unauthenticated with no rate limit, no cap on concurrent
   runs/connections, no idle timeout, no `fly.toml` health check or concurrency block (single 1 GB VM). Unmeasured;
   also no security headers/`UseForwardedHeaders` (low impact: no auth/cookies).

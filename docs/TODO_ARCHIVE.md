@@ -8,6 +8,30 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## `test.ps1 -E2E -StartStack` exits 0 when the backend never starts ✅ DONE (2026-10-10)
+
+**Was** `TODO.md` §7.1 "Dev-script and pre-commit-hook gaps", Part B (§1 row 1). Tooling only; not player-visible.
+Part A (`-StartStack` leak, parked: not reproduced) and Part C (hook triggers) stay in `TODO.md`.
+
+**Problem.** `test.ps1` (`:141-148`) waited 60 s for the backend after `-StartStack`, then fell through to the SKIPPED
+branch, which is not a failure, so a backend that never came up produced exit 0.
+
+**Acceptance (met).** With `-StartStack` and no backend within the timeout, `Playwright E2E` is recorded `FAIL`
+("backend failed to start") and the script exits 1; without `-StartStack`, SKIPPED still exits 0. Quirk: SKIPPED is not
+failure.
+
+**Shipped.** The E2E branch checks `$startedBackend -and -not (Test-Backend)` first and records FAIL; the old
+`-not (Test-Backend)` check is the `elseif` (SKIPPED).
+
+**Verification (manual reproduction, 2026-10-10; no Pester/shell harness, user ruling).** A raw `TcpListener` held
+`:5100` so the backend could not bind: `-E2E -StartStack` gave FAIL, exit 1, no leftover `creaturegame.Web`; `-E2E` with
+no backend gave SKIPPED, exit 0. No Playwright tests ran.
+
+**`e2e.ps1` does not share the defect.** `e2e.ps1:187` throws "Backend did not come up on :5100 within 90s." with no
+catch, so the script exits non-zero (the `finally` cleanup still runs).
+
+---
+
 ## `dev.ps1` readiness + logs and `stop-dev.ps1` ownership ✅ DONE (2026-10-06)
 
 **Was** `TODO.md` §7.1 "`dev.ps1` readiness + logs and `stop-dev.ps1` ownership (S–M)", part of §1 row 1. Tooling only;

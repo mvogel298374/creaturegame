@@ -142,7 +142,11 @@ if ($E2E -or $runAll) {
       while (-not (Test-Backend) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 500 }
     }
 
-    if (-not (Test-Backend)) {
+    if ($startedBackend -and -not (Test-Backend)) {
+      Write-Host "`n=== E2E (Playwright) — FAILED ===" -ForegroundColor Red
+      Write-Host "  Backend did not come up on :5100 within 60s." -ForegroundColor Red
+      $results['Playwright E2E'] = New-Result -Status 'FAIL' -Detail 'backend failed to start'
+    } elseif (-not (Test-Backend)) {
       Write-Host "`n=== E2E (Playwright) — SKIPPED ===" -ForegroundColor Yellow
       Write-Host "  Backend not running. Pass -StartStack." -ForegroundColor Yellow
       $results['Playwright E2E'] = New-Result -Status 'SKIPPED'
