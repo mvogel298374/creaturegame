@@ -174,6 +174,9 @@ Each entry: **Decision · Why · Where it lives.**
   machine for its whole lifetime, so only stateless follow-up requests were affected. Fixed by pinning
   `--ha=false` in `.github/workflows/fly-deploy.yml`. This constraint stands until session state is
   externalized into `save.db` (deferred by decision — §2.12; `docs/TODO.md` §4.2).
+- **Health-check switch (2026-10-11):** `/healthz` always exists, but the Fly `[[http_service.checks]]` block lives in
+  `fly.healthcheck.toml`, not `fly.toml`, because Fly bills by usage. It is **off by default**; set the GitHub repo
+  variable `FLY_HEALTH_CHECK` = `on` (Settings → Variables) and the next RC deploy appends it to `fly.toml`. No commit.
 - **Live-state reads corollary (2026-10-10):** REST endpoints (`/player`, `/bag`, `/party`) read run state on a
   request thread, without a lock, while the run loop writes it. Each collection they enumerate is therefore
   safe against a concurrent write: `Bag` is a `ConcurrentDictionary`, and `Creature.MoveSet` and `Party.Members`

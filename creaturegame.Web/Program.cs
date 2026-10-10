@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
+builder.Services.AddHealthChecks();
 builder
     .Services.AddSignalR()
     .AddJsonProtocol(opts =>
@@ -45,6 +46,16 @@ builder.Services.AddCors(opts =>
 
 var app = builder.Build();
 
+app.Use(
+    (context, next) =>
+    {
+        var headers = context.Response.Headers;
+        headers["X-Content-Type-Options"] = "nosniff";
+        headers["X-Frame-Options"] = "DENY";
+        headers["Referrer-Policy"] = "no-referrer";
+        return next(context);
+    }
+);
 app.UseCors();
 
 // Serve the built React SPA (published into wwwroot) as a single unit with the API:
@@ -54,6 +65,7 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 app.MapControllers();
 app.MapHub<BattleHub>("/hubs/battle");
+app.MapHealthChecks("/healthz");
 app.Map("/api/{**rest}", () => Results.NotFound());
 app.MapFallbackToFile("index.html");
 

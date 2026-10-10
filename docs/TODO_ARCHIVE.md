@@ -8,6 +8,60 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §7.6 V3 — public endpoints: verified and fixed ✅ DONE (2026-10-11)
+
+**Was** `TODO.md` §7.1 "Public endpoint exhaustion" (verified at `b1017ba`) and the §7.6 V3 slice with its fix-phase
+mini-DoRs. Both fixes S, web host + `fly.toml`; gen-invariant; no data, engine or importer change; not player-visible
+(ops only, so no `PRODUCT_SPEC.md` entry).
+
+**Verdicts.**
+- **No rate limit on `POST /api/game/start`** — read-confirmed: no `AddRateLimiter`/`UseRateLimiter` in `Program.cs`,
+  no attribute on `GameController.Start`, and each call does DB work (`CreatePlayerSetupAsync`).
+- **No cap on concurrent runs or connections** — read-confirmed: `RegisterSession` adds to `_pending` unconditionally
+  (`GameSessionManager.cs:165`); no SignalR connection limit; no `[http_service.concurrency]` in `fly.toml` (one
+  shared-CPU 1 GB VM).
+- **No idle timeout** — partly refuted: an unclaimed run is evicted after 2 min (`PendingSessionTtl`, `:23`), though
+  only lazily, on the next `RegisterSession`; a disconnected run ends after the 60 s grace. True: a run whose tab
+  stays open and idle is never ended.
+- **No `fly.toml` health check** — read-confirmed → fixed (V3-a).
+- **No security headers** — read-confirmed → fixed (V3-b).
+- **No `UseForwardedHeaders`** — read-confirmed but inert (nothing reads the client IP or scheme; Fly terminates TLS
+  and `force_https` redirects at the edge) → accepted for now, `TODO.md` §9.
+- **Exhaustion itself** — needs-runtime, never measured → accepted for now, `TODO.md` §9.
+- Rate limit, caps and idle timeout → the low-priority, not-Ready "Abuse protection for the public endpoints" entry in
+  `TODO.md` §7.1 (user ruling 2026-10-11).
+
+**V3-a — health endpoint and Fly health check.** *Acceptance:* `GET /healthz` returns 200 without touching the DB or a
+session; a Fly `[[http_service.checks]]` on `/healthz` (30 s interval, 5 s timeout, 10 s grace) exists in
+`fly.healthcheck.toml` and is deployed only when switched on (V3-c); `/api/*` 404s and the SPA routes are unchanged.
+*Fix:* `AddHealthChecks()` + `MapHealthChecks("/healthz")` in `Program.cs`. *Quirk:* without a check, Fly only knows
+the process is up, not that the app answers. *Verified:* manual repro, `/healthz` → 200 `Healthy` (text/plain).
+**Pending:** the Fly-side check is observable only after an RC deploy with the switch on (V3-c).
+
+**V3-c — the Fly health check is a switch, off by default (user request 2026-10-11).** *Why:* Fly bills by usage; the
+check is wanted only once the game is meant to be "available". *Acceptance:* with the GitHub repository variable
+`FLY_HEALTH_CHECK` unset or anything but `on`, the deployed config has **no** `[[http_service.checks]]`; with it `on`,
+the deploy job appends `fly.healthcheck.toml` to `fly.toml` before `flyctl deploy`. Switching is a repo-settings
+change (Settings → Variables), no commit, effective on the next RC deploy. `/healthz` stays (costs nothing unless
+called). *Fix:* the check block moved out of `fly.toml` into `fly.healthcheck.toml`; a `fly-deploy.yml` step runs
+`if [ "$FLY_HEALTH_CHECK" = "on" ]; then cat fly.healthcheck.toml >> fly.toml; fi`. *Quirk:* `fly.toml` has no
+conditionals, so the switch lives in the deploy job. *Verified:* the step run in Git Bash on scratch copies — unset
+and `off` → `fly.toml` byte-identical to the repo's, 0 check blocks; `on` → exactly 1 block appended after `[[vm]]`.
+Durable pointer: `ARCHITECTURE.md` §2.7 hosting corollary.
+
+**V3-b — baseline security headers.** *Acceptance:* every response carries `X-Content-Type-Options: nosniff`,
+`X-Frame-Options: DENY` and `Referrer-Policy: no-referrer`; no Content-Security-Policy (Phaser and Vite assets make one
+a separate, riskier job). *Fix:* a middleware first in the `Program.cs` pipeline. *Quirk:* static files and the SPA
+fallback must carry them too. *Verified:* all three present on `/`, a hashed `/assets/*.js`, `/api/Species`,
+`/healthz`, `/api/doesNotExist` (404) and `/battle`; Puppeteer A/B (clean localStorage, New Game → Bulbasaur →
+Confirm) with and without the change both reach `/battle` with the route-choice modal and a connected SignalR
+WebSocket.
+
+**Gates (2026-10-11).** format-gate PASS; test-runner PASS (`.\test.ps1 -Dotnet -Web` green; E2E not run);
+requirements-review n/a; pr-review skipped (user ruling "just do the fix").
+
+---
+
 ## §7.6 V2 — CI/deploy hardening: verified and fixed ✅ DONE (2026-10-11)
 
 **Was** `TODO.md` §7.1 "CI/deploy hardening" (five claims verified at `4886bb5`, all *read-confirmed*) and the §7.6 V2

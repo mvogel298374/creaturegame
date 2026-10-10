@@ -38,7 +38,7 @@
 | # | Item | Cost | Ready? (DoR) | Why this slot / what it unblocks |
 |:-:|:-----|:----:|:-------------|:---------------------------------|
 | 1 | **`-StartStack` backend leak** (§7.1 Part A) | S | ✗ parked: leak not reproduced (2026-10-10); un-park condition in §7.1 | Parts B and C are done. Not actionable until the user reproduces it; §1 #3 and #6 do not wait on it. |
-| 2 | **Verification pass over the unverified findings** (§7.6) | S per slice | ✅ (2026-10-10) — 15 tiny slices (V1, V2 done; V3 next); each verifies first, then fixes only S-size, non-central, no-decision findings under a mini-DoR; greenlight and commit each | Turns "reviewer's reading" items into evidenced verdicts or discards. Opens up everything below it. |
+| 2 | **Verification pass over the unverified findings** (§7.6) | S per slice | ✅ (2026-10-10) — 15 tiny slices (V1–V3 done; V4 next); each verifies first, then fixes only S-size, non-central, no-decision findings under a mini-DoR; greenlight and commit each | Turns "reviewer's reading" items into evidenced verdicts or discards. Opens up everything below it. |
 | 3 | **Server test gaps — `GameSessionManager` lifecycle + the `RunFaulted` path** (§6) | M | ⚠️ needs the injectable-clock design | Unblocks the R1d tests and closes a long-open Tier-4 item. |
 | 4 | **Importer hardening** (§3.2) | M | ✗ no design (retry policy, transaction boundaries) or acceptance | Failure no longer wipes evolutions or exits 0; unblocks CI/Docker imports and the multi-generation importer work. |
 | 5 | **R1d-a — replay an open blocking prompt** (§2) | M | ⚠️ designed, but provisional-pending-`/plan` and needs your three decisions (§8) | The only reconnect item that strands a run; highest player value. |
@@ -402,9 +402,16 @@ The stat-selection abstraction is done. Open:
 - **Pre-commit hook — deferred from the item above (user ruling 2026-10-10; each needs its own entry before work):**
   the hook checks the working tree, not the staged snapshot (`:14,22`; fix needs `git stash --keep-index` or a temp
   worktree, **M**, riskier); hardcoded dotnet path (`:11`; portability only).
-- **Public endpoint exhaustion:** `POST /api/game/start` is unauthenticated with no rate limit, no cap on concurrent
-  runs/connections, no idle timeout, no `fly.toml` health check or concurrency block (single 1 GB VM). Unmeasured;
-  also no security headers/`UseForwardedHeaders` (low impact: no auth/cookies).
+- **Abuse protection for the public endpoints (M, low priority — user ruling 2026-10-11).** *Verified (§7.6 V3,
+  `TODO_ARCHIVE.md`):* no rate limit on `POST /api/game/start`, no cap on concurrent runs or connections, no Fly
+  concurrency block, and a run in an open idle tab never ends (unclaimed runs are evicted after 2 min, disconnected
+  ones after the 60 s grace). **Not Ready — needs your numbers and one UX call.** Suggested starting
+  points, to confirm or change: about **10 starts per minute per visitor** (needs `UseForwardedHeaders` reading
+  Fly's client IP, since the limit is per visitor); **200 live runs** in total (pending + active), with `/start`
+  answering 503 above it; a Fly `[http_service.concurrency]` block at **soft 200 / hard 250** connections; and
+  ending a connected run after **30 minutes with no input**, which needs the player-facing notice designed
+  (§2's `RunFaulted`-style transport notice is the likely shape). Acceptance and tests to be written once the
+  numbers are set.
 - **Script/Docker polish:** `dev.ps1:53-54` apostrophe-in-path (the `-Command` strings single-quote `$root`/`$dotnet`); `build-release.ps1:200` leaves cwd changed; `Dockerfile:25-28` `COPY . .` re-downloads every sprite on any
   source change and base images are tag- not digest-pinned; `GameController.cs:66` logs only `ex.Message`;
   `SignalRBattleEventEmitter.cs:86` discards the send task; the client-chosen run `Seed` (a product decision, not a
@@ -509,7 +516,7 @@ a decision (Roar/Whirlwind, the BST bands).
 |:-:|:--|:--|:--|
 | V1 | Verify ✅ and fix ✅ 2026-10-10 — record in `TODO_ARCHIVE.md` → "§7.6 V1 — backend session edges" | — | — |
 | V2 | Verify ✅ and fix ✅ 2026-10-11 — record in `TODO_ARCHIVE.md` → "§7.6 V2 — CI/deploy hardening" (end-to-end proof pending the next RC deploy) | — | — |
-| V3 | Public endpoint: no rate limit / caps / idle timeout / health check / security headers (§7.1) | Config read | Exhaustion itself stays *needs-runtime* |
+| V3 | Verify ✅ and fix ✅ 2026-10-11 — record in `TODO_ARCHIVE.md` → "§7.6 V3 — public endpoints"; limits + idle timeout → the low-priority abuse-protection entry in §7.1; forwarded headers + exhaustion → §9 (Fly-side health check is off by default, `FLY_HEALTH_CHECK` repo variable; observable on an RC deploy only once switched on) | — | — |
 | V4 | Script/Docker polish: `dev.ps1` apostrophe, `build-release.ps1` cwd, `Dockerfile` layering + tags, `GameController` log, emitter discarded task (§7.1) | Code; scratch run for the scripts | — |
 | V5 | Importer hardening: evolution wipe, no retry, "Import Complete!", poisoned DbContext, learnset transaction (§3.2) | Code | No importer run against PokeAPI |
 | V6 | Importer/data lows: `EffectChance` overwrite, stale `-wal`, modern item `Cost`, Yellow exclusion (§3.2) | Code + db query | Gen 1 values via pokered |
@@ -544,6 +551,9 @@ a decision (Roar/Whirlwind, the BST bands).
   matches the tag name only; no on-`master` check (`CLAUDE.md` → Deployment).
 - **The production container runs as root** — accepted (user ruling 2026-10-11, §7.6 V2): the runtime stage keeps
   the `aspnet` image's default user; don't re-file `USER $APP_UID`.
+- **No `UseForwardedHeaders`; server exhaustion unmeasured** — accepted for now (user ruling 2026-10-11, §7.6 V3):
+  nothing reads the client IP or scheme today. Revisit together with the abuse-protection entry in §7.1, whose
+  per-visitor rate limit would need it.
 - **Replay on every reconnect** is the accepted design (the server can't tell a blip from a refresh); the client
   tolerates it (`replayDedupe`).
 - **RNG seam closed:** don't re-file the `AlwaysHit`/`AlwaysCrit` shim idea, the unseeded web composition root, or

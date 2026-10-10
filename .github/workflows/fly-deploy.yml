@@ -19,6 +19,10 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: superfly/flyctl-actions/setup-flyctl@ed8efb33836e8b2096c7fd3ba1c8afe303ebbff1 # 1.6
+      - name: Add the Fly health check when FLY_HEALTH_CHECK is 'on'
+        env:
+          FLY_HEALTH_CHECK: ${{ vars.FLY_HEALTH_CHECK }}
+        run: if [ "$FLY_HEALTH_CHECK" = "on" ]; then cat fly.healthcheck.toml >> fly.toml; fi
       # --ha=false: GameSessionManager keeps run state in-process (no shared/external store yet), so a
       # second machine is actively harmful — Fly's proxy can route a request to the machine that never
       # saw the run's /start call, 404ing endpoints like GET /api/game/{id}/player. flyctl's default

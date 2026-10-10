@@ -1,0 +1,8 @@
+
+# Appended to fly.toml by fly-deploy.yml only when the repo variable FLY_HEALTH_CHECK is 'on'.
+[[http_service.checks]]
+  grace_period = '10s'
+  interval = '30s'
+  method = 'GET'
+  path = '/healthz'
+  timeout = '5s'
