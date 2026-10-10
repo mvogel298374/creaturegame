@@ -150,8 +150,9 @@ deterministic backstop at commit time.
 
 ### Pre-commit hook (`.githooks/pre-commit`)
 Deterministic backstop, per staged file type: `csharpier check .` always; the full `dotnet test` suite when
-`.cs` is staged; `tsc --noEmit` (`npm run typecheck`, ~6s, covering `src/` + `e2e/`) when `.ts`/`.tsx` is
-staged. A pure docs/data commit skips both slow legs. Blocks on failure. Enable once per clone: `git config
+a .NET-affecting path is staged (`.cs`/`.csproj`/`.props`/`.db`/`global.json`; deletes and renames count);
+`tsc --noEmit` (`npm run typecheck`, ~6s, covering `src/` + `e2e/`) when a frontend-affecting path is staged
+(`.ts`/`.tsx`/`package*.json`/`tsconfig*.json`). A docs-only commit skips both slow legs. Blocks on failure. Enable once per clone: `git config
 core.hooksPath .githooks`. Emergency bypass (avoid): `git commit --no-verify`.
 
 > **Why the typecheck leg exists** (2026-07-16): Vitest transpiles via esbuild, which **strips types without

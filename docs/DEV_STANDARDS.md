@@ -83,7 +83,7 @@ cleanup for later.
     with CSharpier is intentional. **Do not add a linter or formatter, and do not re-file its absence as tech
     debt** — if it ever gets revisited, it will be because the user asks, not because a review noticed the
     inconsistency. What *does* police the frontend is the **typecheck**: `tsc --noEmit` runs in the pre-commit
-    hook on staged `.ts`/`.tsx` and as a `TypeScript` row in `test.ps1`, with `tsconfig` covering `e2e/` as
+    hook on staged frontend-affecting paths (`.ts`/`.tsx`, `package*.json`, `tsconfig*.json`) and as a `TypeScript` row in `test.ps1`, with `tsconfig` covering `e2e/` as
     well as `src/` (**keep it that way** — Vitest strips types without checking them, so nothing else catches
     a type error). Match the surrounding file's existing style by hand.
 

@@ -40,22 +40,25 @@ if ! "$DOTNET" csharpier check . ; then
   exit 1
 fi
 
-# Only run the (slower) test suite when C# actually changed — pure docs/data commits stay fast.
-if git diff --cached --name-only --diff-filter=ACM | grep -q '\.cs$'; then
-  echo "[pre-commit] .cs changes staged — running the .NET test suite..."
+# No --diff-filter: deletes and renames must trigger the gates too.
+DOTNET_TRIGGER='\.(cs|csproj|props|db)$|(^|/)global\.json$'
+TS_TRIGGER='\.tsx?$|(^|/)package(-lock)?\.json$|(^|/)tsconfig[^/]*\.json$'
+
+if git diff --cached --name-only | grep -qE "$DOTNET_TRIGGER"; then
+  echo "[pre-commit] .NET-affecting changes staged — running the .NET test suite..."
   if ! "$DOTNET" test tests/creaturegame.Tests --nologo ; then
     echo "[pre-commit] BLOCKED: tests failed. Fix them before committing." >&2
     exit 1
   fi
 else
-  echo "[pre-commit] No .cs changes staged — skipping the test suite."
+  echo "[pre-commit] No .NET-affecting changes staged — skipping the test suite."
 fi
 
 # The TypeScript mirror of the .cs rule above. Vitest transpiles via esbuild, which strips types WITHOUT
 # checking them, so without this a type error passes every gate and lands — `tsc` otherwise runs only in
 # `npm run build`. tsconfig covers src/ + e2e/ and takes ~6s.
-if git diff --cached --name-only --diff-filter=ACM | grep -qE '\.tsx?$'; then
-  echo "[pre-commit] .ts/.tsx changes staged — typechecking the frontend..."
+if git diff --cached --name-only | grep -qE "$TS_TRIGGER"; then
+  echo "[pre-commit] Frontend-affecting changes staged — typechecking the frontend..."
   if [ ! -d creaturegame.Web/ClientApp/node_modules ]; then
     echo "[pre-commit] BLOCKED: creaturegame.Web/ClientApp/node_modules is missing, so the staged" >&2
     echo "            TypeScript cannot be checked. Run: cd creaturegame.Web/ClientApp && npm install" >&2
@@ -66,7 +69,7 @@ if git diff --cached --name-only --diff-filter=ACM | grep -qE '\.tsx?$'; then
     exit 1
   fi
 else
-  echo "[pre-commit] No .ts/.tsx changes staged — skipping the frontend typecheck."
+  echo "[pre-commit] No frontend-affecting changes staged — skipping the frontend typecheck."
 fi
 
 echo "[pre-commit] OK."

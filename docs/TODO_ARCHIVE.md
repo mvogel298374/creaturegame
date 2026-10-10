@@ -8,6 +8,33 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Pre-commit hook triggers miss `.csproj`/`.props`/`global.json`/`*.db`, deletes and renames ✅ DONE (2026-10-10)
+
+**Was** `TODO.md` §7.1 "Dev-script and pre-commit-hook gaps", Part C (§1 row 1). Tooling only; not player-visible.
+Part A (`-StartStack` leak) stays parked in `TODO.md`.
+
+**Problem.** `.githooks/pre-commit` listed staged files with `--diff-filter=ACM` (dropping deletes and renames) and
+matched only `.cs` for the .NET suite and `.ts`/`.tsx` for the typecheck, so a `.csproj`, `Directory.Build.props`,
+`global.json` or `*.db` change, a `.cs` delete/rename, or a `.ts` delete, `package.json` or `tsconfig.json` change
+committed without the matching gate.
+
+**Acceptance (met).** The .NET suite runs when any staged path, deletes and renames included, matches
+`\.(cs|csproj|props|db)$` or `global.json`; the typecheck runs on `\.tsx?$`, `package(-lock)?\.json` or
+`tsconfig*.json`; docs-only commits still skip both. Quirk: `--diff-filter=ACM` drops D and R.
+
+**Shipped.** `--diff-filter=ACM` dropped from both checks; patterns defined at the top of the hook:
+`DOTNET_TRIGGER='\.(cs|csproj|props|db)$|(^|/)global\.json$'`,
+`TS_TRIGGER='\.tsx?$|(^|/)package(-lock)?\.json$|(^|/)tsconfig[^/]*\.json$'`. Echo messages now say
+".NET-affecting" / "Frontend-affecting". Docs (`CLAUDE.md`, `AI_CONTEXT.md`, `DEV_STANDARDS.md`) updated to match.
+
+**Verification (manual, 2026-10-10; no harness, user ruling).** In a throwaway clone, old (HEAD) vs new trigger lines
+over 12 staged cases: csproj modify, Directory.Build.props, global.json, items.db, `.cs` delete, `.cs` rename: new
+dotnet=RUN (old skipped all six); `.ts` delete, package.json, tsconfig.json: new ts=RUN (old skipped all three);
+docs-only: both skip; `.cs`/`.ts` modify: unchanged RUN. `sh -n` passes. A full `git commit` through the hook was not
+run (it needs a docs-cleanup stamp, which must not be forged); the trigger decision itself was tested.
+
+---
+
 ## `test.ps1 -E2E -StartStack` exits 0 when the backend never starts ✅ DONE (2026-10-10)
 
 **Was** `TODO.md` §7.1 "Dev-script and pre-commit-hook gaps", Part B (§1 row 1). Tooling only; not player-visible.
