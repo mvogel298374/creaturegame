@@ -8,6 +8,30 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §1 #4 Importer hardening — step #4c (one failed save no longer poisons the rest) ✅ DONE (2026-10-11)
+
+Step 3 of 5 of `TODO.md` §1 #4 (#4d, #4e remain open there). Importer only; gen-invariant; no data value, engine or
+web change; not player-visible. Decision 3 (`ChangeTracker.Clear()`, not a fresh context per record) taken as
+recommended.
+
+**Was** (verified at `56e9ab6`, §7.6 V5): moves, items and species each reuse one `DbContext` for every record; a
+failed `SaveChangesAsync` left its entity tracked, so every later save retried it and failed. Silent for moves and
+items; loud for species (each landed on the failed list, exit 1).
+
+**Delivered**
+- The per-record catch in `MoveImport`, `ItemImport` and `PokemonImport` calls `context.ChangeTracker.Clear()` (one-line
+  comment), so only the failed record is lost and later records save.
+- `docs/DATA_IMPORT.md` §5.6: paragraph on clearing the change tracker after a failed record.
+- Tests (`tests/creaturegame.Tests/Integration/Importer/ImportSaveFailureIsolationTests.cs`, 3): for moves, items and
+  species, a `BEFORE INSERT … RAISE(ABORT)` trigger refuses the first record's insert -> that record is reported failed
+  and the next one imports.
+- Sabotage-verified: with the three `Clear()` calls removed (HEAD versions), all 3 tests fail; restored -> 3/3.
+
+**Review:** pr-review skipped by user ruling (three one-line changes, sabotage-verified). Gates: format PASS;
+test-runner PASS (E2E not run); requirements-review n/a.
+
+---
+
 ## §1 #4 Importer hardening — step #4b (evolutions never wipe on a bad fetch) ✅ DONE (2026-10-11)
 
 Step 2 of 5 of `TODO.md` §1 #4 (#4c–#4e remain open there). Importer only; gen-invariant; no data value, engine or

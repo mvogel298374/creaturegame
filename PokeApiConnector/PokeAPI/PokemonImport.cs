@@ -114,6 +114,7 @@ public class PokemonImport
         catch (Exception ex) when (ex is not NotSupportedException)
         {
             Console.WriteLine($"Error fetching pokemon data from {url}: {ex.Message}");
+            context.ChangeTracker.Clear(); // a failed save stays tracked and would fail every later one
             return false;
         }
     }

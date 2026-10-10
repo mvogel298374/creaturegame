@@ -78,6 +78,7 @@ public class ItemImport
         catch (Exception ex)
         {
             Console.WriteLine($"Error fetching item '{itemName}' from {url}: {ex.Message}");
+            context.ChangeTracker.Clear(); // a failed save stays tracked and would fail every later one
             return false;
         }
     }

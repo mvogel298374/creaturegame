@@ -99,6 +99,7 @@ public class MoveImport
         catch (Exception ex)
         {
             Console.WriteLine($"Error fetching move data from {url}: {ex.Message}");
+            context.ChangeTracker.Clear(); // a failed save stays tracked and would fail every later one
             return false;
         }
     }

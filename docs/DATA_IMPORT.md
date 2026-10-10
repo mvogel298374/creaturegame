@@ -455,6 +455,10 @@ Every fetch is wrapped in try/catch with `EnsureSuccessStatusCode`, and a failur
 move/species logs and continues. A flaky network drops a few rows you can recover on the
 next run, rather than aborting the whole import.
 
+Because each stage reuses one `DbContext` for every record, a record that fails is also dropped from the change
+tracker (`ChangeTracker.Clear()` in its catch); otherwise the failed entity stays tracked and every later
+`SaveChangesAsync` retries it and fails, turning one bad record into a failed stage.
+
 **…but never a quiet run (2026-10-11).** Continuing is not the same as succeeding. Every stage — moves,
 species, evolutions, items, and the three downloaders — returns what failed (urls, or a count), and every
 entry point hands those to `ImportOutcome.Report` (`StageResult` per stage). It lists each stage's failures
