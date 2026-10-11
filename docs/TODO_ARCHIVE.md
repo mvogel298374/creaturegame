@@ -8,6 +8,58 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §7.6 V7 — gate order and battle-item reuse: verified; no-effect items wasted in Gen 1 ✅ DONE (2026-10-11)
+
+**Was** `TODO.md` §3.2 "Gen 1 gate-order and Dire Hit/Guard Spec gaps" (verified at `b98660f`, against `pret/pokered`
+`master`), the §7.6 V7 slice, and the §3.2 entry "Gen 1 wastes no-effect battle items" (S, greenlit 2026-10-11) that the
+second verdict produced. Player-visible -> `PRODUCT_SPEC.md` §5 *In-battle item party-targeting* (the "A booster with
+nothing to do is still used up" bullet). The first verdict became the open §3.2 entry "Gen 1 roll order in
+`AttackAction`"; the item-description note and the narration/seeding follow-ups stay open in `TODO.md`.
+
+**Verdicts.**
+- **Random-draw order — source-confirmed, partly mis-stated, no observable effect.** pokered draws crit
+  (`engine/battle/core.asm:3140`) → damage (`:3148`) → `MoveHitTest` (`:3150`). Dream Eater's awake check is the
+  first thing in `MoveHitTest` (`:5240-5246`), before its accuracy draw. The OHKO speed check runs inside
+  `CalculateDamage` (`:4328` → `move_effects/one_hit_ko.asm`); a slower user skips the damage *and* accuracy draws
+  (`:3145`). Ours (`AttackAction.cs`): OHKO check first (`:231`), accuracy draw (`:248`), Dream Eater check
+  **after** the accuracy draw (`:342`, so the old "ours do both before the roll" was wrong for Dream Eater), then
+  crit/damage in `ResolveDamage`. Every move differs: Gen 1 is crit → damage → accuracy, ours accuracy → crit →
+  damage. Odds are identical per roll; only the count/order of draws from a seeded stream differs. **User ruling
+  2026-10-11: fix it, behind a generation seam** → `TODO.md` §3.2 "Gen 1 roll order". Regression guard to keep:
+  `XAccuracyContractTests.XAccuracyMakesAFasterOhkoUserLandThroughMaxedEvasion` holds only because our OHKO speed
+  check runs before the roll.
+- **No-effect battle items are refused, Gen 1 wastes them — source-confirmed.** Ours refused and kept the item
+  (`ItemEffects.cs:217-228`) for a second Dire Hit, a second Guard Spec, and an X-item at +6. pokered sets the bit
+  with no check and removes the item (`engine/items/item_effects.asm:1630-1636` Dire Hit, `:1614-1620` Guard
+  Spec); X-items are removed *before* the raise (`:1656` → `:1663`), so at +6 the item is wasted. The refusal was
+  nowhere recorded as a deliberate deviation (`PRODUCT_SPEC.md` covered only the party-target items, where
+  Gen 1 also refuses). **User ruling 2026-10-11: use the item up, behind a Gen 1 seam** → the fix below.
+
+**Fix — Gen 1 wastes no-effect battle items (S).**
+- *Scope + acceptance:* in Gen 1 a second Dire Hit and a second Guard Spec are used up with no state change
+  (`ItemUsed` emitted; no `FocusEnergyApplied`/`MistApplied`), and an X-item at +6 is used up, `ItemUsed` then the
+  `IBattleRules.StatStageCapAnnouncement` event (Gen 1: the existing `ButNothingHappened`, so no wire/TS change).
+  A repeat X Accuracy was already used up (unchanged). Driven by two new `IBattleRules` members, checked in
+  `BattleBoostItemEffect.CanApply` (`ItemEffects.cs`) instead of the hard-coded refusals: `RepeatFlagItemRefused`
+  (Dire Hit, Guard Spec, X Accuracy) and `CappedXItemRefused`. Tests pin the three Gen 1 waste cases (bag count −1,
+  state unchanged, the events above) at both effect and `ItemAction` level, plus accept-side cases; a
+  `DelegatingBattleRules` override with both flags true reproduces the old refusal (`ItemUseFailed`, nothing
+  consumed), X Accuracy included.
+- *Gen-variable surface:* the two members. Gen 1 `false`/`false`; Gen 2 would be `true`/`false` — pokecrystal
+  refuses a repeat Dire Hit/Guard Spec/X Accuracy (`engine/items/item_effects.asm:2089-2125`,
+  `WontHaveAnyEffect_NotUsedMessage`) but uses an X-item up before the raise (`:2127-2129`). Gen 3 `true`/`true`
+  (pokeemerald `src/pokemon.c:4761`, `:4854-4860`). Recorded in `GEN_DIFFERENCES.md` and `GENERATION_SEAMS.md` §2.
+- *Gen 1 source:* pokered `engine/items/item_effects.asm:1614-1620` (Guard Spec), `:1630-1636` (Dire Hit),
+  `:1544-1550` (X Accuracy), `:1656` → `:1663` (X-item removed before `StatModifierUpEffect`).
+- *Data vs runtime:* runtime only (`ItemEffects`, `IBattleRules`, `Gen1BattleRules`); no data.
+- *Quirk the test asserts:* an X-item at +6 is still spent, because Gen 1 removes it before the raise.
+- *Gate findings:* `requirements-review` 6 findings — #1 refuted by pokered `PrintItemUseTextAndRemoveItem`; #2
+  confirmed against pokecrystal; #3 fixed (Gen 3 `true`); #4 fixed with `ItemAction`-level tests; #5 fixed in
+  `GEN_DIFFERENCES.md`; #6 user ruled no warning text. `pr-review` PR-READY; both recommendations done (accept-side
+  tests, `DireHit()`/`Duelists()` helper cleanup).
+
+---
+
 ## §1 #4 Importer hardening — step #4e (retry on rate limits and transient failures) ✅ DONE (2026-10-11)
 
 Step 5 of 5 of `TODO.md` §1 #4 — **the whole item is now complete (#4a–#4e)**. Importer only; gen-invariant; no data

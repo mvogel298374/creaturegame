@@ -214,33 +214,29 @@ public sealed class BattleBoostItemEffect : IItemEffect
         if (!ctx.User.IsAlive())
             return false;
 
-        // Dire Hit / Guard Spec only do anything the first time (the state is a boolean, set-once per battle).
-        if (ctx.Item.BoostsCrit)
-            return !ctx.User.Battle.HasFocusEnergy;
-        if (ctx.Item.SetsMist)
-            return !ctx.User.Battle.HasMist;
-        if (SetsXAccuracyFlag(ctx))
-            return true;
+        if (ctx.Item.BoostsCrit || ctx.Item.SetsMist || SetsXAccuracyFlag(ctx))
+            return !(ctx.Rules.RepeatFlagItemRefused && FlagAlreadySet(ctx));
 
-        // X-item: a stat boost that would actually move the stage (not already capped at +6).
         return ctx.Item.StatBoostStat is { } stat
             && (ctx.Item.StatBoostStages ?? 0) != 0
-            && ctx.User.Battle.Stages.Of(stat) < 6;
+            && !(ctx.Rules.CappedXItemRefused && ctx.User.Battle.Stages.Of(stat) >= 6);
     }
 
     public void Apply(ItemEffectContext ctx)
     {
         if (ctx.Item.BoostsCrit)
         {
+            if (!ctx.User.Battle.HasFocusEnergy)
+                ctx.Emitter?.Emit(new FocusEnergyApplied(ctx.User.Name, ctx.User.Id));
             ctx.User.Battle.HasFocusEnergy = true;
-            ctx.Emitter?.Emit(new FocusEnergyApplied(ctx.User.Name, ctx.User.Id));
             return;
         }
 
         if (ctx.Item.SetsMist)
         {
+            if (!ctx.User.Battle.HasMist)
+                ctx.Emitter?.Emit(new MistApplied(ctx.User.Name, ctx.User.Id));
             ctx.User.Battle.HasMist = true;
-            ctx.Emitter?.Emit(new MistApplied(ctx.User.Name, ctx.User.Id));
             return;
         }
 
@@ -252,11 +248,24 @@ public sealed class BattleBoostItemEffect : IItemEffect
 
         var stat = ctx.Item.StatBoostStat!.Value;
         int delta = ctx.Item.StatBoostStages ?? 0;
+        int before = ctx.User.Battle.Stages.Of(stat);
         int newStage = ctx.User.Battle.Stages.Raise(stat, delta);
-        ctx.Emitter?.Emit(
-            new StatStageChanged(ctx.User.Name, ctx.User.Id, stat.ToString(), delta, newStage)
-        );
+        if (newStage != before)
+        {
+            ctx.Emitter?.Emit(
+                new StatStageChanged(ctx.User.Name, ctx.User.Id, stat.ToString(), delta, newStage)
+            );
+            return;
+        }
+
+        if (ctx.Rules.StatStageCapAnnouncement == StatCapAnnouncement.NothingHappened)
+            ctx.Emitter?.Emit(new ButNothingHappened(ctx.User.Name, ctx.User.Id));
     }
+
+    private static bool FlagAlreadySet(ItemEffectContext ctx) =>
+        ctx.Item.BoostsCrit ? ctx.User.Battle.HasFocusEnergy
+        : ctx.Item.SetsMist ? ctx.User.Battle.HasMist
+        : ctx.User.Battle.UsingXAccuracy;
 
     private static bool SetsXAccuracyFlag(ItemEffectContext ctx) =>
         ctx.Item.StatBoostStat == StageStat.Accuracy && ctx.Rules.XAccuracyBypassesAccuracyCheck;

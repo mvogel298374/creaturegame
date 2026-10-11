@@ -168,6 +168,12 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
   `FlinchContractTests.SubstituteShieldsTheTargetFromFlinch` (decoy survives / decoy breaks). History:
   `docs/TODO_ARCHIVE.md` → "Repo-sweep R1/R2/R3 — five small fixes", item 2.
 
+#### Battle Items
+- A booster with nothing to do is **used up anyway**: a second Dire Hit, Guard Spec or X Accuracy only re-sets its
+  flag, and an X-item is removed *before* the raise, so at +6 it is spent and "Nothing happened!" follows (pokered
+  `engine/items/item_effects.asm:1544-1663`). Dire Hit and Guard Spec print only "<PLAYER> used <ITEM>!"
+  (`PrintItemUseTextAndRemoveItem`). Seam: `IBattleRules.RepeatFlagItemRefused` / `CappedXItemRefused`.
+
 #### No Systems (not yet introduced)
 - No held items
 - No abilities
@@ -206,6 +212,8 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
 - **Sleep**: Pokémon can now act on the turn it wakes up (partial change — varies by version)
 - **1/256 miss bug**: fixed
 - Focus Energy crit bug: fixed
+- A repeat Dire Hit, Guard Spec or X Accuracy is **refused** ("won't have any effect") and kept; an X-item at +6 is
+  still used up (pokecrystal `engine/items/item_effects.asm:2089-2129`)
 
 #### New Battle Systems
 - **Held Items** in battle (Leftovers, berries, type-boosters, etc.)
@@ -269,6 +277,7 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
 - **Save incompatibility**: Gen 3 is completely incompatible with Gen 1–2 (new data format)
 - Physical/Special split still **type-based** (not per-move yet)
 - **X Accuracy** becomes a +1 accuracy stage (pokeemerald `ItemUseInBattle_StatIncrease`); Gen 1–2 skipped the accuracy check instead
+- An X-item at +6 is **refused** and kept (pokeemerald `src/pokemon.c:4761`, `:4854-4860`)
 
 ---
 

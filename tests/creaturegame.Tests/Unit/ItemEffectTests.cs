@@ -79,7 +79,12 @@ public class ItemEffectTests
         return (user, emitter);
     }
 
-    private static bool CanApply(Item item, Creature user, int? slot = null) =>
+    private static bool CanApply(
+        Item item,
+        Creature user,
+        int? slot = null,
+        IBattleRules? rules = null
+    ) =>
         ItemEffects
             .For(item.Category)!
             .CanApply(
@@ -87,10 +92,17 @@ public class ItemEffectTests
                 {
                     User = user,
                     Item = item,
-                    Rules = Gen1BattleRules.Instance,
+                    Rules = rules ?? Gen1BattleRules.Instance,
                     TargetMoveSlot = slot,
                 }
             );
+
+    private sealed class RulesRefusingNoEffectBoosters : DelegatingBattleRules
+    {
+        public override bool RepeatFlagItemRefused => true;
+
+        public override bool CappedXItemRefused => true;
+    }
 
     private static Item XAccuracy() =>
         Item(
@@ -629,23 +641,52 @@ public class ItemEffectTests
         Assert.Equal(1, ev.NewStage);
     }
 
+    private static Item XAttack() =>
+        Item(
+            57,
+            "x-attack",
+            ItemCategory.BattleStatBoost,
+            boostStat: StageStat.Attack,
+            boostStages: 1
+        );
+
     [Fact]
-    public void XItem_AtMaxStage_HasNoEffect()
+    public void XItem_AtMaxStage_UnderGen1_IsSpentAndNothingHappens()
     {
         var c = TestCreatures.Make();
         c.Battle.Stages.RaiseAttack(6);
-        Assert.False(
+
+        var (user, em) = Apply(XAttack(), c);
+
+        Assert.Equal(6, user.Battle.Stages.Attack);
+        Assert.Empty(em.Of<StatStageChanged>());
+        Assert.Equal(user.Name, em.Of<ButNothingHappened>().Single().CreatureName);
+    }
+
+    [Fact]
+    public void XItem_BelowMaxStage_UnderRulesThatRefuseCapped_IsAccepted()
+    {
+        var c = TestCreatures.Make();
+        c.Battle.Stages.RaiseAttack(5);
+        Assert.True(CanApply(XAttack(), c, rules: new RulesRefusingNoEffectBoosters()));
+    }
+
+    [Fact]
+    public void DireHit_FirstUse_UnderRulesThatRefuseARepeat_IsAccepted() =>
+        Assert.True(
             CanApply(
-                Item(
-                    57,
-                    "x-attack",
-                    ItemCategory.BattleStatBoost,
-                    boostStat: StageStat.Attack,
-                    boostStages: 1
-                ),
-                c
+                Item(56, "dire-hit", ItemCategory.BattleStatBoost, boostsCrit: true),
+                TestCreatures.Make(),
+                rules: new RulesRefusingNoEffectBoosters()
             )
         );
+
+    [Fact]
+    public void XItem_AtMaxStage_UnderRulesThatRefuseIt_IsRefused()
+    {
+        var c = TestCreatures.Make();
+        c.Battle.Stages.RaiseAttack(6);
+        Assert.False(CanApply(XAttack(), c, rules: new RulesRefusingNoEffectBoosters()));
     }
 
     [Fact]
@@ -663,12 +704,31 @@ public class ItemEffectTests
     }
 
     [Fact]
-    public void DireHit_WhenAlreadyFocused_HasNoEffect()
+    public void DireHit_WhenAlreadyFocused_UnderGen1_IsSpentWithNoEffect()
+    {
+        var c = TestCreatures.Make();
+        c.Battle.HasFocusEnergy = true;
+
+        var (user, em) = Apply(
+            Item(56, "dire-hit", ItemCategory.BattleStatBoost, boostsCrit: true),
+            c
+        );
+
+        Assert.True(user.Battle.HasFocusEnergy);
+        Assert.Empty(em.Of<FocusEnergyApplied>());
+    }
+
+    [Fact]
+    public void DireHit_WhenAlreadyFocused_UnderRulesThatRefuseIt_IsRefused()
     {
         var c = TestCreatures.Make();
         c.Battle.HasFocusEnergy = true;
         Assert.False(
-            CanApply(Item(56, "dire-hit", ItemCategory.BattleStatBoost, boostsCrit: true), c)
+            CanApply(
+                Item(56, "dire-hit", ItemCategory.BattleStatBoost, boostsCrit: true),
+                c,
+                rules: new RulesRefusingNoEffectBoosters()
+            )
         );
     }
 
@@ -687,12 +747,31 @@ public class ItemEffectTests
     }
 
     [Fact]
-    public void GuardSpec_WhenAlreadyMisted_HasNoEffect()
+    public void GuardSpec_WhenAlreadyMisted_UnderGen1_IsSpentWithNoEffect()
+    {
+        var c = TestCreatures.Make();
+        c.Battle.HasMist = true;
+
+        var (user, em) = Apply(
+            Item(55, "guard-spec", ItemCategory.BattleStatBoost, setsMist: true),
+            c
+        );
+
+        Assert.True(user.Battle.HasMist);
+        Assert.Empty(em.Of<MistApplied>());
+    }
+
+    [Fact]
+    public void GuardSpec_WhenAlreadyMisted_UnderRulesThatRefuseIt_IsRefused()
     {
         var c = TestCreatures.Make();
         c.Battle.HasMist = true;
         Assert.False(
-            CanApply(Item(55, "guard-spec", ItemCategory.BattleStatBoost, setsMist: true), c)
+            CanApply(
+                Item(55, "guard-spec", ItemCategory.BattleStatBoost, setsMist: true),
+                c,
+                rules: new RulesRefusingNoEffectBoosters()
+            )
         );
     }
 
@@ -712,6 +791,14 @@ public class ItemEffectTests
         var c = TestCreatures.Make();
         c.Battle.UsingXAccuracy = true;
         Assert.True(CanApply(XAccuracy(), c));
+    }
+
+    [Fact]
+    public void XAccuracy_WhenAlreadySet_UnderRulesThatRefuseARepeat_IsRefused()
+    {
+        var c = TestCreatures.Make();
+        c.Battle.UsingXAccuracy = true;
+        Assert.False(CanApply(XAccuracy(), c, rules: new RulesRefusingNoEffectBoosters()));
     }
 
     [Fact]

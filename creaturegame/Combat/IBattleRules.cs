@@ -227,6 +227,14 @@ public interface IBattleRules
     /// Gen 1–2: true. Gen 3+: false (+1 stage, the item row's data). See GENERATION_SEAMS.md §2.</summary>
     bool XAccuracyBypassesAccuracyCheck { get; }
 
+    /// <summary>Whether a repeat Dire Hit / Guard Spec / flag-style X Accuracy is refused instead of spent.
+    /// Gen 1: false. Gen 2: true. See GENERATION_SEAMS.md §2.</summary>
+    bool RepeatFlagItemRefused { get; }
+
+    /// <summary>Whether an X-item is refused instead of spent when its stat is already at +6.
+    /// Gen 1–2: false. Gen 3+: true. See GENERATION_SEAMS.md §2.</summary>
+    bool CappedXItemRefused { get; }
+
     /// <summary>
     /// Returns the number of turns a binding move traps the target.
     /// Gen 1: 2–5 turns.

@@ -38,7 +38,7 @@
 | # | Item | Cost | Ready? (DoR) | Why this slot / what it unblocks |
 |:-:|:-----|:----:|:-------------|:---------------------------------|
 | 1 | **`-StartStack` backend leak** (§7.1 Part A) | S | ✗ parked: leak not reproduced (2026-10-10); un-park condition in §7.1 | Parts B and C are done. Not actionable until the user reproduces it; §1 #3 and #6 do not wait on it. |
-| 2 | **Verification pass over the unverified findings** (§7.6) | S per slice | ✅ (2026-10-10) — 15 tiny slices V1–V15 (V1–V6 done; V7 next; the V16 audit row is tracked separately as #11); each verifies first, then fixes only S-size, non-central, no-decision findings under a mini-DoR; greenlight and commit each | Turns "reviewer's reading" items into evidenced verdicts or discards. Opens up everything below it. |
+| 2 | **Verification pass over the unverified findings** (§7.6) | S per slice | ✅ (2026-10-10) — 15 tiny slices V1–V15 (V1–V7 done; V8 next; the V16 audit row is tracked separately as #11); each verifies first, then fixes only S-size, non-central, no-decision findings under a mini-DoR; greenlight and commit each | Turns "reviewer's reading" items into evidenced verdicts or discards. Opens up everything below it. |
 | 3 | **Server test gaps — `GameSessionManager` lifecycle + the `RunFaulted` path** (§6) | M | ⚠️ needs the injectable-clock design | Unblocks the R1d tests and closes a long-open Tier-4 item. |
 | 5 | **R1d-a — replay an open blocking prompt** (§2) | M | ⚠️ designed, but provisional-pending-`/plan` and needs your three decisions (§8) | The only reconnect item that strands a run; highest player value. |
 | 6 | **CI E2E step** (§6) | M | ✗ no design (runner, stack boot, caching) or acceptance | The only automatic E2E coverage; makes "agents don't run E2E" safe, and unblocks checking the BST/balance flag and the reconnect spec. |
@@ -90,8 +90,8 @@ data/engine item usually also means updating the test that pins the wrong value.
 
 - **Damage/accuracy core (L):** `DamageCalculator.cs:219-223` skips the `2L/5` and `/50` floors `GEN_DIFFERENCES.md`
   documents (~24% high at L12); `Gen1BattleRules.cs:213-219` uses a 3-based accuracy/evasion table (Gen 1 uses the
-  standard table); crit multiplier should be ≈(2L+5)/(L+5), not a flat 2× (`:258`); multi-hit re-rolls crit/variance
-  per hit and continues past a broken Substitute (`AttackAction.cs:379-404`); recoil/drain/Struggle use full
+  standard table); crit multiplier should be ≈(2L+5)/(L+5), not a flat 2× (`:258`); multi-hit continues past a broken
+  Substitute (`AttackAction.cs:379-404`; its per-hit crit/variance re-roll moved to §3.2 "Gen 1 roll order"); recoil/drain/Struggle use full
   calculated damage, not HP actually lost (`AttackAction.cs:402,430-437`); Ice can freeze Ice / Electric can
   paralyse Electric (`Gen1BattleRules.cs:161`); Fly/Dig are not untargetable on the charge turn (not listed as a
   known gap).
@@ -119,14 +119,75 @@ data/engine item usually also means updating the test that pins the wrong value.
 (Aside: `Creature.FullHeal` and `ReviveItemEffect` duplicate
 `ClearStatus`'s reset instead of routing through it.)
 
-- **Gen 1 gate-order and Dire Hit/Guard Spec gaps (found during X Accuracy; unverified beyond that review).**
-  `MoveHitTest` fails Dream Eater on an awake target and runs the OHKO speed check *after* the roll draw; ours do
-  both before the roll, so the rng draw order differs when X Accuracy is not in use. pokered's `ItemUseDireHit` does
-  not refuse a second use either (Guard Spec unchecked), while ours does. Verify at pokered before changing.
-  Dependency: `XAccuracyContractTests.XAccuracyMakesAFasterOhkoUserLandThroughMaxedEvasion` holds only because our
-  OHKO speed check runs before the roll — keep it as the regression guard if the gate order is changed. Also:
-  item descriptions are PokeAPI's modern text as-is (only X Accuracy's is overridden), so Dire Hit / Guard Spec and
-  the X-items still describe the modern effects — unverified, check before a descriptions pass.
+- **Item descriptions (found 2026-10-11, V7; unverified):** PokeAPI's modern text as-is (only X Accuracy's is
+  overridden), so Dire Hit / Guard Spec and the X-items describe modern effects. Check before a descriptions pass.
+  (V7 record: `TODO_ARCHIVE.md` → "§7.6 V7".)
+- **Found 2026-10-11 during V7 / the item seam (unverified beyond the citation; each needs its own DoR):**
+  - *AI stat-down 25% fail:* in a normal battle the enemy's stat-lowering status moves first roll a 25% fail
+    (pokered `engine/battle/effects.asm` `StatModifierDownEffect` +14); we don't model it.
+  User ruling 2026-10-11: leave this one as filed; the two below became entries.
+- **Dire Hit / Guard Spec narrate only "used <ITEM>!" in Gen 1 (S; DoR drafted 2026-10-11 — awaiting your
+  greenlight).**
+  - *Scope + acceptance:* under Gen 1 a Dire Hit or Guard Spec sets its flag and emits only `ItemUsed` — no
+    `FocusEnergyApplied` / `MistApplied` (those stay for the moves). Driven by a new `IBattleRules` member
+    `BoosterItemAnnouncesEffect` read in `BattleBoostItemEffect.Apply`. Acceptance: the Gen 1 tests
+    (`ItemEffectTests.DireHit_SetsFocusEnergy`, `GuardSpec_SetsMist`, `ItemActionBattleTests.UsingDireHit_SetsFocusEnergyAndConsumes`,
+    `ASecondDireHit…`, `ASecondGuardSpec…`) assert the flag is set and no effect event is emitted; a
+    `DelegatingBattleRules` with the member `true` emits it. `PRODUCT_SPEC.md` and `GENERATION_SEAMS.md` §2 updated.
+  - *Gen-variable surface:* the new member. Gen 1–2 `false`: pokered `PrintItemUseTextAndRemoveItem` prints only
+    `ItemUseText00`; pokecrystal `DireHitEffect`/`GuardSpecEffect` end in `UseItemText`
+    (`engine/items/item_effects.asm:2113-2125`). Gen 3+ `true` for Dire Hit: one combined line, "used <ITEM> to get
+    pumped!" (pokeemerald `src/battle_message.c:253`, `:1013`); Gen 3 Guard Spec text unverified.
+  - *Gen 1 source:* pokered `engine/items/item_effects.asm:1614-1636` → `PrintItemUseTextAndRemoveItem`.
+  - *Data vs runtime:* runtime only; the frontend needs no change (it only logs those events).
+  - *Quirk the test asserts:* Gen 1 Dire Hit sets Focus Energy silently.
+  - *Dependencies:* builds on the shipped "Gen 1 wastes no-effect battle items" (`TODO_ARCHIVE.md` → "§7.6 V7"; same method).
+- **Battle randomness is only half-seeded in production (S–M; DoR drafted 2026-10-11 — awaiting your greenlight).**
+  - *Scope + acceptance:* every battle draw in a web run comes from the run's seeded source. Today
+    `GameSessionManager.BuildRunOptions` passes `profile.BattleRules` — the `Gen1BattleRules.Instance` singleton on
+    `Random.Shared` — so its nine rolls (damage variance, multi-hit count, sleep/confusion/binding/rampage/Disable/
+    Bide turns) are unseeded, while `session.Rng` drives crit, accuracy and secondaries. Fix: `GenerationProfile`
+    gains `Func<IRandomSource, IBattleRules> CreateBattleRules` (Gen 1: `rng => new Gen1BattleRules(rng)`), and
+    `BuildRunOptions` uses `profile.CreateBattleRules(session.Rng)`. Rules and actions then share **one** stream.
+    `profile.BattleRules` stays for draw-free reads (`EstimateRange`). Acceptance: a test builds run options from a
+    seeded session and shows the rules' rolls come from that seed (they match a twin `SeededRandomSource` with the
+    same seed); `TestAltProfile` gets the factory, and `GenerationProfileTests` pins that the run uses it.
+  - *Gen-variable surface:* none — wiring; the factory is per profile. *Gen 1 source:* n/a (Gen 1 has one RNG,
+    which this matches). *Data vs runtime:* runtime (profile + web wiring). *Quirk:* rules and action draws
+    interleave on one stream. *Dependencies:* none; "Gen 1 roll order" below depends on it (one ordered stream).
+    Docs: `GENERATION_PROFILE.md`, `ARCHITECTURE.md` §2.10, `GAME_LOOP.md` §4.
+- **Gen 1 roll order in `AttackAction`, behind a seam (M–L; from V7; ✗ not Ready — needs a design pass).** User
+  ruling 2026-10-11: be correct, with a generation seam.
+  - *Scope:* `AttackAction` resolves a move in pokered's order, and the order is a new `IBattleRules` member, e.g.
+    `HitRollOrder { CritAndDamageThenAccuracy, AccuracyThenCritAndDamage }`. Gen 1–2 roll crit → damage →
+    accuracy (pokered `engine/battle/core.asm:3140-3150`; pokecrystal `data/moves/effects.asm` `NormalHit`:
+    `critical … damagevariation, checkhit`); Gen 3+ roll accuracy first (pokeemerald `data/battle_scripts_1.s`
+    `BattleScript_EffectHit`: `accuracycheck … critcalc, damagecalc`) — today's order.
+  - *Gen 1 sequence already sourced:* multi-hit count (`SpecialEffectsCont`, `core.asm:3133`) → crit roll (none
+    for a 0-power move, `CriticalHitTest` `ret z`; none for `SetDamageEffects` = Super Fang and the fixed-damage
+    moves Seismic Toss/Night Shade/Dragon Rage/Sonic Boom/Psywave, `data/battle/set_damage_effects.asm`) → Counter
+    (`:3141`) → damage calc, with the OHKO speed check inside (`:4328`; a slower user stops here: no damage or
+    accuracy roll, `:3145`) → damage roll (none when damage ≤ 1, `RandomizeDamage`) → `MoveHitTest`: Dream Eater
+    awake check, Swift, the Substitute/drain bug, Fly/Dig invulnerability, Mist, X Accuracy, then the accuracy roll
+    (`:5228-5327`). **Multi-hit rolls crit, damage and accuracy once; every strike repeats the first strike's
+    damage** (`:3227` loop, "damage calculation and accuracy tests only happen for the first hit") — this absorbs
+    the "multi-hit re-rolls crit/variance per hit" part of §3.1's damage/accuracy core.
+  - *What the design pass must pin before this is Ready:* where Gen 1 applies type immunity
+    (`AdjustDamageForMoveType`) relative to the accuracy roll, and which message wins when a move is both immune
+    and would miss; where freeze-thaw sits; Psywave's damage roll (after the hit, in `ApplyAttack…`); Self-Destruct
+    and Explosion on a miss; status moves (their effect functions call `MoveHitTest` themselves); how the rules
+    stream (`Gen1BattleRules._rng`: damage variance, multi-hit count) and the action stream (`_rng`: crit, accuracy)
+    map onto one Gen 1 sequence (resolved by "Battle randomness is only half-seeded" above, once both share one
+    source); and the seam's exact shape (an enum vs an ordered step list).
+  - *Acceptance (draft):* scripted-`IRandomSource` tests assert the Gen 1 draw sequence per move kind; a
+    `DelegatingBattleRules` with the Gen 3 order reproduces today's sequence (falsification); multi-hit strikes
+    deal equal damage; `XAccuracyContractTests.XAccuracyMakesAFasterOhkoUserLandThroughMaxedEvasion` stays green.
+  - *Gen-variable surface:* the new `IBattleRules` member (`GENERATION_SEAMS.md`). *Gen 1 source:* pokered, as
+    cited. *Data vs runtime:* runtime only. *Quirks the tests assert:* a slower OHKO user draws only the crit
+    roll; Dream Eater on an awake target draws crit and damage but not accuracy; a multi-hit move's strikes all
+    deal the first strike's damage. *Dependencies:* overlaps §1 #8 (§3.1 damage/accuracy core) — the multi-hit
+    part moves here. A central-method rewrite: `opus-engineer` for the code, then `requirements-review` and
+    `pr-review`.
 - **Importer hardening follow-ups (the §1 #4 item shipped #4a–#4e 2026-10-11; record in `TODO_ARCHIVE.md` → "§1 #4
   Importer hardening — step #4e"). Two candidates remain, neither DoR'd:**
   - **Empty-but-parseable generation list (found in #4a review):** an empty generation list (moves/items) still
@@ -568,7 +629,7 @@ a decision (Roar/Whirlwind, the BST bands).
 | V4 | Verify ✅ and fix ✅ 2026-10-11 — record in `TODO_ARCHIVE.md` → "§7.6 V4 — scripts and logging"; Dockerfile items → §9 | — | — |
 | V5 | Verify ✅ 2026-10-11 (verdicts in TODO_ARCHIVE.md → "§1 #4 Importer hardening — step #4e": 4 read-confirmed, 1 refuted, 1 partly refuted). No in-slice fixes — all needed a test seam → shipped as §1 #4, archived | — | — |
 | V6 | Verify ✅ and fix ✅ 2026-10-11 — record in `TODO_ARCHIVE.md` → "§7.6 V6 — importer/data lows"; `-wal`, item `Cost` and the Yellow-label findings → their own §3.2 entries | — | — |
-| V7 | Gate order (Dream Eater, OHKO speed) and Dire Hit / Guard Spec reuse (§3.2) | pokered + code | Gen 1 source per claim |
+| V7 | Verify ✅ and fix ✅ 2026-10-11 — record in `TODO_ARCHIVE.md` → "§7.6 V7 — gate order and battle-item reuse"; the roll-order verdict → §3.2 "Gen 1 roll order" | — | — |
 | V8 | Turn-order/status edges: trap after trapper faints, double recharge, `CanAct` order, para/confusion cancel (§3.1) | pokered + code; scratch test | Gen 1 source per claim |
 | V9 | Smaller gaps I: confusion self-damage, binding duration, Stat Exp rounding, Psywave max (§3.1) | pokered + code | Gen 1 source per claim |
 | V10 | Smaller gaps II: Mist, Leech Seed + Toxic, Fire thaw via Substitute, trainer XP rounding, post-Transform crit, Substitute at exact HP (§3.1) | pokered + code | Gen 1 source per claim |

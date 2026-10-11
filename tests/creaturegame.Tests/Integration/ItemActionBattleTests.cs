@@ -201,6 +201,130 @@ public class ItemActionBattleTests
         Assert.Equal(0, bag.Count(56)); // consumed
     }
 
+    private static Item DireHit() =>
+        new()
+        {
+            Id = 56,
+            Name = "dire-hit",
+            Category = ItemCategory.BattleStatBoost,
+            BoostsCrit = true,
+        };
+
+    private static Item GuardSpec() =>
+        new()
+        {
+            Id = 55,
+            Name = "guard-spec",
+            Category = ItemCategory.BattleStatBoost,
+            SetsMist = true,
+        };
+
+    private static Item XAttack() =>
+        new()
+        {
+            Id = 57,
+            Name = "x-attack",
+            Category = ItemCategory.BattleStatBoost,
+            StatBoostStat = StageStat.Attack,
+            StatBoostStages = 1,
+        };
+
+    private sealed class RulesRefusingNoEffectBoosters()
+        : DelegatingBattleRules(new SeededRandomSource(1))
+    {
+        public override bool RepeatFlagItemRefused => true;
+
+        public override bool CappedXItemRefused => true;
+    }
+
+    private static (Creature Player, Creature Enemy) Duelists()
+    {
+        var player = TestCreatures.Make("Player", hp: 999, speed: 200);
+        player.AddAttack(Tackle());
+        var enemy = TestCreatures.Make("Enemy", hp: 60, speed: 1);
+        enemy.AddAttack(Tackle());
+        return (player, enemy);
+    }
+
+    [Fact]
+    public async Task ASecondDireHit_IsSpentWithNoEffect()
+    {
+        var (player, enemy) = Duelists();
+        var bag = new Bag();
+        bag.Add(56, 2);
+
+        var em = await RunAsync(
+            new TurnChoiceInput(new ItemTurnChoice(DireHit()), new ItemTurnChoice(DireHit())),
+            bag,
+            player,
+            enemy
+        );
+
+        Assert.Equal(2, em.Of<ItemUsed>().Count());
+        Assert.Single(em.Of<FocusEnergyApplied>());
+        Assert.Empty(em.Of<ItemUseFailed>());
+        Assert.Empty(em.Of<ButNothingHappened>());
+        Assert.Equal(0, bag.Count(56));
+    }
+
+    [Fact]
+    public async Task ASecondGuardSpec_IsSpentWithNoEffect()
+    {
+        var (player, enemy) = Duelists();
+        var bag = new Bag();
+        bag.Add(55, 2);
+
+        var em = await RunAsync(
+            new TurnChoiceInput(new ItemTurnChoice(GuardSpec()), new ItemTurnChoice(GuardSpec())),
+            bag,
+            player,
+            enemy
+        );
+
+        Assert.Equal(2, em.Of<ItemUsed>().Count());
+        Assert.Single(em.Of<MistApplied>());
+        Assert.Empty(em.Of<ItemUseFailed>());
+        Assert.Equal(0, bag.Count(55));
+    }
+
+    [Fact]
+    public async Task AnXItemAtPlusSix_IsSpent_ThenNothingHappens()
+    {
+        var (player, enemy) = Duelists();
+        var bag = new Bag();
+        bag.Add(57, 7);
+        var choices = Enumerable.Range(0, 7).Select(_ => (TurnChoice)new ItemTurnChoice(XAttack()));
+
+        var em = await RunAsync(new TurnChoiceInput([.. choices]), bag, player, enemy);
+
+        Assert.Equal(0, bag.Count(57));
+        Assert.Equal(7, em.Of<ItemUsed>().Count());
+        Assert.Equal(6, em.Of<StatStageChanged>().Count(e => e.CreatureName == "Player"));
+        var events = em.Events.ToList();
+        int lastUse = events.FindLastIndex(e => e is ItemUsed);
+        Assert.IsType<ButNothingHappened>(events[lastUse + 1]);
+    }
+
+    [Fact]
+    public async Task UnderRulesThatRefuseNoEffectBoosters_TheRepeatIsRefusedAndKept()
+    {
+        var (player, enemy) = Duelists();
+        var bag = new Bag();
+        bag.Add(56, 2);
+
+        var em = await RunAsync(
+            new TurnChoiceInput(new ItemTurnChoice(DireHit()), new ItemTurnChoice(DireHit())),
+            bag,
+            player,
+            enemy,
+            rules: new RulesRefusingNoEffectBoosters()
+        );
+
+        Assert.Single(em.Of<ItemUsed>());
+        Assert.Single(em.Of<ItemUseFailed>());
+        Assert.Equal(1, bag.Count(56));
+    }
+
     private static Item XAccuracy() =>
         new()
         {

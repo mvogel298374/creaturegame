@@ -233,6 +233,10 @@ public sealed class Gen1BattleRules : IBattleRules
 
     public bool XAccuracyBypassesAccuracyCheck => true;
 
+    public bool RepeatFlagItemRefused => false;
+
+    public bool CappedXItemRefused => false;
+
     // ── Stat selection ─────────────────────────────────────────────────────────
 
     // Gen 1: Physical moves use Attack/Defense; Special moves use the combined Special stat.
