@@ -88,27 +88,27 @@ data/engine item usually also means updating the test that pins the wrong value.
 
 ### 3.1 Engine
 
-- **Damage/accuracy core (L):** `DamageCalculator.cs:219-223` skips the `2L/5` and `/50` floors `GEN_DIFFERENCES.md`
-  documents (~24% high at L12); `Gen1BattleRules.cs:213-219` uses a 3-based accuracy/evasion table (Gen 1 uses the
-  standard table); crit multiplier should be ≈(2L+5)/(L+5), not a flat 2× (`:258`); multi-hit continues past a broken
-  Substitute (`AttackAction.cs:379-404`; its per-hit crit/variance re-roll moved to §3.2 "Gen 1 roll order"); recoil/drain/Struggle use full
-  calculated damage, not HP actually lost (`AttackAction.cs:402,430-437`); Ice can freeze Ice / Electric can
-  paralyse Electric (`Gen1BattleRules.cs:161`); Fly/Dig are not untargetable on the charge turn (not listed as a
+- **Damage/accuracy core (L):** `DamageCalculator.cs:250-251` skips the `2L/5` and `/50` floors `GEN_DIFFERENCES.md`
+  documents (~24% high at L12); `Gen1BattleRules.cs:205-213` uses a 3-based accuracy/evasion table (Gen 1 uses the
+  standard table); crit multiplier should be ≈(2L+5)/(L+5), not a flat 2× (`Gen1BattleRules.cs:273`); multi-hit continues past a broken
+  Substitute (`AttackAction.ResolveDamage`'s multi-hit loop); recoil/drain/Struggle use full calculated damage, not
+  HP actually lost (`AttackAction.ExecuteAsync` Struggle recoil, `ResolveDamage` drain); Ice can freeze Ice /
+  Electric can paralyse Electric (`Gen1BattleRules.CanReceiveStatus`); Fly/Dig are not untargetable on the charge turn (not listed as a
   known gap).
 - **Turn-order/status edges:** a trap persists after the trapper faints (`StatusResolver.cs:46-50`); the recharge
   turn can be lost twice (`Battle.cs:195` runs `CanAct` before `AttackAction.cs:69`'s recharge check) and the
   `CanAct` order differs from Gen 1 (sleep → freeze → trapped → flinch → recharge → confusion → paralysis); full
   paralysis and confusion self-hits don't cancel Thrash/Bide/charge/trap.
-- **Smaller Gen 1 gaps:** confusion self-damage applies variance and ignores stages/Burn (`DamageCalculator.cs:264`);
+- **Smaller Gen 1 gaps:** confusion self-damage applies variance and ignores stages/Burn (`DamageCalculator.cs:299-303`);
   binding duration is uniform 2–5 vs 3/8-3/8-1/8-1/8; Stat Exp `/4` unfloored + sqrt floored not ceiled
-  (`Gen1StatCalculator.cs:20`); Psywave max one too high (`Gen1BattleRules.cs:150`); Mist message before the chance
-  roll and Mist shouldn't block secondary drops (`AttackAction.cs:657`); Leech Seed ignores the Toxic counter
-  (`Battle.cs:674`); a Fire move thaws via a Substitute hit (`AttackAction.cs:270`); trainer XP 1.5× rounding
+  (`Gen1StatCalculator.cs:20`); Psywave max one too high (`Gen1BattleRules.cs:143-151`); Mist message before the chance
+  roll and Mist shouldn't block secondary drops (`AttackAction.TryApplyStatEffect`); Leech Seed ignores the Toxic counter
+  (`Battle.cs:674`); a Fire move thaws via a Substitute hit (`AttackAction.TryThawTarget`); trainer XP 1.5× rounding
   (`:267`); post-Transform crit speed; Substitute at exactly the HP cost should succeed (`MoveEffects.cs:497`).
 - **Open question (documented, but Gen 1 differs):** after Roar/Whirlwind the scared-off foe still acts
   (`Battle.cs:311-313`), which can end the run via a faint with a healthy bench (`GAME_LOOP.md:135`); Gen 1 ends
   the battle immediately. **Needs-decision.**
-- **Seam leak / AI / validation:** `DamageCalculator.cs:189-198` uses Special stages directly, bypassing
+- **Seam leak / AI / validation:** `DamageCalculator.cs:211-226` uses Special stages directly, bypassing
   `GetOffensiveStat`/`GetDefensiveStat` (a Gen 2 Special split would need a change here); AI evaluators overvalue
   10% secondary status and Thunder Wave vs Ground (`MoveEvaluators.cs:153-177`); `Battle.cs:529-531` trusts a
   `MoveTurnChoice` (no PP/Disable check; only `SignalRInput.ResolveMove` validates); latent `Biome.cs:301` crash if
@@ -125,38 +125,17 @@ data/engine item usually also means updating the test that pins the wrong value.
 - **Found 2026-10-11 during V7 / the item seam (unverified beyond the citation; each needs its own DoR):**
   - *AI stat-down 25% fail:* in a normal battle the enemy's stat-lowering status moves first roll a 25% fail
     (pokered `engine/battle/effects.asm` `StatModifierDownEffect` +14); we don't model it.
-  User ruling 2026-10-11: leave this one as filed; the other two became entries and shipped (`TODO_ARCHIVE.md` → "Battle randomness fully seeded; Dire Hit / Guard Spec narration").
-- **Gen 1 roll order in `AttackAction`, behind a seam (M–L; from V7; ✗ not Ready — needs a design pass).** User
-  ruling 2026-10-11: be correct, with a generation seam.
-  - *Scope:* `AttackAction` resolves a move in pokered's order, and the order is a new `IBattleRules` member, e.g.
-    `HitRollOrder { CritAndDamageThenAccuracy, AccuracyThenCritAndDamage }`. Gen 1–2 roll crit → damage →
-    accuracy (pokered `engine/battle/core.asm:3140-3150`; pokecrystal `data/moves/effects.asm` `NormalHit`:
-    `critical … damagevariation, checkhit`); Gen 3+ roll accuracy first (pokeemerald `data/battle_scripts_1.s`
-    `BattleScript_EffectHit`: `accuracycheck … critcalc, damagecalc`) — today's order.
-  - *Gen 1 sequence already sourced:* multi-hit count (`SpecialEffectsCont`, `core.asm:3133`) → crit roll (none
-    for a 0-power move, `CriticalHitTest` `ret z`; none for `SetDamageEffects` = Super Fang and the fixed-damage
-    moves Seismic Toss/Night Shade/Dragon Rage/Sonic Boom/Psywave, `data/battle/set_damage_effects.asm`) → Counter
-    (`:3141`) → damage calc, with the OHKO speed check inside (`:4328`; a slower user stops here: no damage or
-    accuracy roll, `:3145`) → damage roll (none when damage ≤ 1, `RandomizeDamage`) → `MoveHitTest`: Dream Eater
-    awake check, Swift, the Substitute/drain bug, Fly/Dig invulnerability, Mist, X Accuracy, then the accuracy roll
-    (`:5228-5327`). **Multi-hit rolls crit, damage and accuracy once; every strike repeats the first strike's
-    damage** (`:3227` loop, "damage calculation and accuracy tests only happen for the first hit") — this absorbs
-    the "multi-hit re-rolls crit/variance per hit" part of §3.1's damage/accuracy core.
-  - *What the design pass must pin before this is Ready:* where Gen 1 applies type immunity
-    (`AdjustDamageForMoveType`) relative to the accuracy roll, and which message wins when a move is both immune
-    and would miss; where freeze-thaw sits; Psywave's damage roll (after the hit, in `ApplyAttack…`); Self-Destruct
-    and Explosion on a miss; status moves (their effect functions call `MoveHitTest` themselves); how the rules
-    stream (`Gen1BattleRules._rng`: damage variance, multi-hit count) and the action stream (`_rng`: crit, accuracy)
-    map onto one Gen 1 sequence (resolved: both now share the run's one source — `TODO_ARCHIVE.md` → "Battle randomness fully seeded"); and the seam's exact shape (an enum vs an ordered step list).
-  - *Acceptance (draft):* scripted-`IRandomSource` tests assert the Gen 1 draw sequence per move kind; a
-    `DelegatingBattleRules` with the Gen 3 order reproduces today's sequence (falsification); multi-hit strikes
-    deal equal damage; `XAccuracyContractTests.XAccuracyMakesAFasterOhkoUserLandThroughMaxedEvasion` stays green.
-  - *Gen-variable surface:* the new `IBattleRules` member (`GENERATION_SEAMS.md`). *Gen 1 source:* pokered, as
-    cited. *Data vs runtime:* runtime only. *Quirks the tests assert:* a slower OHKO user draws only the crit
-    roll; Dream Eater on an awake target draws crit and damage but not accuracy; a multi-hit move's strikes all
-    deal the first strike's damage. *Dependencies:* overlaps §1 #8 (§3.1 damage/accuracy core) — the multi-hit
-    part moves here. A central-method rewrite: `opus-engineer` for the code, then `requirements-review` and
-    `pr-review`.
+  - *A failed OHKO says "missed", Gen 1–2 say "<target> is unaffected!" (found 2026-10-11, second review of "Gen 1
+    roll order", archived; source-confirmed, predates it):* the OHKO effect sets `wCriticalHitOrOHKO` to `$ff` and
+    `PrintMoveFailureText` then prints `UnaffectedText` (pokered `engine/battle/core.asm:3783`); Gen 2 the same
+    (pokecrystal `effect_commands.asm:2211-2214`). We emit `MoveMissed`. Needs a new event or message on the wire
+    (C# + TS), so its own DoR.
+  - *Struggle skips the accuracy roll* (found during "Gen 1 roll order", archived): `AttackAction.Connects`
+    treats Struggle as never-miss; in pokered it goes through `MoveHitTest` like any move (so the 1/256 miss applies).
+    Unverified beyond that reading; needs its own DoR. **Fixing it must flip
+    `RollOrderContractTests.StruggleRollsCritAndDamageWithNoAccuracyDrawMirroringTheKnownGap`.**
+  User ruling 2026-10-11: leave this one as filed; the other two became entries and shipped (`TODO_ARCHIVE.md` → "Battle randomness fully seeded; Dire Hit / Guard Spec narration"). The
+  roll-order work that surfaced the last two: `TODO_ARCHIVE.md` → "Gen 1 roll order in `AttackAction`".
 - **Importer hardening follow-ups (the §1 #4 item shipped #4a–#4e 2026-10-11; record in `TODO_ARCHIVE.md` → "§1 #4
   Importer hardening — step #4e"). Two candidates remain, neither DoR'd:**
   - **Empty-but-parseable generation list (found in #4a review):** an empty generation list (moves/items) still
@@ -504,8 +483,9 @@ invisible in builds.
 
 ### 7.3 Watch items — do not refactor speculatively
 
-- [ ] `AttackAction` still has three large methods (`ResolveDamage` 145 lines, `ExecuteAsync` 140,
-  `ResolvePreDamageGates` 112); central and well-tested — revisit only if a change makes it hurt.
+- [ ] `AttackAction` still has large methods after the roll-order rewrite (`ExecuteAsync` ~190 lines, `ResolveDamage`
+  ~115, `TryApplyStatEffect` ~65; the old `ResolvePreDamageGates` is gone, split into `TryRollBeforeHitTest`,
+  `RollStrike`, `Connects` and friends); central and well-tested — revisit only if a change makes it hurt.
 - [ ] `Console.WriteLine` is the web layer's whole logging strategy (no `ILogger<T>`); do it as a mechanical pass the
   first time a real Fly.io debugging need bites.
 - [ ] `Battle`'s constructor is at 12 parameters; apply the `RunDirectorOptions` precedent (a `BattleOptions` record
@@ -598,7 +578,7 @@ a decision (Roar/Whirlwind, the BST bands).
 | V4 | Verify ✅ and fix ✅ 2026-10-11 — record in `TODO_ARCHIVE.md` → "§7.6 V4 — scripts and logging"; Dockerfile items → §9 | — | — |
 | V5 | Verify ✅ 2026-10-11 (verdicts in TODO_ARCHIVE.md → "§1 #4 Importer hardening — step #4e": 4 read-confirmed, 1 refuted, 1 partly refuted). No in-slice fixes — all needed a test seam → shipped as §1 #4, archived | — | — |
 | V6 | Verify ✅ and fix ✅ 2026-10-11 — record in `TODO_ARCHIVE.md` → "§7.6 V6 — importer/data lows"; `-wal`, item `Cost` and the Yellow-label findings → their own §3.2 entries | — | — |
-| V7 | Verify ✅ and fix ✅ 2026-10-11 — record in `TODO_ARCHIVE.md` → "§7.6 V7 — gate order and battle-item reuse"; the roll-order verdict → §3.2 "Gen 1 roll order" | — | — |
+| V7 | Verify ✅ and fix ✅ 2026-10-11 — record in `TODO_ARCHIVE.md` → "§7.6 V7 — gate order and battle-item reuse"; the roll-order verdict → shipped, `TODO_ARCHIVE.md` → "Gen 1 roll order in `AttackAction`" | — | — |
 | V8 | Turn-order/status edges: trap after trapper faints, double recharge, `CanAct` order, para/confusion cancel (§3.1) | pokered + code; scratch test | Gen 1 source per claim |
 | V9 | Smaller gaps I: confusion self-damage, binding duration, Stat Exp rounding, Psywave max (§3.1) | pokered + code | Gen 1 source per claim |
 | V10 | Smaller gaps II: Mist, Leech Seed + Toxic, Fire thaw via Substitute, trainer XP rounding, post-Transform crit, Substitute at exact HP (§3.1) | pokered + code | Gen 1 source per claim |

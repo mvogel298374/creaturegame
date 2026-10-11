@@ -8,6 +8,156 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Gen 1 roll order in `AttackAction`, behind a seam; `acquisition.spec` reaches a draft ✅ DONE (2026-10-12)
+
+**Was** `TODO.md` §3.2 "Gen 1 roll order in `AttackAction`, behind a seam" (L; from §7.6 V7; design pass done and greenlit
+2026-10-11) plus the S test-only bullet "`acquisition.spec` can't reach a draft". Player-visible -> `PRODUCT_SPEC.md` §2
+*Gen 1 battle roll order and immunity*. Docs: `GENERATION_SEAMS.md` §2 (*Roll order* row), `GEN_DIFFERENCES.md` → *Roll Order*.
+
+**What shipped.** `AttackAction` rewritten to resolve a move in pokered's order, behind six `IBattleRules` members:
+`HitRollOrder`, `MultiHitRepeatsFirstStrike`, `FixedDamageChecksTypeImmunity`, `DamageRollSkippedBelowTwo`,
+`StatusMoveImmunityBeforeAccuracy`, `CrashOnTypeImmunity` (Gen 1 values in the design pass below). Thaw runs after the
+damage. Tests: `RollOrderContractTests` (a `RecordingRandomSource` shared by rules and action pins each row of the
+Gen 1 sequence table; a `DelegatingBattleRules` with every member flipped reproduces the old order), `EstimateRange`
+exact-range test, and four pinned immunity tests flipped (see rulings).
+
+**User rulings (2026-10-11 / 12).**
+- Follow pokered on fixed-damage / Counter immunity: Seismic Toss, Night Shade, Sonic Boom, Counter now hit "immune"
+  targets in Gen 1 (Super Fang added). The pinned tests `ImmunityContractTests.GhostTypesAreImmuneToSeismicToss`, its
+  Night Shade case, `FixedDamageContractTests.SonicBoomDoesNotAffectGhostTypes` and the Counter case were flipped; they
+  had been written in Batch 8 without a pokered citation.
+- Every generation difference is noted and behind a seam; but Gen 3 is not modelled beyond switches (members 4-6 cite
+  Gen 2 and Gen 3 values for the seam, nothing more).
+- Explosion/Self-Destruct against an immune target faints the user, and a KO suppresses the thaw: confirmed.
+- Struggle's missing accuracy roll deferred (open in `TODO.md` §3.2; fixing it must flip
+  `RollOrderContractTests.StruggleRollsCritAndDamageWithNoAccuracyDrawMirroringTheKnownGap`).
+- `acquisition.spec`: Dev-Mode-only accepted.
+
+**Gates.** format clean; test-runner green (2178+); user-run full E2E earlier showed only `acquisition.spec` failing
+(fixed, re-run passed). `requirements-review` x2: first 11 findings (fixed or user-ruled as above); second 6 findings
+(thaw and Explosion cited gen-invariant Gen 1-3, member 6 added, XML doc trimmed, TODO wording fixed, OHKO "is
+unaffected!" message filed separately in `TODO.md` §3.2, E2E confirmed). `pr-review` CHANGES-REQUESTED, 2 blockers + 4
+recommended, all fixed: OHKO damage roll gated by `DamageRollSkippedBelowTwo` with a test; Counter's crit-roll reason
+cited in `GEN_DIFFERENCES.md`; `EstimateRange` exact-range test; `PureStatusMoveChecksTypeImmunity` doc; dead
+`SecondaryChance` constant removed; `OhkoFails` helper; `HitRollOrder` doc "Gen 2: per move script";
+`AccuracyFirstRules` summary. Post-gate test fix: `StatusConditionTests.Freeze_ThawsOnFireHitWithBurnEffect` was flaky
+(unseeded 60-HP defender sometimes KO'd by Flamethrower, and a KO suppresses the thaw); defender now 999 HP and the
+test asserts it survives. One `pr-review` advisory refuted: a resisted OHKO does draw a damage roll in pokered
+(`OneHitKOEffect` sets damage 65535 before the type multiplier).
+
+### The entry as filed (moved here from `TODO.md` §3.2 on closing)
+
+- *Scope:* `AttackAction` resolves a move in pokered's order, and the order is an `IBattleRules` member
+  `HitRollOrder { CritAndDamageThenAccuracy, AccuracyThenCritAndDamage }`. Gen 1–2 roll crit → damage → accuracy
+  (pokered `engine/battle/core.asm:3140-3150`; pokecrystal `data/moves/effects.asm` `NormalHit`:
+  `critical … damagevariation, checkhit`); Gen 3+ roll accuracy first (pokeemerald `data/battle_scripts_1.s`
+  `BattleScript_EffectHit`: `accuracycheck … critcalc, damagecalc`) — the pre-change order.
+- *Gen 1 sequence sourced:* multi-hit count (`SpecialEffectsCont`, `core.asm:3133`) → crit roll (none for a 0-power
+  move, `CriticalHitTest` `ret z`; none for `SetDamageEffects` = Super Fang and the fixed-damage moves Seismic
+  Toss/Night Shade/Dragon Rage/Sonic Boom/Psywave, `data/battle/set_damage_effects.asm`) → Counter (`:3141`) → damage
+  calc, with the OHKO speed check inside (`:4328`; a slower user stops here: no damage or accuracy roll, `:3145`) →
+  damage roll (none when damage ≤ 1, `RandomizeDamage`) → `MoveHitTest`: Dream Eater awake check, Swift, the
+  Substitute/drain bug, Fly/Dig invulnerability, Mist, X Accuracy, then the accuracy roll (`:5228-5327`). **Multi-hit
+  rolls crit, damage and accuracy once; every strike repeats the first strike's damage** (`:3227` loop, "damage
+  calculation and accuracy tests only happen for the first hit") — this absorbed the "multi-hit re-rolls
+  crit/variance per hit" part of §3.1's damage/accuracy core.
+- **Design pass (2026-10-11)**, each open question pinned against the source:
+  - *Type immunity:* applied **inside** the damage calc (`AdjustDamageForMoveType`, `core.asm:5075` +97-102: 0× ⇒
+    damage 0 and `wMoveMissed`), *before* `MoveHitTest`, which still draws its accuracy roll. The message is "doesn't
+    affect" whenever the multiplier is 0, whatever the roll (`PrintMoveFailureText` checks `wDamageMultipliers`
+    first). The old code halted on immunity *after* the accuracy roll, so an immune target that also rolled a miss
+    showed "missed" — wrong.
+  - *Fixed damage and Counter ignore immunity in Gen 1:* `SetDamageEffects` jump straight to `MoveHitTest`
+    (`core.asm:3136-3139`), Counter returns into `:3142` — both skip `AdjustDamageForMoveType`, and
+    `ApplyAttackToEnemyPokemon`'s Super Fang / special-damage branches have no type check. So Seismic Toss hits a
+    Ghost, Night Shade hits a Normal. Gen 2 checks it (pokecrystal `StaticDamage` → `resettypematchup`,
+    `engine/battle/effect_commands.asm:1473`: "If there is immunity in play, the move automatically misses").
+  - *Freeze-thaw:* after the damage, as a side effect (`effects.asm` `CheckDefrost`, `:312-343`); Gen 2 the same
+    (`BurnHit` → `burntarget` after `applydamage`; `effect_commands.asm:3938`). The old code thawed in a pre-damage
+    gate. Gen-invariant, so an inline reorder: damage, then thaw.
+  - *Psywave:* damage drawn after the hit test (`ApplyAttackToEnemyPokemon` +46-59) — already so.
+  - *Self-Destruct/Explosion on a miss:* unchanged — the user still faints (`:3156`).
+  - *Status moves:* no crit/damage roll; the effect calls `MoveHitTest` then its own draws — already so.
+  - *OHKO:* crit roll (power 1), then the speed check; a slower user stops (no damage or accuracy roll); a faster one
+    gets the damage roll (`RandomizeDamage` on 65535) and the accuracy roll.
+  - *Streams:* one source since `ae5a7cd` (`BuildBattleRules(session.Rng)`), so the order is one sequence.
+  - *Seam shape:* `IBattleRules` members, not an ordered step list — Gen 2 orders its rolls per move script
+    (`MultiHit` runs `checkhit` before `critical`, pokecrystal `data/moves/effects.asm:842`), so no single switch
+    describes all of Gen 2; the members describe Gen 1 and Gen 3+ exactly and say so.
+    1. `HitRollOrder { CritAndDamageThenAccuracy, AccuracyThenCritAndDamage }` — Gen 1 the first; Gen 3+ the second
+       (pokeemerald `BattleScript_EffectHit`).
+    2. `MultiHitRepeatsFirstStrike` — Gen 1 `true` (`core.asm` multi-hit loop comment); Gen 2 `false` (pokecrystal
+       `MultiHit` loops `critical … damagevariation` per strike).
+    3. `FixedDamageChecksTypeImmunity` — Gen 1 `false`; Gen 2 `true` (`:1473`). Covers fixed damage, Super Fang,
+       Psywave and Counter.
+    **Seam-audit extension (user ruling 2026-10-11: every generation difference noted and behind a seam).** Two rules
+    the first implementation hard-coded turned out to vary by generation:
+    4. `DamageRollSkippedBelowTwo` — Gen 1–2 `true`: no damage roll when damage ≤ 1 (pokered `RandomizeDamage`;
+       pokecrystal `BattleCommand_DamageVariation`, `effect_commands.asm:1496-1508`, "No point in reducing 1 or 0
+       damage"); Gen 3 `false`: always draws (pokeemerald `ApplyRandomDmgMultiplier`,
+       `src/battle_script_commands.c:1639-1641`). Replaced the hard-coded `DamageCalculator.MinVariedDamage`.
+    5. `StatusMoveImmunityBeforeAccuracy` — Gen 1 `true` (pokered `move_effects/paralyze.asm:13-29`: Ground check, then
+       `MoveHitTest`); Gen 2 `false` (pokecrystal `DoParalyze`, `data/moves/effects.asm:1050`: `checkhit` before
+       `paralyze`, so a miss shows "missed"); Gen 3 `true` (pokeemerald `BattleScript_EffectParalyze`,
+       `data/battle_scripts_1.s:1007`: `typecalc` before `accuracycheck`). Replaced tying this rule to `HitRollOrder`.
+    Acceptance for 4–5: Gen 1 tests unchanged in outcome; a `DelegatingBattleRules` flipping each member shows the
+    other behaviour (a draw at damage 1; an accuracy draw, then "missed" or "doesn't affect", for Thunder Wave on
+    Ground); `GENERATION_SEAMS.md` §2 rows and `GEN_DIFFERENCES.md` lines with these citations. Dream Eater needs no
+    member: Gen 1–2 check sleep inside the hit test after the rolls, Gen 3 before everything
+    (`battle_scripts_1.s:425`), which the two `HitRollOrder` values already produce; Gen 3's failure message
+    (`BattleScript_DreamEaterNoEffect`) stays an unmodeled, noted difference.
+    **Second review (2026-10-11) — resolved by citation, no seam:** the thaw-after-damage-and-only-if-the-target-
+    survives rule holds in Gen 3 too (pokeemerald `MOVEEND_DEFROST`, `src/battle_script_commands.c:4257-4263`: after
+    the move, `hp != 0`), so it is Gen 1–3; Explosion/Self-Destruct faint the user on a miss in every gen (pokecrystal
+    `Selfdestruct` runs `selfdestruct` after `checkhit`; pokeemerald `setatkhptozero` first).
+    **Greenlit 2026-10-12:**
+    6. `CrashOnTypeImmunity` — Gen 1 `true` (pokered `PrintMoveFailureText`: the Jump Kick crash runs on any failure,
+       immunity included); Gen 2 `false` (pokecrystal `effect_commands.asm:2225-2227`: `ret z` when the type modifier
+       is 0); Gen 3 `false` (pokeemerald `data/battle_scripts_1.s:859`: no crash on `MOVE_RESULT_DOESNT_AFFECT_FOE`).
+       Replaced the inline crash-on-immunity in `ApplyFailedHitSideEffects`. Acceptance: Gen 1 unchanged; with the
+       member off, Hi Jump Kick on a Ghost shows "doesn't affect" and no `CrashDamage`; `GENERATION_SEAMS.md` /
+       `GEN_DIFFERENCES.md` rows.
+- *Gen 1 sequence (the behaviour built), per move kind:*
+
+  | Kind | Draws, in order | Outcome rules |
+  |:--|:--|:--|
+  | Damaging (Standard/Drain/Self-Destruct, Struggle) | [multi-hit count] → crit → damage roll (if damage ≥ 2) → accuracy | Dream Eater on an awake target fails after the damage roll, with no accuracy draw; Swift / X Accuracy skip only the accuracy draw; 0× ⇒ "doesn't affect" whatever the roll |
+  | Multi-hit | count → crit → damage → accuracy, **once** | every strike deals the first strike's damage (and its crit) |
+  | OHKO | crit → speed check → [damage → accuracy] | slower user stops after crit |
+  | Fixed damage, Super Fang, Psywave | accuracy → [Psywave damage] | no crit/damage roll; ignores immunity |
+  | Counter | crit → Counter checks → accuracy | ignores immunity |
+  | Status (power 0) | accuracy → the effect's own draws | unchanged |
+
+  Then damage, then thaw, then secondaries (unchanged).
+- *Acceptance:* a recording `IRandomSource` (logs each call; crit is `NextDouble`, damage `Next(217,256)`, accuracy
+  `Next(256)`), shared by rules and action, pins each row of the table under Gen 1; a `DelegatingBattleRules` with
+  every roll-order member flipped (`AccuracyFirstRules`) reproduces the old sequence (falsification); an immune
+  target whose roll misses emits `MoveHadNoEffect`; a frozen target hit by Ember shows `DamageDealt` before
+  `StatusCleared`; multi-hit strikes are equal; Seismic Toss hits a Ghost under Gen 1 and not under
+  `FixedDamageChecksTypeImmunity=true`, with the pinned tests flipped;
+  `XAccuracyContractTests.XAccuracyMakesAFasterOhkoUserLandThroughMaxedEvasion` stays green. Draw-order-sensitive
+  existing tests (scripted crit/accuracy) were updated, not deleted.
+- *Gen-variable surface:* the six roll-order members, with `GENERATION_SEAMS.md` §2 rows and `GEN_DIFFERENCES.md`
+  lines. *Gen 1 source:* pokered, as cited. *Data vs runtime:* runtime only. *Quirks the tests assert:* a slower OHKO
+  user draws only the crit roll; Dream Eater on an awake target draws crit and damage but not accuracy; a multi-hit
+  move's strikes all deal the first strike's damage; an immune target never shows "missed".
+- *Out of scope (stayed in §3.1):* Fly/Dig invulnerability, the Substitute/drain bug, Mist-before-roll, the crit
+  multiplier and the damage floors.
+- *Dependencies:* the seeding fix (shipped). Overlapped §1 #8 — the multi-hit part moved here. Size **L**:
+  `opus-engineer` for the code, then `requirements-review` and `pr-review`.
+
+### `acquisition.spec` can't reach a draft (S, test-only; found 2026-10-11 by the user's E2E run on this change)
+
+All three tests walked seeds 1–8 without `forceDraft`, so the offer still needed the every-3rd-win × 55% gate; with the
+battle draws moved, every seeded lone Charizard died on battle 3 (failure screenshot: 2 wins, lost the Tranquil Lake
+boss). *Acceptance:* `reachDraftOffer` passes `forceDraft: true` with seeds `[1, 2, 3, 4]` (the
+`voluntary-switch.spec` precedent, which hit the same wall) plus that spec's Dev-Mode precondition check, and the three
+tests pass in a user-run `.\e2e.ps1 -Spec acquisition` (they did, 2026-10-12). The cadence × roll gate stays covered
+at the .NET layer. *Gen-variable surface:* none. *Gen 1 source:* n/a. *Data vs runtime:* test only. *Quirk:* none.
+*Dependencies:* the roll-order change (it moved the draws). Dev-Mode-only reach accepted by the user.
+
+---
+
 ## Battle randomness fully seeded; Dire Hit / Guard Spec narration ✅ DONE (2026-10-11)
 
 **Was** two `TODO.md` §3.2 entries filed from V7 (below it): (D) "Battle randomness is only half-seeded in production"

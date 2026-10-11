@@ -40,6 +40,29 @@ public class CrashDamageContractTests(MovesFixture moves) : Gen1MoveContract(mov
     [Theory]
     [InlineData("jump-kick")]
     [InlineData("high-jump-kick")]
+    public async Task NoCrashOnTypeImmunityUnderRulesThatOnlyCrashOnAMiss(string moveName)
+    {
+        var result = await new MoveScenario()
+            .Rules(new NoImmunityCrashRules())
+            .Attacker(TestCreatures.Make("A", hp: 300))
+            .Defender(TestCreatures.Make("D", type1: DamageType.Ghost, hp: 500))
+            .Use(Move(moveName));
+
+        Assert.True(result.Has<MoveHadNoEffect>());
+        Assert.False(result.Has<CrashDamage>());
+        Assert.Equal(300, result.Attacker.Attributes.HP);
+    }
+
+    private sealed class NoImmunityCrashRules : DelegatingBattleRules
+    {
+        public override int GetHitThreshold(int acc, int accStage, int evaStage) => 256;
+
+        public override bool CrashOnTypeImmunity => false;
+    }
+
+    [Theory]
+    [InlineData("jump-kick")]
+    [InlineData("high-jump-kick")]
     public async Task UserTakesCrashDamageOnTypeImmunity(string moveName)
     {
         // Gen 1: a Fighting Jump Kick at a Ghost (0×) crashes the user just like an accuracy miss —

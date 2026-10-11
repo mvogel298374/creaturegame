@@ -229,13 +229,8 @@ public sealed class CounterEffect : IMoveEffect
         // Any damaging move records its type via DealDamageToTarget, so fixed/level-based Normal/Fighting
         // moves (Sonic Boom, Seismic Toss, Super Fang) are counterable too; only Bide's unleash opts out.
         // Which type qualifies is gen-variable (Gen 1: Normal/Fighting; Gen 2+: physical category) ⇒ the
-        // seam. Type immunity (Fighting ⇒ Ghost) is already handled by the pure-status guard above (Counter's
-        // BaseDamage 0 short-circuits to MoveHadNoEffect before here).
-        if (
-            ctx.Target.IsAlive()
-            && ctx.Source.Battle.LastDamageTaken > 0
-            && ctx.Rules.CounterQualifies(ctx.Source.Battle.LastDamageType)
-        )
+        // seam. Type immunity is AttackAction's, via IBattleRules.FixedDamageChecksTypeImmunity.
+        if (Qualifies(ctx.Source, ctx.Target, ctx.Rules))
         {
             int countered = ctx.Source.Battle.LastDamageTaken * 2;
             ctx.DealDamage(countered, 1.0, false, ctx.Attack.DamageType);
@@ -247,6 +242,11 @@ public sealed class CounterEffect : IMoveEffect
             );
         }
     }
+
+    internal static bool Qualifies(Creature source, Creature target, IBattleRules rules) =>
+        target.IsAlive()
+        && source.Battle.LastDamageTaken > 0
+        && rules.CounterQualifies(source.Battle.LastDamageType);
 }
 
 /// <summary>Mist: the opponent can't lower the user's stats until the battle ends.</summary>

@@ -54,6 +54,16 @@ public enum StatCapAnnouncement
     WontChangeFurther,
 }
 
+/// <summary>Where a move's crit and damage rolls fall relative to its accuracy roll. See GENERATION_SEAMS.md §2.</summary>
+public enum HitRollOrder
+{
+    /// <summary>Crit and damage first, then accuracy; a 0× matchup outranks a miss. Gen 1.</summary>
+    CritAndDamageThenAccuracy,
+
+    /// <summary>Accuracy first; a miss ends the move before any crit or damage roll. Gen 3+.</summary>
+    AccuracyThenCritAndDamage,
+}
+
 public interface IBattleRules
 {
     /// <summary>
@@ -239,6 +249,30 @@ public interface IBattleRules
     /// Gen 1–2: false. Gen 3+: true (Dire Hit). See GENERATION_SEAMS.md §2.</summary>
     bool BoosterItemAnnouncesEffect { get; }
 
+    /// <summary>The order a move draws its crit, damage and accuracy rolls.
+    /// Gen 1: crit and damage first. Gen 2: per move script. Gen 3+: accuracy first. See GENERATION_SEAMS.md §2.</summary>
+    HitRollOrder HitRollOrder { get; }
+
+    /// <summary>Whether every strike of a multi-hit move repeats the first strike's crit and damage.
+    /// Gen 1: true. Gen 2+: false (each strike rolls its own). See GENERATION_SEAMS.md §2.</summary>
+    bool MultiHitRepeatsFirstStrike { get; }
+
+    /// <summary>Whether fixed-damage moves, Super Fang, Psywave and Counter respect a 0× type matchup.
+    /// Gen 1: false. Gen 2: true for the static-damage moves (others unverified). See GENERATION_SEAMS.md §2.</summary>
+    bool FixedDamageChecksTypeImmunity { get; }
+
+    /// <summary>Whether damage below 2 skips the damage roll (no draw).
+    /// Gen 1–2: true. Gen 3: false (always draws). See GENERATION_SEAMS.md §2.</summary>
+    bool DamageRollSkippedBelowTwo { get; }
+
+    /// <summary>Whether a non-damaging move's type immunity ends it before the accuracy roll.
+    /// Gen 1: true. Gen 2: false (accuracy first). Gen 3: true. See GENERATION_SEAMS.md §2.</summary>
+    bool StatusMoveImmunityBeforeAccuracy { get; }
+
+    /// <summary>Whether Jump Kick / Hi Jump Kick crash on a 0× target as well as on a miss.
+    /// Gen 1: true. Gen 2+: false. See GENERATION_SEAMS.md §2.</summary>
+    bool CrashOnTypeImmunity { get; }
+
     /// <summary>
     /// Returns the number of turns a binding move traps the target.
     /// Gen 1: 2–5 turns.
@@ -376,15 +410,13 @@ public interface IBattleRules
     /// <para>
     /// Gen 1: almost no status move checks it — Confuse Ray/Supersonic confuse a Ghost, Glare paralyses a
     /// Ghost, Growl lowers a Ghost's Attack, sleep/Disable land regardless of type. Only Thunder Wave
-    /// (Electric ⇒ Ground is immune) and Counter (reflects damage ⇒ Ghost takes none of its Fighting type)
-    /// return true. Gen 2 makes status moves respect immunity generally ⇒ seam, not a hardcoded check.
-    /// Damaging moves are gated separately and unconditionally: a 0× damaging move halts with the same
-    /// "doesn't affect" announcement before its damage and secondary steps (gen-invariant, so it lives
-    /// inline in <c>AttackAction.ResolvePreDamageGates</c>, not on this seam).
+    /// (Electric ⇒ Ground is immune) returns true. Gen 2 makes status moves respect immunity generally ⇒ seam,
+    /// not a hardcoded check. Counter is governed by <see cref="FixedDamageChecksTypeImmunity"/> instead.
+    /// Power-based damaging moves always respect immunity; fixed-damage moves follow <see cref="FixedDamageChecksTypeImmunity"/>.
     /// </para>
     /// <para>
     /// Implementations may key off the move's status/effect/type rather than a foe-direction flag — safe
-    /// only because every qualifying move (Thunder Wave, Counter) is inherently foe-directed. A future move
+    /// only because every qualifying move (Thunder Wave) is inherently foe-directed. A future move
     /// returning true here MUST be foe-directed (the result is applied against the <i>target's</i> type), or
     /// re-add a target-direction guard.
     /// </para>

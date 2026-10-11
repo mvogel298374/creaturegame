@@ -58,6 +58,24 @@ public class DamageRangeTests
         Assert.True(range.Min < range.Max);
     }
 
+    private static (Creature attacker, Creature defender) OneDamagePair() =>
+        (
+            TestCreatures.Make("A", level: 1, attack: 1),
+            TestCreatures.Make("D", type1: DamageType.Rock, hp: 500, defense: 999)
+        );
+
+    [Fact]
+    public void OneDamageHit_UnderGen1_IsAnExactRange()
+    {
+        var (a, d) = OneDamagePair();
+        var range = DamageCalculator
+            .EstimateRange(a, d, Tackle(40), Chart, Gen1BattleRules.Instance)!
+            .Value;
+
+        Assert.Equal(1, range.Min);
+        Assert.Equal(1, range.Max);
+    }
+
     [Fact]
     public void StabAndTypeEffectiveness_ShiftTheRange()
     {

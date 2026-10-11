@@ -87,6 +87,18 @@ public abstract class DelegatingBattleRules : IBattleRules
 
     public virtual bool BoosterItemAnnouncesEffect => _inner.BoosterItemAnnouncesEffect;
 
+    public virtual HitRollOrder HitRollOrder => _inner.HitRollOrder;
+
+    public virtual bool MultiHitRepeatsFirstStrike => _inner.MultiHitRepeatsFirstStrike;
+
+    public virtual bool FixedDamageChecksTypeImmunity => _inner.FixedDamageChecksTypeImmunity;
+
+    public virtual bool DamageRollSkippedBelowTwo => _inner.DamageRollSkippedBelowTwo;
+
+    public virtual bool StatusMoveImmunityBeforeAccuracy => _inner.StatusMoveImmunityBeforeAccuracy;
+
+    public virtual bool CrashOnTypeImmunity => _inner.CrashOnTypeImmunity;
+
     public virtual double GetCritChance(Creature a, Attack m) => _inner.GetCritChance(a, m);
 
     public virtual double CritMultiplier => _inner.CritMultiplier;
@@ -205,6 +217,32 @@ public sealed class ForceSecondaryRules : DelegatingBattleRules
     public override double GetCritChance(Creature a, Attack m) => 0.0;
 
     public override int GetSecondaryEffectChance(Attack m, SecondaryEffectKind e) => 100;
+}
+
+/// <summary>Always hits, and fixed damage / Super Fang / Psywave / Counter respect type immunity (not Gen 1).</summary>
+public sealed class FixedDamageImmunityRules : DelegatingBattleRules
+{
+    public static readonly FixedDamageImmunityRules Instance = new();
+
+    public override int GetHitThreshold(int acc, int accStage, int evaStage) => 256;
+
+    public override bool FixedDamageChecksTypeImmunity => true;
+}
+
+/// <summary>Gen 1 except for the roll-order members, which take Gen 3-style accuracy-first values.</summary>
+public sealed class AccuracyFirstRules(IRandomSource rng) : DelegatingBattleRules(rng)
+{
+    public override HitRollOrder HitRollOrder => HitRollOrder.AccuracyThenCritAndDamage;
+
+    public override bool MultiHitRepeatsFirstStrike => false;
+
+    public override bool FixedDamageChecksTypeImmunity => true;
+
+    public override bool DamageRollSkippedBelowTwo => false;
+
+    public override bool StatusMoveImmunityBeforeAccuracy => false;
+
+    public override bool CrashOnTypeImmunity => false;
 }
 
 /// <summary>Always hits with a fixed multi-hit count — pins the number of strikes deterministically.</summary>

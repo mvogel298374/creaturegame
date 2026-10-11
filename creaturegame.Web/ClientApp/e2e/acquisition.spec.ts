@@ -7,8 +7,8 @@ import { answerNicknameIfPresent, fightButton, isShowing, logLines, walkSeedsUnt
  * roster layer was covered only at the .NET/Vitest layer.
  *
  * Two answers, two runs: ADD deposits into the party (the strip appears — it only renders above one member),
- * DECLINE is a sequencing no-op that leaves the party alone and the run flowing. The offer is gated on the draft
- * cadence × a web-policy roll, hence the seed walk.
+ * DECLINE is a sequencing no-op that leaves the party alone and the run flowing. The offer is forced onto the first
+ * win (`forceDraft`, Dev Mode only); the cadence × roll gate itself is covered at the .NET layer.
  *
  * ADD opens its own nickname step first (Creature Naming Stage B) — one run clears it with the species-default
  * name (the common "ADD deposits" case, matching every other spec's `drafts: 'accept'` policy), a second types
@@ -19,8 +19,15 @@ const partyChips = (page: Page) => page.locator('.party-strip .party-chip');
 
 /** Plays seeded runs until a themed-draft offer blocks one. Returns the offered creature's name. */
 async function reachDraftOffer(page: Page): Promise<string> {
+  const dev = await page.request.get('/api/dev/status');
+  expect((await dev.json()).enabled, 'forceDraft needs the backend in Dev Mode (dev.ps1 / Development)').toBe(true);
+
   // drafts: 'leave' — this modal is the target, so the driver must not answer it for us.
-  const seed = await walkSeedsUntil(page, p => isShowing(acquireModal(p)), { drafts: 'leave' });
+  const seed = await walkSeedsUntil(page, p => isShowing(acquireModal(p)), {
+    drafts: 'leave',
+    forceDraft: true,
+    seeds: [1, 2, 3, 4],
+  });
   expect(seed, 'no seeded run reached an acquisition offer').not.toBeNull();
 
   const modal = acquireModal(page);

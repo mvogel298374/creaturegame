@@ -96,6 +96,33 @@ Damage = floor(floor(floor(2×Level/5 + 2) × A × Power / D) / 50 + 2)
 ```
 Where A = Attack (or Special), D = Defense (or Special), with no Sp. Atk/Sp. Def split.
 
+#### Roll Order
+- A damaging move rolls **crit → damage → accuracy** (pokered `engine/battle/core.asm:3140-3150`), so a miss has
+  already drawn its crit and damage rolls. Damage of 1 or less is not randomized and draws no roll (`RandomizeDamage`).
+- Type immunity is applied inside the damage calc, before the accuracy roll: a 0× target shows **"doesn't
+  affect"** even when the roll would have missed.
+- A slower OHKO user draws only the crit roll; a faster one draws crit, damage roll and accuracy.
+- **Counter and the OHKO moves draw a crit roll** although the result is unused: both have power 1 in pokered
+  (`data/moves/moves.asm:81` Counter, `:103` Fissure), so `CriticalHitTest` (which skips only power 0) runs.
+- Dream Eater on an awake target fails after the crit and damage rolls, without an accuracy roll.
+- **Thunder Wave on a Ground-type does not roll accuracy**: `ParalyzeEffect` checks the immunity before
+  `MoveHitTest` (`engine/battle/move_effects/paralyze.asm:13-29`).
+- **Multi-hit moves roll crit, damage and accuracy once; every strike repeats the first strike's damage**
+  (`core.asm:3227`).
+- **Seismic Toss, Night Shade, Sonic Boom, Dragon Rage, Psywave, Super Fang and Counter ignore type
+  immunity**: they skip `AdjustDamageForMoveType` (`core.asm:3136-3142`). So Seismic Toss, Sonic Boom, Super Fang
+  and Counter hit Ghost-types, and Night Shade hits Normal-types. (Psywave and Dragon Rage have no Gen 1 immune
+  type.)
+- **Explosion / Self-Destruct against an immune target** shows "doesn't affect", and the user still faints. On a
+  miss the user faints too — the same in Gen 2–3 (pokecrystal `Selfdestruct`: `selfdestruct` after `checkhit`;
+  pokeemerald `BattleScript_EffectExplosion`: `setatkhptozero` first).
+- **Jump Kick / Hi Jump Kick crash on a 0× target** as well as on a miss (`PrintMoveFailureText`).
+- A Fire move thaws a frozen target as a side effect **after** its damage, and **not when the hit faints it**
+  (`engine/battle/effects.asm` `CheckDefrost`). Gen 2–3 the same (pokecrystal `effect_commands.asm:3938`;
+  pokeemerald `MOVEEND_DEFROST`, `src/battle_script_commands.c:4257-4263`, `hp != 0`).
+- Seam: `IBattleRules.HitRollOrder` / `MultiHitRepeatsFirstStrike` / `FixedDamageChecksTypeImmunity` /
+  `DamageRollSkippedBelowTwo` / `StatusMoveImmunityBeforeAccuracy` / `CrashOnTypeImmunity` (`GENERATION_SEAMS.md` §2).
+
 #### Type Chart Quirks (Gen 1 only)
 - **Ghost → Psychic = 0×** (programming bug; intended 2×)
 - **Poison → Bug = 2×** (Gen 2+: 1×)
@@ -211,6 +238,16 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
 - **Poison outside battle**: now stops at 1 HP instead of causing faints
 - **Sleep**: Pokémon can now act on the turn it wakes up (partial change — varies by version)
 - **1/256 miss bug**: fixed
+- **Jump Kick / Hi Jump Kick no longer crash on a 0× target**, only on a miss (pokecrystal
+  `engine/battle/effect_commands.asm:2225-2227`)
+- **Static-damage moves respect type immunity**: `StaticDamage` → `resettypematchup`, "If there is immunity in play,
+  the move automatically misses" (pokecrystal `engine/battle/effect_commands.asm:1473`); Super Fang, Psywave and
+  Counter are unverified
+- **Thunder Wave rolls accuracy before its Ground check**, so a miss on a Ground-type shows "missed" (pokecrystal
+  `DoParalyze`, `data/moves/effects.asm:1050`); damage of 1 or less still draws no roll
+  (`effect_commands.asm:1496-1508`)
+- **Multi-hit strikes roll their own crit and damage** (pokecrystal `data/moves/effects.asm` `MultiHit`); roll order
+  is per move script — most hits still roll crit and damage before `checkhit` (`NormalHit`), `MultiHit` checks first
 - Focus Energy crit bug: fixed
 - A repeat Dire Hit, Guard Spec or X Accuracy is **refused** ("won't have any effect") and kept; an X-item at +6 is
   still used up (pokecrystal `engine/items/item_effects.asm:2089-2129`)
@@ -276,6 +313,14 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
 - **No day/night in Ruby/Sapphire** (time-based mechanics absent; restored in Emerald partially)
 - **Save incompatibility**: Gen 3 is completely incompatible with Gen 1–2 (new data format)
 - Physical/Special split still **type-based** (not per-move yet)
+- **Accuracy is rolled first** (pokeemerald `data/battle_scripts_1.s` `BattleScript_EffectHit`)
+- Jump Kick / Hi Jump Kick do not crash on a 0× target (pokeemerald `data/battle_scripts_1.s:859`)
+- The damage roll is **always drawn**, even at 1 damage (`ApplyRandomDmgMultiplier`,
+  `src/battle_script_commands.c:1639-1641`)
+- A status move's type immunity is checked before accuracy again (`BattleScript_EffectParalyze`,
+  `data/battle_scripts_1.s:1007`: `typecalc` before `accuracycheck`)
+- Dream Eater checks sleep before everything and fails via `BattleScript_DreamEaterNoEffect`
+  (`data/battle_scripts_1.s:425`); the failure message is not modelled
 - **X Accuracy** becomes a +1 accuracy stage (pokeemerald `ItemUseInBattle_StatIncrease`); Gen 1–2 skipped the accuracy check instead
 - An X-item at +6 is **refused** and kept (pokeemerald `src/pokemon.c:4761`, `:4854-4860`)
 - Dire Hit narrates its effect in one line, "used <ITEM> to get pumped!" (pokeemerald `src/battle_message.c:253`);

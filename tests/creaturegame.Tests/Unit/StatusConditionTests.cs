@@ -364,9 +364,8 @@ public class StatusConditionTests
             }
         );
 
-        var defender = new Creature("Articuno") { Level = 50 };
+        var defender = TestCreatures.Make("Articuno", level: 50, hp: 999);
         defender.Battle.Status = StatusCondition.Freeze;
-        defender.CalculateStats();
 
         var action = new AttackAction(
             attacker,
@@ -378,6 +377,7 @@ public class StatusConditionTests
         );
         await action.ExecuteAsync();
 
+        Assert.True(defender.IsAlive());
         Assert.Equal(StatusCondition.None, defender.Battle.Status);
         Assert.True(defender.Attributes.HP < defender.Attributes.MaxHP);
     }

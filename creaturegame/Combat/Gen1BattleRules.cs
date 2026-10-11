@@ -173,14 +173,9 @@ public sealed class Gen1BattleRules : IBattleRules
             _ => true,
         };
 
-    // Gen 1: a non-damaging move ignores the target's type immunity — Confuse Ray confuses a Normal-type,
-    // Glare paralyses a Ghost, Growl lowers a Ghost's Attack, sleep/Disable land regardless of type. Only
-    // Thunder Wave (the lone immunity-checked status move: Electric ⇒ Ground is immune) and Counter
-    // (reflects damage ⇒ a Ghost takes none of its Fighting type) consult the type chart. Gen 2 makes
-    // status moves respect immunity generally, so this lives on the seam, not inline in the engine.
+    // Thunder Wave is the only Gen 1 status move that consults the type chart.
     public bool PureStatusMoveChecksTypeImmunity(Attack move) =>
-        (move.StatusEffect == StatusCondition.Paralysis && move.DamageType == DamageType.Electric)
-        || move.Effect == MoveEffect.Counter;
+        move.StatusEffect == StatusCondition.Paralysis && move.DamageType == DamageType.Electric;
 
     // Grass-types are immune to Leech Seed (all generations).
     public bool CanBeLeechSeeded(Creature target) => !HasType(target, DamageType.Grass);
@@ -238,6 +233,18 @@ public sealed class Gen1BattleRules : IBattleRules
     public bool CappedXItemRefused => false;
 
     public bool BoosterItemAnnouncesEffect => false;
+
+    public HitRollOrder HitRollOrder => HitRollOrder.CritAndDamageThenAccuracy;
+
+    public bool MultiHitRepeatsFirstStrike => true;
+
+    public bool FixedDamageChecksTypeImmunity => false;
+
+    public bool DamageRollSkippedBelowTwo => true;
+
+    public bool StatusMoveImmunityBeforeAccuracy => true;
+
+    public bool CrashOnTypeImmunity => true;
 
     // ── Stat selection ─────────────────────────────────────────────────────────
 

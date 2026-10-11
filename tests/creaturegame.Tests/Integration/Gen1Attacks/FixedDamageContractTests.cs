@@ -5,11 +5,8 @@ using creaturegame.Tests.TestSupport;
 namespace creaturegame.Tests.Integration.Gen1Attacks;
 
 /// <summary>
-/// Fixed-damage moves deal an exact amount of HP, independent of the attacker/defender stats and the
-/// type-effectiveness <i>scaling</i> (no ×2 / ×0.5). Sonic Boom always deals 20 — but a target whose
-/// type is outright <b>immune</b> to the move's type (Ghost vs Normal) still takes nothing, a Gen 1
-/// rule. (Dragon Rage = 40 joins in its batch.) The move still misses on a failed accuracy roll and
-/// spends a PP like any move.
+/// Fixed-damage moves deal an exact amount of HP, independent of the attacker/defender stats and the type
+/// chart — in Gen 1 even an immune type takes it (<see cref="IBattleRules.FixedDamageChecksTypeImmunity"/>).
 /// </summary>
 [Collection(MovesCollection.Name)]
 public class FixedDamageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
@@ -41,11 +38,23 @@ public class FixedDamageContractTests(MovesFixture moves) : Gen1MoveContract(mov
         Assert.Equal(20, result.TotalDamage);
     }
 
-    // …but a full type immunity still applies: Sonic Boom is Normal, so a Ghost takes nothing.
     [Fact]
-    public async Task SonicBoomDoesNotAffectGhostTypes()
+    public async Task SonicBoomHitsGhostTypesInGen1()
     {
         var result = await new MoveScenario()
+            .Defender(TestCreatures.Make("D", type1: DamageType.Ghost, hp: 500))
+            .Use(Move("sonic-boom"));
+
+        Assert.False(result.Has<MoveHadNoEffect>());
+        Assert.Equal(20, result.TotalDamage);
+        Assert.Equal(480, result.Defender.Attributes.HP);
+    }
+
+    [Fact]
+    public async Task SonicBoomDoesNotAffectGhostTypesUnderRulesThatCheckImmunity()
+    {
+        var result = await new MoveScenario()
+            .Rules(FixedDamageImmunityRules.Instance)
             .Defender(TestCreatures.Make("D", type1: DamageType.Ghost, hp: 500))
             .Use(Move("sonic-boom"));
 

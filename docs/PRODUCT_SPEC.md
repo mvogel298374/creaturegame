@@ -104,6 +104,19 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - Design detail → `DATA_IMPORT.md` §4.2, `ARCHITECTURE.md` §2.6.  History → `TODO_ARCHIVE.md` → *Repo-sweep R1 —
   species base stats and BaseExperience were modern, not Gen 1*.
 
+### Gen 1 battle roll order and immunity
+- An attacking move rolls crit, then damage, then accuracy, so a miss has already used its crit and damage rolls; a
+  slower one-hit-KO user stops after the crit roll.
+- A move against a target that is immune by type shows "doesn't affect", never "missed", whatever the accuracy roll.
+- Seismic Toss, Night Shade, Sonic Boom, Super Fang and Counter ignore type immunity: Seismic Toss hits Ghost-types,
+  Night Shade hits Normal-types.
+- Thunder Wave against a Ground-type fails as "doesn't affect" without an accuracy roll.
+- A multi-hit move rolls crit, damage and accuracy once; every strike deals the first strike's damage.
+- A Fire move thaws a frozen target after its damage, and not when the hit faints the target.
+- Jump Kick / Hi Jump Kick crash on a miss and against an immune target.
+- Design detail → `GENERATION_SEAMS.md` §2 (*Roll order*), `GEN_DIFFERENCES.md` → *Roll Order*.  History →
+  `TODO_ARCHIVE.md` → *Gen 1 roll order in `AttackAction`, behind a seam*.
+
 ## 3. Encounters, biomes & acquisition
 
 ### Evolution-chain level floor on species selection

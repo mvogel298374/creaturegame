@@ -8,8 +8,8 @@ namespace creaturegame.Tests.Integration.Gen1Attacks;
 /// <summary>
 /// Gen 1 type-based immunities — a move can hit yet do nothing because the target's type is immune
 /// to the effect. These are gen-variable rules on the <see cref="IBattleRules"/> seam
-/// (status/Leech-Seed immunity) and the <see cref="ITypeChart"/> (0× damage for moves that bypass
-/// the normal calc). Each case emits <see cref="MoveHadNoEffect"/> for the "It doesn't affect …" line,
+/// (status/Leech-Seed immunity, direct damage) and the <see cref="ITypeChart"/>. Each case emits
+/// <see cref="MoveHadNoEffect"/> for the "It doesn't affect …" line,
 /// except a damaging move whose <i>secondary</i> status is blocked (the hit still lands).
 /// </summary>
 [Collection(MovesCollection.Name)]
@@ -81,16 +81,46 @@ public class ImmunityContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     }
 
     [Fact]
-    public async Task GhostTypesAreImmuneToSeismicToss()
+    public async Task SeismicTossHitsGhostTypesInGen1()
     {
-        // Seismic Toss is Fighting-type; Ghost is immune (0×), so even level-based damage does nothing.
         var result = await new MoveScenario()
             .Defender(TestCreatures.Make("D", type1: DamageType.Ghost, hp: 500))
             .Use(Move("seismic-toss"));
 
+        Assert.False(result.Has<MoveHadNoEffect>());
+        Assert.Equal(result.Attacker.Level, result.TotalDamage);
+        Assert.Equal(500 - result.Attacker.Level, result.Defender.Attributes.HP);
+    }
+
+    [Theory]
+    [InlineData("seismic-toss", DamageType.Ghost)]
+    [InlineData("night-shade", DamageType.Normal)]
+    [InlineData("sonic-boom", DamageType.Ghost)]
+    [InlineData("super-fang", DamageType.Ghost)]
+    [InlineData("psywave", DamageType.Ghost)]
+    public async Task DirectDamageRespectsImmunityUnderRulesThatCheckIt(
+        string move,
+        DamageType immuneType
+    )
+    {
+        var result = await new MoveScenario()
+            .Rules(FixedDamageImmunityRules.Instance)
+            .TypeChart(new PsychicImmuneChart(immuneType))
+            .Defender(TestCreatures.Make("D", type1: immuneType, hp: 500))
+            .Use(Move(move));
+
         Assert.False(result.Has<DamageDealt>());
         Assert.Equal(500, result.Defender.Attributes.HP);
         Assert.True(result.Has<MoveHadNoEffect>());
+    }
+
+    // Nothing is immune to Psychic in Gen 1, so Psywave's immune case needs a chart that makes one.
+    private sealed class PsychicImmuneChart(DamageType immuneType) : ITypeChart
+    {
+        public double GetMultiplier(DamageType attackType, DamageType defenderType) =>
+            attackType == DamageType.Psychic && defenderType == immuneType
+                ? 0
+                : Gen1TypeChart.Instance.GetMultiplier(attackType, defenderType);
     }
 
     [Fact]
@@ -119,16 +149,25 @@ public class ImmunityContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     }
 
     [Fact]
-    public async Task NormalTypesAreImmuneToNightShade()
+    public async Task SuperFangHitsGhostTypesInGen1()
     {
-        // Night Shade is Ghost-type (level-based damage); a Normal-type is immune (0×).
+        var result = await new MoveScenario()
+            .Defender(TestCreatures.Make("D", type1: DamageType.Ghost, hp: 500))
+            .Use(Move("super-fang"));
+
+        Assert.False(result.Has<MoveHadNoEffect>());
+        Assert.Equal(250, result.TotalDamage);
+    }
+
+    [Fact]
+    public async Task NightShadeHitsNormalTypesInGen1()
+    {
         var result = await new MoveScenario()
             .Defender(TestCreatures.Make("D", type1: DamageType.Normal, hp: 500))
             .Use(Move("night-shade"));
 
-        Assert.False(result.Has<DamageDealt>());
-        Assert.Equal(500, result.Defender.Attributes.HP);
-        Assert.True(result.Has<MoveHadNoEffect>());
+        Assert.False(result.Has<MoveHadNoEffect>());
+        Assert.Equal(result.Attacker.Level, result.TotalDamage);
     }
 
     [Fact]
@@ -164,14 +203,30 @@ public class ImmunityContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     }
 
     [Fact]
-    public async Task GhostTypesAreImmuneToCounter()
+    public async Task CounterHitsGhostTypesInGen1()
     {
-        // Counter is Fighting-type; a Ghost target is immune even when the user took counterable damage.
         var attacker = TestCreatures.Make("A");
         attacker.Battle.LastDamageTaken = 50;
         attacker.Battle.LastDamageType = DamageType.Fighting;
 
         var result = await new MoveScenario()
+            .Attacker(attacker)
+            .Defender(TestCreatures.Make("D", type1: DamageType.Ghost, hp: 500))
+            .Use(Move("counter"));
+
+        Assert.False(result.Has<MoveHadNoEffect>());
+        Assert.Equal(100, result.TotalDamage);
+    }
+
+    [Fact]
+    public async Task CounterRespectsGhostImmunityUnderRulesThatCheckIt()
+    {
+        var attacker = TestCreatures.Make("A");
+        attacker.Battle.LastDamageTaken = 50;
+        attacker.Battle.LastDamageType = DamageType.Fighting;
+
+        var result = await new MoveScenario()
+            .Rules(FixedDamageImmunityRules.Instance)
             .Attacker(attacker)
             .Defender(TestCreatures.Make("D", type1: DamageType.Ghost, hp: 500))
             .Use(Move("counter"));

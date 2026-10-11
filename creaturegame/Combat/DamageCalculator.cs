@@ -61,6 +61,19 @@ public static class DamageCalculator
                         ? rules.SelfDestructDefenseDivisor
                         : 1;
                 int screen = ScreenMultiplier(defender, move, rules);
+                int unvaried = ComputeDamage(
+                    attacker,
+                    defender,
+                    move,
+                    typeChart,
+                    rules,
+                    false,
+                    1.0,
+                    divisor,
+                    screen
+                );
+                if (SkipsDamageRoll(unvaried, rules))
+                    return DamageRange.Exact(unvaried);
                 var (lo, hi) = rules.DamageVarianceRange;
                 return new DamageRange(
                     ComputeDamage(
@@ -116,7 +129,20 @@ public static class DamageCalculator
 
         isCrit =
             (rng ?? SystemRandomSource.Instance).NextDouble() < rules.GetCritChance(attacker, move);
-        double variance = rules.RollDamageVariance();
+
+        int unvaried = ComputeDamage(
+            attacker,
+            defender,
+            move,
+            typeChart,
+            rules,
+            isCrit,
+            1.0,
+            defenseDivisor,
+            screenDefenseMultiplier
+        );
+        if (SkipsDamageRoll(unvaried, rules))
+            return unvaried;
 
         return ComputeDamage(
             attacker,
@@ -125,11 +151,14 @@ public static class DamageCalculator
             typeChart,
             rules,
             isCrit,
-            variance,
+            rules.RollDamageVariance(),
             defenseDivisor,
             screenDefenseMultiplier
         );
     }
+
+    private static bool SkipsDamageRoll(int unvaried, IBattleRules rules) =>
+        rules.DamageRollSkippedBelowTwo && unvaried < 2;
 
     /// <summary>
     /// Deterministic, no-RNG damage estimate for AI move scoring. Assumes no critical hit and pins the damage
