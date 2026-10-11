@@ -45,16 +45,10 @@ public enum DvQuality
 /// </summary>
 public interface IStatCalculator
 {
-    /// <summary>
-    /// Calculates the HP stat.
-    /// Gen 1: floor(((Base + DV) × 2 + floor(sqrt(StatExp)) / 4) × Level / 100) + Level + 10
-    /// </summary>
+    /// <summary>Calculates the HP stat; per-generation formula in GENERATION_SEAMS.md → Stat calculation.</summary>
     int CalculateHP(int baseStat, int dv, int statExp, int level);
 
-    /// <summary>
-    /// Calculates any non-HP stat (Attack, Defense, Special, Speed).
-    /// Gen 1: floor(((Base + DV) × 2 + floor(sqrt(StatExp)) / 4) × Level / 100) + 5
-    /// </summary>
+    /// <summary>Calculates any non-HP stat; per-generation formula in GENERATION_SEAMS.md → Stat calculation.</summary>
     int CalculateOtherStat(int baseStat, int dv, int statExp, int level);
 
     /// <summary>

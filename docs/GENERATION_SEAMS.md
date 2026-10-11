@@ -120,8 +120,9 @@ The formulas that turn base stats + per-individual values into a creature's actu
 
 - **Gen 1** uses **DVs** (Determinant Values, 0–15, four of them; the HP DV is *derived*
   from the low bits of the other four) and **Stat Exp** (0–65535, scaled by
-  `floor(sqrt)/4`). Formula:
-  `floor(((Base + DV)×2 + floor(sqrt(StatExp))/4) × Level / 100) + Level + 10` for HP,
+  `min(255, ceil(sqrt(StatExp))) / 4`, integer division — pokered `home/move_mon.asm` `CalcStat`). Formula,
+  integer arithmetic throughout:
+  `((Base + DV)×2 + min(255, ceil(sqrt(StatExp)))/4) × Level / 100 + Level + 10` for HP,
   `+ 5` for other stats.
 - **Gen 3+** replaces these with **IVs** (0–31, six independent) and **EVs** (capped at
   252 per stat, ÷4). A `Gen3StatCalculator` swaps the formula and the `RandomiseDvs`

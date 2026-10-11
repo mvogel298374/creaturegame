@@ -14,18 +14,21 @@ public sealed class Gen1StatCalculator : IStatCalculator
     public Gen1StatCalculator(IRandomSource? rng = null) =>
         _rng = rng ?? SystemRandomSource.Instance;
 
-    // Gen 1 HP: floor(((Base + DV) × 2 + floor(sqrt(StatExp)) / 4) × Level / 100) + Level + 10
-    public int CalculateHP(int baseStat, int dv, int statExp, int level)
-    {
-        double expBonus = Math.Floor(Math.Sqrt(statExp)) / 4;
-        return (int)Math.Floor(((baseStat + dv) * 2 + expBonus) * level / 100) + level + 10;
-    }
+    // Gen 1 HP: ((Base + DV) × 2 + StatExpBonus) × Level / 100 + Level + 10, integer division throughout
+    public int CalculateHP(int baseStat, int dv, int statExp, int level) =>
+        ((baseStat + dv) * 2 + StatExpBonus(statExp)) * level / 100 + level + 10;
 
     // Gen 1 other stat: same formula, + 5 instead of + Level + 10
-    public int CalculateOtherStat(int baseStat, int dv, int statExp, int level)
+    public int CalculateOtherStat(int baseStat, int dv, int statExp, int level) =>
+        ((baseStat + dv) * 2 + StatExpBonus(statExp)) * level / 100 + 5;
+
+    // pokered CalcStat: min(255, ceil(sqrt(StatExp))) / 4, integer division (home/move_mon.asm).
+    private static int StatExpBonus(int statExp)
     {
-        double expBonus = Math.Floor(Math.Sqrt(statExp)) / 4;
-        return (int)Math.Floor(((baseStat + dv) * 2 + expBonus) * level / 100) + 5;
+        int root = (int)Math.Sqrt(statExp);
+        if (root * root < statExp)
+            root++;
+        return Math.Min(255, root) / 4;
     }
 
     private const int MaxDv = 15; // Gen 1 DVs are 4-bit: 0–15.

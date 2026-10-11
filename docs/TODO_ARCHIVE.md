@@ -8,6 +8,47 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §7.6 V9 — smaller Gen 1 gaps I: verified, Psywave / binding odds / Stat Exp fixed ✅ DONE (2026-10-12)
+
+**Was** `TODO.md` §3.1 "Smaller Gen 1 gaps I" and the §7.6 V9 slice. Verified at `fc38632` against `pret/pokered`
+`af51989`; throwaway scratch tests outside the repo (8/8) drove the real code. Three of the four claims were fixed in-slice
+(greenlit 2026-10-12; `pr-review` skipped by the user; `format-gate` PASS; `test-runner` green after re-deriving two old-value
+pins). The fourth (confusion self-hit) stays open as its own `TODO.md` §3.1 entry, and two §8 decisions remain.
+
+**Verdicts.**
+- **Confusion self-hit — reproduced, plus one new gap.** Gen 1 runs `CalculateDamage` with no `RandomizeDamage`
+  (`engine/battle/core.asm:3695-3696`). It reads the in-battle `wBattleMonAttack` and the confused mon's own
+  `wBattleMonDefense`, so stages and Burn count (`:3674-3683`, `:4044-4055`). It also checks the **foe's** Reflect
+  (`:4048-4053`), which doubles the self-hit's Defense. Ours applies variance and uses raw stats
+  (`DamageCalculator.cs:293-306`). Not fixed (`DamageCalculator` is central) -> open entry.
+- **Binding duration — reproduced.** Gen 1 rolls `BattleRandom & 3` twice, giving 2/3/4/5 attacks at 3/8, 3/8, 1/8, 1/8
+  (`engine/battle/effects.asm:1094-1102`). Ours was uniform 2-5.
+- **Stat Exp bonus — reproduced.** Gen 1 takes ceil(sqrt(StatExp)) capped at 255, then integer `/4`
+  (`home/move_mon.asm:73-92`, `:163-164`). Ours took floor(sqrt)/4 as a fraction. L100, base 100, DV 15, StatExp 9999: other
+  stat 259, Gen 1 260; HP at StatExp 15: 340, Gen 1 341.
+- **Psywave max — reproduced, plus one new gap.** Gen 1 player rolls `[1, b)`, b = L + floor(L/2), so the max is b - 1
+  (`core.asm:4657-4670`). The foe rolls `[0, b)` and can deal 0 (`:4776-4789`). Ours was `[1, b]` for both.
+
+**Fixes (mini-DoRs, all S, all on existing seams, none central).**
+- **F1 Psywave max.** `IBattleRules.PsywaveDamageRange` returns `(1, max(1, L + L/2 - 1))`; L50 -> 74, never 75.
+  `PsywaveContractTests` and `DamageRangeTests` updated. Min stays 1 for both sides; the L1 Gen 1 hang (`[1,1)`) is not
+  replicated. Gen 2 value unchecked.
+- **F2 Binding odds.** `IBattleRules.RollBindingTurns` has its own 3/8, 3/8, 1/8, 1/8 table, the same odds as
+  `RollMultiHitCount` but deliberately not coupled to it (user ruling 2026-10-12, resolving requirements-review finding 5).
+  Tests pin each roll->count mapping through a scripted RNG (`AttributesAndRulesTests`, plus the shared-stream twin in
+  `GenerationProfileTests`). The counter's meaning is unchanged. Gen 2 value unchecked.
+- **F3 Stat Exp bonus.** `Gen1StatCalculator`: bonus = `min(255, ceil(sqrt(StatExp))) / 4` in integers, for HP and the other
+  stats. `StatCalculationTests` pin 9999 -> 260, HP 15 -> 341, StatExp 0 -> bonus 0. Quirk asserted: the ceiling. A creature
+  with Stat Exp can shift by +/-1 per stat (e.g. StatExp 49: old bonus 1.75, new 1).
+
+**Docs updated in-slice:** `GENERATION_SEAMS.md` stat formula, `DATA_IMPORT.md` Psywave, `GEN_DIFFERENCES.md` (binding odds,
+Stat Exp rounding, Psywave range/asymmetry), XML docs on `IStatCalculator` / `IBattleRules`.
+
+**Still open (in `TODO.md`):** "Gen 1 confusion self-hit damage" (§3.1, ✗ not Ready); §8 "Foe Psywave can deal 0" (user
+ruling 2026-10-12: keep open) and "Confusion self-hit uses the foe's Reflect".
+
+---
+
 ## §7.6 V8 — turn-order/status edges: verified, all four confirmed ✅ VERIFIED (2026-10-12)
 
 **Was** `TODO.md` §3.1 "Turn-order/status edges" and the §7.6 V8 slice (verify-only; no code or data changed). Verified at

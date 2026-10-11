@@ -275,7 +275,7 @@ public interface IBattleRules
 
     /// <summary>
     /// Returns the number of turns a binding move traps the target.
-    /// Gen 1: 2–5 turns.
+    /// Gen 1: 2–5 at 3/8, 3/8, 1/8, 1/8 (GEN_DIFFERENCES.md).
     /// </summary>
     int RollBindingTurns();
 
@@ -381,7 +381,7 @@ public interface IBattleRules
     /// </summary>
     int RollPsywaveDamage(Creature source, IRandomSource rng);
 
-    /// <summary>The inclusive bounds <see cref="RollPsywaveDamage"/> draws within (Gen 1: 1 – floor(1.5 × level)),
+    /// <summary>The inclusive bounds <see cref="RollPsywaveDamage"/> draws within (Gen 1: 1 – floor(1.5 × level) − 1),
     /// the single source for the roll and the Dev Mode damage-range display.</summary>
     (int Min, int Max) PsywaveDamageRange(Creature source);
 

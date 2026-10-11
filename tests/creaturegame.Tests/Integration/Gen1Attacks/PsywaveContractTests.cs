@@ -5,7 +5,7 @@ using creaturegame.Tests.TestSupport;
 namespace creaturegame.Tests.Integration.Gen1Attacks;
 
 /// <summary>
-/// Psywave (Gen 1) deals a random 1..floor(1.5 × user level), ignoring Attack/Defense, type
+/// Psywave (Gen 1) deals a random 1..floor(1.5 × user level) − 1, ignoring Attack/Defense, type
 /// effectiveness, STAB and crits. These tests exercise the gen-variable <i>quirk</i> — the bound is
 /// set only by the user's level, and neither attacker stats nor defender bulk move it — rather than
 /// just the import mapping (pinned in <see cref="SecondaryChanceDataContractTests"/>). There is no
@@ -15,12 +15,12 @@ namespace creaturegame.Tests.Integration.Gen1Attacks;
 public class PsywaveContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 {
     [Theory]
-    [InlineData(50)] // cap = 75
-    [InlineData(30)] // cap = 45
-    [InlineData(100)] // cap = 150
+    [InlineData(50)] // cap = 74
+    [InlineData(30)] // cap = 44
+    [InlineData(100)] // cap = 149
     public async Task DealsVariableDamageBoundedByOnePointFiveLevel(int level)
     {
-        int cap = level * 3 / 2;
+        int cap = level * 3 / 2 - 1;
         var observed = new HashSet<int>();
 
         // Sample many RNG seeds: each run is one real AttackAction through the Gen 1 Psywave path.
@@ -34,7 +34,7 @@ public class PsywaveContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 
             Assert.True(result.Has<DamageDealt>(), "Psywave deals damage on hit");
             int dmg = result.TotalDamage;
-            Assert.InRange(dmg, 1, cap); // Gen 1: 1..floor(1.5 × level), inclusive
+            Assert.InRange(dmg, 1, cap);
             observed.Add(dmg);
         }
 
@@ -45,6 +45,16 @@ public class PsywaveContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             observed.Max() > cap * 2 / 3,
             $"rolls should reach the upper range (max {observed.Max()} of cap {cap})"
         );
+    }
+
+    // pokered rolls [1, b) with b = floor(1.5 × level), so b itself is never dealt.
+    [Theory]
+    [InlineData(50, 74)]
+    [InlineData(1, 1)]
+    public void RangeTopIsOneBelowOnePointFiveLevel(int level, int expectedMax)
+    {
+        var attacker = TestCreatures.Make("A", level: level);
+        Assert.Equal((1, expectedMax), Gen1BattleRules.Instance.PsywaveDamageRange(attacker));
     }
 
     // The quirk that distinguishes Psywave from a Standard Special move: the damage ignores the

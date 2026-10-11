@@ -95,8 +95,15 @@ public sealed class Gen1BattleRules : IBattleRules
     // Gen 1 Bad Poison (Toxic): counter/16 of max HP; no cap — counter increments each turn.
     public double BadPoisonDamageFraction(int toxicCounter) => toxicCounter / 16.0;
 
-    // Gen 1: binding traps for 2–5 turns.
-    public int RollBindingTurns() => _rng.Next(2, 6);
+    // Gen 1: binding uses the multi-hit 2–5 odds (pokered effects.asm TrappingEffect).
+    public int RollBindingTurns() =>
+        _rng.Next(8) switch
+        {
+            0 or 1 or 2 => 2,
+            3 or 4 or 5 => 3,
+            6 => 4,
+            _ => 5,
+        };
 
     // Gen 1: a missed Jump Kick / Hi Jump Kick deals a flat 1 HP of crash damage to the user.
     public int CalculateCrashDamage(Creature user) => 1;
@@ -140,7 +147,7 @@ public sealed class Gen1BattleRules : IBattleRules
 
     public int BideDamageMultiplier => 2;
 
-    // Gen 1: Psywave deals a random 1..floor(1.5 × level), ignoring stats/type/STAB/crits.
+    // Gen 1: Psywave rolls [1, floor(1.5 × level)) — max one below 1.5 × level; ignores stats/type/STAB/crits.
     public int RollPsywaveDamage(Creature source, IRandomSource rng)
     {
         var (min, max) = PsywaveDamageRange(source);
@@ -148,7 +155,7 @@ public sealed class Gen1BattleRules : IBattleRules
     }
 
     public (int Min, int Max) PsywaveDamageRange(Creature source) =>
-        (1, Math.Max(1, source.Level * 3 / 2));
+        (1, Math.Max(1, source.Level * 3 / 2 - 1));
 
     // Gen 1: Rest forces the user asleep for exactly 2 turns (then it wakes and acts).
     public int RestSleepTurns => 2;

@@ -76,6 +76,8 @@ A reference doc covering every major system across all main-series generations �
 - High-crit moves: `min(floor(BaseSpeed / 2) × 8, 255) / 256`
 - Critical hits ignore all stat stages (both attacker's and defender's)
 - Critical hits ignore Burn's Attack penalty
+- **Stat Exp bonus rounds the root up:** `min(255, ceil(sqrt(StatExp))) / 4`, integer division, so StatExp 9999 counts
+  as √ = 100 (pokered `home/move_mon.asm` `CalcStat`, `:73-92`, `:163-164`)
 
 #### Accuracy
 - Internal scale: **0–255** (not 0–100)
@@ -113,6 +115,9 @@ Where A = Attack (or Special), D = Defense (or Special), with no Sp. Atk/Sp. Def
   immunity**: they skip `AdjustDamageForMoveType` (`core.asm:3136-3142`). So Seismic Toss, Sonic Boom, Super Fang
   and Counter hit Ghost-types, and Night Shade hits Normal-types. (Psywave and Dragon Rage have no Gen 1 immune
   type.)
+- **Psywave rolls below 1.5 × level, and the sides differ:** the player rolls `[1, b)`, the foe `[0, b)` with
+  b = L + ⌊L/2⌋, so the foe can deal 0 (`core.asm:4657-4670`, `:4776-4789`). Ours models the player's range for both
+  sides — the foe's 0 is an open decision (`TODO.md` §8).
 - **Explosion / Self-Destruct against an immune target** shows "doesn't affect", and the user still faints. On a
   miss the user faints too — the same in Gen 2–3 (pokecrystal `Selfdestruct`: `selfdestruct` after `checkhit`;
   pokeemerald `BattleScript_EffectExplosion`: `setatkhptozero` first).
@@ -135,7 +140,8 @@ Where A = Attack (or Special), D = Defense (or Special), with no Sp. Atk/Sp. Def
 #### Binding / Trapping Moves
 Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
 - **Fully immobilise the target** — target cannot attack at all while trapped
-- User is **locked into the move** for 2–5 turns
+- User is **locked into the move** for 2–5 turns (2 and 3 at 3/8 each, 4 and 5 at 1/8 each — pokered
+  `engine/battle/effects.asm` `TrappingEffect`)
 - Deals 1/16 max HP chip damage per turn
 - Considered overpowered; used competitively to completely shut down opponents
 

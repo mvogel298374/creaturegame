@@ -32,6 +32,21 @@ public class StatCalculationTests
         Assert.Equal(85, bulbasaur.Attributes.Special);
     }
 
+    // pokered CalcStat: bonus = min(255, ceil(sqrt(StatExp))) / 4 — base 100, DV 15, L100.
+    [Theory]
+    [InlineData(0, 235)]
+    [InlineData(15, 236)]
+    [InlineData(9_999, 260)]
+    [InlineData(65_535, 298)]
+    public void StatExpBonusRoundsTheRootUpThenFloorsTheQuarter(int statExp, int expected) =>
+        Assert.Equal(expected, new Gen1StatCalculator().CalculateOtherStat(100, 15, statExp, 100));
+
+    [Theory]
+    [InlineData(0, 340)]
+    [InlineData(15, 341)]
+    public void HpStatExpBonusRoundsTheRootUp(int statExp, int expected) =>
+        Assert.Equal(expected, new Gen1StatCalculator().CalculateHP(100, 15, statExp, 100));
+
     [Fact]
     public void LevelUpStatIncrease()
     {

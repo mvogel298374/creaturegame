@@ -7,7 +7,28 @@ using creaturegame.Tests.TestSupport;
 namespace creaturegame.Tests.Unit;
 
 public class AttributesAndRulesTests
-{ // --- Attributes Tests ---
+{
+    private sealed class FixedRoll(int value) : IRandomSource
+    {
+        public int Next(int maxExclusive) => value;
+
+        public int Next(int minInclusive, int maxExclusive) => value;
+
+        public double NextDouble() => 0.0;
+    }
+
+    // pokered TrappingEffect: 2 and 3 at 3/8 each, 4 and 5 at 1/8 each.
+    [Theory]
+    [InlineData(0, 2)]
+    [InlineData(2, 2)]
+    [InlineData(3, 3)]
+    [InlineData(5, 3)]
+    [InlineData(6, 4)]
+    [InlineData(7, 5)]
+    public void BindingTurnsUseTheThreeEighthsOneEighthOdds(int roll, int expected) =>
+        Assert.Equal(expected, new Gen1BattleRules(new FixedRoll(roll)).RollBindingTurns());
+
+    // --- Attributes Tests ---
     [Fact]
     public void Attributes_ReceiveDamage_ReducesHP()
     {

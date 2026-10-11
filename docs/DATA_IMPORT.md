@@ -140,7 +140,7 @@ The remaining Gen 1 logic lives in the categorisation:
   - 120/153 Self-Destruct/Explosion → `SelfDestruct`
   - 69/101 Seismic Toss/Night Shade → `LevelBased`
   - 162 Super Fang → `SuperFang`
-  - 149 Psywave → `Psywave` (variable: random `1..floor(1.5×level)`)
+  - 149 Psywave → `Psywave` (variable: random `1..floor(1.5×level) − 1`, pokered `core.asm:4657-4670`)
   - 49 Sonic Boom → `Fixed` (20), 82 Dragon Rage → `Fixed` (40)
 - **`DrainPercent`** ← `meta.drain` for drain moves (default 50%; Mega Drain/Absorb/Leech Life).
 - **`NeverMisses`** — Swift (ID 129) bypasses the accuracy roll.

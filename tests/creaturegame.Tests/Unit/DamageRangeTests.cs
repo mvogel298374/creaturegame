@@ -173,9 +173,9 @@ public class DamageRangeTests
             DamageCalculator.EstimateRange(a, d, Make(DamageCategory.SuperFang), Chart, rules)
         );
         Assert.Equal(
-            new DamageRange(1, 75),
+            new DamageRange(1, 74),
             DamageCalculator.EstimateRange(a, d, Make(DamageCategory.Psywave), Chart, rules)
-        ); // 1..⌊1.5×50⌋
+        ); // pokered [1, ⌊1.5×50⌋)
     }
 
     [Fact]
