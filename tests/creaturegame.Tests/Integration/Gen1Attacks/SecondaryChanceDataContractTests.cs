@@ -19,6 +19,7 @@ public class SecondaryChanceDataContractTests(MovesFixture moves) : Gen1MoveCont
     [InlineData("bite", 10)] // Gen 1 flinch 10% (modern 30%)
     [InlineData("low-kick", 30)] // Gen 1 flinch 30% (modern: weight-based, none)
     [InlineData("poison-sting", 20)] // Gen 1 poison 20% (modern 30%)
+    [InlineData("sludge", 40)] // Gen 1 poison 40% (modern 30%)
     [InlineData("acid", 33)] // acid overrides EffectChance too (33%), not just StatEffectChance
     [InlineData("psychic", 33)]
     public void EffectChanceMatchesGen1(string move, int chance) =>

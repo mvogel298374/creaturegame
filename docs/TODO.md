@@ -38,7 +38,7 @@
 | # | Item | Cost | Ready? (DoR) | Why this slot / what it unblocks |
 |:-:|:-----|:----:|:-------------|:---------------------------------|
 | 1 | **`-StartStack` backend leak** (§7.1 Part A) | S | ✗ parked: leak not reproduced (2026-10-10); un-park condition in §7.1 | Parts B and C are done. Not actionable until the user reproduces it; §1 #3 and #6 do not wait on it. |
-| 2 | **Verification pass over the unverified findings** (§7.6) | S per slice | ✅ (2026-10-10) — 15 tiny slices (V1–V5 done; V6 next); each verifies first, then fixes only S-size, non-central, no-decision findings under a mini-DoR; greenlight and commit each | Turns "reviewer's reading" items into evidenced verdicts or discards. Opens up everything below it. |
+| 2 | **Verification pass over the unverified findings** (§7.6) | S per slice | ✅ (2026-10-10) — 15 tiny slices V1–V15 (V1–V6 done; V7 next; the V16 audit row is tracked separately as #11); each verifies first, then fixes only S-size, non-central, no-decision findings under a mini-DoR; greenlight and commit each | Turns "reviewer's reading" items into evidenced verdicts or discards. Opens up everything below it. |
 | 3 | **Server test gaps — `GameSessionManager` lifecycle + the `RunFaulted` path** (§6) | M | ⚠️ needs the injectable-clock design | Unblocks the R1d tests and closes a long-open Tier-4 item. |
 | 5 | **R1d-a — replay an open blocking prompt** (§2) | M | ⚠️ designed, but provisional-pending-`/plan` and needs your three decisions (§8) | The only reconnect item that strands a run; highest player value. |
 | 6 | **CI E2E step** (§6) | M | ✗ no design (runner, stack boot, caching) or acceptance | The only automatic E2E coverage; makes "agents don't run E2E" safe, and unblocks checking the BST/balance flag and the reconnect spec. |
@@ -46,6 +46,7 @@
 | 8 | **Gen 1 fidelity — the damage/accuracy core** (§3.1) | L | ✗ needs the Gen 1 source per claim, the seam surface, and the quirks to pin | Verify-first; large blast radius (it touches every damage number). |
 | 9 | **End-of-turn residual phase** (§4.2) | L | ✗ needs a `/plan` | A `/plan`, `opus-engineer`, and both review gates; rewrites `Battle`'s turn loop. |
 | 10 | **Features** — Catch, `save.db`, progressive difficulty, Generation Profile 4d+, … (§4) | L | ✗ each needs a `/plan` | Catch and stone evolutions are unblocked by the bag-scope ruling (`ARCHITECTURE.md` §2.12); `save.db` is declined for now. |
+| 11 | **Full Gate 1 audit of the whole TODO** (§7.6 V16) | M | ✅ (2026-10-11) — runs once V1–V15 are done | The final item: after the verification pass, every open entry gets a DoR ✅/✗ audit so the next pick is known-Ready. |
 
 ---
 
@@ -136,11 +137,47 @@ data/engine item usually also means updating the test that pins the wrong value.
     (`DATA_IMPORT.md` §4.6; the species is reported failed). Likely fix: open the transaction in
     `FetchPokemonDataByUrl` around both saves. Needs its mini-DoR (acceptance: a failed learnset leaves the species
     row unchanged too; test: the #4d trigger test also asserts the old stats).
-- **Importer/data lows:** `MoveImport.cs:175` overwrites the Gen-1-resolved `EffectChance` with today's ailment
-  chance; the dev server can read stale data (Web csproj copies `*.db` only, never `-wal`; `DbPathHelper.cs:18`
-  prefers the bin copy); item `Cost` is modern and now drives reward rarity and the starting bag (five cures tie at
-  200, the starter pair is picked by row order; `DATA_IMPORT.md` §4.5's "no shop" rationale is stale); the Yellow
-  exclusion list wrongly drops the Sandshrew/Vulpix/Oddish/Mankey/Growlithe/Bellsprout lines (no gameplay effect).
+- **Yellow availability labels (S; from V6's `requirements-review` 2026-10-11; ✗ not Ready — needs your
+  evolve-only rule).** No gameplay effect (both readers take every `Wild` row, any version).
+  - *Scope + acceptance:* in `GameAvailabilitySeeder.TypeOverrides` and `pokemon.db`: Yellow Eevee `GameCorner` →
+    `Gift` (pokeyellow `scripts/CeladonMansionRoofHouse.asm`; not in `data/events/prizes.asm`); Yellow Lickitung
+    `Trade` → `Wild` (`data/wild/maps/CeruleanCaveB1F.asm`; `data/events/trades.asm:18` trades it *away* for
+    Dugtrio); Yellow Wigglytuff → `GameCorner` (`prizes.asm:9`); and one rule for evolve-only forms, applied to every
+    version (today Ninetales/Omastar/Kabutops take their root's type while Arcanine/Vileplume/Victreebel/Wigglytuff
+    default to `Wild`). Acceptance: `BuildGen1Rows()` tests pin each corrected label and the rule on one line per
+    type; `pokemon.db` rows diffed vs `HEAD`; the rule recorded in `DATA_IMPORT.md` §4.3.
+  - *Recommendation:* an evolve-only form inherits its root's type (matches the fossils), so Arcanine/Vileplume/
+    Victreebel stay `Wild` (their roots are wild) and Wigglytuff gets `GameCorner` only as a prize itself.
+  - *Gen-variable surface:* none (Gen 1 data). *Gen 1 source:* `pret/pokeyellow`, `pret/pokered`. *Data vs runtime:*
+    data (seeder + rows). *Quirk the test asserts:* Yellow Eevee is a gift, not a prize. *Dependencies:* none.
+- **Dev server reads a `-wal`-stale bin copy (S; from V6; ✗ not Ready — needs your mechanism choice, §8).**
+  - *Scope + acceptance:* a write sitting in a root `-wal` reaches the dev server after a build. Acceptance: write a
+    row via a WAL connection without checkpointing, build, and the bin copy shows the row (scripted repro, then a
+    test if the chosen mechanism is code).
+  - *Options:* (a) the importer runs `PRAGMA wal_checkpoint(TRUNCATE)` before exit — covers the importer only, not
+    MCP writes; (b) the Web csproj also copies `*.db-wal` — covers both, but `PreserveNewest` keys on each file's own
+    mtime and a stale bin `-wal` must not outlive a fresh `.db`; (c) switch the committed `.db` files to
+    `journal_mode=DELETE` — no `-wal` ever exists, at the cost of SQLite's WAL concurrency, which a read-only game
+    host does not use. **Recommendation: (c), plus (a) as a belt** — it removes the failure mode instead of copying it.
+  - *Gen-variable surface:* none. *Gen 1 source:* n/a (tooling). *Data vs runtime:* data-file setting / build;
+    no runtime code. *Quirk the test asserts:* the bin copy matches the root after an uncheckpointed write.
+    *Dependencies:* none; touches the `feedback_sqlite_mcp_wal_checkpoint` workflow, which (c) would retire.
+- **Item `Cost` is modern, and drives rarity + the starting bag (S–M; from V6; ✗ not Ready — needs your balance
+  call, §8).**
+  - *Scope + acceptance:* either (a) import Gen 1 prices (a layer-2 price table from `pokered
+    data/items/prices.asm`; `items.db` re-imported; `RarityOf` bands re-checked against the new numbers — X-items
+    become Common, Full Heal Uncommon, PP items 0 → Common), or (b) keep modern prices and only make the starting
+    bag deterministic (tie-break `OrderBy(Cost).ThenBy(Id)`, so Antidote + Burn Heal by id). Either way
+    `DATA_IMPORT.md:344` is rewritten to say `Cost` drives rarity and the starting bag. Acceptance (a): an
+    `items.db` contract test pins the Gen 1 prices and a `RarityOf` test pins the new bands; (b): a test pins the
+    starting-bag pair independent of row order.
+  - *Recommendation: (b) now, (a) only with a balance pass* — the rarity bands were tuned against the modern
+    numbers, and shop prices are already rarity-derived (`ShopCalculator`), so Gen 1 prices buy fidelity in a
+    number the player never sees while shifting loot odds.
+  - *Gen-variable surface:* (a) makes `Cost` per-generation data (fine — `items.db` is per-gen content); the
+    rarity bands are gen-invariant `RunRules`-style tuning. *Gen 1 source:* `pokered data/items/prices.asm`.
+    *Data vs runtime:* (a) data + a band check; (b) runtime one-liner. *Quirk:* PP items cost 0 in Gen 1 (not sold).
+    *Dependencies:* none.
 - **Balance flag — every species' BST changed (2026-10-03).** BST feeds `EncounterSelector.Bst`/`PickByBst`, the
   strength tiers (×0.85/1.10/1.20) and `ScaleTargetBst`, so enemy pool bands shift and the starter picker's BST
   display changed (e.g. Venusaur 425); base experience also dropped sharply for some species (Chansey 395→255,
@@ -470,8 +507,8 @@ The stale comments the sweep listed were fixed 2026-10-03 (`bag.ts`, `timeline.t
 ### 7.5 Speculative, unverified — check before filing as real
 
 `waitForBridge` resolving early on a slow evolution-sprite load; the timeline queue not cleared on unmount (leftover
-steps into a new run); the corner map preview covering the player corner on long node paths; Sludge's poison chance
-possibly 40%; Substitute vs sleep/paralysis status moves and Disable's 1–8 turns; untested types `RunLoop`,
+steps into a new run); the corner map preview covering the player corner on long node paths; Substitute vs
+sleep/paralysis status moves and Disable's 1–8 turns (Sludge 40% was confirmed and fixed — `TODO_ARCHIVE.md` → "§7.6 V6"); untested types `RunLoop`,
 `RewardRunEvent`, `AcquisitionResolution`, `CompositeEvaluator`, `MoveEvaluators` (likely covered indirectly — run
 coverage).
 
@@ -530,7 +567,7 @@ a decision (Roar/Whirlwind, the BST bands).
 | V3 | Verify ✅ and fix ✅ 2026-10-11 — record in `TODO_ARCHIVE.md` → "§7.6 V3 — public endpoints"; limits + idle timeout → the low-priority abuse-protection entry in §7.1; forwarded headers + exhaustion → §9 (Fly-side health check is off by default, `FLY_HEALTH_CHECK` repo variable; observable on an RC deploy only once switched on) | — | — |
 | V4 | Verify ✅ and fix ✅ 2026-10-11 — record in `TODO_ARCHIVE.md` → "§7.6 V4 — scripts and logging"; Dockerfile items → §9 | — | — |
 | V5 | Verify ✅ 2026-10-11 (verdicts in TODO_ARCHIVE.md → "§1 #4 Importer hardening — step #4e": 4 read-confirmed, 1 refuted, 1 partly refuted). No in-slice fixes — all needed a test seam → shipped as §1 #4, archived | — | — |
-| V6 | Importer/data lows: `EffectChance` overwrite, stale `-wal`, modern item `Cost`, Yellow exclusion (§3.2) | Code + db query | Gen 1 values via pokered |
+| V6 | Verify ✅ and fix ✅ 2026-10-11 — record in `TODO_ARCHIVE.md` → "§7.6 V6 — importer/data lows"; `-wal`, item `Cost` and the Yellow-label findings → their own §3.2 entries | — | — |
 | V7 | Gate order (Dream Eater, OHKO speed) and Dire Hit / Guard Spec reuse (§3.2) | pokered + code | Gen 1 source per claim |
 | V8 | Turn-order/status edges: trap after trapper faints, double recharge, `CanAct` order, para/confusion cancel (§3.1) | pokered + code; scratch test | Gen 1 source per claim |
 | V9 | Smaller gaps I: confusion self-damage, binding duration, Stat Exp rounding, Psywave max (§3.1) | pokered + code | Gen 1 source per claim |
@@ -540,6 +577,7 @@ a decision (Roar/Whirlwind, the BST bands).
 | V13 | Frontend: Phaser resize, unheard `entryComplete`, frontend nits (§5) | Code | Browser-only parts → *needs-runtime* |
 | V14 | Test hygiene (§6) | Code; scratch test run | — |
 | V15 | Speculative list (§7.5) | Code; coverage run | — |
+| V16 | **Full Gate 1 audit, after V15 (user 2026-10-11):** every open entry in §1–§7 checked against the seven `DEFINITION_OF_READY.md` items | Docs only: one ✅/✗ row per entry per DoR item | Acceptance: no open entry is left unaudited; each gap gets drafted proposed text, and decisions go to §8. Writes no code and changes no data; only `docs-cleanup` gates it |
 
 ---
 
@@ -553,6 +591,9 @@ a decision (Roar/Whirlwind, the BST bands).
 | **Roar/Whirlwind** — end the battle immediately like Gen 1? | Verify at pokered, then fix | §3.1 |
 | **When to `/plan` the end-of-turn residual phase** | The cheap fidelity fixes have landed (archived) — ready to `/plan` once greenlit | §4.2 |
 | **Per-area encounter floor** — soft floor or accepted tradeoff? | Accept the tradeoff unless playtests show a problem | §4.2 |
+| **Evolve-only availability rule** — inherit the root's type, a new `Evolution` type, or `Wild` catch-all? | Inherit the root's type | §3.2 "Yellow availability labels" |
+| **`-wal` staleness mechanism** — importer checkpoint, copy `-wal`, or `journal_mode=DELETE`? | `DELETE` on the committed files, plus an importer checkpoint | §3.2 entry |
+| **Item `Cost`** — Gen 1 prices (shifts loot rarity) or modern + deterministic starting bag? | Modern + `ThenBy(Id)` now; Gen 1 prices only with a balance pass | §3.2 entry |
 
 ---
 

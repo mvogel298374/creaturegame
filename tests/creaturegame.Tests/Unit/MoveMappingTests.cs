@@ -159,6 +159,19 @@ public class MoveMappingTests
     }
 
     [Fact]
+    public void StatusAilment_PastValuesChanceWinsOverModernAilmentChance()
+    {
+        var move = Move(name: "test-burn-move", type: "fire");
+        move.EffectChance = 10;
+        move.PastValues = [new() { EffectChance = 30 }];
+        move.Meta = new MoveMeta { Ailment = Named("burn"), AilmentChance = 10 };
+
+        var attack = MoveImport.MapToAttack(move);
+
+        Assert.Equal(30, attack.EffectChance);
+    }
+
+    [Fact]
     public void StatChange_SelfTarget_MapsStatStageEffectAtFullChance()
     {
         // A pure stat move (no damage) always succeeds → chance 100.

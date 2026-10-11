@@ -187,7 +187,7 @@ public class MoveImport
         };
 
         if (attack.StatusEffect != StatusCondition.None && pokeMove.Meta?.AilmentChance > 0)
-            attack.EffectChance = pokeMove.Meta.AilmentChance;
+            attack.EffectChance ??= pokeMove.Meta.AilmentChance;
 
         attack.IsHighCrit = pokeMove.Meta?.CritRate > 0;
 
@@ -306,6 +306,9 @@ public class MoveImport
                 break;
             case "poison-sting": // Gen 1: 20% poison (modern: 30%)
                 attack.EffectChance = 20;
+                break;
+            case "sludge": // Gen 1: 40% poison (modern: 30%; past_values empty)
+                attack.EffectChance = 40;
                 break;
             case "fire-blast": // Gen 1: 30% burn (modern: 10%)
                 attack.EffectChance = 30;

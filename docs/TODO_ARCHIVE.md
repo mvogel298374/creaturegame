@@ -185,6 +185,77 @@ generation list still reports clean; no per-command wiring test for `Program`; `
 
 ---
 
+## §7.6 V6 — importer/data lows: verified and fixed ✅ DONE (2026-10-11)
+
+**Was** `TODO.md` §3.2 "Importer/data lows" (verified at `079da90`, against `pret/pokered` and `pret/pokeyellow`
+`master`) and the §7.6 V6 slice with its fix-phase mini-DoRs. Three fixes, all S; importer + two `.db` files;
+gen-invariant; not player-visible, so no `PRODUCT_SPEC.md` entry (the one runtime-visible effect is Sludge's in-battle
+poison chance, 30% → 40%, a Gen 1 data-fidelity correction).
+
+**Verdicts.**
+- **`EffectChance` overwrite — source-confirmed, but inert; the live defect is Sludge.** `MoveImport.cs:189-190`
+  replaced the `past_values` chance with `meta.ailment_chance` for every status move. The three moves whose
+  `past_values` carry a Gen 1 chance (Fire Blast, Thunder, Poison Sting) are re-patched by the layer-2 block
+  (`:307-311`, `:338-339`), so no shipped row was wrong because of the overwrite. **Sludge was wrong:** `moves.db` had
+  30; Gen 1 is 40% (`pokered data/moves/moves.asm:137` `POISON_SIDE_EFFECT2` → `engine/battle/effects.asm:103-104`),
+  and PokeAPI's `past_values` for Sludge are empty, so only a layer-2 entry can fix it. The other 16 damaging status
+  moves match pokered. → F1, F2.
+- **Stale dev data via `-wal` — read-confirmed.** The `.db` files are `journal_mode=wal`; the Web csproj
+  (`creaturegame.Web.csproj:16-18`) copies only `*.db`, `PreserveNewest`; `DbPathHelper.cs:18` prefers the bin copy. An
+  uncheckpointed root `-wal` (MCP writes, or an importer killed before close) never reaches the dev server. No
+  staleness today: the root `-wal`s were 0 bytes and sizes/mtimes matched the bin copies. Needs a mechanism choice →
+  `TODO.md` §3.2 "Dev server reads a `-wal`-stale bin copy" / §8.
+- **Item `Cost` is modern — source-confirmed.** It drives `RewardCalculator.RarityOf` (`RewardCalculator.cs:372`) and
+  the starting bag (`EncounterFactory.cs:134`, `OrderBy(Cost)` → five cures tie at 200, so row order picks the pair).
+  Gen 1 prices (`pokered data/items/prices.asm`) differ for 16 of the 28 items: Potion 300, Antidote 100, Burn/Ice
+  Heal 250, Full Heal 600, Revive 1500, Ultra Ball 1200, Safari Ball 1000, Dire Hit 650, Guard Spec 700, X Attack 500,
+  X Defend 550, X Speed/Special 350, X Accuracy 950, the four PP items 0. Switching moves rarity bands (X-items
+  Uncommon → Common, Full Heal Common → Uncommon) → a balance decision → `TODO.md` §3.2 "Item `Cost` is modern" / §8.
+  `DATA_IMPORT.md:344`'s "Cost isn't battle-relevant and there's no shop" is stale either way (rewrite rides with
+  that entry).
+- **Yellow exclusion — source-confirmed.** `GameAvailabilitySeeder.cs:50-65` dropped six lines that pokeyellow has:
+  Sandshrew (`data/wild/maps/Route4.asm` et al.), Oddish/Bellsprout (`Route12-15`), Mankey (`Route3/4/22`), Growlithe
+  (`PokemonMansion1F`), Vulpix (Game Corner prize, `data/events/prizes.asm:8`). The other exclusions have no
+  wild/trade/prize entry and stand. **No gameplay effect, read-confirmed:** both readers (`EncounterFactory.cs:310`,
+  `:472`) take every `Wild` row regardless of version. → F3.
+
+**F1 — Sludge 40%.** *Acceptance:* `ApplyGen1Corrections` sets Sludge `EffectChance` 40; the `moves.db` row reads 40
+(WAL checkpointed, row diffed vs `HEAD`); `DATA_IMPORT.md` notes it. *Quirk:*
+`SecondaryChanceDataContractTests.EffectChanceMatchesGen1("sludge", 40)` — failed at 30 before. *Surface:* none
+(import-time Gen 1 data, no seam). *Boundary:* data — importer + one `moves.db` row. *Outcome:* a `sludge` case in the
+layer-2 block (`MoveImport.cs`), the `InlineData` added, one `moves.db` row; `DATA_IMPORT.md` §5.5 gains "Sludge is one"
+in the layer-2 caveat.
+
+**F2 — demote the `ailment_chance` overwrite to a fallback.** *Acceptance:* the assignment becomes
+`EffectChance ??= ailment_chance`; a status move keeps its `past_values` chance; `DATA_IMPORT.md` §4.1 stops saying the
+chance comes from `meta.ailment_chance`. *Quirk:* `MoveMappingTests.StatusAilment_PastValuesChanceWinsOverModernAilmentChance`
+— a burn move with `past_values` chance 30 and `ailment_chance` 10 maps to 30; failed before. *Surface:* none.
+*Boundary:* importer only; no db change (a diff over moves 1–165 changes only Poison Sting/Thunder/Fire Blast, each to
+the value layer 2 already sets). *Outcome:* as specified.
+
+**F3 — Yellow availability.** *Acceptance:* Sandshrew, Vulpix, Oddish, Mankey, Growlithe, Bellsprout lines get Yellow
+rows; Vulpix/Ninetales in Yellow are `GameCorner`; row-building extracted to a pure `BuildGen1Rows()`; `pokemon.db`
+re-seeded to match. *Quirk:* unit test on `BuildGen1Rows()` — the lines have Yellow rows, Yellow Vulpix is `GameCorner`;
+failed before. *Surface:* none (Gen 1 data). *Boundary:* data — seeder + `PokemonGameAvailability` rows; no runtime
+effect (readers ignore version). *Outcome:* `NotInYellow` shrank by the Sandshrew/Vulpix/Oddish/Mankey/Growlithe/
+Bellsprout entries; Vulpix (37) and Ninetales (38) added to the Yellow `GameCorner` overrides; `Seed` calls the new
+public `BuildGen1Rows()`; `GameAvailabilitySeederTests` (new); `DATA_IMPORT.md` §4.3 records that Yellow is checked
+against `pret/pokeyellow` `data/wild/maps` and `data/events`.
+
+**Gates (2026-10-11).** format-gate and test-runner passed. **requirements-review** (6 findings):
+- #4 (the other `NotInYellow` entries): the 13 remaining entries were scripted against pokeyellow; all stand.
+- #5, #6: refuted.
+- #1–#3 (Yellow labels): the F3 test was trimmed to the pokeyellow-backed wild species (the first draft asserted
+  lines pokeyellow does not back), and the Raichu comment was corrected (no wild Pikachu in Yellow — not "can't
+  evolve Pikachu"). The remaining label errors (Eevee, Lickitung, Wigglytuff, the evolve-only rule) are outside F3's
+  scope → `TODO.md` §3.2 "Yellow availability labels".
+- **pr-review skipped by user ruling.**
+
+**Spun off, still open (`TODO.md` §3.2 and §8):** "Yellow availability labels"; "Dev server reads a `-wal`-stale bin
+copy"; "Item `Cost` is modern".
+
+---
+
 ## §7.6 V4 — scripts and logging: verified and fixed ✅ DONE (2026-10-11)
 
 **Was** `TODO.md` §7.1 "Script/Docker polish" (verified at `4be7bbd`) and the §7.6 V4 slice with its fix-phase

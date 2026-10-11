@@ -37,7 +37,7 @@ public static class GameAvailabilitySeeder
     ];
 
     // Species completely unobtainable in Yellow without cross-game trading.
-    // Note: 123 (Scyther), 127 (Pinsir), 133 (Eevee) ARE available in Yellow
+    // Note: 37 (Vulpix), 123 (Scyther), 127 (Pinsir), 133 (Eevee) ARE available in Yellow
     // via the Game Corner, so they are intentionally absent from this set.
     private static readonly HashSet<int> NotInYellow =
     [
@@ -46,23 +46,9 @@ public static class GameAvailabilitySeeder
         15, // Weedle, Kakuna, Beedrill  (in both RB, not Yellow)
         23,
         24, // Ekans, Arbok               (Red only)
-        26, // Raichu                     (can't evolve Pikachu in Yellow)
-        27,
-        28, // Sandshrew, Sandslash       (Blue only)
-        37,
-        38, // Vulpix, Ninetales          (Blue only)
-        43,
-        44,
-        45, // Oddish, Gloom, Vileplume   (Red only)
+        26, // Raichu                     (no wild Pikachu in Yellow)
         52,
         53, // Meowth, Persian            (Blue only)
-        56,
-        57, // Mankey, Primeape           (Red only)
-        58,
-        59, // Growlithe, Arcanine        (Red only)
-        69,
-        70,
-        71, // Bellsprout line            (Blue only)
         109,
         110, // Koffing, Weezing           (in both RB, not Yellow)
         124, // Jynx                       (in both RB via NPC trade, not Yellow)
@@ -127,6 +113,8 @@ public static class GameAvailabilitySeeder
         [(137, "red")] = "GameCorner",
         [(137, "blue")] = "GameCorner",
         [(137, "yellow")] = "GameCorner", // Porygon
+        [(37, "yellow")] = "GameCorner", // Vulpix
+        [(38, "yellow")] = "GameCorner", // Ninetales (Fire Stone from the prize Vulpix)
         [(123, "yellow")] = "GameCorner", // Scyther  (Wild in Red; Game Corner only in Yellow)
         [(127, "yellow")] = "GameCorner", // Pinsir   (Wild in Blue; Game Corner only in Yellow)
         [(133, "yellow")] = "GameCorner", // Eevee    (Gift in RB; Game Corner only in Yellow)
@@ -150,6 +138,15 @@ public static class GameAvailabilitySeeder
         context.EnsureDatabaseCreated();
         await context.GameAvailability.ExecuteDeleteAsync();
 
+        var rows = BuildGen1Rows();
+        context.GameAvailability.AddRange(rows);
+        await context.SaveChangesAsync();
+
+        Console.WriteLine($"Seeded {rows.Count} Gen 1 game availability rows.");
+    }
+
+    public static List<PokemonGameAvailability> BuildGen1Rows()
+    {
         var rows = new List<PokemonGameAvailability>();
 
         foreach (var id in Enumerable.Range(1, 151))
@@ -178,9 +175,6 @@ public static class GameAvailabilitySeeder
             }
         }
 
-        context.GameAvailability.AddRange(rows);
-        await context.SaveChangesAsync();
-
-        Console.WriteLine($"Seeded {rows.Count} Gen 1 game availability rows.");
+        return rows;
     }
 }

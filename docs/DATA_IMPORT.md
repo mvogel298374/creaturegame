@@ -131,7 +131,8 @@ The remaining Gen 1 logic lives in the categorisation:
   `damage_class` is the Gen 4+ per-move split — it would wrongly make Fire Punch physical
   and Hyper Beam special; see the resolved note in §6.)*
 - **Status ailment** → `StatusEffect` (paralysis/sleep/burn/poison/freeze/bad-poison),
-  with `EffectChance` taken from `meta.ailment_chance` for damaging moves.
+  keeping the Gen-1-resolved `EffectChance`; `meta.ailment_chance` fills it only when PokeAPI gives no
+  `effect_chance` at all.
 - **`IsHighCrit`** ← `meta.crit_rate > 0` (Slash, Razor Leaf, etc.).
 - **`DamageCategory`** — mostly from `meta.category` (`damage-heal` → Drain, `ohko` →
   OHKO), but PokeAPI doesn't model several Gen 1 mechanics, so those are **special-cased
@@ -277,7 +278,8 @@ cleanly express Gen 1 per-version obtainability. It encodes:
   trade-only), as hand-maintained sets with comments (e.g. Sandshrew is Blue-only).
 - **Availability type** per `(species, version)` — `Wild` by default, overridden to
   `Static` (legendaries/Snorlax), `Event` (Mew), `Gift` (fossils, Hitmons, Lapras),
-  `GameCorner` (Porygon, Yellow's Scyther/Pinsir/Eevee), or `Trade` (NPC in-game trades).
+  `GameCorner` (Porygon, Yellow's Scyther/Pinsir/Eevee/Vulpix), or `Trade` (NPC in-game trades).
+- **Yellow** is checked against `pret/pokeyellow`'s `data/wild/maps` and `data/events` (prizes, trades).
 
 It clears and re-seeds cleanly each run (`ExecuteDeleteAsync` then bulk insert of all 151
 × 3 versions minus exclusions).
@@ -446,7 +448,7 @@ Strict-clone fidelity is decided here, once, rather than patched in the engine.
   ailment/secondary-chance changes PokeAPI didn't record, priority, target, crit rate, and
   **whole-effect rewrites** are invisible to it — and PokeAPI's *structured* data can lag its own
   flavor text. When a move's Gen 1 secondary looks off, cross-check Bulbapedia; do not assume the
-  resolver caught it.
+  resolver caught it. (Sludge is one: Gen 1 40% poison, `past_values` empty, so layer 2 sets it.)
 - "Earliest entry = Gen 1" relies on PokeAPI listing `past_values` **oldest-first**. For a field
   that changed more than once this ordering is load-bearing; if it is ever violated, sort entries
   by their `version_group`'s generation instead of trusting array order.
