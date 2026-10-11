@@ -7,7 +7,7 @@ namespace creaturegame.Tests.Integration.Gen1Attacks;
 
 /// <summary>
 /// Transform (Gen 1): the user becomes a copy of the target — its types, the four non-HP battle stats,
-/// current stat stages, SpeciesId and full moveset (each copied move at 5 PP, capped at the move's max).
+/// current stat stages, SpeciesId, base Speed (crit rate) and full moveset (each copied move at 5 PP, capped at the move's max).
 /// HP, MaxHP and level stay the user's. The change is undone when the battle ends (and on the next battle
 /// boundary's <see cref="Creature.ResetBattleState"/>), so it never leaks into the permanent Creature.
 /// Haze does NOT revert it mid-battle — Gen 1's HazeEffect_ explicitly preserves the TRANSFORMED bit.
@@ -108,6 +108,43 @@ public class TransformContractTests(MovesFixture moves) : Gen1MoveContract(moves
         result.Attacker.Battle.Stages.RaiseAttack(1);
         Assert.Equal(3, result.Attacker.Battle.Stages.Attack);
         Assert.Equal(2, target.Battle.Stages.Attack);
+    }
+
+    // pokered CriticalHitTest reads the current species' base Speed, and Transform copies the species.
+    [Fact]
+    public async Task TransformCritsAtTheTargetsBaseSpeedAndRevertsAfterwards()
+    {
+        var ditto = TestCreatures.Make("Ditto");
+        ditto.BaseSpeed = 48;
+        var jolteon = TestCreatures.Make("Jolteon");
+        jolteon.BaseSpeed = 130;
+        var tackle = Move("tackle");
+        var rules = Gen1BattleRules.Instance;
+        double dittoRate = rules.GetCritChance(ditto, tackle);
+
+        await new MoveScenario().Attacker(ditto).Defender(jolteon).Use(Move("transform"));
+
+        Assert.Equal(rules.GetCritChance(jolteon, tackle), rules.GetCritChance(ditto, tackle));
+        ditto.ResetBattleState();
+        Assert.Equal(48, ditto.BaseSpeed);
+        Assert.Equal(dittoRate, rules.GetCritChance(ditto, tackle));
+    }
+
+    // pokered awards Stat Exp from wEnemyMonBaseStats, which Transform never touches.
+    [Fact]
+    public async Task ATransformedFoeYieldsItsOwnBaseSpeedAsStatExp()
+    {
+        var foeDitto = TestCreatures.Make("Ditto");
+        foeDitto.BaseSpeed = 48;
+        var jolteon = TestCreatures.Make("Jolteon");
+        jolteon.BaseSpeed = 130;
+
+        await new MoveScenario().Attacker(foeDitto).Defender(jolteon).Use(Move("transform"));
+        Assert.Equal(130, foeDitto.BaseSpeed);
+
+        jolteon.GainStatExp(foeDitto);
+
+        Assert.Equal(48, jolteon.ExpSpeed);
     }
 
     [Fact]

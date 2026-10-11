@@ -382,17 +382,14 @@ public sealed class TransformEffect : IMoveEffect
 
     public void Apply(MoveEffectContext ctx)
     {
-        // Gen 1: the user becomes a copy of the target — types, the four non-HP stats, current stat stages,
-        // SpeciesId and full moveset (each copied move at 5 PP, or its max if lower). HP/MaxHP/level stay the
-        // user's. Undone at battle end (RestoreOriginalIdentity via ResetBattleState). Self-affecting, no
-        // damage; fails on a fainted target. Snapshot taken before mutating so the original survives even if
-        // Conversion later changes the type too.
+        // Copied and kept fields: STATE_MODEL.md §2 (Transform).
         if (ctx.Target.IsAlive())
         {
             ctx.Source.SnapshotIdentityForMutation();
             ctx.Source.Type1 = ctx.Target.Type1;
             ctx.Source.Type2 = ctx.Target.Type2;
             ctx.Source.SpeciesId = ctx.Target.SpeciesId;
+            ctx.Source.BaseSpeed = ctx.Target.BaseSpeed;
             ctx.Source.Attributes.Attack = ctx.Target.Attributes.Attack;
             ctx.Source.Attributes.Defense = ctx.Target.Attributes.Defense;
             ctx.Source.Attributes.Special = ctx.Target.Attributes.Special;
@@ -484,11 +481,7 @@ public sealed class SubstituteEffect : IMoveEffect
 
     public void Apply(MoveEffectContext ctx)
     {
-        // Gen 1: spend floor(maxHP/4) HP to raise a decoy with floor(maxHP/4)+1 HP that soaks the foe's hits
-        // (absorption in DealDamageToTarget; status/stat shielding in the Try* methods). Fails if one is
-        // already up or the user can't pay (HP ≤ cost) — a state precondition, so it reuses MoveMissed like
-        // Counter/Rest. The ¼ cost is gen-invariant (litmus "would Gen 2 change it?" → no) ⇒ inline, not the
-        // seam. Self-targeting ⇒ the foe-immunity guard never blocks it.
+        // Cost, decoy HP and the exact-cost KO: GEN_DIFFERENCES.md → Gen 1 Status Quirks (Substitute).
         if (ctx.Source.Battle.SubstituteHp > 0)
         {
             ctx.Emitter?.Emit(
@@ -497,7 +490,7 @@ public sealed class SubstituteEffect : IMoveEffect
             return;
         }
         int cost = ctx.Source.Attributes.MaxHP / 4;
-        if (ctx.Source.Attributes.HP <= cost)
+        if (ctx.Source.Attributes.HP < cost)
         {
             ctx.Emitter?.Emit(
                 new MoveMissed(ctx.Source.Name, ctx.Source.Id, ctx.Attack.Name ?? "")

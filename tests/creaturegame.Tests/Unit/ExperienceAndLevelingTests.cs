@@ -191,15 +191,20 @@ public class ExperienceAndLevelingTests
         Assert.Equal(expectedXP, gain.Amount);
     }
 
-    [Fact]
-    public void Gen1XpFormula_AppliesTrainerBonus_1_5x_InsideTheFloor()
+    // pokered experience.asm: x = floor(baseExp × level / 7), then BoostExp adds floor(x / 2) for a trainer.
+    [Theory]
+    [InlineData(100, 40, 571, 856)]
+    [InlineData(64, 5, 45, 67)]
+    public void Gen1XpFormula_TrainerBonusFloorsTheHalfSeparately(
+        int baseExp,
+        int level,
+        int wild,
+        int trainer
+    )
     {
-        // Gen 1 already split wild vs trainer XP: floor(a × baseExp × level / 7), a = 1.5 for a trainer-owned
-        // foe. baseExp 100 at level 40 → wild floor(100×40/7) = 571; trainer floor(1.5×100×40/7) = 857 (the
-        // 1.5 is inside the floor, so it is NOT just 571×1.5 = 856.5 rounded — it is floor of the scaled value).
         var rules = Gen1BattleRules.Instance;
-        Assert.Equal(571, rules.CalculateXpAwarded(100, 40, trainerOwned: false));
-        Assert.Equal(857, rules.CalculateXpAwarded(100, 40, trainerOwned: true));
+        Assert.Equal(wild, rules.CalculateXpAwarded(baseExp, level, trainerOwned: false));
+        Assert.Equal(trainer, rules.CalculateXpAwarded(baseExp, level, trainerOwned: true));
     }
 
     [Fact]

@@ -38,7 +38,7 @@
 | # | Item | Cost | Ready? (DoR) | Why this slot / what it unblocks |
 |:-:|:-----|:----:|:-------------|:---------------------------------|
 | 1 | **`-StartStack` backend leak** (§7.1 Part A) | S | ✗ parked: leak not reproduced (2026-10-10); un-park condition in §7.1 | Parts B and C are done. Not actionable until the user reproduces it; §1 #3 and #6 do not wait on it. |
-| 2 | **Verification pass over the unverified findings** (§7.6) | S per slice | ✅ (2026-10-10) — 15 tiny slices V1–V15 (V1–V9 done; V10 next; the V16 audit row is tracked separately as #11); each verifies first, then fixes only S-size, non-central, no-decision findings under a mini-DoR; greenlight and commit each | Turns "reviewer's reading" items into evidenced verdicts or discards. Opens up everything below it. |
+| 2 | **Verification pass over the unverified findings** (§7.6) | S per slice | ✅ (2026-10-10) — 15 tiny slices V1–V15 (V1–V10 done; V11 next; the V16 audit row is tracked separately as #11); each verifies first, then fixes only S-size, non-central, no-decision findings under a mini-DoR; greenlight and commit each | Turns "reviewer's reading" items into evidenced verdicts or discards. Opens up everything below it. |
 | 3 | **Server test gaps — `GameSessionManager` lifecycle + the `RunFaulted` path** (§6) | M | ⚠️ needs the injectable-clock design | Unblocks the R1d tests and closes a long-open Tier-4 item. |
 | 5 | **R1d-a — replay an open blocking prompt** (§2) | M | ⚠️ designed, but provisional-pending-`/plan` and needs your three decisions (§8) | The only reconnect item that strands a run; highest player value. |
 | 6 | **CI E2E step** (§6) | M | ✗ no design (runner, stack boot, caching) or acceptance | The only automatic E2E coverage; makes "agents don't run E2E" safe, and unblocks checking the BST/balance flag and the reconnect spec. |
@@ -117,10 +117,20 @@ data/engine item usually also means updating the test that pins the wrong value.
   with stages and Burn applied; the foe's Reflect doubles the Defense. *Gaps:* `DamageCalculator` is central;
   whether to replicate the foe-Reflect quirk is a §8 decision; seam surface (variance on/off, which side's screen).
   *Gen 1 source:* `core.asm:3695-3696`, `:3674-3683`, `:4044-4055` (full cites in the V9 archive record). *Quirk to assert:* the foe's Reflect weakens your self-hit.
-- **Smaller Gen 1 gaps II:** Mist message before the chance
-  roll and Mist shouldn't block secondary drops (`AttackAction.TryApplyStatEffect`); Leech Seed ignores the Toxic counter
-  (`Battle.cs:674`); a Fire move thaws via a Substitute hit (`AttackAction.TryThawTarget`); trainer XP 1.5× rounding
-  (`:267`); post-Transform crit speed; Substitute at exactly the HP cost should succeed (`MoveEffects.cs:497`).
+- **Smaller Gen 1 gaps II — verified, trainer XP / Transform crit speed / Substitute-at-cost fixed 2026-10-12 (§7.6 V10).**
+  Verdicts, F1–F3 and the review rulings: `TODO_ARCHIVE.md` → "§7.6 V10 — smaller Gen 1 gaps II". The remainder stays
+  open as the entries below.
+- **Gen 1 Mist, thaw and Leech Seed fidelity (from §7.6 V10) — M, ✗ not Ready.** *Intent:* Mist only blocks
+  primary stat-down moves, as a miss before the accuracy roll; a Substitute stops a Fire thaw; the Leech Seed drain
+  is multiplied by the Toxic counter. *Gaps:* touches `AttackAction`/`Battle` (central, `opus-engineer` + both
+  gates); Leech Seed overlaps the end-of-turn residual `/plan` (§4.2); the `StatDropBlocked` wire event would lose
+  its Gen 1 use (TS client leg). *Gen 1 source:* Mist `core.asm:5266-5307`; Leech Seed `core.asm:546-591`; thaw
+  `effects.asm:194-204` (full cites in the V10 archive record).
+- **Gen 1 XP participant split order (from §7.6 V10) — S, ✗ not Ready.** Gen 1 divides the base exp and the Stat
+  Exp yields by the participant count first (`experience.asm:294`). *Gaps:* touches `Battle`, and it's a seam question
+  (`SplitXpAmongParticipants`'s contract changes; composition order is in `GENERATION_SEAMS.md`).
+- **Smaller Gen 1 gaps III (new, unverified beyond the cite):** the foe's stat-down moves fail 25% of the time in a
+  non-link battle (`effects.asm:549-554`), a Gen 1 AI handicap → §8 decision.
 - **Open question (documented, but Gen 1 differs):** after Roar/Whirlwind the scared-off foe still acts
   (`Battle.cs:311-313`), which can end the run via a faint with a healthy bench (`GAME_LOOP.md:135`); Gen 1 ends
   the battle immediately. **Needs-decision.**
@@ -597,7 +607,7 @@ a decision (Roar/Whirlwind, the BST bands).
 | V7 | Verify ✅ and fix ✅ 2026-10-11 — record in `TODO_ARCHIVE.md` → "§7.6 V7 — gate order and battle-item reuse"; the roll-order verdict → shipped, `TODO_ARCHIVE.md` → "Gen 1 roll order in `AttackAction`" | — | — |
 | V8 | Verify ✅ 2026-10-12 — all four confirmed (1 source-confirmed, 3 reproduced); record in `TODO_ARCHIVE.md` → "§7.6 V8 — turn-order/status edges". No in-slice fixes (central methods + a seam question) → two §3.1 entries, both ✗ not Ready | — | — |
 | V9 | Done ✅ 2026-10-12 — all four reproduced; Psywave max, binding odds, Stat Exp fixed; record in `TODO_ARCHIVE.md` → "§7.6 V9 — smaller Gen 1 gaps I"; confusion self-hit → its own §3.1 entry | pokered + code; scratch test | Gen 1 source per claim |
-| V10 | Smaller gaps II: Mist, Leech Seed + Toxic, Fire thaw via Substitute, trainer XP rounding, post-Transform crit, Substitute at exact HP (§3.1) | pokered + code | Gen 1 source per claim |
+| V10 | Done ✅ 2026-10-12 — all six confirmed; trainer XP, Transform crit Speed, Substitute-at-cost fixed; record in `TODO_ARCHIVE.md` → "§7.6 V10 — smaller Gen 1 gaps II"; Mist/thaw/Leech Seed and the XP split order → their own §3.1 entries | pokered + code; scratch test | Gen 1 source per claim |
 | V11 | Seam leak (Special stages), AI evaluator weights, unvalidated `MoveTurnChoice`, latent `Biome.cs` crash (§3.1) | Code | — |
 | V12 | Frontend: double-submit, `/battle` "Connecting…" forever, unbounded battle log (§5) | Code | Browser-only parts → *needs-runtime* |
 | V13 | Frontend: Phaser resize, unheard `entryComplete`, frontend nits (§5) | Code | Browser-only parts → *needs-runtime* |
@@ -621,6 +631,7 @@ a decision (Roar/Whirlwind, the BST bands).
 | **`-wal` staleness mechanism** — importer checkpoint, copy `-wal`, or `journal_mode=DELETE`? | `DELETE` on the committed files, plus an importer checkpoint | §3.2 entry |
 | **Foe Psywave can deal 0** (Gen 1 foe rolls `[0, b)`, player `[1, b)`) — replicate? | Replicate behind the existing seam (it's the Gen 1 asymmetry); user ruling 2026-10-12: keep open | `TODO_ARCHIVE.md` → "§7.6 V9" |
 | **Confusion self-hit uses the foe's Reflect** (Gen 1 quirk) — replicate? | Replicate (true Gen 1) | §3.1 confusion entry |
+| **Foe stat-down moves fail 25% in non-link battles** (Gen 1, `effects.asm:549-554`) — replicate? | Replicate behind an `IBattleRules` flag (Gen 1 fidelity; makes the foe weaker) | §3.1 "Smaller Gen 1 gaps III" |
 | **Item `Cost`** — Gen 1 prices (shifts loot rarity) or modern + deterministic starting bag? | Modern + `ThenBy(Id)` now; Gen 1 prices only with a balance pass | §3.2 entry |
 
 ---

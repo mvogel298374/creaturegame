@@ -282,12 +282,12 @@ public sealed class Gen1BattleRules : IBattleRules
     // Gen 1: crits use raw computed stats, bypassing stages and the Burn Attack penalty.
     public bool CritIgnoresStatStages => true;
 
-    // Gen 1 XP formula: floor(a × BaseExperience × EnemyLevel / 7). a = 1.5 for a trainer-owned foe (the
-    // trainer bonus, present since Gen 1), 1 for a wild foe — the multiplier is applied inside the SINGLE
-    // floor/truncation (not floor(wild)×1.5, which would round differently). Source: Bulbapedia "Experience"
-    // §Gen I–IV (Exp = a·b·L/7) / pokered.
-    public int CalculateXpAwarded(int baseExp, int enemyLevel, bool trainerOwned) =>
-        (int)Math.Floor((trainerOwned ? 1.5 : 1.0) * baseExp * enemyLevel / 7);
+    // Gen 1 XP and its trainer-bonus rounding: GEN_DIFFERENCES.md → Experience.
+    public int CalculateXpAwarded(int baseExp, int enemyLevel, bool trainerOwned)
+    {
+        int xp = baseExp * enemyLevel / 7;
+        return trainerOwned ? xp + xp / 2 : xp;
+    }
 
     // Gen 1 divides the award evenly among the Pokémon that were sent out and have not fainted (the formula's
     // `s` divisor). That division holds through Gen 5 and was REMOVED in Gen 6, where every participant earns

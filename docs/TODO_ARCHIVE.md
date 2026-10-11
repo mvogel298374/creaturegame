@@ -8,6 +8,66 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §7.6 V10 — smaller Gen 1 gaps II: verified, trainer XP / Transform crit speed / Substitute-at-cost fixed ✅ DONE (2026-10-12)
+
+**Was** `TODO.md` §3.1 "Smaller Gen 1 gaps II" and the §7.6 V10 slice. Verified at `e0a9647` against `pret/pokered`
+`af51989`; throwaway scratch tests (6/6) drove the real code (Leech Seed is source-confirmed only: its drain is private to
+`Battle`). All six claims hold. Three were fixed in-slice (F1-F3, greenlit 2026-10-12; `pr-review` skipped by the user;
+`format-gate` PASS; `test-runner` PASS after the review fixes). Mist/thaw/Leech Seed, the XP participant split order and the
+foe stat-down handicap stay open as their own `TODO.md` entries.
+
+**Verdicts.**
+- **Mist — reproduced.** Gen 1 checks Mist only for the *primary* stat-down effects (`$12-$19`, `$3a-$41`), inside
+  `MoveHitTest` before the accuracy roll, and a block is a plain miss (`engine/battle/core.asm:5266-5307`). Side-effect drops
+  (Aurora Beam etc.) never consult Mist. Ours checks Mist for every foe drop after the accuracy draw, with its own
+  `StatDropBlocked` message (`AttackAction.cs:717-723`), so a 10% Aurora Beam drop says "protected by Mist" every hit and never
+  lands. New gap: the foe's stat-down moves also fail 25% of the time in a non-link battle (`engine/battle/effects.asm:549-554`).
+  Not fixed (touches `AttackAction`/`Battle`) -> open entry.
+- **Leech Seed x Toxic — source-confirmed.** Gen 1's drain is floor(MaxHP/16) x the Toxic counter and bumps the counter again,
+  the "Leech Seed glitch" (`core.asm:546-591`). Ours drains a flat 1/16 (`Battle.cs:680-698`). Not fixed -> open entry.
+- **Fire thaw through a Substitute — reproduced.** `FreezeBurnParalyzeEffect` returns on `CheckTargetSubstitute` before
+  `CheckDefrost` (`effects.asm:194-204`). Ours thaws first (`AttackAction.cs:436-448`). Not fixed -> open entry.
+- **Trainer XP rounding — reproduced.** Gen 1: floor(base x L / 7), then + floor(x/2) for a trainer (`experience.asm:57-88`,
+  `BoostExp :328-340`). Ours: floor(1.5 x base x L / 7) (`Gen1BattleRules.cs:289-290`). Base 64, L5: ours 68, Gen 1 67. Fixed (F1).
+  New gap: Gen 1 divides the base exp (and the Stat Exp yields) by the participant count *before* the formula
+  (`DivideExpDataByNumMonsGainingExp`, `:294`); ours splits the finished award (`Battle.cs:274-275`) -> open entry.
+- **Post-Transform crit — reproduced.** Transform copies the species (`move_effects/transform.asm:57-60`) and `CriticalHitTest`
+  reads the current species' base Speed (`core.asm:4483-4491`). Ours copied `SpeciesId` but crit off the user's own `BaseSpeed`
+  (`MoveEffects.cs:395`, `Gen1BattleRules.GetCritChance`). Fixed (F2).
+- **Substitute at exactly the cost — reproduced.** Gen 1 fails only on an underflow, so HP equal to the cost succeeds and leaves
+  the user at 0 HP (`move_effects/substitute.asm:34-43`, a documented bug). Ours refused at `HP <= cost` (`MoveEffects.cs:500`).
+  Fixed (F3). The decoy's `cost + 1` HP (`:508`) is **not** a gap: pokered breaks the decoy only on underflow
+  (`core.asm:4873-4877`), which our `cost + 1` with a break at 0 reproduces.
+
+**Fixes (mini-DoRs, all S, none central).**
+- **F1 Trainer XP rounding.** `Gen1BattleRules.CalculateXpAwarded` = x + floor(x/2) for a trainer, x = floor(base x L / 7); a test
+  pins base 64 / L5 -> 67 (wild 45). Quirk asserted: the boost floors the half separately. Gen-variable via `IBattleRules.CalculateXpAwarded`;
+  runtime only.
+- **F2 Transform copies base Speed for crits.** After Transform the user's `BaseSpeed` is the target's; `IdentitySnapshot` gains
+  `BaseSpeed` and restores it at battle end. Test: crit chance follows the target's base Speed and reverts. Quirk asserted: a Ditto
+  transformed into Jolteon crits at Jolteon's rate. No new gen-variable surface (`GetCritChance` already reads `BaseSpeed`).
+- **F3 Substitute at exactly the cost succeeds.** HP == floor(MaxHP/4) puts up the decoy and leaves the user at 0 HP, which
+  faints through `Battle`'s normal path; HP below the cost still fails. Gen 1 behaviour in the effect (no `IBattleRules` flag for one
+  comparison; Gen 2 unchecked). Tests pin both. Quirk asserted: the user can KO itself with Substitute.
+
+**requirements-review outcome — 5 items, user ruled "do all five" (2026-10-12).**
+1. F2 regression: `Gen1StatCalculator.AwardStatExp` now reads the foe's pre-Transform base Speed (`OriginalIdentity`), with a test.
+2. Stale XP code comments cut to pointers; `GEN_DIFFERENCES.md` gained an *Experience* section.
+3. Two full-`Battle` Substitute self-KO tests: the player switch-in path, and the enemy self-KO -> `PlayerWon` + XP.
+4. `GEN_DIFFERENCES.md` Substitute bullet notes the AI self-KO and the unreachable zero cost.
+5. `GEN_DIFFERENCES.md` Stats gained the Transform-crit line.
+
+**User ruling on XP composition.** The Gen 1 XP seam (`IBattleRules.CalculateXpAwarded`) and the roguelite `RunRules` XP multiplier
+work in tandem but stay separate systems. Composition order, documented in `GENERATION_SEAMS.md`: seam award -> RunRules multiplier ->
+seam participant split -> bench share.
+
+**Docs updated in-slice:** `STATE_MODEL.md` (Transform field list), `GEN_DIFFERENCES.md`, `GENERATION_SEAMS.md`.
+
+**Still open (in `TODO.md`):** "Gen 1 Mist, thaw and Leech Seed fidelity" (§3.1, M, not Ready), "Gen 1 XP participant split order"
+(§3.1, S, not Ready), "Smaller Gen 1 gaps III" and its §8 decision (foe stat-down 25% handicap).
+
+---
+
 ## §7.6 V9 — smaller Gen 1 gaps I: verified, Psywave / binding odds / Stat Exp fixed ✅ DONE (2026-10-12)
 
 **Was** `TODO.md` §3.1 "Smaller Gen 1 gaps I" and the §7.6 V9 slice. Verified at `fc38632` against `pret/pokered`

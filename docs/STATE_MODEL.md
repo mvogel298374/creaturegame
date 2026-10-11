@@ -116,6 +116,13 @@ copied moveset or borrowed identity from a previous fight would leak into the ne
 **not** trigger either: Gen 1's Haze never touches an active Mimic swap or a Transformed creature's copied
 identity, so `ResetForHaze` leaves both alone.
 
+**Transform copies** the target's types, `SpeciesId`, base Speed (Gen 1 crits read the current species' base
+Speed — pokered `core.asm:4483-4491`), the four non-HP battle stats, current stat stages and full moveset (each
+copied move at 5 PP, or its max if lower). HP/MaxHP and level stay the user's, and it fails on a fainted target.
+`IdentitySnapshot` holds exactly the fields Transform or Conversion can change (types, `SpeciesId`, base Speed,
+the four non-HP stats, the original moveset wrappers). It is taken once, before the first mutation, so a later
+Conversion can't overwrite the true original.
+
 **End-of-battle effects are party-wide, not lead-only (invariant, 2026-07-18).** A switched-in creature *is* the
 active creature — there is no second-class participant (user ruling 2026-07-15). Two end-of-battle effects act on
 the whole party rather than only the creature that started the fight:

@@ -53,7 +53,7 @@ public class Battle
         CarriedStatus? playerEntryStatus = null,
         Bag? playerBag = null,
         bool escapable = true,
-        // Trainer-owned foe (Elite/Boss) → the Gen-1 seam's ×1.5 XP bonus. Default false = wild.
+        // Trainer-owned foe (Elite/Boss) → the generation seam's trainer XP bonus. Default false = wild.
         bool trainerBattle = false,
         // Roguelite dial on top of the Gen-1 seam, NOT a seam itself — GENERATION_SEAMS.md. Default is a no-op.
         RunRules? runRules = null,

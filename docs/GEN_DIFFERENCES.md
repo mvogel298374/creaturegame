@@ -78,6 +78,10 @@ A reference doc covering every major system across all main-series generations �
 - Critical hits ignore Burn's Attack penalty
 - **Stat Exp bonus rounds the root up:** `min(255, ceil(sqrt(StatExp))) / 4`, integer division, so StatExp 9999 counts
   as √ = 100 (pokered `home/move_mon.asm` `CalcStat`, `:73-92`, `:163-164`)
+- **Transform changes the crit rate:** crits read the *current species'* base Speed (`core.asm:4483-4491`), and
+  Transform copies the species (`move_effects/transform.asm:57-60`), so a transformed Ditto crits at the target's
+  rate. The defeated foe's Stat Exp yield still comes from its own base stats (`wEnemyMonBaseStats`, untouched by
+  Transform — `experience.asm:28`)
 
 #### Accuracy
 - Internal scale: **0–255** (not 0–100)
@@ -200,12 +204,27 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
   `AttackAction` impact-time snapshot (`_targetShieldedAtImpact`) that already covers the breaking hit. Pinned by
   `FlinchContractTests.SubstituteShieldsTheTargetFromFlinch` (decoy survives / decoy breaks). History:
   `docs/TODO_ARCHIVE.md` → "Repo-sweep R1/R2/R3 — five small fixes", item 2.
+- **Substitute (Gen 1):** costs ⌊MaxHP/4⌋ and fails only when HP is *below* the cost, so a user with exactly the
+  cost raises the decoy and is left at 0 HP, fainting itself (pokered `move_effects/substitute.asm:34-43`, a
+  documented bug). The decoy holds ⌊MaxHP/4⌋ and breaks only on an underflow (`core.asm:4873-4877`): damage equal to
+  its HP leaves it standing at 0. Ours models that as `cost + 1` HP breaking at 0, which is the same breakpoint.
+  The ¼ cost is gen-invariant, so it is inline in `SubstituteEffect`, not on a seam. The self-KO applies to both
+  sides, so the foe AI can faint itself too, as on the cartridge. A zero cost (MaxHP < 4) is unreachable: Gen 1
+  HP adds Level + 10, so MaxHP is at least 11.
 
 #### Battle Items
 - A booster with nothing to do is **used up anyway**: a second Dire Hit, Guard Spec or X Accuracy only re-sets its
   flag, and an X-item is removed *before* the raise, so at +6 it is spent and "Nothing happened!" follows (pokered
   `engine/items/item_effects.asm:1544-1663`). Dire Hit and Guard Spec print only "<PLAYER> used <ITEM>!"
   (`PrintItemUseTextAndRemoveItem`). Seam: `IBattleRules.RepeatFlagItemRefused` / `CappedXItemRefused`.
+
+#### Experience
+- **Trainer XP floors the half separately:** x = ⌊base × L / 7⌋, then a trainer battle adds ⌊x/2⌋ (pokered
+  `engine/battle/experience.asm:57-88`, `BoostExp :328-340`). Base 64, L5: 45 wild, 67 trainer (not ⌊1.5 × 320 / 7⌋
+  = 68). Seam: `IBattleRules.CalculateXpAwarded`. The roguelite XP multiplier (`RunRules`) is applied on top of
+  this as a separate system (`GENERATION_SEAMS.md` → XP on faint).
+- Gen 1 divides the base exp by the participant count *before* the formula (`DivideExpDataByNumMonsGainingExp`,
+  `:294`); ours splits the finished award — an open gap (`TODO.md` §3.1).
 
 #### No Systems (not yet introduced)
 - No held items

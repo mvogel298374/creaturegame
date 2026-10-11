@@ -128,16 +128,15 @@ public sealed class BattleState
 /// The pre-mutation identity of a <see cref="Creature"/>, captured so Transform / Conversion can be
 /// undone at battle end (or the start of the creature's next battle — see
 /// <see cref="Creature.ResetBattleState"/>). A mid-battle Haze does NOT undo it: Gen 1's Haze explicitly
-/// keeps an active Transform's TRANSFORMED bit set (see <see cref="Creature.ResetForHaze"/>). Holds the
-/// permanent fields those moves change — types, the four non-HP battle stats, SpeciesId, and the
-/// original moveset wrappers. HP/MaxHP and level are never copied by Transform, so they aren't
-/// snapshotted.
+/// keeps an active Transform's TRANSFORMED bit set (see <see cref="Creature.ResetForHaze"/>). Field list:
+/// STATE_MODEL.md §2.
 /// </summary>
 public sealed class IdentitySnapshot
 {
     public DamageType? Type1 { get; init; }
     public DamageType? Type2 { get; init; }
     public int SpeciesId { get; init; }
+    public int BaseSpeed { get; init; }
     public int Attack { get; init; }
     public int Defense { get; init; }
     public int Special { get; init; }

@@ -105,13 +105,28 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
     public async Task FailsWhenHpTooLowToPayTheCost()
     {
         var user = TestCreatures.Make("A", hp: 200); // cost is 50
-        user.Attributes.ReceiveDamage(160); // down to 40 (≤ cost)
+        user.Attributes.ReceiveDamage(160); // down to 40 (< cost)
 
         var result = await new MoveScenario().Attacker(user).Use(Move("substitute"));
 
         Assert.True(result.Has<MoveMissed>());
         Assert.Equal(0, result.Attacker.Battle.SubstituteHp); // no decoy raised
         Assert.Equal(40, result.Attacker.Attributes.HP); // HP unchanged
+    }
+
+    // pokered substitute.asm fails only on an underflow, so paying the user's last HP still raises the decoy.
+    [Fact]
+    public async Task SucceedsAtExactlyTheCostAndLeavesTheUserAtZeroHp()
+    {
+        var user = TestCreatures.Make("A", hp: 200);
+        user.Attributes.ReceiveDamage(150); // down to 50 (= cost)
+
+        var result = await new MoveScenario().Attacker(user).Use(Move("substitute"));
+
+        Assert.True(result.Has<SubstitutePutUp>());
+        Assert.Equal(51, result.Attacker.Battle.SubstituteHp);
+        Assert.Equal(0, result.Attacker.Attributes.HP);
+        Assert.False(result.Attacker.IsAlive());
     }
 
     [Fact]
@@ -176,10 +191,9 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
     public async Task DecoyPersistsAcrossTurnsAndProtectsHpUntilItBreaks()
     {
         // Deterministic damage (no miss, no crit, no variance) keeps the battle short and reproducible:
-        // the player (only Substitute) raises a 51-HP decoy turn 1, the enemy soaks into it over the next
-        // turns, it breaks, then the enemy whittles the player down — all within Substitute's 10 PP so the
-        // player never falls back to Struggle. The enemy is Water-typed so its Normal Tackle gets no STAB.
-        var player = TestCreatures.Make("Player", hp: 200, speed: 200, defense: 80);
+        // HP 210 (cost 52) leaves 2 HP after the fourth decoy, so the user can't afford a fifth and takes a real
+        // hit; at an exact multiple it would pay its last HP and faint instead (Gen 1 exact-cost rule).
+        var player = TestCreatures.Make("Player", hp: 210, speed: 200, defense: 80);
         player.AddAttack(Move("substitute")); // only move ⇒ AutoSelect always picks it
 
         var enemy = TestCreatures.Make("Enemy", type1: DamageType.Water, attack: 110, speed: 1);
@@ -222,5 +236,76 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
             "the user took no real damage until the decoy broke (Gen 1)"
         );
         Assert.False(player.IsAlive());
+    }
+
+    private static Attack Tackle(int power) =>
+        new()
+        {
+            Name = "Tackle",
+            BaseDamage = power,
+            Accuracy = 100,
+            DamageType = DamageType.Normal,
+            AttackType = AttackType.Physical,
+        };
+
+    // pokered core.asm:424-447 runs the faint handler right after the self-KO, before the foe acts.
+    [Fact]
+    public async Task PlayerSubstituteAtExactlyTheCostFaintsTheLeadAndTheBenchComesIn()
+    {
+        var lead = TestCreatures.Make("Lead", hp: 200, speed: 200);
+        lead.Attributes.ReceiveDamage(150); // HP 50 = cost
+        lead.AddAttack(Move("substitute"));
+        var bench = TestCreatures.Make("Bench", hp: 300, attack: 999, speed: 150);
+        bench.AddAttack(Tackle(120));
+        var party = new Party(lead);
+        party.Add(bench);
+        var enemy = TestCreatures.Make("Enemy", type1: DamageType.Water, hp: 60, speed: 1);
+        enemy.AddAttack(Tackle(50));
+
+        var emitter = new RecordingEmitter();
+        var battle = new Battle(
+            lead,
+            enemy,
+            Gen1TypeChart.Instance,
+            AutoSelectInput.Instance,
+            AutoSelectInput.Instance,
+            rules: NoVarianceNoCritHitRules.Instance,
+            emitter: emitter,
+            playerParty: party
+        );
+        await battle.StartFightAsync();
+
+        Assert.Contains(emitter.Of<SubstitutePutUp>(), e => e.CreatureName == "Lead");
+        Assert.Contains(emitter.Of<CreatureFainted>(), e => e.Name == "Lead");
+        Assert.DoesNotContain(emitter.Of<DamageDealt>(), d => d.TargetName == "Lead");
+        Assert.Equal("Bench", Assert.Single(emitter.Of<CreatureSwitchedIn>()).Name);
+        Assert.True(battle.PlayerWon);
+    }
+
+    [Fact]
+    public async Task EnemySubstituteAtExactlyTheCostFaintsTheFoeAndThePlayerWins()
+    {
+        var player = TestCreatures.Make("Player", hp: 200, speed: 1);
+        player.AddAttack(Tackle(50));
+        var enemy = TestCreatures.Make("Enemy", hp: 200, speed: 200);
+        enemy.Attributes.ReceiveDamage(150); // HP 50 = cost
+        enemy.AddAttack(Move("substitute"));
+
+        var emitter = new RecordingEmitter();
+        var battle = new Battle(
+            player,
+            enemy,
+            Gen1TypeChart.Instance,
+            AutoSelectInput.Instance,
+            AutoSelectInput.Instance,
+            rules: NoVarianceNoCritHitRules.Instance,
+            emitter: emitter
+        );
+        await battle.StartFightAsync();
+
+        Assert.True(battle.PlayerWon);
+        Assert.Contains(emitter.Of<CreatureFainted>(), e => e.Name == "Enemy");
+        Assert.Empty(emitter.Of<DamageDealt>());
+        Assert.NotEmpty(emitter.Of<ExperienceGained>());
     }
 }

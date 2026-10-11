@@ -280,6 +280,7 @@ public class Creature
             Type1 = Type1,
             Type2 = Type2,
             SpeciesId = SpeciesId,
+            BaseSpeed = BaseSpeed,
             Attack = Attributes.Attack,
             Defense = Attributes.Defense,
             Special = Attributes.Special,
@@ -298,6 +299,7 @@ public class Creature
         Type1 = snap.Type1;
         Type2 = snap.Type2;
         SpeciesId = snap.SpeciesId;
+        BaseSpeed = snap.BaseSpeed;
         Attributes.Attack = snap.Attack;
         Attributes.Defense = snap.Defense;
         Attributes.Special = snap.Special;

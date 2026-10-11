@@ -159,7 +159,7 @@ public class RunDirectorNodeTests
         const int enemyLevel = 40;
         const int enemyBaseExp = 100;
         int wildAward = (int)Math.Floor((double)enemyBaseExp * enemyLevel / 7); // 571
-        int trainerAward = (int)Math.Floor(1.5 * enemyBaseExp * enemyLevel / 7); // 857
+        int trainerAward = wildAward + wildAward / 2; // 856 — pokered BoostExp
 
         var solo = new BiomeDefinition("solo", "Solo", Region.Kanto, [DamageType.Normal], []);
         var player = Fighter("Player", hp: 400, attack: 999, speed: 100, level: 50);

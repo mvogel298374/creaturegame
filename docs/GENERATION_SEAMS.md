@@ -89,7 +89,7 @@ Things that genuinely differ generation to generation, each a member on the inte
 | **Burn/Poison damage** | 1/16 max HP per turn | 1/8 in Gen 6+ |
 | **Residual (status tick) timing** | **no end-of-turn phase** — each creature's Burn/Poison/Leech Seed tick fires right after *its own* action, and a faint jumps straight to the faint handler (so a residual double-faint can't happen). Partly modelled today: `FaintEndsTurnImmediately` covers only the direct-hit-faint case. **Seam candidate, not yet built** — `TODO.md` → Known Gaps; rationale → `GEN_DIFFERENCES.md` → Status Quirks | true end-of-turn phase after both actions (Gen 2+) |
 | **Special stat** | one combined **Special** stat for both offense and defense | split into Sp. Atk / Sp. Def (Gen 2) |
-| **XP on faint** | wild `floor(baseExp × level / 7)`; **trainer-owned ×1.5** (Gen 1 already split wild vs trainer) | the trainer ×1.5 persists |
+| **XP on faint** | wild `floor(baseExp × level / 7)`; **trainer-owned: x + ⌊x/2⌋**, the half floored separately (pokered `engine/battle/experience.asm` `BoostExp`) | a trainer bonus persists (later-gen rounding unchecked) |
 | **XP participant divisor** | the award is divided among the Pokémon sent out that have **not** fainted (the formula's `s`) — `IBattleRules.SplitXpAmongParticipants` | same through Gen 5; **Gen 6 removed it** — every participant earns the full award, so a Gen 6 impl returns the award unchanged |
 
 > **Roguelite XP tuning (not a seam change).** `RunRules` is a separate game-balance-dials bag, not part of
@@ -98,7 +98,10 @@ Things that genuinely differ generation to generation, each a member on the inte
 > run. The Gen-1 **participant split** (dividing the win award among creatures that fought) stays on the seam
 > as `IBattleRules.SplitXpAmongParticipants` since Gen 6 dropped it — `Battle` only decides *who* participated,
 > which is gen-invariant. The bench share is layered on top of that split result and is not a Gen-1 mechanic at
-> all (no cartridge pays a creature that wasn't sent out). Full tuning values and rationale → `STATE_MODEL.md`;
+> all (no cartridge pays a creature that wasn't sent out). **Composition order in `Battle`:** the seam's award
+> (`CalculateXpAwarded`, trainer bonus included) → the `RunRules` multiplier → the seam's participant split → the
+> bench share. Neither system reads the other, so a generation swap and a balance retune stay independent.
+> Full tuning values and rationale → `STATE_MODEL.md`;
 > `docs/TODO_ARCHIVE.md` → *Reward Visibility & XP Pacing* (the multiplier anchors and pacing target) and →
 > *Participation XP* (the participant-split decision).
 

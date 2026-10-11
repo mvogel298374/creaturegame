@@ -490,20 +490,8 @@ public interface IBattleRules
 
     // ── Experience ─────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Returns the <em>undivided</em> XP a defeated enemy is worth.
-    /// Gen 1 formula: floor(a × BaseExperience × EnemyLevel / 7), where <paramref name="trainerOwned"/> sets
-    /// a = 1.5 (the trainer bonus, which has existed since Gen 1) vs a = 1 for a wild foe.
-    /// <para>The canonical formula also carries a divisor <c>s</c> — the number of Pokémon that participated in
-    /// the battle and have <em>not</em> fainted — which is <b>present from Gen 1</b> (it holds through Gen 5 and
-    /// was removed in <b>Gen 6</b>, where every participant earns the full amount). It is deliberately NOT
-    /// applied here: this method returns the enemy's full worth, and <see cref="Battle"/> owns the participant
-    /// split, because only the battle knows who took the field. See <c>docs/TODO_ARCHIVE.md</c> →
-    /// <em>Participation XP</em>.</para>
-    /// <para><b>Corrected 2026-07-27.</b> This comment previously read "Gen 5+: additionally divides the gain by
-    /// the number of participants", which had the history backwards — the division is a Gen 1–5 rule, not a
-    /// Gen 5+ addition. Don't restore that wording.</para>
-    /// </summary>
+    /// <summary>The undivided generation-rule XP a defeated enemy is worth; per-gen formula, the participant split and
+    /// the separate roguelite multiplier in GENERATION_SEAMS.md → XP on faint.</summary>
     int CalculateXpAwarded(int baseExp, int enemyLevel, bool trainerOwned);
 
     /// <summary>
