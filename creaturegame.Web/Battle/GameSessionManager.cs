@@ -98,7 +98,7 @@ public sealed class GameSessionManager(
     /// director.</summary>
     /// <remarks>
     /// Extracted from <see cref="AttachConnection"/> so the seams a run is configured with are <b>observable to
-    /// a test</b>: with everything inline, dropping <c>Rules = profile.BattleRules</c> would leave the suite
+    /// a test</b>: with everything inline, dropping <c>Rules = profile.BuildBattleRules(…)</c> would leave the suite
     /// green because of the engine's silent fallback (<c>docs/GENERATION_PROFILE.md</c> §4.2) — pinning this
     /// method against a second profile turns "the profile is threaded" from a claim into a test
     /// (<c>GenerationProfileTests</c>). <c>internal static</c> and dependency-free by design: everything it
@@ -115,7 +115,7 @@ public sealed class GameSessionManager(
         {
             Emitter = emitter,
             Rng = session.Rng,
-            Rules = profile.BattleRules,
+            Rules = profile.BuildBattleRules(session.Rng),
             CheckEvolution = p =>
                 encounters.ResolvePlayerEvolutionAsync(p, session.AllMoves, profile),
             PlayerBag = session.Bag,

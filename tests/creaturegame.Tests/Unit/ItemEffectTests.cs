@@ -689,17 +689,32 @@ public class ItemEffectTests
         Assert.False(CanApply(XAttack(), c, rules: new RulesRefusingNoEffectBoosters()));
     }
 
-    [Fact]
-    public void DireHit_SetsFocusEnergy()
+    private sealed class RulesAnnouncingBoosterEffects : DelegatingBattleRules
     {
-        // Dire Hit raises crit via the Gen 1 Focus Energy state (and reuses its event).
-        var c = TestCreatures.Make();
+        public override bool BoosterItemAnnouncesEffect => true;
+    }
+
+    [Fact]
+    public void DireHit_UnderGen1_SetsFocusEnergySilently()
+    {
         var (user, em) = Apply(
             Item(56, "dire-hit", ItemCategory.BattleStatBoost, boostsCrit: true),
-            c
+            TestCreatures.Make()
         );
 
         Assert.True(user.Battle.HasFocusEnergy);
+        Assert.Empty(em.Of<FocusEnergyApplied>());
+    }
+
+    [Fact]
+    public void DireHit_UnderRulesThatAnnounceIt_EmitsFocusEnergyApplied()
+    {
+        var (user, em) = Apply(
+            Item(56, "dire-hit", ItemCategory.BattleStatBoost, boostsCrit: true),
+            TestCreatures.Make(),
+            rules: new RulesAnnouncingBoosterEffects()
+        );
+
         Assert.Equal(user.Name, em.Of<FocusEnergyApplied>().Single().CreatureName);
     }
 
@@ -733,16 +748,56 @@ public class ItemEffectTests
     }
 
     [Fact]
-    public void GuardSpec_SetsMist()
+    public void DireHit_WhenAlreadyFocused_UnderRulesThatAnnounceIt_EmitsNothing()
     {
-        // Guard Spec. shrouds the user in Mist (foe can't lower its stats) — reuses the Mist move's event.
         var c = TestCreatures.Make();
+        c.Battle.HasFocusEnergy = true;
+
+        var (_, em) = Apply(
+            Item(56, "dire-hit", ItemCategory.BattleStatBoost, boostsCrit: true),
+            c,
+            rules: new RulesAnnouncingBoosterEffects()
+        );
+
+        Assert.Empty(em.Of<FocusEnergyApplied>());
+    }
+
+    [Fact]
+    public void GuardSpec_WhenAlreadyMisted_UnderRulesThatAnnounceIt_EmitsNothing()
+    {
+        var c = TestCreatures.Make();
+        c.Battle.HasMist = true;
+
+        var (_, em) = Apply(
+            Item(55, "guard-spec", ItemCategory.BattleStatBoost, setsMist: true),
+            c,
+            rules: new RulesAnnouncingBoosterEffects()
+        );
+
+        Assert.Empty(em.Of<MistApplied>());
+    }
+
+    [Fact]
+    public void GuardSpec_UnderGen1_SetsMistSilently()
+    {
         var (user, em) = Apply(
             Item(55, "guard-spec", ItemCategory.BattleStatBoost, setsMist: true),
-            c
+            TestCreatures.Make()
         );
 
         Assert.True(user.Battle.HasMist);
+        Assert.Empty(em.Of<MistApplied>());
+    }
+
+    [Fact]
+    public void GuardSpec_UnderRulesThatAnnounceIt_EmitsMistApplied()
+    {
+        var (user, em) = Apply(
+            Item(55, "guard-spec", ItemCategory.BattleStatBoost, setsMist: true),
+            TestCreatures.Make(),
+            rules: new RulesAnnouncingBoosterEffects()
+        );
+
         Assert.Equal(user.Name, em.Of<MistApplied>().Single().CreatureName);
     }
 

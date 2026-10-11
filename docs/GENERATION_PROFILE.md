@@ -107,7 +107,7 @@ deliverable.
 
 | Slice | Today | Under the profile |
 |:--|:--|:--|
-| Battle math | 4 seams, `Gen1*.Instance` defaults ✅ | selected by the profile; the seams themselves are unchanged |
+| Battle math | 4 seams, `Gen1*.Instance` defaults ✅ | selected by the profile; the seams themselves are unchanged. The seeded ones are **factories** on the run's RNG: `BuildStatCalculator`, `BuildAi`, and `BuildBattleRules` (2026-10-11, §4.1) |
 | **Type roster** — which types *exist* | ❌ none. `DamageType` holds all 18 (incl. Steel/Dark/Fairy); nothing states Gen 1 has **15** | on the profile |
 | **Content scope** — species/moves/items | ❌ none. Gen 1 only because the DBs hold only Gen 1 | ✅ `IContentScope` on the profile (Stage 2b) — a filter seam, documented no-op for Gen 1 |
 | **Region + biome roster** | ⚠️ partial — `Biomes.For(Region)` exists; `Region` is an enum; `Biomes.Kanto` is the only roster | ✅ `Region` + `BiomeRoster` on the profile (Stage 3) — the run setup reads the roster, `Biomes.For` stays the one door |
@@ -218,7 +218,7 @@ have failed a test. All four are now read from the run's profile.
 | `ITypeChart` | `GameSessionManager.cs` — `Gen1TypeChart.Instance` passed positionally into the `RunDirector` | ✅ read from the profile (Stage 1a) |
 | `IEvolutionRules` | `EncounterFactory` — `Gen1EvolutionRules.Instance` hardcoded in `ResolvePlayerEvolutionAsync` | ✅ read from the profile (Stage 1a); Stage 1b then widened that method to take the **whole profile**, so the generation used to query edges can't disagree with the rules used to judge them |
 | `IStatCalculator` | `EncounterFactory.BuildCreature` — `new Gen1StatCalculator(rng)`, **seeded per creature** so a fixed seed reproduces DVs. (`Creature.StatCalculator`'s property default is only the unseeded fallback.) | ✅ `profile.BuildStatCalculator(rng)` (Stage 1b) — the profile exposes a **factory**, not a singleton, precisely so it can be seeded per run |
-| `IBattleRules` | **nowhere in the web layer** — never passed at all; `Battle` fell back to `Gen1BattleRules.Instance` internally. The sharpest case: dropping the thread again would leave the whole suite green | ✅ `BuildRunOptions` sets `Rules = profile.BattleRules` (Stage 1a) |
+| `IBattleRules` | **nowhere in the web layer** — never passed at all; `Battle` fell back to `Gen1BattleRules.Instance` internally. The sharpest case: dropping the thread again would leave the whole suite green | ✅ `BuildRunOptions` sets `Rules = profile.BuildBattleRules(session.Rng)` — a **factory**, like `BuildStatCalculator`, so the rules' own rolls (damage variance, multi-hit count, sleep/confusion/binding/rampage/Disable/Bide turns) draw from the run seed and share one stream with the action's draws (2026-10-11; it was `profile.BattleRules`, the `Random.Shared`-backed singleton, from Stage 1a). `profile.BattleRules` remains for draw-free reads (`EstimateRange`) |
 
 **A fifth site, found during Stage 1a:** `EncounterFactory.ActiveGeneration = 1` — a hardcoded `private const int`
 driving **six** learnset/evolution DB queries, plus a duplicate `PlayerOverviewDto.ActiveGeneration = 1`. Not a

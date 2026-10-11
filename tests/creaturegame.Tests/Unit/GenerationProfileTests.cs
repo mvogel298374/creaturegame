@@ -242,19 +242,55 @@ public class GenerationProfileTests
     [Fact]
     public void BuildRunOptions_TakesItsBattleRulesFromTheProfile_NotTheGen1Fallback()
     {
-        var options = BuildOptionsWith(TestAltProfile.Instance);
+        var rules = BuildOptionsWith(TestAltProfile.Instance).Rules;
 
-        // Would fail if `Rules = profile.BattleRules` were dropped: the option would go null and Battle would
-        // quietly resolve Gen 1 instead.
-        Assert.Same(TestAltProfile.Instance.BattleRules, options.Rules);
-        Assert.NotSame(Gen1BattleRules.Instance, options.Rules);
+        Assert.NotNull(rules);
+        Assert.IsNotType<Gen1BattleRules>(rules);
+        Assert.Equal(
+            TestAltProfile.Instance.BattleRules.AccuracyRollBound,
+            rules.AccuracyRollBound
+        );
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(4242)]
+    public void BuildRunOptions_UnderGen1_TheRulesRollFromTheRunSeed(int seed)
+    {
+        var rules = BuildOptionsWith(Gen1Profile.Instance, seed: seed).Rules!;
+        var twin = new SeededRandomSource(seed);
+
+        for (int i = 0; i < 20; i++)
+            Assert.Equal(twin.Next(1, 8), rules.RollSleepTurns());
+    }
+
+    public static TheoryData<string> Profiles => new() { "gen1", "alt" };
+
+    [Theory]
+    [MemberData(nameof(Profiles))]
+    public void BuildBattleRules_BuildsTheSameRulesTypeAsBattleRules(string which)
+    {
+        var profile = which == "gen1" ? Gen1Profile.Instance : TestAltProfile.Instance;
+
+        Assert.Equal(
+            profile.BattleRules.GetType(),
+            profile.BuildBattleRules(new SeededRandomSource(1)).GetType()
+        );
     }
 
     [Fact]
-    public void BuildRunOptions_UnderGen1_StillResolvesTheExactSingletonTheEngineWouldHaveDefaultedTo()
+    public void BuildRunOptions_UnderGen1_TheRulesAndTheRunShareOneStream()
     {
-        // The other half of the no-op proof: threading the profile did not change what Gen 1 runs with.
-        Assert.Same(Gen1BattleRules.Instance, BuildOptionsWith(Gen1Profile.Instance).Rules);
+        var options = BuildOptionsWith(Gen1Profile.Instance, seed: 7);
+        var rules = options.Rules!;
+        var twin = new SeededRandomSource(7);
+
+        for (int i = 0; i < 10; i++)
+        {
+            Assert.Equal(twin.Next(100), options.Rng!.Next(100));
+            Assert.Equal(twin.Next(217, 256) / 255.0, rules.RollDamageVariance());
+            Assert.Equal(twin.Next(2, 6), rules.RollBindingTurns());
+        }
     }
 
     [Fact]
@@ -402,7 +438,8 @@ public class GenerationProfileTests
 
     private static RunDirectorOptions BuildOptionsWith(
         GenerationProfile profile,
-        Difficulty difficulty = Difficulty.Normal
+        Difficulty difficulty = Difficulty.Normal,
+        int seed = 1
     )
     {
         var player = new Creature("TESTMON");
@@ -412,7 +449,7 @@ public class GenerationProfileTests
             new Bag(),
             new Wallet(),
             [],
-            new SeededRandomSource(1),
+            new SeededRandomSource(seed),
             [],
             difficulty,
             Generation.One,

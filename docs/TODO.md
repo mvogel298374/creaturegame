@@ -125,37 +125,7 @@ data/engine item usually also means updating the test that pins the wrong value.
 - **Found 2026-10-11 during V7 / the item seam (unverified beyond the citation; each needs its own DoR):**
   - *AI stat-down 25% fail:* in a normal battle the enemy's stat-lowering status moves first roll a 25% fail
     (pokered `engine/battle/effects.asm` `StatModifierDownEffect` +14); we don't model it.
-  User ruling 2026-10-11: leave this one as filed; the two below became entries.
-- **Dire Hit / Guard Spec narrate only "used <ITEM>!" in Gen 1 (S; DoR drafted 2026-10-11 — awaiting your
-  greenlight).**
-  - *Scope + acceptance:* under Gen 1 a Dire Hit or Guard Spec sets its flag and emits only `ItemUsed` — no
-    `FocusEnergyApplied` / `MistApplied` (those stay for the moves). Driven by a new `IBattleRules` member
-    `BoosterItemAnnouncesEffect` read in `BattleBoostItemEffect.Apply`. Acceptance: the Gen 1 tests
-    (`ItemEffectTests.DireHit_SetsFocusEnergy`, `GuardSpec_SetsMist`, `ItemActionBattleTests.UsingDireHit_SetsFocusEnergyAndConsumes`,
-    `ASecondDireHit…`, `ASecondGuardSpec…`) assert the flag is set and no effect event is emitted; a
-    `DelegatingBattleRules` with the member `true` emits it. `PRODUCT_SPEC.md` and `GENERATION_SEAMS.md` §2 updated.
-  - *Gen-variable surface:* the new member. Gen 1–2 `false`: pokered `PrintItemUseTextAndRemoveItem` prints only
-    `ItemUseText00`; pokecrystal `DireHitEffect`/`GuardSpecEffect` end in `UseItemText`
-    (`engine/items/item_effects.asm:2113-2125`). Gen 3+ `true` for Dire Hit: one combined line, "used <ITEM> to get
-    pumped!" (pokeemerald `src/battle_message.c:253`, `:1013`); Gen 3 Guard Spec text unverified.
-  - *Gen 1 source:* pokered `engine/items/item_effects.asm:1614-1636` → `PrintItemUseTextAndRemoveItem`.
-  - *Data vs runtime:* runtime only; the frontend needs no change (it only logs those events).
-  - *Quirk the test asserts:* Gen 1 Dire Hit sets Focus Energy silently.
-  - *Dependencies:* builds on the shipped "Gen 1 wastes no-effect battle items" (`TODO_ARCHIVE.md` → "§7.6 V7"; same method).
-- **Battle randomness is only half-seeded in production (S–M; DoR drafted 2026-10-11 — awaiting your greenlight).**
-  - *Scope + acceptance:* every battle draw in a web run comes from the run's seeded source. Today
-    `GameSessionManager.BuildRunOptions` passes `profile.BattleRules` — the `Gen1BattleRules.Instance` singleton on
-    `Random.Shared` — so its nine rolls (damage variance, multi-hit count, sleep/confusion/binding/rampage/Disable/
-    Bide turns) are unseeded, while `session.Rng` drives crit, accuracy and secondaries. Fix: `GenerationProfile`
-    gains `Func<IRandomSource, IBattleRules> CreateBattleRules` (Gen 1: `rng => new Gen1BattleRules(rng)`), and
-    `BuildRunOptions` uses `profile.CreateBattleRules(session.Rng)`. Rules and actions then share **one** stream.
-    `profile.BattleRules` stays for draw-free reads (`EstimateRange`). Acceptance: a test builds run options from a
-    seeded session and shows the rules' rolls come from that seed (they match a twin `SeededRandomSource` with the
-    same seed); `TestAltProfile` gets the factory, and `GenerationProfileTests` pins that the run uses it.
-  - *Gen-variable surface:* none — wiring; the factory is per profile. *Gen 1 source:* n/a (Gen 1 has one RNG,
-    which this matches). *Data vs runtime:* runtime (profile + web wiring). *Quirk:* rules and action draws
-    interleave on one stream. *Dependencies:* none; "Gen 1 roll order" below depends on it (one ordered stream).
-    Docs: `GENERATION_PROFILE.md`, `ARCHITECTURE.md` §2.10, `GAME_LOOP.md` §4.
+  User ruling 2026-10-11: leave this one as filed; the other two became entries and shipped (`TODO_ARCHIVE.md` → "Battle randomness fully seeded; Dire Hit / Guard Spec narration").
 - **Gen 1 roll order in `AttackAction`, behind a seam (M–L; from V7; ✗ not Ready — needs a design pass).** User
   ruling 2026-10-11: be correct, with a generation seam.
   - *Scope:* `AttackAction` resolves a move in pokered's order, and the order is a new `IBattleRules` member, e.g.
@@ -177,8 +147,7 @@ data/engine item usually also means updating the test that pins the wrong value.
     and would miss; where freeze-thaw sits; Psywave's damage roll (after the hit, in `ApplyAttack…`); Self-Destruct
     and Explosion on a miss; status moves (their effect functions call `MoveHitTest` themselves); how the rules
     stream (`Gen1BattleRules._rng`: damage variance, multi-hit count) and the action stream (`_rng`: crit, accuracy)
-    map onto one Gen 1 sequence (resolved by "Battle randomness is only half-seeded" above, once both share one
-    source); and the seam's exact shape (an enum vs an ordered step list).
+    map onto one Gen 1 sequence (resolved: both now share the run's one source — `TODO_ARCHIVE.md` → "Battle randomness fully seeded"); and the seam's exact shape (an enum vs an ordered step list).
   - *Acceptance (draft):* scripted-`IRandomSource` tests assert the Gen 1 draw sequence per move kind; a
     `DelegatingBattleRules` with the Gen 3 order reproduces today's sequence (falsification); multi-hit strikes
     deal equal damage; `XAccuracyContractTests.XAccuracyMakesAFasterOhkoUserLandThroughMaxedEvasion` stays green.

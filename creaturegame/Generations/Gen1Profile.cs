@@ -84,6 +84,7 @@ public static class Gen1Profile
         // A new generation authors its own roster in Biomes and reads it out the same way.
         BiomeRoster = Biomes.For(Region.Kanto),
         BattleRules = Gen1BattleRules.Instance,
+        BuildBattleRules = rng => new Gen1BattleRules(rng),
         // Seeded per run — matches EncounterFactory.BuildCreature's existing `new Gen1StatCalculator(rng)`, so a
         // fixed seed keeps reproducing the same DVs.
         BuildStatCalculator = rng => new Gen1StatCalculator(rng),

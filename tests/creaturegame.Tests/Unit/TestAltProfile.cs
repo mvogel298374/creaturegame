@@ -96,6 +96,7 @@ internal static class TestAltProfile
         Region = Region.Kanto,
         BiomeRoster = AltBiomes,
         BattleRules = new AltBattleRules(),
+        BuildBattleRules = rng => new AltBattleRules(rng),
         BuildStatCalculator = rng => new AltStatCalculator(),
         EvolutionRules = new AltEvolutionRules(),
         BuildAi = rng => new Gen1TrainerAi(rng: rng),
@@ -148,7 +149,7 @@ internal static class TestAltProfile
 
     /// <summary>Delegates every rule to Gen 1 except the accuracy roll bound and the X Accuracy bypass — see
     /// <c>GENERATION_PROFILE.md</c> §3 for what each varied member proves.</summary>
-    private sealed class AltBattleRules : DelegatingBattleRules
+    private sealed class AltBattleRules(IRandomSource? rng = null) : DelegatingBattleRules(rng)
     {
         public override int AccuracyRollBound => 100;
 

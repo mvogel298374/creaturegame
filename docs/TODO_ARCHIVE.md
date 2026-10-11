@@ -8,13 +8,61 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Battle randomness fully seeded; Dire Hit / Guard Spec narration ✅ DONE (2026-10-11)
+
+**Was** two `TODO.md` §3.2 entries filed from V7 (below it): (D) "Battle randomness is only half-seeded in production"
+(S–M) and (C) "Dire Hit / Guard Spec narrate only 'used <ITEM>!' in Gen 1" (S). Both greenlit 2026-10-11 and
+committed together. Player-visible (C) -> `PRODUCT_SPEC.md` §5 *In-battle item party-targeting* ("Dire Hit and Guard
+Spec. show only the 'used' line"). The "Gen 1 roll order" entry stays open in `TODO.md`; its stream question is
+resolved by (D).
+
+**(D) Battle randomness fully seeded (S–M).**
+- *Scope + acceptance:* every battle draw in a web run comes from the run's seeded source. Before: `GameSessionManager.
+  BuildRunOptions` passed `profile.BattleRules` — the `Gen1BattleRules.Instance` singleton on `Random.Shared` — so its
+  nine rolls (damage variance, multi-hit count, sleep/confusion/binding/rampage/Disable/Bide turns) were unseeded,
+  while `session.Rng` drove crit, accuracy and secondaries. Fix: `GenerationProfile` gains
+  `Func<IRandomSource, IBattleRules> BuildBattleRules` (named like `BuildStatCalculator`/`BuildAi`; Gen 1:
+  `rng => new Gen1BattleRules(rng)`), and `BuildRunOptions` uses `profile.BuildBattleRules(session.Rng)`. Rules and
+  actions share **one** stream. `profile.BattleRules` stays for draw-free reads (`EstimateRange`). Tests: run options
+  built from a seeded session produce rules rolls matching a twin `SeededRandomSource`; `TestAltProfile` has the
+  factory; `GenerationProfileTests` pins that the run uses it and that `BattleRules`/`BuildBattleRules` agree on type.
+- *Gen-variable surface:* none — wiring; the factory is per profile. *Gen 1 source:* n/a (Gen 1 has one RNG, which
+  this matches). *Data vs runtime:* runtime (profile + web wiring). *Quirk:* rules and action draws interleave on one
+  stream. *Dependencies:* none; "Gen 1 roll order" depends on it. Docs: `GENERATION_PROFILE.md` §2.1/§4.1,
+  `ARCHITECTURE.md` §2.10, `GAME_LOOP.md` §4, `GENERATION_SEAMS.md` §4.3.
+- *Consequence:* the rules' rolls now consume the run stream, so every later draw of a fixed seed moves — seed-pinned
+  E2E specs may land on different encounters (fast suites can't see this; E2E is user-run). The user's E2E run on this
+  change was green (2026-10-11).
+- *Review rulings:* keep the `?? Gen1BattleRules.Instance` fallback (the wiring test pins it).
+
+**(C) Dire Hit / Guard Spec narrate only "used <ITEM>!" in Gen 1 (S).**
+- *Scope + acceptance:* under Gen 1 a Dire Hit or Guard Spec sets its flag and emits only `ItemUsed` — no
+  `FocusEnergyApplied` / `MistApplied` (those stay for the moves). Driven by the new `IBattleRules` member
+  `BoosterItemAnnouncesEffect` (Gen 1 `false`), read in `BattleBoostItemEffect.Apply`. Tests
+  (`ItemEffectTests.DireHit_SetsFocusEnergy`, `GuardSpec_SetsMist`, `ItemActionBattleTests.UsingDireHit_SetsFocusEnergyAndConsumes`,
+  `ASecondDireHit…`, `ASecondGuardSpec…`) assert the flag is set and no effect event is emitted; a
+  `DelegatingBattleRules` with the member `true` emits it; no-double-announce tests added in review.
+- *Gen-variable surface:* the new member. Gen 1–2 `false`: pokered `PrintItemUseTextAndRemoveItem` prints only
+  `ItemUseText00`; pokecrystal `DireHitEffect`/`GuardSpecEffect` end in `UseItemText`
+  (`engine/items/item_effects.asm:2113-2125`). Gen 3+ `true` for Dire Hit: one combined line, "used <ITEM> to get
+  pumped!" (pokeemerald `src/battle_message.c:253`, `:1013`); Gen 3 Guard Spec text unverified.
+- *Gen 1 source:* pokered `engine/items/item_effects.asm:1614-1636` -> `PrintItemUseTextAndRemoveItem`.
+- *Data vs runtime:* runtime only; the frontend needs no change (it only logs those events).
+- *Quirk the test asserts:* Gen 1 Dire Hit sets Focus Energy silently.
+- *Dependencies:* built on "Gen 1 wastes no-effect battle items" (§7.6 V7, same method).
+- *Docs:* `GENERATION_SEAMS.md` §2, `PRODUCT_SPEC.md`, `GEN_DIFFERENCES.md`.
+- *Review rulings:* keep one `BoosterItemAnnouncesEffect` flag; split only if a Gen 3 profile finds Guard Spec differs.
+- *Gates:* `requirements-review` findings 1/2/5 fixed; `pr-review` PR-READY, both recommendations done.
+
+---
+
 ## §7.6 V7 — gate order and battle-item reuse: verified; no-effect items wasted in Gen 1 ✅ DONE (2026-10-11)
 
 **Was** `TODO.md` §3.2 "Gen 1 gate-order and Dire Hit/Guard Spec gaps" (verified at `b98660f`, against `pret/pokered`
 `master`), the §7.6 V7 slice, and the §3.2 entry "Gen 1 wastes no-effect battle items" (S, greenlit 2026-10-11) that the
 second verdict produced. Player-visible -> `PRODUCT_SPEC.md` §5 *In-battle item party-targeting* (the "A booster with
 nothing to do is still used up" bullet). The first verdict became the open §3.2 entry "Gen 1 roll order in
-`AttackAction`"; the item-description note and the narration/seeding follow-ups stay open in `TODO.md`.
+`AttackAction`"; the item-description note stays open in `TODO.md`; the narration and seeding follow-ups shipped (see "Battle randomness fully seeded; Dire Hit / Guard Spec narration").
 
 **Verdicts.**
 - **Random-draw order — source-confirmed, partly mis-stated, no observable effect.** pokered draws crit

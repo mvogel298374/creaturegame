@@ -278,6 +278,8 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
 - Physical/Special split still **type-based** (not per-move yet)
 - **X Accuracy** becomes a +1 accuracy stage (pokeemerald `ItemUseInBattle_StatIncrease`); Gen 1–2 skipped the accuracy check instead
 - An X-item at +6 is **refused** and kept (pokeemerald `src/pokemon.c:4761`, `:4854-4860`)
+- Dire Hit narrates its effect in one line, "used <ITEM> to get pumped!" (pokeemerald `src/battle_message.c:253`);
+  Gen 1–2 print only "used <ITEM>!"
 
 ---
 

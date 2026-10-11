@@ -235,6 +235,10 @@ public interface IBattleRules
     /// Gen 1–2: false. Gen 3+: true. See GENERATION_SEAMS.md §2.</summary>
     bool CappedXItemRefused { get; }
 
+    /// <summary>Whether Dire Hit / Guard Spec narrate their effect beyond the "used <ITEM>!" line.
+    /// Gen 1–2: false. Gen 3+: true (Dire Hit). See GENERATION_SEAMS.md §2.</summary>
+    bool BoosterItemAnnouncesEffect { get; }
+
     /// <summary>
     /// Returns the number of turns a binding move traps the target.
     /// Gen 1: 2–5 turns.

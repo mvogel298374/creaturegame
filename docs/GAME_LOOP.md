@@ -199,7 +199,8 @@ timeline semantics (`timeline.ts` deciding `BattleEnded` ⇒ "announce next"). T
    that edge is closed. The **whole run** is now reproducible too: `GameController.Start` picks one seed per run
    (or accepts `StartGameRequest.Seed`) and threads a single `SeededRandomSource` through enemy construction
    (`EncounterFactory` — incl. creature **construction**'s random DVs via a seeded `Gen1StatCalculator`), the
-   battle (`BattleRunner`), and the AI (`Gen1TrainerAi`). Guarded by `RunSeedReproducibilityTests` (`TODO.md`
+   battle (`BattleRunner`), the battle rules (`profile.BuildBattleRules(rng)`; until 2026-10-11 the web run used
+   the unseeded singleton, so its `Roll*` draws were not reproducible), and the AI (`Gen1TrainerAi`). Guarded by `RunSeedReproducibilityTests` (`TODO.md`
    Tech Debt #3, closed).
 5. **Persistence.** An event boundary is the natural save point — a resumed run re-enters at the next event.
 

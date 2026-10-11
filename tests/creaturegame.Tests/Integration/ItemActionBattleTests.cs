@@ -170,10 +170,8 @@ public class ItemActionBattleTests
     }
 
     [Fact]
-    public async Task UsingDireHit_SetsFocusEnergyAndConsumes()
+    public async Task UsingDireHit_SetsFocusEnergySilentlyAndConsumes()
     {
-        // Dire Hit is a BattleStatBoost booster whose effect is the Gen 1 Focus Energy state — driven
-        // through a real Battle it sets HasFocusEnergy, emits FocusEnergyApplied, and consumes one.
         var player = TestCreatures.Make("Player", hp: 200, speed: 200);
         player.AddAttack(Tackle());
         var enemy = TestCreatures.Make("Enemy", hp: 60, speed: 1);
@@ -197,7 +195,8 @@ public class ItemActionBattleTests
         );
 
         Assert.True(player.Battle.HasFocusEnergy);
-        Assert.Equal("Player", em.Of<FocusEnergyApplied>().Single().CreatureName);
+        Assert.Single(em.Of<ItemUsed>());
+        Assert.Empty(em.Of<FocusEnergyApplied>());
         Assert.Equal(0, bag.Count(56)); // consumed
     }
 
@@ -261,7 +260,7 @@ public class ItemActionBattleTests
         );
 
         Assert.Equal(2, em.Of<ItemUsed>().Count());
-        Assert.Single(em.Of<FocusEnergyApplied>());
+        Assert.Empty(em.Of<FocusEnergyApplied>());
         Assert.Empty(em.Of<ItemUseFailed>());
         Assert.Empty(em.Of<ButNothingHappened>());
         Assert.Equal(0, bag.Count(56));
@@ -282,7 +281,7 @@ public class ItemActionBattleTests
         );
 
         Assert.Equal(2, em.Of<ItemUsed>().Count());
-        Assert.Single(em.Of<MistApplied>());
+        Assert.Empty(em.Of<MistApplied>());
         Assert.Empty(em.Of<ItemUseFailed>());
         Assert.Equal(0, bag.Count(55));
     }

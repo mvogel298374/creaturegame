@@ -303,9 +303,14 @@ Each entry: **Decision · Why · Where it lives.**
   picks one seed per run (client may supply `StartGameRequest.Seed`; else a random int, logged + returned as
   `{ gameId, seed }`) and threads a single `SeededRandomSource` through the whole run — player + every enemy's
   construction (`EncounterFactory` seeds `Gen1StatCalculator` for DVs and passes the source to move selection /
-  `PickByBst` / `ScaleWildLevel`), the battle (`BattleRunner`), and the AI (`Gen1TrainerAi`). One shared stream
-  is safe because a run is single-threaded. This unblocks the deferred recovery/replace-move E2E specs (pass a
-  fixed `seed`). Guarded by `RunSeedReproducibilityTests`.
+  `PickByBst` / `ScaleWildLevel`), the battle (`BattleRunner`), the battle rules (`profile.BuildBattleRules(rng)`,
+  2026-10-11 — before that the run used the unseeded `Gen1BattleRules.Instance`, so damage variance and the
+  turn-count rolls ignored the seed), and the AI (`Gen1TrainerAi`). One shared stream is safe because a run is
+  single-threaded. This unblocks the deferred recovery/replace-move E2E specs (pass a
+  fixed `seed`). Guarded by `RunSeedReproducibilityTests` (creature construction) and
+  `GenerationProfileTests.BuildRunOptions_UnderGen1_TheRulesAndTheRunShareOneStream` (the rules' rolls share the
+  run's stream); no test yet replays a whole seeded battle twice. Moving the rules onto the run stream shifted every
+  later draw, so a seed pinned before 2026-10-11 picks different encounters/outcomes than it did.
 - **Where:** `Combat/IRandomSource.cs`, `Web/Controllers/GameController.cs`, `Web/Battle/EncounterFactory.cs`,
   `tests/.../TestSupport/BattleScenario.cs`.
 

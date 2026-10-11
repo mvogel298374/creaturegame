@@ -191,15 +191,7 @@ public sealed class PpRestoreItemEffect : IItemEffect
     }
 }
 
-/// <summary>
-/// The in-battle "booster" items, all <see cref="ItemCategory.BattleStatBoost"/>, dispatched by item data:
-/// the X-items raise a stat stage (X Accuracy instead sets <c>UsingXAccuracy</c> when
-/// <see cref="IBattleRules.XAccuracyBypassesAccuracyCheck"/>); <b>Dire Hit</b> raises crit (Gen
-/// 1: the Focus Energy state — and its famous ÷4 bug, applied in <c>Gen1BattleRules.GetCritChance</c>); and
-/// <b>Guard Spec.</b> sets Mist (blocks foe stat drops). Dire Hit / Guard Spec reuse the Focus Energy / Mist
-/// volatiles and events so they narrate and wire exactly like the matching moves. (One effect per category —
-/// the registry is keyed by category — so the three behaviours live here rather than in separate classes.)
-/// </summary>
+/// <summary>X-items, X Accuracy, Dire Hit and Guard Spec — see GENERATION_SEAMS.md §2 and §5.0.2.</summary>
 public sealed class BattleBoostItemEffect : IItemEffect
 {
     public ItemCategory Category => ItemCategory.BattleStatBoost;
@@ -226,7 +218,7 @@ public sealed class BattleBoostItemEffect : IItemEffect
     {
         if (ctx.Item.BoostsCrit)
         {
-            if (!ctx.User.Battle.HasFocusEnergy)
+            if (ctx.Rules.BoosterItemAnnouncesEffect && !ctx.User.Battle.HasFocusEnergy)
                 ctx.Emitter?.Emit(new FocusEnergyApplied(ctx.User.Name, ctx.User.Id));
             ctx.User.Battle.HasFocusEnergy = true;
             return;
@@ -234,7 +226,7 @@ public sealed class BattleBoostItemEffect : IItemEffect
 
         if (ctx.Item.SetsMist)
         {
-            if (!ctx.User.Battle.HasMist)
+            if (ctx.Rules.BoosterItemAnnouncesEffect && !ctx.User.Battle.HasMist)
                 ctx.Emitter?.Emit(new MistApplied(ctx.User.Name, ctx.User.Id));
             ctx.User.Battle.HasMist = true;
             return;

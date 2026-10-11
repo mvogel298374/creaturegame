@@ -157,8 +157,10 @@ the linked design doc instead — pull it there and leave only the pointer here.
   1/256 miss) — it is not a +1 accuracy stage, and the bag text says so. It does not rescue a failed one-hit-KO speed
   check, and Mist still blocks stat drops. Haze, and switching the user out, clear it. A second use is still
   consumed. Using it shows only the normal "used" line; no indicator stays on screen.
-- **A booster with nothing to do is still used up (Gen 1):** a second Dire Hit or Guard Spec. shows only the "used"
-  line, and an X-item whose stat is already at +6 shows the "used" line then "But nothing happened!".
+- **Dire Hit and Guard Spec. show only the "used" line (Gen 1)** — no "getting pumped" / Mist line, though the effect
+  applies (the moves Focus Energy and Mist still show theirs).
+- **A booster with nothing to do is still used up (Gen 1):** a second Dire Hit or Guard Spec. is spent silently, and
+  an X-item whose stat is already at +6 shows the "used" line then "But nothing happened!".
 - Design detail → `GENERATION_SEAMS.md` §5.0.2 (gen-invariance judgment, including why X-items are the
   exception), `ARCHITECTURE.md` §2.11, `STATE_MODEL.md` §2 (status cure clears both halves). History →
   `TODO_ARCHIVE.md` → *In-Battle Item Party-Targeting — items other than Revive can target any living party

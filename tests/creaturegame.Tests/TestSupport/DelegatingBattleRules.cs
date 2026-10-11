@@ -85,6 +85,8 @@ public abstract class DelegatingBattleRules : IBattleRules
 
     public virtual bool CappedXItemRefused => _inner.CappedXItemRefused;
 
+    public virtual bool BoosterItemAnnouncesEffect => _inner.BoosterItemAnnouncesEffect;
+
     public virtual double GetCritChance(Creature a, Attack m) => _inner.GetCritChance(a, m);
 
     public virtual double CritMultiplier => _inner.CritMultiplier;

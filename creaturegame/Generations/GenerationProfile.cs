@@ -116,6 +116,9 @@ public sealed record GenerationProfile
     /// accuracy scale, freeze/thaw, status-damage rates, stat selection, the XP formula.</summary>
     public required IBattleRules BattleRules { get; init; }
 
+    /// <summary>Builds a run's battle rules on the run's seeded RNG, so every battle roll shares one stream.</summary>
+    public required Func<IRandomSource, IBattleRules> BuildBattleRules { get; init; }
+
     /// <summary>
     /// Builds the stat calculator for a run: HP/other-stat formulas, DV/IV randomisation, Stat-Exp/EV scaling
     /// and award.

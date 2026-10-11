@@ -77,6 +77,7 @@ Things that genuinely differ generation to generation, each a member on the inte
 | **Accuracy scale** | internal `0–255`; a roll of 255 always misses — the **1/256 miss bug** (even 100%-accurate moves whiff ~0.4% of the time) | `0–100`, no bug |
 | **X Accuracy** (`XAccuracyBypassesAccuracyCheck`) | sets `BattleState.UsingXAccuracy`: the user's moves skip the accuracy roll (no RNG draw), but not the OHKO speed check or Mist; Haze and a switch-out clear it; a second use is consumed | Gen 2 same bypass (a substatus flag) — the bool covers only the bypass; Gen 2's refusal of a second use is `RepeatFlagItemRefused`; Gen 3+ a +1 accuracy stage — the imported item row's data |
 | **Repeat Dire Hit / Guard Spec / X Accuracy** (`RepeatFlagItemRefused`) | `false`: the item is spent and nothing happens (pokered `engine/items/item_effects.asm:1544-1550`, `:1614-1636` set the bit unchecked) | Gen 2 `true`: refused, "won't have any effect", not spent (pokecrystal `engine/items/item_effects.asm:2089-2125`; no Gen 2 profile exercises it yet) |
+| **Dire Hit / Guard Spec narration** (`BoosterItemAnnouncesEffect`) | `false`: only "<PLAYER> used <ITEM>!" (pokered `PrintItemUseTextAndRemoveItem`); the Focus Energy / Mist event is not emitted for the item | Gen 2 `false` (pokecrystal `item_effects.asm:2113-2125`, `UseItemText`); Gen 3+ `true` for Dire Hit — one combined "used <ITEM> to get pumped!" line (pokeemerald `src/battle_message.c:253`, `:1013`); Gen 3 Guard Spec text unverified |
 | **X-item at +6** (`CappedXItemRefused`) | `false`: spent before the raise (pokered `:1656` → `:1663`); the cap announcement follows `StatStageCapAnnouncement` | Gen 2 `false` too (pokecrystal `XItemEffect` uses the item first, `:2127-2129`); Gen 3+ `true`: the item effect fails, and is not spent, unless the stage is below max (pokeemerald `src/pokemon.c:4761`, `:4854-4860`) |
 | **Freeze** | permanent until hit by a damaging Fire move that can burn | 20%/turn random thaw; any Fire move thaws |
 | **Burn/Poison damage** | 1/16 max HP per turn | 1/8 in Gen 6+ |
@@ -213,7 +214,10 @@ Each Gen 1 impl is stateless (or effectively so) and exposed as `.Instance`. Cal
 the interface as an optional constructor/parameter defaulting to that singleton:
 `rules ?? Gen1BattleRules.Instance`. This gives us the best of both — **zero ceremony for
 the common path** (everything is Gen 1 today, so you write nothing) and **full
-substitutability** for tests and future gens.
+substitutability** for tests and future gens. `IBattleRules` is the exception on the web run path: its rolls
+need the run seed, so a run builds its own instance through `GenerationProfile.BuildBattleRules(session.Rng)`
+(like `BuildStatCalculator`); the unseeded `Gen1BattleRules.Instance` is only the fallback for direct callers,
+tests and draw-free reads.
 
 > ⚠️ **The flip side, once a second generation exists.** That same default means a composition path which
 > *forgets* to thread a seam does not crash and does not fail a test — **it silently runs Gen 1**. The defaults
