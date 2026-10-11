@@ -8,6 +8,37 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §7.6 V8 — turn-order/status edges: verified, all four confirmed ✅ VERIFIED (2026-10-12)
+
+**Was** `TODO.md` §3.1 "Turn-order/status edges" and the §7.6 V8 slice (verify-only; no code or data changed). Verified at
+`cbc6c15` against `pret/pokered` `af51989`. Throwaway reproductions (a scratch clone outside the repo, never committed)
+drove the real `StatusResolver.CanAct` and `AttackAction`, 11/11. No in-slice fixes (they touch central methods `Battle` /
+`AttackAction` and raise a seam question), so the fixes are two open `TODO.md` §3.1 entries, both ✗ not Ready: "Gen 1
+status-check order in `CanAct`" (M; claims 2–4) and "A replacement frees the trapped foe" (S; claim 1).
+
+**Verdicts.**
+- **Trap outlives a fainted trapper — source-confirmed.** Gen 1 holds the victim on the *trapper's*
+  `USING_TRAPPING_MOVE` bit (`engine/battle/core.asm:5711-5717`, player side `:3365-3372`). `SendOutMon` zeroes
+  the incoming side's whole battle-status block (`:1744-1749`, layout `ram/wram.asm:1279-1285`) and the foe's
+  trapping bit (`:1755-1756`), so a replacement frees the victim. Ours holds the victim on its own counter
+  (`StatusResolver.cs:45-50`), and `BringInMember` resets only the incoming creature (`Battle.cs:640-645`). A
+  player binder that faints to a residual leaves the wild foe losing its turns to the switch-in.
+- **Recharge lost twice — reproduced.** Gen 1 checks recharge inside the status checks, before confusion and
+  paralysis (`core.asm:3384-3392`). Inflicting sleep (`effects.asm:36-40`), freeze (`:249`), flinch (`:992`) or a
+  trap (`:1091`) clears it (`ClearHyperBeam`, `:1181-1191`). Ours clears it only in `AttackAction.cs:69-74`,
+  after `Battle.cs:195`'s `CanAct`. So a full-paralysis, confusion self-hit, flinch, sleep or trap turn leaves the
+  flag set, and the next turn is lost to recharge as well.
+- **`CanAct` order — reproduced.** Gen 1: sleep → freeze → trapped → flinch → recharge → Disable tick → confusion →
+  disabled-move → paralysis (`core.asm:3328-3458`). Ours: flinch → Haze → trapped → sleep → freeze → paralysis →
+  confusion (`StatusResolver.cs:27-114`). Observable: a flinched or trapped sleeper's counter doesn't tick, and
+  a fully paralysed confused creature's confusion counter doesn't tick.
+- **Full paralysis and confusion self-hits keep lock-ins — reproduced.** Gen 1 full paralysis clears
+  Bide/Thrash/charge/trap (`core.asm:3459-3464`); a confusion self-hit clears every `BattleStatus1` bit except
+  `CONFUSED` (`:3430-3433`). Thrash cleared this way does **not** confuse the user. Ours touches no lock-in state
+  on either path, so Thrash, Bide, a two-turn charge and a bind all resume next turn.
+
+---
+
 ## Gen 1 roll order in `AttackAction`, behind a seam; `acquisition.spec` reaches a draft ✅ DONE (2026-10-12)
 
 **Was** `TODO.md` §3.2 "Gen 1 roll order in `AttackAction`, behind a seam" (L; from §7.6 V7; design pass done and greenlit
