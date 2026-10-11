@@ -1,3 +1,4 @@
+using System.Net;
 using creaturegame.Tests.TestSupport;
 using PokeApiConnector;
 using PokeApiConnector.Generation_1;
@@ -50,6 +51,47 @@ public class ImportFailureReportingTests : IDisposable
         var failed = await MoveImport.FetchMovesByGeneration(1, http, _db.Moves);
 
         Assert.Equal([broken], failed);
+        using var moves = _db.Moves();
+        Assert.Single(moves.Moves, m => m.Id == 1);
+    }
+
+    [Fact]
+    public async Task Moves_AMoveStill503AfterEveryRetry_IsReported_AndTheOthersStillImport()
+    {
+        string ok = $"{Api}/move/1/";
+        string unavailable = $"{Api}/move/2/";
+        var fake = new FakePokeApiHandler()
+            .Json($"{Api}/generation/1/", Generation("moves", ok, unavailable))
+            .Json(
+                ok,
+                new PokeApiMove
+                {
+                    Id = 1,
+                    Name = "pound",
+                    Power = 40,
+                    Accuracy = 100,
+                    Pp = 35,
+                    Type = new NamedApiResource { Name = "normal" },
+                    DamageClass = new NamedApiResource { Name = "physical" },
+                }
+            )
+            .Fail(unavailable, HttpStatusCode.ServiceUnavailable);
+        var waits = new List<TimeSpan>();
+        var http = new HttpClient(
+            new RetryHandler(
+                fake,
+                (wait, _) =>
+                {
+                    waits.Add(wait);
+                    return Task.CompletedTask;
+                }
+            )
+        );
+
+        var failed = await MoveImport.FetchMovesByGeneration(1, http, _db.Moves);
+
+        Assert.Equal([unavailable], failed);
+        Assert.Equal(RetryHandler.MaxRetries, waits.Count);
         using var moves = _db.Moves();
         Assert.Single(moves.Moves, m => m.Id == 1);
     }

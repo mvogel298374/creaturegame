@@ -463,6 +463,15 @@ Because each stage reuses one `DbContext` for every record, a record that fails 
 tracker (`ChangeTracker.Clear()` in its catch); otherwise the failed entity stays tracked and every later
 `SaveChangesAsync` retries it and fails, turning one bad record into a failed stage.
 
+**Retries.** Every request goes through `PokeApiHttp.Client`, whose `RetryHandler` retries a transient failure
+before the record is counted as failed: HTTP 429, any 5xx, a network error (`HttpRequestException`) or a
+timeout. It makes up to **3 retries** (4 attempts in all), waiting what a `Retry-After` header asks for, else
+1 s, 2 s, then 4 s. Anything else (a 404, a bad body) fails at once, since retrying cannot fix it. After the
+last attempt the final response or exception passes through unchanged, so the record fails and is reported as
+before. Note that `HttpClient`'s 100 s timeout spans the whole call including retries and waits: a server slow
+enough to use it up ends the call there rather than retrying further. Tests inject the wait, so they never
+sleep.
+
 **…but never a quiet run (2026-10-11).** Continuing is not the same as succeeding. Every stage — moves,
 species, evolutions, items, and the three downloaders — returns what failed (urls, or a count), and every
 entry point hands those to `ImportOutcome.Report` (`StageResult` per stage). It lists each stage's failures
@@ -493,7 +502,8 @@ code runs with no network and without touching the committed `.db` files.
 - **Shared `HttpClient`.** All requests go through one process-wide `PokeApiHttp.Client` (static, never
   disposed, carries the raw.githubusercontent User-Agent). This replaced the old per-request
   `new HttpClient()` pattern, whose disposed sockets risked ephemeral-port exhaustion under the ~165× fetch
-  loops. A long-running host would instead use `IHttpClientFactory`.
+  loops. It wraps a `RetryHandler` (§5.6 "Retries"), so the sprite and cry downloads retry too. A long-running
+  host would instead use `IHttpClientFactory`.
 - **Per-record `SaveChanges`.** Many round-trips; fine for a one-shot tool, not a pattern
   to copy into the web host.
 - **Hardcoded Gen 1.** Move/species ranges and mappings assume Gen 1; generalising to

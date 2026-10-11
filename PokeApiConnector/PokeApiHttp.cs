@@ -9,7 +9,7 @@ internal static class PokeApiHttp
 
     private static HttpClient CreateClient()
     {
-        var client = new HttpClient();
+        var client = new HttpClient(new RetryHandler(new HttpClientHandler()));
         client.DefaultRequestHeaders.UserAgent.ParseAdd("CreatureGame-Importer/1.0");
         return client;
     }

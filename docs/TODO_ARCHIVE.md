@@ -8,9 +8,65 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §1 #4 Importer hardening — step #4e (retry on rate limits and transient failures) ✅ DONE (2026-10-11)
+
+Step 5 of 5 of `TODO.md` §1 #4 — **the whole item is now complete (#4a–#4e)**. Importer only; gen-invariant; no data
+value, engine or web change; not player-visible. Decision 4 (retry policy) taken as recommended.
+
+**Was** (verified at `56e9ab6`, §7.6 V5): one shared `HttpClient` (`PokeApiHttp.cs`) with no handler, retry or
+rate-limit logic, so one 429 or 503 failed a record outright. ("No timeout" was refuted: `HttpClient`'s 100 s default
+applies.)
+
+**Delivered**
+- `PokeApiConnector/RetryHandler.cs`: a `DelegatingHandler` that makes up to 3 retries (4 attempts) on HTTP 429, any
+  5xx, `HttpRequestException`, or a timeout (a `TaskCanceledException` the caller did not request), waiting the
+  `Retry-After` header (delta or date) when sent, else 1 s / 2 s / 4 s. A 404 or bad body is not retried. After the last
+  attempt the final response or exception passes through, so the record is reported failed as before. The wait is an
+  injectable `Func<TimeSpan, CancellationToken, Task>`.
+- `PokeApiHttp.cs` wraps the shared client in it, so sprite and cry downloads retry too.
+- `docs/DATA_IMPORT.md` §5.6 "Retries" and the "Shared HttpClient" bullet.
+- Tests: `tests/creaturegame.Tests/Unit/RetryHandlerTests.cs` (6 handler tests: 503 twice then 200 with the 1 s / 2 s
+  waits, 429 waiting its `Retry-After`, a network error retried, four failures give up with the last response, four
+  network errors give up and throw, 404 not retried) and
+  `Integration/Importer/ImportFailureReportingTests.cs` -> `Moves_AMoveStill503AfterEveryRetry_IsReported_AndTheOthersStillImport`
+  (a move stays 503 through all retries -> on the failed list after 3 waits; the other move imports).
+
+**Gates:** format PASS; test-runner PASS (1771 .NET + tsc + 324 Vitest; E2E not run); requirements-review n/a (no data
+values change); pr-review skipped by user ruling.
+
+### §1 #4 as a whole — verification record and DoR (moved here from `TODO.md` §3.2 on closing)
+
+**Verified 2026-10-11 at `56e9ab6` (§7.6 V5), with outcomes**
+- A failed or offline run wiped evolutions and exited 0 — read-confirmed; fixed (exit-0 half by #4a, the wipe by #4b).
+- No retry or 429 handling — read-confirmed; fixed by #4e. "No timeout" — refuted.
+- "Import Complete!" always printed — partly refuted, then fixed by #4a (every stage's failures reach the exit code; the
+  banner prints only on a clean run).
+- A failed save poisoned the shared DbContext — read-confirmed (moves `MoveImport.cs:29,82`, items `ItemImport.cs:19,57`,
+  species `PokemonImport.cs:32,101` each reused one context; a failed `SaveChangesAsync` left its entity tracked, so
+  every later save retried and failed: silent for moves and items, loud for species); fixed by #4c.
+- Learnset delete + insert wasn't transactional — read-confirmed; fixed by #4d.
+- Not fixed in the V5 slice because none was testable: every import built its own context (`new …DbContext()`) and
+  called the static `HttpClient`, so a test needed an injectable context and HTTP handler first; that seam plus the
+  retry policy became this item.
+
+**DoR (2026-10-11)** — five steps, one greenlight and one commit each. Shared answers: gen-variable surface none (import
+plumbing; `GenerationImportScope` and every mapper unchanged); Gen 1 source n/a; data vs runtime: importer only, the
+committed `*.db` files not re-imported or changed; no engine or web change. Tests run the real import methods against
+temp-file SQLite (the `MigrationTests` pattern) and a fake `HttpMessageHandler`; a save failure is provoked with a
+SQLite `RAISE(ABORT)` trigger. No test touches PokeAPI. Decisions (all taken as recommended, user ruling 2026-10-11):
+(1) seam shape — optional parameters with today's defaults; (2) partial evolution fetch — keep the old table and fail;
+(3) poisoned context — `ChangeTracker.Clear()` after a failure; (4) retry policy — up to 3 retries on 429, 5xx and
+network errors, `Retry-After` else 1 s / 2 s / 4 s. Steps: #4a seam + exit code, #4b evolutions, #4c poisoned context,
+#4d learnset transaction, #4e retries (records above).
+
+**Open advisories:** two candidates found in review (empty-but-parseable generation list; species row + learnset as one
+unit) were left open and live on in `TODO.md` §3.2 as their own entries.
+
+---
+
 ## §1 #4 Importer hardening — step #4d (the learnset swap is one transaction) ✅ DONE (2026-10-11)
 
-Step 4 of 5 of `TODO.md` §1 #4 (#4e remains open there). Importer only; gen-invariant; no data value, engine or web
+Step 4 of 5 of `TODO.md` §1 #4 (#4e shipped after; the item is complete). Importer only; gen-invariant; no data value, engine or web
 change; not player-visible.
 
 **Was** (verified at `56e9ab6`, §7.6 V5): `ImportLearnset` committed the learnset delete immediately and saved the insert
@@ -44,7 +100,7 @@ PASS; test-runner PASS (E2E not run); requirements-review n/a.
 
 ## §1 #4 Importer hardening — step #4c (one failed save no longer poisons the rest) ✅ DONE (2026-10-11)
 
-Step 3 of 5 of `TODO.md` §1 #4 (#4d, #4e remain open there). Importer only; gen-invariant; no data value, engine or
+Step 3 of 5 of `TODO.md` §1 #4 (#4d, #4e shipped after). Importer only; gen-invariant; no data value, engine or
 web change; not player-visible. Decision 3 (`ChangeTracker.Clear()`, not a fresh context per record) taken as
 recommended.
 
@@ -68,7 +124,7 @@ test-runner PASS (E2E not run); requirements-review n/a.
 
 ## §1 #4 Importer hardening — step #4b (evolutions never wipe on a bad fetch) ✅ DONE (2026-10-11)
 
-Step 2 of 5 of `TODO.md` §1 #4 (#4c–#4e remain open there). Importer only; gen-invariant; no data value, engine or
+Step 2 of 5 of `TODO.md` §1 #4 (#4c–#4e shipped after). Importer only; gen-invariant; no data value, engine or
 web change; not player-visible. Decision 2 (keep the old table and fail) taken as recommended.
 
 **Was** (verified at `56e9ab6`, §7.6 V5; left by #4a): `EvolutionImport` deleted all Gen 1 edges before fetching and
@@ -98,7 +154,7 @@ trimmed to current state; learnset-note pointer to the All-or-nothing rule. Gate
 
 ## §1 #4 Importer hardening — step #4a (the seam and the exit code) ✅ DONE (2026-10-11)
 
-Step 1 of 5 of `TODO.md` §1 #4 (#4b–#4e remain open there). Importer only; gen-invariant; no data value, engine or
+Step 1 of 5 of `TODO.md` §1 #4 (#4b–#4e shipped after). Importer only; gen-invariant; no data value, engine or
 web change; not player-visible. Decision 1 (optional parameters with today's defaults) taken as recommended.
 
 **Was** (verified at `56e9ab6`, §7.6 V5): every import built its own `new …DbContext()` and used the static
