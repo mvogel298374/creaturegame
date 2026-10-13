@@ -40,7 +40,6 @@
 | 1 | **`-StartStack` backend leak** (§7.1 Part A) | S | ✗ parked: leak not reproduced (2026-10-10); un-park condition in §7.1 | Parts B and C are done. Not actionable until the user reproduces it; §1 #3 and #6 do not wait on it. |
 | 2 | **Verification pass over the unverified findings** (§7.6) | S per slice | ✅ (2026-10-10) — 15 tiny slices V1–V15 (V1–V11 done; V12 next; the V16 audit row is tracked separately as #11); each verifies first, then fixes only S-size, non-central, no-decision findings under a mini-DoR; greenlight and commit each | Turns "reviewer's reading" items into evidenced verdicts or discards. Opens up everything below it. |
 | 3 | **Server test gaps — `GameSessionManager` lifecycle + the `RunFaulted` path** (§6) | M | ⚠️ needs the injectable-clock design | Unblocks the R1d tests and closes a long-open Tier-4 item. |
-| 4 | **Stat-stage choice behind the seam** (§3.1, from §7.6 V11) | S–M | ✅ (2026-10-13) — design approved, Gen 1 source pinned; next-ready (V11 done) | Closes a G4 seam leak in `DamageCalculator` before any Gen 2 work. |
 | 5 | **R1d-a — replay an open blocking prompt** (§2) | M | ⚠️ designed, but provisional-pending-`/plan` and needs your three decisions (§8) | The only reconnect item that strands a run; highest player value. |
 | 6 | **CI E2E step** (§6) | M | ✗ no design (runner, stack boot, caching) or acceptance | The only automatic E2E coverage; makes "agents don't run E2E" safe, and unblocks checking the BST/balance flag and the reconnect spec. |
 | 7 | **R1d-d, R1d-c** — refresh-state snapshot + sprite; second-tab policy (§2) | M each | ⚠️ provisional-pending-`/plan`; (c) needs your policy call | Both extend (a)'s replay work. |
@@ -95,7 +94,9 @@ data/engine item usually also means updating the test that pins the wrong value.
   Substitute (`AttackAction.ResolveDamage`'s multi-hit loop); recoil/drain/Struggle use full calculated damage, not
   HP actually lost (`AttackAction.ExecuteAsync` Struggle recoil, `ResolveDamage` drain); Ice can freeze Ice /
   Electric can paralyse Electric (`Gen1BattleRules.CanReceiveStatus`); Fly/Dig are not untargetable on the charge turn (not listed as a
-  known gap).
+  known gap); `DamageCalculator` applies no stat cap after the stage multiplier (Gen 1 reportedly clamps a staged
+  stat to 1–999) and no ÷4 scaling of both stats when either exceeds 255 (found by `requirements-review`
+  2026-10-14, during the stat-stage seam item; unverified against pokered).
 - **Turn-order/status edges — verified 2026-10-12 (§7.6 V8); all four claims hold.** Verdicts and pokered cites:
   `TODO_ARCHIVE.md` → "§7.6 V8 — turn-order/status edges". The fixes are the two entries below.
 - **Gen 1 status-check order in `CanAct` (from §7.6 V8 — claims 2–4) — M, ✗ not Ready.** *Intent:* `CanAct` runs
@@ -137,27 +138,8 @@ data/engine item usually also means updating the test that pins the wrong value.
   the battle immediately. **Needs-decision.**
 - **Seam leak / AI / validation — verified and fixed 2026-10-14 (§7.6 V11).** AI weights, `MoveTurnChoice` trust and the
   `Biome.cs` crash fixed; verdicts, F1–F4 and the review rulings: `TODO_ARCHIVE.md` → "§7.6 V11 — seam leak, AI weights,
-  move validation, map connectivity". The seam leak is the entry below.
-- **Stat-stage choice behind the seam (from §7.6 V11 — claim 1) — S–M, ✅ Ready (user 2026-10-13).** *Intent:*
-  `DamageCalculator` picks the stage beside the stat inline (Physical → Attack/Defense, else the single Special,
-  `DamageCalculator.cs:218-227`), outside the seam that already picks the stat (`Gen1BattleRules.cs:259-263`).
-  *Acceptance:* the damage path reads the stage named by the seam; no inline Physical/Special stage branch remains in
-  `DamageCalculator`; Gen 1 damage is unchanged. *Design (approved 2026-10-13):* `IBattleRules` gains
-  `StageStat OffensiveStage(AttackType)` / `StageStat DefensiveStage(AttackType)`; Gen 1 returns Attack/Defense for
-  Physical and Special for both on Special; `DamageCalculator` reads the stage through a `StageStat` lookup. Splitting
-  `StatStages` into Sp. Atk / Sp. Def is Gen 2 state work → the §7.4 audit, not this item. *Gen-variable surface:* the
-  two new seam members (Gen 2 returns SpAtk/SpDef). *Gen 1 source:* Gen 1 has one Special stat and one Special stage
-  for both sides (pokered `af51989` `ram/wram.asm:550` `wPlayerMonSpecialMod`, `:572` `wEnemyMonSpecialMod`: one Special mod
-  per side, no Sp. Atk / Sp. Def split). *Data vs runtime:*
-  engine only. *Quirk to test:* a +2 Special stage on the attacker scales a Special move's damage and a −2 Special
-  stage on the defender raises it, both via the seam; a scripted rules double that maps Special moves to the Attack
-  stage changes the result (the seam is really consulted). Only the stage *selection* moves: how a stage is applied
-  (multiplier, any stat cap) and the crit rule are unchanged — a crit still ignores stages on both sides via the
-  existing `CritIgnoresStatStages`, pinned by a crit case with the same ±2 Special stages. The two new `IBattleRules` members carry
-  per-generation XML docs like their neighbours; the lookup is the existing `StatStages.Of(StageStat)`. The AI's
-  damage estimate goes through `DamageCalculator.EstimateDamage`, so it inherits the change without its own edit.
-  *Dependencies:* none (V11 is done). Gates: full chain,
-  `GENERATION_SEAMS.md` updated in the same commit.
+  move validation, map connectivity". Its stat-stage seam leak shipped 2026-10-14 (`TODO_ARCHIVE.md` → "Stat-stage choice
+  behind the seam").
 
 ### 3.2 Data and importer
 
@@ -322,7 +304,11 @@ Sage skin, the grid Town Map) are done and archived. The standing 2026-08-04 com
 The stat-selection abstraction is done. Open:
 
 - [ ] **`Attributes` Special split:** `Special` → `SpAtk` + `SpDef` (keep `Special` as a Gen 1 computed alias);
-  `Creature.BaseSpecial`/`DvSpecial`/`ExpSpecial` split in parallel.
+  `Creature.BaseSpecial`/`DvSpecial`/`ExpSpecial` split in parallel, and `StatStages`/`StageStat` gain SpAtk/SpDef
+  stages (`IBattleRules.OffensiveStage`/`DefensiveStage` already route the damage stage, so a Gen 2 rules set
+  returns them with no `DamageCalculator` change). In the same pass, replace `StatStageMoveEvaluator.StageOf`
+  (`MoveEvaluators.cs:129-137`, a copy of `StatStages.Of`) with `Stages.Of(stat)` so the AI can't drift from the
+  engine when the new stages land (`pr-review` advisory, 2026-10-14).
 - [ ] **`PokemonSpecies` per-generation schema:** separate timeless identity (`Id`, `Name`, `PokedexEntry`,
   `GrowthRate`) from a new `PokemonSpeciesGenData` table (`SpeciesId`, `Generation`, types, base stats, base
   experience, catch rate; Gen 3+ adds abilities). The importer stores one row per species per generation; the engine

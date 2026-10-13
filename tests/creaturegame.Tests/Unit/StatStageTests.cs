@@ -112,6 +112,98 @@ public class StatStageTests
         );
     }
 
+    private static readonly Attack SpecialHit = new()
+    {
+        Name = "SpecialHit",
+        BaseDamage = 80,
+        AttackType = AttackType.Special,
+        DamageType = DamageType.Water,
+    };
+
+    private static int Estimate(Creature a, Creature d, IBattleRules? rules = null) =>
+        DamageCalculator.EstimateDamage(a, d, SpecialHit, Gen1TypeChart.Instance, rules);
+
+    [Fact]
+    public void SpecialStages_ScaleASpecialMoveOnBothSides_AndPhysicalStagesDoNot()
+    {
+        int baseline = Estimate(TestCreatures.Make("A"), TestCreatures.Make("D"));
+
+        var boosted = TestCreatures.Make("A");
+        boosted.Battle.Stages.RaiseSpecial(2);
+        var softened = TestCreatures.Make("D");
+        softened.Battle.Stages.RaiseSpecial(-2);
+        var attackOnly = TestCreatures.Make("A");
+        attackOnly.Battle.Stages.RaiseAttack(2);
+        var defenseOnly = TestCreatures.Make("D");
+        defenseOnly.Battle.Stages.RaiseDefense(-2);
+
+        Assert.True(Estimate(boosted, TestCreatures.Make("D")) > baseline);
+        Assert.True(Estimate(TestCreatures.Make("A"), softened) > baseline);
+        Assert.Equal(baseline, Estimate(attackOnly, TestCreatures.Make("D")));
+        Assert.Equal(baseline, Estimate(TestCreatures.Make("A"), defenseOnly));
+    }
+
+    private sealed class SpecialUsesAttackStageRules : DelegatingBattleRules
+    {
+        public override StageStat OffensiveStage(AttackType t) => StageStat.Attack;
+    }
+
+    [Fact]
+    public void TheDamageStageIsTheOneTheRulesSeamNames()
+    {
+        var attacker = TestCreatures.Make("A");
+        attacker.Battle.Stages.RaiseAttack(2);
+        var defender = TestCreatures.Make("D");
+
+        int gen1 = Estimate(attacker, defender);
+        int remapped = Estimate(attacker, defender, new SpecialUsesAttackStageRules());
+
+        Assert.Equal(Estimate(TestCreatures.Make("A"), defender), gen1);
+        Assert.True(remapped > gen1);
+    }
+
+    private sealed class SpecialUsesDefenseStageRules : DelegatingBattleRules
+    {
+        public override StageStat DefensiveStage(AttackType t) => StageStat.Defense;
+    }
+
+    [Fact]
+    public void TheDefendersDamageStageIsTheOneTheRulesSeamNames()
+    {
+        var attacker = TestCreatures.Make("A");
+        var defender = TestCreatures.Make("D");
+        defender.Battle.Stages.RaiseDefense(-2);
+
+        int gen1 = Estimate(attacker, defender);
+        int remapped = Estimate(attacker, defender, new SpecialUsesDefenseStageRules());
+
+        Assert.Equal(Estimate(attacker, TestCreatures.Make("D")), gen1);
+        Assert.True(remapped > gen1);
+    }
+
+    [Fact]
+    public void ACritIgnoresSpecialStagesOnBothSides()
+    {
+        var rules = new ScriptableRules().AlwaysHit().AlwaysCrit().NoVariance();
+        int Crit(Creature a, Creature d) =>
+            DamageCalculator.CalculateDamage(
+                a,
+                d,
+                SpecialHit,
+                Gen1TypeChart.Instance,
+                rules,
+                out _
+            );
+
+        int unstaged = Crit(TestCreatures.Make("A"), TestCreatures.Make("D"));
+        var attacker = TestCreatures.Make("A");
+        attacker.Battle.Stages.RaiseSpecial(-2);
+        var defender = TestCreatures.Make("D");
+        defender.Battle.Stages.RaiseSpecial(2);
+
+        Assert.Equal(unstaged, Crit(attacker, defender));
+    }
+
     [Fact]
     public async Task SwordsDance_RaisesAttackStageByTwo()
     {

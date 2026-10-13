@@ -94,6 +94,10 @@ A reference doc covering every major system across all main-series generations â
   - **Physical types:** Normal, Fighting, Flying, Ground, Rock, Bug, Ghost, Poison
   - **Special types:** Fire, Water, Grass, Electric, Psychic, Ice, Dragon
 - Both attacking and defending use the same Special stat (no Sp. Atk vs Sp. Def distinction)
+- There is also **one Special stat stage** per side (pokered `af51989` `ram/wram.asm:550` `wPlayerMonSpecialMod`,
+  `:572` `wEnemyMonSpecialMod`). Growth or Amnesia raise it, and it scales both the user's Special offence and its
+  Special defence. Gen 2 splits it into Sp. Atk / Sp. Def stages (engine: `IBattleRules.OffensiveStage` /
+  `DefensiveStage`)
 
 #### Damage Formula
 ```

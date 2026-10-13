@@ -466,6 +466,20 @@ public interface IBattleRules
     /// </summary>
     int GetDefensiveStat(Creature defender, AttackType moveType);
 
+    /// <summary>
+    /// The attacker's stat stage applied to <see cref="GetOffensiveStat"/> for the given move type.
+    /// Gen 1: Physical → Attack; Special → Special (one combined stage).
+    /// Gen 2+: Physical → Attack; Special → SpAtk.
+    /// </summary>
+    StageStat OffensiveStage(AttackType moveType);
+
+    /// <summary>
+    /// The defender's stat stage applied to <see cref="GetDefensiveStat"/> for the given move type.
+    /// Gen 1: Physical → Defense; Special → Special (one combined stage).
+    /// Gen 2+: Physical → Defense; Special → SpDef.
+    /// </summary>
+    StageStat DefensiveStage(AttackType moveType);
+
     // ── Critical hits ──────────────────────────────────────────────────────────
 
     /// <summary>

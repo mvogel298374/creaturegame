@@ -161,6 +161,10 @@ public abstract class DelegatingBattleRules : IBattleRules
     public virtual int GetOffensiveStat(Creature a, AttackType t) => _inner.GetOffensiveStat(a, t);
 
     public virtual int GetDefensiveStat(Creature d, AttackType t) => _inner.GetDefensiveStat(d, t);
+
+    public virtual StageStat OffensiveStage(AttackType t) => _inner.OffensiveStage(t);
+
+    public virtual StageStat DefensiveStage(AttackType t) => _inner.DefensiveStage(t);
 }
 
 /// <summary>Always-hits double — overrides only the accuracy threshold. Shared by tests

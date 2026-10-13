@@ -216,14 +216,10 @@ public static class DamageCalculator
         {
             // Apply stat stage multipliers (skipped for crits in Gen 1).
             double atkStageMult = rules.GetStatMultiplier(
-                move.AttackType == AttackType.Physical
-                    ? attacker.Battle.Stages.Attack
-                    : attacker.Battle.Stages.Special
+                attacker.Battle.Stages.Of(rules.OffensiveStage(move.AttackType))
             );
             double defStageMult = rules.GetStatMultiplier(
-                move.AttackType == AttackType.Physical
-                    ? defender.Battle.Stages.Defense
-                    : defender.Battle.Stages.Special
+                defender.Battle.Stages.Of(rules.DefensiveStage(move.AttackType))
             );
 
             attackStat = (int)(attackStat * atkStageMult);

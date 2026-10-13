@@ -8,6 +8,36 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Stat-stage choice behind the seam ✅ DONE (2026-10-14)
+
+**Was** `TODO.md` §1 #4 / §3.1 (from §7.6 V11, claim 1). Ready 2026-10-13 (design approved); greenlit 2026-10-14. `format-gate`
+PASS; `test-runner` PASS (2213/2213); `requirements-review` 3 discrepancies, fixed; `pr-review` PR-READY (0 blocking).
+
+**Intent.** `DamageCalculator` picked the stat stage beside the stat inline (Physical -> Attack/Defense, else the single
+Special), outside the seam that already picks the stat (`Gen1BattleRules`). A G4 leak to close before any Gen 2 work.
+
+**Acceptance.** The damage path reads the stage named by the seam; no inline Physical/Special stage branch remains in
+`DamageCalculator`; Gen 1 damage unchanged.
+
+**Shipped.**
+- `IBattleRules.OffensiveStage(AttackType)` / `DefensiveStage(AttackType)` (return `StageStat`, per-generation XML docs).
+  `Gen1BattleRules`: Physical -> Attack/Defense, Special -> Special for both sides. `DelegatingBattleRules` forwards.
+  `DamageCalculator.ComputeDamage` reads `Stages.Of(rules.OffensiveStage/DefensiveStage(...))`. Only stage *selection*
+  moved: the multiplier and `CritIgnoresStatStages` are unchanged. `EstimateDamage` (the AI) inherits the change.
+- **Gen 1 source:** one Special stat and one Special stage per side, no Sp. Atk / Sp. Def split (pokered `af51989`
+  `ram/wram.asm:550` `wPlayerMonSpecialMod`, `:572` `wEnemyMonSpecialMod`). Gen 2 returns SpAtk/SpDef.
+- **Tests (`StatStageTests`):** Special stages scale a Special move on both sides and physical stages don't; offensive and
+  defensive seam-remap doubles (both fail against the old `DamageCalculator`, verified in a scratch clone); a crit ignores
+  +/-2 Special stages.
+- **Docs:** `GENERATION_SEAMS.md` (5 spots), `GEN_DIFFERENCES.md` (single Special stage line).
+
+**Carried forward (still live in `TODO.md`).** §4.4 `Attributes` Special split: `StatStages`/`StageStat` gain SpAtk/SpDef
+(Gen 2 state work), plus replacing the `StatStageMoveEvaluator.StageOf` copy of `StatStages.Of` (`pr-review` advisory). §3.1
+damage/accuracy core gained the unverified claims that no 1-999 stat clamp and no >255 divide-by-4 is applied (found by
+`requirements-review`). The `Gen1BattleRules` one-line source comment was kept (advisory).
+
+---
+
 ## Directives pass — four doc layers ✅ DONE (2026-10-13)
 
 **Docs restructure, not game work. Gate 1 waived by Mo (2026-10-13); no TODO entry existed.** `CLAUDE.md` was rewritten as the

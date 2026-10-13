@@ -116,7 +116,11 @@ public int GetOffensiveStat(Creature attacker, AttackType moveType) =>
 ```
 
 A `Gen2BattleRules` would return `SpAtk` / `SpDef` here, and `DamageCalculator` — which
-just calls `rules.GetOffensiveStat(...)` — wouldn't change at all.
+just calls `rules.GetOffensiveStat(...)` — wouldn't change at all. The **stat stage** applied beside each stat is
+chosen the same way, by **`OffensiveStage`** / **`DefensiveStage`** (a `StageStat`, read with
+`StatStages.Of`): Gen 1 returns Attack/Defense for Physical and the single Special stage for both sides on
+Special (pokered `af51989` `ram/wram.asm:550`/`:572`, one Special mod per side); Gen 2 would return
+SpAtk/SpDef once `StatStages` grows those stages (the state split: `TODO.md` §4.4).
 
 ### Stat calculation (`IStatCalculator`)
 The formulas that turn base stats + per-individual values into a creature's actual stats:
@@ -193,6 +197,7 @@ public Battle(Creature player, Creature enemy, ITypeChart typeChart,
 ```csharp
 isCrit          = rng.NextDouble() < rules.GetCritChance(attacker, move);   // IBattleRules + IRandomSource
 int attackStat  = rules.GetOffensiveStat(attacker, move.AttackType);        // IBattleRules
+int atkStage    = stages.Of(rules.OffensiveStage(move.AttackType));         // IBattleRules
 double typeMult = typeChart.GetMultiplier(move.DamageType, defender.Type1); // ITypeChart
 double variance = rules.RollDamageVariance();                               // IBattleRules
 ```
@@ -270,7 +275,7 @@ actually bitten us; treat each pattern on the left as a **review blocker**.
 | 🚩 Red flag in a diff | Why it's a leak | ✅ The fix |
 |:----------------------|:----------------|:----------|
 | A **magic number** that is a game rule (`* 1.5`, `< 50`, `/ 16`, `217`, `40`) inline in engine code | The value changes between generations; hardcoding it scatters Gen 1 knowledge into generation-blind code | Add a named member to `IBattleRules` (e.g. `StabMultiplier`, `ConfusionSelfHitPercent`) with a per-gen XML doc; read it at the call site |
-| Reading **`creature.Attributes.Attack` / `.Special` / `.Defense` directly** for damage/effect math | The Special split (Gen 2) means "the offensive stat" is generation-dependent | Go through `rules.GetOffensiveStat(...)` / `GetDefensiveStat(...)` |
+| Reading **`creature.Attributes.Attack` / `.Special` / `.Defense` directly** for damage/effect math | The Special split (Gen 2) means "the offensive stat" is generation-dependent | Go through `rules.GetOffensiveStat(...)` / `GetDefensiveStat(...)`, and pick the matching stage with `OffensiveStage(...)` / `DefensiveStage(...)`, never a Physical-vs-Special branch on `Stages` |
 | Reading a **move/species DB column directly** (`attack.EffectChance`, a stat column) where the *layout* could differ by gen | Later gens may store the same concept in a different shape (e.g. per-effect chances) | Ask the rules for the value (`rules.GetSecondaryEffectChance(move, kind)`); the Gen 1 impl can be a thin pass-through that documents the generic shape |
 | A **move-specific success condition or damage modifier** written inline in an `AttackAction` damage-category branch (`if (Source.Level < Target.Level)`, `Defense / 2`, a flinch/halve/double) | The *condition itself* is almost always gen-variable even when the move exists in every gen — the OHKO success rule, the Self-Destruct halving, crash damage, etc. all changed between gens. Inline, it's invisible Gen 1 knowledge and frequently just **wrong** (copied from a modern wiki) | Put the rule on `IBattleRules` (`OneHitKoSucceeds`, `SelfDestructDefenseDivisor`, …) and **never mutate `creature.Attributes` to fake a modifier** — pass it into `DamageCalculator` (e.g. `defenseDivisor`) instead |
 | A **constant that is genuinely the same in every generation** (4 move slots, the damage-formula `+2`) | — | Leave it inline; **don't** over-abstract. A seam member you'll never vary is noise. |
@@ -355,7 +360,8 @@ row, read generically by the effect. Seam judgments on record:
 Implement all four interfaces — `Gen2TypeChart`, `Gen2BattleRules`, `Gen2StatCalculator`,
 `Gen2EvolutionRules` — and select them where battles/creatures are constructed. The engine itself does not
 change. Expect the bulk of Gen 2 to be: the Special stat split (touches
-`IStatCalculator`, `Attributes`, and `GetOffensiveStat`/`GetDefensiveStat`), the
+`IStatCalculator`, `Attributes`, `StatStages`, `GetOffensiveStat`/`GetDefensiveStat` and
+`OffensiveStage`/`DefensiveStage`), the
 stage-based crit formula, the corrected type chart, and the `0–100` accuracy scale. See
 the multi-generation roadmap in `TODO.md` §4.4.
 
@@ -393,7 +399,8 @@ A level-50 creature uses a Special move into a Psychic-type target:
 2. **`IBattleRules.GetCritChance`** rolls the crit using *base* Speed (Gen 1 rule), via
    `IRandomSource` so it's reproducible under a seed.
 3. **`IBattleRules.GetOffensiveStat`/`GetDefensiveStat`** return the combined **Special**
-   stat for both sides (Gen 1) — a `Gen2BattleRules` would return Sp. Atk / Sp. Def here.
+   stat for both sides (Gen 1), and **`OffensiveStage`/`DefensiveStage`** the single Special stage beside it — a
+   `Gen2BattleRules` would return Sp. Atk / Sp. Def here.
 4. **`ITypeChart.GetMultiplier`** supplies the type multiplier, preserving Gen 1 quirks
    (so e.g. a Bug move into Psychic returns the Gen 1 `2.0×`).
 5. **`IBattleRules.RollDamageVariance`** applies the Gen 1 `217–255/255` spread (its bounds are exposed as `DamageVarianceRange`).

@@ -262,6 +262,13 @@ public sealed class Gen1BattleRules : IBattleRules
     public int GetDefensiveStat(Creature defender, AttackType moveType) =>
         moveType == AttackType.Physical ? defender.Attributes.Defense : defender.Attributes.Special;
 
+    // pokered wram.asm: one Special mod per side (wPlayerMonSpecialMod / wEnemyMonSpecialMod).
+    public StageStat OffensiveStage(AttackType moveType) =>
+        moveType == AttackType.Physical ? StageStat.Attack : StageStat.Special;
+
+    public StageStat DefensiveStage(AttackType moveType) =>
+        moveType == AttackType.Physical ? StageStat.Defense : StageStat.Special;
+
     // ── Critical hits ──────────────────────────────────────────────────────────
 
     // Gen 1: normal = floor(BaseSpeed/2)/256; high-crit = min(floor(BaseSpeed/2)*8, 255)/256.
