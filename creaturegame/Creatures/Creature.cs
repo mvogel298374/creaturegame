@@ -254,6 +254,11 @@ public class Creature
     public bool CanSelectAnyMove =>
         MoveSet.Any(m => m.PowerPointsCurrent > 0 && m != Battle.DisabledMove);
 
+    /// <summary>Whether <paramref name="move"/> is one of this creature's moves and can be chosen this turn —
+    /// the per-move form of <see cref="CanSelectAnyMove"/>.</summary>
+    public bool CanSelect(PokemonAttack move) =>
+        MoveSet.Contains(move) && move.PowerPointsCurrent > 0 && move != Battle.DisabledMove;
+
     /// <summary>Undoes a transient Mimic move-swap. Safe to call when no Mimic is active. Reverts before
     /// any reset, not just at battle end — STATE_MODEL.md §2.</summary>
     public void RestoreMimickedMove()

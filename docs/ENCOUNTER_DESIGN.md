@@ -92,7 +92,11 @@ seed that is already done end-to-end (`GameController.Start` → `SeededRandomSo
 seed ⇒ same map. **Status ✅ (2026-06-28):** each run draws a seeded **connected subset** of the playable set
 (`Biomes.RandomConnectedMap`, `RunBiomeMapSize` = 10 of 18) at setup, threaded into the `RunDirector` as today's
 `playableBiomes` — so *which* biomes appear varies per run (same seed ⇒ same map) and the route through it is
-seeded too (`BiomeChoiceEvent` option sampling). Per-run graph **re-wiring** + §8 intersection mechanics remain
+seeded too (`BiomeChoiceEvent` option sampling). **A disconnected playable set** (possible only for a future
+profile's roster; Kanto's 18 are fully connected) yields the connected component of the seeded start biome, so the
+map can be smaller than the roster and which component appears depends on the seed. Chosen over "largest
+component" (more code for a case no shipped profile hits) and "error at run setup" (user ruling 2026-10-13, §7.6
+V11 F1). Per-run graph **re-wiring** + §8 intersection mechanics remain
 deferred (only if the subset draw alone doesn't give enough variety).
 
 ### 2.2 Pool membership rules (settled — ✅ implemented)

@@ -55,7 +55,7 @@ internal static class TestAltProfile
     /// <para><b>Why two biomes, specifically.</b> Deliberately smaller than
     /// <c>EncounterFactory.RunBiomeMapSize</c>, so the probe simultaneously pins §6's watch note: a roster
     /// thinner than the map cap must yield itself as the whole run map
-    /// (<see cref="Biomes.RandomConnectedMap"/> returns everything when the count exceeds the pool), never break
+    /// (<see cref="Biomes.RandomConnectedMap"/> returns a connected pool whole when the count exceeds it), never break
     /// map generation. And a fake roster at all — rather than a second <see cref="Region"/> — because the enum
     /// has one member, so only a substituted biome <i>list</i> can show whether the run setup reads the
     /// profile or the Kanto registry.</para>

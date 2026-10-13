@@ -160,6 +160,12 @@ Each entry: **Decision · Why · Where it lives.**
   returns a `TurnChoice` (FIGHT `MoveTurnChoice` / ITEM `ItemTurnChoice` / SWITCH `SwitchTurnChoice`). Its
   default just delegates to `ChooseMoveAsync`, so `AutoSelectInput` / `RandomMoveInput` / the AI never need to
   know about items or switching — only the web's `SignalRInput` offers the bag/switch menu.
+- **`Battle` validates every choice itself** (§7.6 V11; fix greenlit 2026-10-13, fallback over throwing 2026-10-14): a chosen move outside the moveset,
+  out of PP or Disabled (`Creature.CanSelect`), like an illegal SWITCH or ITEM, falls back to the first selectable
+  move, on both sides. The inputs validate too, so only a misbehaving input reaches it. Gen 1 re-prompts instead
+  ("No PP left!"); that's a menu behaviour the client already enforces, so the engine fallback is a safety net,
+  not the player-facing rule. Rejected: throwing (would end a live run over an input bug). True lock-ins
+  (Rage, Thrash, charge turns) still bypass the check, as in Gen 1.
 - **Why:** decouples "what the combatant decides" from "how the turn executes," so new action types and new
   deciders drop in without touching `Battle`'s turn loop. The additive default-interface-method keeps every
   non-interactive input untouched when a player-only choice (item, recovery, evolution) is added.
@@ -397,6 +403,22 @@ Each entry: **Decision · Why · Where it lives.**
   where the meta unlocks would live.
 - **Where:** `EncounterFactory.BuildStartingBag` / `RunSetup`; `STATE_MODEL.md` (the `Bag`/`Creature` persistence
   boundary).
+
+### 2.13 AI move scoring (our own evaluator stack, not pokered's trainer AI)
+- **Decision:** the foe scores each legal move as a weighted sum of `IMoveEvaluator`s
+  (`CompositeEvaluator.CreateDefault`: damage 1.0, type effectiveness 0.6, stat stage 0.5, status 0.6). This is
+  our design. pokered's trainer AI only nudges moves by fixed layers and never computes an expected value, so
+  only the "don't re-status a statused foe" penalty and the super-effective bias echo Gen 1.
+- **Status value (§7.6 V11, user rulings 2026-10-13):** Sleep/Freeze 0.60, Paralysis 0.50, Burn 0.40, Poison
+  0.35, multiplied **linearly** by the move's status chance from `IBattleRules.GetSecondaryEffectChance` (a pure
+  status move counts as 100%, so a 10% burn is worth 0.04). A small penalty (−0.30) applies when the foe already has a
+  major status, when `CanReceiveStatus` refuses it, or when the engine would block a pure status move by type
+  (`PureStatusMoveChecksTypeImmunity` plus a 0× chart result, e.g. Thunder Wave vs Ground). That last case is
+  our extension and goes beyond the Gen 1 AI.
+- **Why:** the AI must never value what the engine won't do. Every rule it consults comes through the same seams
+  the engine rolls through, so a new generation's rules flow into the AI unchanged. Linear scaling was chosen
+  over a minimum value so a low-chance secondary can't outrank a stronger plain hit.
+- **Where:** `Combat/Ai/MoveEvaluators.cs`, `Combat/Ai/CompositeEvaluator.cs`; pinned by `MoveEvaluatorTests`.
 
 ---
 

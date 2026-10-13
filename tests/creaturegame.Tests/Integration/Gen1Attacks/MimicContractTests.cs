@@ -107,4 +107,36 @@ public class MimicContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         Assert.Equal("mimic", player.MoveSet[0].Base.Name);
         Assert.Null(player.Battle.MimicWrapper);
     }
+
+    [Fact]
+    public async Task TheCopiedMoveIsSelectableWhenMimicIsNotTheFirstSlot()
+    {
+        // Mimic swaps the slot's Base in place, so the copied move is still that slot.
+        var player = TestCreatures.Make("Player", hp: 2000, attack: 200, speed: 200);
+        player.AddAttack(Move("growl"));
+        player.AddAttack(Move("mimic"));
+        var enemy = TestCreatures.Make("Enemy", hp: 40, defense: 20, speed: 1);
+        enemy.AddAttack(Move("tackle"));
+
+        var emitter = new RecordingEmitter();
+        var battle = new Battle(
+            player,
+            enemy,
+            Gen1TypeChart.Instance,
+            new ScriptedInput("mimic", "tackle"),
+            new ScriptedInput("tackle"),
+            rules: NoVarianceNoCritHitRules.Instance,
+            emitter: emitter
+        );
+        await battle.StartFightAsync();
+
+        var used = emitter
+            .Of<MoveUsed>()
+            .Where(e => e.AttackerName == "Player")
+            .Select(e => e.MoveName)
+            .ToList();
+        Assert.Equal("mimic", used[0]);
+        Assert.Equal("tackle", used[1]);
+        Assert.DoesNotContain("growl", used);
+    }
 }

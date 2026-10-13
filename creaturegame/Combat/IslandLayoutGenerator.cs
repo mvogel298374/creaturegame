@@ -101,7 +101,7 @@ public static class IslandLayoutGenerator
         var edges = BuildEdgeList(biomes, nodeIds);
         var adjacency = BuildAdjacency(biomes, edges);
 
-        if (!IsConnected(biomes, adjacency))
+        if (!Biomes.IsConnected(biomes))
         {
             throw new ArgumentException(
                 "IslandLayoutGenerator requires a connected biome subgraph — pass the result of "
@@ -207,30 +207,6 @@ public static class IslandLayoutGenerator
         }
 
         return adjacency;
-    }
-
-    private static bool IsConnected(
-        IReadOnlyList<BiomeDefinition> biomes,
-        Dictionary<string, List<string>> adjacency
-    )
-    {
-        var visited = new HashSet<string> { biomes[0].Id };
-        var stack = new Stack<string>();
-        stack.Push(biomes[0].Id);
-
-        while (stack.Count > 0)
-        {
-            var current = stack.Pop();
-            foreach (var neighbour in adjacency[current])
-            {
-                if (visited.Add(neighbour))
-                {
-                    stack.Push(neighbour);
-                }
-            }
-        }
-
-        return visited.Count == biomes.Count;
     }
 
     // ---- placement ----------------------------------------------------------------------------------

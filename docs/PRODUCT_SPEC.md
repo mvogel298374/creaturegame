@@ -117,7 +117,21 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - Design detail → `GENERATION_SEAMS.md` §2 (*Roll order*), `GEN_DIFFERENCES.md` → *Roll Order*.  History →
   `TODO_ARCHIVE.md` → *Gen 1 roll order in `AttackAction`, behind a seam*.
 
+### Foe move scoring and chosen-move validation
+- The foe scores a status move by its status chance: a 10% burn side effect is worth a tenth of a pure burn move.
+- The foe never favours a pure status move the engine would fail by type (Thunder Wave against a Ground-type).
+- A chosen move that is out of PP, Disabled or not in the moveset is replaced by the first selectable move, for the
+  player and the foe alike; PP never goes negative.
+- Design detail → `ARCHITECTURE.md` §2.4, §2.13.  History → `TODO_ARCHIVE.md` → *§7.6 V11 — seam leak, AI weights, move
+  validation, map connectivity*.
+
 ## 3. Encounters, biomes & acquisition
+
+### Run map connectivity
+- A run's biome map is always one connected graph: when the playable roster is disconnected, the map is the seed
+  biome's connected component, and the run starts instead of failing.
+- Design detail → `ENCOUNTER_DESIGN.md` §2.1.  History → `TODO_ARCHIVE.md` → *§7.6 V11 — seam leak, AI weights, move
+  validation, map connectivity*.
 
 ### Evolution-chain level floor on species selection
 - A wild, Elite, Boss, or themed-draft encounter never offers an already-evolved species below the level it

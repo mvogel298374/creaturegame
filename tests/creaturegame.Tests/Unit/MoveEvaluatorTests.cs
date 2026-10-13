@@ -11,13 +11,17 @@ namespace creaturegame.Tests.Unit;
 /// </summary>
 public class MoveEvaluatorTests
 {
-    private static TurnContext Context(Creature attacker, Creature defender) =>
+    private static TurnContext Context(
+        Creature attacker,
+        Creature defender,
+        IBattleRules? rules = null
+    ) =>
         new()
         {
             Attacker = attacker,
             Defender = defender,
             TypeChart = Gen1TypeChart.Instance,
-            Rules = Gen1BattleRules.Instance,
+            Rules = rules ?? Gen1BattleRules.Instance,
             TurnNumber = 1,
         };
 
@@ -228,6 +232,96 @@ public class MoveEvaluatorTests
             Context(TestCreatures.Make("A"), iceFoe)
         );
         Assert.True(score > 0);
+    }
+
+    private static PokemonAttack ThunderWave() =>
+        new(
+            new Attack("ThunderWave", "ThunderWave")
+            {
+                BaseDamage = 0,
+                DamageType = DamageType.Electric,
+                StatusEffect = StatusCondition.Paralysis,
+            }
+        );
+
+    [Fact]
+    public void Status_ThunderWaveIsWastedAgainstAGroundFoe()
+    {
+        var a = TestCreatures.Make("A");
+        var eval = new StatusMoveEvaluator();
+
+        double vsGround = eval.Score(
+            ThunderWave(),
+            Context(a, TestCreatures.Make("G", type1: DamageType.Ground))
+        );
+        double vsNormal = eval.Score(ThunderWave(), Context(a, TestCreatures.Make("N")));
+
+        Assert.True(vsGround < 0);
+        Assert.True(vsNormal > 0);
+    }
+
+    private static PokemonAttack Ember(int? burnChance, int power = 40) =>
+        new(
+            new Attack($"Fire{power}", $"Fire{power}")
+            {
+                BaseDamage = power,
+                DamageType = DamageType.Fire,
+                Accuracy = 100,
+                StatusEffect = burnChance is null ? StatusCondition.None : StatusCondition.Burn,
+                EffectChance = burnChance,
+            }
+        );
+
+    [Fact]
+    public void Status_SecondaryValueScalesWithItsChance()
+    {
+        var ctx = Context(TestCreatures.Make("A"), TestCreatures.Make("D"));
+        var eval = new StatusMoveEvaluator();
+
+        Assert.Equal(0.04, eval.Score(Ember(10), ctx), precision: 6);
+        Assert.Equal(0.40, eval.Score(Ember(100), ctx), precision: 6);
+
+        var bodySlam = new PokemonAttack(
+            new Attack("BodySlam", "BodySlam")
+            {
+                BaseDamage = 85,
+                StatusEffect = StatusCondition.Paralysis,
+                EffectChance = 30,
+            }
+        );
+        var waterFoe = Context(
+            TestCreatures.Make("A"),
+            TestCreatures.Make("W", type1: DamageType.Water)
+        );
+        Assert.Equal(0.15, eval.Score(bodySlam, waterFoe), precision: 6); // linear for every status, not only burn
+    }
+
+    private sealed class NoTypeImmunityRules : DelegatingBattleRules
+    {
+        public override bool PureStatusMoveChecksTypeImmunity(Attack move) => false;
+    }
+
+    [Fact]
+    public void Status_ReadsTheChanceAndTheImmunityRuleThroughTheRulesSeam()
+    {
+        var a = TestCreatures.Make("A");
+        var eval = new StatusMoveEvaluator();
+
+        var forced = Context(a, TestCreatures.Make("D"), ForceSecondaryRules.Instance);
+        Assert.Equal(0.40, eval.Score(Ember(10), forced), precision: 6);
+
+        var ground = TestCreatures.Make("G", type1: DamageType.Ground);
+        var noImmunity = Context(a, ground, new NoTypeImmunityRules());
+        Assert.True(eval.Score(ThunderWave(), noImmunity) > 0);
+    }
+
+    [Fact]
+    public void Composite_StrongerPlainMoveOutranksAWeakerMoveWithATenPercentBurn()
+    {
+        var ctx = Context(TestCreatures.Make("A"), TestCreatures.Make("D", hp: 300));
+        var brain = CompositeEvaluator.CreateDefault();
+
+        Assert.True(brain.Score(Ember(null, power: 70), ctx) > brain.Score(Ember(10), ctx));
     }
 
     [Fact]

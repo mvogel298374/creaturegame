@@ -35,6 +35,50 @@ with read triggers, projects, model table, profiles and commands.
 
 ---
 
+## §7.6 V11 — seam leak, AI weights, move validation, map connectivity ✅ DONE (2026-10-14)
+
+**Was** `TODO.md` §3.1 "Seam leak / AI / validation" and the §7.6 V11 slice. Verified 2026-10-13 against `pret/pokered`
+`af51989`: claim 1 read-confirmed, claims 2-4 reproduced in a throwaway scratch clone (5/5 scratch tests drove the real
+code). F1-F4 greenlit 2026-10-13; review rulings 2026-10-13 and 2026-10-14. `format-gate` PASS; `test-runner` PASS
+(2209/2209); every F1-F4 test failed against the unfixed code (6/6) and passes now.
+
+**Verdicts.**
+- **Claim 1, Special-stage seam leak — read-confirmed.** `DamageCalculator` picks the stat stage beside the stat inline
+  (Physical -> Attack/Defense, else the single Special, `DamageCalculator.cs:218-227`), outside the seam that already picks the
+  stat (`Gen1BattleRules.cs:259-263`). Not fixed here -> its own `TODO.md` §3.1 entry "Stat-stage choice behind the seam"
+  (Ready 2026-10-13; Gen 1 source `ram/wram.asm:550`, `:572`).
+- **Claim 2, AI evaluator weights — reproduced.** A 10% secondary status was scored as the full status value; Thunder Wave vs a
+  Ground-type was valued although the engine fails it (`AttackAction.cs:278`). Fixed (F2, F3).
+- **Claim 3, `Battle` trusts `MoveTurnChoice` — reproduced.** A 0-PP move was used and its PP went negative. Fixed (F4).
+- **Claim 4, `Biome.cs:301-302` latent crash — reproduced.** A roster at or under the cap was returned whole even when
+  disconnected, so `IslandLayoutGenerator` threw at run start. Fixed (F1).
+
+**Fixes (mini-DoRs; F4 touched a central method, slice rule waived by the user for this fix).**
+- **F1 `Biomes.RandomConnectedMap`.** A roster at or under the count is returned whole only if connected (new internal
+  `Biomes.IsConnected`, which `IslandLayoutGenerator` now also uses; its private copy was removed); otherwise the frontier
+  expansion runs and yields the seed biome's component. Connected rosters draw no extra RNG. Gen-invariant; runtime. Test
+  (`BiomeTests`): two unlinked biomes, count 10 -> a connected one-biome map, layout doesn't throw. Docs: `ENCOUNTER_DESIGN.md`
+  §2.1, `GENERATION_PROFILE.md` §6 watch note.
+- **F2 type-immune pure status moves.** `StatusMoveEvaluator` penalises a pure status move when
+  `PureStatusMoveChecksTypeImmunity` holds and the chart gives 0x (the engine's check). Existing seam; AI only. Tests
+  (`MoveEvaluatorTests`): Thunder Wave < 0 vs Ground, > 0 vs Normal; a seam-consulted case.
+- **F3 secondary-chance scaling.** Status value x `GetSecondaryEffectChance`, linear (AI decision 2a ruled by the user
+  2026-10-13, so no §8 row); pure status moves count 100%. Tests: 10% burn scores 0.04, 30% paralysis scales, and a 70-power plain
+  move outranks a 40-power 10%-burn one (composite ranking). Reasoning lives in `ARCHITECTURE.md` §2.13 "AI move scoring".
+- **F4 `Battle` move validation.** Player and enemy chosen moves are checked through the new `Creature.CanSelect`; a move
+  outside the moveset, out of PP or Disabled falls back to the first selectable move (fallback over throwing, 2026-10-14).
+  Gen-invariant. Tests: `BattleIntegrationTests` (`CanSelect` fact + 0-PP theory both sides, PP never negative),
+  `MimicContractTests` (a copied move is selectable when Mimic isn't slot 0). Docs: `ARCHITECTURE.md` §2.4 bullet.
+
+**Review outcome.** `requirements-review`: 6 discrepancies, user ruled fix all (done). `pr-review`: CHANGES-REQUESTED, 2 blocking +
+3 recommended, user ruled "go with recommendations" (done). The `CanSelectAnyMove`/`CanSelect` duplication advisory was
+deliberately left: `WebEventContractTests` pins `CanSelectAnyMove`'s source text.
+
+**Docs updated in-slice:** `ARCHITECTURE.md` (§2.4, new §2.13), `ENCOUNTER_DESIGN.md` §2.1, `GENERATION_PROFILE.md` §6,
+`PRODUCT_SPEC.md`.
+
+---
+
 ## §7.6 V10 — smaller Gen 1 gaps II: verified, trainer XP / Transform crit speed / Substitute-at-cost fixed ✅ DONE (2026-10-12)
 
 **Was** `TODO.md` §3.1 "Smaller Gen 1 gaps II" and the §7.6 V10 slice. Verified at `e0a9647` against `pret/pokered`

@@ -491,8 +491,10 @@ green; unscoping the dex read fails exactly the `DexFor` probe. Rider cleanups s
 query dedup, the `Registered` allocation) are archived in `TODO_ARCHIVE.md` → *Tech-Debt cleanups*.
 
 **Watch (now pinned, not aspirational):** `Biomes.Playable` / `RandomConnectedMap` keep working off whatever
-roster the profile supplies — a roster below the map cap yields itself as the whole run map
-(`RandomConnectedMap` returns everything when the count exceeds the pool), asserted by the two-biome probe.
+roster the profile supplies — a connected roster below the map cap yields itself as the whole run map
+(`RandomConnectedMap` returns everything when the count exceeds the pool), asserted by the two-biome probe. A
+disconnected roster below the cap yields the seed biome's component instead, so the layout never receives an island
+pair (§7.6 V11 F1, `BiomeTests`).
 
 ---
 

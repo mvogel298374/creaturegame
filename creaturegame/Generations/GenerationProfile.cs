@@ -107,7 +107,7 @@ public sealed record GenerationProfile
     /// directly on a run path.</para>
     /// <para><b>A thin roster is legal.</b> The run map is a connected subset of the roster's playable biomes,
     /// capped at <c>EncounterFactory.RunBiomeMapSize</c>; a roster smaller than the cap simply yields itself
-    /// (<see cref="Biomes.RandomConnectedMap"/> returns everything when the count exceeds the pool) — pinned by
+    /// (<see cref="Biomes.RandomConnectedMap"/> returns a connected pool whole when the count exceeds it) — pinned by
     /// the alternate profile's two-biome roster, per §6's watch note.</para>
     /// </remarks>
     public required IReadOnlyList<BiomeDefinition> BiomeRoster { get; init; }

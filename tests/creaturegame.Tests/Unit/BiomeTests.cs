@@ -195,6 +195,19 @@ public class BiomeTests
     }
 
     [Fact]
+    public void RandomConnectedMap_DisconnectedRosterUnderTheCap_YieldsAConnectedComponent()
+    {
+        var x = new BiomeDefinition("x", "X", Region.Kanto, [DamageType.Fire], []);
+        var y = new BiomeDefinition("y", "Y", Region.Kanto, [DamageType.Water], []);
+
+        var map = Biomes.RandomConnectedMap([x, y], 10, new SeededRandomSource(0));
+
+        Assert.Single(map); // not both: returning the roster whole would hand the layout an island pair
+        AssertConnectedWithinSubset(map);
+        IslandLayoutGenerator.Generate(map, new SeededRandomSource(0)); // the run-start consumer; threw before
+    }
+
+    [Fact]
     public void RandomConnectedMap_Empty_ForZeroCountOrEmptyPool()
     {
         Assert.Empty(Biomes.RandomConnectedMap(Biomes.Kanto, 0, new SeededRandomSource(0)));

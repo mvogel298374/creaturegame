@@ -139,13 +139,7 @@ public sealed class StatStageMoveEvaluator : IMoveEvaluator
         };
 }
 
-/// <summary>
-/// Values a move that inflicts a major status. A fresh status on a healthy foe is worth a lot — the
-/// disabling ones (Sleep/Freeze) most, then Paralysis, then Burn (it also chips Attack), then Poison — but
-/// it is a wasted turn if the foe already carries a major status or is type-immune to this one, which the Gen
-/// 1 AI explicitly avoids (a small penalty here). Reads <see cref="Attack.StatusEffect"/>, so it covers both
-/// pure status moves and the status secondary on a damaging move. Non-status moves score 0.
-/// </summary>
+/// <summary>Values a move's major-status effect; the scoring rules are in <c>ARCHITECTURE.md</c> §2.13.</summary>
 public sealed class StatusMoveEvaluator : IMoveEvaluator
 {
     private const double RedundantPenalty = -0.30;
@@ -165,8 +159,10 @@ public sealed class StatusMoveEvaluator : IMoveEvaluator
         // judgement always matches what the engine will actually do and never enshrines a wrong/stale fact.
         if (!context.Rules.CanReceiveStatus(foe, status, move.Base.DamageType))
             return RedundantPenalty;
+        if (IsTypeImmunePureStatusMove(move.Base, context))
+            return RedundantPenalty;
 
-        return status switch
+        double value = status switch
         {
             StatusCondition.Sleep or StatusCondition.Freeze => 0.60,
             StatusCondition.Paralysis => 0.50,
@@ -174,5 +170,18 @@ public sealed class StatusMoveEvaluator : IMoveEvaluator
             StatusCondition.Poison or StatusCondition.BadPoison => 0.35,
             _ => 0,
         };
+        int chance = context.Rules.GetSecondaryEffectChance(move.Base, SecondaryEffectKind.Status);
+        return value * Math.Clamp(chance, 0, 100) / 100.0;
     }
+
+    // The engine's own Thunder Wave check (AttackAction's type-chart gate for a pure status move).
+    private static bool IsTypeImmunePureStatusMove(Attack move, TurnContext context) =>
+        move.BaseDamage == 0
+        && context.Rules.PureStatusMoveChecksTypeImmunity(move)
+        && DamageCalculator.GetTypeEffectiveness(
+            move.DamageType,
+            context.Defender.Type1,
+            context.Defender.Type2,
+            context.TypeChart
+        ) <= 0;
 }

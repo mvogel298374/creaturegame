@@ -401,6 +401,97 @@ public class BattleIntegrationTests
         Assert.Equal("Slam", moveUsed.MoveName);
     }
 
+    // Splash (exhausted, 0 PP) + Slam: an input that hands Battle Splash is offering an unselectable move.
+    private static Creature WithExhaustedSplash(string name, int speed)
+    {
+        var c = TestCreatures.Make(name, hp: 300, attack: 999, speed: speed);
+        c.AddAttack(
+            new Attack
+            {
+                Id = 1,
+                Name = "Splash",
+                BaseDamage = 0,
+                Accuracy = 100,
+                PowerPointsMax = 1,
+                AttackType = AttackType.Physical,
+            }
+        );
+        c.AddAttack(
+            new Attack
+            {
+                Id = 2,
+                Name = "Slam",
+                BaseDamage = 100,
+                Accuracy = 100,
+                PowerPointsMax = 30,
+                AttackType = AttackType.Physical,
+            }
+        );
+        c.MoveSet[0].PowerPointsCurrent = 0;
+        return c;
+    }
+
+    [Fact]
+    public void CanSelect_RejectsAnExhaustedADisabledOrAForeignMove()
+    {
+        var c = WithExhaustedSplash("Mon", speed: 100);
+        var slam = c.MoveSet[1];
+        var foreign = new PokemonAttack(new Attack { Name = "Slam", PowerPointsMax = 5 });
+
+        Assert.True(c.CanSelect(slam));
+        Assert.False(c.CanSelect(c.MoveSet[0])); // 0 PP
+        Assert.False(c.CanSelect(foreign)); // same name, not this creature's slot
+
+        c.Battle.DisabledMove = slam;
+        Assert.False(c.CanSelect(slam));
+    }
+
+    [Theory]
+    [InlineData("Player")]
+    [InlineData("Enemy")]
+    public async Task Battle_RejectsAZeroPpMoveFromTheInput_AndFallsBackToTheFirstSelectable(
+        string side
+    )
+    {
+        // ScriptedInput doesn't validate, so this reaches Battle's own guard.
+        var scripted = WithExhaustedSplash(side, speed: 200);
+        var other = TestCreatures.Make(side == "Player" ? "Enemy" : "Player", hp: 300, speed: 1);
+        other.AddAttack(
+            new Attack
+            {
+                Id = 3,
+                Name = "Tackle",
+                BaseDamage = 10,
+                Accuracy = 100,
+                PowerPointsMax = 99,
+                AttackType = AttackType.Physical,
+            }
+        );
+        var (player, enemy) = side == "Player" ? (scripted, other) : (other, scripted);
+
+        var emitter = new RecordingEmitter();
+        var battle = new Battle(
+            player,
+            enemy,
+            Gen1TypeChart.Instance,
+            new ScriptedInput(side == "Player" ? "Splash" : "Tackle"),
+            new ScriptedInput(side == "Player" ? "Tackle" : "Splash"),
+            rules: new ScriptableRules(new SeededRandomSource(1)).Deterministic(),
+            emitter: emitter,
+            rng: new SeededRandomSource(1)
+        );
+        await battle.StartFightAsync();
+
+        var used = emitter
+            .Events.OfType<MoveUsed>()
+            .Where(e => e.AttackerName == side)
+            .Select(e => e.MoveName)
+            .ToList();
+        Assert.NotEmpty(used);
+        Assert.All(used, m => Assert.Equal("Slam", m));
+        Assert.Equal(0, scripted.MoveSet[0].PowerPointsCurrent); // never driven negative
+    }
+
     [Fact]
     public async Task Battle_TurnStartedEvent_ContainsCorrectPlayerEnemyDataAndMoveList()
     {

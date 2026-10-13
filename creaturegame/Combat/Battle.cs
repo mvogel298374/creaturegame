@@ -459,8 +459,8 @@ public class Battle
     /// <summary>Resolves which move a combatant uses. Lock-in mechanics (two-turn release, rampage, Bide,
     /// Rage) bypass <see cref="IBattleInput"/> and auto-repeat, checked before
     /// <see cref="Creature.CanSelectAnyMove"/> so a Disabled Rage move is still force-used (a known,
-    /// unenforced simplification of Gen 1's Rage/Disable nuance). Otherwise the input chooses, or
-    /// <c>null</c> for Struggle when nothing is selectable.</summary>
+    /// unenforced simplification of Gen 1's Rage/Disable nuance). Otherwise the input chooses, checked by
+    /// <see cref="Creature.CanSelect"/> (<c>ARCHITECTURE.md</c> §2.4), or <c>null</c> for Struggle.</summary>
     private async Task<PokemonAttack?> SelectMoveAsync(
         Creature attacker,
         Creature defender,
@@ -475,7 +475,7 @@ public class Battle
         if (!attacker.CanSelectAnyMove)
             return null;
 
-        return await input.ChooseMoveAsync(
+        var chosen = await input.ChooseMoveAsync(
             new TurnContext
             {
                 Attacker = attacker,
@@ -486,6 +486,9 @@ public class Battle
                 DisabledMove = attacker.Battle.DisabledMove,
             }
         );
+        return attacker.CanSelect(chosen)
+            ? chosen
+            : attacker.MoveSet.FirstOrDefault(attacker.CanSelect);
     }
 
     /// <summary>Builds the player's action: ITEM/SWITCH/FIGHT. A true lock-in bypasses the menu entirely. The
@@ -532,20 +535,11 @@ public class Battle
             case SwitchTurnChoice sw when CanSwitchTo(sw.PartyIndex):
                 return new SwitchAction(this, attacker, sw.PartyIndex);
 
-            case MoveTurnChoice mv when attacker.CanSelectAnyMove:
-                // FIGHT: the input's already-validated move.
+            case MoveTurnChoice mv when attacker.CanSelect(mv.Move):
                 return NewPlayerAttack(mv.Move);
 
             default:
-                // FIGHT fallback for every remaining case — an explicit Struggle, an ITEM with no bag wired, an
-                // illegal SWITCH, or a MoveTurnChoice from an out-of-PP creature: pick the first selectable move,
-                // or null (Struggle) when nothing is selectable.
-                PokemonAttack? move = attacker.CanSelectAnyMove
-                    ? attacker.MoveSet.FirstOrDefault(m =>
-                        m.PowerPointsCurrent > 0 && m != attacker.Battle.DisabledMove
-                    )
-                    : null;
-                return NewPlayerAttack(move);
+                return NewPlayerAttack(attacker.MoveSet.FirstOrDefault(attacker.CanSelect));
         }
     }
 

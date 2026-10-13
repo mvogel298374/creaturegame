@@ -287,7 +287,8 @@ public static class Biomes
     /// randomized frontier expansion over the authored neighbour graph restricted to <paramref name="playable"/>:
     /// each added biome is adjacent (within the subset) to one already chosen, so the induced subgraph is always
     /// connected — the route can never strand the player. Returns all of <paramref name="playable"/> when
-    /// <paramref name="count"/> ≥ its size, and <c>[]</c> when it is empty. All randomness is drawn from
+    /// <paramref name="count"/> ≥ its size and it is connected (a disconnected roster yields the seed biome's
+    /// component), and <c>[]</c> when it is empty. All randomness is drawn from
     /// <paramref name="rng"/> so the map replays from the run seed.
     /// </summary>
     public static IReadOnlyList<BiomeDefinition> RandomConnectedMap(
@@ -298,7 +299,7 @@ public static class Biomes
     {
         if (count <= 0 || playable.Count == 0)
             return [];
-        if (count >= playable.Count)
+        if (count >= playable.Count && IsConnected(playable))
             return playable;
 
         var byId = playable.ToDictionary(b => b.Id);
@@ -327,5 +328,26 @@ public static class Biomes
             Add(byId[id]);
         }
         return chosen;
+    }
+
+    // Undirected over the neighbours inside the set; IslandLayoutGenerator gates its input on this too.
+    internal static bool IsConnected(IReadOnlyList<BiomeDefinition> biomes)
+    {
+        var adjacency = biomes.ToDictionary(b => b.Id, _ => new List<string>());
+        foreach (var b in biomes)
+        foreach (var id in b.Neighbours)
+            if (id != b.Id && adjacency.TryGetValue(id, out var back))
+            {
+                adjacency[b.Id].Add(id);
+                back.Add(b.Id);
+            }
+
+        var visited = new HashSet<string> { biomes[0].Id };
+        var stack = new Stack<string>([biomes[0].Id]);
+        while (stack.Count > 0)
+            foreach (var id in adjacency[stack.Pop()])
+                if (visited.Add(id))
+                    stack.Push(id);
+        return visited.Count == biomes.Count;
     }
 }
