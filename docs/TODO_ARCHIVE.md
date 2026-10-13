@@ -27,6 +27,11 @@ with read triggers, projects, model table, profiles and commands.
   `.claude/agents/*.md` and the e2e README.
 - **`docs-cleanup` gained step 8 (doc-layer custody):** docs tree, model table, layer placement, moved sections.
 - **Follow-up.** `TODO.md` §4.6 "Agent profiles -> project skills" (not Ready, intentionally).
+- **Follow-up (2026-10-13, same pass).** `CLAUDE.md` *The four doc layers* gained "New lessons go to layer 3, not memory"
+  (Claude proposes `ClaudeDirectives/` additions and writes them once Mo agrees; auto-memory holds only project state and
+  reference). `ClaudeDirectives/testing.md` gained rule 8 (check test creatures' types against the move; Normal fixtures are
+  Ghost-immune) and rule 9 (don't let the hit end the test early), both from the retired attack-batch playbook memory. Mo
+  declined a move/mechanic skill for now; no TODO entry.
 
 ---
 

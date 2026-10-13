@@ -14,6 +14,10 @@ This file is where everything starts. The docs are layered, and a higher layer w
 | 3. Claude directives | `directives/ClaudeDirectives/` | Practice Claude derived from its own work and failures | **Debatable.** Claude proposes and argues changes; Mo has the final say |
 | 4. Knowledge | `ARCHITECTURE.md`, `docs/`, `.claude/` | Game and project knowledge: design, mechanics, state, process reference | Updated in the same commit as the work it describes |
 
+**New lessons go to layer 3, not memory.** When Claude learns something from its own work or a correction, it
+proposes the addition to `directives/ClaudeDirectives/` and writes it once Mo agrees. Claude's auto-memory holds
+only project state and reference material; it never restates a directive.
+
 Layer 2 is always loaded:
 
 @directives/MoDirectives/authority.md

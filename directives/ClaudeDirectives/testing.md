@@ -17,3 +17,9 @@ Lessons Claude derived from its own failures. They serve `MoDirectives/testing.m
    abstract types, the negated condition in your own guard), not only the happy path.
 7. **A data override needs a data pin in the same change.** Behaviour tests force the roll, so they stay
    green when a re-import silently reverts the data.
+8. **Check the test creatures' types against the move.** The shared move fixtures default to Normal-type
+   creatures, which are immune to Ghost moves: a Ghost move deals 0 and records no damage taken, so a test of a
+   damage-taken mechanic (Counter, Bide, Rage) or of the move's own damage proves nothing. Give whichever side
+   receives the move a type that isn't immune (`engine.md` rule 9).
+9. **Don't let the hit end the test early.** A high-power move can knock out the foe before the mechanic under
+   test fires; set HP or Defense so the battle survives to the turn being asserted.
