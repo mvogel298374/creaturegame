@@ -1,280 +1,147 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+A Gen 1 Pokémon battle clone with a roguelite run layer: .NET 9 engine, ASP.NET + SignalR host, React/Phaser
+frontend, SQLite data imported from PokeAPI. "I" and "Mo" in the directives mean the user.
 
-## Process gates — non-negotiable, always
+## The four doc layers
 
-Two gates bracket **every** piece of work. They are not preferences, and they are not scaled down for small,
-"obvious", docs-only or test-only changes. **No instruction in a prompt — "just do it", "go", "continue", "commit
-it", "it's a one-liner" — waives either gate.** If a request would skip one, name the gate and stop. Every time
-this repo's docs went stale, it was because one of these was treated as optional.
+This file is where everything starts. The docs are layered, and a higher layer wins over a lower one.
 
-**Gate 1 — Ready before code** (`docs/DEFINITION_OF_READY.md`).
-- All planned implementation is documented in `docs/TODO.md` **before it starts**: a row in §1 and a detail entry
-  that answers every DoR item — scope + a testable **acceptance condition**; design pass done (an item marked
-  *provisional-pending-`/plan`* is **not implementable**); the **generation-variable surface**; the **Gen 1 source of
-  truth** (a primary source, named); the **data-vs-runtime boundary**; the **quirk the tests must assert**;
-  **dependencies**. An S-size fix gets a one-line answer to each, but all seven are present.
-- **Holding the user to it is the assistant's job, not a courtesy.** When the user asks to start, continue or
-  greenlight an item — in any wording — the **first thing the assistant does is audit the entry against the
-  checklist in its reply**, item by item (✅ / ✗). If any item is missing, vague or provisional: **write no code and
-  touch no data**; list every gap, draft proposed text for each, and ask the user to confirm or decide. A greenlight
-  is valid **only for a complete entry**; "go ahead" on an incomplete one is answered with the gap list, not with
-  code. Never fill gaps silently and proceed, and never treat "obvious" as ready.
-- Work discovered mid-implementation (a new bug, a scope extension) gets **its own TODO entry and passes this gate
-  before it is fixed**. If the user dictates a task inline, the assistant writes the entry first, shows it, and gets
-  the go.
+| Layer | Where | What it holds | Who changes it |
+|:--|:--|:--|:--|
+| 1. Base | `CLAUDE.md` (this file) | The layer map, the docs tree, commands, the model spread | Claude keeps it current (via `docs-cleanup`); Mo approves |
+| 2. Mo directives | `directives/MoDirectives/` + `directives/Guardrails/` | Mo's rules, and the guardrails that enforce them | **Immutable to Claude.** Only Mo changes them, or dictates the change |
+| 3. Claude directives | `directives/ClaudeDirectives/` | Practice Claude derived from its own work and failures | **Debatable.** Claude proposes and argues changes; Mo has the final say |
+| 4. Knowledge | `ARCHITECTURE.md`, `docs/`, `.claude/` | Game and project knowledge: design, mechanics, state, process reference | Updated in the same commit as the work it describes |
 
-**Gate 2 — Done means `docs-cleanup` ran, last.**
-- The pre-finish sequence is fixed: `format-gate` → `test-runner` → `requirements-review` (battle/stat/move/data
-  work) → `pr-review` (product code or a seam) → **`docs-cleanup` — always last, never skipped, never scoped down.**
-  It runs for docs-only, test-only and one-line changes too. **Any change made after it — code or docs — means it
-  runs again, after that change.**
-- **Nothing may be called done, complete, finished, fixed or shipped, and no commit may be proposed or made, until
-  `docs-cleanup` has reported `DOCS: CLEAN | UPDATED` against the final state and its edits are staged.** Until then
-  the only honest status is "implemented, not done: `docs-cleanup` pending". Do not substitute inline doc edits,
-  a sentence saying the docs are updated, or an earlier run.
-- **It is mechanically enforced.** `docs-cleanup`'s last act is to write a stamp (`.githooks/stamp-docs-cleanup.sh`);
-  the pre-commit hook blocks any commit with no stamp, or with any staged file modified after it. **Never create,
-  copy, touch or fake the stamp, and never use `--no-verify` or `DOCS_CLEANUP_BYPASS`** — those belong to the human,
-  for emergencies only.
+Layer 2 is always loaded:
 
-## Key Files — read on demand, by trigger
+@directives/MoDirectives/authority.md
+@directives/MoDirectives/planning.md
+@directives/MoDirectives/product.md
+@directives/MoDirectives/generation-seams.md
+@directives/MoDirectives/code-style.md
+@directives/MoDirectives/data.md
+@directives/MoDirectives/testing.md
+@directives/MoDirectives/user-communication.md
+@directives/MoDirectives/settled.md
+@directives/Guardrails/GUARDRAILS.md
 
-**This file (`CLAUDE.md`) is the only always-on primer.** The rest below are reference docs: read one
-*when the task you're starting matches its trigger* — not preemptively at session start. (Reading all of
-them up front burns ~25k tokens before the work is even scoped; almost none of it primes any single task.)
+Layer 3 loads `environment.md` always, and the rest by trigger (tree below):
 
-| File | Read it when… |
-|:-----|:--------------|
-| `ARCHITECTURE.md` | you need the **why** behind a design decision, the system map, or the full doc catalog (its §5 indexes every doc in the repo). The decision-log entry point. |
-| `docs/TODO.md` | starting or finishing any task — it's the **authoritative** active task list. Always update it when a task completes. (Finished work is in `docs/TODO_ARCHIVE.md`; read that only to recover the history of a done item.) |
-| `docs/PRODUCT_SPEC.md` | you need to know **what the game currently does** (not why, not its history) — the current-state feature spec, updated per finished player-visible feature by the same `docs-cleanup` gate that updates `TODO.md`. |
-| `.claude/AI_CONTEXT.md` | you need a slash-command/profile definition (`/plan`, `/dev`, `/sync`, `/test`) or the **Tooling & Automation** reference (the pre-finish gate sequence — `format-gate`, `test-runner`, `requirements-review`, `pr-review`, then **`docs-cleanup` always last** — the pre-commit hook, CSharpier, MCP servers). |
-| `docs/DESIGN_GUIDES.md` | doing `/plan` (design) work — Gen 1 mechanics, type-balancing, move-import mapping. |
-| `docs/DEFINITION_OF_READY.md` | doing `/plan` **and before starting ANY implementation (Gate 1)** — the DoR checklist; a plan isn't done, and code can't start, until every item is covered. |
-| `docs/DEV_STANDARDS.md` | doing `/dev` (implementation) work — .NET/EF coding conventions and architecture rules. |
-| `docs/DEFINITION_OF_DONE.md` | finishing a feature — the technical DoD the `pr-review` subagent checks. |
-| `docs/STATE_MODEL.md` | touching battle state — the `Creature` permanent/transient split (`BattleState`). |
-| `docs/GAME_LOOP.md` | working on the **run/roguelite loop** — the game-loop ↔ event model (battle & heal as events), the logic-drives-sequence rule, and the target event abstraction. |
-| `docs/ENCOUNTER_DESIGN.md` | working on **encounters/acquisition** — the biome-graph run model, the `IEnemyArchetype` strength tiers, the type-themed pool, and the two gated acquisition channels (boss catch + themed draft). |
-| `docs/GENERATION_SEAMS.md` | adding a gen-variable rule or a new generation — the seams (`ITypeChart`, `IBattleRules`, `IStatCalculator`) + the §5.0 gen-agnostic checklist. |
-| `docs/RECONNECT_RESILIENCE.md` | working on **reconnect/refresh behaviour** — the emitter's replay cache, open-prompt replay, the abandon timer, multi-tab policy; the provisional designs and their test plan. |
-| `docs/GENERATION_PROFILE.md` | working on the **generation switch** — the profile that bundles seams + content + region + theme, the gen-invariant list (`RunRules` and the node kinds are *not* per-gen), and the `TestAltProfile` falsification rule. |
-| `docs/DATA_IMPORT.md` | changing imported data — the `PokeApiConnector` pipeline, import-vs-runtime boundary, PokeAPI→model mapping. |
-| `docs/SPRITE_PRESENTATION.md` | touching creature-sprite/cry rendering or scoping a Phaser visual-FX pass — the current asset pipeline (source, wire convention, `BattleScene.ts`'s existing tween/tint FX) plus unratified presentation ideas for the existing genuine Gen 1 sprites. |
+@directives/ClaudeDirectives/environment.md
+
+## Docs tree
+
+Read a file **when the task matches its trigger**, not up front.
+
+```
+CLAUDE.md                          layer 1, always loaded
+directives/
+  MoDirectives/  *.md              layer 2, always loaded (imported above)
+  Guardrails/GUARDRAILS.md         layer 2, always loaded
+  ClaudeDirectives/
+    environment.md                 layer 3, always loaded
+    testing.md                     writing, running or debugging tests
+    engine.md                      battle, stat, move or event work
+    data.md                        importer, database or asset work
+    ui.md                          frontend layout work
+ARCHITECTURE.md                    the why behind a design; system map; engine at a glance (§1.1); decision log
+README.md                          getting started, for humans
+docs/
+  TODO.md                          starting or finishing any task; the authoritative active list
+  TODO_ARCHIVE.md                  only to recover the history of a finished item
+  PRODUCT_SPEC.md                  what the game does today (present tense, no history)
+  DEFINITION_OF_READY.md           before any implementation (G1) and in /plan work
+  DEFINITION_OF_DONE.md            finishing a feature; the rubric pr-review checks
+  DEV_STANDARDS.md                 /dev work: .NET/EF conventions, error handling, comment rule in full
+  DESIGN_GUIDES.md                 /plan work: Gen 1 mechanics, type balancing, move-import mapping
+  GEN_DIFFERENCES.md               a generation fact or quirk (secondary source; pokered outranks it)
+  GAME_AVAILABILITY.md             game-version availability lookups
+  GENERATION_SEAMS.md              adding a gen-variable rule or a generation; §5.0 checklist
+  GENERATION_PROFILE.md            the generation switch: seams + content + region + theme
+  STATE_MODEL.md                   touching battle state (Creature permanent/transient split)
+  GAME_LOOP.md                     the run/roguelite loop and its event model
+  ENCOUNTER_DESIGN.md              encounters, enemy tiers, acquisition channels
+  DATA_IMPORT.md                   changing imported data; PokeAPI → model mapping
+  RECONNECT_RESILIENCE.md          reconnect/refresh behaviour, replay, abandon timer
+  SPRITE_PRESENTATION.md           sprite/cry rendering or a Phaser visual-FX pass
+  FRONTEND_PLAN.md                 React + SignalR + Phaser structure and intent
+.claude/
+  AI_CONTEXT.md                    the /plan /dev /sync /test profiles; tooling reference
+  agents/*.md                      the gate and helper subagents (models below)
+creaturegame.Web/ClientApp/e2e/README.md   working on the Playwright suite
+```
+
+`docs/` mixes game knowledge (design, mechanics, state) with process reference (TODO, DoR, DoD, standards). Both
+are layer 4. A new doc goes in this tree and in `ARCHITECTURE.md` §5 in the same commit.
+
+## Projects
+
+- **creaturegame**: the core battle engine, a class library with no entry point.
+- **creaturegame.Web**: the ASP.NET Core host (REST, SignalR hub, static files) with the Vite + React + TypeScript
+  frontend under `ClientApp/`.
+- **PokeApiConnector**: the one-shot importer from PokeAPI into `pokemon.db`, `moves.db`, `items.db`.
+- **tests/creaturegame.Tests**: xUnit, under `Unit/` and `Integration/`; namespaces match folders.
+
+Single branch `master`, remote `origin` (GitHub). Fly.io deploys only on tags matching `v*-rc*`
+(`.github/workflows/fly-deploy.yml`); pushing to `master` never deploys.
+
+## Models
+
+| Who | Model | Job |
+|:--|:--|:--|
+| Main session | Opus | Default for all work |
+| `opus-engineer` | Opus | Delegated hard implementation (a new seam, battle math, a central refactor) |
+| `pr-review` | Opus | Technical review (G3) |
+| `requirements-review` | Sonnet | Gen 1 / roguelite fidelity review (G3) |
+| `docs-cleanup` | Sonnet | Docs gate (G2) |
+| `format-gate` | Haiku | CSharpier check (G3) |
+| `test-runner` | Haiku | Fast suites, relays the summary (G3) |
+
+Also available, currently unused: Fable. Each agent's model is pinned in its frontmatter.
+
+## Profiles
+
+`/plan` (design), `/dev` (implementation), `/sync` (data schema review), `/test` (verification) set the working
+profile; definitions are in `.claude/AI_CONTEXT.md`. With no prefix, blend them; if the request could be either
+design or implementation, ask which.
 
 ## Commands
 
-> **`dotnet` = your SDK 9.0.200 install** (pinned in `global.json`). In the commands below, plain `dotnet`
-> assumes the SDK is on your PATH. If your system `dotnet` is a runtime-only install with no SDK, invoke the
-> SDK's full path instead — e.g. on this dev machine the SDK lives at `C:\Users\USER\.dotnet\dotnet.exe`, so
-> every `dotnet …` below becomes `& "C:\Users\USER\.dotnet\dotnet.exe" …`. Substitute your own SDK path.
+`dotnet` means the SDK 9.0.200 pinned in `global.json`. On this machine the system `dotnet` is runtime-only, so
+use `& "C:\Users\USER\.dotnet\dotnet.exe" …`.
 
 ```powershell
-dotnet build                          # Build all projects
-dotnet run --project PokeApiConnector # Import data from PokeAPI
-dotnet test tests/creaturegame.Tests  # Run all tests
+dotnet build                          # build all projects
+dotnet run --project PokeApiConnector # import data from PokeAPI
+.\dev.ps1 -NoBrowser                  # start backend :5100 + Vite :5173; exits 0 when both answer, 1 on failure
+.\stop-dev.ps1                        # stop the dev stack
 ```
 
-To start the full dev environment (backend + Vite frontend + browser):
+`.\dev.ps1` runs directly through the PowerShell tool with a ≥90 s timeout (or in the background); never wrap it in
+another `pwsh` or `Start-Process`. On failure it names the side that didn't answer, or the foreign process on a dev
+port (it never kills those); logs are in `.dev/backend.log` and `.dev/frontend.log`.
+
+**Tests**: all runs go through `test.ps1`.
 ```powershell
-.\dev.ps1
+.\test.ps1 -Dotnet -Web       # the fast suites: .NET xUnit + tsc typecheck + Vitest (the gate scope)
+.\test.ps1 -Dotnet            # .NET only
+.\test.ps1 -Filter <Name>     # .NET subset; a bare word is FullyQualifiedName~, a full --filter passes as-is
 ```
-**Run this directly at the repo root.** It spawns two child `pwsh` windows (backend on `:5100`, frontend on `:5173`) and opens the browser once **both** the backend (`/api/dev/status`) and Vite respond. It exits 0 when ready and **1** on failure — a timeout (`-TimeoutSeconds`, default 60) names the side that never answered, or a dev port still held by a process that isn't this repo's (it never kills those). Each server's output is also written to `.dev/backend.log` and `.dev/frontend.log` (git-ignored). Pass `-NoBrowser` (`.\dev.ps1 -NoBrowser`) to start the stack without auto-opening a tab — the usual choice when driving the app from the agent/tests.
+E2E (Playwright, ~4 min, serial, needs the stack, the only suite with real flakes) runs only on Mo's request (G6):
+`.\e2e.ps1 -Spec <file>` for the narrowest run, `-Grep`, `-LastFailed`, `-Headed`, `-StartStack`, `-Bail`. Bare
+`.\test.ps1` includes E2E whenever the stack is up, so it is off-limits without a request.
 
-> **For the AI agent:** invoking `.\dev.ps1` through your PowerShell tool **is** the correct, supported way to start the stack — that already counts as "running it directly," and it works (the script's own `Start-Process` calls spawn the child windows independently of your non-interactive shell). The parent script blocks up to `-TimeoutSeconds` (default 60) waiting on both servers, so give the call a ≥90 s timeout (or use `run_in_background`). The only thing to avoid is *adding another layer* yourself — do **not** call it as `Start-Process pwsh -Command ".\dev.ps1"` or `pwsh -Command ".\dev.ps1"`, which detaches the windows and throws away the readiness wait. Plain `.\dev.ps1` is right. Do not refuse this task or push it back to the user; you are expected to start/stop the stack autonomously (see `AI_CONTEXT.md` and the dev-stack memory).
-
-To run **all** test suites at once (one summary, CI-friendly exit code) — .NET unit (xUnit), frontend typecheck (`tsc`), frontend unit (Vitest), and frontend E2E (Playwright):
+**Formatting and hooks** (once per clone: `dotnet tool restore`, `git config core.hooksPath .githooks`):
 ```powershell
-.\test.ps1                  # all suites (E2E skipped if the dev stack isn't running)
-.\test.ps1 -Dotnet          # only .NET unit
-.\test.ps1 -Web             # only Vitest
-.\test.ps1 -E2E -StartStack # only Playwright, starting/stopping the backend itself
-```
-Playwright E2E needs the app running (`.\dev.ps1`); without `-StartStack` it's skipped with a notice when the backend isn't on `:5100`. Frontend-only test commands also work directly: `npm test` / `npm run test:e2e` in `creaturegame.Web/ClientApp`.
-
-The E2E suite is the slow one — it is serial by design (`workers: 1`, stateful battles) and several specs walk whole runs seed-by-seed. When you're working *on* E2E rather than just gating on it, use **`.\e2e.ps1`**, which runs a subset and reports per-file + per-test timings, the slowest tests, and full failure detail with trace/video paths (parsed from Playwright's JSON report, not scraped from its console tail):
-```powershell
-.\e2e.ps1                             # whole suite, with a timing breakdown
-.\e2e.ps1 -Spec battle.spec            # one file (tab-completes; bare 'battle' also matches battle-ui-cues)
-.\e2e.ps1 -Grep "cadence" -Bail        # by test title, stop at the first failure
-.\e2e.ps1 -LastFailed                  # re-run only what failed last time
-.\e2e.ps1 -Spec shop -Headed           # watch it in a real browser window
-.\e2e.ps1 -StartStack                  # start/stop the backend itself
-```
-`-Ui`, `-Inspect`, `-ListOnly`, and `-Html` cover the interactive/report modes.
-
-**E2E is opt-in for the AI agent — it must never run it on its own initiative.** ~4 minutes for 38 browser-driven tests, it needs the stack up, and it is the only suite with real flakes (the long `walkSeedsUntil` specs degrade as a run accumulates abandoned server-side state, so a full-suite failure there is often not a code defect). So the `test-runner` gate deliberately runs **`.\test.ps1 -Dotnet -Web`** and reports that E2E did not run; the agent may *recommend* the narrowest covering command (`.\e2e.ps1 -Spec <file>`) and then stop, and only the **user** asks for a run. Bare `.\test.ps1` is off-limits to the agent for the same reason — with no switches it quietly includes E2E whenever the dev stack is up.
-
-To run a subset of the .NET tests by name (all test runs go through `test.ps1`; a bare word is a `FullyQualifiedName~` match, a full `dotnet --filter` expression is passed as-is, and a filter that matches nothing fails):
-```powershell
-.\test.ps1 -Filter <ClassOrMethodName>
+dotnet csharpier format .     # format C#; never hand-align
+dotnet csharpier check .      # what the hook runs
 ```
 
-Formatting & the pre-commit gate (see `AI_CONTEXT.md` → **Tooling & Automation** for the why):
+**EF Core migrations** need `DOTNET_ROOT` pointed at the SDK:
 ```powershell
-dotnet tool restore          # once per clone — installs the pinned CSharpier
-dotnet csharpier format .    # format C# (do NOT hand-align)
-dotnet csharpier check .     # what the hook/CI runs
-git config core.hooksPath .githooks                         # once per clone — arms .githooks/pre-commit
-```
-The `.githooks/pre-commit` hook runs `csharpier check` (always), the full .NET test suite (when a .NET-affecting path is staged: `.cs`/`.csproj`/`.props`/`.db`/`global.json`, deletes and renames included), and the frontend typecheck `tsc --noEmit` (when a frontend-affecting path is staged: `.ts`/`.tsx`/`package*.json`/`tsconfig*.json` — Vitest strips types without checking them, so nothing else catches a type error), and the **`docs-cleanup` stamp check** (see *Process gates* above), and **blocks the commit on failure**. When a feature is close to done, run the pre-finish gate sequence before proposing a commit, **in this fixed order**: the **`format-gate`** subagent (CSharpier), the **`test-runner`** subagent (the fast suites — .NET + typecheck + Vitest; **E2E is not in the gate**, see below), for battle/stat/move work the **`requirements-review`** subagent (Gen-1 / roguelite domain fidelity), the **`pr-review`** subagent (Opus, technical DoD incl. generation-seam architecture, from `docs/DEFINITION_OF_DONE.md`; product code or a seam only), and **always last** the **`docs-cleanup`** subagent (the **mandatory, unskippable** docs-hygiene gate: archive the finished item to `TODO_ARCHIVE.md`, clear its stale framing; runs for **every** change with no scope exception, and again after any later change; the hook blocks a commit without its fresh stamp). Each is a separate subagent so it can be invoked or edited on its own.
-
-**Both review gates are hard to the pipeline, soft to the user — only the user clears a finding, never a subagent or you.** That applies to a `pr-review` **CHANGES-REQUESTED** exactly as it does to a `requirements-review` discrepancy: report the findings + fix cost + your recommendation, then **stop and let the user decide** (fix / waive / defer). Never run a fix→re-review loop on your own initiative — apply the agreed fix and report your own verification; a second Opus pass to confirm a small fix is waste.
-
-**`pr-review` is Opus and costs real money (~80–100k tokens a run) — it is not automatic.** Run it when the diff touches **product code** (engine, web layer, importer) or a generation seam. **Skip it for a test-only or docs-only diff** unless the user asks — gates 1–2 and the pre-commit hook already cover those. Borderline: state the cost and let the user choose. More generally, when a mandated step would cost more than the change it checks, say so up front rather than spending silently.
-
-EF Core migration commands require `DOTNET_ROOT` set so `dotnet-ef` finds the user-local SDK instead of the system runtime-only install:
-```powershell
-# Point DOTNET_ROOT/PATH at your SDK dir so dotnet-ef resolves it (example dir: C:\Users\USER\.dotnet)
 $env:DOTNET_ROOT = "$HOME\.dotnet"; $env:PATH = "$HOME\.dotnet;$HOME\.dotnet\tools;$env:PATH"
-dotnet ef migrations add <MigrationName> --project creaturegame --context <ContextName> --output-dir DB/Migrations/<Moves|Pokemon|Items>
+dotnet ef migrations add <Name> --project creaturegame --context <ContextName> --output-dir DB/Migrations/<Moves|Pokemon|Items>
 dotnet ef migrations remove --project creaturegame --context <ContextName>
 ```
-
-## Architecture
-
-Four-project .NET 9 solution:
-
-- **creaturegame** — Core battle engine **class library** (no entry point). Namespaced `creaturegame.*`. Referenced by `creaturegame.Web` and `creaturegame.Tests`.
-- **creaturegame.Web** — ASP.NET Core host: REST API, SignalR hub, static file server. Hosts a Vite + React + TypeScript frontend under `ClientApp/`. Run via `.\dev.ps1`.
-- **PokeApiConnector** — One-shot data importer that fetches from PokeAPI and writes to SQLite. Namespaced `PokeApiConnector.*`.
-- **tests/creaturegame.Tests** — xUnit unit tests. Tests live under `Unit/` and `Integration/` subdirectories; namespaces must match folder structure.
-
-### Data flow
-
-PokeApiConnector fetches Gen 1 Pokémon, moves (IDs 1–165), and the battle-usable items from `pokeapi.co`, persisting them to `pokemon.db`, `moves.db`, and `items.db` (SQLite). The main app loads from those databases via **Entity Framework Core** (`PokemonDbContext` / `MovesDbContext` / `ItemsDbContext`) using `PokemonService` / `AttackService` / `ItemService`, constructs `Creature` instances with Gen 1 stat formulas, then runs them through `Battle`. (Items have no `/generation` list endpoint, so their Gen 1 set is a hand-curated roster — see `DATA_IMPORT.md` §4.5.)
-
-### Battle system
-
-`Battle` drives a turn loop: each side submits an `IBattleAction` (`AttackAction`, or `ItemAction` when the player uses a bag item), actions are sorted by `Priority` → effective Speed (stage-adjusted, Paralysis quartered) → random tie-break, then executed in order via `ExecuteAsync()`. (Items resolve first — `ItemAction.Priority` sits above any move; the per-action `CanAct`/dead-target guards apply only to `AttackAction`.) `DamageCalculator` computes Gen 1 damage (base power × Attack/Defense ratio × STAB 1.5× × type effectiveness × stat stage multipliers × critical hit 2× × random variance 217–255/255). All generation-specific rules — stat stage tables, crit formula, accuracy scale, freeze thaw, status damage rates — are delegated to `IBattleRules`; `Gen1BattleRules` is the only implementation. Type effectiveness comes from `ITypeChart`; `Gen1TypeChart` preserves Gen 1 quirks (Ghost → Psychic = 0×, Poison → Bug = 2×, no Steel/Dark/Fairy types, Ice → Fire = 1×). Accuracy uses the Gen 1 0–255 internal scale; a roll of 255 always misses (1/256 bug).
-
-### Key patterns
-
-- **`ITypeChart`** — strategy interface; swap implementations to change the type effectiveness matrix.
-- **`IBattleRules`** — strategy interface for all generation-variable mechanics: stat stage multipliers, accuracy/evasion scale, crit formula, freeze thaw, sleep duration, status damage rates. `Gen1BattleRules.Instance` is the singleton default everywhere.
-- **`IBattleAction`** — encapsulates a single turn action; `Priority` + `ExecuteAsync()`. `AttackAction` (a move/Struggle) and `ItemAction` (use a bag item) are the implementations.
-- **`IBattleInput`** — abstracts the side's turn choice (console, AI, UI). `ChooseMoveAsync` picks a move; the additive `ChooseTurnActionAsync` returns a `TurnChoice` (FIGHT `MoveTurnChoice` / ITEM `ItemTurnChoice`) and defaults to delegating to `ChooseMoveAsync`, so only the interactive player input offers the bag. `AutoSelectInput` is the current default.
-- **`IItemEffect` / `ItemEffects`** — the item-effect registry, keyed by `ItemCategory` (the item-side analogue of `IMoveEffect` / `MoveEffects`): Heal, StatusCure, PpRestore, X-item. Item *amounts* are data (read off the `Item` row). Revive is a party-targeting effect (acts on a fainted bench member via the context's `Party`/`TargetPartySlot`); only Ball stays deferred (`ItemEffects.For` returns null). A transient **`Bag`** (item-id → qty, not yet persisted) gates and is consumed by `ItemAction`.
-- **`StatStages`** — class on `Creature`; holds per-battle Attack/Defense/Special/Speed/Accuracy/Evasion stages clamped to [−6, +6]; cleared between battles. `Raise(stat, delta)` / `Of(stat)` are the generic accessors.
-- All DB reads use `AsNoTracking()` before upserts. All DB operations are async.
-- Schema uses EF Core migrations (in `creaturegame/DB/Migrations/`). `EnsureDatabaseCreated()` calls `Database.Migrate()` — run `PokeApiConnector` on a fresh setup to create and populate the databases. Add new migrations with `dotnet ef migrations add` (see migration command above).
-
-## Agent Profiles (.claude/AI_CONTEXT.md)
-
-Prefix messages to set context:
-
-| Command | Profile | Knowledge base |
-|:--------|:--------|:---------------|
-| `/plan` | Lead Game Designer | `DESIGN_GUIDES.md` — design before implementation |
-| `/dev`  | Senior .NET Engineer | `DEV_STANDARDS.md` — clean, testable, EF-optimized code |
-| `/sync` | Data sync review | Compare `moves.db` schema vs current models |
-| `/test` | Verification | Write and run tests for the current module |
-
-When no command is given, use judgment to blend profiles. If a request is ambiguous, ask whether it's `/plan` or `/dev`.
-
-## Model Strategy (cost vs. depth)
-
-Default to **Sonnet** for the main session — `/plan` discussion, `/sync`, `/test`, data verification,
-doc/TODO edits, and routine `/dev` work are all well within its range. Reserve **Opus** for the genuinely
-hard reasoning: designing a new generation seam, a tricky battle-math batch, or a high-risk refactor of a
-central method (`AttackAction`, `Battle`).
-
-Two ways to bring Opus in: switch the whole session with `/model opus` for a hard stretch, **or** stay on
-Sonnet and delegate the hard job to the **`opus-engineer`** subagent (`.claude/agents/opus-engineer.md`),
-which is pinned to Opus and returns a focused diff. Prefer delegation when the rest of the turn is routine;
-prefer a full switch when the whole task is hard. See `AI_CONTEXT.md` → **Model Strategy** for the
-profile→model mapping and how to brief the subagent so its cold start stays cheap.
-
-## Design Principles
-
-The target is a **true Gen 1 Pokémon battle clone** with future layers inspired by roguelikes, autobattlers, and the Pokémon Infinite Fusion mod. Preserve Gen 1 accuracy (mechanics, quirks, formulas) before extending. See `DESIGN_GUIDES.md` for type-balancing and move-import mapping rules.
-
-## TODO & Product Spec State
-
-`docs/TODO.md` is the **authoritative** prioritised task list; finished work lives in `docs/TODO_ARCHIVE.md`.
-`docs/PRODUCT_SPEC.md` is the **current-state** feature spec — "what does the game do today," present tense,
-no rationale, no history (those live in `ARCHITECTURE.md`/the design docs, and `TODO_ARCHIVE.md`, respectively).
-
-**Updating `docs/TODO.md`, and `docs/PRODUCT_SPEC.md` for a player-visible feature, is part of the commit that
-finishes the work — not a follow-up.** Stage the doc edits in the *same* commit as the code, before proposing
-the commit for approval. A diff that completes an item while `TODO.md` still lists it as open, or ships
-player-visible behavior `PRODUCT_SPEC.md` doesn't yet describe, is an incomplete diff.
-
-**This cleanup is not optional and not ad hoc — it is enforced by the mandatory `docs-cleanup` subagent, the
-*last* step of the pre-finish gate sequence (Gate 2).** After *every* finished feature or closed task, that subagent runs
-(no scope exception) and performs the reconciliation below (plus the `PRODUCT_SPEC.md` entry when the feature
-is player-visible); the main session stages its edits into the finishing commit. See
-`.claude/agents/docs-cleanup.md`.
-
-When an item is done, all of the following, not just the first:
-- Mark it ✅ DONE with the date, or move the whole write-up to `docs/TODO_ARCHIVE.md` — a finished feature or a
-  closed tech-debt item belongs in the archive, because `TODO.md` holds **active work only**.
-- Clear the stale framing around it: the "Next up" ordering, "blocked on X" / "gated on Y" notes, `⚠️ known
-  defect` banners, and any dependency prose that now describes a world that no longer exists.
-- Never leave a done item in the open list "for the record" — the archive *is* the record.
-- **Before dropping any summary as "already archived," verify the full record actually is in the archive** — not
-  a stale placeholder. (Real trap: a "Run Economy" summary pointed to an archive section that said the Shop-node
-  follow-up was *"still live in TODO.md"* and described its pre-ship state, so the record lived only in TODO.md;
-  dropping the summary would have destroyed it. Relocate + fix the archive's stale framing instead.)
-- If the feature is player-visible, add or update its `PRODUCT_SPEC.md` entry (current-behavior bullets + a
-  pointer to the design doc and the archive section) — see that file's own header for the exact format.
-
-## Design Rationale Placement
-
-**The comment budget — read this before writing any code.** This codebase is comment-heavy, and that is a defect
-being reduced, not a style to match. **Do not imitate the surrounding comment density**: new and edited code follows
-this rule even inside a file full of long comments.
-
-- **Default: write no comment.** Name things so the code reads on its own.
-- **Allowed: one short line** (never a block) stating a non-obvious fact tied to that exact line — a unit, a trap,
-  a protocol quirk — or a one-line pointer to the doc that owns the reasoning (`// see docs/X.md §Y`).
-- **Not allowed:** multi-line comment blocks or multi-paragraph XML docs; narrating what the code does; history
-  ("used to…", "changed because…"); ticket or TODO references; restating a Gen 1 fact or a generation difference
-  (those live in `GEN_DIFFERENCES.md` — a code comment that restates them goes stale, and has been wrong before).
-  Public-API XML docs are one summary line; a seam member's per-generation doc stays to a line or two and points
-  at `GENERATION_SEAMS.md`.
-- **Logic documentation lives in markdown.** Any algorithm, formula, tuning rationale, state machine,
-  lifecycle/protocol, decision record or rejected alternative goes in the relevant design doc (`ARCHITECTURE.md`
-  or the per-domain doc), **written in the same commit** as the code. The code gets at most the one-line pointer.
-- **Editing a file:** delete any comment your change makes stale; do not add comments to "match" its neighbours.
-- **Enforced** at `pr-review` (`DEFINITION_OF_DONE.md` §G): a comment-heavy diff is `CHANGES-REQUESTED`. Full rule
-  → `DEV_STANDARDS.md` → **Design Rationale Placement**.
-
-**A code comment is never the only place a design decision lives.** If a comment explains *why* something is
-built a certain way — a tuning rationale, a policy/algorithm design, a "used to do X, changed because Y" — that
-belongs in a design doc (`ARCHITECTURE.md` or the relevant per-domain doc), written in the **same commit**, with
-the comment cut to a pointer. Full rule + what a comment *may* still say on its own → `DEV_STANDARDS.md` →
-**Design Rationale Placement**. This is enforced at `pr-review` (`DEFINITION_OF_DONE.md` §G) but is meant to be
-a live authoring habit, not a defect caught after the fact — extend the doc as the decision happens.
-
-## Permissions
-
-- **File edits and creation are always allowed** — make changes to existing files or create new ones without asking for confirmation first.
-- **Git commits require explicit approval** — stage changes and propose a commit message, but do not run `git commit` until the user confirms. **A commit may be proposed only after `docs-cleanup` has run last against the final state** (Gate 2 — the hook enforces it with a stamp; never forge it or bypass). **Before proposing, check that the staged set includes the `docs/TODO.md` cleanup** for whatever the commit finishes (see **TODO State**). **Once a commit is approved, always push it to `origin`** (`master`) as part of the same step — no separate confirmation is needed for the push; approving the commit approves the push. **After the push, ask whether that commit should be a release candidate** (see **Deployment** below) — every finished commit gets this prompt.
-- **Deployment is gated behind release-candidate tags** — the `Fly Deploy` GitHub Action (`.github/workflows/fly-deploy.yml`) deploys to Fly.io **only on tags matching `v*-rc*`**; pushing to `master` never deploys. A commit ships by being *pinned as a release candidate*: tag it and push the tag. So after each approved commit+push, **ask the user: "Should this commit be a release candidate (deploy), or not?"**
-  - **Yes →** create the next RC tag on that commit and push it, which fires the deploy: `git tag v<X.Y.Z>-rc.<N> <sha>` then `git push origin v<X.Y.Z>-rc.<N>`. Pick the next number by looking at existing tags (`git tag --list 'v*-rc*'`); if unsure of the version, propose one and confirm.
-  - **No →** stop. The code is on `master` but intentionally undeployed; it waits for a later RC tag.
-  - **A tag is a deploy** — creating or pushing a `-rc` tag needs the same explicit approval as a commit. Never tag on your own initiative, and never assume "commit" means "deploy."
-- **Dev stack is freely managed** — start, stop, restart, or kill the dev servers (backend `:5100`, Vite `:5173`) whenever a task needs it (build lock, fresh-code reload, test run), without asking. Don't append their running status to responses as a routine heads-up; only mention it when directly relevant (e.g. a test failed because the backend was down).
-
-## Communication Style
-
-Before running any command or making changes, state in plain language what you are about to do and why — which files will be affected, what the command does, and what outcome you expect. One or two sentences is enough; silence is not.
-
-PowerShell commands are auto-approved, but commands that are system-wide or far-reaching (registry edits, installing software, modifying global environment variables, deleting files outside the repo, etc.) should still be explicitly called out and confirmed with the user before running.
-
-## Coding Conventions
-
-- C# 13 / .NET 9; implicit usings and nullable reference types enabled.
-- Use primary constructors for DTOs and simple data structures (keep models EF-compatible).
-- Enable and handle `Nullable` for all API/DB response types (`int?`, `string?`).
-- Wrap API and DB calls in `try-catch` with console logging **at the call boundary** (the controller
-  action / hub method / background session task that owns the operation) — not inside every internal
-  DB-service accessor. A thin EF pass-through (`PokemonService`/`AttackService`/`ItemService`) can't do
-  anything differently on failure than the boundary already does (log + a controlled error response), so
-  a per-accessor catch is noise, not defense. Amended 2026-07-20 after a repo-wide audit flagged the DB
-  services as inconsistent with the old blanket wording — see `docs/TODO_ARCHIVE.md` → "DB services skip
-  try/catch, boundary wrapping is the real convention".
-- Test method names state what they test — no `Test`/`test` prefix or suffix.

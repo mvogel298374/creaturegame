@@ -74,7 +74,7 @@ cleanup for later.
 ## Coding Conventions
 *   **Primary Constructors**: Use them for DTOs and simple data structures when possible (though keep models EF-compatible).
 *   **Nullability**: Ensure `Nullable` is enabled and handled for API responses (`int?`, `string?`).
-*   **Error Handling**: Wrap API and DB calls in `try-catch` blocks with clear console logging.
+*   **Error Handling**: Wrap API and DB calls in `try-catch` with console logging **at the call boundary** (the controller action, hub method or background session task that owns the operation), not inside every internal DB-service accessor. A thin EF pass-through (`PokemonService`/`AttackService`/`ItemService`) can't do anything differently on failure than the boundary already does (log + a controlled error response). History: `TODO_ARCHIVE.md` → "DB services skip try/catch, boundary wrapping is the real convention".
 *   **Formatting**: [CSharpier](https://csharpier.com) is the source of truth for C# layout — do **not**
     hand-align code into columns; let the formatter own whitespace. Commands + tool details: `CLAUDE.md`
     (commands) and `AI_CONTEXT.md` → **Tooling & Automation**.
@@ -115,7 +115,7 @@ commit time. All are documented in `AI_CONTEXT.md` → **Tooling & Automation**.
 
 | File | Role |
 |:-----|:-----|
-| `CLAUDE.md` | Session setup, architecture overview, build commands — loaded automatically each session |
+| `CLAUDE.md` | Base layer: doc layers, docs tree with read triggers, commands, model spread — loaded automatically each session |
 | `TODO.md` | Authoritative task list; update it when any task completes |
 | `PRODUCT_SPEC.md` | Current-state feature spec ("what does the game do today") — grows one entry per finished feature, same discipline as `TODO.md` |
 | `AI_CONTEXT.md` | Agent profiles and slash-command definitions |

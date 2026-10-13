@@ -48,9 +48,51 @@ section bottoms out in mechanics, state, import mapping, or the seam contract, i
 *(Input seams — `SignalRInput` for the player, `RandomMoveInput` for the enemy — and the test-only
 `ConsoleBattleEventEmitter` are omitted from the map for readability; see §2.4 and §2.2.)*
 
-**Four projects** (see `CLAUDE.md` → Architecture for the one-liners): `creaturegame` (core engine, no entry
+**Four projects:** `creaturegame` (core engine, no entry
 point), `creaturegame.Web` (ASP.NET host + React/Phaser frontend), `PokeApiConnector` (one-shot importer),
 `tests/creaturegame.Tests` (xUnit).
+
+### 1.1 Engine at a glance
+
+**Data flow.** PokeApiConnector fetches Gen 1 Pokémon, moves (IDs 1–165), and the battle-usable items from
+`pokeapi.co`, persisting them to `pokemon.db`, `moves.db`, and `items.db` (SQLite). The main app loads from those
+databases via **Entity Framework Core** (`PokemonDbContext` / `MovesDbContext` / `ItemsDbContext`) using
+`PokemonService` / `AttackService` / `ItemService`, constructs `Creature` instances with Gen 1 stat formulas, then
+runs them through `Battle`. (Items have no `/generation` list endpoint, so their Gen 1 set is a hand-curated
+roster — see `DATA_IMPORT.md` §4.5.)
+
+**Battle system.** `Battle` drives a turn loop: each side submits an `IBattleAction` (`AttackAction`, or
+`ItemAction` when the player uses a bag item), actions are sorted by `Priority` → effective Speed (stage-adjusted,
+Paralysis quartered) → random tie-break, then executed in order via `ExecuteAsync()`. (Items resolve first —
+`ItemAction.Priority` sits above any move; the per-action `CanAct`/dead-target guards apply only to
+`AttackAction`.) `DamageCalculator` computes Gen 1 damage (base power × Attack/Defense ratio × STAB 1.5× × type
+effectiveness × stat stage multipliers × critical hit 2× × random variance 217–255/255). All generation-specific
+rules — stat stage tables, crit formula, accuracy scale, freeze thaw, status damage rates — are delegated to
+`IBattleRules`; `Gen1BattleRules` is the only implementation. Type effectiveness comes from `ITypeChart`;
+`Gen1TypeChart` preserves Gen 1 quirks (Ghost → Psychic = 0×, Poison → Bug = 2×, no Steel/Dark/Fairy types, Ice →
+Fire = 1×). Accuracy uses the Gen 1 0–255 internal scale; a roll of 255 always misses (1/256 bug).
+
+**Key patterns.**
+- **`ITypeChart`** — strategy interface; swap implementations to change the type effectiveness matrix.
+- **`IBattleRules`** — strategy interface for all generation-variable mechanics: stat stage multipliers,
+  accuracy/evasion scale, crit formula, freeze thaw, sleep duration, status damage rates.
+  `Gen1BattleRules.Instance` is the singleton default everywhere.
+- **`IBattleAction`** — encapsulates a single turn action; `Priority` + `ExecuteAsync()`. `AttackAction` (a
+  move/Struggle) and `ItemAction` (use a bag item) are the implementations.
+- **`IBattleInput`** — abstracts the side's turn choice (console, AI, UI). `ChooseMoveAsync` picks a move; the
+  additive `ChooseTurnActionAsync` returns a `TurnChoice` (FIGHT `MoveTurnChoice` / ITEM `ItemTurnChoice`) and
+  defaults to delegating to `ChooseMoveAsync`, so only the interactive player input offers the bag.
+  `AutoSelectInput` is the current default.
+- **`IItemEffect` / `ItemEffects`** — the item-effect registry, keyed by `ItemCategory` (the item-side analogue of
+  `IMoveEffect` / `MoveEffects`): Heal, StatusCure, PpRestore, X-item. Item *amounts* are data (read off the
+  `Item` row). Revive is a party-targeting effect (acts on a fainted bench member via the context's
+  `Party`/`TargetPartySlot`); only Ball stays deferred (`ItemEffects.For` returns null). A transient **`Bag`**
+  (item-id → qty, not yet persisted) gates and is consumed by `ItemAction`.
+- **`StatStages`** — class on `Creature`; holds per-battle Attack/Defense/Special/Speed/Accuracy/Evasion stages
+  clamped to [−6, +6]; cleared between battles. `Raise(stat, delta)` / `Of(stat)` are the generic accessors.
+- All DB reads use `AsNoTracking()` before upserts. All DB operations are async.
+- Schema uses EF Core migrations (in `creaturegame/DB/Migrations/`). `EnsureDatabaseCreated()` calls
+  `Database.Migrate()` — run `PokeApiConnector` on a fresh setup to create and populate the databases.
 
 ---
 
@@ -405,7 +447,8 @@ Every doc in the repo and what it answers, in a line. This file (`ARCHITECTURE.m
 | Doc | What it is |
 |:----|:-----------|
 | `README.md` | Project overview / getting started (repo root). |
-| `CLAUDE.md` | Always-on primer: setup, commands, architecture overview, the read-on-demand trigger table (repo root). |
+| `CLAUDE.md` | The base layer, always loaded: the four doc layers, the docs tree with read-on-demand triggers, commands, model spread (repo root). |
+| `directives/` | Layers 2–3: `MoDirectives/` (Mo's rules, immutable), `ClaudeDirectives/` (Claude's practice, debatable), `Guardrails/GUARDRAILS.md` (how the rules are enforced). |
 | `ARCHITECTURE.md` | **This file** — the decision log (the *why*) + system map (repo root). |
 | `docs/GENERATION_SEAMS.md` | The seam contract + the §5.0 gen-agnostic definition-of-done checklist (the real gate). |
 | `docs/RECONNECT_RESILIENCE.md` | The remaining reconnect work, designed (provisional): replaying an open blocking prompt, the second-tab policy, and the refresh-state snapshot — plus the shared test plan. |
@@ -426,3 +469,5 @@ Every doc in the repo and what it answers, in a line. This file (`ARCHITECTURE.m
 | `docs/TODO_ARCHIVE.md` | History of completed tasks, batches, and resolved tech debt. |
 | `docs/PRODUCT_SPEC.md` | Current-state feature spec — what the game does *today* (present tense, no rationale, no history); grows one entry per finished player-visible feature. |
 | `.claude/AI_CONTEXT.md` | Agent profiles (`/plan` `/dev` …) + the tooling/automation reference. |
+| `.claude/agents/*.md` | The gate and helper subagents (`format-gate`, `test-runner`, `requirements-review`, `pr-review`, `docs-cleanup`, `opus-engineer`); models in the `CLAUDE.md` table. |
+| `creaturegame.Web/ClientApp/e2e/README.md` | The Playwright suite: layout, running it, writing specs. |

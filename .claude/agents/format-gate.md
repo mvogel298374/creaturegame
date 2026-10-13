@@ -2,7 +2,7 @@
 name: format-gate
 description: Runs the CSharpier formatting gate for this .NET 9 repo — `csharpier check`, and an auto-`format` + re-check if it fails — then reports PASS / REFORMATTED / FAIL. Invoke on its own before a commit, or as one step of the pre-finish gate sequence. Deterministic; the only file change it makes is running the formatter, never hand edits.
 tools: Read, Bash
-model: sonnet
+model: haiku
 ---
 
 You are the **format gate** for a .NET 9 Gen 1 Pokémon battle engine. Your only job is the CSharpier

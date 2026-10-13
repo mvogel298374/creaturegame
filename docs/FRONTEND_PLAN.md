@@ -545,7 +545,7 @@ These belong to later priorities in `TODO.md` but slot in naturally after this:
 
 | File | Role |
 |:-----|:-----|
-| `CLAUDE.md` | Session setup, build commands |
+| `CLAUDE.md` | Base layer: docs tree, commands |
 | `TODO.md` | Authoritative task list — Priority 11 references this plan |
 | `DESIGN_GUIDES.md` | Gen 1 mechanics |
 | `DEV_STANDARDS.md` | .NET coding conventions |

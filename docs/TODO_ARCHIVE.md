@@ -8,6 +8,28 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Directives pass — four doc layers ✅ DONE (2026-10-13)
+
+**Docs restructure, not game work. Gate 1 waived by Mo (2026-10-13); no TODO entry existed.** `CLAUDE.md` was rewritten as the
+base layer: the four doc layers (1 `CLAUDE.md`; 2 `directives/MoDirectives/` + `directives/Guardrails/GUARDRAILS.md`, immutable
+to Claude and `@`-imported; 3 `directives/ClaudeDirectives/`, debatable, Mo has the final say; 4 knowledge docs), the docs tree
+with read triggers, projects, model table, profiles and commands.
+
+- **Relocated, not lost.** The old CLAUDE.md sections moved: Process gates, TODO State, Permissions, Model Strategy and the
+  comment budget to `directives/` and `GUARDRAILS.md` (G1-G6); the engine overview verbatim to `ARCHITECTURE.md` §1.1; the
+  amended error-handling wording to `DEV_STANDARDS.md`; the TODO-hygiene rules to the `docs-cleanup` agent.
+- **Mo rulings applied.** RC deploy defaults to no and is never prompted (`authority.md` rule 3); Opus is the default model
+  (rule 8); `format-gate` and `test-runner` pin Haiku (the other gates stay Sonnet; only Fable is unused); the file-edit permission rule is dropped (harness settings own it); the TEST SUMMARY relay and test-naming rules added.
+- **Deleted.** The draft `directives/Base/BASE.md`, superseded by `CLAUDE.md`.
+- **Retargeted.** References to the old CLAUDE.md sections in `AI_CONTEXT.md` (Model Strategy now points at the `CLAUDE.md`
+  model table), `TODO.md`, `.githooks/*`, `Directory.Build.props`, `SpeciesController.cs`, `DESIGN_GUIDES.md`,
+  `DEV_STANDARDS.md`, `FRONTEND_PLAN.md`, `STATE_MODEL.md`, `README.md`; `ARCHITECTURE.md` §5 gained `directives/`,
+  `.claude/agents/*.md` and the e2e README.
+- **`docs-cleanup` gained step 8 (doc-layer custody):** docs tree, model table, layer placement, moved sections.
+- **Follow-up.** `TODO.md` §4.6 "Agent profiles -> project skills" (not Ready, intentionally).
+
+---
+
 ## §7.6 V10 — smaller Gen 1 gaps II: verified, trainer XP / Transform crit speed / Substitute-at-cost fixed ✅ DONE (2026-10-12)
 
 **Was** `TODO.md` §3.1 "Smaller Gen 1 gaps II" and the §7.6 V10 slice. Verified at `e0a9647` against `pret/pokered`

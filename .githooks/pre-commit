@@ -10,7 +10,7 @@
 
 DOTNET="C:/Users/USER/.dotnet/dotnet.exe"
 
-# Gate 2 (CLAUDE.md > Process gates): docs-cleanup must have run LAST. Its final act writes the stamp; a staged
+# Gate 2 (directives/Guardrails/GUARDRAILS.md > G2): docs-cleanup must have run LAST. Its final act writes the stamp; a staged
 # file modified after the stamp means something changed since, so it must run again. Human-only bypass:
 # DOCS_CLEANUP_BYPASS=1. The AI assistant must never set it or forge the stamp.
 GIT_DIR=$(git rev-parse --git-dir)

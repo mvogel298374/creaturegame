@@ -1,7 +1,7 @@
 # Battle Sim – TODO
 
 > **Active work only.** Finished work lives in [`TODO_ARCHIVE.md`](TODO_ARCHIVE.md); design lives in the design
-> docs (`ARCHITECTURE.md` §5 indexes them). **See also:** `CLAUDE.md` (setup/commands) · `AI_CONTEXT.md`
+> docs (`ARCHITECTURE.md` §5 indexes them). **See also:** `CLAUDE.md` (doc layers, docs tree, commands) · `AI_CONTEXT.md`
 > (profiles) · `DESIGN_GUIDES.md` (mechanics) · `DEV_STANDARDS.md` (conventions).
 >
 > Rebuilt 2026-10-03: the finished Generation Profile stages, the closed tech-debt/Known-Gap records and the old
@@ -20,8 +20,8 @@
 - **Gen 1 facts** are checked against the primary source (pret/pokered for Gen 1, pret/pokecrystal for Gen 2), not
   against the repo's own docs or comments — both have been wrong (see §9).
 - **Comment budget:** new code carries no comments beyond one short line; logic documentation goes in markdown
-  (`CLAUDE.md` → *Design Rationale Placement*).
-- **Gate 1 — nothing is implemented until its entry is Ready** (`CLAUDE.md` → *Process gates*,
+  (`DEV_STANDARDS.md` → *Design Rationale Placement*).
+- **Gate 1 — nothing is implemented until its entry is Ready** (`directives/Guardrails/GUARDRAILS.md` → G1,
   `DEFINITION_OF_READY.md`). The **Ready?** column in §1 is the standing audit: ✅ every DoR item is answered; ⚠️
   designed but provisional or awaiting your decision; ✗ missing items (named). **A greenlight is only valid on ✅.**
   If you say "go" on a ⚠️ or ✗ row, the assistant will answer with the gap list instead of code, and ask you to
@@ -373,6 +373,14 @@ The stat-selection abstraction is done. Open:
   `voluntary-switch`/`poke-center` specs); set level or force an evolution; force a battle-win drop; grant gold/items;
   skip to node. **Acceptance / design / gen surface / Gen 1 source / data-vs-runtime / quirk / dependencies:** to be
   filled in. Current behaviour → `PRODUCT_SPEC.md` → *Dev Mode*.
+- [ ] **Agent profiles → project skills (M, ✗ not Ready — user 2026-10-13).** *Intent:* turn `/plan`, `/dev`,
+  `/sync` and `/test` from prose in `.claude/AI_CONTEXT.md` into Claude Code skills under `.claude/skills/<name>/`,
+  invocable by name and loading their knowledge base (DoR, design guides, dev standards, the seam checklist) on
+  use. *Acceptance:* each profile is a skill that loads when invoked; `AI_CONTEXT.md` keeps only the tooling
+  reference; the `CLAUDE.md` *Profiles* section points at the skills. *Design:* ✗ open: one skill per profile or
+  merged; whether `/test` overlaps `test-runner`; whether `/sync` survives. *Gen surface:* none. *Gen 1 source:*
+  n/a (tooling). *Data vs runtime:* neither. *Quirk to assert:* invoking a skill loads its knowledge base, checked
+  by invoking each once. *Dependencies:* none.
 - [ ] `data-testid` attributes — deferred; specs lean on stable semantic classes. Add only where a class proves
   brittle.
 - [ ] §8 visual-regression canvas snapshots — skipped for maintenance cost.
@@ -639,7 +647,7 @@ a decision (Roar/Whirlwind, the BST bands).
 ## 9. Settled — do not re-raise
 
 - **RC tags may point at any commit** — accepted policy (user ruling 2026-10-11, §7.6 V2): the deploy trigger
-  matches the tag name only; no on-`master` check (`CLAUDE.md` → Deployment).
+  matches the tag name only; no on-`master` check (`MoDirectives/authority.md` rule 3).
 - **The production container runs as root** — accepted (user ruling 2026-10-11, §7.6 V2): the runtime stage keeps
   the `aspnet` image's default user; don't re-file `USER $APP_UID`.
 - **The Docker build re-downloads sprites on any source change, and base images are tag-pinned** — accepted (user
@@ -659,7 +667,7 @@ a decision (Roar/Whirlwind, the BST bands).
 - **The frontend stays deliberately un-linted and un-formatted** (user ruling 2026-07-17); `tsc` is the only frontend
   gate. Don't re-file it.
 - **DB services skip try/catch** — decided, not a gap: they are thin EF pass-throughs, and every real caller wraps the
-  operation at its boundary (`CLAUDE.md` → *Coding Conventions*).
+  operation at its boundary (`DEV_STANDARDS.md` → Error Handling).
 - **Every run prompt is `'blocking'` by construction** — each parks a server-side await, so dismissing one would
   strand the run; don't re-file "the modals should close on Escape". (The Escape-as-B-cancel item in §4.5 covers only
   the four prompts that have a negative answer.)

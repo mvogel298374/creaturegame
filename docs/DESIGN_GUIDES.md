@@ -73,7 +73,7 @@ work on a gen-variable rule).
 
 | File | Role |
 |:-----|:-----|
-| `CLAUDE.md` | Session setup, architecture overview, build commands — loaded automatically each session |
+| `CLAUDE.md` | Base layer: doc layers, docs tree with read triggers, commands, model spread — loaded automatically each session |
 | `TODO.md` | Authoritative task list; update it when any task completes |
 | `AI_CONTEXT.md` | Agent profiles and slash-command definitions |
 | `DEV_STANDARDS.md` | .NET/EF coding conventions (implementation counterpart to this file) |

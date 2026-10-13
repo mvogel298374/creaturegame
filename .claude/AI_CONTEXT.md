@@ -13,7 +13,7 @@ established before planning or resolved during it. Do not exit `/plan` (or hand 
 unchecked DoR item; the plan isn't done until the feature is *Ready*. (That file is the checklist; run it.)
 **Gate 1 applies to `/dev` too:** no implementation starts on a `TODO.md` entry that is not DoR-complete. The first
 act on any "start / continue / go" is to audit the entry against the checklist in the reply and, on any gap, write
-no code and list the gaps (`CLAUDE.md` → *Process gates*).
+no code and list the gaps (`GUARDRAILS.md` → G1).
 
 ### `/dev` — Senior .NET Core Software Engineer
 Clean, testable, EF-optimized C# 13 / .NET 9; PokeAPI integration. Knowledge base: `DEV_STANDARDS.md`.
@@ -21,11 +21,11 @@ Clean, testable, EF-optimized C# 13 / .NET 9; PokeAPI integration. Knowledge bas
 `GENERATION_SEAMS.md §5.0` *as part of the feature* — no inline gen-variable magic numbers, no direct
 `Attributes.Attack/Special/Defense` reads in damage math, everything gen-variable behind the seams. Not a
 follow-up cleanup. (That file is the source of truth for the rule; don't restate it, run it.) **Comment budget:**
-default no comment, at most one short line; logic documentation goes in markdown in the same commit (`CLAUDE.md` →
+default no comment, at most one short line; logic documentation goes in markdown in the same commit (`DEV_STANDARDS.md` →
 *Design Rationale Placement*) — never copy a neighbouring file's comment density. **When the
 feature is close to done, run the pre-finish gate sequence** (`format-gate`, `test-runner`, `requirements-review`,
 `pr-review`, and **`docs-cleanup` always last**) before proposing a commit — nothing is "done" until `docs-cleanup`
-has run against the final state (`CLAUDE.md` → *Process gates*).
+has run against the final state (`GUARDRAILS.md` → G2).
 
 ## Action Commands
 
@@ -40,18 +40,8 @@ has run against the final state (`CLAUDE.md` → *Process gates*).
 
 ## Model Strategy
 
-Default to **Sonnet** for the main session; reserve **Opus** for hard reasoning. Mapping:
-
-| Work | Model |
-|:-----|:------|
-| `/plan` discussion, `/sync`, `/test`, data verification, doc/TODO edits, routine `/dev` (coverage rows, wiring an existing mechanic) | **Sonnet** |
-| New generation seam design, a tricky battle-math batch, a high-risk refactor of a central method (`AttackAction`, `Battle`) | **Opus** |
-
-Bring Opus in either way:
-- **Full switch** — `/model opus` when the whole task is hard.
-- **Delegate** — stay on Sonnet and hand the hard job to the **`opus-engineer`** subagent
-  (`.claude/agents/opus-engineer.md`, pinned to Opus) via the Agent tool. Prefer this when the rest of the
-  turn is routine.
+The model spread (main session on Opus by default; Haiku for `format-gate`/`test-runner`, Sonnet for the review/docs gates; `opus-engineer` for delegated hard
+implementation) is the table in `CLAUDE.md` → *Models*; each agent's model is pinned in its frontmatter.
 
 **Cold-start cost:** a subagent re-derives context from scratch, so brief it tightly — name the exact files
 to read (e.g. `GENERATION_SEAMS.md §5.0`, the specific `Combat/*.cs`), state the seam constraints inline,
@@ -242,7 +232,7 @@ Any value other than `0`/`false` (or unset/empty) enables it.
 
 | File | Role |
 |:-----|:-----|
-| `CLAUDE.md` | Session setup, architecture, build commands, model strategy — loaded automatically |
+| `CLAUDE.md` | The base layer: doc layers, docs tree, commands, model spread — loaded automatically, with the Mo directives it imports |
 | `agents/docs-cleanup.md` | Mandatory docs-hygiene gate — archives finished TODO items, clears stale framing (Subagent) |
 | `agents/format-gate.md` | CSharpier formatting gate (Subagent) |
 | `agents/test-runner.md` | Test-suite runner — fast suites only (E2E opt-in), scoped to the brief, one run (Subagent) |

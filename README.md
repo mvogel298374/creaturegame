@@ -123,4 +123,4 @@ For the concrete, prioritised list of what's being worked on next, see [`docs/TO
 - `ITypeChart` / `IBattleRules` / `IStatCalculator` are the generation-switching seams — preserve them
 - All DB reads use `AsNoTracking()`; all DB operations are async
 - Test method names describe what they test — no `Test` prefix/suffix
-- See [`CLAUDE.md`](CLAUDE.md) and [`docs/DEV_STANDARDS.md`](docs/DEV_STANDARDS.md) for the full engineering guidelines
+- See [`CLAUDE.md`](CLAUDE.md) (doc layers, docs tree, commands) and [`docs/DEV_STANDARDS.md`](docs/DEV_STANDARDS.md) for the full engineering guidelines

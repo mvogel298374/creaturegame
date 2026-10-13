@@ -1,5 +1,5 @@
 #!/bin/sh
-# Written by the docs-cleanup agent as its LAST action (CLAUDE.md > Process gates, Gate 2). The pre-commit hook
+# Written by the docs-cleanup agent as its LAST action (directives/Guardrails/GUARDRAILS.md > G2). The pre-commit hook
 # blocks a commit with no stamp, or with any staged file modified after it. Nobody else creates this file.
 
 GIT_DIR=$(git rev-parse --git-dir)

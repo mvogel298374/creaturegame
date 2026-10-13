@@ -25,8 +25,7 @@ public class SpeciesController(IDbContextFactory<PokemonDbContext> pokemonFactor
     [HttpGet]
     public async Task<IActionResult> GetAll([FromQuery] string? generation = null)
     {
-        // The call boundary owns the try/catch (CLAUDE.md → Coding Conventions, amended 2026-07-20) — same
-        // shape as GameController.Start: log here, return a controlled 500, keep the DB read itself thin.
+        // see docs/DEV_STANDARDS.md → Error Handling
         try
         {
             var profile = GameSessionManager.ProfileFor(GameController.ParseGeneration(generation));

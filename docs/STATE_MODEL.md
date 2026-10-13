@@ -6,7 +6,7 @@
 > you must follow when extending it.
 >
 > **See also:** `DESIGN_GUIDES.md` (Gen 1 mechanics), `DEV_STANDARDS.md` (coding
-> conventions), `CLAUDE.md` (architecture overview).
+> conventions), `ARCHITECTURE.md` §1.1 (engine overview).
 
 ---
 
