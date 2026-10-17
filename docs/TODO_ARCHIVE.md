@@ -8,6 +8,36 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §3.2 Importer hardening follow-ups — species + learnset as one unit; empty generation list ✅ DONE (2026-10-18)
+
+**Was** the two candidates left open by "§1 #4 Importer hardening — step #4e" (the `TODO.md` §3.2 "Importer hardening
+follow-ups" block, now removed). Both S, importer only, no `*.db` change, no gen surface, no central method; DoR drafts
+confirmed by the user 2026-10-17.
+
+**Species row and its learnset as one unit (found in #4d review).** `FetchPokemonDataByUrl` in
+`PokeApiConnector/PokeAPI/PokemonImport.cs` now runs the species-row save, the learnset delete and the insert in one
+transaction; `ImportLearnset` no longer opens its own (SQLite can't nest). A failed learnset therefore leaves the old
+species row and the old learnset, and the species is reported failed. Test:
+`LearnsetImportSafetyTests.AFailedLearnsetInsert_KeepsTheOldSpeciesRowAndLearnset_ReportsTheSpecies_AndTheNextSpeciesStillImports`
+(renamed; now also asserts the old species row survives; failed against the old code). `DATA_IMPORT.md` §4.6 updated.
+
+**Empty-but-parseable generation list (found in #4a review).** User ruling 2026-10-17: an empty list is a failure.
+Scope corrected by the user 2026-10-18 from moves/items to moves/species (the item import loops over a fixed roster and
+has no generation list). `MoveImport.FetchMovesByGeneration` and `PokemonImport.FetchPokemonByGeneration` collect the
+non-null urls and report the generation url as the sole failure when none remain. Tests in
+`ImportFailureReportingTests`: `Moves_/Species_AnEmptyGenerationList_IsReported` (failed first, then passed) and
+`Moves_/Species_AGenerationListWithNoUsableUrl_IsReported` (added after requirements-review; not run against the
+pre-fix code). `DATA_IMPORT.md` index-then-detail paragraph and §5.6 "never a quiet run" updated.
+
+**Review record.** format-gate PASS; `.\test.ps1 -Dotnet` 1894/1894. requirements-review raised 2 discrepancies
+(a null-url-only list still reported clean; the empty-list rule was documented only in §5.6); the user ruled fix both,
+done. pr-review PR-READY, 0 changes requested, 1 recommendation: test the third documented shape (the generation
+response has no list at all, e.g. `{}`, which takes the separate `?.moves` / `?.pokemon_species` null path).
+**Waived by the user 2026-10-18** ("the test has already eaten too many resources and it's a tiny risk"); recorded in
+`TODO.md` §9.
+
+---
+
 ## §7.3 Dead code: `AttackService` unused methods ✅ DONE (2026-10-17)
 
 `AttackService.GetRandomAttackAsync`/`GiveDefaultMoveAsync`/`GiveRandomMoveAsync` had no callers anywhere in the repo

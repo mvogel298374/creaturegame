@@ -307,31 +307,6 @@ data/engine item usually also means updating the test that pins the wrong value.
 
   User ruling 2026-10-11: leave this one as filed; the other two became entries and shipped (`TODO_ARCHIVE.md` → "Battle randomness fully seeded; Dire Hit / Guard Spec narration"). The
   roll-order work that surfaced the last two: `TODO_ARCHIVE.md` → "Gen 1 roll order in `AttackAction`".
-- **Importer hardening follow-ups (the §1 #4 item shipped #4a–#4e 2026-10-11; record in `TODO_ARCHIVE.md` → "§1 #4
-  Importer hardening — step #4e"). Two candidates remain, neither DoR'd:**
-  - **Empty-but-parseable generation list (found in #4a review):** an empty generation list (moves/items) still
-    reports clean. **User ruling 2026-10-17:** an empty list counts as a failure (S).
-    **DoR:** ✅ Ready (drafts confirmed by the user 2026-10-17).
-    - **Acceptance:** a test feeds an empty generation list (moves, then items) and the run reports that stage failed.
-    - **Design:** none needed (importer, no central method).
-    - **Gen surface:** none.
-    - **Gen 1 source:** n/a (tooling).
-    - **Data vs runtime:** importer only, no `*.db` change.
-    - **Quirk:** an empty but parseable list fails the stage instead of reporting clean.
-    - **Dependencies:** none.
-  - **Species row and its learnset as one unit (S, found in #4d review; user asked to file it 2026-10-11):**
-    `FetchPokemonDataByUrl` saves the species row on its own, then `ImportLearnset` swaps the learnset in a separate
-    transaction, so a failed learnset leaves the new stats beside the old learnset until a re-run
-    (`DATA_IMPORT.md` §4.6; the species is reported failed). Likely fix: open the transaction in
-    `FetchPokemonDataByUrl` around both saves. Needs its mini-DoR (acceptance: a failed learnset leaves the species
-    row unchanged too; test: the #4d trigger test also asserts the old stats).
-    **DoR:** ✅ Ready (drafts confirmed by the user 2026-10-17):
-    - **Gen surface:** none (transaction scope).
-    - **Gen 1 source:** n/a.
-    - **Data vs runtime:** importer only, no `*.db` change.
-    - **Dependencies:** none.
-
-    1, 2 and 6 are answered above (S, importer, no central method).
 - **Lickitung is wild in Yellow but never appears wild (S; from V6's `requirements-review` 2026-10-11).** The
   availability type is never shown; its only reader is the wild pool (`EncounterFactory.cs:311`, `:473`, any
   version's `Wild` row). Lickitung has `Trade` in all three versions, so it can't appear as a wild enemy. **User
@@ -980,6 +955,9 @@ recommendation, and what it unblocks.
   `StarterSelection` seeding from `DEFAULT_GENERATION` (the 4d+ generation picker replaces the line); the Settings
   difficulty dial's self-referential-scaling limitation; the encounter map's dead-end-fallback orphan-waypoint edge
   (unreachable in a connected run map).
+- **WAIVED (user 2026-10-18): no test for a generation response with no list at all** (e.g. `{}`; the `?.moves` /
+  `?.pokemon_species` null path in the importer). The empty-list and no-usable-URL shapes are pinned; this third one
+  is a tiny risk and the test was declined as not worth the cost. Don't re-file it.
 - **Max Revive** is out of `items.db` and the roster; the scaffolding a future generation needs is the schema, not a
   stray row (§4.4).
 - **Repo docs and comments can be wrong about Gen 1/Gen 2:** `GEN_DIFFERENCES.md` and three code comments misstated the

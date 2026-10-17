@@ -113,8 +113,14 @@ public class LearnsetImportSafetyTests : IDisposable
             .ToList();
     }
 
+    private PokemonSpecies StoredSpecies(int speciesId)
+    {
+        using var context = _db.Pokemon();
+        return context.Species.AsNoTracking().Single(s => s.Id == speciesId);
+    }
+
     [Fact]
-    public async Task AFailedLearnsetInsert_KeepsTheOldLearnset_ReportsTheSpecies_AndTheNextSpeciesStillImports()
+    public async Task AFailedLearnsetInsert_KeepsTheOldSpeciesRowAndLearnset_ReportsTheSpecies_AndTheNextSpeciesStillImports()
     {
         using (var context = _db.Pokemon())
         {
@@ -129,7 +135,11 @@ public class LearnsetImportSafetyTests : IDisposable
 
         Assert.Equal([$"{Api}/pokemon/1/"], failed);
         Assert.Equal([33], StoredMoveIds(1));
+        var unchanged = StoredSpecies(1);
+        Assert.Equal("bulbasaur", unchanged.Name);
+        Assert.Equal(0, unchanged.BaseHP);
         Assert.Equal([22], StoredMoveIds(2));
+        Assert.Equal(45, StoredSpecies(2).BaseHP);
     }
 
     [Fact]

@@ -39,16 +39,19 @@ public class MoveImport
             return failed;
         }
 
-        if (genResponse?.moves != null)
+        var moveUrls = genResponse?.moves?.Select(m => m.url).OfType<string>().ToList() ?? [];
+        if (moveUrls.Count == 0)
         {
-            using var context = (createContext ?? (() => new MovesDbContext()))();
-            foreach (var moveResource in genResponse.moves)
-            {
-                if (moveResource.url == null)
-                    continue;
-                if (!await FetchMoveDataByUrl(moveResource.url, context, http))
-                    failed.Add(moveResource.url);
-            }
+            Console.WriteLine($"Generation {generation} lists no moves at {url}.");
+            failed.Add(url);
+            return failed;
+        }
+
+        using var context = (createContext ?? (() => new MovesDbContext()))();
+        foreach (var moveUrl in moveUrls)
+        {
+            if (!await FetchMoveDataByUrl(moveUrl, context, http))
+                failed.Add(moveUrl);
         }
 
         return failed;

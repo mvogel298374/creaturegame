@@ -25,6 +25,15 @@ public class ImportFailureReportingTests : IDisposable
             : new Gen1Response { pokemon_species = resources };
     }
 
+    // A non-empty list whose only entry has no url — nothing importable.
+    private static Gen1Response NoUsableUrl(string listKey)
+    {
+        var resources = new List<PokeApiConnector.Generation_1.GenerationResource> { new() };
+        return listKey == "moves"
+            ? new Gen1Response { moves = resources }
+            : new Gen1Response { pokemon_species = resources };
+    }
+
     [Fact]
     public async Task Moves_AFailedMoveFetch_IsReported_AndTheOthersStillImport()
     {
@@ -121,6 +130,30 @@ public class ImportFailureReportingTests : IDisposable
     }
 
     [Fact]
+    public async Task Moves_AnEmptyGenerationList_IsReported()
+    {
+        var http = new FakePokeApiHandler()
+            .Json($"{Api}/generation/1/", Generation("moves"))
+            .Client();
+
+        var failed = await MoveImport.FetchMovesByGeneration(1, http, _db.Moves);
+
+        Assert.Equal([$"{Api}/generation/1/"], failed);
+    }
+
+    [Fact]
+    public async Task Moves_AGenerationListWithNoUsableUrl_IsReported()
+    {
+        var http = new FakePokeApiHandler()
+            .Json($"{Api}/generation/1/", NoUsableUrl("moves"))
+            .Client();
+
+        var failed = await MoveImport.FetchMovesByGeneration(1, http, _db.Moves);
+
+        Assert.Equal([$"{Api}/generation/1/"], failed);
+    }
+
+    [Fact]
     public async Task Items_EveryUnfetchableItem_IsReported_AndTheFetchableOneImports()
     {
         string potion = $"{Api}/item/potion/";
@@ -180,6 +213,30 @@ public class ImportFailureReportingTests : IDisposable
         var failed = await PokemonImport.FetchPokemonByGeneration(1, http, _db.Pokemon);
 
         Assert.Equal([$"{Api}/pokemon/1/"], failed);
+    }
+
+    [Fact]
+    public async Task Species_AnEmptyGenerationList_IsReported()
+    {
+        var http = new FakePokeApiHandler()
+            .Json($"{Api}/generation/1/", Generation("pokemon_species"))
+            .Client();
+
+        var failed = await PokemonImport.FetchPokemonByGeneration(1, http, _db.Pokemon);
+
+        Assert.Equal([$"{Api}/generation/1/"], failed);
+    }
+
+    [Fact]
+    public async Task Species_AGenerationListWithNoUsableUrl_IsReported()
+    {
+        var http = new FakePokeApiHandler()
+            .Json($"{Api}/generation/1/", NoUsableUrl("pokemon_species"))
+            .Client();
+
+        var failed = await PokemonImport.FetchPokemonByGeneration(1, http, _db.Pokemon);
+
+        Assert.Equal([$"{Api}/generation/1/"], failed);
     }
 
     [Fact]

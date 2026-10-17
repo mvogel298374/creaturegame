@@ -32,19 +32,21 @@ public class PokemonImport
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
         );
 
-        if (genResponse?.pokemon_species != null)
+        var speciesUrls =
+            genResponse?.pokemon_species?.Select(s => s.url).OfType<string>().ToList() ?? [];
+        if (speciesUrls.Count == 0)
         {
-            using var context = (createContext ?? (() => new PokemonDbContext()))();
+            Console.WriteLine($"Generation {generation} lists no species at {url}.");
+            failed.Add(url);
+            return failed;
+        }
 
-            foreach (var speciesResource in genResponse.pokemon_species)
-            {
-                if (speciesResource.url == null)
-                    continue;
-                string pokemonUrl = speciesResource.url.Replace("pokemon-species", "pokemon");
-                string speciesUrl = speciesResource.url;
-                if (!await FetchPokemonDataByUrl(pokemonUrl, speciesUrl, context, scope, http))
-                    failed.Add(pokemonUrl);
-            }
+        using var context = (createContext ?? (() => new PokemonDbContext()))();
+        foreach (var speciesUrl in speciesUrls)
+        {
+            string pokemonUrl = speciesUrl.Replace("pokemon-species", "pokemon");
+            if (!await FetchPokemonDataByUrl(pokemonUrl, speciesUrl, context, scope, http))
+                failed.Add(pokemonUrl);
         }
 
         return failed;
@@ -90,6 +92,8 @@ public class PokemonImport
 
             PokemonSpecies species = MapToSpecies(pokeData, speciesData, scope.Generation);
 
+            // One transaction for the row and its learnset, so a failed learnset keeps both old (DATA_IMPORT.md §4.6).
+            await using var transaction = await context.Database.BeginTransactionAsync();
             var existing = await context
                 .Species.AsNoTracking()
                 .FirstOrDefaultAsync(s => s.Id == species.Id);
@@ -107,6 +111,7 @@ public class PokemonImport
             await context.SaveChangesAsync();
 
             await ImportLearnset(pokeData, context, scope.Generation);
+            await transaction.CommitAsync();
 
             return true;
         }
@@ -120,7 +125,8 @@ public class PokemonImport
     }
 
     /// <summary>Persists the species' learnset for <paramref name="generation"/> (DATA_IMPORT.md §4.6) — the rows are
-    /// keyed by <c>Generation</c>, so a later generation's import sits beside Gen 1's, never over it.</summary>
+    /// keyed by <c>Generation</c>, so a later generation's import sits beside Gen 1's, never over it. Runs inside the
+    /// caller's transaction.</summary>
     private static async Task ImportLearnset(
         PokeApiPokemon pokeData,
         PokemonDbContext context,
@@ -129,8 +135,6 @@ public class PokemonImport
     {
         var entries = LearnsetMapper.ExtractLearnset(pokeData, generation);
 
-        // One transaction, so a failed insert rolls the delete back (DATA_IMPORT.md §4.6).
-        await using var transaction = await context.Database.BeginTransactionAsync();
         await context
             .Learnsets.Where(l => l.SpeciesId == pokeData.Id && l.Generation == generation)
             .ExecuteDeleteAsync();
@@ -146,7 +150,6 @@ public class PokemonImport
             })
         );
         await context.SaveChangesAsync();
-        await transaction.CommitAsync();
         int levelUp = entries.Count(e => e.Method == LearnMethod.LevelUp);
         Console.WriteLine(
             $"  Learnset: {levelUp} level-up + {entries.Count - levelUp} TM/HM Gen 1 moves for ID {pokeData.Id}"
