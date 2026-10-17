@@ -316,21 +316,10 @@ data/engine item usually also means updating the test that pins the wrong value.
 
   User ruling 2026-10-11: leave this one as filed; the other two became entries and shipped (`TODO_ARCHIVE.md` → "Battle randomness fully seeded; Dire Hit / Guard Spec narration"). The
   roll-order work that surfaced the last two: `TODO_ARCHIVE.md` → "Gen 1 roll order in `AttackAction`".
-- **Lickitung is wild in Yellow but never appears wild (S; from V6's `requirements-review` 2026-10-11).** The
-  availability type is never shown; its only reader is the wild pool (`EncounterFactory.cs:311`, `:473`, any
-  version's `Wild` row). Lickitung has `Trade` in all three versions, so it can't appear as a wild enemy. **User
-  ruling 2026-10-17:** fix Lickitung only; the other Yellow corrections and the evolve-only rule have no in-play
-  effect and are settled in §9.
-  - **Acceptance:** `GameAvailabilitySeeder.TypeOverrides` sets Yellow Lickitung `Trade` → `Wild`; a
-    `BuildGen1Rows()` test pins it; a full importer re-run changes only that row in `pokemon.db` (diffed vs `HEAD`).
-  - **Design:** none (one seeder override). **Gen surface:** none (Gen 1 data). **Gen 1 source:** pokeyellow
-    `data/wild/maps/CeruleanCaveB1F.asm`; `data/events/trades.asm:18` trades it *away* for Dugtrio. **Data vs
-    runtime:** data (seeder + re-import). **Quirk:** Lickitung is wild in Yellow, a trade in Red/Blue.
-    **Dependencies:** none. *Risk:* a larger wild pool can shift seeded-run tests; any that move are re-pinned.
-  - **DoR:** ✅ Ready.
 - **Dev server reads a `-wal`-stale bin copy (S; from V6).** **User ruling 2026-10-17:** every data change is a
   full importer re-run (`MoDirectives/data.md` rule 1), so the mechanism is option (a), the importer's checkpoint
-  on exit; no other writer is supported.
+  on exit; no other writer is supported. **Seen live 2026-10-18:** the Lickitung full re-import left its writes in
+  `pokemon.db-wal` (`git status` showed no change) until a manual `PRAGMA wal_checkpoint(TRUNCATE)`; no data differed.
   - **DoR:** ✗ not Ready — confirm the restated acceptance and it is ✅ Ready. *Acceptance (restated):* after an
     importer run no root `*.db-wal` holds unflushed pages, and the next build's bin copy matches the root (a
     scripted repro: import, build, compare). This retires `ClaudeDirectives/data.md` rule 2 (flush SQLite MCP
@@ -363,7 +352,23 @@ data/engine item usually also means updating the test that pins the wrong value.
   - *Gen-variable surface:* (a) makes `Cost` per-generation data (fine — `items.db` is per-gen content); the
     rarity bands are gen-invariant `RunRules`-style tuning. *Gen 1 source:* `pokered data/items/prices.asm`.
     *Data vs runtime:* (a) data + a band check; (b) runtime one-liner. *Quirk:* PP items cost 0 in Gen 1 (not sold).
-    *Dependencies:* none.
+    *Dependencies:* none. **Now urgent:** PokeAPI no longer serves item prices (entry below), so until (a) lands a
+    full re-import zeroes every `Cost`.
+- **PokeAPI dropped item prices; the importer silently writes `Cost` 0 (found 2026-10-18, S; ✗ not Ready).** A
+  full re-import (for the Lickitung fix) set all 26 `items.db` costs to 0 and still reported "Import Complete!":
+  `/item/potion/` now has no `cost` field, only `"prices": []`. `items.db` was restored to its committed import (user
+  ruling 2026-10-18), so the shipped data is intact, but **any full re-import breaks rarity, the starting bag and
+  shop prices** until this is fixed.
+  **DoR:** ✗ not Ready — gaps **1, 2, 3, 5, 6, 7** drafted below for your confirmation.
+  - **Acceptance:** an item whose PokeAPI response has no usable price fails the items stage (reported, exit 1)
+    instead of importing `Cost` 0; a test serves an item without `cost` and asserts the failure.
+  - **Design:** the clean end state is the Item `Cost` entry's option (a): prices come from a pokered price table,
+    not PokeAPI, so this check then guards only that the table covers every rostered item. Until then, a missing
+    `cost` field is the failure signal — not a 0 value, since Gen 1 PP items legitimately cost 0.
+  - **Gen surface:** none for the check; the prices themselves are per-generation data under the Item `Cost` entry.
+  - **Data vs runtime:** importer only.
+  - **Quirk:** a 0 price is valid (PP items); an absent price is a failure.
+  - **Dependencies:** pairs with the Item `Cost` entry above; doing (a) first makes this a coverage check.
 
 ---
 
@@ -636,17 +641,6 @@ surface: `/help` and the explainer describe the active generation, so they are p
   - **Dependencies:** none.
 - **Double-submit and `/battle` "Connecting…" forever — fixed 2026-10-17 (§7.6 V12).** Verdicts, F1–F2 and the
   rulings: `TODO_ARCHIVE.md` → "§7.6 V12 — frontend double-submit, /battle dead end, battle log".
-- **Battle log unbounded — reproduced 2026-10-17 (§7.6 V12); S, ✅ Ready (cap *N* = 1000, user 2026-10-17).** *Intent:*
-  the log keeps only the last *N* lines. *Evidence:* `battleReducer.ts:276` appends and only `initialState`
-  (`:203`) sets `log`, so it never resets, not even per encounter; a scratch Vitest kept 5,000 of 5,000 lines.
-  *Acceptance:* a reducer test pins that the log holds at most *N* lines and drops the oldest first. *Gaps:* *N*
-  (suggested 200); 10 E2E specs read `.battle-log` text (`helpers.ts`, `battle.spec.ts`, `status.spec.ts`, …), so
-  each must be checked for a wait on a line older than *N*. *Gen surface:* none. *Gen 1 source:* n/a. *Data vs
-  runtime:* client runtime only. *Quirk to assert:* the oldest line goes first. *Dependencies:* none. The companion
-  claim, that the whole `BattleScreen` re-renders on every dispatch, is **read-confirmed** (the reducer lives in its
-  hook and the log lines aren't memoized); its cost in a long run is **needs-runtime** (unmeasured).
-  **DoR:** ✅ Ready — *N* = 1000 (user ruling 2026-10-17). At 1000 no E2E spec plausibly waits on an older line;
-  the fix reads the 10 specs to confirm that, and recommends `.\e2e.ps1 -Spec battle` if any doubt remains.
 - **Phaser resize and entry pacing — fixed 2026-10-17 (§7.6 V13).** Verdicts and fixes FA–FB:
   `TODO_ARCHIVE.md` → "§7.6 V13 — Phaser resize/entry pacing and frontend nits".
 - **Transform's scale pulse may revert a resize (found 2026-10-17 during V13; unverified, S).** `transformSprite`'s
@@ -919,7 +913,7 @@ recommendation, and what it unblocks.
   base stats and are not retuned after the real-Gen-1 import — no measured problem. Reopen only on a playtest report.
 - **The other Yellow availability corrections and an evolve-only rule** — not pursued (user ruling 2026-10-17):
   the type is never shown and only gates the wild pool, so Eevee `GameCorner` → `Gift`, Wigglytuff → `GameCorner`
-  and a rule for evolve-only forms change nothing in play. Only Lickitung is worth fixing (§3.2).
+  and a rule for evolve-only forms change nothing in play. Only Lickitung was worth fixing (shipped 2026-10-18; `TODO_ARCHIVE.md` → "§3.2 Lickitung wild in Yellow").
 - **The map peek may cover the player nameplate at small sizes** — accepted (user ruling 2026-10-17): at 800×600
   the 2.6 s auto-peek covers `.player-corner`; the risk is accepted at that resolution (reproduced in §7.6 V15).
 - **No per-area encounter floor** — accepted for now (user ruling 2026-10-17): `PickByBst`/`ScaleWildLevel` select

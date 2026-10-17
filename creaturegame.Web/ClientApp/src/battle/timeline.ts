@@ -19,7 +19,7 @@ type Side = 'player' | 'enemy';
 // a nonstandard encounter (Elite/Boss) or a non-battle node (Shop/Treasure/Mystery) — in their own accent.
 // Undefined tone = the default neutral line.
 export type LogTone = 'super' | 'weak' | 'immune' | 'loot' | 'event';
-export interface LogEntry { message: string; tone?: LogTone }
+export interface LogEntry { id: number; message: string; tone?: LogTone }
 
 // The stat totals carried by a level-up (matches the engine's StatBlock).
 export interface StatBlock { maxHp: number; attack: number; defense: number; special: number; speed: number }

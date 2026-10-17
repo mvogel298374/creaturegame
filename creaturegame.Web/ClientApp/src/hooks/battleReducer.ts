@@ -215,6 +215,9 @@ export const initialState: BattleState = {
   typeRoster: [],
 };
 
+// The battle log keeps only the newest lines; the oldest go first. Ids stay stable, so React keys don't shift.
+export const LOG_CAP = 1000;
+
 export function battleReducer(state: BattleState, action: Action): BattleState {
   switch (action.type) {
     case 'BATTLE_STARTED':
@@ -272,8 +275,11 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
     case 'RUN_ENDED':
       // Terminal — the player fainted. Show the game-over screen with the run summary.
       return { ...state, phase: 'ended', battlesWon: action.battlesWon, playerLevel: action.finalLevel };
-    case 'LOG':
-      return { ...state, log: [...state.log, { message: action.message, tone: action.tone }] };
+    case 'LOG': {
+      const last = state.log[state.log.length - 1];
+      const log = [...state.log, { id: (last?.id ?? 0) + 1, message: action.message, tone: action.tone }];
+      return { ...state, log: log.length > LOG_CAP ? log.slice(-LOG_CAP) : log };
+    }
     case 'UPDATE_HP':
       if (action.id === state.playerId) return { ...state, playerHp: action.hp };
       if (action.id === state.enemyId)  return { ...state, enemyHp: action.hp };

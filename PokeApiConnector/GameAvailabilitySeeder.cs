@@ -123,8 +123,7 @@ public static class GameAvailabilitySeeder
         [(83, "red")] = "Trade",
         [(83, "blue")] = "Trade", // Farfetch'd (trade Spearow; Wild in Yellow)
         [(108, "red")] = "Trade",
-        [(108, "blue")] = "Trade",
-        [(108, "yellow")] = "Trade", // Lickitung  (trade Slowbro)
+        [(108, "blue")] = "Trade", // Lickitung  (trade Slowbro; Wild in Yellow, Cerulean Cave B1F)
         [(122, "red")] = "Trade",
         [(122, "blue")] = "Trade",
         [(122, "yellow")] = "Trade", // Mr. Mime   (trade Abra)

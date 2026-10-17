@@ -8,6 +8,47 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §5 Battle log capped at 1000 lines ✅ DONE (2026-10-18)
+
+S, client runtime, no gen surface, no Gen 1 source; reproduced 2026-10-17 in §7.6 V12 (`battleReducer.ts` appended and only
+`initialState` set `log`, so it never reset, not even per encounter; a scratch Vitest kept 5,000 of 5,000 lines).
+**User ruling 2026-10-17:** *N* = 1000. **Acceptance:** a reducer test pins that the log holds at most *N* lines and drops
+the oldest first. The companion claim (the whole `BattleScreen` re-renders on every dispatch) was read-confirmed; its cost
+in a long run stays needs-runtime (unmeasured).
+
+`battleReducer.ts` exports `LOG_CAP` (1000) and slices the log to the newest 1000. **Scope addition, waived by the user
+2026-10-18:** `LogEntry` gains a stable `id` and `BattleScreen.tsx` keys the lines by it, because index keys would shift and
+re-render all 1000 lines on every append once the cap is reached. Tests: the LOG reducer test now carries ids, and a new cap
+test asserts the oldest line goes first. All 10 E2E specs that read `.battle-log` were read: none waits on a line older
+than 1000, so E2E was not run. `.\test.ps1 -Dotnet -Web` tsc PASS, Vitest 335/335.
+
+---
+
+## §3.2 Lickitung wild in Yellow ✅ DONE (2026-10-18)
+
+S, data (seeder plus full re-import); from V6's `requirements-review` 2026-10-11. The availability type is never shown; its
+only reader is the wild pool (`EncounterFactory.cs:311`, `:473`, any version's `Wild` row). Lickitung had `Trade` in all
+three versions, so it could not appear as a wild enemy. **User ruling 2026-10-17:** fix Lickitung only; the other Yellow
+corrections and the evolve-only rule have no in-play effect (settled in `TODO.md` §9). **Acceptance:** Yellow Lickitung
+`Trade` → `Wild`, pinned by a seeder test, and a full importer re-run changes only that `pokemon.db` row (diffed vs `HEAD`).
+**Gen 1 source:** pokeyellow `data/wild/maps/CeruleanCaveB1F.asm` (LICKITUNG 55/50); `data/events/trades.asm:18`
+(`npctrade LICKITUNG, DUGTRIO`) trades it away.
+
+`GameAvailabilitySeeder` drops the Yellow Trade override (Lickitung now follows the Farfetch'd pattern, Yellow → Wild).
+`GameAvailabilitySeederTests.YellowHasTheLinesItsWildTablesInclude` gains `InlineData(108)` (failed first, then passed).
+Full importer re-run: the `pokemon.db` row diff vs `HEAD`, ignoring the surrogate Id, is exactly (108, yellow) Trade → Wild.
+`GAME_AVAILABILITY.md` updated (Yellow special-obtainment row and the non-wild table note).
+
+**Upstream drift from the same re-run (user rulings 2026-10-18):** `items.db` was restored to `HEAD` because PokeAPI dropped
+item `cost` (all costs imported as 0); filed as the open `TODO.md` §3.2 "PokeAPI dropped item prices" entry, and the Item
+`Cost` entry marked urgent. `moves.db` Struggle `EffectChance` 10 → null accepted (inert: Struggle is built in code at
+`Creature.cs:35-43`). The re-run also reproduced the `-wal` staleness bug (writes stayed in `pokemon.db-wal` until a manual
+checkpoint); recorded as evidence on the open `TODO.md` §3.2 `-wal` entry. Review: format PASS; .NET 1898/1898, tsc PASS,
+Vitest 335/335; requirements-review 2 discrepancies (stale `GAME_AVAILABILITY.md`, fixed; id scope, waived); pr-review
+CHANGES-REQUESTED 1 (the same doc fix, done).
+
+---
+
 ## §5 Type-badge contrast ✅ DONE (2026-10-18)
 
 S, client styling, no gen surface, no Gen 1 source, no quirk; reproduced 2026-10-17 in §7.6 V13 (computed WCAG: 13 of 18

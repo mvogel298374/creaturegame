@@ -41,6 +41,7 @@ Yellow has a significantly reduced pool. All twelve Red/Blue exclusive lines abo
 | # | Pokémon | RB method | Yellow method |
 |--:|:--------|:----------|:--------------|
 | 83 | Farfetch'd | NPC trade (give Spearow) | **Wild** |
+| 108 | Lickitung | NPC trade (give Slowbro) | **Wild** (Cerulean Cave B1F) |
 | 123 | Scyther | Wild (Red Safari Zone) | **Game Corner** |
 | 127 | Pinsir | Wild (Blue Safari Zone) | **Game Corner** |
 | 133 | Eevee | Gift (Celadon Mansion) | **Game Corner** |
@@ -51,7 +52,7 @@ Yellow has a significantly reduced pool. All twelve Red/Blue exclusive lines abo
 |--:|:--------|:----:|:------|
 | 83 | Farfetch'd | Trade | Give Spearow to NPC in Vermilion (RB); Wild in Yellow |
 | 106–107 | Hitmonlee / Hitmonchan | Gift | Player's choice from Saffron Dojo — one per game |
-| 108 | Lickitung | Trade | Give Slowbro to NPC in Fuchsia |
+| 108 | Lickitung | Trade | Give Slowbro to NPC in Fuchsia (RB); Wild in Yellow |
 | 122 | Mr. Mime | Trade | Give Abra to NPC on Route 2 |
 | 124 | Jynx | Trade | Give Poliwhirl to NPC in Cerulean (RB only; absent in Yellow) |
 | 131 | Lapras | Gift | Given by NPC in Silph Co. |

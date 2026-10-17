@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { battleReducer, initialState, type BattleState } from './battleReducer';
+import { battleReducer, initialState, LOG_CAP, type BattleState } from './battleReducer';
 import type { Action } from '../battle/timeline';
 
 // A mid-battle state with both sides identified, so the id-routed actions (UPDATE_HP/STATUS/CLEAR_STATUS)
@@ -313,10 +313,18 @@ describe('battleReducer — phase transitions', () => {
 });
 
 describe('battleReducer — misc', () => {
-  it('LOG appends to the log preserving order and tone', () => {
-    const s = ready({ log: [{ message: 'first' }] });
+  it('LOG appends to the log preserving order and tone, with the next id', () => {
+    const s = ready({ log: [{ id: 1, message: 'first' }] });
     const next = battleReducer(s, { type: 'LOG', message: 'super!', tone: 'super' });
-    expect(next.log).toEqual([{ message: 'first' }, { message: 'super!', tone: 'super' }]);
+    expect(next.log).toEqual([{ id: 1, message: 'first' }, { id: 2, message: 'super!', tone: 'super' }]);
+  });
+
+  it('LOG keeps only the newest LOG_CAP lines, dropping the oldest first', () => {
+    const full = Array.from({ length: LOG_CAP }, (_, i) => ({ id: i + 1, message: `line ${i + 1}` }));
+    const next = battleReducer(ready({ log: full }), { type: 'LOG', message: 'newest' });
+    expect(next.log).toHaveLength(LOG_CAP);
+    expect(next.log[0]).toEqual({ id: 2, message: 'line 2' });
+    expect(next.log[LOG_CAP - 1]).toEqual({ id: LOG_CAP + 1, message: 'newest' });
   });
 
   it('SET_GOLD sets the HUD total', () => {

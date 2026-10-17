@@ -20,6 +20,7 @@ public class GameAvailabilitySeederTests
     [InlineData(58)] // Growlithe
     [InlineData(69)] // Bellsprout
     [InlineData(70)] // Weepinbell
+    [InlineData(108)] // Lickitung
     public void YellowHasTheLinesItsWildTablesInclude(int speciesId) =>
         Assert.Equal("Wild", YellowType(speciesId));
 
