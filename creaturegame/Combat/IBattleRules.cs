@@ -302,7 +302,7 @@ public interface IBattleRules
 
     /// <summary>
     /// Returns how many turns Disable locks one of the target's moves out of selection.
-    /// Gen 1: 1–7 turns. (Gen 3+: a fixed 4 turns.)
+    /// Gen 1: 1–8 turns. (Gen 3+: a fixed 4 turns.)
     /// </summary>
     int RollDisableTurns();
 
@@ -532,8 +532,8 @@ public interface IBattleRules
     /// the same real-games rule: <see cref="Battle"/>'s turn loop (the residual phase above), and
     /// <c>AttackAction.ExecuteAsync</c>'s Hyper Beam handling (a hit that faints its target needs no
     /// recharge turn when this is true). <b>Not</b> covered: the Disable-lock and binding-trap
-    /// countdowns (<see cref="StatusResolver.TickTurnCounters"/>) — Gen 1 decrements those every turn
-    /// regardless of a faint, so they're gen-invariant and always run unconditionally.
+    /// countdowns (<see cref="StatusResolver.TickTurnCounters"/>), which always run (Gen 1's Disable
+    /// timing differs: <c>docs/GEN_DIFFERENCES.md</c>, Gen 1 status quirks).
     /// <para><b>Gen 1: true</b> — "If a Pokémon faints, the turn ends there and then" (Smogon RBY
     /// Mechanics Guide). <b>Gen 2: false</b> for both halves — end-of-turn effects (Burn, Leftovers,
     /// etc.) still resolve for the surviving side after a mid-turn KO, and Hyper Beam requires its

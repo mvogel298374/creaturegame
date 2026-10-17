@@ -1,5 +1,43 @@
 import { describe, it, expect } from 'vitest';
-import { expandEvent, healSummary, type Step, type Action } from './timeline';
+import { expandEvent, healSummary, createTimelineRunner, type Step, type Action } from './timeline';
+
+describe('createTimelineRunner', () => {
+  const waitStep = (ms: number): Step => ({ kind: 'wait', ms });
+  const flush = () => new Promise<void>(r => setTimeout(r, 0));
+
+  it('plays queued steps in order, bracketed by ANIMATING_START / ANIMATING_DONE', async () => {
+    const actions: string[] = [];
+    const ran: number[] = [];
+    const runner = createTimelineRunner(a => actions.push(a.type), async s => { ran.push((s as { ms: number }).ms); });
+
+    runner.enqueue([waitStep(1), waitStep(2)]);
+    runner.enqueue([waitStep(3)]);
+    await flush();
+
+    expect(ran).toEqual([1, 2, 3]);
+    expect(actions).toEqual(['ANIMATING_START', 'ANIMATING_DONE']);
+  });
+
+  it('stop() mid-drain runs no further step and ignores later enqueues, so leftovers never reach a newer scene', async () => {
+    const actions: string[] = [];
+    const ran: number[] = [];
+    let release!: () => void;
+    const runner = createTimelineRunner(a => actions.push(a.type), s => {
+      ran.push((s as { ms: number }).ms);
+      return ran.length === 1 ? new Promise<void>(r => { release = r; }) : Promise.resolve();
+    });
+
+    runner.enqueue([waitStep(1), waitStep(2), waitStep(3)]);
+    await flush();
+    runner.stop(); // BattleScreen unmounted while step 1 is in flight
+    runner.enqueue([waitStep(4)]);
+    release();
+    await flush();
+
+    expect(ran).toEqual([1]);
+    expect(actions).toEqual(['ANIMATING_START']); // no closing DONE from a stopped runner
+  });
+});
 
 // Ids used throughout: the player (MEWTWO) is 1; whoever it fights is 2.
 const CTX = { playerId: 1 };
@@ -581,6 +619,16 @@ describe('expandEvent — control plane vs timeline', () => {
     );
     expect(rename?.id).toBe(7); // keyed by the creature's id, which is stable across the rename
     expect(rename?.toName).toBe('CHARMELEON');
+  });
+
+  it('CreatureEvolved waits long enough for the morph to load its sprite; a move keeps the default wait', () => {
+    const evolved = expandEvent('CreatureEvolved', {
+      fromName: 'CHARMANDER', toName: 'CHARMELEON', creatureId: 7, fromSpeciesId: 4, toSpeciesId: 5, toSpeciesName: 'CHARMELEON',
+    }, CTX).steps ?? [];
+    expect(evolved.find(s => s.kind === 'awaitAnim')).toEqual({ kind: 'awaitAnim', timeoutMs: 6000 });
+
+    const used = expandEvent('MoveUsed', { attackerName: 'MEWTWO', attackerId: 1, moveName: 'tackle' }, CTX).steps ?? [];
+    expect(used.find(s => s.kind === 'awaitAnim')).toEqual({ kind: 'awaitAnim' });
   });
 
   // docs/TODO.md — Creature Naming: a nicknamed creature's ToName (kept as the nickname) and ToSpeciesName (the

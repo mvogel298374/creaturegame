@@ -8,6 +8,45 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §7.6 V15 — speculative list (§7.5) ✅ DONE (2026-10-17)
+
+**Was** `TODO.md` §7.5 "Speculative, unverified" and the §7.6 V15 slice. `format-gate` PASS; `test-runner` PASS on
+`.\test.ps1 -Dotnet -Web`; `requirements-review` findings decided by the user and applied (Disable countdown timing
+filed as its own entry); `pr-review` CHANGES-REQUESTED, its blocking and recommended findings fixed by user decision
+(comment-only edits in `IBattleRules.cs` and `StatusResolver.cs`), its advisory kept.
+
+**Verdicts and fixes.**
+- **Evolution step's 3 s wait resolving before a slow sprite load — read-confirmed.** The scene loads the evolved back
+  sprite and cry before the 880 ms morph; a timed-out wait logged "evolved into" early and left a stray
+  `animationComplete` for the next wait. Fixed: the evolution step waits 6 s (`EVOLUTION_WAIT_MS`, the entry's load
+  allowance).
+- **Timeline queue not stopped on unmount — reproduced.** After QUIT -> new run, the old turn's sounds, shakes and a
+  faint on an untouched foe played in the new run's scene (the bridge is a module singleton). Fixed:
+  `createTimelineRunner` (`ClientApp/src/battle/timeline.ts`) is made per `BattleScreen` mount; `stop()` drops the
+  queue and ends the drain after the in-flight step, and a stopped runner skips its closing `ANIMATING_DONE`. Tests in
+  `timeline.test.ts`. Design note: `ARCHITECTURE.md` §2.8 *Lifetime*.
+- **Disable rolled 1-7, not pokered's 1-8 — source-confirmed** (`DisableEffect`: `and $7` / `inc a`). Fixed:
+  `Gen1BattleRules.RollDisableTurns` is `_rng.Next(8) + 1`; test
+  `AttributesAndRulesTests.Gen1BattleRules_RollDisableTurns_CoversExactly1To8`. `GEN_DIFFERENCES.md` countdown
+  paragraph corrected.
+- **Corner map preview covering the player corner — reproduced** (800x600, 7-node path: peek spans y 42-398, the
+  player corner y 302-374). Not fixed (layout call) -> `TODO.md` §5 "Map peek covers the player nameplate", ✗ not Ready.
+- **Substitute vs sleep/paralysis status moves — source-confirmed Gen 1 bug.** `SleepEffect` and `ParalyzeEffect_` never
+  call `CheckTargetSubstitute` (`effects.asm:1436`); Poison, Freeze/Burn/Paralyze side effects, stat-down, flinch and
+  confusion do. Ours blocks all (`AttackAction.cs:676-678`, pinned by
+  `SubstituteContractTests.ShieldsTheUserFromTheFoesStatus`). Central + seam -> `TODO.md` §3.1 "Substitute blocks
+  sleep/paralysis status moves", ✗ not Ready.
+- **Disable countdown timing (found by requirements-review).** pokered decrements in the disabled mon's own pre-move
+  check; ours ticks both counters at end of turn. Central + seam -> `TODO.md` §3.1 "Gen 1 Disable countdown", ✗ not
+  Ready.
+- **"Untested types" `RunLoop`, `RewardRunEvent`, `AcquisitionResolution`, `CompositeEvaluator`, `MoveEvaluators` —
+  refuted.** Each is reached by named tests; no coverage run was made (`test.ps1` has no coverage switch).
+
+**Open follow-ups (live in `TODO.md`, all ✗ not Ready):** §3.1 Substitute vs sleep/paralysis; §3.1 Gen 1 Disable
+countdown; §5 map peek over the player nameplate.
+
+---
+
 ## §7.6 V14 — test hygiene ✅ DONE (2026-10-17)
 
 **Was** `TODO.md` §6 "Test hygiene (unverified)" and the §7.6 V14 slice. Test-only change. `format-gate` REFORMATTED

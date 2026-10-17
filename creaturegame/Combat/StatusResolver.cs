@@ -116,15 +116,7 @@ public static class StatusResolver
         return true;
     }
 
-    /// <summary>
-    /// Ticks the Disable and binding (Wrap/Bind/Clamp/Fire Spin) countdowns — split out from
-    /// <see cref="ApplyEndOfTurnDamage"/> (<c>pr-review</c>, 2026-09-13) because these are NOT part of
-    /// the "turn ends there and then" faint rule (<see cref="IBattleRules.FaintEndsTurnImmediately"/>):
-    /// Gen 1 decrements them regardless of whether either side fainted this turn, unlike the residual
-    /// status-damage phase, which that rule skips outright. <see cref="Battle"/> calls this
-    /// unconditionally, every turn, for both creatures; <see cref="ApplyEndOfTurnDamage"/> is the part
-    /// gated behind the faint check.
-    /// </summary>
+    /// <summary>Ticks Disable and binding countdowns every turn (docs/GEN_DIFFERENCES.md, Gen 1 status quirks).</summary>
     public static void TickTurnCounters(Creature creature, IBattleEventEmitter? emitter = null)
     {
         if (!creature.IsAlive())

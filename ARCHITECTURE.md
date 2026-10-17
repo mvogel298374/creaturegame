@@ -334,6 +334,14 @@ Each entry: **Decision · Why · Where it lives.**
   with no browser or wall clock, and confining timers + bridge to the driver removes the async-closure tangle.
   Events that would race the animation (`TurnStarted`, a chained `BattleStarted`) are *queued*, not applied at
   once, so the HP bars drain in step with the animation. <!-- confirm -->
+- **Lifetime (2026-10-17, §7.6 V15):** the driver is a `createTimelineRunner` made per `BattleScreen` mount and
+  stopped on unmount: `stop()` drops the queue and ends the drain after the in-flight step. The bridge is a
+  module singleton, so without it a QUIT mid-turn left the old drain playing its remaining steps into the next
+  run's scene (its sounds, shakes and a faint on an untouched foe), and the new scene's `animationComplete`
+  resolved the old drain's waits. A stopped runner also skips its closing `ANIMATING_DONE`, so StrictMode's dev
+  remount can't clear a live runner's animating flag. The evolution morph's wait gets 6 s (the entry's load
+  allowance) instead of 3 s: the scene loads the evolved back sprite and cry before the 880 ms morph, and a
+  timed-out wait would log "evolved into" early and leave a stray `animationComplete` for the next wait.
 - **Where:** `ClientApp/src/battle/timeline.ts` (expandEvent + driver), `battle/PhaserBridge.ts` (mitt),
   `hooks/useBattleHub.ts` (reducer). **Frontend intent → `FRONTEND_PLAN.md`.**
 

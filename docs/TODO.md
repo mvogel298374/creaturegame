@@ -38,7 +38,7 @@
 | # | Item | Cost | Ready? (DoR) | Why this slot / what it unblocks |
 |:-:|:-----|:----:|:-------------|:---------------------------------|
 | 1 | **`-StartStack` backend leak** (§7.1 Part A) | S | ✗ parked: leak not reproduced (2026-10-10); un-park condition in §7.1 | Parts B and C are done. Not actionable until the user reproduces it; §1 #3 and #6 do not wait on it. |
-| 2 | **Verification pass over the unverified findings** (§7.6) | S per slice | ✅ (2026-10-10) — 15 tiny slices V1–V15 (V1–V14 done; V15 next; the V16 audit row is tracked separately as #11); each verifies first, then fixes only S-size, non-central, no-decision findings under a mini-DoR; greenlight and commit each | Turns "reviewer's reading" items into evidenced verdicts or discards. Opens up everything below it. |
+| 2 | **Verification pass over the unverified findings** (§7.6) | S per slice | ✅ (2026-10-10) — 15 tiny slices V1–V15 (V1–V15 done; V16 next; the V16 audit row is tracked separately as #11); each verifies first, then fixes only S-size, non-central, no-decision findings under a mini-DoR; greenlight and commit each | Turns "reviewer's reading" items into evidenced verdicts or discards. Opens up everything below it. |
 | 3 | **Server test gaps — `GameSessionManager` lifecycle + the `RunFaulted` path** (§6) | M | ⚠️ needs the injectable-clock design | Unblocks the R1d tests and closes a long-open Tier-4 item. |
 | 5 | **R1d-a — replay an open blocking prompt** (§2) | M | ⚠️ designed, but provisional-pending-`/plan` and needs your three decisions (§8) | The only reconnect item that strands a run; highest player value. |
 | 6 | **CI E2E step** (§6) | M | ✗ no design (runner, stack boot, caching) or acceptance | The only automatic E2E coverage; makes "agents don't run E2E" safe, and unblocks checking the BST/balance flag and the reconnect spec. |
@@ -133,6 +133,31 @@ data/engine item usually also means updating the test that pins the wrong value.
   (`SplitXpAmongParticipants`'s contract changes; composition order is in `GENERATION_SEAMS.md`).
 - **Smaller Gen 1 gaps III (new, unverified beyond the cite):** the foe's stat-down moves fail 25% of the time in a
   non-link battle (`effects.asm:549-554`), a Gen 1 AI handicap → §8 decision.
+- **Substitute blocks sleep/paralysis status moves; Gen 1 lets them through (source-confirmed 2026-10-17, §7.6
+  V15) — S–M, ✗ not Ready.** pokered (master): `SleepEffect` (`engine/battle/effects.asm:26-77`) and
+  `ParalyzeEffect_` (`engine/battle/move_effects/paralyze.asm`, reached from `effects.asm:1165`) never call
+  `CheckTargetSubstitute` (`effects.asm:1436`). `PoisonEffect` (`:87`), `FreezeBurnParalyzeEffect` (`:197`),
+  `StatModifierDownEffect` (`:556`), `FlinchSideEffect` (`:972`) and `ConfusionEffect` (`:1121`) do, so
+  Supersonic/Confuse Ray and stat-lowering moves stay blocked, as ours already are. `MoveHitTest`'s substitute
+  branch (`engine/battle/core.asm:5251-5258`) was meant only for drain/Dream Eater and is bugged so it never fires.
+  Ours blocks every status condition behind a substitute (`AttackAction.cs:676-678`), and
+  `SubstituteContractTests.ShieldsTheUserFromTheFoesStatus` pins Thunder Wave as blocked. *Gaps:* touches
+  `AttackAction` (central) and needs a seam (Gen 2+ blocks all status moves), e.g. an `IBattleRules` member saying
+  which pure status moves a substitute stops; the pinned test flips. *Acceptance:* in a full battle, Sleep Powder,
+  Hypnosis, Thunder Wave, Stun Spore and Glare land on a substituted foe; Toxic/Poison Powder, Confuse Ray and a
+  damaging move's secondary status stay blocked; a Gen 2-style profile blocks all of them.
+- **Gen 1 Disable countdown: the lock can end early compared with pokered (source-confirmed 2026-10-17, §7.6 V15) —
+  M, ✗ not Ready.** pokered decrements the counter in the disabled mon's own pre-move check
+  (`engine/battle/core.asm` `CheckPlayerStatusConditions:3328` → `.AnyMoveDisabledCheck:3394`; the enemy mirror is
+  `CheckEnemyStatusConditions:5677`). The sleep, freeze, trapped, flinch and recharge checks before it
+  (`:3355-3384`) jump past it, and a turn spent switching or using an item never reaches it. Ours ticks both
+  creatures' counters at the end of every turn (`StatusResolver.TickTurnCounters`, `Battle.cs:223-224`), including
+  the turn Disable lands when its user moved second. The 1–8 roll itself is fixed (V15). *Gaps:* the countdown moves
+  into the pre-move status check, which touches `Battle`/`StatusResolver` and the faint-skip handling (central), and
+  needs a seam (Gen 2+ timing differs); the binding-trap countdown that shares `TickTurnCounters` must be checked
+  against pokered in the same pass. *Acceptance:* a full-battle test with seeded rolls pins the observable lock
+  length against pokered: a roll of N keeps the move locked for N of the disabled creature's own move attempts, and
+  sleep, flinch, recharge, switch and item turns don't count down.
 - **Open question (documented, but Gen 1 differs):** after Roar/Whirlwind the scared-off foe still acts
   (`Battle.cs:311-313`), which can end the run via a faint with a healthy bench (`GAME_LOOP.md:135`); Gen 1 ends
   the battle immediately. **Needs-decision.**
@@ -436,6 +461,13 @@ The stat-selection abstraction is done. Open:
   `typeColor()` consumers (map glyphs, chips) are unaffected. *Acceptance:* a Vitest test computes every pair in
   `TYPE_COLORS` and asserts ≥4.5:1. *Gen surface:* none. *Gen 1 source:* n/a. *Data vs runtime:* client styling.
   *Quirk to assert:* none. *Dependencies:* none.
+- **Map peek covers the player nameplate (reproduced 2026-10-17, §7.6 V15) — S, ✗ not Ready (needs your layout
+  call).** The auto-peek (`.encounter-map`, `BattleScreen.css:1114`, z-index 6, `max-height: calc(70vh - 4rem)`) at
+  800×600 with a 7-node path spans y 42–398 and fully covers `.player-corner` (y 302–374, z-index 2) for the 2.6 s
+  peek. *Drafted option (recommended):* cap the peek so it ends above the player corner and scrolls; alternative:
+  move it. *Acceptance:* at 800×600 and a phone width, the peek's bottom stays above the player corner's top with a
+  party strip shown (Puppeteer measurement). *Gen surface:* none. *Data vs runtime:* client layout. *Quirk to
+  assert:* none. *Dependencies:* none.
 
 ---
 
@@ -576,11 +608,8 @@ The stale comments the sweep listed were fixed 2026-10-03 (`bag.ts`, `timeline.t
 
 ### 7.5 Speculative, unverified — check before filing as real
 
-`waitForBridge` resolving early on a slow evolution-sprite load; the timeline queue not cleared on unmount (leftover
-steps into a new run); the corner map preview covering the player corner on long node paths; Substitute vs
-sleep/paralysis status moves and Disable's 1–8 turns (Sludge 40% was confirmed and fixed — `TODO_ARCHIVE.md` → "§7.6 V6"); untested types `RunLoop`,
-`RewardRunEvent`, `AcquisitionResolution`, `CompositeEvaluator`, `MoveEvaluators` (likely covered indirectly — run
-coverage).
+Nothing open. The list was verified and its findings fixed or filed in §7.6 V15 (`TODO_ARCHIVE.md` → "§7.6 V15 —
+speculative list (§7.5)").
 
 ### 7.6 Verification pass over the unverified findings (§1 #2, Ready ✅ 2026-10-10)
 
@@ -646,7 +675,7 @@ a decision (Roar/Whirlwind, the BST bands).
 | V12 | Done ✅ 2026-10-17 — all three reproduced (two in Puppeteer, one by scratch Vitest), the re-render claim read-confirmed; double-submit and the `/battle` dead end fixed; record in `TODO_ARCHIVE.md` → "§7.6 V12 — frontend double-submit, /battle dead end, battle log"; the log cap → its own §5 entry, ✗ not Ready | Code | Browser-only parts → *needs-runtime* |
 | V13 | Done ✅ 2026-10-17 — 7 reproduced, 2 read-confirmed, 1 partly refuted; resize re-seat, first-battle entry wait, Space on cards, cold Settings BACK, one-shot Title notice, the cast and the dead code fixed; verdicts inline in §5; contrast → its own §5 entry, ✗ not Ready | Code | Browser-only parts → *needs-runtime* |
 | V14 | Done ✅ 2026-10-17 — 11 claims: 3 reproduced, 7 read-confirmed, 1 mostly refuted; shop vacuous check, dev-range bracket, handshake timeouts, contract-test scope, 33 unseeded `Battle`s, `fakeLocalStorage`, `MovesFixture` doc, `TestAltProfile` location and three no-assertion tests fixed; record in `TODO_ARCHIVE.md` → "§7.6 V14 — test hygiene"; E2E tightening and helper dedup → their own §6 entries, ✗ not Ready | Code; scratch test run | — |
-| V15 | Speculative list (§7.5) | Code; coverage run | — |
+| V15 | Done ✅ 2026-10-17 — 1 reproduced layout claim, 1 reproduced unmount claim, 1 read-confirmed, 1 source-confirmed fix, 1 source-confirmed bug, 1 refuted; evolution wait (6 s), timeline stop on unmount and Disable 1–8 fixed; record in `TODO_ARCHIVE.md` → "§7.6 V15 — speculative list (§7.5)"; Substitute vs sleep/paralysis and Disable countdown timing → their own §3.1 entries, map peek → its own §5 entry, all ✗ not Ready | Code | — |
 | V16 | **Full Gate 1 audit, after V15 (user 2026-10-11):** every open entry in §1–§7 checked against the seven `DEFINITION_OF_READY.md` items | Docs only: one ✅/✗ row per entry per DoR item | Acceptance: no open entry is left unaudited; each gap gets drafted proposed text, and decisions go to §8. Writes no code and changes no data; only `docs-cleanup` gates it |
 
 ---
@@ -700,6 +729,8 @@ a decision (Roar/Whirlwind, the BST bands).
 - **BST tier bands stay as they are** (user ruling 2026-10-06): the tier multipliers and `K` were tuned on modern
   base stats and are not retuned after the real-Gen-1 import — no measured problem. Reopen only on a playtest report.
 - **`RunLoop.cs`'s ~28 types are fine** — a cohesive vocabulary file; don't split it on a type-count metric.
+- **`RunLoop`, `RewardRunEvent`, `AcquisitionResolution`, `CompositeEvaluator` and `MoveEvaluators` are tested** —
+  refuted 2026-10-17 (§7.6 V15): named tests reach each; don't re-file them as "untested types".
 - **WAIVED (user):** the `SignalRInput` cancel/prompt race (abandoned-run task leak) — until a save/persistence
   layer exists; no pinning test for `items.db`'s contents (production ships the committed clean db);
   `StarterSelection` seeding from `DEFAULT_GENERATION` (the 4d+ generation picker replaces the line); the Settings

@@ -170,9 +170,12 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
   creatures' residuals at end of turn (skipped if anyone fainted from a direct hit), so facts (1)–(3) are
   **not** yet modelled — tracked as an open, unplanned item, `docs/TODO.md` §4.2 ("Gen 1 has no
   end-of-turn residual phase"). The fix belongs behind an `IBattleRules` seam alongside
-  `FaintEndsTurnImmediately`. The Disable-lock and binding-trap countdowns are the one exception to all of
-  this — Gen 1 ticks those every turn regardless of a faint (`StatusResolver.TickTurnCounters`), so they're
-  gen-invariant and always run. History of the direct-hit fix (reported log, 2026-09-13):
+  `FaintEndsTurnImmediately`. The Disable-lock and binding-trap countdowns sit outside this: the engine ticks
+  both creatures' counters every turn regardless of a faint (`StatusResolver.TickTurnCounters`). **For Disable
+  that is not Gen 1:** pokered decrements the counter in the disabled mon's own pre-move check
+  (`core.asm` `CheckPlayerStatusConditions` → `.AnyMoveDisabledCheck`, line 3394), after the sleep, freeze,
+  trapped, flinch and recharge checks, each of which skips it; a turn spent switching or using an item skips
+  it too. Tracked in `docs/TODO.md` §3.1 ("Gen 1 Disable countdown"). History of the direct-hit fix (reported log, 2026-09-13):
   `docs/TODO_ARCHIVE.md` → "End-of-turn residual fired even after a same-turn faint".
 - **Hyper Beam**: does NOT require a recharge turn if it KOs the target — the sibling half of the same faint
   rule above, and read off the same `FaintEndsTurnImmediately` member; **switching out during the recharge

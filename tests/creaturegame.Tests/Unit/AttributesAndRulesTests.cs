@@ -72,6 +72,14 @@ public class AttributesAndRulesTests
     }
 
     [Fact]
+    public void Gen1BattleRules_RollDisableTurns_CoversExactly1To8()
+    {
+        var rules = new Gen1BattleRules(new SeededRandomSource(1));
+        var seen = Enumerable.Range(0, 400).Select(_ => rules.RollDisableTurns()).ToHashSet();
+        Assert.Equal(Enumerable.Range(1, 8), seen.Order());
+    }
+
+    [Fact]
     public void Gen1BattleRules_RollDamageVariance_IsInRange()
     {
         var rules = Gen1BattleRules.Instance;

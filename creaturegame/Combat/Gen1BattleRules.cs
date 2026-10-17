@@ -114,8 +114,8 @@ public sealed class Gen1BattleRules : IBattleRules
     // Gen 1: Thrash / Petal Dance lock the user in for 2 or 3 turns, then self-confuse.
     public int RollRampageTurns() => _rng.Next(2, 4);
 
-    // Gen 1: Disable locks a move out for 1–7 turns (the counter decrements each turn).
-    public int RollDisableTurns() => _rng.Next(1, 8);
+    // Gen 1: Disable locks a move out for 1–8 turns (pokered DisableEffect: `and $7` / `inc a`).
+    public int RollDisableTurns() => _rng.Next(8) + 1;
 
     // ── Move-specific damage quirks ──────────────────────────────────────────────
 

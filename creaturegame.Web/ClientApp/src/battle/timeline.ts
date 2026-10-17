@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type { MoveInfo } from '../types/BattleEvents';
 import { bridge } from './PhaserBridge';
 import { formatMoveName, formatDamageRange } from '../utils/format';
@@ -259,7 +259,7 @@ export type Step =
   | { kind: 'dispatch'; action: Action }
   | { kind: 'emit'; command: BridgeCommand }
   | { kind: 'wait'; ms: number }
-  | { kind: 'awaitAnim' }
+  | { kind: 'awaitAnim'; timeoutMs?: number }
   | { kind: 'awaitEntry' };
 
 export interface Expansion {
@@ -291,7 +291,10 @@ export interface ExpandContext {
 const d    = (action: Action): Step => ({ kind: 'dispatch', action });
 const emit = (command: BridgeCommand): Step => ({ kind: 'emit', command });
 const w    = (ms: number): Step => ({ kind: 'wait', ms });
-const anim = (): Step => ({ kind: 'awaitAnim' });
+const anim = (timeoutMs?: number): Step =>
+  timeoutMs === undefined ? { kind: 'awaitAnim' } : { kind: 'awaitAnim', timeoutMs };
+// The morph loads the evolved back sprite and cry before it plays, so it gets the entry's load allowance.
+const EVOLUTION_WAIT_MS = 6000;
 const log  = (message: string, tone?: LogTone): Action => ({ type: 'LOG', message, tone });
 
 // ── Text helpers (pure) ──────────────────────────────────────────────────────
@@ -1037,7 +1040,7 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       return { steps: [
         w(200),
         emit({ type: 'playEvolutionAnimation', toSpeciesId }),
-        anim(),
+        anim(EVOLUTION_WAIT_MS),
         // Rename the HUD as the morph lands, so the nameplate and the "What will X do?" prompt flip together with
         // the sprite instead of lagging to the next BattleStarted. The reducer decides whether this creature is
         // the player (a bench member's evolution reaches here too).
@@ -1321,42 +1324,66 @@ async function execStep(step: Step, dispatch: Dispatch): Promise<void> {
     case 'dispatch':  dispatch(step.action); return;
     case 'emit':      emitCommand(step.command); return;
     case 'wait':      await delay(step.ms); return;
-    case 'awaitAnim': await waitForBridge(); return;
+    case 'awaitAnim': await waitForBridge('animationComplete', E2E ? undefined : step.timeoutMs); return;
     // Covers the lazy Phaser load plus the 2.6 s send-out before the first turn's menu unlocks.
     case 'awaitEntry': await waitForBridge('entryComplete', E2E ? 1500 : 6000); return;
   }
 }
 
-/**
- * Plays queued timeline steps one at a time. Returns an `enqueue` function that
- * appends steps and kicks off draining if idle. A failing step is logged and
- * skipped so a hiccup can never freeze the battle log.
- */
-export function useBattleTimeline(dispatch: Dispatch) {
-  const queueRef   = useRef<Step[]>([]);
-  const runningRef = useRef(false);
+export interface TimelineRunner {
+  enqueue: (steps: Step[]) => void;
+  stop: () => void;
+}
 
-  const drain = useCallback(async () => {
-    runningRef.current = true;
+// Plays steps in order, skipping a failing one; stop() ends it (ARCHITECTURE.md §2.8).
+export function createTimelineRunner(
+  dispatch: Dispatch,
+  exec: (step: Step) => Promise<void> = step => execStep(step, dispatch),
+): TimelineRunner {
+  const queue: Step[] = [];
+  let running = false;
+  let stopped = false;
+
+  const drain = async () => {
+    running = true;
     dispatch({ type: 'ANIMATING_START' });
     try {
-      while (queueRef.current.length > 0) {
-        const step = queueRef.current.shift()!;
+      while (!stopped && queue.length > 0) {
+        const step = queue.shift()!;
         try {
-          await execStep(step, dispatch);
+          await exec(step);
         } catch (err) {
           console.error('[battle timeline] step failed, continuing:', err);
         }
       }
     } finally {
-      runningRef.current = false;
-      dispatch({ type: 'ANIMATING_DONE' });
+      running = false;
+      if (!stopped) dispatch({ type: 'ANIMATING_DONE' });
     }
+  };
+
+  return {
+    enqueue: steps => {
+      if (stopped || steps.length === 0) return;
+      queue.push(...steps);
+      if (!running) void drain();
+    },
+    stop: () => {
+      stopped = true;
+      queue.length = 0;
+    },
+  };
+}
+
+/** One runner per mount; returns a stable `enqueue`. */
+export function useBattleTimeline(dispatch: Dispatch) {
+  const runnerRef = useRef<TimelineRunner | null>(null);
+
+  useEffect(() => {
+    const runner = createTimelineRunner(dispatch);
+    runnerRef.current = runner;
+    return () => runner.stop();
   }, [dispatch]);
 
-  return useCallback((steps: Step[]) => {
-    if (steps.length === 0) return;
-    queueRef.current.push(...steps);
-    if (!runningRef.current) drain();
-  }, [drain]);
+  return useCallback((steps: Step[]) => runnerRef.current?.enqueue(steps), []);
 }
