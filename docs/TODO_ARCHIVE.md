@@ -8,6 +8,25 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §4.6 Stat stages in the dev enemy overview ✅ DONE (2026-10-18)
+
+S, web DTO plus client, no gen surface (stages are gen-invariant here), no quirk; DoR drafts confirmed by the user
+2026-10-18. **Acceptance:** with Dev Mode on, the enemy overview lists each non-zero stage, and with it off the DTO
+carries none.
+
+`PlayerOverviewDto` gains an optional `IReadOnlyList<StageRow>? Stages = null` and a `StageRow(string Stat, int Stage)`
+record with `NonZeroOf(StatStages)`. `DevController.GetEnemy` (404 when Dev Mode is off) is the only setter
+(`From(...) with { Stages = ... }`), so player overviews always carry null. Frontend: `types/PlayerOverview.ts` gains
+`StageRow` and `stages: StageRow[] | null`; the `CreatureOverview.tsx` STATS tab renders a "<Stat> stage ±N" row per
+non-zero stage using the existing stat-row classes; `utils/format.ts` gains `formatStage`.
+
+Tests: `DevModeTests.EnemyEndpointListsOnlyTheFoesNonZeroStages` (new), the existing enemy-endpoint test asserts an
+empty list for an untouched foe, `PlayerOverviewDtoTests.From_LeavesStagesNull_EvenWithStagesInPlay`, Vitest
+`formatStage`. Not checked in a browser (a seeded run can't force the foe to use a stat move); the server test covers
+the payload and tsc covers the rendering. Wiring only: no requirements-review / pr-review.
+
+---
+
 ## §4.4 `StatStageMoveEvaluator.StageOf` → `Stages.Of` ✅ DONE (2026-10-18)
 
 **Was** the "`StageOf` half" of the `Attributes` Special split entry in `TODO.md` §4.4 (the Special split itself stays

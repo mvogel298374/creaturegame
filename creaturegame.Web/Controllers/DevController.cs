@@ -13,7 +13,8 @@ public class DevController(DevModeOptions devMode, GameSessionManager sessionMan
     [HttpGet("status")]
     public IActionResult GetStatus() => Ok(new { enabled = devMode.Enabled });
 
-    /// <summary>The current foe, flattened like CHECK POKEMON's <see cref="PlayerOverviewDto"/>. 404 when Dev
+    /// <summary>The current foe, flattened like CHECK POKEMON's <see cref="PlayerOverviewDto"/> plus its non-zero
+    /// stat stages. 404 when Dev
     /// Mode is off (indistinguishable from a missing route, so production never advertises it) or when the game
     /// is unknown / has no enemy yet.</summary>
     [HttpGet("{gameId}/enemy")]
@@ -25,7 +26,12 @@ public class DevController(DevModeOptions devMode, GameSessionManager sessionMan
         var generation = sessionManager.GetGeneration(gameId);
         if (enemy is null || generation is null)
             return NotFound(new { error = "No active game with that id, or no enemy yet" });
-        return Ok(PlayerOverviewDto.From(enemy, generation.Value));
+        return Ok(
+            PlayerOverviewDto.From(enemy, generation.Value) with
+            {
+                Stages = StageRow.NonZeroOf(enemy.Battle.Stages),
+            }
+        );
     }
 
     /// <summary>Per-move low–high damage for the fight menu / CHECK POKEMON (docs/TODO.md — Dev Mode damage

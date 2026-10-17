@@ -167,9 +167,11 @@ data/engine item usually also means updating the test that pins the wrong value.
   *Drafted:* acceptance, a forced 0 roll on the foe's Psywave deals 0 and leaves the player's HP unchanged, and the
   player's minimum stays 1; the damage-range preview (`DamageCalculator`) shows the foe's 0. Seam: the existing
   Psywave members, given the side; Gen 2 read at pokecrystal. Gen 1 source: cited above. Runtime only. Quirk: only
-  the foe can roll 0. Dependencies: none.
-  **Remaining steps:** (1) you confirm the drafted lines; (2) a short design note fixes how the seam learns the
-  attacker's side, shown to you; (3) then it is Ready (S, `pr-review` applies).
+  the foe can roll 0. Dependencies: shares the attacker's-side design note with "Smaller Gen 1 gaps III" (foe
+  stat-down 25% fail).
+  **Remaining steps:** (1) you confirm the drafted lines; (2) the shared design note (one note covers this and
+  "Smaller Gen 1 gaps III") fixes how the seam learns the attacker's side, shown to you; (3) then it is Ready (S,
+  `pr-review` applies).
 - **Smaller Gen 1 gaps II — verified, trainer XP / Transform crit speed / Substitute-at-cost fixed 2026-10-12 (§7.6 V10).**
   Verdicts, F1–F3 and the review rulings: `TODO_ARCHIVE.md` → "§7.6 V10 — smaller Gen 1 gaps II". The remainder stays
   open as the entries below.
@@ -199,16 +201,23 @@ data/engine item usually also means updating the test that pins the wrong value.
 - **Smaller Gen 1 gaps III (new, unverified beyond the cite):** the foe's stat-down moves fail 25% of the time in a
   non-link battle (`effects.asm:549-554`), a Gen 1 AI handicap.
   **User ruling 2026-10-17:** replicate it behind an `IBattleRules` flag.
-  **DoR:** ✗ not Ready — confirm the drafted lines below and it is ✅ Ready (the fix re-reads the cite before
-  coding). The same claim was filed again in §3.2 ("AI stat-down 25% fail") and is merged here. *Drafted:*
-  - **Acceptance:** a forced roll through the rules seam makes the foe's Growl fail one roll in four; the player's
-    never does.
-  - **Design:** it lives in the stat-down effect, which isn't a central method.
-  - **Seam:** an `IBattleRules` flag (Gen 2's behaviour unverified).
+  *Source-confirmed 2026-10-18:* `StatModifierDownEffect` (`effects.asm:539-557`): on the enemy's turn in any
+  non-link battle, `BattleRandom` < `25 percent + 1` (64/256) jumps to `MoveMissed`, **before** the Substitute check;
+  `MoveMissed` prints "But it failed!" for a primary move and returns silently for a side effect
+  (`effects.asm:712-716`), so the foe's secondary drops are cut too.
+  **DoR:** ✗ not Ready — gap **2** only (drafts confirmed by the user 2026-10-18). The same claim was filed again in
+  §3.2 and is merged here.
+  - **Acceptance:** a full battle with forced rolls through the rules seam: the foe's Growl fails on a roll under
+    64/256 and prints "But it failed!"; the foe's Aurora Beam still damages but its drop silently doesn't happen;
+    the player's moves never take this roll; the roll precedes the Substitute check.
+  - **Design:** central (`AttackAction.TryApplyStatEffect`), so a short design note, then `opus-engineer` plus both
+    gates. The rule needs the attacker's side — the same question as "Foe Psywave can deal 0"; one note covers both.
+  - **Seam:** an `IBattleRules` member for the odds and the side it applies to (Gen 2 read at pokecrystal in the
+    note).
   - **Data vs runtime:** runtime only.
-  - **Quirk:** only the enemy side rolls.
-  - **Dependencies:** none.
-  - **Remaining steps:** you confirm the drafted lines; then it is Ready, with no design pass.
+  - **Quirk:** only the enemy rolls, and a failed secondary drop is silent.
+  - **Dependencies:** shares the attacker's-side design note with the Psywave entry.
+  - **Remaining steps:** the shared design note, shown to the user; then Ready.
 - **Substitute blocks sleep/paralysis status moves; Gen 1 lets them through (source-confirmed 2026-10-17, §7.6
   V15) — S–M, ✗ not Ready.** pokered (master): `SleepEffect` (`engine/battle/effects.asm:26-77`) and
   `ParalyzeEffect_` (`engine/battle/move_effects/paralyze.asm`, reached from `effects.asm:1165`) never call
@@ -571,16 +580,6 @@ now, below.
 - [ ] `ConsoleInput : IBattleInput` — a numbered move menu for terminal play (low priority).
   **DoR (V16):** ✗ not Ready — gaps **1, 2, 7**. Which host runs it? The engine is a class library with no entry
   point. Gen surface none.
-- [ ] *(small)* **Stat stages in the dev enemy overview** — `PlayerOverviewDto` carries none; add them to the DTO (or
-  a dev-only extension) and render in `CreatureOverview` `enemy` mode.
-  **DoR (V16):** ✗ not Ready — gaps **1, 3, 5, 6, 7**, all drafted here; confirm them and it is ✅ Ready. 2 is
-  answered: no design call.
-  - **Acceptance:** with Dev Mode on, the enemy overview lists each non-zero stage, and with it off the DTO
-    carries none.
-  - **Gen surface:** none (stages are gen-invariant here).
-  - **Data vs runtime:** web DTO plus client.
-  - **Quirk:** none.
-  - **Dependencies:** none.
 - [ ] **Dev Mode — next features (shell, not ready: needs a `/plan` and a full DoR entry).** More dev actions behind
   the same `DevController` gate (404 when the flag is off; `forceDraft` is the existing test-support precedent).
   Candidates, unranked: force the first enemy's species/encounter (removes the seed walks behind the slow

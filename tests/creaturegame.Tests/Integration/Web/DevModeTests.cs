@@ -163,6 +163,40 @@ public class DevModeTests
             );
             Assert.Equal("FOE", dto.Name);
             Assert.Equal(77, dto.MaxHp);
+            Assert.Empty(dto.Stages!);
+        }
+        finally
+        {
+            gate.Set();
+        }
+    }
+
+    [Fact]
+    public void EnemyEndpointListsOnlyTheFoesNonZeroStages()
+    {
+        var manager = NewManager(out var gate);
+        try
+        {
+            string gameId = StartActiveGame(manager);
+            var foe = TestCreatures.Make("FOE");
+            foe.Battle.Stages.RaiseDefense(-2);
+            foe.Battle.Stages.RaiseAccuracy(-1);
+            foe.Battle.Stages.RaiseSpeed(3);
+            manager.RecordEnemy(gameId, foe);
+            var controller = new DevController(new DevModeOptions(true), manager);
+
+            var dto = Assert.IsType<PlayerOverviewDto>(
+                Assert.IsType<OkObjectResult>(controller.GetEnemy(gameId)).Value
+            );
+
+            Assert.Equal(
+                [
+                    new StageRow("Defense", -2),
+                    new StageRow("Speed", 3),
+                    new StageRow("Accuracy", -1),
+                ],
+                dto.Stages
+            );
         }
         finally
         {

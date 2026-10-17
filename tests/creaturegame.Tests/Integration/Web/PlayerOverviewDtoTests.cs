@@ -89,6 +89,15 @@ public class PlayerOverviewDtoTests
     }
 
     [Fact]
+    public void From_LeavesStagesNull_EvenWithStagesInPlay()
+    {
+        var c = BuildCharizard();
+        c.Battle.Stages.RaiseAttack(2);
+
+        Assert.Null(PlayerOverviewDto.From(c, Generation.One).Stages);
+    }
+
+    [Fact]
     public void From_ReportsSpeciesNameSeparately_WhenNameIsANickname()
     {
         var c = BuildCharizard();

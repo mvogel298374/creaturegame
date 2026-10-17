@@ -18,6 +18,11 @@ export interface MoveRow {
   description: string | null;
 }
 
+export interface StageRow {
+  stat: string;  // Attack / Defense / Special / Speed / Accuracy / Evasion
+  stage: number; // −6…+6, never 0 (only non-zero stages are sent)
+}
+
 export interface PlayerOverview {
   name: string;
   speciesName: string; // the species' own name, independent of a nickname (may equal `name`)
@@ -39,4 +44,5 @@ export interface PlayerOverview {
   ability: string | null;   // Gen 3+
   nature: string | null;    // Gen 3+
   teraType: string | null;  // Gen 9
+  stages: StageRow[] | null; // Dev Mode enemy overview only; null for every party member
 }

@@ -32,7 +32,9 @@ public sealed record PlayerOverviewDto(
     string? HeldItem = null,
     string? Ability = null,
     string? Nature = null,
-    string? TeraType = null
+    string? TeraType = null,
+    // Dev Mode only: set by the enemy endpoint, null on every player overview.
+    IReadOnlyList<StageRow>? Stages = null
 )
 {
     /// <summary>
@@ -76,6 +78,16 @@ public sealed record PlayerOverviewDto(
 
 /// <summary>One Gen 1 stat (HP/ATK/DEF/SPC/SPD): the actual computed value plus its DV (0–15) and Stat-Exp.</summary>
 public sealed record StatRow(string Label, int Value, int Dv, int StatExp);
+
+/// <summary>One battle stat stage (−6 to +6) that isn't zero.</summary>
+public sealed record StageRow(string Stat, int Stage)
+{
+    public static IReadOnlyList<StageRow> NonZeroOf(StatStages stages) =>
+        Enum.GetValues<StageStat>()
+            .Select(s => new StageRow(s.ToString(), stages.Of(s)))
+            .Where(r => r.Stage != 0)
+            .ToList();
+}
 
 /// <summary>One moveset entry, flattened for display.</summary>
 public sealed record MoveRow(

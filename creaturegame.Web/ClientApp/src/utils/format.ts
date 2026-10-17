@@ -8,6 +8,11 @@ export function formatDamageRange(min: number | null | undefined, max: number | 
   return min === max ? `${min}` : `${min}–${max}`;
 }
 
+// A battle stat stage with its sign: "+2", "−1" (a true minus sign, like the damage-range dash).
+export function formatStage(stage: number): string {
+  return stage > 0 ? `+${stage}` : stage < 0 ? `−${-stage}` : '0';
+}
+
 export function formatMoveName(slug: string): string {
   if (!slug || slug === '---') return slug;
   return slug.replace(/-/g, ' ').toUpperCase();

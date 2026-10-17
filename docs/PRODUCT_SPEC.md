@@ -275,8 +275,8 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - `GET /api/dev/status` reports `{ enabled }`; the Settings panel shows a "Dev mode" toggle only when the server
   reports enabled. The choice persists per browser (default off), and a "DEV" badge shows in the HUD while on.
 - With dev mode on, clicking/tapping the enemy nameplate in battle opens a read-only CHECK POKEMON sheet for the
-  foe (species, level, HP, stats, DVs, Stat-Exp, status, moves + PP; no party picker, no Exp rows, no stat
-  stages) via `GET /api/dev/{gameId}/enemy` (404 if no enemy is active yet).
+  foe (species, level, HP, stats, DVs, Stat-Exp, status, moves + PP, and a "<Stat> stage ±N" row on the STATS tab for each non-zero stat stage; no party
+  picker, no Exp rows) via `GET /api/dev/{gameId}/enemy` (404 if no enemy is active yet).
 - With dev mode on, damage ranges are shown: the combat log prints `took 37 damage (32–38)!` (an exact amount
   prints one number), each fight-menu move button has a DMG line, and every CHECK POKEMON move row (player and
   dev enemy sheets) has a DMG entry. Ranges are non-crit (a crit's actual damage can exceed the printed range)

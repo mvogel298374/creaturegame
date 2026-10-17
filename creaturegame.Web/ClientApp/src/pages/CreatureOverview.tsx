@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { TypeBadge } from '../components/TypeBadge';
 import { PartyCard } from '../components/modals/PartyCard';
-import { formatMoveName, formatDamageRange } from '../utils/format';
+import { formatMoveName, formatDamageRange, formatStage } from '../utils/format';
 import { useDamageRanges, type DamageRange } from '../hooks/useDamageRanges';
 import { friendlyFetchError } from '../utils/fetchError';
 import { defaultOverviewSlot, showOverviewPicker, overviewSlotUrl, enemyOverviewUrl } from '../battle/overviewPicker';
-import type { PlayerOverview, StatRow, MoveRow } from '../types/PlayerOverview';
+import type { PlayerOverview, StatRow, MoveRow, StageRow } from '../types/PlayerOverview';
 import type { PartyMember } from '../hooks/useBattleHub';
 import '../components/modals/RosterPicker.css';
 import './CreatureOverview.css';
@@ -89,7 +89,7 @@ export function CreatureOverview({ gameId, party, onBack, enemy = false }: {
           </div>
           <div className="overview-body">
             {tab === 'info' && <InfoTab d={data} hideXp={enemy} />}
-            {tab === 'stats' && <StatsTab stats={data.stats} hp={data.hp} maxHp={data.maxHp} />}
+            {tab === 'stats' && <StatsTab stats={data.stats} hp={data.hp} maxHp={data.maxHp} stages={data.stages} />}
             {tab === 'moves' && <MovesTab moves={data.moves} ranges={ranges} />}
           </div>
         </>
@@ -146,7 +146,7 @@ const STAT_NAMES: Record<string, string> = {
   SPD: 'Speed',
 };
 
-function StatsTab({ stats, hp, maxHp }: { stats: StatRow[]; hp: number; maxHp: number }) {
+function StatsTab({ stats, hp, maxHp, stages }: { stats: StatRow[]; hp: number; maxHp: number; stages: StageRow[] | null }) {
   // No magnitude bars: the stats don't share a scale, so a value/cap bar wouldn't compare anything. Each row
   // is the stat name, the actual value (HP as current/max), and its DV + gained EV as small chips.
   return (
@@ -164,6 +164,12 @@ function StatsTab({ stats, hp, maxHp }: { stats: StatRow[]; hp: number; maxHp: n
           </div>
         );
       })}
+      {stages?.map(s => (
+        <div className="overview-stat-row" key={`stage-${s.stat}`}>
+          <span className="overview-stat-name">{s.stat} stage</span>
+          <span className="overview-stat-value">{formatStage(s.stage)}</span>
+        </div>
+      ))}
     </div>
   );
 }
