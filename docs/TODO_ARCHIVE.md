@@ -8,6 +8,24 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §4.4 `StatStageMoveEvaluator.StageOf` → `Stages.Of` ✅ DONE (2026-10-18)
+
+**Was** the "`StageOf` half" of the `Attributes` Special split entry in `TODO.md` §4.4 (the Special split itself stays
+open there). S, runtime only, no gen surface, no quirk; DoR drafts confirmed by the user 2026-10-17; origin was a
+`pr-review` advisory (2026-10-14).
+
+`StatStageMoveEvaluator.Score` in `creaturegame/Combat/Ai/MoveEvaluators.cs` now reads `subject.Battle.Stages.Of(effect.Stat)`;
+the private `StageOf` switch (a line-for-line copy of `StatStages.Of`) is deleted, so the AI can't drift from the engine
+when SpAtk/SpDef stages land. New test `MoveEvaluatorTests.StatStage_LoweringAFlooredFoeStatIsPenalised` (foe Defense at
+-6, a -1 Defense move scores below 0) closes a pre-existing coverage gap; sabotage-verified (failed with the floor check
+at -7).
+
+**Review record.** format-gate PASS; `.\test.ps1 -Dotnet` 1895/1895. requirements-review: acceptance met, one docs
+discrepancy (this TODO update). pr-review PR-READY, 0 changes requested; its floored-foe advisory was written at the
+user's request.
+
+---
+
 ## §3.2 Importer hardening follow-ups — species + learnset as one unit; empty generation list ✅ DONE (2026-10-18)
 
 **Was** the two candidates left open by "§1 #4 Importer hardening — step #4e" (the `TODO.md` §3.2 "Importer hardening

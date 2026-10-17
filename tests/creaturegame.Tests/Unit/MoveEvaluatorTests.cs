@@ -184,6 +184,18 @@ public class MoveEvaluatorTests
         Assert.True(score > 0);
     }
 
+    [Fact]
+    public void StatStage_LoweringAFlooredFoeStatIsPenalised()
+    {
+        var defender = TestCreatures.Make("D");
+        defender.Battle.Stages.RaiseDefense(-6); // already at -6
+        double score = new StatStageMoveEvaluator().Score(
+            StatMove(StageStat.Defense, -1, StageTarget.Foe),
+            Context(TestCreatures.Make("A"), defender)
+        );
+        Assert.True(score < 0);
+    }
+
     // ── StatusMoveEvaluator ──────────────────────────────────────────────────
 
     private static PokemonAttack StatusMove(StatusCondition status) =>

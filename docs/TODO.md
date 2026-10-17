@@ -483,19 +483,7 @@ now, below.
 - [ ] **`Attributes` Special split:** `Special` → `SpAtk` + `SpDef` (keep `Special` as a Gen 1 computed alias);
   `Creature.BaseSpecial`/`DvSpecial`/`ExpSpecial` split in parallel, and `StatStages`/`StageStat` gain SpAtk/SpDef
   stages (`IBattleRules.OffensiveStage`/`DefensiveStage` already route the damage stage, so a Gen 2 rules set
-  returns them with no `DamageCalculator` change). In the same pass, replace `StatStageMoveEvaluator.StageOf`
-  (`MoveEvaluators.cs:129-137`, a copy of `StatStages.Of`) with `Stages.Of(stat)` so the AI can't drift from the
-  engine when the new stages land (`pr-review` advisory, 2026-10-14).
-  **DoR, the `StageOf` half:** ✅ Ready (S; drafts confirmed by the user 2026-10-17); ships independent of Gen 2.
-  `MoveEvaluators.cs:129` still holds the copy.
-  - **Acceptance:** `StatStageMoveEvaluator` reads `Stages.Of`, the copy is deleted, and the AI tests are unchanged
-    and green.
-  - **Gen surface:** none.
-  - **Data vs runtime:** runtime.
-  - **Quirk:** none.
-  - **Dependencies:** none.
-
-  Confirm it and it gets its own ✅ entry.
+  returns them with no `DamageCalculator` change).
 - [ ] **`PokemonSpecies` per-generation schema:** separate timeless identity (`Id`, `Name`, `PokedexEntry`,
   `GrowthRate`) from a new `PokemonSpeciesGenData` table (`SpeciesId`, `Generation`, types, base stats, base
   experience, catch rate; Gen 3+ adds abilities). The importer stores one row per species per generation; the engine

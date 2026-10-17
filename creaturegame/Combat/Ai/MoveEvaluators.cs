@@ -111,7 +111,7 @@ public sealed class StatStageMoveEvaluator : IMoveEvaluator
 
         bool affectsSelf = effect.Target == StageTarget.Self;
         var subject = affectsSelf ? context.Attacker : context.Defender;
-        int stage = StageOf(subject, effect.Stat);
+        int stage = subject.Battle.Stages.Of(effect.Stat);
 
         if (effect.Delta > 0) // raising (a self-buff in Gen 1)
         {
@@ -125,18 +125,6 @@ public sealed class StatStageMoveEvaluator : IMoveEvaluator
             return CappedPenalty;
         return LowerValue * ((6 + stage) / 6.0);
     }
-
-    private static int StageOf(Creature c, StageStat stat) =>
-        stat switch
-        {
-            StageStat.Attack => c.Battle.Stages.Attack,
-            StageStat.Defense => c.Battle.Stages.Defense,
-            StageStat.Special => c.Battle.Stages.Special,
-            StageStat.Speed => c.Battle.Stages.Speed,
-            StageStat.Accuracy => c.Battle.Stages.Accuracy,
-            StageStat.Evasion => c.Battle.Stages.Evasion,
-            _ => 0,
-        };
 }
 
 /// <summary>Values a move's major-status effect; the scoring rules are in <c>ARCHITECTURE.md</c> §2.13.</summary>
