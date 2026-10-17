@@ -93,7 +93,8 @@ public class MimicContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             AutoSelectInput.Instance,
             AutoSelectInput.Instance,
             rules: NoVarianceNoCritHitRules.Instance,
-            emitter: emitter
+            emitter: emitter,
+            rng: new SeededRandomSource(1)
         );
         await battle.StartFightAsync();
 
@@ -126,7 +127,8 @@ public class MimicContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             new ScriptedInput("mimic", "tackle"),
             new ScriptedInput("tackle"),
             rules: NoVarianceNoCritHitRules.Instance,
-            emitter: emitter
+            emitter: emitter,
+            rng: new SeededRandomSource(1)
         );
         await battle.StartFightAsync();
 

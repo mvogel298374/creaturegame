@@ -31,8 +31,10 @@ public class DifficultyTests
     {
         // RunRulesFor looks the tier up in an enum-keyed dictionary — a 4th tier added to the enum without a
         // matching preset would throw KeyNotFoundException at run-start with nothing catching it.
-        foreach (var tier in Enum.GetValues<Difficulty>())
-            GameSessionManager.RunRulesFor(tier); // must not throw
+        Assert.All(
+            Enum.GetValues<Difficulty>(),
+            tier => Assert.NotNull(GameSessionManager.RunRulesFor(tier))
+        );
     }
 
     [Fact]

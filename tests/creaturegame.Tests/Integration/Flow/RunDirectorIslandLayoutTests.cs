@@ -2,7 +2,6 @@ using creaturegame.Attacks;
 using creaturegame.Combat;
 using creaturegame.Creatures;
 using creaturegame.Tests.TestSupport;
-using creaturegame.Tests.Unit;
 
 namespace creaturegame.Tests.Integration.Flow;
 

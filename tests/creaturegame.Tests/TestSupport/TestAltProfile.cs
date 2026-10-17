@@ -5,9 +5,8 @@ using creaturegame.DB;
 using creaturegame.Evolution;
 using creaturegame.Generations;
 using creaturegame.Items;
-using creaturegame.Tests.TestSupport;
 
-namespace creaturegame.Tests.Unit;
+namespace creaturegame.Tests.TestSupport;
 
 /// <summary>
 /// A deliberately fake second <see cref="GenerationProfile"/> — the falsification harness from

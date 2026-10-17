@@ -182,25 +182,38 @@ public class DevModeTests
             DamageType = DamageType.Normal,
         };
 
+    private sealed class SeededHitNoCritRules(IRandomSource rng) : DelegatingBattleRules(rng)
+    {
+        public override int GetHitThreshold(int acc, int accStage, int evaStage) => 256;
+
+        public override double GetCritChance(Creature a, Attack m) => 0.0;
+    }
+
     [Fact]
     public async Task DamageDealtCarriesARangeThatBracketsTheActualHit()
     {
         var attacker = TestCreatures.Make("A", attack: 120);
         var defender = TestCreatures.Make("D", defense: 80, hp: 5000);
         var emitter = new RecordingEmitter();
+        var rng = new SeededRandomSource(1);
 
         await new AttackAction(
             attacker,
             defender,
             new PokemonAttack(Strike()),
             new Gen1TypeChart(),
-            new NoVarianceNoCritHitRules(),
-            emitter
+            new SeededHitNoCritRules(rng),
+            emitter,
+            rng: rng
         ).ExecuteAsync();
 
         var hit = Assert.Single(emitter.Of<DamageDealt>());
         Assert.NotNull(hit.MinDamage);
         Assert.NotNull(hit.MaxDamage);
+        Assert.True(
+            hit.MinDamage < hit.MaxDamage,
+            "real variance must give a non-degenerate range"
+        );
         Assert.InRange(hit.Damage, hit.MinDamage!.Value, hit.MaxDamage!.Value);
     }
 

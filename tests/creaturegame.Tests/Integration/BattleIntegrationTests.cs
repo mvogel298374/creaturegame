@@ -49,7 +49,8 @@ public class BattleIntegrationTests
             enemy,
             new Gen1TypeChart(),
             AutoSelectInput.Instance,
-            AutoSelectInput.Instance
+            AutoSelectInput.Instance,
+            rng: new SeededRandomSource(1)
         );
         await battle.StartFightAsync();
 
@@ -94,7 +95,8 @@ public class BattleIntegrationTests
             enemy,
             new Gen1TypeChart(),
             AutoSelectInput.Instance,
-            AutoSelectInput.Instance
+            AutoSelectInput.Instance,
+            rng: new SeededRandomSource(1)
         );
         await battle.StartFightAsync();
 
@@ -258,7 +260,8 @@ public class BattleIntegrationTests
             enemy,
             new Gen1TypeChart(),
             AutoSelectInput.Instance,
-            AutoSelectInput.Instance
+            AutoSelectInput.Instance,
+            rng: new SeededRandomSource(1)
         );
         await battle.StartFightAsync();
 
@@ -392,7 +395,8 @@ public class BattleIntegrationTests
             new Gen1TypeChart(),
             input,
             AutoSelectInput.Instance,
-            emitter: emitter
+            emitter: emitter,
+            rng: new SeededRandomSource(1)
         );
         await battle.StartFightAsync();
 
@@ -547,7 +551,8 @@ public class BattleIntegrationTests
             new Gen1TypeChart(),
             input,
             AutoSelectInput.Instance,
-            emitter: emitter
+            emitter: emitter,
+            rng: new SeededRandomSource(1)
         );
         await battle.StartFightAsync();
 
@@ -612,7 +617,8 @@ public class BattleIntegrationTests
             new Gen1TypeChart(),
             input,
             AutoSelectInput.Instance,
-            emitter: emitter
+            emitter: emitter,
+            rng: new SeededRandomSource(1)
         );
         await battle.StartFightAsync();
 
@@ -666,7 +672,8 @@ public class BattleIntegrationTests
             new Gen1TypeChart(),
             input,
             AutoSelectInput.Instance,
-            emitter: emitter
+            emitter: emitter,
+            rng: new SeededRandomSource(1)
         );
         await battle.StartFightAsync();
 
@@ -720,7 +727,8 @@ public class BattleIntegrationTests
             enemy,
             new Gen1TypeChart(),
             AutoSelectInput.Instance,
-            AutoSelectInput.Instance
+            AutoSelectInput.Instance,
+            rng: new SeededRandomSource(1)
         );
         await battle.StartFightAsync();
 

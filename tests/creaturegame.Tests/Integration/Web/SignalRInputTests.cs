@@ -24,6 +24,10 @@ public class SignalRInputTests
             TurnNumber = 1,
         };
 
+    // A dropped answer means the handshake never completes — bound the wait so that regression FAILS the test
+    // (TimeoutException) instead of hanging the whole suite.
+    private static Task<T> Within<T>(Task<T> task) => task.WaitAsync(TimeSpan.FromSeconds(5));
+
     private static Creature WithMoves(params string[] names)
     {
         var c = TestCreatures.Make("Player");
@@ -50,7 +54,7 @@ public class SignalRInputTests
 
         var task = input.ChooseTurnActionAsync(ctx); // blocks on the handshake
         input.SetChoice(1); // hub: ChooseMove(1)
-        var choice = await task;
+        var choice = await Within(task);
 
         var move = Assert.IsType<MoveTurnChoice>(choice);
         Assert.Equal("growl", move.Move.Base.Name);
@@ -65,7 +69,7 @@ public class SignalRInputTests
 
         var task = input.ChooseTurnActionAsync(ctx);
         input.SetChoice(9); // invalid slot
-        var choice = await task;
+        var choice = await Within(task);
 
         Assert.Equal("tackle", Assert.IsType<MoveTurnChoice>(choice).Move.Base.Name);
     }
@@ -84,7 +88,7 @@ public class SignalRInputTests
 
         var task = input.ChooseTurnActionAsync(ctx);
         input.SetItemChoice(ether, targetMoveSlot: 0); // hub: UseItem(38, 0)
-        var choice = await task;
+        var choice = await Within(task);
 
         var item = Assert.IsType<ItemTurnChoice>(choice);
         Assert.Equal(38, item.Item.Id);
@@ -101,7 +105,7 @@ public class SignalRInputTests
 
         var task = input.ChooseTurnActionAsync(ctx); // blocks on the handshake
         input.SetSwitchChoice(2); // hub: ChooseSwitch(2)
-        var choice = await task;
+        var choice = await Within(task);
 
         Assert.Equal(2, Assert.IsType<SwitchTurnChoice>(choice).PartyIndex);
     }
@@ -120,7 +124,7 @@ public class SignalRInputTests
 
         var task = input.ChooseTurnActionAsync(ctx);
         input.SetChoice(0); // hub: ChooseMove(0) — the STRUGGLE affordance sends a move index
-        var choice = await task;
+        var choice = await Within(task);
 
         Assert.IsType<StruggleTurnChoice>(choice);
     }
@@ -138,7 +142,7 @@ public class SignalRInputTests
 
         var task = input.ChooseTurnActionAsync(ctx);
         input.SetSwitchChoice(1); // hub: ChooseSwitch(1)
-        var choice = await task;
+        var choice = await Within(task);
 
         Assert.Equal(1, Assert.IsType<SwitchTurnChoice>(choice).PartyIndex);
     }
@@ -154,7 +158,7 @@ public class SignalRInputTests
 
         var task = input.ChooseMoveAsync(ctx);
         input.SetChoice(0);
-        var move = await task;
+        var move = await Within(task);
 
         Assert.Equal("tackle", move.Base.Name);
     }
@@ -168,7 +172,7 @@ public class SignalRInputTests
         var task = input.ChooseTurnActionAsync(ctx);
         input.Cancel(); // client disconnected
 
-        await Assert.ThrowsAsync<TaskCanceledException>(async () => await task);
+        await Assert.ThrowsAsync<TaskCanceledException>(async () => await Within(task));
     }
 
     [Fact]
@@ -179,7 +183,7 @@ public class SignalRInputTests
         input.Cancel();
 
         await Assert.ThrowsAsync<OperationCanceledException>(async () =>
-            await input.ChooseTurnActionAsync(ctx)
+            await Within(input.ChooseTurnActionAsync(ctx))
         );
     }
 
@@ -195,7 +199,7 @@ public class SignalRInputTests
         var task = input.ChooseBiomeAsync(ctx); // blocks on the map handshake
         input.SetBiomeChoice("b"); // hub: ChooseBiome("b")
 
-        Assert.Equal("b", await task);
+        Assert.Equal("b", await Within(task));
     }
 
     [Fact]
@@ -209,16 +213,12 @@ public class SignalRInputTests
         var task = input.ChooseBiomeAsync(ctx);
         input.Cancel(); // client disconnected on the map screen
 
-        await Assert.ThrowsAsync<TaskCanceledException>(async () => await task);
+        await Assert.ThrowsAsync<TaskCanceledException>(async () => await Within(task));
     }
 
     // ── Shop: the one iterative prompt — answers can land between two prompts ───────────────────────
 
     private static readonly ShopContext EmptyShop = new([], 0);
-
-    // A dropped answer means the handshake never completes — bound the wait so that regression FAILS the test
-    // (TimeoutException) instead of hanging the whole suite.
-    private static Task<T> Within<T>(Task<T> task) => task.WaitAsync(TimeSpan.FromSeconds(5));
 
     [Fact]
     public async Task ShopActions_BuyThenLeaveArrivingBackToBack_AreBothConsumedInOrder()

@@ -100,7 +100,8 @@ public class FlinchContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             AutoSelectInput.Instance,
             AutoSelectInput.Instance,
             rules: ForceSecondaryRules.Instance,
-            emitter: emitter
+            emitter: emitter,
+            rng: new SeededRandomSource(1)
         );
         await battle.StartFightAsync();
 
@@ -137,7 +138,8 @@ public class FlinchContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             AutoSelectInput.Instance,
             AutoSelectInput.Instance,
             rules: ForceSecondaryRules.Instance,
-            emitter: emitter
+            emitter: emitter,
+            rng: new SeededRandomSource(1)
         );
         await battle.StartFightAsync();
 

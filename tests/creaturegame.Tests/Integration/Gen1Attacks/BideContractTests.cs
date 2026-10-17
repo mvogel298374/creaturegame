@@ -54,7 +54,8 @@ public class BideContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             input,
             AutoSelectInput.Instance,
             rules: new FixedBideRules(),
-            emitter: emitter
+            emitter: emitter,
+            rng: new SeededRandomSource(1)
         );
         await battle.StartFightAsync();
 
@@ -98,7 +99,8 @@ public class BideContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             new CountingInput(0),
             AutoSelectInput.Instance,
             rules: new FixedBideRules(),
-            emitter: emitter
+            emitter: emitter,
+            rng: new SeededRandomSource(1)
         );
         await battle.StartFightAsync();
 
@@ -132,7 +134,8 @@ public class BideContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             new CountingInput(0),
             AutoSelectInput.Instance,
             rules: new FixedBideRules(),
-            emitter: emitter
+            emitter: emitter,
+            rng: new SeededRandomSource(1)
         );
         await battle.StartFightAsync();
 

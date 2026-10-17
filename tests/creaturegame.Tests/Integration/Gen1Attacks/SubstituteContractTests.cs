@@ -216,7 +216,8 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
             AutoSelectInput.Instance,
             AutoSelectInput.Instance,
             rules: NoVarianceNoCritHitRules.Instance,
-            emitter: emitter
+            emitter: emitter,
+            rng: new SeededRandomSource(1)
         );
         await battle.StartFightAsync();
 
@@ -271,7 +272,8 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
             AutoSelectInput.Instance,
             rules: NoVarianceNoCritHitRules.Instance,
             emitter: emitter,
-            playerParty: party
+            playerParty: party,
+            rng: new SeededRandomSource(1)
         );
         await battle.StartFightAsync();
 
@@ -299,7 +301,8 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
             AutoSelectInput.Instance,
             AutoSelectInput.Instance,
             rules: NoVarianceNoCritHitRules.Instance,
-            emitter: emitter
+            emitter: emitter,
+            rng: new SeededRandomSource(1)
         );
         await battle.StartFightAsync();
 

@@ -61,7 +61,8 @@ public class RampageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             input,
             AutoSelectInput.Instance,
             rules: new FixedRampageRules(2),
-            emitter: emitter
+            emitter: emitter,
+            rng: new SeededRandomSource(1)
         );
         await battle.StartFightAsync();
 

@@ -83,6 +83,9 @@ public class PartyTests
             party.Add(Wounded("Caught"));
         foreach (var _ in party.Members)
             party.Replace(0, Wounded("Swapped"));
+
+        Assert.Equal(4, party.Count); // each loop walked the snapshot taken before it began
+        Assert.Equal("Swapped", party.Members[0].Name);
     }
 
     [Fact]

@@ -1,24 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { loadSettings, saveSettings } from './settings';
+import { installFakeLocalStorage } from './fakeLocalStorage';
 
-// This project's Vitest config runs in the plain 'node' environment (no jsdom dependency), so there's no
-// built-in Storage API — a minimal in-memory stand-in is enough to exercise the pure load/save logic without
-// pulling in a new test dependency.
-function fakeLocalStorage(): Storage {
-  const store = new Map<string, string>();
-  return {
-    getItem: (k: string) => (store.has(k) ? store.get(k)! : null),
-    setItem: (k: string, v: string) => { store.set(k, v); },
-    removeItem: (k: string) => { store.delete(k); },
-    clear: () => store.clear(),
-    key: () => null,
-    length: 0,
-  } as Storage;
-}
-
-beforeEach(() => {
-  (globalThis as unknown as { localStorage: Storage }).localStorage = fakeLocalStorage();
-});
+beforeEach(installFakeLocalStorage);
 
 describe('settings', () => {
   it('defaults to full volume when nothing is stored', () => {

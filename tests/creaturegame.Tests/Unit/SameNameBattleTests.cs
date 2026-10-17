@@ -42,7 +42,8 @@ public class SameNameBattleTests
             AutoSelectInput.Instance,
             AutoSelectInput.Instance,
             rules: AlwaysHitRules.Instance,
-            emitter: recorder
+            emitter: recorder,
+            rng: new SeededRandomSource(1)
         ).StartFightAsync();
         return recorder;
     }

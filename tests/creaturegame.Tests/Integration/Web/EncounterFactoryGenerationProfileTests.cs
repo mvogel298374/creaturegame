@@ -5,7 +5,7 @@ using creaturegame.Creatures;
 using creaturegame.DB;
 using creaturegame.Generations;
 using creaturegame.Items;
-using creaturegame.Tests.Unit;
+using creaturegame.Tests.TestSupport;
 using creaturegame.Web.Battle;
 
 namespace creaturegame.Tests.Integration.Web;

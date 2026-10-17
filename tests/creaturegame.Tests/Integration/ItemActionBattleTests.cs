@@ -3,7 +3,6 @@ using creaturegame.Combat;
 using creaturegame.Creatures;
 using creaturegame.Items;
 using creaturegame.Tests.TestSupport;
-using creaturegame.Tests.Unit;
 
 namespace creaturegame.Tests.Integration;
 

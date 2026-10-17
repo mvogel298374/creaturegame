@@ -1,24 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { saveActiveGame, loadActiveGame, clearActiveGame } from './activeGame';
 import type { Species } from '../types/Species';
+import { installFakeLocalStorage } from './fakeLocalStorage';
 
-// Same in-memory Storage stand-in as settings.test.ts — this project's Vitest config runs in the plain 'node'
-// environment (no jsdom), so there's no built-in Storage API.
-function fakeLocalStorage(): Storage {
-  const store = new Map<string, string>();
-  return {
-    getItem: (k: string) => (store.has(k) ? store.get(k)! : null),
-    setItem: (k: string, v: string) => { store.set(k, v); },
-    removeItem: (k: string) => { store.delete(k); },
-    clear: () => store.clear(),
-    key: () => null,
-    length: 0,
-  } as Storage;
-}
-
-beforeEach(() => {
-  (globalThis as unknown as { localStorage: Storage }).localStorage = fakeLocalStorage();
-});
+beforeEach(installFakeLocalStorage);
 
 const species: Species = {
   id: 1, name: 'Bulbasaur', type1: 'Grass', type2: 'Poison',

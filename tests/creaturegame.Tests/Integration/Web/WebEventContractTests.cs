@@ -69,12 +69,17 @@ public class WebEventContractTests
     public void EveryBattleEventHasATimelineArm()
     {
         var timeline = ReadTimelineSource();
+        int start = timeline.IndexOf("export function expandEvent(", StringComparison.Ordinal);
+        Assert.True(start >= 0, "timeline.ts no longer declares `export function expandEvent(`");
+        int end = timeline.IndexOf("\n}", start, StringComparison.Ordinal);
+        // Only expandEvent's own arms count: other switches in the file label node kinds like 'Shop'.
+        var expandBody = timeline[start..end];
 
         var unhandled = ConcreteBattleEventTypes()
             .Select(t => t.Name)
             // The case labels are written `case 'Name':` / `case 'Name' {` — match including the closing
             // quote so a shorter name can't match a longer one's label (e.g. 'Substitute' vs 'SubstitutePutUp').
-            .Where(name => !timeline.Contains($"case '{name}'"))
+            .Where(name => !expandBody.Contains($"case '{name}'"))
             .OrderBy(name => name)
             .ToList();
 

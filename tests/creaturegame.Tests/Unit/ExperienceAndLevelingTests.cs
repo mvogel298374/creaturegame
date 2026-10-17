@@ -112,7 +112,8 @@ public class ExperienceAndLevelingTests
             AutoSelectInput.Instance,
             AutoSelectInput.Instance,
             rules: AlwaysHitRules.Instance,
-            emitter: ConsoleBattleEventEmitter.Instance
+            emitter: ConsoleBattleEventEmitter.Instance,
+            rng: new SeededRandomSource(1)
         );
         await battle.StartFightAsync();
 
@@ -182,7 +183,8 @@ public class ExperienceAndLevelingTests
             AutoSelectInput.Instance,
             rules: AlwaysHitRules.Instance,
             emitter: recorder,
-            runRules: runRules
+            runRules: runRules,
+            rng: new SeededRandomSource(1)
         );
         await battle.StartFightAsync();
 
@@ -310,7 +312,8 @@ public class ExperienceAndLevelingTests
             AutoSelectInput.Instance,
             AutoSelectInput.Instance,
             rules: AlwaysHitRules.Instance,
-            emitter: recorder
+            emitter: recorder,
+            rng: new SeededRandomSource(1)
         );
         await battle.StartFightAsync();
 
@@ -369,7 +372,8 @@ public class ExperienceAndLevelingTests
             AutoSelectInput.Instance,
             AutoSelectInput.Instance,
             rules: AlwaysHitRules.Instance,
-            emitter: ConsoleBattleEventEmitter.Instance
+            emitter: ConsoleBattleEventEmitter.Instance,
+            rng: new SeededRandomSource(1)
         );
         await battle.StartFightAsync();
 

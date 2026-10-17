@@ -169,7 +169,8 @@ public class UniqueMoveEffectContractTests(MovesFixture moves) : Gen1MoveContrac
             AutoSelectInput.Instance,
             rules: AlwaysHitRules.Instance,
             emitter: emitter,
-            playerEntryStatus: new CarriedStatus(StatusCondition.Sleep, 3)
+            playerEntryStatus: new CarriedStatus(StatusCondition.Sleep, 3),
+            rng: new SeededRandomSource(1)
         );
         await battle.StartFightAsync();
 

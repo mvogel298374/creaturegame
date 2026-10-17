@@ -320,6 +320,8 @@ public class SessionResumeTests
     {
         // A pending (not-yet-claimed) session has no emitter yet; guards against a future call site reaching
         // this before AttachConnection's first-attach branch constructs one.
-        GameSessionManager.ReEstablishClient(null, Gen1Profile.Instance);
+        Assert.Null(
+            Record.Exception(() => GameSessionManager.ReEstablishClient(null, Gen1Profile.Instance))
+        );
     }
 }

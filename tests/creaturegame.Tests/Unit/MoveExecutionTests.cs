@@ -466,7 +466,8 @@ public class MoveExecutionTests
             AutoSelectInput.Instance,
             AutoSelectInput.Instance,
             rules: AlwaysHitRules.Instance,
-            emitter: ConsoleBattleEventEmitter.Instance
+            emitter: ConsoleBattleEventEmitter.Instance,
+            rng: new SeededRandomSource(1)
         );
         await battle.StartFightAsync();
 

@@ -89,7 +89,8 @@ public class RageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             input,
             AutoSelectInput.Instance,
             rules: NoVarianceNoCritHitRules.Instance,
-            emitter: emitter
+            emitter: emitter,
+            rng: new SeededRandomSource(1)
         );
         await battle.StartFightAsync();
 

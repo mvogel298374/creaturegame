@@ -45,7 +45,7 @@ public sealed class MovesFixture : IDisposable
         _byId = moves.ToDictionary(m => m.Id);
     }
 
-    /// <summary>Fresh <see cref="PokemonAttack"/>-ready copy of the move by its PokeAPI name (e.g. "fire-punch").</summary>
+    /// <summary>The shared cached move by its PokeAPI name (e.g. "fire-punch"); never mutate it.</summary>
     public Attack Get(string name) =>
         _byName.TryGetValue(name, out var move)
             ? move

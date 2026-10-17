@@ -38,7 +38,7 @@
 | # | Item | Cost | Ready? (DoR) | Why this slot / what it unblocks |
 |:-:|:-----|:----:|:-------------|:---------------------------------|
 | 1 | **`-StartStack` backend leak** (§7.1 Part A) | S | ✗ parked: leak not reproduced (2026-10-10); un-park condition in §7.1 | Parts B and C are done. Not actionable until the user reproduces it; §1 #3 and #6 do not wait on it. |
-| 2 | **Verification pass over the unverified findings** (§7.6) | S per slice | ✅ (2026-10-10) — 15 tiny slices V1–V15 (V1–V13 done; V14 next; the V16 audit row is tracked separately as #11); each verifies first, then fixes only S-size, non-central, no-decision findings under a mini-DoR; greenlight and commit each | Turns "reviewer's reading" items into evidenced verdicts or discards. Opens up everything below it. |
+| 2 | **Verification pass over the unverified findings** (§7.6) | S per slice | ✅ (2026-10-10) — 15 tiny slices V1–V15 (V1–V14 done; V15 next; the V16 audit row is tracked separately as #11); each verifies first, then fixes only S-size, non-central, no-decision findings under a mini-DoR; greenlight and commit each | Turns "reviewer's reading" items into evidenced verdicts or discards. Opens up everything below it. |
 | 3 | **Server test gaps — `GameSessionManager` lifecycle + the `RunFaulted` path** (§6) | M | ⚠️ needs the injectable-clock design | Unblocks the R1d tests and closes a long-open Tier-4 item. |
 | 5 | **R1d-a — replay an open blocking prompt** (§2) | M | ⚠️ designed, but provisional-pending-`/plan` and needs your three decisions (§8) | The only reconnect item that strands a run; highest player value. |
 | 6 | **CI E2E step** (§6) | M | ✗ no design (runner, stack boot, caching) or acceptance | The only automatic E2E coverage; makes "agents don't run E2E" safe, and unblocks checking the BST/balance flag and the reconnect spec. |
@@ -479,14 +479,20 @@ The stat-selection abstraction is done. Open:
 - **Flake watch:** `endless-chain.spec.ts` *"a run ends when the player faints"* failed once in a full 2026-07-26 run
   (no `Run over` line after 1m10s) but passes in 7.3 s alone — consistent with the documented "a long run
   accumulates abandoned server-side runs" degradation, not a code defect.
-- **Test hygiene (unverified):** `shop.spec.ts:22` zero-count assertion can't fail (`startBattle` closes the shop
-  first); `encounter-map.spec.ts:94` ignores `playToNextEncounter`'s result; `DevModeTests.cs:124` never exercises
-  `MinDamage`; `cadence.spec.ts` can pass trivially; the older `SignalRInputTests` handshake tests have no timeout
-  (the newer shop-backlog tests use a 5 s `WaitAsync`); `WebEventContractTests.cs:77` greps all of `timeline.ts` for
-  `case 'Name'` (can be fooled by node-kind labels); ~33 `new Battle(...)` calls with no `rng:`; 10 duplicated
-  `Fighter(...)` helpers plus a duplicated seeded-start preamble and `fakeLocalStorage`; `MovesFixture.cs:48`'s
-  "fresh copy" is a shared cached instance; `TestAltProfile` belongs in `TestSupport/`; two no-assertion "must not
-  throw" tests.
+- [ ] *(small)* **Tighten `encounter-map.spec.ts` and `cadence.spec.ts`** (S, from §7.6 V14, ✗ not Ready).
+  `encounter-map.spec.ts:94` ignores `playToNextEncounter`'s returned log, so a loss surfaces later as a confusing
+  ladder failure (read-confirmed). `cadence.spec.ts`'s `usedWhileFull` accepts any "used X!" line while the enemy
+  is at full HP — the enemy acting first, a status move or a miss pass it, and the run is unseeded (read-confirmed).
+  *Drafted mini-DoR:* acceptance — encounter-map asserts the returned log shows a win before the ladder step;
+  cadence seeds its run and requires the player's own damaging move followed by an enemy HP drop. Gen-variable
+  surface: none. Test: the user runs `.\e2e.ps1 -Spec encounter-map` and `.\e2e.ps1 -Spec cadence` (E2E is
+  user-only). **Gap:** the user's go-ahead on the E2E runs; cadence needs a seed that reaches a hit on turn one.
+- [ ] *(small)* **Deduplicate the test helpers** (M, from §7.6 V14, ✗ not Ready). 10 `Fighter(...)` helpers with
+  3 signatures in `Integration/Flow` and the seeded-start preamble in three E2E files (`helpers.startBattle`,
+  `encounter-map.spec.ts` `gotoOpeningRouteChoice`, `reward-drop.spec.ts` `startSeededRun`) (read-confirmed).
+  *Drafted mini-DoR:* acceptance — one `Fighter` builder in `TestSupport/` covering the three signatures, one
+  seeded-start helper in `e2e/helpers.ts`; no behaviour change. Gen-variable surface: none. Test: the fast suites,
+  plus the user's run of the three affected specs. **Gap:** the user's go-ahead on the E2E runs.
 
 ---
 
@@ -639,7 +645,7 @@ a decision (Roar/Whirlwind, the BST bands).
 | V11 | Done ✅ 2026-10-14 — claim 1 read-confirmed, claims 2–4 reproduced; AI weights (type-immune status, secondary-chance scaling), `MoveTurnChoice` validation and `Biome.cs` map connectivity fixed; record in `TODO_ARCHIVE.md` → "§7.6 V11 — seam leak, AI weights, move validation, map connectivity"; seam leak → its own §3.1 entry | pokered + code; scratch test | Gen 1 source per claim |
 | V12 | Done ✅ 2026-10-17 — all three reproduced (two in Puppeteer, one by scratch Vitest), the re-render claim read-confirmed; double-submit and the `/battle` dead end fixed; record in `TODO_ARCHIVE.md` → "§7.6 V12 — frontend double-submit, /battle dead end, battle log"; the log cap → its own §5 entry, ✗ not Ready | Code | Browser-only parts → *needs-runtime* |
 | V13 | Done ✅ 2026-10-17 — 7 reproduced, 2 read-confirmed, 1 partly refuted; resize re-seat, first-battle entry wait, Space on cards, cold Settings BACK, one-shot Title notice, the cast and the dead code fixed; verdicts inline in §5; contrast → its own §5 entry, ✗ not Ready | Code | Browser-only parts → *needs-runtime* |
-| V14 | Test hygiene (§6) | Code; scratch test run | — |
+| V14 | Done ✅ 2026-10-17 — 11 claims: 3 reproduced, 7 read-confirmed, 1 mostly refuted; shop vacuous check, dev-range bracket, handshake timeouts, contract-test scope, 33 unseeded `Battle`s, `fakeLocalStorage`, `MovesFixture` doc, `TestAltProfile` location and three no-assertion tests fixed; record in `TODO_ARCHIVE.md` → "§7.6 V14 — test hygiene"; E2E tightening and helper dedup → their own §6 entries, ✗ not Ready | Code; scratch test run | — |
 | V15 | Speculative list (§7.5) | Code; coverage run | — |
 | V16 | **Full Gate 1 audit, after V15 (user 2026-10-11):** every open entry in §1–§7 checked against the seven `DEFINITION_OF_READY.md` items | Docs only: one ✅/✗ row per entry per DoR item | Acceptance: no open entry is left unaudited; each gap gets drafted proposed text, and decisions go to §8. Writes no code and changes no data; only `docs-cleanup` gates it |
 

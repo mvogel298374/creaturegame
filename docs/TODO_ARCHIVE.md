@@ -8,6 +8,41 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §7.6 V14 — test hygiene ✅ DONE (2026-10-17)
+
+**Was** `TODO.md` §6 "Test hygiene (unverified)" and the §7.6 V14 slice. Test-only change. `format-gate` REFORMATTED
+(`DevModeTests.cs`); `test-runner` PASS on `.\test.ps1 -Dotnet -Web`; `requirements-review` and `pr-review` N/A
+(test-only, not requested). 11 claims: 3 reproduced, 7 read-confirmed, 1 mostly refuted.
+
+**Verdicts and fixes.**
+- **`shop.spec.ts:22` zero-count `.shop-modal` assertion can't fail — read-confirmed** (`startBattle` dismisses any shop
+  modal first; the log-banner check at `:23` still guards). Line removed.
+- **`DevModeTests` never exercises `MinDamage` — mostly refuted:** `DamageRangeTests` and the emitter test cover
+  `MinDamage`; only the integration bracket test was degenerate, because no-variance rules made min equal max. It now
+  uses a private seeded always-hit/no-crit double with real variance and asserts `MinDamage < MaxDamage`.
+- **Older `SignalRInputTests` handshake tests have no timeout — read-confirmed.** `Within` (5 s `WaitAsync`) moved to
+  the top of the class; the ~10 older tests await through it.
+- **`WebEventContractTests` greps all of `timeline.ts` for `case 'Name'` — reproduced** (no current collision, but
+  node-kind labels could fool it). `EveryBattleEventHasATimelineArm` now searches only the body of
+  `export function expandEvent(`.
+- **33 of 66 `new Battle(...)` calls unseeded — reproduced.** All 33, across 16 test files, now pass
+  `rng: new SeededRandomSource(1)`.
+- **`fakeLocalStorage` duplicated — read-confirmed.** Shared as `ClientApp/src/utils/fakeLocalStorage.ts`
+  (`installFakeLocalStorage`) for `activeGame.test.ts` and `settings.test.ts`.
+- **`MovesFixture.Get` "fresh copy" is a shared cached instance — read-confirmed.** Doc comment corrected (shared, never
+  mutate).
+- **`TestAltProfile` belongs in `TestSupport/` — read-confirmed.** Moved `Unit/` -> `TestSupport/` (namespace
+  `creaturegame.Tests.TestSupport`), usings updated.
+- **Two no-assertion "must not throw" tests — reproduced as three.** Real assertions added to
+  `PartyTests.Members_EnumeratingWhileTheRosterChanges_DoesNotThrow`, `DifficultyTests.EveryDifficultyTier_HasAPreset...`
+  and `SessionResumeTests.ReEstablishClient_ToleratesANullEmitter`.
+
+**Open follow-ups (live in `TODO.md` §6, both ✗ not Ready):** tighten `encounter-map.spec.ts` / `cadence.spec.ts`
+(`encounter-map.spec.ts:94` ignores `playToNextEncounter`'s log; `cadence.spec.ts` `usedWhileFull` passes on any "used X!"
+line and is unseeded); deduplicate the test helpers (10 `Fighter(...)` helpers, three seeded-start E2E preambles).
+
+---
+
 ## §7.6 V13 — Phaser resize/entry pacing and frontend nits ✅ DONE (2026-10-17)
 
 **Was** `TODO.md` §5 (Phaser resize and unheard `entryComplete`; frontend nits) and the §7.6 V13 slice. Verified at
