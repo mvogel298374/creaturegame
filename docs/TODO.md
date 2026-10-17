@@ -38,7 +38,7 @@
 | # | Item | Cost | Ready? (DoR) | Why this slot / what it unblocks |
 |:-:|:-----|:----:|:-------------|:---------------------------------|
 | 1 | **`-StartStack` backend leak** (§7.1 Part A) | S | ✗ parked: leak not reproduced (2026-10-10); un-park condition in §7.1 | Parts B and C are done. Not actionable until the user reproduces it; §1 #3 and #6 do not wait on it. |
-| 2 | **Verification pass over the unverified findings** (§7.6) | S per slice | ✅ (2026-10-10) — 15 tiny slices V1–V15 (V1–V11 done; V12 next; the V16 audit row is tracked separately as #11); each verifies first, then fixes only S-size, non-central, no-decision findings under a mini-DoR; greenlight and commit each | Turns "reviewer's reading" items into evidenced verdicts or discards. Opens up everything below it. |
+| 2 | **Verification pass over the unverified findings** (§7.6) | S per slice | ✅ (2026-10-10) — 15 tiny slices V1–V15 (V1–V12 done; V13 next; the V16 audit row is tracked separately as #11); each verifies first, then fixes only S-size, non-central, no-decision findings under a mini-DoR; greenlight and commit each | Turns "reviewer's reading" items into evidenced verdicts or discards. Opens up everything below it. |
 | 3 | **Server test gaps — `GameSessionManager` lifecycle + the `RunFaulted` path** (§6) | M | ⚠️ needs the injectable-clock design | Unblocks the R1d tests and closes a long-open Tier-4 item. |
 | 5 | **R1d-a — replay an open blocking prompt** (§2) | M | ⚠️ designed, but provisional-pending-`/plan` and needs your three decisions (§8) | The only reconnect item that strands a run; highest player value. |
 | 6 | **CI E2E step** (§6) | M | ✗ no design (runner, stack boot, caching) or acceptance | The only automatic E2E coverage; makes "agents don't run E2E" safe, and unblocks checking the BST/balance flag and the reconnect spec. |
@@ -406,10 +406,17 @@ The stat-selection abstraction is done. Open:
   **Verified in a browser 2026-10-03** (route-choice modal over the pinned map): Tab leaves the modal after the
   offered towns — focus goes to `<body>`, then the MAP toggle, the settings gear, then the pinned map *behind* the
   modal (its close button, then its towns). Not checked: what Enter does on those towns (probably inert).
-- **Double-submit creates two runs** (`StarterSelection.tsx:45-72`, `NicknameModal.tsx:32,38`); **`/battle` with no
-  saved game shows "Connecting…" forever** (`BattleScreen.tsx:78`, `useBattleHub.ts:52`).
-- **Battle log unbounded** (`battleReducer.ts:262`, `BattleScreen.tsx:286`) and the whole `BattleScreen` re-renders on
-  every dispatch.
+- **Double-submit and `/battle` "Connecting…" forever — fixed 2026-10-17 (§7.6 V12).** Verdicts, F1–F2 and the
+  rulings: `TODO_ARCHIVE.md` → "§7.6 V12 — frontend double-submit, /battle dead end, battle log".
+- **Battle log unbounded — reproduced 2026-10-17 (§7.6 V12); S, ✗ not Ready (needs your cap number).** *Intent:*
+  the log keeps only the last *N* lines. *Evidence:* `battleReducer.ts:276` appends and only `initialState`
+  (`:203`) sets `log`, so it never resets, not even per encounter; a scratch Vitest kept 5,000 of 5,000 lines.
+  *Acceptance:* a reducer test pins that the log holds at most *N* lines and drops the oldest first. *Gaps:* *N*
+  (suggested 200); 10 E2E specs read `.battle-log` text (`helpers.ts`, `battle.spec.ts`, `status.spec.ts`, …), so
+  each must be checked for a wait on a line older than *N*. *Gen surface:* none. *Gen 1 source:* n/a. *Data vs
+  runtime:* client runtime only. *Quirk to assert:* the oldest line goes first. *Dependencies:* none. The companion
+  claim, that the whole `BattleScreen` re-renders on every dispatch, is **read-confirmed** (the reducer lives in its
+  hook and the log lines aren't memoized); its cost in a long run is **needs-runtime** (unmeasured).
 - **Phaser:** a resize mid-attack leaves sprites at the old x (`BattleScene.ts:122-137` vs lunge/shake never
   clearing `*Rested`); `entryComplete` is emitted but unheard, so FIGHT unlocks ≈2.6 s before the sprites arrive.
 - **Player species is taken from the starter** (`BattleScreen.tsx:77,237,400`, `activeGame.ts`) — game-over shows the
@@ -612,7 +619,7 @@ a decision (Roar/Whirlwind, the BST bands).
 | # | Claims (section) | Evidence route | Slice-specific DoR |
 |:-:|:--|:--|:--|
 | V1 | Verify ✅ and fix ✅ 2026-10-10 — record in `TODO_ARCHIVE.md` → "§7.6 V1 — backend session edges" | — | — |
-| V2 | Verify ✅ and fix ✅ 2026-10-11 — record in `TODO_ARCHIVE.md` → "§7.6 V2 — CI/deploy hardening" (end-to-end proof pending the next RC deploy) | — | — |
+| V2 | Verify ✅ and fix ✅ 2026-10-11 — record in `TODO_ARCHIVE.md` → "§7.6 V2 — CI/deploy hardening" (end-to-end proof: `v0.1.9-rc.1` deployed green 2026-10-17 on the pinned action and the read-only token; `v0.1.8-rc.1` failed 2026-10-13 before any Fly release was created, cause not recoverable, likely transient) | — | — |
 | V3 | Verify ✅ and fix ✅ 2026-10-11 — record in `TODO_ARCHIVE.md` → "§7.6 V3 — public endpoints"; limits + idle timeout → the low-priority abuse-protection entry in §7.1; forwarded headers + exhaustion → §9 (Fly-side health check is off by default, `FLY_HEALTH_CHECK` repo variable; observable on an RC deploy only once switched on) | — | — |
 | V4 | Verify ✅ and fix ✅ 2026-10-11 — record in `TODO_ARCHIVE.md` → "§7.6 V4 — scripts and logging"; Dockerfile items → §9 | — | — |
 | V5 | Verify ✅ 2026-10-11 (verdicts in TODO_ARCHIVE.md → "§1 #4 Importer hardening — step #4e": 4 read-confirmed, 1 refuted, 1 partly refuted). No in-slice fixes — all needed a test seam → shipped as §1 #4, archived | — | — |
@@ -622,7 +629,7 @@ a decision (Roar/Whirlwind, the BST bands).
 | V9 | Done ✅ 2026-10-12 — all four reproduced; Psywave max, binding odds, Stat Exp fixed; record in `TODO_ARCHIVE.md` → "§7.6 V9 — smaller Gen 1 gaps I"; confusion self-hit → its own §3.1 entry | pokered + code; scratch test | Gen 1 source per claim |
 | V10 | Done ✅ 2026-10-12 — all six confirmed; trainer XP, Transform crit Speed, Substitute-at-cost fixed; record in `TODO_ARCHIVE.md` → "§7.6 V10 — smaller Gen 1 gaps II"; Mist/thaw/Leech Seed and the XP split order → their own §3.1 entries | pokered + code; scratch test | Gen 1 source per claim |
 | V11 | Done ✅ 2026-10-14 — claim 1 read-confirmed, claims 2–4 reproduced; AI weights (type-immune status, secondary-chance scaling), `MoveTurnChoice` validation and `Biome.cs` map connectivity fixed; record in `TODO_ARCHIVE.md` → "§7.6 V11 — seam leak, AI weights, move validation, map connectivity"; seam leak → its own §3.1 entry | pokered + code; scratch test | Gen 1 source per claim |
-| V12 | Frontend: double-submit, `/battle` "Connecting…" forever, unbounded battle log (§5) | Code | Browser-only parts → *needs-runtime* |
+| V12 | Done ✅ 2026-10-17 — all three reproduced (two in Puppeteer, one by scratch Vitest), the re-render claim read-confirmed; double-submit and the `/battle` dead end fixed; record in `TODO_ARCHIVE.md` → "§7.6 V12 — frontend double-submit, /battle dead end, battle log"; the log cap → its own §5 entry, ✗ not Ready | Code | Browser-only parts → *needs-runtime* |
 | V13 | Frontend: Phaser resize, unheard `entryComplete`, frontend nits (§5) | Code | Browser-only parts → *needs-runtime* |
 | V14 | Test hygiene (§6) | Code; scratch test run | — |
 | V15 | Speculative list (§7.5) | Code; coverage run | — |

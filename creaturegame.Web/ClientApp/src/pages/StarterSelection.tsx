@@ -6,6 +6,7 @@ import type { Species } from '../types/Species';
 import { friendlyFetchError } from '../utils/fetchError';
 import { buildStartGameRequest } from '../utils/startGameRequest';
 import { saveActiveGame } from '../utils/activeGame';
+import { createInFlightGuard } from '../utils/inFlight';
 import { DEFAULT_GENERATION } from '../generations/presentation';
 import './StarterSelection.css';
 
@@ -29,6 +30,7 @@ export function StarterSelection() {
   // immediate theme, with the server echo as the authority thereafter.
   const generationChoice = DEFAULT_GENERATION;
   const searchRef = useRef<HTMLInputElement>(null);
+  const [startGuard] = useState(createInFlightGuard);
 
   useEffect(() => {
     fetch('/api/species')
@@ -42,7 +44,7 @@ export function StarterSelection() {
     setFiltered(q ? species.filter(s => s.name.toLowerCase().includes(q)) : species);
   }, [search, species]);
 
-  const confirm = async (nickname: string | null) => {
+  const confirm = (nickname: string | null) => startGuard(async () => {
     if (!selected) return;
     try {
       const query = new URLSearchParams(window.location.search);
@@ -71,7 +73,7 @@ export function StarterSelection() {
       setNaming(false);
       setError(friendlyFetchError(e));
     }
-  };
+  });
 
   return (
     <div className="select-screen">

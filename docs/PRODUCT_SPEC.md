@@ -296,6 +296,9 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - If the run can no longer be resumed (grace window expired, or the server no longer knows the `gameId`), the
   player is bounced to the Title Screen with a "Couldn't connect to the run — it may have expired." notice,
   instead of hanging on "Connecting…".
+- Opening `/battle` with no persisted run (a cold visit, a cleared run) bounces to the Title Screen with a "No run
+  in progress." notice, instead of hanging on "Connecting…".
+- Double-clicking the starter nickname OK, or pressing Enter on it as well, starts one run, not two.
 - If the server-side run crashes mid-run, the client is told: it clears the persisted run and bounces to the Title
   Screen with a "The run hit an unexpected server error and ended." notice, instead of sitting on its last screen.
 - Blocking prompts (reward, shop, acquisition, etc.) render above the pinned Run Map, so the map never hides one.

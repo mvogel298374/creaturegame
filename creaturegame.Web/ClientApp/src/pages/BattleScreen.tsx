@@ -83,6 +83,10 @@ export function BattleScreen() {
 
   const { state, chooseMove, chooseSwitch, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, respondMoveTeachTarget, buyShopItem, leaveShop, respondAcquisition, chooseLead, respondSwitchIn, dismissDrop } = useBattleHub(gameId, startLevel);
 
+  useEffect(() => {
+    if (!gameId) nav('/', { replace: true, state: { notice: 'No run in progress.' } });
+  }, [gameId, nav]);
+
   // Theme the document for the run's generation: echo first, route state until it arrives. applyGenerationTheme
   // resolves an unknown/missing id to the default per the shared boundary contract (a stale value is a Gen 1 run).
   useEffect(() => {

@@ -8,6 +8,36 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §7.6 V12 — frontend double-submit, /battle dead end, battle log ✅ DONE (2026-10-17)
+
+**Was** `TODO.md` §5 (double-submit, `/battle` "Connecting…", battle log) and the §7.6 V12 slice. Verified at `5101086`.
+User rulings 2026-10-17: manual repro only for the fixes (no E2E case); `pr-review` skipped. `format-gate` PASS;
+`test-runner` PASS (.NET 1889/1889, tsc clean, Vitest 327/327).
+
+**Verdicts.**
+- **Claim 1, double-submit creates two runs — reproduced** in Puppeteer (two `POST /api/game/start`, two `gameId`s;
+  `StarterSelection.tsx`, `NicknameModal.tsx`). Fixed (F1).
+- **Claim 2, `/battle` with no saved game shows "Connecting…" forever — reproduced** in Puppeteer (15 s on `/battle`,
+  0 hub requests): `useBattleHub.ts:59` returns early on a null `gameId`, `initialState` phase is `'connecting'`
+  (`battleReducer.ts:169`), and `App.tsx:12` has no route guard. Fixed (F2).
+- **Claim 3a, battle log unbounded — reproduced** by a throwaway scratch-clone Vitest (5,000 of 5,000 lines kept;
+  `battleReducer.ts:276` appends, only `initialState` at `:203` sets `log`). Not fixed here: needs the user's cap number
+  -> its own `TODO.md` §5 entry, not Ready.
+- **Claim 3b, whole-`BattleScreen` re-render on every dispatch — read-confirmed** (reducer lives in its hook, log lines
+  not memoized); cost in a long run is *needs-runtime*, unmeasured.
+
+**Fixes.**
+- **F1.** New `ClientApp/src/utils/inFlight.ts` (`createInFlightGuard`, pinned by `inFlight.test.ts`);
+  `StarterSelection.confirm` runs through it, so two clicks plus Enter send one start. Re-verified by the same
+  Puppeteer reproduction (1 start call). The acquisition path's nickname OK is unguarded too, but `answerPrompt` hides
+  the modal at once and the server ignores a stale answer; not checked further.
+- **F2.** `BattleScreen` sends a null `gameId` to Title via `nav('/', { replace: true, ... })` with "No run in
+  progress."; re-verified (cold `/battle` lands on `/` with the notice and 0 hub requests).
+
+**Docs updated in-slice:** `PRODUCT_SPEC.md` (Session resume).
+
+---
+
 ## Stat-stage choice behind the seam ✅ DONE (2026-10-14)
 
 **Was** `TODO.md` §1 #4 / §3.1 (from §7.6 V11, claim 1). Ready 2026-10-13 (design approved); greenlit 2026-10-14. `format-gate`
