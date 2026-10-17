@@ -43,7 +43,6 @@ export function BattleCanvas({ playerSpeciesId, enemySpeciesId }: Props) {
       game?.destroy(true);
     };
   // IDs are stable for the battle's lifetime
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return <div ref={containerRef} className="battle-canvas-container" />;

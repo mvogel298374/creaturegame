@@ -259,7 +259,8 @@ export type Step =
   | { kind: 'dispatch'; action: Action }
   | { kind: 'emit'; command: BridgeCommand }
   | { kind: 'wait'; ms: number }
-  | { kind: 'awaitAnim' };
+  | { kind: 'awaitAnim' }
+  | { kind: 'awaitEntry' };
 
 export interface Expansion {
   now?: Action[];
@@ -408,7 +409,7 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       // First encounter: the scene's create() plays the entry animation. Subsequent encounters: tell the
       // scene to load + slide in the new enemy sprite (the canvas is never remounted).
       if ((ctx.encounterIndex ?? 1) <= 1) {
-        return { steps: [d(started), d(log(vsLine))] };
+        return { steps: [d(started), d(log(vsLine)), { kind: 'awaitEntry' }] };
       }
       // A chained encounter: announce the new challenger HERE, at the start of the next battle — not on the
       // previous BattleEnded. The run loop emits this only after any interleaved instance (e.g. a Poké Center
@@ -1277,7 +1278,10 @@ const delay = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, E
 // log if that signal is lost (e.g. a stale scene listener after an HMR remount).
 // E2E uses a short fallback: headless WebGL often never fires animationComplete,
 // so this also bounds per-move time (keeps a small gap for ordering assertions).
-function waitForBridge(timeoutMs = E2E ? 100 : 3000): Promise<void> {
+function waitForBridge(
+  event: 'animationComplete' | 'entryComplete' = 'animationComplete',
+  timeoutMs = E2E ? 100 : 3000,
+): Promise<void> {
   return new Promise<void>(resolve => {
     let settled = false;
     let timer: ReturnType<typeof setTimeout>;
@@ -1285,12 +1289,12 @@ function waitForBridge(timeoutMs = E2E ? 100 : 3000): Promise<void> {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      bridge.off('animationComplete', handler);
+      bridge.off(event, handler);
       resolve();
     };
     const handler = () => finish();
     timer = setTimeout(finish, timeoutMs);
-    bridge.on('animationComplete', handler);
+    bridge.on(event, handler);
   });
 }
 
@@ -1318,6 +1322,8 @@ async function execStep(step: Step, dispatch: Dispatch): Promise<void> {
     case 'emit':      emitCommand(step.command); return;
     case 'wait':      await delay(step.ms); return;
     case 'awaitAnim': await waitForBridge(); return;
+    // Covers the lazy Phaser load plus the 2.6 s send-out before the first turn's menu unlocks.
+    case 'awaitEntry': await waitForBridge('entryComplete', E2E ? 1500 : 6000); return;
   }
 }
 

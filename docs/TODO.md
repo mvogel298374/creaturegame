@@ -38,7 +38,7 @@
 | # | Item | Cost | Ready? (DoR) | Why this slot / what it unblocks |
 |:-:|:-----|:----:|:-------------|:---------------------------------|
 | 1 | **`-StartStack` backend leak** (§7.1 Part A) | S | ✗ parked: leak not reproduced (2026-10-10); un-park condition in §7.1 | Parts B and C are done. Not actionable until the user reproduces it; §1 #3 and #6 do not wait on it. |
-| 2 | **Verification pass over the unverified findings** (§7.6) | S per slice | ✅ (2026-10-10) — 15 tiny slices V1–V15 (V1–V12 done; V13 next; the V16 audit row is tracked separately as #11); each verifies first, then fixes only S-size, non-central, no-decision findings under a mini-DoR; greenlight and commit each | Turns "reviewer's reading" items into evidenced verdicts or discards. Opens up everything below it. |
+| 2 | **Verification pass over the unverified findings** (§7.6) | S per slice | ✅ (2026-10-10) — 15 tiny slices V1–V15 (V1–V13 done; V14 next; the V16 audit row is tracked separately as #11); each verifies first, then fixes only S-size, non-central, no-decision findings under a mini-DoR; greenlight and commit each | Turns "reviewer's reading" items into evidenced verdicts or discards. Opens up everything below it. |
 | 3 | **Server test gaps — `GameSessionManager` lifecycle + the `RunFaulted` path** (§6) | M | ⚠️ needs the injectable-clock design | Unblocks the R1d tests and closes a long-open Tier-4 item. |
 | 5 | **R1d-a — replay an open blocking prompt** (§2) | M | ⚠️ designed, but provisional-pending-`/plan` and needs your three decisions (§8) | The only reconnect item that strands a run; highest player value. |
 | 6 | **CI E2E step** (§6) | M | ✗ no design (runner, stack boot, caching) or acceptance | The only automatic E2E coverage; makes "agents don't run E2E" safe, and unblocks checking the BST/balance flag and the reconnect spec. |
@@ -417,17 +417,25 @@ The stat-selection abstraction is done. Open:
   runtime:* client runtime only. *Quirk to assert:* the oldest line goes first. *Dependencies:* none. The companion
   claim, that the whole `BattleScreen` re-renders on every dispatch, is **read-confirmed** (the reducer lives in its
   hook and the log lines aren't memoized); its cost in a long run is **needs-runtime** (unmeasured).
-- **Phaser:** a resize mid-attack leaves sprites at the old x (`BattleScene.ts:122-137` vs lunge/shake never
-  clearing `*Rested`); `entryComplete` is emitted but unheard, so FIGHT unlocks ≈2.6 s before the sprites arrive.
+- **Phaser resize and entry pacing — fixed 2026-10-17 (§7.6 V13).** Verdicts and fixes FA–FB:
+  `TODO_ARCHIVE.md` → "§7.6 V13 — Phaser resize/entry pacing and frontend nits".
+- **Transform's scale pulse may revert a resize (found 2026-10-17 during V13; unverified, S).** `transformSprite`'s
+  yoyo tween returns to the scale captured at its start (`BattleScene.ts` `morph`), so a resize mid-pulse would
+  restore the old scale. Read only; needs its own mini-DoR and a reproduction.
 - **Player species is taken from the starter** (`BattleScreen.tsx:77,237,400`, `activeGame.ts`) — game-over shows the
   starter's sprite with the final creature's name after an evolution or lead change; Continue also shows the
   starter's name/level. Designed in R1d-d (§2).
 - **Level-up panel covering the nameplate** is fixed; the underlying pattern (independent absolute positions) is the
   one the UI no-crowding rule warns about.
-- **Frontend nits:** `/party` JSON dispatched `as never` (`useBattleHub.ts:116`); an `"unknown"` reward kind renders
-  a blank card (`RewardChoiceModal.tsx:32`); `SpeciesCard` is Enter-only (no Space); `TypeBadge` ≈2:1 contrast on
-  light types; `SettingsScreen` `nav(-1)`; the title-screen notice reappears on reload; dead code (`PhaserBridge`
-  `enterBattle`/`entryComplete`, `AudioEngine.playTick`/`playFaintCry`, two `eslint-disable`s).
+- **Frontend nits — verified and fixed 2026-10-17 (§7.6 V13).** Verdicts (incl. the partly refuted unknown-reward
+  claim) and fixes FC–FH: `TODO_ARCHIVE.md` → "§7.6 V13 — Phaser resize/entry pacing and frontend nits".
+- **Type-badge contrast (reproduced 2026-10-17, §7.6 V13) — S, ✗ not Ready (needs your palette call).** *Intent:*
+  every `TypeBadge` meets WCAG AA (4.5:1) for its label. *Evidence:* computed ratios: 13 of 18 below 4.5:1, 7 at or
+  under 2.5:1 (Ice 1.85, Rock 1.99, Fire 2.07, Bug 2.13, Fairy 2.18, Flying 2.38, Grass 2.39). *Drafted option:*
+  dark text (`#333`, as Electric uses) on every badge under 4.5:1 with white text; backgrounds unchanged, so
+  `typeColor()` consumers (map glyphs, chips) are unaffected. *Acceptance:* a Vitest test computes every pair in
+  `TYPE_COLORS` and asserts ≥4.5:1. *Gen surface:* none. *Gen 1 source:* n/a. *Data vs runtime:* client styling.
+  *Quirk to assert:* none. *Dependencies:* none.
 
 ---
 
@@ -630,7 +638,7 @@ a decision (Roar/Whirlwind, the BST bands).
 | V10 | Done ✅ 2026-10-12 — all six confirmed; trainer XP, Transform crit Speed, Substitute-at-cost fixed; record in `TODO_ARCHIVE.md` → "§7.6 V10 — smaller Gen 1 gaps II"; Mist/thaw/Leech Seed and the XP split order → their own §3.1 entries | pokered + code; scratch test | Gen 1 source per claim |
 | V11 | Done ✅ 2026-10-14 — claim 1 read-confirmed, claims 2–4 reproduced; AI weights (type-immune status, secondary-chance scaling), `MoveTurnChoice` validation and `Biome.cs` map connectivity fixed; record in `TODO_ARCHIVE.md` → "§7.6 V11 — seam leak, AI weights, move validation, map connectivity"; seam leak → its own §3.1 entry | pokered + code; scratch test | Gen 1 source per claim |
 | V12 | Done ✅ 2026-10-17 — all three reproduced (two in Puppeteer, one by scratch Vitest), the re-render claim read-confirmed; double-submit and the `/battle` dead end fixed; record in `TODO_ARCHIVE.md` → "§7.6 V12 — frontend double-submit, /battle dead end, battle log"; the log cap → its own §5 entry, ✗ not Ready | Code | Browser-only parts → *needs-runtime* |
-| V13 | Frontend: Phaser resize, unheard `entryComplete`, frontend nits (§5) | Code | Browser-only parts → *needs-runtime* |
+| V13 | Done ✅ 2026-10-17 — 7 reproduced, 2 read-confirmed, 1 partly refuted; resize re-seat, first-battle entry wait, Space on cards, cold Settings BACK, one-shot Title notice, the cast and the dead code fixed; verdicts inline in §5; contrast → its own §5 entry, ✗ not Ready | Code | Browser-only parts → *needs-runtime* |
 | V14 | Test hygiene (§6) | Code; scratch test run | — |
 | V15 | Speculative list (§7.5) | Code; coverage run | — |
 | V16 | **Full Gate 1 audit, after V15 (user 2026-10-11):** every open entry in §1–§7 checked against the seven `DEFINITION_OF_READY.md` items | Docs only: one ✅/✗ row per entry per DoR item | Acceptance: no open entry is left unaudited; each gap gets drafted proposed text, and decisions go to §8. Writes no code and changes no data; only `docs-cleanup` gates it |

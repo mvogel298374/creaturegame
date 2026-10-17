@@ -35,6 +35,9 @@ export class BattleScene extends Phaser.Scene {
   // so it never fights an in-flight slide-in/lunge/faint tween.
   private playerRested = false;
   private enemyRested = false;
+  // Set when a resize skipped a sprite mid-tween; the tween's end re-seats it at the new rest spot.
+  private playerStale = false;
+  private enemyStale = false;
 
   constructor() {
     super({ key: 'BattleScene' });
@@ -76,7 +79,7 @@ export class BattleScene extends Phaser.Scene {
     // faint) much faster so battles play through quickly under test.
     if (E2E) { this.tweens.timeScale = 8; this.time.timeScale = 8; }
 
-    const { enemyRestX, enemyRestY, playerRestX, playerRestY, enemyScale, playerScale } = this.layout();
+    const { enemyRestX, enemyRestY, playerRestY, enemyScale, playerScale } = this.layout();
 
     this.enemySprite = this.add.image(W + 120, enemyRestY, 'enemy').setScale(enemyScale);
     this.playerSprite = this.add.image(-120, playerRestY, 'player').setScale(playerScale);
@@ -99,7 +102,7 @@ export class BattleScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.teardown, this);
     this.events.once(Phaser.Scenes.Events.DESTROY, this.teardown, this);
 
-    this.playEntryAnimation(enemyRestX, playerRestX);
+    this.playEntryAnimation(enemyRestX);
   }
 
   // Rest spots + sprite scales for the current canvas size. Scaled off 96×96 source sprites, capped so large
@@ -124,16 +127,46 @@ export class BattleScene extends Phaser.Scene {
     const l = this.layout();
     this.enemySprite.setScale(l.enemyScale);
     this.playerSprite.setScale(l.playerScale);
-    if (this.enemyRested) {
-      this.enemyIdleTween?.stop();
+    if (this.enemyRested) this.reseat('enemy');
+    else this.enemyStale = true;
+    if (this.playerRested) this.reseat('player');
+    else this.playerStale = true;
+  }
+
+  private snap(side: 'player' | 'enemy') {
+    const l = this.layout();
+    if (side === 'player') {
+      this.playerStale = false;
+      this.playerSprite.setPosition(l.playerRestX, l.playerRestY);
+    } else {
+      this.enemyStale = false;
       this.enemySprite.setPosition(l.enemyRestX, l.enemyRestY);
+    }
+  }
+
+  private reseat(side: 'player' | 'enemy') {
+    if (side === 'player') {
+      this.playerIdleTween?.stop();
+      this.snap('player');
+      this.playerIdleTween = this.bob(this.playerSprite);
+    } else {
+      this.enemyIdleTween?.stop();
+      this.snap('enemy');
       this.enemyIdleTween = this.bob(this.enemySprite);
     }
-    if (this.playerRested) {
-      this.playerIdleTween?.stop();
-      this.playerSprite.setPosition(l.playerRestX, l.playerRestY);
-      this.playerIdleTween = this.bob(this.playerSprite);
-    }
+  }
+
+  private isRested(side: 'player' | 'enemy') {
+    return side === 'player' ? this.playerRested : this.enemyRested;
+  }
+
+  private setRested(side: 'player' | 'enemy', rested: boolean) {
+    if (side === 'player') this.playerRested = rested;
+    else this.enemyRested = rested;
+  }
+
+  private isStale(side: 'player' | 'enemy') {
+    return side === 'player' ? this.playerStale : this.enemyStale;
   }
 
   private bob(sprite: Phaser.GameObjects.Image, delay = 0) {
@@ -159,7 +192,7 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
-  private playEntryAnimation(enemyRestX: number, playerRestX: number) {
+  private playEntryAnimation(enemyRestX: number) {
     this.tweens.add({
       targets: this.enemySprite,
       x: enemyRestX,
@@ -168,8 +201,12 @@ export class BattleScene extends Phaser.Scene {
       onComplete: () => {
         this.playCry('enemy');
         this.enemyRested = true;
+        if (this.enemyStale) this.snap('enemy');
         // Pause after enemy cry before player enters
         this.time.delayedCall(1800, () => {
+          this.playerStale = false;
+          const { playerRestX, playerRestY } = this.layout();
+          this.playerSprite.y = playerRestY;
           this.tweens.add({
             targets: this.playerSprite,
             x: playerRestX,
@@ -178,6 +215,7 @@ export class BattleScene extends Phaser.Scene {
             onComplete: () => {
               this.playCry('player');
               this.playerRested = true;
+              if (this.playerStale) this.snap('player');
               this.startIdleTweens();
               bridge.emit('entryComplete', undefined);
             },
@@ -188,6 +226,8 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private startIdleTweens() {
+    this.enemyIdleTween?.stop();
+    this.snap('enemy');
     this.enemyIdleTween = this.bob(this.enemySprite);
     this.playerIdleTween = this.bob(this.playerSprite, 200);
   }
@@ -200,7 +240,9 @@ export class BattleScene extends Phaser.Scene {
     const lunge  = attackerSide === 'player' ? 50 : -50;
     const originX = attacker.x;
 
+    const wasRested = this.isRested(attackerSide);
     attackerIdle?.pause();
+    this.setRested(attackerSide, false);
 
     this.tweens.add({
       targets: attacker,
@@ -217,7 +259,11 @@ export class BattleScene extends Phaser.Scene {
           duration: 200,
           ease: 'Cubic.easeOut',
           onComplete: () => {
-            attackerIdle?.resume();
+            if (wasRested) {
+              this.setRested(attackerSide, true);
+              if (this.isStale(attackerSide)) this.reseat(attackerSide);
+              else attackerIdle?.resume();
+            }
             bridge.emit('animationComplete', undefined);
           },
         });
@@ -259,7 +305,10 @@ export class BattleScene extends Phaser.Scene {
       ease: 'Sine.easeInOut',
       yoyo: true,
       repeat: 2,
-      onComplete: () => { sprite.x = originX; },
+      onComplete: () => {
+        const l = this.layout();
+        sprite.x = this.isRested(side) ? (side === 'player' ? l.playerRestX : l.enemyRestX) : originX;
+      },
     });
   }
 
@@ -277,6 +326,7 @@ export class BattleScene extends Phaser.Scene {
       this.enemySprite.setTexture(spriteKey);
       this.enemySprite.setAlpha(1).setPosition(W + 120, enemyRestY);
       this.enemyRested = false;
+      this.enemyStale = false;
 
       this.tweens.add({
         targets: this.enemySprite,
@@ -286,6 +336,7 @@ export class BattleScene extends Phaser.Scene {
         onComplete: () => {
           this.playCry('enemy');
           this.enemyRested = true;
+          if (this.enemyStale) this.snap('enemy');
           this.enemyIdleTween = this.bob(this.enemySprite);
         },
       });
@@ -395,6 +446,7 @@ export class BattleScene extends Phaser.Scene {
       this.playerIdleTween?.stop();
       this.playerSprite.setScale(playerScale);
       this.playerRested = false;
+      this.playerStale = false;
       this.playerSprite.setTexture(key);
       this.playerSprite.setAlpha(1).setPosition(-120, playerRestY);
 
@@ -406,6 +458,7 @@ export class BattleScene extends Phaser.Scene {
         onComplete: () => {
           this.playCry('player');
           this.playerRested = true;
+          if (this.playerStale) this.snap('player');
           this.playerIdleTween = this.bob(this.playerSprite);
         },
       });

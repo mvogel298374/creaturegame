@@ -1,7 +1,7 @@
 import { useEffect, useRef, useReducer, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as signalR from '@microsoft/signalr';
-import { type Payload, expandEvent, useBattleTimeline } from '../battle/timeline';
+import { type Payload, type PartyMember, expandEvent, useBattleTimeline } from '../battle/timeline';
 import { battleReducer, initialState } from './battleReducer';
 import { bossTrainerName } from '../battle/bossTrainer';
 import { nextPlayerId } from '../battle/playerIdentity';
@@ -133,7 +133,7 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
       fetch(`/api/game/${gameId}/party`)
         .then(r => (r.ok ? r.json() : null))
         .then((members: unknown) => {
-          if (Array.isArray(members)) dispatch({ type: 'PARTY_SET', members: members as never });
+          if (Array.isArray(members)) dispatch({ type: 'PARTY_SET', members: members as PartyMember[] });
         })
         .catch(() => { /* keep the current panel value */ });
     };

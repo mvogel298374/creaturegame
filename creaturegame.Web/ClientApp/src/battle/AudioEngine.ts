@@ -144,11 +144,6 @@ export function playHitCrit(): void {
   noise.start(t);
 }
 
-/** Damage tick sound for HP/XP bars */
-export function playTick(): void {
-  burst({ startFreq: 660, endFreq: 600, duration: 0.03, volume: 0.12 });
-}
-
 /** Status condition applied (sleep/poison/etc.) */
 export function playStatusApplied(): void {
   // Two descending bleeps
@@ -170,8 +165,4 @@ export function playCry(speciesId: number): void {
   const baseFreq = 220 + (speciesId % 60) * 8;
   burst({ startFreq: baseFreq,        endFreq: baseFreq * 1.4, duration: 0.08, volume: 0.25, type: 'square' });
   burst({ startFreq: baseFreq * 1.4,  endFreq: baseFreq * 0.85, duration: 0.14, volume: 0.22, type: 'square', delayStart: 0.07 });
-}
-
-export function playFaintCry(): void {
-  burst({ startFreq: 400, endFreq: 80, duration: 0.6, volume: 0.2, type: 'square' });
 }

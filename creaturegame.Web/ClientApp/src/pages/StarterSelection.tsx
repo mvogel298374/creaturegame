@@ -184,7 +184,11 @@ function SpeciesCard({ species, isSelected, onClick }: {
       onClick={onClick}
       role="button"
       tabIndex={0}
-      onKeyDown={e => e.key === 'Enter' && onClick()}
+      onKeyDown={e => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
+        onClick();
+      }}
     >
       <span className="card-number">#{String(species.id).padStart(3, '0')}</span>
 

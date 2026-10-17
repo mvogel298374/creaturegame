@@ -3,7 +3,6 @@ import { E2E } from '../testEnv';
 
 type BridgeEvents = {
   // React → Phaser
-  enterBattle: { playerSpeciesId: number; enemySpeciesId: number };
   playMoveAnimation: { attackerSide: 'player' | 'enemy'; targetSide: 'player' | 'enemy' };
   playHitSound: { isCrit: boolean };
   playFaintAnimation: { side: 'player' | 'enemy' };

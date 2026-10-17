@@ -93,6 +93,13 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - Design detail → `ARCHITECTURE.md` §2.2 ("Creatures are identified by id").  History → `TODO_ARCHIVE.md` →
   *Creature Identity — id-keyed events*.
 
+### First-battle send-out
+- The first turn's menu of a run unlocks only once both creatures are on the field, as in Gen 1 (no input during the
+  send-out); a lost signal falls back after 6 s.
+- Resizing the window at any moment, mid-attack included, leaves both sprites at the new resting spot.
+- Design detail → `SPRITE_PRESENTATION.md` §1.3.  History → `TODO_ARCHIVE.md` → *§7.6 V13 — Phaser resize/entry
+  pacing and frontend nits*.
+
 ### Gen 1 species base stats and base experience
 - Every species' base HP/Attack/Defense/Speed and its single Special match the original Gen 1 games (Red/Blue
   `base_stats`), not the modern values: e.g. Chansey Special 105, Gyarados Special 100, Pikachu Defense 30.
@@ -298,6 +305,7 @@ the linked design doc instead — pull it there and leave only the pointer here.
   instead of hanging on "Connecting…".
 - Opening `/battle` with no persisted run (a cold visit, a cleared run) bounces to the Title Screen with a "No run
   in progress." notice, instead of hanging on "Connecting…".
+- A Title Screen notice shows once; reloading the Title Screen does not bring it back.
 - Double-clicking the starter nickname OK, or pressing Enter on it as well, starts one run, not two.
 - If the server-side run crashes mid-run, the client is told: it clears the persisted run and bounces to the Title
   Screen with a "The run hit an unexpected server error and ended." notice, instead of sitting on its last screen.
@@ -310,3 +318,9 @@ the linked design doc instead — pull it there and leave only the pointer here.
   lead choice, switch-in) is open, rather than during an active battle, still hangs on reconnect.
 - Design detail → `ARCHITECTURE.md` §2.7 (Web session lifecycle). History → `TODO_ARCHIVE.md` → *Session Resume
   — refresh/reopen-safe `gameId` persistence*.
+
+### Client navigation and input
+- Space as well as Enter selects a starter card.
+- BACK on Settings returns to the previous in-app page; opened cold (a direct visit or reload), it goes to the
+  Title Screen.
+- Design detail → none.  History → `TODO_ARCHIVE.md` → *§7.6 V13 — Phaser resize/entry pacing and frontend nits*.

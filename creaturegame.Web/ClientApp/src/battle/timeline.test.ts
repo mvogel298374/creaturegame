@@ -157,6 +157,14 @@ describe('expandEvent — control plane vs timeline', () => {
     expect((steps ?? []).some(s => s.kind === 'emit')).toBe(false);
   });
 
+  it('only the first BattleStarted holds the queue until the scene signals its entry is complete', () => {
+    const payload = { playerName: 'MEWTWO', playerId: 1, enemyName: 'ARTICUNO', enemyId: 2, enemySpeciesId: 144, enemyLevel: 50 };
+    const first = expandEvent('BattleStarted', payload, { playerId: 1, encounterIndex: 1 }).steps ?? [];
+    const chained = expandEvent('BattleStarted', payload, { playerId: 1, encounterIndex: 2 }).steps ?? [];
+    expect(first.at(-1)).toEqual({ kind: 'awaitEntry' });
+    expect(chained.some(s => s.kind === 'awaitEntry')).toBe(false);
+  });
+
   it('a chained BattleStarted (2nd+ encounter) announces the new challenger and emits a spawnEnemy command', () => {
     const { now, steps } = expandEvent('BattleStarted',
       { playerName: 'MEWTWO', playerId: 1, enemyName: 'ARBOK', enemyId: 2, enemySpeciesId: 24, enemyLevel: 52 },

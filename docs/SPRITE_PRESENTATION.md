@@ -101,6 +101,24 @@ anywhere in the client, confirmed by a repo-wide grep for `Pipeline|shader|Rende
 | Damage shake | ±8px x, ×3 | on-hit |
 | Faint | +80px y + fade to alpha 0 | faint animation |
 
+**Resize (`Scale.RESIZE`) — re-seat at rest, never mid-tween.** `relayout()` rescales both sprites and re-seats
+only a sprite that is idle at its rest spot (`*Rested`); moving one mid-tween would fight the tween, which
+then finishes at a target captured before the resize. A sprite in flight (slide-in, lunge, faint) is marked
+`*Stale` instead, and the tween's end re-seats it at the current rest spot (`snap`, or `reseat` to also
+restart the idle bob, since the bob is a relative tween that remembers its start y). The lunge clears
+`*Rested` for its duration for this reason, and restores it only if the attacker was resting when it began
+(a lunge can overlap a slide-in); the hit jolt (fire-and-forget, on a resting sprite) ends at the current rest
+x rather than its captured origin. The player's entry tween reads its rest spot, x and y, when it starts,
+after the 1.8 s cry pause, not at `create()`; when the idle bobs start, the enemy is snapped to rest first, so
+a bob stopped mid-swing by a resize in that pause doesn't leave it offset. (§7.6 V13, 2026-10-17.)
+
+**The first battle waits for the send-out.** The scene emits `entryComplete` when the entry slide-in ends
+(≥2.6 s: two 400 ms slides around the 1.8 s cry pause, plus the lazy Phaser load). The first encounter's
+`BattleStarted` expands to an `awaitEntry` step on it, so the first turn's menu unlocks only once both
+creatures are on the field, as in Gen 1, where no input is taken during the send-out. The wait falls back
+after 6 s (1.5 s under E2E, which speeds tweens ×8) so a lost signal can't hang the run; chained encounters
+keep their fixed 450 ms wait for the enemy's slide-in.
+
 **`swapPlayerCreature`** (built for the Stage 3 forced-switch feature): sets the tracked species to the
 incoming creature, loads `back-{id}` on demand if uncached, resets the player sprite to alpha 1 off-screen
 left, tweens it in (400ms, `Cubic.easeOut`), plays its cry, restarts the idle bob. It's written to mirror

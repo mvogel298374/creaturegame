@@ -14,6 +14,10 @@ export function TitleScreen() {
   // A failed-resume bounce (useBattleHub's conn.start() rejection) lands here with a one-shot notice —
   // dismissed on the first interaction with the page, same lifetime rule as the battle level-up panel.
   const [notice, setNotice] = useState<string | null>((location.state as { notice?: string } | null)?.notice ?? null);
+  // Drop the notice from router state once read, or a reload (which keeps history state) shows it again.
+  useEffect(() => {
+    if (location.state) nav('.', { replace: true, state: null });
+  }, [location.state, nav]);
 
   return (
     <div className="title-screen" onClick={() => setNotice(null)}>

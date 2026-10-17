@@ -42,8 +42,7 @@ export function CreatureOverview({ gameId, party, onBack, enemy = false }: {
       .then((d: PlayerOverview) => { if (live) setData(d); })
       .catch(e => { if (live) setError(friendlyFetchError(e)); });
     return () => { live = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- party only affects the URL when empty (resume
-    // fallback); re-fetching on every HP/status tick of the whole party would be wasteful and isn't needed.
+    // party is left out on purpose: it only shapes the URL when empty, and it changes on every HP tick.
   }, [gameId, slot]);
 
   return (

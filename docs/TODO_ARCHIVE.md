@@ -8,6 +8,59 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §7.6 V13 — Phaser resize/entry pacing and frontend nits ✅ DONE (2026-10-17)
+
+**Was** `TODO.md` §5 (Phaser resize and unheard `entryComplete`; frontend nits) and the §7.6 V13 slice. Verified at
+`93a4186`. User rulings 2026-10-17: all seven fixes, type-badge contrast as its own entry, `pr-review` once (no second
+pass after its fixes). `format-gate` PASS; `test-runner` PASS (.NET 1889/1889, tsc clean, Vitest 328/328);
+`requirements-review` N/A; `pr-review` CHANGES-REQUESTED (1 blocker: player entry y not re-read; 2 recommended: enemy
+snap before bob restart, lunge restoring `*Rested` only if it started at rest), all three fixed and re-verified.
+Advisory: headless Playwright may add up to 1.5 s at run start if `entryComplete` never fires; narrowest check
+`.\e2e.ps1 -Spec battle.spec` (user's call).
+
+**Verdicts.**
+- **A, resize mid-lunge leaves sprites at the old x — reproduced** (Puppeteer, canvas 1000→600 px: player at 280, not
+  168). The lunge's return target and the hit jolt's reset were captured before the resize, and the slide-ins (entry,
+  `spawnEnemy`, `swapPlayerCreature`) aimed at a stale rest spot too. Fixed (FA).
+- **B, `entryComplete` emitted but unheard, FIGHT early — reproduced** (E2E mode: FIGHT ≈1.1 s before
+  `entryComplete`; ≥2.6 s at normal speed): the first `BattleStarted` queued no wait. Fixed (FB).
+- **C, `/party` JSON dispatched `as never` — read-confirmed.** Fixed (FC).
+- **D, `"unknown"` reward kind renders a blank card — partly refuted:** it renders a clickable, nameless "COMMON"
+  item card (server `_` arm in `SignalRBattleEventEmitter.ProjectRewardOption`); reachable only if a new
+  `RewardOption` subtype ships without its projection. Verdict only, no fix (user default).
+- **E, `SpeciesCard` Enter-only — reproduced.** Fixed (FE).
+- **F, `TypeBadge` contrast — reproduced** (computed WCAG: 13 of 18 below 4.5:1, worst Ice 1.85). Not fixed here: needs
+  a palette call -> its own `TODO.md` §5 entry, not Ready.
+- **G, `SettingsScreen` `nav(-1)` — reproduced** (cold BACK left to `about:blank`). Fixed (FG).
+- **H, Title notice reappears on reload — reproduced.** Fixed (FH).
+- **I, dead `enterBattle`/`playTick`/`playFaintCry` — read-confirmed.** **J, two `eslint-disable`s — read-confirmed**
+  (no ESLint in the repo). Both removed.
+
+**Fixes.**
+- **FA.** `BattleScene.relayout()` re-seats only a resting sprite; a sprite in flight is marked `*Stale` and the
+  tween's end re-seats it (`snap`, or `reseat` to also restart the bob). The lunge clears `*Rested` for its duration
+  and restores it only if the attacker started at rest; the hit jolt ends at the current rest x; slide-ins snap on
+  end; the player's entry reads rest x/y when it starts (after the 1.8 s cry pause); `startIdleTweens` stops a
+  running bob first and snaps the enemy to rest before restarting its bob. Re-verified by the same Puppeteer runs:
+  resize mid-lunge puts the player at the new rest (168; 126 at 450 px), one tween per sprite; resize during the
+  cry pause leaves both sprites at the new rest x, y within the 5 px bob band.
+- **FB.** `timeline.ts`: the first `BattleStarted` ends with an `awaitEntry` step on `entryComplete` (6 s fallback,
+  1.5 s under E2E); `waitForBridge` takes the event name; Vitest-pinned in `timeline.test.ts`. FIGHT enabled 2 ms
+  after `entryComplete`.
+- **FC.** `useBattleHub.ts`: `as PartyMember[]`.
+- **FE.** `StarterSelection.tsx`: Space selects a `SpeciesCard`, with `preventDefault`.
+- **FG.** `SettingsScreen.tsx`: BACK goes to `/` when `location.key === 'default'`; in-app BACK still goes back.
+- **FH.** `TitleScreen.tsx`: clears the notice from router state with a `replace`; gone after reload.
+- Dead code removed from `PhaserBridge.ts`, `AudioEngine.ts`; inert `eslint-disable`s from `BattleCanvas.tsx`,
+  `CreatureOverview.tsx`.
+
+**Open follow-ups (live in `TODO.md` §5):** type-badge contrast (not Ready); Transform's scale pulse may revert a
+resize (unverified).
+
+**Docs updated in-slice:** `SPRITE_PRESENTATION.md` §1.3 (resize rule, first-battle entry wait), `PRODUCT_SPEC.md`.
+
+---
+
 ## §7.6 V12 — frontend double-submit, /battle dead end, battle log ✅ DONE (2026-10-17)
 
 **Was** `TODO.md` §5 (double-submit, `/battle` "Connecting…", battle log) and the §7.6 V12 slice. Verified at `5101086`.
