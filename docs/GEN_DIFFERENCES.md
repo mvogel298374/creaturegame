@@ -125,7 +125,7 @@ Where A = Attack (or Special), D = Defense (or Special), with no Sp. Atk/Sp. Def
   type.)
 - **Psywave rolls below 1.5 × level, and the sides differ:** the player rolls `[1, b)`, the foe `[0, b)` with
   b = L + ⌊L/2⌋, so the foe can deal 0 (`core.asm:4657-4670`, `:4776-4789`). Ours models the player's range for both
-  sides — the foe's 0 is an open decision (`TODO.md` §8).
+  sides — the foe's 0 is tracked in `TODO.md` §3.1 "Foe Psywave can deal 0".
 - **Explosion / Self-Destruct against an immune target** shows "doesn't affect", and the user still faints. On a
   miss the user faints too — the same in Gen 2–3 (pokecrystal `Selfdestruct`: `selfdestruct` after `checkhit`;
   pokeemerald `BattleScript_EffectExplosion`: `setatkhptozero` first).

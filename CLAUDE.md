@@ -31,9 +31,10 @@ Layer 2 is always loaded:
 @directives/MoDirectives/settled.md
 @directives/Guardrails/GUARDRAILS.md
 
-Layer 3 loads `environment.md` always, and the rest by trigger (tree below):
+Layer 3 loads `environment.md` and `communication.md` always, and the rest by trigger (tree below):
 
 @directives/ClaudeDirectives/environment.md
+@directives/ClaudeDirectives/communication.md
 
 ## Docs tree
 
@@ -46,6 +47,7 @@ directives/
   Guardrails/GUARDRAILS.md         layer 2, always loaded
   ClaudeDirectives/
     environment.md                 layer 3, always loaded
+    communication.md               layer 3, always loaded
     testing.md                     writing, running or debugging tests
     engine.md                      battle, stat, move or event work
     data.md                        importer, database or asset work

@@ -44,9 +44,9 @@
 |:-:|:-----|:----:|:-------------|:---------------------------------|
 | 1 | **`-StartStack` backend leak** (§7.1 Part A) | S | ✗ parked: leak not reproduced (2026-10-10); un-park condition in §7.1 | Parts B and C are done. Not actionable until the user reproduces it; §1 #3 and #6 do not wait on it. |
 | 3 | **Server test gaps — `GameSessionManager` lifecycle + the `RunFaulted` path** (§6) | M | ⚠️ needs the injectable-clock design (V16 drafted `TimeProvider` and the acceptance list) | Unblocks the R1d tests and closes a long-open Tier-4 item. |
-| 5 | **R1d-a — replay an open blocking prompt** (§2) | M | ⚠️ designed, but provisional-pending-`/plan`; V16: that is the only gap (a short server-side `/plan`), with no §8 decision of its own | The only reconnect item that strands a run; highest player value. |
+| 5 | **R1d-a — replay an open blocking prompt** (§2) | M | ⚠️ designed, but provisional-pending-`/plan`; V16: that is the only gap (a short server-side `/plan`), with no decision of its own | The only reconnect item that strands a run; highest player value. |
 | 6 | **CI E2E step** (§6) | M | ✗ no design (runner, stack boot, caching) or acceptance | The only automatic E2E coverage; makes "agents don't run E2E" safe, and unblocks checking the reconnect spec. |
-| 7 | **R1d-d, R1d-c** — refresh-state snapshot + sprite; second-tab policy (§2) | M each | ⚠️ provisional-pending-`/plan`; (c) needs your policy call | Both extend (a)'s replay work. |
+| 7 | **R1d-d, R1d-c** — refresh-state snapshot + sprite; second-tab policy (§2) | M each | ⚠️ provisional-pending-`/plan` (decisions made 2026-10-17) | Both extend (a)'s replay work. |
 | 8 | **Gen 1 fidelity — the damage/accuracy core** (§3.1) | L | ✗ needs the Gen 1 source per claim, the seam surface, and the quirks to pin | Verify-first; large blast radius (it touches every damage number). |
 | 9 | **End-of-turn residual phase** (§4.2) | L | ✗ needs a `/plan` | A `/plan`, `opus-engineer`, and both review gates; rewrites `Battle`'s turn loop. |
 | 10 | **Features** — Catch, `save.db`, progressive difficulty, Generation Profile 4d+, … (§4) | L | ✗ each needs a `/plan` | Catch and stone evolutions are unblocked by the bag-scope ruling (`ARCHITECTURE.md` §2.12); `save.db` is declined for now. |
@@ -59,6 +59,9 @@ Verified in code 2026-10-03. Fixed and archived already: the flee stale-cache, t
 dedupe, lost modal answers, the `RunFaulted` notice, and the abandon-timer race (R1d-b). The server replaying on every reconnect is an **accepted
 design** (it cannot tell a refresh from a blip), not a bug.
 
+**User rulings 2026-10-17:** last tab wins and the displaced tab is told; `SessionTakenOver` and `RunMapSnapshot`
+are transport notices outside the event model, like `RunFaulted`; `BattleStarted` gains `PlayerSpeciesId`.
+
 - **R1d-a — an open blocking prompt is not replayed (strands the run).** Ten prompts park the run on a
   `SignalRInput` handshake and none is cached, so after a refresh *or a blip* the modal never reappears, the server
   stays parked, and reconnect cancels the abandon timer — the player can only QUIT. **Acceptance:** refresh or blip
@@ -68,21 +71,21 @@ design** (it cannot tell a refresh from a blip), not a bug.
   **DoR (V16):** ✗ not Ready — gap **2** only. The doc's R1d-a section answers 3–7 (gen surface none, runtime/web
   only, quirk "replays exactly while open, never after it is answered; a shop replays the current balance",
   dependencies none). *Gap 2, drafted:* a short `/plan` ratifies the server design; the client needs nothing new
-  (`expandEvent` → `SHOW_*`). It has no §8 decision of its own; the three §8 reconnect rows serve R1d-c and R1d-d.
-- **R1d-c — a second tab on the same `gameId` silently takes over.** **Needs-decision:** the recommended policy is
-  last tab wins, with the displaced tab told via a `SessionTakenOver` notice that must **not** clear `activeGame`
-  (it is shared `localStorage`). **Acceptance:** second tab → first tab shows the notice and returns to Title; the
-  second continues; a plain refresh never shows the notice.
-  **DoR (V16):** ✗ not Ready — gap **2** (provisional client half, plus the policy and transport-notice decisions in
-  §8). 3–7 are in the doc: gen surface none; runtime/web plus a small client change; quirk "a plain refresh never
-  shows the notice, and `activeGame` survives"; dependencies none.
+  (`expandEvent` → `SHOW_*`). It has no decision of its own.
+- **R1d-c — a second tab on the same `gameId` silently takes over.** **Policy (user 2026-10-17):** last tab wins,
+  with the displaced tab told via a `SessionTakenOver` notice that must **not** clear `activeGame` (it is shared
+  `localStorage`). **Acceptance:** second tab → first tab shows the notice and returns to Title; the second
+  continues; a plain refresh never shows the notice.
+  **DoR:** ✗ not Ready — gap **2** only (the provisional client half needs its `/plan`; the policy and
+  transport-notice decisions are made). 3–7 are in the doc: gen surface none; runtime/web plus a small client
+  change; quirk "a plain refresh never shows the notice, and `activeGame` survives"; dependencies none.
 - **R1d-d — a refresh loses the route trail, node pin, boss framing and the player's sprite.** **Acceptance:** a
   refresh at any point restores the full trail and pin, keeps boss framing, and shows the current lead's sprite.
   **Design:** an absolute `RunMapSnapshot` sent last and applied as an ordered step (not an immediate action —
   the client's queue lags arrival), plus `PlayerSpeciesId` on `BattleStarted` and a reducer-held
   `playerSpeciesId` (also fixes the post-evolution sprite, §5).
-  **DoR (V16):** ✗ not Ready — gaps **2** (provisional; the transport-notice and `PlayerSpeciesId` decisions in §8)
-  and **7** (sequenced after R1d-a, which shares `ReplayLastKnownState`). 3–6 are in the doc: gen surface none;
+  **DoR:** ✗ not Ready — gaps **2** (provisional-pending-`/plan`; the transport-notice and `PlayerSpeciesId`
+  decisions are made, 2026-10-17) and **7** (sequenced after R1d-a, which shares `ReplayLastKnownState`). 3–6 are in the doc: gen surface none;
   runtime/web plus client; quirk "a blip after three biomes leaves `routePath` unchanged, a refresh restores all
   three".
 - **Test plan** (in the doc): C# unit tests, Vitest, and a new opt-in `reconnect.spec.ts` driven by a Dev-Mode-gated
@@ -146,12 +149,27 @@ data/engine item usually also means updating the test that pins the wrong value.
   `TODO_ARCHIVE.md` → "§7.6 V9 — smaller Gen 1 gaps I". The confusion self-hit claim stays open as the entry below.
 - **Gen 1 confusion self-hit damage (from §7.6 V9) — S, ✗ not Ready.** *Intent:* no variance; Attack and Defense
   with stages and Burn applied; the foe's Reflect doubles the Defense. *Gaps:* `DamageCalculator` is central;
-  whether to replicate the foe-Reflect quirk is a §8 decision; seam surface (variance on/off, which side's screen).
+  seam surface (variance on/off, which side's screen).
   *Gen 1 source:* `core.asm:3695-3696`, `:3674-3683`, `:4044-4055` (full cites in the V9 archive record). *Quirk to assert:* the foe's Reflect weakens your self-hit.
-  **DoR (V16):** ✗ not Ready — gaps **1, 2, 3, 5, 7**. *Drafted:* acceptance, a forced-roll test pins the self-hit
-  with no variance roll, staged Attack/Defense and Burn applied, and (if replicated) the foe's Reflect doubling the
-  Defense. Design: central, so `opus-engineer` plus both gates. Seam: an `IBattleRules` member for variance and for
-  which side's screen applies. Runtime only. Depends on the §8 Reflect decision.
+  **User ruling 2026-10-17:** replicate the foe-Reflect quirk, behind a seam.
+  **DoR:** ✗ not Ready — gap **2** (central `DamageCalculator`: a design pass, then `opus-engineer` plus both
+  gates); 1, 3 and 5 are drafted for your confirmation, 7 is resolved. *Drafted:* acceptance, a forced-roll test
+  pins the self-hit with no variance roll, staged Attack/Defense and Burn applied, and the foe's Reflect doubling
+  the Defense. Seam: an `IBattleRules` member for variance and for which side's screen applies (Gen 2 read at
+  pokecrystal in the design pass). Runtime only. Dependencies: none.
+  **Remaining steps:** (1) you confirm the drafted lines; (2) a design pass names the seam members and reads Gen 2,
+  shown to you; (3) then it is Ready for `opus-engineer` plus both review gates.
+- **Foe Psywave can deal 0 (from §7.6 V9) — S, ✗ not Ready.** Gen 1 rolls the player's Psywave in `[1, b)` and
+  the foe's in `[0, b)`, b = L + floor(L/2) (`core.asm:4657-4670`, `:4776-4789`); ours rolls `[1, b)` for both.
+  **User ruling 2026-10-17:** replicate it behind a seam (it stayed open from 2026-10-12).
+  **DoR:** ✗ not Ready — gap **2** (the seam shape: `PsywaveDamageRange`/`RollPsywaveDamage` take only the source
+  creature, so they need the attacker's side; the call site is `AttackAction`, central, so `pr-review` applies).
+  *Drafted:* acceptance, a forced 0 roll on the foe's Psywave deals 0 and leaves the player's HP unchanged, and the
+  player's minimum stays 1; the damage-range preview (`DamageCalculator`) shows the foe's 0. Seam: the existing
+  Psywave members, given the side; Gen 2 read at pokecrystal. Gen 1 source: cited above. Runtime only. Quirk: only
+  the foe can roll 0. Dependencies: none.
+  **Remaining steps:** (1) you confirm the drafted lines; (2) a short design note fixes how the seam learns the
+  attacker's side, shown to you; (3) then it is Ready (S, `pr-review` applies).
 - **Smaller Gen 1 gaps II — verified, trainer XP / Transform crit speed / Substitute-at-cost fixed 2026-10-12 (§7.6 V10).**
   Verdicts, F1–F3 and the review rulings: `TODO_ARCHIVE.md` → "§7.6 V10 — smaller Gen 1 gaps II". The remainder stays
   open as the entries below.
@@ -179,16 +197,18 @@ data/engine item usually also means updating the test that pins the wrong value.
   - **Quirk:** dividing first loses the remainder that dividing last would keep.
   - **Dependencies:** none.
 - **Smaller Gen 1 gaps III (new, unverified beyond the cite):** the foe's stat-down moves fail 25% of the time in a
-  non-link battle (`effects.asm:549-554`), a Gen 1 AI handicap → §8 decision.
-  **DoR (V16):** ✗ not Ready — gaps **1, 3, 5, 6, 7**; the same claim is filed again in §3.2 ("AI stat-down 25%
-  fail"), so the two are merged here. *Drafted:*
+  non-link battle (`effects.asm:549-554`), a Gen 1 AI handicap.
+  **User ruling 2026-10-17:** replicate it behind an `IBattleRules` flag.
+  **DoR:** ✗ not Ready — confirm the drafted lines below and it is ✅ Ready (the fix re-reads the cite before
+  coding). The same claim was filed again in §3.2 ("AI stat-down 25% fail") and is merged here. *Drafted:*
   - **Acceptance:** a forced roll through the rules seam makes the foe's Growl fail one roll in four; the player's
     never does.
   - **Design:** it lives in the stat-down effect, which isn't a central method.
   - **Seam:** an `IBattleRules` flag (Gen 2's behaviour unverified).
   - **Data vs runtime:** runtime only.
   - **Quirk:** only the enemy side rolls.
-  - **Dependencies:** the §8 decision.
+  - **Dependencies:** none.
+  - **Remaining steps:** you confirm the drafted lines; then it is Ready, with no design pass.
 - **Substitute blocks sleep/paralysis status moves; Gen 1 lets them through (source-confirmed 2026-10-17, §7.6
   V15) — S–M, ✗ not Ready.** pokered (master): `SleepEffect` (`engine/battle/effects.asm:26-77`) and
   `ParalyzeEffect_` (`engine/battle/move_effects/paralyze.asm`, reached from `effects.asm:1165`) never call
@@ -227,15 +247,17 @@ data/engine item usually also means updating the test that pins the wrong value.
   (`core.asm:419-421`, `:430-432`, `:443-445`, `:457-459`): no second action, no residual. A second gap, found in
   V16: in a wild battle, pokered's `SwitchAndTeleportEffect` (`effects.asm:814-838`) makes the move fail when the user
   is lower-level and `rand[0, userLv + targetLv] < targetLv / 4`. Ours always succeeds (`MoveEffects.cs:520-548`).
-  **DoR (V16):** ✗ not Ready — gaps **1, 2, 3, 5, 6, 7**. *Drafted:*
+  **User ruling 2026-10-17:** fix both, with a proper generation seam.
+  **DoR:** ✗ not Ready — gap **2** (design pass, central `Battle`); 1, 5 and 6 are drafted below for your
+  confirmation. 3, 4 and 7 are answered.
   - **Acceptance:** a full battle where a faster Roar ends the turn with no foe action and no residual tick, and a
     forced roll makes a lower-level Roar fail.
   - **Design:** touches `Battle` (central), so `opus-engineer` plus both gates; `GAME_LOOP.md:135` is updated.
-  - **Seam:** check Gen 2 at pokecrystal; likely gen-invariant for the turn end, while the level roll goes behind
-    `IBattleRules`.
+  - **Seam (ruled):** both behaviours sit behind `IBattleRules`. The design pass names the members (whether a flee
+    ends the turn at once; the flee success roll) and reads Gen 2's values at pokecrystal.
   - **Data vs runtime:** runtime only.
   - **Quirk:** the slower foe never acts after being scared off.
-  - **Dependencies:** your §8 go-ahead.
+  - **Dependencies:** none (the go-ahead is given).
 - **Seam leak / AI / validation — verified and fixed 2026-10-14 (§7.6 V11).** AI weights, `MoveTurnChoice` trust and the
   `Biome.cs` crash fixed; verdicts, F1–F4 and the review rulings: `TODO_ARCHIVE.md` → "§7.6 V11 — seam leak, AI weights,
   move validation, map connectivity". Its stat-stage seam leak shipped 2026-10-14 (`TODO_ARCHIVE.md` → "Stat-stage choice
@@ -288,11 +310,14 @@ data/engine item usually also means updating the test that pins the wrong value.
 - **Importer hardening follow-ups (the §1 #4 item shipped #4a–#4e 2026-10-11; record in `TODO_ARCHIVE.md` → "§1 #4
   Importer hardening — step #4e"). Two candidates remain, neither DoR'd:**
   - **Empty-but-parseable generation list (found in #4a review):** an empty generation list (moves/items) still
-    reports clean — decide whether it should count as a failure before it gets a row and a DoR.
-    **DoR (V16):** ✗ not Ready — all items wait on the §8 decision (row added). If the answer is "fail":
-    - **Acceptance:** a test feeds an empty list and the run reports the stage failed.
-    - **Data vs runtime:** importer only.
+    reports clean. **User ruling 2026-10-17:** an empty list counts as a failure (S).
+    **DoR:** ✗ not Ready — confirm the drafted lines below and it is ✅ Ready.
+    - **Acceptance:** a test feeds an empty generation list (moves, then items) and the run reports that stage failed.
+    - **Design:** none needed (importer, no central method).
     - **Gen surface:** none.
+    - **Gen 1 source:** n/a (tooling).
+    - **Data vs runtime:** importer only, no `*.db` change.
+    - **Quirk:** an empty but parseable list fails the stage instead of reporting clean.
     - **Dependencies:** none.
   - **Species row and its learnset as one unit (S, found in #4d review; user asked to file it 2026-10-11):**
     `FetchPokemonDataByUrl` saves the species row on its own, then `ImportLearnset` swaps the learnset in a separate
@@ -307,21 +332,25 @@ data/engine item usually also means updating the test that pins the wrong value.
     - **Dependencies:** none.
 
     1, 2 and 6 are answered above (S, importer, no central method).
-- **Yellow availability labels (S; from V6's `requirements-review` 2026-10-11; ✗ not Ready — needs your
-  evolve-only rule).** No gameplay effect (both readers take every `Wild` row, any version).
-  - *Scope + acceptance:* in `GameAvailabilitySeeder.TypeOverrides` and `pokemon.db`: Yellow Eevee `GameCorner` →
-    `Gift` (pokeyellow `scripts/CeladonMansionRoofHouse.asm`; not in `data/events/prizes.asm`); Yellow Lickitung
-    `Trade` → `Wild` (`data/wild/maps/CeruleanCaveB1F.asm`; `data/events/trades.asm:18` trades it *away* for
-    Dugtrio); Yellow Wigglytuff → `GameCorner` (`prizes.asm:9`); and one rule for evolve-only forms, applied to every
-    version (today Ninetales/Omastar/Kabutops take their root's type while Arcanine/Vileplume/Victreebel/Wigglytuff
-    default to `Wild`). Acceptance: `BuildGen1Rows()` tests pin each corrected label and the rule on one line per
-    type; `pokemon.db` rows diffed vs `HEAD`; the rule recorded in `DATA_IMPORT.md` §4.3.
-  - **DoR (V16):** ✗ not Ready — only the §8 evolve-only rule decision is open; every other item is answered.
-  - *Recommendation:* an evolve-only form inherits its root's type (matches the fossils), so Arcanine/Vileplume/
-    Victreebel stay `Wild` (their roots are wild) and Wigglytuff gets `GameCorner` only as a prize itself.
-  - *Gen-variable surface:* none (Gen 1 data). *Gen 1 source:* `pret/pokeyellow`, `pret/pokered`. *Data vs runtime:*
-    data (seeder + rows). *Quirk the test asserts:* Yellow Eevee is a gift, not a prize. *Dependencies:* none.
-- **Dev server reads a `-wal`-stale bin copy (S; from V6; ✗ not Ready — needs your mechanism choice, §8).**
+- **Lickitung is wild in Yellow but never appears wild (S; from V6's `requirements-review` 2026-10-11).** The
+  availability type is never shown; its only reader is the wild pool (`EncounterFactory.cs:311`, `:473`, any
+  version's `Wild` row). Lickitung has `Trade` in all three versions, so it can't appear as a wild enemy. **User
+  ruling 2026-10-17:** fix Lickitung only; the other Yellow corrections and the evolve-only rule have no in-play
+  effect and are settled in §9.
+  - **Acceptance:** `GameAvailabilitySeeder.TypeOverrides` sets Yellow Lickitung `Trade` → `Wild`; a
+    `BuildGen1Rows()` test pins it; a full importer re-run changes only that row in `pokemon.db` (diffed vs `HEAD`).
+  - **Design:** none (one seeder override). **Gen surface:** none (Gen 1 data). **Gen 1 source:** pokeyellow
+    `data/wild/maps/CeruleanCaveB1F.asm`; `data/events/trades.asm:18` trades it *away* for Dugtrio. **Data vs
+    runtime:** data (seeder + re-import). **Quirk:** Lickitung is wild in Yellow, a trade in Red/Blue.
+    **Dependencies:** none. *Risk:* a larger wild pool can shift seeded-run tests; any that move are re-pinned.
+  - **DoR:** ✅ Ready.
+- **Dev server reads a `-wal`-stale bin copy (S; from V6).** **User ruling 2026-10-17:** every data change is a
+  full importer re-run (`MoDirectives/data.md` rule 1), so the mechanism is option (a), the importer's checkpoint
+  on exit; no other writer is supported.
+  - **DoR:** ✗ not Ready — confirm the restated acceptance and it is ✅ Ready. *Acceptance (restated):* after an
+    importer run no root `*.db-wal` holds unflushed pages, and the next build's bin copy matches the root (a
+    scripted repro: import, build, compare). This retires `ClaudeDirectives/data.md` rule 2 (flush SQLite MCP
+    writes), a layer-3 change proposed in the same commit.
   - *Scope + acceptance:* a write sitting in a root `-wal` reaches the dev server after a build. Acceptance: write a
     row via a WAL connection without checkpointing, build, and the bin copy shows the row (scripted repro, then a
     test if the chosen mechanism is code).
@@ -332,10 +361,11 @@ data/engine item usually also means updating the test that pins the wrong value.
     host does not use. **Recommendation: (c), plus (a) as a belt** — it removes the failure mode instead of copying it.
   - *Gen-variable surface:* none. *Gen 1 source:* n/a (tooling). *Data vs runtime:* data-file setting / build;
     no runtime code. *Quirk the test asserts:* the bin copy matches the root after an uncheckpointed write.
-    *Dependencies:* none; touches the `feedback_sqlite_mcp_wal_checkpoint` workflow, which (c) would retire.
-  - **DoR (V16):** ✗ not Ready — only the §8 mechanism decision is open; every other item is answered.
-- **Item `Cost` is modern, and drives rarity + the starting bag (S–M; from V6; ✗ not Ready — needs your balance
-  call, §8).**
+    *Dependencies:* none.
+- **Item `Cost` is modern, and drives rarity + the starting bag (S–M; from V6).** **User ruling 2026-10-17:**
+  behind a generation seam — option (a), Gen 1 prices as per-generation data, plus the `ThenBy(Id)` tie-break.
+  - **DoR:** ✗ not Ready — gap **2**: the `RarityOf` bands were tuned on modern prices, so the design step drafts
+    the new bands (and whether the bands go per-generation too) and shows them to you before any code.
   - *Scope + acceptance:* either (a) import Gen 1 prices (a layer-2 price table from `pokered
     data/items/prices.asm`; `items.db` re-imported; `RarityOf` bands re-checked against the new numbers — X-items
     become Common, Full Heal Uncommon, PP items 0 → Common), or (b) keep modern prices and only make the starting
@@ -350,7 +380,6 @@ data/engine item usually also means updating the test that pins the wrong value.
     rarity bands are gen-invariant `RunRules`-style tuning. *Gen 1 source:* `pokered data/items/prices.asm`.
     *Data vs runtime:* (a) data + a band check; (b) runtime one-liner. *Quirk:* PP items cost 0 in Gen 1 (not sold).
     *Dependencies:* none.
-  - **DoR (V16):** ✗ not Ready — only the §8 balance decision is open; every other item is answered.
 
 ---
 
@@ -405,12 +434,11 @@ channel of a broader acquisition layer.
   `/start`; the workflow pins `flyctl deploy --ha=false` — don't remove it or raise `min_machines_running`
   (`ARCHITECTURE.md` §2.7).
   *DoR (V16): declined by user ruling, so it is not auditable until revisited.*
-- [ ] **Progressive difficulty** beyond `targetBst = lead BST + depth × 10`; trainer encounters at milestones. A
-  good pairing point for the per-area encounter question below.
+- [ ] **Progressive difficulty** beyond `targetBst = lead BST + depth × 10`; trainer encounters at milestones.
   **DoR (V16):** ✗ not Ready — gaps **1, 2, 4, 6, 7**; needs a `/plan`. *Drafted:*
   - **Seam:** gen-invariant `RunRules` tuning; trainer rosters per region would be profile content.
   - **Data vs runtime:** runtime.
-  - **Dependencies:** pairs with the per-area §8 decision.
+  - **Dependencies:** none (the per-area floor was settled 2026-10-17, §9).
 - [ ] **Gen 1 has no end-of-turn residual phase** *(needs-plan, L)*. Verified against pret/pokered
   `engine/battle/core.asm` (`MainInBattleLoop`, 2026-09-20): each creature ticks its own poison/burn/Leech Seed right
   after its own action — A acts → A's residual → if A fainted, A's faint handler (B never acts) → else B acts → B's
@@ -421,20 +449,16 @@ channel of a broader acquisition layer.
   ButStillCountsTheWin` pins a path Gen 1 cannot produce (the mutual-KO ruling stands for genuine trades like
   Explosion). The fix belongs behind an `IBattleRules` seam beside `FaintEndsTurnImmediately`; design rationale in
   `GEN_DIFFERENCES.md` → Status Quirks and `GENERATION_SEAMS.md` §2. Needs a `/plan`, `opus-engineer`, both gates.
-  **DoR (V16):** ✗ not Ready — gaps **1, 2, 5, 6, 7**. 3 (seam beside `FaintEndsTurnImmediately`) and 4
-  (`MainInBattleLoop`, `core.asm:413-462`) are answered. *Drafted:*
+  **User ruling 2026-10-17:** its own item, behind a generation seam; "slightly modernized but functionally the
+  same" is acceptable — the Gen 1 order of effects and its outcomes are the requirement.
+  **DoR:** ✗ not Ready — gap **2** (the `/plan`); 1, 5 and 6 are drafted below for your confirmation, 7 is
+  resolved. 3 (seam beside `FaintEndsTurnImmediately`) and 4 (`MainInBattleLoop`, `core.asm:413-462`) are
+  answered. *Drafted:*
   - **Acceptance:** (a)–(c) each flip in a full-battle test, and the `RunDirectorTests` double-faint test is
     re-pinned to a path Gen 1 can produce.
   - **Data vs runtime:** runtime only.
   - **Quirk:** the faster creature's own poison tick lands before the slower one acts.
-  - **Dependencies:** the §8 timing row. The Leech Seed half of §3.1 "Mist, thaw and Leech Seed" waits on this.
-- [ ] **Wild/draft selection has no per-area or natural-minimum-level awareness** *(needs-plan)*. The evolution-floor
-  half is done (`EvolutionMinLevel.Compute`, `ENCOUNTER_DESIGN.md` §3.8). Open: `PickByBst`/`ScaleWildLevel` select
-  purely by BST band (deliberate per `ENCOUNTER_DESIGN.md`), so a high-BST species can surface far below where the
-  original games place it. Is a per-species minimum encounter level worth folding in as a soft floor, or is "BST is
-  the only lever" an accepted tradeoff? No `/plan` yet.
-  **DoR (V16):** ✗ not Ready — gaps **1–7**, all waiting on the §8 decision. If it's "accept the tradeoff", this
-  entry moves to §9.
+  - **Dependencies:** none. The Leech Seed half of §3.1 "Mist, thaw and Leech Seed" waits on this.
 - [ ] **Enemy encounter pool ignores game version** — filter by `PokemonGameAvailability` once a version selector
   exists.
   **DoR (V16):** ✗ not Ready — gaps **1, 2, 3, 5, 6, 7**; gap 7 blocks the rest (no version selector exists).
@@ -612,7 +636,8 @@ now, below.
   filled in. Current behaviour → `PRODUCT_SPEC.md` → *Dev Mode*.
   **DoR (V16):** ✗ not Ready — gaps **1–7** (a shell). Pick one candidate first. Forcing the first enemy's species
   would speed up the two slowest specs.
-- [ ] **Agent profiles → project skills (M, ✗ not Ready — user 2026-10-13).** *Intent:* turn `/plan`, `/dev`,
+- [ ] **Agent profiles → project skills (M, ✗ not Ready — user 2026-10-13; needs a full `/plan`, user
+  2026-10-17).** *Intent:* turn `/plan`, `/dev`,
   `/sync` and `/test` from prose in `.claude/AI_CONTEXT.md` into Claude Code skills under `.claude/skills/<name>/`,
   invocable by name and loading their knowledge base (DoR, design guides, dev standards, the seam checklist) on
   use. *Acceptance:* each profile is a skill that loads when invoked; `AI_CONTEXT.md` keeps only the tooling
@@ -620,7 +645,9 @@ now, below.
   merged; whether `/test` overlaps `test-runner`; whether `/sync` survives. *Gen surface:* none. *Gen 1 source:*
   n/a (tooling). *Data vs runtime:* neither. *Quirk to assert:* invoking a skill loads its knowledge base, checked
   by invoking each once. *Dependencies:* none.
-  **DoR (V16):** ✗ not Ready — gap **2** only (the three design questions above).
+  **DoR:** ✗ not Ready — gap **2**: a full `/plan` answers the three design questions. Starting recommendation:
+  one skill each for `/plan` and `/dev`; fold `/test` into `test-runner`'s doc; retire `/sync` unless a schema pass
+  is planned.
 - [ ] `data-testid` attributes — deferred; specs lean on stable semantic classes. Add only where a class proves
   brittle.
 - [ ] §8 visual-regression canvas snapshots — skipped for maintenance cost.
@@ -657,7 +684,7 @@ surface: `/help` and the explainer describe the active generation, so they are p
   - **Dependencies:** none.
 - **Double-submit and `/battle` "Connecting…" forever — fixed 2026-10-17 (§7.6 V12).** Verdicts, F1–F2 and the
   rulings: `TODO_ARCHIVE.md` → "§7.6 V12 — frontend double-submit, /battle dead end, battle log".
-- **Battle log unbounded — reproduced 2026-10-17 (§7.6 V12); S, ✗ not Ready (needs your cap number).** *Intent:*
+- **Battle log unbounded — reproduced 2026-10-17 (§7.6 V12); S, ✅ Ready (cap *N* = 1000, user 2026-10-17).** *Intent:*
   the log keeps only the last *N* lines. *Evidence:* `battleReducer.ts:276` appends and only `initialState`
   (`:203`) sets `log`, so it never resets, not even per encounter; a scratch Vitest kept 5,000 of 5,000 lines.
   *Acceptance:* a reducer test pins that the log holds at most *N* lines and drops the oldest first. *Gaps:* *N*
@@ -666,7 +693,8 @@ surface: `/help` and the explainer describe the active generation, so they are p
   runtime:* client runtime only. *Quirk to assert:* the oldest line goes first. *Dependencies:* none. The companion
   claim, that the whole `BattleScreen` re-renders on every dispatch, is **read-confirmed** (the reducer lives in its
   hook and the log lines aren't memoized); its cost in a long run is **needs-runtime** (unmeasured).
-  **DoR (V16):** ✗ not Ready — gap **1** (your *N*); every other item is answered.
+  **DoR:** ✅ Ready — *N* = 1000 (user ruling 2026-10-17). At 1000 no E2E spec plausibly waits on an older line;
+  the fix reads the 10 specs to confirm that, and recommends `.\e2e.ps1 -Spec battle` if any doubt remains.
 - **Phaser resize and entry pacing — fixed 2026-10-17 (§7.6 V13).** Verdicts and fixes FA–FB:
   `TODO_ARCHIVE.md` → "§7.6 V13 — Phaser resize/entry pacing and frontend nits".
 - **Transform's scale pulse may revert a resize (found 2026-10-17 during V13; unverified, S).** `transformSprite`'s
@@ -684,22 +712,13 @@ surface: `/help` and the explainer describe the active generation, so they are p
   starter's name/level. Designed in R1d-d (§2). *DoR (V16): covered by R1d-d's audit.*
 - **Frontend nits — verified and fixed 2026-10-17 (§7.6 V13).** Verdicts (incl. the partly refuted unknown-reward
   claim) and fixes FC–FH: `TODO_ARCHIVE.md` → "§7.6 V13 — Phaser resize/entry pacing and frontend nits".
-- **Type-badge contrast (reproduced 2026-10-17, §7.6 V13) — S, ✗ not Ready (needs your palette call).** *Intent:*
-  every `TypeBadge` meets WCAG AA (4.5:1) for its label. *Evidence:* computed ratios: 13 of 18 below 4.5:1, 7 at or
-  under 2.5:1 (Ice 1.85, Rock 1.99, Fire 2.07, Bug 2.13, Fairy 2.18, Flying 2.38, Grass 2.39). *Drafted option:*
-  dark text (`#333`, as Electric uses) on every badge under 4.5:1 with white text; backgrounds unchanged, so
-  `typeColor()` consumers (map glyphs, chips) are unaffected. *Acceptance:* a Vitest test computes every pair in
-  `TYPE_COLORS` and asserts ≥4.5:1. *Gen surface:* none. *Gen 1 source:* n/a. *Data vs runtime:* client styling.
-  *Quirk to assert:* none. *Dependencies:* none.
-  **DoR (V16):** ✗ not Ready — only the palette decision is open; every other item is answered.
-- **Map peek covers the player nameplate (reproduced 2026-10-17, §7.6 V15) — S, ✗ not Ready (needs your layout
-  call).** The auto-peek (`.encounter-map`, `BattleScreen.css:1114`, z-index 6, `max-height: calc(70vh - 4rem)`) at
-  800×600 with a 7-node path spans y 42–398 and fully covers `.player-corner` (y 302–374, z-index 2) for the 2.6 s
-  peek. *Drafted option (recommended):* cap the peek so it ends above the player corner and scrolls; alternative:
-  move it. *Acceptance:* at 800×600 and a phone width, the peek's bottom stays above the player corner's top with a
-  party strip shown (Puppeteer measurement). *Gen surface:* none. *Data vs runtime:* client layout. *Quirk to
-  assert:* none. *Dependencies:* none.
-  **DoR (V16):** ✗ not Ready — only the layout decision is open; every other item is answered.
+- **Type-badge contrast (reproduced 2026-10-17, §7.6 V13) — S.** *Intent:* every `TypeBadge` meets WCAG AA (4.5:1)
+  for its label. *Evidence:* computed ratios: 13 of 18 below 4.5:1, 7 at or under 2.5:1 (Ice 1.85, Rock 1.99, Fire
+  2.07, Bug 2.13, Fairy 2.18, Flying 2.38, Grass 2.39). **User ruling 2026-10-17:** darken the failing background
+  colours, keeping white text and each type's hue; every `typeColor()` consumer (map glyphs, chips) darkens with
+  them. *Acceptance:* a Vitest test computes white on every `TYPE_COLORS` entry and asserts ≥4.5:1. *Gen surface:*
+  none. *Gen 1 source:* n/a. *Data vs runtime:* client styling. *Quirk to assert:* none. *Dependencies:* none.
+  **DoR:** ✅ Ready.
 
 ---
 
@@ -831,7 +850,8 @@ surface: `/help` and the explainer describe the active generation, so they are p
   - **Dotnet path (drafted):** acceptance, the hook finds the SDK from `global.json` / `PATH` and falls back to the
     user folder.
   - **Both:** tooling only, verified by manual reproduction.
-- **Abuse protection for the public endpoints (M, low priority — user ruling 2026-10-11).** *Verified (§7.6 V3,
+- **Abuse protection for the public endpoints (M, low priority — user ruling 2026-10-11; shelved, user
+  2026-10-17: not needed now, the numbers below stay as the starting point when reopened).** *Verified (§7.6 V3,
   `TODO_ARCHIVE.md`):* no rate limit on `POST /api/game/start`, no cap on concurrent runs or connections, no Fly
   concurrency block, and a run in an open idle tab never ends (unclaimed runs are evicted after 2 min, disconnected
   ones after the 60 s grace). **Not Ready — needs your numbers and one UX call.** Suggested starting
@@ -843,9 +863,6 @@ surface: `/help` and the explainer describe the active generation, so they are p
   numbers are set.
   **DoR (V16):** ✗ not Ready — gaps **1, 2, 6** wait on your numbers and the idle-notice UX call. Gen surface none;
   runtime/web plus `fly.toml`; depends on `UseForwardedHeaders` (§9).
-- **Client-chosen run `Seed`** — a product decision, not a bug (surfaced by §7.6 V4; the rest of V4 is in
-  `TODO_ARCHIVE.md` → "§7.6 V4 — scripts and logging").
-  **DoR (V16):** a product decision, not an item; the call is the §8 row.
 
 ### 7.2 Dependencies
 
@@ -930,22 +947,8 @@ entry above, kept current as entries change.
 
 ## 8. Open decisions (each needs the user; recommendation first)
 
-| Decision | Recommendation | Unblocks |
-|:---------|:---------------|:---------|
-| **Second-tab policy** (R1d-c) | Last tab wins + notify the displaced tab; never clear `activeGame` | R1d-c |
-| **Transport notices outside the event model** (`SessionTakenOver`, `RunMapSnapshot`, like `RunFaulted`) | Accept | R1d-c, R1d-d |
-| **`PlayerSpeciesId` on `BattleStarted`** (a wire-contract change; the C# wire-drop half is auto-guarded, the TS half is manual) | Accept | R1d-d, the post-evolution sprite |
-| **Roar/Whirlwind** — end the battle immediately, and add the level-based fail roll, like Gen 1? (verified at pokered in V16) | Fix both: true Gen 1, and today's behaviour can end a run unfairly | §3.1 Roar/Whirlwind entry |
-| **Empty generation list in the importer** — count it as a failure? | Yes: an empty list from PokeAPI means a broken fetch, never a real empty generation | §3.2 importer follow-ups |
-| **Client-chosen run `Seed`** — keep, or have the server assign it in production? | Keep: `?seed=N` drives the E2E and Puppeteer reproductions, and a single-player run gains nothing by hiding it | §7.1 |
-| **When to `/plan` the end-of-turn residual phase** | The cheap fidelity fixes have landed (archived) — ready to `/plan` once greenlit | §4.2 |
-| **Per-area encounter floor** — soft floor or accepted tradeoff? | Accept the tradeoff unless playtests show a problem | §4.2 |
-| **Evolve-only availability rule** — inherit the root's type, a new `Evolution` type, or `Wild` catch-all? | Inherit the root's type | §3.2 "Yellow availability labels" |
-| **`-wal` staleness mechanism** — importer checkpoint, copy `-wal`, or `journal_mode=DELETE`? | `DELETE` on the committed files, plus an importer checkpoint | §3.2 entry |
-| **Foe Psywave can deal 0** (Gen 1 foe rolls `[0, b)`, player `[1, b)`) — replicate? | Replicate behind the existing seam (it's the Gen 1 asymmetry); user ruling 2026-10-12: keep open | `TODO_ARCHIVE.md` → "§7.6 V9" |
-| **Confusion self-hit uses the foe's Reflect** (Gen 1 quirk) — replicate? | Replicate (true Gen 1) | §3.1 confusion entry |
-| **Foe stat-down moves fail 25% in non-link battles** (Gen 1, `effects.asm:549-554`) — replicate? | Replicate behind an `IBattleRules` flag (Gen 1 fidelity; makes the foe weaker) | §3.1 "Smaller Gen 1 gaps III" |
-| **Item `Cost`** — Gen 1 prices (shifts loot rarity) or modern + deterministic starting bag? | Modern + `ThenBy(Id)` now; Gen 1 prices only with a balance pass | §3.2 entry |
+None open. The 2026-10-17 rulings are recorded in each entry. New decisions go here as a row: the decision, the
+recommendation, and what it unblocks.
 
 ---
 
@@ -978,6 +981,16 @@ entry above, kept current as entries change.
   the four prompts that have a negative answer.)
 - **BST tier bands stay as they are** (user ruling 2026-10-06): the tier multipliers and `K` were tuned on modern
   base stats and are not retuned after the real-Gen-1 import — no measured problem. Reopen only on a playtest report.
+- **The other Yellow availability corrections and an evolve-only rule** — not pursued (user ruling 2026-10-17):
+  the type is never shown and only gates the wild pool, so Eevee `GameCorner` → `Gift`, Wigglytuff → `GameCorner`
+  and a rule for evolve-only forms change nothing in play. Only Lickitung is worth fixing (§3.2).
+- **The map peek may cover the player nameplate at small sizes** — accepted (user ruling 2026-10-17): at 800×600
+  the 2.6 s auto-peek covers `.player-corner`; the risk is accepted at that resolution (reproduced in §7.6 V15).
+- **No per-area encounter floor** — accepted for now (user ruling 2026-10-17): `PickByBst`/`ScaleWildLevel` select
+  by BST band only, and the evolution floor (`EvolutionMinLevel.Compute`, `ENCOUNTER_DESIGN.md` §3.8) already
+  keeps evolved forms out of low levels. Reopen on a playtest report.
+- **The client chooses the run `Seed`** — kept (user ruling 2026-10-17): `?seed=N` drives the E2E and Puppeteer
+  reproductions; don't re-file "the server should assign it" (surfaced by §7.6 V4).
 - **`RunLoop.cs`'s ~28 types are fine** — a cohesive vocabulary file; don't split it on a type-count metric.
 - **`RunLoop`, `RewardRunEvent`, `AcquisitionResolution`, `CompositeEvaluator` and `MoveEvaluators` are tested** —
   refuted 2026-10-17 (§7.6 V15): named tests reach each; don't re-file them as "untested types".
