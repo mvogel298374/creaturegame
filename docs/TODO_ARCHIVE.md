@@ -8,6 +8,188 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §7.6 V16 — full Gate 1 audit ✅ DONE (2026-10-17)
+
+**Was** `TODO.md` §1 #11 and the §7.6 V16 slice (user 2026-10-11: after V15, audit every open entry in §1–§7 against
+the seven `DEFINITION_OF_READY.md` items). Docs only: no code, no data; `docs-cleanup` was its only gate. With V16
+done the whole §7.6 verification pass (V1–V16, §1 #2) is complete, so §1 #2 and §1 #11 closed with it.
+
+**What it did.**
+- Added an inline **DoR (V16)** marker to every open entry in §1–§7, with drafted text for each gap; non-items are
+  marked as such. **The inline markers are the standing audit and stay in `TODO.md`; the table below is the
+  2026-10-17 snapshot, and where they differ the marker wins.**
+- Result: no entry is ✅ Ready as written; six become Ready once the drafted text is confirmed (marked ★).
+
+**New facts found during the audit.**
+- **Roar/Whirlwind open question rewritten as a source-confirmed entry** (`TODO.md` §3.1 "Roar/Whirlwind: the
+  scared-off side still acts"). pokered `MainInBattleLoop` returns on `wEscapedFromBattle` (`core.asm:419-421`,
+  `:430-432`, `:443-445`, `:457-459`), and `SwitchAndTeleportEffect` (`effects.asm:814-838`) has the wild-battle level
+  roll. Ours: no flee check in the action loop (`Battle.cs:183-209`, the gate runs at `:316-319`) and an unconditional
+  success (`MoveEffects.cs:520-548`). §8 Roar row updated.
+- **Duplicate merged:** the §3.2 "AI stat-down 25% fail" line was the same claim as §3.1 "Smaller Gen 1 gaps III"
+  (`effects.asm:549-554`); §3.1 holds the audit.
+- Damage-core line cites refreshed; the `Battle` constructor parameter count corrected to 15.
+- §8 gained two rows: empty generation list in the importer; client-chosen run `Seed`. §1 got the stale R1d-a "three
+  decisions" pointer fixed, and #3 notes the drafted `TimeProvider` design.
+
+**Entries retired at the audit** (finished or decided, so out of the open list):
+- *§5 "Level-up panel covering the nameplate"* — fixed; the full record is in the "Repo-sweep R1" batch (R3 item).
+- *§3.2 "Balance flag — every species' BST changed (2026-10-03)"* — decided 2026-10-06, ruling in `TODO.md` §9 ("BST
+  tier bands stay as they are"). Text as it stood: BST feeds `EncounterSelector.Bst`/`PickByBst`, the strength tiers
+  (×0.85/1.10/1.20) and `ScaleTargetBst`, so enemy pool bands shift and the starter picker's BST display changed (e.g.
+  Venusaur 425); base experience also dropped sharply for some species (Chansey 395→255, Mew 270→64). The tier
+  offsets were tuned against modern numbers. Seeded E2E specs may land on different encounters. Decided 2026-10-06
+  (user): keep the current tier bands, no retune — the full E2E run that day was 36/38 with no failure attributable to
+  the bands; reopen only if playtests show difficulty spikes or lulls.
+
+### The V16 audit summary (snapshot, 2026-10-17)
+
+**V16 audit summary (2026-10-17).**
+- **Key:** columns 1–7 are the DoR items (intent and acceptance · design · gen surface · Gen 1 source · data vs
+  runtime · quirk · dependencies). ✅ answered · **d** a gap with drafted text to confirm · ✗ a gap needing a
+  decision, design or investigation · – n/a.
+- **Result:** no entry is ✅ Ready as written. Six become Ready once you confirm the drafted text (marked ★).
+- **Not items (left unaudited, each marked inline):** the §2 test plan, the §3.2 aside (since moved to a §7.3 watch item), the balance flag, `save.db`
+  (declined), Stage 5, the Phaser deferral, `data-testid`, visual regression, player species (covered by R1d-d), the
+  level-up panel note, the flake watch, and the §7.3 watch items.
+
+| Entry | 1 | 2 | 3 | 4 | 5 | 6 | 7 | Next step |
+|:--|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:--|
+| §2 R1d-a prompt replay | ✅ | ✗ | ✅ | ✅ | ✅ | ✅ | ✅ | Short server `/plan` |
+| §2 R1d-c second tab | ✅ | ✗ | ✅ | ✅ | ✅ | ✅ | ✅ | `/plan` + §8 policy |
+| §2 R1d-d refresh snapshot | ✅ | ✗ | ✅ | ✅ | ✅ | ✅ | ✗ | `/plan` + §8; after R1d-a |
+| §2 `RunFaulted` server half | d | ✅ | ✅ | ✅ | ✅ | ✅ | d | Fold into §6 GSM lifecycle |
+| §3.1 Damage/accuracy core | ✗ | ✗ | ✗ | ✗ | ✅ | ✗ | ✅ | Verify slice, then split |
+| §3.1 `CanAct` status order | ✅ | ✗ | ✗ | ✅ | ✅ | ✅ | ✅ | Design pass |
+| §3.1 Replacement frees trapped foe | ✅ | ✗ | ✗ | ✅ | ✅ | ✅ | ✅ | Design pass (with `CanAct`) |
+| §3.1 Confusion self-hit | d | ✗ | d | ✅ | d | ✅ | ✗ | §8 Reflect decision |
+| §3.1 Mist, thaw, Leech Seed | d | ✗ | d | ✅ | d | d | ✗ | Split; Leech Seed after §4.2 |
+| §3.1 XP participant split | d | ✗ | d | ✅ | d | d | d | Design (touches `Battle`) |
+| §3.1 Foe stat-down 25% fail (merged) | d | ✅ | d | ✅ | d | d | ✗ | §8 decision |
+| §3.1 Substitute vs sleep/paralysis | ✅ | ✗ | ✗ | ✅ | d | d | d | Design pass |
+| §3.1 Disable countdown | ✅ | ✗ | ✗ | ✅ | d | ✅ | ✗ | Design pass (with `CanAct`) |
+| §3.1 Roar/Whirlwind | d | ✗ | ✗ | ✅ | d | d | ✗ | §8 go-ahead, then design |
+| §3.2 Item descriptions | d | ✅ | d | d | d | d | d | Confirm drafts |
+| §3.2 Failed OHKO message | d | ✗ | d | ✅ | d | d | d | Design (central) |
+| §3.2 Struggle accuracy | d | ✗ | d | d | d | ✅ | d | Left as filed (ruling) |
+| §3.2 Empty generation list | ✗ | ✗ | d | – | d | ✗ | d | §8 decision |
+| §3.2 Species + learnset one unit ★ | ✅ | ✅ | d | d | d | ✅ | d | Confirm drafts |
+| §3.2 Yellow labels | ✅ | ✗ | ✅ | ✅ | ✅ | ✅ | ✅ | §8 rule decision |
+| §3.2 `-wal` staleness | ✅ | ✗ | ✅ | ✅ | ✅ | ✅ | ✅ | §8 mechanism decision |
+| §3.2 Item `Cost` | ✅ | ✗ | ✅ | ✅ | ✅ | ✅ | ✅ | §8 balance decision |
+| §4.1 Catch | d | ✗ | ✗ | ✗ | ✅ | ✗ | ✅ | Verify formula, `/plan` |
+| §4.1 Stone evolutions | d | ✗ | ✅ | d | d | d | ✗ | Acquisition design |
+| §4.2 Progressive difficulty | ✗ | ✗ | ✅ | ✗ | ✅ | ✗ | d | `/plan` |
+| §4.2 End-of-turn residual | d | ✗ | ✅ | ✅ | d | d | ✗ | §8 timing, `/plan` |
+| §4.2 Per-area encounter floor | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | §8 decision |
+| §4.2 Version-aware pool | d | ✗ | d | – | d | ✗ | ✗ | Blocked: no version selector |
+| §4.2 Enemies evolve | d | ✗ | ✅ | ✗ | d | ✗ | ✗ | Product call |
+| §4.3 4d+ catalog | ✗ | ✗ | ✅ | – | ✅ | – | ✅ | Mini-plan per surface |
+| §4.3 `Modal.tsx` CSS wart ★ | d | ✅ | d | – | d | d | d | Confirm drafts |
+| §4.3 Level-up panel follow-ups | ✗ | ✅ | ✅ | ✗ | ✅ | ✗ | ✅ | Verify at pokered |
+| §4.4 Gen 2 data model (6 entries) | ✗ | ✗ | ✅ | – | ✅ | ✗ | ✗ | Gen 2 sprint `/plan` |
+| §4.4 `StageOf` → `Stages.Of` ★ | d | ✅ | d | – | d | d | d | Confirm drafts, own entry |
+| §4.5 Move animations | d | ✗ | d | – | d | ✗ | ✗ | `/plan` |
+| §4.5 Text feel | d | ✗ | ✅ | d | d | ✗ | d | `/plan` |
+| §4.5 Sprite FX | ✗ | ✗ | ✅ | – | ✅ | ✗ | ✅ | Joint sketch session |
+| §4.5 Escape = B-cancel | d | ✅ | d | ✗ | d | d | d | Cite pokered, confirm drafts |
+| §4.6 `ConsoleInput` | ✗ | ✗ | ✅ | – | ✅ | – | ✗ | Host question; low priority |
+| §4.6 Dev stat stages ★ | d | ✅ | d | – | d | d | d | Confirm drafts |
+| §4.6 Dev Mode next features | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | Pick one candidate |
+| §4.6 Agent profiles → skills | ✅ | ✗ | ✅ | – | ✅ | ✅ | ✅ | Three design questions |
+| §4.7 User docs (3 entries) | ✗ | ✗ | d | – | ✅ | – | ✅ | Scope each |
+| §5 Modal accessibility | d | ✅ | d | – | d | d | d | Confirm drafts; E2E route needs your run |
+| §5 Battle log cap | ✗ | ✅ | ✅ | – | ✅ | ✅ | ✅ | Your *N* |
+| §5 Transform scale pulse | ✗ | ✅ | d | – | d | d | d | Reproduce first |
+| §5 Type-badge contrast | ✗ | ✅ | ✅ | – | ✅ | ✅ | ✅ | Your palette call |
+| §5 Map peek | ✗ | ✅ | ✅ | – | ✅ | ✅ | ✅ | Your layout call |
+| §6 CI E2E step | d | ✗ | ✅ | – | ✅ | ✗ | d | Design with §7.1 fast-suite CI |
+| §6 GSM lifecycle | d | ✗ | ✅ | – | ✅ | d | ✅ | Clock design (`TimeProvider`) |
+| §6 `voluntary-switch` slow | d | ✅ | ✅ | – | ✅ | – | ✗ | Investigate |
+| §6 `evolution.spec` nameplate | d | ✅ | ✅ | – | ✅ | – | ✅ | Your E2E go-ahead |
+| §6 `ClearAllPools` flake | ✗ | ✅ | ✅ | – | ✅ | – | ✅ | Reproduce |
+| §6 Tighten two specs | d | ✅ | ✅ | – | ✅ | – | ✗ | Your E2E go-ahead + cadence seed |
+| §6 Dedup test helpers | d | ✅ | ✅ | – | ✅ | – | ✗ | Your E2E go-ahead (C# half could split) |
+| §7.1 Fast suites before deploy | d | ✗ | ✅ | – | ✅ | ✗ | ✗ | Design with §6 CI E2E |
+| §7.1 `-StartStack` leak (Part A) | ✗ | ✅ | ✅ | – | ✅ | – | ✅ | Parked: your reproduction |
+| §7.1 Pre-commit hook (2 entries) | d | ✗ | ✅ | – | ✅ | ✗ | ✅ | Own entries |
+| §7.1 Abuse protection | ✗ | ✗ | ✅ | – | ✅ | ✗ | ✅ | Your numbers + UX call |
+| §7.1 Client-chosen seed | ✗ | – | – | – | – | – | – | §8 decision |
+| §7.2 npm audit | d | ✅ | ✅ | – | ✅ | – | ✗ | Re-run audit; your E2E go-ahead |
+| §7.3 Dead `AttackService` code ★ | d | ✅ | d | – | d | d | d | Confirm drafts |
+| §7.4 Gen 2+ claims audit ★ | d | ✅ | ✅ | ✅ | ✅ | d | ✅ | Confirm drafts (~60–100k tokens) |
+
+### The §7.6 pass as a whole (moved from `TODO.md` §7.6 on closing)
+
+Heading was "7.6 Verification pass over the unverified findings (§1 #2, Ready ✅ 2026-10-10)".
+
+Done as **tiny slices, verify then fix** (user rulings 2026-10-10): each slice verifies its claims, then fixes the
+confirmed ones in the same slice, one greenlight and one commit per slice.
+
+**Two phases per slice:**
+1. **Verify** (read-only): every claim gets a verdict tag and evidence (below).
+2. **Fix** — only for a confirmed finding that is **S-size and touches no central method** (`AttackAction`,
+   `Battle`, `DamageCalculator`) and needs no user decision. Before any code, the slice writes a **mini-DoR per
+   fix** (acceptance · quirk the test asserts · gen-variable surface · any slice-specific line) and gets the
+   greenlight (Gate 1). Anything larger, central or needing a decision gets its own TODO entry instead and stays
+   open.
+
+**Shared DoR (every slice):**
+- **Acceptance (verify):** every claim in the slice carries a verdict tag and its evidence, and none is left
+  *unverified*. The main session re-checks every **refuted** verdict and at least one **confirmed** verdict.
+- **Acceptance (fix):** per the fix's mini-DoR, with a test that fails before and passes after (or a recorded
+  manual reproduction where the mini-DoR says so).
+- **Design:** no `/plan` needed (a process item).
+- **Gen-variable surface:** none for the pass itself. Each engine verdict states whether its eventual fix is
+  gen-variable (a seam) or gen-invariant.
+- **Gen 1 source:** `pret/pokered`. `GEN_DIFFERENCES.md` and code comments are never accepted as evidence.
+- **Data vs runtime:** verify is neither (reproductions run in a throwaway scratch clone, never committed); a fix
+  states its own boundary in its mini-DoR.
+- **Quirk to guard:** a reading is not a reproduction. **read-confirmed** stays distinct from **reproduced** or
+  **source-confirmed** (§1 #1 Part A was marked "verified" by reading and did not reproduce).
+- **Dependencies:** none. **Gates:** verify-only slice → `docs-cleanup` only. A slice with fixes → the full
+  sequence (`format-gate` → `test-runner` → `requirements-review` for battle/stat/move work → `pr-review` for
+  product code → `docs-cleanup`). `pr-review` is recommended per slice by its size; the user decides each time
+  (user ruling 2026-10-10).
+
+**Verdict tags:**
+
+| Tag | Meaning |
+|:--|:--|
+| **reproduced** | Shown by running something (a throwaway test or script in a scratch clone). |
+| **source-confirmed** | A Gen 1 claim matched against a cited pokered file:line, plus our code file:line. |
+| **read-confirmed** | Code path traced, file:line at a named commit, nothing run. The weakest tag. |
+| **refuted** | Wrong, with evidence. Removed from TODO, one line added to §9. |
+| **needs-runtime** | Needs a browser, E2E or Fly run. Stays in TODO with the tag, handed to the user. |
+
+**Write-back:** results go inline in the claim's own section, with refreshed line numbers and a cost if it changed.
+
+**Out of scope:** the §3.1 damage/accuracy core (§1 #8), the §7.4 Gen 2+ audit (its own item), and items awaiting
+a decision (Roar/Whirlwind, the BST bands).
+
+**Slices** (the extra DoR line, where one applies, is in the last column):
+
+| # | Claims (section) | Evidence route | Slice-specific DoR |
+|:-:|:--|:--|:--|
+| V1 | Verify ✅ and fix ✅ 2026-10-10 — record in `TODO_ARCHIVE.md` → "§7.6 V1 — backend session edges" | — | — |
+| V2 | Verify ✅ and fix ✅ 2026-10-11 — record in `TODO_ARCHIVE.md` → "§7.6 V2 — CI/deploy hardening" (end-to-end proof: `v0.1.9-rc.1` deployed green 2026-10-17 on the pinned action and the read-only token; `v0.1.8-rc.1` failed 2026-10-13 before any Fly release was created, cause not recoverable, likely transient) | — | — |
+| V3 | Verify ✅ and fix ✅ 2026-10-11 — record in `TODO_ARCHIVE.md` → "§7.6 V3 — public endpoints"; limits + idle timeout → the low-priority abuse-protection entry in §7.1; forwarded headers + exhaustion → §9 (Fly-side health check is off by default, `FLY_HEALTH_CHECK` repo variable; observable on an RC deploy only once switched on) | — | — |
+| V4 | Verify ✅ and fix ✅ 2026-10-11 — record in `TODO_ARCHIVE.md` → "§7.6 V4 — scripts and logging"; Dockerfile items → §9 | — | — |
+| V5 | Verify ✅ 2026-10-11 (verdicts in TODO_ARCHIVE.md → "§1 #4 Importer hardening — step #4e": 4 read-confirmed, 1 refuted, 1 partly refuted). No in-slice fixes — all needed a test seam → shipped as §1 #4, archived | — | — |
+| V6 | Verify ✅ and fix ✅ 2026-10-11 — record in `TODO_ARCHIVE.md` → "§7.6 V6 — importer/data lows"; `-wal`, item `Cost` and the Yellow-label findings → their own §3.2 entries | — | — |
+| V7 | Verify ✅ and fix ✅ 2026-10-11 — record in `TODO_ARCHIVE.md` → "§7.6 V7 — gate order and battle-item reuse"; the roll-order verdict → shipped, `TODO_ARCHIVE.md` → "Gen 1 roll order in `AttackAction`" | — | — |
+| V8 | Verify ✅ 2026-10-12 — all four confirmed (1 source-confirmed, 3 reproduced); record in `TODO_ARCHIVE.md` → "§7.6 V8 — turn-order/status edges". No in-slice fixes (central methods + a seam question) → two §3.1 entries, both ✗ not Ready | — | — |
+| V9 | Done ✅ 2026-10-12 — all four reproduced; Psywave max, binding odds, Stat Exp fixed; record in `TODO_ARCHIVE.md` → "§7.6 V9 — smaller Gen 1 gaps I"; confusion self-hit → its own §3.1 entry | pokered + code; scratch test | Gen 1 source per claim |
+| V10 | Done ✅ 2026-10-12 — all six confirmed; trainer XP, Transform crit Speed, Substitute-at-cost fixed; record in `TODO_ARCHIVE.md` → "§7.6 V10 — smaller Gen 1 gaps II"; Mist/thaw/Leech Seed and the XP split order → their own §3.1 entries | pokered + code; scratch test | Gen 1 source per claim |
+| V11 | Done ✅ 2026-10-14 — claim 1 read-confirmed, claims 2–4 reproduced; AI weights (type-immune status, secondary-chance scaling), `MoveTurnChoice` validation and `Biome.cs` map connectivity fixed; record in `TODO_ARCHIVE.md` → "§7.6 V11 — seam leak, AI weights, move validation, map connectivity"; seam leak → its own §3.1 entry | pokered + code; scratch test | Gen 1 source per claim |
+| V12 | Done ✅ 2026-10-17 — all three reproduced (two in Puppeteer, one by scratch Vitest), the re-render claim read-confirmed; double-submit and the `/battle` dead end fixed; record in `TODO_ARCHIVE.md` → "§7.6 V12 — frontend double-submit, /battle dead end, battle log"; the log cap → its own §5 entry, ✗ not Ready | Code | Browser-only parts → *needs-runtime* |
+| V13 | Done ✅ 2026-10-17 — 7 reproduced, 2 read-confirmed, 1 partly refuted; resize re-seat, first-battle entry wait, Space on cards, cold Settings BACK, one-shot Title notice, the cast and the dead code fixed; verdicts inline in §5; contrast → its own §5 entry, ✗ not Ready | Code | Browser-only parts → *needs-runtime* |
+| V14 | Done ✅ 2026-10-17 — 11 claims: 3 reproduced, 7 read-confirmed, 1 mostly refuted; shop vacuous check, dev-range bracket, handshake timeouts, contract-test scope, 33 unseeded `Battle`s, `fakeLocalStorage`, `MovesFixture` doc, `TestAltProfile` location and three no-assertion tests fixed; record in `TODO_ARCHIVE.md` → "§7.6 V14 — test hygiene"; E2E tightening and helper dedup → their own §6 entries, ✗ not Ready | Code; scratch test run | — |
+| V15 | Done ✅ 2026-10-17 — 1 reproduced layout claim, 1 reproduced unmount claim, 1 read-confirmed, 1 source-confirmed fix, 1 source-confirmed bug, 1 refuted; evolution wait (6 s), timeline stop on unmount and Disable 1–8 fixed; record in `TODO_ARCHIVE.md` → "§7.6 V15 — speculative list (§7.5)"; Substitute vs sleep/paralysis and Disable countdown timing → their own §3.1 entries, map peek → its own §5 entry, all ✗ not Ready | Code | — |
+| V16 | Done ✅ 2026-10-17 — **Full Gate 1 audit, after V15 (user 2026-10-11):** every open entry in §1–§7 checked against the seven `DEFINITION_OF_READY.md` items. **Audited 2026-10-17:** markers inline in each entry, summary below | Docs only: one ✅/✗ row per entry per DoR item | Acceptance: no open entry is left unaudited; each gap gets drafted proposed text, and decisions go to §8. Writes no code and changes no data; only `docs-cleanup` gates it |
+
+---
+
 ## §7.6 V15 — speculative list (§7.5) ✅ DONE (2026-10-17)
 
 **Was** `TODO.md` §7.5 "Speculative, unverified" and the §7.6 V15 slice. `format-gate` PASS; `test-runner` PASS on
