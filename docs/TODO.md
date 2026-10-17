@@ -311,7 +311,7 @@ data/engine item usually also means updating the test that pins the wrong value.
   Importer hardening — step #4e"). Two candidates remain, neither DoR'd:**
   - **Empty-but-parseable generation list (found in #4a review):** an empty generation list (moves/items) still
     reports clean. **User ruling 2026-10-17:** an empty list counts as a failure (S).
-    **DoR:** ✗ not Ready — confirm the drafted lines below and it is ✅ Ready.
+    **DoR:** ✅ Ready (drafts confirmed by the user 2026-10-17).
     - **Acceptance:** a test feeds an empty generation list (moves, then items) and the run reports that stage failed.
     - **Design:** none needed (importer, no central method).
     - **Gen surface:** none.
@@ -325,7 +325,7 @@ data/engine item usually also means updating the test that pins the wrong value.
     (`DATA_IMPORT.md` §4.6; the species is reported failed). Likely fix: open the transaction in
     `FetchPokemonDataByUrl` around both saves. Needs its mini-DoR (acceptance: a failed learnset leaves the species
     row unchanged too; test: the #4d trigger test also asserts the old stats).
-    **DoR (V16):** ✗ not Ready — gaps **3, 4, 5, 7** (drafted here; once you confirm them, it is ✅ Ready):
+    **DoR:** ✅ Ready (drafts confirmed by the user 2026-10-17):
     - **Gen surface:** none (transaction scope).
     - **Gen 1 source:** n/a.
     - **Data vs runtime:** importer only, no `*.db` change.
@@ -482,16 +482,6 @@ Sage skin, the grid Town Map) are done and archived. The standing 2026-08-04 com
   chips (`.party-chip*`), Title/StarterSelection (including the generation picker). The battle command menu is
   settled (2×2 grid, verbs fixed). Already skinned: the encounter overlay, every run-prompt modal, the SWITCH menu
   cards, CHECK POKEMON's party picker, and the level-up panel.
-  - **Open wart:** `Modal.tsx` still imports `pages/BattleScreen.css` for shared button chrome (`.action-btn`,
-    `.move-btn`); inverting that means extracting the chrome into its own sheet.
-    **DoR (V16):** ✗ not Ready — gaps **1, 3, 5, 6, 7**, all drafted here; confirm them and it is ✅ Ready (S).
-    Still true: `Modal.tsx:3`.
-    - **Acceptance:** `Modal.tsx` imports a shared button sheet, not `pages/BattleScreen.css`, with no visual change
-      (Puppeteer screenshot before and after).
-    - **Gen surface:** none.
-    - **Data vs runtime:** client CSS.
-    - **Quirk:** none.
-    - **Dependencies:** none.
   - **Level-up panel follow-ups.** *Flagged, not decided — a domain claim for `requirements-review`:* whether Gen 1's
     real level-up box lists HP at all (recollection: four rows, ATTACK/DEFENSE/SPEED/SPECIAL) and whether it shows
     gains first, then totals on a keypress; today's panel shows five rows with gain + total together. Also:
@@ -521,8 +511,8 @@ now, below.
   returns them with no `DamageCalculator` change). In the same pass, replace `StatStageMoveEvaluator.StageOf`
   (`MoveEvaluators.cs:129-137`, a copy of `StatStages.Of`) with `Stages.Of(stat)` so the AI can't drift from the
   engine when the new stages land (`pr-review` advisory, 2026-10-14).
-  **DoR (V16), the `StageOf` half:** this can ship now, independent of Gen 2 (S). `MoveEvaluators.cs:129` still holds
-  the copy. Its draft:
+  **DoR, the `StageOf` half:** ✅ Ready (S; drafts confirmed by the user 2026-10-17); ships independent of Gen 2.
+  `MoveEvaluators.cs:129` still holds the copy.
   - **Acceptance:** `StatStageMoveEvaluator` reads `Stages.Of`, the copy is deleted, and the AI tests are unchanged
     and green.
   - **Gen surface:** none.
@@ -903,8 +893,7 @@ code line, marked below.*
   hardening first if a future roster grows past ~12 or `RunBiomeMapSize` is raised.
 - [ ] Dead code: `AttackService.GetRandomAttackAsync`/`GiveDefaultMoveAsync`/`GiveRandomMoveAsync` have no callers
   (and `GetRandomAttackAsync` uses `Skip` without `OrderBy`).
-  **DoR (V16):** ✗ not Ready — gaps **1, 3, 5, 6, 7**, all drafted here; confirm them and it is ✅ Ready (S). Still
-  true: `AttackService.cs:48-68`.
+  **DoR:** ✅ Ready (S; drafts confirmed by the user 2026-10-17). Still true: `AttackService.cs:48-68`.
   - **Acceptance:** the three methods and their comment are deleted, and the build and fast suites are green.
   - **Gen surface:** none.
   - **Data vs runtime:** runtime, removal only.

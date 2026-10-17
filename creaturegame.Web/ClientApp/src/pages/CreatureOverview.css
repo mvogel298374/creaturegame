@@ -31,7 +31,7 @@
   color: var(--clr-text-sub);
 }
 
-/* Party-member picker: reuses the shared .lead-grid/.lead-card cards (BattleScreen.css) — same component and
+/* Party-member picker: reuses the shared .lead-grid/.lead-card cards (modals/RosterPicker.css) — same component and
    look as SwitchMenu/LeadChoiceModal/SwitchInModal, just no disabled state (a fainted/benched member is exactly
    what CHECK POKEMON is for looking at). Hidden with a single member — nothing to pick between. */
 .overview-picker.lead-grid {

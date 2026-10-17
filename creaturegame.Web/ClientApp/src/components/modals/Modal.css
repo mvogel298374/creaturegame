@@ -1,6 +1,4 @@
-/* ── Modal backdrop (shared by every <Modal>; see Modal.tsx) ──
-   The pop-in reuses the `levelup-pop` keyframes, which stay in pages/BattleScreen.css beside the level-up
-   panel (the other user). The --corner variant is the move-replacement prompt's. */
+/* ── Modal backdrop (shared by every <Modal>); `levelup-pop` is also the level-up panel's ── */
 .modal-overlay {
   position: absolute;
   inset: 0;
@@ -26,6 +24,11 @@
 
 .modal-overlay--corner .move-replace-modal {
   animation: modal-rise 160ms ease-out;
+}
+
+@keyframes levelup-pop {
+  from { opacity: 0; transform: translateY(8px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 @keyframes modal-fade {

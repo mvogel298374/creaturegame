@@ -352,71 +352,13 @@
   flex: 1;
 }
 
-.action-btn {
-  padding: var(--sp-sm) var(--sp-md);
-  font-family: var(--font);
-  font-size: var(--fs-base);
-  letter-spacing: var(--ls-wide);
-  background: transparent;
-  color: var(--clr-text);
-  border: 2px solid var(--clr-border);
-  cursor: pointer;
-  transition:
-    background var(--transition),
-    border-color var(--transition),
-    box-shadow var(--transition);
-}
-
-.action-btn:hover {
-  border-color: rgba(233, 69, 96, 0.5);
-  background: rgba(233, 69, 96, 0.06);
-}
-
-.action-btn:active {
-  transform: translateY(1px);
-}
-
-.action-btn--fight {
-  border-color: var(--clr-accent);
-  color: var(--clr-accent);
-}
-
-.action-btn--fight:hover {
-  background: rgba(233, 69, 96, 0.12);
-  box-shadow: 0 0 20px var(--clr-accent-glow);
-}
-
 .action-back {
   align-self: flex-start;
   margin-top: auto;
 }
 
-/* Kanto Sage: the 2×2 command grid — plain bold single border (not the double-line chrome, which
-   is reserved for the outer shell + dialogue box), invert-block selection instead of an accent
-   glow. FIGHT loses its red accent — under the colour budget every command reads the same, as in
-   the real RBY menu. */
+/* Kanto Sage command grid; the button chrome is in components/buttons.css. */
 [data-generation="gen1"] .action-prompt { color: var(--ks-ink); }
-[data-generation="gen1"] .action-btn {
-  background: var(--ks-fill);
-  color: var(--ks-ink);
-  border: 3px solid var(--ks-ink);
-  background-image: var(--ks-grain);
-  background-size: 34px 34px;
-}
-[data-generation="gen1"] .action-btn:hover:not(:disabled),
-[data-generation="gen1"] .action-btn:focus-visible:not(:disabled) {
-  background: var(--ks-ink);
-  border-color: var(--ks-ink);
-  color: var(--ks-fill);
-  box-shadow: none;
-}
-[data-generation="gen1"] .action-btn--fight {
-  border-color: var(--ks-ink);
-  color: var(--ks-ink);
-}
-/* No separate :hover rule needed — the generic .action-btn:hover:not(:disabled) above already wins
-   here (its extra :not() pseudo-class outranks this selector's specificity) and lands on the same
-   ink-invert values. */
 
 /* ── Move menu ───────────────────────────────── */
 .move-menu {
@@ -432,38 +374,6 @@
   grid-template-columns: 1fr 1fr;
   gap: var(--sp-sm);
   flex: 1;
-}
-
-.move-btn {
-  position: relative; /* anchors the absolute STAB tag + effectiveness pill */
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 3px;
-  padding: var(--sp-xs) var(--sp-sm);
-  background: transparent;
-  border: 2px solid var(--clr-border);
-  color: var(--clr-text);
-  font-family: var(--font);
-  cursor: pointer;
-  transition: background var(--transition), border-color var(--transition);
-  text-align: left;
-  overflow: hidden;
-}
-
-.move-btn:hover:not(:disabled) {
-  border-color: var(--clr-accent);
-  background: rgba(233, 69, 96, 0.08);
-}
-
-.move-btn:active:not(:disabled) {
-  transform: translateY(1px);
-}
-
-.move-btn--disabled,
-.move-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
 }
 
 .move-name {
@@ -487,23 +397,7 @@
   color: var(--clr-accent);
 }
 
-/* Kanto Sage: move-select's button chrome only — same plain-bold-border + invert-block treatment
-   as the command grid. STAB accent, the ×N effectiveness pill, the power-tier pill, and the
-   low-PP red stay as they are: functional in-battle signal, not decoration, so they sit outside
-   the four-colour budget (same reasoning as the HP threshold above). */
-[data-generation="gen1"] .move-btn {
-  background: var(--ks-fill);
-  color: var(--ks-ink);
-  border: 3px solid var(--ks-ink);
-  background-image: var(--ks-grain);
-  background-size: 34px 34px;
-}
-[data-generation="gen1"] .move-btn:hover:not(:disabled),
-[data-generation="gen1"] .move-btn:focus-visible:not(:disabled) {
-  background: var(--ks-ink);
-  border-color: var(--ks-ink);
-  color: var(--ks-fill);
-}
+/* Kanto Sage move-select text; the button chrome is in components/buttons.css. */
 [data-generation="gen1"] .move-pp { color: var(--ks-dim); }
 [data-generation="gen1"] .move-btn:hover:not(:disabled) .move-pp,
 [data-generation="gen1"] .move-btn:focus-visible:not(:disabled) .move-pp {
@@ -803,12 +697,7 @@
   border-radius: 4px;
   padding: var(--sp-sm) var(--sp-md);
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.55);
-  animation: levelup-pop 160ms ease-out;
-}
-
-@keyframes levelup-pop {
-  from { opacity: 0; transform: translateY(8px) scale(0.96); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
+  animation: levelup-pop 160ms ease-out; /* keyframes in components/modals/Modal.css */
 }
 
 .levelup-title {

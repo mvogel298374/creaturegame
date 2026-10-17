@@ -1,0 +1,100 @@
+/* Shared button chrome for the battle menus and every modal; modifiers stay in their own sheets. */
+.action-btn {
+  padding: var(--sp-sm) var(--sp-md);
+  font-family: var(--font);
+  font-size: var(--fs-base);
+  letter-spacing: var(--ls-wide);
+  background: transparent;
+  color: var(--clr-text);
+  border: 2px solid var(--clr-border);
+  cursor: pointer;
+  transition:
+    background var(--transition),
+    border-color var(--transition),
+    box-shadow var(--transition);
+}
+
+.action-btn:hover {
+  border-color: rgba(233, 69, 96, 0.5);
+  background: rgba(233, 69, 96, 0.06);
+}
+
+.action-btn:active {
+  transform: translateY(1px);
+}
+
+.action-btn--fight {
+  border-color: var(--clr-accent);
+  color: var(--clr-accent);
+}
+
+.action-btn--fight:hover {
+  background: rgba(233, 69, 96, 0.12);
+  box-shadow: 0 0 20px var(--clr-accent-glow);
+}
+
+/* Kanto Sage skin (docs/GENERATION_PROFILE.md, decision 10): ink border, invert-block selection. */
+[data-generation="gen1"] .action-btn {
+  background: var(--ks-fill);
+  color: var(--ks-ink);
+  border: 3px solid var(--ks-ink);
+  background-image: var(--ks-grain);
+  background-size: 34px 34px;
+}
+[data-generation="gen1"] .action-btn:hover:not(:disabled),
+[data-generation="gen1"] .action-btn:focus-visible:not(:disabled) {
+  background: var(--ks-ink);
+  border-color: var(--ks-ink);
+  color: var(--ks-fill);
+  box-shadow: none;
+}
+[data-generation="gen1"] .action-btn--fight {
+  border-color: var(--ks-ink);
+  color: var(--ks-ink);
+}
+
+.move-btn {
+  position: relative; /* anchors the absolute STAB tag + effectiveness pill */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: var(--sp-xs) var(--sp-sm);
+  background: transparent;
+  border: 2px solid var(--clr-border);
+  color: var(--clr-text);
+  font-family: var(--font);
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition);
+  text-align: left;
+  overflow: hidden;
+}
+
+.move-btn:hover:not(:disabled) {
+  border-color: var(--clr-accent);
+  background: rgba(233, 69, 96, 0.08);
+}
+
+.move-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.move-btn--disabled,
+.move-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+[data-generation="gen1"] .move-btn {
+  background: var(--ks-fill);
+  color: var(--ks-ink);
+  border: 3px solid var(--ks-ink);
+  background-image: var(--ks-grain);
+  background-size: 34px 34px;
+}
+[data-generation="gen1"] .move-btn:hover:not(:disabled),
+[data-generation="gen1"] .move-btn:focus-visible:not(:disabled) {
+  background: var(--ks-ink);
+  border-color: var(--ks-ink);
+  color: var(--ks-fill);
+}

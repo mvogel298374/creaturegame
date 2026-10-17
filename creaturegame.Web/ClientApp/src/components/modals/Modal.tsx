@@ -1,6 +1,6 @@
 import type { ReactNode, RefObject } from 'react';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
-import '../../pages/BattleScreen.css';
+import '../buttons.css';
 import './Modal.css';
 import './ModalFrame.css';
 

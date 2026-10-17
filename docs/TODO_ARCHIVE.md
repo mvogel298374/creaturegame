@@ -2913,9 +2913,21 @@ rule lives in `ModalFrame.css`), the route-choice modal (interleaved with the To
 reduced-motion block), the `levelup-pop` keyframes (used by both `.modal-overlay` and `.levelup-panel`),
 biome-title/sub, the `.bag-gold` box, drop-hover.
 
-**Known remaining wart:** `Modal.tsx` still imports `../../pages/BattleScreen.css` (the modals' buttons/tokens —
-`.action-btn`, `.move-btn` — live there), so the component→page dependency is only partly inverted. Fixing it means
-extracting shared button chrome — its own item (not yet filed).
+**Known remaining wart (as of 2026-10-01):** `Modal.tsx` still imported `../../pages/BattleScreen.css` (the modals'
+buttons/tokens — `.action-btn`, `.move-btn` — lived there), so the component→page dependency was only partly
+inverted.
+
+**Wart closed ✅ DONE (2026-10-17).** New `components/buttons.css` holds the shared `.action-btn` / `.move-btn` chrome
+and their `[data-generation="gen1"]` Kanto Sage rules, moved verbatim from `pages/BattleScreen.css`. `Modal.tsx`
+imports `../buttons.css`; `BattleScreen.tsx` imports `../components/buttons.css` (before `./BattleScreen.css`). The
+`levelup-pop` keyframes moved into `components/modals/Modal.css` (shared by the modal backdrop and the level-up
+panel), superseding the "left in `BattleScreen.css`" note above. Modifier rules (`.move-btn--stab`,
+`.action-btn--waiting`, the `.move-pp` hover colour) stay in `BattleScreen.css`, which loads after `buttons.css`.
+Moved multi-line comments were cut to one-line pointers (`GENERATION_PROFILE.md` decision 10). Verification:
+Puppeteer on the dev stack (`?seed=42`), hash of every computed style property of every element identical before and
+after in four states (starter screen + nickname modal; route-choice map with waiting command buttons; battle command
+menu; move menu), each read twice and stable, screenshots identical; tsc PASS, Vitest 331/331. Not compared: the
+production build.
 
 **Verification.** (1) Line-multiset proof: all 2,255 non-blank original lines present exactly once across old + new
 files; the only non-verbatim edits are comment/header text (stale "up with `.levelup-panel`" pointers →
