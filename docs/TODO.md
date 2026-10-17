@@ -664,13 +664,6 @@ surface: `/help` and the explainer describe the active generation, so they are p
   starter's name/level. Designed in R1d-d (§2). *DoR (V16): covered by R1d-d's audit.*
 - **Frontend nits — verified and fixed 2026-10-17 (§7.6 V13).** Verdicts (incl. the partly refuted unknown-reward
   claim) and fixes FC–FH: `TODO_ARCHIVE.md` → "§7.6 V13 — Phaser resize/entry pacing and frontend nits".
-- **Type-badge contrast (reproduced 2026-10-17, §7.6 V13) — S.** *Intent:* every `TypeBadge` meets WCAG AA (4.5:1)
-  for its label. *Evidence:* computed ratios: 13 of 18 below 4.5:1, 7 at or under 2.5:1 (Ice 1.85, Rock 1.99, Fire
-  2.07, Bug 2.13, Fairy 2.18, Flying 2.38, Grass 2.39). **User ruling 2026-10-17:** darken the failing background
-  colours, keeping white text and each type's hue; every `typeColor()` consumer (map glyphs, chips) darkens with
-  them. *Acceptance:* a Vitest test computes white on every `TYPE_COLORS` entry and asserts ≥4.5:1. *Gen surface:*
-  none. *Gen 1 source:* n/a. *Data vs runtime:* client styling. *Quirk to assert:* none. *Dependencies:* none.
-  **DoR:** ✅ Ready.
 
 ---
 

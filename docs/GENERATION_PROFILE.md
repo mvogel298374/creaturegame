@@ -635,7 +635,11 @@ spent on exactly four things and nothing else:
 - **HP bar — red** `#D6362B`.
 - **XP bar — blue** `#2F63AF`.
 - **Type badges** — unchanged (`TypeBadge.tsx`'s existing 18-colour map; decision 5's preservation rule, confirmed
-  still correct).
+  still correct). **Darkened for contrast (2026-10-18):** 13 badges had white labels under WCAG AA's 4.5:1 (Ice
+  1.85). Each was darkened in OKLCH (same hue, lower lightness, chroma trimmed to stay in sRGB) to about 4.6:1;
+  Electric keeps its dark `#333` label instead, since yellow dark enough for white text turns olive. Ground and
+  Psychic go further (about 6.2:1) because at equal lightness Ground matched Fire and Psychic crowded Fighting.
+  `TypeBadge.test.ts` holds every pair at ≥ 4.5:1. `typeColor()` consumers (map glyphs, chips) darken with them.
 - **Sprite art** — the Phaser canvas creature itself; out of `index.css`'s scope but named here as one of the
   budget's four sources, not an oversight.
 - *(Battle-log emphasis — e.g. "It's super effective!" — already has its own treatment in the running app; out of

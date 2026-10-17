@@ -8,6 +8,29 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §5 Type-badge contrast ✅ DONE (2026-10-18)
+
+S, client styling, no gen surface, no Gen 1 source, no quirk; reproduced 2026-10-17 in §7.6 V13 (computed WCAG: 13 of 18
+badges below 4.5:1, 7 at or under 2.5:1: Ice 1.85, Rock 1.99, Fire 2.07, Bug 2.13, Fairy 2.18, Flying 2.38, Grass 2.39).
+**User ruling 2026-10-17:** darken the failing backgrounds, keep white text and each type's hue; every `typeColor()`
+consumer (map glyphs, chips) darkens with them. **Acceptance:** a Vitest test asserts every `TYPE_COLORS` pair is at
+least 4.5:1.
+
+`TypeBadge.tsx`: 13 backgrounds darkened in OKLCH (same hue, lower lightness, chroma trimmed to sRGB) to about 4.6:1
+with white text. Ground (`#a14504`) and Psychic (`#b22f3c`) go to about 6.2:1 because at equal lightness Ground matched
+Fire and Psychic crowded Fighting (chosen from a rendered swatch comparison). `TYPE_COLORS` is now exported.
+`TypeBadge.test.ts` asserts every pair at 4.5:1 or more (sabotage-verified: fails with Fire's old colour).
+
+**Deviation from the entry's acceptance:** the entry said "computes white on every `TYPE_COLORS` entry"; Electric keeps
+its existing dark `#333` label (already 8.48:1; yellow dark enough for white text turns olive), so the test checks each
+pair's actual text colour. This matches the ruling's intent (the 13 failing white-label badges).
+
+Checked on the dev stack: starter-screen badges and route-map biome chips render clearly. `.\test.ps1 -Web` tsc PASS,
+Vitest 334/334. Styling only: no requirements-review / pr-review, no C# so no format-gate. Method and the Ground/Psychic
+choice recorded in `GENERATION_PROFILE.md` (Kanto Sage colour budget, "Type badges").
+
+---
+
 ## §4.6 Stat stages in the dev enemy overview ✅ DONE (2026-10-18)
 
 S, web DTO plus client, no gen surface (stages are gen-invariant here), no quirk; DoR drafts confirmed by the user
@@ -389,8 +412,8 @@ Advisory: headless Playwright may add up to 1.5 s at run start if `entryComplete
 - Dead code removed from `PhaserBridge.ts`, `AudioEngine.ts`; inert `eslint-disable`s from `BattleCanvas.tsx`,
   `CreatureOverview.tsx`.
 
-**Open follow-ups (live in `TODO.md` §5):** type-badge contrast (not Ready); Transform's scale pulse may revert a
-resize (unverified).
+**Open follow-ups (live in `TODO.md` §5):** Transform's scale pulse may revert a resize (unverified). Type-badge
+contrast was done 2026-10-18 (see "§5 Type-badge contrast").
 
 **Docs updated in-slice:** `SPRITE_PRESENTATION.md` §1.3 (resize rule, first-battle entry wait), `PRODUCT_SPEC.md`.
 
