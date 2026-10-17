@@ -80,6 +80,11 @@ Work through all of these — do not stop at the first.
 
 6. **Structural sanity.** No doubled `---` separators, section seams join cleanly, headers intact. A quick check:
    `awk '/^---$/{if(p=="---")print "DOUBLE --- @ "NR; p="---"; next}{p=$0}' docs/TODO.md`.
+   **No duplicate entries** — after your edits, check that nothing is listed twice: a file in the `CLAUDE.md` docs
+   tree or `@` imports, a row in `ARCHITECTURE.md` §5, a heading or entry title in `TODO.md`, a §9 *Settled* line.
+   A quick check for the tree and the index (any output is a duplicate to resolve):
+   `sed -n '/^CLAUDE.md  /,/^\`\`\`$/p' CLAUDE.md | grep -oE '[A-Za-z_./-]+\.md' | sort | uniq -d` and
+   `grep -oE '^\| \`[^\`]+\`' ARCHITECTURE.md | sort | uniq -d`.
 
 7. **`PRODUCT_SPEC.md` entry.** If the finished feature is player-visible (see the rule above — skip this step
    for a pure refactor/test/tooling/docs-only change), find or add its section in `docs/PRODUCT_SPEC.md` and
@@ -91,6 +96,9 @@ Work through all of these — do not stop at the first.
 8. **Doc-layer custody** (`CLAUDE.md` → *The four doc layers*). Every run, whatever the change:
    - **Docs tree.** Compare `git ls-files '*.md'` with the tree in `CLAUDE.md` and the index in `ARCHITECTURE.md`
      §5. Add a missing doc (with a one-line read trigger), drop a deleted one, fix a trigger the change made wrong.
+     **Before adding a line, grep the tree for the file name** — it may already be listed (real slip, 2026-10-17:
+     `communication.md` was added a second time with a different, wrong trigger). A doc listed twice is an error:
+     keep the one line whose trigger or load status is correct and report the removal.
    - **Model table.** The `CLAUDE.md` model table matches each `.claude/agents/*.md` `model:` line.
    - **Layer placement.** Flag content in the wrong layer: a rule or policy living in a layer-4 doc, game knowledge
      or a rule in `CLAUDE.md`, a lesson buried in a design doc that belongs in `ClaudeDirectives/`.

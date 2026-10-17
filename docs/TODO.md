@@ -891,14 +891,6 @@ code line, marked below.*
   updating `BiomeTests.cs`'s pinning test. Low priority.
 - [ ] `IslandLayoutGenerator` is fuzz-validated for 2–12 biomes (matched to `RunBiomeMapSize` = 10); it needs
   hardening first if a future roster grows past ~12 or `RunBiomeMapSize` is raised.
-- [ ] Dead code: `AttackService.GetRandomAttackAsync`/`GiveDefaultMoveAsync`/`GiveRandomMoveAsync` have no callers
-  (and `GetRandomAttackAsync` uses `Skip` without `OrderBy`).
-  **DoR:** ✅ Ready (S; drafts confirmed by the user 2026-10-17). Still true: `AttackService.cs:48-68`.
-  - **Acceptance:** the three methods and their comment are deleted, and the build and fast suites are green.
-  - **Gen surface:** none.
-  - **Data vs runtime:** runtime, removal only.
-  - **Quirk:** none.
-  - **Dependencies:** none.
 
 ### 7.4 Stale comments and docs (unverified; code comments should shrink toward the comment budget as touched)
 

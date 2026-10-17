@@ -1,6 +1,4 @@
 ﻿using creaturegame.Attacks;
-using creaturegame.Combat;
-using creaturegame.Creatures;
 using Microsoft.EntityFrameworkCore;
 
 namespace creaturegame.DB;
@@ -43,29 +41,5 @@ public class AttackService
         return await _context
             .Moves.AsNoTracking()
             .FirstOrDefaultAsync(m => m.Name != null && m.Name.ToLower() == name.ToLower());
-    }
-
-    // GetRandomAttackAsync/GiveDefaultMoveAsync/GiveRandomMoveAsync below have no callers (dead code).
-
-    public async Task<Attack?> GetRandomAttackAsync(IRandomSource? rng = null)
-    {
-        int count = await _context.Moves.CountAsync();
-        if (count == 0)
-            return null;
-
-        int index = (rng ?? SystemRandomSource.Instance).Next(count);
-        return await _context.Moves.AsNoTracking().Skip(index).FirstOrDefaultAsync();
-    }
-
-    public async Task<bool> GiveDefaultMoveAsync(Creature creature)
-    {
-        var move = await GetAttackByNameAsync("tackle");
-        return move != null && creature.AddAttack(move);
-    }
-
-    public async Task<bool> GiveRandomMoveAsync(Creature creature, IRandomSource? rng = null)
-    {
-        var move = await GetRandomAttackAsync(rng);
-        return move != null && creature.AddAttack(move);
     }
 }

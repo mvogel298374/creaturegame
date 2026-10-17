@@ -8,6 +8,18 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §7.3 Dead code: `AttackService` unused methods ✅ DONE (2026-10-17)
+
+`AttackService.GetRandomAttackAsync`/`GiveDefaultMoveAsync`/`GiveRandomMoveAsync` had no callers anywhere in the repo
+(flagged in Repo-sweep R1 batch 5; `GetRandomAttackAsync` also used `Skip` without `OrderBy`). Deleted the three
+methods, their "no callers (dead code)" comment and the now-unused `using creaturegame.Combat;` /
+`using creaturegame.Creatures;` in `creaturegame/DB/AttackService.cs`. DoR (S, drafts confirmed 2026-10-17):
+acceptance = methods and comment deleted, build and fast suites green; no gen surface; runtime, removal only; no
+quirk; no dependencies. Gates: format-gate pass, `.\test.ps1 -Dotnet` green, requirements-review MET, pr-review
+PR-READY.
+
+---
+
 ## §7.6 V16 — full Gate 1 audit ✅ DONE (2026-10-17)
 
 **Was** `TODO.md` §1 #11 and the §7.6 V16 slice (user 2026-10-11: after V15, audit every open entry in §1–§7 against
