@@ -8,6 +8,36 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §3.2 Dev server reads a `-wal`-stale bin copy ✅ DONE (2026-10-19)
+
+S, importer only; from V6. The databases run in WAL mode and the importer's last writes could sit in `*.db-wal` while
+the build copies only the `.db` files, so the dev server read a stale copy. **Seen live 2026-10-18:** the Lickitung full
+re-import left its writes in `pokemon.db-wal` (`git status` showed no change) until a manual
+`PRAGMA wal_checkpoint(TRUNCATE)`; no data differed. User ruling 2026-10-17: every data change is a full importer re-run
+(`MoDirectives/data.md` rule 1), so the mechanism is the importer's checkpoint on exit; no other writer is supported.
+
+- **Acceptance (met):** `SqliteCheckpointTests` write through a pooled connection (the row stays in the `-wal`), run the
+  flush, and assert the `-wal` is empty and a copy of the `.db` alone has the row. Also pinned: a missing database is
+  skipped, an open read transaction makes `FlushAll` return false, a direct `Flush` on a missing path throws without
+  creating a file (each sabotage-verified).
+- **Design:** `SqliteCheckpoint` runs `PRAGMA wal_checkpoint(TRUNCATE)` on an unpooled `Mode=ReadWrite` connection per
+  database; a busy row throws (SQLite reports a blocked checkpoint as a busy row, which `CommandTimeout` does not retry,
+  so it fails at once and does not wait). `Program.Main` flushes all three databases after `RunAsync`, so every exit path
+  (each subcommand, a failed or aborted run) is flushed; a failed flush makes the exit code 1. Rejected: also copying
+  `*.db-wal` (a stale bin `-wal` can outlive a fresh `.db`) and `journal_mode=DELETE`. Documented in `DATA_IMPORT.md`
+  §5.6 "WAL checkpoint on exit" (the §6 WAL bullet points to it).
+- **Gen surface:** none. **Gen 1 source:** n/a (tooling). **Data vs runtime:** importer only. **Dependencies:** none.
+- **Directive change (user-agreed 2026-10-18):** `ClaudeDirectives/data.md` rule 2 (flush SQLite MCP writes) retired, the
+  importer being the only supported writer; rules renumbered.
+- **Review:** format PASS; test-runner PASS (1906 .NET, tsc, 335 Vitest); requirements-review 4 discrepancies, all fixed
+  by user ruling (stale §6 bullet rewritten; failure path tested; a blocked checkpoint stays exit 1 and is documented;
+  out-of-repo memory pointers fixed); pr-review CHANGES-REQUESTED (1 blocking, 1 recommended, 2 advisories): C1 (the
+  documented 30 s wait never happened) fixed by dropping `timeoutSeconds` and the claim, R1 (stray line break) fixed, A1
+  (`Flush` could create an empty db) fixed with `Mode=ReadWrite` + test, A2 (`Main`'s exit-code line untested) accepted
+  by the user; no second pr-review run (user ruling).
+
+---
+
 ## §3.2 PokeAPI dropped item prices; the importer silently wrote `Cost` 0 ✅ DONE (2026-10-18)
 
 S, importer only; found 2026-10-18. A full re-import (for the Lickitung fix) set all 26 `items.db` costs to 0 and still

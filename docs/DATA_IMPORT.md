@@ -489,6 +489,21 @@ clean empty import. A failure that *throws* instead of being returned — an uns
 unreachable species generation list (§4.2) — aborts the run: `Main`'s catch-all logs it, the later stages don't
 run, and the exit code is 1.
 
+**WAL checkpoint on exit (2026-10-18).** The databases run in SQLite's WAL mode, and `Microsoft.Data.Sqlite`
+pools connections that are never closed cleanly at process exit, so the importer's last writes can sit in a
+`*.db-wal` side file. The build copies only the `.db` files (`creaturegame.Web.csproj`), so the dev server would
+read a stale copy, and `git status` would show no change. `Main` therefore runs `SqliteCheckpoint.FlushAll`
+after every entry point, aborted runs included: `PRAGMA wal_checkpoint(TRUNCATE)` on each existing database
+folds the `-wal` into the `.db` and empties it. A checkpoint that fails or is blocked by another connection is
+reported and makes the exit code 1, even though the import's rows were written: until the flush succeeds, the
+build copies stale data. Only an *open transaction* on another connection blocks it, and the checkpoint then
+fails at once (SQLite reports it as a busy row, not an error, so nothing waits or retries); a running dev stack's
+idle pooled connections hold none, so it rarely happens. On a blocked run, stop whatever holds the database and
+re-run the importer. The flush opens each file read-write without create, so it never makes an empty database.
+The importer is the only supported writer (`MoDirectives/data.md` rule 1), so nothing else needs flushing.
+Rejected: also copying `*.db-wal` into `bin` (a stale bin `-wal` can outlive a fresh `.db`) and switching to
+`journal_mode=DELETE`.
+
 **Test seam.** Each import takes an optional `HttpClient` and context factory (`Func<…DbContext>`),
 defaulting to `PokeApiHttp.Client` and `new …DbContext()`. Tests pass a canned-response handler
 (`FakePokeApiHandler`) and migrated temp-file SQLite databases (`TempImportDatabases`), so the real import
@@ -516,10 +531,9 @@ code runs with no network and without touching the committed `.db` files.
   to copy into the web host.
 - **Hardcoded Gen 1.** Move/species ranges and mappings assume Gen 1; generalising to
   other generations is future work (see `TODO.md` §4.4).
-- **A `.db` edit can sit in the WAL.** SQLite runs these databases in WAL mode, and a running dev stack (or a
-  sqlite MCP connection) keeps them open, so an importer write can land in `moves.db-wal` and leave the
-  checked-in `moves.db` byte-identical — git shows no change. Before committing a regenerated `.db`, stop whatever
-  holds it or run `PRAGMA wal_checkpoint(TRUNCATE)`, then confirm `git status` lists the file as modified.
+- **A `.db` write can sit in the WAL.** The importer flushes it on exit (§5.6 → WAL checkpoint on exit). The
+  remaining case is a flush blocked by another connection's open transaction: the run reports it and exits 1, and
+  the checked-in `.db` stays byte-identical. Stop whatever holds the database and re-run the importer.
 - **Direct `new MovesDbContext()` / `new PokemonDbContext()`.** Acceptable for a CLI tool
   (parameterless ctor + hardcoded path in `OnConfiguring`); it is the default of each import's optional
   context factory, which tests override (§5.6). The *web host* deliberately

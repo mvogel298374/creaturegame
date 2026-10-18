@@ -316,25 +316,6 @@ data/engine item usually also means updating the test that pins the wrong value.
 
   User ruling 2026-10-11: leave this one as filed; the other two became entries and shipped (`TODO_ARCHIVE.md` → "Battle randomness fully seeded; Dire Hit / Guard Spec narration"). The
   roll-order work that surfaced the last two: `TODO_ARCHIVE.md` → "Gen 1 roll order in `AttackAction`".
-- **Dev server reads a `-wal`-stale bin copy (S; from V6).** **User ruling 2026-10-17:** every data change is a
-  full importer re-run (`MoDirectives/data.md` rule 1), so the mechanism is option (a), the importer's checkpoint
-  on exit; no other writer is supported. **Seen live 2026-10-18:** the Lickitung full re-import left its writes in
-  `pokemon.db-wal` (`git status` showed no change) until a manual `PRAGMA wal_checkpoint(TRUNCATE)`; no data differed.
-  - **DoR:** ✗ not Ready — confirm the restated acceptance and it is ✅ Ready. *Acceptance (restated):* after an
-    importer run no root `*.db-wal` holds unflushed pages, and the next build's bin copy matches the root (a
-    scripted repro: import, build, compare). This retires `ClaudeDirectives/data.md` rule 2 (flush SQLite MCP
-    writes), a layer-3 change proposed in the same commit.
-  - *Scope + acceptance:* a write sitting in a root `-wal` reaches the dev server after a build. Acceptance: write a
-    row via a WAL connection without checkpointing, build, and the bin copy shows the row (scripted repro, then a
-    test if the chosen mechanism is code).
-  - *Options:* (a) the importer runs `PRAGMA wal_checkpoint(TRUNCATE)` before exit — covers the importer only, not
-    MCP writes; (b) the Web csproj also copies `*.db-wal` — covers both, but `PreserveNewest` keys on each file's own
-    mtime and a stale bin `-wal` must not outlive a fresh `.db`; (c) switch the committed `.db` files to
-    `journal_mode=DELETE` — no `-wal` ever exists, at the cost of SQLite's WAL concurrency, which a read-only game
-    host does not use. **Recommendation: (c), plus (a) as a belt** — it removes the failure mode instead of copying it.
-  - *Gen-variable surface:* none. *Gen 1 source:* n/a (tooling). *Data vs runtime:* data-file setting / build;
-    no runtime code. *Quirk the test asserts:* the bin copy matches the root after an uncheckpointed write.
-    *Dependencies:* none.
 - **Item `Cost` is modern, and drives rarity + the starting bag (S–M; from V6).** **User ruling 2026-10-17:**
   behind a generation seam — option (a), Gen 1 prices as per-generation data, plus the `ThenBy(Id)` tie-break.
   - **DoR:** ✗ not Ready — gap **2**: the `RarityOf` bands were tuned on modern prices, so the design step drafts

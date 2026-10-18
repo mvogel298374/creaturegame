@@ -6,15 +6,17 @@ class Program
 {
     static async Task<int> Main(string[] args)
     {
+        int exitCode;
         try
         {
-            return await RunAsync(args);
+            exitCode = await RunAsync(args);
         }
         catch (Exception ex)
         {
             Console.WriteLine($"\nImport ABORTED - later stages did not run: {ex}");
-            return 1;
+            exitCode = 1;
         }
+        return SqliteCheckpoint.FlushAll() ? exitCode : 1;
     }
 
     private static async Task<int> RunAsync(string[] args)
