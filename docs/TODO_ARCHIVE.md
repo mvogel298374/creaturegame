@@ -8,6 +8,28 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §6 E2E: `attackUntil` stalls on unanswered run prompts ✅ DONE (2026-10-18)
+
+S, test code only; found 2026-10-18. `endless-chain.spec.ts` "a run ends when the player faints" failed with the
+acquisition offer standing: the older play loop `attackUntil` (`e2e/helpers.ts`, behind `playToRunEnd` /
+`playToNextEncounter` / `attackUntilLog` / `reachLog`) cleared only the Shop and the reward choice, and an unseeded run
+gets the offer by chance.
+
+- **Intent and acceptance:** `attackUntil` answers the same between-node prompts as `playCurrentRunUntil` (declines the
+  draft, answers the nickname, keeps the lead, heals at the Poké Center, leaves the Shop, takes the reward, picks a
+  biome) through one shared prompt helper. Declining keeps a party of one, so the specs' single-creature assumptions hold.
+- **Gen surface:** none. **Gen 1 source:** n/a. **Data vs runtime:** test code only. **Quirk:** n/a. **Dependencies:** none.
+  **Gates:** test-only, so no review chain.
+- **Scope added 2026-10-18 (from the full E2E run; user-confirmed):** `answerRunPromptIfPresent` returns true for every
+  prompt it answers, the Shop, reward and biome choices included, so no loop fights in a pass where it cleared one
+  (`encounter-map` fought battle 2 in the same pass as battle 1's reward pick). It also answers the forced send-in with
+  the first live creature (`switchIn` policy; `forced-switch.spec.ts` passes `leave`), so a seed walk whose lead faints
+  moves on instead of hanging (`voluntary-switch` timed out on it). `e2e/README.md` notes the shared helper.
+- **Acceptance (extended), met 2026-10-18 (user run):** `.\e2e.ps1 -Spec endless-chain`, `encounter-map`,
+  `voluntary-switch` and `forced-switch` all passed.
+
+---
+
 ## §5 Battle log capped at 1000 lines ✅ DONE (2026-10-18)
 
 S, client runtime, no gen surface, no Gen 1 source; reproduced 2026-10-17 in §7.6 V12 (`battleReducer.ts` appended and only

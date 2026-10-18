@@ -242,10 +242,8 @@ async function attackUntil(
 ): Promise<string[]> {
   for (let i = 0; i < maxTurns; i++) {
     if (done(await logLines(page))) break;
-    // Between-node blocking modals must be cleared to keep the chain flowing: leave a Shop (nothing to buy in
-    // an auto-played run) and take the gold bag at a reward node (battle win / Treasure / Mystery).
-    await leaveShopIfPresent(page);
-    await dismissRewardChoiceIfPresent(page);
+    // Declining keeps these specs' party of one; a standing offer parks the server and stalls the loop.
+    if (await answerRunPromptIfPresent(page, { drafts: 'decline' })) continue;
     if (await fightButton(page).isEnabled().catch(() => false)) {
       // A turn/battle can end mid-choice (the move we picked is lethal); the click on the
       // now-disabled button then fails — swallow it and let the next iteration re-check.
@@ -340,7 +338,47 @@ export type PlayOpts = {
   drafts?: DraftPolicy;
   /** `leave` for a spec whose target IS the Poké Center prompt; otherwise the loop answers it (HEAL). */
   pokeCenter?: 'heal' | 'leave';
+  /** `leave` for a spec whose target IS the forced send-in; otherwise the loop sends in the first live creature. */
+  switchIn?: 'answer' | 'leave';
 };
+
+/** Clears any run prompt; true when it answered one, so the caller re-checks before its next move. */
+export async function answerRunPromptIfPresent(
+  page: Page,
+  opts: Pick<PlayOpts, 'drafts' | 'pokeCenter' | 'switchIn'> = {}
+): Promise<boolean> {
+  const { drafts = 'accept', pokeCenter = 'heal', switchIn = 'answer' } = opts;
+
+  // A spec targeting this modal passes `leave` (e2e/README.md → draft policy).
+  const acquire = page.locator('.acquire-modal');
+  if (drafts !== 'leave' && (await acquire.isVisible().catch(() => false))) {
+    const answer =
+      drafts === 'accept'
+        ? acquire.locator('.action-btn--fight')
+        : acquire.getByRole('button', { name: 'DECLINE', exact: true });
+    await answer.click().catch(() => {});
+    return true;
+  }
+  // An ADD opens the acquisition's nickname step on the loop's next pass (Creature Naming Stage B).
+  if (await answerNicknameIfPresent(page)) return true;
+  // Keep the current lead at a biome boundary so the run keeps flowing.
+  const keepLead = page.locator('.lead-modal[aria-label="Choose your lead"] .lead-card--current');
+  if (await keepLead.isVisible().catch(() => false)) {
+    await keepLead.click().catch(() => {});
+    return true;
+  }
+  const sendIn = page.locator('.lead-modal[aria-label="Send in a creature"] .lead-card:not([disabled])').first();
+  if (switchIn !== 'leave' && (await sendIn.isVisible().catch(() => false))) {
+    await sendIn.click().catch(() => {});
+    return true;
+  }
+  if (pokeCenter !== 'leave' && (await answerPokeCenterIfPresent(page))) return true;
+  return (
+    (await leaveShopIfPresent(page)) ||
+    (await dismissRewardChoiceIfPresent(page)) ||
+    (await chooseBiomeIfPresent(page))
+  );
+}
 
 /**
  * Plays the run **already in progress** — answering the draft per `drafts`, keeping the current lead at a biome
@@ -356,39 +394,11 @@ export async function playCurrentRunUntil(
   reached: (page: Page) => Promise<boolean>,
   opts: PlayOpts = {}
 ): Promise<boolean> {
-  const { maxTurns = 400, drafts = 'accept', pokeCenter = 'heal' } = opts;
+  const { maxTurns = 400, ...promptOpts } = opts;
 
   for (let i = 0; i < maxTurns; i++) {
     if (await reached(page)) return true;
-
-    // Answer the draft per policy.
-    //
-    // A spec whose target IS this modal must pass `leave`, and not merely rely on the `reached` probe above
-    // winning the race: both probes run in the same iteration a few ms apart, so a modal that renders between
-    // them gets answered by the loop before the spec ever sees it. That is not hypothetical — it is exactly how
-    // the acquisition spec failed, with "VAPOREON joined the party!" in the log and no modal left to assert on.
-    const acquire = page.locator('.acquire-modal');
-    if (drafts !== 'leave' && (await acquire.isVisible().catch(() => false))) {
-      const answer =
-        drafts === 'accept'
-          ? acquire.locator('.action-btn--fight')
-          : acquire.getByRole('button', { name: 'DECLINE', exact: true });
-      await answer.click().catch(() => {});
-      continue;
-    }
-    // An ADD just clicked above opens the acquisition's own nickname step next turn of the loop (Creature
-    // Naming Stage B) — same species-default clear as the starter's.
-    if (await answerNicknameIfPresent(page)) continue;
-    // Keep the current lead at a biome boundary so the run keeps flowing.
-    const keepLead = page.locator('.lead-modal[aria-label="Choose your lead"] .lead-card--current');
-    if (await keepLead.isVisible().catch(() => false)) {
-      await keepLead.click().catch(() => {});
-      continue;
-    }
-    if (pokeCenter !== 'leave' && (await answerPokeCenterIfPresent(page))) continue;
-    await leaveShopIfPresent(page);
-    await dismissRewardChoiceIfPresent(page);
-    await chooseBiomeIfPresent(page);
+    if (await answerRunPromptIfPresent(page, promptOpts)) continue;
 
     if ((await logLines(page)).some(l => /Run over/.test(l))) return reached(page);
     if (await fightButton(page).isEnabled().catch(() => false)) {

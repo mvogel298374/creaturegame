@@ -16,7 +16,7 @@ on a few patterns instead of a seed:
 - **Force a status/stat effect** → use a *player* move that applies it (e.g. Bulbasaur's Sleep Powder /
   Growth) with a **retry-until-lands** loop (Gen 1 accuracy can whiff; the L50 starter survives the misses).
 - **Drive the chain** → `playToNextEncounter` (one win → intermission) / `playToRunEnd` (play to player
-  faint → game-over).
+  faint → game-over). Both clear every between-node prompt via `answerRunPromptIfPresent`, declining drafts.
 - **Reach a deep run state** → `walkSeedsUntil(page, reached, opts)`. Anything gated on a *party larger than
   one* (both switch specs, the acquisition offer) or on *clearing a whole biome* (the Poké Center) is several
   battles deep behind the draft cadence × roll, and **a seed alone is not determinism**: the seed fixes the
@@ -36,11 +36,16 @@ on a few patterns instead of a seed:
   VICTREEBEL @ L12).
 - **Choose the Poké Center policy** → `pokeCenter: 'heal' | 'leave'` on either loop (default `heal`, via
   `answerPokeCenterIfPresent`). `leave` is for the spec whose target *is* the recovery modal (`poke-center`).
+- **Choose the send-in policy** → `switchIn: 'answer' | 'leave'` on either loop (default `answer`: send in the
+  first live creature, so a walk whose lead faints moves on instead of hanging). `leave` is for the spec whose
+  target *is* the forced send-in (`forced-switch`).
 - **Choose the draft policy** → `drafts: 'accept' | 'decline' | 'leave'` on either loop. `accept` is the only
   way a party grows past one; `decline` keeps the run flowing while staying a party of one (which matters more
   than it looks — *every* creature that levels is eligible for the level-up prompts, so a drafted creature can
   raise the very modal a spec is waiting on and break its identity assertions); `leave` is for the spec whose
-  target *is* that modal.
+  target *is* that modal. Pass it rather than trusting the `reached` probe to win the race: the probe and the
+  loop's answer run a few ms apart, so the loop can answer a modal that renders between them before the spec
+  sees it (the acquisition spec once failed exactly so, "VAPOREON joined the party!" logged and no modal left).
 - **Assert via DOM + the mitt bridge** (`bridgeEvents(page)` reads `window.__cgEvents`), never canvas pixels
   or wall-clock durations.
 

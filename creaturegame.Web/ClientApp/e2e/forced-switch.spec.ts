@@ -17,7 +17,7 @@ const switchInModal = (page: Page): Locator =>
 test('a lead faint with a live bench forces a send-in and the battle continues', async ({ page }) => {
   test.setTimeout(5 * 60_000);
 
-  const seed = await walkSeedsUntil(page, p => isShowing(switchInModal(p)), { level: 5 });
+  const seed = await walkSeedsUntil(page, p => isShowing(switchInModal(p)), { level: 5, switchIn: 'leave' });
   expect(seed, 'no seeded run reached a forced switch-in').not.toBeNull();
 
   const modal = switchInModal(page);
