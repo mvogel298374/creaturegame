@@ -11,7 +11,7 @@ public class PokeApiItem
     public string? Name { get; set; }
 
     [JsonPropertyName("cost")]
-    public int Cost { get; set; }
+    public int? Cost { get; set; }
 
     [JsonPropertyName("fling_power")]
     public int? FlingPower { get; set; }

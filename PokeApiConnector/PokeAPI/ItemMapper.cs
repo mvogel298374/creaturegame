@@ -54,7 +54,11 @@ public static class ItemMapper
             Id = pokeItem.Id,
             Name = pokeItem.Name,
             Category = MapCategory(pokeItem.Category?.Name),
-            Cost = pokeItem.Cost,
+            Cost = pokeItem.Cost is >= 0 and int cost
+                ? cost
+                : throw new InvalidOperationException(
+                    $"PokeAPI item '{pokeItem.Name}' has no usable cost ({pokeItem.Cost?.ToString() ?? "missing"})."
+                ),
             FlingPower = pokeItem.FlingPower,
             Description =
                 pokeItem.EffectEntries?.FirstOrDefault(e => e.Language?.Name == "en")?.ShortEffect

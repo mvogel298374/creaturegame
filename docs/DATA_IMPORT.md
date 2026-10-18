@@ -343,9 +343,13 @@ changes, so they're imported as data-only rows; their effect is deferred to the 
 *formula*, which belongs with the (deferred) Catch mechanic on the seam side, not in the item data row.
 `Description` is PokeAPI's English short effect as-is, with one override: X Accuracy's text describes the Gen 3+
 stage boost, so `ItemMapper.ApplyGen1Gameplay` replaces it with the Gen 1 bypass wording.
-**Caveat:** `cost` is PokeAPI's *current* price (taken as-is, like move `Priority`/`Description`); a few
-Gen 1 prices differ (Antidote was ¥100, not ¥200). Cost isn't battle-relevant and there's no shop, so
-it's left uncorrected — revisit with a curated cost table only if an economy is ever added.
+**Caveat:** a `cost` PokeAPI sends is its *current* price (taken as-is, like move `Priority`/`Description`); a
+few Gen 1 prices differ (Antidote was ¥100, not ¥200). Cost isn't battle-relevant and there's no shop, so a sent
+price is left uncorrected — revisit with a curated cost table only if an economy is ever added.
+A **missing** or negative `cost` fails that item and so the items stage (exit 1). A 0 is valid: Master Ball and
+the four PP items cost 0 in Gen 1 (pokered `data/items/prices.asm`, lines 3 and 82–85).
+PokeAPI stopped serving item prices in 2026 (`"prices": []`, no `cost`), so a full re-import now fails here
+until prices come from a curated table (`TODO.md` → Item `Cost`).
 
 The split mirrors `EvolutionImport`/`EvolutionMapper`: `ItemImport` does network + DB; `ItemMapper`
 holds the pure, unit-tested mapping and the Gen 1 roster.

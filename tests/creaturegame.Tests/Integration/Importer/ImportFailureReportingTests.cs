@@ -178,6 +178,21 @@ public class ImportFailureReportingTests : IDisposable
     }
 
     [Fact]
+    public async Task Items_AnItemWithNoCost_IsReported_NotImportedAsZero()
+    {
+        string potion = $"{Api}/item/potion/";
+        var http = new FakePokeApiHandler()
+            .RawJson(potion, """{"id":17,"name":"potion","prices":[]}""")
+            .Client();
+
+        var failed = await ItemImport.ImportGen1BattleItemsAsync(http, _db.Items);
+
+        Assert.Contains(potion, failed);
+        using var items = _db.Items();
+        Assert.DoesNotContain(items.Items, i => i.Id == 17);
+    }
+
+    [Fact]
     public async Task Evolutions_FailedSpeciesAndChainFetches_AreReported()
     {
         string chain = $"{Api}/evolution-chain/1/";

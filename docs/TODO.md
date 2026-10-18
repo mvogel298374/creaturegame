@@ -351,24 +351,10 @@ data/engine item usually also means updating the test that pins the wrong value.
     number the player never sees while shifting loot odds.
   - *Gen-variable surface:* (a) makes `Cost` per-generation data (fine — `items.db` is per-gen content); the
     rarity bands are gen-invariant `RunRules`-style tuning. *Gen 1 source:* `pokered data/items/prices.asm`.
-    *Data vs runtime:* (a) data + a band check; (b) runtime one-liner. *Quirk:* PP items cost 0 in Gen 1 (not sold).
-    *Dependencies:* none. **Now urgent:** PokeAPI no longer serves item prices (entry below), so until (a) lands a
-    full re-import zeroes every `Cost`.
-- **PokeAPI dropped item prices; the importer silently writes `Cost` 0 (found 2026-10-18, S; ✗ not Ready).** A
-  full re-import (for the Lickitung fix) set all 26 `items.db` costs to 0 and still reported "Import Complete!":
-  `/item/potion/` now has no `cost` field, only `"prices": []`. `items.db` was restored to its committed import (user
-  ruling 2026-10-18), so the shipped data is intact, but **any full re-import breaks rarity, the starting bag and
-  shop prices** until this is fixed.
-  **DoR:** ✗ not Ready — gaps **1, 2, 3, 5, 6, 7** drafted below for your confirmation.
-  - **Acceptance:** an item whose PokeAPI response has no usable price fails the items stage (reported, exit 1)
-    instead of importing `Cost` 0; a test serves an item without `cost` and asserts the failure.
-  - **Design:** the clean end state is the Item `Cost` entry's option (a): prices come from a pokered price table,
-    not PokeAPI, so this check then guards only that the table covers every rostered item. Until then, a missing
-    `cost` field is the failure signal — not a 0 value, since Gen 1 PP items legitimately cost 0.
-  - **Gen surface:** none for the check; the prices themselves are per-generation data under the Item `Cost` entry.
-  - **Data vs runtime:** importer only.
-  - **Quirk:** a 0 price is valid (PP items); an absent price is a failure.
-  - **Dependencies:** pairs with the Item `Cost` entry above; doing (a) first makes this a coverage check.
+    *Data vs runtime:* (a) data + a band check; (b) runtime one-liner. *Quirk:* PP items cost 0 in Gen 1 (not sold; `prices.asm:82-85`).
+    *Dependencies:* none. **Now urgent:** PokeAPI no longer serves item prices, so until (a) lands a full re-import
+    FAILS the items stage loudly (the importer rejects an item with no `cost`; `TODO_ARCHIVE.md` → "§3.2 PokeAPI
+    dropped item prices") and `items.db` cannot be regenerated.
 
 ---
 

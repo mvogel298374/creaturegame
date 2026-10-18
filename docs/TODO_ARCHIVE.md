@@ -8,6 +8,31 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §3.2 PokeAPI dropped item prices; the importer silently wrote `Cost` 0 ✅ DONE (2026-10-18)
+
+S, importer only; found 2026-10-18. A full re-import (for the Lickitung fix) set all 26 `items.db` costs to 0 and still
+reported "Import Complete!": `/item/potion/` now has no `cost` field, only `"prices": []`. `items.db` was restored to its
+committed import (user ruling 2026-10-18), so the shipped data is intact.
+
+- **Acceptance (met):** an item whose PokeAPI response has no usable price (missing or negative `cost`) fails the items
+  stage (reported url, exit 1) instead of importing; a test serves an item without `cost` and asserts the failure
+  (`ImportFailureReportingTests`), and mapper tests keep a real 0 and reject a negative cost.
+- **Design:** `PokeApiItem.Cost` became `int?` (a plain `int` reads a missing field as 0); `ItemMapper.MapToItem` throws on
+  a null or negative cost, which the items stage's existing catch reports as a failed url. A 0 is not the signal: Gen 1's
+  PP items and Master Ball cost 0. Tests: `ImportFailureReportingTests`, `ItemImportTests`,
+  `ImportSaveFailureIsolationTests` (fixtures given a cost). `DATA_IMPORT.md` §4.5 states the rule.
+- **Gen surface:** none for the check; the prices themselves are per-generation data under the open Item `Cost` entry.
+  **Gen 1 source:** pokered `data/items/prices.asm`: `MASTER_BALL` (line 3) and `ETHER`/`MAX_ETHER`/`ELIXER`/`MAX_ELIXER`
+  (lines 82-85) are `bcd3 0` (verified 2026-10-18). **Data vs runtime:** importer only.
+- **Follow-up still live in `TODO.md`:** the Item `Cost` entry (§3.2) owns option (a), Gen 1 prices from a pokered table;
+  until it lands a full re-import fails the items stage. When it lands, this check becomes the table-coverage guard.
+- **Review:** format PASS; test-runner PASS (1902 .NET, tsc, 335 Vitest); requirements-review 3 discrepancies, all fixed
+  (entry headline/design merged, prices.asm cite added, negative cost also rejected); pr-review PR-READY with 2
+  advisories: A1 (`DATA_IMPORT.md` caveat contradicted the new rule) fixed; A2 (an import-level negative-cost case)
+  waived by the user 2026-10-18, since the mapper test covers the same throw and catch.
+
+---
+
 ## §6 E2E: `attackUntil` stalls on unanswered run prompts ✅ DONE (2026-10-18)
 
 S, test code only; found 2026-10-18. `endless-chain.spec.ts` "a run ends when the player faints" failed with the
@@ -62,8 +87,8 @@ Full importer re-run: the `pokemon.db` row diff vs `HEAD`, ignoring the surrogat
 `GAME_AVAILABILITY.md` updated (Yellow special-obtainment row and the non-wild table note).
 
 **Upstream drift from the same re-run (user rulings 2026-10-18):** `items.db` was restored to `HEAD` because PokeAPI dropped
-item `cost` (all costs imported as 0); filed as the open `TODO.md` §3.2 "PokeAPI dropped item prices" entry, and the Item
-`Cost` entry marked urgent. `moves.db` Struggle `EffectChance` 10 → null accepted (inert: Struggle is built in code at
+item `cost` (all costs imported as 0); filed as the §3.2 "PokeAPI dropped item prices" entry (since shipped, archived
+under that name), and the Item `Cost` entry marked urgent. `moves.db` Struggle `EffectChance` 10 → null accepted (inert: Struggle is built in code at
 `Creature.cs:35-43`). The re-run also reproduced the `-wal` staleness bug (writes stayed in `pokemon.db-wal` until a manual
 checkpoint); recorded as evidence on the open `TODO.md` §3.2 `-wal` entry. Review: format PASS; .NET 1898/1898, tsc PASS,
 Vitest 335/335; requirements-review 2 discrepancies (stale `GAME_AVAILABILITY.md`, fixed; id scope, waived); pr-review

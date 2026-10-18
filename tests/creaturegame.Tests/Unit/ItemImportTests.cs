@@ -16,7 +16,7 @@ public class ItemImportTests
         string name,
         string? category = null,
         int id = 1,
-        int cost = 100,
+        int? cost = 100,
         int? flingPower = null,
         string? shortEffect = null
     ) =>
@@ -91,6 +91,24 @@ public class ItemImportTests
         Assert.Equal(0, item.FlingPower);
         Assert.Equal("Catches.", item.Description);
         Assert.Equal("https://img/great-ball.png", item.SpriteUrl);
+    }
+
+    [Fact]
+    public void MapToItem_KeepsAZeroCost_LikeGen1sPpItemsAndMasterBall()
+    {
+        var item = ItemMapper.MapToItem(PokeItem("ether", "pp-recovery", cost: 0));
+
+        Assert.Equal(0, item.Cost);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(-1)]
+    public void MapToItem_RejectsAMissingOrNegativeCost_InsteadOfImportingIt(int? cost)
+    {
+        Assert.Throws<InvalidOperationException>(() =>
+            ItemMapper.MapToItem(PokeItem("potion", "healing", cost: cost))
+        );
     }
 
     [Fact]
