@@ -219,6 +219,20 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - Gen 1's 5 HMs are not offered — only TM-learnable moves.
 - Design detail → `ENCOUNTER_DESIGN.md` §5.1. History → `TODO_ARCHIVE.md` → *TM/HM — Move-Teach Rewards*.
 
+### Shop prices and item rarity
+- Shop prices follow Gen 1's item price order: a pricier Gen 1 item never sells cheaper at the same depth. The price is
+  the Gen 1 price ÷ 35, rising with run depth (+4% per depth, capped at +80%), with ±10% jitter, at least 1 ₽
+  (Potion ≈ 9 ₽, Super Potion 20 ₽, Hyper Potion/Revive ≈ 43 ₽, Full Restore ≈ 86 ₽ at depth 0).
+- PP items (Ether, Max Ether, Elixir, Max Elixir) are never sold in shops; they drop as loot only (Ether as Rare, the
+  others as Epic).
+- Item reward rarity follows the Gen 1 price: Common up to 400, Uncommon up to 1200, Rare up to 2500, Epic above.
+  Every X item, Dire Hit and Guard Spec. is at least Uncommon.
+- A biome keeps a Shop node only when the wallet covers the cheapest sellable healing item (Potion ≈ 9 ₽).
+- The starting bag holds the cheapest item per category, ties broken by item id: four Potions, an Antidote and an
+  Awakening, and an Ether.
+- Design detail → `ENCOUNTER_DESIGN.md` §5.1, `DATA_IMPORT.md` §4.5.  History → `TODO_ARCHIVE.md` → *Item `Cost`
+  becomes the Gen 1 price*.
+
 ## 6. Generation & presentation
 
 ### Level-up stat panel (Gen 1 "Kanto Sage" skin)

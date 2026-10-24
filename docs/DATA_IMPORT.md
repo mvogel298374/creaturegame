@@ -343,13 +343,14 @@ changes, so they're imported as data-only rows; their effect is deferred to the 
 *formula*, which belongs with the (deferred) Catch mechanic on the seam side, not in the item data row.
 `Description` is PokeAPI's English short effect as-is, with one override: X Accuracy's text describes the Gen 3+
 stage boost, so `ItemMapper.ApplyGen1Gameplay` replaces it with the Gen 1 bypass wording.
-**Caveat:** a `cost` PokeAPI sends is its *current* price (taken as-is, like move `Priority`/`Description`); a
-few Gen 1 prices differ (Antidote was ¥100, not ¥200). Cost isn't battle-relevant and there's no shop, so a sent
-price is left uncorrected — revisit with a curated cost table only if an economy is ever added.
-A **missing** or negative `cost` fails that item and so the items stage (exit 1). A 0 is valid: Master Ball and
-the four PP items cost 0 in Gen 1 (pokered `data/items/prices.asm`, lines 3 and 82–85).
-PokeAPI stopped serving item prices in 2026 (`"prices": []`, no `cost`), so a full re-import now fails here
-until prices come from a curated table (`TODO.md` → Item `Cost`).
+**`Cost` is the Gen 1 shop price, a layer-2 table.** PokeAPI stopped serving item prices in 2026 (`"prices": []`,
+no `cost`), and its old prices were modern anyway (Antidote ¥200, not Gen 1's ¥100). So `ItemMapper.Gen1Prices`
+holds pokered's `data/items/prices.asm` price for every roster slug, and PokeAPI's price field is not read at
+all. A roster item with no entry fails that item and so the items stage (exit 1);
+`ItemImportTests.Gen1Prices_CoverExactlyTheRoster` keeps the table and the roster in step, and
+`ItemPriceDataContractTests` pins the stored prices. A 0 means Gen 1 never sold the item: Master Ball and the four
+PP items (`prices.asm` lines 3 and 82–85). `Cost` drives the run's rarity bands, shop prices and starting bag
+(`ENCOUNTER_DESIGN.md` §5.1).
 
 The split mirrors `EvolutionImport`/`EvolutionMapper`: `ItemImport` does network + DB; `ItemMapper`
 holds the pure, unit-tested mapping and the Gen 1 roster.

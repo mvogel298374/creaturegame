@@ -10,44 +10,42 @@ namespace creaturegame.Web.Battle;
 /// a battle seam, and <c>internal static</c> + pure so it's unit-testable the same way. Reuses the reward
 /// policy's rarity machinery (<see cref="RewardCalculator.UsableItems"/> / <c>RollRarity</c> / <c>RarityOf</c>)
 /// so loot and shop stock speak the same rarity language.
-///
-/// <para><b>Pricing is rarity-derived, not the Gen 1 shop cost.</b> Raw <c>Item.Cost</c> is 100s–1000s while a
-/// run's whole wallet is ~tens of ₽ (the reward gold curve), so a Gen-1-priced shop would sell nothing. Instead
-/// each item is priced off its <see cref="RewardRarity"/> band (Common cheap sustain … Epic premium restores),
-/// lifted a little by run depth as gold inflates. All magic numbers are provisional balance tuning — the tests
-/// assert only the <em>shape</em> (price climbs with rarity, stock is distinct items drawn from the usable
-/// pool).</para>
+/// <para>Pricing → <c>ENCOUNTER_DESIGN.md §5.1</c>.</para>
 /// </summary>
 internal static class ShopCalculator
 {
     /// <summary>How many distinct items a visit stocks (capped by the usable pool size).</summary>
     private const int StockSize = 4;
 
-    /// <summary>The cheapest an item can be priced — the Common base band (before any depth lift / jitter). The
-    /// run uses it as the <c>RunDirector</c>'s shop-affordability floor: a biome only keeps a Shop node if the
-    /// wallet clears this at biome entry, so a broke player never gets a dead, all-unaffordable shop.</summary>
-    public const int MinItemPrice = 8;
+    /// <summary>Item ₽ per run ₽ (<c>ENCOUNTER_DESIGN.md §5.1</c>).</summary>
+    private const double PriceDivisor = 35.0;
 
-    /// <summary>The single entry point for the run's shop supplier: rolls this visit's stock — up to
-    /// <see cref="StockSize"/> distinct items, each rarity-rolled (depth-biased) and priced off its band. Empty
-    /// pool → <see cref="ShopOffer.None"/> (the node resolves as a silent banner).</summary>
+    private const double MinJitter = 0.9;
+    private const double JitterSpan = 0.2;
+
+    /// <summary>Rolls this visit's stock of distinct sellable items; none → <see cref="ShopOffer.None"/>.</summary>
     public static ShopOffer BuildStock(int depth, IReadOnlyList<Item> usable, IRandomSource rng)
     {
-        if (usable.Count == 0)
+        var sellable = Sellable(usable);
+        if (sellable.Count == 0)
             return ShopOffer.None;
 
         var items = new List<ShopOfferItem>();
         var chosenIds = new HashSet<int>();
-        int slots = Math.Min(StockSize, usable.Count);
+        int slots = Math.Min(StockSize, sellable.Count);
         for (int i = 0; i < slots; i++)
         {
-            var pick = PickDistinct(usable, chosenIds, depth, rng);
+            var pick = PickDistinct(sellable, chosenIds, depth, rng);
             if (pick is null)
                 break;
             chosenIds.Add(pick.Id);
-            var rarity = RewardCalculator.RarityOf(pick);
             items.Add(
-                new ShopOfferItem(pick.Id, pick.Name ?? "", PriceFor(rarity, depth, rng), rarity)
+                new ShopOfferItem(
+                    pick.Id,
+                    pick.Name ?? "",
+                    PriceFor(pick, depth, rng),
+                    RewardCalculator.RarityOf(pick)
+                )
             );
         }
 
@@ -76,26 +74,25 @@ internal static class ShopCalculator
         return band[rng.Next(band.Count)];
     }
 
-    // Base price per rarity band (₽), tuned to the run's gold curve (gold bags are ~tens). Well-separated so the
-    // bands never overlap after the depth lift + jitter — price is monotone in rarity by construction.
-    private static int BasePrice(RewardRarity rarity) =>
-        rarity switch
-        {
-            RewardRarity.Common => MinItemPrice,
-            RewardRarity.Uncommon => 20,
-            RewardRarity.Rare => 55,
-            RewardRarity.Epic => 90,
-            _ => MinItemPrice,
-        };
+    private static List<Item> Sellable(IReadOnlyList<Item> usable) =>
+        usable.Where(i => !RewardCalculator.IsLootOnly(i)).ToList();
 
-    /// <summary>The shelf price: the rarity's base band, lifted by run depth (deeper shops cost more, as the
-    /// reward gold curve inflates) and nudged by small ±10% jitter so two same-rarity items aren't identically
-    /// priced. Provisional tuning. <c>internal</c> so the rarity-ordering shape is directly unit-testable.</summary>
-    internal static int PriceFor(RewardRarity rarity, int depth, IRandomSource rng)
+    /// <summary>Shop-affordability floor → <c>ENCOUNTER_DESIGN.md §5.1</c>.</summary>
+    public static int AffordabilityFloor(IReadOnlyList<Item> usable)
     {
-        int baseline = BasePrice(rarity);
+        var sellable = Sellable(usable);
+        var heals = sellable.Where(i => i.Category == ItemCategory.Healing).ToList();
+        var basis = heals.Count > 0 ? heals : sellable;
+        return basis.Count == 0 ? 0 : basis.Min(i => Price(i.Cost, depth: 0, jitter: MinJitter));
+    }
+
+    /// <summary>The shelf price → <c>ENCOUNTER_DESIGN.md §5.1</c>; <c>internal</c> for unit testing.</summary>
+    internal static int PriceFor(Item item, int depth, IRandomSource rng) =>
+        Price(item.Cost, depth, jitter: MinJitter + rng.NextDouble() * JitterSpan);
+
+    private static int Price(int cost, int depth, double jitter)
+    {
         double lift = 1.0 + Math.Min(Math.Max(0, depth) * 0.04, 0.8); // up to +80% deep in a run
-        double jitter = 0.9 + rng.NextDouble() * 0.2; // ±10%
-        return Math.Max(1, (int)Math.Round(baseline * lift * jitter));
+        return Math.Max(1, (int)Math.Round(cost / PriceDivisor * lift * jitter));
     }
 }

@@ -7,9 +7,9 @@ namespace creaturegame.Tests.Integration.Web;
 /// <summary>
 /// The run economy's shop policy (<see cref="ShopCalculator"/>) — the per-visit stock + run-scaled pricing
 /// behind <see cref="RunDirector"/>'s injected shop supplier. The spend-side sibling of
-/// <see cref="RewardCalculatorTests"/>: pins the <em>shape</em> (stock is distinct items drawn from the usable
-/// pool, price climbs with rarity, an empty pool yields no stock, seeded reproducibility) without over-fitting
-/// the provisional price band.
+/// <see cref="RewardCalculatorTests"/>: pins the <em>shape</em> (stock is distinct sellable items drawn from the
+/// usable pool, price follows the Gen 1 order, an empty pool yields no stock, seeded reproducibility) without
+/// over-fitting the provisional divisor.
 /// </summary>
 public class ShopCalculatorTests
 {
@@ -95,62 +95,136 @@ public class ShopCalculatorTests
     }
 
     [Fact]
-    public void PriceFor_ClimbsWithRarity_AtTheSameDepth()
+    public void PriceFor_FollowsTheGen1PriceOrder_AtTheSameDepth()
     {
-        // The headline shape: rarer costs more. The bands are well-separated, so the ordering holds regardless of
-        // the ±10% jitter (same seed for each so the jitter draw is identical, isolating the rarity factor).
-        int common = ShopCalculator.PriceFor(
-            RewardRarity.Common,
-            depth: 0,
-            new SeededRandomSource(5)
-        );
-        int uncommon = ShopCalculator.PriceFor(
-            RewardRarity.Uncommon,
-            depth: 0,
-            new SeededRandomSource(5)
-        );
-        int rare = ShopCalculator.PriceFor(RewardRarity.Rare, depth: 0, new SeededRandomSource(5));
-        int epic = ShopCalculator.PriceFor(RewardRarity.Epic, depth: 0, new SeededRandomSource(5));
+        // Same jitter draw for each, isolating the Gen 1 cost.
+        int[] gen1Prices = [100, 300, 600, 700, 950, 1500, 2500, 3000];
+        var prices = gen1Prices
+            .Select(cost =>
+                ShopCalculator.PriceFor(
+                    MakeItem(1, ItemCategory.Healing, cost),
+                    depth: 0,
+                    new SeededRandomSource(5)
+                )
+            )
+            .ToArray();
 
-        Assert.True(common < uncommon, $"Common {common} < Uncommon {uncommon}");
-        Assert.True(uncommon < rare, $"Uncommon {uncommon} < Rare {rare}");
-        Assert.True(rare < epic, $"Rare {rare} < Epic {epic}");
+        for (int i = 1; i < prices.Length; i++)
+            Assert.True(
+                prices[i - 1] < prices[i],
+                $"Gen 1 {gen1Prices[i - 1]} → {prices[i - 1]} should undercut {gen1Prices[i]} → {prices[i]}"
+            );
     }
 
     [Fact]
-    public void PriceFor_LiftsWithDepth_AtTheSameRarity()
+    public void PriceFor_LiftsWithDepth_AtTheSameItem()
     {
         // Deeper shops cost more (gold inflates over a run) — same seed so only the depth lift differs.
-        int shallow = ShopCalculator.PriceFor(
-            RewardRarity.Rare,
-            depth: 0,
-            new SeededRandomSource(9)
-        );
-        int deep = ShopCalculator.PriceFor(RewardRarity.Rare, depth: 20, new SeededRandomSource(9));
+        var hyperPotion = MakeItem(1, ItemCategory.Healing, 1500);
+        int shallow = ShopCalculator.PriceFor(hyperPotion, depth: 0, new SeededRandomSource(9));
+        int deep = ShopCalculator.PriceFor(hyperPotion, depth: 20, new SeededRandomSource(9));
 
         Assert.True(deep > shallow, $"deep {deep} should out-price shallow {shallow}");
     }
 
     [Fact]
-    public void BuildStock_ItemPriceMatchesItsRarityBand()
+    public void BuildStock_PricesEachItemOffItsOwnGen1Cost()
     {
-        // Each stock item's price must be the price of the rarity it carries (not some other band) — proves the
-        // price is derived from the item's own rarity, so the client's rarity colour and the price agree.
         var usable = UsableCatalog();
+        var byId = usable.ToDictionary(i => i.Id);
         var rng = new SeededRandomSource(42);
 
         for (int i = 0; i < 500; i++)
         {
             var offer = ShopCalculator.BuildStock(depth: 2, usable, rng);
-            foreach (var item in offer.Items)
+            foreach (var stocked in offer.Items)
             {
-                // The price for this rarity at depth 2 spans a ±10% jitter window around base×lift; assert the
-                // item's price sits in that window (so it can't have been priced off a different band).
-                int lo = ShopCalculator.PriceFor(item.Rarity, 2, new AlwaysLowJitter());
-                int hi = ShopCalculator.PriceFor(item.Rarity, 2, new AlwaysHighJitter());
-                Assert.InRange(item.Price, lo, hi);
+                var item = byId[stocked.ItemId];
+                int lo = ShopCalculator.PriceFor(item, 2, new AlwaysLowJitter());
+                int hi = ShopCalculator.PriceFor(item, 2, new AlwaysHighJitter());
+                Assert.InRange(stocked.Price, lo, hi);
+                Assert.Equal(RewardCalculator.RarityOf(item), stocked.Rarity);
             }
         }
+    }
+
+    [Fact]
+    public void BuildStock_NeverStocksALootOnlyItem()
+    {
+        // Gen 1 never sold PP items (price 0): the run offers them as loot, never on a shelf.
+        var usable = RewardCalculator.UsableItems([
+            MakeItem(1, ItemCategory.Healing, 300),
+            MakeItem(38, ItemCategory.PpRestore, 0),
+            MakeItem(41, ItemCategory.PpRestore, 0),
+        ]);
+        var rng = new SeededRandomSource(11);
+
+        for (int i = 0; i < 500; i++)
+            Assert.All(
+                ShopCalculator.BuildStock(depth: 3, usable, rng).Items,
+                it => Assert.Equal(1, it.ItemId)
+            );
+    }
+
+    [Fact]
+    public void BuildStock_OnlyLootOnlyItems_YieldsNoStock()
+    {
+        var usable = RewardCalculator.UsableItems([MakeItem(38, ItemCategory.PpRestore, 0)]);
+
+        Assert.Same(
+            ShopOffer.None,
+            ShopCalculator.BuildStock(3, usable, new SeededRandomSource(1))
+        );
+    }
+
+    [Fact]
+    public void AffordabilityFloor_IsTheCheapestHealsLowestPrice_NotACheaperCure()
+    {
+        // Antidote (¥100) undercuts Potion (¥300), but the floor is the cheapest heal's price.
+        var potion = MakeItem(17, ItemCategory.Healing, 300);
+        IReadOnlyList<Item> usable =
+        [
+            MakeItem(18, ItemCategory.StatusCure, 100),
+            potion,
+            MakeItem(25, ItemCategory.Healing, 1500),
+        ];
+
+        int floor = ShopCalculator.AffordabilityFloor(usable);
+
+        Assert.Equal(ShopCalculator.PriceFor(potion, 0, new AlwaysLowJitter()), floor);
+        var rng = new SeededRandomSource(77);
+        for (int i = 0; i < 2000; i++)
+        {
+            int potionPrice = ShopCalculator.PriceFor(potion, depth: i % 30, rng);
+            Assert.True(potionPrice >= floor, $"Potion at {potionPrice} under the floor {floor}");
+        }
+    }
+
+    [Fact]
+    public void AffordabilityFloor_FallsBackToTheCheapestSellable_WithNoHeal()
+    {
+        var antidote = MakeItem(18, ItemCategory.StatusCure, 100);
+        IReadOnlyList<Item> usable = [antidote, MakeItem(57, ItemCategory.BattleStatBoost, 500)];
+
+        Assert.Equal(
+            ShopCalculator.PriceFor(antidote, 0, new AlwaysLowJitter()),
+            ShopCalculator.AffordabilityFloor(usable)
+        );
+    }
+
+    [Fact]
+    public void AffordabilityFloor_IgnoresLootOnlyItems_AndIsZeroWithNothingToSell()
+    {
+        Item[] lootOnly = [MakeItem(38, ItemCategory.PpRestore, 0)];
+
+        Assert.Equal(0, ShopCalculator.AffordabilityFloor(lootOnly));
+        Assert.Equal(
+            ShopCalculator.AffordabilityFloor([MakeItem(1, ItemCategory.Healing, 3000)]),
+            ShopCalculator.AffordabilityFloor([
+                .. lootOnly,
+                MakeItem(1, ItemCategory.Healing, 3000),
+            ])
+        );
     }
 
     [Fact]
@@ -169,7 +243,7 @@ public class ShopCalculatorTests
         string.Join("|", offer.Items.Select(i => $"{i.ItemId}:{i.Rarity}:{i.Price}"));
 
     // Jitter endpoints: PriceFor's jitter is 0.9 + NextDouble()*0.2, so NextDouble()=0 is the low end and →1 is
-    // the high end. These pin the price window a given (rarity, depth) can produce.
+    // the high end. These pin the price window a given (item, depth) can produce.
     private sealed class AlwaysLowJitter : IRandomSource
     {
         public int Next(int max) => 0;

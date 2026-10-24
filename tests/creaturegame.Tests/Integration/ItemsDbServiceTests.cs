@@ -18,7 +18,7 @@ public class ItemsDbServiceTests : IDisposable
     private ItemsDbContext BuildContext()
     {
         var options = new DbContextOptionsBuilder<ItemsDbContext>()
-            .UseSqlite($"Data Source={_itemsDb}")
+            .UseSqlite($"Data Source={_itemsDb};Pooling=False")
             .Options;
         return new ItemsDbContext(options);
     }
@@ -42,7 +42,7 @@ public class ItemsDbServiceTests : IDisposable
         context.EnsureDatabaseCreated();
 
         var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        using var conn = new SqliteConnection($"Data Source={_itemsDb}");
+        using var conn = new SqliteConnection($"Data Source={_itemsDb};Pooling=False");
         conn.Open();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "PRAGMA table_info(Items)";
@@ -182,7 +182,6 @@ public class ItemsDbServiceTests : IDisposable
 
     public void Dispose()
     {
-        SqliteConnection.ClearAllPools();
         if (File.Exists(_itemsDb))
             File.Delete(_itemsDb);
     }

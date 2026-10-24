@@ -106,13 +106,7 @@ public sealed class EncounterFactory(
         );
     }
 
-    /// <summary>
-    /// A curated, modest starting loadout by category/cost (no hardcoded item ids, so it survives a catalog
-    /// re-import): the cheapest Healing item ×4, the two cheapest StatusCure items ×1, the cheapest PpRestore
-    /// item ×1. Replaces the old fixed "every item ×20" test seed now that the run economy (battle drops,
-    /// Treasure/Mystery) grows the bag from here — a lucky early haul still can't trivialise a run because
-    /// this start is deliberately light.
-    /// </summary>
+    /// <summary>Starting loadout → <c>ENCOUNTER_DESIGN.md §5.1</c>.</summary>
     internal static Bag BuildStartingBag(IReadOnlyList<Item> allItems)
     {
         var bag = new Bag();
@@ -131,7 +125,11 @@ public sealed class EncounterFactory(
     )
     {
         foreach (
-            var item in allItems.Where(i => i.Category == category).OrderBy(i => i.Cost).Take(count)
+            var item in allItems
+                .Where(i => i.Category == category)
+                .OrderBy(i => i.Cost)
+                .ThenBy(i => i.Id)
+                .Take(count)
         )
             bag.Add(item.Id, quantity);
     }

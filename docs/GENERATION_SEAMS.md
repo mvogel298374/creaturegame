@@ -374,6 +374,10 @@ result from the DB; rationale → `ARCHITECTURE.md` §2.6, mapping → `DATA_IMP
 - a **base-experience table and a catch-rate table** — `SpeciesBaseExperience.For(generation, speciesId)` and
   `SpeciesCatchRate.For(generation, speciesId)` throw `NotSupportedException` for a generation with no table, so a
   missing table fails the import loudly instead of importing modern values (PokeAPI has no history for either);
+- an **item price table** — `ItemMapper.Gen1Prices` is not keyed by generation, so a second generation's import
+  would give every shared item its Gen 1 price (only an item missing from the table fails). `Item.Cost` drives the
+  run's rarity, shop prices and starting bag (`ENCOUNTER_DESIGN.md` §5.1); key the table by generation with the
+  per-generation item data (`TODO.md` §4.4);
 - for **Gen 2**, the Special split needs **two stat columns** (a model change; `SingleSpecialAsOf` throws for
   generation != 1 until then) — the `GetOffensiveStat`/`GetDefensiveStat` seam is where the engine picks between
   them (the Special-model decision is part of adding the generation);

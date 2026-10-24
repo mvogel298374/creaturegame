@@ -366,16 +366,26 @@ internal static class RewardCalculator
 
     // --- Rarity ---------------------------------------------------------------------------------------------
 
-    /// <summary>Classifies an item into a rarity by its Gen 1 shop cost — bands → <c>ENCOUNTER_DESIGN.md
-    /// §5.1</c>. <c>internal</c> for direct unit testing.</summary>
-    internal static RewardRarity RarityOf(Item item) =>
-        item.Cost switch
+    /// <summary>Rarity by shop cost, bands and floors → <c>ENCOUNTER_DESIGN.md §5.1</c>.</summary>
+    internal static RewardRarity RarityOf(Item item)
+    {
+        var rarity = item.Cost switch
         {
+            0 => item.RestoresAllPp || item.RestoresPpAllMoves
+                ? RewardRarity.Epic
+                : RewardRarity.Rare,
             <= 400 => RewardRarity.Common,
             <= 1200 => RewardRarity.Uncommon,
             <= 2500 => RewardRarity.Rare,
             _ => RewardRarity.Epic,
         };
+        return item.Category == ItemCategory.BattleStatBoost && rarity < RewardRarity.Uncommon
+            ? RewardRarity.Uncommon
+            : rarity;
+    }
+
+    /// <summary>Never sold (price 0), so loot only — <c>ENCOUNTER_DESIGN.md §5.1</c>.</summary>
+    internal static bool IsLootOnly(Item item) => item.Cost == 0;
 
     /// <summary>Rolls a rarity on a per-tier weight table lifted by run depth — <c>ENCOUNTER_DESIGN.md §5.1</c>.
     /// <c>internal</c> for direct unit testing.</summary>

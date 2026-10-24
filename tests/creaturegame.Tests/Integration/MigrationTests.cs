@@ -88,7 +88,7 @@ public class MigrationTests : IDisposable
         context.EnsureDatabaseCreated();
 
         var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        using var conn = new SqliteConnection($"Data Source={_movesDb}");
+        using var conn = new SqliteConnection($"Data Source={_movesDb};Pooling=False");
         conn.Open();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "PRAGMA table_info(Moves)";
@@ -172,7 +172,7 @@ public class MigrationTests : IDisposable
         context.EnsureDatabaseCreated();
 
         var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        using var conn = new SqliteConnection($"Data Source={_pokemonDb}");
+        using var conn = new SqliteConnection($"Data Source={_pokemonDb};Pooling=False");
         conn.Open();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "PRAGMA table_info(PokemonSpecies)";
@@ -202,7 +202,7 @@ public class MigrationTests : IDisposable
         context.EnsureDatabaseCreated();
 
         var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        using var conn = new SqliteConnection($"Data Source={_pokemonDb}");
+        using var conn = new SqliteConnection($"Data Source={_pokemonDb};Pooling=False");
         conn.Open();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "PRAGMA table_info(PokemonGameAvailability)";
@@ -253,7 +253,7 @@ public class MigrationTests : IDisposable
         context.EnsureDatabaseCreated();
 
         var columns = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        using var conn = new SqliteConnection($"Data Source={_pokemonDb}");
+        using var conn = new SqliteConnection($"Data Source={_pokemonDb};Pooling=False");
         conn.Open();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "PRAGMA table_info(PokemonLearnset)";
@@ -319,7 +319,7 @@ public class MigrationTests : IDisposable
     private MovesDbContext BuildMovesContext()
     {
         var options = new DbContextOptionsBuilder<MovesDbContext>()
-            .UseSqlite($"Data Source={_movesDb}")
+            .UseSqlite($"Data Source={_movesDb};Pooling=False")
             .Options;
         return new MovesDbContext(options);
     }
@@ -327,17 +327,13 @@ public class MigrationTests : IDisposable
     private PokemonDbContext BuildPokemonContext()
     {
         var options = new DbContextOptionsBuilder<PokemonDbContext>()
-            .UseSqlite($"Data Source={_pokemonDb}")
+            .UseSqlite($"Data Source={_pokemonDb};Pooling=False")
             .Options;
         return new PokemonDbContext(options);
     }
 
     public void Dispose()
     {
-        // Release any pooled SQLite connections before deleting the temp files,
-        // otherwise the connection pool keeps the file handle open just long enough
-        // to cause an IOException on Windows.
-        SqliteConnection.ClearAllPools();
         if (File.Exists(_movesDb))
             File.Delete(_movesDb);
         if (File.Exists(_pokemonDb))

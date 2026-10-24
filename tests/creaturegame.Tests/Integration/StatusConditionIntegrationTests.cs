@@ -2,7 +2,6 @@ using creaturegame.Attacks;
 using creaturegame.Combat;
 using creaturegame.Creatures;
 using creaturegame.DB;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace creaturegame.Tests.Integration;
@@ -19,7 +18,7 @@ public class StatusConditionIntegrationTests : IDisposable
     private MovesDbContext BuildMovesContext()
     {
         var options = new DbContextOptionsBuilder<MovesDbContext>()
-            .UseSqlite($"Data Source={_movesDb}")
+            .UseSqlite($"Data Source={_movesDb};Pooling=False")
             .Options;
         return new MovesDbContext(options);
     }
@@ -127,7 +126,6 @@ public class StatusConditionIntegrationTests : IDisposable
 
     public void Dispose()
     {
-        SqliteConnection.ClearAllPools();
         if (File.Exists(_movesDb))
             File.Delete(_movesDb);
     }

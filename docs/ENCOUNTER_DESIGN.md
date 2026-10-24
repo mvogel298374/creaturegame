@@ -481,7 +481,7 @@ the interaction kinds are reachable bones awaiting behaviour:**
 | Wild battle | loop-event | ✅ `BattleRunEvent` (Normal tier); **always the biome's opening node** (`plan[0]` is fixed — never an Elite/interaction on entry) |
 | Elite / Boss | loop-event | ✅ `BattleRunEvent` on `EncounterTier` Elite/Boss (3c-1); **Boss caps each biome**; Elite never opens a biome |
 | Rest / Poké Center | interaction-event | ✅ `RecoveryRunEvent` |
-| Shop | interaction-event | ✅ **Run Economy → Shop** — `ShopRunEvent`: rolls run-scaled stock (`ShopCalculator`), then a spend-gold buy loop (`ShopOffered` → `ChooseShopActionAsync`, buy/leave) against the `Wallet`/`Bag`. **Affordability-gated:** a biome only keeps a Shop node if the wallet clears the cheapest stock price (`ShopCalculator.MinItemPrice`) when the route is fixed at biome entry — so a broke player never gets a dead, all-unaffordable shop (the opening 0₽ node is never a shop). Purchases respect the Gen 1 **99-per-slot** bag ceiling (`Bag.MaxPerSlot`) — a buy that would overfill is refused before charging |
+| Shop | interaction-event | ✅ **Run Economy → Shop** — `ShopRunEvent`: rolls run-scaled stock (`ShopCalculator`), then a spend-gold buy loop (`ShopOffered` → `ChooseShopActionAsync`, buy/leave) against the `Wallet`/`Bag`. **Affordability-gated:** a biome only keeps a Shop node if the wallet clears the cheapest heal a visit could charge (`ShopCalculator.AffordabilityFloor`: the cheapest sellable Healing item at depth 0 and the lowest jitter, else the cheapest sellable item; Potion ≈ 9 ₽ on Gen 1 prices) when the route is fixed at biome entry — so a broke player can always afford the cheapest heal a shop could stock (a rolled shelf may still carry none) (the opening 0₽ node is never a shop). Purchases respect the Gen 1 **99-per-slot** bag ceiling (`Bag.MaxPerSlot`) — a buy that would overfill is refused before charging |
 | Mystery / Event | interaction-event | ✅ **Run Economy → Reward Choice** — `RewardRunEvent`: rolls a wildcard reward (sometimes nothing), else offers a **pick-one-of-N** (`RewardChoiceOffered` → `ChooseRewardAsync`) — one item or the gold bag |
 | Treasure / Reward | interaction-event | ✅ **Run Economy → Reward Choice** — `RewardRunEvent`: always rewards; offers a **pick-one-of-N** (two rarity-rolled items or a larger gold bag) — the player takes one, never both |
 
@@ -498,9 +498,29 @@ provisional playtest knob):
 - **Item value is a two-step roll.** First a `RewardRarity` (Common/Uncommon/Rare/Epic) off a per-tier weight
   table lifted by run depth (Epic grows fastest, capped so a late Wild node still isn't all-Epic — `P(Rare or
   Epic)` never decreases with depth); Boss's table skews hardest toward Rare/Epic. Then an item is drawn from
-  that rarity's **cost band** (`RarityOf`: ≤400 Common, ≤1200 Uncommon, ≤2500 Rare, else Epic — cheap sustain
-  like Potion sits at Common, premium restores like Full Restore/Elixir at Epic), falling back to the whole
-  usable pool if the rolled band is empty.
+  that rarity's **cost band**, falling back to the whole usable pool if the rolled band is empty. `RarityOf`
+  bands the Gen 1 shop price (`Item.Cost`, `DATA_IMPORT.md` §4.5): ≤400 Common, ≤1200 Uncommon, ≤2500 Rare,
+  else Epic. That puts cheap sustain like Potion at Common, Hyper Potion and Revive at Rare, and Full Restore at
+  Epic. Two floors sit on top (user ruling 2026-10-25):
+  - **Unsold items** (Gen 1 price 0) are **loot only**, never shop stock, and take a fixed rarity: Rare for a
+    partial one-move PP restore (Ether), Epic otherwise (Max Ether, Elixir, Max Elixir). The rule keys on the
+    price, not the category; today only the four PP items reach it (Master Ball is 0 too, but Balls aren't in the
+    usable pool). Whether it should key on `PpRestore` instead is open (`TODO.md` §3.2).
+  - **Every `BattleStatBoost` is at least Uncommon**, which lifts X Speed and X Special (¥350) off Common.
+
+  Two consequences, both playtest knobs:
+  - **PP comes only from loot.** No shop sells a PP item, so a run's PP sustain rests on reward rolls and Quick
+    Heal.
+  - **Revive is buyable but Boss-only as loot.** A shop can stock it at ≈ 43 ₽ (Rare), while reward rolls offer
+    it only on Boss nodes.
+- **Shop prices derive from the Gen 1 price** (`ShopCalculator.PriceFor`): `Cost ÷ 35`, lifted by depth (+4% per
+  depth, capped at +80%) and ±10% jitter, at least 1 ₽. The divisor maps Gen 1's 100s–1000s onto the run's
+  tens-of-₽ wallet: Antidote ≈ 3, Potion ≈ 9, Super Potion 20, Hyper Potion/Revive ≈ 43, Full Restore ≈ 86 at
+  depth 0. Price follows the Gen 1 order, not the rarity; the offer still carries the rarity for the client's
+  colour. Stock draws the rarity first and the item second, like a reward, but from sellable items only.
+- **The starting bag** is the cheapest item per category (`EncounterFactory.BuildStartingBag`; Healing ×4, two
+  StatusCures ×1, one PpRestore ×1), ties broken by id. On Gen 1 prices that is Potion, Antidote + Awakening,
+  and Ether.
 - **Category bias (Boss only).** Within the drawn band, a Boss up-weights replenishment — Healing ×4, PpRestore
   ×2, BattleStatBoost ×0.5, Revive ×1 (deliberately *not* up-weighted: Revive is pool-eligible only on Boss
   nodes at all, so being Boss-only already makes it rare without a second multiplier) — so a Boss reward leans
@@ -632,4 +652,4 @@ Each phase is shippable on its own and tightens the existing endless chain towar
 - **Currency** — ✅ done (**Run Economy → Reward Choice**): a transient per-run `Wallet`, earned from battle-win
   drops and Treasure/Mystery nodes via a **pick-one-of-N** offer (gold bag **or** one item, never both; web-layer
   `RewardCalculator` policy). **Shop economy** — ✅ done: the `ShopRunEvent` spends the wallet on a per-visit,
-  run-scaled stock (`ShopCalculator` — rarity-derived prices, not the unaffordable Gen 1 `Item.Cost`).
+  run-scaled stock (`ShopCalculator` — prices scaled down from the Gen 1 `Item.Cost`, §5.1).

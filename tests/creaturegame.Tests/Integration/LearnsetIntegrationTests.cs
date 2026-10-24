@@ -2,7 +2,6 @@ using creaturegame.Attacks;
 using creaturegame.Combat;
 using creaturegame.Creatures;
 using creaturegame.DB;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace creaturegame.Tests.Integration;
@@ -20,7 +19,7 @@ public class LearnsetIntegrationTests : IDisposable
     private PokemonDbContext BuildContext()
     {
         var options = new DbContextOptionsBuilder<PokemonDbContext>()
-            .UseSqlite($"Data Source={_pokemonDb}")
+            .UseSqlite($"Data Source={_pokemonDb};Pooling=False")
             .Options;
         return new PokemonDbContext(options);
     }
@@ -241,7 +240,6 @@ public class LearnsetIntegrationTests : IDisposable
 
     public void Dispose()
     {
-        SqliteConnection.ClearAllPools();
         if (File.Exists(_pokemonDb))
             File.Delete(_pokemonDb);
     }

@@ -16,7 +16,6 @@ public class ItemImportTests
         string name,
         string? category = null,
         int id = 1,
-        int? cost = 100,
         int? flingPower = null,
         string? shortEffect = null
     ) =>
@@ -24,7 +23,6 @@ public class ItemImportTests
         {
             Id = id,
             Name = name,
-            Cost = cost,
             FlingPower = flingPower,
             Category = category == null ? null : new NamedApiResource { Name = category },
             Sprites = new ItemSprites { Default = $"https://img/{name}.png" },
@@ -75,14 +73,7 @@ public class ItemImportTests
     public void MapToItem_CopiesCoreFields()
     {
         var item = ItemMapper.MapToItem(
-            PokeItem(
-                "great-ball",
-                "standard-balls",
-                id: 3,
-                cost: 600,
-                flingPower: 0,
-                shortEffect: "Catches."
-            )
+            PokeItem("great-ball", "standard-balls", id: 3, flingPower: 0, shortEffect: "Catches.")
         );
 
         Assert.Equal(3, item.Id);
@@ -93,21 +84,32 @@ public class ItemImportTests
         Assert.Equal("https://img/great-ball.png", item.SpriteUrl);
     }
 
-    [Fact]
-    public void MapToItem_KeepsAZeroCost_LikeGen1sPpItemsAndMasterBall()
+    [Theory]
+    [InlineData("potion", 300)]
+    [InlineData("antidote", 100)]
+    [InlineData("full-heal", 600)]
+    [InlineData("x-accuracy", 950)]
+    [InlineData("ether", 0)] // Gen 1 never sold PP items
+    [InlineData("master-ball", 0)]
+    public void MapToItem_TakesTheGen1Price(string slug, int gen1Price)
     {
-        var item = ItemMapper.MapToItem(PokeItem("ether", "pp-recovery", cost: 0));
-
-        Assert.Equal(0, item.Cost);
+        Assert.Equal(gen1Price, ItemMapper.MapToItem(PokeItem(slug)).Cost);
     }
 
-    [Theory]
-    [InlineData(null)]
-    [InlineData(-1)]
-    public void MapToItem_RejectsAMissingOrNegativeCost_InsteadOfImportingIt(int? cost)
+    [Fact]
+    public void MapToItem_RejectsAnItemWithNoGen1Price_InsteadOfImportingIt()
     {
         Assert.Throws<InvalidOperationException>(() =>
-            ItemMapper.MapToItem(PokeItem("potion", "healing", cost: cost))
+            ItemMapper.MapToItem(PokeItem("nugget", "healing"))
+        );
+    }
+
+    [Fact]
+    public void Gen1Prices_CoverExactlyTheRoster()
+    {
+        Assert.Equal(
+            ItemMapper.Gen1BattleItemNames.OrderBy(n => n),
+            ItemMapper.Gen1Prices.Keys.OrderBy(n => n)
         );
     }
 
@@ -130,7 +132,7 @@ public class ItemImportTests
     [InlineData(null, ItemCategory.Other)]
     public void MapToItem_MapsCategory(string? pokeApiCategory, ItemCategory expected)
     {
-        var item = ItemMapper.MapToItem(PokeItem("x", pokeApiCategory));
+        var item = ItemMapper.MapToItem(PokeItem("potion", pokeApiCategory));
         Assert.Equal(expected, item.Category);
     }
 
@@ -242,7 +244,6 @@ public class ItemImportTests
     [InlineData("x-attack", StageStat.Attack)]
     [InlineData("x-defense", StageStat.Defense)]
     [InlineData("x-speed", StageStat.Speed)]
-    [InlineData("x-special", StageStat.Special)]
     [InlineData("x-sp-atk", StageStat.Special)] // modern name for Gen 1's X Special
     [InlineData("x-accuracy", StageStat.Accuracy)]
     public void MapToItem_XItems_RaiseOneStageOfOneStat(string name, StageStat stat)

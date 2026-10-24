@@ -115,24 +115,8 @@ public class ImportSaveFailureIsolationTests : IDisposable
         string secondName = ItemMapper.Gen1BattleItemNames.ElementAt(1);
         string first = $"{Api}/item/{firstName}/";
         var http = new FakePokeApiHandler()
-            .Json(
-                first,
-                new PokeApiItem
-                {
-                    Id = 901,
-                    Name = firstName,
-                    Cost = 100,
-                }
-            )
-            .Json(
-                $"{Api}/item/{secondName}/",
-                new PokeApiItem
-                {
-                    Id = 902,
-                    Name = secondName,
-                    Cost = 100,
-                }
-            )
+            .Json(first, new PokeApiItem { Id = 901, Name = firstName })
+            .Json($"{Api}/item/{secondName}/", new PokeApiItem { Id = 902, Name = secondName })
             .Client();
         using (var context = _db.Items())
             RefuseInsertOfId<Item>(context, 901);

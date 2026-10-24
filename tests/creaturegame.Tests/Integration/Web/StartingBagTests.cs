@@ -85,6 +85,28 @@ public class StartingBagTests
     }
 
     [Fact]
+    public void BuildStartingBag_BreaksPriceTiesById_WhateverTheRowOrder()
+    {
+        // Gen 1 prices Awakening and Paralyze Heal alike, and every PP item at 0.
+        IReadOnlyList<Item> catalog =
+        [
+            MakeItem(22, ItemCategory.StatusCure, 200),
+            MakeItem(18, ItemCategory.StatusCure, 100),
+            MakeItem(21, ItemCategory.StatusCure, 200),
+            MakeItem(41, ItemCategory.PpRestore, 0),
+            MakeItem(38, ItemCategory.PpRestore, 0),
+        ];
+
+        var forward = EncounterFactory.BuildStartingBag(catalog);
+        var reversed = EncounterFactory.BuildStartingBag(catalog.Reverse().ToList());
+
+        foreach (var bag in new[] { forward, reversed })
+        {
+            Assert.Equal(new[] { 18, 21, 38 }, bag.Entries.Keys.OrderBy(id => id).ToArray());
+        }
+    }
+
+    [Fact]
     public void BuildStartingBag_EmptyCatalog_YieldsEmptyBag()
     {
         var bag = EncounterFactory.BuildStartingBag([]);

@@ -132,6 +132,37 @@ public class RewardCalculatorTests
         Assert.Equal(expected, RewardCalculator.RarityOf(MakeItem(1, ItemCategory.Healing, cost)));
     }
 
+    [Theory]
+    [InlineData(350, RewardRarity.Uncommon)] // X Speed / X Special — Common by price, floored
+    [InlineData(950, RewardRarity.Uncommon)] // X Accuracy
+    [InlineData(1500, RewardRarity.Rare)] // the floor never lowers a band
+    public void RarityOf_BattleStatBoosts_AreAtLeastUncommon(int cost, RewardRarity expected)
+    {
+        Assert.Equal(
+            expected,
+            RewardCalculator.RarityOf(MakeItem(1, ItemCategory.BattleStatBoost, cost))
+        );
+    }
+
+    [Theory]
+    [InlineData(false, false, RewardRarity.Rare)] // Ether: one move, 10 PP
+    [InlineData(true, false, RewardRarity.Epic)] // Max Ether
+    [InlineData(false, true, RewardRarity.Epic)] // Elixir
+    [InlineData(true, true, RewardRarity.Epic)] // Max Elixir
+    public void RarityOf_UnsoldPpItems_TakeTheirFixedRarity(
+        bool restoresAllPp,
+        bool allMoves,
+        RewardRarity expected
+    )
+    {
+        var item = MakeItem(1, ItemCategory.PpRestore, 0);
+        item.RestoresAllPp = restoresAllPp;
+        item.RestoresPpAllMoves = allMoves;
+
+        Assert.Equal(expected, RewardCalculator.RarityOf(item));
+        Assert.True(RewardCalculator.IsLootOnly(item));
+    }
+
     [Fact]
     public void RollRarity_SkewsHigherForBetterTiers_AtTheSameDepth()
     {

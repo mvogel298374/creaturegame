@@ -158,15 +158,7 @@ public class ImportFailureReportingTests : IDisposable
     {
         string potion = $"{Api}/item/potion/";
         var http = new FakePokeApiHandler()
-            .Json(
-                potion,
-                new PokeApiItem
-                {
-                    Id = 17,
-                    Name = "potion",
-                    Cost = 300,
-                }
-            )
+            .Json(potion, new PokeApiItem { Id = 17, Name = "potion" })
             .Client();
 
         var failed = await ItemImport.ImportGen1BattleItemsAsync(http, _db.Items);
@@ -178,7 +170,7 @@ public class ImportFailureReportingTests : IDisposable
     }
 
     [Fact]
-    public async Task Items_AnItemWithNoCost_IsReported_NotImportedAsZero()
+    public async Task Items_AnItemWithNoPokeApiCost_ImportsWithItsGen1Price()
     {
         string potion = $"{Api}/item/potion/";
         var http = new FakePokeApiHandler()
@@ -187,9 +179,9 @@ public class ImportFailureReportingTests : IDisposable
 
         var failed = await ItemImport.ImportGen1BattleItemsAsync(http, _db.Items);
 
-        Assert.Contains(potion, failed);
+        Assert.DoesNotContain(potion, failed);
         using var items = _db.Items();
-        Assert.DoesNotContain(items.Items, i => i.Id == 17);
+        Assert.Equal(300, items.Items.Single(i => i.Id == 17).Cost);
     }
 
     [Fact]

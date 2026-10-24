@@ -47,6 +47,39 @@ public static class ItemMapper
         "guard-spec",
     };
 
+    /// <summary>Gen 1 prices by slug (DATA_IMPORT.md §4.5).</summary>
+    public static readonly IReadOnlyDictionary<string, int> Gen1Prices = new Dictionary<string, int>
+    {
+        ["poke-ball"] = 200,
+        ["great-ball"] = 600,
+        ["ultra-ball"] = 1200,
+        ["master-ball"] = 0,
+        ["safari-ball"] = 1000,
+        ["potion"] = 300,
+        ["super-potion"] = 700,
+        ["hyper-potion"] = 1500,
+        ["max-potion"] = 2500,
+        ["full-restore"] = 3000,
+        ["antidote"] = 100,
+        ["burn-heal"] = 250,
+        ["ice-heal"] = 250,
+        ["awakening"] = 200,
+        ["paralyze-heal"] = 200,
+        ["full-heal"] = 600,
+        ["revive"] = 1500,
+        ["ether"] = 0,
+        ["max-ether"] = 0,
+        ["elixir"] = 0,
+        ["max-elixir"] = 0,
+        ["x-attack"] = 500,
+        ["x-defense"] = 550,
+        ["x-speed"] = 350,
+        ["x-sp-atk"] = 350,
+        ["x-accuracy"] = 950,
+        ["dire-hit"] = 650,
+        ["guard-spec"] = 700,
+    };
+
     public static Item MapToItem(PokeApiItem pokeItem)
     {
         Item item = new Item
@@ -54,11 +87,12 @@ public static class ItemMapper
             Id = pokeItem.Id,
             Name = pokeItem.Name,
             Category = MapCategory(pokeItem.Category?.Name),
-            Cost = pokeItem.Cost is >= 0 and int cost
-                ? cost
-                : throw new InvalidOperationException(
-                    $"PokeAPI item '{pokeItem.Name}' has no usable cost ({pokeItem.Cost?.ToString() ?? "missing"})."
-                ),
+            Cost =
+                pokeItem.Name is { } slug && Gen1Prices.TryGetValue(slug, out int price)
+                    ? price
+                    : throw new InvalidOperationException(
+                        $"Item '{pokeItem.Name}' has no Gen 1 price in ItemMapper.Gen1Prices."
+                    ),
             FlingPower = pokeItem.FlingPower,
             Description =
                 pokeItem.EffectEntries?.FirstOrDefault(e => e.Language?.Name == "en")?.ShortEffect
@@ -146,7 +180,7 @@ public static class ItemMapper
                 item.RestoresPpAllMoves = true;
                 break;
 
-            // X-items — raise one stat by one stage in battle ("x-special" is current "x-sp-atk").
+            // X-items — raise one stat by one stage in battle (Gen 1's X Special is the slug "x-sp-atk").
             case "x-attack":
                 item.StatBoostStat = StageStat.Attack;
                 item.StatBoostStages = 1;
@@ -159,7 +193,6 @@ public static class ItemMapper
                 item.StatBoostStat = StageStat.Speed;
                 item.StatBoostStages = 1;
                 break;
-            case "x-special":
             case "x-sp-atk":
                 item.StatBoostStat = StageStat.Special;
                 item.StatBoostStages = 1;

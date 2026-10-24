@@ -128,8 +128,10 @@ public sealed class GameSessionManager(
                 session.MachineMovesBySpecies
             ),
             ShopSupplier = EncounterFactory.BuildShopSupplier(session.AllItems),
-            // Gates a Shop node on affordability, so a broke player never gets a dead all-unaffordable shop.
-            MinShopBudget = ShopCalculator.MinItemPrice,
+            // A Shop node needs the wallet to cover the cheapest heal a shop could stock (ENCOUNTER_DESIGN.md §5.1).
+            MinShopBudget = ShopCalculator.AffordabilityFloor(
+                RewardCalculator.UsableItems(session.AllItems)
+            ),
             // Keyed to Difficulty, not generation — RunRules is deliberately not a seam (GENERATION_PROFILE.md §2.2).
             RunRules = RunRulesFor(session.Difficulty),
             Party = party,

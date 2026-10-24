@@ -10,10 +10,14 @@ public class SqliteCheckpointTests : IDisposable
 
     public void Dispose()
     {
-        SqliteConnection.ClearAllPools();
+        ClearOwnPool();
         foreach (var path in new[] { _db, $"{_db}-wal", $"{_db}-shm", _copy })
             File.Delete(path);
     }
+
+    // Scoped to this database's pool: ClearAllPools would close other classes' pooled connections mid-test.
+    private void ClearOwnPool() =>
+        SqliteConnection.ClearPool(new SqliteConnection($"Data Source={_db}"));
 
     private void Execute(SqliteConnection connection, string sql)
     {
@@ -66,7 +70,7 @@ public class SqliteCheckpointTests : IDisposable
         SqliteCheckpoint.Flush(_db);
 
         Assert.Equal(0, new FileInfo($"{_db}-wal").Length);
-        SqliteConnection.ClearAllPools();
+        ClearOwnPool();
         File.Copy(_db, _copy);
         using var reader = new SqliteConnection($"Data Source={_copy};Pooling=False");
         reader.Open();

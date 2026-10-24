@@ -316,26 +316,13 @@ data/engine item usually also means updating the test that pins the wrong value.
 
   User ruling 2026-10-11: leave this one as filed; the other two became entries and shipped (`TODO_ARCHIVE.md` → "Battle randomness fully seeded; Dire Hit / Guard Spec narration"). The
   roll-order work that surfaced the last two: `TODO_ARCHIVE.md` → "Gen 1 roll order in `AttackAction`".
-- **Item `Cost` is modern, and drives rarity + the starting bag (S–M; from V6).** **User ruling 2026-10-17:**
-  behind a generation seam — option (a), Gen 1 prices as per-generation data, plus the `ThenBy(Id)` tie-break.
-  - **DoR:** ✗ not Ready — gap **2**: the `RarityOf` bands were tuned on modern prices, so the design step drafts
-    the new bands (and whether the bands go per-generation too) and shows them to you before any code.
-  - *Scope + acceptance:* either (a) import Gen 1 prices (a layer-2 price table from `pokered
-    data/items/prices.asm`; `items.db` re-imported; `RarityOf` bands re-checked against the new numbers — X-items
-    become Common, Full Heal Uncommon, PP items 0 → Common), or (b) keep modern prices and only make the starting
-    bag deterministic (tie-break `OrderBy(Cost).ThenBy(Id)`, so Antidote + Burn Heal by id). Either way
-    `DATA_IMPORT.md:344` is rewritten to say `Cost` drives rarity and the starting bag. Acceptance (a): an
-    `items.db` contract test pins the Gen 1 prices and a `RarityOf` test pins the new bands; (b): a test pins the
-    starting-bag pair independent of row order.
-  - *Recommendation: (b) now, (a) only with a balance pass* — the rarity bands were tuned against the modern
-    numbers, and shop prices are already rarity-derived (`ShopCalculator`), so Gen 1 prices buy fidelity in a
-    number the player never sees while shifting loot odds.
-  - *Gen-variable surface:* (a) makes `Cost` per-generation data (fine — `items.db` is per-gen content); the
-    rarity bands are gen-invariant `RunRules`-style tuning. *Gen 1 source:* `pokered data/items/prices.asm`.
-    *Data vs runtime:* (a) data + a band check; (b) runtime one-liner. *Quirk:* PP items cost 0 in Gen 1 (not sold; `prices.asm:82-85`).
-    *Dependencies:* none. **Now urgent:** PokeAPI no longer serves item prices, so until (a) lands a full re-import
-    FAILS the items stage loudly (the importer rejects an item with no `cost`; `TODO_ARCHIVE.md` → "§3.2 PokeAPI
-    dropped item prices") and `items.db` cannot be regenerated.
+- **The unsold-item rule keys on price, not category (S; from `requirements-review` 2026-10-25, finding 2).**
+  `RarityOf`/`IsLootOnly` treat any `Cost == 0` item as loot only with a PP-shaped fixed rarity. Today only the
+  four PP items reach it. A future 0-priced item in another category (Master Ball, once Catch adds Balls to the
+  pool) would silently become loot only. **User ruling 2026-10-25:** accepted as shipped; revisit in a design pass.
+  **DoR:** ✗ not Ready — gaps **1, 2** (the design pass decides between "unsold ⇒ loot only, rarity by category"
+  and keying the rule on `PpRestore`). Gen surface none (run tuning); runtime only; best paired with the Catch
+  `/plan` (§4.1), which first puts a 0-priced Ball in the pool.
 
 ---
 
@@ -494,7 +481,8 @@ now, below.
     importer, which Gen 2+ changes per move)**; `MoveMinLevels`.
   - *Evolutions:* `EvolutionImport` (`Gen1`, `MaxGen1SpeciesId`) and `EvolutionMapper` (`MaxGen1SpeciesId`,
     `Gen1Stones`, `ExtractGen1Edges`).
-  - *Items:* `ItemImport.ImportGen1BattleItemsAsync`, `ItemMapper.Gen1BattleItemNames`, `ApplyGen1Gameplay`.
+  - *Items:* `ItemImport.ImportGen1BattleItemsAsync`, `ItemMapper.Gen1BattleItemNames`, `ItemMapper.Gen1Prices`,
+    `ApplyGen1Gameplay`.
   - *Availability and assets:* `GameAvailabilitySeeder` (`SeedGen1Async`, the 1–151 loop, the Red/Blue/Yellow tables);
     `SpriteDownloader`/`CryDownloader` (`LastId = 151`).
   - *Entry point:* `Program.cs` passes `1` to both fetchers and calls the `Gen1`-named stages directly.
@@ -685,19 +673,6 @@ surface: `/help` and the explainer describe the active generation, so they are p
   Acceptance (drafted):
   the ALLOW case asserts the evolved name in the nameplate before the next `BattleStarted`. Gen surface none; test
   only; no dependencies.
-- **Flake: process-wide `SqliteConnection.ClearAllPools()` in test `Dispose` (S, found 2026-10-11).** The pre-commit
-  run for importer #4a failed twice in web tests (`EncounterFactoryMinLevelTests`,
-  `EncounterFactoryGenerationProfileTests`) with `SQLite Error 5: unable to delete/modify user-function due to active
-  statements`, thrown while a pooled connection was returned — four following runs passed. Likely cause: four test
-  classes clear **every** SQLite pool from `Dispose` (`ItemsDbServiceTests.cs:185`, `StatusConditionIntegrationTests.cs:130`,
-  `MigrationTests.cs:340`, `LearnsetIntegrationTests.cs:244`) while xUnit runs other classes in parallel. The new
-  `TempImportDatabases` avoids it with `Pooling=False` instead; the same switch is the likely fix for those four.
-  **Not Ready:** needs its mini-DoR (acceptance: no `ClearAllPools` outside a non-parallel collection; test: N
-  consecutive suite runs green) and a reproduction to confirm the cause.
-  **DoR (V16):** ✗ not Ready — gap **1** (a reproduction confirming the cause; the four `ClearAllPools` sites are
-  still there). *Drafted:* N = 10 runs of `.\test.ps1 -Dotnet` green. Gen surface none; Gen 1 source n/a; test only;
-  no dependencies.
-  *DoR (V16), flake watch below: a watch, not an item.*
 - **Flake watch:** `endless-chain.spec.ts` *"a run ends when the player faints"* failed once in a full 2026-07-26 run
   (no `Run over` line after 1m10s) but passes in 7.3 s alone — consistent with the documented "a long run
   accumulates abandoned server-side runs" degradation, not a code defect.

@@ -8,6 +8,52 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §3.2 Item `Cost` becomes the Gen 1 price; the run derives shop prices and rarity from it ✅ DONE (2026-10-25)
+
+M, importer plus run layer; from V6. PokeAPI no longer serves item prices, so a full re-import failed the items stage
+(`TODO_ARCHIVE.md` → "§3.2 PokeAPI dropped item prices") and `items.db` could not be regenerated. **User rulings:**
+2026-10-17, option (a), Gen 1 prices as per-generation data plus the `ThenBy(Id)` tie-break; 2026-10-25, the design
+below. Items are gated by the run's rarity rolls, so the shop price derives from the Gen 1 value but differs from it.
+
+- **Acceptance (met):**
+  - `items.db` holds pokered's prices: `ItemPriceDataContractTests` pins them, including the 0-priced PP items.
+    `ItemMapper.Gen1Prices` (a layer-2 table by slug, `pokered data/items/prices.asm`) replaces PokeAPI's `cost`; a
+    full re-import changed only the Cost column. `PokeApiItem.Cost` and the dead x-special alias were removed.
+  - The shop price is `Gen 1 price ÷ 35`, with the existing depth lift and ±10% jitter. A `ShopCalculator` test pins
+    the ordering: a pricier Gen 1 item never sells cheaper at the same depth, before jitter.
+  - A 0-priced item (Ether, Max Ether, Elixir, Max Elixir) is loot only: never stocked in a shop, with a fixed
+    rarity (Ether Rare, the other three Epic).
+  - `RarityOf` bands on the Gen 1 price: Common ≤ 400, Uncommon ≤ 1200, Rare ≤ 2500, Epic above. Every
+    `BattleStatBoost` item (the X items, Dire Hit, Guard Spec) is at least Uncommon. A `RarityOf` test pins one item
+    per band, X Speed's floor and the 0-priced overrides.
+  - The shop-affordability floor is `ShopCalculator.AffordabilityFloor`, the lowest price of the cheapest sellable
+    Healing item (Potion ≈ 9 ₽), computed from the catalog since the check runs at biome entry, before stock is
+    rolled. It replaced the fixed `MinItemPrice = 8` (`requirements-review` finding 1, user ruling 2026-10-25).
+  - The starting bag is deterministic (`OrderBy(Cost).ThenBy(Id)`); a test pins it independent of row order.
+- **Design:** the rarity weights are unchanged; only the price → band mapping moved. The divisor, bands, floors and
+  overrides are run tuning, gen-invariant. Documented in `ENCOUNTER_DESIGN.md` §5.1, `DATA_IMPORT.md` §4.5,
+  `GAME_LOOP.md` (Shop row) and `GENERATION_SEAMS.md` (the item-price table in the data-side list).
+- **Gen surface:** `Cost` is per-generation data (`items.db` is per-gen content). **Gen 1 source:** `pokered
+  data/items/prices.asm`: Potion 300, Antidote 100, Burn/Ice Heal 250, Full Heal 600, Revive 1500, X Accuracy 950,
+  Dire Hit 650, Guard Spec 700, the PP items 0. **Data vs runtime:** both. **Quirk pinned:** Gen 1 never sold PP
+  items, so they are loot only; Full Heal costs more than a single-status cure.
+- **Folded in (user 2026-10-25): the §6 `ClearAllPools` flake** (S, found 2026-10-11). The pre-commit run for
+  importer #4a failed twice in web tests (`EncounterFactoryMinLevelTests`, `EncounterFactoryGenerationProfileTests`)
+  with `SQLite Error 5: unable to delete/modify user-function due to active statements`, thrown while a pooled
+  connection was returned. *Reproduced 2026-10-25:* in the full `.\test.ps1 -Dotnet -Web` run, both pooled-WAL tests in
+  `SqliteCheckpointTests` failed (one found no `-wal` file, one checkpoint wasn't blocked); the class passed alone and
+  on a rerun. **Cause:** another class's process-wide `ClearAllPools()` (in `ItemsDbServiceTests`,
+  `StatusConditionIntegrationTests`, `MigrationTests`, `LearnsetIntegrationTests` `Dispose`) closed the pooled writer
+  other tests relied on, while xUnit ran classes in parallel. **Fix:** no test calls `ClearAllPools()`; the four
+  temp-database classes open with `Pooling=False` (the `TempImportDatabases` precedent) and `SqliteCheckpointTests`,
+  which needs pooling, clears only its own pool (`ClearPool`). 10 consecutive `.\test.ps1 -Dotnet` runs green.
+- **Review:** requirements-review findings 1, 3, 4 fixed; finding 2 (the unsold-item rule keys on price, not
+  category) accepted and filed as its own open `TODO.md` §3.2 entry. pr-review CHANGES-REQUESTED, all fixed (comment
+  budget, the `GENERATION_SEAMS.md` item-price-table bullet, jitter constants, a rename, the `DATA_IMPORT.md` §4.4
+  `Gen1Prices` mention).
+
+---
+
 ## §3.2 Dev server reads a `-wal`-stale bin copy ✅ DONE (2026-10-19)
 
 S, importer only; from V6. The databases run in WAL mode and the importer's last writes could sit in `*.db-wal` while
@@ -54,8 +100,8 @@ committed import (user ruling 2026-10-18), so the shipped data is intact.
 - **Gen surface:** none for the check; the prices themselves are per-generation data under the open Item `Cost` entry.
   **Gen 1 source:** pokered `data/items/prices.asm`: `MASTER_BALL` (line 3) and `ETHER`/`MAX_ETHER`/`ELIXER`/`MAX_ELIXER`
   (lines 82-85) are `bcd3 0` (verified 2026-10-18). **Data vs runtime:** importer only.
-- **Follow-up still live in `TODO.md`:** the Item `Cost` entry (§3.2) owns option (a), Gen 1 prices from a pokered table;
-  until it lands a full re-import fails the items stage. When it lands, this check becomes the table-coverage guard.
+- **Follow-up shipped 2026-10-25:** "§3.2 Item `Cost` becomes the Gen 1 price" (above) added the pokered price table,
+  so a full re-import works; this check is now the table-coverage guard.
 - **Review:** format PASS; test-runner PASS (1902 .NET, tsc, 335 Vitest); requirements-review 3 discrepancies, all fixed
   (entry headline/design merged, prices.asm cite added, negative cost also rejected); pr-review PR-READY with 2
   advisories: A1 (`DATA_IMPORT.md` caveat contradicted the new rule) fixed; A2 (an import-level negative-cost case)
