@@ -44,14 +44,17 @@
 |:-:|:-----|:----:|:-------------|:---------------------------------|
 | 1 | **`-StartStack` backend leak** (§7.1 Part A) | S | ✗ parked: leak not reproduced (2026-10-10); un-park condition in §7.1 | Parts B and C are done. Not actionable until the user reproduces it; §1 #6 does not wait on it. |
 | 6 | **CI E2E step** (§6) | M | ✗ no design (runner, stack boot, caching) or acceptance | The only automatic E2E coverage; makes "agents don't run E2E" safe, and unblocks checking the reconnect spec. |
-| 7 | **R1d-d, R1d-c** — refresh-state snapshot + sprite; second-tab policy (§2) | M each | ⚠️ provisional-pending-`/plan` (decisions made 2026-10-17) | Both extend the open-prompt replay (R1d-a, shipped); the highest-value reconnect gap left. |
+| 5 | **R1d-d — refresh-state snapshot + sprite** (§2) | M | ✅ Ready (`/plan` 2026-10-26) | The highest-value reconnect gap left; also fixes a pin bug R1d-a introduced and the stale HP behind a mid-battle prompt. |
+| 7 | **R1d-c — second-tab policy** (§2) | M | ⚠️ provisional-pending-`/plan` (decisions made 2026-10-17) | Extends the same replay touch-points. |
+| 7b | **R1d-e — duplicate prompt log lines after a blip** (§2) | S | ✗ gap 2: confirm the drafted design | Cosmetic R1d-a leftover; client only. |
+| 7c | **R1d-f — blip test tooling** (`DropConnection` + blip E2E) (§2) | S–M | ✗ gaps 1, 2: confirm the drafted text | Closes the replay-after-blip verification gaps; serves R1d-c too. |
 | 8 | **Gen 1 fidelity — the damage/accuracy core** (§3.1) | L | ✗ needs the Gen 1 source per claim, the seam surface, and the quirks to pin | Verify-first; large blast radius (it touches every damage number). |
 | 9 | **End-of-turn residual phase** (§4.2) | L | ✗ needs a `/plan` | A `/plan`, `opus-engineer`, and both review gates; rewrites `Battle`'s turn loop. |
 | 10 | **Features** — Catch, `save.db`, progressive difficulty, Generation Profile 4d+, … (§4) | L | ✗ each needs a `/plan` | Catch and stone evolutions are unblocked by the bag-scope ruling (`ARCHITECTURE.md` §2.12); `save.db` is declined for now. |
 
 ---
 
-## 2. Reliability — reconnect (designed in [`RECONNECT_RESILIENCE.md`](RECONNECT_RESILIENCE.md); c and d provisional-pending-`/plan`)
+## 2. Reliability — reconnect (designed in [`RECONNECT_RESILIENCE.md`](RECONNECT_RESILIENCE.md); d ratified, c provisional-pending-`/plan`)
 
 Verified in code 2026-10-03. Fixed and archived already: the flee stale-cache, the 60 s grace, the client replay
 dedupe, lost modal answers, the `RunFaulted` notice, the abandon-timer race (R1d-b), and the open-prompt replay (R1d-a). The server replaying on every reconnect is an **accepted
@@ -69,14 +72,46 @@ are transport notices outside the event model, like `RunFaulted`; `BattleStarted
   change; quirk "a plain refresh never shows the notice, and `activeGame` survives"; dependencies none.
 - **R1d-d — a refresh loses the route trail, node pin, boss framing and the player's sprite.** **Acceptance:** a
   refresh at any point restores the full trail and pin, keeps boss framing, and shows the current lead's sprite.
-  **Design:** an absolute `RunMapSnapshot` sent last and applied as an ordered step (not an immediate action —
-  the client's queue lags arrival), plus `PlayerSpeciesId` on `BattleStarted` and a reducer-held
-  `playerSpeciesId` (also fixes the post-evolution sprite, §5).
-  **DoR:** ✗ not Ready — gaps **2** (provisional-pending-`/plan`; the transport-notice and `PlayerSpeciesId`
-  decisions are made, 2026-10-17); gap 7 is closed (R1d-a, which shares `ReplayLastKnownState`, shipped
-  2026-10-26). It also takes the stale-battle-HP-behind-a-mid-battle-prompt gap R1d-a accepted. 3–6 are in the doc: gen surface none;
-  runtime/web plus client; quirk "a blip after three biomes leaves `routePath` unchanged, a refresh restores all
-  three".
+  A blip changes none of these; a replayed Poké Center prompt leaves the pin on the Rest cap; a refresh behind a
+  mid-battle prompt shows a fainted creature at 0 HP. **Design (ratified by `/plan`, 2026-10-26):** an absolute
+  `RunMapSnapshot { routePath, nodesEntered, restReached, currentNodeKind }` (raw facts; the client derives the pin),
+  replayed **after the plan and before `BattleStarted`** so the boss ref is set before the replayed battle expands,
+  and applied as an ordered step; `RecoveryOffered`'s pin step made absolute (fixes an R1d-a double-advance); the
+  emitter zeroes a fainted creature's HP in the cached `TurnStarted`; a required `BattleStarted.PlayerSpeciesId` and a
+  reducer `playerSpeciesId` (four actions) feeding the canvas mount and the game-over card. Out of scope: the Continue
+  card (§5) and the blip log duplicates (R1d-e).
+  **DoR:** ✅ Ready (2026-10-26). 1 intent and acceptance above · 2 `/plan` done, design in the doc's R1d-d section ·
+  3 gen surface none · 4 Gen 1 source n/a · 5 runtime: one engine event field + web emitter/transport notice +
+  client hook/timeline/reducer; no importer/DB · 6 quirk "the snapshot is absolute (a blip changes nothing, a refresh
+  restores the full trail), it replays after the plan and before `BattleStarted`, a replayed recovery prompt leaves
+  the pin on the Rest cap, a fainted creature's cached HP is 0" · 7 R1d-a, built. Cost M: ~80–120k tokens to build,
+  ~230–270k with the review chain. Browser: one refresh-mid-biome pin scenario in `reconnect.spec.ts`, run on
+  request.
+- **R1d-e — after a blip, a replayed prompt re-writes its intro to the log.** R1d-a replays the open prompt on every
+  reconnect; after a blip the client still has the modal open, and re-expanding `RecoveryOffered` /
+  `MoveReplacementRequired` / `EvolutionOffered` logs their intro lines a second time. Cosmetic.
+  **DoR:** ✗ not Ready — gap **2** (confirm the drafted design). *Drafted:*
+  - **Acceptance:** a blip with one of those prompts open → its intro is logged once and the modal stays open and
+    answerable; a refresh still shows the prompt; after an answer, a replay of that prompt (the accepted race) still
+    shows it.
+  - **Design:** extend `replayDedupe` with an arrival-order tracker of the open prompt (set when a prompt event is
+    accepted, cleared when the client answers it); a replayed prompt event of the same type while it is open is
+    skipped.
+  - **Gen surface:** none. **Gen 1 source:** n/a. **Data vs runtime:** client only. **Quirk:** "a replayed prompt
+    whose modal is open is skipped; once answered, it is not". **Dependencies:** R1d-d first (it touches the same
+    timeline/reducer arms).
+- **R1d-f — blip test tooling.** A deterministic blip for the browser suite: a Dev-Mode-gated `DropConnection` hub
+  method calling `Context.Abort()` (gated like `forceDraft`: the client asks, only a Dev-Mode server grants), reached
+  from Playwright through a test-mode-only hook, plus blip scenarios in `reconnect.spec.ts`.
+  **DoR:** ✗ not Ready — gaps **1** and **2** (confirm the drafted text). *Drafted:*
+  - **Acceptance:** a blip mid-battle → no second "new challenger", the move menu is live; a blip with a prompt open
+    → the modal stays and is answerable (with R1d-e, its intro is logged once); a blip after R1d-d → the ladder pin is
+    unchanged. Also times the 60 s grace against SignalR's real reconnect schedule.
+  - **Design:** the hub method and its Dev-Mode gate (`ARCHITECTURE.md` §2.7); the client exposes `dropConnection` on
+    `window` only under `?e2e=1` (`testEnv.ts`).
+  - **Gen surface:** none. **Gen 1 source:** n/a. **Data vs runtime:** web + client test mode. **Quirk:** "a blip
+    never re-announces a battle, duplicates the route, or loses an open prompt". **Dependencies:** R1d-d; R1d-e for
+    the prompt-log assertion.
 - **Test plan** (in the doc): C# unit tests, Vitest, and a new opt-in `reconnect.spec.ts` driven by a Dev-Mode-gated
   `DropConnection` hub method. It also closes three open verification gaps: replay-after-blip has never been
   checked in a browser; the `useBattleHub` wiring of `replayDedupe` is untested (only the pure helper is); the 60 s
@@ -595,7 +630,10 @@ surface: `/help` and the explainer describe the active generation, so they are p
   - **Dependencies:** none.
 - **Player species is taken from the starter** (`BattleScreen.tsx:77,237,400`, `activeGame.ts`) — game-over shows the
   starter's sprite with the final creature's name after an evolution or lead change; Continue also shows the
-  starter's name/level. Designed in R1d-d (§2). *DoR (V16): covered by R1d-d's audit.*
+  starter's name/level. The on-field sprite and the game-over card are fixed by R1d-d (§2, ratified 2026-10-26);
+  **the Continue card stays open here**: it reads a saved `Species` object from `localStorage` (`activeGame.ts`), so
+  it needs a persisted-shape change. *DoR: ✗ not Ready — gaps 1, 2, 6 (acceptance, the saved shape, the quirk);
+  depends on R1d-d.*
 - **Frontend nits — verified and fixed 2026-10-17 (§7.6 V13).** Verdicts (incl. the partly refuted unknown-reward
   claim) and fixes FC–FH: `TODO_ARCHIVE.md` → "§7.6 V13 — Phaser resize/entry pacing and frontend nits".
 

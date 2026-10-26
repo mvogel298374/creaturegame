@@ -332,7 +332,7 @@ the linked design doc instead — pull it there and leave only the pointer here.
   lead choice, switch-in, move replacement, and the rest) brings the same modal back, and answering it continues
   the run. A prompt already answered does not come back; a reopened shop shows the current gold.
 - **Not covered:** a prompt raised mid-battle (move replacement after a level-up, switch-in after a faint) shows the
-  battle's last known HP behind it after a refresh, until it is answered.
+  battle's last known HP behind it after a refresh, until it is answered (a fainted creature's HP shows pre-faint).
 - Design detail → `ARCHITECTURE.md` §2.7 (Web session lifecycle). History → `TODO_ARCHIVE.md` → *Session Resume
   — refresh/reopen-safe `gameId` persistence* and *§2 R1d-a — an open blocking prompt is replayed on reconnect*.
 

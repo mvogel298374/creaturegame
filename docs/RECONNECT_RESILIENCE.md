@@ -1,8 +1,8 @@
 # RECONNECT_RESILIENCE.md — the remaining reconnect work, designed (2026-10-03)
 
-> **Status: R1d-a BUILT (2026-10-26; its section below is the design record); R1d-c and R1d-d
-> provisional-pending-`/plan`.** Written from a read of the code on 2026-10-03, not from the review sweep's text.
-> The frontend halves of c and d are provisional until their `/plan` pass (DoR #2). The c and d task entries and
+> **Status: R1d-a BUILT (2026-10-26; its section below is the design record); R1d-d ratified by `/plan`
+> (2026-10-26); R1d-c provisional-pending-`/plan`.** Written from a read of the code on 2026-10-03, not from the
+> review sweep's text. The frontend half of c is provisional until its `/plan` pass (DoR #2). The c and d task entries and
 > acceptance conditions live in `TODO.md` → *Reliability — reconnect*; R1d-a's are in `TODO_ARCHIVE.md` → *§2 R1d-a*;
 > this is the design behind them. Already fixed and archived: the flee stale-cache, the 60 s grace, the client replay
 > dedupe (`TODO_ARCHIVE.md` → *Repo-sweep R1 — reconnect replay mishandled…*), lost modal answers
@@ -72,7 +72,8 @@ question is answered. The cross-cutting test plan at the end covers a, c and d p
   - **Accepted cosmetic gap (2026-10-26):** a prompt raised mid-battle — `MoveReplacementRequired` after a KO's
     level-up, `SwitchInOffered` after a faint — is emitted before `BattleEnded`, so a refresh replays the battle's
     last `TurnStarted` behind the modal (pre-faint HP) until the answer moves the battle on. The prompt itself
-    works. The real fix is R1d-d's absolute state snapshot, not this item.
+    works. R1d-d closes the visible half — a fainted creature's cached HP is zeroed (see R1d-d); the rest of that
+    last turn's HP changes stay accepted.
   - **Rejected alternatives.** *Re-derive from `SignalRInput`'s open context* (the TCS owner knows which prompt is
     open): the contexts are not the events (`ShopOffered` is built from the stock + a wallet read), so a second
     projection would drift. *Clear from the hub-thread `Set*` methods* (the 2026-10-03 draft): races the run's next
@@ -120,51 +121,85 @@ question is answered. The cross-cutting test plan at the end covers a, c and d p
 
 ## R1d-d. A refresh loses the route trail, the node pin, boss framing and the player's sprite
 
-- **What is wrong (verified).** After a refresh: `routePath` holds only the *current* biome (only the latest
-  `BiomeEntered` is cached); the node pin is −1 mid-biome (`RunNodeEntered` is not cached, and the replayed plan
-  resets it); a mid-boss-fight refresh loses the trainer framing (`bossNodeActiveRef` is derived from
-  `RunNodeEntered`); and the player's sprite is the **starter** (`BattleScreen.tsx:77,237,400` read the nav-state
-  species — `playerSpecies?.id ?? 1` — because `BattleStarted` carries no player species id). The same species
-  source is why the game-over card / Continue show the starter after an evolution or lead change (also in R2).
-- **Acceptance.** Refresh at any point in a run → the region map shows the full travelled trail and the correct pin,
-  the boss fight keeps its framing, and the on-field player sprite/nameplate are the *current* lead's.
-- **Design — a snapshot, not a history replay.** Replaying every past `BiomeEntered` would be *wrong*: after a
-  *blip* `replayDedupe` accepts the older biomes (they differ from the last arrival) and corrupts `routePath`.
-  Instead the emitter (which already sees every `BiomeEntered` / `RunNodeEntered`, so **no engine change**) keeps
-  `_routePath` and a per-biome node counter, and `ReplayLastKnownState` finishes with one **absolute** transport
-  notice `RunMapSnapshot { routePath, nodesEntered, currentNodeKind }`. Idempotent for refresh and blip alike.
-  - **Timing hazard (the reason this is a design item, not a one-liner).** The client queues animated events behind
-    its timeline (`ARCHITECTURE.md` §2.8), so state lags arrival. The snapshot must travel as an **ordered step**
-    through the same queue — *not* as an immediate `now` action — or the still-queued replayed `MAP_BIOME_ENTERED`
-    would append the current biome on top of it afterwards. It is sent **last**, so it overrides whatever the
-    replayed events produced. The hook also sets `bossNodeActiveRef` from `currentNodeKind`.
-  - **Sprite — a real field, not the snapshot.** Add `PlayerSpeciesId` to `BattleStarted` (engine event + the
-    `MapEvent` projection + the TS payload type; the C# wire-drop half is auto-guarded, the TS leg and render layer
-    are manual — memory *web event field projection gap*), and keep a reducer `playerSpeciesId` set by
-    `BATTLE_STARTED`, `SWITCHED_IN`, `LEAD_CHANGED` and evolution (those events already carry a species id). The
-    view reads `state.playerSpeciesId`, falling back to the nav-state starter only before the first battle. This
-    fixes the refresh case **and** the live post-evolution / post-lead-change cases in one move, and also covers
-    the R2 "Player species always taken from the starter" item.
-- **DoR.** Gen-variable: none (species identity, route state — gen-invariant). Runtime/web + a client change.
-  **Quirk to test:** a blip after three biomes leaves `routePath` unchanged (not duplicated, not truncated); a
-  refresh restores all three; the pin matches; a refresh mid-boss keeps the framing. Dependencies: none, but it is
-  sequenced after (a) because both extend `ReplayLastKnownState` and its tests.
+- **What is wrong (verified 2026-10-26).** After a refresh: `routePath` holds only the *current* biome (only the
+  latest `BiomeEntered` is cached); the ladder pin is −1 mid-biome (`RunNodeEntered` is not cached, and the replayed
+  plan resets it); a mid-boss-fight refresh loses the trainer framing — the "Trainer X wants to battle!" / "VS
+  Trainer X's …" log lines, because `bossNodeActiveRef` is set from `RunNodeEntered` and read when the replayed
+  `BattleStarted` expands (`useBattleHub.ts`); and the player's sprite is the **starter** (`BattleCanvas`'s mount prop
+  and the game-over card read the nav-state species, `BattleScreen.tsx` — `BattleStarted` carries no player species
+  id). Found in this pass, an R1d-a side effect: `RecoveryOffered` advances the pin with a relative `+1` onto the
+  Poké Center cap (`timeline.ts`), so each replay of an open recovery prompt moves the pin one more step.
+- **Acceptance.** Refresh at any point in a run → the region map shows the full travelled trail and the correct pin
+  (Rest cap included), a boss fight keeps its trainer framing, and the on-field player sprite and the game-over card
+  are the *current* lead's. A blip changes none of these. A refresh or blip with the Poké Center prompt open leaves
+  the pin on the Rest cap. A refresh behind a mid-battle prompt shows a fainted creature at 0 HP.
+- **Design (ratified 2026-10-26) — a snapshot, not a history replay.** Replaying every past `BiomeEntered` would be
+  *wrong*: after a *blip* `replayDedupe` accepts the older biomes (they differ from the last arrival) and corrupts
+  `routePath`. Instead the emitter (which already sees every `BiomeEntered` / `RunNodeEntered` / `RecoveryOffered`,
+  so the map half needs **no engine change**) keeps the route and per-biome node facts and replays one **absolute**
+  transport notice, `RunMapSnapshot { routePath, nodesEntered, restReached, currentNodeKind }`. Like `RunFaulted`
+  it is outside the event model: never an engine event. Sent only once a biome has been entered (the legacy chain
+  emits no map events).
+  - **Raw facts, not a pin.** The server sends what happened in the current biome (`nodesEntered` = its
+    `RunNodeEntered` count, `restReached` = a `RecoveryOffered` was emitted in it); the client derives the pin
+    (`restReached` → the Rest cap, else `nodesEntered − 1`). The server never copies the reducer's pin rule.
+  - **Replay order: map, biome, plan, *snapshot*, battle, turn, prompt.** After the plan, so its step lands after
+    the replayed `MAP_BIOME_ENTERED` / `MAP_PLAN_REVEALED` steps and overrides them; **before** `BattleStarted`,
+    because the hook sets `bossNodeActiveRef` from `currentNodeKind` on the snapshot's *arrival*, and the replayed
+    `BattleStarted` reads that ref when it expands. (The 2026-10-03 draft sent it last, which is too late for the
+    boss framing.)
+  - **Timing hazard.** The client queues animated events behind its timeline (`ARCHITECTURE.md` §2.8), so state lags
+    arrival. The snapshot's map update travels as an **ordered step** through the same queue — *not* an immediate
+    `now` action — or a still-queued replayed `MAP_BIOME_ENTERED` would append the current biome on top of it. Only
+    the boss ref is set on arrival. Applying the step twice gives the same state (absolute), so refresh and blip
+    are alike.
+  - **Rest-cap pin made absolute.** `RecoveryOffered`'s step changes from `MAP_NODE_ENTERED` (`+1`) to setting the
+    pin to the Rest cap (the plan length), so a replayed recovery prompt — refresh or blip — can't move it twice.
+  - **Stale HP behind a mid-battle prompt (from R1d-a).** When the emitter sees `CreatureFainted`, it rewrites the
+    cached `TurnStarted` with that creature's HP at 0 (matched by id, player or enemy side). Any other HP change in
+    that last turn stays accepted.
+  - **Sprite — a real field, not the snapshot.** `PlayerSpeciesId` becomes a **required** field on `BattleStarted`
+    (engine event + the `MapEvent` projection + the TS payload type; the C# wire-drop half is auto-guarded, the TS
+    leg and render layer are manual — `ClaudeDirectives/engine.md` rule 8). A reducer `playerSpeciesId` is set by
+    `BATTLE_STARTED`, `SWITCHED_IN`, `LEAD_CHANGED` and `CREATURE_RENAMED` (evolution); those actions gain the species
+    id their events already carry, the last two guarded by the on-field id as today. Transform is **not** tracked —
+    it is temporary and the scene already restores the true species. Consumers: `BattleCanvas`'s mount prop (it
+    builds its scene once, on the first `BATTLE_STARTED`, so a later change can't rebuild it mid-battle; live swaps
+    stay on the bridge commands) and the game-over card. The nav-state starter remains the fallback before the
+    first battle.
+  - **Out of scope:** the Title screen's Continue card reads a saved `Species` object from `localStorage`, so
+    fixing it needs a persisted-shape change; it keeps its §5 entry. Duplicate prompt log lines after a blip
+    (R1d-a's replay re-expands the recovery / move-replacement / evolution intros) have their own TODO entry.
+- **DoR.** Gen-variable: none (species identity, route state — gen-invariant). Gen 1 source: n/a. Data vs runtime:
+  runtime — one engine event field (`BattleStarted.PlayerSpeciesId`), the web emitter and a transport notice, and
+  the client hook / timeline / reducer; no importer or DB change. **Quirk to test:** the snapshot is absolute — a
+  blip leaves `routePath` and the pin unchanged (not duplicated, not truncated), a refresh restores the full trail;
+  the snapshot is replayed after the plan and before `BattleStarted`; a replayed recovery prompt leaves the pin on
+  the Rest cap; the cached `TurnStarted` shows a fainted creature at 0 HP. Dependencies: R1d-a (built).
+- **Tests for this item.** C#: snapshot contents and replay position, the legacy chain sends none, the faint HP
+  rewrite, `PlayerSpeciesId` projected. Vitest: the snapshot step is absolute and idempotent and lands after a
+  replayed `MAP_BIOME_ENTERED`; the Rest-cap pin is idempotent; `playerSpeciesId` follows each of its four actions.
+  Browser: one refresh scenario in `reconnect.spec.ts` mid-first-biome after two nodes, checking the ladder pin, run
+  on request. The blip scenario and its `DropConnection` hub method are their own tooling entry (they serve R1d-c
+  too); a second-biome trail check in E2E is a biome-deep walk and is left to the C# and Vitest tests.
 
 ## Test plan (covers a, c, d and the open verification gaps)
 
 - **Unit (C#, `SessionResumeTests` style):** open prompt cached/replayed last and in order; replaced by the next
   prompt; cleared via `PromptAnswered` (after the run consumes the answer) and `RunEnded`; a stray answer with no
   handshake waiting leaves it cached; shop balance follows `ShopItemPurchased`; the reflection guard above; `AttachConnection` twice → `SessionTakenOver` to the previous
-  connection and the replay to the new; snapshot contents after N biomes/nodes.
+  connection and the replay to the new; snapshot contents after N biomes/nodes and its position (after the plan,
+  before `BattleStarted`); the faint HP rewrite of the cached `TurnStarted`.
 - **Unit (Vitest):** `transportNotices` mapping (incl. the `clearActiveGame: false` case); `expandEvent` for a
   replayed prompt; the snapshot step applies **after** a replayed `BiomeEntered` (the timing hazard) and is
-  idempotent; `playerSpeciesId` reducer transitions.
+  idempotent; the Rest-cap pin is idempotent; `playerSpeciesId` reducer transitions.
 - **Browser/E2E (new `reconnect.spec.ts`, opt-in as always):** (1) **refresh with a reward choice open** → the modal
   reappears, pick → run continues, and a later refresh shows no prompt — ships with R1d-a (the shop-with-a-purchase
   variant was waived, see R1d-a); (2)
-  **blip** mid-battle (ships with R1d-c/d, with `DropConnection`) →
+  **blip** mid-battle (ships with R1d-f, with `DropConnection`) →
   no second "new challenger", move menu live; (3) **second tab** → first tab shows the notice, `activeGame` kept;
-  (4) refresh after two biomes → trail + pin intact. A deterministic blip needs a **Dev-Mode-gated hub method**
+  (4) refresh mid-first-biome after two nodes → the ladder pin is intact (ships with R1d-d; a second-biome trail is
+  left to C#/Vitest, a biome-deep walk). A deterministic blip needs a **Dev-Mode-gated hub method**
   `DropConnection` that calls `Context.Abort()` (the client sees an abnormal close and its automatic reconnect runs
   — `context.setOffline` would wait out SignalR's 30 s client timeout). Gate it exactly like `forceDraft`: the
   client can ask, only a Dev-Mode server grants (`ARCHITECTURE.md` §2.7).

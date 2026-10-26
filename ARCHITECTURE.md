@@ -281,8 +281,8 @@ Each entry: **Decision · Why · Where it lives.**
     the run emitted the *next* prompt (reward pick → `MoveTeachTargetRequired`) and wipe it. `RunEnded` clears it
     as a backstop. **Accepted:** a replay in the instant between the handshake completing and the run clearing
     shows a modal for an answered prompt (its answer is dropped); and a prompt raised mid-battle replays behind
-    the battle's last `TurnStarted` (pre-faint HP) until answered, which R1d-d's snapshot fixes. Design →
-    `docs/RECONNECT_RESILIENCE.md` R1d-a.
+    the battle's last `TurnStarted` (pre-faint HP) until answered; R1d-d (ratified, not built) zeroes a fainted
+    creature's cached HP in the emitter. Design → `docs/RECONNECT_RESILIENCE.md` R1d-a, R1d-d.
   - **A modal answer must not be lost in transit, and the shop is the one prompt whose answers can overlap.**
     Every blocking prompt parks the run on a `SignalRInput` handshake that the hub's answer completes, and an
     answer arriving with no handshake pending is dropped (right for a stray double-click on a one-shot prompt).
