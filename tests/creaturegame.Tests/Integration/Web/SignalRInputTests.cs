@@ -1,3 +1,4 @@
+using System.Reflection;
 using creaturegame.Attacks;
 using creaturegame.Combat;
 using creaturegame.Creatures;
@@ -297,6 +298,8 @@ public class SignalRInputTests
     public async Task ShopActions_ServingAQueuedLeave_ClearsTheRestOfTheBacklog()
     {
         var input = new SignalRInput();
+        int raised = 0;
+        input.PromptAnswered = () => raised++;
 
         var first = input.ChooseShopActionAsync(EmptyShop);
         input.SetShopAction(new BuyShopItem(0));
@@ -305,7 +308,169 @@ public class SignalRInputTests
 
         Assert.Equal(new BuyShopItem(0), await Within(first));
         Assert.Same(LeaveShop.Instance, await Within(input.ChooseShopActionAsync(EmptyShop)));
+        Assert.Equal(1, raised); // the queued LEAVE closes the shop's prompt exactly once
         Assert.False(input.ChooseShopActionAsync(EmptyShop).IsCompleted); // the stray BUY did not survive
+    }
+
+    // ── PromptAnswered: raised on the run thread once an answer is consumed (RECONNECT_RESILIENCE.md R1d-a) ──
+
+    // Keyed by the SignalRInput handshake field, so the guard below can pair every field with its PromptEvent.
+    private static readonly Dictionary<
+        string,
+        (Type Event, Func<SignalRInput, Task> Start, Action<SignalRInput> Answer)
+    > PromptHandshakes = new()
+    {
+        ["_forgetTcs"] = (
+            typeof(MoveReplacementRequired),
+            i => i.ChooseMoveToForgetAsync(null!),
+            i => i.SetForgetChoice(0)
+        ),
+        ["_recoveryTcs"] = (
+            typeof(RecoveryOffered),
+            i => i.ConfirmRecoveryAsync(null!),
+            i => i.SetRecoveryChoice(true)
+        ),
+        ["_evolutionTcs"] = (
+            typeof(EvolutionOffered),
+            i => i.ConfirmEvolutionAsync(null!),
+            i => i.SetEvolutionChoice(true)
+        ),
+        ["_biomeTcs"] = (
+            typeof(BiomeChoiceOffered),
+            i => i.ChooseBiomeAsync(null!),
+            i => i.SetBiomeChoice("a")
+        ),
+        ["_rewardChoiceTcs"] = (
+            typeof(RewardChoiceOffered),
+            i => i.ChooseRewardAsync(null!),
+            i => i.SetRewardChoice(0)
+        ),
+        ["_moveTeachTargetTcs"] = (
+            typeof(MoveTeachTargetRequired),
+            i => i.ChooseMoveTeachTargetAsync(null!),
+            i => i.SetMoveTeachTargetChoice(0)
+        ),
+        ["_shopTcs"] = (
+            typeof(ShopOffered),
+            i => i.ChooseShopActionAsync(EmptyShop),
+            i => i.SetShopAction(LeaveShop.Instance)
+        ),
+        ["_acquisitionTcs"] = (
+            typeof(AcquisitionOffered),
+            i => i.ChooseAcquisitionAsync(null!),
+            i => i.SetAcquisitionDecision(null!)
+        ),
+        ["_leadTcs"] = (
+            typeof(LeadChoiceOffered),
+            i => i.ChooseLeadAsync(null!),
+            i => i.SetLeadChoice(0)
+        ),
+        ["_switchInTcs"] = (
+            typeof(SwitchInOffered),
+            i => i.ChooseSwitchInAsync(null!),
+            i => i.SetSwitchInChoice(0)
+        ),
+    };
+
+    public static TheoryData<string> PromptHandshakeNames => new(PromptHandshakes.Keys);
+
+    // Holds every posted continuation until Drain, so the run side of a handshake cannot resume on its own.
+    private sealed class HeldContext : SynchronizationContext
+    {
+        private readonly Queue<(SendOrPostCallback Callback, object? State)> _posted = new();
+
+        public override void Post(SendOrPostCallback d, object? state) =>
+            _posted.Enqueue((d, state));
+
+        public void Drain()
+        {
+            while (_posted.TryDequeue(out var work))
+                work.Callback(work.State);
+        }
+    }
+
+    private static Task StartHeld(HeldContext held, Func<Task> start)
+    {
+        var prior = SynchronizationContext.Current;
+        SynchronizationContext.SetSynchronizationContext(held);
+        try
+        {
+            return start();
+        }
+        finally
+        {
+            SynchronizationContext.SetSynchronizationContext(prior);
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(PromptHandshakeNames))]
+    public void PromptAnswered_IsRaisedWhenTheRunResumes_NotWhenTheHubDeliversTheAnswer(
+        string prompt
+    )
+    {
+        var (_, start, answer) = PromptHandshakes[prompt];
+        var input = new SignalRInput();
+        int raised = 0;
+        input.PromptAnswered = () => raised++;
+        var held = new HeldContext();
+        var task = StartHeld(held, () => start(input));
+
+        answer(input);
+        Assert.Equal(0, raised);
+
+        held.Drain();
+        Assert.True(task.IsCompletedSuccessfully);
+        Assert.Equal(1, raised);
+    }
+
+    [Fact]
+    public async Task PromptAnswered_IsNotRaisedByAShopBuy_TheShopStaysOpen()
+    {
+        var input = new SignalRInput();
+        int raised = 0;
+        input.PromptAnswered = () => raised++;
+
+        var buy = input.ChooseShopActionAsync(EmptyShop);
+        input.SetShopAction(new BuyShopItem(0));
+        await Within(buy);
+
+        Assert.Equal(0, raised);
+    }
+
+    [Theory]
+    [MemberData(nameof(PromptHandshakeNames))]
+    public void PromptAnswered_IsNotRaisedByAnAnswerWithNoHandshakeWaiting(string prompt)
+    {
+        var input = new SignalRInput();
+        int raised = 0;
+        input.PromptAnswered = () => raised++;
+
+        PromptHandshakes[prompt].Answer(input);
+
+        Assert.Equal(0, raised);
+    }
+
+    [Fact]
+    public void EveryPromptHandshakeField_AndEveryPromptEvent_HasAPromptAnsweredCase()
+    {
+        var handshakeFields = typeof(SignalRInput)
+            .GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+            .Where(f =>
+                f.FieldType.IsGenericType
+                && f.FieldType.GetGenericTypeDefinition() == typeof(TaskCompletionSource<>)
+                && f.Name != "_turnTcs"
+            )
+            .Select(f => f.Name);
+        var promptEvents = typeof(PromptEvent)
+            .Assembly.GetTypes()
+            .Where(t => t.IsSubclassOf(typeof(PromptEvent)) && !t.IsAbstract);
+
+        Assert.Equal(handshakeFields.Order(), PromptHandshakes.Keys.Order());
+        Assert.Equal(
+            promptEvents.Select(t => t.Name).Order(),
+            PromptHandshakes.Values.Select(h => h.Event.Name).Order()
+        );
     }
 
     [Fact]

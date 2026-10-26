@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { answerNicknameIfPresent, fightButton, chooseMove } from './helpers';
+import { answerNicknameIfPresent, fightButton, attackUntilShowing } from './helpers';
 
 // The Run Economy reward flow, driven deterministically by a fixed seed. This closes the known
 // live-verification gap: the reward + wallet credit had unit/integration coverage but were never observed in a
@@ -41,20 +41,8 @@ async function startSeededRun(page: import('@playwright/test').Page, seed: numbe
   await page.locator('.town-map-town--offered').first().click({ timeout: 15_000 });
 }
 
-/** Attacks with the default (first-available) move each turn until the reward-choice modal appears, returning
- * whether it did. Deliberately does NOT use the generic play-loop helpers, which auto-dismiss the reward modal;
- * this spec needs it left standing to assert against. */
-async function winFirstBattle(page: import('@playwright/test').Page): Promise<boolean> {
-  const modal = page.locator('.reward-modal');
-  for (let turn = 0; turn < MAX_TURNS; turn++) {
-    if (await modal.isVisible().catch(() => false)) return true;
-    if (await fightButton(page).isEnabled().catch(() => false)) {
-      await chooseMove(page).catch(() => {});
-    }
-    await page.waitForTimeout(150);
-  }
-  return modal.isVisible().catch(() => false);
-}
+const winFirstBattle = (page: import('@playwright/test').Page) =>
+  attackUntilShowing(page, page.locator('.reward-modal'), MAX_TURNS);
 
 test.describe('Run Economy reward choice (battle-win drop)', () => {
   test('winning a battle pops the pick-one-of-N choice modal; taking the gold bag credits the BAG and continues', async ({ page }) => {

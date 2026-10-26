@@ -23,17 +23,19 @@ public sealed class SignalRBattleEventEmitter(
     // engine's real logic. `volatile`: Emit runs on the run's background task thread while ReplayLastKnownState
     // runs on the SignalR hub thread (a reconnect can land concurrently with a live Emit).
     //
-    // Three different lifetimes:
+    // Four different lifetimes:
     //  - Run-scoped (RegionMapRevealed): set at most once per run, never cleared.
     //  - Biome-scoped (BiomeEntered, BiomeNodePlanRevealed): replaced by the next biome's; NOT cleared by
     //    BattleEnded/RunEnded — the current biome persists across and after the battles fought in it.
     //  - Battle-scoped (BattleStarted, TurnStarted): cleared on BattleEnded/RunEnded — or CreatureFled, which ends a
     //    fled battle WITHOUT a BattleEnded — see that case below.
+    //  - Prompt-scoped (_openPrompt): the one open prompt, until its answer is consumed (RECONNECT_RESILIENCE R1d-a).
     private volatile RegionMapRevealed? _lastRegionMap;
     private volatile BiomeEntered? _lastBiomeEntered;
     private volatile BiomeNodePlanRevealed? _lastBiomeNodePlan;
     private volatile BattleStarted? _lastBattleStarted;
     private volatile TurnStarted? _lastTurnStarted;
+    private volatile PromptEvent? _openPrompt;
 
     public void Emit(BattleEvent evt)
     {
@@ -56,14 +58,19 @@ public sealed class SignalRBattleEventEmitter(
             case TurnStarted turn:
                 _lastTurnStarted = turn;
                 break;
+            case PromptEvent prompt:
+                _openPrompt = prompt;
+                break;
+            case ShopItemPurchased bought:
+                if (_openPrompt is ShopOffered shop)
+                    _openPrompt = shop with { Balance = bought.Balance };
+                break;
             case BattleEnded or RunEnded or CreatureFled:
-                // No battle is live between encounters (a route/shop/reward/recovery/etc. prompt is a separate,
-                // not-yet-replayed event category — ARCHITECTURE.md §2.7's noted follow-up gap). Replaying a
-                // just-finished battle's stale state into one of those would be actively wrong, not just
-                // incomplete, so only the battle-scoped half of the cache clears — the run/biome-scoped half
-                // stays valid (it's still the actual current map/biome).
+                // Only the battle-scoped half clears; the map and biome stay current (ARCHITECTURE.md §2.7).
                 _lastBattleStarted = null;
                 _lastTurnStarted = null;
+                if (evt is RunEnded)
+                    _openPrompt = null;
                 break;
         }
 
@@ -115,11 +122,15 @@ public sealed class SignalRBattleEventEmitter(
         Dispatch(connectionId, "RunFaulted", new { });
     }
 
+    /// <summary>The run has consumed the open prompt's answer. Called on the run thread, so it always lands before
+    /// the run emits its next prompt (RECONNECT_RESILIENCE.md R1d-a).</summary>
+    public void ClearOpenPrompt() => _openPrompt = null;
+
     /// <summary>Re-sends every cached state-establishing event, in the order it would naturally occur, to
     /// whatever connection is current right now — each a no-op while its slice of the cache is empty (e.g. the
     /// battle-scoped pair between encounters, or the whole cache in the legacy endless chain, which never emits
-    /// the biome/map events at all). See the cache fields' own doc for the lifetimes and what this deliberately
-    /// doesn't yet cover.</summary>
+    /// the biome/map events at all). The open prompt goes last: its modal overlays the field. See the cache
+    /// fields' own doc for the lifetimes.</summary>
     public void ReplayLastKnownState()
     {
         if (_lastRegionMap is { } map)
@@ -132,6 +143,8 @@ public sealed class SignalRBattleEventEmitter(
             Send(started);
         if (_lastTurnStarted is { } turn)
             Send(turn);
+        if (_openPrompt is { } prompt)
+            Send(prompt);
     }
 
     // internal for the web event-contract test (reflection-checks every BattleEvent maps to a

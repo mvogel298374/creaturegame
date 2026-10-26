@@ -328,10 +328,13 @@ the linked design doc instead — pull it there and leave only the pointer here.
   Continue afterward.
 - A modal answer sent during a reconnect window is not lost: if the client's connection rejects the send, the
   modal re-opens; a quick shop BUY then LEAVE are both honoured, in order.
-- **Not covered:** a refresh while a between-node prompt (route choice, shop, reward, recovery, acquisition,
-  lead choice, switch-in) is open, rather than during an active battle, still hangs on reconnect.
+- A refresh or network blip while a blocking prompt is open (route choice, shop, reward, recovery, acquisition,
+  lead choice, switch-in, move replacement, and the rest) brings the same modal back, and answering it continues
+  the run. A prompt already answered does not come back; a reopened shop shows the current gold.
+- **Not covered:** a prompt raised mid-battle (move replacement after a level-up, switch-in after a faint) shows the
+  battle's last known HP behind it after a refresh, until it is answered.
 - Design detail → `ARCHITECTURE.md` §2.7 (Web session lifecycle). History → `TODO_ARCHIVE.md` → *Session Resume
-  — refresh/reopen-safe `gameId` persistence*.
+  — refresh/reopen-safe `gameId` persistence* and *§2 R1d-a — an open blocking prompt is replayed on reconnect*.
 
 ### Client navigation and input
 - Space as well as Enter selects a starter card.

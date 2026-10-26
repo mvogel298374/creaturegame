@@ -8,6 +8,38 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §2 R1d-a — an open blocking prompt is replayed on reconnect ✅ DONE (2026-10-26)
+
+M, reliability; was §1 #5 / §2 "R1d-a". Ten prompts park the run on a `SignalRInput` handshake and none was cached, so
+after a refresh or a blip the modal never reappeared, the server stayed parked, reconnect cancelled the abandon
+timer, and the player could only QUIT. Design ratified by `/plan` 2026-10-26; the design record stays in
+`RECONNECT_RESILIENCE.md` → R1d-a.
+
+- **Acceptance (met):** refresh or blip with any of the ten prompts open → the modal reappears, is answerable, and
+  the run continues; an answered prompt never reappears; a replayed shop shows the current balance.
+- **What changed:**
+  - Engine: `PromptEvent` abstract base record for the ten blocking prompts (`creaturegame/Combat/BattleEvents.cs`).
+  - `SignalRBattleEventEmitter` caches the one open prompt and replays it last on reconnect. A shop's cached
+    `ShopOffered` is rewritten on each `ShopItemPurchased` balance. `RunEnded` clears the slot; `CreatureFled` does
+    not (the slot is already empty by then).
+  - `SignalRInput.PromptAnswered` fires on the **run thread** once the run consumes an answer (after each await, and
+    in `CloseShopIfLeaving` for the shop), never from the hub's `Set*` (that races the run's next emit and could
+    wipe a follow-on prompt). `GameSessionManager` wires it to `emitter.ClearOpenPrompt`.
+  - Client unchanged (`expandEvent` → `SHOW_*`).
+  - Tests: `SessionResumeTests`, `SignalRInputTests`, `GameSessionLifecycleTests` (fake-clock harness), including
+    the reflection guard that an 11th prompt cannot be forgotten. New `e2e/reconnect.spec.ts` (one reward-choice
+    refresh scenario, run only on request); `attackUntilShowing` moved into `e2e/helpers.ts`.
+- **User decisions (2026-10-26):** the shop E2E refresh scenario is **waived** (a shop with gold is a biome deep, so a
+  browser walk is long and flaky; the replayed balance is pinned by the emitter test). Accepted: the stale battle HP
+  behind a mid-battle prompt (`MoveReplacementRequired`, `SwitchInOffered`) after a refresh, which R1d-d's absolute
+  snapshot fixes; and the answered-prompt replay race (a replay between the handshake completing and the run
+  clearing the slot shows a modal whose answer is dropped).
+- **Gen surface:** none. **Gen 1 source:** n/a (transport). **Data vs runtime:** runtime only.
+- **Moved on:** the blip scenario and its `DropConnection` hub method go to R1d-c/d. R1d-d's "sequenced after R1d-a"
+  dependency is met.
+
+---
+
 ## §6 `GameSessionManager` connection lifecycle + the `RunFaulted` server half ✅ DONE (2026-10-26)
 
 M, web host test coverage; was §1 #3 "Server test gaps". The abandon grace, the pending-session eviction TTL and the

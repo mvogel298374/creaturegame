@@ -190,8 +190,8 @@ timeline semantics (`timeline.ts` deciding `BattleEnded` ⇒ "announce next"). T
    burst *before* dropping; the rebind (`GameSessionManager.AttachConnection`) then restores the input channel.
    Nothing is lost on that path. The *only* loss window is a disconnect landing inside the sub-millisecond emit
    burst or the few-ms between-battle DB fetch: a rare stall, never the "client desync" it gets mis-filed as.
-   If we ever want belt-and-suspenders, the proportionate fix is a one-shot resync emit on rebind (resend the
-   current `TurnStarted` + any pending prompt) — **not** an event buffer, and **not** urgent.
+   The belt-and-suspenders fix is built: `ReplayLastKnownState()` re-sends the cached state on rebind, including
+   the one open blocking prompt (`ARCHITECTURE.md` §2.7) — **not** an event buffer.
 4. **Per-run seed — DONE end-to-end (seam 2026-06-12, web wiring 2026-06-17).** A battle is fully reproducible
    from a seed: `Gen1BattleRules` takes an `IRandomSource`, `DelegatingBattleRules`/`ScriptableRules` forward a
    seed to it, and `BattleScenario.Seed(...)` makes **every** roll deterministic — including the rules'

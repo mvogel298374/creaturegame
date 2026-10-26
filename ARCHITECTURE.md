@@ -270,11 +270,19 @@ Each entry: **Decision · Why · Where it lives.**
     reconnect doesn't replay a just-finished fight) — each of which otherwise fires exactly once, to whichever
     connection was current at the time. `GameSessionManager.ReEstablishClient` (the reconnect branch's two-call
     sequence, pulled out so it's independently testable) re-echoes the presentation event then calls
-    `ReplayLastKnownState()`, re-sending whatever's cached to the connection that's now current. **Known gap:**
-    a between-node blocking prompt (route choice, shop, reward-choice, recovery, acquisition, lead-choice,
-    switch-in) has no cached "currently open" event of its own yet, so a remount mid-prompt still has nothing to
-    reattach to (unchanged from before this — not a regression, just not yet covered; designed in
-    `docs/RECONNECT_RESILIENCE.md` R1d-a).
+    `ReplayLastKnownState()`, re-sending whatever's cached to the connection that's now current.
+  - **The one open blocking prompt is cached too, and replayed last.** The ten blocking prompts share a
+    `PromptEvent` base record; the emitter keeps a single slot for the open one (a run has at most one) and
+    `ReplayLastKnownState()` re-sends it after the other cached events, so a refresh or blip mid-prompt brings the
+    modal back and the parked run can be answered. A shop's cached `ShopOffered` is rewritten on each
+    `ShopItemPurchased`, so a replay shows the current balance. The slot is cleared on the **run thread**, by
+    `SignalRInput.PromptAnswered` once the run consumes the answer (after each await, and in `CloseShopIfLeaving`),
+    never from the hub's `Set*`: the TCSs run continuations asynchronously, so a hub-thread clear could land after
+    the run emitted the *next* prompt (reward pick → `MoveTeachTargetRequired`) and wipe it. `RunEnded` clears it
+    as a backstop. **Accepted:** a replay in the instant between the handshake completing and the run clearing
+    shows a modal for an answered prompt (its answer is dropped); and a prompt raised mid-battle replays behind
+    the battle's last `TurnStarted` (pre-faint HP) until answered, which R1d-d's snapshot fixes. Design →
+    `docs/RECONNECT_RESILIENCE.md` R1d-a.
   - **A modal answer must not be lost in transit, and the shop is the one prompt whose answers can overlap.**
     Every blocking prompt parks the run on a `SignalRInput` handshake that the hub's answer completes, and an
     answer arriving with no handshake pending is dropped (right for a stray double-click on a one-shot prompt).

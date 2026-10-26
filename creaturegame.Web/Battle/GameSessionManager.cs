@@ -76,7 +76,7 @@ public sealed class GameSessionManager(
 
     /// <summary>Everything a reconnecting client needs re-sent to it, in order: the presentation echo (theme —
     /// GENERATION_PROFILE.md §7.2) first, then whatever state-establishing events the emitter has cached
-    /// (SignalRBattleEventEmitter.ReplayLastKnownState — map/biome/battle/turn, each only if that slice is
+    /// (SignalRBattleEventEmitter.ReplayLastKnownState — map/biome/battle/turn/open prompt, each only if that slice is
     /// currently live). Extracted from <see cref="AttachConnection"/>'s reconnect branch for the same reason as
     /// <see cref="BuildRunOptions"/>: pulled out, the two-call sequence is <b>observable to a test</b> — inlined,
     /// deleting either call (or reordering them) would stay green under every scenario a normal run-through
@@ -251,6 +251,7 @@ public sealed class GameSessionManager(
             includeDamageRange: devMode?.Enabled ?? false
         );
         battle.Emitter = emitter;
+        battle.Input.PromptAnswered = emitter.ClearOpenPrompt;
         emitter.Emit(BuildPresentationEvent(profile));
         // Gen1TrainerAi (an intelligent-but-fallible Gen 1 move selector, TODO_ARCHIVE.md) drives the enemy; a
         // single instance is safe to share/reuse across encounters — the run is single-threaded. The seeded

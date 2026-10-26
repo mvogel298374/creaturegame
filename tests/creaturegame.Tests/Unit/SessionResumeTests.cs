@@ -213,10 +213,7 @@ public class SessionResumeTests
     [Fact]
     public void ReplayLastKnownState_ClearsTheBattlePair_ButNotTheMapOrBiome_AfterBattleEnded()
     {
-        // Between encounters (a route/shop/reward/etc. prompt — not yet covered by this replay, a named gap in
-        // ARCHITECTURE.md §2.7) there is no live battle; replaying the just-finished one's stale state would be
-        // actively wrong, not just incomplete. The run/biome-scoped state is different: the player is still on
-        // the same map, in the same biome, regardless of how the last battle ended.
+        // No battle is live between encounters; the map and biome still are (ARCHITECTURE.md §2.7).
         var hub = new RecordingHubContext();
         var emitter = new SignalRBattleEventEmitter(hub, () => "conn-1");
 
@@ -280,6 +277,89 @@ public class SessionResumeTests
             hub.EventsFor("conn-1").Skip(beforeReplay),
             e => e.Type == "RegionMapRevealed"
         );
+    }
+
+    // ── The open blocking prompt (RECONNECT_RESILIENCE.md R1d-a) ─────────────────────────────────────────────
+
+    private static RewardChoiceOffered RewardChoice() => new("Battle", []);
+
+    private static RecoveryOffered Recovery() => new("Player", 1, 1, 0);
+
+    [Fact]
+    public void ReplayLastKnownState_ResendsTheOpenPrompt_LastAfterTheFieldState()
+    {
+        var hub = new RecordingHubContext();
+        var emitter = new SignalRBattleEventEmitter(hub, () => "conn-1");
+        emitter.Emit(Region());
+        emitter.Emit(Biome("phantom-marsh"));
+        emitter.Emit(NodePlan());
+        emitter.Emit(RewardChoice());
+        int before = hub.EventsFor("conn-1").Count;
+
+        emitter.ReplayLastKnownState();
+
+        Assert.Equal(
+            ["RegionMapRevealed", "BiomeEntered", "BiomeNodePlanRevealed", "RewardChoiceOffered"],
+            hub.EventsFor("conn-1").Skip(before).Select(e => e.Type)
+        );
+    }
+
+    [Fact]
+    public void ReplayLastKnownState_DoesNotResendAPrompt_OnceItsAnswerIsConsumed()
+    {
+        var hub = new RecordingHubContext();
+        var emitter = new SignalRBattleEventEmitter(hub, () => "conn-1");
+        emitter.Emit(Recovery());
+        emitter.ClearOpenPrompt();
+        int before = hub.EventsFor("conn-1").Count;
+
+        emitter.ReplayLastKnownState();
+
+        Assert.Empty(hub.EventsFor("conn-1").Skip(before));
+    }
+
+    [Fact]
+    public void ReplayLastKnownState_ResendsOnlyTheNewestPrompt()
+    {
+        var hub = new RecordingHubContext();
+        var emitter = new SignalRBattleEventEmitter(hub, () => "conn-1");
+        emitter.Emit(RewardChoice());
+        emitter.Emit(Recovery());
+        int before = hub.EventsFor("conn-1").Count;
+
+        emitter.ReplayLastKnownState();
+
+        Assert.Equal(["RecoveryOffered"], hub.EventsFor("conn-1").Skip(before).Select(e => e.Type));
+    }
+
+    [Fact]
+    public void ReplayLastKnownState_ResendsAnOpenShop_WithTheBalanceAfterItsPurchases()
+    {
+        var hub = new RecordingHubContext();
+        var emitter = new SignalRBattleEventEmitter(hub, () => "conn-1");
+        emitter.Emit(new ShopOffered([], 500));
+        emitter.Emit(new ShopItemPurchased("Potion", 300, 200));
+        int before = hub.EventsFor("conn-1").Count;
+
+        emitter.ReplayLastKnownState();
+
+        var shop = Assert.Single(hub.EventsFor("conn-1").Skip(before));
+        Assert.Equal("ShopOffered", shop.Type);
+        Assert.Equal(200, shop.Payload.GetType().GetProperty("Balance")!.GetValue(shop.Payload));
+    }
+
+    [Fact]
+    public void ReplayLastKnownState_DropsTheOpenPrompt_OnRunEnded()
+    {
+        var hub = new RecordingHubContext();
+        var emitter = new SignalRBattleEventEmitter(hub, () => "conn-1");
+        emitter.Emit(Recovery());
+        emitter.Emit(new RunEnded(3, 12, "Player", 1));
+        int before = hub.EventsFor("conn-1").Count;
+
+        emitter.ReplayLastKnownState();
+
+        Assert.Empty(hub.EventsFor("conn-1").Skip(before));
     }
 
     // ── GameSessionManager.ReEstablishClient ──────────────────────────────────────────────────────────────

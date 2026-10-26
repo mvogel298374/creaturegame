@@ -28,6 +28,10 @@ public sealed class SignalRInput : IBattleInput
     private volatile TaskCompletionSource<int>? _switchInTcs;
     private volatile bool _cancelled;
 
+    /// <summary>Raised on the run thread once the run has consumed a prompt's answer, never from the hub's
+    /// <c>Set*</c> (RECONNECT_RESILIENCE.md R1d-a).</summary>
+    public Action? PromptAnswered { get; set; }
+
     // The raw request the hub completes the turn handshake with, mapped to a TurnChoice below.
     private abstract record TurnRequest;
 
@@ -148,6 +152,7 @@ public sealed class SignalRInput : IBattleInput
         _forgetTcs = tcs;
         var slot = await tcs.Task; // throws OperationCanceledException if Cancel() ran
         _forgetTcs = null;
+        PromptAnswered?.Invoke();
         return slot;
     }
 
@@ -174,6 +179,7 @@ public sealed class SignalRInput : IBattleInput
         _recoveryTcs = tcs;
         var accept = await tcs.Task; // throws OperationCanceledException if Cancel() ran
         _recoveryTcs = null;
+        PromptAnswered?.Invoke();
         return accept;
     }
 
@@ -200,6 +206,7 @@ public sealed class SignalRInput : IBattleInput
         _evolutionTcs = tcs;
         var allow = await tcs.Task; // throws OperationCanceledException if Cancel() ran
         _evolutionTcs = null;
+        PromptAnswered?.Invoke();
         return allow;
     }
 
@@ -227,6 +234,7 @@ public sealed class SignalRInput : IBattleInput
         _biomeTcs = tcs;
         var biomeId = await tcs.Task; // throws OperationCanceledException if Cancel() ran
         _biomeTcs = null;
+        PromptAnswered?.Invoke();
         return biomeId;
     }
 
@@ -252,6 +260,7 @@ public sealed class SignalRInput : IBattleInput
         _rewardChoiceTcs = tcs;
         var index = await tcs.Task; // throws OperationCanceledException if Cancel() ran
         _rewardChoiceTcs = null;
+        PromptAnswered?.Invoke();
         return index;
     }
 
@@ -280,6 +289,7 @@ public sealed class SignalRInput : IBattleInput
         _moveTeachTargetTcs = tcs;
         var slot = await tcs.Task; // throws OperationCanceledException if Cancel() ran
         _moveTeachTargetTcs = null;
+        PromptAnswered?.Invoke();
         return slot;
     }
 
@@ -328,13 +338,14 @@ public sealed class SignalRInput : IBattleInput
     }
 
     // Leaving ends the shop: later answers (a stray click on the closing modal) are dropped, not carried into
-    // the NEXT shop's first prompt. Caller holds _shopLock.
+    // the NEXT shop's first prompt. Caller holds _shopLock and is on the run thread.
     private void CloseShopIfLeaving(ShopAction action)
     {
         if (action is BuyShopItem)
             return;
         _shopOpen = false;
         _shopBacklog.Clear();
+        PromptAnswered?.Invoke();
     }
 
     /// <summary>Completes the pending shop prompt, or — when the previous answer has already completed it and the
@@ -371,6 +382,7 @@ public sealed class SignalRInput : IBattleInput
         _acquisitionTcs = tcs;
         var decision = await tcs.Task; // throws OperationCanceledException if Cancel() ran
         _acquisitionTcs = null;
+        PromptAnswered?.Invoke();
         return decision;
     }
 
@@ -396,6 +408,7 @@ public sealed class SignalRInput : IBattleInput
         _leadTcs = tcs;
         var index = await tcs.Task; // throws OperationCanceledException if Cancel() ran
         _leadTcs = null;
+        PromptAnswered?.Invoke();
         return index;
     }
 
@@ -421,6 +434,7 @@ public sealed class SignalRInput : IBattleInput
         _switchInTcs = tcs;
         var index = await tcs.Task; // throws OperationCanceledException if Cancel() ran
         _switchInTcs = null;
+        PromptAnswered?.Invoke();
         return index;
     }
 

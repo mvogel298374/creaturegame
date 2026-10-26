@@ -147,6 +147,22 @@ public class GameSessionLifecycleTests
     }
 
     [Fact]
+    public async Task Reconnect_ReplaysAnOpenPrompt_UntilTheRunConsumesItsAnswer()
+    {
+        using var run = new StartedRun();
+        run.Battle.Emitter!.Emit(new RecoveryOffered("Player", 1, 1, 0));
+        var recovery = run.Battle.Input.ConfirmRecoveryAsync(null!);
+
+        Assert.True(run.Manager.AttachConnection(run.GameId, "conn-2"));
+        Assert.Equal("RecoveryOffered", run.Hub.EventsFor("conn-2")[^1].Type);
+
+        run.Battle.Input.SetRecoveryChoice(true);
+        await recovery.WaitAsync(Settle);
+        Assert.True(run.Manager.AttachConnection(run.GameId, "conn-3"));
+        Assert.DoesNotContain(run.Hub.EventsFor("conn-3"), e => e.Type == "RecoveryOffered");
+    }
+
+    [Fact]
     public async Task DetachConnection_FromAConnectionAlreadyReplaced_IsIgnored()
     {
         using var run = new StartedRun();

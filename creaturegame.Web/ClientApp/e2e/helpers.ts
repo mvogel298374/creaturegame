@@ -456,6 +456,19 @@ export async function walkSeedsUntil(
   return null;
 }
 
+/** Attacks with the default (first-available) move each turn until `target` shows, returning whether it did.
+ * Deliberately not the play-loop helpers, which answer every run modal — this leaves `target` standing. */
+export async function attackUntilShowing(page: Page, target: Locator, maxTurns = 15): Promise<boolean> {
+  for (let turn = 0; turn < maxTurns; turn++) {
+    if (await isShowing(target)) return true;
+    if (await fightButton(page).isEnabled().catch(() => false)) {
+      await chooseMove(page).catch(() => {});
+    }
+    await page.waitForTimeout(150);
+  }
+  return isShowing(target);
+}
+
 /** True when the locator is on the page right now. The `reached` predicates are instantaneous probes, not
  * waits — the seed-walk loop is what does the waiting. */
 export const isShowing = (locator: Locator): Promise<boolean> =>

@@ -5,6 +5,9 @@ namespace creaturegame.Combat;
 
 public abstract record BattleEvent;
 
+// A blocking prompt: the run loop parks on IBattleInput until the player answers (RECONNECT_RESILIENCE.md R1d-a).
+public abstract record PromptEvent : BattleEvent;
+
 // --- Battle lifecycle ---
 public record BattleStarted(
     string PlayerName,
@@ -77,7 +80,7 @@ public record RunEnded(
 /// <see cref="IBattleInput.ConfirmRecoveryAsync"/> before continuing, so the client raises the heal modal here.
 /// Carries the species id so the modal can show the creature's sprite.</summary>
 public record RecoveryOffered(string CreatureName, int CreatureId, int SpeciesId, int BattlesWon)
-    : BattleEvent;
+    : PromptEvent;
 
 /// <summary>The player accepted a Poké Center recovery and the creature was fully restored (HP, PP, and
 /// status). Carries the post-heal HP so the client can fill the bar. Emitted between encounters, never inside
@@ -92,7 +95,7 @@ public record RecoveryDeclined(string CreatureName, int CreatureId) : BattleEven
 /// neighbours, or the run's opening set) the player picks the next leg from. A blocking event — the run loop
 /// awaits the player's pick via <see cref="IBattleInput.ChooseBiomeAsync"/> before continuing, so the client
 /// raises the map screen here. Each option carries id + display name + type theme for the biome card.</summary>
-public record BiomeChoiceOffered(IReadOnlyList<BiomeOption> Options) : BattleEvent;
+public record BiomeChoiceOffered(IReadOnlyList<BiomeOption> Options) : PromptEvent;
 
 /// <summary>One biome on offer in a <see cref="BiomeChoiceOffered"/>: stable id, display name, and the type
 /// theme (1–3 types) for the card's badges.</summary>
@@ -170,13 +173,13 @@ public record RewardGranted(string Source, int Gold, int GoldTotal, IReadOnlyLis
 /// reward-choice modal here. <paramref name="Source"/> is the earning node (<c>"Battle"</c> / the
 /// <c>RunNodeKind</c> name). The chosen option is then applied and announced by a following
 /// <see cref="RewardGranted"/>. Each <see cref="RewardOption"/> is an item (id + name + rarity) or a gold bag.</summary>
-public record RewardChoiceOffered(string Source, IReadOnlyList<RewardOption> Options) : BattleEvent;
+public record RewardChoiceOffered(string Source, IReadOnlyList<RewardOption> Options) : PromptEvent;
 
 /// <summary>A Shop node opened with this stock (<paramref name="Items"/>) and the player's current
 /// <paramref name="Balance"/> in ₽. A blocking event — the run loop awaits the player's buy/leave choices via
 /// <see cref="IBattleInput.ChooseShopActionAsync"/>, so the client raises the shop modal here. Each purchase is
 /// announced by a following <see cref="ShopItemPurchased"/>; the visit ends when the player leaves.</summary>
-public record ShopOffered(IReadOnlyList<ShopOfferItem> Items, int Balance) : BattleEvent;
+public record ShopOffered(IReadOnlyList<ShopOfferItem> Items, int Balance) : PromptEvent;
 
 /// <summary>The player bought <paramref name="ItemName"/> for <paramref name="Price"/>₽; <paramref name="Balance"/>
 /// is the wallet balance after the spend (so the HUD/modal can set rather than subtract). The item was added to
@@ -203,7 +206,7 @@ public record AcquisitionOffered(
     int MaxHp,
     bool PartyFull,
     IReadOnlyList<PartyMemberInfo> Party
-) : BattleEvent;
+) : PromptEvent;
 
 /// <summary>A snapshot of one party member for the client's roster panel + acquisition swap picker: species id
 /// (sprite), name, level, current/max HP, major status, and whether it is the active <see cref="IsLead"/>. The
@@ -277,7 +280,7 @@ public record PartyUpdated(IReadOnlyList<PartyMemberInfo> Members) : BattleEvent
 /// Carries the current roster snapshot (the picked-from members, the active one flagged
 /// <see cref="PartyMemberInfo.IsLead"/>). Purely a between-biome choice — this is <em>not</em> in-battle
 /// switching (that stays a separate, later feature; the battle engine is untouched).</summary>
-public record LeadChoiceOffered(IReadOnlyList<PartyMemberInfo> Party) : BattleEvent;
+public record LeadChoiceOffered(IReadOnlyList<PartyMemberInfo> Party) : PromptEvent;
 
 /// <summary>The party's lead was reassigned (the between-biome lead choice picked a different member). The named
 /// creature is now the active <c>RunState.Player</c> for the next biome. Followed by a <see cref="PartyUpdated"/>
@@ -485,7 +488,7 @@ public record SwitchInOffered(
     IReadOnlyList<PartyMemberInfo> Party,
     string FaintedName,
     int FaintedId
-) : BattleEvent;
+) : PromptEvent;
 
 /// <summary>A replacement creature was sent in after the active one fainted (the forced faint-switch). It battles
 /// the same enemy from the next turn. Carries the incoming creature's <paramref name="SpeciesId"/> (the client
@@ -549,7 +552,7 @@ public record EvolutionOffered(
     int CreatureId,
     int FromSpeciesId,
     int ToSpeciesId
-) : BattleEvent;
+) : PromptEvent;
 
 /// <summary>The player declined an offered evolution (Gen 1 B-cancel). The creature keeps its current form;
 /// it will be offered again at the next level-up while still eligible. Drives the "stopped evolving" line.</summary>
@@ -589,7 +592,7 @@ public record MoveReplacementRequired(
     int CreatureId,
     string NewMoveName,
     IReadOnlyList<string> CurrentMoves
-) : BattleEvent;
+) : PromptEvent;
 
 /// <summary>A move was forgotten to make room for a new one — emitted just before the paired
 /// <see cref="MoveLearned"/>. Drives the "{NAME} forgot {MOVE}!" line.</summary>
@@ -617,7 +620,7 @@ public record MoveTeachTargetRequired(
     AttackType AttackType,
     int Pp,
     IReadOnlyList<MoveTeachCandidateInfo> Candidates
-) : BattleEvent;
+) : PromptEvent;
 
 /// <summary>One party member's legality for a move-teach offer — the client's ABLE/NOT ABLE row. Mirrors
 /// <see cref="PartyMemberInfo"/> (species/name/level/HP/status for the card) plus <see cref="Able"/>, which

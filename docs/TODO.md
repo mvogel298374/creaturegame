@@ -43,34 +43,23 @@
 | # | Item | Cost | Ready? (DoR) | Why this slot / what it unblocks |
 |:-:|:-----|:----:|:-------------|:---------------------------------|
 | 1 | **`-StartStack` backend leak** (§7.1 Part A) | S | ✗ parked: leak not reproduced (2026-10-10); un-park condition in §7.1 | Parts B and C are done. Not actionable until the user reproduces it; §1 #6 does not wait on it. |
-| 5 | **R1d-a — replay an open blocking prompt** (§2) | M | ⚠️ designed, but provisional-pending-`/plan`; V16: that is the only gap (a short server-side `/plan`), with no decision of its own | The only reconnect item that strands a run; highest player value. |
 | 6 | **CI E2E step** (§6) | M | ✗ no design (runner, stack boot, caching) or acceptance | The only automatic E2E coverage; makes "agents don't run E2E" safe, and unblocks checking the reconnect spec. |
-| 7 | **R1d-d, R1d-c** — refresh-state snapshot + sprite; second-tab policy (§2) | M each | ⚠️ provisional-pending-`/plan` (decisions made 2026-10-17) | Both extend (a)'s replay work. |
+| 7 | **R1d-d, R1d-c** — refresh-state snapshot + sprite; second-tab policy (§2) | M each | ⚠️ provisional-pending-`/plan` (decisions made 2026-10-17) | Both extend the open-prompt replay (R1d-a, shipped); the highest-value reconnect gap left. |
 | 8 | **Gen 1 fidelity — the damage/accuracy core** (§3.1) | L | ✗ needs the Gen 1 source per claim, the seam surface, and the quirks to pin | Verify-first; large blast radius (it touches every damage number). |
 | 9 | **End-of-turn residual phase** (§4.2) | L | ✗ needs a `/plan` | A `/plan`, `opus-engineer`, and both review gates; rewrites `Battle`'s turn loop. |
 | 10 | **Features** — Catch, `save.db`, progressive difficulty, Generation Profile 4d+, … (§4) | L | ✗ each needs a `/plan` | Catch and stone evolutions are unblocked by the bag-scope ruling (`ARCHITECTURE.md` §2.12); `save.db` is declined for now. |
 
 ---
 
-## 2. Reliability — reconnect (designed in [`RECONNECT_RESILIENCE.md`](RECONNECT_RESILIENCE.md), provisional-pending-`/plan`)
+## 2. Reliability — reconnect (designed in [`RECONNECT_RESILIENCE.md`](RECONNECT_RESILIENCE.md); c and d provisional-pending-`/plan`)
 
 Verified in code 2026-10-03. Fixed and archived already: the flee stale-cache, the 60 s grace, the client replay
-dedupe, lost modal answers, the `RunFaulted` notice, and the abandon-timer race (R1d-b). The server replaying on every reconnect is an **accepted
+dedupe, lost modal answers, the `RunFaulted` notice, the abandon-timer race (R1d-b), and the open-prompt replay (R1d-a). The server replaying on every reconnect is an **accepted
 design** (it cannot tell a refresh from a blip), not a bug.
 
 **User rulings 2026-10-17:** last tab wins and the displaced tab is told; `SessionTakenOver` and `RunMapSnapshot`
 are transport notices outside the event model, like `RunFaulted`; `BattleStarted` gains `PlayerSpeciesId`.
 
-- **R1d-a — an open blocking prompt is not replayed (strands the run).** Ten prompts park the run on a
-  `SignalRInput` handshake and none is cached, so after a refresh *or a blip* the modal never reappears, the server
-  stays parked, and reconnect cancels the abandon timer — the player can only QUIT. **Acceptance:** refresh or blip
-  with any of the ten prompts open → the modal reappears and is answerable and the run continues; an answered
-  prompt never reappears; a replayed shop shows the current balance. **Design:** the emitter caches the open
-  prompt and replays it last; cleared by one `PromptAnswered` hook. **Needs-decision:** design points in the doc.
-  **DoR (V16):** ✗ not Ready — gap **2** only. The doc's R1d-a section answers 3–7 (gen surface none, runtime/web
-  only, quirk "replays exactly while open, never after it is answered; a shop replays the current balance",
-  dependencies none). *Gap 2, drafted:* a short `/plan` ratifies the server design; the client needs nothing new
-  (`expandEvent` → `SHOW_*`). It has no decision of its own.
 - **R1d-c — a second tab on the same `gameId` silently takes over.** **Policy (user 2026-10-17):** last tab wins,
   with the displaced tab told via a `SessionTakenOver` notice that must **not** clear `activeGame` (it is shared
   `localStorage`). **Acceptance:** second tab → first tab shows the notice and returns to Title; the second
@@ -84,7 +73,8 @@ are transport notices outside the event model, like `RunFaulted`; `BattleStarted
   the client's queue lags arrival), plus `PlayerSpeciesId` on `BattleStarted` and a reducer-held
   `playerSpeciesId` (also fixes the post-evolution sprite, §5).
   **DoR:** ✗ not Ready — gaps **2** (provisional-pending-`/plan`; the transport-notice and `PlayerSpeciesId`
-  decisions are made, 2026-10-17) and **7** (sequenced after R1d-a, which shares `ReplayLastKnownState`). 3–6 are in the doc: gen surface none;
+  decisions are made, 2026-10-17); gap 7 is closed (R1d-a, which shares `ReplayLastKnownState`, shipped
+  2026-10-26). It also takes the stale-battle-HP-behind-a-mid-battle-prompt gap R1d-a accepted. 3–6 are in the doc: gen surface none;
   runtime/web plus client; quirk "a blip after three biomes leaves `routePath` unchanged, a refresh restores all
   three".
 - **Test plan** (in the doc): C# unit tests, Vitest, and a new opt-in `reconnect.spec.ts` driven by a Dev-Mode-gated
