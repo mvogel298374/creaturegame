@@ -214,6 +214,18 @@ Each entry: **Decision · Why · Where it lives.**
   reconnect grace survives a transient network drop without losing the run.
 - **Where:** `creaturegame.Web/Battle/GameSessionManager.cs`, `SignalRInput.cs`, `Hubs/BattleHub.cs`.
   **Run loop / event model → `GAME_LOOP.md`.**
+- **Clock (2026-10-26):** the pending-session TTL and the reconnect grace read an injected `TimeProvider`
+  (`TimeProvider.System` unless a test passes one), so `GameSessionLifecycleTests` drive both with
+  `FakeTimeProvider` and no real waits. The grace timer is a `TimeProvider.CreateTimer`, not `Task.Delay` +
+  `ContinueWith`: a fake clock fires a timer callback synchronously inside `Advance`, whereas `Task.Delay`'s
+  continuation would run later on the pool and race the assertion. Reconnect cancels the token, which disposes the
+  timer. The battle holds the armed timer in a field, because a system timer nothing references can be collected
+  before it fires (the fake-clock tests cannot catch that); a natural fire disposes the timer and its token. An
+  unclaimed session is evicted once it is *older than* `PendingSessionTtl` (2 min; strict, so one aged exactly 2 min
+  is kept), checked on each new registration.
+- **Unknown item id (ruled 2026-10-26):** a `UseItem` naming an item not in the run's catalog is answered as FIGHT
+  with the first usable move, the same fallback as an out-of-range move slot. It is intended: only a malformed or
+  stale client sends it, and it never strands the turn handshake.
 - **Hosting corollary (live bug, fixed 2026-07-23):** because session state is a `ConcurrentDictionary` in one
   process — not a shared/external store — the Fly deployment must stay **single-machine**. `flyctl deploy`
   defaults to `--ha=true`, which maintains 2 machines per process group for redundancy; with 2 machines, Fly's

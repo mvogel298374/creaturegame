@@ -8,6 +8,39 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §6 `GameSessionManager` connection lifecycle + the `RunFaulted` server half ✅ DONE (2026-10-26)
+
+M, web host test coverage; was §1 #3 "Server test gaps". The abandon grace, the pending-session eviction TTL and the
+run-loop `Task.Run` were covered by neither suite (wall-clock timers behind `IHubContext` + `Task.Run`). The §2
+"`RunFaulted` server-half test gap" (nothing pinned `SendRunFaulted` or the catch-all call) was folded in here (user,
+2026-10-26). Design and acceptance confirmed by the user 2026-10-26; no `/plan` (a web-host test seam, not a
+generation seam).
+
+- **Acceptance (met):** `tests/creaturegame.Tests/Integration/Web/GameSessionLifecycleTests.cs` (renamed from
+  `AbandonTimerTests.cs`, which already covered the R1d-b timer race) drives each with `FakeTimeProvider`
+  (`Microsoft.Extensions.TimeProvider.Testing` 9.0.0), no real waits:
+  - a pending session evicted at the TTL, plus the strict boundary (aged exactly the TTL is kept);
+  - a disconnected run abandoned after the grace;
+  - a reconnect inside the grace cancels the abandon (the quirk);
+  - a stale connection's detach ignored;
+  - an unknown item id advancing the turn (answered as FIGHT with the first usable move);
+  - a run whose loop throws reaches the connection as `RunFaulted`, `SendRunFaulted` called once, session dropped.
+- **What changed:** `GameSessionManager` takes an optional `TimeProvider` (default `TimeProvider.System`) for the TTL
+  and the grace. The grace timer is a `TimeProvider.CreateTimer` held in an `ActiveBattle` field (a natural fire
+  disposes the timer and its cts). Test seams `ActiveBattleFor` and `ActiveBattle.RunTask` added.
+- **Documented, not changed:** `ARCHITECTURE.md` §2.7 gained "Clock" and "Unknown item id" bullets (the why, the
+  strict TTL boundary, the intended unknown-item fallback).
+- **Gen surface:** none. **Gen 1 source:** n/a. **Data vs runtime:** runtime/web.
+- **Gates:** `format-gate` REFORMATTED then clean; fast suites green; sabotage-verified (three sabotages, each failed
+  exactly its test). `requirements-review` raised three discrepancies, all ruled by the user 2026-10-26: keep and
+  document the unknown-item fallback; keep and document the strict TTL boundary; the TODO staleness goes to
+  `docs-cleanup`. `pr-review` PR-READY twice: the first run's two advisories (hold the root timer in a field; dispose
+  timer and cts on a natural fire) were applied at the user's request; the second run's advisory "`CancelAbandon`
+  never disposes its cts" (pre-existing, harmless) was **waived** by the user 2026-10-26.
+- **Unblocks:** the R1d server tests (TODO §2) can reuse this harness.
+
+---
+
 ## §3.2 Item `Cost` becomes the Gen 1 price; the run derives shop prices and rarity from it ✅ DONE (2026-10-25)
 
 M, importer plus run layer; from V6. PokeAPI no longer serves item prices, so a full re-import failed the items stage

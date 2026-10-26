@@ -12,20 +12,22 @@ namespace creaturegame.Web.Battle;
 public sealed class GameSessionManager(
     IHubContext<BattleHub, IBattleClient> hubContext,
     EncounterFactory encounters,
-    DevModeOptions? devMode = null
+    DevModeOptions? devMode = null,
+    TimeProvider? timeProvider = null
 )
 {
+    private readonly TimeProvider _time = timeProvider ?? TimeProvider.System;
     private readonly ConcurrentDictionary<string, PendingSession> _pending = new(); // gameId → registered, not yet started
     private readonly ConcurrentDictionary<string, ActiveBattle> _active = new(); // gameId → running battle
     private readonly ConcurrentDictionary<string, string> _connToGame = new(); // connectionId → gameId (routing)
 
     // Pending sessions never claimed (client never connected) are evicted after this TTL.
-    private static readonly TimeSpan PendingSessionTtl = TimeSpan.FromMinutes(2);
+    internal static readonly TimeSpan PendingSessionTtl = TimeSpan.FromMinutes(2);
 
     // Reconnect grace after a disconnect, before the battle is abandoned — must outlast the JS client's automatic-
     // reconnect schedule (0/2/10/30 s, so its last attempt fires ~42 s after the drop). Mechanism and the
     // sizing rationale → ARCHITECTURE.md §2.7.
-    private static readonly TimeSpan ReconnectGrace = TimeSpan.FromSeconds(60);
+    internal static readonly TimeSpan ReconnectGrace = TimeSpan.FromSeconds(60);
 
     // The Easy/Normal/Hard RunRules presets — a roguelite dial bag kept out of the Gen-1 IBattleRules seam.
     // Normal reproduces the pre-difficulty-slider numbers exactly (a true no-op). Full rationale + the curve's
@@ -174,7 +176,7 @@ public sealed class GameSessionManager(
             playableBiomes,
             difficulty,
             generation,
-            DateTimeOffset.UtcNow,
+            _time.GetUtcNow(),
             machineMovesBySpecies,
             ForceDraft: forceDraft && devMode?.Enabled == true
         );
@@ -189,7 +191,7 @@ public sealed class GameSessionManager(
 
     private void EvictExpiredPendingSessions()
     {
-        var cutoff = DateTimeOffset.UtcNow - PendingSessionTtl;
+        var cutoff = _time.GetUtcNow() - PendingSessionTtl;
         foreach (var (key, session) in _pending)
             if (session.RegisteredAt < cutoff)
                 _pending.TryRemove(key, out _);
@@ -238,6 +240,7 @@ public sealed class GameSessionManager(
             Wallet = session.Wallet,
             ItemsById = session.AllItems.ToDictionary(i => i.Id),
             Generation = session.Generation,
+            Time = _time,
         };
 
         // Held on the battle so the reconnect branch above re-echoes through the same instance (ARCHITECTURE.md
@@ -282,7 +285,7 @@ public sealed class GameSessionManager(
         _active[gameId] = battle;
         _connToGame[connectionId] = gameId;
 
-        _ = Task.Run(async () =>
+        battle.RunTask = Task.Run(async () =>
         {
             try
             {
@@ -395,6 +398,10 @@ public sealed class GameSessionManager(
     /// exercised through the full endpoint. Null for an unknown or not-yet-active game.</summary>
     internal Party? ActivePartyFor(string gameId) =>
         _active.TryGetValue(gameId, out var battle) ? battle.Party : null;
+
+    /// <summary>Test seam: the running battle behind a game, or null.</summary>
+    internal ActiveBattle? ActiveBattleFor(string gameId) =>
+        _active.TryGetValue(gameId, out var battle) ? battle : null;
 
     /// <summary>The generation a run is being played under, or null if the gameId is unknown. Resolved in the
     /// same active-then-pending order as <see cref="GetPlayerCreature"/>, so a caller that needs both gets a
@@ -759,8 +766,12 @@ sealed class ActiveBattle
     // own consumers, e.g. AttackAction, which never see this type).
     public SignalRBattleEventEmitter? Emitter;
 
+    public TimeProvider Time { get; init; } = TimeProvider.System;
+    public Task? RunTask;
+
     private readonly object _lock = new();
     private CancellationTokenSource? _abandonCts;
+    private ITimer? _abandonTimer;
 
     /// <summary>Arm a timer that abandons the battle after <paramref name="grace"/> unless a reconnect cancels it.</summary>
     public CancellationTokenSource ScheduleAbandon(TimeSpan grace)
@@ -770,8 +781,14 @@ sealed class ActiveBattle
             _abandonCts?.Cancel();
             var cts = new CancellationTokenSource();
             _abandonCts = cts;
-            _ = Task.Delay(grace, cts.Token)
-                .ContinueWith(_ => OnGraceElapsed(cts), TaskScheduler.Default);
+            var timer = Time.CreateTimer(
+                _ => OnGraceElapsed(cts),
+                null,
+                grace,
+                Timeout.InfiniteTimeSpan
+            );
+            _abandonTimer = timer;
+            cts.Token.Register(timer.Dispose);
             return cts;
         }
     }
@@ -784,6 +801,9 @@ sealed class ActiveBattle
                 return;
             _abandonCts = null;
             Input.Cancel();
+            _abandonTimer?.Dispose();
+            _abandonTimer = null;
+            cts.Dispose();
         }
     }
 
@@ -793,6 +813,7 @@ sealed class ActiveBattle
         {
             _abandonCts?.Cancel();
             _abandonCts = null;
+            _abandonTimer = null;
         }
     }
 }

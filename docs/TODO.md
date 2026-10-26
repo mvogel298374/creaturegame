@@ -42,8 +42,7 @@
 
 | # | Item | Cost | Ready? (DoR) | Why this slot / what it unblocks |
 |:-:|:-----|:----:|:-------------|:---------------------------------|
-| 1 | **`-StartStack` backend leak** (§7.1 Part A) | S | ✗ parked: leak not reproduced (2026-10-10); un-park condition in §7.1 | Parts B and C are done. Not actionable until the user reproduces it; §1 #3 and #6 do not wait on it. |
-| 3 | **Server test gaps — `GameSessionManager` lifecycle + the `RunFaulted` path** (§6) | M | ⚠️ needs the injectable-clock design (V16 drafted `TimeProvider` and the acceptance list) | Unblocks the R1d tests and closes a long-open Tier-4 item. |
+| 1 | **`-StartStack` backend leak** (§7.1 Part A) | S | ✗ parked: leak not reproduced (2026-10-10); un-park condition in §7.1 | Parts B and C are done. Not actionable until the user reproduces it; §1 #6 does not wait on it. |
 | 5 | **R1d-a — replay an open blocking prompt** (§2) | M | ⚠️ designed, but provisional-pending-`/plan`; V16: that is the only gap (a short server-side `/plan`), with no decision of its own | The only reconnect item that strands a run; highest player value. |
 | 6 | **CI E2E step** (§6) | M | ✗ no design (runner, stack boot, caching) or acceptance | The only automatic E2E coverage; makes "agents don't run E2E" safe, and unblocks checking the reconnect spec. |
 | 7 | **R1d-d, R1d-c** — refresh-state snapshot + sprite; second-tab policy (§2) | M each | ⚠️ provisional-pending-`/plan` (decisions made 2026-10-17) | Both extend (a)'s replay work. |
@@ -92,13 +91,9 @@ are transport notices outside the event model, like `RunFaulted`; `BattleStarted
   `DropConnection` hub method. It also closes three open verification gaps: replay-after-blip has never been
   checked in a browser; the `useBattleHub` wiring of `replayDedupe` is untested (only the pure helper is); the 60 s
   grace rests on SignalR's documented 0/2/10/30 s schedule, not a measured run.
-  **DoR (V16):** part of R1d-a/c/d, not a separate item.
-- **`RunFaulted` server-half test gap** — nothing pins `SendRunFaulted` or the `GameSessionManager` catch-all call
-  (the client handler's mapping is covered by R1d-c's `transportNotices` extraction).
-  **DoR (V16):** ✗ not Ready — gaps **1, 7**. *Drafted:* fold into §6 "`GameSessionManager` connection lifecycle"
-  (same class, same harness). Acceptance: a run whose loop throws reaches the connection as `RunFaulted`, and the
-  catch-all calls `SendRunFaulted` once. Gen surface none; Gen 1 source n/a; runtime/web; no quirk; depends on that
-  entry's test harness.
+  **DoR (V16):** part of R1d-a/c/d, not a separate item. The server-side test harness now exists:
+  `GameSessionLifecycleTests` drives `GameSessionManager` with an injected `FakeTimeProvider` (`ActiveBattleFor`,
+  `ActiveBattle.RunTask`); the R1d server tests build on it.
 
 ---
 
@@ -641,25 +636,6 @@ surface: `/help` and the explainer describe the active generation, so they are p
   - **Dependencies:** share setup with §7.1 "Run the fast suites before deploying"; design both together.
   - **Gen surface:** none.
   - **Data vs runtime:** CI only.
-- [ ] **`GameSessionManager` connection lifecycle** (M) — abandon grace, pending-session eviction TTL and the
-  run-loop `Task.Run` are covered by neither suite (entangled with `IHubContext` + `Task.Run` + wall-clock timers;
-  needs an injectable clock). Also untested: `SetItemChoice`'s unknown-id fallback (`:457-464`), `DetachConnection`'s
-  stale-connection guard (`:679-680`) — reachable without SignalR, and the paths behind §2.
-  (`ActiveBattle.ScheduleAbandon`/`OnGraceElapsed`/`CancelAbandon`, `:765-796`, are now covered by `AbandonTimerTests`.)
-  **DoR (V16):** ✗ not Ready — gaps **1, 2, 6**. Cites re-checked 2026-10-17: the fallback is at `:457-462` and the
-  stale guard at `:679-680`. *Drafted:*
-  - **Design:** an injectable clock seam (`TimeProvider`, built into .NET 8+) threaded into the grace and eviction
-    timers.
-  - **Acceptance:** tests drive each of these with a fake clock, with no real waits:
-    - a pending session evicted at the TTL;
-    - a disconnected run abandoned after the grace;
-    - an unknown item id advancing the turn;
-    - a stale connection's detach ignored;
-    - the `RunFaulted` server half (folded in from §2).
-  - **Quirk:** a reconnect inside the grace cancels the abandon.
-  - **Gen surface:** none.
-  - **Data vs runtime:** runtime/web.
-  - **Dependencies:** none.
 - [ ] *(small)* **`voluntary-switch.spec.ts` is still slow (~3 min standalone).** Its seed walk forces a themed draft
   via `forceDraft` yet still burns several seeds before reaching a switchable turn; investigate why seeds 1–3 fail
   even with the draft forced (e.g. battle-one losses) or give the walk a faster-fail path.
