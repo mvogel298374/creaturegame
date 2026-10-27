@@ -1,6 +1,6 @@
 # RECONNECT_RESILIENCE.md — the remaining reconnect work, designed (2026-10-03)
 
-> **Status: R1d-a BUILT (2026-10-26), R1d-d and R1d-e BUILT (2026-10-27); their sections below are the design records;
+> **Status: R1d-a BUILT (2026-10-26), R1d-d, R1d-e and R1d-f BUILT (2026-10-27); their sections below are the design records;
 > R1d-c provisional-pending-`/plan`.** Written from a read of the code on 2026-10-03, not from the
 > review sweep's text. The frontend half of c is provisional until its `/plan` pass (DoR #2). The c task entry and
 > acceptance conditions live in `TODO.md` → *Reliability — reconnect*; R1d-a's and R1d-d's are in `TODO_ARCHIVE.md` → *§2 R1d-a*, *§2 R1d-d*;
@@ -225,6 +225,46 @@ The sections below are the design record; the as-built list is `TODO_ARCHIVE.md`
   (`reconnectReplay.test.ts`); `onRestore` fires only on a restore (`answerPrompt.test.ts`). The browser blip check
   is R1d-f's.
 
+## R1d-f. Blip test tooling — BUILT (2026-10-27)
+
+- **What was missing.** Replay-after-blip had never been checked in a browser: a refresh is `page.reload()`, but
+  nothing could drop a live connection on cue, and `context.setOffline` waits out SignalR's 30 s client timeout.
+- **Design.** `BattleHub.DropConnection` cuts the transport with `Context.GetHttpContext()?.Abort()`; with Dev Mode
+  off it throws a `HubException` ("Method does not exist."), the hub's equivalent of `DevController`'s 404.
+  `useBattleHub` exposes `window.__cgHub` only when `E2E` is true: `drop()` invokes the method (its rejection, from
+  the abort itself, is swallowed), `reconnects` counts `onreconnected`, and `events` records every received event
+  type. The effect's cleanup removes it, so a torn-down connection is never driven.
+- **Why not `Context.Abort()`** (the confirmed draft; switched by user ruling 2026-10-27 after the first E2E run).
+  Since .NET 5 a server-initiated hub abort sends a close message with reconnecting forbidden (`HubConnectionContext`
+  keeps an `_allowReconnect` flag, cleared by `Abort()`), and the JS client obeys: no reconnect, `onclose` fires,
+  and `useBattleHub` bounces to Title ("Couldn't connect to the run"). Both blip scenarios failed that way, with
+  `reconnects` at 0. Aborting the HTTP context drops the WebSocket with no close message, which the client treats as
+  a lost connection, exactly what a network blip is.
+- **How the spec knows the replay landed.** A reconnect fires `onreconnected` before the server's
+  `OnConnectedAsync` replay arrives, so the spec waits for the replay's last event in `events` (`TurnStarted`
+  mid-battle, the open prompt otherwise; `ReplayLastKnownState` sends them in that order). Arrival is not
+  application: replayed steps still play through the animation queue. So the battle scenario plays a move and
+  checks only once that move's "used" line is drawn and the menu is back: every replayed step queues ahead of the
+  turn's, so a re-announced battle (a VS line) or biome ("Entered …") would sit before it, and the replayed
+  `RunMapSnapshot` has applied before the pin is read. A faint in that turn would move the pin legitimately, so the
+  spec asserts none happened (a loud failure if seed 1 ever changes outcome, never a skipped check). Reading the pin
+  right after arrival was rejected by requirements-review: it could pass before the snapshot applied (user ruling
+  2026-10-28).
+- **Seam scope** (ratified by the user 2026-10-28): wider than the confirmed `dropConnection`, because
+  `onreconnected` fires before the replay arrives and the spec must see the replay land without sleeping. Its
+  `events` list is unbounded; that is fine in an E2E session only.
+- **Scenarios** (`reconnect.spec.ts`, opt-in): a blip mid-battle → `BattleStarted` *was* replayed (so the pass
+  proves the client's skip, not a silent server), no new VS or "Entered" line before the next move, the move
+  resolves, the pin unchanged; a blip with the reward choice open → no `BattleStarted` in the replay, the
+  modal stays and is answerable, the run continues. R1d-e's "intro logged once" is pinned in Vitest only.
+  *Waived (user 2026-10-28):* a client VS-line check and a pin check in the reward scenario. The client logs a VS
+  line only for a replayed `BattleStarted`, which the spec already proves was not sent; the pin bullet is covered by
+  the mid-battle scenario, and a sound pin read here would have no move to sync on.
+- **Not covered:** the 60 s grace (an immediate retry never nears it; user ruling 2026-10-27).
+- **Tests.** C#: `DevModeTests.DropConnectionCutsTheTransportOnlyUnderDevMode_NeverTheReconnectForbiddingHubAbort`
+  (Dev Mode off → throws, nothing aborted; on → the transport is aborted, the hub-level `Abort()` never called).
+  Browser: the two scenarios above, run on request.
+
 ## Test plan (covers a, c, d and the open verification gaps)
 
 - **Unit (C#, `SessionResumeTests` style):** open prompt cached/replayed last and in order; replaced by the next
@@ -242,7 +282,10 @@ The sections below are the design record; the as-built list is `TODO_ARCHIVE.md`
   no second "new challenger", move menu live; (3) **second tab** → first tab shows the notice, `activeGame` kept;
   (4) refresh mid-first-biome after two nodes → the ladder pin is intact (ships with R1d-d; a second-biome trail is
   left to C#/Vitest, a biome-deep walk). A deterministic blip needs a **Dev-Mode-gated hub method**
-  `DropConnection` that calls `Context.Abort()` (the client sees an abnormal close and its automatic reconnect runs
-  — `context.setOffline` would wait out SignalR's 30 s client timeout). Gate it exactly like `forceDraft`: the
+  `DropConnection` that cuts the transport (`HttpContext.Abort()`, not `Context.Abort()` — see R1d-f) so the client
+  sees a dropped socket and its automatic reconnect runs — `context.setOffline` would wait out SignalR's 30 s client
+  timeout. Gate it exactly like `forceDraft`: the
   client can ask, only a Dev-Mode server grants (`ARCHITECTURE.md` §2.7).
-- **Closes** the two verification gaps (no browser check of replay-after-blip; `useBattleHub` wiring untested) and the 60 s-grace measurement (the `DropConnection` blip can be timed against the real schedule).
+- **Closes** the two verification gaps (no browser check of replay-after-blip; the hook's receive side untested in a
+  browser). It does **not** measure the 60 s grace: the cut transport is answered by SignalR's immediate (0 s) retry,
+  so measuring the grace needs the reconnects blocked for ≈42 s, a separate spec (user ruling 2026-10-27, R1d-f).

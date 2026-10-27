@@ -8,6 +8,44 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §2 R1d-f — blip test tooling ✅ DONE (2026-10-28)
+
+S–M, reliability (test tooling); was §1 #7c / §2 "R1d-f". A deterministic blip for the browser suite: a Dev-Mode-gated
+`DropConnection` hub method cutting the transport (gated like `forceDraft`: the client asks, only a Dev-Mode server
+grants), reached from Playwright through an E2E-only hook, plus blip scenarios in `reconnect.spec.ts`. DoR confirmed by
+the user 2026-10-27 with three amendments; the design record stays in `RECONNECT_RESILIENCE.md` → R1d-f.
+
+- **Acceptance (met):** a blip mid-battle → no second "new challenger", the move menu is live, the ladder pin
+  unchanged (R1d-d); a blip with the reward choice open → the modal stays and is answerable, no second "new
+  challenger". The reward choice is the one prompt a first battle reaches (by seed walk, as the R1d-a spec does);
+  R1d-e's "intro logged once" for the recovery / move-replacement / evolution prompts stays pinned in Vitest
+  (`reconnectReplay.test.ts`). *Amended 2026-10-27:* no grace timing — the cut transport is answered by SignalR's
+  immediate (0 s) retry, so this blip never exercises the 60 s grace.
+- **What changed:**
+  - `BattleHub.DropConnection` cuts the transport with `Context.GetHttpContext()?.Abort()`; Dev Mode off → a
+    `HubException` (the hub's equivalent of `DevController`'s 404), so production never offers it
+    (`ARCHITECTURE.md` §2.7). *Amended 2026-10-27 after the first E2E run:* `Context.Abort()` closes with reconnecting
+    forbidden (.NET 5+), so the client gave up and bounced to Title; aborting the HTTP context drops the socket like a
+    network blip.
+  - `useBattleHub` exposes `window.__cgHub` only when `E2E` is true (`testEnv.ts`): `drop()`, `reconnects` (counts
+    `onreconnected`), `events` (every received event type); removed on effect cleanup. *Widened from `dropConnection`
+    alone, ratified 2026-10-28:* `onreconnected` fires before the replay arrives, so the spec must see the replay land
+    without sleeping.
+  - Tests: C# `DevModeTests.DropConnectionCutsTheTransportOnlyUnderDevMode_NeverTheReconnectForbiddingHubAbort`; two
+    scenarios in `reconnect.spec.ts` (opt-in), both run and passing by the user.
+- **User decisions (2026-10-28, requirements-review):** seam widening ratified; the pin read moved after the move
+  resolves (a read at replay arrival could precede the snapshot); a client VS-line check and a pin check in the reward
+  scenario waived (the VS line is logged only for a replayed `BattleStarted`, which the spec proves was not sent; a
+  sound pin read there has no move to sync on); the play-helper hang found along the way filed as a new §6 entry
+  ("E2E play helper hangs when the move grid is left open").
+- **Closed:** the replay-after-blip browser gap and the hook's receive-side (`OnBattleEvent` → `intakeEvent`) gap.
+  **Still open:** the 60 s grace is unmeasured (rests on SignalR's 0/2/10/30 s schedule); measuring it needs the
+  reconnects blocked for ≈42 s, a separate spec, not filed.
+- **Gen surface:** none. **Gen 1 source:** n/a. **Data vs runtime:** web + client test mode.
+- **Moved on:** R1d-c's replay touch-points now have blip tooling to build on.
+
+---
+
 ## §2 R1d-e — a blip no longer re-logs a replayed prompt's intro ✅ DONE (2026-10-27)
 
 S, reliability (cosmetic); was §1 #7b / §2 "R1d-e". R1d-a replays the open prompt on every reconnect. After a blip the

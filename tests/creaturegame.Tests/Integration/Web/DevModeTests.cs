@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using System.Text.Json;
 using creaturegame.Attacks;
 using creaturegame.Combat;
@@ -7,7 +8,12 @@ using creaturegame.Items;
 using creaturegame.Tests.TestSupport;
 using creaturegame.Web.Battle;
 using creaturegame.Web.Controllers;
+using creaturegame.Web.Hubs;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http.Connections.Features;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 
 namespace creaturegame.Tests.Integration.Web;
 
@@ -201,6 +207,73 @@ public class DevModeTests
         finally
         {
             gate.Set();
+        }
+    }
+
+    // ── The E2E blip (docs/RECONNECT_RESILIENCE.md R1d-f) ──────────────────────────────────────────────────
+
+    private sealed class RecordingLifetime : IHttpRequestLifetimeFeature
+    {
+        public bool Aborted { get; private set; }
+        public CancellationToken RequestAborted { get; set; }
+
+        public void Abort() => Aborted = true;
+    }
+
+    // A hub caller over a real HttpContext whose transport abort is recorded; a hub-level Abort() is recorded apart.
+    private sealed class BlipContext : HubCallerContext
+    {
+        public RecordingLifetime Transport { get; } = new();
+        public bool HubAborted { get; private set; }
+        public override string ConnectionId => "conn-1";
+        public override string? UserIdentifier => null;
+        public override ClaimsPrincipal? User => null;
+        public override IDictionary<object, object?> Items { get; } =
+            new Dictionary<object, object?>();
+        public override IFeatureCollection Features { get; } = new FeatureCollection();
+        public override CancellationToken ConnectionAborted => CancellationToken.None;
+
+        public BlipContext()
+        {
+            var http = new DefaultHttpContext();
+            http.Features.Set<IHttpRequestLifetimeFeature>(Transport);
+            Features.Set<IHttpContextFeature>(new HttpContextFeature { HttpContext = http });
+        }
+
+        public override void Abort() => HubAborted = true;
+    }
+
+    private sealed class HttpContextFeature : IHttpContextFeature
+    {
+        public HttpContext? HttpContext { get; set; }
+    }
+
+    [Fact]
+    public async Task DropConnectionCutsTheTransportOnlyUnderDevMode_NeverTheReconnectForbiddingHubAbort()
+    {
+        var off = new BlipContext();
+        var offHub = new BattleHub(NewManager(out var offGate), new DevModeOptions(false))
+        {
+            Context = off,
+        };
+        var on = new BlipContext();
+        var onHub = new BattleHub(NewManager(out var onGate), new DevModeOptions(true))
+        {
+            Context = on,
+        };
+        try
+        {
+            await Assert.ThrowsAsync<HubException>(offHub.DropConnection);
+            Assert.False(off.Transport.Aborted);
+
+            await onHub.DropConnection();
+            Assert.True(on.Transport.Aborted);
+            Assert.False(on.HubAborted);
+        }
+        finally
+        {
+            offGate.Set();
+            onGate.Set();
         }
     }
 

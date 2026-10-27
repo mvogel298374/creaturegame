@@ -45,7 +45,6 @@
 | 1 | **`-StartStack` backend leak** (§7.1 Part A) | S | ✗ parked: leak not reproduced (2026-10-10); un-park condition in §7.1 | Parts B and C are done. Not actionable until the user reproduces it; §1 #6 does not wait on it. |
 | 6 | **CI E2E step** (§6) | M | ✗ no design (runner, stack boot, caching) or acceptance | The only automatic E2E coverage; makes "agents don't run E2E" safe, and unblocks checking the reconnect spec. |
 | 7 | **R1d-c — second-tab policy** (§2) | M | ⚠️ provisional-pending-`/plan` (decisions made 2026-10-17) | Extends the same replay touch-points. |
-| 7c | **R1d-f — blip test tooling** (`DropConnection` + blip E2E) (§2) | S–M | ✗ gaps 1, 2: confirm the drafted text | Closes the replay-after-blip verification gaps; serves R1d-c too. |
 | 8 | **Gen 1 fidelity — the damage/accuracy core** (§3.1) | L | ✗ needs the Gen 1 source per claim, the seam surface, and the quirks to pin | Verify-first; large blast radius (it touches every damage number). |
 | 9 | **End-of-turn residual phase** (§4.2) | L | ✗ needs a `/plan` | A `/plan`, `opus-engineer`, and both review gates; rewrites `Battle`'s turn loop. |
 | 10 | **Features** — Catch, `save.db`, progressive difficulty, Generation Profile 4d+, … (§4) | L | ✗ each needs a `/plan` | Catch and stone evolutions are unblocked by the bag-scope ruling (`ARCHITECTURE.md` §2.12); `save.db` is declined for now. |
@@ -55,7 +54,7 @@
 ## 2. Reliability — reconnect (designed in [`RECONNECT_RESILIENCE.md`](RECONNECT_RESILIENCE.md); c provisional-pending-`/plan`)
 
 Verified in code 2026-10-03. Fixed and archived already: the flee stale-cache, the 60 s grace, the client replay
-dedupe, lost modal answers, the `RunFaulted` notice, the abandon-timer race (R1d-b), and the open-prompt replay (R1d-a), the refresh snapshot and sprite (R1d-d), the blip prompt-log duplicates (R1d-e). The server replaying on every reconnect is an **accepted
+dedupe, lost modal answers, the `RunFaulted` notice, the abandon-timer race (R1d-b), and the open-prompt replay (R1d-a), the refresh snapshot and sprite (R1d-d), the blip prompt-log duplicates (R1d-e), the blip test tooling (R1d-f). The server replaying on every reconnect is an **accepted
 design** (it cannot tell a refresh from a blip), not a bug.
 
 **User rulings 2026-10-17:** last tab wins and the displaced tab is told; `SessionTakenOver` is a transport notice
@@ -68,21 +67,10 @@ outside the event model, like `RunFaulted` (and the built `RunMapSnapshot`).
   **DoR:** ✗ not Ready — gap **2** only (the provisional client half needs its `/plan`; the policy and
   transport-notice decisions are made). 3–7 are in the doc: gen surface none; runtime/web plus a small client
   change; quirk "a plain refresh never shows the notice, and `activeGame` survives"; dependencies none.
-- **R1d-f — blip test tooling.** A deterministic blip for the browser suite: a Dev-Mode-gated `DropConnection` hub
-  method calling `Context.Abort()` (gated like `forceDraft`: the client asks, only a Dev-Mode server grants), reached
-  from Playwright through a test-mode-only hook, plus blip scenarios in `reconnect.spec.ts`.
-  **DoR:** ✗ not Ready — gaps **1** and **2** (confirm the drafted text). *Drafted:*
-  - **Acceptance:** a blip mid-battle → no second "new challenger", the move menu is live; a blip with a prompt open
-    → the modal stays and is answerable (R1d-e, built: its intro is logged once); a blip → the ladder pin is
-    unchanged (R1d-d, built). Also times the 60 s grace against SignalR's real reconnect schedule.
-  - **Design:** the hub method and its Dev-Mode gate (`ARCHITECTURE.md` §2.7); the client exposes `dropConnection` on
-    `window` only under `?e2e=1` (`testEnv.ts`).
-  - **Gen surface:** none. **Gen 1 source:** n/a. **Data vs runtime:** web + client test mode. **Quirk:** "a blip
-    never re-announces a battle, duplicates the route, or loses an open prompt". **Dependencies:** R1d-d and R1d-e (both built).
-- **Test plan** (in the doc): C# unit tests, Vitest, and a new opt-in `reconnect.spec.ts` driven by a Dev-Mode-gated
-  `DropConnection` hub method. It also closes three open verification gaps: replay-after-blip has never been
-  checked in a browser; the `useBattleHub` wiring of `replayDedupe` is untested (only the pure helper is); the 60 s
-  grace rests on SignalR's documented 0/2/10/30 s schedule, not a measured run.
+- **Test plan** (in the doc): C# unit tests, Vitest, and the opt-in `reconnect.spec.ts` (refresh and blip scenarios,
+  built; the second-tab scenario ships with R1d-c). One verification gap stays open: the 60 s grace rests on
+  SignalR's documented 0/2/10/30 s schedule, not a measured run; measuring it needs the reconnects blocked for
+  ≈42 s, a separate spec, not filed.
   **DoR (V16):** part of R1d-a/c/d, not a separate item. The server-side test harness now exists:
   `GameSessionLifecycleTests` drives `GameSessionManager` with an injected `FakeTimeProvider` (`ActiveBattleFor`,
   `ActiveBattle.RunTask`); the R1d server tests build on it.
@@ -644,6 +632,18 @@ surface: `/help` and the explainer describe the active generation, so they are p
   Acceptance (drafted):
   the ALLOW case asserts the evolved name in the nameplate before the next `BattleStarted`. Gen surface none; test
   only; no dependencies.
+- [ ] **E2E play helper hangs when the move grid is left open** (S, found 2026-10-28 during R1d-f; filed by user
+  ruling). If `chooseBestMove` / `chooseMove` leaves `.move-grid` open without picking a move (seen with BULBASAUR
+  deep in a run, likely around SOLAR BEAM's charge turn; unconfirmed from the trace), `playCurrentRunUntil`'s next
+  pass clicks the hidden FIGHT button and waits out the whole test timeout instead of failing.
+  **DoR:** ✗ not Ready — gap **2**: the design waits on confirming the trigger.
+  - **Acceptance:** a left-open grid is closed (BACK) or its move picked on the next pass; a spec never waits on a
+    hidden FIGHT button; a BULBASAUR run plays through a charge turn.
+  - **Design (pending):** first confirm the trigger from the trace (`test-results/reconnect-…-chromium/trace.zip`
+    of the 2026-10-28 BULBASAUR run, if still on disk); then the helper checks for an open grid before clicking FIGHT.
+  - **Gen surface:** none. **Gen 1 source:** n/a (the client's handling of a two-turn move, not the mechanic).
+    **Data vs runtime:** E2E helpers only. **Quirk:** "a charge turn never strands the play loop".
+    **Dependencies:** none.
 - **Flake watch:** `endless-chain.spec.ts` *"a run ends when the player faints"* failed once in a full 2026-07-26 run
   (no `Run over` line after 1m10s) but passes in 7.3 s alone — consistent with the documented "a long run
   accumulates abandoned server-side runs" degradation, not a code defect.

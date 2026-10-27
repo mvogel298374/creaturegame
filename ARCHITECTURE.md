@@ -335,6 +335,13 @@ Each entry: **Decision · Why · Where it lives.**
     `BattleEnded` (a flee emits no `BattleEnded`, so the finished battle used to be revived with a dead move
     menu). `ReconnectGrace` is 60 s, sized to outlast the client's `withAutomaticReconnect()` default schedule
     (0/2/10/30 s → last attempt ≈42 s after the drop), which the old 40 s did not.
+  - **E2E blips the connection through a Dev-Mode hub method.** `BattleHub.DropConnection` cuts the transport
+    (`HttpContext.Abort()`; a hub-level `Context.Abort()` closes with reconnecting forbidden, so the client would
+    give up instead); with Dev Mode off it throws a `HubException` worded like a missing method, so production
+    never offers it. The client reaches it only under `?e2e=1` (`window.__cgHub`, `useBattleHub`), which also
+    counts finished reconnects and records received event types so a spec can wait for the replay to land. A
+    server-side abort, not `context.setOffline`, which would wait out SignalR's 30 s client timeout
+    (`RECONNECT_RESILIENCE.md` R1d-f).
   - **E2E reaches a party of two by a Dev-Mode `forceDraft`, not by a seed walk.** A themed draft is the only way
     the party grows past one, and it is gated on every 3rd win × a 55% roll (`DraftCalculator`). A spec that needs
     a switchable turn (`voluntary-switch.spec.ts`) therefore walked seeds hoping one survived to win 3 and rolled

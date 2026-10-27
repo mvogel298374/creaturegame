@@ -8,6 +8,7 @@ import { clearActiveGame } from '../utils/activeGame';
 import { submitTrackedPromptAnswer } from './answerPrompt';
 import { PROMPT_ANSWERS, type PromptRoute } from './promptAnswers';
 import type { PromptKey } from './battleReducer';
+import { E2E } from '../testEnv';
 
 // The view-state shape + modal-prompt types live with the reducer now; re-export them so existing
 // consumers (BattleScreen) keep importing them from the hook.
@@ -57,7 +58,13 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
       .withAutomaticReconnect()
       .build();
 
+    // E2E seam: a server-side abort the reconnect answers, finished reconnects, and every event received (R1d-f).
+    const seam = E2E
+      ? { reconnects: 0, events: [] as string[], drop: () => { conn.invoke('DropConnection').catch(() => {}); } }
+      : null;
+
     conn.on('OnBattleEvent', (eventType: string, payload: Payload) => {
+      seam?.events.push(eventType);
       // Server-side run crash (GameSessionManager's catch-all): the session is gone, so leave like a failed resume.
       if (eventType === 'RunFaulted') {
         clearActiveGame();
@@ -128,8 +135,15 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
       .catch(bounceForFailedConnection);
     connRef.current = conn;
 
+    if (seam) {
+      conn.onreconnected(() => { seam.reconnects++; });
+      (window as unknown as { __cgHub?: typeof seam }).__cgHub = seam;
+    }
+
     return () => {
       torndown = true;
+      const w = window as unknown as { __cgHub?: typeof seam };
+      if (seam && w.__cgHub === seam) delete w.__cgHub;
       conn.stop();
       connRef.current = null;
     };

@@ -299,7 +299,11 @@ the linked design doc instead — pull it there and leave only the pointer here.
   with dev off the server never sends them.
 - Test support: with dev mode enabled server-side, a seeded start with `?forceDraft=1` makes every win offer a
   themed draft (cadence and roll skipped; the fought-pool limit still applies). Ignored when dev mode is off.
-- Design detail / rationale → `TODO_ARCHIVE.md` → *Dev Mode* (no separate design doc).  History → same entry.
+- Test support: with dev mode enabled server-side, the hub method `DropConnection` cuts the caller's transport so
+  the client reconnects as after a network blip; with dev mode off it throws a `HubException`. The browser offers it
+  only to the E2E suite (`window.__cgHub`).
+- Design detail / rationale → `TODO_ARCHIVE.md` → *Dev Mode* (no separate design doc); `DropConnection` →
+  `RECONNECT_RESILIENCE.md` R1d-f and `TODO_ARCHIVE.md` → *§2 R1d-f*.  History → same entries.
 
 ### Session resume (refresh/reopen survival)
 - Refreshing, closing/reopening the tab, or reloading a bookmarked `/battle` URL during a run does not lose it:

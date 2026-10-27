@@ -157,7 +157,10 @@ npx playwright show-report                    # last HTML report (only if it was
 - Loading the app with **`?e2e=1`** (what `startBattle` does) puts it in test mode —
   `src/testEnv.ts` reads the param at load. In test mode the app:
   - exposes the Phaser bridge and **records every bridge event** on `window.__cgEvents`
-    (so specs assert animation ordering, e.g. lunge-before-hit), and
+    (so specs assert animation ordering, e.g. lunge-before-hit),
+  - exposes **`window.__cgHub`**: `drop()` asks the server to abort the hub connection (a
+    deterministic blip; honoured only under Dev Mode), plus `reconnects` and every received
+    event type, so `reconnect.spec.ts` can wait for the replay to land (R1d-f), and
   - **collapses animation delays** (and shortens the animation-complete wait) so battles
     play through fast while step ordering is preserved.
   Specs therefore import straight from `@playwright/test` (no custom fixture), which keeps

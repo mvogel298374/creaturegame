@@ -10,7 +10,7 @@ namespace creaturegame.Web.Hubs;
 /// method. A malformed/out-of-range answer is never fatal — the engine falls back rather than stranding the
 /// turn (exact fallback noted per method where it isn't the obvious "first option").
 /// </summary>
-public class BattleHub(GameSessionManager manager) : Hub<IBattleClient>
+public class BattleHub(GameSessionManager manager, DevModeOptions devMode) : Hub<IBattleClient>
 {
     public override async Task OnConnectedAsync()
     {
@@ -141,6 +141,16 @@ public class BattleHub(GameSessionManager manager) : Hub<IBattleClient>
     public Task ChooseSwitch(int index)
     {
         manager.SetSwitchChoice(Context.ConnectionId, index);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Dev Mode only: cuts the transport, the E2E blip (docs/RECONNECT_RESILIENCE.md R1d-f).</summary>
+    public Task DropConnection()
+    {
+        if (!devMode.Enabled)
+            throw new HubException("Method does not exist.");
+        // Not Context.Abort(): that closes with "no reconnect", so the client gives up instead of reconnecting.
+        Context.GetHttpContext()?.Abort();
         return Task.CompletedTask;
     }
 
