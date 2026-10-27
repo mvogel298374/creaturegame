@@ -90,6 +90,7 @@ public class Battle
             new BattleStarted(
                 PlayerCreature.Name,
                 PlayerCreature.Id,
+                PlayerCreature.SpeciesId,
                 EnemyCreature.Name,
                 EnemyCreature.Id,
                 EnemyCreature.SpeciesId,

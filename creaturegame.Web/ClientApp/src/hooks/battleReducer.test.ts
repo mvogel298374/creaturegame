@@ -83,12 +83,12 @@ describe('battleReducer — same-named creatures', () => {
   it('a benched twin evolving does not rename the on-field creature', () => {
     // BattleRunEvent offers evolution to every member that levelled; CREATURE_RENAMED used to be guarded only on
     // the OLD name matching the lead's, which a same-named bench member also satisfied.
-    const next = battleReducer(twins(), { type: 'CREATURE_RENAMED', id: 8, toName: 'PIDGEOTTO' });
+    const next = battleReducer(twins(), { type: 'CREATURE_RENAMED', id: 8, toName: 'PIDGEOTTO', toSpeciesId: 17 });
     expect(next.playerName).toBe('PIDGEY');
   });
 
   it('the on-field creature evolving does rename it, even with a same-named twin on the bench', () => {
-    expect(battleReducer(twins(), { type: 'CREATURE_RENAMED', id: 4, toName: 'PIDGEOTTO' }).playerName).toBe('PIDGEOTTO');
+    expect(battleReducer(twins(), { type: 'CREATURE_RENAMED', id: 4, toName: 'PIDGEOTTO', toSpeciesId: 17 }).playerName).toBe('PIDGEOTTO');
   });
 
   it('a wild creature sharing the player\'s name gets its own HP and status, not the player\'s', () => {
@@ -105,7 +105,7 @@ describe('battleReducer — same-named creatures', () => {
   it('LEAD_CHANGED retargets onto the twin that was promoted, not the first roster row with that name', () => {
     // Old lead (id 4, HP 10) is row 0; the promoted twin (id 8, HP 5) is row 1. A name lookup finds row 0 and
     // silently keeps the HUD on the outgoing creature.
-    const next = battleReducer(twins(), { type: 'LEAD_CHANGED', id: 8, name: 'PIDGEY' });
+    const next = battleReducer(twins(), { type: 'LEAD_CHANGED', id: 8, name: 'PIDGEY', speciesId: 16 });
     expect(next.playerId).toBe(8);
     expect(next.playerHp).toBe(5);
   });
@@ -227,11 +227,12 @@ describe('battleReducer — phase transitions', () => {
     // (enemyHp/enemyMaxHp = 1), not the old empty bar, until the next TURN_STARTED fills real values.
     const s = ready({ enemyHp: 0, enemyStatus: 'Poison' });
     const next = battleReducer(s, {
-      type: 'BATTLE_STARTED', playerName: 'PIKACHU', playerId: 5, enemyName: 'PIDGEY', enemyId: 6, enemySpeciesId: 16, enemyLevel: 8,
+      type: 'BATTLE_STARTED', playerName: 'PIKACHU', playerId: 5, playerSpeciesId: 25, enemyName: 'PIDGEY', enemyId: 6, enemySpeciesId: 16, enemyLevel: 8,
     });
     expect(next.phase).toBe('waiting');
     expect(next.enemyName).toBe('PIDGEY');
     expect(next.playerId).toBe(5);
+    expect(next.playerSpeciesId).toBe(25);
     expect(next.enemyId).toBe(6); // the new foe's identity replaces the previous one's
     expect(next.enemyHp).toBe(1);
     expect(next.enemyMaxHp).toBe(1);
@@ -259,7 +260,7 @@ describe('battleReducer — phase transitions', () => {
   // creature that actually is, or its HP/status updates are dropped and its nameplate names the wrong creature.
   it('TURN_STARTED re-asserts who is on the field, correcting a stale BattleStarted replay', () => {
     const afterStaleReplay = battleReducer(ready({ phase: 'connecting' }), {
-      type: 'BATTLE_STARTED', playerName: 'CHARMANDER', playerId: 4, enemyName: 'PIDGEY', enemyId: 6,
+      type: 'BATTLE_STARTED', playerName: 'CHARMANDER', playerId: 4, playerSpeciesId: 4, enemyName: 'PIDGEY', enemyId: 6,
       enemySpeciesId: 16, enemyLevel: 8,
     });
     expect(afterStaleReplay.playerId).toBe(4); // the replayed BattleStarted names the original lead
@@ -408,6 +409,35 @@ describe('battleReducer — encounter-map ladder', () => {
     s = battleReducer(s, { type: 'MAP_NODE_ENTERED' }); // Poké Center cap (the synthesized Rest, index = length)
     expect(s.mapPin).toBe(2);
   });
+
+  it('MAP_PIN_TO_REST puts the pin on the Rest cap however often it is applied', () => {
+    let s = battleReducer(ready(), { type: 'MAP_PLAN_REVEALED', nodeKinds: ['WildBattle', 'BossBattle'] });
+    s = battleReducer(s, { type: 'MAP_PIN_TO_REST' });
+    s = battleReducer(s, { type: 'MAP_PIN_TO_REST' }); // a reconnect replays the open recovery prompt
+    expect(s.mapPin).toBe(2);
+  });
+
+  // A reconnect replays the current biome and plan (which append the biome and reset the pin), then the snapshot.
+  it('MAP_SNAPSHOT replaces the replayed route and pin with the absolute ones, idempotently', () => {
+    let s = ready({ routePath: ['woods', 'marsh'], currentBiomeId: 'marsh' });
+    s = battleReducer(s, { type: 'MAP_BIOME_ENTERED', biomeId: 'marsh', biomeName: 'Marsh' });
+    s = battleReducer(s, { type: 'MAP_PLAN_REVEALED', nodeKinds: ['WildBattle', 'WildBattle', 'BossBattle'] });
+    const snapshot = { type: 'MAP_SNAPSHOT' as const, routePath: ['woods', 'marsh'], nodesEntered: 2, restReached: false };
+
+    const once = battleReducer(s, snapshot);
+    const twice = battleReducer(once, snapshot);
+
+    expect(once.routePath).toEqual(['woods', 'marsh']);
+    expect(once.mapPin).toBe(1);
+    expect(once.currentBiomeId).toBe('marsh');
+    expect(twice).toEqual(once);
+  });
+
+  it('MAP_SNAPSHOT puts the pin on the Rest cap once the biome reached its Poké Center', () => {
+    const s = battleReducer(ready(), { type: 'MAP_PLAN_REVEALED', nodeKinds: ['WildBattle', 'BossBattle'] });
+    const next = battleReducer(s, { type: 'MAP_SNAPSHOT', routePath: ['woods'], nodesEntered: 2, restReached: true });
+    expect(next.mapPin).toBe(2);
+  });
 });
 
 describe('battleReducer — party & acquisition (Phase 4 Stage 1c)', () => {
@@ -433,10 +463,11 @@ describe('battleReducer — party & acquisition (Phase 4 Stage 1c)', () => {
       party: [corpse, survivor],
     });
 
-    const next = battleReducer(s, { type: 'LEAD_CHANGED', id: 1, name: 'PIKACHU' });
+    const next = battleReducer(s, { type: 'LEAD_CHANGED', id: 1, name: 'PIKACHU', speciesId: 25 });
 
     expect(next.playerName).toBe('PIKACHU');
     expect(next.playerId).toBe(1);
+    expect(next.playerSpeciesId).toBe(25);
     expect(next.playerLevel).toBe(12);
     expect(next.playerHp).toBe(30);
     expect(next.playerMaxHp).toBe(34);
@@ -474,19 +505,21 @@ describe('battleReducer — party & acquisition (Phase 4 Stage 1c)', () => {
   it('CREATURE_RENAMED renames the player when it is the on-field creature that evolved', () => {
     const s = ready({ playerName: 'CHARMANDER', playerId: 4 });
 
-    const next = battleReducer(s, { type: 'CREATURE_RENAMED', id: 4, toName: 'CHARMELEON' });
+    const next = battleReducer(s, { type: 'CREATURE_RENAMED', id: 4, toName: 'CHARMELEON', toSpeciesId: 5 });
 
     expect(next.playerName).toBe('CHARMELEON');
+    expect(next.playerSpeciesId).toBe(5);
   });
 
   // Evolution is party-wide, so this action also arrives for bench members. Renaming the HUD on one of those
   // would put a benched creature's name on the on-field nameplate.
   it('CREATURE_RENAMED leaves the player alone when a bench member evolved', () => {
-    const s = ready({ playerName: 'CHARMANDER', playerId: 4 });
+    const s = ready({ playerName: 'CHARMANDER', playerId: 4, playerSpeciesId: 4 });
 
-    const next = battleReducer(s, { type: 'CREATURE_RENAMED', id: 9, toName: 'GLOOM' });
+    const next = battleReducer(s, { type: 'CREATURE_RENAMED', id: 9, toName: 'GLOOM', toSpeciesId: 44 });
 
     expect(next.playerName).toBe('CHARMANDER');
+    expect(next.playerSpeciesId).toBe(4);
   });
 
   it('SHOW_ACQUISITION opens the offer; HIDE_ACQUISITION clears it', () => {
@@ -532,9 +565,10 @@ describe('battleReducer — forced faint-switch (Stage 3)', () => {
     // The nameplate tracked the fainted lead; the send-in must move it onto the new creature — including its
     // level, which no TurnStarted carries (so a dropped level would freeze the nameplate on the old creature).
     const s = ready({ playerName: 'CHARIZARD', playerId: 6, playerLevel: 36, playerHp: 0, playerMaxHp: 120, playerStatus: 'None' });
-    const next = battleReducer(s, { type: 'SWITCHED_IN', id: 9, name: 'BLASTOISE', level: 34, hp: 90, maxHp: 110, status: 'Poison' });
+    const next = battleReducer(s, { type: 'SWITCHED_IN', id: 9, name: 'BLASTOISE', speciesId: 9, level: 34, hp: 90, maxHp: 110, status: 'Poison' });
     expect(next.playerName).toBe('BLASTOISE');
     expect(next.playerId).toBe(9);
+    expect(next.playerSpeciesId).toBe(9);
     expect(next.playerLevel).toBe(34);
     expect(next.playerHp).toBe(90);
     expect(next.playerMaxHp).toBe(110);

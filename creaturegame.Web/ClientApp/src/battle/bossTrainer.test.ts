@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { bossTrainerName } from './bossTrainer';
+import { bossTrainerName, nextBossNodeActive } from './bossTrainer';
 
 describe('bossTrainerName — themed gate-boss name', () => {
   it('is deterministic for the same biome + node plan (so the ladder does not flicker)', () => {
@@ -33,5 +33,22 @@ describe('bossTrainerName — themed gate-boss name', () => {
     const generic = ['Blue', 'Trace', 'Silver', 'Vale', 'Rex', 'Nova'];
     expect(generic).toContain(bossTrainerName('mystery-zone', undefined, ['BossBattle']));
     expect(generic).toContain(bossTrainerName('mystery-zone', 'Steel', ['BossBattle'])); // no Gen-1 Steel pool
+  });
+});
+
+describe('nextBossNodeActive — the boss framing flag', () => {
+  it('follows each RunNodeEntered', () => {
+    expect(nextBossNodeActive('RunNodeEntered', { kind: 'BossBattle' }, false)).toBe(true);
+    expect(nextBossNodeActive('RunNodeEntered', { kind: 'WildBattle' }, true)).toBe(false);
+  });
+
+  // A refresh mid-boss replays no RunNodeEntered; the snapshot arrives before the replayed BattleStarted.
+  it('is restored by a RunMapSnapshot on a reconnect', () => {
+    expect(nextBossNodeActive('RunMapSnapshot', { currentNodeKind: 'BossBattle' }, false)).toBe(true);
+    expect(nextBossNodeActive('RunMapSnapshot', { currentNodeKind: null }, true)).toBe(false);
+  });
+
+  it('is left alone by any other event', () => {
+    expect(nextBossNodeActive('BattleStarted', {}, true)).toBe(true);
   });
 });

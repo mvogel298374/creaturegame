@@ -147,7 +147,7 @@ public class SessionResumeTests
         emitter.Emit(Region());
         emitter.Emit(Biome("phantom-marsh"));
         emitter.Emit(NodePlan());
-        emitter.Emit(new BattleStarted("Player", 1, "Enemy", 2, 1, 5));
+        emitter.Emit(new BattleStarted("Player", 1, 25, "Enemy", 2, 1, 5));
         emitter.Emit(Turn(1));
         current = "conn-2"; // the reconnect: a new connection is now current
         int oldConnectionEventCount = hub.EventsFor("conn-1").Count();
@@ -160,6 +160,7 @@ public class SessionResumeTests
                 "RegionMapRevealed",
                 "BiomeEntered",
                 "BiomeNodePlanRevealed",
+                "RunMapSnapshot",
                 "BattleStarted",
                 "TurnStarted",
             ],
@@ -179,9 +180,9 @@ public class SessionResumeTests
         var hub = new RecordingHubContext();
         var emitter = new SignalRBattleEventEmitter(hub, () => "conn-1");
 
-        emitter.Emit(new BattleStarted("Player", 1, "Enemy One", 2, 1, 5));
+        emitter.Emit(new BattleStarted("Player", 1, 25, "Enemy One", 2, 1, 5));
         emitter.Emit(Turn(1));
-        emitter.Emit(new BattleStarted("Player", 1, "Enemy Two", 3, 2, 6)); // next encounter starts; no TurnStarted yet
+        emitter.Emit(new BattleStarted("Player", 1, 25, "Enemy Two", 3, 2, 6)); // next encounter starts; no TurnStarted yet
 
         emitter.ReplayLastKnownState();
 
@@ -199,7 +200,7 @@ public class SessionResumeTests
         var emitter = new SignalRBattleEventEmitter(hub, () => "conn-1");
 
         emitter.Emit(Biome("phantom-marsh"));
-        emitter.Emit(new BattleStarted("Player", 1, "Enemy", 2, 1, 5));
+        emitter.Emit(new BattleStarted("Player", 1, 25, "Enemy", 2, 1, 5));
         emitter.Emit(Turn(1));
         emitter.Emit(new CreatureFled("Player", 1, true));
         int before = hub.EventsFor("conn-1").Count();
@@ -207,7 +208,7 @@ public class SessionResumeTests
         emitter.ReplayLastKnownState();
 
         var replayed = hub.EventsFor("conn-1").Skip(before).Select(e => e.Type);
-        Assert.Equal(["BiomeEntered"], replayed); // the biome survives; the dead battle does not
+        Assert.Equal(["BiomeEntered", "RunMapSnapshot"], replayed); // the biome survives; the dead battle does not
     }
 
     [Fact]
@@ -220,7 +221,7 @@ public class SessionResumeTests
         emitter.Emit(Region());
         emitter.Emit(Biome("phantom-marsh"));
         emitter.Emit(NodePlan());
-        emitter.Emit(new BattleStarted("Player", 1, "Enemy", 2, 1, 5));
+        emitter.Emit(new BattleStarted("Player", 1, 25, "Enemy", 2, 1, 5));
         emitter.Emit(Turn(1));
         emitter.Emit(new BattleEnded("Player", 1));
         int beforeReplay = hub.EventsFor("conn-1").Count;
@@ -266,7 +267,7 @@ public class SessionResumeTests
 
         emitter.Emit(Region());
         emitter.Emit(Biome("whispering-woods"));
-        emitter.Emit(new BattleStarted("Player", 1, "Enemy", 2, 1, 5));
+        emitter.Emit(new BattleStarted("Player", 1, 25, "Enemy", 2, 1, 5));
         emitter.Emit(new BattleEnded("Player", 1));
         emitter.Emit(Biome("phantom-marsh"));
         int beforeReplay = hub.EventsFor("conn-1").Count;
@@ -299,7 +300,13 @@ public class SessionResumeTests
         emitter.ReplayLastKnownState();
 
         Assert.Equal(
-            ["RegionMapRevealed", "BiomeEntered", "BiomeNodePlanRevealed", "RewardChoiceOffered"],
+            [
+                "RegionMapRevealed",
+                "BiomeEntered",
+                "BiomeNodePlanRevealed",
+                "RunMapSnapshot",
+                "RewardChoiceOffered",
+            ],
             hub.EventsFor("conn-1").Skip(before).Select(e => e.Type)
         );
     }
@@ -362,6 +369,151 @@ public class SessionResumeTests
         Assert.Empty(hub.EventsFor("conn-1").Skip(before));
     }
 
+    // ── The route snapshot and the faint HP rewrite (RECONNECT_RESILIENCE.md R1d-d) ──────────────────────────
+
+    private static object? Field(object payload, string name) =>
+        payload.GetType().GetProperty(name)!.GetValue(payload);
+
+    private static object SnapshotAfterReplay(
+        RecordingHubContext hub,
+        SignalRBattleEventEmitter emitter
+    )
+    {
+        int before = hub.EventsFor("conn-1").Count;
+        emitter.ReplayLastKnownState();
+        return Assert
+            .Single(hub.EventsFor("conn-1").Skip(before), e => e.Type == "RunMapSnapshot")
+            .Payload;
+    }
+
+    [Fact]
+    public void ReplayLastKnownState_SendsTheRouteSnapshot_AfterThePlan_BeforeTheBattle()
+    {
+        var hub = new RecordingHubContext();
+        var emitter = new SignalRBattleEventEmitter(hub, () => "conn-1");
+        emitter.Emit(Region());
+        emitter.Emit(Biome("phantom-marsh"));
+        emitter.Emit(NodePlan());
+        emitter.Emit(new RunNodeEntered("BossBattle"));
+        emitter.Emit(new BattleStarted("Player", 1, 25, "Enemy", 2, 1, 5));
+        emitter.Emit(Turn(1));
+        int before = hub.EventsFor("conn-1").Count;
+
+        emitter.ReplayLastKnownState();
+
+        Assert.Equal(
+            [
+                "RegionMapRevealed",
+                "BiomeEntered",
+                "BiomeNodePlanRevealed",
+                "RunMapSnapshot",
+                "BattleStarted",
+                "TurnStarted",
+            ],
+            hub.EventsFor("conn-1").Skip(before).Select(e => e.Type)
+        );
+    }
+
+    [Fact]
+    public void RouteSnapshot_CarriesEveryBiomeEntered_AndTheCurrentBiomesNodeFacts()
+    {
+        var hub = new RecordingHubContext();
+        var emitter = new SignalRBattleEventEmitter(hub, () => "conn-1");
+        emitter.Emit(Biome("whispering-woods"));
+        emitter.Emit(new RunNodeEntered("WildBattle"));
+        emitter.Emit(Biome("phantom-marsh"));
+        emitter.Emit(new RunNodeEntered("WildBattle"));
+        emitter.Emit(new RunNodeEntered("BossBattle"));
+        emitter.Emit(Recovery());
+
+        var snapshot = SnapshotAfterReplay(hub, emitter);
+
+        Assert.Equal(
+            ["whispering-woods", "phantom-marsh"],
+            (IReadOnlyList<string>)Field(snapshot, "RoutePath")!
+        );
+        Assert.Equal(2, Field(snapshot, "NodesEntered"));
+        Assert.Equal(true, Field(snapshot, "RestReached"));
+        Assert.Equal("BossBattle", Field(snapshot, "CurrentNodeKind"));
+    }
+
+    [Fact]
+    public void RouteSnapshot_ResetsTheNodeFacts_OnTheNextBiome()
+    {
+        var hub = new RecordingHubContext();
+        var emitter = new SignalRBattleEventEmitter(hub, () => "conn-1");
+        emitter.Emit(Biome("whispering-woods"));
+        emitter.Emit(new RunNodeEntered("BossBattle"));
+        emitter.Emit(Recovery());
+        emitter.ClearOpenPrompt();
+        emitter.Emit(Biome("phantom-marsh"));
+
+        var snapshot = SnapshotAfterReplay(hub, emitter);
+
+        Assert.Equal(0, Field(snapshot, "NodesEntered"));
+        Assert.Equal(false, Field(snapshot, "RestReached"));
+        Assert.Null(Field(snapshot, "CurrentNodeKind"));
+    }
+
+    [Fact]
+    public void ReplayLastKnownState_SendsNoRouteSnapshot_BeforeAnyBiome()
+    {
+        var hub = new RecordingHubContext();
+        var emitter = new SignalRBattleEventEmitter(hub, () => "conn-1");
+        emitter.Emit(new BattleStarted("Player", 1, 25, "Enemy", 2, 1, 5));
+        emitter.Emit(Turn(1));
+
+        emitter.ReplayLastKnownState();
+
+        Assert.DoesNotContain(hub.EventsFor("conn-1"), e => e.Type == "RunMapSnapshot");
+    }
+
+    [Fact]
+    public void ReplayLastKnownState_ResendsBattleStarted_NamingTheCreatureSwitchedIn()
+    {
+        var hub = new RecordingHubContext();
+        var emitter = new SignalRBattleEventEmitter(hub, () => "conn-1");
+        emitter.Emit(new BattleStarted("Player", 1, 25, "Enemy", 2, 1, 5));
+        emitter.Emit(new CreatureSwitchedIn("Bench", 7, 9, 30, 80, 90, StatusCondition.None));
+        int before = hub.EventsFor("conn-1").Count;
+
+        emitter.ReplayLastKnownState();
+
+        var started = Assert
+            .Single(hub.EventsFor("conn-1").Skip(before), e => e.Type == "BattleStarted")
+            .Payload;
+        Assert.Equal("Bench", Field(started, "PlayerName"));
+        Assert.Equal(7, Field(started, "PlayerId"));
+        Assert.Equal(9, Field(started, "PlayerSpeciesId"));
+        Assert.Equal(2, Field(started, "EnemyId"));
+    }
+
+    [Theory]
+    [InlineData(1, "PlayerHp", "EnemyHp", 40)]
+    [InlineData(2, "EnemyHp", "PlayerHp", 80)]
+    public void ReplayLastKnownState_ResendsTheLastTurn_WithAFaintedCreatureAtZeroHp(
+        int faintedId,
+        string faintedHp,
+        string otherHp,
+        int otherHpValue
+    )
+    {
+        var hub = new RecordingHubContext();
+        var emitter = new SignalRBattleEventEmitter(hub, () => "conn-1");
+        emitter.Emit(new BattleStarted("Player", 1, 25, "Enemy", 2, 1, 5));
+        emitter.Emit(Turn(1));
+        emitter.Emit(new CreatureFainted("Fainted", faintedId));
+        int before = hub.EventsFor("conn-1").Count;
+
+        emitter.ReplayLastKnownState();
+
+        var turn = Assert
+            .Single(hub.EventsFor("conn-1").Skip(before), e => e.Type == "TurnStarted")
+            .Payload;
+        Assert.Equal(0, Field(turn, faintedHp));
+        Assert.Equal(otherHpValue, Field(turn, otherHp));
+    }
+
     // ── GameSessionManager.ReEstablishClient ──────────────────────────────────────────────────────────────
 
     [Fact]
@@ -375,7 +527,7 @@ public class SessionResumeTests
         emitter.Emit(Region());
         emitter.Emit(Biome("phantom-marsh"));
         emitter.Emit(NodePlan());
-        emitter.Emit(new BattleStarted("Player", 1, "Enemy", 2, 1, 5));
+        emitter.Emit(new BattleStarted("Player", 1, 25, "Enemy", 2, 1, 5));
         emitter.Emit(Turn(1));
         int beforeReEstablish = hub.EventsFor("conn-1").Count;
 
@@ -388,6 +540,7 @@ public class SessionResumeTests
                 "RegionMapRevealed",
                 "BiomeEntered",
                 "BiomeNodePlanRevealed",
+                "RunMapSnapshot",
                 "BattleStarted",
                 "TurnStarted",
             ],

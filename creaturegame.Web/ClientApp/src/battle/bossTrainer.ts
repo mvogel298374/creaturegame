@@ -55,3 +55,37 @@ export function bossTrainerName(
   const seed = `${biomeId}|${nodePlan.join(',')}`;
   return pool[hashString(seed) % pool.length];
 }
+
+// Whether the next BattleStarted gets the boss framing (RECONNECT_RESILIENCE.md R1d-d for the snapshot case).
+export function nextBossNodeActive(eventType: string, payload: Record<string, unknown>, current: boolean): boolean {
+  if (eventType === 'RunNodeEntered') return payload.kind === 'BossBattle';
+  if (eventType === 'RunMapSnapshot') return payload.currentNodeKind === 'BossBattle';
+  return current;
+}
+
+// What the boss name derives from, in arrival order: reducer state lags the animation queue (R1d-d).
+export interface BossArrival {
+  biomeTypes: Record<string, string[]>;
+  biomeId: string;
+  nodePlan: string[];
+}
+
+export const NO_BOSS_ARRIVAL: BossArrival = { biomeTypes: {}, biomeId: '', nodePlan: [] };
+
+export function nextBossArrival(eventType: string, payload: Record<string, unknown>, view: BossArrival): BossArrival {
+  switch (eventType) {
+    case 'RegionMapRevealed': {
+      const biomes = (payload.biomes as Array<{ id: string; types?: string[] }>) ?? [];
+      return { ...view, biomeTypes: Object.fromEntries(biomes.map(b => [b.id, b.types ?? []])) };
+    }
+    case 'BiomeEntered':
+      return { ...view, biomeId: payload.biomeId as string, nodePlan: [] };
+    case 'BiomeNodePlanRevealed':
+      return { ...view, nodePlan: (payload.nodeKinds as string[]) ?? [] };
+    default:
+      return view;
+  }
+}
+
+export const arrivalBossName = (view: BossArrival): string =>
+  bossTrainerName(view.biomeId, view.biomeTypes[view.biomeId]?.[0], view.nodePlan);

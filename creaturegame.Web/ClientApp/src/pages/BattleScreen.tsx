@@ -239,7 +239,7 @@ export function BattleScreen() {
 
         {state.enemySpeciesId > 0 && (
           <BattleCanvas
-            playerSpeciesId={playerSpecies?.id ?? 1}
+            playerSpeciesId={state.playerSpeciesId || (playerSpecies?.id ?? 1)}
             enemySpeciesId={state.enemySpeciesId}
           />
         )}
@@ -402,7 +402,7 @@ export function BattleScreen() {
       {state.phase === 'ended' && (
         <BattleEndedOverlay
           creatureName={playerName}
-          speciesId={playerSpecies?.id ?? 1}
+          speciesId={state.playerSpeciesId || (playerSpecies?.id ?? 1)}
           battlesWon={state.battlesWon}
           finalLevel={state.playerLevel}
           onPlayAgain={() => nav('/select')}

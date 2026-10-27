@@ -8,6 +8,41 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §2 R1d-d — a refresh keeps the route trail, node pin, boss framing and the lead's sprite ✅ DONE (2026-10-27)
+
+M, reliability; was §1 #5 / §2 "R1d-d". After a refresh the region map held only the current biome, the ladder pin
+was −1 mid-biome, a boss fight lost its trainer framing, and the on-field sprite and game-over card showed the
+starter. Also fixed a pin bug R1d-a introduced (`RecoveryOffered`'s relative `+1` moved the pin on every replay of an
+open Poké Center prompt) and the stale HP behind a mid-battle prompt. Design ratified by `/plan` 2026-10-26; the design
+record stays in `RECONNECT_RESILIENCE.md` → R1d-d.
+
+- **Acceptance (met):** a refresh at any point restores the full trail and pin, keeps boss framing, and shows the
+  current lead's sprite; a blip changes none of these; a replayed Poké Center prompt leaves the pin on the Rest cap;
+  a refresh behind a mid-battle prompt shows a fainted creature at 0 HP.
+- **What changed:**
+  - Engine: a required `BattleStarted.PlayerSpeciesId` (event, `MapEvent` projection, TS payload type).
+  - `SignalRBattleEventEmitter` keeps the route and per-biome node facts and replays one absolute `RunMapSnapshot
+    { routePath, nodesEntered, restReached, currentNodeKind }` transport notice (outside the event model, like
+    `RunFaulted`) after the node plan and before `BattleStarted`; none for the legacy chain. On `CreatureFainted` it
+    sets that creature's HP to 0 in the cached `TurnStarted`; on `CreatureSwitchedIn` it rewrites the cached
+    `BattleStarted`'s player name, id and species (requirements-review finding).
+  - Client: `MAP_SNAPSHOT` and `MAP_PIN_TO_REST` are absolute ordered steps (the Rest-cap fix closes the R1d-a
+    double-advance); the reducer `playerSpeciesId` (set by `BATTLE_STARTED`, `SWITCHED_IN`, `LEAD_CHANGED`,
+    `CREATURE_RENAMED`) feeds the `BattleCanvas` mount and the game-over card; the boss flag and the boss trainer
+    name come from arrival-order inputs (`battle/bossTrainer.ts`); the hook's per-event bookkeeping is extracted to
+    `battle/eventIntake.ts`.
+  - Tests: C# in `SessionResumeTests` and `BattleIntegrationTests`; Vitest in the reducer, timeline, `bossTrainer`
+    and the new `reconnectReplay.test.ts` (whole replays through `eventIntake`); E2E: a refresh-mid-biome pin scenario
+    in `e2e/reconnect.spec.ts`, run only on request (rewritten after its first version failed: the pinned map overlays
+    the controls, so it opens the map only to read the pin and closes it with its own button; unrun since).
+- **User decisions (2026-10-27):** the boss framing after a refresh is the VS line only; the cached `TurnStarted`
+  after a switch-in is stale only for an instant, accepted; out of scope: the Continue card (keeps its TODO §5 entry)
+  and the blip log duplicates (R1d-e).
+- **Gen surface:** none. **Gen 1 source:** n/a. **Data vs runtime:** runtime only.
+- **Moved on:** R1d-e and R1d-f's "R1d-d first" dependency is met.
+
+---
+
 ## §2 R1d-a — an open blocking prompt is replayed on reconnect ✅ DONE (2026-10-26)
 
 M, reliability; was §1 #5 / §2 "R1d-a". Ten prompts park the run on a `SignalRInput` handshake and none was cached, so

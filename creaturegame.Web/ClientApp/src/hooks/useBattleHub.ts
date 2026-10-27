@@ -1,14 +1,12 @@
 import { useEffect, useRef, useReducer, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import * as signalR from '@microsoft/signalr';
-import { type Payload, type PartyMember, expandEvent, useBattleTimeline } from '../battle/timeline';
+import { type Payload, type PartyMember, useBattleTimeline } from '../battle/timeline';
 import { battleReducer, initialState } from './battleReducer';
-import { bossTrainerName } from '../battle/bossTrainer';
-import { nextPlayerId } from '../battle/playerIdentity';
+import { FRESH_INTAKE, intakeEvent } from '../battle/eventIntake';
 import { clearActiveGame } from '../utils/activeGame';
 import { submitPromptAnswer } from './answerPrompt';
 import { PROMPT_ANSWERS, type PromptRoute } from './promptAnswers';
-import { isReplayOfKnownState, afterAcceptedEvent, type ReplayView } from '../battle/replayDedupe';
 import type { PromptKey } from './battleReducer';
 
 // The view-state shape + modal-prompt types live with the reducer now; re-export them so existing
@@ -34,30 +32,19 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
   const connRef = useRef<signalR.HubConnection | null>(null);
   const nav = useNavigate();
 
-  // The player creature's id drives the player/enemy side split inside expandEvent.
-  const playerIdRef = useRef(0);
-  // Counts BattleStarted events so expandEvent can tell the first encounter (scene entry animation) from a
-  // chained one (slide a new enemy sprite into the running scene).
-  const encounterIndexRef = useRef(0);
-
-  // Fresh mirror of the reducer state for the event handler (registered once), so it can read the current
-  // biome + node plan at event time to name the gate-boss trainer — the same derivation the map ladder uses,
-  // so the ladder label and the battle framing always agree.
+  // Fresh mirror of the reducer state for the event handler (registered once).
   const stateRef = useRef(state);
   stateRef.current = state;
-  // True while the just-entered route node is the Boss, so only the boss fight gets the trainer framing.
-  // Set on RunNodeEntered (BossBattle → true, any other node → false), read by its following BattleStarted.
-  const bossNodeActiveRef = useRef(false);
-  // Arrival-order trackers for replayDedupe.ts (state lags arrival behind the animation queue). Reset with the
-  // connection effect below, since a new gameId is a new run.
-  const replayTrackerRef = useRef<Omit<ReplayView, 'enemyId'>>({ arrivedBiomeId: null, planBiomeId: null });
+  // The per-event bookkeeping in arrival order (state lags arrival behind the animation queue) — eventIntake.ts.
+  const intakeRef = useRef(FRESH_INTAKE);
 
   // The animation timeline: backend events expand into steps it plays in order.
   const enqueueSteps = useBattleTimeline(dispatch);
 
   useEffect(() => {
     if (!gameId) return;
-    replayTrackerRef.current = { arrivedBiomeId: null, planBiomeId: null };
+    // A new gameId is a new run: its replay trackers and boss inputs start over.
+    intakeRef.current = { ...intakeRef.current, tracker: FRESH_INTAKE.tracker, bossArrival: FRESH_INTAKE.bossArrival };
     // Guards the connect-failure handler below against React.StrictMode's dev-only double-invoke: it mounts
     // this effect, tears it down, then mounts it again, all before the throwaway first connection's start()
     // has resolved — so that connection's stop()-induced rejection must not fire the resume-failed bounce (it
@@ -77,38 +64,14 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
         nav('/', { state: { notice: 'The run hit an unexpected server error and ended.' } });
         return;
       }
-      // The server replays its cached state on every (re)connect; after a transport blip our state is already
-      // current, and re-applying a replayed BattleStarted/BiomeEntered/NodePlan would corrupt it — see replayDedupe.ts.
-      const replayView: ReplayView = { ...replayTrackerRef.current, enemyId: stateRef.current.enemyId };
-      if (isReplayOfKnownState(eventType, payload, replayView)) return;
-      const { arrivedBiomeId, planBiomeId } = afterAcceptedEvent(eventType, payload, replayView);
-      replayTrackerRef.current = { arrivedBiomeId, planBiomeId };
-      // Retarget the player/enemy side split BEFORE the event expands, so the newly-named creature's own
-      // moves/damage are sided correctly in the very event that renamed it. The rule itself (which events change
-      // "who the player is") lives in the pure helper.
-      playerIdRef.current = nextPlayerId(eventType, payload, playerIdRef.current);
-      if (eventType === 'BattleStarted') {
-        encounterIndexRef.current += 1;
-      }
-      // Track whether the active node is the Boss (its BattleStarted follows), so the trainer framing is
-      // scoped to the boss fight only.
-      if (eventType === 'RunNodeEntered') {
-        bossNodeActiveRef.current = (payload.kind as string) === 'BossBattle';
-      }
-
-      // The current biome's gate-boss trainer name (themed by biome type; stable per visit) — read from the
-      // live reducer mirror so it matches the ladder label exactly.
-      const s = stateRef.current;
-      const primaryType = s.regionBiomes.find(b => b.id === s.currentBiomeId)?.types[0];
-      const bossName = bossTrainerName(s.currentBiomeId, primaryType, s.mapNodePlan);
-
-      const { now, steps } = expandEvent(eventType, payload, {
-        playerId: playerIdRef.current,
-        encounterIndex: encounterIndexRef.current,
-        bossTrainerName: bossName,
-        isBossBattle: bossNodeActiveRef.current,
-        biomeName: s.mapBiomeName,
+      // A replay of state the client already holds is skipped (a blip, not a refresh) — see replayDedupe.ts.
+      const taken = intakeEvent(intakeRef.current, eventType, payload, {
+        enemyId: stateRef.current.enemyId,
+        biomeName: stateRef.current.mapBiomeName,
       });
+      if (!taken) return;
+      intakeRef.current = taken.intake;
+      const { now, steps } = taken.expansion;
       now?.forEach(action => dispatch(action));   // control plane — immediate
       if (steps) enqueueSteps(steps);              // animated — sequenced
       // Every rolled reward now blocks server-side on a pick-one-of-N (RewardChoiceOffered → the choice modal

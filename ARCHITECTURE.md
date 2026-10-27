@@ -281,8 +281,17 @@ Each entry: **Decision · Why · Where it lives.**
     the run emitted the *next* prompt (reward pick → `MoveTeachTargetRequired`) and wipe it. `RunEnded` clears it
     as a backstop. **Accepted:** a replay in the instant between the handshake completing and the run clearing
     shows a modal for an answered prompt (its answer is dropped); and a prompt raised mid-battle replays behind
-    the battle's last `TurnStarted` (pre-faint HP) until answered; R1d-d (ratified, not built) zeroes a fainted
-    creature's cached HP in the emitter. Design → `docs/RECONNECT_RESILIENCE.md` R1d-a, R1d-d.
+    the battle's last `TurnStarted`, whose fainted creature the emitter has set to 0 HP (R1d-d) while other HP
+    changes of that last turn stay pre-turn. Design → `docs/RECONNECT_RESILIENCE.md` R1d-a, R1d-d.
+  - **Replay order and the route snapshot (R1d-d).** `ReplayLastKnownState()` sends: region map, biome, node plan,
+    `RunMapSnapshot`, `BattleStarted`, `TurnStarted`, open prompt. `RunMapSnapshot { routePath, nodesEntered,
+    restReached, currentNodeKind }` is a transport notice outside the event model (like `RunFaulted`), absolute
+    raw facts the emitter collects from `BiomeEntered` / `RunNodeEntered` / `RecoveryOffered`; it is sent only once a
+    biome has been entered, and it sits before `BattleStarted` so the client's boss flag is set before the replayed
+    battle expands. The client applies it as an ordered timeline step (idempotent, so refresh and blip alike); the pin
+    is derived client-side. `BattleStarted.PlayerSpeciesId` (required) feeds the reducer's `playerSpeciesId`; on
+    `CreatureSwitchedIn` the emitter rewrites the cached `BattleStarted`'s player name, id and species, and on
+    `CreatureFainted` it zeroes that creature's HP in the cached `TurnStarted`.
   - **A modal answer must not be lost in transit, and the shop is the one prompt whose answers can overlap.**
     Every blocking prompt parks the run on a `SignalRInput` handshake that the hub's answer completes, and an
     answer arriving with no handshake pending is dropped (right for a stray double-click on a one-shot prompt).

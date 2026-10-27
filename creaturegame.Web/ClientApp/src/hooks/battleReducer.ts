@@ -104,6 +104,8 @@ export interface BattleState {
   // The on-field creatures' identities. HP/status routing keys on these, never on the names above (two creatures
   // can share a display name — ARCHITECTURE.md §2.2). 0 = nobody yet.
   playerId: number;
+  // The on-field lead's species (0 before the first battle) — the canvas mount and the game-over card read it.
+  playerSpeciesId: number;
   playerHp: number;
   playerMaxHp: number;
   playerStatus: string;
@@ -170,6 +172,7 @@ export const initialState: BattleState = {
   animating: false,
   playerName: '',
   playerId: 0,
+  playerSpeciesId: 0,
   playerHp: 0,
   playerMaxHp: 1,
   playerStatus: 'None',
@@ -229,6 +232,7 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
         phase: 'waiting',
         playerName: action.playerName,
         playerId: action.playerId,
+        playerSpeciesId: action.playerSpeciesId,
         enemyName: action.enemyName,
         enemyId: action.enemyId,
         enemySpeciesId: action.enemySpeciesId,
@@ -394,6 +398,7 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
         ...state,
         playerId: action.id,
         playerName: action.name,
+        playerSpeciesId: action.speciesId,
         playerLevel: member?.level ?? state.playerLevel,
         playerHp: member?.hp ?? state.playerHp,
         playerMaxHp: member?.maxHp ?? state.playerMaxHp,
@@ -409,7 +414,7 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
       // a BENCH member's evolution must not rename the on-field creature — even one that shares its name. The id
       // is stable across the rename, so unlike a name it needs no "compare the from-name" care.
       if (action.id !== state.playerId) return state;
-      return { ...state, playerName: action.toName };
+      return { ...state, playerName: action.toName, playerSpeciesId: action.toSpeciesId };
     }
     case 'SHOW_LEAD_CHOICE':
       return { ...state, leadChoice: action.party };
@@ -432,6 +437,7 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
         ...state,
         playerId: action.id,
         playerName: action.name,
+        playerSpeciesId: action.speciesId,
         playerLevel: action.level,
         playerHp: action.hp,
         playerMaxHp: action.maxHp,
@@ -479,8 +485,19 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
       // The biome's seeded node ladder, drawn ahead of time; pin resets to −1 (no node entered yet).
       return { ...state, mapNodePlan: action.nodeKinds, mapPin: -1 };
     case 'MAP_NODE_ENTERED':
-      // A node started (incl. the Poké Center cap after the Boss) — advance the pin one step along the ladder.
+      // A node started — advance the pin one step along the ladder.
       return { ...state, mapPin: state.mapPin + 1 };
+    case 'MAP_PIN_TO_REST':
+      // The Poké Center cap sits one past the plan (NodeLadder appends it).
+      return { ...state, mapPin: state.mapNodePlan.length };
+    case 'MAP_SNAPSHOT':
+      // A reconnect's absolute route state, after the replayed biome and plan (RECONNECT_RESILIENCE.md R1d-d).
+      return {
+        ...state,
+        routePath: action.routePath,
+        currentBiomeId: action.routePath.at(-1) ?? state.currentBiomeId,
+        mapPin: action.restReached ? state.mapNodePlan.length : action.nodesEntered - 1,
+      };
     default:
       return state;
   }

@@ -12,6 +12,7 @@ public abstract record PromptEvent : BattleEvent;
 public record BattleStarted(
     string PlayerName,
     int PlayerId,
+    int PlayerSpeciesId,
     string EnemyName,
     int EnemyId,
     int EnemySpeciesId,

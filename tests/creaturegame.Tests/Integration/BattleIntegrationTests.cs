@@ -572,7 +572,7 @@ public class BattleIntegrationTests
     {
         // Both sides survive multiple turns — verifies the full turn loop runs correctly
         // under player-controlled input (TurnControlledInput always picking move 0).
-        var player = new Creature("Player") { Level = 50 };
+        var player = new Creature("Player") { Level = 50, SpeciesId = 6 };
         player.CalculateStats();
         player.Attributes.HP = 100;
         player.Attributes.MaxHP = 100;
@@ -622,7 +622,7 @@ public class BattleIntegrationTests
         );
         await battle.StartFightAsync();
 
-        Assert.Contains(emitter.Events, e => e is BattleStarted);
+        Assert.Equal(6, Assert.Single(emitter.Events.OfType<BattleStarted>()).PlayerSpeciesId);
         Assert.True(emitter.Events.OfType<TurnStarted>().Count() >= 2, "Expected multiple turns");
         var ended = emitter.Events.OfType<BattleEnded>().SingleOrDefault();
         Assert.NotNull(ended);

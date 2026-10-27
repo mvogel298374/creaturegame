@@ -23,19 +23,28 @@ public sealed class SignalRBattleEventEmitter(
     // engine's real logic. `volatile`: Emit runs on the run's background task thread while ReplayLastKnownState
     // runs on the SignalR hub thread (a reconnect can land concurrently with a live Emit).
     //
-    // Four different lifetimes:
+    // The lifetimes:
     //  - Run-scoped (RegionMapRevealed): set at most once per run, never cleared.
     //  - Biome-scoped (BiomeEntered, BiomeNodePlanRevealed): replaced by the next biome's; NOT cleared by
     //    BattleEnded/RunEnded — the current biome persists across and after the battles fought in it.
     //  - Battle-scoped (BattleStarted, TurnStarted): cleared on BattleEnded/RunEnded — or CreatureFled, which ends a
     //    fled battle WITHOUT a BattleEnded — see that case below.
     //  - Prompt-scoped (_openPrompt): the one open prompt, until its answer is consumed (RECONNECT_RESILIENCE R1d-a).
+    //  - Route (_route): the travelled biomes + current-biome node facts, replayed as RunMapSnapshot (R1d-d).
     private volatile RegionMapRevealed? _lastRegionMap;
     private volatile BiomeEntered? _lastBiomeEntered;
     private volatile BiomeNodePlanRevealed? _lastBiomeNodePlan;
     private volatile BattleStarted? _lastBattleStarted;
     private volatile TurnStarted? _lastTurnStarted;
     private volatile PromptEvent? _openPrompt;
+    private volatile RouteFacts? _route;
+
+    private sealed record RouteFacts(
+        IReadOnlyList<string> RoutePath,
+        int NodesEntered,
+        bool RestReached,
+        string? CurrentNodeKind
+    );
 
     public void Emit(BattleEvent evt)
     {
@@ -47,6 +56,40 @@ public sealed class SignalRBattleEventEmitter(
             case BiomeEntered entered:
                 _lastBiomeEntered = entered;
                 _lastBiomeNodePlan = null; // the new biome's node plan hasn't rolled yet
+                _route = new RouteFacts(
+                    RoutePath: [.. _route?.RoutePath ?? [], entered.BiomeId],
+                    NodesEntered: 0,
+                    RestReached: false,
+                    CurrentNodeKind: null
+                );
+                break;
+            case RunNodeEntered node:
+                if (_route is { } entering)
+                    _route = entering with
+                    {
+                        NodesEntered = entering.NodesEntered + 1,
+                        CurrentNodeKind = node.Kind,
+                    };
+                break;
+            case RecoveryOffered recovery:
+                _openPrompt = recovery;
+                if (_route is { } resting)
+                    _route = resting with { RestReached = true };
+                break;
+            case CreatureSwitchedIn sent when _lastBattleStarted is { } battle:
+                // A replayed BattleStarted must name the creature now on the field (R1d-d).
+                _lastBattleStarted = battle with
+                {
+                    PlayerName = sent.Name,
+                    PlayerId = sent.Id,
+                    PlayerSpeciesId = sent.SpeciesId,
+                };
+                break;
+            case CreatureFainted fainted:
+                if (_lastTurnStarted is { } t && t.PlayerId == fainted.Id)
+                    _lastTurnStarted = t with { PlayerHp = 0 };
+                else if (_lastTurnStarted is { } u && u.EnemyId == fainted.Id)
+                    _lastTurnStarted = u with { EnemyHp = 0 };
                 break;
             case BiomeNodePlanRevealed plan:
                 _lastBiomeNodePlan = plan;
@@ -122,6 +165,25 @@ public sealed class SignalRBattleEventEmitter(
         Dispatch(connectionId, "RunFaulted", new { });
     }
 
+    // A transport notice like RunFaulted: absolute, so applying it twice changes nothing (R1d-d).
+    private void SendRunMapSnapshot(RouteFacts route)
+    {
+        var connectionId = currentConnectionId();
+        if (string.IsNullOrEmpty(connectionId))
+            return;
+        Dispatch(
+            connectionId,
+            "RunMapSnapshot",
+            new
+            {
+                route.RoutePath,
+                route.NodesEntered,
+                route.RestReached,
+                route.CurrentNodeKind,
+            }
+        );
+    }
+
     /// <summary>The run has consumed the open prompt's answer. Called on the run thread, so it always lands before
     /// the run emits its next prompt (RECONNECT_RESILIENCE.md R1d-a).</summary>
     public void ClearOpenPrompt() => _openPrompt = null;
@@ -129,8 +191,8 @@ public sealed class SignalRBattleEventEmitter(
     /// <summary>Re-sends every cached state-establishing event, in the order it would naturally occur, to
     /// whatever connection is current right now — each a no-op while its slice of the cache is empty (e.g. the
     /// battle-scoped pair between encounters, or the whole cache in the legacy endless chain, which never emits
-    /// the biome/map events at all). The open prompt goes last: its modal overlays the field. See the cache
-    /// fields' own doc for the lifetimes.</summary>
+    /// the biome/map events at all). The route snapshot follows the plan and precedes the battle; the open prompt
+    /// goes last (RECONNECT_RESILIENCE.md R1d-d). See the cache fields' own doc for the lifetimes.</summary>
     public void ReplayLastKnownState()
     {
         if (_lastRegionMap is { } map)
@@ -139,6 +201,8 @@ public sealed class SignalRBattleEventEmitter(
             Send(entered);
         if (_lastBiomeNodePlan is { } plan)
             Send(plan);
+        if (_route is { } route)
+            SendRunMapSnapshot(route);
         if (_lastBattleStarted is { } started)
             Send(started);
         if (_lastTurnStarted is { } turn)
@@ -158,6 +222,7 @@ public sealed class SignalRBattleEventEmitter(
                 {
                     e.PlayerName,
                     e.PlayerId,
+                    e.PlayerSpeciesId,
                     e.EnemyName,
                     e.EnemyId,
                     e.EnemySpeciesId,

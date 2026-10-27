@@ -75,7 +75,8 @@ Revisit only if a backend test hook makes the state forceable.
 - `stat-stage` — Growth raises Bulbasaur's Special. `learnset` — the starter's moves come from its learnset.
 - `forced-switch` — a lead faint with a live bench raises the **blocking** send-in modal; the battle continues.
 - `reconnect` — a refresh with the reward choice open replays the modal, and once it is picked a refresh does
-  not bring it back (R1d-a, `docs/RECONNECT_RESILIENCE.md`).
+  not bring it back (R1d-a); a refresh mid-biome keeps the ladder pin on the node in progress (R1d-d). Both in
+  `docs/RECONNECT_RESILIENCE.md`.
 - `voluntary-switch` — the SWITCH turn-action: greyed while the starter is alone, a **dismissable** picker
   (BACK spends no turn, the creature already out is a disabled `· OUT` card), and a swap mid-battle.
 - **Between-encounter prompts** — every one is a blocking modal parked on a server-side await, so each spec

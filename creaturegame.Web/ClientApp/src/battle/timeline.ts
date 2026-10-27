@@ -132,7 +132,7 @@ export interface ShopOfferItem {
 
 // View-state actions — consumed by the reducer in useBattleHub.
 export type Action =
-  | { type: 'BATTLE_STARTED'; playerName: string; playerId: number; enemyName: string; enemyId: number; enemySpeciesId: number; enemyLevel: number }
+  | { type: 'BATTLE_STARTED'; playerName: string; playerId: number; playerSpeciesId: number; enemyName: string; enemyId: number; enemySpeciesId: number; enemyLevel: number }
   | { type: 'TURN_STARTED'; turnNumber: number; playerName: string; playerId: number; enemyName: string; enemyId: number; playerHp: number; playerMaxHp: number; playerStatus: string; playerXpThisLevel: number; playerXpToNextLevel: number; enemyHp: number; enemyMaxHp: number; enemyStatus: string; moves: MoveInfo[]; canSwitch: boolean }
   | { type: 'TURN_ENDED' }
   | { type: 'PLAYER_CHOSE' }
@@ -209,15 +209,15 @@ export type Action =
   // key and value are tied per prompt, so a shop prompt can't be restored into the rewardChoice slot.
   | { [K in PromptKey]: { type: 'RESTORE_PROMPT'; key: K; value: NonNullable<BattleState[K]> } }[PromptKey]
   // A replacement was sent in — retarget the player nameplate (name/level/HP/status) onto the incoming creature.
-  | { type: 'SWITCHED_IN'; id: number; name: string; level: number; hp: number; maxHp: number; status: string }
+  | { type: 'SWITCHED_IN'; id: number; name: string; speciesId: number; level: number; hp: number; maxHp: number; status: string }
   // The lead was reassigned OUT of battle (the between-biome swap, or the post-mutual-KO promotion): retarget the
   // player nameplate onto it. Carries only the name — the new lead's level/HP/status are read from the roster
   // snapshot, since a lead swap moves no one onto the field and so has no entry-state of its own to report.
-  | { type: 'LEAD_CHANGED'; id: number; name: string }
+  | { type: 'LEAD_CHANGED'; id: number; name: string; speciesId: number }
   // A creature was renamed in place by an evolution. Keyed by the creature's id (stable across the rename), so
   // the reducer renames the on-field creature only when it IS the one that evolved — evolution is party-wide, so
   // this also arrives for bench members, including a bench member that shares the lead's name.
-  | { type: 'CREATURE_RENAMED'; id: number; toName: string }
+  | { type: 'CREATURE_RENAMED'; id: number; toName: string; toSpeciesId: number }
   // Run economy: set the gold total (RewardGranted carries the post-credit total) shown in the BAG money box.
   | { type: 'SET_GOLD'; gold: number }
   // Loot drop hover: a transient floating "you found …" toast (gold + items) shown over the field for a
@@ -236,7 +236,10 @@ export type Action =
   // logic-driven (one MAP_NODE_ENTERED per RunNodeEntered, incl. the wild nodes that carry no banner).
   | { type: 'MAP_BIOME_ENTERED'; biomeId: string; biomeName: string }
   | { type: 'MAP_PLAN_REVEALED'; nodeKinds: string[] }
-  | { type: 'MAP_NODE_ENTERED' };
+  | { type: 'MAP_NODE_ENTERED' }
+  // Absolute, so a replay can't move the pin twice (RECONNECT_RESILIENCE.md R1d-d).
+  | { type: 'MAP_PIN_TO_REST' }
+  | { type: 'MAP_SNAPSHOT'; routePath: string[]; nodesEntered: number; restReached: boolean };
 
 // Phaser commands sent over the mitt bridge.
 export type BridgeCommand =
@@ -400,6 +403,7 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
         type: 'BATTLE_STARTED',
         playerName: pName,
         playerId: payload.playerId as number,
+        playerSpeciesId: payload.playerSpeciesId as number,
         enemyName: eName,
         enemyId: payload.enemyId as number,
         enemySpeciesId,
@@ -491,10 +495,7 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       const speciesId  = payload.speciesId as number;
       const battlesWon = payload.battlesWon as number;
       return { steps: [
-        // Advance the ladder pin onto its synthesized Poké Center cap (the biome's rest step after the Boss —
-        // not a plan node, so the overlay draws it and this walks the pin to it). A no-op on the map in the
-        // legacy chain (empty plan → overlay hidden).
-        d({ type: 'MAP_NODE_ENTERED' }),
+        d({ type: 'MAP_PIN_TO_REST' }), // the synthesized Poké Center cap; absolute (RECONNECT_RESILIENCE.md R1d-d)
         w(300),
         d(log(`${cName} reached a Poké Center!`)),
         w(300),
@@ -587,6 +588,15 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
     case 'BiomeNodePlanRevealed':
       // The current biome's seeded node ladder — feed it to the encounter-map overlay. No battle-log line.
       return { steps: [d({ type: 'MAP_PLAN_REVEALED', nodeKinds: (payload.nodeKinds as string[]) ?? [] })] };
+
+    case 'RunMapSnapshot':
+      // A reconnect's absolute route state — a queued step, so it lands after the replayed biome and plan (R1d-d).
+      return { steps: [d({
+        type: 'MAP_SNAPSHOT',
+        routePath: (payload.routePath as string[]) ?? [],
+        nodesEntered: (payload.nodesEntered as number) ?? 0,
+        restReached: (payload.restReached as boolean) ?? false,
+      })] };
 
     case 'RewardChoiceOffered': {
       // A pick-one-of-N (two rarity-rolled items or a gold bag). This arm only shows the picker — the chosen
@@ -713,7 +723,7 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       return { steps: [
         w(150),
         emit({ type: 'swapPlayerCreature', speciesId }),
-        d({ type: 'LEAD_CHANGED', id, name }),
+        d({ type: 'LEAD_CHANGED', id, name, speciesId }),
         d(log(`${name} is now your lead!`, 'event')),
         w(400),
       ] };
@@ -741,7 +751,7 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       return { steps: [
         w(200),
         emit({ type: 'swapPlayerCreature', speciesId }),
-        d({ type: 'SWITCHED_IN', id, name, level, hp, maxHp, status }),
+        d({ type: 'SWITCHED_IN', id, name, speciesId, level, hp, maxHp, status }),
         d(log(`Go! ${name}!`, 'event')),
         w(400),
       ] };
@@ -1044,7 +1054,7 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
         // Rename the HUD as the morph lands, so the nameplate and the "What will X do?" prompt flip together with
         // the sprite instead of lagging to the next BattleStarted. The reducer decides whether this creature is
         // the player (a bench member's evolution reaches here too).
-        d({ type: 'CREATURE_RENAMED', id: payload.creatureId as number, toName }),
+        d({ type: 'CREATURE_RENAMED', id: payload.creatureId as number, toName, toSpeciesId }),
         d(log(`${fromName} evolved into ${toSpeciesName}!`)),
         w(600),
       ] };

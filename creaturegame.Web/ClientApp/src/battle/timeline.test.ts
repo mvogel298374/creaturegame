@@ -422,13 +422,22 @@ describe('expandEvent — control plane vs timeline', () => {
     expect(logLines(steps)).toEqual([]);
   });
 
-  it('RecoveryOffered advances the map pin onto the synthesized Poké Center (Rest) cap', () => {
-    // The Poké Center caps every biome after the Boss but is NOT a plan node (ENCOUNTER_DESIGN.md §5), so the
-    // ladder synthesizes a terminal Rest step — and RecoveryOffered walks the pin onto it. Pins that dispatch so
-    // a future edit can't silently drop it (the ladder would then stall on the Boss).
+  it('RecoveryOffered puts the map pin on the synthesized Poké Center (Rest) cap, absolutely', () => {
+    // Not a plan node (ENCOUNTER_DESIGN.md §5); absolute, since a reconnect replays it (RECONNECT_RESILIENCE R1d-d).
     const { steps } = expandEvent(
       'RecoveryOffered', { creatureName: 'MEWTWO', speciesId: 150, battlesWon: 3 }, CTX);
-    expect(dispatched(steps)).toContainEqual({ type: 'MAP_NODE_ENTERED' });
+    expect(dispatched(steps)).toContainEqual({ type: 'MAP_PIN_TO_REST' });
+    expect(dispatched(steps)).not.toContainEqual({ type: 'MAP_NODE_ENTERED' });
+  });
+
+  it('RunMapSnapshot is a queued step, so it lands after the replayed biome and plan', () => {
+    const { now, steps } = expandEvent('RunMapSnapshot', {
+      routePath: ['woods', 'marsh'], nodesEntered: 2, restReached: false, currentNodeKind: 'BossBattle',
+    }, CTX);
+    expect(now).toBeUndefined();
+    expect(dispatched(steps)).toEqual([
+      { type: 'MAP_SNAPSHOT', routePath: ['woods', 'marsh'], nodesEntered: 2, restReached: false },
+    ]);
   });
 
   it('RewardGranted (battle drop) bumps the gold total, logs a loot line, and raises the drop hover', () => {
@@ -1048,10 +1057,10 @@ describe('expandEvent — between-biome lead choice (Stage 1d)', () => {
     >;
     expect(swap.speciesId).toBe(9);
     expect(logLines(steps)).toEqual(['BLASTOISE is now your lead!']);
-    // …and retargets the player HUD: a lead swap moves nobody onto the field, so no CreatureSwitchedIn follows to
-    // do it. The reducer fills level/HP/status from the roster; only the name rides on the event.
+    // …and retargets the player HUD (no CreatureSwitchedIn follows); level/HP/status come from the roster.
     const retarget = dispatchedOf(steps, 'LEAD_CHANGED')[0] as Extract<Action, { type: 'LEAD_CHANGED' }>;
     expect(retarget.name).toBe('BLASTOISE');
+    expect(retarget.speciesId).toBe(9);
   });
 });
 
@@ -1082,7 +1091,7 @@ describe('expandEvent — forced faint-switch (Stage 3)', () => {
     >;
     expect(swap.speciesId).toBe(9);
     const set = dispatchedOf(steps, 'SWITCHED_IN')[0] as Extract<Action, { type: 'SWITCHED_IN' }>;
-    expect(set).toMatchObject({ name: 'BLASTOISE', level: 34, hp: 90, maxHp: 110, status: 'Poison' });
+    expect(set).toMatchObject({ name: 'BLASTOISE', speciesId: 9, level: 34, hp: 90, maxHp: 110, status: 'Poison' });
     expect(logLines(steps)).toEqual(['Go! BLASTOISE!']);
   });
 });
@@ -1150,6 +1159,6 @@ describe('expandEvent — same-named combatants are told apart by id', () => {
     const { steps } = expandEvent('CreatureEvolved', {
       fromName: 'PIDGEY', toName: 'PIDGEOTTO', creatureId: 8, fromSpeciesId: 16, toSpeciesId: 17, toSpeciesName: 'PIDGEOTTO',
     }, PIDGEY_CTX);
-    expect(dispatched(steps)).toContainEqual({ type: 'CREATURE_RENAMED', id: 8, toName: 'PIDGEOTTO' });
+    expect(dispatched(steps)).toContainEqual({ type: 'CREATURE_RENAMED', id: 8, toName: 'PIDGEOTTO', toSpeciesId: 17 });
   });
 });

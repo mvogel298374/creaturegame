@@ -1,9 +1,9 @@
 # RECONNECT_RESILIENCE.md — the remaining reconnect work, designed (2026-10-03)
 
-> **Status: R1d-a BUILT (2026-10-26; its section below is the design record); R1d-d ratified by `/plan`
-> (2026-10-26); R1d-c provisional-pending-`/plan`.** Written from a read of the code on 2026-10-03, not from the
-> review sweep's text. The frontend half of c is provisional until its `/plan` pass (DoR #2). The c and d task entries and
-> acceptance conditions live in `TODO.md` → *Reliability — reconnect*; R1d-a's are in `TODO_ARCHIVE.md` → *§2 R1d-a*;
+> **Status: R1d-a BUILT (2026-10-26) and R1d-d BUILT (2026-10-27); their sections below are the design records;
+> R1d-c provisional-pending-`/plan`.** Written from a read of the code on 2026-10-03, not from the
+> review sweep's text. The frontend half of c is provisional until its `/plan` pass (DoR #2). The c task entry and
+> acceptance conditions live in `TODO.md` → *Reliability — reconnect*; R1d-a's and R1d-d's are in `TODO_ARCHIVE.md` → *§2 R1d-a*, *§2 R1d-d*;
 > this is the design behind them. Already fixed and archived: the flee stale-cache, the 60 s grace, the client replay
 > dedupe (`TODO_ARCHIVE.md` → *Repo-sweep R1 — reconnect replay mishandled…*), lost modal answers
 > (*…lost modal answers…*), the `RunFaulted` notice (*…five small fixes*), and the abandon-timer race (*R1d-b*).
@@ -14,16 +14,16 @@
 
 ## How reconnect works today
 
-`SignalRBattleEventEmitter` caches exactly five events — `RegionMapRevealed`, `BiomeEntered`,
-`BiomeNodePlanRevealed`, `BattleStarted`, `TurnStarted` — and `GameSessionManager.ReEstablishClient` replays them
+`SignalRBattleEventEmitter` caches five events — `RegionMapRevealed`, `BiomeEntered`,
+`BiomeNodePlanRevealed`, `BattleStarted`, `TurnStarted` — plus the one open prompt and the route facts behind the
+`RunMapSnapshot` notice, and `GameSessionManager.ReEstablishClient` replays them
 (after the presentation echo) on **every** (re)connect. While no connection is current, `Send` drops events by
 design. The client skips a replay it already holds (`battle/replayDedupe.ts`, arrival-order refs). Reconnect also
 calls `CancelAbandon()`, so a reconnected run has no timer left to rescue it; a timer that already fired is
 ignored unless it is still the current one (`OnGraceElapsed`).
 
 **Ordering.** (a) first — it was the only item that stranded a run (built 2026-10-26). (d) next
-(it shares (a)'s replay touch-points, and the sprite fix shares a `BattleStarted` change). (c) after the policy
-question is answered. The cross-cutting test plan at the end covers a, c and d plus the verification gaps.
+(built 2026-10-27). (c) after the policy question is answered. The cross-cutting test plan at the end covers a, c and d plus the verification gaps.
 
 ## R1d-a. A refresh — or a blip — while a blocking prompt is open strands the run
 
@@ -119,7 +119,9 @@ question is answered. The cross-cutting test plan at the end covers a, c and d p
 - **DoR.** Gen-variable: none. Runtime/web + a small client change. **Open question for the user:** is last-tab-wins
   the intended policy? Dependencies: none (independent of a/b/d).
 
-## R1d-d. A refresh loses the route trail, the node pin, boss framing and the player's sprite
+## R1d-d. A refresh loses the route trail, the node pin, boss framing and the player's sprite — BUILT (2026-10-27)
+
+The sections below are the design record; the as-built list is `TODO_ARCHIVE.md` → *§2 R1d-d*.
 
 - **What is wrong (verified 2026-10-26).** After a refresh: `routePath` holds only the *current* biome (only the
   latest `BiomeEntered` is cached); the ladder pin is −1 mid-biome (`RunNodeEntered` is not cached, and the replayed
@@ -133,7 +135,7 @@ question is answered. The cross-cutting test plan at the end covers a, c and d p
   (Rest cap included), a boss fight keeps its trainer framing, and the on-field player sprite and the game-over card
   are the *current* lead's. A blip changes none of these. A refresh or blip with the Poké Center prompt open leaves
   the pin on the Rest cap. A refresh behind a mid-battle prompt shows a fainted creature at 0 HP.
-- **Design (ratified 2026-10-26) — a snapshot, not a history replay.** Replaying every past `BiomeEntered` would be
+- **Design (ratified 2026-10-26, built 2026-10-27) — a snapshot, not a history replay.** Replaying every past `BiomeEntered` would be
   *wrong*: after a *blip* `replayDedupe` accepts the older biomes (they differ from the last arrival) and corrupts
   `routePath`. Instead the emitter (which already sees every `BiomeEntered` / `RunNodeEntered` / `RecoveryOffered`,
   so the map half needs **no engine change**) keeps the route and per-biome node facts and replays one **absolute**
@@ -158,11 +160,23 @@ question is answered. The cross-cutting test plan at the end covers a, c and d p
   - **Stale HP behind a mid-battle prompt (from R1d-a).** When the emitter sees `CreatureFainted`, it rewrites the
     cached `TurnStarted` with that creature's HP at 0 (matched by id, player or enemy side). Any other HP change in
     that last turn stays accepted.
+  - **The lead after an in-battle switch (requirements-review, 2026-10-27).** `CreatureSwitchedIn` (player-only)
+    rewrites the cached `BattleStarted`'s player name, id and species, so a refresh after a forced or voluntary
+    switch replays the creature on the field, not the battle's first lead. The cached `TurnStarted` is left alone:
+    the run emits the next one at once, so a stale old-lead turn is replayable only for that instant — accepted.
+  - **Boss framing after a refresh (user, 2026-10-27).** A refresh re-enters the fight, so the replayed boss
+    `BattleStarted` takes the first-encounter branch: the "VS Trainer X's …" line, not "Trainer X wants to
+    battle!" — the same as a non-boss refresh skipping "A new challenger approaches!". The trainer name comes from
+    the boss inputs in **arrival order** (`nextBossArrival` / `arrivalBossName`, `bossTrainer.ts`), not from reducer
+    state, which lags the queue mid-replay; so the VS line always matches the ladder. The hook's per-event
+    bookkeeping (dedupe, player id, encounter count, boss flag and inputs, `expandEvent`) is one pure function,
+    `battle/eventIntake.ts`, which `reconnectReplay.test.ts` drives through whole replays.
   - **Sprite — a real field, not the snapshot.** `PlayerSpeciesId` becomes a **required** field on `BattleStarted`
     (engine event + the `MapEvent` projection + the TS payload type; the C# wire-drop half is auto-guarded, the TS
     leg and render layer are manual — `ClaudeDirectives/engine.md` rule 8). A reducer `playerSpeciesId` is set by
     `BATTLE_STARTED`, `SWITCHED_IN`, `LEAD_CHANGED` and `CREATURE_RENAMED` (evolution); those actions gain the species
-    id their events already carry, the last two guarded by the on-field id as today. Transform is **not** tracked —
+    id their events already carry; `CREATURE_RENAMED` changes it only when the evolved creature is the on-field one
+    (evolution is party-wide), while `LEAD_CHANGED` always names the new lead. Transform is **not** tracked —
     it is temporary and the scene already restores the true species. Consumers: `BattleCanvas`'s mount prop (it
     builds its scene once, on the first `BATTLE_STARTED`, so a later change can't rebuild it mid-battle; live swaps
     stay on the bridge commands) and the game-over card. The nav-state starter remains the fallback before the
