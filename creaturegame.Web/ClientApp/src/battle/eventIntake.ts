@@ -1,13 +1,16 @@
 import { expandEvent, type Expansion, type Payload } from './timeline';
-import { isReplayOfKnownState, afterAcceptedEvent } from './replayDedupe';
+import {
+  isReplayOfKnownState, afterAcceptedEvent, afterPromptAnswered, afterPromptRestored, type ReplayView,
+} from './replayDedupe';
 import { nextPlayerId } from './playerIdentity';
 import {
   arrivalBossName, nextBossArrival, nextBossNodeActive, NO_BOSS_ARRIVAL, type BossArrival,
 } from './bossTrainer';
+import type { PromptKey } from '../hooks/battleReducer';
 
 // useBattleHub's per-event bookkeeping, pure so Vitest drives the real sequence (RECONNECT_RESILIENCE.md R1d-d).
 export interface Intake {
-  tracker: { arrivedBiomeId: string | null; planBiomeId: string | null };
+  tracker: Omit<ReplayView, 'enemyId'>;
   playerId: number;
   encounterIndex: number;
   bossNodeActive: boolean;
@@ -15,7 +18,7 @@ export interface Intake {
 }
 
 export const FRESH_INTAKE: Intake = {
-  tracker: { arrivedBiomeId: null, planBiomeId: null },
+  tracker: { arrivedBiomeId: null, planBiomeId: null, openPrompt: null },
   playerId: 0,
   encounterIndex: 0,
   bossNodeActive: false,
@@ -31,9 +34,9 @@ export function intakeEvent(
 ): { intake: Intake; expansion: Expansion } | null {
   const replayView = { ...intake.tracker, enemyId: screen.enemyId };
   if (isReplayOfKnownState(eventType, payload, replayView)) return null;
-  const { arrivedBiomeId, planBiomeId } = afterAcceptedEvent(eventType, payload, replayView);
+  const { arrivedBiomeId, planBiomeId, openPrompt } = afterAcceptedEvent(eventType, payload, replayView);
   const next: Intake = {
-    tracker: { arrivedBiomeId, planBiomeId },
+    tracker: { arrivedBiomeId, planBiomeId, openPrompt },
     // Retargeted BEFORE the event expands, so the newly-named creature's own moves are sided correctly.
     playerId: nextPlayerId(eventType, payload, intake.playerId),
     encounterIndex: intake.encounterIndex + (eventType === 'BattleStarted' ? 1 : 0),
@@ -49,3 +52,9 @@ export function intakeEvent(
   });
   return { intake: next, expansion };
 }
+
+export const intakePromptAnswered = (intake: Intake, key: PromptKey): Intake =>
+  ({ ...intake, tracker: afterPromptAnswered(intake.tracker, key) });
+
+export const intakePromptRestored = (intake: Intake, key: PromptKey): Intake =>
+  ({ ...intake, tracker: afterPromptRestored(intake.tracker, key) });

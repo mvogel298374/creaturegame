@@ -1,21 +1,7 @@
 import type { Payload } from './timeline';
+import type { PromptKey } from '../hooks/battleReducer';
 
-/// Does this incoming event merely re-send state the client already has on screen?
-///
-/// On EVERY hub (re)connect the server replays its cached state-establishing events (ARCHITECTURE.md §2.7). After a
-/// refresh the client's state is fresh, so the replay is exactly what it needs. After a transport blip the client's
-/// React state never unmounted, and applying the replay again is actively wrong: a second `BattleStarted` bumps the
-/// encounter index ("A new challenger approaches!", enemy re-slides, HP flashes), and a second `BiomeEntered` /
-/// `BiomeNodePlanRevealed` duplicates the route path and resets the node pin. The server can't tell the two cases
-/// apart, so the client does — by comparing the event against what its own state already holds.
-///
-/// `TurnStarted` is deliberately NOT here: re-applying it is the designed self-correction for a replay.
-///
-/// Pure, with type-only imports, so Vitest pins the rule without React or SignalR (same shape as `nextPlayerId`).
-///
-/// The biome/plan half reads ARRIVAL-order trackers, not the reducer state: events are queued behind animations
-/// (§2.8), so state lags arrival and a genuine node plan can land while `mapNodePlan` still holds the previous
-/// biome's. The hook keeps the trackers current via `afterAcceptedEvent`.
+// Skips a reconnect replay of state the client already holds (ARCHITECTURE.md §2.7; RECONNECT_RESILIENCE.md R1d-e).
 export interface ReplayView {
   /** The enemy of the battle on screen (reducer state — a replay can never arrive before its original applied). */
   enemyId: number;
@@ -23,9 +9,22 @@ export interface ReplayView {
   arrivedBiomeId: string | null;
   /** The biome whose node plan the hook last accepted, or null (reset by each accepted BiomeEntered). */
   planBiomeId: string | null;
+  /** The logged prompt the hook last accepted and the player has not answered, or null. */
+  openPrompt: string | null;
 }
 
+// Prompts whose intro writes to the log, by the reducer slot their answer clears (RECONNECT_RESILIENCE.md R1d-e).
+const LOGGED_PROMPTS: Partial<Record<string, PromptKey>> = {
+  RecoveryOffered: 'recovery',
+  MoveReplacementRequired: 'moveReplacement',
+  EvolutionOffered: 'evolution',
+};
+
+const loggedPromptKey = (eventType: string) =>
+  Object.hasOwn(LOGGED_PROMPTS, eventType) ? LOGGED_PROMPTS[eventType] : undefined;
+
 export function isReplayOfKnownState(eventType: string, payload: Payload, view: ReplayView): boolean {
+  if (loggedPromptKey(eventType)) return view.openPrompt === eventType;
   switch (eventType) {
     // Creature ids are unique per instance (CreatureIdSource), so the same enemy id is the same encounter.
     case 'BattleStarted':
@@ -45,5 +44,17 @@ export function isReplayOfKnownState(eventType: string, payload: Payload, view: 
 export function afterAcceptedEvent(eventType: string, payload: Payload, view: ReplayView): ReplayView {
   if (eventType === 'BiomeEntered') return { ...view, arrivedBiomeId: payload.biomeId as string, planBiomeId: null };
   if (eventType === 'BiomeNodePlanRevealed') return { ...view, planBiomeId: view.arrivedBiomeId };
+  if (loggedPromptKey(eventType)) return { ...view, openPrompt: eventType };
   return view;
+}
+
+/// The player answered the prompt in `key`: a later replay of it is the accepted race and must show again.
+export function afterPromptAnswered<V extends { openPrompt: string | null }>(view: V, key: PromptKey): V {
+  return view.openPrompt !== null && loggedPromptKey(view.openPrompt) === key ? { ...view, openPrompt: null } : view;
+}
+
+/// The answer's send was rejected and the modal restored: the prompt is open again.
+export function afterPromptRestored<V extends { openPrompt: string | null }>(view: V, key: PromptKey): V {
+  const eventType = Object.keys(LOGGED_PROMPTS).find(t => LOGGED_PROMPTS[t] === key);
+  return eventType ? { ...view, openPrompt: eventType } : view;
 }

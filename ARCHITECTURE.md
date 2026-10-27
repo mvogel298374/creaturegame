@@ -328,7 +328,9 @@ Each entry: **Decision · Why · Where it lives.**
     decides: `battle/replayDedupe.ts` skips a `BattleStarted` whose `enemyId` is already on screen (creature ids are
     unique per instance) and a `BiomeEntered`/plan for a biome it already accepted. The biome/plan check reads
     *arrival-order* refs, not reducer state, because state lags arrival behind the animation queue (§2.8) and a
-    genuine plan can land while the previous biome's is still in state. `TurnStarted` is never skipped — re-applying
+    genuine plan can land while the previous biome's is still in state. A replayed `RecoveryOffered` /
+    `MoveReplacementRequired` / `EvolutionOffered` is skipped while that prompt is still open, so its intro is not
+    logged twice (`RECONNECT_RESILIENCE.md` R1d-e). `TurnStarted` is never skipped — re-applying
     it is the designed self-correction. Server side, `CreatureFled` clears the battle-scoped cache like
     `BattleEnded` (a flee emits no `BattleEnded`, so the finished battle used to be revived with a dead move
     menu). `ReconnectGrace` is 60 s, sized to outlast the client's `withAutomaticReconnect()` default schedule

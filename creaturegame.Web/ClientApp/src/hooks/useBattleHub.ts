@@ -5,7 +5,7 @@ import { type Payload, type PartyMember, useBattleTimeline } from '../battle/tim
 import { battleReducer, initialState } from './battleReducer';
 import { FRESH_INTAKE, intakeEvent } from '../battle/eventIntake';
 import { clearActiveGame } from '../utils/activeGame';
-import { submitPromptAnswer } from './answerPrompt';
+import { submitTrackedPromptAnswer } from './answerPrompt';
 import { PROMPT_ANSWERS, type PromptRoute } from './promptAnswers';
 import type { PromptKey } from './battleReducer';
 
@@ -174,7 +174,7 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
   // the send is rejected (the reconnect window) — see answerPrompt.ts. The route (slot, hide, method) is in promptAnswers.ts.
   const answerPrompt = useCallback(
     <K extends PromptKey>({ key, hide, method }: PromptRoute<K>, ...args: unknown[]) =>
-      submitPromptAnswer({
+      submitTrackedPromptAnswer(intakeRef, {
         key,
         prompt: stateRef.current[key],
         hide,

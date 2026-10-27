@@ -1,8 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { isReplayOfKnownState, afterAcceptedEvent, type ReplayView } from './replayDedupe';
+import {
+  isReplayOfKnownState, afterAcceptedEvent, afterPromptAnswered, afterPromptRestored, type ReplayView,
+} from './replayDedupe';
 
-const fresh: ReplayView = { enemyId: 0, arrivedBiomeId: null, planBiomeId: null };
-const live: ReplayView = { enemyId: 7, arrivedBiomeId: 'phantom-marsh', planBiomeId: 'phantom-marsh' };
+const fresh: ReplayView = { enemyId: 0, arrivedBiomeId: null, planBiomeId: null, openPrompt: null };
+const live: ReplayView = {
+  enemyId: 7, arrivedBiomeId: 'phantom-marsh', planBiomeId: 'phantom-marsh', openPrompt: null,
+};
 
 describe('isReplayOfKnownState', () => {
   it('applies every replayed event to a freshly-mounted client (the refresh case)', () => {
@@ -35,7 +39,7 @@ describe('isReplayOfKnownState', () => {
 describe('afterAcceptedEvent — the full replay sequence', () => {
   it('lets a genuine hop + plan through even though the previous biome had a plan, then skips their replay', () => {
     // Previous biome A fully set up; a genuine hop to B arrives, then B's plan (state would still show A's plan).
-    let v: ReplayView = { enemyId: 7, arrivedBiomeId: 'a', planBiomeId: 'a' };
+    let v: ReplayView = { enemyId: 7, arrivedBiomeId: 'a', planBiomeId: 'a', openPrompt: null };
     expect(isReplayOfKnownState('BiomeEntered', { biomeId: 'b' }, v)).toBe(false);
     v = afterAcceptedEvent('BiomeEntered', { biomeId: 'b' }, v);
     expect(isReplayOfKnownState('BiomeNodePlanRevealed', {}, v)).toBe(false);
@@ -46,13 +50,48 @@ describe('afterAcceptedEvent — the full replay sequence', () => {
   });
 
   it('accepts a return to a previously-visited biome (A -> B -> A)', () => {
-    let v: ReplayView = { enemyId: 7, arrivedBiomeId: 'b', planBiomeId: 'b' };
+    let v: ReplayView = { enemyId: 7, arrivedBiomeId: 'b', planBiomeId: 'b', openPrompt: null };
     expect(isReplayOfKnownState('BiomeEntered', { biomeId: 'a' }, v)).toBe(false);
     v = afterAcceptedEvent('BiomeEntered', { biomeId: 'a' }, v);
-    expect(v).toEqual({ enemyId: 7, arrivedBiomeId: 'a', planBiomeId: null });
+    expect(v).toEqual({ enemyId: 7, arrivedBiomeId: 'a', planBiomeId: null, openPrompt: null });
   });
 
   it('leaves the trackers alone for other events', () => {
     expect(afterAcceptedEvent('TurnStarted', {}, live)).toBe(live);
+  });
+});
+
+describe('logged prompts — skipped while open, shown again once answered', () => {
+  const PROMPTS = [
+    ['RecoveryOffered', 'recovery'],
+    ['MoveReplacementRequired', 'moveReplacement'],
+    ['EvolutionOffered', 'evolution'],
+  ] as const;
+
+  it.each(PROMPTS)('%s is skipped only while it is the open prompt', (eventType, key) => {
+    expect(isReplayOfKnownState(eventType, {}, live)).toBe(false);
+    const open = afterAcceptedEvent(eventType, {}, live);
+    expect(isReplayOfKnownState(eventType, {}, open)).toBe(true);
+
+    const answered = afterPromptAnswered(open, key);
+    expect(isReplayOfKnownState(eventType, {}, answered)).toBe(false);
+
+    expect(isReplayOfKnownState(eventType, {}, afterPromptRestored(answered, key))).toBe(true);
+  });
+
+  it('a different prompt type is never mistaken for the open one', () => {
+    const open = afterAcceptedEvent('RecoveryOffered', {}, live);
+    expect(isReplayOfKnownState('EvolutionOffered', {}, open)).toBe(false);
+  });
+
+  it('answering an unlogged prompt leaves the open one tracked, and restoring one sets nothing', () => {
+    const open = afterAcceptedEvent('EvolutionOffered', {}, live);
+    expect(afterPromptAnswered(open, 'rewardChoice')).toBe(open);
+    expect(afterPromptRestored(live, 'rewardChoice')).toBe(live);
+  });
+
+  it('leaves the tracker alone for a prompt outside the logged three, or an inherited property name', () => {
+    expect(afterAcceptedEvent('RewardChoiceOffered', {}, live)).toBe(live);
+    expect(afterAcceptedEvent('constructor', {}, live)).toBe(live);
   });
 });

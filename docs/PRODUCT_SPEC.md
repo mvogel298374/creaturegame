@@ -330,7 +330,8 @@ the linked design doc instead — pull it there and leave only the pointer here.
   modal re-opens; a quick shop BUY then LEAVE are both honoured, in order.
 - A refresh or network blip while a blocking prompt is open (route choice, shop, reward, recovery, acquisition,
   lead choice, switch-in, move replacement, and the rest) brings the same modal back, and answering it continues
-  the run. A prompt already answered does not come back; a reopened shop shows the current gold.
+  the run. A prompt already answered does not come back; a reopened shop shows the current gold. After a blip the
+  recovery, move-replacement and evolution prompts do not write their intro lines to the log a second time.
 - A refresh keeps the whole route trail and the ladder pin on the node in progress (the Rest cap while a Poké Center
   prompt is open), the boss's "VS Trainer …" framing in a boss fight, and the current lead's sprite on the field and
   on the game-over card (also after an in-battle switch, evolution or lead change). A blip changes none of these.
@@ -340,7 +341,7 @@ the linked design doc instead — pull it there and leave only the pointer here.
   starter's name and level.
 - Design detail → `ARCHITECTURE.md` §2.7 (Web session lifecycle). History → `TODO_ARCHIVE.md` → *Session Resume
   — refresh/reopen-safe `gameId` persistence*, *§2 R1d-a — an open blocking prompt is replayed on reconnect* and
-  *§2 R1d-d — a refresh keeps the route trail…*.
+  *§2 R1d-d — a refresh keeps the route trail…* and *§2 R1d-e — a blip no longer re-logs a prompt's intro*.
 
 ### Client navigation and input
 - Space as well as Enter selects a starter card.

@@ -1,7 +1,9 @@
-import { describe, it, expect } from 'vitest';
-import type { Payload } from './timeline';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import type { Action, Payload } from './timeline';
 import { battleReducer, initialState, type BattleState } from '../hooks/battleReducer';
 import { FRESH_INTAKE, intakeEvent, type Intake } from './eventIntake';
+import { submitTrackedPromptAnswer } from '../hooks/answerPrompt';
+import { PROMPT_ANSWERS, type PromptRoute } from '../hooks/promptAnswers';
 import { bossTrainerName } from './bossTrainer';
 
 // The hook's own intake (eventIntake.ts) with each step applied in arrival order (RECONNECT_RESILIENCE.md R1d-d).
@@ -89,5 +91,86 @@ describe('a reconnect replay rebuilds the screen', () => {
     ]);
 
     expect(state.mapPin).toBe(PLAN.length);
+  });
+});
+
+// A replay of each logged prompt's open state: the server re-sends the cached prompt last (R1d-a).
+const RECOVERY: [string, Payload] =
+  ['RecoveryOffered', { creatureName: 'CHARIZARD', creatureId: 1, speciesId: 6, battlesWon: 3 }];
+const LOGGED_PROMPTS = [
+  { event: RECOVERY, route: PROMPT_ANSWERS.respondRecovery, intro: 'reached a Poké Center' },
+  {
+    event: ['MoveReplacementRequired', {
+      creatureName: 'CHARIZARD', newMoveName: 'slash', currentMoves: ['ember', 'scratch', 'growl', 'leer'],
+    }] as [string, Payload],
+    route: PROMPT_ANSWERS.forgetMove, intro: 'is trying to learn',
+  },
+  {
+    event: ['EvolutionOffered', {
+      fromName: 'CHARMELEON', toName: 'CHARIZARD', fromSpeciesId: 5, toSpeciesId: 6,
+    }] as [string, Payload],
+    route: PROMPT_ANSWERS.respondEvolution, intro: 'is evolving',
+  },
+].map(p => ({ ...p, key: p.route.key }));
+
+const introLines = (state: BattleState, intro: string) => state.log.filter(l => l.message.includes(intro));
+
+// Flush the rejected-promise continuation.
+const settle = () => new Promise(resolve => setTimeout(resolve, 0));
+
+// The player answers through useBattleHub's own answer path, on the hook's route for that prompt.
+async function answer(client: Client, route: PromptRoute, invoke: () => Promise<unknown>): Promise<Client> {
+  const intakeRef = { current: client.intake };
+  let state = client.state;
+  submitTrackedPromptAnswer(intakeRef, {
+    ...route,
+    prompt: client.state[route.key],
+    dispatch: (a: Action) => { state = battleReducer(state, a); },
+    invoke,
+  });
+  await settle();
+  return { state, intake: intakeRef.current };
+}
+
+const sent = () => Promise.resolve();
+const rejected = () => Promise.reject(new Error("not in the 'Connected' State"));
+
+afterEach(() => vi.restoreAllMocks());
+
+describe('a reconnect replay of an open prompt logs its intro once', () => {
+  it.each(LOGGED_PROMPTS)('a blip with $key open: intro logged once, modal still up', ({ event, key, intro }) => {
+    const open = receive(FRESH, event);
+
+    const { state } = receive(open, event);
+
+    expect(introLines(state, intro)).toHaveLength(1);
+    expect(state[key]).not.toBeNull();
+  });
+
+  it.each(LOGGED_PROMPTS)('a refresh with $key open shows it', ({ event, key, intro }) => {
+    const { state } = receive(FRESH, event);
+
+    expect(introLines(state, intro)).toHaveLength(1);
+    expect(state[key]).not.toBeNull();
+  });
+
+  it.each(LOGGED_PROMPTS)('a replay after $key is answered shows it again (the accepted race)', async ({ event, key, route }) => {
+    const answered = await answer(receive(FRESH, event), route, sent);
+    expect(answered.state[key]).toBeNull();
+
+    const { state } = receive(answered, event);
+
+    expect(state[key]).not.toBeNull();
+  });
+
+  it.each(LOGGED_PROMPTS)('a $key answer rejected mid-blip restores the modal, and the replay does not re-log it', async ({ event, key, route, intro }) => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const restored = await answer(receive(FRESH, event), route, rejected);
+    expect(restored.state[key]).not.toBeNull();
+
+    const { state } = receive(restored, event);
+
+    expect(introLines(state, intro)).toHaveLength(1);
+    expect(state[key]).not.toBeNull();
   });
 });

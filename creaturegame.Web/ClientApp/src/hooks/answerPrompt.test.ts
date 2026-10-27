@@ -47,9 +47,34 @@ describe('submitPromptAnswer', () => {
     ]);
   });
 
+  it('calls onRestore after a restore, and never when the answer is sent', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const answer = (invoke: () => Promise<unknown>) => {
+      const onRestore = vi.fn();
+      submitPromptAnswer({
+        key: 'rewardChoice',
+        prompt: reward,
+        hide: { type: 'HIDE_REWARD_CHOICE' },
+        method: 'ChooseReward',
+        dispatch: () => {},
+        invoke,
+        onRestore,
+      });
+      return onRestore;
+    };
+
+    const sent = answer(() => Promise.resolve());
+    const rejected = answer(() => Promise.reject(new Error('reconnecting')));
+    await settle();
+
+    expect(sent).not.toHaveBeenCalled();
+    expect(rejected).toHaveBeenCalledOnce();
+  });
+
   it('does not restore anything when no prompt was open', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     const dispatch = vi.fn<(a: Action) => void>();
+    const onRestore = vi.fn();
 
     submitPromptAnswer({
       key: 'rewardChoice',
@@ -58,10 +83,12 @@ describe('submitPromptAnswer', () => {
       method: 'ChooseReward',
       dispatch,
       invoke: () => Promise.reject(new Error('closed')),
+      onRestore,
     });
     await settle();
 
     expect(dispatch.mock.calls.map(c => c[0].type)).toEqual(['HIDE_REWARD_CHOICE']);
+    expect(onRestore).not.toHaveBeenCalled();
   });
 
   it('only hides (no send, no restore) when there is no live connection', async () => {

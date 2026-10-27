@@ -8,6 +8,31 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §2 R1d-e — a blip no longer re-logs a replayed prompt's intro ✅ DONE (2026-10-27)
+
+S, reliability (cosmetic); was §1 #7b / §2 "R1d-e". R1d-a replays the open prompt on every reconnect. After a blip the
+client still held the modal, and `RecoveryOffered` / `MoveReplacementRequired` / `EvolutionOffered` expand into log
+lines before their idempotent `SHOW_*`, so each blip wrote the intro again. Client only. Design confirmed by the user
+2026-10-27; the design record stays in `RECONNECT_RESILIENCE.md` → R1d-e.
+
+- **Acceptance (met):** a blip with one of those prompts open → its intro is logged once and the modal stays open and
+  answerable; a refresh still shows the prompt; after an answer, a replay of that prompt (the accepted race) still
+  shows it.
+- **What changed:**
+  - `replayDedupe.ts`: an arrival-order `openPrompt` tracker, set when one of the three events is accepted; a replayed
+    event of the same type while it is set is skipped.
+  - `answerPrompt.ts` `submitTrackedPromptAnswer` (called by `useBattleHub`) clears it at answer time; when the send is
+    rejected and the modal is restored, `onRestore` re-arms it. `eventIntake.ts` carries the tracker.
+  - Tests: Vitest in `replayDedupe.test.ts`, `answerPrompt.test.ts` and `reconnectReplay.test.ts` (whole replays
+    through intake, reducer and the hook's answer path). The browser blip check is R1d-f's.
+- **User decisions (2026-10-27):** the re-arm on a rejected send is ratified; the hook wiring gap was closed by
+  extracting `submitTrackedPromptAnswer`; the at-most-one-open-prompt invariant (the skip compares event type, not
+  payload) is documented, not keyed on payload.
+- **Gen surface:** none. **Gen 1 source:** n/a. **Data vs runtime:** client only.
+- **Moved on:** R1d-f's "R1d-e first" dependency (the prompt-log assertion) is met.
+
+---
+
 ## §2 R1d-d — a refresh keeps the route trail, node pin, boss framing and the lead's sprite ✅ DONE (2026-10-27)
 
 M, reliability; was §1 #5 / §2 "R1d-d". After a refresh the region map held only the current biome, the ladder pin

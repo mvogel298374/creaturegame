@@ -1,6 +1,6 @@
 # RECONNECT_RESILIENCE.md — the remaining reconnect work, designed (2026-10-03)
 
-> **Status: R1d-a BUILT (2026-10-26) and R1d-d BUILT (2026-10-27); their sections below are the design records;
+> **Status: R1d-a BUILT (2026-10-26), R1d-d and R1d-e BUILT (2026-10-27); their sections below are the design records;
 > R1d-c provisional-pending-`/plan`.** Written from a read of the code on 2026-10-03, not from the
 > review sweep's text. The frontend half of c is provisional until its `/plan` pass (DoR #2). The c task entry and
 > acceptance conditions live in `TODO.md` → *Reliability — reconnect*; R1d-a's and R1d-d's are in `TODO_ARCHIVE.md` → *§2 R1d-a*, *§2 R1d-d*;
@@ -183,7 +183,7 @@ The sections below are the design record; the as-built list is `TODO_ARCHIVE.md`
     first battle.
   - **Out of scope:** the Title screen's Continue card reads a saved `Species` object from `localStorage`, so
     fixing it needs a persisted-shape change; it keeps its §5 entry. Duplicate prompt log lines after a blip
-    (R1d-a's replay re-expands the recovery / move-replacement / evolution intros) have their own TODO entry.
+    (R1d-a's replay re-expands the recovery / move-replacement / evolution intros) were fixed as R1d-e (below).
 - **DoR.** Gen-variable: none (species identity, route state — gen-invariant). Gen 1 source: n/a. Data vs runtime:
   runtime — one engine event field (`BattleStarted.PlayerSpeciesId`), the web emitter and a transport notice, and
   the client hook / timeline / reducer; no importer or DB change. **Quirk to test:** the snapshot is absolute — a
@@ -196,6 +196,34 @@ The sections below are the design record; the as-built list is `TODO_ARCHIVE.md`
   Browser: one refresh scenario in `reconnect.spec.ts` mid-first-biome after two nodes, checking the ladder pin, run
   on request. The blip scenario and its `DropConnection` hub method are their own tooling entry (they serve R1d-c
   too); a second-biome trail check in E2E is a biome-deep walk and is left to the C# and Vitest tests.
+
+## R1d-e. A blip re-logs an open prompt's intro — BUILT (2026-10-27)
+
+- **What was wrong.** R1d-a replays the open prompt on every reconnect. After a blip the client still holds the
+  modal, and `RecoveryOffered`, `MoveReplacementRequired` and `EvolutionOffered` expand into log lines before their
+  idempotent `SHOW_*`, so each blip wrote the intro again. The other prompts raise their modal with no log line.
+- **Design.** `replayDedupe.ts` gains an arrival-order `openPrompt` tracker, set when one of those three events is
+  accepted. A replayed event of the same type while it is set is skipped. `useBattleHub`'s `answerPrompt` clears it
+  at answer time, so a replay after the answer (R1d-a's accepted race) shows the modal again. When the answer's send is
+  rejected and `submitPromptAnswer` restores the modal, its `onRestore` callback sets the tracker again: the prompt
+  is open, and the reconnect that follows must not re-log it (the re-arm was added in implementation; the user
+  ratified it 2026-10-27). Both live in `submitTrackedPromptAnswer` (`answerPrompt.ts`), which the hook calls. Tracker,
+  not reducer state, for the same reason as the biome trackers: the `SHOW_*` is queued behind the intro's waits, so
+  state lags arrival.
+- **Invariant: at most one logged prompt is open, so the event type identifies it.** The skip compares the event type,
+  not the payload. That holds because the server parks the run on each prompt (`SignalRInput`), so the next prompt of
+  the same type only follows an answer, and the answer clears the tracker. A future flow that opens two same-type
+  prompts at once (a batched evolution, say) breaks this and must key the tracker on a payload identity instead
+  (user ruling 2026-10-27: document, don't key on payload now).
+- **Rejected.** *Skip whenever the reducer slot is set:* misses a replay landing during the intro animation, before
+  `SHOW_*` applies. *Clear only once the send resolves:* would skip a replay that lands before the resolve, but the
+  confirmed acceptance has a post-answer replay show the prompt (the race stays as R1d-a documents it).
+- **Tests.** Vitest: the three prompts are skipped only while open, cleared by their own answer and re-set by their
+  own restore (`replayDedupe.test.ts`); through the real intake, reducer and the hook's answer path
+  (`submitTrackedPromptAnswer` on each prompt's `PROMPT_ANSWERS` route), a blip logs each intro once with the modal
+  up, a refresh shows it, a post-answer replay shows it, and a rejected answer then a replay logs it once
+  (`reconnectReplay.test.ts`); `onRestore` fires only on a restore (`answerPrompt.test.ts`). The browser blip check
+  is R1d-f's.
 
 ## Test plan (covers a, c, d and the open verification gaps)
 
