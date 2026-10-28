@@ -8,6 +8,25 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §6 `E2E-wslog` — quiet the expected websocket reset in the dev proxy log ✅ DONE (2026-10-28)
+
+S, test/CI tooling; greenlit by Mo 2026-10-28, built the same day. The blip specs' deliberate socket abort (R1d-f's
+`DropConnection`) printed Vite's `ws proxy error ... ECONNRESET` stack trace into the E2E log, burying real errors.
+
+- **Acceptance:** `.\e2e.ps1 -Spec reconnect` prints no `ws proxy error` lines; a different proxy error (backend down,
+  `ECONNREFUSED`) still prints. **Not yet verified:** the E2E run is opt-in and had not been run when this was archived.
+- **What changed:**
+  - `creaturegame.Web/ClientApp/vite.config.ts`: a Vite `customLogger` drops a `ws proxy error` message whose error
+    code is `ECONNRESET`; other proxy errors still print. (Vite attaches its own proxy error handler after any
+    `configure` hook, so the hook cannot replace it.)
+  - `e2e/README.md` -> "How it works": the reasoning and the cost.
+  - `test.ps1` help text: "runs all three" -> "runs all four" suites.
+- **Cost accepted:** a genuine mid-socket reset is silent in the proxy log too; the backend log keeps the cause.
+- **Gen surface:** none. **Gen 1 source:** n/a. **Data vs runtime:** dev tooling only, nothing ships.
+- **Tests:** none in the fast suites (logger config, no logic to unit-test); the opt-in E2E run above is the check.
+
+---
+
 ## §2 R1d-c — a second window on the same run takes it over; the first is told ✅ DONE (2026-10-28)
 
 S, reliability; was §1 #7 / §2 "R1d-c". The server already made the new window win (`AttachConnection` repoints the run

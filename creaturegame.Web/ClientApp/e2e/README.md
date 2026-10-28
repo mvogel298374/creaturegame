@@ -160,7 +160,12 @@ npx playwright show-report                    # last HTML report (only if it was
     (so specs assert animation ordering, e.g. lunge-before-hit),
   - exposes **`window.__cgHub`**: `drop()` asks the server to abort the hub connection (a
     deterministic blip; honoured only under Dev Mode), plus `reconnects` and every received
-    event type, so `reconnect.spec.ts` can wait for the replay to land (R1d-f), and
+    event type, so `reconnect.spec.ts` can wait for the replay to land (R1d-f). The abort
+    resets the socket Vite proxies, so `vite.config.ts` gives Vite a `customLogger` that
+    drops that one `ws proxy error … ECONNRESET` line; any other proxy error still prints.
+    It has to be the logger: Vite adds its own proxy error handler after any `configure`
+    hook, so a hook can't replace that handler. The cost is that a genuine mid-socket reset
+    is silent there too, but `.dev/backend.log` still records its cause; and
   - **collapses animation delays** (and shortens the animation-complete wait) so battles
     play through fast while step ordering is preserved.
   Specs therefore import straight from `@playwright/test` (no custom fixture), which keeps

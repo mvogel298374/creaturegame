@@ -11,7 +11,7 @@
   failing tests. Exits non-zero if any suite fails, so it's usable in CI.
 
 .DESCRIPTION
-  With no switches, runs all three. The Playwright suite needs the app running
+  With no switches, runs all four. The Playwright suite needs the app running
   (Vite :5173 proxying to the backend :5100); if the backend isn't detected it is
   skipped with a notice, unless -StartStack is given (then the backend is started
   for the run and stopped afterwards; Playwright starts/stops Vite itself).
