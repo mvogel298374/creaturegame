@@ -147,15 +147,26 @@ public sealed class Gen1BattleRules : IBattleRules
 
     public int BideDamageMultiplier => 2;
 
-    // Gen 1: Psywave rolls [1, floor(1.5 × level)) — max one below 1.5 × level; ignores stats/type/STAB/crits.
-    public int RollPsywaveDamage(Creature source, IRandomSource rng)
+    public int RollPsywaveDamage(Creature source, BattleSide side, IRandomSource rng)
     {
-        var (min, max) = PsywaveDamageRange(source);
+        var (min, max) = PsywaveDamageRange(source, side);
         return rng.Next(min, max + 1);
     }
 
-    public (int Min, int Max) PsywaveDamageRange(Creature source) =>
-        (1, Math.Max(1, source.Level * 3 / 2 - 1));
+    // pokered core.asm: only the player's Psywave loop rejects a 0 roll.
+    public (int Min, int Max) PsywaveDamageRange(Creature source, BattleSide side)
+    {
+        int min = side == BattleSide.Opponent ? 0 : 1;
+        return (min, Math.Max(min, source.Level * 3 / 2 - 1));
+    }
+
+    // pokered effects.asm StatModifierDownEffect: enemy turn, non-link (we have no link battles).
+    public bool StatDownHandicapApplies(BattleSide side, Attack move, bool isSecondary) =>
+        side == BattleSide.Opponent;
+
+    private const int StatDownHandicapFailBelow = 64;
+
+    public bool RollStatDownHandicapFails() => _rng.Next(256) < StatDownHandicapFailBelow;
 
     // Gen 1: Rest forces the user asleep for exactly 2 turns (then it wakes and acts).
     public int RestSleepTurns => 2;

@@ -8,6 +8,62 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §3.1 Foe-only Gen 1 rules: Psywave can deal 0, stat-down moves fail 25% ✅ DONE (2026-10-28)
+
+S–M; merged from V9's Psywave entry and "Smaller Gen 1 gaps III"; `/plan` 2026-10-28. User rulings 2026-10-17: replicate
+both behind a seam. User 2026-10-28: one item, implemented in the main session (not `opus-engineer`), both review gates.
+
+- **Intent:** the engine knows which side is attacking, and two Gen 1 rules that apply only to the computer's side use it.
+- **Acceptance** (full battles, rolls forced through the rules seam):
+  - (a) the foe's Psywave on a forced 0 deals 0 and leaves the player's HP unchanged; the player's minimum stays 1; the
+    Dev Mode range shows the foe's Psywave as 0–max;
+  - (b) the foe's Growl on a roll under 64/256 prints "But it failed!" (`MoveFailed`) and draws no accuracy roll;
+  - (c) the foe's Aurora Beam still damages but its drop silently doesn't happen;
+  - (d) the roll precedes the Substitute check (a substituted player's Growl-fail draws the roll, not the block);
+  - (e) the player's moves never draw the roll, so the player's RNG stream is unchanged.
+- **Design:**
+  - `BattleSide { Player, Opponent }`, a new `AttackAction` constructor parameter defaulting to `Player`. `Battle` passes
+    `Opponent` for the foe's action and `Player` in `NewPlayerAttack`; `ExecuteInner` (Metronome / Mirror Move) forwards
+    it, so a foe's Metronome→Growl rolls too. Rejected: a side flag on `Creature.Battle` (instances are reused across
+    switch-ins; one more transient field to reset).
+  - Primary stat-down move: the roll sits just before the roll-order block in `ExecuteAsync` (before accuracy, both
+    `HitRollOrder` branches); a fail emits the existing `MoveFailed`, so no wire change. Gen 1 stat-down moves skip type
+    immunity in `MoveHitTest`, so the position relative to the immunity check doesn't matter (read-confirmed).
+  - Secondary drop: the roll sits at the top of `TryApplyStatEffect`, before the Substitute check; a fail is silent.
+  - `DamageCalculator.EstimateRange` takes the side; `GameSessionManager.GetDamageRanges` maps `enemySide` to `Opponent`.
+  - We have no link battles, so the Gen 1 rule depends on the side alone; no link concept is added.
+  - A 0 Psywave still emits `DamageDealt(0)` ("took 0 damage!", hit sound, shake); accepted, no client change
+    (re-confirmed at requirements-review 2026-10-28).
+- **Review rulings (requirements-review 2026-10-28, all accepted by Mo):** a level-1 foe's Psywave range is `[0, 0]` (the
+  max clamps to the min, not to 1); Metronome and Mirror Move forwarding are pinned by tests; a KO skips the secondary
+  drop and its roll, which matches pokered (stat-down side effects aren't in `data/battle/always_happen_effects.asm`, so
+  `ExecuteEnemyMove` returns at the 0-HP check); the pre-existing Substitute-vs-primary-stat-down order was filed as its
+  own `TODO.md` §3.1 entry ("Gen 1 Substitute stops a primary stat-down move before accuracy").
+- **Review rulings (pr-review 2026-10-28, all fixed per Mo):** both seam docs state the Gen 1 rule
+  (`StatDownHandicapApplies`, and the full Psywave range); tests pin that the player draws no handicap roll
+  (`StatDownHandicapRolls`, the draw recorder); the foe's Dev Mode Psywave range (endpoint and `MinDamage`) is tested;
+  `isSecondary` is passed from the call site instead of recomputed.
+- **Seam (`IBattleRules`):** `PsywaveDamageRange(Creature source, BattleSide side)` and
+  `RollPsywaveDamage(Creature source, BattleSide side, IRandomSource rng)`, Gen 1 minimum 0 for `Opponent`; new
+  `bool StatDownHandicapApplies(BattleSide side, Attack move, bool isSecondary)` (who takes the roll) and
+  `bool RollStatDownHandicapFails()` (the roll, on the rules' own RNG like `RollDisableTurns`, so a test forces only the
+  roll while Gen 1's side check stays real). Split from the planned single `OpponentStatDownFails` during
+  implementation; the roll is drawn only when the rule applies. Gen 2 (pokecrystal `effect_commands.asm`): Psywave
+  rejects 0 for both sides (`BattleCommand_ConstantDamage`); the handicap stays (`BattleCommand_StatDown`
+  `.ComputerMiss`) but exempts `EFFECT_ACCURACY_DOWN_HIT` and also applies to Paralyze/Poison/Sleep moves. That status
+  extension becomes a sibling member when Gen 2 is built, not now. Rows: `GENERATION_SEAMS.md` §2.
+- **Gen 1 source:** pokered `core.asm` `ApplyAttackToEnemyPokemon` (Psywave loop rejects 0) vs `ApplyAttackToPlayerPokemon`
+  (doesn't), around `:4657-4670` / `:4776-4789`; `effects.asm:539-557` `StatModifierDownEffect` (enemy and non-link →
+  `BattleRandom` < `25 percent + 1` → `MoveMissed`, before `CheckTargetSubstitute`; primary moves then `MoveHitTest`, side
+  effects the 33% roll); `:712-716` `MoveMissed` ("But it failed!" for a primary move, silent for a side effect). Checked
+  2026-10-28. Earlier source confirmation 2026-10-18 for the handicap: same lines.
+- **Data vs runtime:** runtime only (engine, plus the Dev Mode range in the web layer).
+- **Quirk asserted:** only the foe can roll a 0 Psywave or take the fail roll, and a failed secondary drop is silent.
+- **Tests:** `PsywaveContractTests`, `StatDownHandicapContractTests`, `DamageRangeTests`, `DevModeTests`;
+  `DelegatingBattleRules` follows the signature change.
+
+---
+
 ## §6 `E2E-wslog` — quiet the expected websocket reset in the dev proxy log ✅ DONE (2026-10-28)
 
 S, test/CI tooling; greenlit by Mo 2026-10-28, built the same day. The blip specs' deliberate socket abort (R1d-f's

@@ -262,6 +262,7 @@ public sealed class ScriptableRules : DelegatingBattleRules
     private int? _bindingTurns;
     private int? _disableTurns;
     private int? _multiHitCount;
+    private bool? _statDownHandicapFails;
 
     /// <summary>Always hit, never crit, no damage variance — the usual deterministic-damage baseline.</summary>
     public ScriptableRules Deterministic()
@@ -345,6 +346,13 @@ public sealed class ScriptableRules : DelegatingBattleRules
         return this;
     }
 
+    /// <summary>Forces the AI stat-down handicap roll; who takes the roll stays the rules' own call.</summary>
+    public ScriptableRules StatDownHandicap(bool fails)
+    {
+        _statDownHandicapFails = fails;
+        return this;
+    }
+
     public override int GetHitThreshold(int acc, int accStage, int evaStage) =>
         _alwaysHit ? 256 : base.GetHitThreshold(acc, accStage, evaStage);
 
@@ -371,6 +379,15 @@ public sealed class ScriptableRules : DelegatingBattleRules
     public override int RollDisableTurns() => _disableTurns ?? base.RollDisableTurns();
 
     public override int RollMultiHitCount() => _multiHitCount ?? base.RollMultiHitCount();
+
+    /// <summary>How many times the AI stat-down handicap was rolled.</summary>
+    public int StatDownHandicapRolls { get; private set; }
+
+    public override bool RollStatDownHandicapFails()
+    {
+        StatDownHandicapRolls++;
+        return _statDownHandicapFails ?? base.RollStatDownHandicapFails();
+    }
 }
 
 /// <summary>
@@ -393,6 +410,7 @@ public sealed class BattleScenario
     private bool _escapable = true; // wild battle by default; false = the Elite/Boss trainer analog
     private Party? _playerParty; // party-aware battle (forced switch-in + innate Exp-Share) when set
     private RunRules? _runRules; // roguelite run-tuning (XP curve, bench Exp-Share) when set
+    private IRandomSource? _battleRng; // null → SeededRandomSource(_seed)
 
     public BattleScenario Player(Creature c)
     {
@@ -466,6 +484,13 @@ public sealed class BattleScenario
         return this;
     }
 
+    /// <summary>The battle's own draws (turn order, accuracy, Psywave) from a fixed source instead of the seed.</summary>
+    public BattleScenario BattleRng(IRandomSource rng)
+    {
+        _battleRng = rng;
+        return this;
+    }
+
     /// <summary>Whether the battle can be fled — Roar/Whirlwind (ForceFlee) end an escapable wild battle but
     /// fail in a non-escapable one (the Elite/Boss trainer analog). Defaults to true (a plain wild battle).</summary>
     public BattleScenario Escapable(bool escapable)
@@ -493,7 +518,7 @@ public sealed class BattleScenario
             new ScriptedInput(_enemyScript),
             rules: rules,
             emitter: emitter,
-            rng: new SeededRandomSource(_seed),
+            rng: _battleRng ?? new SeededRandomSource(_seed),
             escapable: _escapable,
             runRules: _runRules,
             playerParty: _playerParty

@@ -122,19 +122,6 @@ data/engine item usually also means updating the test that pins the wrong value.
   pokecrystal in the design pass). Runtime only. Dependencies: none.
   **Remaining steps:** (1) you confirm the drafted lines; (2) a design pass names the seam members and reads Gen 2,
   shown to you; (3) then it is Ready for `opus-engineer` plus both review gates.
-- **Foe Psywave can deal 0 (from §7.6 V9) — S, ✗ not Ready.** Gen 1 rolls the player's Psywave in `[1, b)` and
-  the foe's in `[0, b)`, b = L + floor(L/2) (`core.asm:4657-4670`, `:4776-4789`); ours rolls `[1, b)` for both.
-  **User ruling 2026-10-17:** replicate it behind a seam (it stayed open from 2026-10-12).
-  **DoR:** ✗ not Ready — gap **2** (the seam shape: `PsywaveDamageRange`/`RollPsywaveDamage` take only the source
-  creature, so they need the attacker's side; the call site is `AttackAction`, central, so `pr-review` applies).
-  *Drafted:* acceptance, a forced 0 roll on the foe's Psywave deals 0 and leaves the player's HP unchanged, and the
-  player's minimum stays 1; the damage-range preview (`DamageCalculator`) shows the foe's 0. Seam: the existing
-  Psywave members, given the side; Gen 2 read at pokecrystal. Gen 1 source: cited above. Runtime only. Quirk: only
-  the foe can roll 0. Dependencies: shares the attacker's-side design note with "Smaller Gen 1 gaps III" (foe
-  stat-down 25% fail).
-  **Remaining steps:** (1) you confirm the drafted lines; (2) the shared design note (one note covers this and
-  "Smaller Gen 1 gaps III") fixes how the seam learns the attacker's side, shown to you; (3) then it is Ready (S,
-  `pr-review` applies).
 - **Smaller Gen 1 gaps II — verified, trainer XP / Transform crit speed / Substitute-at-cost fixed 2026-10-12 (§7.6 V10).**
   Verdicts, F1–F3 and the review rulings: `TODO_ARCHIVE.md` → "§7.6 V10 — smaller Gen 1 gaps II". The remainder stays
   open as the entries below.
@@ -151,6 +138,13 @@ data/engine item usually also means updating the test that pins the wrong value.
   - **Leech Seed × Toxic counter**, after §4.2. Quirk: the drain grows with the Toxic counter.
 
   Both are `IBattleRules` members, runtime only, `opus-engineer` plus both gates.
+- **Gen 1 Substitute stops a primary stat-down move before accuracy (from requirements-review 2026-10-28) — S, ✗ not
+  Ready.** *Intent:* in Gen 1 a Substitute stops a primary stat-down move (Growl into a substituted target) with
+  "But it failed!" before the accuracy roll (pokered `effects.asm` `StatModifierDownEffect`: `CheckTargetSubstitute`
+  precedes `MoveHitTest`). Ours rolls accuracy first and then blocks silently in `TryApplyStatEffect`, for both
+  sides: different text and an extra RNG draw. *Gaps:* acceptance, seam (whether the order differs in Gen 2), the
+  primary source re-checked for the stat-up and status moves, and the test list. Sits next to "Mist + thaw", which
+  also moves logic ahead of the hit test; plan them together.
 - **Gen 1 XP participant split order (from §7.6 V10) — S, ✗ not Ready.** Gen 1 divides the base exp and the Stat
   Exp yields by the participant count first (`experience.asm:294`). *Gaps:* touches `Battle`, and it's a seam question
   (`SplitXpAmongParticipants`'s contract changes; composition order is in `GENERATION_SEAMS.md`).
@@ -161,26 +155,6 @@ data/engine item usually also means updating the test that pins the wrong value.
   - **Data vs runtime:** runtime only.
   - **Quirk:** dividing first loses the remainder that dividing last would keep.
   - **Dependencies:** none.
-- **Smaller Gen 1 gaps III (new, unverified beyond the cite):** the foe's stat-down moves fail 25% of the time in a
-  non-link battle (`effects.asm:549-554`), a Gen 1 AI handicap.
-  **User ruling 2026-10-17:** replicate it behind an `IBattleRules` flag.
-  *Source-confirmed 2026-10-18:* `StatModifierDownEffect` (`effects.asm:539-557`): on the enemy's turn in any
-  non-link battle, `BattleRandom` < `25 percent + 1` (64/256) jumps to `MoveMissed`, **before** the Substitute check;
-  `MoveMissed` prints "But it failed!" for a primary move and returns silently for a side effect
-  (`effects.asm:712-716`), so the foe's secondary drops are cut too.
-  **DoR:** ✗ not Ready — gap **2** only (drafts confirmed by the user 2026-10-18). The same claim was filed again in
-  §3.2 and is merged here.
-  - **Acceptance:** a full battle with forced rolls through the rules seam: the foe's Growl fails on a roll under
-    64/256 and prints "But it failed!"; the foe's Aurora Beam still damages but its drop silently doesn't happen;
-    the player's moves never take this roll; the roll precedes the Substitute check.
-  - **Design:** central (`AttackAction.TryApplyStatEffect`), so a short design note, then `opus-engineer` plus both
-    gates. The rule needs the attacker's side — the same question as "Foe Psywave can deal 0"; one note covers both.
-  - **Seam:** an `IBattleRules` member for the odds and the side it applies to (Gen 2 read at pokecrystal in the
-    note).
-  - **Data vs runtime:** runtime only.
-  - **Quirk:** only the enemy rolls, and a failed secondary drop is silent.
-  - **Dependencies:** shares the attacker's-side design note with the Psywave entry.
-  - **Remaining steps:** the shared design note, shown to the user; then Ready.
 - **Substitute blocks sleep/paralysis status moves; Gen 1 lets them through (source-confirmed 2026-10-17, §7.6
   V15) — S–M, ✗ not Ready.** pokered (master): `SleepEffect` (`engine/battle/effects.asm:26-77`) and
   `ParalyzeEffect_` (`engine/battle/move_effects/paralyze.asm`, reached from `effects.asm:1165`) never call
@@ -250,7 +224,7 @@ data/engine item usually also means updating the test that pins the wrong value.
   - **Quirk:** Dire Hit's text must not promise a raised crit rate (Gen 1's Focus Energy bug).
   - **Dependencies:** none.
 - **Found 2026-10-11 during V7 / the item seam (unverified beyond the citation; each needs its own DoR):**
-  - *AI stat-down 25% fail:* duplicate of §3.1 "Smaller Gen 1 gaps III", which holds the audit (V16).
+  - *AI stat-down 25% fail:* fixed 2026-10-28, archived (`TODO_ARCHIVE.md` → "Foe-only Gen 1 rules").
   - *A failed OHKO says "missed", Gen 1–2 say "<target> is unaffected!" (found 2026-10-11, second review of "Gen 1
     roll order", archived; source-confirmed, predates it):* the OHKO effect sets `wCriticalHitOrOHKO` to `$ff` and
     `PrintMoveFailureText` then prints `UnaffectedText` (pokered `engine/battle/core.asm:3783`); Gen 2 the same
@@ -773,7 +747,7 @@ The stale comments the sweep listed were fixed 2026-10-03 (`bag.ts`, `timeline.t
 Nothing open. The list was verified and its findings fixed or filed in §7.6 V15 (`TODO_ARCHIVE.md` → "§7.6 V15 —
 speculative list (§7.5)").
 
-### 7.6 Verification pass over the unverified findings (§1 #2) — complete
+### 7.6 Verification pass over the unverified findings — complete
 
 Done 2026-10-17 (V1–V16, nothing open). The per-slice records, the process, the verdict-tag legend and the slice index
 are in `TODO_ARCHIVE.md` → "§7.6 V16 — full Gate 1 audit" (the pass as a whole) and "§7.6 V1" … "§7.6 V15". The

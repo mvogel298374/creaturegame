@@ -368,7 +368,8 @@ public sealed class GameSessionManager(
                     defender,
                     m.Base,
                     profile.TypeChart,
-                    profile.BattleRules
+                    profile.BattleRules,
+                    enemySide ? BattleSide.Opponent : BattleSide.Player
                 )
             )
             .ToList();

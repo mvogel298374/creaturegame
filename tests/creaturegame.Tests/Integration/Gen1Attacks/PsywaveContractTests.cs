@@ -47,14 +47,50 @@ public class PsywaveContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         );
     }
 
-    // pokered rolls [1, b) with b = floor(1.5 × level), so b itself is never dealt.
+    // pokered rolls [1, b) with b = floor(1.5 × level), so b itself is never dealt; the foe's loop also allows 0.
     [Theory]
-    [InlineData(50, 74)]
-    [InlineData(1, 1)]
-    public void RangeTopIsOneBelowOnePointFiveLevel(int level, int expectedMax)
+    [InlineData(50, BattleSide.Player, 1, 74)]
+    [InlineData(1, BattleSide.Player, 1, 1)]
+    [InlineData(50, BattleSide.Opponent, 0, 74)]
+    [InlineData(1, BattleSide.Opponent, 0, 0)] // pokered's foe loop at L1 can only produce 0
+    public void RangeTopIsOneBelowOnePointFiveLevel_AndOnlyTheFoesBottomIsZero(
+        int level,
+        BattleSide side,
+        int expectedMin,
+        int expectedMax
+    )
     {
         var attacker = TestCreatures.Make("A", level: level);
-        Assert.Equal((1, expectedMax), Gen1BattleRules.Instance.PsywaveDamageRange(attacker));
+        Assert.Equal(
+            (expectedMin, expectedMax),
+            Gen1BattleRules.Instance.PsywaveDamageRange(attacker, side)
+        );
+    }
+
+    // pokered: the enemy's Psywave loop has no zero check, so on the lowest roll only the foe deals 0.
+    [Fact]
+    public async Task OnTheLowestRoll_OnlyTheFoesPsywaveDealsZero()
+    {
+        var player = TestCreatures.Make("Player", hp: 999, speed: 200);
+        player.AddAttack(Move("psywave"));
+        var enemy = TestCreatures.Make("Enemy", hp: 3, speed: 1);
+        enemy.AddAttack(Move("psywave"));
+
+        var result = await new BattleScenario()
+            .Player(player)
+            .Enemy(enemy)
+            .PlayerUses("psywave")
+            .EnemyUses("psywave")
+            .BattleRng(new LowestRollSource())
+            .RunAsync();
+
+        Assert.Equal("Player", result.Winner);
+        Assert.All(result.DamageTo("Enemy"), hit => Assert.Equal(1, hit.Damage));
+        Assert.NotEmpty(result.DamageTo("Player"));
+        Assert.All(result.DamageTo("Player"), hit => Assert.Equal(0, hit.Damage));
+        Assert.Equal(999, player.Attributes.HP);
+        Assert.All(result.DamageTo("Enemy"), hit => Assert.Equal(1, hit.MinDamage));
+        Assert.All(result.DamageTo("Player"), hit => Assert.Equal(0, hit.MinDamage));
     }
 
     // The quirk that distinguishes Psywave from a Standard Special move: the damage ignores the

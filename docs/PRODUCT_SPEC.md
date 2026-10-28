@@ -132,6 +132,13 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - Design detail → `ARCHITECTURE.md` §2.4, §2.13.  History → `TODO_ARCHIVE.md` → *§7.6 V11 — seam leak, AI weights, move
   validation, map connectivity*.
 
+### Foe-only Gen 1 rules
+- The foe's Psywave can deal 0 damage; the player's always deals at least 1. Dev Mode shows the foe's range from 0.
+- The foe's stat-down moves fail 25% of the time: a primary one (Growl) prints "But it failed!" before its accuracy
+  roll, and a secondary drop (Aurora Beam) silently doesn't happen. The player's never fail this way.
+- Design detail → `GENERATION_SEAMS.md` §2 (*Psywave range*, *AI stat-down handicap*).  History → `TODO_ARCHIVE.md` →
+  *Foe-only Gen 1 rules*.
+
 ## 3. Encounters, biomes & acquisition
 
 ### Run map connectivity

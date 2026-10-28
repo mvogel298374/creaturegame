@@ -39,7 +39,7 @@ public class DamageRangeTests
         var (a, d) = Pair();
         var move = Tackle();
         var range = DamageCalculator
-            .EstimateRange(a, d, move, Chart, Gen1BattleRules.Instance)!
+            .EstimateRange(a, d, move, Chart, Gen1BattleRules.Instance, BattleSide.Player)!
             .Value;
 
         var seen = new HashSet<int>();
@@ -69,7 +69,7 @@ public class DamageRangeTests
     {
         var (a, d) = OneDamagePair();
         var range = DamageCalculator
-            .EstimateRange(a, d, Tackle(40), Chart, Gen1BattleRules.Instance)!
+            .EstimateRange(a, d, Tackle(40), Chart, Gen1BattleRules.Instance, BattleSide.Player)!
             .Value;
 
         Assert.Equal(1, range.Min);
@@ -81,13 +81,13 @@ public class DamageRangeTests
     {
         var (a, d) = Pair();
         var plain = DamageCalculator
-            .EstimateRange(a, d, Tackle(), Chart, Gen1BattleRules.Instance)!
+            .EstimateRange(a, d, Tackle(), Chart, Gen1BattleRules.Instance, BattleSide.Player)!
             .Value;
         var fire = Tackle();
         fire.DamageType = DamageType.Fire; // STAB (attacker is Fire)
 
         var stab = DamageCalculator
-            .EstimateRange(a, d, fire, Chart, Gen1BattleRules.Instance)!
+            .EstimateRange(a, d, fire, Chart, Gen1BattleRules.Instance, BattleSide.Player)!
             .Value;
 
         Assert.True(stab.Min > plain.Min && stab.Max > plain.Max);
@@ -99,17 +99,17 @@ public class DamageRangeTests
         var (a, d) = Pair();
         var move = Tackle();
         var baseline = DamageCalculator
-            .EstimateRange(a, d, move, Chart, Gen1BattleRules.Instance)!
+            .EstimateRange(a, d, move, Chart, Gen1BattleRules.Instance, BattleSide.Player)!
             .Value;
 
         a.Battle.Stages.Raise(StageStat.Attack, 2);
         var boosted = DamageCalculator
-            .EstimateRange(a, d, move, Chart, Gen1BattleRules.Instance)!
+            .EstimateRange(a, d, move, Chart, Gen1BattleRules.Instance, BattleSide.Player)!
             .Value;
         a.Battle.Stages.Raise(StageStat.Attack, -2);
         a.Battle.Status = StatusCondition.Burn;
         var burned = DamageCalculator
-            .EstimateRange(a, d, move, Chart, Gen1BattleRules.Instance)!
+            .EstimateRange(a, d, move, Chart, Gen1BattleRules.Instance, BattleSide.Player)!
             .Value;
 
         Assert.True(boosted.Max > baseline.Max);
@@ -124,22 +124,24 @@ public class DamageRangeTests
         var special = Tackle();
         special.AttackType = AttackType.Special;
         var physBefore = DamageCalculator
-            .EstimateRange(a, d, physical, Chart, Gen1BattleRules.Instance)!
+            .EstimateRange(a, d, physical, Chart, Gen1BattleRules.Instance, BattleSide.Player)!
             .Value;
         var specBefore = DamageCalculator
-            .EstimateRange(a, d, special, Chart, Gen1BattleRules.Instance)!
+            .EstimateRange(a, d, special, Chart, Gen1BattleRules.Instance, BattleSide.Player)!
             .Value;
 
         d.Battle.HasReflect = true;
 
         Assert.True(
             DamageCalculator
-                .EstimateRange(a, d, physical, Chart, Gen1BattleRules.Instance)!
+                .EstimateRange(a, d, physical, Chart, Gen1BattleRules.Instance, BattleSide.Player)!
                 .Value.Max < physBefore.Max
         );
         Assert.Equal(
             specBefore,
-            DamageCalculator.EstimateRange(a, d, special, Chart, Gen1BattleRules.Instance)!.Value
+            DamageCalculator
+                .EstimateRange(a, d, special, Chart, Gen1BattleRules.Instance, BattleSide.Player)!
+                .Value
         );
     }
 
@@ -158,24 +160,70 @@ public class DamageRangeTests
 
         Assert.Equal(
             new DamageRange(40, 40),
-            DamageCalculator.EstimateRange(a, d, Make(DamageCategory.Fixed, 40), Chart, rules)
+            DamageCalculator.EstimateRange(
+                a,
+                d,
+                Make(DamageCategory.Fixed, 40),
+                Chart,
+                rules,
+                BattleSide.Player
+            )
         );
         Assert.Equal(
             new DamageRange(50, 50),
-            DamageCalculator.EstimateRange(a, d, Make(DamageCategory.LevelBased), Chart, rules)
+            DamageCalculator.EstimateRange(
+                a,
+                d,
+                Make(DamageCategory.LevelBased),
+                Chart,
+                rules,
+                BattleSide.Player
+            )
         );
         Assert.Equal(
             new DamageRange(150, 150),
-            DamageCalculator.EstimateRange(a, d, Make(DamageCategory.OHKO), Chart, rules)
+            DamageCalculator.EstimateRange(
+                a,
+                d,
+                Make(DamageCategory.OHKO),
+                Chart,
+                rules,
+                BattleSide.Player
+            )
         );
         Assert.Equal(
             new DamageRange(75, 75),
-            DamageCalculator.EstimateRange(a, d, Make(DamageCategory.SuperFang), Chart, rules)
+            DamageCalculator.EstimateRange(
+                a,
+                d,
+                Make(DamageCategory.SuperFang),
+                Chart,
+                rules,
+                BattleSide.Player
+            )
         );
         Assert.Equal(
             new DamageRange(1, 74),
-            DamageCalculator.EstimateRange(a, d, Make(DamageCategory.Psywave), Chart, rules)
+            DamageCalculator.EstimateRange(
+                a,
+                d,
+                Make(DamageCategory.Psywave),
+                Chart,
+                rules,
+                BattleSide.Player
+            )
         ); // pokered [1, ⌊1.5×50⌋)
+        Assert.Equal(
+            new DamageRange(0, 74),
+            DamageCalculator.EstimateRange(
+                a,
+                d,
+                Make(DamageCategory.Psywave),
+                Chart,
+                rules,
+                BattleSide.Opponent
+            )
+        ); // the foe's loop doesn't reject 0
     }
 
     [Fact]
@@ -184,7 +232,16 @@ public class DamageRangeTests
         var (a, d) = Pair();
         var growl = new Attack { Name = "Growl", BaseDamage = 0 };
 
-        Assert.Null(DamageCalculator.EstimateRange(a, d, growl, Chart, Gen1BattleRules.Instance));
+        Assert.Null(
+            DamageCalculator.EstimateRange(
+                a,
+                d,
+                growl,
+                Chart,
+                Gen1BattleRules.Instance,
+                BattleSide.Player
+            )
+        );
     }
 
     [Fact]
@@ -196,10 +253,10 @@ public class DamageRangeTests
         var plain = Tackle(130);
 
         var boomRange = DamageCalculator
-            .EstimateRange(a, d, boom, Chart, Gen1BattleRules.Instance)!
+            .EstimateRange(a, d, boom, Chart, Gen1BattleRules.Instance, BattleSide.Player)!
             .Value;
         var plainRange = DamageCalculator
-            .EstimateRange(a, d, plain, Chart, Gen1BattleRules.Instance)!
+            .EstimateRange(a, d, plain, Chart, Gen1BattleRules.Instance, BattleSide.Player)!
             .Value;
 
         Assert.True(boomRange.Max > plainRange.Max);
@@ -211,7 +268,14 @@ public class DamageRangeTests
         var (a, d) = Pair();
         // A pinned-variance ruleset (variance 1.0 .. 1.0) must collapse the range to a single value.
         var range = DamageCalculator
-            .EstimateRange(a, d, Tackle(), Chart, NoVarianceNoCritHitRules.Instance)!
+            .EstimateRange(
+                a,
+                d,
+                Tackle(),
+                Chart,
+                NoVarianceNoCritHitRules.Instance,
+                BattleSide.Player
+            )!
             .Value;
 
         Assert.Equal(range.Min, range.Max);

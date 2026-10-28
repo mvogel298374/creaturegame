@@ -373,17 +373,21 @@ public interface IBattleRules
     /// </summary>
     int BideDamageMultiplier { get; }
 
-    /// <summary>
-    /// Returns the variable damage Psywave deals on hit (it ignores Attack/Defense, type
-    /// effectiveness, STAB and crits). Gen 1: a random integer in [1, floor(1.5 × user level)].
-    /// (Gen 2 uses a different range, Gen 3+ is 50–150% of level — the formula is gen-variable,
-    /// so it lives on the seam rather than inline in the attack resolver.)
-    /// </summary>
-    int RollPsywaveDamage(Creature source, IRandomSource rng);
+    /// <summary>The variable damage Psywave deals on hit (it ignores stats, type, STAB and crits), within
+    /// <see cref="PsywaveDamageRange"/>. See GENERATION_SEAMS.md §2.</summary>
+    int RollPsywaveDamage(Creature source, BattleSide side, IRandomSource rng);
 
-    /// <summary>The inclusive bounds <see cref="RollPsywaveDamage"/> draws within (Gen 1: 1 – floor(1.5 × level) − 1),
-    /// the single source for the roll and the Dev Mode damage-range display.</summary>
-    (int Min, int Max) PsywaveDamageRange(Creature source);
+    /// <summary>The inclusive bounds <see cref="RollPsywaveDamage"/> draws within, by the attacker's side (Gen 1: player
+    /// [1, ⌊1.5L⌋−1], opponent [0, ⌊1.5L⌋−1]); the single source for the roll and the Dev Mode range.</summary>
+    (int Min, int Max) PsywaveDamageRange(Creature source, BattleSide side);
+
+    /// <summary>Whether a foe-targeting stat-down move (or a secondary drop, <paramref name="isSecondary"/>) takes
+    /// the AI handicap roll (<see cref="RollStatDownHandicapFails"/>). Gen 1: the opponent only, primary and secondary;
+    /// Gen 2 exempts the accuracy-down side effect and Lock-On. See GENERATION_SEAMS.md §2.</summary>
+    bool StatDownHandicapApplies(BattleSide side, Attack move, bool isSecondary);
+
+    /// <summary>The AI handicap roll: true when the stat-down move fails (Gen 1: 64/256).</summary>
+    bool RollStatDownHandicapFails();
 
     /// <summary>
     /// The fixed number of turns a Rest user sleeps (Rest heals to full and forces sleep for exactly

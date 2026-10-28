@@ -410,4 +410,56 @@ public class DevModeTests
             gate.Set();
         }
     }
+
+    [Fact]
+    public void DamageRangesEndpoint_ShowsOnlyTheFoesPsywaveFromZero()
+    {
+        var manager = NewManager(out var gate);
+        try
+        {
+            static Attack Psywave() =>
+                new()
+                {
+                    Id = 3,
+                    Name = "Psywave",
+                    DamageCategory = DamageCategory.Psywave,
+                };
+            var starter = TestCreatures.Make("STARTMON", level: 50);
+            starter.AddAttack(Psywave());
+            string gameId = manager.RegisterSession(
+                starter,
+                [],
+                new Bag(),
+                new Wallet(),
+                [],
+                new SeededRandomSource(1),
+                [],
+                Difficulty.Normal,
+                Generation.One,
+                new Dictionary<int, IReadOnlyList<int>>()
+            );
+            Assert.True(manager.AttachConnection(gameId, "conn-1"));
+            var foe = TestCreatures.Make("FOE", level: 50, hp: 200);
+            foe.AddAttack(Psywave());
+            manager.RecordEnemy(gameId, foe);
+
+            var on = new DevController(new DevModeOptions(true), manager);
+            int Min(string side)
+            {
+                var ok = Assert.IsType<OkObjectResult>(on.GetDamageRanges(gameId, side, null));
+                return JsonDocument
+                    .Parse(JsonSerializer.Serialize(ok.Value))
+                    .RootElement.GetProperty("ranges")[0]
+                    .GetProperty("min")
+                    .GetInt32();
+            }
+
+            Assert.Equal(1, Min("player"));
+            Assert.Equal(0, Min("enemy"));
+        }
+        finally
+        {
+            gate.Set();
+        }
+    }
 }

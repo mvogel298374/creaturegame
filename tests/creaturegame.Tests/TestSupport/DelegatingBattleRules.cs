@@ -129,11 +129,16 @@ public abstract class DelegatingBattleRules : IBattleRules
 
     public virtual int BideDamageMultiplier => _inner.BideDamageMultiplier;
 
-    public virtual int RollPsywaveDamage(Creature s, IRandomSource rng) =>
-        _inner.RollPsywaveDamage(s, rng);
+    public virtual int RollPsywaveDamage(Creature s, BattleSide side, IRandomSource rng) =>
+        _inner.RollPsywaveDamage(s, side, rng);
 
-    public virtual (int Min, int Max) PsywaveDamageRange(Creature s) =>
-        _inner.PsywaveDamageRange(s);
+    public virtual (int Min, int Max) PsywaveDamageRange(Creature s, BattleSide side) =>
+        _inner.PsywaveDamageRange(s, side);
+
+    public virtual bool StatDownHandicapApplies(BattleSide side, Attack m, bool isSecondary) =>
+        _inner.StatDownHandicapApplies(side, m, isSecondary);
+
+    public virtual bool RollStatDownHandicapFails() => _inner.RollStatDownHandicapFails();
 
     public virtual int RestSleepTurns => _inner.RestSleepTurns;
 

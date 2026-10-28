@@ -32,7 +32,8 @@ public static class DamageCalculator
         Creature defender,
         Attack move,
         ITypeChart typeChart,
-        IBattleRules rules
+        IBattleRules rules,
+        BattleSide side
     )
     {
         switch (move.DamageCategory)
@@ -47,7 +48,7 @@ public static class DamageCalculator
                 return DamageRange.Exact(CalculateSuperFangDamage(defender));
             case DamageCategory.Psywave:
             {
-                var (min, max) = rules.PsywaveDamageRange(attacker);
+                var (min, max) = rules.PsywaveDamageRange(attacker, side);
                 return new DamageRange(min, max);
             }
             case DamageCategory.Standard:

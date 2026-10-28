@@ -166,7 +166,8 @@ public class Battle
                 _emitter,
                 _movePool,
                 _rng,
-                _escapable
+                _escapable,
+                BattleSide.Opponent
             );
 
             // Turn resolution: Priority → effective Speed (Paralysis quarters) → random tie-breaker.
@@ -581,7 +582,8 @@ public class Battle
             _emitter,
             _movePool,
             _rng,
-            _escapable
+            _escapable,
+            BattleSide.Player
         );
 
     /// <summary>The forced faint-switch: if a live bench member remains, ask the player which to send in and

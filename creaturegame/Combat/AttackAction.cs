@@ -20,6 +20,8 @@ public class AttackAction : IBattleAction
     // legacy chain; the run layer sets it false for the trainer-analog encounters (Elite/Boss).
     private readonly bool _battleEscapable;
 
+    private readonly BattleSide _side;
+
     // Whether the Target had a Substitute up when this move connected — snapshotted pre-damage so a
     // secondary is still shielded on the very hit that breaks the decoy (Gen 1: that hit struck the sub).
     private bool _targetShieldedAtImpact;
@@ -37,10 +39,12 @@ public class AttackAction : IBattleAction
         IBattleEventEmitter? emitter = null,
         IReadOnlyList<Attack>? movePool = null,
         IRandomSource? rng = null,
-        bool battleEscapable = true
+        bool battleEscapable = true,
+        BattleSide side = BattleSide.Player
     )
     {
         Source = source;
+        _side = side;
         Target = target;
         _typeChart = typeChart;
         _rules = rules ?? Gen1BattleRules.Instance;
@@ -175,6 +179,16 @@ public class AttackAction : IBattleAction
         )
         {
             _emitter?.Emit(new MoveHadNoEffect(Target.Name, Target.Id, attackToUse.Name ?? ""));
+            return Task.CompletedTask;
+        }
+
+        if (
+            IsFoeStatDown(attackToUse)
+            && attackToUse.BaseDamage == 0
+            && HandicapFails(attackToUse, isSecondary: false)
+        )
+        {
+            _emitter?.Emit(new MoveFailed());
             return Task.CompletedTask;
         }
 
@@ -461,7 +475,7 @@ public class AttackAction : IBattleAction
 
         // Snapshot before any damage lands (OHKO / Super Fang read the target's current HP) — rides on this
         // attack's DamageDealt events as the Dev Mode range (see _hitRange).
-        _hitRange = DamageCalculator.EstimateRange(Source, Target, move, _typeChart, _rules);
+        _hitRange = DamageCalculator.EstimateRange(Source, Target, move, _typeChart, _rules, _side);
 
         switch (category)
         {
@@ -553,7 +567,7 @@ public class AttackAction : IBattleAction
                 break;
 
             case DamageCategory.Psywave:
-                damage = _rules.RollPsywaveDamage(Source, _rng); // IBattleRules.RollPsywaveDamage
+                damage = _rules.RollPsywaveDamage(Source, _side, _rng);
                 DealDamageToTarget(damage, 1.0, false, move.DamageType);
                 break;
         }
@@ -573,7 +587,8 @@ public class AttackAction : IBattleAction
             _emitter,
             _movePool,
             _rng,
-            _battleEscapable
+            _battleEscapable,
+            _side
         ).ExecuteAsync();
 
     // Bide stores every hit the committed user takes — any damage category — to unleash 2× on release.
@@ -709,6 +724,13 @@ public class AttackAction : IBattleAction
 
         Creature affected = se.Target == StageTarget.Self ? Source : Target;
 
+        if (
+            IsFoeStatDown(attack)
+            && attack.BaseDamage > 0
+            && HandicapFails(attack, isSecondary: true)
+        )
+            return;
+
         // Gen 1: a Substitute shields the user from the foe's stat changes while it stands. A
         // self-targeting stat change (the user's own buff) is unaffected.
         if (se.Target == StageTarget.Foe && TargetShieldedBySubstitute)
@@ -761,6 +783,14 @@ public class AttackAction : IBattleAction
                 _emitter?.Emit(announcement);
         }
     }
+
+    private static bool IsFoeStatDown(Attack attack) =>
+        attack.StatEffect is { Target: StageTarget.Foe, Delta: < 0 };
+
+    // The AI handicap; a primary move's fail precedes accuracy, a secondary's precedes the Substitute check.
+    private bool HandicapFails(Attack attack, bool isSecondary) =>
+        _rules.StatDownHandicapApplies(_side, attack, isSecondary)
+        && _rules.RollStatDownHandicapFails();
 
     // Post-damage move effects (Haze, Counter, Reflect, Transform, Rest, Substitute …) live behind
     // IMoveEffect in the MoveEffects registry, keyed by MoveEffect (mirroring LockInMechanics.For). One

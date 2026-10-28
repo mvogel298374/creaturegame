@@ -54,6 +54,7 @@ public sealed class MoveScenario
     private IRandomSource _rng = new SeededRandomSource(0);
     private ITypeChart _typeChart = Gen1TypeChart.Instance;
     private IReadOnlyList<Attack> _movePool = Array.Empty<Attack>();
+    private BattleSide _side = BattleSide.Player;
 
     public MoveScenario Attacker(Creature c)
     {
@@ -76,6 +77,13 @@ public sealed class MoveScenario
     public MoveScenario Rng(IRandomSource r)
     {
         _rng = r;
+        return this;
+    }
+
+    /// <summary>The attacker's side (default the player); the foe-only Gen 1 rules key on it.</summary>
+    public MoveScenario Side(BattleSide side)
+    {
+        _side = side;
         return this;
     }
 
@@ -105,7 +113,8 @@ public sealed class MoveScenario
             _rules,
             emitter,
             _movePool,
-            _rng
+            _rng,
+            side: _side
         );
         await action.ExecuteAsync();
         return new MoveResult(emitter, _attacker, _defender, pokeMove);
