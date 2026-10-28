@@ -1,10 +1,39 @@
 # creaturegame
 
-A Gen 1 Pokémon battle simulator written in C# / .NET 9, designed from the ground up for correctness, extensibility, and creative expansion.
+A Gen 1 Pokémon battle clone with a roguelite run layer, written in C# / .NET 9 with a React + Phaser 3 web client.
 
-The core goal is a faithful Gen 1 battle engine — accurate damage formula, type chart quirks, stat formulas, PP tracking, turn ordering — with an architecture that makes swapping generations, adding roguelike mechanics, or wiring up a UI a matter of implementing an interface rather than rewriting the engine. On top of the engine sits a playable web client (React + Phaser 3 + SignalR) and an emerging roguelite run layer.
+The battles come first: the engine reproduces Gen 1's mechanics, quirks and bugs included, and every rule that differs between generations sits behind an interface, so a later generation is a new set of implementations rather than a rewrite. Around the battles sits a roguelite run: a seeded route across Kanto's biomes, a run-scoped party, bag and wallet, rewards, shops and new party members picked up along the way.
 
-> **Disclaimer.** This is an unofficial, non-commercial fan project, provided entirely for free — no money is charged and the author gains no monetary benefit from it (no sales, donations, ads, or other revenue). It is not affiliated with, endorsed by, or sponsored by Nintendo, Game Freak, or The Pokémon Company. Pokémon and all associated names, data, sprites, and audio are their trademarks and copyright. **No game assets are stored in this repository** — species data and sprites are fetched at build time from the community-run [PokéAPI](https://pokeapi.co) into local, git-ignored files. The MIT license (see [`LICENSE`](LICENSE)) covers only the original source code here.
+> **Disclaimer.** This is an unofficial, non-commercial fan project, provided entirely for free — no money is charged and the author gains no monetary benefit from it (no sales, donations, ads, or other revenue). It is not affiliated with, endorsed by, or sponsored by Nintendo, Game Freak, or The Pokémon Company. Pokémon and all associated names, data, sprites, and audio are their trademarks and copyright. The repository holds the Gen 1 game data the importer derives from the community-run [PokéAPI](https://pokeapi.co) (`pokemon.db`, `moves.db`, `items.db`); **sprites and cries are not stored here** — the importer downloads them into local, git-ignored folders. The MIT license (see [`LICENSE`](LICENSE)) covers only the original source code here.
+
+---
+
+## What you can play today
+
+A run starts on the Title Screen: pick a difficulty (Easy / Normal / Hard, which sets the XP pace) and a starter, and give it a nickname.
+
+- **The route.** Each run draws a seeded, connected map of Kanto's biomes, shown as a grid Town Map. In each biome you climb a ladder of 4–6 events — wild battles, Elite and Boss trainer fights, shops, Treasure and Mystery nodes — capped by a free Poké Center, then choose the next biome. Foes scale with depth.
+- **The battles.** All 165 Gen 1 moves, status conditions, stat stages, crits, PP and Struggle, a party with switching, and an in-battle bag (healing, status cures, PP restores, Revives, X-items) with party targeting. XP, level-up, learnsets with the forget-a-move prompt, Stat Exp and level evolution all work.
+- **The economy.** Gold from wins, a shop priced in Gen 1's item order, and a pick-1-of-3 reward after a win or a Treasure/Mystery node: items by rarity, a gold bag, or a move a party member can learn by TM.
+- **New party members.** A themed draft after some wins and a chance to recruit a defeated boss, both with a nickname prompt.
+- **Resilience.** Refreshing, reopening the tab or a network blip mid-run resumes the same run, including any open prompt, within a 60-second grace window.
+- **Presentation.** Gen 1 species sprites and cries, Phaser battle animations, and a Gen 1 "Kanto Sage" skin on the run's prompts and map.
+- **Dev Mode** (development builds only): the foe's full stat sheet and damage ranges in the log and menus.
+
+The run state — party, bag and wallet — ends with the run. There are no saves that survive a server restart, by design for the current phase.
+
+The full current-state spec is [`docs/PRODUCT_SPEC.md`](docs/PRODUCT_SPEC.md).
+
+---
+
+## Where it's heading
+
+The ranked, active list is [`docs/TODO.md`](docs/TODO.md). In short:
+
+- **Gen 1 fidelity.** A set of filed Gen 1 discrepancies, each checked against the pret/pokered disassembly before it is fixed: the damage and accuracy core, Gen 1's per-creature residual order (there is no end-of-turn phase in Gen 1), the status-check order, and smaller move quirks.
+- **Reliability.** The last reconnect edge (a second window on the same run) and automatic E2E coverage in CI.
+- **Features.** Throwing Poké Balls in battle, stone evolutions, progressive difficulty, the rest of the Gen 1 skin, and move-specific attack animations.
+- **Later.** A second generation through the existing seams, then ideas from autobattlers and Pokémon Infinite Fusion (fusion, generated sprites and stats).
 
 ---
 
@@ -12,115 +41,65 @@ The core goal is a faithful Gen 1 battle engine — accurate damage formula, typ
 
 | Project | Purpose |
 |---|---|
-| `creaturegame` | Core battle engine **class library** — damage, type chart, status, stat stages, crits, move effects |
-| `creaturegame.Web` | ASP.NET Core host — REST API, SignalR hub, and a Vite + React + Phaser 3 frontend under `ClientApp/`. Run via `.\dev.ps1` |
-| `PokeApiConnector` | One-shot importer: fetches Gen 1 data from PokéAPI and writes to SQLite |
-| `tests/creaturegame.Tests` | xUnit unit + integration tests — 670+ test methods, including a per-move Gen 1 fidelity-contract suite |
+| `creaturegame` | The battle engine and run layer, a class library with no entry point |
+| `creaturegame.Web` | ASP.NET Core host — REST API, SignalR hub, and the Vite + React + Phaser 3 frontend under `ClientApp/` |
+| `PokeApiConnector` | One-shot importer: Gen 1 data from PokéAPI into SQLite, plus sprite and cry downloads |
+| `tests/creaturegame.Tests` | xUnit unit and integration tests, including per-move Gen 1 contract suites |
 
 ---
 
 ## Quick start
 
-**Prerequisites:** the .NET SDK 9.0.200 (pinned in [`global.json`](global.json)), plus Node.js for the frontend.
+**Prerequisites:** the .NET SDK 9.0.200 (pinned in [`global.json`](global.json)) and Node.js.
 
 ```powershell
-# 1. Populate the databases + download sprites (required once on a fresh clone)
-dotnet run --project PokeApiConnector
+# 1. Download sprites and cries (once per clone; the databases are already committed)
+dotnet run --project PokeApiConnector -- assets
 
-# 2. Start the full dev environment (backend :5100 + frontend :5173 + browser)
+# 2. Start the dev stack: backend on :5100, Vite on :5173, then open the browser
 .\dev.ps1
+.\stop-dev.ps1          # stop it again
 
-# 3. Run all test suites (.NET unit, Vitest, Playwright E2E)
-.\test.ps1
+# 3. Run the fast test suites (.NET xUnit, TypeScript typecheck, Vitest)
+.\test.ps1 -Dotnet -Web
 ```
 
-`PokeApiConnector` fetches all Gen 1 Pokémon, moves (IDs 1–165), and the battle-usable items from [pokeapi.co](https://pokeapi.co) and writes them to `pokemon.db`, `moves.db`, and `items.db` at the solution root, and downloads battle sprites to `creaturegame.Web/wwwroot/sprites/`. **These files are git-ignored** — regenerate them any time by re-running the importer.
+The browser suite (Playwright, a few minutes) runs separately: `.\e2e.ps1` (see [`creaturegame.Web/ClientApp/e2e/README.md`](creaturegame.Web/ClientApp/e2e/README.md)). A bare `.\test.ps1` also runs it whenever the dev stack is up.
 
-> If `dotnet` isn't on your PATH, invoke your SDK 9.0.200 install directly (this project was developed against a user-local install, e.g. `& "$HOME\.dotnet\dotnet.exe"`). The individual `dotnet build` / `test` commands work the same way.
+To rebuild the databases from PokéAPI, run the importer with no arguments: `dotnet run --project PokeApiConnector`. The game itself never calls PokéAPI and works offline.
+
+> If `dotnet` on your PATH is a runtime only, call the SDK directly, e.g. `& "$HOME\.dotnet\dotnet.exe"`.
+
+**Deploying.** Fly.io deploys from the [`Dockerfile`](Dockerfile) only when a tag matching `v*-rc*` is pushed; pushing to `master` never deploys. `.\build-release.ps1` produces a local single-process release build.
 
 ---
 
 ## Architecture
 
-For the design decisions and the *why* behind the system's shape, see [`ARCHITECTURE.md`](ARCHITECTURE.md); its §5 indexes every doc in the repo.
-
-### Data flow
+The *why* behind the design is in [`ARCHITECTURE.md`](ARCHITECTURE.md); its §5 indexes every doc in the repo.
 
 ```
-PokéAPI → PokeApiConnector → pokemon.db / moves.db / items.db → EF Core DbContexts → domain services → Creature → Battle
+PokéAPI → PokeApiConnector → pokemon.db / moves.db / items.db → EF Core → Creature → Battle
+                                                                                      │ BattleEvent
+React + Phaser  ←──  SignalR (/hubs/battle)  ←──  SignalRBattleEventEmitter  ←────────┘
 ```
 
-All runtime data comes from the local SQLite databases and static files — there are **no live calls to PokéAPI at runtime**. The importer runs once; after that the game works fully offline.
+- **Event-sourced engine.** The engine does no IO. It emits `BattleEvent`s through an emitter; the web host turns them into SignalR messages, and the client expands each one into reducer actions and a Phaser animation timeline.
+- **Generation seams.** `IBattleRules` (stat stages, crit and accuracy formulas, status rules, roll order), `ITypeChart` and `IStatCalculator` hold every generation-variable rule, and the engine never branches on the generation. A `GenerationProfile` bundles the seams with the generation's content, region and visual theme, chosen once per run. A test-only alternate profile keeps the seams honest. → [`docs/GENERATION_SEAMS.md`](docs/GENERATION_SEAMS.md), [`docs/GENERATION_PROFILE.md`](docs/GENERATION_PROFILE.md)
+- **Run layer over battle layer.** A `RunDirector` drives the biome map and its events; each battle is one `Battle` inside it. → [`docs/GAME_LOOP.md`](docs/GAME_LOOP.md), [`docs/ENCOUNTER_DESIGN.md`](docs/ENCOUNTER_DESIGN.md)
+- **Seeded randomness.** Every roll comes from the run seed through the rules seam, so a run is reproducible and a test can force any outcome.
+- **Gen 1 corrections at import.** PokéAPI serves modern values; the importer maps them back to Gen 1 (base stats, single Special, move data, item prices), so the runtime reads only our own data. → [`docs/DATA_IMPORT.md`](docs/DATA_IMPORT.md)
 
-### Battle engine
+### Gen 1 fidelity
 
-`Battle` drives a turn loop. Each side submits an `IBattleAction`; actions are sorted by `Priority` → effective Speed → random tie-break, then resolved in order via `ExecuteAsync()`.
-
-`DamageCalculator` implements the Gen 1 formula:
-
-```
-Damage = ( (2 × Level / 5 + 2) × Attack × BasePower / Defense ) / 50 + 2
-       × STAB (1.5× if applicable)
-       × type effectiveness (from ITypeChart)
-       × stat stage multipliers (via IBattleRules)
-       × critical hit (2× — Gen 1 crits bypass stages and Burn penalty)
-       × random roll (217–255 / 255)
-```
-
-Accuracy uses an internal 0–255 scale; a roll of 255 always misses even on 100%-accurate moves (the Gen 1 "1/256 miss bug").
-
-### Key extension points
-
-All generation-specific behaviour lives behind interfaces, so a new generation is a new pair of implementations — the engine and calculator don't change.
-
-| Interface | Responsibility | Swap to... |
-|---|---|---|
-| `ITypeChart` | Type effectiveness matrix | `Gen2TypeChart`, `Gen9TypeChart`, custom |
-| `IBattleRules` | All gen-variable mechanics: stat stages, crit formula, accuracy scale, sleep/freeze/status rules | `Gen2BattleRules`, etc. |
-| `IStatCalculator` | Stat formulas (DVs/Stat-Exp vs. IVs/EVs/natures) | `Gen3StatCalculator`, etc. |
-| `IBattleAction` | A single turn action | Attacks, items, flee |
-| `IBattleInput` | Turn-choice source | Console menu, AI, network/UI |
-
-### Database / schema
-
-Three SQLite databases are managed by **EF Core migrations** (`creaturegame/DB/Migrations/`). `EnsureDatabaseCreated()` on each context calls `Database.Migrate()`, so a fresh `PokeApiConnector` run creates, migrates, and populates everything in one step. See [`docs/DATA_IMPORT.md`](docs/DATA_IMPORT.md) for the import pipeline and the import-vs-runtime boundary.
+The engine reproduces the era's quirks rather than fixing them — the Ghost → Psychic 0× type bug, the 1/256 miss on 100%-accurate moves, the DV-based HP formula, permanent Freeze, Gen 1's crit → damage → accuracy roll order. Gen 1 facts are checked against the pret/pokered disassembly, which outranks this repo's own docs. The mechanic-by-mechanic breakdown is in [`docs/GEN_DIFFERENCES.md`](docs/GEN_DIFFERENCES.md).
 
 ---
 
-## Gen 1 fidelity
+## Contributing conventions
 
-Faithfulness to Gen 1 is the point, so the engine deliberately reproduces the era's quirks and bugs rather than "fixing" them — for example the **Ghost → Psychic = 0×** type bug, the **1/256 miss** on 100%-accurate moves, the special DV-based HP formula and Stat Exp gain, and Gen 1's permanent Freeze. These live behind the generation seams (`ITypeChart` / `IBattleRules` / `IStatCalculator`), so swapping a later generation in doesn't mean editing them out.
-
-The full mechanic-by-mechanic breakdown (type-chart differences, accuracy scale, crit formula, stat formulas, status timing) is in [`docs/GEN_DIFFERENCES.md`](docs/GEN_DIFFERENCES.md).
-
----
-
-## Status
-
-The Gen 1 battle engine is **feature-complete**: all 165 moves, status conditions, stat stages, crits, PP/Struggle, XP & level-up, the learnset system, EV/Stat-Exp gain, evolution, and an in-battle item system are implemented and covered by tests.
-
-On top of the engine sits a playable **roguelite run layer**, also live:
-- **Biome-graph encounters** — each run draws a seeded connected subset of Kanto's biomes; the player picks a biome, routes through a randomised 4–6 themed events (wild / elite / boss / shop / treasure / mystery) capped by a Poké Center, then chooses the next biome.
-- **Depth-scaled difficulty** — `IEnemyArchetype` strength tiers and biome-position depth bands scale foes as a run deepens.
-- **Run economy** — earned gold with a gold HUD, and a rarity-rolled **reward choice**: a win (or a Treasure/Mystery node) offers a pick-1-of-3 of rarity-coloured items or a ₽ bag, with Boss nodes skewed toward premium replenishing items.
-- **Level-aware XP curve** — a roguelite XP ramp (kept separate from the Gen 1 `IBattleRules` seam) plus the Gen 1 trainer ×1.5 bonus for Elite/Boss nodes.
-
-Still being built out: **acquisition channels** (boss catch + themed draft), the **Shop** node, bag persistence, and a party / save layer.
-
-For the concrete, prioritised list of what's being worked on next, see [`docs/TODO.md`](docs/TODO.md).
-
-**Loose future goals:**
-- Generation switching — a new `ITypeChart` + `IBattleRules` + `IStatCalculator` set
-- Deeper roguelite / acquisition layer (catch, party, persistence)
-- Pokémon Infinite Fusion-inspired creature composition
-- Abilities layer
-
----
-
-## Project conventions
-
-- C# 13 / .NET 9; implicit usings and nullable reference types enabled
-- `ITypeChart` / `IBattleRules` / `IStatCalculator` are the generation-switching seams — preserve them
-- All DB reads use `AsNoTracking()`; all DB operations are async
-- Test method names describe what they test — no `Test` prefix/suffix
-- See [`CLAUDE.md`](CLAUDE.md) (doc layers, docs tree, commands) and [`docs/DEV_STANDARDS.md`](docs/DEV_STANDARDS.md) for the full engineering guidelines
+- C# 13 / .NET 9, nullable reference types on; format with `dotnet csharpier format .`
+- New engine rules that could differ by generation go through a seam, never an inline value
+- Code carries almost no comments; design reasoning lives in the docs
+- Tests drive the real engine; test names say what they test
+- [`CLAUDE.md`](CLAUDE.md) holds the doc layers, the docs tree and the commands; [`docs/DEV_STANDARDS.md`](docs/DEV_STANDARDS.md) holds the full engineering standards
