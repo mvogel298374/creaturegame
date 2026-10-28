@@ -44,29 +44,46 @@
 |:-:|:-----|:----:|:-------------|:---------------------------------|
 | 1 | **`-StartStack` backend leak** (§7.1 Part A) | S | ✗ parked: leak not reproduced (2026-10-10); un-park condition in §7.1 | Parts B and C are done. Not actionable until the user reproduces it; §1 #6 does not wait on it. |
 | 6 | **CI E2E step** (§6) | M | ✗ no design (runner, stack boot, caching) or acceptance | The only automatic E2E coverage; makes "agents don't run E2E" safe, and unblocks checking the reconnect spec. |
-| 7 | **R1d-c — second-tab policy** (§2) | M | ⚠️ provisional-pending-`/plan` (decisions made 2026-10-17) | Extends the same replay touch-points. |
+| 7 | **R1d-c — second-window takeover** (§2) | S | ✅ Ready (simplified design confirmed 2026-10-28) | The last reconnect item; the displaced window stops looking playable. |
 | 8 | **Gen 1 fidelity — the damage/accuracy core** (§3.1) | L | ✗ needs the Gen 1 source per claim, the seam surface, and the quirks to pin | Verify-first; large blast radius (it touches every damage number). |
 | 9 | **End-of-turn residual phase** (§4.2) | L | ✗ needs a `/plan` | A `/plan`, `opus-engineer`, and both review gates; rewrites `Battle`'s turn loop. |
 | 10 | **Features** — Catch, `save.db`, progressive difficulty, Generation Profile 4d+, … (§4) | L | ✗ each needs a `/plan` | Catch and stone evolutions are unblocked by the bag-scope ruling (`ARCHITECTURE.md` §2.12); `save.db` is declined for now. |
 
 ---
 
-## 2. Reliability — reconnect (designed in [`RECONNECT_RESILIENCE.md`](RECONNECT_RESILIENCE.md); c provisional-pending-`/plan`)
+## 2. Reliability — reconnect (designed in [`RECONNECT_RESILIENCE.md`](RECONNECT_RESILIENCE.md))
 
 Verified in code 2026-10-03. Fixed and archived already: the flee stale-cache, the 60 s grace, the client replay
 dedupe, lost modal answers, the `RunFaulted` notice, the abandon-timer race (R1d-b), and the open-prompt replay (R1d-a), the refresh snapshot and sprite (R1d-d), the blip prompt-log duplicates (R1d-e), the blip test tooling (R1d-f). The server replaying on every reconnect is an **accepted
 design** (it cannot tell a refresh from a blip), not a bug.
 
 **User rulings 2026-10-17:** last tab wins and the displaced tab is told; `SessionTakenOver` is a transport notice
-outside the event model, like `RunFaulted` (and the built `RunMapSnapshot`).
+outside the event model, like `RunFaulted` (and the built `RunMapSnapshot`). **2026-10-28:** "such an edge case" —
+keep it really simple: the new window wins, the old window is outdated and cannot be played anymore.
 
-- **R1d-c — a second tab on the same `gameId` silently takes over.** **Policy (user 2026-10-17):** last tab wins,
-  with the displaced tab told via a `SessionTakenOver` notice that must **not** clear `activeGame` (it is shared
-  `localStorage`). **Acceptance:** second tab → first tab shows the notice and returns to Title; the second
-  continues; a plain refresh never shows the notice.
-  **DoR:** ✗ not Ready — gap **2** only (the provisional client half needs its `/plan`; the policy and
-  transport-notice decisions are made). 3–7 are in the doc: gen surface none; runtime/web plus a small client
-  change; quirk "a plain refresh never shows the notice, and `activeGame` survives"; dependencies none.
+- **R1d-c — a second window on the same `gameId` silently takes over.** The server already enforces "the new window
+  wins": `AttachConnection` repoints the run and drops the old connection from routing, so its inputs are ignored and
+  its disconnect can't start the abandon timer (`GameSessionManager.cs` `AttachConnection` / `DetachConnection`).
+  What's missing is telling the old window, which still looks playable.
+  **DoR:** ✅ Ready — simplified design confirmed by the user 2026-10-28 (replaces the provisional "return to Title"
+  client half, so no `/plan` is needed).
+  - **Acceptance:** opening the run in a second window → the first shows "This run is now open in another window"
+    and can't be played; the second plays on; a plain refresh of a single window never shows it; `activeGame` in
+    `localStorage` is untouched.
+  - **Design:** in `AttachConnection`'s reconnect branch, when a different connection held the run, send that
+    previous connection a `SessionTakenOver` transport notice (never cached, never replayed, like `RunFaulted`)
+    before swapping. The client, on the notice, stops its own connection (marked torn down, so no bounce to Title)
+    and dispatches `SESSION_TAKEN_OVER`; a reducer flag `sessionTakenOver` renders a full-screen panel with no
+    actions. No navigation (a Title "Continue" would take the run back) and no `clearActiveGame()` (the record is
+    shared with the surviving window). A refresh's ghost connection receives the notice harmlessly.
+  - **Tests:** C#: a second attach sends `SessionTakenOver` to the previous connection only, and not when the same
+    connection re-attaches; the replay goes to the new one. Vitest: the reducer flag. Browser: one opt-in scenario in
+    `reconnect.spec.ts` (a second page opens the same run → the first shows the panel; the second plays on), run on
+    request.
+  - **Gen surface:** none. **Gen 1 source:** n/a. **Data vs runtime:** web + client. **Quirk:** "a takeover never
+    clears the shared saved game, and a refresh never shows the panel". **Dependencies:** none.
+  - **Accepted gap:** an old window that is mid-blip at the moment of the takeover misses the notice, and its
+    automatic reconnect takes the run back. An edge of an edge; not worth server state to block.
 - **Test plan** (in the doc): C# unit tests, Vitest, and the opt-in `reconnect.spec.ts` (refresh and blip scenarios,
   built; the second-tab scenario ships with R1d-c). One verification gap stays open: the 60 s grace rests on
   SignalR's documented 0/2/10/30 s schedule, not a measured run; measuring it needs the reconnects blocked for
@@ -608,6 +625,12 @@ surface: `/help` and the explainer describe the active generation, so they are p
   the narrowest `.\e2e.ps1 -Spec <file>`.
 
 **Open:**
+- [ ] *(small)* **The client `RunFaulted` handler is unpinned.** The server half is covered (`GameSessionLifecycleTests`);
+  nothing tests the client side (`clearActiveGame()` and the bounce to Title with the notice). Stands on its own;
+  R1d-c does not close it (its takeover panel replaces the old `transportNotices.ts` extraction).
+  **DoR (V16):** ✗ not Ready — gaps **1, 2, 7**. *Drafted:* acceptance, a Vitest test pins that `RunFaulted` clears the
+  saved game and returns to Title with a notice; the design (extract the handler logic or test it in place) is open.
+  Gen surface none; runtime client.
 - [ ] **CI E2E step** (M) that boots backend + frontend, runs headless, tears down. Now the only automatic E2E
   coverage there is, and so more load-bearing than when it was written: the local gate never runs E2E and
   `test.ps1` skips it when the stack is down, so nothing catches a red suite until someone asks for a run.

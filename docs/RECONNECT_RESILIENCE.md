@@ -1,8 +1,8 @@
 # RECONNECT_RESILIENCE.md — the remaining reconnect work, designed (2026-10-03)
 
 > **Status: R1d-a BUILT (2026-10-26), R1d-d, R1d-e and R1d-f BUILT (2026-10-27); their sections below are the design records;
-> R1d-c provisional-pending-`/plan`.** Written from a read of the code on 2026-10-03, not from the
-> review sweep's text. The frontend half of c is provisional until its `/plan` pass (DoR #2). The c task entry and
+> R1d-c Ready with a simplified design (user 2026-10-28).** Written from a read of the code on 2026-10-03, not from
+> the review sweep's text. The c task entry and
 > acceptance conditions live in `TODO.md` → *Reliability — reconnect*; R1d-a's and R1d-d's are in `TODO_ARCHIVE.md` → *§2 R1d-a*, *§2 R1d-d*;
 > this is the design behind them. Already fixed and archived: the flee stale-cache, the 60 s grace, the client replay
 > dedupe (`TODO_ARCHIVE.md` → *Repo-sweep R1 — reconnect replay mishandled…*), lost modal answers
@@ -96,7 +96,11 @@ ignored unless it is still the current one (`OnGraceElapsed`).
   TaskCompletionSource<…>` field on `SignalRInput` other than the turn handshake has a `PromptEvent` subclass, and
   the emitter's replay includes each — adding a blocking prompt without a cached event fails it.
 
-## R1d-c. A second tab on the same `gameId` silently takes over — **needs a policy decision**
+## R1d-c. A second tab on the same `gameId` silently takes over — design simplified 2026-10-28 (below)
+
+> **Superseded in part (user 2026-10-28):** the server half below stands; the "go to Title with a notice" client
+> half and the `transportNotices.ts` extraction are replaced by a full-screen, no-action panel in the old window
+> (no navigation, no `clearActiveGame()`). The ready entry is in `TODO.md` §2.
 
 - **What is wrong (verified).** `AttachConnection`'s reconnect branch rebinds `CurrentConnectionId` to whoever
   connected last. The old tab keeps its socket, receives nothing, and its invocations are dropped (routing is by
@@ -108,16 +112,13 @@ ignored unless it is still the current one (`OnGraceElapsed`).
   send the **previous** connection a transport-level `SessionTakenOver` notice (same bypass-the-event-model shape as
   `RunFaulted`: never cached, never replayed) before swapping. A refreshed page's ghost connection receives it
   harmlessly.
-  **Client (provisional-pending-`/plan`):** go to Title with a notice ("This run was opened in another tab") and
-  — **unlike `RunFaulted` — do NOT `clearActiveGame()`**: the saved game record lives in `localStorage`, which the
-  *surviving* tab shares, so clearing it would delete that tab's resume point. Extract the notice handling into a
-  pure `battle/transportNotices.ts` (`'RunFaulted' → { clearActiveGame: true, … }`, `'SessionTakenOver' → {
-  clearActiveGame: false, … }`) so the distinction is unit-pinned; this also closes the `RunFaulted` handler test
-  gap in `TODO.md`.
-- **Acceptance.** Opening the run in a second tab → the first tab shows the notice and returns to Title; the second
-  continues; `activeGame` in `localStorage` is untouched; a plain refresh of a single tab never shows the notice.
-- **DoR.** Gen-variable: none. Runtime/web + a small client change. **Open question for the user:** is last-tab-wins
-  the intended policy? Dependencies: none (independent of a/b/d).
+  **Client (as ruled 2026-10-28):** the old window stops its connection (marked torn down) and shows a full-screen
+  "open in another window" panel with no actions (reducer flag `sessionTakenOver`). No navigation and no
+  `clearActiveGame()`: the saved game record lives in `localStorage`, which the *surviving* window shares.
+- **Acceptance.** Opening the run in a second window → the first shows the panel and can't be played; the second
+  continues; `activeGame` in `localStorage` is untouched; a plain refresh of a single window never shows the panel.
+- **DoR.** Ready (user 2026-10-28; last-window-wins confirmed). Gen-variable: none. Runtime/web + a small client
+  change. Dependencies: none (independent of a/b/d).
 
 ## R1d-d. A refresh loses the route trail, the node pin, boss framing and the player's sprite — BUILT (2026-10-27)
 
@@ -272,7 +273,7 @@ The sections below are the design record; the as-built list is `TODO_ARCHIVE.md`
   handshake waiting leaves it cached; shop balance follows `ShopItemPurchased`; the reflection guard above; `AttachConnection` twice → `SessionTakenOver` to the previous
   connection and the replay to the new; snapshot contents after N biomes/nodes and its position (after the plan,
   before `BattleStarted`); the faint HP rewrite of the cached `TurnStarted`.
-- **Unit (Vitest):** `transportNotices` mapping (incl. the `clearActiveGame: false` case); `expandEvent` for a
+- **Unit (Vitest):** the `sessionTakenOver` reducer flag; `expandEvent` for a
   replayed prompt; the snapshot step applies **after** a replayed `BiomeEntered` (the timing hazard) and is
   idempotent; the Rest-cap pin is idempotent; `playerSpeciesId` reducer transitions.
 - **Browser/E2E (new `reconnect.spec.ts`, opt-in as always):** (1) **refresh with a reward choice open** → the modal
