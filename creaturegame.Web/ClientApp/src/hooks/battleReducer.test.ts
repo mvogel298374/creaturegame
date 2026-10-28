@@ -332,6 +332,14 @@ describe('battleReducer — misc', () => {
     expect(battleReducer(ready(), { type: 'SET_GOLD', gold: 250 }).gold).toBe(250);
   });
 
+  it('SESSION_TAKEN_OVER sets the takeover flag and leaves the run state alone', () => {
+    const s = ready({ phase: 'choosing' });
+    const next = battleReducer(s, { type: 'SESSION_TAKEN_OVER' });
+    expect(next.sessionTakenOver).toBe(true);
+    expect(next.phase).toBe('choosing');
+    expect(initialState.sessionTakenOver).toBe(false);
+  });
+
   it('returns the same state reference for an unknown action', () => {
     const s = ready();
     expect(battleReducer(s, { type: 'NOT_A_REAL_ACTION' } as unknown as Action)).toBe(s);

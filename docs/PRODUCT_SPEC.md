@@ -339,13 +339,18 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - A refresh keeps the whole route trail and the ladder pin on the node in progress (the Rest cap while a Poké Center
   prompt is open), the boss's "VS Trainer …" framing in a boss fight, and the current lead's sprite on the field and
   on the game-over card (also after an in-battle switch, evolution or lead change). A blip changes none of these.
-- **Not covered:** a prompt raised mid-battle (move replacement after a level-up, switch-in after a faint) shows the
+- Opening the same run in a second window moves it there: the first window stops its connection and shows only a
+  blocking "This run is now open in another window" panel, with no actions, and can't be played. The second window
+  plays on, and the saved run is untouched. A plain refresh or blip of a single window never shows the panel.
+- **Not covered:** an old window that is mid-blip at the moment of a takeover misses the panel, and its automatic
+  reconnect takes the run back. A prompt raised mid-battle (move replacement after a level-up, switch-in after a faint) shows the
   battle's last known HP behind it after a refresh, until it is answered; the fainted creature's HP is right (0), but
   other HP changes of that last turn show their pre-turn values. The Title Screen's Continue card still shows the
   starter's name and level.
 - Design detail → `ARCHITECTURE.md` §2.7 (Web session lifecycle). History → `TODO_ARCHIVE.md` → *Session Resume
   — refresh/reopen-safe `gameId` persistence*, *§2 R1d-a — an open blocking prompt is replayed on reconnect* and
-  *§2 R1d-d — a refresh keeps the route trail…* and *§2 R1d-e — a blip no longer re-logs a prompt's intro*.
+  *§2 R1d-d — a refresh keeps the route trail…*, *§2 R1d-e — a blip no longer re-logs a prompt's intro* and
+  *§2 R1d-c — a second window takes the run over*. Design → `RECONNECT_RESILIENCE.md`.
 
 ### Client navigation and input
 - Space as well as Enter selects a starter card.

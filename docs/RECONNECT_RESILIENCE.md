@@ -1,10 +1,9 @@
 # RECONNECT_RESILIENCE.md — the remaining reconnect work, designed (2026-10-03)
 
-> **Status: R1d-a BUILT (2026-10-26), R1d-d, R1d-e and R1d-f BUILT (2026-10-27); their sections below are the design records;
-> R1d-c Ready with a simplified design (user 2026-10-28).** Written from a read of the code on 2026-10-03, not from
-> the review sweep's text. The c task entry and
-> acceptance conditions live in `TODO.md` → *Reliability — reconnect*; R1d-a's and R1d-d's are in `TODO_ARCHIVE.md` → *§2 R1d-a*, *§2 R1d-d*;
-> this is the design behind them. Already fixed and archived: the flee stale-cache, the 60 s grace, the client replay
+> **Status: all of R1d is BUILT — R1d-a (2026-10-26), R1d-d, R1d-e, R1d-f (2026-10-27), R1d-c (2026-10-28); their
+> sections below are the design records.** Written from a read of the code on 2026-10-03, not from
+> the review sweep's text. Each item's acceptance conditions and as-built list are in `TODO_ARCHIVE.md` → *§2 R1d-a*,
+> *§2 R1d-c*, *§2 R1d-d*, *§2 R1d-e*, *§2 R1d-f*; this is the design behind them. Already fixed and archived: the flee stale-cache, the 60 s grace, the client replay
 > dedupe (`TODO_ARCHIVE.md` → *Repo-sweep R1 — reconnect replay mishandled…*), lost modal answers
 > (*…lost modal answers…*), the `RunFaulted` notice (*…five small fixes*), and the abandon-timer race (*R1d-b*).
 >
@@ -96,7 +95,7 @@ ignored unless it is still the current one (`OnGraceElapsed`).
   TaskCompletionSource<…>` field on `SignalRInput` other than the turn handshake has a `PromptEvent` subclass, and
   the emitter's replay includes each — adding a blocking prompt without a cached event fails it.
 
-## R1d-c. A second tab on the same `gameId` silently takes over — design simplified 2026-10-28 (below)
+## R1d-c. A second tab on the same `gameId` silently takes over — BUILT (2026-10-28)
 
 > **Superseded in part (user 2026-10-28):** the server half below stands; the "go to Title with a notice" client
 > half and the `transportNotices.ts` extraction are replaced by a full-screen, no-action panel in the old window
@@ -115,6 +114,18 @@ ignored unless it is still the current one (`OnGraceElapsed`).
   **Client (as ruled 2026-10-28):** the old window stops its connection (marked torn down) and shows a full-screen
   "open in another window" panel with no actions (reducer flag `sessionTakenOver`). No navigation and no
   `clearActiveGame()`: the saved game record lives in `localStorage`, which the *surviving* window shares.
+  **As built:** `SignalRBattleEventEmitter.SendSessionTakenOver(connectionId)` addresses the displaced connection by
+  id (every other notice goes to the current one). The panel (`SessionTakenOverPanel`) reuses the game-over card's
+  classes, so it gets the heavy backdrop and the Kanto Sage frame with no CSS of its own. While it is up,
+  `BattleScreen` renders the panel *instead of* the battle view, not over it. `Modal` has no focus trap (`TODO.md`
+  §5), so any control left mounted behind it would stay reachable by Tab. QUIT and the `phase === 'ended'` effect
+  both call `clearActiveGame()`, which would wipe the surviving window's saved game; that effect is also gated on
+  the flag, for a queued step that ends the run after the takeover. `useBattleHub` ignores the notice on a
+  connection it has already torn down: under React StrictMode the first of the two dev mounts can attach, then be
+  displaced by the second one in the same window.
+  **Waived by Mo (2026-10-28):** an old window that is mid-blip at the moment of the takeover misses the notice.
+  Its automatic reconnect then takes the run back, and the newer window gets the panel instead. It needs two windows
+  and a blip at the same moment; one window still plays on, and blocking it would take per-connection server state.
 - **Acceptance.** Opening the run in a second window → the first shows the panel and can't be played; the second
   continues; `activeGame` in `localStorage` is untouched; a plain refresh of a single window never shows the panel.
 - **DoR.** Ready (user 2026-10-28; last-window-wins confirmed). Gen-variable: none. Runtime/web + a small client

@@ -31,7 +31,7 @@ The full current-state spec is [`docs/PRODUCT_SPEC.md`](docs/PRODUCT_SPEC.md).
 The ranked, active list is [`docs/TODO.md`](docs/TODO.md). In short:
 
 - **Gen 1 fidelity.** A set of filed Gen 1 discrepancies, each checked against the pret/pokered disassembly before it is fixed: the damage and accuracy core, Gen 1's per-creature residual order (there is no end-of-turn phase in Gen 1), the status-check order, and smaller move quirks.
-- **Reliability.** The last reconnect edge (a second window on the same run) and automatic E2E coverage in CI.
+- **Reliability.** Automatic E2E coverage in CI.
 - **Features.** Throwing Poké Balls in battle, stone evolutions, progressive difficulty, the rest of the Gen 1 skin, and move-specific attack animations.
 - **Later.** A second generation through the existing seams, then ideas from autobattlers and Pokémon Infinite Fusion (fusion, generated sprites and stats).
 

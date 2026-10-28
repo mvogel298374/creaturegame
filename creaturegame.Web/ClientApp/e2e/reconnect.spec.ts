@@ -27,6 +27,8 @@ async function readLadderPin(page: Page): Promise<number> {
 
 const battlesStarted = async (page: Page) => (await logLines(page)).filter(l => / VS /.test(l)).length;
 
+const takenOverPanel = (page: Page) => page.getByText('This run is now open in another window');
+
 // useBattleHub's E2E seam (R1d-f): a server-side abort, finished reconnects, and every event type received.
 type HubSeam = { __cgHub?: { reconnects: number; events: string[]; drop: () => void } };
 
@@ -65,6 +67,7 @@ test.describe('Reconnect restores the route map (R1d-d)', () => {
 
     await page.reload();
     await expect(fightButton(page)).toBeEnabled({ timeout: 20_000 });
+    await expect(takenOverPanel(page)).toHaveCount(0);
     expect(await readLadderPin(page)).toBe(before);
   });
 });
@@ -90,6 +93,29 @@ test.describe('Reconnect replays an open prompt (R1d-a)', () => {
     await page.reload();
     await expect(fightButton(page)).toBeEnabled({ timeout: 20_000 });
     await expect(page.locator('.modal-overlay')).toHaveCount(0);
+    await expect(takenOverPanel(page)).toHaveCount(0);
+  });
+});
+
+test.describe('A second window takes the run over (R1d-c)', () => {
+  test('the first window is told and blocked; the second plays on with the saved game intact', async ({ page, context }) => {
+    test.setTimeout(90_000);
+    await startBattle(page, 'CHARIZARD', 50, 1);
+    await expect(fightButton(page)).toBeEnabled({ timeout: 20_000 });
+    const saved = await page.evaluate(() => localStorage.getItem('creaturegame.activeGame'));
+    expect(saved).not.toBeNull();
+
+    const second = await context.newPage();
+    await second.goto(page.url());
+    await expect(fightButton(second)).toBeEnabled({ timeout: 20_000 });
+
+    await expect(takenOverPanel(page)).toBeVisible({ timeout: 10_000 });
+    await expect(fightButton(page)).toHaveCount(0);
+    await expect(takenOverPanel(second)).toHaveCount(0);
+    expect(await second.evaluate(() => localStorage.getItem('creaturegame.activeGame'))).toBe(saved);
+
+    await chooseMove(second);
+    await expect.poll(async () => (await logLines(second)).some(l => / used /.test(l)), { timeout: 15_000 }).toBe(true);
   });
 });
 
@@ -114,6 +140,7 @@ test.describe('A blip changes nothing on screen (R1d-f)', () => {
       timeout: 15_000,
     }).toBe(true);
     await expect(fightButton(page)).toBeEnabled({ timeout: 15_000 });
+    await expect(takenOverPanel(page)).toHaveCount(0);
     // Replayed steps queue ahead of the turn's, so anything a replay re-announced lands before the first move line.
     const sinceBlip = (await logLines(page)).slice(logBefore);
     const beforeTheMove = sinceBlip.slice(0, sinceBlip.findIndex(l => / used /.test(l)));
@@ -137,6 +164,7 @@ test.describe('A blip changes nothing on screen (R1d-f)', () => {
 
     expect(replayed, 'a finished battle is never replayed').not.toContain('BattleStarted');
     await expect(modal).toBeVisible();
+    await expect(takenOverPanel(page)).toHaveCount(0);
     await modal.locator('.reward-card--gold').click();
     await expect(modal).toHaveCount(0);
     await reachTheNextTurn(page);

@@ -216,6 +216,8 @@ public sealed class GameSessionManager(
             var previous = existing.CurrentConnectionId;
             if (!string.IsNullOrEmpty(previous))
                 _connToGame.TryRemove(previous!, out _);
+            if (!string.IsNullOrEmpty(previous) && previous != connectionId)
+                existing.Emitter?.SendSessionTakenOver(previous!);
             existing.CurrentConnectionId = connectionId;
             _connToGame[connectionId] = gameId;
             ReEstablishClient(existing.Emitter, ProfileFor(existing.Generation));

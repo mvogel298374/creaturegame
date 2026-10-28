@@ -32,6 +32,7 @@ import { loadActiveGame, clearActiveGame } from '../utils/activeGame';
 import { PartyStrip } from '../components/PartyStrip';
 import { Modal } from '../components/modals/Modal';
 import { BattleEndedOverlay } from '../components/modals/BattleEndedOverlay';
+import { SessionTakenOverPanel } from '../components/modals/SessionTakenOverPanel';
 import { RecoveryModal } from '../components/modals/RecoveryModal';
 import { EvolutionPromptModal } from '../components/modals/EvolutionPromptModal';
 import { RewardChoiceModal } from '../components/modals/RewardChoiceModal';
@@ -138,8 +139,8 @@ export function BattleScreen() {
   // Session Resume: a finished run has nothing left to resume back into — clear the persisted entry so
   // TitleScreen stops offering Continue for it and a stray reload doesn't try to reattach to a dead battle.
   useEffect(() => {
-    if (state.phase === 'ended') clearActiveGame();
-  }, [state.phase]);
+    if (state.phase === 'ended' && !state.sessionTakenOver) clearActiveGame();
+  }, [state.phase, state.sessionTakenOver]);
 
   // The level-up panel stays up until the player does anything — clear it on the first interaction.
   const onAnyInput = () => { if (state.levelUp) dismissLevelUp(); };
@@ -189,6 +190,9 @@ export function BattleScreen() {
   const playerName  = state.playerName || (playerSpecies?.name.toUpperCase() ?? 'PLAYER');
   const enemyName   = state.enemyName  || '???';
   const enemyLevel  = state.enemyLevel || '?';
+
+  // Replaces the whole view so no control under it stays reachable (RECONNECT_RESILIENCE.md R1d-c).
+  if (state.sessionTakenOver) return <SessionTakenOverPanel />;
 
   return (
     <div className="battle-screen">

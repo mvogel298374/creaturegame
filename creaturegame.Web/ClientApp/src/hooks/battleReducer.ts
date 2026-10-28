@@ -165,6 +165,8 @@ export interface BattleState {
   // measured against; [] until known).
   generation: string;
   typeRoster: string[];
+  // Another window took this run over; the view blocks everything (RECONNECT_RESILIENCE.md R1d-c).
+  sessionTakenOver: boolean;
 }
 
 export const initialState: BattleState = {
@@ -216,6 +218,7 @@ export const initialState: BattleState = {
   currentBiomeId: '',
   generation: '',
   typeRoster: [],
+  sessionTakenOver: false,
 };
 
 // The battle log keeps only the newest lines; the oldest go first. Ids stay stable, so React keys don't shift.
@@ -449,6 +452,8 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
       return { ...state, dropToast: { gold: action.gold, itemNames: action.itemNames } };
     case 'HIDE_DROP':
       return { ...state, dropToast: null };
+    case 'SESSION_TAKEN_OVER':
+      return { ...state, sessionTakenOver: true };
     case 'ANIMATING_START':
       return { ...state, animating: true };
     case 'ANIMATING_DONE':

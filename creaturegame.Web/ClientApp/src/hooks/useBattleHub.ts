@@ -71,6 +71,14 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
         nav('/', { state: { notice: 'The run hit an unexpected server error and ended.' } });
         return;
       }
+      // Another window took the run: stop quietly, keeping the shared saved game (RECONNECT_RESILIENCE.md R1d-c).
+      if (eventType === 'SessionTakenOver') {
+        if (torndown) return; // a StrictMode remount's first connection, displaced by its own second
+        torndown = true;
+        conn.stop();
+        dispatch({ type: 'SESSION_TAKEN_OVER' });
+        return;
+      }
       // A replay of state the client already holds is skipped (a blip, not a refresh) — see replayDedupe.ts.
       const taken = intakeEvent(intakeRef.current, eventType, payload, {
         enemyId: stateRef.current.enemyId,

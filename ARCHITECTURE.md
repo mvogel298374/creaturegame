@@ -321,6 +321,11 @@ Each entry: **Decision · Why · Where it lives.**
     connection first; `useBattleHub` clears the active game and bounces to Title with a notice (same exit as a
     failed resume). It deliberately bypasses the event model: never cached, so never replayed, and the server does
     not close the socket.
+  - **A second window on the same run displaces the first with a transport-level `SessionTakenOver`.** When
+    `AttachConnection` repoints a session to a new connection id, `SendSessionTakenOver(previous)` goes to the
+    *displaced* connection. It is the only notice not addressed to the current one. The old window stops its
+    connection and shows a blocking panel, and it keeps the shared saved game. After a refresh or a blip the notice
+    reaches a dead connection and does nothing (`RECONNECT_RESILIENCE.md` R1d-c).
   - **The reconnect replay is idempotent on the client, and its server cache clears on a flee.** The server
     replays on *every* (re)connect because it cannot tell a refresh (fresh client state — needs the replay) from a
     transport blip (state intact — the replay is harmful: a second `BattleStarted` bumps the encounter index, a

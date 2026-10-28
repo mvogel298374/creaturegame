@@ -163,6 +163,40 @@ public class GameSessionLifecycleTests
     }
 
     [Fact]
+    public void SecondAttach_SendsSessionTakenOverToThePreviousConnectionOnly_AndReplaysToTheNewOne()
+    {
+        using var run = new StartedRun();
+
+        Assert.True(run.Manager.AttachConnection(run.GameId, "conn-2"));
+
+        Assert.Single(run.Hub.EventsFor("conn-1"), e => e.Type == "SessionTakenOver");
+        Assert.DoesNotContain(run.Hub.EventsFor("conn-2"), e => e.Type == "SessionTakenOver");
+        Assert.Contains(run.Hub.EventsFor("conn-2"), e => e.Type == "RunPresentationRevealed");
+    }
+
+    [Fact]
+    public void SameConnectionReattaching_IsNotToldItWasTakenOver()
+    {
+        using var run = new StartedRun();
+
+        Assert.True(run.Manager.AttachConnection(run.GameId, "conn-1"));
+
+        Assert.DoesNotContain(run.Hub.EventsFor("conn-1"), e => e.Type == "SessionTakenOver");
+    }
+
+    [Fact]
+    public void ReconnectAfterADetach_NeverTellsTheNewConnectionItWasTakenOver()
+    {
+        using var run = new StartedRun();
+
+        run.Manager.DetachConnection("conn-1");
+        Assert.True(run.Manager.AttachConnection(run.GameId, "conn-2"));
+
+        Assert.DoesNotContain(run.Hub.EventsFor("conn-2"), e => e.Type == "SessionTakenOver");
+        Assert.Contains(run.Hub.EventsFor("conn-2"), e => e.Type == "RunPresentationRevealed");
+    }
+
+    [Fact]
     public async Task DetachConnection_FromAConnectionAlreadyReplaced_IsIgnored()
     {
         using var run = new StartedRun();

@@ -225,6 +225,8 @@ export type Action =
   // reward source now: a battle-win drop and a Treasure/Mystery node both use it (node acks are automatic).
   | { type: 'SHOW_DROP'; gold: number; itemNames: string[] }
   | { type: 'HIDE_DROP' }
+  // Another window opened this run; this one stops for good (RECONNECT_RESILIENCE.md R1d-c).
+  | { type: 'SESSION_TAKEN_OVER' }
   // The run's presentation identity (generation id + type roster), echoed by the server on every hub
   // attach — first connect and reconnect alike (docs/GENERATION_PROFILE.md §7.2).
   | { type: 'RUN_PRESENTATION'; generation: string; typeRoster: string[] }

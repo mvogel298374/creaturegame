@@ -165,6 +165,10 @@ public sealed class SignalRBattleEventEmitter(
         Dispatch(connectionId, "RunFaulted", new { });
     }
 
+    // Sent to the displaced connection, not the current one (RECONNECT_RESILIENCE.md R1d-c).
+    public void SendSessionTakenOver(string connectionId) =>
+        Dispatch(connectionId, "SessionTakenOver", new { });
+
     // A transport notice like RunFaulted: absolute, so applying it twice changes nothing (R1d-d).
     private void SendRunMapSnapshot(RouteFacts route)
     {

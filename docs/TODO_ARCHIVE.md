@@ -8,6 +8,43 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §2 R1d-c — a second window on the same run takes it over; the first is told ✅ DONE (2026-10-28)
+
+S, reliability; was §1 #7 / §2 "R1d-c". The server already made the new window win (`AttachConnection` repoints the run
+and drops the old connection from routing, so its inputs are ignored and its disconnect can't start the abandon timer),
+but the displaced window still looked playable. Design simplified by the user 2026-10-28 ("such an edge case": the new
+window wins, the old window is outdated and cannot be played); it replaces the provisional "return to Title" client
+half and the `transportNotices.ts` extraction. User rulings 2026-10-17: last window wins, the displaced one is told,
+`SessionTakenOver` is a transport notice outside the event model, like `RunFaulted`. The design record stays in
+`RECONNECT_RESILIENCE.md` → R1d-c.
+
+- **Acceptance (met):** opening the run in a second window → the first shows "This run is now open in another window"
+  and can't be played; the second plays on; a plain refresh of a single window never shows it; `activeGame` in
+  `localStorage` is untouched.
+- **What changed:**
+  - `AttachConnection`'s reconnect branch sends the previous connection a `SessionTakenOver` transport notice
+    (`SignalRBattleEventEmitter.SendSessionTakenOver(connectionId)`, addressed by id; never cached, never replayed)
+    before swapping. Not sent when the same connection re-attaches; the replay goes to the new connection.
+  - Client: `useBattleHub` stops its connection (marked torn down, no bounce to Title) and dispatches
+    `SESSION_TAKEN_OVER`; the reducer flag `sessionTakenOver` makes `BattleScreen` render `SessionTakenOverPanel`
+    instead of the battle view (not over it: `Modal` has no focus trap). The panel has no actions, reuses the game-over
+    card's classes. QUIT and the `phase === 'ended'` effect, which call `clearActiveGame()`, are gated on the flag so
+    the surviving window's saved game is never wiped. `useBattleHub` ignores the notice on an already-torn-down
+    connection (StrictMode's double mount can displace the first mount in the same window).
+  - Tests: C# in `GameSessionLifecycleTests` (second attach notifies the previous connection only; same-connection
+    re-attach does not); Vitest reducer flag in `battleReducer.test.ts`; opt-in `reconnect.spec.ts` scenario (second page
+    opens the same run → first shows the panel and no Fight button, second plays on, `activeGame` unchanged), plus
+    "no panel" assertions after a refresh and a blip in the existing scenarios.
+- **Waived by Mo (2026-10-28):** (1) an old window that is mid-blip at the moment of the takeover misses the notice, and
+  its automatic reconnect takes the run back (the newer window then gets the panel); it needs two windows and a blip at
+  the same moment, and blocking it would take per-connection server state. (2) The pr-review advisory to make
+  `SendSessionTakenOver` internal; it stays public for consistency with `SendRunFaulted`.
+- **Gen surface:** none. **Gen 1 source:** n/a. **Data vs runtime:** web + client.
+- **Closed:** the last reconnect item; every R1d item is now built. **Still open:** the 60 s grace is unmeasured (rests
+  on SignalR's 0/2/10/30 s schedule), a separate spec, not filed.
+
+---
+
 ## §2 R1d-f — blip test tooling ✅ DONE (2026-10-28)
 
 S–M, reliability (test tooling); was §1 #7c / §2 "R1d-f". A deterministic blip for the browser suite: a Dev-Mode-gated
