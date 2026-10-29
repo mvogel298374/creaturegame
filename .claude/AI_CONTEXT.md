@@ -115,7 +115,7 @@ each is its own subagent so it can be invoked or edited independently:
    gate, and always the LAST gate.** For *every* change — docs-only, test-only and one-line fixes included — it
    runs after the review gates, against the final state. It reconciles `docs/TODO.md` against reality: archives the
    finished write-up to `TODO_ARCHIVE.md` (TODO.md is active work only), clears its stale framing (its §1 ranking
-   row, blocked-on/gated-on notes, ⚠️ banners, dangling refs), and — the load-bearing check — **verifies a finished
+   row, blocked-on/gated-on notes, ⚠️ banners, dangling refs), keeps the §1 ranking listing every open entry, and — the load-bearing check — **verifies a finished
    write-up's full record is in the archive before any summary of it is dropped** (the Shop-node trap: an archive
    that said "still live in TODO.md" and described the pre-ship state). It also adds/updates the current-state entry
    in `docs/PRODUCT_SPEC.md` for a player-visible feature, audits that the item's `TODO.md` entry met the DoR

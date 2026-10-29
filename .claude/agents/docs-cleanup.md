@@ -72,6 +72,11 @@ Work through all of these — do not stop at the first.
    work invalidated. A ruling or waiver the work produced goes in §9 *Settled*, not in the archive alone. Keep
    `TODO.md` free of finished history and design essays — design belongs in the design docs.
 
+4b. **Keep the §1 ranking complete.** §1 must list every open entry in §2–§7, not only drop finished ones. An entry
+   the change filed, split or re-scoped gets its row in the right tier, with its cost and DoR gaps matching the
+   entry. A row's tier or Ready mark changes when its entry's gaps do. Diff the entry titles in §2–§7 against the
+   §1 rows on every run; a missing row is an UPDATED fix, not a note.
+
 5. **Fix dangling references** — the finished section may be linked from elsewhere:
    - In `TODO.md`/`TODO_ARCHIVE.md`: anchor links (`](#…)`), `see below`/`see above`, `*Section*` refs.
    - Across the repo: `grep` the other docs (`ARCHITECTURE.md`, `GAME_LOOP.md`, `STATE_MODEL.md`, agent files,

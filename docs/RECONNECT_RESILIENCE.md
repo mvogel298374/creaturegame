@@ -99,7 +99,7 @@ ignored unless it is still the current one (`OnGraceElapsed`).
 
 > **Superseded in part (user 2026-10-28):** the server half below stands; the "go to Title with a notice" client
 > half and the `transportNotices.ts` extraction are replaced by a full-screen, no-action panel in the old window
-> (no navigation, no `clearActiveGame()`). The ready entry is in `TODO.md` §2.
+> (no navigation, no `clearActiveGame()`). The record is in `TODO_ARCHIVE.md` → *§2 R1d-c*.
 
 - **What is wrong (verified).** `AttachConnection`'s reconnect branch rebinds `CurrentConnectionId` to whoever
   connected last. The old tab keeps its socket, receives nothing, and its invocations are dropped (routing is by
