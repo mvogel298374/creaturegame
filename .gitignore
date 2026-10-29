@@ -59,5 +59,9 @@ creaturegame.Web/ClientApp/.playwright/
 # Claude Code scheduled-task lock (runtime state, not source)
 .claude/scheduled_tasks.lock
 
+# Guardrail markers (runtime state, not source)
+.claude/active-item
+.claude/e2e-approved
+
 # dev.ps1 server logs (reset on every start)
 .dev/

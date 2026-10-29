@@ -38,7 +38,8 @@ answers all seven `docs/DEFINITION_OF_READY.md` items (an S-size item gets one l
   (✅ / ✗). On a gap: no code, no data; list every gap with drafted text and ask Mo to decide.
 - Work found mid-task, or dictated inline, gets its own entry first, shown to Mo, before it is touched.
 - *Hook to build:* on a greenlight Claude writes the item ID to `.claude/active-item`; a `PreToolUse` hook on
-  product-path edits blocks unless that item exists in `docs/TODO.md` marked ready.
+  product-path edits blocks unless that item exists in `docs/TODO.md` marked ready. Claude deletes the marker in
+  the same step as the item's commit, so a finished item never unlocks the next one.
 
 ### G2 Docs cleanup last
 *Enforces* "done means the docs reflect the final state". *Passes:* `docs-cleanup` reported `DOCS: CLEAN | UPDATED`
