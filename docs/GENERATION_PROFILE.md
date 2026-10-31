@@ -127,6 +127,8 @@ Named explicitly so it is not eroded by accident:
 - **The two acquisition channels** (themed draft, boss catch) and their cadence.
 - **The event/wire model** and the `IRunEvent`/`Outcome` abstraction.
 - **Party size 6.**
+- **The 10-character nickname cap** (`NicknameRules.MaxLength`) — presentation, not battle math, so a plain
+  constant like party size; the §7.5 surface catalog is its home if a generation's own limit is ever modelled.
 
 > A future generation adds **content and chrome, not loop mechanics.** If a later generation ever tempts us to
 > change the loop, that is a **new decision**, not an extension of this one.
@@ -304,8 +306,13 @@ types and stays gen-blind (correct — the enum is a vocabulary, not a claim). W
 Kanto roster is sized so that **all 15 Gen 1 types are homed**, an invariant a 17-type generation would
 re-derive.
 
-**As built:** `GenerationProfile.TypeRoster` (`required IReadOnlySet<DamageType>`); `Gen1Profile` supplies the 15
-in `DamageType` declaration order, so a reader diffing it against the enum sees exactly three members missing.
+**As built:** `GenerationProfile.TypeRoster` (`required IReadOnlySet<DamageType>`, a set because it answers a
+membership question); `Gen1Profile` supplies the 15 in `DamageType` declaration order, so a reader diffing it
+against the enum sees exactly three members missing. `Gen1Profile.Gen1Types` is an **expression-bodied property,
+not a `static readonly` field**: static field initializers run in textual order, so a roster field declared below
+`Instance` would be null when `Instance`'s initializer reads it. The build would catch that (CS8601 under
+`TreatWarningsAsErrors`), but the property removes the trap for an author copying the file as a template;
+`{ get; } = …` would not, since an auto-property initializer compiles to the same order-dependent field.
 The consumer is the region-content invariant, now production code: **`Biomes.UnhomedTypes(region, roster)`**
 (plus `Biomes.HomedTypes(region)`), which takes the roster as an **argument** rather than assuming 15 — that
 parameter *is* the upward compatibility, since a later generation must re-derive the check, not inherit Gen 1's
@@ -352,8 +359,16 @@ checked invariant and a substitutable value; it does not claim more.
 
 **As built:** `IContentScope` — three accessors (`Species`, `Moves`, `Items`), each `IQueryable<T> → IQueryable<T>`
 — on the profile as `GenerationProfile.ContentScope`. `Gen1ContentScope` is the documented stub: every accessor
-returns its query untouched, and its doc names the exact fix (`all.Where(x => x.GenerationIntroduced <= 1)`,
-`<=` not `==`) and the fact that it becomes **wrong** the day a second generation's rows are imported. The actual
+returns its query untouched, which is correct only because the three catalogs hold Gen 1 rows alone. It becomes
+**wrong** the day a second generation's rows are imported, and this class is the one place the fix goes, since
+every consumer asks the scope rather than the table. **The fix:** a `GenerationIntroduced` column on
+`PokemonSpecies`, `Attack` and `Item`, and each accessor becomes `all.Where(x => x.GenerationIntroduced <= 1)`
+(`<=`, not `==`: a generation inherits everything before it), translated to SQL because the seam passes the query
+along. **The premise is enforced, not assumed:** Max Revive, imported early as scaffolding, was removed from the
+roster and `items.db` (2026-07-30) and is pinned out by
+`ItemImportTests.Gen1BattleItemNames_ExcludesMaxRevive_TheItemsCatalogIsOneGenerationsContent`; adding another
+generation's row "as scaffolding" is what breaks the stub. The identity is still load-bearing: it makes every call
+site *ask*, and §3's second scope proves each site reaches it. The actual
 `GenerationIntroduced` columns and filtered queries are **importer/schema work** and stay in `TODO.md`
 §4.4, explicitly sequenced after this.
 

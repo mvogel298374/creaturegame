@@ -58,8 +58,8 @@ growing, because it's carrying weight a doc should be carrying.
   seam/doc that owns the "why".
 - A genuinely local gotcha with no broader design content (e.g. "Next's upper bound is exclusive → +1 makes max
   inclusive").
-- A seam member's per-generation XML doc, kept to a line or two; the explanation of how generations differ
-  lives in `GENERATION_SEAMS.md` / `GEN_DIFFERENCES.md`, not here.
+- A seam member's one-line XML doc (what it returns, at most the Gen 1 value); how generations differ lives in
+  `GENERATION_SEAMS.md` / `GEN_DIFFERENCES.md`, never in a code comment.
 
 **What must go to a doc first:** a tuning constant with a rationale, a policy/algorithm design (a formula, a
 weighting scheme, a state machine), a historical "used to do X, changed because Y," or anything a *different*

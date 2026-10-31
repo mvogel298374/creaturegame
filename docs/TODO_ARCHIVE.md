@@ -8,6 +8,41 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §7.4 Later-generation claims leave the code comments; the dead `StatCapAnnouncement.WontChangeFurther` is dropped ✅ DONE (2026-10-30)
+
+S; two entries merged under one review chain (user rulings 2026-10-29). Replaced the old "audit the Gen 2+ claims against
+pokecrystal" item: later generations are expressed by seam classes and enum members, never by comments, so checking comment
+text before a Gen 2 sprint was wasted reading.
+
+- **Part 1, scope:** ~40 lines of `IBattleRules.cs` doc comments, plus inline comments in `Gen1BattleRules.cs`,
+  `MoveEffects.cs` (Leech Seed, Disable, Counter, Conversion, the empty Roar/Whirlwind force-switch placeholder) and a few
+  engine files (`IStatCalculator`, `Gen1StatCalculator`, `Creature`, `EncounterSelector`, `GenerationProfile`, `Gen1Profile`,
+  `NicknameRules`, `ITypeChart`, `BattleEvents`, `IBattleAi`) stated unverified Gen 2+/Gen 3+ facts. Out of scope: importer
+  comments (they justify a Gen 1 override of PokeAPI's modern data) and test comments describing a later-gen enum arm.
+- **Part 1, acceptance:** no comment under `creaturegame/` or `creaturegame.Web/` (C#, TS) states what a later generation
+  does; comments state the Gen 1 fact only, or are deleted. A later-gen fact worth keeping lands in `GENERATION_SEAMS.md` §2's
+  *Later gens* column or `GEN_DIFFERENCES.md`, marked *unverified — check against pokecrystal in the Gen 2 sprint*.
+  `GENERATION_SEAMS.md` §4.5 is rewritten to "Code comments state Gen 1 only" (was "Interface as living documentation"),
+  with the §5.0 litmus note, the Stat calculation note, `GENERATION_PROFILE.md` §2.2/§5(a)/§5(b) and `DEFINITION_OF_DONE.md`
+  §G amended to match. The empty force-switch placeholder is deleted. Enum members and seam members a later generation needs
+  stay. No behaviour change.
+- **Part 2:** `StatCapAnnouncement.WontChangeFurther` (the Gen 3+ arm) had no handler: `AttackAction` and `ItemEffects` map
+  everything but `NothingHappened` to no message, so a ruleset returning it would silently print nothing. Removed;
+  `StatCapAnnouncement` keeps `NothingHappened` as its only member, `IBattleRules.StatStageCapAnnouncement` stays the seam, the
+  two call sites stay (the `switch`'s `_ => null` default is still required), and the enum's doc comment states Gen 1 only.
+  `HitRollOrder.AccuracyThenCritAndDamage` and `RedundantConfuseAnnouncement.AlreadyConfused` (live, tested engine paths)
+  were kept by the same ruling. Gen 1 source unchanged: pokered `PrintNothingHappenedText`, pinned by
+  `StatStageMoveContractTests`.
+- **Review chain:** format-gate PASS; test-runner PASS (fast suites green after each fix round); requirements-review
+  DISCREPANCIES (8), all adjudicated by Mo (doc facts corrected from pokered; engine gaps filed as TODO entries; two acceptance
+  deviations accepted via amended DoR text; cleanups applied; no second requirements-review); pr-review CHANGES-REQUESTED
+  (2 CR, 2 R, 5 A), all fixed per Mo's ruling, no second pr-review (comment/docs-only fixes), format and fast suites re-run
+  green.
+- **Filed during the item (still open in `TODO.md`):** §3.1 "Same-type secondary status immunity", §3.1 "Counter keys on the
+  foe's selected move", §7.4 "The INFO tab's later-generation rows", and a note on the §3.1 Roar/Whirlwind entry.
+
+---
+
 ## §3.1 Foe-only Gen 1 rules: Psywave can deal 0, stat-down moves fail 25% ✅ DONE (2026-10-28)
 
 S–M; merged from V9's Psywave entry and "Smaller Gen 1 gaps III"; `/plan` 2026-10-28. User rulings 2026-10-17: replicate

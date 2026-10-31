@@ -98,8 +98,7 @@ export function CreatureOverview({ gameId, party, onBack, enemy = false }: {
   );
 }
 
-// Later-generation INFO fields, listed once with the generation that introduces them. Gated invisible until
-// the active generation reaches them (so nothing shows in Gen 1) — the layout is ready, no empty rows today.
+// Hidden until the active generation reaches minGen.
 const GEN_FIELDS: Array<{ label: string; minGen: number; get: (d: PlayerOverview) => string | null }> = [
   { label: 'Held Item', minGen: 2, get: d => d.heldItem },
   { label: 'Ability', minGen: 3, get: d => d.ability },

@@ -18,7 +18,7 @@ public class Item
     /// <summary>Mart buy price in Poké-dollars (PokeAPI <c>cost</c>).</summary>
     public int Cost { get; set; }
 
-    /// <summary>Base power if thrown with Fling (later gen mechanic; kept as raw imported data).</summary>
+    /// <summary>Base power if thrown with Fling (unused in Gen 1; kept as raw imported data).</summary>
     public int? FlingPower { get; set; }
 
     /// <summary>English short-effect text from PokeAPI.</summary>

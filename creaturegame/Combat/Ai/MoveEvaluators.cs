@@ -141,10 +141,7 @@ public sealed class StatusMoveEvaluator : IMoveEvaluator
         var foe = context.Defender;
         if (foe.Battle.Status != StatusCondition.None) // only one major status at a time in Gen 1
             return RedundantPenalty;
-        // Type immunity is the authoritative gen-variable rule on IBattleRules (Gen 1: Poison can't be
-        // poisoned, Fire can't be burned, a Normal move can't paralyse a Normal-type — and notably Freeze
-        // has NO type immunity in Gen 1). Route through the seam rather than re-deriving it here, so the AI's
-        // judgement always matches what the engine will actually do and never enshrines a wrong/stale fact.
+        // Through the seam, so the AI judges exactly what the engine will do.
         if (!context.Rules.CanReceiveStatus(foe, status, move.Base.DamageType))
             return RedundantPenalty;
         if (IsTypeImmunePureStatusMove(move.Base, context))

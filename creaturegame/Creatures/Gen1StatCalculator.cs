@@ -66,10 +66,7 @@ public sealed class Gen1StatCalculator : IStatCalculator
             _ => _rng.Next(0, MaxDv + 1), // Average: 0–15 (the ordinary roll)
         };
 
-    // Gen 1 Stat Experience: defeating a Pokémon adds its base stats to the victor's Stat Exp, per stat,
-    // capped at 65535. The cap and the gain rule are Gen-1 values (Gen 3+ uses EV yields + 252/510 caps), so
-    // they live here behind the seam, never inline at the battle call site. The gain only shows up in the
-    // creature's actual stats on the next CalculateStats (a level-up) — this method just accumulates.
+    // Gen 1: a win adds the defeated species' base stats to Stat Exp, capped at 65535 per stat.
     private const int StatExpMax = 65535;
 
     public void AwardStatExp(Creature victor, Creature defeated)

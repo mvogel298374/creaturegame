@@ -3,13 +3,7 @@ using creaturegame.Creatures;
 
 namespace creaturegame.Combat;
 
-/// <summary>
-/// The kind of secondary effect a move can roll for on hit. Generations differ in how the
-/// chance is stored: Gen 1 keeps a single per-move chance (so every kind reads the same
-/// value), while later generations can attach independent chances per effect. Call sites
-/// ask <see cref="IBattleRules.GetSecondaryEffectChance"/> by kind so they never assume the
-/// Gen 1 single-column layout.
-/// </summary>
+/// <summary>The kind of secondary effect a move can roll for; see <see cref="IBattleRules.GetSecondaryEffectChance"/>.</summary>
 public enum SecondaryEffectKind
 {
     Status,
@@ -18,40 +12,21 @@ public enum SecondaryEffectKind
     StatStage,
 }
 
-/// <summary>
-/// How a <i>dedicated</i> confusion move (a non-damaging status move — Confuse Ray / Supersonic) announces
-/// hitting an <b>already-confused</b> target. The counter is never re-rolled in any generation (that rule is
-/// gen-agnostic and lives in <c>ConfuseEffect</c>); only the message differs, so it rides the seam.
-/// <para>Gen 1–2: <see cref="FailedGeneric"/> — the generic "But it failed!" (<c>ConditionalPrintButItFailed</c>
-/// in pokered). Gen 3+: <see cref="AlreadyConfused"/> — names the redundancy ("… is already confused!").
-/// A <i>secondary</i> confusion on a damaging move (Psybeam etc.) fails <b>silently</b> in every generation and
-/// never consults this.</para>
-/// </summary>
+/// <summary>How a dedicated confusion move announces an already-confused target. See GENERATION_SEAMS.md §2.</summary>
 public enum RedundantConfuseAnnouncement
 {
-    /// <summary>The generic move-failure line ("But it failed!"). Gen 1–2.</summary>
+    /// <summary>The generic "But it failed!" (pokered <c>ConditionalPrintButItFailed</c>). Gen 1.</summary>
     FailedGeneric,
 
-    /// <summary>A message naming the redundancy ("… is already confused!"). Gen 3+.</summary>
+    /// <summary>A message naming the redundancy ("… is already confused!").</summary>
     AlreadyConfused,
 }
 
-/// <summary>
-/// How a <i>primary</i> stat-stage move announces hitting a stat that is already at the ±6 cap (so it can't
-/// change further). The ±6 clamp itself is gen-agnostic — every generation caps there — so only the message
-/// differs, and it rides the seam (the sibling of <see cref="RedundantConfuseAnnouncement"/>).
-/// <para>Gen 1–2: <see cref="NothingHappened"/> — the generic "Nothing happened!" (<c>PrintNothingHappenedText</c>
-/// in pokered). Gen 3+: <see cref="WontChangeFurther"/> — names it ("… won't rise/drop anymore!"; Gen 5+
-/// "… won't go any higher/lower!"). A <i>secondary</i> stat drop on a damaging move fails <b>silently</b> in
-/// Gen 1 and never consults this.</para>
-/// </summary>
+/// <summary>How a primary stat move announces a stat already at the ±6 cap. See GENERATION_SEAMS.md §2.</summary>
 public enum StatCapAnnouncement
 {
-    /// <summary>The generic "Nothing happened!" line. Gen 1–2.</summary>
+    /// <summary>The generic "Nothing happened!" (pokered <c>PrintNothingHappenedText</c>). Gen 1.</summary>
     NothingHappened,
-
-    /// <summary>A message naming the cap ("… won't rise anymore!"). Gen 3+.</summary>
-    WontChangeFurther,
 }
 
 /// <summary>Where a move's crit and damage rolls fall relative to its accuracy roll. See GENERATION_SEAMS.md §2.</summary>
@@ -60,75 +35,37 @@ public enum HitRollOrder
     /// <summary>Crit and damage first, then accuracy; a 0× matchup outranks a miss. Gen 1.</summary>
     CritAndDamageThenAccuracy,
 
-    /// <summary>Accuracy first; a miss ends the move before any crit or damage roll. Gen 3+.</summary>
+    /// <summary>Accuracy first; a miss ends the move before any crit or damage roll.</summary>
     AccuracyThenCritAndDamage,
 }
 
 public interface IBattleRules
 {
-    /// <summary>
-    /// Returns whether the given move thaws a frozen target when it hits.
-    /// Gen 1: only damaging Fire-type moves that can inflict burn (not Fire Spin).
-    /// Gen 2+: any Fire-type move.
-    /// </summary>
+    /// <summary>Whether the given move thaws a frozen target when it hits.</summary>
     bool CanThawFrozenTarget(Attack move);
 
-    /// <summary>
-    /// Per-turn chance (0–100) for a frozen Pokémon to thaw spontaneously at the start of its turn.
-    /// Gen 1: 0 (freeze is permanent until hit by the right move).
-    /// Gen 2+: 20.
-    /// </summary>
+    /// <summary>Per-turn chance (0–100) for a frozen Pokémon to thaw on its own at the start of its turn.</summary>
     int FreezeRandomThawPercent { get; }
 
-    /// <summary>
-    /// Same-Type Attack Bonus multiplier applied when a move's type matches the attacker's.
-    /// Gen 1–5: 1.5. (Later mechanics like Adaptability/Terastal layer on top of this base.)
-    /// </summary>
+    /// <summary>Same-Type Attack Bonus multiplier.</summary>
     double StabMultiplier { get; }
 
-    /// <summary>
-    /// Percent chance (0–100) that a confused creature hits itself instead of acting.
-    /// Gen 1–6: 50. Gen 7+: 33.
-    /// </summary>
+    /// <summary>Percent chance (0–100) that a confused creature hits itself instead of acting.</summary>
     int ConfusionSelfHitPercent { get; }
 
-    /// <summary>
-    /// Number of times a multi-hit move (Double Slap, Comet Punch, Fury Attack…) strikes when it
-    /// connects. Gen 1: 2–5 hits, weighted 2 = 3/8, 3 = 3/8, 4 = 1/8, 5 = 1/8. (Gen 5+ reweights to
-    /// favour 3 more.) Drawn once per use.
-    /// </summary>
+    /// <summary>How many times a multi-hit move strikes when it connects; drawn once per use.</summary>
     int RollMultiHitCount();
 
-    /// <summary>
-    /// Coins-per-level scattered by Pay Day. The money picked up after the battle is this value
-    /// times the user's level. Gen 1: 2× level. (Later generations: 5× level.)
-    /// </summary>
+    /// <summary>Pay Day's money per user level, picked up after the battle.</summary>
     int PayDayCoinMultiplier { get; }
 
-    /// <summary>
-    /// The percent chance (0–100) a move's secondary <paramref name="effect"/> applies on hit.
-    /// Gen 1 stores one chance per move, so every <see cref="SecondaryEffectKind"/> reads the
-    /// same column; a later generation that splits chances per effect overrides this to read
-    /// the right field. Call sites stay generation-agnostic by asking here rather than reading
-    /// the move's chance column directly.
-    /// </summary>
+    /// <summary>The percent chance (0–100) a move's secondary effect applies on hit. See GENERATION_SEAMS.md §5.0.</summary>
     int GetSecondaryEffectChance(Attack move, SecondaryEffectKind effect);
 
-    /// <summary>
-    /// Rolls whether a move's secondary effect procs, given its <paramref name="chancePercent"/>
-    /// (0–100, from <see cref="GetSecondaryEffectChance"/>). Gen 1 models this as a 1–100 roll
-    /// (a simplification of the true internal n/256 scale); a later generation could roll
-    /// differently. Takes the <paramref name="rng"/> explicitly so the caller's battle RNG stream
-    /// stays the source of the roll (the rules' own RNG is for its self-owned rolls like
-    /// <see cref="RollDamageVariance"/>). Returns true when the effect should apply.
-    /// </summary>
+    /// <summary>Whether a secondary effect with <paramref name="chancePercent"/> procs, drawn from the caller's <paramref name="rng"/>.</summary>
     bool SecondaryHits(int chancePercent, IRandomSource rng);
 
-    /// <summary>
-    /// Returns the random damage multiplier for one hit.
-    /// Gen 1: uniform draw from 217–255, divided by 255.
-    /// Gen 2+: uniform draw from 85–100, divided by 100.
-    /// </summary>
+    /// <summary>The random damage multiplier for one hit.</summary>
     double RollDamageVariance();
 
     /// <summary>
@@ -137,10 +74,7 @@ public interface IBattleRules
     /// </summary>
     (double Min, double Max) DamageVarianceRange { get; }
 
-    /// <summary>
-    /// Returns the number of turns the target will sleep (drawn randomly each time Sleep is applied).
-    /// Gen 1: 1–7. Gen 2+: 2–5.
-    /// </summary>
+    /// <summary>The number of turns the target sleeps, drawn each time Sleep is applied.</summary>
     int RollSleepTurns();
 
     /// <summary>
@@ -165,36 +99,19 @@ public interface IBattleRules
     /// </summary>
     StatCapAnnouncement StatStageCapAnnouncement { get; }
 
-    /// <summary>
-    /// Returns the recoil damage dealt to a Struggle user.
-    /// Gen 1: half the damage dealt. Gen 2: half max HP. Gen 3+: quarter max HP.
-    /// </summary>
+    /// <summary>The recoil damage dealt to a Struggle user.</summary>
     int CalculateStruggleRecoil(Creature source, int damageDealt);
 
-    /// <summary>
-    /// Divisor applied to max HP for end-of-turn Burn damage (e.g. 16 → 1/16 max HP).
-    /// Gen 1–5: 16. Gen 6+: 8.
-    /// </summary>
+    /// <summary>Divisor of max HP for end-of-turn Burn damage (16 → 1/16).</summary>
     int BurnDamageDenominator { get; }
 
-    /// <summary>
-    /// Divisor applied to max HP for end-of-turn Poison damage (e.g. 16 → 1/16 max HP).
-    /// Gen 1–5: 16. Gen 6+: 8.
-    /// </summary>
+    /// <summary>Divisor of max HP for end-of-turn Poison damage (16 → 1/16).</summary>
     int PoisonDamageDenominator { get; }
 
-    /// <summary>
-    /// Divisor applied to the seeded creature's max HP for the end-of-turn Leech Seed drain
-    /// (e.g. 16 → 1/16 max HP). Gen 1: 16. Gen 2+: 8. Numerically equal to Poison in Gen 1 but a
-    /// distinct rule on its own member — the two change on different generation boundaries.
-    /// </summary>
+    /// <summary>Divisor of the seeded creature's max HP for the Leech Seed drain; its own rule, not Poison's.</summary>
     int LeechSeedDrainDenominator { get; }
 
-    /// <summary>
-    /// Divisor applied to a paralyzed creature's effective Speed (after stat-stage multipliers) for
-    /// turn-order purposes — see <see cref="StatusResolver.EffectiveSpeed"/> (e.g. 4 → 1/4 Speed).
-    /// Gen 1–6: 4. Gen 7+: 2 (a rebalance, not a generation-invariant rule).
-    /// </summary>
+    /// <summary>Divisor of a paralyzed creature's effective Speed for turn order (<see cref="StatusResolver.EffectiveSpeed"/>).</summary>
     int ParalysisSpeedDivisor { get; }
 
     /// <summary>
@@ -205,11 +122,7 @@ public interface IBattleRules
 
     // ── Stat stages ────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Returns the damage-stat multiplier for a stage in [-6, +6].
-    /// Gen 1/2: stage≤0 → 2/(2+|stage|); stage>0 → (2+stage)/2.
-    /// (Ranges from 0.25× at -6 to 4.0× at +6.)
-    /// </summary>
+    /// <summary>The damage-stat multiplier for a stage in [-6, +6].</summary>
     double GetStatMultiplier(int stage);
 
     /// <summary>
@@ -226,51 +139,37 @@ public interface IBattleRules
     /// </summary>
     int GetHitThreshold(int accuracyPercent, int attackerAccStage, int defenderEvaStage);
 
-    /// <summary>
-    /// Exclusive upper bound for the accuracy roll.
-    /// Gen 1: 256 (roll 0–255; a roll of 255 always misses — the 1/256 bug).
-    /// Gen 2+: 101 (roll 0–100).
-    /// </summary>
+    /// <summary>Exclusive upper bound for the accuracy roll (Gen 1: 256, so a roll of 255 always misses).</summary>
     int AccuracyRollBound { get; }
 
-    /// <summary>Whether X Accuracy sets a skip-the-accuracy-check flag instead of raising the accuracy stage.
-    /// Gen 1–2: true. Gen 3+: false (+1 stage, the item row's data). See GENERATION_SEAMS.md §2.</summary>
+    /// <summary>Whether X Accuracy skips the accuracy roll instead of raising a stage. See GENERATION_SEAMS.md §2.</summary>
     bool XAccuracyBypassesAccuracyCheck { get; }
 
-    /// <summary>Whether a repeat Dire Hit / Guard Spec / flag-style X Accuracy is refused instead of spent.
-    /// Gen 1: false. Gen 2: true. See GENERATION_SEAMS.md §2.</summary>
+    /// <summary>Whether a repeat Dire Hit / Guard Spec / flag-style X Accuracy is refused instead of spent. See GENERATION_SEAMS.md §2.</summary>
     bool RepeatFlagItemRefused { get; }
 
-    /// <summary>Whether an X-item is refused instead of spent when its stat is already at +6.
-    /// Gen 1–2: false. Gen 3+: true. See GENERATION_SEAMS.md §2.</summary>
+    /// <summary>Whether an X-item is refused instead of spent when its stat is already at +6. See GENERATION_SEAMS.md §2.</summary>
     bool CappedXItemRefused { get; }
 
-    /// <summary>Whether Dire Hit / Guard Spec narrate their effect beyond the "used <ITEM>!" line.
-    /// Gen 1–2: false. Gen 3+: true (Dire Hit). See GENERATION_SEAMS.md §2.</summary>
+    /// <summary>Whether Dire Hit / Guard Spec narrate their effect beyond the "used &lt;ITEM&gt;!" line. See GENERATION_SEAMS.md §2.</summary>
     bool BoosterItemAnnouncesEffect { get; }
 
-    /// <summary>The order a move draws its crit, damage and accuracy rolls.
-    /// Gen 1: crit and damage first. Gen 2: per move script. Gen 3+: accuracy first. See GENERATION_SEAMS.md §2.</summary>
+    /// <summary>The order a move draws its crit, damage and accuracy rolls. See GENERATION_SEAMS.md §2.</summary>
     HitRollOrder HitRollOrder { get; }
 
-    /// <summary>Whether every strike of a multi-hit move repeats the first strike's crit and damage.
-    /// Gen 1: true. Gen 2+: false (each strike rolls its own). See GENERATION_SEAMS.md §2.</summary>
+    /// <summary>Whether every strike of a multi-hit move repeats the first strike's crit and damage. See GENERATION_SEAMS.md §2.</summary>
     bool MultiHitRepeatsFirstStrike { get; }
 
-    /// <summary>Whether fixed-damage moves, Super Fang, Psywave and Counter respect a 0× type matchup.
-    /// Gen 1: false. Gen 2: true for the static-damage moves (others unverified). See GENERATION_SEAMS.md §2.</summary>
+    /// <summary>Whether fixed-damage moves, Super Fang, Psywave and Counter respect a 0× type matchup. See GENERATION_SEAMS.md §2.</summary>
     bool FixedDamageChecksTypeImmunity { get; }
 
-    /// <summary>Whether damage below 2 skips the damage roll (no draw).
-    /// Gen 1–2: true. Gen 3: false (always draws). See GENERATION_SEAMS.md §2.</summary>
+    /// <summary>Whether damage below 2 skips the damage roll (no draw). See GENERATION_SEAMS.md §2.</summary>
     bool DamageRollSkippedBelowTwo { get; }
 
-    /// <summary>Whether a non-damaging move's type immunity ends it before the accuracy roll.
-    /// Gen 1: true. Gen 2: false (accuracy first). Gen 3: true. See GENERATION_SEAMS.md §2.</summary>
+    /// <summary>Whether a non-damaging move's type immunity ends it before the accuracy roll. See GENERATION_SEAMS.md §2.</summary>
     bool StatusMoveImmunityBeforeAccuracy { get; }
 
-    /// <summary>Whether Jump Kick / Hi Jump Kick crash on a 0× target as well as on a miss.
-    /// Gen 1: true. Gen 2+: false. See GENERATION_SEAMS.md §2.</summary>
+    /// <summary>Whether Jump Kick / Hi Jump Kick crash on a 0× target as well as on a miss. See GENERATION_SEAMS.md §2.</summary>
     bool CrashOnTypeImmunity { get; }
 
     /// <summary>
@@ -279,98 +178,42 @@ public interface IBattleRules
     /// </summary>
     int RollBindingTurns();
 
-    /// <summary>
-    /// Returns the crash damage a jump-kick user takes when the move misses.
-    /// Gen 1: a flat 1 HP (a famous quirk). Gen 2–4: based on the damage that would have been
-    /// dealt; Gen 5+: half the user's max HP — those generations would read <paramref name="user"/>
-    /// (and could extend the signature with the would-be damage) rather than returning a constant.
-    /// </summary>
+    /// <summary>The crash damage a jump-kick user takes when the move misses.</summary>
     int CalculateCrashDamage(Creature user);
 
-    /// <summary>
-    /// Returns the recoil damage a recoil move (Take Down, Double-Edge, Submission) deals back to
-    /// the user, given the damage it dealt to the target.
-    /// Gen 1: 1/4 of the damage dealt (minimum 1). Gen 2+: same fraction; Gen 7+ rounds differently.
-    /// </summary>
+    /// <summary>The recoil a recoil move (Take Down, Double-Edge, Submission) deals back, given the damage it dealt.</summary>
     int CalculateRecoilDamage(int damageDealt);
 
-    /// <summary>
-    /// Returns how many turns a rampage move (Thrash, Petal Dance) locks the user in before it
-    /// confuses itself. Gen 1: 2–3 turns. (Gen 2+: 2–3 as well; Gen 5+ reworks the confusion.)
-    /// </summary>
+    /// <summary>How many turns a rampage move (Thrash, Petal Dance) locks the user in before it confuses itself.</summary>
     int RollRampageTurns();
 
-    /// <summary>
-    /// Returns how many turns Disable locks one of the target's moves out of selection.
-    /// Gen 1: 1–8 turns. (Gen 3+: a fixed 4 turns.)
-    /// </summary>
+    /// <summary>How many turns Disable locks one of the target's moves out of selection.</summary>
     int RollDisableTurns();
 
     // ── Move-specific damage quirks ──────────────────────────────────────────────
 
-    /// <summary>
-    /// Whether a one-hit KO move (Horn Drill, Guillotine, Fissure) succeeds against
-    /// <paramref name="target"/>, independent of the normal accuracy roll.
-    /// Gen 1: fails when the target's (in-battle) Speed is greater than the user's — a Speed
-    /// comparison, NOT a level check. Gen 2+: fails when the user's level is below the target's.
-    /// </summary>
+    /// <summary>Whether a one-hit KO move succeeds against <paramref name="target"/>, apart from the accuracy roll.</summary>
     bool OneHitKoSucceeds(Creature user, Creature target);
 
-    /// <summary>
-    /// Whether Counter qualifies to answer the damage the user last took, given that hit's type.
-    /// Counter returns double that damage when this is true.
-    /// <para>
-    /// Gen 1: qualifies when the last damaging move was <see cref="DamageType.Normal"/> or
-    /// <see cref="DamageType.Fighting"/> — a <i>type</i> check (so Sonic Boom, Seismic Toss and Super
-    /// Fang qualify, but Night Shade and Psywave don't). Gen 2+ switched to answering by the move's
-    /// <i>physical</i> category instead of its type, which is why this is a seam member rather than a
-    /// hardcoded type test in the engine. (A generation that keys on category will also need the engine
-    /// to record the last hit's <see cref="AttackType"/>, which Gen 1 doesn't require.)
-    /// </para>
-    /// </summary>
+    /// <summary>Whether Counter answers the last damage the user took, given that hit's type. See GENERATION_SEAMS.md §2.</summary>
     bool CounterQualifies(DamageType? lastDamageType);
 
-    /// <summary>
-    /// Divisor applied to the target's defensive stat when computing Self-Destruct / Explosion
-    /// damage — the move halves the target's Defense before the calculation, making it much
-    /// stronger. Gen 1–4: 2. Gen 5+: 1 (the mechanic was removed).
-    /// </summary>
+    /// <summary>Divisor applied to the target's defensive stat for Self-Destruct / Explosion damage.</summary>
     int SelfDestructDefenseDivisor { get; }
 
-    /// <summary>
-    /// Number of Attack stages a Rage user gains each time it is hit by a damaging move while
-    /// locked into Rage. Gen 1: 1 stage per hit (no cap beyond the normal +6). The magnitude is
-    /// gen-variable in spirit (Gen 2 reworked Rage entirely), so it lives on the seam rather than
-    /// inline in the attack resolver.
-    /// </summary>
+    /// <summary>Attack stages a raging user gains each time a damaging move hits it.</summary>
     int RageAttackStagesPerHit { get; }
 
-    /// <summary>
-    /// Fraction of max HP restored by a Recover-family move (Recover, Soft-Boiled). Gen 1: 1/2.
-    /// (The famous Gen 1 "fails when (maxHP − HP) &amp; 255 == 255" quirk is not modelled.) Rest, which
-    /// heals fully and sleeps, is a separate mechanic. On the seam so a later generation can vary it.
-    /// </summary>
+    /// <summary>Fraction of max HP a Recover-family move (Recover, Soft-Boiled) restores. See GENERATION_SEAMS.md §2.</summary>
     double RecoverHealFraction { get; }
 
-    /// <summary>
-    /// Factor applied to the defender's defensive stat while the matching screen (Reflect → Defense,
-    /// Light Screen → Special) is up. Gen 1–4 double the stat (×2); Gen 5+ instead reduce the damage
-    /// directly (and screens become 5-turn/team-wide). Crits ignore screens (handled in the calculator).
-    /// </summary>
+    /// <summary>Factor on the defender's stat while the matching screen is up; crits ignore it (in the calculator).</summary>
     int ScreenDefenseMultiplier { get; }
 
-    /// <summary>
-    /// Number of turns a Bide commitment lasts (storing turns plus the release turn). Gen 1: 2–3
-    /// (random). Gen 2: a fixed 2 turns. Gen 3+: reworked further (variable, +1 priority semantics
-    /// change) — a later generation overrides this rather than reusing the Gen 1 random range.
-    /// </summary>
+    /// <summary>Number of turns a Bide commitment lasts (storing turns plus the release turn).</summary>
     int RollBideTurns();
 
-    /// <summary>
-    /// Multiplier applied to the total damage a Bide user absorbed when it unleashes. Gen 1–4: 2×.
-    /// Gen 5+ reworked Bide entirely (fixed 2 turns, different accumulation), so a later generation
-    /// reimplements the mechanic rather than just swapping this number.
-    /// </summary>
+    /// <summary>Multiplier on the total damage a Bide user absorbed when it unleashes.</summary>
     int BideDamageMultiplier { get; }
 
     /// <summary>The variable damage Psywave deals on hit (it ignores stats, type, STAB and crits), within
@@ -381,107 +224,44 @@ public interface IBattleRules
     /// [1, ⌊1.5L⌋−1], opponent [0, ⌊1.5L⌋−1]); the single source for the roll and the Dev Mode range.</summary>
     (int Min, int Max) PsywaveDamageRange(Creature source, BattleSide side);
 
-    /// <summary>Whether a foe-targeting stat-down move (or a secondary drop, <paramref name="isSecondary"/>) takes
-    /// the AI handicap roll (<see cref="RollStatDownHandicapFails"/>). Gen 1: the opponent only, primary and secondary;
-    /// Gen 2 exempts the accuracy-down side effect and Lock-On. See GENERATION_SEAMS.md §2.</summary>
+    /// <summary>Whether a foe-targeting stat-down move (or a secondary drop) takes the AI handicap roll. See GENERATION_SEAMS.md §2.</summary>
     bool StatDownHandicapApplies(BattleSide side, Attack move, bool isSecondary);
 
     /// <summary>The AI handicap roll: true when the stat-down move fails (Gen 1: 64/256).</summary>
     bool RollStatDownHandicapFails();
 
-    /// <summary>
-    /// The fixed number of turns a Rest user sleeps (Rest heals to full and forces sleep for exactly
-    /// this many turns, unlike the random <see cref="RollSleepTurns"/>). Gen 1–2: 2 turns. The wake
-    /// timing was reworked in later generations, so the duration lives on the seam.
-    /// </summary>
+    /// <summary>The fixed number of turns a Rest user sleeps, unlike the random <see cref="RollSleepTurns"/>.</summary>
     int RestSleepTurns { get; }
 
     // ── Type-based immunities ────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Whether <paramref name="target"/> can receive the major <paramref name="status"/> inflicted
-    /// by a move of <paramref name="moveType"/>. Generations gate status by the target's type:
-    /// Gen 1 — Poison-types can't be poisoned, Fire-types can't be burned, and (a Gen 1 quirk) a
-    /// Normal-type move can't paralyze a Normal-type target (Body Slam). Sleep and Freeze have no
-    /// type immunity in Gen 1. Later gens add immunities (Electric→paralysis, Grass→powder, etc.),
-    /// so this stays on the seam rather than being a hardcoded check in the engine.
-    /// </summary>
+    /// <summary>Whether the target's types let it receive the status from a move of this type. See GENERATION_SEAMS.md §2.</summary>
     bool CanReceiveStatus(Creature target, StatusCondition status, DamageType moveType);
 
-    /// <summary>
-    /// Whether a <i>non-damaging</i> move consults the target's type immunity (a 0× matchup ⇒ "it doesn't
-    /// affect …") — distinct from the status-vs-type check in <see cref="CanReceiveStatus"/>.
-    /// <para>
-    /// Gen 1: almost no status move checks it — Confuse Ray/Supersonic confuse a Ghost, Glare paralyses a
-    /// Ghost, Growl lowers a Ghost's Attack, sleep/Disable land regardless of type. Only Thunder Wave
-    /// (Electric ⇒ Ground is immune) returns true. Gen 2 makes status moves respect immunity generally ⇒ seam,
-    /// not a hardcoded check. Counter is governed by <see cref="FixedDamageChecksTypeImmunity"/> instead.
-    /// Power-based damaging moves always respect immunity; fixed-damage moves follow <see cref="FixedDamageChecksTypeImmunity"/>.
-    /// </para>
-    /// <para>
-    /// Implementations may key off the move's status/effect/type rather than a foe-direction flag — safe
-    /// only because every qualifying move (Thunder Wave) is inherently foe-directed. A future move
-    /// returning true here MUST be foe-directed (the result is applied against the <i>target's</i> type), or
-    /// re-add a target-direction guard.
-    /// </para>
-    /// </summary>
+    /// <summary>Whether a non-damaging, foe-directed move consults type immunity. See GENERATION_SEAMS.md §2.</summary>
     bool PureStatusMoveChecksTypeImmunity(Attack move);
 
-    /// <summary>
-    /// Whether <paramref name="target"/> can be afflicted by Leech Seed.
-    /// All generations: Grass-types are immune.
-    /// </summary>
+    /// <summary>Whether <paramref name="target"/> can be afflicted by Leech Seed.</summary>
     bool CanBeLeechSeeded(Creature target);
 
-    /// <summary>
-    /// Whether Roar / Whirlwind (<see cref="MoveEffect.ForceFlee"/>) have <em>no effect</em> against a
-    /// trainer-analog (non-escapable) opponent. <b>Gen 1:</b> <c>true</c> — they only end a <i>wild</i>
-    /// battle and simply fail in a trainer battle. <b>Gen 2+:</b> <c>false</c> — they force the opponent to
-    /// switch instead, so a Gen 2 ruleset returns false and <see cref="MoveEffect.ForceFlee"/>'s effect runs
-    /// its force-switch path. The wild-vs-trainer distinction itself is a run-layer fact, carried by
-    /// <see cref="MoveEffectContext.BattleEscapable"/>; this seam owns the gen-variable <em>consequence</em>
-    /// of facing a non-escapable foe (fail vs. force-switch).
-    /// </summary>
+    /// <summary>Whether Roar / Whirlwind fail against a non-escapable foe. See GENERATION_SEAMS.md §2.</summary>
     bool ForceFleeFailsVsTrainer { get; }
 
-    /// <summary>
-    /// The major status a creature retains when it leaves a battle — used by an endless run to carry
-    /// status into the next encounter. All generations keep Sleep/Poison/Burn/Paralysis/Freeze. Gen 1
-    /// reverts Bad Poison (Toxic) to regular <see cref="StatusCondition.Poison"/> out of battle (the
-    /// escalating counter is volatile), whereas Gen 2+ keeps it Toxic and only resets the counter — so
-    /// this is gen-variable and lives on the seam. Volatile conditions (confusion, stat stages, …) are
-    /// never carried; they are dropped by the per-battle reset, not here.
-    /// </summary>
+    /// <summary>The major status a creature keeps when it leaves a battle; volatile conditions are dropped elsewhere.</summary>
     StatusCondition CarryStatusOutOfBattle(StatusCondition status);
 
     // ── Stat selection ─────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Returns the offensive stat value used in damage calculation for the given move type.
-    /// Gen 1: Physical → Attack; Special → Special (combined stat).
-    /// Gen 2+: Physical → Attack; Special → SpAtk.
-    /// </summary>
+    /// <summary>The attacker's offensive stat for a move of <paramref name="moveType"/>. See GENERATION_SEAMS.md §2.</summary>
     int GetOffensiveStat(Creature attacker, AttackType moveType);
 
-    /// <summary>
-    /// Returns the defensive stat value used in damage calculation for the given move type.
-    /// Gen 1: Physical → Defense; Special → Special (combined stat).
-    /// Gen 2+: Physical → Defense; Special → SpDef.
-    /// </summary>
+    /// <summary>The defender's defensive stat for a move of <paramref name="moveType"/>. See GENERATION_SEAMS.md §2.</summary>
     int GetDefensiveStat(Creature defender, AttackType moveType);
 
-    /// <summary>
-    /// The attacker's stat stage applied to <see cref="GetOffensiveStat"/> for the given move type.
-    /// Gen 1: Physical → Attack; Special → Special (one combined stage).
-    /// Gen 2+: Physical → Attack; Special → SpAtk.
-    /// </summary>
+    /// <summary>The attacker's stat stage applied to <see cref="GetOffensiveStat"/>.</summary>
     StageStat OffensiveStage(AttackType moveType);
 
-    /// <summary>
-    /// The defender's stat stage applied to <see cref="GetDefensiveStat"/> for the given move type.
-    /// Gen 1: Physical → Defense; Special → Special (one combined stage).
-    /// Gen 2+: Physical → Defense; Special → SpDef.
-    /// </summary>
+    /// <summary>The defender's stat stage applied to <see cref="GetDefensiveStat"/>.</summary>
     StageStat DefensiveStage(AttackType moveType);
 
     // ── Critical hits ──────────────────────────────────────────────────────────
@@ -494,16 +274,10 @@ public interface IBattleRules
     /// </summary>
     double GetCritChance(Creature attacker, Attack move);
 
-    /// <summary>
-    /// Critical hit damage multiplier. Gen 1–5: 2.0. Gen 6+: 1.5.
-    /// </summary>
+    /// <summary>Critical hit damage multiplier.</summary>
     double CritMultiplier { get; }
 
-    /// <summary>
-    /// Whether crits bypass all stat stage modifiers and the Burn Attack penalty.
-    /// True in Gen 1: crits use computed Attack/Defense/Special directly (no stages, no Burn).
-    /// False in Gen 2+.
-    /// </summary>
+    /// <summary>Whether a crit bypasses all stat stages and the Burn Attack penalty.</summary>
     bool CritIgnoresStatStages { get; }
 
     // ── Experience ─────────────────────────────────────────────────────────────
@@ -512,39 +286,9 @@ public interface IBattleRules
     /// the separate roguelite multiplier in GENERATION_SEAMS.md → XP on faint.</summary>
     int CalculateXpAwarded(int baseExp, int enemyLevel, bool trainerOwned);
 
-    /// <summary>
-    /// Divides a win's XP <paramref name="award"/> among the creatures that took the field and are still
-    /// standing (<paramref name="liveParticipants"/>) — the canonical formula's <c>s</c> divisor.
-    /// <para><b>Gen 1–5:</b> <c>floor(award / liveParticipants)</c> — a Pokémon that was sent out and survived
-    /// gets an equal share, so switching costs XP. <b>Gen 6+:</b> the division was removed and every
-    /// participant earns the full <paramref name="award"/> — an implementation for a later generation returns
-    /// <paramref name="award"/> unchanged.</para>
-    /// <para>Fainted participants are excluded by the caller before this is reached (a fainted participant earns
-    /// nothing and is not counted in the divisor). <paramref name="liveParticipants"/> is therefore normally
-    /// ≥ 1, but can be <b>0</b> on a mutual KO where the sole participant fainted alongside the enemy — an
-    /// implementation must not divide by it blindly; nobody is paid in that case. The roguelite bench share
-    /// (<see cref="RunRules.BenchXpShare"/>) is layered on <em>outside</em> this seam — it is run balance, not a
-    /// generation rule.</para>
-    /// </summary>
+    /// <summary>Each live participant's XP share; the count can be 0. See GENERATION_SEAMS.md §2.</summary>
     int SplitXpAmongParticipants(int award, int liveParticipants);
 
-    /// <summary>
-    /// Whether a creature fainting during a turn's action-execution phase ends the turn immediately,
-    /// skipping the rest of that turn's residual phase — status damage (Burn/Poison/Bad Poison, plus
-    /// the toxic-counter escalation it carries) and Leech Seed drain — for <b>both</b> sides, not just
-    /// the fainted creature's own. Two other places consult this same member for the sibling half of
-    /// the same real-games rule: <see cref="Battle"/>'s turn loop (the residual phase above), and
-    /// <c>AttackAction.ExecuteAsync</c>'s Hyper Beam handling (a hit that faints its target needs no
-    /// recharge turn when this is true). <b>Not</b> covered: the Disable-lock and binding-trap
-    /// countdowns (<see cref="StatusResolver.TickTurnCounters"/>), which always run (Gen 1's Disable
-    /// timing differs: <c>docs/GEN_DIFFERENCES.md</c>, Gen 1 status quirks).
-    /// <para><b>Gen 1: true</b> — "If a Pokémon faints, the turn ends there and then" (Smogon RBY
-    /// Mechanics Guide). <b>Gen 2: false</b> for both halves — end-of-turn effects (Burn, Leftovers,
-    /// etc.) still resolve for the surviving side after a mid-turn KO, and Hyper Beam requires its
-    /// recharge turn even after KOing the target (<c>docs/GEN_DIFFERENCES.md</c> "Move and Mechanic
-    /// Fixes"). Either way, the fainted side's own effects are skipped by
-    /// <see cref="StatusResolver.ApplyEndOfTurnDamage"/>'s own <c>IsAlive()</c> guard, which needs no
-    /// seam.</para>
-    /// </summary>
+    /// <summary>Whether a mid-turn faint skips the residuals and Hyper Beam's recharge. See GEN_DIFFERENCES.md.</summary>
     bool FaintEndsTurnImmediately { get; }
 }

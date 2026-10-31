@@ -27,7 +27,7 @@ hard gate to the pipeline but soft to the user: only the user waives a requireme
   constants inline are fine — 4 move slots, the `+2`, confusion base power 40.)
 - Damage/effect math reads stats via `rules.GetOffensiveStat` / `GetDefensiveStat`, never
   `creature.Attributes.Attack/Special/Defense` directly; no `Attributes` mutation to fake a modifier.
-- Every new seam member carries a per-generation XML doc.
+- Every new seam member carries a one-line XML doc naming what it returns (Gen 1 value at most; no later-gen claims, `GENERATION_SEAMS.md` §4.5).
 - Litmus: "when we build Gen 2, will this value/layout change?" → if yes, it belongs on a seam.
 
 **B. Architecture & design**
@@ -74,14 +74,16 @@ hard gate to the pipeline but soft to the user: only the user waives a requireme
 
 **G. Comment budget and design-rationale placement** (`DEV_STANDARDS.md` → *Design Rationale Placement*)
 - **Comment budget:** the diff adds no multi-line comment block and no multi-paragraph XML doc; no comment narrates
-  what the code does, records history, cites a TODO/ticket, or restates a Gen 1 fact or generation difference.
+  what the code does, records history, cites a TODO/ticket, states what a later generation does, or explains a Gen 1
+  fact's reasoning. Naming the Gen 1 value the line itself implements, in one line, is allowed
+  (`GENERATION_SEAMS.md` §4.5).
   Anything beyond a one-line pointer or a one-line local gotcha is `CHANGES-REQUESTED`. Matching a neighbouring
   file's comment density is not a defence.
 - No comment in the diff is the *only* place a design decision, tuning rationale, or "why this and not that"
   lives. A comment stating *why* (not just what) — a formula's rationale, a policy/algorithm design, a
   historical "used to do X, changed because Y" — has a home in a design doc, with the comment cut to a
-  pointer. A comment that's genuinely local (a one-line gotcha tied to that exact line, a seam's own canonical
-  per-generation XML doc) is fine as-is.
+  pointer. A comment that's genuinely local (a one-line gotcha tied to that exact line, a seam member's one-line
+  contract summary) is fine as-is.
 - Litmus: "if this comment were deleted, could someone reconstruct the reasoning from the docs?" If no, it's a
   `CHANGES-REQUESTED`, not an advisory — same enforcement weight as the other DoD lanes.
 

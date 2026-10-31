@@ -2,11 +2,7 @@
 
 namespace creaturegame.Combat;
 
-/// <summary>
-/// Gen 1 (RBY) type effectiveness chart, matching pret/pokered data/types/type_matchups.asm. The quirks it
-/// preserves (Ghost → Psychic = 0x, Poison ↔ Bug, Ice → Fire = 1x) and how later generations differ are in
-/// docs/GEN_DIFFERENCES.md → Type Chart Quirks.
-/// </summary>
+/// <summary>Gen 1 type chart (pokered data/types/type_matchups.asm); quirks in GEN_DIFFERENCES.md → Type Chart Quirks.</summary>
 public class Gen1TypeChart : ITypeChart
 {
     public static readonly Gen1TypeChart Instance = new();

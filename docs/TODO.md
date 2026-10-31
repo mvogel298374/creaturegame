@@ -48,7 +48,6 @@ gap has drafted text, awaiting your confirmation · ✗ gaps remain. Nothing is 
 
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
-| **Audit the "Gen 2+" claims against pokecrystal** (§7.4) | S–M | ⚠️ 1, 6 | No engine change; gives every tier-B design pass its Gen 2 read. |
 | **Shared C# `Fighter` test builder** (§6, the C# half of "Deduplicate the test helpers") | S | ⚠️ split into its own entry | Test-only, fast suites only; the E2E half stays in tier E. |
 | **Gen 1 XP participant split order** (§3.1) | S | ⚠️ 1, 2, 3, 5, 6, 7 | Touches `Battle`, so both review gates. |
 | **A failed OHKO says "unaffected"** (§3.2) | S | ⚠️ 1, 2, 3, 5, 6, 7 | Wire change (C# + TS); `AttackAction`'s OHKO branch, so `pr-review`. |
@@ -90,6 +89,8 @@ gap has drafted text, awaiting your confirmation · ✗ gaps remain. Nothing is 
 
 | Item | Cost | Ready? | Next step |
 |:-----|:----:|:-------|:----------|
+| **Same-type secondary status immunity** (§3.1) | S–M | ✗ 2, 4, 6; the rest drafted | Take the pokered cite; Ice Beam freezes Ice-types today. |
+| **Counter keys on the foe's selected move** (§3.1) | S–M | ✗ 1, 2, 4, 6 | Trace `HandleCounterMove`, list the diverging cases. |
 | **Escape = B-cancel on the negative-answer prompts** (§4.5) | S | ✗ 4; the rest drafted | One pokered cite. |
 | **Dependencies — `npm audit`** (§7.2) | S | ✗ 1, 7 | Re-run `npm audit`; the bumps need your E2E run. |
 | **The client `RunFaulted` handler is unpinned** (§6) | S | ✗ 1, 2, 7 | Choose: extract the handler logic, or test it in place. |
@@ -112,6 +113,7 @@ gap has drafted text, awaiting your confirmation · ✗ gaps remain. Nothing is 
 | **Enemy encounter pool ignores game version** (§4.2) | S | ✗ 1, 2, 3, 5, 6, 7 | Gap 7 blocks the rest: no version selector exists. |
 | **Enemy Pokémon do not evolve** (§4.2) | S | ✗ 1, 2, 4, 6, 7 | Your product call on when the loop wants it. |
 | **`ConsoleInput`** (§4.6) | S | ✗ 1, 2, 7 | Which host runs it. |
+| **The INFO tab's later-generation rows** (§7.4) | S | ✗ 1 | Your keep/delete call on `GEN_FIELDS` and the four null DTO fields. |
 | **`save.db`** (§4.2) | L | declined | Revisit by your ruling only. |
 
 ---
@@ -249,7 +251,9 @@ data/engine item usually also means updating the test that pins the wrong value.
   (`core.asm:419-421`, `:430-432`, `:443-445`, `:457-459`): no second action, no residual. A second gap, found in
   V16: in a wild battle, pokered's `SwitchAndTeleportEffect` (`effects.asm:814-838`) makes the move fail when the user
   is lower-level and `rand[0, userLv + targetLv] < targetLv / 4`. Ours always succeeds (`MoveEffects.cs:520-548`).
-  **User ruling 2026-10-17:** fix both, with a proper generation seam.
+  **User ruling 2026-10-17:** fix both, with a proper generation seam. Also noted 2026-10-29 (`requirements-review`,
+  unverified here): pokered's trainer-battle failure prints "… is unaffected!" (`IsUnaffectedText`); ours emits
+  `MoveHadNoEffect` ("doesn't affect") — check the wording in the same design pass.
   **DoR:** ✗ not Ready — gap **2** (design pass, central `Battle`); 1, 5 and 6 are drafted below for your
   confirmation. 3, 4 and 7 are answered.
   - **Acceptance:** a full battle where a faster Roar ends the turn with no foe action and no residual tick, and a
@@ -260,6 +264,25 @@ data/engine item usually also means updating the test that pins the wrong value.
   - **Data vs runtime:** runtime only.
   - **Quirk:** the slower foe never acts after being scared off.
   - **Dependencies:** none (the go-ahead is given).
+- **Same-type secondary status immunity (found 2026-10-29 by `requirements-review`; read-confirmed by the reviewer,
+  not yet by us) — S–M, ✗ not Ready.** pokered `FreezeBurnParalyzeEffect` (`effects.asm:194-212`) skips a secondary
+  freeze, burn or paralysis whenever the move's type equals either target type ("an ice move can't freeze an
+  ice-type, body slam can't paralyze a normal-type"). `Gen1BattleRules.CanReceiveStatus` models only Poison, burn vs
+  Fire and Normal→Normal paralysis, so Ice Beam can freeze an Ice-type and Thunderbolt/Thunder can paralyze an
+  Electric-type. `GENERATION_SEAMS.md` §2 "Status by type" records the gap.
+  **DoR:** ✗ — gaps **4** (take the pokered cite ourselves, and check whether primary status moves and Tri Attack-style
+  cases share the rule), **2** (does the seam signature change: the rule keys on the move's type vs the target's, which
+  `CanReceiveStatus(target, status, moveType)` already receives), **6** (drafted: a full battle where a forced-hit
+  Ice Beam on an Ice-type never freezes, and Body Slam on a Normal-type never paralyzes). 1 drafted: the engine applies
+  pokered's same-type rule to secondary freeze/burn/paralysis. 3: `CanReceiveStatus` is the seam. 5: runtime only. 7:
+  none.
+- **Counter keys on the foe's selected move (found 2026-10-29 by `requirements-review`; read-confirmed by the
+  reviewer) — S–M, ✗ not Ready.** pokered `HandleCounterMove` (`core.asm:4547-4607`) qualifies on the foe's last
+  *selected* move: it misses when that move is Counter, has 0 power, or isn't Normal/Fighting type, and doubles the
+  shared `wDamage`. Ours keys on the type of the last damage the user *took* (`LastDamageType`). Cases that differ
+  need tracing (a foe that selected a Normal move but missed; damage from the user's own move in `wDamage`).
+  **DoR:** ✗ — gaps **4** (trace `HandleCounterMove` ourselves and list the diverging cases), **2** (design pass:
+  touches `AttackAction`/`CounterEffect` and `CounterQualifies`' signature), **6**, **1**. 5: runtime only. 7: none.
 
 ### 3.2 Data and importer
 
@@ -771,19 +794,13 @@ The stale comments the sweep listed were fixed 2026-10-03 (`bag.ts`, `timeline.t
 `Gen1TypeChart.cs`, `BattleIntegrationTests.cs`, `battle-ui-cues.spec.ts`, and the three `TODO.md` pointers in
 `EvolutionImport.cs`, `MoveImport.cs`, `PartyExpShareTests.cs`).
 
-- [ ] **Audit the "Gen 2+" claims against pret/pokecrystal (S–M, unverified).** The Gen 2+ type-chart claims in
-  `Gen1TypeChart` and `GEN_DIFFERENCES.md` were wrong. `IBattleRules.cs` carries ~20 more per-generation XML docs
-  and `Gen1BattleRules.cs`/`MoveEffects.cs` a handful of inline comments stating what Gen 2+ does (crit, variance,
-  binding duration, status denominators, OHKO rule, Roar/Whirlwind, confusion, Conversion, Leech Seed, Physical/
-  Special split). The Gen 1 value in each is what the engine implements and tests; it is the *Gen 2+ half* that
-  has gone unchecked. Verify each against pokecrystal and trim the docs toward the comment budget as they are
-  touched.
-  **DoR (V16):** ✗ not Ready — gaps **1, 6** (drafted here; confirm them and it is ✅ Ready; S–M, about 60–100k tokens
-  for the pokecrystal reads).
-  - **Acceptance:** every Gen 2+ statement in `IBattleRules.cs`, `Gen1BattleRules.cs` and `MoveEffects.cs` carries a
-    pokecrystal file:line or is deleted. A wrong one is corrected, and any new gap it reveals gets its own entry.
-  - **Quirk:** none (docs and comments only).
-  - **Answered:** 2 (process), 3 (n/a), 4 (pokecrystal), 5 (comments only), 7 (none).
+- [ ] **The INFO tab's later-generation rows (found 2026-10-29) — S, ✗ needs your call.** `CreatureOverview.tsx`'s
+  `GEN_FIELDS` table (`minGen` 2, 3, 3, 9 for Held Item, Ability, Nature, Tera Type) is code that encodes later-gen
+  facts and gates on the generation number on the client, backed by four `PlayerOverviewDto` fields that are always
+  null. Under the 2026-10-29 ruling (later-gen code stays only if it meaningfully helps a future generation) it needs
+  a decision: keep as layout scaffolding, or delete the table and the four fields until a generation fills them.
+  **DoR:** ✗ — gap **1** (your keep/delete call, which sets the acceptance). Drafted for delete: 2 none, 3 n/a, 4 n/a,
+  5 web DTO + client only, 6 none (a Vitest/tsc pass; no behaviour visible in Gen 1), 7 none.
 
 ### 7.5 Speculative, unverified — check before filing as real
 

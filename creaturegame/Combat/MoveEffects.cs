@@ -112,11 +112,7 @@ public sealed class LeechSeedEffect : IMoveEffect
 
     public void Apply(MoveEffectContext ctx)
     {
-        // Deliberately NOT gated on TargetShieldedBySubstitute, unlike the foe's status / stat /
-        // confusion secondaries: in the English (localized) Gen 1 games Leech Seed lands THROUGH
-        // a Substitute. (It's blocked only in the Japanese games and Pokémon Stadium; Gen 2+
-        // blocks it everywhere.) This engine targets English RBY, so the seed takes hold here —
-        // do not "consistency-fix" this to match the other sub-shielded effects.
+        // Not gated on TargetShieldedBySubstitute: English RBY's Leech Seed lands through a Substitute.
         if (ctx.Target.IsAlive() && !ctx.Rules.CanBeLeechSeeded(ctx.Target))
             ctx.Emitter?.Emit(
                 new MoveHadNoEffect(ctx.Target.Name, ctx.Target.Id, ctx.Attack.Name ?? "")
@@ -195,11 +191,7 @@ public sealed class DisableEffect : IMoveEffect
 
     public void Apply(MoveEffectContext ctx)
     {
-        // Disable locks one of the target's moves out for several turns; fails if it already has one
-        // disabled or no usable move. Duration is gen-variable ⇒ the seam (RollDisableTurns). *Which* move
-        // is also gen-variable (Gen 1/2 pick a random PP-bearing move, below; Gen 3+ the last-used) but kept
-        // inline until Gen 3 needs it. The lock is enforced at selection time (Battle/IBattleInput skip
-        // DisabledMove); the counter ticks down end-of-turn (StatusResolver) and re-enables.
+        // Gen 1: a random PP-bearing move; fails if one is already disabled or none qualifies.
         if (ctx.Target.IsAlive() && ctx.Target.Battle.DisableTurnsRemaining == 0)
         {
             var disableable = ctx.Target.MoveSet.Where(m => m.PowerPointsCurrent > 0).ToList();
@@ -223,13 +215,7 @@ public sealed class CounterEffect : IMoveEffect
 
     public void Apply(MoveEffectContext ctx)
     {
-        // Gen 1: returns 2× the damage the user last took from a Normal/Fighting move. The −5 priority
-        // (move data) resolves Counter after the foe's hit. Fails if no qualifying damage was taken — Gen 1
-        // keeps the last value until overwritten, so it can fire off a previous turn (a quirk we preserve).
-        // Any damaging move records its type via DealDamageToTarget, so fixed/level-based Normal/Fighting
-        // moves (Sonic Boom, Seismic Toss, Super Fang) are counterable too; only Bide's unleash opts out.
-        // Which type qualifies is gen-variable (Gen 1: Normal/Fighting; Gen 2+: physical category) ⇒ the
-        // seam. Type immunity is AttackAction's, via IBattleRules.FixedDamageChecksTypeImmunity.
+        // Qualification, the stale last-damage quirk and immunity: GENERATION_SEAMS.md §2 (Counter).
         if (Qualifies(ctx.Source, ctx.Target, ctx.Rules))
         {
             int countered = ctx.Source.Battle.LastDamageTaken * 2;
@@ -424,10 +410,7 @@ public sealed class ConversionEffect : IMoveEffect
 
     public void Apply(MoveEffectContext ctx)
     {
-        // Gen 1: the user copies the target's types (Gen 2+ instead picks one of the user's own moves' type
-        // — a different mechanic, kept inline until Gen 2 can exercise a seam). Self-affecting, no damage;
-        // undone at battle end like Transform. Snapshot first so Transform-then-Conversion still restores the
-        // true original.
+        // Snapshot first so Transform-then-Conversion still restores the true original at battle end.
         if (ctx.Target.IsAlive())
         {
             ctx.Source.SnapshotIdentityForMutation();
@@ -524,21 +507,13 @@ public sealed class ForceFleeEffect : IMoveEffect
 
     public void Apply(MoveEffectContext ctx)
     {
-        // The run layer marks Elite/Boss encounters non-escapable (the trainer analog). What that *means* for
-        // Roar/Whirlwind is gen-variable, so it lives on the seam: Gen 1 makes the move simply fail there
-        // (ForceFleeFailsVsTrainer), whereas Gen 2+ forces a switch — a Gen 2 ruleset returns false and the
-        // force-switch path is implemented in the else branch. No type-immunity check (Gen 1 non-damaging
-        // move; it already cleared accuracy).
-        if (!ctx.BattleEscapable)
+        // Elite/Boss encounters are non-escapable (the trainer analog); see GENERATION_SEAMS.md §2.
+        if (!ctx.BattleEscapable && ctx.Rules.ForceFleeFailsVsTrainer)
         {
-            if (ctx.Rules.ForceFleeFailsVsTrainer)
-            {
-                ctx.Emitter?.Emit(
-                    new MoveHadNoEffect(ctx.Target.Name, ctx.Target.Id, ctx.Attack.Name ?? "")
-                );
-                return;
-            }
-            // Gen 2+ force-switch path goes here when a Gen 2 ruleset lands; unreachable today (Gen 1 fails).
+            ctx.Emitter?.Emit(
+                new MoveHadNoEffect(ctx.Target.Name, ctx.Target.Id, ctx.Attack.Name ?? "")
+            );
+            return;
         }
 
         // Wild battle (escapable): the targeted creature is scared off — the Battle loop sees HasFled and ends.
@@ -561,11 +536,7 @@ public sealed class ConfuseEffect : IMoveEffect
         if (!ctx.Target.IsAlive() || ctx.TargetShieldedBySubstitute)
             return;
 
-        // Already confused: the counter is NEVER re-rolled — true in every generation (pokered checks the
-        // CONFUSED bit before setting the counter), so it's gen-agnostic and lives here. Only the message is
-        // gen-variable: a DEDICATED confusion move (a non-damaging status move — BaseDamage 0, i.e. Confuse
-        // Ray / Supersonic) announces the failure; the ruleset picks the wording (Gen 1 = generic "But it
-        // failed!"). A secondary confusion on a damaging move fails silently in every generation.
+        // Already confused: never re-rolled (pokered checks CONFUSED first); only a dedicated move announces it.
         if (ctx.Target.Battle.ConfusedTurns > 0)
         {
             bool isDedicatedConfusionMove = ctx.Attack.BaseDamage == 0;

@@ -64,7 +64,8 @@ These aren't "balance choices" we made — they're historical facts of the 1996 
 the seam is what lets a future `Gen2TypeChart` fix them without touching damage code.
 
 ### Battle rules (`IBattleRules`) — the big one
-Things that genuinely differ generation to generation, each a member on the interface:
+Things that genuinely differ generation to generation, each a member on the interface. A *Later gens* cell without
+a pokecrystal or pokeemerald cite is **unverified** (§4.5):
 
 | Concept | Gen 1 | Later gens |
 |:--------|:------|:-----------|
@@ -92,7 +93,18 @@ Things that genuinely differ generation to generation, each a member on the inte
 | **Residual (status tick) timing** | **no end-of-turn phase** — each creature's Burn/Poison/Leech Seed tick fires right after *its own* action, and a faint jumps straight to the faint handler (so a residual double-faint can't happen). Partly modelled today: `FaintEndsTurnImmediately` covers only the direct-hit-faint case. **Seam candidate, not yet built** — `TODO.md` → Known Gaps; rationale → `GEN_DIFFERENCES.md` → Status Quirks | true end-of-turn phase after both actions (Gen 2+) |
 | **Special stat** | one combined **Special** stat for both offense and defense | split into Sp. Atk / Sp. Def (Gen 2) |
 | **XP on faint** | wild `floor(baseExp × level / 7)`; **trainer-owned: x + ⌊x/2⌋**, the half floored separately (pokered `engine/battle/experience.asm` `BoostExp`) | a trainer bonus persists (later-gen rounding unchecked) |
-| **XP participant divisor** | the award is divided among the Pokémon sent out that have **not** fainted (the formula's `s`) — `IBattleRules.SplitXpAmongParticipants` | same through Gen 5; **Gen 6 removed it** — every participant earns the full award, so a Gen 6 impl returns the award unchanged |
+| **XP participant divisor** | the award is divided among the Pokémon sent out that have **not** fainted (the formula's `s`) — `IBattleRules.SplitXpAmongParticipants`. The caller excludes fainted participants first; a mutual KO can leave a count of 0, and then nobody is paid | same through Gen 5; **Gen 6 removed it** — every participant earns the full award, so a Gen 6 impl returns the award unchanged |
+| **Already-confused announcement** (`RedundantConfusionAnnouncement`) | `FailedGeneric`: a dedicated confusion move (Confuse Ray, Supersonic) on a confused target prints "But it failed!" (pokered `ConditionalPrintButItFailed`). The counter is never re-rolled (pokered checks the CONFUSED bit first), which is gen-agnostic and inline in `ConfuseEffect`; a secondary confusion on a damaging move fails silently and never consults this | `AlreadyConfused`, "… is already confused!" (Gen 3+, unverified); the engine arm and `ConfusionAlready` event exist and are pinned by a test |
+| **Stat-cap announcement** (`StatStageCapAnnouncement`) | `NothingHappened`: a primary stat move on a stat at ±6 prints "Nothing happened!" (pokered `PrintNothingHappenedText`); a secondary drop stays silent. The ±6 clamp itself is gen-agnostic | a named "won't rise/drop anymore!" line (Gen 3+, unverified). No enum member exists for it: one is added with its engine arm when a generation needs it |
+| **Leech Seed drain** (`LeechSeedDrainDenominator`) | 1/16 max HP, the same number as Poison but its own member | 1/8 from Gen 2 while Poison stays 1/16 (unverified) |
+| **Counter** (`CounterQualifies`) | pokered `HandleCounterMove` (`core.asm:4547-4607`, per `requirements-review` 2026-10-29) keys on the foe's last **selected** move: Counter misses if that move is Counter, has 0 power, or isn't Normal or Fighting type, and otherwise doubles `wDamage`, the last damage value both sides share. **The engine approximates this**: it keys on the type of the last damage the user *took* (`LastDamageType`), which every damaging move records and Bide's typeless unleash doesn't; the value persists until overwritten, so Counter can answer an earlier turn's hit. The gap is `TODO.md` §3.1 ("Counter keys on the foe's selected move"). Its −5 priority is move data; immunity is `FixedDamageChecksTypeImmunity` | keyed on the move's physical category (Gen 2+, unverified); that needs the engine to record the last hit's `AttackType` |
+| **Disable's target move** (inline in `DisableEffect`, **not yet a seam**) | a random move with PP left; the duration is the seam's `RollDisableTurns` | Gen 3+ disables the target's last-used move (unverified); a seam member is added when a generation needs it |
+| **Conversion** (inline in `ConversionEffect`, **not yet a seam**) | the user copies the target's types | Gen 2+ changes the user's type to one of its own moves' types (unverified) — a different mechanic, so a seam is designed with that generation |
+| **Rage** (`RageAttackStagesPerHit`) | +1 Attack stage each time a damaging move hits the raging user, with no cap beyond the normal +6 | reworked in Gen 2 (unverified) |
+| **Recover / Soft-Boiled** (`RecoverHealFraction`) | 1/2 max HP. pokered's failure when (MaxHP − HP) & 255 == 255 is **not modelled** | — |
+| **Status by type** (`CanReceiveStatus`) | pokered `FreezeBurnParalyzeEffect` (`effects.asm:194-212`, per `requirements-review` 2026-10-29) skips a secondary freeze, burn or paralysis whenever the move's type matches either target type: Ice moves can't freeze Ice-types, Fire moves can't burn Fire-types, Electric and Normal moves can't paralyze Electric- and Normal-types (Body Slam). Poison-types can't be poisoned. **The engine is narrower**: it models Poison, burn-vs-Fire and Normal→Normal paralysis only, so Ice Beam can freeze an Ice-type and Thunderbolt can paralyze an Electric-type. The gap is `TODO.md` §3.1 ("Same-type secondary status immunity") | more immunities (unverified) |
+| **Status-move type check** (`PureStatusMoveChecksTypeImmunity`) | only Thunder Wave (a Ground-type is immune); Confuse Ray, Glare, Growl, sleep moves and Disable ignore type. The implementation keys on the move, not a target direction, so **any move returning true must be foe-directed** (the result is applied against the target's type) | status moves respect immunity generally from Gen 2 (unverified) |
+| **Roar / Whirlwind vs a non-escapable foe** (`ForceFleeFailsVsTrainer`) | `true`: in a trainer battle the move fails, "… is unaffected!" (pokered `IsUnaffectedText`). In a wild battle pokered succeeds outright when the user's level is at least the target's, and otherwise only on a level-based roll (`effects.asm` `SwitchAndTeleportEffect`, per `requirements-review` 2026-10-29). Non-escapable is a run-layer fact (`MoveEffectContext.BattleEscapable`: Elite and Boss encounters, the trainer analog). **The engine diverges**: an escapable foe always flees, and the failure shows the "doesn't affect" line. The gap is `TODO.md` §3.1 ("Roar/Whirlwind: the scared-off side still acts", second gap) | forces a switch instead (Gen 2+, unverified); no force-switch path exists, and one is built with that generation |
 
 > **Roguelite XP tuning (not a seam change).** `RunRules` is a separate game-balance-dials bag, not part of
 > `IBattleRules`. Two dials sit on it: a level-aware **XP multiplier** and a **bench XP share** paid to living
@@ -135,7 +147,9 @@ The formulas that turn base stats + per-individual values into a creature's actu
   `+ 5` for other stats.
 - **Gen 3+** replaces these with **IVs** (0–31, six independent) and **EVs** (capped at
   252 per stat, ÷4). A `Gen3StatCalculator` swaps the formula and the `RandomiseDvs`
-  logic; nothing that *calls* the calculator changes.
+  logic; nothing that *calls* the calculator changes. (Unverified: Gen 2 splits the Special *stat* but keeps
+  one shared Special DV, which becomes two IVs only in Gen 3. The Special split also touches `Attributes` and
+  `GetOffensiveStat` / `GetDefensiveStat`.)
 
 The *awarding* of training is on the seam too — `AwardStatExp(victor, defeated)` owns the
 gen-variable **gain rule and cap**: Gen 1 adds the defeated species' **base stats**, capped
@@ -250,11 +264,13 @@ compact, and the table reads as "the interesting cases." Every historical quirk/
 chart, that comment is the spec: it tells the next person the value is intentional, not a
 typo.
 
-### 4.5 Interface as living documentation
-`IBattleRules`' XML doc comments state the value *for each generation*
-("Gen 1: 1–7. Gen 2+: 2–5."). The interface doubles as the spec for what a future
-implementer must provide. Keep these comments accurate — they're how a `Gen2BattleRules`
-author knows what each member is supposed to return.
+### 4.5 Code comments state Gen 1 only
+A seam member's doc comment is one line saying what the member returns, plus at most the Gen 1 value. **No code
+comment states what a later generation does** (user ruling 2026-10-29): those claims went unchecked and drifted —
+the Gen 2+ type-chart claims were wrong. Later-generation facts live in markdown, in §2's *Later gens* column and
+`GEN_DIFFERENCES.md`, marked *unverified* until they are checked against that generation's disassembly (pokecrystal
+for Gen 2) in its own sprint. In code, a later generation exists only as a seam implementation or an enum member
+with a live engine path — never as a placeholder comment or an unhandled member.
 
 ### 4.6 Testing against the seams
 Because rules are injected, tests substitute their own implementations to remove
@@ -276,7 +292,7 @@ actually bitten us; treat each pattern on the left as a **review blocker**.
 
 | 🚩 Red flag in a diff | Why it's a leak | ✅ The fix |
 |:----------------------|:----------------|:----------|
-| A **magic number** that is a game rule (`* 1.5`, `< 50`, `/ 16`, `217`, `40`) inline in engine code | The value changes between generations; hardcoding it scatters Gen 1 knowledge into generation-blind code | Add a named member to `IBattleRules` (e.g. `StabMultiplier`, `ConfusionSelfHitPercent`) with a per-gen XML doc; read it at the call site |
+| A **magic number** that is a game rule (`* 1.5`, `< 50`, `/ 16`, `217`, `40`) inline in engine code | The value changes between generations; hardcoding it scatters Gen 1 knowledge into generation-blind code | Add a named member to `IBattleRules` (e.g. `StabMultiplier`, `ConfusionSelfHitPercent`) with a one-line Gen 1 XML doc; read it at the call site |
 | Reading **`creature.Attributes.Attack` / `.Special` / `.Defense` directly** for damage/effect math | The Special split (Gen 2) means "the offensive stat" is generation-dependent | Go through `rules.GetOffensiveStat(...)` / `GetDefensiveStat(...)`, and pick the matching stage with `OffensiveStage(...)` / `DefensiveStage(...)`, never a Physical-vs-Special branch on `Stages` |
 | Reading a **move/species DB column directly** (`attack.EffectChance`, a stat column) where the *layout* could differ by gen | Later gens may store the same concept in a different shape (e.g. per-effect chances) | Ask the rules for the value (`rules.GetSecondaryEffectChance(move, kind)`); the Gen 1 impl can be a thin pass-through that documents the generic shape |
 | A **move-specific success condition or damage modifier** written inline in an `AttackAction` damage-category branch (`if (Source.Level < Target.Level)`, `Defense / 2`, a flinch/halve/double) | The *condition itself* is almost always gen-variable even when the move exists in every gen — the OHKO success rule, the Self-Destruct halving, crash damage, etc. all changed between gens. Inline, it's invisible Gen 1 knowledge and frequently just **wrong** (copied from a modern wiki) | Put the rule on `IBattleRules` (`OneHitKoSucceeds`, `SelfDestructDefenseDivisor`, …) and **never mutate `creature.Attributes` to fake a modifier** — pass it into `DamageCalculator` (e.g. `defenseDivisor`) instead |
@@ -290,14 +306,15 @@ If "yes" but you're not building Gen 2 yet: still add the seam member, implement
 value, and — when the *data* layout is what differs — make the Gen 1 implementation a
 **documented stub** that shows the generic shape (see `GetSecondaryEffectChance`: Gen 1 reads
 one column for every effect kind; the `kind` parameter exists purely so a later gen can branch).
-This is cheap now and removes a future archaeology dig.
+This is cheap now and removes a future archaeology dig. What the later generation does goes in §2, not in a code
+comment (§4.5).
 
 **Definition of done (gen-agnostic):**
 - [ ] No new game-rule magic numbers in `DamageCalculator` / `AttackAction` / `StatusResolver` / `Battle` — they're on a seam.
 - [ ] No new direct `Attributes.Attack/Special/Defense` reads in damage/effect math — routed through `GetOffensiveStat`/`GetDefensiveStat`.
 - [ ] No new direct gen-shaped DB-column reads at a battle call site — routed through a rules accessor.
 - [ ] No `if (generation == …)` / `"gen1"` checks anywhere in the engine.
-- [ ] Every new `IBattleRules`/`ITypeChart`/`IStatCalculator` member has a per-generation XML doc.
+- [ ] Every new `IBattleRules`/`ITypeChart`/`IStatCalculator` member has a one-line XML doc (Gen 1 only, §4.5).
 
 > Doing this pass **as part of the feature** (not as a later cleanup) is the whole point — the
 > debt compounds invisibly until a generation switch forces it all at once.

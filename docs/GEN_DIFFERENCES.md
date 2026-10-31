@@ -173,7 +173,9 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
   creatures' residuals at end of turn (skipped if anyone fainted from a direct hit), so facts (1)–(3) are
   **not** yet modelled — tracked as an open, unplanned item, `docs/TODO.md` §4.2 ("Gen 1 has no
   end-of-turn residual phase"). The fix belongs behind an `IBattleRules` seam alongside
-  `FaintEndsTurnImmediately`. The Disable-lock and binding-trap countdowns sit outside this: the engine ticks
+  `FaintEndsTurnImmediately`, which `Battle`'s turn loop and `AttackAction`'s Hyper Beam handling both read; the
+  fainted side's own residuals are skipped by `StatusResolver.ApplyEndOfTurnDamage`'s `IsAlive()` guard, which needs
+  no seam. The Disable-lock and binding-trap countdowns sit outside this: the engine ticks
   both creatures' counters every turn regardless of a faint (`StatusResolver.TickTurnCounters`). **For Disable
   that is not Gen 1:** pokered decrements the counter in the disabled mon's own pre-move check
   (`core.asm` `CheckPlayerStatusConditions` → `.AnyMoveDisabledCheck`, line 3394), after the sleep, freeze,
@@ -221,6 +223,13 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
   The ¼ cost is gen-invariant, so it is inline in `SubstituteEffect`, not on a seam. The self-KO applies to both
   sides, so the foe AI can faint itself too, as on the cartridge. A zero cost (MaxHP < 4) is unreachable: Gen 1
   HP adds Level + 10, so MaxHP is at least 11.
+- **Disable** picks a random move with PP left, and the lock is enforced at move selection (`Battle` and
+  `IBattleInput` skip `DisabledMove`); its countdown timing is covered under the residual-phase bullet above.
+- **Leech Seed lands through a Substitute** in the English RBY this engine targets (reported blocked only in the
+  Japanese games and Pokémon Stadium, which is unverified). pokered `engine/battle/move_effects/leech_seed.asm` has no
+  Substitute check (verified by `requirements-review` 2026-10-29). `LeechSeedEffect` is therefore not
+  gated on `TargetShieldedBySubstitute`, unlike the foe's status, stat and confusion secondaries; don't
+  "consistency-fix" it. Later generations block it (unverified).
 
 #### Battle Items
 - A booster with nothing to do is **used up anyway**: a second Dire Hit, Guard Spec or X Accuracy only re-sets its

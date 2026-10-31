@@ -39,10 +39,10 @@ export interface PlayerOverview {
   generation: number;
   stats: StatRow[];
   moves: MoveRow[];
-  // Later-generation fields, gated on `generation` (all null/hidden in Gen 1):
-  heldItem: string | null;  // Gen 2+
-  ability: string | null;   // Gen 3+
-  nature: string | null;    // Gen 3+
-  teraType: string | null;  // Gen 9
+  // Null in Gen 1; CreatureOverview's rows decide when each shows.
+  heldItem: string | null;
+  ability: string | null;
+  nature: string | null;
+  teraType: string | null;
   stages: StageRow[] | null; // Dev Mode enemy overview only; null for every party member
 }

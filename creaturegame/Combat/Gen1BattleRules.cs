@@ -39,23 +39,18 @@ public sealed class Gen1BattleRules : IBattleRules
     // StatusResolver decrements it before checking for clear (see RollConfusionTurns doc).
     public int RollConfusionTurns() => _rng.Next(2, 6);
 
-    // Gen 1: a dedicated confusion move on an already-confused target prints the generic "But it failed!"
-    // (ConditionalPrintButItFailed in pokered) — there is no "already confused!" line until Gen 3.
     public RedundantConfuseAnnouncement RedundantConfusionAnnouncement =>
         RedundantConfuseAnnouncement.FailedGeneric;
 
-    // Gen 1: a primary stat move on a stat already at the ±6 cap prints the generic "Nothing happened!"
-    // (PrintNothingHappenedText in pokered) — there is no "won't rise/drop anymore!" line until Gen 3.
     public StatCapAnnouncement StatStageCapAnnouncement => StatCapAnnouncement.NothingHappened;
 
-    // Gen 1–6: a confused creature hits itself 50% of the time.
+    // Gen 1: a confused creature hits itself 50% of the time.
     public int ConfusionSelfHitPercent => 50;
 
-    // Gen 1–5 Same-Type Attack Bonus.
+    // Gen 1 Same-Type Attack Bonus.
     public double StabMultiplier => 1.5;
 
-    // Gen 1 stores a single ailment/effect chance per move, so every secondary effect kind
-    // resolves to the same column. A later generation would branch on `effect` here.
+    // Gen 1 stores one effect chance per move, so every secondary effect kind reads the same column.
     public int GetSecondaryEffectChance(Attack move, SecondaryEffectKind effect) =>
         move.EffectChance ?? 100;
 
@@ -81,15 +76,14 @@ public sealed class Gen1BattleRules : IBattleRules
     public int CalculateStruggleRecoil(Creature source, int damageDealt) =>
         Math.Max(1, damageDealt / 2);
 
-    // Gen 1–5: Burn and Poison each deal 1/16 max HP per turn.
+    // Gen 1: Burn and Poison each deal 1/16 max HP per turn.
     public int BurnDamageDenominator => 16;
     public int PoisonDamageDenominator => 16;
 
-    // Gen 1: Leech Seed drains 1/16 max HP per turn — the same number as Poison, deliberately on its
-    // own member (Gen 2 raises the drain to 1/8 while Gen 1–5 Poison stays at 1/16).
+    // Gen 1: Leech Seed drains 1/16 max HP per turn.
     public int LeechSeedDrainDenominator => 16;
 
-    // Gen 1–6: Paralysis quarters a paralyzed creature's effective Speed for turn order. (Gen 7+ halves instead.)
+    // Gen 1: Paralysis quarters a paralyzed creature's effective Speed for turn order.
     public int ParalysisSpeedDivisor => 4;
 
     // Gen 1 Bad Poison (Toxic): counter/16 of max HP; no cap — counter increments each turn.
@@ -119,18 +113,15 @@ public sealed class Gen1BattleRules : IBattleRules
 
     // ── Move-specific damage quirks ──────────────────────────────────────────────
 
-    // Gen 1: a one-hit KO move fails outright if the target is faster than the user. This is a
-    // Speed comparison (using the in-battle modified Speed), NOT the level check that Gen 2 added.
+    // Gen 1: an OHKO fails when the target's in-battle Speed beats the user's (a Speed check, not level).
     public bool OneHitKoSucceeds(Creature user, Creature target) =>
         StatusResolver.EffectiveSpeed(user, this) >= StatusResolver.EffectiveSpeed(target, this);
 
-    // Gen 1: Counter answers the last damage taken when it came from a Normal- or Fighting-TYPE move
-    // (Gen 2+ keys on the physical category instead). Bide's typeless unleash never sets a type, so it
-    // arrives here as null and doesn't qualify.
+    // Gen 1: a Normal or Fighting type qualifies; Bide's typeless unleash arrives as null and doesn't.
     public bool CounterQualifies(DamageType? lastDamageType) =>
         lastDamageType is DamageType.Normal or DamageType.Fighting;
 
-    // Gen 1–4: Self-Destruct / Explosion halve the target's Defense before the damage calculation.
+    // Gen 1: Self-Destruct / Explosion halve the target's Defense before the damage calculation.
     public int SelfDestructDefenseDivisor => 2;
 
     // Gen 1: Rage raises the user's Attack by one stage each time it is hit while raging.
@@ -139,7 +130,7 @@ public sealed class Gen1BattleRules : IBattleRules
     // Gen 1: Recover / Soft-Boiled restore half of max HP.
     public double RecoverHealFraction => 0.5;
 
-    // Gen 1–4: Reflect / Light Screen double the relevant defensive stat (crits ignore it).
+    // Gen 1: Reflect / Light Screen double the relevant defensive stat (crits ignore it).
     public int ScreenDefenseMultiplier => 2;
 
     // Gen 1: Bide commits the user for 2–3 turns, then unleashes double the damage absorbed.
@@ -173,9 +164,7 @@ public sealed class Gen1BattleRules : IBattleRules
 
     // ── Type-based immunities ────────────────────────────────────────────────────
 
-    // Gen 1 status immunities by type: Poison-types can't be poisoned, Fire-types can't be burned,
-    // and a Normal-type move can't paralyze a Normal-type (the Body Slam quirk). Sleep/Freeze have
-    // no type immunity in Gen 1.
+    // Narrower than pokered's same-type rule (GENERATION_SEAMS.md §2, Status by type).
     public bool CanReceiveStatus(Creature target, StatusCondition status, DamageType moveType) =>
         status switch
         {
@@ -195,15 +184,13 @@ public sealed class Gen1BattleRules : IBattleRules
     public bool PureStatusMoveChecksTypeImmunity(Attack move) =>
         move.StatusEffect == StatusCondition.Paralysis && move.DamageType == DamageType.Electric;
 
-    // Grass-types are immune to Leech Seed (all generations).
+    // Gen 1: Grass-types are immune to Leech Seed.
     public bool CanBeLeechSeeded(Creature target) => !HasType(target, DamageType.Grass);
 
-    // Gen 1: Roar/Whirlwind have NO effect in a trainer battle — they only end a wild battle. (Gen 2+ would
-    // force a switch instead, so a Gen 2 ruleset returns false and the effect runs its force-switch path.)
+    // Gen 1: Roar/Whirlwind only end a wild battle; against a non-escapable foe they fail.
     public bool ForceFleeFailsVsTrainer => true;
 
-    // Gen 1: a faint during the action phase ends the turn there and then, skipping the rest of the
-    // end-of-turn phase for both sides (Smogon RBY Mechanics Guide). Gen 2+ removed this.
+    // Gen 1: a mid-turn faint ends the turn for both sides (Smogon RBY Mechanics Guide).
     public bool FaintEndsTurnImmediately => true;
 
     // Gen 1: Toxic reverts to regular Poison out of battle (the escalating counter is volatile); every
@@ -215,8 +202,7 @@ public sealed class Gen1BattleRules : IBattleRules
 
     // ── Stat stages ────────────────────────────────────────────────────────────
 
-    // Gen 1/2 battle-stat table: 2/(2+|n|) for n≤0, (2+n)/2 for n>0.
-    // Yields 0.25× at -6, 1.0× at 0, 4.0× at +6.
+    // Gen 1 battle-stat table: 2/(2+|n|) for n≤0, (2+n)/2 for n>0.
     public double GetStatMultiplier(int stage)
     {
         stage = Math.Clamp(stage, -6, 6);
@@ -307,12 +293,7 @@ public sealed class Gen1BattleRules : IBattleRules
         return trainerOwned ? xp + xp / 2 : xp;
     }
 
-    // Gen 1 divides the award evenly among the Pokémon that were sent out and have not fainted (the formula's
-    // `s` divisor). That division holds through Gen 5 and was REMOVED in Gen 6, where every participant earns
-    // the full award — which is why this lives on the seam rather than inline in Battle. Source: Bulbapedia
-    // "Experience" §s ("the number of Pokémon that participated in the battle and have not fainted").
-    // Guards a 0/negative count so a caller that somehow reaches here with no live participant can't divide by
-    // zero; the award site already excludes fainted members and always has at least the winner.
+    // Gen 1: an even split; a count of 1 or less returns the whole award.
     public int SplitXpAmongParticipants(int award, int liveParticipants) =>
         liveParticipants <= 1 ? award : award / liveParticipants;
 }

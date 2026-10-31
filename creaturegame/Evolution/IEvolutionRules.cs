@@ -17,19 +17,7 @@ namespace creaturegame.Evolution;
 /// </summary>
 public interface IEvolutionRules
 {
-    /// <summary>
-    /// Returns the evolution that fires for <paramref name="creature"/> given <paramref name="context"/>,
-    /// or <c>null</c> if none. <paramref name="edges"/> are the candidate evolution edges (the caller
-    /// passes the rows for this species; the implementation also filters defensively by
-    /// <see cref="PokemonEvolution.FromSpeciesId"/>).
-    /// <para>
-    /// <b>Assumption:</b> a species' edges are mutually exclusive under any single context — at most one
-    /// can fire. This holds for Gen 1 (a species has one outgoing trigger type; stone branches are
-    /// disambiguated by the used item). If a later generation's data could have two edges fire at once,
-    /// that generation's implementation must define the precedence deliberately rather than relying on
-    /// edge order (the Gen 1 impl returns the first match).
-    /// </para>
-    /// </summary>
+    /// <summary>The evolution that fires for <paramref name="creature"/> in <paramref name="context"/>, or null; Gen 1 edges are mutually exclusive.</summary>
     EvolutionResult? CheckEvolution(
         Creature creature,
         EvolutionContext context,

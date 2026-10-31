@@ -2,10 +2,7 @@
 
 namespace creaturegame.Combat;
 
-/// <summary>
-/// Defines a type effectiveness chart for a specific generation.
-/// Swap implementations to change generation rules (e.g. Gen1TypeChart → Gen2TypeChart).
-/// </summary>
+/// <summary>A generation's type effectiveness chart.</summary>
 public interface ITypeChart
 {
     /// <summary>

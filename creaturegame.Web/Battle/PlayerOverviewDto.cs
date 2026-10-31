@@ -26,9 +26,7 @@ public sealed record PlayerOverviewDto(
     int Generation,
     IReadOnlyList<StatRow> Stats,
     IReadOnlyList<MoveRow> Moves,
-    // Later-generation summary fields the model doesn't carry yet — null in Gen 1. The client gates their
-    // visibility on Generation (Gen 2 held item, Gen 3 ability/nature, Gen 9 Tera type), so the INFO tab's
-    // layout is ready for them without showing empty rows today.
+    // Null in Gen 1; the client's CreatureOverview rows decide when each shows.
     string? HeldItem = null,
     string? Ability = null,
     string? Nature = null,

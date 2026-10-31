@@ -65,7 +65,7 @@ Flag as a blocker any of these in engine code (`DamageCalculator`, `AttackAction
   type-effectiveness `== 0` immunity read from `ITypeChart` is NOT a break — the chart is the seam.)
 - **Mutating `creature.Attributes` to fake a damage modifier** then restoring it (pass a modifier into
   `DamageCalculator` instead).
-- A new `IBattleRules` / `ITypeChart` / `IStatCalculator` member **without a per-generation XML doc**.
+- A new `IBattleRules` / `ITypeChart` / `IStatCalculator` member **without a one-line XML doc**, or a seam doc/comment that states what a later generation does (`GENERATION_SEAMS.md` §4.5).
 
 Litmus for anything ambiguous: "when we build Gen 2, will this value/layout change?" → if yes, it's a seam.
 
@@ -93,7 +93,7 @@ Litmus for anything ambiguous: "when we build Gen 2, will this value/layout chan
 - **Design-rationale placement** (`DEFINITION_OF_DONE.md` §G, `DEV_STANDARDS.md`) — no comment in the diff is
   the *only* place a design decision/tuning rationale/"why this and not that" lives. A comment stating *why*,
   not just what, needs a doc home (`ARCHITECTURE.md` or the relevant per-domain doc) with the comment cut to a
-  pointer; a genuinely local one-liner or a seam's own canonical per-gen XML doc is fine as-is. Litmus: "if this
+  pointer; a genuinely local one-liner or a seam's own one-line Gen 1 XML doc is fine as-is. Litmus: "if this
   comment were deleted, could someone reconstruct the reasoning from the docs?" If no, `CHANGES-REQUESTED`.
 
 ## Recurring technical defects (from the retired seam-reviewer log — check for repeats, append new ones)

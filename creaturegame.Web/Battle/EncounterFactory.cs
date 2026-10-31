@@ -391,15 +391,7 @@ public sealed class EncounterFactory(
             .ToListAsync();
     }
 
-    /// <summary>Every content-scoped species' Gen 1 <em>TM</em>-legal Machine learnset, as species id → the move
-    /// ids it can legally learn that way — the move-teach reward roll's whole-dex legality source (TM/HM —
-    /// Move-Teach Rewards, <c>docs/TODO_ARCHIVE.md</c>). Reads the same <see cref="LearnMethod.Machine"/> rows
-    /// <see cref="LearnsetMoveSelector.TmEnhanced"/>/<see cref="LearnsetMoveSelector.Optimal"/> already query,
-    /// just for the whole dex instead of one species — <b>minus <see cref="GenerationProfile.HmMoveIds"/></b>:
-    /// PokeAPI's "machine" learn method doesn't separate TM from HM, so the returned dictionary is the one place
-    /// that split is enforced, off the profile rather than a hardcoded list (a later generation's own HM roster
-    /// differs — see the profile member's remarks). Scoped through <c>profile.ContentScope.Species</c> first
-    /// (<c>GENERATION_PROFILE.md</c> §5(b)) so an out-of-scope species can never surface a legal move.</summary>
+    /// <summary>Content-scoped species id → its TM-legal Machine moves, minus <see cref="GenerationProfile.HmMoveIds"/>.</summary>
     private static async Task<
         IReadOnlyDictionary<int, IReadOnlyList<int>>
     > LoadMachineLearnsetsAsync(PokemonDbContext pokemonCtx, GenerationProfile profile)

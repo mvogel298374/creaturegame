@@ -19,7 +19,7 @@ correctly, and hand back a tight summary.
    generation goes on `IBattleRules` / `ITypeChart` / `IStatCalculator`, never inline. No gen-variable
    magic numbers (`* 1.5`, `< 50`), no `if (gen == 1)`, no direct `Attributes.Attack/Special/Defense`
    reads in damage math (use `rules.GetOffensiveStat`/`GetDefensiveStat`), no mutating `Attributes` to
-   fake a modifier (pass a modifier into `DamageCalculator`). New seam members get a per-generation XML doc.
+   fake a modifier (pass a modifier into `DamageCalculator`). New seam members get a one-line, Gen 1-only XML doc (`GENERATION_SEAMS.md` §4.5).
    Apply the litmus: "when we build Gen 2, will this value/layout change?" → if yes, it's a seam.
 3. **Read the whole file you're editing**, not just the area you change — most defects here are about how
    a new line interacts with code outside the hunk (reachability, an existing handler of the same concern,

@@ -372,9 +372,7 @@ public record ActionBlocked(string CreatureName, int CreatureId, StatusCondition
 // --- Confusion (pseudo-status — separate from StatusCondition enum) ---
 public record ConfusionStarted(string TargetName, int TargetId) : BattleEvent;
 
-// A dedicated confusion move that hits an already-confused target, when the ruleset names the redundancy
-// ("… is already confused!") — the Gen 3+ arm of IBattleRules.RedundantConfusionAnnouncement. Gen 1 instead
-// emits the generic MoveFailed ("But it failed!"); neither ever re-rolls the confusion counter.
+// RedundantConfuseAnnouncement.AlreadyConfused: "… is already confused!".
 public record ConfusionAlready(string TargetName, int TargetId) : BattleEvent;
 
 // The generic "But it failed!" line (pokered ConditionalPrintButItFailed) — Gen 1's message for a dedicated

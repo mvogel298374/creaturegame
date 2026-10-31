@@ -5,11 +5,7 @@ namespace creaturegame.Creatures;
 
 public static class EncounterSelector
 {
-    /// <summary>
-    /// Base-stat total — sums the five Gen 1 base stats, where <c>BaseSpecial</c> is the single combined
-    /// Special. This is a Gen 1 schema assumption: when Gen 2 splits Special into SpAtk/SpDef (see
-    /// <c>TODO.md</c> → Multi-Generation), this sum must follow the schema change. It is not a battle-seam rule.
-    /// </summary>
+    /// <summary>Base-stat total of the five Gen 1 base stats; a species-schema change must update it.</summary>
     public static int Bst(PokemonSpecies s) =>
         s.BaseHP + s.BaseAttack + s.BaseDefense + s.BaseSpecial + s.BaseSpeed;
 

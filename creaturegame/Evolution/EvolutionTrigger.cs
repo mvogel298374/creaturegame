@@ -1,16 +1,6 @@
 namespace creaturegame.Evolution;
 
-/// <summary>
-/// The kind of condition that causes one species to evolve into another. These are the
-/// <b>Gen 1</b> triggers; the value is stored <i>faithfully</i> on <see cref="DB.PokemonEvolution"/>
-/// (a trade evolution is recorded as <see cref="Trade"/>, not pre-converted) — the
-/// generation/game-mode interpretation lives on <see cref="IEvolutionRules"/>, never in the data.
-/// <para>
-/// Later generations add more triggers (friendship, time-of-day, held-item trade, the Tyrogue
-/// stat-ratio rule). A new generation is a new <see cref="IEvolutionRules"/> implementation plus,
-/// where the data differs, new rows — not edits here.
-/// </para>
-/// </summary>
+/// <summary>The Gen 1 evolution triggers, stored faithfully; their interpretation lives on <see cref="IEvolutionRules"/>.</summary>
 public enum EvolutionTrigger
 {
     /// <summary>Evolves on reaching a level (PokeAPI <c>level-up</c> with a <c>min_level</c>).</summary>

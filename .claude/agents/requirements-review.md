@@ -68,7 +68,7 @@ features. Over-raising costs the user one line of "yes, fine."
 
 ## Out of your lane (note and hand off, don't audit)
 - **Code structure / generation-seam architecture** — whether a gen-variable value lives on `IBattleRules`,
-  no inline magic, per-gen XML docs, no `Attributes` mutation to fake a modifier → that's **`pr-review`**'s.
+  no inline magic, one-line seam XML docs, no `Attributes` mutation to fake a modifier → that's **`pr-review`**'s.
   You care whether the *behavior/value* is faithful, not where in the code it lives.
 - **Formatting, build, test pass/fail** → `format-gate` / `test-runner`.
 
