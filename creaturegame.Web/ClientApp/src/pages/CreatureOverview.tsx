@@ -98,17 +98,8 @@ export function CreatureOverview({ gameId, party, onBack, enemy = false }: {
   );
 }
 
-// Hidden until the active generation reaches minGen.
-const GEN_FIELDS: Array<{ label: string; minGen: number; get: (d: PlayerOverview) => string | null }> = [
-  { label: 'Held Item', minGen: 2, get: d => d.heldItem },
-  { label: 'Ability', minGen: 3, get: d => d.ability },
-  { label: 'Nature', minGen: 3, get: d => d.nature },
-  { label: 'Tera Type', minGen: 9, get: d => d.teraType },
-];
-
 function InfoTab({ d, hideXp }: { d: PlayerOverview; hideXp: boolean }) {
   const xpPct = Math.min(100, (d.xpThisLevel / Math.max(1, d.xpToNextLevel)) * 100);
-  const genFields = GEN_FIELDS.filter(f => d.generation >= f.minGen);
   return (
     <div className="overview-info">
       <div className="overview-identity">
@@ -128,9 +119,6 @@ function InfoTab({ d, hideXp }: { d: PlayerOverview; hideXp: boolean }) {
           </>
         )}
         <div className="overview-field"><span>Base Stat Total</span><span>{d.baseStatTotal}</span></div>
-        {genFields.map(f => (
-          <div className="overview-field" key={f.label}><span>{f.label}</span><span>{f.get(d) ?? '—'}</span></div>
-        ))}
       </div>
     </div>
   );

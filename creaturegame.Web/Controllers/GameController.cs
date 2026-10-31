@@ -100,10 +100,9 @@ public class GameController(GameSessionManager sessionManager, EncounterFactory 
     public IActionResult GetPlayer(string gameId)
     {
         var player = sessionManager.GetPlayerCreature(gameId);
-        var generation = sessionManager.GetGeneration(gameId);
-        if (player is null || generation is null)
+        if (player is null)
             return NotFound(new { error = "No active game with that id" });
-        return Ok(PlayerOverviewDto.From(player, generation.Value));
+        return Ok(PlayerOverviewDto.From(player));
     }
 
     /// <summary>
@@ -114,10 +113,9 @@ public class GameController(GameSessionManager sessionManager, EncounterFactory 
     public IActionResult GetPlayerSlot(string gameId, int slot)
     {
         var player = sessionManager.GetPlayerCreature(gameId, slot);
-        var generation = sessionManager.GetGeneration(gameId);
-        if (player is null || generation is null)
+        if (player is null)
             return NotFound(new { error = "No active game with that id, or invalid party slot" });
-        return Ok(PlayerOverviewDto.From(player, generation.Value));
+        return Ok(PlayerOverviewDto.From(player));
     }
 
     /// <summary>

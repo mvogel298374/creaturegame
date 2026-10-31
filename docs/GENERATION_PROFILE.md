@@ -226,7 +226,8 @@ have failed a test. All four are now read from the run's profile.
 driving **six** learnset/evolution DB queries, plus a duplicate `PlayerOverviewDto.ActiveGeneration = 1`. Not a
 seam, but a **second source of truth for the generation**, and the most concrete "Gen 1 by assumption" in the
 repo. Folded into Stage 1b (see §4.5) — both consts are **deleted** as of Stage 1b (2026-07-29); the queries now
-filter on `(int)profile.Generation` and `PlayerOverviewDto.From` stamps the run's real generation.
+filter on `(int)profile.Generation` and `PlayerOverviewDto.From` stamped the run's real generation (the field was
+removed 2026-10-31: it had no client reader).
 
 **A sixth site, closed by Stage 2b (2026-07-30):** the species / `PokemonGameAvailability` pool behind the
 wild-encounter selector and the biome map was *not* generation-filtered — `ComputePlayableBiomesAsync` and
@@ -562,7 +563,8 @@ needs both:**
   Settings-modal trap in `TODO.md` (a page nav tore down the live SignalR connection). Treat the server echo as
   required, not optional. *(Concrete carrier is a 4a implementation decision: candidates are a field on an
   existing at-attach event or a small run-presentation event emitted on attach/re-attach, with the REST
-  fallback already in place — `PlayerOverviewDto` has stamped the run's generation since Stage 1b. Whichever
+  fallback: `PlayerOverviewDto` stamped the run's generation from Stage 1b until the field was removed 2026-10-31
+  as unread, so a REST carrier would need a new field or endpoint. Whichever
   carrier, it takes the standard emitter projection + field-guard treatment.)*
 
 **The echo's payload is the generation id plus the profile's type roster.** The roster half closes the Stage 2a

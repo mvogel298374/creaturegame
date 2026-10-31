@@ -113,7 +113,6 @@ gap has drafted text, awaiting your confirmation · ✗ gaps remain. Nothing is 
 | **Enemy encounter pool ignores game version** (§4.2) | S | ✗ 1, 2, 3, 5, 6, 7 | Gap 7 blocks the rest: no version selector exists. |
 | **Enemy Pokémon do not evolve** (§4.2) | S | ✗ 1, 2, 4, 6, 7 | Your product call on when the loop wants it. |
 | **`ConsoleInput`** (§4.6) | S | ✗ 1, 2, 7 | Which host runs it. |
-| **The INFO tab's later-generation rows** (§7.4) | S | ✗ 1 | Your keep/delete call on `GEN_FIELDS` and the four null DTO fields. |
 | **`save.db`** (§4.2) | L | declined | Revisit by your ruling only. |
 
 ---
@@ -794,13 +793,8 @@ The stale comments the sweep listed were fixed 2026-10-03 (`bag.ts`, `timeline.t
 `Gen1TypeChart.cs`, `BattleIntegrationTests.cs`, `battle-ui-cues.spec.ts`, and the three `TODO.md` pointers in
 `EvolutionImport.cs`, `MoveImport.cs`, `PartyExpShareTests.cs`).
 
-- [ ] **The INFO tab's later-generation rows (found 2026-10-29) — S, ✗ needs your call.** `CreatureOverview.tsx`'s
-  `GEN_FIELDS` table (`minGen` 2, 3, 3, 9 for Held Item, Ability, Nature, Tera Type) is code that encodes later-gen
-  facts and gates on the generation number on the client, backed by four `PlayerOverviewDto` fields that are always
-  null. Under the 2026-10-29 ruling (later-gen code stays only if it meaningfully helps a future generation) it needs
-  a decision: keep as layout scaffolding, or delete the table and the four fields until a generation fills them.
-  **DoR:** ✗ — gap **1** (your keep/delete call, which sets the acceptance). Drafted for delete: 2 none, 3 n/a, 4 n/a,
-  5 web DTO + client only, 6 none (a Vitest/tsc pass; no behaviour visible in Gen 1), 7 none.
+Nothing open. The INFO tab's later-generation rows were deleted 2026-10-31 (`TODO_ARCHIVE.md` → "§7.4 The INFO tab's
+later-generation rows").
 
 ### 7.5 Speculative, unverified — check before filing as real
 

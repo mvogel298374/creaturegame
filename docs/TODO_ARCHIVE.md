@@ -8,6 +8,26 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §7.4 The INFO tab's later-generation rows are deleted; the overview's orphaned `generation` goes with them ✅ DONE (2026-10-31)
+
+S; found 2026-10-29 during the §7.4 later-gen comment pass. User rulings 2026-10-31: delete the rows; fold in the orphaned
+`generation` field.
+
+- **Problem:** `CreatureOverview.tsx`'s `GEN_FIELDS` table (`minGen` 2, 3, 3, 9 for Held Item, Ability, Nature, Tera Type)
+  encoded later-gen facts and gated on the generation number on the client, backed by four always-null `PlayerOverviewDto`
+  fields. With the table gone, `PlayerOverviewDto.Generation` had no client reader.
+- **Acceptance:** `GEN_FIELDS`, the four fields and `Generation` are gone from the DTO and the TS type; `From` takes no
+  generation and the three overview endpoints no longer look it up; the INFO tab looks the same in Gen 1. DoR 2 none, 3 n/a,
+  4 n/a, 5 web DTO + client only, 6 the fast suites, 7 none.
+- **Done:** deleted `GEN_FIELDS` and its render loop in `InfoTab`; removed `heldItem`, `ability`, `nature`, `teraType`,
+  `generation` from `PlayerOverview.ts` and `PlayerOverviewDto.cs`; `From(Creature)` takes no `Generation`;
+  `GameController.GetPlayer`/`GetPlayerSlot` and `DevController.GetEnemy` no longer call `GameSessionManager.GetGeneration`
+  (404 only on a null creature; `GetGeneration` stays, used elsewhere). `PlayerOverviewDtoTests` dropped the
+  generation/ability/nature asserts and `From_StampsTheRunsGeneration_NotAHardcodedGen1`; the `GetGeneration` doc in
+  `GenerationProfileTests` no longer mentions the overview. No player-visible change. Not logic-heavy: no G3 chain.
+
+---
+
 ## §7.4 Later-generation claims leave the code comments; the dead `StatCapAnnouncement.WontChangeFurther` is dropped ✅ DONE (2026-10-30)
 
 S; two entries merged under one review chain (user rulings 2026-10-29). Replaced the old "audit the Gen 2+ claims against

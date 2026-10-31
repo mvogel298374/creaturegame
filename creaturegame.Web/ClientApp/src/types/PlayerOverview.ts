@@ -36,13 +36,7 @@ export interface PlayerOverview {
   xpThisLevel: number;
   xpToNextLevel: number;
   baseStatTotal: number;
-  generation: number;
   stats: StatRow[];
   moves: MoveRow[];
-  // Null in Gen 1; CreatureOverview's rows decide when each shows.
-  heldItem: string | null;
-  ability: string | null;
-  nature: string | null;
-  teraType: string | null;
   stages: StageRow[] | null; // Dev Mode enemy overview only; null for every party member
 }

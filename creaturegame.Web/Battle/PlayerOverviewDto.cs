@@ -1,6 +1,5 @@
 using creaturegame.Attacks;
 using creaturegame.Creatures;
-using creaturegame.Generations;
 
 namespace creaturegame.Web.Battle;
 
@@ -23,26 +22,14 @@ public sealed record PlayerOverviewDto(
     int XpThisLevel,
     int XpToNextLevel,
     int BaseStatTotal,
-    int Generation,
     IReadOnlyList<StatRow> Stats,
     IReadOnlyList<MoveRow> Moves,
-    // Null in Gen 1; the client's CreatureOverview rows decide when each shows.
-    string? HeldItem = null,
-    string? Ability = null,
-    string? Nature = null,
-    string? TeraType = null,
     // Dev Mode only: set by the enemy endpoint, null on every player overview.
     IReadOnlyList<StageRow>? Stages = null
 )
 {
-    /// <summary>
-    /// Flattens the live creature for the overview panel, stamped with the <b>run's</b> generation.
-    /// </summary>
-    /// <param name="generation">The generation this run is being played under, read from the session. Previously
-    /// a <c>const int ActiveGeneration = 1</c> here — a second source of truth for the generation alongside
-    /// <see cref="EncounterFactory"/>'s, which would have kept reporting "1" to the client's field-gating no
-    /// matter what profile the run actually selected (Generation Profile Stage 1b).</param>
-    public static PlayerOverviewDto From(Creature c, Generation generation)
+    /// <summary>Flattens the live creature for the overview panel.</summary>
+    public static PlayerOverviewDto From(Creature c)
     {
         var a = c.Attributes;
         var stats = new List<StatRow>
@@ -67,7 +54,6 @@ public sealed record PlayerOverviewDto(
             c.XpThisLevel,
             c.XpToNextLevel,
             c.BaseHP + c.BaseAttack + c.BaseDefense + c.BaseSpecial + c.BaseSpeed,
-            (int)generation,
             stats,
             moves
         );

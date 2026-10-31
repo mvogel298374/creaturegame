@@ -23,11 +23,10 @@ public class DevController(DevModeOptions devMode, GameSessionManager sessionMan
         if (!devMode.Enabled)
             return NotFound();
         var enemy = sessionManager.GetEnemyCreature(gameId);
-        var generation = sessionManager.GetGeneration(gameId);
-        if (enemy is null || generation is null)
+        if (enemy is null)
             return NotFound(new { error = "No active game with that id, or no enemy yet" });
         return Ok(
-            PlayerOverviewDto.From(enemy, generation.Value) with
+            PlayerOverviewDto.From(enemy) with
             {
                 Stages = StageRow.NonZeroOf(enemy.Battle.Stages),
             }

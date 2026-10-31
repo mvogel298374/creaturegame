@@ -393,9 +393,8 @@ public class GenerationProfileTests
     }
 
     /// <summary>
-    /// The run-start → session → REST-read chain: a generation chosen at <c>RegisterSession</c> must be the one
-    /// <see cref="GameSessionManager.GetGeneration"/> reports, because that is what stamps the CHECK POKEMON
-    /// overview's <c>generation</c> field (which the client gates INFO rows on).
+    /// The run-start → session chain: a generation chosen at <c>RegisterSession</c> must be the one
+    /// <see cref="GameSessionManager.GetGeneration"/> reports.
     /// </summary>
     /// <remarks>
     /// Exercises the <b>pending</b> leg, which needs no hub: <c>RegisterSession</c> never touches
