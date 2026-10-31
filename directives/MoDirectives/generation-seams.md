@@ -12,3 +12,6 @@ These hold for every generation the game models.
    that can differ between generations is reached through a generation seam; the engine never branches on
    the generation. This is done inside the feature itself, never left for a later cleanup. Enforced by the
    Generation seam guardrail.
+4. **No inline exceptions in battle logic.** A battle rule, number, formula or message goes behind a seam even when
+   every generation checked so far agrees. Only out-of-battle or ancillary behaviour may stay inline, and only
+   with my waiver.

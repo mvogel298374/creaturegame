@@ -48,7 +48,7 @@ gap has drafted text, awaiting your confirmation · ✗ gaps remain.
 
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
-| **A failed OHKO says "unaffected"** (§3.2) | S | ⚠️ 1, 2, 3, 5, 6, 7 | Wire change (C# + TS); `AttackAction`'s OHKO branch, so `pr-review`. |
+| **Failure announcements: failed OHKO + trainer-battle Roar say "unaffected"** (§3.2) | S–M | ✅ (confirmed 2026-10-31) | Awaiting your greenlight. New seam members + wire event (C# + TS); `AttackAction`, so both review gates. |
 | **Item descriptions describe the Gen 1 effect** (§3.2) | S–M | ⚠️ 1, 3, 4, 5, 6, 7 | Importer override plus a full re-import. |
 | **Modal accessibility** (§5) | S–M | ⚠️ 1, 3, 5, 6, 7 + test route | Client only; the drafted test route is an E2E spec you run. |
 
@@ -67,6 +67,7 @@ gap has drafted text, awaiting your confirmation · ✗ gaps remain.
 |:-----|:----:|:-------|:-----------------------------|
 | **End-of-turn residual phase** (§4.2) | L | ✗ 2; 1, 5, 6 drafted | Unblocks Leech Seed × Toxic (§3.1). |
 | **Damage/accuracy core** (§3.1) | L | ✗ 1, 2, 3, 4, 6 | A verify slice first (a pokered cite per claim); touches every damage number. |
+| **Audit the inline battle rules behind seams** (§3.1) | M | ✗ 1, 2 drafted | Your 2026-10-31 ruling: battle logic always on a seam. A verify slice lists every inline rule first. |
 | **CI E2E step** (§6) + **Run the fast suites before deploying** (§7.1) | M + M | ✗ 1, 2, 6, 7 | Design together; the only automatic E2E coverage. |
 | **Catch / Poké Ball effect** (§4.1) | L | ✗ 1, 2, 3, 4, 6 | Pair with the unsold-item rule (§3.2), which the first 0-priced Ball triggers. |
 | **Stone evolutions** (§4.1) | M | ✗ 1, 2, 4, 5, 6, 7 | Waits on the acquisition design (how stones enter a run). |
@@ -240,7 +241,9 @@ data/engine item usually also means updating the test that pins the wrong value.
   is lower-level and `rand[0, userLv + targetLv] < targetLv / 4`. Ours always succeeds (`MoveEffects.cs:520-548`).
   **User ruling 2026-10-17:** fix both, with a proper generation seam. Also noted 2026-10-29 (`requirements-review`,
   unverified here): pokered's trainer-battle failure prints "… is unaffected!" (`IsUnaffectedText`); ours emits
-  `MoveHadNoEffect` ("doesn't affect") — check the wording in the same design pass.
+  `MoveHadNoEffect` ("doesn't affect"). **Moved 2026-10-31** to "Failure announcements" (§3.2), which adds the
+  `MoveFailureAnnouncement` seam; the wild level-roll failure here prints `_DidntAffectText` "It didn't affect
+  <TARGET>!" (`effects.asm:833-837`) and adds its own member on that seam.
   **DoR:** ✗ not Ready — gap **2** (design pass, central `Battle`); 1, 5 and 6 are drafted below for your
   confirmation. 3, 4 and 7 are answered.
   - **Acceptance:** a full battle where a faster Roar ends the turn with no foe action and no residual tick, and a
@@ -270,6 +273,18 @@ data/engine item usually also means updating the test that pins the wrong value.
   need tracing (a foe that selected a Normal move but missed; damage from the user's own move in `wDamage`).
   **DoR:** ✗ — gaps **4** (trace `HandleCounterMove` ourselves and list the diverging cases), **2** (design pass:
   touches `AttackAction`/`CounterEffect` and `CounterQualifies`' signature), **6**, **1**. 5: runtime only. 7: none.
+- **Audit the inline battle rules and put each behind a seam (user ruling 2026-10-31) — M, ✗ not Ready.** Battle
+  logic gets full generation separation: a rule goes on a seam even when the generations we checked agree, and
+  only out-of-battle or ancillary behaviour may stay inline. `GENERATION_SEAMS.md` still documents deliberate inline
+  rules, among them the freeze thaw and Explosion/Self-Destruct fainting on a miss (row "Freeze", "inline in
+  `AttackAction`"), Disable's target move and Conversion ("not yet a seam"), and Confuse's never-re-rolled counter
+  ("gen-agnostic and inline in `ConfuseEffect`") (read-confirmed 2026-10-31).
+  **DoR:** ✗ not Ready — gaps **1, 2**; the rest follow from the slice. *Drafted:*
+  - **Acceptance:** a verify slice lists every inline battle rule in the engine (the `GENERATION_SEAMS.md` rows plus
+    a code sweep of `Combat/`), each with its pokered cite; each then gets its own seam member and a test that a
+    `TestAltProfile` override changes the outcome; no `GENERATION_SEAMS.md` row says "inline" for battle logic. The same pass rewords the carve-outs that rule 4 now contradicts: `GENERATION_SEAMS.md` §5.0 ("leave it inline … don't over-abstract", the `ItemPriority` note), `pr-review.md` and `DEFINITION_OF_DONE.md` ("gen-invariant constants inline are fine"), `ARCHITECTURE.md:109`.
+  - **Design:** the slice first (read-only, shown to you), then one design pass per cluster of members.
+  - **Data vs runtime:** runtime only. **Dependencies:** none; can split into one item per cluster after the slice.
 
 ### 3.2 Data and importer
 
@@ -286,19 +301,41 @@ data/engine item usually also means updating the test that pins the wrong value.
   - **Quirk:** Dire Hit's text must not promise a raised crit rate (Gen 1's Focus Energy bug).
   - **Dependencies:** none.
 - **Found 2026-10-11 during V7 / the item seam (unverified beyond the citation; each needs its own DoR):**
-  - *A failed OHKO says "missed", Gen 1–2 say "<target> is unaffected!" (found 2026-10-11, second review of "Gen 1
-    roll order", archived; source-confirmed, predates it):* the OHKO effect sets `wCriticalHitOrOHKO` to `$ff` and
-    `PrintMoveFailureText` then prints `UnaffectedText` (pokered `engine/battle/core.asm:3783`); Gen 2 the same
-    (pokecrystal `effect_commands.asm:2211-2214`). We emit `MoveMissed`. Needs a new event or message on the wire
-    (C# + TS), so its own DoR.
-    **DoR (V16):** ✗ not Ready — gaps **1, 2, 3, 5, 6, 7**. *Drafted:*
-    - **Acceptance:** a failed OHKO (the target is faster or higher-level) emits an "unaffected" event, the client
-      prints "<target> is unaffected!", and a real miss still says "missed".
-    - **Design:** S, but it touches `AttackAction`'s OHKO branch (central), so `pr-review` applies.
-    - **Seam:** which outcome a failed OHKO reports (Gen 1–2 agree; Gen 3+ unchecked).
-    - **Data vs runtime:** runtime plus the wire (C# and TS, field guard).
-    - **Quirk:** a Gen 1 failed OHKO is not a miss.
-    - **Dependencies:** none.
+  - **Failure announcements: a failed OHKO and a trainer-battle Roar/Whirlwind say "unaffected"; immunity ends in
+    "!" (source-confirmed 2026-10-31) — S–M, ✅ Ready.** Gen 1 has four failure lines and we collapse them into
+    two. A slower OHKO user: pokered sets `wCriticalHitOrOHKO` to `$ff` and `PrintMoveFailureText` prints
+    `_UnaffectedText` "<TARGET>'s unaffected!" (`engine/battle/core.asm:3718-3734`); Gen 2 the same
+    (pokecrystal `engine/battle/effect_commands.asm` `GetFailureResultText :2211-2214`). We emit `MoveMissed`.
+    Roar/Whirlwind in a trainer battle: `SwitchAndTeleportEffect .notWildBattle1` prints `_IsUnaffectedText`
+    "<TARGET> is unaffected!" (`engine/battle/effects.asm:847-854`); Gen 2 force-switches instead
+    (`BattleCommand_ForceSwitch`). We emit `MoveHadNoEffect`. Type immunity is `_DoesntAffectMonText` "It doesn't
+    affect <TARGET>!"; our client prints "It doesn't affect <TARGET>...". User rulings 2026-10-31: full generation
+    separation for battle logic, seams wherever needed; narrow Roar scope (the wording only; the action-loop and
+    wild level-roll gaps stay in the Roar entry, §3.1, which reuses this seam for its "It didn't affect" line);
+    fold in the immunity punctuation.
+    1. **Intent + acceptance:** in a full battle, a slower user's Fissure on a faster foe emits
+       `MoveUnaffected(Cause: OneHitKo)` (not `MoveMissed`) and draws only the crit roll; Roar in a non-escapable
+       battle emits `MoveUnaffected(Cause: ForceFlee)` (not `MoveHadNoEffect`); a real miss still emits
+       `MoveMissed`. The client prints "<target>'s unaffected!" and "<target> is unaffected!" respectively, and
+       type immunity prints "It doesn't affect <target>!". Under `TestAltProfile` the same two battles emit
+       `MoveMissed` and `MoveHadNoEffect`.
+    2. **Design status:** designed 2026-10-31 (confirmed). New `MoveFailureAnnouncement` enum (`Missed`,
+       `DoesntAffect`, `Unaffected`); `IBattleRules.OneHitKoFailureAnnouncement` and
+       `IBattleRules.ForceFleeTrainerFailureAnnouncement` return it, in the style of `StatStageCapAnnouncement`;
+       `AttackAction.OhkoFails` and `ForceFleeEffect` map the enum to an event. New wire event
+       `MoveUnaffected(TargetName, TargetId, MoveName, Cause)`, `Cause` ∈ {`OneHitKo`, `ForceFlee`}, projected by hand
+       to the client (`ClaudeDirectives/engine.md` rule 8). Touches `AttackAction` (central): both review gates.
+    3. **Gen-variable surface:** the announcement each failure makes (both members). Gen 1: `Unaffected` for both.
+       The OHKO success rule itself is already on the seam (`OneHitKoSucceeds`, Speed-only in Gen 1).
+    4. **Gen 1 source of truth:** pokered `core.asm:3718-3734` (`PrintMoveFailureText`), `effects.asm:847-854`
+       (`SwitchAndTeleportEffect`), texts in `data/text/text_2.asm` (`_UnaffectedText`, `_DoesntAffectMonText`) and
+       `text_3.asm` (`_IsUnaffectedText`); Gen 2 shape check pokecrystal `GetFailureResultText`.
+    5. **Data vs runtime:** runtime plus the wire (C# event, hub projection, TS timeline). No data.
+    6. **Quirk to test:** a Gen 1 failed OHKO is not a miss and stops before the accuracy roll (only the crit roll
+       is drawn); the two "unaffected" lines are different texts; `TestAltProfile` proves the seam decides.
+    7. **Dependencies:** none.
+    *Gates:* `format-gate` → `test-runner` → `requirements-review` → `pr-review` → `docs-cleanup`. Estimate:
+    implementation ~40–60k tokens + reviews ~120–140k.
   - *Struggle skips the accuracy roll* (found during "Gen 1 roll order", archived): `AttackAction.Connects`
     treats Struggle as never-miss; in pokered it goes through `MoveHitTest` like any move (so the 1/256 miss applies).
     Unverified beyond that reading; needs its own DoR. **Fixing it must flip
