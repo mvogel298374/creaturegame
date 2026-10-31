@@ -66,18 +66,19 @@ public sealed class Gen1StatCalculator : IStatCalculator
             _ => _rng.Next(0, MaxDv + 1), // Average: 0–15 (the ordinary roll)
         };
 
-    // Gen 1: a win adds the defeated species' base stats to Stat Exp, capped at 65535 per stat.
+    // Gen 1: a win adds the defeated species' base stats, split by the caller's divisor, capped at 65535 per stat.
     private const int StatExpMax = 65535;
 
-    public void AwardStatExp(Creature victor, Creature defeated)
+    public void AwardStatExp(Creature victor, Creature defeated, int yieldDivisor)
     {
-        victor.ExpHP = AddCapped(victor.ExpHP, defeated.BaseHP);
-        victor.ExpAttack = AddCapped(victor.ExpAttack, defeated.BaseAttack);
-        victor.ExpDefense = AddCapped(victor.ExpDefense, defeated.BaseDefense);
-        victor.ExpSpecial = AddCapped(victor.ExpSpecial, defeated.BaseSpecial);
+        int d = Math.Max(1, yieldDivisor);
+        victor.ExpHP = AddCapped(victor.ExpHP, defeated.BaseHP / d);
+        victor.ExpAttack = AddCapped(victor.ExpAttack, defeated.BaseAttack / d);
+        victor.ExpDefense = AddCapped(victor.ExpDefense, defeated.BaseDefense / d);
+        victor.ExpSpecial = AddCapped(victor.ExpSpecial, defeated.BaseSpecial / d);
         // A transformed foe still yields its own species' base Speed (pokered reads wEnemyMonBaseStats).
         int baseSpeed = defeated.Battle.OriginalIdentity?.BaseSpeed ?? defeated.BaseSpeed;
-        victor.ExpSpeed = AddCapped(victor.ExpSpeed, baseSpeed);
+        victor.ExpSpeed = AddCapped(victor.ExpSpeed, baseSpeed / d);
     }
 
     private static int AddCapped(int current, int gain) => Math.Min(StatExpMax, current + gain);

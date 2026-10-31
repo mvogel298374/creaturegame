@@ -142,7 +142,7 @@ public class TransformContractTests(MovesFixture moves) : Gen1MoveContract(moves
         await new MoveScenario().Attacker(foeDitto).Defender(jolteon).Use(Move("transform"));
         Assert.Equal(130, foeDitto.BaseSpeed);
 
-        jolteon.GainStatExp(foeDitto);
+        jolteon.GainStatExp(foeDitto, yieldDivisor: 1);
 
         Assert.Equal(48, jolteon.ExpSpeed);
     }

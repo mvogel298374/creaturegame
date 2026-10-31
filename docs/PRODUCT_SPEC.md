@@ -173,7 +173,21 @@ the linked design doc instead — pull it there and leave only the pointer here.
   implementation*.
 
 ## 4. Progression (XP, leveling, evolution)
-*(not yet populated)*
+
+### Experience and Stat Exp awards
+- On a win, the foe's base-exp yield and its five Stat Exp yields are each divided by the number of live participants
+  (floored), then the XP is multiplied by the foe's level and divided by 7 (floored); a trainer-owned foe adds half
+  again. A fainted participant earns nothing and is not counted.
+- A level-10 wild Pidgey (base exp 55) pays 78 XP to a solo winner and 38 to each of two participants; a trainer-owned
+  one pays 57 to each of two. Each of its Stat Exp yields is split the same way (two participants: +20/22/20/17/28).
+- The run's difficulty XP multiplier applies to the finished split award, keyed on the finisher's level; Stat Exp gets
+  no run multiplier.
+- When the run has a bench share above 0, every living party member also earns a bench bonus: the run-scaled full
+  (unsplit) award times the share, floored, plus the full Stat Exp yield. Participants receive it on top of their
+  split, in one combined XP gain, so a creature that fought always out-earns one that sat out.
+- Stat Exp is capped at 65535 per stat.
+- Design detail → `GENERATION_SEAMS.md` (`ExperienceRules`, `AwardStatExp`), `STATE_MODEL.md` §2.  History →
+  `TODO_ARCHIVE.md` → *XP formula: generic integer pipeline*.
 
 ## 5. Economy (bag, wallet, shop, rewards)
 

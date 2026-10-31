@@ -92,8 +92,8 @@ a pokecrystal or pokeemerald cite is **unverified** (§4.5):
 | **Burn/Poison damage** | 1/16 max HP per turn | 1/8 in Gen 6+ |
 | **Residual (status tick) timing** | **no end-of-turn phase** — each creature's Burn/Poison/Leech Seed tick fires right after *its own* action, and a faint jumps straight to the faint handler (so a residual double-faint can't happen). Partly modelled today: `FaintEndsTurnImmediately` covers only the direct-hit-faint case. **Seam candidate, not yet built** — `TODO.md` → Known Gaps; rationale → `GEN_DIFFERENCES.md` → Status Quirks | true end-of-turn phase after both actions (Gen 2+) |
 | **Special stat** | one combined **Special** stat for both offense and defense | split into Sp. Atk / Sp. Def (Gen 2) |
-| **XP on faint** | wild `floor(baseExp × level / 7)`; **trainer-owned: x + ⌊x/2⌋**, the half floored separately (pokered `engine/battle/experience.asm` `BoostExp`) | a trainer bonus persists (later-gen rounding unchecked) |
-| **XP participant divisor** | the award is divided among the Pokémon sent out that have **not** fainted (the formula's `s`) — `IBattleRules.SplitXpAmongParticipants`. The caller excludes fainted participants first; a mutual KO can leave a count of 0, and then nobody is paid | same through Gen 5; **Gen 6 removed it** — every participant earns the full award, so a Gen 6 impl returns the award unchanged |
+| **XP on faint** (`Experience` → `ExperienceFormula`) | one gen-blind integer pipeline, every step floored: `y = Split(baseExp, s)` → `x = ⌊y × L_foe / LevelDivisor⌋` → each listed boost in order, `x + ⌊x/2⌋`. The terms are the `ExperienceRules` record: Gen 1 is `LevelDivisor` 7, `Split = Yields`, `Boosts = [Trainer]` (pokered `engine/battle/experience.asm` `:65-68`, `BoostExp :328`; the traded boost `:82` never applies, as there is no OT). Gen 2 has the same order and adds Lucky Egg after Trainer (pokecrystal `engine/battle/core.asm` `GiveExperiencePoints`) | each generation sets its own terms; a term no built generation uses is added with that generation |
+| **XP participant divisor** (`ExperienceRules.Split`, `ExperienceFormula.YieldDivisor`) | `Yields`: the foe's base-exp yield **and its five base stats** are each divided by `s`, the Pokémon sent out that have **not** fainted, **before** the formula, so a remainder is lost (pokered `DivideExpDataByNumMonsGainingExp :294-326`; skipped when `s ≤ 1`). Wild L10 Pidgey (55) with two participants: 38 each, not ⌊78 / 2⌋ = 39. The same divisor reaches `IStatCalculator.AwardStatExp`. The caller excludes fainted participants first; a mutual KO can leave a count of 0, and then nobody is paid | `None` pays every participant the whole award and yield (`TestAltProfile` uses it as the seam's probe) |
 | **Already-confused announcement** (`RedundantConfusionAnnouncement`) | `FailedGeneric`: a dedicated confusion move (Confuse Ray, Supersonic) on a confused target prints "But it failed!" (pokered `ConditionalPrintButItFailed`). The counter is never re-rolled (pokered checks the CONFUSED bit first), which is gen-agnostic and inline in `ConfuseEffect`; a secondary confusion on a damaging move fails silently and never consults this | `AlreadyConfused`, "… is already confused!" (Gen 3+, unverified); the engine arm and `ConfusionAlready` event exist and are pinned by a test |
 | **Stat-cap announcement** (`StatStageCapAnnouncement`) | `NothingHappened`: a primary stat move on a stat at ±6 prints "Nothing happened!" (pokered `PrintNothingHappenedText`); a secondary drop stays silent. The ±6 clamp itself is gen-agnostic | a named "won't rise/drop anymore!" line (Gen 3+, unverified). No enum member exists for it: one is added with its engine arm when a generation needs it |
 | **Leech Seed drain** (`LeechSeedDrainDenominator`) | 1/16 max HP, the same number as Poison but its own member | 1/8 from Gen 2 while Poison stays 1/16 (unverified) |
@@ -109,12 +109,14 @@ a pokecrystal or pokeemerald cite is **unverified** (§4.5):
 > **Roguelite XP tuning (not a seam change).** `RunRules` is a separate game-balance-dials bag, not part of
 > `IBattleRules`. Two dials sit on it: a level-aware **XP multiplier** and a **bench XP share** paid to living
 > members who never took the field. Both are no-ops by default (`RunRules.Default`) and only active on the web
-> run. The Gen-1 **participant split** (dividing the win award among creatures that fought) stays on the seam
-> as `IBattleRules.SplitXpAmongParticipants` since Gen 6 dropped it — `Battle` only decides *who* participated,
-> which is gen-invariant. The bench share is layered on top of that split result and is not a Gen-1 mechanic at
-> all (no cartridge pays a creature that wasn't sent out). **Composition order in `Battle`:** the seam's award
-> (`CalculateXpAwarded`, trainer bonus included) → the `RunRules` multiplier → the seam's participant split → the
-> bench share. Neither system reads the other, so a generation swap and a balance retune stay independent.
+> run. The **participant split** is a term of the seam (`ExperienceRules.Split`) — `Battle` only decides *who*
+> participated, which is gen-invariant, and passes the count in. The bench share is not a Gen-1 mechanic at all
+> (no cartridge pays a creature that wasn't sent out). **Composition in `Battle`** (user ruling 2026-10-31: the
+> XP is the gen-exact base × the game's value): each participant's award is `ExperienceFormula.Award(…, s)` × the
+> `RunRules` multiplier; the bench bonus, `⌊ExperienceFormula.Award(…, 1) × multiplier × BenchXpShare⌋` XP with the
+> full Stat Exp yield, goes to every living member, participants on top of their split (user ruling 2026-10-31).
+> Stat Exp has no game multiplier. Neither system reads the other, so a generation swap and a
+> balance retune stay independent.
 > Full tuning values and rationale → `STATE_MODEL.md`;
 > `docs/TODO_ARCHIVE.md` → *Reward Visibility & XP Pacing* (the multiplier anchors and pacing target) and →
 > *Participation XP* (the participant-split decision).
@@ -151,9 +153,10 @@ The formulas that turn base stats + per-individual values into a creature's actu
   one shared Special DV, which becomes two IVs only in Gen 3. The Special split also touches `Attributes` and
   `GetOffensiveStat` / `GetDefensiveStat`.)
 
-The *awarding* of training is on the seam too — `AwardStatExp(victor, defeated)` owns the
-gen-variable **gain rule and cap**: Gen 1 adds the defeated species' **base stats**, capped
-65535 per stat, and the gain is realized into actual stats only on the next stat recompute (a
+The *awarding* of training is on the seam too — `AwardStatExp(victor, defeated, yieldDivisor)` owns the
+gen-variable **gain rule and cap**: Gen 1 adds the defeated species' **base stats**, each floored by the
+participant divisor that `ExperienceFormula.YieldDivisor` derives from `IBattleRules.Experience` (1 for the
+bench share), capped 65535 per stat, and the gain is realized into actual stats only on the next stat recompute (a
 level-up — never mid-level); a `Gen3StatCalculator` would instead add the defeated species'
 **EV yield** under the 252/stat & 510-total caps. The call site (`Battle`'s win branch) just
 calls `AwardStatExp` and stays generation-blind.

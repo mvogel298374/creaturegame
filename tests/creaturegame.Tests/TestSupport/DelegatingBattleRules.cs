@@ -155,11 +155,7 @@ public abstract class DelegatingBattleRules : IBattleRules
     public virtual StatusCondition CarryStatusOutOfBattle(StatusCondition status) =>
         _inner.CarryStatusOutOfBattle(status);
 
-    public virtual int CalculateXpAwarded(int baseExp, int enemyLevel, bool trainerOwned) =>
-        _inner.CalculateXpAwarded(baseExp, enemyLevel, trainerOwned);
-
-    public virtual int SplitXpAmongParticipants(int award, int liveParticipants) =>
-        _inner.SplitXpAmongParticipants(award, liveParticipants);
+    public virtual ExperienceRules Experience => _inner.Experience;
 
     public virtual bool FaintEndsTurnImmediately => _inner.FaintEndsTurnImmediately;
 

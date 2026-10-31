@@ -282,12 +282,8 @@ public interface IBattleRules
 
     // ── Experience ─────────────────────────────────────────────────────────────
 
-    /// <summary>The undivided generation-rule XP a defeated enemy is worth; per-gen formula, the participant split and
-    /// the separate roguelite multiplier in GENERATION_SEAMS.md → XP on faint.</summary>
-    int CalculateXpAwarded(int baseExp, int enemyLevel, bool trainerOwned);
-
-    /// <summary>Each live participant's XP share; the count can be 0. See GENERATION_SEAMS.md §2.</summary>
-    int SplitXpAmongParticipants(int award, int liveParticipants);
+    /// <summary>The XP and Stat Exp terms <see cref="ExperienceFormula"/> reads. See GENERATION_SEAMS.md → XP on faint.</summary>
+    ExperienceRules Experience { get; }
 
     /// <summary>Whether a mid-turn faint skips the residuals and Hyper Beam's recharge. See GEN_DIFFERENCES.md.</summary>
     bool FaintEndsTurnImmediately { get; }

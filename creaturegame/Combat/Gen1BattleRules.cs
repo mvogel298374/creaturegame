@@ -286,14 +286,7 @@ public sealed class Gen1BattleRules : IBattleRules
     // Gen 1: crits use raw computed stats, bypassing stages and the Burn Attack penalty.
     public bool CritIgnoresStatStages => true;
 
-    // Gen 1 XP and its trainer-bonus rounding: GEN_DIFFERENCES.md → Experience.
-    public int CalculateXpAwarded(int baseExp, int enemyLevel, bool trainerOwned)
-    {
-        int xp = baseExp * enemyLevel / 7;
-        return trainerOwned ? xp + xp / 2 : xp;
-    }
-
-    // Gen 1: an even split; a count of 1 or less returns the whole award.
-    public int SplitXpAmongParticipants(int award, int liveParticipants) =>
-        liveParticipants <= 1 ? award : award / liveParticipants;
+    // pokered engine/battle/experience.asm: GEN_DIFFERENCES.md → Experience.
+    public ExperienceRules Experience { get; } =
+        new(LevelDivisor: 7, Split: ExperienceSplit.Yields, Boosts: [ExperienceBoost.Trainer]);
 }

@@ -408,6 +408,7 @@ public sealed class BattleScenario
     private int? _playerForgetSlot;
     private int?[] _playerTurnPlan = []; // per free-choice turn: an index to SWITCH to, or null to FIGHT
     private bool _escapable = true; // wild battle by default; false = the Elite/Boss trainer analog
+    private bool _trainerBattle; // the foe is trainer-owned (the XP trainer boost)
     private Party? _playerParty; // party-aware battle (forced switch-in + innate Exp-Share) when set
     private RunRules? _runRules; // roguelite run-tuning (XP curve, bench Exp-Share) when set
     private IRandomSource? _battleRng; // null → SeededRandomSource(_seed)
@@ -499,6 +500,12 @@ public sealed class BattleScenario
         return this;
     }
 
+    public BattleScenario TrainerBattle(bool trainerBattle)
+    {
+        _trainerBattle = trainerBattle;
+        return this;
+    }
+
     public async Task<BattleScenarioResult> RunAsync()
     {
         var emitter = new RecordingEmitter();
@@ -520,6 +527,7 @@ public sealed class BattleScenario
             emitter: emitter,
             rng: _battleRng ?? new SeededRandomSource(_seed),
             escapable: _escapable,
+            trainerBattle: _trainerBattle,
             runRules: _runRules,
             playerParty: _playerParty
         );

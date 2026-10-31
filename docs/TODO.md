@@ -48,7 +48,6 @@ gap has drafted text, awaiting your confirmation · ✗ gaps remain.
 
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
-| **Gen 1 XP participant split order** (§3.1) | S | ⚠️ 1, 2, 3, 5, 6, 7 | Touches `Battle`, so both review gates. |
 | **A failed OHKO says "unaffected"** (§3.2) | S | ⚠️ 1, 2, 3, 5, 6, 7 | Wire change (C# + TS); `AttackAction`'s OHKO branch, so `pr-review`. |
 | **Item descriptions describe the Gen 1 effect** (§3.2) | S–M | ⚠️ 1, 3, 4, 5, 6, 7 | Importer override plus a full re-import. |
 | **Modal accessibility** (§5) | S–M | ⚠️ 1, 3, 5, 6, 7 + test route | Client only; the drafted test route is an E2E spec you run. |
@@ -201,16 +200,6 @@ data/engine item usually also means updating the test that pins the wrong value.
   sides: different text and an extra RNG draw. *Gaps:* acceptance, seam (whether the order differs in Gen 2), the
   primary source re-checked for the stat-up and status moves, and the test list. Sits next to "Mist + thaw", which
   also moves logic ahead of the hit test; plan them together.
-- **Gen 1 XP participant split order (from §7.6 V10) — S, ✗ not Ready.** Gen 1 divides the base exp and the Stat
-  Exp yields by the participant count first (`experience.asm:294`). *Gaps:* touches `Battle`, and it's a seam question
-  (`SplitXpAmongParticipants`'s contract changes; composition order is in `GENERATION_SEAMS.md`).
-  **DoR (V16):** ✗ not Ready — gaps **1, 2, 3, 5, 6, 7**. *Drafted:*
-  - **Acceptance:** with two participants, each gets pokered's XP and Stat Exp for a species whose yield is odd.
-  - **Design and seam:** the seam's split runs before the trainer and level factors, so `SplitXpAmongParticipants`
-    moves ahead in the composition; it touches `Battle`, so both gates apply.
-  - **Data vs runtime:** runtime only.
-  - **Quirk:** dividing first loses the remainder that dividing last would keep.
-  - **Dependencies:** none.
 - **Substitute blocks sleep/paralysis status moves; Gen 1 lets them through (source-confirmed 2026-10-17, §7.6
   V15) — S–M, ✗ not Ready.** pokered (master): `SleepEffect` (`engine/battle/effects.asm:26-77`) and
   `ParalyzeEffect_` (`engine/battle/move_effects/paralyze.asm`, reached from `effects.asm:1165`) never call

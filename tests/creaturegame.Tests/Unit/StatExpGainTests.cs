@@ -46,7 +46,7 @@ public class StatExpGainTests
     public void AwardStatExp_AddsDefeatedBaseStatsPerStat()
     {
         var victor = new Creature("Victor");
-        Gen1StatCalculator.Instance.AwardStatExp(victor, Foe(1, 2, 3, 4, 5));
+        Gen1StatCalculator.Instance.AwardStatExp(victor, Foe(1, 2, 3, 4, 5), yieldDivisor: 1);
 
         Assert.Equal(1, victor.ExpHP);
         Assert.Equal(2, victor.ExpAttack);
@@ -61,8 +61,8 @@ public class StatExpGainTests
         var victor = new Creature("Victor");
         var foe = Foe(10, 20, 30, 40, 50);
 
-        Gen1StatCalculator.Instance.AwardStatExp(victor, foe);
-        Gen1StatCalculator.Instance.AwardStatExp(victor, foe);
+        Gen1StatCalculator.Instance.AwardStatExp(victor, foe, yieldDivisor: 1);
+        Gen1StatCalculator.Instance.AwardStatExp(victor, foe, yieldDivisor: 1);
 
         Assert.Equal(20, victor.ExpHP);
         Assert.Equal(40, victor.ExpAttack);
@@ -73,9 +73,23 @@ public class StatExpGainTests
     public void AwardStatExp_CapsEachStatAt65535()
     {
         var victor = new Creature("Victor") { ExpAttack = 65_500 };
-        Gen1StatCalculator.Instance.AwardStatExp(victor, Foe(0, 100, 0, 0, 0));
+        Gen1StatCalculator.Instance.AwardStatExp(victor, Foe(0, 100, 0, 0, 0), yieldDivisor: 1);
 
         Assert.Equal(65_535, victor.ExpAttack); // 65500 + 100 would be 65600 → clamped
+    }
+
+    // pokered DivideExpDataByNumMonsGainingExp: each base stat is floored by the divisor on its own.
+    [Fact]
+    public void AwardStatExp_FloorsEachYieldByTheDivisor()
+    {
+        var victor = new Creature("Victor");
+        Gen1StatCalculator.Instance.AwardStatExp(victor, Foe(40, 45, 40, 35, 56), yieldDivisor: 2);
+
+        Assert.Equal(20, victor.ExpHP);
+        Assert.Equal(22, victor.ExpAttack);
+        Assert.Equal(20, victor.ExpDefense);
+        Assert.Equal(17, victor.ExpSpecial);
+        Assert.Equal(28, victor.ExpSpeed);
     }
 
     // ── Realization timing (the explicit fidelity choice) ────────────────────
@@ -86,7 +100,7 @@ public class StatExpGainTests
         var c = FixedMon();
         int attackBefore = c.Attributes.Attack;
 
-        c.GainStatExp(Foe(0, 65_535, 0, 0, 0)); // huge Attack Stat Exp, but no recalc yet
+        c.GainStatExp(Foe(0, 65_535, 0, 0, 0), yieldDivisor: 1); // huge Attack Stat Exp, but no recalc yet
 
         Assert.Equal(attackBefore, c.Attributes.Attack); // unchanged until a level-up recomputes
     }

@@ -130,18 +130,23 @@ the whole party rather than only the creature that started the fight:
   that finished, or a bench member levelled by the XP share. `BattleRunEvent` snapshots each member's pre-battle
   level (`preLevel`) and evolves every one that levelled (active-first, then roster order); there is no
   starting-lead-only `levelBefore` gate.
-- **XP** follows the **Gen 1 participation split** (2026-07-27): every creature that **took the field** this
-  battle and is still alive splits the award evenly — `fullAward / liveParticipantCount`. A creature that fought
+- **XP** follows the **Gen 1 participation split** (2026-07-27; split order corrected 2026-10-31): every creature
+  that **took the field** this battle and is still alive earns the same share — the foe's yields are divided by
+  the live participant count *before* the formula, as pokered does (`GENERATION_SEAMS.md` → XP participant
+  divisor), so a share can be one less than `fullAward / liveParticipantCount`. A creature that fought
   and was switched back out earns exactly what the finisher earns; taking the field is what makes you a
   participant, and participants are not ranked by who landed the last hit. A **fainted** participant earns nothing
   **and is excluded from the divisor**, so a forced faint-switch leaves the survivor taking the whole award.
   Participation is tracked per battle by `Battle` itself (a `_participants` set, written by the opening lead and by
   `BringInMember` — the shared tail of both switch paths), deliberately **not** as a flag on `BattleState`:
   `ResetBattleState()` never reaches a benched creature, so a per-creature flag would leak into the next battle.
-- **The innate party XP share** (`RunRules.BenchXpShare`) sits on top: every **living** member that *never* took
-  the field earns `floor(fullAward × BenchXpShare)` XP. **Stat-Exp** is never fractionalised by either rule — it is
-  granted in full to every living *participant* always, and to living non-participants only when the share is
-  switched on (a zero share skips the bench loop entirely, so they get neither XP nor Stat-Exp). Fainted members
+- **The innate party XP share** (`RunRules.BenchXpShare`) is a **bonus every living member earns** (user ruling
+  2026-10-31): `floor(fullAward × BenchXpShare)` XP plus the foe's full Stat-Exp yield, where `fullAward` is the
+  undivided, run-scaled award. A participant gets it **on top of** its split, paid as one combined award (one
+  `ExperienceGained`), so a creature that fought always out-earns one that sat out. **Stat-Exp** of the split
+  itself follows the Gen 1 rule (user ruling 2026-10-31; it was previously paid in full to every participant): each
+  living participant gets each base stat floored by the participant count, with no game multiplier. A zero share
+  switches the bonus off for everyone (non-participants then get neither XP nor Stat-Exp). Fainted members
   earn nothing. This share is a roguelite deviation (see
   `GENERATION_SEAMS.md`). A level-up earned off the field carries its own creature's name (`LeveledUp.OnBench`) so
   it surfaces attributed, without disturbing the on-field creature's nameplate — as does every off-field award,
@@ -149,11 +154,11 @@ the whole party rather than only the creature that started the fight:
   which the client logs by name without moving the on-field XP bar) — so the text log names every party member
   that gained XP this battle, not just whoever was on the field (2026-08-23; previously the bench share was
   awarded silently, with no per-member log line until it produced a level-up).
-  > ⚠️ **Known, user-accepted limitation (2026-07-27):** the bench share is taken off the **full** award while
-  > participants split it, so with two live participants a creature that never fought earns the **same** as one
-  > that did at Normal (0.5) and **more** at Easy (0.75). Deliberate — see `docs/TODO_ARCHIVE.md` → *Participation XP*.
+  > **Retired (2026-10-31):** the 2026-07-27 limitation where a creature that never fought could earn the same as,
+  > or more than, a participant (`docs/TODO_ARCHIVE.md` → *Participation XP*) is gone: the bonus now rides on the
+  > split for participants too.
   >
-  > **Known, user-accepted limitation (2026-09-20):** the level-based XP multiplier
+  > ⚠️ **Known, user-accepted limitation (2026-09-20; reconfirmed 2026-10-31):** the level-based XP multiplier
   > (`RunRules.XpMultiplierForLevel`) is computed once from the **finisher's** level at win time
   > (`Battle.cs`, `PlayerCreature.Level`) and applied to the whole XP pool, so every other participant and the
   > bench share are paid on the finisher's multiplier, not their own. By design for the bench (`floor(activeAward ×

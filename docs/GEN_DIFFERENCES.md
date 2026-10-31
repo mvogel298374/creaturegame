@@ -240,10 +240,12 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
 #### Experience
 - **Trainer XP floors the half separately:** x = ⌊base × L / 7⌋, then a trainer battle adds ⌊x/2⌋ (pokered
   `engine/battle/experience.asm:57-88`, `BoostExp :328-340`). Base 64, L5: 45 wild, 67 trainer (not ⌊1.5 × 320 / 7⌋
-  = 68). Seam: `IBattleRules.CalculateXpAwarded`. The roguelite XP multiplier (`RunRules`) is applied on top of
-  this as a separate system (`GENERATION_SEAMS.md` → XP on faint).
-- Gen 1 divides the base exp by the participant count *before* the formula (`DivideExpDataByNumMonsGainingExp`,
-  `:294`); ours splits the finished award — an open gap (`TODO.md` §3.1).
+  = 68). Seam: `IBattleRules.Experience`, evaluated by `ExperienceFormula`. The roguelite XP multiplier
+  (`RunRules`) is applied on top of this as a separate system (`GENERATION_SEAMS.md` → XP on faint).
+- **Gen 1 splits the yields, not the award:** `DivideExpDataByNumMonsGainingExp` (`:294-326`, called at `:5`)
+  divides the base-exp yield and the five base stats by the live participant count before × L / 7, each floored
+  on its own, so the remainder is lost. Wild L10 Pidgey (55), two participants: 38 XP and Stat Exp 20/22/20/17/28
+  each; trainer-owned, 38 + 19 = 57.
 
 #### No Systems (not yet introduced)
 - No held items

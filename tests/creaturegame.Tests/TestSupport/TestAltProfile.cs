@@ -153,6 +153,10 @@ internal static class TestAltProfile
         public override int AccuracyRollBound => 100;
 
         public override bool XAccuracyBypassesAccuracyCheck => false;
+
+        // No participant split: proves the seam, not Battle, decides the division.
+        public override ExperienceRules Experience { get; } =
+            new(LevelDivisor: 7, Split: ExperienceSplit.None, Boosts: []);
     }
 
     /// <summary>
@@ -183,7 +187,7 @@ internal static class TestAltProfile
             creature.DvSpeed = SentinelDv;
         }
 
-        public void AwardStatExp(Creature victor, Creature defeated) { }
+        public void AwardStatExp(Creature victor, Creature defeated, int yieldDivisor) { }
     }
 
     /// <summary>Never evolves anything — the simplest possible difference from Gen 1's real edge logic.</summary>

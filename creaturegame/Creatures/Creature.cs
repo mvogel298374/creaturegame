@@ -167,7 +167,8 @@ public class Creature
     public void AddExperience(int amount) => Experience += amount;
 
     /// <summary>Accumulates training for defeating <paramref name="defeated"/>; call it before the win's level-up loop.</summary>
-    public void GainStatExp(Creature defeated) => StatCalculator.AwardStatExp(this, defeated);
+    public void GainStatExp(Creature defeated, int yieldDivisor) =>
+        StatCalculator.AwardStatExp(this, defeated, yieldDivisor);
 
     /// <summary>
     /// Levels up once if the accumulated XP has crossed the next threshold and the cap isn't reached.

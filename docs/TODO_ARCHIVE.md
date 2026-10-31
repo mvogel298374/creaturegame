@@ -8,6 +8,55 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §3.1 XP formula: generic integer pipeline, gen terms on the seam; Gen 1 splits yields first ✅ DONE (2026-10-31)
+
+M; from §7.6 V10, designed and source-confirmed 2026-10-31. Gen 1 divides the base-exp yield **and the five Stat Exp
+yields** by the live participant count before the formula; ours divided the finished award and never split Stat Exp
+(every participant got the foe's full base stats).
+
+**User rulings 2026-10-31:** one generic formula with the per-gen differences fed in as terms; fold the Stat Exp split
+in; the ±1 rounding change is accepted; overall XP keeps its current level as *gen-exact base × the game's `RunRules`
+multiplier*; Stat Exp gets no game multiplier (option a).
+
+**Review rulings 2026-10-31 (`requirements-review`, finding 1, user chose option i):** a fighter must earn more than a
+creature that sat out, so the bench bonus (`⌊full award × multiplier × BenchXpShare⌋` XP + the full Stat Exp yield)
+goes to every living party member, participants included, on top of their split, paid as one combined
+`ExperienceGained`. This retires the 2026-07-27 limitation where the bench out-earned a participant. No traded boost
+(no OT); the multiplier stays on the finisher's level (the 2026-09-20 limitation stands, reconfirmed). Finding 2
+(run-multiplier-on-split test) fixed; finding 3 accepted. `pr-review`: one G5 comment-budget finding, user approved the
+fix, applied (comments trimmed to one line, plus the `PayOtherParticipantsAsync` summary). `AwardStatExp` takes the
+divisor `ExperienceFormula.YieldDivisor` derives, not `s`, so one term drives both splits.
+
+1. **Intent + acceptance:** one gen-blind `ExperienceFormula` computes each payment as `x = ⌊Split(b, s) × L_foe / D⌋`,
+   then each listed boost in order (`x + ⌊x/2⌋`), and splits each Stat Exp yield the same way (`Split(base_i, s)`,
+   capped at 65535). The gen terms come from an `ExperienceRules` record (`LevelDivisor`, `ExperienceSplit {None,
+   Yields}`, ordered `ExperienceBoost {Trainer}`) on `IBattleRules.Experience`; `Battle` multiplies the result by
+   `RunRules.XpMultiplierForLevel`, unchanged. Accepted when, in a full battle against a wild level-10 Pidgey with two
+   live participants and no bench share, each gets **38 XP** and Stat Exp **+20/22/20/17/28** (HP/Atk/Def/Spc/Spd);
+   trainer-owned gives **57**; a solo win gives **78**. At `BenchXpShare` 0.5 each fighter gets **38 + 39 = 77** XP and
+   **60/67/60/52/84**, the bench member **39** and **40/45/40/35/56**. A test pins the split award under a run
+   multiplier ≠ 1, for participants and bench.
+2. **Design status:** `ExperienceRules` + `ExperienceFormula` replaced `CalculateXpAwarded` +
+   `SplitXpAmongParticipants`; `IStatCalculator.AwardStatExp(victor, defeated, yieldDivisor)`. `Battle` still decides
+   only who participated; the bench share is the `s = 1` award × run multiplier × `BenchXpShare`.
+3. **Gen-variable surface:** split stage (Gen 1–2: the yields before the formula, skipped at `s ≤ 1`), divisor `D` (7),
+   ordered boosts (Gen 1: trainer; traded never applies, as there is no OT), Stat Exp split (Gen 1–2: yes). Gen 1 =
+   (7, Yields, [Trainer]). Only the terms Gen 1 and `TestAltProfile` use are built; a later generation adds its own.
+4. **Gen 1 source of truth:** pokered `engine/battle/experience.asm` `:5` (divide call), `:294-326`
+   (`DivideExpDataByNumMonsGainingExp`, base stats through base exp), `:65-68` (× L / 7), `:82`/`:88` (traded, then
+   trainer), `:328` (`BoostExp`). Gen 2 has the same order (pokecrystal `engine/battle/core.asm`
+   `GiveExperiencePoints`, `.EvenlyDivideExpAmongParticipants`; adds Lucky Egg after trainer), the shape check.
+5. **Data vs runtime:** runtime only; the Pidgey yields in `pokemon.db` match pokered (55; 40/45/40/35/56).
+6. **Quirk tested:** dividing the yield first loses the remainder dividing the award keeps (38, not 39); Stat Exp is
+   divided per stat and floored; a `TestAltProfile` with no split pays the full 78 to each participant.
+7. **Dependencies:** none.
+
+Docs updated in the same commit: `GENERATION_SEAMS.md` (XP rows, run-tuning callout, `AwardStatExp` paragraph),
+`GEN_DIFFERENCES.md` → Experience, `STATE_MODEL.md` §2, `PRODUCT_SPEC.md` §4. Gates: format-gate, test-runner (.NET,
+tsc, Vitest), requirements-review, pr-review, docs-cleanup.
+
+---
+
 ## §6 Shared C# `Fighter` test builder ✅ DONE (2026-10-31)
 
 Split out of "Deduplicate the test helpers" on 2026-10-31 (the E2E half stays open in `TODO.md` §6). 10 private
@@ -5283,7 +5332,10 @@ Pinned by `ExperienceAndLevelingTests.Gen1XpFormula_DividesTheAwardAmongLivePart
    web-event field-projection gap). A never-deployed member's share was originally left silent until it leveled;
    fixed 2026-08-23 to also emit an attributed `OnBench: true` award — see `Innate Party XP Share`, below.
 
-> ⚠️ **Known limitation, deliberately shipped as-is (user-decided 2026-07-27).** Decisions 1 + 3 take their
+> **Superseded 2026-10-31** by *XP formula: generic integer pipeline* (top of this file): yields are now split before
+> the formula, `SplitXpAmongParticipants` is gone, and the bench limitation below is retired. Record kept as written.
+>
+> ⚠️ **Known limitation, deliberately shipped as-is (user-decided 2026-07-27; retired 2026-10-31).** Decisions 1 + 3 take their
 > figures from different bases, so a creature that **never took the field** can out-earn one that fought:
 >
 > | Difficulty | Participant (of a 100 award, 2 live participants) | Bench (never fought) |

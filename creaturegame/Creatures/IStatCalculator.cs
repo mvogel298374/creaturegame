@@ -35,6 +35,6 @@ public interface IStatCalculator
     /// <summary>Rolls a creature's individual values in place at <paramref name="quality"/>; the Gen 1 bands are in <c>Gen1StatCalculator</c>.</summary>
     void RandomiseDvs(Creature creature, DvQuality quality);
 
-    /// <summary>Adds the victor's training for defeating <paramref name="defeated"/>; realized at the next stat recompute.</summary>
-    void AwardStatExp(Creature victor, Creature defeated);
+    /// <summary>Adds the victor's training, each yield floored by <paramref name="yieldDivisor"/>; realized on recompute.</summary>
+    void AwardStatExp(Creature victor, Creature defeated, int yieldDivisor);
 }

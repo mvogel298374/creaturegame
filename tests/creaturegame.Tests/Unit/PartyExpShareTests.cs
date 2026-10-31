@@ -69,8 +69,7 @@ public class PartyExpShareTests
         return c;
     }
 
-    // The core split: the lead earns the full award (as today), each LIVING bench member earns
-    // floor(award × BenchXpShare) plus the foe's full Stat-Exp; a FAINTED bench member earns nothing.
+    // Every living member earns the bench bonus, the lead its award on top (STATE_MODEL.md §2).
     [Fact]
     public async Task LivingBenchEarnsAShareOfTheAward_FaintedEarnsNothing()
     {
@@ -84,6 +83,7 @@ public class PartyExpShareTests
         party.Add(fainted);
 
         int leadXpBefore = lead.Experience;
+        int leadExpHpBefore = lead.ExpHP;
         int aliveXpBefore = alive.Experience;
         int aliveExpHpBefore = alive.ExpHP;
 
@@ -104,18 +104,19 @@ public class PartyExpShareTests
         Assert.Equal(2, xpEvents.Count);
         Assert.Equal("Lead", xpEvents[0].CreatureName);
         Assert.False(xpEvents[0].OnBench);
-        int award = xpEvents[0].Amount;
-        Assert.True(award > 0);
+        int bonus = Bonus(0.5);
+        Assert.Equal(FullAward() + bonus, xpEvents[0].Amount);
         Assert.Equal("Alive", xpEvents[1].CreatureName);
         Assert.True(xpEvents[1].OnBench);
-        Assert.Equal((int)Math.Floor(award * 0.5), xpEvents[1].Amount);
+        Assert.Equal(bonus, xpEvents[1].Amount);
 
-        // Lead: full award. Living bench: floor(award × 0.5). Fainted bench: nothing.
-        Assert.Equal(award, lead.Experience - leadXpBefore);
-        Assert.Equal((int)Math.Floor(award * 0.5), alive.Experience - aliveXpBefore);
+        // Lead: full award + bonus. Living bench: the bonus. Fainted bench: nothing.
+        Assert.Equal(FullAward() + bonus, lead.Experience - leadXpBefore);
+        Assert.Equal(bonus, alive.Experience - aliveXpBefore);
         Assert.Equal(fainted.CalculateExperienceForLevel(55), fainted.Experience); // untouched
 
-        // Stat-Exp is shared in full to each living member (the foe's base HP here); the fainted one gets none.
+        // The foe's base HP (10): the lead gets its own yield plus the bonus yield; the fainted one gets none.
+        Assert.Equal(leadExpHpBefore + 20, lead.ExpHP);
         Assert.Equal(aliveExpHpBefore + 10, alive.ExpHP);
         Assert.Equal(0, fainted.ExpHP);
     }
@@ -267,9 +268,7 @@ public class PartyExpShareTests
         Assert.True(leadRow.Level > 5);
     }
 
-    // The bench share is taken off the active's ALREADY-curve-scaled award (RunRules.XpMultiplier*), not the raw
-    // Gen-1 base — the production config runs both dials at once (live: 1.5→4.5 curve × 0.5 share). Pin that the
-    // bench earns floor(scaledAward × share), i.e. the multiplier compounds into the share as intended.
+    // The bench bonus comes off the curve-scaled full award, not the raw Gen-1 base.
     [Fact]
     public async Task BenchShareIsTakenOffTheCurveScaledAward()
     {
@@ -299,12 +298,11 @@ public class PartyExpShareTests
 
         Assert.Equal("Lead", result.Winner);
 
-        int baseXp = Gen1BattleRules.Instance.CalculateXpAwarded(200, 30, trainerOwned: false);
+        int scaled = FullAward() * 2;
+        int bonus = (int)Math.Floor(scaled * 0.5);
         var xpEvents = result.All<ExperienceGained>();
-        int award = xpEvents.Single(e => e.CreatureName == "Lead").Amount;
-        Assert.Equal(baseXp * 2, award); // the run XP curve applied to the lead's award
-        // …and the bench share is floor(that scaled award × 0.5), not floor(baseXp × 0.5) — logged the same way.
-        Assert.Equal((int)Math.Floor(award * 0.5), bench.Experience - benchXpBefore);
+        Assert.Equal(scaled + bonus, xpEvents.Single(e => e.CreatureName == "Lead").Amount);
+        Assert.Equal(bonus, bench.Experience - benchXpBefore);
         var benchEvent = xpEvents.Single(e => e.CreatureName == "Bench");
         Assert.True(benchEvent.OnBench);
         Assert.Equal(bench.Experience - benchXpBefore, benchEvent.Amount);
@@ -334,8 +332,160 @@ public class PartyExpShareTests
     }
 
     /// <summary>The undivided Gen 1 award for beating <see cref="Foe"/> (base exp 200, level 30, wild).</summary>
-    private static int FullAward() =>
-        Gen1BattleRules.Instance.CalculateXpAwarded(200, 30, trainerOwned: false);
+    private static int FullAward() => Share(1);
+
+    /// <summary>Each live participant's Gen 1 award for beating <see cref="Foe"/> among <paramref name="s"/>.</summary>
+    private static int Share(int s) =>
+        ExperienceFormula.Award(Gen1BattleRules.Instance.Experience, 200, 30, false, s);
+
+    /// <summary>The bench bonus every living member earns for beating <see cref="Foe"/>, at multiplier 1.</summary>
+    private static int Bonus(double benchShare) => (int)Math.Floor(FullAward() * benchShare);
+
+    // pokered's own yields for Pidgey: base exp 55, base stats 40/45/40/35/56 (HP/Atk/Def/Spc/Spd).
+    private static Creature Pidgey()
+    {
+        var enemy = TestCreatures.Make("Pidgey", level: 10, hp: 20);
+        enemy.BaseHP = 40;
+        enemy.BaseAttack = 45;
+        enemy.BaseDefense = 40;
+        enemy.BaseSpecial = 35;
+        enemy.BaseSpeed = 56;
+        enemy.SpeciesBaseExperience = 55;
+        enemy.AddAttack(
+            new Attack("Poke", "")
+            {
+                Id = 2,
+                BaseDamage = 1,
+                Accuracy = 100,
+            }
+        );
+        return enemy;
+    }
+
+    private static (int Hp, int Atk, int Def, int Spc, int Spd) StatExp(Creature c) =>
+        (c.ExpHP, c.ExpAttack, c.ExpDefense, c.ExpSpecial, c.ExpSpeed);
+
+    private static async Task<(
+        Creature Lead,
+        Creature Sub,
+        Creature Rester
+    )> TwoParticipantsBeatPidgey(
+        bool trainerBattle = false,
+        IBattleRules? rules = null,
+        double benchShare = 0.0
+    )
+    {
+        var lead = Striker("Lead", "Slam");
+        var sub = Striker("Sub", "Bash");
+        var rester = Bench("Rester");
+        var party = new Party(lead);
+        party.Add(sub);
+        party.Add(rester);
+
+        var scenario = new BattleScenario()
+            .Party(party)
+            .Enemy(Pidgey())
+            .PlayerTurnPlan(1)
+            .PlayerUses("Bash")
+            .EnemyUses("Poke")
+            .TrainerBattle(trainerBattle)
+            .RunRules(new RunRules { BenchXpShare = benchShare })
+            .Seed(1);
+        if (rules is not null)
+            scenario = scenario.Rules(rules);
+
+        var result = await scenario.RunAsync();
+        Assert.Equal("Sub", result.Winner);
+        return (lead, sub, rester);
+    }
+
+    private static int XpGained(Creature c) =>
+        c.Experience - c.CalculateExperienceForLevel(c.Level);
+
+    // Yields split before the formula: 38 each, not ⌊78 / 2⌋ = 39 (GEN_DIFFERENCES.md → Experience).
+    [Fact]
+    public async Task TwoParticipants_EachEarnPokeredsSplitYield_XpAndStatExp()
+    {
+        var (lead, sub, rester) = await TwoParticipantsBeatPidgey();
+
+        Assert.Equal(38, XpGained(lead));
+        Assert.Equal(38, XpGained(sub));
+        Assert.Equal((20, 22, 20, 17, 28), StatExp(lead));
+        Assert.Equal((20, 22, 20, 17, 28), StatExp(sub));
+        Assert.Equal(0, XpGained(rester));
+        Assert.Equal((0, 0, 0, 0, 0), StatExp(rester));
+    }
+
+    // Each fighter: split + the bonus (⌊78 × 0.5⌋ = 39 and the full yield); the bench: the bonus only.
+    [Fact]
+    public async Task BenchBonus_RidesOnTopOfEachFightersSplit()
+    {
+        var (lead, sub, rester) = await TwoParticipantsBeatPidgey(benchShare: 0.5);
+
+        Assert.Equal(77, XpGained(lead));
+        Assert.Equal(77, XpGained(sub));
+        Assert.Equal((60, 67, 60, 52, 84), StatExp(lead));
+        Assert.Equal((60, 67, 60, 52, 84), StatExp(sub));
+        Assert.Equal(39, XpGained(rester));
+        Assert.Equal((40, 45, 40, 35, 56), StatExp(rester));
+    }
+
+    // The run multiplier scales each finished per-participant award: round(38 × 2) + ⌊round(78 × 2) × 0.5⌋.
+    [Fact]
+    public async Task RunMultiplier_ScalesTheSplitAwardAndTheBonus()
+    {
+        var lead = Striker("Lead", "Slam");
+        var sub = Striker("Sub", "Bash");
+        var rester = Bench("Rester");
+        var party = new Party(lead);
+        party.Add(sub);
+        party.Add(rester);
+
+        var result = await new BattleScenario()
+            .Party(party)
+            .Enemy(Pidgey())
+            .PlayerTurnPlan(1)
+            .PlayerUses("Bash")
+            .EnemyUses("Poke")
+            .RunRules(
+                new RunRules
+                {
+                    XpMultiplierEarly = 2.0,
+                    XpMultiplierLate = 2.0,
+                    BenchXpShare = 0.5,
+                }
+            )
+            .Seed(1)
+            .RunAsync();
+
+        Assert.Equal("Sub", result.Winner);
+        Assert.Equal(76 + 78, XpGained(lead));
+        Assert.Equal(76 + 78, XpGained(sub));
+        Assert.Equal(78, XpGained(rester));
+    }
+
+    // BoostExp runs on the already-split award: 38 + ⌊38 / 2⌋ = 57, not ⌊(78 + 39) / 2⌋ = 58.
+    [Fact]
+    public async Task TwoParticipants_TrainerBattle_BoostTheSplitAward()
+    {
+        var (lead, sub, _) = await TwoParticipantsBeatPidgey(trainerBattle: true);
+
+        Assert.Equal(57, XpGained(lead));
+        Assert.Equal(57, XpGained(sub));
+    }
+
+    [Fact]
+    public async Task NoSplitProfile_PaysEachParticipantTheWholeAwardAndYield()
+    {
+        var (lead, sub, _) = await TwoParticipantsBeatPidgey(
+            rules: TestAltProfile.Instance.BattleRules
+        );
+
+        Assert.Equal(78, XpGained(lead));
+        Assert.Equal(78, XpGained(sub));
+        Assert.Equal((40, 45, 40, 35, 56), StatExp(lead));
+        Assert.Equal((40, 45, 40, 35, 56), StatExp(sub));
+    }
 
     // THE HEADLINE REQUIREMENT: taking the field is what makes you a participant. A creature that fought and was
     // switched back out earns exactly what the creature that happened to land the last hit earns — participants
@@ -367,16 +517,16 @@ public class PartyExpShareTests
 
         Assert.Equal("Sub", result.Winner);
 
-        int fullAward = FullAward();
-        int share = fullAward / 2; // two live participants, evenly split (Gen 1)
+        int bonus = Bonus(0.5);
+        int share = Share(2) + bonus; // the yield split before the formula (Gen 1), plus the bench bonus
 
         Assert.Equal(share, sub.Experience - subBefore);
         Assert.Equal(share, lead.Experience - leadBefore);
         // …and the finisher is no longer paid the WHOLE award just for being the one left standing.
-        Assert.NotEqual(fullAward, sub.Experience - subBefore);
+        Assert.NotEqual(FullAward() + bonus, sub.Experience - subBefore);
 
-        // A member that never took the field is not a participant — it earns the innate bench share instead.
-        Assert.Equal((int)Math.Floor(fullAward * 0.5), rester.Experience - resterBefore);
+        // A member that never took the field is not a participant — it earns only the bench bonus.
+        Assert.Equal(bonus, rester.Experience - resterBefore);
 
         // Exactly one award event per participant (nobody is paid twice — the easy double-pay bug here, since
         // the active creature appears both at the award site and in the participant set), plus one for the
@@ -394,7 +544,7 @@ public class PartyExpShareTests
         Assert.True(xpEvents[2].OnBench);
         Assert.Equal(share, xpEvents[0].Amount);
         Assert.Equal(share, xpEvents[1].Amount);
-        Assert.Equal((int)Math.Floor(fullAward * 0.5), xpEvents[2].Amount); // bench share, off the full award
+        Assert.Equal(bonus, xpEvents[2].Amount); // the bench bonus, off the full award
     }
 
     // A switched-out participant is paid through a different path than the innate bench share, so its level-up
@@ -444,9 +594,9 @@ public class PartyExpShareTests
         Assert.Equal(rookie.Level, snapshot.Members.Single(m => m.Name == "Rookie").Level);
     }
 
-    // Accepted limitation, pinned on purpose: see STATE_MODEL.md (the innate party XP share).
+    // A fighter out-earns a creature that sat out, even at Easy's 0.75 share.
     [Fact]
-    public async Task BenchShareIsTakenOffTheFullAward_SoANonParticipantCanOutEarnAParticipant()
+    public async Task BenchBonusRidesOnTheSplit_SoAFighterOutEarnsTheBenchEvenAtEasy()
     {
         var lead = Striker("Lead", "Slam");
         var sub = Striker("Sub", "Bash");
@@ -471,16 +621,12 @@ public class PartyExpShareTests
 
         Assert.Equal("Sub", result.Winner);
 
-        int fullAward = FullAward();
         int participantShare = sub.Experience - subBefore;
         int benchShare = rester.Experience - resterBefore;
 
-        Assert.Equal(fullAward / 2, participantShare);
-        Assert.Equal((int)Math.Floor(fullAward * 0.75), benchShare);
-        Assert.True(
-            benchShare > participantShare,
-            "accepted limitation: at Easy the bench share (off the full award) exceeds a participant's split share"
-        );
+        Assert.Equal(Share(2) + Bonus(0.75), participantShare);
+        Assert.Equal(Bonus(0.75), benchShare);
+        Assert.True(participantShare > benchShare, "a fighter must out-earn the bench");
     }
 
     // A fainted participant earns nothing AND is excluded from the divisor (Gen 1). So the forced faint-switch
@@ -522,8 +668,7 @@ public class PartyExpShareTests
         Assert.Equal("Striker", result.Winner);
         Assert.False(frail.IsAlive());
 
-        int fullAward = FullAward();
-        Assert.Equal(fullAward, striker.Experience - strikerBefore); // sole LIVE participant ⇒ undivided
+        Assert.Equal(FullAward() + Bonus(0.5), striker.Experience - strikerBefore); // sole LIVE participant ⇒ undivided
         Assert.Equal(frailBefore, frail.Experience); // fainted ⇒ nothing
         Assert.Single(result.All<ExperienceGained>());
     }
@@ -567,8 +712,7 @@ public class PartyExpShareTests
         Assert.False(doomed.IsAlive(), "the finisher must have fainted on the winning turn");
         Assert.True(survivor.IsAlive());
 
-        int fullAward = FullAward();
-        Assert.Equal(fullAward, survivor.Experience - survivorBefore); // sole LIVE participant ⇒ undivided
+        Assert.Equal(FullAward() + Bonus(0.5), survivor.Experience - survivorBefore); // sole LIVE participant ⇒ undivided
         Assert.Equal(doomedBefore, doomed.Experience); // fainted ⇒ nothing, despite landing the KO
 
         // …and only the survivor's award is announced. The dead finisher must not emit an on-field
@@ -608,7 +752,7 @@ public class PartyExpShareTests
             .Seed(1)
             .RunAsync();
 
-        int share = FullAward() / 2;
+        int share = Share(2);
         Assert.Equal(share, lead.Experience - leadBefore);
         Assert.Equal(share, sub.Experience - subBefore);
         Assert.Equal(resterBefore, rester.Experience); // never took the field, share off ⇒ nothing
@@ -675,10 +819,9 @@ public class PartyExpShareTests
 
         Assert.Equal("Sub", second.Winner);
 
-        int fullAward = FullAward();
-        Assert.Equal(fullAward, sub.Experience - subBefore); // sole live participant ⇒ undivided
-        Assert.Equal((int)Math.Floor(fullAward * 0.25), lead.Experience - leadBefore); // bench, not participant
+        Assert.Equal(FullAward() + Bonus(0.25), sub.Experience - subBefore); // sole live participant ⇒ undivided
+        Assert.Equal(Bonus(0.25), lead.Experience - leadBefore); // bench, not participant
         // The two figures are deliberately distinct (0.25 share ≠ a half split), so a leak can't pass unnoticed.
-        Assert.NotEqual(fullAward / 2, lead.Experience - leadBefore);
+        Assert.NotEqual(Share(2), lead.Experience - leadBefore);
     }
 }

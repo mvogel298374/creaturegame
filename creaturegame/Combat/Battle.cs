@@ -257,47 +257,46 @@ public class Battle
                 // trade a win. Cannot double-emit: the branch below is unreachable once we break here.
                 if (!PlayerCreature.IsAlive())
                     _emitter?.Emit(new CreatureFainted(PlayerCreature.Name, PlayerCreature.Id));
-                // Gen-1 base award, then the roguelite XP curve on top (GENERATION_SEAMS.md).
-                int baseXp = _rules.CalculateXpAwarded(
-                    EnemyCreature.SpeciesBaseExperience,
-                    EnemyCreature.Level,
-                    _trainerBattle
-                );
-                double xpMult = _runRules.XpMultiplierForLevel(PlayerCreature.Level);
-                int xp =
-                    xpMult == 1.0
-                        ? baseXp
-                        : Math.Max(
-                            0,
-                            (int)Math.Round(baseXp * xpMult, MidpointRounding.AwayFromZero)
-                        );
-                // Gen 1 participation split (STATE_MODEL.md §2) — Battle only decides WHO participated; the
-                // division itself is gen-variable and lives on the seam.
+                // Gen-exact award per participant, then the roguelite XP curve (GENERATION_SEAMS.md → XP on faint).
                 var participants = LiveParticipants();
-                int participantShare = _rules.SplitXpAmongParticipants(xp, participants.Count);
+                double xpMult = _runRules.XpMultiplierForLevel(PlayerCreature.Level);
+                int participantShare = ScaleXp(GenAward(participants.Count), xpMult);
+                int fullAward = ScaleXp(GenAward(1), xpMult);
+                int statExpDivisor = ExperienceFormula.YieldDivisor(
+                    _rules.Experience,
+                    participants.Count
+                );
+                // The bench bonus reaches every living member, fighters on top of their split (STATE_MODEL.md §2).
+                bool benchBonusOn = _playerParty is not null && _runRules.BenchXpShare > 0;
+                int benchBonus = benchBonusOn
+                    ? (int)Math.Floor(fullAward * _runRules.BenchXpShare)
+                    : 0;
+                int fighterPay = participantShare + benchBonus;
 
                 bool anyLevelled = false; // gates the one PartyUpdated snapshot below
 
                 if (PlayerCreature.IsAlive())
                 {
-                    PlayerCreature.AddExperience(participantShare);
+                    PlayerCreature.AddExperience(fighterPay);
                     _emitter?.Emit(
-                        new ExperienceGained(
-                            PlayerCreature.Name,
-                            PlayerCreature.Id,
-                            participantShare
-                        )
+                        new ExperienceGained(PlayerCreature.Name, PlayerCreature.Id, fighterPay)
                     );
                     // Award Stat-Exp before the level-up loop so a level gained this battle already reflects it.
-                    PlayerCreature.GainStatExp(EnemyCreature);
+                    GainFighterStatExp(PlayerCreature, statExpDivisor, benchBonusOn);
                     // Revert a Transform/Mimic copy before learning mutates the PERMANENT MoveSet.
                     PlayerCreature.RestoreMimickedMove();
                     PlayerCreature.RestoreOriginalIdentity();
                     anyLevelled = await RunLevelUpLoopAsync(PlayerCreature, onBench: false);
                 }
 
-                anyLevelled |= await PayOtherParticipantsAsync(participants, participantShare);
-                anyLevelled |= await ShareExperienceWithBenchAsync(xp); // innate bench share — STATE_MODEL.md §2
+                anyLevelled |= await PayOtherParticipantsAsync(
+                    participants,
+                    fighterPay,
+                    statExpDivisor,
+                    benchBonusOn
+                );
+                if (benchBonusOn)
+                    anyLevelled |= await ShareExperienceWithBenchAsync(benchBonus);
 
                 // Covers all three award loops above, including the on-field creature's own level-up: its
                 // nameplate is driven by LeveledUp directly, but its party-strip row is not.
@@ -370,12 +369,12 @@ public class Battle
         return live;
     }
 
-    /// <summary>Pays every live participant other than the active creature its equal <paramref name="share"/>
-    /// (STATE_MODEL.md §2) — skips the active creature, already paid at the award site (the "paid once"
-    /// invariant). Returns whether any of them levelled.</summary>
+    /// <summary>Pays each live participant but the active creature (paid at the award site); STATE_MODEL.md §2.</summary>
     private async Task<bool> PayOtherParticipantsAsync(
         IReadOnlyList<Creature> participants,
-        int share
+        int share,
+        int statExpDivisor,
+        bool benchBonusOn
     )
     {
         bool anyLevelled = false;
@@ -387,7 +386,7 @@ public class Battle
             if (share > 0)
                 member.AddExperience(share);
             _emitter?.Emit(new ExperienceGained(member.Name, member.Id, share, OnBench: true));
-            member.GainStatExp(EnemyCreature);
+            GainFighterStatExp(member, statExpDivisor, benchBonusOn);
 
             // Its Mimic/Transform identity was already restored by RestoreOutgoing() as it left the field.
             anyLevelled |= await RunLevelUpLoopAsync(member, onBench: true);
@@ -396,15 +395,12 @@ public class Battle
         return anyLevelled;
     }
 
-    /// <summary>Innate party Exp-Share: pays each living non-participant a fraction of the FULL award
-    /// (<see cref="RunRules.BenchXpShare"/>) — STATE_MODEL.md §2, incl. the known bench-vs-participant balance
-    /// inversion. No-op without a party or with a zero share. Returns whether any bench member levelled.</summary>
-    private async Task<bool> ShareExperienceWithBenchAsync(int fullAward)
+    /// <summary>Pays the bench bonus to each living non-participant; STATE_MODEL.md §2.</summary>
+    private async Task<bool> ShareExperienceWithBenchAsync(int share)
     {
-        if (_playerParty is null || _runRules.BenchXpShare <= 0)
+        if (_playerParty is null)
             return false;
 
-        int share = (int)Math.Floor(fullAward * _runRules.BenchXpShare);
         bool anyLevelled = false;
         foreach (var member in _playerParty.Members)
         {
@@ -417,12 +413,33 @@ public class Battle
                 member.AddExperience(share);
                 _emitter?.Emit(new ExperienceGained(member.Name, member.Id, share, OnBench: true));
             }
-            member.GainStatExp(EnemyCreature);
+            member.GainStatExp(EnemyCreature, yieldDivisor: 1);
             anyLevelled |= await RunLevelUpLoopAsync(member, onBench: true);
         }
 
         return anyLevelled;
     }
+
+    private void GainFighterStatExp(Creature fighter, int statExpDivisor, bool benchBonusOn)
+    {
+        fighter.GainStatExp(EnemyCreature, statExpDivisor);
+        if (benchBonusOn)
+            fighter.GainStatExp(EnemyCreature, yieldDivisor: 1);
+    }
+
+    private int GenAward(int liveParticipants) =>
+        ExperienceFormula.Award(
+            _rules.Experience,
+            EnemyCreature.SpeciesBaseExperience,
+            EnemyCreature.Level,
+            _trainerBattle,
+            liveParticipants
+        );
+
+    private static int ScaleXp(int xp, double multiplier) =>
+        multiplier == 1.0
+            ? xp
+            : Math.Max(0, (int)Math.Round(xp * multiplier, MidpointRounding.AwayFromZero));
 
     /// <summary>Drives one creature's level-ups one at a time, learning that level's moves before stepping on —
     /// canonical Gen 1 order for a multi-level award. Returns whether at least one level was gained.</summary>

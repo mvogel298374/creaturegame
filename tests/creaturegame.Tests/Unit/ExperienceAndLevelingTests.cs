@@ -204,24 +204,51 @@ public class ExperienceAndLevelingTests
         int trainer
     )
     {
-        var rules = Gen1BattleRules.Instance;
-        Assert.Equal(wild, rules.CalculateXpAwarded(baseExp, level, trainerOwned: false));
-        Assert.Equal(trainer, rules.CalculateXpAwarded(baseExp, level, trainerOwned: true));
+        var gen1 = Gen1BattleRules.Instance.Experience;
+        Assert.Equal(wild, ExperienceFormula.Award(gen1, baseExp, level, false, 1));
+        Assert.Equal(trainer, ExperienceFormula.Award(gen1, baseExp, level, true, 1));
     }
 
-    [Fact]
-    public void Gen1XpFormula_DividesTheAwardAmongLiveParticipants()
+    // Pidgey (55) at L10, two ways: 38, not ⌊78 / 2⌋ = 39 (GEN_DIFFERENCES.md → Experience).
+    [Theory]
+    [InlineData(1, false, 78)]
+    [InlineData(2, false, 38)]
+    [InlineData(2, true, 57)]
+    [InlineData(3, false, 25)]
+    [InlineData(0, false, 78)]
+    public void Gen1XpFormula_SplitsTheYieldBeforeTheFormula(
+        int liveParticipants,
+        bool trainerOwned,
+        int expected
+    )
     {
-        // The canonical formula's `s` divisor: Gen 1 splits a win's XP evenly between the Pokémon that were
-        // sent out and have not fainted (it holds through Gen 5; Gen 6 removed it, which is why this sits on
-        // the seam rather than inline in Battle). Floor division — a remainder is dropped, not distributed.
-        var rules = Gen1BattleRules.Instance;
-        Assert.Equal(857, rules.SplitXpAmongParticipants(857, 1)); // sole participant ⇒ undivided
-        Assert.Equal(428, rules.SplitXpAmongParticipants(857, 2)); // floor(857/2) — the odd XP is lost
-        Assert.Equal(285, rules.SplitXpAmongParticipants(857, 3));
-        // Defensive: a 0/negative count can't divide by zero (the award site never produces one — the winner
-        // is always a live participant — but the seam must not be a landmine for a future caller).
-        Assert.Equal(857, rules.SplitXpAmongParticipants(857, 0));
+        var gen1 = Gen1BattleRules.Instance.Experience;
+        Assert.Equal(
+            expected,
+            ExperienceFormula.Award(gen1, 55, 10, trainerOwned, liveParticipants)
+        );
+    }
+
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(1, 1)]
+    [InlineData(2, 2)]
+    [InlineData(3, 3)]
+    public void Gen1YieldDivisor_IsTheLiveParticipantCount_OrOne(
+        int liveParticipants,
+        int expected
+    ) =>
+        Assert.Equal(
+            expected,
+            ExperienceFormula.YieldDivisor(Gen1BattleRules.Instance.Experience, liveParticipants)
+        );
+
+    [Fact]
+    public void NoSplitRules_PayEveryParticipantTheWholeAward()
+    {
+        var noSplit = new ExperienceRules(7, ExperienceSplit.None, []);
+        Assert.Equal(78, ExperienceFormula.Award(noSplit, 55, 10, false, 2));
+        Assert.Equal(1, ExperienceFormula.YieldDivisor(noSplit, 2));
     }
 
     [Fact]
