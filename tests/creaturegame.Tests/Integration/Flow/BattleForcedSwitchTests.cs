@@ -3,6 +3,7 @@ using creaturegame.Combat;
 using creaturegame.Creatures;
 using creaturegame.Tests.Integration.Gen1Attacks;
 using creaturegame.Tests.TestSupport;
+using static creaturegame.Tests.TestSupport.TestFighters;
 
 namespace creaturegame.Tests.Integration.Flow;
 
@@ -606,34 +607,6 @@ public class BattleForcedSwitchTests
                 PowerPointsMax = 99,
                 StatusEffect = StatusCondition.Poison,
                 EffectChance = 100,
-            }
-        );
-        return c;
-    }
-
-    private static Creature Fighter(string name, int hp, int attack, int defense, int speed)
-    {
-        var c = new Creature(name)
-        {
-            Level = 50,
-            GrowthRate = GrowthRate.MediumFast,
-            Type1 = DamageType.Normal,
-        };
-        c.CalculateStats();
-        c.Experience = c.CalculateExperienceForLevel(50);
-        c.Attributes.MaxHP = hp;
-        c.Attributes.HP = hp;
-        c.Attributes.Attack = attack;
-        c.Attributes.Defense = defense;
-        c.Attributes.Speed = speed;
-        c.AddAttack(
-            new Attack
-            {
-                Name = "tackle",
-                BaseDamage = 40,
-                Accuracy = 100,
-                AttackType = AttackType.Physical,
-                PowerPointsMax = 99,
             }
         );
         return c;

@@ -2,6 +2,7 @@ using creaturegame.Attacks;
 using creaturegame.Combat;
 using creaturegame.Creatures;
 using creaturegame.Tests.TestSupport;
+using static creaturegame.Tests.TestSupport.TestFighters;
 
 namespace creaturegame.Tests.Integration.Flow;
 
@@ -21,8 +22,8 @@ public class RunDirectorForcedSwitchTests
         // Biome plan: a winnable-via-switch Wild node, then an unbeatable Boss. The frail lead faints in the wild
         // encounter, the strong bench is sent in and wins (so the run continues and the win counts), then the Boss
         // downs the whole party. The finisher (bench) is the active creature the director carried forward.
-        var lead = Fighter("Lead", hp: 10, attack: 1, speed: 1);
-        var bench = Fighter("Bench", hp: 300, attack: 999, speed: 150);
+        var lead = Fighter("Lead", hp: 10, attack: 1, speed: 1, defense: 100);
+        var bench = Fighter("Bench", hp: 300, attack: 999, speed: 150, defense: 100);
         var party = new Party(lead);
         party.Add(bench);
 
@@ -38,8 +39,8 @@ public class RunDirectorForcedSwitchTests
             // Wild foe: KOs the frail lead but falls to the bench. Boss: unbeatable — ends the run.
             var enemy =
                 built == 1
-                    ? Fighter("Wild", hp: 50, attack: 999, speed: 100)
-                    : Fighter("Boss", hp: 999, attack: 999, speed: 999);
+                    ? Fighter("Wild", hp: 50, attack: 999, speed: 100, defense: 100)
+                    : Fighter("Boss", hp: 999, attack: 999, speed: 999, defense: 100);
             enemy.SpeciesBaseExperience = 50;
             return Task.FromResult(enemy);
         };
@@ -70,8 +71,8 @@ public class RunDirectorForcedSwitchTests
     {
         // Both members are frail and the sole Wild foe is unbeatable: the lead faints, the bench is sent in and
         // also faints — with no one left, the run ends (a loss, no win recorded), after the switch was offered.
-        var lead = Fighter("Lead", hp: 10, attack: 1, speed: 1);
-        var bench = Fighter("Bench", hp: 10, attack: 1, speed: 1);
+        var lead = Fighter("Lead", hp: 10, attack: 1, speed: 1, defense: 100);
+        var bench = Fighter("Bench", hp: 10, attack: 1, speed: 1, defense: 100);
         var party = new Party(lead);
         party.Add(bench);
 
@@ -82,7 +83,7 @@ public class RunDirectorForcedSwitchTests
             _
         ) =>
         {
-            var enemy = Fighter("Foe", hp: 999, attack: 999, speed: 999);
+            var enemy = Fighter("Foe", hp: 999, attack: 999, speed: 999, defense: 100);
             enemy.SpeciesBaseExperience = 50;
             return Task.FromResult(enemy);
         };
@@ -128,7 +129,7 @@ public class RunDirectorForcedSwitchTests
             var enemy =
                 built == 1
                     ? Poisoner("Wild", maxHp: 160, hp: 5, speed: 1)
-                    : Fighter("Boss", hp: 999, attack: 999, speed: 999);
+                    : Fighter("Boss", hp: 999, attack: 999, speed: 999, defense: 100);
             enemy.SpeciesBaseExperience = 50;
             return Task.FromResult(enemy);
         };
@@ -233,7 +234,7 @@ public class RunDirectorForcedSwitchTests
             var enemy =
                 built == 1
                     ? Poisoner("Wild", maxHp: 160, hp: 5, speed: 1)
-                    : Fighter("Boss", hp: 999, attack: 999, speed: 999);
+                    : Fighter("Boss", hp: 999, attack: 999, speed: 999, defense: 100);
             enemy.SpeciesBaseExperience = 50;
             return Task.FromResult(enemy);
         };
@@ -374,34 +375,6 @@ public class RunDirectorForcedSwitchTests
                 PowerPointsMax = 99,
                 StatusEffect = StatusCondition.Poison,
                 EffectChance = 100,
-            }
-        );
-        return c;
-    }
-
-    private static Creature Fighter(string name, int hp, int attack, int speed)
-    {
-        var c = new Creature(name)
-        {
-            Level = 50,
-            GrowthRate = GrowthRate.MediumFast,
-            Type1 = DamageType.Normal,
-        };
-        c.CalculateStats();
-        c.Experience = c.CalculateExperienceForLevel(50);
-        c.Attributes.MaxHP = hp;
-        c.Attributes.HP = hp;
-        c.Attributes.Attack = attack;
-        c.Attributes.Defense = 100;
-        c.Attributes.Speed = speed;
-        c.AddAttack(
-            new Attack
-            {
-                Name = "tackle",
-                BaseDamage = 40,
-                Accuracy = 100,
-                AttackType = AttackType.Physical,
-                PowerPointsMax = 99,
             }
         );
         return c;

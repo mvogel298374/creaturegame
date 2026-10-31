@@ -2,6 +2,7 @@ using creaturegame.Attacks;
 using creaturegame.Combat;
 using creaturegame.Creatures;
 using creaturegame.Tests.TestSupport;
+using static creaturegame.Tests.TestSupport.TestFighters;
 
 namespace creaturegame.Tests.Integration.Flow;
 
@@ -461,33 +462,6 @@ public class RunDirectorTests
     {
         public Task<PokemonAttack> ChooseMoveAsync(TurnContext context) =>
             throw new OperationCanceledException("Battle input cancelled (client disconnected).");
-    }
-
-    private static Creature Fighter(string name, int hp, int attack, int speed, int level)
-    {
-        var c = new Creature(name)
-        {
-            Level = level,
-            GrowthRate = GrowthRate.MediumFast,
-            Type1 = DamageType.Normal,
-        };
-        c.CalculateStats();
-        c.Experience = c.CalculateExperienceForLevel(level);
-        c.Attributes.MaxHP = hp;
-        c.Attributes.HP = hp;
-        c.Attributes.Attack = attack;
-        c.Attributes.Speed = speed;
-        c.AddAttack(
-            new Attack
-            {
-                Name = "tackle",
-                BaseDamage = 40,
-                Accuracy = 100,
-                AttackType = AttackType.Physical,
-                PowerPointsMax = 99,
-            }
-        );
-        return c;
     }
 
     // A Normal-type creature whose only move is a 0-damage poison move (Poison status on a Normal-type lands,

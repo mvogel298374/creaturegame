@@ -3,6 +3,7 @@ using creaturegame.Combat;
 using creaturegame.Creatures;
 using creaturegame.Items;
 using creaturegame.Tests.TestSupport;
+using static creaturegame.Tests.TestSupport.TestFighters;
 
 namespace creaturegame.Tests.Integration.Flow;
 
@@ -22,11 +23,11 @@ public class BattleVoluntarySwitchTests
     {
         // THE core retarget test. The player switches on turn 1; the enemy's move was built targeting the creature
         // that LEFT, but the switch resolves first, so Battle must repoint the enemy's move onto the incoming one.
-        var lead = Fighter("Lead", hp: 300, attack: 40, defense: 100, speed: 200);
-        var bench = Fighter("Bench", hp: 300, attack: 999, defense: 100, speed: 150);
+        var lead = Fighter("Lead", hp: 300, attack: 40, defense: 100, speed: 200, tackleId: 33);
+        var bench = Fighter("Bench", hp: 300, attack: 999, defense: 100, speed: 150, tackleId: 33);
         var party = new Party(lead);
         party.Add(bench);
-        var enemy = Fighter("Foe", hp: 500, attack: 60, defense: 100, speed: 100); // slower than the lead
+        var enemy = Fighter("Foe", hp: 500, attack: 60, defense: 100, speed: 100, tackleId: 33); // slower than the lead
 
         var input = new ScriptedInput("tackle").TurnPlan(1); // turn 1: SWITCH to the bench (index 1)
         var recorder = new RecordingEmitter();
@@ -48,11 +49,11 @@ public class BattleVoluntarySwitchTests
     {
         // A +1-priority enemy move from a FASTER enemy still can't pre-empt the switch: SwitchAction sits above
         // any move priority (7 > 1), so the incoming creature — not the one that left — takes the Quick Attack.
-        var lead = Fighter("Lead", hp: 300, attack: 40, defense: 100, speed: 50); // slower than the enemy
-        var bench = Fighter("Bench", hp: 300, attack: 999, defense: 100, speed: 150);
+        var lead = Fighter("Lead", hp: 300, attack: 40, defense: 100, speed: 50, tackleId: 33); // slower than the enemy
+        var bench = Fighter("Bench", hp: 300, attack: 999, defense: 100, speed: 150, tackleId: 33);
         var party = new Party(lead);
         party.Add(bench);
-        var enemy = Fighter("Foe", hp: 500, attack: 60, defense: 100, speed: 100);
+        var enemy = Fighter("Foe", hp: 500, attack: 60, defense: 100, speed: 100, tackleId: 33);
         enemy.AddAttack(QuickAttack());
 
         var input = new ScriptedInput("tackle").TurnPlan(1);
@@ -79,11 +80,11 @@ public class BattleVoluntarySwitchTests
         // The lead is tanky (survives the bind chip) but hits softly, so it does NOT one-shot the enemy on turn 1
         // — the enemy must survive to land its bind. The enemy is frail enough that the lead's intermittent free
         // turns (between binds) still whittle it down, so the battle terminates.
-        var lead = Fighter("Lead", hp: 999, attack: 60, defense: 999, speed: 200);
-        var bench = Fighter("Bench", hp: 300, attack: 999, defense: 100, speed: 150);
+        var lead = Fighter("Lead", hp: 999, attack: 60, defense: 999, speed: 200, tackleId: 33);
+        var bench = Fighter("Bench", hp: 300, attack: 999, defense: 100, speed: 150, tackleId: 33);
         var party = new Party(lead);
         party.Add(bench);
-        var enemy = Fighter("Foe", hp: 40, attack: 1, defense: 100, speed: 100);
+        var enemy = Fighter("Foe", hp: 40, attack: 1, defense: 100, speed: 100, tackleId: 33);
         enemy.AddAttack(Wrap());
 
         // Turn 1: FIGHT (the enemy binds the lead). Turn 2: attempt to SWITCH — refused while trapped.
@@ -115,12 +116,12 @@ public class BattleVoluntarySwitchTests
         // Gen 1: switching out keeps major status on the creature but wipes volatiles. The lead raises its Attack
         // (a volatile) and is poisoned (major) on turn 1, switches out on turn 2, and back in on turn 3 — it must
         // return poisoned with its Attack stage reset to 0.
-        var lead = Fighter("Lead", hp: 999, attack: 40, defense: 999, speed: 200);
+        var lead = Fighter("Lead", hp: 999, attack: 40, defense: 999, speed: 200, tackleId: 33);
         lead.AddAttack(SwordsDance());
-        var bench = Fighter("Bench", hp: 999, attack: 999, defense: 999, speed: 150);
+        var bench = Fighter("Bench", hp: 999, attack: 999, defense: 999, speed: 150, tackleId: 33);
         var party = new Party(lead);
         party.Add(bench);
-        var enemy = Fighter("Foe", hp: 60, attack: 1, defense: 999, speed: 100);
+        var enemy = Fighter("Foe", hp: 60, attack: 1, defense: 999, speed: 100, tackleId: 33);
         enemy.AddAttack(PoisonPowder());
 
         // Turn 1: FIGHT (Swords Dance → Attack +2, and the enemy poisons the lead). Turn 2: SWITCH to bench.
@@ -161,8 +162,8 @@ public class BattleVoluntarySwitchTests
     {
         // Regression: curing a benched member only reset Battle.Status, leaving its CarriedStatus set — and the
         // switch-in re-applies CarriedStatus, so the "cured" member walked back in poisoned.
-        var lead = Fighter("Lead", hp: 300, attack: 40, defense: 100, speed: 200);
-        var bench = Fighter("Bench", hp: 300, attack: 999, defense: 100, speed: 150);
+        var lead = Fighter("Lead", hp: 300, attack: 40, defense: 100, speed: 200, tackleId: 33);
+        var bench = Fighter("Bench", hp: 300, attack: 999, defense: 100, speed: 150, tackleId: 33);
         bench.Battle.Status = StatusCondition.Poison;
         bench.CarriedStatus = new CarriedStatus(StatusCondition.Poison, 0);
         var party = new Party(lead);
@@ -187,7 +188,7 @@ public class BattleVoluntarySwitchTests
         Assert.True(effect.CanApply(ctx));
         effect.Apply(ctx);
 
-        var enemy = Fighter("Foe", hp: 500, attack: 40, defense: 100, speed: 100);
+        var enemy = Fighter("Foe", hp: 500, attack: 40, defense: 100, speed: 100, tackleId: 33);
         var input = new ScriptedInput("tackle").TurnPlan(1); // turn 1: SWITCH to the cured bench member
         var recorder = new RecordingEmitter();
         var battle = NewBattle(lead, enemy, input, "tackle", party, recorder);
@@ -206,11 +207,11 @@ public class BattleVoluntarySwitchTests
         // Poison (a known stalling counter-play). The lead enters Bad Poison, switches out (turn 1) and back in
         // (turn 2) — it must return as regular Poison, not Bad Poison. (Adjudicated with the user 2026-07-24: the
         // code was right; GEN_DIFFERENCES.md's old "switching does not reset the counter" line was the error.)
-        var lead = Fighter("Lead", hp: 999, attack: 999, defense: 999, speed: 200);
-        var bench = Fighter("Bench", hp: 999, attack: 100, defense: 999, speed: 150);
+        var lead = Fighter("Lead", hp: 999, attack: 999, defense: 999, speed: 200, tackleId: 33);
+        var bench = Fighter("Bench", hp: 999, attack: 100, defense: 999, speed: 150, tackleId: 33);
         var party = new Party(lead);
         party.Add(bench);
-        var enemy = Fighter("Foe", hp: 60, attack: 1, defense: 100, speed: 100);
+        var enemy = Fighter("Foe", hp: 60, attack: 1, defense: 100, speed: 100, tackleId: 33);
 
         var input = new ScriptedInput("tackle").TurnPlan(1, 0); // switch out, then back in
         var recorder = new RecordingEmitter();
@@ -242,12 +243,12 @@ public class BattleVoluntarySwitchTests
         // Adjudicated with the user 2026-07-24: Rage is treated as a true lock-in (like Thrash) — its whole-turn
         // menu is bypassed, so SWITCH is unreachable while raging. Guards that the Struggle-menu fix didn't open
         // the menu for a raging creature. The lead locks into Rage on turn 1; the turn-2 SWITCH is never consulted.
-        var lead = Fighter("Lead", hp: 300, attack: 200, defense: 100, speed: 200);
+        var lead = Fighter("Lead", hp: 300, attack: 200, defense: 100, speed: 200, tackleId: 33);
         lead.AddAttack(Rage());
-        var bench = Fighter("Bench", hp: 300, attack: 999, defense: 100, speed: 150);
+        var bench = Fighter("Bench", hp: 300, attack: 999, defense: 100, speed: 150, tackleId: 33);
         var party = new Party(lead);
         party.Add(bench);
-        var enemy = Fighter("Foe", hp: 60, attack: 1, defense: 100, speed: 100);
+        var enemy = Fighter("Foe", hp: 60, attack: 1, defense: 100, speed: 100, tackleId: 33);
 
         var input = new ScriptedInput("rage").TurnPlan(null, 1); // turn 1 FIGHT Rage; turn 2 SWITCH (ignored)
         var recorder = new RecordingEmitter();
@@ -276,12 +277,12 @@ public class BattleVoluntarySwitchTests
         // the recharge is enforced inside AttackAction (only spent if the creature stays in and FIGHTs), not the
         // turn menu, so CanSwitchTo does not gate on IsRecharging. The lead fires Hyper Beam (recharge set) then
         // switches out on the recharge turn, pre-empting the wasted turn (no Recharging event ever fires).
-        var lead = Fighter("Lead", hp: 300, attack: 40, defense: 999, speed: 200);
+        var lead = Fighter("Lead", hp: 300, attack: 40, defense: 999, speed: 200, tackleId: 33);
         lead.AddAttack(HyperBeam());
-        var bench = Fighter("Bench", hp: 999, attack: 999, defense: 999, speed: 150);
+        var bench = Fighter("Bench", hp: 999, attack: 999, defense: 999, speed: 150, tackleId: 33);
         var party = new Party(lead);
         party.Add(bench);
-        var enemy = Fighter("Foe", hp: 300, attack: 40, defense: 100, speed: 100);
+        var enemy = Fighter("Foe", hp: 300, attack: 40, defense: 100, speed: 100, tackleId: 33);
 
         // turn 1 Hyper Beam; turn 2 SWITCH mid-recharge; the bench then FIGHTs with its own move ("tackle").
         var input = new ScriptedInput("hyperbeam", "tackle").TurnPlan(null, 1);
@@ -313,13 +314,13 @@ public class BattleVoluntarySwitchTests
     {
         // The Struggle-menu fix: Gen 1 keeps the menu open out of PP, so BAG/SWITCH stay reachable and only
         // *choosing FIGHT* Struggles. With every move at 0 PP the lead still switches instead of being force-Struggled.
-        var lead = Fighter("Lead", hp: 300, attack: 40, defense: 100, speed: 200);
+        var lead = Fighter("Lead", hp: 300, attack: 40, defense: 100, speed: 200, tackleId: 33);
         foreach (var m in lead.MoveSet)
             m.PowerPointsCurrent = 0;
-        var bench = Fighter("Bench", hp: 300, attack: 999, defense: 100, speed: 150);
+        var bench = Fighter("Bench", hp: 300, attack: 999, defense: 100, speed: 150, tackleId: 33);
         var party = new Party(lead);
         party.Add(bench);
-        var enemy = Fighter("Foe", hp: 500, attack: 40, defense: 100, speed: 100);
+        var enemy = Fighter("Foe", hp: 500, attack: 40, defense: 100, speed: 100, tackleId: 33);
 
         var input = new ScriptedInput("tackle").TurnPlan(1); // SWITCH despite 0 PP everywhere
         var recorder = new RecordingEmitter();
@@ -337,10 +338,10 @@ public class BattleVoluntarySwitchTests
     {
         // The other half of the Struggle-menu fix: offering the menu out of PP must not have broken Struggle
         // itself. With no switch/bag chosen (a plain FIGHT default), a moveless creature still Struggles.
-        var player = Fighter("Player", hp: 300, attack: 40, defense: 100, speed: 200);
+        var player = Fighter("Player", hp: 300, attack: 40, defense: 100, speed: 200, tackleId: 33);
         foreach (var m in player.MoveSet)
             m.PowerPointsCurrent = 0;
-        var enemy = Fighter("Foe", hp: 40, attack: 1, defense: 100, speed: 100);
+        var enemy = Fighter("Foe", hp: 40, attack: 1, defense: 100, speed: 100, tackleId: 33);
 
         var recorder = new RecordingEmitter();
         var battle = new Battle(
@@ -370,11 +371,11 @@ public class BattleVoluntarySwitchTests
     {
         // A stale / malformed pick (the active slot, or out of range in either direction) must not strand the
         // turn: it falls back to FIGHT rather than switching. The lead one-shots the frail enemy instead.
-        var lead = Fighter("Lead", hp: 300, attack: 999, defense: 100, speed: 200);
-        var bench = Fighter("Bench", hp: 300, attack: 100, defense: 100, speed: 150);
+        var lead = Fighter("Lead", hp: 300, attack: 999, defense: 100, speed: 200, tackleId: 33);
+        var bench = Fighter("Bench", hp: 300, attack: 100, defense: 100, speed: 150, tackleId: 33);
         var party = new Party(lead);
         party.Add(bench);
-        var enemy = Fighter("Foe", hp: 60, attack: 1, defense: 100, speed: 100);
+        var enemy = Fighter("Foe", hp: 60, attack: 1, defense: 100, speed: 100, tackleId: 33);
 
         var input = new ScriptedInput("tackle").TurnPlan(pick);
         var recorder = new RecordingEmitter();
@@ -392,12 +393,19 @@ public class BattleVoluntarySwitchTests
     {
         // The in-range-but-fainted branch of the illegal-pick guard: picking a downed member is refused (you can't
         // send in a fainted creature voluntarily), so the turn falls back to FIGHT.
-        var lead = Fighter("Lead", hp: 300, attack: 999, defense: 100, speed: 200);
-        var downed = Fighter("Downed", hp: 300, attack: 100, defense: 100, speed: 150);
+        var lead = Fighter("Lead", hp: 300, attack: 999, defense: 100, speed: 200, tackleId: 33);
+        var downed = Fighter(
+            "Downed",
+            hp: 300,
+            attack: 100,
+            defense: 100,
+            speed: 150,
+            tackleId: 33
+        );
         downed.Attributes.HP = 0;
         var party = new Party(lead);
         party.Add(downed);
-        var enemy = Fighter("Foe", hp: 60, attack: 1, defense: 100, speed: 100);
+        var enemy = Fighter("Foe", hp: 60, attack: 1, defense: 100, speed: 100, tackleId: 33);
 
         var input = new ScriptedInput("tackle").TurnPlan(1); // slot 1 is fainted
         var recorder = new RecordingEmitter();
@@ -415,12 +423,12 @@ public class BattleVoluntarySwitchTests
         // A true lock-in (Thrash/rampage) owns the whole turn — no menu at all — so even a scripted SWITCH on the
         // locked turn is never consulted. This guards that the Struggle-menu fix did NOT accidentally open the menu
         // for a locked-in creature (which stays force-repeating, unlike the out-of-PP case).
-        var lead = Fighter("Lead", hp: 300, attack: 300, defense: 100, speed: 200);
+        var lead = Fighter("Lead", hp: 300, attack: 300, defense: 100, speed: 200, tackleId: 33);
         lead.AddAttack(Thrash());
-        var bench = Fighter("Bench", hp: 300, attack: 999, defense: 100, speed: 150);
+        var bench = Fighter("Bench", hp: 300, attack: 999, defense: 100, speed: 150, tackleId: 33);
         var party = new Party(lead);
         party.Add(bench);
-        var enemy = Fighter("Foe", hp: 90, attack: 1, defense: 100, speed: 100);
+        var enemy = Fighter("Foe", hp: 90, attack: 1, defense: 100, speed: 100, tackleId: 33);
 
         // Turn 1: FIGHT Thrash (locks in). Turn 2: a SWITCH is scripted but must be ignored (still locked).
         var input = new ScriptedInput("thrash").TurnPlan(null, 1);
@@ -459,11 +467,11 @@ public class BattleVoluntarySwitchTests
         // is the whole point of switching as a defensive option). SwitchAction is deliberately NOT subject to the
         // CanAct status gate, so an afflicted-but-untrapped creature still switches. This pins that positively, so
         // a later "reuse CanAct on SwitchAction for consistency" refactor can't silently reintroduce the bug.
-        var lead = Fighter("Lead", hp: 300, attack: 40, defense: 100, speed: 200);
-        var bench = Fighter("Bench", hp: 300, attack: 999, defense: 100, speed: 150);
+        var lead = Fighter("Lead", hp: 300, attack: 40, defense: 100, speed: 200, tackleId: 33);
+        var bench = Fighter("Bench", hp: 300, attack: 999, defense: 100, speed: 150, tackleId: 33);
         var party = new Party(lead);
         party.Add(bench);
-        var enemy = Fighter("Foe", hp: 500, attack: 40, defense: 100, speed: 100);
+        var enemy = Fighter("Foe", hp: 500, attack: 40, defense: 100, speed: 100, tackleId: 33);
 
         var input = new ScriptedInput("tackle").TurnPlan(1);
         var recorder = new RecordingEmitter();
@@ -492,13 +500,20 @@ public class BattleVoluntarySwitchTests
         // The incoming creature can be KO'd by the same turn's (retargeted) enemy hit. There is NO recursive
         // switch prompt inside the voluntary switch — the faint is handled by the FORCED path at end of turn, so
         // the only SwitchInOffered is that forced one.
-        var lead = Fighter("Lead", hp: 300, attack: 40, defense: 100, speed: 200);
-        var frail = Fighter("Frail", hp: 10, attack: 40, defense: 1, speed: 150); // dies to the enemy hit
-        var anchor = Fighter("Anchor", hp: 400, attack: 999, defense: 200, speed: 150);
+        var lead = Fighter("Lead", hp: 300, attack: 40, defense: 100, speed: 200, tackleId: 33);
+        var frail = Fighter("Frail", hp: 10, attack: 40, defense: 1, speed: 150, tackleId: 33); // dies to the enemy hit
+        var anchor = Fighter(
+            "Anchor",
+            hp: 400,
+            attack: 999,
+            defense: 200,
+            speed: 150,
+            tackleId: 33
+        );
         var party = new Party(lead);
         party.Add(frail);
         party.Add(anchor);
-        var enemy = Fighter("Foe", hp: 500, attack: 999, defense: 100, speed: 100);
+        var enemy = Fighter("Foe", hp: 500, attack: 999, defense: 100, speed: 100, tackleId: 33);
 
         // Voluntary switch (turn 1) sends in Frail; the forced switch after its faint sends in Anchor (index 2).
         var input = new ScriptedInput("tackle").TurnPlan(1).PicksSwitchIn(2);
@@ -519,13 +534,13 @@ public class BattleVoluntarySwitchTests
     {
         // The SWITCH button's enabled state rides TurnStarted.CanSwitch. Gen 1 lets you switch with no usable move,
         // so an out-of-PP lead with a live bench still advertises CanSwitch true (the button stays enabled at 0 PP).
-        var lead = Fighter("Lead", hp: 300, attack: 40, defense: 100, speed: 200);
+        var lead = Fighter("Lead", hp: 300, attack: 40, defense: 100, speed: 200, tackleId: 33);
         foreach (var m in lead.MoveSet)
             m.PowerPointsCurrent = 0; // out of PP
-        var bench = Fighter("Bench", hp: 300, attack: 999, defense: 100, speed: 150);
+        var bench = Fighter("Bench", hp: 300, attack: 999, defense: 100, speed: 150, tackleId: 33);
         var party = new Party(lead);
         party.Add(bench);
-        var enemy = Fighter("Foe", hp: 20, attack: 1, defense: 100, speed: 100);
+        var enemy = Fighter("Foe", hp: 20, attack: 1, defense: 100, speed: 100, tackleId: 33);
 
         var input = new ScriptedInput("tackle").TurnPlan(1); // switch turn 1 (no PP needed to switch)
         var recorder = new RecordingEmitter();
@@ -540,9 +555,9 @@ public class BattleVoluntarySwitchTests
     public async Task CanSwitch_IsFalse_ForALoneStarter_WithNoBench()
     {
         // No benched member ⇒ nothing to switch to ⇒ the SWITCH button greys out (CanSwitch false).
-        var lead = Fighter("Lead", hp: 300, attack: 999, defense: 100, speed: 200);
+        var lead = Fighter("Lead", hp: 300, attack: 999, defense: 100, speed: 200, tackleId: 33);
         var party = new Party(lead); // lone starter
-        var enemy = Fighter("Foe", hp: 20, attack: 1, defense: 100, speed: 100);
+        var enemy = Fighter("Foe", hp: 20, attack: 1, defense: 100, speed: 100, tackleId: 33);
 
         var recorder = new RecordingEmitter();
         var battle = NewBattle(lead, enemy, new ScriptedInput("tackle"), "tackle", party, recorder);
@@ -557,11 +572,11 @@ public class BattleVoluntarySwitchTests
     {
         // A trapped lead can't switch, so the signal reflects it: turn 1 (pre-bind) advertises CanSwitch true, but
         // turn 2 — after the enemy's bind lands — advertises false, so the client greys SWITCH while trapped.
-        var lead = Fighter("Lead", hp: 999, attack: 60, defense: 999, speed: 200);
-        var bench = Fighter("Bench", hp: 300, attack: 999, defense: 100, speed: 150);
+        var lead = Fighter("Lead", hp: 999, attack: 60, defense: 999, speed: 200, tackleId: 33);
+        var bench = Fighter("Bench", hp: 300, attack: 999, defense: 100, speed: 150, tackleId: 33);
         var party = new Party(lead);
         party.Add(bench);
-        var enemy = Fighter("Foe", hp: 40, attack: 1, defense: 100, speed: 100);
+        var enemy = Fighter("Foe", hp: 40, attack: 1, defense: 100, speed: 100, tackleId: 33);
         enemy.AddAttack(Wrap());
 
         var input = new ScriptedInput("tackle"); // just fight; the enemy binds on turn 1
@@ -695,33 +710,4 @@ public class BattleVoluntarySwitchTests
             PowerPointsMax = 99,
             Effect = MoveEffect.Recharge,
         };
-
-    private static Creature Fighter(string name, int hp, int attack, int defense, int speed)
-    {
-        var c = new Creature(name)
-        {
-            Level = 50,
-            GrowthRate = GrowthRate.MediumFast,
-            Type1 = DamageType.Normal,
-        };
-        c.CalculateStats();
-        c.Experience = c.CalculateExperienceForLevel(50);
-        c.Attributes.MaxHP = hp;
-        c.Attributes.HP = hp;
-        c.Attributes.Attack = attack;
-        c.Attributes.Defense = defense;
-        c.Attributes.Speed = speed;
-        c.AddAttack(
-            new Attack
-            {
-                Id = 33,
-                Name = "tackle",
-                BaseDamage = 40,
-                Accuracy = 100,
-                AttackType = AttackType.Physical,
-                PowerPointsMax = 99,
-            }
-        );
-        return c;
-    }
 }

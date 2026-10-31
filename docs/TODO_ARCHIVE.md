@@ -8,6 +8,23 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §6 Shared C# `Fighter` test builder ✅ DONE (2026-10-31)
+
+Split out of "Deduplicate the test helpers" on 2026-10-31 (the E2E half stays open in `TODO.md` §6). 10 private
+`Fighter(...)` helpers in `tests/creaturegame.Tests/Integration/Flow` built the same creature (Normal, MediumFast,
+one Tackle: 40 power, 100 accuracy, physical, 99 PP) in three shapes: `(name, hp, attack, defense, speed)` at level
+50 in `BattleForcedSwitchTests` and `BattleVoluntarySwitchTests` (only the Voluntary one set Tackle `Id = 33`);
+`(name, hp, attack, speed, level)` in seven `RunDirector*Tests`, Defense left at the calculated value;
+`(name, hp, attack, speed)` at level 50 in `RunDirectorForcedSwitchTests`, Defense hard-coded to 100.
+
+- **Done:** one `TestSupport/TestFighters.cs` builder `Fighter(name, hp, attack, speed, level = 50, defense = null,
+  tackleId = null)` replaced all 10; call sites use `using static ...TestFighters`. Call sites keep their exact
+  values (Voluntary passes `tackleId: 33`, ForcedSwitch passes `defense: 100`).
+- **Acceptance met:** private helpers gone; fast suites pass with the same tests passing as before.
+- **DoR:** ✅ Ready at start (all seven items answered); test-only, G3 not applicable.
+
+---
+
 ## §7.4 The INFO tab's later-generation rows are deleted; the overview's orphaned `generation` goes with them ✅ DONE (2026-10-31)
 
 S; found 2026-10-29 during the §7.4 later-gen comment pass. User rulings 2026-10-31: delete the rows; fold in the orphaned

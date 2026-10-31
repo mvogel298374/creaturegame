@@ -42,13 +42,12 @@
 ## 1. Now / next — ranked by cost-to-benefit and unblocking value
 
 Ranked within each tier; the tiers run from the shortest path to a greenlight to the longest. ✅ Ready · ⚠️ every
-gap has drafted text, awaiting your confirmation · ✗ gaps remain. Nothing is ✅ today.
+gap has drafted text, awaiting your confirmation · ✗ gaps remain.
 
 **A. Confirm the drafted lines, then Ready**
 
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
-| **Shared C# `Fighter` test builder** (§6, the C# half of "Deduplicate the test helpers") | S | ⚠️ split into its own entry | Test-only, fast suites only; the E2E half stays in tier E. |
 | **Gen 1 XP participant split order** (§3.1) | S | ⚠️ 1, 2, 3, 5, 6, 7 | Touches `Battle`, so both review gates. |
 | **A failed OHKO says "unaffected"** (§3.2) | S | ⚠️ 1, 2, 3, 5, 6, 7 | Wire change (C# + TS); `AttackAction`'s OHKO branch, so `pr-review`. |
 | **Item descriptions describe the Gen 1 effect** (§3.2) | S–M | ⚠️ 1, 3, 4, 5, 6, 7 | Importer override plus a full re-import. |
@@ -689,14 +688,12 @@ surface: `/help` and the explainer describe the active generation, so they are p
   surface: none. Test: the user runs `.\e2e.ps1 -Spec encounter-map` and `.\e2e.ps1 -Spec cadence` (E2E is
   user-only). **Gap:** the user's go-ahead on the E2E runs; cadence needs a seed that reaches a hit on turn one.
   **DoR (V16):** ✗ not Ready — confirmed as above (your E2E go-ahead and the cadence seed).
-- [ ] *(small)* **Deduplicate the test helpers** (M, from §7.6 V14, ✗ not Ready). 10 `Fighter(...)` helpers with
-  3 signatures in `Integration/Flow` and the seeded-start preamble in three E2E files (`helpers.startBattle`,
-  `encounter-map.spec.ts` `gotoOpeningRouteChoice`, `reward-drop.spec.ts` `startSeededRun`) (read-confirmed).
-  *Drafted mini-DoR:* acceptance — one `Fighter` builder in `TestSupport/` covering the three signatures, one
-  seeded-start helper in `e2e/helpers.ts`; no behaviour change. Gen-variable surface: none. Test: the fast suites,
-  plus the user's run of the three affected specs. **Gap:** the user's go-ahead on the E2E runs.
-  **DoR (V16):** ✗ not Ready — confirmed as above. The C# `Fighter` half needs no E2E and could split off as its
-  own ✅ item.
+- [ ] *(small)* **Deduplicate the test helpers — E2E half** (M, from §7.6 V14, ✗ not Ready). The seeded-start
+  preamble in three E2E files (`helpers.startBattle`, `encounter-map.spec.ts` `gotoOpeningRouteChoice`,
+  `reward-drop.spec.ts` `startSeededRun`) (read-confirmed). The C# `Fighter` half shipped (see the archive).
+  *Drafted mini-DoR:* acceptance — one seeded-start helper in `e2e/helpers.ts`; no behaviour change. Gen-variable
+  surface: none. Test: the user's run of the three affected specs. **Gap:** the user's go-ahead on the E2E runs.
+  **DoR (V16):** ✗ not Ready — confirmed as above.
 
 ---
 
