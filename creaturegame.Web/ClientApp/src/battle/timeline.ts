@@ -796,7 +796,14 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
     case 'MoveHadNoEffect': {
       // Type immunity (e.g. Ghost vs a Normal/Fighting move, Poison vs poison-powder).
       const targetName = payload.targetName as string;
-      return { steps: [w(650), d(log(`It doesn't affect ${targetName}...`)), w(800)] };
+      return { steps: [w(650), d(log(`It doesn't affect ${targetName}!`)), w(800)] };
+    }
+
+    case 'MoveUnaffected': {
+      // Gen 1 prints two different texts: _UnaffectedText (OHKO) and _IsUnaffectedText (Roar vs a trainer).
+      const targetName = payload.targetName as string;
+      const line = payload.cause === 'OneHitKo' ? `${targetName}'s unaffected!` : `${targetName} is unaffected!`;
+      return { steps: [w(650), d(log(line)), w(800)] };
     }
 
     case 'AlreadyAsleep': {
@@ -835,7 +842,7 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
 
       // Immunity: no hit, no damage number — just the Gen 1 line (red).
       if (eff === 0) {
-        return { steps: [w(650), d(log(`It doesn't affect ${targetName}...`, 'immune')), w(800)] };
+        return { steps: [w(650), d(log(`It doesn't affect ${targetName}!`, 'immune')), w(800)] };
       }
 
       // Dev Mode: the engine's non-crit low–high for this hit rides on the event (withheld by the server unless

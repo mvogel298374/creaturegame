@@ -43,7 +43,8 @@ public class OneHitKoContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             .Defender(TestCreatures.Make("D", level: 50, hp: 500, speed: 200))
             .Use(Move(moveName));
 
-        Assert.True(result.Has<MoveMissed>());
+        Assert.Equal(UnaffectedCause.OneHitKo, result.First<MoveUnaffected>()?.Cause);
+        Assert.False(result.Has<MoveMissed>()); // Gen 1: a failed OHKO is not a miss
         Assert.False(result.Has<DamageDealt>());
         Assert.Equal(500, result.Defender.Attributes.HP);
     }

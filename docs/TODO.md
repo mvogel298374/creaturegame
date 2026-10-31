@@ -48,7 +48,6 @@ gap has drafted text, awaiting your confirmation · ✗ gaps remain.
 
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
-| **Failure announcements: failed OHKO + trainer-battle Roar say "unaffected"** (§3.2) | S–M | ✅ (confirmed 2026-10-31) | Awaiting your greenlight. New seam members + wire event (C# + TS); `AttackAction`, so both review gates. |
 | **Item descriptions describe the Gen 1 effect** (§3.2) | S–M | ⚠️ 1, 3, 4, 5, 6, 7 | Importer override plus a full re-import. |
 | **Modal accessibility** (§5) | S–M | ⚠️ 1, 3, 5, 6, 7 + test route | Client only; the drafted test route is an E2E spec you run. |
 
@@ -57,6 +56,7 @@ gap has drafted text, awaiting your confirmation · ✗ gaps remain.
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
 | **Roar/Whirlwind: the scared-off side still acts** (§3.1) | S–M | ✗ 2; 1, 5, 6 drafted | Ruled 2026-10-17. Can end a run with a healthy bench. |
+| **"It didn't affect": Gen 1's fifth failure line** (§3.1) | S–M | ✗ 2, 3; the rest drafted | Design with the Roar entry's `DidntAffect` member. |
 | **Gen 1 confusion self-hit damage** (§3.1) | S | ✗ 2; 1, 3, 5 drafted | Ruled 2026-10-17 (replicate the foe-Reflect quirk). |
 | **Pre-hit-test cluster** — Mist + thaw; Substitute stops a stat-down move before accuracy; Substitute lets sleep/paralysis through (§3.1) | M | ✗ 2, 3 each; 1, 5, 6, 7 drafted for Mist + thaw and sleep/paralysis, none for the stat-down entry | One design pass: all three move logic ahead of the hit test. |
 | **Pre-move-check cluster** — `CanAct` status order; a replacement frees the trapped foe; Disable countdown (§3.1) | M | ✗ 2, 3 each | One design pass: all three live in the pre-move check. |
@@ -241,8 +241,8 @@ data/engine item usually also means updating the test that pins the wrong value.
   is lower-level and `rand[0, userLv + targetLv] < targetLv / 4`. Ours always succeeds (`MoveEffects.cs:520-548`).
   **User ruling 2026-10-17:** fix both, with a proper generation seam. Also noted 2026-10-29 (`requirements-review`,
   unverified here): pokered's trainer-battle failure prints "… is unaffected!" (`IsUnaffectedText`); ours emits
-  `MoveHadNoEffect` ("doesn't affect"). **Moved 2026-10-31** to "Failure announcements" (§3.2), which adds the
-  `MoveFailureAnnouncement` seam; the wild level-roll failure here prints `_DidntAffectText` "It didn't affect
+  `MoveHadNoEffect` ("doesn't affect"). **Done 2026-10-31** (`TODO_ARCHIVE.md` → "Failure announcements"): the
+  `MoveFailureAnnouncement` seam and `MoveFailureEvents.For` now exist; the wild level-roll failure here prints `_DidntAffectText` "It didn't affect
   <TARGET>!" (`effects.asm:833-837`) and adds its own member on that seam.
   **DoR:** ✗ not Ready — gap **2** (design pass, central `Battle`); 1, 5 and 6 are drafted below for your
   confirmation. 3, 4 and 7 are answered.
@@ -285,6 +285,24 @@ data/engine item usually also means updating the test that pins the wrong value.
     `TestAltProfile` override changes the outcome; no `GENERATION_SEAMS.md` row says "inline" for battle logic. The same pass rewords the carve-outs that rule 4 now contradicts: `GENERATION_SEAMS.md` §5.0 ("leave it inline … don't over-abstract", the `ItemPriority` note), `pr-review.md` and `DEFINITION_OF_DONE.md` ("gen-invariant constants inline are fine"), `ARCHITECTURE.md:109`.
   - **Design:** the slice first (read-only, shown to you), then one design pass per cluster of members.
   - **Data vs runtime:** runtime only. **Dependencies:** none; can split into one item per cluster after the slice.
+  - **Also in scope (user ruling 2026-10-31, waived from "Failure announcements"):** battle message *wording* lives in
+    the client (`timeline.ts`) and the console emitter, keyed on event fields (e.g. `MoveUnaffected.Cause`), not on a
+    seam. Decide whether battle text moves to the presentation catalog (§4.3) or a seam; the same question covers
+    the Counter-failure and Dream Eater `MoveMissed` lines.
+- **"It didn't affect": Gen 1's fifth failure line (found 2026-10-31 by `requirements-review` of "Failure
+  announcements"; source-confirmed) — S–M, ✗ not Ready.** pokered prints `_DidntAffectText` "It didn't affect
+  <TARGET>!" (`effects.asm:1416-1423`, `text_3.asm`) when a status move hits an already-statused or status-immune
+  target; only a 0× type multiplier prints `_DoesntAffectMonText` "It doesn't affect <TARGET>!". We emit
+  `MoveHadNoEffect` for both, so the client prints "doesn't affect" for the no-op cases.
+  **DoR:** ✗ — gaps **2, 3**; the rest drafted. *Drafted:*
+  - **Acceptance:** each `MoveHadNoEffect` emit site (`AttackAction.cs` ~181, ~427, ~693, ~709; `MoveEffects.cs`
+    ~118) is classified as type immunity or a no-op with a pokered cite; a no-op emits a distinct "didn't affect"
+    event or announcement and the client prints "It didn't affect <target>!"; type immunity is unchanged.
+  - **Design (gap 2):** a new event vs a `DidntAffect` member on `MoveFailureAnnouncement`; the Roar entry above
+    plans the same member for its wild level-roll failure, so design both together.
+  - **Gen-variable surface (gap 3):** which failures print which line, per site.
+  - **Data vs runtime:** runtime plus the wire (C# + TS). **Quirk:** the two lines differ by one word.
+    **Dependencies:** pairs with the Roar entry's wild level roll.
 
 ### 3.2 Data and importer
 
@@ -301,41 +319,6 @@ data/engine item usually also means updating the test that pins the wrong value.
   - **Quirk:** Dire Hit's text must not promise a raised crit rate (Gen 1's Focus Energy bug).
   - **Dependencies:** none.
 - **Found 2026-10-11 during V7 / the item seam (unverified beyond the citation; each needs its own DoR):**
-  - **Failure announcements: a failed OHKO and a trainer-battle Roar/Whirlwind say "unaffected"; immunity ends in
-    "!" (source-confirmed 2026-10-31) — S–M, ✅ Ready.** Gen 1 has four failure lines and we collapse them into
-    two. A slower OHKO user: pokered sets `wCriticalHitOrOHKO` to `$ff` and `PrintMoveFailureText` prints
-    `_UnaffectedText` "<TARGET>'s unaffected!" (`engine/battle/core.asm:3718-3734`); Gen 2 the same
-    (pokecrystal `engine/battle/effect_commands.asm` `GetFailureResultText :2211-2214`). We emit `MoveMissed`.
-    Roar/Whirlwind in a trainer battle: `SwitchAndTeleportEffect .notWildBattle1` prints `_IsUnaffectedText`
-    "<TARGET> is unaffected!" (`engine/battle/effects.asm:847-854`); Gen 2 force-switches instead
-    (`BattleCommand_ForceSwitch`). We emit `MoveHadNoEffect`. Type immunity is `_DoesntAffectMonText` "It doesn't
-    affect <TARGET>!"; our client prints "It doesn't affect <TARGET>...". User rulings 2026-10-31: full generation
-    separation for battle logic, seams wherever needed; narrow Roar scope (the wording only; the action-loop and
-    wild level-roll gaps stay in the Roar entry, §3.1, which reuses this seam for its "It didn't affect" line);
-    fold in the immunity punctuation.
-    1. **Intent + acceptance:** in a full battle, a slower user's Fissure on a faster foe emits
-       `MoveUnaffected(Cause: OneHitKo)` (not `MoveMissed`) and draws only the crit roll; Roar in a non-escapable
-       battle emits `MoveUnaffected(Cause: ForceFlee)` (not `MoveHadNoEffect`); a real miss still emits
-       `MoveMissed`. The client prints "<target>'s unaffected!" and "<target> is unaffected!" respectively, and
-       type immunity prints "It doesn't affect <target>!". Under `TestAltProfile` the same two battles emit
-       `MoveMissed` and `MoveHadNoEffect`.
-    2. **Design status:** designed 2026-10-31 (confirmed). New `MoveFailureAnnouncement` enum (`Missed`,
-       `DoesntAffect`, `Unaffected`); `IBattleRules.OneHitKoFailureAnnouncement` and
-       `IBattleRules.ForceFleeTrainerFailureAnnouncement` return it, in the style of `StatStageCapAnnouncement`;
-       `AttackAction.OhkoFails` and `ForceFleeEffect` map the enum to an event. New wire event
-       `MoveUnaffected(TargetName, TargetId, MoveName, Cause)`, `Cause` ∈ {`OneHitKo`, `ForceFlee`}, projected by hand
-       to the client (`ClaudeDirectives/engine.md` rule 8). Touches `AttackAction` (central): both review gates.
-    3. **Gen-variable surface:** the announcement each failure makes (both members). Gen 1: `Unaffected` for both.
-       The OHKO success rule itself is already on the seam (`OneHitKoSucceeds`, Speed-only in Gen 1).
-    4. **Gen 1 source of truth:** pokered `core.asm:3718-3734` (`PrintMoveFailureText`), `effects.asm:847-854`
-       (`SwitchAndTeleportEffect`), texts in `data/text/text_2.asm` (`_UnaffectedText`, `_DoesntAffectMonText`) and
-       `text_3.asm` (`_IsUnaffectedText`); Gen 2 shape check pokecrystal `GetFailureResultText`.
-    5. **Data vs runtime:** runtime plus the wire (C# event, hub projection, TS timeline). No data.
-    6. **Quirk to test:** a Gen 1 failed OHKO is not a miss and stops before the accuracy roll (only the crit roll
-       is drawn); the two "unaffected" lines are different texts; `TestAltProfile` proves the seam decides.
-    7. **Dependencies:** none.
-    *Gates:* `format-gate` → `test-runner` → `requirements-review` → `pr-review` → `docs-cleanup`. Estimate:
-    implementation ~40–60k tokens + reviews ~120–140k.
   - *Struggle skips the accuracy roll* (found during "Gen 1 roll order", archived): `AttackAction.Connects`
     treats Struggle as never-miss; in pokered it goes through `MoveHitTest` like any move (so the 1/256 miss applies).
     Unverified beyond that reading; needs its own DoR. **Fixing it must flip

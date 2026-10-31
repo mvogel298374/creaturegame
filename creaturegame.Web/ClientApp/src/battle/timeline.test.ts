@@ -84,7 +84,17 @@ describe('expandEvent — move-name formatting', () => {
 
   it('reads the Gen 1 immunity line for a no-effect move', () => {
     const { steps } = expandEvent('MoveHadNoEffect', { targetName: 'GENGAR', moveName: 'seismic-toss' }, CTX);
-    expect(logLines(steps)).toEqual(["It doesn't affect GENGAR..."]);
+    expect(logLines(steps)).toEqual(["It doesn't affect GENGAR!"]);
+  });
+
+  it('reads the Gen 1 OHKO failure line for an unaffected one-hit KO', () => {
+    const { steps } = expandEvent('MoveUnaffected', { targetName: 'JOLTEON', moveName: 'fissure', cause: 'OneHitKo' }, CTX);
+    expect(logLines(steps)).toEqual(["JOLTEON's unaffected!"]);
+  });
+
+  it('reads the Gen 1 trainer-battle Roar failure line', () => {
+    const { steps } = expandEvent('MoveUnaffected', { targetName: 'ONIX', moveName: 'roar', cause: 'ForceFlee' }, CTX);
+    expect(logLines(steps)).toEqual(['ONIX is unaffected!']);
   });
 
   it('reads the Gen 1 "But nothing happened!" line for Splash', () => {
@@ -106,7 +116,7 @@ describe('expandEvent — DamageDealt', () => {
   it('immunity reads the Gen 1 line, with no hit sound and no damage number', () => {
     const { steps } = expandEvent('DamageDealt',
       { targetName: 'ARTICUNO', targetId: 2, damage: 0, typeEffectiveness: 0, hpAfter: 100, isCrit: false }, CTX);
-    expect(logLines(steps)).toEqual(["It doesn't affect ARTICUNO..."]);
+    expect(logLines(steps)).toEqual(["It doesn't affect ARTICUNO!"]);
     expect(steps!.some(s => s.kind === 'emit')).toBe(false);          // no playHitSound
     expect(logLines(steps)[0]).not.toContain('damage');
   });

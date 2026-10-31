@@ -71,7 +71,7 @@ public class ForceFleeTests(MovesFixture moves) : InteractionTest(moves)
         Assert.True(player.Battle.HasFled);
     }
 
-    // Non-escapable battle (the Elite/Boss trainer analog): Roar fails ("But it had no effect!") and the fight
+    // Non-escapable battle (the Elite/Boss trainer analog): Roar fails ("… is unaffected!") and the fight
     // continues — the player finishes the foe off with a real attack, so the battle ends as a normal win.
     [Fact]
     public async Task NonEscapableBattle_ForceFlee_Fails_BattleContinuesToKo()
@@ -97,7 +97,7 @@ public class ForceFleeTests(MovesFixture moves) : InteractionTest(moves)
 
         Assert.False(result.Has<CreatureFled>()); // the move failed — nobody fled
         Assert.False(enemy.Battle.HasFled);
-        Assert.True(result.Has<MoveHadNoEffect>()); // Roar announced as failing in a non-escapable battle
+        Assert.Contains(result.All<MoveUnaffected>(), e => e.Cause == UnaffectedCause.ForceFlee);
         Assert.Equal("Player", result.Winner); // the fight ended on a normal KO, not a flee
         Assert.True(result.Has<BattleEnded>());
     }
@@ -159,7 +159,7 @@ public class ForceFleeTests(MovesFixture moves) : InteractionTest(moves)
     }
 
     // The escapability flag must reach the move on the ALTERNATE execution path too: Metronome calling Roar in
-    // a non-escapable battle must fail (MoveHadNoEffect, no flee), exactly as a directly-chosen Roar would —
+    // a non-escapable battle must fail (MoveUnaffected, no flee), exactly as a directly-chosen Roar would —
     // not slip through on the inner action's default escapable=true. Pool's only eligible move is Roar, so the
     // Metronome pick is deterministic; the battle is non-escapable (the Elite/Boss trainer analog).
     [Fact]
@@ -190,7 +190,7 @@ public class ForceFleeTests(MovesFixture moves) : InteractionTest(moves)
         await action.ExecuteAsync();
 
         Assert.Contains(recorder.Of<MoveUsed>(), e => e.MoveName == "roar"); // Metronome called Roar
-        Assert.True(recorder.Of<MoveHadNoEffect>().Any()); // ... which failed in the non-escapable battle
+        Assert.True(recorder.Of<MoveUnaffected>().Any()); // ... which failed in the non-escapable battle
         Assert.False(defender.Battle.HasFled); // the inner action honoured escapable=false — nobody fled
     }
 }

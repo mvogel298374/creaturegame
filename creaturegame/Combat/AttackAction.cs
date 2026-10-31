@@ -343,7 +343,15 @@ public class AttackAction : IBattleAction
     {
         if (_rules.OneHitKoSucceeds(Source, Target))
             return false;
-        _emitter?.Emit(new MoveMissed(Source.Name, Source.Id, move.Name ?? ""));
+        _emitter?.Emit(
+            MoveFailureEvents.For(
+                _rules.OneHitKoFailureAnnouncement,
+                Source,
+                Target,
+                move.Name ?? "",
+                UnaffectedCause.OneHitKo
+            )
+        );
         return true;
     }
 

@@ -114,7 +114,10 @@ the linked design doc instead — pull it there and leave only the pointer here.
 ### Gen 1 battle roll order and immunity
 - An attacking move rolls crit, then damage, then accuracy, so a miss has already used its crit and damage rolls; a
   slower one-hit-KO user stops after the crit roll.
-- A move against a target that is immune by type shows "doesn't affect", never "missed", whatever the accuracy roll.
+- A move against a target that is immune by type shows "It doesn't affect <target>!", never "missed", whatever the
+  accuracy roll.
+- A one-hit-KO move from a slower user fails with "<target>'s unaffected!", not "missed"; a real accuracy miss still
+  says "missed". Roar or Whirlwind against an Elite or Boss foe fails with "<target> is unaffected!".
 - Seismic Toss, Night Shade, Sonic Boom, Super Fang and Counter ignore type immunity: Seismic Toss hits Ghost-types,
   Night Shade hits Normal-types.
 - Thunder Wave against a Ground-type fails as "doesn't affect" without an accuracy roll.
@@ -122,7 +125,8 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - A Fire move thaws a frozen target after its damage, and not when the hit faints the target.
 - Jump Kick / Hi Jump Kick crash on a miss and against an immune target.
 - Design detail → `GENERATION_SEAMS.md` §2 (*Roll order*), `GEN_DIFFERENCES.md` → *Roll Order*.  History →
-  `TODO_ARCHIVE.md` → *Gen 1 roll order in `AttackAction`, behind a seam*.
+  `TODO_ARCHIVE.md` → *Gen 1 roll order in `AttackAction`, behind a seam* and *Failure announcements: a failed OHKO and
+  a trainer-battle Roar/Whirlwind say "unaffected"*.
 
 ### Foe move scoring and chosen-move validation
 - The foe scores a status move by its status chance: a 10% burn side effect is worth a tenth of a pure burn move.

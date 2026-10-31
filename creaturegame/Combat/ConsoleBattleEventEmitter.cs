@@ -73,7 +73,15 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                 break;
 
             case MoveHadNoEffect e:
-                Console.WriteLine($"It doesn't affect {e.TargetName}...");
+                Console.WriteLine($"It doesn't affect {e.TargetName}!");
+                break;
+
+            case MoveUnaffected e:
+                Console.WriteLine(
+                    e.Cause == UnaffectedCause.OneHitKo
+                        ? $"{e.TargetName}'s unaffected!"
+                        : $"{e.TargetName} is unaffected!"
+                );
                 break;
 
             case AlreadyAsleep e:
@@ -99,7 +107,7 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
             case DamageDealt e:
                 if (e.TypeEffectiveness == 0.0)
                 {
-                    Console.WriteLine($"It doesn't affect {e.TargetName}...");
+                    Console.WriteLine($"It doesn't affect {e.TargetName}!");
                     break;
                 }
                 if (e.IsCrit)

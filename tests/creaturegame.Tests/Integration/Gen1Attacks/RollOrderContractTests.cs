@@ -165,7 +165,7 @@ public class RollOrderContractTests(MovesFixture moves) : Gen1MoveContract(moves
         );
 
         Assert.Equal([Crit], draws);
-        Assert.True(result.Has<MoveMissed>());
+        Assert.True(result.Has<MoveUnaffected>());
     }
 
     [Fact]
@@ -485,7 +485,7 @@ public class RollOrderContractTests(MovesFixture moves) : Gen1MoveContract(moves
         );
 
         Assert.Empty(slowerDraws);
-        Assert.True(slower.Has<MoveMissed>());
+        Assert.True(slower.Has<MoveUnaffected>());
         Assert.Equal([Accuracy], fasterDraws);
     }
 

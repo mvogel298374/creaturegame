@@ -8,6 +8,48 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §3.2 Failure announcements: a failed OHKO and a trainer-battle Roar/Whirlwind say "unaffected"; immunity ends in "!" ✅ DONE (2026-10-31)
+
+S–M; source-confirmed and designed 2026-10-31. Gen 1 has four failure lines and we collapsed them into two. A slower
+OHKO user: pokered sets `wCriticalHitOrOHKO` to `$ff` and `PrintMoveFailureText` prints `_UnaffectedText`
+"<TARGET>'s unaffected!" (`engine/battle/core.asm:3718-3734`); Gen 2 the same (pokecrystal
+`engine/battle/effect_commands.asm` `GetFailureResultText :2211-2214`). We emitted `MoveMissed`. Roar/Whirlwind in a
+trainer battle: `SwitchAndTeleportEffect .notWildBattle1` prints `_IsUnaffectedText` "<TARGET> is unaffected!"
+(`engine/battle/effects.asm:847-854`); Gen 2 force-switches instead (`BattleCommand_ForceSwitch`). We emitted
+`MoveHadNoEffect`. Type immunity is `_DoesntAffectMonText` "It doesn't affect <TARGET>!"; our client printed
+"It doesn't affect <TARGET>...". User rulings 2026-10-31: full generation separation for battle logic, seams wherever
+needed; narrow Roar scope (the wording only; the action-loop and wild level-roll gaps stay in the Roar entry, §3.1,
+which reuses this seam for its "It didn't affect" line); fold in the immunity punctuation.
+
+**Outcome.** New `MoveFailureAnnouncement` enum (`Missed`, `DoesntAffect`, `Unaffected`) on `IBattleRules`; two seam
+members, `OneHitKoFailureAnnouncement` and `ForceFleeTrainerFailureAnnouncement`, return it (Gen 1: `Unaffected` for
+both; `TestAltProfile`: `Missed` and `DoesntAffect`). `MoveFailureEvents.For` maps the enum to an event, called from
+`AttackAction.OhkoFails` and `ForceFleeEffect`. New wire event `MoveUnaffected(TargetName, TargetId, MoveName, Cause)`
+with `UnaffectedCause` ∈ {`OneHitKo`, `ForceFlee`}, projected by hand in `SignalRBattleEventEmitter` and printed by
+`timeline.ts` and the console emitter. A failed Gen 1 OHKO stops before the accuracy roll (only the crit roll is
+drawn). Tests: `FailureAnnouncementTests`, plus updates to `OneHitKoContractTests`, `RollOrderContractTests`,
+`ForceFleeTests`, `WebEventContractTests`.
+
+**Review rulings 2026-10-31.**
+- **RR1** (`requirements-review`): pokered's fifth line, `_DidntAffectText` "It didn't affect <TARGET>!" for
+  already-statused / status-immune no-ops, is not covered; the split is **deferred** to the new §3.1 entry
+  "'It didn't affect': Gen 1's fifth failure line".
+- **RR2:** docs fixed.
+- **RR3:** battle message *wording* living in the client and console emitter rather than on a seam is **waived** into
+  the §3.1 inline-rule audit ("Also in scope").
+- **PR1** (`pr-review`): a comment trimmed.
+- **PR2:** a `Cause` value pin added to `WebEventContractTests`.
+
+**DoR (all seven answered, confirmed 2026-10-31):** acceptance (a slower user's Fissure on a faster foe emits
+`MoveUnaffected(Cause: OneHitKo)` and not `MoveMissed`, a real miss still emits `MoveMissed`; Roar in a non-escapable
+battle emits `MoveUnaffected(Cause: ForceFlee)`; under `TestAltProfile` the same battles emit `MoveMissed` and
+`MoveHadNoEffect`); design (above); gen-variable surface (the announcement each failure makes; the OHKO success rule
+was already on the seam as `OneHitKoSucceeds`); Gen 1 source (pokered `core.asm:3718-3734`, `effects.asm:847-854`,
+texts in `text_2.asm` / `text_3.asm`; pokecrystal `GetFailureResultText`); runtime plus the wire, no data; quirk (a
+failed OHKO is not a miss; the two "unaffected" lines are different texts); no dependencies.
+
+---
+
 ## §3.1 XP formula: generic integer pipeline, gen terms on the seam; Gen 1 splits yields first ✅ DONE (2026-10-31)
 
 M; from §7.6 V10, designed and source-confirmed 2026-10-31. Gen 1 divides the base-exp yield **and the five Stat Exp

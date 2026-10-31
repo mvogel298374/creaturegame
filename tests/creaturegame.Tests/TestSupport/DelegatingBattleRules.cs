@@ -117,6 +117,9 @@ public abstract class DelegatingBattleRules : IBattleRules
 
     public virtual bool OneHitKoSucceeds(Creature u, Creature t) => _inner.OneHitKoSucceeds(u, t);
 
+    public virtual MoveFailureAnnouncement OneHitKoFailureAnnouncement =>
+        _inner.OneHitKoFailureAnnouncement;
+
     public virtual bool CounterQualifies(DamageType? lastDamageType) =>
         _inner.CounterQualifies(lastDamageType);
 
@@ -151,6 +154,9 @@ public abstract class DelegatingBattleRules : IBattleRules
     public virtual bool CanBeLeechSeeded(Creature t) => _inner.CanBeLeechSeeded(t);
 
     public virtual bool ForceFleeFailsVsTrainer => _inner.ForceFleeFailsVsTrainer;
+
+    public virtual MoveFailureAnnouncement ForceFleeTrainerFailureAnnouncement =>
+        _inner.ForceFleeTrainerFailureAnnouncement;
 
     public virtual StatusCondition CarryStatusOutOfBattle(StatusCondition status) =>
         _inner.CarryStatusOutOfBattle(status);

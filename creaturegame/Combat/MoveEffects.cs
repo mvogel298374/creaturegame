@@ -511,7 +511,13 @@ public sealed class ForceFleeEffect : IMoveEffect
         if (!ctx.BattleEscapable && ctx.Rules.ForceFleeFailsVsTrainer)
         {
             ctx.Emitter?.Emit(
-                new MoveHadNoEffect(ctx.Target.Name, ctx.Target.Id, ctx.Attack.Name ?? "")
+                MoveFailureEvents.For(
+                    ctx.Rules.ForceFleeTrainerFailureAnnouncement,
+                    ctx.Source,
+                    ctx.Target,
+                    ctx.Attack.Name ?? "",
+                    UnaffectedCause.ForceFlee
+                )
             );
             return;
         }

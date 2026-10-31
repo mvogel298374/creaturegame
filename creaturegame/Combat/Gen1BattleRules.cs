@@ -117,6 +117,10 @@ public sealed class Gen1BattleRules : IBattleRules
     public bool OneHitKoSucceeds(Creature user, Creature target) =>
         StatusResolver.EffectiveSpeed(user, this) >= StatusResolver.EffectiveSpeed(target, this);
 
+    // pokered core.asm PrintMoveFailureText: wCriticalHitOrOHKO $ff prints _UnaffectedText.
+    public MoveFailureAnnouncement OneHitKoFailureAnnouncement =>
+        MoveFailureAnnouncement.Unaffected;
+
     // Gen 1: a Normal or Fighting type qualifies; Bide's typeless unleash arrives as null and doesn't.
     public bool CounterQualifies(DamageType? lastDamageType) =>
         lastDamageType is DamageType.Normal or DamageType.Fighting;
@@ -189,6 +193,10 @@ public sealed class Gen1BattleRules : IBattleRules
 
     // Gen 1: Roar/Whirlwind only end a wild battle; against a non-escapable foe they fail.
     public bool ForceFleeFailsVsTrainer => true;
+
+    // pokered effects.asm SwitchAndTeleportEffect .notWildBattle1 prints _IsUnaffectedText.
+    public MoveFailureAnnouncement ForceFleeTrainerFailureAnnouncement =>
+        MoveFailureAnnouncement.Unaffected;
 
     // Gen 1: a mid-turn faint ends the turn for both sides (Smogon RBY Mechanics Guide).
     public bool FaintEndsTurnImmediately => true;

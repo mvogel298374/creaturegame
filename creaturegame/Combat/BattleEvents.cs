@@ -296,6 +296,21 @@ public record MoveMissed(string AttackerName, int AttackerId, string MoveName) :
 /// <summary>The move hit but the target is immune (type-based) so nothing happened — "It doesn't affect …".</summary>
 public record MoveHadNoEffect(string TargetName, int TargetId, string MoveName) : BattleEvent;
 
+/// <summary>Which failure a <see cref="MoveUnaffected"/> reports; the client picks its line from it.</summary>
+public enum UnaffectedCause
+{
+    OneHitKo,
+    ForceFlee,
+}
+
+/// <summary>A move failed on a precondition and the generation says "… unaffected!". See GENERATION_SEAMS.md §2.</summary>
+public record MoveUnaffected(
+    string TargetName,
+    int TargetId,
+    string MoveName,
+    UnaffectedCause Cause
+) : BattleEvent;
+
 /// <summary>A sleep move hit a target that is already asleep — Gen 1's distinct "… is already asleep!"
 /// (AlreadyAsleepText), as opposed to the generic "It doesn't affect …" every other already-statused case uses.</summary>
 public record AlreadyAsleep(string TargetName, int TargetId) : BattleEvent;

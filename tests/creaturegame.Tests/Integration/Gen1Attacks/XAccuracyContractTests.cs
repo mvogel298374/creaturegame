@@ -112,7 +112,7 @@ public class XAccuracyContractTests(MovesFixture moves) : Gen1MoveContract(moves
             .Defender(TestCreatures.Make("D", hp: 500, speed: 200))
             .Use(Move("fissure"));
 
-        Assert.True(result.Has<MoveMissed>());
+        Assert.True(result.Has<MoveUnaffected>());
         Assert.False(result.Has<DamageDealt>());
         Assert.Equal(500, result.Defender.Attributes.HP);
     }

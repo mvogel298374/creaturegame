@@ -832,6 +832,22 @@ public class WebEventContractTests
         Assert.Equal("Poison", candidates[1].GetProperty("Status").GetString());
     }
 
+    /// <summary>The client picks its "unaffected" line by the <c>Cause</c> string, so pin each value.</summary>
+    [Theory]
+    [InlineData(UnaffectedCause.OneHitKo, "OneHitKo")]
+    [InlineData(UnaffectedCause.ForceFlee, "ForceFlee")]
+    public void MoveUnaffected_Projection_CarriesCauseName(UnaffectedCause cause, string expected)
+    {
+        var evt = new MoveUnaffected("JOLTEON", 1, "fissure", cause);
+
+        var (type, payload) = SignalRBattleEventEmitter.MapEvent(evt);
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+
+        Assert.Equal("MoveUnaffected", type);
+        Assert.Equal(expected, doc.RootElement.GetProperty("Cause").GetString());
+        Assert.Equal("JOLTEON", doc.RootElement.GetProperty("TargetName").GetString());
+    }
+
     /// <summary>Same projection guard for <see cref="BiomeEntered"/> — the client titles/themes the next leg
     /// from these fields, dropped on the wire if not listed (the failure mode the STAB flag hit).</summary>
     [Fact]

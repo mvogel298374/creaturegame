@@ -29,6 +29,19 @@ public enum StatCapAnnouncement
     NothingHappened,
 }
 
+/// <summary>Which line a move that fails on a precondition prints. See GENERATION_SEAMS.md §2.</summary>
+public enum MoveFailureAnnouncement
+{
+    /// <summary>"&lt;USER&gt;'s &lt;MOVE&gt; missed!" (<see cref="MoveMissed"/>).</summary>
+    Missed,
+
+    /// <summary><see cref="MoveHadNoEffect"/>; its lines are in GENERATION_SEAMS.md §2 (Failure announcements).</summary>
+    DoesntAffect,
+
+    /// <summary>"&lt;TARGET&gt; is unaffected!" (<see cref="MoveUnaffected"/>).</summary>
+    Unaffected,
+}
+
 /// <summary>Where a move's crit and damage rolls fall relative to its accuracy roll. See GENERATION_SEAMS.md §2.</summary>
 public enum HitRollOrder
 {
@@ -195,6 +208,9 @@ public interface IBattleRules
     /// <summary>Whether a one-hit KO move succeeds against <paramref name="target"/>, apart from the accuracy roll.</summary>
     bool OneHitKoSucceeds(Creature user, Creature target);
 
+    /// <summary>The line a one-hit KO move prints when <see cref="OneHitKoSucceeds"/> is false. See GENERATION_SEAMS.md §2.</summary>
+    MoveFailureAnnouncement OneHitKoFailureAnnouncement { get; }
+
     /// <summary>Whether Counter answers the last damage the user took, given that hit's type. See GENERATION_SEAMS.md §2.</summary>
     bool CounterQualifies(DamageType? lastDamageType);
 
@@ -246,6 +262,9 @@ public interface IBattleRules
 
     /// <summary>Whether Roar / Whirlwind fail against a non-escapable foe. See GENERATION_SEAMS.md §2.</summary>
     bool ForceFleeFailsVsTrainer { get; }
+
+    /// <summary>The line Roar / Whirlwind print when they fail against a non-escapable foe. See GENERATION_SEAMS.md §2.</summary>
+    MoveFailureAnnouncement ForceFleeTrainerFailureAnnouncement { get; }
 
     /// <summary>The major status a creature keeps when it leaves a battle; volatile conditions are dropped elsewhere.</summary>
     StatusCondition CarryStatusOutOfBattle(StatusCondition status);

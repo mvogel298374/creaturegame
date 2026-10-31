@@ -146,13 +146,19 @@ internal static class TestAltProfile
         public double GetMultiplier(DamageType attackType, DamageType defenderType) => 1.0;
     }
 
-    /// <summary>Delegates every rule to Gen 1 except the accuracy roll bound and the X Accuracy bypass — see
+    /// <summary>Delegates every rule to Gen 1 except the members overridden below — see
     /// <c>GENERATION_PROFILE.md</c> §3 for what each varied member proves.</summary>
     private sealed class AltBattleRules(IRandomSource? rng = null) : DelegatingBattleRules(rng)
     {
         public override int AccuracyRollBound => 100;
 
         public override bool XAccuracyBypassesAccuracyCheck => false;
+
+        public override MoveFailureAnnouncement OneHitKoFailureAnnouncement =>
+            MoveFailureAnnouncement.Missed;
+
+        public override MoveFailureAnnouncement ForceFleeTrainerFailureAnnouncement =>
+            MoveFailureAnnouncement.DoesntAffect;
 
         // No participant split: proves the seam, not Battle, decides the division.
         public override ExperienceRules Experience { get; } =
