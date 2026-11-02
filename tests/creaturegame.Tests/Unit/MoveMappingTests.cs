@@ -60,6 +60,19 @@ public class MoveMappingTests
         Assert.Null(MoveImport.MapToAttack(Move(name: "hydro-pump")).MinLevel); // level-up only
     }
 
+    [Theory]
+    [InlineData("karate-chop", true)]
+    [InlineData("razor-leaf", true)]
+    [InlineData("crabhammer", true)]
+    [InlineData("slash", true)]
+    [InlineData("razor-wind", false)]
+    [InlineData("sky-attack", false)]
+    [InlineData("pound", false)]
+    public void IsHighCrit_ComesFromPokeredsList(string name, bool isHighCrit)
+    {
+        Assert.Equal(isHighCrit, MoveImport.MapToAttack(Move(name: name)).IsHighCrit);
+    }
+
     [Fact]
     public void PastValues_EarliestEntry_SuppliesGen1PowerAndAccuracy()
     {

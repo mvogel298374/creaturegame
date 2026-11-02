@@ -134,7 +134,9 @@ The remaining Gen 1 logic lives in the categorisation:
 - **Status ailment** → `StatusEffect` (paralysis/sleep/burn/poison/freeze/bad-poison),
   keeping the Gen-1-resolved `EffectChance`; `meta.ailment_chance` fills it only when PokeAPI gives no
   `effect_chance` at all.
-- **`IsHighCrit`** ← `meta.crit_rate > 0` (Slash, Razor Leaf, etc.).
+- **`IsHighCrit`** ← `MoveImport.Gen1HighCritMoves`, pokered's `HighCriticalMoves` (`data/battle/critical_hit_moves.asm`):
+  Karate Chop, Razor Leaf, Crabhammer and Slash. PokeAPI's `meta.crit_rate` is not used, because it also marks Razor Wind
+  and Sky Attack, which crit at the normal rate in Gen 1.
 - **`DamageCategory`** — mostly from `meta.category` (`damage-heal` → Drain, `ohko` →
   OHKO), but PokeAPI doesn't model several Gen 1 mechanics, so those are **special-cased
   by move ID**:
@@ -430,8 +432,8 @@ one-shot tool run occasionally it's not worth batching — simplicity and obviou
 logging win.
 
 ### 5.4 Encode what the API can't express — explicitly and with comments
-Five places do this: move categorisation special-cased by **ID** (§4.1), game
-availability curated by **hand** (§4.3), the item roster curated by **hand** (§4.5) —
+Several places do this, among them: move categorisation special-cased by **ID** (§4.1), the high-crit move list
+curated from pokered (§4.1), game availability curated by **hand** (§4.3), the item roster curated by **hand** (§4.5) —
 PokeAPI gives no Gen 1 signal for items at all — and species base experience and catch rate, both curated from
 pokered (§4.2) because PokeAPI keeps no history for either. The practice: when the source data lacks
 the structure you need, encode the domain knowledge directly, **comment every magic
@@ -454,7 +456,8 @@ Strict-clone fidelity is decided here, once, rather than patched in the engine.
 2. **A targeted, commented override in the importer** — *only* for a Gen 1 fact the historical
    fields **can't express** (a secondary's target stat, an ailment, priority, a mechanic). Verify
    it against an authority (Bulbapedia / the pret/pokered disassembly) and keep each entry commented
-   with both the Gen 1 and modern value — see `MoveImport.ApplyGen1Corrections` for the current list.
+   with both the Gen 1 and modern value — see `MoveImport.ApplyGen1Corrections` and `MoveImport.Gen1HighCritMoves`
+   for the current list.
 3. **The runtime seams** (`IBattleRules` / `ITypeChart` / `IStatCalculator`) — for anything that
    is a *formula or mechanic* difference rather than stored move/species **data**. Mechanic
    differences never belong in the importer; data differences never belong in the engine.

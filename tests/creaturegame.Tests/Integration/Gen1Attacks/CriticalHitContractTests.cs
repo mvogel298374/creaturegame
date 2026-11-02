@@ -1,13 +1,11 @@
 using creaturegame.Combat;
+using creaturegame.DB;
 using creaturegame.Tests.TestSupport;
+using Microsoft.EntityFrameworkCore;
 
 namespace creaturegame.Tests.Integration.Gen1Attacks;
 
-/// <summary>
-/// High-crit moves crit far more often than their normal-rate counterparts. Crits run on the real
-/// Gen 1 speed-based crit formula over many seeded RNG runs (no rules double forces the result) —
-/// so this measures the actual engine crit behaviour, not a stubbed flag.
-/// </summary>
+/// <summary>Which moves are high-crit, and their crit rates over seeded runs of the real formula.</summary>
 [Collection(MovesCollection.Name)]
 public class CriticalHitContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 {
@@ -27,33 +25,36 @@ public class CriticalHitContractTests(MovesFixture moves) : Gen1MoveContract(mov
         );
     }
 
-    // Razor Wind is a high-crit move that is also two-turn, so its crit only happens on the release
-    // turn. Fly is a normal-crit two-turn move — the natural baseline to compare against.
     [Fact]
-    public async Task RazorWindCritsFarMoreOftenThanFlyOnRelease()
+    public void OnlyPokeredsFourMovesAreHighCrit()
     {
-        int razorWind = await ReleaseCrits("razor-wind");
-        int fly = await ReleaseCrits("fly");
+        using var ctx = new MovesDbContext();
+        var highCrit = ctx
+            .Moves.AsNoTracking()
+            .Where(m => m.IsHighCrit)
+            .Select(m => m.Name!)
+            .OrderBy(n => n)
+            .ToList();
 
-        Assert.True(razorWind > fly, $"razor-wind crits ({razorWind}) should exceed fly ({fly})");
-        Assert.True(
-            razorWind >= 40,
-            $"high-crit move should crit most of the time (got {razorWind}/60)"
-        );
+        string[] pokered = ["crabhammer", "karate-chop", "razor-leaf", "slash"];
+        Assert.Equal(pokered, highCrit);
     }
 
-    // Sky Attack is the other high-crit two-turn move — same high crit rate, only on the release turn.
-    [Fact]
-    public async Task SkyAttackCritsFarMoreOftenThanFlyOnRelease()
+    // PokeAPI marks both high-crit; Fly is the normal-rate two-turn baseline.
+    [Theory]
+    [InlineData("razor-wind")]
+    [InlineData("sky-attack")]
+    public async Task TwoTurnMoveCritsAtTheNormalRateOnRelease(string moveName)
     {
-        int skyAttack = await ReleaseCrits("sky-attack");
-        int fly = await ReleaseCrits("fly");
-
-        Assert.True(skyAttack > fly, $"sky-attack crits ({skyAttack}) should exceed fly ({fly})");
-        Assert.True(
-            skyAttack >= 40,
-            $"high-crit move should crit most of the time (got {skyAttack}/60)"
+        var attacker = TestCreatures.Make("A", baseSpeed: 100);
+        Assert.Equal(
+            Gen1BattleRules.Instance.GetCritChance(attacker, Move("fly")),
+            Gen1BattleRules.Instance.GetCritChance(attacker, Move(moveName))
         );
+
+        int crits = await ReleaseCrits(moveName);
+
+        Assert.InRange(crits, 1, 25);
     }
 
     // Razor Leaf is a single-turn high-crit Special move (Gen 1) — same high crit rate, no charge.

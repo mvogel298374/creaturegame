@@ -73,7 +73,8 @@ A reference doc covering every major system across all main-series generations �
   from today's (later-generation buffs, e.g. Pikachu Def 30, Beedrill Atk 80). The importer resolves stats from
   `past_stats` and base experience / catch rate from pokered-sourced tables — `DATA_IMPORT.md` §4.2
 - Critical hit chance based on base Speed: `floor(BaseSpeed / 2) / 256`
-- High-crit moves: `min(floor(BaseSpeed / 2) × 8, 255) / 256`
+- High-crit moves: `min(floor(BaseSpeed / 2) × 8, 255) / 256`. Only Karate Chop, Razor Leaf, Crabhammer and Slash are
+  high-crit; Razor Wind and Sky Attack crit at the normal rate (pokered `HighCriticalMoves`)
 - Under Focus Energy or Dire Hit, the extra halving comes before the move's multiplier (pokered `CriticalHitTest`): a
   normal move is `floor(BaseSpeed / 8) / 256`, a high-crit move `floor(BaseSpeed / 4) × 4 / 256`, which never reaches the
   255 cap. From base speed 64 up the unfocused high-crit chance is already capped, so the bug costs less than three

@@ -8,6 +8,33 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §3.1 Razor Wind and Sky Attack aren't high-crit in Gen 1 ✅ DONE (2026-11-02)
+
+S; found 2026-11-02 by `requirements-review` (source-confirmed), DoR confirmed and greenlit by the user. `moves.db`
+marked six moves high-crit because `MoveImport` took `IsHighCrit` from PokeAPI's modern `meta.crit_rate`; Razor Wind and
+Sky Attack therefore got the ×8 chance. pokered's `HighCriticalMoves` (`data/battle/critical_hit_moves.asm`) lists only
+Karate Chop, Razor Leaf, Crabhammer and Slash.
+
+**Outcome.** `MoveImport.Gen1HighCritMoves` (private) holds those four and replaces `meta.crit_rate`; `PokeApiMove`'s
+`CritRate` is removed. Razor Wind and Sky Attack crit at the normal rate. A full importer re-run changed `moves.db` only
+in `IsHighCrit` 1→0 on razor-wind and sky-attack (row comparison, re-confirmed independently by `pr-review`);
+`items.db` had identical rows and `pokemon.db` only regenerated surrogate Ids, so both were returned to their committed
+bytes. Docs: `DATA_IMPORT.md` §5.4 and §5.5, `GEN_DIFFERENCES.md` names the moves, `GENERATION_SEAMS.md` lists the
+high-crit move list as importer data.
+
+**Tests.** `CriticalHitContractTests` lost the two tests pinning the wrong behaviour and gained
+`OnlyPokeredsFourMovesAreHighCrit` (data contract, crit-count bound `Assert.InRange(crits, 1, 25)`) and
+`TwoTurnMoveCritsAtTheNormalRateOnRelease`; `MoveMappingTests` gained `IsHighCrit_ComesFromPokeredsList`. The data and
+two-turn tests failed on the old data before the re-import.
+
+**Reviews.** `requirements-review`: three findings, all recommendations accepted (tighten the crit-count bound; add a
+high-crit list bullet to `GENERATION_SEAMS.md`; keep the new move-description entry's wording, filed as `TODO.md` §3.2
+"Move descriptions state modern effects"). `pr-review`: PR-READY with two recommended items and three advisories, all
+five done (list made private, `DATA_IMPORT.md` §5.4/§5.5, bound tightened, one-line class summary, `GEN_DIFFERENCES.md`
+names the moves); not re-run after them. E2E not run.
+
+---
+
 ## §3.1 High-crit moves under Focus Energy or Dire Hit ✅ DONE (2026-11-02)
 
 S; found 2026-11-02 by `requirements-review` (source-confirmed), DoR confirmed by the user in-session ("go on", then

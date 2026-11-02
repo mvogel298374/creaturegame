@@ -49,7 +49,7 @@ gap has drafted text, awaiting your confirmation · ✗ gaps remain.
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
 | **Modal accessibility** (§5) | S–M | ⚠️ 1, 3, 5, 6, 7 + test route | Client only; the drafted test route is an E2E spec you run. |
-| **Razor Wind and Sky Attack aren't high-crit in Gen 1** (§3.1) | S | ✅ confirmed 2026-11-02 | Importer list plus a full re-import. Awaiting your greenlight. |
+| **Move descriptions state modern effects** (§3.2) | S–M | ⚠️ 1, 2, 3, 4, 5, 6, 7 | Found 2026-11-02. Same shape as the item descriptions; the audit of all 165 sets the size. |
 
 **B. A design pass first** (central engine code: `opus-engineer` plus both gates; each pass is shown to you)
 
@@ -150,19 +150,6 @@ data/engine item usually also means updating the test that pins the wrong value.
   test pinning pokered's number; its seam member (most are already `IBattleRules`/`DamageCalculator` inputs);
   `opus-engineer` plus both gates, since `DamageCalculator`/`AttackAction` are central. Data vs runtime: runtime.
   Dependencies: none.
-- **Razor Wind and Sky Attack aren't high-crit in Gen 1 (found 2026-11-02 by `requirements-review`; source-confirmed) —
-  S, ✅ Ready, awaiting greenlight.** `MoveImport.cs:195` sets `IsHighCrit` from PokeAPI's modern `crit_rate`, so
-  `moves.db` marks six moves high-crit and both of these get the ×8 chance in battle. pokered's `HighCriticalMoves`
-  (`data/battle/critical_hit_moves.asm`) lists only Karate Chop, Razor Leaf, Crabhammer and Slash.
-  `CriticalHitContractTests` has two tests pinning the wrong behaviour.
-  - **Acceptance:** exactly pokered's four moves are high-crit in `moves.db`, pinned by a data contract test; the two
-    wrong tests are corrected.
-  - **Design:** no design pass; the importer gets a pokered-sourced list.
-  - **Seam:** the high-crit list is importer data, so no new seam.
-  - **Gen 1 source:** `data/battle/critical_hit_moves.asm`.
-  - **Data vs runtime:** importer only, with a full re-import.
-  - **Quirk:** Razor Wind and Sky Attack crit at the normal rate, unlike later generations.
-  - **Dependencies:** none.
 - **Gen 1 status-check order in `CanAct` (from §7.6 V8 — claims 2–4) — M, ✗ not Ready.** *Intent:* `CanAct` runs
   pokered's order, owns the recharge check, and full paralysis or a confusion self-hit cancels
   Bide/Thrash/charge/trap. Sleep, freeze, flinch and trap infliction clear a pending recharge. *Acceptance:* each
@@ -319,6 +306,20 @@ data/engine item usually also means updating the test that pins the wrong value.
 
 ### 3.2 Data and importer
 
+- **Move descriptions state modern effects (found 2026-11-02 while fixing high-crit data) — S–M, ⚠️ drafted.**
+  `MoveImport.BuildGen1Attack` stores PokeAPI's modern `short_effect`, and `CreatureOverview.tsx:184` shows it to the
+  player. Two are confirmed wrong: Sky Attack says it can flinch (no flinch in Gen 1) and Focus Energy says it raises the
+  crit chance (its Gen 1 bug lowers it). The other moves are unaudited.
+  **DoR:** ⚠️ every line drafted, awaiting your confirmation.
+  - **Acceptance:** every stored move description states the Gen 1 effect, pinned by importer tests and a data contract
+    test, as the item descriptions are.
+  - **Design:** no design pass; an audit of all 165 first, then either a full table or overrides for the wrong ones,
+    whichever the audit supports.
+  - **Seam:** importer data, so no new seam; `DATA_IMPORT.md` and `GENERATION_SEAMS.md` name the table.
+  - **Gen 1 source:** pokered's move effect handlers, checked per move.
+  - **Data vs runtime:** importer only, with a full re-import.
+  - **Quirk:** Focus Energy's text warns that it usually lowers the crit chance.
+  - **Dependencies:** none.
 - **Found 2026-10-11 during V7 / the item seam (unverified beyond the citation; each needs its own DoR):**
   - *Struggle skips the accuracy roll* (found during "Gen 1 roll order", archived): `AttackAction.Connects`
     treats Struggle as never-miss; in pokered it goes through `MoveHitTest` like any move (so the 1/256 miss applies).

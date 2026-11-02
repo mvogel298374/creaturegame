@@ -192,7 +192,7 @@ public class MoveImport
         if (attack.StatusEffect != StatusCondition.None && pokeMove.Meta?.AilmentChance > 0)
             attack.EffectChance ??= pokeMove.Meta.AilmentChance;
 
-        attack.IsHighCrit = pokeMove.Meta?.CritRate > 0;
+        attack.IsHighCrit = pokeMove.Name != null && Gen1HighCritMoves.Contains(pokeMove.Name);
 
         return attack;
     }
@@ -350,6 +350,15 @@ public class MoveImport
                 break;
         }
     }
+
+    /// <summary>pokered's <c>HighCriticalMoves</c> (DATA_IMPORT.md §4.1).</summary>
+    private static readonly HashSet<string> Gen1HighCritMoves = new()
+    {
+        "karate-chop",
+        "razor-leaf",
+        "crabhammer",
+        "slash",
+    };
 
     // Gen 1 special move mechanics keyed by PokeAPI move name — full catalog in DATA_IMPORT.md §4.1.
     private static readonly Dictionary<string, MoveEffect> Gen1MoveEffects = new()

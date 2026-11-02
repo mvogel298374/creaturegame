@@ -404,6 +404,8 @@ result from the DB; rationale → `ARCHITECTURE.md` §2.6, mapping → `DATA_IMP
 - an **item description table** — `ItemMapper.Gen1Descriptions` has the same weakness: a second generation's import
   would give every shared item its Gen 1 text, including Dire Hit's bug warning and "but not confusion" (only an item
   missing from the table fails). Key it by generation alongside the prices;
+- a **high-crit move list** — `MoveImport.Gen1HighCritMoves` is Gen 1's list, and `IsHighCrit` holds one generation's
+  answer per move. Verify each generation's list at its own disassembly rather than PokeAPI's modern `crit_rate`;
 - for **Gen 2**, the Special split needs **two stat columns** (a model change; `SingleSpecialAsOf` throws for
   generation != 1 until then) — the `GetOffensiveStat`/`GetDefensiveStat` seam is where the engine picks between
   them (the Special-model decision is part of adding the generation);
