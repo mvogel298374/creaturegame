@@ -49,7 +49,7 @@ gap has drafted text, awaiting your confirmation · ✗ gaps remain.
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
 | **Modal accessibility** (§5) | S–M | ⚠️ 1, 3, 5, 6, 7 + test route | Client only; the drafted test route is an E2E spec you run. |
-| **High-crit moves under Focus Energy** (§3.1) | S | ⚠️ 1, 2, 3, 4, 5, 6, 7 | Found by `requirements-review` 2026-11-02. One seam method plus a test. |
+| **Razor Wind and Sky Attack aren't high-crit in Gen 1** (§3.1) | S | ✅ confirmed 2026-11-02 | Importer list plus a full re-import. Awaiting your greenlight. |
 
 **B. A design pass first** (central engine code: `opus-engineer` plus both gates; each pass is shown to you)
 
@@ -150,19 +150,18 @@ data/engine item usually also means updating the test that pins the wrong value.
   test pinning pokered's number; its seam member (most are already `IBattleRules`/`DamageCalculator` inputs);
   `opus-engineer` plus both gates, since `DamageCalculator`/`AttackAction` are central. Data vs runtime: runtime.
   Dependencies: none.
-- **High-crit moves under Focus Energy or Dire Hit (found 2026-11-02 by `requirements-review`; source-confirmed) — S,
-  ⚠️ drafted.** `Gen1BattleRules.GetCritChance` (`:281-290`) applies the ×8 and its 255 cap first and then quarters the
-  result. pokered's `CriticalHitTest` (`core.asm:4506-4532`) halves before the multiplier and caps afterwards. A base
-  speed 100 Slash under Focus Energy is 100/256 in pokered and 63/256 here; normal moves already match.
-  **DoR:** ⚠️ every line drafted, awaiting your confirmation.
-  - **Acceptance:** a test pins pokered's numerator for high-crit moves under Focus Energy, including the 100/256
-    Slash case, and normal-move and no-Focus-Energy results stay unchanged.
-  - **Design:** no design pass; a change inside one existing seam method, away from the central methods.
-  - **Seam:** `IBattleRules.GetCritChance` already owns this; only the Gen 1 implementation changes.
-  - **Gen 1 source:** `core.asm` `CriticalHitTest`, lines above.
-  - **Data vs runtime:** runtime only.
-  - **Quirk:** under Focus Energy a high-crit move can lose less than three quarters of its chance, because the ×8
-    cap no longer bites.
+- **Razor Wind and Sky Attack aren't high-crit in Gen 1 (found 2026-11-02 by `requirements-review`; source-confirmed) —
+  S, ✅ Ready, awaiting greenlight.** `MoveImport.cs:195` sets `IsHighCrit` from PokeAPI's modern `crit_rate`, so
+  `moves.db` marks six moves high-crit and both of these get the ×8 chance in battle. pokered's `HighCriticalMoves`
+  (`data/battle/critical_hit_moves.asm`) lists only Karate Chop, Razor Leaf, Crabhammer and Slash.
+  `CriticalHitContractTests` has two tests pinning the wrong behaviour.
+  - **Acceptance:** exactly pokered's four moves are high-crit in `moves.db`, pinned by a data contract test; the two
+    wrong tests are corrected.
+  - **Design:** no design pass; the importer gets a pokered-sourced list.
+  - **Seam:** the high-crit list is importer data, so no new seam.
+  - **Gen 1 source:** `data/battle/critical_hit_moves.asm`.
+  - **Data vs runtime:** importer only, with a full re-import.
+  - **Quirk:** Razor Wind and Sky Attack crit at the normal rate, unlike later generations.
   - **Dependencies:** none.
 - **Gen 1 status-check order in `CanAct` (from §7.6 V8 — claims 2–4) — M, ✗ not Ready.** *Intent:* `CanAct` runs
   pokered's order, owns the recharge check, and full paralysis or a confusion self-hit cancels

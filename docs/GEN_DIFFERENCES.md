@@ -74,6 +74,11 @@ A reference doc covering every major system across all main-series generations �
   `past_stats` and base experience / catch rate from pokered-sourced tables — `DATA_IMPORT.md` §4.2
 - Critical hit chance based on base Speed: `floor(BaseSpeed / 2) / 256`
 - High-crit moves: `min(floor(BaseSpeed / 2) × 8, 255) / 256`
+- Under Focus Energy or Dire Hit, the extra halving comes before the move's multiplier (pokered `CriticalHitTest`): a
+  normal move is `floor(BaseSpeed / 8) / 256`, a high-crit move `floor(BaseSpeed / 4) × 4 / 256`, which never reaches the
+  255 cap. From base speed 64 up the unfocused high-crit chance is already capped, so the bug costs less than three
+  quarters: base speed 100 goes from 255/256 to 100/256. Below 64 it costs about three quarters: base speed 30 goes from
+  120/256 to 28/256
 - Critical hits ignore all stat stages (both attacker's and defender's)
 - Critical hits ignore Burn's Attack penalty
 - **Stat Exp bonus rounds the root up:** `min(255, ceil(sqrt(StatExp))) / 4`, integer division, so StatExp 9999 counts
@@ -186,7 +191,8 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
   rule above, and read off the same `FaintEndsTurnImmediately` member; **switching out during the recharge
   turn is legal** — the recharge is only spent if the creature stays in and FIGHTs (it's enforced inside
   `AttackAction.ExecuteAsync`, not the turn menu), so a voluntary switch pre-empts it
-- **Focus Energy / Dire Hit**: bug causes it to **quarter** the crit rate instead of quadrupling it
+- **Focus Energy / Dire Hit**: bug causes it to **quarter** the crit rate instead of quadrupling it; a high-crit move
+  from base speed 64 up loses less (formula under Stats)
 - **Sleep**: Pokémon wakes up before acting — but **cannot act** on the turn it wakes
 - **Burn**: halves the Attack stat; has no effect on Special (no Sp. Atk yet)
 - **Poison**: causes damage outside battle; Pokémon **can faint** from overworld Poison in Gen 1

@@ -288,7 +288,7 @@ public sealed class FocusEnergyEffect : IMoveEffect
 
     public void Apply(MoveEffectContext ctx)
     {
-        // The bugged ÷4 itself is applied in Gen1BattleRules.GetCritChance.
+        // The bug itself lives in Gen1BattleRules.GetCritChance.
         if (!ctx.Source.Battle.HasFocusEnergy)
         {
             ctx.Source.Battle.HasFocusEnergy = true;

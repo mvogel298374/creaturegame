@@ -8,6 +8,25 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §3.1 High-crit moves under Focus Energy or Dire Hit ✅ DONE (2026-11-02)
+
+S; found 2026-11-02 by `requirements-review` (source-confirmed), DoR confirmed by the user in-session ("go on", then
+"accept all five"). `Gen1BattleRules.GetCritChance` applied the ×8 and its 255 cap first and then quartered the result;
+pokered's `CriticalHitTest` (`engine/battle/core.asm:4506-4532`) halves, applies the Focus Energy shift, then the
+high-crit multiplier and the cap.
+
+**Outcome.** `GetCritChance` now follows that order. Base speed 100 Slash under Focus Energy is 100/256 (was 63/256);
+base speed 30 is 28/256 (was 30/256), so low speeds went down as well as high speeds up. Normal moves and results
+without Focus Energy are unchanged. Formula: `GEN_DIFFERENCES.md` → Stats; `GENERATION_SEAMS.md` crit row points there.
+Tests: `FocusEnergyContractTests` (the four high-crit Focus Energy rows failed on the unfixed code). Runtime only; no
+data change, `moves.db` and `pokemon.db` untouched.
+
+**User rulings on `requirements-review` findings.** Reword the docs and the `MoveEffects.cs` comment (done). Dire Hit
+keeps "usually a quarter as likely", no re-import. Razor Wind / Sky Attack filed as a separate item (`TODO.md` §3.1,
+Ready). A full 0-255 sweep and a separate Dire Hit crit test waived. `pr-review` waived for this item.
+
+---
+
 ## §3.2 Item descriptions describe the Gen 1 effect ✅ DONE (2026-11-02)
 
 S–M; found 2026-10-11 (V7, unverified), confirmed Ready by the user 2026-11-02. PokeAPI's modern text was stored as-is

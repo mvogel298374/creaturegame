@@ -276,16 +276,13 @@ public sealed class Gen1BattleRules : IBattleRules
 
     // ── Critical hits ──────────────────────────────────────────────────────────
 
-    // Gen 1: normal = floor(BaseSpeed/2)/256; high-crit = min(floor(BaseSpeed/2)*8, 255)/256.
-    // BaseSpeed is the raw unmodified base speed stat.
+    // pokered CriticalHitTest, in its order: GEN_DIFFERENCES.md → Stats.
     public double GetCritChance(Creature attacker, Attack move)
     {
-        double numerator = Math.Floor(attacker.BaseSpeed / 2.0);
-        if (move.IsHighCrit)
-            numerator = Math.Min(numerator * 8, 255);
-        // Gen 1 bug: Focus Energy was meant to quadruple the crit rate but instead quarters it.
-        if (attacker.Battle.HasFocusEnergy)
-            numerator = Math.Floor(numerator / 4.0);
+        int halved = attacker.BaseSpeed / 2;
+        // Gen 1 bug: Focus Energy shifts right where it should shift left.
+        int focused = attacker.Battle.HasFocusEnergy ? halved / 2 : halved * 2;
+        int numerator = move.IsHighCrit ? Math.Min(focused * 4, 255) : focused / 2;
         return numerator / 256.0;
     }
 

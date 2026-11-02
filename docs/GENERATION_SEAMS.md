@@ -69,7 +69,7 @@ a pokecrystal or pokeemerald cite is **unverified** (§4.5):
 
 | Concept | Gen 1 | Later gens |
 |:--------|:------|:-----------|
-| **Crit chance** | `floor(BaseSpeed/2)/256`; high-crit moves ×8. Uses *base* Speed, ignoring stat stages — fast Pokémon crit constantly. | Stage-based (a fixed ladder), unrelated to Speed. |
+| **Crit chance** | `floor(BaseSpeed/2)/256`; high-crit moves ×8. Uses *base* Speed, ignoring stat stages — fast Pokémon crit constantly. Focus Energy / Dire Hit change the order of the halving and the multiplier (`GEN_DIFFERENCES.md` → Stats). | Stage-based (a fixed ladder), unrelated to Speed. |
 | **Crit ignores stat stages** | **Yes** — a Gen 1 crit recomputes from raw stats, *discarding* your Swords Dance boosts *and* the Burn penalty (sometimes a crit hits *weaker*!). | No. |
 | **Crit multiplier** | 2.0× | 2.0× (Gen 1–5), 1.5× (Gen 6+). |
 | **Damage variance** | random `217–255` ÷ 255 | random `85–100` ÷ 100 |

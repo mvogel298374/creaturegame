@@ -1,3 +1,4 @@
+using creaturegame.Attacks;
 using creaturegame.Combat;
 using creaturegame.Tests.TestSupport;
 
@@ -36,5 +37,63 @@ public class FocusEnergyContractTests(MovesFixture moves) : Gen1MoveContract(mov
         Assert.True(focused < normal, "the Gen 1 bug lowers crit rate instead of raising it");
         // floor(floor(200/2)/4)/256 = floor(100/4)/256 = 25/256
         Assert.Equal(25.0 / 256.0, focused, 5);
+    }
+
+    [Theory]
+    [InlineData(100, 100)] // loses less than three quarters of the capped 255
+    [InlineData(130, 128)]
+    [InlineData(255, 252)]
+    [InlineData(30, 28)] // floor(30/4) x 4, below a plain quarter of 120
+    public void HighCritMoveUnderFocusEnergy_HalvesBeforeTheMultiplier(int baseSpeed, int numerator)
+    {
+        var attacker = TestCreatures.Make("A", baseSpeed: baseSpeed);
+        attacker.Battle.HasFocusEnergy = true;
+
+        double chance = Gen1BattleRules.Instance.GetCritChance(
+            attacker,
+            new Attack { Name = "Slash", IsHighCrit = true }
+        );
+
+        Assert.Equal(numerator / 256.0, chance);
+    }
+
+    [Theory]
+    [InlineData(100, true, 255)]
+    [InlineData(64, true, 255)]
+    [InlineData(63, true, 248)]
+    [InlineData(31, true, 120)]
+    [InlineData(100, false, 50)]
+    [InlineData(31, false, 15)]
+    public void CritChanceWithoutFocusEnergy_MatchesPokered(
+        int baseSpeed,
+        bool isHighCrit,
+        int numerator
+    )
+    {
+        var attacker = TestCreatures.Make("A", baseSpeed: baseSpeed);
+
+        double chance = Gen1BattleRules.Instance.GetCritChance(
+            attacker,
+            new Attack { Name = "Move", IsHighCrit = isHighCrit }
+        );
+
+        Assert.Equal(numerator / 256.0, chance);
+    }
+
+    [Theory]
+    [InlineData(200, 25)]
+    [InlineData(100, 12)]
+    [InlineData(15, 1)]
+    public void NormalMoveUnderFocusEnergy_MatchesPokered(int baseSpeed, int numerator)
+    {
+        var attacker = TestCreatures.Make("A", baseSpeed: baseSpeed);
+        attacker.Battle.HasFocusEnergy = true;
+
+        double chance = Gen1BattleRules.Instance.GetCritChance(
+            attacker,
+            new Attack { Name = "Tackle", IsHighCrit = false }
+        );
+
+        Assert.Equal(numerator / 256.0, chance);
     }
 }
