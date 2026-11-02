@@ -80,6 +80,43 @@ public static class ItemMapper
         ["guard-spec"] = 700,
     };
 
+    /// <summary>Each item's Gen 1 effect, from pokered (DATA_IMPORT.md §4.5).</summary>
+    public static readonly IReadOnlyDictionary<string, string> Gen1Descriptions = new Dictionary<
+        string,
+        string
+    >
+    {
+        ["poke-ball"] = "Tries to catch a wild Pokémon.",
+        ["great-ball"] = "Tries to catch a wild Pokémon, with better odds than a Poké Ball.",
+        ["ultra-ball"] = "Tries to catch a wild Pokémon, with better odds than a Poké Ball.",
+        ["master-ball"] = "Catches a wild Pokémon every time.",
+        ["safari-ball"] = "Tries to catch a wild Pokémon, with the same odds as an Ultra Ball.",
+        ["potion"] = "Restores 20 HP.",
+        ["super-potion"] = "Restores 50 HP.",
+        ["hyper-potion"] = "Restores 200 HP.",
+        ["max-potion"] = "Restores HP to full.",
+        ["full-restore"] = "Restores HP to full and cures any status ailment, but not confusion.",
+        ["antidote"] = "Cures poison.",
+        ["burn-heal"] = "Cures a burn.",
+        ["ice-heal"] = "Cures freezing.",
+        ["awakening"] = "Cures sleep.",
+        ["paralyze-heal"] = "Cures paralysis.",
+        ["full-heal"] = "Cures any status ailment, but not confusion.",
+        ["revive"] = "Revives with half HP.",
+        ["ether"] = "Restores 10 PP for one move.",
+        ["max-ether"] = "Restores PP to full for one move.",
+        ["elixir"] = "Restores 10 PP for each move.",
+        ["max-elixir"] = "Restores PP to full for each move.",
+        ["x-attack"] = "Raises Attack by one stage in battle.",
+        ["x-defense"] = "Raises Defense by one stage in battle.",
+        ["x-speed"] = "Raises Speed by one stage in battle.",
+        ["x-sp-atk"] = "Raises Special by one stage in battle.",
+        ["x-accuracy"] = "The user's moves skip the accuracy check until it switches out.",
+        ["dire-hit"] =
+            "Pumps up the user, but a bug usually makes its critical hits a quarter as likely until it switches out.",
+        ["guard-spec"] = "Stops status moves that lower the user's stats until it switches out.",
+    };
+
     public static Item MapToItem(PokeApiItem pokeItem)
     {
         Item item = new Item
@@ -94,9 +131,7 @@ public static class ItemMapper
                         $"Item '{pokeItem.Name}' has no Gen 1 price in ItemMapper.Gen1Prices."
                     ),
             FlingPower = pokeItem.FlingPower,
-            Description =
-                pokeItem.EffectEntries?.FirstOrDefault(e => e.Language?.Name == "en")?.ShortEffect
-                ?? "No description available.",
+            Description = Gen1Descriptions[pokeItem.Name!],
             SpriteUrl = pokeItem.Sprites?.Default,
         };
 
@@ -200,7 +235,6 @@ public static class ItemMapper
             case "x-accuracy":
                 item.StatBoostStat = StageStat.Accuracy;
                 item.StatBoostStages = 1;
-                item.Description = "Your moves skip the accuracy check for the rest of the battle.";
                 break;
             case "dire-hit":
                 item.BoostsCrit = true;

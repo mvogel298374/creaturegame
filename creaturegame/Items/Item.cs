@@ -15,13 +15,13 @@ public class Item
     public string? Name { get; set; }
     public ItemCategory Category { get; set; } = ItemCategory.Other;
 
-    /// <summary>Mart buy price in Poké-dollars (PokeAPI <c>cost</c>).</summary>
+    /// <summary>Gen 1 mart price from pokered (DATA_IMPORT.md §4.5).</summary>
     public int Cost { get; set; }
 
     /// <summary>Base power if thrown with Fling (unused in Gen 1; kept as raw imported data).</summary>
     public int? FlingPower { get; set; }
 
-    /// <summary>English short-effect text from PokeAPI.</summary>
+    /// <summary>The item's Gen 1 effect text (DATA_IMPORT.md §4.5).</summary>
     public string? Description { get; set; }
 
     /// <summary>PokeAPI default sprite URL (sprite download into wwwroot is deferred to UI time).</summary>
@@ -59,11 +59,10 @@ public class Item
     public StageStat? StatBoostStat { get; set; }
     public int? StatBoostStages { get; set; }
 
-    /// <summary>Dire Hit — raises the user's critical-hit ratio (Gen 1: sets the Focus Energy state). In Gen 1
-    /// this faithfully reproduces the famous bug where "focusing" actually <i>quarters</i> crit chance.</summary>
+    /// <summary>Dire Hit: sets the Focus Energy state, whose Gen 1 bug lowers the crit chance.</summary>
     public bool BoostsCrit { get; set; }
 
-    /// <summary>Guard Spec. — shrouds the user in Mist (the opponent can't lower its stat stages this battle).</summary>
+    /// <summary>Guard Spec.: sets the Mist state on the user.</summary>
     public bool SetsMist { get; set; }
 
     public Item() { }

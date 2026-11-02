@@ -16,9 +16,6 @@ public class PokeApiItem
     [JsonPropertyName("category")]
     public NamedApiResource? Category { get; set; }
 
-    [JsonPropertyName("effect_entries")]
-    public List<EffectEntry>? EffectEntries { get; set; }
-
     [JsonPropertyName("sprites")]
     public ItemSprites? Sprites { get; set; }
 }

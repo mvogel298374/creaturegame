@@ -212,7 +212,10 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - **X-item stat boosts (X Attack etc., Guard Spec., Dire Hit) do NOT show this screen** and always apply to
   the creature currently on the field — Gen 1 has no per-party-member storage for a stat stage, so there is
   no benched target to pick.
-- **X Accuracy** makes the user's moves skip the accuracy check for the rest of the battle (they always hit, with no
+- **Bag text states each item's Gen 1 effect:** nothing about happiness or ball multipliers, and Full Heal and Full
+  Restore say they don't cure confusion. Dire Hit's text warns of Gen 1's bug, which usually makes critical hits a
+  quarter as likely.
+- **X Accuracy** makes the user's moves skip the accuracy check until it switches out (they always hit, with no
   1/256 miss) — it is not a +1 accuracy stage, and the bag text says so. It does not rescue a failed one-hit-KO speed
   check, and Mist still blocks stat drops. Haze, and switching the user out, clear it. A second use is still
   consumed. Using it shows only the normal "used" line; no indicator stays on screen.

@@ -8,6 +8,37 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §3.2 Item descriptions describe the Gen 1 effect ✅ DONE (2026-11-02)
+
+S–M; found 2026-10-11 (V7, unverified), confirmed Ready by the user 2026-11-02. PokeAPI's modern text was stored as-is
+(only X Accuracy's was overridden), so Dire Hit, Guard Spec and the X-items described modern effects.
+
+**Outcome.** `ItemMapper.Gen1Descriptions`, a layer-2 table covering the full 28-item roster (same shape as
+`ItemMapper.Gen1Prices`), replaces PokeAPI's `effect_entries` text for items. Sources (pokered):
+`engine/items/item_effects.asm`; `engine/battle/core.asm` `CriticalHitTest` and `SendOutMon`;
+`engine/battle/move_effects/haze.asm`. Tests: `ItemImportTests` (table and roster in step, text pins) and the new
+`ItemDescriptionDataContractTests` (stored text in `items.db`). A full importer run changed 12 `Description` values in
+`items.db`; `moves.db` and `pokemon.db` were returned to their committed bytes because the run only regenerated
+surrogate Ids.
+
+**The filed claim was wider than filed.** Beyond Dire Hit, Guard Spec and the X-items: happiness text, Guard Spec's
+"five turns", X Special's name, Safari Ball's Great Marsh, the ball multipliers, Full Heal and Full Restore claiming to
+cure confusion (pokered never touches `CONFUSED`), and X Accuracy's "rest of the battle" (it lasts until the user
+switches out, because `SendOutMon` clears `wPlayerBattleStatus1`-`3`).
+
+**User rulings 2026-11-02.**
+- Ball text kept, describing pokered's effect, though Catch isn't built.
+- Dire Hit says "usually" (its Focus Energy-bit bug quarters a normal move's crit chance, but a high-crit move can lose
+  less; the latter is filed as the §3.1 entry "High-crit moves under Focus Energy or Dire Hit").
+- Guard Spec names status moves (pokered's Mist check sits in `MoveHitTest` and covers primary stat-down moves).
+- Haze is omitted from "until it switches out" by waiver (it also clears the bits via `CureVolatileStatuses`).
+- Full Heal / Full Restore text states that confusion is not cured (stays).
+
+**Follow-ups:** generation keying of the table is noted in `GENERATION_SEAMS.md`; pr-review advisory, the importer
+Gen-1-isms list in `TODO.md` §4.4 now names `Gen1Descriptions`.
+
+---
+
 ## §3.2 Failure announcements: a failed OHKO and a trainer-battle Roar/Whirlwind say "unaffected"; immunity ends in "!" ✅ DONE (2026-10-31)
 
 S–M; source-confirmed and designed 2026-10-31. Gen 1 has four failure lines and we collapsed them into two. A slower

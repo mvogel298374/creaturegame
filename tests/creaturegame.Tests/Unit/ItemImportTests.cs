@@ -16,8 +16,7 @@ public class ItemImportTests
         string name,
         string? category = null,
         int id = 1,
-        int? flingPower = null,
-        string? shortEffect = null
+        int? flingPower = null
     ) =>
         new()
         {
@@ -26,17 +25,6 @@ public class ItemImportTests
             FlingPower = flingPower,
             Category = category == null ? null : new NamedApiResource { Name = category },
             Sprites = new ItemSprites { Default = $"https://img/{name}.png" },
-            EffectEntries =
-                shortEffect == null
-                    ? null
-                    :
-                    [
-                        new EffectEntry
-                        {
-                            ShortEffect = shortEffect,
-                            Language = new() { Name = "en" },
-                        },
-                    ],
         };
 
     // ── Gen 1 roster (hand-curated, since PokeAPI has no Gen 1 item signal) ─────────────────────────
@@ -73,14 +61,13 @@ public class ItemImportTests
     public void MapToItem_CopiesCoreFields()
     {
         var item = ItemMapper.MapToItem(
-            PokeItem("great-ball", "standard-balls", id: 3, flingPower: 0, shortEffect: "Catches.")
+            PokeItem("great-ball", "standard-balls", id: 3, flingPower: 0)
         );
 
         Assert.Equal(3, item.Id);
         Assert.Equal("great-ball", item.Name);
         Assert.Equal(600, item.Cost);
         Assert.Equal(0, item.FlingPower);
-        Assert.Equal("Catches.", item.Description);
         Assert.Equal("https://img/great-ball.png", item.SpriteUrl);
     }
 
@@ -114,10 +101,69 @@ public class ItemImportTests
     }
 
     [Fact]
-    public void MapToItem_FallsBackWhenNoEnglishEffect()
+    public void Gen1Descriptions_CoverExactlyTheRoster()
     {
-        var item = ItemMapper.MapToItem(PokeItem("potion", "healing", shortEffect: null));
-        Assert.Equal("No description available.", item.Description);
+        Assert.Equal(
+            ItemMapper.Gen1BattleItemNames.OrderBy(n => n),
+            ItemMapper.Gen1Descriptions.Keys.OrderBy(n => n)
+        );
+    }
+
+    [Theory]
+    [InlineData("x-attack", "Raises Attack by one stage in battle.")]
+    [InlineData("x-defense", "Raises Defense by one stage in battle.")]
+    [InlineData("x-speed", "Raises Speed by one stage in battle.")]
+    [InlineData("x-sp-atk", "Raises Special by one stage in battle.")]
+    [InlineData("x-accuracy", "The user's moves skip the accuracy check until it switches out.")]
+    [InlineData(
+        "dire-hit",
+        "Pumps up the user, but a bug usually makes its critical hits a quarter as likely until it switches out."
+    )]
+    [InlineData(
+        "guard-spec",
+        "Stops status moves that lower the user's stats until it switches out."
+    )]
+    public void MapToItem_BattleBoosters_DescribeTheirGen1Effect(string slug, string description)
+    {
+        Assert.Equal(description, ItemMapper.MapToItem(PokeItem(slug)).Description);
+    }
+
+    [Theory]
+    [InlineData(
+        "full-restore",
+        "Restores HP to full and cures any status ailment, but not confusion."
+    )]
+    [InlineData("full-heal", "Cures any status ailment, but not confusion.")]
+    public void MapToItem_FullCures_StateThatConfusionStays(string slug, string description)
+    {
+        Assert.Equal(description, ItemMapper.MapToItem(PokeItem(slug)).Description);
+    }
+
+    [Theory]
+    [InlineData("great-ball", "Tries to catch a wild Pokémon, with better odds than a Poké Ball.")]
+    [InlineData("ultra-ball", "Tries to catch a wild Pokémon, with better odds than a Poké Ball.")]
+    [InlineData(
+        "safari-ball",
+        "Tries to catch a wild Pokémon, with the same odds as an Ultra Ball."
+    )]
+    public void MapToItem_Balls_DescribeGen1Odds(string slug, string description)
+    {
+        Assert.Equal(description, ItemMapper.MapToItem(PokeItem(slug)).Description);
+    }
+
+    [Fact]
+    public void Gen1Descriptions_CarryNoLaterGenerationEffects()
+    {
+        Assert.All(
+            ItemMapper.Gen1Descriptions.Values,
+            text =>
+            {
+                Assert.DoesNotContain("happiness", text);
+                Assert.DoesNotContain("Success rate", text);
+                Assert.DoesNotContain("five turns", text);
+                Assert.DoesNotContain("Great Marsh", text);
+            }
+        );
     }
 
     [Theory]
@@ -265,7 +311,7 @@ public class ItemImportTests
     [Fact]
     public void MapToItem_DireHit_BoostsCrit()
     {
-        // Dire Hit raises crit (Gen 1 Focus Energy state); it's a booster, not a stat-stage change.
+        // Dire Hit sets Gen 1's bugged Focus Energy state; a flag, not a stat stage.
         var item = ItemMapper.MapToItem(PokeItem("dire-hit", "stat-boosts"));
         Assert.True(item.BoostsCrit);
         Assert.False(item.SetsMist);

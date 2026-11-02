@@ -341,8 +341,20 @@ changes, so they're imported as data-only rows; their effect is deferred to the 
 
 **Deliberately NOT modelled here:** Poké Ball catch-rate multipliers — Gen 1 capture is a battle
 *formula*, which belongs with the (deferred) Catch mechanic on the seam side, not in the item data row.
-`Description` is PokeAPI's English short effect as-is, with one override: X Accuracy's text describes the Gen 3+
-stage boost, so `ItemMapper.ApplyGen1Gameplay` replaces it with the Gen 1 bypass wording.
+**`Description` is the item's Gen 1 effect, a layer-2 table.** The Gen 1 games show no item descriptions and PokeAPI's
+text describes modern effects (happiness, five-turn Guard Spec, a +1 accuracy X Accuracy, ball multipliers), so
+`ItemMapper.Gen1Descriptions` states what pokered does and PokeAPI's `effect_entries` is not read for items. The
+sources are `engine/items/item_effects.asm` and `engine/battle/core.asm`. Dire Hit sets the Focus Energy bit
+(`ItemUseDireHit`), whose `CriticalHitTest` bug quarters a normal move's crit chance (a high-crit move can lose less,
+hence "usually"), so its text must not promise a raise. Guard Spec's text names status moves because pokered's Mist
+check sits in `MoveHitTest` and only covers primary stat-down moves. Dire Hit, Guard Spec and X Accuracy last until a
+switch-out, because `SendOutMon` clears `wPlayerBattleStatus1`–`3`; Haze also clears them (`CureVolatileStatuses`),
+which the text leaves out by the user's waiver of 2026-11-02. Full Heal and Full Restore never touch `CONFUSED`, and
+their text says so. Gen 1 has no ball multiplier: `ItemUseBall` varies the random ceiling and the ball factor, and a
+Great Ball can beat an Ultra Ball, so the text only ranks each against the Poké Ball. The ball text describes pokered's
+effect even though catching isn't built (`TODO.md` §4.1); the bag hides balls.
+`ItemImportTests.Gen1Descriptions_CoverExactlyTheRoster` keeps the table and the roster in step, and
+`ItemDescriptionDataContractTests` pins the stored text.
 **`Cost` is the Gen 1 shop price, a layer-2 table.** PokeAPI stopped serving item prices in 2026 (`"prices": []`,
 no `cost`), and its old prices were modern anyway (Antidote ¥200, not Gen 1's ¥100). So `ItemMapper.Gen1Prices`
 holds pokered's `data/items/prices.asm` price for every roster slug, and PokeAPI's price field is not read at
