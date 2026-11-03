@@ -49,8 +49,7 @@ gap has drafted text, awaiting your confirmation · ✗ gaps remain.
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
 | **Modal accessibility** (§5) | S–M | ⚠️ 1, 3, 5, 6, 7 + test route | Client only; the drafted test route is an E2E spec you run. |
-| **Minimize raises evasion by two stages** (§3.2) | S | ✅ Ready, ruled "fix" 2026-11-03 | Found by the move description audit. First of the move-data fixes. |
-| **Thrash and Petal Dance end a turn early** (§3.1) | S | ✅ Ready, ruled "fix" 2026-11-03 | After Minimize. |
+| **Thrash and Petal Dance end a turn early** (§3.1) | S | ✅ Ready, ruled "fix" 2026-11-03 | Found by the move description audit. First of the move-data fixes. |
 | **Moves store modern priority** (§3.2) | S | ✅ Ready, accepted 2026-11-03 | After Thrash. |
 
 **B. A design pass first** (central engine code: `opus-engineer` plus both gates; each pass is shown to you)
@@ -321,6 +320,7 @@ data/engine item usually also means updating the test that pins the wrong value.
   - **Data vs runtime:** runtime only.
   - **Quirk:** a missed turn still counts toward the lock, as now.
   - **Dependencies:** none.
+  - **Review:** `pr-review` waived by the user 2026-11-03 (cost far exceeds the change); the other gates still run.
 - **Fly and Dig don't dodge anything (found 2026-11-03, move description audit) — M, ✗ not Ready.** pokered sets
   `INVULNERABLE` on the charge turn, and `MoveHitTest` misses against it (`core.asm:5259-5261`). Only Swift, which returns
   first (`:5247-5250`), and Bide's release, which skips the test (`:3528`), get through. Ours sets `IsTwoTurnCharging`, but
@@ -376,18 +376,7 @@ data/engine item usually also means updating the test that pins the wrong value.
   - **Data vs runtime:** importer only, with a full re-import.
   - **Quirk:** none.
   - **Dependencies:** after Thrash, as ruled; none in the code.
-- **Minimize raises evasion by two stages (found 2026-11-03, move description audit) — S, ✅ Ready, ruled "fix".**
-  pokered's Minimize uses `EVASION_UP1_EFFECT` (one stage), but PokeAPI reports its modern +2, so `moves.db` stores
-  `StatEffectDelta` 2 and `StatStageMoveContractTests.cs:92` pins that.
-  **DoR:**
-  - **Acceptance:** a Minimize user's evasion rises one stage; `moves.db` stores +1; the contract test and a mapping
-    test pin it.
-  - **Design:** none; one layer-2 correction like String Shot's.
-  - **Seam:** importer data; no new seam.
-  - **Gen 1 source:** pokered `data/moves/moves.asm`.
-  - **Data vs runtime:** importer only, with a full re-import.
-  - **Quirk:** none.
-  - **Dependencies:** none.
+  - **Review:** `pr-review` waived by the user 2026-11-03 (cost far exceeds the change); the other gates still run.
 - **Found 2026-10-11 during V7 / the item seam (unverified beyond the citation; each needs its own DoR):**
   - *Struggle skips the accuracy roll* (found during "Gen 1 roll order", archived): `AttackAction.Connects`
     treats Struggle as never-miss; in pokered it goes through `MoveHitTest` like any move (so the 1/256 miss applies).

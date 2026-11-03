@@ -8,6 +8,25 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §3.2 Minimize raises evasion by one stage ✅ DONE (2026-11-03)
+
+S; found 2026-11-03 by the move description audit (see *Move descriptions state the Gen 1 effect*), ruled "fix". pokered's
+Minimize uses `EVASION_UP1_EFFECT` (`data/moves/moves.asm:120`), one stage, but PokeAPI reports its modern +2, so `moves.db`
+stored `StatEffectDelta` 2 and `StatStageMoveContractTests` pinned that.
+
+**Outcome.** One case in `MoveImport.ApplyGen1Corrections` sets Minimize's `StatEffectDelta` to 1, like String Shot's
+correction. `moves.db` changed by that one value. All 28 stat-stage moves were compared with pokered; Minimize was the
+only wrong one. Importer only, with a full re-import; no new seam.
+
+**Tests.** `MoveMappingTests.Minimize_RaisesEvasionByOneStage_NotPokeApisTwo`; the Minimize row in
+`StatStageMoveContractTests` now pins +1.
+
+**Reviews.** `format-gate` PASS, `test-runner` PASS, `requirements-review` MET. `pr-review` waived by the user on
+2026-11-03 for this item, Thrash and Petal Dance, and Moves store modern priority: its cost far exceeds these small
+changes. E2E not run.
+
+---
+
 ## §3.2 Move descriptions state the Gen 1 effect ✅ DONE (2026-11-03)
 
 S–M; found 2026-11-02 while fixing high-crit data (`requirements-review`), greenlit 2026-11-03. `MoveImport.BuildGen1Attack`

@@ -344,6 +344,9 @@ public class MoveImport
             case "string-shot": // Gen 1–5: lowers Speed by 1 (modern: by 2)
                 attack.StatEffectDelta = -1;
                 break;
+            case "minimize": // Gen 1: EVASION_UP1_EFFECT, +1 (modern: +2)
+                attack.StatEffectDelta = 1;
+                break;
             case "thunder": // Gen 1: 10% paralysis (modern: 30%)
                 attack.EffectChance = 10;
                 break;

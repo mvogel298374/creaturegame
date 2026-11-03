@@ -83,13 +83,13 @@ public class StatStageMoveContractTests(MovesFixture moves) : Gen1MoveContract(m
     }
 
     // Self-targeting raises beyond the special cases above: Harden / Withdraw (+1 Defense),
-    // Double Team (+1 Evasion), Minimize (+2 Evasion — first Evasion mover).
+    // Double Team and Minimize (+1 Evasion: pokered gives both EVASION_UP1_EFFECT).
     [Theory]
     [InlineData("harden", "Defense", 1)]
     [InlineData("withdraw", "Defense", 1)]
     [InlineData("defense-curl", "Defense", 1)]
     [InlineData("double-team", "Evasion", 1)]
-    [InlineData("minimize", "Evasion", 2)]
+    [InlineData("minimize", "Evasion", 1)]
     [InlineData("barrier", "Defense", 2)]
     [InlineData("acid-armor", "Defense", 2)]
     [InlineData("amnesia", "Special", 2)] // Gen 1: +2 to the combined Special stat

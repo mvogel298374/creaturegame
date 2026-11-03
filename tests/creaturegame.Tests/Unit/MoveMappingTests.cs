@@ -292,6 +292,19 @@ public class MoveMappingTests
     }
 
     [Fact]
+    public void Minimize_RaisesEvasionByOneStage_NotPokeApisTwo()
+    {
+        var move = Move(name: "minimize", power: null, damageClass: "status");
+        move.Target = Named("user");
+        move.StatChanges = [new() { Change = 2, Stat = Named("evasion") }];
+
+        var attack = MoveImport.MapToAttack(move);
+
+        Assert.Equal(StageStat.Evasion, attack.StatEffectStat);
+        Assert.Equal(1, attack.StatEffectDelta);
+    }
+
+    [Fact]
     public void StatChange_SelfTarget_MapsStatStageEffectAtFullChance()
     {
         // A pure stat move (no damage) always succeeds → chance 100.
