@@ -291,6 +291,25 @@ public class MoveMappingTests
         Assert.Equal(30, attack.EffectChance);
     }
 
+    [Theory]
+    [InlineData("bide", 1, 0)]
+    [InlineData("roar", -6, 0)]
+    [InlineData("whirlwind", -6, 0)]
+    [InlineData("teleport", -6, 0)]
+    [InlineData("quick-attack", 1, 1)]
+    [InlineData("counter", -5, -5)]
+    public void Priority_KeepsOnlyPokeredsOrderingExceptions(
+        string name,
+        int pokeApiPriority,
+        int expected
+    )
+    {
+        var move = Move(name: name);
+        move.Priority = pokeApiPriority;
+
+        Assert.Equal(expected, MoveImport.MapToAttack(move).Priority);
+    }
+
     [Fact]
     public void Minimize_RaisesEvasionByOneStage_NotPokeApisTwo()
     {

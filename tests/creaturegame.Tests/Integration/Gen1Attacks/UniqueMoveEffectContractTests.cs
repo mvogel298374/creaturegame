@@ -12,8 +12,7 @@ namespace creaturegame.Tests.Integration.Gen1Attacks;
 /// <item><b>Pay Day</b> — deals normal damage and scatters coins = multiplier × user level.</item>
 /// <item><b>Roar / Whirlwind</b> — end a wild battle in Gen 1: the target is scared off and flees
 /// (<c>MoveEffect.ForceFlee</c>). Pinned below via the real imported rows. <b>Teleport</b> (player flee /
-/// switch) still has no home with one creature, so it stays a deliberate announced-but-harmless no-op; all
-/// three keep their Gen 1 −6 priority.</item>
+/// switch) still has no home with one creature, so it stays a deliberate announced-but-harmless no-op.</item>
 /// <item><b>Haze / Metronome / Self-Destruct</b> — engine mechanics unit-tested in CoreMechanicsTests;
 /// here the <i>real imported rows</i> are driven through <c>AttackAction</c> to prove the mapping works.</item>
 /// </list>
@@ -71,13 +70,6 @@ public class UniqueMoveEffectContractTests(MovesFixture moves) : Gen1MoveContrac
         Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
         Assert.Equal(move.PowerPointsMax - 1, result.Move.PowerPointsCurrent);
     }
-
-    [Theory]
-    [InlineData("whirlwind")]
-    [InlineData("roar")]
-    [InlineData("teleport")]
-    public void SwitchMoveHasGen1NegativePriority(string moveName) =>
-        Assert.Equal(-6, Move(moveName).Priority);
 
     // Haze (real imported row) clears every stat stage on both battlers. The escalation math is unit-
     // tested in CoreMechanicsTests; this proves the imported move drives it through AttackAction.

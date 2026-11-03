@@ -49,7 +49,6 @@ gap has drafted text, awaiting your confirmation · ✗ gaps remain.
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
 | **Modal accessibility** (§5) | S–M | ⚠️ 1, 3, 5, 6, 7 + test route | Client only; the drafted test route is an E2E spec you run. |
-| **Moves store modern priority** (§3.2) | S | ✅ Ready, accepted 2026-11-03 | First of the move-data fixes. |
 
 **B. A design pass first** (central engine code: `opus-engineer` plus both gates; each pass is shown to you)
 
@@ -366,20 +365,6 @@ data/engine item usually also means updating the test that pins the wrong value.
 
 ### 3.2 Data and importer
 
-- **Moves store modern priority (found 2026-11-03, `requirements-review`) — S, ✅ Ready, accepted 2026-11-03.** pokered
-  has two ordering exceptions, Quick Attack first and Counter last (`core.asm:371-390`); everything else goes by speed.
-  PokeAPI's `Priority` is stored as-is, so Bide has +1 and Roar, Whirlwind and Teleport have -6, and `Battle.cs:180` sorts on
-  it. A slower Bide user acts before a faster foe; Roar and Whirlwind always act last.
-  **DoR:**
-  - **Acceptance:** those four store 0 in `moves.db`, Quick Attack and Counter keep theirs, a data contract test pins the
-    full list of non-zero priorities, and `SwitchMoveHasGen1NegativePriority` is replaced.
-  - **Design:** none; layer-2 importer corrections.
-  - **Seam:** importer data; no new seam.
-  - **Gen 1 source:** the cite above.
-  - **Data vs runtime:** importer only, with a full re-import.
-  - **Quirk:** none.
-  - **Dependencies:** none; the first of the move-data fixes, as ruled.
-  - **Review:** `pr-review` waived by the user 2026-11-03 (cost far exceeds the change); the other gates still run.
 - **Found 2026-10-11 during V7 / the item seam (unverified beyond the citation; each needs its own DoR):**
   - *Struggle skips the accuracy roll* (found during "Gen 1 roll order", archived): `AttackAction.Connects`
     treats Struggle as never-miss; in pokered it goes through `MoveHitTest` like any move (so the 1/256 miss applies).

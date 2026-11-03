@@ -162,6 +162,11 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
 - Deals 1/16 max HP chip damage per turn
 - Considered overpowered; used competitively to completely shut down opponents
 
+#### Turn Order
+- **Speed decides, with two exceptions:** Quick Attack goes first and Counter goes last; both sides using the same one
+  falls back to speed (pokered `engine/battle/core.asm:371-391`). Gen 1 has no priority field; PokeAPI's current values
+  (Bide +1; Roar, Whirlwind and Teleport -6) are not Gen 1's.
+
 #### Thrash / Petal Dance
 - **Attack for 3 or 4 turns, at 1/2 each.** `ThrashPetalDanceEffect` sets a counter of 2 or 3 on the first turn
   (pokered `engine/battle/effects.asm:800-805`); each later turn decrements it and still attacks, including the

@@ -58,6 +58,9 @@ public sealed class MovesFixture : IDisposable
             ? move
             : throw new InvalidOperationException($"No move with id {id} in moves.db.");
 
+    /// <summary>Every imported move, for data contracts over the whole table; never mutate them.</summary>
+    public IReadOnlyCollection<Attack> All => _byId.Values;
+
     public void Dispose() => _ctx.Dispose();
 }
 

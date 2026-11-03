@@ -347,6 +347,12 @@ public class MoveImport
             case "minimize": // Gen 1: EVASION_UP1_EFFECT, +1 (modern: +2)
                 attack.StatEffectDelta = 1;
                 break;
+            case "bide": // Gen 1: speed decides; only Quick Attack and Counter change the order
+            case "roar":
+            case "whirlwind":
+            case "teleport":
+                attack.Priority = 0;
+                break;
             case "thunder": // Gen 1: 10% paralysis (modern: 30%)
                 attack.EffectChance = 10;
                 break;

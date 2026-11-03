@@ -8,6 +8,37 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §3.2 Moves store modern priority ✅ DONE (2026-11-03)
+
+S; found 2026-11-03 by `requirements-review`, accepted Ready the same day. pokered has two ordering exceptions, Quick Attack
+first and Counter last (`core.asm:371-391`); everything else goes by speed. PokeAPI's `Priority` was stored as-is, so Bide had
++1 and Roar, Whirlwind and Teleport -6, and `Battle.cs:180` sorts on it: a slower Bide user acted before a faster foe, and
+Roar and Whirlwind always acted last.
+
+**Outcome.** One case in `MoveImport.ApplyGen1Corrections` sets Priority to 0 for Bide, Roar, Whirlwind and Teleport, leaving
+only Quick Attack (+1) and Counter (-5). A slower Bide user no longer acts before a faster foe; Roar, Whirlwind and Teleport
+go by the user's own speed. Importer only, with a full re-import; no new seam. `moves.db` changed in those four Priority
+values and nothing else.
+
+**Tests.** `PriorityMoveContractTests.OnlyQuickAttackAndCounterHaveAPriority` (whole-table pin, via the new
+`MovesFixture.All`), `RoarWhirlwindAndTeleportGoByTheUsersOwnSpeed`, `ASlowerBideUserStoresOnlyAfterTheFasterFoeMoves` and
+`BothSidesUsingTheSameExceptionFallBackToSpeed`; `MoveMappingTests.Priority_KeepsOnlyPokeredsOrderingExceptions`.
+`SwitchMoveHasGen1NegativePriority` and `QuickAttackHasGen1PositivePriority` were removed, replaced by the pin. The tests
+that depend on the new values failed against the old data before the fix.
+
+**Reviews.** `format-gate` REFORMATTED, then passed; `test-runner` PASS; `requirements-review` DISCREPANCIES (2) plus two
+questions, all ruled by the user 2026-11-03; `pr-review` waived by the user 2026-11-03 (cost far exceeds the change).
+`requirements-review` was not re-run on the small post-ruling edits. E2E not run.
+
+**Rulings.**
+1. The stale "-6 priority" clause is removed from the `UniqueMoveEffectContractTests` class doc, and the test renamed.
+2. The unverified "later generations" sentence in `GEN_DIFFERENCES.md` "Turn Order" is reworded to what pokered proves.
+3. Importer data is the right home for this item; a strict reading of `generation-seams.md` rule 4 for the priority sort
+   itself belongs to the pending "audit inline battle rules" item.
+4. The mirror-matchup test is added (`BothSidesUsingTheSameExceptionFallBackToSpeed`).
+
+---
+
 ## §3.1 Thrash and Petal Dance end a turn early ✅ DONE (2026-11-03)
 
 S; found 2026-11-03 by the move description audit, ruled "fix". pokered attacks for 3-4 turns: `ThrashPetalDanceEffect` sets
