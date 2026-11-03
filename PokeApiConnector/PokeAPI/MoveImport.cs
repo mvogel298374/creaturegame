@@ -283,6 +283,9 @@ public class MoveImport
     /// Runs last so it wins over the mapping above.</summary>
     private static void ApplyGen1Corrections(Attack attack, PokeApiMove pokeMove)
     {
+        if (pokeMove.Name != null && Gen1Descriptions.TryGetValue(pokeMove.Name, out var text))
+            attack.Description = text;
+
         switch (pokeMove.Name)
         {
             case "acid": // Gen 1: 33% to lower Defense (modern: 10% Sp. Def; past_values empty)
@@ -358,6 +361,92 @@ public class MoveImport
         "razor-leaf",
         "crabhammer",
         "slash",
+    };
+
+    private const string NoAdditionalEffect = "Inflicts regular damage with no additional effect.";
+    private const string ChargesFirst = "Requires a turn to charge before attacking.";
+    private const string BindingText = "Hits for 2-5 turns, and the target can’t act during them.";
+    private const string CrashText = "If the user misses, it takes 1 point of damage.";
+    private const string OneHitKoText = "Causes a one-hit KO, but fails against a faster target.";
+    private const string ForceFleeText =
+        "Immediately ends wild battles, but can fail against a higher-level target. No effect on trainers.";
+    private const string RampageText = "Hits every turn for 3-4 turns, then confuses the user.";
+    private const string SelfFaintText =
+        "User faints, even if it misses. Halves the target’s Defense for this attack.";
+    private const string HealText = "Heals the user by half its max HP. Fails at full HP.";
+
+    /// <summary>Gen 1 text where PokeAPI's is wrong or incomplete; other moves keep it (DATA_IMPORT.md §4.1).</summary>
+    public static readonly IReadOnlyDictionary<string, string> Gen1Descriptions = new Dictionary<
+        string,
+        string
+    >
+    {
+        ["acid"] = "Has a chance to lower the target’s Defense by one stage.",
+        ["amnesia"] = "Raises the user’s Special by two stages.",
+        ["bide"] = "User waits for 2-3 turns, then hits back for twice the damage it took.",
+        ["bind"] = BindingText,
+        ["clamp"] = BindingText,
+        ["conversion"] = "Changes the user’s types to match the target’s.",
+        ["counter"] =
+            "Deals back twice the last damage, but fails unless the target’s last move was a damaging Normal or Fighting move. Usually goes last.",
+        ["dig"] =
+            "User digs underground, and only Swift and Bide can hit it until it attacks next turn.",
+        ["disable"] = "Disables one of the target’s moves at random for 1-8 turns.",
+        ["dizzy-punch"] = NoAdditionalEffect,
+        ["double-edge"] = "User receives 1/4 the damage it inflicts in recoil.",
+        ["earthquake"] = NoAdditionalEffect,
+        ["explosion"] = SelfFaintText,
+        ["fire-spin"] = BindingText,
+        ["fissure"] = OneHitKoText,
+        ["fly"] =
+            "User flies high into the air, and only Swift and Bide can hit it until it attacks next turn.",
+        ["focus-energy"] = "Meant to raise the critical hit chance, but a bug lowers it instead.",
+        ["growth"] = "Raises the user’s Special by one stage.",
+        ["guillotine"] = OneHitKoText,
+        ["gust"] = NoAdditionalEffect,
+        ["haze"] =
+            "Resets all Pokémon’s stats, accuracy, and evasion, ends their lasting effects, and cures the target’s status.",
+        ["high-jump-kick"] = CrashText,
+        ["horn-drill"] = OneHitKoText,
+        ["hyper-beam"] =
+            "User foregoes its next turn to recharge, unless this move misses, knocks out the target or breaks a Substitute.",
+        ["jump-kick"] = CrashText,
+        ["light-screen"] =
+            "Doubles the user’s Special against special attacks until it leaves battle.",
+        ["low-kick"] = "Has a chance to make the target flinch.",
+        ["metronome"] = "Randomly selects and uses any move except itself and Struggle.",
+        ["mimic"] = "Copies one of the target’s moves in place of this one.",
+        ["minimize"] = "Raises the user’s evasion by one stage.",
+        ["mist"] =
+            "Blocks enemy moves that only lower stats, but not stat drops from damaging moves.",
+        ["pay-day"] = "Scatters money on the ground worth twice the user’s level.",
+        ["petal-dance"] = RampageText,
+        ["psychic"] = "Has a chance to lower the target’s Special by one stage.",
+        ["psywave"] = "Inflicts random damage up to about 1.5 times the user’s level.",
+        ["quick-attack"] = "Usually goes first.",
+        ["rage"] =
+            "The user can’t stop using this move, and its Attack rises by one stage each time it is hit.",
+        ["recover"] = HealText,
+        ["reflect"] = "Doubles the user’s Defense against physical attacks until it leaves battle.",
+        ["rest"] =
+            "User sleeps for two turns, fully healing itself and curing its status. Fails at full HP.",
+        ["roar"] = ForceFleeText,
+        ["rock-slide"] = NoAdditionalEffect,
+        ["self-destruct"] = SelfFaintText,
+        ["skull-bash"] = ChargesFirst,
+        ["sky-attack"] = ChargesFirst,
+        ["soft-boiled"] = HealText,
+        ["string-shot"] = "Lowers the target’s Speed by one stage.",
+        ["struggle"] = "User receives 1/2 the damage it inflicts in recoil.",
+        ["substitute"] =
+            "Transfers 1/4 of the user’s max HP into a doll that takes damage until it breaks. Blocks most status changes, but not moves that only put to sleep or paralyze.",
+        ["surf"] = NoAdditionalEffect,
+        ["teleport"] = "Has no effect.",
+        ["thrash"] = RampageText,
+        ["tri-attack"] = NoAdditionalEffect,
+        ["waterfall"] = NoAdditionalEffect,
+        ["whirlwind"] = ForceFleeText,
+        ["wrap"] = BindingText,
     };
 
     // Gen 1 special move mechanics keyed by PokeAPI move name — full catalog in DATA_IMPORT.md §4.1.

@@ -98,7 +98,7 @@ if any asset failed to download.
 For each move, `GET /move/{id}` → `PokeApiMove` DTO → `MapToAttack`. Core stat fields
 (`BaseDamage`/power, `Accuracy`, `PowerPointsMax`/pp, `EffectChance`, and `DamageType`) are
 **resolved to their Gen 1 values** (see immediately below), *not* copied from PokeAPI's current
-data; `Priority` and `Description` (English short-effect) are taken as-is.
+data; `Priority` is taken as-is, and `Description` is PokeAPI's English short effect unless `Gen1Descriptions` overrides it.
 
 #### Gen 1 value resolution (`past_values`) — the default fidelity mechanism
 PokeAPI returns each move's **current** (latest-generation) stats, and many Gen 1 moves differ:
@@ -137,6 +137,13 @@ The remaining Gen 1 logic lives in the categorisation:
 - **`IsHighCrit`** ← `MoveImport.Gen1HighCritMoves`, pokered's `HighCriticalMoves` (`data/battle/critical_hit_moves.asm`):
   Karate Chop, Razor Leaf, Crabhammer and Slash. PokeAPI's `meta.crit_rate` is not used, because it also marks Razor Wind
   and Sky Attack, which crit at the normal rate in Gen 1.
+- **`Description`** ← PokeAPI's English `short_effect`, unless `MoveImport.Gen1Descriptions` names the move. PokeAPI's text
+  describes modern effects, so an audit of all 165 against pokered (`data/moves/moves.asm` and the effect handlers) gave
+  that table its 56 overrides: moves whose text is false in Gen 1, or true but missing what a player needs (Fly and Dig's
+  gaps, the one-hit KO speed check, Quick Attack's priority). The other moves keep PokeAPI's text, so a PokeAPI wording
+  change reaches them on the next import. The text states Gen 1 even where a tracked engine bug still differs
+  (`TODO.md` §3.1 and §3.2). The one exception is Teleport, "Has no effect.", because ours is a deliberate no-op.
+  `MoveDescriptionDataContractTests` pins the stored text and bans the modern phrases across every move.
 - **`DamageCategory`** — mostly from `meta.category` (`damage-heal` → Drain, `ohko` →
   OHKO), but PokeAPI doesn't model several Gen 1 mechanics, so those are **special-cased
   by move ID**:

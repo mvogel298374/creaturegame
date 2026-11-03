@@ -143,6 +143,14 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - Design detail → `GENERATION_SEAMS.md` §2 (*Psywave range*, *AI stat-down handicap*).  History → `TODO_ARCHIVE.md` →
   *Foe-only Gen 1 rules*.
 
+### Move descriptions
+- The creature overview shows each move's description, and it states the Gen 1 effect, not PokeAPI's modern text
+  (Sky Attack has no flinch, Focus Energy lowers the crit chance, Quick Attack names its priority).
+- 56 of the 165 moves carry a pokered-sourced override; the other 109 keep PokeAPI's text.
+- Teleport reads "Has no effect.", because it is a deliberate no-op.
+- Design detail → `DATA_IMPORT.md` (*Description*), `GENERATION_SEAMS.md` (*move description table*).  History →
+  `TODO_ARCHIVE.md` → *§3.2 Move descriptions state the Gen 1 effect*.
+
 ## 3. Encounters, biomes & acquisition
 
 ### Run map connectivity

@@ -60,6 +60,113 @@ public class MoveMappingTests
         Assert.Null(MoveImport.MapToAttack(Move(name: "hydro-pump")).MinLevel); // level-up only
     }
 
+    private static PokeApiMove MoveWithModernText(string name)
+    {
+        var move = Move(name: name);
+        move.EffectEntries =
+        [
+            new EffectEntry { Language = Named("de"), ShortEffect = "Deutscher Text." },
+            new EffectEntry { Language = Named("en"), ShortEffect = "Modern text." },
+        ];
+        return move;
+    }
+
+    [Theory]
+    [InlineData("acid", "Has a chance to lower the target’s Defense by one stage.")]
+    [InlineData("psychic", "Has a chance to lower the target’s Special by one stage.")]
+    [InlineData("amnesia", "Raises the user’s Special by two stages.")]
+    [InlineData("minimize", "Raises the user’s evasion by one stage.")]
+    [InlineData("double-edge", "User receives 1/4 the damage it inflicts in recoil.")]
+    [InlineData("struggle", "User receives 1/2 the damage it inflicts in recoil.")]
+    [InlineData("jump-kick", "If the user misses, it takes 1 point of damage.")]
+    [InlineData("thrash", "Hits every turn for 3-4 turns, then confuses the user.")]
+    [InlineData("bide", "User waits for 2-3 turns, then hits back for twice the damage it took.")]
+    [InlineData(
+        "rest",
+        "User sleeps for two turns, fully healing itself and curing its status. Fails at full HP."
+    )]
+    [InlineData("metronome", "Randomly selects and uses any move except itself and Struggle.")]
+    [InlineData("teleport", "Has no effect.")]
+    public void GenOneDescription_ReplacesPokeApisModernText(string name, string expected)
+    {
+        Assert.Equal(expected, MoveImport.MapToAttack(MoveWithModernText(name)).Description);
+    }
+
+    [Fact]
+    public void Gen1Descriptions_CoverExactlyTheAuditedMoves()
+    {
+        string[] audited =
+        [
+            "acid",
+            "amnesia",
+            "bide",
+            "bind",
+            "clamp",
+            "conversion",
+            "counter",
+            "dig",
+            "disable",
+            "dizzy-punch",
+            "double-edge",
+            "earthquake",
+            "explosion",
+            "fire-spin",
+            "fissure",
+            "fly",
+            "focus-energy",
+            "growth",
+            "guillotine",
+            "gust",
+            "haze",
+            "high-jump-kick",
+            "horn-drill",
+            "hyper-beam",
+            "jump-kick",
+            "light-screen",
+            "low-kick",
+            "metronome",
+            "mimic",
+            "minimize",
+            "mist",
+            "pay-day",
+            "petal-dance",
+            "psychic",
+            "psywave",
+            "quick-attack",
+            "rage",
+            "recover",
+            "reflect",
+            "rest",
+            "roar",
+            "rock-slide",
+            "self-destruct",
+            "skull-bash",
+            "sky-attack",
+            "soft-boiled",
+            "string-shot",
+            "struggle",
+            "substitute",
+            "surf",
+            "teleport",
+            "thrash",
+            "tri-attack",
+            "waterfall",
+            "whirlwind",
+            "wrap",
+        ];
+
+        Assert.Equal(audited, MoveImport.Gen1Descriptions.Keys.Order(StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void MoveWithoutAnOverride_KeepsPokeApisEnglishText()
+    {
+        Assert.Equal(
+            "Modern text.",
+            MoveImport.MapToAttack(MoveWithModernText("pound")).Description
+        );
+    }
+
     [Theory]
     [InlineData("karate-chop", true)]
     [InlineData("razor-leaf", true)]

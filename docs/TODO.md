@@ -49,7 +49,9 @@ gap has drafted text, awaiting your confirmation · ✗ gaps remain.
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
 | **Modal accessibility** (§5) | S–M | ⚠️ 1, 3, 5, 6, 7 + test route | Client only; the drafted test route is an E2E spec you run. |
-| **Move descriptions state modern effects** (§3.2) | S–M | ⚠️ 1, 2, 3, 4, 5, 6, 7 | Found 2026-11-02. Same shape as the item descriptions; the audit of all 165 sets the size. |
+| **Minimize raises evasion by two stages** (§3.2) | S | ✅ Ready, ruled "fix" 2026-11-03 | Found by the move description audit. First of the move-data fixes. |
+| **Thrash and Petal Dance end a turn early** (§3.1) | S | ✅ Ready, ruled "fix" 2026-11-03 | After Minimize. |
+| **Moves store modern priority** (§3.2) | S | ✅ Ready, accepted 2026-11-03 | After Thrash. |
 
 **B. A design pass first** (central engine code: `opus-engineer` plus both gates; each pass is shown to you)
 
@@ -60,6 +62,10 @@ gap has drafted text, awaiting your confirmation · ✗ gaps remain.
 | **Gen 1 confusion self-hit damage** (§3.1) | S | ✗ 2; 1, 3, 5 drafted | Ruled 2026-10-17 (replicate the foe-Reflect quirk). |
 | **Pre-hit-test cluster** — Mist + thaw; Substitute stops a stat-down move before accuracy; Substitute lets sleep/paralysis through (§3.1) | M | ✗ 2, 3 each; 1, 5, 6, 7 drafted for Mist + thaw and sleep/paralysis, none for the stat-down entry | One design pass: all three move logic ahead of the hit test. |
 | **Pre-move-check cluster** — `CanAct` status order; a replacement frees the trapped foe; Disable countdown (§3.1) | M | ✗ 2, 3 each | One design pass: all three live in the pre-move check. |
+| **Fly and Dig don't dodge anything** (§3.1) | M | ✗ 2, 3; the rest drafted | Found 2026-11-03. Central hit check; pairs with the pre-hit-test cluster. |
+| **Hyper Beam recharges after breaking a Substitute** (§3.1) | S | ✗ 2, 3; the rest drafted | Found 2026-11-03. Central `AttackAction`. |
+| **Recover and Soft-Boiled fail cases** (§3.1) | S | ✗ 3; the rest drafted | Found 2026-11-03. Full HP, plus the 255/511 bug shared with Rest. |
+| **The player chooses what Mimic copies** (§3.1) | M | ✗ 2, 3; the rest drafted | Found 2026-11-03. Needs an input prompt, so a design pass. |
 
 **C. Needs a `/plan` or a verify slice**
 
@@ -303,22 +309,84 @@ data/engine item usually also means updating the test that pins the wrong value.
   - **Gen-variable surface (gap 3):** which failures print which line, per site.
   - **Data vs runtime:** runtime plus the wire (C# + TS). **Quirk:** the two lines differ by one word.
     **Dependencies:** pairs with the Roar entry's wild level roll.
+- **Thrash and Petal Dance end a turn early (found 2026-11-03, move description audit) — S, ✅ Ready, ruled "fix".**
+  pokered attacks for 3–4 turns: `ThrashPetalDanceEffect` sets the counter to 2–3 (`effects.asm:791-805`), and the turn
+  it reaches zero still attacks, confusing the user (`core.asm:3531-3552`; enemy branch `:5907-5925`). Ours attacks for 2–3.
+  **DoR:**
+  - **Acceptance:** a full-battle test sees 3 attacking turns on the low roll and 4 on the high roll, then confusion;
+    `RampageContractTests` and any doc stating 2–3 turns change with it.
+  - **Design:** none; a value behind an existing seam, no central method.
+  - **Seam:** `IBattleRules.RollRampageTurns`, in `Gen1BattleRules`.
+  - **Gen 1 source:** the cites above.
+  - **Data vs runtime:** runtime only.
+  - **Quirk:** a missed turn still counts toward the lock, as now.
+  - **Dependencies:** none.
+- **Fly and Dig don't dodge anything (found 2026-11-03, move description audit) — M, ✗ not Ready.** pokered sets
+  `INVULNERABLE` on the charge turn, and `MoveHitTest` misses against it (`core.asm:5259-5261`). Only Swift, which returns
+  first (`:5247-5250`), and Bide's release, which skips the test (`:3528`), get through. Ours sets `IsTwoTurnCharging`, but
+  nothing in the hit check reads it, so a Pokémon using Fly can be hit on the charge turn. No test covers it. An older
+  note (`TODO_ARCHIVE.md`, "stayed in §3.1") names this gap, but no entry survived here.
+  **DoR:** ✗ gaps **2** (central `AttackAction`; design with the pre-hit-test cluster) and **3** (a seam member, and
+  Fly/Dig need telling apart from the other charge moves, which don't dodge). *Drafted:*
+  - **Acceptance:** an attack against a Fly or Dig charge turn misses; Swift and Bide's release hit; Solar Beam's
+    charge turn stays hittable.
+  - **Gen 1 source:** the cites above; also check moves that test `INVULNERABLE` themselves, such as Mimic and
+    `StatModifierDownEffect` (`effects.asm:579`).
+  - **Data vs runtime:** runtime, and possibly an importer flag.
+  - **Quirk:** Swift and Bide get through.
+  - **Dependencies:** pairs with the pre-hit-test cluster.
+- **Hyper Beam recharges after breaking a Substitute (found 2026-11-03, move description audit) — S, ✗ not Ready.**
+  pokered zeroes the attacker's move effect when a Substitute breaks (`core.asm:4879-4895`), so no recharge follows. Ours
+  checks only that damage landed and the target lives (`AttackAction.cs:247-253`). Read from the code; not yet reproduced.
+  **DoR:** ✗ gaps **2** (central `AttackAction`) and **3** (a rule member, or reuse the substitute snapshot). *Drafted:*
+  - **Acceptance:** a Hyper Beam that breaks a Substitute leaves the user free next turn; one the decoy survives still
+    recharges.
+  - **Gen 1 source:** the cite above. **Data vs runtime:** runtime only. **Quirk:** the test above.
+  - **Dependencies:** none.
+- **Recover and Soft-Boiled fail cases (found 2026-11-03, move description audit) — S, ✗ not Ready.** pokered fails the
+  heal at full HP, and its comparison skips the high byte, so it also fails when the user is exactly 255 or 511 HP below
+  max (`HealEffect_`, `heal.asm`; Rest shares this code). Ours always "heals", for 0 at full HP (`HealEffect`,
+  `MoveEffects.cs:301-327`), and Rest checks only full HP.
+  **DoR:** ✗ gap **3** (a rule member for the check). *Drafted:*
+  - **Acceptance:** all three moves fail at full HP and at exactly 255 or 511 below max, with pokered's failure message.
+  - **Design:** none, unless the message needs a new event.
+  - **Gen 1 source:** the cite above. **Data vs runtime:** runtime only. **Quirk:** the 255/511 bug.
+  - **Dependencies:** none.
+- **The player chooses what Mimic copies (found 2026-11-03, move description audit) — M, ✗ not Ready.** pokered lets the
+  player pick any of the target's moves, and only the enemy picks at random (`MimicEffect`, `effects.asm:1203-1250`). Ours
+  always picks at random (`MoveEffects.cs:345-352`).
+  **DoR:** ✗ gaps **2** (a new input prompt across the engine, hub and client) and **3** (the seam for who chooses).
+  *Drafted:*
+  - **Acceptance:** the player's Mimic prompts for one of the target's moves; an opponent's stays random.
+  - **Gen 1 source:** the cite above. **Data vs runtime:** runtime and client. **Quirk:** the target's moves show in full.
+  - **Dependencies:** none.
 
 ### 3.2 Data and importer
 
-- **Move descriptions state modern effects (found 2026-11-02 while fixing high-crit data) — S–M, ⚠️ drafted.**
-  `MoveImport.BuildGen1Attack` stores PokeAPI's modern `short_effect`, and `CreatureOverview.tsx:184` shows it to the
-  player. Two are confirmed wrong: Sky Attack says it can flinch (no flinch in Gen 1) and Focus Energy says it raises the
-  crit chance (its Gen 1 bug lowers it). The other moves are unaudited.
-  **DoR:** ⚠️ every line drafted, awaiting your confirmation.
-  - **Acceptance:** every stored move description states the Gen 1 effect, pinned by importer tests and a data contract
-    test, as the item descriptions are.
-  - **Design:** no design pass; an audit of all 165 first, then either a full table or overrides for the wrong ones,
-    whichever the audit supports.
-  - **Seam:** importer data, so no new seam; `DATA_IMPORT.md` and `GENERATION_SEAMS.md` name the table.
-  - **Gen 1 source:** pokered's move effect handlers, checked per move.
+- **Moves store modern priority (found 2026-11-03, `requirements-review`) — S, ✅ Ready, accepted 2026-11-03.** pokered
+  has two ordering exceptions, Quick Attack first and Counter last (`core.asm:371-390`); everything else goes by speed.
+  PokeAPI's `Priority` is stored as-is, so Bide has +1 and Roar, Whirlwind and Teleport have -6, and `Battle.cs:180` sorts on
+  it. A slower Bide user acts before a faster foe; Roar and Whirlwind always act last.
+  **DoR:**
+  - **Acceptance:** those four store 0 in `moves.db`, Quick Attack and Counter keep theirs, a data contract test pins the
+    full list of non-zero priorities, and `SwitchMoveHasGen1NegativePriority` is replaced.
+  - **Design:** none; layer-2 importer corrections.
+  - **Seam:** importer data; no new seam.
+  - **Gen 1 source:** the cite above.
   - **Data vs runtime:** importer only, with a full re-import.
-  - **Quirk:** Focus Energy's text warns that it usually lowers the crit chance.
+  - **Quirk:** none.
+  - **Dependencies:** after Thrash, as ruled; none in the code.
+- **Minimize raises evasion by two stages (found 2026-11-03, move description audit) — S, ✅ Ready, ruled "fix".**
+  pokered's Minimize uses `EVASION_UP1_EFFECT` (one stage), but PokeAPI reports its modern +2, so `moves.db` stores
+  `StatEffectDelta` 2 and `StatStageMoveContractTests.cs:92` pins that.
+  **DoR:**
+  - **Acceptance:** a Minimize user's evasion rises one stage; `moves.db` stores +1; the contract test and a mapping
+    test pin it.
+  - **Design:** none; one layer-2 correction like String Shot's.
+  - **Seam:** importer data; no new seam.
+  - **Gen 1 source:** pokered `data/moves/moves.asm`.
+  - **Data vs runtime:** importer only, with a full re-import.
+  - **Quirk:** none.
   - **Dependencies:** none.
 - **Found 2026-10-11 during V7 / the item seam (unverified beyond the citation; each needs its own DoR):**
   - *Struggle skips the accuracy roll* (found during "Gen 1 roll order", archived): `AttackAction.Connects`

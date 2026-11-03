@@ -8,6 +8,37 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §3.2 Move descriptions state the Gen 1 effect ✅ DONE (2026-11-03)
+
+S–M; found 2026-11-02 while fixing high-crit data (`requirements-review`), greenlit 2026-11-03. `MoveImport.BuildGen1Attack`
+stored PokeAPI's modern `short_effect`, and `CreatureOverview.tsx:184` shows it to the player.
+
+**Audit** (all 165 moves against pokered's `data/moves/moves.asm` and effect handlers): 38 false, 14 incomplete, and
+Teleport; Quick Attack, Rest and Metronome were added during implementation and review. Result: **56 overrides**, and the
+other **109** keep PokeAPI's text.
+
+**Outcome.** `MoveImport.Gen1Descriptions` is a name-keyed override table. `DATA_IMPORT.md` documents `Description`;
+`GENERATION_SEAMS.md` lists the table as importer data (one generation's text per move; a second generation keys it by
+generation and re-audits). `MoveMappingTests` pin the importer mapping; `MoveDescriptionDataContractTests` pin the stored
+text and ban the modern phrases across every move. Importer only, with a full re-import of `moves.db`.
+
+**Rulings 2026-11-03.**
+- Name-keyed overrides, not a full table; the 14 incomplete descriptions are in scope.
+- Teleport says "Has no effect." because ours is a deliberate no-op, the one exception to "states the Gen 1 effect".
+- The text states Gen 1 even where a tracked engine bug still differs.
+- Focus Energy's text drops "usually": it warns that the bug lowers the crit chance.
+- Dire Hit's text is deliberately unchanged: its "usually a quarter as likely" is accurate (item description, see
+  *Item descriptions describe the Gen 1 effect* and *High-crit moves under Focus Energy or Dire Hit*).
+
+**Filed from the audit** (each a live `TODO.md` entry): Minimize raises evasion by two stages (§3.2), Thrash and Petal
+Dance end a turn early (§3.1), Moves store modern priority (§3.2), Fly and Dig don't dodge anything, Hyper Beam recharges
+after breaking a Substitute, Recover and Soft-Boiled fail cases, the player chooses what Mimic copies (all §3.1).
+
+**Reviews.** `format-gate` PASS, `test-runner` PASS, `requirements-review` findings ruled by the user, `pr-review`
+PR-READY with its three recommendations applied. E2E not run.
+
+---
+
 ## §3.1 Razor Wind and Sky Attack aren't high-crit in Gen 1 ✅ DONE (2026-11-02)
 
 S; found 2026-11-02 by `requirements-review` (source-confirmed), DoR confirmed and greenlit by the user. `moves.db`

@@ -406,6 +406,9 @@ result from the DB; rationale → `ARCHITECTURE.md` §2.6, mapping → `DATA_IMP
   missing from the table fails). Key it by generation alongside the prices;
 - a **high-crit move list** — `MoveImport.Gen1HighCritMoves` is Gen 1's list, and `IsHighCrit` holds one generation's
   answer per move. Verify each generation's list at its own disassembly rather than PokeAPI's modern `crit_rate`;
+- a **move description table** — `MoveImport.Gen1Descriptions` overrides PokeAPI's text for the moves Gen 1 gets different,
+  and `Description` holds one generation's text per move. A second generation's import would give shared moves Gen 1's
+  text. Key it by generation and audit each generation's moves at its own disassembly;
 - for **Gen 2**, the Special split needs **two stat columns** (a model change; `SingleSpecialAsOf` throws for
   generation != 1 until then) — the `GetOffensiveStat`/`GetDefensiveStat` seam is where the engine picks between
   them (the Special-model decision is part of adding the generation);
