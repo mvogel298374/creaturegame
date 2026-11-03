@@ -105,8 +105,8 @@ public sealed class Gen1BattleRules : IBattleRules
     // Gen 1: recoil moves deal 1/4 of the damage dealt back to the user (minimum 1).
     public int CalculateRecoilDamage(int damageDealt) => Math.Max(1, damageDealt / 4);
 
-    // Gen 1: Thrash / Petal Dance lock the user in for 2 or 3 turns, then self-confuse.
-    public int RollRampageTurns() => _rng.Next(2, 4);
+    // Gen 1: Thrash / Petal Dance attack for 3 or 4 turns (pokered's counter of 2-3 follows the first).
+    public int RollRampageTurns() => _rng.Next(3, 5);
 
     // Gen 1: Disable locks a move out for 1–8 turns (pokered DisableEffect: `and $7` / `inc a`).
     public int RollDisableTurns() => _rng.Next(8) + 1;

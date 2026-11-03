@@ -185,7 +185,7 @@ The remaining Gen 1 logic lives in the categorisation:
 | `FocusEnergy` | Focus Energy | Gen 1's bugged crit modifier (`Gen1BattleRules.GetCritChance`) |
 | `Bide` | Bide | Stores damage for 2–3 turns, then unleashes 2× |
 | `MirrorMove` | Mirror Move | Re-executes the opponent's last move |
-| `Rampage` | Thrash, Petal Dance | Locks in 2–3 turns, then self-confuses |
+| `Rampage` | Thrash, Petal Dance | Attacks for 3–4 turns, then self-confuses |
 | `PayDay` | Pay Day | Scatters money on hit |
 | `Mist` | Mist | Shields the user's stats from being lowered |
 | `Disable` | Disable | Locks one of the target's moves (enforced at move-selection time) |

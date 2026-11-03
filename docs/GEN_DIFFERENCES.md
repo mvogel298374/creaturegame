@@ -162,6 +162,15 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
 - Deals 1/16 max HP chip damage per turn
 - Considered overpowered; used competitively to completely shut down opponents
 
+#### Thrash / Petal Dance
+- **Attack for 3 or 4 turns, at 1/2 each.** `ThrashPetalDanceEffect` sets a counter of 2 or 3 on the first turn
+  (pokered `engine/battle/effects.asm:800-805`); each later turn decrements it and still attacks, including the
+  turn it reaches zero (`core.asm:3538-3541`, enemy `:5913-5916`). The counter is not the attack count.
+- **A miss still locks.** The effect runs before the hit test (`core.asm:3130-3133`, hit test `:3150`), so a
+  first-turn miss or immunity starts the lock, and a missed later turn still counts toward it.
+- **The lock's end confuses the user** with a fresh 2–5 counter (`core.asm:3542-3552`). Our remaining differences
+  are filed in `docs/TODO.md` §3.1, *Rampage edge gaps*.
+
 #### Status Quirks
 - **Gen 1 has NO end-of-turn residual phase — each creature takes its own Burn/Poison/Bad Poison/Leech Seed
   tick immediately after its own action** (verified 2026-09-20 against pret/pokered `engine/battle/core.asm`,

@@ -93,12 +93,12 @@ public class TypeImmunityContractTests(MovesFixture moves) : Gen1MoveContract(mo
     public async Task RampageLockedOntoImmuneTargetStillResolvesAndSelfConfuses()
     {
         // Thrash (Normal) locked onto a Ghost: every turn is an immune no-effect halt, but the halt
-        // must still tick the lock (like a miss does) — so a 2-turn rampage ends on turn 2 with the
+        // must still tick the lock (like a miss does) — so a 3-turn rampage ends on turn 3 with the
         // user's end-of-lock self-confusion, not a dangling lock.
         var results = await new MoveScenario()
-            .Rules(new FixedRampageAlwaysHitRules(2))
+            .Rules(new FixedRampageAlwaysHitRules(3))
             .Defender(TestCreatures.Make("D", type1: DamageType.Ghost, hp: 500))
-            .UseRepeated(Move("thrash"), turns: 2);
+            .UseRepeated(Move("thrash"), turns: 3);
 
         Assert.All(results, r => Assert.True(r.Has<MoveHadNoEffect>()));
         Assert.True(results[^1].Has<ConfusionStarted>());
@@ -107,7 +107,7 @@ public class TypeImmunityContractTests(MovesFixture moves) : Gen1MoveContract(mo
         Assert.True(results[^1].Attacker.Battle.ConfusedTurns > 0);
     }
 
-    /// <summary>Always-hit rules with a fixed 2-turn rampage so the lock's end is deterministic.</summary>
+    /// <summary>Always-hit rules with a fixed rampage length so the lock's end is deterministic.</summary>
     private sealed class FixedRampageAlwaysHitRules(int turns) : DelegatingBattleRules
     {
         public override int RollRampageTurns() => turns;

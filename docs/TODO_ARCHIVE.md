@@ -8,6 +8,31 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §3.1 Thrash and Petal Dance end a turn early ✅ DONE (2026-11-03)
+
+S; found 2026-11-03 by the move description audit, ruled "fix". pokered attacks for 3-4 turns: `ThrashPetalDanceEffect` sets
+the counter to 2-3 (`effects.asm:791-805`), and the turn it reaches zero still attacks, confusing the user
+(`core.asm:3531-3552`; enemy branch `:5907-5925`). Ours attacked for 2-3.
+
+**Outcome.** `Gen1BattleRules.RollRampageTurns` rolls 3-4 total attacking turns (`_rng.Next(3, 5)`), matching pokered's counter
+of 2-3 after the first turn. `RampageMechanic` unchanged. Runtime only; no new seam (`IBattleRules.RollRampageTurns`).
+A missed turn still counts toward the lock, as before.
+
+**Tests.** `RampageContractTests.RealRollAttacksForThreeOrFourTurnsThenConfuses` (both moves, real rule, forced low and high
+rolls) and `MissedTurnsStillCountTowardTheLock`; the existing rampage tests in `RampageContractTests` and
+`TypeImmunityContractTests` moved to valid lengths. The new tests failed against the old rule (2 and 3 attacks) before the fix.
+
+**Reviews.** `format-gate` REFORMATTED, then passed; `test-runner` PASS; `requirements-review` DISCREPANCIES (4), all ruled by
+the user 2026-11-03; `pr-review` waived by the user 2026-11-03 (cost far exceeds the change). E2E not run.
+
+**Rulings on the four discrepancies.**
+1. "A first-turn miss shouldn't start the lock": closed, refuted by pokered `core.asm:3130-3133`; the effect runs before the hit test.
+2. The lock-end text, the repeat-turn text and the already-confused counter: filed as the open entry "Rampage edge gaps" (TODO.md §3.1).
+3. A note added to `GEN_DIFFERENCES.md`, "Thrash / Petal Dance".
+4. No enemy-side test and no 50/50 pin, waived: both sides share one code path.
+
+---
+
 ## §3.2 Minimize raises evasion by one stage ✅ DONE (2026-11-03)
 
 S; found 2026-11-03 by the move description audit (see *Move descriptions state the Gen 1 effect*), ruled "fix". pokered's

@@ -49,14 +49,14 @@ gap has drafted text, awaiting your confirmation · ✗ gaps remain.
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
 | **Modal accessibility** (§5) | S–M | ⚠️ 1, 3, 5, 6, 7 + test route | Client only; the drafted test route is an E2E spec you run. |
-| **Thrash and Petal Dance end a turn early** (§3.1) | S | ✅ Ready, ruled "fix" 2026-11-03 | Found by the move description audit. First of the move-data fixes. |
-| **Moves store modern priority** (§3.2) | S | ✅ Ready, accepted 2026-11-03 | After Thrash. |
+| **Moves store modern priority** (§3.2) | S | ✅ Ready, accepted 2026-11-03 | First of the move-data fixes. |
 
 **B. A design pass first** (central engine code: `opus-engineer` plus both gates; each pass is shown to you)
 
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
 | **Roar/Whirlwind: the scared-off side still acts** (§3.1) | S–M | ✗ 2; 1, 5, 6 drafted | Ruled 2026-10-17. Can end a run with a healthy bench. |
+| **Rampage edge gaps** (§3.1) | S–M | ✗ 2, 3; the rest drafted | Found 2026-11-03. Lock-end and repeat-turn messages, plus the confusion counter. |
 | **"It didn't affect": Gen 1's fifth failure line** (§3.1) | S–M | ✗ 2, 3; the rest drafted | Design with the Roar entry's `DidntAffect` member. |
 | **Gen 1 confusion self-hit damage** (§3.1) | S | ✗ 2; 1, 3, 5 drafted | Ruled 2026-10-17 (replicate the foe-Reflect quirk). |
 | **Pre-hit-test cluster** — Mist + thaw; Substitute stops a stat-down move before accuracy; Substitute lets sleep/paralysis through (§3.1) | M | ✗ 2, 3 each; 1, 5, 6, 7 drafted for Mist + thaw and sleep/paralysis, none for the stat-down entry | One design pass: all three move logic ahead of the hit test. |
@@ -308,19 +308,22 @@ data/engine item usually also means updating the test that pins the wrong value.
   - **Gen-variable surface (gap 3):** which failures print which line, per site.
   - **Data vs runtime:** runtime plus the wire (C# + TS). **Quirk:** the two lines differ by one word.
     **Dependencies:** pairs with the Roar entry's wild level roll.
-- **Thrash and Petal Dance end a turn early (found 2026-11-03, move description audit) — S, ✅ Ready, ruled "fix".**
-  pokered attacks for 3–4 turns: `ThrashPetalDanceEffect` sets the counter to 2–3 (`effects.asm:791-805`), and the turn
-  it reaches zero still attacks, confusing the user (`core.asm:3531-3552`; enemy branch `:5907-5925`). Ours attacks for 2–3.
+- **Rampage edge gaps (found 2026-11-03, Thrash fix review) — S–M, ✗ not Ready, filed by ruling.** Three differences
+  from pokered, none changing the turn count: the lock's end logs "became confused!", where pokered is silent
+  (`core.asm:3542-3552`; its only such text is the ordinary effect, `effects.asm:1151`; ours `LockInMechanics.cs:142`,
+  `timeline.ts:1104`); a repeat turn announces "used", where pokered prints "is thrashing about!" and skips that line
+  (`core.asm:3536`; ours `AttackAction.cs:108`); and a user already confused keeps its old counter, where pokered always
+  rolls a fresh 2–5 (`core.asm:3545-3550`; ours `LockInMechanics.cs:139`).
   **DoR:**
-  - **Acceptance:** a full-battle test sees 3 attacking turns on the low roll and 4 on the high roll, then confusion;
-    `RampageContractTests` and any doc stating 2–3 turns change with it.
-  - **Design:** none; a value behind an existing seam, no central method.
-  - **Seam:** `IBattleRules.RollRampageTurns`, in `Gen1BattleRules`.
+  - **Acceptance (drafted):** a full-battle test sees no "became confused" line at the lock's end, "is thrashing about!"
+    on each repeat turn with no "used" line, and a new counter on a user already confused.
+  - **Design ✗:** how the client learns of a silent confusion, and how the tests find the lock's end, since both now use
+    `ConfusionStarted`; a repeat-turn event is wired in the four places of `engine.md` rule 7.
+  - **Seam ✗:** battle messages go behind a seam (`generation-seams.md` rule 4); which member, settled in that pass.
   - **Gen 1 source:** the cites above.
   - **Data vs runtime:** runtime only.
-  - **Quirk:** a missed turn still counts toward the lock, as now.
-  - **Dependencies:** none.
-  - **Review:** `pr-review` waived by the user 2026-11-03 (cost far exceeds the change); the other gates still run.
+  - **Quirk:** the counter is overwritten even when the old one is still running.
+  - **Dependencies:** none; the turn-count fix is archived (`TODO_ARCHIVE.md`, "Thrash and Petal Dance end a turn early").
 - **Fly and Dig don't dodge anything (found 2026-11-03, move description audit) — M, ✗ not Ready.** pokered sets
   `INVULNERABLE` on the charge turn, and `MoveHitTest` misses against it (`core.asm:5259-5261`). Only Swift, which returns
   first (`:5247-5250`), and Bide's release, which skips the test (`:3528`), get through. Ours sets `IsTwoTurnCharging`, but
@@ -375,7 +378,7 @@ data/engine item usually also means updating the test that pins the wrong value.
   - **Gen 1 source:** the cite above.
   - **Data vs runtime:** importer only, with a full re-import.
   - **Quirk:** none.
-  - **Dependencies:** after Thrash, as ruled; none in the code.
+  - **Dependencies:** none; the first of the move-data fixes, as ruled.
   - **Review:** `pr-review` waived by the user 2026-11-03 (cost far exceeds the change); the other gates still run.
 - **Found 2026-10-11 during V7 / the item seam (unverified beyond the citation; each needs its own DoR):**
   - *Struggle skips the accuracy roll* (found during "Gen 1 roll order", archived): `AttackAction.Connects`
