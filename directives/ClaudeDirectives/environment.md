@@ -8,3 +8,6 @@ Lessons Claude derived from working in this environment.
    in the user folder, not the system runtime. A failed commit is said plainly before retrying.
 2. **Stop the dev stack with `.\stop-dev.ps1`.** Never kill processes by name: killing every `node` also
    kills the MCP servers. If another program holds a dev port, leave it alone and tell Mo which PID holds it.
+3. **Check a scripted edit before building on it.** After any script that edits several files, read
+   `git diff --stat` and one file's diff before the next step. Learned 2026-10-31: a line-range script stripped
+   blank lines from ten test files and the batch had to be restored.

@@ -23,7 +23,7 @@ Clean, testable, EF-optimized C# 13 / .NET 9; PokeAPI integration. Knowledge bas
 follow-up cleanup. (That file is the source of truth for the rule; don't restate it, run it.) **Comment budget:**
 default no comment, at most one short line; logic documentation goes in markdown in the same commit (`DEV_STANDARDS.md` →
 *Design Rationale Placement*) — never copy a neighbouring file's comment density. **When the
-feature is close to done, run the pre-finish gate sequence** (`format-gate`, `test-runner`, `requirements-review`,
+feature is close to done, run the pre-finish gate sequence** (format step, test step, `requirements-review`,
 `pr-review`, and **`docs-cleanup` always last**) before proposing a commit — nothing is "done" until `docs-cleanup`
 has run against the final state (`GUARDRAILS.md` → G2).
 
@@ -40,7 +40,7 @@ has run against the final state (`GUARDRAILS.md` → G2).
 
 ## Model Strategy
 
-The model spread (main session on Opus by default; Haiku for `format-gate`/`test-runner`, Sonnet for the review/docs gates; `opus-engineer` for delegated hard
+The model spread (main session on Opus by default; Sonnet for the review/docs gates; `opus-engineer` for delegated hard
 implementation) is the table in `CLAUDE.md` → *Models*; each agent's model is pinned in its frontmatter.
 
 **Cold-start cost:** a subagent re-derives context from scratch, so brief it tightly — name the exact files
@@ -59,32 +59,20 @@ deterministic shell hook (format + tests) and LLM reasoning a shell can't do.
 
 ### Pre-finish gate sequence
 When a feature is close to done, the main session runs these **separable** gates before proposing a commit, **in this
-fixed order, `docs-cleanup` always last** —
-each is its own subagent so it can be invoked or edited independently:
+fixed order, `docs-cleanup` always last** — the two mechanical steps inline, each review its own subagent:
 
-1. **`format-gate`** (Subagent, `.claude/agents/format-gate.md`) — the CSharpier gate: `check`, auto-`format`
-   + re-check if it fails → `FORMAT: PASS | REFORMATTED | FAIL`.
-2. **`test-runner`** (Subagent, `.claude/agents/test-runner.md`) — the fast suites via `.\test.ps1 -Dotnet -Web`,
-   TEST SUMMARY relayed verbatim, failing tests named → `TESTS: PASS | FAIL`.
-   **E2E is NOT in the default scope and is not the agent's call, or yours — it is the user's.** ~4 minutes for
-   37 browser-driven tests, and the only suite with real flakes. The gate passes without it. If a change looks
-   like it warrants E2E, **recommend the narrowest command and let the user choose** (`.\e2e.ps1 -Spec <file>`);
-   do not brief the subagent to run it, and do not run it yourself, on your own initiative.
-   **Caller's half of the contract — the main session must:**
-   - **State the scope in the invocation.** Name what changed (engine / frontend / both). Say `-Dotnet` or
-     `-Web` when only one side moved; otherwise the default `-Dotnet -Web` stands. Only name E2E if the **user**
-     asked for it.
-   - **Not delegate a single-test re-check.** Re-running one named spec or one `--filter` is faster inline
-     than a subagent cold start: `npx playwright test <spec>.spec.ts` / `.\test.ps1 -Filter <Name>`.
-     Delegate when you want the *whole* suite; run it yourself when you want *one* test.
-   - **Accept one green run.** Don't ask for a re-run to confirm a pass or probe flakiness unless the user
-     asked — and never queue back-to-back stability runs.
-   - **Triage failures yourself.** The agent hands up failing names + Playwright artifact paths and stops;
-     opening `test-failed-1.png` is usually a one-look diagnosis and is the main session's job, not a
-     second delegation. It also spares an E2E re-run: the screenshot often shows the app behaving correctly
+1. **Format step** (inline, no agent; `GUARDRAILS.md` → G3) — `dotnet csharpier format .`, then
+   `dotnet csharpier check .` → PASS, or REFORMATTED with the changed files.
+2. **Test step** (inline, no agent; G3) — `.\test.ps1 -Dotnet -Web` once against the final code (`-Dotnet` or `-Web`
+   when only one side moved), TEST SUMMARY relayed verbatim, failing tests named, and a line saying E2E did not run.
+   Retired the Haiku `format-gate` / `test-runner` agents on 2026-11-06: each cold start cost ~50k tokens for one
+   deterministic command the pre-commit hook re-runs anyway.
+   - **Never bare `.\test.ps1`** — it includes E2E whenever the stack is up (G6). E2E is the user's call; if a change
+     looks like it needs it, recommend the narrowest `.\e2e.ps1 -Spec <file>` and stop.
+   - **One green run is enough**, but any code change after it voids it. A run that dies without a summary gets
+     one re-run.
+   - **On an E2E failure, open `test-failed-1.png` first** — the screenshot often shows the app behaving correctly
      and the *spec* being wrong (both `reward-drop.spec.ts` and `voluntary-switch.spec.ts` were exactly this).
-   - **Never let it run in the background and stop.** If it returns without a summary, the run was orphaned;
-     tell it to poll in an until-loop inside one turn rather than re-running from scratch.
 3. **`requirements-review`** (Subagent, `.claude/agents/requirements-review.md`, Sonnet) — the domain gate,
    for battle/stat/move work. A Pokémon-Gen-1 + roguelite expert that challenges the implementation against
    the DoR-finalized plan, the internal docs, and its own knowledge, and flags undocumented behavior →
@@ -234,8 +222,6 @@ Any value other than `0`/`false` (or unset/empty) enables it.
 |:-----|:-----|
 | `CLAUDE.md` | The base layer: doc layers, docs tree, commands, model spread — loaded automatically, with the Mo directives it imports |
 | `agents/docs-cleanup.md` | Mandatory docs-hygiene gate — archives finished TODO items, clears stale framing (Subagent) |
-| `agents/format-gate.md` | CSharpier formatting gate (Subagent) |
-| `agents/test-runner.md` | Test-suite runner — fast suites only (E2E opt-in), scoped to the brief, one run (Subagent) |
 | `agents/requirements-review.md` | Gen-1 / roguelite domain & requirements gate — hard to pipeline, soft to user (Subagent) |
 | `agents/pr-review.md` | Opus technical / PR review incl. seam architecture — checks `DEFINITION_OF_DONE.md` (Subagent) |
 | `DEFINITION_OF_READY.md` | DoR — the exit criteria of `/plan` |

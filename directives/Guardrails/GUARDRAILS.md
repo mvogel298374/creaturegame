@@ -19,10 +19,10 @@ from `.githooks/` or `.claude/settings.json`; agents live in `.claude/agents/`.
 |:--|:--|:--|:--|:--|
 | G1 | Ready before code | any edit to product code, data or the importer | to build (build hook) | — |
 | G2 | Docs cleanup last | every commit | **built** (pre-commit + stamp) | `docs-cleanup` |
-| G3 | Review chain | any change to logic-heavy code | to build (push hook) | `format-gate`, `test-runner`, `requirements-review`, `pr-review` |
+| G3 | Review chain | any change to logic-heavy code | to build (push hook) | format + test steps (inline), `requirements-review`, `pr-review` |
 | G4 | Generation seam | any change to logic-heavy code | to build (push hook) | `requirements-review`, `pr-review` |
 | G5 | Comment budget | any staged code change | to build (push hook) | `pr-review` |
-| G6 | E2E is opt-in | any shell command Claude runs | to build (build hook) | `test-runner` |
+| G6 | E2E is opt-in | any shell command Claude runs | to build (build hook) | — |
 
 **The built hook today.** `.githooks/pre-commit` runs `csharpier check` on every commit, the full .NET suite when a
 .NET path is staged (`.cs`, `.csproj`, `.props`, `.db`, `global.json`), `tsc --noEmit` when a frontend path is
@@ -44,7 +44,7 @@ answers all seven `docs/DEFINITION_OF_READY.md` items (an S-size item gets one l
 ### G2 Docs cleanup last
 *Enforces* "done means the docs reflect the final state". *Passes:* `docs-cleanup` reported `DOCS: CLEAN | UPDATED`
 after the last change and its edits are staged. *Blocks:* no stamp, or a staged file changed after it.
-- The finish sequence is fixed: `format-gate` → `test-runner` → `requirements-review` → `pr-review` (each where G3
+- The finish sequence is fixed: format step → test step → `requirements-review` → `pr-review` (each where G3
   applies) → **`docs-cleanup`, always last**, for every change: docs-only, test-only and one-line changes included.
   Any change after it means it runs again.
 - Until then nothing is called done, fixed or shipped, and no commit is proposed. The only honest status is
@@ -52,9 +52,14 @@ after the last change and its edits are staged. *Blocks:* no stamp, or a staged 
 - *Hook:* `.githooks/pre-commit` + `.githooks/stamp-docs-cleanup.sh`, written by `docs-cleanup` as its last act.
 
 ### G3 Review chain for logic-heavy code
-*Enforces* `authority.md` 4–6. *Passes:* `format-gate`, `test-runner`, `requirements-review`, `pr-review` ran in
-that order, then G2, and Mo decided every blocking finding (fix, waive or defer). *Blocks:* a missing review or an
-undecided finding.
+*Enforces* `authority.md` 4–6. *Passes:* the format step, the test step, `requirements-review` and `pr-review` ran
+in that order, then G2, and Mo decided every blocking finding (fix, waive or defer). *Blocks:* a missing step or
+review, or an undecided finding.
+- *Format step* (Claude runs it inline, no agent): `dotnet csharpier format .`, then `dotnet csharpier check .`;
+  report PASS, or REFORMATTED with the files it changed.
+- *Test step* (Claude runs it inline, no agent): `.\test.ps1 -Dotnet -Web` once against the final code (`-Dotnet` or
+  `-Web` when only one side changed); relay the TEST SUMMARY verbatim and say that E2E did not run. Any later code
+  change voids it.
 - `pr-review` runs on Opus (~80–100k tokens a run); give the estimate before running it.
 - *Hook to build:* `pre-push` requires a fresh review stamp from each agent when a logic-heavy path is pushed.
 

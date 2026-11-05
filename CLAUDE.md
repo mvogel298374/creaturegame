@@ -102,8 +102,6 @@ Single branch `master`, remote `origin` (GitHub). Fly.io deploys only on tags ma
 | `pr-review` | Opus | Technical review (G3) |
 | `requirements-review` | Sonnet | Gen 1 / roguelite fidelity review (G3) |
 | `docs-cleanup` | Sonnet | Docs gate (G2) |
-| `format-gate` | Haiku | CSharpier check (G3) |
-| `test-runner` | Haiku | Fast suites, relays the summary (G3) |
 
 Also available, currently unused: Fable. Each agent's model is pinned in its frontmatter.
 

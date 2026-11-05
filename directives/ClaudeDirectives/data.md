@@ -10,3 +10,7 @@ Lessons Claude derived from data and asset work. They serve `MoDirectives/data.m
    combination of them, before choosing it. Never pick one from memory or an assumed sheet layout.
 3. **Check embedded images after a hand edit.** Hand-editing a file that embeds base64 images can corrupt a
    single character without any error. Compare the payloads with the last good version.
+4. **Leave the databases clean when an item ends.** After an importer run, restore any `.db` the item doesn't
+   change before proposing the commit. If `git restore` is blocked, the holder is usually a sqlite MCP server:
+   name its PID to Mo and wait, never overwrite the file by hand. Learned 2026-11-06: `pokemon.db` stayed dirty
+   across three sessions.

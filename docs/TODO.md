@@ -94,6 +94,7 @@ gap has drafted text, awaiting your confirmation · ✗ gaps remain.
 |:-----|:----:|:-------|:----------|
 | **Same-type secondary status immunity** (§3.1) | S–M | ✗ 2, 4, 6; the rest drafted | Take the pokered cite; Ice Beam freezes Ice-types today. |
 | **Counter keys on the foe's selected move** (§3.1) | S–M | ✗ 1, 2, 4, 6 | Trace `HandleCounterMove`, list the diverging cases. |
+| **A re-import marks `pokemon.db` changed with identical data** (§3.2) | S | ✗ 2; the rest drafted | Filed 2026-11-06. Read the three delete-and-insert sites, pick upsert or stable IDs. |
 | **Escape = B-cancel on the negative-answer prompts** (§4.5) | S | ✗ 4; the rest drafted | One pokered cite. |
 | **Dependencies — `npm audit`** (§7.2) | S | ✗ 1, 7 | Re-run `npm audit`; the bumps need your E2E run. |
 | **The client `RunFaulted` handler is unpinned** (§6) | S | ✗ 1, 2, 7 | Choose: extract the handler logic, or test it in place. |
@@ -387,6 +388,22 @@ data/engine item usually also means updating the test that pins the wrong value.
   **DoR:** ✗ not Ready — gaps **1, 2** (the design pass decides between "unsold ⇒ loot only, rarity by category"
   and keying the rule on `PpRestore`). Gen surface none (run tuning); runtime only; best paired with the Catch
   `/plan` (§4.1), which first puts a 0-priced Ball in the pool.
+- **A re-import marks `pokemon.db` changed with identical data (S; found 2026-11-06 in the process pass,
+  read-confirmed).** `PokemonImport.cs:140`, `EvolutionImport.cs:71` and `GameAvailabilitySeeder.cs:138` delete
+  and re-insert their rows, so every run regenerates auto-increment IDs and the binary differs. It left the working
+  copy dirty after three sessions (2026-11-02, 11-03, 11-05), and `git restore` then fails while the sqlite MCP
+  server holds the file open.
+  **DoR:** ✗ not Ready — gap **2**; the rest drafted:
+  - **Acceptance:** two importer runs in a row leave `pokemon.db` byte-identical to the committed file
+    (`git status` clean), with the same row content as today.
+  - **Design:** ✗ open — upsert by natural key (species/evolution/game-version) instead of delete-and-insert, or
+    keep the delete but insert in a stable order with explicit IDs. Read the three call sites first.
+  - **Gen surface:** none (importer persistence, no rule or value changes).
+  - **Gen 1 source:** n/a.
+  - **Data vs runtime:** importer only; the re-run is the data change (`MoDirectives/data.md` 1).
+  - **Quirk to assert:** an importer test that runs the evolution and availability writes twice on one database
+    and asserts the row IDs are unchanged.
+  - **Dependencies:** none. Not logic-heavy (persistence wiring), so the format and test steps, then `docs-cleanup`.
 
 ---
 
@@ -617,11 +634,11 @@ each). Their seam and data-vs-runtime lines are already written in the text.
   invocable by name and loading their knowledge base (DoR, design guides, dev standards, the seam checklist) on
   use. *Acceptance:* each profile is a skill that loads when invoked; `AI_CONTEXT.md` keeps only the tooling
   reference; the `CLAUDE.md` *Profiles* section points at the skills. *Design:* ✗ open: one skill per profile or
-  merged; whether `/test` overlaps `test-runner`; whether `/sync` survives. *Gen surface:* none. *Gen 1 source:*
+  merged; whether `/test` overlaps the G3 test step; whether `/sync` survives. *Gen surface:* none. *Gen 1 source:*
   n/a (tooling). *Data vs runtime:* neither. *Quirk to assert:* invoking a skill loads its knowledge base, checked
   by invoking each once. *Dependencies:* none.
   **DoR:** ✗ not Ready — gap **2**: a full `/plan` answers the three design questions. Starting recommendation:
-  one skill each for `/plan` and `/dev`; fold `/test` into `test-runner`'s doc; retire `/sync` unless a schema pass
+  one skill each for `/plan` and `/dev`; fold `/test` into the test step's description; retire `/sync` unless a schema pass
   is planned.
 - [ ] `data-testid` attributes — deferred; specs lean on stable semantic classes. Add only where a class proves
   brittle.
@@ -683,7 +700,7 @@ surface: `/help` and the explainer describe the active generation, so they are p
 - *Vitest owns pure decision logic; Playwright owns anything needing the full stack or the DOM.* Do not add a second
   DOM harness (`jsdom`/RTL) to re-assert what E2E already renders.
 - *E2E is user-only for the agent* (2026-07-26): the suite is ~4 min for 38 tests and the only one with real flakes,
-  so the `test-runner` gate runs `.\test.ps1 -Dotnet -Web`, reports that E2E did not run, and may only *recommend*
+  so the G3 test step runs `.\test.ps1 -Dotnet -Web`, reports that E2E did not run, and may only *recommend*
   the narrowest `.\e2e.ps1 -Spec <file>`.
 
 **Open:**
@@ -757,7 +774,7 @@ surface: `/help` and the explainer describe the active generation, so they are p
 - **Run the fast suites before deploying (M, low priority — user ruling 2026-10-11).** *Verified (§7.6 V2):*
   `fly-deploy.yml` goes checkout → setup-flyctl → `flyctl deploy`, and it is the repo's only workflow, so no suite
   ever runs on GitHub; an RC tag on a red commit deploys anyway, and the local pre-commit hook is the only net.
-  **Not Ready:** needs a design pass for which suites (the `test-runner` gate set: .NET + `tsc` + Vitest), the CI
+  **Not Ready:** needs a design pass for which suites (the G3 test step's set: .NET + `tsc` + Vitest), the CI
   .NET (SDK 9.0.200 pin) and Node setup, `needs:` ordering ahead of the deploy job, and how it shares setup with
   §6 "CI E2E step". Acceptance and test approach to be written then; the result is only observable on an RC
   deploy or a non-deploying trigger added for the purpose.

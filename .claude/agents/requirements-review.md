@@ -70,7 +70,7 @@ features. Over-raising costs the user one line of "yes, fine."
 - **Code structure / generation-seam architecture** — whether a gen-variable value lives on `IBattleRules`,
   no inline magic, one-line seam XML docs, no `Attributes` mutation to fake a modifier → that's **`pr-review`**'s.
   You care whether the *behavior/value* is faithful, not where in the code it lives.
-- **Formatting, build, test pass/fail** → `format-gate` / `test-runner`.
+- **Formatting, build, test pass/fail** → the main session's format and test steps.
 
 If you spot one, note it as an aside naming the owner — don't turn your report into a code review.
 
@@ -117,7 +117,7 @@ DISCREPANCIES (n)  — each BLOCKS until the user adjudicates (fix or explicit w
   ...
 
 ASIDES (n)  — out of lane; name the owner
-- <file:line> — <owner: pr-review | format-gate | test-runner> — <what>
+- <file:line> — <owner: pr-review | format step | test step> — <what>
 ```
 `MET` only when nothing conflicts with the docs or authentic Gen-1/roguelite behavior, no new behavior is
 undocumented, **and every domain claim the plan makes has been independently checked and holds**. `MET` is a

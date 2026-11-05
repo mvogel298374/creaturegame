@@ -12,8 +12,8 @@ One lane is deliberately **not** here, because another reviewer owns it:
 hard gate to the pipeline but soft to the user: only the user waives a requirements discrepancy.)
 
 ## Preconditions (green before `pr-review` runs)
-- `format-gate` — CSharpier `PASS` or `REFORMATTED`.
-- `test-runner` — full suite green.
+- Format step — CSharpier `PASS` or `REFORMATTED`.
+- Test step — the fast suites green.
 - `requirements-review` — `REQUIREMENTS: MET`, or every discrepancy user-adjudicated (fixed or explicitly
   waived by the user).
 

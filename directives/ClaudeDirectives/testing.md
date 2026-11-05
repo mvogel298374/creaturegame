@@ -2,8 +2,9 @@
 
 Lessons Claude derived from its own failures. They serve `MoDirectives/testing.md`.
 
-1. **Delegate whole-suite runs only, and state the scope.** Re-check a single test inline with
-   `.\test.ps1 -Filter`. One green run is enough; never re-run only to confirm a pass.
+1. **Run the suites yourself, at the narrowest scope.** Re-check a single test with `.\test.ps1 -Filter`;
+   the G3 test step is one `-Dotnet -Web` run against the final code. One green run is enough; never re-run
+   only to confirm a pass.
 2. **On an E2E failure, open the failure screenshot first.** More than once it showed the app correct and
    the spec wrong.
 3. **Test the quirk, not the outcome.** Assert why the result happened ("damage is higher because Defense
