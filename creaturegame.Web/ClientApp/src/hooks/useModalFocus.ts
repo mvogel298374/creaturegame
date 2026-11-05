@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 // Design: FRONTEND_PLAN.md → Modal focus.
 const inerted = new Set<Element>();
 
-const topOverlay = () => Array.from(document.querySelectorAll('.modal-overlay')).at(-1);
+const topOverlay = () => Array.from(document.querySelectorAll('.modal-overlay, [data-modal-root]')).at(-1);
 
 const tabbable = (root: Element) =>
   Array.from(root.querySelectorAll<HTMLElement>('a[href], button, input, select, textarea, [tabindex]')).filter(
@@ -55,4 +55,9 @@ export function useModalFocus(label: string) {
     },
     []
   );
+}
+
+export function ModalFocus({ label }: { label: string }) {
+  useModalFocus(label);
+  return null;
 }

@@ -402,5 +402,9 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - With two prompts open, the one rendered last is active; Settings always renders last, so it stays on top of a run prompt or
   the game-over overlay and the prompt takes focus when Settings closes.
 - The battle log is a polite live region (`role="log"`, `aria-live="polite"`).
-- Not covered: the pinned Run Map has no focus trap.
-- Design detail → `FRONTEND_PLAN.md` → Modal focus.  History → `TODO_ARCHIVE.md` → *§5 Modal accessibility*.
+- The pinned Run Map is a modal too: Tab and Shift+Tab cycle inside it, its close button takes focus on open, the rest of the
+  screen is inert, and Escape closes it and returns focus to the MAP toggle. A prompt arriving over it takes focus and hands it
+  back when it closes. The corner peek is not a modal.
+- Known gap: with a prompt over the pinned map, Escape also closes the map behind the prompt.
+- Design detail → `FRONTEND_PLAN.md` → Modal focus.  History → `TODO_ARCHIVE.md` → *§5 Modal accessibility* and *§5 The
+  pinned Run Map has no focus trap*.

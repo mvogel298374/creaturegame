@@ -172,6 +172,15 @@ export async function chooseBestMove(page: Page): Promise<string> {
   const grid = page.locator('.move-grid');
   await expect(grid.locator('.move-btn:not([disabled])').first()).toBeEnabled();
 
+  const chosen = grid.locator('.move-btn').nth(await bestMoveIndex(page));
+  const label = (await chosen.locator('.move-name').textContent())?.trim() ?? '';
+  await chosen.click();
+  return label;
+}
+
+/** `chooseBestMove`'s pick, as an index into the open grid's `.move-btn`s, for a caller that clicks it itself. */
+export async function bestMoveIndex(page: Page): Promise<number> {
+  const grid = page.locator('.move-grid');
   const scored = await grid.locator('.move-btn').evaluateAll(nodes =>
     nodes.map((node, i) => {
       const el = node as HTMLButtonElement;
@@ -197,11 +206,7 @@ export async function chooseBestMove(page: Page): Promise<string> {
     (a, b) => (b.power * b.eff * (b.stab ? 1.5 : 1) > a.power * a.eff * (a.stab ? 1.5 : 1) ? b : a),
     usable[0]
   );
-
-  const chosen = grid.locator('.move-btn').nth(best.i);
-  const label = (await chosen.locator('.move-name').textContent())?.trim() ?? '';
-  await chosen.click();
-  return label;
+  return best.i;
 }
 
 export const logLines = (page: Page): Promise<string[]> =>

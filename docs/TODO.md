@@ -48,7 +48,7 @@ gap has drafted text, awaiting your confirmation · ✗ gaps remain.
 
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
-| **The pinned Run Map has no focus trap** (§5) | S | ⚠️ 1, 3, 5, 6, 7 | Split out 2026-11-05. Its dependency is met: Modal accessibility shipped `useModalFocus`, which it reuses. Confirm the drafted lines. |
+| **The pinned map's Escape fires under a prompt** (§5) | S | ⚠️ 1–7 drafted | Filed 2026-11-05. Confirm the drafted lines. |
 
 **B. A design pass first** (central engine code: `opus-engineer` plus both gates; each pass is shown to you)
 
@@ -643,19 +643,17 @@ surface: `/help` and the explainer describe the active generation, so they are p
 
 ## 5. UX, accessibility and robustness (all unverified unless noted)
 
-- **The pinned Run Map has no focus trap (found 2026-11-05, Modal accessibility audit) — S, ✗ not Ready, split out by
-  ruling.** `RunMapPanel`'s pinned view (`BattleScreen.tsx`) declares `aria-modal="true"` but doesn't use `Modal`, so
-  the Modal accessibility fix (`useModalFocus`, `FRONTEND_PLAN.md` → Modal focus) doesn't cover it: Tab can still leave
-  the map for the controls behind it.
-  **DoR:** ✗ gaps **1, 3, 5, 6, 7**, all drafted. *Drafted:*
-  - **Acceptance:** with the map pinned, Tab and Shift+Tab cycle only inside it, its close button gets focus on open,
-    the rest of the screen is `inert`, and Escape still closes it. A prompt arriving over the map takes focus, and
-    focus returns to the map when the prompt closes.
-  - **Design:** reuse `useModalFocus` (its active modal is the last `.modal-overlay` in DOM order, so the pinned map
-    needs that class or a hook change). **Gen surface:** none. **Gen 1 source:** not applicable.
-  - **Data vs runtime:** client. **Test route:** an E2E spec, so it needs your run.
-  - **Quirk:** a prompt arriving over the pinned map takes focus, then hands it back.
-  - **Dependencies:** none. Modal accessibility shipped 2026-11-05 (`TODO_ARCHIVE.md`), so the hook exists.
+- **The pinned map's Escape fires under a prompt (found 2026-11-05, Run Map focus trap) — S, ✗ not Ready.**
+  `useEscapeKey` listens on `window`, so with a prompt open over the pinned Run Map, Escape closes the map behind
+  the prompt. The prompt keeps focus and nothing breaks, but the key acts on a panel the player can't see.
+  **DoR:** ⚠️ every line drafted, awaiting your confirmation. *Drafted:*
+  - **Acceptance:** with a prompt over the pinned map, Escape leaves the map open; with no prompt, Escape still
+    closes it.
+  - **Design:** `useEscapeKey` ignores the key unless its owner is the active modal (the hook's last modal root).
+    **Gen surface:** none. **Gen 1 source:** not applicable.
+  - **Data vs runtime:** client. **Test route:** a step in the prompt-over-map case of `modal-accessibility.spec.ts`.
+  - **Quirk:** none.
+  - **Dependencies:** none. The Run Map focus trap shipped 2026-11-05 (`TODO_ARCHIVE.md`), so the active-modal root exists.
 - **Transform's scale pulse may revert a resize (found 2026-10-17 during V13; unverified, S).** `transformSprite`'s
   yoyo tween returns to the scale captured at its start (`BattleScene.ts` `morph`), so a resize mid-pulse would
   restore the old scale. Read only; needs its own mini-DoR and a reproduction.

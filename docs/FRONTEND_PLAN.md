@@ -240,7 +240,10 @@ top is the one that takes input.
   while it's open waits underneath, `inert`, and takes focus when Settings closes. Most-recently-opened-wins was rejected:
   it could make a prompt active while it was hidden under a dead Settings panel.
 
-The pinned Run Map doesn't use `Modal`, so this doesn't cover it (`TODO.md` §5).
+- **A modal without `Modal`:** the pinned Run Map is the full-screen surface itself, not an overlay plus a card, and
+  `.modal-overlay` would reposition it and lift it above the prompts. It marks itself `data-modal-root`, which the hook
+  treats like `.modal-overlay`, and mounts `ModalFocus` (the hook as a component) only while pinned, so the corner peek
+  never traps focus. It renders before the prompts, so a prompt arriving over it takes focus and hands it back.
 
 ---
 

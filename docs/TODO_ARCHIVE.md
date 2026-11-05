@@ -8,6 +8,38 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §5 The pinned Run Map has no focus trap ✅ DONE (2026-11-05)
+
+S; client only; found 2026-11-05 in the Modal accessibility audit and split out by ruling. `RunMapPanel`'s pinned view
+(`BattleScreen.tsx`) declared `aria-modal="true"` but doesn't use `Modal`, so `useModalFocus` didn't cover it: Tab could still
+leave the map for the controls behind it. Drafted lines confirmed Ready by the user 2026-11-05.
+
+**Acceptance (met).** With the map pinned, Tab and Shift+Tab cycle only inside it, its close button gets focus on open, the rest
+of the screen is `inert`, and Escape still closes it. A prompt arriving over the map takes focus, and focus returns to the map
+when the prompt closes.
+
+**Outcome.** `useModalFocus` now treats `[data-modal-root]` as a modal alongside `.modal-overlay` (the pinned map can't take
+`.modal-overlay`: that class repositions it and puts it above the prompts). A new exported `ModalFocus` component is the hook as
+a component; the pinned `RunMapPanel` view carries `data-modal-root` and mounts `<ModalFocus label="Route map" />` only while
+pinned (the corner peek doesn't). Design → `FRONTEND_PLAN.md` → Modal focus ("A modal without Modal"). Gen surface: none.
+
+**Folded in (user ruling 2026-11-05).** The spec's play loop clicked the first move (MEWTWO's BARRIER), so "Settings stays on top
+of a run prompt" most likely passed on Game Over. The loop is now `playWithOpenUntil(page, open, target)` playing `bestMoveIndex`
+(split out of `chooseBestMove`, behaviour unchanged), and both prompt tests target `runPrompt` (excludes Game Over). They start as
+CHARIZARD Lv50, seed 1 (`shop.spec.ts`'s fixture): a Lv100 MEWTWO knows only Barrier, Recover, Mist and Amnesia, as in pokered,
+so it can't win a battle.
+
+**Tests.** `e2e/modal-accessibility.spec.ts` gained two cases (pinned map traps Tab, Escape returns focus to MAP; a prompt over
+the pinned map takes focus and hands it back) plus `runPrompt` and `isInert` helpers. tsc and Vitest passed; the user ran the
+spec 2026-11-05: all 7 cases passed. No .NET code changed.
+
+**Reviews.** E2E run by the user; review agents not recorded for this client-only change.
+
+**Split out.** The pinned map's Escape (`useEscapeKey` on `window`) still fires under a prompt; filed in `TODO.md` §5 as "The
+pinned map's Escape fires under a prompt".
+
+---
+
 ## §5 Modal accessibility ✅ DONE (2026-11-05)
 
 S–M; client only. `Modal.tsx` declared `aria-modal` but had no focus trap, initial focus or inert background: Tab still reached

@@ -47,6 +47,7 @@ import { MoveReplacementModal } from '../components/modals/MoveReplacementModal'
 import { SettingsModal } from '../components/modals/SettingsModal';
 import { EnemyOverviewModal } from '../components/modals/EnemyOverviewModal';
 import { useDevMode } from '../hooks/useDevMode';
+import { ModalFocus } from '../hooks/useModalFocus';
 import { useDamageRanges } from '../hooks/useDamageRanges';
 import { CreatureOverview } from './CreatureOverview';
 import '../components/buttons.css';
@@ -673,8 +674,10 @@ function RunMapPanel({ width, height, biomes, routes, routePath, currentId, biom
       role="dialog"
       aria-modal="true"
       aria-label="Route map"
+      data-modal-root
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
+      <ModalFocus label="Route map" />
       <div className="map-topbar">
         <div className="map-brand">
           <h2 className="map-title">Run Map</h2>
