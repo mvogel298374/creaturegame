@@ -117,8 +117,8 @@ ignored unless it is still the current one (`OnGraceElapsed`).
   **As built:** `SignalRBattleEventEmitter.SendSessionTakenOver(connectionId)` addresses the displaced connection by
   id (every other notice goes to the current one). The panel (`SessionTakenOverPanel`) reuses the game-over card's
   classes, so it gets the heavy backdrop and the Kanto Sage frame with no CSS of its own. While it is up,
-  `BattleScreen` renders the panel *instead of* the battle view, not over it. `Modal` has no focus trap (`TODO.md`
-  §5), so any control left mounted behind it would stay reachable by Tab. QUIT and the `phase === 'ended'` effect
+  `BattleScreen` renders the panel *instead of* the battle view, not over it. The panel is a `Modal`, so
+  any control left mounted behind it is `inert` (`FRONTEND_PLAN.md` → Modal focus). QUIT and the `phase === 'ended'` effect
   both call `clearActiveGame()`, which would wipe the surviving window's saved game; that effect is also gated on
   the flag, for a queued step that ends the run after the takeover. `useBattleHub` ignores the notice on a
   connection it has already torn down: under React StrictMode the first of the two dev mounts can attach, then be

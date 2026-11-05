@@ -218,6 +218,32 @@ with max DVs and Stat Exp). This gives a consistent visual reference across all 
 
 ---
 
+## Modal focus
+
+Every overlay goes through `Modal`, whose `useModalFocus` hook keeps one rule: **the last `.modal-overlay` in DOM order
+is the active modal.** Overlays stack by DOM order because they all share z-index 70, so the modal the player sees on
+top is the one that takes input.
+
+- **Background:** the hook walks up from the active overlay and sets `inert` on every sibling along the way. Overlays
+  render in place, not in a portal, so this leaves their positioning alone. Other open modals go `inert` too; each one
+  marking the others independently would lock them all.
+- **Focus on open:** the first tabbable control, or the card when it has none. A modal that already placed focus inside
+  itself keeps it (nickname's `autoFocus`, the route choice's first offered town). Because prompts arrive on their own,
+  a stray Enter or Space can answer one; this was ruled acceptable (2026-11-05).
+- **Tab:** one document-level listener wraps Tab and Shift+Tab inside the active modal. It reads the controls on each
+  press, since they change with state (a shop purchase, a multi-step prompt), and pulls focus back if it fell to `<body>`.
+- **Multi-step prompts:** `AcquisitionModal` and `MoveReplacementModal` keep one `Modal` instance across steps, so the
+  hook re-runs when `label` changes rather than on mount.
+- **Close:** the next modal takes focus if one remains. Focus then returns to the control that had it when the modal
+  opened, if that control still exists and isn't `inert`.
+- **Settings always wins:** `SettingsModal` renders last in `BattleScreen`, after `BattleEndedOverlay`. A prompt arriving
+  while it's open waits underneath, `inert`, and takes focus when Settings closes. Most-recently-opened-wins was rejected:
+  it could make a prompt active while it was hidden under a dead Settings panel.
+
+The pinned Run Map doesn't use `Modal`, so this doesn't cover it (`TODO.md` §5).
+
+---
+
 ## Project Structure
 
 ### .NET side — new project `creaturegame.Web`

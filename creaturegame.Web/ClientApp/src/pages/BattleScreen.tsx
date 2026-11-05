@@ -291,7 +291,7 @@ export function BattleScreen() {
       </div>
 
       <div className="battle-panel">
-        <div className="battle-log" ref={logRef}>
+        <div className="battle-log" ref={logRef} role="log" aria-live="polite">
           {state.log.map(entry => (
             <p key={entry.id} className={`log-line${entry.tone ? ` log-line--${entry.tone}` : ''}`}>{entry.message}</p>
           ))}
@@ -399,10 +399,6 @@ export function BattleScreen() {
         <EnemyOverviewModal gameId={gameId} onClose={() => setEnemyOverviewOpen(false)} />
       )}
 
-      {settingsOpen && (
-        <SettingsModal onClose={() => setSettingsOpen(false)} />
-      )}
-
       {state.phase === 'ended' && (
         <BattleEndedOverlay
           creatureName={playerName}
@@ -412,6 +408,11 @@ export function BattleScreen() {
           onPlayAgain={() => nav('/select')}
           onQuit={() => nav('/')}
         />
+      )}
+
+      {/* Stays last: Settings always wins (FRONTEND_PLAN.md → Modal focus). */}
+      {settingsOpen && (
+        <SettingsModal onClose={() => setSettingsOpen(false)} />
       )}
     </div>
   );

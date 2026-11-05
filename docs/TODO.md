@@ -48,7 +48,7 @@ gap has drafted text, awaiting your confirmation · ✗ gaps remain.
 
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
-| **Modal accessibility** (§5) | S–M | ⚠️ 1, 3, 5, 6, 7 + test route | Client only; the drafted test route is an E2E spec you run. |
+| **The pinned Run Map has no focus trap** (§5) | S | ⚠️ 1, 3, 5, 6, 7 | Split out 2026-11-05. Its dependency is met: Modal accessibility shipped `useModalFocus`, which it reuses. Confirm the drafted lines. |
 
 **B. A design pass first** (central engine code: `opus-engineer` plus both gates; each pass is shown to you)
 
@@ -643,20 +643,19 @@ surface: `/help` and the explainer describe the active generation, so they are p
 
 ## 5. UX, accessibility and robustness (all unverified unless noted)
 
-- **Modal accessibility:** `Modal.tsx:35-44` has `aria-modal` but no focus trap, initial focus or inert background —
-  Tab still reaches QUIT (abandons the run, no confirmation); the battle log has no `role="log"`/`aria-live`.
-  **Verified in a browser 2026-10-03** (route-choice modal over the pinned map): Tab leaves the modal after the
-  offered towns — focus goes to `<body>`, then the MAP toggle, the settings gear, then the pinned map *behind* the
-  modal (its close button, then its towns). Not checked: what Enter does on those towns (probably inert).
-  **DoR (V16):** ✗ not Ready — gaps **1, 3, 5, 6, 7**, all drafted here. Confirm them and choose the test route,
-  then it is ✅ Ready (S–M; client, no central method).
-  - **Acceptance:** with a modal open, Tab and Shift+Tab cycle only inside it, the first control gets focus on
-    open, the background is `inert`, and the battle log has `role="log"` with `aria-live="polite"`.
-  - **Test route:** an E2E spec (no DOM harness by rule), so it needs your run.
-  - **Gen surface:** none.
-  - **Data vs runtime:** client.
-  - **Quirk:** Tab from the last control wraps to the first, never to QUIT.
-  - **Dependencies:** none.
+- **The pinned Run Map has no focus trap (found 2026-11-05, Modal accessibility audit) — S, ✗ not Ready, split out by
+  ruling.** `RunMapPanel`'s pinned view (`BattleScreen.tsx`) declares `aria-modal="true"` but doesn't use `Modal`, so
+  the Modal accessibility fix (`useModalFocus`, `FRONTEND_PLAN.md` → Modal focus) doesn't cover it: Tab can still leave
+  the map for the controls behind it.
+  **DoR:** ✗ gaps **1, 3, 5, 6, 7**, all drafted. *Drafted:*
+  - **Acceptance:** with the map pinned, Tab and Shift+Tab cycle only inside it, its close button gets focus on open,
+    the rest of the screen is `inert`, and Escape still closes it. A prompt arriving over the map takes focus, and
+    focus returns to the map when the prompt closes.
+  - **Design:** reuse `useModalFocus` (its active modal is the last `.modal-overlay` in DOM order, so the pinned map
+    needs that class or a hook change). **Gen surface:** none. **Gen 1 source:** not applicable.
+  - **Data vs runtime:** client. **Test route:** an E2E spec, so it needs your run.
+  - **Quirk:** a prompt arriving over the pinned map takes focus, then hands it back.
+  - **Dependencies:** none. Modal accessibility shipped 2026-11-05 (`TODO_ARCHIVE.md`), so the hook exists.
 - **Transform's scale pulse may revert a resize (found 2026-10-17 during V13; unverified, S).** `transformSprite`'s
   yoyo tween returns to the scale captured at its start (`BattleScene.ts` `morph`), so a resize mid-pulse would
   restore the old scale. Read only; needs its own mini-DoR and a reproduction.

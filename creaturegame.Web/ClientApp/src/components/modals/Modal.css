@@ -11,6 +11,10 @@
   animation: levelup-pop 160ms ease-out;
 }
 
+.modal-overlay > [tabindex="-1"]:focus {
+  outline: none;
+}
+
 /* The move-replacement prompt is a menu decision, so anchor it to the player menu in the bottom-right
    corner (and dim the field more lightly) instead of floating centred over the combat area, which read
    as jarring. It rises in from the menu rather than popping in the middle of the battlefield. */

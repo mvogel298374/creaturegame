@@ -393,3 +393,14 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - BACK on Settings returns to the previous in-app page; opened cold (a direct visit or reload), it goes to the
   Title Screen.
 - Design detail → none.  History → `TODO_ARCHIVE.md` → *§7.6 V13 — Phaser resize/entry pacing and frontend nits*.
+
+### Modal keyboard focus
+- With a prompt or panel open, Tab and Shift+Tab cycle only inside it and wrap from the last control to the first; the rest of
+  the screen is inert.
+- A prompt takes focus on its first control when it opens, unless it already placed focus itself (nickname, route choice).
+- When a prompt closes, focus goes to the next open prompt if there is one, otherwise back to the control that had it.
+- With two prompts open, the one rendered last is active; Settings always renders last, so it stays on top of a run prompt or
+  the game-over overlay and the prompt takes focus when Settings closes.
+- The battle log is a polite live region (`role="log"`, `aria-live="polite"`).
+- Not covered: the pinned Run Map has no focus trap.
+- Design detail → `FRONTEND_PLAN.md` → Modal focus.  History → `TODO_ARCHIVE.md` → *§5 Modal accessibility*.

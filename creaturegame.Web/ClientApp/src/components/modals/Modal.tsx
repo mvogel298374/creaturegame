@@ -1,5 +1,6 @@
 import type { ReactNode, RefObject } from 'react';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
+import { useModalFocus } from '../../hooks/useModalFocus';
 import '../buttons.css';
 import './Modal.css';
 import './ModalFrame.css';
@@ -32,12 +33,13 @@ export function Modal({ label, dismiss, card, overlay, role = 'alertdialog', car
 }) {
   const onEscape = typeof dismiss === 'object' ? dismiss.onEscape : null;
   useEscapeKey(onEscape);
+  useModalFocus(label);
   return (
     <div
       className={overlay ? `modal-overlay ${overlay}` : 'modal-overlay'}
       onClick={onEscape ? e => { if (e.target === e.currentTarget) onEscape(); } : undefined}
     >
-      <div ref={cardRef} className={card} role={role} aria-modal="true" aria-label={label}>
+      <div ref={cardRef} className={card} role={role} aria-modal="true" aria-label={label} tabIndex={-1}>
         {children}
       </div>
     </div>

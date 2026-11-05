@@ -8,6 +8,41 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §5 Modal accessibility ✅ DONE (2026-11-05)
+
+S–M; client only. `Modal.tsx` declared `aria-modal` but had no focus trap, initial focus or inert background: Tab still reached
+QUIT (abandons the run, no confirmation), and the battle log had no `role="log"`/`aria-live`. Verified in a browser 2026-10-03
+(route-choice modal over the pinned map): Tab left the modal after the offered towns, to `<body>`, then the MAP toggle, the
+settings gear, then the pinned map behind the modal. Ruled Ready 2026-11-05.
+
+**Acceptance (met).** With a modal open, Tab and Shift+Tab cycle only inside it, the first control gets focus on open, the
+background is `inert`, and the battle log has `role="log"` with `aria-live="polite"`. When a modal closes, focus returns to the
+control that had it, if that control still exists. With two modals open, only the last in DOM order is active and the other is
+`inert`; focus moves to it when the top one closes. Settings always wins: no other modal renders above it, including one that
+opens after it, such as a run prompt or the game-over overlay.
+
+**Outcome.** New hook `src/hooks/useModalFocus.ts`, called by `Modal`: a document-level Tab wrap, first-control focus (a modal
+that already placed focus inside itself keeps it, as nickname and the route choice do), `inert` on every sibling along the
+path to the active overlay, and focus return on close. `Modal`'s card gets `tabIndex={-1}` (with an outline rule in `Modal.css`)
+as the focus target when a modal has no controls. `BattleScreen` renders `SettingsModal` last, after `BattleEndedOverlay`, so
+DOM order alone puts it on top (user ruling 2026-11-05; most-recently-opened-wins was rejected), and `.battle-log` gained
+`role="log"` and `aria-live="polite"`. The first control takes focus even though prompts arrive unprompted, so a stray Enter or
+Space can answer one; ruled acceptable 2026-11-05. Design → `FRONTEND_PLAN.md` → Modal focus.
+
+**Tests.** New E2E spec `e2e/modal-accessibility.spec.ts` (listed in `e2e/README.md`); no DOM harness by rule. tsc and Vitest
+passed; a Puppeteer pass covered nickname, route choice, Settings, and Settings over a reward prompt. The user ran the E2E spec
+2026-11-05: all passed. No .NET code changed.
+
+**Known limit.** No test covers focus moving between the steps of a multi-step prompt (`AcquisitionModal`,
+`MoveReplacementModal`), which keep one `Modal` instance across steps; the hook re-runs on a `label` change there.
+
+**Reviews.** E2E run by the user; `format-gate`, `test-runner` and the review agents are not recorded for this client-only change.
+
+**Split out.** The pinned Run Map declares `aria-modal` but doesn't use `Modal`, so this fix doesn't cover it; filed in
+`TODO.md` §5 as "The pinned Run Map has no focus trap".
+
+---
+
 ## §3.2 Moves store modern priority ✅ DONE (2026-11-03)
 
 S; found 2026-11-03 by `requirements-review`, accepted Ready the same day. pokered has two ordering exceptions, Quick Attack
