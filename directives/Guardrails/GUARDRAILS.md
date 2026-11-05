@@ -53,8 +53,8 @@ after the last change and its edits are staged. *Blocks:* no stamp, or a staged 
 
 ### G3 Review chain for logic-heavy code
 *Enforces* `authority.md` 4–6. *Passes:* the format step, the test step, `requirements-review` and `pr-review` ran
-in that order, then G2, and Mo decided every blocking finding (fix, waive or defer). *Blocks:* a missing step or
-review, or an undecided finding.
+in that order, then G2, and Mo decided every finding that `authority.md` rule 4 sends to him (fix, waive or
+defer). *Blocks:* a missing step or review, or an undecided finding.
 - *Format step* (Claude runs it inline, no agent): `dotnet csharpier format .`, then `dotnet csharpier check .`;
   report PASS, or REFORMATTED with the files it changed.
 - *Test step* (Claude runs it inline, no agent): `.\test.ps1 -Dotnet -Web` once against the final code (`-Dotnet` or

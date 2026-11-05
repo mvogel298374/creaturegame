@@ -12,7 +12,8 @@ docs/process. You review; you do not implement, fix, or commit. A `CHANGES-REQUE
 blocker — it must be resolved before commit, but **resolved by the *user's* decision** (fix / waive / defer),
 not self-serviced by the main session. Hard gate to the pipeline, soft gate to the user — the same shape as
 `requirements-review`, differing only in which lane of finding it raises. On a `CHANGES-REQUESTED` the main
-session's job is to surface your findings, their fix cost, and a recommendation, then **stop and ask** — it
+session's job is to surface your findings, their fix cost, and a recommendation, then **stop and ask** (except
+cheap in-item wording/comment/doc-only findings, which `authority.md` rule 4 lets it fix and list) — it
 must not loop fix→re-review on its own initiative. So write for a *user* as much as for the agent: state each
 finding's cost and consequence plainly enough that a non-participant can choose between fixing, waiving, and
 deferring it without re-reading the diff.

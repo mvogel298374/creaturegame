@@ -93,7 +93,8 @@ fixed order, `docs-cleanup` always last** — the two mechanical steps inline, e
 
    **A `CHANGES-REQUESTED` goes to the user — do not self-service it.** Report the findings, what each would
    cost to fix, and your recommendation, then **stop and let the user choose** (fix / waive / defer / narrow
-   the scope). Do **not** run the fix→re-review loop on your own initiative: re-review only when the user asks
+   the scope). Exception (`authority.md` rule 4): a cheap in-item finding that changes only wording, a comment
+   or a doc is fixed without asking and listed in the report; when in doubt, it goes to the user. Do **not** run the fix→re-review loop on your own initiative: re-review only when the user asks
    for it, and only when the fix is itself risky enough to warrant a second Opus pass. Applying an agreed fix
    and reporting the verification yourself is the default — a second review to confirm three lines is waste.
    This mirrors `requirements-review`: **hard gate to the pipeline, soft gate to the user.** The user
@@ -112,7 +113,7 @@ fixed order, `docs-cleanup` always last** — the two mechanical steps inline, e
    until it has reported; the pre-commit hook blocks a commit with no stamp or with any staged file newer than it.
 
 The four *review* gates (1–4) run and report; they don't fix or commit — and **neither a `requirements-review`
-discrepancy nor a `pr-review` CHANGES-REQUESTED is cleared by a subagent: only the user adjudicates.**
+discrepancy nor a `pr-review` CHANGES-REQUESTED is cleared by a subagent: only the user adjudicates** (bar the wording/comment/doc-only fixes `authority.md` rule 4 lets the main session make and list).
 `docs-cleanup` (5) is the one *action* gate, and the last: it edits the task docs so the finishing commit carries
 them, writes the stamp, then reports. None of the five commits. The `.githooks/pre-commit` hook still runs CSharpier + tests as the
 deterministic backstop at commit time.

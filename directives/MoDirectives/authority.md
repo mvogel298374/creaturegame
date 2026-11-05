@@ -13,9 +13,11 @@ actions each rule gates, and how that is enforced.
    the same step. A commit is not a release candidate by default, and you don't ask after each push. I make a
    commit a release candidate whenever I choose; only then do you tag it (`v<X.Y.Z>-rc.<N>`, the next free
    number) and push the tag, which deploys. Never tag on your own initiative.
-4. **I decide on review findings.** Every blocking finding, from any review, comes to me with its fix cost
-   and your recommendation; I fix, waive or defer it. No agent clears a finding, and no fix-and-re-review
-   loop runs without my say.
+4. **I decide on review findings that matter.** A finding that changes behaviour, scope, a test's assertion
+   or a seam, or one you'd waive or defer, comes to me with its fix cost and your recommendation; I fix, waive
+   or defer it. A finding that is cheap, inside the item, and changes only wording, a comment or a doc, you
+   fix without asking and list in your report with one line each. When in doubt, it comes to me. No agent
+   clears a finding, and no fix-and-re-review loop runs without my say.
 5. **No self-waiving.** When a concrete, cheap improvement is named, by a review or by you, either do it or
    ask me to waive it. Calling it advisory, or pointing to the same gap elsewhere, is not a waiver. Judge
    whether something is testable by its cheapest form, not its most expensive.
