@@ -157,7 +157,7 @@ test.describe('Modal accessibility', () => {
     await expect(page.locator('.battle-panel')).not.toHaveAttribute('inert', '');
   });
 
-  test('a prompt arriving over the pinned Run Map takes focus, then hands it back to the map', async ({ page }) => {
+  test('a prompt arriving over the pinned Run Map takes focus and Escape, then hands both back to the map', async ({ page }) => {
     test.setTimeout(120_000);
     await pinnableMap(page, 'CHARIZARD', 50);
     expect(await playWithOpenUntil(page, PINNED_MAP, runPrompt(page))).toBe(true);
@@ -167,9 +167,16 @@ test.describe('Modal accessibility', () => {
     await page.keyboard.press('Tab');
     expect(await focusIsInside(page, '.modal-overlay')).toBe(true);
 
+    await page.keyboard.press('Escape');
+    await expect(page.locator(PINNED_MAP.panel)).toBeVisible();
+    await expect(runPrompt(page)).not.toHaveCount(0);
+
     while (await answerRunPromptIfPresent(page, { drafts: 'decline' })) {}
     await expect(page.locator(PINNED_MAP.panel)).toBeVisible();
     await expect.poll(() => isInert(page, PINNED_MAP.panel)).toBe(false);
     await expect.poll(() => focusIsInside(page, PINNED_MAP.panel)).toBe(true);
+
+    await page.keyboard.press('Escape');
+    await expect(page.locator(PINNED_MAP.panel)).toHaveCount(0);
   });
 });

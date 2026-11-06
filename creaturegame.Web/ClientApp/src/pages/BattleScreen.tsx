@@ -640,10 +640,9 @@ function RunMapPanel({ width, height, biomes, routes, routePath, currentId, biom
   pinned: boolean;
   onClose: () => void;
 }) {
-  // The map is the one overlay Escape may close: it only draws run state the client already has, so leaving it
-  // costs nothing. Every other overlay is a prompt the run is blocked on — see Modal's `dismiss`. It can't use
-  // that wrapper (the pinned panel *is* the full-screen surface, not an overlay + card), but it shares the rule.
-  useEscapeKey(pinned ? onClose : null);
+  // Escape rule shared with Modal's `dismiss` (FRONTEND_PLAN.md → Modal focus).
+  const rootRef = useRef<HTMLDivElement>(null);
+  useEscapeKey(pinned ? onClose : null, rootRef);
 
   // The biome boss's themed trainer name (stable per biome visit — see bossTrainer.ts), used for the Boss
   // node's ladder sub-label in place of the behind-the-curtain "Region gate".
@@ -670,6 +669,7 @@ function RunMapPanel({ width, height, biomes, routes, routePath, currentId, biom
   // Pinned: the full-screen overworld. Backdrop click (outside the stage) closes it.
   return (
     <div
+      ref={rootRef}
       className="encounter-map encounter-map--pinned"
       role="dialog"
       aria-modal="true"

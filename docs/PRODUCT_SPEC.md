@@ -405,6 +405,7 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - The pinned Run Map is a modal too: Tab and Shift+Tab cycle inside it, its close button takes focus on open, the rest of the
   screen is inert, and Escape closes it and returns focus to the MAP toggle. A prompt arriving over it takes focus and hands it
   back when it closes. The corner peek is not a modal.
-- Known gap: with a prompt over the pinned map, Escape also closes the map behind the prompt.
-- Design detail → `FRONTEND_PLAN.md` → Modal focus.  History → `TODO_ARCHIVE.md` → *§5 Modal accessibility* and *§5 The
-  pinned Run Map has no focus trap*.
+- Escape acts only on the topmost overlay: with a prompt over the pinned map it leaves the map open, and with Settings over a
+  dismissable prompt it closes only Settings.
+- Design detail → `FRONTEND_PLAN.md` → Modal focus.  History → `TODO_ARCHIVE.md` → *§5 Modal accessibility*, *§5 The
+  pinned Run Map has no focus trap* and *§5 The pinned map's Escape fires under a prompt*.

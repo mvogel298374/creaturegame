@@ -232,6 +232,9 @@ top is the one that takes input.
   a stray Enter or Space can answer one; this was ruled acceptable (2026-11-05).
 - **Tab:** one document-level listener wraps Tab and Shift+Tab inside the active modal. It reads the controls on each
   press, since they change with state (a shop purchase, a multi-step prompt), and pulls focus back if it fell to `<body>`.
+- **Escape:** `useEscapeKey` takes the owner's root and fires only while that root is the active modal (the pure
+  `isTopmost` check in `modalStack.ts`, which shares the overlay selector with this hook). So Escape over a prompt
+  leaves the pinned map open behind it, and with Settings over a dismissable modal it closes only Settings.
 - **Multi-step prompts:** `AcquisitionModal` and `MoveReplacementModal` keep one `Modal` instance across steps, so the
   hook re-runs when `label` changes rather than on mount.
 - **Close:** the next modal takes focus if one remains. Focus then returns to the control that had it when the modal

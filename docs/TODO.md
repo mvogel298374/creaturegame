@@ -46,9 +46,7 @@ gap has drafted text, awaiting your confirmation · ✗ gaps remain.
 
 **A. Confirm the drafted lines, then Ready**
 
-| Item | Cost | Ready? | Next step / what it unblocks |
-|:-----|:----:|:-------|:-----------------------------|
-| **The pinned map's Escape fires under a prompt** (§5) | S | ⚠️ 1–7 drafted | Filed 2026-11-05. Confirm the drafted lines. |
+_(none)_
 
 **B. A design pass first** (central engine code: `opus-engineer` plus both gates; each pass is shown to you)
 
@@ -660,17 +658,6 @@ surface: `/help` and the explainer describe the active generation, so they are p
 
 ## 5. UX, accessibility and robustness (all unverified unless noted)
 
-- **The pinned map's Escape fires under a prompt (found 2026-11-05, Run Map focus trap) — S, ✗ not Ready.**
-  `useEscapeKey` listens on `window`, so with a prompt open over the pinned Run Map, Escape closes the map behind
-  the prompt. The prompt keeps focus and nothing breaks, but the key acts on a panel the player can't see.
-  **DoR:** ⚠️ every line drafted, awaiting your confirmation. *Drafted:*
-  - **Acceptance:** with a prompt over the pinned map, Escape leaves the map open; with no prompt, Escape still
-    closes it.
-  - **Design:** `useEscapeKey` ignores the key unless its owner is the active modal (the hook's last modal root).
-    **Gen surface:** none. **Gen 1 source:** not applicable.
-  - **Data vs runtime:** client. **Test route:** a step in the prompt-over-map case of `modal-accessibility.spec.ts`.
-  - **Quirk:** none.
-  - **Dependencies:** none. The Run Map focus trap shipped 2026-11-05 (`TODO_ARCHIVE.md`), so the active-modal root exists.
 - **Transform's scale pulse may revert a resize (found 2026-10-17 during V13; unverified, S).** `transformSprite`'s
   yoyo tween returns to the scale captured at its start (`BattleScene.ts` `morph`), so a resize mid-pulse would
   restore the old scale. Read only; needs its own mini-DoR and a reproduction.

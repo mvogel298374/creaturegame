@@ -1,4 +1,4 @@
-import type { ReactNode, RefObject } from 'react';
+import { useRef, type ReactNode, type RefObject } from 'react';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
 import { useModalFocus } from '../../hooks/useModalFocus';
 import '../buttons.css';
@@ -32,10 +32,12 @@ export function Modal({ label, dismiss, card, overlay, role = 'alertdialog', car
   children: ReactNode;
 }) {
   const onEscape = typeof dismiss === 'object' ? dismiss.onEscape : null;
-  useEscapeKey(onEscape);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  useEscapeKey(onEscape, overlayRef);
   useModalFocus(label);
   return (
     <div
+      ref={overlayRef}
       className={overlay ? `modal-overlay ${overlay}` : 'modal-overlay'}
       onClick={onEscape ? e => { if (e.target === e.currentTarget) onEscape(); } : undefined}
     >

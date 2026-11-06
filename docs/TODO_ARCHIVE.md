@@ -36,7 +36,32 @@ spec 2026-11-05: all 7 cases passed. No .NET code changed.
 **Reviews.** E2E run by the user; review agents not recorded for this client-only change.
 
 **Split out.** The pinned map's Escape (`useEscapeKey` on `window`) still fires under a prompt; filed in `TODO.md` §5 as "The
-pinned map's Escape fires under a prompt".
+pinned map's Escape fires under a prompt". Fixed 2026-11-06 (next section).
+
+---
+
+## §5 The pinned map's Escape fires under a prompt ✅ DONE (2026-11-06)
+
+S; client only; found 2026-11-05 in the Run Map focus trap work. `useEscapeKey` listens on `window`, so with a prompt open over
+the pinned Run Map, Escape closed the map behind the prompt. The prompt kept focus and nothing broke, but the key acted on a
+panel the player couldn't see. DoR confirmed Ready by the user 2026-11-06 with two additions (Settings over a dismissable
+prompt in the acceptance; a Vitest pure-helper test alongside the E2E step); greenlit.
+
+**Acceptance (met).** With a prompt over the pinned map, Escape leaves the map open; with no prompt, Escape still closes it. With
+Settings over a dismissable prompt, Escape closes only Settings. Gen surface: none. Gen 1 source: not applicable. Quirk: none.
+
+**Outcome.** New `hooks/modalStack.ts`: `overlayStack()` (the shared `.modal-overlay, [data-modal-root]` selector, now used by
+both `useModalFocus` and `useEscapeKey`) and pure `isTopmost(stack, owner)`. `useEscapeKey(onEscape, owner)` fires only when
+the owner's root is the topmost overlay, so the rule covers every `Modal`, not only the map. `Modal.tsx` passes a ref to its
+`.modal-overlay` div; `RunMapPanel` passes a ref to the pinned `data-modal-root` div. Comments on the hook and the panel cut to
+one line. Design → `FRONTEND_PLAN.md` → Modal focus ("Escape").
+
+**Tests.** `hooks/modalStack.test.ts` (Vitest) pins: a lone map is topmost; a map under a prompt isn't; Settings over a
+dismissable prompt, only Settings; a null or absent owner is never topmost. The prompt-over-map case in
+`e2e/modal-accessibility.spec.ts` (renamed "a prompt arriving over the pinned Run Map takes focus and Escape, then hands both
+back to the map") now presses Escape under the prompt, asserts the map and the prompt stay, then after the prompts are answered
+Escape closes the map. `.\test.ps1 -Web`: TypeScript pass, Vitest 372/372. **The E2E step is written but not run** (opt-in);
+recommended command `.\e2e.ps1 -Spec modal-accessibility`. No .NET code changed.
 
 ---
 
