@@ -8,9 +8,8 @@ namespace creaturegame.Tests.Integration.Gen1Attacks;
 /// <summary>
 /// Gen 1 type-based immunities — a move can hit yet do nothing because the target's type is immune
 /// to the effect. These are gen-variable rules on the <see cref="IBattleRules"/> seam
-/// (status/Leech-Seed immunity, direct damage) and the <see cref="ITypeChart"/>. Each case emits
-/// <see cref="MoveHadNoEffect"/> for the "It doesn't affect …" line,
-/// except a damaging move whose <i>secondary</i> status is blocked (the hit still lands).
+/// (status/Leech-Seed immunity, direct damage) and the <see cref="ITypeChart"/>. Which failure line each
+/// case prints is in GENERATION_SEAMS.md §2 (Failure announcements).
 /// </summary>
 [Collection(MovesCollection.Name)]
 public class ImmunityContractTests(MovesFixture moves) : Gen1MoveContract(moves)
@@ -23,7 +22,8 @@ public class ImmunityContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             .Use(Move("poison-powder"));
 
         Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
-        Assert.True(result.Has<MoveHadNoEffect>());
+        Assert.True(result.Has<MoveDidntAffect>());
+        Assert.False(result.Has<MoveHadNoEffect>());
     }
 
     [Fact]
@@ -35,7 +35,21 @@ public class ImmunityContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             .Use(Move("poison-gas"));
 
         Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
-        Assert.True(result.Has<MoveHadNoEffect>());
+        Assert.True(result.Has<MoveDidntAffect>());
+        Assert.False(result.Has<MoveHadNoEffect>());
+    }
+
+    [Fact]
+    public async Task PoisonTypesAreImmuneToToxic()
+    {
+        var result = await new MoveScenario()
+            .Rules(AlwaysHitRules.Instance)
+            .Defender(TestCreatures.Make("D", type1: DamageType.Poison, hp: 500))
+            .Use(Move("toxic"));
+
+        Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
+        Assert.True(result.Has<MoveDidntAffect>());
+        Assert.False(result.Has<MoveHadNoEffect>());
     }
 
     [Fact]
@@ -78,6 +92,7 @@ public class ImmunityContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             result.Has<MoveHadNoEffect>(),
             "the move connected; only the secondary status was blocked"
         );
+        Assert.False(result.Has<MoveDidntAffect>());
     }
 
     [Fact]
@@ -133,6 +148,7 @@ public class ImmunityContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 
         Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
         Assert.True(result.Has<MoveHadNoEffect>());
+        Assert.False(result.Has<MoveDidntAffect>());
     }
 
     [Fact]

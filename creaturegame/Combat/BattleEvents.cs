@@ -301,6 +301,7 @@ public enum UnaffectedCause
 {
     OneHitKo,
     ForceFlee,
+    StatusMove,
 }
 
 /// <summary>A move failed on a precondition and the generation says "… unaffected!". See GENERATION_SEAMS.md §2.</summary>
@@ -314,8 +315,7 @@ public record MoveUnaffected(
 /// <summary>A move failed and the generation says "It didn't affect …". See GENERATION_SEAMS.md §2.</summary>
 public record MoveDidntAffect(string TargetName, int TargetId, string MoveName) : BattleEvent;
 
-/// <summary>A sleep move hit a target that is already asleep — Gen 1's distinct "… is already asleep!"
-/// (AlreadyAsleepText), as opposed to the generic "It doesn't affect …" every other already-statused case uses.</summary>
+/// <summary>A sleep move on an already-asleep target: "… is already asleep!" (AlreadyAsleepText).</summary>
 public record AlreadyAsleep(string TargetName, int TargetId) : BattleEvent;
 
 /// <summary>A move with no effect by design (Splash) resolved — the Gen 1 "But nothing happened!" line.</summary>

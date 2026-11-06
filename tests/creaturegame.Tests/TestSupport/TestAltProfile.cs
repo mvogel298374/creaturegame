@@ -170,6 +170,12 @@ internal static class TestAltProfile
 
         public override bool FleeEndsTurnImmediately => false;
 
+        public override MoveFailureAnnouncement StatusMoveNoOpAnnouncement =>
+            MoveFailureAnnouncement.DoesntAffect;
+
+        public override MoveFailureAnnouncement StatusMoveMissAnnouncement =>
+            MoveFailureAnnouncement.Missed;
+
         // No participant split: proves the seam, not Battle, decides the division.
         public override ExperienceRules Experience { get; } =
             new(LevelDivisor: 7, Split: ExperienceSplit.None, Boosts: []);

@@ -53,9 +53,8 @@ None open.
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
 | **Rampage edge gaps** (§3.1) | S–M | ✗ 2, 3; the rest drafted | Found 2026-11-03. Lock-end and repeat-turn messages, plus the confusion counter. |
-| **"It didn't affect": Gen 1's fifth failure line** (§3.1) | S–M | ✗ 2, 3; the rest drafted | `MoveFailureAnnouncement.DidntAffect` and the `MoveDidntAffect` event exist (Roar, shipped 2026-11-06); gap 2 is down to which sites use them. |
 | **Gen 1 confusion self-hit damage** (§3.1) | S | ✗ 2; 1, 3, 5 drafted | Ruled 2026-10-17 (replicate the foe-Reflect quirk). |
-| **Pre-hit-test cluster** — Mist + thaw; Substitute stops a stat-down move before accuracy; Substitute lets sleep/paralysis through (§3.1) | M | ✗ 2, 3 each; 1, 5, 6, 7 drafted for Mist + thaw and sleep/paralysis, none for the stat-down entry | One design pass: all three move logic ahead of the hit test. |
+| **Pre-hit-test cluster** — Mist + thaw; Substitute stops a stat-down move before accuracy; Substitute lets sleep/paralysis through; status-move checks ahead of the hit test (§3.1) | M | ✗ 2, 3 each; 1, 5, 6, 7 drafted for Mist + thaw and sleep/paralysis, 6 for the status-move checks, none for the stat-down entry | One design pass: all four move logic ahead of the hit test. |
 | **Pre-move-check cluster** — `CanAct` status order; a replacement frees the trapped foe; Disable countdown (§3.1) | M | ✗ 2, 3 each | One design pass: all three live in the pre-move check. |
 | **Fly and Dig don't dodge anything** (§3.1) | M | ✗ 2, 3; the rest drafted | Found 2026-11-03. Central hit check; pairs with the pre-hit-test cluster. |
 | **Hyper Beam recharges after breaking a Substitute** (§3.1) | S | ✗ 2, 3; the rest drafted | Found 2026-11-03. Central `AttackAction`. |
@@ -91,6 +90,7 @@ None open.
 |:-----|:----:|:-------|:----------|
 | **Same-type secondary status immunity** (§3.1) | S–M | ✗ 2, 4, 6; the rest drafted | Take the pokered cite; Ice Beam freezes Ice-types today. |
 | **Other `ResidualEffects1` moves may roll accuracy** (§3.1) | S–M | ✗ 1, 2, 4, 6 | Filed 2026-11-06. A verify slice reads each effect for its own hit test. |
+| **Residual-effect failure lines: Leech Seed "evaded", confusion-move miss** (§3.1) | S–M | ✗ 2, 3, 6 | Filed 2026-11-06. Pair with the `ResidualEffects1` slice. |
 | **Counter keys on the foe's selected move** (§3.1) | S–M | ✗ 1, 2, 4, 6 | Trace `HandleCounterMove`, list the diverging cases. |
 | **A re-import marks `pokemon.db` changed with identical data** (§3.2) | S | ✗ 2; the rest drafted | Filed 2026-11-06. Read the three delete-and-insert sites, pick upsert or stable IDs. |
 | **Escape = B-cancel on the negative-answer prompts** (§4.5) | S | ✗ 4; the rest drafted | One pokered cite. |
@@ -220,6 +220,14 @@ data/engine item usually also means updating the test that pins the wrong value.
   **DoR (V16):** ✗ not Ready — gaps **2** (central `AttackAction`: `opus-engineer` plus both gates) and **3** (seam
   member to design), plus **5, 6, 7** (drafted). *Drafted:* runtime only; quirk "Thunder Wave lands through a substitute but Toxic
   doesn't"; dependencies none.
+- **Status-move checks ahead of the hit test (found 2026-11-06 by `requirements-review` of "It didn't affect";
+  source-confirmed) — S, ✗ not Ready; part of the pre-hit-test cluster.** pokered's Sleep, Poison and Paralyze effects
+  test "already statused" (and Poison-type for poison) before `MoveHitTest` and before Thunder Wave's Ground check
+  (`effects.asm:42-51`, `:89-98`; `paralyze.asm` `.next`). Ours checks type immunity first and rolls accuracy before
+  the status check, so (a) Thunder Wave on a statused Ground-type prints "doesn't affect" where pokered prints "didn't
+  affect", and (b) a statused or Poison-type foe draws an accuracy roll pokered never makes (same text, different RNG
+  draws). *Gaps:* **2** (central `AttackAction` ordering), **3** (likely one ordering member, planned with the cluster),
+  **6** (drafted: Thunder Wave on a paralyzed Ground-type says "didn't affect" and draws no accuracy roll).
 - **Gen 1 Disable countdown: the lock can end early compared with pokered (source-confirmed 2026-10-17, §7.6 V15) —
   M, ✗ not Ready.** pokered decrements the counter in the disabled mon's own pre-move check
   (`engine/battle/core.asm` `CheckPlayerStatusConditions:3328` → `.AnyMoveDisabledCheck:3394`; the enemy mirror is
@@ -248,7 +256,10 @@ data/engine item usually also means updating the test that pins the wrong value.
   freeze, burn or paralysis whenever the move's type equals either target type ("an ice move can't freeze an
   ice-type, body slam can't paralyze a normal-type"). `Gen1BattleRules.CanReceiveStatus` models only Poison, burn vs
   Fire and Normal→Normal paralysis, so Ice Beam can freeze an Ice-type and Thunderbolt/Thunder can paralyze an
-  Electric-type. `GENERATION_SEAMS.md` §2 "Status by type" records the gap.
+  Electric-type. `GENERATION_SEAMS.md` §2 "Status by type" records the gap. The rule also over-applies to pure status
+  moves: `CanReceiveStatus` blocks Glare (Normal) on a Normal-type, so it prints "It didn't affect" and never paralyzes,
+  but pokered's `ParalyzeEffect_` (`paralyze.asm`) checks only Electric vs Ground, so Glare paralyzes a Normal-type
+  (found 2026-11-06 by `requirements-review` of "It didn't affect"; unpinned).
   **DoR:** ✗ — gaps **4** (take the pokered cite ourselves, and check whether primary status moves and Tri Attack-style
   cases share the rule), **2** (does the seam signature change: the rule keys on the move's type vs the target's, which
   `CanReceiveStatus(target, status, moveType)` already receives), **6** (drafted: a full battle where a forced-hit
@@ -278,22 +289,15 @@ data/engine item usually also means updating the test that pins the wrong value.
     the client (`timeline.ts`) and the console emitter, keyed on event fields (e.g. `MoveUnaffected.Cause`), not on a
     seam. Decide whether battle text moves to the presentation catalog (§4.3) or a seam; the same question covers
     the Counter-failure and Dream Eater `MoveMissed` lines.
-- **"It didn't affect": Gen 1's fifth failure line (found 2026-10-31 by `requirements-review` of "Failure
-  announcements"; source-confirmed) — S–M, ✗ not Ready.** pokered prints `_DidntAffectText` "It didn't affect
-  <TARGET>!" (`effects.asm:1416-1423`, `text_3.asm`) when a status move hits an already-statused or status-immune
-  target; only a 0× type multiplier prints `_DoesntAffectMonText` "It doesn't affect <TARGET>!". We emit
-  `MoveHadNoEffect` for both, so the client prints "doesn't affect" for the no-op cases.
-  **DoR:** ✗ — gaps **2** (partly resolved), **3**; the rest drafted. *Drafted:*
-  - **Acceptance:** each `MoveHadNoEffect` emit site (`AttackAction.cs` ~181, ~427, ~693, ~709; `MoveEffects.cs`
-    ~118) is classified as type immunity or a no-op with a pokered cite; a no-op emits a distinct "didn't affect"
-    event or announcement and the client prints "It didn't affect <target>!"; type immunity is unchanged.
-  - **Design (gap 2, partly resolved 2026-11-06):** the Roar fix shipped the `DidntAffect` member on
-    `MoveFailureAnnouncement` and the `MoveDidntAffect(TargetName, TargetId, MoveName)` event, wired in all four places.
-    Left: whether the `MoveHadNoEffect` no-op sites emit `MoveDidntAffect` directly or route through the seam, and how
-    `MoveFailureEvents.For` is reached from those sites (`TODO_ARCHIVE.md` → "Roar/Whirlwind").
-  - **Gen-variable surface (gap 3):** which failures print which line, per site.
-  - **Data vs runtime:** runtime plus the wire (C# + TS). **Quirk:** the two lines differ by one word.
-    **Dependencies:** reuses the `MoveDidntAffect` event the Roar fix added.
+- **Residual-effect failure lines (found 2026-11-06, "It didn't affect" design pass; source-confirmed) — S–M, ✗ not
+  Ready.** Two more pokered lines we don't print. Leech Seed on a Grass type, on an already-seeded foe, or on a miss
+  prints "<TARGET> evaded the attack!" (`leech_seed.asm` `.moveMissed`, `EvadedAttackText`); ours prints "doesn't
+  affect" for Grass (`MoveEffects.cs` ~118), nothing when already seeded, and "missed" on a miss. A missed Supersonic
+  or Confuse Ray prints "But it failed!" (`effects.asm:1120-1126`, `ConfusionEffectFailed` :1158-1163); ours prints
+  "missed".
+  **DoR:** ✗ — gaps **2, 3, 6**. *Drafted:* **Acceptance:** each case prints its pokered line in a full battle.
+  **Data vs runtime:** runtime plus a new "evaded" event wired in all four places. **Dependencies:** pair with the
+  `ResidualEffects1` accuracy slice, which decides where these moves roll accuracy.
 - **Rampage edge gaps (found 2026-11-03, Thrash fix review) — S–M, ✗ not Ready, filed by ruling.** Three differences
   from pokered, none changing the turn count: the lock's end logs "became confused!", where pokered is silent
   (`core.asm:3542-3552`; its only such text is the ordinary effect, `effects.asm:1151`; ours `LockInMechanics.cs:142`,

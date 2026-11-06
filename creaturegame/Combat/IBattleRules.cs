@@ -281,6 +281,12 @@ public interface IBattleRules
     /// <summary>Whether a flee ends the turn at once: no further action, counter tick or residual. See GENERATION_SEAMS.md §2.</summary>
     bool FleeEndsTurnImmediately { get; }
 
+    /// <summary>The line a pure status move prints on an already-statused or status-immune foe. See GENERATION_SEAMS.md §2.</summary>
+    MoveFailureAnnouncement StatusMoveNoOpAnnouncement { get; }
+
+    /// <summary>The line a pure status move that inflicts a major status prints when it misses. See GENERATION_SEAMS.md §2.</summary>
+    MoveFailureAnnouncement StatusMoveMissAnnouncement { get; }
+
     /// <summary>The major status a creature keeps when it leaves a battle; volatile conditions are dropped elsewhere.</summary>
     StatusCondition CarryStatusOutOfBattle(StatusCondition status);
 

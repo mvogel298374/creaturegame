@@ -169,6 +169,7 @@ test is green, and the first real second generation discovers the whole thing le
 | Accuracy scale | 0–255, 1/256 miss bug | 0–100, no bug | the scale is read, not assumed |
 | X Accuracy | skips the accuracy roll | +1 accuracy stage | the item and the hit test ask `XAccuracyBypassesAccuracyCheck`, not the item id |
 | Failure announcements | a failed OHKO and a trainer-battle Roar print "… unaffected!" | "missed" and "doesn't affect" | `AttackAction` and `ForceFleeEffect` ask the seam for the line (`FailureAnnouncementTests`) |
+| Status-move failure lines | a status move on a statused or Poison-type foe, or one that misses, prints "It didn't affect" | "doesn't affect" and "missed" | `AttackAction` asks `StatusMoveNoOpAnnouncement` and `StatusMoveMissAnnouncement` (`FailureAnnouncementTests`) |
 | Roar / Whirlwind | a flee ends the turn at once; a lower-level user rolls to succeed and "didn't affect" on a fail | the turn plays out; a lower-level user always fails, "missed" | `Battle` and `ForceFleeEffect` ask `FleeEndsTurnImmediately`, `ForceFleeSucceeds` and the wild failure line (`ForceFleeTests`) |
 | Special stat | combined | split (Sp.Atk/Sp.Def) | `GetOffensiveStat`/`GetDefensiveStat` are actually routed through |
 | Type roster | 15 | 17 (adds Dark, Steel) | nothing hardcodes "15 types" |

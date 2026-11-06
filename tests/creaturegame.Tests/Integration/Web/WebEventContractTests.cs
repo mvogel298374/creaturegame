@@ -836,6 +836,7 @@ public class WebEventContractTests
     [Theory]
     [InlineData(UnaffectedCause.OneHitKo, "OneHitKo")]
     [InlineData(UnaffectedCause.ForceFlee, "ForceFlee")]
+    [InlineData(UnaffectedCause.StatusMove, "StatusMove")]
     public void MoveUnaffected_Projection_CarriesCauseName(UnaffectedCause cause, string expected)
     {
         var evt = new MoveUnaffected("JOLTEON", 1, "fissure", cause);

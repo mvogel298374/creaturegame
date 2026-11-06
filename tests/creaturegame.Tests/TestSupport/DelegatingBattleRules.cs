@@ -168,6 +168,12 @@ public abstract class DelegatingBattleRules : IBattleRules
 
     public virtual bool FleeEndsTurnImmediately => _inner.FleeEndsTurnImmediately;
 
+    public virtual MoveFailureAnnouncement StatusMoveNoOpAnnouncement =>
+        _inner.StatusMoveNoOpAnnouncement;
+
+    public virtual MoveFailureAnnouncement StatusMoveMissAnnouncement =>
+        _inner.StatusMoveMissAnnouncement;
+
     public virtual StatusCondition CarryStatusOutOfBattle(StatusCondition status) =>
         _inner.CarryStatusOutOfBattle(status);
 

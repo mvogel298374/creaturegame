@@ -37,7 +37,7 @@ public class StatusMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
             .Defender(TestCreatures.Make("D", hp: 500))
             .Use(Move("sing"));
 
-        Assert.True(result.Has<MoveMissed>());
+        AssertGen1StatusMiss(result);
         Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
     }
 
@@ -72,7 +72,7 @@ public class StatusMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
             .Defender(TestCreatures.Make("D", type1: DamageType.Water, hp: 500))
             .Use(Move(moveName));
 
-        Assert.True(result.Has<MoveMissed>());
+        AssertGen1StatusMiss(result);
         Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
     }
 
@@ -130,7 +130,7 @@ public class StatusMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
             .Defender(TestCreatures.Make("D", type1: DamageType.Water, hp: 500))
             .Use(Move("toxic"));
 
-        Assert.True(result.Has<MoveMissed>());
+        AssertGen1StatusMiss(result);
         Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
     }
 
@@ -160,7 +160,7 @@ public class StatusMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
             .Defender(TestCreatures.Make("D", type1: DamageType.Water, hp: 500))
             .Use(Move(moveName));
 
-        Assert.True(result.Has<MoveMissed>());
+        AssertGen1StatusMiss(result);
         Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
     }
 
@@ -194,7 +194,7 @@ public class StatusMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
             .Defender(TestCreatures.Make("D", hp: 500))
             .Use(Move(moveName));
 
-        Assert.True(result.Has<MoveMissed>());
+        AssertGen1StatusMiss(result);
         Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
     }
 
@@ -225,5 +225,24 @@ public class StatusMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
 
         Assert.True(result.Has<MoveMissed>());
         Assert.Equal(0, result.Defender.Battle.ConfusedTurns);
+    }
+
+    [Fact]
+    public async Task AMissedStatDownMoveStillSaysMissed()
+    {
+        var result = await new MoveScenario()
+            .Rules(NeverHitRules.Instance)
+            .Defender(TestCreatures.Make("D", type1: DamageType.Water, hp: 500))
+            .Use(Move("growl"));
+
+        Assert.True(result.Has<MoveMissed>());
+        Assert.False(result.Has<MoveDidntAffect>());
+    }
+
+    // Gen 1: a missed major-status move prints "It didn't affect", not "missed" (GENERATION_SEAMS.md §2).
+    private static void AssertGen1StatusMiss(MoveResult result)
+    {
+        Assert.True(result.Has<MoveDidntAffect>());
+        Assert.False(result.Has<MoveMissed>());
     }
 }

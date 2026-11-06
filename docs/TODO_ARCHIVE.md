@@ -8,6 +8,45 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §3.1 "It didn't affect": Gen 1's fifth failure line ✅ DONE (2026-11-06)
+
+S–M; found 2026-10-31 by `requirements-review` of "Failure announcements", source-confirmed; design pass and DoR ruled by
+Mo 2026-11-06.
+
+**Problem.** pokered prints `_DidntAffectText` "It didn't affect <TARGET>!" (`effects.asm:1416-1423`, `text_3.asm`) when a
+status move hits an already-statused or status-immune target; only a 0× type multiplier prints `_DoesntAffectMonText`
+"It doesn't affect <TARGET>!". We emitted `MoveHadNoEffect` for both. Also, a 0-power move skips the main hit test
+(`core.asm:3145`) and the Sleep, Poison and Paralyze effects roll their own, printing "didn't affect" on a miss
+(`effects.asm:53-57`, `:108-113`, `paralyze.asm` `.hitTest`); we printed "attack missed!".
+
+**Acceptance (met).** A pure status move on an already-statused foe (`AttackAction.TryApplyStatus`, the not-already-asleep
+branch) and Poison Powder / Toxic on a Poison type (the `CanReceiveStatus` branch) print "It didn't affect <target>!"; a
+missed pure status move that inflicts a major status prints the same, with no `MoveMissed`. Type immunity still prints
+"doesn't affect"; a missed damaging, confusion or stat-down move still prints "missed"; Leech Seed is out of scope.
+
+**Outcome.** Two `IBattleRules` members, `StatusMoveNoOpAnnouncement` (the two `TryApplyStatus` sites) and
+`StatusMoveMissAnnouncement` (the miss branch of `Connects`, for `BaseDamage == 0` and `StatusEffect != None`), both emitted
+through `MoveFailureEvents.For`. Gen 1 = `DidntAffect` for both; `TestAltProfile` keeps the old lines (`DoesntAffect`,
+`Missed`). New `UnaffectedCause.StatusMove`. Runtime plus the wire (`MoveDidntAffect` already existed from Roar); no data
+change. Gen 1 source: `effects.asm` `SleepEffect` (:42-68), `PoisonEffect` (:87-113, :155-162), `paralyze.asm`
+`ParalyzeEffect_`, `core.asm` `PrintMoveFailureText` (:3718-3733). Docs: `GENERATION_SEAMS.md` §2, `GENERATION_PROFILE.md`,
+`GEN_DIFFERENCES.md`, `PRODUCT_SPEC.md`.
+
+**Tests.** `FailureAnnouncementTests` and the contract tests (`ImmunityContractTests`, `RollOrderContractTests`,
+`StatusMoveContractTests`, `WebEventContractTests`), full battles with forced rolls: Thunder Wave on a paralyzed foe says
+"didn't affect" while on a Ground type it still says "doesn't affect"; Poison Powder on a Poison type; a missed Sleep
+Powder with no `MoveMissed` while a missed Tackle still misses; alt-profile seam probes keep the old lines.
+
+**Reviews.** Format PASS; .NET, tsc and Vitest passed on final code; E2E not run. `requirements-review` and `pr-review`
+findings ruled by Mo and applied.
+
+**Follow-ups filed (still open in `TODO.md`).** §3.1 "Residual-effect failure lines" (Leech Seed "evaded", confusion-move
+miss "But it failed!"); §3.1 "Status-move checks ahead of the hit test" (pre-hit-test cluster: Thunder Wave on a statused
+Ground-type, status-before-accuracy RNG draws); the Glare-on-Normal note under "Same-type secondary status immunity".
+Not covered: Poison Powder into a Substitute and Sleep Powder missing on a sleeping foe ("already asleep" before the hit test).
+
+---
+
 ## §3.1 Roar/Whirlwind: the scared-off side still acts ✅ DONE (2026-11-06)
 
 S–M; source-confirmed 2026-10-17 (V16), design approved and greenlit by Mo 2026-11-06 (five rulings, all as recommended).

@@ -794,7 +794,7 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
     }
 
     case 'MoveHadNoEffect': {
-      // Type immunity (e.g. Ghost vs a Normal/Fighting move, Poison vs poison-powder).
+      // Type immunity (e.g. Ghost vs a Normal/Fighting move).
       const targetName = payload.targetName as string;
       return { steps: [w(650), d(log(`It doesn't affect ${targetName}!`)), w(800)] };
     }

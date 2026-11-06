@@ -235,7 +235,7 @@ public class RollOrderContractTests(MovesFixture moves) : Gen1MoveContract(moves
             .Use(Move("thunder-wave"));
 
         Assert.Equal([Accuracy], rng.Draws);
-        Assert.Equal(rollMisses, result.Has<MoveMissed>());
+        Assert.Equal(rollMisses, result.Has<MoveDidntAffect>());
         Assert.Equal(!rollMisses, result.Has<MoveHadNoEffect>());
         Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
     }

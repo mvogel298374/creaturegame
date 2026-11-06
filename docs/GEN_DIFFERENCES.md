@@ -176,6 +176,18 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
 - **The lock's end confuses the user** with a fresh 2–5 counter (`core.asm:3542-3552`). Our remaining differences
   are filed in `docs/TODO.md` §3.1, *Rampage edge gaps*.
 
+#### "Doesn't affect" vs "didn't affect"
+- **Two lines, one word apart.** "It doesn't affect <TARGET>!" is type immunity only (`_DoesntAffectMonText`, pokered
+  `engine/battle/core.asm:3718-3733`; Thunder Wave on a Ground-type, `paralyze.asm` `.doesntAffect`). "It didn't
+  affect <TARGET>!" (`_DidntAffectText`, `effects.asm:1416-1423`) is a status move that lands on nothing: a foe that
+  already has a major status, Poison Powder / Toxic on a Poison-type, or a miss.
+- **A missed status move says "didn't affect", not "missed".** A 0-power move skips the main hit test
+  (`core.asm:3145`); Sleep, Poison and Paralyze moves roll accuracy inside their effect and print `_DidntAffectText`
+  when it fails (`effects.asm:53-57`, `:108-113`).
+- **The status check comes first.** Those effects test "already statused" (and Poison-type) before the hit test and
+  before Thunder Wave's Ground check, so Thunder Wave on a paralyzed Ground-type says "didn't affect". Our engine
+  doesn't follow that order yet (`docs/TODO.md` §3.1, *Status-move checks ahead of the hit test*).
+
 #### Roar / Whirlwind
 - **A flee ends the battle on the spot.** `MainInBattleLoop` returns as soon as `wEscapedFromBattle` is set, after
   either side's move and before that side's poison/burn/Leech Seed tick (pokered `engine/battle/core.asm:419-421`,

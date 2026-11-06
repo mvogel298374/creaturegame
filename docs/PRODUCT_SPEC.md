@@ -124,6 +124,8 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - Seismic Toss, Night Shade, Sonic Boom, Super Fang and Counter ignore type immunity: Seismic Toss hits Ghost-types,
   Night Shade hits Normal-types.
 - Thunder Wave against a Ground-type fails as "doesn't affect" without an accuracy roll.
+- A status move (Thunder Wave, Sleep Powder, Toxic and the like) against a foe that already has a status, Poison
+  Powder or Toxic against a Poison-type, and a status move that misses all show "It didn't affect <target>!".
 - A multi-hit move rolls crit, damage and accuracy once; every strike deals the first strike's damage.
 - A Fire move thaws a frozen target after its damage, and not when the hit faints the target.
 - Jump Kick / Hi Jump Kick crash on a miss and against an immune target.

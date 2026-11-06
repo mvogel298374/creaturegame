@@ -433,7 +433,14 @@ public class AttackAction : IBattleAction
 
         if (missed)
         {
-            _emitter?.Emit(new MoveMissed(Source.Name, Source.Id, move.Name ?? ""));
+            bool statusMiss =
+                IsStatusMove(move, category, usingStruggle)
+                && move.StatusEffect != StatusCondition.None;
+            _emitter?.Emit(
+                statusMiss
+                    ? StatusMoveFailure(_rules.StatusMoveMissAnnouncement, move)
+                    : new MoveMissed(Source.Name, Source.Id, move.Name ?? "")
+            );
             ApplyFailedHitSideEffects(move, category, crashes: true);
             lockIn?.OnTurnEnd(lockCtx!);
             return false;
@@ -441,6 +448,15 @@ public class AttackAction : IBattleAction
 
         return true;
     }
+
+    private BattleEvent StatusMoveFailure(MoveFailureAnnouncement announcement, Attack move) =>
+        MoveFailureEvents.For(
+            announcement,
+            Source,
+            Target,
+            move.Name ?? "",
+            UnaffectedCause.StatusMove
+        );
 
     private void ApplyFailedHitSideEffects(Attack move, DamageCategory category, bool crashes)
     {
@@ -677,12 +693,7 @@ public class AttackAction : IBattleAction
             return;
         if (Target.Battle.Status != StatusCondition.None)
         {
-            // Gen 1: a major status never stacks. A DEDICATED status move (a non-damaging move — BaseDamage 0,
-            // e.g. Thunder Wave / Sleep Powder / Poison Powder) announces the no-op: a sleep move on an
-            // already-asleep target says "… is already asleep!" (AlreadyAsleepText), every other already-statused
-            // case says "It doesn't affect …" (PrintDidntAffectText). A secondary status on a damaging move (Body
-            // Slam etc.) fails silently — the hit already landed. Confusion's "But it failed!" is a separate,
-            // confusion-only line (see ConfuseEffect); status never uses it.
+            // A status never stacks; only a pure status move announces it (GENERATION_SEAMS.md §2).
             if (attack.BaseDamage == 0)
             {
                 if (
@@ -691,7 +702,7 @@ public class AttackAction : IBattleAction
                 )
                     _emitter?.Emit(new AlreadyAsleep(Target.Name, Target.Id));
                 else
-                    _emitter?.Emit(new MoveHadNoEffect(Target.Name, Target.Id, attack.Name ?? ""));
+                    _emitter?.Emit(StatusMoveFailure(_rules.StatusMoveNoOpAnnouncement, attack));
             }
             return;
         }
@@ -701,13 +712,11 @@ public class AttackAction : IBattleAction
         if (TargetShieldedBySubstitute)
             return;
 
-        // Gen 1 type immunity (Poison can't be poisoned, Fire can't be burned, Body Slam can't
-        // paralyze a Normal-type). For a pure status move this is "it doesn't affect …"; on a
-        // damaging move with a secondary status, the hit already landed, so just skip silently.
+        // Only a pure status move announces this; a damaging move's hit already landed.
         if (!_rules.CanReceiveStatus(Target, attack.StatusEffect, attack.DamageType))
         {
             if (attack.BaseDamage == 0)
-                _emitter?.Emit(new MoveHadNoEffect(Target.Name, Target.Id, attack.Name ?? ""));
+                _emitter?.Emit(StatusMoveFailure(_rules.StatusMoveNoOpAnnouncement, attack));
             return;
         }
 

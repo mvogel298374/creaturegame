@@ -212,6 +212,14 @@ public sealed class Gen1BattleRules : IBattleRules
     // MainInBattleLoop returns as soon as wEscapedFromBattle is set.
     public bool FleeEndsTurnImmediately => true;
 
+    // Sleep/Poison/Paralyze effects jump to PrintDidntAffectText on an existing status or a Poison type.
+    public MoveFailureAnnouncement StatusMoveNoOpAnnouncement =>
+        MoveFailureAnnouncement.DidntAffect;
+
+    // A 0-power move skips the main MoveHitTest; its effect's own miss also prints PrintDidntAffectText.
+    public MoveFailureAnnouncement StatusMoveMissAnnouncement =>
+        MoveFailureAnnouncement.DidntAffect;
+
     // Gen 1: a mid-turn faint ends the turn for both sides (Smogon RBY Mechanics Guide).
     public bool FaintEndsTurnImmediately => true;
 
