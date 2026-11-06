@@ -46,15 +46,14 @@ gap has drafted text, awaiting your confirmation · ✗ gaps remain.
 
 **A. Confirm the drafted lines, then Ready**
 
-_(none)_
+None open.
 
 **B. A design pass first** (central engine code: `opus-engineer` plus both gates; each pass is shown to you)
 
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
-| **Roar/Whirlwind: the scared-off side still acts** (§3.1) | S–M | ✗ 2; 1, 5, 6 drafted | Ruled 2026-10-17. Can end a run with a healthy bench. |
 | **Rampage edge gaps** (§3.1) | S–M | ✗ 2, 3; the rest drafted | Found 2026-11-03. Lock-end and repeat-turn messages, plus the confusion counter. |
-| **"It didn't affect": Gen 1's fifth failure line** (§3.1) | S–M | ✗ 2, 3; the rest drafted | Design with the Roar entry's `DidntAffect` member. |
+| **"It didn't affect": Gen 1's fifth failure line** (§3.1) | S–M | ✗ 2, 3; the rest drafted | `MoveFailureAnnouncement.DidntAffect` and the `MoveDidntAffect` event exist (Roar, shipped 2026-11-06); gap 2 is down to which sites use them. |
 | **Gen 1 confusion self-hit damage** (§3.1) | S | ✗ 2; 1, 3, 5 drafted | Ruled 2026-10-17 (replicate the foe-Reflect quirk). |
 | **Pre-hit-test cluster** — Mist + thaw; Substitute stops a stat-down move before accuracy; Substitute lets sleep/paralysis through (§3.1) | M | ✗ 2, 3 each; 1, 5, 6, 7 drafted for Mist + thaw and sleep/paralysis, none for the stat-down entry | One design pass: all three move logic ahead of the hit test. |
 | **Pre-move-check cluster** — `CanAct` status order; a replacement frees the trapped foe; Disable countdown (§3.1) | M | ✗ 2, 3 each | One design pass: all three live in the pre-move check. |
@@ -91,6 +90,7 @@ _(none)_
 | Item | Cost | Ready? | Next step |
 |:-----|:----:|:-------|:----------|
 | **Same-type secondary status immunity** (§3.1) | S–M | ✗ 2, 4, 6; the rest drafted | Take the pokered cite; Ice Beam freezes Ice-types today. |
+| **Other `ResidualEffects1` moves may roll accuracy** (§3.1) | S–M | ✗ 1, 2, 4, 6 | Filed 2026-11-06. A verify slice reads each effect for its own hit test. |
 | **Counter keys on the foe's selected move** (§3.1) | S–M | ✗ 1, 2, 4, 6 | Trace `HandleCounterMove`, list the diverging cases. |
 | **A re-import marks `pokemon.db` changed with identical data** (§3.2) | S | ✗ 2; the rest drafted | Filed 2026-11-06. Read the three delete-and-insert sites, pick upsert or stable IDs. |
 | **Escape = B-cancel on the negative-answer prompts** (§4.5) | S | ✗ 4; the rest drafted | One pokered cite. |
@@ -235,28 +235,14 @@ data/engine item usually also means updating the test that pins the wrong value.
   **DoR (V16):** ✗ not Ready — gaps **2** (central), **3** (seam member to design), **5** (drafted) and **7** (the
   binding-trap check). *Drafted:* runtime only; best paired with the `CanAct` status-order design pass above, since both move
   logic into the pre-move check.
-- **Roar/Whirlwind: the scared-off side still acts (source-confirmed 2026-10-17, V16) — S–M, ✗ not Ready.** Our
-  action loop has no flee check (`Battle.cs:183-209`; the flee gate only runs after both actions and the residuals,
-  `:316-319`), so the scared-off foe still acts, which can end the run via a faint with a healthy bench
-  (`GAME_LOOP.md:135`). pokered's `MainInBattleLoop` returns the moment `wEscapedFromBattle` is set
-  (`core.asm:419-421`, `:430-432`, `:443-445`, `:457-459`): no second action, no residual. A second gap, found in
-  V16: in a wild battle, pokered's `SwitchAndTeleportEffect` (`effects.asm:814-838`) makes the move fail when the user
-  is lower-level and `rand[0, userLv + targetLv] < targetLv / 4`. Ours always succeeds (`MoveEffects.cs:520-548`).
-  **User ruling 2026-10-17:** fix both, with a proper generation seam. Also noted 2026-10-29 (`requirements-review`,
-  unverified here): pokered's trainer-battle failure prints "… is unaffected!" (`IsUnaffectedText`); ours emits
-  `MoveHadNoEffect` ("doesn't affect"). **Done 2026-10-31** (`TODO_ARCHIVE.md` → "Failure announcements"): the
-  `MoveFailureAnnouncement` seam and `MoveFailureEvents.For` now exist; the wild level-roll failure here prints `_DidntAffectText` "It didn't affect
-  <TARGET>!" (`effects.asm:833-837`) and adds its own member on that seam.
-  **DoR:** ✗ not Ready — gap **2** (design pass, central `Battle`); 1, 5 and 6 are drafted below for your
-  confirmation. 3, 4 and 7 are answered.
-  - **Acceptance:** a full battle where a faster Roar ends the turn with no foe action and no residual tick, and a
-    forced roll makes a lower-level Roar fail.
-  - **Design:** touches `Battle` (central), so `opus-engineer` plus both gates; `GAME_LOOP.md:135` is updated.
-  - **Seam (ruled):** both behaviours sit behind `IBattleRules`. The design pass names the members (whether a flee
-    ends the turn at once; the flee success roll) and reads Gen 2's values at pokecrystal.
-  - **Data vs runtime:** runtime only.
-  - **Quirk:** the slower foe never acts after being scared off.
-  - **Dependencies:** none (the go-ahead is given).
+- **Other `ResidualEffects1` moves may roll accuracy they skip in Gen 1 (found 2026-11-06, Roar design pass;
+  unverified) — S–M, ✗ not Ready.** pokered skips the accuracy test for every effect in `ResidualEffects1`
+  (`data/battle/residual_effects_1.asm`, dispatched at `core.asm:3124-3127`) unless the effect calls `MoveHitTest`
+  itself. Roar and Whirlwind are done (`TODO_ARCHIVE.md` → "Roar/Whirlwind"); the rest (Conversion, Haze, Mist, Focus Energy,
+  Confusion, Heal, Transform, the screens, Poison, Paralyze, Substitute, Mimic, Leech Seed, Splash) are unchecked.
+  **DoR:** ✗ — gaps **1, 2, 4, 6**. *Drafted:* a verify slice reads each effect for its own `MoveHitTest` call and
+  lists which of ours roll accuracy that pokered skips; then one entry or one seam member (likely generalising
+  `ForceFleeSkipsAccuracy`, shipped 2026-11-06). 3: `IBattleRules`. 5: runtime only. 7: none now that Roar has shipped.
 - **Same-type secondary status immunity (found 2026-10-29 by `requirements-review`; read-confirmed by the reviewer,
   not yet by us) — S–M, ✗ not Ready.** pokered `FreezeBurnParalyzeEffect` (`effects.asm:194-212`) skips a secondary
   freeze, burn or paralysis whenever the move's type equals either target type ("an ice move can't freeze an
@@ -297,15 +283,17 @@ data/engine item usually also means updating the test that pins the wrong value.
   <TARGET>!" (`effects.asm:1416-1423`, `text_3.asm`) when a status move hits an already-statused or status-immune
   target; only a 0× type multiplier prints `_DoesntAffectMonText` "It doesn't affect <TARGET>!". We emit
   `MoveHadNoEffect` for both, so the client prints "doesn't affect" for the no-op cases.
-  **DoR:** ✗ — gaps **2, 3**; the rest drafted. *Drafted:*
+  **DoR:** ✗ — gaps **2** (partly resolved), **3**; the rest drafted. *Drafted:*
   - **Acceptance:** each `MoveHadNoEffect` emit site (`AttackAction.cs` ~181, ~427, ~693, ~709; `MoveEffects.cs`
     ~118) is classified as type immunity or a no-op with a pokered cite; a no-op emits a distinct "didn't affect"
     event or announcement and the client prints "It didn't affect <target>!"; type immunity is unchanged.
-  - **Design (gap 2):** a new event vs a `DidntAffect` member on `MoveFailureAnnouncement`; the Roar entry above
-    plans the same member for its wild level-roll failure, so design both together.
+  - **Design (gap 2, partly resolved 2026-11-06):** the Roar fix shipped the `DidntAffect` member on
+    `MoveFailureAnnouncement` and the `MoveDidntAffect(TargetName, TargetId, MoveName)` event, wired in all four places.
+    Left: whether the `MoveHadNoEffect` no-op sites emit `MoveDidntAffect` directly or route through the seam, and how
+    `MoveFailureEvents.For` is reached from those sites (`TODO_ARCHIVE.md` → "Roar/Whirlwind").
   - **Gen-variable surface (gap 3):** which failures print which line, per site.
   - **Data vs runtime:** runtime plus the wire (C# + TS). **Quirk:** the two lines differ by one word.
-    **Dependencies:** pairs with the Roar entry's wild level roll.
+    **Dependencies:** reuses the `MoveDidntAffect` event the Roar fix added.
 - **Rampage edge gaps (found 2026-11-03, Thrash fix review) — S–M, ✗ not Ready, filed by ruling.** Three differences
   from pokered, none changing the turn count: the lock's end logs "became confused!", where pokered is silent
   (`core.asm:3542-3552`; its only such text is the ordinary effect, `effects.asm:1151`; ours `LockInMechanics.cs:142`,
@@ -481,6 +469,12 @@ channel of a broader acquisition layer.
   - **Data vs runtime:** runtime only.
   - **Quirk:** the faster creature's own poison tick lands before the slower one acts.
   - **Dependencies:** none. The Leech Seed half of §3.1 "Mist, thaw and Leech Seed" waits on this.
+  - **Also covers (ruling 2026-11-06):** when the slower side's Roar ends a Gen 1 battle, the faster side's own
+    residual has already ticked (`core.asm:426`, `:449`); with the flee ending the turn at once, ours never ticks it.
+    HP carries between battles, so the per-creature residual order fixes this too. Gen 1 consequences: the faster
+    side's poison can faint it before the slower side ever Roars, and Leech Seed heals the slower side first. When
+    this lands, re-pin `ForceFleeTests.Gen1SlowerRoarEndsTheTurnAtOnce_TheRoarersPoisonNeverTicks`, which asserts
+    only the Roar user's tick; the faster side's tick should then run.
 - [ ] **Enemy encounter pool ignores game version** — filter by `PokemonGameAvailability` once a version selector
   exists.
   **DoR (V16):** ✗ not Ready — gaps **1, 2, 3, 5, 6, 7**; gap 7 blocks the rest (no version selector exists).

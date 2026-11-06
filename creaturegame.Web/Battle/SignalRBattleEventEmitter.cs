@@ -485,6 +485,15 @@ public sealed class SignalRBattleEventEmitter(
                     Cause = e.Cause.ToString(),
                 }
             ),
+            MoveDidntAffect e => (
+                "MoveDidntAffect",
+                new
+                {
+                    e.TargetName,
+                    e.TargetId,
+                    e.MoveName,
+                }
+            ),
             AlreadyAsleep e => ("AlreadyAsleep", new { e.TargetName, e.TargetId }),
             ButNothingHappened e => ("ButNothingHappened", new { e.CreatureName, e.CreatureId }),
             SubstitutePutUp e => (

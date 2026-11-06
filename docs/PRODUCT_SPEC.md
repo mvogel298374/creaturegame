@@ -118,6 +118,9 @@ the linked design doc instead — pull it there and leave only the pointer here.
   accuracy roll.
 - A one-hit-KO move from a slower user fails with "<target>'s unaffected!", not "missed"; a real accuracy miss still
   says "missed". Roar or Whirlwind against an Elite or Boss foe fails with "<target> is unaffected!".
+- In a wild battle a Roar or Whirlwind that lands ends the battle at once: the other side doesn't act and no poison,
+  burn or Leech Seed ticks that turn. A user of lower level than its target succeeds only on a level-based roll and
+  otherwise fails with "It didn't affect <target>!". Neither move rolls accuracy, so Whirlwind never misses.
 - Seismic Toss, Night Shade, Sonic Boom, Super Fang and Counter ignore type immunity: Seismic Toss hits Ghost-types,
   Night Shade hits Normal-types.
 - Thunder Wave against a Ground-type fails as "doesn't affect" without an accuracy roll.
@@ -126,7 +129,7 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - Jump Kick / Hi Jump Kick crash on a miss and against an immune target.
 - Design detail → `GENERATION_SEAMS.md` §2 (*Roll order*), `GEN_DIFFERENCES.md` → *Roll Order*.  History →
   `TODO_ARCHIVE.md` → *Gen 1 roll order in `AttackAction`, behind a seam* and *Failure announcements: a failed OHKO and
-  a trainer-battle Roar/Whirlwind say "unaffected"*.
+  a trainer-battle Roar/Whirlwind say "unaffected"* and *Roar/Whirlwind: the scared-off side still acts*.
 
 ### Foe move scoring and chosen-move validation
 - The foe scores a status move by its status chance: a 10% burn side effect is worth a tenth of a pure burn move.

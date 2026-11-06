@@ -176,6 +176,18 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
 - **The lock's end confuses the user** with a fresh 2–5 counter (`core.asm:3542-3552`). Our remaining differences
   are filed in `docs/TODO.md` §3.1, *Rampage edge gaps*.
 
+#### Roar / Whirlwind
+- **A flee ends the battle on the spot.** `MainInBattleLoop` returns as soon as `wEscapedFromBattle` is set, after
+  either side's move and before that side's poison/burn/Leech Seed tick (pokered `engine/battle/core.asm:419-421`,
+  `:430-432`, `:443-445`, `:457-459`). When the slower side flees, the faster side's own tick has already run.
+- **Wild level roll, for either side's user.** Succeeds outright when the user's level is at least the target's,
+  otherwise when `rand[0, user + target] >= target / 4`; a failure prints "It didn't affect <TARGET>!"
+  (`engine/battle/effects.asm:810-888`). In a trainer battle the move fails: "<TARGET> is unaffected!".
+- **No accuracy roll.** The effect is in `ResidualEffects1`, which skips the hit test (`core.asm:3124-3127`), so
+  Whirlwind's 85 accuracy is never used, and type immunity doesn't apply (Roar works on a Ghost-type).
+- **Gen 2** keeps the roll and the immediate end, but rolls accuracy, prints "But it failed!", and in a trainer battle
+  drags out a random party member instead (pokecrystal `engine/battle/effect_commands.asm` `BattleCommand_ForceSwitch`).
+
 #### Status Quirks
 - **Gen 1 has NO end-of-turn residual phase — each creature takes its own Burn/Poison/Bad Poison/Leech Seed
   tick immediately after its own action** (verified 2026-09-20 against pret/pokered `engine/battle/core.asm`,

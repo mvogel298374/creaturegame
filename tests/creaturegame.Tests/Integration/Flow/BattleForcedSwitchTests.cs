@@ -550,7 +550,8 @@ public class BattleForcedSwitchTests
             Gen1TypeChart.Instance,
             input,
             new ScriptedInput("tackle"),
-            rules: new ScriptableRules().Deterministic(),
+            // Gen 1 ends the turn on the flee, so no poison tick (ForceFleeTests); this pins the other path.
+            rules: new ScriptableRules().Deterministic().FleeEndsTurn(false),
             emitter: recorder,
             rng: new SeededRandomSource(0),
             // The opening lead's entry status comes from the ctor (the same value RunDirector threads from

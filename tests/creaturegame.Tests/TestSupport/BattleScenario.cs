@@ -263,6 +263,7 @@ public sealed class ScriptableRules : DelegatingBattleRules
     private int? _disableTurns;
     private int? _multiHitCount;
     private bool? _statDownHandicapFails;
+    private bool? _fleeEndsTurn;
 
     /// <summary>Always hit, never crit, no damage variance — the usual deterministic-damage baseline.</summary>
     public ScriptableRules Deterministic()
@@ -352,6 +353,15 @@ public sealed class ScriptableRules : DelegatingBattleRules
         _statDownHandicapFails = fails;
         return this;
     }
+
+    /// <summary>Overrides whether a flee ends the turn at once, for paths another generation can reach.</summary>
+    public ScriptableRules FleeEndsTurn(bool ends)
+    {
+        _fleeEndsTurn = ends;
+        return this;
+    }
+
+    public override bool FleeEndsTurnImmediately => _fleeEndsTurn ?? base.FleeEndsTurnImmediately;
 
     public override int GetHitThreshold(int acc, int accStage, int evaStage) =>
         _alwaysHit ? 256 : base.GetHitThreshold(acc, accStage, evaStage);

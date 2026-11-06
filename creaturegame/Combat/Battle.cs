@@ -208,6 +208,9 @@ public class Battle
                     foreach (var queued in turnQueue)
                         if (queued is AttackAction toRetarget)
                             toRetarget.Retarget(PlayerCreature);
+
+                if (FleeEndsTurn())
+                    break;
             }
 
             // A suppression set but never consumed this turn is stale, not a pending block (next turn's move
@@ -220,25 +223,28 @@ public class Battle
             PlayerCreature.Battle.IsFlinched = false;
             EnemyCreature.Battle.IsFlinched = false;
 
-            // Disable/binding countdowns always tick, even on a turn a faint ends early below — unlike the
-            // residual phase, these are NOT part of IBattleRules.FaintEndsTurnImmediately.
-            StatusResolver.TickTurnCounters(PlayerCreature, _emitter);
-            StatusResolver.TickTurnCounters(EnemyCreature, _emitter);
-
-            // IBattleRules.FaintEndsTurnImmediately — TODO_ARCHIVE.md → "End-of-turn residual … fired even
-            // after a same-turn faint" for the incident this guards against.
-            if (
-                !_rules.FaintEndsTurnImmediately
-                || (PlayerCreature.IsAlive() && EnemyCreature.IsAlive())
-            )
+            if (!FleeEndsTurn())
             {
-                // End-of-turn: Burn, Poison
-                StatusResolver.ApplyEndOfTurnDamage(PlayerCreature, _rules, _emitter);
-                StatusResolver.ApplyEndOfTurnDamage(EnemyCreature, _rules, _emitter);
+                // Disable/binding countdowns tick even on a turn a faint ends early below — unlike the
+                // residual phase, these are NOT part of IBattleRules.FaintEndsTurnImmediately.
+                StatusResolver.TickTurnCounters(PlayerCreature, _emitter);
+                StatusResolver.TickTurnCounters(EnemyCreature, _emitter);
 
-                // End-of-turn: Leech Seed drain (must see both creatures, so handled here not in StatusResolver)
-                ApplyLeechSeedDrain(PlayerCreature, EnemyCreature);
-                ApplyLeechSeedDrain(EnemyCreature, PlayerCreature);
+                // IBattleRules.FaintEndsTurnImmediately — TODO_ARCHIVE.md → "End-of-turn residual … fired even
+                // after a same-turn faint" for the incident this guards against.
+                if (
+                    !_rules.FaintEndsTurnImmediately
+                    || (PlayerCreature.IsAlive() && EnemyCreature.IsAlive())
+                )
+                {
+                    // End-of-turn: Burn, Poison
+                    StatusResolver.ApplyEndOfTurnDamage(PlayerCreature, _rules, _emitter);
+                    StatusResolver.ApplyEndOfTurnDamage(EnemyCreature, _rules, _emitter);
+
+                    // End-of-turn: Leech Seed drain (must see both creatures, so handled here not in StatusResolver)
+                    ApplyLeechSeedDrain(PlayerCreature, EnemyCreature);
+                    ApplyLeechSeedDrain(EnemyCreature, PlayerCreature);
+                }
             }
 
             // Snapshot the flee BEFORE the faint branches: a forced switch-in `continue`s past the flee gate
@@ -690,6 +696,10 @@ public class Battle
     }
 
     private int FirstLiveMemberIndex() => _playerParty?.FirstLiveIndex() ?? -1;
+
+    private bool FleeEndsTurn() =>
+        _rules.FleeEndsTurnImmediately
+        && (PlayerCreature.Battle.HasFled || EnemyCreature.Battle.HasFled);
 
     private void ApplyLeechSeedDrain(Creature drained, Creature healed)
     {

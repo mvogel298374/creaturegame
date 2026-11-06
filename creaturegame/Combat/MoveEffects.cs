@@ -522,6 +522,20 @@ public sealed class ForceFleeEffect : IMoveEffect
             return;
         }
 
+        if (!ctx.Rules.ForceFleeSucceeds(ctx.Source.Level, ctx.Target.Level, ctx.Rng))
+        {
+            ctx.Emitter?.Emit(
+                MoveFailureEvents.For(
+                    ctx.Rules.ForceFleeWildFailureAnnouncement,
+                    ctx.Source,
+                    ctx.Target,
+                    ctx.Attack.Name ?? "",
+                    UnaffectedCause.ForceFlee
+                )
+            );
+            return;
+        }
+
         // Wild battle (escapable): the targeted creature is scared off — the Battle loop sees HasFled and ends.
         if (ctx.Target.IsAlive())
             ctx.Target.Battle.HasFled = true;

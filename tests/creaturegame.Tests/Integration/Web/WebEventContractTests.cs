@@ -848,6 +848,20 @@ public class WebEventContractTests
         Assert.Equal("JOLTEON", doc.RootElement.GetProperty("TargetName").GetString());
     }
 
+    [Fact]
+    public void MoveDidntAffect_Projection_CarriesTargetAndMove()
+    {
+        var evt = new MoveDidntAffect("ONIX", 7, "roar");
+
+        var (type, payload) = SignalRBattleEventEmitter.MapEvent(evt);
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+
+        Assert.Equal("MoveDidntAffect", type);
+        Assert.Equal("ONIX", doc.RootElement.GetProperty("TargetName").GetString());
+        Assert.Equal(7, doc.RootElement.GetProperty("TargetId").GetInt32());
+        Assert.Equal("roar", doc.RootElement.GetProperty("MoveName").GetString());
+    }
+
     /// <summary>Same projection guard for <see cref="BiomeEntered"/> — the client titles/themes the next leg
     /// from these fields, dropped on the wire if not listed (the failure mode the STAB flag hit).</summary>
     [Fact]

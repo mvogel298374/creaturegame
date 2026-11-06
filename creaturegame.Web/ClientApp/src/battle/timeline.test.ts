@@ -97,6 +97,11 @@ describe('expandEvent — move-name formatting', () => {
     expect(logLines(steps)).toEqual(['ONIX is unaffected!']);
   });
 
+  it('reads the Gen 1 "didn\'t affect" line for a failed wild Roar, not the immunity line', () => {
+    const { steps } = expandEvent('MoveDidntAffect', { targetName: 'ONIX', moveName: 'roar' }, CTX);
+    expect(logLines(steps)).toEqual(["It didn't affect ONIX!"]);
+  });
+
   it('reads the Gen 1 "But nothing happened!" line for Splash', () => {
     const { steps } = expandEvent('ButNothingHappened', { creatureName: 'GYARADOS' }, CTX);
     expect(logLines(steps)).toEqual(['But nothing happened!']);

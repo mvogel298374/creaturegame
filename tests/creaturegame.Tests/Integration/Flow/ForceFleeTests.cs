@@ -69,6 +69,7 @@ public class ForceFleeTests(MovesFixture moves) : InteractionTest(moves)
         Assert.True(fled.IsPlayer);
         Assert.False(result.Has<BattleEnded>());
         Assert.True(player.Battle.HasFled);
+        Assert.DoesNotContain(result.All<MoveUsed>(), e => e.AttackerName == "Player");
     }
 
     // Non-escapable battle (the Elite/Boss trainer analog): Roar fails ("… is unaffected!") and the fight
@@ -192,5 +193,261 @@ public class ForceFleeTests(MovesFixture moves) : InteractionTest(moves)
         Assert.Contains(recorder.Of<MoveUsed>(), e => e.MoveName == "roar"); // Metronome called Roar
         Assert.True(recorder.Of<MoveUnaffected>().Any()); // ... which failed in the non-escapable battle
         Assert.False(defender.Battle.HasFled); // the inner action honoured escapable=false — nobody fled
+    }
+
+    // ── Gen 1 turn end, level roll and accuracy (GENERATION_SEAMS.md §2) ──
+
+    private static IBattleRules AltRules() =>
+        TestAltProfile.Instance.BuildBattleRules(new SeededRandomSource(0));
+
+    private static IBattleRules RealAccuracyRules() =>
+        new ScriptableRules(new SeededRandomSource(0)).NoCrit().NoVariance();
+
+    private async Task<(Battle Battle, RecordingEmitter Recorder, Creature Lead)> PoisonedLeadRoars(
+        IBattleRules rules,
+        int leadSpeed = 200
+    )
+    {
+        var lead = TestFighters.Fighter("Lead", hp: 160, attack: 1, speed: leadSpeed, defense: 999);
+        lead.Attributes.HP = 5; // the 10-point poison tick would be lethal
+        lead.AddAttack(Move("roar"));
+        var party = new Party(lead);
+        party.Add(TestFighters.Fighter("Bench", hp: 300, attack: 999, speed: 150));
+        var foe = TestFighters.Fighter("Foe", hp: 500, attack: 1, speed: 100);
+        var recorder = new RecordingEmitter();
+        var battle = new Battle(
+            lead,
+            foe,
+            Gen1TypeChart.Instance,
+            new ScriptedInput("roar", "tackle"),
+            new ScriptedInput("tackle"),
+            rules: rules,
+            emitter: recorder,
+            rng: new SeededRandomSource(0),
+            playerEntryStatus: new CarriedStatus(StatusCondition.Poison, 0),
+            escapable: true,
+            playerParty: party
+        );
+        await battle.StartFightAsync();
+        return (battle, recorder, lead);
+    }
+
+    [Fact]
+    public async Task Gen1FasterRoarEndsTheTurnAtOnce_TheFoeNeverActsAndThePoisonNeverTicks()
+    {
+        var (battle, recorder, lead) = await PoisonedLeadRoars(
+            new ScriptableRules().Deterministic()
+        );
+
+        Assert.True(battle.EndedInFlee);
+        Assert.Equal("Foe", Assert.Single(recorder.Of<CreatureFled>()).Name);
+        Assert.DoesNotContain(recorder.Of<MoveUsed>(), e => e.AttackerName == "Foe");
+        Assert.Empty(recorder.Of<DamageDealt>());
+        Assert.Equal(5, lead.Attributes.HP);
+        Assert.Empty(recorder.Of<CreatureFainted>());
+        Assert.Empty(recorder.Of<BattleEnded>());
+    }
+
+    [Fact]
+    public async Task TheSeamDecidesWhetherAFleeEndsTheTurn()
+    {
+        var (battle, recorder, _) = await PoisonedLeadRoars(AltRules());
+
+        Assert.Contains(recorder.Of<MoveUsed>(), e => e.AttackerName == "Foe");
+        Assert.Contains(recorder.Of<CreatureFainted>(), e => e.Name == "Lead");
+        Assert.False(battle.EndedInFlee);
+        Assert.Empty(recorder.Of<CreatureSwitchedIn>()); // the Roar landed, so no switch-in
+    }
+
+    // The slower side's Roar also ends the turn: its own poison never ticks after it (core.asm:430-432).
+    [Fact]
+    public async Task Gen1SlowerRoarEndsTheTurnAtOnce_TheRoarersPoisonNeverTicks()
+    {
+        var (battle, recorder, lead) = await PoisonedLeadRoars(
+            new ScriptableRules().Deterministic(),
+            leadSpeed: 50
+        );
+
+        Assert.Single(recorder.Of<MoveUsed>(), e => e.AttackerName == "Foe");
+        int tackled = recorder
+            .Of<DamageDealt>()
+            .Where(d => d.TargetName == "Lead")
+            .Sum(d => d.Damage);
+        Assert.Equal(5 - tackled, lead.Attributes.HP);
+        Assert.True(lead.IsAlive());
+        Assert.True(battle.EndedInFlee);
+    }
+
+    private Task<BattleScenarioResult> LowerLevelRoar(
+        IRandomSource battleRng,
+        IBattleRules? rules = null
+    )
+    {
+        var player = Mon(
+            "Player",
+            hp: 300,
+            attack: 999,
+            speed: 200,
+            DamageType.Normal,
+            "roar",
+            "tackle"
+        );
+        player.Level = 10;
+        var enemy = Mon("Enemy", hp: 1, attack: 1, speed: 1, DamageType.Normal, "splash");
+        var scenario = new BattleScenario()
+            .Player(player)
+            .Enemy(enemy)
+            .PlayerUses("roar", "tackle")
+            .EnemyUses("splash")
+            .BattleRng(battleRng);
+        return (rules is null ? scenario : scenario.Rules(rules)).RunAsync();
+    }
+
+    [Fact]
+    public async Task Gen1LowerLevelRoarFailsOnALowRoll_AndSaysItDidntAffect()
+    {
+        var result = await LowerLevelRoar(new LowestRollSource());
+
+        var failed = Assert.Single(result.All<MoveDidntAffect>());
+        Assert.Equal("Enemy", failed.TargetName);
+        Assert.Equal("roar", failed.MoveName);
+        Assert.False(result.Has<CreatureFled>());
+        Assert.False(result.Has<MoveUnaffected>());
+        Assert.Equal("Player", result.Winner);
+    }
+
+    [Fact]
+    public async Task Gen1LowerLevelRoarStillSucceedsOnAHighRoll()
+    {
+        var result = await LowerLevelRoar(new HighestRollSource());
+
+        Assert.False(result.Has<MoveDidntAffect>());
+        Assert.Equal("Enemy", Assert.Single(result.All<CreatureFled>()).Name);
+    }
+
+    // pokered's .handleEnemy branch rolls the same way for a wild foe's Roar.
+    [Fact]
+    public async Task Gen1LowerLevelFoesRoarFailsOnALowRoll_AndThePlayerStays()
+    {
+        var player = Mon("Player", hp: 300, attack: 999, speed: 1, DamageType.Normal, "tackle");
+        var enemy = Mon("Enemy", hp: 1, attack: 1, speed: 200, DamageType.Normal, "roar");
+        enemy.Level = 10;
+
+        var result = await new BattleScenario()
+            .Player(player)
+            .Enemy(enemy)
+            .PlayerUses("tackle")
+            .EnemyUses("roar")
+            .BattleRng(new LowestRollSource())
+            .RunAsync();
+
+        var failed = Assert.Single(result.All<MoveDidntAffect>());
+        Assert.Equal("Player", failed.TargetName);
+        Assert.False(result.Has<CreatureFled>());
+        Assert.False(player.Battle.HasFled);
+        Assert.Equal("Player", result.Winner);
+    }
+
+    // Roar's effect skips the hit test, so a Normal-type Roar still works on a Ghost-type.
+    [Fact]
+    public async Task Gen1WhirlwindBlowsAwayAGhostType_TypeImmunityDoesNotApply()
+    {
+        var player = Mon("Player", hp: 300, attack: 1, speed: 200, DamageType.Normal, "whirlwind");
+        var enemy = Mon("Enemy", hp: 300, attack: 1, speed: 1, DamageType.Ghost, "splash");
+
+        var result = await new BattleScenario()
+            .Player(player)
+            .Enemy(enemy)
+            .PlayerUses("whirlwind")
+            .EnemyUses("splash")
+            .RunAsync();
+
+        Assert.False(result.Has<MoveHadNoEffect>());
+        Assert.Equal("Enemy", Assert.Single(result.All<CreatureFled>()).Name);
+    }
+
+    [Fact]
+    public async Task TheSeamDecidesTheWildRollAndItsFailureLine()
+    {
+        var result = await LowerLevelRoar(new HighestRollSource(), AltRules());
+
+        Assert.False(result.Has<CreatureFled>());
+        Assert.False(result.Has<MoveDidntAffect>());
+        Assert.Contains(result.All<MoveMissed>(), e => e.MoveName == "roar");
+    }
+
+    private Task<BattleScenarioResult> WhirlwindOnAMissingAccuracyRoll(IBattleRules rules)
+    {
+        var player = Mon("Player", hp: 300, attack: 1, speed: 200, DamageType.Normal, "whirlwind");
+        var enemy = Mon("Enemy", hp: 300, attack: 1, speed: 1, DamageType.Normal, "splash");
+        return new BattleScenario()
+            .Player(player)
+            .Enemy(enemy)
+            .PlayerUses("whirlwind")
+            .EnemyUses("splash")
+            .Rules(rules)
+            .BattleRng(new HighestRollSource())
+            .RunAsync();
+    }
+
+    [Fact]
+    public async Task Gen1WhirlwindSkipsTheAccuracyRoll_SoAMissingRollStillBlowsTheFoeAway()
+    {
+        var result = await WhirlwindOnAMissingAccuracyRoll(RealAccuracyRules());
+
+        Assert.DoesNotContain(result.All<MoveMissed>(), e => e.MoveName == "whirlwind");
+        Assert.Equal("Enemy", Assert.Single(result.All<CreatureFled>()).Name);
+    }
+
+    private sealed class WhirlwindRollsAccuracyRules : DelegatingBattleRules
+    {
+        public override bool ForceFleeSkipsAccuracy => false;
+    }
+
+    [Fact]
+    public async Task TheSeamDecidesWhetherWhirlwindRollsAccuracy()
+    {
+        var result = await WhirlwindOnAMissingAccuracyRoll(new WhirlwindRollsAccuracyRules());
+
+        Assert.Contains(result.All<MoveMissed>(), e => e.MoveName == "whirlwind");
+        Assert.False(result.Has<CreatureFled>());
+    }
+
+    private sealed class FixedRoll(int value) : IRandomSource
+    {
+        public int Draws { get; private set; }
+
+        public int Next(int maxExclusive)
+        {
+            Draws++;
+            return value;
+        }
+
+        public int Next(int minInclusive, int maxExclusive) => Next(maxExclusive);
+
+        public double NextDouble() => throw new NotSupportedException();
+    }
+
+    // pokered SwitchAndTeleportEffect: rand[0, user + target] >= target / 4; Lv10 vs Lv50 → the cut is 12.
+    [Theory]
+    [InlineData(12, true)]
+    [InlineData(11, false)]
+    public void Gen1WildRollPassesAtAQuarterOfTheTargetsLevel(int roll, bool succeeds)
+    {
+        var rng = new FixedRoll(roll);
+
+        Assert.Equal(succeeds, Gen1BattleRules.Instance.ForceFleeSucceeds(10, 50, rng));
+        Assert.Equal(1, rng.Draws);
+    }
+
+    [Theory]
+    [InlineData(50, 50)]
+    [InlineData(60, 50)]
+    public void Gen1RoarAtOrAboveTheTargetsLevelSucceedsWithoutARoll(int userLevel, int targetLevel)
+    {
+        var rng = new FixedRoll(0);
+
+        Assert.True(Gen1BattleRules.Instance.ForceFleeSucceeds(userLevel, targetLevel, rng));
+        Assert.Equal(0, rng.Draws);
     }
 }

@@ -40,6 +40,9 @@ public enum MoveFailureAnnouncement
 
     /// <summary>"&lt;TARGET&gt; is unaffected!" (<see cref="MoveUnaffected"/>).</summary>
     Unaffected,
+
+    /// <summary>"It didn't affect &lt;TARGET&gt;!" (<see cref="MoveDidntAffect"/>).</summary>
+    DidntAffect,
 }
 
 /// <summary>Where a move's crit and damage rolls fall relative to its accuracy roll. See GENERATION_SEAMS.md §2.</summary>
@@ -265,6 +268,18 @@ public interface IBattleRules
 
     /// <summary>The line Roar / Whirlwind print when they fail against a non-escapable foe. See GENERATION_SEAMS.md §2.</summary>
     MoveFailureAnnouncement ForceFleeTrainerFailureAnnouncement { get; }
+
+    /// <summary>Whether Roar / Whirlwind succeed in a wild battle, given both levels. See GENERATION_SEAMS.md §2.</summary>
+    bool ForceFleeSucceeds(int userLevel, int targetLevel, IRandomSource rng);
+
+    /// <summary>The line Roar / Whirlwind print when the wild success roll fails. See GENERATION_SEAMS.md §2.</summary>
+    MoveFailureAnnouncement ForceFleeWildFailureAnnouncement { get; }
+
+    /// <summary>Whether Roar / Whirlwind skip the accuracy roll. See GENERATION_SEAMS.md §2.</summary>
+    bool ForceFleeSkipsAccuracy { get; }
+
+    /// <summary>Whether a flee ends the turn at once: no further action, counter tick or residual. See GENERATION_SEAMS.md §2.</summary>
+    bool FleeEndsTurnImmediately { get; }
 
     /// <summary>The major status a creature keeps when it leaves a battle; volatile conditions are dropped elsewhere.</summary>
     StatusCondition CarryStatusOutOfBattle(StatusCondition status);

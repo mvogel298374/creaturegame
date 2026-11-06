@@ -160,6 +160,16 @@ internal static class TestAltProfile
         public override MoveFailureAnnouncement ForceFleeTrainerFailureAnnouncement =>
             MoveFailureAnnouncement.DoesntAffect;
 
+        public override bool ForceFleeSucceeds(int userLevel, int targetLevel, IRandomSource rng) =>
+            userLevel >= targetLevel;
+
+        public override MoveFailureAnnouncement ForceFleeWildFailureAnnouncement =>
+            MoveFailureAnnouncement.Missed;
+
+        public override bool ForceFleeSkipsAccuracy => false;
+
+        public override bool FleeEndsTurnImmediately => false;
+
         // No participant split: proves the seam, not Battle, decides the division.
         public override ExperienceRules Experience { get; } =
             new(LevelDivisor: 7, Split: ExperienceSplit.None, Boosts: []);

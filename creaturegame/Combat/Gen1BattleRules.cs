@@ -198,6 +198,20 @@ public sealed class Gen1BattleRules : IBattleRules
     public MoveFailureAnnouncement ForceFleeTrainerFailureAnnouncement =>
         MoveFailureAnnouncement.Unaffected;
 
+    // pokered effects.asm SwitchAndTeleportEffect: rand[0, user + target] >= target / 4 unless user >= target.
+    public bool ForceFleeSucceeds(int userLevel, int targetLevel, IRandomSource rng) =>
+        userLevel >= targetLevel || rng.Next(userLevel + targetLevel + 1) >= targetLevel / 4;
+
+    // The failed roll jumps to PrintDidntAffectText.
+    public MoveFailureAnnouncement ForceFleeWildFailureAnnouncement =>
+        MoveFailureAnnouncement.DidntAffect;
+
+    // SWITCH_AND_TELEPORT_EFFECT is in ResidualEffects1, which skips the accuracy test (core.asm).
+    public bool ForceFleeSkipsAccuracy => true;
+
+    // MainInBattleLoop returns as soon as wEscapedFromBattle is set.
+    public bool FleeEndsTurnImmediately => true;
+
     // Gen 1: a mid-turn faint ends the turn for both sides (Smogon RBY Mechanics Guide).
     public bool FaintEndsTurnImmediately => true;
 

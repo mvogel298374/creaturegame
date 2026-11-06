@@ -806,6 +806,12 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       return { steps: [w(650), d(log(line)), w(800)] };
     }
 
+    case 'MoveDidntAffect': {
+      // Gen 1's _DidntAffectText, distinct from the type-immunity "doesn't affect".
+      const targetName = payload.targetName as string;
+      return { steps: [w(650), d(log(`It didn't affect ${targetName}!`)), w(800)] };
+    }
+
     case 'AlreadyAsleep': {
       // A sleep move on an already-asleep target (Gen 1's distinct line).
       const targetName = payload.targetName as string;

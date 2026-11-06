@@ -311,6 +311,9 @@ public record MoveUnaffected(
     UnaffectedCause Cause
 ) : BattleEvent;
 
+/// <summary>A move failed and the generation says "It didn't affect …". See GENERATION_SEAMS.md §2.</summary>
+public record MoveDidntAffect(string TargetName, int TargetId, string MoveName) : BattleEvent;
+
 /// <summary>A sleep move hit a target that is already asleep — Gen 1's distinct "… is already asleep!"
 /// (AlreadyAsleepText), as opposed to the generic "It doesn't affect …" every other already-statused case uses.</summary>
 public record AlreadyAsleep(string TargetName, int TargetId) : BattleEvent;

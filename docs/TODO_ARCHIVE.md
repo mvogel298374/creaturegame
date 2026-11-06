@@ -8,6 +8,58 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §3.1 Roar/Whirlwind: the scared-off side still acts ✅ DONE (2026-11-06)
+
+S–M; source-confirmed 2026-10-17 (V16), design approved and greenlit by Mo 2026-11-06 (five rulings, all as recommended).
+
+**Problem.** Our action loop had no flee check (`Battle.cs:183-209`; the flee gate ran only after both actions and the
+residuals), so the scared-off foe still acted, which could end the run via a faint with a healthy bench
+(`GAME_LOOP.md:135`). pokered's `MainInBattleLoop` returns the moment `wEscapedFromBattle` is set (`core.asm:419-421`,
+`:430-432`, `:443-445`, `:457-459`): no second action, no residual. Second gap: in a wild battle pokered's
+`SwitchAndTeleportEffect` (`effects.asm:810-888`) fails the move when the user is lower-level and
+`rand[0, userLv + targetLv] < targetLv / 4`; ours always succeeded. Third gap (2026-11-06 design pass): Roar and
+Whirlwind are in `ResidualEffects1`, which skips the accuracy test (`core.asm:3124-3127`), so Gen 1's Whirlwind never
+misses; ours rolled accuracy (~15% miss). User ruling 2026-10-17: fix, with a proper generation seam. The trainer-battle
+"unaffected" wording shipped earlier under "Failure announcements".
+
+**Acceptance.** A faster Roar ends the turn with no foe action and no residual tick; a slower foe's Roar likewise; a
+forced roll makes a lower-level Roar fail with "It didn't affect <TARGET>!"; a forced-miss accuracy roll still lets
+Whirlwind flee. Under `TestAltProfile` each of the old behaviours returns.
+
+**Outcome.** Four `IBattleRules` members, Gen 1 / Gen 2 (read at pokecrystal) / `TestAltProfile`:
+- `FleeEndsTurnImmediately`: true / true (`Battle_PlayerFirst`/`Battle_EnemyFirst`, `ret nz` on `wForcedSwitch`) / false.
+  `Battle` breaks out of the action loop on a flee and skips the turn counters and residuals (`FleeEndsTurn()`).
+- `ForceFleeSucceeds(userLevel, targetLevel, rng)`: user >= target always succeeds, else `rand[0, user + target] >=
+  target / 4` (`effects.asm:810-888`, both sides) / same formula (`effect_commands.asm:4976-4991`) / user >= target
+  with no roll, so the alt failure line is observable.
+- `ForceFleeWildFailureAnnouncement`: new `MoveFailureAnnouncement.DidntAffect`, "It didn't affect <TARGET>!"
+  (`PrintDidntAffectText`, `effects.asm:837`) / "But it failed!" / `Missed`.
+- `ForceFleeSkipsAccuracy`: true / false (`wAttackMissed`, `effect_commands.asm:4970-4972`) / false;
+  `AttackAction.Connects` honours it.
+
+`ForceFleeEffect` rolls the level check and emits through `MoveFailureEvents`. `DidntAffect` maps to a new
+`MoveDidntAffect(TargetName, TargetId, MoveName)` event, wired in `BattleEvents`, `ConsoleBattleEventEmitter`,
+`SignalRBattleEventEmitter` (+ `WebEventContractTests`) and `timeline.ts` (+ Vitest). Implemented inline (ruling: no
+`opus-engineer`). Runtime plus the wire; no data change. Docs: `GENERATION_SEAMS.md` §2, `GENERATION_PROFILE.md` §3,
+`GAME_LOOP.md:135`, `GEN_DIFFERENCES.md`, `PRODUCT_SPEC.md`.
+
+**Tests.** `ForceFleeTests`: the Gen 1 turn end (faster and slower Roar), the level roll (low and high forced roll,
+exact cut, no draw at >= level, enemy-user fail), Whirlwind's accuracy skip, Whirlwind vs Ghost, alt-profile seam probes,
+and one added assertion on `WildBattle_EnemyForceFlee_ScaresPlayerOff_FlagsIsPlayer`.
+`BattleForcedSwitchTests.ActiveFaints_OnTheSameTurnAFoeFled_…` re-pinned under `ScriptableRules.FleeEndsTurn(false)`.
+Gen 1 tests sabotage-verified.
+
+**Reviews.** Format PASS; `.\test.ps1 -Dotnet -Web` on final code passed; E2E not run (no browser spec covers Roar).
+`requirements-review`: 5 discrepancies, 3 doc-only fixed inline, 2 tests added by Mo's ruling. `pr-review`:
+CHANGES-REQUESTED, 2 doc/comment fixes plus a `timeline.ts` comment trim, fixed inline; Mo ruled recommendations 1, 2 and
+advisory 4 done, advisory 3 (snapshot `FleeEndsTurn` once) skipped.
+
+**Follow-ups filed.** The residual-order gap a slower Roar leaves is §4.2's ("Also covers", ruling 5); the other
+`ResidualEffects1` moves that may roll accuracy are filed in §3.1 ("Other `ResidualEffects1` moves…"); the
+`DidntAffect` member and event are reused by §3.1 "It didn't affect".
+
+---
+
 ## §5 The pinned Run Map has no focus trap ✅ DONE (2026-11-05)
 
 S; client only; found 2026-11-05 in the Modal accessibility audit and split out by ruling. `RunMapPanel`'s pinned view
@@ -60,8 +112,8 @@ one line. Design → `FRONTEND_PLAN.md` → Modal focus ("Escape").
 dismissable prompt, only Settings; a null or absent owner is never topmost. The prompt-over-map case in
 `e2e/modal-accessibility.spec.ts` (renamed "a prompt arriving over the pinned Run Map takes focus and Escape, then hands both
 back to the map") now presses Escape under the prompt, asserts the map and the prompt stay, then after the prompts are answered
-Escape closes the map. `.\test.ps1 -Web`: TypeScript pass, Vitest 372/372. **The E2E step is written but not run** (opt-in);
-recommended command `.\e2e.ps1 -Spec modal-accessibility`. No .NET code changed.
+Escape closes the map. `.\test.ps1 -Web`: TypeScript pass, Vitest 372/372. E2E: the user ran it after the
+commit and reported it passing (2026-11-06). No .NET code changed.
 
 ---
 

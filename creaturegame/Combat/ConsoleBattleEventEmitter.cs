@@ -84,6 +84,10 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                 );
                 break;
 
+            case MoveDidntAffect e:
+                Console.WriteLine($"It didn't affect {e.TargetName}!");
+                break;
+
             case AlreadyAsleep e:
                 Console.WriteLine($"{e.TargetName} is already asleep!");
                 break;

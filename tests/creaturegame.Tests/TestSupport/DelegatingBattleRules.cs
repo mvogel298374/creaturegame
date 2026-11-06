@@ -158,6 +158,16 @@ public abstract class DelegatingBattleRules : IBattleRules
     public virtual MoveFailureAnnouncement ForceFleeTrainerFailureAnnouncement =>
         _inner.ForceFleeTrainerFailureAnnouncement;
 
+    public virtual bool ForceFleeSucceeds(int userLevel, int targetLevel, IRandomSource rng) =>
+        _inner.ForceFleeSucceeds(userLevel, targetLevel, rng);
+
+    public virtual MoveFailureAnnouncement ForceFleeWildFailureAnnouncement =>
+        _inner.ForceFleeWildFailureAnnouncement;
+
+    public virtual bool ForceFleeSkipsAccuracy => _inner.ForceFleeSkipsAccuracy;
+
+    public virtual bool FleeEndsTurnImmediately => _inner.FleeEndsTurnImmediately;
+
     public virtual StatusCondition CarryStatusOutOfBattle(StatusCondition status) =>
         _inner.CarryStatusOutOfBattle(status);
 

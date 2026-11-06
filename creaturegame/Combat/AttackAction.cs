@@ -409,6 +409,7 @@ public class AttackAction : IBattleAction
         bool skipsAccuracyRoll =
             usingStruggle
             || move.NeverMisses
+            || (move.Effect == MoveEffect.ForceFlee && _rules.ForceFleeSkipsAccuracy)
             || (_rules.XAccuracyBypassesAccuracyCheck && Source.Battle.UsingXAccuracy);
         bool missed =
             !skipsAccuracyRoll
