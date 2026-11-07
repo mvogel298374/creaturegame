@@ -134,6 +134,15 @@ public sealed class Gen1BattleRules : IBattleRules
     // Gen 1: Recover / Soft-Boiled restore half of max HP.
     public double RecoverHealFraction => 0.5;
 
+    // pokered heal.asm HealEffect_'s two-byte compare, bug included: GENERATION_SEAMS.md §2.
+    public bool HealFails(int currentHp, int maxHp)
+    {
+        int borrow = (currentHp >> 8) < (maxHp >> 8) ? 1 : 0;
+        return (((currentHp & 0xFF) - (maxHp & 0xFF) - borrow) & 0xFF) == 0;
+    }
+
+    public MoveFailureAnnouncement HealFailureAnnouncement => MoveFailureAnnouncement.Failed;
+
     // Gen 1: Reflect / Light Screen double the relevant defensive stat (crits ignore it).
     public int ScreenDefenseMultiplier => 2;
 

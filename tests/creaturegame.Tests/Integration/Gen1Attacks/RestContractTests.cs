@@ -39,17 +39,40 @@ public class RestContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         );
     }
 
-    [Fact]
-    public async Task FailsWhenAlreadyAtFullHp()
+    // GENERATION_SEAMS.md §2, Heal failure.
+    [Theory]
+    [InlineData(600, 600)]
+    [InlineData(600, 345)]
+    [InlineData(600, 89)]
+    [InlineData(300, 45)]
+    public async Task FailsAtFullHpAndAtTheLowByteBugGaps(int maxHp, int hp)
     {
-        var user = TestCreatures.Make("A", hp: 200); // starts at full HP
+        var user = TestCreatures.Make("A", hp: maxHp);
+        user.Attributes.HP = hp;
 
         var result = await new MoveScenario().Attacker(user).Use(Move("rest"));
 
-        Assert.True(result.Has<MoveMissed>(), "Rest fails (state precondition) at full HP");
+        Assert.True(result.Has<MoveFailed>());
+        Assert.False(result.Has<MoveMissed>());
         Assert.False(result.Has<Healed>());
-        Assert.Equal(StatusCondition.None, result.Attacker.Battle.Status); // didn't put itself to sleep
-        Assert.Equal(user.Attributes.MaxHP, user.Attributes.HP);
+        Assert.Equal(StatusCondition.None, result.Attacker.Battle.Status);
+        Assert.Equal(hp, user.Attributes.HP);
+        Assert.Equal(result.Move.Base.PowerPointsMax - 1, result.Move.PowerPointsCurrent);
+    }
+
+    [Theory]
+    [InlineData(600, 346)]
+    [InlineData(511, 256)]
+    public async Task RestsOutsideTheBugGaps(int maxHp, int hp)
+    {
+        var user = TestCreatures.Make("A", hp: maxHp);
+        user.Attributes.HP = hp;
+
+        var result = await new MoveScenario().Attacker(user).Use(Move("rest"));
+
+        Assert.False(result.Has<MoveFailed>());
+        Assert.Equal(maxHp, user.Attributes.HP);
+        Assert.Equal(StatusCondition.Sleep, result.Attacker.Battle.Status);
     }
 
     [Fact]

@@ -43,6 +43,9 @@ public enum MoveFailureAnnouncement
 
     /// <summary>"It didn't affect &lt;TARGET&gt;!" (<see cref="MoveDidntAffect"/>).</summary>
     DidntAffect,
+
+    /// <summary>"But it failed!" (<see cref="MoveFailed"/>).</summary>
+    Failed,
 }
 
 /// <summary>Where a move's crit and damage rolls fall relative to its accuracy roll. See GENERATION_SEAMS.md §2.</summary>
@@ -225,6 +228,12 @@ public interface IBattleRules
 
     /// <summary>Fraction of max HP a Recover-family move (Recover, Soft-Boiled) restores. See GENERATION_SEAMS.md §2.</summary>
     double RecoverHealFraction { get; }
+
+    /// <summary>Whether Recover, Soft-Boiled or Rest fails on the user's HP. See GENERATION_SEAMS.md §2.</summary>
+    bool HealFails(int currentHp, int maxHp);
+
+    /// <summary>The line a failed Recover, Soft-Boiled or Rest prints. See GENERATION_SEAMS.md §2.</summary>
+    MoveFailureAnnouncement HealFailureAnnouncement { get; }
 
     /// <summary>Factor on the defender's stat while the matching screen is up; crits ignore it (in the calculator).</summary>
     int ScreenDefenseMultiplier { get; }

@@ -8,6 +8,35 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §3.1 Recover and Soft-Boiled fail cases ✅ DONE (2026-11-07)
+
+S; found 2026-11-03 (move description audit), seam confirmed and greenlit by Mo 2026-11-07.
+
+**Problem.** pokered fails the heal at full HP, and its comparison skips the high byte, so it also fails when the user is
+exactly 255 or 511 HP below max (`HealEffect_`, `heal.asm`; Rest shares this code). Ours always "healed", for 0 at full
+HP (`HealEffect`), and Rest checked only full HP and printed "missed" (`MoveMissed`).
+
+**Acceptance (met).** Recover, Soft-Boiled and Rest fail at full HP and on pokered's two-byte compare bug (255 or 511
+below max when the high bytes differ), printing "But it failed!" (Rest included); 254 below, and max 511 at HP 256 (same
+high byte), still heal. A failed heal still spends PP. `requirements-review` 2026-11-07: model the borrow exactly, not
+`% 256 == 255` (fixed).
+
+**Outcome.** Two `IBattleRules` members and one enum value, no new event (`MoveFailed` already existed end to end).
+`bool HealFails(int currentHp, int maxHp)`: Gen 1 replicates `HealEffect_`'s high-byte `cp` then low-byte `sbc` with
+borrow; Gen 2 compares both bytes (pokecrystal `BattleCommand_Heal`, `CompareBytes`, `c = 2`). `MoveFailureAnnouncement
+HealFailureAnnouncement`: Gen 1 a new `Failed` value, emitted as `MoveFailed` through `MoveFailureEvents.For`; Gen 2's
+"HP is full!" (`HPIsFullText`) is added with Gen 2. `HealEffect` and `RestEffect` both consult them. Runtime only; no
+data change. Gen 1 source: `engine/battle/move_effects/heal.asm` `HealEffect_` (`cp [hl]` / `sbc [hl]`, `.failed` →
+`PrintButItFailedText_`). Docs: `GENERATION_SEAMS.md` §2, `GENERATION_PROFILE.md` §3, `PRODUCT_SPEC.md`.
+
+**Tests.** `FailureAnnouncementTests`, `HealContractTests`, `RestContractTests`: each move fails with `MoveFailed` and
+spends PP at full HP, 255 and 511 below a 600 max, and max 300 at HP 45; heals at 254 below and at max 511 / HP 256.
+
+**Reviews.** Format PASS; `.\test.ps1 -Dotnet` passed on final code; E2E not run. `requirements-review` findings ruled
+by Mo (exact two-byte borrow model: fixed; PP-spent assertion: added; doc wording: fixed); `pr-review` PR-READY.
+
+---
+
 ## §3.1 "It didn't affect": Gen 1's fifth failure line ✅ DONE (2026-11-06)
 
 S–M; found 2026-10-31 by `requirements-review` of "Failure announcements", source-confirmed; design pass and DoR ruled by

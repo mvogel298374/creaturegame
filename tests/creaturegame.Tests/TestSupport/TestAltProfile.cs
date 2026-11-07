@@ -176,6 +176,11 @@ internal static class TestAltProfile
         public override MoveFailureAnnouncement StatusMoveMissAnnouncement =>
             MoveFailureAnnouncement.Missed;
 
+        public override bool HealFails(int currentHp, int maxHp) => currentHp >= maxHp;
+
+        public override MoveFailureAnnouncement HealFailureAnnouncement =>
+            MoveFailureAnnouncement.Missed;
+
         // No participant split: proves the seam, not Battle, decides the division.
         public override ExperienceRules Experience { get; } =
             new(LevelDivisor: 7, Split: ExperienceSplit.None, Boosts: []);

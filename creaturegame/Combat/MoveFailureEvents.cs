@@ -31,6 +31,7 @@ public static class MoveFailureEvents
                 target.Id,
                 moveName
             ),
+            MoveFailureAnnouncement.Failed => new MoveFailed(),
             _ => throw new ArgumentOutOfRangeException(nameof(announcement), announcement, null),
         };
 }

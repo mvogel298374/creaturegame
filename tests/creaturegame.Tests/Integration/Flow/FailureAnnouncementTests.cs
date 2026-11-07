@@ -188,6 +188,40 @@ public class FailureAnnouncementTests(MovesFixture moves) : InteractionTest(move
         Assert.False(result.Has<MoveDidntAffect>());
     }
 
+    [Theory]
+    [InlineData("recover")]
+    [InlineData("rest")]
+    public async Task TheSeamPicksTheHealFailureCheckAndLine(string moveName)
+    {
+        var bugGap = TestCreatures.Make("Healer", hp: 600);
+        bugGap.Attributes.HP = 600 - 255;
+        var full = TestCreatures.Make("Healer", hp: 600);
+
+        var healed = await new MoveScenario()
+            .Rules(new AltHealRules())
+            .Attacker(bugGap)
+            .Use(Move(moveName));
+        var failed = await new MoveScenario()
+            .Rules(new AltHealRules())
+            .Attacker(full)
+            .Use(Move(moveName));
+
+        Assert.True(healed.Has<Healed>());
+        Assert.Equal(moveName, failed.First<MoveMissed>()?.MoveName);
+        Assert.False(failed.Has<MoveFailed>());
+    }
+
+    private sealed class AltHealRules : DelegatingBattleRules
+    {
+        public override int GetHitThreshold(int acc, int accStage, int evaStage) => 256;
+
+        public override bool HealFails(int currentHp, int maxHp) =>
+            AltRules().HealFails(currentHp, maxHp);
+
+        public override MoveFailureAnnouncement HealFailureAnnouncement =>
+            AltRules().HealFailureAnnouncement;
+    }
+
     // Forced roll: moves under 80% accuracy (Sleep Powder 75, Rock Throw 65) miss; Tackle and Thunder Wave hit.
     private class MissesBelowEightyRules : DelegatingBattleRules
     {

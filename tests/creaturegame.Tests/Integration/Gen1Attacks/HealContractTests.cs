@@ -6,7 +6,7 @@ namespace creaturegame.Tests.Integration.Gen1Attacks;
 /// <summary>
 /// Self-heal moves (Recover) restore a fraction of the user's max HP and deal no damage. The fraction
 /// is the gen-variable <see cref="IBattleRules.RecoverHealFraction"/> (Gen 1 = ½); healing is capped at
-/// max HP. Soft-Boiled joins this class in its batch.
+/// max HP. The fail check is <see cref="IBattleRules.HealFails"/>.
 /// </summary>
 [Collection(MovesCollection.Name)]
 public class HealContractTests(MovesFixture moves) : Gen1MoveContract(moves)
@@ -44,5 +44,46 @@ public class HealContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 
         Assert.Equal(200, healer.Attributes.HP); // capped at max, not 280
         Assert.True(result.Has<Healed>());
+    }
+
+    // GENERATION_SEAMS.md §2, Heal failure.
+    [Theory]
+    [InlineData("recover", 600, 600)]
+    [InlineData("recover", 600, 345)]
+    [InlineData("recover", 600, 89)]
+    [InlineData("recover", 300, 45)]
+    [InlineData("soft-boiled", 600, 600)]
+    [InlineData("soft-boiled", 600, 345)]
+    [InlineData("soft-boiled", 600, 89)]
+    [InlineData("soft-boiled", 300, 45)]
+    public async Task FailsAtFullHpAndAtTheLowByteBugGaps(string moveName, int maxHp, int hp)
+    {
+        var healer = TestCreatures.Make("Healer", hp: maxHp);
+        healer.Attributes.HP = hp;
+
+        var result = await new MoveScenario().Attacker(healer).Use(Move(moveName));
+
+        Assert.True(result.Has<MoveFailed>());
+        Assert.False(result.Has<Healed>());
+        Assert.False(result.Has<MoveMissed>());
+        Assert.Equal(hp, healer.Attributes.HP);
+        Assert.Equal(result.Move.Base.PowerPointsMax - 1, result.Move.PowerPointsCurrent);
+    }
+
+    [Theory]
+    [InlineData("recover", 600, 346)]
+    [InlineData("recover", 511, 256)]
+    [InlineData("soft-boiled", 600, 346)]
+    [InlineData("soft-boiled", 511, 256)]
+    public async Task HealsOutsideTheBugGaps(string moveName, int maxHp, int hp)
+    {
+        var healer = TestCreatures.Make("Healer", hp: maxHp);
+        healer.Attributes.HP = hp;
+
+        var result = await new MoveScenario().Attacker(healer).Use(Move(moveName));
+
+        Assert.False(result.Has<MoveFailed>());
+        Assert.Equal(maxHp - hp, result.First<Healed>()!.HealAmount);
+        Assert.Equal(maxHp, healer.Attributes.HP);
     }
 }

@@ -126,6 +126,11 @@ public abstract class DelegatingBattleRules : IBattleRules
     public virtual int SelfDestructDefenseDivisor => _inner.SelfDestructDefenseDivisor;
     public virtual int RageAttackStagesPerHit => _inner.RageAttackStagesPerHit;
     public virtual double RecoverHealFraction => _inner.RecoverHealFraction;
+
+    public virtual bool HealFails(int currentHp, int maxHp) => _inner.HealFails(currentHp, maxHp);
+
+    public virtual MoveFailureAnnouncement HealFailureAnnouncement =>
+        _inner.HealFailureAnnouncement;
     public virtual int ScreenDefenseMultiplier => _inner.ScreenDefenseMultiplier;
 
     public virtual int RollBideTurns() => _inner.RollBideTurns();

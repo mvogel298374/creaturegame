@@ -58,7 +58,6 @@ None open.
 | **Pre-move-check cluster** — `CanAct` status order; a replacement frees the trapped foe; Disable countdown (§3.1) | M | ✗ 2, 3 each | One design pass: all three live in the pre-move check. |
 | **Fly and Dig don't dodge anything** (§3.1) | M | ✗ 2, 3; the rest drafted | Found 2026-11-03. Central hit check; pairs with the pre-hit-test cluster. |
 | **Hyper Beam recharges after breaking a Substitute** (§3.1) | S | ✗ 2, 3; the rest drafted | Found 2026-11-03. Central `AttackAction`. |
-| **Recover and Soft-Boiled fail cases** (§3.1) | S | ✗ 3; the rest drafted | Found 2026-11-03. Full HP, plus the 255/511 bug shared with Rest. |
 | **The player chooses what Mimic copies** (§3.1) | M | ✗ 2, 3; the rest drafted | Found 2026-11-03. Needs an input prompt, so a design pass. |
 
 **C. Needs a `/plan` or a verify slice**
@@ -335,15 +334,6 @@ data/engine item usually also means updating the test that pins the wrong value.
   - **Acceptance:** a Hyper Beam that breaks a Substitute leaves the user free next turn; one the decoy survives still
     recharges.
   - **Gen 1 source:** the cite above. **Data vs runtime:** runtime only. **Quirk:** the test above.
-  - **Dependencies:** none.
-- **Recover and Soft-Boiled fail cases (found 2026-11-03, move description audit) — S, ✗ not Ready.** pokered fails the
-  heal at full HP, and its comparison skips the high byte, so it also fails when the user is exactly 255 or 511 HP below
-  max (`HealEffect_`, `heal.asm`; Rest shares this code). Ours always "heals", for 0 at full HP (`HealEffect`,
-  `MoveEffects.cs:301-327`), and Rest checks only full HP.
-  **DoR:** ✗ gap **3** (a rule member for the check). *Drafted:*
-  - **Acceptance:** all three moves fail at full HP and at exactly 255 or 511 below max, with pokered's failure message.
-  - **Design:** none, unless the message needs a new event.
-  - **Gen 1 source:** the cite above. **Data vs runtime:** runtime only. **Quirk:** the 255/511 bug.
   - **Dependencies:** none.
 - **The player chooses what Mimic copies (found 2026-11-03, move description audit) — M, ✗ not Ready.** pokered lets the
   player pick any of the target's moves, and only the enemy picks at random (`MimicEffect`, `effects.asm:1203-1250`). Ours

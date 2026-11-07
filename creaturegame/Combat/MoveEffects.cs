@@ -305,7 +305,7 @@ public sealed class HealEffect : IMoveEffect
     public void Apply(MoveEffectContext ctx)
     {
         // The heal fraction is gen-variable, so it comes from the rules seam (ReceiveHealing caps at max).
-        if (ctx.Source.IsAlive())
+        if (ctx.Source.IsAlive() && !FailsAndAnnounces(ctx))
         {
             int hpBefore = ctx.Source.Attributes.HP;
             int heal = Math.Max(
@@ -323,6 +323,23 @@ public sealed class HealEffect : IMoveEffect
                 )
             );
         }
+    }
+
+    /// <summary>The HP check Recover, Soft-Boiled and Rest share; emits the failure line when it fails.</summary>
+    internal static bool FailsAndAnnounces(MoveEffectContext ctx)
+    {
+        if (!ctx.Rules.HealFails(ctx.Source.Attributes.HP, ctx.Source.Attributes.MaxHP))
+            return false;
+        ctx.Emitter?.Emit(
+            MoveFailureEvents.For(
+                ctx.Rules.HealFailureAnnouncement,
+                ctx.Source,
+                ctx.Source,
+                ctx.Attack.Name ?? "",
+                UnaffectedCause.StatusMove
+            )
+        );
+        return true;
     }
 }
 
@@ -434,17 +451,8 @@ public sealed class RestEffect : IMoveEffect
 
     public void Apply(MoveEffectContext ctx)
     {
-        // Gen 1: fully restore HP, cure any major status, then force sleep for a fixed number of turns
-        // (gen-variable ⇒ RestSleepTurns, distinct from the random RollSleepTurns). Fails if already at full
-        // HP — a state precondition, so it reuses MoveMissed like Counter/Dream Eater, not the type-based
-        // MoveHadNoEffect. Self-targeting ⇒ the foe-immunity guard never blocks it.
-        if (ctx.Source.Attributes.HP >= ctx.Source.Attributes.MaxHP)
-        {
-            ctx.Emitter?.Emit(
-                new MoveMissed(ctx.Source.Name, ctx.Source.Id, ctx.Attack.Name ?? "")
-            );
+        if (HealEffect.FailsAndAnnounces(ctx))
             return;
-        }
         int restored = ctx.Source.Attributes.MaxHP - ctx.Source.Attributes.HP;
         ctx.Source.Attributes.ReceiveHealing(restored); // heals exactly to full
         // Sleep overwrites any prior major status (Gen 1 allows only one) — Rest's documented cure.
