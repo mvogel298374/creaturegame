@@ -185,6 +185,199 @@ public class ConfusionAndInputTests
         Assert.DoesNotContain(emitter.Events, e => e is MoveFailed);
     }
 
+    // --- Confusion self-hit damage -------------------------------------------
+
+    private class SelfHitRules : DelegatingBattleRules
+    {
+        public override int ConfusionSelfHitPercent => 100;
+
+        public override double RollDamageVariance() => 0.85;
+
+        public override (double Min, double Max) DamageVarianceRange => (0.85, 0.85);
+
+        public override int GetHitThreshold(int acc, int accStage, int evaStage) => 256;
+
+        public override double GetCritChance(Creature a, Attack m) => 0.0;
+
+        public override int RollConfusionTurns() => 2;
+    }
+
+    private sealed class VarianceSelfHitRules : SelfHitRules
+    {
+        public override bool ConfusionSelfHitRollsVariance => true;
+    }
+
+    private sealed class OwnReflectSelfHitRules : SelfHitRules
+    {
+        public override bool ConfusionSelfHitUsesFoeReflect => false;
+    }
+
+    // pokered's integer formula for a level-50 user: power 40, no variance.
+    private static int Gen1SelfHit(int attack, int defense) =>
+        (2 * 50 / 5 + 2) * attack * 40 / defense / 50 + 2;
+
+    private static int SelfHit(Creature user, Creature? foe, SelfHitRules? rules = null)
+    {
+        user.Battle.ConfusedTurns = 3;
+        int hpBefore = user.Attributes.HP;
+        var emitter = new RecordingEmitter();
+
+        bool acted = StatusResolver.CanAct(
+            user,
+            rules ?? new SelfHitRules(),
+            emitter,
+            new SeededRandomSource(1),
+            foe
+        );
+
+        Assert.False(acted);
+        int damage = Assert.Single(emitter.Of<ConfusionDamage>()).Damage;
+        Assert.Equal(hpBefore - damage, user.Attributes.HP);
+        return damage;
+    }
+
+    private static Creature SelfHitUser() =>
+        TestCreatures.Make("User", hp: 500, attack: 100, defense: 100);
+
+    [Fact]
+    public void SelfHit_RollsNoDamageVariance()
+    {
+        int damage = SelfHit(SelfHitUser(), TestCreatures.Make("Foe"));
+
+        // SelfHitRules rolls 0.85, which would have made it 16.
+        Assert.Equal(Gen1SelfHit(100, 100), damage);
+        Assert.Equal(19, damage);
+    }
+
+    [Fact]
+    public void SelfHit_UsesTheUsersStagedAttackAndDefense()
+    {
+        var user = SelfHitUser();
+        user.Battle.Stages.Raise(StageStat.Attack, 2);
+        user.Battle.Stages.Raise(StageStat.Defense, -1);
+
+        int damage = SelfHit(user, TestCreatures.Make("Foe"));
+
+        Assert.Equal(Gen1SelfHit(200, 66), damage);
+        Assert.Equal(55, damage);
+    }
+
+    [Fact]
+    public void SelfHit_BurnHalvesTheUsersAttack()
+    {
+        var user = SelfHitUser();
+        user.Battle.Status = StatusCondition.Burn;
+
+        int damage = SelfHit(user, TestCreatures.Make("Foe"));
+
+        Assert.Equal(Gen1SelfHit(50, 100), damage);
+        Assert.Equal(10, damage);
+    }
+
+    [Fact]
+    public void SelfHit_TheFoesReflectDoublesDefense_TheUsersOwnReflectDoesNothing()
+    {
+        var foeWithReflect = TestCreatures.Make("Foe");
+        foeWithReflect.Battle.HasReflect = true;
+        int underFoeReflect = SelfHit(SelfHitUser(), foeWithReflect);
+
+        var userWithReflect = SelfHitUser();
+        userWithReflect.Battle.HasReflect = true;
+        int underOwnReflect = SelfHit(userWithReflect, TestCreatures.Make("Foe"));
+
+        Assert.Equal(Gen1SelfHit(100, 200), underFoeReflect);
+        Assert.Equal(Gen1SelfHit(100, 100), underOwnReflect);
+        Assert.True(underFoeReflect < underOwnReflect);
+    }
+
+    [Fact]
+    public void SelfHit_RollsVariance_WhenTheRulesSaySo()
+    {
+        int damage = SelfHit(SelfHitUser(), TestCreatures.Make("Foe"), new VarianceSelfHitRules());
+
+        Assert.Equal((int)(Gen1SelfHit(100, 100) * 0.85), damage);
+        Assert.Equal(16, damage);
+    }
+
+    [Fact]
+    public void SelfHit_UsesTheUsersOwnReflect_WhenTheRulesSaySo()
+    {
+        var userWithReflect = SelfHitUser();
+        userWithReflect.Battle.HasReflect = true;
+        int underOwnReflect = SelfHit(
+            userWithReflect,
+            TestCreatures.Make("Foe"),
+            new OwnReflectSelfHitRules()
+        );
+
+        var foeWithReflect = TestCreatures.Make("Foe");
+        foeWithReflect.Battle.HasReflect = true;
+        int underFoeReflect = SelfHit(SelfHitUser(), foeWithReflect, new OwnReflectSelfHitRules());
+
+        Assert.Equal(Gen1SelfHit(100, 200), underOwnReflect);
+        Assert.Equal(Gen1SelfHit(100, 100), underFoeReflect);
+    }
+
+    [Fact]
+    public void SelfHit_WithNoFoe_AppliesNoReflect()
+    {
+        int damage = SelfHit(SelfHitUser(), foe: null);
+
+        Assert.Equal(Gen1SelfHit(100, 100), damage);
+    }
+
+    [Fact]
+    public async Task SelfHit_InBattle_IsWeakenedByTheFoesReflectRaisedOnAnEarlierTurn()
+    {
+        var player = TestCreatures.Make("Player", hp: 60, attack: 100, defense: 100, speed: 50);
+        player.MoveSet.Clear();
+        player.AddAttack(Tackle());
+
+        var enemy = TestCreatures.Make("Enemy", hp: 500, attack: 100, defense: 100, speed: 150);
+        enemy.MoveSet.Clear();
+        enemy.AddAttack(
+            new Attack("reflect", "")
+            {
+                Id = 115,
+                BaseDamage = 0,
+                Accuracy = 100,
+                AttackType = AttackType.Undefined,
+                DamageType = DamageType.Psychic,
+                Effect = MoveEffect.Reflect,
+            }
+        );
+        enemy.AddAttack(ConfuseMove());
+        enemy.AddAttack(Tackle());
+
+        var result = await new BattleScenario()
+            .Player(player)
+            .Enemy(enemy)
+            .PlayerUses("tackle")
+            .EnemyUses("reflect", "supersonic", "tackle")
+            .Rules(new SelfHitRules())
+            .Seed(1)
+            .RunAsync();
+
+        int reflectAt = result.Events.ToList().FindIndex(e => e is ScreenApplied);
+        int selfHitAt = result.Events.ToList().FindIndex(e => e is ConfusionDamage);
+        Assert.InRange(reflectAt, 0, selfHitAt - 1);
+        var selfHit = Assert.Single(result.All<ConfusionDamage>());
+        Assert.Equal("Player", selfHit.CreatureName);
+        Assert.Equal(Gen1SelfHit(100, 200), selfHit.Damage);
+        Assert.Equal(10, selfHit.Damage);
+    }
+
+    private static Attack Tackle() =>
+        new("tackle", "")
+        {
+            Id = 33,
+            BaseDamage = 40,
+            Accuracy = 100,
+            AttackType = AttackType.Physical,
+            DamageType = DamageType.Normal,
+            PowerPointsMax = 99,
+        };
+
     // --- RandomMoveInput (Bug 1) --------------------------------------------
 
     [Fact]

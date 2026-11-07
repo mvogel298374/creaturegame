@@ -53,7 +53,7 @@ None open.
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
 | **Rampage edge gaps** (§3.1) | S–M | ✗ 2, 3; the rest drafted | Found 2026-11-03. Lock-end and repeat-turn messages, plus the confusion counter. |
-| **Gen 1 confusion self-hit damage** (§3.1) | S | ✗ 2; 1, 3, 5 drafted | Ruled 2026-10-17 (replicate the foe-Reflect quirk). |
+| **Self-hit and crash damage strike the foe's Substitute** (§3.1) | S–M | ✗ 1, 2, 3, 6 (drafted) | Found 2026-11-07. Unblocked: the confusion self-hit shipped (`CanAct` has its foe parameter); one ruling on the no-foe-Substitute edge. |
 | **Pre-hit-test cluster** — Mist + thaw; Substitute stops a stat-down move before accuracy; Substitute lets sleep/paralysis through; status-move checks ahead of the hit test (§3.1) | M | ✗ 2, 3 each; 1, 5, 6, 7 drafted for Mist + thaw and sleep/paralysis, 6 for the status-move checks, none for the stat-down entry | One design pass: all four move logic ahead of the hit test. |
 | **Pre-move-check cluster** — `CanAct` status order; a replacement frees the trapped foe; Disable countdown (§3.1) | M | ✗ 2, 3 each | One design pass: all three live in the pre-move check. |
 | **Fly and Dig don't dodge anything** (§3.1) | M | ✗ 2, 3; the rest drafted | Found 2026-11-03. Central hit check; pairs with the pre-hit-test cluster. |
@@ -171,18 +171,19 @@ data/engine item usually also means updating the test that pins the wrong value.
   **DoR (V16):** ✗ not Ready — gaps **2** (touches `Battle`: `opus-engineer` plus both gates, or fold into the
   `CanAct` design pass above) and **3**. *Gap 3, drafted:* gen-invariant if Gen 2 also frees the bind on send-out;
   verify at pokecrystal before calling it.
-- **Gen 1 confusion self-hit damage (from §7.6 V9) — S, ✗ not Ready.** *Intent:* no variance; Attack and Defense
-  with stages and Burn applied; the foe's Reflect doubles the Defense. *Gaps:* `DamageCalculator` is central;
-  seam surface (variance on/off, which side's screen).
-  *Gen 1 source:* `core.asm:3695-3696`, `:3674-3683`, `:4044-4055` (full cites in the V9 archive record). *Quirk to assert:* the foe's Reflect weakens your self-hit.
-  **User ruling 2026-10-17:** replicate the foe-Reflect quirk, behind a seam.
-  **DoR:** ✗ not Ready — gap **2** (central `DamageCalculator`: a design pass, then `opus-engineer` plus both
-  gates); 1, 3 and 5 are drafted for your confirmation, 7 is resolved. *Drafted:* acceptance, a forced-roll test
-  pins the self-hit with no variance roll, staged Attack/Defense and Burn applied, and the foe's Reflect doubling
-  the Defense. Seam: an `IBattleRules` member for variance and for which side's screen applies (Gen 2 read at
-  pokecrystal in the design pass). Runtime only. Dependencies: none.
-  **Remaining steps:** (1) you confirm the drafted lines; (2) a design pass names the seam members and reads Gen 2,
-  shown to you; (3) then it is Ready for `opus-engineer` plus both review gates.
+- **Self-hit and crash damage strike the foe's Substitute (found 2026-11-07) — S–M, ✗ not Ready.** *Intent:* when
+  the confused user (or a crashing Jump Kick / Hi Jump Kick user) has a Substitute up, Gen 1 applies the damage to
+  the **foe's** Substitute, not the user (`core.asm:4849-4855`, `AttackSubstitute` after the turn swap). Ours sends
+  both to the user's HP and ignores Substitutes (`StatusResolver.CanAct`, `AttackAction.ApplyFailedHitSideEffects`).
+  *Edge:* with no foe Substitute, pokered subtracts from a stale or zero Substitute HP and prints the break text.
+  **DoR:** ✗ not Ready — gaps **1** (*drafted:* acceptance, a forced self-hit and a forced crash with the user
+  behind a Substitute damage the foe's Substitute, user HP untouched; the no-foe-Substitute edge needs your ruling:
+  replicate the stale-HP text or let it fall to the user), **2** (a design pass; touches `AttackAction`, so
+  `opus-engineer` plus both gates), **3** (*drafted:* an `IBattleRules` member for where self-inflicted damage lands
+  behind a Substitute; Gen 2 unread, check `HitConfusion`'s `DoPlayerDamage` with `c = TRUE` at pokecrystal), **6**
+  (*drafted:* the self-hit breaks the foe's Substitute). 4 is answered above, 5 runtime only, 7 none open: the Gen 1
+  confusion self-hit shipped 2026-11-07 and `StatusResolver.CanAct` already takes the optional foe (`Battle` passes
+  `attack.Target`), so the self-hit's Substitute branch reuses it.
 - **Gen 1 Mist, thaw and Leech Seed fidelity (from §7.6 V10) — M, ✗ not Ready.** *Intent:* Mist only blocks
   primary stat-down moves, as a miss before the accuracy roll; a Substitute stops a Fire thaw; the Leech Seed drain
   is multiplied by the Toxic counter. *Gaps:* touches `AttackAction`/`Battle` (central, `opus-engineer` + both

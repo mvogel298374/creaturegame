@@ -34,6 +34,9 @@ public abstract class DelegatingBattleRules : IBattleRules
     public virtual int FreezeRandomThawPercent => _inner.FreezeRandomThawPercent;
     public virtual double StabMultiplier => _inner.StabMultiplier;
     public virtual int ConfusionSelfHitPercent => _inner.ConfusionSelfHitPercent;
+    public virtual int ConfusionSelfHitPower => _inner.ConfusionSelfHitPower;
+    public virtual bool ConfusionSelfHitRollsVariance => _inner.ConfusionSelfHitRollsVariance;
+    public virtual bool ConfusionSelfHitUsesFoeReflect => _inner.ConfusionSelfHitUsesFoeReflect;
 
     public virtual int GetSecondaryEffectChance(Attack m, SecondaryEffectKind e) =>
         _inner.GetSecondaryEffectChance(m, e);

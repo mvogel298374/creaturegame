@@ -72,6 +72,15 @@ public interface IBattleRules
     /// <summary>Percent chance (0–100) that a confused creature hits itself instead of acting.</summary>
     int ConfusionSelfHitPercent { get; }
 
+    /// <summary>The power of a confusion self-hit, a typeless physical hit. See GENERATION_SEAMS.md §2.</summary>
+    int ConfusionSelfHitPower { get; }
+
+    /// <summary>Whether a confusion self-hit rolls damage variance. See GENERATION_SEAMS.md §2.</summary>
+    bool ConfusionSelfHitRollsVariance { get; }
+
+    /// <summary>Whether the foe's Reflect, not the user's, doubles a confusion self-hit's Defense. See GENERATION_SEAMS.md §2.</summary>
+    bool ConfusionSelfHitUsesFoeReflect { get; }
+
     /// <summary>How many times a multi-hit move strikes when it connects; drawn once per use.</summary>
     int RollMultiHitCount();
 

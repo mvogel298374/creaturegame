@@ -57,8 +57,7 @@ Flag as a blocker any of these in engine code (`DamageCalculator`, `AttackAction
   inspection. (The `Generation` *data column* on learnsets is fine — that's import/query data.)
 - A **gen-variable game-rule magic number** inline (multiplier, divisor, threshold, denominator, duration,
   chance, stage value) instead of a named member on `IBattleRules` / `ITypeChart` / `IStatCalculator`.
-  (Truly gen-invariant constants inline are fine — the 4 move slots, the damage-formula `+2`, confusion base
-  power 40.)
+  (Truly gen-invariant constants inline are fine — the 4 move slots, the damage-formula `+2`.)
 - Reading `creature.Attributes.Attack/Special/Defense` **directly for damage/effect math** instead of
   `rules.GetOffensiveStat(...)` / `GetDefensiveStat(...)`.
 - A **gen-variable rule/condition** (a success condition, a type/status immunity, a formula, a stage/accuracy

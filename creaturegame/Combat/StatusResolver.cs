@@ -18,7 +18,8 @@ public static class StatusResolver
         Creature creature,
         IBattleRules? rules = null,
         IBattleEventEmitter? emitter = null,
-        IRandomSource? rng = null
+        IRandomSource? rng = null,
+        Creature? foe = null
     )
     {
         var battleRules = rules ?? Gen1BattleRules.Instance;
@@ -99,7 +100,11 @@ public static class StatusResolver
             }
             if (random.Next(100) < battleRules.ConfusionSelfHitPercent)
             {
-                int selfDamage = DamageCalculator.CalculateConfusionDamage(creature, battleRules);
+                int selfDamage = DamageCalculator.CalculateConfusionDamage(
+                    creature,
+                    foe,
+                    battleRules
+                );
                 creature.Attributes.ReceiveDamage(selfDamage);
                 emitter?.Emit(
                     new ConfusionDamage(

@@ -24,7 +24,7 @@ hard gate to the pipeline but soft to the user: only the user waives a requireme
   inspection). The `Generation` *data column* on learnsets is fine.
 - No gen-variable game-rule magic number inline — multipliers, divisors, thresholds, durations, chances,
   stage values live on `IBattleRules` / `ITypeChart` / `IStatCalculator`, not in the branch. (Gen-invariant
-  constants inline are fine — 4 move slots, the `+2`, confusion base power 40.)
+  constants inline are fine — 4 move slots, the `+2`.)
 - Damage/effect math reads stats via `rules.GetOffensiveStat` / `GetDefensiveStat`, never
   `creature.Attributes.Attack/Special/Defense` directly; no `Attributes` mutation to fake a modifier.
 - Every new seam member carries a one-line XML doc naming what it returns (Gen 1 value at most; no later-gen claims, `GENERATION_SEAMS.md` §4.5).

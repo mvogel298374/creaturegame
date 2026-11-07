@@ -209,44 +209,16 @@ public static class DamageCalculator
         int screenDefenseMultiplier
     )
     {
-        // IBattleRules.GetOffensiveStat/GetDefensiveStat.
-        int attackStat = rules.GetOffensiveStat(attacker, move.AttackType);
-        int defenseStat = rules.GetDefensiveStat(defender, move.AttackType);
-
-        if (!isCrit || !rules.CritIgnoresStatStages)
-        {
-            // Apply stat stage multipliers (skipped for crits in Gen 1).
-            double atkStageMult = rules.GetStatMultiplier(
-                attacker.Battle.Stages.Of(rules.OffensiveStage(move.AttackType))
-            );
-            double defStageMult = rules.GetStatMultiplier(
-                defender.Battle.Stages.Of(rules.DefensiveStage(move.AttackType))
-            );
-
-            attackStat = (int)(attackStat * atkStageMult);
-            defenseStat = (int)(defenseStat * defStageMult);
-
-            // Reflect / Light Screen multiply the defensive stat while up. Inside the non-crit block
-            // so a crit ignores the screen (Gen 1), exactly like stat stages and Burn below.
-            defenseStat *= screenDefenseMultiplier;
-
-            // Burn halves physical Attack (skipped on crit path in Gen 1).
-            if (
-                move.AttackType == AttackType.Physical
-                && attacker.Battle.Status == StatusCondition.Burn
-            )
-                attackStat /= 2;
-        }
-
-        // Guard against zero defense; defenseDivisor is the seam's Self-Destruct/Explosion Defense-halving.
-        defenseStat = Math.Max(1, defenseStat / defenseDivisor);
-        attackStat = Math.Max(1, attackStat);
-
-        double baseDamage =
-            (
-                ((2.0 * attacker.Level / 5.0 + 2.0) * attackStat * move.BaseDamage / defenseStat)
-                / 50.0
-            ) + 2.0;
+        double baseDamage = ComputeBaseDamage(
+            attacker,
+            defender,
+            move.AttackType,
+            move.BaseDamage,
+            rules,
+            isCrit,
+            defenseDivisor,
+            screenDefenseMultiplier
+        );
 
         double stab =
             (attacker.Type1 == move.DamageType || attacker.Type2 == move.DamageType)
@@ -261,6 +233,46 @@ public static class DamageCalculator
         double critMult = isCrit ? rules.CritMultiplier : 1.0;
 
         return (int)(baseDamage * stab * typeEffectiveness * critMult * variance);
+    }
+
+    private static double ComputeBaseDamage(
+        Creature attacker,
+        Creature defender,
+        AttackType attackType,
+        int power,
+        IBattleRules rules,
+        bool isCrit,
+        int defenseDivisor,
+        int screenDefenseMultiplier
+    )
+    {
+        int attackStat = rules.GetOffensiveStat(attacker, attackType);
+        int defenseStat = rules.GetDefensiveStat(defender, attackType);
+
+        if (!isCrit || !rules.CritIgnoresStatStages)
+        {
+            double atkStageMult = rules.GetStatMultiplier(
+                attacker.Battle.Stages.Of(rules.OffensiveStage(attackType))
+            );
+            double defStageMult = rules.GetStatMultiplier(
+                defender.Battle.Stages.Of(rules.DefensiveStage(attackType))
+            );
+
+            attackStat = (int)(attackStat * atkStageMult);
+            defenseStat = (int)(defenseStat * defStageMult);
+
+            // Inside the non-crit block, so a crit ignores the screen like stages and Burn.
+            defenseStat *= screenDefenseMultiplier;
+
+            if (attackType == AttackType.Physical && attacker.Battle.Status == StatusCondition.Burn)
+                attackStat /= 2;
+        }
+
+        defenseStat = Math.Max(1, defenseStat / defenseDivisor);
+        attackStat = Math.Max(1, attackStat);
+
+        return (((2.0 * attacker.Level / 5.0 + 2.0) * attackStat * power / defenseStat) / 50.0)
+            + 2.0;
     }
 
     /// <summary>
@@ -284,22 +296,29 @@ public static class DamageCalculator
             out _
         );
 
-    // Confusion self-damage is a typeless physical hit at this fixed power (gen-invariant: 40).
-    private const int ConfusionBasePower = 40;
-
-    public static int CalculateConfusionDamage(Creature attacker, IBattleRules? rules = null)
+    /// <summary>The confusion self-hit; GENERATION_SEAMS.md §2 (Confusion self-hit).</summary>
+    public static int CalculateConfusionDamage(
+        Creature user,
+        Creature? foe,
+        IBattleRules? rules = null
+    )
     {
         var r = rules ?? Gen1BattleRules.Instance;
-        // Stat reads go through the rules seam (physical Attack vs Defense in Gen 1; a split-
-        // Special gen would still resolve Physical → Attack/Defense here) rather than touching
-        // Attributes directly.
-        int attackStat = r.GetOffensiveStat(attacker, AttackType.Physical);
-        int defenseStat = Math.Max(1, r.GetDefensiveStat(attacker, AttackType.Physical));
-        double raw =
-            ((2.0 * attacker.Level / 5.0 + 2.0) * attackStat * ConfusionBasePower / defenseStat)
-                / 50.0
-            + 2.0;
-        return Math.Max(1, (int)(raw * r.RollDamageVariance()));
+        var reflectHolder = r.ConfusionSelfHitUsesFoeReflect ? foe : user;
+        int screen = reflectHolder?.Battle.HasReflect == true ? r.ScreenDefenseMultiplier : 1;
+        double damage = ComputeBaseDamage(
+            user,
+            user,
+            AttackType.Physical,
+            r.ConfusionSelfHitPower,
+            r,
+            isCrit: false,
+            defenseDivisor: 1,
+            screenDefenseMultiplier: screen
+        );
+        if (r.ConfusionSelfHitRollsVariance)
+            damage *= r.RollDamageVariance();
+        return Math.Max(1, (int)damage);
     }
 
     /// <summary>Super Fang / Guillotine-variant: deals exactly half the target's current HP.</summary>

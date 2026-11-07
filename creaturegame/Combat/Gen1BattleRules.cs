@@ -47,6 +47,13 @@ public sealed class Gen1BattleRules : IBattleRules
     // Gen 1: a confused creature hits itself 50% of the time.
     public int ConfusionSelfHitPercent => 50;
 
+    // pokered core.asm HandleSelfConfusionDamage: power 40, no RandomizeDamage, the foe's Reflect bit.
+    public int ConfusionSelfHitPower => 40;
+
+    public bool ConfusionSelfHitRollsVariance => false;
+
+    public bool ConfusionSelfHitUsesFoeReflect => true;
+
     // Gen 1 Same-Type Attack Bonus.
     public double StabMultiplier => 1.5;
 

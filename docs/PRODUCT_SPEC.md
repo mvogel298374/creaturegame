@@ -131,9 +131,11 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - A multi-hit move rolls crit, damage and accuracy once; every strike deals the first strike's damage.
 - A Fire move thaws a frozen target after its damage, and not when the hit faints the target.
 - Jump Kick / Hi Jump Kick crash on a miss and against an immune target.
+- A confusion self-hit rolls no damage variance, uses the user's own staged Attack and Defense with Burn halving the
+  Attack, and is weakened by the foe's Reflect, not the user's own.
 - Design detail → `GENERATION_SEAMS.md` §2 (*Roll order*), `GEN_DIFFERENCES.md` → *Roll Order*.  History →
   `TODO_ARCHIVE.md` → *Gen 1 roll order in `AttackAction`, behind a seam* and *Failure announcements: a failed OHKO and
-  a trainer-battle Roar/Whirlwind say "unaffected"* and *Roar/Whirlwind: the scared-off side still acts* and *Recover and Soft-Boiled fail cases*.
+  a trainer-battle Roar/Whirlwind say "unaffected"* and *Roar/Whirlwind: the scared-off side still acts* and *Recover and Soft-Boiled fail cases* and *Gen 1 confusion self-hit damage*.
 
 ### Foe move scoring and chosen-move validation
 - The foe scores a status move by its status chance: a 10% burn side effect is worth a tenth of a pure burn move.

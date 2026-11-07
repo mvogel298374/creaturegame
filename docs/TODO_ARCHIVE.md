@@ -8,6 +8,44 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §3.1 Gen 1 confusion self-hit damage ✅ DONE (2026-11-07)
+
+S; split from §7.6 V9 (see its record below); user ruling 2026-10-17: replicate the foe-Reflect quirk behind a seam. Design
+and DoR lines approved 2026-11-07; `opus-engineer` plus both review gates (central `DamageCalculator`).
+
+**Problem.** Gen 1 runs the self-hit through the damage formula with no variance roll, using the user's in-battle (staged,
+Burn-halved) Attack and Defense, and reads the **foe's** Reflect because it borrows the attack path (`core.asm:3672-3714`
+player, `:5771-5815` enemy, `:4044-4055` and `:4161` in `GetDamageVarsFor*Attack`). Ours used an inline power constant and
+its own approximation.
+
+**Acceptance (met).** The self-hit rolls no variance, uses the user's staged Attack and Defense with Burn, and the foe's
+Reflect doubles the Defense; the user's own Reflect does not. Eight tests in `ConfusionAndInputTests`, the self-hit forced
+through `ConfusionSelfHitPercent`: the exact value against a rules double whose variance roll would change it; +2 Attack /
+−1 Defense; Burn halves; the foe's Reflect lowers it and the user's own does not; the three non-Gen-1 flag settings; one full
+`Battle` test where the foe raises Reflect and the confused player hurts itself on a later turn.
+
+**Outcome.** Three `IBattleRules` members (with `DelegatingBattleRules` pass-throughs): `ConfusionSelfHitPower` (40, replaces
+the inline `ConfusionBasePower`), `ConfusionSelfHitRollsVariance` (false), `ConfusionSelfHitUsesFoeReflect` (true). The
+stat-and-base step of `DamageCalculator` is a shared `ComputeBaseDamage` helper (stages, screen, Burn, level/power/defense
+formula); the live attack adds STAB, type, crit and variance, and `CalculateConfusionDamage(user, foe, rules)` calls it with
+attacker = defender = user, physical, no crit. `StatusResolver.CanAct` takes an optional `Creature? foe`; `Battle` passes
+`attack.Target`. `ConfusionDamage` is unchanged on the wire. Runtime only; no data change. Gen 2 read at pokecrystal: the
+user's **own** Reflect and no variance (`effect_commands.asm:602-611`, `:2864-2898`). Docs: `GENERATION_SEAMS.md` §2,
+`GEN_DIFFERENCES.md`; `DEFINITION_OF_DONE.md` and `.claude/agents/pr-review.md` dropped "confusion base power 40" as an
+inline-constant example.
+
+**Out of scope, filed separately.** The self-hit striking the foe's Substitute (own `TODO.md` §3.1 entry); the self-hit
+clearing Bide/Thrash/charge (the `CanAct` status-order entry).
+
+**Reviews.** Format PASS; `.\test.ps1 -Dotnet` 2174/2174; E2E not run. `requirements-review`: 2 discrepancies, user rulings
+2026-11-07: (1) rejected, Gen 2 does apply stages and Burn (pokecrystal `CalcPlayerStats` bakes them into
+`wBattleMonAttack`/`Defense`, `effect_commands.asm:4778-4797`); (1b) the Gen 2 type-boost-item / Self-Destruct self-hit bug
+recorded as a doc note only, no seam member until a Gen 2 sprint; (2) the `Math.Max(1)` floor waived (unreachable, the
+formula is at least 2). `pr-review` PR-READY; non-Gen-1 flag tests recommended and added; DoD / `pr-review.md` example fixed;
+advisory on `CanAct`'s optional foe accepted as-is.
+
+---
+
 ## §3.1 Recover and Soft-Boiled fail cases ✅ DONE (2026-11-07)
 
 S; found 2026-11-03 (move description audit), seam confirmed and greenlit by Mo 2026-11-07.

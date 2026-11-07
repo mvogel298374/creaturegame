@@ -194,7 +194,9 @@ public class Battle
                 {
                     if (!attack.Target.IsAlive())
                         continue;
-                    if (!StatusResolver.CanAct(action.Source, _rules, _emitter, _rng))
+                    if (
+                        !StatusResolver.CanAct(action.Source, _rules, _emitter, _rng, attack.Target)
+                    )
                         continue;
                 }
                 await action.ExecuteAsync();

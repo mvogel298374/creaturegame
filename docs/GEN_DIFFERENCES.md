@@ -112,6 +112,12 @@ Damage = floor(floor(floor(2×Level/5 + 2) × A × Power / D) / 50 + 2)
 ```
 Where A = Attack (or Special), D = Defense (or Special), with no Sp. Atk/Sp. Def split.
 
+**Confusion self-hit**: the same formula at power 40 with the user's own in-battle Attack and Defense (stages and
+Burn apply), and nothing after the base: no STAB, type, crit or damage variance (pokered `engine/battle/core.asm:3672-3714`).
+**The foe's Reflect doubles the Defense, the user's own Reflect doesn't**, because the self-hit borrows the attack
+routine that checks the other side's screen (`:4044-4055`, enemy `:5771-5815`, `:4161`). Seam: `IBattleRules`
+`ConfusionSelfHitPower` / `ConfusionSelfHitRollsVariance` / `ConfusionSelfHitUsesFoeReflect`.
+
 #### Roll Order
 - A damaging move rolls **crit → damage → accuracy** (pokered `engine/battle/core.asm:3140-3150`), so a miss has
   already drawn its crit and damage rolls. Damage of 1 or less is not randomized and draws no roll (`RandomizeDamage`).
@@ -340,6 +346,11 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
 - **Multi-hit strikes roll their own crit and damage** (pokecrystal `data/moves/effects.asm` `MultiHit`); roll order
   is per move script — most hits still roll crit and damage before `checkhit` (`NormalHit`), `MultiHit` checks first
 - Focus Energy crit bug: fixed
+- **A confusion self-hit checks the user's own Reflect**, not the foe's, and still rolls no variance (pokecrystal
+  `engine/battle/effect_commands.asm:602-611`, `:2864-2898`). Stages and Burn still apply: `CalcPlayerStats` bakes
+  them into `wBattleMonAttack`/`wBattleMonDefense` (`:4778-4797`). Bug: the self-hit is boosted by a type-boosting
+  held item and halves Defense when the user selected Self-Destruct or Explosion (`:2902`); not seamed until a Gen 2
+  sprint
 - A repeat Dire Hit, Guard Spec or X Accuracy is **refused** ("won't have any effect") and kept; an X-item at +6 is
   still used up (pokecrystal `engine/items/item_effects.asm:2089-2129`)
 
