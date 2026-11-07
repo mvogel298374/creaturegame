@@ -863,6 +863,20 @@ public class WebEventContractTests
         Assert.Equal("roar", doc.RootElement.GetProperty("MoveName").GetString());
     }
 
+    [Fact]
+    public void RampageContinues_Projection_CarriesCreatureAndMove()
+    {
+        var evt = new RampageContinues("TAUROS", 3, "thrash");
+
+        var (type, payload) = SignalRBattleEventEmitter.MapEvent(evt);
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+
+        Assert.Equal("RampageContinues", type);
+        Assert.Equal("TAUROS", doc.RootElement.GetProperty("CreatureName").GetString());
+        Assert.Equal(3, doc.RootElement.GetProperty("CreatureId").GetInt32());
+        Assert.Equal("thrash", doc.RootElement.GetProperty("MoveName").GetString());
+    }
+
     /// <summary>Same projection guard for <see cref="BiomeEntered"/> — the client titles/themes the next leg
     /// from these fields, dropped on the wire if not listed (the failure mode the STAB flag hit).</summary>
     [Fact]

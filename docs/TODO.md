@@ -52,7 +52,6 @@ None open.
 
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
-| **Rampage edge gaps** (§3.1) | S–M | ✗ 2, 3; the rest drafted | Found 2026-11-03. Lock-end and repeat-turn messages, plus the confusion counter. |
 | **Self-hit and crash damage strike the foe's Substitute** (§3.1) | S–M | ✗ 1, 2, 3, 6 (drafted) | Found 2026-11-07. Unblocked: the confusion self-hit shipped (`CanAct` has its foe parameter); one ruling on the no-foe-Substitute edge. |
 | **Pre-hit-test cluster** — Mist + thaw; Substitute stops a stat-down move before accuracy; Substitute lets sleep/paralysis through; status-move checks ahead of the hit test (§3.1) | M | ✗ 2, 3 each; 1, 5, 6, 7 drafted for Mist + thaw and sleep/paralysis, 6 for the status-move checks, none for the stat-down entry | One design pass: all four move logic ahead of the hit test. |
 | **Pre-move-check cluster** — `CanAct` status order; a replacement frees the trapped foe; Disable countdown (§3.1) | M | ✗ 2, 3 each | One design pass: all three live in the pre-move check. |
@@ -298,22 +297,6 @@ data/engine item usually also means updating the test that pins the wrong value.
   **DoR:** ✗ — gaps **2, 3, 6**. *Drafted:* **Acceptance:** each case prints its pokered line in a full battle.
   **Data vs runtime:** runtime plus a new "evaded" event wired in all four places. **Dependencies:** pair with the
   `ResidualEffects1` accuracy slice, which decides where these moves roll accuracy.
-- **Rampage edge gaps (found 2026-11-03, Thrash fix review) — S–M, ✗ not Ready, filed by ruling.** Three differences
-  from pokered, none changing the turn count: the lock's end logs "became confused!", where pokered is silent
-  (`core.asm:3542-3552`; its only such text is the ordinary effect, `effects.asm:1151`; ours `LockInMechanics.cs:142`,
-  `timeline.ts:1104`); a repeat turn announces "used", where pokered prints "is thrashing about!" and skips that line
-  (`core.asm:3536`; ours `AttackAction.cs:108`); and a user already confused keeps its old counter, where pokered always
-  rolls a fresh 2–5 (`core.asm:3545-3550`; ours `LockInMechanics.cs:139`).
-  **DoR:**
-  - **Acceptance (drafted):** a full-battle test sees no "became confused" line at the lock's end, "is thrashing about!"
-    on each repeat turn with no "used" line, and a new counter on a user already confused.
-  - **Design ✗:** how the client learns of a silent confusion, and how the tests find the lock's end, since both now use
-    `ConfusionStarted`; a repeat-turn event is wired in the four places of `engine.md` rule 7.
-  - **Seam ✗:** battle messages go behind a seam (`generation-seams.md` rule 4); which member, settled in that pass.
-  - **Gen 1 source:** the cites above.
-  - **Data vs runtime:** runtime only.
-  - **Quirk:** the counter is overwritten even when the old one is still running.
-  - **Dependencies:** none; the turn-count fix is archived (`TODO_ARCHIVE.md`, "Thrash and Petal Dance end a turn early").
 - **Fly and Dig don't dodge anything (found 2026-11-03, move description audit) — M, ✗ not Ready.** pokered sets
   `INVULNERABLE` on the charge turn, and `MoveHitTest` misses against it (`core.asm:5259-5261`). Only Swift, which returns
   first (`:5247-5250`), and Bide's release, which skips the test (`:3528`), get through. Ours sets `IsTwoTurnCharging`, but
@@ -565,7 +548,9 @@ each). Their seam and data-vs-runtime lines are already written in the text.
   guard), then a pure `moveAnimationFamily(type, category, slug)` map, per-family `BridgeCommand`s and `BattleScene`
   handlers each still emitting `animationComplete`. Worth doing in the same pass: read the hit-flash tint and the log's
   "super effective" emphasis from **one** shared type-colour source (`TypeBadge`'s palette). Design notes:
-  `SPRITE_PRESENTATION.md` §3.3–3.5.
+  `SPRITE_PRESENTATION.md` §3.3–3.5. **Gen 1 quirk to carry (ruled 2026-11-07):** a Petal Dance repeat turn plays
+  Thrash's animation, since pokered sets `wPlayerMoveNum = THRASH` (`core.asm:3534`) and the hit animation reads it
+  (`:3174-3175`); `RampageContinues` (and its `MoveName`) will need the animation move projected.
   **DoR (V16):** ✗ not Ready — gaps **1, 2, 6, 7**; a volatile frontend design, so it needs a `/plan`. *Drafted:*
   - **Seam:** the family keys off per-generation move data (`DamageType`/`AttackType`), and the colours are theme.
   - **Data vs runtime:** wire (C# and TS) plus client.

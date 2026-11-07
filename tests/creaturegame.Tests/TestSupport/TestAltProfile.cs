@@ -176,6 +176,13 @@ internal static class TestAltProfile
         public override MoveFailureAnnouncement StatusMoveMissAnnouncement =>
             MoveFailureAnnouncement.Missed;
 
+        public override RampageRepeatAnnouncement RampageRepeatAnnouncement =>
+            RampageRepeatAnnouncement.UsedMove;
+
+        public override bool RampageEndAnnouncesConfusion => true;
+
+        public override bool RampageEndOverwritesConfusion => false;
+
         public override bool HealFails(int currentHp, int maxHp) => currentHp >= maxHp;
 
         public override MoveFailureAnnouncement HealFailureAnnouncement =>

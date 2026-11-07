@@ -8,6 +8,52 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §3.1 Rampage edge gaps: "is thrashing about!", a silent lock end, a fresh confusion counter ✅ DONE (2026-11-07)
+
+M; found 2026-11-03 in the Thrash fix review (see *Thrash and Petal Dance end a turn early*). Design and DoR lines approved
+2026-11-07; `opus-engineer` plus both review gates (central `AttackAction`).
+
+**Problem.** Three differences from pokered, none changing the turn count: the lock's end logged "became confused!", where
+pokered is silent (`core.asm:3542-3552`; its only such text is the ordinary effect, `effects.asm:1151`); a repeat turn
+announced "used", where pokered prints "is thrashing about!" and skips that line (`core.asm:3536-3541`, jumping past
+`DisplayUsedMoveText` at `:3118`); and a user already confused kept its old counter, where pokered always rolls a fresh 2-5
+(`core.asm:3545-3550`).
+
+**Acceptance (met).** Full-battle tests in `RampageContractTests`: no "became confused" line at the lock's end; "is
+thrashing about!" on each repeat turn with no "used" line, Petal Dance included; a user already confused at the lock's end
+gets a new counter; through `TestAltProfile` the other setting of each member behaves the other way. Approved assertion
+changes: the rampage tests find the lock's end by the player's first `ConfusionMessage` on the next turn instead of
+`ConfusionStarted`, count attacks as `MoveUsed` plus `RampageContinues`, and `TypeImmunityContractTests:104` checks the
+user's confusion state instead of `ConfusionStarted`.
+
+**Outcome.** Three `IBattleRules` members (with `DelegatingBattleRules` pass-throughs): `RampageRepeatAnnouncement` (new enum
+`{ UsedMove, ThrashingAbout }`, Gen 1 `ThrashingAbout`), `RampageEndAnnouncesConfusion` (false),
+`RampageEndOverwritesConfusion` (true). A new `RampageContinues(CreatureName, CreatureId, MoveName)` event wired in
+`BattleEvents`, the console emitter, the SignalR projection (+ `WebEventContractTests`) and the client timeline (+ Vitest):
+the client logs "X is thrashing about!" then plays the move animation. `RampageMechanic.OnCommit` on a repeat turn under
+`ThrashingAbout` emits it and returns the new `LockInFlow.ProceedUnannounced`; `AttackAction` then skips `MoveUsed` but still
+records `LastMoveUsed`. `OnTurnEnd` rolls a fresh counter when `RampageEndOverwritesConfusion` and emits `ConfusionStarted`
+only when `RampageEndAnnouncesConfusion`. The confusion stays set after the final attack, not before it as in pokered:
+nothing reads it in between. Runtime only; no data change. Gen 2 read at pokecrystal: "used" every turn
+(`data/moves/effects.asm:811-816`); a silent end with a fresh counter (`engine/battle/effect_commands.asm:4888-4920`).
+Docs: `GENERATION_SEAMS.md` §2, `GENERATION_PROFILE.md`, `GEN_DIFFERENCES.md`.
+
+**Carried to another entry.** A Petal Dance repeat turn plays Thrash's animation in Gen 1 (`core.asm:3534`, `:3174-3175`);
+noted in the §4.5 *Move-specific attack animations* entry in `TODO.md`, where `RampageContinues.MoveName` will need the
+animation move projected.
+
+**Reviews.** Format PASS; `.\test.ps1 -Dotnet -Web` .NET 2183/2183, tsc clean, Vitest 374/374; E2E not run.
+`requirements-review`: 4 discrepancies, user rulings 2026-11-07: (1) the `BattleVoluntarySwitchTests:452` assertion change
+(count `MoveUsed` plus `RampageContinues`) accepted; (2) the keep-counter alt test converted to a full battle
+(`ScriptedConfusionRules` subclass flipping only `RampageEndOverwritesConfusion`; sabotage-verified); (3) the two
+end-of-lock alt members tested only in combination in `TestAltProfile`, waived; (4) the Gen 1 Thrash animation on a Petal
+Dance repeat turn: no code, noted in the §4.5 entry. The extra `RollConfusionTurns` draw when already confused is faithful
+(acknowledged). `pr-review` PR-READY; a test pinning that a repeat turn still records `LastMoveUsed` was recommended and
+added as `RepeatTurnStillRecordsTheMoveForMirrorMove` (a single repeat-turn `AttackAction` with `LastMoveUsed` preset to
+another move, since a full battle can't catch the regression; sabotage-verified); two comment nits needed no action.
+
+---
+
 ## §3.1 Gen 1 confusion self-hit damage ✅ DONE (2026-11-07)
 
 S; split from §7.6 V9 (see its record below); user ruling 2026-10-17: replicate the foe-Reflect quirk behind a seam. Design

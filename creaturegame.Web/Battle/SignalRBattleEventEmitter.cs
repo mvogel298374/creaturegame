@@ -747,6 +747,15 @@ public sealed class SignalRBattleEventEmitter(
                     e.MoveName,
                 }
             ),
+            RampageContinues e => (
+                "RampageContinues",
+                new
+                {
+                    e.CreatureName,
+                    e.CreatureId,
+                    e.MoveName,
+                }
+            ),
             CreatureFainted e => ("CreatureFainted", new { e.Name, e.Id }),
             CreatureFled e => (
                 "CreatureFled",

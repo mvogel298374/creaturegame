@@ -472,6 +472,10 @@ public record FlinchBlocked(string CreatureName, int CreatureId) : BattleEvent;
 // --- Two-turn moves (Fly, Dig, SolarBeam…) ---
 public record ChargingUp(string CreatureName, int CreatureId, string MoveName) : BattleEvent;
 
+// --- Rampage (Thrash, Petal Dance) ---
+/// <summary>A locked rampage turn announced as "is thrashing about!" in place of <see cref="MoveUsed"/>; the move still animates.</summary>
+public record RampageContinues(string CreatureName, int CreatureId, string MoveName) : BattleEvent;
+
 // --- Crash damage (Jump Kick / Hi Jump Kick miss) ---
 public record CrashDamage(string SourceName, int SourceId, int Damage, int HpAfter) : BattleEvent;
 

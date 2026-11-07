@@ -48,6 +48,16 @@ public enum MoveFailureAnnouncement
     Failed,
 }
 
+/// <summary>How a rampage move (Thrash, Petal Dance) announces a locked repeat turn. See GENERATION_SEAMS.md §2.</summary>
+public enum RampageRepeatAnnouncement
+{
+    /// <summary>"&lt;USER&gt; used &lt;MOVE&gt;!" (<see cref="MoveUsed"/>), as on the first turn.</summary>
+    UsedMove,
+
+    /// <summary>"&lt;USER&gt; is thrashing about!" (<see cref="RampageContinues"/>) instead of the "used" line. Gen 1.</summary>
+    ThrashingAbout,
+}
+
 /// <summary>Where a move's crit and damage rolls fall relative to its accuracy roll. See GENERATION_SEAMS.md §2.</summary>
 public enum HitRollOrder
 {
@@ -214,6 +224,15 @@ public interface IBattleRules
 
     /// <summary>How many turns a rampage move (Thrash, Petal Dance) locks the user in before it confuses itself.</summary>
     int RollRampageTurns();
+
+    /// <summary>How a rampage move announces each turn after the first. See GENERATION_SEAMS.md §2.</summary>
+    RampageRepeatAnnouncement RampageRepeatAnnouncement { get; }
+
+    /// <summary>Whether the confusion a rampage's end inflicts prints "became confused!". See GENERATION_SEAMS.md §2.</summary>
+    bool RampageEndAnnouncesConfusion { get; }
+
+    /// <summary>Whether a rampage's end rolls a fresh confusion counter over a running one. See GENERATION_SEAMS.md §2.</summary>
+    bool RampageEndOverwritesConfusion { get; }
 
     /// <summary>How many turns Disable locks one of the target's moves out of selection.</summary>
     int RollDisableTurns();

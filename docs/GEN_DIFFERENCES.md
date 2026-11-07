@@ -179,8 +179,12 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
   turn it reaches zero (`core.asm:3538-3541`, enemy `:5913-5916`). The counter is not the attack count.
 - **A miss still locks.** The effect runs before the hit test (`core.asm:3130-3133`, hit test `:3150`), so a
   first-turn miss or immunity starts the lock, and a missed later turn still counts toward it.
-- **The lock's end confuses the user** with a fresh 2–5 counter (`core.asm:3542-3552`). Our remaining differences
-  are filed in `docs/TODO.md` §3.1, *Rampage edge gaps*.
+- **The lock's end confuses the user silently** with a fresh 2–5 counter (`core.asm:3542-3552`): no "became
+  confused!" line, and the counter is rewritten even when the user is already confused.
+- **A repeat turn says "is thrashing about!", not "used".** `.ThrashingAboutCheck` prints `ThrashingAboutText` and
+  jumps past `DisplayUsedMoveText` (`core.asm:3118`, `:3536-3541`); the attack still animates. Gen 2 prints "used"
+  every turn (pokecrystal `data/moves/effects.asm:811-816`) and, like Gen 1, confuses silently with a fresh counter
+  (`engine/battle/effect_commands.asm:4888-4920`).
 
 #### "Doesn't affect" vs "didn't affect"
 - **Two lines, one word apart.** "It doesn't affect <TARGET>!" is type immunity only (`_DoesntAffectMonText`, pokered

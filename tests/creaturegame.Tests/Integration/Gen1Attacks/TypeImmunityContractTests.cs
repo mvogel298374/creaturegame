@@ -101,7 +101,6 @@ public class TypeImmunityContractTests(MovesFixture moves) : Gen1MoveContract(mo
             .UseRepeated(Move("thrash"), turns: 3);
 
         Assert.All(results, r => Assert.True(r.Has<MoveHadNoEffect>()));
-        Assert.True(results[^1].Has<ConfusionStarted>());
         Assert.Equal(0, results[^1].Attacker.Battle.RampageTurnsRemaining);
         Assert.Null(results[^1].Attacker.Battle.RampageMove);
         Assert.True(results[^1].Attacker.Battle.ConfusedTurns > 0);

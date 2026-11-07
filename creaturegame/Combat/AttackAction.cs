@@ -102,10 +102,12 @@ public class AttackAction : IBattleAction
             _selectedMove!.PowerPointsCurrent--;
 
         // Commit phase: a charge (two-turn) or store (bide) turn ends here, before the move is announced.
-        if (lockIn is not null && lockIn.OnCommit(lockCtx!).Flow == LockInFlow.Halt)
+        var commit = lockIn?.OnCommit(lockCtx!).Flow ?? LockInFlow.Proceed;
+        if (commit == LockInFlow.Halt)
             return Task.CompletedTask;
 
-        _emitter?.Emit(new MoveUsed(Source.Name, Source.Id, attackToUse.Name ?? ""));
+        if (commit != LockInFlow.ProceedUnannounced)
+            _emitter?.Emit(new MoveUsed(Source.Name, Source.Id, attackToUse.Name ?? ""));
 
         // Remember the move actually used so the foe's Mirror Move can copy it. Metronome / Mirror Move
         // don't record themselves — the move they *call* does — so neither is ever the foe's LastMoveUsed

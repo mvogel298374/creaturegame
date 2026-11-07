@@ -32,6 +32,9 @@ public enum LockInFlow
 
     /// <summary>The mechanic finished the turn here (charging, storing, or Bide's unleash).</summary>
     Halt,
+
+    /// <summary>Run the normal attack, but the mechanic already announced the turn in place of "MoveUsed".</summary>
+    ProceedUnannounced,
 }
 
 /// <summary>
@@ -43,6 +46,7 @@ public readonly record struct LockInResult(LockInFlow Flow, int UnleashDamage = 
 {
     public static readonly LockInResult Proceed = new(LockInFlow.Proceed);
     public static readonly LockInResult Halt = new(LockInFlow.Halt);
+    public static readonly LockInResult ProceedUnannounced = new(LockInFlow.ProceedUnannounced);
 
     public static LockInResult Unleash(int damage) => new(LockInFlow.Halt, damage);
 }
@@ -71,12 +75,12 @@ public interface ILockInMechanic
     /// <summary>
     /// Before "MoveUsed" is announced: charge / store / commit. <see cref="LockInFlow.Halt"/> ends the
     /// turn now (two-turn charge, bide store); <see cref="LockInFlow.Proceed"/> announces the move and
-    /// continues.
+    /// continues; <see cref="LockInFlow.ProceedUnannounced"/> continues without it (a rampage repeat turn).
     /// </summary>
     LockInResult OnCommit(LockInContext ctx) => LockInResult.Proceed;
 
     /// <summary>
-    /// After "MoveUsed", before the normal attack pipeline: set up counters (rampage/rage) and
+    /// After the move is announced, before the normal attack pipeline: set up counters (rampage/rage) and
     /// <see cref="LockInFlow.Proceed"/> to run the attack, or do the mechanic's own damage and
     /// <see cref="LockInFlow.Halt"/> (bide unleash).
     /// </summary>
@@ -120,6 +124,17 @@ public sealed class RampageMechanic : ILockInMechanic
     public PokemonAttack? ForcedMove(Creature c) =>
         c.Battle.RampageTurnsRemaining > 0 ? c.Battle.RampageMove : null;
 
+    public LockInResult OnCommit(LockInContext ctx)
+    {
+        if (
+            !ctx.IsContinuation
+            || ctx.Rules.RampageRepeatAnnouncement != RampageRepeatAnnouncement.ThrashingAbout
+        )
+            return LockInResult.Proceed;
+        ctx.Emitter?.Emit(new RampageContinues(ctx.Source.Name, ctx.Source.Id, ctx.MoveName));
+        return LockInResult.ProceedUnannounced;
+    }
+
     public LockInResult OnRelease(LockInContext ctx)
     {
         if (!ctx.IsContinuation)
@@ -136,11 +151,14 @@ public sealed class RampageMechanic : ILockInMechanic
         if (ctx.Source.Battle.RampageTurnsRemaining > 0)
             return;
         ctx.Source.Battle.RampageMove = null;
-        if (ctx.Source.IsAlive() && ctx.Source.Battle.ConfusedTurns == 0)
-        {
-            ctx.Source.Battle.ConfusedTurns = ctx.Rules.RollConfusionTurns();
+        if (
+            !ctx.Source.IsAlive()
+            || (!ctx.Rules.RampageEndOverwritesConfusion && ctx.Source.Battle.ConfusedTurns > 0)
+        )
+            return;
+        ctx.Source.Battle.ConfusedTurns = ctx.Rules.RollConfusionTurns();
+        if (ctx.Rules.RampageEndAnnouncesConfusion)
             ctx.Emitter?.Emit(new ConfusionStarted(ctx.Source.Name, ctx.Source.Id));
-        }
     }
 }
 

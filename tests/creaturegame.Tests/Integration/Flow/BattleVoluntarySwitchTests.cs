@@ -449,7 +449,11 @@ public class BattleVoluntarySwitchTests
 
         Assert.Empty(recorder.Of<CreatureSwitchedIn>()); // the locked-in creature never switched
         // It kept thrashing across turns 1 and 2 (the menu — and thus SWITCH — was bypassed both times).
-        Assert.True(recorder.Of<MoveUsed>().Count(m => m.MoveName == "thrash") >= 2);
+        Assert.True(
+            recorder.Of<MoveUsed>().Count(m => m.MoveName == "thrash")
+                + recorder.Of<RampageContinues>().Count(r => r.MoveName == "thrash")
+                >= 2
+        );
         // ...and the client is told so up front: turn 2 (mid-lock) advertises CanSwitch false, so the SWITCH
         // button greys out instead of offering a switch the locked-in turn would silently ignore.
         Assert.False(recorder.Of<TurnStarted>().ElementAt(1).CanSwitch);

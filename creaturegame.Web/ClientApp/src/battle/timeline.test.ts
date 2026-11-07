@@ -77,6 +77,13 @@ describe('expandEvent — move-name formatting', () => {
     expect(kinds(steps)).toEqual(['dispatch', 'wait', 'emit', 'awaitAnim']);
   });
 
+  it('a rampage repeat turn says "is thrashing about!" in place of "used", then plays the lunge', () => {
+    const { steps } = expandEvent('RampageContinues', { creatureName: 'NIDOKING', creatureId: 2, moveName: 'petal-dance' }, CTX);
+    expect(logLines(steps)).toEqual(['NIDOKING is thrashing about!']);
+    expect(kinds(steps)).toEqual(['dispatch', 'wait', 'emit', 'awaitAnim']);
+    expect(emits(steps)).toEqual([{ type: 'playMoveAnimation', attackerSide: 'enemy', targetSide: 'player' }]);
+  });
+
   it('formats the slug in "missed" lines', () => {
     const { steps } = expandEvent('MoveMissed', { attackerName: 'ARTICUNO', moveName: 'rolling-kick' }, CTX);
     expect(logLines(steps)).toEqual(["ARTICUNO's ROLLING KICK missed!"]);

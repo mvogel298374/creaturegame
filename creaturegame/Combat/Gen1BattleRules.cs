@@ -115,6 +115,15 @@ public sealed class Gen1BattleRules : IBattleRules
     // Gen 1: Thrash / Petal Dance attack for 3 or 4 turns (pokered's counter of 2-3 follows the first).
     public int RollRampageTurns() => _rng.Next(3, 5);
 
+    // .ThrashingAboutCheck prints ThrashingAboutText and jumps past DisplayUsedMoveText (core.asm:3531-3552).
+    public RampageRepeatAnnouncement RampageRepeatAnnouncement =>
+        RampageRepeatAnnouncement.ThrashingAbout;
+
+    // The lock's end sets CONFUSED with no text and always writes a fresh 2–5 counter (core.asm:3545-3550).
+    public bool RampageEndAnnouncesConfusion => false;
+
+    public bool RampageEndOverwritesConfusion => true;
+
     // Gen 1: Disable locks a move out for 1–8 turns (pokered DisableEffect: `and $7` / `inc a`).
     public int RollDisableTurns() => _rng.Next(8) + 1;
 

@@ -318,6 +318,10 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                 Console.WriteLine($"{e.CreatureName} is charging up {e.MoveName}!");
                 break;
 
+            case RampageContinues e:
+                Console.WriteLine($"{e.CreatureName} is thrashing about!");
+                break;
+
             case CreatureFainted e:
                 Console.WriteLine($"{e.Name} fainted!");
                 break;

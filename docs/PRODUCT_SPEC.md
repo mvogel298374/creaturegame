@@ -133,9 +133,12 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - Jump Kick / Hi Jump Kick crash on a miss and against an immune target.
 - A confusion self-hit rolls no damage variance, uses the user's own staged Attack and Defense with Burn halving the
   Attack, and is weakened by the foe's Reflect, not the user's own.
+- Thrash and Petal Dance print "<user> is thrashing about!" on each repeat turn instead of "used <move>!". The lock's
+  end confuses the user without a "became confused" line, and always rolls a fresh 2-5 turn counter, even when the user
+  was already confused.
 - Design detail → `GENERATION_SEAMS.md` §2 (*Roll order*), `GEN_DIFFERENCES.md` → *Roll Order*.  History →
   `TODO_ARCHIVE.md` → *Gen 1 roll order in `AttackAction`, behind a seam* and *Failure announcements: a failed OHKO and
-  a trainer-battle Roar/Whirlwind say "unaffected"* and *Roar/Whirlwind: the scared-off side still acts* and *Recover and Soft-Boiled fail cases* and *Gen 1 confusion self-hit damage*.
+  a trainer-battle Roar/Whirlwind say "unaffected"* and *Roar/Whirlwind: the scared-off side still acts* and *Recover and Soft-Boiled fail cases* and *Gen 1 confusion self-hit damage* and *Rampage edge gaps*.
 
 ### Foe move scoring and chosen-move validation
 - The foe scores a status move by its status chance: a 10% burn side effect is worth a tenth of a pure burn move.

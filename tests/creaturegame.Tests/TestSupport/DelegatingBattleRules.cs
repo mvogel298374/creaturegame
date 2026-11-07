@@ -116,6 +116,13 @@ public abstract class DelegatingBattleRules : IBattleRules
 
     public virtual int RollRampageTurns() => _inner.RollRampageTurns();
 
+    public virtual RampageRepeatAnnouncement RampageRepeatAnnouncement =>
+        _inner.RampageRepeatAnnouncement;
+
+    public virtual bool RampageEndAnnouncesConfusion => _inner.RampageEndAnnouncesConfusion;
+
+    public virtual bool RampageEndOverwritesConfusion => _inner.RampageEndOverwritesConfusion;
+
     public virtual int RollDisableTurns() => _inner.RollDisableTurns();
 
     public virtual bool OneHitKoSucceeds(Creature u, Creature t) => _inner.OneHitKoSucceeds(u, t);
