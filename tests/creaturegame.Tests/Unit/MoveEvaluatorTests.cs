@@ -226,8 +226,42 @@ public class MoveEvaluatorTests
     {
         var fireFoe = TestCreatures.Make("Fire", type1: DamageType.Fire);
         double score = new StatusMoveEvaluator().Score(
-            StatusMove(StatusCondition.Burn),
+            Ember(10),
             Context(TestCreatures.Make("A"), fireFoe)
+        );
+        Assert.True(score < 0);
+    }
+
+    [Fact]
+    public void Status_ValuesGlareOnANormalTypeBecauseThePureMoveLands()
+    {
+        var glare = new PokemonAttack(
+            new Attack("Glare", "Glare")
+            {
+                BaseDamage = 0,
+                StatusEffect = StatusCondition.Paralysis,
+                DamageType = DamageType.Normal,
+            }
+        );
+        double score = new StatusMoveEvaluator().Score(
+            glare,
+            Context(TestCreatures.Make("A"), TestCreatures.Make("Normal", type1: DamageType.Normal))
+        );
+        Assert.True(score > 0);
+    }
+
+    [Fact]
+    public void Status_WastedWhenAPureMoveCannotAffectThePoisonTypeFoe()
+    {
+        double score = new StatusMoveEvaluator().Score(
+            new PokemonAttack(
+                new Attack("Toxic", "Toxic")
+                {
+                    BaseDamage = 0,
+                    StatusEffect = StatusCondition.BadPoison,
+                }
+            ),
+            Context(TestCreatures.Make("A"), TestCreatures.Make("P", type1: DamageType.Poison))
         );
         Assert.True(score < 0);
     }

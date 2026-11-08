@@ -389,6 +389,201 @@ public class RollOrderContractTests(MovesFixture moves) : Gen1MoveContract(moves
         Assert.Equal([Crit, DamageRoll, Accuracy], rng.Draws);
     }
 
+    [Theory]
+    [InlineData("sleep-powder", StatusCondition.Sleep, DamageType.Water)]
+    [InlineData("sleep-powder", StatusCondition.Burn, DamageType.Water)]
+    [InlineData("stun-spore", StatusCondition.Burn, DamageType.Water)]
+    [InlineData("toxic", StatusCondition.None, DamageType.Poison)]
+    public async Task ATargetTheMoveCannotAffectDrawsNoAccuracyRoll(
+        string move,
+        StatusCondition status,
+        DamageType targetType
+    )
+    {
+        var defender = TestCreatures.Make("D", type1: targetType, hp: 500);
+        defender.Battle.Status = status;
+
+        var (_, draws) = await UseGen1(Move(move), new LowestRollSource(), defender: defender);
+
+        Assert.DoesNotContain(Accuracy, draws);
+    }
+
+    [Fact]
+    public async Task AStatusedTargetDrawsNoAccuracyRoll()
+    {
+        var defender = TestCreatures.Make("D", type1: DamageType.Water, hp: 500);
+        defender.Battle.Status = StatusCondition.Burn;
+
+        var (result, draws) = await UseGen1(
+            Move("toxic"),
+            new LowestRollSource(),
+            defender: defender
+        );
+
+        Assert.DoesNotContain(Accuracy, draws);
+        Assert.True(result.Has<MoveDidntAffect>());
+    }
+
+    [Fact]
+    public async Task ThunderWaveOnAParalyzedGroundTypeSaysDidntAffectWithNoRoll()
+    {
+        var defender = TestCreatures.Make("D", type1: DamageType.Ground, hp: 500);
+        defender.Battle.Status = StatusCondition.Paralysis;
+
+        var (result, draws) = await UseGen1(
+            Move("thunder-wave"),
+            new LowestRollSource(),
+            defender: defender
+        );
+
+        Assert.DoesNotContain(Accuracy, draws);
+        Assert.True(result.Has<MoveDidntAffect>());
+        Assert.False(result.Has<MoveHadNoEffect>());
+    }
+
+    [Fact]
+    public async Task ThunderWaveOnAnUnstatusedGroundTypeSaysDoesntAffect()
+    {
+        var defender = TestCreatures.Make("D", type1: DamageType.Ground, hp: 500);
+
+        var (result, draws) = await UseGen1(
+            Move("thunder-wave"),
+            new LowestRollSource(),
+            defender: defender
+        );
+
+        Assert.DoesNotContain(Accuracy, draws);
+        Assert.True(result.Has<MoveHadNoEffect>());
+    }
+
+    [Theory]
+    [InlineData("growl")]
+    [InlineData("confuse-ray")]
+    public async Task AMoveASubstituteStopsDrawsNoAccuracyRoll(string move)
+    {
+        var defender = TestCreatures.Make("D", type1: DamageType.Water, hp: 500);
+        defender.Battle.SubstituteHp = 51;
+
+        var (result, draws) = await UseGen1(Move(move), new LowestRollSource(), defender: defender);
+
+        Assert.DoesNotContain(Accuracy, draws);
+        Assert.True(result.Has<MoveFailed>());
+    }
+
+    [Fact]
+    public async Task MistStopsAStatDownMoveWithNoAccuracyRoll()
+    {
+        var defender = TestCreatures.Make("D", type1: DamageType.Water, hp: 500);
+        defender.Battle.HasMist = true;
+
+        var (result, draws) = await UseGen1(
+            Move("growl"),
+            new LowestRollSource(),
+            defender: defender
+        );
+
+        Assert.DoesNotContain(Accuracy, draws);
+        Assert.True(result.Has<MoveFailed>());
+    }
+
+    private sealed class HitTestFirstRules(IRandomSource rng) : DelegatingBattleRules(rng)
+    {
+        public override bool PrimaryEffectChecksPrecedeHitTest => false;
+    }
+
+    private static (MoveScenario Scenario, RecordingRandomSource Rng) HitTestFirst(
+        Creature defender
+    )
+    {
+        var rng = new RecordingRandomSource(new LowestRollSource());
+        var scenario = new MoveScenario()
+            .Rules(new HitTestFirstRules(rng))
+            .Rng(rng)
+            .Defender(defender);
+        return (scenario, rng);
+    }
+
+    [Fact]
+    public async Task WithTheHitTestFirstAStatusedTargetStillGetsItsLine()
+    {
+        var defender = TestCreatures.Make("D", type1: DamageType.Water, hp: 500);
+        defender.Battle.Status = StatusCondition.Burn;
+        var (scenario, rng) = HitTestFirst(defender);
+
+        var result = await scenario.Use(Move("toxic"));
+
+        Assert.Contains(Accuracy, rng.Draws);
+        Assert.True(result.Has<MoveDidntAffect>());
+        Assert.Equal(StatusCondition.Burn, result.Defender.Battle.Status);
+    }
+
+    [Fact]
+    public async Task WithTheHitTestFirstMistStillStopsAPrimaryDrop()
+    {
+        var defender = TestCreatures.Make("D", type1: DamageType.Water, hp: 500);
+        defender.Battle.HasMist = true;
+        var (scenario, rng) = HitTestFirst(defender);
+
+        var result = await scenario.Use(Move("growl"));
+
+        Assert.Contains(Accuracy, rng.Draws);
+        Assert.True(result.Has<MoveFailed>());
+        Assert.Equal(0, result.Defender.Battle.Stages.Attack);
+    }
+
+    [Theory]
+    [InlineData("toxic", StatusCondition.None)]
+    [InlineData("thunder-wave", StatusCondition.Paralysis)]
+    public async Task WithTheHitTestFirstTheSubstituteRuleStillDecides(
+        string move,
+        StatusCondition expected
+    )
+    {
+        var defender = TestCreatures.Make("D", type1: DamageType.Water, hp: 500);
+        defender.Battle.SubstituteHp = 51;
+        var (scenario, _) = HitTestFirst(defender);
+
+        var result = await scenario.Use(Move(move));
+
+        Assert.Equal(expected, result.Defender.Battle.Status);
+    }
+
+    private sealed class MissedLineRules : DelegatingBattleRules
+    {
+        public override int GetHitThreshold(int acc, int accStage, int evaStage) => 0;
+
+        public override MoveFailureAnnouncement PrimaryEffectFailureAnnouncement =>
+            MoveFailureAnnouncement.Missed;
+    }
+
+    [Fact]
+    public async Task TheRulesPickTheLineForAMissedStatDownMove()
+    {
+        var result = await new MoveScenario()
+            .Rules(new MissedLineRules())
+            .Defender(TestCreatures.Make("D", type1: DamageType.Water, hp: 500))
+            .Use(Move("growl"));
+
+        Assert.True(result.Has<MoveMissed>());
+        Assert.False(result.Has<MoveFailed>());
+    }
+
+    [Fact]
+    public async Task TheRulesCanPutTheHitTestFirst()
+    {
+        var rng = new RecordingRandomSource(new LowestRollSource());
+        var defender = TestCreatures.Make("D", type1: DamageType.Water, hp: 500);
+        defender.Battle.Status = StatusCondition.Burn;
+
+        await new MoveScenario()
+            .Rules(new HitTestFirstRules(rng))
+            .Rng(rng)
+            .Defender(defender)
+            .Use(Move("toxic"));
+
+        Assert.Contains(Accuracy, rng.Draws);
+    }
+
     [Fact]
     public async Task AFireMoveThatFaintsAFrozenTargetDoesNotThawIt()
     {

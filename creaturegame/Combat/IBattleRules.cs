@@ -88,6 +88,16 @@ public enum SubstituteFailureAnnouncement
     Failed,
 }
 
+/// <summary>The line printed when Mist stops a stat drop. See GENERATION_SEAMS.md §2.</summary>
+public enum MistBlockAnnouncement
+{
+    /// <summary>"But it failed!" (<see cref="MoveFailed"/>). Gen 1.</summary>
+    Failed,
+
+    /// <summary>"&lt;TARGET&gt; is protected by the mist!" (<see cref="StatDropBlocked"/>).</summary>
+    ProtectedByMist,
+}
+
 /// <summary>The wording of the crit, one-hit KO and effectiveness lines. See GENERATION_SEAMS.md §2.</summary>
 public enum HitLineWording
 {
@@ -270,6 +280,27 @@ public interface IBattleRules
 
     /// <summary>Whether a multi-hit move prints its effectiveness line on every strike or only the first. See GENERATION_SEAMS.md §2.</summary>
     bool EffectivenessLineRepeatsOnEveryStrike { get; }
+
+    /// <summary>Whether a damageless move's Substitute, status and Mist checks run before its accuracy roll. See GENERATION_SEAMS.md §2.</summary>
+    bool PrimaryEffectChecksPrecedeHitTest { get; }
+
+    /// <summary>Whether a pure status move can affect this target, by type. See GENERATION_SEAMS.md §2.</summary>
+    bool PureStatusMoveCanAffect(Creature target, StatusCondition status);
+
+    /// <summary>Whether a Substitute stops this pure status move. See GENERATION_SEAMS.md §2.</summary>
+    bool SubstituteStopsPureStatusMove(Attack move);
+
+    /// <summary>Whether Mist stops a primary or secondary stat drop. See GENERATION_SEAMS.md §2.</summary>
+    bool MistStopsStatDrop(bool isSecondary);
+
+    /// <summary>The line printed when Mist stops a stat drop. See GENERATION_SEAMS.md §2.</summary>
+    MistBlockAnnouncement MistBlockAnnouncement { get; }
+
+    /// <summary>Whether a Substitute stops a hit from thawing the frozen target behind it. See GENERATION_SEAMS.md §2.</summary>
+    bool SubstituteStopsThaw { get; }
+
+    /// <summary>The line a stat-down or confusion move prints when a Substitute stops it or it misses. See GENERATION_SEAMS.md §2.</summary>
+    MoveFailureAnnouncement PrimaryEffectFailureAnnouncement { get; }
 
     /// <summary>The wording of the crit, one-hit KO and effectiveness lines. See GENERATION_SEAMS.md §2.</summary>
     HitLineWording HitLineWording { get; }

@@ -8,6 +8,60 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §3.1 Status and stat-down moves check before the hit test ✅ DONE (2026-11-08)
+
+M; merged 2026-11-08 from four entries: Mist + thaw (§7.6 V10), Substitute stops a primary stat-down before accuracy,
+Substitute lets sleep/paralysis through (`requirements-review` 2026-10-28 and 2026-11-06, V15), and status-move checks
+ahead of the hit test. Design ruled 2026-11-08.
+
+**Problem.** For a move that deals no damage, Gen 1 runs its blocked and already-statused checks before the accuracy
+roll, so a blocked or statused target draws no accuracy roll. Sleep and paralysis moves pass a Substitute; a poison
+move on one, a statused target or a Poison-type prints "It didn't affect"; Thunder Wave on a statused Ground-type
+prints "didn't affect", and on an unstatused one "doesn't affect". Confusion and stat-down moves blocked by a
+Substitute print "But it failed!". Mist stops only a primary stat-down move, after the Substitute check and past X
+Accuracy, and leaves a secondary drop alone. A Fire hit doesn't thaw a frozen target behind a Substitute. Ours rolled
+accuracy first and applied the Mist, Substitute and same-type checks later or with the wrong scope.
+
+**Rulings (Mo, 2026-11-08).** Merge into one item. A blocked or missed stat-down or confusion move prints "But it
+failed!". Sleep on a recharging foe gets its own entry ("Sleep moves always land on a recharging foe", still open).
+Glare paralyzes a Normal-type, fixed here (`paralyze.asm` has no same-type check); the secondary same-type rule stays
+open as "Same-type secondary status immunity".
+
+**Outcome.** A pre-hit step in `AttackAction` (`StatusMoveStopsBeforeHitTest`, `StatDownStopsBeforeHitTest`), running
+after the immunity is computed and before it is announced; the stat-down half follows the AI's 25% roll. The later
+checks stay for secondary effects and for rules where the step is off. Seven `IBattleRules` members:
+`PrimaryEffectChecksPrecedeHitTest` (Gen 1 true, Gen 2 false: `checkhit` comes first in every script),
+`PureStatusMoveCanAffect` (Gen 1 only the poison check; the same-type rule in `CanReceiveStatus` stays for
+secondaries), `SubstituteStopsPureStatusMove(move)` (Gen 1 not for sleep or paralysis; Gen 2 all),
+`MistStopsStatDrop(isSecondary)` (Gen 1 primary only; Gen 2 both), `MistBlockAnnouncement` (Gen 1 "But it failed!";
+Gen 2 `StatDropBlocked`, "protected by the mist"), `SubstituteStopsThaw` (both true) and
+`PrimaryEffectFailureAnnouncement` (Gen 1 "But it failed!"). `StatDropBlocked` stays as the alternate Mist line.
+`StatusMoveEvaluator` follows the same pure-versus-secondary split as the engine. Runtime only; no data change.
+
+**Gen 1 source.** pokered `engine/battle/effects.asm` `SleepEffect`, `PoisonEffect`, `FreezeBurnParalyzeEffect`,
+`StatModifierDownEffect`, `MoveMissed`, `ConfusionEffect`, `ConfusionEffectFailed`, `ConditionalPrintButItFailed`,
+`CheckTargetSubstitute`; `engine/battle/move_effects/paralyze.asm`; `engine/battle/core.asm:5266-5307` (Mist inside
+`MoveHitTest`, before X Accuracy). pokecrystal `data/moves/effects.asm` `DoSleep`, `DoPoison`, `DoParalyze`,
+`DoConfuse`, `AttackDown`; `engine/battle/effect_commands.asm` `BattleCommand_SleepTarget`, `BattleCommand_Poison`,
+`BattleCommand_Paralyze`, `BattleCommand_Confuse`, `BattleCommand_StatDown`, `CheckMist`, `BattleCommand_BurnTarget`.
+
+**Tests.** Thunder Wave lands through a Substitute but Toxic doesn't; Thunder Wave on a paralyzed Ground-type says
+"didn't affect" with no accuracy roll; Mist doesn't stop Aurora Beam's drop; a statused target draws no accuracy roll.
+Eight existing tests changed, each pinning behaviour Mo ruled on (`ShieldsTheUserFromTheFoesStatus`, the Mist test, the
+X Accuracy Mist test among them); `TheRoll_PrecedesTheSubstituteCheck` now proves the order by counting draws.
+
+**Reviews.**
+- `requirements-review`: confirmed every family against pokered, no code discrepancy; doc findings fixed; added
+  roll-count cases for sleep and paralysis on a statused target and Toxic on a Poison-type.
+- `pr-review` (CHANGES-REQUESTED, all taken on Mo's ruling): the AI evaluator carried the old type rule; gate-off tests
+  added; the two new Substitute checks now ask the seam; removed an unused `immune` parameter.
+- `requirements-review` and `pr-review` were not re-run after their fixes, by Mo's process.
+
+**Left as is.** Advisory: with the step off, a Substitute-blocked poison, confusion or stat-down move ends silently (a
+Gen 2 sprint decision). E2E did not run.
+
+---
+
 ## §3.1 Crit, effectiveness and one-hit KO lines follow Gen 1 ✅ DONE (2026-11-08)
 
 M; found 2026-11-08 (filed as "A hit on a Substitute loses its crit and effectiveness lines", widened by Mo's rulings);

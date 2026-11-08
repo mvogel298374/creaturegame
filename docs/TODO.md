@@ -52,9 +52,9 @@ None open.
 
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
-| **Pre-hit-test cluster** — Mist + thaw; Substitute stops a stat-down move before accuracy; Substitute lets sleep/paralysis through; status-move checks ahead of the hit test (§3.1) | M | ✗ 2, 3 each; 1, 5, 6, 7 drafted for Mist + thaw and sleep/paralysis, 6 for the status-move checks, none for the stat-down entry | One design pass: all four move logic ahead of the hit test. |
+| **Sleep moves always land on a recharging foe** (§3.1) | S | ✗ 2, 3; the rest drafted | Found 2026-11-08. Tied to the recharge redesign in the `CanAct` entry. |
 | **Pre-move-check cluster** — `CanAct` status order; a replacement frees the trapped foe; Disable countdown (§3.1) | M | ✗ 2, 3 each | One design pass: all three live in the pre-move check. |
-| **Fly and Dig don't dodge anything** (§3.1) | M | ✗ 2, 3; the rest drafted | Found 2026-11-03. Central hit check; pairs with the pre-hit-test cluster. |
+| **Fly and Dig don't dodge anything** (§3.1) | M | ✗ 2, 3; the rest drafted | Found 2026-11-03. Central hit check; the pre-hit step is in `AttackAction`'s `StatusMoveStopsBeforeHitTest`. |
 | **Hyper Beam recharges after breaking a Substitute** (§3.1) | S | ✗ 2, 3; the rest drafted | Found 2026-11-03. Central `AttackAction`. |
 | **The player chooses what Mimic copies** (§3.1) | M | ✗ 2, 3; the rest drafted | Found 2026-11-03. Needs an input prompt, so a design pass. |
 
@@ -169,50 +169,14 @@ data/engine item usually also means updating the test that pins the wrong value.
   **DoR (V16):** ✗ not Ready — gaps **2** (touches `Battle`: `opus-engineer` plus both gates, or fold into the
   `CanAct` design pass above) and **3**. *Gap 3, drafted:* gen-invariant if Gen 2 also frees the bind on send-out;
   verify at pokecrystal before calling it.
-- **Gen 1 Mist, thaw and Leech Seed fidelity (from §7.6 V10) — M, ✗ not Ready.** *Intent:* Mist only blocks
-  primary stat-down moves, as a miss before the accuracy roll; a Substitute stops a Fire thaw; the Leech Seed drain
-  is multiplied by the Toxic counter. *Gaps:* touches `AttackAction`/`Battle` (central, `opus-engineer` + both
-  gates); Leech Seed overlaps the end-of-turn residual `/plan` (§4.2); the `StatDropBlocked` wire event would lose
-  its Gen 1 use (TS client leg). *Gen 1 source:* Mist `core.asm:5266-5307`; Leech Seed `core.asm:546-591`; thaw
-  `effects.asm:194-204` (full cites in the V10 archive record).
-  **DoR (V16):** ✗ not Ready — gaps **1, 2, 3, 5, 6, 7**. *Drafted:* split in two.
-  - **Mist + thaw**, no dependency. Acceptance: Mist turns a primary stat-down move into a miss before the accuracy
-    roll and leaves a secondary stat drop alone; a Fire hit on a substituted frozen foe doesn't thaw it. Quirk: Mist
-    doesn't stop Aurora Beam's secondary drop.
-  - **Leech Seed × Toxic counter**, after §4.2. Quirk: the drain grows with the Toxic counter.
-
-  Both are `IBattleRules` members, runtime only, `opus-engineer` plus both gates.
-- **Gen 1 Substitute stops a primary stat-down move before accuracy (from requirements-review 2026-10-28) — S, ✗ not
-  Ready.** *Intent:* in Gen 1 a Substitute stops a primary stat-down move (Growl into a substituted target) with
-  "But it failed!" before the accuracy roll (pokered `effects.asm` `StatModifierDownEffect`: `CheckTargetSubstitute`
-  precedes `MoveHitTest`). Ours rolls accuracy first and then blocks silently in `TryApplyStatEffect`, for both
-  sides: different text and an extra RNG draw. *Gaps:* acceptance, seam (whether the order differs in Gen 2), the
-  primary source re-checked for the stat-up and status moves, and the test list. Sits next to "Mist + thaw", which
-  also moves logic ahead of the hit test; plan them together.
-- **Substitute blocks sleep/paralysis status moves; Gen 1 lets them through (source-confirmed 2026-10-17, §7.6
-  V15) — S–M, ✗ not Ready.** pokered (master): `SleepEffect` (`engine/battle/effects.asm:26-77`) and
-  `ParalyzeEffect_` (`engine/battle/move_effects/paralyze.asm`, reached from `effects.asm:1165`) never call
-  `CheckTargetSubstitute` (`effects.asm:1436`). `PoisonEffect` (`:87`), `FreezeBurnParalyzeEffect` (`:197`),
-  `StatModifierDownEffect` (`:556`), `FlinchSideEffect` (`:972`) and `ConfusionEffect` (`:1121`) do, so
-  Supersonic/Confuse Ray and stat-lowering moves stay blocked, as ours already are. `MoveHitTest`'s substitute
-  branch (`engine/battle/core.asm:5251-5258`) was meant only for drain/Dream Eater and is bugged so it never fires.
-  Ours blocks every status condition behind a substitute (`AttackAction.cs:676-678`), and
-  `SubstituteContractTests.ShieldsTheUserFromTheFoesStatus` pins Thunder Wave as blocked. *Gaps:* touches
-  `AttackAction` (central) and needs a seam (Gen 2+ blocks all status moves), e.g. an `IBattleRules` member saying
-  which pure status moves a substitute stops; the pinned test flips. *Acceptance:* in a full battle, Sleep Powder,
-  Hypnosis, Thunder Wave, Stun Spore and Glare land on a substituted foe; Toxic/Poison Powder, Confuse Ray and a
-  damaging move's secondary status stay blocked; a Gen 2-style profile blocks all of them.
-  **DoR (V16):** ✗ not Ready — gaps **2** (central `AttackAction`: `opus-engineer` plus both gates) and **3** (seam
-  member to design), plus **5, 6, 7** (drafted). *Drafted:* runtime only; quirk "Thunder Wave lands through a substitute but Toxic
-  doesn't"; dependencies none.
-- **Status-move checks ahead of the hit test (found 2026-11-06 by `requirements-review` of "It didn't affect";
-  source-confirmed) — S, ✗ not Ready; part of the pre-hit-test cluster.** pokered's Sleep, Poison and Paralyze effects
-  test "already statused" (and Poison-type for poison) before `MoveHitTest` and before Thunder Wave's Ground check
-  (`effects.asm:42-51`, `:89-98`; `paralyze.asm` `.next`). Ours checks type immunity first and rolls accuracy before
-  the status check, so (a) Thunder Wave on a statused Ground-type prints "doesn't affect" where pokered prints "didn't
-  affect", and (b) a statused or Poison-type foe draws an accuracy roll pokered never makes (same text, different RNG
-  draws). *Gaps:* **2** (central `AttackAction` ordering), **3** (likely one ordering member, planned with the cluster),
-  **6** (drafted: Thunder Wave on a paralyzed Ground-type says "didn't affect" and draws no accuracy roll).
+- **Leech Seed × Toxic counter (from §7.6 V10) — S, ✗ not Ready.** *Intent:* the Leech Seed drain is multiplied by the
+  Toxic counter (`core.asm:546-591`). *Gaps:* overlaps the end-of-turn residual `/plan` (§4.2); sequence after it.
+  *Drafted:* an `IBattleRules` member, runtime only; quirk: the drain grows with the Toxic counter.
+- **Sleep moves always land on a recharging foe (found 2026-11-08) — S, ✗ not Ready.** *Intent:* in Gen 1 a sleep move on
+  a foe that must recharge from Hyper Beam clears the recharge and skips the status and accuracy checks, so it always
+  lands, even over a status (`effects.asm` `SleepEffect`, `NEEDS_TO_RECHARGE`). **DoR:** ✗ gaps **2** (tied to the
+  recharge redesign in the `CanAct` entry) and **3** (Gen 2 unread). *Drafted:* **5** runtime only; **6** a sleep move
+  on a recharging target draws no accuracy roll; **7** sequence with the `CanAct` entry.
 - **Gen 1 Disable countdown: the lock can end early compared with pokered (source-confirmed 2026-10-17, §7.6 V15) —
   M, ✗ not Ready.** pokered decrements the counter in the disabled mon's own pre-move check
   (`engine/battle/core.asm` `CheckPlayerStatusConditions:3328` → `.AnyMoveDisabledCheck:3394`; the enemy mirror is
@@ -241,10 +205,7 @@ data/engine item usually also means updating the test that pins the wrong value.
   freeze, burn or paralysis whenever the move's type equals either target type ("an ice move can't freeze an
   ice-type, body slam can't paralyze a normal-type"). `Gen1BattleRules.CanReceiveStatus` models only Poison, burn vs
   Fire and Normal→Normal paralysis, so Ice Beam can freeze an Ice-type and Thunderbolt/Thunder can paralyze an
-  Electric-type. `GENERATION_SEAMS.md` §2 "Status by type" records the gap. The rule also over-applies to pure status
-  moves: `CanReceiveStatus` blocks Glare (Normal) on a Normal-type, so it prints "It didn't affect" and never paralyzes,
-  but pokered's `ParalyzeEffect_` (`paralyze.asm`) checks only Electric vs Ground, so Glare paralyzes a Normal-type
-  (found 2026-11-06 by `requirements-review` of "It didn't affect"; unpinned).
+  Electric-type. `GENERATION_SEAMS.md` §2 "Status by type" records the gap.
   **DoR:** ✗ — gaps **4** (take the pokered cite ourselves, and check whether primary status moves and Tri Attack-style
   cases share the rule), **2** (does the seam signature change: the rule keys on the move's type vs the target's, which
   `CanReceiveStatus(target, status, moveType)` already receives), **6** (drafted: a full battle where a forced-hit
@@ -289,7 +250,7 @@ data/engine item usually also means updating the test that pins the wrong value.
   first (`:5247-5250`), and Bide's release, which skips the test (`:3528`), get through. Ours sets `IsTwoTurnCharging`, but
   nothing in the hit check reads it, so a Pokémon using Fly can be hit on the charge turn. No test covers it. An older
   note (`TODO_ARCHIVE.md`, "stayed in §3.1") names this gap, but no entry survived here.
-  **DoR:** ✗ gaps **2** (central `AttackAction`; design with the pre-hit-test cluster) and **3** (a seam member, and
+  **DoR:** ✗ gaps **2** (central `AttackAction`; design around the pre-hit step) and **3** (a seam member, and
   Fly/Dig need telling apart from the other charge moves, which don't dodge). *Drafted:*
   - **Acceptance:** an attack against a Fly or Dig charge turn misses; Swift and Bide's release hit; Solar Beam's
     charge turn stays hittable.
@@ -297,7 +258,7 @@ data/engine item usually also means updating the test that pins the wrong value.
     `StatModifierDownEffect` (`effects.asm:579`).
   - **Data vs runtime:** runtime, and possibly an importer flag.
   - **Quirk:** Swift and Bide get through.
-  - **Dependencies:** pairs with the pre-hit-test cluster.
+  - **Dependencies:** none; the pre-hit step is in place.
 - **Hyper Beam recharges after breaking a Substitute (found 2026-11-03, move description audit) — S, ✗ not Ready.**
   pokered zeroes the attacker's move effect when a Substitute breaks (`core.asm:4879-4895`), so no recharge follows. Ours
   checks only that damage landed and the target lives (`AttackAction.cs:247-253`). Read from the code; not yet reproduced.
@@ -433,7 +394,7 @@ channel of a broader acquisition layer.
     re-pinned to a path Gen 1 can produce.
   - **Data vs runtime:** runtime only.
   - **Quirk:** the faster creature's own poison tick lands before the slower one acts.
-  - **Dependencies:** none. The Leech Seed half of §3.1 "Mist, thaw and Leech Seed" waits on this.
+  - **Dependencies:** none. §3.1 "Leech Seed × Toxic counter" waits on this.
   - **Also covers (ruling 2026-11-06):** when the slower side's Roar ends a Gen 1 battle, the faster side's own
     residual has already ticked (`core.asm:426`, `:449`); with the flee ending the turn at once, ours never ticks it.
     HP carries between battles, so the per-creature residual order fixes this too. Gen 1 consequences: the faster

@@ -43,10 +43,9 @@ public class SubstituteInteractionTests(MovesFixture moves) : Gen1MoveContract(m
         Assert.Equal("Player", result.Winner);
     }
 
-    // Gen 1: a Substitute shields the user from the opponent's status moves — Thunder Wave can't
-    // paralyse through a standing decoy.
+    // Gen 1: Thunder Wave never checks for a Substitute, so it paralyses through a standing decoy.
     [Fact]
-    public async Task SubstituteBlocksOpponentParalysis()
+    public async Task ThunderWaveParalysesThroughASubstitute()
     {
         var enemy = Mon("Enemy", hp: 50, attack: 10, speed: 200, "substitute", "splash");
         var player = Mon("Player", hp: 999, attack: 200, speed: 1, "thunder-wave", "tackle");
@@ -58,14 +57,13 @@ public class SubstituteInteractionTests(MovesFixture moves) : Gen1MoveContract(m
             .PlayerUses("thunder-wave", "tackle")
             .RunAsync();
 
-        Assert.DoesNotContain(
+        Assert.Contains(
             result.All<StatusApplied>(),
             s => s.TargetName == "Enemy" && s.Status == StatusCondition.Paralysis
         );
-        Assert.NotEqual(StatusCondition.Paralysis, enemy.Battle.Status);
     }
 
-    // English RBY quirk: unlike status / stat-drops / confusion, Leech Seed lands THROUGH a Substitute
+    // English RBY quirk: unlike poison / stat-drops / confusion, Leech Seed lands THROUGH a Substitute
     // in the localized Gen 1 games (it's blocked only in the Japanese games and Stadium; Gen 2+ blocks
     // it everywhere). This engine targets English RBY, so the seed takes hold and drains. Pins the
     // behaviour so a future "make Leech Seed consistent with the other sub-shielded effects" change

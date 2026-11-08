@@ -195,8 +195,12 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
   (`core.asm:3145`); Sleep, Poison and Paralyze moves roll accuracy inside their effect and print `_DidntAffectText`
   when it fails (`effects.asm:53-57`, `:108-113`).
 - **The status check comes first.** Those effects test "already statused" (and Poison-type) before the hit test and
-  before Thunder Wave's Ground check, so Thunder Wave on a paralyzed Ground-type says "didn't affect". Our engine
-  doesn't follow that order yet (`docs/TODO.md` §3.1, *Status-move checks ahead of the hit test*).
+  before Thunder Wave's Ground check, so Thunder Wave on a paralyzed Ground-type says "didn't affect" and a statused
+  target draws no accuracy roll.
+- **Sleep and paralysis moves land through a Substitute (Gen 1).** Poison moves print "didn't affect" on one; confusion
+  and stat-down moves print "But it failed!", also on a miss. Gen 2's Substitute stops them all, and its accuracy check
+  comes first. Gen 1's Mist stops only a primary stat-down move, before the accuracy roll and past X Accuracy, printing
+  "But it failed!"; Gen 2's also stops secondary drops, with its own line. Seam: `GENERATION_SEAMS.md` §2, Pre-hit checks.
 
 #### Roar / Whirlwind
 - **A flee ends the battle on the spot.** `MainInBattleLoop` returns as soon as `wEscapedFromBattle` is set, after

@@ -141,6 +141,10 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - Substitute prints "It created a SUBSTITUTE!" on setup. Every hit on one prints "The SUBSTITUTE took damage for
   <target>!", and a breaking hit then prints "<target>'s SUBSTITUTE broke!". With one already up it prints "<user> has
   a SUBSTITUTE!", and without the HP to pay for it "Too weak to make a SUBSTITUTE!".
+- Sleep and paralysis moves land through a Substitute. A poison move on one prints "It didn't affect", and a confusion or
+  stat-down move prints "But it failed!", as it does on a miss. A statused target, or a poison, confusion or stat-down
+  move stopped by a Substitute, draws no accuracy roll. A Fire hit doesn't thaw a frozen target behind a Substitute.
+- Mist stops only a stat-down move, printing "But it failed!"; a damaging move's secondary drop still lands.
 - A hit on a Substitute still prints "Critical hit!" and its effectiveness line after the Substitute lines. A multi-hit
   move prints "Critical hit!" once, on its first strike, and its effectiveness on every strike. A landed one-hit KO
   move prints "One-hit KO!" and then its effectiveness.
@@ -248,7 +252,7 @@ the linked design doc instead — pull it there and leave only the pointer here.
   quarter as likely.
 - **X Accuracy** makes the user's moves skip the accuracy check until it switches out (they always hit, with no
   1/256 miss) — it is not a +1 accuracy stage, and the bag text says so. It does not rescue a failed one-hit-KO speed
-  check, and Mist still blocks stat drops. Haze, and switching the user out, clear it. A second use is still
+  check, and Mist still stops stat-down moves. Haze, and switching the user out, clear it. A second use is still
   consumed. Using it shows only the normal "used" line; no indicator stays on screen.
 - **Dire Hit and Guard Spec. show only the "used" line (Gen 1)** — no "getting pumped" / Mist line, though the effect
   applies (the moves Focus Energy and Mist still show theirs).

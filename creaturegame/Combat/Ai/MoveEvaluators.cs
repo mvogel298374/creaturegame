@@ -142,7 +142,11 @@ public sealed class StatusMoveEvaluator : IMoveEvaluator
         if (foe.Battle.Status != StatusCondition.None) // only one major status at a time in Gen 1
             return RedundantPenalty;
         // Through the seam, so the AI judges exactly what the engine will do.
-        if (!context.Rules.CanReceiveStatus(foe, status, move.Base.DamageType))
+        bool canAffect =
+            move.Base.BaseDamage == 0
+                ? context.Rules.PureStatusMoveCanAffect(foe, status)
+                : context.Rules.CanReceiveStatus(foe, status, move.Base.DamageType);
+        if (!canAffect)
             return RedundantPenalty;
         if (IsTypeImmunePureStatusMove(move.Base, context))
             return RedundantPenalty;

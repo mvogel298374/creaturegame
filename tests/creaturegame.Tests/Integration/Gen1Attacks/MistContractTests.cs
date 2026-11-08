@@ -1,4 +1,6 @@
+using creaturegame.Attacks;
 using creaturegame.Combat;
+using creaturegame.Creatures;
 using creaturegame.Tests.TestSupport;
 
 namespace creaturegame.Tests.Integration.Gen1Attacks;
@@ -38,6 +40,51 @@ public class MistContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 
         Assert.Equal(0, result.Defender.Battle.Stages.Attack); // not lowered
         Assert.False(result.Has<StatStageChanged>());
+        Assert.True(result.Has<MoveFailed>());
+        Assert.False(result.Has<StatDropBlocked>());
+    }
+
+    [Fact]
+    public async Task MistDoesNotStopASecondaryStatDrop()
+    {
+        var defender = TestCreatures.Make("Defender", hp: 500);
+        defender.Battle.HasMist = true;
+
+        var result = await new MoveScenario()
+            .Rules(ForceSecondaryRules.Instance)
+            .Defender(defender)
+            .Use(Move("aurora-beam"));
+
+        Assert.Equal(-1, result.Defender.Battle.Stages.Attack);
+        Assert.False(result.Has<MoveFailed>());
+    }
+
+    private sealed class MistStopsEverythingRules : DelegatingBattleRules
+    {
+        public override int GetHitThreshold(int acc, int accStage, int evaStage) => 256;
+
+        public override double GetCritChance(Creature a, Attack m) => 0.0;
+
+        public override int GetSecondaryEffectChance(Attack m, SecondaryEffectKind e) => 100;
+
+        public override bool MistStopsStatDrop(bool isSecondary) => true;
+
+        public override MistBlockAnnouncement MistBlockAnnouncement =>
+            MistBlockAnnouncement.ProtectedByMist;
+    }
+
+    [Fact]
+    public async Task TheRulesCanMakeMistStopSecondaryDropsWithItsOwnLine()
+    {
+        var defender = TestCreatures.Make("Defender", hp: 500);
+        defender.Battle.HasMist = true;
+
+        var result = await new MoveScenario()
+            .Rules(new MistStopsEverythingRules())
+            .Defender(defender)
+            .Use(Move("aurora-beam"));
+
+        Assert.Equal(0, result.Defender.Battle.Stages.Attack);
         Assert.Contains(result.Events, e => e is StatDropBlocked s && s.CreatureName == "Defender");
     }
 

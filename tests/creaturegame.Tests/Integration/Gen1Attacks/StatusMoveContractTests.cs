@@ -223,19 +223,21 @@ public class StatusMoveContractTests(MovesFixture moves) : Gen1MoveContract(move
             .Defender(TestCreatures.Make("D", type1: DamageType.Water, hp: 500))
             .Use(Move(moveName));
 
-        Assert.True(result.Has<MoveMissed>());
+        Assert.True(result.Has<MoveFailed>());
+        Assert.False(result.Has<MoveMissed>());
         Assert.Equal(0, result.Defender.Battle.ConfusedTurns);
     }
 
     [Fact]
-    public async Task AMissedStatDownMoveStillSaysMissed()
+    public async Task AMissedStatDownMoveSaysButItFailed()
     {
         var result = await new MoveScenario()
             .Rules(NeverHitRules.Instance)
             .Defender(TestCreatures.Make("D", type1: DamageType.Water, hp: 500))
             .Use(Move("growl"));
 
-        Assert.True(result.Has<MoveMissed>());
+        Assert.True(result.Has<MoveFailed>());
+        Assert.False(result.Has<MoveMissed>());
         Assert.False(result.Has<MoveDidntAffect>());
     }
 

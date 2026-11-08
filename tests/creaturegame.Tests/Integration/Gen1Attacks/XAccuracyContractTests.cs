@@ -131,7 +131,7 @@ public class XAccuracyContractTests(MovesFixture moves) : Gen1MoveContract(moves
             .Use(Move("growl"));
 
         Assert.False(result.Has<MoveMissed>()); // the roll that would miss was skipped...
-        Assert.True(result.Has<StatDropBlocked>()); // ...and Mist still stopped the drop
+        Assert.True(result.Has<MoveFailed>()); // ...and Mist still stopped the drop
         Assert.Equal(0, result.Defender.Battle.Stages.Attack);
     }
 

@@ -463,7 +463,7 @@ Each entry: **Decision · Why · Where it lives.**
 - **Status value (§7.6 V11, user rulings 2026-10-13):** Sleep/Freeze 0.60, Paralysis 0.50, Burn 0.40, Poison
   0.35, multiplied **linearly** by the move's status chance from `IBattleRules.GetSecondaryEffectChance` (a pure
   status move counts as 100%, so a 10% burn is worth 0.04). A small penalty (−0.30) applies when the foe already has a
-  major status, when `CanReceiveStatus` refuses it, or when the engine would block a pure status move by type
+  major status, when `PureStatusMoveCanAffect` (a pure move) or `CanReceiveStatus` (a secondary) refuses it, or when the engine would block a pure status move by type
   (`PureStatusMoveChecksTypeImmunity` plus a 0× chart result, e.g. Thunder Wave vs Ground). That last case is
   our extension and goes beyond the Gen 1 AI.
 - **Why:** the AI must never value what the engine won't do. Every rule it consults comes through the same seams

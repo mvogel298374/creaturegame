@@ -325,6 +325,27 @@ public sealed class Gen1BattleRules : IBattleRules
 
     public bool EffectivenessLineRepeatsOnEveryStrike => true;
 
+    public bool PrimaryEffectChecksPrecedeHitTest => true;
+
+    // pokered: only PoisonEffect checks the target's type; ParalyzeEffect_ has no same-type check.
+    public bool PureStatusMoveCanAffect(Creature target, StatusCondition status) =>
+        status is not (StatusCondition.Poison or StatusCondition.BadPoison)
+        || !HasType(target, DamageType.Poison);
+
+    // pokered SleepEffect and ParalyzeEffect_ never call CheckTargetSubstitute.
+    public bool SubstituteStopsPureStatusMove(Attack move) =>
+        move.StatusEffect is not (StatusCondition.Sleep or StatusCondition.Paralysis);
+
+    // pokered core.asm MoveHitTest: the Mist check covers only the primary stat-down effects.
+    public bool MistStopsStatDrop(bool isSecondary) => !isSecondary;
+
+    public MistBlockAnnouncement MistBlockAnnouncement => MistBlockAnnouncement.Failed;
+
+    public bool SubstituteStopsThaw => true;
+
+    public MoveFailureAnnouncement PrimaryEffectFailureAnnouncement =>
+        MoveFailureAnnouncement.Failed;
+
     public HitLineWording HitLineWording => HitLineWording.Short;
 
     // pokered core.asm AttackSubstitute: the byte wraps; damage above 255 breaks without writing it.

@@ -8,7 +8,7 @@ namespace creaturegame.Tests.Integration.Gen1Attacks;
 /// <summary>
 /// Substitute (Gen 1): the user spends floor(maxHP/4) HP to raise a decoy with floor(maxHP/4)+1 HP.
 /// While it stands, the foe's hits strike the decoy (the user takes nothing, and overflow damage is
-/// lost), and the foe's status / stat-drops / confusion are shielded. It fails if a Substitute is
+/// lost), and the foe's poison, stat drops and confusion are shielded. It fails if a Substitute is
 /// already up or the user can't pay the HP cost. The decoy persists across turns, so the last test
 /// drives a full <see cref="Battle"/> to prove it soaks real enemy attacks on later turns and protects
 /// the user's HP until it breaks.
@@ -148,15 +148,128 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
     }
 
     [Fact]
-    public async Task ShieldsTheUserFromTheFoesStatus()
+    public async Task ShieldsTheUserFromAPoisonMoveWithDidntAffect()
     {
         var defender = TestCreatures.Make("D", hp: 300);
         defender.Battle.SubstituteHp = 150;
 
-        var result = await new MoveScenario().Defender(defender).Use(Move("thunder-wave")); // would paralyze, but the decoy shields it
+        var result = await new MoveScenario().Defender(defender).Use(Move("toxic"));
 
         Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
         Assert.False(result.Has<StatusApplied>());
+        Assert.True(result.Has<MoveDidntAffect>());
+    }
+
+    [Theory]
+    [InlineData("sleep-powder", StatusCondition.Sleep)]
+    [InlineData("hypnosis", StatusCondition.Sleep)]
+    [InlineData("thunder-wave", StatusCondition.Paralysis)]
+    [InlineData("stun-spore", StatusCondition.Paralysis)]
+    [InlineData("glare", StatusCondition.Paralysis)]
+    public async Task SleepAndParalysisMovesLandThroughASubstitute(
+        string move,
+        StatusCondition expected
+    )
+    {
+        var defender = TestCreatures.Make("D", type1: DamageType.Water, hp: 300);
+        defender.Battle.SubstituteHp = 150;
+
+        var result = await new MoveScenario().Defender(defender).Use(Move(move));
+
+        Assert.Equal(expected, result.Defender.Battle.Status);
+        Assert.Equal(150, result.Defender.Battle.SubstituteHp);
+    }
+
+    [Theory]
+    [InlineData("confuse-ray")]
+    [InlineData("growl")]
+    public async Task AConfusionOrStatDownMoveOnASubstituteSaysButItFailed(string move)
+    {
+        var defender = TestCreatures.Make("D", type1: DamageType.Water, hp: 300);
+        defender.Battle.SubstituteHp = 150;
+
+        var result = await new MoveScenario().Defender(defender).Use(Move(move));
+
+        Assert.True(result.Has<MoveFailed>());
+        Assert.Equal(0, result.Defender.Battle.ConfusedTurns);
+        Assert.Equal(0, result.Defender.Battle.Stages.Attack);
+    }
+
+    [Fact]
+    public async Task GlareParalyzesANormalTypeBecauseAPureMoveHasNoSameTypeCheck()
+    {
+        var defender = TestCreatures.Make("D", type1: DamageType.Normal, hp: 300);
+
+        var result = await new MoveScenario().Defender(defender).Use(Move("glare"));
+
+        Assert.Equal(StatusCondition.Paralysis, result.Defender.Battle.Status);
+        Assert.False(result.Has<MoveDidntAffect>());
+    }
+
+    [Fact]
+    public async Task ASameTypeSecondaryStillCannotParalyze()
+    {
+        var defender = TestCreatures.Make("D", type1: DamageType.Normal, hp: 5000);
+
+        var result = await new MoveScenario()
+            .Rules(ForceSecondaryRules.Instance)
+            .Defender(defender)
+            .Use(Move("body-slam"));
+
+        Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
+    }
+
+    private sealed class SubstituteStopsAllStatusRules : DelegatingBattleRules
+    {
+        public override int GetHitThreshold(int acc, int accStage, int evaStage) => 256;
+
+        public override bool SubstituteStopsPureStatusMove(Attack move) => true;
+    }
+
+    [Fact]
+    public async Task TheRulesCanMakeASubstituteStopParalysisMoves()
+    {
+        var defender = TestCreatures.Make("D", type1: DamageType.Water, hp: 300);
+        defender.Battle.SubstituteHp = 150;
+
+        var result = await new MoveScenario()
+            .Rules(new SubstituteStopsAllStatusRules())
+            .Defender(defender)
+            .Use(Move("thunder-wave"));
+
+        Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
+    }
+
+    private sealed class ThawThroughSubstituteRules : DelegatingBattleRules
+    {
+        public override int GetHitThreshold(int acc, int accStage, int evaStage) => 256;
+
+        public override bool SubstituteStopsThaw => false;
+    }
+
+    private async Task<MoveResult> EmberAFrozenSubstituteHolder(IBattleRules rules)
+    {
+        var defender = TestCreatures.Make("D", hp: 300);
+        defender.Battle.Status = StatusCondition.Freeze;
+        defender.Battle.SubstituteHp = 5000;
+        return await new MoveScenario().Rules(rules).Defender(defender).Use(Move("ember"));
+    }
+
+    [Fact]
+    public async Task AFireHitDoesNotThawAFrozenTargetBehindASubstitute()
+    {
+        var result = await EmberAFrozenSubstituteHolder(AlwaysHitRules.Instance);
+
+        Assert.Equal(StatusCondition.Freeze, result.Defender.Battle.Status);
+        Assert.False(result.Has<StatusCleared>());
+    }
+
+    [Fact]
+    public async Task TheRulesCanLetAFireHitThawThroughASubstitute()
+    {
+        var result = await EmberAFrozenSubstituteHolder(new ThawThroughSubstituteRules());
+
+        Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
     }
 
     [Fact]

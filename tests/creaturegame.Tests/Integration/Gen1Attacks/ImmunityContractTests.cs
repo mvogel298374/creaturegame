@@ -29,7 +29,7 @@ public class ImmunityContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     [Fact]
     public async Task PoisonTypesAreImmuneToPoisonGas()
     {
-        // Poison Gas inflicts Poison; a Poison-type can't be poisoned (CanReceiveStatus).
+        // Poison Gas inflicts Poison; a Poison-type can't be poisoned (PureStatusMoveCanAffect).
         var result = await new MoveScenario()
             .Defender(TestCreatures.Make("D", type1: DamageType.Poison, hp: 500))
             .Use(Move("poison-gas"));

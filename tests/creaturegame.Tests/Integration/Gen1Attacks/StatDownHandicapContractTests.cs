@@ -73,22 +73,26 @@ public class StatDownHandicapContractTests(MovesFixture moves) : Gen1MoveContrac
         Assert.False(result.Has<MoveFailed>());
     }
 
-    // Behind a Substitute a passing roll is silently blocked, so "But it failed!" proves the roll came first.
+    // A passing roll still fails on the Substitute, so the single draw proves the roll came first.
     [Theory]
-    [InlineData(true, true)]
-    [InlineData(false, false)]
-    public async Task TheRoll_PrecedesTheSubstituteCheck(bool fails, bool expectFailedLine)
+    [InlineData(BattleSide.Opponent, 1)]
+    [InlineData(BattleSide.Player, 0)]
+    public async Task TheRoll_PrecedesTheSubstituteCheck(BattleSide side, int expectedDraws)
     {
-        var result = await new BattleScenario()
-            .Player(Mon("Player", 999, 200, "substitute", "tackle"))
-            .Enemy(Mon("Enemy", 100, 1, "growl"))
-            .PlayerUses("substitute", "tackle")
-            .EnemyUses("growl")
-            .Rules(Handicap(fails))
-            .RunAsync();
+        var defender = TestCreatures.Make("D", hp: 500);
+        defender.Battle.SubstituteHp = 51;
+        var rng = new RecordingRandomSource(new HighestRollSource());
 
-        Assert.Equal(expectFailedLine, result.Has<MoveFailed>());
-        Assert.False(Dropped(result, "Player"));
+        var result = await new MoveScenario()
+            .Rules(new Gen1BattleRules(rng))
+            .Rng(rng)
+            .Side(side)
+            .Defender(defender)
+            .Use(Move("growl"));
+
+        Assert.True(result.Has<MoveFailed>());
+        Assert.Equal(expectedDraws, rng.Draws.Count);
+        Assert.Equal(0, result.Defender.Battle.Stages.Attack);
     }
 
     [Fact]

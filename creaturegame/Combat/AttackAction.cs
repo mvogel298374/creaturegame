@@ -174,6 +174,12 @@ public class AttackAction : IBattleAction
         bool immune =
             effectiveness == 0 && ChecksTypeImmunity(attackToUse, category, usingStruggle);
 
+        bool checksBeforeHitTest =
+            _rules.PrimaryEffectChecksPrecedeHitTest
+            && IsStatusMove(attackToUse, category, usingStruggle);
+        if (checksBeforeHitTest && StatusMoveStopsBeforeHitTest(attackToUse))
+            return Task.CompletedTask;
+
         if (
             immune
             && IsStatusMove(attackToUse, category, usingStruggle)
@@ -193,6 +199,13 @@ public class AttackAction : IBattleAction
             _emitter?.Emit(new MoveFailed());
             return Task.CompletedTask;
         }
+
+        if (
+            checksBeforeHitTest
+            && IsFoeStatDown(attackToUse)
+            && StatDownStopsBeforeHitTest(attackToUse)
+        )
+            return Task.CompletedTask;
 
         // Roll order per IBattleRules.HitRollOrder — see GENERATION_SEAMS.md §2.
         Strike? strike;
@@ -435,13 +448,13 @@ public class AttackAction : IBattleAction
 
         if (missed)
         {
-            bool statusMiss =
-                IsStatusMove(move, category, usingStruggle)
-                && move.StatusEffect != StatusCondition.None;
+            bool isStatusMove = IsStatusMove(move, category, usingStruggle);
             _emitter?.Emit(
-                statusMiss
+                isStatusMove && move.StatusEffect != StatusCondition.None
                     ? StatusMoveFailure(_rules.StatusMoveMissAnnouncement, move)
-                    : new MoveMissed(Source.Name, Source.Id, move.Name ?? "")
+                : isStatusMove && (IsFoeStatDown(move) || move.Effect == MoveEffect.Confuse)
+                    ? StatusMoveFailure(_rules.PrimaryEffectFailureAnnouncement, move)
+                : new MoveMissed(Source.Name, Source.Id, move.Name ?? "")
             );
             ApplyFailedHitSideEffects(move, category, crashes: true);
             lockIn?.OnTurnEnd(lockCtx!);
@@ -449,6 +462,71 @@ public class AttackAction : IBattleAction
         }
 
         return true;
+    }
+
+    // True when the move ended here. See GENERATION_SEAMS.md §2 (Pre-hit checks).
+    private bool StatusMoveStopsBeforeHitTest(Attack move)
+    {
+        if (move.Effect == MoveEffect.Confuse)
+        {
+            if (Target.Battle.SubstituteHp == 0 || !_rules.SubstituteStopsPureStatusMove(move))
+                return false;
+            _emitter?.Emit(StatusMoveFailure(_rules.PrimaryEffectFailureAnnouncement, move));
+            return true;
+        }
+        if (move.StatusEffect == StatusCondition.None)
+            return false;
+
+        if (Target.Battle.SubstituteHp > 0 && _rules.SubstituteStopsPureStatusMove(move))
+        {
+            _emitter?.Emit(StatusMoveFailure(_rules.StatusMoveNoOpAnnouncement, move));
+            return true;
+        }
+        if (Target.Battle.Status != StatusCondition.None)
+        {
+            AnnounceAlreadyStatused(move);
+            return true;
+        }
+        if (_rules.PureStatusMoveCanAffect(Target, move.StatusEffect))
+            return false;
+        _emitter?.Emit(StatusMoveFailure(_rules.StatusMoveNoOpAnnouncement, move));
+        return true;
+    }
+
+    private bool StatDownStopsBeforeHitTest(Attack move)
+    {
+        if (Target.Battle.SubstituteHp > 0 && _rules.SubstituteStopsPureStatusMove(move))
+        {
+            _emitter?.Emit(StatusMoveFailure(_rules.PrimaryEffectFailureAnnouncement, move));
+            return true;
+        }
+        if (!Target.Battle.HasMist || !_rules.MistStopsStatDrop(isSecondary: false))
+            return false;
+        _emitter?.Emit(MistBlockLine(Target));
+        return true;
+    }
+
+    private BattleEvent MistBlockLine(Creature holder) =>
+        _rules.MistBlockAnnouncement switch
+        {
+            MistBlockAnnouncement.Failed => new MoveFailed(),
+            MistBlockAnnouncement.ProtectedByMist => new StatDropBlocked(holder.Name, holder.Id),
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(_rules.MistBlockAnnouncement),
+                _rules.MistBlockAnnouncement,
+                null
+            ),
+        };
+
+    private void AnnounceAlreadyStatused(Attack move)
+    {
+        if (
+            move.StatusEffect == StatusCondition.Sleep
+            && Target.Battle.Status == StatusCondition.Sleep
+        )
+            _emitter?.Emit(new AlreadyAsleep(Target.Name, Target.Id));
+        else
+            _emitter?.Emit(StatusMoveFailure(_rules.StatusMoveNoOpAnnouncement, move));
     }
 
     private BattleEvent StatusMoveFailure(MoveFailureAnnouncement announcement, Attack move) =>
@@ -486,6 +564,7 @@ public class AttackAction : IBattleAction
             !Target.IsAlive()
             || Target.Battle.Status != StatusCondition.Freeze
             || !_rules.CanThawFrozenTarget(move)
+            || (TargetShieldedBySubstitute && _rules.SubstituteStopsThaw)
         )
             return false;
 
@@ -738,25 +817,24 @@ public class AttackAction : IBattleAction
         {
             // A status never stacks; only a pure status move announces it (GENERATION_SEAMS.md §2).
             if (attack.BaseDamage == 0)
-            {
-                if (
-                    attack.StatusEffect == StatusCondition.Sleep
-                    && Target.Battle.Status == StatusCondition.Sleep
-                )
-                    _emitter?.Emit(new AlreadyAsleep(Target.Name, Target.Id));
-                else
-                    _emitter?.Emit(StatusMoveFailure(_rules.StatusMoveNoOpAnnouncement, attack));
-            }
+                AnnounceAlreadyStatused(attack);
             return;
         }
         if (!Target.IsAlive())
             return;
-        // Gen 1: a Substitute shields the user from the foe's status (the hit, if any, struck the decoy).
-        if (TargetShieldedBySubstitute)
+        // A damaging move's secondary always stops at a Substitute; the hit struck the decoy.
+        if (
+            TargetShieldedBySubstitute
+            && (attack.BaseDamage > 0 || _rules.SubstituteStopsPureStatusMove(attack))
+        )
             return;
 
         // Only a pure status move announces this; a damaging move's hit already landed.
-        if (!_rules.CanReceiveStatus(Target, attack.StatusEffect, attack.DamageType))
+        bool canAffect =
+            attack.BaseDamage == 0
+                ? _rules.PureStatusMoveCanAffect(Target, attack.StatusEffect)
+                : _rules.CanReceiveStatus(Target, attack.StatusEffect, attack.DamageType);
+        if (!canAffect)
         {
             if (attack.BaseDamage == 0)
                 _emitter?.Emit(StatusMoveFailure(_rules.StatusMoveNoOpAnnouncement, attack));
@@ -797,11 +875,15 @@ public class AttackAction : IBattleAction
         if (se.Target == StageTarget.Foe && TargetShieldedBySubstitute)
             return;
 
-        // Gen 1 Mist: the opponent cannot lower the Mist-holder's stats. Self-inflicted drops
-        // (and any raise) are unaffected.
-        if (se.Target == StageTarget.Foe && se.Delta < 0 && affected.Battle.HasMist)
+        // Self-inflicted drops and any raise are unaffected by Mist.
+        if (
+            se.Target == StageTarget.Foe
+            && se.Delta < 0
+            && affected.Battle.HasMist
+            && _rules.MistStopsStatDrop(isSecondary: attack.BaseDamage > 0)
+        )
         {
-            _emitter?.Emit(new StatDropBlocked(affected.Name, affected.Id));
+            _emitter?.Emit(MistBlockLine(affected));
             return;
         }
 

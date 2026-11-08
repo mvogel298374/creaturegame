@@ -198,6 +198,23 @@ internal static class TestAltProfile
 
         public override HitLineWording HitLineWording => HitLineWording.Long;
 
+        public override bool PrimaryEffectChecksPrecedeHitTest => false;
+
+        public override bool PureStatusMoveCanAffect(Creature target, StatusCondition status) =>
+            false;
+
+        public override bool SubstituteStopsPureStatusMove(Attack move) => true;
+
+        public override bool MistStopsStatDrop(bool isSecondary) => true;
+
+        public override MistBlockAnnouncement MistBlockAnnouncement =>
+            MistBlockAnnouncement.ProtectedByMist;
+
+        public override bool SubstituteStopsThaw => false;
+
+        public override MoveFailureAnnouncement PrimaryEffectFailureAnnouncement =>
+            MoveFailureAnnouncement.Missed;
+
         public override bool HealFails(int currentHp, int maxHp) => currentHp >= maxHp;
 
         public override MoveFailureAnnouncement HealFailureAnnouncement =>

@@ -133,6 +133,25 @@ public abstract class DelegatingBattleRules : IBattleRules
 
     public virtual HitLineWording HitLineWording => _inner.HitLineWording;
 
+    public virtual bool PrimaryEffectChecksPrecedeHitTest =>
+        _inner.PrimaryEffectChecksPrecedeHitTest;
+
+    public virtual bool PureStatusMoveCanAffect(Creature target, StatusCondition status) =>
+        _inner.PureStatusMoveCanAffect(target, status);
+
+    public virtual bool SubstituteStopsPureStatusMove(Attack move) =>
+        _inner.SubstituteStopsPureStatusMove(move);
+
+    public virtual bool MistStopsStatDrop(bool isSecondary) =>
+        _inner.MistStopsStatDrop(isSecondary);
+
+    public virtual MistBlockAnnouncement MistBlockAnnouncement => _inner.MistBlockAnnouncement;
+
+    public virtual bool SubstituteStopsThaw => _inner.SubstituteStopsThaw;
+
+    public virtual MoveFailureAnnouncement PrimaryEffectFailureAnnouncement =>
+        _inner.PrimaryEffectFailureAnnouncement;
+
     public virtual SubstituteStrike StrikeSubstituteByte(int remnant, int damage) =>
         _inner.StrikeSubstituteByte(remnant, damage);
 
