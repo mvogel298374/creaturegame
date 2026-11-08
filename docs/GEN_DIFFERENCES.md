@@ -290,6 +290,12 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
   including the breaking one. Gen 1 then prints "<TARGET>'s SUBSTITUTE broke!" and Gen 2 "… faded!". Gen 1's setup
   line is "It created a SUBSTITUTE!" and Gen 2's "<USER> made a SUBSTITUTE!". Both print "<USER> has a SUBSTITUTE!"
   with one already up and "Too weak to make a SUBSTITUTE!" without the HP. Seam: `GENERATION_SEAMS.md` §2.
+- **A soaked hit still prints its crit and effectiveness lines,** after the Substitute lines, in Gen 1 and Gen 2. A
+  self-hit or crash prints neither. Gen 1 says "Critical hit!", "One-hit KO!" and "It's super effective!"; Gen 2 "A
+  critical hit!", "It's a one-hit KO!" and "It's super-effective!". On a Gen 1 multi-hit move the crit line prints only
+  for the first strike, though every strike deals crit damage; its effectiveness line repeats on every strike. A
+  one-hit KO never prints "Critical hit!" (the two share one slot), prints "One-hit KO!" only when the Speed check
+  passes, and then prints its effectiveness. Seam: `GENERATION_SEAMS.md` §2.
 - **Disable** picks a random move with PP left, and the lock is enforced at move selection (`Battle` and
   `IBattleInput` skip `DisabledMove`); its countdown timing is covered under the residual-phase bullet above.
 - **Leech Seed lands through a Substitute** in the English RBY this engine targets (reported blocked only in the

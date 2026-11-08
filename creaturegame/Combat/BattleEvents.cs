@@ -355,7 +355,22 @@ public record DamageDealt(
     // Dev Mode: the move's non-crit low–high for this hit (DamageCalculator.EstimateRange). Always filled by the
     // engine; the web emitter drops it unless the server's Dev Mode flag is on, so prod clients never see it.
     int? MinDamage = null,
-    int? MaxDamage = null
+    int? MaxDamage = null,
+    bool PrintsCritLine = false,
+    bool PrintsOneHitKoLine = false,
+    bool PrintsEffectivenessLine = true,
+    HitLineWording Wording = HitLineWording.Short
+) : BattleEvent;
+
+/// <summary>The crit, one-hit KO and effectiveness lines of a hit a Substitute soaked. See GENERATION_SEAMS.md §2.</summary>
+public record SoakedHitReport(
+    string TargetName,
+    int TargetId,
+    bool PrintsCritLine,
+    bool PrintsOneHitKoLine,
+    double TypeEffectiveness,
+    bool PrintsEffectivenessLine,
+    HitLineWording Wording
 ) : BattleEvent;
 
 public record RecoilDamage(string SourceName, int SourceId, int Damage, int HpAfter) : BattleEvent;

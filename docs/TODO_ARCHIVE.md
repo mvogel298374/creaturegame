@@ -8,6 +8,59 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §3.1 Crit, effectiveness and one-hit KO lines follow Gen 1 ✅ DONE (2026-11-08)
+
+M; found 2026-11-08 (filed as "A hit on a Substitute loses its crit and effectiveness lines", widened by Mo's rulings);
+design ruled 2026-11-08.
+
+**Problem.** In Gen 1 a hit soaked by a Substitute still prints "Critical hit!" and the effectiveness line after the
+Substitute lines (`core.asm:3227-3229`, `:5627-5629`: `PrintCriticalOHKOText` and `DisplayEffectiveness` run after
+`ApplyAttack…Pokemon` returns from `AttackSubstitute`). Ours appended both to the `DamageDealt` line (`timeline.ts`),
+and a soaked hit returned from `AttackAction.DealDamageToTarget` before emitting it. Real hits also said Gen 2's
+"A critical hit!", and a landed OHKO printed no "One-hit KO!" line.
+
+**Rulings (Mo, 2026-11-08).** Real hits use Gen 1's "Critical hit!" and keep their single combined line. The crit line
+prints once on a multi-hit move (the first strike), while effectiveness prints on every strike. "One-hit KO!" joined the
+item, on a real hit or a Substitute. After `requirements-review`: an OHKO prints its real effectiveness after
+"One-hit KO!". After `pr-review`: the effectiveness repeat went behind a seam instead of waiting for a Gen 2 sprint.
+
+**Outcome.** Three `IBattleRules` members: `SoakedHitPrintsCritAndEffectiveness` (true in Gen 1 and Gen 2),
+`EffectivenessLineRepeatsOnEveryStrike` (true in Gen 1, false in Gen 2: `supereffectivelooptext` prints it on a
+multi-hit's first strike only) and `HitLineWording` (an enum covering all four lines: Gen 1 "Critical hit!",
+"One-hit KO!", "It's super effective!", "It's not very effective..."; Gen 2 "A critical hit!", "It's a one-hit KO!",
+"It's super-effective!", "It's not very effective…"), with `DelegatingBattleRules` pass-throughs and `TestAltProfile`
+values. A new `SoakedHitReport` event (target, crit flag, effectiveness, wording) is emitted by
+`AttackAction.DealDamageToTarget` after `SubstituteStrikes.AnnounceStrike`, only for a crit, an OHKO or a non-neutral
+hit; it can't ride on `SubstituteAbsorbedHit` because the break line comes between them. `DamageDealt` and
+`SoakedHitReport` both carry `PrintsCritLine`, `PrintsOneHitKoLine`, `PrintsEffectivenessLine` and `Wording`. A repeated
+strike under `MultiHitRepeatsFirstStrike` prints no crit line through `PrintsCritLine`; `IsCrit` stays true on it because
+the strike still deals crit damage. Self-hit and crash damage add nothing. The new event and fields are projected in the
+SignalR emitter, the console emitter and `timeline.ts`. Runtime only; no data change.
+Docs: `GENERATION_SEAMS.md`, `GENERATION_PROFILE.md`, `GEN_DIFFERENCES.md`, `PRODUCT_SPEC.md`.
+
+**Gen 1 source.** pokered `engine/battle/core.asm:3227-3229`, `:5627-5629`, `:3690`, `:3796-3811`
+`PrintCriticalOHKOText`, `engine/battle/display_effectiveness.asm`, `data/text/text_2.asm` `_CriticalHitText`,
+`_OHKOText`, `_SuperEffectiveText`, `_NotVeryEffectiveText`. Gen 2: pokecrystal `data/moves/effects.asm` `NormalHit`,
+`MultiHit`, `engine/battle/effect_commands.asm` `BattleCommand_CriticalText`, `BattleCommand_SuperEffectiveLoopText`,
+`data/text/battle.asm` `CriticalHitText`, `OneHitKOText`, `SuperEffectiveText`, `NotVeryEffectiveText`.
+
+**Reviews.**
+- `requirements-review`: an OHKO must print its real effectiveness after "One-hit KO!" (pokered `core.asm:4467-4471`,
+  `:3144-3147`); fixed on Mo's ruling by passing it through a flag on the existing events instead of a planned separate
+  event. Rejected after a source check: fixed-damage moves don't read a stale effectiveness byte (it is reset each move,
+  `core.asm:3085`, `:5480`); the `GENERATION_PROFILE` "contradiction" was the `TestAltProfile` column.
+- `pr-review` (CHANGES-REQUESTED, all taken on Mo's ruling): the effectiveness repeat went behind a seam
+  (`EffectivenessLineRepeatsOnEveryStrike`) rather than waiting for a Gen 2 sprint; added wire-field value tests; added
+  tests that the wording comes from the seam, for an immune OHKO behind a Substitute, and for a fixed-damage move into a
+  resisting type.
+- `requirements-review` and `pr-review` were not re-run after their fixes, by Mo's process (no re-review loop without
+  his say).
+
+**Left as is.** Strike flags are never cleared (safe because each move gets a new action object). Repeated strikes still
+play the crit sound, because the sound follows `IsCrit`. E2E did not run.
+
+---
+
 ## §3.1 Substitute prints Gen 1's lines ✅ DONE (2026-11-08)
 
 S; found 2026-11-08 (follow-on to the self-hit entry below); design ruled 2026-11-08.
@@ -20,7 +73,7 @@ too little HP "Too weak to make a SUBSTITUTE!".
 
 **Rulings (Mo, 2026-11-08).** "SUBSTITUTE" in capitals on every line. The setup line, and then the two failure lines,
 joined this item. The crit and effectiveness lines of a soaked hit were filed separately (*A hit on a Substitute loses
-its crit and effectiveness lines*, open in `TODO.md`).
+its crit and effectiveness lines*, since done: "Crit, effectiveness and one-hit KO lines follow Gen 1" above).
 
 **Outcome.** Three `IBattleRules` members: `SubstituteBreakAnnouncement` (enum `TookDamageThenBroke`, Gen 1, and
 `TookDamageThenFaded`; carries line order as well as wording), `SubstituteSetupAnnouncement` (`SubstituteCreated` in

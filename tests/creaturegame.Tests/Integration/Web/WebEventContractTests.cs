@@ -850,6 +850,81 @@ public class WebEventContractTests
     }
 
     [Fact]
+    public void HitLineWording_Projects_AsItsName()
+    {
+        var evt = new SoakedHitReport("ONIX", 7, false, true, 1.0, true, HitLineWording.Long);
+
+        var (_, payload) = SignalRBattleEventEmitter.MapEvent(evt);
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+
+        Assert.Equal("Long", doc.RootElement.GetProperty("Wording").GetString());
+    }
+
+    [Theory]
+    [InlineData(true, false, false, HitLineWording.Short, "Short")]
+    [InlineData(false, true, false, HitLineWording.Long, "Long")]
+    [InlineData(false, false, true, HitLineWording.Short, "Short")]
+    public void SoakedHitReport_Projection_CarriesEachLineFlagsValue(
+        bool crit,
+        bool ohko,
+        bool effectiveness,
+        HitLineWording wording,
+        string expectedWording
+    )
+    {
+        var evt = new SoakedHitReport("ONIX", 7, crit, ohko, 2.0, effectiveness, wording);
+
+        var (_, payload) = SignalRBattleEventEmitter.MapEvent(evt);
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+
+        Assert.Equal(crit, doc.RootElement.GetProperty("PrintsCritLine").GetBoolean());
+        Assert.Equal(ohko, doc.RootElement.GetProperty("PrintsOneHitKoLine").GetBoolean());
+        Assert.Equal(
+            effectiveness,
+            doc.RootElement.GetProperty("PrintsEffectivenessLine").GetBoolean()
+        );
+        Assert.Equal(2.0, doc.RootElement.GetProperty("TypeEffectiveness").GetDouble());
+        Assert.Equal(expectedWording, doc.RootElement.GetProperty("Wording").GetString());
+    }
+
+    [Theory]
+    [InlineData(true, false, false, HitLineWording.Short, "Short")]
+    [InlineData(false, true, false, HitLineWording.Long, "Long")]
+    [InlineData(false, false, true, HitLineWording.Short, "Short")]
+    public void DamageDealt_Projection_CarriesEachLineFlagsValue(
+        bool crit,
+        bool ohko,
+        bool effectiveness,
+        HitLineWording wording,
+        string expectedWording
+    )
+    {
+        var evt = new DamageDealt(
+            "ONIX",
+            7,
+            30,
+            2.0,
+            70,
+            100,
+            PrintsCritLine: crit,
+            PrintsOneHitKoLine: ohko,
+            PrintsEffectivenessLine: effectiveness,
+            Wording: wording
+        );
+
+        var (_, payload) = SignalRBattleEventEmitter.MapEvent(evt);
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+
+        Assert.Equal(crit, doc.RootElement.GetProperty("PrintsCritLine").GetBoolean());
+        Assert.Equal(ohko, doc.RootElement.GetProperty("PrintsOneHitKoLine").GetBoolean());
+        Assert.Equal(
+            effectiveness,
+            doc.RootElement.GetProperty("PrintsEffectivenessLine").GetBoolean()
+        );
+        Assert.Equal(expectedWording, doc.RootElement.GetProperty("Wording").GetString());
+    }
+
+    [Fact]
     public void MoveDidntAffect_Projection_CarriesTargetAndMove()
     {
         var evt = new MoveDidntAffect("ONIX", 7, "roar");

@@ -141,6 +141,9 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - Substitute prints "It created a SUBSTITUTE!" on setup. Every hit on one prints "The SUBSTITUTE took damage for
   <target>!", and a breaking hit then prints "<target>'s SUBSTITUTE broke!". With one already up it prints "<user> has
   a SUBSTITUTE!", and without the HP to pay for it "Too weak to make a SUBSTITUTE!".
+- A hit on a Substitute still prints "Critical hit!" and its effectiveness line after the Substitute lines. A multi-hit
+  move prints "Critical hit!" once, on its first strike, and its effectiveness on every strike. A landed one-hit KO
+  move prints "One-hit KO!" and then its effectiveness.
 - Thrash and Petal Dance print "<user> is thrashing about!" on each repeat turn instead of "used <move>!". The lock's
   end confuses the user without a "became confused" line, and always rolls a fresh 2-5 turn counter, even when the user
   was already confused.

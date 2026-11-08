@@ -149,14 +149,53 @@ describe('expandEvent — DamageDealt', () => {
 
   it('appends crit + effectiveness suffixes in order', () => {
     const { steps } = expandEvent('DamageDealt',
-      { targetName: 'ARTICUNO', targetId: 2, damage: 42, typeEffectiveness: 2, hpAfter: 58, isCrit: true }, CTX);
-    expect(logLines(steps)).toEqual(["ARTICUNO took 42 damage! A critical hit! It's super effective!"]);
+      { targetName: 'ARTICUNO', targetId: 2, damage: 42, typeEffectiveness: 2, hpAfter: 58, isCrit: true, printsCritLine: true, printsEffectivenessLine: true, wording: 'Short' }, CTX);
+    expect(logLines(steps)).toEqual(["ARTICUNO took 42 damage! Critical hit! It's super effective!"]);
   });
 
   it('uses "not very effective" for resisted hits', () => {
     const { steps } = expandEvent('DamageDealt',
-      { targetName: 'ARTICUNO', targetId: 2, damage: 10, typeEffectiveness: 0.5, hpAfter: 90, isCrit: false }, CTX);
+      { targetName: 'ARTICUNO', targetId: 2, damage: 10, typeEffectiveness: 0.5, hpAfter: 90, isCrit: false, printsEffectivenessLine: true, wording: 'Short' }, CTX);
     expect(logLines(steps)).toEqual(["ARTICUNO took 10 damage! It's not very effective..."]);
+  });
+
+  it('prints no crit line for a repeated strike that was still a crit', () => {
+    const { steps } = expandEvent('DamageDealt',
+      { targetName: 'ARTICUNO', targetId: 2, damage: 42, typeEffectiveness: 1, hpAfter: 58, isCrit: true, printsCritLine: false, wording: 'Short' }, CTX);
+    expect(logLines(steps)).toEqual(['ARTICUNO took 42 damage!']);
+  });
+
+  it('switches every hit line with the wording', () => {
+    const { steps } = expandEvent('DamageDealt',
+      { targetName: 'ARTICUNO', targetId: 2, damage: 42, typeEffectiveness: 2, hpAfter: 58, isCrit: true, printsCritLine: true, printsEffectivenessLine: true, wording: 'Long' }, CTX);
+    expect(logLines(steps)).toEqual(["ARTICUNO took 42 damage! A critical hit! It's super-effective!"]);
+    expect(logLines(expandEvent('SoakedHitReport', { printsCritLine: false, typeEffectiveness: 0.5, printsEffectivenessLine: true, wording: 'Long' }, CTX).steps))
+      .toEqual(['It\'s not very effective…']);
+    expect(logLines(expandEvent('SoakedHitReport', { printsOneHitKoLine: true, typeEffectiveness: 1, wording: 'Long' }, CTX).steps))
+      .toEqual(["It's a one-hit KO!"]);
+  });
+
+  it('prints a soaked hit\'s crit and effectiveness as separate lines', () => {
+    expect(logLines(expandEvent('SoakedHitReport', { printsCritLine: true, typeEffectiveness: 2, printsEffectivenessLine: true, wording: 'Short' }, CTX).steps))
+      .toEqual(['Critical hit!', "It's super effective!"]);
+    expect(logLines(expandEvent('SoakedHitReport', { printsCritLine: true, typeEffectiveness: 1, wording: 'Short' }, CTX).steps))
+      .toEqual(['Critical hit!']);
+  });
+
+  it('prints "One-hit KO!" before the effectiveness line', () => {
+    const { steps } = expandEvent('DamageDealt',
+      { targetName: 'ONIX', targetId: 2, damage: 500, typeEffectiveness: 2, hpAfter: 0, isCrit: false, printsOneHitKoLine: true, printsEffectivenessLine: true, wording: 'Short' }, CTX);
+    expect(logLines(steps)).toEqual(["ONIX took 500 damage! One-hit KO! It's super effective!"]);
+    expect(logLines(expandEvent('SoakedHitReport', { printsOneHitKoLine: true, typeEffectiveness: 2, printsEffectivenessLine: true, wording: 'Short' }, CTX).steps))
+      .toEqual(['One-hit KO!', "It's super effective!"]);
+  });
+
+  it('prints no effectiveness line when the flag is off', () => {
+    const { steps } = expandEvent('DamageDealt',
+      { targetName: 'ARTICUNO', targetId: 2, damage: 42, typeEffectiveness: 2, hpAfter: 58, isCrit: false, printsEffectivenessLine: false, wording: 'Short' }, CTX);
+    expect(logLines(steps)).toEqual(['ARTICUNO took 42 damage!']);
+    expect(logLines(expandEvent('SoakedHitReport', { printsCritLine: true, typeEffectiveness: 2, printsEffectivenessLine: false, wording: 'Short' }, CTX).steps))
+      .toEqual(['Critical hit!']);
   });
 
   it('tags damage lines with a colour tone by effectiveness (super/weak/immune, none for neutral)', () => {
@@ -170,7 +209,7 @@ describe('expandEvent — DamageDealt', () => {
 
   it('Dev Mode: prints the low–high range in brackets right behind the actual damage, before the suffixes', () => {
     const { steps } = expandEvent('DamageDealt',
-      { targetName: 'ARTICUNO', targetId: 2, damage: 37, typeEffectiveness: 2, hpAfter: 58, isCrit: false, minDamage: 32, maxDamage: 38 }, CTX);
+      { targetName: 'ARTICUNO', targetId: 2, damage: 37, typeEffectiveness: 2, hpAfter: 58, isCrit: false, minDamage: 32, maxDamage: 38, printsEffectivenessLine: true, wording: 'Short' }, CTX);
     expect(logLines(steps)).toEqual(["ARTICUNO took 37 damage (32–38)! It's super effective!"]);
   });
 

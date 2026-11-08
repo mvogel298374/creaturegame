@@ -320,6 +320,13 @@ public sealed class Gen1BattleRules : IBattleRules
     public SubstituteFailureAnnouncement SubstituteFailureAnnouncement =>
         SubstituteFailureAnnouncement.NamedReason;
 
+    // pokered core.asm:3227-3229: the lines follow ApplyAttackToEnemyPokemon, Substitute or not.
+    public bool SoakedHitPrintsCritAndEffectiveness => true;
+
+    public bool EffectivenessLineRepeatsOnEveryStrike => true;
+
+    public HitLineWording HitLineWording => HitLineWording.Short;
+
     // pokered core.asm AttackSubstitute: the byte wraps; damage above 255 breaks without writing it.
     public SubstituteStrike StrikeSubstituteByte(int remnant, int damage)
     {

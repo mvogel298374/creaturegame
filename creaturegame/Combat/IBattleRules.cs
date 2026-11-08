@@ -88,6 +88,16 @@ public enum SubstituteFailureAnnouncement
     Failed,
 }
 
+/// <summary>The wording of the crit, one-hit KO and effectiveness lines. See GENERATION_SEAMS.md §2.</summary>
+public enum HitLineWording
+{
+    /// <summary>"Critical hit!", "One-hit KO!", "It's super effective!", "It's not very effective...". Gen 1.</summary>
+    Short,
+
+    /// <summary>"A critical hit!", "It's a one-hit KO!", "It's super-effective!", "It's not very effective…".</summary>
+    Long,
+}
+
 /// <summary>Where a move's crit and damage rolls fall relative to its accuracy roll. See GENERATION_SEAMS.md §2.</summary>
 public enum HitRollOrder
 {
@@ -254,6 +264,15 @@ public interface IBattleRules
 
     /// <summary>The line a Substitute that can't be raised prints. See GENERATION_SEAMS.md §2.</summary>
     SubstituteFailureAnnouncement SubstituteFailureAnnouncement { get; }
+
+    /// <summary>Whether a hit soaked by a Substitute still prints its crit, one-hit KO and effectiveness lines. See GENERATION_SEAMS.md §2.</summary>
+    bool SoakedHitPrintsCritAndEffectiveness { get; }
+
+    /// <summary>Whether a multi-hit move prints its effectiveness line on every strike or only the first. See GENERATION_SEAMS.md §2.</summary>
+    bool EffectivenessLineRepeatsOnEveryStrike { get; }
+
+    /// <summary>The wording of the crit, one-hit KO and effectiveness lines. See GENERATION_SEAMS.md §2.</summary>
+    HitLineWording HitLineWording { get; }
 
     /// <summary>The byte a strike leaves and whether it broke. See GENERATION_SEAMS.md §2.</summary>
     SubstituteStrike StrikeSubstituteByte(int remnant, int damage);

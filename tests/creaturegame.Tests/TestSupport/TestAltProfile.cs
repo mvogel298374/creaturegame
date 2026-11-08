@@ -192,6 +192,12 @@ internal static class TestAltProfile
         public override SubstituteFailureAnnouncement SubstituteFailureAnnouncement =>
             SubstituteFailureAnnouncement.Failed;
 
+        public override bool SoakedHitPrintsCritAndEffectiveness => false;
+
+        public override bool EffectivenessLineRepeatsOnEveryStrike => false;
+
+        public override HitLineWording HitLineWording => HitLineWording.Long;
+
         public override bool HealFails(int currentHp, int maxHp) => currentHp >= maxHp;
 
         public override MoveFailureAnnouncement HealFailureAnnouncement =>

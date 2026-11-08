@@ -526,6 +526,7 @@ public class AttackAction : IBattleAction
                         bool isCrit = first.IsCrit;
                         if (i > 0 && !_rules.MultiHitRepeatsFirstStrike)
                             hitDamage = RollCritAndDamage(move, category, screenMult, out isCrit);
+                        _laterStrike = i > 0;
                         if (DealDamageToTarget(hitDamage, effectiveness, isCrit, move.DamageType))
                             dealtRealDamage = true;
                         damage += hitDamage; // accumulated total gates drain/recoil/recharge below
@@ -583,7 +584,8 @@ public class AttackAction : IBattleAction
                     Target.Battle.SubstituteHp > 0
                         ? _rules.OhkoDamageToSubstitute
                         : Target.Attributes.HP;
-                DealDamageToTarget(damage, 1.0, false, move.DamageType);
+                _ohkoStrike = true;
+                DealDamageToTarget(damage, effectiveness, false, move.DamageType);
                 break;
 
             case DamageCategory.SelfDestruct:
@@ -646,6 +648,11 @@ public class AttackAction : IBattleAction
     // site (one per damage category) carries it without a signature change.
     private DamageRange? _hitRange;
 
+    // Any multi-hit strike after the first; a field for the same reason as _hitRange.
+    private bool _laterStrike;
+
+    private bool _ohkoStrike;
+
     private bool DealDamageToTarget(
         int dmg,
         double effectiveness,
@@ -653,6 +660,9 @@ public class AttackAction : IBattleAction
         DamageType? counterableType = null
     )
     {
+        bool printsCritLine = isCrit && !(_laterStrike && _rules.MultiHitRepeatsFirstStrike);
+        bool printsEffectivenessLine =
+            !_laterStrike || _rules.EffectivenessLineRepeatsOnEveryStrike;
         if (Target.Battle.SubstituteHp > 0)
         {
             bool broke = SubstituteStrikes.StrikeDecoy(Target.Battle, dmg, _rules);
@@ -663,6 +673,25 @@ public class AttackAction : IBattleAction
                 _rules,
                 _emitter
             );
+            if (
+                _rules.SoakedHitPrintsCritAndEffectiveness
+                && (
+                    printsCritLine
+                    || _ohkoStrike
+                    || (printsEffectivenessLine && effectiveness != 1.0)
+                )
+            )
+                _emitter?.Emit(
+                    new SoakedHitReport(
+                        Target.Name,
+                        Target.Id,
+                        printsCritLine,
+                        _ohkoStrike,
+                        effectiveness,
+                        printsEffectivenessLine,
+                        _rules.HitLineWording
+                    )
+                );
             return false;
         }
 
@@ -687,7 +716,11 @@ public class AttackAction : IBattleAction
                 Target.Attributes.MaxHP,
                 isCrit,
                 _hitRange?.Min,
-                _hitRange?.Max
+                _hitRange?.Max,
+                printsCritLine,
+                _ohkoStrike,
+                printsEffectivenessLine,
+                _rules.HitLineWording
             )
         );
         return true;

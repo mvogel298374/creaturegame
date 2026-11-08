@@ -130,13 +130,22 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                     Console.WriteLine($"It doesn't affect {e.TargetName}!");
                     break;
                 }
-                if (e.IsCrit)
-                    Console.WriteLine("A critical hit!");
+                if (e.PrintsCritLine)
+                    Console.WriteLine(CritLine(e.Wording));
                 Console.WriteLine($"{e.TargetName} took {e.Damage} damage!");
-                if (e.TypeEffectiveness >= 2.0)
-                    Console.WriteLine("It's super effective!");
-                else if (e.TypeEffectiveness is > 0 and <= 0.5)
-                    Console.WriteLine("It's not very effective...");
+                if (e.PrintsOneHitKoLine)
+                    Console.WriteLine(OneHitKoLine(e.Wording));
+                if (e.PrintsEffectivenessLine)
+                    WriteEffectivenessLine(e.TypeEffectiveness, e.Wording);
+                break;
+
+            case SoakedHitReport e:
+                if (e.PrintsCritLine)
+                    Console.WriteLine(CritLine(e.Wording));
+                if (e.PrintsOneHitKoLine)
+                    Console.WriteLine(OneHitKoLine(e.Wording));
+                if (e.PrintsEffectivenessLine)
+                    WriteEffectivenessLine(e.TypeEffectiveness, e.Wording);
                 break;
 
             case RecoilDamage e:
@@ -395,5 +404,25 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                 Console.WriteLine($"{e.CreatureName} decided to keep going!");
                 break;
         }
+    }
+
+    private static string CritLine(HitLineWording wording) =>
+        wording == HitLineWording.Short ? "Critical hit!" : "A critical hit!";
+
+    private static string OneHitKoLine(HitLineWording wording) =>
+        wording == HitLineWording.Short ? "One-hit KO!" : "It's a one-hit KO!";
+
+    private static void WriteEffectivenessLine(double effectiveness, HitLineWording wording)
+    {
+        if (effectiveness > 1.0)
+            Console.WriteLine(
+                wording == HitLineWording.Short ? "It's super effective!" : "It's super-effective!"
+            );
+        else if (effectiveness is > 0 and < 1.0)
+            Console.WriteLine(
+                wording == HitLineWording.Short
+                    ? "It's not very effective..."
+                    : "It's not very effective…"
+            );
     }
 }

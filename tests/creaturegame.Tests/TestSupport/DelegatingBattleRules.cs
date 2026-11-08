@@ -125,6 +125,14 @@ public abstract class DelegatingBattleRules : IBattleRules
     public virtual SubstituteFailureAnnouncement SubstituteFailureAnnouncement =>
         _inner.SubstituteFailureAnnouncement;
 
+    public virtual bool SoakedHitPrintsCritAndEffectiveness =>
+        _inner.SoakedHitPrintsCritAndEffectiveness;
+
+    public virtual bool EffectivenessLineRepeatsOnEveryStrike =>
+        _inner.EffectivenessLineRepeatsOnEveryStrike;
+
+    public virtual HitLineWording HitLineWording => _inner.HitLineWording;
+
     public virtual SubstituteStrike StrikeSubstituteByte(int remnant, int damage) =>
         _inner.StrikeSubstituteByte(remnant, damage);
 

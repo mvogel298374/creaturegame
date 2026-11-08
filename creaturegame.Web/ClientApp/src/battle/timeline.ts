@@ -315,6 +315,20 @@ function statusAppliedMsg(name: string, status: string): string {
   }
 }
 
+function critLine(wording: string): string {
+  return wording === 'Short' ? 'Critical hit!' : 'A critical hit!';
+}
+
+function oneHitKoLine(wording: string): string {
+  return wording === 'Short' ? 'One-hit KO!' : "It's a one-hit KO!";
+}
+
+function effectivenessLine(eff: number, wording: string): string | null {
+  if (eff > 1) return wording === 'Short' ? "It's super effective!" : "It's super-effective!";
+  if (eff > 0 && eff < 1) return wording === 'Short' ? "It's not very effective..." : "It's not very effective…";
+  return null;
+}
+
 function statusClearedMsg(name: string, wasStatus: string): string {
   switch (wasStatus) {
     case 'Sleep':     return `${name} woke up!`;
@@ -885,11 +899,13 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       // dev is on), printed right behind the actual damage — "took 37 damage (32–38)!".
       const range = formatDamageRange(payload.minDamage as number | null | undefined, payload.maxDamage as number | null | undefined);
       let msg = `${targetName} took ${damage} damage${range ? ` (${range})` : ''}!`;
-      if (isCrit) msg += ' A critical hit!';
+      const wording = payload.wording as string;
+      if (payload.printsCritLine) msg += ` ${critLine(wording)}`;
+      if (payload.printsOneHitKoLine) msg += ` ${oneHitKoLine(wording)}`;
       // Tint the line by type effectiveness: super-effective green, not-very-effective grey.
       const tone: LogTone | undefined = eff > 1 ? 'super' : eff < 1 ? 'weak' : undefined;
-      if (eff > 1)      msg += " It's super effective!";
-      else if (eff < 1) msg += " It's not very effective...";
+      const effLine = payload.printsEffectivenessLine ? effectivenessLine(eff, wording) : null;
+      if (effLine) msg += ` ${effLine}`;
 
       return { steps: [
         emit({ type: 'playHitSound', isCrit }),
@@ -899,6 +915,17 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
         d(log(msg, tone)),
         w(800),   // breathing room between the two attackers' sequences
       ] };
+    }
+
+    case 'SoakedHitReport': {
+      const eff = payload.typeEffectiveness as number;
+      const wording = payload.wording as string;
+      const effLine = payload.printsEffectivenessLine ? effectivenessLine(eff, wording) : null;
+      const steps: Step[] = [];
+      if (payload.printsCritLine) steps.push(w(300), d(log(critLine(wording))), w(600));
+      if (payload.printsOneHitKoLine) steps.push(w(300), d(log(oneHitKoLine(wording))), w(600));
+      if (effLine) steps.push(w(300), d(log(effLine, eff > 1 ? 'super' : 'weak')), w(600));
+      return { steps };
     }
 
     case 'RecoilDamage': {

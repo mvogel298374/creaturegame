@@ -540,6 +540,23 @@ public sealed class SignalRBattleEventEmitter(
                     e.IsCrit,
                     e.MinDamage,
                     e.MaxDamage,
+                    e.PrintsCritLine,
+                    e.PrintsOneHitKoLine,
+                    e.PrintsEffectivenessLine,
+                    Wording = e.Wording.ToString(),
+                }
+            ),
+            SoakedHitReport e => (
+                "SoakedHitReport",
+                new
+                {
+                    e.TargetName,
+                    e.TargetId,
+                    e.PrintsCritLine,
+                    e.PrintsOneHitKoLine,
+                    e.TypeEffectiveness,
+                    e.PrintsEffectivenessLine,
+                    Wording = e.Wording.ToString(),
                 }
             ),
             RecoilDamage e => (

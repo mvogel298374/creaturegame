@@ -1,3 +1,4 @@
+using creaturegame.Attacks;
 using creaturegame.Combat;
 using creaturegame.Tests.TestSupport;
 
@@ -28,6 +29,64 @@ public class OneHitKoContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         Assert.Equal(500, result.TotalDamage);
         Assert.Equal(0, result.Defender.Attributes.HP);
         Assert.False(result.Defender.IsAlive());
+    }
+
+    [Fact]
+    public async Task ALandedOhkoPrintsItsLineAndNeverTheCritLine()
+    {
+        var result = await new MoveScenario()
+            .Attacker(TestCreatures.Make("A"))
+            .Defender(TestCreatures.Make("D", hp: 500))
+            .Use(Move("guillotine"));
+
+        var hit = result.First<DamageDealt>()!;
+        Assert.True(hit.PrintsOneHitKoLine);
+        Assert.False(hit.PrintsCritLine);
+        Assert.Equal(HitLineWording.Short, hit.Wording);
+    }
+
+    [Fact]
+    public async Task ALandedOhkoReportsTheMovesRealEffectiveness()
+    {
+        var result = await new MoveScenario()
+            .Attacker(TestCreatures.Make("A"))
+            .Defender(TestCreatures.Make("D", type1: DamageType.Rock, hp: 500))
+            .Use(Move("fissure"));
+
+        Assert.Equal(2.0, result.First<DamageDealt>()!.TypeEffectiveness);
+    }
+
+    [Fact]
+    public async Task AnOhkoThatBreaksASubstituteReportsItsLinesAfterTheBreak()
+    {
+        var foe = TestCreatures.Make("D", type1: DamageType.Rock, hp: 500);
+        foe.Battle.SubstituteHp = 51;
+
+        var result = await new MoveScenario()
+            .Attacker(TestCreatures.Make("A"))
+            .Defender(foe)
+            .Use(Move("fissure"));
+
+        var events = result.Events.ToList();
+        int broke = events.FindIndex(e => e is SubstituteBroke);
+        var report = Assert.Single(result.Emitter.Of<SoakedHitReport>());
+        Assert.True(broke >= 0);
+        Assert.True(events.IndexOf(report) > broke, "the lines follow the break");
+        Assert.True(report.PrintsOneHitKoLine);
+        Assert.False(report.PrintsCritLine);
+        Assert.Equal(2.0, report.TypeEffectiveness);
+    }
+
+    [Fact]
+    public async Task AFailedOhkoPrintsNoLine()
+    {
+        var result = await new MoveScenario()
+            .Attacker(TestCreatures.Make("A", speed: 50))
+            .Defender(TestCreatures.Make("D", hp: 500, speed: 200))
+            .Use(Move("guillotine"));
+
+        Assert.DoesNotContain(result.Hits, h => h.PrintsOneHitKoLine);
+        Assert.False(result.Has<SoakedHitReport>());
     }
 
     [Theory]

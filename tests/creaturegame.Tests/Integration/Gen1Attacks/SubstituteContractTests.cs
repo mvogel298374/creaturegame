@@ -494,6 +494,181 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
         Assert.Empty(emitter.Of<SubstituteBroke>());
     }
 
+    private class CritHitRules : SelfHitRules
+    {
+        public override double GetCritChance(Creature a, Attack m) => 1.0;
+    }
+
+    private sealed class ThreeHitCritRules : CritHitRules
+    {
+        public override int RollMultiHitCount() => 3;
+    }
+
+    private sealed class NoSoakedLinesRules : CritHitRules
+    {
+        public override bool SoakedHitPrintsCritAndEffectiveness => false;
+    }
+
+    private async Task<MoveResult> HitDecoy(
+        IBattleRules rules,
+        string move = "tackle",
+        int decoyHp = 5000,
+        DamageType defenderType = DamageType.Normal
+    )
+    {
+        var foe = TestCreatures.Make("Foe", type1: defenderType, hp: 300);
+        foe.Battle.SubstituteHp = decoyHp;
+        return await new MoveScenario()
+            .Attacker(TestCreatures.Make("A"))
+            .Defender(foe)
+            .Rules(rules)
+            .Use(Move(move));
+    }
+
+    [Fact]
+    public async Task ASoakedCritPrintsTheCritLineThoughTheCreatureTookNothing()
+    {
+        var result = await HitDecoy(new CritHitRules());
+
+        var report = result.First<SoakedHitReport>()!;
+        Assert.True(report.PrintsCritLine);
+        Assert.Equal(1.0, report.TypeEffectiveness);
+        Assert.Equal(300, result.Defender.Attributes.HP);
+        Assert.False(result.Has<DamageDealt>());
+    }
+
+    [Fact]
+    public async Task TheCritLineFollowsTheBreakLine()
+    {
+        var result = await HitDecoy(new CritHitRules(), decoyHp: 1);
+
+        var events = result.Events.ToList();
+        int broke = events.FindIndex(e => e is SubstituteBroke);
+        int report = events.FindIndex(e => e is SoakedHitReport);
+        Assert.True(broke >= 0);
+        Assert.True(report > broke, "the crit line follows the break line");
+    }
+
+    [Fact]
+    public async Task ASoakedNonNeutralHitReportsItsEffectiveness()
+    {
+        var result = await HitDecoy(new SelfHitRules(), "water-gun", defenderType: DamageType.Fire);
+
+        var report = result.First<SoakedHitReport>()!;
+        Assert.False(report.PrintsCritLine);
+        Assert.Equal(2.0, report.TypeEffectiveness);
+    }
+
+    [Fact]
+    public async Task ANeutralNonCritSoakAddsNoLines()
+    {
+        var result = await HitDecoy(new SelfHitRules());
+
+        Assert.True(result.Has<SubstituteAbsorbedHit>());
+        Assert.False(result.Has<SoakedHitReport>());
+    }
+
+    [Fact]
+    public async Task OnASoakedMultiHitTheCritLinePrintsOnceAndEffectivenessRepeats()
+    {
+        var result = await HitDecoy(
+            new ThreeHitCritRules(),
+            "fury-attack",
+            defenderType: DamageType.Rock
+        );
+
+        var reports = result.Emitter.Of<SoakedHitReport>().ToList();
+        Assert.Equal(3, reports.Count);
+        Assert.Equal([true, false, false], reports.Select(r => r.PrintsCritLine));
+        Assert.All(reports, r => Assert.Equal(0.5, r.TypeEffectiveness));
+    }
+
+    [Fact]
+    public void ASelfHitOnTheFoesSubstituteAddsNoCritOrEffectivenessLines()
+    {
+        var user = SelfHitter(substituteHp: 51);
+        var foe = TestCreatures.Make("Foe", hp: 300);
+        foe.Battle.SubstituteHp = 200;
+
+        var emitter = ForceSelfHit(user, foe, new CritHitRules());
+
+        Assert.Single(emitter.Of<SubstituteAbsorbedHit>());
+        Assert.Empty(emitter.Of<SoakedHitReport>());
+    }
+
+    private sealed class FirstStrikeEffectivenessRules : SelfHitRules
+    {
+        public override int RollMultiHitCount() => 3;
+
+        public override bool EffectivenessLineRepeatsOnEveryStrike => false;
+    }
+
+    private sealed class LongWordingRules : SelfHitRules
+    {
+        public override double GetCritChance(Creature a, Attack m) => 1.0;
+
+        public override HitLineWording HitLineWording => HitLineWording.Long;
+    }
+
+    [Fact]
+    public async Task TheRulesCanLimitASoakedEffectivenessLineToTheFirstStrike()
+    {
+        var result = await HitDecoy(
+            new FirstStrikeEffectivenessRules(),
+            "fury-attack",
+            defenderType: DamageType.Rock
+        );
+
+        var report = Assert.Single(result.Emitter.Of<SoakedHitReport>());
+        Assert.True(report.PrintsEffectivenessLine);
+    }
+
+    [Fact]
+    public async Task TheWordingOnBothHitEventsComesFromTheRules()
+    {
+        var soaked = await HitDecoy(new LongWordingRules());
+        var real = await new MoveScenario()
+            .Attacker(TestCreatures.Make("A"))
+            .Defender(TestCreatures.Make("D", hp: 5000))
+            .Rules(new LongWordingRules())
+            .Use(Move("tackle"));
+
+        Assert.Equal(HitLineWording.Long, soaked.First<SoakedHitReport>()!.Wording);
+        Assert.Equal(HitLineWording.Long, real.First<DamageDealt>()!.Wording);
+    }
+
+    [Fact]
+    public async Task AnImmuneOhkoLeavesASubstituteAloneAndAddsNoLines()
+    {
+        var result = await HitDecoy(new SelfHitRules(), "fissure", defenderType: DamageType.Flying);
+
+        Assert.False(result.Has<SoakedHitReport>());
+        Assert.False(result.Has<SubstituteAbsorbedHit>());
+        Assert.Equal(5000, result.Defender.Battle.SubstituteHp);
+    }
+
+    [Fact]
+    public async Task AFixedDamageMoveOnAResistingSubstituteHolderAddsNoLines()
+    {
+        var result = await HitDecoy(
+            new SelfHitRules(),
+            "sonic-boom",
+            defenderType: DamageType.Rock
+        );
+
+        Assert.True(result.Has<SubstituteAbsorbedHit>());
+        Assert.False(result.Has<SoakedHitReport>());
+    }
+
+    [Fact]
+    public async Task TheRulesCanSilenceTheSoakedLines()
+    {
+        var result = await HitDecoy(new NoSoakedLinesRules());
+
+        Assert.True(result.Has<SubstituteAbsorbedHit>());
+        Assert.False(result.Has<SoakedHitReport>());
+    }
+
     [Fact]
     public async Task TheRulesPickTheFailedLineWhenASubstituteIsAlreadyUp()
     {

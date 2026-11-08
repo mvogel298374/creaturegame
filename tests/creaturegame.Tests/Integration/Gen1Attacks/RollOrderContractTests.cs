@@ -132,6 +132,71 @@ public class RollOrderContractTests(MovesFixture moves) : Gen1MoveContract(moves
     }
 
     [Fact]
+    public async Task ARepeatedStrikeIsStillACritButOnlyTheFirstPrintsTheLine()
+    {
+        var (result, _) = await UseGen1(
+            Move("fury-attack"),
+            new LowestRollSource(),
+            attacker: TestCreatures.Make("A")
+        );
+
+        Assert.All(result.Hits, h => Assert.True(h.IsCrit));
+        Assert.Equal([true, false], result.Hits.Select(h => h.PrintsCritLine));
+    }
+
+    [Fact]
+    public async Task EveryStrikePrintsItsEffectivenessLineInGen1()
+    {
+        var (result, _) = await UseGen1(Move("fury-attack"), new LowestRollSource());
+
+        Assert.Equal(2, result.Hits.Count);
+        Assert.All(result.Hits, h => Assert.True(h.PrintsEffectivenessLine));
+    }
+
+    private sealed class FirstStrikeEffectivenessRules : DelegatingBattleRules
+    {
+        public override int RollMultiHitCount() => 3;
+
+        public override int GetHitThreshold(int acc, int accStage, int evaStage) => 256;
+
+        public override bool EffectivenessLineRepeatsOnEveryStrike => false;
+    }
+
+    [Fact]
+    public async Task TheRulesCanLimitTheEffectivenessLineToTheFirstStrike()
+    {
+        var result = await new MoveScenario()
+            .Rules(new FirstStrikeEffectivenessRules())
+            .Defender(TestCreatures.Make("D", hp: 5000))
+            .Use(Move("fury-attack"));
+
+        Assert.Equal([true, false, false], result.Hits.Select(h => h.PrintsEffectivenessLine));
+    }
+
+    private sealed class EachStrikeRollsItsOwnCritRules : DelegatingBattleRules
+    {
+        public override bool MultiHitRepeatsFirstStrike => false;
+
+        public override int RollMultiHitCount() => 3;
+
+        public override int GetHitThreshold(int acc, int accStage, int evaStage) => 256;
+
+        public override double GetCritChance(Creature a, Attack m) => 1.0;
+    }
+
+    [Fact]
+    public async Task AStrikeThatRollsItsOwnCritPrintsItsOwnLine()
+    {
+        var result = await new MoveScenario()
+            .Rules(new EachStrikeRollsItsOwnCritRules())
+            .Defender(TestCreatures.Make("D", hp: 5000))
+            .Use(Move("fury-attack"));
+
+        Assert.Equal(3, result.Hits.Count);
+        Assert.All(result.Hits, h => Assert.True(h.PrintsCritLine));
+    }
+
+    [Fact]
     public async Task EveryStrikeRepeatsTheFirstStrikesDamage()
     {
         var rng = new RecordingRandomSource(new SeededRandomSource(7));
