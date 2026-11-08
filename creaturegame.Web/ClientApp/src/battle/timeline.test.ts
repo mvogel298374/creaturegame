@@ -114,13 +114,27 @@ describe('expandEvent — move-name formatting', () => {
     expect(logLines(steps)).toEqual(['But nothing happened!']);
   });
 
-  it('narrates the Substitute lifecycle (put up, soak a hit, fade)', () => {
-    expect(logLines(expandEvent('SubstitutePutUp', { creatureName: 'CHANSEY', substituteHp: 90 }, CTX).steps))
-      .toEqual(['CHANSEY put up a substitute!']);
+  it('narrates the Substitute lifecycle (created, soak a hit, break)', () => {
+    expect(logLines(expandEvent('SubstituteCreated', { creatureName: 'CHANSEY', substituteHp: 90 }, CTX).steps))
+      .toEqual(['It created a SUBSTITUTE!']);
     expect(logLines(expandEvent('SubstituteAbsorbedHit', { creatureName: 'CHANSEY', substituteHpAfter: 40 }, CTX).steps))
-      .toEqual(['The substitute took damage for CHANSEY!']);
+      .toEqual(['The SUBSTITUTE took damage for CHANSEY!']);
+    expect(logLines(expandEvent('SubstituteBroke', { creatureName: 'CHANSEY' }, CTX).steps))
+      .toEqual(["CHANSEY's SUBSTITUTE broke!"]);
+  });
+
+  it('narrates why a Substitute could not be raised', () => {
+    expect(logLines(expandEvent('SubstituteAlreadyUp', { creatureName: 'CHANSEY' }, CTX).steps))
+      .toEqual(['CHANSEY has a SUBSTITUTE!']);
+    expect(logLines(expandEvent('SubstituteTooWeak', {}, CTX).steps))
+      .toEqual(['Too weak to make a SUBSTITUTE!']);
+  });
+
+  it('narrates the alternate Substitute lines (made, faded)', () => {
+    expect(logLines(expandEvent('SubstituteMade', { creatureName: 'CHANSEY', substituteHp: 90 }, CTX).steps))
+      .toEqual(['CHANSEY made a SUBSTITUTE!']);
     expect(logLines(expandEvent('SubstituteFaded', { creatureName: 'CHANSEY' }, CTX).steps))
-      .toEqual(["CHANSEY's substitute faded!"]);
+      .toEqual(["CHANSEY's SUBSTITUTE faded!"]);
   });
 });
 

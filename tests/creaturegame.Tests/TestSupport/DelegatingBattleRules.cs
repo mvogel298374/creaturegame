@@ -116,6 +116,15 @@ public abstract class DelegatingBattleRules : IBattleRules
 
     public virtual int OhkoDamageToSubstitute => _inner.OhkoDamageToSubstitute;
 
+    public virtual SubstituteBreakAnnouncement SubstituteBreakAnnouncement =>
+        _inner.SubstituteBreakAnnouncement;
+
+    public virtual SubstituteSetupAnnouncement SubstituteSetupAnnouncement =>
+        _inner.SubstituteSetupAnnouncement;
+
+    public virtual SubstituteFailureAnnouncement SubstituteFailureAnnouncement =>
+        _inner.SubstituteFailureAnnouncement;
+
     public virtual SubstituteStrike StrikeSubstituteByte(int remnant, int damage) =>
         _inner.StrikeSubstituteByte(remnant, damage);
 

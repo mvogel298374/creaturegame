@@ -52,8 +52,6 @@ public static class SelfInflictedDamage
             after = broke ? 0 : strike.Remnant;
         }
 
-        emitter?.Emit(new SubstituteAbsorbedHit(foe.Name, foe.Id, after));
-        if (broke)
-            emitter?.Emit(new SubstituteFaded(foe.Name, foe.Id));
+        SubstituteStrikes.AnnounceStrike(foe, after, broke, rules, emitter);
     }
 }

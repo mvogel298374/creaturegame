@@ -655,12 +655,14 @@ public class AttackAction : IBattleAction
     {
         if (Target.Battle.SubstituteHp > 0)
         {
-            if (SubstituteStrikes.StrikeDecoy(Target.Battle, dmg, _rules))
-                _emitter?.Emit(new SubstituteFaded(Target.Name, Target.Id));
-            else
-                _emitter?.Emit(
-                    new SubstituteAbsorbedHit(Target.Name, Target.Id, Target.Battle.SubstituteHp)
-                );
+            bool broke = SubstituteStrikes.StrikeDecoy(Target.Battle, dmg, _rules);
+            SubstituteStrikes.AnnounceStrike(
+                Target,
+                Target.Battle.SubstituteHp,
+                broke,
+                _rules,
+                _emitter
+            );
             return false;
         }
 

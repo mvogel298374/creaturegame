@@ -135,15 +135,18 @@ the linked design doc instead — pull it there and leave only the pointer here.
   Attack, and is weakened by the foe's Reflect, not the user's own.
 - A confusion self-hit or a Jump Kick / Hi Jump Kick crash by a Substitute holder leaves the user unharmed and its
   Substitute intact; the damage strikes the foe's Substitute instead. With no foe Substitute it strikes Gen 1's leftover
-  Substitute byte: at or above the damage it prints only "The Substitute took damage"; below it the break line prints
+  Substitute byte: at or above the damage it prints only "The SUBSTITUTE took damage"; below it the break line prints
   too. The byte survives switches and resets each battle. Ordinary recoil still hits the user.
 - An OHKO move always breaks a standing Substitute, whatever the target's HP.
+- Substitute prints "It created a SUBSTITUTE!" on setup. Every hit on one prints "The SUBSTITUTE took damage for
+  <target>!", and a breaking hit then prints "<target>'s SUBSTITUTE broke!". With one already up it prints "<user> has
+  a SUBSTITUTE!", and without the HP to pay for it "Too weak to make a SUBSTITUTE!".
 - Thrash and Petal Dance print "<user> is thrashing about!" on each repeat turn instead of "used <move>!". The lock's
   end confuses the user without a "became confused" line, and always rolls a fresh 2-5 turn counter, even when the user
   was already confused.
 - Design detail → `GENERATION_SEAMS.md` §2 (*Roll order*), `GEN_DIFFERENCES.md` → *Roll Order*.  History →
   `TODO_ARCHIVE.md` → *Gen 1 roll order in `AttackAction`, behind a seam* and *Failure announcements: a failed OHKO and
-  a trainer-battle Roar/Whirlwind say "unaffected"* and *Roar/Whirlwind: the scared-off side still acts* and *Recover and Soft-Boiled fail cases* and *Gen 1 confusion self-hit damage* and *Rampage edge gaps* and *Self-hit and crash damage strike the foe's Substitute*.
+  a trainer-battle Roar/Whirlwind say "unaffected"* and *Roar/Whirlwind: the scared-off side still acts* and *Recover and Soft-Boiled fail cases* and *Gen 1 confusion self-hit damage* and *Rampage edge gaps* and *Self-hit and crash damage strike the foe's Substitute* and *Substitute prints Gen 1's lines*.
 
 ### Foe move scoring and chosen-move validation
 - The foe scores a status move by its status chance: a 10% burn side effect is worth a tenth of a pure burn move.

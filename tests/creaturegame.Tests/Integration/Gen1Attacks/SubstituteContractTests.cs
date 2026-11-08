@@ -24,7 +24,7 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
         var result = await new MoveScenario().Attacker(user).Use(Move("substitute"));
 
         int cost = 200 / 4; // 50
-        Assert.True(result.Has<SubstitutePutUp>());
+        Assert.True(result.Has<SubstituteCreated>());
         Assert.Equal(cost + 1, result.Attacker.Battle.SubstituteHp); // decoy has the cost +1 (Gen 1)
         Assert.Equal(200 - cost, result.Attacker.Attributes.HP); // user paid exactly the cost
         Assert.False(result.Has<DamageDealt>(), "Substitute deals no damage to the foe");
@@ -43,6 +43,7 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
             .Use(Move("tackle"));
 
         Assert.True(result.Has<SubstituteAbsorbedHit>());
+        Assert.False(result.Has<SubstituteBroke>(), "the decoy survived, so no break line");
         Assert.False(result.Has<DamageDealt>(), "the user behind the decoy takes no damage");
         Assert.Equal(300, result.Defender.Attributes.HP); // HP untouched
         Assert.InRange(result.Defender.Battle.SubstituteHp, 1, 199); // decoy soaked the hit but didn't break
@@ -80,7 +81,7 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
             .Defender(defender)
             .Use(Move("tackle"));
 
-        Assert.True(result.Has<SubstituteFaded>());
+        Assert.True(result.Has<SubstituteBroke>());
         Assert.Equal(0, result.Defender.Battle.SubstituteHp);
         // Gen 1: the overflow past the decoy's HP is NOT applied to the user.
         Assert.False(result.Has<DamageDealt>());
@@ -95,8 +96,9 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
 
         var result = await new MoveScenario().Attacker(user).Use(Move("substitute"));
 
-        Assert.True(result.Has<MoveMissed>());
-        Assert.False(result.Has<SubstitutePutUp>());
+        Assert.Equal("A", result.First<SubstituteAlreadyUp>()?.CreatureName);
+        Assert.False(result.Has<MoveMissed>());
+        Assert.False(result.Has<SubstituteCreated>());
         Assert.Equal(51, result.Attacker.Battle.SubstituteHp); // unchanged
         Assert.Equal(200, result.Attacker.Attributes.HP); // no extra HP paid
     }
@@ -109,9 +111,25 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
 
         var result = await new MoveScenario().Attacker(user).Use(Move("substitute"));
 
-        Assert.True(result.Has<MoveMissed>());
+        Assert.True(result.Has<SubstituteTooWeak>());
+        Assert.False(result.Has<MoveMissed>());
         Assert.Equal(0, result.Attacker.Battle.SubstituteHp); // no decoy raised
         Assert.Equal(40, result.Attacker.Attributes.HP); // HP unchanged
+    }
+
+    [Fact]
+    public async Task AStandingSubstituteOutranksTooWeakAndLeavesTheByteAlone()
+    {
+        var user = TestCreatures.Make("A", hp: 200); // cost is 50
+        user.Attributes.ReceiveDamage(160);
+        user.Battle.SubstituteHp = 51;
+        user.Battle.SubstituteRemnant = 7;
+
+        var result = await new MoveScenario().Attacker(user).Use(Move("substitute"));
+
+        Assert.True(result.Has<SubstituteAlreadyUp>());
+        Assert.False(result.Has<SubstituteTooWeak>());
+        Assert.Equal(7, result.Attacker.Battle.SubstituteRemnant);
     }
 
     // pokered substitute.asm fails only on an underflow, so paying the user's last HP still raises the decoy.
@@ -123,7 +141,7 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
 
         var result = await new MoveScenario().Attacker(user).Use(Move("substitute"));
 
-        Assert.True(result.Has<SubstitutePutUp>());
+        Assert.True(result.Has<SubstituteCreated>());
         Assert.Equal(51, result.Attacker.Battle.SubstituteHp);
         Assert.Equal(0, result.Attacker.Attributes.HP);
         Assert.False(result.Attacker.IsAlive());
@@ -179,7 +197,7 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
             .Defender(defender)
             .Use(Move("body-slam"));
 
-        Assert.True(result.Has<SubstituteFaded>(), "the decoy broke on this hit");
+        Assert.True(result.Has<SubstituteBroke>(), "the decoy broke on this hit");
         Assert.Equal(StatusCondition.None, result.Defender.Battle.Status); // …but the paralysis was shielded
         Assert.False(result.Has<StatusApplied>());
     }
@@ -224,16 +242,16 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
         var events = emitter.Events.ToList();
         // The player re-raises the decoy each time it breaks (paying the cost again) until it can no
         // longer afford it — so a Substitute goes up at least once and soaks real enemy hits on later turns.
-        Assert.Contains(events, e => e is SubstitutePutUp);
+        Assert.Contains(events, e => e is SubstituteCreated);
         Assert.Contains(events, e => e is SubstituteAbsorbedHit);
 
-        int fadedIdx = events.FindIndex(e => e is SubstituteFaded);
+        int brokeIdx = events.FindIndex(e => e is SubstituteBroke);
         int playerHitIdx = events.FindIndex(e => e is DamageDealt d && d.TargetName == "Player");
-        Assert.True(fadedIdx >= 0, "the decoy eventually broke");
+        Assert.True(brokeIdx >= 0, "the decoy eventually broke");
         // The user only takes real HP damage once it can no longer keep a decoy up — never while one
-        // stands (the decoy soaks everything). So the first hit on the user follows a faded decoy.
+        // stands (the decoy soaks everything). So the first hit on the user follows a broken decoy.
         Assert.True(
-            playerHitIdx > fadedIdx,
+            playerHitIdx > brokeIdx,
             "the user took no real damage until the decoy broke (Gen 1)"
         );
         Assert.False(player.IsAlive());
@@ -277,7 +295,7 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
         );
         await battle.StartFightAsync();
 
-        Assert.Contains(emitter.Of<SubstitutePutUp>(), e => e.CreatureName == "Lead");
+        Assert.Contains(emitter.Of<SubstituteCreated>(), e => e.CreatureName == "Lead");
         Assert.Contains(emitter.Of<CreatureFainted>(), e => e.Name == "Lead");
         Assert.DoesNotContain(emitter.Of<DamageDealt>(), d => d.TargetName == "Lead");
         Assert.Equal("Bench", Assert.Single(emitter.Of<CreatureSwitchedIn>()).Name);
@@ -393,7 +411,7 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
         var absorbed = Assert.Single(emitter.Of<SubstituteAbsorbedHit>());
         Assert.Equal("Foe", absorbed.CreatureName);
         Assert.Equal(200 - damage, absorbed.SubstituteHpAfter);
-        Assert.Empty(emitter.Of<SubstituteFaded>());
+        Assert.Empty(emitter.Of<SubstituteBroke>());
     }
 
     [Fact]
@@ -417,9 +435,105 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
         int absorbed = events.FindIndex(e =>
             e is SubstituteAbsorbedHit a && a.CreatureName == "Foe"
         );
-        int faded = events.FindIndex(e => e is SubstituteFaded f && f.CreatureName == "Foe");
+        int broke = events.FindIndex(e => e is SubstituteBroke b && b.CreatureName == "Foe");
         Assert.True(absorbed >= 0, "the took-damage line prints first");
-        Assert.True(faded > absorbed, "the break line follows it");
+        Assert.True(broke > absorbed, "the break line follows it");
+    }
+
+    private sealed class AlternateLinesRules : SelfHitRules
+    {
+        public override SubstituteBreakAnnouncement SubstituteBreakAnnouncement =>
+            SubstituteBreakAnnouncement.TookDamageThenFaded;
+
+        public override SubstituteSetupAnnouncement SubstituteSetupAnnouncement =>
+            SubstituteSetupAnnouncement.UserMade;
+
+        public override SubstituteFailureAnnouncement SubstituteFailureAnnouncement =>
+            SubstituteFailureAnnouncement.Failed;
+    }
+
+    private async Task<MoveResult> BreakFoesDecoy(IBattleRules? rules = null)
+    {
+        var foe = TestCreatures.Make("Foe", hp: 300, defense: 100);
+        foe.Battle.SubstituteHp = 1;
+        var scenario = new MoveScenario()
+            .Attacker(TestCreatures.Make("A", attack: 150))
+            .Defender(foe);
+        return await (rules is null ? scenario : scenario.Rules(rules)).Use(Move("tackle"));
+    }
+
+    [Fact]
+    public async Task ABreakingHitPrintsTheTookDamageLineBeforeTheBreakLine()
+    {
+        var result = await BreakFoesDecoy();
+
+        AssertStruckThenBroke(result.Emitter);
+        Assert.False(result.Has<SubstituteFaded>());
+    }
+
+    [Fact]
+    public async Task TheRulesPickTheFadedLineOnABreak()
+    {
+        var result = await BreakFoesDecoy(new AlternateLinesRules());
+
+        Assert.True(result.Has<SubstituteAbsorbedHit>());
+        Assert.True(result.Has<SubstituteFaded>());
+        Assert.False(result.Has<SubstituteBroke>());
+    }
+
+    [Fact]
+    public void TheRulesPickTheFadedLineOnASelfHitBreak()
+    {
+        var user = SelfHitter(substituteHp: 51);
+        var foe = TestCreatures.Make("Foe", hp: 300);
+        foe.Battle.SubstituteHp = 1;
+
+        var emitter = ForceSelfHit(user, foe, new AlternateLinesRules());
+
+        Assert.Single(emitter.Of<SubstituteFaded>());
+        Assert.Empty(emitter.Of<SubstituteBroke>());
+    }
+
+    [Fact]
+    public async Task TheRulesPickTheFailedLineWhenASubstituteIsAlreadyUp()
+    {
+        var user = TestCreatures.Make("A", hp: 200);
+        user.Battle.SubstituteHp = 51;
+
+        var result = await new MoveScenario()
+            .Attacker(user)
+            .Rules(new AlternateLinesRules())
+            .Use(Move("substitute"));
+
+        Assert.True(result.Has<MoveFailed>());
+        Assert.False(result.Has<SubstituteAlreadyUp>());
+    }
+
+    [Fact]
+    public async Task TheRulesPickTheFailedLineWhenTooWeak()
+    {
+        var user = TestCreatures.Make("A", hp: 200);
+        user.Attributes.ReceiveDamage(160);
+
+        var result = await new MoveScenario()
+            .Attacker(user)
+            .Rules(new AlternateLinesRules())
+            .Use(Move("substitute"));
+
+        Assert.True(result.Has<MoveFailed>());
+        Assert.False(result.Has<SubstituteTooWeak>());
+    }
+
+    [Fact]
+    public async Task TheRulesPickTheMadeLineOnSetup()
+    {
+        var result = await new MoveScenario()
+            .Attacker(TestCreatures.Make("A", hp: 200))
+            .Rules(new AlternateLinesRules())
+            .Use(Move("substitute"));
+
+        Assert.True(result.Has<SubstituteMade>());
+        Assert.False(result.Has<SubstituteCreated>());
     }
 
     [Fact]
@@ -452,7 +566,7 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
         Assert.Equal(200 - damage, foe.Battle.SubstituteRemnant);
         Assert.Equal(0, foe.Battle.SubstituteHp);
         Assert.Single(emitter.Of<SubstituteAbsorbedHit>());
-        Assert.Empty(emitter.Of<SubstituteFaded>());
+        Assert.Empty(emitter.Of<SubstituteBroke>());
     }
 
     [Fact]
@@ -525,7 +639,7 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
         AssertUserUntouched(user, 51);
         Assert.Equal(300, foe.Attributes.HP);
         Assert.True(result.Has<SubstituteAbsorbedHit>());
-        Assert.True(result.Has<SubstituteFaded>());
+        Assert.True(result.Has<SubstituteBroke>());
     }
 
     [Fact]
@@ -541,7 +655,7 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
 
         Assert.True(result.Has<CrashDamage>());
         Assert.False(result.Has<SubstituteAbsorbedHit>());
-        Assert.False(result.Has<SubstituteFaded>());
+        Assert.False(result.Has<SubstituteBroke>());
     }
 
     [Fact]
@@ -594,7 +708,7 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
 
         var result = await new MoveScenario().Attacker(user).Use(Move("substitute"));
 
-        Assert.False(result.Has<SubstitutePutUp>());
+        Assert.False(result.Has<SubstituteCreated>());
         Assert.Equal(50, result.Attacker.Battle.SubstituteRemnant);
     }
 
@@ -623,7 +737,7 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
             .Defender(defender)
             .Use(Move("seismic-toss"));
 
-        Assert.True(result.Has<SubstituteFaded>());
+        Assert.True(result.Has<SubstituteBroke>());
         Assert.Equal(216, result.Defender.Battle.SubstituteRemnant);
     }
 
@@ -715,7 +829,7 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
         Assert.Equal(30, confusion.HpAfter);
         Assert.Equal("Bench", absorbed.CreatureName);
         Assert.Equal(100 - confusion.Damage, absorbed.SubstituteHpAfter);
-        Assert.DoesNotContain(events, e => e is SubstituteFaded f && f.CreatureName == "Bench");
+        Assert.DoesNotContain(events, e => e is SubstituteBroke b && b.CreatureName == "Bench");
         Assert.Equal(400, bench.Attributes.HP);
     }
 
@@ -733,7 +847,7 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
             .Defender(defender)
             .Use(Move("guillotine"));
 
-        Assert.True(result.Has<SubstituteFaded>());
+        Assert.True(result.Has<SubstituteBroke>());
         Assert.Equal(0, result.Defender.Battle.SubstituteHp);
         Assert.Equal(50, result.Defender.Battle.SubstituteRemnant);
         Assert.Equal(10, result.Defender.Attributes.HP);

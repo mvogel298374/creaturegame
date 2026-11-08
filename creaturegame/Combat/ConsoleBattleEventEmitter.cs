@@ -96,16 +96,32 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                 Console.WriteLine("But nothing happened!");
                 break;
 
-            case SubstitutePutUp e:
-                Console.WriteLine($"{e.CreatureName} put up a substitute!");
+            case SubstituteCreated:
+                Console.WriteLine("It created a SUBSTITUTE!");
+                break;
+
+            case SubstituteMade e:
+                Console.WriteLine($"{e.CreatureName} made a SUBSTITUTE!");
+                break;
+
+            case SubstituteAlreadyUp e:
+                Console.WriteLine($"{e.CreatureName} has a SUBSTITUTE!");
+                break;
+
+            case SubstituteTooWeak:
+                Console.WriteLine("Too weak to make a SUBSTITUTE!");
                 break;
 
             case SubstituteAbsorbedHit e:
-                Console.WriteLine($"The substitute took damage for {e.CreatureName}!");
+                Console.WriteLine($"The SUBSTITUTE took damage for {e.CreatureName}!");
+                break;
+
+            case SubstituteBroke e:
+                Console.WriteLine($"{e.CreatureName}'s SUBSTITUTE broke!");
                 break;
 
             case SubstituteFaded e:
-                Console.WriteLine($"{e.CreatureName}'s substitute faded!");
+                Console.WriteLine($"{e.CreatureName}'s SUBSTITUTE faded!");
                 break;
 
             case DamageDealt e:

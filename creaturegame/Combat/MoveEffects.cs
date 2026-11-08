@@ -473,26 +473,27 @@ public sealed class SubstituteEffect : IMoveEffect
     public void Apply(MoveEffectContext ctx)
     {
         // Cost, decoy HP and the exact-cost KO: GEN_DIFFERENCES.md → Gen 1 Status Quirks (Substitute).
+        var failure = ctx.Rules.SubstituteFailureAnnouncement;
         if (ctx.Source.Battle.SubstituteHp > 0)
         {
-            ctx.Emitter?.Emit(
-                new MoveMissed(ctx.Source.Name, ctx.Source.Id, ctx.Attack.Name ?? "")
-            );
+            ctx.Emitter?.Emit(SubstituteStrikes.FailureLine(failure, ctx.Source, alreadyUp: true));
             return;
         }
         int cost = ctx.Source.Attributes.MaxHP / 4;
         ctx.Source.Battle.SubstituteRemnant = cost;
         if (ctx.Source.Attributes.HP < cost)
         {
-            ctx.Emitter?.Emit(
-                new MoveMissed(ctx.Source.Name, ctx.Source.Id, ctx.Attack.Name ?? "")
-            );
+            ctx.Emitter?.Emit(SubstituteStrikes.FailureLine(failure, ctx.Source, alreadyUp: false));
             return;
         }
         ctx.Source.Attributes.ReceiveDamage(cost);
         ctx.Source.Battle.SubstituteHp = cost + 1;
         ctx.Emitter?.Emit(
-            new SubstitutePutUp(ctx.Source.Name, ctx.Source.Id, ctx.Source.Battle.SubstituteHp)
+            SubstituteStrikes.SetupLine(
+                ctx.Rules.SubstituteSetupAnnouncement,
+                ctx.Source,
+                ctx.Source.Battle.SubstituteHp
+            )
         );
     }
 }

@@ -52,7 +52,7 @@ None open.
 
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
-| **A Substitute break prints the wrong lines** (§3.1) | S | ✗ 1, 2, 3, 6 (1, 3, 6 drafted) | Found 2026-11-08. Central `AttackAction`; one design pass. |
+| **A hit on a Substitute loses its crit and effectiveness lines** (§3.1) | S | ✗ 2, 3; the rest drafted | Found 2026-11-08. The lines live inside `DamageDealt`, which a soaked hit never emits. |
 | **Pre-hit-test cluster** — Mist + thaw; Substitute stops a stat-down move before accuracy; Substitute lets sleep/paralysis through; status-move checks ahead of the hit test (§3.1) | M | ✗ 2, 3 each; 1, 5, 6, 7 drafted for Mist + thaw and sleep/paralysis, 6 for the status-move checks, none for the stat-down entry | One design pass: all four move logic ahead of the hit test. |
 | **Pre-move-check cluster** — `CanAct` status order; a replacement frees the trapped foe; Disable countdown (§3.1) | M | ✗ 2, 3 each | One design pass: all three live in the pre-move check. |
 | **Fly and Dig don't dodge anything** (§3.1) | M | ✗ 2, 3; the rest drafted | Found 2026-11-03. Central hit check; pairs with the pre-hit-test cluster. |
@@ -170,14 +170,16 @@ data/engine item usually also means updating the test that pins the wrong value.
   **DoR (V16):** ✗ not Ready — gaps **2** (touches `Battle`: `opus-engineer` plus both gates, or fold into the
   `CanAct` design pass above) and **3**. *Gap 3, drafted:* gen-invariant if Gen 2 also frees the bind on send-out;
   verify at pokecrystal before calling it.
-- **A Substitute break prints the wrong lines (found 2026-11-08) — S, ✗ not Ready.** *Intent:* on a break Gen 1 prints
-  "The SUBSTITUTE took damage for <TARGET>!" and then "<TARGET>'s SUBSTITUTE broke!" (`core.asm:4857`, `:4884`). Ours
-  prints only "<name>'s substitute faded!" (`AttackAction.DealDamageToTarget`, `timeline.ts` `SubstituteFaded`).
-  **DoR:** ✗ gaps **1** (*drafted:* a breaking hit logs both lines in order), **2** (a design pass: where the two
-  lines come from), **3** (*drafted:* a seam for the break narration; Gen 2 text unread), **6** (*drafted:* the
-  took-damage line also prints on the breaking hit). 4 above, 5 runtime only, 7 none. Self-inflicted Substitute damage
-  (shipped 2026-11-08, see the archive) emits both events, so it is correct in order but keeps the "faded" wording until this item, including when
-  the break line prints for a Substitute that never stood.
+- **A hit on a Substitute loses its crit and effectiveness lines (found 2026-11-08) — S, ✗ not Ready.** *Intent:* in
+  Gen 1 a hit soaked by a Substitute still prints "Critical hit!" and the effectiveness line after the Substitute lines
+  (`core.asm:3227-3229`, `:5627-5629`: `PrintCriticalOHKOText` and `DisplayEffectiveness` run after
+  `ApplyAttack…Pokemon` returns from `AttackSubstitute`). Ours appends both to the `DamageDealt` line (`timeline.ts`),
+  and a soaked hit returns from `AttackAction.DealDamageToTarget` before emitting it.
+  **DoR:** ✗ gaps **2** (a design pass: how the lines reach the client without a `DamageDealt`; touches `AttackAction`)
+  and **3** (Gen 2 unread; `BattleCommand_CriticalText` is the place to start). *Drafted:* **1** a crit or a
+  non-neutral hit on a Substitute logs its lines after the Substitute lines, and the HP is unchanged; **5** runtime
+  only; **6** the crit line still prints when the real creature took no damage; **7** none open; the Substitute lines
+  it follows are in place (`SubstituteStrikes.AnnounceStrike`). **4** the cites in the intent.
 - **Gen 1 Mist, thaw and Leech Seed fidelity (from §7.6 V10) — M, ✗ not Ready.** *Intent:* Mist only blocks
   primary stat-down moves, as a miss before the accuracy roll; a Substitute stops a Fire thaw; the Leech Seed drain
   is multiplied by the Toxic counter. *Gaps:* touches `AttackAction`/`Battle` (central, `opus-engineer` + both
@@ -272,7 +274,8 @@ data/engine item usually also means updating the test that pins the wrong value.
   only out-of-battle or ancillary behaviour may stay inline. `GENERATION_SEAMS.md` still documents deliberate inline
   rules, among them the freeze thaw and Explosion/Self-Destruct fainting on a miss (row "Freeze", "inline in
   `AttackAction`"), Disable's target move and Conversion ("not yet a seam"), and Confuse's never-re-rolled counter
-  ("gen-agnostic and inline in `ConfuseEffect`") (read-confirmed 2026-10-31).
+  ("gen-agnostic and inline in `ConfuseEffect`") (read-confirmed 2026-10-31). Also `SubstituteEffect`'s can't-pay
+  check: Gen 1 fails only below the cost, Gen 2 at exactly the cost too (`GENERATION_SEAMS.md` §2, Substitute lines).
   **DoR:** ✗ not Ready — gaps **1, 2**; the rest follow from the slice. *Drafted:*
   - **Acceptance:** a verify slice lists every inline battle rule in the engine (the `GENERATION_SEAMS.md` rows plus
     a code sweep of `Combat/`), each with its pokered cite; each then gets its own seam member and a test that a

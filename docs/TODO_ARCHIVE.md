@@ -8,6 +8,44 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §3.1 Substitute prints Gen 1's lines ✅ DONE (2026-11-08)
+
+S; found 2026-11-08 (follow-on to the self-hit entry below); design ruled 2026-11-08.
+
+**Problem.** Ours printed "<name>'s substitute faded!" on a break, "<name> put up a substitute!" on setup and
+"<name>'s Substitute missed!" on both failures. Gen 1 prints "The SUBSTITUTE took damage for <TARGET>!" and, on a
+breaking hit, "<TARGET>'s SUBSTITUTE broke!" (ordinary and self-inflicted hits alike, including a break on a Substitute
+that never stood); setup prints "It created a SUBSTITUTE!"; an existing Substitute prints "<USER> has a SUBSTITUTE!" and
+too little HP "Too weak to make a SUBSTITUTE!".
+
+**Rulings (Mo, 2026-11-08).** "SUBSTITUTE" in capitals on every line. The setup line, and then the two failure lines,
+joined this item. The crit and effectiveness lines of a soaked hit were filed separately (*A hit on a Substitute loses
+its crit and effectiveness lines*, open in `TODO.md`).
+
+**Outcome.** Three `IBattleRules` members: `SubstituteBreakAnnouncement` (enum `TookDamageThenBroke`, Gen 1, and
+`TookDamageThenFaded`; carries line order as well as wording), `SubstituteSetupAnnouncement` (`SubstituteCreated` in
+Gen 1, or `SubstituteMade`) and `SubstituteFailureAnnouncement` (`NamedReason`, or `Failed` via `MoveFailed`), with
+`DelegatingBattleRules` pass-throughs. Events: `SubstituteCreated` (replaces `SubstitutePutUp`, same fields),
+`SubstituteMade`, `SubstituteBroke`, `SubstituteAlreadyUp`, `SubstituteTooWeak`, beside the existing `SubstituteFaded`;
+each projected in the SignalR emitter, the console emitter and `timeline.ts`. `SubstituteStrikes.AnnounceStrike` is shared
+by `AttackAction` and `SelfInflictedDamage`. Runtime only; no data change. Gen 2 keeps the took-damage line first, breaks
+with "<TARGET>'s SUBSTITUTE faded!", sets up with "<USER> made a SUBSTITUTE!" and has the same two failure lines.
+Docs: `GENERATION_SEAMS.md` §2, `GENERATION_PROFILE.md`, `GEN_DIFFERENCES.md`.
+
+**Gen 1 source.** pokered `engine/battle/core.asm:4857`, `:4884`, `_SubstituteTookDamageText`, `_SubstituteBrokeText`,
+`_SubstituteText`; `engine/battle/move_effects/substitute.asm` `.alreadyHasSubstitute`, `.notEnoughHP`,
+`_HasSubstituteText`, `_TooWeakSubstituteText`. Gen 2: pokecrystal `engine/battle/effect_commands.asm:3498-3525`,
+`engine/battle/move_effects/substitute.asm` `.already_has_sub`, `.too_weak_to_sub`, `data/text/battle.asm`
+`MadeSubstituteText`, `HasSubstituteText`, `TooWeakSubText`, `SubTookDamageText`, `SubFadedText`.
+
+**Reviews.** `requirements-review` ran before the failure lines were folded in and was not re-run, on Mo's approval.
+`pr-review` PR-READY; it source-checked the failure lines' text and control flow. Added a test that a standing
+Substitute outranks too-weak. Deferred by Mo to the seam-audit entry in `TODO.md` (*Audit the inline battle rules and put each behind a seam*):
+the Gen 2 too-weak condition (fails at exactly the cost), inline in `SubstituteEffect`. Waived by Mo: renaming
+`SubstituteStrikes` to `SubstituteLines` and evening out its parameters. E2E did not run.
+
+---
+
 ## §3.1 Self-hit and crash damage strike the foe's Substitute ✅ DONE (2026-11-08)
 
 S–M; found 2026-11-07; designed 2026-11-08. Implemented in the main session, not delegated to `opus-engineer`.
@@ -48,8 +86,8 @@ check. OHKO: `one_hit_ko.asm` sets `wDamage` to `$FFFF`. Gen 2 `false`: `HitConf
 which ignores every Substitute (pokecrystal `engine/battle/effect_commands.asm:520-521`, `:627-628`, `:2249-2253`,
 `:3448`); OHKO 65535 (`:5449-5452`). Docs: `GENERATION_SEAMS.md` §2, `GEN_DIFFERENCES.md`, `STATE_MODEL.md`.
 
-**Carried to another entry.** *A Substitute break prints the wrong lines* (TODO §3.1): self-inflicted damage emits both
-events in the right order but keeps the "faded" wording. `requirements-review` residual: no whole-repo pokered search for
+**Carried to another entry.** *Substitute prints Gen 1's lines* (below, done 2026-11-08): self-inflicted damage emitted both
+events in the right order but kept the "faded" wording. `requirements-review` residual: no whole-repo pokered search for
 another writer of the Substitute byte.
 
 ---

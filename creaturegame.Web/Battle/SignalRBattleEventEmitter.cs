@@ -496,8 +496,8 @@ public sealed class SignalRBattleEventEmitter(
             ),
             AlreadyAsleep e => ("AlreadyAsleep", new { e.TargetName, e.TargetId }),
             ButNothingHappened e => ("ButNothingHappened", new { e.CreatureName, e.CreatureId }),
-            SubstitutePutUp e => (
-                "SubstitutePutUp",
+            SubstituteCreated e => (
+                "SubstituteCreated",
                 new
                 {
                     e.CreatureName,
@@ -505,6 +505,17 @@ public sealed class SignalRBattleEventEmitter(
                     e.SubstituteHp,
                 }
             ),
+            SubstituteMade e => (
+                "SubstituteMade",
+                new
+                {
+                    e.CreatureName,
+                    e.CreatureId,
+                    e.SubstituteHp,
+                }
+            ),
+            SubstituteAlreadyUp e => ("SubstituteAlreadyUp", new { e.CreatureName, e.CreatureId }),
+            SubstituteTooWeak => ("SubstituteTooWeak", new { }),
             SubstituteAbsorbedHit e => (
                 "SubstituteAbsorbedHit",
                 new
@@ -514,6 +525,7 @@ public sealed class SignalRBattleEventEmitter(
                     e.SubstituteHpAfter,
                 }
             ),
+            SubstituteBroke e => ("SubstituteBroke", new { e.CreatureName, e.CreatureId }),
             SubstituteFaded e => ("SubstituteFaded", new { e.CreatureName, e.CreatureId }),
             DamageDealt e => (
                 "DamageDealt",

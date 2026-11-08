@@ -321,14 +321,27 @@ public record AlreadyAsleep(string TargetName, int TargetId) : BattleEvent;
 /// <summary>A move with no effect by design (Splash) resolved — the Gen 1 "But nothing happened!" line.</summary>
 public record ButNothingHappened(string CreatureName, int CreatureId) : BattleEvent;
 
-/// <summary>The user spent HP to put up a Substitute decoy with <paramref name="SubstituteHp"/> HP.</summary>
-public record SubstitutePutUp(string CreatureName, int CreatureId, int SubstituteHp) : BattleEvent;
+/// <summary>The user spent HP on a Substitute with <paramref name="SubstituteHp"/> HP: "It created a SUBSTITUTE!".</summary>
+public record SubstituteCreated(string CreatureName, int CreatureId, int SubstituteHp)
+    : BattleEvent;
+
+/// <summary>The user spent HP on a Substitute with <paramref name="SubstituteHp"/> HP: "&lt;USER&gt; made a SUBSTITUTE!".</summary>
+public record SubstituteMade(string CreatureName, int CreatureId, int SubstituteHp) : BattleEvent;
+
+/// <summary>A Substitute was already up: "&lt;USER&gt; has a SUBSTITUTE!".</summary>
+public record SubstituteAlreadyUp(string CreatureName, int CreatureId) : BattleEvent;
+
+/// <summary>The user couldn't pay the HP cost: "Too weak to make a SUBSTITUTE!".</summary>
+public record SubstituteTooWeak : BattleEvent;
 
 /// <summary>An incoming hit was soaked by the creature's Substitute (the user took no damage).</summary>
 public record SubstituteAbsorbedHit(string CreatureName, int CreatureId, int SubstituteHpAfter)
     : BattleEvent;
 
-/// <summary>The Substitute ran out of HP and broke — the user is exposed again.</summary>
+/// <summary>A Substitute broke: "&lt;TARGET&gt;'s SUBSTITUTE broke!".</summary>
+public record SubstituteBroke(string CreatureName, int CreatureId) : BattleEvent;
+
+/// <summary>A Substitute broke: "&lt;TARGET&gt;'s SUBSTITUTE faded!".</summary>
 public record SubstituteFaded(string CreatureName, int CreatureId) : BattleEvent;
 
 public record DamageDealt(

@@ -835,19 +835,37 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       return { steps: [w(650), d(log('But nothing happened!')), w(800)] };
     }
 
-    case 'SubstitutePutUp': {
+    case 'SubstituteCreated': {
+      return { steps: [w(300), d(log('It created a SUBSTITUTE!')), w(600)] };
+    }
+
+    case 'SubstituteMade': {
       const name = payload.creatureName as string;
-      return { steps: [w(300), d(log(`${name} put up a substitute!`)), w(600)] };
+      return { steps: [w(300), d(log(`${name} made a SUBSTITUTE!`)), w(600)] };
+    }
+
+    case 'SubstituteAlreadyUp': {
+      const name = payload.creatureName as string;
+      return { steps: [w(300), d(log(`${name} has a SUBSTITUTE!`)), w(600)] };
+    }
+
+    case 'SubstituteTooWeak': {
+      return { steps: [w(300), d(log('Too weak to make a SUBSTITUTE!')), w(600)] };
     }
 
     case 'SubstituteAbsorbedHit': {
       const name = payload.creatureName as string;
-      return { steps: [w(300), d(log(`The substitute took damage for ${name}!`)), w(600)] };
+      return { steps: [w(300), d(log(`The SUBSTITUTE took damage for ${name}!`)), w(600)] };
+    }
+
+    case 'SubstituteBroke': {
+      const name = payload.creatureName as string;
+      return { steps: [w(300), d(log(`${name}'s SUBSTITUTE broke!`)), w(600)] };
     }
 
     case 'SubstituteFaded': {
       const name = payload.creatureName as string;
-      return { steps: [w(300), d(log(`${name}'s substitute faded!`)), w(600)] };
+      return { steps: [w(300), d(log(`${name}'s SUBSTITUTE faded!`)), w(600)] };
     }
 
     case 'DamageDealt': {

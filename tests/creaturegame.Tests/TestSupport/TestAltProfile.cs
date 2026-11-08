@@ -183,6 +183,15 @@ internal static class TestAltProfile
 
         public override bool RampageEndOverwritesConfusion => false;
 
+        public override SubstituteBreakAnnouncement SubstituteBreakAnnouncement =>
+            SubstituteBreakAnnouncement.TookDamageThenFaded;
+
+        public override SubstituteSetupAnnouncement SubstituteSetupAnnouncement =>
+            SubstituteSetupAnnouncement.UserMade;
+
+        public override SubstituteFailureAnnouncement SubstituteFailureAnnouncement =>
+            SubstituteFailureAnnouncement.Failed;
+
         public override bool HealFails(int currentHp, int maxHp) => currentHp >= maxHp;
 
         public override MoveFailureAnnouncement HealFailureAnnouncement =>

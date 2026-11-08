@@ -78,7 +78,7 @@ public class WebEventContractTests
         var unhandled = ConcreteBattleEventTypes()
             .Select(t => t.Name)
             // The case labels are written `case 'Name':` / `case 'Name' {` — match including the closing
-            // quote so a shorter name can't match a longer one's label (e.g. 'Substitute' vs 'SubstitutePutUp').
+            // quote so a shorter name can't match a longer one's label (e.g. 'Substitute' vs 'SubstituteMade').
             .Where(name => !expandBody.Contains($"case '{name}'"))
             .OrderBy(name => name)
             .ToList();

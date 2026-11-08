@@ -58,6 +58,36 @@ public enum RampageRepeatAnnouncement
     ThrashingAbout,
 }
 
+/// <summary>The lines a hit that breaks a Substitute prints. See GENERATION_SEAMS.md §2.</summary>
+public enum SubstituteBreakAnnouncement
+{
+    /// <summary><see cref="SubstituteAbsorbedHit"/>, then "&lt;TARGET&gt;'s SUBSTITUTE broke!" (<see cref="SubstituteBroke"/>). Gen 1.</summary>
+    TookDamageThenBroke,
+
+    /// <summary><see cref="SubstituteAbsorbedHit"/>, then "&lt;TARGET&gt;'s SUBSTITUTE faded!" (<see cref="SubstituteFaded"/>).</summary>
+    TookDamageThenFaded,
+}
+
+/// <summary>The line a successful Substitute prints. See GENERATION_SEAMS.md §2.</summary>
+public enum SubstituteSetupAnnouncement
+{
+    /// <summary>"It created a SUBSTITUTE!" (<see cref="SubstituteCreated"/>). Gen 1.</summary>
+    ItCreated,
+
+    /// <summary>"&lt;USER&gt; made a SUBSTITUTE!" (<see cref="SubstituteMade"/>).</summary>
+    UserMade,
+}
+
+/// <summary>The line a Substitute that can't be raised prints. See GENERATION_SEAMS.md §2.</summary>
+public enum SubstituteFailureAnnouncement
+{
+    /// <summary>"&lt;USER&gt; has a SUBSTITUTE!" or "Too weak to make a SUBSTITUTE!". Gen 1.</summary>
+    NamedReason,
+
+    /// <summary>"But it failed!" (<see cref="MoveFailed"/>).</summary>
+    Failed,
+}
+
 /// <summary>Where a move's crit and damage rolls fall relative to its accuracy roll. See GENERATION_SEAMS.md §2.</summary>
 public enum HitRollOrder
 {
@@ -215,6 +245,15 @@ public interface IBattleRules
 
     /// <summary>The damage an OHKO deals a standing Substitute. See GENERATION_SEAMS.md §2.</summary>
     int OhkoDamageToSubstitute { get; }
+
+    /// <summary>The lines a hit that breaks a Substitute prints. See GENERATION_SEAMS.md §2.</summary>
+    SubstituteBreakAnnouncement SubstituteBreakAnnouncement { get; }
+
+    /// <summary>The line a successful Substitute prints. See GENERATION_SEAMS.md §2.</summary>
+    SubstituteSetupAnnouncement SubstituteSetupAnnouncement { get; }
+
+    /// <summary>The line a Substitute that can't be raised prints. See GENERATION_SEAMS.md §2.</summary>
+    SubstituteFailureAnnouncement SubstituteFailureAnnouncement { get; }
 
     /// <summary>The byte a strike leaves and whether it broke. See GENERATION_SEAMS.md §2.</summary>
     SubstituteStrike StrikeSubstituteByte(int remnant, int damage);

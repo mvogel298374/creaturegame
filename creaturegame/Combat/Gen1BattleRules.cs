@@ -310,6 +310,16 @@ public sealed class Gen1BattleRules : IBattleRules
     // pokered move_effects/one_hit_ko.asm sets wDamage to $FFFF.
     public int OhkoDamageToSubstitute => 65535;
 
+    // pokered core.asm AttackSubstitute prints the took-damage line before it strikes.
+    public SubstituteBreakAnnouncement SubstituteBreakAnnouncement =>
+        SubstituteBreakAnnouncement.TookDamageThenBroke;
+
+    public SubstituteSetupAnnouncement SubstituteSetupAnnouncement =>
+        SubstituteSetupAnnouncement.ItCreated;
+
+    public SubstituteFailureAnnouncement SubstituteFailureAnnouncement =>
+        SubstituteFailureAnnouncement.NamedReason;
+
     // pokered core.asm AttackSubstitute: the byte wraps; damage above 255 breaks without writing it.
     public SubstituteStrike StrikeSubstituteByte(int remnant, int damage)
     {

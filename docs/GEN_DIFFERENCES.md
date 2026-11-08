@@ -286,6 +286,10 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
   (`move_effects/substitute.asm`). Seam: `GENERATION_SEAMS.md` §2. Not replicated, waived 2026-11-08 as unobservable:
   a break also zeroes the attacker's move-effect byte (`.nullifyEffect`), but a self-hit or crash has already ended
   the move.
+- **Substitute's lines differ by generation.** Both print "The SUBSTITUTE took damage for <TARGET>!" on every hit,
+  including the breaking one. Gen 1 then prints "<TARGET>'s SUBSTITUTE broke!" and Gen 2 "… faded!". Gen 1's setup
+  line is "It created a SUBSTITUTE!" and Gen 2's "<USER> made a SUBSTITUTE!". Both print "<USER> has a SUBSTITUTE!"
+  with one already up and "Too weak to make a SUBSTITUTE!" without the HP. Seam: `GENERATION_SEAMS.md` §2.
 - **Disable** picks a random move with PP left, and the lock is enforced at move selection (`Battle` and
   `IBattleInput` skip `DisabledMove`); its countdown timing is covered under the residual-phase bullet above.
 - **Leech Seed lands through a Substitute** in the English RBY this engine targets (reported blocked only in the
