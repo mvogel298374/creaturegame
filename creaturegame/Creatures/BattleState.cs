@@ -110,6 +110,9 @@ public sealed class BattleState
     // for floor(maxHP/4)+1 HP at a cost of floor(maxHP/4) of the user's own HP. Clears on battle reset.
     public int SubstituteHp { get; set; }
 
+    // The side's Substitute byte, left over once no decoy stands (GEN_DIFFERENCES.md, Substitute).
+    public int SubstituteRemnant { get; set; }
+
     // Counter: the damage this creature last took from a damaging move, and that move's type.
     // Counter returns 2× it when the type was Normal/Fighting (Gen 1). Persists until overwritten
     // by the next hit (a Gen 1 quirk — Counter can hit off a previous turn's damage).

@@ -8,6 +8,52 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §3.1 Self-hit and crash damage strike the foe's Substitute ✅ DONE (2026-11-08)
+
+S–M; found 2026-11-07; designed 2026-11-08. Implemented in the main session, not delegated to `opus-engineer`.
+
+**Problem.** When the confused user (or a crashing Jump Kick / Hi Jump Kick user) has a Substitute up, Gen 1 applies the
+damage to the **foe's** Substitute, not the user. Ours sent both to the user's HP and ignored Substitutes
+(`StatusResolver.CanAct`, `AttackAction.ApplyFailedHitSideEffects`).
+
+**Rulings (Mo, 2026-11-08).** (1) With no foe Substitute, replicate pokered, including the stale Substitute byte. (2) The
+attacker's move-effect zeroing on a break (`.nullifyEffect`) is waived as unobservable, since a self-hit or crash has
+already ended the move (`GEN_DIFFERENCES.md`). (3) `SubstituteRemnant` stays per-creature, carried in
+`Battle.BringInMember`; `STATE_MODEL.md` records that the enemy side must carry it when enemy parties land. (4) On the
+pr-review finding: an OHKO now always breaks a standing Substitute and leaves its byte unwritten, behind
+`IBattleRules.OhkoDamageToSubstitute` (65535); before this, a target with less HP than its decoy kept the decoy. (5) One
+shared `SubstituteStrikes.StrikeDecoy` helper for both strike paths; tests pin the byte on a standing decoy and across a
+forced faint-switch. (6) No re-run of pr-review.
+
+**Acceptance (met).** With the user behind a Substitute, a forced self-hit or crash leaves the user's HP and own
+Substitute untouched, and: (a) a foe Substitute takes the damage, or breaks; (b) with no foe Substitute and a stale byte
+below the damage, it prints the took-damage line then the break line, nothing else changes; (c) with a stale byte at or
+above the damage, it prints only the took-damage line and the byte drops. With no user Substitute the damage hits the user
+as today; ordinary recoil (Double-Edge) still hits the user behind a Substitute.
+
+**Outcome.** New `SelfInflictedDamage.Apply` (called from `CanAct` and `ApplyFailedHitSideEffects`) and
+`SubstituteStrikes.StrikeDecoy`. The existing `ConfusionDamage` / `CrashDamage` event fires first with HP unchanged, then
+`SubstituteAbsorbedHit` and, on a break, `SubstituteFaded`, both naming the foe (no wire or client change). `BattleState`
+gains `SubstituteRemnant`, the side's stale byte: written on Substitute setup (also a too-weak setup, which writes before
+its HP check) and on every break, zero from `ResetBattleState` at battle start, carried across `Battle.BringInMember`.
+Zero damage does nothing. `IBattleRules` members: `SelfInflictedDamageStrikesFoeSubstitute` (Gen 1 `true`),
+`StrikeSubstituteByte(remnant, damage)` returning `SubstituteStrike(Remnant, Broke)`, and `OhkoDamageToSubstitute`
+(65535), with `DelegatingBattleRules` pass-throughs. Runtime only; no data change.
+
+**Gen 1 source.** `engine/battle/core.asm`: `AttackSubstitute` `:4849-4902` picks the foe's byte by `hWhoseTurn`; the user's
+own flag routes there at `:4686-4687` / `:4805-4806`; player self-hit `:3672-3714`, enemy `:5770-5814`, crash
+`:3762-3773`. The byte wraps and any damage above 255 breaks without writing it. Bytes: `ram/wram.asm:448-449`, inside
+`wMiscBattleData`, zeroed by `InitBattleVariables` only. `move_effects/substitute.asm` writes the byte before the HP
+check. OHKO: `one_hit_ko.asm` sets `wDamage` to `$FFFF`. Gen 2 `false`: `HitConfusion` and the crash pass `c = TRUE`,
+which ignores every Substitute (pokecrystal `engine/battle/effect_commands.asm:520-521`, `:627-628`, `:2249-2253`,
+`:3448`); OHKO 65535 (`:5449-5452`). Docs: `GENERATION_SEAMS.md` §2, `GEN_DIFFERENCES.md`, `STATE_MODEL.md`.
+
+**Carried to another entry.** *A Substitute break prints the wrong lines* (TODO §3.1): self-inflicted damage emits both
+events in the right order but keeps the "faded" wording. `requirements-review` residual: no whole-repo pokered search for
+another writer of the Substitute byte.
+
+---
+
 ## §3.1 Rampage edge gaps: "is thrashing about!", a silent lock end, a fresh confusion counter ✅ DONE (2026-11-07)
 
 M; found 2026-11-03 in the Thrash fix review (see *Thrash and Petal Dance end a turn early*). Design and DoR lines approved

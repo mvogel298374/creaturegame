@@ -22,7 +22,9 @@ A `Creature` holds two kinds of state:
 The transient half is a separate object, `BattleState`, held as `Creature.Battle`.
 **Resetting between battles is a single line — `Battle = new BattleState()` — not a
 field-by-field wipe.** That one design choice is the whole point of this model, and
-section 4 explains why.
+section 4 explains why. One field outlives a switch: `SubstituteRemnant` belongs to the side, not the creature, so
+`Battle.BringInMember` carries it to the incoming creature (`GEN_DIFFERENCES.md`, Substitute). Only the player side
+switches today; when enemy parties land, the enemy's switch must carry it too.
 
 ---
 

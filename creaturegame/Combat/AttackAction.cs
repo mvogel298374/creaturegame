@@ -468,8 +468,14 @@ public class AttackAction : IBattleAction
         if (crashes && move.Effect == MoveEffect.Crash)
         {
             int crash = _rules.CalculateCrashDamage(Source);
-            Source.Attributes.ReceiveDamage(crash);
-            _emitter?.Emit(new CrashDamage(Source.Name, Source.Id, crash, Source.Attributes.HP));
+            SelfInflictedDamage.Apply(
+                Source,
+                Target,
+                crash,
+                _rules,
+                _emitter,
+                hp => new CrashDamage(Source.Name, Source.Id, crash, hp)
+            );
         }
     }
 
@@ -573,9 +579,10 @@ public class AttackAction : IBattleAction
                 break;
 
             case DamageCategory.OHKO:
-                // Against a Substitute the OHKO just breaks the decoy (the soak caps at the sub's HP);
-                // otherwise it removes the target's full current HP.
-                damage = Target.Attributes.HP;
+                damage =
+                    Target.Battle.SubstituteHp > 0
+                        ? _rules.OhkoDamageToSubstitute
+                        : Target.Attributes.HP;
                 DealDamageToTarget(damage, 1.0, false, move.DamageType);
                 break;
 
@@ -648,8 +655,7 @@ public class AttackAction : IBattleAction
     {
         if (Target.Battle.SubstituteHp > 0)
         {
-            Target.Battle.SubstituteHp = Math.Max(0, Target.Battle.SubstituteHp - dmg);
-            if (Target.Battle.SubstituteHp == 0)
+            if (SubstituteStrikes.StrikeDecoy(Target.Battle, dmg, _rules))
                 _emitter?.Emit(new SubstituteFaded(Target.Name, Target.Id));
             else
                 _emitter?.Emit(

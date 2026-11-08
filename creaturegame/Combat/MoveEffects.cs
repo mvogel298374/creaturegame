@@ -481,6 +481,7 @@ public sealed class SubstituteEffect : IMoveEffect
             return;
         }
         int cost = ctx.Source.Attributes.MaxHP / 4;
+        ctx.Source.Battle.SubstituteRemnant = cost;
         if (ctx.Source.Attributes.HP < cost)
         {
             ctx.Emitter?.Emit(

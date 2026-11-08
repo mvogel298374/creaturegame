@@ -657,13 +657,15 @@ public class Battle
     }
 
     /// <summary>Brings the party member at <paramref name="index"/> onto the field — the shared tail of both
-    /// switch paths. Resets volatiles, re-applies its OWN carried status (nothing leaks from the creature that
-    /// left), and records participation.</summary>
+    /// switch paths. Resets volatiles, re-applies its OWN carried status (no status leaks from the creature that
+    /// left), keeps the side's Substitute byte (STATE_MODEL.md), and records participation.</summary>
     private void BringInMember(int index)
     {
+        int substituteRemnant = PlayerCreature.Battle.SubstituteRemnant;
         _playerParty!.SetLead(index);
         PlayerCreature = _playerParty.Lead;
         PlayerCreature.ResetBattleState();
+        PlayerCreature.Battle.SubstituteRemnant = substituteRemnant;
         ApplyEntryStatus(PlayerCreature.CarriedStatus);
         _participants.Add(PlayerCreature);
 

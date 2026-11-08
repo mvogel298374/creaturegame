@@ -111,6 +111,14 @@ public abstract class DelegatingBattleRules : IBattleRules
 
     public virtual int CalculateCrashDamage(Creature user) => _inner.CalculateCrashDamage(user);
 
+    public virtual bool SelfInflictedDamageStrikesFoeSubstitute =>
+        _inner.SelfInflictedDamageStrikesFoeSubstitute;
+
+    public virtual int OhkoDamageToSubstitute => _inner.OhkoDamageToSubstitute;
+
+    public virtual SubstituteStrike StrikeSubstituteByte(int remnant, int damage) =>
+        _inner.StrikeSubstituteByte(remnant, damage);
+
     public virtual int CalculateRecoilDamage(int damageDealt) =>
         _inner.CalculateRecoilDamage(damageDealt);
 

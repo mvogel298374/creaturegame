@@ -210,6 +210,15 @@ public interface IBattleRules
     /// <summary>Whether Jump Kick / Hi Jump Kick crash on a 0× target as well as on a miss. See GENERATION_SEAMS.md §2.</summary>
     bool CrashOnTypeImmunity { get; }
 
+    /// <summary>Whether a self-hit or crash by a Substitute holder lands on the foe's Substitute. See GENERATION_SEAMS.md §2.</summary>
+    bool SelfInflictedDamageStrikesFoeSubstitute { get; }
+
+    /// <summary>The damage an OHKO deals a standing Substitute. See GENERATION_SEAMS.md §2.</summary>
+    int OhkoDamageToSubstitute { get; }
+
+    /// <summary>The byte a strike leaves and whether it broke. See GENERATION_SEAMS.md §2.</summary>
+    SubstituteStrike StrikeSubstituteByte(int remnant, int damage);
+
     /// <summary>
     /// Returns the number of turns a binding move traps the target.
     /// Gen 1: 2–5 at 3/8, 3/8, 1/8, 1/8 (GEN_DIFFERENCES.md).

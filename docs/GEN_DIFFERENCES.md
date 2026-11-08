@@ -278,6 +278,14 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
   The ¼ cost is gen-invariant, so it is inline in `SubstituteEffect`, not on a seam. The self-KO applies to both
   sides, so the foe AI can faint itself too, as on the cartridge. A zero cost (MaxHP < 4) is unreachable: Gen 1
   HP adds Level + 10, so MaxHP is at least 11.
+- **A self-hit or crash behind a Substitute strikes the foe's (Gen 1):** the user takes nothing. Each side has one
+  Substitute HP byte (`ram/wram.asm:448-449`), zeroed only at battle start, so it survives switches. With no foe
+  Substitute the leftover byte (`BattleState.SubstituteRemnant`, carried by `Battle.BringInMember`) is struck instead:
+  a byte at or above the damage only drops and prints "took damage"; below it, the byte wraps and the break line
+  prints too, with nothing else changing. A setup that is too weak still writes the byte, before its HP check
+  (`move_effects/substitute.asm`). Seam: `GENERATION_SEAMS.md` §2. Not replicated, waived 2026-11-08 as unobservable:
+  a break also zeroes the attacker's move-effect byte (`.nullifyEffect`), but a self-hit or crash has already ended
+  the move.
 - **Disable** picks a random move with PP left, and the lock is enforced at move selection (`Battle` and
   `IBattleInput` skip `DisabledMove`); its countdown timing is covered under the residual-phase bullet above.
 - **Leech Seed lands through a Substitute** in the English RBY this engine targets (reported blocked only in the

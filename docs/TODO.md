@@ -52,7 +52,7 @@ None open.
 
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
-| **Self-hit and crash damage strike the foe's Substitute** (§3.1) | S–M | ✗ 1, 2, 3, 6 (drafted) | Found 2026-11-07. Unblocked: the confusion self-hit shipped (`CanAct` has its foe parameter); one ruling on the no-foe-Substitute edge. |
+| **A Substitute break prints the wrong lines** (§3.1) | S | ✗ 1, 2, 3, 6 (1, 3, 6 drafted) | Found 2026-11-08. Central `AttackAction`; one design pass. |
 | **Pre-hit-test cluster** — Mist + thaw; Substitute stops a stat-down move before accuracy; Substitute lets sleep/paralysis through; status-move checks ahead of the hit test (§3.1) | M | ✗ 2, 3 each; 1, 5, 6, 7 drafted for Mist + thaw and sleep/paralysis, 6 for the status-move checks, none for the stat-down entry | One design pass: all four move logic ahead of the hit test. |
 | **Pre-move-check cluster** — `CanAct` status order; a replacement frees the trapped foe; Disable countdown (§3.1) | M | ✗ 2, 3 each | One design pass: all three live in the pre-move check. |
 | **Fly and Dig don't dodge anything** (§3.1) | M | ✗ 2, 3; the rest drafted | Found 2026-11-03. Central hit check; pairs with the pre-hit-test cluster. |
@@ -170,19 +170,14 @@ data/engine item usually also means updating the test that pins the wrong value.
   **DoR (V16):** ✗ not Ready — gaps **2** (touches `Battle`: `opus-engineer` plus both gates, or fold into the
   `CanAct` design pass above) and **3**. *Gap 3, drafted:* gen-invariant if Gen 2 also frees the bind on send-out;
   verify at pokecrystal before calling it.
-- **Self-hit and crash damage strike the foe's Substitute (found 2026-11-07) — S–M, ✗ not Ready.** *Intent:* when
-  the confused user (or a crashing Jump Kick / Hi Jump Kick user) has a Substitute up, Gen 1 applies the damage to
-  the **foe's** Substitute, not the user (`core.asm:4849-4855`, `AttackSubstitute` after the turn swap). Ours sends
-  both to the user's HP and ignores Substitutes (`StatusResolver.CanAct`, `AttackAction.ApplyFailedHitSideEffects`).
-  *Edge:* with no foe Substitute, pokered subtracts from a stale or zero Substitute HP and prints the break text.
-  **DoR:** ✗ not Ready — gaps **1** (*drafted:* acceptance, a forced self-hit and a forced crash with the user
-  behind a Substitute damage the foe's Substitute, user HP untouched; the no-foe-Substitute edge needs your ruling:
-  replicate the stale-HP text or let it fall to the user), **2** (a design pass; touches `AttackAction`, so
-  `opus-engineer` plus both gates), **3** (*drafted:* an `IBattleRules` member for where self-inflicted damage lands
-  behind a Substitute; Gen 2 unread, check `HitConfusion`'s `DoPlayerDamage` with `c = TRUE` at pokecrystal), **6**
-  (*drafted:* the self-hit breaks the foe's Substitute). 4 is answered above, 5 runtime only, 7 none open: the Gen 1
-  confusion self-hit shipped 2026-11-07 and `StatusResolver.CanAct` already takes the optional foe (`Battle` passes
-  `attack.Target`), so the self-hit's Substitute branch reuses it.
+- **A Substitute break prints the wrong lines (found 2026-11-08) — S, ✗ not Ready.** *Intent:* on a break Gen 1 prints
+  "The SUBSTITUTE took damage for <TARGET>!" and then "<TARGET>'s SUBSTITUTE broke!" (`core.asm:4857`, `:4884`). Ours
+  prints only "<name>'s substitute faded!" (`AttackAction.DealDamageToTarget`, `timeline.ts` `SubstituteFaded`).
+  **DoR:** ✗ gaps **1** (*drafted:* a breaking hit logs both lines in order), **2** (a design pass: where the two
+  lines come from), **3** (*drafted:* a seam for the break narration; Gen 2 text unread), **6** (*drafted:* the
+  took-damage line also prints on the breaking hit). 4 above, 5 runtime only, 7 none. Self-inflicted Substitute damage
+  (shipped 2026-11-08, see the archive) emits both events, so it is correct in order but keeps the "faded" wording until this item, including when
+  the break line prints for a Substitute that never stood.
 - **Gen 1 Mist, thaw and Leech Seed fidelity (from §7.6 V10) — M, ✗ not Ready.** *Intent:* Mist only blocks
   primary stat-down moves, as a miss before the accuracy roll; a Substitute stops a Fire thaw; the Leech Seed drain
   is multiplied by the Toxic counter. *Gaps:* touches `AttackAction`/`Battle` (central, `opus-engineer` + both

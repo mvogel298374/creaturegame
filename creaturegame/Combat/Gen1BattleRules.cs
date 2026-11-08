@@ -305,6 +305,20 @@ public sealed class Gen1BattleRules : IBattleRules
 
     public bool CrashOnTypeImmunity => true;
 
+    public bool SelfInflictedDamageStrikesFoeSubstitute => true;
+
+    // pokered move_effects/one_hit_ko.asm sets wDamage to $FFFF.
+    public int OhkoDamageToSubstitute => 65535;
+
+    // pokered core.asm AttackSubstitute: the byte wraps; damage above 255 breaks without writing it.
+    public SubstituteStrike StrikeSubstituteByte(int remnant, int damage)
+    {
+        if (damage > 255)
+            return new SubstituteStrike(remnant, Broke: true);
+        int left = remnant - damage;
+        return new SubstituteStrike(left & 0xFF, Broke: left < 0);
+    }
+
     // ── Stat selection ─────────────────────────────────────────────────────────
 
     // Gen 1: Physical moves use Attack/Defense; Special moves use the combined Special stat.

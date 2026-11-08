@@ -311,4 +311,454 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
         Assert.Empty(emitter.Of<DamageDealt>());
         Assert.NotEmpty(emitter.Of<ExperienceGained>());
     }
+
+    // --- Self-inflicted damage behind a Substitute (pokered core.asm AttackSubstitute) ---
+
+    private class SelfHitRules(int firstSelfHitRoll = 1) : DelegatingBattleRules
+    {
+        private int _rolls;
+
+        public override int ConfusionSelfHitPercent => ++_rolls >= firstSelfHitRoll ? 100 : 0;
+
+        public override int RollConfusionTurns() => 8;
+
+        public override int GetHitThreshold(int acc, int accStage, int evaStage) => 256;
+
+        public override double GetCritChance(Creature a, Attack m) => 0.0;
+
+        public override double RollDamageVariance() => 1.0;
+
+        public override (double Min, double Max) DamageVarianceRange => (1.0, 1.0);
+    }
+
+    private sealed class SelfInflictedIgnoresSubstituteRules : SelfHitRules
+    {
+        public override bool SelfInflictedDamageStrikesFoeSubstitute => false;
+    }
+
+    private sealed class ZeroCrashRules : DelegatingBattleRules
+    {
+        public override int GetHitThreshold(int acc, int accStage, int evaStage) => 0;
+
+        public override int CalculateCrashDamage(Creature user) => 0;
+    }
+
+    private static Creature SelfHitter(int substituteHp)
+    {
+        var user = TestCreatures.Make("User", hp: 400, attack: 50, defense: 100);
+        user.Battle.SubstituteHp = substituteHp;
+        user.Battle.ConfusedTurns = 3;
+        return user;
+    }
+
+    private static RecordingEmitter ForceSelfHit(
+        Creature user,
+        Creature foe,
+        IBattleRules? rules = null
+    )
+    {
+        var emitter = new RecordingEmitter();
+        bool acted = StatusResolver.CanAct(
+            user,
+            rules ?? new SelfHitRules(),
+            emitter,
+            new SeededRandomSource(1),
+            foe
+        );
+        Assert.False(acted);
+        return emitter;
+    }
+
+    private static void AssertUserUntouched(Creature user, int substituteHp)
+    {
+        Assert.Equal(400, user.Attributes.HP);
+        Assert.Equal(substituteHp, user.Battle.SubstituteHp);
+    }
+
+    [Fact]
+    public void SelfHitBehindASubstituteDamagesTheFoesSubstitute()
+    {
+        var user = SelfHitter(substituteHp: 51);
+        var foe = TestCreatures.Make("Foe", hp: 300);
+        foe.Battle.SubstituteHp = 200;
+        foe.Battle.SubstituteRemnant = 199;
+
+        var emitter = ForceSelfHit(user, foe);
+
+        int damage = Assert.Single(emitter.Of<ConfusionDamage>()).Damage;
+        AssertUserUntouched(user, 51);
+        Assert.Equal(200 - damage, foe.Battle.SubstituteHp);
+        Assert.Equal(199 - damage, foe.Battle.SubstituteRemnant);
+        Assert.Equal(300, foe.Attributes.HP);
+        var absorbed = Assert.Single(emitter.Of<SubstituteAbsorbedHit>());
+        Assert.Equal("Foe", absorbed.CreatureName);
+        Assert.Equal(200 - damage, absorbed.SubstituteHpAfter);
+        Assert.Empty(emitter.Of<SubstituteFaded>());
+    }
+
+    [Fact]
+    public void SelfHitBreaksTheFoesSubstituteWithBothLinesInOrder()
+    {
+        var user = SelfHitter(substituteHp: 51);
+        var foe = TestCreatures.Make("Foe", hp: 300);
+        foe.Battle.SubstituteHp = 1;
+
+        var emitter = ForceSelfHit(user, foe);
+
+        AssertUserUntouched(user, 51);
+        Assert.Equal(0, foe.Battle.SubstituteHp);
+        Assert.Equal(300, foe.Attributes.HP);
+        AssertStruckThenBroke(emitter);
+    }
+
+    private static void AssertStruckThenBroke(RecordingEmitter emitter)
+    {
+        var events = emitter.Events.ToList();
+        int absorbed = events.FindIndex(e =>
+            e is SubstituteAbsorbedHit a && a.CreatureName == "Foe"
+        );
+        int faded = events.FindIndex(e => e is SubstituteFaded f && f.CreatureName == "Foe");
+        Assert.True(absorbed >= 0, "the took-damage line prints first");
+        Assert.True(faded > absorbed, "the break line follows it");
+    }
+
+    [Fact]
+    public void SelfHitWithNoFoeSubstituteAndAByteBelowTheDamagePrintsTheBreak()
+    {
+        var user = SelfHitter(substituteHp: 51);
+        var foe = TestCreatures.Make("Foe", hp: 300);
+
+        var emitter = ForceSelfHit(user, foe);
+
+        int damage = Assert.Single(emitter.Of<ConfusionDamage>()).Damage;
+        AssertUserUntouched(user, 51);
+        Assert.Equal(300, foe.Attributes.HP);
+        Assert.Equal(0, foe.Battle.SubstituteHp);
+        Assert.Equal(256 - damage, foe.Battle.SubstituteRemnant);
+        AssertStruckThenBroke(emitter);
+    }
+
+    [Fact]
+    public void SelfHitWithNoFoeSubstituteAndAByteAboveTheDamageOnlyDrainsTheByte()
+    {
+        var user = SelfHitter(substituteHp: 51);
+        var foe = TestCreatures.Make("Foe", hp: 300);
+        foe.Battle.SubstituteRemnant = 200;
+
+        var emitter = ForceSelfHit(user, foe);
+
+        int damage = Assert.Single(emitter.Of<ConfusionDamage>()).Damage;
+        AssertUserUntouched(user, 51);
+        Assert.Equal(200 - damage, foe.Battle.SubstituteRemnant);
+        Assert.Equal(0, foe.Battle.SubstituteHp);
+        Assert.Single(emitter.Of<SubstituteAbsorbedHit>());
+        Assert.Empty(emitter.Of<SubstituteFaded>());
+    }
+
+    [Fact]
+    public void SelfHitWithoutAUserSubstituteHitsTheUserAndLeavesTheFoesSubstituteAlone()
+    {
+        var user = SelfHitter(substituteHp: 0);
+        var foe = TestCreatures.Make("Foe", hp: 300);
+        foe.Battle.SubstituteHp = 200;
+
+        var emitter = ForceSelfHit(user, foe);
+
+        int damage = Assert.Single(emitter.Of<ConfusionDamage>()).Damage;
+        Assert.Equal(400 - damage, user.Attributes.HP);
+        Assert.Equal(200, foe.Battle.SubstituteHp);
+        Assert.Empty(emitter.Of<SubstituteAbsorbedHit>());
+    }
+
+    [Fact]
+    public void SelfHitBehindASubstituteHitsTheUserWhenTheRulesIgnoreSubstitutes()
+    {
+        var user = SelfHitter(substituteHp: 51);
+        var foe = TestCreatures.Make("Foe", hp: 300);
+        foe.Battle.SubstituteHp = 200;
+
+        var emitter = ForceSelfHit(user, foe, new SelfInflictedIgnoresSubstituteRules());
+
+        int damage = Assert.Single(emitter.Of<ConfusionDamage>()).Damage;
+        Assert.Equal(400 - damage, user.Attributes.HP);
+        Assert.Equal(51, user.Battle.SubstituteHp);
+        Assert.Equal(200, foe.Battle.SubstituteHp);
+    }
+
+    [Theory]
+    [InlineData("jump-kick")]
+    [InlineData("high-jump-kick")]
+    public async Task CrashBehindASubstituteDamagesTheFoesSubstitute(string moveName)
+    {
+        var user = TestCreatures.Make("User", hp: 400);
+        user.Battle.SubstituteHp = 51;
+        var foe = TestCreatures.Make("Foe", hp: 300);
+        foe.Battle.SubstituteHp = 200;
+
+        var result = await new MoveScenario()
+            .Attacker(user)
+            .Defender(foe)
+            .Rules(NeverHitRules.Instance)
+            .Use(Move(moveName));
+
+        var crash = result.First<CrashDamage>();
+        Assert.NotNull(crash);
+        Assert.Equal(400, crash!.HpAfter);
+        AssertUserUntouched(user, 51);
+        Assert.Equal(200 - crash.Damage, foe.Battle.SubstituteHp);
+        Assert.True(result.Has<SubstituteAbsorbedHit>());
+    }
+
+    [Fact]
+    public async Task CrashWithNoFoeSubstitutePrintsTheBreakAndLeavesTheUserAlone()
+    {
+        var user = TestCreatures.Make("User", hp: 400);
+        user.Battle.SubstituteHp = 51;
+        var foe = TestCreatures.Make("Foe", hp: 300);
+
+        var result = await new MoveScenario()
+            .Attacker(user)
+            .Defender(foe)
+            .Rules(NeverHitRules.Instance)
+            .Use(Move("jump-kick"));
+
+        AssertUserUntouched(user, 51);
+        Assert.Equal(300, foe.Attributes.HP);
+        Assert.True(result.Has<SubstituteAbsorbedHit>());
+        Assert.True(result.Has<SubstituteFaded>());
+    }
+
+    [Fact]
+    public async Task ZeroCrashDamageBehindASubstituteStrikesNothing()
+    {
+        var user = TestCreatures.Make("User", hp: 400);
+        user.Battle.SubstituteHp = 51;
+
+        var result = await new MoveScenario()
+            .Attacker(user)
+            .Rules(new ZeroCrashRules())
+            .Use(Move("jump-kick"));
+
+        Assert.True(result.Has<CrashDamage>());
+        Assert.False(result.Has<SubstituteAbsorbedHit>());
+        Assert.False(result.Has<SubstituteFaded>());
+    }
+
+    [Fact]
+    public async Task OrdinaryRecoilStillHitsTheUserBehindASubstitute()
+    {
+        var user = TestCreatures.Make("User", hp: 400);
+        user.Battle.SubstituteHp = 51;
+        var foe = TestCreatures.Make("Foe", type1: DamageType.Water, hp: 300);
+
+        var result = await new MoveScenario().Attacker(user).Defender(foe).Use(Move("double-edge"));
+
+        Assert.True(result.Attacker.Attributes.HP < 400);
+        Assert.Equal(51, result.Attacker.Battle.SubstituteHp);
+    }
+
+    [Theory]
+    [InlineData(50, 10, 40, false)]
+    [InlineData(50, 50, 0, false)]
+    [InlineData(10, 50, 216, true)]
+    [InlineData(0, 3, 253, true)]
+    [InlineData(50, 256, 50, true)]
+    public void Gen1SubstituteByteWrapsAndBreaksOnlyOnAnUnderflow(
+        int remnant,
+        int damage,
+        int expectedRemnant,
+        bool expectedBroke
+    )
+    {
+        var strike = Gen1BattleRules.Instance.StrikeSubstituteByte(remnant, damage);
+
+        Assert.Equal(expectedRemnant, strike.Remnant);
+        Assert.Equal(expectedBroke, strike.Broke);
+    }
+
+    [Fact]
+    public async Task PuttingUpASubstituteWritesTheByte()
+    {
+        var user = TestCreatures.Make("A", hp: 200);
+
+        var result = await new MoveScenario().Attacker(user).Use(Move("substitute"));
+
+        Assert.Equal(50, result.Attacker.Battle.SubstituteRemnant);
+    }
+
+    [Fact]
+    public async Task ATooWeakSubstituteStillWritesTheByte()
+    {
+        var user = TestCreatures.Make("A", hp: 200);
+        user.Attributes.ReceiveDamage(160);
+
+        var result = await new MoveScenario().Attacker(user).Use(Move("substitute"));
+
+        Assert.False(result.Has<SubstitutePutUp>());
+        Assert.Equal(50, result.Attacker.Battle.SubstituteRemnant);
+    }
+
+    [Fact]
+    public async Task ARedundantSubstituteLeavesTheByteAlone()
+    {
+        var user = TestCreatures.Make("A", hp: 200);
+        user.Battle.SubstituteHp = 51;
+        user.Battle.SubstituteRemnant = 7;
+
+        var result = await new MoveScenario().Attacker(user).Use(Move("substitute"));
+
+        Assert.Equal(7, result.Attacker.Battle.SubstituteRemnant);
+    }
+
+    [Fact]
+    public async Task ABreakingHitLeavesTheWrappedByte()
+    {
+        var defender = TestCreatures.Make("D", hp: 300);
+        defender.Battle.SubstituteHp = 11;
+        defender.Battle.SubstituteRemnant = 10;
+        var attacker = TestCreatures.Make("A", level: 50);
+
+        var result = await new MoveScenario()
+            .Attacker(attacker)
+            .Defender(defender)
+            .Use(Move("seismic-toss"));
+
+        Assert.True(result.Has<SubstituteFaded>());
+        Assert.Equal(216, result.Defender.Battle.SubstituteRemnant);
+    }
+
+    [Fact]
+    public async Task TheByteSurvivesASwitchAndAbsorbsTheFoesSelfHit()
+    {
+        var lead = TestCreatures.Make("Lead", hp: 400, speed: 200);
+        lead.AddAttack(Move("supersonic"));
+        lead.AddAttack(Move("substitute"));
+        var bench = TestCreatures.Make("Bench", hp: 400, attack: 999, speed: 150);
+        bench.AddAttack(Tackle(120));
+        var party = new Party(lead);
+        party.Add(bench);
+        var enemy = TestCreatures.Make(
+            "Enemy",
+            type1: DamageType.Water,
+            hp: 40,
+            attack: 50,
+            defense: 100,
+            speed: 1
+        );
+        enemy.AddAttack(Move("substitute"));
+        enemy.AddAttack(Move("growl"));
+
+        var emitter = new RecordingEmitter();
+        var battle = new Battle(
+            lead,
+            enemy,
+            Gen1TypeChart.Instance,
+            new ScriptedInput("supersonic", "substitute", "Tackle").TurnPlan(null, null, 1),
+            new ScriptedInput("substitute", "growl"),
+            rules: new SelfHitRules(firstSelfHitRoll: 3),
+            emitter: emitter,
+            playerParty: party,
+            rng: new SeededRandomSource(1)
+        );
+        await battle.StartFightAsync();
+
+        AssertBenchByteAbsorbedTheSelfHit(emitter, bench);
+    }
+
+    [Fact]
+    public async Task TheByteSurvivesAFaintSwitchAndAbsorbsTheFoesSelfHit()
+    {
+        var lead = TestCreatures.Make("Lead", hp: 400, speed: 200);
+        lead.Attributes.ReceiveDamage(300); // HP 100 = cost, so raising the decoy faints it
+        lead.AddAttack(Move("supersonic"));
+        lead.AddAttack(Move("substitute"));
+        var bench = TestCreatures.Make("Bench", hp: 400, attack: 999, speed: 1);
+        bench.AddAttack(Tackle(120));
+        var party = new Party(lead);
+        party.Add(bench);
+        var enemy = TestCreatures.Make(
+            "Enemy",
+            type1: DamageType.Water,
+            hp: 40,
+            attack: 50,
+            defense: 100,
+            speed: 5
+        );
+        enemy.AddAttack(Move("substitute"));
+        enemy.AddAttack(Move("growl"));
+
+        var emitter = new RecordingEmitter();
+        var battle = new Battle(
+            lead,
+            enemy,
+            Gen1TypeChart.Instance,
+            new ScriptedInput("supersonic", "substitute", "Tackle"),
+            new ScriptedInput("substitute", "growl"),
+            rules: new SelfHitRules(firstSelfHitRoll: 2),
+            emitter: emitter,
+            playerParty: party,
+            rng: new SeededRandomSource(1)
+        );
+        await battle.StartFightAsync();
+
+        Assert.Contains(emitter.Of<CreatureFainted>(), e => e.Name == "Lead");
+        AssertBenchByteAbsorbedTheSelfHit(emitter, bench);
+    }
+
+    private static void AssertBenchByteAbsorbedTheSelfHit(RecordingEmitter emitter, Creature bench)
+    {
+        var events = emitter.Events.ToList();
+        int selfHit = events.FindIndex(e => e is ConfusionDamage);
+        var confusion = Assert.IsType<ConfusionDamage>(events[selfHit]);
+        var absorbed = Assert.IsType<SubstituteAbsorbedHit>(events[selfHit + 1]);
+        Assert.Equal("Enemy", confusion.CreatureName);
+        Assert.Equal(30, confusion.HpAfter);
+        Assert.Equal("Bench", absorbed.CreatureName);
+        Assert.Equal(100 - confusion.Damage, absorbed.SubstituteHpAfter);
+        Assert.DoesNotContain(events, e => e is SubstituteFaded f && f.CreatureName == "Bench");
+        Assert.Equal(400, bench.Attributes.HP);
+    }
+
+    [Fact]
+    public async Task AnOhkoBreaksADecoyLargerThanTheTargetsHpAndLeavesTheByte()
+    {
+        var defender = TestCreatures.Make("D", hp: 200, speed: 1);
+        defender.Attributes.ReceiveDamage(190); // HP 10, below the decoy's 51
+        defender.Battle.SubstituteHp = 51;
+        defender.Battle.SubstituteRemnant = 50;
+        var attacker = TestCreatures.Make("A", speed: 200);
+
+        var result = await new MoveScenario()
+            .Attacker(attacker)
+            .Defender(defender)
+            .Use(Move("guillotine"));
+
+        Assert.True(result.Has<SubstituteFaded>());
+        Assert.Equal(0, result.Defender.Battle.SubstituteHp);
+        Assert.Equal(50, result.Defender.Battle.SubstituteRemnant);
+        Assert.Equal(10, result.Defender.Attributes.HP);
+    }
+
+    [Fact]
+    public async Task TheByteIsZeroInTheNextBattle()
+    {
+        var player = TestCreatures.Make("Player", attack: 999, speed: 200);
+        player.AddAttack(Tackle(120));
+        player.Battle.SubstituteRemnant = 77;
+        var enemy = TestCreatures.Make("Enemy", type1: DamageType.Water, hp: 20, speed: 1);
+        enemy.AddAttack(Tackle(10));
+
+        var battle = new Battle(
+            player,
+            enemy,
+            Gen1TypeChart.Instance,
+            AutoSelectInput.Instance,
+            AutoSelectInput.Instance,
+            rules: NoVarianceNoCritHitRules.Instance,
+            rng: new SeededRandomSource(1)
+        );
+        await battle.StartFightAsync();
+
+        Assert.Equal(0, player.Battle.SubstituteRemnant);
+    }
 }

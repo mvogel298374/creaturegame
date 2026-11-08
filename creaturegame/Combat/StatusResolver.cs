@@ -105,14 +105,13 @@ public static class StatusResolver
                     foe,
                     battleRules
                 );
-                creature.Attributes.ReceiveDamage(selfDamage);
-                emitter?.Emit(
-                    new ConfusionDamage(
-                        creature.Name,
-                        creature.Id,
-                        selfDamage,
-                        creature.Attributes.HP
-                    )
+                SelfInflictedDamage.Apply(
+                    creature,
+                    foe,
+                    selfDamage,
+                    battleRules,
+                    emitter,
+                    hp => new ConfusionDamage(creature.Name, creature.Id, selfDamage, hp)
                 );
                 return false;
             }
