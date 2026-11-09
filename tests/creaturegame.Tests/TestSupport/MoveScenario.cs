@@ -143,7 +143,8 @@ public sealed class MoveScenario
                 emitter,
                 rng: _rng
             );
-            await action.ExecuteAsync();
+            if (StatusResolver.CanAct(_attacker, _rules, emitter, _rng, _defender, pokeMove))
+                await action.ExecuteAsync();
             results.Add(new MoveResult(emitter, _attacker, _defender, pokeMove));
         }
         return results;

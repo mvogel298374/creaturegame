@@ -382,16 +382,15 @@ public class MoveExecutionTests
         defender.Attributes.HP = defender.Attributes.MaxHP;
         int hpBefore = defender.Attributes.HP;
 
-        var action2 = new AttackAction(
+        bool canAct = StatusResolver.CanAct(
             attacker,
-            defender,
-            attacker.MoveSet[0],
-            new Gen1TypeChart(),
             AlwaysHitRules.Instance,
-            ConsoleBattleEventEmitter.Instance
+            ConsoleBattleEventEmitter.Instance,
+            foe: defender,
+            selectedMove: attacker.MoveSet[0]
         );
-        await action2.ExecuteAsync();
 
+        Assert.False(canAct);
         Assert.False(attacker.Battle.IsRecharging); // flag cleared
         Assert.Equal(hpBefore, defender.Attributes.HP); // no damage on recharge turn
     }

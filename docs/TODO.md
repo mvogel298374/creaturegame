@@ -52,8 +52,7 @@ None open.
 
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
-| **Sleep moves always land on a recharging foe** (§3.1) | S | ✗ 2, 3; the rest drafted | Found 2026-11-08. Tied to the recharge redesign in the `CanAct` entry. |
-| **Pre-move-check cluster** — `CanAct` status order; a replacement frees the trapped foe; Disable countdown (§3.1) | M | ✗ 2, 3 each | One design pass: all three live in the pre-move check. |
+| **Snapping out of confusion prints "is confused!" first** (§3.1) | S | ✗ 2, 3, 6; the rest drafted | Found 2026-11-08. Touches `StatusResolver.ConfusionStops`; the cite is drafted. |
 | **Fly and Dig don't dodge anything** (§3.1) | M | ✗ 2, 3; the rest drafted | Found 2026-11-03. Central hit check; the pre-hit step is in `AttackAction`'s `StatusMoveStopsBeforeHitTest`. |
 | **Hyper Beam recharges after breaking a Substitute** (§3.1) | S | ✗ 2, 3; the rest drafted | Found 2026-11-03. Central `AttackAction`. |
 | **The player chooses what Mimic copies** (§3.1) | M | ✗ 2, 3; the rest drafted | Found 2026-11-03. Needs an input prompt, so a design pass. |
@@ -150,48 +149,14 @@ data/engine item usually also means updating the test that pins the wrong value.
   test pinning pokered's number; its seam member (most are already `IBattleRules`/`DamageCalculator` inputs);
   `opus-engineer` plus both gates, since `DamageCalculator`/`AttackAction` are central. Data vs runtime: runtime.
   Dependencies: none.
-- **Gen 1 status-check order in `CanAct` (from §7.6 V8 — claims 2–4) — M, ✗ not Ready.** *Intent:* `CanAct` runs
-  pokered's order, owns the recharge check, and full paralysis or a confusion self-hit cancels
-  Bide/Thrash/charge/trap. Sleep, freeze, flinch and trap infliction clear a pending recharge. *Acceptance:* each
-  reproduction in the V8 archive record flips (one lost turn, counters tick in Gen 1 order, the lock-in is cleared with no Thrash
-  confusion). *Gaps:* a design pass (does the order become an `IBattleRules` seam? Gen 2's order is unchecked,
-  verify at pokecrystal; moving recharge out of `AttackAction` touches a central method, so `opus-engineer` + both
-  review gates). *Gen 1 source:* `core.asm:3328-3464`, `:1181-1191`, `effects.asm:36-40`/`:249`/`:992`/`:1091` (full cites in the V8 archive record). *Data vs runtime:* runtime only. *Quirk to assert:* Thrash
-  cancelled by full paralysis leaves the user unconfused. *Dependencies:* none.
-  **DoR (V16):** ✗ not Ready — gaps **2** (design pass, central) and **3** (seam or not, settled in that pass; check
-  Gen 2's order at pokecrystal). 1 and 4–7 are answered.
-- **A replacement frees the trapped foe (from §7.6 V8 — claim 1) — S, ✗ not Ready.** *Intent:* when the player's
-  binder leaves the field, the foe's `BindingTurnsRemaining` clears. *Acceptance:* a `Battle`-level test where the
-  player's binder faints mid-bind and the switch-in's first turn lets the foe act. *Gaps:* touches `Battle`
-  (central, outside a V-slice fix); does the seam question above cover it? *Gen 1 source:* `core.asm:1744-1749`,
-  `:5711-5717`. *Data vs runtime:* runtime. *Quirk to assert:* the bind ends on the send-out, not on its counter.
-  *Dependencies:* none.
-  **DoR (V16):** ✗ not Ready — gaps **2** (touches `Battle`: `opus-engineer` plus both gates, or fold into the
-  `CanAct` design pass above) and **3**. *Gap 3, drafted:* gen-invariant if Gen 2 also frees the bind on send-out;
-  verify at pokecrystal before calling it.
+- **Snapping out of confusion prints "is confused!" first (found 2026-11-08, pre-move checks) — S, ✗ not Ready.**
+  pokered decrements the counter first and prints only `ConfusedNoMoreText` when it reaches 0 (`core.asm:3412-3419`);
+  `StatusResolver.ConfusionStops` emits `ConfusionMessage` before the decrement, so the last turn prints both lines.
+  *Gaps:* 2, 3, 6. *Drafted:* move the emit below the 0 branch behind an `IBattleRules` member; quirk: the turn it ends
+  prints no "is confused!". 4: the cite above. 5: runtime only. 7: none.
 - **Leech Seed × Toxic counter (from §7.6 V10) — S, ✗ not Ready.** *Intent:* the Leech Seed drain is multiplied by the
   Toxic counter (`core.asm:546-591`). *Gaps:* overlaps the end-of-turn residual `/plan` (§4.2); sequence after it.
   *Drafted:* an `IBattleRules` member, runtime only; quirk: the drain grows with the Toxic counter.
-- **Sleep moves always land on a recharging foe (found 2026-11-08) — S, ✗ not Ready.** *Intent:* in Gen 1 a sleep move on
-  a foe that must recharge from Hyper Beam clears the recharge and skips the status and accuracy checks, so it always
-  lands, even over a status (`effects.asm` `SleepEffect`, `NEEDS_TO_RECHARGE`). **DoR:** ✗ gaps **2** (tied to the
-  recharge redesign in the `CanAct` entry) and **3** (Gen 2 unread). *Drafted:* **5** runtime only; **6** a sleep move
-  on a recharging target draws no accuracy roll; **7** sequence with the `CanAct` entry.
-- **Gen 1 Disable countdown: the lock can end early compared with pokered (source-confirmed 2026-10-17, §7.6 V15) —
-  M, ✗ not Ready.** pokered decrements the counter in the disabled mon's own pre-move check
-  (`engine/battle/core.asm` `CheckPlayerStatusConditions:3328` → `.AnyMoveDisabledCheck:3394`; the enemy mirror is
-  `CheckEnemyStatusConditions:5677`). The sleep, freeze, trapped, flinch and recharge checks before it
-  (`:3355-3384`) jump past it, and a turn spent switching or using an item never reaches it. Ours ticks both
-  creatures' counters at the end of every turn (`StatusResolver.TickTurnCounters`, `Battle.cs:223-224`), including
-  the turn Disable lands when its user moved second. The 1–8 roll itself is fixed (V15). *Gaps:* the countdown moves
-  into the pre-move status check, which touches `Battle`/`StatusResolver` and the faint-skip handling (central), and
-  needs a seam (Gen 2+ timing differs); the binding-trap countdown that shares `TickTurnCounters` must be checked
-  against pokered in the same pass. *Acceptance:* a full-battle test with seeded rolls pins the observable lock
-  length against pokered: a roll of N keeps the move locked for N of the disabled creature's own move attempts, and
-  sleep, flinch, recharge, switch and item turns don't count down.
-  **DoR (V16):** ✗ not Ready — gaps **2** (central), **3** (seam member to design), **5** (drafted) and **7** (the
-  binding-trap check). *Drafted:* runtime only; best paired with the `CanAct` status-order design pass above, since both move
-  logic into the pre-move check.
 - **Other `ResidualEffects1` moves may roll accuracy they skip in Gen 1 (found 2026-11-06, Roar design pass;
   unverified) — S–M, ✗ not Ready.** pokered skips the accuracy test for every effect in `ResidualEffects1`
   (`data/battle/residual_effects_1.asm`, dispatched at `core.asm:3124-3127`) unless the effect calls `MoveHitTest`
@@ -245,7 +210,8 @@ data/engine item usually also means updating the test that pins the wrong value.
   **DoR:** ✗ — gaps **2, 3, 6**. *Drafted:* **Acceptance:** each case prints its pokered line in a full battle.
   **Data vs runtime:** runtime plus a new "evaded" event wired in all four places. **Dependencies:** pair with the
   `ResidualEffects1` accuracy slice, which decides where these moves roll accuracy.
-- **Fly and Dig don't dodge anything (found 2026-11-03, move description audit) — M, ✗ not Ready.** pokered sets
+- **Fly and Dig don't dodge anything (found 2026-11-03, move description audit) — M, ✗ not Ready.** (Noted
+  2026-11-08: a confusion self-hit clears the invulnerable bit but full paralysis doesn't, `core.asm:3432`, `:3463`.) pokered sets
   `INVULNERABLE` on the charge turn, and `MoveHitTest` misses against it (`core.asm:5259-5261`). Only Swift, which returns
   first (`:5247-5250`), and Bide's release, which skips the test (`:3528`), get through. Ours sets `IsTwoTurnCharging`, but
   nothing in the hit check reads it, so a Pokémon using Fly can be hit on the charge turn. No test covers it. An older

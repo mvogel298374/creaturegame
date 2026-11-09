@@ -88,6 +88,29 @@ public enum SubstituteFailureAnnouncement
     Failed,
 }
 
+/// <summary>One step of the routine a creature runs before it moves. See GENERATION_SEAMS.md §2.</summary>
+public enum PreMoveCheck
+{
+    Sleep,
+    Freeze,
+    HeldByTrap,
+    Flinch,
+    Recharge,
+    DisableCountdown,
+    Confusion,
+    UsingDisabledMove,
+    Paralysis,
+}
+
+/// <summary>What can clear a pending recharge when it lands. See GENERATION_SEAMS.md §2.</summary>
+public enum RechargeClearingInfliction
+{
+    Sleep,
+    Freeze,
+    Flinch,
+    Trap,
+}
+
 /// <summary>The line printed when Mist stops a stat drop. See GENERATION_SEAMS.md §2.</summary>
 public enum MistBlockAnnouncement
 {
@@ -301,6 +324,30 @@ public interface IBattleRules
 
     /// <summary>The line a stat-down or confusion move prints when a Substitute stops it or it misses. See GENERATION_SEAMS.md §2.</summary>
     MoveFailureAnnouncement PrimaryEffectFailureAnnouncement { get; }
+
+    /// <summary>The checks a creature runs before it moves, in order. See GENERATION_SEAMS.md §2.</summary>
+    IReadOnlyList<PreMoveCheck> PreMoveCheckOrder { get; }
+
+    /// <summary>Whether losing the turn to this check ends the user's Bide, rampage, charge and trap. See GENERATION_SEAMS.md §2.</summary>
+    bool PreMoveCheckCancelsLockIn(PreMoveCheck check);
+
+    /// <summary>Whether being stopped from using a disabled move ends the user's charge. See GENERATION_SEAMS.md §2.</summary>
+    bool DisabledMoveBlockEndsCharge { get; }
+
+    /// <summary>Whether this infliction clears the target's pending recharge. See GENERATION_SEAMS.md §2.</summary>
+    bool InflictionClearsRecharge(RechargeClearingInfliction infliction);
+
+    /// <summary>Whether a sleep move on a recharging target skips its checks and always lands. See GENERATION_SEAMS.md §2.</summary>
+    bool SleepMoveIgnoresChecksOnRechargingTarget { get; }
+
+    /// <summary>Whether a sleep or frozen turn erases the move Mirror Move would copy. See GENERATION_SEAMS.md §2.</summary>
+    bool SleepOrFreezeTurnForgetsLastMove { get; }
+
+    /// <summary>Rolls whether a paralyzed creature loses this turn. See GENERATION_SEAMS.md §2.</summary>
+    bool RollsFullParalysis(IRandomSource rng);
+
+    /// <summary>Whether replacing a binder frees the creature it held. See GENERATION_SEAMS.md §2.</summary>
+    bool ReplacementEndsTrap { get; }
 
     /// <summary>The wording of the crit, one-hit KO and effectiveness lines. See GENERATION_SEAMS.md §2.</summary>
     HitLineWording HitLineWording { get; }

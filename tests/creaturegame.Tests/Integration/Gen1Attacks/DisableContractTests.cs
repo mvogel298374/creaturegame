@@ -53,8 +53,8 @@ public class DisableContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         // Player knows only Pound, so once Disable locks it the player has no other move and must
         // Struggle until it re-enables. The enemy is faster and Disables; its later Disables fail
         // (the move's already locked). A fixed 2-turn lock + always-hit makes the timeline exact:
-        //   turn 1 — player Pounds (chosen before Disable lands); enemy Disables Pound.
-        //   turn 2 — Pound is locked → player Struggles; end of turn the lock expires (re-enabled).
+        //   turn 1 — enemy Disables Pound; the player's chosen Pound stops at "is disabled!" (2 → 1).
+        //   turn 2 — Pound is locked → player Struggles; its attempt ends the lock (re-enabled).
         // The enemy never attacks, so the player (huge HP) outlasts the enemy, which dies to the
         // accumulating Pound/Struggle damage — the loop is guaranteed to terminate.
         var player = TestCreatures.Make("Player", hp: 99999, attack: 150, speed: 1);

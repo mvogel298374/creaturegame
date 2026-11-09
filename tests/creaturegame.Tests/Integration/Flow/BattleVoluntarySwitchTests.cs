@@ -274,7 +274,7 @@ public class BattleVoluntarySwitchTests
     public async Task VoluntarySwitch_DuringHyperBeamRecharge_IsAllowed()
     {
         // Adjudicated with the user 2026-07-24: switching out during a Hyper Beam recharge turn is legal Gen 1 —
-        // the recharge is enforced inside AttackAction (only spent if the creature stays in and FIGHTs), not the
+        // the recharge is enforced inside StatusResolver.CanAct (only spent if the creature stays in and FIGHTs), not the
         // turn menu, so CanSwitchTo does not gate on IsRecharging. The lead fires Hyper Beam (recharge set) then
         // switches out on the recharge turn, pre-empting the wasted turn (no Recharging event ever fires).
         var lead = Fighter("Lead", hp: 300, attack: 40, defense: 999, speed: 200, tackleId: 33);

@@ -100,7 +100,14 @@ public sealed class FlinchEffect : IMoveEffect
         {
             int chance = ctx.Rules.GetSecondaryEffectChance(ctx.Attack, SecondaryEffectKind.Flinch);
             if (ctx.Rules.SecondaryHits(chance, ctx.Rng))
+            {
                 ctx.Target.Battle.IsFlinched = true;
+                StatusResolver.ClearRechargeOn(
+                    ctx.Target,
+                    RechargeClearingInfliction.Flinch,
+                    ctx.Rules
+                );
+            }
         }
     }
 }

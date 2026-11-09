@@ -30,6 +30,8 @@ public class AttackAction : IBattleAction
     // (out of PP, or its only move is Disabled), bypassing IBattleInput.
     private readonly PokemonAttack? _selectedMove;
 
+    internal PokemonAttack? SelectedMove => _selectedMove;
+
     public AttackAction(
         Creature source,
         Creature target,
@@ -68,14 +70,6 @@ public class AttackAction : IBattleAction
     {
         if (!Source.IsAlive())
             return Task.CompletedTask;
-
-        // Recharge: skip this turn and clear the flag (Hyper Beam, etc.)
-        if (Source.Battle.IsRecharging)
-        {
-            Source.Battle.IsRecharging = false;
-            _emitter?.Emit(new Recharging(Source.Name, Source.Id));
-            return Task.CompletedTask;
-        }
 
         bool usingStruggle = _selectedMove == null;
         Attack attackToUse = usingStruggle ? Source.Struggle : _selectedMove!.Base;
@@ -174,6 +168,9 @@ public class AttackAction : IBattleAction
         bool immune =
             effectiveness == 0 && ChecksTypeImmunity(attackToUse, category, usingStruggle);
 
+        if (SleepsRechargingTarget(attackToUse, category, usingStruggle))
+            return Task.CompletedTask;
+
         bool checksBeforeHitTest =
             _rules.PrimaryEffectChecksPrecedeHitTest
             && IsStatusMove(attackToUse, category, usingStruggle);
@@ -206,6 +203,10 @@ public class AttackAction : IBattleAction
             && StatDownStopsBeforeHitTest(attackToUse)
         )
             return Task.CompletedTask;
+
+        // Before the hit test, so a trap move that misses still clears the recharge.
+        if (attackToUse.Effect == MoveEffect.Binding && !isLockedInContinuation)
+            StatusResolver.ClearRechargeOn(Target, RechargeClearingInfliction.Trap, _rules);
 
         // Roll order per IBattleRules.HitRollOrder — see GENERATION_SEAMS.md §2.
         Strike? strike;
@@ -461,6 +462,20 @@ public class AttackAction : IBattleAction
             return false;
         }
 
+        return true;
+    }
+
+    // Skips every check and lands even over a status. See GENERATION_SEAMS.md §2 (Pre-move checks).
+    private bool SleepsRechargingTarget(Attack move, DamageCategory category, bool usingStruggle)
+    {
+        if (
+            !_rules.SleepMoveIgnoresChecksOnRechargingTarget
+            || !Target.Battle.IsRecharging
+            || move.StatusEffect != StatusCondition.Sleep
+            || !IsStatusMove(move, category, usingStruggle)
+        )
+            return false;
+        InflictStatus(move);
         return true;
     }
 
@@ -845,10 +860,22 @@ public class AttackAction : IBattleAction
         if (!_rules.SecondaryHits(chance, _rng))
             return;
 
+        InflictStatus(attack);
+    }
+
+    private void InflictStatus(Attack attack)
+    {
         Target.Battle.Status = attack.StatusEffect;
 
         if (attack.StatusEffect == StatusCondition.Sleep)
+        {
             Target.Battle.SleepTurns = _rules.RollSleepTurns();
+            StatusResolver.ClearRechargeOn(Target, RechargeClearingInfliction.Sleep, _rules);
+        }
+        else if (attack.StatusEffect == StatusCondition.Freeze)
+        {
+            StatusResolver.ClearRechargeOn(Target, RechargeClearingInfliction.Freeze, _rules);
+        }
 
         _emitter?.Emit(new StatusApplied(Target.Name, Target.Id, attack.StatusEffect));
     }

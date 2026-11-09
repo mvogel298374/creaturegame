@@ -857,6 +857,10 @@ describe('expandEvent — Disable', () => {
     expect(logLines(expandEvent('MoveDisabled', { targetName: 'ARTICUNO', moveName: 'ice-beam' }, CTX).steps))
       .toEqual(["ARTICUNO's ICE BEAM was disabled!"]);
   });
+  it('MoveIsDisabled names the move that could not be used', () => {
+    expect(logLines(expandEvent('MoveIsDisabled', { creatureName: 'ARTICUNO', moveName: 'ice-beam' }, CTX).steps))
+      .toEqual(["ARTICUNO's ICE BEAM is disabled!"]);
+  });
   it('MoveReEnabled announces the move is usable again', () => {
     expect(logLines(expandEvent('MoveReEnabled', { creatureName: 'ARTICUNO', moveName: 'ice-beam' }, CTX).steps))
       .toEqual(["ARTICUNO's ICE BEAM is no longer disabled!"]);

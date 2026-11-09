@@ -588,6 +588,15 @@ public sealed class SignalRBattleEventEmitter(
                     e.MoveName,
                 }
             ),
+            MoveIsDisabled e => (
+                "MoveIsDisabled",
+                new
+                {
+                    e.CreatureName,
+                    e.CreatureId,
+                    e.MoveName,
+                }
+            ),
             MoveReEnabled e => (
                 "MoveReEnabled",
                 new

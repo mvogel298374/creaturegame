@@ -346,6 +346,36 @@ public sealed class Gen1BattleRules : IBattleRules
     public MoveFailureAnnouncement PrimaryEffectFailureAnnouncement =>
         MoveFailureAnnouncement.Failed;
 
+    // pokered core.asm CheckPlayerStatusConditions, top to bottom.
+    public IReadOnlyList<PreMoveCheck> PreMoveCheckOrder { get; } =
+    [
+        PreMoveCheck.Sleep,
+        PreMoveCheck.Freeze,
+        PreMoveCheck.HeldByTrap,
+        PreMoveCheck.Flinch,
+        PreMoveCheck.Recharge,
+        PreMoveCheck.DisableCountdown,
+        PreMoveCheck.Confusion,
+        PreMoveCheck.UsingDisabledMove,
+        PreMoveCheck.Paralysis,
+    ];
+
+    public bool PreMoveCheckCancelsLockIn(PreMoveCheck check) =>
+        check is PreMoveCheck.Paralysis or PreMoveCheck.Confusion;
+
+    public bool DisabledMoveBlockEndsCharge => true;
+
+    public bool InflictionClearsRecharge(RechargeClearingInfliction infliction) => true;
+
+    public bool SleepMoveIgnoresChecksOnRechargingTarget => true;
+
+    public bool SleepOrFreezeTurnForgetsLastMove => true;
+
+    // pokered: cp 25 percent, where percent is * $ff / 100.
+    public bool RollsFullParalysis(IRandomSource rng) => rng.Next(256) < 63;
+
+    public bool ReplacementEndsTrap => true;
+
     public HitLineWording HitLineWording => HitLineWording.Short;
 
     // pokered core.asm AttackSubstitute: the byte wraps; damage above 255 breaks without writing it.

@@ -1,3 +1,4 @@
+using creaturegame.Attacks;
 using creaturegame.Creatures;
 
 namespace creaturegame.Combat;
@@ -19,19 +20,12 @@ public static class StatusResolver
         IBattleRules? rules = null,
         IBattleEventEmitter? emitter = null,
         IRandomSource? rng = null,
-        Creature? foe = null
+        Creature? foe = null,
+        PokemonAttack? selectedMove = null
     )
     {
         var battleRules = rules ?? Gen1BattleRules.Instance;
         var random = rng ?? SystemRandomSource.Instance;
-
-        // Flinch: self-clearing flag set by a faster attacker this turn
-        if (creature.Battle.IsFlinched)
-        {
-            creature.Battle.IsFlinched = false;
-            emitter?.Emit(new FlinchBlocked(creature.Name, creature.Id));
-            return false;
-        }
 
         // Haze: self-clearing flag set by a faster Haze user this turn that just cured this
         // creature's Sleep/Freeze — Gen 1 still forfeits the already-chosen action rather than
@@ -43,103 +37,242 @@ public static class StatusResolver
             return false;
         }
 
-        // Binding: trapped by Wrap/Bind/Clamp/Fire Spin
-        if (creature.Battle.BindingTurnsRemaining > 0)
+        foreach (var check in battleRules.PreMoveCheckOrder)
         {
-            emitter?.Emit(new BindingBlocked(creature.Name, creature.Id));
-            return false;
-        }
-
-        if (creature.Battle.Status == StatusCondition.Sleep)
-        {
-            creature.Battle.SleepTurns--;
-            if (creature.Battle.SleepTurns <= 0)
+            bool lost = check switch
             {
-                creature.Battle.SleepTurns = 0;
-                creature.Battle.Status = StatusCondition.None;
-                emitter?.Emit(new StatusCleared(creature.Name, creature.Id, StatusCondition.Sleep));
-            }
-            else
-            {
-                emitter?.Emit(new ActionBlocked(creature.Name, creature.Id, StatusCondition.Sleep));
-            }
-            return false;
-        }
-
-        if (creature.Battle.Status == StatusCondition.Freeze)
-        {
-            if (
-                battleRules.FreezeRandomThawPercent > 0
-                && random.Next(100) < battleRules.FreezeRandomThawPercent
-            )
-            {
-                creature.Battle.Status = StatusCondition.None;
-                emitter?.Emit(
-                    new StatusCleared(creature.Name, creature.Id, StatusCondition.Freeze)
-                );
-                return true;
-            }
-            emitter?.Emit(new ActionBlocked(creature.Name, creature.Id, StatusCondition.Freeze));
-            return false;
-        }
-
-        if (creature.Battle.Status == StatusCondition.Paralysis && random.Next(4) == 0)
-        {
-            emitter?.Emit(new ActionBlocked(creature.Name, creature.Id, StatusCondition.Paralysis));
-            return false;
-        }
-
-        if (creature.Battle.ConfusedTurns > 0)
-        {
-            emitter?.Emit(new ConfusionMessage(creature.Name, creature.Id));
-            creature.Battle.ConfusedTurns--;
-            if (creature.Battle.ConfusedTurns == 0)
-            {
-                emitter?.Emit(new ConfusionCleared(creature.Name, creature.Id));
-                return true;
-            }
-            if (random.Next(100) < battleRules.ConfusionSelfHitPercent)
-            {
-                int selfDamage = DamageCalculator.CalculateConfusionDamage(
+                PreMoveCheck.Sleep => SleepStops(creature, battleRules, emitter),
+                PreMoveCheck.Freeze => FreezeStops(creature, battleRules, emitter, random),
+                PreMoveCheck.HeldByTrap => TrapStops(creature, emitter),
+                PreMoveCheck.Flinch => FlinchStops(creature, emitter),
+                PreMoveCheck.Recharge => RechargeStops(creature, emitter),
+                PreMoveCheck.DisableCountdown => TickDisable(creature, emitter),
+                PreMoveCheck.Confusion => ConfusionStops(
                     creature,
                     foe,
-                    battleRules
-                );
-                SelfInflictedDamage.Apply(
-                    creature,
-                    foe,
-                    selfDamage,
                     battleRules,
                     emitter,
-                    hp => new ConfusionDamage(creature.Name, creature.Id, selfDamage, hp)
-                );
-                return false;
-            }
+                    random
+                ),
+                PreMoveCheck.UsingDisabledMove => DisabledMoveStops(
+                    creature,
+                    selectedMove,
+                    battleRules,
+                    emitter
+                ),
+                PreMoveCheck.Paralysis => ParalysisStops(creature, battleRules, emitter, random),
+                _ => throw new ArgumentOutOfRangeException(nameof(check), check, null),
+            };
+            if (!lost)
+                continue;
+            if (battleRules.PreMoveCheckCancelsLockIn(check))
+                CancelLockIn(creature);
+            return false;
         }
 
         return true;
     }
 
-    /// <summary>Ticks Disable and binding countdowns every turn (docs/GEN_DIFFERENCES.md, Gen 1 status quirks).</summary>
-    public static void TickTurnCounters(Creature creature, IBattleEventEmitter? emitter = null)
+    private static void ForgetLastMove(Creature creature, IBattleRules rules)
+    {
+        if (rules.SleepOrFreezeTurnForgetsLastMove)
+            creature.Battle.LastMoveUsed = null;
+    }
+
+    private static bool SleepStops(
+        Creature creature,
+        IBattleRules rules,
+        IBattleEventEmitter? emitter
+    )
+    {
+        if (creature.Battle.Status != StatusCondition.Sleep)
+            return false;
+
+        ForgetLastMove(creature, rules);
+        creature.Battle.SleepTurns--;
+        if (creature.Battle.SleepTurns <= 0)
+        {
+            creature.Battle.SleepTurns = 0;
+            creature.Battle.Status = StatusCondition.None;
+            emitter?.Emit(new StatusCleared(creature.Name, creature.Id, StatusCondition.Sleep));
+        }
+        else
+        {
+            emitter?.Emit(new ActionBlocked(creature.Name, creature.Id, StatusCondition.Sleep));
+        }
+        return true;
+    }
+
+    private static bool FreezeStops(
+        Creature creature,
+        IBattleRules rules,
+        IBattleEventEmitter? emitter,
+        IRandomSource random
+    )
+    {
+        if (creature.Battle.Status != StatusCondition.Freeze)
+            return false;
+
+        if (rules.FreezeRandomThawPercent > 0 && random.Next(100) < rules.FreezeRandomThawPercent)
+        {
+            creature.Battle.Status = StatusCondition.None;
+            emitter?.Emit(new StatusCleared(creature.Name, creature.Id, StatusCondition.Freeze));
+            return false;
+        }
+        ForgetLastMove(creature, rules);
+        emitter?.Emit(new ActionBlocked(creature.Name, creature.Id, StatusCondition.Freeze));
+        return true;
+    }
+
+    private static bool TrapStops(Creature creature, IBattleEventEmitter? emitter)
+    {
+        if (creature.Battle.BindingTurnsRemaining == 0)
+            return false;
+        emitter?.Emit(new BindingBlocked(creature.Name, creature.Id));
+        return true;
+    }
+
+    private static bool FlinchStops(Creature creature, IBattleEventEmitter? emitter)
+    {
+        if (!creature.Battle.IsFlinched)
+            return false;
+        creature.Battle.IsFlinched = false;
+        emitter?.Emit(new FlinchBlocked(creature.Name, creature.Id));
+        return true;
+    }
+
+    private static bool RechargeStops(Creature creature, IBattleEventEmitter? emitter)
+    {
+        if (!creature.Battle.IsRecharging)
+            return false;
+        creature.Battle.IsRecharging = false;
+        emitter?.Emit(new Recharging(creature.Name, creature.Id));
+        return true;
+    }
+
+    // Never costs the turn; it only counts this attempt down.
+    private static bool TickDisable(Creature creature, IBattleEventEmitter? emitter)
+    {
+        if (creature.Battle.DisableTurnsRemaining == 0)
+            return false;
+
+        creature.Battle.DisableTurnsRemaining--;
+        if (creature.Battle.DisableTurnsRemaining == 0 && creature.Battle.DisabledMove != null)
+        {
+            string reEnabled = creature.Battle.DisabledMove.Base.Name ?? "";
+            creature.Battle.DisabledMove = null;
+            emitter?.Emit(new MoveReEnabled(creature.Name, creature.Id, reEnabled));
+        }
+        return false;
+    }
+
+    private static bool ConfusionStops(
+        Creature creature,
+        Creature? foe,
+        IBattleRules rules,
+        IBattleEventEmitter? emitter,
+        IRandomSource random
+    )
+    {
+        if (creature.Battle.ConfusedTurns == 0)
+            return false;
+
+        emitter?.Emit(new ConfusionMessage(creature.Name, creature.Id));
+        creature.Battle.ConfusedTurns--;
+        if (creature.Battle.ConfusedTurns == 0)
+        {
+            emitter?.Emit(new ConfusionCleared(creature.Name, creature.Id));
+            return false;
+        }
+        if (random.Next(100) >= rules.ConfusionSelfHitPercent)
+            return false;
+
+        int selfDamage = DamageCalculator.CalculateConfusionDamage(creature, foe, rules);
+        SelfInflictedDamage.Apply(
+            creature,
+            foe,
+            selfDamage,
+            rules,
+            emitter,
+            hp => new ConfusionDamage(creature.Name, creature.Id, selfDamage, hp)
+        );
+        return true;
+    }
+
+    private static bool DisabledMoveStops(
+        Creature creature,
+        PokemonAttack? selectedMove,
+        IBattleRules rules,
+        IBattleEventEmitter? emitter
+    )
+    {
+        if (selectedMove is null || selectedMove != creature.Battle.DisabledMove)
+            return false;
+
+        if (rules.DisabledMoveBlockEndsCharge)
+        {
+            creature.Battle.IsTwoTurnCharging = false;
+            creature.Battle.ChargingMove = null;
+        }
+        emitter?.Emit(new MoveIsDisabled(creature.Name, creature.Id, selectedMove.Base.Name ?? ""));
+        return true;
+    }
+
+    private static bool ParalysisStops(
+        Creature creature,
+        IBattleRules rules,
+        IBattleEventEmitter? emitter,
+        IRandomSource random
+    )
+    {
+        if (
+            creature.Battle.Status != StatusCondition.Paralysis
+            || !rules.RollsFullParalysis(random)
+        )
+            return false;
+        emitter?.Emit(new ActionBlocked(creature.Name, creature.Id, StatusCondition.Paralysis));
+        return true;
+    }
+
+    private static void CancelLockIn(Creature creature)
+    {
+        var state = creature.Battle;
+        state.BideTurnsRemaining = 0;
+        state.BideDamageAccumulated = 0;
+        state.BideMove = null;
+        state.RampageTurnsRemaining = 0;
+        state.RampageMove = null;
+        state.IsTwoTurnCharging = false;
+        state.ChargingMove = null;
+        ReleaseTrap(creature);
+    }
+
+    /// <summary>Ends any trap <paramref name="binder"/> holds, freeing its victim at once.</summary>
+    internal static void ReleaseTrap(Creature binder)
+    {
+        if (binder.Battle.BindingTarget is { } victim)
+            victim.Battle.BindingTurnsRemaining = 0;
+        binder.Battle.BindingMove = null;
+        binder.Battle.BindingTarget = null;
+    }
+
+    /// <summary>Clears <paramref name="victim"/>'s pending recharge when the rules say this infliction does.</summary>
+    internal static void ClearRechargeOn(
+        Creature victim,
+        RechargeClearingInfliction infliction,
+        IBattleRules rules
+    )
+    {
+        if (rules.InflictionClearsRecharge(infliction))
+            victim.Battle.IsRecharging = false;
+    }
+
+    /// <summary>Ticks the binding countdown every turn (GENERATION_SEAMS.md §2, Pre-move checks).</summary>
+    public static void TickTurnCounters(Creature creature)
     {
         if (!creature.IsAlive())
             return;
 
-        // Disable countdown — tick down each turn and re-enable the move when the lock expires.
-        if (creature.Battle.DisableTurnsRemaining > 0)
-        {
-            creature.Battle.DisableTurnsRemaining--;
-            if (creature.Battle.DisableTurnsRemaining == 0 && creature.Battle.DisabledMove != null)
-            {
-                string reEnabled = creature.Battle.DisabledMove.Base.Name ?? "";
-                creature.Battle.DisabledMove = null;
-                emitter?.Emit(new MoveReEnabled(creature.Name, creature.Id, reEnabled));
-            }
-        }
-
-        // Binding (Wrap/Bind/Clamp/Fire Spin): tick the victim's trap counter toward release. Gen 1 deals NO
-        // residual chip — the damage is the binder's move re-hitting each turn (the attack path), not here.
         if (creature.Battle.BindingTurnsRemaining > 0)
             creature.Battle.BindingTurnsRemaining--;
     }

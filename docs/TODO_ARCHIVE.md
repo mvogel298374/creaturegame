@@ -8,6 +8,63 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §3.1 Pre-move checks follow Gen 1 ✅ DONE (2026-11-09)
+
+M+; merged 2026-11-08 from four entries (§7.6 V8 and V15): the `CanAct` status order, a replacement frees the trapped
+foe, the Disable countdown, and "Sleep moves always land on a recharging foe". Design ruled 2026-11-08.
+
+**Problem.** Ours ran the pre-move checks in its own order, left recharge in `AttackAction` and ticked the Disable
+countdown at the end of every turn, so a recharge cost two turns, the lock ended early, full paralysis and a confusion
+self-hit left Bide, Thrash, charging and trapping standing, and a replaced binder kept its victim held.
+
+**Outcome.** `StatusResolver.CanAct` walks `PreMoveCheckOrder`: sleep (ticks, and always costs the turn), freeze, held
+by the foe's trap, flinch, recharge, the Disable countdown, confusion, using a move disabled this turn ("X's MOVE is
+disabled!", new `MoveIsDisabled` event), paralysis. It took recharge over from `AttackAction` and the Disable countdown
+from `TickTurnCounters`. A roll of N keeps a move disabled for N of the creature's own move attempts; sleep, flinch,
+recharge, switch and item turns don't count down, and the attempt that reaches 0 lets the move through. Full paralysis
+(a roll below 63 of 256) and a confusion self-hit cancel Bide, rampage, charging and any trap the user holds, with no
+Thrash confusion, and free a bound foe. Being stopped by "is disabled!" ends a charge but not a rampage. Sleep, freeze,
+flinch and a trap clear a pending recharge (flinch and freeze only if they land, a new trap before its hit test so
+even on a miss). A sleep move on a recharging foe skips its status and accuracy checks and always lands, even over a
+status or through a Substitute. A sleep or frozen turn, the wake turn included, erases the last move, so Mirror Move
+fails against it. `Battle.BringInMember` ends a replaced binder's trap. `HazeSuppressedStatus` keeps its place ahead
+of the list. The binding-trap countdown stays at end of turn (`TickTurnCounters`): checked against pokered it matches
+in every reachable case once the cancel is in. Runtime only; no data change.
+
+**Seam.** Eight `IBattleRules` members: `PreMoveCheckOrder` (Gen 2: recharge first, no held check),
+`PreMoveCheckCancelsLockIn(check)` (Gen 1 paralysis and confusion; Gen 2 every lost turn),
+`DisabledMoveBlockEndsCharge` (Gen 1 true), `InflictionClearsRecharge(kind)` (Gen 1 sleep, freeze, flinch, trap; Gen 2
+freeze and flinch only), `SleepMoveIgnoresChecksOnRechargingTarget` (Gen 1 true), `SleepOrFreezeTurnForgetsLastMove`
+(Gen 1 true), `RollsFullParalysis` (63 of 256 in both; replaced the earlier `FullParalysisThreshold`) and
+`ReplacementEndsTrap` (both true).
+
+**Rulings (Mo).**
+- A sleep or frozen turn erasing the Mirror Move last move: fixed here.
+- Full paralysis is 63/256: fixed here.
+- The binding countdown staying outside the seam and the player-only `ReplacementEndsTrap` (enemies have no
+  replacement path): waived 2026-11-08, "revisit when enemy parties or Gen 2 arrive"; recorded in
+  `GENERATION_SEAMS.md` (row *Pre-move checks*).
+- `DisabledMoveBlockEndsCharge` kept as a seam member.
+- On `pr-review`'s finding the paralysis roll's whole scale (the 256 and the 63) moved behind `RollsFullParalysis`.
+
+**Gen 1 source.** pokered `engine/battle/core.asm` `CheckPlayerStatusConditions` (`:3328`),
+`.MonHurtItselfOrFullyParalysed`, `CheckEnemyStatusConditions` (`:5677`), `SendOutMon` (`:1744-1756`),
+`CheckNumAttacksLeft` (`:683`); `engine/battle/effects.asm` `SleepEffect`, `.freeze1`, `FlinchSideEffect`,
+`TrappingEffect`, `ClearHyperBeam` (`:1181-1191`). pokecrystal `engine/battle/effect_commands.asm` `CheckTurn`,
+`CantMove`, `EndRechargeOpp`; `engine/battle/core.asm` `NewEnemyMonStatus`. Full cites in the V8 and V15 records.
+
+**Tests.** `PreMoveCheckContractTests` (new) plus changes to the recharge, Disable and voluntary-switch tests:
+Thrash cancelled by full paralysis leaves the user unconfused; a bound creature's sleep still ticks; sleep, flinch,
+recharge, switch and item turns don't count Disable down; a missed trap move still clears recharge; the bind ends on
+the send-out, not on its counter; a sleep move on a recharging target draws no accuracy roll. The tests that drove
+recharge through `AttackAction` directly and those pinning the old Disable tick changed.
+
+**Left open (own entries in `TODO.md`).** "Snapping out of confusion prints 'is confused!' first" (found here);
+the note on "Fly and Dig don't dodge anything" (a confusion self-hit clears the invulnerable bit, full paralysis
+doesn't).
+
+---
+
 ## §3.1 Status and stat-down moves check before the hit test ✅ DONE (2026-11-08)
 
 M; merged 2026-11-08 from four entries: Mist + thaw (§7.6 V10), Substitute stops a primary stat-down before accuracy,

@@ -160,6 +160,10 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                 Console.WriteLine($"{e.TargetName}'s {e.MoveName} was disabled!");
                 break;
 
+            case MoveIsDisabled e:
+                Console.WriteLine($"{e.CreatureName}'s {e.MoveName} is disabled!");
+                break;
+
             case MoveReEnabled e:
                 Console.WriteLine($"{e.CreatureName}'s {e.MoveName} is no longer disabled!");
                 break;

@@ -1332,6 +1332,12 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       return { steps: [w(120), d(log(`${tName}'s ${formatMoveName(mName)} was disabled!`))] };
     }
 
+    case 'MoveIsDisabled': {
+      const cName = payload.creatureName as string;
+      const mName = payload.moveName as string;
+      return { steps: [w(120), d(log(`${cName}'s ${formatMoveName(mName)} is disabled!`))] };
+    }
+
     case 'MoveReEnabled': {
       const cName = payload.creatureName as string;
       const mName = payload.moveName as string;

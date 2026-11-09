@@ -215,6 +215,33 @@ internal static class TestAltProfile
         public override MoveFailureAnnouncement PrimaryEffectFailureAnnouncement =>
             MoveFailureAnnouncement.Missed;
 
+        public override IReadOnlyList<PreMoveCheck> PreMoveCheckOrder { get; } =
+        [
+            PreMoveCheck.Recharge,
+            PreMoveCheck.Sleep,
+            PreMoveCheck.Freeze,
+            PreMoveCheck.Flinch,
+            PreMoveCheck.DisableCountdown,
+            PreMoveCheck.Confusion,
+            PreMoveCheck.UsingDisabledMove,
+            PreMoveCheck.Paralysis,
+        ];
+
+        public override bool PreMoveCheckCancelsLockIn(PreMoveCheck check) => true;
+
+        public override bool DisabledMoveBlockEndsCharge => false;
+
+        public override bool InflictionClearsRecharge(RechargeClearingInfliction infliction) =>
+            infliction != RechargeClearingInfliction.Sleep;
+
+        public override bool SleepMoveIgnoresChecksOnRechargingTarget => false;
+
+        public override bool SleepOrFreezeTurnForgetsLastMove => false;
+
+        public override bool RollsFullParalysis(IRandomSource rng) => rng.Next(2) == 0;
+
+        public override bool ReplacementEndsTrap => false;
+
         public override bool HealFails(int currentHp, int maxHp) => currentHp >= maxHp;
 
         public override MoveFailureAnnouncement HealFailureAnnouncement =>

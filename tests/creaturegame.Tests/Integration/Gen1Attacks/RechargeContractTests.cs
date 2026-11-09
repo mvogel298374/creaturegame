@@ -6,7 +6,7 @@ namespace creaturegame.Tests.Integration.Gen1Attacks;
 
 /// <summary>
 /// Recharge moves (Hyper Beam): a successful hit forces the user to spend the next turn recharging
-/// (no action). Recharge is checked in <c>AttackAction</c> and driven across turns by <c>Battle</c>,
+/// (no action). Recharge is checked in <c>StatusResolver.CanAct</c> and driven across turns by <c>Battle</c>,
 /// so it's covered both with consecutive actions and in a full battle. A miss deals no damage, so it
 /// does not trigger a recharge.
 /// </summary>

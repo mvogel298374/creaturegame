@@ -65,7 +65,7 @@ public sealed class BattleState
 
     // Disable (the move): one of this creature's moves is locked out by the foe. DisabledMove is
     // the exact PokemonAttack instance that can't be selected; DisableTurnsRemaining counts down
-    // each end-of-turn and the move is re-enabled when it reaches 0.
+    // on each of this creature's move attempts and the move is re-enabled when it reaches 0.
     public PokemonAttack? DisabledMove { get; set; }
     public int DisableTurnsRemaining { get; set; }
 

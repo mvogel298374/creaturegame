@@ -233,17 +233,14 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
   end-of-turn residual phase"). The fix belongs behind an `IBattleRules` seam alongside
   `FaintEndsTurnImmediately`, which `Battle`'s turn loop and `AttackAction`'s Hyper Beam handling both read; the
   fainted side's own residuals are skipped by `StatusResolver.ApplyEndOfTurnDamage`'s `IsAlive()` guard, which needs
-  no seam. The Disable-lock and binding-trap countdowns sit outside this: the engine ticks
-  both creatures' counters every turn regardless of a faint (`StatusResolver.TickTurnCounters`). **For Disable
-  that is not Gen 1:** pokered decrements the counter in the disabled mon's own pre-move check
-  (`core.asm` `CheckPlayerStatusConditions` → `.AnyMoveDisabledCheck`, line 3394), after the sleep, freeze,
-  trapped, flinch and recharge checks, each of which skips it; a turn spent switching or using an item skips
-  it too. Tracked in `docs/TODO.md` §3.1 ("Gen 1 Disable countdown"). History of the direct-hit fix (reported log, 2026-09-13):
+  no seam. The binding-trap countdown sits outside this: the engine ticks it every turn regardless of a faint
+  (`StatusResolver.TickTurnCounters`). Disable counts down in the disabled mon's own pre-move check instead
+  (`GENERATION_SEAMS.md` §2, Pre-move checks). History of the direct-hit fix (reported log, 2026-09-13):
   `docs/TODO_ARCHIVE.md` → "End-of-turn residual fired even after a same-turn faint".
 - **Hyper Beam**: does NOT require a recharge turn if it KOs the target — the sibling half of the same faint
   rule above, and read off the same `FaintEndsTurnImmediately` member; **switching out during the recharge
   turn is legal** — the recharge is only spent if the creature stays in and FIGHTs (it's enforced inside
-  `AttackAction.ExecuteAsync`, not the turn menu), so a voluntary switch pre-empts it
+  `StatusResolver.CanAct`, not the turn menu), so a voluntary switch pre-empts it
 - **Focus Energy / Dire Hit**: bug causes it to **quarter** the crit rate instead of quadrupling it; a high-crit move
   from base speed 64 up loses less (formula under Stats)
 - **Sleep**: Pokémon wakes up before acting — but **cannot act** on the turn it wakes
@@ -301,7 +298,8 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
   one-hit KO never prints "Critical hit!" (the two share one slot), prints "One-hit KO!" only when the Speed check
   passes, and then prints its effectiveness. Seam: `GENERATION_SEAMS.md` §2.
 - **Disable** picks a random move with PP left, and the lock is enforced at move selection (`Battle` and
-  `IBattleInput` skip `DisabledMove`); its countdown timing is covered under the residual-phase bullet above.
+  `IBattleInput` skip `DisabledMove`) and again by the pre-move "is disabled!" check, for a move disabled after it
+  was chosen; its countdown is in `GENERATION_SEAMS.md` §2, Pre-move checks.
 - **Leech Seed lands through a Substitute** in the English RBY this engine targets (reported blocked only in the
   Japanese games and Pokémon Stadium, which is unverified). pokered `engine/battle/move_effects/leech_seed.asm` has no
   Substitute check (verified by `requirements-review` 2026-10-29). `LeechSeedEffect` is therefore not

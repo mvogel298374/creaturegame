@@ -512,6 +512,8 @@ public record MoveDisabled(string TargetName, int TargetId, string MoveName) : B
 
 public record MoveReEnabled(string CreatureName, int CreatureId, string MoveName) : BattleEvent;
 
+public record MoveIsDisabled(string CreatureName, int CreatureId, string MoveName) : BattleEvent;
+
 // --- Mist (the move) ---
 public record MistApplied(string CreatureName, int CreatureId) : BattleEvent;
 

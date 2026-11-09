@@ -195,7 +195,14 @@ public class Battle
                     if (!attack.Target.IsAlive())
                         continue;
                     if (
-                        !StatusResolver.CanAct(action.Source, _rules, _emitter, _rng, attack.Target)
+                        !StatusResolver.CanAct(
+                            action.Source,
+                            _rules,
+                            _emitter,
+                            _rng,
+                            attack.Target,
+                            attack.SelectedMove
+                        )
                     )
                         continue;
                 }
@@ -227,10 +234,9 @@ public class Battle
 
             if (!FleeEndsTurn())
             {
-                // Disable/binding countdowns tick even on a turn a faint ends early below — unlike the
-                // residual phase, these are NOT part of IBattleRules.FaintEndsTurnImmediately.
-                StatusResolver.TickTurnCounters(PlayerCreature, _emitter);
-                StatusResolver.TickTurnCounters(EnemyCreature, _emitter);
+                // Runs even on a faint: GEN_DIFFERENCES.md, end-of-turn residuals.
+                StatusResolver.TickTurnCounters(PlayerCreature);
+                StatusResolver.TickTurnCounters(EnemyCreature);
 
                 // IBattleRules.FaintEndsTurnImmediately — TODO_ARCHIVE.md → "End-of-turn residual … fired even
                 // after a same-turn faint" for the incident this guards against.
@@ -662,6 +668,8 @@ public class Battle
     private void BringInMember(int index)
     {
         int substituteRemnant = PlayerCreature.Battle.SubstituteRemnant;
+        if (_rules.ReplacementEndsTrap)
+            StatusResolver.ReleaseTrap(PlayerCreature);
         _playerParty!.SetLead(index);
         PlayerCreature = _playerParty.Lead;
         PlayerCreature.ResetBattleState();

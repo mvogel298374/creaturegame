@@ -151,9 +151,19 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - Thrash and Petal Dance print "<user> is thrashing about!" on each repeat turn instead of "used <move>!". The lock's
   end confuses the user without a "became confused" line, and always rolls a fresh 2-5 turn counter, even when the user
   was already confused.
-- Design detail → `GENERATION_SEAMS.md` §2 (*Roll order*), `GEN_DIFFERENCES.md` → *Roll Order*.  History →
+- Before a move the checks run in this order: sleep, freeze, held by the foe's trap, flinch, recharge, the Disable
+  countdown, confusion, "<user>'s <move> is disabled!", paralysis. A recharge costs one lost turn, not two.
+- A roll of N keeps a move disabled for N of the creature's own move attempts; sleep, flinch, recharge, switch and item
+  turns don't count down.
+- Full paralysis is a roll below 63 of 256. Full paralysis or a confusion self-hit ends Bide, a rampage, a charge and
+  any trap the user holds, with no Thrash confusion, and frees a bound foe. Being stopped by "is disabled!" ends a
+  charge but not a rampage.
+- Sleep, freeze, flinch and a trap clear a pending recharge; a trap does so even when its move misses. A sleep move on
+  a recharging foe skips its status and accuracy checks and always lands.
+- A sleep or frozen turn erases the move Mirror Move would copy. Replacing a binder frees the foe it held.
+- Design detail → `GENERATION_SEAMS.md` §2 (*Roll order*, *Pre-move checks*), `GEN_DIFFERENCES.md` → *Roll Order*.  History →
   `TODO_ARCHIVE.md` → *Gen 1 roll order in `AttackAction`, behind a seam* and *Failure announcements: a failed OHKO and
-  a trainer-battle Roar/Whirlwind say "unaffected"* and *Roar/Whirlwind: the scared-off side still acts* and *Recover and Soft-Boiled fail cases* and *Gen 1 confusion self-hit damage* and *Rampage edge gaps* and *Self-hit and crash damage strike the foe's Substitute* and *Substitute prints Gen 1's lines*.
+  a trainer-battle Roar/Whirlwind say "unaffected"* and *Roar/Whirlwind: the scared-off side still acts* and *Recover and Soft-Boiled fail cases* and *Gen 1 confusion self-hit damage* and *Rampage edge gaps* and *Self-hit and crash damage strike the foe's Substitute* and *Substitute prints Gen 1's lines* and *Pre-move checks follow Gen 1*.
 
 ### Foe move scoring and chosen-move validation
 - The foe scores a status move by its status chance: a 10% burn side effect is worth a tenth of a pure burn move.

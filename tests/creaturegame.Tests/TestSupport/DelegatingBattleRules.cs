@@ -152,6 +152,25 @@ public abstract class DelegatingBattleRules : IBattleRules
     public virtual MoveFailureAnnouncement PrimaryEffectFailureAnnouncement =>
         _inner.PrimaryEffectFailureAnnouncement;
 
+    public virtual IReadOnlyList<PreMoveCheck> PreMoveCheckOrder => _inner.PreMoveCheckOrder;
+
+    public virtual bool PreMoveCheckCancelsLockIn(PreMoveCheck check) =>
+        _inner.PreMoveCheckCancelsLockIn(check);
+
+    public virtual bool DisabledMoveBlockEndsCharge => _inner.DisabledMoveBlockEndsCharge;
+
+    public virtual bool InflictionClearsRecharge(RechargeClearingInfliction infliction) =>
+        _inner.InflictionClearsRecharge(infliction);
+
+    public virtual bool SleepMoveIgnoresChecksOnRechargingTarget =>
+        _inner.SleepMoveIgnoresChecksOnRechargingTarget;
+
+    public virtual bool SleepOrFreezeTurnForgetsLastMove => _inner.SleepOrFreezeTurnForgetsLastMove;
+
+    public virtual bool RollsFullParalysis(IRandomSource rng) => _inner.RollsFullParalysis(rng);
+
+    public virtual bool ReplacementEndsTrap => _inner.ReplacementEndsTrap;
+
     public virtual SubstituteStrike StrikeSubstituteByte(int remnant, int damage) =>
         _inner.StrikeSubstituteByte(remnant, damage);
 
