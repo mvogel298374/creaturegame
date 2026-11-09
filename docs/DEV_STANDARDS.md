@@ -99,7 +99,7 @@ cleanup for later.
 
 ## Pre-finish Gates
 When a feature is close to done, run the pre-finish gate sequence before proposing a commit — the format
-step (CSharpier) and the test step (fast suites), both run inline, then `requirements-review` (Gen-1 / roguelite domain fidelity — a hard
+step (CSharpier), the lint step (Rider, the `lint-diff` skill) and the test step (fast suites), all run inline, then `requirements-review` (Gen-1 / roguelite domain fidelity — a hard
 gate to the pipeline, soft to the user) and `pr-review` (Opus technical DoD, incl. generation-seam
 architecture). The **`.githooks/pre-commit`** hook is the deterministic backstop (CSharpier + tests) at
 commit time. All are documented in `AI_CONTEXT.md` → **Tooling & Automation**.

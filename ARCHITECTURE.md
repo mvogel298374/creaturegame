@@ -543,4 +543,5 @@ Every doc in the repo and what it answers, in a line. This file (`ARCHITECTURE.m
 | `docs/PRODUCT_SPEC.md` | Current-state feature spec — what the game does *today* (present tense, no rationale, no history); grows one entry per finished player-visible feature. |
 | `.claude/AI_CONTEXT.md` | Agent profiles (`/plan` `/dev` …) + the tooling/automation reference. |
 | `.claude/agents/*.md` | The gate and helper subagents (`requirements-review`, `pr-review`, `docs-cleanup`, `opus-engineer`); models in the `CLAUDE.md` table. |
+| `.claude/skills/*/SKILL.md` | Project skills: `lint-diff` (the G3 lint step) and `trace-turn` (pause one test in Rider's debugger). |
 | `creaturegame.Web/ClientApp/e2e/README.md` | The Playwright suite: layout, running it, writing specs. |

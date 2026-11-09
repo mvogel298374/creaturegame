@@ -26,6 +26,8 @@
   .\test.ps1 -Filter AbandonTimerTests   # only .NET tests whose name contains it (implies -Dotnet)
 .EXAMPLE
   .\test.ps1 -Dotnet -Filter "FullyQualifiedName~Bag&Category=Unit"   # a full dotnet --filter expression, passed as-is
+.EXAMPLE
+  .\test.ps1 -Filter SomeExactTest -WaitForDebugger   # testhost prints its PID and waits for a debugger (see the trace-turn skill)
 #>
 [CmdletBinding()]
 param(
@@ -33,8 +35,14 @@ param(
   [switch]$Web,
   [switch]$E2E,
   [switch]$StartStack,
-  [string]$Filter
+  [string]$Filter,
+  [switch]$WaitForDebugger
 )
+
+if ($WaitForDebugger -and (-not $Filter -or $Web -or $E2E)) {
+  Write-Host "-WaitForDebugger needs -Filter and the .NET suite only." -ForegroundColor Red
+  exit 2
+}
 
 # Playwright/npm/dotnet write UTF-8 (› ✓ ✘ …), but PowerShell decodes native-command output with the console's
 # OEM code page, so on Windows those show as mojibake ("ÔÇ║", "Ô£ô"). Decode as UTF-8 for the run and put the
@@ -84,7 +92,9 @@ function Strip-Ansi([object[]]$lines) {
 # ── .NET unit tests ──────────────────────────────────────────────────────────
 if ($Dotnet -or $runAll) {
   Write-Host "`n=== .NET unit tests (xUnit) ===" -ForegroundColor Cyan
-  & $dotnetExe test (Join-Path $root 'tests\creaturegame.Tests') --nologo @dotnetFilterArgs 2>&1 | Tee-Object -Variable raw
+  if ($WaitForDebugger) { $env:VSTEST_HOST_DEBUG = '1' }
+  try { & $dotnetExe test (Join-Path $root 'tests\creaturegame.Tests') --nologo @dotnetFilterArgs 2>&1 | Tee-Object -Variable raw }
+  finally { if ($WaitForDebugger) { $env:VSTEST_HOST_DEBUG = $null } }
   $ok = ($LASTEXITCODE -eq 0)
   $lines = Strip-Ansi $raw; $text = ($lines -join "`n")
   $passed = $failed = $skipped = $total = 0

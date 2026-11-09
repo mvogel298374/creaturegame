@@ -13,6 +13,7 @@ hard gate to the pipeline but soft to the user: only the user waives a requireme
 
 ## Preconditions (green before `pr-review` runs)
 - Format step — CSharpier `PASS` or `REFORMATTED`.
+- Lint step — `LINT: PASS` or `N/A`, or every finding fixed or decided by the user.
 - Test step — the fast suites green.
 - `requirements-review` — `REQUIREMENTS: MET`, or every discrepancy user-adjudicated (fixed or explicitly
   waived by the user).

@@ -52,6 +52,7 @@ directives/
     engine.md                      battle, stat, move or event work
     data.md                        importer, database or asset work
     ui.md                          frontend layout work
+    rider.md                       using a Rider MCP tool
 ARCHITECTURE.md                    the why behind a design; system map; engine at a glance (§1.1); decision log
 README.md                          getting started, for humans
 docs/
@@ -76,6 +77,8 @@ docs/
 .claude/
   AI_CONTEXT.md                    the /plan /dev /sync /test profiles; tooling reference
   agents/*.md                      the gate and helper subagents (models below)
+  skills/lint-diff/                the G3 lint step (Rider analysis over the diff)
+  skills/trace-turn/               diagnosing battle behaviour: pause one test in Rider's debugger
 creaturegame.Web/ClientApp/e2e/README.md   working on the Playwright suite
 ```
 
@@ -132,6 +135,7 @@ port (it never kills those); logs are in `.dev/backend.log` and `.dev/frontend.l
 .\test.ps1 -Dotnet -Web       # the fast suites: .NET xUnit + tsc typecheck + Vitest (the gate scope)
 .\test.ps1 -Dotnet            # .NET only
 .\test.ps1 -Filter <Name>     # .NET subset; a bare word is FullyQualifiedName~, a full --filter passes as-is
+.\test.ps1 -Filter <Name> -WaitForDebugger   # the test host prints its PID and waits (trace-turn skill)
 ```
 E2E (Playwright, ~4 min, serial, needs the stack, the only suite with real flakes) runs only on Mo's request (G6):
 `.\e2e.ps1 -Spec <file>` for the narrowest run, `-Grep`, `-LastFailed`, `-Headed`, `-StartStack`, `-Bail`. Bare

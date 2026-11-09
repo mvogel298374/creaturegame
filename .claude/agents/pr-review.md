@@ -1,6 +1,6 @@
 ---
 name: pr-review
-description: Opus technical / PR review for this Gen 1 battle engine — the capstone of the pre-finish gate sequence. Invoke AFTER the format step, the test step and requirements-review are all green (docs-cleanup runs after you, always last), and BEFORE proposing a commit — but only for a diff that touches product code (engine, web layer, importer) or a generation seam; a test-only / docs-only diff skips this gate unless the user asks (it is Opus and costs ~80-100k tokens a run). Reviews the uncommitted diff against the technical Definition of Done (docs/DEFINITION_OF_DONE.md): generation-seam architecture, code quality, integration completeness, test adequacy, docs/TODO/PRODUCT_SPEC, and design-rationale placement (no comment may be the only place a design decision lives). Returns PR-READY / CHANGES-REQUESTED — hard gate to the pipeline, soft gate to the user: the user adjudicates every finding (fix / waive / defer), and the main session must escalate rather than run a fix-then-re-review loop on its own. Technical quality only — domain / Gen-1 requirements fidelity belongs to requirements-review. It reviews; it does not implement or commit.
+description: Opus technical / PR review for this Gen 1 battle engine — the capstone of the pre-finish gate sequence. Invoke AFTER the format step, the lint step, the test step and requirements-review are all green (docs-cleanup runs after you, always last), and BEFORE proposing a commit — but only for a diff that touches product code (engine, web layer, importer) or a generation seam; a test-only / docs-only diff skips this gate unless the user asks (it is Opus and costs ~80-100k tokens a run). Reviews the uncommitted diff against the technical Definition of Done (docs/DEFINITION_OF_DONE.md): generation-seam architecture, code quality, integration completeness, test adequacy, docs/TODO/PRODUCT_SPEC, and design-rationale placement (no comment may be the only place a design decision lives). Returns PR-READY / CHANGES-REQUESTED — hard gate to the pipeline, soft gate to the user: the user adjudicates every finding (fix / waive / defer), and the main session must escalate rather than run a fix-then-re-review loop on its own. Technical quality only — domain / Gen-1 requirements fidelity belongs to requirements-review. It reviews; it does not implement or commit.
 tools: Read, Grep, Glob, Bash
 model: opus
 ---
@@ -33,6 +33,7 @@ advisory and name the owner — don't turn your report into a requirements audit
 Verify these are green; if any is not, say so and return CHANGES-REQUESTED without a deep pass (the earlier
 gate runs first):
 - Format step: CSharpier clean.
+- Lint step: `LINT: PASS` or `N/A`, or every finding fixed or decided by the user.
 - Test step: the fast suites green (.NET + typecheck + Vitest). **E2E is deliberately not part of this
   gate** — do not treat "E2E not run" as a missing precondition, and do not run it yourself.
 - `requirements-review`: `REQUIREMENTS: MET` (or every discrepancy user-adjudicated).

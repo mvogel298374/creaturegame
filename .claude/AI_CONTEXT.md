@@ -23,7 +23,7 @@ Clean, testable, EF-optimized C# 13 / .NET 9; PokeAPI integration. Knowledge bas
 follow-up cleanup. (That file is the source of truth for the rule; don't restate it, run it.) **Comment budget:**
 default no comment, at most one short line; logic documentation goes in markdown in the same commit (`DEV_STANDARDS.md` →
 *Design Rationale Placement*) — never copy a neighbouring file's comment density. **When the
-feature is close to done, run the pre-finish gate sequence** (format step, test step, `requirements-review`,
+feature is close to done, run the pre-finish gate sequence** (format step, lint step, test step, `requirements-review`,
 `pr-review`, and **`docs-cleanup` always last**) before proposing a commit — nothing is "done" until `docs-cleanup`
 has run against the final state (`GUARDRAILS.md` → G2).
 
@@ -59,11 +59,15 @@ deterministic shell hook (format + tests) and LLM reasoning a shell can't do.
 
 ### Pre-finish gate sequence
 When a feature is close to done, the main session runs these **separable** gates before proposing a commit, **in this
-fixed order, `docs-cleanup` always last** — the two mechanical steps inline, each review its own subagent:
+fixed order, `docs-cleanup` always last** — the three mechanical steps inline, each review its own subagent:
 
 1. **Format step** (inline, no agent; `GUARDRAILS.md` → G3) — `dotnet csharpier format .`, then
    `dotnet csharpier check .` → PASS, or REFORMATTED with the changed files.
-2. **Test step** (inline, no agent; G3) — `.\test.ps1 -Dotnet -Web` once against the final code (`-Dotnet` or `-Web`
+2. **Lint step** (inline, no agent; G3) — the `lint-diff` skill: Rider's `lint_files` over the `.cs` files in the diff
+   → `LINT: PASS | FINDINGS | N/A`. An `ERROR` blocks anywhere in a listed file; a `WARNING` counts only on a changed
+   line, so existing warnings don't block unrelated work; a `WEAK WARNING` is ignored because it is style noise that
+   partly contradicts CSharpier. It runs before the test step because it finds compile errors in seconds.
+3. **Test step** (inline, no agent; G3) — `.\test.ps1 -Dotnet -Web` once against the final code (`-Dotnet` or `-Web`
    when only one side moved), TEST SUMMARY relayed verbatim, failing tests named, and a line saying E2E did not run.
    Retired the Haiku `format-gate` / `test-runner` agents on 2026-11-06: each cold start cost ~50k tokens for one
    deterministic command the pre-commit hook re-runs anyway.
@@ -73,13 +77,13 @@ fixed order, `docs-cleanup` always last** — the two mechanical steps inline, e
      one re-run.
    - **On an E2E failure, open `test-failed-1.png` first** — the screenshot often shows the app behaving correctly
      and the *spec* being wrong (both `reward-drop.spec.ts` and `voluntary-switch.spec.ts` were exactly this).
-3. **`requirements-review`** (Subagent, `.claude/agents/requirements-review.md`, Sonnet) — the domain gate,
+4. **`requirements-review`** (Subagent, `.claude/agents/requirements-review.md`, Sonnet) — the domain gate,
    for battle/stat/move work. A Pokémon-Gen-1 + roguelite expert that challenges the implementation against
    the DoR-finalized plan, the internal docs, and its own knowledge, and flags undocumented behavior →
    `REQUIREMENTS: MET | DISCREPANCIES`. **Hard gate to the pipeline, soft gate to the user:** a discrepancy
    blocks progress to done/commit and no subagent may clear it; only the **user** adjudicates (fix or waive).
-4. **`pr-review`** (Subagent, `.claude/agents/pr-review.md`, **Opus**) — the technical capstone, run **after**
-   1–3 are green. Reviews the diff against the technical Definition of Done (`docs/DEFINITION_OF_DONE.md`) —
+5. **`pr-review`** (Subagent, `.claude/agents/pr-review.md`, **Opus**) — the technical capstone, run **after**
+   1–4 are green. Reviews the diff against the technical Definition of Done (`docs/DEFINITION_OF_DONE.md`) —
    generation-seam architecture, code quality, integration completeness, test adequacy, the comment budget,
    and design-rationale placement (§G — no comment is the *only* place a design decision lives) → `PR-READY
    | CHANGES-REQUESTED`. Technical quality only; domain fidelity is `requirements-review`'s. It treats
@@ -87,7 +91,7 @@ fixed order, `docs-cleanup` always last** — the two mechanical steps inline, e
 
    **Scope — it is Opus and costs real money (~80–100k tokens a run), so it is not automatic.** Run it when the
    diff touches **product code** (engine, web layer, importer) or a generation seam. A **test-only or docs-only
-   diff skips it** unless the user asks: gates 1–2 plus the pre-commit hook already cover those, and a review
+   diff skips it** unless the user asks: gates 1–3 plus the pre-commit hook already cover those, and a review
    that costs more than the change it reviews is a bad trade. Borderline? Say what it will cost and let the
    user pick — don't decide silently in either direction.
 
@@ -100,7 +104,7 @@ fixed order, `docs-cleanup` always last** — the two mechanical steps inline, e
    This mirrors `requirements-review`: **hard gate to the pipeline, soft gate to the user.** The user
    adjudicates both lanes; the difference is only which kind of finding each raises.
 
-5. **`docs-cleanup`** (Subagent, `.claude/agents/docs-cleanup.md`, Sonnet) — **the mandatory, unskippable docs-hygiene
+6. **`docs-cleanup`** (Subagent, `.claude/agents/docs-cleanup.md`, Sonnet) — **the mandatory, unskippable docs-hygiene
    gate, and always the LAST gate.** For *every* change — docs-only, test-only and one-line fixes included — it
    runs after the review gates, against the final state. It reconciles `docs/TODO.md` against reality: archives the
    finished write-up to `TODO_ARCHIVE.md` (TODO.md is active work only), clears its stale framing (its §1 ranking
@@ -112,10 +116,10 @@ fixed order, `docs-cleanup` always last** — the two mechanical steps inline, e
    **Any change after it — code or docs — means it runs again.** Nothing is called done, and no commit is proposed,
    until it has reported; the pre-commit hook blocks a commit with no stamp or with any staged file newer than it.
 
-The four *review* gates (1–4) run and report; they don't fix or commit — and **neither a `requirements-review`
+The five *review* gates (1–5) run and report; they don't fix or commit — and **neither a `requirements-review`
 discrepancy nor a `pr-review` CHANGES-REQUESTED is cleared by a subagent: only the user adjudicates** (bar the wording/comment/doc-only fixes `authority.md` rule 4 lets the main session make and list).
-`docs-cleanup` (5) is the one *action* gate, and the last: it edits the task docs so the finishing commit carries
-them, writes the stamp, then reports. None of the five commits. The `.githooks/pre-commit` hook still runs CSharpier + tests as the
+`docs-cleanup` (6) is the one *action* gate, and the last: it edits the task docs so the finishing commit carries
+them, writes the stamp, then reports. None of the six commits. The `.githooks/pre-commit` hook still runs CSharpier + tests as the
 deterministic backstop at commit time.
 
 > **Why the escalation rule exists** (2026-07-16): a test-only diff drew two Opus `pr-review` runs (~185k
@@ -125,7 +129,7 @@ deterministic backstop at commit time.
 
 > The old `/audit` skill and `seam-reviewer` subagent are **retired.** Their two jobs were split by lane:
 > Gen-1 / domain fidelity → `requirements-review`; generation-seam *architecture* (the first invariant) →
-> `pr-review`. There is no longer an orchestrator skill — the main session runs the five gates in sequence.
+> `pr-review`. There is no longer an orchestrator skill — the main session runs the six gates in sequence.
 
 ### Pre-commit hook (`.githooks/pre-commit`)
 Deterministic backstop, per staged file type: `csharpier check .` always; the full `dotnet test` suite when
@@ -186,6 +190,11 @@ $env:CG_BATTLE_LOG = $null   # turn it back off
 ```
 Any value other than `0`/`false` (or unset/empty) enables it.
 
+### Debugging a test (`-WaitForDebugger`)
+`.\test.ps1 -Filter <one test> -WaitForDebugger` sets `VSTEST_HOST_DEBUG`, so the test host prints its PID and waits
+for a debugger. The `trace-turn` skill drives the rest in Rider. Launching the test from Rider instead would bypass
+`test.ps1` (`MoDirectives/testing.md` rules 1–2).
+
 ### MCP servers (data & UI inspection)
 - **`sqlite-moves` / `sqlite-pokemon`** — read/verify `moves.db` / `pokemon.db` rows after a
   `PokeApiConnector` run, without throwaway code. Treat as read-only: fix data by editing the importer +
@@ -193,6 +202,10 @@ Any value other than `0`/`false` (or unset/empty) enables it.
 - **`puppeteer`** — drives the running web UI to confirm the full game flow (title → select → battle →
   status → faint → end) for changes tests can't capture. Start the dev stack (`.\dev.ps1`), then follow the
   UI checklist.
+- **`rider`** — Rider's own MCP server, registered at user scope. It answers only while Rider has this solution open,
+  and every call needs `rootFolder`. The skills `lint-diff` and `trace-turn` use it. Its run-configuration, terminal,
+  `reformat_file`, SQL and `execute_tool` tools are denied in `.claude/settings.local.json` because they bypass
+  `test.ps1`, CSharpier and the importer.
 - **`github`** — GitHub's **remote hosted** MCP server (`https://api.githubcopilot.com/mcp/`, HTTP transport),
   for working the `origin` repo remotely: read/manage issues & PRs, inspect CI/Actions runs (incl. the Fly
   deploy workflow), push branches, comment. Registered at **project scope** in the repo-root `.mcp.json`
@@ -222,6 +235,8 @@ Any value other than `0`/`false` (or unset/empty) enables it.
 | File | Role |
 |:-----|:-----|
 | `CLAUDE.md` | The base layer: doc layers, docs tree, commands, model spread — loaded automatically, with the Mo directives it imports |
+| `skills/lint-diff/SKILL.md` | The G3 lint step: Rider analysis over the diff's C# files |
+| `skills/trace-turn/SKILL.md` | Pause one test through `test.ps1` and read live state in Rider's debugger |
 | `agents/docs-cleanup.md` | Mandatory docs-hygiene gate — archives finished TODO items, clears stale framing (Subagent) |
 | `agents/requirements-review.md` | Gen-1 / roguelite domain & requirements gate — hard to pipeline, soft to user (Subagent) |
 | `agents/pr-review.md` | Opus technical / PR review incl. seam architecture — checks `DEFINITION_OF_DONE.md` (Subagent) |
