@@ -1189,7 +1189,7 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
 
     case 'ConfusionCleared': {
       const cName = payload.creatureName as string;
-      return { steps: [w(120), d(log(`${cName} snapped out of confusion!`))] };
+      return { steps: [w(120), d(log(`${cName}'s confused no more!`))] };
     }
 
     case 'StatStageChanged': {

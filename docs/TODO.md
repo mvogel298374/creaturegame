@@ -52,7 +52,6 @@ None open.
 
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
-| **Snapping out of confusion prints "is confused!" first** (§3.1) | S | ✗ 2, 3, 6; the rest drafted | Found 2026-11-08. Touches `StatusResolver.ConfusionStops`; the cite is drafted. |
 | **Fly and Dig don't dodge anything** (§3.1) | M | ✗ 2, 3; the rest drafted | Found 2026-11-03. Central hit check; the pre-hit step is in `AttackAction`'s `StatusMoveStopsBeforeHitTest`. |
 | **Hyper Beam recharges after breaking a Substitute** (§3.1) | S | ✗ 2, 3; the rest drafted | Found 2026-11-03. Central `AttackAction`. |
 | **The player chooses what Mimic copies** (§3.1) | M | ✗ 2, 3; the rest drafted | Found 2026-11-03. Needs an input prompt, so a design pass. |
@@ -149,11 +148,6 @@ data/engine item usually also means updating the test that pins the wrong value.
   test pinning pokered's number; its seam member (most are already `IBattleRules`/`DamageCalculator` inputs);
   `opus-engineer` plus both gates, since `DamageCalculator`/`AttackAction` are central. Data vs runtime: runtime.
   Dependencies: none.
-- **Snapping out of confusion prints "is confused!" first (found 2026-11-08, pre-move checks) — S, ✗ not Ready.**
-  pokered decrements the counter first and prints only `ConfusedNoMoreText` when it reaches 0 (`core.asm:3412-3419`);
-  `StatusResolver.ConfusionStops` emits `ConfusionMessage` before the decrement, so the last turn prints both lines.
-  *Gaps:* 2, 3, 6. *Drafted:* move the emit below the 0 branch behind an `IBattleRules` member; quirk: the turn it ends
-  prints no "is confused!". 4: the cite above. 5: runtime only. 7: none.
 - **Leech Seed × Toxic counter (from §7.6 V10) — S, ✗ not Ready.** *Intent:* the Leech Seed drain is multiplied by the
   Toxic counter (`core.asm:546-591`). *Gaps:* overlaps the end-of-turn residual `/plan` (§4.2); sequence after it.
   *Drafted:* an `IBattleRules` member, runtime only; quirk: the drain grows with the Toxic counter.

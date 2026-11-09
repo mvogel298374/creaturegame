@@ -202,6 +202,9 @@ public interface IBattleRules
     /// </summary>
     RedundantConfuseAnnouncement RedundantConfusionAnnouncement { get; }
 
+    /// <summary>Whether the turn confusion ends still prints "is confused!" first. See GENERATION_SEAMS.md §2.</summary>
+    bool ConfusionEndTurnPrintsConfusedLine { get; }
+
     /// <summary>
     /// How a PRIMARY stat move announces hitting a stat already at the ±6 cap — see
     /// <see cref="StatCapAnnouncement"/>. Gen 1: <see cref="StatCapAnnouncement.NothingHappened"/> ("Nothing

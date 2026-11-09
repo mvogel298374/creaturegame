@@ -938,9 +938,9 @@ describe('expandEvent — confusion & coins', () => {
     expect(steps![0]).toMatchObject({ kind: 'dispatch', action: { type: 'UPDATE_HP', id: 1, hp: 88 } });
     expect(logLines(steps)).toEqual(['MEWTWO hurt itself in confusion!']);
   });
-  it('ConfusionCleared announces snapping out', () => {
+  it('ConfusionCleared logs the Gen 1 confused-no-more line', () => {
     expect(logLines(expandEvent('ConfusionCleared', { creatureName: 'MEWTWO' }, CTX).steps))
-      .toEqual(['MEWTWO snapped out of confusion!']);
+      .toEqual(["MEWTWO's confused no more!"]);
   });
   it('CoinsScattered logs the Gen 1 Pay Day line', () => {
     expect(logLines(expandEvent('CoinsScattered', { sourceName: 'MEOWTH', amount: 100 }, CTX).steps))

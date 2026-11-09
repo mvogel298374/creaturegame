@@ -153,6 +153,8 @@ the linked design doc instead — pull it there and leave only the pointer here.
   was already confused.
 - Before a move the checks run in this order: sleep, freeze, held by the foe's trap, flinch, recharge, the Disable
   countdown, confusion, "<user>'s <move> is disabled!", paralysis. A recharge costs one lost turn, not two.
+- The turn confusion ends prints only "<name>'s confused no more!" (no "is confused!", no self-hit roll), and the
+  Pokémon then acts.
 - A roll of N keeps a move disabled for N of the creature's own move attempts; sleep, flinch, recharge, switch and item
   turns don't count down.
 - Full paralysis is a roll below 63 of 256. Full paralysis or a confusion self-hit ends Bide, a rampage, a charge and
@@ -163,7 +165,7 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - A sleep or frozen turn erases the move Mirror Move would copy. Replacing a binder frees the foe it held.
 - Design detail → `GENERATION_SEAMS.md` §2 (*Roll order*, *Pre-move checks*), `GEN_DIFFERENCES.md` → *Roll Order*.  History →
   `TODO_ARCHIVE.md` → *Gen 1 roll order in `AttackAction`, behind a seam* and *Failure announcements: a failed OHKO and
-  a trainer-battle Roar/Whirlwind say "unaffected"* and *Roar/Whirlwind: the scared-off side still acts* and *Recover and Soft-Boiled fail cases* and *Gen 1 confusion self-hit damage* and *Rampage edge gaps* and *Self-hit and crash damage strike the foe's Substitute* and *Substitute prints Gen 1's lines* and *Pre-move checks follow Gen 1*.
+  a trainer-battle Roar/Whirlwind say "unaffected"* and *Roar/Whirlwind: the scared-off side still acts* and *Recover and Soft-Boiled fail cases* and *Gen 1 confusion self-hit damage* and *Rampage edge gaps* and *Self-hit and crash damage strike the foe's Substitute* and *Substitute prints Gen 1's lines* and *Pre-move checks follow Gen 1* and *Snapping out of confusion prints only "confused no more!"*.
 
 ### Foe move scoring and chosen-move validation
 - The foe scores a status move by its status chance: a 10% burn side effect is worth a tenth of a pure burn move.

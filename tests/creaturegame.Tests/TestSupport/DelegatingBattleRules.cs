@@ -37,6 +37,8 @@ public abstract class DelegatingBattleRules : IBattleRules
     public virtual int ConfusionSelfHitPower => _inner.ConfusionSelfHitPower;
     public virtual bool ConfusionSelfHitRollsVariance => _inner.ConfusionSelfHitRollsVariance;
     public virtual bool ConfusionSelfHitUsesFoeReflect => _inner.ConfusionSelfHitUsesFoeReflect;
+    public virtual bool ConfusionEndTurnPrintsConfusedLine =>
+        _inner.ConfusionEndTurnPrintsConfusedLine;
 
     public virtual int GetSecondaryEffectChance(Attack m, SecondaryEffectKind e) =>
         _inner.GetSecondaryEffectChance(m, e);

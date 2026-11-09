@@ -42,6 +42,9 @@ public sealed class Gen1BattleRules : IBattleRules
     public RedundantConfuseAnnouncement RedundantConfusionAnnouncement =>
         RedundantConfuseAnnouncement.FailedGeneric;
 
+    // pokered core.asm:3412-3419: at 0 only ConfusedNoMoreText prints.
+    public bool ConfusionEndTurnPrintsConfusedLine => false;
+
     public StatCapAnnouncement StatStageCapAnnouncement => StatCapAnnouncement.NothingHappened;
 
     // Gen 1: a confused creature hits itself 50% of the time.

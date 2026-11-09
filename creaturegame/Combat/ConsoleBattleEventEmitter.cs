@@ -206,7 +206,7 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                 break;
 
             case ConfusionCleared e:
-                Console.WriteLine($"{e.CreatureName} snapped out of confusion!");
+                Console.WriteLine($"{e.CreatureName}'s confused no more!");
                 break;
 
             case StatusApplied e:

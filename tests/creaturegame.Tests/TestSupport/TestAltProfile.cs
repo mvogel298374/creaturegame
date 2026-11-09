@@ -183,6 +183,8 @@ internal static class TestAltProfile
 
         public override bool RampageEndOverwritesConfusion => false;
 
+        public override bool ConfusionEndTurnPrintsConfusedLine => true;
+
         public override SubstituteBreakAnnouncement SubstituteBreakAnnouncement =>
             SubstituteBreakAnnouncement.TookDamageThenFaded;
 

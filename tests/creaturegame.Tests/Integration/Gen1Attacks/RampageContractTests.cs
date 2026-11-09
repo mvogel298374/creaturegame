@@ -155,7 +155,7 @@ public class RampageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             .Events.Skip(lockEnd + 1)
             .TakeWhile(e => e is not ConfusionCleared { CreatureName: "Player" })
             .Count(IsPlayerConfusionMessage);
-        Assert.Equal(2, confusedTurnsAfterLock); // the kept counter would have lasted 3
+        Assert.Equal(1, confusedTurnsAfterLock); // the kept counter would have printed 2
     }
 
     [Fact]
@@ -200,7 +200,7 @@ public class RampageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
             .Events.Skip(lockEnd + 1)
             .TakeWhile(e => e is not ConfusionCleared { CreatureName: "Player" })
             .ToList();
-        Assert.Equal(3, afterLock.Count(IsPlayerConfusionMessage)); // a fresh roll would have lasted 2
+        Assert.Equal(2, afterLock.Count(IsPlayerConfusionMessage)); // a fresh roll would have printed 1
         Assert.DoesNotContain(afterLock, e => e is ConfusionStarted);
     }
 

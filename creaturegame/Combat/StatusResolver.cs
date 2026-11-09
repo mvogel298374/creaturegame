@@ -177,9 +177,11 @@ public static class StatusResolver
         if (creature.Battle.ConfusedTurns == 0)
             return false;
 
-        emitter?.Emit(new ConfusionMessage(creature.Name, creature.Id));
         creature.Battle.ConfusedTurns--;
-        if (creature.Battle.ConfusedTurns == 0)
+        bool ended = creature.Battle.ConfusedTurns == 0;
+        if (!ended || rules.ConfusionEndTurnPrintsConfusedLine)
+            emitter?.Emit(new ConfusionMessage(creature.Name, creature.Id));
+        if (ended)
         {
             emitter?.Emit(new ConfusionCleared(creature.Name, creature.Id));
             return false;

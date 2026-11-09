@@ -8,6 +8,35 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §3.1 Snapping out of confusion prints only "confused no more!" ✅ DONE (2026-11-09)
+
+S; found 2026-11-08 in the pre-move checks item; confirmed Ready and greenlit 2026-11-09.
+
+**Problem.** pokered decrements the confusion counter first and prints only `ConfusedNoMoreText` when it reaches 0
+(`core.asm:3412-3419` player, `:5752-5759` enemy). `StatusResolver.ConfusionStops` emitted `ConfusionMessage` before the
+decrement, so the last turn printed both "is confused!" and the snap-out line.
+
+**Outcome.** `ConfusionStops` decrements first. On the turn the counter reaches 0 it emits only `ConfusionCleared` (no
+`ConfusionMessage`, no self-hit roll) and the Pokémon goes on to the later checks and acts. Otherwise `ConfusionMessage`
+and the self-hit roll run as before. No new event. Runtime only; no data change.
+
+**Seam.** `IBattleRules.ConfusionEndTurnPrintsConfusedLine`: Gen 1 false; `TestAltProfile` true (pokecrystal
+`engine/battle/effect_commands.asm:242-252` matches Gen 1, so the true arm is a test-only contrast).
+
+**Ruling (Mo, 2026-11-09, on a `requirements-review` finding).** The `ConfusionCleared` line reads "<name>'s confused no
+more!" (`_ConfusedNoMoreText`, pokered `data/text/text_2.asm:1041-1043`) in the client timeline (`timeline.ts`) and the
+console emitter; it used to read "snapped out of confusion!".
+
+**Tests.** New theory `PreMoveCheckContractTests.TheTurnConfusionEndsPrintsIsConfusedOnlyWhenTheSeamSaysSo`: with a
+scripted counter of 2, "is confused!" prints once, then "confused no more!" alone on the ending turn; with the member
+overridden to true, both lines print. Two `RampageContractTests` "is confused!" line counts re-pinned (2 to 1, 3 to 2);
+`timeline.test.ts` wording; `DelegatingBattleRules` delegate.
+
+**Note.** `pr-review` advisory: `TestAltProfile`'s `true` is never exercised through an ending turn; the theory's own
+rules class pins that arm.
+
+---
+
 ## §3.1 Pre-move checks follow Gen 1 ✅ DONE (2026-11-09)
 
 M+; merged 2026-11-08 from four entries (§7.6 V8 and V15): the `CanAct` status order, a replacement frees the trapped

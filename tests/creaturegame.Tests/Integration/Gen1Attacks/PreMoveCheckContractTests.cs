@@ -187,6 +187,52 @@ public class PreMoveCheckContractTests(MovesFixture moves) : Gen1MoveContract(mo
         Assert.Single(log.Of<ActionBlocked>());
     }
 
+    [Theory]
+    [InlineData(false, 1)]
+    [InlineData(true, 2)]
+    public async Task TheTurnConfusionEndsPrintsIsConfusedOnlyWhenTheSeamSaysSo(
+        bool printsConfusedLine,
+        int confusedLines
+    )
+    {
+        var player = TestCreatures.Make("Player", hp: 300, attack: 50, speed: 1);
+        player.AddAttack(Move("tackle"));
+        var enemy = TestCreatures.Make("Enemy", hp: 9999, attack: 200, speed: 200);
+        enemy.AddAttack(Move("confuse-ray"));
+        enemy.AddAttack(Move("tackle"));
+
+        var result = await new BattleScenario()
+            .Player(player)
+            .Enemy(enemy)
+            .PlayerUses("tackle")
+            .EnemyUses("confuse-ray", "tackle")
+            .Rules(new TwoTurnConfusionRules(printsConfusedLine))
+            .RunAsync();
+
+        var events = result.Events.ToList();
+        int cleared = events.FindIndex(e => e is ConfusionCleared { CreatureName: "Player" });
+        Assert.Equal(
+            confusedLines,
+            result.All<ConfusionMessage>().Count(m => m.CreatureName == "Player")
+        );
+        Assert.Single(result.All<ConfusionCleared>());
+        Assert.Equal(printsConfusedLine, events[cleared - 1] is ConfusionMessage);
+        Assert.IsType<MoveUsed>(events[cleared + 1]);
+    }
+
+    private sealed class TwoTurnConfusionRules(bool printsConfusedLine) : DelegatingBattleRules
+    {
+        public override bool ConfusionEndTurnPrintsConfusedLine => printsConfusedLine;
+
+        public override int RollConfusionTurns() => 2;
+
+        public override int ConfusionSelfHitPercent => 0;
+
+        public override int GetHitThreshold(int acc, int accStage, int evaStage) => 256;
+
+        public override double GetCritChance(Creature attacker, Attack move) => 0;
+    }
+
     [Fact]
     public void UsingADisabledMoveStopsTheTurnBeforeParalysis()
     {
