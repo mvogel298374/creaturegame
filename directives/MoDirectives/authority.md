@@ -28,4 +28,6 @@ actions each rule gates, and how that is enforced.
 7. **The dev stack is yours to manage.** Start, stop and restart it whenever a task needs it, without asking
    and without reporting its status unless it matters to the result.
 8. **Opus is the default model.** The main session runs on Opus. Each subagent pins the model that fits its
-   job; the current spread is the model table in `CLAUDE.md`, and changing it is my call.
+   job; the current spread is the model table in `CLAUDE.md`, and changing it is my call. Implementation stays
+   in the main session. Delegate to `opus-engineer` only for a contained job where a fresh agent is efficient:
+   the brief is complete and it needn't re-read what the session already knows.

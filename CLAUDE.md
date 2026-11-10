@@ -101,7 +101,7 @@ Single branch `master`, remote `origin` (GitHub). Fly.io deploys only on tags ma
 | Who | Model | Job |
 |:--|:--|:--|
 | Main session | Opus | Default for all work |
-| `opus-engineer` | Opus | Delegated hard implementation (a new seam, battle math, a central refactor) |
+| `opus-engineer` | Opus | Contained implementation jobs, by exception (`authority.md` rule 8) |
 | `pr-review` | Opus | Technical review (G3) |
 | `requirements-review` | Sonnet | Gen 1 / roguelite fidelity review (G3) |
 | `docs-cleanup` | Sonnet | Docs gate (G2) |

@@ -40,13 +40,13 @@ has run against the final state (`GUARDRAILS.md` → G2).
 
 ## Model Strategy
 
-The model spread (main session on Opus by default; Sonnet for the review/docs gates; `opus-engineer` for delegated hard
-implementation) is the table in `CLAUDE.md` → *Models*; each agent's model is pinned in its frontmatter.
+The model spread (main session on Opus by default; Sonnet for the review/docs gates; `opus-engineer` for contained jobs, by exception, see
+`authority.md` rule 8) is the table in `CLAUDE.md` → *Models*; each agent's model is pinned in its frontmatter.
 
 **Cold-start cost:** a subagent re-derives context from scratch, so brief it tightly — name the exact files
 to read (e.g. `GENERATION_SEAMS.md §5.0`, the specific `Combat/*.cs`), state the seam constraints inline,
 and give a concrete done-condition. A vague brief makes the agent re-read the whole doc set and erases the
-saving. `opus-engineer` implements; it does not replace the `requirements-review` + `pr-review` gate before commit.
+saving. `opus-engineer` implements contained jobs; it does not replace the `requirements-review` + `pr-review` gate before commit.
 
 ---
 
