@@ -52,7 +52,6 @@ None open.
 
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
-| **A Rage that misses or breaks a Substitute still starts raging** (§3.1) | S–M | ✗ 2, 4, 6 | Found 2026-11-10 by `requirements-review`. Central `AttackAction` and `RageMechanic`. |
 | **A missed Wrap doesn't lock the user in** (§3.1) | S–M | ✗ 2, 6; the rest drafted | Found 2026-11-09 by `requirements-review`. Central `AttackAction` and `BindingMechanic`. |
 | **The player chooses what Mimic copies** (§3.1) | M | ✗ 2, 3; the rest drafted | Found 2026-11-03. Needs an input prompt, so a design pass. |
 
@@ -236,15 +235,6 @@ data/engine item usually also means updating the test that pins the wrong value.
   wanted:* acceptance, the enemy picks a move that lands (or its best move when none does) against a foe out of
   reach; the evaluator asks the rules member instead of re-deriving it (`ClaudeDirectives/engine.md` rule 2). 3: the
   existing member. 4: pokered's AI has no such check. 5: runtime only. 7: none.
-- **A Rage that misses or breaks a Substitute still starts raging (found 2026-11-10 by `requirements-review`) — S–M, ✗
-  not Ready.** pokered starts Rage in `RageEffect` after the damage (`RAGE_EFFECT` is in
-  `data/battle/always_happen_effects.asm`), so a break, which zeroes the effect byte, stops it, and a miss likely does
-  too. Ours sets `IsRaging` in `RageMechanic.OnRelease` (`LockInMechanics.cs:176-181`), before the hit test. No earlier
-  ruling covers this: the archive's Rage rulings are "Rage blocks switching" and "Attack rises once per hit received".
-  **DoR:** ✗ gaps **2** (lock-in timing in central `AttackAction`), **4** (confirm the miss case against `RageEffect` and
-  the miss path), **6**. *Drafted:*
-  - **Acceptance:** a Rage that misses or breaks a Substitute doesn't lock the user in; one that connects does.
-  - **Data vs runtime:** runtime only. **Dependencies:** none; reads the same break flag, `AttackAction._brokeSubstitute` (archived: `TODO_ARCHIVE.md` → "Breaking a Substitute cancels the attacker's post-damage effects").
 - **The player chooses what Mimic copies (found 2026-11-03, move description audit) — M, ✗ not Ready.** pokered lets the
   player pick any of the target's moves, and only the enemy picks at random (`MimicEffect`, `effects.asm:1203-1250`). Ours
   always picks at random (`MoveEffects.cs:345-352`).

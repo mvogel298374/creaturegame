@@ -214,6 +214,8 @@ internal static class TestAltProfile
 
         public override bool SubstituteStopsThaw => false;
 
+        public override bool RageStartsBeforeHitTest => true;
+
         public override MoveFailureAnnouncement PrimaryEffectFailureAnnouncement =>
             MoveFailureAnnouncement.Missed;
 

@@ -150,6 +150,9 @@ public sealed class Gen1BattleRules : IBattleRules
     // Gen 1: Rage raises the user's Attack by one stage each time it is hit while raging.
     public int RageAttackStagesPerHit => 1;
 
+    // pokered effects.asm RageEffect runs from the post-damage dispatch, which a miss skips.
+    public bool RageStartsBeforeHitTest => false;
+
     // Gen 1: Recover / Soft-Boiled restore half of max HP.
     public double RecoverHealFraction => 0.5;
 
@@ -353,6 +356,7 @@ public sealed class Gen1BattleRules : IBattleRules
                 or MoveEffect.Recoil
                 or MoveEffect.PayDay
                 or MoveEffect.MultiHit
+                or MoveEffect.Rage
         || category is DamageCategory.Drain or DamageCategory.SelfDestruct;
 
     public MoveFailureAnnouncement PrimaryEffectFailureAnnouncement =>

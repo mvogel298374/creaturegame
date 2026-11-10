@@ -75,7 +75,7 @@ public sealed class BattleState
     // Gen 1 lasts until the battle ends, so it lives here and clears on the per-battle reset.
     public bool HasMist { get; set; }
 
-    // Rage (the move): once used, the user is locked into Rage (auto-repeats every turn, like a
+    // Rage (the move): once it connects, the user is locked into Rage (auto-repeats every turn, like a
     // rampage with no turn limit) and gains an Attack stage each time it is hit. RageMove is the
     // exact PokemonAttack instance to keep selecting. Both clear on the per-battle reset.
     public bool IsRaging { get; set; }

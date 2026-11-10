@@ -427,6 +427,9 @@ public interface IBattleRules
     /// <summary>Attack stages a raging user gains each time a damaging move hits it.</summary>
     int RageAttackStagesPerHit { get; }
 
+    /// <summary>Whether Rage locks its user in before the hit test, so a miss still locks. See GENERATION_SEAMS.md §2.</summary>
+    bool RageStartsBeforeHitTest { get; }
+
     /// <summary>Fraction of max HP a Recover-family move (Recover, Soft-Boiled) restores. See GENERATION_SEAMS.md §2.</summary>
     double RecoverHealFraction { get; }
 

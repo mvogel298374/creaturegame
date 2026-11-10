@@ -8,6 +8,51 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §3.1 A Rage that misses or breaks a Substitute no longer starts raging ✅ DONE (2026-11-11)
+
+S–M; found 2026-11-10 by `requirements-review` (during the Substitute-break item); lines confirmed by the user and
+greenlit 2026-11-10.
+
+**Problem.** pokered starts Rage in `RageEffect` after the damage; ours set `IsRaging` in `RageMechanic.OnRelease`,
+before the hit test. No earlier ruling covered this: the archive's Rage rulings are "Rage blocks switching" and
+"Attack rises once per hit received".
+
+**DoR (as filed).**
+- **1. Acceptance:** a Rage that misses, hits a type-immune foe, or breaks a Substitute doesn't lock the user in; one
+  that connects does, and a later Rage that misses keeps the lock.
+- **2. Design:** the lock moves out of `RageMechanic.OnRelease` into a post-damage lock-in hook that `AttackAction`
+  calls at the `BreakCancels`-guarded point after `TryApplyMoveEffect`; a miss or immunity never reaches it and a
+  break fails its guard. `RageMove` is still recorded on the first turn only.
+- **3. Seam:** a new `IBattleRules` member for whether Rage starts before the hit test or after damage (Gen 1: after
+  damage); `MoveEffect.Rage` joins Gen 1's `SubstituteBreakCancels` set, so the break case needs no new member.
+- **4. Gen 1 source:** `RageEffect` (`effects.asm`) is the only setter of `USING_RAGE`, run from the
+  `AlwaysHappenSideEffects` dispatch after damage. On a miss `ExecutePlayerMove` calls `PrintMoveFailureText` (no Rage
+  case; only Jump Kick) then `jp ExecutePlayerMoveDone`, skipping the dispatch; type immunity takes the same miss path
+  ("doesn't affect"). A break zeroes the effect byte (`AttackSubstitute .nullifyEffect`). Once raging, `.RageCheck`
+  zeroes the effect and the bit stays set, so a later miss changes nothing.
+- **5. Data vs runtime:** runtime only.
+- **6. Quirks to assert** (full battles, `RageContractTests`): a forced-miss Rage on turn 1 leaves the user free on turn
+  2; Rage into a Ghost type prints "doesn't affect" and doesn't lock in; a Rage that breaks a Substitute doesn't lock
+  in; a Rage that connects locks in and a later missed Rage keeps the lock; a `TestAltProfile` override of the new
+  member restores lock-before-hit.
+- **7. Dependencies:** none; reads `AttackAction._brokeSubstitute` (see "Breaking a Substitute cancels the attacker's
+  post-damage effects" below).
+
+**Outcome.** `IBattleRules.RageStartsBeforeHitTest` (Gen 1 false), `MoveEffect.Rage` added to Gen 1's
+`SubstituteBreakCancels`, new `ILockInMechanic.OnConnect` hook called by `AttackAction` after the post-damage effects.
+A Rage copied by Mirror Move follows the same rule. Design docs: `GENERATION_SEAMS.md` §2 (Rage and
+SubstituteBreakCancels rows), `GEN_DIFFERENCES.md` (Rage).
+
+**Review history.** `requirements-review` raised five test-coverage items. Fixed by the user: #1 (a Mirror Move-copied
+Rage that misses) and #3 (Rage into a Substitute that holds). Waived by the user: #2 (a first Rage hit that KOs:
+unchanged behaviour), #4 (Rage into a Fly/Dig target: same early return as a miss) and #5 (the alt profile proves only
+the immunity case; its rules can't force a miss). `pr-review`: PR-READY; three wording fixes applied (OnRelease summary,
+BattleState IsRaging comment, HitScriptRules comment). Advisory left: the `GENERATION_SEAMS.md` Rage row's Gen 2 column
+("reworked in Gen 2 (unverified)") is pre-existing and matters only when Gen 2 Rage is designed. Gates: format PASS,
+lint PASS, `.\test.ps1 -Dotnet` 2403/2403 passed, E2E not run.
+
+---
+
 ## §3.1 Breaking a Substitute cancels the attacker's post-damage effects ✅ DONE (2026-11-10)
 
 M; found 2026-11-03 (move description audit) as "Hyper Beam recharges after breaking a Substitute"; widened by Mo's
@@ -48,7 +93,7 @@ seam, because the seam already decides whether a break cancels the repeat.
 
 **Outcome.** `IBattleRules.SubstituteBreakCancels` (Gen 1 in `Gen1BattleRules`), `AttackAction._brokeSubstitute` and
 `AttackAction.BreakCancels`. Left open and filed separately: a Rage that misses or breaks a Substitute still starts
-raging (`TODO.md` §3.1).
+raging (done 2026-11-11, see the entry above).
 
 ---
 

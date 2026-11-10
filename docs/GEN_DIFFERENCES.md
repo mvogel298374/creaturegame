@@ -308,6 +308,12 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
   - **Secondary effects on the breaking hit.** pokered skips them because the byte is zeroed; ours skips the foe-targeted
     ones through the impact-time shield snapshot instead (the flinch entry above). The break does not gate a
     self-targeted secondary; no Gen 1 move has one.
+- **Rage locks its user in only once it connects (Gen 1).** `RageEffect` (`engine/battle/effects.asm`), the only
+  setter of `USING_RAGE`, runs from the `AlwaysHappenSideEffects` dispatch after the damage. A miss jumps from
+  `PrintMoveFailureText` to `ExecutePlayerMoveDone` and skips that dispatch, and a type immunity ("doesn't affect")
+  takes the same miss path, so neither starts the lock; a Substitute break zeroes the effect byte the dispatch reads.
+  Once raging, `.RageCheck` zeroes the effect each turn and the bit stays set, so a later miss keeps the lock. Seam:
+  `GENERATION_SEAMS.md` §2 (`RageStartsBeforeHitTest`, `SubstituteBreakCancels`).
 - **Substitute (Gen 1):** costs ⌊MaxHP/4⌋ and fails only when HP is *below* the cost, so a user with exactly the
   cost raises the decoy and is left at 0 HP, fainting itself (pokered `move_effects/substitute.asm:34-43`, a
   documented bug). The decoy holds ⌊MaxHP/4⌋ and breaks only on an underflow (`core.asm:4873-4877`): damage equal to

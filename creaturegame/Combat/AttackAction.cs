@@ -278,7 +278,10 @@ public class AttackAction : IBattleAction
 
         TryApplyStatEffect(attackToUse);
         if (!BreakCancels(attackToUse.Effect, category))
+        {
             TryApplyMoveEffect(attackToUse, damage);
+            lockIn?.OnConnect(lockCtx!);
+        }
 
         lockIn?.OnTurnEnd(lockCtx!); // confuse the user if this was the rampage's last turn
 

@@ -80,11 +80,14 @@ public interface ILockInMechanic
     LockInResult OnCommit(LockInContext ctx) => LockInResult.Proceed;
 
     /// <summary>
-    /// After the move is announced, before the normal attack pipeline: set up counters (rampage/rage) and
+    /// After the move is announced, before the normal attack pipeline: set up counters (rampage) and
     /// <see cref="LockInFlow.Proceed"/> to run the attack, or do the mechanic's own damage and
     /// <see cref="LockInFlow.Halt"/> (bide unleash).
     /// </summary>
     LockInResult OnRelease(LockInContext ctx) => LockInResult.Proceed;
+
+    /// <summary>After the move connects and its post-damage effects run, unless a Substitute break cancels them.</summary>
+    void OnConnect(LockInContext ctx) { }
 
     /// <summary>After the attack resolves (hit OR miss): finalize the lock — rampage self-confuse.</summary>
     void OnTurnEnd(LockInContext ctx) { }
@@ -166,7 +169,7 @@ public sealed class RampageMechanic : ILockInMechanic
     }
 }
 
-/// <summary>Rage: once used, the user is locked in forever (the on-hit Attack raise lives in the damage path).</summary>
+/// <summary>Rage: once started, the user is locked in forever (the on-hit Attack raise lives in the damage path).</summary>
 public sealed class RageMechanic : ILockInMechanic
 {
     public MoveEffect Effect => MoveEffect.Rage;
@@ -175,12 +178,23 @@ public sealed class RageMechanic : ILockInMechanic
 
     public LockInResult OnRelease(LockInContext ctx)
     {
-        if (!ctx.IsContinuation)
-        {
-            ctx.Source.Battle.IsRaging = true;
-            ctx.Source.Battle.RageMove = ctx.Move;
-        }
+        if (ctx.Rules.RageStartsBeforeHitTest)
+            Start(ctx);
         return LockInResult.Proceed;
+    }
+
+    public void OnConnect(LockInContext ctx)
+    {
+        if (!ctx.Rules.RageStartsBeforeHitTest)
+            Start(ctx);
+    }
+
+    private static void Start(LockInContext ctx)
+    {
+        if (ctx.IsContinuation)
+            return;
+        ctx.Source.Battle.IsRaging = true;
+        ctx.Source.Battle.RageMove = ctx.Move;
     }
 }
 

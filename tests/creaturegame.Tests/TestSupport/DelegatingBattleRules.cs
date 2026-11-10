@@ -214,6 +214,7 @@ public abstract class DelegatingBattleRules : IBattleRules
 
     public virtual int SelfDestructDefenseDivisor => _inner.SelfDestructDefenseDivisor;
     public virtual int RageAttackStagesPerHit => _inner.RageAttackStagesPerHit;
+    public virtual bool RageStartsBeforeHitTest => _inner.RageStartsBeforeHitTest;
     public virtual double RecoverHealFraction => _inner.RecoverHealFraction;
 
     public virtual bool HealFails(int currentHp, int maxHp) => _inner.HealFails(currentHp, maxHp);
