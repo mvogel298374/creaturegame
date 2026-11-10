@@ -67,6 +67,8 @@ public static class StatusResolver
                 continue;
             if (battleRules.PreMoveCheckCancelsLockIn(check))
                 CancelLockIn(creature);
+            if (battleRules.LostTurnEndsSemiInvulnerability(check))
+                creature.Battle.SemiInvulnerability = SemiInvulnerability.None;
             return false;
         }
 

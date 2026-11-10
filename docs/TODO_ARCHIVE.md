@@ -8,6 +8,67 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §3.1 Fly and Dig put the user out of reach ✅ DONE (2026-11-09)
+
+M; found 2026-11-03 (move description audit); design pass shown, four rulings and greenlight from Mo 2026-11-09.
+
+**Problem.** pokered sets `INVULNERABLE` on a Fly or Dig charge turn and `MoveHitTest` misses against it
+(`core.asm:5259-5261`). Only Swift, which returns first (`:5247-5250`), and Bide's release, which skips the test
+(`:3528`), get through. Ours set `IsTwoTurnCharging`, but nothing in the hit check read it, so a Pokémon on a Fly or Dig
+charge turn could be hit. An older note (the "stayed in §3.1" line in the roll-order record) named the gap, but no entry
+survived.
+
+**Outcome.** `BattleState.SemiInvulnerability` (`None`, `Flying`, `Underground`; new `SemiInvulnerability.cs`).
+`TwoTurnMechanic.OnCommit` sets it on a charge turn when `IBattleRules.ChargeGrantsSemiInvulnerability` says so (Fly and
+Dig only, keyed on the move, no importer flag) and clears it on any charge move's release. `AttackAction.Connects` asks
+`HitOnSemiInvulnerable` (`SemiInvulnerableHit { Lands, Misses, Fails }`) when the target is out of reach, after Swift's
+return and before the X Accuracy check. A move that runs the hit test (`Gen1BattleRules.RunsHitTest`) misses with no
+accuracy draw and prints its usual miss line; X Accuracy and Struggle miss too. Swift, Bide's release, Roar, Whirlwind,
+Transform, Haze and self-targeting moves land (no hit test; `transform.asm:5-20`'s check is bugged); Mimic
+(`effects.asm:1221`, `:1245`, `:1272`) and Conversion (`conversion.asm:14`) print "But it failed!". Solar Beam's charge
+turn stays hittable. A confusion self-hit clears the state (`core.asm:3432`); Haze does not. Runtime only; no data change.
+
+**Seam.** `IBattleRules.ChargeGrantsSemiInvulnerability`, `HitOnSemiInvulnerable`, `LostTurnEndsSemiInvulnerability`
+(`StatusResolver.CanAct`). Three values because Gen 2 lets Gust, Whirlwind and Thunder hit a flying foe and Earthquake,
+Fissure and Magnitude one underground (pokecrystal `effect_commands.asm` `.FlyDigMoves`). `TestAltProfile` and
+`DelegatingBattleRules` carry the contrast arm.
+
+**Gen 1 source.** Set for Fly (by effect) and Dig (by move number), `effects.asm:1010-1020`; cleared on release
+(`core.asm:3116`, `:5500`) and by a confusion self-hit (`:3432`).
+
+**Ruling 1, the glitch is replicated.** Full paralysis (`core.asm:3463`) and "is disabled!" (`:3650-3660`) clear only the
+charging bit, so the Pokémon stays out of reach until it next completes a charge move or leaves the field. Only full
+paralysis is a real route; the "is disabled!" route exists in rule form only (`LostTurnEndsSemiInvulnerability`), since
+it can't occur in a real battle. Also faithful: the player's send-out clears only `USING_TRAPPING_MOVE` on the enemy
+(`core.asm:1755-1756`), so an enemy stays out of reach through the player's faint-switch.
+
+**Rulings 2 and 3.** Which state a charge move grants, which moves get through and which lost turns clear the state are
+`IBattleRules` members. **Ruling 4.** Roar, Whirlwind, Transform, Mimic and Conversion side cases are in scope.
+
+**`requirements-review` outcomes (Mo, 2026-11-09).**
+1. A missed Disable prints "But it failed!" (`effects.asm:1366-1367`) through `PrimaryEffectFailureAnnouncement`: FIXED.
+2. A Leech Seed theory row that pinned the wrong line: DROPPED.
+3. Transform's one-sided bugged check: replication WAIVED, docs corrected. Revisit when a generation with a different
+   Transform check is built.
+4. A primary stat-down's Mist check runs before the out-of-reach check (pokered order differs): WAIVED. Revisit when a
+   generation with a different Mist line is built.
+5. "A missed Wrap doesn't lock the user in": FILED as a new §3.1 entry (`TODO.md`).
+6. Docs now say the "is disabled!" route can't occur in a real battle.
+7. `PRODUCT_SPEC.md` coverage added.
+
+**`pr-review`.** PR-READY, 0 changes requested. Seven tests added for its recommendations and advisories (type-immune
+flyer, OHKO on a digger, Self-Destruct, Jump Kick crash, Thrash miss, a failing rampage's lock end, accuracy-first
+order). An advisory became a note on the `TODO.md` entry "Other `ResidualEffects1` moves may roll accuracy": the accuracy
+roll should read `RunsHitTest` too.
+
+**Tests.** `TwoTurnMoveContractTests` (the contract), `DisableContractTests` (missed Disable line, two cases).
+
+**Filed as entries (2026-11-10).** The three open points are now in `TODO.md`: §3.1 "Enemy AI ignores a foe that is out
+of reach" (Mo's product call), §3.1 "Disable matches move instances, not move ids", §4.5 "A Fly or Dig user's sprite
+stays on screen".
+
+---
+
 ## §3.1 Snapping out of confusion prints only "confused no more!" ✅ DONE (2026-11-09)
 
 S; found 2026-11-08 in the pre-move checks item; confirmed Ready and greenlit 2026-11-09.

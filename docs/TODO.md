@@ -48,11 +48,11 @@ gap has drafted text, awaiting your confirmation · ✗ gaps remain.
 
 None open.
 
-**B. A design pass first** (central engine code: `opus-engineer` plus both gates; each pass is shown to you)
+**B. A design pass first** (central engine code: both gates; each pass is shown to you)
 
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
-| **Fly and Dig don't dodge anything** (§3.1) | M | ✗ 2, 3; the rest drafted | Found 2026-11-03. Central hit check; the pre-hit step is in `AttackAction`'s `StatusMoveStopsBeforeHitTest`. |
+| **A missed Wrap doesn't lock the user in** (§3.1) | S–M | ✗ 2, 6; the rest drafted | Found 2026-11-09 by `requirements-review`. Central `AttackAction` and `BindingMechanic`. |
 | **Hyper Beam recharges after breaking a Substitute** (§3.1) | S | ✗ 2, 3; the rest drafted | Found 2026-11-03. Central `AttackAction`. |
 | **The player chooses what Mimic copies** (§3.1) | M | ✗ 2, 3; the rest drafted | Found 2026-11-03. Needs an input prompt, so a design pass. |
 
@@ -74,6 +74,7 @@ None open.
 | **Generation Profile 4d+ surface catalog** (§4.3) | L | ✗ 1, 2 per surface | Each surface its own mini-plan with you. |
 | **Move-specific attack animations** (§4.5) | M | ✗ 1, 2, 6, 7 | Folds in Sprite FX §3.4. |
 | **Text feel — typewriter + menu blips** (§4.5) | M | ✗ 1, 2, 4, 6, 7 | |
+| **A Fly or Dig user's sprite stays on screen** (§4.5) | S–M | ✗ 1, 2, 4, 6 | Filed 2026-11-09. Needs a wire signal and a `BattleScene` handler. |
 | **Sprite presentation FX** (§4.5) | S–M | ✗ 1, 2, 6 | A joint sketch session; the §3.1 `pixelArt` check could go first as its own S item. |
 | **Pre-commit hook: staged snapshot; dotnet path** (§7.1) | M + S | ✗ 1, 2, 6 each | |
 | **User documentation** — `/help`, README, Gen 1 explainer (§4.7) | M | ✗ 1, 2 | |
@@ -83,6 +84,7 @@ None open.
 
 | Item | Cost | Ready? | Next step |
 |:-----|:----:|:-------|:----------|
+| **Disable matches move instances, not move ids** (§3.1) | S | ✗ 1, 2, 4, 6 | Filed 2026-11-09. Read `DisabledMoveStops` and the Metronome and Mirror Move wrappers first. |
 | **Same-type secondary status immunity** (§3.1) | S–M | ✗ 2, 4, 6; the rest drafted | Take the pokered cite; Ice Beam freezes Ice-types today. |
 | **Other `ResidualEffects1` moves may roll accuracy** (§3.1) | S–M | ✗ 1, 2, 4, 6 | Filed 2026-11-06. A verify slice reads each effect for its own hit test. |
 | **Residual-effect failure lines: Leech Seed "evaded", confusion-move miss** (§3.1) | S–M | ✗ 2, 3, 6 | Filed 2026-11-06. Pair with the `ResidualEffects1` slice. |
@@ -101,6 +103,7 @@ None open.
 
 | Item | Cost | Ready? | What it waits on |
 |:-----|:----:|:-------|:-----------------|
+| **Enemy AI ignores a foe that is out of reach** (§3.1) | S–M | ✗ 1, 2, 6 | Your product call: stay faithful to Gen 1's AI or add a guard. |
 | **`evolution.spec.ts` nameplate assertion** (§6) | S | ✗ 1 drafted | Your E2E go-ahead. |
 | **Tighten `encounter-map` and `cadence` specs** (§6) | S | ✗ | Your E2E go-ahead; a cadence seed. |
 | **E2E half of "Deduplicate the test helpers"** (§6) | M | ✗ | Your E2E go-ahead. |
@@ -139,14 +142,13 @@ data/engine item usually also means updating the test that pins the wrong value.
   standard table); crit multiplier should be ≈(2L+5)/(L+5), not a flat 2× (`Gen1BattleRules.cs` crit block, ~`:287`); multi-hit continues past a broken
   Substitute (`AttackAction.ResolveDamage`'s multi-hit loop); recoil/drain/Struggle use full calculated damage, not
   HP actually lost (`AttackAction.ExecuteAsync` Struggle recoil, `ResolveDamage` drain); Ice can freeze Ice /
-  Electric can paralyse Electric (`Gen1BattleRules.CanReceiveStatus`); Fly/Dig are not untargetable on the charge turn (not listed as a
-  known gap); `DamageCalculator` applies no stat cap after the stage multiplier (Gen 1 reportedly clamps a staged
+  Electric can paralyse Electric (`Gen1BattleRules.CanReceiveStatus`); `DamageCalculator` applies no stat cap after the stage multiplier (Gen 1 reportedly clamps a staged
   stat to 1–999) and no ÷4 scaling of both stats when either exceeds 255 (found by `requirements-review`
   2026-10-14, during the stat-stage seam item; unverified against pokered).
   **DoR (V16):** ✗ not Ready — gaps **1, 2, 3, 4, 6** (line cites refreshed 2026-10-17). *Drafted:* first a verify
   slice that gives each claim a pokered cite, then one entry per confirmed claim. Each entry gets: acceptance, a
   test pinning pokered's number; its seam member (most are already `IBattleRules`/`DamageCalculator` inputs);
-  `opus-engineer` plus both gates, since `DamageCalculator`/`AttackAction` are central. Data vs runtime: runtime.
+  both gates, since `DamageCalculator`/`AttackAction` are central. Data vs runtime: runtime.
   Dependencies: none.
 - **Leech Seed × Toxic counter (from §7.6 V10) — S, ✗ not Ready.** *Intent:* the Leech Seed drain is multiplied by the
   Toxic counter (`core.asm:546-591`). *Gaps:* overlaps the end-of-turn residual `/plan` (§4.2); sequence after it.
@@ -159,6 +161,8 @@ data/engine item usually also means updating the test that pins the wrong value.
   **DoR:** ✗ — gaps **1, 2, 4, 6**. *Drafted:* a verify slice reads each effect for its own `MoveHitTest` call and
   lists which of ours roll accuracy that pokered skips; then one entry or one seam member (likely generalising
   `ForceFleeSkipsAccuracy`, shipped 2026-11-06). 3: `IBattleRules`. 5: runtime only. 7: none now that Roar has shipped.
+  Noted 2026-11-09 (`pr-review`, Fly and Dig): `Gen1BattleRules.RunsHitTest` already lists which moves run the hit
+  test, for the out-of-reach rule; this item should make the accuracy roll read the same member so the two can't drift.
 - **Same-type secondary status immunity (found 2026-10-29 by `requirements-review`; read-confirmed by the reviewer,
   not yet by us) — S–M, ✗ not Ready.** pokered `FreezeBurnParalyzeEffect` (`effects.asm:194-212`) skips a secondary
   freeze, burn or paralysis whenever the move's type equals either target type ("an ice move can't freeze an
@@ -204,21 +208,35 @@ data/engine item usually also means updating the test that pins the wrong value.
   **DoR:** ✗ — gaps **2, 3, 6**. *Drafted:* **Acceptance:** each case prints its pokered line in a full battle.
   **Data vs runtime:** runtime plus a new "evaded" event wired in all four places. **Dependencies:** pair with the
   `ResidualEffects1` accuracy slice, which decides where these moves roll accuracy.
-- **Fly and Dig don't dodge anything (found 2026-11-03, move description audit) — M, ✗ not Ready.** (Noted
-  2026-11-08: a confusion self-hit clears the invulnerable bit but full paralysis doesn't, `core.asm:3432`, `:3463`.) pokered sets
-  `INVULNERABLE` on the charge turn, and `MoveHitTest` misses against it (`core.asm:5259-5261`). Only Swift, which returns
-  first (`:5247-5250`), and Bide's release, which skips the test (`:3528`), get through. Ours sets `IsTwoTurnCharging`, but
-  nothing in the hit check reads it, so a Pokémon using Fly can be hit on the charge turn. No test covers it. An older
-  note (`TODO_ARCHIVE.md`, "stayed in §3.1") names this gap, but no entry survived here.
-  **DoR:** ✗ gaps **2** (central `AttackAction`; design around the pre-hit step) and **3** (a seam member, and
-  Fly/Dig need telling apart from the other charge moves, which don't dodge). *Drafted:*
-  - **Acceptance:** an attack against a Fly or Dig charge turn misses; Swift and Bide's release hit; Solar Beam's
-    charge turn stays hittable.
-  - **Gen 1 source:** the cites above; also check moves that test `INVULNERABLE` themselves, such as Mimic and
-    `StatModifierDownEffect` (`effects.asm:579`).
-  - **Data vs runtime:** runtime, and possibly an importer flag.
-  - **Quirk:** Swift and Bide get through.
-  - **Dependencies:** none; the pre-hit step is in place.
+- **A missed Wrap doesn't lock the user in (found 2026-11-09 by `requirements-review`, Fly and Dig item;
+  source-confirmed) — S–M, ✗ not Ready.** pokered runs `TrappingEffect` before the hit test (`SpecialEffectsCont`,
+  `core.asm:3130-3133`): it sets `USING_TRAPPING_MOVE` and rolls the 2–5 attack counter (`effects.asm:1080-1103`), so
+  a Wrap, Bind, Clamp or Fire Spin that misses still commits the user to the move for the rolled turns. Ours starts
+  the lock only on a hit (`AttackAction`, `BindingMechanic`). A flying or underground foe makes the miss routine.
+  **DoR:** ✗ gaps **2** (central `AttackAction`; where the lock starts, and what a locked user does on later turns
+  when the first hit missed) and **6**. *Drafted:*
+  - **Acceptance:** a binding move that misses still locks its user in for the rolled turns; each later turn re-runs
+    the move, and the foe is held only on turns it hits.
+  - **Seam:** an `IBattleRules` member for whether the lock starts before the hit test.
+  - **Gen 1 source:** the cites above; trace what each repeat turn does after a first-turn miss before designing.
+  - **Data vs runtime:** runtime only. **Dependencies:** none.
+- **Disable matches move instances, not move ids (found 2026-11-09 by `opus-engineer`, Fly and Dig item;
+  read-confirmed, unverified beyond that) — S, ✗ not Ready.** `StatusResolver.DisabledMoveStops` compares the selected
+  `PokemonAttack` with `Battle.DisabledMove` by reference; pokered compares move numbers
+  (`wPlayerDisabledMoveNumber`, `core.asm:3437`+). A disabled move called through Metronome or Mirror Move is a
+  different instance here, so it is not stopped, and the "is disabled!" route into the Fly and Dig glitch cannot
+  occur. Whether anything else leans on the instance comparison (Mimic, Transform's copied moveset) is unchecked.
+  **DoR:** ✗ gaps **1, 2, 4, 6**. *Drafted:* a verify slice reads `DisabledMoveStops`, `DisableEffect` and the
+  Metronome and Mirror Move wrappers against pokered, then lists the diverging cases. 3: likely none (a matching bug,
+  not a rule), decided by the slice. 5: runtime only. 7: none.
+- **Enemy AI ignores a foe that is out of reach (found 2026-11-09, Fly and Dig item) — S–M, ✗ not Ready, your
+  call.** `Ai/MoveEvaluators.cs:26` scores hit chance from `NeverMisses` and `Accuracy` and doesn't ask
+  `HitOnSemiInvulnerable`, so the enemy attacks a flying or underground Pokémon as if it could hit. pokered's AI
+  doesn't consider `INVULNERABLE` either, so today's behaviour is faithful; a guard would be a roguelite extension.
+  **DoR:** ✗ gaps **1** (the product decision: stay faithful or add a guard), **2**, **6**. *Drafted if a guard is
+  wanted:* acceptance, the enemy picks a move that lands (or its best move when none does) against a foe out of
+  reach; the evaluator asks the rules member instead of re-deriving it (`ClaudeDirectives/engine.md` rule 2). 3: the
+  existing member. 4: pokered's AI has no such check. 5: runtime only. 7: none.
 - **Hyper Beam recharges after breaking a Substitute (found 2026-11-03, move description audit) — S, ✗ not Ready.**
   pokered zeroes the attacker's move effect when a Substitute breaks (`core.asm:4879-4895`), so no recharge follows. Ours
   checks only that damage landed and the target lives (`AttackAction.cs:247-253`). Read from the code; not yet reproduced.
@@ -246,7 +264,7 @@ data/engine item usually also means updating the test that pins the wrong value.
   **DoR (V16), Struggle:** ✗ not Ready — gaps **1, 2, 3, 4, 5, 7**, left as filed per the ruling below. When
   reopened, the draft is:
   - **Acceptance:** Struggle rolls accuracy, so a forced 255 roll misses.
-  - **Design:** central `AttackAction`, so `opus-engineer` plus both gates.
+  - **Design:** central `AttackAction`, so both gates.
   - **Seam:** `IBattleRules` (Gen 2's Struggle is unchecked).
   - **Gen 1 source:** cite `MoveHitTest` (`core.asm:5228`).
   - **Data vs runtime:** runtime only.
@@ -344,7 +362,7 @@ channel of a broader acquisition layer.
   in Gen 1 but our engine can produce it. `RunDirectorTests.Runner_DoubleFaintFromEndOfTurnPoison_EndsTheRun_
   ButStillCountsTheWin` pins a path Gen 1 cannot produce (the mutual-KO ruling stands for genuine trades like
   Explosion). The fix belongs behind an `IBattleRules` seam beside `FaintEndsTurnImmediately`; design rationale in
-  `GEN_DIFFERENCES.md` → Status Quirks and `GENERATION_SEAMS.md` §2. Needs a `/plan`, `opus-engineer`, both gates.
+  `GEN_DIFFERENCES.md` → Status Quirks and `GENERATION_SEAMS.md` §2. Needs a `/plan` and both gates.
   **User ruling 2026-10-17:** its own item, behind a generation seam; "slightly modernized but functionally the
   same" is acceptable — the Gen 1 order of effects and its outcomes are the requirement.
   **DoR:** ✗ not Ready — gap **2** (the `/plan`); 1, 5 and 6 are drafted below for your confirmation, 7 is
@@ -473,6 +491,15 @@ each). Their seam and data-vs-runtime lines are already written in the text.
   - **Gen 1 source:** the games' text speed setting and sound IDs (pokered `audio/`) for fidelity.
   - **Data vs runtime:** client only, plus blip assets.
   - **Dependencies:** none, though skipping the typewriter must not stall the timeline.
+- [ ] **A Fly or Dig user's sprite stays on screen (found 2026-11-09 by `pr-review`, Fly and Dig item) — S–M, ✗ not
+  Ready.** The engine puts a Fly or Dig user out of reach on its charge turn, but the client keeps drawing it. In
+  Gen 1 the sprite leaves the screen (Fly plays Teleport's animation, Dig a slide down; pokered `effects.asm`
+  `ChargeEffect`, `:1014-1022`) and returns on the release turn. `ChargingUp` carries no out-of-reach field, and the
+  glitch (a stranded user) has no event at all.
+  **DoR:** ✗ gaps **1, 2, 4, 6**. *Drafted:* acceptance, the sprite hides when its owner goes out of reach and shows
+  again when it comes back, including after a reconnect replay. Design open: which event carries the state (a field
+  on `ChargingUp` plus a cleared signal, wired by hand per `ClaudeDirectives/engine.md` rule 8) and whether a stranded
+  user stays hidden as in Gen 1. 3: the animation is theme. 5: wire (C# and TS) plus client. 7: none.
 - [ ] **Sprite presentation FX — joint mini-plan not yet scheduled.** `SPRITE_PRESENTATION.md` §3 sketches eight
   unratified ideas. Recommendation: §3.1 (confirm `pixelArt: true`) is a one-line check, do it standalone; §3.4
   (type-coloured particles) folds into the animations item above (same wire dependency); §3.2 (a grounding shadow)

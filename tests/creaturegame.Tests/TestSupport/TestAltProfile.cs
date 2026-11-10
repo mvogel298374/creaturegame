@@ -233,6 +233,16 @@ internal static class TestAltProfile
 
         public override bool DisabledMoveBlockEndsCharge => false;
 
+        public override SemiInvulnerability ChargeGrantsSemiInvulnerability(Attack move) =>
+            SemiInvulnerability.Underground;
+
+        public override SemiInvulnerableHit HitOnSemiInvulnerable(
+            Attack move,
+            SemiInvulnerability state
+        ) => SemiInvulnerableHit.Lands;
+
+        public override bool LostTurnEndsSemiInvulnerability(PreMoveCheck check) => true;
+
         public override bool InflictionClearsRecharge(RechargeClearingInfliction infliction) =>
             infliction != RechargeClearingInfliction.Sleep;
 

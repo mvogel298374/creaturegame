@@ -105,6 +105,9 @@ public sealed class TwoTurnMechanic : ILockInMechanic
             // Charge turn: wind up and defer the strike to next turn.
             ctx.Source.Battle.IsTwoTurnCharging = true;
             ctx.Source.Battle.ChargingMove = ctx.Move;
+            var away = ctx.Rules.ChargeGrantsSemiInvulnerability(ctx.Move.Base);
+            if (away != SemiInvulnerability.None)
+                ctx.Source.Battle.SemiInvulnerability = away;
             ctx.Emitter?.Emit(new ChargingUp(ctx.Source.Name, ctx.Source.Id, ctx.MoveName));
             return LockInResult.Halt;
         }
@@ -112,6 +115,7 @@ public sealed class TwoTurnMechanic : ILockInMechanic
         // Release turn: clear the charge and let the attack run.
         ctx.Source.Battle.IsTwoTurnCharging = false;
         ctx.Source.Battle.ChargingMove = null;
+        ctx.Source.Battle.SemiInvulnerability = SemiInvulnerability.None;
         return LockInResult.Proceed;
     }
 }

@@ -368,6 +368,36 @@ public sealed class Gen1BattleRules : IBattleRules
 
     public bool DisabledMoveBlockEndsCharge => true;
 
+    // pokered effects.asm ChargeEffect: Fly by its effect, Dig by its move number.
+    public SemiInvulnerability ChargeGrantsSemiInvulnerability(Attack move) =>
+        move.Name switch
+        {
+            "fly" => SemiInvulnerability.Flying,
+            "dig" => SemiInvulnerability.Underground,
+            _ => SemiInvulnerability.None,
+        };
+
+    // Only a move that runs MoveHitTest misses; Mimic and Conversion test the bit themselves.
+    public SemiInvulnerableHit HitOnSemiInvulnerable(Attack move, SemiInvulnerability state) =>
+        move.Effect is MoveEffect.Mimic or MoveEffect.Conversion ? SemiInvulnerableHit.Fails
+        : !move.NeverMisses && RunsHitTest(move) ? SemiInvulnerableHit.Misses
+        : SemiInvulnerableHit.Lands;
+
+    private static bool RunsHitTest(Attack move) =>
+        move.BaseDamage > 0
+        || move.DamageCategory != DamageCategory.Standard
+        || move.StatusEffect != StatusCondition.None
+        || move.StatEffect is { Target: StageTarget.Foe, Delta: < 0 }
+        || move.Effect
+            is MoveEffect.Confuse
+                or MoveEffect.LeechSeed
+                or MoveEffect.Disable
+                or MoveEffect.Counter;
+
+    // core.asm:3432 clears INVULNERABLE on a self-hit; :3463 and :3650 leave it (the glitch).
+    public bool LostTurnEndsSemiInvulnerability(PreMoveCheck check) =>
+        check == PreMoveCheck.Confusion;
+
     public bool InflictionClearsRecharge(RechargeClearingInfliction infliction) => true;
 
     public bool SleepMoveIgnoresChecksOnRechargingTarget => true;

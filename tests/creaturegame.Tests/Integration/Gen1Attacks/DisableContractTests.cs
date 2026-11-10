@@ -32,6 +32,45 @@ public class DisableContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     }
 
     [Fact]
+    public async Task AMissedDisablePrintsButItFailed()
+    {
+        var defender = TestCreatures.Make("D", hp: 500);
+        defender.AddAttack(Move("pound"));
+
+        var result = await new MoveScenario()
+            .Rules(NeverHitRules.Instance)
+            .Defender(defender)
+            .Use(Move("disable"));
+
+        Assert.True(result.Has<MoveFailed>());
+        Assert.False(result.Has<MoveMissed>());
+        Assert.Null(result.Defender.Battle.DisabledMove);
+    }
+
+    [Fact]
+    public async Task TheSeamPicksAMissedDisablesLine()
+    {
+        var defender = TestCreatures.Make("D", hp: 500);
+        defender.AddAttack(Move("pound"));
+
+        var result = await new MoveScenario()
+            .Rules(new MissedLineNeverHitRules())
+            .Defender(defender)
+            .Use(Move("disable"));
+
+        Assert.True(result.Has<MoveMissed>());
+        Assert.False(result.Has<MoveFailed>());
+    }
+
+    private sealed class MissedLineNeverHitRules : DelegatingBattleRules
+    {
+        public override int GetHitThreshold(int acc, int accStage, int evaStage) => 0;
+
+        public override MoveFailureAnnouncement PrimaryEffectFailureAnnouncement =>
+            MoveFailureAnnouncement.Missed;
+    }
+
+    [Fact]
     public async Task DisableDoesNotStackWhenAMoveIsAlreadyDisabled()
     {
         var defender = TestCreatures.Make("D", hp: 500);

@@ -161,6 +161,17 @@ public abstract class DelegatingBattleRules : IBattleRules
 
     public virtual bool DisabledMoveBlockEndsCharge => _inner.DisabledMoveBlockEndsCharge;
 
+    public virtual SemiInvulnerability ChargeGrantsSemiInvulnerability(Attack move) =>
+        _inner.ChargeGrantsSemiInvulnerability(move);
+
+    public virtual SemiInvulnerableHit HitOnSemiInvulnerable(
+        Attack move,
+        SemiInvulnerability state
+    ) => _inner.HitOnSemiInvulnerable(move, state);
+
+    public virtual bool LostTurnEndsSemiInvulnerability(PreMoveCheck check) =>
+        _inner.LostTurnEndsSemiInvulnerability(check);
+
     public virtual bool InflictionClearsRecharge(RechargeClearingInfliction infliction) =>
         _inner.InflictionClearsRecharge(infliction);
 

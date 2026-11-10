@@ -186,6 +186,31 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
   every turn (pokecrystal `data/moves/effects.asm:811-816`) and, like Gen 1, confuses silently with a fresh counter
   (`engine/battle/effect_commands.asm:4888-4920`).
 
+#### Fly / Dig
+- **The charge turn is out of reach, but only for Fly and Dig.** `ChargeEffect` sets `INVULNERABLE` for Fly (by its
+  effect) and Dig (by its move number); Solar Beam, Razor Wind, Skull Bash and Sky Attack charge in plain sight
+  (pokered `engine/battle/effects.asm:1010-1020`).
+- **A hit misses with no accuracy roll.** `MoveHitTest` checks the bit before the roll and before X Accuracy, so X
+  Accuracy doesn't get through, and a damaging move has already drawn its crit and damage (`core.asm:5259-5261`).
+  Swift returns before the check and hits (`:5247-5250`); Bide's release skips the hit test and hits (`:3528`).
+- **Moves that never run the hit test still land:** Roar and Whirlwind (`ResidualEffects1`, `:3124-3127`),
+  Transform, Haze, and every self-targeting move. Transform's own check is bugged
+  (`engine/battle/move_effects/transform.asm:5-20`): it never fires against the target, and fires only for a
+  player-side user that is itself stranded by the glitch below, which then fails. We don't replicate that one-sided
+  case (waived 2026-11-09); Transform always lands. A status move misses with its usual line ("didn't affect", or
+  "But it failed!" for a stat-down, confusion or Disable move, `effects.asm:1366-1367`). Leech Seed prints "missed"
+  where Gen 1 prints "evaded the attack!" (`TODO.md` §3.1, "Residual-effect failure lines"). Mimic and Conversion check the bit themselves: "But it failed!" (`effects.asm:1221`,
+  `:1245`, `:1272`; `move_effects/conversion.asm:14`).
+- **Cleared on any charge move's release** (`core.asm:3116`, enemy `:5500`) and by a confusion self-hit (`:3432`).
+  Haze doesn't touch it.
+- **The glitch:** full paralysis and "is disabled!" clear the charge but not the bit (`:3463`, `:3650-3660`). The
+  Pokémon stays out of reach on every later turn until it next completes a charge move or leaves the field. Only
+  full paralysis is a real route: Disable misses a Pokémon that is out of reach, so the "is disabled!" route is
+  nearly unreachable in Gen 1 and cannot occur in a battle here (the rule is there and tested by setting the state up).
+- **Gen 2** splits the bit into flying and underground: Gust, Whirlwind, Thunder and Twister hit a flying Pokémon, and
+  Earthquake, Fissure and Magnitude one underground (pokecrystal `engine/battle/effect_commands.asm` `.FlyDigMoves`).
+  Seam: `GENERATION_SEAMS.md` §2, Fly and Dig out of reach.
+
 #### "Doesn't affect" vs "didn't affect"
 - **Two lines, one word apart.** "It doesn't affect <TARGET>!" is type immunity only (`_DoesntAffectMonText`, pokered
   `engine/battle/core.asm:3718-3733`; Thunder Wave on a Ground-type, `paralyze.asm` `.doesntAffect`). "It didn't

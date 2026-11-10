@@ -51,6 +51,7 @@ Here is every field, what it represents in Gen 1 terms, and why it's transient.
 | `BindingMove` / `BindingTarget` | `PokemonAttack?` / `Creature?` | On the **binder**: the move it is locked into and the victim it is trapping. `BindingMechanic.ForcedMove` re-forces the move while the victim's counter is alive (Gen 1 locks the binder in too). | Lock only exists during the fight. |
 | `IsTwoTurnCharging` | `bool` | Whether the creature is **mid two-turn move** (Dig, Fly, Solar Beam, Razor Wind, Skull Bash, Sky Attack). Set on the charge turn, cleared on the release turn. | Spans exactly two turns of one battle. |
 | `ChargingMove` | `PokemonAttack?` | *Which* move is being charged, so the release turn knows what to fire without re-asking the player. | Pairs with `IsTwoTurnCharging`. |
+| `SemiInvulnerability` | `SemiInvulnerability` (`None`, `Flying`, `Underground`) | Whether the creature is **out of reach** after a Fly or Dig charge turn (pokered's `INVULNERABLE` bit; Gen 2 splits it, hence three values). Set by `TwoTurnMechanic` from `IBattleRules.ChargeGrantsSemiInvulnerability`; read by `AttackAction.Connects` through `HitOnSemiInvulnerable`. Cleared by any charge move's release and by the lost turns `LostTurnEndsSemiInvulnerability` names (Gen 1: a confusion self-hit). **Not** cleared with `IsTwoTurnCharging` by full paralysis or "is disabled!", the Gen 1 glitch, and not by Haze. Rules: `GENERATION_SEAMS.md` §2, Fly and Dig out of reach. | Volatile: the per-battle reset and a send-in (`Battle.BringInMember` resets the incoming creature) clear it, so a creature that leaves the field and comes back is within reach. |
 
 ### ⚠️ Important nuance: status persistence
 
@@ -102,7 +103,7 @@ cure above maintains it, and a new path that breaks it would leave that creature
 sides); the CONFUSED bit; Disable; Mist; Focus Energy; X Accuracy; Leech Seed; Reflect/Light Screen; and the
 "badly poisoned" bit (downgrades to regular Poison, both sides — only the escalation stops, the Poison itself
 is never cured on the user's own side). Everything else on `BattleState` — Substitute, Bide, Rampage/Thrash,
-Rage, binding, Recharge, two-turn charging, Flinch, `LastMoveUsed`, Counter's damage memory, and any
+Rage, binding, Recharge, two-turn charging, Fly and Dig's `SemiInvulnerability`, Flinch, `LastMoveUsed`, Counter's damage memory, and any
 Transform/Mimic identity swap — is left alone; a wholesale `Battle = new BattleState()` here would silently
 wipe all of that (the "full nuke, then allow-list a few fields back" mistake this narrow method exists to
 avoid). `preserveMajorStatus` (true for the *user's own* side, false for the *target's*) gates whether the
@@ -205,6 +206,7 @@ public sealed class BattleState
     public Creature? BindingTarget { get; set; }
     public bool IsTwoTurnCharging { get; set; }
     public PokemonAttack? ChargingMove { get; set; }
+    public SemiInvulnerability SemiInvulnerability { get; set; }
 }
 ```
 

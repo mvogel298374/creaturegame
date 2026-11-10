@@ -141,6 +141,19 @@ public enum HitRollOrder
     AccuracyThenCritAndDamage,
 }
 
+/// <summary>What a move does to a Fly or Dig user that is out of reach. See GENERATION_SEAMS.md §2.</summary>
+public enum SemiInvulnerableHit
+{
+    /// <summary>The move carries on as against any target.</summary>
+    Lands,
+
+    /// <summary>The move misses with no accuracy roll and prints its usual miss line.</summary>
+    Misses,
+
+    /// <summary>"But it failed!" (<see cref="MoveFailed"/>).</summary>
+    Fails,
+}
+
 public interface IBattleRules
 {
     /// <summary>Whether the given move thaws a frozen target when it hits.</summary>
@@ -325,7 +338,7 @@ public interface IBattleRules
     /// <summary>Whether a Substitute stops a hit from thawing the frozen target behind it. See GENERATION_SEAMS.md §2.</summary>
     bool SubstituteStopsThaw { get; }
 
-    /// <summary>The line a stat-down or confusion move prints when a Substitute stops it or it misses. See GENERATION_SEAMS.md §2.</summary>
+    /// <summary>The line a stat-down or confusion move prints when a Substitute stops it or it misses, and Disable when it misses. See GENERATION_SEAMS.md §2.</summary>
     MoveFailureAnnouncement PrimaryEffectFailureAnnouncement { get; }
 
     /// <summary>The checks a creature runs before it moves, in order. See GENERATION_SEAMS.md §2.</summary>
@@ -336,6 +349,15 @@ public interface IBattleRules
 
     /// <summary>Whether being stopped from using a disabled move ends the user's charge. See GENERATION_SEAMS.md §2.</summary>
     bool DisabledMoveBlockEndsCharge { get; }
+
+    /// <summary>Where this charge move's charge turn puts the user out of reach (Gen 1: Fly and Dig). See GENERATION_SEAMS.md §2.</summary>
+    SemiInvulnerability ChargeGrantsSemiInvulnerability(Attack move);
+
+    /// <summary>What this move does to a target out of reach. See GENERATION_SEAMS.md §2.</summary>
+    SemiInvulnerableHit HitOnSemiInvulnerable(Attack move, SemiInvulnerability state);
+
+    /// <summary>Whether losing the turn to this check brings the user back within reach. See GENERATION_SEAMS.md §2.</summary>
+    bool LostTurnEndsSemiInvulnerability(PreMoveCheck check);
 
     /// <summary>Whether this infliction clears the target's pending recharge. See GENERATION_SEAMS.md §2.</summary>
     bool InflictionClearsRecharge(RechargeClearingInfliction infliction);

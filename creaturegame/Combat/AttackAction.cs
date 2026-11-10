@@ -422,19 +422,36 @@ public class AttackAction : IBattleAction
             return false;
         }
 
+        var outOfReach = Target.Battle.SemiInvulnerability;
+        var reach =
+            outOfReach == SemiInvulnerability.None
+                ? SemiInvulnerableHit.Lands
+                : _rules.HitOnSemiInvulnerable(move, outOfReach);
+        if (reach == SemiInvulnerableHit.Fails)
+        {
+            _emitter?.Emit(new MoveFailed());
+            lockIn?.OnTurnEnd(lockCtx!);
+            return false;
+        }
+
+        bool dodged = reach == SemiInvulnerableHit.Misses;
         bool skipsAccuracyRoll =
-            usingStruggle
+            dodged
+            || usingStruggle
             || move.NeverMisses
             || (move.Effect == MoveEffect.ForceFlee && _rules.ForceFleeSkipsAccuracy)
             || (_rules.XAccuracyBypassesAccuracyCheck && Source.Battle.UsingXAccuracy);
         bool missed =
-            !skipsAccuracyRoll
-            && _rng.Next(_rules.AccuracyRollBound)
-                >= _rules.GetHitThreshold(
-                    move.Accuracy,
-                    Source.Battle.Stages.Accuracy,
-                    Target.Battle.Stages.Evasion
-                );
+            dodged
+            || (
+                !skipsAccuracyRoll
+                && _rng.Next(_rules.AccuracyRollBound)
+                    >= _rules.GetHitThreshold(
+                        move.Accuracy,
+                        Source.Battle.Stages.Accuracy,
+                        Target.Battle.Stages.Evasion
+                    )
+            );
         bool immunityOutranksMiss =
             _rules.HitRollOrder == HitRollOrder.CritAndDamageThenAccuracy
             && !IsStatusMove(move, category, usingStruggle);
@@ -453,7 +470,8 @@ public class AttackAction : IBattleAction
             _emitter?.Emit(
                 isStatusMove && move.StatusEffect != StatusCondition.None
                     ? StatusMoveFailure(_rules.StatusMoveMissAnnouncement, move)
-                : isStatusMove && (IsFoeStatDown(move) || move.Effect == MoveEffect.Confuse)
+                : isStatusMove
+                && (IsFoeStatDown(move) || move.Effect is MoveEffect.Confuse or MoveEffect.Disable)
                     ? StatusMoveFailure(_rules.PrimaryEffectFailureAnnouncement, move)
                 : new MoveMissed(Source.Name, Source.Id, move.Name ?? "")
             );
