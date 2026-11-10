@@ -26,6 +26,8 @@ public class AttackAction : IBattleAction
     // secondary is still shielded on the very hit that breaks the decoy (Gen 1: that hit struck the sub).
     private bool _targetShieldedAtImpact;
 
+    private bool _brokeSubstitute;
+
     // Null means Struggle — Battle passes null when the source has no selectable move
     // (out of PP, or its only move is Disabled), bypassing IBattleInput.
     private readonly PokemonAttack? _selectedMove;
@@ -239,6 +241,7 @@ public class AttackAction : IBattleAction
 
         // Snapshot the shield state before any damage lands (see the _targetShieldedAtImpact field).
         _targetShieldedAtImpact = Target.Battle.SubstituteHp > 0;
+        _brokeSubstitute = false;
 
         int damage = ResolveDamage(
             attackToUse,
@@ -250,7 +253,7 @@ public class AttackAction : IBattleAction
         );
 
         // Struggle recoil
-        if (usingStruggle)
+        if (usingStruggle && !BreakCancels(MoveEffect.Recoil, category))
         {
             int recoil = _rules.CalculateStruggleRecoil(Source, damage);
             Source.Attributes.ReceiveDamage(recoil);
@@ -265,6 +268,7 @@ public class AttackAction : IBattleAction
             && attackToUse.Effect == MoveEffect.Recharge
             && damage > 0
             && (!_rules.FaintEndsTurnImmediately || Target.IsAlive())
+            && !BreakCancels(attackToUse.Effect, category)
         )
             Source.Battle.IsRecharging = true;
 
@@ -273,7 +277,8 @@ public class AttackAction : IBattleAction
             TryApplyStatus(attackToUse);
 
         TryApplyStatEffect(attackToUse);
-        TryApplyMoveEffect(attackToUse, damage);
+        if (!BreakCancels(attackToUse.Effect, category))
+            TryApplyMoveEffect(attackToUse, damage);
 
         lockIn?.OnTurnEnd(lockCtx!); // confuse the user if this was the rampage's last turn
 
@@ -632,7 +637,8 @@ public class AttackAction : IBattleAction
                     bool isMultiHit = !usingStruggle && move.Effect == MoveEffect.MultiHit;
                     int landed = 0;
                     bool dealtRealDamage = false;
-                    for (int i = 0; i < first.Hits && Target.IsAlive(); i++)
+                    bool cutShort = false;
+                    for (int i = 0; i < first.Hits && Target.IsAlive() && !cutShort; i++)
                     {
                         int hitDamage = first.Damage;
                         bool isCrit = first.IsCrit;
@@ -643,9 +649,10 @@ public class AttackAction : IBattleAction
                             dealtRealDamage = true;
                         damage += hitDamage; // accumulated total gates drain/recoil/recharge below
                         landed++;
+                        cutShort = i == 0 && isMultiHit && BreakCancels(move.Effect, category);
                     }
 
-                    if (isMultiHit)
+                    if (isMultiHit && !cutShort)
                         _emitter?.Emit(new MultiHitCompleted(landed));
 
                     // Rage: a raging creature that's hit gains Attack stage(s) — once per connecting attack
@@ -669,7 +676,11 @@ public class AttackAction : IBattleAction
                         );
                     }
 
-                    if (category == DamageCategory.Drain && damage > 0)
+                    if (
+                        category == DamageCategory.Drain
+                        && damage > 0
+                        && !BreakCancels(move.Effect, category)
+                    )
                     {
                         int heal = Math.Max(1, damage * move.DrainPercent / 100);
                         Source.Attributes.ReceiveHealing(heal);
@@ -706,7 +717,8 @@ public class AttackAction : IBattleAction
                     damage = blast.Damage;
                     DealDamageToTarget(damage, effectiveness, blast.IsCrit, move.DamageType);
                 }
-                Source.Attributes.ReceiveDamage(Source.Attributes.HP);
+                if (!BreakCancels(move.Effect, category))
+                    Source.Attributes.ReceiveDamage(Source.Attributes.HP);
                 break;
 
             case DamageCategory.SuperFang:
@@ -778,6 +790,7 @@ public class AttackAction : IBattleAction
         if (Target.Battle.SubstituteHp > 0)
         {
             bool broke = SubstituteStrikes.StrikeDecoy(Target.Battle, dmg, _rules);
+            _brokeSubstitute |= broke;
             SubstituteStrikes.AnnounceStrike(
                 Target,
                 Target.Battle.SubstituteHp,
@@ -841,6 +854,9 @@ public class AttackAction : IBattleAction
     // The shield flag consumed by the foe-directed secondaries (status / stat-drop / confusion);
     // see the _targetShieldedAtImpact field for the Gen 1 rationale.
     private bool TargetShieldedBySubstitute => _targetShieldedAtImpact;
+
+    private bool BreakCancels(MoveEffect effect, DamageCategory category) =>
+        _brokeSubstitute && _rules.SubstituteBreakCancels(effect, category);
 
     private void TryApplyStatus(Attack attack)
     {

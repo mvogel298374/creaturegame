@@ -297,6 +297,17 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
   `AttackAction` impact-time snapshot (`_targetShieldedAtImpact`) that already covers the breaking hit. Pinned by
   `FlinchContractTests.SubstituteShieldsTheTargetFromFlinch` (decoy survives / decoy breaks). History:
   `docs/TODO_ARCHIVE.md` → "Repo-sweep R1/R2/R3 — five small fixes", item 2.
+- **Breaking a Substitute cancels the attacker's post-damage effects (Gen 1).** The zeroed effect byte (above) also
+  stops what pokered runs after the damage: Hyper Beam doesn't recharge, Explosion and Self-Destruct don't faint the
+  user, recoil and the drain heal don't apply, and Pay Day scatters nothing. Struggle's recoil is cancelled too: pokered's
+  Struggle carries `RECOIL_EFFECT` (`data/moves/moves.asm:178`). A multi-hit move (Fury Attack, Double Kick, Twineedle)
+  whose first strike breaks the decoy stops after that strike with no "Hit N times" line; a break on a later strike
+  changes nothing. A hit the decoy survives keeps all of these, and Wrap still traps. Gen 2 keeps the recharge and the
+  Explosion faint, exempts multi-hit moves, and reduces recoil and drain to 1 HP after any Substitute hit. Seam:
+  `GENERATION_SEAMS.md` §2 (`SubstituteBreakCancels`).
+  - **Secondary effects on the breaking hit.** pokered skips them because the byte is zeroed; ours skips the foe-targeted
+    ones through the impact-time shield snapshot instead (the flinch entry above). The break does not gate a
+    self-targeted secondary; no Gen 1 move has one.
 - **Substitute (Gen 1):** costs ⌊MaxHP/4⌋ and fails only when HP is *below* the cost, so a user with exactly the
   cost raises the decoy and is left at 0 HP, fainting itself (pokered `move_effects/substitute.asm:34-43`, a
   documented bug). The decoy holds ⌊MaxHP/4⌋ and breaks only on an underflow (`core.asm:4873-4877`): damage equal to

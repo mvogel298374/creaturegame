@@ -346,6 +346,15 @@ public sealed class Gen1BattleRules : IBattleRules
 
     public bool SubstituteStopsThaw => true;
 
+    // pokered core.asm AttackSubstitute .nullifyEffect zeroes the effect byte the post-damage dispatch reads.
+    public bool SubstituteBreakCancels(MoveEffect effect, DamageCategory category) =>
+        effect
+            is MoveEffect.Recharge
+                or MoveEffect.Recoil
+                or MoveEffect.PayDay
+                or MoveEffect.MultiHit
+        || category is DamageCategory.Drain or DamageCategory.SelfDestruct;
+
     public MoveFailureAnnouncement PrimaryEffectFailureAnnouncement =>
         MoveFailureAnnouncement.Failed;
 

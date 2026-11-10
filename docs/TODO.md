@@ -52,8 +52,8 @@ None open.
 
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
+| **A Rage that misses or breaks a Substitute still starts raging** (§3.1) | S–M | ✗ 2, 4, 6 | Found 2026-11-10 by `requirements-review`. Central `AttackAction` and `RageMechanic`. |
 | **A missed Wrap doesn't lock the user in** (§3.1) | S–M | ✗ 2, 6; the rest drafted | Found 2026-11-09 by `requirements-review`. Central `AttackAction` and `BindingMechanic`. |
-| **Hyper Beam recharges after breaking a Substitute** (§3.1) | S | ✗ 2, 3; the rest drafted | Found 2026-11-03. Central `AttackAction`. |
 | **The player chooses what Mimic copies** (§3.1) | M | ✗ 2, 3; the rest drafted | Found 2026-11-03. Needs an input prompt, so a design pass. |
 
 **C. Needs a `/plan` or a verify slice**
@@ -139,8 +139,7 @@ data/engine item usually also means updating the test that pins the wrong value.
 
 - **Damage/accuracy core (L):** `DamageCalculator.cs:246-247` skips the `2L/5` and `/50` floors `GEN_DIFFERENCES.md`
   documents (~24% high at L12); `Gen1BattleRules.cs:215` uses a 3-based accuracy/evasion table (Gen 1 uses the
-  standard table); crit multiplier should be ≈(2L+5)/(L+5), not a flat 2× (`Gen1BattleRules.cs` crit block, ~`:287`); multi-hit continues past a broken
-  Substitute (`AttackAction.ResolveDamage`'s multi-hit loop); recoil/drain/Struggle use full calculated damage, not
+  standard table); crit multiplier should be ≈(2L+5)/(L+5), not a flat 2× (`Gen1BattleRules.cs` crit block, ~`:287`); recoil/drain/Struggle use full calculated damage, not
   HP actually lost (`AttackAction.ExecuteAsync` Struggle recoil, `ResolveDamage` drain); Ice can freeze Ice /
   Electric can paralyse Electric (`Gen1BattleRules.CanReceiveStatus`); `DamageCalculator` applies no stat cap after the stage multiplier (Gen 1 reportedly clamps a staged
   stat to 1–999) and no ÷4 scaling of both stats when either exceeds 255 (found by `requirements-review`
@@ -237,14 +236,15 @@ data/engine item usually also means updating the test that pins the wrong value.
   wanted:* acceptance, the enemy picks a move that lands (or its best move when none does) against a foe out of
   reach; the evaluator asks the rules member instead of re-deriving it (`ClaudeDirectives/engine.md` rule 2). 3: the
   existing member. 4: pokered's AI has no such check. 5: runtime only. 7: none.
-- **Hyper Beam recharges after breaking a Substitute (found 2026-11-03, move description audit) — S, ✗ not Ready.**
-  pokered zeroes the attacker's move effect when a Substitute breaks (`core.asm:4879-4895`), so no recharge follows. Ours
-  checks only that damage landed and the target lives (`AttackAction.cs:247-253`). Read from the code; not yet reproduced.
-  **DoR:** ✗ gaps **2** (central `AttackAction`) and **3** (a rule member, or reuse the substitute snapshot). *Drafted:*
-  - **Acceptance:** a Hyper Beam that breaks a Substitute leaves the user free next turn; one the decoy survives still
-    recharges.
-  - **Gen 1 source:** the cite above. **Data vs runtime:** runtime only. **Quirk:** the test above.
-  - **Dependencies:** none.
+- **A Rage that misses or breaks a Substitute still starts raging (found 2026-11-10 by `requirements-review`) — S–M, ✗
+  not Ready.** pokered starts Rage in `RageEffect` after the damage (`RAGE_EFFECT` is in
+  `data/battle/always_happen_effects.asm`), so a break, which zeroes the effect byte, stops it, and a miss likely does
+  too. Ours sets `IsRaging` in `RageMechanic.OnRelease` (`LockInMechanics.cs:176-181`), before the hit test. No earlier
+  ruling covers this: the archive's Rage rulings are "Rage blocks switching" and "Attack rises once per hit received".
+  **DoR:** ✗ gaps **2** (lock-in timing in central `AttackAction`), **4** (confirm the miss case against `RageEffect` and
+  the miss path), **6**. *Drafted:*
+  - **Acceptance:** a Rage that misses or breaks a Substitute doesn't lock the user in; one that connects does.
+  - **Data vs runtime:** runtime only. **Dependencies:** none; reads the same break flag, `AttackAction._brokeSubstitute` (archived: `TODO_ARCHIVE.md` → "Breaking a Substitute cancels the attacker's post-damage effects").
 - **The player chooses what Mimic copies (found 2026-11-03, move description audit) — M, ✗ not Ready.** pokered lets the
   player pick any of the target's moves, and only the enemy picks at random (`MimicEffect`, `effects.asm:1203-1250`). Ours
   always picks at random (`MoveEffects.cs:345-352`).

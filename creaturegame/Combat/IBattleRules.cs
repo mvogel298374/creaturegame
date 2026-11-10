@@ -338,6 +338,9 @@ public interface IBattleRules
     /// <summary>Whether a Substitute stops a hit from thawing the frozen target behind it. See GENERATION_SEAMS.md §2.</summary>
     bool SubstituteStopsThaw { get; }
 
+    /// <summary>Whether a hit that breaks a Substitute cancels this post-damage effect of the attacker's move. See GENERATION_SEAMS.md §2.</summary>
+    bool SubstituteBreakCancels(MoveEffect effect, DamageCategory category);
+
     /// <summary>The line a stat-down or confusion move prints when a Substitute stops it or it misses, and Disable when it misses. See GENERATION_SEAMS.md §2.</summary>
     MoveFailureAnnouncement PrimaryEffectFailureAnnouncement { get; }
 

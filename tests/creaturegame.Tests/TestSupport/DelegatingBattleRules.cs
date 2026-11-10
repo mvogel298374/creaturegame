@@ -151,6 +151,9 @@ public abstract class DelegatingBattleRules : IBattleRules
 
     public virtual bool SubstituteStopsThaw => _inner.SubstituteStopsThaw;
 
+    public virtual bool SubstituteBreakCancels(MoveEffect effect, DamageCategory category) =>
+        _inner.SubstituteBreakCancels(effect, category);
+
     public virtual MoveFailureAnnouncement PrimaryEffectFailureAnnouncement =>
         _inner.PrimaryEffectFailureAnnouncement;
 

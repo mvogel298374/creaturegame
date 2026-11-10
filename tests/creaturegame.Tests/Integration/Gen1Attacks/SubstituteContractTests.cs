@@ -1163,4 +1163,190 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
 
         Assert.Equal(0, player.Battle.SubstituteRemnant);
     }
+
+    // --- A breaking hit cancels the attacker's post-damage effects (pokered core.asm AttackSubstitute) ---
+
+    private async Task<MoveResult> StrikeDecoyWith(
+        string move,
+        bool decoyBreaks,
+        IBattleRules? rules = null
+    )
+    {
+        var attacker = TestCreatures.Make("A", hp: 200);
+        attacker.Attributes.ReceiveDamage(100);
+        var foe = TestCreatures.Make("Foe", hp: 500);
+        foe.Battle.SubstituteHp = decoyBreaks ? 1 : 99999;
+        var scenario = new MoveScenario().Attacker(attacker).Defender(foe);
+        return await (rules is null ? scenario : scenario.Rules(rules)).Use(Move(move));
+    }
+
+    private static bool PostDamageEffectApplied(MoveResult result, string move) =>
+        move switch
+        {
+            "double-edge" => result.Has<RecoilDamage>(),
+            "absorb" => result.Has<DrainHealed>(),
+            "pay-day" => result.Has<CoinsScattered>(),
+            "explosion" => !result.Attacker.IsAlive(),
+            _ => throw new ArgumentOutOfRangeException(nameof(move)),
+        };
+
+    [Theory]
+    [InlineData("double-edge")]
+    [InlineData("absorb")]
+    [InlineData("pay-day")]
+    [InlineData("explosion")]
+    public async Task ABreakingHitCancelsThePostDamageEffect(string move)
+    {
+        var result = await StrikeDecoyWith(move, decoyBreaks: true);
+
+        Assert.True(result.Has<SubstituteBroke>());
+        Assert.False(PostDamageEffectApplied(result, move));
+    }
+
+    [Theory]
+    [InlineData("double-edge")]
+    [InlineData("absorb")]
+    [InlineData("pay-day")]
+    [InlineData("explosion")]
+    public async Task AHitTheDecoySurvivesKeepsThePostDamageEffect(string move)
+    {
+        var result = await StrikeDecoyWith(move, decoyBreaks: false);
+
+        Assert.True(result.Has<SubstituteAbsorbedHit>());
+        Assert.False(result.Has<SubstituteBroke>());
+        Assert.True(PostDamageEffectApplied(result, move));
+    }
+
+    [Fact]
+    public async Task AnExplosionThatBreaksADecoyLeavesTheUserAtItsHp()
+    {
+        var result = await StrikeDecoyWith("explosion", decoyBreaks: true);
+
+        Assert.Equal(100, result.Attacker.Attributes.HP);
+    }
+
+    [Theory]
+    [InlineData(1, false)]
+    [InlineData(99999, true)]
+    public async Task HyperBeamRechargesOnlyWhenTheDecoySurvives(int decoyHp, bool recharges)
+    {
+        var foe = TestCreatures.Make("Foe", hp: 500);
+        foe.Battle.SubstituteHp = decoyHp;
+
+        var turns = await new MoveScenario()
+            .Attacker(TestCreatures.Make("A", attack: 150))
+            .Defender(foe)
+            .UseRepeated(Move("hyper-beam"), 2);
+
+        Assert.Equal(recharges, turns[1].Has<Recharging>());
+        Assert.Equal(!recharges, turns[1].Has<MoveUsed>());
+    }
+
+    [Theory]
+    [InlineData(1, false)]
+    [InlineData(99999, true)]
+    public async Task StruggleRecoilsOnlyWhenTheDecoySurvives(int decoyHp, bool recoils)
+    {
+        var user = TestCreatures.Make("A", hp: 200);
+        var foe = TestCreatures.Make("Foe", hp: 500);
+        foe.Battle.SubstituteHp = decoyHp;
+        var emitter = new RecordingEmitter();
+
+        await new AttackAction(
+            user,
+            foe,
+            null,
+            Gen1TypeChart.Instance,
+            AlwaysHitRules.Instance,
+            emitter
+        ).ExecuteAsync();
+
+        Assert.Equal(recoils, emitter.Of<RecoilDamage>().Any());
+    }
+
+    [Fact]
+    public async Task WrapThatBreaksADecoyStillTraps()
+    {
+        var result = await StrikeDecoyWith("wrap", decoyBreaks: true);
+
+        Assert.True(result.Has<SubstituteBroke>());
+        Assert.True(result.Has<BindingStarted>());
+    }
+
+    private sealed class BreakCancelsNothingRules : DelegatingBattleRules
+    {
+        public override int GetHitThreshold(int acc, int accStage, int evaStage) => 256;
+
+        public override bool SubstituteBreakCancels(MoveEffect effect, DamageCategory category) =>
+            false;
+    }
+
+    [Fact]
+    public async Task TheRulesCanKeepTheExplosionFaintOnABreak()
+    {
+        var result = await StrikeDecoyWith(
+            "explosion",
+            decoyBreaks: true,
+            new BreakCancelsNothingRules()
+        );
+
+        Assert.True(result.Has<SubstituteBroke>());
+        Assert.False(result.Attacker.IsAlive());
+    }
+
+    private class ThreeHitRules : DelegatingBattleRules
+    {
+        public override int GetHitThreshold(int acc, int accStage, int evaStage) => 256;
+
+        public override double GetCritChance(Creature a, Attack m) => 0.0;
+
+        public override double RollDamageVariance() => 1.0;
+
+        public override (double Min, double Max) DamageVarianceRange => (1.0, 1.0);
+
+        public override int RollMultiHitCount() => 3;
+    }
+
+    private sealed class ThreeHitsThroughABreakRules : ThreeHitRules
+    {
+        public override bool SubstituteBreakCancels(MoveEffect effect, DamageCategory category) =>
+            false;
+    }
+
+    [Fact]
+    public async Task TheRulesCanKeepAMultiHitMoveStrikingAfterAFirstStrikeBreak()
+    {
+        var probe = await HitDecoy(new ThreeHitRules(), "fury-attack", decoyHp: 99999);
+        int perStrike = (99999 - probe.Defender.Battle.SubstituteHp) / 3;
+
+        var result = await HitDecoy(new ThreeHitsThroughABreakRules(), "fury-attack", decoyHp: 1);
+
+        Assert.True(result.Has<SubstituteBroke>());
+        Assert.Equal(3, result.First<MultiHitCompleted>()!.Hits);
+        Assert.Equal(300 - 2 * perStrike, result.Defender.Attributes.HP);
+    }
+
+    [Fact]
+    public async Task AMultiHitMoveWhoseFirstStrikeBreaksADecoyStopsThere()
+    {
+        var result = await HitDecoy(new ThreeHitRules(), "fury-attack", decoyHp: 1);
+
+        Assert.True(result.Has<SubstituteBroke>());
+        Assert.Single(result.Emitter.Of<SubstituteAbsorbedHit>());
+        Assert.False(result.Has<MultiHitCompleted>());
+        Assert.Equal(300, result.Defender.Attributes.HP);
+    }
+
+    [Fact]
+    public async Task AMultiHitMoveThatBreaksADecoyOnALaterStrikeKeepsStriking()
+    {
+        var probe = await HitDecoy(new ThreeHitRules(), "fury-attack", decoyHp: 99999);
+        int perStrike = (99999 - probe.Defender.Battle.SubstituteHp) / 3;
+
+        var result = await HitDecoy(new ThreeHitRules(), "fury-attack", decoyHp: perStrike + 1);
+
+        Assert.True(result.Has<SubstituteBroke>());
+        Assert.Equal(3, result.First<MultiHitCompleted>()!.Hits);
+        Assert.Equal(300 - perStrike, result.Defender.Attributes.HP);
+    }
 }

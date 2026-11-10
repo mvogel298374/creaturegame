@@ -8,6 +8,50 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §3.1 Breaking a Substitute cancels the attacker's post-damage effects ✅ DONE (2026-11-10)
+
+M; found 2026-11-03 (move description audit) as "Hyper Beam recharges after breaking a Substitute"; widened by Mo's
+2026-11-10 ruling, scope (a); greenlit 2026-11-10.
+
+**Problem.** pokered's `AttackSubstitute` zeroes the attacker's move effect at `.nullifyEffect`
+(`engine/battle/core.asm:4899`), and every effect after the damage dispatches off that byte (`core.asm:3232-3237`,
+`.executeOtherEffects` at `:3258`). So a break cancels Hyper Beam's recharge, Explosion's self-faint, recoil, the drain
+heal and Pay Day (`ExplodeEffect`, `DrainHPEffect`, `RecoilEffect`, `PayDayEffect` in `engine/battle/effects.asm`;
+`data/battle/always_happen_effects.asm`). Effects pokered runs before the damage (Wrap's trap, Thrash) are untouched.
+Ours cancelled none: recharge, the Explosion faint, the drain heal, recoil, Pay Day.
+
+**Rulings 2026-11-10.** After `requirements-review`: multi-hit folded in (`TwoToFiveAttacksEffect` sets the repeat bit
+after the first strike, `effects.asm:936-938`); the design change below approved; self-targeted secondaries left ungated
+and documented. After `pr-review`: the inline first-strike check in the multi-hit loop (`i == 0`) waived as off the
+seam, because the seam already decides whether a break cancels the repeat.
+
+**DoR (as filed).**
+- **1. Acceptance:** a hit that breaks a Substitute doesn't make Hyper Beam recharge, doesn't faint an Explosion or
+  Self-Destruct user, deals no recoil (Struggle's included), heals no drain and scatters no Pay Day coins; a hit the
+  decoy survives still does all five. A multi-hit move whose first strike breaks the decoy stops there with no
+  "Hit N times" line; a later break changes nothing. Wrap that breaks a Substitute still traps.
+- **2. Design (as approved 2026-11-10):** `DealDamageToTarget` records that this attack broke a decoy
+  (`_brokeSubstitute`). `AttackAction.BreakCancels(effect, category)` asks the seam at each site: the recharge, the
+  self-faint, the drain heal, Struggle's recoil, the multi-hit loop after the first strike, and the call to
+  `TryApplyMoveEffect` (which covers `RecoilEffect` and `PayDayEffect`). Per effect, not a blanket gate: Binding is not
+  listed, so Wrap still traps although our `BindingEffect` runs after the damage.
+- **3. Gen-variable surface:** one `IBattleRules` member, `bool SubstituteBreakCancels(MoveEffect effect,
+  DamageCategory category)`. Gen 1 returns true for Recharge, Recoil, PayDay, MultiHit, the Drain category and the
+  SelfDestruct category. Gen 2 differs (see `GENERATION_SEAMS.md` §2); documented there and in `GEN_DIFFERENCES.md`.
+- **4. Gen 1 source:** the `core.asm` and `effects.asm` cites above. Gen 2 (pokecrystal) cites are in
+  `GENERATION_SEAMS.md` §2 (`DoSubstituteDamage`, `engine/battle/effect_commands.asm:3540-3556`).
+- **5. Data vs runtime:** runtime only.
+- **6. Quirk to test:** `SubstituteContractTests`. For each of the five effects, the decoy breaks (effect cancelled)
+  and the decoy survives (effect applies); Explosion breaking a decoy leaves the user at its HP; Struggle both ways;
+  a multi-hit first-strike break stops at one strike and a later break keeps striking; Wrap still traps.
+- **7. Dependencies:** none.
+
+**Outcome.** `IBattleRules.SubstituteBreakCancels` (Gen 1 in `Gen1BattleRules`), `AttackAction._brokeSubstitute` and
+`AttackAction.BreakCancels`. Left open and filed separately: a Rage that misses or breaks a Substitute still starts
+raging (`TODO.md` §3.1).
+
+---
+
 ## §3.1 Fly and Dig put the user out of reach ✅ DONE (2026-11-09)
 
 M; found 2026-11-03 (move description audit); design pass shown, four rulings and greenlight from Mo 2026-11-09.
