@@ -53,4 +53,74 @@ public class BindingInteractionTests(MovesFixture moves) : InteractionTest(moves
 
         Assert.Equal("Player", result.Winner);
     }
+
+    [Fact]
+    public async Task AWrapThatFailsItsAccuracyRollTrapsNoOneAndLeavesItsUserFree()
+    {
+        var player = Mon(
+            "Player",
+            hp: 300,
+            attack: 50,
+            speed: 200,
+            DamageType.Normal,
+            "wrap",
+            "tackle"
+        );
+        var enemy = Mon("Enemy", hp: 999, attack: 60, speed: 1, DamageType.Normal, "swift");
+
+        var result = await new BattleScenario()
+            .Player(player)
+            .Enemy(enemy)
+            .PlayerUses("wrap", "tackle")
+            .EnemyUses("swift")
+            .Rules(NeverHitRules.Instance)
+            .RunAsync();
+
+        AssertMissedWrapLeftBothSidesFree(result, foeMove: "swift");
+    }
+
+    [Fact]
+    public async Task AWrapThatMissesAnUndergroundFoeTrapsNoOneAndLeavesItsUserFree()
+    {
+        var player = Mon(
+            "Player",
+            hp: 999,
+            attack: 200,
+            speed: 1,
+            DamageType.Normal,
+            "wrap",
+            "tackle"
+        );
+        var enemy = Mon("Enemy", hp: 60, attack: 20, speed: 200, DamageType.Normal, "dig");
+
+        var result = await new BattleScenario()
+            .Player(player)
+            .Enemy(enemy)
+            .PlayerUses("wrap", "tackle")
+            .EnemyUses("dig")
+            .Rules(new ScriptableRules().Deterministic())
+            .RunAsync();
+
+        Assert.Contains(result.All<MoveMissed>(), m => m.AttackerName == "Player");
+        AssertMissedWrapLeftBothSidesFree(result, foeMove: "dig");
+    }
+
+    private static void AssertMissedWrapLeftBothSidesFree(
+        BattleScenarioResult result,
+        string foeMove
+    )
+    {
+        Assert.Empty(result.All<BindingStarted>());
+        Assert.Empty(result.All<BindingBlocked>());
+        Assert.Contains(
+            result.All<MoveUsed>(),
+            m => m.AttackerName == "Enemy" && m.MoveName == foeMove
+        );
+        var playerMoves = result
+            .All<MoveUsed>()
+            .Where(m => m.AttackerName == "Player")
+            .Select(m => m.MoveName)
+            .Take(2);
+        Assert.Equal(["wrap", "tackle"], playerMoves);
+    }
 }

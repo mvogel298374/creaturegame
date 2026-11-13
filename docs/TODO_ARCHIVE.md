@@ -8,6 +8,36 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §3.1 A missed Wrap leaves its user free ✅ DONE (2026-11-13)
+
+S, test-only. Replaced the disproved 2026-11-09 entry "A missed Wrap doesn't lock the user in"; the 2026-11-13 design
+pass found that premise wrong (source-confirmed).
+
+**Finding.** pokered sets `USING_TRAPPING_MOVE` before the hit test (`effects.asm:1090-1094`), but every miss route in
+`MoveHitTest` ends at `.moveMissed`, which clears it again (`core.asm:5328-5345`). Only the cleared recharge survives a
+miss (`effects.asm:1092-1093`), which the engine already did (`AttackAction.cs` ~209). The engine matched Gen 1; no
+test pinned it.
+
+**DoR (as filed).**
+- **1. Acceptance:** a binding move that misses (failed accuracy roll, or a foe that is flying or underground) starts
+  no lock: the user chooses freely next turn, the foe acts, and the foe's pending recharge is still cleared.
+- **2. Design:** none; the engine is correct, this only pins it.
+- **3. Seam:** none new.
+- **4. Gen 1 source:** the cites above.
+- **5. Data vs runtime:** runtime only.
+- **6. Quirk asserted:** after a missed Wrap there is no `BindingStarted`, the foe uses a move next turn, the binder's
+  next move is its own scripted choice, and a recharging foe's recharge is cleared.
+- **7. Dependencies:** none. Test-only, so G3 did not apply.
+
+**Done.** Two full-battle facts in `BindingInteractionTests`: `AWrapThatFailsItsAccuracyRollTrapsNoOneAndLeavesItsUserFree`
+(`NeverHitRules`, faster binder, foe uses Swift) and `AWrapThatMissesAnUndergroundFoeTrapsNoOneAndLeavesItsUserFree`
+(faster foe uses Dig, the Wrap is dodged with no roll). Both assert no `BindingStarted`, no `BindingBlocked`, the foe
+uses its move, and the binder's first two moves are Wrap then its own scripted Tackle. The recharge-clear half was
+already pinned by `PreMoveCheckContractTests.ATrapMoveThatMissesStillClearsTheRecharge`. Verified by sabotage
+(injecting a trap on a missed binding move failed both new tests), then reverted.
+
+---
+
 ## §3.1 A Rage that misses or breaks a Substitute no longer starts raging ✅ DONE (2026-11-11)
 
 S–M; found 2026-11-10 by `requirements-review` (during the Substitute-break item); lines confirmed by the user and
