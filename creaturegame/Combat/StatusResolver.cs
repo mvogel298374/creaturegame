@@ -258,6 +258,7 @@ public static class StatusResolver
             victim.Battle.BindingTurnsRemaining = 0;
         binder.Battle.BindingMove = null;
         binder.Battle.BindingTarget = null;
+        binder.Battle.BindingDamage = 0;
     }
 
     /// <summary>Clears <paramref name="victim"/>'s pending recharge when the rules say this infliction does.</summary>

@@ -109,6 +109,12 @@ public sealed class Gen1BattleRules : IBattleRules
             _ => 5,
         };
 
+    // pokered core.asm .MultiturnMoveCheck jumps past damage calculation and MoveHitTest.
+    public bool BindingContinuationReplaysDamage => true;
+
+    // pokered core.asm: only MoveHitTest's .moveMissed clears USING_TRAPPING_MOVE.
+    public bool BindingLockSurvivesTypeMiss => true;
+
     // Gen 1: a missed Jump Kick / Hi Jump Kick deals a flat 1 HP of crash damage to the user.
     public int CalculateCrashDamage(Creature user) => 1;
 
@@ -306,6 +312,9 @@ public sealed class Gen1BattleRules : IBattleRules
     public bool FixedDamageChecksTypeImmunity => false;
 
     public bool DamageRollSkippedBelowTwo => true;
+
+    // pokered core.asm AdjustDamageForMoveType sets wMoveMissed when the multiplier leaves 0.
+    public bool TypeReducedZeroDamageMisses => true;
 
     public bool StatusMoveImmunityBeforeAccuracy => true;
 

@@ -139,19 +139,31 @@ public sealed class BindingEffect : IMoveEffect
 
     public void Apply(MoveEffectContext ctx)
     {
-        // Gen 1 partial trap: on a hit, trap the VICTIM (loses its turn for 2–5 turns, no residual chip)
-        // and lock THIS user into re-using the move — BindingMechanic.ForcedMove reads the victim's counter
-        // to keep forcing it. Guarded so a forced continuation hit doesn't re-roll the duration. Damage is
-        // recalculated per re-hit, not locked to the first (a documented Gen 1 simplification).
-        if (ctx.Target.Battle.BindingTurnsRemaining == 0 && ctx.Damage > 0 && ctx.Target.IsAlive())
-        {
-            ctx.Target.Battle.BindingTurnsRemaining = ctx.Rules.RollBindingTurns();
-            ctx.Source.Battle.BindingMove = ctx.SelectedMove;
-            ctx.Source.Battle.BindingTarget = ctx.Target;
-            ctx.Emitter?.Emit(
-                new BindingStarted(ctx.Target.Name, ctx.Target.Id, ctx.Attack.Name ?? "")
-            );
-        }
+        // Guarded so a re-run continuation (BindingContinuationReplaysDamage false) doesn't re-roll the duration.
+        if (
+            ctx.SelectedMove is { } move
+            && ctx.Target.Battle.BindingTurnsRemaining == 0
+            && ctx.Damage > 0
+            && ctx.Target.IsAlive()
+        )
+            Start(ctx.Source, ctx.Target, move, ctx.Damage, ctx.Rules, ctx.Emitter);
+    }
+
+    /// <summary>Traps <paramref name="victim"/> and locks <paramref name="binder"/> in, storing the damage its later turns replay.</summary>
+    internal static void Start(
+        Creature binder,
+        Creature victim,
+        PokemonAttack move,
+        int damage,
+        IBattleRules rules,
+        IBattleEventEmitter? emitter
+    )
+    {
+        victim.Battle.BindingTurnsRemaining = rules.RollBindingTurns();
+        binder.Battle.BindingMove = move;
+        binder.Battle.BindingTarget = victim;
+        binder.Battle.BindingDamage = damage;
+        emitter?.Emit(new BindingStarted(victim.Name, victim.Id, move.Base.Name ?? ""));
     }
 }
 

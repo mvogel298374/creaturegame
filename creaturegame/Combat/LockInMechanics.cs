@@ -37,18 +37,16 @@ public enum LockInFlow
     ProceedUnannounced,
 }
 
-/// <summary>
-/// A lock-in hook's decision. <see cref="UnleashDamage"/> (&gt; 0, only with <see cref="LockInFlow.Halt"/>)
-/// tells <see cref="AttackAction"/> to deal that much typeless damage through the shared damage helper
-/// before ending the turn — Bide's release.
-/// </summary>
-public readonly record struct LockInResult(LockInFlow Flow, int UnleashDamage = 0)
+/// <summary>A lock-in hook's decision; with Halt, the damage Bide unleashes or a binding continuation replays.</summary>
+public readonly record struct LockInResult(LockInFlow Flow, int Damage = 0, bool ReplaysHit = false)
 {
     public static readonly LockInResult Proceed = new(LockInFlow.Proceed);
     public static readonly LockInResult Halt = new(LockInFlow.Halt);
     public static readonly LockInResult ProceedUnannounced = new(LockInFlow.ProceedUnannounced);
 
     public static LockInResult Unleash(int damage) => new(LockInFlow.Halt, damage);
+
+    public static LockInResult Replay(int damage) => new(LockInFlow.Halt, damage, ReplaysHit: true);
 }
 
 /// <summary>
@@ -238,14 +236,7 @@ public sealed class BideMechanic : ILockInMechanic
     }
 }
 
-/// <summary>
-/// Binding (Wrap, Bind, Clamp, Fire Spin): Gen 1 partial trap. The binder is locked into re-using the move
-/// each turn (dealing its damage) while the trapped foe can't act. <see cref="AttackAction"/> STARTS the trap
-/// on a hit (setting the victim's <c>BindingTurnsRemaining</c> + this binder's <c>BindingMove</c>/
-/// <c>BindingTarget</c>); this mechanic only force-repeats while the victim's counter is alive. That counter —
-/// ticked down end-of-turn — is the single source of truth, so the binder is freed automatically when it
-/// expires (or the victim faints). Unlike rampage, there's NO residual chip and the lock begins on hit, not commit.
-/// </summary>
+/// <summary>Binding (Wrap, Bind, Clamp, Fire Spin): forced while the victim's trap counter runs; see GEN_DIFFERENCES.md → Binding.</summary>
 public sealed class BindingMechanic : ILockInMechanic
 {
     public MoveEffect Effect => MoveEffect.Binding;
@@ -256,6 +247,20 @@ public sealed class BindingMechanic : ILockInMechanic
         && victim.Battle.BindingTurnsRemaining > 0
             ? c.Battle.BindingMove
             : null;
+
+    public LockInResult OnCommit(LockInContext ctx)
+    {
+        if (!Replays(ctx))
+            return LockInResult.Proceed;
+        ctx.Emitter?.Emit(new BindingContinues(ctx.Source.Name, ctx.Source.Id, ctx.MoveName));
+        return LockInResult.ProceedUnannounced;
+    }
+
+    public LockInResult OnRelease(LockInContext ctx) =>
+        Replays(ctx) ? LockInResult.Replay(ctx.Source.Battle.BindingDamage) : LockInResult.Proceed;
+
+    private static bool Replays(LockInContext ctx) =>
+        ctx.IsContinuation && ctx.Rules.BindingContinuationReplaysDamage;
 }
 
 /// <summary>The registry of lock-in mechanics, keyed by the move effect that drives each.</summary>

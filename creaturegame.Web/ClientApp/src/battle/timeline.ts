@@ -813,6 +813,18 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       ] };
     }
 
+    case 'BindingContinues': {
+      const cName = payload.creatureName as string;
+      const attackerSide = side(payload.creatureId as number);
+      const targetSide: Side = attackerSide === 'player' ? 'enemy' : 'player';
+      return { steps: [
+        d(log(`${cName}'s attack continues!`)),
+        w(400),
+        emit({ type: 'playMoveAnimation', attackerSide, targetSide }),
+        anim(),
+      ] };
+    }
+
     case 'MoveMissed': {
       const aName = payload.attackerName as string;
       const mName = payload.moveName as string;

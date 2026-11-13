@@ -178,9 +178,18 @@ the linked design doc instead — pull it there and leave only the pointer here.
   Fly or Dig release turn does not: the Pokémon stays out of reach until it next completes a charge move or leaves the
   field.
 - A missed Disable prints "But it failed!".
-- Design detail → `GENERATION_SEAMS.md` §2 (*Roll order*, *Pre-move checks*, *Fly and Dig out of reach*), `GEN_DIFFERENCES.md` → *Roll Order*, *Fly / Dig*.  History →
+- Every turn of a Wrap, Bind, Clamp or Fire Spin after the first prints "<user>'s attack continues!" instead of "used
+  <move>". It always lands: no accuracy, crit or damage roll and no PP. It repeats the first strike's damage (a crit's
+  included) through the normal damage path, so a Substitute soaks it and, once broken, the next turn hits the foe for the
+  same amount; Rage builds and Counter can answer it.
+- Wrap or Bind on a Ghost whose accuracy roll passes prints "It doesn't affect <foe>!" and still locks both sides in
+  for the rolled turns, each continuation dealing 0. A failed roll locks no one.
+- A non-immune hit whose damage the type multiplier rounds to 0 is a miss: the accuracy roll is still drawn, the ordinary
+  miss line prints, and the miss side effects apply. A binding move in that case still locks for 0 (Fire Spin into
+  Rock or Water).
+- Design detail → `GENERATION_SEAMS.md` §2 (*Roll order*, *Pre-move checks*, *Fly and Dig out of reach*), `GEN_DIFFERENCES.md` → *Roll Order*, *Fly / Dig*, *Binding*, *Type-reduced zero damage*.  History →
   `TODO_ARCHIVE.md` → *Gen 1 roll order in `AttackAction`, behind a seam* and *Failure announcements: a failed OHKO and
-  a trainer-battle Roar/Whirlwind say "unaffected"* and *Roar/Whirlwind: the scared-off side still acts* and *Recover and Soft-Boiled fail cases* and *Gen 1 confusion self-hit damage* and *Rampage edge gaps* and *Self-hit and crash damage strike the foe's Substitute* and *Substitute prints Gen 1's lines* and *Pre-move checks follow Gen 1* and *Snapping out of confusion prints only "confused no more!"* and *Fly and Dig put the user out of reach* and *Breaking a Substitute cancels the attacker's post-damage effects* and *A Rage that misses or breaks a Substitute no longer starts raging*.
+  a trainer-battle Roar/Whirlwind say "unaffected"* and *Roar/Whirlwind: the scared-off side still acts* and *Recover and Soft-Boiled fail cases* and *Gen 1 confusion self-hit damage* and *Rampage edge gaps* and *Self-hit and crash damage strike the foe's Substitute* and *Substitute prints Gen 1's lines* and *Pre-move checks follow Gen 1* and *Snapping out of confusion prints only "confused no more!"* and *Fly and Dig put the user out of reach* and *Breaking a Substitute cancels the attacker's post-damage effects* and *A Rage that misses or breaks a Substitute no longer starts raging* and *Binding continuation turns follow Gen 1*.
 
 ### Foe move scoring and chosen-move validation
 - The foe scores a status move by its status chance: a 10% burn side effect is worth a tenth of a pure burn move.

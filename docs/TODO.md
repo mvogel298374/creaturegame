@@ -46,9 +46,7 @@ gap has drafted text, awaiting your confirmation · ✗ gaps remain.
 
 **Ready — each awaits your greenlight**
 
-| Item | Cost | Ready? | Next step / what it unblocks |
-|:-----|:----:|:-------|:-----------------------------|
-| **Binding continuation turns follow Gen 1** (§3.1) | M | ✅ | Central `AttackAction` and `BindingMechanic`; two `IBattleRules` members and one new event. |
+None open.
 
 **A. Confirm the drafted lines, then Ready**
 
@@ -58,7 +56,7 @@ None open.
 
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
-| **A trapped Pokémon can switch out in Gen 1** (§3.1) | S–M | ✗ 2, 4, 6; the rest drafted | Found 2026-11-13. `Battle.CanSwitchTo`; best after the continuation item. |
+| **A trapped Pokémon can switch out in Gen 1** (§3.1) | S–M | ✗ 2, 4, 6; the rest drafted | Found 2026-11-13. `Battle.CanSwitchTo`. |
 | **The player chooses what Mimic copies** (§3.1) | M | ✗ 2, 3; the rest drafted | Found 2026-11-03. Needs an input prompt, so a design pass. |
 
 **C. Needs a `/plan` or a verify slice**
@@ -148,7 +146,10 @@ data/engine item usually also means updating the test that pins the wrong value.
   HP actually lost (`AttackAction.ExecuteAsync` Struggle recoil, `ResolveDamage` drain); Ice can freeze Ice /
   Electric can paralyse Electric (`Gen1BattleRules.CanReceiveStatus`); `DamageCalculator` applies no stat cap after the stage multiplier (Gen 1 reportedly clamps a staged
   stat to 1–999) and no ÷4 scaling of both stats when either exceeds 255 (found by `requirements-review`
-  2026-10-14, during the stat-stage seam item; unverified against pokered).
+  2026-10-14, during the stat-stage seam item; unverified against pokered). Also roll order (found 2026-11-13 by
+  `requirements-review`, binding continuation item; source-confirmed): pokered draws the binding duration in
+  `TrappingEffect`, before the hit test, so a missed or immune Wrap still consumes those draws (`effects.asm:1095-1103`);
+  ours draws `RollBindingTurns` only when the lock starts (`BindingEffect.Start`). Invisible in play; RNG-stream only.
   **DoR (V16):** ✗ not Ready — gaps **1, 2, 3, 4, 6** (line cites refreshed 2026-10-17). *Drafted:* first a verify
   slice that gives each claim a pokered cite, then one entry per confirmed claim. Each entry gets: acceptance, a
   test pinning pokered's number; its seam member (most are already `IBattleRules`/`DamageCalculator` inputs);
@@ -212,49 +213,6 @@ data/engine item usually also means updating the test that pins the wrong value.
   **DoR:** ✗ — gaps **2, 3, 6**. *Drafted:* **Acceptance:** each case prints its pokered line in a full battle.
   **Data vs runtime:** runtime plus a new "evaded" event wired in all four places. **Dependencies:** pair with the
   `ResidualEffects1` accuracy slice, which decides where these moves roll accuracy.
-- **Binding continuation turns follow Gen 1 (found 2026-11-13, missed-Wrap design pass; source-confirmed) — M, ✅
-  Ready.** On every turn after the first, pokered prints "<user>'s attack continues!" and skips damage calculation,
-  `MoveHitTest` and PP (`core.asm:3554-3566`, enemy `:5929-5938`): the turn always lands and deals the last damage
-  again. Ours re-runs the whole pipeline: it announces "used Wrap", rolls accuracy (so it can miss) and re-rolls crit
-  and damage. Separately, a 0× matchup marks the move missed without clearing the lock (`core.asm:5171-5176`), so
-  Wrap or Bind on a Ghost whose accuracy roll passes still locks both sides in, dealing 0; ours prints "no effect"
-  and starts no trap (`AttackAction.cs` ~467).
-  **DoR:** ✅ (audited 2026-11-13).
-  1. **Intent / acceptance:**
-     - A continuation turn prints "<user>'s attack continues!" in place of "used <move>", with no accuracy, crit,
-       damage or type roll and no PP spent. It deals exactly the first strike's damage (a crit's included) through
-       `DealDamageToTarget`, so a Substitute soaks it, and after the decoy breaks the next turn hits the foe for the
-       same amount.
-     - An immune first strike (Wrap or Bind on a Ghost, or Fire Spin damage that rounds to 0) prints "It doesn't
-       affect <foe>!". If its accuracy roll passed, the lock starts with stored damage 0: the user is locked for the
-       rolled turns, the foe can't move, and each continuation deals 0. If the roll failed, it is a plain miss.
-  2. **Design:**
-     - The binder gets a transient `BindingDamage`, cleared in `ResetBattleState` and listed in `STATE_MODEL.md`.
-       `BindingEffect` stores the computed damage when the lock starts, not capped by a Substitute's HP (check what
-       `ResolveDamage` returns).
-     - `BindingMechanic.OnCommit` on a continuation emits a new `BindingContinues` and returns `ProceedUnannounced`;
-       `OnRelease` returns the stored damage through the unleash path Bide uses, so the turn skips `Connects` and
-       the damage roll.
-     - `Connects`' immune branch calls the same lock-start helper as `BindingEffect` when the move is a binding move,
-       the rule allows it and the accuracy roll passed; under the Gen 1 roll order that branch must now read the
-       roll's result.
-     - `BindingContinues` gets the four-place wiring (`ClaudeDirectives/engine.md` rule 7).
-  3. **Gen-variable surface:** two `IBattleRules` members, both true for Gen 1:
-     `BindingContinuationReplaysDamage` and `BindingLockSurvivesTypeImmunity`. Gen 2 differs on both.
-  4. **Gen 1 source:** `core.asm:3554-3566`, `:5929-5938`, `:5171-5176`, `:5328-5345`, `:4879-4880` (a broken
-     Substitute leaves the stored damage whole), `effects.asm:1081-1104`, `PrintMoveFailureText` ("It doesn't
-     affect"), `data/text/text_2.asm:1061-1069`.
-  5. **Data vs runtime:** runtime only.
-  6. **Quirks the tests assert (full battle):** with an always-miss double installed after the first hit the
-     continuations still land; each deals exactly the first hit's damage and repeats a crit's; a continuation emits
-     `BindingContinues`, not `MoveUsed`, and PP is spent once; Wrap on a Ghost with the roll passing prints the
-     no-effect line, the foe is blocked every turn, the binder is locked and continuations deal 0; with the roll
-     failing, no lock; a Substitute takes the stored damage and after it breaks the next hit lands on the foe for
-     the same amount. Plus `WebEventContractTests` and a client timeline test for the new event.
-  7. **Dependencies:** none. The same commit fixes `GEN_DIFFERENCES.md:168` (Gen 1 binding has no 1/16 chip) and adds
-     the continuation rules there, adds `GENERATION_SEAMS.md` §2 rows for both members, and deletes the stale
-     "recalculated per re-hit" comment (`MoveEffects.cs` ~144) and the `BindingMechanic` summary comment.
-  **Estimate:** ~150–250k tokens through the full review chain (`pr-review` ~80–100k of it).
 - **A trapped Pokémon can switch out in Gen 1 (found 2026-11-13, missed-Wrap design pass; read-confirmed, not run) —
   S–M, ✗ not Ready.** pokered shows the battle menu to a trapped Pokémon and skips only move selection
   (`core.asm:305-322`); the switch and run paths have no trap check. Sending out any Pokémon frees the opponent's
@@ -264,8 +222,7 @@ data/engine item usually also means updating the test that pins the wrong value.
   **DoR:** ✗ gaps **2** (what the binder does against the switch-in: a fresh use that spends PP, next to the known
   Gen 1 PP glitch), **4** (trace the binder's own switch: `RetreatMon` only prints a line, so its lock may survive
   it; and whether running from a wild battle while trapped is allowed), **6**. *Drafted:* 3: an `IBattleRules`
-  member for whether a trapped Pokémon may switch. 5: runtime only. 7: best done after "Binding continuation turns
-  follow Gen 1".
+  member for whether a trapped Pokémon may switch. 5: runtime only. 7: none.
 - **Disable matches move instances, not move ids (found 2026-11-09 by `opus-engineer`, Fly and Dig item;
   read-confirmed, unverified beyond that) — S, ✗ not Ready.** `StatusResolver.DisabledMoveStops` compares the selected
   `PokemonAttack` with `Battle.DisabledMove` by reference; pokered compares move numbers

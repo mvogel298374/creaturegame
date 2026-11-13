@@ -111,6 +111,12 @@ public abstract class DelegatingBattleRules : IBattleRules
 
     public virtual int RollBindingTurns() => _inner.RollBindingTurns();
 
+    public virtual bool BindingContinuationReplaysDamage => _inner.BindingContinuationReplaysDamage;
+
+    public virtual bool BindingLockSurvivesTypeMiss => _inner.BindingLockSurvivesTypeMiss;
+
+    public virtual bool TypeReducedZeroDamageMisses => _inner.TypeReducedZeroDamageMisses;
+
     public virtual int CalculateCrashDamage(Creature user) => _inner.CalculateCrashDamage(user);
 
     public virtual bool SelfInflictedDamageStrikesFoeSubstitute =>

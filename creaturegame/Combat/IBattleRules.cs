@@ -293,6 +293,9 @@ public interface IBattleRules
     /// <summary>Whether damage below 2 skips the damage roll (no draw). See GENERATION_SEAMS.md §2.</summary>
     bool DamageRollSkippedBelowTwo { get; }
 
+    /// <summary>Whether a hit the type multiplier rounds to 0 damage counts as a miss. See GENERATION_SEAMS.md §2.</summary>
+    bool TypeReducedZeroDamageMisses { get; }
+
     /// <summary>Whether a non-damaging move's type immunity ends it before the accuracy roll. See GENERATION_SEAMS.md §2.</summary>
     bool StatusMoveImmunityBeforeAccuracy { get; }
 
@@ -388,6 +391,12 @@ public interface IBattleRules
     /// Gen 1: 2–5 at 3/8, 3/8, 1/8, 1/8 (GEN_DIFFERENCES.md).
     /// </summary>
     int RollBindingTurns();
+
+    /// <summary>Whether a binding move's later turns skip the hit test and replay the first strike's damage. See GENERATION_SEAMS.md §2.</summary>
+    bool BindingContinuationReplaysDamage { get; }
+
+    /// <summary>Whether a binding move missed by its type matchup still locks both sides in once its accuracy roll passes. See GENERATION_SEAMS.md §2.</summary>
+    bool BindingLockSurvivesTypeMiss { get; }
 
     /// <summary>The crash damage a jump-kick user takes when the move misses.</summary>
     int CalculateCrashDamage(Creature user);

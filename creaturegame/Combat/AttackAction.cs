@@ -121,10 +121,11 @@ public class AttackAction : IBattleAction
             var release = lockIn.OnRelease(lockCtx!);
             if (release.Flow == LockInFlow.Halt)
             {
-                // Bide's unleash is typeless and routes through the shared helper so a foe Substitute
-                // soaks it too; UnleashDamage is 0 when the mechanic already emitted its own outcome.
-                if (release.UnleashDamage > 0)
-                    DealDamageToTarget(release.UnleashDamage, 1.0, false);
+                // Both route through DealDamageToTarget, so a Substitute soaks them; Bide's unleash is typeless.
+                if (release.ReplaysHit)
+                    ReplayHit(attackToUse, release.Damage);
+                else if (release.Damage > 0)
+                    DealDamageToTarget(release.Damage, 1.0, false);
                 return Task.CompletedTask;
             }
         }
@@ -225,18 +226,36 @@ public class AttackAction : IBattleAction
                 )
             )
                 return Task.CompletedTask;
-            if (!Connects(attackToUse, category, usingStruggle, immune, lockIn, lockCtx))
+            bool typeZeroed = TypeZeroes(strike, effectiveness);
+            if (
+                !Connects(attackToUse, category, usingStruggle, immune, typeZeroed, lockIn, lockCtx)
+            )
                 return Task.CompletedTask;
         }
         else
         {
             if (category == DamageCategory.OHKO && OhkoFails(attackToUse))
                 return Task.CompletedTask;
-            if (!Connects(attackToUse, category, usingStruggle, immune, lockIn, lockCtx))
+            if (
+                !Connects(
+                    attackToUse,
+                    category,
+                    usingStruggle,
+                    immune,
+                    typeZeroed: false,
+                    lockIn,
+                    lockCtx
+                )
+            )
                 return Task.CompletedTask;
             strike = RollsCritAndDamage(attackToUse, category, usingStruggle)
                 ? RollStrike(attackToUse, category, usingStruggle, screenMult)
                 : null;
+            if (TypeZeroes(strike, effectiveness))
+            {
+                EndTypeZeroedHit(attackToUse, category, lockIn, lockCtx);
+                return Task.CompletedTask;
+            }
         }
 
         // Snapshot the shield state before any damage lands (see the _targetShieldedAtImpact field).
@@ -414,12 +433,46 @@ public class AttackAction : IBattleAction
             screenDefenseMultiplier: screenMult
         );
 
+    // A non-immune hit the type multiplier rounded to 0; GEN_DIFFERENCES.md → Type-reduced zero damage.
+    private bool TypeZeroes(Strike? strike, double effectiveness) =>
+        _rules.TypeReducedZeroDamageMisses
+        && strike is { Damage: 0 }
+        && effectiveness is > 0 and < 1.0;
+
+    // The type-zeroed miss once the accuracy roll has passed: the miss line, and a binding move still locks.
+    private void EndTypeZeroedHit(
+        Attack move,
+        DamageCategory category,
+        ILockInMechanic? lockIn,
+        LockInContext? lockCtx
+    )
+    {
+        _emitter?.Emit(new MoveMissed(Source.Name, Source.Id, move.Name ?? ""));
+        LockDespiteTypeMiss(move, lockCtx);
+        ApplyFailedHitSideEffects(move, category, crashes: true);
+        lockIn?.OnTurnEnd(lockCtx!);
+    }
+
+    private void LockDespiteTypeMiss(Attack move, LockInContext? lockCtx)
+    {
+        if (
+            move.Effect != MoveEffect.Binding
+            || !_rules.BindingLockSurvivesTypeMiss
+            || lockCtx is not { IsContinuation: false }
+            || Target.Battle.BindingTurnsRemaining > 0
+            || !Target.IsAlive()
+        )
+            return;
+        BindingEffect.Start(Source, Target, lockCtx.Move, 0, _rules, _emitter);
+    }
+
     // The hit test; false ends the turn after emitting the miss / no-effect outcome.
     private bool Connects(
         Attack move,
         DamageCategory category,
         bool usingStruggle,
         bool immune,
+        bool typeZeroed,
         ILockInMechanic? lockIn,
         LockInContext? lockCtx
     )
@@ -467,8 +520,16 @@ public class AttackAction : IBattleAction
         if (immune && (!missed || immunityOutranksMiss))
         {
             _emitter?.Emit(new MoveHadNoEffect(Target.Name, Target.Id, move.Name ?? ""));
+            if (!missed)
+                LockDespiteTypeMiss(move, lockCtx);
             ApplyFailedHitSideEffects(move, category, crashes: _rules.CrashOnTypeImmunity);
             lockIn?.OnTurnEnd(lockCtx!);
+            return false;
+        }
+
+        if (typeZeroed && !missed)
+        {
+            EndTypeZeroedHit(move, category, lockIn, lockCtx);
             return false;
         }
 
@@ -658,26 +719,9 @@ public class AttackAction : IBattleAction
                     if (isMultiHit && !cutShort)
                         _emitter?.Emit(new MultiHitCompleted(landed));
 
-                    // Rage: a raging creature that's hit gains Attack stage(s) — once per connecting attack
-                    // (the Counter boundary), not per multi-hit strike, and only when the hit reached the
-                    // creature itself (a Substitute soak doesn't enrage it). Reuses StatStageChanged.
-                    if (dealtRealDamage && Target.Battle.IsRaging && Target.IsAlive())
-                    {
-                        int newStage = ApplyStageChange(
-                            Target,
-                            StageStat.Attack,
-                            _rules.RageAttackStagesPerHit
-                        );
-                        _emitter?.Emit(
-                            new StatStageChanged(
-                                Target.Name,
-                                Target.Id,
-                                StageStat.Attack.ToString(),
-                                _rules.RageAttackStagesPerHit,
-                                newStage
-                            )
-                        );
-                    }
+                    // Once per connecting attack, not per multi-hit strike; a Substitute soak doesn't enrage.
+                    if (dealtRealDamage)
+                        BuildRage();
 
                     if (
                         category == DamageCategory.Drain
@@ -736,6 +780,30 @@ public class AttackAction : IBattleAction
         }
 
         return damage;
+    }
+
+    private void BuildRage()
+    {
+        if (!Target.Battle.IsRaging || !Target.IsAlive())
+            return;
+        int newStage = ApplyStageChange(Target, StageStat.Attack, _rules.RageAttackStagesPerHit);
+        _emitter?.Emit(
+            new StatStageChanged(
+                Target.Name,
+                Target.Id,
+                StageStat.Attack.ToString(),
+                _rules.RageAttackStagesPerHit,
+                newStage
+            )
+        );
+    }
+
+    // A binding continuation: no rolls, no crit or effectiveness line; GEN_DIFFERENCES.md → Binding.
+    private void ReplayHit(Attack move, int damage)
+    {
+        _hitRange = DamageRange.Exact(damage);
+        if (DealDamageToTarget(damage, 1.0, false, move.DamageType))
+            BuildRage();
     }
 
     // Runs another move in full as this turn's action (Metronome / Mirror Move). A fresh AttackAction on a

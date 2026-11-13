@@ -216,6 +216,12 @@ internal static class TestAltProfile
 
         public override bool RageStartsBeforeHitTest => true;
 
+        public override bool BindingContinuationReplaysDamage => false;
+
+        public override bool BindingLockSurvivesTypeMiss => false;
+
+        public override bool TypeReducedZeroDamageMisses => false;
+
         public override MoveFailureAnnouncement PrimaryEffectFailureAnnouncement =>
             MoveFailureAnnouncement.Missed;
 

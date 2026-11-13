@@ -1,4 +1,6 @@
 using creaturegame.Attacks;
+using creaturegame.Combat;
+using creaturegame.Creatures;
 using creaturegame.Tests.TestSupport;
 
 namespace creaturegame.Tests.Integration.Gen1Attacks;
@@ -101,5 +103,74 @@ public class StabAndTypeEffectivenessContractTests(MovesFixture moves) : Gen1Mov
 
         Assert.Equal(0, result.TotalDamage);
         Assert.Equal(500, result.Defender.Attributes.HP);
+    }
+
+    [Fact]
+    public async Task AHitADoubleResistRoundsToZeroMissesAndLandsNoSecondary()
+    {
+        var result = await WeakEmberInto(ForceSecondaryRules.Instance, DamageType.Water);
+
+        Assert.True(result.Has<MoveMissed>());
+        Assert.False(result.Has<DamageDealt>());
+        Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
+    }
+
+    [Fact]
+    public async Task ASingleResistLeavesTheSameWeakHitAtOneDamage()
+    {
+        var result = await WeakEmberInto(ForceSecondaryRules.Instance, type2: null);
+
+        Assert.False(result.Has<MoveMissed>());
+        Assert.Equal(1, result.TotalDamage);
+    }
+
+    [Fact]
+    public async Task UnderAccuracyFirstOrderAHitRoundedToZeroStillMisses()
+    {
+        var result = await WeakEmberInto(new AccuracyFirstHitRules(), DamageType.Water);
+
+        Assert.True(result.Has<MoveMissed>());
+        Assert.False(result.Has<DamageDealt>());
+        Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
+    }
+
+    [Fact]
+    public async Task TheRulesCanLetAHitRoundedToZeroLand()
+    {
+        var result = await WeakEmberInto(new NoZeroMissRules(), DamageType.Water);
+
+        Assert.False(result.Has<MoveMissed>());
+        Assert.True(result.Has<DamageDealt>());
+        Assert.Equal(0, result.TotalDamage);
+    }
+
+    // Ember from a level 2 attacker into a high Special Rock: about 2 damage before the type multiplier.
+    private Task<MoveResult> WeakEmberInto(IBattleRules rules, DamageType? type2) =>
+        new MoveScenario()
+            .Attacker(TestCreatures.Make("A", level: 2, attack: 5, special: 5))
+            .Defender(
+                TestCreatures.Make("D", type1: DamageType.Rock, type2: type2, hp: 500, special: 500)
+            )
+            .Rules(rules)
+            .Use(Move("ember"));
+
+    private sealed class AccuracyFirstHitRules : DelegatingBattleRules
+    {
+        public override HitRollOrder HitRollOrder => HitRollOrder.AccuracyThenCritAndDamage;
+
+        public override int GetHitThreshold(int acc, int accStage, int evaStage) => 256;
+
+        public override double GetCritChance(Creature a, Attack m) => 0.0;
+
+        public override int GetSecondaryEffectChance(Attack m, SecondaryEffectKind e) => 100;
+    }
+
+    private sealed class NoZeroMissRules : DelegatingBattleRules
+    {
+        public override int GetHitThreshold(int acc, int accStage, int evaStage) => 256;
+
+        public override double GetCritChance(Creature a, Attack m) => 0.0;
+
+        public override bool TypeReducedZeroDamageMisses => false;
     }
 }

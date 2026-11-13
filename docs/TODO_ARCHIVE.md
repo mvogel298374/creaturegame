@@ -8,6 +8,68 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §3.1 Binding continuation turns follow Gen 1 ✅ DONE (2026-11-13)
+
+M, central `AttackAction` and `BindingMechanic`. Found 2026-11-13 in the missed-Wrap design pass (source-confirmed).
+
+**Finding.** On every turn after the first, pokered prints "<user>'s attack continues!" and skips damage calculation,
+`MoveHitTest` and PP (`core.asm:3554-3566`, enemy `:5929-5938`): the turn always lands and deals the last damage
+again. Ours re-ran the whole pipeline: it announced "used Wrap", rolled accuracy (so it could miss) and re-rolled crit
+and damage. Separately, a 0x matchup marks the move missed without clearing the lock (`core.asm:5171-5176`), so Wrap
+or Bind on a Ghost whose accuracy roll passes still locks both sides in, dealing 0; ours printed "no effect" and
+started no trap.
+
+**DoR (as filed, audited 2026-11-13).**
+1. **Intent / acceptance:**
+   - A continuation turn prints "<user>'s attack continues!" in place of "used <move>", with no accuracy, crit,
+     damage or type roll and no PP spent. It deals exactly the first strike's damage (a crit's included) through
+     `DealDamageToTarget`, so a Substitute soaks it, and after the decoy breaks the next turn hits the foe for the
+     same amount.
+   - An immune first strike (Wrap or Bind on a Ghost) prints "It doesn't affect <foe>!". If its accuracy roll
+     passed, the lock starts with stored damage 0: the user is locked for the rolled turns, the foe can't move, and
+     each continuation deals 0. If the roll failed, it is a plain miss.
+   - *(Added 2026-11-13, user ruling: keep the Fire Spin case in scope.)* Any damaging, type-adjusted move (Standard,
+     Drain, Self-Destruct) whose damage after the type multiplier is 0 against a non-immune target misses: the
+     accuracy roll is still drawn, the ordinary miss line prints (not "It doesn't affect"; the original draft was
+     wrong), no damage, no effects, and the miss side effects apply. Fixed-damage categories are unaffected. A binding
+     move whose roll passed still locks for 0 damage (Fire Spin into Rock/Water).
+2. **Design:** the binder gets a transient `BindingDamage`, cleared in `ResetBattleState` and listed in
+   `STATE_MODEL.md`; `BindingEffect` stores the computed damage when the lock starts, not capped by a Substitute's HP.
+   `BindingMechanic.OnCommit` on a continuation emits a new `BindingContinues` and returns `ProceedUnannounced`;
+   `OnRelease` returns the stored damage through the unleash path Bide uses. `Connects`' immune branch and a new
+   type-zeroed flag (checked after the accuracy roll) call one shared lock-start helper for a binding move whose roll
+   passed. `BindingContinues` gets the four-place wiring.
+3. **Gen-variable surface:** three `IBattleRules` members, all true for Gen 1: `BindingContinuationReplaysDamage`,
+   `TypeReducedZeroDamageMisses`, `BindingLockSurvivesTypeMiss`.
+4. **Gen 1 source:** `core.asm:3554-3566`, `:5929-5938`, `:5171-5176`, `:5328-5345`, `:4879-4880` (a broken Substitute
+   leaves the stored damage whole), `effects.asm:1081-1104`, `PrintMoveFailureText`, `data/text/text_2.asm:1061-1069`.
+5. **Data vs runtime:** runtime only.
+6. **Quirks asserted (full battle):** continuations land after an always-miss double is installed, each deals the first
+   hit's damage (a crit's repeated), `BindingContinues` not `MoveUsed`, PP spent once; Wrap on a Ghost with the roll
+   passing locks both sides for 0; with the roll failing, no lock; a Substitute takes the stored damage and the next
+   hit after a break lands on the foe for the same amount; a weak Fire move into Rock/Water misses with the miss line;
+   Fire Spin there locks with 0-damage continuations; a single resist still lands.
+7. **Dependencies:** none. Same commit fixed `GEN_DIFFERENCES.md` (Gen 1 binding has no 1/16 chip), added
+   `GENERATION_SEAMS.md` §2 rows, and deleted the stale comments.
+
+**Done.** New `BindingContinues` event (engine, `SignalRBattleEventEmitter`, `ConsoleBattleEventEmitter`, `timeline.ts`).
+`BattleState.BindingDamage`. A continuation replays the stored damage through `ReplayHit` and the normal damage path:
+a Substitute soaks it, a break leaves the stored amount whole, Rage builds, Counter can answer. A Ghost whose accuracy
+roll passes is locked for 0 per turn; a failed roll locks no one. New damage-core rule: a non-immune hit the type
+multiplier rounds to 0 is a miss (ordinary miss line, accuracy still rolled, miss side effects apply), while a binding
+move still locks for 0. Docs: `GEN_DIFFERENCES.md` (Binding rewritten, the false 1/16 chip line removed, *Type-reduced
+zero damage*, the "took 0 damage" display and the Rage/Counter note), `GENERATION_SEAMS.md` §2, `STATE_MODEL.md`.
+
+**User rulings.** Kept the Fire Spin rounds-to-0 case in scope. `requirements-review`: #1 the
+`TypeReducedZeroDamageMisses` false branch documented as a "no rule" stub; #2 the 0-damage "took 0 damage!" display
+accepted and documented; #3 citation fixed; #4 counts fixed; #5 the trap-duration draw timing filed under *Damage/accuracy
+core*; #6 a first-strike Substitute-break test added. `pr-review`: the comment-budget blocker fixed (comment-only), and
+all recommended fixes applied (dead writes removed from `ReplayHit`, an accuracy-first type-zero test, uncapped
+stored-damage assertions, `BindingEffect.Start`'s `moveName` parameter dropped, `LockInResult.UnleashDamage` renamed
+`Damage`, an exact Dev Mode range on a replayed hit); no `pr-review` re-run, by the user's ruling.
+
+---
+
 ## §3.1 A missed Wrap leaves its user free ✅ DONE (2026-11-13)
 
 S, test-only. Replaced the disproved 2026-11-09 entry "A missed Wrap doesn't lock the user in"; the 2026-11-13 design

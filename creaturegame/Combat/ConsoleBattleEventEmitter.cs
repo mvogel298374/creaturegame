@@ -339,6 +339,10 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                 Console.WriteLine($"{e.CreatureName} is bound and can't move!");
                 break;
 
+            case BindingContinues e:
+                Console.WriteLine($"{e.CreatureName}'s attack continues!");
+                break;
+
             case FlinchBlocked e:
                 Console.WriteLine($"{e.CreatureName} flinched and couldn't move!");
                 break;

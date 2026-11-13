@@ -84,6 +84,13 @@ describe('expandEvent — move-name formatting', () => {
     expect(emits(steps)).toEqual([{ type: 'playMoveAnimation', attackerSide: 'enemy', targetSide: 'player' }]);
   });
 
+  it('a binder\'s later turn says "attack continues!" in place of "used", then plays the lunge', () => {
+    const { steps } = expandEvent('BindingContinues', { creatureName: 'ARBOK', creatureId: 2, moveName: 'wrap' }, CTX);
+    expect(logLines(steps)).toEqual(["ARBOK's attack continues!"]);
+    expect(kinds(steps)).toEqual(['dispatch', 'wait', 'emit', 'awaitAnim']);
+    expect(emits(steps)).toEqual([{ type: 'playMoveAnimation', attackerSide: 'enemy', targetSide: 'player' }]);
+  });
+
   it('formats the slug in "missed" lines', () => {
     const { steps } = expandEvent('MoveMissed', { attackerName: 'ARTICUNO', moveName: 'rolling-kick' }, CTX);
     expect(logLines(steps)).toEqual(["ARTICUNO's ROLLING KICK missed!"]);

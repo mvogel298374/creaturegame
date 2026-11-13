@@ -49,6 +49,7 @@ Here is every field, what it represents in Gen 1 terms, and why it's transient.
 | `HasLeechSeed` | `bool` | Whether **Leech Seed** is attached — each turn the seeded creature loses HP and the seeder gains it. | Volatile; clears on switch/battle end. |
 | `BindingTurnsRemaining` | `int` | On the **trapped victim**: the **Wrap / Bind / Clamp / Fire Spin** trap counter (Gen 1: **2–5 turns**). While > 0 the victim can't act. Gen 1 deals **no residual chip** — damage is the binder re-hitting each turn. | Trap only exists during the fight. |
 | `BindingMove` / `BindingTarget` | `PokemonAttack?` / `Creature?` | On the **binder**: the move it is locked into and the victim it is trapping. `BindingMechanic.ForcedMove` re-forces the move while the victim's counter is alive (Gen 1 locks the binder in too). | Lock only exists during the fight. |
+| `BindingDamage` | `int` | On the **binder**: the first strike's damage, which every later binding turn replays (`IBattleRules.BindingContinuationReplaysDamage`); 0 when a type miss started the lock. Cleared with the trap (`StatusResolver.ReleaseTrap`). | Lock only exists during the fight. |
 | `IsTwoTurnCharging` | `bool` | Whether the creature is **mid two-turn move** (Dig, Fly, Solar Beam, Razor Wind, Skull Bash, Sky Attack). Set on the charge turn, cleared on the release turn. | Spans exactly two turns of one battle. |
 | `ChargingMove` | `PokemonAttack?` | *Which* move is being charged, so the release turn knows what to fire without re-asking the player. | Pairs with `IsTwoTurnCharging`. |
 | `SemiInvulnerability` | `SemiInvulnerability` (`None`, `Flying`, `Underground`) | Whether the creature is **out of reach** after a Fly or Dig charge turn (pokered's `INVULNERABLE` bit; Gen 2 splits it, hence three values). Set by `TwoTurnMechanic` from `IBattleRules.ChargeGrantsSemiInvulnerability`; read by `AttackAction.Connects` through `HitOnSemiInvulnerable`. Cleared by any charge move's release and by the lost turns `LostTurnEndsSemiInvulnerability` names (Gen 1: a confusion self-hit). **Not** cleared with `IsTwoTurnCharging` by full paralysis or "is disabled!", the Gen 1 glitch, and not by Haze. Rules: `GENERATION_SEAMS.md` §2, Fly and Dig out of reach. | Volatile: the per-battle reset and a send-in (`Battle.BringInMember` resets the incoming creature) clear it, so a creature that leaves the field and comes back is within reach. |
@@ -204,6 +205,7 @@ public sealed class BattleState
     public int BindingTurnsRemaining { get; set; }
     public PokemonAttack? BindingMove { get; set; }
     public Creature? BindingTarget { get; set; }
+    public int BindingDamage { get; set; }
     public bool IsTwoTurnCharging { get; set; }
     public PokemonAttack? ChargingMove { get; set; }
     public SemiInvulnerability SemiInvulnerability { get; set; }

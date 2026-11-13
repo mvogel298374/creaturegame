@@ -775,6 +775,15 @@ public sealed class SignalRBattleEventEmitter(
                 }
             ),
             BindingBlocked e => ("BindingBlocked", new { e.CreatureName, e.CreatureId }),
+            BindingContinues e => (
+                "BindingContinues",
+                new
+                {
+                    e.CreatureName,
+                    e.CreatureId,
+                    e.MoveName,
+                }
+            ),
             FlinchBlocked e => ("FlinchBlocked", new { e.CreatureName, e.CreatureId }),
             ChargingUp e => (
                 "ChargingUp",

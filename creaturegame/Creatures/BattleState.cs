@@ -54,6 +54,7 @@ public sealed class BattleState
     public int BindingTurnsRemaining { get; set; }
     public PokemonAttack? BindingMove { get; set; }
     public Creature? BindingTarget { get; set; }
+    public int BindingDamage { get; set; }
 
     public bool IsTwoTurnCharging { get; set; }
     public PokemonAttack? ChargingMove { get; set; }

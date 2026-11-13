@@ -494,6 +494,9 @@ public record BindingStarted(string TargetName, int TargetId, string MoveName) :
 
 public record BindingBlocked(string CreatureName, int CreatureId) : BattleEvent;
 
+/// <summary>A binder's later turn, announced as "attack continues!" in place of <see cref="MoveUsed"/>; the move still animates.</summary>
+public record BindingContinues(string CreatureName, int CreatureId, string MoveName) : BattleEvent;
+
 // --- Flinch ---
 public record FlinchBlocked(string CreatureName, int CreatureId) : BattleEvent;
 

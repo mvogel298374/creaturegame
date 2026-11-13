@@ -162,11 +162,39 @@ routine that checks the other side's screen (`:4044-4055`, enemy `:5771-5815`, `
 
 #### Binding / Trapping Moves
 Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
-- **Fully immobilise the target** — target cannot attack at all while trapped
+- **Fully immobilise the target** — target cannot attack at all while trapped ("<foe> can't move!")
 - User is **locked into the move** for 2–5 turns (2 and 3 at 3/8 each, 4 and 5 at 1/8 each — pokered
   `engine/battle/effects.asm` `TrappingEffect`)
-- Deals 1/16 max HP chip damage per turn
+- **No residual chip.** The only damage is the binder's own move each turn (the 1/16 chip is Gen 2's).
+- **The lock is set before the hit test, and a miss clears it.** `TrappingEffect` runs from `SpecialEffectsCont`
+  ahead of `MoveHitTest` (`core.asm:3130-3133`, `effects.asm:1090-1094`); every miss route in `MoveHitTest` ends at
+  `.moveMissed`, which clears `USING_TRAPPING_MOVE` (`core.asm:5328-5345`). A missed Wrap locks no one in; only the
+  cleared recharge survives (`effects.asm:1092-1093`).
+- **A type miss keeps the lock.** A 0× matchup (Wrap or Bind on a Ghost) or damage the type multiplier rounds to 0
+  marks the move missed inside `AdjustDamageForMoveType` (`core.asm:5171-5176`), not through `.moveMissed`. When the
+  accuracy roll then passes, both sides are locked in and every later turn deals 0. A failed roll is a plain miss.
+- **Later turns cannot miss and repeat the first strike's damage.** `.MultiturnMoveCheck` prints "<user>'s attack
+  continues!" and jumps past damage calculation, PP and `MoveHitTest` (`core.asm:3554-3566`, enemy `:5929-5938`),
+  so the turn deals `wDamage` again: the first strike's amount, a crit's included, with no crit or effectiveness
+  line (`:3084-3085` resets the effectiveness flags; the first strike's `PrintCriticalOHKOText` cleared the crit flag,
+  `:3796-3811`). A Substitute soaks the replay, and a break leaves `wDamage` whole
+  (`:4879-4880`), so the next turn hits the Pokémon for the same amount. Rage still builds (`:3243`) and Counter can
+  answer it. Seams: `GENERATION_SEAMS.md` §2 (`BindingContinuationReplaysDamage`, `BindingLockSurvivesTypeMiss`).
+- **Ours shows a 0-damage continuation as a hit** ("<foe> took 0 damage!", with the hit sound and shake), where
+  pokered plays only the move animation. It follows our "took N damage" line, which every hit prints and Gen 1 does
+  not (user ruling 2026-11-13: accepted). As in pokered, a 0-damage continuation still builds a raging foe's Rage
+  (`HandleBuildingRage` runs on that path, `core.asm:3243`), and Counter answers it with a miss, since the last
+  damage is 0 (`HandleCounterMove`).
 - Considered overpowered; used competitively to completely shut down opponents
+
+#### Type-reduced zero damage
+- **A hit the type multiplier rounds to 0 is a miss.** After STAB, each matching type pair scales the damage with
+  integer division; a 0 result sets `wMoveMissed` (`core.asm:5171-5176`). Only a 2–3 damage hit into a double resist
+  can reach it. The accuracy roll is still drawn (`:3149-3150`), the line is the ordinary miss, not "doesn't affect"
+  (`PrintMoveFailureText` picks that only for a 0× matchup), and the miss side effects apply (crash damage,
+  Explosion's faint). Fixed-damage categories skip the type step (`SetDamageEffects`). Ours tests the rolled damage:
+  a value of 1 or more is never randomized to 0, because damage below 2 skips the roll. Seam: `GENERATION_SEAMS.md`
+  §2 (`TypeReducedZeroDamageMisses`).
 
 #### Turn Order
 - **Speed decides, with two exceptions:** Quick Attack goes first and Counter goes last; both sides using the same one
