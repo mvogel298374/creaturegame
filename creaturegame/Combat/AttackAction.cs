@@ -60,7 +60,7 @@ public class AttackAction : IBattleAction
         Priority = selectedMove?.Base.Priority ?? 0;
     }
 
-    /// <summary>Repoints this action at the switch-in when a switch is queued with the foe's move (<see cref="IBattleRules.SwitchResolvesBeforeFoeChoice"/> false).</summary>
+    /// <summary>Repoints this action at the switch-in when a switch is queued with the foe's move (<see cref="IBattleRules.MenuActionResolvesBeforeFoeChoice"/> false).</summary>
     internal void Retarget(Creature target) => Target = target;
 
     public Task ExecuteAsync()

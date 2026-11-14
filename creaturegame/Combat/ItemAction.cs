@@ -8,10 +8,7 @@ namespace creaturegame.Combat;
 /// another party member via <c>targetPartySlot</c>. The item analogue of
 /// <see cref="AttackAction"/>: it resolves the effect via <see cref="ItemEffects"/>, and on a successful
 /// use announces it (<see cref="ItemUsed"/>), runs the effect, and consumes one from the <see cref="Bag"/>.
-/// <para>Gen 1: using an item takes the whole turn and resolves <b>before</b> either side's move — so its
-/// <see cref="Priority"/> sits above any move's (moves cap at +1). Status (sleep/paralysis/confusion)
-/// does not gate item use, so <see cref="Battle"/> runs this action without the <c>CanAct</c> check it
-/// applies to attacks.</para>
+/// <para>Using an item takes the whole turn; status does not gate it, so <see cref="Battle"/> skips <c>CanAct</c>.</para>
 /// </summary>
 public sealed class ItemAction : IBattleAction
 {
@@ -26,7 +23,7 @@ public sealed class ItemAction : IBattleAction
     private readonly IBattleEventEmitter? _emitter;
     private readonly IBattleRules _rules;
 
-    /// <summary>Above any move priority (Quick Attack is +1) so an item resolves first in Battle's queue.</summary>
+    /// <summary>Above any move priority (Quick Attack is +1) so a queued item resolves first in Battle's queue.</summary>
     public const int ItemPriority = 6;
 
     public ItemAction(

@@ -8,6 +8,37 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §3.1 A menu item takes effect before the enemy picks its move ✅ DONE (2026-11-15)
+
+S, `Battle` turn flow, `IBattleRules.MenuActionResolvesBeforeFoeChoice`. Found 2026-11-14 by `requirements-review` in the switch-before-foe-choice item; source-confirmed.
+
+**Finding.** In pokered the bag opens inside `DisplayBattleMenu` (`core.asm:2001`+) and `UseBagItem` calls `UseItem` there (`:2240`, `:2248`); the
+loop then sees the turn taken (`wActionResultOrTookBattleTurn`, `:323-325`) and only then runs `SelectEnemyMove` (`:338-339`). So a Potion, Full Heal or
+X-item has landed when the enemy and its AI choose. Ours queued the `ItemAction` and picked the enemy's move first.
+
+**DoR (confirmed 2026-11-14).**
+1. **Acceptance:** the enemy's move choice sees the player's state after the item.
+2. **Design:** a player `ItemAction` executes before the enemy's `SelectMoveAsync` under the seam, as the switch does; `switchedFirst` became
+   `menuActionFirst` over both action types, and the queue then holds only the enemy's attack. No RNG draw moves; a failed use still prints its line before
+   the enemy acts. With the member false the item is queued and sorts by `ItemAction.ItemPriority`.
+3. **Seam:** `SwitchResolvesBeforeFoeChoice` renamed `MenuActionResolvesBeforeFoeChoice`, covering switches and items (user ruling 2026-11-14, option a:
+   one member for every turn-taking menu choice; it splits if pokecrystal differs). `TestAltProfile` stays false; the Gen 2 cell stays unverified.
+4. **Gen 1 source:** the cites above.
+5. **Data vs runtime:** runtime only.
+6. **Tests** (`ItemActionBattleTests`): `TheFoeChoosesItsMoveAfterTheItemLands`, `AQueuedItemLetsTheFoeChooseBeforeTheItemLands` (also pins that a queued
+   item lands before the enemy's move), `TheTrainerAiCanPoisonAPlayerAnAntidoteJustCured` (seed-dependent; user accepted).
+7. **Dependencies:** none.
+
+**Review outcomes (2026-11-15).** Format PASS. Lint step waived by the user for this item (Rider MCP unavailable). Test step green (.NET, tsc, Vitest); E2E
+not run. `requirements-review`: 4 discrepancies. The item-turn first-mover residual ordering was added to the residual-phase "Also covers" line (user: defer
+there); the section 5.0.2 `ItemPriority` note was updated and the `ItemAction` summary cut to one line (fixed); a seam-split note was added to the
+`GENERATION_SEAMS` row (user ruling); the AI test's seed-dependence was accepted (user). It also raised an untraced Counter/Mirror Move question, filed as
+the live tier-D entry "An enemy Counter or Mirror Move on a switch or item turn" (user ruling). `pr-review`: PR-READY; a narration comment trimmed and the
+`ItemPriority` doc reworded to "a queued item" (fixed); a queued-item ordering assertion added by user ruling, sabotage-verified. Also filed in the DoR pass
+and kept live: "A failed item use spends no turn".
+
+---
+
 ## §3.1 The enemy picks its move against the creature the player is switching out ✅ DONE (2026-11-14)
 
 S–M, `Battle` turn flow, `IBattleRules.SwitchResolvesBeforeFoeChoice`. Found 2026-11-14 in the trapped-switch design pass; read-confirmed.

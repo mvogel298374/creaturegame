@@ -195,7 +195,8 @@ public abstract class DelegatingBattleRules : IBattleRules
 
     public virtual bool TrapBlocksSwitch => _inner.TrapBlocksSwitch;
 
-    public virtual bool SwitchResolvesBeforeFoeChoice => _inner.SwitchResolvesBeforeFoeChoice;
+    public virtual bool MenuActionResolvesBeforeFoeChoice =>
+        _inner.MenuActionResolvesBeforeFoeChoice;
 
     public virtual SubstituteStrike StrikeSubstituteByte(int remnant, int damage) =>
         _inner.StrikeSubstituteByte(remnant, damage);

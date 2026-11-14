@@ -152,9 +152,10 @@ public class Battle
 
             // The player may FIGHT or use a bag ITEM this turn; the enemy only ever attacks.
             IBattleAction playerAction = await BuildPlayerActionAsync();
-            bool switchedFirst =
-                playerAction is SwitchAction && _rules.SwitchResolvesBeforeFoeChoice;
-            if (switchedFirst)
+            bool menuActionFirst =
+                playerAction is SwitchAction or ItemAction
+                && _rules.MenuActionResolvesBeforeFoeChoice;
+            if (menuActionFirst)
                 await playerAction.ExecuteAsync();
             PokemonAttack? enemyMove = await SelectMoveAsync(
                 EnemyCreature,
@@ -178,7 +179,7 @@ public class Battle
             // Draw the tie-break once (a stable sort key) rather than calling RNG inside the
             // comparator, where it would be evaluated an unspecified number of times.
             int tieBreak = _rng.Next(2);
-            var turnQueue = switchedFirst
+            var turnQueue = menuActionFirst
                 ? new List<IBattleAction> { enemyAction }
                 : new List<IBattleAction> { playerAction, enemyAction };
 

@@ -264,7 +264,7 @@ internal static class TestAltProfile
 
         public override bool TrapBlocksSwitch => true;
 
-        public override bool SwitchResolvesBeforeFoeChoice => false;
+        public override bool MenuActionResolvesBeforeFoeChoice => false;
 
         public override bool HealFails(int currentHp, int maxHp) => currentHp >= maxHp;
 

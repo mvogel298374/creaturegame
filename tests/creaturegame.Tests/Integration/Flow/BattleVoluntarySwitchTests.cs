@@ -60,7 +60,7 @@ public class BattleVoluntarySwitchTests
     public async Task AQueuedSwitchLetsTheFoeChooseAgainstTheOutgoingCreatureThenRepointsIt()
     {
         var (battle, enemyInput, recorder) = SwitchOnTurnOne(
-            new ScriptableRules().Deterministic().QueuesSwitchWithFoeMove()
+            new ScriptableRules().Deterministic().QueuesMenuActionWithFoeMove()
         );
 
         await battle.StartFightAsync();

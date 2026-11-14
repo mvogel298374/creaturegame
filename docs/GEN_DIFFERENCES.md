@@ -190,7 +190,7 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
   `SendOutMon` clears the enemy's `USING_TRAPPING_MOVE` (`:1755-1756`), and since the switch happens inside the menu,
   before `SelectEnemyMove` (`:338-339`), the binder then chooses its move freely: a Wrap into the switch-in is a fresh use
   that spends PP and rolls a new trap. Ours runs the switch before the enemy picks, too. Seams: `TrapBlocksSwitch`
-  (false), `ReplacementEndsTrap`, `SwitchResolvesBeforeFoeChoice` (true). Gen 2
+  (false), `ReplacementEndsTrap`, `MenuActionResolvesBeforeFoeChoice` (true). Gen 2
   forbids the switch (pokecrystal `TryPlayerSwitch`, `engine/battle/core.asm:5166-5176`).
 - Considered overpowered; used competitively to completely shut down opponents
 

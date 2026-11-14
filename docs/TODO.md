@@ -57,7 +57,7 @@ None open.
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
 | **A binder or a Bide user still gets the battle menu** (§3.1) | S–M | ✗ 2, 4, 6; the rest drafted | Filed 2026-11-14. |
-| **A menu item takes effect before the enemy picks its move** (§3.1) | S–M | ✗ 2, 3; the rest drafted | Filed 2026-11-14. Extend the switch-before-foe-choice pattern to `ItemAction`. |
+| **A failed item use spends no turn** (§3.1) | S–M | ✗ 2, 3, 6; the rest drafted | Filed 2026-11-14. pokered returns to the bag menu. |
 | **The player chooses what Mimic copies** (§3.1) | M | ✗ 2, 3; the rest drafted | Found 2026-11-03. Needs an input prompt, so a design pass. |
 
 **C. Needs a `/plan` or a verify slice**
@@ -88,6 +88,7 @@ None open.
 
 | Item | Cost | Ready? | Next step |
 |:-----|:----:|:-------|:----------|
+| **An enemy Counter or Mirror Move on a switch or item turn** (§3.1) | S | ✗ 1, 2, 6; 4 drafted | Filed 2026-11-15. Read `HandleCounterMove` and `MirrorMoveCopyMove` for the stale player move and damage, then ours. |
 | **Disable matches move instances, not move ids** (§3.1) | S | ✗ 1, 2, 4, 6 | Filed 2026-11-09. Read `DisabledMoveStops` and the Metronome and Mirror Move wrappers first. |
 | **Same-type secondary status immunity** (§3.1) | S–M | ✗ 2, 4, 6; the rest drafted | Take the pokered cite; Ice Beam freezes Ice-types today. |
 | **Other `ResidualEffects1` moves may roll accuracy** (§3.1) | S–M | ✗ 1, 2, 4, 6 | Filed 2026-11-06. A verify slice reads each effect for its own hit test. |
@@ -236,17 +237,20 @@ data/engine item usually also means updating the test that pins the wrong value.
   accumulation and the binding replay), **4** (trace Bide across a switch or item turn), **6**. *Drafted:* 1: a
   binder or Bide user is offered the full menu; FIGHT continues the locked move. 3: an `IBattleRules` member or a
   per-mechanic flag on `ILockInMechanic` for "keeps the menu". 5: runtime only. 7: none.
-- **A menu item takes effect before the enemy picks its move (found 2026-11-14 by `requirements-review`,
-  switch-before-foe-choice item; reviewer-reported, not yet read by the main session) — S–M, ✗ not Ready.** In pokered
-  an ITEM choice resolves inside `DisplayBattleMenu`, before `SelectEnemyMove` (`core.asm:2257`+,
-  `wActionResultOrTookBattleTurn`; `:338-339`), so a Potion, Full Heal or X-item has landed when the enemy and its AI
-  choose. Ours queues the `ItemAction` and picks the enemy's move first (`Battle.cs` ~153-190). Observable today where
-  the AI reads player state: scoring a status move against a creature a Full Heal just cured.
-  **DoR:** ✗ gaps **2** (run a committed `ItemAction` before enemy selection, as the switch now does, and what that
-  does to the queue), **3** (widen `SwitchResolvesBeforeFoeChoice` to every menu action, renamed, or add a sibling
-  member). *Drafted:* 1: the enemy's move choice sees the player's state after the item. 4: the cites above, to be read
-  against pokered. 5: runtime only. 6: an enemy input records the defender's status after a Full Heal; with the
-  trainer AI, a cure changes a status-move pick. 7: none.
+- **A failed item use spends no turn in Gen 1 (found 2026-11-14, menu-item design pass; source-read, not run) — S–M,
+  ✗ not Ready.** In pokered an item that can't be used returns to the bag menu without taking the turn (`UseBagItem`,
+  `core.asm:2257-2259` → `BagWasSelected`). Ours emits `ItemUseFailed` from `ItemAction.ExecuteAsync` and the enemy
+  still attacks.
+  **DoR:** ✗ gaps **2** (re-prompt from `BuildPlayerActionAsync` on a use that can't apply, or check at build time;
+  what the client shows), **3** (an `IBattleRules` member for whether a failed use costs the turn), **6**. *Drafted:*
+  1: an item that can't be used costs no turn and the player chooses again. 4: the cite above; read each `UseItem`
+  failure path for its line. 5: runtime, possibly client text. 7: none.
+- **An enemy Counter or Mirror Move on a switch or item turn (found 2026-11-15 by `requirements-review`, menu-item
+  item; unverified) — S, ✗ not Ready.** No player move runs on a switch or item turn, so pokered's enemy Counter and
+  Mirror Move read the stale `wPlayerSelectedMove` and `wDamage` from the previous turn. Whether ours matches is
+  untraced. **DoR:** ✗ gaps **1**, **2**, **6** (all wait on the read). *Drafted:* 4: pokered `HandleCounterMove`
+  (`core.asm:4547-4607`) and `MirrorMoveCopyMove`, read against the switch and item paths. 3: existing Counter and
+  Mirror Move seams, if the read shows a gap. 5: runtime only. 7: none.
 - **Disable matches move instances, not move ids (found 2026-11-09 by `opus-engineer`, Fly and Dig item;
   read-confirmed, unverified beyond that) — S, ✗ not Ready.** `StatusResolver.DisabledMoveStops` compares the selected
   `PokemonAttack` with `Battle.DisabledMove` by reference; pokered compares move numbers
@@ -398,11 +402,12 @@ channel of a broader acquisition layer.
     side's poison can faint it before the slower side ever Roars, and Leech Seed heals the slower side first. When
     this lands, re-pin `ForceFleeTests.Gen1SlowerRoarEndsTheTurnAtOnce_TheRoarersPoisonNeverTicks`, which asserts
     only the Roar user's tick; the faster side's tick should then run.
-  - **Also covers (ruling 2026-11-14):** a switch turn still has a first mover in Gen 1. The player's slot is a
+  - **Also covers (rulings 2026-11-14, 2026-11-15):** a switch or item turn still has a first mover in Gen 1. The player's slot is a
     no-op (`ExecutePlayerMove` exits on `wActionResultOrTookBattleTurn`, `core.asm:3086`), but the order uses the stale
-    `wPlayerSelectedMove` (Quick Attack first, Counter last) and then the switch-in's Speed (`:340-441`), so a
-    poisoned, burned or seeded switch-in that goes first ticks before the enemy attacks and can faint before it acts.
-    Ours lets the enemy act, then ticks both (`requirements-review`, switch-before-foe-choice item).
+    `wPlayerSelectedMove` (Quick Attack first, Counter last) and then the player's Speed (`:340-441`), so a
+    poisoned, burned or seeded switch-in or item user that goes first ticks before the enemy attacks and can faint
+    before it acts. Ours lets the enemy act, then ticks both (`requirements-review`, switch-before-foe-choice and
+    menu-item items).
 - [ ] **Enemy encounter pool ignores game version** — filter by `PokemonGameAvailability` once a version selector
   exists.
   **DoR (V16):** ✗ not Ready — gaps **1, 2, 3, 5, 6, 7**; gap 7 blocks the rest (no version selector exists).

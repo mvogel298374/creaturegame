@@ -58,7 +58,8 @@ public class ItemActionBattleTests
         Creature enemy,
         CarriedStatus? entryStatus = null,
         Party? party = null,
-        IBattleRules? rules = null
+        IBattleRules? rules = null,
+        IBattleInput? enemyInput = null
     )
     {
         var emitter = new RecordingEmitter();
@@ -67,7 +68,7 @@ public class ItemActionBattleTests
             enemy,
             Gen1TypeChart.Instance,
             playerInput,
-            new ScriptedInput("tackle"),
+            enemyInput ?? new ScriptedInput("tackle"),
             rules: rules ?? new ScriptableRules(new SeededRandomSource(1)).Deterministic(),
             emitter: emitter,
             rng: new SeededRandomSource(1),
@@ -141,6 +142,105 @@ public class ItemActionBattleTests
             .FindIndex(e => e is DamageDealt d && d.TargetName == "Player");
         Assert.True(healIdx >= 0 && firstHitOnPlayer >= 0);
         Assert.True(healIdx < firstHitOnPlayer, "item heal should resolve before the enemy's hit");
+    }
+
+    [Fact]
+    public async Task TheFoeChoosesItsMoveAfterTheItemLands()
+    {
+        var enemyInput = new DefenderStatusRecordingInput(new ScriptedInput("tackle"));
+
+        await RunAntidoteTurnAsync(new ScriptableRules().Deterministic(), enemyInput);
+
+        Assert.Equal(StatusCondition.None, enemyInput.Statuses[0]);
+    }
+
+    [Fact]
+    public async Task AQueuedItemLetsTheFoeChooseBeforeTheItemLands()
+    {
+        var enemyInput = new DefenderStatusRecordingInput(new ScriptedInput("tackle"));
+
+        var em = await RunAntidoteTurnAsync(
+            new ScriptableRules().Deterministic().QueuesMenuActionWithFoeMove(),
+            enemyInput
+        );
+
+        Assert.Equal(StatusCondition.Poison, enemyInput.Statuses[0]);
+        var events = em.Events.ToList();
+        int enemyMove = events.FindIndex(e => e is MoveUsed { AttackerName: "Enemy" });
+        Assert.InRange(events.FindIndex(e => e is ItemUsed), 0, enemyMove - 1);
+    }
+
+    [Fact]
+    public async Task TheTrainerAiCanPoisonAPlayerAnAntidoteJustCured()
+    {
+        var enemyInput = new AiBattleInput(
+            new Gen1TrainerAi(rng: new SeededRandomSource(1), intelligence: 1.0)
+        );
+
+        var em = await RunAntidoteTurnAsync(new ScriptableRules().Deterministic(), enemyInput);
+
+        Assert.Equal(
+            "poisonpowder",
+            em.Of<MoveUsed>().First(m => m.AttackerName == "Enemy").MoveName
+        );
+    }
+
+    // The 1-power Tackle keeps the AI's damage score near 0, so the Poison Powder score decides its pick.
+    private static Task<RecordingEmitter> RunAntidoteTurnAsync(
+        IBattleRules rules,
+        IBattleInput enemyInput
+    )
+    {
+        var player = TestCreatures.Make("Player", hp: 200, speed: 1);
+        player.AddAttack(Tackle());
+        var enemy = TestCreatures.Make("Enemy", hp: 60, speed: 200);
+        var weakTackle = Tackle();
+        weakTackle.BaseDamage = 1;
+        enemy.AddAttack(weakTackle);
+        enemy.AddAttack(
+            new Attack
+            {
+                Id = 77,
+                Name = "poisonpowder",
+                BaseDamage = 0,
+                Accuracy = 100,
+                AttackType = AttackType.Physical,
+                PowerPointsMax = 35,
+                StatusEffect = StatusCondition.Poison,
+                EffectChance = 100,
+            }
+        );
+        var bag = new Bag();
+        bag.Add(18, 1);
+        return RunAsync(
+            new TurnChoiceInput(new ItemTurnChoice(Antidote())),
+            bag,
+            player,
+            enemy,
+            entryStatus: new CarriedStatus(StatusCondition.Poison, 0),
+            rules: rules,
+            enemyInput: enemyInput
+        );
+    }
+
+    private static Item Antidote() =>
+        new()
+        {
+            Id = 18,
+            Name = "antidote",
+            Category = ItemCategory.StatusCure,
+            CuredStatus = StatusCondition.Poison,
+        };
+
+    private sealed class DefenderStatusRecordingInput(IBattleInput inner) : IBattleInput
+    {
+        public List<StatusCondition> Statuses { get; } = [];
+
+        public Task<PokemonAttack> ChooseMoveAsync(TurnContext context)
+        {
+            Statuses.Add(context.Defender.Battle.Status);
+            return inner.ChooseMoveAsync(context);
+        }
     }
 
     [Fact]
