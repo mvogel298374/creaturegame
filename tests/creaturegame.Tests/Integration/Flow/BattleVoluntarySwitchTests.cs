@@ -11,18 +11,16 @@ namespace creaturegame.Tests.Integration.Flow;
 /// The voluntary in-battle SWITCH turn-action at the <see cref="Battle"/> level (In-Combat Switching, Stage A —
 /// the engine core). Distinct from the forced faint-switch (<see cref="BattleForcedSwitchTests"/>): here the
 /// player chooses to swap the <em>still-alive</em> active creature for a benched one, at the cost of the turn.
-/// <para>These cover the correctness-risk pieces of the engine core: the switch always resolves first and the
-/// enemy's already-built move is repointed onto the creature that came in (the retarget fix); a trapped creature
+/// <para>These cover the correctness-risk pieces of the engine core: the switch resolves first and the enemy's
+/// move lands on the creature that came in, chosen against it or repointed onto it per the rules; a trapped creature
 /// can switch, and the switch frees it; major status persists on switch-out while volatiles reset; the menu stays
 /// reachable out of PP (the Struggle-menu fix); and an illegal pick safely falls back to FIGHT.</para>
 /// </summary>
 public class BattleVoluntarySwitchTests
 {
     [Fact]
-    public async Task VoluntarySwitch_RepointsASlowerEnemyMoveOntoTheIncomingCreature()
+    public async Task VoluntarySwitch_ASlowerEnemyMoveLandsOnTheIncomingCreature()
     {
-        // THE core retarget test. The player switches on turn 1; the enemy's move was built targeting the creature
-        // that LEFT, but the switch resolves first, so Battle must repoint the enemy's move onto the incoming one.
         var lead = Fighter("Lead", hp: 300, attack: 40, defense: 100, speed: 200, tackleId: 33);
         var bench = Fighter("Bench", hp: 300, attack: 999, defense: 100, speed: 150, tackleId: 33);
         var party = new Party(lead);
@@ -42,6 +40,119 @@ public class BattleVoluntarySwitchTests
         // The outgoing lead was never touched — it left the field before the enemy struck.
         Assert.DoesNotContain(recorder.Of<DamageDealt>(), d => d.TargetName == "Lead");
         Assert.Equal(lead.Attributes.MaxHP, lead.Attributes.HP);
+    }
+
+    [Fact]
+    public async Task TheFoeChoosesItsMoveAgainstTheSwitchIn()
+    {
+        var (battle, enemyInput, recorder) = SwitchOnTurnOne(new ScriptableRules().Deterministic());
+
+        await battle.StartFightAsync();
+
+        Assert.Equal("Bench", enemyInput.Defenders[0]);
+        Assert.Equal(
+            "Bench",
+            recorder.Of<DamageDealt>().First(d => d.TargetName is "Lead" or "Bench").TargetName
+        );
+    }
+
+    [Fact]
+    public async Task AQueuedSwitchLetsTheFoeChooseAgainstTheOutgoingCreatureThenRepointsIt()
+    {
+        var (battle, enemyInput, recorder) = SwitchOnTurnOne(
+            new ScriptableRules().Deterministic().QueuesSwitchWithFoeMove()
+        );
+
+        await battle.StartFightAsync();
+
+        Assert.Equal("Lead", enemyInput.Defenders[0]);
+        Assert.Equal(
+            "Bench",
+            recorder.Of<DamageDealt>().First(d => d.TargetName is "Lead" or "Bench").TargetName
+        );
+        Assert.DoesNotContain(recorder.Of<DamageDealt>(), d => d.TargetName == "Lead");
+    }
+
+    [Fact]
+    public async Task TheTrainerAiPicksByTheSwitchInsTyping()
+    {
+        var lead = Fighter("Lead", hp: 300, attack: 40, defense: 100, speed: 200, tackleId: 33);
+        var bench = Fighter("Bench", hp: 300, attack: 999, defense: 100, speed: 150, tackleId: 33);
+        bench.Type1 = DamageType.Ghost;
+        var party = new Party(lead);
+        party.Add(bench);
+        var enemy = Fighter("Foe", hp: 500, attack: 60, defense: 100, speed: 100);
+        enemy.MoveSet[0].Base.BaseDamage = 80;
+        enemy.AddAttack(
+            new Attack
+            {
+                Id = 55,
+                Name = "watergun",
+                BaseDamage = 20,
+                Accuracy = 100,
+                AttackType = AttackType.Special,
+                DamageType = DamageType.Water,
+                PowerPointsMax = 99,
+            }
+        );
+        var recorder = new RecordingEmitter();
+        var battle = new Battle(
+            lead,
+            enemy,
+            Gen1TypeChart.Instance,
+            new ScriptedInput("tackle").TurnPlan(1),
+            new AiBattleInput(new Gen1TrainerAi(rng: new SeededRandomSource(1), intelligence: 1.0)),
+            rules: new ScriptableRules().Deterministic(),
+            emitter: recorder,
+            rng: new SeededRandomSource(0),
+            playerParty: party
+        );
+
+        await battle.StartFightAsync();
+
+        Assert.Equal(
+            "watergun",
+            recorder.Of<MoveUsed>().First(m => m.AttackerName == "Foe").MoveName
+        );
+    }
+
+    // Turn 1 the player switches to the bench; the foe's input records the defender it was shown.
+    private static (
+        Battle Battle,
+        DefenderRecordingInput EnemyInput,
+        RecordingEmitter Recorder
+    ) SwitchOnTurnOne(ScriptableRules rules)
+    {
+        var lead = Fighter("Lead", hp: 300, attack: 40, defense: 100, speed: 200, tackleId: 33);
+        var bench = Fighter("Bench", hp: 300, attack: 999, defense: 100, speed: 150, tackleId: 33);
+        var party = new Party(lead);
+        party.Add(bench);
+        var enemy = Fighter("Foe", hp: 500, attack: 60, defense: 100, speed: 100, tackleId: 33);
+        var enemyInput = new DefenderRecordingInput(new ScriptedInput("tackle"));
+        var recorder = new RecordingEmitter();
+        var battle = new Battle(
+            lead,
+            enemy,
+            Gen1TypeChart.Instance,
+            new ScriptedInput("tackle").TurnPlan(1),
+            enemyInput,
+            rules: rules,
+            emitter: recorder,
+            rng: new SeededRandomSource(0),
+            playerParty: party
+        );
+        return (battle, enemyInput, recorder);
+    }
+
+    private sealed class DefenderRecordingInput(IBattleInput inner) : IBattleInput
+    {
+        public List<string> Defenders { get; } = [];
+
+        public Task<PokemonAttack> ChooseMoveAsync(TurnContext context)
+        {
+            Defenders.Add(context.Defender.Name);
+            return inner.ChooseMoveAsync(context);
+        }
     }
 
     [Fact]

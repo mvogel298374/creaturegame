@@ -8,6 +8,41 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §3.1 The enemy picks its move against the creature the player is switching out ✅ DONE (2026-11-14)
+
+S–M, `Battle` turn flow, `IBattleRules.SwitchResolvesBeforeFoeChoice`. Found 2026-11-14 in the trapped-switch design pass; read-confirmed.
+
+**Finding.** pokered resolves the player's switch inside the menu, before `SelectEnemyMove` (`core.asm:305`, `:338-339`),
+so the enemy's choice, and the trainer AI's type and status modifiers, see the switch-in. Ours selected the enemy's move
+against the outgoing creature and only retargeted the built action after the `SwitchAction` ran (`AttackAction.Retarget`).
+
+**DoR (confirmed 2026-11-14).**
+1. **Acceptance:** the enemy's move choice sees the creature that will be on the field.
+2. **Design:** under the seam, a `SwitchAction` from `BuildPlayerActionAsync` executes at once, before the enemy's
+   `SelectMoveAsync`; the queue then holds only the enemy's attack, built against the new `PlayerCreature`. The foe's hold
+   on the player moved into `Battle.BringInMember` beside the binder release (pokered `SendOutMon` clears both sides' trap
+   flags, `wram.asm:1278-1284`), gated by `ReplacementEndsTrap`; `Battle.ReleaseFoesHoldOnPlayer` was deleted. Event and
+   RNG order are unchanged.
+3. **Seam:** new `IBattleRules.SwitchResolvesBeforeFoeChoice`: Gen 1 true; `TestAltProfile` false, keeping the
+   queue-and-`Retarget` path. Gen 2 value left unverified against pokecrystal (user ruling).
+4. **Gen 1 source:** the cites above.
+5. **Data vs runtime:** runtime only.
+6. **Tests** (`BattleVoluntarySwitchTests`): `TheFoeChoosesItsMoveAgainstTheSwitchIn`,
+   `AQueuedSwitchLetsTheFoeChooseAgainstTheOutgoingCreatureThenRepointsIt` (seam false),
+   `TheTrainerAiPicksByTheSwitchInsTyping`; `VoluntarySwitch_RepointsASlowerEnemyMoveOntoTheIncomingCreature` renamed
+   `VoluntarySwitch_ASlowerEnemyMoveLandsOnTheIncomingCreature`; the trapped-switch tests still pass.
+7. **Dependencies:** none; subsumed the commit-time release of the trapped-switch item.
+
+**Review outcomes (2026-11-14).** Format PASS. Lint step waived by the user for this item (Rider MCP unavailable). Test
+step green (.NET, tsc, Vitest); E2E not run. `requirements-review`: 4 discrepancies. The `SelectEnemyMove` cite was
+corrected to `core.asm:338-339` and the `SendOutMon` status-zeroing cite made explicit (fixed); the switch-turn
+first-mover residual ordering was filed as an "Also covers (ruling 2026-11-14)" line on the end-of-turn residual entry
+(user ruling: file, don't fix); items resolving before enemy selection was filed as the live §3.1 entry "A menu item
+takes effect before the enemy picks its move" (user ruling); the Gen 2 value stays unverified (user ruling). `pr-review`:
+PR-READY; two wording recommendations fixed (the `AttackAction.Retarget` doc cut to one line; the test rename above).
+
+---
+
 ## §3.1 A trapped Pokémon can switch out in Gen 1 ✅ DONE (2026-11-14)
 
 S–M, `Battle.CanSwitchTo` / `Battle.ReleaseFoesHoldOnPlayer`. Found 2026-11-13 in the missed-Wrap design pass; design pass 2026-11-14, source-confirmed.

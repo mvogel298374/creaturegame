@@ -60,12 +60,7 @@ public class AttackAction : IBattleAction
         Priority = selectedMove?.Base.Priority ?? 0;
     }
 
-    /// <summary>
-    /// Repoints this action at a new <paramref name="target"/>. Called by <see cref="Battle"/> on the enemy's
-    /// still-queued move right after the player's voluntary switch executes this turn — so a slower (or even
-    /// priority) enemy move lands on the creature that came in, not the one that just left the field. A no-op
-    /// for the switch's own turn ordering (the switch always resolves first), it only fixes the retarget.
-    /// </summary>
+    /// <summary>Repoints this action at the switch-in when a switch is queued with the foe's move (<see cref="IBattleRules.SwitchResolvesBeforeFoeChoice"/> false).</summary>
     internal void Retarget(Creature target) => Target = target;
 
     public Task ExecuteAsync()

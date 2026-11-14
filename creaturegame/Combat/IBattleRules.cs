@@ -383,6 +383,9 @@ public interface IBattleRules
     /// <summary>Whether a creature held by a binding move may not switch out. See GENERATION_SEAMS.md §2.</summary>
     bool TrapBlocksSwitch { get; }
 
+    /// <summary>Whether the player's switch runs before the foe picks its move, so the foe chooses against the switch-in. See GENERATION_SEAMS.md §2.</summary>
+    bool SwitchResolvesBeforeFoeChoice { get; }
+
     /// <summary>The wording of the crit, one-hit KO and effectiveness lines. See GENERATION_SEAMS.md §2.</summary>
     HitLineWording HitLineWording { get; }
 

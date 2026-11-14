@@ -434,6 +434,9 @@ public sealed class Gen1BattleRules : IBattleRules
     // pokered: the party menu's switch path has no trap check (core.asm:2396-2437).
     public bool TrapBlocksSwitch => false;
 
+    // pokered: the switch runs inside the menu, before SelectEnemyMove (core.asm:305, :338-339).
+    public bool SwitchResolvesBeforeFoeChoice => true;
+
     public HitLineWording HitLineWording => HitLineWording.Short;
 
     // pokered core.asm AttackSubstitute: the byte wraps; damage above 255 breaks without writing it.

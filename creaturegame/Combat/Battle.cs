@@ -152,8 +152,10 @@ public class Battle
 
             // The player may FIGHT or use a bag ITEM this turn; the enemy only ever attacks.
             IBattleAction playerAction = await BuildPlayerActionAsync();
-            if (playerAction is SwitchAction)
-                ReleaseFoesHoldOnPlayer();
+            bool switchedFirst =
+                playerAction is SwitchAction && _rules.SwitchResolvesBeforeFoeChoice;
+            if (switchedFirst)
+                await playerAction.ExecuteAsync();
             PokemonAttack? enemyMove = await SelectMoveAsync(
                 EnemyCreature,
                 PlayerCreature,
@@ -176,7 +178,9 @@ public class Battle
             // Draw the tie-break once (a stable sort key) rather than calling RNG inside the
             // comparator, where it would be evaluated an unspecified number of times.
             int tieBreak = _rng.Next(2);
-            var turnQueue = new List<IBattleAction> { playerAction, enemyAction };
+            var turnQueue = switchedFirst
+                ? new List<IBattleAction> { enemyAction }
+                : new List<IBattleAction> { playerAction, enemyAction };
 
             turnQueue = turnQueue
                 .OrderByDescending(a => a.Priority)
@@ -210,11 +214,7 @@ public class Battle
                 }
                 await action.ExecuteAsync();
 
-                // A voluntary switch (which always sorts first) reassigned the active creature mid-turn. The
-                // enemy's action was built against the creature that just LEFT the field — repoint every
-                // still-queued attack at the one that came in, so a slower (or priority) enemy move this turn
-                // lands on the switch-in, not the benched creature. Only the enemy's action remains here (the
-                // enemy never switches), so this touches exactly it.
+                // A queued switch: the enemy's move still targets the creature that left.
                 if (action is SwitchAction)
                     foreach (var queued in turnQueue)
                         if (queued is AttackAction toRetarget)
@@ -604,13 +604,6 @@ public class Battle
         return false;
     }
 
-    // pokered switches inside the menu, before the enemy picks its move: GEN_DIFFERENCES.md → Binding.
-    private void ReleaseFoesHoldOnPlayer()
-    {
-        if (_rules.ReplacementEndsTrap && EnemyCreature.Battle.BindingTarget == PlayerCreature)
-            StatusResolver.ReleaseTrap(EnemyCreature);
-    }
-
     private AttackAction NewPlayerAttack(PokemonAttack? move) =>
         new(
             PlayerCreature,
@@ -677,7 +670,11 @@ public class Battle
     {
         int substituteRemnant = PlayerCreature.Battle.SubstituteRemnant;
         if (_rules.ReplacementEndsTrap)
+        {
             StatusResolver.ReleaseTrap(PlayerCreature);
+            if (EnemyCreature.Battle.BindingTarget == PlayerCreature)
+                StatusResolver.ReleaseTrap(EnemyCreature);
+        }
         _playerParty!.SetLead(index);
         PlayerCreature = _playerParty.Lead;
         PlayerCreature.ResetBattleState();

@@ -374,6 +374,18 @@ public sealed class ScriptableRules : DelegatingBattleRules
 
     public override bool TrapBlocksSwitch => _trapBlocksSwitch ?? base.TrapBlocksSwitch;
 
+    private bool? _switchResolvesBeforeFoeChoice;
+
+    /// <summary>Queues the player's switch with the foe's move, as a generation whose foe commits first would.</summary>
+    public ScriptableRules QueuesSwitchWithFoeMove()
+    {
+        _switchResolvesBeforeFoeChoice = false;
+        return this;
+    }
+
+    public override bool SwitchResolvesBeforeFoeChoice =>
+        _switchResolvesBeforeFoeChoice ?? base.SwitchResolvesBeforeFoeChoice;
+
     public override int GetHitThreshold(int acc, int accStage, int evaStage) =>
         _alwaysHit ? 256 : base.GetHitThreshold(acc, accStage, evaStage);
 
