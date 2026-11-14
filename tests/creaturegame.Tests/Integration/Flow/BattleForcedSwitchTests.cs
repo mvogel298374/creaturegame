@@ -583,6 +583,51 @@ public class BattleForcedSwitchTests
         Assert.Single(recorder.Of<TurnStarted>());
     }
 
+    [Fact]
+    public async Task ABinderWhoseVictimFaintsChoosesFreelyAgainstTheReplacement()
+    {
+        var lead = Fighter("Lead", hp: 20, attack: 1, defense: 100, speed: 200, tackleId: 33);
+        var bench = Fighter("Bench", hp: 300, attack: 999, defense: 100, speed: 50, tackleId: 33);
+        var party = new Party(lead);
+        party.Add(bench);
+        var foe = Fighter("Foe", hp: 40, attack: 60, defense: 100, speed: 100, tackleId: 33);
+        foe.AddAttack(
+            new Attack
+            {
+                Id = 35,
+                Name = "wrap",
+                BaseDamage = 15,
+                Accuracy = 100,
+                AttackType = AttackType.Physical,
+                PowerPointsMax = 99,
+                Effect = MoveEffect.Binding,
+            }
+        );
+        var recorder = new RecordingEmitter();
+        var battle = new Battle(
+            lead,
+            foe,
+            Gen1TypeChart.Instance,
+            new ScriptedInput("tackle").PicksSwitchIn(1),
+            new ScriptedInput("wrap", "tackle"),
+            rules: new ScriptableRules().Deterministic().BindingTurns(5),
+            emitter: recorder,
+            rng: new SeededRandomSource(0),
+            playerParty: party
+        );
+
+        await battle.StartFightAsync();
+
+        Assert.Contains(recorder.Of<BindingStarted>(), b => b.TargetName == "Lead");
+        Assert.False(lead.IsAlive());
+        var afterSwitch = recorder
+            .Events.SkipWhile(e => e is not CreatureSwitchedIn)
+            .Where(e => e is MoveUsed { AttackerName: "Foe" } or BindingContinues)
+            .ToList();
+        Assert.Equal("tackle", Assert.IsType<MoveUsed>(afterSwitch[0]).MoveName);
+        Assert.DoesNotContain(afterSwitch, e => e is BindingContinues);
+    }
+
     // A 0-damage always-poisons move: the attack phase changes no HP, so both sides enter end-of-turn alive and
     // poisoned (the same shape the existing double-faint regression uses).
     private static Creature Poisoner(string name, int maxHp, int hp, int speed)

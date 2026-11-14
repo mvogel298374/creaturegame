@@ -56,7 +56,8 @@ None open.
 
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
-| **A trapped Pokémon can switch out in Gen 1** (§3.1) | S–M | ✗ 2, 4, 6; the rest drafted | Found 2026-11-13. `Battle.CanSwitchTo`. |
+| **A binder or a Bide user still gets the battle menu** (§3.1) | S–M | ✗ 2, 4, 6; the rest drafted | Filed 2026-11-14. |
+| **The enemy picks its move against the outgoing creature** (§3.1) | S–M | ✗ 2, 6; the rest drafted | Filed 2026-11-14. Run a committed switch before enemy selection. |
 | **The player chooses what Mimic copies** (§3.1) | M | ✗ 2, 3; the rest drafted | Found 2026-11-03. Needs an input prompt, so a design pass. |
 
 **C. Needs a `/plan` or a verify slice**
@@ -107,6 +108,7 @@ None open.
 | Item | Cost | Ready? | What it waits on |
 |:-----|:----:|:-------|:-----------------|
 | **Enemy AI ignores a foe that is out of reach** (§3.1) | S–M | ✗ 1, 2, 6 | Your product call: stay faithful to Gen 1's AI or add a guard. |
+| **Binding and miss lines follow pokered's text** (§3.1) | S | ✗ 3 | Your battle-text placement decision (presentation catalog or seam). |
 | **`evolution.spec.ts` nameplate assertion** (§6) | S | ✗ 1 drafted | Your E2E go-ahead. |
 | **Tighten `encounter-map` and `cadence` specs** (§6) | S | ✗ | Your E2E go-ahead; a cadence seed. |
 | **E2E half of "Deduplicate the test helpers"** (§6) | M | ✗ | Your E2E go-ahead. |
@@ -213,16 +215,36 @@ data/engine item usually also means updating the test that pins the wrong value.
   **DoR:** ✗ — gaps **2, 3, 6**. *Drafted:* **Acceptance:** each case prints its pokered line in a full battle.
   **Data vs runtime:** runtime plus a new "evaded" event wired in all four places. **Dependencies:** pair with the
   `ResidualEffects1` accuracy slice, which decides where these moves roll accuracy.
-- **A trapped Pokémon can switch out in Gen 1 (found 2026-11-13, missed-Wrap design pass; read-confirmed, not run) —
-  S–M, ✗ not Ready.** pokered shows the battle menu to a trapped Pokémon and skips only move selection
-  (`core.asm:305-322`); the switch and run paths have no trap check. Sending out any Pokémon frees the opponent's
-  binder (`core.asm:1755-1756` player side, `:1308-1309` enemy side), so the binder's next turn is a fresh use of the
-  move against the switch-in. Ours forbids the switch (`Battle.CanSwitchTo`, `Battle.cs` ~579), and its comment says
-  Gen 1 does too.
-  **DoR:** ✗ gaps **2** (what the binder does against the switch-in: a fresh use that spends PP, next to the known
-  Gen 1 PP glitch), **4** (trace the binder's own switch: `RetreatMon` only prints a line, so its lock may survive
-  it; and whether running from a wild battle while trapped is allowed), **6**. *Drafted:* 3: an `IBattleRules`
-  member for whether a trapped Pokémon may switch. 5: runtime only. 7: none.
+- **Binding and miss lines follow pokered's text (found 2026-11-13, binding continuation item; read-confirmed, not
+  run) — S, ✗ not Ready.** Starting a trap prints "<foe> was squeezed by WRAP!" (`timeline.ts` and
+  `ConsoleBattleEventEmitter.cs`, `BindingStarted`); pokered's `TrappingEffect` prints nothing (`effects.asm:1081-1104`),
+  and since that item the line also shows on the Ghost lock's first turn. Every miss prints "<user>'s <MOVE> missed!"
+  (`timeline.ts`, `MoveMissed`); pokered prints "<user>'s attack missed!" (`data/text/text_2.asm:1122-1125`).
+  **DoR:** ✗ gap **3**: where battle wording lives is the open question under "Audit the inline battle rules" (the
+  "Also in scope" ruling: presentation catalog §4.3 or a seam). *Drafted:* 1: a trap starts with no line and a miss
+  reads "<user>'s attack missed!"; the `BindingStarted` event stays, since state and tests use it. 2: wording only, in
+  the client timeline and the console emitter. 4: the cites above. 5: runtime only (client and console text). 6:
+  timeline tests pin both lines. 7: the battle-text placement decision.
+- **A binder or a Bide user still gets the battle menu in Gen 1 (found 2026-11-14, trapped-switch design pass;
+  source-confirmed) — S–M, ✗ not Ready.** pokered checks `STORING_ENERGY | USING_TRAPPING_MOVE` only after
+  `DisplayBattleMenu` (`core.asm:305-315`), so a binder or a Bide user can switch, use an item or run, and only move
+  selection is skipped. Only Rage, recharge, thrash and charging skip the menu (`core.asm:293-304`). A binder's item
+  turn counts down its trap (`UseBagItem`, `core.asm:2261-2268`); a binder's send-out frees its victim
+  (`ReplacementEndsTrap`, already wired in `BringInMember`). Ours bypasses the menu for every lock-in
+  (`Battle.BuildPlayerActionAsync`, ~536-541) and `CanSwitchThisTurn` reports false for any lock-in.
+  **DoR:** ✗ gaps **2** (which lock-ins keep the menu, and how an item or switch turn interacts with Bide's
+  accumulation and the binding replay), **4** (trace Bide across a switch or item turn), **6**. *Drafted:* 1: a
+  binder or Bide user is offered the full menu; FIGHT continues the locked move. 3: an `IBattleRules` member or a
+  per-mechanic flag on `ILockInMechanic` for "keeps the menu". 5: runtime only. 7: none.
+- **The enemy picks its move against the creature the player is switching out (found 2026-11-14, trapped-switch
+  design pass; read-confirmed, not run) — S–M, ✗ not Ready.** pokered resolves the player's switch inside the menu,
+  before `SelectEnemyMove` (`core.asm:305`, `:337`), so the enemy's choice, and the trainer AI's type and status
+  modifiers, see the switch-in. Ours selects the enemy's move against the outgoing creature (`Battle.cs` ~155) and
+  only retargets the built action after the `SwitchAction` runs (~208-216).
+  **DoR:** ✗ gaps **2** (run a committed switch before enemy selection and drop the retarget, or keep the queue),
+  **6** (an AI that picks by matchup chooses against the switch-in). *Drafted:* 1: the enemy's move choice sees the
+  creature that will be on the field. 3: none expected (turn flow, not a rule; decided in the pass). 4: the cites
+  above. 5: runtime only. 7: none; it subsumes the commit-time release that `Battle.ReleaseFoesHoldOnPlayer` now does for a trapped switch.
 - **Disable matches move instances, not move ids (found 2026-11-09 by `opus-engineer`, Fly and Dig item;
   read-confirmed, unverified beyond that) — S, ✗ not Ready.** `StatusResolver.DisabledMoveStops` compares the selected
   `PokemonAttack` with `Battle.DisabledMove` by reference; pokered compares move numbers

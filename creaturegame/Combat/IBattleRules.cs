@@ -377,8 +377,11 @@ public interface IBattleRules
     /// <summary>Rolls whether a paralyzed creature loses this turn. See GENERATION_SEAMS.md §2.</summary>
     bool RollsFullParalysis(IRandomSource rng);
 
-    /// <summary>Whether replacing a binder frees the creature it held. See GENERATION_SEAMS.md §2.</summary>
+    /// <summary>Whether a send-out ends a trap on either side, the binder's or the victim's. See GENERATION_SEAMS.md §2.</summary>
     bool ReplacementEndsTrap { get; }
+
+    /// <summary>Whether a creature held by a binding move may not switch out. See GENERATION_SEAMS.md §2.</summary>
+    bool TrapBlocksSwitch { get; }
 
     /// <summary>The wording of the crit, one-hit KO and effectiveness lines. See GENERATION_SEAMS.md §2.</summary>
     HitLineWording HitLineWording { get; }

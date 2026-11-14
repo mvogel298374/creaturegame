@@ -152,6 +152,8 @@ public class Battle
 
             // The player may FIGHT or use a bag ITEM this turn; the enemy only ever attacks.
             IBattleAction playerAction = await BuildPlayerActionAsync();
+            if (playerAction is SwitchAction)
+                ReleaseFoesHoldOnPlayer();
             PokemonAttack? enemyMove = await SelectMoveAsync(
                 EnemyCreature,
                 PlayerCreature,
@@ -189,7 +191,7 @@ public class Battle
                 // The dead-target and status (sleep/para/confusion) gates are attack-specific. An
                 // ItemAction has no foe target and isn't blocked by status — using an item is the turn —
                 // so it executes as long as its user is alive. A SwitchAction likewise has no target and
-                // isn't gated by status (Gen 1: only trapping blocks a switch, checked at build time).
+                // isn't gated by status (its legality is checked at build time).
                 if (action is AttackAction attack)
                 {
                     if (!attack.Target.IsAlive())
@@ -576,12 +578,11 @@ public class Battle
         }
     }
 
-    /// <summary>Legal to switch to <paramref name="index"/> this turn: a party is wired, the active creature
-    /// isn't trapped by a partial-trap bind (the one thing that blocks switching in Gen 1 — status does not),
-    /// and the target is in range, alive, and not already active.</summary>
+    /// <summary>Legal to switch to <paramref name="index"/> this turn: a party is wired, the rules don't hold a
+    /// trapped creature in place, and the target is in range, alive, and not already active.</summary>
     private bool CanSwitchTo(int index) =>
         _playerParty is not null
-        && PlayerCreature.Battle.BindingTurnsRemaining == 0
+        && (!_rules.TrapBlocksSwitch || PlayerCreature.Battle.BindingTurnsRemaining == 0)
         && index >= 0
         && index < _playerParty.Count
         && index != _playerParty.LeadIndex
@@ -601,6 +602,13 @@ public class Battle
             if (CanSwitchTo(i))
                 return true;
         return false;
+    }
+
+    // pokered switches inside the menu, before the enemy picks its move: GEN_DIFFERENCES.md → Binding.
+    private void ReleaseFoesHoldOnPlayer()
+    {
+        if (_rules.ReplacementEndsTrap && EnemyCreature.Battle.BindingTarget == PlayerCreature)
+            StatusResolver.ReleaseTrap(EnemyCreature);
     }
 
     private AttackAction NewPlayerAttack(PokemonAttack? move) =>

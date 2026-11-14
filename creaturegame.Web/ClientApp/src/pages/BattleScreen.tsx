@@ -870,9 +870,9 @@ function ActionMenu({ playerName, canAct, canSwitch, onFight, onBag, onSwitch, o
   onBack: () => void;
 }) {
   // FIGHT, BAG and SWITCH all spend the turn, so they're gated on it being the player's turn (canAct). SWITCH
-  // is additionally gated on canSwitch (server-computed: a party is wired, the active creature isn't locked-in or
-  // trapped, and a live benched member exists) so it greys out when a switch would be refused. CHECK POKEMON is
-  // read-only, so it's always available.
+  // is additionally gated on canSwitch (server-computed: a party is wired, the active creature isn't locked in,
+  // the rules allow it, and a live benched member exists) so it greys out when a switch would be refused. CHECK
+  // POKEMON is read-only, so it's always available.
   const canSwitchNow = canAct && canSwitch;
   return (
     <div className="action-menu">

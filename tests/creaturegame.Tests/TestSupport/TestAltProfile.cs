@@ -262,6 +262,8 @@ internal static class TestAltProfile
 
         public override bool ReplacementEndsTrap => false;
 
+        public override bool TrapBlocksSwitch => true;
+
         public override bool HealFails(int currentHp, int maxHp) => currentHp >= maxHp;
 
         public override MoveFailureAnnouncement HealFailureAnnouncement =>

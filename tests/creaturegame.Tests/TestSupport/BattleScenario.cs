@@ -363,6 +363,17 @@ public sealed class ScriptableRules : DelegatingBattleRules
 
     public override bool FleeEndsTurnImmediately => _fleeEndsTurn ?? base.FleeEndsTurnImmediately;
 
+    private bool? _trapBlocksSwitch;
+
+    /// <summary>Holds a trapped creature in place, as a generation that forbids the switch would.</summary>
+    public ScriptableRules BlocksTrappedSwitch()
+    {
+        _trapBlocksSwitch = true;
+        return this;
+    }
+
+    public override bool TrapBlocksSwitch => _trapBlocksSwitch ?? base.TrapBlocksSwitch;
+
     public override int GetHitThreshold(int acc, int accStage, int evaStage) =>
         _alwaysHit ? 256 : base.GetHitThreshold(acc, accStage, evaStage);
 

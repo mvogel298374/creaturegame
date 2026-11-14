@@ -9,7 +9,7 @@ namespace creaturegame.Combat;
 /// delegates the actual send-in to <see cref="Battle"/> (which owns the active-creature reassignment and the
 /// shared forced/voluntary send-in machinery).
 /// <para>The pick is validated at build time in <see cref="Battle.BuildPlayerActionAsync"/> (in range, alive,
-/// not the already-active member, not trapped by a partial-trap bind), so by the time this executes the index is
+/// not the already-active member, and the rules allow it), so by the time this executes the index is
 /// known-good.</para>
 /// </summary>
 public sealed class SwitchAction : IBattleAction

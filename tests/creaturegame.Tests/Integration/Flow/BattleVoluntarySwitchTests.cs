@@ -12,9 +12,9 @@ namespace creaturegame.Tests.Integration.Flow;
 /// the engine core). Distinct from the forced faint-switch (<see cref="BattleForcedSwitchTests"/>): here the
 /// player chooses to swap the <em>still-alive</em> active creature for a benched one, at the cost of the turn.
 /// <para>These cover the correctness-risk pieces of the engine core: the switch always resolves first and the
-/// enemy's already-built move is repointed onto the creature that came in (the retarget fix); a partial-trap bind
-/// blocks switching (but sleep/paralysis don't); major status persists on switch-out while volatiles reset; the
-/// menu stays reachable out of PP (the Struggle-menu fix); and an illegal pick safely falls back to FIGHT.</para>
+/// enemy's already-built move is repointed onto the creature that came in (the retarget fix); a trapped creature
+/// can switch, and the switch frees it; major status persists on switch-out while volatiles reset; the menu stays
+/// reachable out of PP (the Struggle-menu fix); and an illegal pick safely falls back to FIGHT.</para>
 /// </summary>
 public class BattleVoluntarySwitchTests
 {
@@ -71,43 +71,94 @@ public class BattleVoluntarySwitchTests
     }
 
     [Fact]
-    public async Task VoluntarySwitch_WhileTrappedByABind_IsRefused()
+    public async Task VoluntarySwitch_WhileTrappedByABind_GoesThroughAndTheFoeChoosesFreely()
     {
-        // Gen 1: a partial-trap bind (Wrap/Bind/Clamp/Fire Spin) is the ONE thing that blocks switching. The enemy
-        // binds the lead on turn 1; the lead's turn-2 switch attempt is refused (CanSwitchTo's trap gate). Without
-        // that gate the SwitchAction — which isn't subject to the CanAct status gate — would execute anyway, so an
-        // empty CreatureSwitchedIn is a real proof the trap blocked it.
-        // The lead is tanky (survives the bind chip) but hits softly, so it does NOT one-shot the enemy on turn 1
-        // — the enemy must survive to land its bind. The enemy is frail enough that the lead's intermittent free
-        // turns (between binds) still whittle it down, so the battle terminates.
+        // Turn 2 the lead switches out of the Wrap; turn 3 the switch-in acts.
+        var (battle, recorder, party, _) = TrappedSwitchBattle(
+            new ScriptableRules().Deterministic().BindingTurns(5),
+            "wrap",
+            "tackle"
+        );
+
+        await battle.StartFightAsync();
+
+        Assert.Equal("Bench", Assert.Single(recorder.Of<CreatureSwitchedIn>()).Name);
+        Assert.Equal("Bench", party.Lead.Name);
+        Assert.Equal(
+            ["wrap", "tackle"],
+            recorder.Of<MoveUsed>().Where(m => m.AttackerName == "Foe").Select(m => m.MoveName)
+        );
+        Assert.Empty(recorder.Of<BindingContinues>());
+        Assert.Contains(recorder.Of<DamageDealt>(), d => d.TargetName == "Bench");
+        Assert.DoesNotContain(recorder.Of<BindingBlocked>(), b => b.CreatureName == "Bench");
+        Assert.Contains(recorder.Of<MoveUsed>(), m => m.AttackerName == "Bench");
+    }
+
+    [Fact]
+    public async Task AWrapIntoTheSwitchInIsAFreshUseThatSpendsPpAndTrapsItAnew()
+    {
+        var (battle, recorder, _, foe) = TrappedSwitchBattle(
+            new ScriptableRules().Deterministic().BindingTurns(5),
+            "wrap"
+        );
+
+        await battle.StartFightAsync();
+
+        var afterSwitch = recorder
+            .Events.SkipWhile(e => e is not CreatureSwitchedIn)
+            .Where(e => e is MoveUsed { AttackerName: "Foe" } or BindingContinues or BindingStarted)
+            .Take(2)
+            .ToList();
+        Assert.IsType<MoveUsed>(afterSwitch[0]);
+        Assert.Equal("Bench", Assert.IsType<BindingStarted>(afterSwitch[1]).TargetName);
+        var wrapUses = recorder.Of<MoveUsed>().Count(m => m.AttackerName == "Foe");
+        var wrap = foe.MoveSet.Single(m => m.Base.Name == "wrap");
+        Assert.Equal(wrap.Base.PowerPointsMax - wrapUses, wrap.PowerPointsCurrent);
+    }
+
+    [Fact]
+    public async Task TheRulesCanBlockATrappedSwitch()
+    {
+        var (battle, recorder, party, _) = TrappedSwitchBattle(
+            new ScriptableRules().Deterministic().BindingTurns(3).BlocksTrappedSwitch(),
+            "wrap"
+        );
+
+        await battle.StartFightAsync();
+
+        Assert.Contains(recorder.Of<BindingBlocked>(), b => b.CreatureName == "Lead");
+        Assert.Empty(recorder.Of<CreatureSwitchedIn>());
+        Assert.Equal("Lead", party.Lead.Name);
+        Assert.False(recorder.Of<TurnStarted>().ElementAt(1).CanSwitch);
+    }
+
+    // Turn 1 FIGHT so the foe lands its Wrap, turn 2 SWITCH to the bench.
+    private static (
+        Battle Battle,
+        RecordingEmitter Recorder,
+        Party Party,
+        Creature Foe
+    ) TrappedSwitchBattle(ScriptableRules rules, params string[] enemyMoves)
+    {
         var lead = Fighter("Lead", hp: 999, attack: 60, defense: 999, speed: 200, tackleId: 33);
         var bench = Fighter("Bench", hp: 300, attack: 999, defense: 100, speed: 150, tackleId: 33);
         var party = new Party(lead);
         party.Add(bench);
         var enemy = Fighter("Foe", hp: 40, attack: 1, defense: 100, speed: 100, tackleId: 33);
         enemy.AddAttack(Wrap());
-
-        // Turn 1: FIGHT (the enemy binds the lead). Turn 2: attempt to SWITCH — refused while trapped.
-        var input = new ScriptedInput("tackle").TurnPlan(null, 1);
         var recorder = new RecordingEmitter();
         var battle = new Battle(
             lead,
             enemy,
             Gen1TypeChart.Instance,
-            input,
-            new ScriptedInput("wrap"),
-            rules: new ScriptableRules().Deterministic().BindingTurns(3),
+            new ScriptedInput("tackle").TurnPlan(null, 1),
+            new ScriptedInput(enemyMoves),
+            rules: rules,
             emitter: recorder,
             rng: new SeededRandomSource(0),
             playerParty: party
         );
-
-        await battle.StartFightAsync();
-
-        Assert.Contains(recorder.Of<BindingBlocked>(), b => b.CreatureName == "Lead");
-        Assert.Empty(recorder.Of<CreatureSwitchedIn>()); // the trapped switch never fired
-        Assert.Same(lead, party.Lead);
-        Assert.Equal("Lead", recorder.Of<BattleEnded>().Last().WinnerName); // freed itself and won
+        return (battle, recorder, party, enemy);
     }
 
     [Fact]
@@ -572,10 +623,9 @@ public class BattleVoluntarySwitchTests
     }
 
     [Fact]
-    public async Task CanSwitch_IsFalse_WhileTrappedByABind()
+    public async Task CanSwitch_IsTrue_WhileTrappedByABind()
     {
-        // A trapped lead can't switch, so the signal reflects it: turn 1 (pre-bind) advertises CanSwitch true, but
-        // turn 2 — after the enemy's bind lands — advertises false, so the client greys SWITCH while trapped.
+        // Turn 2 opens with the lead held by the foe's Wrap, and SWITCH is still offered.
         var lead = Fighter("Lead", hp: 999, attack: 60, defense: 999, speed: 200, tackleId: 33);
         var bench = Fighter("Bench", hp: 300, attack: 999, defense: 100, speed: 150, tackleId: 33);
         var party = new Party(lead);
@@ -600,8 +650,9 @@ public class BattleVoluntarySwitchTests
         await battle.StartFightAsync();
 
         var turns = recorder.Of<TurnStarted>().ToList();
-        Assert.True(turns[0].CanSwitch); // turn 1: a live bench, not yet trapped
-        Assert.False(turns[1].CanSwitch); // turn 2: trapped by the bind → can't switch
+        Assert.True(turns[0].CanSwitch);
+        Assert.Contains(recorder.Of<BindingBlocked>(), b => b.CreatureName == "Lead");
+        Assert.True(turns[1].CanSwitch);
     }
 
     // A party-aware battle with deterministic rules; the enemy spams a single named move.

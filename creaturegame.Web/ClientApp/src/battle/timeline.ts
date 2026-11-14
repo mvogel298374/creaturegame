@@ -469,7 +469,7 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
           enemyMaxHp: payload.enemyMaxHp as number,
           enemyStatus: payload.enemyStatus as string,
           moves: payload.moves as MoveInfo[],
-          // Whether a voluntary SWITCH is offered this turn (server-computed: party wired, not locked-in/trapped,
+          // Whether a voluntary SWITCH is offered this turn (server-computed: party wired, not locked in, the rules allow it,
           // a live benched target exists). Defaults false so a pre-Stage-C payload (or a non-party battle) hides it.
           canSwitch: (payload.canSwitch as boolean | undefined) ?? false,
         })],

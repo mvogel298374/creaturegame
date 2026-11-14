@@ -8,6 +8,50 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §3.1 A trapped Pokémon can switch out in Gen 1 ✅ DONE (2026-11-14)
+
+S–M, `Battle.CanSwitchTo` / `Battle.ReleaseFoesHoldOnPlayer`. Found 2026-11-13 in the missed-Wrap design pass; design pass 2026-11-14, source-confirmed.
+
+**Finding.** pokered shows the battle menu to a trapped Pokémon and skips only move selection (`core.asm:305-322`); the
+switch path has no trap check (`core.asm:2396-2437`). The player's send-out clears the enemy's trap flag (`SendOutMon`,
+`core.asm:1755-1756`), and the enemy then picks its move freely, since `SelectEnemyMove` runs after the menu
+(`core.asm:337`). Ours forbade the switch (`Battle.CanSwitchTo`), with a comment claiming Gen 1 does too. Our enemy also
+picks its move before the switch runs, so a bound enemy would have been forced into its Wrap continuation against the
+switch-in; freeing the trap only at send-out would turn that into a fresh Wrap, the pokered *enemy*-switch PP glitch on
+the wrong side. Design pass findings: the binder's own send-out ends its lock (`RetreatMon` only prints,
+`common_text.asm:167-169`, but `SendOutMon` zeroes `wPlayerStatsToDouble` through `wPlayerBattleStatus3`,
+`wram.asm:1279-1285`); running while trapped is allowed (`TryRunningFromBattle`, `core.asm:1496`+) but our player has no
+RUN choice; the PP-underflow glitch needs an enemy switch, which can't happen here (covered by the 2026-11-08 waiver,
+revisit with enemy parties). Gen 2 blocks the switch (pokecrystal `TryPlayerSwitch`, `core.asm:5166-5176`;
+`GEN_DIFFERENCES.md` Binding section).
+
+**DoR (confirmed 2026-11-14).**
+1. **Acceptance:** a trapped player can switch; the foe's trap ends, the foe chooses its move freely that turn, and the
+   switch-in acts normally next turn.
+2. **Design:** `CanSwitchTo` reads a new `IBattleRules.TrapBlocksSwitch` (Gen 1 false, Gen 2 true). When the player
+   commits a switch, the foe's hold on the outgoing creature is released before the enemy picks its move
+   (`Battle.ReleaseFoesHoldOnPlayer`), gated by the existing `ReplacementEndsTrap`, whose doc widens to "a send-out
+   ends a trap on either side".
+3. **Seam:** those two members; `TestAltProfile` flips `TrapBlocksSwitch`.
+4. **Gen 1 source:** the cites above.
+5. **Data vs runtime:** runtime only; the client already greys SWITCH from the server's `canSwitch`, so the SWITCH
+   button is now enabled while trapped; only the `timeline.ts` / `BattleScreen.tsx` comments changed.
+6. **Tests:** `VoluntarySwitch_WhileTrappedByABind_IsRefused` became "goes through and frees the switcher", with the
+   enemy scripted Wrap then Tackle, so turn 2 shows Tackle into Bench and no `BindingContinues`;
+   `CanSwitch_IsFalse_WhileTrappedByABind` flipped to true; new: the switch-in is never `BindingBlocked`; new:
+   `TheRulesCanBlockATrappedSwitch` under the double keeps the old refusal; a forced-faint-switch test added after
+   review.
+7. **Dependencies:** none. The "enemy picks its move against the outgoing creature" entry (live) would later subsume
+   the commit-time release.
+
+**Review outcomes (2026-11-14).** `requirements-review`: wording fixed; a forced-faint-switch test added; a
+Substitute-remnant test and a last-turn test waived by the user. `pr-review`: CHANGES-REQUESTED on comment budget only,
+fixed (test comments cut to one line, a class-summary line shortened, a `BattleScreen.tsx` comment rewrapped). Advisory:
+no profile pairs `TrapBlocksSwitch` false with `ReplacementEndsTrap` false, so that branch is unexercised; no test
+warranted. Test step: 2421 .NET, tsc, 383 Vitest; E2E not run.
+
+---
+
 ## §3.1 Binding continuation turns follow Gen 1 ✅ DONE (2026-11-13)
 
 M, central `AttackAction` and `BindingMechanic`. Found 2026-11-13 in the missed-Wrap design pass (source-confirmed).

@@ -431,6 +431,9 @@ public sealed class Gen1BattleRules : IBattleRules
 
     public bool ReplacementEndsTrap => true;
 
+    // pokered: the party menu's switch path has no trap check (core.asm:2396-2437).
+    public bool TrapBlocksSwitch => false;
+
     public HitLineWording HitLineWording => HitLineWording.Short;
 
     // pokered core.asm AttackSubstitute: the byte wraps; damage above 255 breaks without writing it.
