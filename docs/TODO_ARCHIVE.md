@@ -8,6 +8,56 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## Closed, not pursued (user ruling 2026-11-15)
+
+Four entries closed by the user's ruling of 2026-11-15 in a TODO audit. Each record is the entry as it stood in `TODO.md`, with the reason.
+
+### §3.1 Enemy AI ignores a foe that is out of reach — closed: faithful, no change; reopen only on a playtest report
+
+*(found 2026-11-09, Fly and Dig item) — S–M.* `Ai/MoveEvaluators.cs:26` scores hit chance from `NeverMisses` and `Accuracy` and doesn't ask
+`HitOnSemiInvulnerable`, so the enemy attacks a flying or underground Pokémon as if it could hit. pokered's AI
+doesn't consider `INVULNERABLE` either, so today's behaviour is faithful; a guard would be a roguelite extension.
+
+**DoR as left:** ✗ gaps 1 (the product decision: stay faithful or add a guard), 2, 6. *Drafted if a guard is wanted:* acceptance, the enemy picks a move
+that lands (or its best move when none does) against a foe out of reach; the evaluator asks the rules member instead of re-deriving it
+(`ClaudeDirectives/engine.md` rule 2). 3: the existing member. 4: pokered's AI has no such check. 5: runtime only. 7: none.
+
+**Reason.** Ours matches pokered, so there is no fidelity defect; a guard would be an extension nobody asked for. Reopen only on a playtest report.
+
+### §4.6 `ConsoleInput : IBattleInput` — closed: not pursued, no host can run it
+
+A numbered move menu for terminal play (low priority). **DoR as left:** ✗ gaps 1, 2, 7. Which host runs it? The engine is a class library with no entry
+point. Gen surface none.
+
+**Reason.** No host exists to run it.
+
+### §5 Transform's scale pulse may revert a resize — closed: not pursued, speculative, never reproduced, cosmetic
+
+*(found 2026-10-17 during V13; unverified, S).* `transformSprite`'s yoyo tween returns to the scale captured at its start (`BattleScene.ts` `morph`), so a
+resize mid-pulse would restore the old scale. Read only; needed its own mini-DoR and a reproduction.
+
+**DoR as left:** ✗ gaps 1, 3, 5, 6, 7; reproduce first. *Drafted:*
+- **Acceptance:** a resize during the Transform pulse leaves the sprite at the new layout's scale (Puppeteer: trigger Transform, resize mid-tween, measure).
+- **Gen surface:** none. **Data vs runtime:** client. **Dependencies:** none.
+
+**Reason.** Speculative, never reproduced, cosmetic.
+
+### §7.1 Dev-script gaps, Part A: `-StartStack` backend leak — closed: not pursued, the claim was disproved and the item parked since 2026-10-10
+
+(`test.ps1:139,166-169`, `e2e.ps1:183,358-360`). *Not reproduced (2026-10-10), parked, not Ready.* The reviewer's reading was that `Start-Process dotnet run`
+returns the wrapper and the `finally` kills only that PID. Starting the backend exactly as the scripts do and killing it with `Stop-Process` on the
+returned PID released `:5100` and left no `creaturegame.Web` process. Only the start/kill mechanism was tested; no `-StartStack` E2E run (user-only).
+**To un-park:** the user runs `.\e2e.ps1 -Spec <small> -StartStack` (also on a failing run and on Ctrl-C) and `Get-NetTCPConnection -LocalPort 5100` still
+shows a listener afterward. Then re-draft the acceptance condition against that observed case.
+
+**DoR as left:** ✗ parked, gap 1 until the user's reproduction; 2–7 answered. The wider item (dev-script and pre-commit-hook gaps) had tooling only, no
+gen-variable surface, no `*.db` change, manual-reproduction verification and no Pester/shell harness (user ruling 2026-10-10); Parts B and C were done
+earlier (see the §7.1 records below).
+
+**Reason.** The claim was disproved and the item had been parked since 2026-10-10.
+
+---
+
 ## §3.1 A failed item use spends no turn ✅ DONE (2026-11-15)
 
 S–M, `Battle` turn flow, `IBattleRules.FailedItemUseSpendsTurn`. Found 2026-11-14 in the menu-item design pass; source-confirmed, design pass 2026-11-15.

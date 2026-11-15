@@ -166,6 +166,10 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
 - User is **locked into the move** for 2–5 turns (2 and 3 at 3/8 each, 4 and 5 at 1/8 each — pokered
   `engine/battle/effects.asm` `TrappingEffect`)
 - **No residual chip.** The only damage is the binder's own move each turn (the 1/16 chip is Gen 2's).
+- **The duration is drawn before the hit test.** `TrappingEffect` draws the 2–5 turns before `MoveHitTest`
+  (`effects.asm:1095-1103`), so a missed or immune Wrap still consumes those draws; ours draws `RollBindingTurns` only
+  when the lock starts (`BindingEffect.Start`). Not modelled: it changes only the RNG stream, never a visible outcome
+  (user ruling 2026-11-15).
 - **The lock is set before the hit test, and a miss clears it.** `TrappingEffect` runs from `SpecialEffectsCont`
   ahead of `MoveHitTest` (`core.asm:3130-3133`, `effects.asm:1090-1094`); every miss route in `MoveHitTest` ends at
   `.moveMissed`, which clears `USING_TRAPPING_MOVE` (`core.asm:5328-5345`). A missed Wrap locks no one in; only the
@@ -234,7 +238,7 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
   player-side user that is itself stranded by the glitch below, which then fails. We don't replicate that one-sided
   case (waived 2026-11-09); Transform always lands. A status move misses with its usual line ("didn't affect", or
   "But it failed!" for a stat-down, confusion or Disable move, `effects.asm:1366-1367`). Leech Seed prints "missed"
-  where Gen 1 prints "evaded the attack!" (`TODO.md` §3.1, "Residual-effect failure lines"). Mimic and Conversion check the bit themselves: "But it failed!" (`effects.asm:1221`,
+  where Gen 1 prints "evaded the attack!" (`TODO.md` §3.1, "Other `ResidualEffects1` moves may roll accuracy"). Mimic and Conversion check the bit themselves: "But it failed!" (`effects.asm:1221`,
   `:1245`, `:1272`; `move_effects/conversion.asm:14`).
 - **Cleared on any charge move's release** (`core.asm:3116`, enemy `:5500`) and by a confusion self-hit (`:3432`).
   Haze doesn't touch it.

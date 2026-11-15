@@ -44,6 +44,26 @@
 Ranked within each tier; the tiers run from the shortest path to a greenlight to the longest. ✅ Ready · ⚠️ every
 gap has drafted text, awaiting your confirmation · ✗ gaps remain.
 
+**Code groups** (user ruling 2026-11-15): items that touch the same code are tackled together, so one pokered read or
+design pass serves the group. Groups 1, 3 and 5 are clusters of S/S–M items and the cheapest wins.
+
+| # | Group | Code | Items |
+|:-:|:--|:--|:--|
+| 1 | Battle menu and turn loop | `Battle.BuildPlayerActionAsync`, the turn loop, the client bag | Binder/Bide still gets the menu · Reopen the bag after a failed item use |
+| 2 | End-of-turn residual phase | `Battle` turn tail, residuals, `TickTurnCounters` | End-of-turn residual phase (with Leech Seed × Toxic and the menu-turn first mover) |
+| 3 | Hit test and accuracy | `AttackAction.Connects`, `Gen1BattleRules.RunsHitTest` | Other `ResidualEffects1` moves (with the residual-effect failure lines) · Struggle skips accuracy |
+| 4 | Damage formula | `DamageCalculator`, crit and accuracy tables | Damage/accuracy core |
+| 5 | Effects that copy or name a move | `CounterEffect`, `StatusResolver.DisabledMoveStops`, Mimic, Mirror Move | Counter keys on the selected move (with Counter/Mirror Move on a menu turn) · Disable matches instances · The player chooses what Mimic copies (needs an input prompt) |
+| 6 | Status by type | `Gen1BattleRules.CanReceiveStatus` | Same-type secondary status immunity |
+| 7 | Battle text and seams | `timeline.ts`, the console emitter, `GENERATION_SEAMS.md` | Audit the inline battle rules · Binding and miss lines |
+| 8 | Battle presentation | `BattleScene`, the event wire | Move animations · Sprite FX · Fly/Dig sprite stays on screen · Text feel |
+| 9 | Acquisition and items | `ItemEffects`, `RewardCalculator`, evolution | Catch · Unsold-item rule · Stone evolutions |
+| 10 | Run loop and progression | `RunDirector`, `EncounterFactory` | Progressive difficulty · Enemies don't evolve · Encounter pool by game version · `save.db` (declined) |
+| 11 | Client UX | modals, Title, the level-up panel | Escape = B-cancel · Continue card species · `RunFaulted` handler test · Level-up panel · 4d+ surface catalog |
+| 12 | E2E and CI | `e2e/`, workflows, scripts | CI E2E + fast suites before deploying · `voluntary-switch` slow · evolution nameplate · Tighten two specs · E2E helper dedup · Play helper hang (four wait only on one E2E session) |
+| 13 | Importer and data model | `PokeApiConnector`, schema | Re-import churn on `pokemon.db` · §4.4 multi-generation data model |
+| 14 | Tooling and docs | `.claude/`, README, hooks | Agent profiles → skills · User docs · Pre-commit hook gaps · `npm audit` · Dev Mode next features · Abuse protection |
+
 **Ready — each awaits your greenlight**
 
 None open.
@@ -64,7 +84,7 @@ None open.
 
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
-| **End-of-turn residual phase** (§4.2) | L | ✗ 2; 1, 5, 6 drafted | Unblocks Leech Seed × Toxic (§3.1). |
+| **End-of-turn residual phase** (§4.2) | L | ✗ 2; 1, 5, 6 drafted | Now also carries the Leech Seed × Toxic counter. |
 | **Damage/accuracy core** (§3.1) | L | ✗ 1, 2, 3, 4, 6 | A verify slice first (a pokered cite per claim); touches every damage number. |
 | **Audit the inline battle rules behind seams** (§3.1) | M | ✗ 1, 2 drafted | Your 2026-10-31 ruling: battle logic always on a seam. A verify slice lists every inline rule first. |
 | **CI E2E step** (§6) + **Run the fast suites before deploying** (§7.1) | M + M | ✗ 1, 2, 6, 7 | Design together; the only automatic E2E coverage. |
@@ -72,7 +92,6 @@ None open.
 | **Stone evolutions** (§4.1) | M | ✗ 1, 2, 4, 5, 6, 7 | Waits on the acquisition design (how stones enter a run). |
 | **Progressive difficulty** (§4.2) | L | ✗ 1, 2, 4, 6, 7 | |
 | **The unsold-item rule keys on price, not category** (§3.2) | S | ✗ 1, 2 | A design pass picks the rule; pair with Catch, which first puts a 0-priced Ball in the pool. |
-| **Leech Seed × Toxic counter** (§3.1) | S | ✗ 1, 2, 3, 5, 6, 7 (drafted) | After the residual phase. |
 | **Dev Mode — next features** (§4.6) | M | ✗ 1–7 | "Force the first enemy" would speed the two slowest specs. |
 | **Agent profiles → project skills** (§4.6) | M | ✗ 2 | |
 | **Generation Profile 4d+ surface catalog** (§4.3) | L | ✗ 1, 2 per surface | Each surface its own mini-plan with you. |
@@ -88,19 +107,16 @@ None open.
 
 | Item | Cost | Ready? | Next step |
 |:-----|:----:|:-------|:----------|
-| **An enemy Counter or Mirror Move on a switch or item turn** (§3.1) | S | ✗ 1, 2, 6; 4 drafted | Filed 2026-11-15. Read `HandleCounterMove` and `MirrorMoveCopyMove` for the stale player move and damage, then ours. |
 | **Disable matches move instances, not move ids** (§3.1) | S | ✗ 1, 2, 4, 6 | Filed 2026-11-09. Read `DisabledMoveStops` and the Metronome and Mirror Move wrappers first. |
 | **Same-type secondary status immunity** (§3.1) | S–M | ✗ 2, 4, 6; the rest drafted | Take the pokered cite; Ice Beam freezes Ice-types today. |
-| **Other `ResidualEffects1` moves may roll accuracy** (§3.1) | S–M | ✗ 1, 2, 4, 6 | Filed 2026-11-06. A verify slice reads each effect for its own hit test. |
-| **Residual-effect failure lines: Leech Seed "evaded", confusion-move miss** (§3.1) | S–M | ✗ 2, 3, 6 | Filed 2026-11-06. Pair with the `ResidualEffects1` slice. |
-| **Counter keys on the foe's selected move** (§3.1) | S–M | ✗ 1, 2, 4, 6 | Trace `HandleCounterMove`, list the diverging cases. |
+| **Other `ResidualEffects1` moves may roll accuracy** (§3.1) | S–M | ✗ 1, 2, 4, 6 | Filed 2026-11-06. A verify slice reads each effect for its own hit test; now also carries the residual-effect failure lines. |
+| **Counter keys on the foe's selected move** (§3.1) | S–M | ✗ 1, 2, 4, 6 | Trace `HandleCounterMove` and `MirrorMoveCopyMove`, including switch and item turns; list the diverging cases. |
 | **A re-import marks `pokemon.db` changed with identical data** (§3.2) | S | ✗ 2; the rest drafted | Filed 2026-11-06. Read the three delete-and-insert sites, pick upsert or stable IDs. |
 | **Escape = B-cancel on the negative-answer prompts** (§4.5) | S | ✗ 4; the rest drafted | One pokered cite. |
 | **Dependencies — `npm audit`** (§7.2) | S | ✗ 1, 7 | Re-run `npm audit`; the bumps need your E2E run. |
 | **The client `RunFaulted` handler is unpinned** (§6) | S | ✗ 1, 2, 7 | Choose: extract the handler logic, or test it in place. |
 | **E2E play helper hangs on an open move grid** (§6) | S | ✗ 2 | Confirm the trigger from the trace. |
 | **Level-up panel follow-ups** (§4.3) | S | ✗ 4 | Verify pokered's level-up stats box. |
-| **Transform's scale pulse may revert a resize** (§5) | S | ✗ 1, 3, 5, 6, 7 | Reproduce first. |
 | **`voluntary-switch.spec.ts` is still slow** (§6) | S | ✗ 1, 7 | Investigate; likely waits on Dev Mode "force the first enemy". |
 | **The Continue card shows the starter's species** (§5) | S–M | ✗ 1, 2, 6 | Needs a persisted-shape change. |
 
@@ -108,17 +124,14 @@ None open.
 
 | Item | Cost | Ready? | What it waits on |
 |:-----|:----:|:-------|:-----------------|
-| **Enemy AI ignores a foe that is out of reach** (§3.1) | S–M | ✗ 1, 2, 6 | Your product call: stay faithful to Gen 1's AI or add a guard. |
 | **Binding and miss lines follow pokered's text** (§3.1) | S | ✗ 3 | Your battle-text placement decision (presentation catalog or seam). |
 | **`evolution.spec.ts` nameplate assertion** (§6) | S | ✗ 1 drafted | Your E2E go-ahead. |
 | **Tighten `encounter-map` and `cadence` specs** (§6) | S | ✗ | Your E2E go-ahead; a cadence seed. |
 | **E2E half of "Deduplicate the test helpers"** (§6) | M | ✗ | Your E2E go-ahead. |
-| **`-StartStack` backend leak** (§7.1 A) | S | ✗ parked | Your reproduction. |
 | **Abuse protection** (§7.1) | M | ✗ shelved | Your numbers and the idle-notice UX call. |
 | **Struggle skips the accuracy roll** (§3.2) | S | ✗ | Left as filed (ruling 2026-10-11). |
 | **Enemy encounter pool ignores game version** (§4.2) | S | ✗ 1, 2, 3, 5, 6, 7 | Gap 7 blocks the rest: no version selector exists. |
 | **Enemy Pokémon do not evolve** (§4.2) | S | ✗ 1, 2, 4, 6, 7 | Your product call on when the loop wants it. |
-| **`ConsoleInput`** (§4.6) | S | ✗ 1, 2, 7 | Which host runs it. |
 | **`save.db`** (§4.2) | L | declined | Revisit by your ruling only. |
 
 ---
@@ -146,21 +159,16 @@ data/engine item usually also means updating the test that pins the wrong value.
 - **Damage/accuracy core (L):** `DamageCalculator.cs:246-247` skips the `2L/5` and `/50` floors `GEN_DIFFERENCES.md`
   documents (~24% high at L12); `Gen1BattleRules.cs:215` uses a 3-based accuracy/evasion table (Gen 1 uses the
   standard table); crit multiplier should be ≈(2L+5)/(L+5), not a flat 2× (`Gen1BattleRules.cs` crit block, ~`:287`); recoil/drain/Struggle use full calculated damage, not
-  HP actually lost (`AttackAction.ExecuteAsync` Struggle recoil, `ResolveDamage` drain); Ice can freeze Ice /
-  Electric can paralyse Electric (`Gen1BattleRules.CanReceiveStatus`); `DamageCalculator` applies no stat cap after the stage multiplier (Gen 1 reportedly clamps a staged
-  stat to 1–999) and no ÷4 scaling of both stats when either exceeds 255 (found by `requirements-review`
-  2026-10-14, during the stat-stage seam item; unverified against pokered). Also roll order (found 2026-11-13 by
-  `requirements-review`, binding continuation item; source-confirmed): pokered draws the binding duration in
-  `TrappingEffect`, before the hit test, so a missed or immune Wrap still consumes those draws (`effects.asm:1095-1103`);
-  ours draws `RollBindingTurns` only when the lock starts (`BindingEffect.Start`). Invisible in play; RNG-stream only.
+  HP actually lost (`AttackAction.ExecuteAsync` Struggle recoil, `ResolveDamage` drain); `DamageCalculator`
+  applies no stat cap after the stage multiplier (Gen 1 reportedly clamps a staged stat to 1–999) and no ÷4 scaling
+  of both stats when either exceeds 255 (found by `requirements-review` 2026-10-14, during the stat-stage seam item;
+  unverified against pokered). The same-type status claim is its own entry below (*Same-type secondary status
+  immunity*); the binding-duration draw order is closed as invisible in play (`GEN_DIFFERENCES.md`, binding moves).
   **DoR (V16):** ✗ not Ready — gaps **1, 2, 3, 4, 6** (line cites refreshed 2026-10-17). *Drafted:* first a verify
   slice that gives each claim a pokered cite, then one entry per confirmed claim. Each entry gets: acceptance, a
   test pinning pokered's number; its seam member (most are already `IBattleRules`/`DamageCalculator` inputs);
   both gates, since `DamageCalculator`/`AttackAction` are central. Data vs runtime: runtime.
   Dependencies: none.
-- **Leech Seed × Toxic counter (from §7.6 V10) — S, ✗ not Ready.** *Intent:* the Leech Seed drain is multiplied by the
-  Toxic counter (`core.asm:546-591`). *Gaps:* overlaps the end-of-turn residual `/plan` (§4.2); sequence after it.
-  *Drafted:* an `IBattleRules` member, runtime only; quirk: the drain grows with the Toxic counter.
 - **Other `ResidualEffects1` moves may roll accuracy they skip in Gen 1 (found 2026-11-06, Roar design pass;
   unverified) — S–M, ✗ not Ready.** pokered skips the accuracy test for every effect in `ResidualEffects1`
   (`data/battle/residual_effects_1.asm`, dispatched at `core.asm:3124-3127`) unless the effect calls `MoveHitTest`
@@ -171,6 +179,13 @@ data/engine item usually also means updating the test that pins the wrong value.
   `ForceFleeSkipsAccuracy`, shipped 2026-11-06). 3: `IBattleRules`. 5: runtime only. 7: none now that Roar has shipped.
   Noted 2026-11-09 (`pr-review`, Fly and Dig): `Gen1BattleRules.RunsHitTest` already lists which moves run the hit
   test, for the out-of-reach rule; this item should make the accuracy roll read the same member so the two can't drift.
+  **Merged in (ruling 2026-11-15): the residual-effect failure lines** (found 2026-11-06, "It didn't affect" design
+  pass; source-confirmed). Two more pokered lines we don't print. Leech Seed on a Grass type, on an already-seeded
+  foe, or on a miss prints "<TARGET> evaded the attack!" (`leech_seed.asm` `.moveMissed`, `EvadedAttackText`); ours
+  prints "doesn't affect" for Grass (`MoveEffects.cs` ~118), nothing when already seeded, and "missed" on a miss. A
+  missed Supersonic or Confuse Ray prints "But it failed!" (`effects.asm:1120-1126`, `ConfusionEffectFailed`
+  :1158-1163); ours prints "missed". The slice decides where these moves roll accuracy, then each case prints its
+  pokered line in a full battle; a new "evaded" event is wired in all four places. Lines gaps: **2, 3, 6**.
 - **Same-type secondary status immunity (found 2026-10-29 by `requirements-review`; read-confirmed by the reviewer,
   not yet by us) — S–M, ✗ not Ready.** pokered `FreezeBurnParalyzeEffect` (`effects.asm:194-212`) skips a secondary
   freeze, burn or paralysis whenever the move's type equals either target type ("an ice move can't freeze an
@@ -188,8 +203,13 @@ data/engine item usually also means updating the test that pins the wrong value.
   *selected* move: it misses when that move is Counter, has 0 power, or isn't Normal/Fighting type, and doubles the
   shared `wDamage`. Ours keys on the type of the last damage the user *took* (`LastDamageType`). Cases that differ
   need tracing (a foe that selected a Normal move but missed; damage from the user's own move in `wDamage`).
-  **DoR:** ✗ — gaps **4** (trace `HandleCounterMove` ourselves and list the diverging cases), **2** (design pass:
-  touches `AttackAction`/`CounterEffect` and `CounterQualifies`' signature), **6**, **1**. 5: runtime only. 7: none.
+  **Merged in (ruling 2026-11-15): an enemy Counter or Mirror Move on a switch or item turn** (found 2026-11-15 by
+  `requirements-review`, menu-item item; unverified). No player move runs on a switch or item turn, so pokered's
+  enemy Counter and Mirror Move read the stale `wPlayerSelectedMove` and `wDamage` from the previous turn
+  (`MirrorMoveCopyMove` too); whether ours matches is untraced. The same trace covers both.
+  **DoR:** ✗ — gaps **4** (trace `HandleCounterMove` and `MirrorMoveCopyMove` ourselves, including the switch and item
+  paths, and list the diverging cases), **2** (design pass: touches `AttackAction`/`CounterEffect` and
+  `CounterQualifies`' signature), **6**, **1**. 3: existing Counter and Mirror Move seams. 5: runtime only. 7: none.
 - **Audit the inline battle rules and put each behind a seam (user ruling 2026-10-31) — M, ✗ not Ready.** Battle
   logic gets full generation separation: a rule goes on a seam even when the generations we checked agree, and
   only out-of-battle or ancillary behaviour may stay inline. `GENERATION_SEAMS.md` still documents deliberate inline
@@ -207,15 +227,6 @@ data/engine item usually also means updating the test that pins the wrong value.
     the client (`timeline.ts`) and the console emitter, keyed on event fields (e.g. `MoveUnaffected.Cause`), not on a
     seam. Decide whether battle text moves to the presentation catalog (§4.3) or a seam; the same question covers
     the Counter-failure and Dream Eater `MoveMissed` lines.
-- **Residual-effect failure lines (found 2026-11-06, "It didn't affect" design pass; source-confirmed) — S–M, ✗ not
-  Ready.** Two more pokered lines we don't print. Leech Seed on a Grass type, on an already-seeded foe, or on a miss
-  prints "<TARGET> evaded the attack!" (`leech_seed.asm` `.moveMissed`, `EvadedAttackText`); ours prints "doesn't
-  affect" for Grass (`MoveEffects.cs` ~118), nothing when already seeded, and "missed" on a miss. A missed Supersonic
-  or Confuse Ray prints "But it failed!" (`effects.asm:1120-1126`, `ConfusionEffectFailed` :1158-1163); ours prints
-  "missed".
-  **DoR:** ✗ — gaps **2, 3, 6**. *Drafted:* **Acceptance:** each case prints its pokered line in a full battle.
-  **Data vs runtime:** runtime plus a new "evaded" event wired in all four places. **Dependencies:** pair with the
-  `ResidualEffects1` accuracy slice, which decides where these moves roll accuracy.
 - **Binding and miss lines follow pokered's text (found 2026-11-13, binding continuation item; read-confirmed, not
   run) — S, ✗ not Ready.** Starting a trap prints "<foe> was squeezed by WRAP!" (`timeline.ts` and
   `ConsoleBattleEventEmitter.cs`, `BindingStarted`); pokered's `TrappingEffect` prints nothing (`effects.asm:1081-1104`),
@@ -245,12 +256,6 @@ data/engine item usually also means updating the test that pins the wrong value.
   **6**. *Drafted:* 1: after "It won't have any effect" the bag list is open, and backing out shows the action menu.
   3: none (the turn rule is `FailedItemUseSpendsTurn`; this is presentation). 4: the cite above. 5: runtime, client
   only. 7: the failed-item-use item (landed; see `TODO_ARCHIVE.md`).
-- **An enemy Counter or Mirror Move on a switch or item turn (found 2026-11-15 by `requirements-review`, menu-item
-  item; unverified) — S, ✗ not Ready.** No player move runs on a switch or item turn, so pokered's enemy Counter and
-  Mirror Move read the stale `wPlayerSelectedMove` and `wDamage` from the previous turn. Whether ours matches is
-  untraced. **DoR:** ✗ gaps **1**, **2**, **6** (all wait on the read). *Drafted:* 4: pokered `HandleCounterMove`
-  (`core.asm:4547-4607`) and `MirrorMoveCopyMove`, read against the switch and item paths. 3: existing Counter and
-  Mirror Move seams, if the read shows a gap. 5: runtime only. 7: none.
 - **Disable matches move instances, not move ids (found 2026-11-09 by `opus-engineer`, Fly and Dig item;
   read-confirmed, unverified beyond that) — S, ✗ not Ready.** `StatusResolver.DisabledMoveStops` compares the selected
   `PokemonAttack` with `Battle.DisabledMove` by reference; pokered compares move numbers
@@ -260,14 +265,6 @@ data/engine item usually also means updating the test that pins the wrong value.
   **DoR:** ✗ gaps **1, 2, 4, 6**. *Drafted:* a verify slice reads `DisabledMoveStops`, `DisableEffect` and the
   Metronome and Mirror Move wrappers against pokered, then lists the diverging cases. 3: likely none (a matching bug,
   not a rule), decided by the slice. 5: runtime only. 7: none.
-- **Enemy AI ignores a foe that is out of reach (found 2026-11-09, Fly and Dig item) — S–M, ✗ not Ready, your
-  call.** `Ai/MoveEvaluators.cs:26` scores hit chance from `NeverMisses` and `Accuracy` and doesn't ask
-  `HitOnSemiInvulnerable`, so the enemy attacks a flying or underground Pokémon as if it could hit. pokered's AI
-  doesn't consider `INVULNERABLE` either, so today's behaviour is faithful; a guard would be a roguelite extension.
-  **DoR:** ✗ gaps **1** (the product decision: stay faithful or add a guard), **2**, **6**. *Drafted if a guard is
-  wanted:* acceptance, the enemy picks a move that lands (or its best move when none does) against a foe out of
-  reach; the evaluator asks the rules member instead of re-deriving it (`ClaudeDirectives/engine.md` rule 2). 3: the
-  existing member. 4: pokered's AI has no such check. 5: runtime only. 7: none.
 - **The player chooses what Mimic copies (found 2026-11-03, move description audit) — M, ✗ not Ready.** pokered lets the
   player pick any of the target's moves, and only the enemy picks at random (`MimicEffect`, `effects.asm:1203-1250`). Ours
   always picks at random (`MoveEffects.cs:345-352`).
@@ -398,7 +395,10 @@ channel of a broader acquisition layer.
     re-pinned to a path Gen 1 can produce.
   - **Data vs runtime:** runtime only.
   - **Quirk:** the faster creature's own poison tick lands before the slower one acts.
-  - **Dependencies:** none. §3.1 "Leech Seed × Toxic counter" waits on this.
+  - **Dependencies:** none.
+  - **Also covers (merged 2026-11-15, from §7.6 V10): the Leech Seed × Toxic counter.** The Leech Seed drain is
+    multiplied by the Toxic counter (`core.asm:546-591`). An `IBattleRules` member, runtime only; quirk: the drain
+    grows with the Toxic counter. Lines 1–7 for it are drafted; it lands with or right after this phase.
   - **Also covers (ruling 2026-11-06):** when the slower side's Roar ends a Gen 1 battle, the faster side's own
     residual has already ticked (`core.asm:426`, `:449`); with the flee ending the turn at once, ours never ticks it.
     HP carries between battles, so the per-creature residual order fixes this too. Gen 1 consequences: the faster
@@ -556,9 +556,6 @@ each). Their seam and data-vs-runtime lines are already written in the text.
 
 ### 4.6 Dev and test tooling features
 
-- [ ] `ConsoleInput : IBattleInput` — a numbered move menu for terminal play (low priority).
-  **DoR (V16):** ✗ not Ready — gaps **1, 2, 7**. Which host runs it? The engine is a class library with no entry
-  point. Gen surface none.
 - [ ] **Dev Mode — next features (shell, not ready: needs a `/plan` and a full DoR entry).** More dev actions behind
   the same `DevController` gate (404 when the flag is off; `forceDraft` is the existing test-support precedent).
   Candidates, unranked: force the first enemy's species/encounter (removes the seed walks behind the slow
@@ -599,16 +596,6 @@ surface: `/help` and the explainer describe the active generation, so they are p
 
 ## 5. UX, accessibility and robustness (all unverified unless noted)
 
-- **Transform's scale pulse may revert a resize (found 2026-10-17 during V13; unverified, S).** `transformSprite`'s
-  yoyo tween returns to the scale captured at its start (`BattleScene.ts` `morph`), so a resize mid-pulse would
-  restore the old scale. Read only; needs its own mini-DoR and a reproduction.
-  **DoR (V16):** ✗ not Ready — gaps **1, 3, 5, 6, 7**; reproduce first. *Drafted:*
-  - **Acceptance:** a resize during the Transform pulse leaves the sprite at the new layout's scale (Puppeteer:
-    trigger Transform, resize mid-tween, measure).
-  - **Gen surface:** none.
-  - **Data vs runtime:** client.
-  - **Quirk:** the pulse ends at the current scale, not the captured one.
-  - **Dependencies:** none.
 - **Player species is taken from the starter** (`BattleScreen.tsx:77,237,400`, `activeGame.ts`) — game-over shows the
   starter's sprite with the final creature's name after an evolution or lead change; Continue also shows the
   starter's name/level. The on-field sprite and the game-over card were fixed by R1d-d (`TODO_ARCHIVE.md` → *§2 R1d-d*, 2026-10-27);
@@ -709,19 +696,7 @@ surface: `/help` and the explainer describe the active generation, so they are p
   **DoR (V16):** ✗ not Ready — gaps **1, 2, 6, 7**, as the entry says. *Drafted:* acceptance, a red commit's RC tag
   fails before `flyctl deploy` runs (proven on a throwaway tag or a `workflow_dispatch` dry run). Design this
   together with §6 "CI E2E step". Gen surface none; CI only.
-- **Dev-script and pre-commit-hook gaps — only Part A remains (parked).** B and C are done (see
-  `TODO_ARCHIVE.md`). Tooling only: no `/plan` needed; gen-variable surface none; no importer, engine or `*.db` change;
-  no dependencies. Verification is **manual reproduction** (nothing in xUnit covers these scripts); no Pester/shell
-  harness (user ruling 2026-10-10).
-  - **A — `-StartStack` backend leak** (`test.ps1:139,166-169`, `e2e.ps1:183,358-360`). *Not reproduced
-    (2026-10-10) — parked, not Ready.* The reviewer's reading was that `Start-Process dotnet run` returns the wrapper
-    and the `finally` kills only that PID. Starting the backend exactly as the scripts do and killing it with
-    `Stop-Process` on the returned PID released `:5100` and left no `creaturegame.Web` process. Only the start/kill
-    mechanism was tested; no `-StartStack` E2E run (user-only). **To un-park:** the user runs `.\e2e.ps1 -Spec <small>
-    -StartStack` (also on a failing run and on Ctrl-C) and `Get-NetTCPConnection -LocalPort 5100` still shows a
-    listener afterward. Then re-draft the acceptance condition against that observed case.
-    **DoR (V16):** ✗ parked — gap **1** until your reproduction. 2–7 are answered above.
-- **Pre-commit hook — deferred from the item above (user ruling 2026-10-10; each needs its own entry before work):**
+- **Pre-commit hook gaps (split out of the dev-script item, user ruling 2026-10-10; Parts B and C and the `-StartStack` leak are closed or archived; each needs its own entry before work). Tooling only, verified by manual reproduction (no Pester/shell harness, user ruling 2026-10-10):**
   the hook checks the working tree, not the staged snapshot (`:14,22`; fix needs `git stash --keep-index` or a temp
   worktree, **M**, riskier); hardcoded dotnet path (`:11`; portability only).
   **DoR (V16):** ✗ not Ready — gaps **1, 2, 6** for each.
