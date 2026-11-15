@@ -440,6 +440,16 @@ public sealed class Gen1BattleRules : IBattleRules
     // pokered: a failed UseItem jumps back to BagWasSelected (core.asm UseBagItem).
     public bool FailedItemUseSpendsTurn => false;
 
+    // pokered core.asm:2261-2268: UseBagItem decrements the binder's trap before SelectEnemyMove reads it.
+    public bool ItemTurnCountsDownTrap => true;
+
+    // pokered core.asm:293-304: Rage, recharge, Thrash and a charge skip DisplayBattleMenu; Bide and a trap don't.
+    public bool SkipsBattleMenu(Creature creature) =>
+        creature.Battle.IsRecharging
+        || creature.Battle.IsRaging
+        || creature.Battle.RampageTurnsRemaining > 0
+        || creature.Battle.IsTwoTurnCharging;
+
     public HitLineWording HitLineWording => HitLineWording.Short;
 
     // pokered core.asm AttackSubstitute: the byte wraps; damage above 255 breaks without writing it.

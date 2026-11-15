@@ -193,6 +193,14 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
   not (user ruling 2026-11-13: accepted). As in pokered, a 0-damage continuation still builds a raging foe's Rage
   (`HandleBuildingRage` runs on that path, `core.asm:3243`), and Counter answers it with a miss, since the last
   damage is 0 (`HandleCounterMove`).
+- **The binder keeps the battle menu too.** A binder or a Bide user sees the full menu and only its move list is
+  skipped (`core.asm:313-316`): FIGHT continues the lock, an item turn counts the trap down inside the bag menu, before
+  the foe chooses (`UseBagItem`, `:2261-2268`), so the foe is held unless that was the trap's last turn, and a switch-out zeroes the side's battle status (`SendOutMon`, `:1744-1749`), ending the lock and freeing the foe.
+  Bide doesn't count down on an item turn (`ExecutePlayerMove` exits first, `:3085-3087`). Seams: `SkipsBattleMenu`, `ItemTurnCountsDownTrap`.
+- **Not modelled: a recharge turn after a called Hyper Beam can sort first.** On a skipped recharge turn the action
+  carries the last move used; when Metronome or Mirror Move called the Hyper Beam it isn't in the moveset, so the
+  first usable move stands in, and a Quick Attack there sorts the recharging side first. Only the message order
+  changes ("must recharge" before the foe's move).
 - **The trapped Pokémon can still switch out, and that frees it.** The battle menu shows to a trapped Pokémon and only
   move selection is skipped (`core.asm:305-322`); the party menu's switch path has no trap check (`:2396-2437`).
   `SendOutMon` clears the enemy's `USING_TRAPPING_MOVE` (`:1755-1756`), and since the switch happens inside the menu,
@@ -306,9 +314,10 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
   (`GENERATION_SEAMS.md` §2, Pre-move checks). History of the direct-hit fix (reported log, 2026-09-13):
   `docs/TODO_ARCHIVE.md` → "End-of-turn residual fired even after a same-turn faint".
 - **Hyper Beam**: does NOT require a recharge turn if it KOs the target — the sibling half of the same faint
-  rule above, and read off the same `FaintEndsTurnImmediately` member; **switching out during the recharge
-  turn is legal** — the recharge is only spent if the creature stays in and FIGHTs (it's enforced inside
-  `StatusResolver.CanAct`, not the turn menu), so a voluntary switch pre-empts it
+  rule above, and read off the same `FaintEndsTurnImmediately` member. **The recharge turn has no battle menu**:
+  `NEEDS_TO_RECHARGE` jumps past `DisplayBattleMenu` (pokered `engine/battle/core.asm:293-296`), so the player can't
+  switch or use an item during it (corrected 2026-11-15; an earlier note said a switch was legal). Seam:
+  `SkipsBattleMenu`
 - **Focus Energy / Dire Hit**: bug causes it to **quarter** the crit rate instead of quadrupling it; a high-crit move
   from base speed 64 up loses less (formula under Stats)
 - **Sleep**: Pokémon wakes up before acting — but **cannot act** on the turn it wakes

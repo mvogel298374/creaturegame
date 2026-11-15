@@ -1087,6 +1087,39 @@ public class WebEventContractTests
         Assert.False(ProjectedCanSwitch(false));
     }
 
+    [Fact]
+    public void TurnStarted_Projection_CarriesFightContinuesLock()
+    {
+        static bool ProjectedFightContinuesLock(bool fightContinuesLock)
+        {
+            var (type, payload) = SignalRBattleEventEmitter.MapEvent(
+                new TurnStarted(
+                    1,
+                    "PIKACHU",
+                    1,
+                    30,
+                    35,
+                    StatusCondition.None,
+                    0,
+                    100,
+                    "PIDGEY",
+                    2,
+                    20,
+                    24,
+                    StatusCondition.None,
+                    [],
+                    FightContinuesLock: fightContinuesLock
+                )
+            );
+            Assert.Equal("TurnStarted", type);
+            using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+            return doc.RootElement.GetProperty("FightContinuesLock").GetBoolean();
+        }
+
+        Assert.True(ProjectedFightContinuesLock(true));
+        Assert.False(ProjectedFightContinuesLock(false));
+    }
+
     /// <summary>Projection guard for <see cref="RunNodeEntered"/>: the client titles the node from
     /// <c>Kind</c> (the reflection contract test instantiates it with an empty string, so this pins a real
     /// value round-trips).</summary>

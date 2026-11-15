@@ -177,7 +177,7 @@ export function BattleScreen() {
   // resolves to Struggle server-side (SignalRInput) once no move is selectable, so slot 0 is as good as any.
   // BAG and SWITCH are untouched by this: they stay reachable at 0 PP, and Struggle only ever follows a FIGHT.
   const handleFight = () => {
-    if (!hasUsableMove(state.moves)) {
+    if (state.fightContinuesLock || !hasUsableMove(state.moves)) {
       handleChooseMove(0);
       return;
     }
@@ -874,8 +874,8 @@ function ActionMenu({ playerName, canAct, canSwitch, onFight, onBag, onSwitch, o
   onBack: () => void;
 }) {
   // FIGHT, BAG and SWITCH all spend the turn, so they're gated on it being the player's turn (canAct). SWITCH
-  // is additionally gated on canSwitch (server-computed: a party is wired, the active creature isn't locked in,
-  // the rules allow it, and a live benched member exists) so it greys out when a switch would be refused. CHECK
+  // is additionally gated on canSwitch (server-computed: the menu shows, the rules allow it, a bench member
+  // lives) so it greys out when a switch would be refused. CHECK
   // POKEMON is read-only, so it's always available.
   const canSwitchNow = canAct && canSwitch;
   return (

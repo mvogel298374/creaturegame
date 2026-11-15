@@ -150,7 +150,8 @@ public class Battle
                                 m.Base.BaseDamage
                             ))
                             .ToList(),
-                        CanSwitchThisTurn()
+                        CanSwitchThisTurn(),
+                        FightContinuesLock()
                     )
                 );
 
@@ -167,6 +168,7 @@ public class Battle
                 }
                 break;
             }
+            var trapCountedDown = CountDownTrapOnItemTurn(playerAction);
             bool menuActionFirst =
                 playerAction is SwitchAction or ItemAction
                 && _rules.MenuActionResolvesBeforeFoeChoice;
@@ -253,8 +255,10 @@ public class Battle
             if (!FleeEndsTurn())
             {
                 // Runs even on a faint: GEN_DIFFERENCES.md, end-of-turn residuals.
-                StatusResolver.TickTurnCounters(PlayerCreature);
-                StatusResolver.TickTurnCounters(EnemyCreature);
+                if (trapCountedDown != PlayerCreature)
+                    StatusResolver.TickTurnCounters(PlayerCreature);
+                if (trapCountedDown != EnemyCreature)
+                    StatusResolver.TickTurnCounters(EnemyCreature);
 
                 // IBattleRules.FaintEndsTurnImmediately — TODO_ARCHIVE.md → "End-of-turn residual … fired even
                 // after a same-turn faint" for the incident this guards against.
@@ -542,21 +546,15 @@ public class Battle
             : attacker.MoveSet.FirstOrDefault(attacker.CanSelect);
     }
 
-    /// <summary>Builds the player's action: ITEM/SWITCH/FIGHT. A true lock-in bypasses the menu entirely. The
-    /// whole-turn menu is otherwise offered even out of PP (BAG/SWITCH stay reachable — Gen 1); an illegal
-    /// ITEM/SWITCH pick falls through to FIGHT (Struggle if nothing is selectable) rather than stranding the
-    /// turn.</summary>
+    /// <summary>Builds the player's action: ITEM/SWITCH/FIGHT, or the forced move when <see cref="IBattleRules.SkipsBattleMenu"/> skips the menu. See GENERATION_SEAMS.md §2.</summary>
     private async Task<IBattleAction> BuildPlayerActionAsync()
     {
         var attacker = PlayerCreature;
 
-        // A TRUE lock-in owns the whole turn — no menu at all. Struggle is NOT a lock-in: out of PP the menu
-        // still shows below (only a FIGHT with nothing selectable becomes Struggle), so it is not checked here.
-        foreach (var mechanic in LockInMechanics.All)
-        {
-            if (mechanic.ForcedMove(attacker) is { } forced)
-                return NewPlayerAttack(forced);
-        }
+        // Struggle is not a lock-in: out of PP the menu still shows (only a FIGHT with nothing selectable Struggles).
+        var forced = ForcedPlayerMove();
+        if (_rules.SkipsBattleMenu(attacker))
+            return NewPlayerAttack(forced ?? RechargePlaceholderMove(attacker));
 
         var context = new TurnContext
         {
@@ -586,13 +584,42 @@ public class Battle
             case SwitchTurnChoice sw when CanSwitchTo(sw.PartyIndex):
                 return new SwitchAction(this, attacker, sw.PartyIndex);
 
+            case MoveTurnChoice when forced is not null:
+                return NewPlayerAttack(forced);
+
             case MoveTurnChoice mv when attacker.CanSelect(mv.Move):
                 return NewPlayerAttack(mv.Move);
 
             default:
-                return NewPlayerAttack(attacker.MoveSet.FirstOrDefault(attacker.CanSelect));
+                return NewPlayerAttack(
+                    forced ?? attacker.MoveSet.FirstOrDefault(attacker.CanSelect)
+                );
         }
     }
+
+    private PokemonAttack? ForcedPlayerMove() =>
+        LockInMechanics
+            .All.Select(m => m.ForcedMove(PlayerCreature))
+            .FirstOrDefault(m => m is not null);
+
+    // The recharge check stops the turn before this move is used; it only stands in for the last move used.
+    private static PokemonAttack? RechargePlaceholderMove(Creature attacker) =>
+        attacker.MoveSet.FirstOrDefault(m => m.Base == attacker.Battle.LastMoveUsed)
+        ?? attacker.MoveSet.FirstOrDefault(attacker.CanSelect);
+
+    // The victim whose trap this turn's tick already counted down, or null.
+    private Creature? CountDownTrapOnItemTurn(IBattleAction playerAction)
+    {
+        if (playerAction is not ItemAction item || !_rules.ItemTurnCountsDownTrap || !item.CanUse())
+            return null;
+        if (PlayerCreature.Battle.BindingTarget is not { Battle.BindingTurnsRemaining: > 0 } victim)
+            return null;
+        StatusResolver.TickTurnCounters(victim);
+        return victim;
+    }
+
+    private bool FightContinuesLock() =>
+        !_rules.SkipsBattleMenu(PlayerCreature) && ForcedPlayerMove() is not null;
 
     /// <summary>Legal to switch to <paramref name="index"/> this turn: a party is wired, the rules don't hold a
     /// trapped creature in place, and the target is in range, alive, and not already active.</summary>
@@ -612,7 +639,7 @@ public class Battle
             return false;
         // Same predicate the menu bypass uses, so the two can't drift apart and advertise a switch the server
         // then refuses.
-        if (LockInMechanics.All.Any(m => m.IsLockedIn(PlayerCreature)))
+        if (_rules.SkipsBattleMenu(PlayerCreature))
             return false;
         for (int i = 0; i < _playerParty.Count; i++)
             if (CanSwitchTo(i))

@@ -31,3 +31,7 @@ Lessons Claude derived from the move batches. They serve `MoDirectives/generatio
 11. **Seeded in tests is not seeded in production.** When a seam is proven in tests, check the production
     composition root that builds it too. The production run once used an unseeded rules instance while every
     test passed.
+12. **Read the RAM layout before naming what a block write touches.** When a pokered routine writes a run of
+    bytes with `[hli]` from one label, check `ram/wram.asm` for which fields that run covers before saying what it
+    clears. Learned 2026-11-15: `SendOutMon`'s five zero bytes from `wPlayerStatsToDouble` include the three
+    battle-status bytes, which a design pass missed, and a ruling briefly rested on the miss.

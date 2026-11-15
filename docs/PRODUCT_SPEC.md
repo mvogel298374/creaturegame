@@ -190,13 +190,18 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - A trapped Pokémon can still switch out: the SWITCH button stays enabled while a Wrap, Bind, Clamp or Fire Spin holds
   it. Committing the switch frees it, so the foe picks its move freely that turn and a Wrap into the switch-in is a
   fresh use. The binder's own switch ends its lock.
+- A Bide user or a binder (Wrap, Bind, Clamp, Fire Spin) gets the full battle menu; FIGHT continues the lock at once
+  with no move list, and BAG and SWITCH are offered. Rage, Thrash/Petal Dance, a two-turn charge and a Hyper Beam
+  recharge turn get no menu: no switch or item on those turns.
+- An item turn under Bide delays the release by a turn. A binder's successful item turn counts the trap down before the
+  foe chooses, so the foe is held unless that was the trap's last turn, when it moves that turn.
 - The foe chooses its move knowing which Pokémon you switched in: a trainer's pick follows the switch-in's typing
   (it won't throw a Normal move at a Ghost switch-in), and a slower foe's move lands on the switch-in.
 - An item you use takes effect before the foe chooses its move: the foe's pick sees your state after it (an Antidote's
   cure is visible to the foe's choice).
 - Design detail → `GENERATION_SEAMS.md` §2 (*Roll order*, *Pre-move checks*, *Fly and Dig out of reach*), `GEN_DIFFERENCES.md` → *Roll Order*, *Fly / Dig*, *Binding*, *Type-reduced zero damage*.  History →
   `TODO_ARCHIVE.md` → *Gen 1 roll order in `AttackAction`, behind a seam* and *Failure announcements: a failed OHKO and
-  a trainer-battle Roar/Whirlwind say "unaffected"* and *Roar/Whirlwind: the scared-off side still acts* and *Recover and Soft-Boiled fail cases* and *Gen 1 confusion self-hit damage* and *Rampage edge gaps* and *Self-hit and crash damage strike the foe's Substitute* and *Substitute prints Gen 1's lines* and *Pre-move checks follow Gen 1* and *Snapping out of confusion prints only "confused no more!"* and *Fly and Dig put the user out of reach* and *Breaking a Substitute cancels the attacker's post-damage effects* and *A Rage that misses or breaks a Substitute no longer starts raging* and *Binding continuation turns follow Gen 1* and *A trapped Pokémon can switch out in Gen 1*.
+  a trainer-battle Roar/Whirlwind say "unaffected"* and *Roar/Whirlwind: the scared-off side still acts* and *Recover and Soft-Boiled fail cases* and *Gen 1 confusion self-hit damage* and *Rampage edge gaps* and *Self-hit and crash damage strike the foe's Substitute* and *Substitute prints Gen 1's lines* and *Pre-move checks follow Gen 1* and *Snapping out of confusion prints only "confused no more!"* and *Fly and Dig put the user out of reach* and *Breaking a Substitute cancels the attacker's post-damage effects* and *A Rage that misses or breaks a Substitute no longer starts raging* and *Binding continuation turns follow Gen 1* and *A trapped Pokémon can switch out in Gen 1* and *A binder or a Bide user still gets the battle menu*.
 
 ### Foe move scoring and chosen-move validation
 - The foe scores a status move by its status chance: a 10% burn side effect is worth a tenth of a pure burn move.

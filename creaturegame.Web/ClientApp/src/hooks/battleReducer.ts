@@ -122,6 +122,8 @@ export interface BattleState {
   moves: MoveInfo[];
   // A failed item use re-prompts the same turn; the bag reopens (Gen 1 BagWasSelected) until a choice or turn end.
   reopenBag: boolean;
+  // A Bide or binding lock keeps the menu but not the move list: FIGHT sends at once (server-computed).
+  fightContinuesLock: boolean;
   // Whether a voluntary SWITCH is offered this turn (from TurnStarted; server-computed). Drives the SWITCH
   // action button's enabled state. False between turns / when no party.
   canSwitch: boolean;
@@ -192,6 +194,7 @@ export const initialState: BattleState = {
   enemyLevel: 0,
   moves: [],
   reopenBag: false,
+  fightContinuesLock: false,
   canSwitch: false,
   battlesWon: 0,
   levelUp: null,
@@ -269,6 +272,7 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
         enemyStatus: action.enemyStatus,
         moves: action.moves,
         canSwitch: action.canSwitch,
+        fightContinuesLock: action.fightContinuesLock,
         // Keep the lead's roster card in step with the live HP/status. The party snapshot only refreshes on
         // PartyUpdated (acquisition / send-in / item / recovery), so without this the SWITCH picker shows the
         // active creature at its pre-battle HP — the one number you actually weigh when deciding to pull it out.

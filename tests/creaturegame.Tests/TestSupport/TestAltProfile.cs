@@ -21,6 +21,10 @@ namespace creaturegame.Tests.TestSupport;
 /// </remarks>
 internal static class TestAltProfile
 {
+    /// <summary>The alt menu rule: a recharge or any lock-in skips the battle menu.</summary>
+    public static bool EveryLockInSkipsTheMenu(Creature creature) =>
+        creature.Battle.IsRecharging || LockInMechanics.All.Any(m => m.IsLockedIn(creature));
+
     /// <summary>The DV this profile's stat calculator stamps on every stat — the marker a test reads to prove a
     /// creature was built with <b>this</b> profile's stat seam and not a leaked Gen 1 one. Deliberately outside
     /// Gen 1's 0–15 DV range so the assertion cannot pass by coincidence. See <see cref="AltStatCalculator"/>.</summary>
@@ -267,6 +271,11 @@ internal static class TestAltProfile
         public override bool MenuActionResolvesBeforeFoeChoice => false;
 
         public override bool FailedItemUseSpendsTurn => true;
+
+        public override bool ItemTurnCountsDownTrap => false;
+
+        public override bool SkipsBattleMenu(Creature creature) =>
+            EveryLockInSkipsTheMenu(creature);
 
         public override bool HealFails(int currentHp, int maxHp) => currentHp >= maxHp;
 

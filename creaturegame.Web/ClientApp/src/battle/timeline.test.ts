@@ -313,6 +313,14 @@ describe('expandEvent — control plane vs timeline', () => {
     expect(steps![0]).toMatchObject({ kind: 'dispatch', action: { type: 'TURN_STARTED', canSwitch: false } });
   });
 
+  it('TurnStarted carries fightContinuesLock, and defaults it to false when absent', () => {
+    const base = { turnNumber: 1, playerHp: 100, playerMaxHp: 150, playerStatus: 'None', enemyHp: 80, enemyMaxHp: 120, enemyStatus: 'None', moves: [] };
+    const locked = expandEvent('TurnStarted', { ...base, fightContinuesLock: true }, CTX).steps!;
+    const absent = expandEvent('TurnStarted', base, CTX).steps!;
+    expect(locked[0]).toMatchObject({ kind: 'dispatch', action: { type: 'TURN_STARTED', fightContinuesLock: true } });
+    expect(absent[0]).toMatchObject({ kind: 'dispatch', action: { type: 'TURN_STARTED', fightContinuesLock: false } });
+  });
+
   it('BattleEnded with the player winning is a silent intermission beat that reverts the player sprite', () => {
     // Endless chain: a player win is not the end — the next BattleStarted resumes play. It logs NOTHING here
     // (so a between-battle instance like the Poké Center recovery is never preceded by "a new challenger"),

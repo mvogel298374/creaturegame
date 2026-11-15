@@ -45,15 +45,14 @@ Ranked within each tier; the tiers run from the shortest path to a greenlight to
 gap has drafted text, awaiting your confirmation · ✗ gaps remain.
 
 **Code groups** (user ruling 2026-11-15): items that touch the same code are tackled together, so one pokered read or
-design pass serves the group. Groups 1, 3 and 5 are clusters of S/S–M items and the cheapest wins.
+design pass serves the group. Groups 3 and 5 are clusters of S/S–M items and the cheapest wins.
 
 | # | Group | Code | Items |
 |:-:|:--|:--|:--|
-| 1 | Battle menu and turn loop | `Battle.BuildPlayerActionAsync`, the turn loop | Binder/Bide still gets the menu (with the recharge-turn menu) |
 | 2 | End-of-turn residual phase | `Battle` turn tail, residuals, `TickTurnCounters` | End-of-turn residual phase (with Leech Seed × Toxic and the menu-turn first mover) |
 | 3 | Hit test and accuracy | `AttackAction.Connects`, `Gen1BattleRules.RunsHitTest` | Other `ResidualEffects1` moves (with the residual-effect failure lines) |
 | 4 | Damage formula | `DamageCalculator`, crit and accuracy tables | Damage/accuracy core |
-| 5 | Effects that copy or name a move | `CounterEffect`, `StatusResolver.DisabledMoveStops`, Mimic, Mirror Move | Counter keys on the selected move (with Counter/Mirror Move on a menu turn) · Disable matches instances · The player chooses what Mimic copies (needs an input prompt) |
+| 5 | Effects that copy or name a move | `CounterEffect`, `StatusResolver.DisabledMoveStops`, Mimic, Mirror Move | Counter keys on the selected move (with Counter/Mirror Move on a menu turn) · Bide stores on its own turn · Disable matches instances · The player chooses what Mimic copies (needs an input prompt) |
 | 6 | Status by type | `Gen1BattleRules.CanReceiveStatus` | Same-type secondary status immunity |
 | 7 | Battle text and seams | `timeline.ts`, the console emitter, `GENERATION_SEAMS.md` | Audit the inline battle rules · Binding and miss lines |
 | 8 | Battle presentation | `BattleScene`, the event wire | Move animations · Sprite FX · Fly/Dig sprite stays on screen · Text feel |
@@ -66,9 +65,7 @@ design pass serves the group. Groups 1, 3 and 5 are clusters of S/S–M items an
 
 **Ready — each awaits your greenlight**
 
-| Item | Cost | Ready? | Next step / what it unblocks |
-|:-----|:----:|:-------|:-----------------------------|
-| **A binder or a Bide user still gets the battle menu** (§3.1), with the recharge-turn menu | M | ✅ confirmed 2026-11-15 | Awaits your greenlight. |
+None open.
 
 **A. Confirm the drafted lines, then Ready**
 
@@ -107,6 +104,7 @@ None open.
 
 | Item | Cost | Ready? | Next step |
 |:-----|:----:|:-------|:----------|
+| **Bide stores on its own turn, not on each hit** (§3.1) | S | ✗ 1, 2, 6 | Filed 2026-11-15. A verify slice lists where the two models differ. |
 | **Disable matches move instances, not move ids** (§3.1) | S | ✗ 1, 2, 4, 6 | Filed 2026-11-09. Read `DisabledMoveStops` and the Metronome and Mirror Move wrappers first. |
 | **Same-type secondary status immunity** (§3.1) | S–M | ✗ 2, 4, 6; the rest drafted | Take the pokered cite; Ice Beam freezes Ice-types today. |
 | **Other `ResidualEffects1` moves may roll accuracy** (§3.1) | S–M | ✗ 1, 2, 4, 6 | Filed 2026-11-06. A verify slice reads each effect for its own hit test; now also carries the residual-effect failure lines. |
@@ -233,39 +231,13 @@ data/engine item usually also means updating the test that pins the wrong value.
   reads "<user>'s attack missed!"; the `BindingStarted` event stays, since state and tests use it. 2: wording only, in
   the client timeline and the console emitter. 4: the cites above. 5: runtime only (client and console text). 6:
   timeline tests pin both lines. 7: the battle-text placement decision.
-- **A binder or a Bide user still gets the battle menu in Gen 1 (found 2026-11-14, trapped-switch design pass;
-  source-confirmed) — S–M, ✗ not Ready.** pokered checks `STORING_ENERGY | USING_TRAPPING_MOVE` only after
-  `DisplayBattleMenu` (`core.asm:305-315`), so a binder or a Bide user can switch, use an item or run, and only move
-  selection is skipped. Only Rage, recharge, thrash and charging skip the menu (`core.asm:293-304`). A binder's item
-  turn counts down its trap (`UseBagItem`, `core.asm:2261-2268`); a binder's send-out frees its victim
-  (`ReplacementEndsTrap`, already wired in `BringInMember`). Ours bypasses the menu for every lock-in
-  (`Battle.BuildPlayerActionAsync`, ~536-541) and `CanSwitchThisTurn` reports false for any lock-in. **Joined
-  (ruling 2026-11-15):** ours shows the full menu on a Hyper Beam recharge turn (recharge is not a lock-in;
-  `StatusResolver.RechargeStops`), so the player can switch or use an item during it; Gen 1 skips the menu.
-  **DoR:** ✅ confirmed 2026-11-15 (design pass, source-read, not run; ruling 1a). M.
-  1. *Intent + acceptance:* a Bide user or binder is offered the full menu, and FIGHT continues the locked move with
-     no move list; Rage, recharge, Thrash/Petal Dance and a charging move skip the menu (recharge newly). A binder's
-     item turn counts its trap down and the foe can't move; a Bide user's item turn neither counts down nor stores.
-     A Bide user or binder that switches out hands its lock to the switch-in, which continues the Bide or Wrap (the
-     replayed damage included) whether or not it knows the move, and the foe stays trapped. SWITCH is enabled
-     exactly when the menu shows.
-  2. *Design:* one seam member says which states skip the menu; `BuildPlayerActionAsync` and `CanSwitchThisTurn`
-     read it. FIGHT under Bide or binding returns the forced move. The binder's item turn decrements the victim's
-     `BindingTurnsRemaining`; the foe's "can't move" comes from the existing trap check; Bide skips because an item
-     turn never runs `OnCommit`. The switch hand-off moves the Bide and binding lock state from the outgoing
-     creature to the switch-in (the lock belongs to the side in Gen 1).
-  3. *Gen-variable surface:* `IBattleRules.SkipsBattleMenu` (or a per-mechanic flag), `ItemTurnCountsDownTrap`,
-     `SwitchOutKeepsLock` (Gen 1 true).
-  4. *Gen 1 source:* pokered `engine/battle/core.asm`: the menu skip `:293-304` and the Bide/trap check after the
-     menu `:313-316`; `UseBagItem` `:2261-2268`; `SelectEnemyMove` `:2949-2955`; `ExecutePlayerMove` exits on the
-     turn-used flag `:3085-3087`, before the Bide check `:3482-3500`; `SwitchPlayerMon`/`SendOutMon` clear no
-     player battle-status bits `:1723-1756`, `:2419-2441`.
-  5. *Data vs runtime:* runtime only; the client already greys SWITCH from `canSwitch`.
-  6. *Quirks the tests assert (full battles):* a Bide user takes an item turn and releases one turn later; a binder
-     uses a Potion, the foe can't move, and the lock ends a turn early; a Hyper Beam user gets no menu on its
-     recharge turn; FIGHT continues Wrap; a binder's switch-in continues the Wrap with the foe still trapped; a
-     Bide user's switch-in releases the Bide; a `TestAltProfile` override flips each member.
-  7. *Dependencies:* none. Est. ~310k tokens with both reviews.
+- **Bide stores on its own turn, not on each hit (found 2026-11-15, group 1 design pass; source-read, not run) — S,
+  ✗ not Ready.** pokered adds `wDamage`, the last damage either side dealt, during the Bide user's own turn
+  (`CheckPlayerStatusConditions` `.BideCheck`, `engine/battle/core.asm:3482-3500`); ours adds every hit as it lands
+  (`AttackAction.AccumulateBideDamage`). The totals differ when a turn's last damage isn't the hit Bide took, and on
+  an item or switch turn, which skips Gen 1's read. **DoR:** ✗ gaps **1, 2, 6** (a verify slice lists the cases
+  where the two models give different unleash damage, then the acceptance). *Drafted:* 3: `IBattleRules` (how Bide
+  accumulates). 4: the cite above. 5: runtime only. 7: none.
 - **Disable matches move instances, not move ids (found 2026-11-09 by `opus-engineer`, Fly and Dig item;
   read-confirmed, unverified beyond that) — S, ✗ not Ready.** `StatusResolver.DisabledMoveStops` compares the selected
   `PokemonAttack` with `Battle.DisabledMove` by reference; pokered compares move numbers

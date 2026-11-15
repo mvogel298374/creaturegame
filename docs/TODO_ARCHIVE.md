@@ -103,6 +103,25 @@ REST call routed to the machine that never saw `/start`; the workflow pins `flyc
 
 ---
 
+## §3.1 A binder or a Bide user still gets the battle menu ✅ DONE (2026-11-16)
+
+S–M, source-confirmed. Found 2026-11-14 in the trapped-switch design pass; DoR confirmed and greenlit 2026-11-15, corrected the same day (the switch hand-off dropped; Bide's storage model filed separately as "Bide stores on its own turn, not on each hit", still open in `TODO.md`; `ItemTurnCountsDownTrap` restored after `requirements-review` found the turn-end tick a turn late when the item lands on the last trap turn).
+
+**Finding.** pokered checks `STORING_ENERGY | USING_TRAPPING_MOVE` only after `DisplayBattleMenu` (`core.asm:305-315`), so a binder or a Bide user can switch, use an item or run, and only move selection is skipped. Only Rage, recharge, thrash and charging skip the menu (`core.asm:293-304`). Ours bypassed the menu for every lock-in (`Battle.BuildPlayerActionAsync`) and `CanSwitchThisTurn` reported false for any lock-in. **Joined (ruling 2026-11-15):** ours showed the full menu on a Hyper Beam recharge turn (recharge is not a lock-in; `StatusResolver.RechargeStops`), so the player could switch or use an item during it; Gen 1 skips the menu.
+
+**DoR (confirmed 2026-11-15).**
+1. **Acceptance:** a Bide user or binder is offered the full menu, and FIGHT continues the locked move with no move list; Rage, recharge, Thrash/Petal Dance and a charging move skip the menu (recharge newly). A binder's item turn counts the trap down before the foe chooses, so the foe is held unless that was the last trap turn, when it moves at once; a Bide user's item turn doesn't count Bide down. A Bide user or binder that switches out ends its lock and frees the foe, as before. SWITCH is enabled exactly when the menu shows.
+2. **Design:** one seam member says which states skip the menu; `BuildPlayerActionAsync` and `CanSwitchThisTurn` read it. FIGHT under Bide or binding returns the forced move (`TurnStarted.FightContinuesLock`). A binder's successful item turn runs the victim's `TickTurnCounters` before the foe's choice and skips it at turn end (`IBattleRules.ItemTurnCountsDownTrap`); the foe's "can't move" comes from `TrapStops`, and Bide counts down only in `OnCommit`, which an item turn never runs. The switch-out release stays in `BringInMember` (`ReplacementEndsTrap`) and `ResetBattleState`.
+3. **Gen-variable surface:** `IBattleRules.SkipsBattleMenu`, `IBattleRules.ItemTurnCountsDownTrap`.
+4. **Gen 1 source:** pokered `engine/battle/core.asm`: the menu skip `:293-304` and the Bide/trap check after the menu `:313-316`; `UseBagItem` `:2261-2268`; `SelectEnemyMove` `:2949-2955`; `ExecutePlayerMove` exits on the turn-used flag `:3085-3087`, before the Bide check `:3482-3500`; `SendOutMon` zeroes the side's battle status `:1744-1749` (five bytes from `wPlayerStatsToDouble` through `wPlayerBattleStatus3`, `ram/wram.asm:1279-1285`).
+5. **Data vs runtime:** runtime only; the client already greys SWITCH from `canSwitch`.
+6. **Quirks the tests assert (full battles):** a Bide user takes an item turn and releases one turn later; a binder uses a Potion mid-trap and the foe can't move, or on the last trap turn and the foe moves that turn; a Hyper Beam user gets no menu on its recharge turn and makes no move; FIGHT continues Wrap and Bide; a binder that switches out frees the foe; alt-rule tests flip both members (`BattleMenuUnderLockInTests`).
+7. **Dependencies:** none.
+
+**Outcome (2026-11-16).** Format PASS, lint PASS, .NET 2441/2441, tsc and Vitest 388/388, E2E not run; `requirements-review` MET; `pr-review` findings decided by Mo and applied. `GEN_DIFFERENCES.md` carries the Hyper Beam recharge-turn correction, the binder bullet and a not-modelled note on a called Hyper Beam's recharge-turn sort.
+
+---
+
 ## §3.1 Reopen the bag after a failed item use ✅ DONE (2026-11-15)
 
 S, client only. Found 2026-11-15 by `requirements-review` in the failed-item-use item; filed on the user's ruling, DoR confirmed and greenlit 2026-11-15.

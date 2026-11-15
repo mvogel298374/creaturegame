@@ -50,7 +50,7 @@ public sealed record StruggleTurnChoice : TurnChoice
 /// bypasses it and passes null to AttackAction, which Struggles.</para>
 /// <para><see cref="ChooseTurnActionAsync"/> does NOT work that way. Gen 1 keeps the whole menu open out of PP,
 /// so it is consulted even with nothing selectable — BAG and SWITCH stay reachable, and Struggle follows only
-/// from *choosing FIGHT*. The one thing that still bypasses the menu entirely is a true lock-in.</para>
+/// from *choosing FIGHT*. Only a state that <see cref="IBattleRules.SkipsBattleMenu"/> names bypasses it.</para>
 /// </summary>
 public interface IBattleInput
 {
@@ -58,8 +58,8 @@ public interface IBattleInput
 
     /// <summary>
     /// The player's whole-turn choice: FIGHT (a move), ITEM (a bag item), or SWITCH (swap the active creature).
-    /// Only consulted for a side that can actually open the menu — <see cref="Battle"/> still resolves true
-    /// lock-in first, and only the player side has a bag / party. The default delegates to
+    /// Only consulted for a side that can actually open the menu — <see cref="Battle"/> first checks
+    /// <see cref="IBattleRules.SkipsBattleMenu"/>, and only the player side has a bag / party. The default delegates to
     /// <see cref="ChooseMoveAsync"/> (FIGHT only), so AI / automated inputs never need to know about items or
     /// switching; only the interactive <c>SignalRInput</c> overrides this to offer the bag / SWITCH.
     /// <para>Unlike <see cref="ChooseMoveAsync"/> this is now consulted even when the creature is out of PP (Gen 1

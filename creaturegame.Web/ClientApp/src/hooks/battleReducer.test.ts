@@ -244,7 +244,7 @@ describe('battleReducer — phase transitions', () => {
       type: 'TURN_STARTED', turnNumber,
       playerName: 'PIKACHU', playerId: 1, enemyName: 'RATTATA', enemyId: 2,
       playerHp: 100, playerMaxHp: 100, playerStatus: 'None', playerXpThisLevel: 0, playerXpToNextLevel: 100,
-      enemyHp: 80, enemyMaxHp: 80, enemyStatus: 'None', moves: [], canSwitch: true,
+      enemyHp: 80, enemyMaxHp: 80, enemyStatus: 'None', moves: [], canSwitch: true, fightContinuesLock: false,
     });
     const failedThenReprompted = () =>
       [{ type: 'PLAYER_CHOSE' } as Action, { type: 'ITEM_USE_FAILED' } as Action, turnStarted(1)]
@@ -273,7 +273,7 @@ describe('battleReducer — phase transitions', () => {
       type: 'TURN_STARTED', turnNumber: 3,
       playerName: 'PIKACHU', playerId: 1, enemyName: 'RATTATA', enemyId: 2,
       playerHp: 55, playerMaxHp: 100, playerStatus: 'None', playerXpThisLevel: 20, playerXpToNextLevel: 100,
-      enemyHp: 33, enemyMaxHp: 80, enemyStatus: 'Paralysis', moves: [], canSwitch: true,
+      enemyHp: 33, enemyMaxHp: 80, enemyStatus: 'Paralysis', moves: [], canSwitch: true, fightContinuesLock: false,
     });
     expect(next.phase).toBe('choosing');
     expect(next.animating).toBe(false);
@@ -297,7 +297,7 @@ describe('battleReducer — phase transitions', () => {
       type: 'TURN_STARTED', turnNumber: 5,
       playerName: 'SQUIRTLE', playerId: 9, enemyName: 'PIDGEY', enemyId: 6, // …but SQUIRTLE was switched in
       playerHp: 30, playerMaxHp: 44, playerStatus: 'None', playerXpThisLevel: 0, playerXpToNextLevel: 100,
-      enemyHp: 20, enemyMaxHp: 24, enemyStatus: 'None', moves: [], canSwitch: true,
+      enemyHp: 20, enemyMaxHp: 24, enemyStatus: 'None', moves: [], canSwitch: true, fightContinuesLock: false,
     });
 
     expect(next.playerId).toBe(9);
@@ -320,7 +320,7 @@ describe('battleReducer — phase transitions', () => {
       type: 'TURN_STARTED', turnNumber: 4,
       playerName: 'CHARIZARD', playerId: 6, enemyName: 'RATTATA', enemyId: 2,
       playerHp: 41, playerMaxHp: 90, playerStatus: 'Poison', playerXpThisLevel: 0, playerXpToNextLevel: 100,
-      enemyHp: 50, enemyMaxHp: 50, enemyStatus: 'None', moves: [], canSwitch: true,
+      enemyHp: 50, enemyMaxHp: 50, enemyStatus: 'None', moves: [], canSwitch: true, fightContinuesLock: false,
     });
 
     expect(next.party[0]).toMatchObject({ name: 'CHARIZARD', hp: 41, status: 'Poison' });

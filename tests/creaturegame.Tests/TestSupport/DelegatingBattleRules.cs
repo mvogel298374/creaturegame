@@ -200,6 +200,10 @@ public abstract class DelegatingBattleRules : IBattleRules
 
     public virtual bool FailedItemUseSpendsTurn => _inner.FailedItemUseSpendsTurn;
 
+    public virtual bool ItemTurnCountsDownTrap => _inner.ItemTurnCountsDownTrap;
+
+    public virtual bool SkipsBattleMenu(Creature creature) => _inner.SkipsBattleMenu(creature);
+
     public virtual SubstituteStrike StrikeSubstituteByte(int remnant, int damage) =>
         _inner.StrikeSubstituteByte(remnant, damage);
 

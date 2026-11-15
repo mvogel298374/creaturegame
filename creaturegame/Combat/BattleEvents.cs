@@ -34,10 +34,10 @@ public record TurnStarted(
     int EnemyMaxHp,
     StatusCondition EnemyStatus,
     IReadOnlyList<MoveInfo> PlayerMoves,
-    // Whether the player may voluntarily SWITCH this turn (In-Combat Switching): a party is wired, the active
-    // creature isn't locked in or trapped, and a live benched member exists. The client greys the SWITCH button
-    // when false. Independent of PP — Gen 1 lets you switch even with no usable move.
-    bool CanSwitch = false
+    // Whether SWITCH is offered: the menu shows (IBattleRules.SkipsBattleMenu), a party is wired and a bench member lives.
+    bool CanSwitch = false,
+    // A Bide or binding lock keeps the menu but not the move list: FIGHT sends at once and continues the lock.
+    bool FightContinuesLock = false
 ) : BattleEvent;
 
 public record MoveInfo(

@@ -60,7 +60,7 @@ public class BideContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         await battle.StartFightAsync();
 
         Assert.Contains(emitter.Events, e => e is BideStoring);
-        Assert.Equal(1, input.CallCount); // asked only on the first turn — Bide auto-repeats while committed
+        Assert.Equal(2, input.CallCount); // asked every turn — the menu shows under Bide; FIGHT continues it
         Assert.False(enemy.IsAlive());
 
         int absorbed = emitter

@@ -262,6 +262,7 @@ public sealed class SignalRBattleEventEmitter(
                         m.Power,
                     }),
                     e.CanSwitch,
+                    e.FightContinuesLock,
                 }
             ),
             TurnEnded => ("TurnEnded", new { }),

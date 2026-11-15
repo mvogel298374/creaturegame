@@ -433,45 +433,6 @@ public class BattleVoluntarySwitchTests
     }
 
     [Fact]
-    public async Task VoluntarySwitch_DuringHyperBeamRecharge_IsAllowed()
-    {
-        // Adjudicated with the user 2026-07-24: switching out during a Hyper Beam recharge turn is legal Gen 1 —
-        // the recharge is enforced inside StatusResolver.CanAct (only spent if the creature stays in and FIGHTs), not the
-        // turn menu, so CanSwitchTo does not gate on IsRecharging. The lead fires Hyper Beam (recharge set) then
-        // switches out on the recharge turn, pre-empting the wasted turn (no Recharging event ever fires).
-        var lead = Fighter("Lead", hp: 300, attack: 40, defense: 999, speed: 200, tackleId: 33);
-        lead.AddAttack(HyperBeam());
-        var bench = Fighter("Bench", hp: 999, attack: 999, defense: 999, speed: 150, tackleId: 33);
-        var party = new Party(lead);
-        party.Add(bench);
-        var enemy = Fighter("Foe", hp: 300, attack: 40, defense: 100, speed: 100, tackleId: 33);
-
-        // turn 1 Hyper Beam; turn 2 SWITCH mid-recharge; the bench then FIGHTs with its own move ("tackle").
-        var input = new ScriptedInput("hyperbeam", "tackle").TurnPlan(null, 1);
-        var recorder = new RecordingEmitter();
-        var battle = new Battle(
-            lead,
-            enemy,
-            Gen1TypeChart.Instance,
-            input,
-            new ScriptedInput("tackle"),
-            rules: new ScriptableRules().Deterministic(),
-            emitter: recorder,
-            rng: new SeededRandomSource(0),
-            playerParty: party
-        );
-
-        await battle.StartFightAsync();
-
-        Assert.Contains(
-            recorder.Of<MoveUsed>(),
-            m => m.AttackerName == "Lead" && m.MoveName == "hyperbeam"
-        );
-        Assert.Equal("Bench", recorder.Of<CreatureSwitchedIn>().First().Name); // switched despite recharging
-        Assert.Empty(recorder.Of<Recharging>()); // it never spent the recharge turn — the switch pre-empted it
-    }
-
-    [Fact]
     public async Task VoluntarySwitch_IsReachableOutOfPP_NotForcedToStruggle()
     {
         // The Struggle-menu fix: Gen 1 keeps the menu open out of PP, so BAG/SWITCH stay reachable and only
@@ -861,19 +822,5 @@ public class BattleVoluntarySwitchTests
             AttackType = AttackType.Physical,
             PowerPointsMax = 99,
             Effect = MoveEffect.Rage,
-        };
-
-    // Physical (not Special) purely so the test's damage is predictable from the stats set here; the recharge
-    // behaviour under test is category-independent. The enemy must survive the hit for the recharge flag to set.
-    private static Attack HyperBeam() =>
-        new()
-        {
-            Id = 63,
-            Name = "hyperbeam",
-            BaseDamage = 150,
-            Accuracy = 100,
-            AttackType = AttackType.Physical,
-            PowerPointsMax = 99,
-            Effect = MoveEffect.Recharge,
         };
 }

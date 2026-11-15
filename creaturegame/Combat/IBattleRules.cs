@@ -389,6 +389,12 @@ public interface IBattleRules
     /// <summary>Whether an item that can't be used still costs the turn; false re-prompts the player. See GENERATION_SEAMS.md §2.</summary>
     bool FailedItemUseSpendsTurn { get; }
 
+    /// <summary>Whether a binder's item turn counts its trap down before the foe picks its move, rather than at turn end. See GENERATION_SEAMS.md §2.</summary>
+    bool ItemTurnCountsDownTrap { get; }
+
+    /// <summary>Whether <paramref name="creature"/>'s state skips the battle menu this turn; otherwise a lock-in only skips the move list. See GENERATION_SEAMS.md §2.</summary>
+    bool SkipsBattleMenu(Creature creature);
+
     /// <summary>The wording of the crit, one-hit KO and effectiveness lines. See GENERATION_SEAMS.md §2.</summary>
     HitLineWording HitLineWording { get; }
 

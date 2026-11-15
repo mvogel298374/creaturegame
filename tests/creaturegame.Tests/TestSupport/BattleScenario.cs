@@ -374,6 +374,18 @@ public sealed class ScriptableRules : DelegatingBattleRules
 
     public override bool TrapBlocksSwitch => _trapBlocksSwitch ?? base.TrapBlocksSwitch;
 
+    private bool? _itemTurnCountsDownTrap;
+
+    /// <summary>Counts a binder's trap down only at turn end, even on an item turn.</summary>
+    public ScriptableRules TrapCountsDownAtTurnEndOnly()
+    {
+        _itemTurnCountsDownTrap = false;
+        return this;
+    }
+
+    public override bool ItemTurnCountsDownTrap =>
+        _itemTurnCountsDownTrap ?? base.ItemTurnCountsDownTrap;
+
     private bool? _menuActionResolvesBeforeFoeChoice;
 
     /// <summary>Queues the player's switch or item with the foe's move, as a generation whose foe commits first would.</summary>
