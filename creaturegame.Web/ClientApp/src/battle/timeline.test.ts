@@ -1046,6 +1046,11 @@ describe('expandEvent — items', () => {
     expect(logLines(steps)).toEqual(["It won't have any effect!"]);
   });
 
+  it('a failed item use asks the screen to reopen the bag after its line', () => {
+    const { steps } = expandEvent('ItemUseFailed', { itemName: 'potion' }, CTX);
+    expect(dispatched(steps).map(a => a.type)).toEqual(['LOG', 'ITEM_USE_FAILED']);
+  });
+
   it('narrates a Revive (the bench member\'s HP repaints off the PartyUpdated that follows)', () => {
     const { steps } = expandEvent('Revived', { creatureName: 'BULBASAUR', hpRestored: 100, hpAfter: 100 }, CTX);
     expect(logLines(steps)).toEqual(['BULBASAUR was revived!']);

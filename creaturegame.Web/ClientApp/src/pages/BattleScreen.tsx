@@ -143,6 +143,10 @@ export function BattleScreen() {
     if (state.phase === 'ended' && !state.sessionTakenOver) clearActiveGame();
   }, [state.phase, state.sessionTakenOver]);
 
+  useEffect(() => {
+    if (state.phase === 'choosing' && state.reopenBag) setControlView('bag');
+  }, [state.phase, state.reopenBag]);
+
   // The level-up panel stays up until the player does anything — clear it on the first interaction.
   const onAnyInput = () => { if (state.levelUp) dismissLevelUp(); };
 

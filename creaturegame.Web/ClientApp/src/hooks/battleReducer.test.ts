@@ -239,6 +239,34 @@ describe('battleReducer — phase transitions', () => {
     expect(next.enemyStatus).toBe('None');
   });
 
+  describe('reopening the bag after a failed item use', () => {
+    const turnStarted = (turnNumber: number): Action => ({
+      type: 'TURN_STARTED', turnNumber,
+      playerName: 'PIKACHU', playerId: 1, enemyName: 'RATTATA', enemyId: 2,
+      playerHp: 100, playerMaxHp: 100, playerStatus: 'None', playerXpThisLevel: 0, playerXpToNextLevel: 100,
+      enemyHp: 80, enemyMaxHp: 80, enemyStatus: 'None', moves: [], canSwitch: true,
+    });
+    const failedThenReprompted = () =>
+      [{ type: 'PLAYER_CHOSE' } as Action, { type: 'ITEM_USE_FAILED' } as Action, turnStarted(1)]
+        .reduce(battleReducer, ready({ phase: 'choosing', turnNumber: 1 }));
+
+    it('the same-turn re-prompt keeps the flag, so the bag is open in the choosing phase', () => {
+      const s = failedThenReprompted();
+      expect(s.phase).toBe('choosing');
+      expect(s.reopenBag).toBe(true);
+    });
+
+    it('the next choice clears it', () => {
+      expect(battleReducer(failedThenReprompted(), { type: 'PLAYER_CHOSE' }).reopenBag).toBe(false);
+    });
+
+    it('a turn that ends first clears it, so rules where a failed use spends the turn reopen the menu', () => {
+      const s = [{ type: 'PLAYER_CHOSE' } as Action, { type: 'ITEM_USE_FAILED' } as Action, { type: 'TURN_ENDED' } as Action, turnStarted(2)]
+        .reduce(battleReducer, ready({ phase: 'choosing', turnNumber: 1 }));
+      expect(s.reopenBag).toBe(false);
+    });
+  });
+
   it('TURN_STARTED moves to the choosing phase, stops animating, and carries canSwitch', () => {
     const s = ready({ phase: 'battling', animating: true, canSwitch: false });
     const next = battleReducer(s, {

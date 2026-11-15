@@ -103,6 +103,31 @@ REST call routed to the machine that never saw `/start`; the workflow pins `flyc
 
 ---
 
+## §3.1 Reopen the bag after a failed item use ✅ DONE (2026-11-15)
+
+S, client only. Found 2026-11-15 by `requirements-review` in the failed-item-use item; filed on the user's ruling, DoR confirmed and greenlit 2026-11-15.
+
+**Finding.** In pokered a use that can't apply returns to the bag list (`UseBagItem` → `jp z, BagWasSelected`), so the player can pick another item or
+back out. Ours re-emitted `TurnStarted` and the client reopened the whole action menu.
+
+**DoR (confirmed 2026-11-15).**
+1. **Acceptance:** after "It won't have any effect!" the bag list is open again, and backing out shows the action menu.
+2. **Design:** the `ItemUseFailed` timeline step dispatches a new `ITEM_USE_FAILED` reducer action that sets `reopenBag`; `PLAYER_CHOSE` and `TURN_ENDED`
+   clear it (under rules where a failed use spends the turn, the turn ends before the next prompt, so the bag does not reopen). While the phase is
+   `choosing` and the flag is set, `BattleScreen` shows the bag view. No server or wire change. A refresh or reconnect at that moment shows the action menu
+   (the reconnect cache holds only the latest `TurnStarted`); accepted.
+3. **Gen-variable surface:** none; presentation, the turn rule is `FailedItemUseSpendsTurn`.
+4. **Gen 1 source:** `UseBagItem` → `jp z, BagWasSelected` (`engine/battle/core.asm:2258-2259`).
+5. **Data vs runtime:** client only.
+6. **Quirk the tests assert (Vitest):** `ITEM_USE_FAILED` then `TURN_STARTED` keeps `reopenBag` set; `PLAYER_CHOSE` clears it; `TURN_ENDED` clears it; the
+   `ItemUseFailed` timeline step dispatches the action (three cases in `battleReducer.test.ts`, one in `timeline.test.ts`). The view switch is wiring
+   (E2E only).
+7. **Dependencies:** the failed-item-use item (below).
+
+**Outcome (2026-11-15).** tsc PASS, Vitest 387/387; not logic-heavy, so no reviews; E2E not run.
+
+---
+
 ## §3.1 A failed item use spends no turn ✅ DONE (2026-11-15)
 
 S–M, `Battle` turn flow, `IBattleRules.FailedItemUseSpendsTurn`. Found 2026-11-14 in the menu-item design pass; source-confirmed, design pass 2026-11-15.

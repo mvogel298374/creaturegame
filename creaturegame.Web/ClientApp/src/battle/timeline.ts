@@ -136,6 +136,7 @@ export type Action =
   | { type: 'TURN_STARTED'; turnNumber: number; playerName: string; playerId: number; enemyName: string; enemyId: number; playerHp: number; playerMaxHp: number; playerStatus: string; playerXpThisLevel: number; playerXpToNextLevel: number; enemyHp: number; enemyMaxHp: number; enemyStatus: string; moves: MoveInfo[]; canSwitch: boolean }
   | { type: 'TURN_ENDED' }
   | { type: 'PLAYER_CHOSE' }
+  | { type: 'ITEM_USE_FAILED' }
   | { type: 'RUN_ENDED'; battlesWon: number; finalLevel: number }
   | { type: 'LOG'; message: string; tone?: LogTone }
   | { type: 'UPDATE_HP'; id: number; hp: number }
@@ -1244,7 +1245,7 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
     }
 
     case 'ItemUseFailed':
-      return { steps: [w(120), d(log(`It won't have any effect!`))] };
+      return { steps: [w(120), d(log(`It won't have any effect!`)), d({ type: 'ITEM_USE_FAILED' })] };
 
     case 'Revived': {
       // A Revive/Max Revive brought a fainted BENCH member back — narrate it. The member isn't a nameplate, so

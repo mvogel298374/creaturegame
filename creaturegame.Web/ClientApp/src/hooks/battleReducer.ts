@@ -120,6 +120,8 @@ export interface BattleState {
   enemySpeciesId: number;
   enemyLevel: number;
   moves: MoveInfo[];
+  // A failed item use re-prompts the same turn; the bag reopens (Gen 1 BagWasSelected) until a choice or turn end.
+  reopenBag: boolean;
   // Whether a voluntary SWITCH is offered this turn (from TurnStarted; server-computed). Drives the SWITCH
   // action button's enabled state. False between turns / when no party.
   canSwitch: boolean;
@@ -189,6 +191,7 @@ export const initialState: BattleState = {
   enemySpeciesId: 0,
   enemyLevel: 0,
   moves: [],
+  reopenBag: false,
   canSwitch: false,
   battlesWon: 0,
   levelUp: null,
@@ -276,9 +279,11 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
         ),
       };
     case 'PLAYER_CHOSE':
-      return { ...state, phase: 'battling', animating: true };
+      return { ...state, phase: 'battling', animating: true, reopenBag: false };
+    case 'ITEM_USE_FAILED':
+      return { ...state, reopenBag: true };
     case 'TURN_ENDED':
-      return { ...state, phase: 'battling' };
+      return { ...state, phase: 'battling', reopenBag: false };
     case 'RUN_ENDED':
       // Terminal — the player fainted. Show the game-over screen with the run summary.
       return { ...state, phase: 'ended', battlesWon: action.battlesWon, playerLevel: action.finalLevel };

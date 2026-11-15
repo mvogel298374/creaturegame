@@ -401,8 +401,8 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
   `jp z, BagWasSelected`, `engine/battle/core.asm`). This applies to a Potion at full HP, a cure with no matching
   status, a Revive on a live Pokémon, and an Ether or Elixir with nothing to restore. The foe neither picks nor
   moves, and a binder's trap counts down only after a success. Seam: `IBattleRules.FailedItemUseSpendsTurn` (false).
-  **Known divergence:** ours reopens the whole action menu (a repeated `TurnStarted`), not the bag list; the turn
-  semantics match (`TODO.md` §3.1 *Reopen the bag after a failed item use*).
+  Ours reopens the bag list as Gen 1 does (the client's `reopenBag` flag, set by the `ItemUseFailed` step), except
+  after a refresh or reconnect, which shows the action menu.
 - **Max Ether and Max Elixir ignore PP Ups when checking for "nothing to restore"**: `.fullyRestorePP` compares the
   PP byte without masking the PP Up bits (pokered `engine/items/item_effects.asm`), so on a full-PP move that has had
   PP Ups the item is used up and takes the turn. Not modelled: the game has no PP Up yet, so `PpRestoreItemEffect`
