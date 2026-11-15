@@ -233,7 +233,7 @@ Each entry: **Decision · Why · Where it lives.**
   saw that run's `/start` call, 404ing it — the live SignalR connection stays fine because it's pinned to one
   machine for its whole lifetime, so only stateless follow-up requests were affected. Fixed by pinning
   `--ha=false` in `.github/workflows/fly-deploy.yml`. This constraint stands until session state is
-  externalized into `save.db` (deferred by decision — §2.12; `docs/TODO.md` §4.2).
+  externalized into `save.db` (deferred by decision — §2.12; `docs/TODO.md` §9, parked design in `docs/TODO_ARCHIVE.md`).
 - **Health-check switch (2026-10-11):** `/healthz` always exists, but the Fly `[[http_service.checks]]` block lives in
   `fly.healthcheck.toml`, not `fly.toml`, because Fly bills by usage. It is **off by default**; set the GitHub repo
   variable `FLY_HEALTH_CHECK` = `on` (Settings → Variables) and the next RC deploy appends it to `fly.toml`. No commit.

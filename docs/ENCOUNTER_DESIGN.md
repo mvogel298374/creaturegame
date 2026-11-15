@@ -108,7 +108,7 @@ deferred (only if the subset draw alone doesn't give enough variety).
    `PokemonGameAvailability` (`EncounterFactory.CreateEnemyAsync`) — excludes legendaries, statics, gifts, and
    fossils (19 of 151 in Gen 1), the canonical lucky-spike hazard. *Resilience:* if no availability rows exist
    (a minimally-seeded DB) the filter falls back to the full dex so the selector never starves. (Version-specific
-   Red/Blue/Yellow filtering stays deferred — see `TODO.md` §4.2.)
+   Red/Blue/Yellow filtering stays deferred; no version selector is planned, and the 4d+ Title/StarterSelection surface in `TODO.md` §4.3 carries the idea.)
 3. **Empty biomes never generate.** A biome whose Wild pool is empty for the active generation is **excluded at
    map-generation time** (`Biomes.Playable` returns only non-empty biomes) — it simply isn't placed. Within a
    *valid* biome, if the target-BST band finds no candidate, the band **widens in-theme** to the nearest-BST

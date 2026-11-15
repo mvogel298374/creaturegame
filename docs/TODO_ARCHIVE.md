@@ -10,7 +10,7 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ## Closed, not pursued (user ruling 2026-11-15)
 
-Four entries closed by the user's ruling of 2026-11-15 in a TODO audit. Each record is the entry as it stood in `TODO.md`, with the reason.
+Eight entries closed by the user's ruling of 2026-11-15 in a TODO audit. Each record is the entry as it stood in `TODO.md`, with the reason.
 
 ### §3.1 Enemy AI ignores a foe that is out of reach — closed: faithful, no change; reopen only on a playtest report
 
@@ -55,6 +55,51 @@ gen-variable surface, no `*.db` change, manual-reproduction verification and no 
 earlier (see the §7.1 records below).
 
 **Reason.** The claim was disproved and the item had been parked since 2026-10-10.
+
+### §3.2 Struggle skips the accuracy roll — closed: not modelled, recorded in `GEN_DIFFERENCES.md`; the pinning test stays
+
+*(found 2026-10-11 during V7 / the item seam; found during "Gen 1 roll order", archived; unverified beyond the citation).* `AttackAction.Connects`
+treats Struggle as never-miss; in pokered it goes through `MoveHitTest` like any move (so the 1/256 miss applies). Fixing it would flip
+`RollOrderContractTests.StruggleRollsCritAndDamageWithNoAccuracyDrawMirroringTheKnownGap`.
+
+**DoR as left (V16):** ✗ not Ready, gaps 1, 2, 3, 4, 5, 7, left as filed per the user ruling of 2026-10-11. *Drafted if reopened:*
+- **Acceptance:** Struggle rolls accuracy, so a forced 255 roll misses.
+- **Design:** central `AttackAction`, so both gates.
+- **Seam:** `IBattleRules` (Gen 2's Struggle is unchecked).
+- **Gen 1 source:** cite `MoveHitTest` (`core.asm:5228`).
+- **Data vs runtime:** runtime only. **Dependencies:** none.
+
+**Reason.** The user ruled it not modelled; a note under the 1/256 miss bullet in `GEN_DIFFERENCES.md` records the gap, and the pinning test stays.
+
+### §4.2 Enemy encounter pool ignores game version — closed: no version selector is planned
+
+Filter by `PokemonGameAvailability` once a version selector exists. **DoR as left (V16):** ✗ not Ready, gaps 1, 2, 3, 5, 6, 7; gap 7 blocked the rest
+(no version selector exists). *Drafted for when it does:*
+- **Acceptance:** with Blue selected, no Red-exclusive species appears.
+- **Data vs runtime:** runtime over existing availability data. **Seam:** versions are profile content.
+
+**Reason.** No version selector is planned. The one live idea (if a game-version picker is ever added, the wild pool filters by `PokemonGameAvailability`)
+rides on the 4d+ catalog's Title/StarterSelection surface text in `TODO.md` §4.3.
+
+### §4.2 Enemy Pokémon do not evolve — closed: not needed by the current loop; reopen if persistent rivals are designed
+
+Wire into level-up when the loop wants it. **DoR as left (V16):** ✗ not Ready, gaps 1, 2, 4, 6, 7. A product call with no acceptance; 3 was answered
+(`IEvolutionRules` is the seam). *Drafted:* acceptance, an enemy that levels past its evolution level between encounters appears evolved; runtime only.
+
+**Reason.** Each encounter builds a fresh enemy, and the evolution floor picks evolved species at higher levels. Reopen if persistent rivals are designed.
+
+### §4.2 `PlayerSave`/`SavedCreature` in `save.db` — declined, moved to §9 Settled
+
+**DECLINED for the development phase (user, 2026-10-03): no server-restart-surviving saves** (`ARCHITECTURE.md` §2.12); kept as the parked design.
+Auto-save after each battle, party-management UI; the heavier persistence beyond the lightweight Session Resume (survives a server restart/redeploy,
+not just a client refresh). When revisited it is two tiers: a mid-run snapshot and a cross-run profile for the roguelite meta unlocks (unplanned).
+**Fly deploys must stay single-machine until session state is externalised here:** `GameSessionManager` is in-process, so a second machine 404s any
+REST call routed to the machine that never saw `/start`; the workflow pins `flyctl deploy --ha=false`. Don't remove it or raise
+`min_machines_running` (`ARCHITECTURE.md` §2.7).
+
+*DoR (V16): declined by user ruling, so it was not auditable.*
+
+**Reason.** Declined by the user for the development phase; the ruling now lives in `TODO.md` §9 Settled, which points here for the parked design.
 
 ---
 

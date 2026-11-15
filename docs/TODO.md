@@ -51,14 +51,14 @@ design pass serves the group. Groups 1, 3 and 5 are clusters of S/S–M items an
 |:-:|:--|:--|:--|
 | 1 | Battle menu and turn loop | `Battle.BuildPlayerActionAsync`, the turn loop, the client bag | Binder/Bide still gets the menu · Reopen the bag after a failed item use |
 | 2 | End-of-turn residual phase | `Battle` turn tail, residuals, `TickTurnCounters` | End-of-turn residual phase (with Leech Seed × Toxic and the menu-turn first mover) |
-| 3 | Hit test and accuracy | `AttackAction.Connects`, `Gen1BattleRules.RunsHitTest` | Other `ResidualEffects1` moves (with the residual-effect failure lines) · Struggle skips accuracy |
+| 3 | Hit test and accuracy | `AttackAction.Connects`, `Gen1BattleRules.RunsHitTest` | Other `ResidualEffects1` moves (with the residual-effect failure lines) |
 | 4 | Damage formula | `DamageCalculator`, crit and accuracy tables | Damage/accuracy core |
 | 5 | Effects that copy or name a move | `CounterEffect`, `StatusResolver.DisabledMoveStops`, Mimic, Mirror Move | Counter keys on the selected move (with Counter/Mirror Move on a menu turn) · Disable matches instances · The player chooses what Mimic copies (needs an input prompt) |
 | 6 | Status by type | `Gen1BattleRules.CanReceiveStatus` | Same-type secondary status immunity |
 | 7 | Battle text and seams | `timeline.ts`, the console emitter, `GENERATION_SEAMS.md` | Audit the inline battle rules · Binding and miss lines |
 | 8 | Battle presentation | `BattleScene`, the event wire | Move animations · Sprite FX · Fly/Dig sprite stays on screen · Text feel |
 | 9 | Acquisition and items | `ItemEffects`, `RewardCalculator`, evolution | Catch · Unsold-item rule · Stone evolutions |
-| 10 | Run loop and progression | `RunDirector`, `EncounterFactory` | Progressive difficulty · Enemies don't evolve · Encounter pool by game version · `save.db` (declined) |
+| 10 | Run loop and progression | `RunDirector`, `EncounterFactory` | Progressive difficulty |
 | 11 | Client UX | modals, Title, the level-up panel | Escape = B-cancel · Continue card species · `RunFaulted` handler test · Level-up panel · 4d+ surface catalog |
 | 12 | E2E and CI | `e2e/`, workflows, scripts | CI E2E + fast suites before deploying · `voluntary-switch` slow · evolution nameplate · Tighten two specs · E2E helper dedup · Play helper hang (four wait only on one E2E session) |
 | 13 | Importer and data model | `PokeApiConnector`, schema | Re-import churn on `pokemon.db` · §4.4 multi-generation data model |
@@ -129,10 +129,6 @@ None open.
 | **Tighten `encounter-map` and `cadence` specs** (§6) | S | ✗ | Your E2E go-ahead; a cadence seed. |
 | **E2E half of "Deduplicate the test helpers"** (§6) | M | ✗ | Your E2E go-ahead. |
 | **Abuse protection** (§7.1) | M | ✗ shelved | Your numbers and the idle-notice UX call. |
-| **Struggle skips the accuracy roll** (§3.2) | S | ✗ | Left as filed (ruling 2026-10-11). |
-| **Enemy encounter pool ignores game version** (§4.2) | S | ✗ 1, 2, 3, 5, 6, 7 | Gap 7 blocks the rest: no version selector exists. |
-| **Enemy Pokémon do not evolve** (§4.2) | S | ✗ 1, 2, 4, 6, 7 | Your product call on when the loop wants it. |
-| **`save.db`** (§4.2) | L | declined | Revisit by your ruling only. |
 
 ---
 
@@ -276,21 +272,6 @@ data/engine item usually also means updating the test that pins the wrong value.
 
 ### 3.2 Data and importer
 
-- **Found 2026-10-11 during V7 / the item seam (unverified beyond the citation; each needs its own DoR):**
-  - *Struggle skips the accuracy roll* (found during "Gen 1 roll order", archived): `AttackAction.Connects`
-    treats Struggle as never-miss; in pokered it goes through `MoveHitTest` like any move (so the 1/256 miss applies).
-    Unverified beyond that reading; needs its own DoR. **Fixing it must flip
-    `RollOrderContractTests.StruggleRollsCritAndDamageWithNoAccuracyDrawMirroringTheKnownGap`.**
-  **DoR (V16), Struggle:** ✗ not Ready — gaps **1, 2, 3, 4, 5, 7**, left as filed per the ruling below. When
-  reopened, the draft is:
-  - **Acceptance:** Struggle rolls accuracy, so a forced 255 roll misses.
-  - **Design:** central `AttackAction`, so both gates.
-  - **Seam:** `IBattleRules` (Gen 2's Struggle is unchecked).
-  - **Gen 1 source:** cite `MoveHitTest` (`core.asm:5228`).
-  - **Data vs runtime:** runtime only.
-  - **Dependencies:** none.
-
-  User ruling 2026-10-11: leave this one as filed.
 - **The unsold-item rule keys on price, not category (S; from `requirements-review` 2026-10-25, finding 2).**
   `RarityOf`/`IsLootOnly` treat any `Cost == 0` item as loot only with a PP-shaped fixed rarity. Today only the
   four PP items reach it. A future 0-priced item in another category (Master Ball, once Catch adds Balls to the
@@ -362,15 +343,6 @@ channel of a broader acquisition layer.
 
 ### 4.2 Run loop and progression
 
-- [ ] **`PlayerSave`/`SavedCreature` in `save.db`** — **DECLINED for the development phase (user, 2026-10-03):
-  no server-restart-surviving saves** (`ARCHITECTURE.md` §2.12); kept here only as the parked design. Auto-save after
-  each battle, party-management UI; the heavier persistence beyond the lightweight Session Resume (survives a
-  server restart/redeploy, not just a client refresh). When revisited it is two tiers — a mid-run snapshot and a
-  cross-run profile for the roguelite meta unlocks (unplanned). **Fly deploys must stay single-machine until session state is externalised here:**
-  `GameSessionManager` is in-process, so a second machine 404s any REST call routed to the machine that never saw
-  `/start`; the workflow pins `flyctl deploy --ha=false` — don't remove it or raise `min_machines_running`
-  (`ARCHITECTURE.md` §2.7).
-  *DoR (V16): declined by user ruling, so it is not auditable until revisited.*
 - [ ] **Progressive difficulty** beyond `targetBst = lead BST + depth × 10`; trainer encounters at milestones.
   **DoR (V16):** ✗ not Ready — gaps **1, 2, 4, 6, 7**; needs a `/plan`. *Drafted:*
   - **Seam:** gen-invariant `RunRules` tuning; trainer rosters per region would be profile content.
@@ -411,17 +383,6 @@ channel of a broader acquisition layer.
     poisoned, burned or seeded switch-in or item user that goes first ticks before the enemy attacks and can faint
     before it acts. Ours lets the enemy act, then ticks both (`requirements-review`, switch-before-foe-choice and
     menu-item items).
-- [ ] **Enemy encounter pool ignores game version** — filter by `PokemonGameAvailability` once a version selector
-  exists.
-  **DoR (V16):** ✗ not Ready — gaps **1, 2, 3, 5, 6, 7**; gap 7 blocks the rest (no version selector exists).
-  *Drafted for when it does:*
-  - **Acceptance:** with Blue selected, no Red-exclusive species appears.
-  - **Data vs runtime:** runtime over existing availability data.
-  - **Seam:** versions are profile content.
-- [ ] **Enemy Pokémon do not evolve** — wire into level-up when the loop wants it.
-  **DoR (V16):** ✗ not Ready — gaps **1, 2, 4, 6, 7**. It's a product call ("when the loop wants it") with no
-  acceptance. 3 is answered: `IEvolutionRules` is the seam. *Drafted:* acceptance, an enemy that levels past its
-  evolution level between encounters appears evolved; runtime only.
 
 ### 4.3 Generation Profile — presentation catalog (Stage 4d+) and the falsification rule
 
@@ -431,7 +392,8 @@ Sage skin, the grid Town Map) are done and archived. The standing 2026-08-04 com
 
 - [ ] **4d+ — the surface catalog, jointly iterated** (each surface its own greenlit mini-plan): move select, battle
   HUD, CHECK POKEMON (the main overview), BAG (a full skin beyond the 2026-08-23 legibility fix), the `PartyStrip`
-  chips (`.party-chip*`), Title/StarterSelection (including the generation picker). The battle command menu is
+  chips (`.party-chip*`), Title/StarterSelection (including the generation picker; if a game-version picker is ever
+  added, the wild pool filters by `PokemonGameAvailability`). The battle command menu is
   settled (2×2 grid, verbs fixed). Already skinned: the encounter overlay, every run-prompt modal, the SWITCH menu
   cards, CHECK POKEMON's party picker, and the level-up panel.
   - **Level-up panel follow-ups.** *Flagged, not decided — a domain claim for `requirements-review`:* whether Gen 1's
@@ -443,11 +405,6 @@ Sage skin, the grid Town Map) are done and archived. The standing 2026-08-04 com
     any change. Then 1 and 6 follow from it. Client-only; gen surface is the profile's theme.
   **DoR (V16), 4d+ catalog:** ✗ not Ready by design — gaps **1, 2** per surface. Each surface gets its own
   mini-plan with you.
-- [ ] **Stage 5 — the falsification harness** is a standing requirement, not a final stage: each stage ships its
-  leg of `TestAltProfile`, because upward compatibility is unfalsifiable with one profile.
-  *DoR (V16): a standing requirement on other items, not an item.*
-- Phaser/canvas and per-gen sprite/cry assets stay deferred (`GENERATION_PROFILE.md` §7.6). *DoR (V16): a deferral,
-  not an item.*
 
 ### 4.4 Multi-Generation data model and schema (deferred to a Gen 2 sprint)
 
@@ -576,11 +533,6 @@ each). Their seam and data-vs-runtime lines are already written in the text.
   **DoR:** ✗ not Ready — gap **2**: a full `/plan` answers the three design questions. Starting recommendation:
   one skill each for `/plan` and `/dev`; fold `/test` into the test step's description; retire `/sync` unless a schema pass
   is planned.
-- [ ] `data-testid` attributes — deferred; specs lean on stable semantic classes. Add only where a class proves
-  brittle.
-- [ ] §8 visual-regression canvas snapshots — skipped for maintenance cost.
-
-*DoR (V16): the two lines above are deferred or skipped by decision, not items.*
 
 ### 4.7 User documentation
 
@@ -789,6 +741,12 @@ recommendation, and what it unblocks.
 
 ## 9. Settled — do not re-raise
 
+- **No `save.db` (`PlayerSave`/`SavedCreature`) in the development phase** — declined (user ruling 2026-10-03,
+  moved here 2026-11-15); reopen only by your ruling. The parked design is in `TODO_ARCHIVE.md`; the Fly
+  single-machine constraint it would lift stands (`ARCHITECTURE.md` §2.7).
+- **No `data-testid` attributes** — deferred: specs lean on stable semantic classes; add one only where a class proves
+  brittle.
+- **No visual-regression canvas snapshots** — skipped for maintenance cost.
 - **RC tags may point at any commit** — accepted policy (user ruling 2026-10-11, §7.6 V2): the deploy trigger
   matches the tag name only; no on-`master` check (`MoDirectives/authority.md` rule 3).
 - **The production container runs as root** — accepted (user ruling 2026-10-11, §7.6 V2): the runtime stage keeps
