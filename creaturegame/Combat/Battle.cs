@@ -102,56 +102,71 @@ public class Battle
         {
             _turnNumber++;
 
-            _emitter?.Emit(
-                new TurnStarted(
-                    _turnNumber,
-                    PlayerCreature.Name,
-                    PlayerCreature.Id,
-                    PlayerCreature.Attributes.HP,
-                    PlayerCreature.Attributes.MaxHP,
-                    PlayerCreature.Battle.Status,
-                    PlayerCreature.XpThisLevel,
-                    PlayerCreature.XpToNextLevel,
-                    EnemyCreature.Name,
-                    EnemyCreature.Id,
-                    EnemyCreature.Attributes.HP,
-                    EnemyCreature.Attributes.MaxHP,
-                    EnemyCreature.Battle.Status,
-                    PlayerCreature
-                        .MoveSet.Select(m => new MoveInfo(
-                            m.Base.Name ?? "",
-                            m.Base.DamageType,
-                            m.PowerPointsCurrent,
-                            m.Base.PowerPointsMax,
-                            m == PlayerCreature.Battle.DisabledMove,
-                            // STAB: a damaging move whose type matches the user's current type (mirrors the
-                            // DamageCalculator condition). Fixed-damage moves (BaseDamage 0) get no STAB.
-                            m.Base.BaseDamage > 0
-                                && (
-                                    PlayerCreature.Type1 == m.Base.DamageType
-                                    || PlayerCreature.Type2 == m.Base.DamageType
-                                ),
-                            // Type effectiveness vs the live enemy, via the active type chart — damaging moves
-                            // only (fixed-damage/status moves ignore the chart, so they report neutral 1.0).
-                            m.Base.BaseDamage > 0
-                                ? DamageCalculator.GetTypeEffectiveness(
-                                    m.Base.DamageType,
-                                    EnemyCreature.Type1,
-                                    EnemyCreature.Type2,
-                                    _typeChart
-                                )
-                                : 1.0,
-                            // Raw base power for the menu's strength cue — plain move data (fixed-damage/status
-                            // moves have BaseDamage 0, so they carry no power and the UI shows no pill).
-                            m.Base.BaseDamage
-                        ))
-                        .ToList(),
-                    CanSwitchThisTurn()
-                )
-            );
+            // A failed item use that spends no turn re-prompts the same turn (GENERATION_SEAMS.md §2).
+            IBattleAction playerAction;
+            while (true)
+            {
+                _emitter?.Emit(
+                    new TurnStarted(
+                        _turnNumber,
+                        PlayerCreature.Name,
+                        PlayerCreature.Id,
+                        PlayerCreature.Attributes.HP,
+                        PlayerCreature.Attributes.MaxHP,
+                        PlayerCreature.Battle.Status,
+                        PlayerCreature.XpThisLevel,
+                        PlayerCreature.XpToNextLevel,
+                        EnemyCreature.Name,
+                        EnemyCreature.Id,
+                        EnemyCreature.Attributes.HP,
+                        EnemyCreature.Attributes.MaxHP,
+                        EnemyCreature.Battle.Status,
+                        PlayerCreature
+                            .MoveSet.Select(m => new MoveInfo(
+                                m.Base.Name ?? "",
+                                m.Base.DamageType,
+                                m.PowerPointsCurrent,
+                                m.Base.PowerPointsMax,
+                                m == PlayerCreature.Battle.DisabledMove,
+                                // STAB: a damaging move whose type matches the user's current type (mirrors the
+                                // DamageCalculator condition). Fixed-damage moves (BaseDamage 0) get no STAB.
+                                m.Base.BaseDamage > 0
+                                    && (
+                                        PlayerCreature.Type1 == m.Base.DamageType
+                                        || PlayerCreature.Type2 == m.Base.DamageType
+                                    ),
+                                // Type effectiveness vs the live enemy, via the active type chart — damaging moves
+                                // only (fixed-damage/status moves ignore the chart, so they report neutral 1.0).
+                                m.Base.BaseDamage > 0
+                                    ? DamageCalculator.GetTypeEffectiveness(
+                                        m.Base.DamageType,
+                                        EnemyCreature.Type1,
+                                        EnemyCreature.Type2,
+                                        _typeChart
+                                    )
+                                    : 1.0,
+                                // Raw base power for the menu's strength cue — plain move data (fixed-damage/status
+                                // moves have BaseDamage 0, so they carry no power and the UI shows no pill).
+                                m.Base.BaseDamage
+                            ))
+                            .ToList(),
+                        CanSwitchThisTurn()
+                    )
+                );
 
-            // The player may FIGHT or use a bag ITEM this turn; the enemy only ever attacks.
-            IBattleAction playerAction = await BuildPlayerActionAsync();
+                // The player may FIGHT or use a bag ITEM this turn; the enemy only ever attacks.
+                playerAction = await BuildPlayerActionAsync();
+                if (
+                    playerAction is ItemAction item
+                    && !_rules.FailedItemUseSpendsTurn
+                    && !item.CanUse()
+                )
+                {
+                    _emitter?.Emit(new ItemUseFailed(item.ItemName));
+                    continue;
+                }
+                break;
+            }
             bool menuActionFirst =
                 playerAction is SwitchAction or ItemAction
                 && _rules.MenuActionResolvesBeforeFoeChoice;

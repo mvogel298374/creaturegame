@@ -769,4 +769,146 @@ public class ItemActionBattleTests
         Assert.False(em.Of<Revived>().Any());
         Assert.Equal(1, bag.Count(62)); // not consumed
     }
+
+    private sealed class RulesWhereAFailedItemSpendsTheTurn()
+        : DelegatingBattleRules(new SeededRandomSource(1))
+    {
+        public override bool FailedItemUseSpendsTurn => true;
+    }
+
+    private static void AssertFailedUseRepromptedTurnOne(RecordingEmitter em)
+    {
+        var events = em.Events.ToList();
+        Assert.Single(em.Of<ItemUseFailed>());
+        Assert.Equal(2, em.Of<TurnStarted>().Count(t => t.TurnNumber == 1));
+        int failed = events.FindIndex(e => e is ItemUseFailed);
+        int reprompt = events.FindIndex(failed, e => e is TurnStarted);
+        Assert.Equal(failed + 1, reprompt);
+        Assert.DoesNotContain(events.Take(reprompt), e => e is MoveUsed);
+        Assert.Equal("Player", events.Skip(reprompt).OfType<MoveUsed>().First().AttackerName);
+    }
+
+    [Fact]
+    public async Task APotionAtFullHp_SpendsNoTurn_AndThePlayerChoosesAgain()
+    {
+        var player = TestCreatures.Make("Player", hp: 200, speed: 200, attack: 999);
+        player.AddAttack(Tackle());
+        var enemy = TestCreatures.Make("Enemy", hp: 30, speed: 1, defense: 1);
+        enemy.AddAttack(Tackle());
+        var bag = new Bag();
+        bag.Add(17);
+        var enemyInput = new DefenderStatusRecordingInput(new ScriptedInput("tackle"));
+
+        var em = await RunAsync(
+            new TurnChoiceInput(new ItemTurnChoice(Potion())),
+            bag,
+            player,
+            enemy,
+            enemyInput: enemyInput
+        );
+
+        AssertFailedUseRepromptedTurnOne(em);
+        Assert.Single(enemyInput.Statuses);
+        Assert.Equal(1, bag.Count(17));
+    }
+
+    [Fact]
+    public async Task AReviveOnALiveMember_SpendsNoTurn_AndThePlayerChoosesAgain()
+    {
+        var player = TestCreatures.Make("Player", hp: 200, speed: 200, attack: 999);
+        player.AddAttack(Tackle());
+        var enemy = TestCreatures.Make("Enemy", hp: 30, speed: 1, defense: 1);
+        enemy.AddAttack(Tackle());
+        var party = new Party(player);
+        party.Add(TestCreatures.Make("Bench", hp: 200));
+        var bag = new Bag();
+        bag.Add(62);
+
+        var em = await RunAsync(
+            new TurnChoiceInput(new ItemTurnChoice(Revive(), TargetPartySlot: 1)),
+            bag,
+            player,
+            enemy,
+            party: party
+        );
+
+        AssertFailedUseRepromptedTurnOne(em);
+        Assert.Equal(1, bag.Count(62));
+    }
+
+    [Fact]
+    public async Task AnAntidoteWithNoMatchingStatus_SpendsNoTurn_AndThePlayerChoosesAgain()
+    {
+        var player = TestCreatures.Make("Player", hp: 200, speed: 200, attack: 999);
+        player.AddAttack(Tackle());
+        var enemy = TestCreatures.Make("Enemy", hp: 30, speed: 1, defense: 1);
+        enemy.AddAttack(Tackle());
+        var bag = new Bag();
+        bag.Add(18);
+
+        var em = await RunAsync(
+            new TurnChoiceInput(new ItemTurnChoice(Antidote())),
+            bag,
+            player,
+            enemy
+        );
+
+        AssertFailedUseRepromptedTurnOne(em);
+        Assert.Equal(1, bag.Count(18));
+    }
+
+    [Fact]
+    public async Task AnEtherOnAFullPpMove_SpendsNoTurn_AndThePlayerChoosesAgain()
+    {
+        var player = TestCreatures.Make("Player", hp: 200, speed: 200, attack: 999);
+        player.AddAttack(Tackle());
+        var enemy = TestCreatures.Make("Enemy", hp: 30, speed: 1, defense: 1);
+        enemy.AddAttack(Tackle());
+        var ether = new Item
+        {
+            Id = 51,
+            Name = "ether",
+            Category = ItemCategory.PpRestore,
+            PpRestoreAmount = 10,
+        };
+        var bag = new Bag();
+        bag.Add(51);
+
+        var em = await RunAsync(
+            new TurnChoiceInput(new ItemTurnChoice(ether, TargetMoveSlot: 0)),
+            bag,
+            player,
+            enemy
+        );
+
+        AssertFailedUseRepromptedTurnOne(em);
+        Assert.Equal(1, bag.Count(51));
+    }
+
+    [Fact]
+    public async Task UnderRulesWhereAFailedItemSpendsTheTurn_TheFoeAttacksOnTheFailedTurn()
+    {
+        var player = TestCreatures.Make("Player", hp: 200, speed: 200);
+        player.AddAttack(Tackle());
+        var enemy = TestCreatures.Make("Enemy", hp: 60, speed: 1);
+        enemy.AddAttack(Tackle());
+        var bag = new Bag();
+        bag.Add(17);
+
+        var em = await RunAsync(
+            new TurnChoiceInput(new ItemTurnChoice(Potion())),
+            bag,
+            player,
+            enemy,
+            rules: new RulesWhereAFailedItemSpendsTheTurn()
+        );
+
+        var events = em.Events.ToList();
+        Assert.Single(em.Of<TurnStarted>(), t => t.TurnNumber == 1);
+        int failed = events.FindIndex(e => e is ItemUseFailed);
+        int turnTwo = events.FindIndex(e => e is TurnStarted { TurnNumber: 2 });
+        var turnOneMoves = events.Skip(failed).Take(turnTwo - failed).OfType<MoveUsed>().ToList();
+        Assert.Equal("Enemy", Assert.Single(turnOneMoves).AttackerName);
+        Assert.Equal(1, bag.Count(17));
+    }
 }

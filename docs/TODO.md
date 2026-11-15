@@ -57,8 +57,8 @@ None open.
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
 | **A binder or a Bide user still gets the battle menu** (§3.1) | S–M | ✗ 2, 4, 6; the rest drafted | Filed 2026-11-14. |
-| **A failed item use spends no turn** (§3.1) | S–M | ✗ 2, 3, 6; the rest drafted | Filed 2026-11-14. pokered returns to the bag menu. |
 | **The player chooses what Mimic copies** (§3.1) | M | ✗ 2, 3; the rest drafted | Found 2026-11-03. Needs an input prompt, so a design pass. |
+| **Reopen the bag after a failed item use** (§3.1) | S | ✗ 2, 6; the rest drafted | Filed 2026-11-15 (your ruling). Client-side; a design pass picks the signal. |
 
 **C. Needs a `/plan` or a verify slice**
 
@@ -237,14 +237,14 @@ data/engine item usually also means updating the test that pins the wrong value.
   accumulation and the binding replay), **4** (trace Bide across a switch or item turn), **6**. *Drafted:* 1: a
   binder or Bide user is offered the full menu; FIGHT continues the locked move. 3: an `IBattleRules` member or a
   per-mechanic flag on `ILockInMechanic` for "keeps the menu". 5: runtime only. 7: none.
-- **A failed item use spends no turn in Gen 1 (found 2026-11-14, menu-item design pass; source-read, not run) — S–M,
-  ✗ not Ready.** In pokered an item that can't be used returns to the bag menu without taking the turn (`UseBagItem`,
-  `core.asm:2257-2259` → `BagWasSelected`). Ours emits `ItemUseFailed` from `ItemAction.ExecuteAsync` and the enemy
-  still attacks.
-  **DoR:** ✗ gaps **2** (re-prompt from `BuildPlayerActionAsync` on a use that can't apply, or check at build time;
-  what the client shows), **3** (an `IBattleRules` member for whether a failed use costs the turn), **6**. *Drafted:*
-  1: an item that can't be used costs no turn and the player chooses again. 4: the cite above; read each `UseItem`
-  failure path for its line. 5: runtime, possibly client text. 7: none.
+- **Reopen the bag after a failed item use (found 2026-11-15 by `requirements-review`, failed-item-use item; filed on
+  your ruling) — S, ✗ not Ready.** In pokered a use that can't apply returns to the bag list (`UseBagItem` →
+  `jp z, BagWasSelected`), so the player can pick another item or back out. Ours re-emits `TurnStarted` and the
+  client reopens the whole action menu. **DoR:** ✗ gaps **2** (how the client knows to reopen the bag: the
+  `ItemUseFailed` it already receives, or a flag on the repeated `TurnStarted`; what a reconnect mid-prompt shows),
+  **6**. *Drafted:* 1: after "It won't have any effect" the bag list is open, and backing out shows the action menu.
+  3: none (the turn rule is `FailedItemUseSpendsTurn`; this is presentation). 4: the cite above. 5: runtime, client
+  only. 7: the failed-item-use item (landed; see `TODO_ARCHIVE.md`).
 - **An enemy Counter or Mirror Move on a switch or item turn (found 2026-11-15 by `requirements-review`, menu-item
   item; unverified) — S, ✗ not Ready.** No player move runs on a switch or item turn, so pokered's enemy Counter and
   Mirror Move read the stale `wPlayerSelectedMove` and `wDamage` from the previous turn. Whether ours matches is
@@ -346,6 +346,9 @@ channel of a broader acquisition layer.
     rate, then the HP factor. Verify and cite it before the `/plan`.
   - **3:** the capture formula is gen-variable (Gen 2 changed it), so it needs a seam, a rules member or an
     `ICatchRules`.
+  - **2:** `ItemAction.CanUse()` treats an item with no registered effect as a failed use, which costs no turn
+    under Gen 1 rules. The design must split "not usable here" (`ItemUseNotTime`, no turn) from a thrown ball
+    (turn spent, ball consumed) (`requirements-review` 2026-11-15, failed-item-use item).
   - **Answered:** 5 (both: imported `CatchRate` plus runtime) and 7 (bag scope decided).
   - **Drafted acceptance:** in a seeded wild battle a ball at 1 HP with the matching roll catches, the creature
     joins `Party`, and the battle ends `"Caught"`; trainer-tier foes refuse the ball.

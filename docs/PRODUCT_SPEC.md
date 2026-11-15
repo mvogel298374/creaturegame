@@ -280,6 +280,9 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - Revive/Max Revive only offer **fainted** party members as valid targets; the other three categories above
   only offer **living** members. Picking an ineligible member (e.g. a full-HP Potion, a status cure with
   nothing to cure) refuses with "It won't have any effect!" — no item consumed, no announce.
+- A refused item use costs no turn: the line shows, the action menu reopens on the same turn, and the foe neither
+  chooses nor moves. Design → `GENERATION_SEAMS.md` (`FailedItemUseSpendsTurn`); history → `TODO_ARCHIVE.md` →
+  *A failed item use spends no turn*.
 - Ether/Elixir on a benched member reads and restores PP against *that member's own* moveset, not the active
   creature's.
 - Full Restore on a full-HP creature with a major status (burn, freeze, paralysis, poison, sleep) cures the status

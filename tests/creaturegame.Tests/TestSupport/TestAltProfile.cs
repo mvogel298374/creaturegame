@@ -266,6 +266,8 @@ internal static class TestAltProfile
 
         public override bool MenuActionResolvesBeforeFoeChoice => false;
 
+        public override bool FailedItemUseSpendsTurn => true;
+
         public override bool HealFails(int currentHp, int maxHp) => currentHp >= maxHp;
 
         public override MoveFailureAnnouncement HealFailureAnnouncement =>

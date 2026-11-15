@@ -388,6 +388,17 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
   flag, and an X-item is removed *before* the raise, so at +6 it is spent and "Nothing happened!" follows (pokered
   `engine/items/item_effects.asm:1544-1663`). Dire Hit and Guard Spec print only "<PLAYER> used <ITEM>!"
   (`PrintItemUseTextAndRemoveItem`). Seam: `IBattleRules.RepeatFlagItemRefused` / `CappedXItemRefused`.
+- An item that **can't be used costs no turn**: "It won't have any effect." prints and the bag menu reopens
+  (`ItemUseNoEffect` → `ItemUseFailed` zeroes `wActionResultOrTookBattleTurn`; `UseBagItem` then takes
+  `jp z, BagWasSelected`, `engine/battle/core.asm`). This applies to a Potion at full HP, a cure with no matching
+  status, a Revive on a live Pokémon, and an Ether or Elixir with nothing to restore. The foe neither picks nor
+  moves, and a binder's trap counts down only after a success. Seam: `IBattleRules.FailedItemUseSpendsTurn` (false).
+  **Known divergence:** ours reopens the whole action menu (a repeated `TurnStarted`), not the bag list; the turn
+  semantics match (`TODO.md` §3.1 *Reopen the bag after a failed item use*).
+- **Max Ether and Max Elixir ignore PP Ups when checking for "nothing to restore"**: `.fullyRestorePP` compares the
+  PP byte without masking the PP Up bits (pokered `engine/items/item_effects.asm`), so on a full-PP move that has had
+  PP Ups the item is used up and takes the turn. Not modelled: the game has no PP Up yet, so `PpRestoreItemEffect`
+  refuses a full move. Model it with PP Up.
 
 #### Experience
 - **Trainer XP floors the half separately:** x = ⌊base × L / 7⌋, then a trainer battle adds ⌊x/2⌋ (pokered

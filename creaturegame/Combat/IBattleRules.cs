@@ -386,6 +386,9 @@ public interface IBattleRules
     /// <summary>Whether the player's switch or item runs before the foe picks its move, so the foe chooses against its result. See GENERATION_SEAMS.md §2.</summary>
     bool MenuActionResolvesBeforeFoeChoice { get; }
 
+    /// <summary>Whether an item that can't be used still costs the turn; false re-prompts the player. See GENERATION_SEAMS.md §2.</summary>
+    bool FailedItemUseSpendsTurn { get; }
+
     /// <summary>The wording of the crit, one-hit KO and effectiveness lines. See GENERATION_SEAMS.md §2.</summary>
     HitLineWording HitLineWording { get; }
 

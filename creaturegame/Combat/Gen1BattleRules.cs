@@ -437,6 +437,9 @@ public sealed class Gen1BattleRules : IBattleRules
     // pokered: a switch or item runs inside the menu, before SelectEnemyMove (core.asm:305, :338-339).
     public bool MenuActionResolvesBeforeFoeChoice => true;
 
+    // pokered: a failed UseItem jumps back to BagWasSelected (core.asm UseBagItem).
+    public bool FailedItemUseSpendsTurn => false;
+
     public HitLineWording HitLineWording => HitLineWording.Short;
 
     // pokered core.asm AttackSubstitute: the byte wraps; damage above 255 breaks without writing it.

@@ -447,7 +447,7 @@ public sealed class GameSessionManager(
 
     /// <summary>Routes a bag-item use to the battle's input: resolves the item from the run's catalog and
     /// completes the turn handshake. The engine's <c>ItemAction</c> does the has-in-bag + would-have-effect
-    /// checks (a no-op use yields <c>ItemUseFailed</c> and the turn proceeds), so this only validates that the
+    /// checks (a no-op use yields <c>ItemUseFailed</c>; the rules decide whether it costs the turn), so this only validates that the
     /// id is a real catalog item. An unknown id is ignored (a malformed client request).</summary>
     public void SetItemChoice(
         string connectionId,
@@ -471,7 +471,7 @@ public sealed class GameSessionManager(
             // Unknown item id (malformed/stale client request): don't leave the turn handshake parked.
             // Advance the turn with a move fallback (ResolveMove(-1) → first selectable), mirroring the
             // out-of-range move-slot handling. ItemAction stays the authority for a *known* item that's out
-            // of stock or would have no effect (it soft-fails with ItemUseFailed and the turn proceeds).
+            // of stock or would have no effect.
             battle.Input.SetChoice(-1);
         }
     }

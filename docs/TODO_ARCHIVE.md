@@ -8,6 +8,42 @@ double as a fidelity record and the `seam-reviewer` references these patterns.
 
 ---
 
+## §3.1 A failed item use spends no turn ✅ DONE (2026-11-15)
+
+S–M, `Battle` turn flow, `IBattleRules.FailedItemUseSpendsTurn`. Found 2026-11-14 in the menu-item design pass; source-confirmed, design pass 2026-11-15.
+
+**Finding.** In pokered an item that can't be used returns to the bag menu without taking the turn. Ours emitted `ItemUseFailed` from
+`ItemAction.ExecuteAsync` and the enemy still attacked.
+
+**DoR (confirmed 2026-11-15).**
+1. **Acceptance:** an item whose use can't apply costs no turn: "It won't have any effect!" shows, the action menu reopens on the same turn, the foe
+   neither chooses nor moves, nothing is consumed, and the next choice plays the turn normally.
+2. **Design:** `ItemAction` exposes its refusal check (`effect is null || !bag.Has || !CanApply`) as `CanUse()`. In `Battle`'s turn loop the
+   `TurnStarted` emit and `BuildPlayerActionAsync` sit in an inner loop: an `ItemAction` that can't be used, under rules where a failed use spends no
+   turn, emits `ItemUseFailed` and goes round again. `TurnStarted` is re-emitted with the same turn number, so the client's existing `TURN_STARTED`
+   reducer reopens the menu and the reconnect cache holds the live prompt; no client change. Nothing runs before the re-prompt, so the trap countdown,
+   the trainer AI and the foe's selection never see the failed attempt. Under rules where it spends the turn, the old path is kept (`ExecuteAsync`
+   refuses and the foe acts).
+3. **Seam:** `IBattleRules.FailedItemUseSpendsTurn` (Gen 1 `false`; `TestAltProfile` true); `ItemUseFailed` reused. Gen 2 cell unverified.
+4. **Gen 1 source:** pokered `engine/battle/core.asm` `UseBagItem`: after `UseItem`, a zero `wActionResultOrTookBattleTurn` takes `jp z, BagWasSelected`,
+   and the trap countdown only follows a success. `engine/items/item_effects.asm`: `ItemUseNoEffect` → `ItemUseFailed` zeroes the flag: Potion-line at
+   full HP, status cure with no matching status, Revive on a live mon, Ether or Elixir with nothing to restore. In-battle X items at +6 and a repeat
+   Dire Hit or Guard Spec are consumed and take the turn (our Gen 1 `CanApply` already allows them), so they are unaffected.
+5. **Data vs runtime:** runtime only. The failure line's exact pokered wording stays with the battle-text placement decision.
+6. **Tests** (`ItemActionBattleTests`, full battles): `APotionAtFullHp_SpendsNoTurn_AndThePlayerChoosesAgain`,
+   `AReviveOnALiveMember_SpendsNoTurn_AndThePlayerChoosesAgain`, `AnAntidoteWithNoMatchingStatus_SpendsNoTurn_AndThePlayerChoosesAgain`,
+   `AnEtherOnAFullPpMove_SpendsNoTurn_AndThePlayerChoosesAgain`, `UnderRulesWhereAFailedItemSpendsTheTurn_TheFoeAttacksOnTheFailedTurn`.
+7. **Dependencies:** none. The binder/Bide menu item, when built, inherits the rule that only a successful use counts down the trap.
+
+**Review outcomes (2026-11-15).** Format PASS, lint PASS, test step green (.NET 2432/2432, tsc, Vitest); E2E not run, the client-flow risk accepted by the
+user. `requirements-review`: 6 findings, all ruled by the user: the menu-vs-bag divergence (ours reopens the whole action menu, pokered the bag list) is
+recorded in `GEN_DIFFERENCES` and filed as the live item "Reopen the bag after a failed item use"; the Ball and unregistered-effect split is deferred to
+the Catch entry (DoR line 2); the Max Ether/Elixir PP-Up quirk is recorded in `GEN_DIFFERENCES` as not modelled (no PP Up in the game yet); the
+Ether and Antidote no-turn tests were added. `pr-review`: PR-READY; its one recommended assertion (the enemy chooses once across the failed turn) was
+added on the user's say.
+
+---
+
 ## §3.1 A menu item takes effect before the enemy picks its move ✅ DONE (2026-11-15)
 
 S, `Battle` turn flow, `IBattleRules.MenuActionResolvesBeforeFoeChoice`. Found 2026-11-14 by `requirements-review` in the switch-before-foe-choice item; source-confirmed.
@@ -35,7 +71,7 @@ there); the section 5.0.2 `ItemPriority` note was updated and the `ItemAction` s
 `GENERATION_SEAMS` row (user ruling); the AI test's seed-dependence was accepted (user). It also raised an untraced Counter/Mirror Move question, filed as
 the live tier-D entry "An enemy Counter or Mirror Move on a switch or item turn" (user ruling). `pr-review`: PR-READY; a narration comment trimmed and the
 `ItemPriority` doc reworded to "a queued item" (fixed); a queued-item ordering assertion added by user ruling, sabotage-verified. Also filed in the DoR pass
-and kept live: "A failed item use spends no turn".
+and since archived above: "A failed item use spends no turn".
 
 ---
 

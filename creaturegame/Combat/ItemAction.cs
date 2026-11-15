@@ -48,10 +48,18 @@ public sealed class ItemAction : IBattleAction
         Priority = ItemPriority;
     }
 
-    public Task ExecuteAsync()
+    public string ItemName => _item.Name ?? "";
+
+    /// <summary>False for a use that wouldn't do anything (no effect for the category, the precondition isn't met)
+    /// or an item not in the bag.</summary>
+    public bool CanUse()
     {
         var effect = ItemEffects.For(_item.Category);
-        var ctx = new ItemEffectContext
+        return effect is not null && _bag.Has(_item.Id) && effect.CanApply(NewContext());
+    }
+
+    private ItemEffectContext NewContext() =>
+        new()
         {
             User = Source,
             Item = _item,
@@ -62,17 +70,18 @@ public sealed class ItemAction : IBattleAction
             Rules = _rules,
         };
 
-        // Refuse a use that wouldn't do anything (no effect for the category, or the precondition isn't
-        // met) or that isn't actually in the bag — announce nothing, consume nothing (Gen 1 menu rule).
-        if (effect is null || !_bag.Has(_item.Id) || !effect.CanApply(ctx))
+    public Task ExecuteAsync()
+    {
+        // A refused use announces nothing and consumes nothing.
+        if (!CanUse())
         {
-            _emitter?.Emit(new ItemUseFailed(_item.Name ?? ""));
+            _emitter?.Emit(new ItemUseFailed(ItemName));
             return Task.CompletedTask;
         }
 
-        _emitter?.Emit(
-            new ItemUsed(_item.Name ?? "", ctx.ResolvedTarget.Name, ctx.ResolvedTarget.Id)
-        );
+        var effect = ItemEffects.For(_item.Category)!;
+        var ctx = NewContext();
+        _emitter?.Emit(new ItemUsed(ItemName, ctx.ResolvedTarget.Name, ctx.ResolvedTarget.Id));
         effect.Apply(ctx);
         _bag.Consume(_item.Id);
 
