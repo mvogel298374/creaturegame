@@ -143,7 +143,7 @@ The remaining Gen 1 logic lives in the categorisation:
   that table its 56 overrides: moves whose text is false in Gen 1, or true but missing what a player needs (Fly and Dig's
   gaps, the one-hit KO speed check, Quick Attack's priority). The other moves keep PokeAPI's text, so a PokeAPI wording
   change reaches them on the next import. The text states Gen 1 even where a tracked engine bug still differs
-  (`TODO.md` §3.1). The one exception is Teleport, "Has no effect.", because ours is a deliberate no-op.
+  (`TODO.md` §3.1).
   `MoveDescriptionDataContractTests` pins the stored text and bans the modern phrases across every move.
 - **`DamageCategory`** — mostly from `meta.category` (`damage-heal` → Drain, `ohko` →
   OHKO), but PokeAPI doesn't model several Gen 1 mechanics, so those are **special-cased
@@ -196,6 +196,7 @@ The remaining Gen 1 logic lives in the categorisation:
 | `Substitute` | Substitute | Spends HP to raise a decoy that soaks hits |
 | `Transform`/`Conversion` | Transform, Conversion | Transform copies the target's species/types/stats/stages/moveset (reverted at battle end); Conversion copies just the target's types onto the user |
 | `ForceFlee` | Roar, Whirlwind | Ends a WILD battle (target flees); fails in Elite/Boss — non-escapable, the Gen 1 trainer-battle rule |
+| `Teleport` | Teleport | Ends a WILD battle (the user flees), under Roar's level roll; fails in Elite/Boss |
 
 **Ordering matters in the mapping.** The name→effect lookup above runs *before* the two meta-based
 fallbacks, so a rampage move maps to `Rampage` rather than falling into the `Confuse` fallback its

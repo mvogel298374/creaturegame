@@ -282,6 +282,9 @@ public abstract class DelegatingBattleRules : IBattleRules
 
     public virtual bool ForceFleeSkipsAccuracy => _inner.ForceFleeSkipsAccuracy;
 
+    public virtual MoveFailureAnnouncement TeleportFailureAnnouncement =>
+        _inner.TeleportFailureAnnouncement;
+
     public virtual bool FleeEndsTurnImmediately => _inner.FleeEndsTurnImmediately;
 
     public virtual MoveFailureAnnouncement StatusMoveNoOpAnnouncement =>

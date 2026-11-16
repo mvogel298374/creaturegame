@@ -1,3 +1,4 @@
+using creaturegame.Attacks;
 using creaturegame.Combat;
 using creaturegame.Creatures;
 using creaturegame.Tests.TestSupport;
@@ -11,8 +12,7 @@ namespace creaturegame.Tests.Integration.Gen1Attacks;
 /// <list type="bullet">
 /// <item><b>Pay Day</b> — deals normal damage and scatters coins = multiplier × user level.</item>
 /// <item><b>Roar / Whirlwind</b> — end a wild battle in Gen 1: the target is scared off and flees
-/// (<c>MoveEffect.ForceFlee</c>). Pinned below via the real imported rows. <b>Teleport</b> (player flee /
-/// switch) still has no home with one creature, so it stays a deliberate announced-but-harmless no-op.</item>
+/// (<c>MoveEffect.ForceFlee</c>); <b>Teleport</b> makes its user flee (<c>MoveEffect.Teleport</c>).</item>
 /// <item><b>Haze / Metronome / Self-Destruct</b> — engine mechanics unit-tested in CoreMechanicsTests;
 /// here the <i>real imported rows</i> are driven through <c>AttackAction</c> to prove the mapping works.</item>
 /// </list>
@@ -34,20 +34,19 @@ public class UniqueMoveEffectContractTests(MovesFixture moves) : Gen1MoveContrac
         Assert.True(result.Has<DamageDealt>(), "Pay Day also deals damage");
     }
 
-    // Teleport: still no home with a single creature (player flee / switch), so it stays a deliberate no-op —
-    // announced, harmless, PP spent. Roar/Whirlwind moved to the flee contract below now they end a battle.
-    [Theory]
-    [InlineData("teleport")]
-    public async Task SwitchMoveIsAnnouncedButHasNoCombatEffect(string moveName)
+    [Fact]
+    public async Task TeleportMakesTheUserFlee()
     {
-        var move = Move(moveName);
+        var move = Move("teleport");
+        Assert.Equal(MoveEffect.Teleport, move.Effect);
         var result = await new MoveScenario().Defender(TestCreatures.Make("D", hp: 500)).Use(move);
 
         Assert.True(result.Has<MoveUsed>());
         Assert.False(result.Has<DamageDealt>());
         Assert.Equal(result.Defender.Attributes.MaxHP, result.Defender.Attributes.HP);
         Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
-        Assert.False(result.Defender.Battle.HasFled); // teleport is still a no-op (no flee mapped)
+        Assert.Equal("teleport", result.Attacker.Battle.FledFromMove);
+        Assert.False(result.Defender.Battle.HasFled);
         Assert.Equal(move.PowerPointsMax - 1, result.Move.PowerPointsCurrent);
     }
 

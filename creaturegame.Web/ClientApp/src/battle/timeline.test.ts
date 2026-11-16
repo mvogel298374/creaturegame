@@ -335,19 +335,20 @@ describe('expandEvent — control plane vs timeline', () => {
     expect(expandEvent('BattleEnded', { winnerName: 'GENGAR', winnerId: 2 }, CTX)).toEqual({});
   });
 
-  it('CreatureFled (foe scared off) logs the wild flee and resets the player sprite', () => {
-    // Roar/Whirlwind ended the wild battle. We skip BattleEnded on a flee, so this is where the player
-    // sprite reverts (in case it Transformed). The foe-fled branch words it as the wild Pokémon fleeing.
-    const { now, steps } = expandEvent('CreatureFled', { name: 'PIDGEY', isPlayer: false }, CTX);
+  it('CreatureFled resets the player sprite, since a flee skips BattleEnded', () => {
+    const { now, steps } = expandEvent('CreatureFled', { name: 'PIDGEY', isPlayer: false, moveName: 'roar' }, CTX);
     expect(now).toBeUndefined();
-    expect(logLines(steps)).toEqual(['PIDGEY fled!']);
     expect(emits(steps)).toContainEqual({ type: 'resetPlayerSprite' });
   });
 
-  it('CreatureFled (player blown away) words it from the player side', () => {
-    const { steps } = expandEvent('CreatureFled', { name: 'MEWTWO', isPlayer: true }, CTX);
-    expect(logLines(steps)).toEqual(['MEWTWO was blown away!']);
-    expect(emits(steps)).toContainEqual({ type: 'resetPlayerSprite' });
+  it.each([
+    ['teleport', 'ABRA', true, 'ABRA ran from battle!'],
+    ['teleport', 'ABRA', false, 'ABRA ran from battle!'],
+    ['roar', 'PIDGEY', false, 'PIDGEY ran away scared!'],
+    ['whirlwind', 'MEWTWO', true, 'MEWTWO was blown away!'],
+  ])('CreatureFled from %s words the line by the move, as pokered does', (moveName, name, isPlayer, line) => {
+    const { steps } = expandEvent('CreatureFled', { name, isPlayer, moveName }, CTX);
+    expect(logLines(steps)).toEqual([line]);
   });
 
   it('RunEnded logs the run summary and queues the game-over phase flip', () => {

@@ -525,11 +525,8 @@ public record StatDropBlocked(string CreatureName, int CreatureId) : BattleEvent
 // --- Creature ---
 public record CreatureFainted(string Name, int Id) : BattleEvent;
 
-/// <summary>A creature was scared off by Roar/Whirlwind and fled — the wild battle ends with no faint
-/// (Gen 1). <see cref="IsPlayer"/> distinguishes the player being blown away from the wild foe fleeing, so
-/// the client can word it ("… was blown away!" vs "The wild … fled!"). Emitted instead of
-/// <see cref="BattleEnded"/>; the run loop advances the encounter as neither a win nor a loss.</summary>
-public record CreatureFled(string Name, int Id, bool IsPlayer) : BattleEvent;
+/// <summary>A creature fled a wild battle, ending it instead of <see cref="BattleEnded"/>; see GAME_LOOP.md §2 (Outcome).</summary>
+public record CreatureFled(string Name, int Id, bool IsPlayer, string MoveName) : BattleEvent;
 
 // --- Forced switch on faint (Encounter Logic Phase 4 Stage 3) ---
 /// <summary>The player's active creature fainted <em>but the party still has a live bench member</em>, so the run

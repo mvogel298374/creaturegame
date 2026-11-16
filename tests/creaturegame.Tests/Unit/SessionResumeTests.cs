@@ -202,7 +202,7 @@ public class SessionResumeTests
         emitter.Emit(Biome("phantom-marsh"));
         emitter.Emit(new BattleStarted("Player", 1, 25, "Enemy", 2, 1, 5));
         emitter.Emit(Turn(1));
-        emitter.Emit(new CreatureFled("Player", 1, true));
+        emitter.Emit(new CreatureFled("Player", 1, true, "whirlwind"));
         int before = hub.EventsFor("conn-1").Count();
 
         emitter.ReplayLastKnownState();

@@ -37,11 +37,7 @@ public sealed class MoveEffectContext
     /// </summary>
     public required bool TargetShieldedBySubstitute { get; init; }
 
-    /// <summary>
-    /// Whether this battle can be fled — Roar/Whirlwind end a <em>wild</em> battle but fail against the
-    /// trainer-analog encounters (Elite/Boss). The run layer sets it per encounter tier; defaults true (a
-    /// plain wild battle / the legacy chain). Read by <see cref="ForceFleeEffect"/>.
-    /// </summary>
+    /// <summary>Whether a flee move can end this battle (false for Elite/Boss); see GENERATION_SEAMS.md §2.</summary>
     public bool BattleEscapable { get; init; } = true;
 
     /// <summary>
@@ -567,7 +563,33 @@ public sealed class ForceFleeEffect : IMoveEffect
 
         // Wild battle (escapable): the targeted creature is scared off — the Battle loop sees HasFled and ends.
         if (ctx.Target.IsAlive())
-            ctx.Target.Battle.HasFled = true;
+            ctx.Target.Battle.FledFromMove = ctx.Attack.Name ?? "";
+    }
+}
+
+/// <summary>Teleport: the user flees a wild battle, under Roar's level check. See GENERATION_SEAMS.md §2.</summary>
+public sealed class TeleportEffect : IMoveEffect
+{
+    public MoveEffect Effect => MoveEffect.Teleport;
+
+    public void Apply(MoveEffectContext ctx)
+    {
+        bool blocked = !ctx.BattleEscapable && ctx.Rules.ForceFleeFailsVsTrainer;
+        if (blocked || !ctx.Rules.ForceFleeSucceeds(ctx.Source.Level, ctx.Target.Level, ctx.Rng))
+        {
+            ctx.Emitter?.Emit(
+                MoveFailureEvents.For(
+                    ctx.Rules.TeleportFailureAnnouncement,
+                    ctx.Source,
+                    ctx.Target,
+                    ctx.Attack.Name ?? "",
+                    UnaffectedCause.ForceFlee
+                )
+            );
+            return;
+        }
+
+        ctx.Source.Battle.FledFromMove = ctx.Attack.Name ?? "";
     }
 }
 
@@ -640,6 +662,7 @@ public static class MoveEffects
         new SplashEffect(),
         new ConfuseEffect(),
         new ForceFleeEffect(),
+        new TeleportEffect(),
     };
 
     // Effect → effect, derived from All so each effect's own Effect is the single source of truth:

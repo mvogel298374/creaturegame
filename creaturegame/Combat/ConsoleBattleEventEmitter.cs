@@ -359,6 +359,10 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                 Console.WriteLine($"{e.Name} fainted!");
                 break;
 
+            case CreatureFled e:
+                Console.WriteLine($"{e.Name} fled ({e.MoveName})!");
+                break;
+
             case Revived e:
                 Console.WriteLine($"{e.CreatureName} was revived! ({e.HpAfter} HP restored)");
                 break;

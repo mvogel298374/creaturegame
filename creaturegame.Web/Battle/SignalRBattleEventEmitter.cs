@@ -812,6 +812,7 @@ public sealed class SignalRBattleEventEmitter(
                     e.Name,
                     e.Id,
                     e.IsPlayer,
+                    e.MoveName,
                 }
             ),
             SwitchInOffered e => (

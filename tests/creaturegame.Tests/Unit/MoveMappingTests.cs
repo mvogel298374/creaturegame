@@ -86,7 +86,10 @@ public class MoveMappingTests
         "User sleeps for two turns, fully healing itself and curing its status. Fails at full HP."
     )]
     [InlineData("metronome", "Randomly selects and uses any move except itself and Struggle.")]
-    [InlineData("teleport", "Has no effect.")]
+    [InlineData(
+        "teleport",
+        "The user flees a wild battle, but can fail against a higher-level target. Fails against trainers."
+    )]
     public void GenOneDescription_ReplacesPokeApisModernText(string name, string expected)
     {
         Assert.Equal(expected, MoveImport.MapToAttack(MoveWithModernText(name)).Description);

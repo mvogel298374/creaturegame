@@ -39,10 +39,10 @@ public sealed class BattleState
     // for the turn it's issued on; the next turn's fresh move selection overwrites it unread).
     public StatusCondition? HazeSuppressedStatus { get; set; }
 
-    // Roar / Whirlwind: set on a creature when it is scared off (the move's target flees). The Battle loop
-    // ends the encounter when either side has fled — no faint. Transient like the rest; the per-battle reset
-    // clears it.
-    public bool HasFled { get; set; }
+    // The move that made this creature flee; the Battle loop ends a wild battle on it.
+    public string? FledFromMove { get; set; }
+
+    public bool HasFled => FledFromMove is not null;
 
     // Binding (Wrap/Bind/Clamp/Fire Spin) — Gen 1 partial trap, two halves of one effect:
     //  • On the VICTIM: BindingTurnsRemaining > 0 means trapped — it loses its turn (StatusResolver.CanAct)

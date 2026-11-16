@@ -450,7 +450,8 @@ public class MoveImport
         ["substitute"] =
             "Transfers 1/4 of the user’s max HP into a doll that takes damage until it breaks. Blocks most status changes, but not moves that only put to sleep or paralyze.",
         ["surf"] = NoAdditionalEffect,
-        ["teleport"] = "Has no effect.",
+        ["teleport"] =
+            "The user flees a wild battle, but can fail against a higher-level target. Fails against trainers.",
         ["thrash"] = RampageText,
         ["tri-attack"] = NoAdditionalEffect,
         ["waterfall"] = NoAdditionalEffect,
@@ -513,6 +514,7 @@ public class MoveImport
         ["conversion"] = MoveEffect.Conversion,
         ["roar"] = MoveEffect.ForceFlee,
         ["whirlwind"] = MoveEffect.ForceFlee,
+        ["teleport"] = MoveEffect.Teleport,
     };
 
     // DATA_IMPORT.md §4.1 — Gen 1's physical/special split by type.

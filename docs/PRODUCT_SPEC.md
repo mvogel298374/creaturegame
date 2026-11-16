@@ -121,6 +121,10 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - In a wild battle a Roar or Whirlwind that lands ends the battle at once: the other side doesn't act and no poison,
   burn or Leech Seed ticks that turn. A user of lower level than its target succeeds only on a level-based roll and
   otherwise fails with "It didn't affect <target>!". Neither move rolls accuracy, so Whirlwind never misses.
+- Teleport makes its user leave a wild battle, under the same level roll and with no accuracy roll, so a wild Abra
+  usually escapes. A failed roll, or any Elite or Boss battle, prints "But it failed!" and the battle goes on.
+- The flee line names the move, as in Gen 1: "<user> ran from battle!" (Teleport), "<target> ran away scared!"
+  (Roar), "<target> was blown away!" (Whirlwind).
 - Seismic Toss, Night Shade, Sonic Boom, Super Fang and Counter ignore type immunity: Seismic Toss hits Ghost-types,
   Night Shade hits Normal-types.
 - Thunder Wave against a Ground-type fails as "doesn't affect" without an accuracy roll.
@@ -227,7 +231,6 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - The creature overview shows each move's description, and it states the Gen 1 effect, not PokeAPI's modern text
   (Sky Attack has no flinch, Focus Energy lowers the crit chance, Quick Attack names its priority).
 - 56 of the 165 moves carry a pokered-sourced override; the other 109 keep PokeAPI's text.
-- Teleport reads "Has no effect.", because it is a deliberate no-op.
 - Design detail → `DATA_IMPORT.md` (*Description*), `GENERATION_SEAMS.md` (*move description table*).  History →
   `TODO_ARCHIVE.md` → *§3.2 Move descriptions state the Gen 1 effect*.
 

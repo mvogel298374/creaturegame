@@ -104,7 +104,6 @@ None open.
 
 | Item | Cost | Ready? | Next step |
 |:-----|:----:|:-------|:----------|
-| **Teleport flees a wild battle, as in Gen 1** (§3.1) | S | ✗ 2, 4, 6 | Filed 2026-11-16. Read `SwitchAndTeleportEffect` for Teleport's own lines and level check. |
 | **Disable matches move instances, not move ids** (§3.1) | S | ✗ 1, 2, 4, 6 | Filed 2026-11-09. Read `DisabledMoveStops` and the Metronome and Mirror Move wrappers first. |
 | **Same-type secondary status immunity** (§3.1) | S–M | ✗ 2, 4, 6; the rest drafted | Take the pokered cite; Ice Beam freezes Ice-types today. |
 | **Other `ResidualEffects1` moves may roll accuracy** (§3.1) | S–M | ✗ 1, 2, 4, 6 | Filed 2026-11-06. A verify slice reads each effect for its own hit test; now also carries the residual-effect failure lines. |
@@ -232,16 +231,6 @@ data/engine item usually also means updating the test that pins the wrong value.
   reads "<user>'s attack missed!"; the `BindingStarted` event stays, since state and tests use it. 2: wording only, in
   the client timeline and the console emitter. 4: the cites above. 5: runtime only (client and console text). 6:
   timeline tests pin both lines. 7: the battle-text placement decision.
-- **Teleport flees a wild battle, as in Gen 1 (found 2026-11-16 by `requirements-review`, Bide item; not yet
-  source-read) — S, ✗ not Ready.** pokered gives Teleport `SWITCH_AND_TELEPORT_EFFECT`, the effect Roar and Whirlwind
-  use (`effects.asm` `SwitchAndTeleportEffect`): the user leaves a wild battle under the same level check, and it
-  fails in a trainer battle. We import Teleport with no effect, so it does nothing, and
-  `Gen1BattleRules.SkipsDamageCalculation` matches it by its blank shape (the only 0-power move with no effect,
-  status or stat change). **DoR:** ✗ gaps **2** (map Teleport to `ForceFlee` or a sibling effect; the user flees, not
-  the target), **4** (read the Teleport branch for its lines and level rule), **6**. *Drafted:* 1: a wild-battle
-  Teleport ends the battle as the user flees, a failed level check or a trainer battle prints the failure line, and
-  the shape clause in `SkipsDamageCalculation` gives way to the effect (the `teleport` table row stays). 3: existing
-  `ForceFlee*` seams. 5: importer mapping, re-import `moves.db`. 7: none.
 - **Disable matches move instances, not move ids (found 2026-11-09 by `opus-engineer`, Fly and Dig item;
   read-confirmed, unverified beyond that) — S, ✗ not Ready.** `StatusResolver.DisabledMoveStops` compares the selected
   `PokemonAttack` with `Battle.DisabledMove` by reference; pokered compares move numbers

@@ -192,6 +192,7 @@ public sealed class Gen1BattleRules : IBattleRules
                     is MoveEffect.Conversion
                         or MoveEffect.Haze
                         or MoveEffect.ForceFlee
+                        or MoveEffect.Teleport
                         or MoveEffect.Mist
                         or MoveEffect.FocusEnergy
                         or MoveEffect.Confuse
@@ -208,11 +209,6 @@ public sealed class Gen1BattleRules : IBattleRules
                     is StatusCondition.Poison
                         or StatusCondition.BadPoison
                         or StatusCondition.Paralysis
-                || (
-                    move.Effect == MoveEffect.None
-                    && move.StatusEffect == StatusCondition.None
-                    && move.StatEffect is null
-                )
             );
 
     public int RollPsywaveDamage(Creature source, BattleSide side, IRandomSource rng)
@@ -281,6 +277,9 @@ public sealed class Gen1BattleRules : IBattleRules
 
     // SWITCH_AND_TELEPORT_EFFECT is in ResidualEffects1, which skips the accuracy test (core.asm).
     public bool ForceFleeSkipsAccuracy => true;
+
+    // pokered effects.asm SwitchAndTeleportEffect: Teleport jumps to PrintButItFailedText_ on every failure.
+    public MoveFailureAnnouncement TeleportFailureAnnouncement => MoveFailureAnnouncement.Failed;
 
     // MainInBattleLoop returns as soon as wEscapedFromBattle is set.
     public bool FleeEndsTurnImmediately => true;

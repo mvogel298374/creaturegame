@@ -525,8 +525,11 @@ public interface IBattleRules
     /// <summary>The line Roar / Whirlwind print when the wild success roll fails. See GENERATION_SEAMS.md §2.</summary>
     MoveFailureAnnouncement ForceFleeWildFailureAnnouncement { get; }
 
-    /// <summary>Whether Roar / Whirlwind skip the accuracy roll. See GENERATION_SEAMS.md §2.</summary>
+    /// <summary>Whether Roar / Whirlwind / Teleport skip the accuracy roll. See GENERATION_SEAMS.md §2.</summary>
     bool ForceFleeSkipsAccuracy { get; }
+
+    /// <summary>The line Teleport prints when it fails, in a wild or a trainer battle. See GENERATION_SEAMS.md §2.</summary>
+    MoveFailureAnnouncement TeleportFailureAnnouncement { get; }
 
     /// <summary>Whether a flee ends the turn at once: no further action, counter tick or residual. See GENERATION_SEAMS.md §2.</summary>
     bool FleeEndsTurnImmediately { get; }

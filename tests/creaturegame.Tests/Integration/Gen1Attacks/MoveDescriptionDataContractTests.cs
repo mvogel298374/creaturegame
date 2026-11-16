@@ -78,11 +78,12 @@ public class MoveDescriptionDataContractTests
     }
 
     [Fact]
-    public void Teleport_StatesThatItDoesNothingInOurGame()
+    public void Teleport_StatesThatTheUserFleesAWildBattle()
     {
         using var ctx = new MovesDbContext();
         var teleport = ctx.Moves.AsNoTracking().Single(m => m.Name == "teleport");
 
-        Assert.Equal("Has no effect.", teleport.Description);
+        Assert.Contains("user flees a wild battle", teleport.Description);
+        Assert.Contains("Fails against trainers", teleport.Description);
     }
 }

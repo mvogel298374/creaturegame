@@ -6,20 +6,7 @@ using creaturegame.Tests.TestSupport;
 
 namespace creaturegame.Tests.Integration.Flow;
 
-/// <summary>
-/// End-to-end contract for Roar / Whirlwind (<see cref="MoveEffect.ForceFlee"/>), driven through the real
-/// <see cref="Battle"/> loop and <see cref="RunDirector"/> on the <b>imported</b> rows (the DB-row →
-/// <c>ForceFlee</c> mapping + the effect-sets-the-flag step are pinned in
-/// <c>UniqueMoveEffectContractTests</c>; here we prove what that flag does to a whole battle and a run):
-/// <list type="bullet">
-/// <item>A <b>wild</b> (escapable) battle ends in a flee — one <see cref="CreatureFled"/> instead of a
-/// <see cref="BattleEnded"/>, no faint, no winner; <see cref="CreatureFled.IsPlayer"/> tracks which side
-/// was scared off (the foe fleeing vs the player being blown away).</item>
-/// <item>Against the trainer-analog tiers (Elite/Boss) the battle is <b>non-escapable</b>: the move just
-/// fails and the fight continues to a normal KO.</item>
-/// <item>In a run a flee advances the encounter as <b>neither a win nor a loss</b> — no XP, no win count.</item>
-/// </list>
-/// </summary>
+/// <summary>Full-battle and run contract for the flee moves (Roar, Whirlwind, Teleport).</summary>
 [Collection(MovesCollection.Name)]
 public class ForceFleeTests(MovesFixture moves) : InteractionTest(moves)
 {
@@ -411,6 +398,179 @@ public class ForceFleeTests(MovesFixture moves) : InteractionTest(moves)
 
         Assert.Contains(result.All<MoveMissed>(), e => e.MoveName == "whirlwind");
         Assert.False(result.Has<CreatureFled>());
+    }
+
+    // ── Teleport: the same pokered routine, but the user flees and every failure says "But it failed!" ──
+
+    [Fact]
+    public async Task WildBattle_PlayerTeleport_ThePlayerFlees_NotBattleEnded()
+    {
+        var player = Mon("Player", hp: 300, attack: 1, speed: 200, DamageType.Psychic, "teleport");
+        var enemy = Mon("Enemy", hp: 300, attack: 1, speed: 1, DamageType.Normal, "tackle");
+
+        var result = await new BattleScenario()
+            .Player(player)
+            .Enemy(enemy)
+            .PlayerUses("teleport")
+            .EnemyUses("tackle")
+            .RunAsync();
+
+        var fled = Assert.Single(result.All<CreatureFled>());
+        Assert.Equal("Player", fled.Name);
+        Assert.True(fled.IsPlayer);
+        Assert.Equal("teleport", fled.MoveName);
+        Assert.False(result.Has<BattleEnded>());
+        Assert.False(enemy.Battle.HasFled);
+        Assert.DoesNotContain(result.All<MoveUsed>(), e => e.AttackerName == "Enemy");
+    }
+
+    [Fact]
+    public async Task WildBattle_FoesTeleport_TheWildFoeEscapes()
+    {
+        var player = Mon("Player", hp: 300, attack: 1, speed: 1, DamageType.Normal, "tackle");
+        var enemy = Mon("Abra", hp: 300, attack: 1, speed: 200, DamageType.Psychic, "teleport");
+
+        var result = await new BattleScenario()
+            .Player(player)
+            .Enemy(enemy)
+            .PlayerUses("tackle")
+            .EnemyUses("teleport")
+            .RunAsync();
+
+        var fled = Assert.Single(result.All<CreatureFled>());
+        Assert.Equal("Abra", fled.Name);
+        Assert.False(fled.IsPlayer);
+        Assert.Equal("teleport", fled.MoveName);
+        Assert.False(player.Battle.HasFled);
+    }
+
+    private Task<BattleScenarioResult> LowerLevelTeleport(
+        IRandomSource battleRng,
+        IBattleRules? rules = null
+    )
+    {
+        var player = Mon(
+            "Player",
+            hp: 300,
+            attack: 999,
+            speed: 200,
+            DamageType.Normal,
+            "teleport",
+            "tackle"
+        );
+        player.Level = 10;
+        var enemy = Mon("Enemy", hp: 1, attack: 1, speed: 1, DamageType.Normal, "splash");
+        var scenario = new BattleScenario()
+            .Player(player)
+            .Enemy(enemy)
+            .PlayerUses("teleport", "tackle")
+            .EnemyUses("splash")
+            .BattleRng(battleRng);
+        return (rules is null ? scenario : scenario.Rules(rules)).RunAsync();
+    }
+
+    [Fact]
+    public async Task Gen1LowerLevelTeleportFailsOnALowRoll_AndSaysButItFailed()
+    {
+        var result = await LowerLevelTeleport(new LowestRollSource());
+
+        Assert.True(result.Has<MoveFailed>());
+        Assert.False(result.Has<MoveDidntAffect>());
+        Assert.False(result.Has<CreatureFled>());
+        Assert.Equal("Player", result.Winner);
+    }
+
+    [Fact]
+    public async Task Gen1LowerLevelTeleportStillSucceedsOnAHighRoll()
+    {
+        var result = await LowerLevelTeleport(new HighestRollSource());
+
+        Assert.False(result.Has<MoveFailed>());
+        Assert.Equal("Player", Assert.Single(result.All<CreatureFled>()).Name);
+    }
+
+    private sealed class TeleportMissesRules : DelegatingBattleRules
+    {
+        public override MoveFailureAnnouncement TeleportFailureAnnouncement =>
+            MoveFailureAnnouncement.Missed;
+    }
+
+    [Fact]
+    public async Task TheSeamDecidesTeleportsFailureLine()
+    {
+        var result = await LowerLevelTeleport(new LowestRollSource(), new TeleportMissesRules());
+
+        Assert.Contains(result.All<MoveMissed>(), e => e.MoveName == "teleport");
+        Assert.False(result.Has<MoveFailed>());
+        Assert.False(result.Has<CreatureFled>());
+    }
+
+    [Fact]
+    public async Task NonEscapableBattle_PlayerTeleport_SaysButItFailed_BattleContinuesToKo()
+    {
+        var player = Mon(
+            "Player",
+            hp: 300,
+            attack: 999,
+            speed: 200,
+            DamageType.Normal,
+            "teleport",
+            "tackle"
+        );
+        var enemy = Mon("Enemy", hp: 1, attack: 1, speed: 1, DamageType.Normal, "splash");
+
+        var result = await new BattleScenario()
+            .Escapable(false)
+            .Player(player)
+            .Enemy(enemy)
+            .PlayerUses("teleport", "tackle")
+            .EnemyUses("splash")
+            .RunAsync();
+
+        Assert.True(result.Has<MoveFailed>());
+        Assert.False(result.Has<MoveUnaffected>());
+        Assert.False(result.Has<CreatureFled>());
+        Assert.Equal("Player", result.Winner);
+    }
+
+    // pokered .notWildBattle2: the enemy's Teleport goes through ConditionalPrintButItFailed, which prints here.
+    [Fact]
+    public async Task NonEscapableBattle_FoesTeleport_SaysButItFailed_AndTheFoeStays()
+    {
+        var player = Mon("Player", hp: 300, attack: 999, speed: 1, DamageType.Normal, "tackle");
+        var enemy = Mon("Abra", hp: 1, attack: 1, speed: 200, DamageType.Psychic, "teleport");
+
+        var result = await new BattleScenario()
+            .Escapable(false)
+            .Player(player)
+            .Enemy(enemy)
+            .PlayerUses("tackle")
+            .EnemyUses("teleport")
+            .RunAsync();
+
+        Assert.True(result.Has<MoveFailed>());
+        Assert.False(result.Has<CreatureFled>());
+        Assert.False(enemy.Battle.HasFled);
+        Assert.Equal("Player", result.Winner);
+    }
+
+    [Fact]
+    public async Task Gen1TeleportSkipsTheAccuracyRoll_SoAMissingRollStillFlees()
+    {
+        var player = Mon("Player", hp: 300, attack: 1, speed: 200, DamageType.Psychic, "teleport");
+        var enemy = Mon("Enemy", hp: 300, attack: 1, speed: 1, DamageType.Normal, "splash");
+
+        var result = await new BattleScenario()
+            .Player(player)
+            .Enemy(enemy)
+            .PlayerUses("teleport")
+            .EnemyUses("splash")
+            .Rules(RealAccuracyRules())
+            .BattleRng(new HighestRollSource())
+            .RunAsync();
+
+        Assert.DoesNotContain(result.All<MoveMissed>(), e => e.MoveName == "teleport");
+        Assert.Equal("Player", Assert.Single(result.All<CreatureFled>()).Name);
     }
 
     private sealed class FixedRoll(int value) : IRandomSource

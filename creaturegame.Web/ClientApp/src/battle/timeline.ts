@@ -400,6 +400,16 @@ function chargingMsg(name: string, slug: string): string {
   }
 }
 
+// pokered SwitchAndTeleportEffect picks the flee line by move.
+function fledMsg(name: string, slug: string): string {
+  switch (slug) {
+    case 'teleport':  return `${name} ran from battle!`;
+    case 'roar':      return `${name} ran away scared!`;
+    case 'whirlwind': return `${name} was blown away!`;
+    default:          return `${name} fled!`;
+  }
+}
+
 /**
  * Pure mapping from a backend battle event to its immediate actions + timeline steps.
  * No timers, no bridge, no dispatch — entirely testable in isolation.
@@ -972,12 +982,9 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
     }
 
     case 'CreatureFled': {
-      // Roar/Whirlwind ended the wild battle — a side was scared off (no faint). Reset the player sprite in
-      // case it Transformed this battle (we skip BattleEnded on a flee, which is where that revert normally
-      // fires); the foe's sprite self-corrects via the next encounter's spawnEnemy.
+      // Reset the player sprite in case it Transformed: a flee skips BattleEnded, where that revert fires.
       const name = payload.name as string;
-      const isPlayer = payload.isPlayer as boolean;
-      const msg = isPlayer ? `${name} was blown away!` : `${name} fled!`;
+      const msg = fledMsg(name, payload.moveName as string);
       return { steps: [emit({ type: 'resetPlayerSprite' }), w(150), d(log(msg)), w(500)] };
     }
 

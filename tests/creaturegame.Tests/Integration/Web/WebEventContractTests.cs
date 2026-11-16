@@ -987,14 +987,12 @@ public class WebEventContractTests
         Assert.Equal("Ghost", root.GetProperty("Types")[0].GetString());
     }
 
-    /// <summary>Field-level guard for the <see cref="CreatureFled"/> projection: the client picks the flee
-    /// wording from <c>IsPlayer</c> ("… was blown away!" vs "The wild … fled!"), so a dropped flag would
-    /// silently mis-word every flee. The reflection contract test only checks the event is mapped.</summary>
+    // The client words the flee line by MoveName, so a dropped field would mis-word every flee.
     [Fact]
-    public void CreatureFled_Projection_CarriesNameAndIsPlayer()
+    public void CreatureFled_Projection_CarriesNameIsPlayerAndMoveName()
     {
         var (type, payload) = SignalRBattleEventEmitter.MapEvent(
-            new CreatureFled("PIDGEY", 5, IsPlayer: true)
+            new CreatureFled("PIDGEY", 5, IsPlayer: true, MoveName: "teleport")
         );
         using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
         var root = doc.RootElement;
@@ -1002,6 +1000,7 @@ public class WebEventContractTests
         Assert.Equal("CreatureFled", type);
         Assert.Equal("PIDGEY", root.GetProperty("Name").GetString());
         Assert.True(root.GetProperty("IsPlayer").GetBoolean());
+        Assert.Equal("teleport", root.GetProperty("MoveName").GetString());
     }
 
     /// <summary>Field-level guard for the <see cref="ExperienceGained"/> projection: <c>OnBench</c> decides

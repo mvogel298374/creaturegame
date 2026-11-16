@@ -353,13 +353,18 @@ public class Battle
                 break;
             }
 
-            // Roar / Whirlwind: a side was scared off (no faint). Ends the wild battle — the run loop reads
-            // EndedInFlee and advances the encounter without a win/loss. A faint above takes precedence (a KO
-            // is a real result); checked here so the fled creature's last action still resolved this turn.
+            // A side fled: ends a wild battle; a faint above takes precedence. See GAME_LOOP.md §2 (Outcome).
             if (PlayerCreature.Battle.HasFled || EnemyCreature.Battle.HasFled)
             {
                 var fled = PlayerCreature.Battle.HasFled ? PlayerCreature : EnemyCreature;
-                _emitter?.Emit(new CreatureFled(fled.Name, fled.Id, fled == PlayerCreature));
+                _emitter?.Emit(
+                    new CreatureFled(
+                        fled.Name,
+                        fled.Id,
+                        fled == PlayerCreature,
+                        fled.Battle.FledFromMove!
+                    )
+                );
                 EndedInFlee = true;
                 break;
             }

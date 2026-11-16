@@ -285,7 +285,13 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
   comes first. Gen 1's Mist stops only a primary stat-down move, before the accuracy roll and past X Accuracy, printing
   "But it failed!"; Gen 2's also stops secondary drops, with its own line. Seam: `GENERATION_SEAMS.md` §2, Pre-hit checks.
 
-#### Roar / Whirlwind
+#### Roar / Whirlwind / Teleport
+- **One routine, branched by move.** `SwitchAndTeleportEffect` (`engine/battle/effects.asm:810-911`) runs all three.
+  Teleport makes the *user* flee; Roar and Whirlwind the target. The success line names the move: "<USER> ran from
+  battle!", "<TARGET> ran away scared!", "<TARGET> was blown away!" (`:903-909`, `data/text/text_3.asm`). Every
+  Teleport failure, a failed roll or a trainer battle, prints "But, it failed!" (`:836-838`, `:852-854`; the enemy's
+  `ConditionalPrintButItFailed` at `:896` always prints, as `wMoveDidntMiss` is 0 for a residual effect,
+  `core.asm:5477`). Gen 3+ Teleport always escapes a wild battle.
 - **A flee ends the battle on the spot.** `MainInBattleLoop` returns as soon as `wEscapedFromBattle` is set, after
   either side's move and before that side's poison/burn/Leech Seed tick (pokered `engine/battle/core.asm:419-421`,
   `:430-432`, `:443-445`, `:457-459`). When the slower side flees, the faster side's own tick has already run.

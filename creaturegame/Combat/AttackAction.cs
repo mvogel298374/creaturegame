@@ -16,8 +16,7 @@ public class AttackAction : IBattleAction
     private readonly IReadOnlyList<Attack> _movePool;
     private readonly IRandomSource _rng;
 
-    // Whether this battle can be fled — gates Roar/Whirlwind (ForceFlee). True for a plain wild battle / the
-    // legacy chain; the run layer sets it false for the trainer-analog encounters (Elite/Boss).
+    // Whether a flee move can end this battle; see GENERATION_SEAMS.md §2.
     private readonly bool _battleEscapable;
 
     private readonly BattleSide _side;
@@ -503,7 +502,10 @@ public class AttackAction : IBattleAction
             dodged
             || usingStruggle
             || move.NeverMisses
-            || (move.Effect == MoveEffect.ForceFlee && _rules.ForceFleeSkipsAccuracy)
+            || (
+                move.Effect is MoveEffect.ForceFlee or MoveEffect.Teleport
+                && _rules.ForceFleeSkipsAccuracy
+            )
             || (_rules.XAccuracyBypassesAccuracyCheck && Source.Battle.UsingXAccuracy);
         bool missed =
             dodged
