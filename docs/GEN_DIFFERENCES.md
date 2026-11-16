@@ -201,6 +201,13 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
   carries the last move used; when Metronome or Mirror Move called the Hyper Beam it isn't in the moveset, so the
   first usable move stands in, and a Quick Attack there sorts the recharging side first. Only the message order
   changes ("must recharge" before the foe's move).
+- **Bide stores the last damage on its own turn, not each hit.** `.BideCheck` adds `wDamage`, shared by both sides,
+  on each of the Bide user's turns (`core.asm:3482-3500`). A foe's Thunder Wave, Splash or other `ResidualEffects1`
+  move, a failed Counter, or a turn it can't move, leaves the value alone, so the previous hit counts again; a
+  multi-hit move counts one hit; a hit on the Bide user's Substitute, the foe's confusion self-hit and a Jump Kick
+  crash (1) count; an item turn under Bide loses the hit before it. Seams: `BideAccumulation`,
+  `SkipsDamageCalculation`. **Not modelled:** a Counter that passes its checks and then misses the hit test zeroes
+  `wDamage` (`MoveHitTest`); ours leaves it.
 - **The trapped Pokémon can still switch out, and that frees it.** The battle menu shows to a trapped Pokémon and only
   move selection is skipped (`core.asm:305-322`); the party menu's switch path has no trap check (`:2396-2437`).
   `SendOutMon` clears the enemy's `USING_TRAPPING_MOVE` (`:1755-1756`), and since the switch happens inside the menu,

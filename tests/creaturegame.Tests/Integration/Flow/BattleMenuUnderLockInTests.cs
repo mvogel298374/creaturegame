@@ -76,6 +76,9 @@ public class BattleMenuUnderLockInTests
         Assert.Single(recorder.Of<BideStoring>());
         Assert.Equal(1, TurnOf(recorder, e => e is ItemUsed));
         Assert.Equal(2, TurnOf(recorder, e => e is DamageDealt { TargetName: "Foe" }));
+        var foeHits = recorder.Of<DamageDealt>().Where(d => d.TargetName == "Player").ToList();
+        var unleash = recorder.Of<DamageDealt>().First(d => d.TargetName == "Foe");
+        Assert.Equal(2 * foeHits[1].Damage, unleash.Damage);
     }
 
     [Fact]

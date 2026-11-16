@@ -19,6 +19,7 @@ public class Battle
     private readonly CarriedStatus? _playerEntryStatus;
     private readonly Bag? _playerBag;
     private readonly bool _escapable;
+    private readonly LastDamage _lastDamage = new();
     private readonly bool _trainerBattle;
     private readonly RunRules _runRules;
 
@@ -189,7 +190,8 @@ public class Battle
                 _movePool,
                 _rng,
                 _escapable,
-                BattleSide.Opponent
+                BattleSide.Opponent,
+                _lastDamage
             );
 
             // Turn resolution: Priority → effective Speed (Paralysis quarters) → random tie-breaker.
@@ -225,7 +227,8 @@ public class Battle
                             _emitter,
                             _rng,
                             attack.Target,
-                            attack.SelectedMove
+                            attack.SelectedMove,
+                            _lastDamage
                         )
                     )
                         continue;
@@ -658,7 +661,8 @@ public class Battle
             _movePool,
             _rng,
             _escapable,
-            BattleSide.Player
+            BattleSide.Player,
+            _lastDamage
         );
 
     /// <summary>The forced faint-switch: if a live bench member remains, ask the player which to send in and

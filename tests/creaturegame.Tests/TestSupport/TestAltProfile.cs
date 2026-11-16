@@ -274,6 +274,10 @@ internal static class TestAltProfile
 
         public override bool ItemTurnCountsDownTrap => false;
 
+        public override BideAccumulation BideAccumulation => BideAccumulation.EachHitTaken;
+
+        public override bool SkipsDamageCalculation(Attack move) => false;
+
         public override bool SkipsBattleMenu(Creature creature) =>
             EveryLockInSkipsTheMenu(creature);
 

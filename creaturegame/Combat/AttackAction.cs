@@ -22,6 +22,8 @@ public class AttackAction : IBattleAction
 
     private readonly BattleSide _side;
 
+    private readonly LastDamage _lastDamage;
+
     // Whether the Target had a Substitute up when this move connected — snapshotted pre-damage so a
     // secondary is still shielded on the very hit that breaks the decoy (Gen 1: that hit struck the sub).
     private bool _targetShieldedAtImpact;
@@ -44,9 +46,11 @@ public class AttackAction : IBattleAction
         IReadOnlyList<Attack>? movePool = null,
         IRandomSource? rng = null,
         bool battleEscapable = true,
-        BattleSide side = BattleSide.Player
+        BattleSide side = BattleSide.Player,
+        LastDamage? lastDamage = null
     )
     {
+        _lastDamage = lastDamage ?? new LastDamage();
         Source = source;
         _side = side;
         Target = target;
@@ -86,6 +90,7 @@ public class AttackAction : IBattleAction
                 Rules = _rules,
                 Emitter = _emitter,
                 IsContinuation = isLockedInContinuation,
+                LastDamage = _lastDamage,
             };
 
         // PP decremented on the first turn only — a lock-in continuation already paid on turn 1.
@@ -124,6 +129,9 @@ public class AttackAction : IBattleAction
                 return Task.CompletedTask;
             }
         }
+
+        if (usingStruggle || !_rules.SkipsDamageCalculation(attackToUse))
+            _lastDamage.Value = 0;
 
         // Metronome: pick a random move (excluding Metronome and Mirror Move) and execute it in full.
         // Gen 1: the called move's PP is not consumed (temporary wrapper, no effect on creature's moveset).
@@ -643,6 +651,7 @@ public class AttackAction : IBattleAction
         if (crashes && move.Effect == MoveEffect.Crash)
         {
             int crash = _rules.CalculateCrashDamage(Source);
+            _lastDamage.Value = crash;
             SelfInflictedDamage.Apply(
                 Source,
                 Target,
@@ -814,13 +823,16 @@ public class AttackAction : IBattleAction
             _movePool,
             _rng,
             _battleEscapable,
-            _side
+            _side,
+            _lastDamage
         ).ExecuteAsync();
 
-    // Bide stores every hit the committed user takes — any damage category — to unleash 2× on release.
     private void AccumulateBideDamage(int dmg)
     {
-        if (Target.Battle.BideTurnsRemaining > 0)
+        if (
+            Target.Battle.BideTurnsRemaining > 0
+            && _rules.BideAccumulation == BideAccumulation.EachHitTaken
+        )
             Target.Battle.BideDamageAccumulated += dmg;
     }
 
@@ -850,6 +862,7 @@ public class AttackAction : IBattleAction
         DamageType? counterableType = null
     )
     {
+        _lastDamage.Value = dmg;
         bool printsCritLine = isCrit && !(_laterStrike && _rules.MultiHitRepeatsFirstStrike);
         bool printsEffectivenessLine =
             !_laterStrike || _rules.EffectivenessLineRepeatsOnEveryStrike;

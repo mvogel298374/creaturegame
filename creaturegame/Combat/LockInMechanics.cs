@@ -22,6 +22,8 @@ public sealed class LockInContext
     /// mechanic uses it to tell "begin the lock" from "carry it on."
     /// </summary>
     public required bool IsContinuation { get; init; }
+
+    public LastDamage LastDamage { get; init; } = new();
 }
 
 /// <summary>Whether the turn keeps running the normal attack pipeline after a lock-in hook.</summary>
@@ -211,7 +213,10 @@ public sealed class BideMechanic : ILockInMechanic
             ctx.Source.Battle.BideTurnsRemaining = ctx.Rules.RollBideTurns();
             ctx.Source.Battle.BideDamageAccumulated = 0;
             ctx.Source.Battle.BideMove = ctx.Move;
+            ctx.LastDamage.Value = 0;
         }
+        else if (ctx.Rules.BideAccumulation == BideAccumulation.LastDamageOnOwnTurn)
+            ctx.Source.Battle.BideDamageAccumulated += ctx.LastDamage.Value;
         ctx.Source.Battle.BideTurnsRemaining--;
         if (ctx.Source.Battle.BideTurnsRemaining > 0)
         {

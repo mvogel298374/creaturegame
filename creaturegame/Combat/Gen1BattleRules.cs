@@ -179,6 +179,42 @@ public sealed class Gen1BattleRules : IBattleRules
 
     public int BideDamageMultiplier => 2;
 
+    // pokered core.asm:3482-3500: .BideCheck adds wDamage on the Bide user's own turn.
+    public BideAccumulation BideAccumulation => BideAccumulation.LastDamageOnOwnTurn;
+
+    // pokered data/battle/residual_effects_1.asm, and Counter (HandleCounterMove returns first, core.asm:3141).
+    public bool SkipsDamageCalculation(Attack move) =>
+        move.Effect == MoveEffect.Counter
+        || move.BaseDamage == 0
+            && move.DamageCategory == DamageCategory.Standard
+            && (
+                move.Effect
+                    is MoveEffect.Conversion
+                        or MoveEffect.Haze
+                        or MoveEffect.ForceFlee
+                        or MoveEffect.Mist
+                        or MoveEffect.FocusEnergy
+                        or MoveEffect.Confuse
+                        or MoveEffect.Heal
+                        or MoveEffect.Rest
+                        or MoveEffect.Transform
+                        or MoveEffect.LightScreen
+                        or MoveEffect.Reflect
+                        or MoveEffect.Substitute
+                        or MoveEffect.Mimic
+                        or MoveEffect.LeechSeed
+                        or MoveEffect.Splash
+                || move.StatusEffect
+                    is StatusCondition.Poison
+                        or StatusCondition.BadPoison
+                        or StatusCondition.Paralysis
+                || (
+                    move.Effect == MoveEffect.None
+                    && move.StatusEffect == StatusCondition.None
+                    && move.StatEffect is null
+                )
+            );
+
     public int RollPsywaveDamage(Creature source, BattleSide side, IRandomSource rng)
     {
         var (min, max) = PsywaveDamageRange(source, side);

@@ -244,6 +244,10 @@ public abstract class DelegatingBattleRules : IBattleRules
 
     public virtual int BideDamageMultiplier => _inner.BideDamageMultiplier;
 
+    public virtual BideAccumulation BideAccumulation => _inner.BideAccumulation;
+
+    public virtual bool SkipsDamageCalculation(Attack move) => _inner.SkipsDamageCalculation(move);
+
     public virtual int RollPsywaveDamage(Creature s, BattleSide side, IRandomSource rng) =>
         _inner.RollPsywaveDamage(s, side, rng);
 

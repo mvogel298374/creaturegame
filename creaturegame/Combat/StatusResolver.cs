@@ -21,7 +21,8 @@ public static class StatusResolver
         IBattleEventEmitter? emitter = null,
         IRandomSource? rng = null,
         Creature? foe = null,
-        PokemonAttack? selectedMove = null
+        PokemonAttack? selectedMove = null,
+        LastDamage? lastDamage = null
     )
     {
         var battleRules = rules ?? Gen1BattleRules.Instance;
@@ -52,7 +53,8 @@ public static class StatusResolver
                     foe,
                     battleRules,
                     emitter,
-                    random
+                    random,
+                    lastDamage
                 ),
                 PreMoveCheck.UsingDisabledMove => DisabledMoveStops(
                     creature,
@@ -173,7 +175,8 @@ public static class StatusResolver
         Creature? foe,
         IBattleRules rules,
         IBattleEventEmitter? emitter,
-        IRandomSource random
+        IRandomSource random,
+        LastDamage? lastDamage
     )
     {
         if (creature.Battle.ConfusedTurns == 0)
@@ -192,6 +195,8 @@ public static class StatusResolver
             return false;
 
         int selfDamage = DamageCalculator.CalculateConfusionDamage(creature, foe, rules);
+        if (lastDamage is not null)
+            lastDamage.Value = selfDamage;
         SelfInflictedDamage.Apply(
             creature,
             foe,

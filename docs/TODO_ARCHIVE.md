@@ -103,9 +103,28 @@ REST call routed to the machine that never saw `/start`; the workflow pins `flyc
 
 ---
 
+## §3.1 Bide stores on its own turn, not on each hit ✅ DONE (2026-11-16)
+
+M, source-confirmed. Found 2026-11-15 in the group 1 design pass; design pass and DoR confirmed 2026-11-16 (rulings: model the shared `wDamage`; Bide only, Counter stays its own entry; S → M); greenlit the same day.
+
+**Finding.** pokered adds `wDamage`, the last damage either side's move produced, on each of the Bide user's own turns (`CheckPlayerStatusConditions` `.BideCheck`, `engine/battle/core.asm:3482-3500`); ours added every hit as it landed (`AttackAction.AccumulateBideDamage`).
+
+**DoR (confirmed 2026-11-16).**
+1. **Acceptance:** Bide adds the battle's last computed damage on each of its own turns, store and release alike. A foe's `ResidualEffects1` move (Thunder Wave, Toxic, Leech Seed, Confuse Ray, Recover, Reflect, Light Screen, Substitute, Splash, Haze, Mist, Focus Energy, Conversion, Transform, Mimic, Whirlwind, Teleport) or a turn it can't move (sleep, freeze, full paralysis, flinch, recharge) counts the previous hit again; a multi-hit move counts one hit; a hit on the Bide user's Substitute counts; the foe's confusion self-hit counts; an item turn under Bide loses the hit before it. Plain hits, misses, Growl-type moves, fixed damage and residual damage stay as they are.
+2. **Design:** a battle-wide `LastDamage` (pokered's shared `wDamage`, `Combat/LastDamage.cs`), owned by `Battle` and handed to `AttackAction` and the confusion self-hit. A move zeroes it as it starts unless its effect skips the damage calc; the damage calc, fixed damage, the self-hit and a hit on a Substitute (the computed damage, even when the sub breaks) write it; a miss zeroes it. `BideMechanic.OnCommit` adds it on every Bide turn before the count-down; the per-hit `AccumulateBideDamage` stays for the alt rule.
+3. **Gen-variable surface:** `IBattleRules.BideAccumulation` (Gen 1: the last damage on its own turn; alt: each hit taken) and `IBattleRules.SkipsDamageCalculation(Attack)` (the `ResidualEffects1` set and Counter, read off the whole move).
+4. **Gen 1 source:** pokered `engine/battle/core.asm`: `.BideCheck` `:3482-3500` and the enemy's `:5856-5880`; `GetDamageVarsFor*Attack` zero `wDamage` `:4031`, `:4144`; the `ResidualEffects1` skip `:3124` (`data/battle/residual_effects_1.asm`); a miss zeroes it `:5330`; multi-hit damage is computed once `:3252`; `HandleSelfConfusionDamage` `:3672-3700`; a broken Substitute keeps the computed damage `:4879`; the shared value `:4591`.
+5. **Data vs runtime:** runtime only.
+6. **Quirks the tests assert (full battles):** a foe's Splash, a recharging foe and a failed Counter count the hit again; a Growl stores 0; Double Kick counts one hit; a Substitute hit, a confusion self-hit and a Jump Kick crash are stored; a Metronome-called hit is stored; an item turn loses a hit; an alt-rule test stores each hit; a table pins the `SkipsDamageCalculation` set. A sleeping-foe test was waived (ruling 2026-11-16): it runs the same `CanAct` path as the recharging foe.
+7. **Dependencies:** none.
+
+**Outcome (2026-11-16).** Format PASS, lint PASS, .NET 2487/2487, tsc and Vitest 388/388, E2E not run; `requirements-review` (two passes) and `pr-review` findings decided by Mo and applied. `GENERATION_SEAMS.md` §2 and `GEN_DIFFERENCES.md` carry the rows. Follow-up filed: "Teleport flees a wild battle, as in Gen 1" (`SkipsDamageCalculation` matches Teleport by its blank shape until then).
+
+---
+
 ## §3.1 A binder or a Bide user still gets the battle menu ✅ DONE (2026-11-16)
 
-S–M, source-confirmed. Found 2026-11-14 in the trapped-switch design pass; DoR confirmed and greenlit 2026-11-15, corrected the same day (the switch hand-off dropped; Bide's storage model filed separately as "Bide stores on its own turn, not on each hit", still open in `TODO.md`; `ItemTurnCountsDownTrap` restored after `requirements-review` found the turn-end tick a turn late when the item lands on the last trap turn).
+S–M, source-confirmed. Found 2026-11-14 in the trapped-switch design pass; DoR confirmed and greenlit 2026-11-15, corrected the same day (the switch hand-off dropped; Bide's storage model filed separately as "Bide stores on its own turn, not on each hit", since done; `ItemTurnCountsDownTrap` restored after `requirements-review` found the turn-end tick a turn late when the item lands on the last trap turn).
 
 **Finding.** pokered checks `STORING_ENERGY | USING_TRAPPING_MOVE` only after `DisplayBattleMenu` (`core.asm:305-315`), so a binder or a Bide user can switch, use an item or run, and only move selection is skipped. Only Rage, recharge, thrash and charging skip the menu (`core.asm:293-304`). Ours bypassed the menu for every lock-in (`Battle.BuildPlayerActionAsync`) and `CanSwitchThisTurn` reported false for any lock-in. **Joined (ruling 2026-11-15):** ours showed the full menu on a Hyper Beam recharge turn (recharge is not a lock-in; `StatusResolver.RechargeStops`), so the player could switch or use an item during it; Gen 1 skips the menu.
 

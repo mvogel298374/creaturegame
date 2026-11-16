@@ -154,6 +154,13 @@ public enum SemiInvulnerableHit
     Fails,
 }
 
+/// <summary>How a Bide user stores damage (<see cref="IBattleRules.BideAccumulation"/>).</summary>
+public enum BideAccumulation
+{
+    LastDamageOnOwnTurn,
+    EachHitTaken,
+}
+
 public interface IBattleRules
 {
     /// <summary>Whether the given move thaws a frozen target when it hits.</summary>
@@ -471,6 +478,12 @@ public interface IBattleRules
 
     /// <summary>Multiplier on the total damage a Bide user absorbed when it unleashes.</summary>
     int BideDamageMultiplier { get; }
+
+    /// <summary>What a Bide user stores: the last damage on each of its own turns, or every hit it takes. See GENERATION_SEAMS.md §2.</summary>
+    BideAccumulation BideAccumulation { get; }
+
+    /// <summary>Whether <paramref name="move"/> skips the damage calculation, leaving <see cref="LastDamage"/> as it was. See GENERATION_SEAMS.md §2.</summary>
+    bool SkipsDamageCalculation(Attack move);
 
     /// <summary>The variable damage Psywave deals on hit (it ignores stats, type, STAB and crits), within
     /// <see cref="PsywaveDamageRange"/>. See GENERATION_SEAMS.md §2.</summary>

@@ -52,7 +52,7 @@ design pass serves the group. Groups 3 and 5 are clusters of S/S–M items and t
 | 2 | End-of-turn residual phase | `Battle` turn tail, residuals, `TickTurnCounters` | End-of-turn residual phase (with Leech Seed × Toxic and the menu-turn first mover) |
 | 3 | Hit test and accuracy | `AttackAction.Connects`, `Gen1BattleRules.RunsHitTest` | Other `ResidualEffects1` moves (with the residual-effect failure lines) |
 | 4 | Damage formula | `DamageCalculator`, crit and accuracy tables | Damage/accuracy core |
-| 5 | Effects that copy or name a move | `CounterEffect`, `StatusResolver.DisabledMoveStops`, Mimic, Mirror Move | Counter keys on the selected move (with Counter/Mirror Move on a menu turn) · Bide stores on its own turn · Disable matches instances · The player chooses what Mimic copies (needs an input prompt) |
+| 5 | Effects that copy or name a move | `CounterEffect`, `StatusResolver.DisabledMoveStops`, Mimic, Mirror Move | Counter keys on the selected move (with Counter/Mirror Move on a menu turn) · Disable matches instances · The player chooses what Mimic copies (needs an input prompt) |
 | 6 | Status by type | `Gen1BattleRules.CanReceiveStatus` | Same-type secondary status immunity |
 | 7 | Battle text and seams | `timeline.ts`, the console emitter, `GENERATION_SEAMS.md` | Audit the inline battle rules · Binding and miss lines |
 | 8 | Battle presentation | `BattleScene`, the event wire | Move animations · Sprite FX · Fly/Dig sprite stays on screen · Text feel |
@@ -104,7 +104,7 @@ None open.
 
 | Item | Cost | Ready? | Next step |
 |:-----|:----:|:-------|:----------|
-| **Bide stores on its own turn, not on each hit** (§3.1) | S | ✗ 1, 2, 6 | Filed 2026-11-15. A verify slice lists where the two models differ. |
+| **Teleport flees a wild battle, as in Gen 1** (§3.1) | S | ✗ 2, 4, 6 | Filed 2026-11-16. Read `SwitchAndTeleportEffect` for Teleport's own lines and level check. |
 | **Disable matches move instances, not move ids** (§3.1) | S | ✗ 1, 2, 4, 6 | Filed 2026-11-09. Read `DisabledMoveStops` and the Metronome and Mirror Move wrappers first. |
 | **Same-type secondary status immunity** (§3.1) | S–M | ✗ 2, 4, 6; the rest drafted | Take the pokered cite; Ice Beam freezes Ice-types today. |
 | **Other `ResidualEffects1` moves may roll accuracy** (§3.1) | S–M | ✗ 1, 2, 4, 6 | Filed 2026-11-06. A verify slice reads each effect for its own hit test; now also carries the residual-effect failure lines. |
@@ -203,7 +203,8 @@ data/engine item usually also means updating the test that pins the wrong value.
   (`MirrorMoveCopyMove` too); whether ours matches is untraced. The same trace covers both.
   **DoR:** ✗ — gaps **4** (trace `HandleCounterMove` and `MirrorMoveCopyMove` ourselves, including the switch and item
   paths, and list the diverging cases), **2** (design pass: touches `AttackAction`/`CounterEffect` and
-  `CounterQualifies`' signature), **6**, **1**. 3: existing Counter and Mirror Move seams. 5: runtime only. 7: none.
+  `CounterQualifies`' signature; it can switch from `LastDamageTaken` to the shared `Battle.LastDamage` Bide now uses),
+  **6**, **1**. 3: existing Counter and Mirror Move seams. 5: runtime only. 7: none.
 - **Audit the inline battle rules and put each behind a seam (user ruling 2026-10-31) — M, ✗ not Ready.** Battle
   logic gets full generation separation: a rule goes on a seam even when the generations we checked agree, and
   only out-of-battle or ancillary behaviour may stay inline. `GENERATION_SEAMS.md` still documents deliberate inline
@@ -231,13 +232,16 @@ data/engine item usually also means updating the test that pins the wrong value.
   reads "<user>'s attack missed!"; the `BindingStarted` event stays, since state and tests use it. 2: wording only, in
   the client timeline and the console emitter. 4: the cites above. 5: runtime only (client and console text). 6:
   timeline tests pin both lines. 7: the battle-text placement decision.
-- **Bide stores on its own turn, not on each hit (found 2026-11-15, group 1 design pass; source-read, not run) — S,
-  ✗ not Ready.** pokered adds `wDamage`, the last damage either side dealt, during the Bide user's own turn
-  (`CheckPlayerStatusConditions` `.BideCheck`, `engine/battle/core.asm:3482-3500`); ours adds every hit as it lands
-  (`AttackAction.AccumulateBideDamage`). The totals differ when a turn's last damage isn't the hit Bide took, and on
-  an item or switch turn, which skips Gen 1's read. **DoR:** ✗ gaps **1, 2, 6** (a verify slice lists the cases
-  where the two models give different unleash damage, then the acceptance). *Drafted:* 3: `IBattleRules` (how Bide
-  accumulates). 4: the cite above. 5: runtime only. 7: none.
+- **Teleport flees a wild battle, as in Gen 1 (found 2026-11-16 by `requirements-review`, Bide item; not yet
+  source-read) — S, ✗ not Ready.** pokered gives Teleport `SWITCH_AND_TELEPORT_EFFECT`, the effect Roar and Whirlwind
+  use (`effects.asm` `SwitchAndTeleportEffect`): the user leaves a wild battle under the same level check, and it
+  fails in a trainer battle. We import Teleport with no effect, so it does nothing, and
+  `Gen1BattleRules.SkipsDamageCalculation` matches it by its blank shape (the only 0-power move with no effect,
+  status or stat change). **DoR:** ✗ gaps **2** (map Teleport to `ForceFlee` or a sibling effect; the user flees, not
+  the target), **4** (read the Teleport branch for its lines and level rule), **6**. *Drafted:* 1: a wild-battle
+  Teleport ends the battle as the user flees, a failed level check or a trainer battle prints the failure line, and
+  the shape clause in `SkipsDamageCalculation` gives way to the effect (the `teleport` table row stays). 3: existing
+  `ForceFlee*` seams. 5: importer mapping, re-import `moves.db`. 7: none.
 - **Disable matches move instances, not move ids (found 2026-11-09 by `opus-engineer`, Fly and Dig item;
   read-confirmed, unverified beyond that) — S, ✗ not Ready.** `StatusResolver.DisabledMoveStops` compares the selected
   `PokemonAttack` with `Battle.DisabledMove` by reference; pokered compares move numbers
