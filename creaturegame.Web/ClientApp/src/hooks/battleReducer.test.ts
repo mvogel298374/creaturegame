@@ -597,6 +597,12 @@ describe('battleReducer — forced faint-switch (Stage 3)', () => {
     expect(battleReducer(shown, { type: 'HIDE_SWITCH_IN' }).switchIn).toBeNull();
   });
 
+  it('SHOW_MIMIC_CHOICE opens the picker with the foe\'s moves; HIDE_MIMIC_CHOICE clears it', () => {
+    const shown = battleReducer(ready(), { type: 'SHOW_MIMIC_CHOICE', creatureName: 'DITTO', moves: ['tackle', 'growl'] });
+    expect(shown.mimicChoice).toEqual({ creatureName: 'DITTO', moves: ['tackle', 'growl'] });
+    expect(battleReducer(shown, { type: 'HIDE_MIMIC_CHOICE' }).mimicChoice).toBeNull();
+  });
+
   it('SWITCHED_IN retargets the player nameplate (name/level/HP/status) onto the incoming creature', () => {
     // The nameplate tracked the fainted lead; the send-in must move it onto the new creature — including its
     // level, which no TurnStarted carries (so a dropped level would freeze the nameplate on the old creature).

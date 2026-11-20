@@ -161,6 +161,16 @@ public enum BideAccumulation
     EachHitTaken,
 }
 
+/// <summary>How a side's Mimic picks the move it copies (<see cref="IBattleRules.MimicPickFor"/>).</summary>
+public enum MimicPick
+{
+    /// <summary>The side's input picks one of the target's moves.</summary>
+    UserChooses,
+
+    /// <summary>A random filled slot of the target's moves.</summary>
+    RandomSlot,
+}
+
 public interface IBattleRules
 {
     /// <summary>Whether the given move thaws a frozen target when it hits.</summary>
@@ -501,6 +511,12 @@ public interface IBattleRules
 
     /// <summary>The fixed number of turns a Rest user sleeps, unlike the random <see cref="RollSleepTurns"/>.</summary>
     int RestSleepTurns { get; }
+
+    /// <summary>How this side's Mimic picks the move it copies. See GENERATION_SEAMS.md §2.</summary>
+    MimicPick MimicPickFor(BattleSide side);
+
+    /// <summary>Whether Mimic can copy this move from the target. See GENERATION_SEAMS.md §2.</summary>
+    bool MimicCanCopy(Attack move);
 
     // ── Type-based immunities ────────────────────────────────────────────────────
 

@@ -15,12 +15,13 @@ describe('PROMPT_ANSWERS — each answer pairs its prompt slot, hide action and 
     ['respondAcquisition', 'acquisition', 'HIDE_ACQUISITION', 'RespondAcquisition'],
     ['chooseLead', 'leadChoice', 'HIDE_LEAD_CHOICE', 'ChooseLead'],
     ['respondSwitchIn', 'switchIn', 'HIDE_SWITCH_IN', 'RespondSwitchIn'],
+    ['respondMimicChoice', 'mimicChoice', 'HIDE_MIMIC_CHOICE', 'RespondMimicChoice'],
   ] as const)('%s → slot %s, hide %s, hub method %s', (name, key, hideType, method) => {
     expect(PROMPT_ANSWERS[name]).toEqual({ key, hide: { type: hideType }, method });
   });
 
-  it('covers exactly ten answers', () => {
-    expect(Object.keys(PROMPT_ANSWERS)).toHaveLength(10);
+  it('covers exactly eleven answers', () => {
+    expect(Object.keys(PROMPT_ANSWERS)).toHaveLength(11);
   });
 
   it('every hide action clears the very slot its route names', () => {

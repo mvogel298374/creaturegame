@@ -5,13 +5,7 @@ using creaturegame.Tests.TestSupport;
 
 namespace creaturegame.Tests.Integration.Gen1Attacks;
 
-/// <summary>
-/// Mimic (Gen 1): copies a random move from the target's set into the Mimic slot for the rest of the
-/// battle, dealing no damage the turn it copies. The first test drives the copy through the real
-/// <c>AttackAction</c> (a single-move target makes the random pick deterministic); the second runs a
-/// full <see cref="Battle"/> to prove the copied move is then usable and that the swap <b>reverts</b>
-/// at battle end — it must never leak into the permanent <see cref="Creature.MoveSet"/>.
-/// </summary>
+/// <summary>Mimic (Gen 1): the pick, the copy and its revert; GEN_DIFFERENCES.md → Mimic.</summary>
 [Collection(MovesCollection.Name)]
 public class MimicContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 {
@@ -29,6 +23,33 @@ public class MimicContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         var learned = result.First<MimicLearned>();
         Assert.NotNull(learned);
         Assert.Equal("tackle", learned!.MoveName);
+    }
+
+    [Fact]
+    public async Task MimicCopiesThroughASubstitute()
+    {
+        var defender = TestCreatures.Make("D", hp: 500);
+        defender.AddAttack(Move("tackle"));
+        defender.Battle.SubstituteHp = 50;
+
+        var result = await new MoveScenario().Defender(defender).Use(Move("mimic"));
+
+        Assert.Equal("tackle", result.First<MimicLearned>()?.MoveName);
+        Assert.False(result.Has<MoveFailed>());
+        Assert.Equal(50, defender.Battle.SubstituteHp);
+    }
+
+    [Fact]
+    public async Task MimicCopiesFromAGhostTypeDespiteBeingANormalMove()
+    {
+        var defender = TestCreatures.Make("D", hp: 500);
+        defender.Type1 = DamageType.Ghost;
+        defender.AddAttack(Move("tackle"));
+
+        var result = await new MoveScenario().Defender(defender).Use(Move("mimic"));
+
+        Assert.Equal("tackle", result.First<MimicLearned>()?.MoveName);
+        Assert.False(result.Has<MoveHadNoEffect>());
     }
 
     [Fact]
@@ -140,5 +161,230 @@ public class MimicContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         Assert.Equal("mimic", used[0]);
         Assert.Equal("tackle", used[1]);
         Assert.DoesNotContain("growl", used);
+    }
+
+    private static Creature Fast(string name) =>
+        TestCreatures.Make(name, hp: 2000, attack: 200, speed: 200);
+
+    private static Creature SlowAndFrail(string name) =>
+        TestCreatures.Make(name, hp: 40, defense: 20, speed: 1);
+
+    private static async Task<RecordingEmitter> Fight(
+        Creature player,
+        Creature enemy,
+        ScriptedInput playerInput,
+        ScriptedInput enemyInput,
+        IBattleRules? rules = null,
+        IRandomSource? rng = null,
+        IReadOnlyList<Attack>? movePool = null
+    )
+    {
+        var emitter = new RecordingEmitter();
+        await new Battle(
+            player,
+            enemy,
+            Gen1TypeChart.Instance,
+            playerInput,
+            enemyInput,
+            rules: rules ?? new ScriptableRules().Deterministic(),
+            movePool: movePool,
+            emitter: emitter,
+            rng: rng ?? new SeededRandomSource(1)
+        ).StartFightAsync();
+        return emitter;
+    }
+
+    [Fact]
+    public async Task ThePlayerPicksWhichFoeMoveMimicCopiesAndTheCopySpendsMimicsPp()
+    {
+        var player = Fast("Player");
+        player.AddAttack(Move("mimic"));
+        var enemy = SlowAndFrail("Enemy");
+        enemy.AddAttack(Move("growl"));
+        enemy.AddAttack(Move("leer"));
+        enemy.AddAttack(Move("tackle"));
+        var playerInput = new ScriptedInput("mimic", "tackle").PicksMimic(2);
+
+        var emitter = await Fight(player, enemy, playerInput, new ScriptedInput("growl"));
+
+        var offered = Assert.Single(playerInput.MimicChoicesOffered);
+        Assert.Equal(["growl", "leer", "tackle"], offered.Moves.Select(m => m.Name));
+        Assert.Equal(
+            ["growl", "leer", "tackle"],
+            Assert.Single(emitter.Of<MimicChoiceOffered>()).Moves
+        );
+        Assert.Equal("tackle", Assert.Single(emitter.Of<MimicLearned>()).MoveName);
+        Assert.False(enemy.IsAlive());
+        Assert.Equal(Move("mimic").PowerPointsMax - 2, player.MoveSet[0].PowerPointsCurrent);
+    }
+
+    [Theory]
+    [InlineData(false, "tackle")]
+    [InlineData(true, "leer")]
+    public async Task TheFoesMimicCopiesARandomSlotWithoutAsking(bool highRoll, string copied)
+    {
+        var player = TestCreatures.Make("Player", hp: 2000, attack: 200, speed: 1);
+        player.AddAttack(Move("tackle"));
+        player.AddAttack(Move("growl"));
+        player.AddAttack(Move("leer"));
+        var enemy = TestCreatures.Make("Enemy", hp: 40, defense: 20, speed: 200);
+        enemy.AddAttack(Move("mimic"));
+        var enemyInput = new ScriptedInput("mimic");
+
+        var emitter = await Fight(
+            player,
+            enemy,
+            new ScriptedInput("tackle"),
+            enemyInput,
+            rng: highRoll ? new HighestRollSource() : new LowestRollSource()
+        );
+
+        Assert.Empty(enemyInput.MimicChoicesOffered);
+        Assert.False(emitter.Of<MimicChoiceOffered>().Any());
+        var learned = Assert.Single(emitter.Of<MimicLearned>());
+        Assert.Equal("Enemy", learned.CreatureName);
+        Assert.Equal(copied, learned.MoveName);
+    }
+
+    [Fact]
+    public async Task MimicCanCopyMimicAndTheCopiedMimicCopiesAgain()
+    {
+        var player = Fast("Player");
+        player.AddAttack(Move("mimic"));
+        var enemy = SlowAndFrail("Enemy");
+        enemy.AddAttack(Move("mimic"));
+        enemy.AddAttack(Move("tackle"));
+
+        var emitter = await Fight(
+            player,
+            enemy,
+            new ScriptedInput("mimic", "mimic", "tackle").PicksMimic(0, 1),
+            new ScriptedInput("tackle")
+        );
+
+        Assert.Equal(
+            ["mimic", "tackle"],
+            emitter
+                .Of<MimicLearned>()
+                .Where(e => e.CreatureName == "Player")
+                .Select(e => e.MoveName)
+        );
+        Assert.False(emitter.Of<MoveFailed>().Any());
+        Assert.False(enemy.IsAlive());
+        Assert.Equal("mimic", player.MoveSet[0].Base.Name);
+        Assert.Null(player.Battle.MimicWrapper);
+    }
+
+    [Fact]
+    public async Task AMimicCalledByMetronomeLeavesTheEarlierCopyInPlace()
+    {
+        var player = Fast("Player");
+        player.AddAttack(Move("mimic"));
+        player.AddAttack(Move("metronome"));
+        var enemy = SlowAndFrail("Enemy");
+        enemy.AddAttack(Move("growl"));
+        enemy.AddAttack(Move("tackle"));
+
+        var emitter = await Fight(
+            player,
+            enemy,
+            new ScriptedInput("mimic", "metronome", "tackle").PicksMimic(1, 0),
+            new ScriptedInput("growl"),
+            movePool: [Move("mimic")]
+        );
+
+        Assert.Equal(
+            ["tackle", "growl"],
+            emitter
+                .Of<MimicLearned>()
+                .Where(e => e.CreatureName == "Player")
+                .Select(e => e.MoveName)
+        );
+        Assert.False(enemy.IsAlive());
+        Assert.Equal("mimic", player.MoveSet[0].Base.Name);
+        Assert.Equal("metronome", player.MoveSet[1].Base.Name);
+        Assert.Null(player.Battle.MimicWrapper);
+    }
+
+    [Fact]
+    public async Task AMimicAfterTransformNeverLeaksTheEarlierCopyIntoThePermanentMoveSet()
+    {
+        var player = Fast("Player");
+        player.AddAttack(Move("mimic"));
+        player.AddAttack(Move("transform"));
+        var enemy = SlowAndFrail("Enemy");
+        enemy.AddAttack(Move("mimic"));
+        enemy.AddAttack(Move("tackle"));
+
+        var emitter = await Fight(
+            player,
+            enemy,
+            new ScriptedInput("mimic", "transform", "mimic", "tackle").PicksMimic(1, 1),
+            new ScriptedInput("tackle")
+        );
+
+        Assert.Equal(2, emitter.Of<MimicLearned>().Count(e => e.CreatureName == "Player"));
+        Assert.False(enemy.IsAlive());
+        Assert.Equal(["mimic", "transform"], player.MoveSet.Select(m => m.Base.Name));
+        Assert.Null(player.Battle.MimicWrapper);
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(9)]
+    public async Task AnOutOfRangeMimicPickCopiesTheFirstMove(int badPick)
+    {
+        var player = Fast("Player");
+        player.AddAttack(Move("mimic"));
+        var enemy = SlowAndFrail("Enemy");
+        enemy.AddAttack(Move("tackle"));
+        enemy.AddAttack(Move("growl"));
+
+        var emitter = await Fight(
+            player,
+            enemy,
+            new ScriptedInput("mimic", "tackle").PicksMimic(badPick),
+            new ScriptedInput("growl")
+        );
+
+        Assert.Equal("tackle", Assert.Single(emitter.Of<MimicLearned>()).MoveName);
+        Assert.False(enemy.IsAlive());
+    }
+
+    private sealed class RandomPickNoGrowlRules : DelegatingBattleRules
+    {
+        public override int GetHitThreshold(int acc, int accStage, int evaStage) => 256;
+
+        public override double GetCritChance(Creature a, Attack m) => 0.0;
+
+        public override double RollDamageVariance() => 1.0;
+
+        public override MimicPick MimicPickFor(BattleSide side) => MimicPick.RandomSlot;
+
+        public override bool MimicCanCopy(Attack move) => move.Name != "growl";
+    }
+
+    [Fact]
+    public async Task TheSeamDecidesWhoPicksAndWhatMimicCanCopy()
+    {
+        var player = Fast("Player");
+        player.AddAttack(Move("mimic"));
+        var enemy = SlowAndFrail("Enemy");
+        enemy.AddAttack(Move("growl"));
+        enemy.AddAttack(Move("tackle"));
+        var playerInput = new ScriptedInput("mimic", "tackle");
+
+        var emitter = await Fight(
+            player,
+            enemy,
+            playerInput,
+            new ScriptedInput("growl"),
+            new RandomPickNoGrowlRules(),
+            new LowestRollSource()
+        );
+
+        Assert.Empty(playerInput.MimicChoicesOffered);
+        Assert.False(emitter.Of<MimicChoiceOffered>().Any());
+        Assert.Equal("tackle", Assert.Single(emitter.Of<MimicLearned>()).MoveName);
     }
 }

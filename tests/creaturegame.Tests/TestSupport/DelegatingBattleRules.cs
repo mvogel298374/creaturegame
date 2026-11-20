@@ -261,6 +261,10 @@ public abstract class DelegatingBattleRules : IBattleRules
 
     public virtual int RestSleepTurns => _inner.RestSleepTurns;
 
+    public virtual MimicPick MimicPickFor(BattleSide side) => _inner.MimicPickFor(side);
+
+    public virtual bool MimicCanCopy(Attack move) => _inner.MimicCanCopy(move);
+
     public virtual bool CanReceiveStatus(Creature t, StatusCondition s, DamageType mt) =>
         _inner.CanReceiveStatus(t, s, mt);
 

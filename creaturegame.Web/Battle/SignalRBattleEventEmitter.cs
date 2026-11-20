@@ -713,6 +713,15 @@ public sealed class SignalRBattleEventEmitter(
                     e.MoveName,
                 }
             ),
+            MimicChoiceOffered e => (
+                "MimicChoiceOffered",
+                new
+                {
+                    e.CreatureName,
+                    e.CreatureId,
+                    e.Moves,
+                }
+            ),
             TransformedInto e => (
                 "TransformedInto",
                 new

@@ -24,6 +24,7 @@ export type {
   ShopPrompt,
   AcquisitionPrompt,
   SwitchInPrompt,
+  MimicChoicePrompt,
   DropToast,
 } from './battleReducer';
 export type { PartyMember } from '../battle/timeline';
@@ -256,9 +257,13 @@ export function useBattleHub(gameId: string | null, initialLevel = 50) {
     answerPrompt(PROMPT_ANSWERS.respondSwitchIn, index);
   }, [answerPrompt]);
 
+  const respondMimicChoice = useCallback((index: number) => {
+    answerPrompt(PROMPT_ANSWERS.respondMimicChoice, index);
+  }, [answerPrompt]);
+
   // Purely local (nothing server-side blocks on it) — the view runs a timer and calls this to auto-dismiss the
   // toast after its on-screen beat.
   const dismissDrop = useCallback(() => dispatch({ type: 'HIDE_DROP' }), []);
 
-  return { state, chooseMove, chooseSwitch, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, respondMoveTeachTarget, buyShopItem, leaveShop, respondAcquisition, chooseLead, respondSwitchIn, dismissDrop };
+  return { state, chooseMove, chooseSwitch, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, respondMoveTeachTarget, buyShopItem, leaveShop, respondAcquisition, chooseLead, respondSwitchIn, respondMimicChoice, dismissDrop };
 }

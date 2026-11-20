@@ -303,6 +303,18 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
 - **Gen 2** keeps the roll and the immediate end, but rolls accuracy, prints "But it failed!", and in a trainer battle
   drags out a random party member instead (pokecrystal `engine/battle/effect_commands.asm` `BattleCommand_ForceSwitch`).
 
+#### Mimic
+
+- The player chooses which of the foe's moves Mimic copies, from a menu of the foe's moves with no cancel; the
+  enemy's Mimic copies a random filled slot (pokered `engine/battle/effects.asm:1211-1261`, `core.asm:2508-2556`).
+- Any move can be copied, Mimic included, and a copied Mimic copies again. The copy keeps Mimic's PP: only the
+  move id is written into the slot (`effects.asm:1262-1267`).
+- A target in the air (Fly) or underground (Dig) makes Mimic fail with "But it failed!" (`:1222`, `:1246`, `:1274`).
+- Not modelled: pokered's enemy rolls `BattleRandom & 3` and retries on an empty slot; ours draws once over the filled
+  slots. The odds are the same; only the number of RNG draws differs.
+- Not modelled yet: a Mimic called by Metronome or Mirror Move copies into the calling slot (`TODO.md` §3.1).
+- Gen 2 reportedly copies the target's last-used move instead (unverified against pokecrystal).
+
 #### Status Quirks
 - **Gen 1 has NO end-of-turn residual phase — each creature takes its own Burn/Poison/Bad Poison/Leech Seed
   tick immediately after its own action** (verified 2026-09-20 against pret/pokered `engine/battle/core.asm`,

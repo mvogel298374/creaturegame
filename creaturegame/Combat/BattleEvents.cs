@@ -454,6 +454,10 @@ public record Healed(string CreatureName, int CreatureId, int HealAmount, int Hp
 // --- Mimic (the move) ---
 public record MimicLearned(string CreatureName, int CreatureId, string MoveName) : BattleEvent;
 
+/// <summary>The user's Mimic asks which target move to copy; <paramref name="Moves"/> are in slot order.</summary>
+public record MimicChoiceOffered(string CreatureName, int CreatureId, IReadOnlyList<string> Moves)
+    : PromptEvent;
+
 // --- Transform / Conversion (identity & type mutation) ---
 /// <summary>The user copied the target's species, types, stats and moveset (Transform). <paramref name="IntoSpeciesId"/>
 /// is the species the user became — the client morphs the transforming side's sprite to it.</summary>

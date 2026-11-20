@@ -171,13 +171,16 @@ public interface IBattleInput
     Task<ShopAction> ChooseShopActionAsync(ShopContext context) =>
         Task.FromResult<ShopAction>(LeaveShop.Instance);
 
+    /// <summary>Asked mid-move when this side's Mimic lets the user pick (<see cref="IBattleRules.MimicPickFor"/>).</summary>
+    Task<int> ChooseMimicMoveAsync(MimicChoiceContext context) => Task.FromResult(0);
+
     /// <summary>
     /// Asked mid-battle when the active creature faints but a bench member is still alive (the forced
     /// faint-switch, Phase 4 Stage 3): return the <see cref="Creatures.Party.Members"/> index of the creature to
     /// send in against the same enemy. A <em>forced</em> choice — unlike the between-biome lead pick it can't be
     /// declined (the alternative is losing the run). Only the interactive player input is ever consulted; the
     /// default sends in the first <em>alive</em> member, so automated / AI inputs never stall on the prompt and
-    /// never send in a fainted creature — only the web <see cref="SignalRInput"/> blocks awaiting a real choice.
+    /// never send in a fainted creature — only the web <c>SignalRInput</c> blocks awaiting a real choice.
     /// A stale / out-of-range / <em>fainted</em> pick is corrected to the first live member downstream
     /// (<see cref="Battle"/>), so a malformed client can never send in a downed creature.
     /// </summary>
@@ -239,6 +242,9 @@ public sealed record LeadChoiceContext(Party Party);
 /// member to send in against the same enemy (the default picks the first alive one). Carries the live
 /// <see cref="Creatures.Party"/> so an input can inspect each member's <see cref="Creature.IsAlive"/> state.</summary>
 public sealed record SwitchInContext(Party Party);
+
+/// <summary>Context for a Mimic pick: the Mimic user, and the target's copyable moves in slot order.</summary>
+public sealed record MimicChoiceContext(Creature User, IReadOnlyList<Attack> Moves);
 
 /// <summary>The player's answer to an acquisition offer: <see cref="Accept"/> false = decline (roster
 /// unchanged); accept with a null <see cref="ReplaceSlot"/> = add to a party with room; accept with a

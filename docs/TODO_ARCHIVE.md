@@ -103,6 +103,46 @@ REST call routed to the machine that never saw `/start`; the workflow pins `flyc
 
 ---
 
+## §3.1 The player chooses what Mimic copies ✅ DONE (2026-11-20)
+
+*(found 2026-11-03, move description audit; design pass 2026-11-20, source-confirmed) — M–L.* Ours always picked at random and
+excluded Mimic (`MoveEffects.cs:377-384`), refused a second Mimic once one copied (`:374`), and printed nothing on a failure.
+
+**DoR** (design rulings 2026-11-20, all four recommendations taken):
+1. **Acceptance:** the player's Mimic opens a picker of the target's moves and copies the one picked; the opponent's
+   copies a random filled slot without asking. Any filled slot is copyable, Mimic included, and a copied Mimic can be
+   used again. Every failure (the hit test, a Fly/Dig target, nothing to copy) prints "But it failed!" and opens no
+   picker. The copied move keeps Mimic's PP. A refresh while the picker is open re-opens it.
+2. **Design:** `AttackAction.ExecuteAsync` becomes truly async; after the hit test, when Mimic will
+   succeed and `MimicPickFor` says the user chooses, it emits a new `MimicChoiceOffered` (`PromptEvent`) and awaits a new
+   `IBattleInput.ChooseMimicMoveAsync(MimicChoiceContext)` (default: slot 0, so automated inputs never block); the
+   index rides on `MoveEffectContext` and `MimicEffect.Apply` stays synchronous (rejected: async `IMoveEffect`, which
+   touches every effect). Web: a TCS in `SignalRInput` (plus its `Cancel()` line), a hub `RespondMimicChoice`, an
+   out-of-range index corrected downstream, the `_openPrompt` replay and a `replayDedupe` key; the event is wired in
+   all four places (`ClaudeDirectives/engine.md` rule 8). Client: a timeline step after the "used MIMIC!" line raises
+   the picker, the move grid in a "which technique?" mode listing the foe's move names only, with no cancel (Escape
+   does nothing). Central code: both gates.
+3. **Gen-variable surface:** `IBattleRules.MimicPickFor(BattleSide)` (Gen 1: player → user chooses, opponent → random
+   slot; Gen 2 will add the target's last-used move) and `IBattleRules.MimicCanCopy(Attack)` (Gen 1: any filled slot).
+   The "But it failed!" line is the existing failure event, not a new seam.
+4. **Gen 1 source:** pokered `effects.asm:1204-1274` (`MimicEffect`: `MoveHitTest` :1207, the `INVULNERABLE` checks
+   :1222/:1246, the random retry over filled slots :1224-1234, the player's menu :1244-1261, the slot write of the move
+   id only :1262-1267, `PrintButItFailedText_` :1274); `core.asm:2508-2519` (`.mimicmenu` lists `wEnemyMonMoves`) and
+   :2553-2556 (Up/Down/A only, no B).
+5. **Data vs runtime:** runtime (engine, hub, client); no data change.
+6. **Quirk to test:** full battles: a scripted player pick of slot 2 copies exactly the foe's slot-2 move with
+   Mimic's PP; the opponent's Mimic never consults its input and copies the forced random slot; Mimic copies Mimic and
+   the copy works again; a Mimic into a Fly user prints "But it failed!" with no prompt. Plus the `MimicChoiceOffered`
+   wire round-trip, a Vitest case that the picker opens and Escape doesn't close it, and a reconnect replay of the
+   open prompt.
+7. **Dependencies:** none. Whether Mimic rolls accuracy at all stays with *Other `ResidualEffects1` moves*.
+
+**Shipped (2026-11-20):** as designed. A Mimic called by Metronome or Mirror Move still copies onto a temporary
+wrapper (the copy vanishes) but no longer disturbs an earlier real copy; the faithful fix is the open §3.1 entry
+*A called Mimic copies into the calling slot*. `Other ResidualEffects1 moves` gained a Mimic cite and stays open.
+
+---
+
 ## §3.1 Teleport flees a wild battle, and the flee lines follow pokered ✅ DONE (2026-11-17)
 
 S, source-confirmed. Found 2026-11-16 by `requirements-review` (Bide item); source-read 2026-11-16 against pret/pokered `ba9c056`; rulings A and B taken 2026-11-16, B refined mid-build 2026-11-17.

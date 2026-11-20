@@ -40,6 +40,9 @@ public sealed class MoveEffectContext
     /// <summary>Whether a flee move can end this battle (false for Elite/Boss); see GENERATION_SEAMS.md §2.</summary>
     public bool BattleEscapable { get; init; } = true;
 
+    /// <summary>The index into <see cref="MimicEffect.Copyable"/> the user picked; null means a random slot.</summary>
+    public int? MimicChoice { get; init; }
+
     /// <summary>
     /// Applies damage to the Target through <see cref="AttackAction"/>'s shared helper (Substitute soak +
     /// Bide accumulation + Counter recording). Signature mirrors <c>DealDamageToTarget</c>:
@@ -358,38 +361,35 @@ public sealed class HealEffect : IMoveEffect
     }
 }
 
-/// <summary>Mimic: copy a random move from the target's set for the rest of the battle.</summary>
+/// <summary>Mimic: the slot becomes a picked or random move of the target's for the rest of the battle.</summary>
 public sealed class MimicEffect : IMoveEffect
 {
     public MoveEffect Effect => MoveEffect.Mimic;
 
+    /// <summary>The target's moves Mimic may copy, in slot order (<see cref="IBattleRules.MimicCanCopy"/>).</summary>
+    public static IReadOnlyList<Attack> Copyable(Creature target, IBattleRules rules) =>
+        target.MoveSet.Select(m => m.Base).Where(rules.MimicCanCopy).ToList();
+
     public void Apply(MoveEffectContext ctx)
     {
-        // Gen 1: copy a random move from the target's set; it replaces Mimic for the rest of the battle
-        // (Battle restores it on end). Copying is this turn's action (no damage); the move is usable on
-        // later turns. Fails if already mimicked or the target has no copyable move.
-        if (
-            ctx.Target.IsAlive()
-            && ctx.SelectedMove != null
-            && ctx.Source.Battle.MimicWrapper == null
-        )
+        var copyable = Copyable(ctx.Target, ctx.Rules);
+        if (ctx.SelectedMove is null || copyable.Count == 0)
         {
-            var copyable = ctx
-                .Target.MoveSet.Where(m =>
-                    m.Base.Effect != MoveEffect.Mimic && m.Base.Name != "struggle"
-                )
-                .ToList();
-            if (copyable.Count > 0)
-            {
-                var chosen = copyable[ctx.Rng.Next(copyable.Count)].Base;
-                ctx.Source.Battle.MimicWrapper = ctx.SelectedMove;
-                ctx.Source.Battle.MimicOriginalBase = ctx.SelectedMove.Base;
-                ctx.SelectedMove.Base = chosen;
-                ctx.Emitter?.Emit(
-                    new MimicLearned(ctx.Source.Name, ctx.Source.Id, chosen.Name ?? "")
-                );
-            }
+            ctx.Emitter?.Emit(new MoveFailed());
+            return;
         }
+
+        var chosen = copyable[ctx.MimicChoice ?? ctx.Rng.Next(copyable.Count)];
+        var battle = ctx.Source.Battle;
+        bool ownSlot = ctx.Source.MoveSet.Contains(ctx.SelectedMove);
+        if (ownSlot && battle.MimicWrapper != ctx.SelectedMove)
+        {
+            ctx.Source.RestoreMimickedMove();
+            battle.MimicWrapper = ctx.SelectedMove;
+            battle.MimicOriginalBase = ctx.SelectedMove.Base;
+        }
+        ctx.SelectedMove.Base = chosen;
+        ctx.Emitter?.Emit(new MimicLearned(ctx.Source.Name, ctx.Source.Id, chosen.Name ?? ""));
     }
 }
 

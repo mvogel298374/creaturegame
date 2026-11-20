@@ -235,6 +235,13 @@ public sealed class Gen1BattleRules : IBattleRules
     // Gen 1: Rest forces the user asleep for exactly 2 turns (then it wakes and acts).
     public int RestSleepTurns => 2;
 
+    // pokered effects.asm:1211-1261: the player's Mimic opens a menu, the enemy's rolls a filled slot.
+    public MimicPick MimicPickFor(BattleSide side) =>
+        side == BattleSide.Player ? MimicPick.UserChooses : MimicPick.RandomSlot;
+
+    // effects.asm:1224-1234 retries only an empty slot, so any move is copyable, Mimic included.
+    public bool MimicCanCopy(Attack move) => true;
+
     // ── Type-based immunities ────────────────────────────────────────────────────
 
     // Narrower than pokered's same-type rule (GENERATION_SEAMS.md §2, Status by type).

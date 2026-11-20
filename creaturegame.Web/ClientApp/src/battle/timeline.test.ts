@@ -1183,6 +1183,13 @@ describe('expandEvent — forced faint-switch (Stage 3)', () => {
     expect(show.party[1].name).toBe('BLASTOISE');
   });
 
+  it('MimicChoiceOffered raises the blocking Mimic picker with the foe\'s moves in slot order, logging nothing', () => {
+    const { steps } = expandEvent('MimicChoiceOffered', { creatureName: 'DITTO', creatureId: 7, moves: ['tackle', 'growl'] }, CTX);
+    const show = dispatchedOf(steps, 'SHOW_MIMIC_CHOICE')[0] as Extract<Action, { type: 'SHOW_MIMIC_CHOICE' }>;
+    expect(show).toEqual({ type: 'SHOW_MIMIC_CHOICE', creatureName: 'DITTO', moves: ['tackle', 'growl'] });
+    expect(logLines(steps)).toEqual([]);
+  });
+
   it('CreatureSwitchedIn swaps the player sprite, retargets the nameplate, and logs the send-in', () => {
     const { steps } = expandEvent('CreatureSwitchedIn',
       { name: 'BLASTOISE', speciesId: 9, level: 34, hp: 90, maxHp: 110, status: 'Poison' }, CTX);

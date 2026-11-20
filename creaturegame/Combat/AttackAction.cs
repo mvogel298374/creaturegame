@@ -23,6 +23,9 @@ public class AttackAction : IBattleAction
 
     private readonly LastDamage _lastDamage;
 
+    // This side's input, asked only for a Mimic pick; null takes the first move.
+    private readonly IBattleInput? _input;
+
     // Whether the Target had a Substitute up when this move connected — snapshotted pre-damage so a
     // secondary is still shielded on the very hit that breaks the decoy (Gen 1: that hit struck the sub).
     private bool _targetShieldedAtImpact;
@@ -46,10 +49,12 @@ public class AttackAction : IBattleAction
         IRandomSource? rng = null,
         bool battleEscapable = true,
         BattleSide side = BattleSide.Player,
-        LastDamage? lastDamage = null
+        LastDamage? lastDamage = null,
+        IBattleInput? input = null
     )
     {
         _lastDamage = lastDamage ?? new LastDamage();
+        _input = input;
         Source = source;
         _side = side;
         Target = target;
@@ -66,10 +71,10 @@ public class AttackAction : IBattleAction
     /// <summary>Repoints this action at the switch-in when a switch is queued with the foe's move (<see cref="IBattleRules.MenuActionResolvesBeforeFoeChoice"/> false).</summary>
     internal void Retarget(Creature target) => Target = target;
 
-    public Task ExecuteAsync()
+    public async Task ExecuteAsync()
     {
         if (!Source.IsAlive())
-            return Task.CompletedTask;
+            return;
 
         bool usingStruggle = _selectedMove == null;
         Attack attackToUse = usingStruggle ? Source.Struggle : _selectedMove!.Base;
@@ -99,7 +104,7 @@ public class AttackAction : IBattleAction
         // Commit phase: a charge (two-turn) or store (bide) turn ends here, before the move is announced.
         var commit = lockIn?.OnCommit(lockCtx!).Flow ?? LockInFlow.Proceed;
         if (commit == LockInFlow.Halt)
-            return Task.CompletedTask;
+            return;
 
         if (commit != LockInFlow.ProceedUnannounced)
             _emitter?.Emit(new MoveUsed(Source.Name, Source.Id, attackToUse.Name ?? ""));
@@ -125,7 +130,7 @@ public class AttackAction : IBattleAction
                     ReplayHit(attackToUse, release.Damage);
                 else if (release.Damage > 0)
                     DealDamageToTarget(release.Damage, 1.0, false);
-                return Task.CompletedTask;
+                return;
             }
         }
 
@@ -145,8 +150,8 @@ public class AttackAction : IBattleAction
                 .ToList();
 
             if (eligible.Count > 0)
-                return ExecuteInner(eligible[_rng.Next(eligible.Count)]);
-            return Task.CompletedTask;
+                await ExecuteInner(eligible[_rng.Next(eligible.Count)]);
+            return;
         }
 
         // Mirror Move: re-run the foe's last move in full (through its own inner action, which records it
@@ -157,9 +162,12 @@ public class AttackAction : IBattleAction
         {
             var last = Target.Battle.LastMoveUsed;
             if (last != null && last.Name != "struggle")
-                return ExecuteInner(last);
+            {
+                await ExecuteInner(last);
+                return;
+            }
             _emitter?.Emit(new MoveMissed(Source.Name, Source.Id, attackToUse.Name ?? ""));
-            return Task.CompletedTask;
+            return;
         }
 
         var category = usingStruggle ? DamageCategory.Standard : attackToUse.DamageCategory;
@@ -174,13 +182,13 @@ public class AttackAction : IBattleAction
             effectiveness == 0 && ChecksTypeImmunity(attackToUse, category, usingStruggle);
 
         if (SleepsRechargingTarget(attackToUse, category, usingStruggle))
-            return Task.CompletedTask;
+            return;
 
         bool checksBeforeHitTest =
             _rules.PrimaryEffectChecksPrecedeHitTest
             && IsStatusMove(attackToUse, category, usingStruggle);
         if (checksBeforeHitTest && StatusMoveStopsBeforeHitTest(attackToUse))
-            return Task.CompletedTask;
+            return;
 
         if (
             immune
@@ -189,7 +197,7 @@ public class AttackAction : IBattleAction
         )
         {
             _emitter?.Emit(new MoveHadNoEffect(Target.Name, Target.Id, attackToUse.Name ?? ""));
-            return Task.CompletedTask;
+            return;
         }
 
         if (
@@ -199,7 +207,7 @@ public class AttackAction : IBattleAction
         )
         {
             _emitter?.Emit(new MoveFailed());
-            return Task.CompletedTask;
+            return;
         }
 
         if (
@@ -207,7 +215,7 @@ public class AttackAction : IBattleAction
             && IsFoeStatDown(attackToUse)
             && StatDownStopsBeforeHitTest(attackToUse)
         )
-            return Task.CompletedTask;
+            return;
 
         // Before the hit test, so a trap move that misses still clears the recharge.
         if (attackToUse.Effect == MoveEffect.Binding && !isLockedInContinuation)
@@ -227,17 +235,17 @@ public class AttackAction : IBattleAction
                     out strike
                 )
             )
-                return Task.CompletedTask;
+                return;
             bool typeZeroed = TypeZeroes(strike, effectiveness);
             if (
                 !Connects(attackToUse, category, usingStruggle, immune, typeZeroed, lockIn, lockCtx)
             )
-                return Task.CompletedTask;
+                return;
         }
         else
         {
             if (category == DamageCategory.OHKO && OhkoFails(attackToUse))
-                return Task.CompletedTask;
+                return;
             if (
                 !Connects(
                     attackToUse,
@@ -249,14 +257,14 @@ public class AttackAction : IBattleAction
                     lockCtx
                 )
             )
-                return Task.CompletedTask;
+                return;
             strike = RollsCritAndDamage(attackToUse, category, usingStruggle)
                 ? RollStrike(attackToUse, category, usingStruggle, screenMult)
                 : null;
             if (TypeZeroes(strike, effectiveness))
             {
                 EndTypeZeroedHit(attackToUse, category, lockIn, lockCtx);
-                return Task.CompletedTask;
+                return;
             }
         }
 
@@ -300,13 +308,12 @@ public class AttackAction : IBattleAction
         TryApplyStatEffect(attackToUse);
         if (!BreakCancels(attackToUse.Effect, category))
         {
-            TryApplyMoveEffect(attackToUse, damage);
+            int? mimicChoice = await ChooseMimicMoveAsync(attackToUse);
+            TryApplyMoveEffect(attackToUse, damage, mimicChoice);
             lockIn?.OnConnect(lockCtx!);
         }
 
         lockIn?.OnTurnEnd(lockCtx!); // confuse the user if this was the rampage's last turn
-
-        return Task.CompletedTask;
     }
 
     private readonly record struct Strike(int Hits, int Damage, bool IsCrit);
@@ -826,7 +833,8 @@ public class AttackAction : IBattleAction
             _rng,
             _battleEscapable,
             _side,
-            _lastDamage
+            _lastDamage,
+            _input
         ).ExecuteAsync();
 
     private void AccumulateBideDamage(int dmg)
@@ -1077,10 +1085,31 @@ public class AttackAction : IBattleAction
         _rules.StatDownHandicapApplies(_side, attack, isSecondary)
         && _rules.RollStatDownHandicapFails();
 
+    // Asks this side's input which target move Mimic copies; GENERATION_SEAMS.md §2.
+    private async Task<int?> ChooseMimicMoveAsync(Attack attack)
+    {
+        if (
+            attack.Effect != MoveEffect.Mimic
+            || _rules.MimicPickFor(_side) != MimicPick.UserChooses
+            || _selectedMove is null
+        )
+            return null;
+        var moves = MimicEffect.Copyable(Target, _rules);
+        if (moves.Count == 0)
+            return null;
+        _emitter?.Emit(
+            new MimicChoiceOffered(Source.Name, Source.Id, moves.Select(m => m.Name ?? "").ToList())
+        );
+        int index = _input is null
+            ? 0
+            : await _input.ChooseMimicMoveAsync(new MimicChoiceContext(Source, moves));
+        return index >= 0 && index < moves.Count ? index : 0;
+    }
+
     // Post-damage move effects (Haze, Counter, Reflect, Transform, Rest, Substitute …) live behind
     // IMoveEffect in the MoveEffects registry, keyed by MoveEffect (mirroring LockInMechanics.For). One
     // runs per move; the context's DealDamage delegate keeps the soak / Bide / Counter recording centralized.
-    private void TryApplyMoveEffect(Attack attack, int damage)
+    private void TryApplyMoveEffect(Attack attack, int damage, int? mimicChoice = null)
     {
         var effect = MoveEffects.For(attack.Effect);
         if (effect is null)
@@ -1099,6 +1128,7 @@ public class AttackAction : IBattleAction
                 Emitter = _emitter,
                 TargetShieldedBySubstitute = TargetShieldedBySubstitute,
                 BattleEscapable = _battleEscapable,
+                MimicChoice = mimicChoice,
                 DealDamage = DealDamageToTarget,
             }
         );

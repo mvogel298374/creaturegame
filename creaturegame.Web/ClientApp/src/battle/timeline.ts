@@ -205,6 +205,9 @@ export type Action =
   // The battle waits server-side until RespondSwitchIn answers.
   | { type: 'SHOW_SWITCH_IN'; party: PartyMember[]; faintedName: string }
   | { type: 'HIDE_SWITCH_IN' }
+  // The player's Mimic: a blocking pick of the foe's move to copy, with no cancel (RespondMimicChoice).
+  | { type: 'SHOW_MIMIC_CHOICE'; creatureName: string; moves: string[] }
+  | { type: 'HIDE_MIMIC_CHOICE' }
   // Re-opens a blocking prompt whose answer never reached the server (the hub call was rejected while the
   // connection was down) — see hooks/answerPrompt.ts. Only fills an EMPTY slot, so a newer prompt wins.
   // key and value are tied per prompt, so a shop prompt can't be restored into the rewardChoice slot.
@@ -1265,6 +1268,13 @@ export function expandEvent(eventType: string, payload: Payload, ctx: ExpandCont
       const cName = payload.creatureName as string;
       const mName = payload.moveName as string;
       return { steps: [w(120), d(log(`${cName} learned ${formatMoveName(mName)}!`))] };
+    }
+
+    case 'MimicChoiceOffered': {
+      // Queued after the "used MIMIC!" line; the move waits server-side until RespondMimicChoice answers.
+      const creatureName = payload.creatureName as string;
+      const moves = payload.moves as string[];
+      return { steps: [w(200), d({ type: 'SHOW_MIMIC_CHOICE', creatureName, moves })] };
     }
 
     case 'TransformedInto': {

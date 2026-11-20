@@ -271,7 +271,7 @@ Each entry: **Decision · Why · Where it lives.**
     connection was current at the time. `GameSessionManager.ReEstablishClient` (the reconnect branch's two-call
     sequence, pulled out so it's independently testable) re-echoes the presentation event then calls
     `ReplayLastKnownState()`, re-sending whatever's cached to the connection that's now current.
-  - **The one open blocking prompt is cached too, and replayed last.** The ten blocking prompts share a
+  - **The one open blocking prompt is cached too, and replayed last.** The eleven blocking prompts share a
     `PromptEvent` base record; the emitter keeps a single slot for the open one (a run has at most one) and
     `ReplayLastKnownState()` re-sends it after the other cached events, so a refresh or blip mid-prompt brings the
     modal back and the parked run can be answered. A shop's cached `ShopOffered` is rewritten on each

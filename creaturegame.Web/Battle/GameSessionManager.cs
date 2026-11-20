@@ -624,6 +624,16 @@ public sealed class GameSessionManager(
             battle.Input.SetSwitchInChoice(index);
     }
 
+    /// <summary>Forwards a Mimic pick; the engine corrects an out-of-range index.</summary>
+    public void SetMimicChoice(string connectionId, int index)
+    {
+        if (
+            _connToGame.TryGetValue(connectionId, out var gameId)
+            && _active.TryGetValue(gameId, out var battle)
+        )
+            battle.Input.SetMimicChoice(index);
+    }
+
     /// <summary>Routes a voluntary in-battle SWITCH (the chosen party-member index) to the battle's input, as a
     /// whole-turn choice. The engine's <c>Battle.CanSwitchTo</c> validates the pick (in range / alive / not the
     /// active member / not trapped) and falls back to FIGHT on an illegal one, so this only forwards.</summary>

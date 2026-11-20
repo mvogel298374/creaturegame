@@ -22,4 +22,5 @@ export const PROMPT_ANSWERS = {
   respondAcquisition: { key: 'acquisition', hide: { type: 'HIDE_ACQUISITION' }, method: 'RespondAcquisition' },
   chooseLead: { key: 'leadChoice', hide: { type: 'HIDE_LEAD_CHOICE' }, method: 'ChooseLead' },
   respondSwitchIn: { key: 'switchIn', hide: { type: 'HIDE_SWITCH_IN' }, method: 'RespondSwitchIn' },
+  respondMimicChoice: { key: 'mimicChoice', hide: { type: 'HIDE_MIMIC_CHOICE' }, method: 'RespondMimicChoice' },
 } as const satisfies Record<string, PromptRoute>;

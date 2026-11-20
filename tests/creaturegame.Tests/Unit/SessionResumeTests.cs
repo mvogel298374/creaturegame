@@ -312,6 +312,24 @@ public class SessionResumeTests
     }
 
     [Fact]
+    public void ReplayLastKnownState_ResendsAMidTurnMimicPrompt_AfterTheBattleAndTurn()
+    {
+        var hub = new RecordingHubContext();
+        var emitter = new SignalRBattleEventEmitter(hub, () => "conn-1");
+        emitter.Emit(new BattleStarted("Player", 1, 25, "Enemy", 2, 1, 5));
+        emitter.Emit(Turn(1));
+        emitter.Emit(new MimicChoiceOffered("Player", 1, ["tackle", "growl"]));
+        int before = hub.EventsFor("conn-1").Count;
+
+        emitter.ReplayLastKnownState();
+
+        Assert.Equal(
+            ["BattleStarted", "TurnStarted", "MimicChoiceOffered"],
+            hub.EventsFor("conn-1").Skip(before).Select(e => e.Type)
+        );
+    }
+
+    [Fact]
     public void ReplayLastKnownState_DoesNotResendAPrompt_OnceItsAnswerIsConsumed()
     {
         var hub = new RecordingHubContext();

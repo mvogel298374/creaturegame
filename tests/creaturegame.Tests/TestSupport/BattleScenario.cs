@@ -235,6 +235,25 @@ public sealed class ScriptedInput(params string[] moveNames) : IBattleInput
                 return Task.FromResult(i);
         return Task.FromResult(context.Party.LeadIndex);
     }
+
+    private readonly Queue<int> _mimicPicks = new();
+
+    /// <summary>The answers to this side's Mimic prompts, in order; exhausted, it takes the interface default (0).</summary>
+    public ScriptedInput PicksMimic(params int[] indices)
+    {
+        foreach (var i in indices)
+            _mimicPicks.Enqueue(i);
+        return this;
+    }
+
+    /// <summary>Mimic prompts this input has received, in order.</summary>
+    public List<MimicChoiceContext> MimicChoicesOffered { get; } = [];
+
+    public Task<int> ChooseMimicMoveAsync(MimicChoiceContext context)
+    {
+        MimicChoicesOffered.Add(context);
+        return Task.FromResult(_mimicPicks.Count > 0 ? _mimicPicks.Dequeue() : 0);
+    }
 }
 
 /// <summary>

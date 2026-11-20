@@ -135,6 +135,13 @@ public class BattleHub(GameSessionManager manager, DevModeOptions devMode) : Hub
         return Task.CompletedTask;
     }
 
+    /// <summary>Answers the player's Mimic prompt with the index of the foe's move to copy.</summary>
+    public Task RespondMimicChoice(int index)
+    {
+        manager.SetMimicChoice(Context.ConnectionId, index);
+        return Task.CompletedTask;
+    }
+
     /// <summary>Voluntarily switches the active creature out this turn for the party member at
     /// <paramref name="index"/> — the in-battle SWITCH turn-action. An illegal pick falls back to FIGHT in the
     /// engine.</summary>

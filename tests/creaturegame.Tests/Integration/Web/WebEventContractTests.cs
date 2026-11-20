@@ -1510,6 +1510,23 @@ public class WebEventContractTests
         Assert.Equal(9, root.GetProperty("SpeciesId").GetInt32());
     }
 
+    [Fact]
+    public void MimicChoiceOffered_Projection_CarriesTheFoesMoveNamesInSlotOrder()
+    {
+        var (type, payload) = SignalRBattleEventEmitter.MapEvent(
+            new MimicChoiceOffered("DITTO", 7, ["tackle", "growl", "ember"])
+        );
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+        var root = doc.RootElement;
+
+        Assert.Equal("MimicChoiceOffered", type);
+        Assert.Equal("DITTO", root.GetProperty("CreatureName").GetString());
+        Assert.Equal(
+            ["tackle", "growl", "ember"],
+            root.GetProperty("Moves").EnumerateArray().Select(m => m.GetString())
+        );
+    }
+
     /// <summary>Value-level guard for the <see cref="SwitchInOffered"/> projection (Phase 4 Stage 3): the forced
     /// switch-in modal reads the roster snapshot and the fainted name for the title.
     /// <see cref="EveryBattleEventProjectsAllOfItsFields"/> proves the member sub-fields are present; this pins the

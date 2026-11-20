@@ -26,6 +26,7 @@ public sealed class SignalRInput : IBattleInput
     private volatile TaskCompletionSource<AcquisitionDecision>? _acquisitionTcs;
     private volatile TaskCompletionSource<int>? _leadTcs;
     private volatile TaskCompletionSource<int>? _switchInTcs;
+    private volatile TaskCompletionSource<int>? _mimicTcs;
     private volatile bool _cancelled;
 
     /// <summary>Raised on the run thread once the run has consumed a prompt's answer, never from the hub's
@@ -444,6 +445,26 @@ public sealed class SignalRInput : IBattleInput
         tcs?.TrySetResult(index);
     }
 
+    /// <summary>Awaits the player's Mimic pick; the hub's <c>RespondMimicChoice</c> completes it.</summary>
+    public async Task<int> ChooseMimicMoveAsync(MimicChoiceContext context)
+    {
+        if (_cancelled)
+            throw new OperationCanceledException("Battle input cancelled (client disconnected).");
+
+        var tcs = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _mimicTcs = tcs;
+        var index = await tcs.Task;
+        _mimicTcs = null;
+        PromptAnswered?.Invoke();
+        return index;
+    }
+
+    public void SetMimicChoice(int index)
+    {
+        var tcs = _mimicTcs;
+        tcs?.TrySetResult(index);
+    }
+
     /// <summary>
     /// Unblocks a battle loop waiting on player input when the client disconnects,
     /// so the fire-and-forget battle task can complete and be collected.
@@ -468,5 +489,6 @@ public sealed class SignalRInput : IBattleInput
         _acquisitionTcs?.TrySetCanceled();
         _leadTcs?.TrySetCanceled();
         _switchInTcs?.TrySetCanceled();
+        _mimicTcs?.TrySetCanceled();
     }
 }

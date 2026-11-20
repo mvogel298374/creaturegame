@@ -26,21 +26,21 @@ ignored unless it is still the current one (`OnGraceElapsed`).
 
 ## R1d-a. A refresh — or a blip — while a blocking prompt is open strands the run
 
-- **What is wrong (verified in code).** Ten prompts park the run on a `SignalRInput` handshake:
+- **What is wrong (verified in code).** Eleven prompts park the run on a `SignalRInput` handshake:
   `MoveReplacementRequired`, `RecoveryOffered`, `EvolutionOffered`, `BiomeChoiceOffered`, `RewardChoiceOffered`,
   `MoveTeachTargetRequired`, `ShopOffered` (iterative — `ShopItemPurchased` updates it), `AcquisitionOffered`,
-  `LeadChoiceOffered`, `SwitchInOffered`. None is cached. Two ways to lose one: (1) **refresh while it is open** —
+  `LeadChoiceOffered`, `SwitchInOffered`, `MimicChoiceOffered`. None is cached. Two ways to lose one: (1) **refresh while it is open** —
   the fresh client never learns of it; (2) **a prompt emitted during an outage** — `Send` drops it, and the replay
   has nothing to resend. (2) is the likelier one. Either way the server stays parked, reconnect cancels the abandon
   timer, and nothing ever unparks it: the player can only QUIT. Supersedes the former Known Gap *"Session Resume doesn't cover a reconnect during a between-node blocking prompt"*.
-  Re-verified against the code 2026-10-26: the ten prompts, the emitter's five-event cache and `SignalRInput`'s
+  Re-verified against the code 2026-10-26: the prompts (ten then; `MimicChoiceOffered` is the eleventh), the emitter's five-event cache and `SignalRInput`'s
   handshakes are as described.
-- **Acceptance.** Refresh or blip while any of the ten prompts is open → the modal reappears and is answerable and
+- **Acceptance.** Refresh or blip while any of the eleven prompts is open → the modal reappears and is answerable and
   the run continues; an **answered** prompt never reappears; a replayed shop shows the **current** balance.
 - **Design — the emitter caches the open prompt (ratified and built 2026-10-26).** Same reasoning as `TurnStarted`: the
   emitter is where each payload is already fully assembled; re-deriving it elsewhere would drift from the real
   projection.
-  - `public abstract record PromptEvent : BattleEvent` as a new base for the ten records (engine event model; the
+  - `public abstract record PromptEvent : BattleEvent` as a new base for the eleven records (engine event model; the
     set of blocking prompts is an event-model fact, not a web one). The emitter keeps one `volatile` `_openPrompt`
     (a run has **at most one** open prompt — the loop is sequential — so a single slot, replaced by the next).
   - **Clear when the run consumes the answer, on the run thread.** `SignalRInput` gains one `Action?

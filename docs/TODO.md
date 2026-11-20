@@ -52,7 +52,7 @@ design pass serves the group. Groups 3 and 5 are clusters of S/S–M items and t
 | 2 | End-of-turn residual phase | `Battle` turn tail, residuals, `TickTurnCounters` | End-of-turn residual phase (with Leech Seed × Toxic and the menu-turn first mover) |
 | 3 | Hit test and accuracy | `AttackAction.Connects`, `Gen1BattleRules.RunsHitTest` | Other `ResidualEffects1` moves (with the residual-effect failure lines) |
 | 4 | Damage formula | `DamageCalculator`, crit and accuracy tables | Damage/accuracy core |
-| 5 | Effects that copy or name a move | `CounterEffect`, `StatusResolver.DisabledMoveStops`, Mimic, Mirror Move | Counter keys on the selected move (with Counter/Mirror Move on a menu turn) · Disable matches instances · The player chooses what Mimic copies (needs an input prompt) |
+| 5 | Effects that copy or name a move | `CounterEffect`, `StatusResolver.DisabledMoveStops`, Mimic, Mirror Move | Counter keys on the selected move (with Counter/Mirror Move on a menu turn) · Disable matches instances · A called Mimic copies into the calling slot |
 | 6 | Status by type | `Gen1BattleRules.CanReceiveStatus` | Same-type secondary status immunity |
 | 7 | Battle text and seams | `timeline.ts`, the console emitter, `GENERATION_SEAMS.md` | Audit the inline battle rules · Binding and miss lines |
 | 8 | Battle presentation | `BattleScene`, the event wire | Move animations · Sprite FX · Fly/Dig sprite stays on screen · Text feel |
@@ -73,9 +73,7 @@ None open.
 
 **B. A design pass first** (central engine code: both gates; each pass is shown to you)
 
-| Item | Cost | Ready? | Next step / what it unblocks |
-|:-----|:----:|:-------|:-----------------------------|
-| **The player chooses what Mimic copies** (§3.1) | M | ✗ 2, 3; the rest drafted | Found 2026-11-03. Needs an input prompt, so a design pass. |
+None open.
 
 **C. Needs a `/plan` or a verify slice**
 
@@ -105,6 +103,7 @@ None open.
 | Item | Cost | Ready? | Next step |
 |:-----|:----:|:-------|:----------|
 | **Disable matches move instances, not move ids** (§3.1) | S | ✗ 1, 2, 4, 6 | Filed 2026-11-09. Read `DisabledMoveStops` and the Metronome and Mirror Move wrappers first. |
+| **A called Mimic copies into the calling slot** (§3.1) | S–M | ✗ 2, 6; the rest drafted | Filed 2026-11-20. Shares the Metronome / Mirror Move wrapper with Disable. |
 | **Same-type secondary status immunity** (§3.1) | S–M | ✗ 2, 4, 6; the rest drafted | Take the pokered cite; Ice Beam freezes Ice-types today. |
 | **Other `ResidualEffects1` moves may roll accuracy** (§3.1) | S–M | ✗ 1, 2, 4, 6 | Filed 2026-11-06. A verify slice reads each effect for its own hit test; now also carries the residual-effect failure lines. |
 | **Counter keys on the foe's selected move** (§3.1) | S–M | ✗ 1, 2, 4, 6 | Trace `HandleCounterMove` and `MirrorMoveCopyMove`, including switch and item turns; list the diverging cases. |
@@ -170,7 +169,8 @@ data/engine item usually also means updating the test that pins the wrong value.
   **DoR:** ✗ — gaps **1, 2, 4, 6**. *Drafted:* a verify slice reads each effect for its own `MoveHitTest` call and
   lists which of ours roll accuracy that pokered skips; then one entry or one seam member (likely generalising
   `ForceFleeSkipsAccuracy`, shipped 2026-11-06). 3: `IBattleRules`. 5: runtime only. 7: none now that Roar has shipped.
-  Noted 2026-11-09 (`pr-review`, Fly and Dig): `Gen1BattleRules.RunsHitTest` already lists which moves run the hit
+  Mimic calls `MoveHitTest` itself (`effects.asm:1207`), so its accuracy roll is pokered's (noted 2026-11-20,
+  `requirements-review`). Noted 2026-11-09 (`pr-review`, Fly and Dig): `Gen1BattleRules.RunsHitTest` already lists which moves run the hit
   test, for the out-of-reach rule; this item should make the accuracy roll read the same member so the two can't drift.
   **Merged in (ruling 2026-11-15): the residual-effect failure lines** (found 2026-11-06, "It didn't affect" design
   pass; source-confirmed). Two more pokered lines we don't print. Leech Seed on a Grass type, on an already-seeded
@@ -240,14 +240,18 @@ data/engine item usually also means updating the test that pins the wrong value.
   **DoR:** ✗ gaps **1, 2, 4, 6**. *Drafted:* a verify slice reads `DisabledMoveStops`, `DisableEffect` and the
   Metronome and Mirror Move wrappers against pokered, then lists the diverging cases. 3: likely none (a matching bug,
   not a rule), decided by the slice. 5: runtime only. 7: none.
-- **The player chooses what Mimic copies (found 2026-11-03, move description audit) — M, ✗ not Ready.** pokered lets the
-  player pick any of the target's moves, and only the enemy picks at random (`MimicEffect`, `effects.asm:1203-1250`). Ours
-  always picks at random (`MoveEffects.cs:345-352`).
-  **DoR:** ✗ gaps **2** (a new input prompt across the engine, hub and client) and **3** (the seam for who chooses).
-  *Drafted:*
-  - **Acceptance:** the player's Mimic prompts for one of the target's moves; an opponent's stays random.
-  - **Gen 1 source:** the cite above. **Data vs runtime:** runtime and client. **Quirk:** the target's moves show in full.
-  - **Dependencies:** none.
+- **A Mimic called by Metronome or Mirror Move copies into the calling slot (found 2026-11-20 by `requirements-review`,
+  Mimic pick item; source-confirmed) — S–M, ✗ not Ready.** `AttackAction.ExecuteInner` runs the called move on a fresh
+  `PokemonAttack`, so a called Mimic's copy lands on that temporary wrapper and is gone at once (the picker still opens
+  and "learned X" prints). pokered writes the copied move into the slot at `wPlayerMoveListIndex` /
+  `wEnemyMoveListIndex` (`effects.asm:1236-1267`), the Metronome or Mirror Move slot, which keeps it for the battle.
+  Since 2026-11-20 `MimicEffect` leaves an earlier real Mimic copy alone in this case
+  (`MimicContractTests.AMimicCalledByMetronomeLeavesTheEarlierCopyInPlace`).
+  **DoR:** ✗ gaps **2, 6**. *Drafted:* 1: a called Mimic's copy replaces the calling Metronome / Mirror Move slot for
+  the rest of the battle and reverts with the others at battle end. 2: design pass: `ExecuteInner` passes the calling
+  slot; `BattleState`'s single `MimicWrapper` / `MimicOriginalBase` pair becomes one record per swapped slot. 3: none
+  (no rule differs; Gen 2's Mimic is unverified). 4: the cite above. 5: runtime only. 6: drafted: a full battle where
+  Metronome calls Mimic, the Metronome slot then uses the copy, and both slots revert at battle end. 7: none.
 
 ### 3.2 Data and importer
 

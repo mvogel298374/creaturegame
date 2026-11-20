@@ -16,7 +16,8 @@ export type PromptKey =
   | 'shop'
   | 'acquisition'
   | 'leadChoice'
-  | 'switchIn';
+  | 'switchIn'
+  | 'mimicChoice';
 
 export interface LevelUpPanel {
   creatureName: string;
@@ -89,6 +90,12 @@ export interface SwitchInPrompt {
   faintedName: string;
 }
 
+// The player's Mimic (Gen 1): the foe's moves in slot order to copy one from — blocking, with no cancel.
+export interface MimicChoicePrompt {
+  creatureName: string;
+  moves: string[];
+}
+
 // A transient loot hover (gold + items) floated over the field, then auto-dismissed by the view. Shows the
 // *granted* reward (the option the player picked) after the blocking pick-one-of-N choice resolves — every
 // source (a battle-win drop and a Treasure/Mystery node) funnels its RewardGranted through this same hover.
@@ -142,6 +149,7 @@ export interface BattleState {
   leadChoice: PartyMember[] | null;
   // Forced faint-switch (Stage 3): the send-in prompt when the lead faints with a live bench member, or null.
   switchIn: SwitchInPrompt | null;
+  mimicChoice: MimicChoicePrompt | null;
   party: PartyMember[];
   dropToast: DropToast | null;
   gold: number;
@@ -208,6 +216,7 @@ export const initialState: BattleState = {
   acquisition: null,
   leadChoice: null,
   switchIn: null,
+  mimicChoice: null,
   party: [],
   dropToast: null,
   gold: 0,
@@ -436,6 +445,10 @@ export function battleReducer(state: BattleState, action: Action): BattleState {
       return { ...state, switchIn: { party: action.party, faintedName: action.faintedName } };
     case 'HIDE_SWITCH_IN':
       return { ...state, switchIn: null };
+    case 'SHOW_MIMIC_CHOICE':
+      return { ...state, mimicChoice: { creatureName: action.creatureName, moves: action.moves } };
+    case 'HIDE_MIMIC_CHOICE':
+      return { ...state, mimicChoice: null };
     case 'RESTORE_PROMPT': {
       // Only into an empty slot: if a newer prompt of the same kind arrived meanwhile, that one is the live one.
       if (state[action.key]) return state;

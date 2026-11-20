@@ -217,6 +217,28 @@ public class SignalRInputTests
         await Assert.ThrowsAsync<TaskCanceledException>(async () => await Within(task));
     }
 
+    [Fact]
+    public async Task MimicChoice_CompletesWithTheHubsAnswer()
+    {
+        var input = new SignalRInput();
+
+        var task = input.ChooseMimicMoveAsync(null!);
+        input.SetMimicChoice(2); // hub: RespondMimicChoice(2)
+
+        Assert.Equal(2, await Within(task));
+    }
+
+    [Fact]
+    public async Task Cancel_UnblocksThePendingMimicChoice()
+    {
+        var input = new SignalRInput();
+
+        var task = input.ChooseMimicMoveAsync(null!);
+        input.Cancel(); // client disconnected with the Mimic picker open
+
+        await Assert.ThrowsAsync<TaskCanceledException>(async () => await Within(task));
+    }
+
     // ── Shop: the one iterative prompt — answers can land between two prompts ───────────────────────
 
     private static readonly ShopContext EmptyShop = new([], 0);
@@ -369,6 +391,11 @@ public class SignalRInputTests
             typeof(SwitchInOffered),
             i => i.ChooseSwitchInAsync(null!),
             i => i.SetSwitchInChoice(0)
+        ),
+        ["_mimicTcs"] = (
+            typeof(MimicChoiceOffered),
+            i => i.ChooseMimicMoveAsync(null!),
+            i => i.SetMimicChoice(0)
         ),
     };
 

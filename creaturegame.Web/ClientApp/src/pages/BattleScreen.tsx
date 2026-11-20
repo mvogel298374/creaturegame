@@ -41,6 +41,7 @@ import { ShopModal } from '../components/modals/ShopModal';
 import { AcquisitionModal } from '../components/modals/AcquisitionModal';
 import { LeadChoiceModal } from '../components/modals/LeadChoiceModal';
 import { SwitchInModal } from '../components/modals/SwitchInModal';
+import { MimicChoiceModal } from '../components/modals/MimicChoiceModal';
 import { PartyCard } from '../components/modals/PartyCard';
 import { hasUsableMove } from '../battle/moveMenu';
 import { MoveReplacementModal } from '../components/modals/MoveReplacementModal';
@@ -84,7 +85,7 @@ export function BattleScreen() {
   // authority and takes over once it arrives.
   const routeGeneration: string | null = location.state?.generation ?? fallback?.generation ?? null;
 
-  const { state, chooseMove, chooseSwitch, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, respondMoveTeachTarget, buyShopItem, leaveShop, respondAcquisition, chooseLead, respondSwitchIn, dismissDrop } = useBattleHub(gameId, startLevel);
+  const { state, chooseMove, chooseSwitch, useItem, dismissLevelUp, forgetMove, respondRecovery, respondEvolution, chooseBiome, chooseReward, respondMoveTeachTarget, buyShopItem, leaveShop, respondAcquisition, chooseLead, respondSwitchIn, respondMimicChoice, dismissDrop } = useBattleHub(gameId, startLevel);
 
   useEffect(() => {
     if (!gameId) nav('/', { replace: true, state: { notice: 'No run in progress.' } });
@@ -398,6 +399,10 @@ export function BattleScreen() {
 
       {state.switchIn && (
         <SwitchInModal prompt={state.switchIn} onChoose={respondSwitchIn} />
+      )}
+
+      {state.mimicChoice && (
+        <MimicChoiceModal prompt={state.mimicChoice} onChoose={respondMimicChoice} />
       )}
 
       {devModeOn && enemyOverviewOpen && (
