@@ -58,12 +58,16 @@ design pass serves the group. Groups 3 and 5 are clusters of S/S–M items and t
 | 8 | Battle presentation | `BattleScene`, the event wire | Move animations · Sprite FX · Fly/Dig sprite stays on screen · Text feel |
 | 9 | Acquisition and items | `ItemEffects`, `RewardCalculator`, evolution | Catch · Unsold-item rule · Stone evolutions |
 | 10 | Run loop and progression | `RunDirector`, `EncounterFactory` | Progressive difficulty |
-| 11 | Client UX | modals, Title, the level-up panel | Continue card species · `RunFaulted` handler test · Level-up panel · 4d+ surface catalog |
+| 11 | Client UX | modals, Title, the level-up panel | Escape = B on move-teach and Poké Center · Continue card species · `RunFaulted` handler test · Level-up panel · 4d+ surface catalog |
 | 12 | E2E and CI | `e2e/`, workflows, scripts | CI E2E + fast suites before deploying · `voluntary-switch` slow · evolution nameplate · Tighten two specs · E2E helper dedup · Play helper hang (four wait only on one E2E session) |
 | 13 | Importer and data model | `PokeApiConnector`, schema | Re-import churn on `pokemon.db` · §4.4 multi-generation data model |
 | 14 | Tooling and docs | `.claude/`, README, hooks | Agent profiles → skills · User docs · Pre-commit hook gaps · `npm audit` · Dev Mode next features · Abuse protection |
 
-**Ready — each awaits your greenlight:** none.
+**Ready — each awaits your greenlight**
+
+| Item | Cost | Ready? | Note |
+|:-----|:----:|:-------|:-----|
+| **Escape = B on the move-teach picker and the Poké Center** (§4.5) | S | ✅ | Client only; reuses `{ onBKey }`. |
 
 **A. Confirm the drafted lines, then Ready**
 
@@ -476,6 +480,24 @@ each). Their seam and data-vs-runtime lines are already written in the text.
   is the strongest candidate for a joint sketch → ratify session.
   **DoR (V16):** ✗ not Ready — gaps **1, 2, 6**; needs the joint sketch session, then a DoR per ratified idea. §3.1's
   one-line check could go first as its own S item.
+- [ ] *(small)* **Escape = B on the move-teach picker and the Poké Center** — filed 2026-11-21 from the Escape = B
+  item (`TODO_ARCHIVE.md`); the two remaining prompts with a negative answer.
+  **DoR:** ✅ Ready (2026-11-21).
+  - **Acceptance:** Escape answers as B, once, and a backdrop click does nothing. On `MoveTeachTargetModal`, Escape is
+    "Don't teach X" (`onChoose(null)`), skipping the teach; the reward was already granted on pick. On
+    `RecoveryModal`, Escape is SKIP (`onRespond(false)`).
+  - **Design:** `dismiss={{ onBKey: … }}` on both, the variant in `Modal.tsx` (`FRONTEND_PLAN.md` → Dismiss).
+  - **Gen surface:** none; the key map is theme.
+  - **Gen 1 source (pokered):** TM use: B at "Teach X to a POKéMON?" is NO and the item is not used
+    (`engine/items/item_effects.asm:2181-2189`); B in the TM party menu cancels the teach (`item_effects.asm:2204-2218`).
+    We have no YES/NO before the picker, so the picker's B maps to that cancel. Poké Center: the nurse's HEAL/CANCEL
+    menu (`home/yes_no.asm:21-27`) takes B as the second item (`engine/menus/text_box.asm:310-313, 327-329`), which
+    goes to the declined-healing path (`engine/events/pokecenter.asm:13-16, 41-42`).
+  - **Data vs runtime:** client only.
+  - **Quirk the tests assert:** two `bKey.test.ts` cases: each prompt's Escape answer, and a backdrop click sending
+    nothing. `requirements-review` checks the B claim.
+  - **Dependencies:** none.
+
 ### 4.6 Dev and test tooling features
 
 - [ ] **Dev Mode — next features (shell, not ready: needs a `/plan` and a full DoR entry).** More dev actions behind
