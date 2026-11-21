@@ -103,6 +103,30 @@ REST call routed to the machine that never saw `/start`; the workflow pins `flyc
 
 ---
 
+## §4.5 Escape = B on the move-teach picker and the Poké Center ✅ DONE (2026-11-21)
+
+*(small; filed 2026-11-21 from the Escape = B item below).* The two remaining prompts with a negative answer. **DoR:** ✅ Ready (2026-11-21).
+
+- **Acceptance (as built):** Escape answers as B, once, and a backdrop click does nothing. On `MoveTeachTargetModal`, Escape and the "Don't teach X"
+  button open a "Don't teach X?" YES/NO; YES skips the teach (`onChoose(null)`), NO or Escape goes back to the picker. On `RecoveryModal`, Escape is
+  SKIP (`onRespond(false)`).
+- **Design:** `dismiss={{ onBKey }}` on both (`FRONTEND_PLAN.md` → Dismiss); the picker holds a local `confirming` state and a `.lead-confirm` row in
+  `RosterPicker.css`.
+- **Gen surface:** none; the key map is theme. **Data vs runtime:** client only. **Dependencies:** none.
+- **Gen 1 source (pokered):** TM use: B at "Teach X to a POKéMON?" is NO and the item is not used (`engine/items/item_effects.asm:2181-2189`); B in
+  the TM party menu cancels the teach (`item_effects.asm:2204-2218`). Poké Center: the nurse's HEAL/CANCEL menu (`home/yes_no.asm:21-27`) takes B as
+  the second item (`engine/menus/text_box.asm:310-313, 327-329`), which goes to the declined-healing path (`engine/events/pokecenter.asm:13-16, 41-42`).
+- **As built / ruling (user, 2026-11-21, on a `requirements-review` finding):** pokered's B keeps the TM, but ours was spent on the reward pick, so
+  declining the teach is permanent and is never one press. The picker's B and its "Don't teach X" button open the confirm (same shape as "Stop learning
+  X?"); a confirm's B is NO, back to the picker. The first draft mapped B straight to `onChoose(null)`.
+- **Quirk the tests assert:** `bKey.test.ts`: the picker's B opens the confirm and sends nothing; the confirm's B is NO, back; the Poké Center's B is
+  SKIP; a backdrop click answers none of them.
+- **Spec assertion (user ruling 2026-11-21):** `e2e/modal-accessibility.spec.ts`'s "prompt arriving over the pinned Run Map" case now asserts the
+  seed's first prompt is one that ignores Escape (reward pick or route choice, `blockingPrompt`) before pressing Escape. Ran by the user: 7/7 passed;
+  tsc + Vitest pass.
+
+---
+
 ## §4.5 Escape = B on the prompts that have a negative answer ✅ DONE (2026-11-21)
 
 *(small).* Escape acts as Gen 1's B on the step showing, in the evolution, shop, acquisition, nickname and move-replacement modals. The required

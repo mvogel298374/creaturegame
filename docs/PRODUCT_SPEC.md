@@ -508,7 +508,7 @@ the linked design doc instead — pull it there and leave only the pointer here.
   dismissable prompt it closes only Settings.
 - Escape acts as B, once per press (a held key's auto-repeat is ignored), on the step showing: evolution → cancel; shop → leave;
   acquisition offer → decline, swap picker → back, release confirm → no; nickname → no nickname; move replacement → the forget list
-  opens "Stop learning X?" and either confirm → no.
+  opens "Stop learning X?" and either confirm → no; move-teach picker → opens "Don't teach X?" and its confirm → no; Poké Center → skip.
 - Escape does nothing on the route, reward, lead, switch-in and Mimic prompts. A backdrop click never answers a prompt.
 - Design detail → `FRONTEND_PLAN.md` → Modal focus.  History → `TODO_ARCHIVE.md` → *§5 Modal accessibility*, *§5 The
   pinned Run Map has no focus trap* and *§5 The pinned map's Escape fires under a prompt*, *§4.5 Escape = B*.

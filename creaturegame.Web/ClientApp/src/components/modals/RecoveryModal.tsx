@@ -10,7 +10,7 @@ export function RecoveryModal({ prompt, onRespond }: {
   onRespond: (accept: boolean) => void;
 }) {
   return (
-    <Modal label="Poké Center recovery" dismiss="blocking" card="recovery-modal">
+    <Modal label="Poké Center recovery" dismiss={{ onBKey: () => onRespond(false) }} card="recovery-modal">
       <p className="recovery-title">Poké Center</p>
       <p className="recovery-sub">Your whole party can be fully healed.</p>
       <div className="recovery-sprite-wrap">

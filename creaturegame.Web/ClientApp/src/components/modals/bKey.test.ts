@@ -11,6 +11,8 @@ import { RewardChoiceModal } from './RewardChoiceModal';
 import { LeadChoiceModal } from './LeadChoiceModal';
 import { SwitchInModal } from './SwitchInModal';
 import { MimicChoiceModal } from './MimicChoiceModal';
+import { MoveTeachTargetModal } from './MoveTeachTargetModal';
+import { RecoveryModal } from './RecoveryModal';
 import type { AcquisitionPrompt } from '../../hooks/useBattleHub';
 import type { PartyMember } from '../../battle/timeline';
 
@@ -65,6 +67,17 @@ describe('Escape plays Gen 1 B on the prompts that have a negative answer', () =
     const el = ShopModal({ prompt: { items: [], balance: 0 }, onBuy: () => {}, onLeave: () => left++ });
     dismissHandlers(dismissOf(el)).key!();
     expect(left).toBe(1);
+  });
+
+  it('Escape at the Poké Center is SKIP, and a backdrop click does nothing', () => {
+    const answers: boolean[] = [];
+    const el = RecoveryModal({
+      prompt: { creatureName: 'PIKACHU', speciesId: 25, battlesWon: 1 },
+      onRespond: a => answers.push(a),
+    });
+    expect(dismissHandlers(dismissOf(el)).backdrop).toBeNull();
+    pressB(el);
+    expect(answers).toEqual([false]);
   });
 
   it('Escape on the forget list opens "Stop learning?" without answering', () => {
@@ -149,6 +162,33 @@ describe('Escape plays Gen 1 B on the prompts that have a negative answer', () =
       pressB(el);
       expect(setPending).toHaveBeenCalledWith(null);
       expect(forgot).toEqual([]);
+    });
+
+    const renderTeach = (confirming: boolean) => {
+      const setConfirming = vi.fn();
+      const chosen: (number | null)[] = [];
+      stubState.mockReturnValueOnce([confirming, setConfirming]);
+      const el = MoveTeachTargetModal({
+        prompt: { moveName: 'thunderbolt', power: 95, accuracy: 100, damageType: 'Electric', attackType: 'Special', pp: 15, candidates: [] },
+        onChoose: i => chosen.push(i),
+      });
+      return { el, setConfirming, chosen };
+    };
+
+    it('the move-teach picker opens "Don\'t teach?" and sends nothing, and a backdrop click does nothing', () => {
+      const { el, setConfirming, chosen } = renderTeach(false);
+      expect(dismissHandlers(dismissOf(el)).backdrop).toBeNull();
+      pressB(el);
+      expect(setConfirming).toHaveBeenCalledWith(true);
+      expect(chosen).toEqual([]);
+    });
+
+    it('the "Don\'t teach?" confirm is NO, back to the picker, and sends nothing', () => {
+      const { el, setConfirming, chosen } = renderTeach(true);
+      expect(dismissHandlers(dismissOf(el)).backdrop).toBeNull();
+      pressB(el);
+      expect(setConfirming).toHaveBeenCalledWith(false);
+      expect(chosen).toEqual([]);
     });
   });
 

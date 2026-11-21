@@ -130,3 +130,9 @@
    resolves to 0 in a modal that is only as tall as its content, so there was no gap in ANY skin (the Kanto Sage
    3px card borders just made it obvious). Give it the same gap the grid has above its title block. */
 .lead-modal .action-back { margin-top: var(--sp-md); }
+
+.lead-confirm {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-md);
+}

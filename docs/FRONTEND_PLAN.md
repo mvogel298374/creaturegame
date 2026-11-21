@@ -250,6 +250,10 @@ top is the one that takes input.
       - Our list folds in pokered's "Delete an older move?" question, so NO at "Stop learning?" returns straight to
         the list. Every Gen 1 outcome is still reachable.
       - The per-move "Forget X and learn Y?" confirm is our own; pokered forgets the move on the pick.
+    - Move-teach picker: B and the "Don't teach X" button open "Don't teach X?", and a confirm is NO, back to the
+      picker. pokered's B cancels the teach and keeps the TM (`item_effects.asm:2181-2189, 2204-2218`); ours was spent
+      on the reward pick, so a decline is permanent and is never one press (user ruling 2026-11-21).
+    - Poké Center: SKIP, as B on the nurse's HEAL/CANCEL menu declines the healing (`pokecenter.asm:13-16, 41-42`).
   - `{ onEscape }`: both Escape and a backdrop click close the overlay. It's for overlays that only draw client state:
     Settings and the enemy overview.
   - A held Escape's auto-repeat is ignored (`isEscapePress`), so a held key answers once and can't walk a multi-step

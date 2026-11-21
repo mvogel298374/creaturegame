@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { MoveTeachTargetPrompt } from '../../hooks/useBattleHub';
 import { formatMoveName } from '../../utils/format';
 import { TypeBadge } from '../TypeBadge';
@@ -9,16 +10,31 @@ import './RosterPicker.css';
 // reward card. A deliberate roguelite QoL improvement over the source games, NOT a literal Gen 1 reproduction —
 // real Gen 1 lets you pick any party member and only tells you afterward if it can't learn the move; this
 // flags ABLE/NOT ABLE up front instead. Every current party member is shown; only an ABLE one (a real
-// Machine-learnset match that isn't already known) is selectable. A Decline button lets the player back out
-// without teaching anything — the reward itself was already granted on pick, so declining here only skips the
-// teach, not the reward.
+// Machine-learnset match that isn't already known) is selectable. Declining asks "Don't teach X?" first: the
+// reward was already spent on pick, so a decline forfeits the teach (FRONTEND_PLAN.md → Dismiss).
 export function MoveTeachTargetModal({ prompt, onChoose }: {
   prompt: MoveTeachTargetPrompt;
   onChoose: (index: number | null) => void;
 }) {
+  const [confirming, setConfirming] = useState(false);
+  const move = formatMoveName(prompt.moveName);
+  const onB = () => setConfirming(!confirming);
+
+  if (confirming) {
+    return (
+      <Modal label="Confirm skipping the teach" dismiss={{ onBKey: onB }} card="lead-modal">
+        <p className="lead-title">Don't teach {move}?</p>
+        <div className="lead-confirm">
+          <button className="action-btn action-btn--fight" onClick={() => onChoose(null)}>YES</button>
+          <button className="action-btn" onClick={() => setConfirming(false)}>NO</button>
+        </div>
+      </Modal>
+    );
+  }
+
   return (
-    <Modal label="Teach a move" dismiss="blocking" card="lead-modal">
-      <p className="lead-title">Teach {formatMoveName(prompt.moveName)}?</p>
+    <Modal label="Teach a move" dismiss={{ onBKey: onB }} card="lead-modal">
+      <p className="lead-title">Teach {move}?</p>
       <p className="lead-sub">
         <TypeBadge type={prompt.damageType} />
         {' '}
@@ -58,8 +74,8 @@ export function MoveTeachTargetModal({ prompt, onChoose }: {
           );
         })}
       </div>
-      <button className="btn-ghost action-back" onClick={() => onChoose(null)}>
-        Don't teach {formatMoveName(prompt.moveName)}
+      <button className="btn-ghost action-back" onClick={() => setConfirming(true)}>
+        Don't teach {move}
       </button>
     </Modal>
   );

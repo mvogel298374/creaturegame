@@ -9,6 +9,10 @@ const otherOverlay = (page: Page) =>
 
 const runPrompt = (page: Page) => otherOverlay(page).filter({ hasNot: page.locator('.battle-end-modal') });
 
+// The prompts that ignore Escape; the others answer it as B.
+const blockingPrompt = (page: Page) =>
+  page.locator('.modal-overlay').filter({ has: page.locator('.reward-modal, .route-choice-modal') });
+
 const isInert = (page: Page, selector: string) =>
   page.evaluate(sel => document.querySelector(sel)?.closest('[inert]') != null, selector);
 
@@ -161,6 +165,7 @@ test.describe('Modal accessibility', () => {
     test.setTimeout(120_000);
     await pinnableMap(page, 'CHARIZARD', 50);
     expect(await playWithOpenUntil(page, PINNED_MAP, runPrompt(page))).toBe(true);
+    await expect(blockingPrompt(page), "the seed's first prompt must be one that ignores Escape").not.toHaveCount(0);
 
     await expect.poll(() => isInert(page, PINNED_MAP.panel)).toBe(true);
     await expect.poll(() => focusIsInside(page, '.modal-overlay')).toBe(true);
@@ -169,7 +174,7 @@ test.describe('Modal accessibility', () => {
 
     await page.keyboard.press('Escape');
     await expect(page.locator(PINNED_MAP.panel)).toBeVisible();
-    await expect(runPrompt(page)).not.toHaveCount(0);
+    await expect(blockingPrompt(page)).not.toHaveCount(0);
 
     while (await answerRunPromptIfPresent(page, { drafts: 'decline' })) {}
     await expect(page.locator(PINNED_MAP.panel)).toBeVisible();
