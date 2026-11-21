@@ -313,6 +313,8 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
 - Not modelled: pokered's enemy rolls `BattleRandom & 3` and retries on an empty slot; ours draws once over the filled
   slots. The odds are the same; only the number of RNG draws differs.
 - Not modelled yet: a Mimic called by Metronome or Mirror Move copies into the calling slot (`TODO.md` §3.1).
+- Not modelled yet: Metronome can call Mirror Move in pokered (`core.asm:5013-5035` rejects only Metronome and
+  Struggle); ours never calls it (`TODO.md` §3.1, "Metronome can call Mirror Move").
 - Gen 2 reportedly copies the target's last-used move instead (unverified against pokecrystal).
 
 #### Status Quirks
@@ -419,6 +421,11 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
 - **Disable** picks a random move with PP left, and the lock is enforced at move selection (`Battle` and
   `IBattleInput` skip `DisabledMove`) and again by the pre-move "is disabled!" check, for a move disabled after it
   was chosen; its countdown is in `GENERATION_SEAMS.md` §2, Pre-move checks.
+  - Not modelled: after Transform, pokered keeps the disabled slot blocked in the menu (the slot is in the high nibble
+    of `wPlayerDisabledMove`, `core.asm:2845-2852`); here the Disable falls away with the old moveset. It needs a Mew
+    disabled before it transforms.
+  - Not modelled: against a foe, pokered's Disable ignores PP and can pick a move the foe has run out of
+    (`effects.asm:1324-1344`, non-link enemies skip the PP check); here it picks only a move with PP left.
 - **Leech Seed lands through a Substitute** in the English RBY this engine targets (reported blocked only in the
   Japanese games and Pokémon Stadium, which is unverified). pokered `engine/battle/move_effects/leech_seed.asm` has no
   Substitute check (verified by `requirements-review` 2026-10-29). `LeechSeedEffect` is therefore not

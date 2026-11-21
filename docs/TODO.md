@@ -52,7 +52,7 @@ design pass serves the group. Groups 3 and 5 are clusters of S/S–M items and t
 | 2 | End-of-turn residual phase | `Battle` turn tail, residuals, `TickTurnCounters` | End-of-turn residual phase (with Leech Seed × Toxic and the menu-turn first mover) |
 | 3 | Hit test and accuracy | `AttackAction.Connects`, `Gen1BattleRules.RunsHitTest` | Other `ResidualEffects1` moves (with the residual-effect failure lines) |
 | 4 | Damage formula | `DamageCalculator`, crit and accuracy tables | Damage/accuracy core |
-| 5 | Effects that copy or name a move | `CounterEffect`, `StatusResolver.DisabledMoveStops`, Mimic, Mirror Move | Counter keys on the selected move (with Counter/Mirror Move on a menu turn) · Disable matches instances · A called Mimic copies into the calling slot |
+| 5 | Effects that copy or name a move | `CounterEffect`, `StatusResolver.DisabledMoveStops`, Mimic, Mirror Move | Counter keys on the selected move (with Counter/Mirror Move on a menu turn) · "Is disabled!" matches the move · A called Mimic copies into the calling slot · Metronome can call Mirror Move |
 | 6 | Status by type | `Gen1BattleRules.CanReceiveStatus` | Same-type secondary status immunity |
 | 7 | Battle text and seams | `timeline.ts`, the console emitter, `GENERATION_SEAMS.md` | Audit the inline battle rules · Binding and miss lines |
 | 8 | Battle presentation | `BattleScene`, the event wire | Move animations · Sprite FX · Fly/Dig sprite stays on screen · Text feel |
@@ -65,7 +65,11 @@ design pass serves the group. Groups 3 and 5 are clusters of S/S–M items and t
 
 **Ready — each awaits your greenlight**
 
-None open.
+| Item | Cost | Ready? | Note |
+|:-----|:----:|:-------|:-----|
+| **The "is disabled!" check matches the move, not the slot** (§3.1) | S | ✅ | Verify slice 2026-11-21; new seam `DisabledMoveCheckMatchesMoveId`. |
+| **A called Mimic copies into the calling slot** (§3.1) | S–M | ✅ | Design approved 2026-11-21; touches `AttackAction.ExecuteInner`. |
+| **Metronome can call Mirror Move** (§3.1) | S | ✅ | After the called Mimic; new seam `MetronomeCanCall`. |
 
 **A. Confirm the drafted lines, then Ready**
 
@@ -102,8 +106,6 @@ None open.
 
 | Item | Cost | Ready? | Next step |
 |:-----|:----:|:-------|:----------|
-| **Disable matches move instances, not move ids** (§3.1) | S | ✗ 1, 2, 4, 6 | Filed 2026-11-09. Read `DisabledMoveStops` and the Metronome and Mirror Move wrappers first. |
-| **A called Mimic copies into the calling slot** (§3.1) | S–M | ✗ 2, 6; the rest drafted | Filed 2026-11-20. Shares the Metronome / Mirror Move wrapper with Disable. |
 | **Same-type secondary status immunity** (§3.1) | S–M | ✗ 2, 4, 6; the rest drafted | Take the pokered cite; Ice Beam freezes Ice-types today. |
 | **Other `ResidualEffects1` moves may roll accuracy** (§3.1) | S–M | ✗ 1, 2, 4, 6 | Filed 2026-11-06. A verify slice reads each effect for its own hit test; now also carries the residual-effect failure lines. |
 | **Counter keys on the foe's selected move** (§3.1) | S–M | ✗ 1, 2, 4, 6 | Trace `HandleCounterMove` and `MirrorMoveCopyMove`, including switch and item turns; list the diverging cases. |
@@ -230,27 +232,66 @@ data/engine item usually also means updating the test that pins the wrong value.
   reads "<user>'s attack missed!"; the `BindingStarted` event stays, since state and tests use it. 2: wording only, in
   the client timeline and the console emitter. 4: the cites above. 5: runtime only (client and console text). 6:
   timeline tests pin both lines. 7: the battle-text placement decision.
-- **Disable matches move instances, not move ids (found 2026-11-09 by `opus-engineer`, Fly and Dig item;
-  read-confirmed, unverified beyond that) — S, ✗ not Ready.** `StatusResolver.DisabledMoveStops` compares the selected
-  `PokemonAttack` with `Battle.DisabledMove` by reference; pokered compares move numbers
-  (`wPlayerDisabledMoveNumber`, `core.asm:3437`+). A disabled move called through Metronome or Mirror Move is a
-  different instance here, so it is not stopped, and the "is disabled!" route into the Fly and Dig glitch cannot
-  occur. Whether anything else leans on the instance comparison (Mimic, Transform's copied moveset) is unchecked.
-  **DoR:** ✗ gaps **1, 2, 4, 6**. *Drafted:* a verify slice reads `DisabledMoveStops`, `DisableEffect` and the
-  Metronome and Mirror Move wrappers against pokered, then lists the diverging cases. 3: likely none (a matching bug,
-  not a rule), decided by the slice. 5: runtime only. 7: none.
+- **The "is disabled!" check matches the move, not the slot (found 2026-11-09 by `opus-engineer`, Fly and Dig item;
+  source-confirmed by the verify slice 2026-11-21) — S.** pokered blocks Disable two ways: the move menu and the foe's
+  pick by slot (`core.asm:2845-2852`, enemy `:2989-2996`), and the pre-move check by move number
+  (`wPlayerDisabledMoveNumber` vs `wPlayerSelectedMove`, `:3437-3446`). Metronome and Mirror Move write the called
+  move's number into `wPlayerSelectedMove` and jump past the status checks (`:3198-3211`), so the calling turn is never
+  checked, in pokered or here. Our selection matches (instance = slot); our pre-move check compares the instance, so
+  two reachable cases diverge: (a) a Mimic copy that duplicates a known move, the other copy disabled: pokered loses
+  the turn ("Tackle is disabled!"), we use it; (b) a called lock-in move (Fly, Dig, Thrash, Rage, Bide, the charge
+  moves) whose number is the disabled slot's: pokered blocks its continuation turn, and for Fly or Dig the user stays
+  out of reach (the glitch in `GEN_DIFFERENCES.md`, whose "cannot occur here" this makes reachable); we continue.
+  **DoR:** ✅ Ready (2026-11-21, user confirmed the verify slice's drafts).
+  - **Acceptance:** the pre-move check blocks any selected move with the disabled move's number, from any slot or a
+    called move's continuation; selection stays by slot; the Metronome / Mirror Move calling turn stays unchecked.
+  - **Design:** Disable records the disabled move (its `Attack`) beside the slot when it lands; `DisabledMoveStops`
+    compares the selected move with that record. No central method changes.
+  - **Gen surface:** `IBattleRules.DisabledMoveCheckMatchesMoveId` (Gen 1 true; Gen 2 unverified).
+  - **Gen 1 source:** the pokered cites above.
+  - **Data vs runtime:** runtime only.
+  - **Quirk the tests assert:** full battles: the Mimic-duplicate pick loses the turn with "is disabled!"; a Mirror
+    Move'd Fly into a disabled Fly slot prints "is disabled!" on the release turn and the user stays out of reach;
+    Metronome calling the disabled move's number still runs on the calling turn.
+  - **Dependencies:** none. `GEN_DIFFERENCES.md:264-267` is corrected in the same commit.
 - **A Mimic called by Metronome or Mirror Move copies into the calling slot (found 2026-11-20 by `requirements-review`,
-  Mimic pick item; source-confirmed) — S–M, ✗ not Ready.** `AttackAction.ExecuteInner` runs the called move on a fresh
+  Mimic pick item; source-confirmed) — S–M.** `AttackAction.ExecuteInner` runs the called move on a fresh
   `PokemonAttack`, so a called Mimic's copy lands on that temporary wrapper and is gone at once (the picker still opens
   and "learned X" prints). pokered writes the copied move into the slot at `wPlayerMoveListIndex` /
   `wEnemyMoveListIndex` (`effects.asm:1236-1267`), the Metronome or Mirror Move slot, which keeps it for the battle.
   Since 2026-11-20 `MimicEffect` leaves an earlier real Mimic copy alone in this case
   (`MimicContractTests.AMimicCalledByMetronomeLeavesTheEarlierCopyInPlace`).
-  **DoR:** ✗ gaps **2, 6**. *Drafted:* 1: a called Mimic's copy replaces the calling Metronome / Mirror Move slot for
-  the rest of the battle and reverts with the others at battle end. 2: design pass: `ExecuteInner` passes the calling
-  slot; `BattleState`'s single `MimicWrapper` / `MimicOriginalBase` pair becomes one record per swapped slot. 3: none
-  (no rule differs; Gen 2's Mimic is unverified). 4: the cite above. 5: runtime only. 6: drafted: a full battle where
-  Metronome calls Mimic, the Metronome slot then uses the copy, and both slots revert at battle end. 7: none.
+  Verify slice 2026-11-21: confirmed against current pokered (`effects.asm:1204-1267`, the write at `.playerTurn`
+  `:1262-1267`); the slot keeps its own PP, and the copy reverts on switch-out and at battle end, as our reverts do.
+  **DoR:** ✅ Ready (2026-11-21, user approved the design pass and the drafts).
+  - **Acceptance:** a called Mimic's copy replaces the calling Metronome / Mirror Move slot for the rest of the battle,
+    keeping that slot's PP, and reverts with any other Mimic copy on switch-out and at battle end.
+  - **Design (approved 2026-11-21):** `ExecuteInner` passes the calling slot down, nested calls keeping the outermost
+    (Metronome → Mirror Move → Mimic lands in the Metronome slot); `MimicEffect` writes into that slot; `BattleState`'s
+    single `MimicWrapper` / `MimicOriginalBase` pair becomes one record per swapped slot, all reverted together.
+  - **Gen surface:** none (the slot write has one shape; whether Mimic can be called at all is the Metronome call list,
+    "Metronome can call Mirror Move" below). Gen 2's Mimic is unverified.
+  - **Gen 1 source:** the cites above.
+  - **Data vs runtime:** runtime only.
+  - **Quirk the tests assert:** full battles: Metronome calls Mimic and the Metronome slot then uses the copy; a real
+    Mimic copy and a called one coexist; every swapped slot reverts on switch-out and at battle end.
+  - **Dependencies:** none.
+- **Metronome can call Mirror Move, as in Gen 1 (found 2026-11-21 by the Disable / Mimic verify slice;
+  source-confirmed) — S.** pokered's `MetronomePickMove` (`core.asm:5013-5035`) rejects only 0, Metronome and
+  Struggle; `AttackAction` also rejects Mirror Move (`m.Name != "mirror-move"`), inline, pinned by
+  `MetronomeTests.Metronome_NeverCallsMirrorMove` with no source. Gen 2 rejects a longer list, so the list is
+  generation-variable and belongs on a seam.
+  **DoR:** ✅ Ready (2026-11-21, user confirmed the drafts).
+  - **Acceptance:** Metronome can call any move but Metronome and Struggle; a called Mirror Move copies the foe's last
+    move, or fails as Mirror Move does.
+  - **Design:** the inline filter moves to `IBattleRules.MetronomeCanCall(Attack)`.
+  - **Gen surface:** `MetronomeCanCall` (Gen 1: anything but Metronome and Struggle; Gen 2's list, unverified, differs).
+  - **Gen 1 source:** `core.asm:5013-5035`.
+  - **Data vs runtime:** runtime only.
+  - **Quirk the tests assert:** `Metronome_NeverCallsMirrorMove` becomes a full battle where a forced roll calls Mirror
+    Move and it copies the foe's last move; Metronome and Struggle stay excluded.
+  - **Dependencies:** sequenced after "A called Mimic copies into the calling slot", so Metronome → Mirror Move →
+    Mimic lands in the Metronome slot.
 
 ### 3.2 Data and importer
 
