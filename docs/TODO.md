@@ -615,7 +615,8 @@ surface: `/help` and the explainer describe the active generation, so they are p
   together with §6 "CI E2E step". Gen surface none; CI only.
 - **Pre-commit hook gaps (split out of the dev-script item, user ruling 2026-10-10; Parts B and C and the `-StartStack` leak are closed or archived; each needs its own entry before work). Tooling only, verified by manual reproduction (no Pester/shell harness, user ruling 2026-10-10):**
   the hook checks the working tree, not the staged snapshot (`:14,22`; fix needs `git stash --keep-index` or a temp
-  worktree, **M**, riskier); hardcoded dotnet path (`:11`; portability only).
+  worktree, **M**, riskier; until then `directives/ClaudeDirectives/environment.md` rule 4 keeps the tree clean by
+  hand); hardcoded dotnet path (`:11`; portability only).
   **DoR (V16):** ✗ not Ready — gaps **1, 2, 6** for each.
   - **Staged-snapshot (drafted):** acceptance, a commit whose staged file differs from the working copy is checked
     on the staged content.

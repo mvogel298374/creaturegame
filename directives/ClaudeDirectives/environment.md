@@ -11,3 +11,7 @@ Lessons Claude derived from working in this environment.
 3. **Check a scripted edit before building on it.** After any script that edits several files, read
    `git diff --stat` and one file's diff before the next step. Learned 2026-10-31: a line-range script stripped
    blank lines from ten test files and the batch had to be restored.
+4. **Prepare a commit only from a working tree that holds nothing else.** Finish or commit the item in flight first:
+   the pre-commit hook builds and tests the working tree, not the staged snapshot. Learned 2026-11-21: a line-ending
+   commit was staged from `HEAD`'s `Creature.cs` beside the called-Mimic item's unstaged edits, the tree didn't
+   compile, and the hook blocked the commit.
