@@ -52,7 +52,7 @@ design pass serves the group. Groups 3 and 5 are clusters of S/S–M items and t
 | 2 | End-of-turn residual phase | `Battle` turn tail, residuals, `TickTurnCounters` | End-of-turn residual phase (with Leech Seed × Toxic and the menu-turn first mover) |
 | 3 | Hit test and accuracy | `AttackAction.Connects`, `Gen1BattleRules.RunsHitTest` | Other `ResidualEffects1` moves (with the residual-effect failure lines) |
 | 4 | Damage formula | `DamageCalculator`, crit and accuracy tables | Damage/accuracy core |
-| 5 | Effects that copy or name a move | `CounterEffect`, Mimic, Mirror Move | Counter keys on the selected move (with Counter/Mirror Move on a menu turn) · Metronome can call Mirror Move |
+| 5 | Effects that copy or name a move | `CounterEffect`, Mimic, Mirror Move | Counter keys on the selected move (with Counter/Mirror Move on a menu turn) |
 | 6 | Status by type | `Gen1BattleRules.CanReceiveStatus` | Same-type secondary status immunity |
 | 7 | Battle text and seams | `timeline.ts`, the console emitter, `GENERATION_SEAMS.md` | Audit the inline battle rules · Binding and miss lines |
 | 8 | Battle presentation | `BattleScene`, the event wire | Move animations · Sprite FX · Fly/Dig sprite stays on screen · Text feel |
@@ -65,9 +65,7 @@ design pass serves the group. Groups 3 and 5 are clusters of S/S–M items and t
 
 **Ready — each awaits your greenlight**
 
-| Item | Cost | Ready? | Note |
-|:-----|:----:|:-------|:-----|
-| **Metronome can call Mirror Move** (§3.1) | S | ✅ | New seam `MetronomeCanCall`; also lands the deferred Metronome → Mirror Move → Mimic test. |
+None open.
 
 **A. Confirm the drafted lines, then Ready**
 
@@ -199,6 +197,12 @@ data/engine item usually also means updating the test that pins the wrong value.
   `requirements-review`, menu-item item; unverified). No player move runs on a switch or item turn, so pokered's
   enemy Counter and Mirror Move read the stale `wPlayerSelectedMove` and `wDamage` from the previous turn
   (`MirrorMoveCopyMove` too); whether ours matches is untraced. The same trace covers both.
+  **Merged in (ruling 2026-11-21): a failed Mirror Move is the user's last move** (found 2026-11-21 by
+  `requirements-review`, Metronome item; source-confirmed by the reviewer). pokered's `UsedMoveText` writes
+  `wPlayerUsedMove` / `wEnemyUsedMove` on every announcement, so a failed Mirror Move leaves MIRROR_MOVE there and a foe's
+  Mirror Move then fails (`core.asm:4979-4985`, `.mirrorMoveFailed`). Ours records nothing on a failure
+  (`AttackAction.cs:115-122`), so the foe's Mirror Move copies the user's earlier move. Metronome calling Mirror Move
+  makes it easier to reach.
   **DoR:** ✗ — gaps **4** (trace `HandleCounterMove` and `MirrorMoveCopyMove` ourselves, including the switch and item
   paths, and list the diverging cases), **2** (design pass: touches `AttackAction`/`CounterEffect` and
   `CounterQualifies`' signature; it can switch from `LastDamageTaken` to the shared `Battle.LastDamage` Bide now uses),
@@ -210,6 +214,8 @@ data/engine item usually also means updating the test that pins the wrong value.
   `AttackAction`"), Disable's target move and Conversion ("not yet a seam"), and Confuse's never-re-rolled counter
   ("gen-agnostic and inline in `ConfuseEffect`") (read-confirmed 2026-10-31). Also `SubstituteEffect`'s can't-pay
   check: Gen 1 fails only below the cost, Gen 2 at exactly the cost too (`GENERATION_SEAMS.md` §2, Substitute lines).
+  Also Mirror Move's inline "the foe's last move isn't Struggle" check (`AttackAction.cs:160`; `pr-review` 2026-11-21,
+  Metronome item): it never fires today, since Struggle never records itself and Metronome can't call it.
   **DoR:** ✗ not Ready — gaps **1, 2**; the rest follow from the slice. *Drafted:*
   - **Acceptance:** a verify slice lists every inline battle rule in the engine (the `GENERATION_SEAMS.md` rows plus
     a code sweep of `Combat/`), each with its pokered cite; each then gets its own seam member and a test that a
@@ -225,29 +231,15 @@ data/engine item usually also means updating the test that pins the wrong value.
   `ConsoleBattleEventEmitter.cs`, `BindingStarted`); pokered's `TrappingEffect` prints nothing (`effects.asm:1081-1104`),
   and since that item the line also shows on the Ghost lock's first turn. Every miss prints "<user>'s <MOVE> missed!"
   (`timeline.ts`, `MoveMissed`); pokered prints "<user>'s attack missed!" (`data/text/text_2.asm:1122-1125`).
+  **Merged in (ruling 2026-11-21): Mirror Move's failure line** (found by `requirements-review`, Metronome item). A
+  Mirror Move with nothing to copy emits `MoveMissed` ("<user>'s Mirror Move missed!", `AttackAction.cs:165`,
+  `timeline.ts:842-845`); pokered's `MirrorMoveCopyMove` prints "The MIRROR MOVE failed!" (`_MirrorMoveFailedText`).
+  Metronome can now call Mirror Move, so this shows there too.
   **DoR:** ✗ gap **3**: where battle wording lives is the open question under "Audit the inline battle rules" (the
   "Also in scope" ruling: presentation catalog §4.3 or a seam). *Drafted:* 1: a trap starts with no line and a miss
   reads "<user>'s attack missed!"; the `BindingStarted` event stays, since state and tests use it. 2: wording only, in
   the client timeline and the console emitter. 4: the cites above. 5: runtime only (client and console text). 6:
   timeline tests pin both lines. 7: the battle-text placement decision.
-- **Metronome can call Mirror Move, as in Gen 1 (found 2026-11-21 by the Disable / Mimic verify slice;
-  source-confirmed) — S.** pokered's `MetronomePickMove` (`core.asm:5013-5035`) rejects only 0, Metronome and
-  Struggle; `AttackAction` also rejects Mirror Move (`m.Name != "mirror-move"`), inline, pinned by
-  `MetronomeTests.Metronome_NeverCallsMirrorMove` with no source. Gen 2 rejects a longer list, so the list is
-  generation-variable and belongs on a seam.
-  **DoR:** ✅ Ready (2026-11-21, user confirmed the drafts).
-  - **Acceptance:** Metronome can call any move but Metronome and Struggle; a called Mirror Move copies the foe's last
-    move, or fails as Mirror Move does.
-  - **Design:** the inline filter moves to `IBattleRules.MetronomeCanCall(Attack)`.
-  - **Gen surface:** `MetronomeCanCall` (Gen 1: anything but Metronome and Struggle; Gen 2's list, unverified, differs).
-  - **Gen 1 source:** `core.asm:5013-5035`.
-  - **Data vs runtime:** runtime only.
-  - **Quirk the tests assert:** `Metronome_NeverCallsMirrorMove` becomes a full battle where a forced roll calls Mirror
-    Move and it copies the foe's last move; Metronome and Struggle stay excluded; Metronome → Mirror Move → Mimic writes
-    the copy into the Metronome slot (the outermost calling slot, deferred here from the called-Mimic item, user
-    ruling 2026-11-21).
-  - **Dependencies:** none; the called-Mimic slot write shipped 2026-11-21 (`TODO_ARCHIVE.md`), so Metronome → Mirror
-    Move → Mimic only needs the outermost `CallingSlot` to carry through.
 
 ### 3.2 Data and importer
 

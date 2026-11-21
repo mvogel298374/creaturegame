@@ -177,6 +177,8 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - Sleep, freeze, flinch and a trap clear a pending recharge; a trap does so even when its move misses. A sleep move on
   a recharging foe skips its status and accuracy checks and always lands.
 - A sleep or frozen turn erases the move Mirror Move would copy. Replacing a binder frees the foe it held.
+- Metronome can call any move but Metronome and Struggle, Mirror Move included; a called Mirror Move copies the foe's
+  last move, or fails if the foe hasn't moved yet.
 - A Pokémon on its Fly or Dig charge turn is out of reach. A move that runs the hit test misses it with no accuracy roll
   and prints its usual miss line, and X Accuracy and Struggle miss too. Swift, Bide's release, Roar, Whirlwind,
   Transform, Haze and self-targeting moves land; Mimic and Conversion print "But it failed!". Solar Beam's charge turn

@@ -356,6 +356,41 @@ public class MimicContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     }
 
     [Fact]
+    public async Task AMimicCalledThroughMetronomeThenMirrorMoveCopiesIntoTheMetronomeSlot()
+    {
+        var player = TestCreatures.Make("Player", hp: 2000, attack: 200, speed: 1);
+        player.AddAttack(Move("metronome"));
+        var enemy = TestCreatures.Make("Enemy", hp: 40, defense: 20, speed: 200);
+        enemy.AddAttack(Move("mimic"));
+        enemy.AddAttack(Move("tackle"));
+
+        var emitter = await FullBattle.Fight(
+            player,
+            enemy,
+            new ScriptedInput("metronome", "tackle").PicksMimic(1),
+            new ScriptedInput("mimic", "tackle"),
+            rng: new LowestRollSource(),
+            movePool: [Move("mirror-move")]
+        );
+
+        Assert.Equal(
+            "tackle",
+            Assert.Single(emitter.Of<MimicLearned>(), e => e.CreatureName == "Player").MoveName
+        );
+        Assert.Equal(
+            ["metronome", "mirror-move", "mimic", "tackle"],
+            emitter
+                .Of<MoveUsed>()
+                .Where(e => e.AttackerName == "Player")
+                .Select(e => e.MoveName)
+                .Take(4)
+        );
+        Assert.False(enemy.IsAlive());
+        Assert.Equal("metronome", player.MoveSet[0].Base.Name);
+        Assert.Equal(Move("metronome").PowerPointsMax - 2, player.MoveSet[0].PowerPointsCurrent);
+    }
+
+    [Fact]
     public async Task ASlotCopiedTwiceRevertsToItsFirstMove()
     {
         var player = Fast("Player");

@@ -187,6 +187,16 @@ public class UniqueMoveEffectContractTests(MovesFixture moves) : Gen1MoveContrac
         Assert.True(result.Has<DamageDealt>(), "the called move deals damage");
     }
 
+    [Theory]
+    [InlineData("metronome", false)]
+    [InlineData("struggle", false)]
+    [InlineData("mirror-move", true)]
+    [InlineData("tackle", true)]
+    public void MetronomeCanCallEveryImportedMoveButMetronomeAndStruggle(
+        string moveName,
+        bool callable
+    ) => Assert.Equal(callable, Gen1BattleRules.Instance.MetronomeCanCall(Move(moveName)));
+
     // Self-Destruct and Explosion (real imported rows, DamageCategory.SelfDestruct) damage the foe and
     // faint the user — Explosion is the higher-power sibling sharing the same category.
     [Theory]

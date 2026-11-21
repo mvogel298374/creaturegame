@@ -317,8 +317,12 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
   `wEnemyMoveListIndex` (`effects.asm:1262-1267`), which keeps that slot's PP. `AttackAction.ExecuteInner` passes the
   outermost calling slot down, and every slot holding a copy reverts on a switch and at battle end. Each slot Mimic
   writes keeps its copy: a later Mimic never restores an earlier slot (`effects.asm:1262-1267` writes only the one slot).
-- Not modelled yet: Metronome can call Mirror Move in pokered (`core.asm:5013-5035` rejects only Metronome and
-  Struggle); ours never calls it (`TODO.md` §3.1, "Metronome can call Mirror Move").
+- Metronome can call Mirror Move (`core.asm:5013-5035` rejects only Metronome and Struggle), so Metronome → Mirror Move
+  → Mimic writes the copy into the Metronome slot. Seam: `GENERATION_SEAMS.md` §2, What Metronome can call.
+- Not modelled: a transformed user gains party PP on each Metronome or Mirror Move call. pokered's `IncrementMovePP`
+  always raises the party slot's PP (`core.asm:5043-5066`), while `DecrementPP` returns early for a transformed user
+  before touching it (`engine/battle/decrement_pp.asm:21-22`, party PP at `:32`). Our Transform keeps its own moveset,
+  so neither runs.
 - Gen 2 reportedly copies the target's last-used move instead (unverified against pokecrystal).
 
 #### Status Quirks

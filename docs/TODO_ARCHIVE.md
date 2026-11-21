@@ -103,6 +103,31 @@ REST call routed to the machine that never saw `/start`; the workflow pins `flyc
 
 ---
 
+## §3.1 Metronome can call Mirror Move, as in Gen 1 ✅ DONE (2026-11-21)
+
+*(found 2026-11-21 by the Disable / Mimic verify slice; source-confirmed) — S.* pokered's `MetronomePickMove` (`core.asm:5013-5035`) rejects only 0,
+Metronome and Struggle; `AttackAction` also rejected Mirror Move (`m.Name != "mirror-move"`), inline, pinned by `MetronomeTests.Metronome_NeverCallsMirrorMove`
+with no source. Gen 2 rejects a longer list, so the list is generation-variable and belongs on a seam. **DoR:** ✅ Ready (2026-11-21, user confirmed the drafts).
+
+- **Acceptance:** Metronome can call any move but Metronome and Struggle; a called Mirror Move copies the foe's last move, or fails as Mirror Move does.
+- **Design:** the inline filter moves to `IBattleRules.MetronomeCanCall(Attack)`.
+- **Gen surface:** `MetronomeCanCall` (Gen 1: anything but Metronome and Struggle; Gen 2's list, unverified, differs). **Gen 1 source:** `core.asm:5013-5035`.
+  **Data vs runtime:** runtime only. **Dependencies:** none; the called-Mimic slot write shipped the same day.
+- **Quirk the tests assert:** a forced roll calls Mirror Move and it copies the foe's last move; Metronome and Struggle stay excluded; Metronome → Mirror
+  Move → Mimic writes the copy into the Metronome slot (the outermost calling slot, deferred here from the called-Mimic item, user ruling 2026-11-21).
+- **As built (2026-11-21):** `IBattleRules.MetronomeCanCall(Attack)` (Gen 1 `Gen1BattleRules`: anything but Metronome and Struggle); `AttackAction`'s Metronome
+  branch filters its pool through it and the inline Mirror Move exclusion is gone; `DelegatingBattleRules` passes it through. Tests: `MetronomeTests` — a full
+  battle where a called Mirror Move fails on turn 1 (the foe hasn't moved) then copies the foe's Tackle; `MetronomeNeverCallsStruggle` (a Struggle-only pool,
+  so it cannot recurse); `TheSeamDecidesWhatMetronomeCanCall`. `UniqueMoveEffectContractTests` — a real-data Theory pinning `MetronomeCanCall` for
+  metronome / struggle (false) and mirror-move / tackle (true). `MimicContractTests` — Metronome → Mirror Move → Mimic writes into the Metronome slot.
+  Sabotage runs confirmed each can fail.
+- **Reviews and rulings (2026-11-21):** `requirements-review`: two pre-existing Mirror Move findings merged into open entries ("The MIRROR MOVE failed!" line into
+  "Binding and miss lines follow pokered's text"; a failed Mirror Move as the user's last move into "Counter keys on the foe's selected move"); a not-modelled
+  transformed-PP note added to `GEN_DIFFERENCES.md`. `pr-review`: PR-READY; the real-data Theory and the unused `using` done; the inline Struggle check in
+  Mirror Move (`AttackAction.cs:160`) filed under "Audit the inline battle rules".
+
+---
+
 ## §3.1 A Mimic called by Metronome or Mirror Move copies into the calling slot ✅ DONE (2026-11-21)
 
 *(found 2026-11-20 by `requirements-review`, Mimic pick item; source-confirmed) — S–M.* `AttackAction.ExecuteInner` ran the called move on a fresh

@@ -521,6 +521,9 @@ public interface IBattleRules
     /// <summary>Whether Mimic can copy this move from the target. See GENERATION_SEAMS.md §2.</summary>
     bool MimicCanCopy(Attack move);
 
+    /// <summary>Whether Metronome may call this move. See GENERATION_SEAMS.md §2.</summary>
+    bool MetronomeCanCall(Attack move);
+
     // ── Type-based immunities ────────────────────────────────────────────────────
 
     /// <summary>Whether the target's types let it receive the status from a move of this type. See GENERATION_SEAMS.md §2.</summary>

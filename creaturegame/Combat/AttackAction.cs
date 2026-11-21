@@ -143,13 +143,7 @@ public class AttackAction : IBattleAction
         // Metronome: run a random move in full; only Metronome's own slot pays PP.
         if (!usingStruggle && attackToUse.Effect == MoveEffect.Metronome && _movePool.Count > 0)
         {
-            var eligible = _movePool
-                .Where(m =>
-                    m.Effect != MoveEffect.Metronome
-                    && m.Name != "mirror-move"
-                    && m.Name != "struggle"
-                )
-                .ToList();
+            var eligible = _movePool.Where(_rules.MetronomeCanCall).ToList();
 
             if (eligible.Count > 0)
                 await ExecuteInner(eligible[_rng.Next(eligible.Count)]);

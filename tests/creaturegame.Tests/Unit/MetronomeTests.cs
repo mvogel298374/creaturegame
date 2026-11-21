@@ -1,7 +1,6 @@
 using creaturegame.Attacks;
 using creaturegame.Combat;
 using creaturegame.Creatures;
-using creaturegame.DB;
 using creaturegame.Tests.TestSupport;
 
 namespace creaturegame.Tests.Unit;
@@ -153,105 +152,128 @@ public class MetronomeTests
         }
     }
 
-    [Fact]
-    public async Task Metronome_NeverCallsMirrorMove()
-    {
-        var attacker = new Creature("Attacker") { Level = 50 };
-        attacker.CalculateStats();
-        var defender = new Creature("Defender") { Level = 50 };
-        defender.CalculateStats();
-
-        var metronome = new Attack
+    private static Attack MetronomeMove() =>
+        new()
         {
-            Id = 1,
+            Id = 118,
             Name = "metronome",
-            BaseDamage = 0,
             Accuracy = 100,
+            PowerPointsMax = 10,
             Effect = MoveEffect.Metronome,
         };
-        var mirrorMove = new Attack
+
+    private static Attack TackleMove() =>
+        new()
         {
-            Id = 2,
-            Name = "mirror-move",
-            BaseDamage = 0,
+            Id = 33,
+            Name = "tackle",
+            BaseDamage = 40,
             Accuracy = 100,
-        };
-        var tackle = new Attack
-        {
-            Id = 3,
-            Name = "Tackle",
-            BaseDamage = 1,
-            Accuracy = 100,
+            PowerPointsMax = 35,
             AttackType = AttackType.Physical,
             DamageType = DamageType.Normal,
         };
-        attacker.AddAttack(metronome);
 
-        var pool = new List<Attack> { metronome, mirrorMove, tackle };
-
-        for (int i = 0; i < 50; i++)
+    [Fact]
+    public async Task MetronomeCanCallMirrorMoveWhichFailsBeforeTheFoeMovesThenCopiesItsLastMove()
+    {
+        var player = TestCreatures.Make("Player", hp: 2000, attack: 200, speed: 200);
+        player.AddAttack(MetronomeMove());
+        var enemy = TestCreatures.Make("Enemy", hp: 150, defense: 20, speed: 1);
+        enemy.AddAttack(TackleMove());
+        var mirrorMove = new Attack
         {
-            defender.Attributes.HP = defender.Attributes.MaxHP;
-            var recorder = new RecordingEmitter();
-            var action = new AttackAction(
-                attacker,
-                defender,
-                attacker.MoveSet[0],
-                new Gen1TypeChart(),
-                rules: AlwaysHitRules.Instance,
-                emitter: recorder,
-                movePool: pool
-            );
-            await action.ExecuteAsync();
+            Id = 119,
+            Name = "mirror-move",
+            Accuracy = 100,
+            PowerPointsMax = 20,
+            Effect = MoveEffect.MirrorMove,
+        };
 
-            var calledMoves = recorder.Of<MoveUsed>().Skip(1).Select(e => e.MoveName).ToList();
-            Assert.DoesNotContain("mirror-move", calledMoves, StringComparer.OrdinalIgnoreCase);
-        }
+        var emitter = await FullBattle.Fight(
+            player,
+            enemy,
+            new ScriptedInput("metronome"),
+            new ScriptedInput("tackle"),
+            movePool: [mirrorMove]
+        );
+
+        var events = emitter.Events.ToList();
+        int failed = events.FindIndex(e =>
+            e is MoveMissed { AttackerName: "Player", MoveName: "mirror-move" }
+        );
+        int copied = events.FindIndex(e =>
+            e is MoveUsed { AttackerName: "Player", MoveName: "tackle" }
+        );
+        Assert.True(failed >= 0, "turn 1: the called Mirror Move fails, the foe has not moved yet");
+        Assert.True(copied > failed, "turn 2: the called Mirror Move copies the foe's Tackle");
+        Assert.Equal(
+            ["metronome", "mirror-move", "metronome", "mirror-move", "tackle"],
+            emitter
+                .Of<MoveUsed>()
+                .Where(e => e.AttackerName == "Player")
+                .Select(e => e.MoveName)
+                .Take(5)
+        );
+        Assert.False(enemy.IsAlive());
     }
 
     [Fact]
-    public async Task Metronome_WithNoEligibleMoves_DoesNothing()
+    public async Task MetronomeNeverCallsStruggle()
     {
-        var attacker = new Creature("Attacker") { Level = 50 };
-        attacker.CalculateStats();
-        var defender = new Creature("Defender") { Level = 50 };
-        defender.CalculateStats();
+        var attacker = TestCreatures.Make("Attacker");
+        var defender = TestCreatures.Make("Defender");
         int fullHp = defender.Attributes.HP;
-
-        var metronome = new Attack
+        attacker.AddAttack(MetronomeMove());
+        var struggle = new Attack
         {
-            Id = 1,
-            Name = "metronome",
-            BaseDamage = 0,
-            Accuracy = 100,
-            Effect = MoveEffect.Metronome,
-        };
-        var mirrorMove = new Attack
-        {
-            Id = 2,
-            Name = "mirror-move",
-            BaseDamage = 0,
+            Id = 165,
+            Name = "struggle",
+            BaseDamage = 50,
             Accuracy = 100,
         };
-        attacker.AddAttack(metronome);
-
-        // Pool contains only excluded moves → eligible list is empty → no inner action
-        var pool = new List<Attack> { metronome, mirrorMove };
         var recorder = new RecordingEmitter();
 
-        var action = new AttackAction(
+        await new AttackAction(
             attacker,
             defender,
             attacker.MoveSet[0],
             new Gen1TypeChart(),
             rules: AlwaysHitRules.Instance,
             emitter: recorder,
-            movePool: pool
-        );
-        await action.ExecuteAsync();
+            movePool: [struggle]
+        ).ExecuteAsync();
 
         Assert.Equal(fullHp, defender.Attributes.HP);
-        Assert.Single(recorder.Of<MoveUsed>()); // only "metronome" itself, no inner move
+        Assert.Equal("metronome", Assert.Single(recorder.Of<MoveUsed>()).MoveName);
+    }
+
+    [Fact]
+    public async Task TheSeamDecidesWhatMetronomeCanCall()
+    {
+        var attacker = TestCreatures.Make("Attacker");
+        var defender = TestCreatures.Make("Defender");
+        int fullHp = defender.Attributes.HP;
+        attacker.AddAttack(MetronomeMove());
+        var recorder = new RecordingEmitter();
+
+        await new AttackAction(
+            attacker,
+            defender,
+            attacker.MoveSet[0],
+            new Gen1TypeChart(),
+            rules: new CallsNothingRules(),
+            emitter: recorder,
+            movePool: [TackleMove()]
+        ).ExecuteAsync();
+
+        Assert.Equal(fullHp, defender.Attributes.HP);
+        Assert.Equal("metronome", Assert.Single(recorder.Of<MoveUsed>()).MoveName);
+    }
+
+    private sealed class CallsNothingRules : DelegatingBattleRules
+    {
+        public override bool MetronomeCanCall(Attack move) => false;
     }
 
     [Fact]

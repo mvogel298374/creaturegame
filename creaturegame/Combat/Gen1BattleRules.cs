@@ -242,6 +242,10 @@ public sealed class Gen1BattleRules : IBattleRules
     // effects.asm:1224-1234 retries only an empty slot, so any move is copyable, Mimic included.
     public bool MimicCanCopy(Attack move) => true;
 
+    // pokered core.asm:5013-5035 MetronomePickMove rerolls only Metronome and Struggle.
+    public bool MetronomeCanCall(Attack move) =>
+        move.Effect != MoveEffect.Metronome && move.Name != "struggle";
+
     // ── Type-based immunities ────────────────────────────────────────────────────
 
     // Narrower than pokered's same-type rule (GENERATION_SEAMS.md §2, Status by type).
