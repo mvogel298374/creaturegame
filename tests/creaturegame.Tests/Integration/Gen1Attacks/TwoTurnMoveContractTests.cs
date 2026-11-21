@@ -408,7 +408,7 @@ public class TwoTurnMoveContractTests(MovesFixture moves) : Gen1MoveContract(mov
         Assert.False(result.Has<MimicLearned>());
         Assert.False(result.Has<MimicChoiceOffered>());
         Assert.False(result.Has<ConvertedType>());
-        Assert.Null(result.Attacker.Battle.MimicWrapper);
+        Assert.Empty(result.Attacker.Battle.MimicSwaps);
         Assert.Equal(DamageType.Normal, result.Attacker.Type1);
     }
 

@@ -248,15 +248,20 @@ public class Creature
     public bool CanSelect(PokemonAttack move) =>
         MoveSet.Contains(move) && move.PowerPointsCurrent > 0 && move != Battle.DisabledMove;
 
-    /// <summary>Undoes a transient Mimic move-swap. Safe to call when no Mimic is active. Reverts before
-    /// any reset, not just at battle end — STATE_MODEL.md §2.</summary>
-    public void RestoreMimickedMove()
+    /// <summary>Remembers a slot's own move before Mimic writes a copy into it; a slot keeps its first original.</summary>
+    internal void RecordMimicSwap(PokemonAttack slot)
     {
-        if (Battle.MimicWrapper is null || Battle.MimicOriginalBase is null)
-            return;
-        Battle.MimicWrapper.Base = Battle.MimicOriginalBase;
-        Battle.MimicWrapper = null;
-        Battle.MimicOriginalBase = null;
+        if (Battle.MimicSwaps.All(s => s.Slot != slot))
+            Battle.MimicSwaps.Add(new MimicSwap(slot, slot.Base));
+    }
+
+    /// <summary>Undoes every transient Mimic copy. Safe to call when none is active. Reverts before
+    /// any reset, not just at battle end — STATE_MODEL.md §2.</summary>
+    public void RestoreMimickedMoves()
+    {
+        foreach (var swap in Battle.MimicSwaps)
+            swap.Slot.Base = swap.Original;
+        Battle.MimicSwaps.Clear();
     }
 
     /// <summary>
@@ -311,7 +316,7 @@ public class Creature
     /// </summary>
     public void ResetBattleState()
     {
-        RestoreMimickedMove();
+        RestoreMimickedMoves();
         RestoreOriginalIdentity();
         Battle = new BattleState();
     }

@@ -14,7 +14,8 @@ public static class FullBattle
         ScriptedInput enemyInput,
         IBattleRules? rules = null,
         IRandomSource? rng = null,
-        IReadOnlyList<Attack>? movePool = null
+        IReadOnlyList<Attack>? movePool = null,
+        Party? playerParty = null
     )
     {
         var emitter = new RecordingEmitter();
@@ -27,7 +28,8 @@ public static class FullBattle
             rules: rules ?? new ScriptableRules().Deterministic(),
             movePool: movePool,
             emitter: emitter,
-            rng: rng ?? new SeededRandomSource(1)
+            rng: rng ?? new SeededRandomSource(1),
+            playerParty: playerParty
         ).StartFightAsync();
         return emitter;
     }

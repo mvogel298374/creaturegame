@@ -313,7 +313,10 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
 - A target in the air (Fly) or underground (Dig) makes Mimic fail with "But it failed!" (`:1222`, `:1246`, `:1274`).
 - Not modelled: pokered's enemy rolls `BattleRandom & 3` and retries on an empty slot; ours draws once over the filled
   slots. The odds are the same; only the number of RNG draws differs.
-- Not modelled yet: a Mimic called by Metronome or Mirror Move copies into the calling slot (`TODO.md` §3.1).
+- A Mimic called by Metronome or Mirror Move writes its copy into the calling slot, the one at `wPlayerMoveListIndex` /
+  `wEnemyMoveListIndex` (`effects.asm:1262-1267`), which keeps that slot's PP. `AttackAction.ExecuteInner` passes the
+  outermost calling slot down, and every slot holding a copy reverts on a switch and at battle end. Each slot Mimic
+  writes keeps its copy: a later Mimic never restores an earlier slot (`effects.asm:1262-1267` writes only the one slot).
 - Not modelled yet: Metronome can call Mirror Move in pokered (`core.asm:5013-5035` rejects only Metronome and
   Struggle); ours never calls it (`TODO.md` §3.1, "Metronome can call Mirror Move").
 - Gen 2 reportedly copies the target's last-used move instead (unverified against pokecrystal).

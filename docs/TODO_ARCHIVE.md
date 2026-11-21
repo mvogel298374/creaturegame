@@ -103,6 +103,39 @@ REST call routed to the machine that never saw `/start`; the workflow pins `flyc
 
 ---
 
+## §3.1 A Mimic called by Metronome or Mirror Move copies into the calling slot ✅ DONE (2026-11-21)
+
+*(found 2026-11-20 by `requirements-review`, Mimic pick item; source-confirmed) — S–M.* `AttackAction.ExecuteInner` ran the called move on a fresh
+`PokemonAttack`, so a called Mimic's copy landed on that temporary wrapper and was gone at once (the picker still opened and "learned X" printed).
+pokered writes the copied move into the slot at `wPlayerMoveListIndex` / `wEnemyMoveListIndex` (`effects.asm:1236-1267`), the Metronome or Mirror Move
+slot, which keeps it for the battle. Since 2026-11-20 `MimicEffect` had left an earlier real Mimic copy alone in this case. Verify slice 2026-11-21:
+confirmed against current pokered (`effects.asm:1204-1267`, the write at `.playerTurn` `:1262-1267`); the slot keeps its own PP, and the copy reverts on
+switch-out and at battle end, as our reverts do. **DoR:** ✅ Ready (2026-11-21, user approved the design pass and the drafts).
+
+- **Acceptance:** a called Mimic's copy replaces the calling Metronome / Mirror Move slot for the rest of the battle, keeping that slot's PP, and
+  reverts with any other Mimic copy on switch-out and at battle end.
+- **Design (approved 2026-11-21):** `ExecuteInner` passes the calling slot down, nested calls keeping the outermost (Metronome → Mirror Move → Mimic
+  lands in the Metronome slot); `MimicEffect` writes into that slot; `BattleState`'s single `MimicWrapper` / `MimicOriginalBase` pair becomes one
+  record per swapped slot, all reverted together.
+- **Gen surface:** none (the slot write has one shape; whether Mimic can be called at all is the Metronome call list, "Metronome can call Mirror
+  Move"). Gen 2's Mimic is unverified. **Gen 1 source:** the cites above. **Data vs runtime:** runtime only. **Dependencies:** none.
+- **Quirk the tests assert:** full battles: Metronome calls Mimic and the Metronome slot then uses the copy; a real Mimic copy and a called one
+  coexist; every swapped slot reverts on switch-out and at battle end.
+- **As built (2026-11-21):** `AttackAction` has a private init-only `CallingSlot`, set only by `ExecuteInner` (`CallingSlot ?? _selectedMove`, so
+  nested calls keep the outermost); the effect context gains `MoveSlot` (`SelectedMove` stays the executing wrapper, which Binding needs).
+  `MimicEffect` writes the copy into `MoveSlot` after `Creature.RecordMimicSwap(slot)`, which records each written slot's first original (no MoveSet
+  guard, so no copy can escape the revert); the old mid-battle restore of an earlier copy is gone (pokered writes only the one slot).
+  `BattleState.MimicWrapper` / `MimicOriginalBase` became `List<MimicSwap> MimicSwaps`; `Creature.RestoreMimickedMove` became `RestoreMimickedMoves`.
+  Tests in `MimicContractTests`: Metronome → Mimic into the Metronome slot beside an earlier copy (used, PP −2); Mirror Move → Mimic into its slot
+  (used, PP −2); the foe's Mirror Move → Mimic; a slot copied twice reverts to its first move; every copy reverts across a switch and at battle end.
+  `FullBattle.Fight` gained `playerParty`. This commit also carries the CRLF → LF normalization of five files (`creaturegame.sln`, `Attack.cs`,
+  `Attributes.cs`, `Creature.cs`, `creaturegame.csproj`), merged in by user ruling 2026-11-21 after a separate commit failed in the pre-commit hook
+  (the §7.1 "Pre-commit hook: staged snapshot" gap).
+- **Rulings (2026-11-21):** the "two real Mimic copies coexist" test is WAIVED (unreachable: `AddAttack` refuses duplicate ids, so two Mimic slots
+  cannot exist; the real + called case is tested). The nested Metronome → Mirror Move → Mimic test is DEFERRED to "Metronome can call Mirror Move".
+
+---
+
 ## §3.1 The "is disabled!" check matches the move, not the slot ✅ DONE (2026-11-21)
 
 *(S; found 2026-11-09 by `opus-engineer`, Fly and Dig item; source-confirmed by the verify slice 2026-11-21).* pokered blocks Disable two ways: the
@@ -218,8 +251,8 @@ excluded Mimic (`MoveEffects.cs:377-384`), refused a second Mimic once one copie
 7. **Dependencies:** none. Whether Mimic rolls accuracy at all stays with *Other `ResidualEffects1` moves*.
 
 **Shipped (2026-11-20):** as designed. A Mimic called by Metronome or Mirror Move still copies onto a temporary
-wrapper (the copy vanishes) but no longer disturbs an earlier real copy; the faithful fix is the open §3.1 entry
-*A called Mimic copies into the calling slot*. `Other ResidualEffects1 moves` gained a Mimic cite and stays open.
+wrapper (the copy vanishes) but no longer disturbs an earlier real copy; the faithful fix shipped 2026-11-21 (§3.1
+*A Mimic called by Metronome or Mirror Move copies into the calling slot*, above). `Other ResidualEffects1 moves` gained a Mimic cite and stays open.
 
 ---
 

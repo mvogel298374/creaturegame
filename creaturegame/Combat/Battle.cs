@@ -324,7 +324,7 @@ public class Battle
                     // Award Stat-Exp before the level-up loop so a level gained this battle already reflects it.
                     GainFighterStatExp(PlayerCreature, statExpDivisor, benchBonusOn);
                     // Revert a Transform/Mimic copy before learning mutates the PERMANENT MoveSet.
-                    PlayerCreature.RestoreMimickedMove();
+                    PlayerCreature.RestoreMimickedMoves();
                     PlayerCreature.RestoreOriginalIdentity();
                     anyLevelled = await RunLevelUpLoopAsync(PlayerCreature, onBench: false);
                 }
@@ -376,8 +376,8 @@ public class Battle
         // Mimic and Transform/Conversion all revert when the battle ends (Gen 1 also reverts on
         // switch-out) — undo the transient move-swap and any copied identity so neither leaks into the
         // permanent half (MoveSet, types, stats) of a reused Creature.
-        PlayerCreature.RestoreMimickedMove();
-        EnemyCreature.RestoreMimickedMove();
+        PlayerCreature.RestoreMimickedMoves();
+        EnemyCreature.RestoreMimickedMoves();
         PlayerCreature.RestoreOriginalIdentity();
         EnemyCreature.RestoreOriginalIdentity();
 
@@ -713,7 +713,7 @@ public class Battle
     /// reaches whichever creature is active then). Shared by the forced and voluntary switch-out paths.</summary>
     private void RestoreOutgoing()
     {
-        PlayerCreature.RestoreMimickedMove();
+        PlayerCreature.RestoreMimickedMoves();
         PlayerCreature.RestoreOriginalIdentity();
     }
 

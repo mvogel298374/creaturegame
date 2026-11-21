@@ -223,8 +223,8 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - A target in the air (Fly) or underground (Dig), a failed hit test or nothing to copy prints "But it failed!" and opens
   no picker.
 - A refresh while the picker is open re-opens it.
-- A Mimic called by Metronome or Mirror Move copies onto a temporary move that vanishes; it leaves an earlier real copy
-  alone.
+- A Mimic called by Metronome or Mirror Move copies into the Metronome or Mirror Move slot, which keeps its PP and the
+  copy until the user switches out or the battle ends; an earlier real Mimic copy stays as it is.
 - Design detail → `GENERATION_SEAMS.md` §2 (*Who picks what Mimic copies*), `GEN_DIFFERENCES.md` → *Mimic*, `RECONNECT_RESILIENCE.md` R1d-a.  History → `TODO_ARCHIVE.md` → *The player chooses what Mimic copies*.
 
 ### Foe move scoring and chosen-move validation

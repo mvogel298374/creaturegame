@@ -127,7 +127,7 @@ public class MimicContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 
         // ...and the swap reverted — the permanent move slot is Mimic again, not Tackle.
         Assert.Equal("mimic", player.MoveSet[0].Base.Name);
-        Assert.Null(player.Battle.MimicWrapper);
+        Assert.Empty(player.Battle.MimicSwaps);
     }
 
     [Fact]
@@ -252,11 +252,11 @@ public class MimicContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         Assert.False(emitter.Of<MoveFailed>().Any());
         Assert.False(enemy.IsAlive());
         Assert.Equal("mimic", player.MoveSet[0].Base.Name);
-        Assert.Null(player.Battle.MimicWrapper);
+        Assert.Empty(player.Battle.MimicSwaps);
     }
 
     [Fact]
-    public async Task AMimicCalledByMetronomeLeavesTheEarlierCopyInPlace()
+    public async Task AMimicCalledByMetronomeCopiesIntoTheMetronomeSlotBesideTheEarlierCopy()
     {
         var player = Fast("Player");
         player.AddAttack(Move("mimic"));
@@ -268,7 +268,7 @@ public class MimicContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         var emitter = await FullBattle.Fight(
             player,
             enemy,
-            new ScriptedInput("mimic", "metronome", "tackle").PicksMimic(1, 0),
+            new ScriptedInput("mimic", "metronome", "growl", "tackle").PicksMimic(1, 0),
             new ScriptedInput("growl"),
             movePool: [Move("mimic")]
         );
@@ -280,10 +280,148 @@ public class MimicContractTests(MovesFixture moves) : Gen1MoveContract(moves)
                 .Where(e => e.CreatureName == "Player")
                 .Select(e => e.MoveName)
         );
+        Assert.Equal(
+            ["mimic", "metronome", "mimic", "growl", "tackle"],
+            emitter.Of<MoveUsed>().Where(e => e.AttackerName == "Player").Select(e => e.MoveName)
+        );
+        Assert.False(enemy.IsAlive());
+        Assert.Equal(["mimic", "metronome"], player.MoveSet.Select(m => m.Base.Name));
+        Assert.Equal(Move("metronome").PowerPointsMax - 2, player.MoveSet[1].PowerPointsCurrent);
+        Assert.Empty(player.Battle.MimicSwaps);
+    }
+
+    [Fact]
+    public async Task AMirrorMovedMimicCopiesIntoTheMirrorMoveSlot()
+    {
+        var player = TestCreatures.Make("Player", hp: 2000, attack: 200, speed: 1);
+        player.AddAttack(Move("mirror-move"));
+        var enemy = TestCreatures.Make("Enemy", hp: 40, defense: 20, speed: 200);
+        enemy.AddAttack(Move("mimic"));
+        enemy.AddAttack(Move("tackle"));
+
+        var emitter = await FullBattle.Fight(
+            player,
+            enemy,
+            new ScriptedInput("mirror-move", "tackle").PicksMimic(1),
+            new ScriptedInput("mimic", "tackle"),
+            rng: new LowestRollSource()
+        );
+
+        Assert.Equal(
+            "tackle",
+            Assert.Single(emitter.Of<MimicLearned>(), e => e.CreatureName == "Player").MoveName
+        );
+        Assert.Equal(
+            ["mirror-move", "mimic", "tackle"],
+            emitter
+                .Of<MoveUsed>()
+                .Where(e => e.AttackerName == "Player")
+                .Select(e => e.MoveName)
+                .Take(3)
+        );
+        Assert.False(enemy.IsAlive());
+        Assert.Equal("mirror-move", player.MoveSet[0].Base.Name);
+        Assert.Equal(Move("mirror-move").PowerPointsMax - 2, player.MoveSet[0].PowerPointsCurrent);
+    }
+
+    [Fact]
+    public async Task TheFoesMirrorMovedMimicCopiesIntoItsMirrorMoveSlot()
+    {
+        var player = Fast("Player");
+        player.AddAttack(Move("mimic"));
+        player.AddAttack(Move("growl"));
+        player.AddAttack(Move("tackle"));
+        var enemy = SlowAndFrail("Enemy");
+        enemy.AddAttack(Move("mirror-move"));
+
+        var emitter = await FullBattle.Fight(
+            player,
+            enemy,
+            new ScriptedInput("mimic", "growl", "tackle").PicksMimic(0),
+            new ScriptedInput("mirror-move", "tackle"),
+            rng: new HighestRollSource()
+        );
+
+        Assert.Equal(
+            "tackle",
+            Assert.Single(emitter.Of<MimicLearned>(), e => e.CreatureName == "Enemy").MoveName
+        );
+        Assert.Equal(
+            ["mirror-move", "mimic", "tackle"],
+            emitter.Of<MoveUsed>().Where(e => e.AttackerName == "Enemy").Select(e => e.MoveName)
+        );
+        Assert.False(enemy.IsAlive());
+        Assert.Equal("mirror-move", enemy.MoveSet[0].Base.Name);
+        Assert.Equal(Move("mirror-move").PowerPointsMax - 2, enemy.MoveSet[0].PowerPointsCurrent);
+    }
+
+    [Fact]
+    public async Task ASlotCopiedTwiceRevertsToItsFirstMove()
+    {
+        var player = Fast("Player");
+        player.AddAttack(Move("mimic"));
+        var enemy = SlowAndFrail("Enemy");
+        enemy.AddAttack(Move("metronome"));
+        enemy.AddAttack(Move("tackle"));
+
+        var emitter = await FullBattle.Fight(
+            player,
+            enemy,
+            new ScriptedInput("mimic", "metronome", "tackle").PicksMimic(0, 1),
+            new ScriptedInput("tackle"),
+            movePool: [Move("mimic")]
+        );
+
+        Assert.Equal(
+            ["metronome", "tackle"],
+            emitter
+                .Of<MimicLearned>()
+                .Where(e => e.CreatureName == "Player")
+                .Select(e => e.MoveName)
+        );
+        Assert.Equal(
+            ["mimic", "metronome", "mimic", "tackle"],
+            emitter.Of<MoveUsed>().Where(e => e.AttackerName == "Player").Select(e => e.MoveName)
+        );
         Assert.False(enemy.IsAlive());
         Assert.Equal("mimic", player.MoveSet[0].Base.Name);
-        Assert.Equal("metronome", player.MoveSet[1].Base.Name);
-        Assert.Null(player.Battle.MimicWrapper);
+        Assert.Empty(player.Battle.MimicSwaps);
+    }
+
+    [Fact]
+    public async Task EveryMimicCopyRevertsAcrossASwitch()
+    {
+        var lead = Fast("Lead");
+        lead.AddAttack(Move("mimic"));
+        lead.AddAttack(Move("metronome"));
+        lead.AddAttack(Move("tackle"));
+        var bench = TestCreatures.Make("Bench", hp: 2000, speed: 200);
+        bench.AddAttack(Move("tackle"));
+        var party = new Party(lead);
+        party.Add(bench);
+        var enemy = TestCreatures.Make("Enemy", hp: 200, defense: 20, speed: 1);
+        enemy.AddAttack(Move("growl"));
+        enemy.AddAttack(Move("leer"));
+        var playerInput = new ScriptedInput("mimic", "metronome", "mimic", "metronome", "tackle")
+            .PicksMimic(0, 1, 0, 1)
+            .TurnPlan(null, null, 1, 0);
+
+        var emitter = await FullBattle.Fight(
+            lead,
+            enemy,
+            playerInput,
+            new ScriptedInput("growl"),
+            movePool: [Move("mimic")],
+            playerParty: party
+        );
+
+        Assert.Equal(
+            ["growl", "leer", "growl", "leer"],
+            emitter.Of<MimicLearned>().Where(e => e.CreatureName == "Lead").Select(e => e.MoveName)
+        );
+        Assert.False(enemy.IsAlive());
+        Assert.Equal(["mimic", "metronome", "tackle"], lead.MoveSet.Select(m => m.Base.Name));
+        Assert.Empty(lead.Battle.MimicSwaps);
     }
 
     [Fact]
@@ -306,7 +444,7 @@ public class MimicContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         Assert.Equal(2, emitter.Of<MimicLearned>().Count(e => e.CreatureName == "Player"));
         Assert.False(enemy.IsAlive());
         Assert.Equal(["mimic", "transform"], player.MoveSet.Select(m => m.Base.Name));
-        Assert.Null(player.Battle.MimicWrapper);
+        Assert.Empty(player.Battle.MimicSwaps);
     }
 
     [Theory]

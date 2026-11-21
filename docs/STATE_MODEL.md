@@ -54,6 +54,7 @@ Here is every field, what it represents in Gen 1 terms, and why it's transient.
 | `ChargingMove` | `PokemonAttack?` | *Which* move is being charged, so the release turn knows what to fire without re-asking the player. | Pairs with `IsTwoTurnCharging`. |
 | `SemiInvulnerability` | `SemiInvulnerability` (`None`, `Flying`, `Underground`) | Whether the creature is **out of reach** after a Fly or Dig charge turn (pokered's `INVULNERABLE` bit; Gen 2 splits it, hence three values). Set by `TwoTurnMechanic` from `IBattleRules.ChargeGrantsSemiInvulnerability`; read by `AttackAction.Connects` through `HitOnSemiInvulnerable`. Cleared by any charge move's release and by the lost turns `LostTurnEndsSemiInvulnerability` names (Gen 1: a confusion self-hit). **Not** cleared with `IsTwoTurnCharging` by full paralysis or "is disabled!", the Gen 1 glitch, and not by Haze. Rules: `GENERATION_SEAMS.md` §2, Fly and Dig out of reach. | Volatile: the per-battle reset and a send-in (`Battle.BringInMember` resets the incoming creature) clear it, so a creature that leaves the field and comes back is within reach. |
 | `DisabledMove` / `DisabledMoveId` / `DisableTurnsRemaining` | `PokemonAttack?` / `int` / `int` | **Disable**: the locked slot, the move number it held when locked (set with the slot, as pokered's `wPlayerDisabledMove` slot nibble and `wPlayerDisabledMoveNumber`), and the attempts left. Selection (the menu, `Creature.CanSelect`, the AI) skips the slot; the pre-move "is disabled!" check matches the number under `IBattleRules.DisabledMoveCheckMatchesMoveId`, so a Mimic duplicate or a called move with that number is stopped too. Rules: `GENERATION_SEAMS.md` §2, Pre-move checks. | Volatile: Haze, the per-battle reset and a send-in clear it. |
+| `MimicSwaps` | `List<MimicSwap>` (slot, original move) | **Mimic**: each move slot whose `Base` now holds a copied move, with the move it held first. Mimic writes into the slot the user picked this turn, which is the Metronome or Mirror Move slot when one of those called it (`MoveEffectContext.MoveSlot`, as pokered writes at `wPlayerMoveListIndex`). The copy changes the permanent `MoveSet` slot in place, so `Creature.RestoreMimickedMoves` puts every original back. Rules: `GEN_DIFFERENCES.md`, Mimic. | Reverted before any reset (the switch, the per-battle reset, the level-up at battle end); Haze leaves it. |
 
 ### ⚠️ Important nuance: status persistence
 
@@ -114,7 +115,7 @@ the target's Sleep/Freeze also sets `BattleState.HazeSuppressedStatus`, so a fas
 the freshly-woken target act that same turn (pokered marks the woken target's already-selected move invalid
 rather than letting it through) — see `StatusResolver.CanAct`.
 
-**Mimic/Transform identity reverts before any reset, not just at battle end (`RestoreMimickedMove` /
+**Mimic/Transform identity reverts before any reset, not just at battle end (`RestoreMimickedMoves` /
 `RestoreOriginalIdentity`).** Both mutate the *permanent* half of `Creature` (`MoveSet`, types, stats,
 `SpeciesId`) rather than `BattleState`, so a battle-start `ResetBattleState()` calls them first — otherwise a
 copied moveset or borrowed identity from a previous fight would leak into the next one. Haze deliberately does

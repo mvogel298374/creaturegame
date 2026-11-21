@@ -36,6 +36,9 @@ public class AttackAction : IBattleAction
     // (out of PP, or its only move is Disabled), bypassing IBattleInput.
     private readonly PokemonAttack? _selectedMove;
 
+    // The outermost Metronome / Mirror Move slot that called this move, for Mimic (GEN_DIFFERENCES.md, Mimic).
+    private PokemonAttack? CallingSlot { get; init; }
+
     internal PokemonAttack? SelectedMove => _selectedMove;
 
     public AttackAction(
@@ -137,8 +140,7 @@ public class AttackAction : IBattleAction
         if (usingStruggle || !_rules.SkipsDamageCalculation(attackToUse))
             _lastDamage.Value = 0;
 
-        // Metronome: pick a random move (excluding Metronome and Mirror Move) and execute it in full.
-        // Gen 1: the called move's PP is not consumed (temporary wrapper, no effect on creature's moveset).
+        // Metronome: run a random move in full; only Metronome's own slot pays PP.
         if (!usingStruggle && attackToUse.Effect == MoveEffect.Metronome && _movePool.Count > 0)
         {
             var eligible = _movePool
@@ -819,8 +821,7 @@ public class AttackAction : IBattleAction
             BuildRage();
     }
 
-    // Runs another move in full as this turn's action (Metronome / Mirror Move). A fresh AttackAction on a
-    // temporary wrapper leaves the creature's own PP/moveset untouched and records it as the user's last move.
+    // Runs a called move (Metronome / Mirror Move) on a temporary wrapper, so it costs no PP of its own.
     private Task ExecuteInner(Attack move) =>
         new AttackAction(
             Source,
@@ -835,7 +836,10 @@ public class AttackAction : IBattleAction
             _side,
             _lastDamage,
             _input
-        ).ExecuteAsync();
+        )
+        {
+            CallingSlot = CallingSlot ?? _selectedMove,
+        }.ExecuteAsync();
 
     private void AccumulateBideDamage(int dmg)
     {
@@ -1122,6 +1126,7 @@ public class AttackAction : IBattleAction
                 Target = Target,
                 Attack = attack,
                 SelectedMove = _selectedMove,
+                MoveSlot = CallingSlot ?? _selectedMove,
                 Damage = damage,
                 Rules = _rules,
                 Rng = _rng,

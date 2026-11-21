@@ -110,11 +110,8 @@ public sealed class BattleState
     // The last move this creature actually used — Mirror Move copies the opponent's.
     public Attack? LastMoveUsed { get; set; }
 
-    // Mimic (the move): when used, the Mimic slot's Base is swapped to a copied foe move for the rest
-    // of the battle. MimicWrapper is the slot whose Base was swapped and MimicOriginalBase is the move
-    // to put back; Battle restores it at battle end so the swap never leaks into the permanent MoveSet.
-    public PokemonAttack? MimicWrapper { get; set; }
-    public Attack? MimicOriginalBase { get; set; }
+    // Mimic: each slot whose Base holds a copy, with the move to put back (STATE_MODEL.md §2, Mimic).
+    public List<MimicSwap> MimicSwaps { get; } = [];
 
     // Substitute (the move): while > 0, this creature has a decoy that soaks incoming damage from the
     // foe (Gen 1: the user takes nothing until the substitute breaks; overflow damage is lost). Created
@@ -157,3 +154,6 @@ public sealed class IdentitySnapshot
     public int Speed { get; init; }
     public required List<PokemonAttack> MoveSet { get; init; }
 }
+
+/// <summary>A slot Mimic wrote a copy into, and the move it held before.</summary>
+public sealed record MimicSwap(PokemonAttack Slot, Attack Original);

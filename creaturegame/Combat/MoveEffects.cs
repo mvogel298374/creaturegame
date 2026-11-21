@@ -18,11 +18,11 @@ public sealed class MoveEffectContext
     /// <summary>The resolved move (its base data — name, type, …).</summary>
     public required Attack Attack { get; init; }
 
-    /// <summary>
-    /// The selected move wrapper, or null for Struggle. Binding locks the user into re-using it and Mimic
-    /// replaces its base, so they need the wrapper, not just the base data.
-    /// </summary>
+    /// <summary>The executing move's wrapper (temporary for a called move), or null for Struggle; Binding locks the user into it.</summary>
     public PokemonAttack? SelectedMove { get; init; }
+
+    /// <summary>The user's own slot this turn: the selected move, or the Metronome / Mirror Move slot that called it.</summary>
+    public PokemonAttack? MoveSlot { get; init; }
 
     /// <summary>Total damage the attack dealt this turn — gates recoil and the binding trap.</summary>
     public required int Damage { get; init; }
@@ -373,22 +373,15 @@ public sealed class MimicEffect : IMoveEffect
     public void Apply(MoveEffectContext ctx)
     {
         var copyable = Copyable(ctx.Target, ctx.Rules);
-        if (ctx.SelectedMove is null || copyable.Count == 0)
+        if (ctx.MoveSlot is not { } slot || copyable.Count == 0)
         {
             ctx.Emitter?.Emit(new MoveFailed());
             return;
         }
 
         var chosen = copyable[ctx.MimicChoice ?? ctx.Rng.Next(copyable.Count)];
-        var battle = ctx.Source.Battle;
-        bool ownSlot = ctx.Source.MoveSet.Contains(ctx.SelectedMove);
-        if (ownSlot && battle.MimicWrapper != ctx.SelectedMove)
-        {
-            ctx.Source.RestoreMimickedMove();
-            battle.MimicWrapper = ctx.SelectedMove;
-            battle.MimicOriginalBase = ctx.SelectedMove.Base;
-        }
-        ctx.SelectedMove.Base = chosen;
+        ctx.Source.RecordMimicSwap(slot);
+        slot.Base = chosen;
         ctx.Emitter?.Emit(new MimicLearned(ctx.Source.Name, ctx.Source.Id, chosen.Name ?? ""));
     }
 }
