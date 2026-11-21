@@ -103,6 +103,33 @@ REST call routed to the machine that never saw `/start`; the workflow pins `flyc
 
 ---
 
+## §4.5 Escape = B on the prompts that have a negative answer ✅ DONE (2026-11-21)
+
+*(small).* Escape acts as Gen 1's B on the step showing, in the evolution, shop, acquisition, nickname and move-replacement modals. The required
+choices stay blocking. **DoR:** ✅ Ready (2026-11-21; user rulings: learn-move follows pokered, an Escape-only dismiss variant, acquisition walks back one step).
+
+- **Acceptance:** Escape answers as B, once, on the visible step: evolution → CANCEL; shop → Leave; acquisition offer → DECLINE, swap picker → BACK,
+  release confirm → NO, nickname → no nickname (its backdrop click goes, ruled 2026-11-21); move replacement: the forget list opens "Stop learning X?"
+  and sends nothing, and either confirm → NO. A held Escape's auto-repeat is ignored. Escape does nothing on `RouteChoice`, `RewardChoice`,
+  `LeadChoice`, `SwitchIn` and `MimicChoice`. A backdrop click never answers a prompt. Waived 2026-11-21: the learn-move fold of "Delete an older
+  move?" (`FRONTEND_PLAN.md` → Dismiss), Vitest pinning `RouteChoice` (inline in `BattleScreen`), and `pr-review` for this item.
+- **Design:** a new `ModalDismiss` variant `{ onBKey: () => void }` wires Escape through `useEscapeKey` with no backdrop click; `{ onEscape }` stays for
+  overlays that only draw client state, since its backdrop click would let a stray click decline an evolution or leave the shop. The `Modal.tsx`
+  comment is updated to match.
+- **Gen surface:** none; the key map is theme.
+- **Gen 1 source (pokered):** evolution B cancels at once (`engine/movie/evolution.asm:54-55, 142-159`; ignored under `wForceEvolution`, which we don't
+  model); learn move: B on the forget list or at "Delete an older move?" goes to "Abandon learning X?", where B is NO, so B never abandons on its own
+  (`engine/pokemon/learn_move.asm:29, 76-90, 104-110, 146-159, 182-184`); YES/NO menus take B as the second item, NO
+  (`engine/menus/text_box.asm:310-313, 327-329`); the mart's B leaves whatever the cursor is on (`engine/events/pokemart.asm:28-30`). Acquisition is
+  ours; it follows B = NO, one step back per press.
+- **Data vs runtime:** client only. **Dependencies:** none.
+- **Quirk the tests assert:** Vitest, one case per prompt step (`bKey.test.ts`): each step's Escape answer; Escape on the learn-move list opens the
+  confirm and sends nothing; Escape on a required prompt and a backdrop click send nothing.
+- **Shipped:** `Modal.tsx` `ModalDismiss { onBKey }` with the pure `dismissHandlers`; `useEscapeKey` `isEscapePress` ignores auto-repeat;
+  `moveReplacementOnB` and `acquisitionOnB`; `NicknameModal` takes `{ onBKey }`. Design detail → `FRONTEND_PLAN.md` → Modal focus → Dismiss.
+
+---
+
 ## §3.1 The player chooses what Mimic copies ✅ DONE (2026-11-20)
 
 *(found 2026-11-03, move description audit; design pass 2026-11-20, source-confirmed) — M–L.* Ours always picked at random and

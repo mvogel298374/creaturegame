@@ -4,6 +4,13 @@ import { formatMoveName } from '../../utils/format';
 import { Modal } from './Modal';
 import './MoveReplacementModal.css';
 
+type Pending = { slot: number | null } | null;
+
+// B on the list asks "Stop learning?"; B on a confirm is NO, so B never answers alone (pokered learn_move.asm).
+export function moveReplacementOnB(pending: Pending): Pending {
+  return pending ? null : { slot: null };
+}
+
 // Level-up move learning: the four slots are full, so the player chooses one to forget for the new move —
 // or declines. Two steps with a confirmation so a move is never deleted on a single misclick.
 export function MoveReplacementModal({ prompt, onForget }: {
@@ -11,8 +18,9 @@ export function MoveReplacementModal({ prompt, onForget }: {
   onForget: (slot: number | null) => void;
 }) {
   // null → choosing; { slot } → confirming that choice (slot null = confirming a decline).
-  const [pending, setPending] = useState<{ slot: number | null } | null>(null);
+  const [pending, setPending] = useState<Pending>(null);
   const newMove = formatMoveName(prompt.newMoveName);
+  const onB = () => setPending(moveReplacementOnB(pending));
 
   if (pending) {
     const declining = pending.slot === null;
@@ -20,7 +28,7 @@ export function MoveReplacementModal({ prompt, onForget }: {
       ? `Stop learning ${newMove}?`
       : `Forget ${formatMoveName(prompt.currentMoves[pending.slot!])} and learn ${newMove}?`;
     return (
-      <Modal label="Confirm move change" dismiss="blocking" card="move-replace-modal" overlay="modal-overlay--corner">
+      <Modal label="Confirm move change" dismiss={{ onBKey: onB }} card="move-replace-modal" overlay="modal-overlay--corner">
         <p className="move-replace-question">{question}</p>
         <div className="move-replace-confirm">
           <button className="action-btn action-btn--fight" onClick={() => onForget(pending.slot)}>YES</button>
@@ -31,7 +39,7 @@ export function MoveReplacementModal({ prompt, onForget }: {
   }
 
   return (
-    <Modal label="Choose a move to forget" dismiss="blocking" card="move-replace-modal" overlay="modal-overlay--corner">
+    <Modal label="Choose a move to forget" dismiss={{ onBKey: onB }} card="move-replace-modal" overlay="modal-overlay--corner">
       <p className="move-replace-title">{prompt.creatureName} wants to learn {newMove}!</p>
       <p className="move-replace-sub">But {prompt.creatureName} already knows 4 moves. Forget one?</p>
       <div className="move-replace-grid">

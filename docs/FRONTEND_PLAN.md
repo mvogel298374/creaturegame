@@ -235,6 +235,25 @@ top is the one that takes input.
 - **Escape:** `useEscapeKey` takes the owner's root and fires only while that root is the active modal (the pure
   `isTopmost` check in `modalStack.ts`, which shares the overlay selector with this hook). So Escape over a prompt
   leaves the pinned map open behind it, and with Settings over a dismissable modal it closes only Settings.
+- **Dismiss:** `Modal`'s `dismiss` prop has three forms, resolved by the pure `dismissHandlers`.
+  - `'blocking'`: neither Escape nor a backdrop click does anything. Every required run prompt uses it, because each
+    parks a server-side await, so a close would strand the run.
+  - `{ onBKey }`: Escape plays Gen 1's B on the visible step of a prompt with a negative answer, and a backdrop click
+    does nothing, so a stray click never answers.
+    - Evolution: CANCEL.
+    - Shop: Leave. Our shop is one screen, so B acts as it does on pokered's top BUY/SELL/QUIT menu
+      (`pokemart.asm:28-30`).
+    - Acquisition: the offer declines, the swap picker goes back, and the release confirm is NO.
+    - Nickname: no nickname, as Gen 1's B at "Give a nickname?" is NO. This covers the acquisition and starter paths.
+    - Move replacement: the list opens "Stop learning X?", and a confirm is NO, so B never answers alone. pokered sends
+      B to the abandon prompt (`learn_move.asm:29, 76-90, 146-159`). Two differences, waived 2026-11-21:
+      - Our list folds in pokered's "Delete an older move?" question, so NO at "Stop learning?" returns straight to
+        the list. Every Gen 1 outcome is still reachable.
+      - The per-move "Forget X and learn Y?" confirm is our own; pokered forgets the move on the pick.
+  - `{ onEscape }`: both Escape and a backdrop click close the overlay. It's for overlays that only draw client state:
+    Settings and the enemy overview.
+  - A held Escape's auto-repeat is ignored (`isEscapePress`), so a held key answers once and can't walk a multi-step
+    prompt back to its decline.
 - **Multi-step prompts:** `AcquisitionModal` and `MoveReplacementModal` keep one `Modal` instance across steps, so the
   hook re-runs when `label` changes rather than on mount.
 - **Close:** the next modal takes focus if one remains. Focus then returns to the control that had it when the modal

@@ -552,7 +552,8 @@ generation's overview screen exposing an extra per-gen stat panel — it does **
 possibilities. When a surface iteration proposes a functionality difference, that proposal is escalated in the
 joint mini-plan, never assumed. Every modal stays `'blocking'` by construction (each parks a server-side
 await — see `TODO.md` §9, and the `<Modal>` refactor in `TODO_ARCHIVE.md`); a redesign may restyle and re-lay-out them but
-must not make one dismissable.
+must not make one dismissable. Escape on the five prompts that have a negative answer is an answer (Gen 1's B, sent
+once), not a dismissal, and a redesign keeps it that way.
 
 ### 7.2 Sub-stage 4a — the generation channel + the client presentation registry ✅ DONE (2026-07-31)
 

@@ -10,7 +10,7 @@ export function EvolutionPromptModal({ prompt, onRespond }: {
   onRespond: (allow: boolean) => void;
 }) {
   return (
-    <Modal label="Evolution" dismiss="blocking" card="recovery-modal">
+    <Modal label="Evolution" dismiss={{ onBKey: () => onRespond(false) }} card="recovery-modal">
       <p className="recovery-title">Evolution</p>
       <p className="recovery-sub">{prompt.fromName} is evolving into {prompt.toName}!</p>
       <div className="recovery-sprite-wrap">

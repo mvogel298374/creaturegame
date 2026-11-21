@@ -506,5 +506,9 @@ the linked design doc instead — pull it there and leave only the pointer here.
   back when it closes. The corner peek is not a modal.
 - Escape acts only on the topmost overlay: with a prompt over the pinned map it leaves the map open, and with Settings over a
   dismissable prompt it closes only Settings.
+- Escape acts as B, once per press (a held key's auto-repeat is ignored), on the step showing: evolution → cancel; shop → leave;
+  acquisition offer → decline, swap picker → back, release confirm → no; nickname → no nickname; move replacement → the forget list
+  opens "Stop learning X?" and either confirm → no.
+- Escape does nothing on the route, reward, lead, switch-in and Mimic prompts. A backdrop click never answers a prompt.
 - Design detail → `FRONTEND_PLAN.md` → Modal focus.  History → `TODO_ARCHIVE.md` → *§5 Modal accessibility*, *§5 The
-  pinned Run Map has no focus trap* and *§5 The pinned map's Escape fires under a prompt*.
+  pinned Run Map has no focus trap* and *§5 The pinned map's Escape fires under a prompt*, *§4.5 Escape = B*.

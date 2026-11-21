@@ -6,12 +6,7 @@ import './NicknameModal.css';
 // — Gen 1's own nickname-entry cap (Red/Blue).
 const NICKNAME_MAX_LENGTH = 10;
 
-// A cancelable "Do you want to give a nickname to X?" step, shared by every acquisition path (starter pick,
-// themed draft, boss catch). Deliberately its own step *after* the accept/confirm decision and *before* the
-// network call that carries it — so, like SettingsModal, nothing here parks a server-side await and it's safe
-// to make escapable (Modal's `{ onEscape }` dismiss). Cancel, Escape, and OK-with-blank-text all resolve to
-// "no nickname" (the caller normalizes via NicknameRules.Normalize either way) — mirroring Gen 1's own
-// cancel-out-of-naming behavior, which keeps the species name rather than aborting the acquisition itself.
+// The "Give a nickname?" step after every accept; Cancel, Escape (B) and blank OK all mean no nickname.
 export function NicknameModal({ speciesName, onDone }: {
   speciesName: string;
   onDone: (nickname: string | null) => void;
@@ -21,7 +16,7 @@ export function NicknameModal({ speciesName, onDone }: {
   const confirm = () => onDone(nickname.trim() || null);
 
   return (
-    <Modal label="Nickname" dismiss={{ onEscape: cancel }} card="nickname-modal">
+    <Modal label="Nickname" dismiss={{ onBKey: cancel }} card="nickname-modal">
       <p className="nickname-title">Give a nickname?</p>
       <p className="nickname-sub">{speciesName}</p>
       <input

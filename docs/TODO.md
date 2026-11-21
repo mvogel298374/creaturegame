@@ -58,14 +58,12 @@ design pass serves the group. Groups 3 and 5 are clusters of S/S–M items and t
 | 8 | Battle presentation | `BattleScene`, the event wire | Move animations · Sprite FX · Fly/Dig sprite stays on screen · Text feel |
 | 9 | Acquisition and items | `ItemEffects`, `RewardCalculator`, evolution | Catch · Unsold-item rule · Stone evolutions |
 | 10 | Run loop and progression | `RunDirector`, `EncounterFactory` | Progressive difficulty |
-| 11 | Client UX | modals, Title, the level-up panel | Escape = B-cancel · Continue card species · `RunFaulted` handler test · Level-up panel · 4d+ surface catalog |
+| 11 | Client UX | modals, Title, the level-up panel | Continue card species · `RunFaulted` handler test · Level-up panel · 4d+ surface catalog |
 | 12 | E2E and CI | `e2e/`, workflows, scripts | CI E2E + fast suites before deploying · `voluntary-switch` slow · evolution nameplate · Tighten two specs · E2E helper dedup · Play helper hang (four wait only on one E2E session) |
 | 13 | Importer and data model | `PokeApiConnector`, schema | Re-import churn on `pokemon.db` · §4.4 multi-generation data model |
 | 14 | Tooling and docs | `.claude/`, README, hooks | Agent profiles → skills · User docs · Pre-commit hook gaps · `npm audit` · Dev Mode next features · Abuse protection |
 
-**Ready — each awaits your greenlight**
-
-None open.
+**Ready — each awaits your greenlight:** none.
 
 **A. Confirm the drafted lines, then Ready**
 
@@ -108,7 +106,6 @@ None open.
 | **Other `ResidualEffects1` moves may roll accuracy** (§3.1) | S–M | ✗ 1, 2, 4, 6 | Filed 2026-11-06. A verify slice reads each effect for its own hit test; now also carries the residual-effect failure lines. |
 | **Counter keys on the foe's selected move** (§3.1) | S–M | ✗ 1, 2, 4, 6 | Trace `HandleCounterMove` and `MirrorMoveCopyMove`, including switch and item turns; list the diverging cases. |
 | **A re-import marks `pokemon.db` changed with identical data** (§3.2) | S | ✗ 2; the rest drafted | Filed 2026-11-06. Read the three delete-and-insert sites, pick upsert or stable IDs. |
-| **Escape = B-cancel on the negative-answer prompts** (§4.5) | S | ✗ 4; the rest drafted | One pokered cite. |
 | **Dependencies — `npm audit`** (§7.2) | S | ✗ 1, 7 | Re-run `npm audit`; the bumps need your E2E run. |
 | **The client `RunFaulted` handler is unpinned** (§6) | S | ✗ 1, 2, 7 | Choose: extract the handler logic, or test it in place. |
 | **E2E play helper hangs on an open move grid** (§6) | S | ✗ 2 | Confirm the trigger from the trace. |
@@ -322,7 +319,8 @@ channel of a broader acquisition layer.
     acquisition layer owns.
   - **Data vs runtime:** whether stones are in `items.db` (importer allowlist) plus runtime.
   - **Gen 1 source:** pokered's stone item effect (`item_effects.asm`).
-  - **Quirk:** a stone works outside a level threshold.
+  - **Quirk:** a stone works outside a level threshold, and its evolution can't be cancelled: `ItemUseEvoStone` sets
+    `wForceEvolution` (`item_effects.asm:778`), so the evolution prompt's CANCEL and Escape must not apply to it.
 
 ### 4.2 Run loop and progression
 
@@ -478,22 +476,6 @@ each). Their seam and data-vs-runtime lines are already written in the text.
   is the strongest candidate for a joint sketch → ratify session.
   **DoR (V16):** ✗ not Ready — gaps **1, 2, 6**; needs the joint sketch session, then a DoR per ratified idea. §3.1's
   one-line check could go first as its own S item.
-- [ ] *(small)* **Escape = B-cancel on the prompts that have a negative answer** — evolution→CANCEL,
-  acquisition→DECLINE, shop→LEAVE, move-replacement→don't-learn. The four required choices (`RouteChoice`,
-  `RewardChoice`, `LeadChoice`, `SwitchIn`) stay blocking. Give those four `dismiss={{ onEscape: … }}`
-  (the wrapper already supports it). Needs Vitest coverage and a `requirements-review` pass on the B-cancel claim.
-  **DoR (V16):** ✗ not Ready — gaps **1, 3, 4, 5, 6, 7** (all drafted except 4, which needs a pokered cite). "Those four" means the four negative-answer prompts, not the four
-  required ones. *Drafted:*
-  - **Acceptance:** Escape on each of the four sends its negative answer once, and Escape on a required prompt
-    does nothing.
-  - **Gen 1 source:** cite where pokered treats B as CANCEL at the evolution and learn-move prompts.
-  - **Quirk:** B cancels an evolution in Gen 1.
-  - **Gen surface:** the key map is theme, so none.
-  - **Data vs runtime:** client.
-  - **Dependencies:** none.
-
-  Vitest covers the key mapping, since it's pure logic.
-
 ### 4.6 Dev and test tooling features
 
 - [ ] **Dev Mode — next features (shell, not ready: needs a `/plan` and a full DoR entry).** More dev actions behind
@@ -753,8 +735,9 @@ recommendation, and what it unblocks.
 - **DB services skip try/catch** — decided, not a gap: they are thin EF pass-throughs, and every real caller wraps the
   operation at its boundary (`DEV_STANDARDS.md` → Error Handling).
 - **Every run prompt is `'blocking'` by construction** — each parks a server-side await, so dismissing one would
-  strand the run; don't re-file "the modals should close on Escape". (The Escape-as-B-cancel item in §4.5 covers only
-  the four prompts that have a negative answer.)
+  strand the run; don't re-file "the modals should close on Escape". Escape is an answer, not a dismissal: on the
+  evolution, shop, acquisition, nickname and move-replacement prompts the `{ onBKey }` variant sends Gen 1's B once per
+  press, and a backdrop click never answers a prompt (shipped 2026-11-21; `TODO_ARCHIVE.md` → "§4.5 Escape = B").
 - **BST tier bands stay as they are** (user ruling 2026-10-06): the tier multipliers and `K` were tuned on modern
   base stats and are not retuned after the real-Gen-1 import — no measured problem. Reopen only on a playtest report.
 - **The other Yellow availability corrections and an evolve-only rule** — not pursued (user ruling 2026-10-17):

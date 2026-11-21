@@ -12,7 +12,7 @@ export function ShopModal({ prompt, onBuy, onLeave }: {
   onLeave: () => void;
 }) {
   return (
-    <Modal label="Shop" dismiss="blocking" card="shop-modal">
+    <Modal label="Shop" dismiss={{ onBKey: onLeave }} card="shop-modal">
       <p className="shop-title">Shop</p>
       <p className="shop-sub">Balance: <span className="shop-balance">{prompt.balance}₽</span></p>
       <div className="shop-items">

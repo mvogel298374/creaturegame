@@ -5,7 +5,15 @@ import { Modal } from './Modal';
 import './AcquisitionModal.css';
 import { NicknameModal } from './NicknameModal';
 
-// Acquisition offer (themed draft / boss catch): a blocking modal to add the offered creature to the party.
+type Phase = 'offer' | 'swap' | { slot: number } | 'naming';
+
+// B steps back one phase; on the offer it declines (null). The naming step escapes through NicknameModal.
+export function acquisitionOnB(phase: Exclude<Phase, 'naming'>): Phase | null {
+  if (phase === 'offer') return null;
+  return phase === 'swap' ? 'offer' : 'swap';
+}
+
+// Acquisition offer (themed draft / boss catch): a modal to add the offered creature to the party.
 // With room, it's a simple ACCEPT / DECLINE. When the party is full, ACCEPT opens a "release which member?"
 // step over the benched members (the lead is excluded — a mid-biome lead change is Stage 1d) with a two-step
 // confirm so no creature is released on a single misclick. Either accept path then opens the nickname step
@@ -17,15 +25,12 @@ export function AcquisitionModal({ prompt, onRespond }: {
 }) {
   // null → the offer; 'swap' → picking a member to release (full party); { slot } → confirming that release;
   // 'naming' → the nickname step, the final one before onRespond fires.
-  const [phase, setPhase] = useState<'offer' | 'swap' | { slot: number } | 'naming'>('offer');
+  const [phase, setPhase] = useState<Phase>('offer');
   // The slot to swap (full-party accept) or null (open-slot accept) — captured when entering 'naming' so it
   // survives to the final onRespond call.
   const [pendingSlot, setPendingSlot] = useState<number | null>(null);
   const label = prompt.source === 'BossCatch' ? 'Catch!' : 'A creature wants to join!';
 
-  // The nickname step — only the escapable phase here (it runs after the accept is already decided and before
-  // the network call, so leaving it costs nothing; Escape/blank text both mean "no nickname", same as the
-  // starter path).
   if (phase === 'naming') {
     return (
       <NicknameModal
@@ -35,11 +40,18 @@ export function AcquisitionModal({ prompt, onRespond }: {
     );
   }
 
+  const step = phase;
+  const onB = () => {
+    const next = acquisitionOnB(step);
+    if (next === null) onRespond(false, null, null);
+    else setPhase(next);
+  };
+
   // Full-party release confirm.
   if (typeof phase === 'object') {
     const releasing = prompt.party[phase.slot];
     return (
-      <Modal label="Confirm release" dismiss="blocking" card="acquire-modal">
+      <Modal label="Confirm release" dismiss={{ onBKey: onB }} card="acquire-modal">
         <p className="acquire-question">Release {releasing.name} to make room for {prompt.name}?</p>
         <div className="acquire-buttons">
           <button
@@ -55,7 +67,7 @@ export function AcquisitionModal({ prompt, onRespond }: {
   // Full-party swap picker: choose a benched member to release (the lead can't be swapped out here).
   if (phase === 'swap') {
     return (
-      <Modal label="Choose a member to release" dismiss="blocking" card="acquire-modal">
+      <Modal label="Choose a member to release" dismiss={{ onBKey: onB }} card="acquire-modal">
         <p className="acquire-title">Party is full!</p>
         <p className="acquire-sub">Release which creature for {prompt.name}?</p>
         <div className="acquire-swap-grid">
@@ -86,7 +98,7 @@ export function AcquisitionModal({ prompt, onRespond }: {
 
   // The offer itself.
   return (
-    <Modal label="Creature offer" dismiss="blocking" card="acquire-modal">
+    <Modal label="Creature offer" dismiss={{ onBKey: onB }} card="acquire-modal">
       <p className="acquire-title">{label}</p>
       <p className="acquire-sub">{prompt.name} (Lv{prompt.level}) wants to join your party!</p>
       <div className="acquire-sprite-wrap">

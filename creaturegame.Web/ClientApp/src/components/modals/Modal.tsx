@@ -5,15 +5,14 @@ import '../buttons.css';
 import './Modal.css';
 import './ModalFrame.css';
 
-// Whether this overlay can be dismissed without answering it.
-//
-// 'blocking' is the right answer for every run prompt, and the reason is structural rather than stylistic:
-// each one parks a server-side await (the run loop sits on a TCS until the player answers), so there is no
-// "close" that a prompt could perform — dismissing it would strand the run with nothing to send back. The
-// negative choices these modals offer (DECLINE, CANCEL, SKIP, Leave) are *answers*, not dismissals.
-//
-// { onEscape } is for an overlay that only draws state the client already has, so leaving it costs nothing.
-export type ModalDismiss = 'blocking' | { onEscape: () => void };
+// How an overlay takes Escape and a backdrop click: FRONTEND_PLAN.md → Modal focus ("Dismiss").
+export type ModalDismiss = 'blocking' | { onEscape: () => void } | { onBKey: () => void };
+
+export function dismissHandlers(dismiss: ModalDismiss): { key: (() => void) | null; backdrop: (() => void) | null } {
+  if (dismiss === 'blocking') return { key: null, backdrop: null };
+  if ('onBKey' in dismiss) return { key: dismiss.onBKey, backdrop: null };
+  return { key: dismiss.onEscape, backdrop: dismiss.onEscape };
+}
 
 // The shared overlay every prompt renders through: a dimmed full-field backdrop (.modal-overlay) wrapping a
 // card. `dismiss` makes the escapable/blocking decision an explicit, reviewable prop — previously each modal
@@ -31,15 +30,15 @@ export function Modal({ label, dismiss, card, overlay, role = 'alertdialog', car
   cardRef?: RefObject<HTMLDivElement>;
   children: ReactNode;
 }) {
-  const onEscape = typeof dismiss === 'object' ? dismiss.onEscape : null;
+  const { key, backdrop } = dismissHandlers(dismiss);
   const overlayRef = useRef<HTMLDivElement>(null);
-  useEscapeKey(onEscape, overlayRef);
+  useEscapeKey(key, overlayRef);
   useModalFocus(label);
   return (
     <div
       ref={overlayRef}
       className={overlay ? `modal-overlay ${overlay}` : 'modal-overlay'}
-      onClick={onEscape ? e => { if (e.target === e.currentTarget) onEscape(); } : undefined}
+      onClick={backdrop ? e => { if (e.target === e.currentTarget) backdrop(); } : undefined}
     >
       <div ref={cardRef} className={card} role={role} aria-modal="true" aria-label={label} tabIndex={-1}>
         {children}
