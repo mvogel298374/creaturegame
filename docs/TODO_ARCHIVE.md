@@ -103,6 +103,35 @@ REST call routed to the machine that never saw `/start`; the workflow pins `flyc
 
 ---
 
+## §3.1 The "is disabled!" check matches the move, not the slot ✅ DONE (2026-11-21)
+
+*(S; found 2026-11-09 by `opus-engineer`, Fly and Dig item; source-confirmed by the verify slice 2026-11-21).* pokered blocks Disable two ways: the
+move menu and the foe's pick by slot (`core.asm:2845-2852`, enemy `:2989-2996`), and the pre-move check by move number (`wPlayerDisabledMoveNumber` vs
+`wPlayerSelectedMove`, `:3437-3446`). Metronome and Mirror Move write the called move's number into `wPlayerSelectedMove` and jump past the status
+checks (`:3198-3211`), so the calling turn is never checked. Ours compared the instance in the pre-move check, so two cases diverged: (a) a Mimic copy
+that duplicates a known move, the other copy disabled: pokered loses the turn ("Tackle is disabled!"), we used it; (b) a called lock-in move (Fly, Dig,
+Thrash, Rage, Bide, the charge moves) whose number is the disabled slot's: pokered blocks its continuation turn, and for Fly or Dig the user stays out
+of reach (the glitch in `GEN_DIFFERENCES.md`, now reachable). **DoR:** ✅ Ready (2026-11-21, user confirmed the verify slice's drafts).
+
+- **Acceptance:** the pre-move check blocks any selected move with the disabled move's number, from any slot or a called move's continuation; selection
+  stays by slot; the Metronome / Mirror Move calling turn stays unchecked.
+- **Design:** Disable records the disabled move's number (`BattleState.DisabledMoveId`) beside the slot when it lands; `DisabledMoveStops` compares the
+  selected move's number with it. No central method changes. (Drafted as "records the disabled move (its `Attack`)"; reworded during the build.)
+- **Gen surface:** `IBattleRules.DisabledMoveCheckMatchesMoveId` (Gen 1 true; Gen 2 unverified). **Gen 1 source:** the pokered cites above.
+- **Data vs runtime:** runtime only. **Dependencies:** none.
+- **Quirk the tests assert:** full battles: the Mimic-duplicate pick loses the turn with "is disabled!"; a Mirror Move'd Fly into a disabled Fly slot
+  prints "is disabled!" on the release turn and the user stays out of reach; Metronome calling the disabled move's number still runs on the calling turn.
+- **As built:** `BattleState.DisabledMove`'s setter also records `DisabledMoveId` (the slot's move number at lock time); `StatusResolver.DisabledMoveStops`
+  compares move numbers under the seam; selection (menu, `CanSelect`, AI) stays by slot; `Battle.SelectMoveAsync`'s stale doc comment reworded.
+  `DisableContractTests` gained six full battles (Mimic-duplicate Theory over the seam, foe-side Mimic duplicate, Mirror Move'd Fly into a disabled Fly
+  slot, Mirror Move'd Thrash stays locked and loses each turn until re-enabled, Transform keeps the number, Metronome's calling turn unchecked);
+  `PreMoveCheckContractTests` gained a Theory (either seam value stops the disabled slot and no other move). The full-battle helper moved to
+  `TestSupport/FullBattle.cs`, shared with `MimicContractTests`. Rulings 2026-11-21 (`requirements-review`): Transform keeps the number, tested, note
+  reworded; Thrash and foe-side tests added. `GEN_DIFFERENCES.md` (Disable bullet, Transform note, Fly glitch), `GENERATION_SEAMS.md` §2, `STATE_MODEL.md`
+  §2 and `PRODUCT_SPEC.md` updated.
+
+---
+
 ## §4.5 Escape = B on the move-teach picker and the Poké Center ✅ DONE (2026-11-21)
 
 *(small; filed 2026-11-21 from the Escape = B item below).* The two remaining prompts with a negative answer. **DoR:** ✅ Ready (2026-11-21).

@@ -522,8 +522,8 @@ public class Battle
 
     /// <summary>Resolves which move a combatant uses. Lock-in mechanics (two-turn release, rampage, Bide,
     /// Rage) bypass <see cref="IBattleInput"/> and auto-repeat, checked before
-    /// <see cref="Creature.CanSelectAnyMove"/> so a Disabled Rage move is still force-used (a known,
-    /// unenforced simplification of Gen 1's Rage/Disable nuance). Otherwise the input chooses, checked by
+    /// <see cref="Creature.CanSelectAnyMove"/>, so a disabled lock-in move is forced here and stopped by the pre-move
+    /// "is disabled!" check. Otherwise the input chooses, checked by
     /// <see cref="Creature.CanSelect"/> (<c>ARCHITECTURE.md</c> §2.4), or <c>null</c> for Struggle.</summary>
     private async Task<PokemonAttack?> SelectMoveAsync(
         Creature attacker,

@@ -168,6 +168,9 @@ the linked design doc instead — pull it there and leave only the pointer here.
   Pokémon then acts.
 - A roll of N keeps a move disabled for N of the creature's own move attempts; sleep, flinch, recharge, switch and item
   turns don't count down.
+- The menu blocks only the disabled slot, but "is disabled!" stops any move with the disabled move's number: a Mimic
+  copy of it in another slot, or the next turn of a Fly, Dig, Thrash or other locked move that Metronome or Mirror Move
+  called. The turn Metronome or Mirror Move is used isn't checked.
 - Full paralysis is a roll below 63 of 256. Full paralysis or a confusion self-hit ends Bide, a rampage, a charge and
   any trap the user holds, with no Thrash confusion, and frees a bound foe. Being stopped by "is disabled!" ends a
   charge but not a rampage.

@@ -130,11 +130,210 @@ public class DisableContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         );
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task TheSeamDecidesWhetherAMimicCopyOfTheDisabledMoveIsDisabledToo(
+        bool matchesMoveId
+    )
+    {
+        var player = TestCreatures.Make("Player", hp: 2000, attack: 200, speed: 200);
+        player.AddAttack(Move("tackle"));
+        player.AddAttack(Move("mimic"));
+        var enemy = TestCreatures.Make("Enemy", hp: 200, defense: 20, speed: 1);
+        enemy.AddAttack(Move("tackle"));
+        enemy.AddAttack(Move("disable"));
+        enemy.AddAttack(Move("growl"));
+
+        var emitter = await FullBattle.Fight(
+            player,
+            enemy,
+            new ScriptedInput("mimic", "tackle").PicksMimic(0),
+            new ScriptedInput("disable", "growl"),
+            new FixedDisableRules(3, matchesMoveId),
+            new HighestRollSource()
+        );
+
+        var locked = Assert.Single(emitter.Of<MoveDisabled>());
+        Assert.Equal(("Player", "tackle"), (locked.TargetName, locked.MoveName));
+        var blocked = emitter.Of<MoveIsDisabled>().ToList();
+        if (matchesMoveId)
+            Assert.Equal(["tackle", "tackle"], blocked.Select(b => b.MoveName));
+        else
+            Assert.Empty(blocked);
+        Assert.False(enemy.IsAlive());
+    }
+
+    [Fact]
+    public async Task AMirrorMovedFlyIntoADisabledFlySlotIsDisabledOnItsReleaseAndStaysOutOfReach()
+    {
+        var player = TestCreatures.Make("Player", hp: 99999, attack: 150, speed: 1);
+        player.AddAttack(Move("fly"));
+        player.AddAttack(Move("mirror-move"));
+        player.AddAttack(Move("growl"));
+        player.AddAttack(Move("tackle"));
+        var enemy = TestCreatures.Make("Enemy", hp: 300, defense: 20, speed: 200);
+        enemy.AddAttack(Move("disable"));
+        enemy.AddAttack(Move("fly"));
+        enemy.AddAttack(Move("tackle"));
+
+        var emitter = await FullBattle.Fight(
+            player,
+            enemy,
+            new ScriptedInput("growl", "growl", "mirror-move", "tackle"),
+            new ScriptedInput("disable", "fly", "tackle"),
+            new FixedDisableRules(8),
+            new LowestRollSource()
+        );
+
+        var events = emitter.Events.ToList();
+        Assert.Equal("fly", Assert.Single(emitter.Of<MoveDisabled>()).MoveName);
+        int blockedAt = events.FindIndex(e =>
+            e is MoveIsDisabled { CreatureName: "Player", MoveName: "fly" }
+        );
+        Assert.True(blockedAt >= 0, "the called Fly's release turn stops at \"is disabled!\"");
+        Assert.Contains(
+            events.Skip(blockedAt + 1),
+            e => e is MoveMissed { AttackerName: "Enemy", MoveName: "tackle" }
+        );
+        Assert.False(enemy.IsAlive());
+    }
+
+    [Fact]
+    public async Task MetronomeCallingTheDisabledMoveStillRunsOnTheCallingTurn()
+    {
+        var player = TestCreatures.Make("Player", hp: 2000, attack: 200, speed: 1);
+        player.AddAttack(Move("tackle"));
+        player.AddAttack(Move("metronome"));
+        var enemy = TestCreatures.Make("Enemy", hp: 60, defense: 20, speed: 200);
+        enemy.AddAttack(Move("disable"));
+        enemy.AddAttack(Move("growl"));
+
+        var emitter = await FullBattle.Fight(
+            player,
+            enemy,
+            new ScriptedInput("metronome"),
+            new ScriptedInput("disable", "growl"),
+            new FixedDisableRules(8),
+            new LowestRollSource(),
+            movePool: [Move("tackle")]
+        );
+
+        Assert.Equal("tackle", Assert.Single(emitter.Of<MoveDisabled>()).MoveName);
+        Assert.Empty(emitter.Of<MoveIsDisabled>());
+        Assert.Contains(
+            emitter.Of<MoveUsed>(),
+            m => m is { AttackerName: "Player", MoveName: "tackle" }
+        );
+        Assert.False(enemy.IsAlive());
+    }
+
+    [Fact]
+    public async Task AFoesMimicCopyOfItsDisabledMoveIsDisabledToo()
+    {
+        var player = TestCreatures.Make("Player", hp: 2000, attack: 60, speed: 1);
+        player.AddAttack(Move("disable"));
+        player.AddAttack(Move("tackle"));
+        var enemy = TestCreatures.Make("Enemy", hp: 400, defense: 20, speed: 200);
+        enemy.AddAttack(Move("tackle"));
+        enemy.AddAttack(Move("mimic"));
+
+        var emitter = await FullBattle.Fight(
+            player,
+            enemy,
+            new ScriptedInput("disable", "tackle"),
+            new ScriptedInput("mimic", "tackle"),
+            new ScriptableRules().AlwaysHit().DisableTurns(3),
+            new HighestRollSource()
+        );
+
+        Assert.Equal("tackle", Assert.Single(emitter.Of<MimicLearned>()).MoveName);
+        var locked = Assert.Single(emitter.Of<MoveDisabled>());
+        Assert.Equal(("Enemy", "tackle"), (locked.TargetName, locked.MoveName));
+        Assert.Equal(
+            ["tackle", "tackle"],
+            emitter
+                .Of<MoveIsDisabled>()
+                .Where(b => b.CreatureName == "Enemy")
+                .Select(b => b.MoveName)
+        );
+        Assert.False(enemy.IsAlive());
+    }
+
+    [Fact]
+    public async Task AMirrorMovedThrashIntoADisabledThrashSlotStaysLockedAndLosesEachTurnUntilReEnabled()
+    {
+        var player = TestCreatures.Make("Player", hp: 99999, attack: 30, speed: 1);
+        player.AddAttack(Move("thrash"));
+        player.AddAttack(Move("mirror-move"));
+        player.AddAttack(Move("growl"));
+        var enemy = TestCreatures.Make("Enemy", hp: 2000, defense: 20, speed: 200);
+        enemy.AddAttack(Move("disable"));
+        enemy.AddAttack(Move("thrash"));
+
+        var emitter = await FullBattle.Fight(
+            player,
+            enemy,
+            new ScriptedInput("growl", "mirror-move", "growl"),
+            new ScriptedInput("disable", "thrash"),
+            new ScriptableRules().AlwaysHit().DisableTurns(5).RampageTurns(3),
+            new LowestRollSource()
+        );
+
+        var events = emitter.Events.ToList();
+        Assert.Equal("thrash", Assert.Single(emitter.Of<MoveDisabled>()).MoveName);
+        int firstBlock = events.FindIndex(e => e is MoveIsDisabled { CreatureName: "Player" });
+        int reEnabled = events.FindIndex(e => e is MoveReEnabled { CreatureName: "Player" });
+        Assert.True(firstBlock >= 0 && reEnabled > firstBlock);
+        var whileLocked = events.Skip(firstBlock).Take(reEnabled - firstBlock).ToList();
+        Assert.Equal(
+            2,
+            whileLocked.Count(e =>
+                e is MoveIsDisabled { CreatureName: "Player", MoveName: "thrash" }
+            )
+        );
+        Assert.DoesNotContain(whileLocked, e => e is MoveUsed { AttackerName: "Player" });
+        Assert.False(enemy.IsAlive());
+    }
+
+    [Fact]
+    public async Task ATransformerKeepsTheDisabledMoveNumberSoTheCopiedMoveIsDisabled()
+    {
+        var player = TestCreatures.Make("Player", hp: 2000, speed: 1);
+        player.AddAttack(Move("transform"));
+        player.AddAttack(Move("tackle"));
+        var enemy = TestCreatures.Make("Enemy", hp: 60, attack: 200, defense: 20, speed: 200);
+        enemy.AddAttack(Move("tackle"));
+        enemy.AddAttack(Move("disable"));
+
+        var emitter = await FullBattle.Fight(
+            player,
+            enemy,
+            new ScriptedInput("transform", "tackle"),
+            new ScriptedInput("disable", "tackle"),
+            new ScriptableRules().AlwaysHit().DisableTurns(3),
+            new HighestRollSource()
+        );
+
+        var events = emitter.Events.ToList();
+        Assert.Equal("tackle", Assert.Single(emitter.Of<MoveDisabled>()).MoveName);
+        int transformed = events.FindIndex(e => e is TransformedInto { CreatureName: "Player" });
+        int blocked = events.FindIndex(e =>
+            e is MoveIsDisabled { CreatureName: "Player", MoveName: "tackle" }
+        );
+        Assert.True(transformed >= 0 && blocked > transformed);
+        Assert.False(enemy.IsAlive());
+    }
+
     /// <summary>Always hits and locks Disable for a fixed number of turns — deterministic timeline.</summary>
-    private sealed class FixedDisableRules(int turns) : DelegatingBattleRules
+    private sealed class FixedDisableRules(int turns, bool? matchesMoveId = null)
+        : DelegatingBattleRules
     {
         public override int GetHitThreshold(int acc, int accStage, int evaStage) => 256; // always hit
 
         public override int RollDisableTurns() => turns;
+
+        public override bool DisabledMoveCheckMatchesMoveId =>
+            matchesMoveId ?? base.DisabledMoveCheckMatchesMoveId;
     }
 }

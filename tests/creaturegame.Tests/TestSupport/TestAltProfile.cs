@@ -245,6 +245,8 @@ internal static class TestAltProfile
 
         public override bool DisabledMoveBlockEndsCharge => false;
 
+        public override bool DisabledMoveCheckMatchesMoveId => false;
+
         public override SemiInvulnerability ChargeGrantsSemiInvulnerability(Attack move) =>
             SemiInvulnerability.Underground;
 

@@ -245,6 +245,29 @@ public class PreMoveCheckContractTests(MovesFixture moves) : Gen1MoveContract(mo
         Assert.Empty(log.Of<ActionBlocked>());
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void EitherDisabledMoveMatchStopsTheDisabledSlotAndNoOtherMove(bool matchesMoveId)
+    {
+        var rules = new DisabledMatchRules(matchesMoveId);
+        var creature = WithDisabledPound();
+        creature.AddAttack(Move("scratch"));
+
+        var (lockedActed, lockedLog) = Check(creature, selected: creature.MoveSet[0], rules: rules);
+        var (otherActed, otherLog) = Check(creature, selected: creature.MoveSet[1], rules: rules);
+
+        Assert.False(lockedActed);
+        Assert.Equal("pound", Assert.Single(lockedLog.Of<MoveIsDisabled>()).MoveName);
+        Assert.True(otherActed);
+        Assert.Empty(otherLog.Of<MoveIsDisabled>());
+    }
+
+    private sealed class DisabledMatchRules(bool matchesMoveId) : DelegatingBattleRules
+    {
+        public override bool DisabledMoveCheckMatchesMoveId => matchesMoveId;
+    }
+
     // ── Disable ──────────────────────────────────────────────────────────────
 
     [Theory]

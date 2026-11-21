@@ -373,6 +373,9 @@ public interface IBattleRules
     /// <summary>Whether being stopped from using a disabled move ends the user's charge. See GENERATION_SEAMS.md §2.</summary>
     bool DisabledMoveBlockEndsCharge { get; }
 
+    /// <summary>Whether "is disabled!" stops a move by its number, from any slot, rather than only the locked slot. See GENERATION_SEAMS.md §2.</summary>
+    bool DisabledMoveCheckMatchesMoveId { get; }
+
     /// <summary>Where this charge move's charge turn puts the user out of reach (Gen 1: Fly and Dig). See GENERATION_SEAMS.md §2.</summary>
     SemiInvulnerability ChargeGrantsSemiInvulnerability(Attack move);
 

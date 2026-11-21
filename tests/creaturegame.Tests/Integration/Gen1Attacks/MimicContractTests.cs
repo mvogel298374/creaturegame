@@ -169,31 +169,6 @@ public class MimicContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     private static Creature SlowAndFrail(string name) =>
         TestCreatures.Make(name, hp: 40, defense: 20, speed: 1);
 
-    private static async Task<RecordingEmitter> Fight(
-        Creature player,
-        Creature enemy,
-        ScriptedInput playerInput,
-        ScriptedInput enemyInput,
-        IBattleRules? rules = null,
-        IRandomSource? rng = null,
-        IReadOnlyList<Attack>? movePool = null
-    )
-    {
-        var emitter = new RecordingEmitter();
-        await new Battle(
-            player,
-            enemy,
-            Gen1TypeChart.Instance,
-            playerInput,
-            enemyInput,
-            rules: rules ?? new ScriptableRules().Deterministic(),
-            movePool: movePool,
-            emitter: emitter,
-            rng: rng ?? new SeededRandomSource(1)
-        ).StartFightAsync();
-        return emitter;
-    }
-
     [Fact]
     public async Task ThePlayerPicksWhichFoeMoveMimicCopiesAndTheCopySpendsMimicsPp()
     {
@@ -205,7 +180,12 @@ public class MimicContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         enemy.AddAttack(Move("tackle"));
         var playerInput = new ScriptedInput("mimic", "tackle").PicksMimic(2);
 
-        var emitter = await Fight(player, enemy, playerInput, new ScriptedInput("growl"));
+        var emitter = await FullBattle.Fight(
+            player,
+            enemy,
+            playerInput,
+            new ScriptedInput("growl")
+        );
 
         var offered = Assert.Single(playerInput.MimicChoicesOffered);
         Assert.Equal(["growl", "leer", "tackle"], offered.Moves.Select(m => m.Name));
@@ -231,7 +211,7 @@ public class MimicContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         enemy.AddAttack(Move("mimic"));
         var enemyInput = new ScriptedInput("mimic");
 
-        var emitter = await Fight(
+        var emitter = await FullBattle.Fight(
             player,
             enemy,
             new ScriptedInput("tackle"),
@@ -255,7 +235,7 @@ public class MimicContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         enemy.AddAttack(Move("mimic"));
         enemy.AddAttack(Move("tackle"));
 
-        var emitter = await Fight(
+        var emitter = await FullBattle.Fight(
             player,
             enemy,
             new ScriptedInput("mimic", "mimic", "tackle").PicksMimic(0, 1),
@@ -285,7 +265,7 @@ public class MimicContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         enemy.AddAttack(Move("growl"));
         enemy.AddAttack(Move("tackle"));
 
-        var emitter = await Fight(
+        var emitter = await FullBattle.Fight(
             player,
             enemy,
             new ScriptedInput("mimic", "metronome", "tackle").PicksMimic(1, 0),
@@ -316,7 +296,7 @@ public class MimicContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         enemy.AddAttack(Move("mimic"));
         enemy.AddAttack(Move("tackle"));
 
-        var emitter = await Fight(
+        var emitter = await FullBattle.Fight(
             player,
             enemy,
             new ScriptedInput("mimic", "transform", "mimic", "tackle").PicksMimic(1, 1),
@@ -340,7 +320,7 @@ public class MimicContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         enemy.AddAttack(Move("tackle"));
         enemy.AddAttack(Move("growl"));
 
-        var emitter = await Fight(
+        var emitter = await FullBattle.Fight(
             player,
             enemy,
             new ScriptedInput("mimic", "tackle").PicksMimic(badPick),
@@ -374,7 +354,7 @@ public class MimicContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         enemy.AddAttack(Move("tackle"));
         var playerInput = new ScriptedInput("mimic", "tackle");
 
-        var emitter = await Fight(
+        var emitter = await FullBattle.Fight(
             player,
             enemy,
             playerInput,

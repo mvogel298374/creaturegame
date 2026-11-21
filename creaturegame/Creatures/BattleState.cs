@@ -66,10 +66,18 @@ public sealed class BattleState
     public int RampageTurnsRemaining { get; set; }
     public PokemonAttack? RampageMove { get; set; }
 
-    // Disable (the move): one of this creature's moves is locked out by the foe. DisabledMove is
-    // the exact PokemonAttack instance that can't be selected; DisableTurnsRemaining counts down
-    // on each of this creature's move attempts and the move is re-enabled when it reaches 0.
-    public PokemonAttack? DisabledMove { get; set; }
+    // Disable: the locked slot and the move number it held when locked (STATE_MODEL.md §2, Disable).
+    public PokemonAttack? DisabledMove
+    {
+        get => _disabledMove;
+        set
+        {
+            _disabledMove = value;
+            DisabledMoveId = value?.Base.Id ?? 0;
+        }
+    }
+    private PokemonAttack? _disabledMove;
+    public int DisabledMoveId { get; private set; }
     public int DisableTurnsRemaining { get; set; }
 
     // Mist (the move): while set, the opponent cannot lower this creature's stat stages.

@@ -432,6 +432,9 @@ public sealed class Gen1BattleRules : IBattleRules
 
     public bool DisabledMoveBlockEndsCharge => true;
 
+    // pokered core.asm:3437-3446 compares wPlayerDisabledMoveNumber with wPlayerSelectedMove.
+    public bool DisabledMoveCheckMatchesMoveId => true;
+
     // pokered effects.asm ChargeEffect: Fly by its effect, Dig by its move number.
     public SemiInvulnerability ChargeGrantsSemiInvulnerability(Attack move) =>
         move.Name switch

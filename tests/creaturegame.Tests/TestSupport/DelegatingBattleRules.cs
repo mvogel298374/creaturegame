@@ -170,6 +170,8 @@ public abstract class DelegatingBattleRules : IBattleRules
 
     public virtual bool DisabledMoveBlockEndsCharge => _inner.DisabledMoveBlockEndsCharge;
 
+    public virtual bool DisabledMoveCheckMatchesMoveId => _inner.DisabledMoveCheckMatchesMoveId;
+
     public virtual SemiInvulnerability ChargeGrantsSemiInvulnerability(Attack move) =>
         _inner.ChargeGrantsSemiInvulnerability(move);
 

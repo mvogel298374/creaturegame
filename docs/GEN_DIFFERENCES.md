@@ -262,9 +262,10 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
 - **Cleared on any charge move's release** (`core.asm:3116`, enemy `:5500`) and by a confusion self-hit (`:3432`).
   Haze doesn't touch it.
 - **The glitch:** full paralysis and "is disabled!" clear the charge but not the bit (`:3463`, `:3650-3660`). The
-  Pokémon stays out of reach on every later turn until it next completes a charge move or leaves the field. Only
-  full paralysis is a real route: Disable misses a Pokémon that is out of reach, so the "is disabled!" route is
-  nearly unreachable in Gen 1 and cannot occur in a battle here (the rule is there and tested by setting the state up).
+  Pokémon stays out of reach on every later turn until it next completes a charge move or leaves the field. Disable
+  misses a Pokémon that is out of reach, so the "is disabled!" route needs the Disable to land first: a Fly or Dig
+  slot is disabled, then Metronome or Mirror Move calls that move, and its release turn stops at "is disabled!"
+  (the check matches move numbers, `core.asm:3437-3446`; `DisableContractTests`).
 - **Gen 2** splits the bit into flying and underground: Gust, Whirlwind, Thunder and Twister hit a flying Pokémon, and
   Earthquake, Fissure and Magnitude one underground (pokecrystal `engine/battle/effect_commands.asm` `.FlyDigMoves`).
   Seam: `GENERATION_SEAMS.md` §2, Fly and Dig out of reach.
@@ -418,12 +419,14 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
   for the first strike, though every strike deals crit damage; its effectiveness line repeats on every strike. A
   one-hit KO never prints "Critical hit!" (the two share one slot), prints "One-hit KO!" only when the Speed check
   passes, and then prints its effectiveness. Seam: `GENERATION_SEAMS.md` §2.
-- **Disable** picks a random move with PP left, and the lock is enforced at move selection (`Battle` and
-  `IBattleInput` skip `DisabledMove`) and again by the pre-move "is disabled!" check, for a move disabled after it
-  was chosen; its countdown is in `GENERATION_SEAMS.md` §2, Pre-move checks.
-  - Not modelled: after Transform, pokered keeps the disabled slot blocked in the menu (the slot is in the high nibble
-    of `wPlayerDisabledMove`, `core.asm:2845-2852`); here the Disable falls away with the old moveset. It needs a Mew
-    disabled before it transforms.
+- **Disable** picks a random move with PP left, and the lock is enforced at move selection by slot (`Battle` and
+  `IBattleInput` skip `DisabledMove`) and again by the pre-move "is disabled!" check by move number: a move disabled
+  after it was chosen, a Mimic copy of the disabled move in another slot, or a called move's continuation with that
+  number (`core.asm:3437-3446`). Its countdown is in `GENERATION_SEAMS.md` §2, Pre-move checks.
+  - After Transform the disabled move number is kept, so "is disabled!" still stops that move if the copied moveset has
+    it, as in pokered (`DisableContractTests`). Not modelled: pokered's menu also keeps the old slot index blocked,
+    whatever move it now holds (the slot is in the high nibble of `wPlayerDisabledMove`, `core.asm:2845-2852`); here
+    the menu block falls away with the old moveset. It needs a Mew disabled before it transforms.
   - Not modelled: against a foe, pokered's Disable ignores PP and can pick a move the foe has run out of
     (`effects.asm:1324-1344`, non-link enemies skip the PP check); here it picks only a move with PP left.
 - **Leech Seed lands through a Substitute** in the English RBY this engine targets (reported blocked only in the

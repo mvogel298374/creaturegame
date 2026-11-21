@@ -215,7 +215,13 @@ public static class StatusResolver
         IBattleEventEmitter? emitter
     )
     {
-        if (selectedMove is null || selectedMove != creature.Battle.DisabledMove)
+        var disabled = creature.Battle.DisabledMove;
+        if (selectedMove is null || disabled is null)
+            return false;
+        bool matches = rules.DisabledMoveCheckMatchesMoveId
+            ? selectedMove.Base.Id == creature.Battle.DisabledMoveId
+            : selectedMove == disabled;
+        if (!matches)
             return false;
 
         if (rules.DisabledMoveBlockEndsCharge)
