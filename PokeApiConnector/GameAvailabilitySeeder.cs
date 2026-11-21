@@ -131,14 +131,14 @@ public static class GameAvailabilitySeeder
         [(124, "blue")] = "Trade", // Jynx       (trade Poliwhirl; not in Yellow)
     };
 
-    public static async Task SeedGen1Async()
+    public static async Task SeedGen1Async(Func<PokemonDbContext>? createContext = null)
     {
-        using var context = new PokemonDbContext();
+        using var context = (createContext ?? (() => new PokemonDbContext()))();
         context.EnsureDatabaseCreated();
-        await context.GameAvailability.ExecuteDeleteAsync();
 
         var rows = BuildGen1Rows();
-        context.GameAvailability.AddRange(rows);
+        var existing = await context.GameAvailability.ToListAsync();
+        RowSync.Apply(context, existing, rows, r => (r.SpeciesId, r.GameVersion));
         await context.SaveChangesAsync();
 
         Console.WriteLine($"Seeded {rows.Count} Gen 1 game availability rows.");

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using creaturegame.Attacks;
 using creaturegame.Creatures;
 using creaturegame.DB;
+using creaturegame.Tests.TestSupport;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
@@ -163,6 +164,21 @@ public class MigrationTests : IDisposable
             context.EnsureDatabaseCreated();
         });
         Assert.Null(ex);
+    }
+
+    [Fact]
+    public void EnsureDatabaseCreated_WritesNothingWhenTheSchemaIsCurrent()
+    {
+        using var db = new TempImportDatabases();
+        using var probe = db.WatchPokemon();
+
+        using (var context = db.Pokemon())
+            context.EnsureDatabaseCreated();
+
+        Assert.False(
+            probe.SawAWrite,
+            "an up-to-date database must not be written (EF's migration lock row)"
+        );
     }
 
     [Fact]

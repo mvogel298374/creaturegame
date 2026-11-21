@@ -74,8 +74,10 @@ public class PokemonDbContext : DbContext
             .IsUnique();
     }
 
+    // Migrate() writes its lock row on every call, so skip it when nothing is pending (DATA_IMPORT.md §5.3).
     public void EnsureDatabaseCreated()
     {
-        Database.Migrate();
+        if (Database.GetPendingMigrations().Any())
+            Database.Migrate();
     }
 }

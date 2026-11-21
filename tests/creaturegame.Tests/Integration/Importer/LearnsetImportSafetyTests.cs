@@ -143,6 +143,39 @@ public class LearnsetImportSafetyTests : IDisposable
     }
 
     [Fact]
+    public async Task AnUnchangedReImport_KeepsTheLearnsetRowIds_AndWritesNothing()
+    {
+        await PokemonImport.FetchPokemonByGeneration(1, ApiServing(1, 2), _db.Pokemon);
+        var idsAfterFirst = StoredLearnsetIds();
+        using var probe = _db.WatchPokemon();
+
+        var failed = await PokemonImport.FetchPokemonByGeneration(1, ApiServing(1, 2), _db.Pokemon);
+
+        Assert.Empty(failed);
+        Assert.Equal(idsAfterFirst, StoredLearnsetIds());
+        Assert.False(
+            probe.SawAWrite,
+            "an unchanged re-import must not write the species or learnset rows"
+        );
+    }
+
+    private List<(int Id, int SpeciesId, int MoveId)> StoredLearnsetIds()
+    {
+        using var context = _db.Pokemon();
+        return context
+            .Learnsets.Select(l => new
+            {
+                l.Id,
+                l.SpeciesId,
+                l.MoveId,
+            })
+            .AsEnumerable()
+            .Select(l => (l.Id, l.SpeciesId, l.MoveId))
+            .OrderBy(l => l)
+            .ToList();
+    }
+
+    [Fact]
     public async Task ACleanImport_ReplacesTheLearnset()
     {
         var failed = await PokemonImport.FetchPokemonByGeneration(1, ApiServing(1), _db.Pokemon);

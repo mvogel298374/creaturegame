@@ -293,8 +293,8 @@ cleanly express Gen 1 per-version obtainability. It encodes:
   `GameCorner` (Porygon, Yellow's Scyther/Pinsir/Eevee/Vulpix), or `Trade` (NPC in-game trades).
 - **Yellow** is checked against `pret/pokeyellow`'s `data/wild/maps` and `data/events` (prizes, trades).
 
-It clears and re-seeds cleanly each run (`ExecuteDeleteAsync` then bulk insert of all 151
-× 3 versions minus exclusions).
+Each run syncs the table to all 151 × 3 versions minus exclusions by (species, version) (§5.3), so an unchanged run
+writes nothing.
 
 ### 4.4 Sprites & cries (`SpriteDownloader`, `CryDownloader`, `ItemSpriteDownloader`)
 Pull PNGs (front/back) and OGG cries for IDs 1–151 into `wwwroot`, located by walking up
@@ -385,9 +385,9 @@ generation's `GenerationImportScope` version group (`red-blue` for Gen 1; moves 
 methods: `level-up` (tagged `LearnMethod.LevelUp`, lowest level kept
 if a move repeats) and `machine` (TM/HM, tagged `LearnMethod.Machine`, `LearnLevel = 0`). A move
 learnable both ways is kept as level-up only — it's already in that pool, so the machine tag would add
-nothing. `PokemonImport.ImportLearnset(…, generation)` persists the result idempotently: clears this species'
-rows for that generation, then re-inserts. `FetchPokemonDataByUrl` runs the species-row save, the delete and the
-insert in **one transaction**, so a failed insert rolls all three back: the species keeps both its previous row
+nothing. `PokemonImport.ImportLearnset(…, generation)` persists the result idempotently: it syncs this species'
+rows for that generation by (move, level, method) (§5.3). `FetchPokemonDataByUrl` runs the species-row save and the
+learnset sync in **one transaction**, so a failed write rolls both back: the species keeps both its previous row
 and its previous learnset, instead of new stats beside an old learnset or no learnset at all. The species is
 still reported as failed (§5.6). (`EvolutionImport` below is stricter again: it replaces nothing unless every
 fetch succeeded, §4.7.)
@@ -400,8 +400,8 @@ into faithful Gen 1 edges — idempotent (replaces this generation's rows as a s
 **All-or-nothing.** Every species and chain is fetched **before** the table is touched. If any fetch failed,
 the existing edges are left exactly as they were and the failures are reported (exit 1, §5.6). A species
 that answers with a null body or no `evolution_chain.url` counts as a failed fetch (every Gen 1 species has a
-chain). Only a fully clean fetch replaces the rows, and the delete and insert run in **one transaction**, so a
-failed insert rolls the delete back too. Evolutions are replaced as a set rather than upserted per record,
+chain). Only a fully clean fetch replaces the rows (a sync by (from, to), §5.3), and its deletes and inserts run in
+**one transaction**, so a failed insert rolls the deletes back too. Evolutions are replaced as a set rather than per record,
 which is why they get this rule and per-record "fail a record, not the run" (§5.6) doesn't apply.
 
 **The Gen 1 filter.** A chain can span every generation the games have added since, so an edge
@@ -434,8 +434,16 @@ changes. *When integrating any third-party data source, put a mapping layer betw
 your domain model.*
 
 ### 5.3 Idempotent upsert
-Each entity is read with `AsNoTracking()` and then `Add`-ed or `Update`-d by primary key,
-so re-running the importer is safe and converges to the same state. Trade-off we accepted:
+Each entity is upserted by primary key, so re-running the importer is safe and converges to the same state.
+**An unchanged re-run writes nothing (2026-11-21)**, so the committed `.db` files stay byte-identical and `git status`
+clean. Species rows are loaded tracked and `RowSync.CopyValues` copies the new values on, so EF writes only changed
+columns (a detached `Update` marked every column). Learnsets, evolutions and game availability, which have
+auto-increment ids, go through `RowSync.Apply`: it matches the existing rows to the new set by natural key, deletes
+the missing, inserts the new and copies values onto the rest, so matched rows keep their ids. Before this, a
+delete-and-reinsert gave them new `AUTOINCREMENT` ids every run. `EnsureDatabaseCreated()` also calls `Migrate()`
+only when a migration is pending: EF Core 9 takes its migration lock by writing a `__EFMigrationsLock` row on every
+call, and that alone changed the file. Tests: the `…WritesNothing` cases in the importer safety tests, the seeder
+tests and `MigrationTests` watch `PRAGMA data_version` (`TempImportDatabases.WatchPokemon`). Trade-off we accepted:
 it `SaveChangesAsync()` **per record** (hundreds of small writes). That's slow, but for a
 one-shot tool run occasionally it's not worth batching — simplicity and obvious progress
 logging win.

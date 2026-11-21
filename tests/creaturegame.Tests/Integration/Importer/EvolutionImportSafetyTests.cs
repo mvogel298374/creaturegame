@@ -143,6 +143,26 @@ public class EvolutionImportSafetyTests : IDisposable
     }
 
     [Fact]
+    public async Task AnUnchangedReImport_KeepsTheEdgeIds_AndWritesNothing()
+    {
+        await EvolutionImport.ImportAllAsync(HealthyApi().Client(), _db.Pokemon);
+        var idsAfterFirst = StoredEdgeIds();
+        using var probe = _db.WatchPokemon();
+
+        var failed = await EvolutionImport.ImportAllAsync(HealthyApi().Client(), _db.Pokemon);
+
+        Assert.Empty(failed);
+        Assert.Equal(idsAfterFirst, StoredEdgeIds());
+        Assert.False(probe.SawAWrite, "an unchanged re-import must not write the edges");
+    }
+
+    private List<int> StoredEdgeIds()
+    {
+        using var context = _db.Pokemon();
+        return context.Evolutions.Select(e => e.Id).OrderBy(id => id).ToList();
+    }
+
+    [Fact]
     public async Task AFailedInsert_RollsTheDeleteBack()
     {
         SeedExistingEdge();

@@ -1,4 +1,5 @@
 using creaturegame.DB;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace creaturegame.Tests.TestSupport;
@@ -34,6 +35,35 @@ public sealed class TempImportDatabases : IDisposable
 
     public ItemsDbContext Items() =>
         new(new DbContextOptionsBuilder<ItemsDbContext>().UseSqlite(Source(_items)).Options);
+
+    /// <summary>Watches the Pokémon database for any write committed by another connection from now on.</summary>
+    public WriteProbe WatchPokemon() => new(Source(_pokemon));
+
+    /// <summary>Holds one connection open and compares SQLite's <c>PRAGMA data_version</c>, which changes only when
+    /// another connection commits a write.</summary>
+    public sealed class WriteProbe : IDisposable
+    {
+        private readonly SqliteConnection _connection;
+        private readonly long _start;
+
+        public WriteProbe(string source)
+        {
+            _connection = new SqliteConnection(source);
+            _connection.Open();
+            _start = DataVersion();
+        }
+
+        private long DataVersion()
+        {
+            using var command = _connection.CreateCommand();
+            command.CommandText = "PRAGMA data_version";
+            return (long)command.ExecuteScalar()!;
+        }
+
+        public bool SawAWrite => DataVersion() != _start;
+
+        public void Dispose() => _connection.Dispose();
+    }
 
     public void Dispose()
     {

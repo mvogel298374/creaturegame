@@ -68,8 +68,8 @@ public static class EvolutionImport
 
             using var context = (createContext ?? (() => new PokemonDbContext()))();
             await using var transaction = await context.Database.BeginTransactionAsync();
-            await context.Evolutions.Where(e => e.Generation == Gen1).ExecuteDeleteAsync();
-            context.Evolutions.AddRange(rows);
+            var existing = await context.Evolutions.Where(e => e.Generation == Gen1).ToListAsync();
+            RowSync.Apply(context, existing, rows, e => (e.FromSpeciesId, e.ToSpeciesId));
             await context.SaveChangesAsync();
             await transaction.CommitAsync();
             Console.WriteLine(

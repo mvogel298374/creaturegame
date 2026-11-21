@@ -103,6 +103,35 @@ REST call routed to the machine that never saw `/start`; the workflow pins `flyc
 
 ---
 
+## §3.2 A re-import marks `pokemon.db` changed with identical data ✅ DONE (2026-11-21)
+
+*(S; found 2026-11-06 in the process pass, read-confirmed.)* `PokemonImport.cs:140`, `EvolutionImport.cs:71` and `GameAvailabilitySeeder.cs:138` deleted
+and re-inserted their rows, so every run regenerated auto-increment IDs and the binary differed. It left the working copy dirty after three
+sessions (2026-11-02, 11-03, 11-05), and `git restore` then failed while the sqlite MCP server held the file open.
+Design pass 2026-11-21: the dirty `pokemon.db` was pure churn (evolution, availability and learnset rows equal `HEAD`'s but for their `AUTOINCREMENT`
+IDs); `PokemonImport` also rewrote every species row (`Species.Update` on a detached object marks every column); any write transaction changes the
+file, so only skipping writes can work.
+
+- **Acceptance:** two importer runs in a row leave `pokemon.db` byte-identical to the committed file (`git status` clean), with the same row content.
+- **Design (approved 2026-11-21):** sync by natural key: a shared importer helper deletes the missing, inserts the new, and copies values onto matched
+  rows, for learnsets (species, move, method, level, generation), evolutions (from, to, generation), game availability (species, version) and the
+  species row; an unchanged run saves nothing. User ruling 2026-11-21: EF Core 9's `Migrate()` writes its `__EFMigrationsLock` row on every call,
+  which alone changes the file, so `EnsureDatabaseCreated()` migrates only when a migration is pending (all three contexts).
+- **Gen surface:** none. **Gen 1 source:** n/a. **Data vs runtime:** importer only. **Dependencies:** none; not logic-heavy.
+- **Quirk asserted:** a second run on one database keeps the row IDs and saves nothing.
+
+**As built (2026-11-21).** `PokeApiConnector/RowSync.cs`: `Apply` syncs tracked rows to a desired set by natural key (delete missing, insert new, copy
+values onto matched rows so EF writes only changed columns); `CopyValues` copies non-key values onto a tracked row. Used for learnsets, evolutions
+(within Gen 1), game availability and the species row (tracked + `CopyValues` instead of a detached `Update`). `GameAvailabilitySeeder.SeedGen1Async`
+gained an optional context factory (test seam). `EnsureDatabaseCreated()` in the three contexts calls `Migrate()` only when a migration is pending.
+Tests: `TempImportDatabases.WatchPokemon()` (a `PRAGMA data_version` write probe); "unchanged re-import keeps the row ids and writes nothing" cases in
+`LearnsetImportSafetyTests`, `EvolutionImportSafetyTests` and `GameAvailabilitySeederTests`;
+`MigrationTests.EnsureDatabaseCreated_WritesNothingWhenTheSchemaIsCurrent` (sabotage, always Migrate, failed the two tests that call it).
+Verified: `git restore pokemon.db`, then two full importer runs left `pokemon.db`, `moves.db` and `items.db` byte-identical. Docs: `DATA_IMPORT.md`
+§4.3, §4.6, §4.7, §5.3.
+
+---
+
 ## §3.1 Metronome can call Mirror Move, as in Gen 1 ✅ DONE (2026-11-21)
 
 *(found 2026-11-21 by the Disable / Mimic verify slice; source-confirmed) — S.* pokered's `MetronomePickMove` (`core.asm:5013-5035`) rejects only 0,

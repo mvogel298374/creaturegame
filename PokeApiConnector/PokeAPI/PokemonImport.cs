@@ -94,9 +94,7 @@ public class PokemonImport
 
             // One transaction for the row and its learnset, so a failed learnset keeps both old (DATA_IMPORT.md §4.6).
             await using var transaction = await context.Database.BeginTransactionAsync();
-            var existing = await context
-                .Species.AsNoTracking()
-                .FirstOrDefaultAsync(s => s.Id == species.Id);
+            var existing = await context.Species.FirstOrDefaultAsync(s => s.Id == species.Id);
             if (existing == null)
             {
                 context.Species.Add(species);
@@ -104,7 +102,7 @@ public class PokemonImport
             }
             else
             {
-                context.Species.Update(species);
+                RowSync.CopyValues(context, existing, species);
                 Console.WriteLine($"Updated Existing Pokemon: {species.Name} (ID: {species.Id})");
             }
 
@@ -135,11 +133,13 @@ public class PokemonImport
     {
         var entries = LearnsetMapper.ExtractLearnset(pokeData, generation);
 
-        await context
+        var existing = await context
             .Learnsets.Where(l => l.SpeciesId == pokeData.Id && l.Generation == generation)
-            .ExecuteDeleteAsync();
+            .ToListAsync();
 
-        context.Learnsets.AddRange(
+        RowSync.Apply(
+            context,
+            existing,
             entries.Select(e => new PokemonLearnset
             {
                 SpeciesId = pokeData.Id,
@@ -147,7 +147,8 @@ public class PokemonImport
                 LearnLevel = e.LearnLevel,
                 Method = e.Method,
                 Generation = generation,
-            })
+            }),
+            l => (l.MoveId, l.LearnLevel, l.Method)
         );
         await context.SaveChangesAsync();
         int levelUp = entries.Count(e => e.Method == LearnMethod.LevelUp);

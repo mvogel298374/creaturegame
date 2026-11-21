@@ -60,7 +60,7 @@ design pass serves the group. Groups 3 and 5 are clusters of S/S–M items and t
 | 10 | Run loop and progression | `RunDirector`, `EncounterFactory` | Progressive difficulty |
 | 11 | Client UX | modals, Title, the level-up panel | Continue card species · `RunFaulted` handler test · Level-up panel · 4d+ surface catalog |
 | 12 | E2E and CI | `e2e/`, workflows, scripts | CI E2E + fast suites before deploying · `voluntary-switch` slow · evolution nameplate · Tighten two specs · E2E helper dedup · Play helper hang (four wait only on one E2E session) |
-| 13 | Importer and data model | `PokeApiConnector`, schema | Re-import churn on `pokemon.db` · §4.4 multi-generation data model |
+| 13 | Importer and data model | `PokeApiConnector`, schema | §4.4 multi-generation data model |
 | 14 | Tooling and docs | `.claude/`, README, hooks | Agent profiles → skills · User docs · Pre-commit hook gaps · `npm audit` · Dev Mode next features · Abuse protection |
 
 **Ready — each awaits your greenlight**
@@ -105,7 +105,6 @@ None open.
 | **Same-type secondary status immunity** (§3.1) | S–M | ✗ 2, 4, 6; the rest drafted | Take the pokered cite; Ice Beam freezes Ice-types today. |
 | **Other `ResidualEffects1` moves may roll accuracy** (§3.1) | S–M | ✗ 1, 2, 4, 6 | Filed 2026-11-06. A verify slice reads each effect for its own hit test; now also carries the residual-effect failure lines. |
 | **Counter keys on the foe's selected move** (§3.1) | S–M | ✗ 1, 2, 4, 6 | Trace `HandleCounterMove` and `MirrorMoveCopyMove`, including switch and item turns; list the diverging cases. |
-| **A re-import marks `pokemon.db` changed with identical data** (§3.2) | S | ✗ 2; the rest drafted | Filed 2026-11-06. Read the three delete-and-insert sites, pick upsert or stable IDs. |
 | **Dependencies — `npm audit`** (§7.2) | S | ✗ 1, 7 | Re-run `npm audit`; the bumps need your E2E run. |
 | **The client `RunFaulted` handler is unpinned** (§6) | S | ✗ 1, 2, 7 | Choose: extract the handler logic, or test it in place. |
 | **E2E play helper hangs on an open move grid** (§6) | S | ✗ 2 | Confirm the trigger from the trace. |
@@ -250,22 +249,6 @@ data/engine item usually also means updating the test that pins the wrong value.
   **DoR:** ✗ not Ready — gaps **1, 2** (the design pass decides between "unsold ⇒ loot only, rarity by category"
   and keying the rule on `PpRestore`). Gen surface none (run tuning); runtime only; best paired with the Catch
   `/plan` (§4.1), which first puts a 0-priced Ball in the pool.
-- **A re-import marks `pokemon.db` changed with identical data (S; found 2026-11-06 in the process pass,
-  read-confirmed).** `PokemonImport.cs:140`, `EvolutionImport.cs:71` and `GameAvailabilitySeeder.cs:138` delete
-  and re-insert their rows, so every run regenerates auto-increment IDs and the binary differs. It left the working
-  copy dirty after three sessions (2026-11-02, 11-03, 11-05), and `git restore` then fails while the sqlite MCP
-  server holds the file open.
-  **DoR:** ✗ not Ready — gap **2**; the rest drafted:
-  - **Acceptance:** two importer runs in a row leave `pokemon.db` byte-identical to the committed file
-    (`git status` clean), with the same row content as today.
-  - **Design:** ✗ open — upsert by natural key (species/evolution/game-version) instead of delete-and-insert, or
-    keep the delete but insert in a stable order with explicit IDs. Read the three call sites first.
-  - **Gen surface:** none (importer persistence, no rule or value changes).
-  - **Gen 1 source:** n/a.
-  - **Data vs runtime:** importer only; the re-run is the data change (`MoDirectives/data.md` 1).
-  - **Quirk to assert:** an importer test that runs the evolution and availability writes twice on one database
-    and asserts the row IDs are unchanged.
-  - **Dependencies:** none. Not logic-heavy (persistence wiring), so the format and test steps, then `docs-cleanup`.
 
 ---
 
