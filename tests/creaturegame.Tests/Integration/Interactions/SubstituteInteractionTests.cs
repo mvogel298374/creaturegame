@@ -1,4 +1,3 @@
-using creaturegame.Attacks;
 using creaturegame.Combat;
 using creaturegame.Creatures;
 using creaturegame.Tests.Integration.Gen1Attacks;
@@ -14,35 +13,6 @@ namespace creaturegame.Tests.Integration.Interactions;
 [Collection(MovesCollection.Name)]
 public class SubstituteInteractionTests(MovesFixture moves) : Gen1MoveContract(moves)
 {
-    // Gen 1: damage your own Substitute soaks is NOT damage *you* took, so Counter has nothing to
-    // answer — it must fail even though the foe just hit (the decoy) with a Normal move.
-    [Fact]
-    public async Task CounterCannotAnswerDamageAbsorbedByOwnSubstitute()
-    {
-        var player = Mon(
-            "Player",
-            hp: 999,
-            attack: 200,
-            speed: 200,
-            "substitute",
-            "counter",
-            "tackle"
-        );
-        var enemy = Mon("Enemy", hp: 50, attack: 40, speed: 1, "tackle");
-
-        var result = await new BattleScenario()
-            .Player(player)
-            .Enemy(enemy)
-            .PlayerUses("substitute", "counter", "tackle")
-            .EnemyUses("tackle")
-            .RunAsync();
-
-        // The turn-2 Counter found no counterable damage (the tackle hit the substitute) and missed.
-        Assert.Contains(result.All<MoveMissed>(), m => m.MoveName == "counter");
-        // Counter therefore never damaged the enemy — its only damage came from the finishing tackle.
-        Assert.Equal("Player", result.Winner);
-    }
-
     // Gen 1: Thunder Wave never checks for a Substitute, so it paralyses through a standing decoy.
     [Fact]
     public async Task ThunderWaveParalysesThroughASubstitute()

@@ -179,9 +179,18 @@ the linked design doc instead — pull it there and leave only the pointer here.
   charge but not a rampage.
 - Sleep, freeze, flinch and a trap clear a pending recharge; a trap does so even when its move misses. A sleep move on
   a recharging foe skips its status and accuracy checks and always lands.
-- A sleep or frozen turn erases the move Mirror Move would copy. Replacing a binder frees the foe it held.
+- A sleep or frozen turn erases the move Mirror Move would copy, and so does any switch-in, on both sides. Replacing a
+  binder frees the foe it held.
+- Mirror Move fails when the foe hasn't moved or last used Mirror Move, including one that failed; it copies a foe's
+  Struggle, recoil included.
 - Metronome can call any move but Metronome and Struggle, Mirror Move included; a called Mirror Move copies the foe's
-  last move, or fails if the foe hasn't moved yet.
+  last move, or fails as Mirror Move does.
+- Counter strikes back for twice the battle's last damage when the foe's move this turn was a Normal or Fighting move
+  that dealt damage. It misses after the foe's move missed, after a Growl or Splash, against another Counter, and when
+  nothing was dealt. It answers a hit its user's Substitute soaked; against a fully paralysed foe it doubles its own
+  last Counter again, and against a foe hurting itself in confusion it doubles that self-hit; an enemy's Counter on the
+  player's item or switch turn reads the player's previous move and can hit the incoming Pokémon. A move picked while
+  asleep or frozen doesn't count as the foe's move for Counter.
 - A Pokémon on its Fly or Dig charge turn is out of reach. A move that runs the hit test misses it with no accuracy roll
   and prints its usual miss line, and X Accuracy and Struggle miss too. Swift, Bide's release, Roar, Whirlwind,
   Transform, Haze and self-targeting moves land; Mimic and Conversion print "But it failed!". Solar Beam's charge turn

@@ -23,6 +23,10 @@ public class AttackAction : IBattleAction
 
     private readonly LastDamage _lastDamage;
 
+    // Each side's last selected and loaded move (GENERATION_SEAMS.md §2, Counter).
+    private readonly MoveRecord _ownMoves;
+    private readonly MoveRecord _foeMoves;
+
     // This side's input, asked only for a Mimic pick; null takes the first move.
     private readonly IBattleInput? _input;
 
@@ -53,10 +57,14 @@ public class AttackAction : IBattleAction
         bool battleEscapable = true,
         BattleSide side = BattleSide.Player,
         LastDamage? lastDamage = null,
-        IBattleInput? input = null
+        IBattleInput? input = null,
+        MoveRecord? ownMoves = null,
+        MoveRecord? foeMoves = null
     )
     {
         _lastDamage = lastDamage ?? new LastDamage();
+        _ownMoves = ownMoves ?? new MoveRecord();
+        _foeMoves = foeMoves ?? new MoveRecord();
         _input = input;
         Source = source;
         _side = side;
@@ -81,6 +89,11 @@ public class AttackAction : IBattleAction
 
         bool usingStruggle = _selectedMove == null;
         Attack attackToUse = usingStruggle ? Source.Struggle : _selectedMove!.Base;
+
+        // Past the status checks, as pokered's GetCurrentMove; a called move also becomes the selection.
+        _ownMoves.Loaded = attackToUse;
+        if (CallingSlot is not null)
+            _ownMoves.Selected = attackToUse;
 
         // Lock-in mechanics (two-turn, rampage, rage, bide) own their per-turn flow — charge/store/
         // unleash/self-confuse — behind ILockInMechanic. A non-lock-in move (or Struggle) leaves lockIn null.
@@ -112,14 +125,8 @@ public class AttackAction : IBattleAction
         if (commit != LockInFlow.ProceedUnannounced)
             _emitter?.Emit(new MoveUsed(Source.Name, Source.Id, attackToUse.Name ?? ""));
 
-        // Remember the move actually used so the foe's Mirror Move can copy it. Metronome / Mirror Move
-        // don't record themselves — the move they *call* does — so neither is ever the foe's LastMoveUsed
-        // (hence the Mirror Move filter below only excludes Struggle, not them).
-        if (
-            !usingStruggle
-            && attackToUse.Effect is not (MoveEffect.Metronome or MoveEffect.MirrorMove)
-        )
-            Source.Battle.LastMoveUsed = attackToUse;
+        // pokered UsedMoveText: every announcement records, and a called move overwrites its caller.
+        Source.Battle.LastMoveUsed = attackToUse;
 
         // Release phase: the mechanic may unleash its own damage and end the turn (bide), or set up its
         // lock (rampage/rage) and let the normal attack pipeline run.
@@ -128,9 +135,9 @@ public class AttackAction : IBattleAction
             var release = lockIn.OnRelease(lockCtx!);
             if (release.Flow == LockInFlow.Halt)
             {
-                // Both route through DealDamageToTarget, so a Substitute soaks them; Bide's unleash is typeless.
+                // Both route through DealDamageToTarget, so a Substitute soaks them.
                 if (release.ReplaysHit)
-                    ReplayHit(attackToUse, release.Damage);
+                    ReplayHit(release.Damage);
                 else if (release.Damage > 0)
                     DealDamageToTarget(release.Damage, 1.0, false);
                 return;
@@ -150,16 +157,13 @@ public class AttackAction : IBattleAction
             return;
         }
 
-        // Mirror Move: re-run the foe's last move in full (through its own inner action, which records it
-        // as this user's last move). Fails if the foe has no copyable move yet; only Struggle is excluded
-        // (see above). Copying a lock-in move is valid Gen 1 — Bide starts a fresh commitment, and a
-        // two-turn move (Fly) charges then auto-releases through the normal lock-in path on this user.
+        // A copied Struggle runs as this user's own Struggle (GENERATION_SEAMS.md §2, Mirror Move).
         if (!usingStruggle && attackToUse.Effect == MoveEffect.MirrorMove)
         {
             var last = Target.Battle.LastMoveUsed;
-            if (last != null && last.Name != "struggle")
+            if (last != null && _rules.MirrorMoveCanCopy(last))
             {
-                await ExecuteInner(last);
+                await ExecuteInner(ReferenceEquals(last, Target.Struggle) ? null : last);
                 return;
             }
             _emitter?.Emit(new MoveMissed(Source.Name, Source.Id, attackToUse.Name ?? ""));
@@ -377,7 +381,7 @@ public class AttackAction : IBattleAction
         if (move.Effect == MoveEffect.Counter)
         {
             _rng.NextDouble(); // see GEN_DIFFERENCES.md → Roll Order (Counter)
-            if (!CounterEffect.Qualifies(Source, Target, _rules))
+            if (!CounterEffect.Qualifies(Target, _rules, _foeMoves, _lastDamage))
             {
                 _emitter?.Emit(new MoveMissed(Source.Name, Source.Id, move.Name ?? ""));
                 return false;
@@ -718,7 +722,7 @@ public class AttackAction : IBattleAction
                         if (i > 0 && !_rules.MultiHitRepeatsFirstStrike)
                             hitDamage = RollCritAndDamage(move, category, screenMult, out isCrit);
                         _laterStrike = i > 0;
-                        if (DealDamageToTarget(hitDamage, effectiveness, isCrit, move.DamageType))
+                        if (DealDamageToTarget(hitDamage, effectiveness, isCrit))
                             dealtRealDamage = true;
                         damage += hitDamage; // accumulated total gates drain/recoil/recharge below
                         landed++;
@@ -750,12 +754,12 @@ public class AttackAction : IBattleAction
 
             case DamageCategory.Fixed:
                 damage = move.FixedDamageValue ?? 1;
-                DealDamageToTarget(damage, 1.0, false, move.DamageType);
+                DealDamageToTarget(damage, 1.0, false);
                 break;
 
             case DamageCategory.LevelBased:
                 damage = DamageCalculator.CalculateLevelBasedDamage(Source);
-                DealDamageToTarget(damage, 1.0, false, move.DamageType);
+                DealDamageToTarget(damage, 1.0, false);
                 break;
 
             case DamageCategory.OHKO:
@@ -764,14 +768,14 @@ public class AttackAction : IBattleAction
                         ? _rules.OhkoDamageToSubstitute
                         : Target.Attributes.HP;
                 _ohkoStrike = true;
-                DealDamageToTarget(damage, effectiveness, false, move.DamageType);
+                DealDamageToTarget(damage, effectiveness, false);
                 break;
 
             case DamageCategory.SelfDestruct:
                 if (strike is { } blast)
                 {
                     damage = blast.Damage;
-                    DealDamageToTarget(damage, effectiveness, blast.IsCrit, move.DamageType);
+                    DealDamageToTarget(damage, effectiveness, blast.IsCrit);
                 }
                 if (!BreakCancels(move.Effect, category))
                     Source.Attributes.ReceiveDamage(Source.Attributes.HP);
@@ -779,12 +783,12 @@ public class AttackAction : IBattleAction
 
             case DamageCategory.SuperFang:
                 damage = DamageCalculator.CalculateSuperFangDamage(Target);
-                DealDamageToTarget(damage, 1.0, false, move.DamageType);
+                DealDamageToTarget(damage, 1.0, false);
                 break;
 
             case DamageCategory.Psywave:
                 damage = _rules.RollPsywaveDamage(Source, _side, _rng);
-                DealDamageToTarget(damage, 1.0, false, move.DamageType);
+                DealDamageToTarget(damage, 1.0, false);
                 break;
         }
 
@@ -808,19 +812,19 @@ public class AttackAction : IBattleAction
     }
 
     // A binding continuation: no rolls, no crit or effectiveness line; GEN_DIFFERENCES.md → Binding.
-    private void ReplayHit(Attack move, int damage)
+    private void ReplayHit(int damage)
     {
         _hitRange = DamageRange.Exact(damage);
-        if (DealDamageToTarget(damage, 1.0, false, move.DamageType))
+        if (DealDamageToTarget(damage, 1.0, false))
             BuildRage();
     }
 
-    // Runs a called move (Metronome / Mirror Move) on a temporary wrapper, so it costs no PP of its own.
-    private Task ExecuteInner(Attack move) =>
+    // Runs a called move on a temporary wrapper, so it costs no PP of its own; null runs Struggle.
+    private Task ExecuteInner(Attack? move) =>
         new AttackAction(
             Source,
             Target,
-            new PokemonAttack(move),
+            move is null ? null : new PokemonAttack(move),
             _typeChart,
             _rules,
             _emitter,
@@ -829,7 +833,9 @@ public class AttackAction : IBattleAction
             _battleEscapable,
             _side,
             _lastDamage,
-            _input
+            _input,
+            _ownMoves,
+            _foeMoves
         )
         {
             CallingSlot = CallingSlot ?? _selectedMove,
@@ -844,15 +850,6 @@ public class AttackAction : IBattleAction
             Target.Battle.BideDamageAccumulated += dmg;
     }
 
-    // Applies <paramref name="dmg"/> to the Target, honoring an active Substitute. Gen 1: while a Substitute
-    // stands the decoy soaks the whole hit — the user's HP is untouched and overflow is lost (it does NOT
-    // carry through, even from an OHKO). Returns true when the real creature took the hit (so a caller can
-    // run on-real-hit follow-ups like Rage), false when the sub absorbed it. Every damage category routes
-    // through here so the soak can't be missed by one branch (the recurring "hook on only Standard" defect).
-    //
-    // <paramref name="counterableType"/> is the move's type when the hit is recordable for the target's
-    // Counter (read back as 2× the last Normal/Fighting damage). Recorded centrally here, gated on real
-    // damage, so every damaging category is counterable through one path; callers that must not be (Bide) pass null.
     // The current attack's non-crit damage range, stamped onto its DamageDealt events (Dev Mode combat log).
     // Set once at the top of ResolveDamage; a field rather than a parameter so every DealDamageToTarget call
     // site (one per damage category) carries it without a signature change.
@@ -863,12 +860,8 @@ public class AttackAction : IBattleAction
 
     private bool _ohkoStrike;
 
-    private bool DealDamageToTarget(
-        int dmg,
-        double effectiveness,
-        bool isCrit,
-        DamageType? counterableType = null
-    )
+    // Every damage category lands here, so the Substitute soak is never missed (GEN_DIFFERENCES.md, Substitute).
+    private bool DealDamageToTarget(int dmg, double effectiveness, bool isCrit)
     {
         _lastDamage.Value = dmg;
         bool printsCritLine = isCrit && !(_laterStrike && _rules.MultiHitRepeatsFirstStrike);
@@ -909,14 +902,6 @@ public class AttackAction : IBattleAction
 
         Target.Attributes.ReceiveDamage(dmg);
         AccumulateBideDamage(dmg);
-
-        // Record for the target's Counter — the last hit that actually connected with the creature (a
-        // hit soaked by a Substitute returned above, so it never reaches here and doesn't update this).
-        if (counterableType is { } type)
-        {
-            Target.Battle.LastDamageTaken = dmg;
-            Target.Battle.LastDamageType = type;
-        }
 
         _emitter?.Emit(
             new DamageDealt(
@@ -1106,7 +1091,7 @@ public class AttackAction : IBattleAction
 
     // Post-damage move effects (Haze, Counter, Reflect, Transform, Rest, Substitute …) live behind
     // IMoveEffect in the MoveEffects registry, keyed by MoveEffect (mirroring LockInMechanics.For). One
-    // runs per move; the context's DealDamage delegate keeps the soak / Bide / Counter recording centralized.
+    // runs per move; the context's DealDamage delegate keeps the soak / Bide / shared last damage centralized.
     private void TryApplyMoveEffect(Attack attack, int damage, int? mimicChoice = null)
     {
         var effect = MoveEffects.For(attack.Effect);
@@ -1129,6 +1114,8 @@ public class AttackAction : IBattleAction
                 BattleEscapable = _battleEscapable,
                 MimicChoice = mimicChoice,
                 DealDamage = DealDamageToTarget,
+                LastDamage = _lastDamage,
+                FoeMoves = _foeMoves,
             }
         );
     }

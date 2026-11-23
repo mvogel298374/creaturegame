@@ -191,6 +191,11 @@ public abstract class DelegatingBattleRules : IBattleRules
 
     public virtual bool SleepOrFreezeTurnForgetsLastMove => _inner.SleepOrFreezeTurnForgetsLastMove;
 
+    public virtual bool SendOutClearsBothLastMoves => _inner.SendOutClearsBothLastMoves;
+
+    public virtual bool SkipsMoveSelection(Creature creature) =>
+        _inner.SkipsMoveSelection(creature);
+
     public virtual bool RollsFullParalysis(IRandomSource rng) => _inner.RollsFullParalysis(rng);
 
     public virtual bool ReplacementEndsTrap => _inner.ReplacementEndsTrap;
@@ -228,8 +233,10 @@ public abstract class DelegatingBattleRules : IBattleRules
     public virtual MoveFailureAnnouncement OneHitKoFailureAnnouncement =>
         _inner.OneHitKoFailureAnnouncement;
 
-    public virtual bool CounterQualifies(DamageType? lastDamageType) =>
-        _inner.CounterQualifies(lastDamageType);
+    public virtual bool CounterQualifies(Attack? foeSelected, Attack? foeLoaded) =>
+        _inner.CounterQualifies(foeSelected, foeLoaded);
+
+    public virtual int CounterDamage(int lastDamage) => _inner.CounterDamage(lastDamage);
 
     public virtual int SelfDestructDefenseDivisor => _inner.SelfDestructDefenseDivisor;
     public virtual int RageAttackStagesPerHit => _inner.RageAttackStagesPerHit;
@@ -268,6 +275,8 @@ public abstract class DelegatingBattleRules : IBattleRules
     public virtual bool MimicCanCopy(Attack move) => _inner.MimicCanCopy(move);
 
     public virtual bool MetronomeCanCall(Attack move) => _inner.MetronomeCanCall(move);
+
+    public virtual bool MirrorMoveCanCopy(Attack lastMove) => _inner.MirrorMoveCanCopy(lastMove);
 
     public virtual bool CanReceiveStatus(Creature t, StatusCondition s, DamageType mt) =>
         _inner.CanReceiveStatus(t, s, mt);

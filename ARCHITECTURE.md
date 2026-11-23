@@ -423,7 +423,7 @@ Each entry: **Decision · Why · Where it lives.**
 - **Why:** lock-ins differ sharply turn-to-turn (charge / store / strike); post-damage effects were a
   ~320-line switch that concentrated change-risk. Owning their own hooks keeps the main pipeline linear and
   each effect independently testable. Damage-dealing move effects (Counter) reach `AttackAction`'s centralized
-  `DealDamageToTarget` through a context delegate, so the Substitute-soak / Bide / Counter-recording stays in
+  `DealDamageToTarget` through a context delegate, so the Substitute-soak / Bide / shared last damage stays in
   one place. **Item effects** mirror the same shape: `CanApply` gates the announce + bag-consume (the Gen 1
   "won't have any effect" rule), `Apply` mutates state and emits events; their *amounts* are **data** read off
   the `Item` row (never inlined). Four of the five categories resolve their target via

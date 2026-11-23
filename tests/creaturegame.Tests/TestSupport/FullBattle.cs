@@ -1,6 +1,7 @@
 using creaturegame.Attacks;
 using creaturegame.Combat;
 using creaturegame.Creatures;
+using creaturegame.Items;
 
 namespace creaturegame.Tests.TestSupport;
 
@@ -10,12 +11,13 @@ public static class FullBattle
     public static async Task<RecordingEmitter> Fight(
         Creature player,
         Creature enemy,
-        ScriptedInput playerInput,
-        ScriptedInput enemyInput,
+        IBattleInput playerInput,
+        IBattleInput enemyInput,
         IBattleRules? rules = null,
         IRandomSource? rng = null,
         IReadOnlyList<Attack>? movePool = null,
-        Party? playerParty = null
+        Party? playerParty = null,
+        Bag? playerBag = null
     )
     {
         var emitter = new RecordingEmitter();
@@ -29,6 +31,7 @@ public static class FullBattle
             movePool: movePool,
             emitter: emitter,
             rng: rng ?? new SeededRandomSource(1),
+            playerBag: playerBag,
             playerParty: playerParty
         ).StartFightAsync();
         return emitter;

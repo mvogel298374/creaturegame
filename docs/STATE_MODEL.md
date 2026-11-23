@@ -24,7 +24,10 @@ The transient half is a separate object, `BattleState`, held as `Creature.Battle
 field-by-field wipe.** That one design choice is the whole point of this model, and
 section 4 explains why. One field outlives a switch: `SubstituteRemnant` belongs to the side, not the creature, so
 `Battle.BringInMember` carries it to the incoming creature (`GEN_DIFFERENCES.md`, Substitute). Only the player side
-switches today; when enemy parties land, the enemy's switch must carry it too.
+switches today; when enemy parties land, the enemy's switch must carry it too. `Battle` also keeps each side's
+`MoveRecord` (the last selected and loaded move Counter reads) across a switch, and a send-out clears the foe's
+`LastMoveUsed` as well as the incoming creature's (`SendOutClearsBothLastMoves`); an enemy send-out must read the same
+member (`GENERATION_SEAMS.md` §2, Counter and Mirror Move).
 
 ---
 
@@ -106,7 +109,7 @@ cure above maintains it, and a new path that breaks it would leave that creature
 sides); the CONFUSED bit; Disable; Mist; Focus Energy; X Accuracy; Leech Seed; Reflect/Light Screen; and the
 "badly poisoned" bit (downgrades to regular Poison, both sides — only the escalation stops, the Poison itself
 is never cured on the user's own side). Everything else on `BattleState` — Substitute, Bide, Rampage/Thrash,
-Rage, binding, Recharge, two-turn charging, Fly and Dig's `SemiInvulnerability`, Flinch, `LastMoveUsed`, Counter's damage memory, and any
+Rage, binding, Recharge, two-turn charging, Fly and Dig's `SemiInvulnerability`, Flinch, `LastMoveUsed`, and any
 Transform/Mimic identity swap — is left alone; a wholesale `Battle = new BattleState()` here would silently
 wipe all of that (the "full nuke, then allow-list a few fields back" mistake this narrow method exists to
 avoid). `preserveMajorStatus` (true for the *user's own* side, false for the *target's*) gates whether the

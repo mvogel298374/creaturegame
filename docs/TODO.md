@@ -45,20 +45,19 @@ Ranked within each tier; the tiers run from the shortest path to a greenlight to
 gap has drafted text, awaiting your confirmation · ✗ gaps remain.
 
 **Code groups** (user ruling 2026-11-15): items that touch the same code are tackled together, so one pokered read or
-design pass serves the group. Groups 3 and 5 are clusters of S/S–M items and the cheapest wins.
+design pass serves the group. Group 3 is a cluster of S/S–M items and the cheapest win.
 
 | # | Group | Code | Items |
 |:-:|:--|:--|:--|
 | 2 | End-of-turn residual phase | `Battle` turn tail, residuals, `TickTurnCounters` | End-of-turn residual phase (with Leech Seed × Toxic and the menu-turn first mover) |
-| 3 | Hit test and accuracy | `AttackAction.Connects`, `Gen1BattleRules.RunsHitTest` | Other `ResidualEffects1` moves (with the residual-effect failure lines) |
+| 3 | Hit test and accuracy | `AttackAction.Connects`, `Gen1BattleRules.RunsHitTest` | Other `ResidualEffects1` moves (with the residual-effect failure lines) · A missed move zeroes the shared last damage |
 | 4 | Damage formula | `DamageCalculator`, crit and accuracy tables | Damage/accuracy core |
-| 5 | Effects that copy or name a move | `CounterEffect`, Mimic, Mirror Move | Counter keys on the selected move (with Counter/Mirror Move on a menu turn) |
 | 7 | Battle text and seams | `timeline.ts`, the console emitter, `GENERATION_SEAMS.md` | Audit the inline battle rules · Binding and miss lines |
 | 8 | Battle presentation | `BattleScene`, the event wire | Move animations · Sprite FX · Fly/Dig sprite stays on screen · Text feel |
 | 9 | Acquisition and items | `ItemEffects`, `RewardCalculator`, evolution | Catch · Unsold-item rule · Stone evolutions |
 | 10 | Run loop and progression | `RunDirector`, `EncounterFactory` | Progressive difficulty |
 | 11 | Client UX | modals, Title, the level-up panel | Continue card species · `RunFaulted` handler test · Level-up panel · 4d+ surface catalog |
-| 12 | E2E and CI | `e2e/`, workflows, scripts | CI E2E + fast suites before deploying · `voluntary-switch` slow · evolution nameplate · Tighten two specs · E2E helper dedup · Play helper hang (four wait only on one E2E session) |
+| 12 | E2E and CI | `e2e/`, workflows, scripts | Flaky Bide Substitute test · CI E2E + fast suites before deploying · `voluntary-switch` slow · evolution nameplate · Tighten two specs · E2E helper dedup · Play helper hang (four wait only on one E2E session) |
 | 13 | Importer and data model | `PokeApiConnector`, schema | §4.4 multi-generation data model |
 | 14 | Tooling and docs | `.claude/`, README, hooks | Agent profiles → skills · User docs · Pre-commit hook gaps · `npm audit` · Dev Mode next features · Abuse protection |
 
@@ -102,7 +101,8 @@ None open.
 | Item | Cost | Ready? | Next step |
 |:-----|:----:|:-------|:----------|
 | **Other `ResidualEffects1` moves may roll accuracy** (§3.1) | S–M | ✗ 1, 2, 4, 6 | Filed 2026-11-06. A verify slice reads each effect for its own hit test; now also carries the residual-effect failure lines. |
-| **Counter keys on the foe's selected move** (§3.1) | S–M | ✗ 1, 2, 4, 6 | Trace `HandleCounterMove` and `MirrorMoveCopyMove`, including switch and item turns; list the diverging cases. |
+| **A missed move zeroes the shared last damage** (§3.1) | S–M | ✗ 2, 6; the rest drafted | Filed 2026-11-24; Bide counts a missed status move's turn as the previous hit. |
+| **Flaky `AHitOnTheBideUsersSubstitute_IsStored`** (§6) | S | ✗ 1, 2 drafted | Filed 2026-11-24; trace the unpinned draw. |
 | **Dependencies — `npm audit`** (§7.2) | S | ✗ 1, 7 | Re-run `npm audit`; the bumps need your E2E run. |
 | **The client `RunFaulted` handler is unpinned** (§6) | S | ✗ 1, 2, 7 | Choose: extract the handler logic, or test it in place. |
 | **E2E play helper hangs on an open move grid** (§6) | S | ✗ 2 | Confirm the trigger from the trace. |
@@ -172,25 +172,17 @@ data/engine item usually also means updating the test that pins the wrong value.
   missed Supersonic or Confuse Ray prints "But it failed!" (`effects.asm:1120-1126`, `ConfusionEffectFailed`
   :1158-1163); ours prints "missed". The slice decides where these moves roll accuracy, then each case prints its
   pokered line in a full battle; a new "evaded" event is wired in all four places. Lines gaps: **2, 3, 6**.
-- **Counter keys on the foe's selected move (found 2026-10-29 by `requirements-review`; read-confirmed by the
-  reviewer) — S–M, ✗ not Ready.** pokered `HandleCounterMove` (`core.asm:4547-4607`) qualifies on the foe's last
-  *selected* move: it misses when that move is Counter, has 0 power, or isn't Normal/Fighting type, and doubles the
-  shared `wDamage`. Ours keys on the type of the last damage the user *took* (`LastDamageType`). Cases that differ
-  need tracing (a foe that selected a Normal move but missed; damage from the user's own move in `wDamage`).
-  **Merged in (ruling 2026-11-15): an enemy Counter or Mirror Move on a switch or item turn** (found 2026-11-15 by
-  `requirements-review`, menu-item item; unverified). No player move runs on a switch or item turn, so pokered's
-  enemy Counter and Mirror Move read the stale `wPlayerSelectedMove` and `wDamage` from the previous turn
-  (`MirrorMoveCopyMove` too); whether ours matches is untraced. The same trace covers both.
-  **Merged in (ruling 2026-11-21): a failed Mirror Move is the user's last move** (found 2026-11-21 by
-  `requirements-review`, Metronome item; source-confirmed by the reviewer). pokered's `UsedMoveText` writes
-  `wPlayerUsedMove` / `wEnemyUsedMove` on every announcement, so a failed Mirror Move leaves MIRROR_MOVE there and a foe's
-  Mirror Move then fails (`core.asm:4979-4985`, `.mirrorMoveFailed`). Ours records nothing on a failure
-  (`AttackAction.cs:115-122`), so the foe's Mirror Move copies the user's earlier move. Metronome calling Mirror Move
-  makes it easier to reach.
-  **DoR:** ✗ — gaps **4** (trace `HandleCounterMove` and `MirrorMoveCopyMove` ourselves, including the switch and item
-  paths, and list the diverging cases), **2** (design pass: touches `AttackAction`/`CounterEffect` and
-  `CounterQualifies`' signature; it can switch from `LastDamageTaken` to the shared `Battle.LastDamage` Bide now uses),
-  **6**, **1**. 3: existing Counter and Mirror Move seams. 5: runtime only. 7: none.
+- **A missed move zeroes the shared last damage (found 2026-11-24, Counter item; source-confirmed) — S–M, ✗ not
+  Ready.** pokered's `MoveHitTest` zeroes `wDamage` on every miss (`core.asm:5328-5332`), including a status move that
+  calls it from its effect (`PoisonEffect` `effects.asm:106-113`, `ParalyzeEffect_` `move_effects/paralyze.asm:27-33`,
+  `SleepEffect` `effects.asm:52-57`). Ours never touches `LastDamage` on a miss of a move that skips the damage
+  calculation, so a Bide user whose foe misses Poison Powder or Thunder Wave counts the previous hit again where pokered
+  counts 0 (`GEN_DIFFERENCES.md` → Bide; only the missed-Counter case is noted there today).
+  **DoR:** ✗ — gaps **2, 6**. *Drafted:* 1. any move whose hit test misses leaves the shared last damage at 0, so Bide
+  stores 0 for that turn and a later Counter has nothing to answer. 2. the miss path in `AttackAction.Connects` and
+  the status effects' own hit tests zero `LastDamage`, behind a seam member (Gen 1: every miss zeroes). 3.
+  `IBattleRules` (new member). 4. the cites above. 5. runtime only. 6. full battles: a foe's missed Poison Powder during
+  Bide stores 0; a missed Counter leaves nothing for the next Counter. 7. none.
 - **Audit the inline battle rules and put each behind a seam (user ruling 2026-10-31) — M, ✗ not Ready.** Battle
   logic gets full generation separation: a rule goes on a seam even when the generations we checked agree, and
   only out-of-battle or ancillary behaviour may stay inline. `GENERATION_SEAMS.md` still documents deliberate inline
@@ -198,8 +190,8 @@ data/engine item usually also means updating the test that pins the wrong value.
   `AttackAction`"), Disable's target move and Conversion ("not yet a seam"), and Confuse's never-re-rolled counter
   ("gen-agnostic and inline in `ConfuseEffect`") (read-confirmed 2026-10-31). Also `SubstituteEffect`'s can't-pay
   check: Gen 1 fails only below the cost, Gen 2 at exactly the cost too (`GENERATION_SEAMS.md` §2, Substitute lines).
-  Also Mirror Move's inline "the foe's last move isn't Struggle" check (`AttackAction.cs:160`; `pr-review` 2026-11-21,
-  Metronome item): it never fires today, since Struggle never records itself and Metronome can't call it.
+  Mirror Move's inline Struggle check is done: the check was deleted, since pokered's Mirror Move copies Struggle
+  (`TODO_ARCHIVE.md` → "Counter keys on the foe's selected move").
   **DoR:** ✗ not Ready — gaps **1, 2**; the rest follow from the slice. *Drafted:*
   - **Acceptance:** a verify slice lists every inline battle rule in the engine (the `GENERATION_SEAMS.md` rows plus
     a code sweep of `Combat/`), each with its pokered cite; each then gets its own seam member and a test that a
@@ -541,6 +533,13 @@ surface: `/help` and the explainer describe the active generation, so they are p
 - **Flake watch:** `endless-chain.spec.ts` *"a run ends when the player faints"* failed once in a full 2026-07-26 run
   (no `Run over` line after 1m10s) but passes in 7.3 s alone — consistent with the documented "a long run
   accumulates abandoned server-side runs" degradation, not a code defect.
+- **`BideContractTests.AHitOnTheBideUsersSubstitute_IsStored` is flaky (found 2026-11-24, Counter item; reproduced) —
+  S, ✗ not Ready.** It failed 1 of 8 runs alone on `HEAD` (commit `b43c122`) and about 1 in 5 with the Counter work; a
+  full `.\test.ps1 -Dotnet` can go red at random. `FixedBideRules` pins hit, crit and variance and the battle RNG is
+  seeded, so some unpinned roll still reaches the shared inner ruleset.
+  **DoR:** ✗ — gaps **1, 2**. *Drafted:* 1. the test passes 50 runs in a row; 2. trace which draw varies (the
+  `trace-turn` skill, or a `RecordingRandomSource` over the inner rules), then pin it in the test's rules double or the
+  harness. 3–5: n/a (test only). 6: the repeated run is the check. 7: none.
 - [ ] *(small)* **Tighten `encounter-map.spec.ts` and `cadence.spec.ts`** (S, from §7.6 V14, ✗ not Ready).
   `encounter-map.spec.ts:94` ignores `playToNextEncounter`'s returned log, so a loss surfaces later as a confusing
   ladder failure (read-confirmed). `cadence.spec.ts`'s `usedWhileFull` accepts any "used X!" line while the enemy

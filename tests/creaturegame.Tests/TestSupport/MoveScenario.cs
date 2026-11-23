@@ -55,6 +55,8 @@ public sealed class MoveScenario
     private ITypeChart _typeChart = Gen1TypeChart.Instance;
     private IReadOnlyList<Attack> _movePool = Array.Empty<Attack>();
     private BattleSide _side = BattleSide.Player;
+    private readonly MoveRecord _foeMoves = new();
+    private readonly LastDamage _lastDamage = new();
 
     public MoveScenario Attacker(Creature c)
     {
@@ -93,6 +95,15 @@ public sealed class MoveScenario
         return this;
     }
 
+    /// <summary>The foe's last selected and loaded move and the shared last damage, as Counter reads them.</summary>
+    public MoveScenario FoeLastMove(Attack move, int lastDamage)
+    {
+        _foeMoves.Selected = move;
+        _foeMoves.Loaded = move;
+        _lastDamage.Value = lastDamage;
+        return this;
+    }
+
     /// <summary>Move pool for effects that draw from one (Metronome).</summary>
     public MoveScenario MovePool(params Attack[] pool)
     {
@@ -114,7 +125,9 @@ public sealed class MoveScenario
             emitter,
             _movePool,
             _rng,
-            side: _side
+            side: _side,
+            lastDamage: _lastDamage,
+            foeMoves: _foeMoves
         );
         await action.ExecuteAsync();
         return new MoveResult(emitter, _attacker, _defender, pokeMove);

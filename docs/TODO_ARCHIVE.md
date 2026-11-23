@@ -103,6 +103,86 @@ REST call routed to the machine that never saw `/start`; the workflow pins `flyc
 
 ---
 
+## §3.1 Counter keys on the foe's selected move, with the Mirror Move last-move cases ✅ DONE (2026-11-24)
+
+*(found 2026-10-29 by `requirements-review`; read-confirmed by the reviewer, source-confirmed by the 2026-11-23 verify slice; greenlit 2026-11-23) — M.*
+pokered `HandleCounterMove` (`core.asm:4547-4607`) qualifies on the foe's last *selected* move: it misses when that move is Counter, has 0 power, or
+isn't Normal/Fighting type, and doubles the shared `wDamage`. Ours keyed on the type of the last damage the user *took* (`LastDamageType`). Cases that
+differed needed tracing (a foe that selected a Normal move but missed; damage from the user's own move in `wDamage`).
+**Merged in (ruling 2026-11-15): an enemy Counter or Mirror Move on a switch or item turn** (found 2026-11-15 by `requirements-review`, menu-item item;
+unverified). No player move runs on a switch or item turn, so pokered's enemy Counter and Mirror Move read the stale `wPlayerSelectedMove` and `wDamage`
+from the previous turn (`MirrorMoveCopyMove` too); whether ours matched was untraced. The same trace covers both.
+**Merged in (ruling 2026-11-21): a failed Mirror Move is the user's last move** (found 2026-11-21 by `requirements-review`, Metronome item;
+source-confirmed by the reviewer). pokered's `UsedMoveText` writes `wPlayerUsedMove` / `wEnemyUsedMove` on every announcement, so a failed Mirror Move
+leaves MIRROR_MOVE there and a foe's Mirror Move then fails (`core.asm:4979-4985`, `.mirrorMoveFailed`). Ours recorded nothing on a failure
+(`AttackAction.cs:115-122`), so the foe's Mirror Move copied the user's earlier move. Metronome calling Mirror Move made it easier to reach.
+
+**Verify slice 2026-11-23 (source-confirmed against pret/pokered master).** Counter reads three things refreshed at different times: the foe's selected
+move *number* (`wEnemySelectedMove`, written at selection; Metronome and Mirror Move overwrite it with the called move, `core.asm:4980`), the foe's
+*loaded* move data (`wEnemyMovePower`/`Type`, written by `GetCurrentMove` only past the status checks, `:3091-3095` / `:5488`, so a fully paralysed foe
+keeps its previous move's power and type), and the shared `wDamage` (zeroed by a miss `:5330`, set by a Substitute-soaked hit `:4869-4881` and a
+confusion self-hit, doubled in place by Counter, capped at $FFFF `:4594-4604`). Mirror Move copies `w*UsedMove`, which `UsedMoveText` writes on every
+announcement (`used_move_text.asm:9-18`), a sleep or freeze turn zeroes, and any send-out zeroes on **both** sides (`SendOutMon` `:1741`,
+`EnemySendOutFirstMon` `:1303`); it fails only on 0 or MIRROR_MOVE (`:4981-4984`). Our shared `LastDamage` already behaved as `wDamage`. Diverging cases,
+all reachable: **C1** the foe's Normal/Fighting move misses (pokered misses; ours countered an older hit); **C2** the foe uses a 0-power move after an
+earlier hit (misses; ours countered the old hit); **C3** the foe's hit is soaked by the user's Substitute (2× the soaked damage; ours ignored it); **C4**
+the foe is fully paralysed or hits itself in confusion (2× `wDamage`, i.e. the user's own last hit or the self-hit, keyed on the foe's last *loaded*
+move; ours countered an older hit); **C5** both use Counter (both miss; ours both connected); **C6** an enemy Counter on the player's item or switch turn
+(the player's previous selection + the last `wDamage`, so the incoming mon can be hit; ours used the enemy's own last-taken record); **M1** a failed
+Mirror Move, then the foe's Mirror Move (fails; ours copied an older move); **M2** the foe Struggled (Mirror Move copies Struggle; ours copied the foe's
+earlier move); **M3** the player switches and the enemy can't act, then the new mon's Mirror Move (fails; ours copied the pre-switch move). Already
+matching: an enemy Mirror Move on a switch turn (fails) or item turn (copies), fixed-damage Normal/Fighting hits being counterable, Bide's unleash.
+Not modelled (invisible: our UI has no hover state): the move-menu cursor rewriting `wPlayerSelectedMove` on hover (`:2869`), a `GEN_DIFFERENCES.md`
+note in this item's commit.
+
+**Rulings 2026-11-23 (all as recommended):** M2 and M3 join this item (M2 made the inline Struggle check in "Audit the inline battle rules" obsolete);
+the design below; Counter reads the *loaded* move's power and type (C4); the test list below. **DoR:** ✅ Ready (confirmed 2026-11-23).
+1. Counter misses when the foe's selected move is Counter, or the foe's loaded move has 0 power or isn't Normal or Fighting, or the shared last damage
+   is 0; otherwise it deals 2× the shared last damage, capped at 65535. Mirror Move fails when the foe's last move is none or Mirror Move, copies
+   Struggle, and a failed Mirror Move stays the user's last move; any send-out clears both sides' last move. C1–C6 and M1–M3 then match pokered.
+2. A per-side move record owned by `Battle` (survives a switch, as pokered's does), passed to `AttackAction` like `LastDamage`: the selected move
+   (written at selection, overwritten by a Metronome or Mirror Move call) and the loaded move (written once the move passes the status checks; for the
+   player also at selection). `CounterEffect` reads the foe's record and the shared `LastDamage`; `BattleState.LastDamageTaken` / `LastDamageType` and
+   their write in `DealDamageToTarget` are deleted. Mirror Move records itself at its announcement (the called move overwrites it); Struggle records
+   itself; `BringInMember` clears the foe's last move as well as the incoming creature's. The inline Struggle check at `AttackAction.cs:160` goes.
+3. `IBattleRules`: `CounterQualifies(selected, loaded)` (signature change, Gen 1 as line 1), the Counter damage cap on the Counter seam, new
+   `MirrorMoveCanCopy(lastMove)` (Gen 1: anything but Mirror Move), new `SendOutClearsBothLastMoves` (Gen 1 true).
+4. pokered `HandleCounterMove` `core.asm:4547-4610`; `GetCurrentMove` after the status checks `:3091-3095`, `:5488`; `wDamage` zeroed on a miss
+   `:5330`, Substitute path `:4869-4881`; `MirrorMoveCopyMove` `:4961-4989`; `UsedMoveText` `engine/battle/used_move_text.asm:9-18`; send-out zeroing
+   `:1741`, `:1303`; cursor hover `:2869`.
+5. Runtime only.
+6. One full-battle test per case C1–C6 and M1–M3, with C1 and C5 from both sides; each new or changed seam member proven by a swapped rule
+   (`DelegatingBattleRules`); forced outcomes only through the rules seam.
+7. None. It absorbed the Mirror Move Struggle line of "Audit the inline battle rules".
+
+**`requirements-review` rulings 2026-11-24 (all as recommended):** an asleep or frozen pick and a Struggle pick write nothing to the record (new
+`SkipsMoveSelection`, both sides tested); a real-data test pins `HasGen1Power` for every Normal/Fighting move (it differs from pokered only on Night
+Shade, rejected by type); C4's confusion self-hit and C6's item turn get full-battle tests (`FullBattle.Fight` takes a bag); a failed Mirror Move's
+selection write is a not-modelled `GEN_DIFFERENCES` note; the missed-move zeroing and the flaky Bide test are filed as their own entries.
+**`pr-review` 2026-11-24: CHANGES-REQUESTED; rulings (all as recommended, re-review skipped):** a test that a called Counter becomes the caller's
+selection (a Metronome-called Counter kept across a sleep; a Mirror Move-then-Counter turn can't show it, since Mirror Move and Metronome zero `wDamage`
+themselves, `core.asm:3143` before `:3198`); the Bide-unleash case folded into the Counter Theory; `MoveEffectContext.LastDamage` / `FoeMoves` made
+`required`; the seam widened to `SkipsMoveSelection(creature)` (asleep, frozen or recharging, `SelectEnemyMove` `:2938-2947`) with freeze and recharge
+tests; stale and over-budget comments fixed; a `STATE_MODEL.md` line on the per-side record.
+
+**What was built (2026-11-24).**
+- `Battle` keeps a per-side `MoveRecord` (Selected, Loaded) that survives a switch.
+- Counter reads the foe's record plus the shared `LastDamage`; `BattleState.LastDamageTaken` / `LastDamageType` are deleted.
+- `LastMoveUsed` is recorded on every announcement (Mirror Move, Metronome and Struggle included); a copied Struggle runs as the user's Struggle; a
+  send-out clears both sides' last move.
+- Seam members: `CounterQualifies(selected, loaded)` (changed), `CounterDamage` (65535 cap), `MirrorMoveCanCopy`, `SendOutClearsBothLastMoves`,
+  `SkipsMoveSelection(creature)` (asleep, frozen or recharging).
+- Tests: a full battle per case, seam swaps, a real-data test over every imported Normal/Fighting move, and sabotage checks. Two older tests asserted
+  the opposite of pokered: the `CounterInteractionTests` Splash test was flipped (C2), and `SubstituteInteractionTests`' Counter-vs-own-Substitute
+  test was deleted, replaced by C3. The harness gained `MoveScenario.FoeLastMove`, `Gen1MoveContract.AllMoves`, and a `FullBattle.Fight` that takes an
+  `IBattleInput` and a `Bag`.
+- Docs: `GENERATION_SEAMS.md` §2 (Counter row, new Mirror Move row), `GEN_DIFFERENCES.md` (Counter and Mirror Move), `PRODUCT_SPEC.md`, `STATE_MODEL.md`,
+  `ARCHITECTURE.md` wording.
+- **Filed during the item (still open in `TODO.md`):** §3.1 "A missed move zeroes the shared last damage"; §6 "`BideContractTests.AHitOnTheBideUsersSubstitute_IsStored`
+  is flaky".
+
+---
+
 ## §3.1 A secondary freeze, burn or paralysis never lands on a target of the move's type ✅ DONE (2026-11-23)
 
 *(found 2026-10-29 by `requirements-review`; read-confirmed by the reviewer, source-confirmed by the 2026-11-23 verify slice) — S.* pokered

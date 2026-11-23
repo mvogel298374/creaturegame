@@ -429,8 +429,6 @@ public class StatStageTests
         creature.Battle.ChargingMove = rampageMove;
         creature.Battle.IsFlinched = true;
         creature.Battle.LastMoveUsed = rampageMove.Base;
-        creature.Battle.LastDamageTaken = 17;
-        creature.Battle.LastDamageType = DamageType.Fire;
 
         creature.ResetForHaze(preserveMajorStatus: true);
 
@@ -448,8 +446,6 @@ public class StatStageTests
         Assert.Same(rampageMove, creature.Battle.ChargingMove);
         Assert.True(creature.Battle.IsFlinched);
         Assert.Same(rampageMove.Base, creature.Battle.LastMoveUsed);
-        Assert.Equal(17, creature.Battle.LastDamageTaken);
-        Assert.Equal(DamageType.Fire, creature.Battle.LastDamageType);
     }
 
     [Fact]

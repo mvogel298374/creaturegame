@@ -18,16 +18,20 @@ public class RollOrderContractTests(MovesFixture moves) : Gen1MoveContract(moves
         Attack move,
         IRandomSource inner,
         Creature? attacker = null,
-        Creature? defender = null
+        Creature? defender = null,
+        Attack? foeLastMove = null,
+        int lastDamage = 0
     )
     {
         var rng = new RecordingRandomSource(inner);
-        var result = await new MoveScenario()
+        var scenario = new MoveScenario()
             .Rules(new Gen1BattleRules(rng))
             .Rng(rng)
             .Attacker(attacker ?? NoCritAttacker())
-            .Defender(defender ?? TestCreatures.Make("D", hp: 5000))
-            .Use(move);
+            .Defender(defender ?? TestCreatures.Make("D", hp: 5000));
+        if (foeLastMove is not null)
+            scenario.FoeLastMove(foeLastMove, lastDamage);
+        var result = await scenario.Use(move);
         return (result, rng.Draws);
     }
 
@@ -628,14 +632,11 @@ public class RollOrderContractTests(MovesFixture moves) : Gen1MoveContract(moves
     [Fact]
     public async Task CounterDrawsCritThenAccuracyWhenItQualifies()
     {
-        var attacker = NoCritAttacker();
-        attacker.Battle.LastDamageTaken = 30;
-        attacker.Battle.LastDamageType = DamageType.Normal;
-
         var (result, draws) = await UseGen1(
             Move("counter"),
             new LowestRollSource(),
-            attacker: attacker
+            foeLastMove: Move("tackle"),
+            lastDamage: 30
         );
 
         Assert.Equal([Crit, Accuracy], draws);

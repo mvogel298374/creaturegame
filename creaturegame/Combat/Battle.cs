@@ -20,6 +20,8 @@ public class Battle
     private readonly Bag? _playerBag;
     private readonly bool _escapable;
     private readonly LastDamage _lastDamage = new();
+    private readonly MoveRecord _playerMoves = new();
+    private readonly MoveRecord _enemyMoves = new();
     private readonly bool _trainerBattle;
     private readonly RunRules _runRules;
 
@@ -180,6 +182,8 @@ public class Battle
                 PlayerCreature,
                 _enemyInput
             );
+            if (SelectsMove(EnemyCreature))
+                _enemyMoves.Selected = enemyMove?.Base ?? EnemyCreature.Struggle;
             var enemyAction = new AttackAction(
                 EnemyCreature,
                 PlayerCreature,
@@ -192,7 +196,9 @@ public class Battle
                 _escapable,
                 BattleSide.Opponent,
                 _lastDamage,
-                _enemyInput
+                _enemyInput,
+                _enemyMoves,
+                _playerMoves
             );
 
             // Turn resolution: Priority → effective Speed (Paralysis quarters) → random tie-breaker.
@@ -597,14 +603,28 @@ public class Battle
                 return NewPlayerAttack(forced);
 
             case MoveTurnChoice mv when attacker.CanSelect(mv.Move):
-                return NewPlayerAttack(mv.Move);
+                return PlayerPicksFromMenu(mv.Move);
 
             default:
-                return NewPlayerAttack(
-                    forced ?? attacker.MoveSet.FirstOrDefault(attacker.CanSelect)
-                );
+                return forced is not null
+                    ? NewPlayerAttack(forced)
+                    : PlayerPicksFromMenu(attacker.MoveSet.FirstOrDefault(attacker.CanSelect));
         }
     }
+
+    // pokered's move menu writes the selection and loads its data (core.asm:2869, :2901); a lock-in skips it.
+    private AttackAction PlayerPicksFromMenu(PokemonAttack? move)
+    {
+        if (SelectsMove(PlayerCreature))
+        {
+            _playerMoves.Selected = move?.Base ?? PlayerCreature.Struggle;
+            if (move is not null) // Struggle bypasses the menu, so it loads only when it runs
+                _playerMoves.Loaded = move.Base;
+        }
+        return NewPlayerAttack(move);
+    }
+
+    private bool SelectsMove(Creature creature) => !_rules.SkipsMoveSelection(creature);
 
     private PokemonAttack? ForcedPlayerMove() =>
         LockInMechanics
@@ -669,7 +689,9 @@ public class Battle
             _escapable,
             BattleSide.Player,
             _lastDamage,
-            _playerInput
+            _playerInput,
+            _playerMoves,
+            _enemyMoves
         );
 
     /// <summary>The forced faint-switch: if a live bench member remains, ask the player which to send in and
@@ -732,6 +754,8 @@ public class Battle
         _playerParty!.SetLead(index);
         PlayerCreature = _playerParty.Lead;
         PlayerCreature.ResetBattleState();
+        if (_rules.SendOutClearsBothLastMoves)
+            EnemyCreature.Battle.LastMoveUsed = null;
         PlayerCreature.Battle.SubstituteRemnant = substituteRemnant;
         ApplyEntryStatus(PlayerCreature.CarriedStatus);
         _participants.Add(PlayerCreature);

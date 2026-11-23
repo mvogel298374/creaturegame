@@ -146,9 +146,21 @@ public sealed class Gen1BattleRules : IBattleRules
     public MoveFailureAnnouncement OneHitKoFailureAnnouncement =>
         MoveFailureAnnouncement.Unaffected;
 
-    // Gen 1: a Normal or Fighting type qualifies; Bide's typeless unleash arrives as null and doesn't.
-    public bool CounterQualifies(DamageType? lastDamageType) =>
-        lastDamageType is DamageType.Normal or DamageType.Fighting;
+    // pokered core.asm:4566-4582 HandleCounterMove.
+    public bool CounterQualifies(Attack? foeSelected, Attack? foeLoaded) =>
+        foeSelected?.Effect != MoveEffect.Counter
+        && foeLoaded is not null
+        && HasGen1Power(foeLoaded)
+        && foeLoaded.DamageType is DamageType.Normal or DamageType.Fighting;
+
+    // core.asm:4594-4604: doubled in place, capped at $FFFF.
+    public int CounterDamage(int lastDamage) => Math.Min(lastDamage * 2, 0xFFFF);
+
+    // pokered power > 0 on our imported shapes (GENERATION_SEAMS.md §2, Counter).
+    private static bool HasGen1Power(Attack move) =>
+        move.BaseDamage > 0
+        || move.DamageCategory != DamageCategory.Standard
+        || move.Effect == MoveEffect.Counter;
 
     // Gen 1: Self-Destruct / Explosion halve the target's Defense before the damage calculation.
     public int SelfDestructDefenseDivisor => 2;
@@ -245,6 +257,9 @@ public sealed class Gen1BattleRules : IBattleRules
     // pokered core.asm:5013-5035 MetronomePickMove rerolls only Metronome and Struggle.
     public bool MetronomeCanCall(Attack move) =>
         move.Effect != MoveEffect.Metronome && move.Name != "struggle";
+
+    // pokered core.asm:4981-4984 MirrorMoveCopyMove fails only on MIRROR_MOVE, so Struggle is copyable.
+    public bool MirrorMoveCanCopy(Attack lastMove) => lastMove.Effect != MoveEffect.MirrorMove;
 
     // ── Type-based immunities ────────────────────────────────────────────────────
 
@@ -473,6 +488,14 @@ public sealed class Gen1BattleRules : IBattleRules
     public bool SleepMoveIgnoresChecksOnRechargingTarget => true;
 
     public bool SleepOrFreezeTurnForgetsLastMove => true;
+
+    // pokered SendOutMon core.asm:1741 and EnemySendOutFirstMon :1303 zero both w*UsedMove bytes.
+    public bool SendOutClearsBothLastMoves => true;
+
+    // pokered core.asm:310-312 (player menu) and SelectEnemyMove :2938-2947; the lock-ins re-pick the same move.
+    public bool SkipsMoveSelection(Creature creature) =>
+        creature.Battle.IsRecharging
+        || creature.Battle.Status is StatusCondition.Sleep or StatusCondition.Freeze;
 
     // pokered: cp 25 percent, where percent is * $ff / 100.
     public bool RollsFullParalysis(IRandomSource rng) => rng.Next(256) < 63;

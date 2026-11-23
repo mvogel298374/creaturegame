@@ -8,7 +8,7 @@ namespace creaturegame.Combat;
 /// internals. The effect reads the resolved move, the damage the attack just dealt, and the shared seams
 /// (rules/rng/emitter), mutates battle state, and emits its own events. Damage-dealing effects (Counter,
 /// Bide's unleash routes elsewhere) call <see cref="DealDamage"/> so the Substitute soak, Bide
-/// accumulation and Counter recording stay centralized in one place.
+/// accumulation and the shared last damage stay centralized in one place.
 /// </summary>
 public sealed class MoveEffectContext
 {
@@ -45,10 +45,16 @@ public sealed class MoveEffectContext
 
     /// <summary>
     /// Applies damage to the Target through <see cref="AttackAction"/>'s shared helper (Substitute soak +
-    /// Bide accumulation + Counter recording). Signature mirrors <c>DealDamageToTarget</c>:
-    /// (damage, effectiveness, isCrit, counterableType) → true when the real creature took the hit.
+    /// Bide accumulation + the shared last damage). Signature mirrors <c>DealDamageToTarget</c>:
+    /// (damage, effectiveness, isCrit) → true when the real creature took the hit.
     /// </summary>
-    public required Func<int, double, bool, DamageType?, bool> DealDamage { get; init; }
+    public required Func<int, double, bool, bool> DealDamage { get; init; }
+
+    /// <summary>The last damage either side's move produced (pokered's <c>wDamage</c>).</summary>
+    public required LastDamage LastDamage { get; init; }
+
+    /// <summary>The foe's last selected and loaded move, for Counter.</summary>
+    public required MoveRecord FoeMoves { get; init; }
 }
 
 /// <summary>
@@ -226,31 +232,31 @@ public sealed class DisableEffect : IMoveEffect
     }
 }
 
-/// <summary>Counter: return double the damage the user last took from a Normal/Fighting move.</summary>
+/// <summary>Counter: strike back with double the shared last damage, keyed on the foe's last move.</summary>
 public sealed class CounterEffect : IMoveEffect
 {
     public MoveEffect Effect => MoveEffect.Counter;
 
     public void Apply(MoveEffectContext ctx)
     {
-        // Qualification, the stale last-damage quirk and immunity: GENERATION_SEAMS.md §2 (Counter).
-        if (Qualifies(ctx.Source, ctx.Target, ctx.Rules))
-        {
-            int countered = ctx.Source.Battle.LastDamageTaken * 2;
-            ctx.DealDamage(countered, 1.0, false, ctx.Attack.DamageType);
-        }
+        // Qualification, the shared last damage and immunity: GENERATION_SEAMS.md §2 (Counter).
+        if (Qualifies(ctx.Target, ctx.Rules, ctx.FoeMoves, ctx.LastDamage))
+            ctx.DealDamage(ctx.Rules.CounterDamage(ctx.LastDamage.Value), 1.0, false);
         else
-        {
             ctx.Emitter?.Emit(
                 new MoveMissed(ctx.Source.Name, ctx.Source.Id, ctx.Attack.Name ?? "")
             );
-        }
     }
 
-    internal static bool Qualifies(Creature source, Creature target, IBattleRules rules) =>
+    internal static bool Qualifies(
+        Creature target,
+        IBattleRules rules,
+        MoveRecord foeMoves,
+        LastDamage lastDamage
+    ) =>
         target.IsAlive()
-        && source.Battle.LastDamageTaken > 0
-        && rules.CounterQualifies(source.Battle.LastDamageType);
+        && lastDamage.Value > 0
+        && rules.CounterQualifies(foeMoves.Selected, foeMoves.Loaded);
 }
 
 /// <summary>Mist: the opponent can't lower the user's stats until the battle ends.</summary>

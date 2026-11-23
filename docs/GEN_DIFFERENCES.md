@@ -311,6 +311,29 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
 - **Gen 2** keeps the roll and the immediate end, but rolls accuracy, prints "But it failed!", and in a trainer battle
   drags out a random party member instead (pokecrystal `engine/battle/effect_commands.asm` `BattleCommand_ForceSwitch`).
 
+#### Counter and Mirror Move
+- **Counter keys on the foe's move, not on the damage the user took.** It misses when the foe selected Counter, or
+  the foe's loaded move has 0 power or isn't Normal or Fighting, or the shared `wDamage` is 0, and otherwise deals
+  2× `wDamage` (`HandleCounterMove`, `core.asm:4547-4610`). So Counter misses after the foe's Normal move misses
+  (Mega Kick) or after a Growl or Splash, answers a hit its own Substitute soaked, doubles the user's own earlier
+  Counter again when the foe is fully paralysed (the foe's loaded move is still its last executed one,
+  `GetCurrentMove` runs after the status checks, `:3091-3095`), and both Counters miss when both sides use it. An
+  enemy's Counter on the player's item or switch turn reads the player's previous selection and can hit the
+  incoming Pokémon. Seam: `GENERATION_SEAMS.md` §2, Counter.
+- **An asleep, frozen or recharging Pokémon selects nothing.** The player's move menu and `SelectEnemyMove` both
+  skip it (`core.asm:310-312`, `:2938-2947`), so a pick made that turn leaves Counter's record as it was; a Struggle
+  pick likewise loads nothing until Struggle runs. Seam: `SkipsMoveSelection`.
+- **Not modelled (invisible): a failed Mirror Move's selection.** `MirrorMoveCopyMove` writes the foe's used move (0
+  or MIRROR_MOVE) into the user's own `w*SelectedMove` before failing (`:4977-4980`); ours keeps Mirror Move there. No
+  reader tells them apart: neither is Counter, and the loaded Mirror Move has 0 power.
+- **Not modelled: the move menu's cursor rewrites the selection.** pokered updates `wPlayerSelectedMove` whenever
+  the cursor rests on a move (`core.asm:2869`), so backing out of FIGHT and switching changes what an enemy Counter
+  reads. Our menu has no hover state, so the record keeps the last move actually picked.
+- **Mirror Move copies the last announced move.** A failed Mirror Move stays the user's last move, so the foe's Mirror
+  Move fails against it; Struggle is recorded and copyable; any send-out erases both sides' last move
+  (`MirrorMoveCopyMove`, `:4961-4989`; `UsedMoveText`, `engine/battle/used_move_text.asm:9-18`; `SendOutMon`
+  `:1741`). Seam: `GENERATION_SEAMS.md` §2, Mirror Move.
+
 #### Mimic
 
 - The player chooses which of the foe's moves Mimic copies, from a menu of the foe's moves with no cancel; the

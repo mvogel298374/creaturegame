@@ -290,12 +290,8 @@ public class ImmunityContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     [Fact]
     public async Task CounterHitsGhostTypesInGen1()
     {
-        var attacker = TestCreatures.Make("A");
-        attacker.Battle.LastDamageTaken = 50;
-        attacker.Battle.LastDamageType = DamageType.Fighting;
-
         var result = await new MoveScenario()
-            .Attacker(attacker)
+            .FoeLastMove(Move("karate-chop"), 50)
             .Defender(TestCreatures.Make("D", type1: DamageType.Ghost, hp: 500))
             .Use(Move("counter"));
 
@@ -306,13 +302,9 @@ public class ImmunityContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     [Fact]
     public async Task CounterRespectsGhostImmunityUnderRulesThatCheckIt()
     {
-        var attacker = TestCreatures.Make("A");
-        attacker.Battle.LastDamageTaken = 50;
-        attacker.Battle.LastDamageType = DamageType.Fighting;
-
         var result = await new MoveScenario()
             .Rules(FixedDamageImmunityRules.Instance)
-            .Attacker(attacker)
+            .FoeLastMove(Move("karate-chop"), 50)
             .Defender(TestCreatures.Make("D", type1: DamageType.Ghost, hp: 500))
             .Use(Move("counter"));
 

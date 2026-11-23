@@ -394,6 +394,12 @@ public interface IBattleRules
     /// <summary>Whether a sleep or frozen turn erases the move Mirror Move would copy. See GENERATION_SEAMS.md §2.</summary>
     bool SleepOrFreezeTurnForgetsLastMove { get; }
 
+    /// <summary>Whether a send-out erases both sides' last move, not only the incoming creature's. See GENERATION_SEAMS.md §2 (Mirror Move).</summary>
+    bool SendOutClearsBothLastMoves { get; }
+
+    /// <summary>Whether <paramref name="creature"/> selects no move this turn, leaving its selected and loaded move as they were. See GENERATION_SEAMS.md §2 (Counter).</summary>
+    bool SkipsMoveSelection(Creature creature);
+
     /// <summary>Rolls whether a paralyzed creature loses this turn. See GENERATION_SEAMS.md §2.</summary>
     bool RollsFullParalysis(IRandomSource rng);
 
@@ -462,8 +468,11 @@ public interface IBattleRules
     /// <summary>The line a one-hit KO move prints when <see cref="OneHitKoSucceeds"/> is false. See GENERATION_SEAMS.md §2.</summary>
     MoveFailureAnnouncement OneHitKoFailureAnnouncement { get; }
 
-    /// <summary>Whether Counter answers the last damage the user took, given that hit's type. See GENERATION_SEAMS.md §2.</summary>
-    bool CounterQualifies(DamageType? lastDamageType);
+    /// <summary>Whether Counter can strike back, given the foe's last selected and last loaded move. See GENERATION_SEAMS.md §2 (Counter).</summary>
+    bool CounterQualifies(Attack? foeSelected, Attack? foeLoaded);
+
+    /// <summary>The damage Counter deals from the shared last damage. See GENERATION_SEAMS.md §2 (Counter).</summary>
+    int CounterDamage(int lastDamage);
 
     /// <summary>Divisor applied to the target's defensive stat for Self-Destruct / Explosion damage.</summary>
     int SelfDestructDefenseDivisor { get; }
@@ -523,6 +532,9 @@ public interface IBattleRules
 
     /// <summary>Whether Metronome may call this move. See GENERATION_SEAMS.md §2.</summary>
     bool MetronomeCanCall(Attack move);
+
+    /// <summary>Whether Mirror Move can copy the foe's last move. See GENERATION_SEAMS.md §2 (Mirror Move).</summary>
+    bool MirrorMoveCanCopy(Attack lastMove);
 
     // ── Type-based immunities ────────────────────────────────────────────────────
 

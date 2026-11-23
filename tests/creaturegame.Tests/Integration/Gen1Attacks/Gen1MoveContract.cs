@@ -22,4 +22,7 @@ public abstract class Gen1MoveContract(MovesFixture moves)
 {
     /// <summary>The real, imported move row by its PokeAPI name (e.g. "fire-punch").</summary>
     protected Attack Move(string name) => moves.Get(name);
+
+    /// <summary>Every imported move row, for real-data Theories over the whole move list.</summary>
+    protected IReadOnlyCollection<Attack> AllMoves => moves.All;
 }

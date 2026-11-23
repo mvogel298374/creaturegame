@@ -107,7 +107,7 @@ public sealed class BattleState
     public int BideDamageAccumulated { get; set; }
     public PokemonAttack? BideMove { get; set; }
 
-    // The last move this creature actually used — Mirror Move copies the opponent's.
+    // The last move this creature announced, as pokered's w*UsedMove — Mirror Move copies the opponent's.
     public Attack? LastMoveUsed { get; set; }
 
     // Mimic: each slot whose Base holds a copy, with the move to put back (STATE_MODEL.md §2, Mimic).
@@ -120,12 +120,6 @@ public sealed class BattleState
 
     // The side's Substitute byte, left over once no decoy stands (GEN_DIFFERENCES.md, Substitute).
     public int SubstituteRemnant { get; set; }
-
-    // Counter: the damage this creature last took from a damaging move, and that move's type.
-    // Counter returns 2× it when the type was Normal/Fighting (Gen 1). Persists until overwritten
-    // by the next hit (a Gen 1 quirk — Counter can hit off a previous turn's damage).
-    public int LastDamageTaken { get; set; }
-    public DamageType? LastDamageType { get; set; }
 
     // Transform / Conversion: both mutate the creature's *permanent* identity (types, the four non-HP
     // battle stats, SpeciesId, and — for Transform — the whole moveset). This snapshot of the original
