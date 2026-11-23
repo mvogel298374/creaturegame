@@ -95,6 +95,75 @@ public class ImmunityContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         Assert.False(result.Has<MoveDidntAffect>());
     }
 
+    [Theory]
+    [InlineData("ice-beam", DamageType.Ice, null)]
+    [InlineData("ice-beam", DamageType.Water, DamageType.Ice)]
+    [InlineData("thunderbolt", DamageType.Electric, null)]
+    [InlineData("lick", DamageType.Ghost, DamageType.Poison)]
+    [InlineData("ember", DamageType.Fire, null)]
+    public async Task SecondaryStatusNeverLandsOnATargetSharingTheMovesType(
+        string move,
+        DamageType type1,
+        DamageType? type2
+    )
+    {
+        var result = await new MoveScenario()
+            .Rules(ForceSecondaryRules.Instance)
+            .Defender(TestCreatures.Make("D", type1: type1, type2: type2, hp: 500))
+            .Use(Move(move));
+
+        Assert.True(result.Has<DamageDealt>());
+        Assert.Equal(StatusCondition.None, result.Defender.Battle.Status);
+        Assert.False(result.Has<MoveHadNoEffect>());
+        Assert.False(result.Has<MoveDidntAffect>());
+    }
+
+    [Theory]
+    [InlineData("conversion", 0)]
+    [InlineData("growl", 1)]
+    public async Task TheSameTypeRuleReadsTheTypesConversionCopied(string enemyMove, int freezes)
+    {
+        var player = TestCreatures.Make("Player", type1: DamageType.Ice, hp: 2000, speed: 1);
+        player.AddAttack(Move("ice-beam"));
+        var enemy = TestCreatures.Make("Enemy", type1: DamageType.Normal, hp: 200, speed: 200);
+        enemy.AddAttack(Move(enemyMove));
+
+        var emitter = await FullBattle.Fight(
+            player,
+            enemy,
+            new ScriptedInput("ice-beam"),
+            new ScriptedInput(enemyMove),
+            new ScriptableRules().Deterministic().ForceSecondary()
+        );
+
+        Assert.Equal(freezes, emitter.Of<StatusApplied>().Count(s => s.TargetName == "Enemy"));
+        Assert.Equal(enemyMove == "conversion", emitter.Of<ConvertedType>().Any());
+        Assert.False(enemy.IsAlive());
+    }
+
+    [Fact]
+    public async Task IceBeamFreezesATargetOfAnotherType()
+    {
+        var result = await new MoveScenario()
+            .Rules(ForceSecondaryRules.Instance)
+            .Defender(TestCreatures.Make("D", type1: DamageType.Normal, hp: 500))
+            .Use(Move("ice-beam"));
+
+        Assert.Equal(StatusCondition.Freeze, result.Defender.Battle.Status);
+    }
+
+    [Fact]
+    public async Task ThunderWaveParalyzesElectricTypesInGen1()
+    {
+        // pokered move_effects/paralyze.asm:13-26.
+        var result = await new MoveScenario()
+            .Rules(AlwaysHitRules.Instance)
+            .Defender(TestCreatures.Make("D", type1: DamageType.Electric, hp: 500))
+            .Use(Move("thunder-wave"));
+
+        Assert.Equal(StatusCondition.Paralysis, result.Defender.Battle.Status);
+    }
+
     [Fact]
     public async Task SeismicTossHitsGhostTypesInGen1()
     {

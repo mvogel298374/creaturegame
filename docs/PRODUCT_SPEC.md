@@ -128,6 +128,9 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - Seismic Toss, Night Shade, Sonic Boom, Super Fang and Counter ignore type immunity: Seismic Toss hits Ghost-types,
   Night Shade hits Normal-types.
 - Thunder Wave against a Ground-type fails as "doesn't affect" without an accuracy roll.
+- A damaging move never freezes, burns or paralyzes a target that shares its type: Ice Beam can't freeze an Ice-type,
+  Thunderbolt can't paralyze an Electric-type, Lick can't paralyze a Ghost-type, Body Slam can't paralyze a
+  Normal-type. The hit still lands, with no extra line. Thunder Wave still paralyzes an Electric-type.
 - A status move (Thunder Wave, Sleep Powder, Toxic and the like) against a foe that already has a status, Poison
   Powder or Toxic against a Poison-type, and a status move that misses all show "It didn't affect <target>!".
 - Recover, Soft-Boiled and Rest fail with "But it failed!" at full HP, and also when the user is exactly 255 or 511 HP

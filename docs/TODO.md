@@ -53,7 +53,6 @@ design pass serves the group. Groups 3 and 5 are clusters of S/S–M items and t
 | 3 | Hit test and accuracy | `AttackAction.Connects`, `Gen1BattleRules.RunsHitTest` | Other `ResidualEffects1` moves (with the residual-effect failure lines) |
 | 4 | Damage formula | `DamageCalculator`, crit and accuracy tables | Damage/accuracy core |
 | 5 | Effects that copy or name a move | `CounterEffect`, Mimic, Mirror Move | Counter keys on the selected move (with Counter/Mirror Move on a menu turn) |
-| 6 | Status by type | `Gen1BattleRules.CanReceiveStatus` | Same-type secondary status immunity |
 | 7 | Battle text and seams | `timeline.ts`, the console emitter, `GENERATION_SEAMS.md` | Audit the inline battle rules · Binding and miss lines |
 | 8 | Battle presentation | `BattleScene`, the event wire | Move animations · Sprite FX · Fly/Dig sprite stays on screen · Text feel |
 | 9 | Acquisition and items | `ItemEffects`, `RewardCalculator`, evolution | Catch · Unsold-item rule · Stone evolutions |
@@ -102,7 +101,6 @@ None open.
 
 | Item | Cost | Ready? | Next step |
 |:-----|:----:|:-------|:----------|
-| **Same-type secondary status immunity** (§3.1) | S–M | ✗ 2, 4, 6; the rest drafted | Take the pokered cite; Ice Beam freezes Ice-types today. |
 | **Other `ResidualEffects1` moves may roll accuracy** (§3.1) | S–M | ✗ 1, 2, 4, 6 | Filed 2026-11-06. A verify slice reads each effect for its own hit test; now also carries the residual-effect failure lines. |
 | **Counter keys on the foe's selected move** (§3.1) | S–M | ✗ 1, 2, 4, 6 | Trace `HandleCounterMove` and `MirrorMoveCopyMove`, including switch and item turns; list the diverging cases. |
 | **Dependencies — `npm audit`** (§7.2) | S | ✗ 1, 7 | Re-run `npm audit`; the bumps need your E2E run. |
@@ -150,8 +148,7 @@ data/engine item usually also means updating the test that pins the wrong value.
   HP actually lost (`AttackAction.ExecuteAsync` Struggle recoil, `ResolveDamage` drain); `DamageCalculator`
   applies no stat cap after the stage multiplier (Gen 1 reportedly clamps a staged stat to 1–999) and no ÷4 scaling
   of both stats when either exceeds 255 (found by `requirements-review` 2026-10-14, during the stat-stage seam item;
-  unverified against pokered). The same-type status claim is its own entry below (*Same-type secondary status
-  immunity*); the binding-duration draw order is closed as invisible in play (`GEN_DIFFERENCES.md`, binding moves).
+  unverified against pokered). The binding-duration draw order is closed as invisible in play (`GEN_DIFFERENCES.md`, binding moves).
   **DoR (V16):** ✗ not Ready — gaps **1, 2, 3, 4, 6** (line cites refreshed 2026-10-17). *Drafted:* first a verify
   slice that gives each claim a pokered cite, then one entry per confirmed claim. Each entry gets: acceptance, a
   test pinning pokered's number; its seam member (most are already `IBattleRules`/`DamageCalculator` inputs);
@@ -175,18 +172,6 @@ data/engine item usually also means updating the test that pins the wrong value.
   missed Supersonic or Confuse Ray prints "But it failed!" (`effects.asm:1120-1126`, `ConfusionEffectFailed`
   :1158-1163); ours prints "missed". The slice decides where these moves roll accuracy, then each case prints its
   pokered line in a full battle; a new "evaded" event is wired in all four places. Lines gaps: **2, 3, 6**.
-- **Same-type secondary status immunity (found 2026-10-29 by `requirements-review`; read-confirmed by the reviewer,
-  not yet by us) — S–M, ✗ not Ready.** pokered `FreezeBurnParalyzeEffect` (`effects.asm:194-212`) skips a secondary
-  freeze, burn or paralysis whenever the move's type equals either target type ("an ice move can't freeze an
-  ice-type, body slam can't paralyze a normal-type"). `Gen1BattleRules.CanReceiveStatus` models only Poison, burn vs
-  Fire and Normal→Normal paralysis, so Ice Beam can freeze an Ice-type and Thunderbolt/Thunder can paralyze an
-  Electric-type. `GENERATION_SEAMS.md` §2 "Status by type" records the gap.
-  **DoR:** ✗ — gaps **4** (take the pokered cite ourselves, and check whether primary status moves and Tri Attack-style
-  cases share the rule), **2** (does the seam signature change: the rule keys on the move's type vs the target's, which
-  `CanReceiveStatus(target, status, moveType)` already receives), **6** (drafted: a full battle where a forced-hit
-  Ice Beam on an Ice-type never freezes, and Body Slam on a Normal-type never paralyzes). 1 drafted: the engine applies
-  pokered's same-type rule to secondary freeze/burn/paralysis. 3: `CanReceiveStatus` is the seam. 5: runtime only. 7:
-  none.
 - **Counter keys on the foe's selected move (found 2026-10-29 by `requirements-review`; read-confirmed by the
   reviewer) — S–M, ✗ not Ready.** pokered `HandleCounterMove` (`core.asm:4547-4607`) qualifies on the foe's last
   *selected* move: it misses when that move is Counter, has 0 power, or isn't Normal/Fighting type, and doubles the

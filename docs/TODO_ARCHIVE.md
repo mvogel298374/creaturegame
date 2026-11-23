@@ -103,6 +103,40 @@ REST call routed to the machine that never saw `/start`; the workflow pins `flyc
 
 ---
 
+## §3.1 A secondary freeze, burn or paralysis never lands on a target of the move's type ✅ DONE (2026-11-23)
+
+*(found 2026-10-29 by `requirements-review`; read-confirmed by the reviewer, source-confirmed by the 2026-11-23 verify slice) — S.* pokered
+`FreezeBurnParalyzeEffect` (`effects.asm:194-212`, enemy side `:256-267`) skips a secondary freeze, burn or paralysis whenever the move's type
+equals either target type. `Gen1BattleRules.CanReceiveStatus` modelled only Poison, burn vs Fire and Normal→Normal paralysis, so Ice Beam could
+freeze an Ice-type, Thunderbolt and Thunder could paralyze an Electric-type, and Lick (Ghost) could paralyze the Gastly line. Burn vs Fire already
+matched, since every Gen 1 burn secondary is a Fire move. **DoR:** ✅ Ready (2026-11-23, user confirmed the drafts; greenlit the same day).
+
+- **Acceptance:** a damaging move's secondary freeze, burn or paralysis never lands when the move's type matches either target type; the damage
+  still lands and no failure line prints.
+- **Design:** `Gen1BattleRules.CanReceiveStatus`: Poison/BadPoison → not a Poison-type; Freeze/Burn/Paralysis → neither target type equals the move's
+  type; otherwise true. The signature is unchanged. The AI scoring (`MoveEvaluators.cs`) reads the same seam.
+- **Gen surface:** `IBattleRules.CanReceiveStatus` (existing seam). **Gen 1 source:** `effects.asm:194-212` / `:256-267`; poison keys on the target's type
+  only (`PoisonEffect`, `:94-98`); pure paralysis checks only Electric vs Ground (`move_effects/paralyze.asm:13-26`), so Thunder Wave still paralyses an
+  Electric-type; Tri Attack has no Gen 1 secondary (`data/moves/moves.asm:174`). **Data vs runtime:** runtime only. **Dependencies:** none.
+- **Quirk the tests assert:** Ice Beam vs Ice, Thunderbolt vs Electric, Lick vs Ghost, Ember vs Fire each deal damage and leave no status; Ice Beam
+  freezes a non-Ice target (control); Thunder Wave paralyses an Electric-type (guard).
+
+**As built (2026-11-23).** `Gen1BattleRules.CanReceiveStatus` applies the same-type rule to Freeze/Burn/Paralysis; poison unchanged; pure status moves
+still go through `PureStatusMoveCanAffect`. The AI evaluator reads the seam, so it no longer values freezing an Ice foe with an Ice move (the −0.30
+penalty is the one in `ARCHITECTURE.md` §2.13). Tests: `ImmunityContractTests` — the `SecondaryStatusNeverLandsOnATargetSharingTheMovesType` Theory,
+the full-battle `TheSameTypeRuleReadsTheTypesConversionCopied`, the `IceBeamFreezesATargetOfAnotherType` control and `ThunderWaveParalyzesElectricTypesInGen1`
+guard; `SecondaryStatusContractTests` adjusted; `MoveEvaluatorTests` — `Status_PureFreezeMoveIsValuedAgainstAnIceFoe` (renamed) and
+`Status_IceMovesFreezeIsNotValuedAgainstAnIceFoe`. Sabotage-verified against the old rule. Docs: `GENERATION_SEAMS.md` §2 "Status by type",
+`GEN_DIFFERENCES.md` Roll Order, `PRODUCT_SPEC.md`.
+
+**Reviews and rulings (2026-11-23).** `requirements-review` raised four findings, user ruled: (1) add a Conversion full-battle test (done: the rule reads
+the types Conversion copied); (2) a Metronome / Mirror Move called-move test **waived** — `ExecuteInner` runs the called move as its own action, so it
+takes the same path; (3) the AI −0.30 penalty is already covered by `ARCHITECTURE.md` §2.13, no change; (4) the TODO entry body described the old state in
+present tense, reconciled on archive. `pr-review`: PR-READY; its recommended comment trims applied (two test comments) and its advisory `GEN_DIFFERENCES.md`
+wording applied (names both seam members); its advisory about the redundant control test was not acted on, since DoR line 6 asked for it.
+
+---
+
 ## §3.2 A re-import marks `pokemon.db` changed with identical data ✅ DONE (2026-11-21)
 
 *(S; found 2026-11-06 in the process pass, read-confirmed.)* `PokemonImport.cs:140`, `EvolutionImport.cs:71` and `GameAvailabilitySeeder.cs:138` deleted

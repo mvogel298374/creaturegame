@@ -248,7 +248,7 @@ public sealed class Gen1BattleRules : IBattleRules
 
     // ── Type-based immunities ────────────────────────────────────────────────────
 
-    // Narrower than pokered's same-type rule (GENERATION_SEAMS.md §2, Status by type).
+    // pokered effects.asm:194-212 FreezeBurnParalyzeEffect; PoisonEffect :94-98.
     public bool CanReceiveStatus(Creature target, StatusCondition status, DamageType moveType) =>
         status switch
         {
@@ -256,10 +256,9 @@ public sealed class Gen1BattleRules : IBattleRules
                 target,
                 DamageType.Poison
             ),
-            StatusCondition.Burn => !HasType(target, DamageType.Fire),
-            StatusCondition.Paralysis when moveType == DamageType.Normal => !HasType(
+            StatusCondition.Freeze or StatusCondition.Burn or StatusCondition.Paralysis => !HasType(
                 target,
-                DamageType.Normal
+                moveType
             ),
             _ => true,
         };

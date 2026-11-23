@@ -91,8 +91,7 @@ public class SecondaryStatusContractTests(MovesFixture moves) : Gen1MoveContract
         Assert.Equal(StatusCondition.Poison, result.Defender.Battle.Status); // not overwritten
     }
 
-    // Body Slam is special-cased: in Gen 1 it can't paralyze Normal-types (see ImmunityContractTests),
-    // but it paralyzes a non-Normal target normally.
+    // The Normal-type case: ImmunityContractTests.
     [Fact]
     public async Task BodySlamParalyzesANonNormalTarget()
     {

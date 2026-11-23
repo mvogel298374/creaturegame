@@ -139,6 +139,13 @@ routine that checks the other side's screen (`:4044-4055`, enemy `:5771-5815`, `
   immunity**: they skip `AdjustDamageForMoveType` (`core.asm:3136-3142`). So Seismic Toss, Sonic Boom, Super Fang
   and Counter hit Ghost-types, and Night Shade hits Normal-types. (Psywave and Dragon Rage have no Gen 1 immune
   type.)
+- **A secondary freeze, burn or paralysis never lands on a target that shares the move's type**, and no roll is
+  drawn: `FreezeBurnParalyzeEffect` returns when the move's type equals either target type (`effects.asm:194-212`,
+  `:256-267`). So Ice Beam can't freeze Lapras, Thunderbolt can't paralyze Pikachu, Lick can't paralyze Gengar and
+  Body Slam can't paralyze a Normal-type. A secondary poison keys on the target alone (`PoisonEffect`, `:94-98`), and
+  pure status moves skip the rule (`paralyze.asm` checks only Electric vs Ground), so Thunder Wave paralyzes
+  Electric-types and Glare paralyzes Normal-types. Modelled through `IBattleRules.CanReceiveStatus` (secondaries)
+  and `PureStatusMoveCanAffect` (pure status moves).
 - **Psywave rolls below 1.5 × level, and the sides differ:** the player rolls `[1, b)`, the foe `[0, b)` with
   b = L + ⌊L/2⌋, so the foe can deal 0 (`core.asm:4657-4670`, `:4776-4789`). Modelled through
   `IBattleRules.PsywaveDamageRange(source, side)`.

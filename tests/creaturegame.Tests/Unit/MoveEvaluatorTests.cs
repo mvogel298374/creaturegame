@@ -267,17 +267,33 @@ public class MoveEvaluatorTests
     }
 
     [Fact]
-    public void Status_FreezeIsValuedAgainstAnIceFoe_NoGen1FreezeImmunity()
+    public void Status_PureFreezeMoveIsValuedAgainstAnIceFoe()
     {
-        // Gen 1 has NO type-based Freeze immunity — Ice-types CAN be frozen — so the AI must still value a
-        // Freeze move here (immunity is the authoritative IBattleRules.CanReceiveStatus rule, not an inline
-        // guess). This pins the §5.0.1 leak the seam review caught.
+        // Immunity comes from the seam, not an inline type guess (GENERATION_SEAMS.md §5.0.1).
         var iceFoe = TestCreatures.Make("Ice", type1: DamageType.Ice);
         double score = new StatusMoveEvaluator().Score(
             StatusMove(StatusCondition.Freeze),
             Context(TestCreatures.Make("A"), iceFoe)
         );
         Assert.True(score > 0);
+    }
+
+    [Fact]
+    public void Status_IceMovesFreezeIsNotValuedAgainstAnIceFoe()
+    {
+        var iceBeam = new PokemonAttack(
+            new Attack("IceBeam", "IceBeam")
+            {
+                BaseDamage = 95,
+                DamageType = DamageType.Ice,
+                StatusEffect = StatusCondition.Freeze,
+            }
+        );
+        double score = new StatusMoveEvaluator().Score(
+            iceBeam,
+            Context(TestCreatures.Make("A"), TestCreatures.Make("Ice", type1: DamageType.Ice))
+        );
+        Assert.True(score < 0);
     }
 
     private static PokemonAttack ThunderWave() =>
