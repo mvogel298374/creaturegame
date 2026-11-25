@@ -103,6 +103,38 @@ REST call routed to the machine that never saw `/start`; the workflow pins `flyc
 
 ---
 
+## §3.1 A missed move zeroes the shared last damage ✅ DONE (2026-11-26)
+
+*(found 2026-11-24 during the Counter item; source-confirmed) — S–M.* pokered's `MoveHitTest` zeroes `wDamage` on every miss
+(`core.asm:5328-5332`, `.moveMissed`), including a status move that calls it from its effect (`PoisonEffect` `effects.asm:106-113`,
+`ParalyzeEffect_` `move_effects/paralyze.asm:27-33`, `SleepEffect` `effects.asm:52-57`). Ours never touched `LastDamage` on a miss of a move
+that skips the damage calculation, so a Bide user whose foe missed Poison Powder or Thunder Wave counted the previous hit again where pokered
+counts 0.
+
+**DoR (confirmed 2026-11-25).** 1. any move whose hit test misses leaves the shared last damage at 0, so Bide stores 0 for that turn; a Counter
+that passes its checks and then misses its accuracy roll zeroes it too (one that fails its checks leaves it). 2. the `missed` branch of
+`AttackAction.Connects` sets `LastDamage` to 0 behind `IBattleRules.MissZeroesLastDamage` (Gen 1: true); Counter's own check failure and a
+no-effect immunity stay untouched. 3. `IBattleRules` (new member). 4. the cites above. 5. runtime only. 6. full battles. 7. none; a
+`ResidualEffects1` move that wrongly rolls accuracy would also zero on a miss, and that error stays the "Other `ResidualEffects1` moves" item's.
+
+**What was built (2026-11-26).**
+- `IBattleRules.MissZeroesLastDamage` (Gen 1 true); `AttackAction.Connects` zeroes `LastDamage` at the top of its `missed` branch, before
+  `ApplyFailedHitSideEffects`, so a Jump Kick crash still writes its 1. Pre-hit stops (already statused, type immunity, Substitute) and
+  Counter's own check failure leave the value. A Mist-blocked stat drop zeroes it through the start-of-move zero (stat-down moves aren't in
+  `SkipsDamageCalculation`). `DelegatingBattleRules` delegates; `TestAltProfile` returns false; `MoveScenario` gained a read-only `LastDamage`.
+- Tests: `BideContractTests` (missed Poison Powder stores 0, landed Poison Powder counts the previous hit again, Mist-blocked Growl stores 0,
+  seam swap: `FixedBideRules` gains `missAccuracy`, read from the imported move, and `missZeroes`); `CounterContractTests` (a Counter that
+  passes its checks and misses its roll leaves 0 in Gen 1 and 50 under the seam swap; one that fails its checks leaves 50);
+  `CrashDamageContractTests` (a crash after a missed accuracy roll is the last damage: Jump Kick, High Jump Kick). Sabotage-checked: flipping
+  Gen 1's value fails the two Gen 1 default tests; moving the zero after the crash write fails the two crash cases.
+- Review: `requirements-review` 3 findings: Mist (the start-of-move zero covers it; docs row fixed, test added); Mo waived (2026-11-26) DoR line
+  6's "full battles" for the Counter case (move-level test; the zero has no cross-turn reader) and the Thunder Wave control (landed Poison
+  Powder instead); Mimic at a Fly or Dig target zeroing in pokered recorded as not modelled in `GEN_DIFFERENCES.md` (Bide, with a pointer in
+  Mimic), and the `Gen1BattleRules.cs` comment corrected. `pr-review` PR-READY with 4 recommendations, all done; second pr-review skipped by Mo.
+- Docs: `GENERATION_SEAMS.md` §2 row "A miss zeroes the last damage"; `GEN_DIFFERENCES.md` Bide note and Mimic pointer; `PRODUCT_SPEC.md` Bide.
+
+---
+
 ## §6 `BideContractTests.AHitOnTheBideUsersSubstitute_IsStored` is flaky ✅ DONE (2026-11-25)
 
 *(found 2026-11-24 during the Counter item; reproduced) — S, test-only.*
@@ -197,7 +229,7 @@ tests; stale and over-budget comments fixed; a `STATE_MODEL.md` line on the per-
   `IBattleInput` and a `Bag`.
 - Docs: `GENERATION_SEAMS.md` §2 (Counter row, new Mirror Move row), `GEN_DIFFERENCES.md` (Counter and Mirror Move), `PRODUCT_SPEC.md`, `STATE_MODEL.md`,
   `ARCHITECTURE.md` wording.
-- **Filed during the item (still open in `TODO.md`):** §3.1 "A missed move zeroes the shared last damage"; §6 "`BideContractTests.AHitOnTheBideUsersSubstitute_IsStored`
+- **Filed during the item (both since archived, 2026-11-25 and 2026-11-26):** §3.1 "A missed move zeroes the shared last damage"; §6 "`BideContractTests.AHitOnTheBideUsersSubstitute_IsStored`
   is flaky".
 
 ---

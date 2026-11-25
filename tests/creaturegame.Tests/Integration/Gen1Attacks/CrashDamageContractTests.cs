@@ -40,6 +40,22 @@ public class CrashDamageContractTests(MovesFixture moves) : Gen1MoveContract(mov
     [Theory]
     [InlineData("jump-kick")]
     [InlineData("high-jump-kick")]
+    public async Task ACrashAfterAMissedAccuracyRoll_IsTheLastDamage(string moveName)
+    {
+        var scenario = new MoveScenario()
+            .Attacker(TestCreatures.Make("A", hp: 300))
+            .Defender(TestCreatures.Make("D", hp: 500))
+            .Rules(NeverHitRules.Instance);
+
+        var result = await scenario.Use(Move(moveName));
+
+        Assert.True(result.Has<MoveMissed>());
+        Assert.Equal(result.First<CrashDamage>()!.Damage, scenario.LastDamage);
+    }
+
+    [Theory]
+    [InlineData("jump-kick")]
+    [InlineData("high-jump-kick")]
     public async Task NoCrashOnTypeImmunityUnderRulesThatOnlyCrashOnAMiss(string moveName)
     {
         var result = await new MoveScenario()

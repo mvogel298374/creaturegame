@@ -50,7 +50,7 @@ design pass serves the group. Group 3 is a cluster of S/S–M items and the chea
 | # | Group | Code | Items |
 |:-:|:--|:--|:--|
 | 2 | End-of-turn residual phase | `Battle` turn tail, residuals, `TickTurnCounters` | End-of-turn residual phase (with Leech Seed × Toxic and the menu-turn first mover) |
-| 3 | Hit test and accuracy | `AttackAction.Connects`, `Gen1BattleRules.RunsHitTest` | Other `ResidualEffects1` moves (with the residual-effect failure lines) · A missed move zeroes the shared last damage |
+| 3 | Hit test and accuracy | `AttackAction.Connects`, `Gen1BattleRules.RunsHitTest` | Other `ResidualEffects1` moves (with the residual-effect failure lines) |
 | 4 | Damage formula | `DamageCalculator`, crit and accuracy tables | Damage/accuracy core |
 | 7 | Battle text and seams | `timeline.ts`, the console emitter, `GENERATION_SEAMS.md` | Audit the inline battle rules · Binding and miss lines |
 | 8 | Battle presentation | `BattleScene`, the event wire | Move animations · Sprite FX · Fly/Dig sprite stays on screen · Text feel |
@@ -63,9 +63,7 @@ design pass serves the group. Group 3 is a cluster of S/S–M items and the chea
 
 **Ready — each awaits your greenlight**
 
-| Item | Cost | Ready? | Next step / what it unblocks |
-|:-----|:----:|:-------|:-----------------------------|
-| **A missed move zeroes the shared last damage** (§3.1) | S–M | ✅ confirmed 2026-11-25 | Bide counts a missed status move's turn as the previous hit; a Counter that misses its roll zeroes it too. |
+None open.
 
 **A. Confirm the drafted lines, then Ready**
 
@@ -165,8 +163,8 @@ data/engine item usually also means updating the test that pins the wrong value.
   Mimic calls `MoveHitTest` itself (`effects.asm:1207`), so its accuracy roll is pokered's (noted 2026-11-20,
   `requirements-review`). Noted 2026-11-09 (`pr-review`, Fly and Dig): `Gen1BattleRules.RunsHitTest` already lists which moves run the hit
   test, for the out-of-reach rule; this item should make the accuracy roll read the same member so the two can't drift.
-  Noted 2026-11-25: once "A missed move zeroes the shared last damage" lands, a wrongly rolled miss here also zeroes
-  `LastDamage`, so the slice should check Bide alongside the miss line.
+  Noted 2026-11-25: "A missed move zeroes the shared last damage" has shipped (2026-11-26), so a wrongly rolled miss
+  here also zeroes `LastDamage`; the slice should check Bide alongside the miss line.
   **Merged in (ruling 2026-11-15): the residual-effect failure lines** (found 2026-11-06, "It didn't affect" design
   pass; source-confirmed). Two more pokered lines we don't print. Leech Seed on a Grass type, on an already-seeded
   foe, or on a miss prints "<TARGET> evaded the attack!" (`leech_seed.asm` `.moveMissed`, `EvadedAttackText`); ours
@@ -174,22 +172,6 @@ data/engine item usually also means updating the test that pins the wrong value.
   missed Supersonic or Confuse Ray prints "But it failed!" (`effects.asm:1120-1126`, `ConfusionEffectFailed`
   :1158-1163); ours prints "missed". The slice decides where these moves roll accuracy, then each case prints its
   pokered line in a full battle; a new "evaded" event is wired in all four places. Lines gaps: **2, 3, 6**.
-- **A missed move zeroes the shared last damage (found 2026-11-24, Counter item; source-confirmed) — S–M, ✅
-  Ready.** pokered's `MoveHitTest` zeroes `wDamage` on every miss (`core.asm:5328-5332`), including a status move that
-  calls it from its effect (`PoisonEffect` `effects.asm:106-113`, `ParalyzeEffect_` `move_effects/paralyze.asm:27-33`,
-  `SleepEffect` `effects.asm:52-57`). Ours never touches `LastDamage` on a miss of a move that skips the damage
-  calculation, so a Bide user whose foe misses Poison Powder or Thunder Wave counts the previous hit again where pokered
-  counts 0 (`GEN_DIFFERENCES.md` → Bide; only the missed-Counter case is noted there today).
-  **DoR:** ✅ Ready (confirmed 2026-11-25). 1. any move whose hit test misses leaves the shared last damage at 0, so
-  Bide stores 0 for that turn; a Counter that passes its checks and then misses its accuracy roll zeroes it too (one
-  that fails its checks leaves it, `GEN_DIFFERENCES.md` → Bide). 2. the `missed` branch of `AttackAction.Connects`
-  (status moves with a hit test, Counter, the Fly/Dig dodge) sets `LastDamage` to 0 behind
-  `IBattleRules.MissZeroesLastDamage` (Gen 1: true); Counter's own check failure and a no-effect immunity stay
-  untouched; damaging moves already zero it up front. 3. `IBattleRules` (new member). 4. the cites above. 5. runtime
-  only. 6. full battles: a foe's missed Poison Powder during Bide stores 0; a landed Thunder Wave stores the previous
-  hit (control); a Counter that misses its accuracy roll stores 0; a seam swap restores the old behaviour. 7. none;
-  a `ResidualEffects1` move that wrongly rolls accuracy (the item above) would also zero on a miss, and that error
-  stays the item above's.
 - **Audit the inline battle rules and put each behind a seam (user ruling 2026-10-31) — M, ✗ not Ready.** Battle
   logic gets full generation separation: a rule goes on a seam even when the generations we checked agree, and
   only out-of-battle or ancillary behaviour may stay inline. `GENERATION_SEAMS.md` still documents deliberate inline

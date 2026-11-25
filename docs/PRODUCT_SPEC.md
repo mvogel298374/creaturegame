@@ -216,7 +216,8 @@ the linked design doc instead — pull it there and leave only the pointer here.
   recharge turn get no menu: no switch or item on those turns.
 - Bide adds the battle's last computed damage on each of its own turns, store and release alike, not each hit as it
   lands. A foe's move that skips the damage calculation (Splash, Thunder Wave, Toxic, Leech Seed, Recover, Reflect...),
-  a failed Counter or a turn the foe can't move counts the previous hit again; a Growl or sleep move stores 0; a
+  a failed Counter or a turn the foe can't move counts the previous hit again; a Growl or sleep move stores 0, and
+  so does any move that misses its accuracy roll (a missed Poison Powder or Thunder Wave, a Counter that misses); a
   multi-hit move counts one hit; a hit on the Bide user's Substitute, the foe's confusion self-hit, a Jump Kick crash
   and a Metronome-called hit are stored. An item turn under Bide loses the hit before it.
 - An item turn under Bide delays the release by a turn. A binder's successful item turn counts the trap down before the

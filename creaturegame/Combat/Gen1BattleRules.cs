@@ -194,6 +194,9 @@ public sealed class Gen1BattleRules : IBattleRules
     // pokered core.asm:3482-3500: .BideCheck adds wDamage on the Bide user's own turn.
     public BideAccumulation BideAccumulation => BideAccumulation.LastDamageOnOwnTurn;
 
+    // pokered core.asm:5328-5332: MoveHitTest's .moveMissed clears wDamage, for status effects that call it too.
+    public bool MissZeroesLastDamage => true;
+
     // pokered data/battle/residual_effects_1.asm, and Counter (HandleCounterMove returns first, core.asm:3141).
     public bool SkipsDamageCalculation(Attack move) =>
         move.Effect == MoveEffect.Counter
@@ -462,7 +465,7 @@ public sealed class Gen1BattleRules : IBattleRules
             _ => SemiInvulnerability.None,
         };
 
-    // Only a move that runs MoveHitTest misses; Mimic and Conversion test the bit themselves.
+    // Only a move that runs MoveHitTest misses; Conversion tests the bit, Mimic: GEN_DIFFERENCES.md → Bide.
     public SemiInvulnerableHit HitOnSemiInvulnerable(Attack move, SemiInvulnerability state) =>
         move.Effect is MoveEffect.Mimic or MoveEffect.Conversion ? SemiInvulnerableHit.Fails
         : !move.NeverMisses && RunsHitTest(move) ? SemiInvulnerableHit.Misses

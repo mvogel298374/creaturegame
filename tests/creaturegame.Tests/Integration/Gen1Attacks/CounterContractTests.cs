@@ -72,6 +72,39 @@ public class CounterContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         Assert.False(result.Has<DamageDealt>());
     }
 
+    [Theory]
+    [InlineData(null, 0)]
+    [InlineData(false, 50)]
+    public async Task ACounterThatMissesItsAccuracyRoll_ZeroesTheLastDamageUnlessTheSeamSaysNot(
+        bool? missZeroes,
+        int lastDamageAfter
+    )
+    {
+        var scenario = new MoveScenario()
+            .Rules(new ForcedMissRules(missZeroes))
+            .FoeLastMove(Move("tackle"), 50)
+            .Defender(TestCreatures.Make("D", hp: 500));
+
+        var result = await scenario.Use(Move("counter"));
+
+        Assert.True(result.Has<MoveMissed>());
+        Assert.Equal(lastDamageAfter, scenario.LastDamage);
+    }
+
+    [Fact]
+    public async Task ACounterThatFailsItsChecks_LeavesTheLastDamage()
+    {
+        var scenario = new MoveScenario()
+            .Rules(new ForcedMissRules())
+            .FoeLastMove(Move("water-gun"), 50)
+            .Defender(TestCreatures.Make("D", hp: 500));
+
+        var result = await scenario.Use(Move("counter"));
+
+        Assert.True(result.Has<MoveMissed>());
+        Assert.Equal(50, scenario.LastDamage);
+    }
+
     [Fact]
     public void Gen1CounterDamageIsCappedAt65535()
     {
@@ -108,6 +141,13 @@ public class CounterContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         public override int GetHitThreshold(int acc, int accStage, int evaStage) => 256;
 
         public override bool CounterQualifies(Attack? foeSelected, Attack? foeLoaded) => true;
+    }
+
+    private sealed class ForcedMissRules(bool? missZeroes = null) : DelegatingBattleRules
+    {
+        public override int GetHitThreshold(int acc, int accStage, int evaStage) => 0;
+
+        public override bool MissZeroesLastDamage => missZeroes ?? base.MissZeroesLastDamage;
     }
 
     private sealed class UndoubledCounterRules : DelegatingBattleRules

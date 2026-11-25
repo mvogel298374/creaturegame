@@ -547,6 +547,8 @@ public class AttackAction : IBattleAction
 
         if (missed)
         {
+            if (_rules.MissZeroesLastDamage)
+                _lastDamage.Value = 0;
             bool isStatusMove = IsStatusMove(move, category, usingStruggle);
             _emitter?.Emit(
                 isStatusMove && move.StatusEffect != StatusCondition.None

@@ -280,6 +280,8 @@ internal static class TestAltProfile
 
         public override bool SkipsDamageCalculation(Attack move) => false;
 
+        public override bool MissZeroesLastDamage => false;
+
         public override bool SkipsBattleMenu(Creature creature) =>
             EveryLockInSkipsTheMenu(creature);
 

@@ -507,6 +507,9 @@ public interface IBattleRules
     /// <summary>Whether <paramref name="move"/> skips the damage calculation, leaving <see cref="LastDamage"/> as it was. See GENERATION_SEAMS.md §2.</summary>
     bool SkipsDamageCalculation(Attack move);
 
+    /// <summary>Whether a move that misses its hit test sets <see cref="LastDamage"/> to 0. See GENERATION_SEAMS.md §2.</summary>
+    bool MissZeroesLastDamage { get; }
+
     /// <summary>The variable damage Psywave deals on hit (it ignores stats, type, STAB and crits), within
     /// <see cref="PsywaveDamageRange"/>. See GENERATION_SEAMS.md §2.</summary>
     int RollPsywaveDamage(Creature source, BattleSide side, IRandomSource rng);

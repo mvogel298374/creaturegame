@@ -209,12 +209,16 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
   first usable move stands in, and a Quick Attack there sorts the recharging side first. Only the message order
   changes ("must recharge" before the foe's move).
 - **Bide stores the last damage on its own turn, not each hit.** `.BideCheck` adds `wDamage`, shared by both sides,
-  on each of the Bide user's turns (`core.asm:3482-3500`). A foe's Thunder Wave, Splash or other `ResidualEffects1`
-  move, a failed Counter, or a turn it can't move, leaves the value alone, so the previous hit counts again; a
-  multi-hit move counts one hit; a hit on the Bide user's Substitute, the foe's confusion self-hit and a Jump Kick
-  crash (1) count; an item turn under Bide loses the hit before it. Seams: `BideAccumulation`,
-  `SkipsDamageCalculation`. **Not modelled:** a Counter that passes its checks and then misses the hit test zeroes
-  `wDamage` (`MoveHitTest`); ours leaves it.
+  on each of the Bide user's turns (`core.asm:3482-3500`). A foe's landed Thunder Wave, Splash or other
+  `ResidualEffects1` move, a failed Counter, or a turn it can't move, leaves the value alone, so the previous hit
+  counts again; any move that misses its hit test zeroes it (`MoveHitTest`, `core.asm:5328-5332`), so a missed
+  Poison Powder or Thunder Wave stores 0, and so does a Counter that passes its checks and then misses; a multi-hit
+  move counts one hit; a hit on the Bide user's Substitute, the foe's confusion self-hit and a Jump Kick crash (1)
+  count; an item turn under Bide loses the hit before it. Seams: `BideAccumulation`, `SkipsDamageCalculation`,
+  `MissZeroesLastDamage`. **Not modelled:** a Mimic at a Fly or Dig target misses inside `MoveHitTest`
+  (`effects.asm:1207`, `core.asm:5259-5261`) and so zeroes `wDamage`; ours ends it on the `HitOnSemiInvulnerable`
+  `Fails` path and leaves the value. No reader can see it: a Bide user can't be out of reach, and a Counter answering
+  Mimic fails on its 0 power. Conversion tests the bit itself and leaves the value in both.
 - **The trapped Pokémon can still switch out, and that frees it.** The battle menu shows to a trapped Pokémon and only
   move selection is skipped (`core.asm:305-322`); the party menu's switch path has no trap check (`:2396-2437`).
   `SendOutMon` clears the enemy's `USING_TRAPPING_MOVE` (`:1755-1756`), and since the switch happens inside the menu,
@@ -341,6 +345,7 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
 - Any move can be copied, Mimic included, and a copied Mimic copies again. The copy keeps Mimic's PP: only the
   move id is written into the slot (`effects.asm:1262-1267`).
 - A target in the air (Fly) or underground (Dig) makes Mimic fail with "But it failed!" (`:1222`, `:1246`, `:1274`).
+  That miss also zeroes the last damage in pokered, which ours doesn't model (see Bide).
 - Not modelled: pokered's enemy rolls `BattleRandom & 3` and retries on an empty slot; ours draws once over the filled
   slots. The odds are the same; only the number of RNG draws differs.
 - A Mimic called by Metronome or Mirror Move writes its copy into the calling slot, the one at `wPlayerMoveListIndex` /

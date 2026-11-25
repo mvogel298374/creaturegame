@@ -188,6 +188,59 @@ public class BideContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     }
 
     [Fact]
+    public async Task AFoesMissedStatusMove_StoresNothingThatTurn()
+    {
+        var (emitter, unleashed) = await BideAgainstAsync(
+            Foe("tackle", "poison-powder"),
+            new FixedBideRules(3, missAccuracy: Move("poison-powder").Accuracy),
+            ["tackle", "poison-powder"]
+        );
+
+        Assert.DoesNotContain(emitter.Events, e => e is StatusApplied { TargetName: "Player" });
+        Assert.Equal(2 * HitsOn(emitter, "Player")[0], unleashed);
+    }
+
+    [Fact]
+    public async Task AFoesLandedStatusMove_CountsThePreviousHitAgain()
+    {
+        var (emitter, unleashed) = await BideAgainstAsync(
+            Foe("tackle", "poison-powder"),
+            new FixedBideRules(3),
+            ["tackle", "poison-powder"]
+        );
+
+        Assert.Contains(emitter.Events, e => e is StatusApplied { TargetName: "Player" });
+        Assert.Equal(4 * HitsOn(emitter, "Player")[0], unleashed);
+    }
+
+    [Fact]
+    public async Task AFoesStatDropBlockedByMist_StoresNothingThatTurn()
+    {
+        var (emitter, unleashed) = await BideAgainstAsync(
+            Foe("tackle", "growl"),
+            new FixedBideRules(3),
+            ["tackle", "tackle", "growl"],
+            ["mist", "bide"]
+        );
+
+        Assert.Contains(emitter.Events, e => e is MoveFailed);
+        Assert.Equal(2 * HitsOn(emitter, "Player")[0], unleashed);
+    }
+
+    [Fact]
+    public async Task UnderRulesWhereAMissLeavesTheLastDamage_AFoesMissedStatusMoveCountsThePreviousHitAgain()
+    {
+        var (emitter, unleashed) = await BideAgainstAsync(
+            Foe("tackle", "poison-powder"),
+            new FixedBideRules(3, missAccuracy: Move("poison-powder").Accuracy, missZeroes: false),
+            ["tackle", "poison-powder"]
+        );
+
+        Assert.DoesNotContain(emitter.Events, e => e is StatusApplied { TargetName: "Player" });
+        Assert.Equal(4 * HitsOn(emitter, "Player")[0], unleashed);
+    }
+
+    [Fact]
     public async Task AFoesFailedCounter_CountsThePreviousHitAgain()
     {
         var (emitter, unleashed) = await BideAgainstAsync(
@@ -331,14 +384,18 @@ public class BideContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     private static List<int> HitsOn(RecordingEmitter emitter, string target) =>
         emitter.Of<DamageDealt>().Where(d => d.TargetName == target).Select(d => d.Damage).ToList();
 
-    /// <summary>Always-hit, no-crit, no-variance, and a fixed Bide length for determinism.</summary>
+    /// <summary>Always-hit (except moves of <c>missAccuracy</c>), no-crit, no-variance, and a fixed Bide length.</summary>
     private sealed class FixedBideRules(
         int bideTurns = 2,
         int? selfHitPercent = null,
         BideAccumulation? accumulation = null,
-        int? confusionTurns = null
+        int? confusionTurns = null,
+        int? missAccuracy = null,
+        bool? missZeroes = null
     ) : DelegatingBattleRules
     {
+        public override bool MissZeroesLastDamage => missZeroes ?? base.MissZeroesLastDamage;
+
         public override int RollBideTurns() => bideTurns;
 
         public override int RollConfusionTurns() => confusionTurns ?? base.RollConfusionTurns();
@@ -348,7 +405,8 @@ public class BideContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 
         public override BideAccumulation BideAccumulation => accumulation ?? base.BideAccumulation;
 
-        public override int GetHitThreshold(int acc, int accStage, int evaStage) => 256;
+        public override int GetHitThreshold(int acc, int accStage, int evaStage) =>
+            acc == missAccuracy ? 0 : 256;
 
         public override double GetCritChance(Creature a, Attack m) => 0.0;
 

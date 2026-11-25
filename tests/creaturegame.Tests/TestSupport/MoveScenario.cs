@@ -104,6 +104,9 @@ public sealed class MoveScenario
         return this;
     }
 
+    /// <summary>The shared last damage as the move left it.</summary>
+    public int LastDamage => _lastDamage.Value;
+
     /// <summary>Move pool for effects that draw from one (Metronome).</summary>
     public MoveScenario MovePool(params Attack[] pool)
     {
