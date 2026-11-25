@@ -103,6 +103,25 @@ REST call routed to the machine that never saw `/start`; the workflow pins `flyc
 
 ---
 
+## §6 `BideContractTests.AHitOnTheBideUsersSubstitute_IsStored` is flaky ✅ DONE (2026-11-25)
+
+*(found 2026-11-24 during the Counter item; reproduced) — S, test-only.*
+The test failed 1 of 8 runs alone on `HEAD` (commit `b43c122`) and about 1 in 5 with the Counter work, so a full
+`.\test.ps1 -Dotnet` could go red at random. The entry guessed an unpinned battle roll behind `FixedBideRules`.
+
+**Cause.** Not a battle roll: `Creature.CalculateStats()` rolls DVs from the global RNG (`Gen1StatCalculator` defaults to
+`SystemRandomSource`). The test player has no base stats, so a 0 Defense DV (1 in 16) leaves Defense 5; the foe's Tackle
+then deals 280, the second hit breaks the 500-HP Substitute and the third hits the player, so the "every hit equal"
+assertion fails. A temporary 2000-iteration in-process sweep reproduced it (every mismatch had Defense 5) and showed no
+mismatch after the fix; the temporary test was deleted.
+
+**Fix.** `BideContractTests.BideAgainstAsync` pins `player.Attributes.Defense = 50`, beside the pinned HP and Speed.
+
+**Acceptance (DoR confirmed 2026-11-25).** 50 separate `.\test.ps1 -Filter AHitOnTheBideUsersSubstitute_IsStored` runs, 0
+failed; `.\test.ps1 -Dotnet` all passing; E2E not run.
+
+---
+
 ## §3.1 Counter keys on the foe's selected move, with the Mirror Move last-move cases ✅ DONE (2026-11-24)
 
 *(found 2026-10-29 by `requirements-review`; read-confirmed by the reviewer, source-confirmed by the 2026-11-23 verify slice; greenlit 2026-11-23) — M.*

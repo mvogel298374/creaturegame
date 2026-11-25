@@ -294,6 +294,7 @@ public class BideContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         var player = new Creature("Player") { Level = 50, Type1 = DamageType.Normal };
         player.CalculateStats();
         player.Attributes.HP = player.Attributes.MaxHP = 2000;
+        player.Attributes.Defense = 50; // a 0 DV leaves 5, and three hits then break the Substitute
         player.Attributes.Speed = 200;
         foreach (var move in playerMoves)
             player.AddAttack(Move(move));
