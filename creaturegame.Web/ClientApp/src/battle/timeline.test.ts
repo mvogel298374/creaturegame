@@ -116,6 +116,11 @@ describe('expandEvent — move-name formatting', () => {
     expect(logLines(steps)).toEqual(["It didn't affect ONIX!"]);
   });
 
+  it('reads the Gen 1 "evaded attack!" line for a failed Leech Seed', () => {
+    const { steps } = expandEvent('MoveEvaded', { targetName: 'BULBASAUR' }, CTX);
+    expect(logLines(steps)).toEqual(['BULBASAUR evaded attack!']);
+  });
+
   it('reads the Gen 1 "But nothing happened!" line for Splash', () => {
     const { steps } = expandEvent('ButNothingHappened', { creatureName: 'GYARADOS' }, CTX);
     expect(logLines(steps)).toEqual(['But nothing happened!']);

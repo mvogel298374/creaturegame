@@ -45,12 +45,11 @@ Ranked within each tier; the tiers run from the shortest path to a greenlight to
 gap has drafted text, awaiting your confirmation · ✗ gaps remain.
 
 **Code groups** (user ruling 2026-11-15): items that touch the same code are tackled together, so one pokered read or
-design pass serves the group. Group 3 is a cluster of S/S–M items and the cheapest win.
+design pass serves the group. Group 3 (hit test and accuracy) is finished and archived.
 
 | # | Group | Code | Items |
 |:-:|:--|:--|:--|
 | 2 | End-of-turn residual phase | `Battle` turn tail, residuals, `TickTurnCounters` | End-of-turn residual phase (with Leech Seed × Toxic and the menu-turn first mover) |
-| 3 | Hit test and accuracy | `AttackAction.Connects`, `Gen1BattleRules.RunsHitTest` | Moves that never reach the hit test skip the accuracy roll (with Leech Seed's "evaded" line) |
 | 4 | Damage formula | `DamageCalculator`, crit and accuracy tables | Damage/accuracy core |
 | 7 | Battle text and seams | `timeline.ts`, the console emitter, `GENERATION_SEAMS.md` | Audit the inline battle rules · Binding and miss lines |
 | 8 | Battle presentation | `BattleScene`, the event wire | Move animations · Sprite FX · Fly/Dig sprite stays on screen · Text feel |
@@ -63,9 +62,7 @@ design pass serves the group. Group 3 is a cluster of S/S–M items and the chea
 
 **Ready — each awaits your greenlight**
 
-| Item | Cost | Ready? | Next step / what it unblocks |
-|:-----|:----:|:-------|:-----------------------------|
-| **Moves that never reach the hit test skip the accuracy roll** (§3.1) | S–M | ✅ | Verify slice done 2026-11-26. Est. 150–250k tokens with the gates; shifts seeded RNG streams, so recommend three E2E specs after. |
+None open.
 
 **A. Confirm the drafted lines, then Ready**
 
@@ -153,44 +150,6 @@ data/engine item usually also means updating the test that pins the wrong value.
   test pinning pokered's number; its seam member (most are already `IBattleRules`/`DamageCalculator` inputs);
   both gates, since `DamageCalculator`/`AttackAction` are central. Data vs runtime: runtime.
   Dependencies: none.
-- **Moves that never reach the hit test skip the accuracy roll, as in Gen 1 (filed 2026-11-06; verify slice
-  2026-11-26, source-confirmed) — S–M, ✅ Ready.** In pokered a 0-power move rolls accuracy only if its effect calls
-  `MoveHitTest` itself: `ResidualEffects1` jumps straight to the effect (`core.asm:3124-3128`), and every other
-  0-power move skips the hit test after `CalculateDamage` (`:3144-3146`), then runs its effect via `ResidualEffects2`
-  (`:3213-3217`; enemy side `:5515`, `:5614`). `AttackAction.Connects` instead rolls accuracy for every move except
-  Swift, Struggle, Roar/Whirlwind/Teleport and X Accuracy, and the roll reads the foe's evasion even for a
-  self-targeting move: one foe Double Team makes our Recover or Swords Dance miss 25% of the time, +6 evasion 67%.
-  - **Wrongly rolled in ours:** Conversion, Haze, Mist, Focus Energy, Recover, Soft-Boiled, Rest, Transform, Light
-    Screen, Reflect, Substitute, Splash (`ResidualEffects1`), and every self stat-up (`ResidualEffects2`;
-    `StatModifierUpEffect`, `effects.asm:351`, calls no hit test). A wrong miss also zeroes `LastDamage`, which
-    pokered leaves alone for these moves, so a Bide user can lose its stored damage.
-  - **Rolled correctly already** (the effect calls `MoveHitTest`): Supersonic/Confuse Ray (`effects.asm:1124`),
-    Poison Powder/Poison Gas/Toxic (`:108`), Thunder Wave/Stun Spore/Glare (`move_effects/paralyze.asm:29`), Leech
-    Seed (`leech_seed.asm:2`), Mimic (`effects.asm:1207`), Disable (`:1288`), the sleep moves (`:53`), the stat-downs
-    (`:571`). Supersonic's "But it failed!" already ships (`StatusMoveContractTests.DoesNotConfuseOnMiss`), and
-    Transform landing on a Fly/Dig target matches pokered's dead check (`transform.asm:5-20`).
-  - **Leech Seed's line:** a miss, a Grass target and an already-seeded target all print "<TARGET> evaded the attack!"
-    (`leech_seed.asm:14-31`, `EvadedAttackText`); ours prints "missed" (`AttackAction.Connects`), "doesn't affect"
-    (`LeechSeedEffect`) and nothing.
-  **DoR** (rulings 2026-11-26: widen to the self stat-ups; one hit-test member; a new evaded event):
-  1. **Acceptance:** with the accuracy roll forced to fail, and separately against a foe at +6 evasion, each move in
-     the "wrongly rolled" list lands and draws no accuracy number; a foe's such move leaves a Bide user's stored
-     damage intact; each move in the "rolled correctly" list still misses. In a full battle, a Leech Seed miss, a Grass
-     target and an already-seeded target each print "<TARGET> evaded the attack!".
-  2. **Design:** `Gen1BattleRules.RunsHitTest` becomes a public `IBattleRules.RunsHitTest(Attack)` member, adding
-     Mimic; `Connects` skips the accuracy roll when it is false, and `HitOnSemiInvulnerable` reads the same member, so
-     the two can't drift. `ForceFleeSkipsAccuracy` is removed (Roar, Whirlwind and Teleport fall out of the member;
-     the alt profile returns true for them). A new `MoveEvaded(TargetName, TargetId)` event, wired by hand in all four
-     places (`ClaudeDirectives/engine.md` rule 8), behind a Leech Seed failure-announcement member; wording stays
-     event-keyed in the client and console emitter, so this doesn't wait on the battle-text placement decision.
-  3. **Gen-variable surface:** `IBattleRules.RunsHitTest(Attack)` and the Leech Seed failure announcement; the Gen 2
-     values are checked in pokecrystal during the work (`effect_commands.asm`).
-  4. **Gen 1 source:** the cites above.
-  5. **Data vs runtime:** runtime, plus one wire event (C# and TS).
-  6. **Quirk the tests assert:** an evasive foe can't make Recover or Swords Dance miss; Leech Seed on a Grass type
-     "evaded the attack".
-  7. **Dependencies:** none. Risk: removing a draw shifts seeded RNG streams, so seeded tests may move; after the
-     work, recommend `.\e2e.ps1 -Spec voluntary-switch`, `-Spec cadence` and `-Spec encounter-map`.
 - **Audit the inline battle rules and put each behind a seam (user ruling 2026-10-31) — M, ✗ not Ready.** Battle
   logic gets full generation separation: a rule goes on a seam even when the generations we checked agree, and
   only out-of-battle or ancillary behaviour may stay inline. `GENERATION_SEAMS.md` still documents deliberate inline

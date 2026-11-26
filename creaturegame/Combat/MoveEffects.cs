@@ -125,16 +125,29 @@ public sealed class LeechSeedEffect : IMoveEffect
     public void Apply(MoveEffectContext ctx)
     {
         // Not gated on TargetShieldedBySubstitute: English RBY's Leech Seed lands through a Substitute.
-        if (ctx.Target.IsAlive() && !ctx.Rules.CanBeLeechSeeded(ctx.Target))
-            ctx.Emitter?.Emit(
-                new MoveHadNoEffect(ctx.Target.Name, ctx.Target.Id, ctx.Attack.Name ?? "")
-            ); // Grass-types are immune
-        else if (!ctx.Target.Battle.HasLeechSeed && ctx.Target.IsAlive())
+        if (!ctx.Target.IsAlive())
+            return;
+        if (!ctx.Rules.CanBeLeechSeeded(ctx.Target))
+            Fail(ctx, LeechSeedFailure.GrassTarget);
+        else if (ctx.Target.Battle.HasLeechSeed)
+            Fail(ctx, LeechSeedFailure.AlreadySeeded);
+        else
         {
             ctx.Target.Battle.HasLeechSeed = true;
             ctx.Emitter?.Emit(new LeechSeedApplied(ctx.Target.Name, ctx.Target.Id));
         }
     }
+
+    private static void Fail(MoveEffectContext ctx, LeechSeedFailure failure) =>
+        ctx.Emitter?.Emit(
+            MoveFailureEvents.For(
+                ctx.Rules.LeechSeedFailureAnnouncement(failure),
+                ctx.Source,
+                ctx.Target,
+                ctx.Attack.Name ?? "",
+                UnaffectedCause.StatusMove
+            )
+        );
 }
 
 /// <summary>Binding (Wrap, Bind, Clamp, Fire Spin): start the Gen 1 partial trap on a hit.</summary>

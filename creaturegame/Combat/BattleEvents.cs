@@ -315,6 +315,9 @@ public record MoveUnaffected(
 /// <summary>A move failed and the generation says "It didn't affect …". See GENERATION_SEAMS.md §2.</summary>
 public record MoveDidntAffect(string TargetName, int TargetId, string MoveName) : BattleEvent;
 
+/// <summary>A move failed and the generation says "&lt;TARGET&gt; evaded attack!". See GENERATION_SEAMS.md §2.</summary>
+public record MoveEvaded(string TargetName, int TargetId) : BattleEvent;
+
 /// <summary>A sleep move on an already-asleep target: "… is already asleep!" (AlreadyAsleepText).</summary>
 public record AlreadyAsleep(string TargetName, int TargetId) : BattleEvent;
 

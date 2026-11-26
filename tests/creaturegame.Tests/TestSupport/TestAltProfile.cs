@@ -170,7 +170,8 @@ internal static class TestAltProfile
         public override MoveFailureAnnouncement ForceFleeWildFailureAnnouncement =>
             MoveFailureAnnouncement.Missed;
 
-        public override bool ForceFleeSkipsAccuracy => false;
+        public override bool RunsHitTest(Attack move) =>
+            move.Effect is MoveEffect.ForceFlee or MoveEffect.Teleport || base.RunsHitTest(move);
 
         public override bool FleeEndsTurnImmediately => false;
 

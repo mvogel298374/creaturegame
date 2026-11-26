@@ -288,6 +288,10 @@ public sealed class Gen1BattleRules : IBattleRules
     // Gen 1: Grass-types are immune to Leech Seed.
     public bool CanBeLeechSeeded(Creature target) => !HasType(target, DamageType.Grass);
 
+    // pokered leech_seed.asm:2-32: every cause jumps to .moveMissed and EvadedAttackText.
+    public MoveFailureAnnouncement LeechSeedFailureAnnouncement(LeechSeedFailure failure) =>
+        MoveFailureAnnouncement.Evaded;
+
     // Gen 1: Roar/Whirlwind only end a wild battle; against a non-escapable foe they fail.
     public bool ForceFleeFailsVsTrainer => true;
 
@@ -302,9 +306,6 @@ public sealed class Gen1BattleRules : IBattleRules
     // The failed roll jumps to PrintDidntAffectText.
     public MoveFailureAnnouncement ForceFleeWildFailureAnnouncement =>
         MoveFailureAnnouncement.DidntAffect;
-
-    // SWITCH_AND_TELEPORT_EFFECT is in ResidualEffects1, which skips the accuracy test (core.asm).
-    public bool ForceFleeSkipsAccuracy => true;
 
     // pokered effects.asm SwitchAndTeleportEffect: Teleport jumps to PrintButItFailedText_ on every failure.
     public MoveFailureAnnouncement TeleportFailureAnnouncement => MoveFailureAnnouncement.Failed;
@@ -471,7 +472,8 @@ public sealed class Gen1BattleRules : IBattleRules
         : !move.NeverMisses && RunsHitTest(move) ? SemiInvulnerableHit.Misses
         : SemiInvulnerableHit.Lands;
 
-    private static bool RunsHitTest(Attack move) =>
+    // A 0-power move reaches MoveHitTest only through its own effect: GENERATION_SEAMS.md §2 (Hit test).
+    public bool RunsHitTest(Attack move) =>
         move.BaseDamage > 0
         || move.DamageCategory != DamageCategory.Standard
         || move.StatusEffect != StatusCondition.None
@@ -480,7 +482,8 @@ public sealed class Gen1BattleRules : IBattleRules
             is MoveEffect.Confuse
                 or MoveEffect.LeechSeed
                 or MoveEffect.Disable
-                or MoveEffect.Counter;
+                or MoveEffect.Counter
+                or MoveEffect.Mimic;
 
     // core.asm:3432 clears INVULNERABLE on a self-hit; :3463 and :3650 leave it (the glitch).
     public bool LostTurnEndsSemiInvulnerability(PreMoveCheck check) =>

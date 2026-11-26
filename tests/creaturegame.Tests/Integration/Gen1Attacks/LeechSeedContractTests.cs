@@ -34,8 +34,110 @@ public class LeechSeedContractTests(MovesFixture moves) : Gen1MoveContract(moves
             .Defender(TestCreatures.Make("D", type1: DamageType.Water, hp: 500))
             .Use(Move("leech-seed"));
 
-        Assert.True(result.Has<MoveMissed>());
+        Assert.Equal("D", Assert.Single(result.Emitter.Of<MoveEvaded>()).TargetName);
+        Assert.False(result.Has<MoveMissed>());
         Assert.False(result.Defender.Battle.HasLeechSeed);
+    }
+
+    // A faster player plays playerMoves at a foe that only Splashes, then KOs it with Tackle.
+    private Task<BattleScenarioResult> SeedTheFoe(
+        IBattleRules rules,
+        DamageType foeType,
+        params string[] playerMoves
+    )
+    {
+        var player = TestCreatures.Make("Player", type1: DamageType.Water, attack: 999, speed: 200);
+        player.AddAttack(Move("leech-seed"));
+        player.AddAttack(Move("tackle"));
+        var enemy = TestCreatures.Make("Enemy", type1: foeType, hp: 64, speed: 1);
+        enemy.AddAttack(Move("splash"));
+        return new BattleScenario()
+            .Player(player)
+            .Enemy(enemy)
+            .PlayerUses(playerMoves)
+            .EnemyUses("splash")
+            .Rules(rules)
+            .RunAsync();
+    }
+
+    [Fact]
+    public async Task InABattle_AMissedLeechSeedIsEvaded()
+    {
+        var result = await SeedTheFoe(
+            new MissesAccuracyRules(Move("leech-seed").Accuracy),
+            DamageType.Water,
+            "leech-seed",
+            "tackle"
+        );
+
+        Assert.Equal("Enemy", Assert.Single(result.All<MoveEvaded>()).TargetName);
+        Assert.DoesNotContain(result.All<MoveMissed>(), e => e.MoveName == "leech-seed");
+        Assert.False(result.Has<LeechSeedApplied>());
+    }
+
+    [Fact]
+    public async Task InABattle_ALeechSeedOnAnAlreadySeededFoeIsEvaded()
+    {
+        var result = await SeedTheFoe(
+            AlwaysHitRules.Instance,
+            DamageType.Water,
+            "leech-seed",
+            "leech-seed",
+            "tackle"
+        );
+
+        Assert.Single(result.All<LeechSeedApplied>());
+        Assert.Equal("Enemy", Assert.Single(result.All<MoveEvaded>()).TargetName);
+    }
+
+    [Fact]
+    public async Task InABattle_ALeechSeedOnAGrassFoeIsEvaded()
+    {
+        var result = await SeedTheFoe(
+            AlwaysHitRules.Instance,
+            DamageType.Grass,
+            "leech-seed",
+            "tackle"
+        );
+
+        Assert.Equal("Enemy", Assert.Single(result.All<MoveEvaded>()).TargetName);
+        Assert.False(result.Has<MoveHadNoEffect>());
+        Assert.False(result.Has<LeechSeedApplied>());
+    }
+
+    [Fact]
+    public async Task TheSeamPicksEachLeechSeedFailuresLine()
+    {
+        var rules = new GrassDoesntAffectRules();
+
+        var grass = await SeedTheFoe(rules, DamageType.Grass, "leech-seed", "tackle");
+        var reseeded = await SeedTheFoe(
+            rules,
+            DamageType.Water,
+            "leech-seed",
+            "leech-seed",
+            "tackle"
+        );
+
+        Assert.Equal("Enemy", Assert.Single(grass.All<MoveHadNoEffect>()).TargetName);
+        Assert.False(grass.Has<MoveEvaded>());
+        Assert.Single(reseeded.All<MoveEvaded>());
+    }
+
+    private sealed class MissesAccuracyRules(int missAccuracy) : DelegatingBattleRules
+    {
+        public override int GetHitThreshold(int acc, int accStage, int evaStage) =>
+            acc == missAccuracy ? 0 : 256;
+    }
+
+    private sealed class GrassDoesntAffectRules : DelegatingBattleRules
+    {
+        public override MoveFailureAnnouncement LeechSeedFailureAnnouncement(LeechSeedFailure f) =>
+            f == LeechSeedFailure.GrassTarget
+                ? MoveFailureAnnouncement.DoesntAffect
+                : base.LeechSeedFailureAnnouncement(f);
+
+        public override int GetHitThreshold(int acc, int accStage, int evaStage) => 256;
     }
 
     [Fact]

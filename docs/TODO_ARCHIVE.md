@@ -103,6 +103,62 @@ REST call routed to the machine that never saw `/start`; the workflow pins `flyc
 
 ---
 
+## §3.1 Moves that never reach the hit test skip the accuracy roll, as in Gen 1 ✅ DONE (2026-11-26)
+
+*(filed 2026-11-06; verify slice 2026-11-26, source-confirmed) — S–M.* In pokered a 0-power move rolls accuracy only if its effect calls
+`MoveHitTest` itself: `ResidualEffects1` jumps straight to the effect (`core.asm:3124-3128`), and every other 0-power move skips the hit test
+after `CalculateDamage` (`:3144-3146`), then runs its effect via `ResidualEffects2` (`:3213-3217`; enemy side `:5515`, `:5614`).
+`AttackAction.Connects` instead rolled accuracy for every move except Swift, Struggle, Roar/Whirlwind/Teleport and X Accuracy, and the roll read
+the foe's evasion even for a self-targeting move: one foe Double Team made our Recover or Swords Dance miss 25% of the time, +6 evasion 67%.
+- **Wrongly rolled in ours:** Conversion, Haze, Mist, Focus Energy, Recover, Soft-Boiled, Rest, Transform, Light Screen, Reflect, Substitute,
+  Splash (`ResidualEffects1`), and every self stat-up (`ResidualEffects2`; `StatModifierUpEffect`, `effects.asm:351`, calls no hit test). A wrong
+  miss also zeroed `LastDamage`, which pokered leaves alone for these moves, so a Bide user could lose its stored damage.
+- **Rolled correctly already** (the effect calls `MoveHitTest`): Supersonic/Confuse Ray (`effects.asm:1124`), Poison Powder/Poison Gas/Toxic
+  (`:108`), Thunder Wave/Stun Spore/Glare (`move_effects/paralyze.asm:29`), Leech Seed (`leech_seed.asm:2`), Mimic (`effects.asm:1207`), Disable
+  (`:1288`), the sleep moves (`:53`), the stat-downs (`:571`). Supersonic's "But it failed!" already shipped
+  (`StatusMoveContractTests.DoesNotConfuseOnMiss`), and Transform landing on a Fly/Dig target matches pokered's dead check (`transform.asm:5-20`).
+- **Leech Seed's line:** a miss, a Grass target and an already-seeded target all print "<TARGET> evaded attack!" (`leech_seed.asm:2-32`,
+  `EvadedAttackText`); ours printed "missed" (`AttackAction.Connects`), "doesn't affect" (`LeechSeedEffect`) and nothing.
+- **Mimic's miss line** (folded in by ruling 2026-11-26, from `requirements-review`): a missed Mimic prints "But it failed!"
+  (`effects.asm:1207-1210`, `:1273-1274`); ours printed "missed". It joined Disable on `PrimaryEffectFailureAnnouncement`.
+
+**DoR (rulings 2026-11-26: widen to the self stat-ups; one hit-test member; a new evaded event; after `requirements-review`, a real-data check of
+every imported move against pokered's skip set, the missing theory cases, and Mimic's miss line).**
+1. **Acceptance:** with the accuracy roll forced to fail, and separately against a foe at +6 evasion, each move in the "wrongly rolled" list lands
+   and draws no accuracy number; a foe's such move leaves a Bide user's stored damage intact; each move in the "rolled correctly" list still
+   misses. In a full battle, a Leech Seed miss, a Grass target and an already-seeded target each print "<TARGET> evaded attack!"
+   (`data/text/text_3.asm:254-257`). Every imported move runs the hit test exactly when pokered does (a named skip set); a missed Mimic prints
+   "But it failed!".
+2. **Design:** `Gen1BattleRules.RunsHitTest` becomes a public `IBattleRules.RunsHitTest(Attack)` member, adding Mimic; `Connects` skips the
+   accuracy roll when it is false, and `HitOnSemiInvulnerable` reads the same member, so the two can't drift. `ForceFleeSkipsAccuracy` is
+   removed (Roar, Whirlwind and Teleport fall out of the member; the alt profile returns true for them). A new `MoveEvaded(TargetName, TargetId)`
+   event, wired by hand in all four places (`ClaudeDirectives/engine.md` rule 8), behind a Leech Seed failure-announcement member; wording stays
+   event-keyed in the client and console emitter, so this didn't wait on the battle-text placement decision.
+3. **Gen-variable surface:** `IBattleRules.RunsHitTest(Attack)` and `LeechSeedFailureAnnouncement(LeechSeedFailure)`; the Gen 2 values were
+   checked in pokecrystal (`effect_commands.asm`, `move_effects/leech_seed.asm`).
+4. **Gen 1 source:** the cites above. 5. **Data vs runtime:** runtime, plus one wire event (C# and TS).
+6. **Quirk the tests assert:** an evasive foe can't make Recover or Swords Dance miss; Leech Seed on a Grass type "evaded attack".
+7. **Dependencies:** none. Risk: removing a draw shifts seeded RNG streams, so seeded tests may move.
+
+**What was built (2026-11-26).**
+- `IBattleRules.RunsHitTest(Attack)` replaces `ForceFleeSkipsAccuracy`: `AttackAction.Connects` draws no accuracy roll and can't miss when it is
+  false, and `Gen1BattleRules.HitOnSemiInvulnerable` reads its own `RunsHitTest`. A skipped roll no longer zeroes `LastDamage`.
+- `MoveEvaded` event ("<TARGET> evaded attack!") for Leech Seed's miss, Grass and already-seeded cases, behind
+  `LeechSeedFailureAnnouncement(LeechSeedFailure)`; wired in the C# event, the SignalR emitter, the console emitter and `timeline.ts`. A missed
+  Mimic prints "But it failed!" through `PrimaryEffectFailureAnnouncement`.
+- Tests: theory cases per move in both lists (forced miss, +6 evasion), a real-data sweep over every imported move against pokered's skip set,
+  full-battle Leech Seed cases including a Fly/Dig flyer, Bide intact after a foe's skipped-roll move, a seam swap, and the web event contract
+  and `timeline.test.ts` for `MoveEvaded`.
+- Review: `requirements-review` findings led to the widening to self stat-ups, the real-data sweep, the missing theory cases and Mimic's miss
+  line (rulings above). `pr-review` findings all decided by Mo. Deferred by Mo to a real second profile: a profile that overrides `RunsHitTest`
+  must also answer `HitOnSemiInvulnerable` (noted in the `GENERATION_SEAMS.md` "Hit test" row); Leech Seed's Gen 2 Substitute cause is noted in
+  the "Leech Seed failure" row.
+- Docs: `GENERATION_SEAMS.md` rows "Hit test", "Leech Seed failure", "Failure announcements", "Status-move miss line", "Teleport";
+  `GEN_DIFFERENCES.md` (accuracy, Fly/Dig status-move line, Mimic); `PRODUCT_SPEC.md` (self-targeting moves never miss, Leech Seed line, Mimic).
+- Follow-up recommended, not filed: `.\e2e.ps1 -Spec voluntary-switch`, `-Spec cadence`, `-Spec encounter-map` (seeded RNG streams shifted).
+
+---
+
 ## §3.1 A missed move zeroes the shared last damage ✅ DONE (2026-11-26)
 
 *(found 2026-11-24 during the Counter item; source-confirmed) — S–M.* pokered's `MoveHitTest` zeroes `wDamage` on every miss

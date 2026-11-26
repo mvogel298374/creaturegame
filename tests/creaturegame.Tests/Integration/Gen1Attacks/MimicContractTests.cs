@@ -25,6 +25,47 @@ public class MimicContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         Assert.Equal("tackle", learned!.MoveName);
     }
 
+    // pokered effects.asm:1207-1210 and :1273-1274: a missed Mimic jumps to PrintButItFailedText_.
+    [Fact]
+    public async Task AMissedMimicPrintsButItFailedAndCopiesNothing()
+    {
+        var defender = TestCreatures.Make("D", hp: 500);
+        defender.AddAttack(Move("tackle"));
+
+        var result = await new MoveScenario()
+            .Rules(NeverHitRules.Instance)
+            .Defender(defender)
+            .Use(Move("mimic"));
+
+        Assert.True(result.Has<MoveFailed>());
+        Assert.False(result.Has<MoveMissed>());
+        Assert.False(result.Has<MimicLearned>());
+        Assert.Equal("mimic", result.Move.Base.Name);
+    }
+
+    [Fact]
+    public async Task TheSeamPicksAMissedMimicsLine()
+    {
+        var defender = TestCreatures.Make("D", hp: 500);
+        defender.AddAttack(Move("tackle"));
+
+        var result = await new MoveScenario()
+            .Rules(new MissedLineNeverHitRules())
+            .Defender(defender)
+            .Use(Move("mimic"));
+
+        Assert.True(result.Has<MoveMissed>());
+        Assert.False(result.Has<MoveFailed>());
+    }
+
+    private sealed class MissedLineNeverHitRules : DelegatingBattleRules
+    {
+        public override int GetHitThreshold(int acc, int accStage, int evaStage) => 0;
+
+        public override MoveFailureAnnouncement PrimaryEffectFailureAnnouncement =>
+            MoveFailureAnnouncement.Missed;
+    }
+
     [Fact]
     public async Task MimicCopiesThroughASubstitute()
     {

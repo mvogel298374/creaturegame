@@ -939,6 +939,19 @@ public class WebEventContractTests
     }
 
     [Fact]
+    public void MoveEvaded_Projection_CarriesTheTarget()
+    {
+        var evt = new MoveEvaded("BULBASAUR", 7);
+
+        var (type, payload) = SignalRBattleEventEmitter.MapEvent(evt);
+        using var doc = JsonDocument.Parse(JsonSerializer.Serialize(payload));
+
+        Assert.Equal("MoveEvaded", type);
+        Assert.Equal("BULBASAUR", doc.RootElement.GetProperty("TargetName").GetString());
+        Assert.Equal(7, doc.RootElement.GetProperty("TargetId").GetInt32());
+    }
+
+    [Fact]
     public void RampageContinues_Projection_CarriesCreatureAndMove()
     {
         var evt = new RampageContinues("TAUROS", 3, "thrash");

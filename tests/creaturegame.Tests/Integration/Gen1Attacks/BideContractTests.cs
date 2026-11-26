@@ -241,6 +241,19 @@ public class BideContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     }
 
     [Fact]
+    public async Task AFoesSelfTargetingMoveNeverRollsAccuracy_SoItCountsThePreviousHitAgain()
+    {
+        var (emitter, unleashed) = await BideAgainstAsync(
+            Foe("tackle", "focus-energy"),
+            new FixedBideRules(3, missAccuracy: Move("focus-energy").Accuracy),
+            ["tackle", "focus-energy"]
+        );
+
+        Assert.Contains(emitter.Events, e => e is FocusEnergyApplied { CreatureName: "Enemy" });
+        Assert.Equal(4 * HitsOn(emitter, "Player")[0], unleashed);
+    }
+
+    [Fact]
     public async Task AFoesFailedCounter_CountsThePreviousHitAgain()
     {
         var (emitter, unleashed) = await BideAgainstAsync(

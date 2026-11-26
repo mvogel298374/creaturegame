@@ -133,6 +133,11 @@ the linked design doc instead — pull it there and leave only the pointer here.
   Normal-type. The hit still lands, with no extra line. Thunder Wave still paralyzes an Electric-type.
 - A status move (Thunder Wave, Sleep Powder, Toxic and the like) against a foe that already has a status, Poison
   Powder or Toxic against a Poison-type, and a status move that misses all show "It didn't affect <target>!".
+- A move that works on its user or the field never rolls accuracy, so it never misses, however evasive the foe or
+  inaccurate the user: Recover, Soft-Boiled, Rest, Swords Dance and every other self stat-up, Haze, Mist, Focus
+  Energy, Reflect, Light Screen, Substitute, Conversion, Transform and Splash. Status moves aimed at the foe
+  (confusion, poison, paralysis, sleep, stat-downs, Leech Seed, Mimic, Disable) still roll.
+- Leech Seed that misses, or targets a Grass-type or an already-seeded foe, shows "<target> evaded attack!".
 - Recover, Soft-Boiled and Rest fail with "But it failed!" at full HP, and also when the user is exactly 255 or 511 HP
   below max across a high-byte boundary (Gen 1's low-byte compare bug); a failed heal still spends PP.
 - A multi-hit move rolls crit, damage and accuracy once; every strike deals the first strike's damage.
@@ -198,7 +203,7 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - Any charge move's release and a confusion self-hit end the out-of-reach state; Haze does not. Full paralysis on the
   Fly or Dig release turn does not: the Pokémon stays out of reach until it next completes a charge move or leaves the
   field.
-- A missed Disable prints "But it failed!".
+- A missed Disable or Mimic prints "But it failed!".
 - Every turn of a Wrap, Bind, Clamp or Fire Spin after the first prints "<user>'s attack continues!" instead of "used
   <move>". It always lands: no accuracy, crit or damage roll and no PP. It repeats the first strike's damage (a crit's
   included) through the normal damage path, so a Substitute soaks it and, once broken, the next turn hits the foe for the

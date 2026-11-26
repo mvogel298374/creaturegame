@@ -495,6 +495,7 @@ public sealed class SignalRBattleEventEmitter(
                     e.MoveName,
                 }
             ),
+            MoveEvaded e => ("MoveEvaded", new { e.TargetName, e.TargetId }),
             AlreadyAsleep e => ("AlreadyAsleep", new { e.TargetName, e.TargetId }),
             ButNothingHappened e => ("ButNothingHappened", new { e.CreatureName, e.CreatureId }),
             SubstituteCreated e => (

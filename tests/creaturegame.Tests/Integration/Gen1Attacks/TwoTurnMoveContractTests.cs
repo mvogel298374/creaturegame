@@ -338,6 +338,7 @@ public class TwoTurnMoveContractTests(MovesFixture moves) : Gen1MoveContract(mov
     [InlineData("growl", typeof(MoveFailed))]
     [InlineData("supersonic", typeof(MoveFailed))]
     [InlineData("disable", typeof(MoveFailed))]
+    [InlineData("leech-seed", typeof(MoveEvaded))]
     public async Task AStatusMoveOnAFlyerPrintsItsUsualMissLineWithoutARoll(
         string move,
         Type missLine
@@ -353,6 +354,7 @@ public class TwoTurnMoveContractTests(MovesFixture moves) : Gen1MoveContract(mov
         Assert.Equal(0, user.Battle.Stages.Attack);
         Assert.Equal(0, user.Battle.ConfusedTurns);
         Assert.Null(user.Battle.DisabledMove);
+        Assert.False(user.Battle.HasLeechSeed);
     }
 
     [Theory]

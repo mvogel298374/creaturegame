@@ -67,14 +67,15 @@ public class ImmunityContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     }
 
     [Fact]
-    public async Task GrassTypesAreImmuneToLeechSeed()
+    public async Task GrassTypesAreImmuneToLeechSeed_AndTheSeedIsEvaded()
     {
         var result = await new MoveScenario()
             .Defender(TestCreatures.Make("D", type1: DamageType.Grass, hp: 500))
             .Use(Move("leech-seed"));
 
         Assert.False(result.Defender.Battle.HasLeechSeed);
-        Assert.True(result.Has<MoveHadNoEffect>());
+        Assert.Equal("D", Assert.Single(result.Emitter.Of<MoveEvaded>()).TargetName);
+        Assert.False(result.Has<MoveHadNoEffect>());
     }
 
     [Fact]

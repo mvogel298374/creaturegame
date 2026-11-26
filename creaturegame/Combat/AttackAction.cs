@@ -509,10 +509,7 @@ public class AttackAction : IBattleAction
             dodged
             || usingStruggle
             || move.NeverMisses
-            || (
-                move.Effect is MoveEffect.ForceFlee or MoveEffect.Teleport
-                && _rules.ForceFleeSkipsAccuracy
-            )
+            || !_rules.RunsHitTest(move)
             || (_rules.XAccuracyBypassesAccuracyCheck && Source.Battle.UsingXAccuracy);
         bool missed =
             dodged
@@ -549,15 +546,7 @@ public class AttackAction : IBattleAction
         {
             if (_rules.MissZeroesLastDamage)
                 _lastDamage.Value = 0;
-            bool isStatusMove = IsStatusMove(move, category, usingStruggle);
-            _emitter?.Emit(
-                isStatusMove && move.StatusEffect != StatusCondition.None
-                    ? StatusMoveFailure(_rules.StatusMoveMissAnnouncement, move)
-                : isStatusMove
-                && (IsFoeStatDown(move) || move.Effect is MoveEffect.Confuse or MoveEffect.Disable)
-                    ? StatusMoveFailure(_rules.PrimaryEffectFailureAnnouncement, move)
-                : new MoveMissed(Source.Name, Source.Id, move.Name ?? "")
-            );
+            _emitter?.Emit(MissLine(move, IsStatusMove(move, category, usingStruggle)));
             ApplyFailedHitSideEffects(move, category, crashes: true);
             lockIn?.OnTurnEnd(lockCtx!);
             return false;
@@ -643,6 +632,26 @@ public class AttackAction : IBattleAction
             _emitter?.Emit(new AlreadyAsleep(Target.Name, Target.Id));
         else
             _emitter?.Emit(StatusMoveFailure(_rules.StatusMoveNoOpAnnouncement, move));
+    }
+
+    private BattleEvent MissLine(Attack move, bool isStatusMove)
+    {
+        if (move.Effect == MoveEffect.LeechSeed)
+            return StatusMoveFailure(
+                _rules.LeechSeedFailureAnnouncement(LeechSeedFailure.Missed),
+                move
+            );
+        if (isStatusMove && move.StatusEffect != StatusCondition.None)
+            return StatusMoveFailure(_rules.StatusMoveMissAnnouncement, move);
+        if (
+            isStatusMove
+            && (
+                IsFoeStatDown(move)
+                || move.Effect is MoveEffect.Confuse or MoveEffect.Disable or MoveEffect.Mimic
+            )
+        )
+            return StatusMoveFailure(_rules.PrimaryEffectFailureAnnouncement, move);
+        return new MoveMissed(Source.Name, Source.Id, move.Name ?? "");
     }
 
     private BattleEvent StatusMoveFailure(MoveFailureAnnouncement announcement, Attack move) =>

@@ -180,6 +180,8 @@ public abstract class DelegatingBattleRules : IBattleRules
         SemiInvulnerability state
     ) => _inner.HitOnSemiInvulnerable(move, state);
 
+    public virtual bool RunsHitTest(Attack move) => _inner.RunsHitTest(move);
+
     public virtual bool LostTurnEndsSemiInvulnerability(PreMoveCheck check) =>
         _inner.LostTurnEndsSemiInvulnerability(check);
 
@@ -288,6 +290,9 @@ public abstract class DelegatingBattleRules : IBattleRules
 
     public virtual bool CanBeLeechSeeded(Creature t) => _inner.CanBeLeechSeeded(t);
 
+    public virtual MoveFailureAnnouncement LeechSeedFailureAnnouncement(LeechSeedFailure f) =>
+        _inner.LeechSeedFailureAnnouncement(f);
+
     public virtual bool ForceFleeFailsVsTrainer => _inner.ForceFleeFailsVsTrainer;
 
     public virtual MoveFailureAnnouncement ForceFleeTrainerFailureAnnouncement =>
@@ -298,8 +303,6 @@ public abstract class DelegatingBattleRules : IBattleRules
 
     public virtual MoveFailureAnnouncement ForceFleeWildFailureAnnouncement =>
         _inner.ForceFleeWildFailureAnnouncement;
-
-    public virtual bool ForceFleeSkipsAccuracy => _inner.ForceFleeSkipsAccuracy;
 
     public virtual MoveFailureAnnouncement TeleportFailureAnnouncement =>
         _inner.TeleportFailureAnnouncement;

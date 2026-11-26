@@ -388,7 +388,8 @@ public class ForceFleeTests(MovesFixture moves) : InteractionTest(moves)
 
     private sealed class WhirlwindRollsAccuracyRules : DelegatingBattleRules
     {
-        public override bool ForceFleeSkipsAccuracy => false;
+        public override bool RunsHitTest(Attack move) =>
+            move.Effect == MoveEffect.ForceFlee || base.RunsHitTest(move);
     }
 
     [Fact]

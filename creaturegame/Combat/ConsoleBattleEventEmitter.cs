@@ -88,6 +88,10 @@ public sealed class ConsoleBattleEventEmitter : IBattleEventEmitter
                 Console.WriteLine($"It didn't affect {e.TargetName}!");
                 break;
 
+            case MoveEvaded e:
+                Console.WriteLine($"{e.TargetName} evaded attack!");
+                break;
+
             case AlreadyAsleep e:
                 Console.WriteLine($"{e.TargetName} is already asleep!");
                 break;

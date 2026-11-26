@@ -46,6 +46,17 @@ public enum MoveFailureAnnouncement
 
     /// <summary>"But it failed!" (<see cref="MoveFailed"/>).</summary>
     Failed,
+
+    /// <summary>"&lt;TARGET&gt; evaded attack!" (<see cref="MoveEvaded"/>).</summary>
+    Evaded,
+}
+
+/// <summary>Why a Leech Seed failed to plant; each cause picks its own line. See GENERATION_SEAMS.md §2.</summary>
+public enum LeechSeedFailure
+{
+    Missed,
+    GrassTarget,
+    AlreadySeeded,
 }
 
 /// <summary>How a rampage move (Thrash, Petal Dance) announces a locked repeat turn. See GENERATION_SEAMS.md §2.</summary>
@@ -361,7 +372,7 @@ public interface IBattleRules
     /// <summary>Whether a hit that breaks a Substitute cancels this post-damage effect of the attacker's move. See GENERATION_SEAMS.md §2.</summary>
     bool SubstituteBreakCancels(MoveEffect effect, DamageCategory category);
 
-    /// <summary>The line a stat-down or confusion move prints when a Substitute stops it or it misses, and Disable when it misses. See GENERATION_SEAMS.md §2.</summary>
+    /// <summary>The line a stat-down or confusion move prints when a Substitute stops it or it misses, and Disable or Mimic when it misses. See GENERATION_SEAMS.md §2.</summary>
     MoveFailureAnnouncement PrimaryEffectFailureAnnouncement { get; }
 
     /// <summary>The checks a creature runs before it moves, in order. See GENERATION_SEAMS.md §2.</summary>
@@ -381,6 +392,9 @@ public interface IBattleRules
 
     /// <summary>What this move does to a target out of reach. See GENERATION_SEAMS.md §2.</summary>
     SemiInvulnerableHit HitOnSemiInvulnerable(Attack move, SemiInvulnerability state);
+
+    /// <summary>Whether <paramref name="move"/> runs the hit test; one that doesn't never rolls accuracy. See GENERATION_SEAMS.md §2.</summary>
+    bool RunsHitTest(Attack move);
 
     /// <summary>Whether losing the turn to this check brings the user back within reach. See GENERATION_SEAMS.md §2.</summary>
     bool LostTurnEndsSemiInvulnerability(PreMoveCheck check);
@@ -550,6 +564,9 @@ public interface IBattleRules
     /// <summary>Whether <paramref name="target"/> can be afflicted by Leech Seed.</summary>
     bool CanBeLeechSeeded(Creature target);
 
+    /// <summary>The line a Leech Seed that didn't plant prints, by cause. See GENERATION_SEAMS.md §2.</summary>
+    MoveFailureAnnouncement LeechSeedFailureAnnouncement(LeechSeedFailure failure);
+
     /// <summary>Whether Roar / Whirlwind fail against a non-escapable foe. See GENERATION_SEAMS.md §2.</summary>
     bool ForceFleeFailsVsTrainer { get; }
 
@@ -561,9 +578,6 @@ public interface IBattleRules
 
     /// <summary>The line Roar / Whirlwind print when the wild success roll fails. See GENERATION_SEAMS.md §2.</summary>
     MoveFailureAnnouncement ForceFleeWildFailureAnnouncement { get; }
-
-    /// <summary>Whether Roar / Whirlwind / Teleport skip the accuracy roll. See GENERATION_SEAMS.md §2.</summary>
-    bool ForceFleeSkipsAccuracy { get; }
 
     /// <summary>The line Teleport prints when it fails, in a wild or a trainer battle. See GENERATION_SEAMS.md §2.</summary>
     MoveFailureAnnouncement TeleportFailureAnnouncement { get; }

@@ -96,6 +96,15 @@ A reference doc covering every major system across all main-series generations โ
     too misses on a 255; ours treats Struggle as never-miss (`AttackAction.Connects`). Reachable only out of PP and on
     a 1/256 roll (user ruling 2026-11-15). Pinned as a known gap by
     `RollOrderContractTests.StruggleRollsCritAndDamageWithNoAccuracyDrawMirroringTheKnownGap`; fixing it flips that test.
+- **Only a move that runs the hit test rolls accuracy.** `ResidualEffects1` jumps straight to its effect
+  (`core.asm:3124-3128`) and every other 0-power move skips `MoveHitTest` after `CalculateDamage` (`:3144-3146`); such a
+  move rolls only if its effect calls `MoveHitTest` itself (Sleep `effects.asm:53`, Poison `:108`, a stat-down `:571`,
+  Confusion `:1124`, Mimic `:1207`, Disable `:1288`, Paralyze `move_effects/paralyze.asm:29`, Leech Seed
+  `move_effects/leech_seed.asm:2`). So Recover, Rest, Haze, Mist, Focus Energy, the screens, Substitute, Conversion,
+  Transform, Splash, Roar/Whirlwind/Teleport and every self stat-up never miss, whatever the foe's evasion or the
+  user's accuracy, and never hit the 1/256 miss. A move that skips the roll also leaves the shared last damage alone,
+  so it can't empty a Bide. Gen 2 keeps the shape: self-targeting effect scripts carry no `checkhit`
+  (pokecrystal `data/moves/effects.asm`). Seam: `IBattleRules.RunsHitTest`.
 - Accuracy/Evasion stage multipliers use a different formula than Gen 2+
 - **X Accuracy** sets a flag (pokered `USING_X_ACCURACY`) that makes `MoveHitTest` return before the roll: the user's moves ignore accuracy and evasion and dodge the 1/256 miss. It is checked *after* Dream Eater, Swift, Dig/Fly and Mist, and the OHKO speed check is separate, so a faster X Accuracy user's OHKO always lands. Haze clears it on both sides, and so does switching out (it is a volatile bit). Using it a second time is consumed, not refused; Gen 2 adds the "won't have any effect" refusal. Gen 2 keeps the flag (`SUBSTATUS_X_ACCURACY`); Gen 3+ makes it a +1 accuracy stage
 
@@ -267,8 +276,8 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
   (`engine/battle/move_effects/transform.asm:5-20`): it never fires against the target, and fires only for a
   player-side user that is itself stranded by the glitch below, which then fails. We don't replicate that one-sided
   case (waived 2026-11-09); Transform always lands. A status move misses with its usual line ("didn't affect", or
-  "But it failed!" for a stat-down, confusion or Disable move, `effects.asm:1366-1367`). Leech Seed prints "missed"
-  where Gen 1 prints "evaded the attack!" (`TODO.md` ยง3.1, "Moves that never reach the hit test skip the accuracy roll"). Mimic and Conversion check the bit themselves: "But it failed!" (`effects.asm:1221`,
+  "But it failed!" for a stat-down, confusion or Disable move, `effects.asm:1366-1367`), and Leech Seed "<TARGET> evaded
+  attack!" (`leech_seed.asm:2-32`, `data/text/text_3.asm:254-257`). Mimic and Conversion check the bit themselves: "But it failed!" (`effects.asm:1221`,
   `:1245`, `:1272`; `move_effects/conversion.asm:14`).
 - **Cleared on any charge move's release** (`core.asm:3116`, enemy `:5500`) and by a confusion self-hit (`:3432`).
   Haze doesn't touch it.
@@ -344,6 +353,7 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
   enemy's Mimic copies a random filled slot (pokered `engine/battle/effects.asm:1211-1261`, `core.asm:2508-2556`).
 - Any move can be copied, Mimic included, and a copied Mimic copies again. The copy keeps Mimic's PP: only the
   move id is written into the slot (`effects.asm:1262-1267`).
+- A missed accuracy roll prints "But it failed!", not "missed" (`:1207-1210`, `:1273-1274`).
 - A target in the air (Fly) or underground (Dig) makes Mimic fail with "But it failed!" (`:1222`, `:1246`, `:1274`).
   That miss also zeroes the last damage in pokered, which ours doesn't model (see Bide).
 - Not modelled: pokered's enemy rolls `BattleRandom & 3` and retries on an empty slot; ours draws once over the filled
