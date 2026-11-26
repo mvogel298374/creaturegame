@@ -268,7 +268,7 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
   player-side user that is itself stranded by the glitch below, which then fails. We don't replicate that one-sided
   case (waived 2026-11-09); Transform always lands. A status move misses with its usual line ("didn't affect", or
   "But it failed!" for a stat-down, confusion or Disable move, `effects.asm:1366-1367`). Leech Seed prints "missed"
-  where Gen 1 prints "evaded the attack!" (`TODO.md` §3.1, "Other `ResidualEffects1` moves may roll accuracy"). Mimic and Conversion check the bit themselves: "But it failed!" (`effects.asm:1221`,
+  where Gen 1 prints "evaded the attack!" (`TODO.md` §3.1, "Moves that never reach the hit test skip the accuracy roll"). Mimic and Conversion check the bit themselves: "But it failed!" (`effects.asm:1221`,
   `:1245`, `:1272`; `move_effects/conversion.asm:14`).
 - **Cleared on any charge move's release** (`core.asm:3116`, enemy `:5500`) and by a confusion self-hit (`:3432`).
   Haze doesn't touch it.
