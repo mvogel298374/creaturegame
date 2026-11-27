@@ -341,22 +341,37 @@ public sealed class Gen1BattleRules : IBattleRules
         return stage <= 0 ? 2.0 / (2 - stage) : (2.0 + stage) / 2.0;
     }
 
-    // Gen 1 accuracy/evasion table: 3/(3+|n|) for n≤0, (3+n)/3 for n>0.
-    // Yields 0.333× at -6, 1.0× at 0, 3.0× at +6.
-    public double GetAccuracyStageMultiplier(int stage)
-    {
-        stage = Math.Clamp(stage, -6, 6);
-        return stage <= 0 ? 3.0 / (3 - stage) : (3.0 + stage) / 3.0;
-    }
+    // pokered data/battle/stat_modifiers.asm StatModifierRatios, stages -6 to +6.
+    private static readonly (int Numerator, int Denominator)[] StatModifierRatios =
+    [
+        (25, 100),
+        (28, 100),
+        (33, 100),
+        (40, 100),
+        (50, 100),
+        (66, 100),
+        (1, 1),
+        (15, 10),
+        (2, 1),
+        (25, 10),
+        (3, 1),
+        (35, 10),
+        (4, 1),
+    ];
 
-    // Gen 1: convert accuracy % to 0-255 scale, apply stage multipliers.
-    // A roll of 255 always misses (1/256 bug) because the threshold caps at 255.
+    // pokered core.asm CalcHitChance; GENERATION_SEAMS.md → Hit chance.
     public int GetHitThreshold(int accuracyPercent, int attackerAccStage, int defenderEvaStage)
     {
-        int threshold = (int)Math.Floor(accuracyPercent * 255.0 / 100.0);
-        double accMult = GetAccuracyStageMultiplier(attackerAccStage);
-        double evaMult = GetAccuracyStageMultiplier(defenderEvaStage);
-        return Math.Clamp((int)Math.Floor(threshold * accMult / evaMult), 0, 255);
+        int threshold = accuracyPercent * 255 / 100;
+        threshold = ApplyStageRatio(threshold, attackerAccStage);
+        threshold = ApplyStageRatio(threshold, -defenderEvaStage);
+        return Math.Min(threshold, 255);
+    }
+
+    private static int ApplyStageRatio(int value, int stage)
+    {
+        var (numerator, denominator) = StatModifierRatios[Math.Clamp(stage, -6, 6) + 6];
+        return Math.Max(1, value * numerator / denominator);
     }
 
     // Gen 1: roll 0-255; roll >= threshold → miss. Roll 255 always misses for 100%-acc moves.

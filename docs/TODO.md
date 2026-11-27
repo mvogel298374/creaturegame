@@ -50,7 +50,7 @@ design pass serves the group. Group 3 (hit test and accuracy) is finished and ar
 | # | Group | Code | Items |
 |:-:|:--|:--|:--|
 | 2 | End-of-turn residual phase | `Battle` turn tail, residuals, `TickTurnCounters` | End-of-turn residual phase (with Leech Seed × Toxic and the menu-turn first mover) |
-| 4 | Damage formula | `DamageCalculator`, crit and accuracy tables, stat stages | Accuracy table · Drain and recoil on HP lost · Stat stages · Re-applied stat penalties |
+| 4 | Damage formula | `DamageCalculator`, stat stages | Drain and recoil on HP lost · Stat stages · Re-applied stat penalties |
 | 7 | Battle text and seams | `timeline.ts`, the console emitter, `GENERATION_SEAMS.md` | Audit the inline battle rules · Binding and miss lines |
 | 8 | Battle presentation | `BattleScene`, the event wire | Move animations · Sprite FX · Fly/Dig sprite stays on screen · Text feel |
 | 9 | Acquisition and items | `ItemEffects`, `RewardCalculator`, evolution | Catch · Unsold-item rule · Stone evolutions |
@@ -60,21 +60,14 @@ design pass serves the group. Group 3 (hit test and accuracy) is finished and ar
 | 13 | Importer and data model | `PokeApiConnector`, schema | §4.4 multi-generation data model |
 | 14 | Tooling and docs | `.claude/`, README, hooks | Agent profiles → skills · User docs · Pre-commit hook gaps · `npm audit` · Dev Mode next features · Abuse protection |
 
-**Ready — each awaits your greenlight**
-
-| Item | Cost | Ready? | Next step / what it unblocks |
-|:-----|:----:|:-------|:-----------------------------|
-| None | | | |
-
 **A. Confirm the drafted lines, then Ready**
 
-Damage-core verify slice done 2026-11-27 (§3.1); suggested order B → D → C (A shipped 2026-11-27). Each shifts seeded damage, so recommend E2E after.
+Damage-core verify slice done 2026-11-27 (§3.1); suggested order D → C (A and B shipped 2026-11-27). Each shifts seeded damage, so recommend E2E after.
 
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
-| **B. Accuracy and evasion use the stat-stage ratios** (§3.1) | S | ⚠️ 1–7 drafted | Est. 50–80k. |
 | **D. Drain, recoil and Struggle use the HP actually lost** (§3.1) | S | ⚠️ 1–7 drafted | Est. 50–80k. |
-| **C. Staged stats: pokered's ratios, the 1–999 clamp, ÷4 scaling and the screen wrap** (§3.1) | S–M | ⚠️ 1–7 drafted | Est. 80–120k; shares the ratio pairs with B. |
+| **C. Staged stats: pokered's ratios, the 1–999 clamp, ÷4 scaling and the screen wrap** (§3.1) | S–M | ⚠️ 1–7 drafted | Est. 80–120k; the ratio pairs exist privately in `Gen1BattleRules.StatModifierRatios` (B). |
 
 **B. A design pass first** (central engine code: both gates; each pass is shown to you)
 
@@ -152,26 +145,7 @@ data/engine item usually also means updating the test that pins the wrong value.
   model the screen wrap glitch inside C, and file E as an entry. The binding-duration draw order stays closed as
   invisible in play (`GEN_DIFFERENCES.md`, binding moves). Each entry shifts seeded damage or hit rolls, so seeded
   tests move; after each, recommend `.\e2e.ps1 -Spec voluntary-switch`, `-Spec cadence` and `-Spec encounter-map`.
-  A (the integer damage pipeline and level-doubling crit) shipped 2026-11-27 and is archived.
-- **B. Accuracy and evasion use the stat-stage ratios, as in Gen 1 — S, ⚠️ lines drafted.** pokered `CalcHitChance`
-  (`core.asm:5348-5418`) multiplies the move's 0–255 accuracy by the user's accuracy ratio, then by the ratio at
-  `14 − evasion` (the foe's evasion mirrored), from the same `StatModifierRatios` as stats
-  (`data/battle/stat_modifiers.asm`: 25/100 … 66/100, 1, 15/10 … 4/1); each step floors with a minimum of 1, and the
-  result caps at 255. Ours (`Gen1BattleRules.GetAccuracyStageMultiplier`, `GetHitThreshold`) uses a 3-based table
-  (3/(3+n), the Gen 2 shape) and no minimum: against +1 evasion a 100% move hits 74.6% instead of 65.6%, at +6
-  33.2% instead of 24.6%.
-  **DoR** (drafted 2026-11-27, to confirm):
-  1. **Acceptance:** `GetHitThreshold` equals pokered for every accuracy × evasion stage pair at 100% and 85%
-     accuracy (a table test), including the minimum 1 and the 255 cap. A full battle: after one Double Team a 100%
-     move misses on rolls of 168 and above and hits below.
-  2. **Design:** Gen 1's `GetHitThreshold` reads the stat-stage ratio pairs (shared with C) as integer
-     multiply-then-divide steps; `GetAccuracyStageMultiplier` leaves `IBattleRules` if nothing else reads it.
-  3. **Gen-variable surface:** `GetHitThreshold`; Gen 2's `AccuracyLevelMultipliers` is checked in pokecrystal
-     during the work.
-  4. **Gen 1 source:** the cites above.
-  5. **Data vs runtime:** runtime.
-  6. **Quirk the tests assert:** evasion mirrors through the stat table, so +1 evasion is ×0.66, not ×0.75.
-  7. **Dependencies:** none; the ratio pairs land here first if B goes before C.
+  A (the integer damage pipeline and level-doubling crit) and B (accuracy and evasion ratios) shipped 2026-11-27 and are archived.
 - **D. Drain, recoil and Struggle use the HP actually lost, as in Gen 1 — S, ⚠️ lines drafted.** pokered rewrites
   `wDamage` to the target's remaining HP on an overkill (`ApplyDamageToEnemyPokemon`, `core.asm:4703-4712`), and
   drain (`move_effects/drain_hp.asm:1-12`, half, minimum 1) and recoil (`move_effects/recoil.asm:10-25`, a quarter, or
@@ -210,7 +184,7 @@ data/engine item usually also means updating the test that pins the wrong value.
   5. **Data vs runtime:** runtime.
   6. **Quirk the tests assert:** the Reflect wrap. *Not modelled:* pokered's freeze when the scaled Defense is 0
      (`:4120-4121`); ours keeps a minimum of 1 — a `GEN_DIFFERENCES.md` note.
-  7. **Dependencies:** none open (A, which also rewrote `ComputeBaseDamage`, shipped 2026-11-27); shares the ratio pairs with B.
+  7. **Dependencies:** none open (A, which also rewrote `ComputeBaseDamage`, and B shipped 2026-11-27); B left the ratio pairs as the private `Gen1BattleRules.StatModifierRatios`, which C promotes to the `StatStageRatio` seam.
 - **E. A stat change re-applies the burn and paralysis penalties, as in Gen 1 — M, ✗ not Ready (2, 6).** pokered
   stores the in-battle stats. A stat-up move recomputes the raised stat from the unmodified one, dropping the user's
   own burn or paralysis penalty on it, then halves the foe's Attack if it is burned and quarters its Speed if it is

@@ -120,6 +120,13 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - Design detail → `GENERATION_SEAMS.md` (Damage formula row), `GEN_DIFFERENCES.md` → Damage Formula.  History → `TODO_ARCHIVE.md` → *§3.1 The damage
   formula floors each step, and a crit doubles the level, as in Gen 1*.
 
+### Gen 1 accuracy and evasion stages
+- A move's accuracy is scaled by the user's accuracy stage, then by the foe's evasion stage mirrored, using the same ratios as the other stat stages; each
+  step rounds down (never below 1) and the result caps at 255.
+- One level of evasion (Double Team) leaves a 100% move hitting 168 times in 256 (65.6%); at +6 evasion, 63 in 256 (24.6%).
+- Design detail → `GENERATION_SEAMS.md` (Hit chance row), `GEN_DIFFERENCES.md` → accuracy and evasion stages.  History → `TODO_ARCHIVE.md` → *§3.1 Accuracy
+  and evasion use the stat-stage ratios, as in Gen 1*.
+
 ### Gen 1 battle roll order and immunity
 - An attacking move rolls crit, then damage, then accuracy, so a miss has already used its crit and damage rolls; a
   slower one-hit-KO user stops after the crit roll.

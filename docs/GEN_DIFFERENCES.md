@@ -105,7 +105,10 @@ A reference doc covering every major system across all main-series generations �
   user's accuracy, and never hit the 1/256 miss. A move that skips the roll also leaves the shared last damage alone,
   so it can't empty a Bide. Gen 2 keeps the shape: self-targeting effect scripts carry no `checkhit`
   (pokecrystal `data/moves/effects.asm`). Seam: `IBattleRules.RunsHitTest`.
-- Accuracy/Evasion stage multipliers use a different formula than Gen 2+
+- **Accuracy and evasion stages use the stat-stage ratios** (pokered `CalcHitChance`, `core.asm:5348-5418`): the
+  accuracy ratio, then the ratio at the mirrored evasion (`14 − evasion mod`), each floored with a minimum of 1, then
+  capped at 255. +1 evasion is ×0.66, so a 100% move hits 168/256 (65.6%); at +6, 63/256 (24.6%). Gen 2 runs the same
+  steps on its own accuracy table, where +1 evasion is ×0.75 (pokecrystal `data/battle/accuracy_multipliers.asm`)
 - **X Accuracy** sets a flag (pokered `USING_X_ACCURACY`) that makes `MoveHitTest` return before the roll: the user's moves ignore accuracy and evasion and dodge the 1/256 miss. It is checked *after* Dream Eater, Swift, Dig/Fly and Mist, and the OHKO speed check is separate, so a faster X Accuracy user's OHKO always lands. Haze clears it on both sides, and so does switching out (it is a volatile bit). Using it a second time is consumed, not refused; Gen 2 adds the "won't have any effect" refusal. Gen 2 keeps the flag (`SUBSTATUS_X_ACCURACY`); Gen 3+ makes it a +1 accuracy stage
 
 #### Move Category (Physical vs Special)

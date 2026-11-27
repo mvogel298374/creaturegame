@@ -11,6 +11,42 @@ namespace creaturegame.Tests.Integration.Gen1Attacks;
 [Collection(MovesCollection.Name)]
 public class StatStageMoveContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 {
+    [Theory]
+    [InlineData(167, true)]
+    [InlineData(168, false)]
+    public async Task OneDoubleTeamLeavesAHundredPercentMoveHittingBelowRoll168(int roll, bool hits)
+    {
+        var player = TestCreatures.Make("Player", hp: 60, speed: 1);
+        player.AddAttack(Move("pound"));
+        var enemy = TestCreatures.Make("Enemy", hp: 60, speed: 200);
+        enemy.AddAttack(Move("double-team"));
+        enemy.AddAttack(Move("tackle"));
+
+        var result = await new BattleScenario()
+            .Player(player)
+            .Enemy(enemy)
+            .PlayerUses("pound")
+            .EnemyUses("double-team", "tackle")
+            .Rules(new Gen1BattleRules(new SeededRandomSource(1)))
+            .BattleRng(new ClampedRoll(roll))
+            .RunAsync();
+
+        // +1 evasion reads the stat table's 66/100: 255 × 66/100 = 168.
+        Assert.Equal("double-team", result.All<MoveUsed>().First().MoveName);
+        Assert.Equal(!hits, result.Has<MoveMissed>());
+        Assert.Equal(hits, result.All<DamageDealt>().Any(d => d.TargetName == "Enemy"));
+    }
+
+    private sealed class ClampedRoll(int value) : IRandomSource
+    {
+        public int Next(int maxExclusive) => Math.Min(value, maxExclusive - 1);
+
+        public int Next(int minInclusive, int maxExclusive) =>
+            Math.Clamp(value, minInclusive, maxExclusive - 1);
+
+        public double NextDouble() => 0.999;
+    }
+
     [Fact]
     public async Task SwordsDanceRaisesUserAttackByTwoStages()
     {

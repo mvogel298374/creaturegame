@@ -103,6 +103,44 @@ REST call routed to the machine that never saw `/start`; the workflow pins `flyc
 
 ---
 
+## §3.1 Accuracy and evasion use the stat-stage ratios, as in Gen 1 ✅ DONE (2026-11-27)
+
+*(verify slice 2026-11-27, source-confirmed; entry B of the damage-core split) — S.*
+pokered `CalcHitChance` (`core.asm:5348-5418`) multiplies the move's 0–255 accuracy by the user's accuracy ratio, then by the ratio at
+`14 − evasion` (the foe's evasion mirrored), from the same `StatModifierRatios` as stats
+(`data/battle/stat_modifiers.asm`: 25/100 … 66/100, 1, 15/10 … 4/1); each step floors with a minimum of 1, and the
+result caps at 255. Ours (`Gen1BattleRules.GetAccuracyStageMultiplier`, `GetHitThreshold`) used a 3-based table
+(3/(3+n), the Gen 2 shape) and no minimum: against +1 evasion a 100% move hit 74.6% instead of 65.6%, at +6
+33.2% instead of 24.6%.
+**DoR** (drafted and confirmed 2026-11-27):
+1. **Acceptance:** `GetHitThreshold` equals pokered for every accuracy × evasion stage pair at 100% and 85%
+   accuracy (a table test), including the minimum 1 and the 255 cap. A full battle: after one Double Team a 100%
+   move misses on rolls of 168 and above and hits below.
+2. **Design:** Gen 1's `GetHitThreshold` reads the stat-stage ratio pairs (shared with C) as integer
+   multiply-then-divide steps; `GetAccuracyStageMultiplier` leaves `IBattleRules` if nothing else reads it.
+   Rulings 2026-11-27: the old 0%-accuracy battle test becomes a direct `GetHitThreshold(0, 0, 0) == 1` check;
+   the AI's `DamageEvaluator` ignoring accuracy and evasion stages stays unfiled; `pr-review`'s two other 0%-accuracy
+   tests (miss applies no status, Self-Destruct faints on a miss) now force the miss with `NeverHitRules`, and the
+   re-review was skipped.
+3. **Gen-variable surface:** `GetHitThreshold`; Gen 2's `AccuracyLevelMultipliers` is checked in pokecrystal
+   during the work.
+4. **Gen 1 source:** the cites above.
+5. **Data vs runtime:** runtime.
+6. **Quirk the tests assert:** evasion mirrors through the stat table, so +1 evasion is ×0.66, not ×0.75.
+7. **Dependencies:** none; the ratio pairs land here first if B goes before C.
+
+**What was built (2026-11-27).**
+- `Gen1BattleRules.GetHitThreshold` follows `CalcHitChance`: accuracy as `n × 255 / 100`, then the accuracy-stage ratio, then the ratio at the mirrored
+  evasion, each from the private `StatModifierRatios`, each step floored with a minimum of 1, chained, capped at 255. +1 evasion leaves a 100% move at
+  168/256 (65.6%, was 74.6%). `IBattleRules.GetAccuracyStageMultiplier` removed.
+- Tests: 13×13 stage matrices at 100% and 85%, the quirk and minimum-1 tests, a Double Team full battle (hits at roll 167, misses at 168); three
+  0%-accuracy tests reworked (one a direct `GetHitThreshold(0, 0, 0) == 1` check, two forcing the miss with `NeverHitRules`).
+- Docs: `GENERATION_SEAMS.md` (Hit chance row), `GEN_DIFFERENCES.md` (accuracy and evasion stages), `PRODUCT_SPEC.md`.
+- Not filed by ruling: the AI's `DamageEvaluator` ignores accuracy and evasion stages. Follow-up recommended, not filed: `.\e2e.ps1 -Spec voluntary-switch`,
+  `-Spec cadence`, `-Spec encounter-map` (seeded hit rolls shifted).
+
+---
+
 ## §3.1 The damage formula floors each step, and a crit doubles the level, as in Gen 1 ✅ DONE (2026-11-27)
 
 *(verify slice 2026-11-27, source-confirmed; entry A of the damage-core split) — M.*

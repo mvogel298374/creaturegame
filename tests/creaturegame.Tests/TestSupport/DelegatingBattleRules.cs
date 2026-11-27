@@ -78,9 +78,6 @@ public abstract class DelegatingBattleRules : IBattleRules
 
     public virtual double GetStatMultiplier(int stage) => _inner.GetStatMultiplier(stage);
 
-    public virtual double GetAccuracyStageMultiplier(int stage) =>
-        _inner.GetAccuracyStageMultiplier(stage);
-
     public virtual int GetHitThreshold(int acc, int accStage, int evaStage) =>
         _inner.GetHitThreshold(acc, accStage, evaStage);
 

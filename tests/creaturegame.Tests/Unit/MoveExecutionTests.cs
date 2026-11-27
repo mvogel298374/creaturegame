@@ -231,7 +231,6 @@ public class MoveExecutionTests
         var defender = new Creature("Defender") { Level = 50 };
         defender.CalculateStats();
 
-        // Accuracy 0 → always misses under Gen1 rules (threshold = 0, any roll >= 0)
         var explosion = new Attack
         {
             Id = 5,
@@ -249,7 +248,7 @@ public class MoveExecutionTests
             defender,
             attacker.MoveSet[0],
             new Gen1TypeChart(),
-            Gen1BattleRules.Instance,
+            NeverHitRules.Instance,
             ConsoleBattleEventEmitter.Instance
         );
         await action.ExecuteAsync();
@@ -581,7 +580,7 @@ public class MoveExecutionTests
         var defender = new Creature("Defender") { Level = 50 };
         defender.CalculateStats();
 
-        // Accuracy 0 would always miss under Gen1BattleRules; NeverMisses bypasses the check entirely
+        // NeverMisses skips the accuracy roll.
         var swift = new Attack
         {
             Id = 12,

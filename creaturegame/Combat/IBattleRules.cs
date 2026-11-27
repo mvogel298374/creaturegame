@@ -280,18 +280,7 @@ public interface IBattleRules
     /// <summary>The damage-stat multiplier for a stage in [-6, +6].</summary>
     double GetStatMultiplier(int stage);
 
-    /// <summary>
-    /// Returns the accuracy/evasion multiplier for a stage in [-6, +6].
-    /// Gen 1: stage≤0 → 3/(3+|stage|); stage>0 → (3+stage)/3.
-    /// (Ranges from 0.333× at -6 to 3.0× at +6.)
-    /// </summary>
-    double GetAccuracyStageMultiplier(int stage);
-
-    /// <summary>
-    /// Converts a move's accuracy % and the combatants' accuracy/evasion stages
-    /// to an internal hit threshold on the [0, AccuracyRollBound) scale.
-    /// Roll Random.Next(AccuracyRollBound) and miss if roll >= threshold.
-    /// </summary>
+    /// <summary>The hit threshold for a move's accuracy % and the stages; a roll at or above it misses.</summary>
     int GetHitThreshold(int accuracyPercent, int attackerAccStage, int defenderEvaStage);
 
     /// <summary>Exclusive upper bound for the accuracy roll (Gen 1: 256, so a roll of 255 always misses).</summary>
