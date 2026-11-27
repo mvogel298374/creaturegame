@@ -655,10 +655,26 @@ public class ItemEffectTests
     {
         var c = TestCreatures.Make();
         c.Battle.Stages.RaiseAttack(6);
+        Assert.True(CanApply(XAttack(), c), "Gen 1 spends the item rather than refusing it");
 
         var (user, em) = Apply(XAttack(), c);
 
         Assert.Equal(6, user.Battle.Stages.Attack);
+        Assert.Empty(em.Of<StatStageChanged>());
+        Assert.Equal(user.Name, em.Of<ButNothingHappened>().Single().CreatureName);
+    }
+
+    [Fact]
+    public void XItem_OnAStatAlreadyAt999_UnderGen1_IsSpentAndNothingHappens()
+    {
+        // pokered ItemUseXStat runs StatModifierUpEffect, whose .checkIf999 refuses 500 × 2 capped at 999.
+        var c = TestCreatures.Make(attack: 500);
+        c.Battle.Stages.RaiseAttack(2);
+        Assert.True(CanApply(XAttack(), c), "Gen 1 spends the item rather than refusing it");
+
+        var (user, em) = Apply(XAttack(), c);
+
+        Assert.Equal(2, user.Battle.Stages.Attack);
         Assert.Empty(em.Of<StatStageChanged>());
         Assert.Equal(user.Name, em.Of<ButNothingHappened>().Single().CreatureName);
     }

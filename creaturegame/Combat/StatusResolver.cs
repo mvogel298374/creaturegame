@@ -8,11 +8,10 @@ public static class StatusResolver
     public static int EffectiveSpeed(Creature creature, IBattleRules? rules = null)
     {
         var r = rules ?? Gen1BattleRules.Instance;
-        double speed =
-            creature.Attributes.Speed * r.GetStatMultiplier(creature.Battle.Stages.Speed);
+        int speed = StagedStats.Apply(creature.Attributes.Speed, creature.Battle.Stages.Speed, r);
         if (creature.Battle.Status == StatusCondition.Paralysis)
-            speed /= r.ParalysisSpeedDivisor;
-        return (int)speed;
+            speed = Math.Max(r.MinStatValue, speed / r.ParalysisSpeedDivisor);
+        return speed;
     }
 
     public static bool CanAct(

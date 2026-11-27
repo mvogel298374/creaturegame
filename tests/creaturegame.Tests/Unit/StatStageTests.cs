@@ -8,22 +8,54 @@ namespace creaturegame.Tests.Unit;
 
 public class StatStageTests
 {
-    [Fact]
-    public void GetStatMultiplier_Plus6_Returns4()
+    // pokered CalculateModifiedStat, hand-run: the stat, then its value at stages -6..+6.
+    public static TheoryData<int, int[]> StagedStatTable =>
+        new()
+        {
+            { 1, [1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 3, 3, 4] },
+            { 3, [1, 1, 1, 1, 1, 1, 3, 4, 6, 7, 9, 10, 12] },
+            { 7, [1, 1, 2, 2, 3, 4, 7, 10, 14, 17, 21, 24, 28] },
+            { 50, [12, 14, 16, 20, 25, 33, 50, 75, 100, 125, 150, 175, 200] },
+            { 100, [25, 28, 33, 40, 50, 66, 100, 150, 200, 250, 300, 350, 400] },
+            { 255, [63, 71, 84, 102, 127, 168, 255, 382, 510, 637, 765, 892, 999] },
+            { 333, [83, 93, 109, 133, 166, 219, 333, 499, 666, 832, 999, 999, 999] },
+            { 500, [125, 140, 165, 200, 250, 330, 500, 750, 999, 999, 999, 999, 999] },
+            { 999, [249, 279, 329, 399, 499, 659, 999, 999, 999, 999, 999, 999, 999] },
+        };
+
+    [Theory]
+    [MemberData(nameof(StagedStatTable))]
+    public void AStagedStatFollowsPokeredsRatiosAndTheClamp(int stat, int[] expected)
     {
-        Assert.Equal(4.0, Gen1BattleRules.Instance.GetStatMultiplier(6));
+        for (int stage = -6; stage <= 6; stage++)
+            Assert.True(
+                expected[stage + 6] == StagedStats.Apply(stat, stage, Gen1BattleRules.Instance),
+                $"{stat} at stage {stage}"
+            );
+    }
+
+    [Theory]
+    [MemberData(nameof(StagedStatTable))]
+    public void TurnOrderSpeedReadsTheSameStagedValues(int stat, int[] expected)
+    {
+        for (int stage = -6; stage <= 6; stage++)
+        {
+            var creature = TestCreatures.Make(speed: stat);
+            creature.Battle.Stages.RaiseSpeed(stage);
+            Assert.True(
+                expected[stage + 6] == StatusResolver.EffectiveSpeed(creature),
+                $"{stat} at stage {stage}"
+            );
+        }
     }
 
     [Fact]
-    public void GetStatMultiplier_Minus6_Returns0Point25()
+    public void AParalysedSpeedKeepsAMinimumOfOne()
     {
-        Assert.Equal(0.25, Gen1BattleRules.Instance.GetStatMultiplier(-6));
-    }
-
-    [Fact]
-    public void GetStatMultiplier_Zero_Returns1()
-    {
-        Assert.Equal(1.0, Gen1BattleRules.Instance.GetStatMultiplier(0));
+        // pokered QuarterSpeedDueToParalysis: 3 / 4 floors to 0, raised to 1.
+        var creature = TestCreatures.Make(speed: 3);
+        creature.Battle.Status = StatusCondition.Paralysis;
+        Assert.Equal(1, StatusResolver.EffectiveSpeed(creature));
     }
 
     [Fact]

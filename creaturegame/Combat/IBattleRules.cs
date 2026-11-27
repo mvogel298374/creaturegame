@@ -269,6 +269,9 @@ public interface IBattleRules
     /// <summary>Divisor of a paralyzed creature's effective Speed for turn order (<see cref="StatusResolver.EffectiveSpeed"/>).</summary>
     int ParalysisSpeedDivisor { get; }
 
+    /// <summary>Divisor of a burned creature's Attack in the damage calc (<see cref="DamageCalculator"/>).</summary>
+    int BurnAttackDivisor { get; }
+
     /// <summary>
     /// Returns the fraction of max HP dealt by Bad Poison (Toxic) on the given counter tick.
     /// Gen 1: counter/16 — escalates each turn with no cap (counter starts at 1, increments after damage).
@@ -277,8 +280,26 @@ public interface IBattleRules
 
     // ── Stat stages ────────────────────────────────────────────────────────────
 
-    /// <summary>The damage-stat multiplier for a stage in [-6, +6].</summary>
-    double GetStatMultiplier(int stage);
+    /// <summary>The ratio a stat is multiplied by at a stage in [-6, +6]. See GENERATION_SEAMS.md §2 (Staged stats).</summary>
+    (int Numerator, int Denominator) StatStageRatio(int stage);
+
+    /// <summary>The cap on a staged stat.</summary>
+    int MaxStatValue { get; }
+
+    /// <summary>The floor of a staged or penalised stat.</summary>
+    int MinStatValue { get; }
+
+    /// <summary>The unmodified stat a stage scales, or null for a stage that scales none (accuracy, evasion).</summary>
+    int? UnstagedStat(Creature creature, StageStat stat);
+
+    /// <summary>The damage stat at or above which both damage stats are divided by 4. See GENERATION_SEAMS.md §2 (Staged stats).</summary>
+    int DamageStatScaleThreshold { get; }
+
+    /// <summary>Whether one ÷4 pass leaves the defensive stat to wrap below the threshold, rather than dividing again.</summary>
+    bool ScreenedStatWrapsAfterScaling { get; }
+
+    /// <summary>Whether a stat-change move fails on a staged stat already at <see cref="MaxStatValue"/> (up) or 1 (down).</summary>
+    bool StatChangeFailsAtTheStatClamp { get; }
 
     /// <summary>The hit threshold for a move's accuracy % and the stages; a roll at or above it misses.</summary>
     int GetHitThreshold(int accuracyPercent, int attackerAccStage, int defenderEvaStage);

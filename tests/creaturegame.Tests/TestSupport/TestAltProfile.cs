@@ -287,6 +287,10 @@ internal static class TestAltProfile
 
         public override bool DrainHealIsLastDamage => false;
 
+        public override bool ScreenedStatWrapsAfterScaling => false;
+
+        public override bool StatChangeFailsAtTheStatClamp => false;
+
         public override bool SkipsBattleMenu(Creature creature) =>
             EveryLockInSkipsTheMenu(creature);
 

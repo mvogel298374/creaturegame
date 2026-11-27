@@ -809,17 +809,34 @@ public class AttackAction : IBattleAction
         return damage;
     }
 
+    // GENERATION_SEAMS.md §2 (Rage; Staged stats).
     private void BuildRage()
     {
         if (!Target.Battle.IsRaging || !Target.IsAlive())
             return;
-        int newStage = ApplyStageChange(Target, StageStat.Attack, _rules.RageAttackStagesPerHit);
+        int delta = _rules.RageAttackStagesPerHit;
+        bool failsAtClamp = StagedStats.ChangeFailsAtTheClamp(
+            Target,
+            StageStat.Attack,
+            delta,
+            _rules
+        );
+        int before = Target.Battle.Stages.Attack;
+        int newStage = ApplyStageChange(Target, StageStat.Attack, delta);
+        if (newStage == before)
+            return;
+        if (failsAtClamp)
+        {
+            ApplyStageChange(Target, StageStat.Attack, before - newStage);
+            EmitStatCapAnnouncement(Target);
+            return;
+        }
         _emitter?.Emit(
             new StatStageChanged(
                 Target.Name,
                 Target.Id,
                 StageStat.Attack.ToString(),
-                _rules.RageAttackStagesPerHit,
+                delta,
                 newStage
             )
         );
@@ -1043,7 +1060,9 @@ public class AttackAction : IBattleAction
             return;
 
         int before = affected.Battle.Stages.Of(se.Stat);
-        int newStage = ApplyStageChange(affected, se.Stat, se.Delta);
+        int newStage = StagedStats.ChangeFailsAtTheClamp(affected, se.Stat, se.Delta, _rules)
+            ? before
+            : ApplyStageChange(affected, se.Stat, se.Delta);
 
         if (newStage != before)
         {
@@ -1059,22 +1078,23 @@ public class AttackAction : IBattleAction
             return;
         }
 
-        // The stage was already at the ±6 cap, so it didn't move. Only a PRIMARY stat move announces this
-        // (IBattleRules.StatStageCapAnnouncement); a side-effect stat drop on a damaging move stays silent —
-        // mirrors the redundant-confusion path in MoveEffects (dedicated-move gate + switch on the rules enum).
+        // Only a primary stat move announces a stat that didn't move (StatStageCapAnnouncement).
         if (attack.BaseDamage == 0)
+            EmitStatCapAnnouncement(affected);
+    }
+
+    private void EmitStatCapAnnouncement(Creature affected)
+    {
+        BattleEvent? announcement = _rules.StatStageCapAnnouncement switch
         {
-            BattleEvent? announcement = _rules.StatStageCapAnnouncement switch
-            {
-                StatCapAnnouncement.NothingHappened => new ButNothingHappened(
-                    affected.Name,
-                    affected.Id
-                ),
-                _ => null,
-            };
-            if (announcement is not null)
-                _emitter?.Emit(announcement);
-        }
+            StatCapAnnouncement.NothingHappened => new ButNothingHappened(
+                affected.Name,
+                affected.Id
+            ),
+            _ => null,
+        };
+        if (announcement is not null)
+            _emitter?.Emit(announcement);
     }
 
     private static bool IsFoeStatDown(Attack attack) =>

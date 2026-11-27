@@ -103,6 +103,55 @@ REST call routed to the machine that never saw `/start`; the workflow pins `flyc
 
 ---
 
+## §3.1 Staged stats use pokered's ratios, clamp to 1–999, scale ÷4 past 255, and screens wrap, as in Gen 1 ✅ DONE (2026-11-27)
+
+*(verify slice 2026-11-27, source-confirmed; entry C of the damage-core split) — S–M.*
+pokered `CalculateModifiedStat` (`core.asm:6376-6452`) multiplies the unmodified stat by the
+stage's ratio pair, floors, caps at 999 and raises 0 to 1; ours (`GetStatMultiplier`, `ComputeBaseDamage`) used
+exact fractions (2/3, 1/3, 2/7 where pokered has 66/100, 33/100, 28/100) and no clamp. When either damage stat is
+256 or more, pokered divides both by 4, raising the attacker's 0 to 1 (`:4107-4131`); ours never scaled. Reflect and
+Light Screen double the defensive stat without the 999 cap (`:4083-4084`), and only the low byte survives the ÷4, so
+a doubled stat of 1024 or more wraps: Defense 579 under Reflect is read as 33 (ruling 2026-11-27: model it).
+A stat-change move reads the staged stat too: a stat-up on a stat already at 999 fails (`StatModifierUpEffect`
+`.checkIf999` → `RestoreOriginalStatModifier`, `effects.asm`), and a stat-down on a stat at 1 fails
+(`StatModifierDownEffect` → `CantLowerAnymore`), each with "Nothing happened!" and the stage left; runs reach level
+100 and start low, so both are reachable (folded in by ruling 2026-11-27).
+**DoR** (drafted and confirmed 2026-11-27; lines 1, 3 and 6 extended by ruling 2026-11-27):
+1. **Acceptance:** a table test of every stage over a set of stats against pokered's ratios and the clamp; the
+   staged Speed for turn order uses the same values; damage with a stat over 255 equals the ÷4-scaled formula; a
+   full battle where a Reflect user with Defense 512+ takes the wrapped damage; a stat-up move on a stat already at
+   999, and a stat-down move on a stat at 1, fail with "Nothing happened!" and leave the stage.
+2. **Design:** `GetStatMultiplier(double)` becomes a ratio-pair seam (`StatStageRatio(stage)` → numerator,
+   denominator) with `MaxStatValue` (999); the scaling (`DamageStatScaleThreshold`, 256) and the wrap
+   (`ScreenedStatWrapsAfterScaling`) are `IBattleRules` members.
+3. **Gen-variable surface:** those members and `StatChangeFailsAtTheStatClamp`; the Gen 2 values are checked in
+   pokecrystal during the work.
+4. **Gen 1 source:** the cites above.
+5. **Data vs runtime:** runtime.
+6. **Quirk the tests assert:** the Reflect wrap; the 999 stat-up failure. *Not modelled:* pokered's freeze when the scaled Defense is 0
+   (`:4120-4121`); ours keeps a minimum of 1 — a `GEN_DIFFERENCES.md` note.
+7. **Dependencies:** none open (A, which also rewrote `ComputeBaseDamage`, and B shipped 2026-11-27); B left the ratio pairs as the private `Gen1BattleRules.StatModifierRatios`, which C promoted to the `StatStageRatio` seam.
+**Rulings 2026-11-27 (requirements-review):** Rage's build checks the clamp too (silent at +6, "Nothing happened!"
+at 999, `core.asm:4928-4944`; its "Rage is building!" line joins "Binding and miss lines follow pokered's text");
+the 999 and 1 check reads the recomputed staged stat, not pokered's stored one with the burn or paralysis
+penalty, shipped as a known gap that E absorbs; Gen 2's stat-down floor is verified (`TryLowerStat`).
+`pr-review` rulings: `UnstagedStat`, `BurnAttackDivisor` and `MinStatValue` join the seam; the Rage 999 battle runs
+long enough to pin the stage restore; the X-item cap tests assert the item is spent; re-review skipped by Mo.
+
+**What was built (2026-11-27).**
+- Seam: `IBattleRules.StatStageRatio`, `MaxStatValue` (999), `MinStatValue` (1), `UnstagedStat`, `BurnAttackDivisor` (2), `DamageStatScaleThreshold` (256),
+  `ScreenedStatWrapsAfterScaling` and `StatChangeFailsAtTheStatClamp`; the old double table is gone. `StagedStats.Apply` clamps to 1–999 and serves the damage
+  calc and turn-order Speed; paralysis's Speed quarter has a minimum of 1.
+- The damage calc divides both stats by 4 when either is 256 or more and Gen 1 keeps the low byte (Defense 579 under Reflect reads 33; a Tackle deals 13, not 4).
+  Explosion and Self-Destruct halve Defense after the scaling.
+- A stat-up on a staged 999 and a stat-down on a staged 1 fail with "Nothing happened!" for moves, X items and Rage's build; Rage's build is silent at +6
+  (it used to emit a phantom rise). Gen 2 checked in pokecrystal.
+- Docs: `GENERATION_SEAMS.md` (Staged stats row, the stat-cap and Rage rows), `GEN_DIFFERENCES.md` (Stats), `PRODUCT_SPEC.md`. E's acceptance absorbed the
+  stored-stat gap; "Binding and miss lines follow pokered's text" absorbed Rage's "Rage is building!" line.
+- Follow-up recommended, not filed: `.\e2e.ps1 -Spec voluntary-switch`, `-Spec cadence`, `-Spec encounter-map` (seeded damage shifted; closes the damage-core A–D run).
+
+---
+
 ## §3.1 Drain, recoil and Struggle use the HP actually lost, as in Gen 1 ✅ DONE (2026-11-27)
 
 *(verify slice 2026-11-27, source-confirmed; entry D of the damage-core split) — S.*

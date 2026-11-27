@@ -97,6 +97,9 @@ public sealed class Gen1BattleRules : IBattleRules
     // Gen 1: Paralysis quarters a paralyzed creature's effective Speed for turn order.
     public int ParalysisSpeedDivisor => 4;
 
+    // pokered core.asm HalveAttackDueToBurn.
+    public int BurnAttackDivisor => 2;
+
     // Gen 1 Bad Poison (Toxic): counter/16 of max HP; no cap — counter increments each turn.
     public double BadPoisonDamageFraction(int toxicCounter) => toxicCounter / 16.0;
 
@@ -340,12 +343,35 @@ public sealed class Gen1BattleRules : IBattleRules
 
     // ── Stat stages ────────────────────────────────────────────────────────────
 
-    // Gen 1 battle-stat table: 2/(2+|n|) for n≤0, (2+n)/2 for n>0.
-    public double GetStatMultiplier(int stage)
-    {
-        stage = Math.Clamp(stage, -6, 6);
-        return stage <= 0 ? 2.0 / (2 - stage) : (2.0 + stage) / 2.0;
-    }
+    // pokered core.asm:6376-6452 CalculateModifiedStat reads StatModifierRatios.
+    public (int Numerator, int Denominator) StatStageRatio(int stage) =>
+        StatModifierRatios[Math.Clamp(stage, -6, 6) + 6];
+
+    // pokered constants/battle_constants.asm MAX_STAT_VALUE.
+    public int MaxStatValue => 999;
+
+    // pokered CalculateModifiedStat, HalveAttackDueToBurn and QuarterSpeedDueToParalysis each raise 0 to 1.
+    public int MinStatValue => 1;
+
+    // pokered keeps a stage per stat in wPlayerMonStatMods; accuracy and evasion scale the hit chance instead.
+    public int? UnstagedStat(Creature creature, StageStat stat) =>
+        stat switch
+        {
+            StageStat.Attack => creature.Attributes.Attack,
+            StageStat.Defense => creature.Attributes.Defense,
+            StageStat.Special => creature.Attributes.Special,
+            StageStat.Speed => creature.Attributes.Speed,
+            _ => null,
+        };
+
+    // pokered core.asm:4107-4131 .scaleStats runs when either stat's high byte is nonzero.
+    public int DamageStatScaleThreshold => 256;
+
+    // pokered core.asm:4129-4130: one ÷4 pass, then only the low byte is read.
+    public bool ScreenedStatWrapsAfterScaling => true;
+
+    // pokered effects.asm StatModifierUpEffect .checkIf999 and StatModifierDownEffect CantLowerAnymore.
+    public bool StatChangeFailsAtTheStatClamp => true;
 
     // pokered data/battle/stat_modifiers.asm StatModifierRatios, stages -6 to +6.
     private static readonly (int Numerator, int Denominator)[] StatModifierRatios =
@@ -374,9 +400,9 @@ public sealed class Gen1BattleRules : IBattleRules
         return Math.Min(threshold, 255);
     }
 
-    private static int ApplyStageRatio(int value, int stage)
+    private int ApplyStageRatio(int value, int stage)
     {
-        var (numerator, denominator) = StatModifierRatios[Math.Clamp(stage, -6, 6) + 6];
+        var (numerator, denominator) = StatStageRatio(stage);
         return Math.Max(1, value * numerator / denominator);
     }
 

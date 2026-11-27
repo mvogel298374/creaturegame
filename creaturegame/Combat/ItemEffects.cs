@@ -241,7 +241,9 @@ public sealed class BattleBoostItemEffect : IItemEffect
         var stat = ctx.Item.StatBoostStat!.Value;
         int delta = ctx.Item.StatBoostStages ?? 0;
         int before = ctx.User.Battle.Stages.Of(stat);
-        int newStage = ctx.User.Battle.Stages.Raise(stat, delta);
+        int newStage = StagedStats.ChangeFailsAtTheClamp(ctx.User, stat, delta, ctx.Rules)
+            ? before
+            : ctx.User.Battle.Stages.Raise(stat, delta);
         if (newStage != before)
         {
             ctx.Emitter?.Emit(

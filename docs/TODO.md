@@ -50,7 +50,7 @@ design pass serves the group. Group 3 (hit test and accuracy) is finished and ar
 | # | Group | Code | Items |
 |:-:|:--|:--|:--|
 | 2 | End-of-turn residual phase | `Battle` turn tail, residuals, `TickTurnCounters` | End-of-turn residual phase (with Leech Seed × Toxic and the menu-turn first mover) |
-| 4 | Damage formula | `DamageCalculator`, stat stages | Stat stages · Re-applied stat penalties |
+| 4 | Damage formula | `DamageCalculator`, stat stages | Re-applied stat penalties (E; A–D shipped) |
 | 7 | Battle text and seams | `timeline.ts`, the console emitter, `GENERATION_SEAMS.md` | Audit the inline battle rules · Binding and miss lines |
 | 8 | Battle presentation | `BattleScene`, the event wire | Move animations · Sprite FX · Fly/Dig sprite stays on screen · Text feel |
 | 9 | Acquisition and items | `ItemEffects`, `RewardCalculator`, evolution | Catch · Unsold-item rule · Stone evolutions |
@@ -62,17 +62,17 @@ design pass serves the group. Group 3 (hit test and accuracy) is finished and ar
 
 **A. Confirm the drafted lines, then Ready**
 
-Damage-core verify slice done 2026-11-27 (§3.1); suggested order C next (A, B and D shipped 2026-11-27). Each shifts seeded damage, so recommend E2E after.
+Damage-core verify slice done 2026-11-27 (§3.1); A–D have shipped, and only E remains (tier B, needs its design pass).
 
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
-| **C. Staged stats: pokered's ratios, the 1–999 clamp, ÷4 scaling and the screen wrap** (§3.1) | S–M | ⚠️ 1–7 drafted | Est. 80–120k; the ratio pairs exist privately in `Gen1BattleRules.StatModifierRatios` (B). |
+| None | | | |
 
 **B. A design pass first** (central engine code: both gates; each pass is shown to you)
 
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
-| **E. A stat change re-applies the burn and paralysis penalties** (§3.1) | M | ✗ 2, 6; rest drafted | Needs stored in-battle stats (`STATE_MODEL.md`); after C. |
+| **E. A stat change re-applies the burn and paralysis penalties** (§3.1) | M | ✗ 2, 6; rest drafted | Needs stored in-battle stats (`STATE_MODEL.md`); C shipped, so it can start once the pass is done. |
 
 **C. Needs a `/plan` or a verify slice**
 
@@ -144,27 +144,7 @@ data/engine item usually also means updating the test that pins the wrong value.
   model the screen wrap glitch inside C, and file E as an entry. The binding-duration draw order stays closed as
   invisible in play (`GEN_DIFFERENCES.md`, binding moves). Each entry shifts seeded damage or hit rolls, so seeded
   tests move; after each, recommend `.\e2e.ps1 -Spec voluntary-switch`, `-Spec cadence` and `-Spec encounter-map`.
-  A (the integer damage pipeline and level-doubling crit), B (accuracy and evasion ratios) and D (drain, recoil and Struggle on HP lost) shipped 2026-11-27 and are archived.
-- **C. Staged stats use pokered's ratios, clamp to 1–999, scale ÷4 past 255, and screens wrap, as in Gen 1 — S–M,
-  ⚠️ lines drafted.** pokered `CalculateModifiedStat` (`core.asm:6376-6452`) multiplies the unmodified stat by the
-  stage's ratio pair, floors, caps at 999 and raises 0 to 1; ours (`GetStatMultiplier`, `ComputeBaseDamage`) uses
-  exact fractions (2/3, 1/3, 2/7 where pokered has 66/100, 33/100, 28/100) and no clamp. When either damage stat is
-  256 or more, pokered divides both by 4, raising the attacker's 0 to 1 (`:4107-4131`); ours never scales. Reflect and
-  Light Screen double the defensive stat without the 999 cap (`:4083-4084`), and only the low byte survives the ÷4, so
-  a doubled stat of 1024 or more wraps: Defense 579 under Reflect is read as 33 (ruling 2026-11-27: model it).
-  **DoR** (drafted 2026-11-27, to confirm):
-  1. **Acceptance:** a table test of every stage over a set of stats against pokered's ratios and the clamp; the
-     staged Speed for turn order uses the same values; damage with a stat over 255 equals the ÷4-scaled formula; a
-     full battle where a Reflect user with Defense 512+ takes the wrapped damage.
-  2. **Design:** `GetStatMultiplier(double)` becomes a ratio-pair seam (`StatStageRatio(stage)` → numerator,
-     denominator) with `MaxStatValue` (999); the scaling (`DamageStatScaleThreshold`, 256) and the wrap
-     (`ScreenedStatWrapsAfterScaling`) are `IBattleRules` members.
-  3. **Gen-variable surface:** those members; the Gen 2 values are checked in pokecrystal during the work.
-  4. **Gen 1 source:** the cites above.
-  5. **Data vs runtime:** runtime.
-  6. **Quirk the tests assert:** the Reflect wrap. *Not modelled:* pokered's freeze when the scaled Defense is 0
-     (`:4120-4121`); ours keeps a minimum of 1 — a `GEN_DIFFERENCES.md` note.
-  7. **Dependencies:** none open (A, which also rewrote `ComputeBaseDamage`, and B shipped 2026-11-27); B left the ratio pairs as the private `Gen1BattleRules.StatModifierRatios`, which C promotes to the `StatStageRatio` seam.
+  A (the integer damage pipeline and level-doubling crit), B (accuracy and evasion ratios), C (staged stats) and D (drain, recoil and Struggle on HP lost) shipped 2026-11-27 and are archived.
 - **E. A stat change re-applies the burn and paralysis penalties, as in Gen 1 — M, ✗ not Ready (2, 6).** pokered
   stores the in-battle stats. A stat-up move recomputes the raised stat from the unmodified one, dropping the user's
   own burn or paralysis penalty on it, then halves the foe's Attack if it is burned and quarters its Speed if it is
@@ -173,7 +153,9 @@ data/engine item usually also means updating the test that pins the wrong value.
   (`ComputeBaseDamage`), so the penalty never stacks or drops. Filed by ruling 2026-11-27 (player-reachable).
   **DoR** (drafted 2026-11-27):
   1. **Acceptance:** in full battles, a burned foe's Attack halves again on each of the user's stat changes; a
-     paralysed foe's Speed quarters again; the user's own raised stat loses its own penalty.
+     paralysed foe's Speed quarters again; the user's own raised stat loses its own penalty; the 999 and 1
+     stat-change failures read the stored stat, penalties included (C reads the recomputed staged stat; ruling
+     2026-11-27).
   2. **Design:** ✗ a design pass: stored, modifiable in-battle stats (`STATE_MODEL.md`), and how the existing
      stage seams read them.
   3. **Gen-variable surface:** a member for the re-application; Gen 2 recomputes cleanly (checked in pokecrystal
@@ -181,7 +163,7 @@ data/engine item usually also means updating the test that pins the wrong value.
   4. **Gen 1 source:** the cites above; `ApplyBurnAndParalysisPenalties`, `core.asm:6271-6364`.
   5. **Data vs runtime:** runtime.
   6. **Quirk the tests assert:** ✗ set by the design pass (the stacking case above is the candidate).
-  7. **Dependencies:** after C (it rewrites the staged-stat path).
+  7. **Dependencies:** none open (C, which rewrote the staged-stat path, shipped 2026-11-27).
 - **Audit the inline battle rules and put each behind a seam (user ruling 2026-10-31) — M, ✗ not Ready.** Battle
   logic gets full generation separation: a rule goes on a seam even when the generations we checked agree, and
   only out-of-battle or ancillary behaviour may stay inline. `GENERATION_SEAMS.md` still documents deliberate inline
@@ -210,9 +192,12 @@ data/engine item usually also means updating the test that pins the wrong value.
   Mirror Move with nothing to copy emits `MoveMissed` ("<user>'s Mirror Move missed!", `AttackAction.cs:165`,
   `timeline.ts:842-845`); pokered's `MirrorMoveCopyMove` prints "The MIRROR MOVE failed!" (`_MirrorMoveFailedText`).
   Metronome can now call Mirror Move, so this shows there too.
+  **Merged in (ruling 2026-11-27): Rage's build line** (found by `requirements-review`, staged-stats item C). Below
+  +6, each Rage build prints "Rage is building!" before the rise (`BuildingRageText`, `core.asm:4941-4943`); ours
+  prints only the Attack rise.
   **DoR:** ✗ gap **3**: where battle wording lives is the open question under "Audit the inline battle rules" (the
-  "Also in scope" ruling: presentation catalog §4.3 or a seam). *Drafted:* 1: a trap starts with no line and a miss
-  reads "<user>'s attack missed!"; the `BindingStarted` event stays, since state and tests use it. 2: wording only, in
+  "Also in scope" ruling: presentation catalog §4.3 or a seam). *Drafted:* 1: a trap starts with no line, a miss
+  reads "<user>'s attack missed!" and a Rage build prints "Rage is building!"; the `BindingStarted` event stays, since state and tests use it. 2: wording only, in
   the client timeline and the console emitter. 4: the cites above. 5: runtime only (client and console text). 6:
   timeline tests pin both lines. 7: the battle-text placement decision.
 

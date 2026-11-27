@@ -54,7 +54,7 @@ Any mechanic that differs between Pokémon generations **must** be implemented b
 | Interface | Governs |
 |:----------|:--------|
 | `ITypeChart` | Type effectiveness matrix |
-| `IBattleRules` | Battle mechanics that vary by generation — crit formula, damage variance, stat-stage multiplier table, accuracy scale, freeze/thaw rules, status damage rates, XP formula, **stat selection** (`GetOffensiveStat` / `GetDefensiveStat`) |
+| `IBattleRules` | Battle mechanics that vary by generation — crit formula, damage variance, stat-stage ratio pairs and the 1–999 clamp, accuracy scale, freeze/thaw rules, status damage rates, XP formula, **stat selection** (`GetOffensiveStat` / `GetDefensiveStat`) |
 | `IStatCalculator` | Stat calculation formulas — HP and other stat formula, DV randomisation, Stat Exp scaling. Gen 3+ will swap for a 0–31 IV / 252-cap EV implementation. |
 
 Before implementing any mechanic, check whether it is the same in all generations; if it differs, it goes

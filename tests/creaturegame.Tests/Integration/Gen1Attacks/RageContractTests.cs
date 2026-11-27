@@ -110,6 +110,63 @@ public class RageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         Assert.Equal(playerHits, attackRaises);
     }
 
+    [Fact]
+    public async Task RageAtPlusSixBuildsSilently()
+    {
+        // pokered core.asm:4929-4930 returns before any text once Attack is +6.
+        var log = await RageAgainstPound(playerAttack: 30, NoVarianceNoCritHitRules.Instance);
+
+        Assert.True(HitsOnPlayer(log) >= 7, "the foe lands more hits than the six stages");
+        Assert.Equal(6, AttackRises(log));
+        Assert.Empty(log.Of<ButNothingHappened>());
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(false)]
+    public async Task RageOnAnAttackAlreadyAt999SaysNothingHappenedUnlessTheSeamSaysNot(
+        bool? failsAtClamp
+    )
+    {
+        // 500 rises to 750, then to 1000 capped at 999; every hit after that fails the 999 check.
+        var log = await RageAgainstPound(playerAttack: 500, new RageClampRules(failsAtClamp));
+
+        int hits = HitsOnPlayer(log);
+        Assert.True(hits >= 7, "enough hits after the cap that a leaked stage would reach +6");
+        int expectedRises = failsAtClamp ?? true ? 2 : Math.Min(hits, 6);
+        Assert.Equal(expectedRises, AttackRises(log));
+        Assert.Equal(failsAtClamp ?? true ? hits - 2 : 0, log.Of<ButNothingHappened>().Count());
+    }
+
+    // The faster player Rages from the first turn; the bulky foe's weak Pound drives the build.
+    private async Task<RecordingEmitter> RageAgainstPound(int playerAttack, IBattleRules rules)
+    {
+        var player = TestCreatures.Make("Player", hp: 2000, attack: playerAttack, speed: 200);
+        player.AddAttack(Move("rage"));
+        var enemy = TestCreatures.Make("Enemy", hp: 1200, attack: 30, speed: 1);
+        enemy.AddAttack(Move("pound"));
+
+        return await FullBattle.Fight(
+            player,
+            enemy,
+            new ScriptedInput("rage"),
+            new ScriptedInput("pound"),
+            rules
+        );
+    }
+
+    private static int HitsOnPlayer(RecordingEmitter log) =>
+        log.Of<DamageDealt>().Count(d => d.TargetName == "Player");
+
+    private static int AttackRises(RecordingEmitter log) =>
+        log.Of<StatStageChanged>().Count(s => s.CreatureName == "Player" && s.Stat == "Attack");
+
+    private sealed class RageClampRules(bool? failsAtClamp) : NoVarianceNoCritHitRules
+    {
+        public override bool StatChangeFailsAtTheStatClamp =>
+            failsAtClamp ?? base.StatChangeFailsAtTheStatClamp;
+    }
+
     // --- When the lock starts: after the damage, so a miss, an immunity or a Substitute break never locks ---
 
     private sealed record RageBattle(RecordingEmitter Events, Creature Player)

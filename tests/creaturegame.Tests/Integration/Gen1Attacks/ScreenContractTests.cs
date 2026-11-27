@@ -1,3 +1,4 @@
+using creaturegame.Attacks;
 using creaturegame.Combat;
 using creaturegame.Creatures;
 using creaturegame.Tests.TestSupport;
@@ -74,6 +75,43 @@ public class ScreenContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         );
 
         Assert.Equal(critNoScreen, critReflect);
+    }
+
+    [Theory]
+    [InlineData(true, 13)]
+    [InlineData(false, 3)]
+    public async Task AReflectUserWithDefense579TakesTheWrappedHit(bool wraps, int expected)
+    {
+        // 579 doubles to 1158 and ÷4 gives 289; Gen 1 keeps the low byte, 33, so Tackle deals 13 (4 unscreened).
+        var player = TestCreatures.Make(
+            "Player",
+            type1: DamageType.Water,
+            hp: 9999,
+            attack: 999,
+            defense: 579,
+            speed: 200
+        );
+        player.AddAttack(Move("reflect"));
+        player.AddAttack(Move("strength"));
+        var enemy = TestCreatures.Make("Enemy", type1: DamageType.Water, hp: 300, speed: 1);
+        enemy.AddAttack(Move("tackle"));
+
+        var log = await FullBattle.Fight(
+            player,
+            enemy,
+            new ScriptedInput("reflect", "strength"),
+            new ScriptedInput("tackle"),
+            wraps ? NoVarianceNoCritHitRules.Instance : RepeatedScalingRules.Instance
+        );
+
+        Assert.Equal(expected, log.Of<DamageDealt>().First(d => d.TargetName == "Player").Damage);
+    }
+
+    private sealed class RepeatedScalingRules : NoVarianceNoCritHitRules
+    {
+        public static new readonly RepeatedScalingRules Instance = new();
+
+        public override bool ScreenedStatWrapsAfterScaling => false;
     }
 
     [Fact]

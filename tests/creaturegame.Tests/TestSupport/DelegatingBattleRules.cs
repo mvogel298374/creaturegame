@@ -73,10 +73,26 @@ public abstract class DelegatingBattleRules : IBattleRules
     public virtual int LeechSeedDrainDenominator => _inner.LeechSeedDrainDenominator;
     public virtual int ParalysisSpeedDivisor => _inner.ParalysisSpeedDivisor;
 
+    public virtual int BurnAttackDivisor => _inner.BurnAttackDivisor;
+
     public virtual double BadPoisonDamageFraction(int toxicCounter) =>
         _inner.BadPoisonDamageFraction(toxicCounter);
 
-    public virtual double GetStatMultiplier(int stage) => _inner.GetStatMultiplier(stage);
+    public virtual (int Numerator, int Denominator) StatStageRatio(int stage) =>
+        _inner.StatStageRatio(stage);
+
+    public virtual int MaxStatValue => _inner.MaxStatValue;
+
+    public virtual int MinStatValue => _inner.MinStatValue;
+
+    public virtual int? UnstagedStat(Creature creature, StageStat stat) =>
+        _inner.UnstagedStat(creature, stat);
+
+    public virtual int DamageStatScaleThreshold => _inner.DamageStatScaleThreshold;
+
+    public virtual bool ScreenedStatWrapsAfterScaling => _inner.ScreenedStatWrapsAfterScaling;
+
+    public virtual bool StatChangeFailsAtTheStatClamp => _inner.StatChangeFailsAtTheStatClamp;
 
     public virtual int GetHitThreshold(int acc, int accStage, int evaStage) =>
         _inner.GetHitThreshold(acc, accStage, evaStage);

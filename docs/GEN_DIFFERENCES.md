@@ -82,6 +82,18 @@ A reference doc covering every major system across all main-series generations �
   120/256 to 28/256
 - Critical hits ignore all stat stages (both attacker's and defender's)
 - Critical hits ignore Burn's Attack penalty
+- **Staged stats use pokered's ratio pairs and clamp to 1–999** (`CalculateModifiedStat`, `core.asm:6376-6452`): −1 is
+  66/100, −4 33/100, −5 28/100 (not 2/3, 1/3, 2/7), so a 255 stat at −1 is 168. A stat-up move on a stat already at
+  999 and a stat-down move on a stat at 1 fail with "Nothing happened!" and leave the stage (`effects.asm`
+  `StatModifierUpEffect` `.checkIf999`, `StatModifierDownEffect` `CantLowerAnymore`); an X item and a Rage build too,
+  and Rage builds silently at +6 (`core.asm:4928-4944`). Gen 2 keeps the table and both failures. **Not modelled
+  until TODO entry E:** pokered checks the stored stat, which carries the burn or paralysis penalty, so a paralysed
+  creature at a staged 999 Speed (stored 249) can still raise it there; ours reads the staged stat and refuses
+- **Damage stats of 256 or more are divided by 4**, both of them, and an Attack of 0 becomes 1 (`.scaleStats`,
+  `core.asm:4107-4131`). Reflect and Light Screen double the Defense with no cap, and only the low byte survives the
+  ÷4, so a doubled stat of 1024 or more wraps: Defense 579 under Reflect reads as 33, and a Tackle deals more than
+  without the screen. Explosion halves the Defense after the scaling. **Not modelled:** a scaled Defense of 0 freezes
+  pokered (`:4118`); ours reads it as 1. Gen 2 repeats the ÷4 until both fit outside link battles, so it never wraps
 - **Stat Exp bonus rounds the root up:** `min(255, ceil(sqrt(StatExp))) / 4`, integer division, so StatExp 9999 counts
   as √ = 100 (pokered `home/move_mon.asm` `CalcStat`, `:73-92`, `:163-164`)
 - **Transform changes the crit rate:** crits read the *current species'* base Speed (`core.asm:4483-4491`), and

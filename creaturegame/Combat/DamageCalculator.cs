@@ -195,23 +195,25 @@ public static class DamageCalculator
 
         if (!isCrit || !rules.CritIgnoresStatStages)
         {
-            double atkStageMult = rules.GetStatMultiplier(
-                attacker.Battle.Stages.Of(rules.OffensiveStage(attackType))
+            attackStat = StagedStats.Apply(
+                attackStat,
+                attacker.Battle.Stages.Of(rules.OffensiveStage(attackType)),
+                rules
             );
-            double defStageMult = rules.GetStatMultiplier(
-                defender.Battle.Stages.Of(rules.DefensiveStage(attackType))
+            defenseStat = StagedStats.Apply(
+                defenseStat,
+                defender.Battle.Stages.Of(rules.DefensiveStage(attackType)),
+                rules
             );
-
-            attackStat = (int)(attackStat * atkStageMult);
-            defenseStat = (int)(defenseStat * defStageMult);
 
             // Inside the non-crit block, so a crit ignores the screen like stages and Burn.
             defenseStat *= screenDefenseMultiplier;
 
             if (attackType == AttackType.Physical && attacker.Battle.Status == StatusCondition.Burn)
-                attackStat /= 2;
+                attackStat = Math.Max(rules.MinStatValue, attackStat / rules.BurnAttackDivisor);
         }
 
+        (attackStat, defenseStat) = ScaleDamageStats(attackStat, defenseStat, rules);
         defenseStat = Math.Max(1, defenseStat / defenseDivisor);
         attackStat = Math.Max(1, attackStat);
 
@@ -220,6 +222,24 @@ public static class DamageCalculator
         if (isCrit)
             damage *= rules.CritDamageMultiplier;
         return Math.Min(damage, rules.MaxBaseDamage) + 2;
+    }
+
+    // GENERATION_SEAMS.md §2 (Staged stats).
+    private static (int Attack, int Defense) ScaleDamageStats(
+        int attack,
+        int defense,
+        IBattleRules rules
+    )
+    {
+        int limit = rules.DamageStatScaleThreshold;
+        while (attack >= limit || defense >= limit)
+        {
+            attack = Math.Max(rules.MinStatValue, attack / 4);
+            defense /= 4;
+            if (rules.ScreenedStatWrapsAfterScaling)
+                return (attack, defense % limit);
+        }
+        return (attack, defense);
     }
 
     /// <summary>

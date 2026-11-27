@@ -363,6 +363,44 @@ public class DamageCalculationTests
         Assert.Equal(850, FixedHit(attacker, defender, Hit(250), new FixedRollRules(true, 217)));
     }
 
+    [Theory]
+    [InlineData(300, 6, 332)] // reads as 75 vs 1; unscaled it would be 222
+    [InlineData(256, 7, 283)] // 64 vs 1; unscaled 162
+    [InlineData(255, 7, 162)] // below the threshold, unscaled
+    [InlineData(999, 9, 549)] // 249 vs 2; unscaled 490
+    public void ADamageStatOf256OrMoreDividesBothStatsBy4(int attack, int defense, int expected)
+    {
+        // pokered .scaleStats, hand-run at level 50 and power 10.
+        var attacker = TestCreatures.Make("A", 50, DamageType.Fire, attack: attack);
+        var defender = TestCreatures.Make("D", defense: defense);
+
+        Assert.Equal(
+            expected,
+            FixedHit(attacker, defender, Hit(10), new FixedRollRules(false, 255))
+        );
+    }
+
+    [Fact]
+    public void SelfDestructHalvesTheDefenseAfterTheScaling()
+    {
+        // Attack 7 vs 300 reads as 1 vs 75, halved to 37: 3. Halving first (7 vs 150, no scaling) gives 4.
+        var attacker = TestCreatures.Make("A", 50, DamageType.Fire, attack: 7);
+        var defender = TestCreatures.Make("D", defense: 300);
+
+        int damage = DamageCalculator.CalculateDamage(
+            attacker,
+            defender,
+            Hit(130),
+            Gen1TypeChart.Instance,
+            new FixedRollRules(false, 255),
+            out _,
+            new SeededRandomSource(0),
+            defenseDivisor: 2
+        );
+
+        Assert.Equal(3, damage);
+    }
+
     [Fact]
     public void ARulesetThatDoublesCritDamageAppliesItToTheBaseBeforeTheCap()
     {
@@ -432,7 +470,7 @@ public class DamageCalculationTests
     {
         public override int RollDamageVariance() => DamageVarianceDivisor;
 
-        public override double GetStatMultiplier(int stage) => 1.0;
+        public override (int Numerator, int Denominator) StatStageRatio(int stage) => (1, 1);
 
         public override int GetHitThreshold(int a, int b, int c) => 256;
 
@@ -445,7 +483,7 @@ public class DamageCalculationTests
     {
         public override int RollDamageVariance() => DamageVarianceDivisor;
 
-        public override double GetStatMultiplier(int stage) => 1.0;
+        public override (int Numerator, int Denominator) StatStageRatio(int stage) => (1, 1);
 
         public override int GetHitThreshold(int a, int b, int c) => 256;
 

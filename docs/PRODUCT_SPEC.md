@@ -127,6 +127,18 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - Design detail → `GENERATION_SEAMS.md` (Hit chance row), `GEN_DIFFERENCES.md` → accuracy and evasion stages.  History → `TODO_ARCHIVE.md` → *§3.1 Accuracy
   and evasion use the stat-stage ratios, as in Gen 1*.
 
+### Gen 1 staged stats
+- A stage multiplies the stat by the Gen 1 ratio pair (+1 is 3/2, -1 is 66/100, +6 is 4, -6 is 25/100), rounded down, and the result stays within 1 to 999.
+  Damage and turn order both read the staged stat; a paralysed Speed is a quarter of it, at least 1.
+- When either stat in a damage calculation is 256 or more, both are divided by 4 first.
+- Reflect and Light Screen double the defensive stat with no cap, and only the low byte survives the division by 4: a doubled stat of 1024 or more wraps
+  (Defense 579 under Reflect reads as 33, so a Tackle deals 13, not 4).
+- Explosion and Self-Destruct halve Defense after that scaling.
+- A stat-up move or X item on a stat at 999, and a stat-down move on a stat at 1, fails with "Nothing happened!" and leaves the stage. Rage's build does the
+  same at 999 and is silent at +6.
+- Design detail → `GENERATION_SEAMS.md` (Staged stats row), `GEN_DIFFERENCES.md` → Stats.  History → `TODO_ARCHIVE.md` → *§3.1 Staged stats use pokered's
+  ratios, clamp to 1–999, scale ÷4 past 255, and screens wrap, as in Gen 1*.
+
 ### Gen 1 drain, recoil and Struggle on a KO
 - A hit that overkills counts only the HP the target had left: recoil (a quarter of it, half for Struggle) and a drain heal (half of it) are taken from that
   amount, each at least 1. A confusion self-hit or a crash is capped the same way.

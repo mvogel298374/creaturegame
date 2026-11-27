@@ -223,6 +223,59 @@ public class StatStageMoveContractTests(MovesFixture moves) : Gen1MoveContract(m
         );
     }
 
+    [Theory]
+    [InlineData(500, null, 2)] // 500 × 2 is capped at 999, so the next Amnesia fails
+    [InlineData(499, null, 4)] // 998 still rises
+    [InlineData(500, false, 4)]
+    public async Task AStatUpOnAStatAlreadyAt999FailsAndLeavesTheStage(
+        int special,
+        bool? failsAtClamp,
+        int stageAfter
+    )
+    {
+        var attacker = TestCreatures.Make("A", special: special);
+        attacker.Battle.Stages.RaiseSpecial(2);
+
+        var result = await new MoveScenario()
+            .Attacker(attacker)
+            .Rules(new ClampRules(failsAtClamp))
+            .Use(Move("amnesia"));
+
+        Assert.Equal(stageAfter, result.Attacker.Battle.Stages.Special);
+        Assert.Equal(stageAfter == 2, result.Has<ButNothingHappened>());
+        Assert.Equal(stageAfter != 2, result.Has<StatStageChanged>());
+    }
+
+    [Theory]
+    [InlineData(3, null, -2)] // 3 × 50/100 is 1, so the next Screech fails
+    [InlineData(4, null, -4)] // 2 still falls
+    [InlineData(3, false, -4)]
+    public async Task AStatDownOnAStatAlreadyAt1FailsAndLeavesTheStage(
+        int defense,
+        bool? failsAtClamp,
+        int stageAfter
+    )
+    {
+        var defender = TestCreatures.Make("Defender", hp: 500, defense: defense);
+        defender.Battle.Stages.RaiseDefense(-2);
+
+        var result = await new MoveScenario()
+            .Defender(defender)
+            .Rules(new ClampRules(failsAtClamp))
+            .Use(Move("screech"));
+
+        Assert.Equal(stageAfter, result.Defender.Battle.Stages.Defense);
+        Assert.Equal(stageAfter == -2, result.Has<ButNothingHappened>());
+    }
+
+    private sealed class ClampRules(bool? failsAtClamp) : DelegatingBattleRules
+    {
+        public override bool StatChangeFailsAtTheStatClamp =>
+            failsAtClamp ?? base.StatChangeFailsAtTheStatClamp;
+
+        public override int GetHitThreshold(int acc, int accStage, int evaStage) => 256;
+    }
+
     [Fact]
     public async Task SecondaryDropAtTheCap_FailsSilently_NoMessage()
     {
