@@ -513,6 +513,12 @@ public interface IBattleRules
     /// <summary>Whether a move that misses its hit test sets <see cref="LastDamage"/> to 0. See GENERATION_SEAMS.md §2.</summary>
     bool MissZeroesLastDamage { get; }
 
+    /// <summary>Whether an overkill records only the HP the target had, as the damage drain, recoil and <see cref="LastDamage"/> read. See GENERATION_SEAMS.md §2.</summary>
+    bool DrainAndRecoilUseHpLost { get; }
+
+    /// <summary>Whether a drain move leaves its heal as <see cref="LastDamage"/>. See GENERATION_SEAMS.md §2.</summary>
+    bool DrainHealIsLastDamage { get; }
+
     /// <summary>The variable damage Psywave deals on hit (it ignores stats, type, STAB and crits), within
     /// <see cref="PsywaveDamageRange"/>. See GENERATION_SEAMS.md §2.</summary>
     int RollPsywaveDamage(Creature source, BattleSide side, IRandomSource rng);

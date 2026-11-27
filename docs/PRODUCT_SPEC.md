@@ -127,6 +127,15 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - Design detail → `GENERATION_SEAMS.md` (Hit chance row), `GEN_DIFFERENCES.md` → accuracy and evasion stages.  History → `TODO_ARCHIVE.md` → *§3.1 Accuracy
   and evasion use the stat-stage ratios, as in Gen 1*.
 
+### Gen 1 drain, recoil and Struggle on a KO
+- A hit that overkills counts only the HP the target had left: recoil (a quarter of it, half for Struggle) and a drain heal (half of it) are taken from that
+  amount, each at least 1. A confusion self-hit or a crash is capped the same way.
+- A hit on a Substitute counts its full damage in the shared last damage; a hit that breaks it still cancels recoil and the drain heal.
+- After a drain move, the shared last damage is the heal (half the damage), so a Bide user hit by one stores half.
+- The "took N damage" number is the computed damage, not the HP lost.
+- Design detail → `GENERATION_SEAMS.md` §2 (the drain and recoil rows), `GEN_DIFFERENCES.md` → Drain, recoil and Struggle.  History → `TODO_ARCHIVE.md` →
+  *§3.1 Drain, recoil and Struggle use the HP actually lost, as in Gen 1*.
+
 ### Gen 1 battle roll order and immunity
 - An attacking move rolls crit, then damage, then accuracy, so a miss has already used its crit and damage rolls; a
   slower one-hit-KO user stops after the crit roll.

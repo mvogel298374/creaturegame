@@ -103,6 +103,51 @@ REST call routed to the machine that never saw `/start`; the workflow pins `flyc
 
 ---
 
+## §3.1 Drain, recoil and Struggle use the HP actually lost, as in Gen 1 ✅ DONE (2026-11-27)
+
+*(verify slice 2026-11-27, source-confirmed; entry D of the damage-core split) — S.*
+pokered rewrites `wDamage` to the target's remaining HP on an overkill (`ApplyDamageToEnemyPokemon`, `core.asm:4703-4712`), and
+drain (`move_effects/drain_hp.asm:1-12`, half, minimum 1) and recoil (`move_effects/recoil.asm:10-25`, a quarter, or
+half for Struggle, minimum 1) read `wDamage`. A hit that breaks a Substitute leaves `wDamage` uncapped
+(`AttackSubstitute`, `:4873-4875`), though the break also zeroes the move effect (`.nullifyEffect`), so it neither
+drains nor recoils (`SubstituteBreakCancels`); the full damage shows only in the shared last damage. Drain halves
+`wDamage` in place (`drain_hp.asm:2-12`), and Bide adds `wDamage` on its own turn (`core.asm:3485-3496`), so a Bide
+user hit by a faster drain move stores half the damage. Ours summed the full `hitDamage` (`AttackAction.ResolveDamage`)
+for drain, `RecoilEffect` and Struggle recoil, and left the full damage after a drain.
+**DoR** (drafted and confirmed 2026-11-27; lines 1, 2, 3 and 6 corrected by ruling 2026-11-27):
+1. **Acceptance:** in full battles, an overkilling Double-Edge's recoil is a quarter of the target's remaining HP
+   (minimum 1), an overkilling Mega Drain heals half of it, a finishing Struggle recoils half of it; the shared last
+   damage after an overkill is the capped amount, and after a Substitute break it stays the full damage (a
+   Substitute break still cancels drain and recoil); after a foe's drain move, a Bide user stores the heal amount
+   (half the damage, minimum 1).
+2. **Design:** the shared last damage records the HP removed on an overkill, and `ResolveDamage` sums it for drain,
+   recoil and Struggle, behind `IBattleRules.DrainAndRecoilUseHpLost` (Gen 1 and Gen 2 true); a drain then sets the
+   shared last damage to its heal, behind `DrainHealIsLastDamage` (Gen 1 true; Gen 2 false, pokecrystal `SapHealth`
+   halves into `hDividend`).
+3. **Gen-variable surface:** those two members.
+4. **Gen 1 source:** the cites above.
+5. **Data vs runtime:** runtime.
+6. **Quirk the tests assert:** a KO counts only the HP that was left; a Substitute break keeps the full damage as
+   the shared last damage; Bide stores half a drain's damage.
+7. **Dependencies:** none.
+**Rulings 2026-11-27 (requirements-review):** the confusion self-hit and a crash also record the HP lost (one full
+battle: a Bide stores the fainted self-hitter's HP); the "took N damage" number stays the computed damage, noted in
+`GEN_DIFFERENCES.md`; no separate Dream Eater test (waived: the same drain branch); `EachHitTaken` Bide adds the
+recorded value; the drain member is named `DrainHealIsLastDamage`. `pr-review` (PR-READY): the `ResolveDamage` sum is
+named `recorded`, `FullOverkillDamageRules` derives from `NoVarianceNoCritHitRules`; re-review skipped by Mo.
+
+**What was built (2026-11-27).**
+- `IBattleRules.DrainAndRecoilUseHpLost` (Gen 1 and Gen 2 true): an overkill records only the HP the target had in the shared `LastDamage`; drain, recoil
+  and Struggle read that. The confusion self-hit and a crash cap the same way through `SelfInflictedDamage.Apply`, which now returns the recorded value.
+  A hit on a Substitute keeps the full damage; a Substitute break still cancels drain and recoil.
+- `IBattleRules.DrainHealIsLastDamage` (Gen 1 true, Gen 2 false): after a drain the shared last damage is the heal, so Bide stores half.
+- The "took N damage" number stays the computed damage.
+- Tests: full battles for each case, each with seam swaps, all sabotage-checked.
+- Docs: `GENERATION_SEAMS.md` (two §2 rows, the Bide row's note), `GEN_DIFFERENCES.md`, `PRODUCT_SPEC.md`.
+- Follow-up recommended, not filed: `.\e2e.ps1 -Spec voluntary-switch`, `-Spec cadence`, `-Spec encounter-map` (seeded damage and Bide storage shifted).
+
+---
+
 ## §3.1 Accuracy and evasion use the stat-stage ratios, as in Gen 1 ✅ DONE (2026-11-27)
 
 *(verify slice 2026-11-27, source-confirmed; entry B of the damage-core split) — S.*

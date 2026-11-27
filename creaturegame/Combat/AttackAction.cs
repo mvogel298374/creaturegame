@@ -671,8 +671,7 @@ public class AttackAction : IBattleAction
         if (crashes && move.Effect == MoveEffect.Crash)
         {
             int crash = _rules.CalculateCrashDamage(Source);
-            _lastDamage.Value = crash;
-            SelfInflictedDamage.Apply(
+            _lastDamage.Value = SelfInflictedDamage.Apply(
                 Source,
                 Target,
                 crash,
@@ -699,7 +698,7 @@ public class AttackAction : IBattleAction
         return true;
     }
 
-    // Every category deals through DealDamageToTarget; returns the total dealt.
+    // Every category deals through DealDamageToTarget; returns what drain, recoil, binding and recharge read.
     private int ResolveDamage(
         Attack move,
         DamageCategory category,
@@ -723,6 +722,7 @@ public class AttackAction : IBattleAction
                 if (strike is { } first)
                 {
                     bool isMultiHit = !usingStruggle && move.Effect == MoveEffect.MultiHit;
+                    int recorded = 0;
                     int landed = 0;
                     bool dealtRealDamage = false;
                     bool cutShort = false;
@@ -735,7 +735,7 @@ public class AttackAction : IBattleAction
                         _laterStrike = i > 0;
                         if (DealDamageToTarget(hitDamage, effectiveness, isCrit))
                             dealtRealDamage = true;
-                        damage += hitDamage; // accumulated total gates drain/recoil/recharge below
+                        recorded += _lastDamage.Value;
                         landed++;
                         cutShort = i == 0 && isMultiHit && BreakCancels(move.Effect, category);
                     }
@@ -749,16 +749,19 @@ public class AttackAction : IBattleAction
 
                     if (
                         category == DamageCategory.Drain
-                        && damage > 0
+                        && recorded > 0
                         && !BreakCancels(move.Effect, category)
                     )
                     {
-                        int heal = Math.Max(1, damage * move.DrainPercent / 100);
+                        int heal = Math.Max(1, recorded * move.DrainPercent / 100);
                         Source.Attributes.ReceiveHealing(heal);
+                        if (_rules.DrainHealIsLastDamage)
+                            _lastDamage.Value = heal;
                         _emitter?.Emit(
                             new DrainHealed(Source.Name, Source.Id, heal, Source.Attributes.HP)
                         );
                     }
+                    damage = recorded;
                 }
                 break;
             }
@@ -911,8 +914,11 @@ public class AttackAction : IBattleAction
             return false;
         }
 
+        int hpBefore = Target.Attributes.HP;
         Target.Attributes.ReceiveDamage(dmg);
-        AccumulateBideDamage(dmg);
+        if (_rules.DrainAndRecoilUseHpLost)
+            _lastDamage.Value = Math.Min(dmg, hpBefore);
+        AccumulateBideDamage(_lastDamage.Value);
 
         _emitter?.Emit(
             new DamageDealt(

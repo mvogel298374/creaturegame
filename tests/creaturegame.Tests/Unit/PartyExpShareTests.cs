@@ -691,7 +691,7 @@ public class PartyExpShareTests
         var survivor = Striker("Survivor", "Slam"); // fights turn 1, switches out, still standing at the end
         var doomed = Striker("Doomed", "Bash");
         doomed.MoveSet[0].Base.Effect = MoveEffect.Recoil; // same mechanism as Take Down/Double-Edge
-        doomed.Attributes.HP = 30; // recoil (¼ of Doomed's huge hit) comfortably exceeds this
+        doomed.Attributes.HP = 30; // recoil (¼ of the foe's 400 HP) comfortably exceeds this
 
         var party = new Party(survivor);
         party.Add(doomed);
@@ -701,7 +701,7 @@ public class PartyExpShareTests
 
         var result = await new BattleScenario()
             .Party(party)
-            .Enemy(Foe())
+            .Enemy(Foe(hp: 400))
             .PlayerTurnPlan(1) // turn 1: SWITCH — Survivor fought, Doomed comes in
             .PlayerUses("Bash") // turn 2: Doomed wins the fight and recoils to death the same turn
             .EnemyUses("Poke")

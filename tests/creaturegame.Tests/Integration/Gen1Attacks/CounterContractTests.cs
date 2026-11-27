@@ -217,6 +217,68 @@ public class CounterContractTests(MovesFixture moves) : Gen1MoveContract(moves)
     }
 
     [Fact]
+    public async Task ACounterAfterItsSubstituteBreaks_AnswersTheFullHit()
+    {
+        var (user, foe) = Duel("tackle", "strength");
+        user.AddAttack(Move("substitute"));
+        user.Attributes.MaxHP = user.Attributes.HP = 1200;
+        foe.Attributes.Attack = 999;
+        var rules = new CounterDuelRules();
+        int hit = DamageCalculator.EstimateDamage(
+            foe,
+            user,
+            Move("strength"),
+            Gen1TypeChart.Instance,
+            rules
+        );
+
+        var log = await FightAs(
+            true,
+            user,
+            foe,
+            new ScriptedInput("substitute", "counter", "strength"),
+            new ScriptedInput("tackle", "strength"),
+            rules
+        );
+
+        Assert.True(hit > log.Of<SubstituteCreated>().Single().SubstituteHp, "the hit breaks it");
+        Assert.Single(log.Of<SubstituteBroke>());
+        Assert.Equal(2 * hit, HitsOn(log, "Foe")[0]);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(false)]
+    public async Task ACounterAfterAnOverkill_AnswersOnlyTheHpTheFaintedLeadHadUnlessTheSeamSaysNot(
+        bool? capsOverkill
+    )
+    {
+        // The paralysed foe's Tackle fells the 5-HP lead; fully paralysed next turn, it leaves that hit for the bench.
+        var lead = TestCreatures.Make("Lead", hp: 5, speed: 300);
+        lead.AddAttack(Move("thunder-wave"));
+        var bench = TestCreatures.Make("Bench", hp: 9999, attack: 999, speed: 1);
+        bench.AddAttack(Move("counter"));
+        bench.AddAttack(Move("strength"));
+        var party = new Party(lead);
+        party.Add(bench);
+        var enemy = TestCreatures.Make("Enemy", hp: 300, attack: 300, speed: 200);
+        enemy.AddAttack(Move("tackle"));
+
+        var log = await FullBattle.Fight(
+            lead,
+            enemy,
+            new ScriptedInput("thunder-wave", "counter", "strength"),
+            new ScriptedInput("tackle"),
+            new CounterDuelRules(fullParalysisFrom: 2) { CapsOverkill = capsOverkill },
+            playerParty: party
+        );
+
+        int hit = HitsOn(log, "Lead").Single();
+        Assert.True(hit > 5, "the hit overkills");
+        Assert.Equal(2 * (capsOverkill ?? true ? 5 : hit), HitsOn(log, "Enemy")[0]);
+    }
+
+    [Fact]
     public async Task CounterOnAFullyParalysedFoeDoublesTheSharedDamageAgain()
     {
         // The foe's loaded move is still Tackle, and the last damage is the user's own first Counter.
@@ -646,6 +708,10 @@ public class CounterContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         public int? SelfHitPercent { get; init; }
         public int? ConfusionTurns { get; init; }
         public bool? SkipsSelection { get; init; }
+        public bool? CapsOverkill { get; init; }
+
+        public override bool DrainAndRecoilUseHpLost =>
+            CapsOverkill ?? base.DrainAndRecoilUseHpLost;
 
         public override int GetHitThreshold(int acc, int accStage, int evaStage) =>
             AlwaysHits || acc >= 85 ? 256 : 0;

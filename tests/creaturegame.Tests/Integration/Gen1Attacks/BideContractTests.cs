@@ -265,6 +265,54 @@ public class BideContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         Assert.Equal(4 * HitsOn(emitter, "Player").Single(), unleashed);
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData(false)]
+    public async Task AFoesDrainMove_StoresOnlyTheHealUnlessTheSeamSaysNot(bool? healIsLastDamage)
+    {
+        var (emitter, unleashed) = await BideAgainstAsync(
+            Foe("absorb"),
+            new FixedBideRules(3, healIsLastDamage: healIsLastDamage),
+            ["absorb"]
+        );
+
+        int hit = HitsOn(emitter, "Player")[0];
+        Assert.True(hit >= 2, "half the hit differs from the hit");
+        Assert.Equal(4 * (healIsLastDamage ?? true ? Math.Max(1, hit / 2) : hit), unleashed);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(false)]
+    public async Task ASelfHitThatFaintsTheUser_StoresOnlyTheHpItHadUnlessTheSeamSaysNot(
+        bool? capsOverkill
+    )
+    {
+        // Turn 1 confuses the lead, turn 2 the foe starts Bide and the lead's self-hit fells it, turn 3 Bide releases.
+        var lead = TestCreatures.Make("Lead", hp: 3, speed: 1);
+        lead.AddAttack(Move("splash"));
+        var bench = TestCreatures.Make("Bench", hp: 9999, attack: 999, speed: 1);
+        bench.AddAttack(Move("strength"));
+        var party = new Party(lead);
+        party.Add(bench);
+        var enemy = TestCreatures.Make("Enemy", hp: 300, speed: 200);
+        enemy.AddAttack(Move("confuse-ray"));
+        enemy.AddAttack(Move("bide"));
+
+        var log = await FullBattle.Fight(
+            lead,
+            enemy,
+            new ScriptedInput("splash", "splash", "strength"),
+            new ScriptedInput("confuse-ray", "bide"),
+            new SecondSelfHitRules(capsOverkill),
+            playerParty: party
+        );
+
+        int selfHit = log.Of<ConfusionDamage>().Single().Damage;
+        Assert.True(selfHit > 3, "the self-hit overkills");
+        Assert.Equal(2 * (capsOverkill ?? true ? 3 : selfHit), HitsOn(log, "Bench").Single());
+    }
+
     [Fact]
     public async Task AFoesCrash_IsStored()
     {
@@ -404,10 +452,14 @@ public class BideContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         BideAccumulation? accumulation = null,
         int? confusionTurns = null,
         int? missAccuracy = null,
-        bool? missZeroes = null
+        bool? missZeroes = null,
+        bool? healIsLastDamage = null
     ) : DelegatingBattleRules
     {
         public override bool MissZeroesLastDamage => missZeroes ?? base.MissZeroesLastDamage;
+
+        public override bool DrainHealIsLastDamage =>
+            healIsLastDamage ?? base.DrainHealIsLastDamage;
 
         public override int RollBideTurns() => bideTurns;
 
@@ -420,6 +472,27 @@ public class BideContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 
         public override int GetHitThreshold(int acc, int accStage, int evaStage) =>
             acc == missAccuracy ? 0 : 256;
+
+        public override double GetCritChance(Creature a, Attack m) => 0.0;
+
+        public override int RollDamageVariance() => DamageVarianceDivisor;
+    }
+
+    /// <summary>Always-hit, no-crit, no-variance; a 2-turn Bide, and only the second confusion check self-hits.</summary>
+    private sealed class SecondSelfHitRules(bool? capsOverkill) : DelegatingBattleRules
+    {
+        private int _confusionChecks;
+
+        public override bool DrainAndRecoilUseHpLost =>
+            capsOverkill ?? base.DrainAndRecoilUseHpLost;
+
+        public override int ConfusionSelfHitPercent => ++_confusionChecks == 2 ? 100 : 0;
+
+        public override int RollConfusionTurns() => 5;
+
+        public override int RollBideTurns() => 2;
+
+        public override int GetHitThreshold(int acc, int accStage, int evaStage) => 256;
 
         public override double GetCritChance(Creature a, Attack m) => 0.0;
 

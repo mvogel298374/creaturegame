@@ -50,7 +50,7 @@ design pass serves the group. Group 3 (hit test and accuracy) is finished and ar
 | # | Group | Code | Items |
 |:-:|:--|:--|:--|
 | 2 | End-of-turn residual phase | `Battle` turn tail, residuals, `TickTurnCounters` | End-of-turn residual phase (with Leech Seed × Toxic and the menu-turn first mover) |
-| 4 | Damage formula | `DamageCalculator`, stat stages | Drain and recoil on HP lost · Stat stages · Re-applied stat penalties |
+| 4 | Damage formula | `DamageCalculator`, stat stages | Stat stages · Re-applied stat penalties |
 | 7 | Battle text and seams | `timeline.ts`, the console emitter, `GENERATION_SEAMS.md` | Audit the inline battle rules · Binding and miss lines |
 | 8 | Battle presentation | `BattleScene`, the event wire | Move animations · Sprite FX · Fly/Dig sprite stays on screen · Text feel |
 | 9 | Acquisition and items | `ItemEffects`, `RewardCalculator`, evolution | Catch · Unsold-item rule · Stone evolutions |
@@ -62,11 +62,10 @@ design pass serves the group. Group 3 (hit test and accuracy) is finished and ar
 
 **A. Confirm the drafted lines, then Ready**
 
-Damage-core verify slice done 2026-11-27 (§3.1); suggested order D → C (A and B shipped 2026-11-27). Each shifts seeded damage, so recommend E2E after.
+Damage-core verify slice done 2026-11-27 (§3.1); suggested order C next (A, B and D shipped 2026-11-27). Each shifts seeded damage, so recommend E2E after.
 
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
-| **D. Drain, recoil and Struggle use the HP actually lost** (§3.1) | S | ⚠️ 1–7 drafted | Est. 50–80k. |
 | **C. Staged stats: pokered's ratios, the 1–999 clamp, ÷4 scaling and the screen wrap** (§3.1) | S–M | ⚠️ 1–7 drafted | Est. 80–120k; the ratio pairs exist privately in `Gen1BattleRules.StatModifierRatios` (B). |
 
 **B. A design pass first** (central engine code: both gates; each pass is shown to you)
@@ -145,26 +144,7 @@ data/engine item usually also means updating the test that pins the wrong value.
   model the screen wrap glitch inside C, and file E as an entry. The binding-duration draw order stays closed as
   invisible in play (`GEN_DIFFERENCES.md`, binding moves). Each entry shifts seeded damage or hit rolls, so seeded
   tests move; after each, recommend `.\e2e.ps1 -Spec voluntary-switch`, `-Spec cadence` and `-Spec encounter-map`.
-  A (the integer damage pipeline and level-doubling crit) and B (accuracy and evasion ratios) shipped 2026-11-27 and are archived.
-- **D. Drain, recoil and Struggle use the HP actually lost, as in Gen 1 — S, ⚠️ lines drafted.** pokered rewrites
-  `wDamage` to the target's remaining HP on an overkill (`ApplyDamageToEnemyPokemon`, `core.asm:4703-4712`), and
-  drain (`move_effects/drain_hp.asm:1-12`, half, minimum 1) and recoil (`move_effects/recoil.asm:10-25`, a quarter, or
-  half for Struggle, minimum 1) read `wDamage`. A hit that breaks a Substitute leaves `wDamage` uncapped
-  (`AttackSubstitute`, `:4873-4875`). Ours sums the full `hitDamage` (`AttackAction.ResolveDamage`) for drain,
-  `RecoilEffect` and Struggle recoil.
-  **DoR** (drafted 2026-11-27, to confirm):
-  1. **Acceptance:** in full battles, an overkilling Double-Edge's recoil is a quarter of the target's remaining HP
-     (minimum 1), an overkilling Mega Drain heals half of it, a finishing Struggle recoils half of it; a hit that
-     breaks a Substitute still drains and recoils from the full damage; the shared last damage after an overkill is
-     the capped amount.
-  2. **Design:** `DealDamageToTarget` reports the HP removed; `ResolveDamage` passes that to drain, recoil and
-     Struggle behind one `IBattleRules` member (`DrainAndRecoilUseHpLost`, Gen 1 true), with the Substitute-break
-     case keeping the full damage.
-  3. **Gen-variable surface:** that member; the Gen 2 value is checked in pokecrystal during the work.
-  4. **Gen 1 source:** the cites above.
-  5. **Data vs runtime:** runtime.
-  6. **Quirk the tests assert:** breaking a Substitute drains from the full damage, a KO from the HP that was left.
-  7. **Dependencies:** none.
+  A (the integer damage pipeline and level-doubling crit), B (accuracy and evasion ratios) and D (drain, recoil and Struggle on HP lost) shipped 2026-11-27 and are archived.
 - **C. Staged stats use pokered's ratios, clamp to 1–999, scale ÷4 past 255, and screens wrap, as in Gen 1 — S–M,
   ⚠️ lines drafted.** pokered `CalculateModifiedStat` (`core.asm:6376-6452`) multiplies the unmodified stat by the
   stage's ratio pair, floors, caps at 999 and raises 0 to 1; ours (`GetStatMultiplier`, `ComputeBaseDamage`) uses

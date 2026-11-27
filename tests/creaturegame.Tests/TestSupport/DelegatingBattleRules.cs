@@ -260,6 +260,10 @@ public abstract class DelegatingBattleRules : IBattleRules
 
     public virtual bool MissZeroesLastDamage => _inner.MissZeroesLastDamage;
 
+    public virtual bool DrainAndRecoilUseHpLost => _inner.DrainAndRecoilUseHpLost;
+
+    public virtual bool DrainHealIsLastDamage => _inner.DrainHealIsLastDamage;
+
     public virtual bool SkipsDamageCalculation(Attack move) => _inner.SkipsDamageCalculation(move);
 
     public virtual int RollPsywaveDamage(Creature s, BattleSide side, IRandomSource rng) =>
@@ -363,7 +367,7 @@ public sealed class NeverHitRules : DelegatingBattleRules
 }
 
 /// <summary>Always hits, no crit, no damage variance — deterministic damage for exact-math asserts.</summary>
-public sealed class NoVarianceNoCritHitRules : DelegatingBattleRules
+public class NoVarianceNoCritHitRules : DelegatingBattleRules
 {
     public static readonly NoVarianceNoCritHitRules Instance = new();
 
@@ -375,6 +379,14 @@ public sealed class NoVarianceNoCritHitRules : DelegatingBattleRules
 
     public override (int Min, int Max) DamageVarianceRange =>
         (DamageVarianceDivisor, DamageVarianceDivisor);
+}
+
+/// <summary><see cref="NoVarianceNoCritHitRules"/>, but an overkill records the full damage (the <see cref="IBattleRules.DrainAndRecoilUseHpLost"/> swap).</summary>
+public sealed class FullOverkillDamageRules : NoVarianceNoCritHitRules
+{
+    public static new readonly FullOverkillDamageRules Instance = new();
+
+    public override bool DrainAndRecoilUseHpLost => false;
 }
 
 /// <summary>Always hits, no crit, and forces any secondary effect to land (chance 100).

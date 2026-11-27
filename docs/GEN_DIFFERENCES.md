@@ -236,6 +236,16 @@ Wrap, Bind, Fire Spin, Clamp behave very differently in Gen 1:
   (`effects.asm:1207`, `core.asm:5259-5261`) and so zeroes `wDamage`; ours ends it on the `HitOnSemiInvulnerable`
   `Fails` path and leaves the value. No reader can see it: a Bide user can't be out of reach, and a Counter answering
   Mimic fails on its 0 power. Conversion tests the bit itself and leaves the value in both.
+- **Drain, recoil and Struggle read the HP actually lost.** On an overkill pokered rewrites `wDamage` to the HP the
+  target had (`ApplyDamageToEnemyPokemon`, `core.asm:4703-4712`), so an overkilling Double-Edge recoils a quarter of
+  it, Mega Drain heals half of it and a finishing Struggle recoils half of it (minimum 1 each), and the shared last
+  damage after a KO is the capped amount, a confusion self-hit that faints the user included
+  (`HandleSelfConfusionDamage` ends in `ApplyDamageToPlayerPokemon`). Our "took N damage" line still shows the computed
+  damage (pokered prints no number). A hit that breaks a Substitute leaves `wDamage` whole (`:4873-4875`), but the
+  break cancels drain and recoil (below), so only Counter and Bide see the full value. Drain then halves `wDamage` in
+  place (`move_effects/drain_hp.asm:2-12`), so a Bide user hit by a faster Absorb, Mega Drain or Leech Life stores
+  half the hit; Gen 2 caps on an overkill too, but its `SapHealth` leaves the damage whole. Seams:
+  `DrainAndRecoilUseHpLost`, `DrainHealIsLastDamage`.
 - **The trapped Pokémon can still switch out, and that frees it.** The battle menu shows to a trapped Pokémon and only
   move selection is skipped (`core.asm:305-322`); the party menu's switch path has no trap check (`:2396-2437`).
   `SendOutMon` clears the enemy's `USING_TRAPPING_MOVE` (`:1755-1756`), and since the switch happens inside the menu,

@@ -198,6 +198,12 @@ public sealed class Gen1BattleRules : IBattleRules
     // pokered core.asm:5328-5332: MoveHitTest's .moveMissed clears wDamage, for status effects that call it too.
     public bool MissZeroesLastDamage => true;
 
+    // pokered core.asm:4703-4712: an overkill rewrites wDamage to the HP the target had.
+    public bool DrainAndRecoilUseHpLost => true;
+
+    // pokered drain_hp.asm:2-12: DrainHPEffect_ halves wDamage in place.
+    public bool DrainHealIsLastDamage => true;
+
     // pokered data/battle/residual_effects_1.asm, and Counter (HandleCounterMove returns first, core.asm:3141).
     public bool SkipsDamageCalculation(Attack move) =>
         move.Effect == MoveEffect.Counter

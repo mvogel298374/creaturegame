@@ -283,6 +283,10 @@ internal static class TestAltProfile
 
         public override bool MissZeroesLastDamage => false;
 
+        public override bool DrainAndRecoilUseHpLost => false;
+
+        public override bool DrainHealIsLastDamage => false;
+
         public override bool SkipsBattleMenu(Creature creature) =>
             EveryLockInSkipsTheMenu(creature);
 

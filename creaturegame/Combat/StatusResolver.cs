@@ -195,9 +195,7 @@ public static class StatusResolver
             return false;
 
         int selfDamage = DamageCalculator.CalculateConfusionDamage(creature, foe, rules);
-        if (lastDamage is not null)
-            lastDamage.Value = selfDamage;
-        SelfInflictedDamage.Apply(
+        int recorded = SelfInflictedDamage.Apply(
             creature,
             foe,
             selfDamage,
@@ -205,6 +203,8 @@ public static class StatusResolver
             emitter,
             hp => new ConfusionDamage(creature.Name, creature.Id, selfDamage, hp)
         );
+        if (lastDamage is not null)
+            lastDamage.Value = recorded;
         return true;
     }
 

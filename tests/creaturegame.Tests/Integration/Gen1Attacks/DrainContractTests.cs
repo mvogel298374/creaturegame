@@ -50,4 +50,28 @@ public class DrainContractTests(MovesFixture moves) : Gen1MoveContract(moves)
         Assert.True(result.Has<DamageDealt>());
         Assert.Equal(300, result.Attacker.Attributes.HP); // capped, no overflow
     }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task AnOverkillingDrainHealsHalfTheHpTheFoeHad(bool capsOverkill)
+    {
+        var player = TestCreatures.Make("Player", hp: 9999, special: 300, speed: 200);
+        player.Attributes.HP = 1;
+        player.AddAttack(Move("mega-drain"));
+        var enemy = TestCreatures.Make("Enemy", hp: 41, speed: 1);
+        enemy.AddAttack(Move("tackle"));
+
+        var log = await FullBattle.Fight(
+            player,
+            enemy,
+            new ScriptedInput("mega-drain"),
+            new ScriptedInput("tackle"),
+            capsOverkill ? NoVarianceNoCritHitRules.Instance : FullOverkillDamageRules.Instance
+        );
+
+        int hit = log.Of<DamageDealt>().Single(d => d.TargetName == "Enemy").Damage;
+        Assert.True(hit > 41, "the hit overkills");
+        Assert.Equal((capsOverkill ? 41 : hit) / 2, log.Of<DrainHealed>().Single().HealAmount);
+    }
 }
