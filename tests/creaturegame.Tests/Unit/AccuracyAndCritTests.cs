@@ -125,9 +125,11 @@ public class AccuracyAndCritTests
     }
 
     [Fact]
-    public void CritMultiplier_Gen1_IsTwo()
+    public void Gen1CritDoublesTheLevelNotTheDamage()
     {
-        Assert.Equal(2.0, Gen1BattleRules.Instance.CritMultiplier);
+        Assert.Equal(2, Gen1BattleRules.Instance.CritLevelMultiplier);
+        Assert.Equal(1, Gen1BattleRules.Instance.CritDamageMultiplier);
+        Assert.Equal(997, Gen1BattleRules.Instance.MaxBaseDamage);
     }
 
     [Fact]

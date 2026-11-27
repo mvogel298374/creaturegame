@@ -536,7 +536,7 @@ public class TwoTurnMoveContractTests(MovesFixture moves) : Gen1MoveContract(mov
 
         public override double GetCritChance(Creature attacker, Attack move) => 0;
 
-        public override double RollDamageVariance() => 1.0;
+        public override int RollDamageVariance() => DamageVarianceDivisor;
     }
 
     [Fact]

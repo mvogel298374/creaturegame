@@ -83,9 +83,9 @@ public class AttributesAndRulesTests
     public void Gen1BattleRules_RollDamageVariance_IsInRange()
     {
         var rules = Gen1BattleRules.Instance;
-        double min = 217.0 / 255.0;
         for (int i = 0; i < 200; i++)
-            Assert.InRange(rules.RollDamageVariance(), min, 1.0);
+            Assert.InRange(rules.RollDamageVariance(), 217, 255);
+        Assert.Equal(255, rules.DamageVarianceDivisor);
     }
 
     [Fact]

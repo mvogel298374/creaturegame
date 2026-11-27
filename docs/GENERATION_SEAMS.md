@@ -71,8 +71,8 @@ a pokecrystal or pokeemerald cite is **unverified** (§4.5):
 |:--------|:------|:-----------|
 | **Crit chance** | `floor(BaseSpeed/2)/256`; high-crit moves ×8. Uses *base* Speed, ignoring stat stages — fast Pokémon crit constantly. Focus Energy / Dire Hit change the order of the halving and the multiplier (`GEN_DIFFERENCES.md` → Stats). | Stage-based (a fixed ladder), unrelated to Speed. |
 | **Crit ignores stat stages** | **Yes** — a Gen 1 crit recomputes from raw stats, *discarding* your Swords Dance boosts *and* the Burn penalty (sometimes a crit hits *weaker*!). | No. |
-| **Crit multiplier** | 2.0× | 2.0× (Gen 1–5), 1.5× (Gen 6+). |
-| **Damage variance** | random `217–255` ÷ 255 | random `85–100` ÷ 100 |
+| **Damage formula** (`CritLevelMultiplier`, `CritDamageMultiplier`, `MaxBaseDamage`, `DamageVarianceDivisor`, `StabMultiplier`) | Integer steps, each rounded down, in pokered's order (`DamageCalculator.ComputeDamage`): `floor(2L/5) + 2`, × power × Attack, ÷ Defense, ÷ 50, capped at `MaxBaseDamage` 997, + 2 (`engine/battle/core.asm:4299-4460` `CalculateDamage`); STAB `d + floor(d/2)`, then each defender type `floor(d × m)`, one type at a time (`AdjustDamageForMoveType`, `:5075-5180`); then the roll `floor(d × r / 255)` (`RandomizeDamage`, `:5420-5450`). **A crit doubles the level, not the damage** (`CritLevelMultiplier` 2, `CritDamageMultiplier` 1; `GetDamageVarsForPlayerAttack` `sla e`, `:4135-4138`): ×1.5 on the level term at L5, ≈×1.9 at L50. The confusion self-hit runs the same base steps. Dev Mode's range (`EstimateRange`) is the non-crit damage at the roll's two bounds; the AI's `EstimateDamage` skips the crit, the roll (one factor shared by every move, so it cancels when ranking) and the foe's screens | Gen 2 keeps the level and **doubles the base damage** after ÷ 50, before the cap (`CritLevelMultiplier` 1, `CritDamageMultiplier` 2; pokecrystal `engine/battle/effect_commands.asm` `BattleCommand_DamageCalc` `.CriticalMultiplier`); a type-boosting item applies just before it; same cap and + 2. Gen 3–5 (×2) and Gen 6+ (×1.5) unverified; ×1.5 needs a non-integer member, shaped when that generation is planned |
+| **Damage variance** (`RollDamageVariance`, `DamageVarianceRange`) | an integer roll `217–255`, ÷ `DamageVarianceDivisor` 255; damage below 2 skips it (`DamageRollSkippedBelowTwo`) | Gen 2 the same (pokecrystal `BattleCommand_DamageVariation`: `85 percent + 1` … `100 percent`); Gen 3+ unverified |
 | **Sleep duration** | 1–7 turns | 2–5 turns |
 | **Binding (Wrap etc.)** | 2–5 turns, locks the victim out | reworked later |
 | **Binding continuation** (`BindingContinuationReplaysDamage`) | `true`: every turn after the first prints "attack continues!", skips the hit test, the crit and damage rolls and PP, and replays the first strike's damage through the normal damage path (pokered `core.asm:3554-3566`); `GEN_DIFFERENCES.md` → Binding | Gen 2 makes binding a residual 1/16 chip and frees the user (unverified) |
@@ -220,8 +220,8 @@ the default, and it takes an optional `IRandomSource` so its random rolls are se
 
 ```csharp
 public Gen1BattleRules(IRandomSource? rng = null) => _rng = rng ?? SystemRandomSource.Instance;
-public double RollDamageVariance() => _rng.Next(VarianceMinRoll, VarianceMaxRoll + 1) / 255.0;   // 217–255
-public (double Min, double Max) DamageVarianceRange => (VarianceMinRoll / 255.0, VarianceMaxRoll / 255.0);
+public int RollDamageVariance() => _rng.Next(VarianceMinRoll, VarianceMaxRoll + 1);   // 217–255
+public (int Min, int Max) DamageVarianceRange => (VarianceMinRoll, VarianceMaxRoll);
 ```
 
 The roll and its range read the same constants, so the dev damage-range display
@@ -251,7 +251,7 @@ isCrit          = rng.NextDouble() < rules.GetCritChance(attacker, move);   // I
 int attackStat  = rules.GetOffensiveStat(attacker, move.AttackType);        // IBattleRules
 int atkStage    = stages.Of(rules.OffensiveStage(move.AttackType));         // IBattleRules
 double typeMult = typeChart.GetMultiplier(move.DamageType, defender.Type1); // ITypeChart
-double variance = rules.RollDamageVariance();                               // IBattleRules
+int roll        = rules.RollDamageVariance();                               // IBattleRules
 ```
 
 `Creature` holds its `IStatCalculator` (default `Gen1StatCalculator.Instance`) and calls
@@ -471,7 +471,7 @@ A level-50 creature uses a Special move into a Psychic-type target:
    `Gen2BattleRules` would return Sp. Atk / Sp. Def here.
 4. **`ITypeChart.GetMultiplier`** supplies the type multiplier, preserving Gen 1 quirks
    (so e.g. a Bug move into Psychic returns the Gen 1 `2.0×`).
-5. **`IBattleRules.RollDamageVariance`** applies the Gen 1 `217–255/255` spread (its bounds are exposed as `DamageVarianceRange`).
+5. **`IBattleRules.RollDamageVariance`** draws the Gen 1 roll of `217–255`, applied as `× r ÷ DamageVarianceDivisor` (its bounds are exposed as `DamageVarianceRange`).
 
 Five generation-variable decisions, zero generation checks — each resolved by the
 injected implementation. That's the seams working.

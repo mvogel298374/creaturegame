@@ -289,7 +289,7 @@ public class RampageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 
         public override double GetCritChance(Creature a, Attack m) => 0.0;
 
-        public override double RollDamageVariance() => 1.0;
+        public override int RollDamageVariance() => DamageVarianceDivisor;
     }
 
     /// <summary>A fixed rampage length, scripted confusion rolls (the last repeats) and no confusion self-hit.</summary>
@@ -309,7 +309,7 @@ public class RampageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 
         public override double GetCritChance(Creature a, Attack m) => 0.0;
 
-        public override double RollDamageVariance() => 1.0;
+        public override int RollDamageVariance() => DamageVarianceDivisor;
     }
 
     private sealed class KeepCounterScriptedRules(int rampageTurns, params int[] confusionRolls)
@@ -326,6 +326,6 @@ public class RampageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 
         public override double GetCritChance(Creature a, Attack m) => 0.0;
 
-        public override double RollDamageVariance() => 1.0;
+        public override int RollDamageVariance() => DamageVarianceDivisor;
     }
 }

@@ -65,8 +65,9 @@ roster — see `DATA_IMPORT.md` §4.5.)
 `ItemAction` when the player uses a bag item), actions are sorted by `Priority` → effective Speed (stage-adjusted,
 Paralysis quartered) → random tie-break, then executed in order via `ExecuteAsync()`. (Items resolve first —
 `ItemAction.Priority` sits above any move; the per-action `CanAct`/dead-target guards apply only to
-`AttackAction`.) `DamageCalculator` computes Gen 1 damage (base power × Attack/Defense ratio × STAB 1.5× × type
-effectiveness × stat stage multipliers × critical hit 2× × random variance 217–255/255). All generation-specific
+`AttackAction`.) `DamageCalculator` computes Gen 1 damage in integer steps, each rounded down: the level term ×
+power × staged Attack ÷ Defense ÷ 50, capped at 997, + 2; then STAB, each defender type, and the roll r ÷ 255 (a crit
+doubles the level; `GENERATION_SEAMS.md` → Damage formula). All generation-specific
 rules — stat stage tables, crit formula, accuracy scale, freeze thaw, status damage rates — are delegated to
 `IBattleRules`; `Gen1BattleRules` is the only implementation. Type effectiveness comes from `ITypeChart`;
 `Gen1TypeChart` preserves Gen 1 quirks (Ghost → Psychic = 0×, Poison → Bug = 2×, no Steel/Dark/Fairy types, Ice →

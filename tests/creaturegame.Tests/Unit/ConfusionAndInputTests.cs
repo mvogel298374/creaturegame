@@ -191,9 +191,9 @@ public class ConfusionAndInputTests
     {
         public override int ConfusionSelfHitPercent => 100;
 
-        public override double RollDamageVariance() => 0.85;
+        public override int RollDamageVariance() => 217;
 
-        public override (double Min, double Max) DamageVarianceRange => (0.85, 0.85);
+        public override (int Min, int Max) DamageVarianceRange => (217, 217);
 
         public override int GetHitThreshold(int acc, int accStage, int evaStage) => 256;
 
@@ -244,9 +244,20 @@ public class ConfusionAndInputTests
     {
         int damage = SelfHit(SelfHitUser(), TestCreatures.Make("Foe"));
 
-        // SelfHitRules rolls 0.85, which would have made it 16.
+        // SelfHitRules rolls 217, which would have made it 16.
         Assert.Equal(Gen1SelfHit(100, 100), damage);
         Assert.Equal(19, damage);
+    }
+
+    [Fact]
+    public void SelfHit_DropsTheFractionOfTwoLOverFive()
+    {
+        var user = TestCreatures.Make("User", level: 12, hp: 500, attack: 100, defense: 100);
+
+        int damage = SelfHit(user, TestCreatures.Make("Foe"));
+
+        // floor(24/5) + 2 = 6, and 6 × 40 ÷ 50 = 4, + 2; unfloored it would be 7.
+        Assert.Equal(6, damage);
     }
 
     [Fact]
@@ -295,7 +306,7 @@ public class ConfusionAndInputTests
     {
         int damage = SelfHit(SelfHitUser(), TestCreatures.Make("Foe"), new VarianceSelfHitRules());
 
-        Assert.Equal((int)(Gen1SelfHit(100, 100) * 0.85), damage);
+        Assert.Equal(Gen1SelfHit(100, 100) * 217 / 255, damage);
         Assert.Equal(16, damage);
     }
 

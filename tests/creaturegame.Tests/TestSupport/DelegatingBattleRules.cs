@@ -50,9 +50,11 @@ public abstract class DelegatingBattleRules : IBattleRules
 
     public virtual int PayDayCoinMultiplier => _inner.PayDayCoinMultiplier;
 
-    public virtual double RollDamageVariance() => _inner.RollDamageVariance();
+    public virtual int RollDamageVariance() => _inner.RollDamageVariance();
 
-    public virtual (double Min, double Max) DamageVarianceRange => _inner.DamageVarianceRange;
+    public virtual (int Min, int Max) DamageVarianceRange => _inner.DamageVarianceRange;
+
+    public virtual int DamageVarianceDivisor => _inner.DamageVarianceDivisor;
 
     public virtual int RollSleepTurns() => _inner.RollSleepTurns();
 
@@ -106,7 +108,9 @@ public abstract class DelegatingBattleRules : IBattleRules
 
     public virtual double GetCritChance(Creature a, Attack m) => _inner.GetCritChance(a, m);
 
-    public virtual double CritMultiplier => _inner.CritMultiplier;
+    public virtual int CritLevelMultiplier => _inner.CritLevelMultiplier;
+    public virtual int CritDamageMultiplier => _inner.CritDamageMultiplier;
+    public virtual int MaxBaseDamage => _inner.MaxBaseDamage;
     public virtual bool CritIgnoresStatStages => _inner.CritIgnoresStatStages;
 
     public virtual int RollBindingTurns() => _inner.RollBindingTurns();
@@ -345,9 +349,10 @@ public sealed class AlwaysCritRules : DelegatingBattleRules
 {
     public static readonly AlwaysCritRules Instance = new();
 
-    public override double RollDamageVariance() => 1.0;
+    public override int RollDamageVariance() => DamageVarianceDivisor;
 
-    public override (double Min, double Max) DamageVarianceRange => (1.0, 1.0);
+    public override (int Min, int Max) DamageVarianceRange =>
+        (DamageVarianceDivisor, DamageVarianceDivisor);
 
     public override double GetCritChance(Creature a, Attack m) => 1.0;
 }
@@ -369,9 +374,10 @@ public sealed class NoVarianceNoCritHitRules : DelegatingBattleRules
 
     public override double GetCritChance(Creature a, Attack m) => 0.0;
 
-    public override double RollDamageVariance() => 1.0;
+    public override int RollDamageVariance() => DamageVarianceDivisor;
 
-    public override (double Min, double Max) DamageVarianceRange => (1.0, 1.0);
+    public override (int Min, int Max) DamageVarianceRange =>
+        (DamageVarianceDivisor, DamageVarianceDivisor);
 }
 
 /// <summary>Always hits, no crit, and forces any secondary effect to land (chance 100).

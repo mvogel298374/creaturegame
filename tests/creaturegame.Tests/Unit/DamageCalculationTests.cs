@@ -3,6 +3,7 @@ using creaturegame.Combat;
 using creaturegame.Creatures;
 using creaturegame.DB;
 using creaturegame.Tests.TestSupport;
+using DT = creaturegame.Attacks.DamageType;
 
 namespace creaturegame.Tests.Unit;
 
@@ -259,11 +260,177 @@ public class DamageCalculationTests
         );
     }
 
+    // --- pokered's integer pipeline (core.asm CalculateDamage, AdjustDamageForMoveType, RandomizeDamage) ---
+
+    public sealed record DamageCase(
+        int Level,
+        int Power,
+        int Attack,
+        int Defense,
+        DT AttackerType,
+        DT MoveType,
+        DT DefenderType1,
+        DT? DefenderType2,
+        bool Crit,
+        int Roll,
+        int Expected
+    );
+
+    // Hand-computed from pokered's steps; the Grass/Ground rows pin ½× then 2× floored one at a time (53 → 26 → 52).
+    public static TheoryData<DamageCase> PokeredDamage =>
+        new()
+        {
+            new(5, 40, 30, 25, DT.Fire, DT.Normal, DT.Normal, null, false, 217, 4),
+            new(5, 40, 30, 25, DT.Fire, DT.Normal, DT.Normal, null, false, 255, 5),
+            new(5, 40, 30, 25, DT.Fire, DT.Normal, DT.Normal, null, true, 217, 5),
+            new(5, 40, 30, 25, DT.Fire, DT.Normal, DT.Normal, null, true, 255, 7),
+            new(12, 40, 33, 29, DT.Normal, DT.Normal, DT.Normal, null, false, 217, 8),
+            new(12, 40, 33, 29, DT.Normal, DT.Normal, DT.Normal, null, false, 255, 10),
+            new(12, 40, 33, 29, DT.Normal, DT.Normal, DT.Normal, null, true, 217, 15),
+            new(12, 40, 33, 29, DT.Normal, DT.Normal, DT.Normal, null, true, 255, 18),
+            new(50, 95, 120, 98, DT.Fire, DT.Fire, DT.Grass, DT.Poison, false, 217, 134),
+            new(50, 95, 120, 98, DT.Fire, DT.Fire, DT.Grass, DT.Poison, false, 255, 158),
+            new(50, 95, 120, 98, DT.Fire, DT.Fire, DT.Grass, DT.Poison, true, 217, 251),
+            new(50, 95, 120, 98, DT.Fire, DT.Fire, DT.Grass, DT.Poison, true, 255, 296),
+            new(50, 95, 120, 98, DT.Water, DT.Electric, DT.Grass, DT.Poison, false, 217, 22),
+            new(50, 95, 120, 98, DT.Water, DT.Electric, DT.Grass, DT.Poison, false, 255, 26),
+            new(50, 95, 120, 98, DT.Water, DT.Electric, DT.Grass, DT.Poison, true, 217, 41),
+            new(50, 95, 120, 98, DT.Water, DT.Electric, DT.Grass, DT.Poison, true, 255, 49),
+            new(50, 95, 120, 98, DT.Fire, DT.Water, DT.Grass, DT.Ground, false, 217, 44),
+            new(50, 95, 120, 98, DT.Fire, DT.Water, DT.Grass, DT.Ground, false, 255, 52),
+            new(12, 55, 40, 31, DT.Water, DT.Grass, DT.Fire, DT.Flying, false, 217, 1),
+            new(12, 55, 40, 31, DT.Water, DT.Grass, DT.Fire, DT.Flying, false, 255, 2),
+            new(12, 55, 40, 31, DT.Water, DT.Grass, DT.Fire, DT.Flying, true, 217, 3),
+            new(12, 55, 40, 31, DT.Water, DT.Grass, DT.Fire, DT.Flying, true, 255, 4),
+        };
+
+    [Theory]
+    [MemberData(nameof(PokeredDamage))]
+    public void DamageFollowsPokeredsIntegerSteps(DamageCase c)
+    {
+        var attacker = TestCreatures.Make("A", c.Level, c.AttackerType, attack: c.Attack);
+        var defender = TestCreatures.Make(
+            "D",
+            50,
+            c.DefenderType1,
+            c.DefenderType2,
+            defense: c.Defense
+        );
+
+        int damage = FixedHit(
+            attacker,
+            defender,
+            Hit(c.Power, c.MoveType),
+            new FixedRollRules(c.Crit, c.Roll)
+        );
+
+        Assert.Equal(c.Expected, damage);
+    }
+
+    [Fact]
+    public void ALevel5CritRaisesTheLevelTermByHalfNotTheDamageByDouble()
+    {
+        var attacker = TestCreatures.Make("A", 5, DamageType.Fire);
+        var defender = TestCreatures.Make("D");
+
+        int normal = FixedHit(attacker, defender, Hit(100), new FixedRollRules(false, 255));
+        int crit = FixedHit(attacker, defender, Hit(100), new FixedRollRules(true, 255));
+
+        // floor(2L/5) + 2: 4 at L5, 6 at the crit's L10, so the base goes 8 → 12, then + 2.
+        Assert.Equal(10, normal);
+        Assert.Equal(14, crit);
+    }
+
+    [Fact]
+    public void ALevel12HitDropsTheFractionOfTwoLOverFive()
+    {
+        var attacker = TestCreatures.Make("A", 12, DamageType.Fire);
+        var defender = TestCreatures.Make("D");
+
+        int damage = FixedHit(attacker, defender, Hit(40), new FixedRollRules(false, 255));
+
+        // floor(24/5) + 2 = 6, and 6 × 40 ÷ 50 = 4; unfloored, 6.8 × 40 ÷ 50 + 2 would give 7.
+        Assert.Equal(6, damage);
+    }
+
+    [Fact]
+    public void TheBaseDamageCapsAt997BeforeThePlusTwoAndTheRoll()
+    {
+        var attacker = TestCreatures.Make("A", 100, DamageType.Fire, attack: 999);
+        var defender = TestCreatures.Make("D", defense: 10);
+
+        Assert.Equal(999, FixedHit(attacker, defender, Hit(250), new FixedRollRules(true, 255)));
+        Assert.Equal(850, FixedHit(attacker, defender, Hit(250), new FixedRollRules(true, 217)));
+    }
+
+    [Fact]
+    public void ARulesetThatDoublesCritDamageAppliesItToTheBaseBeforeTheCap()
+    {
+        var attacker = TestCreatures.Make("A", 50, DamageType.Fire, attack: 120);
+        var defender = TestCreatures.Make(
+            "D",
+            50,
+            DamageType.Grass,
+            DamageType.Poison,
+            defense: 98
+        );
+        var capAttacker = TestCreatures.Make("A", 100, DamageType.Fire, attack: 999);
+        var capDefender = TestCreatures.Make("D", defense: 10);
+        var rules = new DamageDoublingCritRules();
+
+        // Base 51 doubles to 102, + 2, STAB 156, ×2 Grass 312; Gen 1's doubled level gives 296.
+        Assert.Equal(312, FixedHit(attacker, defender, Hit(95, DamageType.Fire), rules));
+        Assert.Equal(999, FixedHit(capAttacker, capDefender, Hit(250), rules));
+    }
+
+    private static Attack Hit(int power, DamageType type = DamageType.Normal) =>
+        new()
+        {
+            Name = "Hit",
+            BaseDamage = power,
+            AttackType = AttackType.Physical,
+            DamageType = type,
+        };
+
+    private static int FixedHit(
+        Creature attacker,
+        Creature defender,
+        Attack move,
+        IBattleRules rules
+    ) =>
+        DamageCalculator.CalculateDamage(
+            attacker,
+            defender,
+            move,
+            Gen1TypeChart.Instance,
+            rules,
+            out _,
+            new SeededRandomSource(0)
+        );
+
+    private sealed class FixedRollRules(bool crit, int roll) : DelegatingBattleRules
+    {
+        public override double GetCritChance(Creature a, Attack m) => crit ? 1.0 : 0.0;
+
+        public override int RollDamageVariance() => roll;
+    }
+
+    private sealed class DamageDoublingCritRules : DelegatingBattleRules
+    {
+        public override double GetCritChance(Creature a, Attack m) => 1.0;
+
+        public override int RollDamageVariance() => DamageVarianceDivisor;
+
+        public override int CritLevelMultiplier => 1;
+
+        public override int CritDamageMultiplier => 2;
+    }
+
     // Deterministic (no variance, always-hit, no crit, flat stat mult) so the only thing that
     // moves the damage is the stat the rules select — which is what these tests assert.
     private sealed class AlwaysUseAttackStatRules : DelegatingBattleRules
     {
-        public override double RollDamageVariance() => 1.0;
+        public override int RollDamageVariance() => DamageVarianceDivisor;
 
         public override double GetStatMultiplier(int stage) => 1.0;
 
@@ -276,7 +443,7 @@ public class DamageCalculationTests
 
     private sealed class AlwaysUseDefenseStatRules : DelegatingBattleRules
     {
-        public override double RollDamageVariance() => 1.0;
+        public override int RollDamageVariance() => DamageVarianceDivisor;
 
         public override double GetStatMultiplier(int stage) => 1.0;
 

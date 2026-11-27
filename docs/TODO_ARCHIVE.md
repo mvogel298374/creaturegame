@@ -103,6 +103,59 @@ REST call routed to the machine that never saw `/start`; the workflow pins `flyc
 
 ---
 
+## §3.1 The damage formula floors each step, and a crit doubles the level, as in Gen 1 ✅ DONE (2026-11-27)
+
+*(verify slice 2026-11-27, source-confirmed; entry A of the damage-core split) — M.*
+pokered `CalculateDamage` (`core.asm:4299-4460`): `floor(2L/5) + 2`, × power × Attack, floored after ÷ Defense and
+again after ÷ 50, capped at 997, then + 2. STAB is `d + floor(d/2)` and each matching type pair
+`floor(d × m / 10)` (`AdjustDamageForMoveType`, `:5075-5180`); the random factor is `floor(d × r / 255)`, r 217–255
+(`RandomizeDamage`, `:5420-5450`). A crit doubles `L` inside the formula (`:4135-4138`, ≈(2L+5)/(L+5): ×1.5 at
+L5, ×1.9 at L50) on the unmodified party stats (`:4056-4071`). Ours (`DamageCalculator.ComputeDamage`,
+`ComputeBaseDamage`) works in doubles, truncates once, has no cap and multiplies by a flat
+`CritMultiplier => 2.0`, the `+2` included. Measured: normal hits 13–27% high at L5–12 and ~1% at L50; crits
+56–74% high at L5, 32–51% at L12, 8–13% at L50.
+**DoR** (drafted and confirmed 2026-11-27):
+1. **Acceptance:** `ComputeDamage` equals pokered's integer pipeline at the low and high variance rolls for a
+   table of cases (L5, L12, L50; neutral, STAB, 2× and ½× dual-type; crit and non-crit), each hand-computed from
+   the cites above; a base over 997 caps; the confusion self-hit uses the same floors. A full battle where a seeded
+   crit deals the level-doubled amount.
+2. **Design:** `ComputeDamage` becomes an integer pipeline in pokered's order. Seam members replace
+   `CritMultiplier`: `CritLevelMultiplier` (Gen 1 2) and `CritDamageMultiplier` (Gen 1 1), plus `MaxBaseDamage`
+   (997). STAB and type stay `IBattleRules`/`ITypeChart` inputs but apply as floored steps, the defender's types
+   one at a time. The variance roll returns the integer r; `DamageVarianceRange` and Dev Mode's `EstimateRange`
+   read the same bounds. `AccuracyAndCritTests.CritMultiplier_Gen1_IsTwo` asserts the opposite of pokered and is
+   replaced. *Ruling 2026-11-27:* `DamageVarianceDivisor` (255) joins the seam, since the roll is now the integer r;
+   pokered's redraw-until-217 draw count is not noted (settled item 2: our draws never mirror pokered's stream).
+3. **Gen-variable surface:** the crit members, `MaxBaseDamage`, the step order; the Gen 2 values are checked in
+   pokecrystal during the work (`effect_commands.asm` `BattleCommand_DamageCalc`, `BattleCommand_Critical`).
+4. **Gen 1 source:** the cites above.
+5. **Data vs runtime:** runtime.
+6. **Quirk the tests assert:** a level-5 crit is ×1.5, not ×2; a level-12 Tackle loses the fractional `2L/5`.
+7. **Dependencies:** none. The AI evaluator (`EstimateDamage`) and Dev Mode's range share the path and move with
+   it. *Not modelled* (invisible): pokered applies the type pairs in `TypeEffects` table order, which can differ by
+   1 from defender-type order on a dual type; note it in `GEN_DIFFERENCES.md`.
+
+**DoR rulings (2026-11-27, after `requirements-review` and `pr-review`).** `DamageVarianceDivisor` (255) joined the seam; a lost Gen 6+ crit
+note was restored; no note for pokered's redraw draw count (settled item 2); a ½×-then-2× Grass/Ground row was added, the Dev Mode range test
+moved to `DamageRangeTests`, the cases became `TheoryData`; the double `SkipsDamageRoll` nit was waived by Mo.
+
+**What was built (2026-11-27).**
+- `DamageCalculator` computes damage in pokered's integer steps, each floored: `floor(2L/5)+2`, × power × Attack ÷ Defense ÷ 50, capped at 997,
+  +2; STAB `d + floor(d/2)`; each defender type floored one at a time; the roll `d × r ÷ 255`, r 217–255, skipped below 2
+  (`core.asm:4299-4460`, `:5075-5180`, `:5420-5450`). A crit doubles the level, not the damage (`:4135-4138`). The confusion self-hit, Dev Mode's
+  range and the AI's estimate share the pipeline. Normal hits drop 13–27% at L5–12; crits up to 74% at L5.
+- `IBattleRules`: `CritMultiplier` removed; `CritLevelMultiplier` (2), `CritDamageMultiplier` (1), `MaxBaseDamage` (997) and
+  `DamageVarianceDivisor` (255) added; `RollDamageVariance` returns the integer roll; `DamageVarianceRange` is `(int, int)`. Gen 2 values
+  checked in pokecrystal (`BattleCommand_DamageCalc` doubles the base before the cap; `DamageVariation` 217–255 ÷ 255).
+- Tests: `DamageCalculationTests` (a `TheoryData` table of 22 hand-computed cases and named quirk tests), `DamageRangeTests.TheDevModeRangeReadsTheSameRollBounds`,
+  `ConfusionAndInputTests.SelfHit_DropsTheFractionOfTwoLOverFive`, `AccuracyAndCritTests.Gen1CritDoublesTheLevelNotTheDamage` (replaces
+  `CritMultiplier_Gen1_IsTwo`), `CriticalHitContractTests.ACritInABattleDoublesTheLevelNotTheDamage`. Sabotage-checked.
+- Docs: `GENERATION_SEAMS.md` (Damage formula row, variance row, snippets), `GEN_DIFFERENCES.md` (Damage Formula; the type-pair order note),
+  `ARCHITECTURE.md` battle-system summary, `PRODUCT_SPEC.md`.
+- Follow-up recommended, not filed: `.\e2e.ps1 -Spec voluntary-switch`, `-Spec cadence`, `-Spec encounter-map` (seeded damage shifted).
+
+---
+
 ## §3.1 Moves that never reach the hit test skip the accuracy roll, as in Gen 1 ✅ DONE (2026-11-26)
 
 *(filed 2026-11-06; verify slice 2026-11-26, source-confirmed) — S–M.* In pokered a 0-power move rolls accuracy only if its effect calls

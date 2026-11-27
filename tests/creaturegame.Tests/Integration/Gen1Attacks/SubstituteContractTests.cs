@@ -457,9 +457,10 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
 
         public override double GetCritChance(Creature a, Attack m) => 0.0;
 
-        public override double RollDamageVariance() => 1.0;
+        public override int RollDamageVariance() => DamageVarianceDivisor;
 
-        public override (double Min, double Max) DamageVarianceRange => (1.0, 1.0);
+        public override (int Min, int Max) DamageVarianceRange =>
+            (DamageVarianceDivisor, DamageVarianceDivisor);
     }
 
     private sealed class SelfInflictedIgnoresSubstituteRules : SelfHitRules
@@ -1300,9 +1301,10 @@ public class SubstituteContractTests(MovesFixture moves) : Gen1MoveContract(move
 
         public override double GetCritChance(Creature a, Attack m) => 0.0;
 
-        public override double RollDamageVariance() => 1.0;
+        public override int RollDamageVariance() => DamageVarianceDivisor;
 
-        public override (double Min, double Max) DamageVarianceRange => (1.0, 1.0);
+        public override (int Min, int Max) DamageVarianceRange =>
+            (DamageVarianceDivisor, DamageVarianceDivisor);
 
         public override int RollMultiHitCount() => 3;
     }

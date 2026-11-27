@@ -23,14 +23,15 @@ public sealed class Gen1BattleRules : IBattleRules
     // Gen 1 freeze is permanent until hit by the right move; no random per-turn thaw.
     public int FreezeRandomThawPercent => 0;
 
-    // Gen 1 damage roll: uniform integer in [217, 255], divided by 255.
+    // pokered core.asm RandomizeDamage: a roll of 217-255, then ÷ 255.
     private const int VarianceMinRoll = 217;
     private const int VarianceMaxRoll = 255;
 
-    public double RollDamageVariance() => _rng.Next(VarianceMinRoll, VarianceMaxRoll + 1) / 255.0;
+    public int RollDamageVariance() => _rng.Next(VarianceMinRoll, VarianceMaxRoll + 1);
 
-    public (double Min, double Max) DamageVarianceRange =>
-        (VarianceMinRoll / 255.0, VarianceMaxRoll / 255.0);
+    public (int Min, int Max) DamageVarianceRange => (VarianceMinRoll, VarianceMaxRoll);
+
+    public int DamageVarianceDivisor => 255;
 
     // Gen 1 sleep lasts 1–7 turns.
     public int RollSleepTurns() => _rng.Next(1, 8);
@@ -566,7 +567,13 @@ public sealed class Gen1BattleRules : IBattleRules
         return numerator / 256.0;
     }
 
-    public double CritMultiplier => 2.0;
+    // pokered core.asm GetDamageVarsForPlayerAttack: a crit doubles the level (sla e), not the damage.
+    public int CritLevelMultiplier => 2;
+
+    public int CritDamageMultiplier => 1;
+
+    // pokered core.asm CalculateDamage: MAX_NEUTRAL_DAMAGE - MIN_NEUTRAL_DAMAGE.
+    public int MaxBaseDamage => 997;
 
     // Gen 1: crits use raw computed stats, bypassing stages and the Burn Attack penalty.
     public bool CritIgnoresStatStages => true;

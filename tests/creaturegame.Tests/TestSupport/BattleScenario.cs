@@ -425,7 +425,8 @@ public sealed class ScriptableRules : DelegatingBattleRules
         : _noCrit ? 0.0
         : base.GetCritChance(a, m);
 
-    public override double RollDamageVariance() => _noVariance ? 1.0 : base.RollDamageVariance();
+    public override int RollDamageVariance() =>
+        _noVariance ? DamageVarianceDivisor : base.RollDamageVariance();
 
     public override int GetSecondaryEffectChance(Attack m, SecondaryEffectKind e) =>
         _forceSecondary ? 100 : base.GetSecondaryEffectChance(m, e);

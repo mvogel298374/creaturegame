@@ -178,9 +178,10 @@ public class RageContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 
         public override double GetCritChance(Creature a, Attack m) => 0.0;
 
-        public override double RollDamageVariance() => 1.0;
+        public override int RollDamageVariance() => DamageVarianceDivisor;
 
-        public override (double Min, double Max) DamageVarianceRange => (1.0, 1.0);
+        public override (int Min, int Max) DamageVarianceRange =>
+            (DamageVarianceDivisor, DamageVarianceDivisor);
     }
 
     [Fact]

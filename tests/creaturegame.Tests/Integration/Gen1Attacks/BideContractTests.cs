@@ -423,7 +423,7 @@ public class BideContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 
         public override double GetCritChance(Creature a, Attack m) => 0.0;
 
-        public override double RollDamageVariance() => 1.0;
+        public override int RollDamageVariance() => DamageVarianceDivisor;
     }
 
     private sealed class CountingInput(int index) : IBattleInput

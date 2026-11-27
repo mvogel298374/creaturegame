@@ -34,6 +34,36 @@ public class DamageRangeTests
         };
 
     [Fact]
+    public void TheDevModeRangeReadsTheSameRollBounds()
+    {
+        var attacker = TestCreatures.Make("A", 50, DamageType.Fire, attack: 120);
+        var defender = TestCreatures.Make(
+            "D",
+            50,
+            DamageType.Grass,
+            DamageType.Poison,
+            defense: 98
+        );
+
+        var range = DamageCalculator.EstimateRange(
+            attacker,
+            defender,
+            new Attack
+            {
+                Name = "Hit",
+                BaseDamage = 95,
+                AttackType = AttackType.Physical,
+                DamageType = DamageType.Fire,
+            },
+            Chart,
+            Gen1BattleRules.Instance,
+            BattleSide.Player
+        );
+
+        Assert.Equal(new DamageRange(134, 158), range);
+    }
+
+    [Fact]
     public void StandardRange_BracketsEveryRealNonCritRoll_AndBothBoundsAreReachable()
     {
         var (a, d) = Pair();

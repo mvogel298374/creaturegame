@@ -383,7 +383,8 @@ public class BindingInteractionTests(MovesFixture moves) : InteractionTest(moves
         public override double GetCritChance(Creature a, Attack m) =>
             _critCalls++ == 0 && critFirst ? 1.0 : 0.0;
 
-        public override double RollDamageVariance() => _varianceCalls++ == 0 ? 1.0 : 217 / 255.0;
+        public override int RollDamageVariance() =>
+            _varianceCalls++ == 0 ? DamageVarianceDivisor : 217;
 
         public override int RollBindingTurns() => bindingTurns;
     }

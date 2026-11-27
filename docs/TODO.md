@@ -50,7 +50,7 @@ design pass serves the group. Group 3 (hit test and accuracy) is finished and ar
 | # | Group | Code | Items |
 |:-:|:--|:--|:--|
 | 2 | End-of-turn residual phase | `Battle` turn tail, residuals, `TickTurnCounters` | End-of-turn residual phase (with Leech Seed × Toxic and the menu-turn first mover) |
-| 4 | Damage formula | `DamageCalculator`, crit and accuracy tables, stat stages | Damage pipeline and crits · Accuracy table · Drain and recoil on HP lost · Stat stages · Re-applied stat penalties |
+| 4 | Damage formula | `DamageCalculator`, crit and accuracy tables, stat stages | Accuracy table · Drain and recoil on HP lost · Stat stages · Re-applied stat penalties |
 | 7 | Battle text and seams | `timeline.ts`, the console emitter, `GENERATION_SEAMS.md` | Audit the inline battle rules · Binding and miss lines |
 | 8 | Battle presentation | `BattleScene`, the event wire | Move animations · Sprite FX · Fly/Dig sprite stays on screen · Text feel |
 | 9 | Acquisition and items | `ItemEffects`, `RewardCalculator`, evolution | Catch · Unsold-item rule · Stone evolutions |
@@ -62,18 +62,19 @@ design pass serves the group. Group 3 (hit test and accuracy) is finished and ar
 
 **Ready — each awaits your greenlight**
 
-None open.
+| Item | Cost | Ready? | Next step / what it unblocks |
+|:-----|:----:|:-------|:-----------------------------|
+| None | | | |
 
 **A. Confirm the drafted lines, then Ready**
 
-Damage-core verify slice done 2026-11-27 (§3.1); suggested order A → B → D → C. Each shifts seeded damage, so recommend E2E after.
+Damage-core verify slice done 2026-11-27 (§3.1); suggested order B → D → C (A shipped 2026-11-27). Each shifts seeded damage, so recommend E2E after.
 
 | Item | Cost | Ready? | Next step / what it unblocks |
 |:-----|:----:|:-------|:-----------------------------|
-| **A. The damage formula floors each step, and a crit doubles the level** (§3.1) | M | ⚠️ 1–7 drafted | The biggest player-visible gap: normal hits 13–27% high at L5–12, crits up to 74%. Est. 100–150k tokens with the gates. |
 | **B. Accuracy and evasion use the stat-stage ratios** (§3.1) | S | ⚠️ 1–7 drafted | Est. 50–80k. |
 | **D. Drain, recoil and Struggle use the HP actually lost** (§3.1) | S | ⚠️ 1–7 drafted | Est. 50–80k. |
-| **C. Staged stats: pokered's ratios, the 1–999 clamp, ÷4 scaling and the screen wrap** (§3.1) | S–M | ⚠️ 1–7 drafted | After A (same function). Est. 80–120k. |
+| **C. Staged stats: pokered's ratios, the 1–999 clamp, ÷4 scaling and the screen wrap** (§3.1) | S–M | ⚠️ 1–7 drafted | Est. 80–120k; shares the ratio pairs with B. |
 
 **B. A design pass first** (central engine code: both gates; each pass is shown to you)
 
@@ -147,39 +148,11 @@ data/engine item usually also means updating the test that pins the wrong value.
 ### 3.1 Engine
 
 - **Damage core: verify slice done 2026-11-27, source-confirmed.** All five claims filed 2026-10-14 hold against
-  pret/pokered, and one more was found; rulings 2026-11-27: split into entries A–E (A, B, D, C in that order),
+  pret/pokered, and one more was found; rulings 2026-11-27: split into entries A–E (B, D, C in that order after A),
   model the screen wrap glitch inside C, and file E as an entry. The binding-duration draw order stays closed as
   invisible in play (`GEN_DIFFERENCES.md`, binding moves). Each entry shifts seeded damage or hit rolls, so seeded
   tests move; after each, recommend `.\e2e.ps1 -Spec voluntary-switch`, `-Spec cadence` and `-Spec encounter-map`.
-  `GEN_DIFFERENCES.md` → *Damage Formula* lists crit as a flat `× Critical`; A corrects it.
-- **A. The damage formula floors each step, and a crit doubles the level, as in Gen 1 — M, ⚠️ lines drafted.**
-  pokered `CalculateDamage` (`core.asm:4299-4460`): `floor(2L/5) + 2`, × power × Attack, floored after ÷ Defense and
-  again after ÷ 50, capped at 997, then + 2. STAB is `d + floor(d/2)` and each matching type pair
-  `floor(d × m / 10)` (`AdjustDamageForMoveType`, `:5075-5180`); the random factor is `floor(d × r / 255)`, r 217–255
-  (`RandomizeDamage`, `:5420-5450`). A crit doubles `L` inside the formula (`:4135-4138`, ≈(2L+5)/(L+5): ×1.5 at
-  L5, ×1.9 at L50) on the unmodified party stats (`:4056-4071`). Ours (`DamageCalculator.ComputeDamage`,
-  `ComputeBaseDamage`) works in doubles, truncates once, has no cap and multiplies by a flat
-  `CritMultiplier => 2.0`, the `+2` included. Measured: normal hits 13–27% high at L5–12 and ~1% at L50; crits
-  56–74% high at L5, 32–51% at L12, 8–13% at L50.
-  **DoR** (drafted 2026-11-27, to confirm):
-  1. **Acceptance:** `ComputeDamage` equals pokered's integer pipeline at the low and high variance rolls for a
-     table of cases (L5, L12, L50; neutral, STAB, 2× and ½× dual-type; crit and non-crit), each hand-computed from
-     the cites above; a base over 997 caps; the confusion self-hit uses the same floors. A full battle where a seeded
-     crit deals the level-doubled amount.
-  2. **Design:** `ComputeDamage` becomes an integer pipeline in pokered's order. Seam members replace
-     `CritMultiplier`: `CritLevelMultiplier` (Gen 1 2) and `CritDamageMultiplier` (Gen 1 1), plus `MaxBaseDamage`
-     (997). STAB and type stay `IBattleRules`/`ITypeChart` inputs but apply as floored steps, the defender's types
-     one at a time. The variance roll returns the integer r; `DamageVarianceRange` and Dev Mode's `EstimateRange`
-     read the same bounds. `AccuracyAndCritTests.CritMultiplier_Gen1_IsTwo` asserts the opposite of pokered and is
-     replaced.
-  3. **Gen-variable surface:** the crit members, `MaxBaseDamage`, the step order; the Gen 2 values are checked in
-     pokecrystal during the work (`effect_commands.asm` `BattleCommand_DamageCalc`, `BattleCommand_Critical`).
-  4. **Gen 1 source:** the cites above.
-  5. **Data vs runtime:** runtime.
-  6. **Quirk the tests assert:** a level-5 crit is ×1.5, not ×2; a level-12 Tackle loses the fractional `2L/5`.
-  7. **Dependencies:** none. The AI evaluator (`EstimateDamage`) and Dev Mode's range share the path and move with
-     it. *Not modelled* (invisible): pokered applies the type pairs in `TypeEffects` table order, which can differ by
-     1 from defender-type order on a dual type; note it in `GEN_DIFFERENCES.md`.
+  A (the integer damage pipeline and level-doubling crit) shipped 2026-11-27 and is archived.
 - **B. Accuracy and evasion use the stat-stage ratios, as in Gen 1 — S, ⚠️ lines drafted.** pokered `CalcHitChance`
   (`core.asm:5348-5418`) multiplies the move's 0–255 accuracy by the user's accuracy ratio, then by the ratio at
   `14 − evasion` (the foe's evasion mirrored), from the same `StatModifierRatios` as stats
@@ -237,7 +210,7 @@ data/engine item usually also means updating the test that pins the wrong value.
   5. **Data vs runtime:** runtime.
   6. **Quirk the tests assert:** the Reflect wrap. *Not modelled:* pokered's freeze when the scaled Defense is 0
      (`:4120-4121`); ours keeps a minimum of 1 — a `GEN_DIFFERENCES.md` note.
-  7. **Dependencies:** after A (both rewrite `ComputeBaseDamage`); shares the ratio pairs with B.
+  7. **Dependencies:** none open (A, which also rewrote `ComputeBaseDamage`, shipped 2026-11-27); shares the ratio pairs with B.
 - **E. A stat change re-applies the burn and paralysis penalties, as in Gen 1 — M, ✗ not Ready (2, 6).** pokered
   stores the in-battle stats. A stat-up move recomputes the raised stat from the unmodified one, dropping the user's
   own burn or paralysis penalty on it, then halves the foe's Attack if it is burned and quarters its Speed if it is

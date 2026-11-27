@@ -652,7 +652,7 @@ public class CounterContractTests(MovesFixture moves) : Gen1MoveContract(moves)
 
         public override double GetCritChance(Creature a, Attack m) => 0;
 
-        public override double RollDamageVariance() => 1.0;
+        public override int RollDamageVariance() => DamageVarianceDivisor;
 
         public override bool RollsFullParalysis(IRandomSource rng) =>
             ++_paralysisChecks >= fullParalysisFrom;

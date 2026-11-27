@@ -288,7 +288,7 @@ public class GenerationProfileTests
         for (int i = 0; i < 10; i++)
         {
             Assert.Equal(twin.Next(100), options.Rng!.Next(100));
-            Assert.Equal(twin.Next(217, 256) / 255.0, rules.RollDamageVariance());
+            Assert.Equal(twin.Next(217, 256), rules.RollDamageVariance());
             Assert.Equal(new[] { 2, 2, 2, 3, 3, 3, 4, 5 }[twin.Next(8)], rules.RollBindingTurns());
         }
     }

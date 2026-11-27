@@ -111,6 +111,15 @@ the linked design doc instead — pull it there and leave only the pointer here.
 - Design detail → `DATA_IMPORT.md` §4.2, `ARCHITECTURE.md` §2.6.  History → `TODO_ARCHIVE.md` → *Repo-sweep R1 —
   species base stats and BaseExperience were modern, not Gen 1*.
 
+### Gen 1 damage formula
+- Damage is computed in whole-number steps, each rounded down: `2×level÷5 + 2`, times power and Attack, ÷ Defense, ÷ 50, capped at 997, then + 2.
+- STAB adds half the damage; each of the defender's types then scales it in turn, rounding down at each step; the random factor is 217–255 out of 255,
+  skipped when the damage is below 2.
+- A critical hit doubles the attacker's level inside the formula, not the final damage: about ×1.5 at level 5 and ×1.9 at level 50.
+- A confusion self-hit, Dev Mode's damage range and the foe AI's estimate use the same steps.
+- Design detail → `GENERATION_SEAMS.md` (Damage formula row), `GEN_DIFFERENCES.md` → Damage Formula.  History → `TODO_ARCHIVE.md` → *§3.1 The damage
+  formula floors each step, and a crit doubles the level, as in Gen 1*.
+
 ### Gen 1 battle roll order and immunity
 - An attacking move rolls crit, then damage, then accuracy, so a miss has already used its crit and damage rolls; a
   slower one-hit-KO user stops after the crit roll.

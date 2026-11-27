@@ -217,14 +217,14 @@ public interface IBattleRules
     /// <summary>Whether a secondary effect with <paramref name="chancePercent"/> procs, drawn from the caller's <paramref name="rng"/>.</summary>
     bool SecondaryHits(int chancePercent, IRandomSource rng);
 
-    /// <summary>The random damage multiplier for one hit.</summary>
-    double RollDamageVariance();
+    /// <summary>The random damage roll for one hit; the damage becomes damage × roll ÷ <see cref="DamageVarianceDivisor"/>.</summary>
+    int RollDamageVariance();
 
-    /// <summary>
-    /// The inclusive bounds <see cref="RollDamageVariance"/> draws between — the single source for both the roll
-    /// and the Dev Mode damage-range display, so the two can't disagree. Gen 1: 217/255 – 255/255.
-    /// </summary>
-    (double Min, double Max) DamageVarianceRange { get; }
+    /// <summary>The inclusive bounds <see cref="RollDamageVariance"/> draws between, shared with the Dev Mode range.</summary>
+    (int Min, int Max) DamageVarianceRange { get; }
+
+    /// <summary>The divisor of the damage roll; a roll equal to it leaves the damage unchanged.</summary>
+    int DamageVarianceDivisor { get; }
 
     /// <summary>The number of turns the target sleeps, drawn each time Sleep is applied.</summary>
     int RollSleepTurns();
@@ -618,8 +618,14 @@ public interface IBattleRules
     /// </summary>
     double GetCritChance(Creature attacker, Attack move);
 
-    /// <summary>Critical hit damage multiplier.</summary>
-    double CritMultiplier { get; }
+    /// <summary>What a crit multiplies the attacker's level by inside the damage formula.</summary>
+    int CritLevelMultiplier { get; }
+
+    /// <summary>What a crit multiplies the base damage by, before the cap. See GENERATION_SEAMS.md → Damage formula.</summary>
+    int CritDamageMultiplier { get; }
+
+    /// <summary>The cap on the base damage before the formula's final +2.</summary>
+    int MaxBaseDamage { get; }
 
     /// <summary>Whether a crit bypasses all stat stages and the Burn Attack penalty.</summary>
     bool CritIgnoresStatStages { get; }

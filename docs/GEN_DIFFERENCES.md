@@ -120,10 +120,15 @@ A reference doc covering every major system across all main-series generations �
 
 #### Damage Formula
 ```
-Damage = floor(floor(floor(2×Level/5 + 2) × A × Power / D) / 50 + 2)
-         × STAB × Type × Critical × (217–255)/255
+base   = min(floor(floor((floor(2×L/5) + 2) × Power × A / D) / 50), 997) + 2
+damage = base → + floor(base/2) on STAB → floor(× m) per matching type pair → floor(× r / 255), r 217–255
 ```
-Where A = Attack (or Special), D = Defense (or Special), with no Sp. Atk/Sp. Def split.
+Where A = Attack (or Special), D = Defense (or Special), with no Sp. Atk/Sp. Def split; every step rounds down
+(pokered `engine/battle/core.asm:4299-4460`, `:5075-5180`, `:5420-5450`). **A crit doubles L inside the formula, not
+the damage** (`:4135-4138`): ×1.5 on the level term at L5, ≈×1.9 at L50, and on the unmodified stats. Damage below 2
+skips the roll.
+- *Not modelled* (invisible): pokered applies a dual type's pairs in `TypeEffects` table order; ours applies Type1
+  then Type2. With a 2× and a ½× pair on one defender, the two orders can differ by 1.
 
 **Confusion self-hit**: the same formula at power 40 with the user's own in-battle Attack and Defense (stages and
 Burn apply), and nothing after the base: no STAB, type, crit or damage variance (pokered `engine/battle/core.asm:3672-3714`).

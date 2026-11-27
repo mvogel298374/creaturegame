@@ -1,4 +1,6 @@
+using creaturegame.Attacks;
 using creaturegame.Combat;
+using creaturegame.Creatures;
 using creaturegame.DB;
 using creaturegame.Tests.TestSupport;
 using Microsoft.EntityFrameworkCore;
@@ -100,6 +102,38 @@ public class CriticalHitContractTests(MovesFixture moves) : Gen1MoveContract(mov
 
         Assert.True(slash > pound, $"slash crits ({slash}) should exceed pound ({pound})");
         Assert.True(slash >= 40, $"high-crit move should crit most of the time (got {slash}/60)");
+    }
+
+    [Fact]
+    public async Task ACritInABattleDoublesTheLevelNotTheDamage()
+    {
+        var player = TestCreatures.Make("Player", 5, DamageType.Fire, attack: 50, speed: 200);
+        player.AddAttack(Move("pound"));
+        var enemy = TestCreatures.Make("Enemy", 5, hp: 40, defense: 20, speed: 1);
+        enemy.AddAttack(Move("splash"));
+
+        var result = await new BattleScenario()
+            .Player(player)
+            .Enemy(enemy)
+            .PlayerUses("pound")
+            .EnemyUses("splash")
+            .Rules(new CritEveryHitRules())
+            .RunAsync();
+
+        // L5 crit → L10: (6 × 40 × 50 ÷ 20 ÷ 50) + 2 = 14; a doubled L5 hit would be 20.
+        var hits = result.All<DamageDealt>().Where(h => h.TargetName == "Enemy").ToList();
+        Assert.All(hits, h => Assert.True(h.IsCrit));
+        Assert.Equal(14, hits[0].Damage);
+        Assert.Equal("Player", result.Winner);
+    }
+
+    private sealed class CritEveryHitRules : DelegatingBattleRules
+    {
+        public override int GetHitThreshold(int acc, int accStage, int evaStage) => 256;
+
+        public override double GetCritChance(Creature a, Attack m) => 1.0;
+
+        public override int RollDamageVariance() => DamageVarianceDivisor;
     }
 
     private async Task<int> CritRuns(string moveName)

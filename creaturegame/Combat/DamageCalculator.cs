@@ -20,13 +20,7 @@ public static class DamageCalculator
             ? rules.ScreenDefenseMultiplier
             : 1;
 
-    /// <summary>
-    /// The low–high damage a move can deal right now (Dev Mode display), or null when there's no damage to show
-    /// (a status move, or a category that depends on the damage taken). <b>Non-crit by design.</b> Runs the live
-    /// formula with the variance pinned to <see cref="IBattleRules.DamageVarianceRange"/>'s bounds, so it can't
-    /// drift from the real roll. Fixed/LevelBased are exact; OHKO is the target's current HP, SuperFang half of
-    /// it; Psywave comes off the rules seam.
-    /// </summary>
+    /// <summary>Dev Mode's non-crit low–high for a move, or null; GENERATION_SEAMS.md → Damage formula.</summary>
     public static DamageRange? EstimateRange(
         Creature attacker,
         Creature defender,
@@ -69,36 +63,13 @@ public static class DamageCalculator
                     typeChart,
                     rules,
                     false,
-                    1.0,
                     divisor,
                     screen
                 );
-                if (SkipsDamageRoll(unvaried, rules))
-                    return DamageRange.Exact(unvaried);
                 var (lo, hi) = rules.DamageVarianceRange;
                 return new DamageRange(
-                    ComputeDamage(
-                        attacker,
-                        defender,
-                        move,
-                        typeChart,
-                        rules,
-                        false,
-                        lo,
-                        divisor,
-                        screen
-                    ),
-                    ComputeDamage(
-                        attacker,
-                        defender,
-                        move,
-                        typeChart,
-                        rules,
-                        false,
-                        hi,
-                        divisor,
-                        screen
-                    )
+                    ApplyDamageRoll(unvaried, lo, rules),
+                    ApplyDamageRoll(unvaried, hi, rules)
                 );
             }
             default:
@@ -138,38 +109,24 @@ public static class DamageCalculator
             typeChart,
             rules,
             isCrit,
-            1.0,
             defenseDivisor,
             screenDefenseMultiplier
         );
-        if (SkipsDamageRoll(unvaried, rules))
-            return unvaried;
-
-        return ComputeDamage(
-            attacker,
-            defender,
-            move,
-            typeChart,
-            rules,
-            isCrit,
-            rules.RollDamageVariance(),
-            defenseDivisor,
-            screenDefenseMultiplier
-        );
+        return RollDamage(unvaried, rules);
     }
+
+    private static int RollDamage(int unvaried, IBattleRules rules) =>
+        SkipsDamageRoll(unvaried, rules)
+            ? unvaried
+            : ApplyDamageRoll(unvaried, rules.RollDamageVariance(), rules);
+
+    private static int ApplyDamageRoll(int unvaried, int roll, IBattleRules rules) =>
+        SkipsDamageRoll(unvaried, rules) ? unvaried : unvaried * roll / rules.DamageVarianceDivisor;
 
     private static bool SkipsDamageRoll(int unvaried, IBattleRules rules) =>
         rules.DamageRollSkippedBelowTwo && unvaried < 2;
 
-    /// <summary>
-    /// Deterministic, no-RNG damage estimate for AI move scoring. Assumes no critical hit and pins the damage
-    /// variance to 1.0 (no roll) — variance is a single multiplicative factor shared by every move, so it
-    /// cancels out when <i>ranking</i> moves; fixing it at 1.0 keeps no gen-variable variance constant leaking
-    /// into the estimate. Honours the current stat stages, Burn, STAB and the type chart exactly like the live
-    /// calculator (Reflect/Light Screen are ignored — the AI doesn't model the foe's screens). Returns 0 for
-    /// a non-damaging move; the special damage categories (Fixed, LevelBased, OHKO, …) are resolved by the
-    /// caller, since this covers only the Standard power-based formula.
-    /// </summary>
+    /// <summary>The AI's no-crit, no-roll, unscreened estimate; GENERATION_SEAMS.md → Damage formula.</summary>
     public static int EstimateDamage(
         Creature attacker,
         Creature defender,
@@ -186,17 +143,11 @@ public static class DamageCalculator
                 typeChart,
                 rules ?? Gen1BattleRules.Instance,
                 isCrit: false,
-                variance: 1.0,
                 defenseDivisor: 1,
                 screenDefenseMultiplier: 1
             );
 
-    /// <summary>
-    /// The pure Gen 1 damage formula given an already-decided crit and variance roll. Shared by the live
-    /// <see cref="CalculateDamage(Creature, Creature, Attack, ITypeChart, IBattleRules, out bool, IRandomSource?, int, int)"/>
-    /// (which rolls crit + variance) and the deterministic <see cref="EstimateDamage"/> (which pins them), so
-    /// both stay in lock-step with no duplicated formula. Caller guarantees <c>move.BaseDamage &gt; 0</c>.
-    /// </summary>
+    /// <summary>The damage before the roll, in integer steps; GENERATION_SEAMS.md → Damage formula.</summary>
     private static int ComputeDamage(
         Creature attacker,
         Creature defender,
@@ -204,12 +155,11 @@ public static class DamageCalculator
         ITypeChart typeChart,
         IBattleRules rules,
         bool isCrit,
-        double variance,
         int defenseDivisor,
         int screenDefenseMultiplier
     )
     {
-        double baseDamage = ComputeBaseDamage(
+        int damage = ComputeBaseDamage(
             attacker,
             defender,
             move.AttackType,
@@ -220,22 +170,16 @@ public static class DamageCalculator
             screenDefenseMultiplier
         );
 
-        double stab =
-            (attacker.Type1 == move.DamageType || attacker.Type2 == move.DamageType)
-                ? rules.StabMultiplier
-                : 1.0;
-        double typeEffectiveness = GetTypeEffectiveness(
-            move.DamageType,
-            defender.Type1,
-            defender.Type2,
-            typeChart
-        );
-        double critMult = isCrit ? rules.CritMultiplier : 1.0;
-
-        return (int)(baseDamage * stab * typeEffectiveness * critMult * variance);
+        if (attacker.Type1 == move.DamageType || attacker.Type2 == move.DamageType)
+            damage = (int)(damage * rules.StabMultiplier);
+        if (defender.Type1 is { } type1)
+            damage = (int)(damage * typeChart.GetMultiplier(move.DamageType, type1));
+        if (defender.Type2 is { } type2)
+            damage = (int)(damage * typeChart.GetMultiplier(move.DamageType, type2));
+        return damage;
     }
 
-    private static double ComputeBaseDamage(
+    private static int ComputeBaseDamage(
         Creature attacker,
         Creature defender,
         AttackType attackType,
@@ -271,8 +215,11 @@ public static class DamageCalculator
         defenseStat = Math.Max(1, defenseStat / defenseDivisor);
         attackStat = Math.Max(1, attackStat);
 
-        return (((2.0 * attacker.Level / 5.0 + 2.0) * attackStat * power / defenseStat) / 50.0)
-            + 2.0;
+        int level = isCrit ? attacker.Level * rules.CritLevelMultiplier : attacker.Level;
+        int damage = (2 * level / 5 + 2) * power * attackStat / defenseStat / 50;
+        if (isCrit)
+            damage *= rules.CritDamageMultiplier;
+        return Math.Min(damage, rules.MaxBaseDamage) + 2;
     }
 
     /// <summary>
@@ -306,7 +253,7 @@ public static class DamageCalculator
         var r = rules ?? Gen1BattleRules.Instance;
         var reflectHolder = r.ConfusionSelfHitUsesFoeReflect ? foe : user;
         int screen = reflectHolder?.Battle.HasReflect == true ? r.ScreenDefenseMultiplier : 1;
-        double damage = ComputeBaseDamage(
+        int damage = ComputeBaseDamage(
             user,
             user,
             AttackType.Physical,
@@ -317,8 +264,8 @@ public static class DamageCalculator
             screenDefenseMultiplier: screen
         );
         if (r.ConfusionSelfHitRollsVariance)
-            damage *= r.RollDamageVariance();
-        return Math.Max(1, (int)damage);
+            damage = RollDamage(damage, r);
+        return Math.Max(1, damage);
     }
 
     /// <summary>Super Fang / Guillotine-variant: deals exactly half the target's current HP.</summary>
